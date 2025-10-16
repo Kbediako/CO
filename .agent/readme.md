@@ -13,8 +13,20 @@ When scoped work meets any trigger in `.agent/SOPs/specs-and-research.md`, creat
 
 ### Operating Rules
 1) Read `.agent/AGENTS.md` and all docs under `.agent/system/` before drafting plans or executing tasks.
-2) Update the active `/tasks/tasks-*.md` file after each meaningful change and pause for review.
-3) Execute only one subtask at a time and wait for explicit approval before advancing.
+2) Track approvals: default mode is safe `read/edit/run/network`. Log any escalations and mode overrides in `.runs/<task>/<timestamp>/manifest.json`.
+3) Update the active `/tasks/tasks-*.md` file after each meaningful change and pause for review.
+4) Execute only one subtask at a time and wait for explicit approval before advancing.
+
+### Build & Test Checklist
+- `npm run lint` (always) — runs `npm run build:patterns` first.
+- `npm run test` — covers orchestrator agents, persistence, and adapter logic.
+- `npm run eval:test` — validates evaluation harness; ensure fixtures in `evaluation/fixtures/**` are in sync.
+- `bash scripts/spec-guard.sh --dry-run` — verify specs updated before review.
+
+### External Pointers
+- MCP registration: `scripts/run-local-mcp.sh` launches the local server; confirm builder/tester agents produce artifacts in `.runs`.
+- Pattern assets: `patterns/index.json` lists available codemods/linters/templates with versions.
+- Release mirrors: `docs/PRD.md`, `docs/TECH_SPEC.md`, `docs/ACTION_PLAN.md` must reference their canonical `/tasks` counterparts after every milestone update.
 
 ### Quick Links
 - Control files: `/.ai-dev-tasks/*`

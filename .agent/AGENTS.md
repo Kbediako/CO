@@ -9,6 +9,18 @@
 - Tests: maintain coverage across unit, integration, and e2e layers; align with the active `/tasks/tasks-*.md` checklist before merging.
 - Deployment: coordinate through the deployment SOPs under `.agent/SOPs/` once environments are defined.
 
+### Execution Modes & Approvals
+- Default run mode is `mcp`; switch to cloud only when the canonical task list flags `execution.parallel=true` and the reviewer records the override in the run manifest.
+- Honor the safe `read/edit/run/network` approval profile. Capture escalations in the manifest `approvals` array with reviewer justification and timestamp.
+- Run `bash scripts/spec-guard.sh --dry-run` prior to requesting review; a failing guard requires refreshing relevant specs (see `.agent/SOPs/specs-and-research.md`).
+
+### Build & Test Quick Reference
+- `npm run lint` — Executes `npm run build:patterns` before linting orchestrator, adapter, and evaluation sources.
+- `npm run test` — Complete Vitest suite (manager, agents, persistence, adapters).
+- `npm run eval:test` — Exercises evaluation harness scenarios; depends on local `python3` for cross-language fixtures.
+- `npm run build:patterns` — Compile codemods/linters/templates; run whenever `patterns/**` changes.
+- `node --loader ts-node/esm evaluation/harness/run-all.ts --mode=mcp` — Manual sweep to generate scenario artifacts for manifests.
+
 ### Read First Order
 1. `.agent/system/architecture.md`
 2. `.agent/system/services.md`

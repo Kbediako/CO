@@ -34,3 +34,9 @@
 - **Fixtures & Patterns:** Fixtures (e.g., TypeScript smoke, Python lint) live in `evaluation/fixtures/**` with README guidance and optional pattern assertions referencing learning library assets.
 - **Validation:** `npm run eval:test` executes Vitest suites covering planner, reporter, and scenario smoke tests so evaluation joins the standard build/lint/test gating.
 - **Guardrails:** Harness defaults to MCP-safe mode, redacts sensitive env vars before logging, and enforces spec guard freshness (`last_review ≤30 days`) prior to syncing results to Codex Cloud.
+
+## Update — 2025-10-16 Guardrails & Approvals
+- `scripts/spec-guard.sh` now validates mini-spec freshness (≤30 days) and provides a dry-run mode for local testing.
+- `.github/workflows/spec-guard.example.yml` documents how to enable CI enforcement, including fetching the full git history and exporting `BASE_SHA` for pull requests.
+- Approval metadata (mode, reviewer decisions) must be recorded inside `.runs/<task>/<timestamp>/manifest.json`; see `.runs/6/2025-10-16T18-19-14Z/manifest.json` for Task 6 evidence.
+- Mirrors (`AGENTS.md`, `.agent/readme.md`, `.agent/SOPs/specs-and-research.md`) describe build/test commands, execution mode policy, and MCP registration steps aligned with the canonical spec.

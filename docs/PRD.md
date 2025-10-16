@@ -14,7 +14,7 @@
 ## Added by Orchestrator 2025-10-16
 
 - **Canonical Source:** `tasks/0001-prd-codex-orchestrator.md`
-- **Approval State:** Pending signatures as of 2025-10-16; awaiting Product/Engineering/Design confirmation.
+- **Approval State:** Approved 2025-10-16 — Product (Jordan Lee), Engineering (Priya Desai), and Design (Mateo Alvarez) confirmed in safe approval mode.
 - **Focus:** Codex-Orchestrator workflow establishing SOP-aligned planning, guardrails, MCP-based automation, and learning libraries.
 - **Highlights:** Goals cover deterministic Codex handoffs, artifact mirroring, and security defaults; success metrics target complete SOP coverage, reusable patterns, and faster bootstraps.
 - **Status Update:** Approvals logged in Governance Update 2025-10-16.
@@ -24,3 +24,8 @@
 - Engineering — Priya Desai confirmed approval 2025-10-16 22:05 UTC (safe approval mode)
 - Design — Mateo Alvarez confirmed approval 2025-10-16 22:20 UTC (safe approval mode)
 - Log Reference: tasks/0001-prd-codex-orchestrator.md#approval-log-2025-10-16 (Phase Gate G1) with Codex CLI run ID GOV-0001-PRD-20251016 maintained in session notes.
+
+## Release Notes — 2025-10-16
+- Guardrails CI package landed: `scripts/spec-guard.sh` enforces spec freshness and the example GitHub Actions workflow documents trigger strategy.
+- Learning library & evaluation harness delivered with supporting manifests (`.runs/4/`, `.runs/5/`).
+- Pending follow-up: finalize Task 6 documentation mirrors (this file, `docs/ACTION_PLAN.md`, `docs/TECH_SPEC.md`) for sign-off.

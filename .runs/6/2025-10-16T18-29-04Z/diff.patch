@@ -1,0 +1,66 @@
+diff --git a/.agent/AGENTS.md b/.agent/AGENTS.md
+index 746a395..a40f705 100644
+--- a/.agent/AGENTS.md
++++ b/.agent/AGENTS.md
+@@ -9,6 +9,18 @@
+ - Tests: maintain coverage across unit, integration, and e2e layers; align with the active `/tasks/tasks-*.md` checklist before merging.
+ - Deployment: coordinate through the deployment SOPs under `.agent/SOPs/` once environments are defined.
+ 
++### Execution Modes & Approvals
++- Default run mode is `mcp`; switch to cloud only when the canonical task list flags `execution.parallel=true` and the reviewer records the override in the run manifest.
++- Honor the safe `read/edit/run/network` approval profile. Capture escalations in the manifest `approvals` array with reviewer justification and timestamp.
++- Run `bash scripts/spec-guard.sh --dry-run` prior to requesting review; a failing guard requires refreshing relevant specs (see `.agent/SOPs/specs-and-research.md`).
++
++### Build & Test Quick Reference
++- `npm run lint` — Executes `npm run build:patterns` before linting orchestrator, adapter, and evaluation sources.
++- `npm run test` — Complete Vitest suite (manager, agents, persistence, adapters).
++- `npm run eval:test` — Exercises evaluation harness scenarios; depends on local `python3` for cross-language fixtures.
++- `npm run build:patterns` — Compile codemods/linters/templates; run whenever `patterns/**` changes.
++- `node --loader ts-node/esm evaluation/harness/run-all.ts --mode=mcp` — Manual sweep to generate scenario artifacts for manifests.
++
+ ### Read First Order
+ 1. `.agent/system/architecture.md`
+ 2. `.agent/system/services.md`
+diff --git a/.agent/SOPs/specs-and-research.md b/.agent/SOPs/specs-and-research.md
+index 89ba02d..1b7a81a 100644
+--- a/.agent/SOPs/specs-and-research.md
++++ b/.agent/SOPs/specs-and-research.md
+@@ -18,6 +18,11 @@
+ ### STALENESS RULE
+ Ensure every significant spec has `last_review` ≤ 30 days; refresh or re-approve stale specs before executing related work.
+ 
++### APPROVAL LOGGING & MODE POLICY — Added 2025-10-16
++- Record the execution mode (`mcp` vs `cloud`) and approval rationale inside the run manifest before implementation begins.
++- Safe approval profile (`read/edit/run/network`) is mandatory; escalations require reviewer/human acknowledgement captured under `approvals` in the manifest.
++- Run `bash scripts/spec-guard.sh --dry-run` prior to code changes touching `src/**` or migrations; a failure means halt work, update the relevant spec, and capture the refreshed `last_review` date.
++
+ ## Added by Governance 2025-10-16
+ - G1 — PRD approval must be recorded in `tasks/0001-prd-codex-orchestrator.md#approval-log-2025-10-16` with a safe approval mode run ID before downstream work starts.
+ - G2 — Update `tasks/index.json` gate metadata after each approval so task owners can verify status and log anchors without opening every artifact.
+diff --git a/.agent/readme.md b/.agent/readme.md
+index e11b946..34be0d5 100644
+--- a/.agent/readme.md
++++ b/.agent/readme.md
+@@ -13,8 +13,20 @@ When scoped work meets any trigger in `.agent/SOPs/specs-and-research.md`, creat
+ 
+ ### Operating Rules
+ 1) Read `.agent/AGENTS.md` and all docs under `.agent/system/` before drafting plans or executing tasks.
+-2) Update the active `/tasks/tasks-*.md` file after each meaningful change and pause for review.
+-3) Execute only one subtask at a time and wait for explicit approval before advancing.
++2) Track approvals: default mode is safe `read/edit/run/network`. Log any escalations and mode overrides in `.runs/<task>/<timestamp>/manifest.json`.
++3) Update the active `/tasks/tasks-*.md` file after each meaningful change and pause for review.
++4) Execute only one subtask at a time and wait for explicit approval before advancing.
++
++### Build & Test Checklist
++- `npm run lint` (always) — runs `npm run build:patterns` first.
++- `npm run test` — covers orchestrator agents, persistence, and adapter logic.
++- `npm run eval:test` — validates evaluation harness; ensure fixtures in `evaluation/fixtures/**` are in sync.
++- `bash scripts/spec-guard.sh --dry-run` — verify specs updated before review.
++
++### External Pointers
++- MCP registration: `scripts/run-local-mcp.sh` launches the local server; confirm builder/tester agents produce artifacts in `.runs`.
++- Pattern assets: `patterns/index.json` lists available codemods/linters/templates with versions.
++- Release mirrors: `docs/PRD.md`, `docs/TECH_SPEC.md`, `docs/ACTION_PLAN.md` must reference their canonical `/tasks` counterparts after every milestone update.
+ 
+ ### Quick Links
+ - Control files: `/.ai-dev-tasks/*`
