@@ -1,0 +1,27 @@
+diff --git a/tasks/index.json b/tasks/index.json
+index fee6805..9d95062 100644
+--- a/tasks/index.json
++++ b/tasks/index.json
+@@ -64,6 +64,22 @@
+         "log": "tasks/specs/tech-spec-0001-codex-orchestrator.md#14-approvals"
+       },
+       "last_review": "2025-10-16"
++    },
++    {
++      "id": "20251016-core",
++      "slug": "orchestrator-core",
++      "title": "Codex-Orchestrator Core Execution Mini-Spec",
++      "path": "tasks/specs/0002-orchestrator-core.md",
++      "relates_to": "tasks/0001-prd-codex-orchestrator.md",
++      "status": "done",
++      "gate": {
++        "kind": "spec_guard",
++        "status": "approved",
++        "approved_on": "2025-10-16T00:00:00Z",
++        "approver": "Orchestrator Reviewer",
++        "log": "tasks/specs/0002-orchestrator-core.md#approvals"
++      },
++      "last_review": "2025-10-16"
+     }
+   ]
+ }

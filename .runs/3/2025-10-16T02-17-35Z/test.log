@@ -1,0 +1,17 @@
+
+> codex-orchestrator@0.1.0 test
+> vitest run
+
+
+ RUN  v1.6.1 /Users/asabeko/Documents/Code/CO
+
+ ✓ orchestrator/tests/CloudRunsHttpClient.test.ts  (5 tests) 6ms
+ ✓ orchestrator/tests/PersistenceCoordinator.test.ts  (3 tests) 16ms
+ ✓ orchestrator/tests/TaskManager.test.ts  (4 tests) 25ms
+ ✓ orchestrator/tests/CloudSyncWorker.test.ts  (6 tests) 330ms
+
+ Test Files  4 passed (4)
+      Tests  18 passed (18)
+   Start at  02:17:45
+   Duration  491ms (transform 94ms, setup 0ms, collect 132ms, tests 377ms, environment 0ms, prepare 140ms)
+

@@ -1,0 +1,14 @@
+
+> codex-orchestrator@0.1.0 test
+> vitest run
+
+
+ RUN  v1.6.1 /Users/asabeko/Documents/Code/CO
+
+ ✓ orchestrator/tests/TaskManager.test.ts  (3 tests) 3ms
+
+ Test Files  1 passed (1)
+      Tests  3 passed (3)
+   Start at  01:33:20
+   Duration  127ms (transform 21ms, setup 0ms, collect 23ms, tests 3ms, environment 0ms, prepare 23ms)
+

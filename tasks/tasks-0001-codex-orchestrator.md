@@ -36,14 +36,17 @@
       - Files: `tasks/specs/0002-orchestrator-core.md`, `/tasks/index.json`
       - Commands: `n/a`
       - Acceptance: Approved spec describing manager orchestration logic, handoff contracts, and persistence plan.
+      - Status: Completed 2025-10-16 — see `.runs/3/2025-10-16T02-28-10Z/manifest.json` for approval record.
    2. Scaffold manager and agents using Agents SDK
       - Files: `orchestrator/src/manager.ts`, `orchestrator/src/agents/*.ts`, `orchestrator/tests`
       - Commands: `npm install`, `npm run lint`, `npm test`
       - Acceptance: Manager delegates to planner/builder/tester/reviewer; tests cover handoff scenarios; lint and unit tests pass.
+      - Status: Completed 2025-10-16 — validated via `.runs/3/2025-10-16T01-21-30Z/`, `.runs/3/2025-10-16T01-33-15Z/`, and `.runs/3/2025-10-16T01-41-05Z/` manifests.
    3. Persist run artifacts and logging
       - Files: `orchestrator/src/persistence/*.ts`, `.runs/README.md`
       - Commands: `npm test -- --runInBand orchestrator/tests/persistence.test.ts`
       - Acceptance: Artifacts stored under `.runs` or `/out`, with configurable retention and documented in README.
+      - Status: Completed 2025-10-16 — see `.runs/3/2025-10-16T01-57-50Z/`, `.runs/3/2025-10-16T02-04-25Z/`, `.runs/3/2025-10-16T02-10-20Z/`, and `.runs/3/2025-10-16T02-17-35Z/` for lint/test logs and sync verification.
 
 4. Learning Library & Patterns Ecosystem
    1. Write/Update mini-spec and obtain approval
@@ -100,3 +103,4 @@
 - Spec Requirements: Mini-specs required before implementing orchestration core, learning library, adapters/evaluation, and architecture decisions.
 - Approvals Needed: PRD (Product/Engineering/Design), mini-spec approvals, technical spec sign-off, CI guardrail confirmation.
 - Links: Codex platform docs, Agents SDK overview, MCP specification.
+- Follow-ups: Monitor `/out/audit.log` growth and tune manifest read/backoff thresholds if production environments exhibit higher latency.
