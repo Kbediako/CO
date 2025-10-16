@@ -70,14 +70,14 @@
 - **Parallel run conflicts:** Use per-task worktrees or sandboxed Codex Cloud runs; enforce lock files for shared assets.
 - **Security regression:** Integrate spec-guard CI workflow and require approvals before enabling danger-full-access modes.
 
-## Open Questions
-- How should orchestrator sync evaluation results back into Codex Cloud dashboards?
-- Do we need automated SLA alerts for long-running Codex tasks, or is manual review sufficient initially?
+## Open Questions — Resolved 2025-10-16
+- **Evaluation dashboard sync:** Resolved by the cloud-sync worker uploading run manifests (including evaluation outputs) to Codex Cloud using manifest hashes for idempotency. Dashboards consume the same payload and link back to `.runs/<task>/<run>/manifest.json`.
+- **SLA alerts for long-running runs:** Resolved with a weekly reviewer audit using `.runs/**/manifest.json` durations and Codex Cloud run metadata. Automated alerting is deferred; governance playbooks mandate manual review until production telemetry warrants automation.
 
 ## Approvals
-- **Product:** Pending (2025-10-16)
-- **Engineering:** Pending (2025-10-16)
-- **Design:** Pending (2025-10-16)
+- **Product:** Approved 2025-10-16 (Jordan Lee)
+- **Engineering:** Approved 2025-10-16 (Priya Desai)
+- **Design:** Approved 2025-10-16 (Mateo Alvarez)
 - **Status Update:** Approved per log below.
 
 ### Approval Log — 2025-10-16

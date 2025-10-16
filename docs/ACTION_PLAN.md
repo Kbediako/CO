@@ -2,12 +2,12 @@
 
 > **Source Context:** tasks/0001-prd-codex-orchestrator.md, tasks/tasks-0001-codex-orchestrator.md, tasks/specs/tech-spec-0001-codex-orchestrator.md
 >
-> **Status:** Updated 2025-10-16 — Milestones M1 & M2 complete; M3 guardrails delivered and documentation pending final review.
+> **Status:** Updated 2025-10-16 — Milestones M1–M3 complete with guardrails and documentation signed off.
 
 ## Status Snapshot — 2025-10-16
 - **Canonical sources:** `tasks/0001-prd-codex-orchestrator.md`, `tasks/tasks-0001-codex-orchestrator.md`, `tasks/specs/tech-spec-0001-codex-orchestrator.md` (all with `last_review` 2025-10-16).
-- **Run evidence:** `.runs/3/*` (orchestrator core), `.runs/4/*` (learning library), `.runs/5/*` (evaluation harness), `.runs/6/2025-10-16T18-19-14Z` (spec guard + documentation updates).
-- **Open follow-up:** Publish documentation handoff (Task 6.2) and release notes sign-off (Task 6.3) — this action plan reflects the proposed content for review.
+- **Run evidence:** `.runs/3/*` (orchestrator core), `.runs/4/*` (learning library), `.runs/5/*` (evaluation harness), `.runs/6/2025-10-16T18-49-34Z` (spec guard, lint, eval harness for documentation rollout).
+- **Open follow-up:** None — Task 6 documentation mirrors and release notes approved (see `.runs/6/2025-10-16T18-49-34Z/manifest.json` capturing spec guard, lint, and eval harness validations).
 
 ## Milestone M1 — Skeleton Orchestrator & MCP Demo
 - Objective: Establish repo scaffolding with working Agents SDK manager, handoffs, and local MCP demo editing one file end-to-end.
@@ -38,4 +38,4 @@
   1. Reviewer — Prepare adapters/evaluation mini-spec (`tasks/specs/0004-adapters-evaluation.md`) and secure approval; Acceptance: spec registered with status `planned`→`done` and approvals recorded; Effort: 0.5 day; Risks: unclear adapter scope → Mitigation: review adapter catalog with platform leads.
   2. Builder — Implement `scripts/spec-guard.sh` and `.github/workflows/spec-guard.example.yml`; Acceptance: dry-run blocks missing/stale specs and CI workflow documented; Effort: 2 days; Risks: false positives → Mitigation: allow override flag with approval logging. **Status:** Completed; see `.runs/6/2025-10-16T18-19-14Z/manifest.json`.
   3. Tester — Develop evaluation harness in `evaluation/` applying learning assets to two open-source repos; Acceptance: `npm run eval:test` passes, results stored in `.runs/`; Effort: 3 days; Risks: fixture drift → Mitigation: version fixture snapshots and schedule refresh. **Status:** Completed; see `.runs/5/2025-10-16T18-52-00Z/` + `.runs/5/2025-10-16T18-59-30Z/`.
-  4. Reviewer — Compile release notes and update `docs/ACTION_PLAN.md`, `docs/PRD.md`, `docs/TECH_SPEC.md` with final statuses; Acceptance: human-facing docs note completion metrics and approvals; Effort: 1 day; Risks: misaligned messaging → Mitigation: cross-check with state manifests before publication. **Status:** In review — this document captures the proposed wording; awaiting stakeholder confirmation.
+  4. Reviewer — Compile release notes and update `docs/ACTION_PLAN.md`, `docs/PRD.md`, `docs/TECH_SPEC.md` with final statuses; Acceptance: human-facing docs note completion metrics and approvals; Effort: 1 day; Risks: misaligned messaging → Mitigation: cross-check with state manifests before publication. **Status:** Completed 2025-10-16 — see `.runs/6/2025-10-16T18-49-34Z/manifest.json` for stakeholder approval, including spec guard, lint, and eval harness runs.

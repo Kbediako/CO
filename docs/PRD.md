@@ -28,4 +28,4 @@
 ## Release Notes — 2025-10-16
 - Guardrails CI package landed: `scripts/spec-guard.sh` enforces spec freshness and the example GitHub Actions workflow documents trigger strategy.
 - Learning library & evaluation harness delivered with supporting manifests (`.runs/4/`, `.runs/5/`).
-- Pending follow-up: finalize Task 6 documentation mirrors (this file, `docs/ACTION_PLAN.md`, `docs/TECH_SPEC.md`) for sign-off.
+- Task 6 documentation mirrors (this file, `docs/ACTION_PLAN.md`, `docs/TECH_SPEC.md`) approved; see `.runs/6/2025-10-16T18-49-34Z/manifest.json` with spec guard, lint, and eval harness validations.
