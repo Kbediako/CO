@@ -93,6 +93,7 @@
 - `.ai-dev-tasks/generate-tasks.md`
 - `.agent/task/templates/tasks-template.md`
 - `docs/TECH_SPEC.md`
+- 2025-10-16 Governance Summary: PRD approvals recorded (Jordan Lee, Priya Desai, Mateo Alvarez); gate metadata updated with log anchor `tasks/0001-prd-codex-orchestrator.md#approval-log-2025-10-16` and run ID GOV-0001-PRD-20251016.
 
 ## Notes
 - Spec Requirements: Mini-specs required before implementing orchestration core, learning library, adapters/evaluation, and architecture decisions.
