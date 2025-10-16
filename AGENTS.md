@@ -8,6 +8,10 @@ This handbook orients Codex agents and human reviewers to the operational guardr
 - **Approval policy:** Safe `read/edit/run/network`. Escalations require reviewer sign-off stored in `.runs/<task>/<timestamp>/manifest.json` under `approvals`.
 - **Spec guard:** Run `bash scripts/spec-guard.sh --dry-run` before review and unblock merges only when specs touched in `src/**` or migrations have `last_review` ≤30 days.
 
+## Checklist Convention
+- Represent every task and subtask as a checkbox in `/tasks` and mirrors (`docs/`, `.agent/`). Start with `[ ]` while work is active and switch to `[x]` immediately upon completion.
+- When flipping to `[x]`, add the completion date plus the manifest or log path that proves the outcome so reviewers can audit without re-running commands.
+
 ## Build & Test Commands
 | Command | When to use | Notes |
 | --- | --- | --- |

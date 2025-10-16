@@ -17,11 +17,14 @@ When scoped work meets any trigger in `.agent/SOPs/specs-and-research.md`, creat
 3) Update the active `/tasks/tasks-*.md` file after each meaningful change and pause for review.
 4) Execute only one subtask at a time and wait for explicit approval before advancing.
 
+### Checklist Convention
+Use explicit checkboxes (`[ ]` → `[x]`) for every task and subtask tracked in `/tasks` or mirror docs. Flip the marker to `[x]` as soon as the work is complete and reference the supporting run manifest or log alongside the checkbox note.
+
 ### Build & Test Checklist
-- `npm run lint` (always) — runs `npm run build:patterns` first.
-- `npm run test` — covers orchestrator agents, persistence, and adapter logic.
-- `npm run eval:test` — validates evaluation harness; ensure fixtures in `evaluation/fixtures/**` are in sync.
-- `bash scripts/spec-guard.sh --dry-run` — verify specs updated before review.
+- [ ] `npm run lint` (always) — runs `npm run build:patterns` first.
+- [ ] `npm run test` — covers orchestrator agents, persistence, and adapter logic.
+- [ ] `npm run eval:test` — validates evaluation harness; ensure fixtures in `evaluation/fixtures/**` are in sync.
+- [ ] `bash scripts/spec-guard.sh --dry-run` — verify specs updated before review.
 
 ### External Pointers
 - MCP registration: `scripts/run-local-mcp.sh` launches the local server; confirm builder/tester agents produce artifacts in `.runs`.

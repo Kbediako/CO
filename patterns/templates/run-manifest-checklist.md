@@ -6,6 +6,8 @@ usage: Reviewer confirmation that `.runs/<task>/<run>/manifest.json` meets guard
 
 # Run Manifest Checklist — {{task_id}} / {{run_id}}
 
+> Flip each checklist entry from `[ ]` to `[x]` once the evidence exists; leave `[ ]` only while the criterion is unmet.
+
 - [ ] Manifest lists correct `mode` (expected: {{expected_mode}})
 - [ ] Approvals captured or explicitly `[]` when not required
 - [ ] Artifacts section references diff/log files stored under `.runs/{{task_id}}/{{run_id}}/`

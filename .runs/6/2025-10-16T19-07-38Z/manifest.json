@@ -1,0 +1,32 @@
+{
+  "task": {
+    "id": "0001",
+    "subtask": "6.2",
+    "title": "Guardrails, CI, and Documentation Rollout — Document operational playbooks & approvals"
+  },
+  "run": {
+    "id": "TASK6-20251016-CHECKLIST-REFRESH",
+    "timestamp": "2025-10-16T19-07-38Z",
+    "agent_role": "implementation",
+    "mode": {
+      "selected": "mcp",
+      "reason": "Updated SOP and canonical task checklists to require flipping [ ] → [x] on completion, then validated guardrail commands."
+    }
+  },
+  "artifacts": [
+    {"type": "diff", "path": "diff.patch", "description": "Documentation and template changes introducing the [ ]→[x] checklist convention."},
+    {"type": "log", "path": "spec-guard-dry-run.log", "description": "bash scripts/spec-guard.sh --dry-run output"},
+    {"type": "log", "path": "lint.log", "description": "npm run lint output"},
+    {"type": "log", "path": "eval-test.log", "description": "npm run eval:test output"}
+  ],
+  "validations": [
+    {"command": "bash scripts/spec-guard.sh --dry-run", "status": "passed", "log_path": "spec-guard-dry-run.log"},
+    {"command": "npm run lint", "status": "passed", "log_path": "lint.log"},
+    {"command": "npm run eval:test", "status": "passed", "log_path": "eval-test.log"}
+  ],
+  "notes": {
+    "summary": "Refreshed SOP, canonical task list, and mirrors so completed items flip to [x] with manifest evidence; verified no automation depended on the old checklist format.",
+    "risks": [],
+    "follow_up": []
+  }
+}
