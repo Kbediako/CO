@@ -1,4 +1,42 @@
 {
-  "items": [],
-  "specs": []
+  "items": [
+    {
+      "id": "0001",
+      "slug": "codex-orchestrator",
+      "title": "Codex-Orchestrator PRD",
+      "path": "tasks/0001-prd-codex-orchestrator.md",
+      "kind": "prd",
+      "status": "planned",
+      "created_at": "2025-10-16"
+    },
+    {
+      "id": "0001-tasks",
+      "slug": "tasks-0001-codex-orchestrator",
+      "title": "Codex-Orchestrator Task List",
+      "path": "tasks/tasks-0001-codex-orchestrator.md",
+      "kind": "task_list",
+      "status": "planned",
+      "created_at": "2025-10-16"
+    }
+  ],
+  "specs": [
+    {
+      "id": "20251016-arch",
+      "slug": "orchestrator-architecture",
+      "title": "Codex-Orchestrator Architecture & MCP Integration",
+      "path": "tasks/specs/0001-orchestrator-architecture.md",
+      "relates_to": "tasks/0001-prd-codex-orchestrator.md",
+      "status": "planned",
+      "last_review": "2025-10-16"
+    },
+    {
+      "id": "tech-spec-0001",
+      "slug": "tech-spec-0001-codex-orchestrator",
+      "title": "Codex-Orchestrator Technical Specification",
+      "path": "tasks/specs/tech-spec-0001-codex-orchestrator.md",
+      "relates_to": "tasks/0001-prd-codex-orchestrator.md",
+      "status": "planned",
+      "last_review": "2025-10-16"
+    }
+  ]
 }
