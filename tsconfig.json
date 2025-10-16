@@ -12,5 +12,11 @@
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true
   },
-  "include": ["orchestrator/src/**/*.ts", "orchestrator/tests/**/*.ts"]
+  "include": [
+    "orchestrator/src/**/*.ts",
+    "orchestrator/tests/**/*.ts",
+    "adapters/**/*.ts",
+    "evaluation/**/*.ts",
+    "scripts/**/*.ts"
+  ]
 }

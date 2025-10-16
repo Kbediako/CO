@@ -1,0 +1,69 @@
+{
+  "scenario": {
+    "id": "python-smoke",
+    "title": "Python adapter smoke fixture",
+    "adapterId": "python-pytest"
+  },
+  "mode": "mcp",
+  "fixturePath": "/var/folders/h0/byyfnp910yx9tgk4l56xmx6m0000gn/T/codex-eval-UP9Rrz",
+  "startedAt": "2025-10-16T17:38:21.103Z",
+  "completedAt": "2025-10-16T17:38:21.143Z",
+  "goals": [
+    {
+      "goal": "build",
+      "command": {
+        "id": "build",
+        "title": "Install dependencies",
+        "command": "python3",
+        "args": [
+          "scripts/build.py"
+        ],
+        "description": "Installs project dependencies declared in requirements.txt.",
+        "env": {
+          "PIP_DISABLE_PIP_VERSION_CHECK": "1"
+        },
+        "cwd": "/var/folders/h0/byyfnp910yx9tgk4l56xmx6m0000gn/T/codex-eval-UP9Rrz",
+        "requiresCleanFixture": true,
+        "supportsParallel": false,
+        "timeoutMs": 15000
+      },
+      "status": "passed",
+      "exitCode": 0,
+      "stdout": "build check passed\n",
+      "stderr": "",
+      "durationMs": 25
+    },
+    {
+      "goal": "test",
+      "command": {
+        "id": "test",
+        "title": "Run pytest suite",
+        "command": "python3",
+        "args": [
+          "scripts/test.py"
+        ],
+        "description": "Executes the repository pytest suite in quiet mode.",
+        "env": {},
+        "cwd": "/var/folders/h0/byyfnp910yx9tgk4l56xmx6m0000gn/T/codex-eval-UP9Rrz",
+        "requiresCleanFixture": true,
+        "supportsParallel": false,
+        "timeoutMs": 15000
+      },
+      "status": "passed",
+      "exitCode": 0,
+      "stdout": "test check passed\n",
+      "stderr": "",
+      "durationMs": 14
+    }
+  ],
+  "patternAssertions": [
+    {
+      "assertion": {
+        "type": "file-exists",
+        "scope": "repo",
+        "path": "patterns/templates/run-manifest-checklist.md"
+      },
+      "status": "passed"
+    }
+  ]
+}

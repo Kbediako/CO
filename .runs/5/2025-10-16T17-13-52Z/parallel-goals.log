@@ -1,0 +1,25 @@
+
+> codex-orchestrator@0.1.0 parallel:goals
+> node --loader ts-node/esm scripts/run-parallel-goals.ts --dry-run --verbose
+
+(node:24108) ExperimentalWarning: `--experimental-loader` may be removed in the future; instead use `register()`:
+--import 'data:text/javascript,import { register } from "node:module"; import { pathToFileURL } from "node:url"; register("ts-node/esm", pathToFileURL("./"));'
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:24108) [DEP0180] DeprecationWarning: fs.Stats constructor is deprecated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+[dry-run] typescript-default → build: npm run build
+[dry-run] typescript-default → test: npm test
+[dry-run] python-pytest → build: pip install -r requirements.txt
+[dry-run] python-pytest → test: pytest -q
+[dry-run] go-module → build: go build ./...
+[dry-run] go-module → test: go test ./...
+┌─────────┬──────────────────────┬─────────┬───────────┬────────────┐
+│ (index) │ adapter              │ goal    │ status    │ durationMs │
+├─────────┼──────────────────────┼─────────┼───────────┼────────────┤
+│ 0       │ 'typescript-default' │ 'build' │ 'success' │ 50         │
+│ 1       │ 'typescript-default' │ 'test'  │ 'success' │ 50         │
+│ 2       │ 'python-pytest'      │ 'build' │ 'success' │ 50         │
+│ 3       │ 'python-pytest'      │ 'test'  │ 'success' │ 50         │
+│ 4       │ 'go-module'          │ 'build' │ 'success' │ 50         │
+│ 5       │ 'go-module'          │ 'test'  │ 'success' │ 50         │
+└─────────┴──────────────────────┴─────────┴───────────┴────────────┘

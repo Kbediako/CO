@@ -1,0 +1,93 @@
+{
+  "scenario": {
+    "id": "typescript-smoke",
+    "title": "TypeScript adapter smoke fixture",
+    "adapterId": "typescript-default"
+  },
+  "mode": "mcp",
+  "fixturePath": "/var/folders/h0/byyfnp910yx9tgk4l56xmx6m0000gn/T/codex-eval-VVQuYn",
+  "startedAt": "2025-10-16T17:38:21.146Z",
+  "completedAt": "2025-10-16T17:38:21.680Z",
+  "goals": [
+    {
+      "goal": "build",
+      "command": {
+        "id": "build",
+        "title": "Compile TypeScript sources",
+        "command": "npm",
+        "args": [
+          "run",
+          "build"
+        ],
+        "description": "Runs the project TypeScript compiler via npm scripts to emit `dist/` output.",
+        "env": {},
+        "cwd": "/var/folders/h0/byyfnp910yx9tgk4l56xmx6m0000gn/T/codex-eval-VVQuYn",
+        "requiresCleanFixture": true,
+        "supportsParallel": true,
+        "timeoutMs": 20000
+      },
+      "status": "passed",
+      "exitCode": 0,
+      "stdout": "\n> typescript-smoke-fixture@0.1.0 build\n> node ./scripts/build.js\n\nbuild check passed\n",
+      "stderr": "",
+      "durationMs": 86
+    },
+    {
+      "goal": "test",
+      "command": {
+        "id": "test",
+        "title": "Execute unit tests with Vitest",
+        "command": "npm",
+        "args": [
+          "test"
+        ],
+        "description": "Invokes Vitest in run mode to execute the full unit test suite.",
+        "env": {},
+        "cwd": "/var/folders/h0/byyfnp910yx9tgk4l56xmx6m0000gn/T/codex-eval-VVQuYn",
+        "requiresCleanFixture": true,
+        "supportsParallel": false,
+        "timeoutMs": 25000
+      },
+      "status": "passed",
+      "exitCode": 0,
+      "stdout": "\n> typescript-smoke-fixture@0.1.0 test\n> node ./scripts/test.js\n\ntest check passed\n",
+      "stderr": "",
+      "durationMs": 364
+    },
+    {
+      "goal": "lint",
+      "command": {
+        "id": "lint",
+        "title": "Lint orchestrator sources",
+        "command": "npm",
+        "args": [
+          "run",
+          "lint"
+        ],
+        "description": "Runs ESLint against orchestrator sources to enforce repository guardrails.",
+        "env": {},
+        "cwd": "/var/folders/h0/byyfnp910yx9tgk4l56xmx6m0000gn/T/codex-eval-VVQuYn",
+        "requiresCleanFixture": true,
+        "supportsParallel": true,
+        "timeoutMs": 20000
+      },
+      "status": "passed",
+      "exitCode": 0,
+      "stdout": "\n> typescript-smoke-fixture@0.1.0 lint\n> node ./scripts/lint.js\n\nlint check passed\n",
+      "stderr": "",
+      "durationMs": 84
+    }
+  ],
+  "patternAssertions": [
+    {
+      "assertion": {
+        "type": "file-contains",
+        "scope": "fixture",
+        "path": "README.md",
+        "includes": "TypeScript smoke fixture"
+      },
+      "status": "failed",
+      "details": "Missing expected content: TypeScript smoke fixture in /var/folders/h0/byyfnp910yx9tgk4l56xmx6m0000gn/T/codex-eval-VVQuYn/README.md"
+    }
+  ]
+}

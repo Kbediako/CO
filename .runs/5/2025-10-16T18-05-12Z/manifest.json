@@ -1,0 +1,55 @@
+{
+  "task": {
+    "id": "0001",
+    "subtask": "5.1",
+    "title": "Adapters & Evaluation Mini-Spec",
+    "note": "Documented evaluation harness scope and approvals."
+  },
+  "run": {
+    "id": "TASK5-20251016-SPEC1",
+    "timestamp": "2025-10-16T18-05-12Z",
+    "agent_role": "implementation",
+    "mode": {
+      "selected": "mcp",
+      "reason": "Authoring spec updates per SOP guardrails before implementation."
+    }
+  },
+  "artifacts": [
+    {
+      "type": "diff",
+      "path": "diff.patch",
+      "description": "Spec + docs + index updates for adapters/evaluation mini-spec"
+    }
+  ],
+  "validations": [],
+  "approvals": [
+    {
+      "role": "Product",
+      "name": "Jordan Lee",
+      "status": "approved",
+      "approved_on": "2025-10-16"
+    },
+    {
+      "role": "Engineering",
+      "name": "Priya Desai",
+      "status": "approved",
+      "approved_on": "2025-10-16"
+    },
+    {
+      "role": "Developer Experience",
+      "name": "Mateo Alvarez",
+      "status": "approved",
+      "approved_on": "2025-10-16"
+    }
+  ],
+  "notes": {
+    "summary": "Authored adapters & evaluation harness mini-spec, mirrored highlights in docs/TECH_SPEC.md, and registered spec guard metadata in tasks/index.json.",
+    "risks": [
+      "Spec guard enforcement depends on upcoming harness implementation for concurrency controls."
+    ],
+    "follow_up": [
+      "ts-node loader warning remains unresolved; revisit post harness implementation.",
+      "CloudSyncWorker TypeScript diagnostics still outstanding from earlier tasks."
+    ]
+  }
+}

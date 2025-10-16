@@ -1,0 +1,89 @@
+diff --git a/docs/TECH_SPEC.md b/docs/TECH_SPEC.md
+index a908e7c..cabc0ec 100644
+--- a/docs/TECH_SPEC.md
++++ b/docs/TECH_SPEC.md
+@@ -26,3 +26,11 @@
+    - Sync receipts append to `/out/audit.log`; failures trigger reviewer follow-up with the run checklist template (`patterns/templates/run-manifest-checklist.md`).
+ 4. **Consumption**
+    - Agents read `patterns/index.json` to discover the latest assets and wire them into adapters/evaluation harness flows during subsequent tasks.
++
++## Update — 2025-10-16 Adapters Evaluation Harness
++
++- **Adapter Schema:** Commands gain optional `evaluation` overrides (cwd/env/guard tags) so scenarios run deterministically without mutating source assets; planner helpers validate adapter + goal combinations before execution.
++- **Harness Workflow:** `evaluation/harness/index.ts` exposes `runScenario`/`runAllScenarios` that read JSON scenario manifests, spawn adapter commands with timeouts, and persist structured results under `.runs/<task>/<run>/evaluation/`.
++- **Fixtures & Patterns:** Fixtures (e.g., TypeScript smoke, Python lint) live in `evaluation/fixtures/**` with README guidance and optional pattern assertions referencing learning library assets.
++- **Validation:** `npm run eval:test` executes Vitest suites covering planner, reporter, and scenario smoke tests so evaluation joins the standard build/lint/test gating.
++- **Guardrails:** Harness defaults to MCP-safe mode, redacts sensitive env vars before logging, and enforces spec guard freshness (`last_review ≤30 days`) prior to syncing results to Codex Cloud.
+diff --git a/tasks/index.json b/tasks/index.json
+index b627e22..cef5d21 100644
+--- a/tasks/index.json
++++ b/tasks/index.json
+@@ -34,26 +34,26 @@
+   ],
+   "specs": [
+     {
+-      "id": "20251016-arch",
+-      "slug": "orchestrator-architecture",
+-      "title": "Codex-Orchestrator Architecture & MCP Integration",
+-      "path": "tasks/specs/0001-orchestrator-architecture.md",
++      "id": "20251016-adapters-eval",
++      "slug": "adapters-evaluation",
++      "title": "Codex-Orchestrator Adapters & Evaluation Harness Mini-Spec",
++      "path": "tasks/specs/0004-adapters-evaluation.md",
+       "relates_to": "tasks/0001-prd-codex-orchestrator.md",
+       "status": "done",
+       "gate": {
+         "kind": "spec_guard",
+         "status": "approved",
+         "approved_on": "2025-10-16T00:00:00Z",
+-        "approver": "Architecture Steward (Codex)",
+-        "log": "tasks/specs/0001-orchestrator-architecture.md#review-decisions-2025-10-16"
++        "approver": "Product, Engineering, DX Leads",
++        "log": "tasks/specs/0004-adapters-evaluation.md#approvals"
+       },
+       "last_review": "2025-10-16"
+     },
+     {
+-      "id": "tech-spec-0001",
+-      "slug": "tech-spec-0001-codex-orchestrator",
+-      "title": "Codex-Orchestrator Technical Specification",
+-      "path": "tasks/specs/tech-spec-0001-codex-orchestrator.md",
++      "id": "20251016-arch",
++      "slug": "orchestrator-architecture",
++      "title": "Codex-Orchestrator Architecture & MCP Integration",
++      "path": "tasks/specs/0001-orchestrator-architecture.md",
+       "relates_to": "tasks/0001-prd-codex-orchestrator.md",
+       "status": "done",
+       "gate": {
+@@ -61,7 +61,7 @@
+         "status": "approved",
+         "approved_on": "2025-10-16T00:00:00Z",
+         "approver": "Architecture Steward (Codex)",
+-        "log": "tasks/specs/tech-spec-0001-codex-orchestrator.md#14-approvals"
++        "log": "tasks/specs/0001-orchestrator-architecture.md#review-decisions-2025-10-16"
+       },
+       "last_review": "2025-10-16"
+     },
+@@ -96,6 +96,22 @@
+         "log": "tasks/specs/0003-learning-library.md#approvals"
+       },
+       "last_review": "2025-10-16"
++    },
++    {
++      "id": "tech-spec-0001",
++      "slug": "tech-spec-0001-codex-orchestrator",
++      "title": "Codex-Orchestrator Technical Specification",
++      "path": "tasks/specs/tech-spec-0001-codex-orchestrator.md",
++      "relates_to": "tasks/0001-prd-codex-orchestrator.md",
++      "status": "done",
++      "gate": {
++        "kind": "spec_guard",
++        "status": "approved",
++        "approved_on": "2025-10-16T00:00:00Z",
++        "approver": "Architecture Steward (Codex)",
++        "log": "tasks/specs/tech-spec-0001-codex-orchestrator.md#14-approvals"
++      },
++      "last_review": "2025-10-16"
+     }
+   ]
+ }

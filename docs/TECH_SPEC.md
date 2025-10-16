@@ -26,3 +26,11 @@
    - Sync receipts append to `/out/audit.log`; failures trigger reviewer follow-up with the run checklist template (`patterns/templates/run-manifest-checklist.md`).
 4. **Consumption**
    - Agents read `patterns/index.json` to discover the latest assets and wire them into adapters/evaluation harness flows during subsequent tasks.
+
+## Update — 2025-10-16 Adapters Evaluation Harness
+
+- **Adapter Schema:** Commands gain optional `evaluation` overrides (cwd/env/guard tags) so scenarios run deterministically without mutating source assets; planner helpers validate adapter + goal combinations before execution.
+- **Harness Workflow:** `evaluation/harness/index.ts` exposes `runScenario`/`runAllScenarios` that read JSON scenario manifests, spawn adapter commands with timeouts, and persist structured results under `.runs/<task>/<run>/evaluation/`.
+- **Fixtures & Patterns:** Fixtures (e.g., TypeScript smoke, Python lint) live in `evaluation/fixtures/**` with README guidance and optional pattern assertions referencing learning library assets.
+- **Validation:** `npm run eval:test` executes Vitest suites covering planner, reporter, and scenario smoke tests so evaluation joins the standard build/lint/test gating.
+- **Guardrails:** Harness defaults to MCP-safe mode, redacts sensitive env vars before logging, and enforces spec guard freshness (`last_review ≤30 days`) prior to syncing results to Codex Cloud.

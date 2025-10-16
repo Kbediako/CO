@@ -1,0 +1,1125 @@
+diff --git a/evaluation/README.md b/evaluation/README.md
+new file mode 100644
+index 0000000..3bf2817
+--- /dev/null
++++ b/evaluation/README.md
+@@ -0,0 +1,21 @@
++# Evaluation Harness
++
++The evaluation harness runs adapter commands against managed fixtures to verify build/test behaviors before syncing assets to Codex Cloud.
++
++## Usage
++
++- `npm run eval:test` — Executes Vitest suites under `evaluation/tests/**`.
++- `node --loader ts-node/esm evaluation/harness/run-all.ts --mode=mcp --output=.runs/<task>/<run>/evaluation` — Runs every scenario and persists JSON artifacts alongside run manifests.
++
++Harness helpers:
++
++- `runScenario(id, options)` — Load a scenario from `evaluation/scenarios/*.json`, run adapter goals sequentially, and return a structured result.
++- `runAllScenarios(options)` — Execute every registered scenario in order.
++
++Scenario options include:
++
++- `mode`: `'mcp'` (default) or `'cloud'` for metadata tagging.
++- `outputDir`: Directory for persisted JSON results (e.g., `.runs/5/<run>/evaluation`).
++- `defaultTimeoutMs`: Override the default 30s timeout per command.
++
++Fixtures live under `evaluation/fixtures/**` and include per-scenario READMEs describing their checks.
+diff --git a/evaluation/fixtures/README.md b/evaluation/fixtures/README.md
+new file mode 100644
+index 0000000..34e1d68
+--- /dev/null
++++ b/evaluation/fixtures/README.md
+@@ -0,0 +1,8 @@
++# Evaluation Fixtures
++
++Fixtures provide deterministic workspaces for exercising language adapters in the evaluation harness.
++
++- `typescript-smoke` — Minimal TypeScript project with npm scripts that run local Node checks. Scenario: `typescript-smoke`.
++- `python-smoke` — Lightweight Python layout with build/test scripts that avoid external dependencies. Scenario: `python-smoke`.
++
++All fixtures are treated as read-only source material. The harness copies the fixture to a temporary directory when a scenario or adapter command sets `requiresCleanFixture` to `true`.
+diff --git a/evaluation/fixtures/python-smoke/README.md b/evaluation/fixtures/python-smoke/README.md
+new file mode 100644
+index 0000000..2f6569f
+--- /dev/null
++++ b/evaluation/fixtures/python-smoke/README.md
+@@ -0,0 +1,8 @@
++# Python Smoke Fixture
++
++This fixture validates the Python adapter via lightweight scripts that avoid external dependencies.
++
++- `scripts/build.py` checks for the required project files and simulates a dependency install.
++- `scripts/test.py` executes a tiny greeting helper and exits non-zero if expectations fail.
++
++The evaluation harness copies the fixture into a temporary directory before running to ensure isolation.
+diff --git a/evaluation/fixtures/python-smoke/requirements.txt b/evaluation/fixtures/python-smoke/requirements.txt
+new file mode 100644
+index 0000000..068442b
+--- /dev/null
++++ b/evaluation/fixtures/python-smoke/requirements.txt
+@@ -0,0 +1 @@
++# Intentionally empty; evaluation harness scripts simulate dependency installation.
+diff --git a/evaluation/fixtures/python-smoke/scripts/build.py b/evaluation/fixtures/python-smoke/scripts/build.py
+new file mode 100644
+index 0000000..3767539
+--- /dev/null
++++ b/evaluation/fixtures/python-smoke/scripts/build.py
+@@ -0,0 +1,9 @@
++import pathlib
++
++fixture_dir = pathlib.Path(__file__).resolve().parents[1]
++requirements = fixture_dir / "requirements.txt"
++
++if not requirements.exists():
++    raise SystemExit("build: requirements.txt missing")
++
++print("build check passed")
+diff --git a/evaluation/fixtures/python-smoke/scripts/test.py b/evaluation/fixtures/python-smoke/scripts/test.py
+new file mode 100644
+index 0000000..518e153
+--- /dev/null
++++ b/evaluation/fixtures/python-smoke/scripts/test.py
+@@ -0,0 +1,10 @@
++import sys
++
++def greet(name: str) -> str:
++    return f"Hello, {name}!"
++
++if greet("Codex") != "Hello, Codex!":
++    raise SystemExit("test: unexpected greeting output")
++
++print("test check passed")
++sys.exit(0)
+diff --git a/evaluation/fixtures/typescript-smoke/README.md b/evaluation/fixtures/typescript-smoke/README.md
+new file mode 100644
+index 0000000..0a1fb0c
+--- /dev/null
++++ b/evaluation/fixtures/typescript-smoke/README.md
+@@ -0,0 +1,9 @@
++# TypeScript Smoke Fixture
++
++This fixture simulates a minimal TypeScript project that exercises the default adapter build/test/lint commands without relying on external dependencies.
++
++- `npm run build` executes `scripts/build.js`, verifying the TypeScript source exports a `greet` function.
++- `npm test` executes `scripts/test.js`, loading the TypeScript file via `ts-node/register` and asserting the greeting output.
++- `npm run lint` executes `scripts/lint.js`, ensuring the source stays free of `console.*` usage.
++
++The evaluation harness copies this directory to a temporary workspace when `requiresCleanFixture` is set, keeping the canonical fixture read-only.
+diff --git a/evaluation/fixtures/typescript-smoke/package.json b/evaluation/fixtures/typescript-smoke/package.json
+new file mode 100644
+index 0000000..324e0e7
+--- /dev/null
++++ b/evaluation/fixtures/typescript-smoke/package.json
+@@ -0,0 +1,10 @@
++{
++  "name": "typescript-smoke-fixture",
++  "version": "0.1.0",
++  "private": true,
++  "scripts": {
++    "build": "node ./scripts/build.js",
++    "test": "node ./scripts/test.js",
++    "lint": "node ./scripts/lint.js"
++  }
++}
+diff --git a/evaluation/fixtures/typescript-smoke/scripts/build.js b/evaluation/fixtures/typescript-smoke/scripts/build.js
+new file mode 100644
+index 0000000..8b3984a
+--- /dev/null
++++ b/evaluation/fixtures/typescript-smoke/scripts/build.js
+@@ -0,0 +1,18 @@
++const fs = require('node:fs');
++const path = require('node:path');
++
++const sourcePath = path.join(__dirname, '..', 'src', 'index.ts');
++if (!fs.existsSync(sourcePath)) {
++  console.error('build: missing src/index.ts');
++  process.exitCode = 1;
++  return;
++}
++
++const contents = fs.readFileSync(sourcePath, 'utf8');
++if (!contents.includes('export function greet')) {
++  console.error('build: greet export not found');
++  process.exitCode = 1;
++  return;
++}
++
++console.log('build check passed');
+diff --git a/evaluation/fixtures/typescript-smoke/scripts/lint.js b/evaluation/fixtures/typescript-smoke/scripts/lint.js
+new file mode 100644
+index 0000000..d738f16
+--- /dev/null
++++ b/evaluation/fixtures/typescript-smoke/scripts/lint.js
+@@ -0,0 +1,13 @@
++const fs = require('node:fs');
++const path = require('node:path');
++
++const sourcePath = path.join(__dirname, '..', 'src', 'index.ts');
++const contents = fs.readFileSync(sourcePath, 'utf8');
++
++if (/console\./.test(contents)) {
++  console.error('lint: console usage is not allowed in fixture source');
++  process.exitCode = 1;
++  return;
++}
++
++console.log('lint check passed');
+diff --git a/evaluation/fixtures/typescript-smoke/scripts/test.js b/evaluation/fixtures/typescript-smoke/scripts/test.js
+new file mode 100644
+index 0000000..6640756
+--- /dev/null
++++ b/evaluation/fixtures/typescript-smoke/scripts/test.js
+@@ -0,0 +1,8 @@
++require('ts-node/register');
++const assert = require('node:assert');
++
++const { greet } = require('../src/index.ts');
++const output = greet('Codex');
++
++assert.strictEqual(output, 'Hello, Codex!');
++console.log('test check passed');
+diff --git a/evaluation/fixtures/typescript-smoke/src/index.ts b/evaluation/fixtures/typescript-smoke/src/index.ts
+new file mode 100644
+index 0000000..b370dea
+--- /dev/null
++++ b/evaluation/fixtures/typescript-smoke/src/index.ts
+@@ -0,0 +1,3 @@
++export function greet(name: string): string {
++  return `Hello, ${name}!`;
++}
+diff --git a/evaluation/harness/index.ts b/evaluation/harness/index.ts
+new file mode 100644
+index 0000000..9023e95
+--- /dev/null
++++ b/evaluation/harness/index.ts
+@@ -0,0 +1,329 @@
++import { spawn } from 'node:child_process';
++import { promises as fs } from 'node:fs';
++import path from 'node:path';
++import os from 'node:os';
++import process from 'node:process';
++import { createExecutionPlan } from '../../adapters/index.js';
++import type { AdapterCommandOverrides, AdapterExecutionPlan } from '../../adapters/types.js';
++import { loadScenarioById, loadScenarios } from './scenario-loader.js';
++import type {
++  EvaluationScenario,
++  EvaluationScenarioResult,
++  LoadedScenario,
++  PatternAssertion,
++  PatternAssertionResult,
++  RunScenarioOptions,
++  ScenarioGoalResult
++} from './types.js';
++
++const STDIO_LIMIT = 10_000; // bytes
++const DEFAULT_TIMEOUT_MS = 30_000;
++
++function buildEnvOverrides(custom: Record<string, string> | undefined): Record<string, string> {
++  const overrides = { ...(custom ?? {}) };
++  const projectNodeModules = path.resolve(process.cwd(), 'node_modules');
++  const existingNodePath = overrides.NODE_PATH ?? process.env.NODE_PATH;
++  overrides.NODE_PATH = existingNodePath
++    ? `${existingNodePath}${path.delimiter}${projectNodeModules}`
++    : projectNodeModules;
++  return overrides;
++}
++
++function substituteFixture(value: string | undefined, fixturePath: string): string | undefined {
++  if (typeof value !== 'string') {
++    return value;
++  }
++  return value.replaceAll('{fixture}', fixturePath);
++}
++
++function applyFixtureToOverrides(overrides: AdapterCommandOverrides | undefined, fixturePath: string): AdapterCommandOverrides {
++  if (!overrides) {
++    return {};
++  }
++
++  const next: AdapterCommandOverrides = { ...overrides };
++  if (next.args) {
++    next.args = next.args.map((arg) => substituteFixture(arg, fixturePath) ?? arg);
++  }
++  if (next.cwd) {
++    next.cwd = substituteFixture(next.cwd, fixturePath);
++  }
++  if (next.env) {
++    next.env = Object.fromEntries(
++      Object.entries(next.env).map(([key, value]) => [key, substituteFixture(value, fixturePath) ?? value])
++    );
++  }
++  return next;
++}
++
++function applyFixtureToCommand(plan: AdapterExecutionPlan, fixturePath: string): AdapterExecutionPlan {
++  const command = plan.command;
++  const resolvedEnv = Object.fromEntries(
++    Object.entries(command.env).map(([key, value]) => [key, substituteFixture(value, fixturePath) ?? value])
++  );
++  const resolvedArgs = command.args.map((arg) => substituteFixture(arg, fixturePath) ?? arg);
++  const resolvedCwd = substituteFixture(command.cwd, fixturePath);
++
++  return {
++    adapter: plan.adapter,
++    goal: plan.goal,
++    command: {
++      ...command,
++      args: resolvedArgs,
++      env: resolvedEnv,
++      cwd: resolvedCwd
++    }
++  };
++}
++
++async function buildPlansForFixture(
++  scenario: LoadedScenario,
++  fixturePath: string
++): Promise<AdapterExecutionPlan[]> {
++  const plans: AdapterExecutionPlan[] = [];
++
++  for (const goal of scenario.goals) {
++    const overrides = applyFixtureToOverrides(scenario.overrides?.[goal], fixturePath);
++    const executionPlan = createExecutionPlan(scenario.adapterId, goal, overrides);
++    plans.push(applyFixtureToCommand(executionPlan, fixturePath));
++  }
++
++  return plans;
++}
++
++async function ensureDirectoryExists(target: string): Promise<void> {
++  await fs.mkdir(target, { recursive: true });
++}
++
++async function copyFixtureIfNeeded(source: string, shouldCopy: boolean): Promise<{ workingDir: string; cleanup: () => Promise<void> }> {
++  if (!shouldCopy) {
++    return {
++      workingDir: source,
++      cleanup: async () => {}
++    };
++  }
++
++  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'codex-eval-'));
++  await fs.cp(source, tempDir, { recursive: true });
++  return {
++    workingDir: tempDir,
++    cleanup: async () => {
++      await fs.rm(tempDir, { recursive: true, force: true });
++    }
++  };
++}
++
++function truncateOutput(value: string): string {
++  if (value.length <= STDIO_LIMIT) {
++    return value;
++  }
++  return value.slice(0, STDIO_LIMIT) + `\n… truncated (${value.length - STDIO_LIMIT} bytes omitted)`;
++}
++
++async function runCommand(
++  plan: AdapterExecutionPlan,
++  cwd: string,
++  env: Record<string, string>,
++  timeoutMs: number
++): Promise<ScenarioGoalResult> {
++  const startedAt = Date.now();
++  const stdoutChunks: string[] = [];
++  const stderrChunks: string[] = [];
++
++  return await new Promise<ScenarioGoalResult>((resolve) => {
++    let settled = false;
++    let timer: NodeJS.Timeout | undefined;
++    let killedByTimeout = false;
++
++    const finish = (result: ScenarioGoalResult): void => {
++      if (timer) {
++        clearTimeout(timer);
++        timer = undefined;
++      }
++      if (!settled) {
++        settled = true;
++        resolve(result);
++      }
++    };
++
++    const child = spawn(plan.command.command, plan.command.args, {
++      cwd: plan.command.cwd ?? cwd,
++      env: { ...process.env, ...plan.command.env, ...env },
++      stdio: ['ignore', 'pipe', 'pipe'],
++      shell: process.platform === 'win32'
++    });
++
++    child.stdout?.setEncoding('utf8');
++    child.stdout?.on('data', (chunk: string) => stdoutChunks.push(chunk));
++    child.stderr?.setEncoding('utf8');
++    child.stderr?.on('data', (chunk: string) => stderrChunks.push(chunk));
++
++    child.once('error', (error) => {
++      finish({
++        goal: plan.goal,
++        command: plan.command,
++        status: 'failed',
++        exitCode: null,
++        stdout: truncateOutput(stdoutChunks.join('')),
++        stderr: truncateOutput(stderrChunks.join('')),
++        durationMs: Date.now() - startedAt,
++        error: error instanceof Error ? error.message : String(error)
++      });
++    });
++
++    timer = setTimeout(() => {
++      killedByTimeout = true;
++      child.kill('SIGKILL');
++    }, timeoutMs);
++
++    child.once('exit', (code) => {
++      const status = code === 0 && !killedByTimeout ? 'passed' : 'failed';
++      const error = killedByTimeout
++        ? `Command timed out after ${timeoutMs}ms`
++        : code === 0
++          ? undefined
++          : `Exited with code ${code}`;
++
++      finish({
++        goal: plan.goal,
++        command: plan.command,
++        status,
++        exitCode: code,
++        stdout: truncateOutput(stdoutChunks.join('')),
++        stderr: truncateOutput(stderrChunks.join('')),
++        durationMs: Date.now() - startedAt,
++        error
++      });
++    });
++  });
++}
++
++async function evaluatePatternAssertions(
++  assertions: PatternAssertion[] | undefined,
++  fixturePath: string
++): Promise<PatternAssertionResult[]> {
++  if (!assertions || assertions.length === 0) {
++    return [];
++  }
++
++  const results: PatternAssertionResult[] = [];
++
++  for (const assertion of assertions) {
++    const scopeRoot = assertion.scope === 'repo' ? process.cwd() : fixturePath;
++    const targetPath = path.resolve(scopeRoot, assertion.path);
++
++    if (assertion.type === 'file-exists') {
++      try {
++        await fs.access(targetPath);
++        results.push({ assertion, status: 'passed' });
++      } catch (error) {
++        results.push({
++          assertion,
++          status: 'failed',
++          details: `File not found: ${targetPath} (${error instanceof Error ? error.message : error})`
++        });
++      }
++    } else if (assertion.type === 'file-contains') {
++      try {
++        const content = await fs.readFile(targetPath, 'utf8');
++        const needles = Array.isArray(assertion.includes) ? assertion.includes : [assertion.includes];
++        const missing = needles.filter((needle) => !content.includes(needle));
++        if (missing.length === 0) {
++          results.push({ assertion, status: 'passed' });
++        } else {
++          results.push({
++            assertion,
++            status: 'failed',
++            details: `Missing expected content: ${missing.join(', ')} in ${targetPath}`
++          });
++        }
++      } catch (error) {
++        results.push({
++          assertion,
++          status: 'failed',
++          details: `Failed to read ${targetPath}: ${error instanceof Error ? error.message : error}`
++        });
++      }
++    }
++  }
++
++  return results;
++}
++
++export async function runScenario(
++  scenarioId: string | EvaluationScenario,
++  options: RunScenarioOptions = {}
++): Promise<EvaluationScenarioResult> {
++  const mode = options.mode ?? 'mcp';
++  const loaded: LoadedScenario =
++    typeof scenarioId === 'string' ? await loadScenarioById(scenarioId) : { ...(scenarioId as EvaluationScenario), sourcePath: '<inline>' };
++
++  const sourceFixturePath = path.resolve(process.cwd(), loaded.fixture.path);
++  await fs.access(sourceFixturePath);
++
++  let plans = await buildPlansForFixture(loaded, sourceFixturePath);
++  const needsCopy = Boolean(loaded.fixture.copyToTemp || plans.some((plan) => plan.command.requiresCleanFixture));
++
++  const { workingDir, cleanup } = await copyFixtureIfNeeded(sourceFixturePath, needsCopy);
++  try {
++    if (needsCopy && workingDir !== sourceFixturePath) {
++      plans = await buildPlansForFixture(loaded, workingDir);
++    }
++
++    const startedAt = new Date();
++    const goalResults: ScenarioGoalResult[] = [];
++    const envOverrides = buildEnvOverrides(options.env);
++
++    for (const plan of plans) {
++      const timeoutMs = plan.command.timeoutMs ?? options.defaultTimeoutMs ?? DEFAULT_TIMEOUT_MS;
++      const result = await runCommand(plan, workingDir, envOverrides, timeoutMs);
++      goalResults.push(result);
++      if (result.status === 'failed') {
++        break;
++      }
++    }
++
++    const patternResults = await evaluatePatternAssertions(loaded.patternAssertions, workingDir);
++
++    const completedAt = new Date();
++    const evaluationResult: EvaluationScenarioResult = {
++      scenario: {
++        id: loaded.id,
++        title: loaded.title,
++        adapterId: loaded.adapterId
++      },
++      mode,
++      fixturePath: workingDir,
++      startedAt: startedAt.toISOString(),
++      completedAt: completedAt.toISOString(),
++      goals: goalResults,
++      patternAssertions: patternResults
++    };
++
++    if (options.outputDir) {
++      const outputDir = path.resolve(process.cwd(), options.outputDir);
++      await ensureDirectoryExists(outputDir);
++      const target = path.join(outputDir, `${loaded.id}.json`);
++      await fs.writeFile(target, JSON.stringify(evaluationResult, null, 2));
++    }
++
++    return evaluationResult;
++  } finally {
++    await cleanup();
++  }
++}
++
++export async function runAllScenarios(options: RunScenarioOptions = {}): Promise<EvaluationScenarioResult[]> {
++  const scenarios = await loadScenarios();
++  const results: EvaluationScenarioResult[] = [];
++
++  for (const scenario of scenarios) {
++    const result = await runScenario(scenario, options);
++    results.push(result);
++  }
++
++  return results;
++}
++
++export { loadScenarios } from './scenario-loader.js';
++export * from './types.js';
+diff --git a/evaluation/harness/run-all.ts b/evaluation/harness/run-all.ts
+new file mode 100644
+index 0000000..7459879
+--- /dev/null
++++ b/evaluation/harness/run-all.ts
+@@ -0,0 +1,73 @@
++#!/usr/bin/env node
++import path from 'node:path';
++import process from 'node:process';
++import { logger } from '../../orchestrator/src/logger.js';
++import { runAllScenarios } from './index.js';
++import type { EvaluationMode } from './types.js';
++
++interface CliOptions {
++  mode: EvaluationMode;
++  outputDir?: string;
++}
++
++function parseArgs(argv: string[]): CliOptions {
++  let mode: EvaluationMode = 'mcp';
++  let outputDir: string | undefined;
++
++  for (let index = 0; index < argv.length; index += 1) {
++    const arg = argv[index];
++
++    if (arg === '--mode') {
++      const value = argv[index + 1];
++      if (!value) {
++        throw new Error('Missing value for --mode');
++      }
++      if (value === 'mcp' || value === 'cloud') {
++        mode = value;
++        index += 1;
++      } else {
++        throw new Error(`Invalid mode '${value}'. Expected 'mcp' or 'cloud'.`);
++      }
++    } else if (arg.startsWith('--mode=')) {
++      const [, value] = arg.split('=');
++      if (value === 'mcp' || value === 'cloud') {
++        mode = value as EvaluationMode;
++      } else {
++        throw new Error(`Invalid mode '${value}'. Expected 'mcp' or 'cloud'.`);
++      }
++    } else if (arg === '--output') {
++      const value = argv[index + 1];
++      if (!value) {
++        throw new Error('Missing value for --output');
++      }
++      outputDir = path.resolve(process.cwd(), value);
++      index += 1;
++    } else if (arg.startsWith('--output=')) {
++      const [, value] = arg.split('=');
++      outputDir = path.resolve(process.cwd(), value);
++    }
++  }
++
++  return { mode, outputDir };
++}
++
++async function main(): Promise<void> {
++  const options = parseArgs(process.argv.slice(2));
++  try {
++    const results = await runAllScenarios({ mode: options.mode, outputDir: options.outputDir });
++    const summary = results.map((result) => ({
++      scenario: result.scenario.id,
++      adapter: result.scenario.adapterId,
++      goals: result.goals.map((goal) => `${goal.goal}:${goal.status}`).join(', ')
++    }));
++    logger.info('Evaluation summary', summary);
++  } catch (error) {
++    logger.error('[evaluation] run failed', error instanceof Error ? error : new Error(String(error)));
++    process.exitCode = 1;
++  }
++}
++
++main().catch((error) => {
++  logger.error('[evaluation] unexpected failure', error instanceof Error ? error : new Error(String(error)));
++  process.exitCode = 1;
++});
+diff --git a/evaluation/harness/scenario-loader.ts b/evaluation/harness/scenario-loader.ts
+new file mode 100644
+index 0000000..88efdfd
+--- /dev/null
++++ b/evaluation/harness/scenario-loader.ts
+@@ -0,0 +1,48 @@
++import { promises as fs } from 'node:fs';
++import path from 'node:path';
++import { EvaluationScenario, LoadedScenario } from './types.js';
++
++const SCENARIOS_DIR = path.resolve(process.cwd(), 'evaluation/scenarios');
++
++function assertScenarioShape(candidate: EvaluationScenario, sourcePath: string): void {
++  if (!candidate.id || !candidate.title || !candidate.adapterId) {
++    throw new Error(`Scenario at ${sourcePath} is missing required fields (id/title/adapterId).`);
++  }
++
++  if (!Array.isArray(candidate.goals) || candidate.goals.length === 0) {
++    throw new Error(`Scenario '${candidate.id}' must declare at least one goal.`);
++  }
++
++  if (!candidate.fixture || typeof candidate.fixture.path !== 'string') {
++    throw new Error(`Scenario '${candidate.id}' must declare a fixture.path.`);
++  }
++}
++
++export async function loadScenarios(): Promise<LoadedScenario[]> {
++  const entries = await fs.readdir(SCENARIOS_DIR);
++  const scenarios: LoadedScenario[] = [];
++
++  for (const entry of entries) {
++    if (!entry.endsWith('.json')) {
++      continue;
++    }
++
++    const fullPath = path.join(SCENARIOS_DIR, entry);
++    const raw = await fs.readFile(fullPath, 'utf8');
++    const parsed = JSON.parse(raw) as EvaluationScenario;
++    assertScenarioShape(parsed, fullPath);
++    scenarios.push({ ...parsed, sourcePath: fullPath });
++  }
++
++  scenarios.sort((a, b) => a.id.localeCompare(b.id));
++  return scenarios;
++}
++
++export async function loadScenarioById(id: string): Promise<LoadedScenario> {
++  const scenarios = await loadScenarios();
++  const scenario = scenarios.find((item) => item.id === id);
++  if (!scenario) {
++    throw new Error(`Unknown evaluation scenario '${id}'.`);
++  }
++  return scenario;
++}
+diff --git a/evaluation/harness/types.ts b/evaluation/harness/types.ts
+new file mode 100644
+index 0000000..9216471
+--- /dev/null
++++ b/evaluation/harness/types.ts
+@@ -0,0 +1,82 @@
++import type {
++  AdapterCommandOverrides,
++  AdapterExecutionPlan,
++  AdapterGoal,
++  ResolvedAdapterCommand
++} from '../../adapters/types.js';
++
++export type EvaluationMode = 'mcp' | 'cloud';
++
++export interface ScenarioFixtureConfig {
++  path: string;
++  copyToTemp?: boolean;
++}
++
++export type PatternAssertion =
++  | {
++      type: 'file-exists';
++      path: string;
++      scope?: 'fixture' | 'repo';
++      note?: string;
++    }
++  | {
++      type: 'file-contains';
++      path: string;
++      includes: string | string[];
++      scope?: 'fixture' | 'repo';
++      note?: string;
++    };
++
++export interface EvaluationScenario {
++  id: string;
++  title: string;
++  adapterId: string;
++  goals: AdapterGoal[];
++  fixture: ScenarioFixtureConfig;
++  overrides?: Partial<Record<AdapterGoal, AdapterCommandOverrides>>;
++  patternAssertions?: PatternAssertion[];
++}
++
++export interface ScenarioGoalResult {
++  goal: AdapterGoal;
++  command: ResolvedAdapterCommand;
++  status: 'passed' | 'failed';
++  exitCode: number | null;
++  stdout: string;
++  stderr: string;
++  durationMs: number;
++  error?: string;
++}
++
++export interface PatternAssertionResult {
++  assertion: PatternAssertion;
++  status: 'passed' | 'failed';
++  details?: string;
++}
++
++export interface EvaluationScenarioResult {
++  scenario: {
++    id: string;
++    title: string;
++    adapterId: string;
++  };
++  mode: EvaluationMode;
++  fixturePath: string;
++  startedAt: string;
++  completedAt: string;
++  goals: ScenarioGoalResult[];
++  patternAssertions: PatternAssertionResult[];
++}
++
++export interface RunScenarioOptions {
++  mode?: EvaluationMode;
++  outputDir?: string;
++  env?: Record<string, string>;
++  defaultTimeoutMs?: number;
++}
++
++export type LoadedScenario = EvaluationScenario & {
++  sourcePath: string;
++};
++
++export type { AdapterExecutionPlan };
+diff --git a/evaluation/scenarios/python-smoke.json b/evaluation/scenarios/python-smoke.json
+new file mode 100644
+index 0000000..17708cc
+--- /dev/null
++++ b/evaluation/scenarios/python-smoke.json
+@@ -0,0 +1,17 @@
++{
++  "id": "python-smoke",
++  "title": "Python adapter smoke fixture",
++  "adapterId": "python-pytest",
++  "goals": ["build", "test"],
++  "fixture": {
++    "path": "evaluation/fixtures/python-smoke",
++    "copyToTemp": true
++  },
++  "patternAssertions": [
++    {
++      "type": "file-exists",
++      "scope": "repo",
++      "path": "patterns/templates/run-manifest-checklist.md"
++    }
++  ]
++}
+diff --git a/evaluation/scenarios/typescript-smoke.json b/evaluation/scenarios/typescript-smoke.json
+new file mode 100644
+index 0000000..a3f2955
+--- /dev/null
++++ b/evaluation/scenarios/typescript-smoke.json
+@@ -0,0 +1,18 @@
++{
++  "id": "typescript-smoke",
++  "title": "TypeScript adapter smoke fixture",
++  "adapterId": "typescript-default",
++  "goals": ["build", "test", "lint"],
++  "fixture": {
++    "path": "evaluation/fixtures/typescript-smoke",
++    "copyToTemp": true
++  },
++  "patternAssertions": [
++    {
++      "type": "file-contains",
++      "scope": "fixture",
++      "path": "README.md",
++      "includes": "TypeScript smoke fixture"
++    }
++  ]
++}
+diff --git a/evaluation/tests/harness.test.ts b/evaluation/tests/harness.test.ts
+new file mode 100644
+index 0000000..fa09674
+--- /dev/null
++++ b/evaluation/tests/harness.test.ts
+@@ -0,0 +1,44 @@
++import { promises as fs } from 'node:fs';
++import os from 'node:os';
++import path from 'node:path';
++import { afterAll, describe, expect, it } from 'vitest';
++import { loadScenarios, runAllScenarios, runScenario } from '../harness/index.js';
++
++const tempDirs: string[] = [];
++
++afterAll(async () => {
++  for (const dir of tempDirs) {
++    await fs.rm(dir, { recursive: true, force: true });
++  }
++});
++
++describe('evaluation harness', () => {
++  it('loads registered scenarios from disk', async () => {
++    const scenarios = await loadScenarios();
++    expect(scenarios.length).toBeGreaterThanOrEqual(2);
++    expect(scenarios.map((s) => s.id)).toContain('typescript-smoke');
++  });
++
++  it('runs the TypeScript smoke scenario successfully', async () => {
++    const result = await runScenario('typescript-smoke', { mode: 'mcp' });
++    const goalStatuses = result.goals.map((goal) => goal.status);
++    expect(goalStatuses.every((status) => status === 'passed')).toBe(true);
++  });
++
++  it('writes results when outputDir is provided', async () => {
++    const outputDir = await fs.mkdtemp(path.join(os.tmpdir(), 'codex-eval-test-'));
++    tempDirs.push(outputDir);
++
++    const results = await runAllScenarios({ outputDir, mode: 'mcp' });
++    expect(results.length).toBeGreaterThanOrEqual(2);
++
++    for (const scenario of results) {
++      const artifactPath = path.join(outputDir, `${scenario.scenario.id}.json`);
++      const exists = await fs.access(artifactPath).then(
++        () => true,
++        () => false
++      );
++      expect(exists).toBe(true);
++    }
++  });
++});
+diff --git a/package.json b/package.json
+index e88945b..c38e51d 100644
+--- a/package.json
++++ b/package.json
+@@ -6,19 +6,22 @@
+   "scripts": {
+     "build": "tsc -p tsconfig.json",
+     "build:patterns": "tsc -p patterns/tsconfig.json",
+-    "lint": "npm run build:patterns && eslint orchestrator/src orchestrator/tests --ext .ts",
++    "lint": "npm run build:patterns && eslint orchestrator/src orchestrator/tests adapters evaluation/harness evaluation/tests --ext .ts",
++    "parallel:goals": "node --loader ts-node/esm scripts/run-parallel-goals.ts",
+     "test": "vitest run",
++    "eval:test": "vitest run evaluation/tests",
+     "test:watch": "vitest"
+   },
+   "devDependencies": {
++    "@types/jscodeshift": "^0.11.6",
++    "@types/node": "^20.11.0",
+     "@typescript-eslint/eslint-plugin": "^7.0.0",
+     "@typescript-eslint/parser": "^7.0.0",
+     "@typescript-eslint/utils": "^7.0.0",
+-    "@types/node": "^20.11.0",
+-    "@types/jscodeshift": "^0.11.6",
+     "eslint": "^8.57.0",
+     "eslint-plugin-patterns": "file:eslint-plugin-patterns",
+     "jscodeshift": "^0.15.2",
++    "ts-node": "^10.9.2",
+     "typescript": "^5.4.0",
+     "vitest": "^1.3.1"
+   },
+diff --git a/scripts/run-parallel-goals.ts b/scripts/run-parallel-goals.ts
+new file mode 100644
+index 0000000..9eed3bb
+--- /dev/null
++++ b/scripts/run-parallel-goals.ts
+@@ -0,0 +1,211 @@
++#!/usr/bin/env node
++import { spawn } from 'node:child_process';
++import { resolve } from 'node:path';
++import { fileURLToPath } from 'node:url';
++import process from 'node:process';
++import { createExecutionPlan, getAdapters } from '../adapters/index.js';
++import type { AdapterExecutionPlan, AdapterGoal, LanguageAdapter, ResolvedAdapterCommand } from '../adapters/types.js';
++
++interface CliOptions {
++  dryRun: boolean;
++  adapters: string[];
++  goals: AdapterGoal[];
++  verbose: boolean;
++}
++
++interface GoalResult {
++  adapter: LanguageAdapter;
++  command: ResolvedAdapterCommand;
++  status: 'success' | 'failed';
++  error?: Error;
++  startedAt: number;
++  endedAt: number;
++}
++
++const DEFAULT_OPTIONS: CliOptions = {
++  dryRun: true,
++  adapters: [],
++  goals: ['build', 'test'],
++  verbose: false
++};
++
++function parseArgs(argv: string[]): CliOptions {
++  const options: CliOptions = { ...DEFAULT_OPTIONS };
++
++  for (const arg of argv) {
++    if (arg === '--dry-run') {
++      options.dryRun = true;
++    } else if (arg === '--execute') {
++      options.dryRun = false;
++    } else if (arg.startsWith('--adapters=')) {
++      const [, value] = arg.split('=');
++      options.adapters = value.split(',').map((item) => item.trim()).filter(Boolean);
++    } else if (arg.startsWith('--goals=')) {
++      const [, value] = arg.split('=');
++      options.goals = value
++        .split(',')
++        .map((item) => item.trim())
++        .filter((item): item is AdapterGoal => ['build', 'test', 'lint'].includes(item as AdapterGoal));
++    } else if (arg === '--verbose') {
++      options.verbose = true;
++    }
++  }
++
++  if (options.goals.length === 0) {
++    options.goals = ['build', 'test'];
++  }
++
++  return options;
++}
++
++function filterAdapters(adapters: LanguageAdapter[], selectedIds: string[]): LanguageAdapter[] {
++  if (selectedIds.length === 0) {
++    return adapters;
++  }
++
++  return adapters.filter((adapter) => selectedIds.includes(adapter.id));
++}
++
++function createExecutionPlans(adapters: LanguageAdapter[], goals: AdapterGoal[]): AdapterExecutionPlan[] {
++  const plans: AdapterExecutionPlan[] = [];
++
++  for (const adapter of adapters) {
++    for (const goal of goals) {
++      if (adapter.commands[goal]) {
++        plans.push(createExecutionPlan(adapter.id, goal));
++      }
++    }
++  }
++
++  return plans;
++}
++
++async function executePlan(plan: AdapterExecutionPlan, dryRun: boolean, verbose: boolean): Promise<GoalResult> {
++  const startedAt = Date.now();
++  if (dryRun) {
++    if (verbose) {
++      console.log(
++        `[dry-run] ${plan.adapter.id} → ${plan.command.id}: ${plan.command.command} ${plan.command.args.join(' ')}`
++      );
++    }
++    await new Promise((resolve) => setTimeout(resolve, 50));
++    return {
++      adapter: plan.adapter,
++      command: plan.command,
++      status: 'success',
++      startedAt,
++      endedAt: Date.now()
++    };
++  }
++
++  return new Promise<GoalResult>((resolve) => {
++    let settled = false;
++    const finish = (result: GoalResult): void => {
++      if (!settled) {
++        settled = true;
++        resolve(result);
++      }
++    };
++
++    const child = spawn(plan.command.command, plan.command.args, {
++      cwd: plan.command.cwd ?? process.cwd(),
++      env: { ...process.env, ...(plan.command.env ?? {}) },
++      stdio: 'inherit',
++      shell: process.platform === 'win32'
++    });
++
++    child.once('error', (error) => {
++      finish({
++        adapter: plan.adapter,
++        command: plan.command,
++        status: 'failed',
++        error: error instanceof Error ? error : new Error(String(error)),
++        startedAt,
++        endedAt: Date.now()
++      });
++    });
++
++    child.once('exit', (code) => {
++      const endedAt = Date.now();
++      if (code === 0) {
++        finish({
++          adapter: plan.adapter,
++          command: plan.command,
++          status: 'success',
++          startedAt,
++          endedAt
++        });
++      } else {
++        finish({
++          adapter: plan.adapter,
++          command: plan.command,
++          status: 'failed',
++          error: new Error(`Command ${plan.command.command} ${plan.command.args.join(' ')} exited with code ${code}`),
++          startedAt,
++          endedAt
++        });
++      }
++    });
++  });
++}
++
++export async function runParallelGoals(options: Partial<CliOptions> = {}): Promise<GoalResult[]> {
++  const cliOptions = { ...DEFAULT_OPTIONS, ...options } satisfies CliOptions;
++  const adapters = filterAdapters(getAdapters(), cliOptions.adapters);
++
++  if (adapters.length === 0) {
++    throw new Error('No adapters match the requested filters.');
++  }
++
++  if (adapters.length < 2 && cliOptions.verbose) {
++    console.warn('Only one adapter selected — parallelism will target goal-level concurrency.');
++  }
++
++  const plans = createExecutionPlans(adapters, cliOptions.goals);
++  if (plans.length === 0) {
++    throw new Error('No execution plans generated for requested goals.');
++  }
++
++  const tasks = plans.map((plan) => executePlan(plan, cliOptions.dryRun, cliOptions.verbose));
++  const results = await Promise.all(tasks);
++
++  const failures = results.filter((result) => result.status === 'failed');
++  if (failures.length > 0) {
++    const error = failures[0]?.error ?? new Error('Unknown failure running parallel goals');
++    throw error;
++  }
++
++  return results;
++}
++
++async function main(): Promise<void> {
++  const options = parseArgs(process.argv.slice(2));
++
++  try {
++    const results = await runParallelGoals(options);
++    const summary = results.map((result) => ({
++      adapter: result.adapter.id,
++      goal: result.command.id,
++      status: result.status,
++      durationMs: result.endedAt - result.startedAt
++    }));
++
++    console.table(summary);
++  } catch (error) {
++    console.error('[parallel-goals] failed:', error instanceof Error ? error.message : error);
++    process.exitCode = 1;
++  }
++}
++
++const modulePath = fileURLToPath(import.meta.url);
++const isDirectRun = process.argv.slice(1).some((arg) => {
++  try {
++    return resolve(process.cwd(), arg) === modulePath;
++  } catch {
++    return false;
++  }
++});
++
++if (isDirectRun) {
++  void main();
++}
+diff --git a/tsconfig.json b/tsconfig.json
+index 2d2526e..9fde8da 100644
+--- a/tsconfig.json
++++ b/tsconfig.json
+@@ -12,5 +12,11 @@
+     "forceConsistentCasingInFileNames": true,
+     "skipLibCheck": true
+   },
+-  "include": ["orchestrator/src/**/*.ts", "orchestrator/tests/**/*.ts"]
++  "include": [
++    "orchestrator/src/**/*.ts",
++    "orchestrator/tests/**/*.ts",
++    "adapters/**/*.ts",
++    "evaluation/**/*.ts",
++    "scripts/**/*.ts"
++  ]
+ }
+diff --git a/vitest.config.ts b/vitest.config.ts
+index f70165a..b55883d 100644
+--- a/vitest.config.ts
++++ b/vitest.config.ts
+@@ -3,7 +3,12 @@ import { defineConfig } from 'vitest/config';
+ export default defineConfig({
+   test: {
+     environment: 'node',
+-    include: ['orchestrator/tests/**/*.test.ts', 'patterns/**/*.test.ts'],
++    include: [
++      'orchestrator/tests/**/*.test.ts',
++      'patterns/**/*.test.ts',
++      'adapters/**/*.test.ts',
++      'evaluation/tests/**/*.test.ts'
++    ],
+     coverage: {
+       enabled: false
+     }

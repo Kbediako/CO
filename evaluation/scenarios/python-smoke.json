@@ -1,0 +1,17 @@
+{
+  "id": "python-smoke",
+  "title": "Python adapter smoke fixture",
+  "adapterId": "python-pytest",
+  "goals": ["build", "test"],
+  "fixture": {
+    "path": "evaluation/fixtures/python-smoke",
+    "copyToTemp": true
+  },
+  "patternAssertions": [
+    {
+      "type": "file-exists",
+      "scope": "repo",
+      "path": "patterns/templates/run-manifest-checklist.md"
+    }
+  ]
+}

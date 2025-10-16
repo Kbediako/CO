@@ -1,0 +1,18 @@
+{
+  "id": "typescript-smoke",
+  "title": "TypeScript adapter smoke fixture",
+  "adapterId": "typescript-default",
+  "goals": ["build", "test", "lint"],
+  "fixture": {
+    "path": "evaluation/fixtures/typescript-smoke",
+    "copyToTemp": true
+  },
+  "patternAssertions": [
+    {
+      "type": "file-contains",
+      "scope": "fixture",
+      "path": "README.md",
+      "includes": "TypeScript smoke fixture"
+    }
+  ]
+}

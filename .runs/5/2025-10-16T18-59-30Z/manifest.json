@@ -1,0 +1,34 @@
+{
+  "task": {
+    "id": "0001",
+    "subtask": "5.3",
+    "title": "Evaluation Harness & Fixtures",
+    "review_fix": true,
+    "note": "Applied review feedback to keep evaluation overrides opt-in and revalidated lint/eval tests."
+  },
+  "run": {
+    "id": "TASK5-20251016-REVIEWFIX1",
+    "timestamp": "2025-10-16T18-59-30Z",
+    "agent_role": "implementation",
+    "mode": {
+      "selected": "mcp",
+      "reason": "Follow-up fix from review without changing execution mode."
+    }
+  },
+  "artifacts": [
+    {"type": "diff", "path": "diff.patch", "description": "Opt-in evaluation overrides changes"},
+    {"type": "log", "path": "lint.log", "description": "npm run lint output"},
+    {"type": "log", "path": "eval-test.log", "description": "npm run eval:test output"}
+  ],
+  "validations": [
+    {"command": "npm run lint", "status": "passed", "log_path": "lint.log"},
+    {"command": "npm run eval:test", "status": "passed", "log_path": "eval-test.log"}
+  ],
+  "notes": {
+    "summary": "Ensured evaluation defaults only apply when requested, fixing CLI usage regression while preserving harness behavior.",
+    "risks": [
+      "None newly introduced"
+    ],
+    "follow_up": []
+  }
+}

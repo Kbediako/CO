@@ -1,0 +1,14 @@
+
+> codex-orchestrator@0.1.0 eval:test
+> vitest run evaluation/tests
+
+
+ RUN  v1.6.1 /Users/asabeko/Documents/Code/CO
+
+ ✓ evaluation/tests/harness.test.ts  (3 tests) 1132ms
+
+ Test Files  1 passed (1)
+      Tests  3 passed (3)
+   Start at  04:39:06
+   Duration  1.26s (transform 25ms, setup 0ms, collect 28ms, tests 1.13s, environment 0ms, prepare 25ms)
+
