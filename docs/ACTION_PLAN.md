@@ -21,6 +21,12 @@
   3. Builder — Implement codemods/linters/templates under `patterns/` with reusable APIs; Acceptance: assets versioned and sample usage recorded in `/tasks/index.json`; Effort: 4 days; Risks: regressions on target repos → Mitigation: add rollback notes and fixture coverage.
   4. Reviewer — Validate learning ingestion SOP and update `docs/TECH_SPEC.md` & `docs/TASKS.md`; Acceptance: documentation references new assets and guardrails; Effort: 1 day; Risks: knowledge silos → Mitigation: host recorded walkthrough for contributors.
 
+### Learning Library Ingestion Flow (Update 2025-10-16)
+1. Author new assets in `patterns/`, update `patterns/index.json`, and stage before/after examples in README tables.
+2. Run `npm run build:patterns` and `npm test -- patterns`; attach logs to `.runs/<task>/<run>/` alongside `diff.patch`.
+3. Record approvals and highlights in the run manifest, referencing the learning-library mini-spec (`tasks/specs/0003-learning-library.md`).
+4. Notify the cloud-sync worker to mirror metadata into Codex Cloud learning catalogs; reviewer signs off using `patterns/templates/run-manifest-checklist.md`.
+
 ## Milestone M3 — Guardrails, CI, Evaluation Harness
 - Objective: Lock guardrails in CI and prove orchestrator across sample repos with evaluation harness.
 - Tasks:

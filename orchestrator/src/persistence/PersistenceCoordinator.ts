@@ -1,5 +1,6 @@
 import type { EventBus } from '../events/EventBus.js';
 import type { RunSummary } from '../types.js';
+import { logger } from '../logger.js';
 import { TaskStateStore } from './TaskStateStore.js';
 import { RunManifestWriter } from './RunManifestWriter.js';
 
@@ -45,8 +46,7 @@ export class PersistenceCoordinator {
     } catch (error: unknown) {
       this.options.onError?.(error, summary);
       if (!this.options.onError) {
-        // eslint-disable-next-line no-console
-        console.error('PersistenceCoordinator error', error);
+        logger.error('PersistenceCoordinator error', error);
       }
     }
   }

@@ -80,6 +80,22 @@
         "log": "tasks/specs/0002-orchestrator-core.md#approvals"
       },
       "last_review": "2025-10-16"
+    },
+    {
+      "id": "20251016-learning",
+      "slug": "learning-library",
+      "title": "Codex-Orchestrator Learning Library Seed",
+      "path": "tasks/specs/0003-learning-library.md",
+      "relates_to": "tasks/0001-prd-codex-orchestrator.md",
+      "status": "done",
+      "gate": {
+        "kind": "spec_guard",
+        "status": "approved",
+        "approved_on": "2025-10-16T21:55:00Z",
+        "approver": "Product, Engineering, Design/DX Leads",
+        "log": "tasks/specs/0003-learning-library.md#approvals"
+      },
+      "last_review": "2025-10-16"
     }
   ]
 }

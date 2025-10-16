@@ -1,0 +1,16 @@
+
+> codex-orchestrator@0.1.0 test
+> vitest run patterns
+
+
+ RUN  v1.6.1 /Users/asabeko/Documents/Code/CO
+
+ ✓ patterns/codemods/__tests__/ensure-run-summary-fields.test.ts  (2 tests) 10ms
+ ✓ patterns/codemods/__tests__/structured-event-emit.test.ts  (3 tests) 10ms
+ ✓ patterns/linters/__tests__/prefer-logger-over-console.test.ts  (3 tests) 10ms
+
+ Test Files  3 passed (3)
+      Tests  8 passed (8)
+   Start at  03:21:42
+   Duration  332ms (transform 38ms, setup 0ms, collect 270ms, tests 30ms, environment 0ms, prepare 82ms)
+

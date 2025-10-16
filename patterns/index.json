@@ -1,0 +1,44 @@
+{
+  "version": "0.1.0",
+  "generated": "2025-10-16",
+  "assets": [
+    {
+      "id": "structured-event-emit",
+      "kind": "codemod",
+      "version": "0.1.0",
+      "entry": "./codemods/structured-event-emit.ts",
+      "description": "Convert EventBus string emits into structured payload objects.",
+      "usage": "npx jscodeshift -t patterns/codemods/structured-event-emit.js <files>"
+    },
+    {
+      "id": "ensure-run-summary-fields",
+      "kind": "codemod",
+      "version": "0.1.0",
+      "entry": "./codemods/ensure-run-summary-fields.ts",
+      "description": "Add missing mode and timestamp fields to run summary object literals.",
+      "usage": "npx jscodeshift -t patterns/codemods/ensure-run-summary-fields.js <files>"
+    },
+    {
+      "id": "prefer-logger-over-console",
+      "kind": "linter-rule",
+      "version": "0.1.0",
+      "entry": "./linters/rules/prefer-logger-over-console.ts",
+      "description": "Report console usage; prefer orchestrator logger APIs.",
+      "usage": "Configure eslint rule `patterns/prefer-logger-over-console: warn`"
+    },
+    {
+      "id": "implementation-summary",
+      "kind": "template",
+      "version": "0.1.0",
+      "entry": "./templates/implementation-summary.md",
+      "description": "Builder/tester hand-off summary skeleton."
+    },
+    {
+      "id": "run-manifest-checklist",
+      "kind": "template",
+      "version": "0.1.0",
+      "entry": "./templates/run-manifest-checklist.md",
+      "description": "Reviewer checklist to validate run manifest completeness."
+    }
+  ]
+}

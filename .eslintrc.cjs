@@ -9,8 +9,8 @@ module.exports = {
     sourceType: 'module',
     ecmaVersion: 'latest'
   },
-  plugins: ['@typescript-eslint'],
-  extends: ['eslint:recommended', 'plugin:@typescript-eslint/recommended'],
+  plugins: ['@typescript-eslint', 'patterns'],
+  extends: ['eslint:recommended', 'plugin:@typescript-eslint/recommended', 'plugin:patterns/recommended'],
   ignorePatterns: ['dist/', 'node_modules/'],
   rules: {
     '@typescript-eslint/no-explicit-any': 'warn',

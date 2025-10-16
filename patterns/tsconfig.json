@@ -1,0 +1,17 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "outDir": "../dist/patterns",
+    "noEmit": false
+  },
+  "include": [
+    "codemods/**/*.ts",
+    "linters/**/*.ts",
+    "index.ts"
+  ],
+  "exclude": [
+    "**/__tests__/**",
+    "tests/**"
+  ]
+}
