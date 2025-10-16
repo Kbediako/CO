@@ -1,0 +1,16 @@
+# Added by Bootstrap 2025-10-16
+name: Spec Guard (Example)
+
+on:
+  # push:
+  #   branches:
+  #     - main
+  # pull_request:
+
+jobs:
+  spec-guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run spec guard
+        run: scripts/spec-guard.sh
