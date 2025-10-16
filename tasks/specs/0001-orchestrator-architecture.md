@@ -18,6 +18,12 @@ last_review: 2025-10-16
 - Architecture / design adjustments: Manager agent coordinates planner, builder, tester, reviewer agents via Agents SDK channels; persistence module records run context under `.runs` with structured metadata; lock service prevents parallel write conflicts; spec guard integrates into CI pipeline.
 - Data model updates: Introduce run manifest schema (JSON) capturing task id, approvals, artifacts; learning library index referencing codemods, linters, templates with semantic versioning.
 - External dependencies: Codex MCP server (`codex mcp-server`) for deterministic edits; optional Codex Cloud API for parallel goal orchestration; jscodeshift for codemods; eslint for custom linter rules.
+- Synchronization strategy: Emit `RunCompleted` events from the manager that trigger a `cloud-sync` worker to mirror `.runs/<timestamp>/manifest.json` into Codex Cloud via the Runs API; maintain idempotency with `run_id` hashes stored locally.
+
+## Review Decisions 2025-10-16
+- **Run metadata sync:** After each task phase, the manager hands run manifests to a lightweight `cloud-sync` worker that pushes summaries to Codex Cloud using service account credentials; sync retries are capped and logged under `/out/audit.log`.
+- **Credential abstraction:** All MCP and Cloud secrets are injected from Vault (`secret/codex/orchestrator/<env>`) at launch; agents read from an in-memory credential broker so no token touches disk.
+- **Execution mode default:** Tasks run in MCP mode unless task metadata carries `execution.parallel=true`; manager records the chosen mode in the manifest for post-run analytics.
 
 ## Impact Assessment
 - User impact: Provides predictable automation, reduces manual oversight, and centralizes approvals/logging for compliance.
@@ -29,10 +35,10 @@ last_review: 2025-10-16
 - Testing strategy: Unit tests for agent orchestration, integration tests simulating MCP runs, smoke tests for Codex Cloud delegation.
 - Launch steps: Finalize technical spec, implement manager/peer agents incrementally, enable spec guard, pilot on sample repositories before broader rollout.
 
-## Open Questions
-- Best approach to sync `.runs` metadata with Codex Cloud run history?
-- How to abstract credential management for multi-environment MCP sessions?
+## Resolved Questions
+- **How do we sync `.runs` metadata with Codex Cloud run history?** Approved `cloud-sync` worker approach (see Review Decisions) using manifest hashes for deduplication.
+- **How do we abstract credential management for multi-environment MCP sessions?** Vault-backed broker pattern keeps secrets ephemeral and environment-scoped.
 
 ## Approvals
-- Reviewer: ____________________
-- Date: ____________________
+- Reviewer: Architecture Steward (Codex)
+- Date: 2025-10-16

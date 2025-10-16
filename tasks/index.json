@@ -39,11 +39,13 @@
       "title": "Codex-Orchestrator Architecture & MCP Integration",
       "path": "tasks/specs/0001-orchestrator-architecture.md",
       "relates_to": "tasks/0001-prd-codex-orchestrator.md",
-      "status": "planned",
+      "status": "done",
       "gate": {
         "kind": "spec_guard",
-        "status": "pending",
-        "log": ".agent/SOPs/specs-and-research.md#added-by-governance-2025-10-16"
+        "status": "approved",
+        "approved_on": "2025-10-16T00:00:00Z",
+        "approver": "Architecture Steward (Codex)",
+        "log": "tasks/specs/0001-orchestrator-architecture.md#review-decisions-2025-10-16"
       },
       "last_review": "2025-10-16"
     },
@@ -53,11 +55,13 @@
       "title": "Codex-Orchestrator Technical Specification",
       "path": "tasks/specs/tech-spec-0001-codex-orchestrator.md",
       "relates_to": "tasks/0001-prd-codex-orchestrator.md",
-      "status": "planned",
+      "status": "done",
       "gate": {
         "kind": "spec_guard",
-        "status": "pending",
-        "log": ".agent/SOPs/specs-and-research.md#added-by-governance-2025-10-16"
+        "status": "approved",
+        "approved_on": "2025-10-16T00:00:00Z",
+        "approver": "Architecture Steward (Codex)",
+        "log": "tasks/specs/tech-spec-0001-codex-orchestrator.md#14-approvals"
       },
       "last_review": "2025-10-16"
     }

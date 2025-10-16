@@ -96,6 +96,7 @@
 - 2025-10-16 Governance Summary: PRD approvals recorded (Jordan Lee, Priya Desai, Mateo Alvarez); gate metadata updated with log anchor `tasks/0001-prd-codex-orchestrator.md#approval-log-2025-10-16` and run ID GOV-0001-PRD-20251016.
 
 ## Notes
+- 2025-10-16: Architecture steward approved mini-spec and technical spec; review decisions capture cloud-sync worker, Vault credential broker, and mode policy updates (see tasks/specs/0001-orchestrator-architecture.md#review-decisions-2025-10-16 and tasks/specs/tech-spec-0001-codex-orchestrator.md#13-review-decisions-2025-10-16).
 - Spec Requirements: Mini-specs required before implementing orchestration core, learning library, adapters/evaluation, and architecture decisions.
 - Approvals Needed: PRD (Product/Engineering/Design), mini-spec approvals, technical spec sign-off, CI guardrail confirmation.
 - Links: Codex platform docs, Agents SDK overview, MCP specification.
