@@ -94,7 +94,7 @@ if [[ "$log_enabled" == true ]]; then
     log_enabled=false
   else
     jq -n --arg mode "mcp" --arg started "$timestamp" --arg repo "$repo_root" \
-      --arg command "codex mcp-server" \
+      --arg command "codex -C $repo_root mcp-server" \
       '{mode: $mode, started_at: $started, repo: $repo, command: $command}' \
       >"${run_dir}/manifest.json" || {
         echo "Warning: failed to write manifest; continuing without run artifact." >&2
@@ -103,7 +103,7 @@ if [[ "$log_enabled" == true ]]; then
   fi
 fi
 
-cmd=(codex mcp-server --root "$repo_root")
+cmd=(codex -C "$repo_root" mcp-server)
 if [[ ${#extra_args[@]} -gt 0 ]]; then
   cmd+=("${extra_args[@]}")
 fi
@@ -111,10 +111,11 @@ fi
 if [[ "$log_enabled" == true ]]; then
   log_file="${run_dir}/mcp-server.log"
   echo "Launching Codex MCP server (logs: ${log_file})..."
+  : >"$log_file"
   {
     set +e
-    "${cmd[@]}" |& tee "$log_file"
-    exit_code=${PIPESTATUS[0]}
+    "${cmd[@]}" > >(tee -a "$log_file") 2> >(tee -a "$log_file" >&2)
+    exit_code=$?
     set -e
   }
 
