@@ -9,6 +9,21 @@
 - **Run evidence:** `.runs/3/*` (orchestrator core), `.runs/4/*` (learning library), `.runs/5/*` (evaluation harness), `.runs/6/2025-10-16T18-49-34Z` (spec guard, lint, eval harness for documentation rollout).
 - **Open follow-up:** None — Task 6 documentation mirrors and release notes approved (see `.runs/6/2025-10-16T18-49-34Z/manifest.json` capturing spec guard, lint, and eval harness validations).
 
+## Local MCP Harness Usage — Update 2025-10-18
+- **Preconditions:** Install and authenticate the Codex CLI, ensure Node.js ≥18 is available (for `npx`), and maintain optional `jq` if you want pretty-printed manifests. No background process is required; the harness is launched per session.
+- **Launching via MCP client (recommended):**
+  1. From the repository root run `npx @wong2/mcp-cli --config ./mcp-client.json`. This spawns `scripts/run-local-mcp.sh`, opens a stdio session, and writes a fresh `.runs/local-mcp/<timestamp>/` bundle (`manifest.json`, `mcp-server.log`, `result.json`).
+  2. When the CLI prompts for a server, choose `codex-local`, then select the `codex` tool and provide the requested `approval_policy` (e.g., `never`, `on-request`, `on-failure`). Each session requires a single approval choice; subsequent tool calls reuse it.
+  3. Use `tools/call edit`/`call-tool` to modify files, `tools/call run` for commands such as `npm run lint`, and capture the resulting artifact references in the run manifest before exiting the CLI. Leaving the CLI terminates the MCP server and finalizes `result.json`.
+- **Using the harness in other codebases:** Copy or symlink `mcp-client.json`, or point `--config` at this repository’s file (`npx @wong2/mcp-cli --config /path/to/CO/mcp-client.json`). Because `npx` downloads the CLI on demand, no per-project dependency is required; teams preferring a global install can run `npm install -g @wong2/mcp-cli` and invoke `mcp-cli --config …`.
+- **Always-on sessions:** The architecture intentionally scopes runs so each invocation of `scripts/run-local-mcp.sh` produces auditable artifacts. Avoid keeping long-lived background servers; instead, start a session when work begins and stop (Ctrl+C or exit the CLI) after run manifests are written.
+- **Workflow integration:** Builder/tester agents operate exclusively through MCP edits so every diff and command is mirrored under `.runs/<task>/<timestamp>/`. Reviewers cross-check those manifests with spec guard status before marking checklists complete. Mirrors (`docs/`, `.agent/`) must reflect any process updates immediately after a run is marked `[x]` with completion date + manifest path.
+- **Quick reference checklist:**
+  1. Confirm Codex CLI auth + Node.js, optionally install `jq`.
+  2. Launch `npx @wong2/mcp-cli --config ./mcp-client.json` (or equivalent) and pick `codex-local`.
+  3. Set the desired `approval_policy`, run edits/tests through MCP tools, and update `manifest.json` with command output.
+  4. Exit the CLI to stop the server, then attach the `.runs/local-mcp/<timestamp>/` artifact path to the task checklist entry before marking it complete.
+
 ## Milestone M1 — Skeleton Orchestrator & MCP Demo
 - Objective: Establish repo scaffolding with working Agents SDK manager, handoffs, and local MCP demo editing one file end-to-end.
 - Tasks:

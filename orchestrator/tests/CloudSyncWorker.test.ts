@@ -34,7 +34,7 @@ describe('CloudSyncWorker', () => {
     await writer.write(summary);
 
     const bus = new EventBus();
-    const upload = vi.fn<(payload: UploadPayload) => Promise<UploadResult>>().mockResolvedValue({
+    const upload = vi.fn<[UploadPayload], Promise<UploadResult>>().mockResolvedValue({
       status: 'success',
       runId: summary.runId,
       remoteId: 'remote-123'
@@ -64,7 +64,7 @@ describe('CloudSyncWorker', () => {
     const summary = createSummary();
 
     const bus = new EventBus();
-    const upload = vi.fn<(payload: UploadPayload) => Promise<UploadResult>>().mockResolvedValue({
+    const upload = vi.fn<[UploadPayload], Promise<UploadResult>>().mockResolvedValue({
       status: 'success',
       runId: summary.runId
     });
@@ -101,7 +101,7 @@ describe('CloudSyncWorker', () => {
 
     const bus = new EventBus();
     const upload = vi
-      .fn<(payload: UploadPayload) => Promise<UploadResult>>()
+      .fn<[UploadPayload], Promise<UploadResult>>()
       .mockRejectedValueOnce(new Error('transient'))
       .mockRejectedValueOnce(new Error('still failing'))
       .mockResolvedValue({ status: 'success', runId: summary.runId });
@@ -160,7 +160,7 @@ describe('CloudSyncWorker', () => {
 
     const bus = new EventBus();
     const upload = vi
-      .fn<(payload: UploadPayload) => Promise<UploadResult>>()
+      .fn<[UploadPayload], Promise<UploadResult>>()
       .mockRejectedValue(new CloudRunsHttpError('bad request', 400, 'Bad Request', ''));
     const onError = vi.fn();
     const worker = new CloudSyncWorker(bus, { uploadManifest: upload }, {

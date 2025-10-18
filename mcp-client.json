@@ -1,0 +1,7 @@
+{
+  "mcpServers": {
+    "codex-local": {
+      "command": "./scripts/run-local-mcp.sh"
+    }
+  }
+}
