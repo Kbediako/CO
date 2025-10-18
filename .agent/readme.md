@@ -31,6 +31,26 @@ Use explicit checkboxes (`[ ]` → `[x]`) for every task and subtask tracked in 
 - Pattern assets: `patterns/index.json` lists available codemods/linters/templates with versions.
 - Release mirrors: `docs/PRD.md`, `docs/TECH_SPEC.md`, `docs/ACTION_PLAN.md` must reference their canonical `/tasks` counterparts after every milestone update.
 
+### Local MCP Harness Quickstart
+- **One-time setup (optional but handy):**
+  ```bash
+  ln -s "/Users/asabeko/Documents/Code/CO/scripts/run-local-mcp.sh" /usr/local/bin/codex-local-mcp
+  chmod +x /usr/local/bin/codex-local-mcp
+  ```
+  Drop this config in any repo to reuse the harness:
+  ```json
+  {
+    "mcpServers": {
+      "codex-local": {
+        "command": "codex-local-mcp"
+      }
+    }
+  }
+  ```
+- **Start a session:** `npx --yes @wong2/mcp-cli --config ./mcp-client.json`, pick `codex-local`, then choose the `codex` tool. Provide an `approval_policy` (`never`, `on-request`, etc.) and a natural-language prompt describing the work.
+- **Do the work through MCP:** Use `call-tool edit` to modify files and `call-tool run` for commands (`npm run lint`, `npm run test`, `bash scripts/spec-guard.sh --dry-run`, etc.). Every call is logged under `.runs/local-mcp/<timestamp>/`.
+- **Shut down:** Exit the CLI (Ctrl+C or `exit`). The harness writes `manifest.json`, `mcp-server.log`, and `result.json`. Reference that path when marking checklist items complete.
+
 ### Quick Links
 - Control files: `/.ai-dev-tasks/*`
 - Templates: `.agent/task/templates/`
