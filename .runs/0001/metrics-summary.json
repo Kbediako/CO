@@ -1,0 +1,12 @@
+{
+  "generated_at": "2025-10-18T18:32:50.197Z",
+  "task_id": "0001",
+  "metrics_file": ".runs/0001/metrics.json",
+  "entries_total": 3,
+  "entries_succeeded": 1,
+  "entries_failed": 2,
+  "success_rate": 0.3333333333333333,
+  "guardrail_coverage": 0.3333333333333333,
+  "average_duration_seconds": 49.85,
+  "parse_errors": []
+}

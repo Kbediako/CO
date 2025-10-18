@@ -18,7 +18,7 @@
 
 ## Local MCP Harness Usage — Update 2025-10-18
 - **Preconditions:** Install and authenticate the Codex CLI, ensure Node.js ≥18 is available (for `npx`), and maintain optional `jq` if you want pretty-printed manifests. No background process is required; the harness is launched per session.
-- **Automation shortcut:** `scripts/run-mcp-diagnostics.sh` now wraps the Agents SDK runner. It spawns `scripts/agents_mcp_runner.mjs`, sets `client_session_timeout_seconds=3600`, executes build/lint/test/spec-guard through Codex, and tails progress until completion. The command prints the run id plus `.runs/local-mcp/<run-id>/manifest.json`.
+- **Automation shortcut:** `scripts/run-mcp-diagnostics.sh` now wraps the Agents SDK runner. It spawns `scripts/agents_mcp_runner.mjs`, sets `client_session_timeout_seconds=3600`, executes build/lint/test/spec-guard through Codex, and tails progress until completion. The command prints the run id plus `.runs/0001/mcp/<run-id>/manifest.json` and the compatibility pointer under `.runs/local-mcp/<run-id>/`.
 - **Manual start & poll:** Use `scripts/mcp-runner-start.sh --timeout 7200 --approval-policy never` to enqueue a session without blocking, then `scripts/mcp-runner-poll.sh <run-id> --watch` to monitor. Each run directory contains `manifest.json`, `runner.log`, and per-command response JSON (one file per diagnostic).
 - **Extended sessions & resilience:** The runner hosts `scripts/run-local-mcp.sh` via `MCPServerStdio`, eliminating the two-minute CLI timeout and persisting state between poll calls. Progress updates write back to the manifest after each command so mid-run monitoring never requires restarting diagnostics.
 - **Customization:** Pass `--command "<cmd>"` flags to `node scripts/agents_mcp_runner.mjs start` to add extra MCP actions, or override `--timeout` if longer build/test cycles are expected. All work still flows through Codex MCP tools.
@@ -28,7 +28,7 @@
   1. Confirm Codex CLI auth and run `npm install` so the Agents SDK dependencies (`@openai/agents`, `@modelcontextprotocol/sdk`) are available; optionally export `OPENAI_API_KEY` for tracing.
   2. Run `scripts/run-mcp-diagnostics.sh` (or `scripts/mcp-runner-start.sh`) with the desired approval policy and timeout.
   3. Poll progress via `scripts/mcp-runner-poll.sh <run-id> --watch` or inspect `manifest.json` directly.
-  4. Attach the `.runs/local-mcp/<run-id>/manifest.json` path to the relevant checklist entry before marking it complete.
+  4. Attach the `.runs/0001/mcp/<run-id>/manifest.json` path (and reference the legacy pointer when applicable) to the relevant checklist entry before marking it complete.
 
 ## Milestone M1 — Skeleton Orchestrator & MCP Demo
 - Objective: Establish repo scaffolding with working Agents SDK manager, handoffs, and local MCP demo editing one file end-to-end.

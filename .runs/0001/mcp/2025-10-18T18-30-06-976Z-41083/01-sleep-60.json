@@ -1,0 +1,6 @@
+[
+  {
+    "type": "text",
+    "text": "{\"exit_code\":124,\"summary\":\"sleep 60 timed out after 10 seconds; rerun with a longer timeout to allow completion\",\"manifest_path\":null}"
+  }
+]

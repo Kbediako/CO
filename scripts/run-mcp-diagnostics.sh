@@ -70,11 +70,14 @@ if [[ -z "$START_OUTPUT" ]]; then
 fi
 
 RUN_ID="$(node -e 'const data = JSON.parse(process.argv[1]); console.log(data.run_id);' "$START_OUTPUT")"
-
 MANIFEST_PATH="$(node -e 'const data = JSON.parse(process.argv[1]); console.log(data.manifest);' "$START_OUTPUT")"
+ARTIFACT_ROOT="$(node -e 'const data = JSON.parse(process.argv[1]); console.log(data.artifact_root);' "$START_OUTPUT")"
+COMPAT_PATH="$(node -e 'const data = JSON.parse(process.argv[1]); console.log(data.compat_path);' "$START_OUTPUT")"
 
 echo "Diagnostics run started."
 echo "Run ID: ${RUN_ID}"
+echo "Artifact root: ${ARTIFACT_ROOT}"
+echo "Compatibility path: ${COMPAT_PATH}"
 echo "Manifest: ${MANIFEST_PATH}"
 echo
 

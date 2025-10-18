@@ -2,7 +2,7 @@
 set -euo pipefail
 
 if [[ $# -lt 1 ]]; then
-  echo "Usage: scripts/mcp-runner-poll.sh <run-id> [--watch]" >&2
+  echo "Usage: scripts/mcp-runner-poll.sh <run-id> [--watch] [--interval N]" >&2
   exit 2
 fi
 

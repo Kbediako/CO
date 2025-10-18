@@ -1,0 +1,16 @@
+{
+  "generated_at": "2025-10-18T18:26:01.631Z",
+  "dry_run": false,
+  "repo_root": "/Users/asabeko/Documents/Code/CO",
+  "legacy_root": ".runs/local-mcp",
+  "task_runs_root": ".runs/0001/mcp",
+  "runs": [
+    {
+      "run_id": "demo-legacy",
+      "source": ".runs/local-mcp/demo-legacy",
+      "destination": ".runs/0001/mcp/demo-legacy",
+      "status": "migrated",
+      "message": "Migrated successfully."
+    }
+  ]
+}

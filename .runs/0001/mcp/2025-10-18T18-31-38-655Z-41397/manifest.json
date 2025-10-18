@@ -1,0 +1,37 @@
+{
+  "runner": "agents-sdk",
+  "script": "scripts/agents_mcp_runner.mjs",
+  "status": "failed",
+  "status_detail": "command-failed",
+  "commands": [
+    {
+      "index": 1,
+      "command": "sleep 600",
+      "status": "failed",
+      "started_at": "2025-10-18T18:31:38.776Z",
+      "completed_at": "2025-10-18T18:32:14.632Z",
+      "exit_code": 124,
+      "manifest_path": null,
+      "response_file": ".runs/0001/mcp/2025-10-18T18-31-38-655Z-41397/01-sleep-600.json",
+      "summary": "sleep 600 timed out after 10 seconds (command exceeded tool timeout)"
+    }
+  ],
+  "started_at": "2025-10-18T18:31:38.656Z",
+  "updated_at": "2025-10-18T18:32:14.634Z",
+  "completed_at": "2025-10-18T18:32:14.633Z",
+  "run_id": "2025-10-18T18-31-38-655Z-41397",
+  "repo_root": "/Users/asabeko/Documents/Code/CO",
+  "approval_policy": "never",
+  "timeout_seconds": 900,
+  "runner_pid": 41398,
+  "runner_log": ".runs/0001/mcp/2025-10-18T18-31-38-655Z-41397/runner.log",
+  "task_id": "0001",
+  "artifact_root": ".runs/0001/mcp/2025-10-18T18-31-38-655Z-41397",
+  "compat_path": ".runs/local-mcp/2025-10-18T18-31-38-655Z-41397",
+  "heartbeat_at": "2025-10-18T18:32:08.781Z",
+  "heartbeat_interval_seconds": 10,
+  "heartbeat_stale_after_seconds": 30,
+  "resume_token": "198e9f943c1039082ce7bd4549a5bb7b8571ae7436a9db2f36d6c02f031f4326",
+  "resume_events": [],
+  "metrics_recorded": true
+}

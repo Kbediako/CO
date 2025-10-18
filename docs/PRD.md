@@ -32,7 +32,7 @@
 
 ## Added by PRD Author 2025-10-18
 - **Canonical Source:** `tasks/0001-prd-codex-orchestrator.md` (section “Added by PRD Author 2025-10-18”).
-- **Focus:** Document the current Agents-SDK runner contract (`scripts/mcp-runner-start.sh` → `scripts/agents_mcp_runner.mjs`) and its manifest/log outputs under `.runs/local-mcp/<run-id>/` for builder/tester/reviewer agents.
+- **Focus:** Document the current Agents-SDK runner contract (`scripts/mcp-runner-start.sh` → `scripts/agents_mcp_runner.mjs`) and its manifest/log outputs under `.runs/0001/mcp/<run-id>/` (with `.runs/local-mcp/<run-id>/` maintained as a compatibility pointer) for builder/tester/reviewer agents.
 - **Key Behaviors:** Start script forwards `--command`, `--approval-policy`, `--timeout`, `--format`; manifest tracks command statuses and response artifacts; poll script streams textual updates. Enhancements like JSON polling or diff artifact capture are backlog items.
 - **Guardrails:** Default timeout remains 3600 seconds; spec-guard stays in the default command queue; automated diagnostics and retries are explicitly called out as future work.
 - **Open Items:** Normalize manifest locations vs. task directories, add heartbeat/resume support, design metrics aggregation, and pin the Agents SDK version.

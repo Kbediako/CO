@@ -7,7 +7,8 @@ export default defineConfig({
       'orchestrator/tests/**/*.test.ts',
       'patterns/**/*.test.ts',
       'adapters/**/*.test.ts',
-      'evaluation/tests/**/*.test.ts'
+      'evaluation/tests/**/*.test.ts',
+      'tests/**/*.spec.ts'
     ],
     coverage: {
       enabled: false

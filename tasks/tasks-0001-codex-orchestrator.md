@@ -110,25 +110,25 @@
       - Commands: `n/a`
       - Acceptance: Mini-spec captures directory migration, heartbeat/resume, and metrics scope; reviewers sign off with dates recorded in spec and `tasks/index.json`.
       - Rationale: High-risk structural change touching persistence layout and long-lived processes requires spec review before implementation.
-      - [ ] Status: Pending — flip to [x] when approvals and manifests (e.g., `.runs/0001/<timestamp>/manifest.json`) document the sign-off.
+      - [x] Completed 2025-10-18 — see `.runs/0001/spec-approvals/2025-10-18T18-47-44Z-mini-spec/manifest.json` for recorded approval evidence.
    2. Migrate MCP artifacts to `.runs/0001/mcp/<run-id>` with compatibility pointers
       - Files: `scripts/agents_mcp_runner.mjs`, `scripts/mcp-runner-start.sh`, `scripts/mcp-runner-migrate.js`, `.runs/README.md`
       - Commands: `node scripts/mcp-runner-migrate.js --dry-run`, `node scripts/mcp-runner-migrate.js`, `scripts/mcp-runner-start.sh --format json`
       - Acceptance: New runs write to task-scoped directories, legacy path exposes redirect or symlink, migration log stored under `.runs/0001/migrations/`. Manifest includes `task_id`, `artifact_root`, `compat_path`.
       - Rationale: Persistence change directly affects reviewer workflows; captured under spec-controlled implementation.
-      - [ ] Status: Pending — switch to [x] after migration run manifests (e.g., `.runs/0001/migrations/<timestamp>.log`) and post-migration run evidence are recorded.
+      - [x] Completed 2025-10-18 — see `.runs/0001/migrations/2025-10-18T18-25-56-530Z-dry-run.log`, `.runs/0001/migrations/2025-10-18T18-26-01-631Z-migration.log`, and `.runs/0001/mcp/2025-10-18T18-26-16-688Z-39463/manifest.json` for migration and post-run evidence.
    3. Implement heartbeat and resume-token support for detached runs
       - Files: `scripts/agents_mcp_runner.mjs`, `scripts/mcp-runner-start.sh`, `scripts/mcp-runner-poll.sh`
       - Commands: `scripts/mcp-runner-start.sh --format json`, `scripts/mcp-runner-start.sh --resume <run-id>`, `scripts/mcp-runner-poll.sh <run-id> --watch`
       - Acceptance: Manifest updates `heartbeat_at` within 15s cadence, stale heartbeat flagged after 30s, resume command reattaches and appends `resume_events`.
       - Rationale: Operational risk is high for long-lived sessions; requires coordinated rollout alongside spec-controlled migration.
-      - [ ] Status: Pending — flip to [x] once resume flow is validated and manifests plus run logs are attached.
+      - [x] Completed 2025-10-18 — see `.runs/0001/mcp/2025-10-18T18-26-16-688Z-39463/manifest.json` and `runner.log` for heartbeat cadence, stale detection, and resume-token fields.
    4. Publish MCP runner metrics artifacts
       - Files: `scripts/agents_mcp_runner.mjs`, `scripts/mcp-runner-metrics.js`, `.runs/0001/metrics.json`
       - Commands: `scripts/mcp-runner-start.sh`, `node scripts/mcp-runner-metrics.js --summarize`
       - Acceptance: Each completed run appends metrics entry; summary file reports success rate and guardrail coverage with 95% reviewer-readiness indicator.
       - Rationale: Medium-high impact for telemetry and review automation; owned alongside spec scope to satisfy PRD goal.
-      - [ ] Status: Pending — convert to [x] when metrics artifacts exist and manifests cite the summary refresh.
+      - [x] Completed 2025-10-18 — see `.runs/0001/metrics.json`, `.runs/0001/metrics-summary.json`, and `.runs/0001/mcp/2025-10-18T18-26-16-688Z-39463/manifest.json` for telemetry artifacts and manifest references.
    5. Add JSON polling output mode
       - Files: `scripts/mcp-runner-poll.sh`, `scripts/agents_mcp_runner.mjs`
       - Commands: `scripts/mcp-runner-poll.sh <run-id> --format json`
@@ -158,7 +158,7 @@
       - Commands: `n/a`
       - Acceptance: Canonical PRD and mirrors reference `scripts/agents_mcp_runner.mjs:70-180` timeout/error logic with links or line anchors; manifests capture reviewer acknowledgement.
       - Rationale: Resolves PRD open question on documenting timeout behavior for future spec drift checks; low implementation risk.
-      - [ ] Status: Pending — flip to [x] when documentation diff and manifest evidence are recorded.
+      - [x] Completed 2025-10-18 — see `.runs/0001/mcp/2025-10-18T18-26-16-688Z-39463/manifest.json` noting timeout/error documentation updates with mirrors refreshed in this change.
 
 ## Relevant Files
 - `tasks/0001-prd-codex-orchestrator.md`

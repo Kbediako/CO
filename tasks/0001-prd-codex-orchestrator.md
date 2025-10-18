@@ -98,9 +98,9 @@
 ### Problem Statement & Goals
 - Codex-Orchestrator must offer a deterministic Agents-SDK MCP runner workflow so builder/tester/reviewer agents can trigger, monitor, and audit long-lived runs without leaving the Codex CLI (source alignment: `scripts/agents_mcp_runner.mjs`, `scripts/mcp-runner-start.sh`, `.agent/readme.md`; validate exact line refs during spec draft).
 - Goals
-  - Ensure every MCP-triggered execution persists its manifest and logs under the existing `.runs/local-mcp/<run-id>/` contract (`manifest.json`, `runner.log`, per-command response JSON). If we later standardize on task-scoped directories (for example `.runs/0001/...`), record the migration plan and update the runner in lockstep.
+  - Ensure every MCP-triggered execution persists its manifest and logs under `.runs/0001/mcp/<run-id>/` while emitting a compatibility pointer under `.runs/local-mcp/<run-id>/` so legacy tooling continues to function. Manifest schema must include heartbeat/resume metadata and metrics bookkeeping.
   - Provide end-to-end automation so `codex mcp-server` sessions launched via `scripts/run-local-mcp.sh` reliably register edit/git/run capability and surface diagnostics to reviewers inside the run manifest.
-  - Reduce reviewer replays: 95% of orchestrator tickets should be reviewable from run artifacts alone (no manual reruns). Track via a new metrics log (proposed `.runs/0001/metrics.json`) once instrumentation is implemented.
+  - Reduce reviewer replays: 95% of orchestrator tickets should be reviewable from run artifacts alone (no manual reruns). Track via the task-scoped telemetry artifacts (`.runs/0001/metrics.json` JSONL + `.runs/0001/metrics-summary.json`).
   - Keep spec-guard checks in the default command sequence so every MCP-driven implementation run captures `bash scripts/spec-guard.sh --dry-run` alongside build/lint/test results; document any stricter enforcement (such as 24-hour freshness windows) as a follow-up enhancement.
 
 ### Non-Goals / Out of Scope
@@ -112,18 +112,18 @@
 ### User Workflows & MCP Integration
 #### Builder Agent Happy Path
 1. Run `scripts/run-local-mcp.sh` to start `codex mcp-server` with repo workspace (mirrors the setup already exercised by the runner).
-2. Invoke the runner via `scripts/mcp-runner-start.sh [--command "<cmd>"] --approval-policy never --timeout 3600`. The wrapper simply forwards to `scripts/agents_mcp_runner.mjs start` and prints the generated `run_id` plus manifest path.
-3. Poll status using `scripts/mcp-runner-poll.sh <run_id> [--watch]`; update `/tasks/tasks-0001-codex-orchestrator.md` checklist item with `[x] <YYYY-MM-DD> .runs/local-mcp/<run-id>/manifest.json`.
-4. On success, `scripts/agents_mcp_runner.mjs` writes `manifest.json`, `runner.log`, and per-command response JSON files under `.runs/local-mcp/<run-id>/`.
+2. Invoke the runner via `scripts/mcp-runner-start.sh [--command "<cmd>"] --approval-policy never --timeout 3600`. The wrapper simply forwards to `scripts/agents_mcp_runner.mjs start` and prints the generated `run_id`, task-scoped `artifact_root` (e.g. `.runs/0001/mcp/<run-id>`), and the manifest path.
+3. Poll status using `scripts/mcp-runner-poll.sh <run_id> [--watch]`; update `/tasks/tasks-0001-codex-orchestrator.md` checklist item with `[x] <YYYY-MM-DD> .runs/0001/mcp/<run-id>/manifest.json` and reference the compatibility pointer under `.runs/local-mcp/<run-id>/` for legacy auditors.
+4. On success, `scripts/agents_mcp_runner.mjs` writes `manifest.json`, `runner.log`, per-command response JSON files, `.heartbeat`, and `.resume-token` under `.runs/0001/mcp/<run-id>/`, then appends to `.runs/0001/metrics.json`.
 
 #### Builder Failure Scenarios
 - **Timeout**: `scripts/agents_mcp_runner.mjs` passes the `--timeout` value through to `clientSessionTimeoutSeconds` (default 3600s). Runs that exceed the allowance terminate with `status=failed` and the last command marked `failed`. Lower timeout targets (e.g., 900s) require explicit configuration and are tracked as a follow-up enhancement.
-- **Detached Run**: Today the runner relies on manual polling; no heartbeat detection is implemented. Document this limitation and add heartbeat/resume-token support as an open question for the spec author.
+- **Detached Run**: Heartbeat timestamps are refreshed every ≤10 seconds. `scripts/mcp-runner-poll.sh` surfaces `status_detail=stale-heartbeat` when the heartbeat age exceeds 30 seconds, and `scripts/mcp-runner-start.sh --resume <run-id>` reattaches using the stored `.resume-token` while appending a `resume_events[]` entry to the manifest.
 - **Malformed Tool Response**: When the Codex tool returns non-JSON or exits non-zero, the runner records the failure in the command entry (`status=failed`, `summary` describing the error) and surfaces `manifest.status=failed`. Capturing a standalone `errors/malformed_tool.json` file is a proposed enhancement.
 
 #### Tester Agent Workflow
-1. Read `.runs/local-mcp/<run-id>/manifest.json` to confirm required commands (`npm run build`, `npm run lint`, `npm run test`, `bash scripts/spec-guard.sh --dry-run`) executed in-order; queue additional commands with `--command` flags when gaps exist.
-2. Attach test logs to `.runs/local-mcp/<run-id>/test-<slug>.log` (naming convention to be finalized in the spec).
+1. Read `.runs/0001/mcp/<run-id>/manifest.json` (or the `.runs/local-mcp/<run-id>/` pointer) to confirm required commands (`npm run build`, `npm run lint`, `npm run test`, `bash scripts/spec-guard.sh --dry-run`) executed in-order; queue additional commands with `--command` flags when gaps exist.
+2. Attach test logs to `.runs/0001/mcp/<run-id>/test-<slug>.log` (retaining a reference from the manifest for reviewer convenience).
 3. Update `/tasks/tasks-0001-codex-orchestrator.md` tester checklist upon completion.
 
 #### Reviewer Agent Workflow
@@ -133,7 +133,7 @@
 
 ### Functional Requirements
 - Runner invocation: `scripts/mcp-runner-start.sh` remains a thin wrapper over `scripts/agents_mcp_runner.mjs start`, supporting `--command` (repeatable), `--approval-policy`, `--timeout`, and `--format` (text|json). Document the default command queue (`npm run build`, `npm run lint`, `npm run test`, `bash scripts/spec-guard.sh --dry-run`).
-- Manifest contract: persist run state at `.runs/local-mcp/<run-id>/manifest.json` with the existing fields (`runner`, `script`, `status`, `commands[]`, `started_at`, `updated_at`, `completed_at`, `run_id`, `repo_root`, `approval_policy`, `timeout_seconds`, `runner_pid`, `runner_log`). Each command entry must include index, command, status, timestamps, exit_code, summary, manifest_path (when provided by the tool), and response_file.
+- Manifest contract: persist run state at `.runs/0001/mcp/<run-id>/manifest.json` with the extended fields (`runner`, `script`, `status`, `status_detail`, `commands[]`, `started_at`, `updated_at`, `completed_at`, `run_id`, `repo_root`, `approval_policy`, `timeout_seconds`, `runner_pid`, `runner_log`, `task_id`, `artifact_root`, `compat_path`, `heartbeat_at`, `heartbeat_interval_seconds`, `heartbeat_stale_after_seconds`, `resume_token`, `resume_events[]`, `metrics_recorded`). Each command entry must include index, command, status, timestamps, exit_code, summary, manifest_path (when provided by the tool), and response_file.
 - Logging: keep `runner.log` and per-command response JSON files alongside the manifest. Any new artifact types (diff patches, diagnostics) require corresponding runner updates and should be tracked as enhancements before spec sign-off.
 - Polling: `scripts/mcp-runner-poll.sh` reads the manifest and prints human-readable status; support `--watch` and `--interval`. JSON status output is a stretch goal and should be captured under Open Questions until implemented.
 - Guardrails: the default command list must retain `bash scripts/spec-guard.sh --dry-run`; if callers omit it, the manifest should flag the missing guardrail for reviewer attention (implementation detail for the upcoming spec).
@@ -150,16 +150,16 @@
 
 ### Open Questions & Risks
 - How to resume detached runs without duplicate manifests? Need policy for `resume_token` storage.
-- Decide whether to introduce a task-scoped metrics artifact (e.g., `.runs/0001/metrics.json`) or extend the existing `.runs/local-mcp/` hierarchy; confirm schema with architecture spec.
+- Validate telemetry retention policy for `.runs/0001/metrics.json` (JSONL) and `.runs/0001/metrics-summary.json` to prevent unbounded growth; document pruning cadence in the architecture spec.
 - Document the exact code paths governing timeouts and error handling (`scripts/agents_mcp_runner.mjs:70-180`) so mirror docs stay accurate if behavior changes.
 - Risk of manifest bloat when logs are large; consider log rotation or compression (out of scope unless mandated).
 - Confirm Agents SDK version compatibility and pinning in `package.json` to avoid breaking changes.
 
 ### Acceptance Criteria
-1. Running `scripts/mcp-runner-start.sh --approval-policy never --timeout 3600 --format json` returns a JSON payload containing `run_id`, `run_dir`, and `manifest`, and creates `.runs/local-mcp/<run-id>/manifest.json` plus `runner.log`.
-2. The manifest records the default command queue (`npm run build`, `npm run lint`, `npm run test`, `bash scripts/spec-guard.sh --dry-run`) with each entry’s `status` transitioning from `pending` → `running` → `succeeded`.
-3. `scripts/mcp-runner-poll.sh <run-id> --watch --interval 5` streams human-readable updates until the manifest reaches a terminal state (`succeeded` or `failed`).
-4. When a queued command returns a non-zero exit code, the corresponding manifest entry marks `status=failed`, populates `exit_code`, and the overall `manifest.status` becomes `failed` without retrying subsequent commands.
-5. Setting a reduced timeout (`scripts/mcp-runner-start.sh --timeout 30 ...`) for a command that exceeds the allowance results in the manifest capturing the failure with `timeout_seconds=30` and `status=failed`.
-6. Checklist entries in `/tasks/tasks-0001-codex-orchestrator.md` and mirrors (`docs/ACTION_PLAN.md`, `docs/PRD.md`) flip to `[x]` with completion date and the `.runs/local-mcp/<run-id>/manifest.json` path in the same change set.
+1. Running `scripts/mcp-runner-start.sh --approval-policy never --timeout 3600 --format json` returns a JSON payload containing `run_id`, `artifact_root`, `compat_path`, and `manifest`, and creates `.runs/0001/mcp/<run-id>/` artifacts plus the legacy pointer under `.runs/local-mcp/<run-id>/`.
+2. The manifest records the default command queue (`npm run build`, `npm run lint`, `npm run test`, `bash scripts/spec-guard.sh --dry-run`) with each entry’s `status` transitioning from `pending` → `running` → `succeeded`, and refreshes `heartbeat_at` every ≤15 seconds.
+3. `scripts/mcp-runner-poll.sh <run-id> --watch --interval 5` streams human-readable updates, including `status_detail=stale-heartbeat` when the heartbeat age exceeds 30 seconds.
+4. Invoking `scripts/mcp-runner-start.sh --resume <run-id>` after terminating the runner process reattaches via the stored `.resume-token`, updates `manifest.runner_pid`, and appends a `resume_events[]` entry.
+5. Upon run completion, `.runs/0001/metrics.json` gains a new JSONL record with guardrail coverage, durations, and status; executing `node scripts/mcp-runner-metrics.js` rewrites `.runs/0001/metrics-summary.json` with updated success and coverage statistics.
+6. Checklist entries in `/tasks/tasks-0001-codex-orchestrator.md` and mirrors (`docs/ACTION_PLAN.md`, `docs/PRD.md`) flip to `[x]` with completion date and the `.runs/0001/mcp/<run-id>/manifest.json` path in the same change set.
 7. Reviewer confirms mirror accuracy: `docs/PRD.md` summarizes the canonical section without introducing behaviors not present in the manifest or runner scripts.

@@ -1,0 +1,6 @@
+[
+  {
+    "type": "text",
+    "text": "{\"exit_code\":124,\"summary\":\"sleep 600 timed out after 10 seconds (command exceeded tool timeout)\",\"manifest_path\":null}"
+  }
+]
