@@ -27,6 +27,14 @@
   Update the `prompt` string with the specific work you need Codex to perform; the tool handles editing/testing via MCP and logs artifacts automatically.
 - **Timeout tip:** If the CLI returns `MCP error -32001: Request timed out`, split the workflow into separate tool calls (one per command, e.g., build, then lint, etc.) or use the interactive picker and run commands sequentially. Each call appends to the same `.runs/local-mcp/<timestamp>/` manifest.
 - **Skip manual scaffolding:** The harness automatically creates the timestamped run directory and updates `manifest.json` after every tool call. You do not need to list prior manifests or create folders manually—just run the command(s) and review the new manifest when the call completes.
+- **Default diagnostics sequence:** Run the following four commands exactly (one at a time) and wait for each JSON response before starting the next:
+  ```bash
+  npx --yes @wong2/mcp-cli --config ./mcp-client.json call-tool codex-local:codex --args '{"approval_policy":"never","prompt":"Run npm run build and record the output in the current MCP run manifest. Reply only when the command finishes."}'
+  npx --yes @wong2/mcp-cli --config ./mcp-client.json call-tool codex-local:codex --args '{"approval_policy":"never","prompt":"Run npm run lint and record the output in the current MCP run manifest. Reply only when the command finishes."}'
+  npx --yes @wong2/mcp-cli --config ./mcp-client.json call-tool codex-local:codex --args '{"approval_policy":"never","prompt":"Run npm run test and record the output in the current MCP run manifest. Reply only when the command finishes."}'
+  npx --yes @wong2/mcp-cli --config ./mcp-client.json call-tool codex-local:codex --args '{"approval_policy":"never","prompt":"Run bash scripts/spec-guard.sh --dry-run and record the output in the current MCP run manifest. Reply only when the command finishes."}'
+  ```
+  Avoid extra preparatory commands (e.g., `ls`, `grep`) before the sequence—the harness handles manifest creation once the first call completes.
 - **Using the harness in other codebases:** Copy or symlink `mcp-client.json`, or point `--config` at this repository’s file (`npx @wong2/mcp-cli --config /path/to/CO/mcp-client.json`). Because `npx` downloads the CLI on demand, no per-project dependency is required; teams preferring a global install can run `npm install -g @wong2/mcp-cli` and invoke `mcp-cli --config …`. For a copy/paste setup, create a global symlink once:
   ```bash
   ln -s "/Users/asabeko/Documents/Code/CO/scripts/run-local-mcp.sh" /usr/local/bin/codex-local-mcp

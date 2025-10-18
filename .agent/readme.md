@@ -67,6 +67,14 @@ Use explicit checkboxes (`[ ]` → `[x]`) for every task and subtask tracked in 
   ```
   Or stay in the interactive CLI and run one command at a time.
 - **Skip manual scaffolding:** The harness auto-creates the `.runs/local-mcp/<timestamp>/` structure and appends to the manifest after each call. Do not spend time listing existing manifests or creating folders yourself—just run the tool commands and review the new manifest when finished.
+- **Default diagnostics sequence (run exactly these, in order, waiting for each JSON reply):**
+  ```bash
+  npx --yes @wong2/mcp-cli --config ./mcp-client.json call-tool codex-local:codex --args '{"approval_policy":"never","prompt":"Run npm run build and record the output in the current MCP run manifest. Reply only when the command finishes."}'
+  npx --yes @wong2/mcp-cli --config ./mcp-client.json call-tool codex-local:codex --args '{"approval_policy":"never","prompt":"Run npm run lint and record the output in the current MCP run manifest. Reply only when the command finishes."}'
+  npx --yes @wong2/mcp-cli --config ./mcp-client.json call-tool codex-local:codex --args '{"approval_policy":"never","prompt":"Run npm run test and record the output in the current MCP run manifest. Reply only when the command finishes."}'
+  npx --yes @wong2/mcp-cli --config ./mcp-client.json call-tool codex-local:codex --args '{"approval_policy":"never","prompt":"Run bash scripts/spec-guard.sh --dry-run and record the output in the current MCP run manifest. Reply only when the command finishes."}'
+  ```
+  Do not insert extra `ls`, `grep`, or directory-creation commands before the sequence; the tool will write the manifest once each call completes.
 - **Do the work through MCP:** Use `call-tool edit` to modify files and `call-tool run` for commands (`npm run lint`, `npm run test`, `bash scripts/spec-guard.sh --dry-run`, etc.). Every call is logged under `.runs/local-mcp/<timestamp>/`.
 - **Shut down:** Exit the CLI (Ctrl+C or `exit`). The harness writes `manifest.json`, `mcp-server.log`, and `result.json`. Reference that path when marking checklist items complete.
 
