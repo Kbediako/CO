@@ -27,5 +27,9 @@
   },
   "overrides": {
     "esbuild": "^0.25.11"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.20.1",
+    "@openai/agents": "^0.1.10"
   }
 }

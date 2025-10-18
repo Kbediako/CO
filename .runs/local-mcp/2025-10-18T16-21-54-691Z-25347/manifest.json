@@ -1,0 +1,60 @@
+{
+  "runner": "agents-sdk",
+  "script": "scripts/agents_mcp_runner.mjs",
+  "status": "succeeded",
+  "commands": [
+    {
+      "index": 1,
+      "command": "npm run build",
+      "status": "succeeded",
+      "started_at": "2025-10-18T16-21-54-804Z",
+      "completed_at": "2025-10-18T16-22-03-102Z",
+      "exit_code": 0,
+      "manifest_path": null,
+      "response_file": ".runs/local-mcp/2025-10-18T16-21-54-691Z-25347/01-npm-run-build.json",
+      "summary": "Finished npm run build (tsc compile) successfully."
+    },
+    {
+      "index": 2,
+      "command": "npm run lint",
+      "status": "succeeded",
+      "started_at": "2025-10-18T16-22-03-103Z",
+      "completed_at": "2025-10-18T16-22-16-497Z",
+      "exit_code": 0,
+      "manifest_path": null,
+      "response_file": ".runs/local-mcp/2025-10-18T16-21-54-691Z-25347/02-npm-run-lint.json",
+      "summary": "npm run lint completed successfully after building patterns and running eslint."
+    },
+    {
+      "index": 3,
+      "command": "npm run test",
+      "status": "succeeded",
+      "started_at": "2025-10-18T16-22-16-498Z",
+      "completed_at": "2025-10-18T16-22-26-736Z",
+      "exit_code": 0,
+      "manifest_path": null,
+      "response_file": ".runs/local-mcp/2025-10-18T16-21-54-691Z-25347/03-npm-run-test.json",
+      "summary": "Vitest suite passed (9 files, 32 tests)"
+    },
+    {
+      "index": 4,
+      "command": "bash scripts/spec-guard.sh --dry-run",
+      "status": "succeeded",
+      "started_at": "2025-10-18T16-22-26-736Z",
+      "completed_at": "2025-10-18T16-22-36-034Z",
+      "exit_code": 0,
+      "manifest_path": null,
+      "response_file": ".runs/local-mcp/2025-10-18T16-21-54-691Z-25347/04-bash-scripts-spec-guard-sh-dry-run.json",
+      "summary": "Spec guard dry run succeeded."
+    }
+  ],
+  "started_at": "2025-10-18T16-21-54-692Z",
+  "updated_at": "2025-10-18T16-22-36-035Z",
+  "completed_at": "2025-10-18T16-22-36-035Z",
+  "run_id": "2025-10-18T16-21-54-691Z-25347",
+  "repo_root": "/Users/asabeko/Documents/Code/CO",
+  "approval_policy": "never",
+  "timeout_seconds": 3600,
+  "runner_pid": 25348,
+  "runner_log": ".runs/local-mcp/2025-10-18T16-21-54-691Z-25347/runner.log"
+}

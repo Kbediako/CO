@@ -11,53 +11,17 @@
 
 ## Local MCP Harness Usage — Update 2025-10-18
 - **Preconditions:** Install and authenticate the Codex CLI, ensure Node.js ≥18 is available (for `npx`), and maintain optional `jq` if you want pretty-printed manifests. No background process is required; the harness is launched per session.
-- **Launching via MCP client (recommended):**
-  1. From the repository root run `npx @wong2/mcp-cli --config ./mcp-client.json`. This spawns `scripts/run-local-mcp.sh`, opens a stdio session, and writes a fresh `.runs/local-mcp/<timestamp>/` bundle (`manifest.json`, `mcp-server.log`, `result.json`).
-  2. When the CLI prompts for a server, choose `codex-local`, then select the `codex` tool and provide the requested `approval_policy` (e.g., `never`, `on-request`, `on-failure`). Each session requires a single approval choice; subsequent tool calls reuse it.
-  3. Use `tools/call edit`/`call-tool` to modify files, `tools/call run` for commands such as `npm run lint`, and capture the resulting artifact references in the run manifest before exiting the CLI. Leaving the CLI terminates the MCP server and finalizes `result.json`.
-- **Non-interactive batch commands:** To bypass interactive prompts, invoke the codex tool directly:
-  ```bash
-  npx --yes @wong2/mcp-cli --config ./mcp-client.json \
-    call-tool codex-local:codex \
-    --args '{
-      "approval_policy": "never",
-      "prompt": "Run npm run build, npm run lint, npm run test, and bash scripts/spec-guard.sh --dry-run. Record outputs in the run manifest and summarize findings."
-    }'
-  ```
-  Update the `prompt` string with the specific work you need Codex to perform; the tool handles editing/testing via MCP and logs artifacts automatically.
-- **Timeout tip:** If the CLI returns `MCP error -32001: Request timed out`, split the workflow into separate tool calls (one per command, e.g., build, then lint, etc.) or use the interactive picker and run commands sequentially. Each call appends to the same `.runs/local-mcp/<timestamp>/` manifest.
-- **Skip manual scaffolding:** The harness automatically creates the timestamped run directory and updates `manifest.json` after every tool call. You do not need to list prior manifests or create folders manually—just run the command(s) and review the new manifest when the call completes.
-- **Default diagnostics sequence:** Run the following four commands exactly (one at a time) and wait for each JSON response before starting the next:
-  ```bash
-  npx --yes @wong2/mcp-cli --config ./mcp-client.json call-tool codex-local:codex --args '{"approval_policy":"never","prompt":"Run npm run build and record the output in the current MCP run manifest. Reply only when the command finishes."}'
-  npx --yes @wong2/mcp-cli --config ./mcp-client.json call-tool codex-local:codex --args '{"approval_policy":"never","prompt":"Run npm run lint and record the output in the current MCP run manifest. Reply only when the command finishes."}'
-  npx --yes @wong2/mcp-cli --config ./mcp-client.json call-tool codex-local:codex --args '{"approval_policy":"never","prompt":"Run npm run test and record the output in the current MCP run manifest. Reply only when the command finishes."}'
-  npx --yes @wong2/mcp-cli --config ./mcp-client.json call-tool codex-local:codex --args '{"approval_policy":"never","prompt":"Run bash scripts/spec-guard.sh --dry-run and record the output in the current MCP run manifest. Reply only when the command finishes."}'
-  ```
-  Avoid extra preparatory commands (e.g., `ls`, `grep`) before the sequence—the harness handles manifest creation once the first call completes.
-- **Automation shortcut:** Run `scripts/run-mcp-diagnostics.sh` (optionally `--config <path>`) to execute the four commands sequentially via MCP without manual copy/paste.
-- **Using the harness in other codebases:** Copy or symlink `mcp-client.json`, or point `--config` at this repository’s file (`npx @wong2/mcp-cli --config /path/to/CO/mcp-client.json`). Because `npx` downloads the CLI on demand, no per-project dependency is required; teams preferring a global install can run `npm install -g @wong2/mcp-cli` and invoke `mcp-cli --config …`. For a copy/paste setup, create a global symlink once:
-  ```bash
-  ln -s "/Users/asabeko/Documents/Code/CO/scripts/run-local-mcp.sh" /usr/local/bin/codex-local-mcp
-  chmod +x /usr/local/bin/codex-local-mcp
-  ```
-  Then drop this config into any repo so agents can launch the same harness:
-  ```json
-  {
-    "mcpServers": {
-      "codex-local": {
-        "command": "codex-local-mcp"
-      }
-    }
-  }
-  ```
-- **Always-on sessions:** The architecture intentionally scopes runs so each invocation of `scripts/run-local-mcp.sh` produces auditable artifacts. Avoid keeping long-lived background servers; instead, start a session when work begins and stop (Ctrl+C or exit the CLI) after run manifests are written.
-- **Workflow integration:** Builder/tester agents operate exclusively through MCP edits so every diff and command is mirrored under `.runs/<task>/<timestamp>/`. Reviewers cross-check those manifests with spec guard status before marking checklists complete. Mirrors (`docs/`, `.agent/`) must reflect any process updates immediately after a run is marked `[x]` with completion date + manifest path.
+- **Automation shortcut:** `scripts/run-mcp-diagnostics.sh` now wraps the Agents SDK runner. It spawns `scripts/agents_mcp_runner.mjs`, sets `client_session_timeout_seconds=3600`, executes build/lint/test/spec-guard through Codex, and tails progress until completion. The command prints the run id plus `.runs/local-mcp/<run-id>/manifest.json`.
+- **Manual start & poll:** Use `scripts/mcp-runner-start.sh --timeout 7200 --approval-policy never` to enqueue a session without blocking, then `scripts/mcp-runner-poll.sh <run-id> --watch` to monitor. Each run directory contains `manifest.json`, `runner.log`, and per-command response JSON (one file per diagnostic).
+- **Extended sessions & resilience:** The runner hosts `scripts/run-local-mcp.sh` via `MCPServerStdio`, eliminating the two-minute CLI timeout and persisting state between poll calls. Progress updates write back to the manifest after each command so mid-run monitoring never requires restarting diagnostics.
+- **Customization:** Pass `--command "<cmd>"` flags to `node scripts/agents_mcp_runner.mjs start` to add extra MCP actions, or override `--timeout` if longer build/test cycles are expected. All work still flows through Codex MCP tools.
+- **Cross-repo reuse:** To bootstrap another repository, copy `scripts/agents_mcp_runner.mjs`, `scripts/mcp-runner-start.sh`, `scripts/mcp-runner-poll.sh`, and ensure `scripts/run-local-mcp.sh` exists. No `mcp-client.json` is required—the runner invokes the MCP server directly.
+- **Workflow integration:** Builder/tester agents continue to operate solely through Codex MCP edits; manifests under `.runs/` remain the audit log for reviewers validating spec guard status before flipping checklist items to `[x]`.
 - **Quick reference checklist:**
-  1. Confirm Codex CLI auth + Node.js, optionally install `jq`.
-  2. Launch `npx @wong2/mcp-cli --config ./mcp-client.json` (or equivalent) and pick `codex-local`.
-  3. Set the desired `approval_policy`, run edits/tests through MCP tools, and update `manifest.json` with command output.
-  4. Exit the CLI to stop the server, then attach the `.runs/local-mcp/<timestamp>/` artifact path to the task checklist entry before marking it complete.
+  1. Confirm Codex CLI auth and run `npm install` so the Agents SDK dependencies (`@openai/agents`, `@modelcontextprotocol/sdk`) are available; optionally export `OPENAI_API_KEY` for tracing.
+  2. Run `scripts/run-mcp-diagnostics.sh` (or `scripts/mcp-runner-start.sh`) with the desired approval policy and timeout.
+  3. Poll progress via `scripts/mcp-runner-poll.sh <run-id> --watch` or inspect `manifest.json` directly.
+  4. Attach the `.runs/local-mcp/<run-id>/manifest.json` path to the relevant checklist entry before marking it complete.
 
 ## Milestone M1 — Skeleton Orchestrator & MCP Demo
 - Objective: Establish repo scaffolding with working Agents SDK manager, handoffs, and local MCP demo editing one file end-to-end.

@@ -1,57 +1,85 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-usage() {
+show_help() {
   cat <<'HELP'
-Usage: scripts/run-mcp-diagnostics.sh [--config PATH]
+Usage: scripts/run-mcp-diagnostics.sh [options]
 
-Runs the standard build/lint/test/spec-guard commands through the local MCP
-harness in sequence. Each command is executed via `npx @wong2/mcp-cli` with a
-non-interactive `call-tool` request so manifests are captured automatically.
+Launches the Agents SDK-based MCP diagnostics runner, which executes the
+standard build/lint/test/spec-guard sequence via Codex with an extended timeout.
 
 Options:
-  --config PATH  Override the MCP client config path (default: ./mcp-client.json)
-  -h, --help     Show this help message
+  --approval-policy VALUE   Override the Codex approval policy (default: never)
+  --timeout SECONDS         Override MCP client session timeout (default: 3600)
+  --no-watch                Do not tail progress; print the run id and exit
+  -h, --help                Show this message
 HELP
 }
 
-CONFIG="./mcp-client.json"
+APPROVAL_POLICY="never"
+TIMEOUT="3600"
+WATCH=true
 
 while (($#)); do
   case "$1" in
-    --config)
+    --approval-policy)
       shift
-      CONFIG="${1:-}"
-      if [[ -z "$CONFIG" ]]; then
-        echo "Error: --config requires a path" >&2
+      APPROVAL_POLICY="${1:-}"
+      if [[ -z "$APPROVAL_POLICY" ]]; then
+        echo "Error: --approval-policy requires a value." >&2
         exit 2
       fi
       ;;
+    --timeout)
+      shift
+      TIMEOUT="${1:-}"
+      if [[ -z "$TIMEOUT" ]]; then
+        echo "Error: --timeout requires a numeric value." >&2
+        exit 2
+      fi
+      ;;
+    --no-watch)
+      WATCH=false
+      ;;
     -h|--help)
-      usage
+      show_help
       exit 0
       ;;
     *)
       echo "Unknown option: $1" >&2
-      usage >&2
+      show_help >&2
       exit 2
       ;;
   esac
   shift || true
 done
 
-COMMANDS=(
-  "npm run build"
-  "npm run lint"
-  "npm run test"
-  "bash scripts/spec-guard.sh --dry-run"
-)
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+RUNNER="${ROOT}/scripts/agents_mcp_runner.mjs"
 
-for cmd in "${COMMANDS[@]}"; do
-  echo "=== Running via MCP: $cmd" >&2
-  payload=$(printf '{"approval_policy":"never","prompt":"Immediately run the exact shell command: %s. Do not read or modify any files, do not list directories, and do not plan additional steps. Execute the command once using the run tool, stream output until it finishes, then reply with the exit status and the manifest/log paths recorded. If the command fails, report the failure reason. Respond only after the command completes."}' "$cmd")
-  npx --yes @wong2/mcp-cli --config "$CONFIG" \
-    call-tool codex-local:codex --args "$payload"
-done
+if [[ ! -x "$RUNNER" ]]; then
+  echo "Error: agents MCP runner not found at ${RUNNER}" >&2
+  exit 1
+fi
 
-echo "=== Diagnostics complete. Check the latest .runs/local-mcp/<timestamp>/manifest.json for results." >&2
+START_OUTPUT="$(node "$RUNNER" start --approval-policy "${APPROVAL_POLICY}" --timeout "${TIMEOUT}" --format json)"
+
+if [[ -z "$START_OUTPUT" ]]; then
+  echo "Failed to start diagnostics runner." >&2
+  exit 1
+fi
+
+RUN_ID="$(node -e 'const data = JSON.parse(process.argv[1]); console.log(data.run_id);' "$START_OUTPUT")"
+
+MANIFEST_PATH="$(node -e 'const data = JSON.parse(process.argv[1]); console.log(data.manifest);' "$START_OUTPUT")"
+
+echo "Diagnostics run started."
+echo "Run ID: ${RUN_ID}"
+echo "Manifest: ${MANIFEST_PATH}"
+echo
+
+if [[ "$WATCH" == true ]]; then
+  node "$RUNNER" poll "$RUN_ID" --watch --interval 10
+else
+  echo "Use scripts/mcp-runner-poll.sh ${RUN_ID} to monitor progress."
+fi

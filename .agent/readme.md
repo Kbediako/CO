@@ -47,37 +47,16 @@ Use explicit checkboxes (`[ ]` → `[x]`) for every task and subtask tracked in 
     }
   }
   ```
-- **Start a session:** `npx --yes @wong2/mcp-cli --config ./mcp-client.json`, pick `codex-local`, then choose the `codex` tool. Provide an `approval_policy` (`never`, `on-request`, etc.) and a natural-language prompt describing the work.
-- **Non-interactive call:** When you want to skip the prompt flow, run:
-  ```bash
-  npx --yes @wong2/mcp-cli --config ./mcp-client.json \
-    call-tool codex-local:codex \
-    --args '{
-      "approval_policy": "never",
-      "prompt": "Run npm run build, npm run lint, npm run test, and bash scripts/spec-guard.sh --dry-run. Record outputs in the run manifest and summarize findings."
-    }'
-  ```
-  Adjust the prompt text to describe the task you need Codex to perform.
-- **Avoiding timeouts:** Long multi-command prompts can exceed the MCP request window. Prefer sequential calls:
-  ```bash
-  npx --yes @wong2/mcp-cli --config ./mcp-client.json \
-    call-tool codex-local:codex \
-    --args '{"approval_policy":"never","prompt":"Run npm run build and record the output in the current MCP run manifest."}'
-  # repeat for lint / test / spec-guard
-  ```
-  Or stay in the interactive CLI and run one command at a time.
-- **Skip manual scaffolding:** The harness auto-creates the `.runs/local-mcp/<timestamp>/` structure and appends to the manifest after each call. Do not spend time listing existing manifests or creating folders yourself—just run the tool commands and review the new manifest when finished.
-- **Default diagnostics sequence (run exactly these, in order, waiting for each JSON reply):**
-  ```bash
-  npx --yes @wong2/mcp-cli --config ./mcp-client.json call-tool codex-local:codex --args '{"approval_policy":"never","prompt":"Run npm run build and record the output in the current MCP run manifest. Reply only when the command finishes."}'
-  npx --yes @wong2/mcp-cli --config ./mcp-client.json call-tool codex-local:codex --args '{"approval_policy":"never","prompt":"Run npm run lint and record the output in the current MCP run manifest. Reply only when the command finishes."}'
-  npx --yes @wong2/mcp-cli --config ./mcp-client.json call-tool codex-local:codex --args '{"approval_policy":"never","prompt":"Run npm run test and record the output in the current MCP run manifest. Reply only when the command finishes."}'
-  npx --yes @wong2/mcp-cli --config ./mcp-client.json call-tool codex-local:codex --args '{"approval_policy":"never","prompt":"Run bash scripts/spec-guard.sh --dry-run and record the output in the current MCP run manifest. Reply only when the command finishes."}'
-  ```
-  Do not insert extra `ls`, `grep`, or directory-creation commands before the sequence; the tool will write the manifest once each call completes.
-- **One-liner helper:** `scripts/run-mcp-diagnostics.sh` issues the four commands above (use `--config PATH` if you keep the JSON elsewhere) and exits once the manifest is updated.
-- **Do the work through MCP:** Use `call-tool edit` to modify files and `call-tool run` for commands (`npm run lint`, `npm run test`, `bash scripts/spec-guard.sh --dry-run`, etc.). Every call is logged under `.runs/local-mcp/<timestamp>/`.
-- **Shut down:** Exit the CLI (Ctrl+C or `exit`). The harness writes `manifest.json`, `mcp-server.log`, and `result.json`. Reference that path when marking checklist items complete.
+- **Start a session:** `scripts/mcp-runner-start.sh --approval-policy never --timeout 3600` launches the Agents SDK runner, then prints the run id and manifest path. Each session spins up `codex mcp-server` in the background and records logs under `.runs/local-mcp/<run-id>/`.
+- **Diagnostics sequence:** `scripts/run-mcp-diagnostics.sh` runs the standard build/lint/test/spec-guard workflow end-to-end, waits for completion, and echoes the manifest path so you can update checklists.
+- **Poll progress:** `scripts/mcp-runner-poll.sh <run-id> --watch` tails the manifest status until the run finishes. Use it when you launch the runner with `--no-watch` or need to reattach to an existing session.
+- **Customize commands:** Call `node scripts/agents_mcp_runner.mjs start --command "<cmd>"` (repeatable) to queue bespoke MCP actions while retaining the start/poll flow. All commands execute via Codex MCP and stream outputs into the manifest.
+- **Prerequisites:** Install the Codex CLI and run `npm install` so Node dependencies (including `@openai/agents` and `@modelcontextprotocol/sdk`) are available. Optionally set `OPENAI_API_KEY` if you want Codex traces forwarded to the OpenAI dashboard.
+- **Diagnostics shortcut:** `scripts/run-mcp-diagnostics.sh` starts the Agents SDK runner, sets `client_session_timeout_seconds=3600`, and executes build/lint/test/spec-guard through Codex. By default it tails progress until completion and prints the `.runs/local-mcp/<run-id>/manifest.json` path.
+- **Manual start/poll controls:** Use `scripts/mcp-runner-start.sh [--timeout 7200] [--approval-policy never]` to enqueue a run and `scripts/mcp-runner-poll.sh <run-id> --watch` to monitor status. Each start command records `runner.log`, per-command response JSON, and the aggregated manifest inside `.runs/local-mcp/<run-id>/`.
+- **Extended sessions:** The runner hosts `scripts/run-local-mcp.sh` via `MCPServerStdio` so Codex stays connected well beyond the legacy two-minute limit. Progress updates are written after each command, enabling `poll --watch` to stream state without restarting the run.
+- **Staying inside MCP:** The runner calls the Codex MCP `codex` tool for every command—no local shell execution occurs outside Codex. File edits still flow through Codex MCP (`edit` / `run` tools), and command output is captured in the manifest artifacts.
+- **Shutdown:** Once the final status is `succeeded` or `failed`, the background runner exits automatically. Review the manifest and per-command JSON files when updating checklists or reporting diagnostics results.
 
 ### Quick Links
 - Control files: `/.ai-dev-tasks/*`
