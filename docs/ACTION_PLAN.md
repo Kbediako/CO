@@ -15,7 +15,21 @@
   1. From the repository root run `npx @wong2/mcp-cli --config ./mcp-client.json`. This spawns `scripts/run-local-mcp.sh`, opens a stdio session, and writes a fresh `.runs/local-mcp/<timestamp>/` bundle (`manifest.json`, `mcp-server.log`, `result.json`).
   2. When the CLI prompts for a server, choose `codex-local`, then select the `codex` tool and provide the requested `approval_policy` (e.g., `never`, `on-request`, `on-failure`). Each session requires a single approval choice; subsequent tool calls reuse it.
   3. Use `tools/call edit`/`call-tool` to modify files, `tools/call run` for commands such as `npm run lint`, and capture the resulting artifact references in the run manifest before exiting the CLI. Leaving the CLI terminates the MCP server and finalizes `result.json`.
-- **Using the harness in other codebases:** Copy or symlink `mcp-client.json`, or point `--config` at this repository’s file (`npx @wong2/mcp-cli --config /path/to/CO/mcp-client.json`). Because `npx` downloads the CLI on demand, no per-project dependency is required; teams preferring a global install can run `npm install -g @wong2/mcp-cli` and invoke `mcp-cli --config …`.
+- **Using the harness in other codebases:** Copy or symlink `mcp-client.json`, or point `--config` at this repository’s file (`npx @wong2/mcp-cli --config /path/to/CO/mcp-client.json`). Because `npx` downloads the CLI on demand, no per-project dependency is required; teams preferring a global install can run `npm install -g @wong2/mcp-cli` and invoke `mcp-cli --config …`. For a copy/paste setup, create a global symlink once:
+  ```bash
+  ln -s "/Users/asabeko/Documents/Code/CO/scripts/run-local-mcp.sh" /usr/local/bin/codex-local-mcp
+  chmod +x /usr/local/bin/codex-local-mcp
+  ```
+  Then drop this config into any repo so agents can launch the same harness:
+  ```json
+  {
+    "mcpServers": {
+      "codex-local": {
+        "command": "codex-local-mcp"
+      }
+    }
+  }
+  ```
 - **Always-on sessions:** The architecture intentionally scopes runs so each invocation of `scripts/run-local-mcp.sh` produces auditable artifacts. Avoid keeping long-lived background servers; instead, start a session when work begins and stop (Ctrl+C or exit the CLI) after run manifests are written.
 - **Workflow integration:** Builder/tester agents operate exclusively through MCP edits so every diff and command is mirrored under `.runs/<task>/<timestamp>/`. Reviewers cross-check those manifests with spec guard status before marking checklists complete. Mirrors (`docs/`, `.agent/`) must reflect any process updates immediately after a run is marked `[x]` with completion date + manifest path.
 - **Quick reference checklist:**
