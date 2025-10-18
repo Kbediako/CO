@@ -92,3 +92,74 @@
 ³ OpenAI, “Model Context Protocol.” https://developers.openai.com/docs/guides/mcp  
 ⁴ OpenAI, “Bringing Codex to every developer.” https://openai.com/index/bringing-codex-to-every-developer/  
 ⁵ OpenAI, “Codex Security Admin guide.” https://developers.openai.com/codex/guides/security-admin
+
+## Added by PRD Author 2025-10-18
+
+### Problem Statement & Goals
+- Codex-Orchestrator must offer a deterministic Agents-SDK MCP runner workflow so builder/tester/reviewer agents can trigger, monitor, and audit long-lived runs without leaving the Codex CLI (source alignment: `scripts/agents_mcp_runner.mjs`, `scripts/mcp-runner-start.sh`, `.agent/readme.md`; validate exact line refs during spec draft).
+- Goals
+  - Ensure every MCP-triggered execution persists its manifest and logs under the existing `.runs/local-mcp/<run-id>/` contract (`manifest.json`, `runner.log`, per-command response JSON). If we later standardize on task-scoped directories (for example `.runs/0001/...`), record the migration plan and update the runner in lockstep.
+  - Provide end-to-end automation so `codex mcp-server` sessions launched via `scripts/run-local-mcp.sh` reliably register edit/git/run capability and surface diagnostics to reviewers inside the run manifest.
+  - Reduce reviewer replays: 95% of orchestrator tickets should be reviewable from run artifacts alone (no manual reruns). Track via a new metrics log (proposed `.runs/0001/metrics.json`) once instrumentation is implemented.
+  - Keep spec-guard checks in the default command sequence so every MCP-driven implementation run captures `bash scripts/spec-guard.sh --dry-run` alongside build/lint/test results; document any stricter enforcement (such as 24-hour freshness windows) as a follow-up enhancement.
+
+### Non-Goals / Out of Scope
+- Implementing new Codex CLI UX beyond MCP runner orchestration (defer to CLI team).
+- Changing approval policy defaults or manifest schema outside Task 0001.
+- Designing evaluation harness scenarios (`evaluation/` ownership stays with Evaluation WG).
+- Cloud execution optimizations unless `tasks/tasks-0001-codex-orchestrator.md` explicitly flags `execution.parallel=true`.
+
+### User Workflows & MCP Integration
+#### Builder Agent Happy Path
+1. Run `scripts/run-local-mcp.sh` to start `codex mcp-server` with repo workspace (mirrors the setup already exercised by the runner).
+2. Invoke the runner via `scripts/mcp-runner-start.sh [--command "<cmd>"] --approval-policy never --timeout 3600`. The wrapper simply forwards to `scripts/agents_mcp_runner.mjs start` and prints the generated `run_id` plus manifest path.
+3. Poll status using `scripts/mcp-runner-poll.sh <run_id> [--watch]`; update `/tasks/tasks-0001-codex-orchestrator.md` checklist item with `[x] <YYYY-MM-DD> .runs/local-mcp/<run-id>/manifest.json`.
+4. On success, `scripts/agents_mcp_runner.mjs` writes `manifest.json`, `runner.log`, and per-command response JSON files under `.runs/local-mcp/<run-id>/`.
+
+#### Builder Failure Scenarios
+- **Timeout**: `scripts/agents_mcp_runner.mjs` passes the `--timeout` value through to `clientSessionTimeoutSeconds` (default 3600s). Runs that exceed the allowance terminate with `status=failed` and the last command marked `failed`. Lower timeout targets (e.g., 900s) require explicit configuration and are tracked as a follow-up enhancement.
+- **Detached Run**: Today the runner relies on manual polling; no heartbeat detection is implemented. Document this limitation and add heartbeat/resume-token support as an open question for the spec author.
+- **Malformed Tool Response**: When the Codex tool returns non-JSON or exits non-zero, the runner records the failure in the command entry (`status=failed`, `summary` describing the error) and surfaces `manifest.status=failed`. Capturing a standalone `errors/malformed_tool.json` file is a proposed enhancement.
+
+#### Tester Agent Workflow
+1. Read `.runs/local-mcp/<run-id>/manifest.json` to confirm required commands (`npm run build`, `npm run lint`, `npm run test`, `bash scripts/spec-guard.sh --dry-run`) executed in-order; queue additional commands with `--command` flags when gaps exist.
+2. Attach test logs to `.runs/local-mcp/<run-id>/test-<slug>.log` (naming convention to be finalized in the spec).
+3. Update `/tasks/tasks-0001-codex-orchestrator.md` tester checklist upon completion.
+
+#### Reviewer Agent Workflow
+1. Verify manifest timestamps, approvals, and guardrails already satisfied.
+2. Cross-check mirrors (`docs/ACTION_PLAN.md`, `docs/PRD.md`, `docs/TECH_SPEC.md`) using MCP `read` tool to confirm they mirror `/tasks/**`.
+3. Only approve when all checklists track `[x]` with evidence links and `spec-guard` recency <30 days.
+
+### Functional Requirements
+- Runner invocation: `scripts/mcp-runner-start.sh` remains a thin wrapper over `scripts/agents_mcp_runner.mjs start`, supporting `--command` (repeatable), `--approval-policy`, `--timeout`, and `--format` (text|json). Document the default command queue (`npm run build`, `npm run lint`, `npm run test`, `bash scripts/spec-guard.sh --dry-run`).
+- Manifest contract: persist run state at `.runs/local-mcp/<run-id>/manifest.json` with the existing fields (`runner`, `script`, `status`, `commands[]`, `started_at`, `updated_at`, `completed_at`, `run_id`, `repo_root`, `approval_policy`, `timeout_seconds`, `runner_pid`, `runner_log`). Each command entry must include index, command, status, timestamps, exit_code, summary, manifest_path (when provided by the tool), and response_file.
+- Logging: keep `runner.log` and per-command response JSON files alongside the manifest. Any new artifact types (diff patches, diagnostics) require corresponding runner updates and should be tracked as enhancements before spec sign-off.
+- Polling: `scripts/mcp-runner-poll.sh` reads the manifest and prints human-readable status; support `--watch` and `--interval`. JSON status output is a stretch goal and should be captured under Open Questions until implemented.
+- Guardrails: the default command list must retain `bash scripts/spec-guard.sh --dry-run`; if callers omit it, the manifest should flag the missing guardrail for reviewer attention (implementation detail for the upcoming spec).
+- Approval policy: the runner passes `--approval-policy` directly to the Codex MCP tool (default `never`). Any attempt to escalate without human approval must fail fast and record the reason in the manifest summary.
+- Error handling: on tool failures the runner records the failure in the command entry and sets `manifest.status=failed`. Automated retry/backoff is not implemented; evaluating exponential backoff belongs in Open Questions.
+
+### Operational Guardrails
+- Timeout default remains 3600 seconds (current runner behavior). If the program wants a stricter 900-second default, capture it as a required code change in the upcoming spec.
+- Automated retry/backoff is out of scope for the existing runner; failures short-circuit the command queue. Evaluate transient-error retries as an enhancement.
+- Manifest consistency: keep atomic writes via `.tmp` rename (already implemented in `writeJsonAtomic`).
+- Spec guard enforcement: rely on the default command queue including `bash scripts/spec-guard.sh --dry-run`; reviewers must block runs where the guardrail command is missing or failed.
+- Checklist synchronization: `/tasks/tasks-0001-codex-orchestrator.md` and mirrors in `docs/` must be updated in the same change set with completion date plus manifest path.
+- MCP diagnostics: `scripts/run-mcp-diagnostics.sh` remains a manual follow-up tool; automatic invocation after failures is a future enhancement to be evaluated.
+
+### Open Questions & Risks
+- How to resume detached runs without duplicate manifests? Need policy for `resume_token` storage.
+- Decide whether to introduce a task-scoped metrics artifact (e.g., `.runs/0001/metrics.json`) or extend the existing `.runs/local-mcp/` hierarchy; confirm schema with architecture spec.
+- Document the exact code paths governing timeouts and error handling (`scripts/agents_mcp_runner.mjs:70-180`) so mirror docs stay accurate if behavior changes.
+- Risk of manifest bloat when logs are large; consider log rotation or compression (out of scope unless mandated).
+- Confirm Agents SDK version compatibility and pinning in `package.json` to avoid breaking changes.
+
+### Acceptance Criteria
+1. Running `scripts/mcp-runner-start.sh --approval-policy never --timeout 3600 --format json` returns a JSON payload containing `run_id`, `run_dir`, and `manifest`, and creates `.runs/local-mcp/<run-id>/manifest.json` plus `runner.log`.
+2. The manifest records the default command queue (`npm run build`, `npm run lint`, `npm run test`, `bash scripts/spec-guard.sh --dry-run`) with each entry’s `status` transitioning from `pending` → `running` → `succeeded`.
+3. `scripts/mcp-runner-poll.sh <run-id> --watch --interval 5` streams human-readable updates until the manifest reaches a terminal state (`succeeded` or `failed`).
+4. When a queued command returns a non-zero exit code, the corresponding manifest entry marks `status=failed`, populates `exit_code`, and the overall `manifest.status` becomes `failed` without retrying subsequent commands.
+5. Setting a reduced timeout (`scripts/mcp-runner-start.sh --timeout 30 ...`) for a command that exceeds the allowance results in the manifest capturing the failure with `timeout_seconds=30` and `status=failed`.
+6. Checklist entries in `/tasks/tasks-0001-codex-orchestrator.md` and mirrors (`docs/ACTION_PLAN.md`, `docs/PRD.md`) flip to `[x]` with completion date and the `.runs/local-mcp/<run-id>/manifest.json` path in the same change set.
+7. Reviewer confirms mirror accuracy: `docs/PRD.md` summarizes the canonical section without introducing behaviors not present in the manifest or runner scripts.

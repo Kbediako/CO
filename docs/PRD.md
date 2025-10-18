@@ -29,3 +29,10 @@
 - Guardrails CI package landed: `scripts/spec-guard.sh` enforces spec freshness and the example GitHub Actions workflow documents trigger strategy.
 - Learning library & evaluation harness delivered with supporting manifests (`.runs/4/`, `.runs/5/`).
 - Task 6 documentation mirrors (this file, `docs/ACTION_PLAN.md`, `docs/TECH_SPEC.md`) approved; see `.runs/6/2025-10-16T18-49-34Z/manifest.json` with spec guard, lint, and eval harness validations.
+
+## Added by PRD Author 2025-10-18
+- **Canonical Source:** `tasks/0001-prd-codex-orchestrator.md` (section “Added by PRD Author 2025-10-18”).
+- **Focus:** Document the current Agents-SDK runner contract (`scripts/mcp-runner-start.sh` → `scripts/agents_mcp_runner.mjs`) and its manifest/log outputs under `.runs/local-mcp/<run-id>/` for builder/tester/reviewer agents.
+- **Key Behaviors:** Start script forwards `--command`, `--approval-policy`, `--timeout`, `--format`; manifest tracks command statuses and response artifacts; poll script streams textual updates. Enhancements like JSON polling or diff artifact capture are backlog items.
+- **Guardrails:** Default timeout remains 3600 seconds; spec-guard stays in the default command queue; automated diagnostics and retries are explicitly called out as future work.
+- **Open Items:** Normalize manifest locations vs. task directories, add heartbeat/resume support, design metrics aggregation, and pin the Agents SDK version.
