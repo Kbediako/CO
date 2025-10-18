@@ -66,6 +66,7 @@ Use explicit checkboxes (`[ ]` → `[x]`) for every task and subtask tracked in 
   # repeat for lint / test / spec-guard
   ```
   Or stay in the interactive CLI and run one command at a time.
+- **Skip manual scaffolding:** The harness auto-creates the `.runs/local-mcp/<timestamp>/` structure and appends to the manifest after each call. Do not spend time listing existing manifests or creating folders yourself—just run the tool commands and review the new manifest when finished.
 - **Do the work through MCP:** Use `call-tool edit` to modify files and `call-tool run` for commands (`npm run lint`, `npm run test`, `bash scripts/spec-guard.sh --dry-run`, etc.). Every call is logged under `.runs/local-mcp/<timestamp>/`.
 - **Shut down:** Exit the CLI (Ctrl+C or `exit`). The harness writes `manifest.json`, `mcp-server.log`, and `result.json`. Reference that path when marking checklist items complete.
 
