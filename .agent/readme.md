@@ -48,6 +48,16 @@ Use explicit checkboxes (`[ ]` → `[x]`) for every task and subtask tracked in 
   }
   ```
 - **Start a session:** `npx --yes @wong2/mcp-cli --config ./mcp-client.json`, pick `codex-local`, then choose the `codex` tool. Provide an `approval_policy` (`never`, `on-request`, etc.) and a natural-language prompt describing the work.
+- **Non-interactive call:** When you want to skip the prompt flow, run:
+  ```bash
+  npx --yes @wong2/mcp-cli --config ./mcp-client.json \
+    call-tool codex-local:codex \
+    --args '{
+      "approval_policy": "never",
+      "prompt": "Run npm run build, npm run lint, npm run test, and bash scripts/spec-guard.sh --dry-run. Record outputs in the run manifest and summarize findings."
+    }'
+  ```
+  Adjust the prompt text to describe the task you need Codex to perform.
 - **Do the work through MCP:** Use `call-tool edit` to modify files and `call-tool run` for commands (`npm run lint`, `npm run test`, `bash scripts/spec-guard.sh --dry-run`, etc.). Every call is logged under `.runs/local-mcp/<timestamp>/`.
 - **Shut down:** Exit the CLI (Ctrl+C or `exit`). The harness writes `manifest.json`, `mcp-server.log`, and `result.json`. Reference that path when marking checklist items complete.
 
