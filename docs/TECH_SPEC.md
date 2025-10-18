@@ -40,3 +40,9 @@
 - `.github/workflows/spec-guard.example.yml` documents how to enable CI enforcement, including fetching the full git history and exporting `BASE_SHA` for pull requests.
 - Approval metadata (mode, reviewer decisions) must be recorded inside `.runs/<task>/<timestamp>/manifest.json`; see `.runs/6/2025-10-16T18-19-14Z/manifest.json` for Task 6 evidence.
 - Mirrors (`AGENTS.md`, `.agent/readme.md`, `.agent/SOPs/specs-and-research.md`) describe build/test commands, execution mode policy, and MCP registration steps aligned with the canonical spec.
+
+## Update — 2025-10-18 MCP Runner Durability
+- Mini-spec `tasks/specs/0005-mcp-runner-enhancements.md` scopes the move to `.runs/0001/mcp/<run-id>/` directories, heartbeat/resume tokens, and metrics aggregation; approvals to follow.
+- Runner wrappers (`scripts/mcp-runner-start.sh`, `scripts/mcp-runner-poll.sh`) will gain `--resume` and JSON output options plus heartbeat awareness to surface stale sessions.
+- Metrics artifacts (`.runs/0001/metrics.json`, `.runs/0001/metrics-summary.json`) will quantify command success, guardrail coverage, and reviewer readiness for the PRD’s 95% reviewability KPI.
+- Low-risk backlog items (JSON poll output, structured error artifacts, diagnostics prompts, Agents SDK pinning, timeout/error-path documentation) are enumerated in task checklist Section 7 for direct implementation.

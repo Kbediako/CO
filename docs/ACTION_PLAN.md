@@ -9,6 +9,13 @@
 - **Run evidence:** `.runs/3/*` (orchestrator core), `.runs/4/*` (learning library), `.runs/5/*` (evaluation harness), `.runs/6/2025-10-16T18-49-34Z` (spec guard, lint, eval harness for documentation rollout).
 - **Open follow-up:** None — Task 6 documentation mirrors and release notes approved (see `.runs/6/2025-10-16T18-49-34Z/manifest.json` capturing spec guard, lint, and eval harness validations).
 
+## Update — 2025-10-18 MCP Runner Enhancements
+- Drafted `tasks/specs/0005-mcp-runner-enhancements.md` to manage task-scoped run directory migration, heartbeat/resume tokens, and metrics aggregation; approvals pending.
+- Added checklist Section 7 tasks for migration execution, heartbeat/resume implementation, metrics emission, JSON poll output, structured error artifacts, diagnostics prompts, Agents SDK version pinning, and timeout/error-path documentation.
+- Migration tooling will create `.runs/0001/mcp/<run-id>/` with compatibility pointers so reviewers can audit new manifests without breaking existing scripts.
+- Metrics targets support the PRD goal of 95% reviewer coverage from artifacts; low-risk items (JSON poll, diagnostics prompt, SDK pin, timeout doc) proceed as implementation tasks without additional specs.
+- Log rotation and retry automation remain deferred pending telemetry from the new metrics artifacts.
+
 ## Local MCP Harness Usage — Update 2025-10-18
 - **Preconditions:** Install and authenticate the Codex CLI, ensure Node.js ≥18 is available (for `npx`), and maintain optional `jq` if you want pretty-printed manifests. No background process is required; the harness is launched per session.
 - **Automation shortcut:** `scripts/run-mcp-diagnostics.sh` now wraps the Agents SDK runner. It spawns `scripts/agents_mcp_runner.mjs`, sets `client_session_timeout_seconds=3600`, executes build/lint/test/spec-guard through Codex, and tails progress until completion. The command prints the run id plus `.runs/local-mcp/<run-id>/manifest.json`.

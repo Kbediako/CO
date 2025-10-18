@@ -36,3 +36,4 @@
 - **Key Behaviors:** Start script forwards `--command`, `--approval-policy`, `--timeout`, `--format`; manifest tracks command statuses and response artifacts; poll script streams textual updates. Enhancements like JSON polling or diff artifact capture are backlog items.
 - **Guardrails:** Default timeout remains 3600 seconds; spec-guard stays in the default command queue; automated diagnostics and retries are explicitly called out as future work.
 - **Open Items:** Normalize manifest locations vs. task directories, add heartbeat/resume support, design metrics aggregation, and pin the Agents SDK version.
+- **2025-10-18 Update:** Drafted `tasks/specs/0005-mcp-runner-enhancements.md` to govern directory migration, heartbeat/resume, and metrics logs; queued task-level follow-ups for JSON polling, structured error artifacts, diagnostics prompts, and SDK pinning per task checklist section 7.

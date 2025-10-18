@@ -115,6 +115,22 @@
         "log": "tasks/specs/tech-spec-0001-codex-orchestrator.md#14-approvals"
       },
       "last_review": "2025-10-16"
+    },
+    {
+      "id": "20251018-mcp-runner",
+      "slug": "mcp-runner-enhancements",
+      "title": "Codex MCP Runner Durability & Telemetry Mini-Spec",
+      "path": "tasks/specs/0005-mcp-runner-enhancements.md",
+      "relates_to": "tasks/0001-prd-codex-orchestrator.md",
+      "status": "draft",
+      "gate": {
+        "kind": "spec_guard",
+        "status": "pending",
+        "approved_on": null,
+        "approver": null,
+        "log": null
+      },
+      "last_review": "2025-10-18"
     }
   ]
 }
