@@ -49,7 +49,7 @@ COMMANDS=(
 
 for cmd in "${COMMANDS[@]}"; do
   echo "=== Running via MCP: $cmd" >&2
-  payload=$(printf '{"approval_policy":"never","prompt":"Run %s and record the output in the current MCP run manifest. Reply only when the command finishes."}' "$cmd")
+  payload=$(printf '{"approval_policy":"never","prompt":"Immediately run the exact shell command: %s. Do not read or modify any files, do not list directories, and do not plan additional steps. Execute the command once using the run tool, stream output until it finishes, then reply with the exit status and the manifest/log paths recorded. If the command fails, report the failure reason. Respond only after the command completes."}' "$cmd")
   npx --yes @wong2/mcp-cli --config "$CONFIG" \
     call-tool codex-local:codex --args "$payload"
 done
