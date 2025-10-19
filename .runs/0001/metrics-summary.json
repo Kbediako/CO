@@ -1,12 +1,12 @@
 {
-  "generated_at": "2025-10-19T06:30:57.180Z",
+  "generated_at": "2025-10-19T06:55:49.607Z",
   "task_id": "0001",
   "metrics_file": ".runs/0001/metrics.json",
-  "entries_total": 4,
+  "entries_total": 5,
   "entries_succeeded": 1,
-  "entries_failed": 3,
-  "success_rate": 0.25,
-  "guardrail_coverage": 0.25,
-  "average_duration_seconds": 39.2085,
+  "entries_failed": 4,
+  "success_rate": 0.2,
+  "guardrail_coverage": 0.2,
+  "average_duration_seconds": 31.3668,
   "parse_errors": []
 }

@@ -244,6 +244,34 @@ function guardrailCommandPresent(commands) {
   );
 }
 
+function guardrailRecommendation(commands) {
+  const guardrailEntries = commands.filter((entry) =>
+    typeof entry.command === 'string' && entry.command.includes('scripts/spec-guard.sh'),
+  );
+  if (guardrailEntries.length === 0) {
+    return 'Guardrail command missing; run scripts/run-mcp-diagnostics.sh --no-watch to capture reviewer diagnostics.';
+  }
+  const failedEntries = guardrailEntries.filter((entry) => entry.status !== 'succeeded');
+  if (failedEntries.length > 0) {
+    return 'Guardrail command failed; re-run scripts/run-mcp-diagnostics.sh --no-watch to gather failure artifacts.';
+  }
+  return null;
+}
+
+function appendManifestSummary(manifest, message) {
+  if (!message) {
+    return;
+  }
+  if (!manifest.summary) {
+    manifest.summary = message;
+    return;
+  }
+  if (manifest.summary.includes(message)) {
+    return;
+  }
+  manifest.summary = `${manifest.summary}\n${message}`;
+}
+
 function ensureResumeEvents(manifest) {
   if (!Array.isArray(manifest.resume_events)) {
     manifest.resume_events = [];
@@ -273,8 +301,10 @@ async function appendMetricsEntry(manifest, manifestPath) {
     ? null
     : Math.max(0, (completedAt - startedAt) / 1000);
 
-  const commandsPassed = (manifest.commands ?? []).filter((cmd) => cmd.status === 'succeeded').length;
-  const commandsFailed = (manifest.commands ?? []).filter((cmd) => cmd.status === 'failed').length;
+  const commandsList = manifest.commands ?? [];
+  const commandsPassed = commandsList.filter((cmd) => cmd.status === 'succeeded').length;
+  const commandsFailed = commandsList.filter((cmd) => cmd.status === 'failed').length;
+  const guardrailSuccess = guardrailCommandPresent(commandsList);
   const artifactPath = manifest.artifact_root ?? path.relative(repoRoot, path.dirname(manifestPath));
 
   const entry = {
@@ -286,13 +316,20 @@ async function appendMetricsEntry(manifest, manifestPath) {
     status: manifest.status,
     commands_passed: commandsPassed,
     commands_failed: commandsFailed,
-    guardrails_present: guardrailCommandPresent(manifest.commands ?? []),
+    guardrails_present: guardrailSuccess,
     artifact_path: artifactPath,
     recorded_at: isoTimestamp(),
   };
 
   await fs.mkdir(metricsRoot, { recursive: true });
   await fs.appendFile(metricsFilePath, `${JSON.stringify(entry)}\n`, 'utf8');
+  if (!guardrailSuccess) {
+    const recommendation = guardrailRecommendation(commandsList);
+    if (recommendation) {
+      appendManifestSummary(manifest, recommendation);
+      console.warn(recommendation);
+    }
+  }
   manifest.metrics_recorded = true;
   await saveManifest(manifestPath, manifest);
 }
@@ -573,6 +610,9 @@ function renderStatus(manifest) {
   console.log(`\nRun ${manifest.run_id} status: ${manifest.status}`);
   if (manifest.status_detail) {
     console.log(`Status detail: ${manifest.status_detail}`);
+  }
+  if (manifest.summary) {
+    console.log(`Summary: ${manifest.summary}`);
   }
   console.log(`Started: ${manifest.started_at}`);
   if (manifest.completed_at) {

@@ -181,6 +181,87 @@ describe('mcp runner durability + telemetry', () => {
     expect(summary.average_duration_seconds).toBeCloseTo(21);
   });
 
+  it('recommends diagnostics when guardrail command is missing', async () => {
+    const { appendMetricsEntry, constants, isoTimestamp } = runnerModule;
+    const runId = 'missing-guardrail';
+    const runDir = path.join(constants.taskRunsRoot, runId);
+    const manifestPath = path.join(runDir, 'manifest.json');
+
+    await fs.mkdir(runDir, { recursive: true });
+    const manifest = {
+      run_id: runId,
+      status: 'succeeded',
+      started_at: isoTimestamp(),
+      completed_at: isoTimestamp(),
+      commands: [
+        {
+          index: 1,
+          command: 'npm run build',
+          status: 'succeeded',
+        },
+      ],
+      metrics_recorded: false,
+    };
+    await fs.writeFile(manifestPath, JSON.stringify(manifest, null, 2));
+
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    let calls: unknown[][] = [];
+    try {
+      await appendMetricsEntry(manifest, manifestPath);
+      calls = warnSpy.mock.calls.slice();
+    } finally {
+      warnSpy.mockRestore();
+    }
+
+    expect(calls.some((call) => String(call[0]).includes('scripts/run-mcp-diagnostics.sh --no-watch'))).toBe(true);
+
+    const updatedManifest = JSON.parse(await fs.readFile(manifestPath, 'utf8'));
+    expect(updatedManifest.summary).toContain('scripts/run-mcp-diagnostics.sh --no-watch');
+    const metricsData = await fs.readFile(path.join(constants.metricsRoot, 'metrics.json'), 'utf8');
+    const entry = JSON.parse(metricsData.trim());
+    expect(entry.guardrails_present).toBe(false);
+  });
+
+  it('appends diagnostics recommendation when guardrail command fails', async () => {
+    const { appendMetricsEntry, constants, isoTimestamp } = runnerModule;
+    const runId = 'failing-guardrail';
+    const runDir = path.join(constants.taskRunsRoot, runId);
+    const manifestPath = path.join(runDir, 'manifest.json');
+
+    await fs.mkdir(runDir, { recursive: true });
+    const manifest = {
+      run_id: runId,
+      status: 'failed',
+      started_at: isoTimestamp(),
+      completed_at: isoTimestamp(),
+      summary: 'Primary command sequence interrupted.',
+      commands: [
+        {
+          index: 1,
+          command: 'bash scripts/spec-guard.sh --dry-run',
+          status: 'failed',
+        },
+      ],
+      metrics_recorded: false,
+    };
+    await fs.writeFile(manifestPath, JSON.stringify(manifest, null, 2));
+
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    let calls: unknown[][] = [];
+    try {
+      await appendMetricsEntry(manifest, manifestPath);
+      calls = warnSpy.mock.calls.slice();
+    } finally {
+      warnSpy.mockRestore();
+    }
+
+    expect(calls.some((call) => String(call[0]).includes('Guardrail command failed'))).toBe(true);
+
+    const updatedManifest = JSON.parse(await fs.readFile(manifestPath, 'utf8'));
+    expect(updatedManifest.summary).toMatch(/Primary command sequence interrupted./);
+    expect(updatedManifest.summary).toMatch(/scripts\/run-mcp-diagnostics\.sh --no-watch/);
+  });
+
   it('writes structured error artifacts with run metadata', async () => {
     const { recordCommandErrorArtifact, constants, isoTimestamp } = runnerModule;
     const runId = 'failure-run';

@@ -128,7 +128,7 @@
       - Commands: `scripts/mcp-runner-start.sh`, `node scripts/mcp-runner-metrics.js --summarize`
       - Acceptance: Each completed run appends metrics entry; summary file reports success rate and guardrail coverage with 95% reviewer-readiness indicator.
       - Rationale: Medium-high impact for telemetry and review automation; owned alongside spec scope to satisfy PRD goal.
-      - [x] Completed 2025-10-18 — see `.runs/0001/metrics.json`, `.runs/0001/metrics-summary.json`, and `.runs/0001/mcp/2025-10-18T18-26-16-688Z-39463/manifest.json` for telemetry artifacts and manifest references.
+   - [x] Completed 2025-10-18 — see `.runs/0001/metrics.json`, `.runs/0001/metrics-summary.json`, and `.runs/0001/mcp/2025-10-18T18-26-16-688Z-39463/manifest.json` for telemetry artifacts and manifest references.
    5. Add JSON polling output mode
       - Files: `scripts/mcp-runner-poll.sh`, `scripts/agents_mcp_runner.mjs`
       - Commands: `scripts/mcp-runner-poll.sh <run-id> --format json`
@@ -146,7 +146,7 @@
       - Commands: `scripts/run-mcp-diagnostics.sh --no-watch`, `scripts/mcp-runner-start.sh`
       - Acceptance: Runner prints guidance to invoke diagnostics script when guardrail command missing/failing and records recommendation in manifest summary.
       - Rationale: Low-risk UX follow-up improving reviewer handoff; no mini-spec required.
-      - [ ] Status: Pending — mark complete once manifest evidence and runner log snippet are attached.
+      - [x] 2025-10-19 `.runs/0001/mcp/2025-10-19T06-54-01-535Z-diagnostics/manifest.json` — manifest summary records diagnostics prompt; see accompanying `runner.log` for emitted guidance.
    8. Pin Agents SDK versions for MCP compatibility
       - Files: `package.json`, `package-lock.json`
       - Commands: `npm install`, `npm run lint`

@@ -1,0 +1,21 @@
+{
+  "run_id": "2025-10-19T06-54-01-535Z-diagnostics",
+  "status": "failed",
+  "status_detail": "command-failed",
+  "started_at": "2025-10-19T06:54:01.536Z",
+  "completed_at": "2025-10-19T06:54:01.536Z",
+  "commands": [
+    {
+      "index": 1,
+      "command": "bash scripts/spec-guard.sh --dry-run",
+      "status": "failed",
+      "exit_code": 1,
+      "summary": "Spec guard validation failed in sample generation."
+    }
+  ],
+  "artifact_root": ".runs/0001/mcp/2025-10-19T06-54-01-535Z-diagnostics",
+  "compat_path": ".runs/local-mcp/2025-10-19T06-54-01-535Z-diagnostics",
+  "metrics_recorded": true,
+  "summary": "Guardrail command failed; re-run scripts/run-mcp-diagnostics.sh --no-watch to gather failure artifacts.",
+  "updated_at": "2025-10-19T06:54:01.538Z"
+}

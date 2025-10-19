@@ -5,7 +5,7 @@ This directory stores per-task run manifests, transient logs, and reviewer-facin
 ## Layout
 
 - `.runs/0001/mcp/<run-id>/` — canonical artifact root for Task 0001 MCP executions. Each run contains:
-  - `manifest.json` — per-command status, heartbeat metadata, resume token, and metrics bookkeeping (`metrics_recorded`).
+  - `manifest.json` — per-command status, heartbeat metadata, resume token, metrics bookkeeping (`metrics_recorded`), and run-level summary guidance (diagnostics recommendations when guardrails are missing or failing).
   - `runner.log` — aggregated stdout/stderr from the MCP runner process.
   - `.heartbeat` — last heartbeat timestamp written every 10 seconds while the runner is active.
   - `.resume-token` — the 32-byte token required by `scripts/mcp-runner-start.sh --resume` to reattach to a run.
@@ -23,4 +23,5 @@ This directory stores per-task run manifests, transient logs, and reviewer-facin
 - The MCP runner refuses to start if it cannot write both the task-scoped artifact root and the compatibility pointer.
 - Resume events are tracked in `manifest.resume_events[]` with actor/reason metadata to help reviewers trace handoffs.
 - Failed commands produce dedicated error artifacts under `errors/` so reviewers can inspect malformed payloads without replaying the run.
+- When the spec-guard command is missing or fails, the runner logs a recommendation to run `scripts/run-mcp-diagnostics.sh --no-watch` and records the guidance in `manifest.summary` for reviewer follow-through.
 - Reviewers should cite `.runs/0001/metrics-summary.json` alongside the specific run manifest when validating checklist entries.
