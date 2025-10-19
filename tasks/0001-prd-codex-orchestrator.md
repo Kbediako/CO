@@ -119,7 +119,7 @@
 #### Builder Failure Scenarios
 - **Timeout**: `scripts/agents_mcp_runner.mjs` passes the `--timeout` value through to `clientSessionTimeoutSeconds` (default 3600s). Runs that exceed the allowance terminate with `status=failed` and the last command marked `failed`. Lower timeout targets (e.g., 900s) require explicit configuration and are tracked as a follow-up enhancement.
 - **Detached Run**: Heartbeat timestamps are refreshed every ≤10 seconds. `scripts/mcp-runner-poll.sh` surfaces `status_detail=stale-heartbeat` when the heartbeat age exceeds 30 seconds, and `scripts/mcp-runner-start.sh --resume <run-id>` reattaches using the stored `.resume-token` while appending a `resume_events[]` entry to the manifest.
-- **Malformed Tool Response**: When the Codex tool returns non-JSON or exits non-zero, the runner records the failure in the command entry (`status=failed`, `summary` describing the error) and surfaces `manifest.status=failed`. Capturing a standalone `errors/malformed_tool.json` file is a proposed enhancement.
+- **Malformed Tool Response**: When the Codex tool returns non-JSON or exits non-zero, the runner records the failure in the command entry (`status=failed`, `summary` describing the error) and surfaces `manifest.status=failed`. The runner also writes `errors/<index>-<slug>.json` with the raw tool payload, exit metadata, and summary and references it from `manifest.commands[].error_file` for reviewer triage.
 
 #### Tester Agent Workflow
 1. Read `.runs/0001/mcp/<run-id>/manifest.json` (or the `.runs/local-mcp/<run-id>/` pointer) to confirm required commands (`npm run build`, `npm run lint`, `npm run test`, `bash scripts/spec-guard.sh --dry-run`) executed in-order; queue additional commands with `--command` flags when gaps exist.

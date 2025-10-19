@@ -10,6 +10,7 @@ This directory stores per-task run manifests, transient logs, and reviewer-facin
   - `.heartbeat` — last heartbeat timestamp written every 10 seconds while the runner is active.
   - `.resume-token` — the 32-byte token required by `scripts/mcp-runner-start.sh --resume` to reattach to a run.
   - `<index>-<slug>.json` — raw tool responses captured for each command.
+  - `errors/<index>-<slug>.json` — structured failure artifacts with raw tool payloads and summaries when commands return malformed responses or non-zero exit codes (referenced via `manifest.commands[].error_file`).
   - `poll.json` — optional JSON snapshot produced via `scripts/mcp-runner-poll.sh <run-id> --format json` for reviewer automation.
 - `.runs/local-mcp/<run-id>/` — compatibility pointer re-created during each run/migration. When symlinks are not supported, the directory contains a JSON stub (`manifest.json`) with `redirect_to` and `manifest` fields.
 - `.runs/0001/metrics.json` — JSON Lines stream appended after each run reaches a terminal state (success/failure/cancelled).
@@ -21,4 +22,5 @@ This directory stores per-task run manifests, transient logs, and reviewer-facin
 - All timestamps are stored in ISO 8601 format; heartbeat staleness is derived from `manifest.heartbeat_at` with a 30 second threshold.
 - The MCP runner refuses to start if it cannot write both the task-scoped artifact root and the compatibility pointer.
 - Resume events are tracked in `manifest.resume_events[]` with actor/reason metadata to help reviewers trace handoffs.
+- Failed commands produce dedicated error artifacts under `errors/` so reviewers can inspect malformed payloads without replaying the run.
 - Reviewers should cite `.runs/0001/metrics-summary.json` alongside the specific run manifest when validating checklist entries.

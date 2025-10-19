@@ -11,9 +11,9 @@
 
 ## Update — 2025-10-18 MCP Runner Enhancements
 - Drafted `tasks/specs/0005-mcp-runner-enhancements.md` to manage task-scoped run directory migration, heartbeat/resume tokens, and metrics aggregation; approvals pending.
-- Added checklist Section 7 tasks for migration execution, heartbeat/resume implementation, metrics emission, JSON poll output, structured error artifacts, diagnostics prompts, Agents SDK version pinning, and timeout/error-path documentation; JSON poll mode transitioned to `[x]` on 2025-10-18 with artifacts under `.runs/0001/mcp/2025-10-18T18-26-16-688Z-39463/`.
+- Added checklist Section 7 tasks for migration execution, heartbeat/resume implementation, metrics emission, JSON poll output, structured error artifacts, diagnostics prompts, Agents SDK version pinning, and timeout/error-path documentation; JSON poll mode transitioned to `[x]` on 2025-10-18 with artifacts under `.runs/0001/mcp/2025-10-18T18-26-16-688Z-39463/` and structured error artifacts followed on 2025-10-19 (`errors/<index>-<slug>.json`).
 - Migration tooling will create `.runs/0001/mcp/<run-id>/` with compatibility pointers so reviewers can audit new manifests without breaking existing scripts.
-- Metrics targets support the PRD goal of 95% reviewer coverage from artifacts; remaining low-risk items (diagnostics prompt, SDK pin, timeout doc, structured error artifacts) proceed as implementation tasks without additional specs.
+- Metrics targets support the PRD goal of 95% reviewer coverage from artifacts; remaining low-risk items (diagnostics prompt, SDK pin) proceed as implementation tasks without additional specs.
 - Log rotation and retry automation remain deferred pending telemetry from the new metrics artifacts.
 
 ## Local MCP Harness Usage — Update 2025-10-18

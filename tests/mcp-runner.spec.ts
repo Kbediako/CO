@@ -181,6 +181,43 @@ describe('mcp runner durability + telemetry', () => {
     expect(summary.average_duration_seconds).toBeCloseTo(21);
   });
 
+  it('writes structured error artifacts with run metadata', async () => {
+    const { recordCommandErrorArtifact, constants, isoTimestamp } = runnerModule;
+    const runId = 'failure-run';
+    const runDir = path.join(constants.taskRunsRoot, runId);
+    await fs.mkdir(runDir, { recursive: true });
+
+    const manifest = {
+      run_id: runId,
+      task_id: constants.TASK_ID,
+      started_at: isoTimestamp(),
+    };
+    const entry = {
+      index: 3,
+      command: "bash -lc 'exit 2'",
+    };
+
+    const relativePath = await recordCommandErrorArtifact({
+      manifest,
+      entry,
+      runDir,
+      reason: 'command-failed',
+      details: { exit_code: 2 },
+    });
+
+    expect(relativePath).toBe(
+      path.join('.runs', '0001', 'mcp', runId, 'errors', '03-bash-lc-exit-2.json'),
+    );
+
+    const artifactPath = path.join(constants.repoRoot, relativePath);
+    const artifact = JSON.parse(await fs.readFile(artifactPath, 'utf8'));
+    expect(artifact.run_id).toBe(runId);
+    expect(artifact.reason).toBe('command-failed');
+    expect(artifact.details.exit_code).toBe(2);
+    expect(artifact.command).toBe(entry.command);
+    expect(artifact.command_index).toBe(3);
+  });
+
   it('outputs structured json when polling with format=json', async () => {
     const { pollRun, constants, isoTimestamp } = runnerModule;
     const runId = 'json-mode-run';
@@ -204,6 +241,7 @@ describe('mcp runner durability + telemetry', () => {
               command: 'echo ok',
               status: 'succeeded',
               summary: 'ok',
+              error_file: null,
             },
           ],
           artifact_root: path.relative(constants.repoRoot, runDir),
@@ -230,5 +268,7 @@ describe('mcp runner durability + telemetry', () => {
     expect(payload.manifest).toBe(path.relative(constants.repoRoot, manifestPath));
     expect(payload.heartbeat.stale).toBe(false);
     expect(payload.commands[0].command).toBe('echo ok');
+    expect(payload.commands[0]).toHaveProperty('error_file');
+    expect(payload.commands[0].error_file).toBeNull();
   });
 });

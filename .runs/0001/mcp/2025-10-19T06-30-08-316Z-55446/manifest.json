@@ -1,0 +1,38 @@
+{
+  "runner": "agents-sdk",
+  "script": "scripts/agents_mcp_runner.mjs",
+  "status": "failed",
+  "status_detail": "command-failed",
+  "commands": [
+    {
+      "index": 1,
+      "command": "bash -lc 'exit 2'",
+      "status": "failed",
+      "started_at": "2025-10-19T06:30:08.430Z",
+      "completed_at": "2025-10-19T06:30:15.600Z",
+      "exit_code": 2,
+      "manifest_path": null,
+      "response_file": ".runs/0001/mcp/2025-10-19T06-30-08-316Z-55446/01-bash-lc-exit-2.json",
+      "summary": "Command exited with status 2",
+      "error_file": ".runs/0001/mcp/2025-10-19T06-30-08-316Z-55446/errors/01-bash-lc-exit-2.json"
+    }
+  ],
+  "started_at": "2025-10-19T06:30:08.317Z",
+  "updated_at": "2025-10-19T06:30:15.603Z",
+  "completed_at": "2025-10-19T06:30:15.601Z",
+  "run_id": "2025-10-19T06-30-08-316Z-55446",
+  "repo_root": "/Users/asabeko/Documents/Code/CO",
+  "approval_policy": "never",
+  "timeout_seconds": 3600,
+  "runner_pid": 55447,
+  "runner_log": ".runs/0001/mcp/2025-10-19T06-30-08-316Z-55446/runner.log",
+  "task_id": "0001",
+  "artifact_root": ".runs/0001/mcp/2025-10-19T06-30-08-316Z-55446",
+  "compat_path": ".runs/local-mcp/2025-10-19T06-30-08-316Z-55446",
+  "heartbeat_at": "2025-10-19T06:30:08.429Z",
+  "heartbeat_interval_seconds": 10,
+  "heartbeat_stale_after_seconds": 30,
+  "resume_token": "201e6aeaa4a8eeffe86423389efd2b01b588fac23793f57ff8fdccfcd573b5b8",
+  "resume_events": [],
+  "metrics_recorded": true
+}

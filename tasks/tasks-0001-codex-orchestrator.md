@@ -140,7 +140,7 @@
       - Commands: `scripts/mcp-runner-start.sh --command "bash -lc 'exit 2'" --format json`
       - Acceptance: Failed commands write `errors/<command-index>-<slug>.json` capturing raw tool payload and error summary, referenced from manifest.
       - Rationale: Medium impact on reviewer diagnostics; safe to deliver as implementation task once metrics groundwork lands.
-      - [ ] Status: Pending — flip to [x] with manifests linking error artifacts and logged validation run.
+      - [x] 2025-10-19 .runs/0001/mcp/2025-10-19T06-30-08-316Z-55446/manifest.json — includes `errors/01-bash-lc-exit-2.json` artifact for failed command.
    7. Automate diagnostics suggestion on guardrail failure
       - Files: `scripts/run-mcp-diagnostics.sh`, `scripts/agents_mcp_runner.mjs`
       - Commands: `scripts/run-mcp-diagnostics.sh --no-watch`, `scripts/mcp-runner-start.sh`

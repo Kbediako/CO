@@ -94,6 +94,24 @@ function slugify(command) {
   return cleaned.replace(/^-|-$/g, '').slice(0, 60) || 'command';
 }
 
+async function recordCommandErrorArtifact({ manifest, entry, runDir, reason, details }) {
+  const errorsDir = path.join(runDir, 'errors');
+  await fs.mkdir(errorsDir, { recursive: true });
+  const filename = `${String(entry.index).padStart(2, '0')}-${slugify(entry.command)}.json`;
+  const filePath = path.join(errorsDir, filename);
+  const payload = {
+    run_id: manifest.run_id ?? null,
+    task_id: manifest.task_id ?? TASK_ID,
+    command_index: entry.index,
+    command: entry.command,
+    created_at: isoTimestamp(),
+    reason,
+    details,
+  };
+  await writeJsonAtomic(filePath, payload);
+  return path.relative(repoRoot, filePath);
+}
+
 function extractSummary(content) {
   if (!Array.isArray(content)) {
     return null;
@@ -303,6 +321,7 @@ async function startRun(options) {
     manifest_path: null,
     response_file: null,
     summary: null,
+    error_file: null,
   }));
 
   const now = isoTimestamp();
@@ -438,6 +457,20 @@ async function executeRun(runId) {
         entry.status = 'failed';
         entry.completed_at = isoTimestamp();
         entry.summary = `Tool invocation failed: ${error.message ?? error}`;
+        entry.exit_code = null;
+        entry.error_file = await recordCommandErrorArtifact({
+          manifest,
+          entry,
+          runDir,
+          reason: 'tool-invocation-error',
+          details: {
+            message: error?.message ?? String(error),
+            stack: error?.stack ?? null,
+          },
+        }).catch((artifactError) => {
+          console.error(`Failed to write error artifact: ${artifactError.message ?? artifactError}`);
+          return null;
+        });
         manifest.status = 'failed';
         manifest.status_detail = 'tool-invocation-error';
         manifest.completed_at = isoTimestamp();
@@ -461,22 +494,55 @@ async function executeRun(runId) {
       const parsed = parseJsonPayload(summary);
       entry.completed_at = isoTimestamp();
 
-      if (parsed) {
-        entry.exit_code = parsed.exit_code ?? null;
-        entry.summary = parsed.summary ?? summary;
-        entry.manifest_path = parsed.manifest_path ?? null;
-        entry.status = parsed.exit_code === 0 ? 'succeeded' : 'failed';
-      } else {
-        entry.summary = summary;
-        entry.status = entry.exit_code === 0 ? 'succeeded' : entry.status;
-        if (entry.status === 'running') {
-          entry.status = 'succeeded';
-        }
+      const hasExitCode = typeof parsed?.exit_code === 'number';
+
+      if (!hasExitCode) {
+        entry.exit_code = parsed?.exit_code ?? null;
+        entry.summary = summary ?? 'Tool response missing JSON payload.';
+        entry.status = 'failed';
+        entry.error_file = await recordCommandErrorArtifact({
+          manifest,
+          entry,
+          runDir,
+          reason: 'malformed-tool-response',
+          details: {
+            note: 'Expected JSON object with numeric exit_code.',
+            raw_summary: summary ?? null,
+            normalized_response: normalizedResponse,
+          },
+        }).catch((artifactError) => {
+          console.error(`Failed to write error artifact: ${artifactError.message ?? artifactError}`);
+          return null;
+        });
+        manifest.status = 'failed';
+        manifest.status_detail = 'malformed-tool-response';
+        manifest.completed_at = isoTimestamp();
+        await saveManifest(manifestPath, manifest);
+        await appendMetricsEntry(manifest, manifestPath);
+        process.exitCode = 1;
+        return;
       }
 
-      await saveManifest(manifestPath, manifest);
+      entry.exit_code = parsed.exit_code;
+      entry.summary = parsed.summary ?? summary ?? null;
+      entry.manifest_path = parsed.manifest_path ?? null;
+      entry.status = parsed.exit_code === 0 ? 'succeeded' : 'failed';
 
       if (entry.status === 'failed') {
+        entry.error_file = await recordCommandErrorArtifact({
+          manifest,
+          entry,
+          runDir,
+          reason: 'command-failed',
+          details: {
+            exit_code: entry.exit_code,
+            summary: entry.summary,
+            normalized_response: normalizedResponse,
+          },
+        }).catch((artifactError) => {
+          console.error(`Failed to write error artifact: ${artifactError.message ?? artifactError}`);
+          return null;
+        });
         manifest.status = 'failed';
         manifest.status_detail = 'command-failed';
         manifest.completed_at = isoTimestamp();
@@ -485,6 +551,9 @@ async function executeRun(runId) {
         process.exitCode = 1;
         return;
       }
+
+      entry.error_file = null;
+      await saveManifest(manifestPath, manifest);
     }
 
     manifest.status = 'succeeded';
@@ -522,6 +591,9 @@ function renderStatus(manifest) {
     }
     if (entry.response_file) {
       console.log(`     response: ${entry.response_file}`);
+    }
+    if (entry.error_file) {
+      console.log(`     error: ${entry.error_file}`);
     }
   }
 }
@@ -588,6 +660,7 @@ async function pollRun(runId, { watch = false, interval = 10, format = 'text' })
           started_at: entry.started_at ?? null,
           completed_at: entry.completed_at ?? null,
           response_file: entry.response_file ?? null,
+          error_file: entry.error_file ?? null,
         })),
       };
       console.log(JSON.stringify(payload, null, 2));
@@ -906,6 +979,7 @@ export {
   saveManifest,
   startRun,
   timestampForRunId,
+  recordCommandErrorArtifact,
   HEARTBEAT_INTERVAL_MS,
   HEARTBEAT_STALE_THRESHOLD_MS,
 };
