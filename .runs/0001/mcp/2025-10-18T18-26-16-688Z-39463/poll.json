@@ -1,0 +1,60 @@
+{
+  "run_id": "2025-10-18T18-26-16-688Z-39463",
+  "status": "succeeded",
+  "status_detail": null,
+  "started_at": "2025-10-18T18:26:16.689Z",
+  "completed_at": "2025-10-18T18:27:10.396Z",
+  "manifest": ".runs/0001/mcp/2025-10-18T18-26-16-688Z-39463/manifest.json",
+  "artifact_root": ".runs/0001/mcp/2025-10-18T18-26-16-688Z-39463",
+  "compat_path": ".runs/local-mcp/2025-10-18T18-26-16-688Z-39463",
+  "polled_at": "2025-10-18T18:55:29.508Z",
+  "heartbeat": {
+    "updated_at": "2025-10-18T18:27:06.832Z",
+    "age_seconds": 1702.676,
+    "stale": true,
+    "interval_seconds": 10,
+    "stale_after_seconds": 30
+  },
+  "commands": [
+    {
+      "index": 1,
+      "command": "npm run build",
+      "status": "succeeded",
+      "summary": "Completed npm run build.",
+      "exit_code": 0,
+      "started_at": "2025-10-18T18:26:16.821Z",
+      "completed_at": "2025-10-18T18:26:28.265Z",
+      "response_file": ".runs/0001/mcp/2025-10-18T18-26-16-688Z-39463/01-npm-run-build.json"
+    },
+    {
+      "index": 2,
+      "command": "npm run lint",
+      "status": "succeeded",
+      "summary": "npm run lint completed successfully (build:patterns then eslint).",
+      "exit_code": 0,
+      "started_at": "2025-10-18T18:26:28.266Z",
+      "completed_at": "2025-10-18T18:26:41.326Z",
+      "response_file": ".runs/0001/mcp/2025-10-18T18-26-16-688Z-39463/02-npm-run-lint.json"
+    },
+    {
+      "index": 3,
+      "command": "npm run test",
+      "status": "succeeded",
+      "summary": "npm run test completed successfully (10 files, 37 tests).",
+      "exit_code": 0,
+      "started_at": "2025-10-18T18:26:41.327Z",
+      "completed_at": "2025-10-18T18:26:55.350Z",
+      "response_file": ".runs/0001/mcp/2025-10-18T18-26-16-688Z-39463/03-npm-run-test.json"
+    },
+    {
+      "index": 4,
+      "command": "bash scripts/spec-guard.sh --dry-run",
+      "status": "succeeded",
+      "summary": "Spec guard dry run succeeded.",
+      "exit_code": 0,
+      "started_at": "2025-10-18T18:26:55.351Z",
+      "completed_at": "2025-10-18T18:27:10.395Z",
+      "response_file": ".runs/0001/mcp/2025-10-18T18-26-16-688Z-39463/04-bash-scripts-spec-guard-sh-dry-run.json"
+    }
+  ]
+}

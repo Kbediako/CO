@@ -547,7 +547,7 @@ async function resolveManifestPath(runId) {
   return legacyManifestPath;
 }
 
-async function pollRun(runId, { watch = false, interval = 10 }) {
+async function pollRun(runId, { watch = false, interval = 10, format = 'text' }) {
   const manifestPath = await resolveManifestPath(runId);
 
   do {
@@ -558,7 +558,42 @@ async function pollRun(runId, { watch = false, interval = 10 }) {
       await saveManifest(manifestPath, manifest);
     }
 
-    renderStatus(manifest);
+    if (format === 'json') {
+      const payload = {
+        run_id: manifest.run_id,
+        status: manifest.status,
+        status_detail: manifest.status_detail ?? null,
+        started_at: manifest.started_at ?? null,
+        completed_at: manifest.completed_at ?? null,
+        manifest: path.relative(repoRoot, manifestPath),
+        artifact_root:
+          manifest.artifact_root ?? path.relative(repoRoot, path.dirname(manifestPath)),
+        compat_path: manifest.compat_path ?? null,
+        polled_at: isoTimestamp(),
+        heartbeat: {
+          updated_at: manifest.heartbeat_at ?? null,
+          age_seconds: heartbeatState.ageSeconds,
+          stale: heartbeatState.stale,
+          interval_seconds:
+            manifest.heartbeat_interval_seconds ?? HEARTBEAT_INTERVAL_MS / 1000,
+          stale_after_seconds:
+            manifest.heartbeat_stale_after_seconds ?? HEARTBEAT_STALE_THRESHOLD_MS / 1000,
+        },
+        commands: (manifest.commands ?? []).map((entry) => ({
+          index: entry.index,
+          command: entry.command,
+          status: entry.status,
+          summary: entry.summary ?? null,
+          exit_code: entry.exit_code ?? null,
+          started_at: entry.started_at ?? null,
+          completed_at: entry.completed_at ?? null,
+          response_file: entry.response_file ?? null,
+        })),
+      };
+      console.log(JSON.stringify(payload, null, 2));
+    } else {
+      renderStatus(manifest);
+    }
     if (!watch || TERMINAL_STATES.has(manifest.status)) {
       break;
     }
@@ -733,7 +768,7 @@ function parseArgs(argv) {
         throw new Error('Usage: scripts/agents_mcp_runner.mjs poll <run-id> [--watch] [--interval N]');
       }
       const runId = rest[0];
-      const options = { watch: false, interval: 10 };
+      const options = { watch: false, interval: 10, format: 'text' };
       for (let i = 1; i < rest.length; i += 1) {
         const arg = rest[i];
         switch (arg) {
@@ -746,6 +781,17 @@ function parseArgs(argv) {
               throw new Error('--interval requires a numeric value');
             }
             options.interval = Number(value);
+            break;
+          }
+          case '--format': {
+            const value = rest[++i];
+            if (!value) {
+              throw new Error('--format requires a value');
+            }
+            if (value !== 'text' && value !== 'json') {
+              throw new Error(`Unsupported format: ${value}. Expected "text" or "json".`);
+            }
+            options.format = value;
             break;
           }
           default:

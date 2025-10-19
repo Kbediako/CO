@@ -134,7 +134,7 @@
       - Commands: `scripts/mcp-runner-poll.sh <run-id> --format json`
       - Acceptance: Poll command emits machine-readable JSON with heartbeat age, command statuses, and manifest path; textual output remains default.
       - Rationale: Low-risk CLI enhancement; tracked as direct implementation task without mini-spec.
-      - [ ] Status: Pending — switch to [x] after recorded run demonstrates JSON output saved in `.runs/0001/<run-id>/poll.json`.
+      - [x] 2025-10-18 `.runs/0001/mcp/2025-10-18T18-26-16-688Z-39463/poll.json` — JSON poll snapshot captured for reviewer automation.
    6. Capture structured error artifacts for malformed tool responses
       - Files: `scripts/agents_mcp_runner.mjs`, `.runs/README.md`
       - Commands: `scripts/mcp-runner-start.sh --command "bash -lc 'exit 2'" --format json`

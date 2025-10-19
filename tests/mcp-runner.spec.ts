@@ -4,7 +4,7 @@ import os from 'os';
 import path from 'path';
 import { promisify } from 'util';
 
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const execFileAsync = promisify(execFile);
 const importModule = async (target: string) => import(`${target}?test=${Date.now()}${Math.random()}`);
@@ -179,5 +179,56 @@ describe('mcp runner durability + telemetry', () => {
     expect(summary.entries_succeeded).toBe(1);
     expect(summary.guardrail_coverage).toBeCloseTo(0.5, 5);
     expect(summary.average_duration_seconds).toBeCloseTo(21);
+  });
+
+  it('outputs structured json when polling with format=json', async () => {
+    const { pollRun, constants, isoTimestamp } = runnerModule;
+    const runId = 'json-mode-run';
+    const runDir = path.join(constants.taskRunsRoot, runId);
+    const manifestPath = path.join(runDir, 'manifest.json');
+
+    await fs.mkdir(runDir, { recursive: true });
+    await fs.writeFile(
+      manifestPath,
+      JSON.stringify(
+        {
+          run_id: runId,
+          status: 'succeeded',
+          status_detail: null,
+          started_at: isoTimestamp(),
+          completed_at: isoTimestamp(),
+          heartbeat_at: isoTimestamp(),
+          commands: [
+            {
+              index: 1,
+              command: 'echo ok',
+              status: 'succeeded',
+              summary: 'ok',
+            },
+          ],
+          artifact_root: path.relative(constants.repoRoot, runDir),
+        },
+        null,
+        2,
+      ),
+      'utf8',
+    );
+
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    let calls: unknown[][] = [];
+    try {
+      await pollRun(runId, { watch: false, interval: 1, format: 'json' });
+      expect(logSpy).toHaveBeenCalled();
+      calls = logSpy.mock.calls.slice();
+    } finally {
+      logSpy.mockRestore();
+    }
+
+    expect(calls.length).toBeGreaterThan(0);
+    const payload = JSON.parse(String(calls[0][0]));
+    expect(payload.run_id).toBe(runId);
+    expect(payload.manifest).toBe(path.relative(constants.repoRoot, manifestPath));
+    expect(payload.heartbeat.stale).toBe(false);
+    expect(payload.commands[0].command).toBe('echo ok');
   });
 });

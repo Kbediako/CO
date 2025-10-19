@@ -43,6 +43,6 @@
 
 ## Update — 2025-10-18 MCP Runner Durability
 - Mini-spec `tasks/specs/0005-mcp-runner-enhancements.md` scopes the move to `.runs/0001/mcp/<run-id>/` directories, heartbeat/resume tokens, and metrics aggregation (implemented in this change set).
-- Runner wrappers (`scripts/mcp-runner-start.sh`, `scripts/mcp-runner-poll.sh`) expose `--resume` and heartbeat-aware polling, surfacing stale sessions after 30 seconds and preserving backwards compatibility via `.runs/local-mcp/<run-id>/` pointers.
+- Runner wrappers (`scripts/mcp-runner-start.sh`, `scripts/mcp-runner-poll.sh`) expose `--resume`, heartbeat-aware polling, and `--format json` for machine-readable status snapshots while preserving backwards compatibility via `.runs/local-mcp/<run-id>/` pointers.
 - Metrics artifacts (`.runs/0001/metrics.json`, `.runs/0001/metrics-summary.json`) will quantify command success, guardrail coverage, and reviewer readiness for the PRD’s 95% reviewability KPI.
-- Low-risk backlog items (JSON poll output, structured error artifacts, diagnostics prompts, Agents SDK pinning, timeout/error-path documentation) are enumerated in task checklist Section 7 for direct implementation.
+- Low-risk backlog items (structured error artifacts, diagnostics prompts, Agents SDK pinning, timeout/error-path documentation) remain tracked in task checklist Section 7 for direct implementation.
