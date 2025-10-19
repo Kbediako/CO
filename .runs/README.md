@@ -24,4 +24,5 @@ This directory stores per-task run manifests, transient logs, and reviewer-facin
 - Resume events are tracked in `manifest.resume_events[]` with actor/reason metadata to help reviewers trace handoffs.
 - Failed commands produce dedicated error artifacts under `errors/` so reviewers can inspect malformed payloads without replaying the run.
 - When the spec-guard command is missing or fails, the runner logs a recommendation to run `scripts/run-mcp-diagnostics.sh --no-watch` and records the guidance in `manifest.summary` for reviewer follow-through.
+- `scripts/run-mcp-diagnostics.sh` monitors heartbeat freshness and, if the runner stalls (`status_detail: stale-heartbeat`), instructs reviewers to resume the run with `scripts/mcp-runner-start.sh --resume <run-id>` using the stored `.resume-token`.
 - Reviewers should cite `.runs/0001/metrics-summary.json` alongside the specific run manifest when validating checklist entries.

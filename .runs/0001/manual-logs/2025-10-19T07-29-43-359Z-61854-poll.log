@@ -1,0 +1,19 @@
+
+Run 2025-10-19T07-29-43-359Z-61854 status: failed
+Status detail: command-failed
+Summary: Guardrail command failed; re-run scripts/run-mcp-diagnostics.sh --no-watch to gather failure artifacts.
+Started: 2025-10-19T07:29:43.361Z
+Completed: 2025-10-19T07:30:14.297Z
+Heartbeat age: 15.2s
+Commands:
+  1. npm run build -> succeeded
+     summary: npm run build completed successfully
+     response: .runs/0001/mcp/2025-10-19T07-29-43-359Z-61854/01-npm-run-build.json
+  2. npm run lint -> succeeded
+     summary: npm run lint completed successfully with build:patterns and eslint passing.
+     response: .runs/0001/mcp/2025-10-19T07-29-43-359Z-61854/02-npm-run-lint.json
+  3. npm run test -> failed
+     summary: Command timed out after 0.004s before npm tests could start.
+     response: .runs/0001/mcp/2025-10-19T07-29-43-359Z-61854/03-npm-run-test.json
+     error: .runs/0001/mcp/2025-10-19T07-29-43-359Z-61854/errors/03-npm-run-test.json
+  4. bash scripts/spec-guard.sh --dry-run -> pending

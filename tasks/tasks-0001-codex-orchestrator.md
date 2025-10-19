@@ -152,7 +152,7 @@
       - Commands: `npm install`, `npm run lint`
       - Acceptance: `@openai/agents-*` dependencies pinned to approved range; manifest documents version audit and lint/test pass.
       - Rationale: Addresses PRD risk about SDK drift; implementation task coordinated with diagnostics rollout.
-      - [ ] Status: Pending — switch to [x] after dependency updates merge with manifest evidence.
+      - [x] 2025-10-19 `.runs/0001/mcp/2025-10-19T07-25-23-684Z-60187/manifest.json` — dependency pins recorded in `package.json`/`package-lock.json`; lint/test/spec-guard captured via `.runs/0001/manual-logs/2025-10-19T07-23-03Z-spec-guard.log`.
    9. Document MCP timeout and error-handling code paths
       - Files: `tasks/0001-prd-codex-orchestrator.md`, `docs/PRD.md`, `docs/TECH_SPEC.md`
       - Commands: `n/a`

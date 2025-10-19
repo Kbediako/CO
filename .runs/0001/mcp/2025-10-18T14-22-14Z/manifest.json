@@ -1,0 +1,13 @@
+{
+  "mode": "mcp",
+  "started_at": "2025-10-18T14-22-14Z",
+  "repo": "/Users/asabeko/Documents/Code/CO",
+  "command": "codex -C /Users/asabeko/Documents/Code/CO mcp-server",
+  "task_id": "0001",
+  "artifact_root": ".runs/0001/mcp/2025-10-18T14-22-14Z",
+  "compat_path": ".runs/local-mcp/2025-10-18T14-22-14Z",
+  "metrics_recorded": true,
+  "resume_token": null,
+  "resume_events": [],
+  "updated_at": "2025-10-19T07:25:00.046Z"
+}

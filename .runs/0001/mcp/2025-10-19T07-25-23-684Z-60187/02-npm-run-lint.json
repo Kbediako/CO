@@ -1,0 +1,6 @@
+[
+  {
+    "type": "text",
+    "text": "{\"exit_code\":0,\"summary\":\"npm run lint completed successfully (build:patterns compiled via tsc, eslint reported no issues).\",\"manifest_path\":null}"
+  }
+]

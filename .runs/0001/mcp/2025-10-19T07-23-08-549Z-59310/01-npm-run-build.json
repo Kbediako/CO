@@ -1,0 +1,6 @@
+[
+  {
+    "type": "text",
+    "text": "{\"exit_code\":0,\"summary\":\"Ran `npm run build`; TypeScript compilation succeeded.\",\"manifest_path\":null}"
+  }
+]

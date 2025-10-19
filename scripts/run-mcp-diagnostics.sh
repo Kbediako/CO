@@ -62,6 +62,11 @@ if [[ ! -x "$RUNNER" ]]; then
   exit 1
 fi
 
+if ! command -v python3 >/dev/null 2>&1; then
+  echo "Error: python3 is required to parse heartbeat status." >&2
+  exit 2
+fi
+
 START_OUTPUT="$(node "$RUNNER" start --approval-policy "${APPROVAL_POLICY}" --timeout "${TIMEOUT}" --format json)"
 
 if [[ -z "$START_OUTPUT" ]]; then
@@ -73,6 +78,8 @@ RUN_ID="$(node -e 'const data = JSON.parse(process.argv[1]); console.log(data.ru
 MANIFEST_PATH="$(node -e 'const data = JSON.parse(process.argv[1]); console.log(data.manifest);' "$START_OUTPUT")"
 ARTIFACT_ROOT="$(node -e 'const data = JSON.parse(process.argv[1]); console.log(data.artifact_root);' "$START_OUTPUT")"
 COMPAT_PATH="$(node -e 'const data = JSON.parse(process.argv[1]); console.log(data.compat_path);' "$START_OUTPUT")"
+RUN_DIR="${ROOT}/${ARTIFACT_ROOT}"
+RESUME_TOKEN_PATH="${RUN_DIR}/.resume-token"
 
 echo "Diagnostics run started."
 echo "Run ID: ${RUN_ID}"
@@ -81,8 +88,93 @@ echo "Compatibility path: ${COMPAT_PATH}"
 echo "Manifest: ${MANIFEST_PATH}"
 echo
 
+monitor_heartbeat() {
+  local poll_pid="${1:-}"
+  while true; do
+    local status_json
+    if ! status_json="$(node "$RUNNER" poll "$RUN_ID" --format json 2>/dev/null)"; then
+      sleep 5
+      continue
+    fi
+
+    if [[ -z "${status_json//[[:space:]]/}" ]]; then
+      sleep 5
+      continue
+    fi
+
+    local parsed
+    if ! parsed="$(python3 -c 'import json, sys; data=json.load(sys.stdin); heartbeat = data.get("heartbeat") or {}; fields = [data.get("status", ""), data.get("status_detail") or "", "true" if heartbeat.get("stale") else "false", str(heartbeat.get("age_seconds", ""))]; print("\n".join(fields))' <<<"$status_json")"; then
+      sleep 5
+      continue
+    fi
+
+    IFS=$'\n' read -r status status_detail heartbeat_stale heartbeat_age <<<"$parsed"
+
+    if [[ "$status" == "succeeded" || "$status" == "failed" || "$status" == "cancelled" ]]; then
+      break
+    fi
+
+    if [[ "$heartbeat_stale" == "true" ]]; then
+      if [[ -n "$poll_pid" ]]; then
+        kill "$poll_pid" 2>/dev/null || true
+      fi
+      echo
+      echo "Warning: heartbeat stale for run ${RUN_ID} (age: ${heartbeat_age}s)."
+      if [[ -z "${status_detail}" ]]; then
+        status_detail="stale-heartbeat"
+      fi
+      echo "Status detail: ${status_detail}"
+      if [[ -f "$RESUME_TOKEN_PATH" ]]; then
+        local resume_token
+        resume_token="$(tr -d '\r\n' < "$RESUME_TOKEN_PATH")"
+        echo "Resume with: scripts/mcp-runner-start.sh --resume ${RUN_ID} --resume-token ${resume_token}"
+      else
+        echo "Resume with: scripts/mcp-runner-start.sh --resume ${RUN_ID}"
+      fi
+      echo "Heartbeat monitor exiting; investigate runner logs or resume the run."
+      break
+    fi
+
+    sleep 10
+  done
+}
+
+POLL_PID=""
+MONITOR_PID=""
+
+cleanup_background() {
+  if [[ -n "${POLL_PID:-}" ]]; then
+    kill "$POLL_PID" 2>/dev/null || true
+  fi
+  if [[ -n "${MONITOR_PID:-}" ]]; then
+    kill "$MONITOR_PID" 2>/dev/null || true
+  fi
+}
+trap cleanup_background EXIT
+
 if [[ "$WATCH" == true ]]; then
-  node "$RUNNER" poll "$RUN_ID" --watch --interval 10
+  node "$RUNNER" poll "$RUN_ID" --watch --interval 10 &
+  POLL_PID=$!
+  monitor_heartbeat "$POLL_PID" &
+  MONITOR_PID=$!
+  wait "$POLL_PID" || true
+  wait "$MONITOR_PID" 2>/dev/null || true
 else
   echo "Use scripts/mcp-runner-poll.sh ${RUN_ID} to monitor progress."
+  if status_json="$(node "$RUNNER" poll "$RUN_ID" --format json 2>/dev/null)"; then
+    if [[ -z "${status_json//[[:space:]]/}" ]]; then
+      exit 0
+    fi
+    parsed_status="$(python3 -c 'import json, sys; data=json.load(sys.stdin); heartbeat = data.get("heartbeat") or {}; fields = [data.get("status", ""), data.get("status_detail") or "", "true" if heartbeat.get("stale") else "false", str(heartbeat.get("age_seconds", ""))]; print("\n".join(fields))' <<<"$status_json")"
+    IFS=$'\n' read -r status status_detail heartbeat_stale heartbeat_age <<<"$parsed_status"
+    if [[ "$heartbeat_stale" == "true" && "$status" != "succeeded" && "$status" != "failed" && "$status" != "cancelled" ]]; then
+      echo "Warning: heartbeat stale for run ${RUN_ID} (age: ${heartbeat_age}s)."
+      if [[ -f "$RESUME_TOKEN_PATH" ]]; then
+        resume_token="$(tr -d '\r\n' < "$RESUME_TOKEN_PATH")"
+        echo "Resume with: scripts/mcp-runner-start.sh --resume ${RUN_ID} --resume-token ${resume_token}"
+      else
+        echo "Resume with: scripts/mcp-runner-start.sh --resume ${RUN_ID}"
+      fi
+    fi
+  fi
 fi

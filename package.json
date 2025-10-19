@@ -29,7 +29,9 @@
     "esbuild": "^0.25.11"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.20.1",
-    "@openai/agents": "^0.1.10"
+    "@modelcontextprotocol/sdk": "1.20.1",
+    "@openai/agents": "0.1.10",
+    "@openai/agents-core": "0.1.10",
+    "@openai/agents-openai": "0.1.10"
   }
 }
