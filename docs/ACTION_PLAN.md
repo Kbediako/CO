@@ -2,7 +2,7 @@
 
 > **Source Context:** tasks/0001-prd-codex-orchestrator.md, tasks/tasks-0001-codex-orchestrator.md, tasks/specs/tech-spec-0001-codex-orchestrator.md
 >
-> **Status:** Updated 2025-10-16 — Milestones M1–M3 complete with guardrails and documentation signed off.
+> **Status:** Updated 2025-10-19 — Milestones M1–M3 complete with guardrails and documentation signed off.
 
 ## Status Snapshot — 2025-10-16
 - **Canonical sources:** `tasks/0001-prd-codex-orchestrator.md`, `tasks/tasks-0001-codex-orchestrator.md`, `tasks/specs/tech-spec-0001-codex-orchestrator.md` (all with `last_review` 2025-10-16).
@@ -11,14 +11,14 @@
 
 ## Update — 2025-10-18 MCP Runner Enhancements
 - Drafted `tasks/specs/0005-mcp-runner-enhancements.md` to manage task-scoped run directory migration, heartbeat/resume tokens, and metrics aggregation; approvals pending.
-- Added checklist Section 7 tasks for migration execution, heartbeat/resume implementation, metrics emission, JSON poll output, structured error artifacts, diagnostics prompts, Agents SDK version pinning, and timeout/error-path documentation; JSON poll mode transitioned to `[x]` on 2025-10-18 with artifacts under `.runs/0001/mcp/2025-10-18T18-26-16-688Z-39463/`, structured error artifacts followed on 2025-10-19 (`errors/<index>-<slug>.json`), diagnostics prompts shipped 2025-10-19 with summary guidance captured in `.runs/0001/mcp/2025-10-19T06-54-01-535Z-diagnostics/`, and Agents SDK pinning landed on 2025-10-19 (`.runs/0001/mcp/2025-10-19T07-25-23-684Z-60187/manifest.json`).
+- Added checklist Section 7 tasks for migration execution, heartbeat/resume implementation, metrics emission, JSON poll output, structured error artifacts, diagnostics prompts, Agents SDK version pinning, and timeout/error-path documentation; JSON poll mode transitioned to `[x]` on 2025-10-18 with artifacts under `.runs/0001/mcp/2025-10-18T18-26-16-688Z-39463/`, structured error artifacts followed on 2025-10-19 (`errors/<index>-<slug>.json`), diagnostics prompts shipped 2025-10-19 with summary guidance captured in `.runs/0001/mcp/2025-10-19T10-00-05-814Z-68910/manifest.json`, and Agents SDK pinning landed on 2025-10-19 (`.runs/0001/mcp/2025-10-19T07-25-23-684Z-60187/manifest.json`).
 - Migration tooling will create `.runs/0001/mcp/<run-id>/` with compatibility pointers so reviewers can audit new manifests without breaking existing scripts.
 - Metrics targets support the PRD goal of 95% reviewer coverage from artifacts; remaining low-risk items focus on telemetry tuning now that the Agents SDK pin is complete.
 - Log rotation and retry automation remain deferred pending telemetry from the new metrics artifacts.
 
-## Local MCP Harness Usage — Update 2025-10-18
+## Local MCP Harness Usage — Update 2025-10-19
 - **Preconditions:** Install and authenticate the Codex CLI, ensure Node.js ≥18 is available (for `npx`), and maintain optional `jq` if you want pretty-printed manifests. No background process is required; the harness is launched per session.
-- **Automation shortcut:** `scripts/run-mcp-diagnostics.sh` now wraps the Agents SDK runner. It spawns `scripts/agents_mcp_runner.mjs`, sets `client_session_timeout_seconds=3600`, executes build/lint/test/spec-guard through Codex, and tails progress until completion. While watching, the script monitors heartbeat freshness and suggests `scripts/mcp-runner-start.sh --resume <run-id>` if the runner stalls. The command prints the run id plus `.runs/0001/mcp/<run-id>/manifest.json` and the compatibility pointer under `.runs/local-mcp/<run-id>/`.
+- **Automation shortcut:** `scripts/run-mcp-diagnostics.sh` now wraps the Agents SDK runner. It spawns `scripts/agents_mcp_runner.mjs`, sets `client_session_timeout_seconds=3600`, executes build/lint/test/spec-guard through Codex, and tails progress until completion. While watching, the script monitors heartbeat freshness and suggests `scripts/mcp-runner-start.sh --resume <run-id>` if the runner stalls. The command prints the run id plus `.runs/0001/mcp/<run-id>/manifest.json` and the compatibility pointer under `.runs/local-mcp/<run-id>/`. JSON parsing now routes through `node`, so the watcher no longer requires `python3`.
 - **Manual start & poll:** Use `scripts/mcp-runner-start.sh --timeout 7200 --approval-policy never` to enqueue a session without blocking, then `scripts/mcp-runner-poll.sh <run-id> --watch` to monitor. Each run directory contains `manifest.json`, `runner.log`, and per-command response JSON (one file per diagnostic).
 - **Extended sessions & resilience:** The runner hosts `scripts/run-local-mcp.sh` via `MCPServerStdio`, eliminating the two-minute CLI timeout and persisting state between poll calls. Progress updates write back to the manifest after each command so mid-run monitoring never requires restarting diagnostics.
 - **Customization:** Pass `--command "<cmd>"` flags to `node scripts/agents_mcp_runner.mjs start` to add extra MCP actions, or override `--timeout` if longer build/test cycles are expected. All work still flows through Codex MCP tools.

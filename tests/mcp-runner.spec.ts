@@ -1,4 +1,4 @@
-import { execFile } from 'child_process';
+import * as childProcess from 'child_process';
 import fs from 'fs/promises';
 import os from 'os';
 import path from 'path';
@@ -6,7 +6,7 @@ import { promisify } from 'util';
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const execFileAsync = promisify(execFile);
+const execFileAsync = promisify(childProcess.execFile);
 const importModule = async (target: string) => import(`${target}?test=${Date.now()}${Math.random()}`);
 
 describe('mcp runner durability + telemetry', () => {
@@ -297,6 +297,21 @@ describe('mcp runner durability + telemetry', () => {
     expect(artifact.details.exit_code).toBe(2);
     expect(artifact.command).toBe(entry.command);
     expect(artifact.command_index).toBe(3);
+  });
+
+  it('resets metrics bookkeeping when preparing a manifest for resume', () => {
+    const { resetManifestForResume, isoTimestamp } = runnerModule;
+    const manifest = {
+      completed_at: isoTimestamp(),
+      metrics_recorded: true,
+      status_detail: 'command-failed',
+    };
+
+    resetManifestForResume(manifest);
+
+    expect(manifest.metrics_recorded).toBe(false);
+    expect(manifest.completed_at).toBeNull();
+    expect(manifest.status_detail).toBe('resuming');
   });
 
   it('outputs structured json when polling with format=json', async () => {

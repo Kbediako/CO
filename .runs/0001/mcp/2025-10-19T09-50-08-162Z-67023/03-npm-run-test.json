@@ -1,0 +1,6 @@
+[
+  {
+    "type": "text",
+    "text": "{\"exit_code\":0,\"summary\":\"npm run test succeeded: 42 tests across 10 files passed.\",\"manifest_path\":null}"
+  }
+]

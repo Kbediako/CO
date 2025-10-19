@@ -62,11 +62,6 @@ if [[ ! -x "$RUNNER" ]]; then
   exit 1
 fi
 
-if ! command -v python3 >/dev/null 2>&1; then
-  echo "Error: python3 is required to parse heartbeat status." >&2
-  exit 2
-fi
-
 START_OUTPUT="$(node "$RUNNER" start --approval-policy "${APPROVAL_POLICY}" --timeout "${TIMEOUT}" --format json)"
 
 if [[ -z "$START_OUTPUT" ]]; then
@@ -88,6 +83,31 @@ echo "Compatibility path: ${COMPAT_PATH}"
 echo "Manifest: ${MANIFEST_PATH}"
 echo
 
+parse_status_payload() {
+  local payload="${1:-}"
+  node - "$payload" <<'NODE'
+const input = process.argv[2] ?? '';
+if (!input.trim()) {
+  process.exit(1);
+}
+let data;
+try {
+  data = JSON.parse(input);
+} catch (error) {
+  console.error(error?.message ?? String(error));
+  process.exit(1);
+}
+const heartbeat = data.heartbeat ?? {};
+const fields = [
+  data.status ?? '',
+  data.status_detail ?? '',
+  heartbeat.stale ? 'true' : 'false',
+  String(heartbeat.age_seconds ?? ''),
+];
+console.log(fields.join('\n'));
+NODE
+}
+
 monitor_heartbeat() {
   local poll_pid="${1:-}"
   while true; do
@@ -103,7 +123,7 @@ monitor_heartbeat() {
     fi
 
     local parsed
-    if ! parsed="$(python3 -c 'import json, sys; data=json.load(sys.stdin); heartbeat = data.get("heartbeat") or {}; fields = [data.get("status", ""), data.get("status_detail") or "", "true" if heartbeat.get("stale") else "false", str(heartbeat.get("age_seconds", ""))]; print("\n".join(fields))' <<<"$status_json")"; then
+    if ! parsed="$(parse_status_payload "$status_json")"; then
       sleep 5
       continue
     fi
@@ -165,7 +185,7 @@ else
     if [[ -z "${status_json//[[:space:]]/}" ]]; then
       exit 0
     fi
-    parsed_status="$(python3 -c 'import json, sys; data=json.load(sys.stdin); heartbeat = data.get("heartbeat") or {}; fields = [data.get("status", ""), data.get("status_detail") or "", "true" if heartbeat.get("stale") else "false", str(heartbeat.get("age_seconds", ""))]; print("\n".join(fields))' <<<"$status_json")"
+    parsed_status="$(parse_status_payload "$status_json")"
     IFS=$'\n' read -r status status_detail heartbeat_stale heartbeat_age <<<"$parsed_status"
     if [[ "$heartbeat_stale" == "true" && "$status" != "succeeded" && "$status" != "failed" && "$status" != "cancelled" ]]; then
       echo "Warning: heartbeat stale for run ${RUN_ID} (age: ${heartbeat_age}s)."

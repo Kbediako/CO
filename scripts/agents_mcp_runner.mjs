@@ -278,6 +278,12 @@ function ensureResumeEvents(manifest) {
   }
 }
 
+function resetManifestForResume(manifest) {
+  manifest.completed_at = null;
+  manifest.metrics_recorded = false;
+  manifest.status_detail = 'resuming';
+}
+
 async function recordResumeAttempt(manifest, manifestPath, event) {
   ensureResumeEvents(manifest);
   manifest.resume_events.push({
@@ -771,17 +777,18 @@ async function resumeRun(options) {
     throw new Error('Resume token mismatch.');
   }
 
+  const resumeTimestamp = isoTimestamp();
   manifest.resume_token = storedToken;
+  resetManifestForResume(manifest);
   manifest.resume_events.push({
-    timestamp: isoTimestamp(),
+    timestamp: resumeTimestamp,
     actor,
     reason,
     outcome: 'accepted',
     detail: 'resume-started',
   });
-  manifest.status_detail = 'resuming';
   await saveManifest(manifestPath, manifest);
-  await fs.writeFile(heartbeatPath, `${isoTimestamp()}\n`, 'utf8');
+  await fs.writeFile(heartbeatPath, `${resumeTimestamp}\n`, 'utf8');
 
   const child = spawn(process.execPath, [__filename, 'execute', '--run-id', runId], {
     cwd: repoRoot,
@@ -1015,6 +1022,7 @@ export {
   isoTimestamp,
   parseArgs,
   pollRun,
+  resetManifestForResume,
   resumeRun,
   saveManifest,
   startRun,

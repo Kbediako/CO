@@ -146,7 +146,7 @@
       - Commands: `scripts/run-mcp-diagnostics.sh --no-watch`, `scripts/mcp-runner-start.sh`
       - Acceptance: Runner prints guidance to invoke diagnostics script when guardrail command missing/failing and records recommendation in manifest summary.
       - Rationale: Low-risk UX follow-up improving reviewer handoff; no mini-spec required.
-      - [x] 2025-10-19 `.runs/0001/mcp/2025-10-19T06-54-01-535Z-diagnostics/manifest.json` — manifest summary records diagnostics prompt; see accompanying `runner.log` for emitted guidance.
+      - [x] 2025-10-19 `.runs/0001/mcp/2025-10-19T10-00-05-814Z-68910/manifest.json` — manifest summary records diagnostics prompt; see accompanying `runner.log` for emitted guidance.
    8. Pin Agents SDK versions for MCP compatibility
       - Files: `package.json`, `package-lock.json`
       - Commands: `npm install`, `npm run lint`
