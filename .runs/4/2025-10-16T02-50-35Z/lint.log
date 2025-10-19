@@ -1,8 +1,0 @@
-
-> codex-orchestrator@0.1.0 lint
-> npm run build:patterns && eslint orchestrator/src orchestrator/tests --ext .ts
-
-
-> codex-orchestrator@0.1.0 build:patterns
-> tsc -p patterns/tsconfig.json
-

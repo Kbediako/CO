@@ -19,7 +19,7 @@ import { spawn } from 'child_process';
 import { MCPServerStdio } from '@openai/agents-core';
 import { setDefaultOpenAIKey } from '@openai/agents-openai';
 
-const TASK_ID = '0001';
+const TASK_ID = process.env.MCP_RUNNER_TASK_ID ?? '0001';
 const HEARTBEAT_INTERVAL_MS = 10_000;
 const HEARTBEAT_STALE_THRESHOLD_MS = 30_000;
 const DEFAULT_COMMANDS = [

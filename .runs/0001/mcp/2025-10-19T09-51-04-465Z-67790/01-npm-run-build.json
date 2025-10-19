@@ -1,6 +1,0 @@
-[
-  {
-    "type": "text",
-    "text": "{\"exit_code\":0,\"summary\":\"npm run build succeeded (tsc -p tsconfig.json).\",\"manifest_path\":null}"
-  }
-]

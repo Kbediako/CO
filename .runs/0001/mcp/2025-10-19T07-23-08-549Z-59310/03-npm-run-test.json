@@ -1,6 +1,0 @@
-[
-  {
-    "type": "text",
-    "text": "{\"exit_code\":0,\"summary\":\"npm run test succeeded; 41 vitest checks passed.\",\"manifest_path\":null}"
-  }
-]

@@ -1,7 +1,0 @@
-Diagnostics run started.
-Run ID: 2025-10-19T07-23-08-549Z-59310
-Artifact root: .runs/0001/mcp/2025-10-19T07-23-08-549Z-59310
-Compatibility path: .runs/local-mcp/2025-10-19T07-23-08-549Z-59310
-Manifest: .runs/0001/mcp/2025-10-19T07-23-08-549Z-59310/manifest.json
-
-Use scripts/mcp-runner-poll.sh 2025-10-19T07-23-08-549Z-59310 to monitor progress.

@@ -1,40 +1,38 @@
-# Codex-Orchestrator Agent Handbook
+# Codex-Orchestrator Agent Handbook (Template)
 
-## Purpose
-This handbook orients Codex agents and human reviewers to the operational guardrails for Task 0001. It mirrors canonical guidance from `/tasks` and `.agent/` so day-to-day execution stays aligned with approved specs.
+Use this repository as the starting point for a new Codex-driven project. After cloning, replace the placeholder metadata (task IDs, documents, SOPs) with values for your initiative. This handbook summarizes the core guardrails that remain constant across projects.
 
 ## Execution Modes & Approvals
-- **Default mode:** `mcp` — deterministic local edits via `codex mcp-server`. Override with `--mode cloud` only when `tasks/tasks-0001-codex-orchestrator.md` marks a subtask `execution.parallel=true` _and_ the reviewer records the approval in the run manifest.
-- **Approval policy:** Safe `read/edit/run/network`. Escalations require reviewer sign-off stored in `.runs/<task>/<timestamp>/manifest.json` under `approvals`.
-- **Spec guard:** Run `bash scripts/spec-guard.sh --dry-run` before review and unblock merges only when specs touched in `src/**` or migrations have `last_review` ≤30 days.
+- Default execution mode is `mcp`.
+- Switch to cloud mode only if your task plan explicitly allows a parallel run and the reviewer records the override in the active run manifest.
+- Keep the safe approval profile (`read/edit/run/network`). Capture any escalation in `.runs/<task>/<timestamp>/manifest.json` under `approvals`.
+- Run `bash scripts/spec-guard.sh --dry-run` before requesting review. Update specs or refresh approvals when the guard fails.
 
 ## Checklist Convention
-- Represent every task and subtask as a checkbox in `/tasks` and mirrors (`docs/`, `.agent/`). Start with `[ ]` while work is active and switch to `[x]` immediately upon completion.
-- When flipping to `[x]`, add the completion date plus the manifest or log path that proves the outcome so reviewers can audit without re-running commands.
+- Track every task and subtask with `[ ]` until complete, then flip to `[x]` while linking the run manifest that proves the outcome.
+- Mirror the same status across `/tasks`, `docs/`, and `.agent/` so reviewers and automation see a single source of truth.
 
-## Build & Test Commands
+## Build & Test Commands (defaults)
 | Command | When to use | Notes |
 | --- | --- | --- |
-| `npm run lint` | Pre-commit and review gates | Executes `npm run build:patterns` first to ensure codemods compile. |
-| `npm run test` | Validates orchestrator unit/integration suites | Stores logs under `.runs` via tester agent. |
-| `npm run eval:test` | Exercises evaluation harness scenarios | Requires seeded fixtures in `evaluation/fixtures/**`. |
-| `npm run build:patterns` | After updating codemods, linters, templates | Builds TypeScript assets before publishing. |
-| `node --loader ts-node/esm evaluation/harness/run-all.ts --mode=<mcp|cloud>` | Manual evaluation sweep | Persists scenario outputs to `.runs/<task>/<run>/evaluation/`. |
+| `npm run lint` | Pre-commit / review gates | Executes `npm run build:patterns` first so codemods compile. |
+| `npm run test` | Unit + integration checks | Vitest harness covering orchestrator + patterns. |
+| `npm run eval:test` | Evaluation harness smoke tests | Requires fixtures in `evaluation/fixtures/**`; optional, enable when evaluation scope exists. |
+| `bash scripts/spec-guard.sh --dry-run` | Spec freshness validation | Blocks merges when touched specs are older than 30 days. |
 
-## MCP Registration Quick Start
-1. Install the Codex CLI and authenticate with the approved workspace.
-2. Run `scripts/run-local-mcp.sh` to spawn `codex mcp-server` with the repository mounted.
-3. Confirm the builder agent can call `edit`, `git`, and `run` tools; attach resulting `diff.patch` and logs to the active run manifest.
-4. For cloud overrides, configure `CODEX_MODE=cloud` and provide `CLOUD_WORKSPACE_ID` per the technical spec (§4 Integration Policy).
+Update the table once you wire different build pipelines or tooling.
 
-## External References
-- **Canonical artifacts:** `/tasks/0001-prd-codex-orchestrator.md`, `/tasks/tasks-0001-codex-orchestrator.md`, `/tasks/specs/*`.
-- **Mirrors:** `docs/PRD.md`, `docs/ACTION_PLAN.md`, `docs/TECH_SPEC.md` — keep these synchronized with the `/tasks` originals after every approval or milestone shift.
-- **Learning assets:** `patterns/` (codemods, linters, templates) with metadata in `patterns/index.json`.
-- **Evaluation harness:** `evaluation/` directory plus run instructions above; requires local `python3` for mixed-language scenarios.
+## MCP Runner Quick Start
+1. Install and authenticate the Codex CLI.
+2. Set `MCP_RUNNER_TASK_ID` to the identifier you plan to track (for example `export MCP_RUNNER_TASK_ID=0001`).
+3. Launch diagnostics with `scripts/run-mcp-diagnostics.sh --no-watch` or enqueue a run with `scripts/agents_mcp_runner.mjs start` (add `--command` flags to customize the sequence).
+4. Poll the run using `scripts/mcp-runner-poll.sh <run-id> --watch` or inspect `.runs/<task>/mcp/<run-id>/manifest.json`.
+5. Attach the manifest path when flipping checklist items.
 
-## Run Artifact Expectations
-- Store every command log, diff, and summary inside `.runs/<task>/<timestamp>/` following the manifest schema approved in `tasks/specs/0001-orchestrator-architecture.md`.
-- Include `mode.selected`, validation status, and any escalations so the reviewer agent can verify guardrails without re-running commands.
+## Customization Checklist for New Projects
+- [ ] Duplicate `/tasks` files and rename them for the new PRD / task identifiers.
+- [ ] Refresh `docs/PRD.md`, `docs/TECH_SPEC.md`, and `docs/ACTION_PLAN.md` with project-specific content.
+- [ ] Update `.agent/AGENTS.md` and related SOPs to reflect the new workflows.
+- [ ] Remove any placeholder references that remain in manifests or docs before committing.
 
-Refer to `.agent/readme.md` for the operating loop and `.agent/SOPs/` for role-specific playbooks.
+Once these items are complete you can treat the repo as the canonical workspace for the new project.

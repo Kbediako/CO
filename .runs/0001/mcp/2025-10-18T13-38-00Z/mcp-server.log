@@ -1,2 +1,0 @@
-{"id":0,"jsonrpc":"2.0","result":{"capabilities":{"tools":{"listChanged":true}},"protocolVersion":"2025-06-18","serverInfo":{"name":"codex-mcp-server","title":"Codex","version":"0.47.0","user_agent":"codex_cli_rs/0.47.0 (Mac OS 26.0.1; arm64) xterm-256color (mcp-cli; 1.0.0)"}}}
-{"id":1,"jsonrpc":"2.0","result":{"content":[{"text":"Unknown tool 'tools/list'","type":"text"}],"isError":true}}

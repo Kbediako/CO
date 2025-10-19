@@ -1,6 +1,0 @@
-[
-  {
-    "type": "text",
-    "text": "{\"exit_code\":124,\"summary\":\"Command timed out after 0.004s before npm tests could start.\",\"manifest_path\":null}"
-  }
-]

@@ -1,8 +1,0 @@
-{
-  "mode": "manual",
-  "event": "spec-approval",
-  "spec": "tasks/specs/0005-mcp-runner-enhancements.md",
-  "approved_at": "2025-10-18T18-47-33Z",
-  "approved_by": "task-owner",
-  "notes": "Mini-spec approved; recorded per checklist requirement."
-}

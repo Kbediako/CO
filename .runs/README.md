@@ -4,7 +4,7 @@ This directory stores per-task run manifests, transient logs, and reviewer-facin
 
 ## Layout
 
-- `.runs/0001/mcp/<run-id>/` — canonical artifact root for Task 0001 MCP executions. Each run contains:
+- `.runs/<task-id>/mcp/<run-id>/` — canonical artifact root for MCP executions (task id defaults to `MCP_RUNNER_TASK_ID` or `0001`). Each run contains:
   - `manifest.json` — per-command status, heartbeat metadata, resume token, metrics bookkeeping (`metrics_recorded`), and run-level summary guidance (diagnostics recommendations when guardrails are missing or failing).
   - `runner.log` — aggregated stdout/stderr from the MCP runner process.
   - `.heartbeat` — last heartbeat timestamp written every 10 seconds while the runner is active.
@@ -13,9 +13,9 @@ This directory stores per-task run manifests, transient logs, and reviewer-facin
   - `errors/<index>-<slug>.json` — structured failure artifacts with raw tool payloads and summaries when commands return malformed responses or non-zero exit codes (referenced via `manifest.commands[].error_file`).
   - `poll.json` — optional JSON snapshot produced via `scripts/mcp-runner-poll.sh <run-id> --format json` for reviewer automation.
 - `.runs/local-mcp/<run-id>/` — compatibility pointer re-created during each run/migration. When symlinks are not supported, the directory contains a JSON stub (`manifest.json`) with `redirect_to` and `manifest` fields.
-- `.runs/0001/metrics.json` — JSON Lines stream appended after each run reaches a terminal state (success/failure/cancelled).
-- `.runs/0001/metrics-summary.json` — aggregate statistics generated via `scripts/mcp-runner-metrics.js` (success rate, average duration, guardrail coverage).
-- `.runs/0001/migrations/<timestamp>.log` — audit records produced by `scripts/mcp-runner-migrate.js` in either dry-run or execution mode.
+- `.runs/<task-id>/metrics.json` — JSON Lines stream appended after each run reaches a terminal state (success/failure/cancelled).
+- `.runs/<task-id>/metrics-summary.json` — aggregate statistics generated via `scripts/mcp-runner-metrics.js` (success rate, average duration, guardrail coverage).
+- `.runs/<task-id>/migrations/<timestamp>.log` — audit records produced by `scripts/mcp-runner-migrate.js` in either dry-run or execution mode when migrating legacy artifacts.
 
 ## Notes
 
@@ -25,4 +25,4 @@ This directory stores per-task run manifests, transient logs, and reviewer-facin
 - Failed commands produce dedicated error artifacts under `errors/` so reviewers can inspect malformed payloads without replaying the run.
 - When the spec-guard command is missing or fails, the runner logs a recommendation to run `scripts/run-mcp-diagnostics.sh --no-watch` and records the guidance in `manifest.summary` for reviewer follow-through.
 - `scripts/run-mcp-diagnostics.sh` monitors heartbeat freshness and, if the runner stalls (`status_detail: stale-heartbeat`), instructs reviewers to resume the run with `scripts/mcp-runner-start.sh --resume <run-id>` using the stored `.resume-token`.
-- Reviewers should cite `.runs/0001/metrics-summary.json` alongside the specific run manifest when validating checklist entries.
+- Reviewers should cite the metrics summary alongside the specific run manifest when validating checklist entries.
