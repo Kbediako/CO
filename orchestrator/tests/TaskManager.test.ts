@@ -40,13 +40,16 @@ describe('TaskManager', () => {
         { path: '.runs/3/diff.patch', description: 'Manager scaffolding diff' }
       ],
       mode: 'mcp' as const,
-      notes: 'Mutation via MCP path'
+      notes: 'Mutation via MCP path',
+      success: true,
+      runId: 'ignored-by-normalizer'
     } satisfies BuildResult));
 
     const testerFn = vi.fn(async () => ({
       subtaskId: 'subtask-A',
       success: true,
-      reports: [{ name: 'npm test', status: 'passed' }]
+      reports: [{ name: 'npm test', status: 'passed' }],
+      runId: 'ignored'
     } satisfies TestResult));
 
     const reviewerFn = vi.fn(async () => ({
@@ -82,19 +85,22 @@ describe('TaskManager', () => {
       task: baseTask,
       plan,
       target: plan.items[0],
-      mode: 'mcp'
+      mode: 'mcp',
+      runId: 'run-fixed'
     });
     expect(testerFn).toHaveBeenCalledWith({
       task: baseTask,
-      build: expect.objectContaining({ subtaskId: 'subtask-A', mode: 'mcp' }),
-      mode: 'mcp'
+      build: expect.objectContaining({ subtaskId: 'subtask-A', mode: 'mcp', runId: 'run-fixed' }),
+      mode: 'mcp',
+      runId: 'run-fixed'
     });
     expect(reviewerFn).toHaveBeenCalledWith({
       task: baseTask,
       plan,
       build: expect.objectContaining({ subtaskId: 'subtask-A', mode: 'mcp' }),
       test: expect.objectContaining({ success: true }),
-      mode: 'mcp'
+      mode: 'mcp',
+      runId: 'run-fixed'
     });
 
     expect(result.runId).toBe('run-fixed');
@@ -127,12 +133,15 @@ describe('TaskManager', () => {
       subtaskId: input.target.id,
       artifacts: [],
       mode: input.mode,
-      notes: 'ran'
+      notes: 'ran',
+      success: true,
+      runId: 'should-overwrite'
     }));
     const tester = new FunctionalTesterAgent(async (input) => ({
       subtaskId: input.build.subtaskId,
       success: true,
-      reports: []
+      reports: [],
+      runId: input.runId
     }));
     const reviewer = new FunctionalReviewerAgent(async () => ({
       summary: 'approved',
@@ -176,12 +185,15 @@ describe('TaskManager', () => {
     const builder = new FunctionalBuilderAgent(async (input) => ({
       subtaskId: input.target.id,
       artifacts: [],
-      mode: input.mode
+      mode: input.mode,
+      success: true,
+      runId: input.runId
     }));
     const tester = new FunctionalTesterAgent(async () => ({
       subtaskId: 'persist',
       success: true,
-      reports: []
+      reports: [],
+      runId: 'run-fixed'
     }));
     const reviewer = new FunctionalReviewerAgent(async () => ({
       summary: 'ok',

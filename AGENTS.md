@@ -19,6 +19,7 @@ Use this repository as the starting point for a new Codex-driven project. After 
 | `npm run test` | Unit + integration checks | Vitest harness covering orchestrator + patterns. |
 | `npm run eval:test` | Evaluation harness smoke tests | Requires fixtures in `evaluation/fixtures/**`; optional, enable when evaluation scope exists. |
 | `bash scripts/spec-guard.sh --dry-run` | Spec freshness validation | Blocks merges when touched specs are older than 30 days. |
+| `npm run review` | Reviewer hand-off | Runs `codex review --manifest <latest>` using the newest run manifest under `.runs/**`. |
 
 Update the table once you wire different build pipelines or tooling.
 

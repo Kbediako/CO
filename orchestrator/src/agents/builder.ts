@@ -10,6 +10,9 @@ export class FunctionalBuilderAgent implements BuilderAgent {
     if (!result || !result.subtaskId) {
       throw new Error('Builder strategy must return a BuildResult with subtaskId');
     }
+    if (typeof result.success !== 'boolean') {
+      throw new Error('Builder strategy must return a BuildResult with success flag');
+    }
     return result;
   }
 }

@@ -1,0 +1,85 @@
+import { access, copyFile, mkdir, rename } from 'node:fs/promises';
+import { basename, dirname, extname, join, relative, resolve } from 'node:path';
+import type { BuildArtifact } from '../types.js';
+
+export interface StageArtifactsOptions {
+  runsDir?: string;
+  keepOriginal?: boolean;
+}
+
+function sanitizeRunId(runId: string): string {
+  return runId.replace(/[:]/g, '-');
+}
+
+async function pathExists(path: string): Promise<boolean> {
+  try {
+    await access(path);
+    return true;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      return false;
+    }
+    throw error;
+  }
+}
+
+async function ensureUniquePath(basePath: string): Promise<string> {
+  let candidate = basePath;
+  let attempt = 0;
+  const dir = dirname(basePath);
+  const original = basename(basePath);
+  const extension = extname(original);
+  const stem = extension ? original.slice(0, -extension.length) : original;
+
+  while (attempt < 1000) {
+    if (!(await pathExists(candidate))) {
+      return candidate;
+    }
+    attempt += 1;
+    const suffix = `-${attempt}`;
+    const nextName = `${stem}${suffix}${extension}`;
+    candidate = join(dir, nextName);
+  }
+  throw new Error(`Unable to stage artifact: too many name collisions for ${basePath}`);
+}
+
+export async function stageArtifacts(params: {
+  taskId: string;
+  runId: string;
+  artifacts: BuildArtifact[];
+  options?: StageArtifactsOptions;
+}): Promise<BuildArtifact[]> {
+  const { taskId, runId, artifacts, options } = params;
+  if (artifacts.length === 0) {
+    return artifacts;
+  }
+
+  const runsDir = options?.runsDir ?? join(process.cwd(), '.runs');
+  const runDir = join(runsDir, taskId, sanitizeRunId(runId));
+  const artifactsDir = join(runDir, 'artifacts');
+  await mkdir(artifactsDir, { recursive: true });
+
+  const results: BuildArtifact[] = [];
+  for (const artifact of artifacts) {
+    const sourcePath = resolve(process.cwd(), artifact.path);
+    if (sourcePath.startsWith(artifactsDir)) {
+      results.push(artifact);
+      continue;
+    }
+
+    const destinationBase = join(artifactsDir, basename(sourcePath));
+    const destinationPath = await ensureUniquePath(destinationBase);
+    if (options?.keepOriginal) {
+      await copyFile(sourcePath, destinationPath);
+    } else {
+      await rename(sourcePath, destinationPath);
+    }
+    const relativePath = relative(process.cwd(), destinationPath);
+    results.push({
+      ...artifact,
+      path: relativePath
+    });
+  }
+
+  return results;
+}

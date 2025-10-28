@@ -20,6 +20,7 @@
 - `npm run eval:test` — Exercises evaluation harness scenarios; depends on local `python3` for cross-language fixtures.
 - `npm run build:patterns` — Compile codemods/linters/templates; run whenever `patterns/**` changes.
 - `node --loader ts-node/esm evaluation/harness/run-all.ts --mode=mcp` — Manual sweep to generate scenario artifacts for manifests.
+- `npm run review` — Launches `codex review --manifest <latest>` using the newest manifest under `.runs/**` for reviewer workflows.
 
 ### Read First Order
 1. `.agent/system/architecture.md`

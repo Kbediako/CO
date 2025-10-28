@@ -10,7 +10,8 @@
     "parallel:goals": "node --loader ts-node/esm scripts/run-parallel-goals.ts",
     "test": "vitest run",
     "eval:test": "vitest run evaluation/tests",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "review": "node dist/scripts/run-review.js"
   },
   "devDependencies": {
     "@types/jscodeshift": "^0.11.6",

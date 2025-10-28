@@ -97,43 +97,48 @@ export class TaskManager {
   }
 
   async execute(task: TaskContext): Promise<RunSummary> {
+    const runId = this.runIdFactory(task.id);
     const plan = await this.options.planner.plan(task);
     const subtask = this.selectExecutableSubtask(plan);
     const mode = this.modePolicy(task, subtask);
 
     this.eventBus.emit({
       type: 'plan:completed',
-      payload: { task, plan }
+      payload: { task, plan, runId }
     });
 
     const buildInput: BuilderInput = {
       task,
       plan,
       target: subtask,
-      mode
+      mode,
+      runId
     };
-    const build = this.normalizeBuildResult(await this.options.builder.build(buildInput), mode);
+    const build = this.normalizeBuildResult(await this.options.builder.build(buildInput), mode, runId);
 
     this.eventBus.emit({
       type: 'build:completed',
-      payload: { task, plan, build }
+      payload: { task, plan, build, runId }
     });
 
-    const test = await this.options.tester.test({ task, build, mode });
+    const test = this.normalizeTestResult(
+      await this.options.tester.test({ task, build, mode, runId }),
+      runId
+    );
 
     this.eventBus.emit({
       type: 'test:completed',
-      payload: { task, build, test }
+      payload: { task, build, test, runId }
     });
 
-    const review = await this.options.reviewer.review({ task, plan, build, test, mode });
+    const review = await this.options.reviewer.review({ task, plan, build, test, mode, runId });
 
     this.eventBus.emit({
       type: 'review:completed',
-      payload: { task, review }
+      payload: { task, review, runId }
     });
 
-    const runSummary = this.createRunSummary(task, mode, plan, build, test, review);
+    const runSummary = this.createRunSummary(task, mode, plan, build, test, review, runId);
 
     this.eventBus.emit({ type: 'run:completed', payload: runSummary });
 
@@ -154,10 +159,10 @@ export class TaskManager {
     plan: PlanResult,
     build: BuildResult,
     test: TestResult,
-    review: ReviewResult
+    review: ReviewResult,
+    runId: string
   ): RunSummary {
     const timestamp = new Date().toISOString();
-    const runId = this.runIdFactory(task.id);
     return {
       taskId: task.id,
       runId,
@@ -170,7 +175,14 @@ export class TaskManager {
     };
   }
 
-  private normalizeBuildResult(build: BuildResult, mode: ExecutionMode): BuildResult {
-    return { ...build, mode };
+  private normalizeBuildResult(build: BuildResult, mode: ExecutionMode, runId: string): BuildResult {
+    if (typeof build.success !== 'boolean') {
+      throw new Error('Builder result missing success flag');
+    }
+    return { ...build, mode, runId };
+  }
+
+  private normalizeTestResult(test: TestResult, runId: string): TestResult {
+    return { ...test, runId };
   }
 }

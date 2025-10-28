@@ -20,12 +20,15 @@ const createRunSummary = (): RunSummary => ({
     subtaskId: 'subtask',
     artifacts: [],
     mode: 'mcp',
-    notes: 'builder notes'
+    notes: 'builder notes',
+    runId: 'run:2025-10-16T01:33:15Z',
+    success: true
   },
   test: {
     subtaskId: 'subtask',
     success: true,
-    reports: []
+    reports: [],
+    runId: 'run:2025-10-16T01:33:15Z'
   },
   review: {
     summary: 'approved',

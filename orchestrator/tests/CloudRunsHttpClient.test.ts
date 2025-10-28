@@ -8,8 +8,8 @@ const summary = {
   runId: 'run-123',
   mode: 'mcp' as const,
   plan: { items: [], notes: undefined },
-  build: { subtaskId: 'sub', artifacts: [], mode: 'mcp' as const },
-  test: { subtaskId: 'sub', success: true, reports: [] },
+  build: { subtaskId: 'sub', artifacts: [], mode: 'mcp' as const, runId: 'run-123', success: true },
+  test: { subtaskId: 'sub', success: true, reports: [], runId: 'run-123' },
   review: { summary: 'ok', decision: { approved: true } },
   timestamp: '2025-10-16T02:00:00Z'
 };

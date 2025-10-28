@@ -17,8 +17,8 @@ const createSummary = (): RunSummary => ({
   runId: 'run:2025-10-16T01:41:05Z',
   mode: 'mcp',
   plan: { items: [], notes: undefined },
-  build: { subtaskId: 'sub', artifacts: [], mode: 'mcp' },
-  test: { subtaskId: 'sub', success: true, reports: [] },
+  build: { subtaskId: 'sub', artifacts: [], mode: 'mcp', runId: 'run:2025-10-16T01:41:05Z', success: true },
+  test: { subtaskId: 'sub', success: true, reports: [], runId: 'run:2025-10-16T01:41:05Z' },
   review: { summary: 'ok', decision: { approved: true } },
   timestamp: new Date().toISOString()
 });

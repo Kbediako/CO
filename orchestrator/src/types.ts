@@ -34,6 +34,7 @@ export interface BuilderInput {
   plan: PlanResult;
   target: PlanItem;
   mode: ExecutionMode;
+  runId: string;
 }
 
 export interface BuildArtifact {
@@ -45,6 +46,8 @@ export interface BuildResult {
   subtaskId: string;
   artifacts: BuildArtifact[];
   mode: ExecutionMode;
+  runId: string;
+  success: boolean;
   notes?: string;
 }
 
@@ -52,6 +55,7 @@ export interface TestInput {
   task: TaskContext;
   build: BuildResult;
   mode: ExecutionMode;
+  runId: string;
 }
 
 export interface TestReport {
@@ -64,6 +68,7 @@ export interface TestResult {
   subtaskId: string;
   success: boolean;
   reports: TestReport[];
+  runId: string;
 }
 
 export interface ReviewInput {
@@ -72,6 +77,7 @@ export interface ReviewInput {
   build: BuildResult;
   test: TestResult;
   mode: ExecutionMode;
+  runId: string;
 }
 
 export interface ReviewDecision {
@@ -122,6 +128,7 @@ export interface PlanCompletedEvent {
   type: 'plan:completed';
   payload: {
     task: TaskContext;
+    runId: string;
     plan: PlanResult;
   };
 }
@@ -132,6 +139,7 @@ export interface BuildCompletedEvent {
     task: TaskContext;
     build: BuildResult;
     plan: PlanResult;
+    runId: string;
   };
 }
 
@@ -141,6 +149,7 @@ export interface TestCompletedEvent {
     task: TaskContext;
     test: TestResult;
     build: BuildResult;
+    runId: string;
   };
 }
 
@@ -149,6 +158,7 @@ export interface ReviewCompletedEvent {
   payload: {
     task: TaskContext;
     review: ReviewResult;
+    runId: string;
   };
 }
 
