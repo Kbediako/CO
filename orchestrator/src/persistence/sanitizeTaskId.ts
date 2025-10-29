@@ -1,5 +1,3 @@
-const CONTROL_CHAR_PATTERN = /[\u0000-\u001f\u007f]/u;
-
 /**
  * Validates task identifiers before they are used in filesystem paths.
  * Rejects traversal sequences and characters that would break directory layout.
@@ -9,8 +7,12 @@ export function sanitizeTaskId(taskId: string): string {
     throw new Error('Invalid task ID: value must be a non-empty string.');
   }
 
-  if (CONTROL_CHAR_PATTERN.test(taskId)) {
-    throw new Error(`Invalid task ID "${taskId}": control characters are not allowed.`);
+  for (const char of taskId) {
+    const codePoint = char.codePointAt(0);
+
+    if (codePoint !== undefined && (codePoint <= 31 || codePoint === 127)) {
+      throw new Error(`Invalid task ID "${taskId}": control characters are not allowed.`);
+    }
   }
 
   if (taskId.startsWith('.')) {
