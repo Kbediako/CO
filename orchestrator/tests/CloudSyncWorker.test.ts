@@ -1,8 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
-import { mkdtemp, readFile } from 'node:fs/promises';
+import { mkdtemp, readFile, mkdir, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
+import { createWriteStream } from 'node:fs';
 import { EventBus } from '../src/events/EventBus.js';
 import { RunManifestWriter } from '../src/persistence/RunManifestWriter.js';
 import type { RunSummary } from '../src/types.js';
@@ -84,6 +85,55 @@ describe('CloudSyncWorker', () => {
       void writer.write(summary);
     }, 10);
 
+    await new Promise((resolve) => setTimeout(resolve, 80));
+
+    expect(upload).toHaveBeenCalledTimes(1);
+    const audit = await readFile(join(outDir, 'audit.log'), 'utf-8');
+    expect(audit).toContain('Cloud sync completed');
+  });
+
+  it('retries reading manifest after transient parse errors and logs success', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'cloud-sync-parse-'));
+    const runsDir = join(root, 'runs');
+    const outDir = join(root, 'out');
+    const summary = createSummary();
+
+    const runDir = join(runsDir, summary.taskId, summary.runId.replace(/[:]/g, '-'));
+    await mkdir(runDir, { recursive: true });
+    const manifestPath = join(runDir, 'manifest.json');
+
+    const partialStream = createWriteStream(manifestPath, { encoding: 'utf-8' });
+    partialStream.write('{"taskId":');
+    partialStream.end();
+    await new Promise<void>((resolve, reject) => {
+      partialStream.once('close', resolve);
+      partialStream.once('error', reject);
+    });
+
+    const bus = new EventBus();
+    const upload = vi.fn<[UploadPayload], Promise<UploadResult>>().mockResolvedValue({
+      status: 'success',
+      runId: summary.runId
+    });
+    const client: CloudRunsClient = { uploadManifest: upload };
+    const worker = new CloudSyncWorker(bus, client, {
+      runsDir,
+      outDir,
+      manifestInitialDelayMs: 5,
+      manifestReadRetries: 6
+    });
+
+    worker.start();
+    bus.emit({ type: 'run:completed', payload: summary });
+
+    const serialized = JSON.stringify(summary, null, 2);
+    const finalizeManifest = new Promise<void>((resolve, reject) => {
+      setTimeout(() => {
+        writeFile(manifestPath, serialized, 'utf-8').then(() => resolve()).catch(reject);
+      }, 15);
+    });
+
+    await finalizeManifest;
     await new Promise((resolve) => setTimeout(resolve, 80));
 
     expect(upload).toHaveBeenCalledTimes(1);

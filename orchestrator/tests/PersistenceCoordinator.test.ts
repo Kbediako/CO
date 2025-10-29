@@ -115,4 +115,25 @@ describe('PersistenceCoordinator', () => {
 
     coordinator.stop();
   });
+
+  it('rejects task IDs that attempt directory traversal', async () => {
+    const stateStore = new TaskStateStore({ runsDir, outDir });
+    const manifestWriter = new RunManifestWriter({ runsDir });
+    const bus = new EventBus();
+    const onError = vi.fn();
+    const coordinator = new PersistenceCoordinator(bus, stateStore, manifestWriter, { onError });
+
+    const traversalSummary = {
+      ...createRunSummary(),
+      taskId: '../escape-attempt'
+    };
+
+    await coordinator.handleRunCompleted(traversalSummary);
+
+    expect(onError).toHaveBeenCalledTimes(1);
+    const [error, summary] = onError.mock.calls[0];
+    expect(summary).toBe(traversalSummary);
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).toContain('Invalid task ID "../escape-attempt"');
+  });
 });

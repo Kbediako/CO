@@ -1,6 +1,7 @@
 import { access, copyFile, mkdir, rename } from 'node:fs/promises';
-import { basename, dirname, extname, join, relative, resolve } from 'node:path';
+import { basename, dirname, extname, isAbsolute, join, relative, resolve } from 'node:path';
 import type { BuildArtifact } from '../types.js';
+import { sanitizeTaskId } from './sanitizeTaskId.js';
 
 export interface StageArtifactsOptions {
   runsDir?: string;
@@ -55,14 +56,20 @@ export async function stageArtifacts(params: {
   }
 
   const runsDir = options?.runsDir ?? join(process.cwd(), '.runs');
-  const runDir = join(runsDir, taskId, sanitizeRunId(runId));
+  const safeTaskId = sanitizeTaskId(taskId);
+  const runDir = join(runsDir, safeTaskId, sanitizeRunId(runId));
   const artifactsDir = join(runDir, 'artifacts');
   await mkdir(artifactsDir, { recursive: true });
 
   const results: BuildArtifact[] = [];
   for (const artifact of artifacts) {
     const sourcePath = resolve(process.cwd(), artifact.path);
-    if (sourcePath.startsWith(artifactsDir)) {
+    const relativeToArtifacts = relative(artifactsDir, sourcePath);
+    const isWithinArtifactsDir =
+      relativeToArtifacts.length > 0 &&
+      !relativeToArtifacts.startsWith('..') &&
+      !isAbsolute(relativeToArtifacts);
+    if (isWithinArtifactsDir) {
       results.push(artifact);
       continue;
     }

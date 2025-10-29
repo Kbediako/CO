@@ -12,6 +12,7 @@ import {
 } from '../src/agents/index.js';
 import { TaskStateStore } from '../src/persistence/TaskStateStore.js';
 import { RunManifestWriter } from '../src/persistence/RunManifestWriter.js';
+import * as Sanitize from '../src/persistence/sanitizeTaskId.js';
 import type {
   BuildResult,
   PlanResult,
@@ -224,5 +225,64 @@ describe('TaskManager', () => {
     const state = JSON.parse(await readFile(join(outDir, baseTask.id, 'state.json'), 'utf-8'));
     expect(state.lastRunAt).toBe(manifest.timestamp);
     expect(state.runs).toHaveLength(1);
+  });
+
+  it('sanitizes task IDs before persisting run artifacts', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'task-manager-sanitize-'));
+    const runsDir = join(root, 'runs');
+    const outDir = join(root, 'out');
+    const taskWithPunctuation: TaskContext = {
+      ...baseTask,
+      id: 'task.safe-123'
+    };
+
+    const plan: PlanResult = {
+      items: [{ id: 'sanitize', description: 'Validate persistence paths' }]
+    };
+
+    const planner = new FunctionalPlannerAgent(async () => plan);
+    const builder = new FunctionalBuilderAgent(async (input) => ({
+      subtaskId: input.target.id,
+      artifacts: [],
+      mode: input.mode,
+      success: true,
+      runId: input.runId
+    }));
+    const tester = new FunctionalTesterAgent(async () => ({
+      subtaskId: 'sanitize',
+      success: true,
+      reports: [],
+      runId: 'run-fixed'
+    }));
+    const reviewer = new FunctionalReviewerAgent(async () => ({
+      summary: 'ok',
+      decision: { approved: true }
+    }));
+
+    const sanitizeSpy = vi.spyOn(Sanitize, 'sanitizeTaskId');
+
+    const manager = new TaskManager({
+      planner,
+      builder,
+      tester,
+      reviewer,
+      runIdFactory: () => 'run-fixed',
+      persistence: {
+        stateStore: new TaskStateStore({ runsDir, outDir }),
+        manifestWriter: new RunManifestWriter({ runsDir })
+      }
+    });
+
+    try {
+      await manager.execute(taskWithPunctuation);
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(sanitizeSpy).toHaveBeenCalledWith(taskWithPunctuation.id);
+
+      const expectedManifestPath = join(runsDir, taskWithPunctuation.id, 'run-fixed', 'manifest.json');
+      const manifest = JSON.parse(await readFile(expectedManifestPath, 'utf-8'));
+      expect(manifest.taskId).toBe(taskWithPunctuation.id);
+    } finally {
+      sanitizeSpy.mockRestore();
+    }
   });
 });

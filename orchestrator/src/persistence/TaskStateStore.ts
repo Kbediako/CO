@@ -1,6 +1,7 @@
 import { mkdir, readFile, rename, writeFile, rm, open } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import type { RunSummary } from '../types.js';
+import { sanitizeTaskId } from './sanitizeTaskId.js';
 
 export interface TaskStateStoreOptions {
   outDir?: string;
@@ -37,16 +38,17 @@ export class TaskStateStore {
   }
 
   async recordRun(summary: RunSummary): Promise<void> {
-    const lockPath = this.buildLockPath(summary.taskId);
-    await this.acquireLock(summary.taskId, lockPath);
+    const safeTaskId = sanitizeTaskId(summary.taskId);
+    const lockPath = this.buildLockPath(safeTaskId);
+    await this.acquireLock(safeTaskId, lockPath);
     try {
       await this.ensureDirectory(this.outDir);
-      const taskOutDir = join(this.outDir, summary.taskId);
+      const taskOutDir = join(this.outDir, safeTaskId);
       await this.ensureDirectory(taskOutDir);
 
       const snapshotPath = join(taskOutDir, 'state.json');
-      const snapshot = await this.loadSnapshot(snapshotPath, summary.taskId);
-      const updated = this.mergeSnapshot(snapshot, summary);
+      const snapshot = await this.loadSnapshot(snapshotPath, safeTaskId);
+      const updated = this.mergeSnapshot(snapshot, { ...summary, taskId: safeTaskId });
       await this.writeAtomic(snapshotPath, JSON.stringify(updated, null, 2));
     } finally {
       await this.releaseLock(lockPath);
@@ -54,7 +56,8 @@ export class TaskStateStore {
   }
 
   private buildLockPath(taskId: string): string {
-    return join(this.runsDir, `${taskId}.lock`);
+    const safeTaskId = sanitizeTaskId(taskId);
+    return join(this.runsDir, `${safeTaskId}.lock`);
   }
 
   private async acquireLock(taskId: string, lockPath: string): Promise<void> {
@@ -101,9 +104,10 @@ export class TaskStateStore {
     const runs = snapshot.runs.filter((run) => run.runId !== summary.runId);
     runs.push(summary);
     runs.sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+    const lastRunAt = runs.length > 0 ? runs[runs.length - 1]!.timestamp : snapshot.lastRunAt;
     return {
       taskId: snapshot.taskId,
-      lastRunAt: summary.timestamp,
+      lastRunAt,
       runs
     };
   }

@@ -49,4 +49,32 @@ describe('stageArtifacts', () => {
     expect(await exists(destinationPath)).toBe(true);
     expect(await readFile(destinationPath, 'utf8')).toBe('log-content');
   });
+
+  it('does not treat similarly prefixed directories as already staged', async () => {
+    const runBaseDir = join(runsDir, taskId, 'run-with-colon');
+    const artifactsOldDir = join(runBaseDir, 'artifacts-old');
+    await mkdir(artifactsOldDir, { recursive: true });
+    const sourcePath = join(artifactsOldDir, 'tricky.log');
+    await writeFile(sourcePath, 'tricky', 'utf8');
+
+    const relativeSource = relative(process.cwd(), sourcePath);
+    const [staged] = await stageArtifacts({
+      taskId,
+      runId,
+      artifacts: [
+        {
+          path: relativeSource,
+          description: 'prefixed directory artifact'
+        }
+      ],
+      options: { runsDir }
+    });
+
+    const stagedPath = join(process.cwd(), staged.path);
+    expect(staged.path).not.toBe(relativeSource);
+    expect(stagedPath).toContain(`${taskId}/run-with-colon/artifacts/tricky`);
+    expect(await exists(sourcePath)).toBe(false);
+    expect(await exists(stagedPath)).toBe(true);
+    expect(await readFile(stagedPath, 'utf8')).toBe('tricky');
+  });
 });

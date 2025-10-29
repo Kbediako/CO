@@ -5,6 +5,7 @@ import type { EventBus } from '../events/EventBus.js';
 import type { RunSummary } from '../types.js';
 import type { CloudRunsClient, UploadResult } from './CloudRunsClient.js';
 import { CloudRunsHttpError } from './CloudRunsHttpClient.js';
+import { sanitizeTaskId } from '../persistence/sanitizeTaskId.js';
 
 export interface CloudSyncWorkerOptions {
   runsDir?: string;
@@ -119,7 +120,8 @@ export class CloudSyncWorker {
   }
 
   private buildManifestPath(summary: RunSummary): string {
-    const runDir = join(this.runsDir, summary.taskId, summary.runId.replace(/[:]/g, '-'));
+    const safeTaskId = sanitizeTaskId(summary.taskId);
+    const runDir = join(this.runsDir, safeTaskId, summary.runId.replace(/[:]/g, '-'));
     return join(runDir, 'manifest.json');
   }
 
@@ -154,13 +156,15 @@ export class CloudSyncWorker {
     const manifestPath = this.buildManifestPath(summary);
     let attempt = 0;
     let delay = this.manifestInitialDelayMs;
+    let lastError: unknown;
     while (attempt < this.manifestReadRetries) {
       attempt += 1;
       try {
         const contents = await readFile(manifestPath, 'utf-8');
         return JSON.parse(contents) as Record<string, unknown>;
       } catch (error: unknown) {
-        if (isEnoent(error) && attempt < this.manifestReadRetries) {
+        lastError = error;
+        if (shouldRetryManifestRead(error) && attempt < this.manifestReadRetries) {
           await new Promise((resolve) => setTimeout(resolve, delay));
           delay *= 2;
           continue;
@@ -168,12 +172,16 @@ export class CloudSyncWorker {
         throw error;
       }
     }
-    throw new Error(`Manifest not available after ${this.manifestReadRetries} attempts`);
+    throw lastError ?? new Error(`Manifest not available after ${this.manifestReadRetries} attempts`);
   }
 }
 
-function isEnoent(error: unknown): boolean {
-  return Boolean((error as NodeJS.ErrnoException)?.code === 'ENOENT');
+function shouldRetryManifestRead(error: unknown): boolean {
+  if (error instanceof SyntaxError) {
+    return true;
+  }
+  const code = (error as NodeJS.ErrnoException)?.code;
+  return code === 'ENOENT' || code === 'EBUSY' || code === 'EMFILE';
 }
 
 interface AuditLogEntry {

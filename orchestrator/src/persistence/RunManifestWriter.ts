@@ -1,6 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { RunSummary } from '../types.js';
+import { sanitizeTaskId } from './sanitizeTaskId.js';
 
 export interface RunManifestWriterOptions {
   runsDir?: string;
@@ -18,7 +19,8 @@ export class RunManifestWriter {
   }
 
   async write(summary: RunSummary): Promise<string> {
-    const runDir = join(this.runsDir, summary.taskId, summary.runId.replace(/[:]/g, '-'));
+    const safeTaskId = sanitizeTaskId(summary.taskId);
+    const runDir = join(this.runsDir, safeTaskId, summary.runId.replace(/[:]/g, '-'));
     await mkdir(runDir, { recursive: true });
     const manifestPath = join(runDir, 'manifest.json');
     await writeFile(manifestPath, JSON.stringify(summary, null, 2), 'utf-8');
