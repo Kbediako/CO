@@ -1,79 +1,60 @@
-# Task List — CLI Migration (Task 0101)
+# Task List — Orchestrator Wrapper Template
 
 ## Context
 - Link to PRD: `docs/PRD.md`
-- Summary: Replace MCP runner with Codex Orchestrator CLI while preserving manifests, metrics, and nested run lineage.
+- Summary: Maintain a Codex orchestrator wrapper that supports multiple downstream projects, each with its own task id, manifests, and guardrail evidence.
 
 ### Checklist Convention
-- Keep `[ ]` until acceptance criteria met; flip to `[x]` with manifest or log path.
+- Keep `[ ]` until acceptance criteria is met. Flip to `[x]` and attach the manifest path from `.runs/<task-id>/cli/<run-id>/manifest.json` that proves completion.
 
 ## Parent Tasks
 1. **Foundation**
    - Subtask: Synchronize docs & checklists
-     - Files: `docs/PRD.md`, `docs/TECH_SPEC.md`, `docs/ACTION_PLAN.md`, `/tasks/0101-prd-cli-migration.md`
-     - Acceptance: Reviewer confirms task 0101 mirrored across docs; Evidence: docs refreshed 2025-10-31
-     - [x] Status: Complete
+     - Files: `docs/PRD.md`, `docs/TECH_SPEC.md`, `docs/ACTION_PLAN.md`, `/tasks/<task-id>-<slug>.md`
+     - Acceptance: Reviewer confirms documentation mirrors the active project with manifest placeholders; Evidence: manifest link added to each checklist entry.
+     - [ ] Status: Pending
    - Subtask: Prepare run directories & env
-     - Files: `.runs/0101/**`, `.runs/local-mcp/**`
-     - Commands: `mkdir -p .runs/0101/cli`, export `MCP_RUNNER_TASK_ID=0101`
-     - Acceptance: first CLI run emits manifest under `.runs/0101/cli`; Evidence: `.runs/0101/cli/2025-10-31T13-09-10-303Z-ed11132f/manifest.json`
-     - [x] Status: Complete
-2. **CLI Core**
-   - Subtask: Implement CLI scaffolding
-     - Files: `orchestrator/src/cli/**`, `bin/codex-orchestrator.ts`
-     - Commands: `npm run build`
-     - Acceptance: `codex-orchestrator --help` lists commands; Evidence: lint/build logs 2025-10-31
-     - [x] Status: Complete
-   - Subtask: TaskManager integration
-     - Files: `orchestrator/src/cli/adapters/*`
-     - Acceptance: Plan/build/test/review events emitted during run; Evidence: `.runs/0101/cli/2025-10-31T13-09-10-303Z-ed11132f/manifest.json`
-     - [x] Status: Complete
-   - Subtask: Nested sub-agent support
+     - Files: `.runs/<task-id>/**`, `.runs/local-mcp/**`
+     - Commands: `mkdir -p .runs/<task-id>/cli`, export `MCP_RUNNER_TASK_ID=<task-id>`
+     - Acceptance: First diagnostics run writes `.runs/<task-id>/cli/<run-id>/manifest.json`; Evidence: attach manifest path.
+     - [ ] Status: Pending
+2. **Project Pipelines**
+   - Subtask: Configure orchestrator scaffolding
+     - Files: `packages/<project>/**`, `orchestrator/src/cli/pipelines/**`
+     - Acceptance: `codex-orchestrator start diagnostics --format json` succeeds for the project; Evidence: diagnostics manifest path + metrics file.
+     - [ ] Status: Pending
+   - Subtask: Nested run lineage
      - Files: `orchestrator/src/cli/pipelines/**`
-     - Acceptance: Child run manifest references parent run id; Evidence: `tests/cli-orchestrator.spec.ts`
-     - [x] Status: Complete
+     - Acceptance: Child manifest references `parent_run_id` (verified via manifest snippet or test log); Evidence: manifest + test output.
+     - [ ] Status: Pending
 3. **Persistence & Telemetry**
    - Subtask: Manifest & compatibility pointers
      - Files: `orchestrator/src/cli/persistence/**`, `scripts/agents_mcp_runner.mjs`
-     - Acceptance: `.runs/0101/mcp/<run-id>/manifest.json` points to CLI artifact; Evidence: `.runs/0101/mcp/2025-10-31T13-09-10-303Z-ed11132f/manifest.json`
-     - [x] Status: Complete
+     - Acceptance: `.runs/<task-id>/mcp/<run-id>/manifest.json` points to CLI artifact; Evidence: compatibility manifest path.
+     - [ ] Status: Pending
    - Subtask: Metrics + snapshots
-     - Files: `orchestrator/src/cli/metrics/**`, `out/0101/state.json`
-     - Acceptance: Metrics JSONL appended and task state snapshot updated; Evidence: `.runs/0101/metrics.json`, `out/0101/state.json`
-     - [x] Status: Complete
+     - Files: `orchestrator/src/cli/metrics/**`, `out/<task-id>/state.json`
+     - Acceptance: `.runs/<task-id>/metrics.json` updated with latest run and `out/<task-id>/state.json` written; Evidence: manifest summary referencing metrics file.
+     - [ ] Status: Pending
 4. **Guardrails & Rollout**
    - Subtask: Diagnostics pipeline validation
      - Commands: `codex-orchestrator start diagnostics`
-     - Acceptance: Manifest `status: succeeded`; Evidence: `.runs/0101/cli/2025-10-31T13-09-10-303Z-ed11132f/manifest.json`
-     - [x] Status: Complete
+     - Acceptance: Manifest `status: succeeded` and guardrail summary recorded; Evidence: `.runs/<task-id>/cli/<run-id>/manifest.json#summary`.
+     - [ ] Status: Pending
    - Subtask: Documentation + shims
      - Files: `.agent/AGENTS.md`, `docs/TASKS.md`, `scripts/*.sh`
-     - Acceptance: MCP references replaced with CLI instructions; Evidence: updated 2025-10-31
-     - [x] Status: Complete
+     - Acceptance: Docs explain multi-project layout and reference manifest paths; Evidence: updated doc links.
+     - [ ] Status: Pending
 5. **Reviewer Hand-off**
-   - Subtask: `npm run review` alignment
-     - Commands: `npm run review`
-     - Acceptance: review script reads latest CLI manifest or skips when unsupported; Evidence: npm run review output 2025-10-31
-     - [x] Status: Complete
-
-6. **Enhancements — Telemetry & Preview (2025-10-31)**
-   - Subtask: Telemetry schema helper
-     - Files: `orchestrator/src/cli/telemetry/schema.ts`
-     - Acceptance: helper exposes JSON schema + validator; Evidence: `tests/cli-orchestrator.spec.ts`
-     - [x] Status: Complete
-   - Subtask: Plan preview command
-     - Files: `bin/codex-orchestrator.ts`, `orchestrator/src/cli/orchestrator.ts`
-     - Acceptance: `codex-orchestrator plan` prints stages (text/JSON); Evidence: `tests/cli-orchestrator.spec.ts`
-     - [x] Status: Complete
-   - Subtask: Guardrail summary emission
-     - Files: `orchestrator/src/cli/run/manifest.ts`, `orchestrator/src/cli/metrics/metricsRecorder.ts`
-     - Acceptance: manifest summary ends with `Guardrails:` entry; Evidence: `tests/cli-orchestrator.spec.ts`
-     - [x] Status: Complete
+   - Subtask: Review workflow alignment
+     - Commands: `npm run review` (or project command)
+     - Acceptance: Review instructions pull latest manifest under `.runs/<task-id>/cli/`; Evidence: command output + manifest path.
+     - [ ] Status: Pending
 
 ## Relevant Files
-- `docs/PRD.md`, `docs/TECH_SPEC.md`, `docs/ACTION_PLAN.md`, `/tasks/0101-prd-cli-migration.md`, `/tasks/tasks-0101-cli-migration.md`
+- `docs/PRD.md`, `docs/TECH_SPEC.md`, `docs/ACTION_PLAN.md`, `/tasks/<task-id>-<slug>.md`, `/tasks/tasks-<task-id>-<slug>.md`
 
 ## Notes
-- Spec Requirements: maintain updates under `tasks/specs` as CLI evolves.
-- Approvals Needed: none (approval policy `never` for this environment).
-- Links: pending manifest references once runs execute.
+- Spec Requirements: keep `tasks/specs` synchronized with manifest links as new projects onboard.
+- Approvals: Log all escalations inside manifests under `approvals` and reference those entries in checklist updates when present.
+- Links: Replace placeholders with concrete run ids before requesting review.

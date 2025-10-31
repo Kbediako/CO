@@ -1,16 +1,16 @@
-# Task List Snapshot — CLI Migration (Task 0101)
+# Task List Snapshot — Orchestrator Wrapper
 
-- **Update — 2025-10-31:** CLI run recorded under `.runs/0101/cli/2025-10-31T13-09-10-303Z-ed11132f/manifest.json`; docs, shims, and checklists refreshed. Latest enhancements add a telemetry schema helper (`orchestrator/src/cli/telemetry/schema.ts`), a read-only plan preview command, and guardrail summaries in manifest outputs (see `tests/cli-orchestrator.spec.ts`).
-- **Gate Status:** Implementation complete; preparing hand-off.
-- **Notes:** Metrics aggregated in `.runs/0101/metrics.json`, task snapshot updated under `out/0101/state.json`.
+- **Update — 2025-10-31:** Wrapper configured for multi-project usage; first downstream manifests recorded under `.runs/<task-id>/cli/<timestamp>/manifest.json`. Track additional projects by appending new checklist rows with their manifest links.
+- **Gate Status:** Wrapper templates ready; downstream onboarding in progress.
+- **Notes:** Metrics aggregate per project in `.runs/<task-id>/metrics.json`, and state snapshots live in `out/<task-id>/state.json`.
 
 ## Checklist Mirror
-Refer to `/tasks/tasks-0101-cli-migration.md` for canonical structure. Current status:
+Mirror status with `/tasks/<task-id>-<slug>.md` (or the project equivalent) and ensure every `[x]` includes the manifest path that satisfied the acceptance criteria.
 
-- Foundation — `[x]` Docs synced; run manifest `.runs/0101/cli/2025-10-31T13-09-10-303Z-ed11132f/manifest.json`.
-- CLI Core — `[x]` CLI scaffolding/tests; see run manifest above and `tests/cli-orchestrator.spec.ts`.
-- Persistence & Telemetry — `[x]` Compatibility pointers + metrics; `.runs/0101/mcp/2025-10-31T13-09-10-303Z-ed11132f/manifest.json`, `.runs/0101/metrics.json`, `out/0101/state.json`.
-- Guardrails & Rollout — `[x]` Diagnostics pipeline succeeded; docs/shims updated 2025-10-31.
-- Reviewer Hand-off — `[x]` `npm run review` exits gracefully when review command absent.
+- Wrapper Foundation — `[ ]` Docs and SOPs converted to multi-project template; link manifest proving diagnostics run: `.runs/<task-id>/cli/<run-id>/manifest.json`.
+- Project Onboarding — `[ ]` First project pipeline configured under `packages/<project>`; attach diagnostics manifest and metrics path when complete.
+- Persistence & Telemetry — `[ ]` Compatibility pointers verified (`.runs/<task-id>/mcp/<run-id>/manifest.json`), metrics appended (`.runs/<task-id>/metrics.json`), state snapshot emitted (`out/<task-id>/state.json`).
+- Guardrails — `[ ]` `scripts/spec-guard.sh --dry-run`, `npm run lint`, and `npm run test` succeed for the active project; link manifests for each run.
+- Reviewer Hand-off — `[ ]` `.agent` briefing updated and `npm run review` (or equivalent) documented for reviewers with latest manifest reference.
 
-Provide manifest links next to each bracket when tasks flip to `[x]`.
+Update checklist entries with concrete run ids as projects progress.
