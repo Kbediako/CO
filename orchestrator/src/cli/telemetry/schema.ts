@@ -212,7 +212,8 @@ export function validateCliManifest(candidate: unknown): ValidationResult<CliMan
     return { valid: false, errors, value: null };
   }
 
-  return { valid: true, errors: [], value: candidate as CliManifest };
+  // At this point we've validated every property, so the cast is safe.
+  return { valid: true, errors: [], value: candidate as unknown as CliManifest };
 }
 
 function validateCommands(candidate: unknown, errors: string[]): void {
