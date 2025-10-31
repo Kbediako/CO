@@ -11,20 +11,53 @@ import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
-import { constants, createCompatibilityPointer, isoTimestamp, timestampForRunId } from './agents_mcp_runner.mjs';
+const repoRoot = path.resolve(process.env.CODEX_ORCHESTRATOR_ROOT ?? process.cwd());
+const taskId = (process.env.MCP_RUNNER_TASK_ID ?? '0101').toLowerCase();
+const runsRoot = path.resolve(process.env.CODEX_ORCHESTRATOR_RUNS_DIR ?? path.join(repoRoot, '.runs'));
+const legacyRunsRoot = path.join(runsRoot, 'local-mcp');
+const taskRunsRoot = path.join(runsRoot, taskId, 'cli');
+const compatRoot = path.join(runsRoot, taskId, 'mcp');
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const { repoRoot, legacyRunsRoot, taskRunsRoot, TASK_ID } = constants;
+const migrationsRoot = path.join(runsRoot, taskId, 'migrations');
 
-const migrationsRoot = path.join(repoRoot, '.runs', TASK_ID, 'migrations');
+function isoTimestamp(date = new Date()) {
+  return date.toISOString();
+}
+
+function timestampForRunId(date = new Date()) {
+  return isoTimestamp(date).replace(/[:.]/g, '-');
+}
 
 async function writeJsonAtomic(targetPath, data) {
   const tmpPath = `${targetPath}.tmp`;
   await fs.mkdir(path.dirname(targetPath), { recursive: true });
   await fs.writeFile(tmpPath, `${JSON.stringify(data, null, 2)}\n`, 'utf8');
   await fs.rename(tmpPath, targetPath);
+}
+
+async function createCompatibilityPointer(runId, manifestPath, runDir) {
+  const compatDir = path.join(compatRoot, runId);
+  await fs.mkdir(compatDir, { recursive: true });
+  const artifactRoot = path.relative(repoRoot, runDir);
+  const manifestRelative = path.relative(compatDir, manifestPath);
+  try {
+    await fs.rm(path.join(compatDir, 'manifest.json'), { force: true });
+    await fs.symlink(manifestRelative, path.join(compatDir, 'manifest.json'));
+  } catch (error) {
+    await writeJsonAtomic(path.join(compatDir, 'manifest.json'), {
+      redirect_to: artifactRoot,
+      manifest: path.relative(repoRoot, manifestPath),
+      note: 'Generated during CLI migration.'
+    });
+  }
+  await writeJsonAtomic(path.join(compatDir, 'compat.json'), {
+    artifact_root: artifactRoot,
+    manifest: path.relative(repoRoot, manifestPath),
+    created_at: isoTimestamp()
+  });
 }
 
 async function listLegacyRuns() {
@@ -81,9 +114,9 @@ async function migrateRun(runId, { dryRun }) {
   await fs.rename(sourceDir, destinationDir);
 
   const manifest = await readManifest(path.join(destinationDir, 'manifest.json'));
-  manifest.task_id = manifest.task_id ?? TASK_ID;
+  manifest.task_id = manifest.task_id ?? taskId;
   manifest.artifact_root = path.relative(repoRoot, destinationDir);
-  manifest.compat_path = path.relative(repoRoot, path.join(legacyRunsRoot, runId));
+  manifest.compat_path = path.relative(repoRoot, path.join(compatRoot, runId));
   manifest.metrics_recorded = manifest.metrics_recorded ?? true;
   manifest.resume_token = manifest.resume_token ?? null;
   manifest.resume_events = manifest.resume_events ?? [];
@@ -152,6 +185,7 @@ async function main() {
   const logPayload = {
     generated_at: isoTimestamp(),
     dry_run: dryRun,
+    task_id: taskId,
     repo_root: repoRoot,
     legacy_root: path.relative(repoRoot, legacyRunsRoot),
     task_runs_root: path.relative(repoRoot, taskRunsRoot),
@@ -168,7 +202,7 @@ async function main() {
 
 function printHelp() {
   console.log(`Usage: scripts/mcp-runner-migrate.js [--dry-run] [--run-id <id>]`);
-  console.log('Moves legacy .runs/local-mcp/<run-id> directories into .runs/0001/mcp/.');
+  console.log('Moves legacy .runs/local-mcp/<run-id> directories into .runs/<task>/cli/.');
 }
 
 if (path.resolve(process.argv[1] ?? '') === __filename) {

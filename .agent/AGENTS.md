@@ -21,6 +21,7 @@
 - `npm run build:patterns` — Compile codemods/linters/templates; run whenever `patterns/**` changes.
 - `node --loader ts-node/esm evaluation/harness/run-all.ts --mode=mcp` — Manual sweep to generate scenario artifacts for manifests.
 - `npm run review` — Launches `codex review --manifest <latest>` using the newest manifest under `.runs/**` for reviewer workflows.
+- `codex-orchestrator plan [pipeline]` — Preview resolved pipeline stages without execution; add `--format json` for automation inputs.
 
 ### Read First Order
 1. `.agent/system/architecture.md`

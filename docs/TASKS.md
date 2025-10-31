@@ -1,10 +1,16 @@
-# Task List Snapshot Template
+# Task List Snapshot — CLI Migration (Task 0101)
 
-Mirror the canonical checklist from `/tasks` here once you define your project plan. Include dated updates summarizing changes so reviewers can scan progress without re-opening the full checklist.
+- **Update — 2025-10-31:** CLI run recorded under `.runs/0101/cli/2025-10-31T13-09-10-303Z-ed11132f/manifest.json`; docs, shims, and checklists refreshed. Latest enhancements add a telemetry schema helper (`orchestrator/src/cli/telemetry/schema.ts`), a read-only plan preview command, and guardrail summaries in manifest outputs (see `tests/cli-orchestrator.spec.ts`).
+- **Gate Status:** Implementation complete; preparing hand-off.
+- **Notes:** Metrics aggregated in `.runs/0101/metrics.json`, task snapshot updated under `out/0101/state.json`.
 
-Example format:
-- **Update — YYYY-MM-DD:** _What changed (approvals, new subtasks, etc.)_
-- **Gate Status:** _planned / in-progress / done_
-- **Notes:** _Anything a reviewer should know_
+## Checklist Mirror
+Refer to `/tasks/tasks-0101-cli-migration.md` for canonical structure. Current status:
 
-Remove this template text once you create the first real entry.
+- Foundation — `[x]` Docs synced; run manifest `.runs/0101/cli/2025-10-31T13-09-10-303Z-ed11132f/manifest.json`.
+- CLI Core — `[x]` CLI scaffolding/tests; see run manifest above and `tests/cli-orchestrator.spec.ts`.
+- Persistence & Telemetry — `[x]` Compatibility pointers + metrics; `.runs/0101/mcp/2025-10-31T13-09-10-303Z-ed11132f/manifest.json`, `.runs/0101/metrics.json`, `out/0101/state.json`.
+- Guardrails & Rollout — `[x]` Diagnostics pipeline succeeded; docs/shims updated 2025-10-31.
+- Reviewer Hand-off — `[x]` `npm run review` exits gracefully when review command absent.
+
+Provide manifest links next to each bracket when tasks flip to `[x]`.

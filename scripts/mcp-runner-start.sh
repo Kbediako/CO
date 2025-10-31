@@ -2,11 +2,10 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SCRIPT="${ROOT}/scripts/agents_mcp_runner.mjs"
+CLI="${ROOT}/node_modules/.bin/codex-orchestrator"
 
-if [[ ! -x "$SCRIPT" ]]; then
-  echo "Error: ${SCRIPT} not found or not executable." >&2
-  exit 1
+if [[ ! -x "$CLI" ]]; then
+  CLI="${ROOT}/dist/bin/codex-orchestrator.js"
 fi
 
 if [[ "${1:-}" == "--resume" ]]; then
@@ -17,7 +16,7 @@ if [[ "${1:-}" == "--resume" ]]; then
     exit 2
   fi
   shift || true
-  node "$SCRIPT" resume --run-id "$RUN_ID" "$@"
+  node "$CLI" resume --run "$RUN_ID" "$@"
 else
-  node "$SCRIPT" start "$@"
+  node "$CLI" start "$@"
 fi

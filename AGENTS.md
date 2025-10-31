@@ -23,12 +23,12 @@ Use this repository as the starting point for a new Codex-driven project. After 
 
 Update the table once you wire different build pipelines or tooling.
 
-## MCP Runner Quick Start
+## CLI Orchestrator Quick Start
 1. Install and authenticate the Codex CLI.
-2. Set `MCP_RUNNER_TASK_ID` to the identifier you plan to track (for example `export MCP_RUNNER_TASK_ID=0001`).
-3. Launch diagnostics with `scripts/run-mcp-diagnostics.sh --no-watch` or enqueue a run with `scripts/agents_mcp_runner.mjs start` (add `--command` flags to customize the sequence).
-4. Poll the run using `scripts/mcp-runner-poll.sh <run-id> --watch` or inspect `.runs/<task>/mcp/<run-id>/manifest.json`.
-5. Attach the manifest path when flipping checklist items.
+2. Set `MCP_RUNNER_TASK_ID=0101` (or the active task id) in your shell so manifests land under `.runs/<task>/cli/`.
+3. Launch diagnostics with `npx codex-orchestrator start diagnostics --format json`; the command prints the run id, manifest path, and log location.
+4. Monitor progress using `npx codex-orchestrator status --run <run-id> --watch --interval 10` or read `.runs/<task>/cli/<run-id>/manifest.json` directly.
+5. Attach the manifest path when flipping checklist items; metrics aggregate in `.runs/<task>/metrics.json` and summaries in `out/<task>/state.json`.
 
 ## Customization Checklist for New Projects
 - [ ] Duplicate `/tasks` files and rename them for the new PRD / task identifiers.

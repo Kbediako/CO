@@ -10,10 +10,16 @@ import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
-import { constants, isoTimestamp } from './agents_mcp_runner.mjs';
-
-const { TASK_ID, metricsFilePath, metricsRoot, repoRoot } = constants;
+const repoRoot = path.resolve(process.env.CODEX_ORCHESTRATOR_ROOT ?? process.cwd());
+const taskId = (process.env.MCP_RUNNER_TASK_ID ?? '0101').toLowerCase();
+const runsRoot = path.resolve(process.env.CODEX_ORCHESTRATOR_RUNS_DIR ?? path.join(repoRoot, '.runs'));
+const metricsRoot = path.join(runsRoot, taskId);
+const metricsFilePath = path.join(metricsRoot, 'metrics.json');
 const summaryPath = path.join(metricsRoot, 'metrics-summary.json');
+
+function isoTimestamp(date = new Date()) {
+  return date.toISOString();
+}
 
 async function writeJsonAtomic(targetPath, data) {
   const tmpPath = `${targetPath}.tmp`;
@@ -59,7 +65,7 @@ function summarize(entries) {
 
   return {
     generated_at: isoTimestamp(),
-    task_id: TASK_ID,
+    task_id: taskId,
     metrics_file: path.relative(repoRoot, metricsFilePath),
     entries_total: total,
     entries_succeeded: successes,
@@ -109,4 +115,4 @@ if (path.resolve(process.argv[1] ?? '') === fileURLToPath(import.meta.url)) {
   }
 }
 
-export { readMetricsEntries, summarize, main, constants };
+export { readMetricsEntries, summarize, main };

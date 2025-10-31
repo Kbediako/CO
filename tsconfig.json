@@ -17,6 +17,7 @@
     "orchestrator/tests/**/*.ts",
     "adapters/**/*.ts",
     "evaluation/**/*.ts",
-    "scripts/**/*.ts"
+    "scripts/**/*.ts",
+    "bin/**/*.ts"
   ]
 }

@@ -1,15 +1,15 @@
 {
   "items": [
     {
-      "id": "0001",
-      "slug": "codex-orchestrator",
-      "title": "PRD Placeholder",
-      "path": "tasks/0001-prd-codex-orchestrator.md",
+      "id": "0101",
+      "slug": "cli-migration",
+      "title": "Codex Orchestrator CLI Migration PRD",
+      "path": "tasks/0101-prd-cli-migration.md",
       "kind": "prd",
-      "status": "draft",
+      "status": "in-progress",
       "gate": {
-        "phase": "prd-approval",
-        "status": "pending",
+        "phase": "cli-migration-planning",
+        "status": "in-progress",
         "log": null,
         "run_id": null
       },

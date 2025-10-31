@@ -7,6 +7,10 @@ if [[ $# -lt 1 ]]; then
 fi
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SCRIPT="${ROOT}/scripts/agents_mcp_runner.mjs"
+CLI="${ROOT}/node_modules/.bin/codex-orchestrator"
 
-node "$SCRIPT" poll "$@"
+if [[ ! -x "$CLI" ]]; then
+  CLI="${ROOT}/dist/bin/codex-orchestrator.js"
+fi
+
+node "$CLI" status "$@"

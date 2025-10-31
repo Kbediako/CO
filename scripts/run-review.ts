@@ -54,15 +54,31 @@ async function collectManifests(runsDir: string, taskFilter?: string): Promise<s
       continue;
     }
     const taskPath = path.join(runsDir, taskId);
-    let runIds: string[] = [];
+    const cliPath = path.join(taskPath, 'cli');
+    const legacyPath = taskPath;
+
+    const candidates: Array<{ root: string; runIds: string[] }> = [];
     try {
-      runIds = await readdir(taskPath);
+      const cliRunIds = await readdir(cliPath);
+      candidates.push({ root: cliPath, runIds: cliRunIds });
     } catch {
-      continue;
+      // Ignore missing CLI directory; fall back to legacy layout.
     }
-    for (const runId of runIds) {
-      const manifestPath = path.join(taskPath, runId, 'manifest.json');
-      results.push(manifestPath);
+
+    if (candidates.length === 0) {
+      try {
+        const legacyRunIds = await readdir(legacyPath);
+        candidates.push({ root: legacyPath, runIds: legacyRunIds });
+      } catch {
+        continue;
+      }
+    }
+
+    for (const candidate of candidates) {
+      for (const runId of candidate.runIds) {
+        const manifestPath = path.join(candidate.root, runId, 'manifest.json');
+        results.push(manifestPath);
+      }
     }
   }
   return results;
@@ -94,11 +110,15 @@ async function resolveManifestPath(options: CliOptions): Promise<string> {
 }
 
 async function main(): Promise<void> {
+  if (!(await hasReviewCommand())) {
+    console.log('codex CLI does not expose a review command; skipping review hand-off.');
+    return;
+  }
   const options = parseArgs(process.argv.slice(2));
   const manifestPath = await resolveManifestPath(options);
 
   console.log(`Launching Codex review for ${path.relative(process.cwd(), manifestPath)}`);
-  const child = spawn('codex', ['review', '--manifest', manifestPath], {
+  const child = spawn('codex', ['review', manifestPath], {
     stdio: 'inherit',
     env: process.env
   });
@@ -119,3 +139,17 @@ main().catch((error) => {
   console.error('[run-review] failed:', error.message ?? error);
   process.exitCode = 1;
 });
+
+async function hasReviewCommand(): Promise<boolean> {
+  return new Promise((resolve) => {
+    const child = spawn('codex', ['--help'], { stdio: ['ignore', 'pipe', 'pipe'] });
+    let output = '';
+    child.stdout?.on('data', (chunk) => {
+      output += chunk.toString();
+    });
+    child.once('error', () => resolve(false));
+    child.once('close', () => {
+      resolve(output.includes(' review'));
+    });
+  });
+}
