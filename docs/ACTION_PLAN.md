@@ -1,31 +1,24 @@
-# Action Plan — Codex Orchestrator Wrapper
+# Action Plan — Codex Orchestrator Resilience Hardening (Task 0202)
 
 ## Status Snapshot
-- **Canonical sources:** `docs/PRD.md`, `docs/TECH_SPEC.md`, `/tasks/<task-id>-<slug>.md`, `.agent/task/<task-id>-<slug>.md` for each onboarded project.
-- **Run evidence:** `.runs/<task-id>/cli/<timestamp>/manifest.json` with metrics in `.runs/<task-id>/metrics.json`; attach the exact manifest path when updating checklists.
-- **Open follow-up:**
-  - Confirm every downstream project maps to a task id and `packages/<project>` (or agreed alt) directory.
-  - Review guardrail coverage across projects; extend pipelines if team-specific checks are missing.
+- Current Phase: Ready for review (persistence + telemetry hardening complete).
+- Run Manifest Link: `.runs/0202-orchestrator-hardening/cli/2025-10-31T22-56-34-431Z-9574035c/manifest.json`
+- Metrics / State Snapshots: `.runs/0202-orchestrator-hardening/metrics.json`, `out/0202-orchestrator-hardening/state.json` (updated 2025-10-31).
+- Approvals / Escalations: None required; safe `read/edit/run/network` profile maintained.
 
-## Milestone Outline
+## Milestones & Tasks
+1. Milestone: Persistence Reliability
+   - Tasks: Implement retry/backoff in `TaskStateStore`, adjust `PersistenceCoordinator` to continue manifest writes on snapshot failure, add unit coverage for contention.
+2. Milestone: Heartbeat Safety
+   - Tasks: Queue heartbeat writes with awaited async handling, throttle manifest persistence to 30s intervals, log failures with context.
+3. Milestone: Output Bounding & Verification
+   - Tasks: Cap command runner buffers, truncate error payloads, refresh docs/checklists, execute diagnostics + guardrail commands, run `npm run review`.
 
-### Milestone M1 — Wrapper Scaffolding
-- Objective: Stand up the shared orchestrator wrapper and document how multiple projects plug into it.
-- Tasks:
-  1. Docs — Refresh PRD/Spec/Action Plan templates with multi-project guidance; Acceptance: reviewers see manifest placeholders for each project and linked evidence; Risks: stale template fragments.
-  2. Ops — Align `/tasks`, `.agent/`, and `docs/TASKS.md` checklist conventions on mirroring status with manifest links per project; Risks: out-of-sync checklists.
-
-### Milestone M2 — Project Onboarding
-- Objective: Wire the orchestrator to downstream codebases and establish per-project pipelines.
-- Tasks:
-  1. Dev — Configure `packages/<project>` scaffolding, ensure `MCP_RUNNER_TASK_ID` routes runs to `.runs/<task-id>/cli/`; Acceptance: first diagnostics manifest linked in project checklist; Risks: run data written to the wrong task directory.
-  2. DevOps — Capture compatibility pointers, metrics, and state snapshots (`out/<task-id>/state.json`) for each project; Acceptance: manifests and metrics paths referenced in docs; Risks: missing guardrail evidence.
-
-### Milestone M3 — Guardrails & Rollout
-- Objective: Validate guardrails and hand off to reviewers with project-aware documentation.
-- Tasks:
-  1. QA — Execute `scripts/spec-guard.sh --dry-run`, `npm run lint`, `npm run test`, and any project-specific pipelines; Acceptance: manifests attached to checklist updates; Risks: pipeline drift between projects.
-  2. Enablement — Update `.agent/AGENTS.md`, `docs/TASKS.md`, and project SOPs so reviewers can navigate manifests and approvals per project; Risks: missing manifest pointers in enablement docs.
+## Risks & Mitigations
+- Excessive contention prolongs retries — cap retries to <3s and surface warnings in logs.
+- Heartbeat queue drift — force manifest flush on completion and during error handling.
+- Truncated output hides root cause — record full logs in `.ndjson` files while trimming summaries/error payloads.
 
 ## Next Review
-- Schedule reviewer sync once the first downstream project records a passing diagnostics manifest and documentation links to `.runs/<task-id>/cli/<run-id>/manifest.json`.
+- Date: 2025-11-03
+- Agenda: Confirm retry metrics, validate diagnostics manifest `2025-10-31T22-56-34-431Z-9574035c`, approve documentation updates.

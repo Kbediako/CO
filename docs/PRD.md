@@ -1,40 +1,47 @@
-# Product Requirements — Codex Orchestrator Wrapper
+# PRD — Codex Orchestrator Resilience Hardening (Task 0202)
 
-## Vision
-- Provide a single orchestrator repository that can manage diagnostics, guardrails, and review flows for multiple downstream codebases.
-- Preserve durability guarantees for manifests, metrics, and lineage regardless of which project is active so automation remains trustworthy.
-- Offer a consistent developer experience across local CLI and cloud execution modes while allowing per-project customization of pipelines.
+## Summary
+- Problem Statement: Transient lock contention, unbounded heartbeat writes, and unrestricted command output buffering can corrupt run history or exhaust resources when orchestrator pipelines overlap.
+- Desired Outcome: Harden persistence and telemetry paths so concurrent runs remain durable, heartbeat updates stay safe, and captured output stays within predictable limits.
 
-## Success Metrics
-- Every onboarded project runs through `codex-orchestrator` commands (`start`, `resume`, `status`) without MCP dependencies.
-- Run manifests persist under `.runs/<task-id>/cli/<run-id>/manifest.json` with compatibility pointers in `.runs/<task-id>/mcp/<run-id>/` within ±1 second of run completion.
-- Metrics recorder appends JSONL entries for all terminal runs and surfaces guardrail coverage ≥90% per project over a rolling seven-day window.
-- Diagnostics pipeline (`build`, `lint`, `test`, `spec-guard`) completes in ≤30 minutes on reference hardware for each project, or publishes a per-project SLA if different.
-- Task state snapshots under `out/<task-id>/state.json` align with manifest history across at least three consecutive runs for every active project.
-
-## User Stories
-- **Platform engineer:** I can onboard a new downstream project by creating `packages/<project>`, exporting `MCP_RUNNER_TASK_ID=<task-id>`, and capturing the diagnostics manifest path for reviewers.
-- **Reviewer:** I can open `codex-orchestrator status <run-id> --format json` and trace approvals, guardrail outcomes, and lineage without parsing multiple project-specific conventions.
-- **Agent author:** I can spawn nested agents or pipelines for a project while maintaining correct `parentRunId` lineage in manifests so cross-project workflows remain auditable.
-
-## Risks & Mitigations
-- **Process drift:** Project-specific pipelines might diverge from approved guardrail sequences. *Mitigation:* encode defaults in versioned config, require manifest links in checklists, and cover with integration tests.
-- **Manifest regression:** Incorrect task ids could route artifacts to the wrong directory. *Mitigation:* document `MCP_RUNNER_TASK_ID` usage prominently and add validation in reviewer scripts.
-- **Adoption friction:** Teams may keep referencing single-project docs. *Mitigation:* maintain multi-project templates in `/docs`, `/tasks`, and `.agent/` with clear instructions for linking manifests.
-- **Performance:** Heavier downstream builds may exceed guardrail thresholds. *Mitigation:* capture per-project SLAs and log durations in metrics for trend analysis.
+## Goals
+- Guarantee `TaskStateStore` records run history even when a lock file already exists by introducing bounded retries with backoff.
+- Eliminate unhandled promise rejections from heartbeat maintenance by awaiting manifest/heartbeat writes and throttling manifest churn.
+- Cap stdout/stderr buffers and truncate command error payloads to keep artifacts and memory usage within safe limits (≤64 KiB per stream, ≤8 KiB per error detail).
 
 ## Non-Goals
-- Delivering UI dashboards or new persistence backends (tracked separately).
-- Replacing downstream build/test tooling; wrapper focuses on orchestration and documentation guardrails.
-- Managing cloud override policies beyond recording them in manifests.
+- Replacing the local filesystem persistence model or introducing a database-backed store.
+- Designing new pipeline stages or changing approval workflows beyond documenting heartbeat behaviour updates.
+- Shipping UI dashboards for run artifacts (tracked under a separate enablement effort).
 
-## Launch Criteria
-- PRD, technical spec, action plan, and mirrored task checklist show `[x]` status with manifest links for planning, implementation, testing, and enablement milestones per project.
-- Passing runs for `scripts/spec-guard.sh --dry-run`, `npm run lint`, `npm run test`, and `npm run review` (or approved alternatives) are captured under `.runs/<task-id>/` with metrics entries for each project.
-- Integration tests cover CLI start/resume/status flows, manifest schema validation, and compatibility pointers for multi-project inputs.
-- Shims (`scripts/agents_mcp_runner.mjs`, `scripts/mcp-runner-*.sh`) call into the CLI without hardcoding project ids while preserving backwards compatibility.
-- Documentation (`docs/**`, `/tasks`, `.agent/`) mirrors the same task status, manifest evidence, and approval records.
+## Stakeholders
+- Product: Platform Enablement (Alex Rivera)
+- Engineering: Orchestrator Reliability (Jamie Chen)
+- Design: N/A — CLI-only scope
+
+## Metrics & Guardrails
+- Primary Success Metrics: 0 missed state snapshots across 50 concurrent pipeline runs; <1% heartbeat write failures observed in diagnostics runs.
+- Guardrails / Error Budgets: Heartbeat/manifest writes must complete within 10 seconds; error files capped to 10 KB on disk to prevent bloating reviews.
+
+## User Experience
+- Personas: Platform engineers running diagnostics, reviewers inspecting manifests, automation agents tailing `.heartbeat`.
+- User Journeys: 
+  - Engineer launches diagnostics, orchestrator retries lock acquisition transparently, manifest updates proceed without rejections.
+  - Reviewer opens error artifacts that remain concise and readable despite failures.
+
+## Technical Considerations
+- Architectural Notes: Extend `TaskStateStore` with retry/backoff; restructure `PersistenceCoordinator` to persist manifests even if snapshots are skipped; sequence heartbeat writes via awaited async tasks with a 30s manifest throttle.
+- Dependencies / Integrations: No new external services. Continues to rely on Node.js `fs/promises` and existing CLI entrypoints.
+
+## Documentation & Evidence
+- Run Manifest Link: `.runs/0202-orchestrator-hardening/cli/2025-10-31T22-56-34-431Z-9574035c/manifest.json`
+- Metrics / State Snapshots: `.runs/0202-orchestrator-hardening/metrics.json`, `out/0202-orchestrator-hardening/state.json` (updated 2025-10-31).
 
 ## Open Questions
-- Should we codify lightweight pipelines (e.g., smoke vs. diagnostics) per project, or rely on project owners to declare them in config?
-- Do reviewers need an aggregated manifest index across projects, or is the `.runs/<task-id>/cli/` hierarchy sufficient?
+- Should state snapshot retries escalate to warnings in manifest summaries when exhausted?
+- Do we need configurable limits for stdout/stderr truncation per project?
+
+## Approvals
+- Product: _(pending)_
+- Engineering: _(pending)_
+- Design: N/A

@@ -126,6 +126,19 @@ describe('CodexOrchestrator CLI', () => {
     expect(resumed.manifest.status).toBe('succeeded');
   });
 
+  it('retains failure status_detail after heartbeat flush', async () => {
+    const orchestrator = new CodexOrchestrator();
+    await fs.writeFile(path.join(tempDir, 'fail.flag'), 'fail');
+
+    const failed = await orchestrator.start({ pipelineId: 'failable' });
+    expect(failed.manifest.status).toBe('failed');
+    expect(failed.manifest.status_detail).toBe('stage:fail-once:failed');
+
+    const manifestPath = path.join(tempDir, failed.manifest.artifact_root, 'manifest.json');
+    const storedManifest = JSON.parse(await fs.readFile(manifestPath, 'utf8'));
+    expect(storedManifest.status_detail).toBe('stage:fail-once:failed');
+  });
+
   it('records child runs for sub-pipeline stages', async () => {
     const orchestrator = new CodexOrchestrator();
     const parent = await orchestrator.start({ pipelineId: 'parent' });

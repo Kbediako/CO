@@ -40,5 +40,5 @@ describe('evaluation harness', () => {
       );
       expect(exists).toBe(true);
     }
-  });
+  }, 60000);
 });

@@ -95,6 +95,15 @@ describe('PersistenceCoordinator', () => {
     expect(onError).toHaveBeenCalledTimes(1);
     const [error] = onError.mock.calls[0];
     expect(error).toBeInstanceOf(TaskStateStoreLockError);
+
+    const manifestPath = join(
+      runsDir,
+      summary.taskId,
+      summary.runId.replace(/[:]/g, '-'),
+      'manifest.json'
+    );
+    const manifest = JSON.parse(await readFile(manifestPath, 'utf-8')) as RunSummary;
+    expect(manifest.runId).toBe(summary.runId);
   });
 
   it('registers run:completed listener via start()', async () => {

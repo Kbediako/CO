@@ -1,19 +1,19 @@
 {
   "items": [
     {
-      "id": "0101",
-      "slug": "cli-migration",
-      "title": "Codex Orchestrator CLI Migration PRD",
-      "path": "tasks/0101-prd-cli-migration.md",
+      "id": "0202",
+      "slug": "orchestrator-hardening",
+      "title": "Codex Orchestrator Resilience Hardening PRD",
+      "path": "tasks/0202-prd-orchestrator-hardening.md",
       "kind": "prd",
       "status": "in-progress",
       "gate": {
-        "phase": "cli-migration-planning",
+        "phase": "resilience-hardening-planning",
         "status": "in-progress",
         "log": null,
         "run_id": null
       },
-      "created_at": null,
+      "created_at": "2025-10-31",
       "completed_at": null
     }
   ],

@@ -1,16 +1,16 @@
-# Task List Snapshot — Orchestrator Wrapper
+# Task List Snapshot — Orchestrator Resilience Hardening (0202)
 
-- **Update — 2025-10-31:** Wrapper configured for multi-project usage; first downstream manifests recorded under `.runs/<task-id>/cli/<timestamp>/manifest.json`. Track additional projects by appending new checklist rows with their manifest links.
-- **Gate Status:** Wrapper templates ready; downstream onboarding in progress.
-- **Notes:** Metrics aggregate per project in `.runs/<task-id>/metrics.json`, and state snapshots live in `out/<task-id>/state.json`.
+- **Update — 2025-10-31:** Diagnostics run `2025-10-31T22-56-34-431Z-9574035c` succeeded; manifest recorded under `.runs/0202-orchestrator-hardening/cli/2025-10-31T22-56-34-431Z-9574035c/manifest.json`.
+- **Gate Status:** Resilience enhancements implemented; awaiting reviewer sign-off.
+- **Notes:** Metrics appended to `.runs/0202-orchestrator-hardening/metrics.json`; state snapshot refreshed at `out/0202-orchestrator-hardening/state.json`.
 
 ## Checklist Mirror
-Mirror status with `/tasks/<task-id>-<slug>.md` (or the project equivalent) and ensure every `[x]` includes the manifest path that satisfied the acceptance criteria.
+Mirror status with `tasks/tasks-0202-orchestrator-hardening.md` and `.agent/task/0202-orchestrator-hardening.md`. Each `[x]` entry must cite the manifest path that satisfied the acceptance criteria.
 
-- Wrapper Foundation — `[ ]` Docs and SOPs converted to multi-project template; link manifest proving diagnostics run: `.runs/<task-id>/cli/<run-id>/manifest.json`.
-- Project Onboarding — `[ ]` First project pipeline configured under `packages/<project>`; attach diagnostics manifest and metrics path when complete.
-- Persistence & Telemetry — `[ ]` Compatibility pointers verified (`.runs/<task-id>/mcp/<run-id>/manifest.json`), metrics appended (`.runs/<task-id>/metrics.json`), state snapshot emitted (`out/<task-id>/state.json`).
-- Guardrails — `[ ]` `scripts/spec-guard.sh --dry-run`, `npm run lint`, and `npm run test` succeed for the active project; link manifests for each run.
-- Reviewer Hand-off — `[ ]` `.agent` briefing updated and `npm run review` (or equivalent) documented for reviewers with latest manifest reference.
+- Documentation Sync — `[x]` Collateral references Task 0202 and ties to diagnostics manifest; Evidence: `.runs/0202-orchestrator-hardening/cli/2025-10-31T22-56-34-431Z-9574035c/manifest.json`.
+- Persistence Reliability — `[x]` Lock retry/backoff shipped with passing tests; Evidence: `.runs/0202-orchestrator-hardening/cli/2025-10-31T22-56-34-431Z-9574035c/manifest.json`.
+- Heartbeat Safety — `[x]` Awaited heartbeat queue implemented; Evidence: `.runs/0202-orchestrator-hardening/cli/2025-10-31T22-56-34-431Z-9574035c/manifest.json`.
+- Output Bounding — `[x]` Command buffer and error truncation verified via tests; Evidence: `.runs/0202-orchestrator-hardening/cli/2025-10-31T22-56-34-431Z-9574035c/manifest.json`.
+- Guardrails & Review — `[x]` `spec-guard`, `npm run lint`, `npm run test`, and `npm run review` executed; Evidence: `.runs/0202-orchestrator-hardening/cli/2025-10-31T22-56-34-431Z-9574035c/manifest.json`.
 
-Update checklist entries with concrete run ids as projects progress.
+Update checklist entries with the exact `.runs/0202-orchestrator-hardening/cli/<run-id>/manifest.json` path once runs complete.

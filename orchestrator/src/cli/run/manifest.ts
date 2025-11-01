@@ -33,6 +33,7 @@ export interface HeartbeatState {
 
 const HEARTBEAT_INTERVAL_SECONDS = 5;
 const HEARTBEAT_STALE_AFTER_SECONDS = 30;
+const MAX_ERROR_DETAIL_CHARS = 8 * 1024;
 
 export async function bootstrapManifest(runId: string, options: ManifestBootstrapOptions): Promise<{
   manifest: CliManifest;
@@ -131,11 +132,31 @@ export async function appendCommandError(
     command_id: command.id,
     command: command.command,
     reason,
-    details,
+    details: sanitizeErrorDetails(details),
     created_at: isoTimestamp()
   };
   await writeJsonAtomic(errorPath, payload);
   return relativeToRepo(env, errorPath);
+}
+
+function sanitizeErrorDetails(details: Record<string, unknown>): Record<string, unknown> {
+  const sanitized: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(details)) {
+    if (typeof value === 'string') {
+      if (value.length > MAX_ERROR_DETAIL_CHARS) {
+        sanitized[key] = `${value.slice(0, MAX_ERROR_DETAIL_CHARS)}…`;
+        const truncatedKey = `${key}_truncated`;
+        if (!(truncatedKey in details)) {
+          sanitized[truncatedKey] = true;
+        }
+      } else {
+        sanitized[key] = value;
+      }
+    } else {
+      sanitized[key] = value;
+    }
+  }
+  return sanitized;
 }
 
 export function computeHeartbeatState(manifest: CliManifest): HeartbeatState {
@@ -155,7 +176,9 @@ export function computeHeartbeatState(manifest: CliManifest): HeartbeatState {
 
 export function updateHeartbeat(manifest: CliManifest): void {
   manifest.heartbeat_at = isoTimestamp();
-  manifest.status_detail = null;
+  if (manifest.status === 'in_progress') {
+    manifest.status_detail = null;
+  }
 }
 
 export function resetForResume(manifest: CliManifest): void {

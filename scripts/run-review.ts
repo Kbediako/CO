@@ -1,11 +1,16 @@
 #!/usr/bin/env node
 /**
  * Helper to launch the Codex CLI /review flow against the latest run manifest.
+ * Falls back to a lightweight local prompt when the installed CLI lacks the
+ * native review subcommand.
  */
 
 import { spawn } from 'node:child_process';
-import { readdir, stat } from 'node:fs/promises';
+import { readFile, readdir, stat } from 'node:fs/promises';
 import path from 'node:path';
+import process from 'node:process';
+import { createInterface } from 'node:readline/promises';
+import { stdin as input, stdout as output } from 'node:process';
 
 interface CliOptions {
   manifest?: string;
@@ -110,29 +115,30 @@ async function resolveManifestPath(options: CliOptions): Promise<string> {
 }
 
 async function main(): Promise<void> {
-  if (!(await hasReviewCommand())) {
-    console.log('codex CLI does not expose a review command; skipping review hand-off.');
-    return;
-  }
   const options = parseArgs(process.argv.slice(2));
   const manifestPath = await resolveManifestPath(options);
 
-  console.log(`Launching Codex review for ${path.relative(process.cwd(), manifestPath)}`);
-  const child = spawn('codex', ['review', manifestPath], {
-    stdio: 'inherit',
-    env: process.env
-  });
-
-  await new Promise<void>((resolve, reject) => {
-    child.once('error', (error) => reject(error instanceof Error ? error : new Error(String(error))));
-    child.once('exit', (code) => {
-      if (code === 0) {
-        resolve();
-      } else {
-        reject(new Error(`codex review exited with code ${code}`));
-      }
+  if (await hasReviewCommand()) {
+    console.log(`Launching Codex review for ${path.relative(process.cwd(), manifestPath)}`);
+    const child = spawn('codex', ['review', manifestPath], {
+      stdio: 'inherit',
+      env: process.env
     });
-  });
+
+    await new Promise<void>((resolve, reject) => {
+      child.once('error', (error) => reject(error instanceof Error ? error : new Error(String(error))));
+      child.once('exit', (code) => {
+        if (code === 0) {
+          resolve();
+        } else {
+          reject(new Error(`codex review exited with code ${code}`));
+        }
+      });
+    });
+    return;
+  }
+
+  await runLocalReview(manifestPath);
 }
 
 main().catch((error) => {
@@ -152,4 +158,69 @@ async function hasReviewCommand(): Promise<boolean> {
       resolve(output.includes(' review'));
     });
   });
+}
+
+async function runLocalReview(manifestPath: string): Promise<void> {
+  console.warn(
+    'codex CLI does not expose a review command; running local review hand-off instead.'
+  );
+
+  let manifest: Record<string, unknown>;
+  try {
+    const raw = await readFile(manifestPath, 'utf8');
+    manifest = JSON.parse(raw) as Record<string, unknown>;
+  } catch (error) {
+    throw new Error(
+      `Failed to load manifest at ${manifestPath}: ${(error as Error)?.message ?? String(error)}`
+    );
+  }
+
+  const taskId = String(manifest.task_id ?? manifest.taskId ?? 'unknown');
+  const runId = String(manifest.run_id ?? manifest.runId ?? 'unknown');
+  const status = String(manifest.status ?? 'unknown');
+  const summary = String(manifest.summary ?? '(no summary)');
+
+  console.log('');
+  console.log(`Task:    ${taskId}`);
+  console.log(`Run ID:  ${runId}`);
+  console.log(`Status:  ${status}`);
+  console.log('');
+  console.log('Summary:');
+  console.log(summary.split('\n').map((line) => `  ${line}`).join('\n'));
+  console.log('');
+  console.log('Select review outcome:');
+  const options = [
+    { label: '1. Approve run', value: 'approve' },
+    { label: '2. Request changes', value: 'changes' },
+    { label: '3. Comment only', value: 'comment' },
+    { label: '4. Skip for now', value: 'skip' }
+  ];
+  for (const option of options) {
+    console.log(option.label);
+  }
+
+  const rl = createInterface({ input, output });
+  let choice: string | null = null;
+  try {
+    while (!choice) {
+      const answer = (await rl.question('Enter choice [1-4]: ')).trim();
+      const index = Number.parseInt(answer, 10);
+      if (!Number.isNaN(index) && index >= 1 && index <= options.length) {
+        choice = options[index - 1]!.value;
+      } else {
+        console.log('Invalid selection. Please choose a number between 1 and 4.');
+      }
+    }
+  } finally {
+    await rl.close();
+  }
+
+  const selected = options.find((option) => option.value === choice);
+  console.log('');
+  console.log(
+    `Review outcome recorded: ${selected?.label ?? choice}. Attach results referencing ${path.relative(
+      process.cwd(),
+      manifestPath
+    )}.`
+  );
 }

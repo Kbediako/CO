@@ -1,11 +1,20 @@
 import { mkdir, readFile, rename, writeFile, rm, open } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
+import { setTimeout as delay } from 'node:timers/promises';
 import type { RunSummary } from '../types.js';
 import { sanitizeTaskId } from './sanitizeTaskId.js';
+
+interface LockRetryOptions {
+  maxAttempts: number;
+  initialDelayMs: number;
+  backoffFactor: number;
+  maxDelayMs: number;
+}
 
 export interface TaskStateStoreOptions {
   outDir?: string;
   runsDir?: string;
+  lockRetry?: Partial<LockRetryOptions>;
 }
 
 export interface StoredRunSummary extends RunSummary {}
@@ -31,10 +40,18 @@ export class TaskStateStoreLockError extends Error {
 export class TaskStateStore {
   private readonly outDir: string;
   private readonly runsDir: string;
+  private readonly lockRetry: LockRetryOptions;
 
   constructor(options: TaskStateStoreOptions = {}) {
     this.outDir = options.outDir ?? join(process.cwd(), 'out');
     this.runsDir = options.runsDir ?? join(process.cwd(), '.runs');
+    const defaults = {
+      maxAttempts: 5,
+      initialDelayMs: 100,
+      backoffFactor: 2,
+      maxDelayMs: 1000
+    };
+    this.lockRetry = { ...defaults, ...(options.lockRetry ?? {}) };
   }
 
   async recordRun(summary: RunSummary): Promise<void> {
@@ -62,14 +79,28 @@ export class TaskStateStore {
 
   private async acquireLock(taskId: string, lockPath: string): Promise<void> {
     await this.ensureDirectory(dirname(lockPath));
-    try {
-      const handle = await open(lockPath, 'wx');
-      await handle.close();
-    } catch (error: unknown) {
-      if ((error as NodeJS.ErrnoException).code === 'EEXIST') {
-        throw new TaskStateStoreLockError(`Lock file already exists for task ${taskId}`, taskId);
+    const { maxAttempts, initialDelayMs, backoffFactor, maxDelayMs } = this.lockRetry;
+    let attempt = 0;
+    let delayMs = initialDelayMs;
+    while (attempt < maxAttempts) {
+      attempt += 1;
+      try {
+        const handle = await open(lockPath, 'wx');
+        await handle.close();
+        return;
+      } catch (error: unknown) {
+        if ((error as NodeJS.ErrnoException).code !== 'EEXIST') {
+          throw error;
+        }
+        if (attempt >= maxAttempts) {
+          throw new TaskStateStoreLockError(
+            `Failed to acquire task state lock for ${taskId} after ${attempt} attempts`,
+            taskId
+          );
+        }
+        await delay(Math.min(delayMs, maxDelayMs));
+        delayMs = Math.min(delayMs * backoffFactor, maxDelayMs);
       }
-      throw error;
     }
   }
 

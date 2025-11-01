@@ -15,6 +15,8 @@ import {
 import { slugify } from '../utils/strings.js';
 import { isoTimestamp } from '../utils/time.js';
 
+const MAX_BUFFERED_OUTPUT_CHARS = 64 * 1024;
+
 export interface CommandRunnerContext {
   env: EnvironmentPaths;
   paths: RunPaths;
@@ -59,19 +61,25 @@ export async function runCommandStage(context: CommandRunnerContext): Promise<Co
     env: { ...process.env, ...stage.env }
   });
 
-  const stdoutChunks: string[] = [];
-  const stderrChunks: string[] = [];
+  let stdoutBuffer = '';
+  let stderrBuffer = '';
+  let stdoutTruncated = false;
+  let stderrTruncated = false;
 
   child.stdout?.setEncoding('utf8');
   child.stderr?.setEncoding('utf8');
 
   child.stdout?.on('data', (chunk: string) => {
-    stdoutChunks.push(chunk);
+    const result = appendWithLimit(stdoutBuffer, chunk, MAX_BUFFERED_OUTPUT_CHARS);
+    stdoutBuffer = result.buffer;
+    stdoutTruncated = stdoutTruncated || result.truncated;
     writeEvent({ type: 'command:stdout', data: chunk });
   });
 
   child.stderr?.on('data', (chunk: string) => {
-    stderrChunks.push(chunk);
+    const result = appendWithLimit(stderrBuffer, chunk, MAX_BUFFERED_OUTPUT_CHARS);
+    stderrBuffer = result.buffer;
+    stderrTruncated = stderrTruncated || result.truncated;
     writeEvent({ type: 'command:stderr', data: chunk });
   });
 
@@ -89,8 +97,8 @@ export async function runCommandStage(context: CommandRunnerContext): Promise<Co
   runnerLog.end();
   commandLog.end();
 
-  const stdoutText = stdoutChunks.join('').trim();
-  const stderrText = stderrChunks.join('').trim();
+  const stdoutText = stdoutBuffer.trim();
+  const stderrText = stderrBuffer.trim();
   const summary = buildSummary(stage, exitCode, stdoutText, stderrText);
 
   entry.completed_at = isoTimestamp();
@@ -99,10 +107,24 @@ export async function runCommandStage(context: CommandRunnerContext): Promise<Co
   entry.status = exitCode === 0 ? 'succeeded' : stage.allowFailure ? 'skipped' : 'failed';
 
   if (entry.status === 'failed') {
-    entry.error_file = await appendCommandError(env, paths, manifest, entry, 'command-failed', {
+    const errorDetails: Record<string, unknown> = {
       exit_code: exitCode,
       stderr: stderrText
-    });
+    };
+    if (stdoutTruncated) {
+      errorDetails.stdout_truncated = true;
+    }
+    if (stderrTruncated) {
+      errorDetails.stderr_truncated = true;
+    }
+    entry.error_file = await appendCommandError(
+      env,
+      paths,
+      manifest,
+      entry,
+      'command-failed',
+      errorDetails
+    );
   }
 
   await saveManifest(paths, manifest);
@@ -131,4 +153,22 @@ function truncate(value: string, length = 240): string {
     return value;
   }
   return `${value.slice(0, length)}…`;
+}
+
+function appendWithLimit(
+  buffer: string,
+  chunk: string,
+  maxLength: number
+): { buffer: string; truncated: boolean } {
+  if (!chunk) {
+    return { buffer, truncated: false };
+  }
+  const combined = buffer + chunk;
+  if (combined.length <= maxLength) {
+    return { buffer: combined, truncated: false };
+  }
+  return {
+    buffer: combined.slice(combined.length - maxLength),
+    truncated: true
+  };
 }

@@ -1,7 +1,7 @@
 import type { EventBus } from '../events/EventBus.js';
 import type { RunSummary } from '../types.js';
 import { logger } from '../logger.js';
-import { TaskStateStore } from './TaskStateStore.js';
+import { TaskStateStore, TaskStateStoreLockError } from './TaskStateStore.js';
 import { RunManifestWriter } from './RunManifestWriter.js';
 
 export interface PersistenceCoordinatorOptions {
@@ -40,13 +40,43 @@ export class PersistenceCoordinator {
   }
 
   async handleRunCompleted(summary: RunSummary): Promise<void> {
+    let stateStoreError: unknown | null = null;
+
     try {
       await this.stateStore.recordRun(summary);
+    } catch (error: unknown) {
+      stateStoreError = error;
+      if (error instanceof TaskStateStoreLockError) {
+        logger.warn(
+          `Task state snapshot skipped for task ${summary.taskId} (run ${summary.runId}): ${error.message}`
+        );
+      } else {
+        logger.error(
+          `Task state snapshot failed for task ${summary.taskId} (run ${summary.runId})`,
+          error
+        );
+      }
+    }
+
+    try {
       await this.manifestWriter.write(summary);
     } catch (error: unknown) {
       this.options.onError?.(error, summary);
       if (!this.options.onError) {
-        logger.error('PersistenceCoordinator error', error);
+        logger.error(
+          `PersistenceCoordinator manifest write error for task ${summary.taskId} (run ${summary.runId})`,
+          error
+        );
+      }
+      return;
+    }
+
+    if (stateStoreError) {
+      this.options.onError?.(stateStoreError, summary);
+      if (!this.options.onError) {
+        logger.warn(
+          `Task state snapshot not recorded for task ${summary.taskId} (run ${summary.runId})`
+        );
       }
     }
   }

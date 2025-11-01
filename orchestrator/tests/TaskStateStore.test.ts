@@ -1,8 +1,8 @@
 import { describe, expect, it, beforeEach } from 'vitest';
 import { join } from 'node:path';
-import { mkdtemp, readFile } from 'node:fs/promises';
+import { mkdtemp, readFile, writeFile, mkdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { TaskStateStore } from '../src/persistence/TaskStateStore.js';
+import { TaskStateStore, TaskStateStoreLockError } from '../src/persistence/TaskStateStore.js';
 import type { RunSummary } from '../src/types.js';
 import type { TaskStateSnapshot } from '../src/persistence/TaskStateStore.js';
 
@@ -71,5 +71,19 @@ describe('TaskStateStore', () => {
 
     expect(state.runs.map((run) => run.runId)).toEqual([olderRun.runId, newerRun.runId]);
     expect(state.lastRunAt).toBe(newerRun.timestamp);
+  });
+
+  it('retries lock acquisition before throwing a TaskStateStoreLockError', async () => {
+    const store = new TaskStateStore({
+      runsDir,
+      outDir,
+      lockRetry: { maxAttempts: 3, initialDelayMs: 1, maxDelayMs: 1 }
+    });
+
+    await mkdir(runsDir, { recursive: true });
+    const lockPath = join(runsDir, '0001.lock');
+    await writeFile(lockPath, 'locked', 'utf-8');
+
+    await expect(store.recordRun(createRunSummary())).rejects.toBeInstanceOf(TaskStateStoreLockError);
   });
 });

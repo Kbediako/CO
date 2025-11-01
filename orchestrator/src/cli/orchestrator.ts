@@ -49,6 +49,7 @@ import type { RunPaths } from './run/runPaths.js';
 import { resolveRunPaths, relativeToRepo } from './run/runPaths.js';
 import { logger } from '../logger.js';
 
+const HEARTBEAT_MANIFEST_THROTTLE_MS = 30_000;
 interface ExecutePipelineOptions {
   env: EnvironmentPaths;
   pipeline: PipelineDefinition;
@@ -259,14 +260,29 @@ export class CodexOrchestrator {
     await saveManifest(paths, manifest);
     await writeHeartbeatFile(paths, manifest);
 
-    const heartbeatInterval = setInterval(() => {
-      try {
+    let heartbeatWrite = Promise.resolve();
+    let lastHeartbeatManifestPersistMs = Date.now();
+    const enqueueHeartbeat = (forceManifest = false) => {
+      heartbeatWrite = heartbeatWrite.then(async () => {
         updateHeartbeat(manifest);
-        void saveManifest(paths, manifest);
-        void writeHeartbeatFile(paths, manifest);
-      } catch (error) {
-        logger.warn(`Heartbeat update failed: ${(error as Error)?.message ?? String(error)}`);
-      }
+        try {
+          const now = Date.now();
+          if (forceManifest || now - lastHeartbeatManifestPersistMs >= HEARTBEAT_MANIFEST_THROTTLE_MS) {
+            await saveManifest(paths, manifest);
+            lastHeartbeatManifestPersistMs = now;
+          }
+          await writeHeartbeatFile(paths, manifest);
+        } catch (error) {
+          logger.warn(
+            `Heartbeat update failed for run ${manifest.run_id}: ${(error as Error)?.message ?? String(error)}`
+          );
+        }
+      });
+      return heartbeatWrite;
+    };
+
+    const heartbeatInterval = setInterval(() => {
+      void enqueueHeartbeat(false);
     }, manifest.heartbeat_interval_seconds * 1000);
 
     try {
@@ -336,6 +352,7 @@ export class CodexOrchestrator {
       }
     } finally {
       clearInterval(heartbeatInterval);
+      await heartbeatWrite;
     }
 
     if (success) {
@@ -349,6 +366,7 @@ export class CodexOrchestrator {
       appendSummary(manifest, recommendation);
     }
 
+    await enqueueHeartbeat(true);
     await saveManifest(paths, manifest);
     await appendMetricsEntry(env, paths, manifest);
 
