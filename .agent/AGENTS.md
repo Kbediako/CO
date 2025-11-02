@@ -40,4 +40,4 @@
 ### Database Safety Safeguards
 - Treat production data as immutable; require read-only replicas or sanitized fixtures for testing.
 - Follow `.agent/SOPs/db-migration.md` for expand/contract rollouts with backups and verification gates.
-- Gate schema changes behind peer review plus sign-off recorded in `/tasks` manifests..
+- Gate schema changes behind peer review plus sign-off recorded in `/tasks` manifests.
