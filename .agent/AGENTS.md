@@ -37,6 +37,13 @@
 - Use templates in `.agent/task/templates/` to draft PRDs, task lists, mini-specs, and research notes.
 - Run `scripts/spec-guard.sh` before opening reviews to ensure specs stay in sync with code changes.
 
+## Project 0303 — Codex Orchestrator Autonomy Enhancements
+- Set `MCP_RUNNER_TASK_ID=0303-orchestrator-autonomy` for all diagnostics and orchestrator executions; confirm manifests land in `.runs/0303-orchestrator-autonomy/cli/`.
+- Log approvals/escalations inside each run manifest and reference the same path when you flip checkmarks in `tasks/tasks-0303-orchestrator-autonomy.md`, `docs/TASKS.md`, and `.agent/task/0303-orchestrator-autonomy.md`.
+- Keep metrics in `.runs/0303-orchestrator-autonomy/metrics.json` and summarize outcomes in `out/0303-orchestrator-autonomy/state.json`; update docs when these files change.
+- Before requesting review, run `bash scripts/spec-guard.sh --dry-run`, `npm run lint`, `npm run test`, and `npm run eval:test` (if fixtures exist), then capture the manifest path documenting those executions.
+- Follow `.agent/SOPs/orchestrator-autonomy.md` for guardrail, evidence, and hand-off requirements specific to Task 0303.
+
 ### Database Safety Safeguards
 - Treat production data as immutable; require read-only replicas or sanitized fixtures for testing.
 - Follow `.agent/SOPs/db-migration.md` for expand/contract rollouts with backups and verification gates.

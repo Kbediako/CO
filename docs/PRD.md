@@ -1,3 +1,13 @@
+# PRD Overview — Codex Orchestrator Projects
+
+## Task 0303 — Codex Orchestrator Autonomy Enhancements
+- Primary Doc: `docs/PRD-codex-orchestrator-autonomy.md`
+- Run Manifest Link: _(pending — capture first diagnostics run under `.runs/0303-orchestrator-autonomy/cli/<run-id>/manifest.json`)._
+- Metrics / State Snapshots: _(pending — populate `.runs/0303-orchestrator-autonomy/metrics.json` and `out/0303-orchestrator-autonomy/state.json` as execution begins)._
+- Checklist Mirror: `tasks/tasks-0303-orchestrator-autonomy.md`, `.agent/task/0303-orchestrator-autonomy.md`, `docs/TASKS.md` (0303 section).
+
+---
+
 # PRD — Codex Orchestrator Resilience Hardening (Task 0202)
 
 ## Summary

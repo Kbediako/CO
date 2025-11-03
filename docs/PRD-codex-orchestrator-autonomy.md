@@ -1,4 +1,4 @@
-# PRD — Codex Orchestrator Autonomy Enhancements (Task TBD)
+# PRD — Codex Orchestrator Autonomy Enhancements (Task 0303)
 
 ## Summary
 - Problem Statement: Our orchestrator lacks the unified tooling, telemetry, and automation hooks present in Codex CLI, leading to inconsistent approvals, fragmented command streaming, and limited CI/SDK integrations.
@@ -16,6 +16,10 @@
 - Forcing approval presets beyond the user’s global configuration or introducing auto-approval in restricted environments.
 - Replacing existing persistence layers or manifest formats beyond the event additions needed for streaming/telemetry.
 - Shipping a graphical UI; scope is CLI, SDK, and manifest outputs.
+
+## Documentation & Evidence
+- Run Manifest Link: _(pending — capture first diagnostics run under `.runs/0303-orchestrator-autonomy/cli/<run-id>/manifest.json`)._
+- Metrics / State Snapshots: _(pending — populate `.runs/0303-orchestrator-autonomy/metrics.json` and `out/0303-orchestrator-autonomy/state.json` after initial run)._
 
 ## Stakeholders
 - Product: Platform Enablement (TBD)
