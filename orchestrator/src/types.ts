@@ -90,6 +90,8 @@ export interface ReviewResult {
   decision: ReviewDecision;
 }
 
+import type { ToolRunRecord } from '../../packages/shared/manifest/types.js';
+
 export interface RunSummary {
   taskId: string;
   runId: string;
@@ -99,6 +101,7 @@ export interface RunSummary {
   test: TestResult;
   review: ReviewResult;
   timestamp: string;
+  toolRuns?: ToolRunRecord[];
 }
 
 export interface PlannerAgent {

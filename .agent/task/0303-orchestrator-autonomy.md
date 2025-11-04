@@ -25,12 +25,12 @@
 2. **Tool Orchestrator Layer**
    - Subtask: Implement `ToolOrchestrator`
      - Files: `packages/orchestrator/src/tool-orchestrator.ts`, `packages/shared/manifest/writer.ts`
-     - Acceptance: Approval cache reuse + sandbox retry recorded in manifest; Evidence: _(pending)._
-     - [ ] Status: _(pending)_
+     - Acceptance: Approval cache reuse + sandbox retry recorded in manifest; Evidence: `.runs/0303-orchestrator-autonomy/cli/2025-11-04T01-16-58-286Z-eeec1865/manifest.json`.
+     - [x] Status: _completed 2025-11-04_
    - Subtask: Persist approval/retry metadata
      - Files: `schemas/manifest.json`, `tests/**`
-     - Acceptance: `toolRuns[].approvalSource|retryCount|sandboxState` populated with tests; Evidence: _(pending)._
-     - [ ] Status: _(pending)_
+     - Acceptance: `toolRuns[].approvalSource|retryCount|sandboxState` populated with tests; Evidence: `.runs/0303-orchestrator-autonomy/cli/2025-11-04T01-16-58-286Z-eeec1865/manifest.json`.
+     - [x] Status: _completed 2025-11-04_
 3. **Unified Exec Runtime**
    - Subtask: Build `ExecSessionManager`
      - Files: `packages/orchestrator/src/exec/session-manager.ts`

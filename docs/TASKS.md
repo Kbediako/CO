@@ -1,6 +1,7 @@
 # Task List Snapshot — Codex Orchestrator Autonomy Enhancements (0303)
 
 - **Update — 2025-11-04:** Diagnostics-with-eval pipeline `2025-11-04T00-46-22-699Z-8be8efb9` captured the full guardrail suite (build/lint/test/eval/spec-guard); manifest at `.runs/0303-orchestrator-autonomy/cli/2025-11-04T00-46-22-699Z-8be8efb9/manifest.json`.
+- **Update — 2025-11-04:** Tool orchestrator layer implemented with manifest evidence `.runs/0303-orchestrator-autonomy/cli/2025-11-04T01-16-58-286Z-eeec1865/manifest.json`.
 - **Gate Status:** Planning approved — greenlight to begin ToolOrchestrator implementation. Evidence: `.runs/0303-orchestrator-autonomy/cli/2025-11-04T00-46-22-699Z-8be8efb9/manifest.json`.
 - **Notes:** Metrics recorded at `.runs/0303-orchestrator-autonomy/metrics.json`; state snapshot refreshed at `out/0303-orchestrator-autonomy/state.json`.
 
@@ -13,8 +14,8 @@ Mirror status with `tasks/tasks-0303-orchestrator-autonomy.md` and `.agent/task/
 - [x] Environment defaults — `MCP_RUNNER_TASK_ID` exported in shell / CI and recorded in diagnostics manifest task id + approval profile; Evidence: `.runs/0303-orchestrator-autonomy/cli/2025-11-04T00-31-05-908Z-9d1b561c/manifest.json` (manifest records `approval_policy: read/edit/run/network`).
 
 ### Tool Orchestrator Layer
-- [ ] Implement centralized `ToolOrchestrator` service with approval cache reuse and sandbox retry policy; Evidence: _(pending — reference manifest + tests when merged)._
-- [ ] Persist approval/retry metadata into manifests (`toolRuns[].approvalSource`, `toolRuns[].retryCount`, `toolRuns[].sandboxState`) with unit coverage; Evidence: _(pending)._
+- [x] Implement centralized `ToolOrchestrator` service with approval cache reuse and sandbox retry policy; Evidence: `.runs/0303-orchestrator-autonomy/cli/2025-11-04T01-16-58-286Z-eeec1865/manifest.json`.
+- [x] Persist approval/retry metadata into manifests (`toolRuns[].approvalSource`, `toolRuns[].retryCount`, `toolRuns[].sandboxState`) with unit coverage; Evidence: `.runs/0303-orchestrator-autonomy/cli/2025-11-04T01-16-58-286Z-eeec1865/manifest.json`.
 
 ### Unified Exec Runtime
 - [ ] Build `ExecSessionManager` supporting reusable PTY handles, opt-out flows, and environment snapshots; Evidence: _(pending)._

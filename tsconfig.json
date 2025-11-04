@@ -15,6 +15,7 @@
   "include": [
     "orchestrator/src/**/*.ts",
     "orchestrator/tests/**/*.ts",
+    "packages/**/*.ts",
     "adapters/**/*.ts",
     "evaluation/**/*.ts",
     "scripts/**/*.ts",
