@@ -19,6 +19,11 @@ export interface CommandStage {
   env?: Record<string, string>;
   allowFailure?: boolean;
   summaryHint?: string;
+  session?: {
+    id?: string;
+    reuse?: boolean;
+    persist?: boolean;
+  };
 }
 
 export interface SubPipelineStage {

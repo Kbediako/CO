@@ -1,6 +1,6 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
-import type { ToolRunManifest, ToolRunRecord } from './types.js';
+import type { ToolRunEvent, ToolRunManifest, ToolRunRecord } from './types.js';
 
 export interface PersistToolRunOptions {
   read?: (path: string, encoding: 'utf-8') => Promise<string>;
@@ -12,7 +12,8 @@ export function sanitizeToolRunRecord(record: ToolRunRecord): ToolRunRecord {
   const { metadata, ...rest } = record;
   const sanitized: ToolRunRecord = {
     ...rest,
-    metadata: metadata ? { ...metadata } : undefined
+    metadata: metadata ? { ...metadata } : undefined,
+    events: record.events ? record.events.map(sanitizeToolRunEvent) : undefined
   };
   if (!sanitized.id) {
     throw new Error('Tool run record must include an id.');
@@ -27,6 +28,42 @@ export function sanitizeToolRunRecord(record: ToolRunRecord): ToolRunRecord {
     sanitized.attemptCount = 1;
   }
   return sanitized;
+}
+
+export function sanitizeToolRunEvent(event: ToolRunEvent): ToolRunEvent {
+  if (!event.timestamp) {
+    throw new Error('Tool run events must include a timestamp.');
+  }
+  if (!event.correlationId) {
+    throw new Error('Tool run events must include a correlationId.');
+  }
+  if (event.attempt < 1) {
+    throw new Error('Tool run events must reference an attempt greater than or equal to 1.');
+  }
+
+  switch (event.type) {
+    case 'exec:begin':
+      return { ...event };
+    case 'exec:chunk':
+      if (event.sequence < 1) {
+        throw new Error('exec:chunk events must have a positive sequence value.');
+      }
+      if (event.bytes < 0) {
+        throw new Error('exec:chunk events must report a non-negative byte count.');
+      }
+      return { ...event };
+    case 'exec:end':
+      return { ...event };
+    case 'exec:retry':
+      if (event.delayMs < 0) {
+        throw new Error('exec:retry events must report a non-negative delay.');
+      }
+      return { ...event };
+    default: {
+      const exhaustive: never = event;
+      return exhaustive;
+    }
+  }
 }
 
 export function mergeToolRunRecord(manifest: ToolRunManifest, record: ToolRunRecord): ToolRunManifest {

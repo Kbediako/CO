@@ -1,9 +1,9 @@
-import { spawn } from 'node:child_process';
 import { createWriteStream } from 'node:fs';
 import { join } from 'node:path';
 
-import type { CommandStage } from '../types.js';
-import type { CliManifest } from '../types.js';
+import type { ExecEvent } from '../../../../packages/orchestrator/src/index.js';
+import { getCliExecRunner } from './execRuntime.js';
+import type { CommandStage, CliManifest } from '../types.js';
 import type { EnvironmentPaths } from '../run/environment.js';
 import type { RunPaths } from '../run/runPaths.js';
 import { relativeToRepo } from '../run/runPaths.js';
@@ -15,7 +15,7 @@ import {
 import { slugify } from '../utils/strings.js';
 import { isoTimestamp } from '../utils/time.js';
 
-const MAX_BUFFERED_OUTPUT_CHARS = 64 * 1024;
+const MAX_BUFFERED_OUTPUT_BYTES = 64 * 1024;
 
 export interface CommandRunnerContext {
   env: EnvironmentPaths;
@@ -55,86 +55,193 @@ export async function runCommandStage(context: CommandRunnerContext): Promise<Co
 
   writeEvent({ type: 'command:start', command: stage.command });
 
-  const child = spawn(stage.command, {
-    shell: true,
-    cwd: stage.cwd ?? env.repoRoot,
-    env: { ...process.env, ...stage.env }
-  });
+  const runner = getCliExecRunner();
 
-  let stdoutBuffer = '';
-  let stderrBuffer = '';
+  let activeCorrelationId: string | null = null;
+  let stdoutBytes = 0;
+  let stderrBytes = 0;
   let stdoutTruncated = false;
   let stderrTruncated = false;
 
-  child.stdout?.setEncoding('utf8');
-  child.stderr?.setEncoding('utf8');
-
-  child.stdout?.on('data', (chunk: string) => {
-    const result = appendWithLimit(stdoutBuffer, chunk, MAX_BUFFERED_OUTPUT_CHARS);
-    stdoutBuffer = result.buffer;
-    stdoutTruncated = stdoutTruncated || result.truncated;
-    writeEvent({ type: 'command:stdout', data: chunk });
-  });
-
-  child.stderr?.on('data', (chunk: string) => {
-    const result = appendWithLimit(stderrBuffer, chunk, MAX_BUFFERED_OUTPUT_CHARS);
-    stderrBuffer = result.buffer;
-    stderrTruncated = stderrTruncated || result.truncated;
-    writeEvent({ type: 'command:stderr', data: chunk });
-  });
-
-  const exitCode: number = await new Promise((resolve, reject) => {
-    child.on('error', (error) => {
-      reject(error);
-    });
-    child.on('close', (code) => {
-      resolve(code ?? 0);
-    });
-  });
-
-  writeEvent({ type: 'command:end', exit_code: exitCode });
-
-  runnerLog.end();
-  commandLog.end();
-
-  const stdoutText = stdoutBuffer.trim();
-  const stderrText = stderrBuffer.trim();
-  const summary = buildSummary(stage, exitCode, stdoutText, stderrText);
-
-  entry.completed_at = isoTimestamp();
-  entry.exit_code = exitCode;
-  entry.summary = summary;
-  entry.status = exitCode === 0 ? 'succeeded' : stage.allowFailure ? 'skipped' : 'failed';
-
-  if (entry.status === 'failed') {
-    const errorDetails: Record<string, unknown> = {
-      exit_code: exitCode,
-      stderr: stderrText
-    };
-    if (stdoutTruncated) {
-      errorDetails.stdout_truncated = true;
+  const handleEvent = (event: ExecEvent) => {
+    if (!activeCorrelationId) {
+      activeCorrelationId = event.correlationId;
     }
-    if (stderrTruncated) {
-      errorDetails.stderr_truncated = true;
+    if (event.correlationId !== activeCorrelationId) {
+      return;
     }
-    entry.error_file = await appendCommandError(
-      env,
-      paths,
-      manifest,
-      entry,
-      'command-failed',
-      errorDetails
-    );
+    streamEvent(writeEvent, event, {
+      onStdout: (bytes) => {
+        stdoutBytes += bytes;
+        stdoutTruncated = stdoutTruncated || stdoutBytes > MAX_BUFFERED_OUTPUT_BYTES;
+      },
+      onStderr: (bytes) => {
+        stderrBytes += bytes;
+        stderrTruncated = stderrTruncated || stderrBytes > MAX_BUFFERED_OUTPUT_BYTES;
+      }
+    });
+  };
+
+  const unsubscribe = runner.on(handleEvent);
+  try {
+    const sessionConfig = stage.session ?? {};
+    const sessionId = sessionConfig.id;
+    const wantsPersist = Boolean(sessionConfig.persist || sessionConfig.reuse);
+    const persistSession = Boolean(sessionId && wantsPersist);
+    const reuseSession = Boolean(sessionId && (sessionConfig.reuse ?? persistSession));
+
+    const execEnv: NodeJS.ProcessEnv = { ...process.env, ...stage.env };
+    const invocationId = `cli-command:${manifest.run_id}:${stage.id}:${Date.now()}`;
+
+    const result = await runner.run({
+      command: stage.command,
+      args: [],
+      cwd: stage.cwd ?? env.repoRoot,
+      env: execEnv,
+      sessionId: sessionId ?? undefined,
+      persistSession,
+      reuseSession,
+      invocationId,
+      toolId: 'cli:command',
+      description: stage.title,
+      metadata: {
+        stageId: stage.id,
+        pipelineId: manifest.pipeline_id,
+        runId: manifest.run_id,
+        commandIndex: entry.index
+      }
+    });
+
+    const normalizedExitCode =
+      result.exitCode ?? (result.signal ? 128 : 0);
+    const stdoutText = result.stdout.trim();
+    const stderrText = result.stderr.trim();
+    const summary = buildSummary(stage, normalizedExitCode, stdoutText, stderrText, result.signal);
+
+    entry.completed_at = isoTimestamp();
+    entry.exit_code = normalizedExitCode;
+    entry.summary = summary;
+    entry.status = result.status === 'succeeded' ? 'succeeded' : stage.allowFailure ? 'skipped' : 'failed';
+
+    if (entry.status === 'failed') {
+      const errorDetails: Record<string, unknown> = {
+        exit_code: normalizedExitCode,
+        sandbox_state: result.sandboxState,
+        stderr: stderrText
+      };
+      if (result.signal) {
+        errorDetails.signal = result.signal;
+      }
+      if (stdoutTruncated) {
+        errorDetails.stdout_truncated = true;
+      }
+      if (stderrTruncated) {
+        errorDetails.stderr_truncated = true;
+      }
+      entry.error_file = await appendCommandError(
+        env,
+        paths,
+        manifest,
+        entry,
+        'command-failed',
+        errorDetails
+      );
+    }
+
+    await saveManifest(paths, manifest);
+
+    return { exitCode: normalizedExitCode, summary };
+  } finally {
+    unsubscribe();
+    runnerLog.end();
+    commandLog.end();
   }
-
-  await saveManifest(paths, manifest);
-
-  return { exitCode, summary };
 }
 
-function buildSummary(stage: CommandStage, exitCode: number, stdout: string, stderr: string): string {
+function streamEvent(
+  writeEvent: (payload: Record<string, unknown>) => void,
+  event: ExecEvent,
+  hooks: { onStdout: (bytes: number) => void; onStderr: (bytes: number) => void }
+): void {
+  switch (event.type) {
+    case 'exec:begin':
+      writeEvent({
+        type: 'exec:begin',
+        correlation_id: event.correlationId,
+        attempt: event.attempt,
+        command: event.payload.command,
+        args: event.payload.args,
+        cwd: event.payload.cwd,
+        session_id: event.payload.sessionId,
+        sandbox_state: event.payload.sandboxState,
+        persisted: event.payload.persisted
+      });
+      break;
+    case 'exec:chunk': {
+      writeEvent({
+        type: 'exec:chunk',
+        correlation_id: event.correlationId,
+        attempt: event.attempt,
+        stream: event.payload.stream,
+        sequence: event.payload.sequence,
+        bytes: event.payload.bytes,
+        data: event.payload.data
+      });
+      writeEvent({
+        type: event.payload.stream === 'stdout' ? 'command:stdout' : 'command:stderr',
+        data: event.payload.data
+      });
+      if (event.payload.stream === 'stdout') {
+        hooks.onStdout(event.payload.bytes);
+      } else {
+        hooks.onStderr(event.payload.bytes);
+      }
+      break;
+    }
+    case 'exec:retry':
+      writeEvent({
+        type: 'exec:retry',
+        correlation_id: event.correlationId,
+        attempt: event.attempt,
+        delay_ms: event.payload.delayMs,
+        sandbox_state: event.payload.sandboxState,
+        error: event.payload.errorMessage
+      });
+      break;
+    case 'exec:end':
+      writeEvent({
+        type: 'exec:end',
+        correlation_id: event.correlationId,
+        attempt: event.attempt,
+        exit_code: event.payload.exitCode,
+        signal: event.payload.signal,
+        duration_ms: event.payload.durationMs,
+        status: event.payload.status
+      });
+      writeEvent({
+        type: 'command:end',
+        exit_code: event.payload.exitCode,
+        signal: event.payload.signal,
+        duration_ms: event.payload.durationMs
+      });
+      break;
+    default:
+      break;
+  }
+}
+
+function buildSummary(
+  stage: CommandStage,
+  exitCode: number,
+  stdout: string,
+  stderr: string,
+  signal: NodeJS.Signals | null
+): string {
   if (stage.summaryHint) {
     return stage.summaryHint;
+  }
+  if (signal) {
+    return `Terminated with signal ${signal}${stderr ? ` — ${truncate(stderr)}` : ''}`;
   }
   if (exitCode !== 0) {
     return `Exited with code ${exitCode}${stderr ? ` — ${truncate(stderr)}` : ''}`;
@@ -153,22 +260,4 @@ function truncate(value: string, length = 240): string {
     return value;
   }
   return `${value.slice(0, length)}…`;
-}
-
-function appendWithLimit(
-  buffer: string,
-  chunk: string,
-  maxLength: number
-): { buffer: string; truncated: boolean } {
-  if (!chunk) {
-    return { buffer, truncated: false };
-  }
-  const combined = buffer + chunk;
-  if (combined.length <= maxLength) {
-    return { buffer: combined, truncated: false };
-  }
-  return {
-    buffer: combined.slice(combined.length - maxLength),
-    truncated: true
-  };
 }

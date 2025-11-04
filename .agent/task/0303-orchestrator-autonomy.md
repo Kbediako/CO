@@ -34,12 +34,12 @@
 3. **Unified Exec Runtime**
    - Subtask: Build `ExecSessionManager`
      - Files: `packages/orchestrator/src/exec/session-manager.ts`
-     - Acceptance: Reusable PTY handles + opt-out flows validated via tests; Evidence: _(pending)._
-     - [ ] Status: _(pending)_
+     - Acceptance: Reusable PTY handles + opt-out flows validated via tests; Evidence: `.runs/0303-orchestrator-autonomy/cli/2025-11-04T01-59-37-568Z-8065982c/manifest.json`.
+     - [x] Status: _completed 2025-11-04_
    - Subtask: Streamed unified exec events
      - Files: `packages/orchestrator/src/exec/unified-exec.ts`, `packages/shared/streams/stdio.ts`
-     - Acceptance: Emits `exec:begin|chunk|end`, caps streams at 64 KiB, integrates sandbox retries; Evidence: _(pending)._
-     - [ ] Status: _(pending)_
+     - Acceptance: Emits `exec:begin|chunk|end`, caps streams at 64 KiB, integrates sandbox retries; Evidence: `.runs/0303-orchestrator-autonomy/cli/2025-11-04T01-59-37-568Z-8065982c/manifest.json`.
+     - [x] Status: _completed 2025-11-04_
 4. **CLI & SDK Interfaces**
    - Subtask: CLI `exec` command
      - Files: `cli/src/commands/exec.ts`, `docs/guides/ci-integration.md`
@@ -74,7 +74,7 @@
     - [x] Status: _completed 2025-11-04_
   - Subtask: Guardrail commands
     - Commands: `bash scripts/spec-guard.sh --dry-run`, `npm run lint`, `npm run test`, `npm run eval:test`
-    - Acceptance: Commands succeed with manifest/log evidence; Evidence: `.runs/0303-orchestrator-autonomy/cli/2025-11-04T00-46-22-699Z-8be8efb9/manifest.json` (diagnostics-with-eval pipeline captures build/lint/test/eval/spec-guard).
+    - Acceptance: Commands succeed with manifest/log evidence; Evidence: `.runs/0303-orchestrator-autonomy/cli/2025-11-04T02-29-08-856Z-ea703ea0/manifest.json` (diagnostics run captures guardrail execution summary).
     - [x] Status: _completed 2025-11-04_
    - Subtask: Reviewer hand-off
      - Commands: `npm run review`

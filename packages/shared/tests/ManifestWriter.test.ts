@@ -95,4 +95,56 @@ describe('manifest writer', () => {
     expect(manifest.toolRuns[0].approvalSource).toBe('prompt');
     expect(manifest.toolRuns[0].sandboxState).toBe('escalated');
   });
+
+  it('persists exec lifecycle events when present', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'manifest-writer-'));
+    const manifestPath = join(root, 'manifest.json');
+    const record = createRecord({
+      id: 'run-events',
+      events: [
+        {
+          type: 'exec:begin',
+          timestamp: '2025-11-04T00:00:00.000Z',
+          correlationId: 'corr-1',
+          attempt: 1,
+          command: 'echo',
+          args: ['hello'],
+          sessionId: 'session-1',
+          sandboxState: 'sandboxed',
+          persisted: true
+        },
+        {
+          type: 'exec:retry',
+          timestamp: '2025-11-04T00:00:00.750Z',
+          correlationId: 'corr-1',
+          attempt: 1,
+          delayMs: 500,
+          sandboxState: 'sandboxed',
+          errorMessage: 'network hiccup'
+        },
+        {
+          type: 'exec:end',
+          timestamp: '2025-11-04T00:00:01.000Z',
+          correlationId: 'corr-1',
+          attempt: 1,
+          exitCode: 0,
+          signal: null,
+          durationMs: 1000,
+          stdout: 'hello\n',
+          stderr: '',
+          sandboxState: 'sandboxed',
+          sessionId: 'session-1',
+          status: 'succeeded'
+        }
+      ]
+    });
+
+    await persistToolRunRecord(manifestPath, record);
+    const raw = await readFile(manifestPath, 'utf-8');
+    const manifest = JSON.parse(raw) as { toolRuns: ToolRunRecord[] };
+    expect(manifest.toolRuns[0].events).toHaveLength(3);
+    expect(manifest.toolRuns[0].events?.[0].type).toBe('exec:begin');
+    expect(manifest.toolRuns[0].events?.[1].type).toBe('exec:retry');
+    expect(manifest.toolRuns[0].events?.[2].type).toBe('exec:end');
+  });
 });
