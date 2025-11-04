@@ -1,7 +1,7 @@
 # Task List Snapshot — Codex Orchestrator Autonomy Enhancements (0303)
 
-- **Update — 2025-11-04:** Diagnostics-with-eval pipeline `2025-11-04T00-31-05-908Z-9d1b561c` captured approval profile plus eval harness; manifest at `.runs/0303-orchestrator-autonomy/cli/2025-11-04T00-31-05-908Z-9d1b561c/manifest.json`.
-- **Gate Status:** Planning in progress; awaiting ToolOrchestrator implementation kickoff.
+- **Update — 2025-11-04:** Diagnostics-with-eval pipeline `2025-11-04T00-46-22-699Z-8be8efb9` captured the full guardrail suite (build/lint/test/eval/spec-guard); manifest at `.runs/0303-orchestrator-autonomy/cli/2025-11-04T00-46-22-699Z-8be8efb9/manifest.json`.
+- **Gate Status:** Planning approved — greenlight to begin ToolOrchestrator implementation. Evidence: `.runs/0303-orchestrator-autonomy/cli/2025-11-04T00-46-22-699Z-8be8efb9/manifest.json`.
 - **Notes:** Metrics recorded at `.runs/0303-orchestrator-autonomy/metrics.json`; state snapshot refreshed at `out/0303-orchestrator-autonomy/state.json`.
 
 ## Checklist Mirror
@@ -33,8 +33,8 @@ Mirror status with `tasks/tasks-0303-orchestrator-autonomy.md` and `.agent/task/
 - [ ] Update manifest/config schemas for new fields and document JSONL event format; Evidence: _(pending)._
 
 ### Verification & Guardrails
-- [x] Run diagnostics (`npx codex-orchestrator start diagnostics --format json`) and record manifest link; Evidence: `.runs/0303-orchestrator-autonomy/cli/2025-11-03T23-58-59-546Z-49371323/manifest.json`.
-- [x] Guardrails — `bash scripts/spec-guard.sh --dry-run`, `npm run lint`, `npm run test`, `npm run eval:test` (when fixtures ready); Evidence: `.runs/0303-orchestrator-autonomy/cli/2025-11-04T00-31-05-908Z-9d1b561c/manifest.json` (pipeline records lint/test/eval/spec-guard under safe approval profile).
+- [x] Run diagnostics (`npx codex-orchestrator start diagnostics --format json`) and record manifest link; Evidence: `.runs/0303-orchestrator-autonomy/cli/2025-11-04T00-44-59-137Z-de57c4d7/manifest.json`.
+- [x] Guardrails — `bash scripts/spec-guard.sh --dry-run`, `npm run lint`, `npm run test`, `npm run eval:test` (when fixtures ready); Evidence: `.runs/0303-orchestrator-autonomy/cli/2025-11-04T00-46-22-699Z-8be8efb9/manifest.json` (pipeline recorded build/lint/test/eval/spec-guard suite).
 - [x] Reviewer hand-off — Execute `npm run review` using latest manifest; Evidence: `.runs/0303-orchestrator-autonomy/cli/2025-11-04T00-31-05-908Z-9d1b561c/manifest.json` (review outcome “Skip for now” logged).
 
 ---

@@ -2,8 +2,8 @@
 
 ## Status Snapshot
 - Current Phase: Planning (orchestrator autonomy backlog aligned, implementation pending).
-- Run Manifest Link: `.runs/0303-orchestrator-autonomy/cli/2025-11-04T00-31-05-908Z-9d1b561c/manifest.json` (diagnostics+eval pipeline capturing approval profile).
-- Metrics / State Snapshots: `.runs/0303-orchestrator-autonomy/metrics.json`, `out/0303-orchestrator-autonomy/state.json` (refreshed 2025-11-04T00:31:10Z diagnostics+eval run).
+- Run Manifest Link: `.runs/0303-orchestrator-autonomy/cli/2025-11-04T00-46-22-699Z-8be8efb9/manifest.json` (diagnostics-with-eval pipeline captured guardrail suite).
+- Metrics / State Snapshots: `.runs/0303-orchestrator-autonomy/metrics.json`, `out/0303-orchestrator-autonomy/state.json` (refreshed 2025-11-04T00:46:28Z diagnostics-with-eval run).
 - Approvals / Escalations: None to date; retain safe `read/edit/run/network` profile and record future escalations in run manifests.
 
 ## Milestones & Tasks

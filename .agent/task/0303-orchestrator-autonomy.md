@@ -70,11 +70,11 @@
 7. **Verification & Rollout**
   - Subtask: Diagnostics
     - Commands: `npx codex-orchestrator start diagnostics --format json`
-    - Acceptance: Manifest appended to `.runs/0303-orchestrator-autonomy/cli/<run-id>/manifest.json`; Evidence: `.runs/0303-orchestrator-autonomy/cli/2025-11-03T23-58-59-546Z-49371323/manifest.json`.
-    - [x] Status: _completed 2025-11-03_
+    - Acceptance: Manifest appended to `.runs/0303-orchestrator-autonomy/cli/<run-id>/manifest.json`; Evidence: `.runs/0303-orchestrator-autonomy/cli/2025-11-04T00-44-59-137Z-de57c4d7/manifest.json`.
+    - [x] Status: _completed 2025-11-04_
   - Subtask: Guardrail commands
     - Commands: `bash scripts/spec-guard.sh --dry-run`, `npm run lint`, `npm run test`, `npm run eval:test`
-    - Acceptance: Commands succeed with manifest/log evidence; Evidence: `.runs/0303-orchestrator-autonomy/cli/2025-11-04T00-31-05-908Z-9d1b561c/manifest.json` (pipeline records lint/test/eval/spec-guard under safe approval profile).
+    - Acceptance: Commands succeed with manifest/log evidence; Evidence: `.runs/0303-orchestrator-autonomy/cli/2025-11-04T00-46-22-699Z-8be8efb9/manifest.json` (diagnostics-with-eval pipeline captures build/lint/test/eval/spec-guard).
     - [x] Status: _completed 2025-11-04_
    - Subtask: Reviewer hand-off
      - Commands: `npm run review`

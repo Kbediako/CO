@@ -127,6 +127,6 @@
 ## Evidence & Links
 - PRD: `docs/PRD-codex-orchestrator-autonomy.md`
 - Task Checklist: `tasks/tasks-0303-orchestrator-autonomy.md`
-- Run Manifest Link: `.runs/0303-orchestrator-autonomy/cli/2025-11-04T00-31-05-908Z-9d1b561c/manifest.json` (diagnostics+eval pipeline with approval profile recorded).
-- Metrics / State Snapshots: `.runs/0303-orchestrator-autonomy/metrics.json`, `out/0303-orchestrator-autonomy/state.json` (updated 2025-11-04T00:31:10Z diagnostics+eval run).
+- Run Manifest Link: `.runs/0303-orchestrator-autonomy/cli/2025-11-04T00-46-22-699Z-8be8efb9/manifest.json` (diagnostics-with-eval pipeline captured build/lint/test/eval/spec-guard run).
+- Metrics / State Snapshots: `.runs/0303-orchestrator-autonomy/metrics.json`, `out/0303-orchestrator-autonomy/state.json` (updated 2025-11-04T00:46:28Z diagnostics-with-eval run).
 - Spec Guard Run: `.runs/0303-orchestrator-autonomy/cli/2025-11-03T23-58-59-546Z-49371323/manifest.json` (spec-guard command captured in diagnostics run).
