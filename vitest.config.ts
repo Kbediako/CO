@@ -6,6 +6,7 @@ export default defineConfig({
     include: [
       'orchestrator/tests/**/*.test.ts',
       'packages/orchestrator/tests/**/*.test.ts',
+      'packages/sdk-node/tests/**/*.test.ts',
       'packages/shared/tests/**/*.test.ts',
       'patterns/**/*.test.ts',
       'adapters/**/*.test.ts',

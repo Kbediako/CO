@@ -1,0 +1,224 @@
+import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
+import { EventEmitter } from 'node:events';
+import { createInterface } from 'node:readline';
+import { PassThrough } from 'node:stream';
+
+import type { JsonlEvent, RunSummaryEvent, RunSummaryEventPayload } from '../../shared/events/types.js';
+
+export interface ExecClientOptions {
+  cliPath?: string;
+  cwd?: string;
+  env?: NodeJS.ProcessEnv;
+}
+
+export interface ExecCommandOptions {
+  command: string;
+  args?: string[];
+  cwd?: string;
+  env?: NodeJS.ProcessEnv;
+  notify?: string[];
+  otelEndpoint?: string;
+  taskId?: string;
+}
+
+export interface ExecRunResult {
+  summary: RunSummaryEvent;
+  events: JsonlEvent[];
+  exitCode: number | null;
+  status: 'succeeded' | 'failed';
+  manifestPath: string;
+  rawStderr: string[];
+}
+
+interface InternalExecOptions extends ExecCommandOptions {
+  cliPath: string;
+  spawnCwd: string;
+  inheritedEnv: NodeJS.ProcessEnv;
+}
+
+export class ExecClient {
+  private readonly cliPath: string;
+  private readonly cwd: string;
+  private readonly baseEnv: NodeJS.ProcessEnv;
+
+  constructor(options: ExecClientOptions = {}) {
+    this.cliPath = options.cliPath ?? 'codex-orchestrator';
+    this.cwd = options.cwd ?? process.cwd();
+    this.baseEnv = { ...process.env, ...options.env };
+  }
+
+  run(options: ExecCommandOptions): ExecRunHandle {
+    if (!options.command) {
+      throw new Error('Exec command requires a command to run.');
+    }
+    const internal = this.normalizeOptions(options);
+    const child = spawn(internal.cliPath, buildCliArgs(internal), {
+      cwd: internal.spawnCwd,
+      env: internal.inheritedEnv,
+      stdio: ['pipe', 'pipe', 'pipe']
+    });
+    return new ExecRunHandle(this, internal, child);
+  }
+
+  private normalizeOptions(options: ExecCommandOptions): InternalExecOptions {
+    const spawnCwd = this.cwd;
+    const mergedEnv = { ...this.baseEnv, ...options.env };
+    return {
+      ...options,
+      cliPath: this.cliPath,
+      spawnCwd,
+      inheritedEnv: mergedEnv
+    };
+  }
+}
+
+export class ExecRunHandle extends EventEmitter {
+  private readonly child: ChildProcessWithoutNullStreams;
+  private readonly eventsList: JsonlEvent[] = [];
+  private readonly stderrLines: string[] = [];
+  private summaryEvent: RunSummaryEvent | null = null;
+  private readonly resultPromise: Promise<ExecRunResult>;
+  private resolveResult!: (value: ExecRunResult) => void;
+  private rejectResult!: (reason: unknown) => void;
+
+  constructor(
+    private readonly client: ExecClient,
+    private readonly baseOptions: InternalExecOptions,
+    child: ChildProcessWithoutNullStreams
+  ) {
+    super();
+    this.child = child;
+    this.resultPromise = new Promise<ExecRunResult>((resolve, reject) => {
+      this.resolveResult = resolve;
+      this.rejectResult = reject;
+    });
+
+    const stdout = child.stdout ?? new PassThrough();
+    const stderr = child.stderr ?? new PassThrough();
+
+    const rl = createInterface({ input: stdout, crlfDelay: Infinity });
+    rl.on('line', (line) => {
+      const trimmed = line.trim();
+      if (!trimmed) {
+        return;
+      }
+      let parsed: JsonlEvent;
+      try {
+        parsed = JSON.parse(trimmed) as JsonlEvent;
+      } catch (error) {
+        this.emit('warning', new Error(`Failed to parse JSONL line: ${trimmed}`));
+        return;
+      }
+      this.eventsList.push(parsed);
+      this.emit('event', parsed);
+      if (parsed.type === 'run:summary') {
+        this.summaryEvent = parsed as RunSummaryEvent;
+        this.resolveResult(this.buildResult());
+        this.emit('summary', this.summaryEvent);
+      }
+    });
+
+    stderr.on('data', (chunk: Buffer | string) => {
+      const text = chunk.toString();
+      this.stderrLines.push(text.trim());
+      this.emit('stderr', text);
+    });
+
+    child.once('error', (error) => {
+      this.emit('error', error);
+      this.rejectResult(error);
+    });
+
+    child.once('close', (code, signal) => {
+      this.emit('exit', { code, signal });
+      if (!this.summaryEvent) {
+        const error = new Error('Exec command exited without emitting a summary event.') as Error & {
+          exitCode?: number | null;
+          signal?: NodeJS.Signals | null;
+        };
+        error.exitCode = code ?? null;
+        error.signal = signal ?? null;
+        this.rejectResult(error);
+      }
+    });
+  }
+
+  get events(): readonly JsonlEvent[] {
+    return this.eventsList;
+  }
+
+  get summary(): RunSummaryEvent | null {
+    return this.summaryEvent;
+  }
+
+  get result(): Promise<ExecRunResult> {
+    return this.resultPromise;
+  }
+
+  cancel(signal: NodeJS.Signals | number = 'SIGTERM'): void {
+    if (!this.child.killed) {
+      this.child.kill(signal);
+    }
+  }
+
+  retry(overrides: Partial<ExecCommandOptions> = {}): ExecRunHandle {
+    const merged: ExecCommandOptions = {
+      ...this.baseOptions,
+      ...overrides
+    };
+    delete (merged as Partial<InternalExecOptions>).cliPath;
+    delete (merged as Partial<InternalExecOptions>).spawnCwd;
+    delete (merged as Partial<InternalExecOptions>).inheritedEnv;
+    return this.client.run(merged);
+  }
+
+  private buildResult(): ExecRunResult {
+    if (!this.summaryEvent) {
+      throw new Error('Summary not available');
+    }
+    const payload = this.summaryEvent.payload as RunSummaryEventPayload;
+    return {
+      summary: this.summaryEvent,
+      events: [...this.eventsList],
+      exitCode: payload.result.exitCode ?? null,
+      status: payload.status,
+      manifestPath: payload.run.manifest,
+      rawStderr: [...this.stderrLines]
+    };
+  }
+}
+
+export function deriveRetryOptions(summary: RunSummaryEvent): ExecCommandOptions {
+  const payload = summary.payload as RunSummaryEventPayload;
+  const command = payload.command;
+  const argv = Array.isArray(command.argv) && command.argv.length > 0 ? command.argv : [command.shell];
+  const [first, ...rest] = argv;
+  return {
+    command: first ?? '',
+    args: rest,
+    cwd: command.cwd ?? undefined,
+    notify: payload.notifications?.targets ?? undefined,
+    taskId: payload.run.taskId ?? undefined
+  };
+}
+
+function buildCliArgs(options: InternalExecOptions): string[] {
+  const args: string[] = ['exec', '--jsonl'];
+  if (options.taskId) {
+    args.push('--task', options.taskId);
+  }
+  if (options.cwd) {
+    args.push('--cwd', options.cwd);
+  }
+  if (options.otelEndpoint) {
+    args.push('--otel-endpoint', options.otelEndpoint);
+  }
+  if (options.notify) {
+    for (const target of options.notify) {
+      args.push('--notify', target);
+    }
+  }
+  args.push('--');
+  args.push(options.command, ...(options.args ?? []));
+  return args;
+}

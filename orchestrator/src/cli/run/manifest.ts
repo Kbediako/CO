@@ -14,6 +14,7 @@ import type {
 import { writeJsonAtomic } from '../utils/fs.js';
 import { slugify } from '../utils/strings.js';
 import { isoTimestamp } from '../utils/time.js';
+import { loadInstructionSet } from '../../../../packages/orchestrator/src/instructions/loader.js';
 import type { EnvironmentPaths } from './environment.js';
 import type { RunPaths } from './runPaths.js';
 import { resolveRunPaths, relativeToRepo } from './runPaths.js';
@@ -77,8 +78,14 @@ export async function bootstrapManifest(runId: string, options: ManifestBootstra
     approvals: [],
     commands,
     child_runs: [],
-    run_summary_path: null
+    run_summary_path: null,
+    instructions_hash: null,
+    instructions_sources: []
   };
+
+  const instructions = await loadInstructionSet(env.repoRoot);
+  manifest.instructions_hash = instructions.hash || null;
+  manifest.instructions_sources = instructions.sources.map((source) => source.path);
 
   await writeJsonAtomic(paths.manifestPath, manifest);
   await writeFile(paths.resumeTokenPath, `${resumeToken}\n`, 'utf8');

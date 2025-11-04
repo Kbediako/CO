@@ -3,6 +3,11 @@ import process from 'node:process';
 
 import { CodexOrchestrator } from '../orchestrator/src/cli/orchestrator.js';
 import { formatPlanPreview } from '../orchestrator/src/cli/utils/planFormatter.js';
+import {
+  executeExecCommand,
+  type ExecOutputMode
+} from '../orchestrator/src/cli/exec/command.js';
+import { resolveEnvironment, sanitizeTaskId } from '../orchestrator/src/cli/run/environment.js';
 
 type ArgMap = Record<string, string | boolean>;
 
@@ -30,6 +35,9 @@ async function main(): Promise<void> {
       case 'status':
         await handleStatus(orchestrator, args);
         break;
+      case 'exec':
+        await handleExec(args);
+        break;
       default:
         console.error(`Unknown command: ${command}`);
         printHelp();
@@ -48,6 +56,10 @@ function parseArgs(raw: string[]): { positionals: string[]; flags: ArgMap } {
   while (queue.length > 0) {
     const token = queue.shift();
     if (!token) {
+      break;
+    }
+    if (token === '--') {
+      positionals.push(...queue);
       break;
     }
     if (!token.startsWith('--')) {
@@ -145,6 +157,170 @@ async function handleStatus(orchestrator: CodexOrchestrator, rawArgs: string[]):
   }
 }
 
+interface ParsedExecArgs {
+  commandTokens: string[];
+  notifyTargets: string[];
+  otelEndpoint: string | null;
+  requestedMode: ExecOutputMode | null;
+  jsonPretty: boolean;
+  cwd?: string;
+  taskId?: string;
+}
+
+async function handleExec(rawArgs: string[]): Promise<void> {
+  const parsed = parseExecArgs(rawArgs);
+  if (parsed.commandTokens.length === 0) {
+    throw new Error('exec requires a command to run.');
+  }
+
+  const isInteractive = process.stdout.isTTY === true && process.stderr.isTTY === true;
+  const outputMode: ExecOutputMode =
+    parsed.requestedMode ?? (isInteractive ? 'interactive' : 'jsonl');
+
+  const env = resolveEnvironment();
+  if (parsed.taskId) {
+    env.taskId = sanitizeTaskId(parsed.taskId);
+  }
+
+  const context = {
+    env,
+    stdout: process.stdout,
+    stderr: process.stderr
+  };
+
+  const invocation = {
+    command: parsed.commandTokens[0]!,
+    args: parsed.commandTokens.slice(1),
+    cwd: parsed.cwd,
+    outputMode,
+    notifyTargets: parsed.notifyTargets,
+    otelEndpoint: parsed.otelEndpoint,
+    jsonPretty: parsed.jsonPretty
+  };
+
+  const result = await executeExecCommand(context, invocation);
+  if (result.exitCode !== null) {
+    process.exitCode = result.exitCode;
+  } else if (result.status !== 'succeeded') {
+    process.exitCode = 1;
+  }
+}
+
+function parseExecArgs(rawArgs: string[]): ParsedExecArgs {
+  const notifyTargets: string[] = [];
+  let otelEndpoint: string | null = null;
+  let requestedMode: ExecOutputMode | null = null;
+  let jsonPretty = true;
+  let cwd: string | undefined;
+  let taskId: string | undefined;
+  const commandTokens: string[] = [];
+  let afterDoubleDash = false;
+
+  const readValue = (currentIndex: number, inlineValue: string | undefined): { value: string | null; nextIndex: number } => {
+    if (typeof inlineValue === 'string') {
+      return { value: inlineValue, nextIndex: currentIndex };
+    }
+    const nextToken = rawArgs[currentIndex + 1];
+    if (nextToken && !nextToken.startsWith('--')) {
+      return { value: nextToken, nextIndex: currentIndex + 1 };
+    }
+    return { value: null, nextIndex: currentIndex };
+  };
+
+  for (let i = 0; i < rawArgs.length; i += 1) {
+    const token = rawArgs[i]!;
+    if (afterDoubleDash) {
+      commandTokens.push(token);
+      continue;
+    }
+    if (token === '--') {
+      afterDoubleDash = true;
+      continue;
+    }
+    if (!token.startsWith('--')) {
+      commandTokens.push(token);
+      continue;
+    }
+    const [rawKey, inlineValue] = token.slice(2).split('=', 2);
+    switch (rawKey) {
+      case 'json': {
+        if (requestedMode && requestedMode !== 'json') {
+          throw new Error('Cannot combine --json with other output modes.');
+        }
+        requestedMode = 'json';
+        let modeValue = inlineValue;
+        if (!modeValue) {
+          const probe = rawArgs[i + 1];
+          if (probe === 'compact' || probe === 'pretty') {
+            modeValue = probe;
+            i += 1;
+          }
+        }
+        jsonPretty = modeValue === 'compact' ? false : true;
+        break;
+      }
+      case 'jsonl':
+        if (requestedMode && requestedMode !== 'jsonl') {
+          throw new Error('Cannot combine --jsonl with other output modes.');
+        }
+        requestedMode = 'jsonl';
+        break;
+      case 'notify': {
+        const { value, nextIndex } = readValue(i, inlineValue);
+        if (!value) {
+          throw new Error('--notify requires a target URI.');
+        }
+        i = nextIndex;
+        value
+          .split(',')
+          .map((entry) => entry.trim())
+          .filter(Boolean)
+          .forEach((entry) => notifyTargets.push(entry));
+        break;
+      }
+      case 'otel-endpoint': {
+        const { value, nextIndex } = readValue(i, inlineValue);
+        if (!value) {
+          throw new Error('--otel-endpoint requires a URL.');
+        }
+        i = nextIndex;
+        otelEndpoint = value;
+        break;
+      }
+      case 'cwd': {
+        const { value, nextIndex } = readValue(i, inlineValue);
+        if (!value) {
+          throw new Error('--cwd requires a path.');
+        }
+        i = nextIndex;
+        cwd = value;
+        break;
+      }
+      case 'task': {
+        const { value, nextIndex } = readValue(i, inlineValue);
+        if (!value) {
+          throw new Error('--task requires an identifier.');
+        }
+        i = nextIndex;
+        taskId = value;
+        break;
+      }
+      default:
+        throw new Error(`Unknown exec option: --${rawKey}`);
+    }
+  }
+
+  return {
+    commandTokens,
+    notifyTargets,
+    otelEndpoint,
+    requestedMode,
+    jsonPretty,
+    cwd,
+    taskId
+  };
+}
+
 function printHelp(): void {
   console.log(`Usage: codex-orchestrator <command> [options]
 
@@ -158,6 +334,14 @@ Commands:
   plan [pipeline]           Preview pipeline stages without executing.
     --task <id>             Override task identifier.
     --format json           Emit machine-readable output.
+
+  exec [command]            Run a one-off command with unified exec runtime.
+    --json [compact]        Emit final JSON summary (optional compact mode).
+    --jsonl                 Stream JSONL events (default when STDIN is non-interactive).
+    --notify <uri>          Send run summary notifications (repeatable, comma-separated supported).
+    --otel-endpoint <url>   Forward events to OTEL collector endpoint.
+    --cwd <path>            Override working directory for the command.
+    --task <id>             Override task identifier for manifest routing.
 
   resume --run <id> [options]
     --token <resume-token>  Verify the resume token before restarting.

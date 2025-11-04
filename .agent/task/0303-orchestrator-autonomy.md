@@ -43,38 +43,38 @@
 4. **CLI & SDK Interfaces**
    - Subtask: CLI `exec` command
      - Files: `cli/src/commands/exec.ts`, `docs/guides/ci-integration.md`
-     - Acceptance: Flags `--json`, `--jsonl`, `--otel-endpoint`, `--notify` documented and tested; Evidence: _(pending)._
-     - [ ] Status: _(pending)_
+     - Acceptance: Flags `--json`, `--jsonl`, `--otel-endpoint`, `--notify` documented and tested; Evidence: `.runs/0303-orchestrator-autonomy/cli/2025-11-04T04-55-02-406Z-9663b24b/manifest.json`. 
+     - [x] Status: _(completed 2025-11-04)_
    - Subtask: Node SDK streaming support
      - Files: `packages/sdk-node/src/orchestrator.ts`
-     - Acceptance: Streams JSONL events, surfaces resume helpers, updates docs; Evidence: _(pending)._
-     - [ ] Status: _(pending)_
+     - Acceptance: Streams JSONL events, surfaces resume helpers, updates docs; Evidence: `.runs/0303-orchestrator-autonomy/cli/2025-11-04T04-55-02-406Z-9663b24b/manifest.json`. 
+     - [x] Status: _(completed 2025-11-04)_
 5. **Telemetry & Notifications**
    - Subtask: OTEL exporter
      - Files: `packages/orchestrator/src/telemetry/otel-exporter.ts`
-     - Acceptance: Retries/backoff, opt-in gating, manifest metrics recorded; Evidence: _(pending)._
-     - [ ] Status: _(pending)_
+     - Acceptance: Retries/backoff, opt-in gating, manifest metrics recorded; Evidence: `.runs/0303-orchestrator-autonomy/cli/2025-11-04T04-55-02-406Z-9663b24b/manifest.json`. 
+     - [x] Status: _(completed 2025-11-04)_
    - Subtask: Notification hooks
      - Files: `packages/orchestrator/src/notifications/index.ts`
-     - Acceptance: Config precedence (CLI > env > config) respected; Evidence: _(pending)._
-     - [ ] Status: _(pending)_
+     - Acceptance: Config precedence (CLI > env > config) respected; Evidence: `.runs/0303-orchestrator-autonomy/cli/2025-11-04T04-55-02-406Z-9663b24b/manifest.json`. 
+     - [x] Status: _(completed 2025-11-04)_
 6. **Instruction Hierarchy & Schema**
    - Subtask: Instruction loader
      - Files: `packages/orchestrator/src/instructions/loader.ts`, docs additions
-     - Acceptance: Resolves `AGENTS.md` hierarchy, writes hash to manifest metadata; Evidence: _(pending)._
-     - [ ] Status: _(pending)_
+     - Acceptance: Resolves `AGENTS.md` hierarchy, writes hash to manifest metadata; Evidence: `.runs/0303-orchestrator-autonomy/cli/2025-11-04T04-55-02-406Z-9663b24b/manifest.json`. 
+     - [x] Status: _(completed 2025-11-04)_
    - Subtask: Schema & docs updates
      - Files: `schemas/manifest.json`, `docs/specs/exec-jsonl.md`
-     - Acceptance: JSONL + manifest schema updates documented; Evidence: _(pending)._
-     - [ ] Status: _(pending)_
+     - Acceptance: JSONL + manifest schema updates documented; Evidence: `.runs/0303-orchestrator-autonomy/cli/2025-11-04T04-55-02-406Z-9663b24b/manifest.json`. 
+     - [x] Status: _(completed 2025-11-04)_
 7. **Verification & Rollout**
   - Subtask: Diagnostics
     - Commands: `npx codex-orchestrator start diagnostics --format json`
     - Acceptance: Manifest appended to `.runs/0303-orchestrator-autonomy/cli/<run-id>/manifest.json`; Evidence: `.runs/0303-orchestrator-autonomy/cli/2025-11-04T00-44-59-137Z-de57c4d7/manifest.json`.
     - [x] Status: _completed 2025-11-04_
-  - Subtask: Guardrail commands
-    - Commands: `bash scripts/spec-guard.sh --dry-run`, `npm run lint`, `npm run test`, `npm run eval:test`
-    - Acceptance: Commands succeed with manifest/log evidence; Evidence: `.runs/0303-orchestrator-autonomy/cli/2025-11-04T02-29-08-856Z-ea703ea0/manifest.json` (diagnostics run captures guardrail execution summary).
+   - Subtask: Guardrail commands
+     - Commands: `bash scripts/spec-guard.sh --dry-run`, `npm run lint`, `npm run test`, `npm run eval:test`
+     - Acceptance: Commands succeed with manifest/log evidence; Evidence: `.runs/0303-orchestrator-autonomy/cli/2025-11-04T04-55-02-406Z-9663b24b/manifest.json` (diagnostics run captures guardrail execution summary).
     - [x] Status: _completed 2025-11-04_
    - Subtask: Reviewer hand-off
      - Commands: `npm run review`

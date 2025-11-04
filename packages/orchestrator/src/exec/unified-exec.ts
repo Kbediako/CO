@@ -7,64 +7,15 @@ import {
   type ToolSandboxOptions
 } from '../tool-orchestrator.js';
 import type { ToolRunStatus, SandboxState, ToolRunEvent, ToolRunRecord } from '../../../shared/manifest/types.js';
+import type {
+  ExecBeginEvent,
+  ExecChunkEvent,
+  ExecEndEvent,
+  ExecEvent,
+  ExecRetryEvent
+} from '../../../shared/events/types.js';
 import { createStdioTracker, type SequencedStdioChunk, type StdioStream } from '../../../shared/streams/stdio.js';
 import { ExecSessionManager, type ExecSessionHandle, type ExecSessionLease } from './session-manager.js';
-
-export type ExecEventType = 'exec:begin' | 'exec:chunk' | 'exec:end' | 'exec:retry';
-
-export interface ExecEventBase {
-  type: ExecEventType;
-  correlationId: string;
-  timestamp: string;
-  attempt: number;
-}
-
-export interface ExecBeginEvent extends ExecEventBase {
-  type: 'exec:begin';
-  payload: {
-    command: string;
-    args: string[];
-    cwd?: string;
-    sessionId: string;
-    sandboxState: SandboxState;
-    persisted: boolean;
-  };
-}
-
-export interface ExecChunkEvent extends ExecEventBase {
-  type: 'exec:chunk';
-  payload: {
-    stream: StdioStream;
-    sequence: number;
-    bytes: number;
-    data: string;
-  };
-}
-
-export interface ExecEndEvent extends ExecEventBase {
-  type: 'exec:end';
-  payload: {
-    exitCode: number | null;
-    signal: NodeJS.Signals | null;
-    durationMs: number;
-    stdout: string;
-    stderr: string;
-    sandboxState: SandboxState;
-    sessionId: string;
-    status: ToolRunStatus;
-  };
-}
-
-export interface ExecRetryEvent extends ExecEventBase {
-  type: 'exec:retry';
-  payload: {
-    delayMs: number;
-    sandboxState: SandboxState;
-    errorMessage: string;
-  };
-}
-
-export type ExecEvent = ExecBeginEvent | ExecChunkEvent | ExecEndEvent | ExecRetryEvent;
 
 export interface ExecCommandExecutionResult {
   exitCode: number | null;
@@ -584,3 +535,11 @@ const defaultExecutor: ExecCommandExecutor<ExecSessionHandle> = async (request) 
     child.once('error', handleError);
   });
 };
+
+export type {
+  ExecEvent,
+  ExecBeginEvent,
+  ExecChunkEvent,
+  ExecEndEvent,
+  ExecRetryEvent
+} from '../../../shared/events/types.js';

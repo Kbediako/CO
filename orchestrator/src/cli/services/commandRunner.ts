@@ -1,7 +1,8 @@
 import { createWriteStream } from 'node:fs';
 import { join } from 'node:path';
 
-import type { ExecEvent } from '../../../../packages/orchestrator/src/index.js';
+import type { ExecEvent, UnifiedExecRunResult } from '../../../../packages/orchestrator/src/index.js';
+import { ToolInvocationFailedError } from '../../../../packages/orchestrator/src/index.js';
 import { getCliExecRunner } from './execRuntime.js';
 import type { CommandStage, CliManifest } from '../types.js';
 import type { EnvironmentPaths } from '../run/environment.js';
@@ -25,12 +26,21 @@ export interface CommandRunnerContext {
   index: number;
 }
 
+export interface CommandRunHooks {
+  onEvent?: (event: ExecEvent) => void;
+  onResult?: (result: UnifiedExecRunResult) => void;
+  onError?: (error: ToolInvocationFailedError) => void;
+}
+
 interface CommandRunResult {
   exitCode: number;
   summary: string;
 }
 
-export async function runCommandStage(context: CommandRunnerContext): Promise<CommandRunResult> {
+export async function runCommandStage(
+  context: CommandRunnerContext,
+  hooks: CommandRunHooks = {}
+): Promise<CommandRunResult> {
   const { env, paths, manifest, stage, index } = context;
   const entryIndex = index - 1;
   const entry = updateCommandStatus(manifest, entryIndex, {
@@ -70,6 +80,7 @@ export async function runCommandStage(context: CommandRunnerContext): Promise<Co
     if (event.correlationId !== activeCorrelationId) {
       return;
     }
+    hooks.onEvent?.(event);
     streamEvent(writeEvent, event, {
       onStdout: (bytes) => {
         stdoutBytes += bytes;
@@ -93,24 +104,33 @@ export async function runCommandStage(context: CommandRunnerContext): Promise<Co
     const execEnv: NodeJS.ProcessEnv = { ...process.env, ...stage.env };
     const invocationId = `cli-command:${manifest.run_id}:${stage.id}:${Date.now()}`;
 
-    const result = await runner.run({
-      command: stage.command,
-      args: [],
-      cwd: stage.cwd ?? env.repoRoot,
-      env: execEnv,
-      sessionId: sessionId ?? undefined,
-      persistSession,
-      reuseSession,
-      invocationId,
-      toolId: 'cli:command',
-      description: stage.title,
-      metadata: {
-        stageId: stage.id,
-        pipelineId: manifest.pipeline_id,
-        runId: manifest.run_id,
-        commandIndex: entry.index
+    let result: UnifiedExecRunResult;
+    try {
+      result = await runner.run({
+        command: stage.command,
+        args: [],
+        cwd: stage.cwd ?? env.repoRoot,
+        env: execEnv,
+        sessionId: sessionId ?? undefined,
+        persistSession,
+        reuseSession,
+        invocationId,
+        toolId: 'cli:command',
+        description: stage.title,
+        metadata: {
+          stageId: stage.id,
+          pipelineId: manifest.pipeline_id,
+          runId: manifest.run_id,
+          commandIndex: entry.index
+        }
+      });
+      hooks.onResult?.(result);
+    } catch (error) {
+      if (error instanceof ToolInvocationFailedError) {
+        hooks.onError?.(error);
       }
-    });
+      throw error;
+    }
 
     const normalizedExitCode =
       result.exitCode ?? (result.signal ? 128 : 0);

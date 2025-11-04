@@ -1,0 +1,149 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://schemas.codex.openai.com/orchestrator/cli-manifest.json",
+  "title": "Codex Orchestrator CLI Manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "task_id",
+    "task_slug",
+    "run_id",
+    "parent_run_id",
+    "pipeline_id",
+    "pipeline_title",
+    "runner",
+    "approval_policy",
+    "status",
+    "status_detail",
+    "started_at",
+    "completed_at",
+    "updated_at",
+    "heartbeat_at",
+    "heartbeat_interval_seconds",
+    "heartbeat_stale_after_seconds",
+    "artifact_root",
+    "compat_path",
+    "log_path",
+    "summary",
+    "metrics_recorded",
+    "resume_token",
+    "resume_events",
+    "approvals",
+    "commands",
+    "child_runs",
+    "run_summary_path",
+    "instructions_hash",
+    "instructions_sources"
+  ],
+  "properties": {
+    "version": { "type": "integer", "minimum": 1 },
+    "task_id": { "type": "string", "minLength": 1 },
+    "task_slug": { "type": ["string", "null"] },
+    "run_id": { "type": "string", "minLength": 1 },
+    "parent_run_id": { "type": ["string", "null"] },
+    "pipeline_id": { "type": "string", "minLength": 1 },
+    "pipeline_title": { "type": "string", "minLength": 1 },
+    "runner": { "type": "string", "const": "codex-cli" },
+    "approval_policy": { "type": ["string", "null"] },
+    "status": { "type": "string", "enum": ["queued", "in_progress", "succeeded", "failed", "cancelled"] },
+    "status_detail": { "type": ["string", "null"] },
+    "started_at": { "type": "string", "minLength": 1 },
+    "completed_at": { "type": ["string", "null"] },
+    "updated_at": { "type": "string", "minLength": 1 },
+    "heartbeat_at": { "type": ["string", "null"] },
+    "heartbeat_interval_seconds": { "type": "integer", "minimum": 1 },
+    "heartbeat_stale_after_seconds": { "type": "integer", "minimum": 1 },
+    "artifact_root": { "type": "string", "minLength": 1 },
+    "compat_path": { "type": "string", "minLength": 1 },
+    "log_path": { "type": "string", "minLength": 1 },
+    "summary": { "type": ["string", "null"] },
+    "metrics_recorded": { "type": "boolean" },
+    "resume_token": { "type": "string", "minLength": 1 },
+    "resume_events": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["timestamp", "actor", "reason", "outcome"],
+        "additionalProperties": false,
+        "properties": {
+          "timestamp": { "type": "string", "minLength": 1 },
+          "actor": { "type": "string", "minLength": 1 },
+          "reason": { "type": "string", "minLength": 1 },
+          "outcome": { "type": "string", "enum": ["accepted", "blocked"] },
+          "detail": { "type": ["string", "null"] }
+        }
+      }
+    },
+    "approvals": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["actor", "timestamp"],
+        "additionalProperties": false,
+        "properties": {
+          "actor": { "type": "string", "minLength": 1 },
+          "timestamp": { "type": "string", "minLength": 1 },
+          "reason": { "type": ["string", "null"] }
+        }
+      }
+    },
+    "commands": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "index",
+          "id",
+          "title",
+          "command",
+          "kind",
+          "status",
+          "started_at",
+          "completed_at",
+          "exit_code",
+          "summary",
+          "log_path",
+          "error_file",
+          "sub_run_id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "index": { "type": "integer", "minimum": 1 },
+          "id": { "type": "string", "minLength": 1 },
+          "title": { "type": "string", "minLength": 1 },
+          "command": { "type": ["string", "null"] },
+          "kind": { "type": "string", "enum": ["command", "subpipeline"] },
+          "status": { "type": "string", "enum": ["pending", "running", "succeeded", "failed", "skipped"] },
+          "started_at": { "type": ["string", "null"] },
+          "completed_at": { "type": ["string", "null"] },
+          "exit_code": { "type": ["integer", "null"] },
+          "summary": { "type": ["string", "null"] },
+          "log_path": { "type": ["string", "null"] },
+          "error_file": { "type": ["string", "null"] },
+          "sub_run_id": { "type": ["string", "null"] }
+        }
+      }
+    },
+    "child_runs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["run_id", "pipeline_id", "status", "manifest"],
+        "additionalProperties": false,
+        "properties": {
+          "run_id": { "type": "string", "minLength": 1 },
+          "pipeline_id": { "type": "string", "minLength": 1 },
+          "status": { "type": "string", "enum": ["queued", "in_progress", "succeeded", "failed", "cancelled"] },
+          "manifest": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "run_summary_path": { "type": ["string", "null"] },
+    "instructions_hash": { "type": ["string", "null"] },
+    "instructions_sources": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    }
+  }
+}

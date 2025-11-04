@@ -139,6 +139,8 @@ export interface CliManifest {
   commands: CliManifestCommand[];
   child_runs: ChildRunRecord[];
   run_summary_path: string | null;
+  instructions_hash: string | null;
+  instructions_sources: string[];
 }
 
 export type RunStatus = 'queued' | 'in_progress' | 'succeeded' | 'failed' | 'cancelled';

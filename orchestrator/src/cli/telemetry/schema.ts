@@ -52,7 +52,9 @@ export const CLI_MANIFEST_SCHEMA: JsonSchema = {
     'approvals',
     'commands',
     'child_runs',
-    'run_summary_path'
+    'run_summary_path',
+    'instructions_hash',
+    'instructions_sources'
   ],
   properties: {
     version: { type: 'integer', minimum: 1 },
@@ -157,7 +159,12 @@ export const CLI_MANIFEST_SCHEMA: JsonSchema = {
         }
       }
     },
-    run_summary_path: { type: ['string', 'null'] }
+    run_summary_path: { type: ['string', 'null'] },
+    instructions_hash: { type: ['string', 'null'] },
+    instructions_sources: {
+      type: 'array',
+      items: { type: 'string', minLength: 1 }
+    }
   }
 };
 
@@ -195,6 +202,12 @@ export function validateCliManifest(candidate: unknown): ValidationResult<CliMan
   validateOptionalString(candidate, 'heartbeat_at', errors);
   validateOptionalString(candidate, 'summary', errors);
   validateOptionalString(candidate, 'run_summary_path', errors);
+  validateOptionalString(candidate, 'instructions_hash', errors);
+  if (!Array.isArray(candidate.instructions_sources)) {
+    errors.push('instructions_sources must be an array');
+  } else if (!candidate.instructions_sources.every((source: unknown) => typeof source === 'string')) {
+    errors.push('instructions_sources must contain only strings');
+  }
 
   validateBoolean(candidate, 'metrics_recorded', errors);
 
