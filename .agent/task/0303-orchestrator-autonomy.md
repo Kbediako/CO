@@ -9,19 +9,19 @@
 
 ## Parent Tasks
 1. **Foundation**
-   - Subtask: Synchronize collateral
-     - Files: `tasks/index.json`, `docs/PRD-codex-orchestrator-autonomy.md`, `docs/TECH_SPEC-codex-orchestrator-autonomy.md`, `docs/ACTION_PLAN-codex-orchestrator-autonomy.md`, `.agent/task/0303-orchestrator-autonomy.md`
-     - Acceptance: All references point to Task 0303 with manifest placeholder ready; Evidence: _(pending — add diagnostics manifest)._
-     - [ ] Status: _(pending)_
-   - Subtask: Prepare run directories & env
-     - Files: `.runs/0303-orchestrator-autonomy/**`, `out/0303-orchestrator-autonomy/**`
-     - Commands: export `MCP_RUNNER_TASK_ID=0303-orchestrator-autonomy`, run diagnostics to seed manifest.
-     - Acceptance: Diagnostics manifest written under `.runs/0303-orchestrator-autonomy/cli/<run-id>/manifest.json`; Evidence: _(pending)._
-     - [ ] Status: _(pending)_
-   - Subtask: Environment defaults recorded
-     - Files: `.runs/0303-orchestrator-autonomy/cli/<run-id>/manifest.json`
-     - Acceptance: Manifest captures task id + approval profile; Evidence: _(pending)._
-     - [ ] Status: _(pending)_
+  - Subtask: Synchronize collateral
+    - Files: `tasks/index.json`, `docs/PRD-codex-orchestrator-autonomy.md`, `docs/TECH_SPEC-codex-orchestrator-autonomy.md`, `docs/ACTION_PLAN-codex-orchestrator-autonomy.md`, `.agent/task/0303-orchestrator-autonomy.md`
+    - Acceptance: All references point to Task 0303 with manifest placeholder ready; Evidence: `.runs/0303-orchestrator-autonomy/cli/2025-11-03T23-58-59-546Z-49371323/manifest.json` (diagnostics run recorded 2025-11-03T23:58:59Z).
+    - [x] Status: _completed 2025-11-03_
+  - Subtask: Prepare run directories & env
+    - Files: `.runs/0303-orchestrator-autonomy/**`, `out/0303-orchestrator-autonomy/**`
+    - Commands: export `MCP_RUNNER_TASK_ID=0303-orchestrator-autonomy`, run diagnostics to seed manifest.
+    - Acceptance: Diagnostics manifest written under `.runs/0303-orchestrator-autonomy/cli/<run-id>/manifest.json`; Evidence: `.runs/0303-orchestrator-autonomy/cli/2025-11-03T23-58-59-546Z-49371323/manifest.json`.
+    - [x] Status: _completed 2025-11-03_
+  - Subtask: Environment defaults recorded
+    - Files: `.runs/0303-orchestrator-autonomy/cli/<run-id>/manifest.json`
+    - Acceptance: Manifest captures task id + approval profile; Evidence: `.runs/0303-orchestrator-autonomy/cli/2025-11-04T00-31-05-908Z-9d1b561c/manifest.json` (stores `approval_policy: read/edit/run/network`).
+    - [x] Status: _completed 2025-11-04_
 2. **Tool Orchestrator Layer**
    - Subtask: Implement `ToolOrchestrator`
      - Files: `packages/orchestrator/src/tool-orchestrator.ts`, `packages/shared/manifest/writer.ts`
@@ -68,18 +68,18 @@
      - Acceptance: JSONL + manifest schema updates documented; Evidence: _(pending)._
      - [ ] Status: _(pending)_
 7. **Verification & Rollout**
-   - Subtask: Diagnostics
-     - Commands: `npx codex-orchestrator start diagnostics --format json`
-     - Acceptance: Manifest appended to `.runs/0303-orchestrator-autonomy/cli/<run-id>/manifest.json`; Evidence: _(pending)._
-     - [ ] Status: _(pending)_
-   - Subtask: Guardrail commands
-     - Commands: `bash scripts/spec-guard.sh --dry-run`, `npm run lint`, `npm run test`, `npm run eval:test`
-     - Acceptance: Commands succeed with manifest/log evidence; Evidence: _(pending)._
-     - [ ] Status: _(pending)_
+  - Subtask: Diagnostics
+    - Commands: `npx codex-orchestrator start diagnostics --format json`
+    - Acceptance: Manifest appended to `.runs/0303-orchestrator-autonomy/cli/<run-id>/manifest.json`; Evidence: `.runs/0303-orchestrator-autonomy/cli/2025-11-03T23-58-59-546Z-49371323/manifest.json`.
+    - [x] Status: _completed 2025-11-03_
+  - Subtask: Guardrail commands
+    - Commands: `bash scripts/spec-guard.sh --dry-run`, `npm run lint`, `npm run test`, `npm run eval:test`
+    - Acceptance: Commands succeed with manifest/log evidence; Evidence: `.runs/0303-orchestrator-autonomy/cli/2025-11-04T00-31-05-908Z-9d1b561c/manifest.json` (pipeline records lint/test/eval/spec-guard under safe approval profile).
+    - [x] Status: _completed 2025-11-04_
    - Subtask: Reviewer hand-off
      - Commands: `npm run review`
-     - Acceptance: Review command references latest manifest; Evidence: _(pending)._
-     - [ ] Status: _(pending)_
+     - Acceptance: Review command references latest manifest; Evidence: `.runs/0303-orchestrator-autonomy/cli/2025-11-04T00-31-05-908Z-9d1b561c/manifest.json` (local review recorded outcome “Skip for now”).
+     - [x] Status: _completed 2025-11-04_
 
 ## Relevant Files
 - `docs/PRD-codex-orchestrator-autonomy.md`, `docs/TECH_SPEC-codex-orchestrator-autonomy.md`, `docs/ACTION_PLAN-codex-orchestrator-autonomy.md`, `tasks/0303-prd-orchestrator-autonomy.md`, `tasks/tasks-0303-orchestrator-autonomy.md`

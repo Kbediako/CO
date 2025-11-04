@@ -18,8 +18,8 @@
 - Shipping a graphical UI; scope is CLI, SDK, and manifest outputs.
 
 ## Documentation & Evidence
-- Run Manifest Link: _(pending — capture first diagnostics run under `.runs/0303-orchestrator-autonomy/cli/<run-id>/manifest.json`)._
-- Metrics / State Snapshots: _(pending — populate `.runs/0303-orchestrator-autonomy/metrics.json` and `out/0303-orchestrator-autonomy/state.json` after initial run)._
+- Run Manifest Link: `.runs/0303-orchestrator-autonomy/cli/2025-11-04T00-31-05-908Z-9d1b561c/manifest.json` (diagnostics+eval pipeline completed 2025-11-04T00:31:10Z with approval profile recorded).
+- Metrics / State Snapshots: `.runs/0303-orchestrator-autonomy/metrics.json`, `out/0303-orchestrator-autonomy/state.json` (refreshed with 2025-11-04T00:31:05Z diagnostics+eval run).
 
 ## Stakeholders
 - Product: Platform Enablement (TBD)

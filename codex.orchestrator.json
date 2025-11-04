@@ -1,0 +1,41 @@
+{
+  "pipelines": [
+    {
+      "id": "diagnostics-with-eval",
+      "title": "Diagnostics Pipeline (with Eval Harness)",
+      "description": "Build, lint, test, run evaluation harness, and verify specs for guardrail evidence capture.",
+      "stages": [
+        {
+          "kind": "command",
+          "id": "build",
+          "title": "npm run build",
+          "command": "npm run build"
+        },
+        {
+          "kind": "command",
+          "id": "lint",
+          "title": "npm run lint",
+          "command": "npm run lint"
+        },
+        {
+          "kind": "command",
+          "id": "test",
+          "title": "npm run test",
+          "command": "npm run test"
+        },
+        {
+          "kind": "command",
+          "id": "eval-test",
+          "title": "npm run eval:test",
+          "command": "npm run eval:test"
+        },
+        {
+          "kind": "command",
+          "id": "spec-guard",
+          "title": "bash scripts/spec-guard.sh --dry-run",
+          "command": "bash scripts/spec-guard.sh --dry-run"
+        }
+      ]
+    }
+  ]
+}

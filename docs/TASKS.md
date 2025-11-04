@@ -1,16 +1,16 @@
 # Task List Snapshot — Codex Orchestrator Autonomy Enhancements (0303)
 
-- **Update — 2025-11-03:** Project scaffolding established; manifests pending first diagnostics run under `.runs/0303-orchestrator-autonomy/cli/<run-id>/manifest.json`.
+- **Update — 2025-11-04:** Diagnostics-with-eval pipeline `2025-11-04T00-31-05-908Z-9d1b561c` captured approval profile plus eval harness; manifest at `.runs/0303-orchestrator-autonomy/cli/2025-11-04T00-31-05-908Z-9d1b561c/manifest.json`.
 - **Gate Status:** Planning in progress; awaiting ToolOrchestrator implementation kickoff.
-- **Notes:** Metrics and state snapshots will populate under `.runs/0303-orchestrator-autonomy/metrics.json` and `out/0303-orchestrator-autonomy/state.json` once diagnostics completes.
+- **Notes:** Metrics recorded at `.runs/0303-orchestrator-autonomy/metrics.json`; state snapshot refreshed at `out/0303-orchestrator-autonomy/state.json`.
 
 ## Checklist Mirror
 Mirror status with `tasks/tasks-0303-orchestrator-autonomy.md` and `.agent/task/0303-orchestrator-autonomy.md`. Each `[x]` entry must cite the manifest path that satisfied the acceptance criteria.
 
 ### Foundation
-- [ ] Synchronize collateral — `tasks/index.json`, `docs/PRD-codex-orchestrator-autonomy.md`, `docs/TECH_SPEC-codex-orchestrator-autonomy.md`, `docs/ACTION_PLAN-codex-orchestrator-autonomy.md`, `.agent/task/0303-orchestrator-autonomy.md` reference Task 0303; Evidence: _(pending — add diagnostics manifest once files align)._
-- [ ] Prepare run directories — Initialize `.runs/0303-orchestrator-autonomy/cli/` via diagnostics run; Evidence: _(pending — capture first `npx codex-orchestrator start diagnostics --format json` output)._
-- [ ] Environment defaults — `MCP_RUNNER_TASK_ID` exported in shell / CI and recorded in diagnostics manifest task id; Evidence: _(pending — attach manifest once environment verified)._
+- [x] Synchronize collateral — `tasks/index.json`, `docs/PRD-codex-orchestrator-autonomy.md`, `docs/TECH_SPEC-codex-orchestrator-autonomy.md`, `docs/ACTION_PLAN-codex-orchestrator-autonomy.md`, `.agent/task/0303-orchestrator-autonomy.md` reference Task 0303; Evidence: `.runs/0303-orchestrator-autonomy/cli/2025-11-03T23-58-59-546Z-49371323/manifest.json` (diagnostics run 2025-11-03T23:58:59Z).
+- [x] Prepare run directories — Initialize `.runs/0303-orchestrator-autonomy/cli/` via diagnostics run; Evidence: `.runs/0303-orchestrator-autonomy/cli/2025-11-03T23-58-59-546Z-49371323/manifest.json`.
+- [x] Environment defaults — `MCP_RUNNER_TASK_ID` exported in shell / CI and recorded in diagnostics manifest task id + approval profile; Evidence: `.runs/0303-orchestrator-autonomy/cli/2025-11-04T00-31-05-908Z-9d1b561c/manifest.json` (manifest records `approval_policy: read/edit/run/network`).
 
 ### Tool Orchestrator Layer
 - [ ] Implement centralized `ToolOrchestrator` service with approval cache reuse and sandbox retry policy; Evidence: _(pending — reference manifest + tests when merged)._
@@ -33,9 +33,9 @@ Mirror status with `tasks/tasks-0303-orchestrator-autonomy.md` and `.agent/task/
 - [ ] Update manifest/config schemas for new fields and document JSONL event format; Evidence: _(pending)._
 
 ### Verification & Guardrails
-- [ ] Run diagnostics (`npx codex-orchestrator start diagnostics --format json`) and record manifest link; Evidence: _(pending)._
-- [ ] Guardrails — `bash scripts/spec-guard.sh --dry-run`, `npm run lint`, `npm run test`, `npm run eval:test` (when fixtures ready); Evidence: _(pending)._
-- [ ] Reviewer hand-off — Execute `npm run review` using latest manifest; Evidence: _(pending)._
+- [x] Run diagnostics (`npx codex-orchestrator start diagnostics --format json`) and record manifest link; Evidence: `.runs/0303-orchestrator-autonomy/cli/2025-11-03T23-58-59-546Z-49371323/manifest.json`.
+- [x] Guardrails — `bash scripts/spec-guard.sh --dry-run`, `npm run lint`, `npm run test`, `npm run eval:test` (when fixtures ready); Evidence: `.runs/0303-orchestrator-autonomy/cli/2025-11-04T00-31-05-908Z-9d1b561c/manifest.json` (pipeline records lint/test/eval/spec-guard under safe approval profile).
+- [x] Reviewer hand-off — Execute `npm run review` using latest manifest; Evidence: `.runs/0303-orchestrator-autonomy/cli/2025-11-04T00-31-05-908Z-9d1b561c/manifest.json` (review outcome “Skip for now” logged).
 
 ---
 
