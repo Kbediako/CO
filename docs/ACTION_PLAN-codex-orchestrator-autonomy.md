@@ -1,10 +1,10 @@
 # Action Plan — Codex Orchestrator Autonomy Enhancements (Task 0303)
 
 ## Status Snapshot
-- Current Phase: Planning (orchestrator autonomy backlog aligned, implementation pending).
-- Run Manifest Link: `.runs/0303-orchestrator-autonomy/cli/2025-11-04T00-46-22-699Z-8be8efb9/manifest.json` (diagnostics-with-eval pipeline captured guardrail suite).
-- Metrics / State Snapshots: `.runs/0303-orchestrator-autonomy/metrics.json`, `out/0303-orchestrator-autonomy/state.json` (refreshed 2025-11-04T00:46:28Z diagnostics-with-eval run).
-- Approvals / Escalations: None to date; retain safe `read/edit/run/network` profile and record future escalations in run manifests.
+- Current Phase: Full autonomy rollout validated (typed control plane, multi-instance scheduling, streaming guard, and telemetry gates complete).
+- Run Manifest Link: `.runs/autonomy-upgrade/cli/2025-11-05T13-30-00Z-upgrade/manifest.json` (captures enforced control-plane validation, fan-out scheduler assignments, streaming handles, and privacy guard decisions).
+- Metrics / State Snapshots: `.runs/autonomy-upgrade/metrics.json`, `.runs/autonomy-upgrade/metrics/post-rollout.json`, `.runs/autonomy-upgrade/metrics/completeness.json`, `out/autonomy-upgrade/metrics/mttr-delta.json` (aggregates generated after the upgrade validation run).
+- Approvals / Escalations: None outstanding; maintain safe `read/edit/run/network` profile and continue recording approvals within run manifests.
 
 ## Milestones & Tasks
 1. Milestone: Foundation & Orchestrator Layer

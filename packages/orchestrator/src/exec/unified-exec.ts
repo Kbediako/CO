@@ -16,6 +16,7 @@ import type {
 } from '../../../shared/events/types.js';
 import { createStdioTracker, type SequencedStdioChunk, type StdioStream } from '../../../shared/streams/stdio.js';
 import { ExecSessionManager, type ExecSessionHandle, type ExecSessionLease } from './session-manager.js';
+import { RemoteExecHandleService, type ExecHandleDescriptor } from './handle-service.js';
 
 export interface ExecCommandExecutionResult {
   exitCode: number | null;
@@ -46,6 +47,7 @@ export interface UnifiedExecRunnerOptions<THandle extends ExecSessionHandle> {
   maxBufferBytes?: number;
   now?: () => Date;
   idGenerator?: () => string;
+  handleService?: RemoteExecHandleService;
 }
 
 export interface UnifiedExecRunOptions {
@@ -87,6 +89,7 @@ export interface UnifiedExecRunResult {
   sandboxState: SandboxState;
   record: ToolRunRecord;
   events: ExecEvent[];
+  handle?: ExecHandleDescriptor;
 }
 
 export class UnifiedExecRunner<THandle extends ExecSessionHandle> {
@@ -97,6 +100,7 @@ export class UnifiedExecRunner<THandle extends ExecSessionHandle> {
   private readonly now: () => Date;
   private readonly idGenerator: () => string;
   private readonly listeners = new Set<(event: ExecEvent) => void>();
+  private readonly handleService?: RemoteExecHandleService;
 
   constructor(options: UnifiedExecRunnerOptions<THandle>) {
     this.orchestrator = options.orchestrator;
@@ -105,6 +109,7 @@ export class UnifiedExecRunner<THandle extends ExecSessionHandle> {
     this.maxBufferBytes = options.maxBufferBytes ?? 64 * 1024;
     this.now = options.now ?? (() => new Date());
     this.idGenerator = options.idGenerator ?? (() => randomUUID());
+    this.handleService = options.handleService;
   }
 
   on(listener: (event: ExecEvent) => void): () => void {
@@ -118,6 +123,9 @@ export class UnifiedExecRunner<THandle extends ExecSessionHandle> {
     const args = options.args ?? [];
     const invocationId = options.invocationId ?? this.idGenerator();
     const correlationId = this.idGenerator();
+    const issuedHandle = this.handleService ? this.handleService.issueHandle(correlationId) : undefined;
+    const handleId = issuedHandle?.id;
+    let handleClosed = false;
     const reuse = options.reuseSession ?? Boolean(options.sessionId);
     const lease = await this.sessionManager.acquire({
       id: options.sessionId,
@@ -130,7 +138,7 @@ export class UnifiedExecRunner<THandle extends ExecSessionHandle> {
     let chunkSequence = 0;
 
     const sandboxOptions = options.sandbox
-      ? this.decorateSandboxOptions(options.sandbox, correlationId, events)
+      ? this.decorateSandboxOptions(options.sandbox, correlationId, events, handleId)
       : undefined;
     const metadata = {
       ...options.metadata,
@@ -139,7 +147,8 @@ export class UnifiedExecRunner<THandle extends ExecSessionHandle> {
       cwd: options.cwd,
       sessionId: lease.id,
       correlationId,
-      persisted: lease.persisted
+      persisted: lease.persisted,
+      handleId
     };
 
     const toolInvocation = {
@@ -176,7 +185,7 @@ export class UnifiedExecRunner<THandle extends ExecSessionHandle> {
             persisted: lease.persisted
           });
 
-          this.emit(beginEvent, events);
+          await this.publishEvent(beginEvent, events, handleId);
 
           let capturedError: unknown;
           const attemptSummary: ExecAttemptResult = {
@@ -207,7 +216,7 @@ export class UnifiedExecRunner<THandle extends ExecSessionHandle> {
                   correlationId,
                   chunk: sequenced
                 });
-                this.emit(chunkEvent, events);
+                void this.publishEvent(chunkEvent, events, handleId);
               },
               onStderr: (chunk) => {
                 const sequenced = this.recordChunk(tracker, 'stderr', chunk);
@@ -217,7 +226,7 @@ export class UnifiedExecRunner<THandle extends ExecSessionHandle> {
                   correlationId,
                   chunk: sequenced
                 });
-                this.emit(chunkEvent, events);
+                void this.publishEvent(chunkEvent, events, handleId);
               }
             });
             attemptSummary.exitCode = outcome.exitCode ?? null;
@@ -239,7 +248,7 @@ export class UnifiedExecRunner<THandle extends ExecSessionHandle> {
               correlationId,
               summary: attemptSummary
             });
-            this.emit(endEvent, events);
+            await this.publishEvent(endEvent, events, handleId);
           }
 
           if (capturedError) {
@@ -251,8 +260,16 @@ export class UnifiedExecRunner<THandle extends ExecSessionHandle> {
 
       attemptResult = result.output;
       invocationRecord = result.record;
-      this.attachManifestMetadata(invocationRecord, events, lease, options, correlationId, attemptResult);
-      return {
+      this.attachManifestMetadata(
+        invocationRecord,
+        events,
+        lease,
+        options,
+        correlationId,
+        attemptResult,
+        handleId ?? undefined
+      );
+      const runOutcome: UnifiedExecRunResult = {
         correlationId,
         stdout: attemptResult.stdout,
         stderr: attemptResult.stderr,
@@ -262,17 +279,41 @@ export class UnifiedExecRunner<THandle extends ExecSessionHandle> {
         status: attemptResult.status,
         sandboxState: attemptResult.sandboxState,
         record: invocationRecord,
-        events
+        events,
+        handle: undefined
       };
+
+      if (handleId && this.handleService) {
+        this.handleService.close(handleId);
+        handleClosed = true;
+        runOutcome.handle = this.handleService.getDescriptor(handleId);
+      }
+
+      return runOutcome;
     } catch (error: unknown) {
       if (
         error instanceof ToolInvocationFailedError &&
         error.record
       ) {
-        this.attachManifestMetadata(error.record, events, lease, options, correlationId, attemptResult);
+        this.attachManifestMetadata(
+          error.record,
+          events,
+          lease,
+          options,
+          correlationId,
+          attemptResult,
+          handleId ?? undefined
+        );
+      }
+      if (handleId && this.handleService && !handleClosed) {
+        this.handleService.close(handleId);
+        handleClosed = true;
       }
       throw error;
     } finally {
+      if (handleId && this.handleService && !handleClosed) {
+        this.handleService.close(handleId);
+      }
       await lease.release();
     }
   }
@@ -285,8 +326,15 @@ export class UnifiedExecRunner<THandle extends ExecSessionHandle> {
     return tracker.push(stream, chunk);
   }
 
-  private emit(event: ExecEvent, sink: ExecEvent[]): void {
+  private async publishEvent(
+    event: ExecEvent,
+    sink: ExecEvent[],
+    handleId?: string
+  ): Promise<void> {
     sink.push(event);
+    if (handleId && this.handleService) {
+      await this.handleService.append(handleId, event);
+    }
     for (const listener of this.listeners) {
       listener(event);
     }
@@ -383,7 +431,8 @@ export class UnifiedExecRunner<THandle extends ExecSessionHandle> {
   private decorateSandboxOptions(
     input: ToolSandboxOptions,
     correlationId: string,
-    events: ExecEvent[]
+    events: ExecEvent[],
+    handleId?: string
   ): ToolSandboxOptions {
     const { onRetry, ...rest } = input;
     const decorated: ToolSandboxOptions = {
@@ -396,7 +445,7 @@ export class UnifiedExecRunner<THandle extends ExecSessionHandle> {
           sandboxState: context.sandboxState,
           error: context.error
         });
-        this.emit(retryEvent, events);
+        await this.publishEvent(retryEvent, events, handleId);
         if (onRetry) {
           await onRetry.call(input, context);
         }
@@ -411,7 +460,8 @@ export class UnifiedExecRunner<THandle extends ExecSessionHandle> {
     lease: ExecSessionLease<THandle>,
     options: UnifiedExecRunOptions,
     correlationId: string,
-    attemptResult?: ExecAttemptResult
+    attemptResult?: ExecAttemptResult,
+    handleId?: string
   ): void {
     const execMetadata = {
       ...(record.metadata ?? {}),
@@ -422,6 +472,7 @@ export class UnifiedExecRunner<THandle extends ExecSessionHandle> {
         sessionId: lease.id,
         persisted: lease.persisted,
         correlationId,
+        handleId,
         exitCode: attemptResult?.exitCode ?? null,
         signal: attemptResult?.signal ?? null
       }

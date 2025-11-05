@@ -11,6 +11,20 @@ import {
   CommandTester,
   CommandReviewer
 } from './adapters/index.js';
+import {
+  buildRunRequestV2,
+  ControlPlaneDriftReporter,
+  ControlPlaneValidationError,
+  ControlPlaneValidator
+} from '../control-plane/index.js';
+import type { ControlPlaneValidationResult, ControlPlaneValidationMode } from '../control-plane/types.js';
+import {
+  buildSchedulerRunSummary,
+  createSchedulerPlan,
+  finalizeSchedulerPlan,
+  serializeSchedulerPlan
+} from '../scheduler/index.js';
+import type { SchedulerPlan } from '../scheduler/index.js';
 import { resolveEnvironment, sanitizeTaskId } from './run/environment.js';
 import type { EnvironmentPaths } from './run/environment.js';
 import {
@@ -34,7 +48,8 @@ import type {
   PlanOptions,
   StartOptions,
   ResumeOptions,
-  StatusOptions
+  StatusOptions,
+  RunStatus
 } from './types.js';
 import { generateRunId } from './utils/runId.js';
 import { loadUserConfig, findPipeline } from './config/userConfig.js';
@@ -48,6 +63,7 @@ import { isoTimestamp } from './utils/time.js';
 import type { RunPaths } from './run/runPaths.js';
 import { resolveRunPaths, relativeToRepo } from './run/runPaths.js';
 import { logger } from '../logger.js';
+import { getPrivacyGuard } from './services/execRuntime.js';
 
 const HEARTBEAT_MANIFEST_THROTTLE_MS = 30_000;
 interface ExecutePipelineOptions {
@@ -81,8 +97,39 @@ export class CodexOrchestrator {
     const manager = this.createTaskManager(runId, pipeline, executePipeline, getResult);
     const taskContext = this.createTaskContext(metadata);
 
+    getPrivacyGuard().reset();
+
+    const controlPlaneResult = await this.guardControlPlane({
+      env,
+      manifest,
+      paths,
+      pipeline,
+      task: taskContext,
+      runId,
+      requestedBy: { actorId: 'codex-cli', channel: 'cli', name: 'Codex CLI' }
+    });
+
+    const schedulerPlan = await this.createSchedulerPlanForRun({
+      env,
+      manifest,
+      paths,
+      controlPlaneResult
+    });
+
     const runSummary = await manager.execute(taskContext);
     manager.dispose();
+
+    await this.finalizeSchedulerPlanForManifest({
+      env,
+      manifest,
+      paths,
+      plan: schedulerPlan
+    });
+
+    this.applySchedulerToRunSummary(runSummary, schedulerPlan);
+    this.applyHandlesToRunSummary(runSummary, manifest);
+    this.applyPrivacyToRunSummary(runSummary, manifest);
+    this.applyControlPlaneToRunSummary(runSummary, controlPlaneResult);
 
     await this.persistRunSummary(env, paths, manifest, runSummary);
 
@@ -119,8 +166,39 @@ export class CodexOrchestrator {
     const manager = this.createTaskManager(manifest.run_id, pipeline, executePipeline, getResult);
     const taskContext = this.createTaskContext(metadata);
 
+    getPrivacyGuard().reset();
+
+    const controlPlaneResult = await this.guardControlPlane({
+      env: actualEnv,
+      manifest,
+      paths,
+      pipeline,
+      task: taskContext,
+      runId: manifest.run_id,
+      requestedBy: { actorId: 'codex-cli', channel: 'cli', name: 'Codex CLI' }
+    });
+
+    const schedulerPlan = await this.createSchedulerPlanForRun({
+      env: actualEnv,
+      manifest,
+      paths,
+      controlPlaneResult
+    });
+
     const runSummary = await manager.execute(taskContext);
     manager.dispose();
+
+    await this.finalizeSchedulerPlanForManifest({
+      env: actualEnv,
+      manifest,
+      paths,
+      plan: schedulerPlan
+    });
+
+    this.applySchedulerToRunSummary(runSummary, schedulerPlan);
+    this.applyHandlesToRunSummary(runSummary, manifest);
+    this.applyPrivacyToRunSummary(runSummary, manifest);
+    this.applyControlPlaneToRunSummary(runSummary, controlPlaneResult);
 
     await this.persistRunSummary(actualEnv, paths, manifest, runSummary);
 
@@ -376,6 +454,205 @@ export class CodexOrchestrator {
       manifest,
       manifestPath: relativeToRepo(env, paths.manifestPath),
       logPath: relativeToRepo(env, paths.logPath)
+    };
+  }
+
+  private async guardControlPlane(options: {
+    env: EnvironmentPaths;
+    manifest: CliManifest;
+    paths: RunPaths;
+    pipeline: PipelineDefinition;
+    task: TaskContext;
+    runId: string;
+    requestedBy: { actorId: string; channel: string; name?: string };
+  }): Promise<ControlPlaneValidationResult | null> {
+    const mode = this.resolveControlPlaneMode();
+    const driftReporter = new ControlPlaneDriftReporter({
+      repoRoot: options.env.repoRoot,
+      taskId: options.env.taskId
+    });
+    const validator = new ControlPlaneValidator({ mode, driftReporter, now: () => new Date() });
+    const request = buildRunRequestV2({
+      runId: options.runId,
+      task: options.task,
+      pipeline: options.pipeline,
+      manifest: options.manifest,
+      env: options.env,
+      requestedBy: options.requestedBy,
+      now: () => new Date()
+    });
+
+    try {
+      const result = await validator.validate(request);
+      this.attachControlPlaneToManifest(options.env, options.manifest, result);
+      await saveManifest(options.paths, options.manifest);
+      return result;
+    } catch (error: unknown) {
+      if (error instanceof ControlPlaneValidationError) {
+        this.attachControlPlaneToManifest(options.env, options.manifest, error.result);
+        options.manifest.status = 'failed';
+        options.manifest.status_detail = 'control-plane-validation-failed';
+        options.manifest.completed_at = isoTimestamp();
+        appendSummary(options.manifest, `Control plane validation failed: ${error.message}`);
+        await saveManifest(options.paths, options.manifest);
+      }
+      throw error;
+    }
+  }
+
+  private attachControlPlaneToManifest(
+    env: EnvironmentPaths,
+    manifest: CliManifest,
+    result: ControlPlaneValidationResult
+  ): void {
+    const { request, outcome } = result;
+    const drift = outcome.drift
+      ? {
+          report_path: relativeToRepo(env, outcome.drift.absoluteReportPath),
+          total_samples: outcome.drift.totalSamples,
+          invalid_samples: outcome.drift.invalidSamples,
+          invalid_rate: outcome.drift.invalidRate,
+          last_sampled_at: outcome.drift.lastSampledAt,
+          mode: outcome.drift.mode
+        }
+      : undefined;
+
+    manifest.control_plane = {
+      schema_id: request.schema,
+      schema_version: request.version,
+      request_id: request.requestId,
+      validation: {
+        mode: outcome.mode,
+        status: outcome.status,
+        timestamp: outcome.timestamp,
+        errors: outcome.errors.map((error) => ({ ...error }))
+      },
+      drift,
+      enforcement: {
+        enabled: outcome.mode === 'enforce',
+        activated_at: outcome.mode === 'enforce' ? outcome.timestamp : null
+      }
+    };
+  }
+
+  private applyControlPlaneToRunSummary(
+    runSummary: RunSummary,
+    result: ControlPlaneValidationResult | null
+  ): void {
+    if (!result) {
+      return;
+    }
+    const { request, outcome } = result;
+    runSummary.controlPlane = {
+      schemaId: request.schema,
+      schemaVersion: request.version,
+      requestId: request.requestId,
+      validation: {
+        mode: outcome.mode,
+        status: outcome.status,
+        timestamp: outcome.timestamp,
+        errors: outcome.errors.map((error) => ({ ...error }))
+      },
+      drift: outcome.drift
+        ? {
+            mode: outcome.drift.mode,
+            totalSamples: outcome.drift.totalSamples,
+            invalidSamples: outcome.drift.invalidSamples,
+            invalidRate: outcome.drift.invalidRate,
+            lastSampledAt: outcome.drift.lastSampledAt
+          }
+        : undefined
+    };
+  }
+
+  private resolveControlPlaneMode(): ControlPlaneValidationMode {
+    const explicit = process.env.CODEX_CONTROL_PLANE_MODE ?? null;
+    const enforce = process.env.CODEX_CONTROL_PLANE_ENFORCE ?? null;
+    const candidate = explicit ?? enforce;
+    if (!candidate) {
+      return 'shadow';
+    }
+    const normalized = candidate.trim().toLowerCase();
+    if (['1', 'true', 'enforce', 'on', 'yes'].includes(normalized)) {
+      return 'enforce';
+    }
+    return 'shadow';
+  }
+
+  private async createSchedulerPlanForRun(options: {
+    env: EnvironmentPaths;
+    manifest: CliManifest;
+    paths: RunPaths;
+    controlPlaneResult: ControlPlaneValidationResult;
+  }): Promise<SchedulerPlan> {
+    const plan = createSchedulerPlan(options.controlPlaneResult.request, {
+      now: () => new Date(),
+      instancePrefix: sanitizeTaskId(options.env.taskId)
+    });
+    this.attachSchedulerPlanToManifest(options.env, options.manifest, plan);
+    await saveManifest(options.paths, options.manifest);
+    return plan;
+  }
+
+  private async finalizeSchedulerPlanForManifest(options: {
+    env: EnvironmentPaths;
+    manifest: CliManifest;
+    paths: RunPaths;
+    plan: SchedulerPlan;
+  }): Promise<void> {
+    const finalStatus = this.resolveSchedulerFinalStatus(options.manifest.status);
+    finalizeSchedulerPlan(options.plan, finalStatus, isoTimestamp());
+    this.attachSchedulerPlanToManifest(options.env, options.manifest, options.plan);
+    await saveManifest(options.paths, options.manifest);
+  }
+
+  private attachSchedulerPlanToManifest(
+    env: EnvironmentPaths,
+    manifest: CliManifest,
+    plan: SchedulerPlan
+  ): void {
+    manifest.scheduler = serializeSchedulerPlan(plan);
+  }
+
+  private resolveSchedulerFinalStatus(status: RunStatus): SchedulerAssignmentStatus {
+    switch (status) {
+      case 'succeeded':
+        return 'succeeded';
+      case 'in_progress':
+        return 'running';
+      default:
+        return 'failed';
+    }
+  }
+
+  private applySchedulerToRunSummary(runSummary: RunSummary, plan: SchedulerPlan): void {
+    runSummary.scheduler = buildSchedulerRunSummary(plan);
+  }
+
+  private applyHandlesToRunSummary(runSummary: RunSummary, manifest: CliManifest): void {
+    if (!manifest.handles || manifest.handles.length === 0) {
+      return;
+    }
+    runSummary.handles = manifest.handles.map((handle) => ({
+      handleId: handle.handle_id,
+      correlationId: handle.correlation_id,
+      stageId: handle.stage_id,
+      status: handle.status,
+      frameCount: handle.frame_count,
+      latestSequence: handle.latest_sequence
+    }));
+  }
+
+  private applyPrivacyToRunSummary(runSummary: RunSummary, manifest: CliManifest): void {
+    if (!manifest.privacy) {
+      return;
+    }
+    runSummary.privacy = {
+      mode: manifest.privacy.mode,
+      totalFrames: manifest.privacy.totals.total_frames,
+      redactedFrames: manifest.privacy.totals.redacted_frames,
+      blockedFrames: manifest.privacy.totals.blocked_frames,
+      allowedFrames: manifest.privacy.totals.allowed_frames
     };
   }
 

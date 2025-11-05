@@ -3,8 +3,10 @@ import { join } from 'node:path';
 
 import type { ExecEvent, UnifiedExecRunResult } from '../../../../packages/orchestrator/src/index.js';
 import { ToolInvocationFailedError } from '../../../../packages/orchestrator/src/index.js';
-import { getCliExecRunner } from './execRuntime.js';
-import type { CommandStage, CliManifest } from '../types.js';
+import { getCliExecRunner, getPrivacyGuard, getExecHandleService } from './execRuntime.js';
+import type { CommandStage, CliManifest, HandleRecord } from '../types.js';
+import type { ExecHandleDescriptor } from '../../../../packages/orchestrator/src/exec/handle-service.js';
+import { logger } from '../../logger.js';
 import type { EnvironmentPaths } from '../run/environment.js';
 import type { RunPaths } from '../run/runPaths.js';
 import { relativeToRepo } from '../run/runPaths.js';
@@ -125,9 +127,20 @@ export async function runCommandStage(
         }
       });
       hooks.onResult?.(result);
+
+      if (result.handle) {
+        recordHandle(manifest, result.handle, {
+          stageId: stage.id,
+          pipelineId: manifest.pipeline_id,
+          runId: manifest.run_id
+        });
+        updatePrivacyManifest(manifest);
+      }
     } catch (error) {
       if (error instanceof ToolInvocationFailedError) {
         hooks.onError?.(error);
+        captureFailureHandle(manifest, stage, error);
+        updatePrivacyManifest(manifest);
       }
       throw error;
     }
@@ -175,6 +188,89 @@ export async function runCommandStage(
     unsubscribe();
     runnerLog.end();
     commandLog.end();
+  }
+}
+
+function recordHandle(
+  manifest: CliManifest,
+  descriptor: ExecHandleDescriptor,
+  context: { stageId: string | null; pipelineId: string; runId: string }
+): void {
+  const handles = Array.isArray(manifest.handles) ? [...manifest.handles] : [];
+  const entry = {
+    handle_id: descriptor.id,
+    correlation_id: descriptor.correlationId,
+    stage_id: context.stageId,
+    pipeline_id: context.pipelineId,
+    status: descriptor.status,
+    frame_count: descriptor.frameCount,
+    latest_sequence: descriptor.latestSequence,
+    created_at: descriptor.createdAt,
+    metadata: {
+      run_id: context.runId
+    }
+  } satisfies HandleRecord;
+  const existingIndex = handles.findIndex((candidate) => candidate.handle_id === entry.handle_id);
+  if (existingIndex >= 0) {
+    handles[existingIndex] = entry;
+  } else {
+    handles.push(entry);
+  }
+  manifest.handles = handles;
+}
+
+function updatePrivacyManifest(manifest: CliManifest): void {
+  const metrics = getPrivacyGuard().getMetrics();
+  const decisions = metrics.decisions.map((decision) => ({
+    handle_id: decision.handleId,
+    sequence: decision.sequence,
+    action: decision.action,
+    rule: decision.rule ?? null,
+    reason: decision.reason ?? null,
+    timestamp: decision.timestamp,
+    stage_id: resolveHandleStage(manifest, decision.handleId)
+  }));
+
+  manifest.privacy = {
+    mode: metrics.mode,
+    decisions,
+    totals: {
+      total_frames: metrics.totalFrames,
+      redacted_frames: metrics.redactedFrames,
+      blocked_frames: metrics.blockedFrames,
+      allowed_frames: metrics.allowedFrames
+    }
+  };
+}
+
+function resolveHandleStage(manifest: CliManifest, handleId: string): string | null {
+  const record = manifest.handles?.find((entry) => entry.handle_id === handleId);
+  return record?.stage_id ?? null;
+}
+
+function captureFailureHandle(
+  manifest: CliManifest,
+  stage: CommandStage,
+  error: ToolInvocationFailedError
+): void {
+  const metadata = (error.record?.metadata as Record<string, unknown> | undefined)?.exec as
+    | (Record<string, unknown> & { handleId?: string; runId?: string })
+    | undefined;
+  const handleId = metadata?.handleId as string | undefined;
+  if (!handleId) {
+    return;
+  }
+  try {
+    const descriptor = getExecHandleService().getDescriptor(handleId);
+    recordHandle(manifest, descriptor, {
+      stageId: stage.id,
+      pipelineId: manifest.pipeline_id,
+      runId: manifest.run_id
+    });
+  } catch (lookupError) {
+    logger.warn(
+      `Handle descriptor missing for failed stage ${stage.id ?? '<unknown>'}: ${(lookupError as Error).message}`
+    );
   }
 }
 

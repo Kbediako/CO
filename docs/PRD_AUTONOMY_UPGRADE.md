@@ -60,7 +60,6 @@ Codex orchestrator teams need to launch, monitor, and close delegated Codex runs
 - What service-level objectives (SLOs) should trigger auto-escalation, and who receives notifications?
 
 ## Status Checklist
-- [ ] Confirm sponsor alignment on objectives and success metrics. Evidence: `.runs/autonomy-upgrade/cli/<run-id>/manifest.json`
-- [ ] Baseline current orchestrator MTTR and completion rates. Evidence: `.runs/autonomy-upgrade/metrics/baseline.json`
+- [x] Confirm sponsor alignment on objectives and success metrics. Evidence: `.runs/autonomy-upgrade/cli/2025-11-05T13-30-00Z-upgrade/manifest.json`
+- [x] Baseline current orchestrator MTTR and completion rates. Evidence: `.runs/autonomy-upgrade/metrics/baseline.json`
 - [ ] Approvals captured for schema registry and privacy guard changes. Evidence: `.runs/autonomy-upgrade/approvals/latest.json`
-

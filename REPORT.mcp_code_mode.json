@@ -1,0 +1,126 @@
+{
+  "summary": "Local tooling is solid, yet the orchestrator cannot launch or steer additional Codex runners, so autonomy and throughput plateau; a typed MCP control plane, remote scheduler, and handle-based streaming are the immediate unlocks.",
+  "scores": {
+    "progressive_tool_discovery": 0,
+    "code_execution_first": 0,
+    "data_by_reference": 0,
+    "control_flow_in_code": 2,
+    "privacy_guard": 0,
+    "state_and_skills": 1,
+    "security_sandboxing": 0,
+    "observability": 1,
+    "migration_router": 1,
+    "prompting_nudges": 0
+  },
+  "top_recommendations": [
+    {
+      "title": "Stand up typed Codex MCP control plane",
+      "effort": "M",
+      "impact": "High",
+      "risk": "Med",
+      "files": [
+        "packages/orchestrator/src/mcp",
+        "packages/sdk-node/src"
+      ],
+      "acceptance_criteria": [
+        "Thin client wraps `@modelcontextprotocol/sdk` once and exposes `startRun`, `resumeRun`, `pollRun` helpers",
+        "Typed stubs live under `packages/orchestrator/src/mcp/servers/codex/*`",
+        "Manifests record which remote runners were invoked with their handles"
+      ]
+    },
+    {
+      "title": "Add multi-instance scheduler + manifest fan-out",
+      "effort": "M",
+      "impact": "High",
+      "risk": "Med",
+      "files": [
+        "orchestrator/src/manager.ts",
+        "orchestrator/src/persistence",
+        "packages/sdk-node/src/orchestrator.ts"
+      ],
+      "acceptance_criteria": [
+        "Mode policy can select from a pool of remote Codex instances based on load",
+        "Child manifests are linked under `.runs/<task>/delegated/`",
+        "Tests cover failure + retry of remote workers"
+      ]
+    },
+    {
+      "title": "Stream exec output by handle with sampled previews",
+      "effort": "M",
+      "impact": "High",
+      "risk": "Low",
+      "files": [
+        "orchestrator/src/cli/services/commandRunner.ts",
+        "packages/shared/manifest"
+      ],
+      "acceptance_criteria": [
+        "Exec events persist `handle` + sample metadata",
+        "Summary payloads deliver preview arrays",
+        "Vitest ensures retries reuse persisted blobs"
+      ]
+    },
+    {
+      "title": "Ship privacy-aware streaming guard",
+      "effort": "S",
+      "impact": "Med",
+      "risk": "Low",
+      "files": [
+        "packages/orchestrator/src/privacy",
+        "orchestrator/src/cli/services"
+      ],
+      "acceptance_criteria": [
+        "Tokenizer masks emails/phones/names before persistence",
+        "Remote responses untokenize only for allow-listed endpoints",
+        "Unit tests cover redaction + restoration across hops"
+      ]
+    },
+    {
+      "title": "Instrument cross-instance performance metrics",
+      "effort": "S",
+      "impact": "Med",
+      "risk": "Low",
+      "files": [
+        "orchestrator/src/cli/metrics",
+        "packages/orchestrator/src/telemetry",
+        "packages/sdk-node/src/orchestrator.ts"
+      ],
+      "acceptance_criteria": [
+        "Metrics capture remote queue wait, bytes transferred, and avoided tokens",
+        "Manifest summary records worker selection + latency",
+        "Documentation explains new counters for reviewers"
+      ]
+    }
+  ],
+  "evidence": [
+    {
+      "practice": "progressive_tool_discovery",
+      "file": "orchestrator/src/cli/pipelines/defaultDiagnostics.ts",
+      "line": 8,
+      "snippet": "command: 'npm run build'"
+    },
+    {
+      "practice": "data_by_reference",
+      "file": "orchestrator/src/cli/services/commandRunner.ts",
+      "line": 202,
+      "snippet": "writeEvent({\n        type: 'exec:chunk',\n        correlation_id: event.correlationId,\n        attempt: event.attempt,\n        stream: event.payload.stream,\n        sequence: event.payload.sequence,\n        bytes: event.payload.bytes,\n        data: event.payload.data\n      });"
+    },
+    {
+      "practice": "security_sandboxing",
+      "file": "orchestrator/src/cli/services/execRuntime.ts",
+      "line": 25,
+      "snippet": "const child = spawn(request.command, {\n    cwd: request.cwd,\n    env: request.env,\n    shell: true,\n    stdio: ['ignore', 'pipe', 'pipe']\n  });"
+    },
+    {
+      "practice": "prompting_nudges",
+      "file": ".agent/prompts/mcp-diagnostics.md",
+      "line": 8,
+      "snippet": "npx --yes @wong2/mcp-cli --config ./mcp-client.json call-tool codex-local:codex --args '{\"approval_policy\":\"never\",\"prompt\":\"Run npm run build and record the output in the current MCP run manifest. Reply only when the command finishes.\"}'"
+    },
+    {
+      "practice": "migration_router",
+      "file": "packages/sdk-node/src/orchestrator.ts",
+      "line": 55,
+      "snippet": "const child = spawn(internal.cliPath, buildCliArgs(internal), {\n      cwd: internal.spawnCwd,\n      env: internal.inheritedEnv,\n      stdio: ['pipe', 'pipe', 'pipe']\n    });"
+    }
+  ]
+}

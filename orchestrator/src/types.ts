@@ -90,6 +90,8 @@ export interface ReviewResult {
   decision: ReviewDecision;
 }
 
+import type { ControlPlaneRunSummary } from './control-plane/types.js';
+import type { SchedulerRunSummary } from './scheduler/types.js';
 import type { ToolRunRecord } from '../../packages/shared/manifest/types.js';
 
 export interface RunSummary {
@@ -102,6 +104,27 @@ export interface RunSummary {
   review: ReviewResult;
   timestamp: string;
   toolRuns?: ToolRunRecord[];
+  controlPlane?: ControlPlaneRunSummary;
+  scheduler?: SchedulerRunSummary;
+  handles?: RunHandleSummary[];
+  privacy?: PrivacyRunSummary;
+}
+
+export interface RunHandleSummary {
+  handleId: string;
+  correlationId: string;
+  stageId: string | null;
+  status: 'open' | 'closed';
+  frameCount: number;
+  latestSequence: number;
+}
+
+export interface PrivacyRunSummary {
+  mode: 'shadow' | 'enforce';
+  totalFrames: number;
+  redactedFrames: number;
+  blockedFrames: number;
+  allowedFrames: number;
 }
 
 export interface PlannerAgent {

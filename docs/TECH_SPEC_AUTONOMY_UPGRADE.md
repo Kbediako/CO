@@ -58,8 +58,8 @@ Data flow:
 - **Dashboards & Alerts**: Provide derived KPIs (utilization, MTTR, queue depth) and thresholds triggering auto-escalation.
 
 ## Data Model Updates
-- **Manifest Schema**: Extend with `controlPlane`, `scheduler`, `handles`, and `privacy` sections. Each entry references schema version IDs and timestamps.
-- **Metrics File (`.runs/<task-id>/metrics.json`)**: Add arrays `instanceStats` and `privacyEvents`.
+- **Manifest Schema**: Extend with `controlPlane`, `scheduler`, `handles`, and `privacy` sections. Control-plane validation writes enforcement status and drift summaries; scheduler assignments capture per-instance attempts and recovery checkpoints; handle metadata records resume tokens and frame sequences; privacy guard entries store redaction/block decisions with reasoning.
+- **Metrics File (`.runs/<task-id>/metrics.json`)**: Add arrays `instanceStats` and `privacyEvents` plus `control_plane_status`, `scheduler_mode`, and `handle_count` for downstream analytics.
 - **State Snapshot (`out/<task-id>/state.json`)**: Include handle metadata and observer subscription history.
 - **Control-Plane Drift Reports (`out/<task-id>/control-plane/drift.json`)**: Store validation drift findings separately from handle state to avoid artifact collisions.
 
@@ -79,6 +79,11 @@ Data flow:
   - MTTR reduction ≥40% derived from baseline metrics (TASK-002) versus post-rollout averages, calculated by telemetry collectors and attached to the same metrics artifact.
   - Metrics completeness (<5% missing fields) validated by schema checks during ingestion; failures annotate manifests and block rollout progression.
   - Each threshold assessed prior to advancing rollout Phase 3; failures trigger rollback via scheduler feature flag.
+- Aggregated artifacts are published alongside per-run entries:
+  - `.runs/autonomy-upgrade/metrics/baseline.json` anchors pre-upgrade MTTR and completion figures.
+  - `.runs/autonomy-upgrade/metrics/post-rollout.json` tracks live completion rates against the ≥95% objective.
+  - `.runs/autonomy-upgrade/metrics/completeness.json` surfaces schema coverage and <5% missing-field compliance.
+  - `out/autonomy-upgrade/metrics/mttr-delta.json` reports cumulative MTTR deltas and threshold status for release gating.
 
 ## Rollout Plan
 1. **Phase 0 (Shadow Validation)**: Deploy typed control plane and privacy guard in passive mode; collect metrics baselines.

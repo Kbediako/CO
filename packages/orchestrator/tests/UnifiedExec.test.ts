@@ -1,7 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 import { UnifiedExecRunner } from '../src/exec/unified-exec.js';
 import { ExecSessionManager, type ExecSessionHandle } from '../src/exec/session-manager.js';
+import { RemoteExecHandleService } from '../src/exec/handle-service.js';
 import { ToolOrchestrator, SandboxRetryableError, ToolInvocationFailedError } from '../src/tool-orchestrator.js';
+import { RemoteExecHandleService } from '../src/exec/handle-service.js';
 
 class TestHandle implements ExecSessionHandle {
   disposed = false;
@@ -188,6 +190,71 @@ describe('UnifiedExecRunner', () => {
         expect(events[0].type).toBe('exec:begin');
         expect(events[events.length - 1].type).toBe('exec:end');
       }
+      return true;
+    });
+  });
+
+  it('issues streaming handles and records frames', async () => {
+    const sessionManager = createSessionManager();
+    const orchestrator = new ToolOrchestrator({
+      now: () => new Date('2025-11-04T00:00:00.000Z')
+    });
+    const handleService = new RemoteExecHandleService({ now: () => new Date('2025-11-04T00:00:00.000Z') });
+    const runner = new UnifiedExecRunner<TestHandle>({
+      orchestrator,
+      sessionManager,
+      now: createClock(),
+      handleService,
+      executor: async (request) => {
+        request.onStdout('frame-1');
+        request.onStdout('frame-2');
+        return { exitCode: 0, signal: null };
+      }
+    });
+
+    const result = await runner.run({ command: 'echo', sessionId: 'shell' });
+    expect(result.handle).toBeDefined();
+    const descriptor = result.handle!;
+    expect(descriptor.status).toBe('closed');
+    expect(descriptor.frameCount).toBeGreaterThanOrEqual(4); // begin, two chunks, end
+  });
+
+  it('retains handle metadata when executor fails', async () => {
+    // This test enforces the contract that UnifiedExecRunner always embeds the
+    // issued streaming handle id into ToolInvocationFailedError metadata. If
+    // future changes stop populating exec.handleId, both this test and the CLI
+    // failure regression (orchestrator/tests/CommandRunnerFailure.test.ts) will
+    // fail, signalling that downstream manifests/metrics can no longer rely on
+    // handle persistence.
+    const sessionManager = createSessionManager();
+    const orchestrator = new ToolOrchestrator({
+      wait: async () => {},
+      now: () => new Date('2025-11-04T00:00:00.000Z')
+    });
+    const handleService = new RemoteExecHandleService({ now: () => new Date('2025-11-04T00:00:00.000Z') });
+    const runner = new UnifiedExecRunner<TestHandle>({
+      orchestrator,
+      sessionManager,
+      now: createClock(),
+      handleService,
+      executor: async () => {
+        throw new Error('simulated failure');
+      }
+    });
+
+    await expect(
+      runner.run({
+        command: 'echo',
+        sessionId: 'shell',
+        invocationId: 'failure-case'
+      })
+    ).rejects.toSatisfy((error: unknown) => {
+      if (!(error instanceof ToolInvocationFailedError)) {
+        return false;
+      }
+      const execMetadata = error.record.metadata?.exec as Record<string, unknown> | undefined;
+      expect(execMetadata?.handleId).toBeDefined();
+      expect(typeof execMetadata?.handleId).toBe('string');
       return true;
     });
   });

@@ -13,6 +13,7 @@ import { isoTimestamp } from '../utils/time.js';
 import { saveManifest } from '../run/manifest.js';
 import type { RunPaths } from '../run/runPaths.js';
 import { logger } from '../../logger.js';
+import { updateMetricsAggregates } from './metricsAggregator.js';
 
 const TERMINAL_STATES = new Set(['succeeded', 'failed', 'cancelled']);
 
@@ -54,7 +55,22 @@ export async function appendMetricsEntry(
     guardrails_present: guardrailsPresent,
     recorded_at: isoTimestamp(),
     artifact_path: manifest.artifact_root,
-    child_runs: manifest.child_runs.length
+    child_runs: manifest.child_runs.length,
+    control_plane_status: manifest.control_plane?.validation.status ?? 'unknown',
+    scheduler_mode: manifest.scheduler?.mode ?? null,
+    instance_stats: (manifest.scheduler?.assignments ?? []).map((assignment) => ({
+      instance_id: assignment.instance_id,
+      capability: assignment.capability,
+      status: assignment.status,
+      attempts: assignment.attempts.length,
+      recovery_events: assignment.attempts.reduce(
+        (sum, attempt) => sum + attempt.recovery_checkpoints.length,
+        0
+      )
+    })),
+    privacy_mode: manifest.privacy?.mode ?? null,
+    privacy_events: manifest.privacy?.decisions ?? [],
+    handle_count: manifest.handles?.length ?? 0
   };
 
   await mkdir(metricsRoot, { recursive: true });
@@ -71,4 +87,5 @@ export async function appendMetricsEntry(
   upsertGuardrailSummary(manifest);
   manifest.metrics_recorded = true;
   await saveManifest(paths, manifest);
+  await updateMetricsAggregates(env);
 }

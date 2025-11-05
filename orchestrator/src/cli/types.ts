@@ -1,3 +1,5 @@
+import type { ControlPlaneManifestSection } from '../control-plane/types.js';
+import type { SchedulerManifest } from '../scheduler/types.js';
 import type { PlanResult, RunSummary } from '../types.js';
 
 export type PipelineStage = CommandStage | SubPipelineStage;
@@ -104,6 +106,41 @@ export interface ApprovalRecord {
   reason?: string;
 }
 
+export interface HandleRecord {
+  handle_id: string;
+  correlation_id: string;
+  stage_id: string | null;
+  pipeline_id: string;
+  status: 'open' | 'closed';
+  frame_count: number;
+  latest_sequence: number;
+  created_at: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface PrivacyDecisionRecord {
+  handle_id: string;
+  sequence: number;
+  action: 'allow' | 'redact' | 'block';
+  rule?: string | null;
+  reason?: string | null;
+  timestamp: string;
+  stage_id: string | null;
+}
+
+export interface PrivacyTotals {
+  total_frames: number;
+  redacted_frames: number;
+  blocked_frames: number;
+  allowed_frames: number;
+}
+
+export interface PrivacyManifest {
+  mode: 'shadow' | 'enforce';
+  decisions: PrivacyDecisionRecord[];
+  totals: PrivacyTotals;
+}
+
 export interface CliManifest {
   version: number;
   task_id: string;
@@ -141,6 +178,10 @@ export interface CliManifest {
   run_summary_path: string | null;
   instructions_hash: string | null;
   instructions_sources: string[];
+  control_plane?: ControlPlaneManifestSection;
+  scheduler?: SchedulerManifest;
+  handles?: HandleRecord[];
+  privacy?: PrivacyManifest;
 }
 
 export type RunStatus = 'queued' | 'in_progress' | 'succeeded' | 'failed' | 'cancelled';

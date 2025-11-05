@@ -7,6 +7,8 @@ import {
   type ExecCommandExecutor,
   type ExecSessionHandle
 } from '../../../../packages/orchestrator/src/index.js';
+import { RemoteExecHandleService } from '../../../../packages/orchestrator/src/exec/handle-service.js';
+import { PrivacyGuard } from '../../privacy/guard.js';
 
 class CliExecSessionHandle implements ExecSessionHandle {
   constructor(public readonly id: string) {}
@@ -21,6 +23,9 @@ const sessionManager = new ExecSessionManager<CliExecSessionHandle>({
   baseEnv: process.env,
   factory: async ({ id }) => new CliExecSessionHandle(id)
 });
+
+const privacyGuard = new PrivacyGuard({ mode: resolvePrivacyGuardMode() });
+const handleService = new RemoteExecHandleService({ guard: privacyGuard, now: () => new Date() });
 
 const cliExecutor: ExecCommandExecutor<CliExecSessionHandle> = async (request) => {
   const child = spawn(request.command, {
@@ -62,7 +67,8 @@ const runner = new UnifiedExecRunner<CliExecSessionHandle>({
   orchestrator,
   sessionManager,
   executor: cliExecutor,
-  now: () => new Date()
+  now: () => new Date(),
+  handleService
 });
 
 export function getCliExecRunner(): UnifiedExecRunner<CliExecSessionHandle> {
@@ -71,4 +77,26 @@ export function getCliExecRunner(): UnifiedExecRunner<CliExecSessionHandle> {
 
 export function getCliSessionManager(): ExecSessionManager<CliExecSessionHandle> {
   return sessionManager;
+}
+
+export function getExecHandleService(): RemoteExecHandleService {
+  return handleService;
+}
+
+export function getPrivacyGuard(): PrivacyGuard {
+  return privacyGuard;
+}
+
+function resolvePrivacyGuardMode(): 'shadow' | 'enforce' {
+  const explicit = process.env.CODEX_PRIVACY_GUARD_MODE ?? null;
+  const enforce = process.env.CODEX_PRIVACY_GUARD_ENFORCE ?? null;
+  const candidate = explicit ?? enforce;
+  if (!candidate) {
+    return 'shadow';
+  }
+  const normalized = candidate.trim().toLowerCase();
+  if (['1', 'true', 'enforce', 'on', 'yes'].includes(normalized)) {
+    return 'enforce';
+  }
+  return 'shadow';
 }
