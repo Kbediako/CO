@@ -100,23 +100,36 @@ function isCodePath(file) {
 }
 
 function isSpecPath(file) {
-  return file.startsWith('tasks/specs/') || file === 'tasks/index.json';
+  return (
+    file.startsWith('tasks/specs/') ||
+    file.startsWith('docs/design/specs/') ||
+    file === 'tasks/index.json'
+  );
 }
 
 async function listSpecFiles() {
-  try {
-    const entries = await readdir('tasks/specs', { withFileTypes: true });
-    return entries
-      .filter((entry) => entry.isFile() && entry.name.endsWith('.md'))
-      .map((entry) => join('tasks/specs', entry.name))
-      .sort();
-  } catch (error) {
-    const code = error && typeof error === 'object' && error !== null && 'code' in error ? error.code : undefined;
-    if (code === 'ENOENT') {
-      return [];
+  const specDirs = ['tasks/specs', 'docs/design/specs'];
+  const files = [];
+
+  for (const dir of specDirs) {
+    try {
+      const entries = await readdir(dir, { withFileTypes: true });
+      for (const entry of entries) {
+        if (entry.isFile() && entry.name.endsWith('.md')) {
+          files.push(join(dir, entry.name));
+        }
+      }
+    } catch (error) {
+      const code =
+        error && typeof error === 'object' && error !== null && 'code' in error ? error.code : undefined;
+      if (code === 'ENOENT') {
+        continue;
+      }
+      throw error;
     }
-    throw error;
   }
+
+  return files.sort();
 }
 
 function parseReviewDate(raw) {

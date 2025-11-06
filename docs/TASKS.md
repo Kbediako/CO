@@ -5,6 +5,37 @@
 ## Checklist Mirror
 The Snakes Arena checklist has been retired from this workspace; reference the archived manifests in `/Users/asabeko/Documents/snakes-arena-backup/.runs/` if historical evidence is needed.
 
+# Task List Snapshot — Design Reference Pipeline (0401-design-reference)
+
+- **Update — Pending kickoff:** Await first diagnostics run to seed `.runs/0401-design-reference/cli/<run-id>/manifest.json` and `out/0401-design-reference/design/runs/<run>.json`.
+- **Update — Configuration planning:** `design.config.yaml` schema drafted alongside pipeline toggles documentation; manifest placeholder `<manifest-path>` to be swapped in once reviewed.
+- **Notes:** Optional tool setup lives behind `npm run setup:design-tools`; retention/expiry policies will reference `design.config.yaml > metadata.design.retention`.
+
+## Checklist Mirror
+Mirror status with `tasks/design-reference-pipeline.md` and `.agent/task/design-reference-pipeline.md`. Keep `[ ]` until a manifest path such as `.runs/0401-design-reference/cli/<run-id>/manifest.json` is recorded.
+
+### Foundation
+- [ ] Collateral synchronized — `docs/design/PRD-design-reference-pipeline.md`, `docs/design/specs/DESIGN_REFERENCE_PIPELINE.md`, `tasks/index.json`, `.agent/task/design-reference-pipeline.md`, `docs/TASKS.md`; Evidence: `<manifest-path>`.
+- [ ] Pipeline toggles wired — `design.config.yaml` template + CLI/ENV triggers (`--pipeline design-reference`, `DESIGN_PIPELINE=1`) documented; Evidence: `<manifest-path>`.
+- [ ] Setup tooling — `npm run setup:design-tools` captures Playwright/FFmpeg optional installs without impacting baseline CI; Evidence: `<manifest-path>`.
+
+### Pipeline Stages
+- [ ] Playwright extractor implemented — stages DOM/CSS/screenshots with privacy approvals logged; Evidence: `<manifest-path>`.
+- [ ] Reference page builder shipped — `motherduck.html` staged under `design/reference/`; Evidence: `<manifest-path>`.
+- [ ] Componentization stage delivered — `packages/design-system` assets staged under `design/components/`; Evidence: `<manifest-path>`.
+- [ ] Advanced assets optionality — Framer Motion + FFmpeg outputs gated by config quotas; Evidence: `<manifest-path>`.
+
+### Manifest & Guardrails
+- [ ] Manifest schema updates — `packages/shared/manifest/types.ts` + `packages/shared/manifest/writer.ts` persist `design_artifacts`; Evidence: `<manifest-path>`.
+- [ ] DesignArtifactWriter output — `out/0401-design-reference/design/runs/<run>.json` summary written with retention/privacy fields; Evidence: `<manifest-path>`.
+- [ ] Retention & privacy controls — expiry automation/docs and approval logging established; Evidence: `<manifest-path>`.
+- [ ] Guardrail integration — `scripts/spec-guard.mjs` covers `docs/design/specs/**`; `npm --prefix packages/design-system run test:visual` hooked into pipeline; Evidence: `<manifest-path>`.
+
+### Verification & Approvals
+- [ ] Visual regression evidence — diff artifacts + pass/fail summaries staged under `design/visual-regression/`; Evidence: `<manifest-path>`.
+- [ ] Diagnostics run — `npx codex-orchestrator start diagnostics --pipeline design-reference --format json`; Evidence: `<manifest-path>`.
+- [ ] Reviewer hand-off — `npm run review` references latest design-reference manifest and approvals; Evidence: `<manifest-path>`.
+
 # Task List Snapshot — Codex Orchestrator Autonomy Enhancements (0303)
 
 - **Update — 2025-11-05:** Multi-instance autonomy upgrade validation run recorded; manifest `.runs/autonomy-upgrade/cli/2025-11-05T13-30-00Z-upgrade/manifest.json` captures control-plane enforcement, scheduler fan-out, streaming handles, and privacy guard enforcement.
