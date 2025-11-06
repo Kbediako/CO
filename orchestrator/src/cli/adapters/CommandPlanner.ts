@@ -113,7 +113,8 @@ interface StagePlanHints {
 }
 
 function extractStagePlanHints(stage: PipelineStage): StagePlanHints {
-  const planConfig = (stage as { plan?: Partial<StagePlanHints> & Record<string, unknown> }).plan ?? {};
+  const stageRecord = stage as unknown as Record<string, unknown>;
+  const planConfig = (stageRecord.plan as (Partial<StagePlanHints> & Record<string, unknown>) | undefined) ?? {};
   const aliases = Array.isArray(planConfig.aliases)
     ? planConfig.aliases.map((alias) => String(alias))
     : [];
@@ -125,12 +126,12 @@ function extractStagePlanHints(stage: PipelineStage): StagePlanHints {
       : undefined;
   const rawExecutionMode = typeof planConfig.executionMode === 'string'
     ? planConfig.executionMode
-    : typeof (stage as Record<string, unknown>).executionMode === 'string'
-      ? (stage as Record<string, unknown>).executionMode
-      : typeof (stage as Record<string, unknown>).execution_mode === 'string'
-        ? (stage as Record<string, unknown>).execution_mode
-        : typeof (stage as Record<string, unknown>).mode === 'string'
-          ? (stage as Record<string, unknown>).mode
+    : typeof stageRecord.executionMode === 'string'
+      ? (stageRecord.executionMode as string)
+      : typeof stageRecord.execution_mode === 'string'
+        ? (stageRecord.execution_mode as string)
+        : typeof stageRecord.mode === 'string'
+          ? (stageRecord.mode as string)
           : undefined;
   const executionMode = typeof rawExecutionMode === 'string'
     ? rawExecutionMode.trim().toLowerCase() || null
@@ -146,13 +147,14 @@ function extractStagePlanHints(stage: PipelineStage): StagePlanHints {
 }
 
 function resolveStageRequiresCloud(stage: PipelineStage, hints: StagePlanHints): boolean {
+  const stageRecord = stage as unknown as Record<string, unknown>;
   const candidates: Array<boolean | null | undefined> = [
     hints.requiresCloud,
-    typeof (stage as Record<string, unknown>).requires_cloud === 'boolean'
-      ? ((stage as Record<string, unknown>).requires_cloud as boolean)
+    typeof stageRecord.requires_cloud === 'boolean'
+      ? (stageRecord.requires_cloud as boolean)
       : undefined,
-    typeof (stage as Record<string, unknown>).requiresCloud === 'boolean'
-      ? ((stage as Record<string, unknown>).requiresCloud as boolean)
+    typeof stageRecord.requiresCloud === 'boolean'
+      ? (stageRecord.requiresCloud as boolean)
       : undefined
   ];
   for (const candidate of candidates) {

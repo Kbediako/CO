@@ -45,6 +45,7 @@ function createManifest(runId: string, pipeline: PipelineDefinition): CliManifes
     commands: [],
     child_runs: [],
     run_summary_path: null,
+    plan_target_id: null,
     instructions_hash: null,
     instructions_sources: []
   };
