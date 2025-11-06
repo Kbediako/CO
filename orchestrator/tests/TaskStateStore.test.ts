@@ -86,4 +86,45 @@ describe('TaskStateStore', () => {
 
     await expect(store.recordRun(createRunSummary())).rejects.toBeInstanceOf(TaskStateStoreLockError);
   });
+
+  it('replaces existing runs without duplicating entries and keeps ordering intact', async () => {
+    const store = new TaskStateStore({ runsDir, outDir });
+
+    const runA = createRunSummary({
+      runId: 'run:2025-10-29T00:00:00Z',
+      timestamp: '2025-10-29T00:00:00.000Z'
+    });
+    const runB = createRunSummary({
+      runId: 'run:2025-10-29T01:00:00Z',
+      timestamp: '2025-10-29T01:00:00.000Z'
+    });
+    const runC = createRunSummary({
+      runId: 'run:2025-10-29T02:00:00Z',
+      timestamp: '2025-10-29T02:00:00.000Z'
+    });
+
+    await store.recordRun(runA);
+    await store.recordRun(runB);
+    await store.recordRun(runC);
+
+    const replacement = createRunSummary({
+      runId: runB.runId,
+      timestamp: '2025-10-29T04:00:00.000Z',
+      build: {
+        ...runB.build,
+        notes: 'updated',
+        runId: runB.runId
+      }
+    });
+
+    await store.recordRun(replacement);
+
+    const statePath = join(outDir, runA.taskId, 'state.json');
+    const state = JSON.parse(await readFile(statePath, 'utf-8')) as TaskStateSnapshot;
+
+    expect(state.runs).toHaveLength(3);
+    expect(state.runs.map((run) => run.runId)).toEqual([runA.runId, runC.runId, runB.runId]);
+    expect(state.runs.find((run) => run.runId === runB.runId)?.build.notes).toBe('updated');
+    expect(state.lastRunAt).toBe(replacement.timestamp);
+  });
 });

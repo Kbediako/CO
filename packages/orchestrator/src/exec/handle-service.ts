@@ -136,17 +136,15 @@ export class RemoteExecHandleService {
       ? await this.guard.process(frame, { handleId })
       : { frame, decision: { action: 'allow' as const } };
     handle.decisions.push({ sequence: frame.sequence, decision: processed.decision });
-
-    if (!processed.frame) {
-      return;
+    if (processed.frame) {
+      handle.frames.push(processed.frame);
+      if (handle.frames.length > this.maxStoredFrames) {
+        handle.frames.splice(0, handle.frames.length - this.maxStoredFrames);
+      }
+      this.notifyObservers(handle, processed.frame);
     }
 
-    handle.frames.push(processed.frame);
-    if (handle.frames.length > this.maxStoredFrames) {
-      handle.frames.splice(0, handle.frames.length - this.maxStoredFrames);
-    }
-
-    this.notifyObservers(handle, processed.frame);
+    this.pruneDecisions(handle);
   }
 
   close(handleId: string): void {
@@ -175,8 +173,12 @@ export class RemoteExecHandleService {
 
     // Replay frames from requested sequence.
     const fromSequence = options.fromSequence ?? 1;
-    const replay = handle.frames.filter((frame) => frame.sequence >= fromSequence);
-    for (const frame of replay) {
+    const startIndex = this.findFrameStartIndex(handle.frames, fromSequence);
+    for (let index = startIndex; index < handle.frames.length; index += 1) {
+      const frame = handle.frames[index];
+      if (!frame) {
+        continue;
+      }
       this.enqueueFrame(state, frame);
     }
 
@@ -192,7 +194,8 @@ export class RemoteExecHandleService {
 
   getSnapshot(handleId: string, fromSequence = 1): ExecStreamFrame[] {
     const handle = this.getHandle(handleId);
-    return handle.frames.filter((frame) => frame.sequence >= fromSequence);
+    const startIndex = this.findFrameStartIndex(handle.frames, fromSequence);
+    return handle.frames.slice(startIndex);
   }
 
   getDescriptor(handleId: string): ExecHandleDescriptor {
@@ -255,5 +258,61 @@ export class RemoteExecHandleService {
       status: handle.status,
       latestSequence: handle.nextSequence - 1
     };
+  }
+
+  private pruneDecisions(handle: ExecHandle): void {
+    if (handle.decisions.length === 0) {
+      return;
+    }
+    if (this.maxStoredFrames <= 0) {
+      handle.decisions.length = 0;
+      return;
+    }
+
+    const slidingMinSequence = Math.max(1, handle.nextSequence - this.maxStoredFrames);
+    const preservedSequences = new Set<number>();
+    for (const frame of handle.frames) {
+      preservedSequences.add(frame.sequence);
+    }
+
+    let writeIndex = 0;
+    for (let index = 0; index < handle.decisions.length; index += 1) {
+      const entry = handle.decisions[index];
+      if (!entry) {
+        continue;
+      }
+      const keep =
+        entry.sequence >= slidingMinSequence || preservedSequences.has(entry.sequence);
+      if (keep) {
+        handle.decisions[writeIndex] = entry;
+        writeIndex += 1;
+      }
+    }
+    if (writeIndex < handle.decisions.length) {
+      handle.decisions.length = writeIndex;
+    }
+  }
+
+  private findFrameStartIndex(frames: ExecStreamFrame[], fromSequence: number): number {
+    if (fromSequence <= 1 || frames.length === 0) {
+      return 0;
+    }
+    let low = 0;
+    let high = frames.length - 1;
+    let result = frames.length;
+    while (low <= high) {
+      const mid = (low + high) >> 1;
+      const frame = frames[mid];
+      if (!frame) {
+        break;
+      }
+      if (frame.sequence >= fromSequence) {
+        result = mid;
+        high = mid - 1;
+      } else {
+        low = mid + 1;
+      }
+    }
+    return result;
   }
 }

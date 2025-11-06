@@ -50,4 +50,28 @@ describe('createStdioTracker', () => {
     expect(tracker.getBuffered('stderr')).toBe('');
     expect(tracker.push('stdout', 'c').sequence).toBe(6);
   });
+
+  it('retains only the newest bytes when a single chunk exceeds the limit', () => {
+    const tracker = createStdioTracker({
+      maxBufferBytes: 4
+    });
+
+    tracker.push('stderr', 'abcdef');
+
+    expect(tracker.getBuffered('stderr')).toBe('cdef');
+    expect(tracker.getBufferedBytes('stderr')).toBe(4);
+  });
+
+  it('drops only the overflow bytes when advancing the sliding window', () => {
+    const tracker = createStdioTracker({
+      maxBufferBytes: 5
+    });
+
+    tracker.push('stdout', 'abc');
+    tracker.push('stdout', 'de');
+    tracker.push('stdout', 'f');
+
+    expect(tracker.getBuffered('stdout')).toBe('bcdef');
+    expect(tracker.getBufferedBytes('stdout')).toBe(5);
+  });
 });

@@ -132,15 +132,68 @@ export class TaskStateStore {
   }
 
   private mergeSnapshot(snapshot: TaskStateSnapshot, summary: RunSummary): TaskStateSnapshot {
-    const runs = snapshot.runs.filter((run) => run.runId !== summary.runId);
-    runs.push(summary);
-    runs.sort((a, b) => a.timestamp.localeCompare(b.timestamp));
-    const lastRunAt = runs.length > 0 ? runs[runs.length - 1]!.timestamp : snapshot.lastRunAt;
+    const runs = snapshot.runs;
+    const existingIndex = runs.findIndex((run) => run.runId === summary.runId);
+    if (existingIndex !== -1) {
+      const updatedRuns = runs.slice();
+      updatedRuns[existingIndex] = summary;
+      updatedRuns.sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+      const lastRunAt = updatedRuns.length > 0 ? updatedRuns[updatedRuns.length - 1]!.timestamp : snapshot.lastRunAt;
+      return {
+        taskId: snapshot.taskId,
+        lastRunAt,
+        runs: updatedRuns
+      };
+    }
+
+    if (runs.length === 0) {
+      runs.push(summary);
+      return {
+        taskId: snapshot.taskId,
+        lastRunAt: summary.timestamp,
+        runs
+      };
+    }
+
+    const lastTimestamp = runs[runs.length - 1]!.timestamp;
+    if (lastTimestamp.localeCompare(summary.timestamp) <= 0) {
+      runs.push(summary);
+      return {
+        taskId: snapshot.taskId,
+        lastRunAt: summary.timestamp,
+        runs
+      };
+    }
+
+    const insertIndex = this.findInsertIndex(runs, summary.timestamp);
+    runs.splice(insertIndex, 0, summary);
+    const lastRunAt = runs[runs.length - 1]!.timestamp;
     return {
       taskId: snapshot.taskId,
       lastRunAt,
       runs
     };
+  }
+
+  private findInsertIndex(runs: StoredRunSummary[], timestamp: string): number {
+    let low = 0;
+    let high = runs.length - 1;
+    let result = runs.length;
+
+    while (low <= high) {
+      const mid = (low + high) >> 1;
+      const candidate = runs[mid];
+      if (!candidate) {
+        break;
+      }
+      if (candidate.timestamp.localeCompare(timestamp) > 0) {
+        result = mid;
+        high = mid - 1;
+      } else {
+        low = mid + 1;
+      }
+    }
+    return result;
   }
 
   private async writeAtomic(destination: string, contents: string): Promise<void> {

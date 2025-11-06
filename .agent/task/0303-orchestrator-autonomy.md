@@ -80,6 +80,27 @@
      - Commands: `npm run review`
      - Acceptance: Review command references latest manifest; Evidence: `.runs/0303-orchestrator-autonomy/cli/2025-11-04T00-31-05-908Z-9d1b561c/manifest.json` (local review recorded outcome “Skip for now”).
      - [x] Status: _completed 2025-11-04_
+8. **Efficiency Optimizations**
+   - Subtask: Bounded guard decisions
+     - Files: `packages/orchestrator/src/exec/handle-service.ts`
+     - Acceptance: `handle.decisions` pruned with frame buffer; Evidence: `.runs/0303-orchestrator-autonomy/cli/2025-11-06T07-19-49-813Z-8dd5ff38/manifest.json`, tests `packages/orchestrator/tests/HandleService.test.ts`.
+     - [x] Status: _completed 2025-11-06_
+   - Subtask: Replay window reuse
+     - Files: `packages/orchestrator/src/exec/handle-service.ts`
+     - Acceptance: Snapshots/subscriptions reuse stored frame tail (O(replayed frames)); Evidence: `.runs/0303-orchestrator-autonomy/cli/2025-11-06T07-19-49-813Z-8dd5ff38/manifest.json`, tests `packages/orchestrator/tests/HandleService.test.ts`.
+     - [x] Status: _completed 2025-11-06_
+   - Subtask: Sliding stdio buffer
+     - Files: `packages/shared/streams/stdio.ts`
+     - Acceptance: O(chunk) sliding window with unit coverage; Evidence: `.runs/0303-orchestrator-autonomy/cli/2025-11-06T07-19-49-813Z-8dd5ff38/manifest.json`, tests `packages/shared/tests/StdioTracker.test.ts`.
+     - [x] Status: _completed 2025-11-06_
+   - Subtask: O(1) TaskStateStore append
+     - Files: `orchestrator/src/persistence/TaskStateStore.ts`
+     - Acceptance: Append path avoids full rescan; Evidence: `.runs/0303-orchestrator-autonomy/cli/2025-11-06T07-19-49-813Z-8dd5ff38/manifest.json`, tests `orchestrator/tests/TaskStateStore.test.ts`.
+     - [x] Status: _completed 2025-11-06_
+   - Subtask: Guardrails rerun
+     - Commands: `npm run test`, `node scripts/spec-guard.mjs --dry-run`, `scripts/run-mcp-diagnostics.sh --no-watch`
+     - Acceptance: Diagnostics manifest captures successful guardrail execution; Evidence: `.runs/0303-orchestrator-autonomy/cli/2025-11-06T07-19-49-813Z-8dd5ff38/manifest.json`.
+     - [x] Status: _completed 2025-11-06_
 
 ## Relevant Files
 - `docs/PRD-codex-orchestrator-autonomy.md`, `docs/TECH_SPEC-codex-orchestrator-autonomy.md`, `docs/ACTION_PLAN-codex-orchestrator-autonomy.md`, `tasks/0303-prd-orchestrator-autonomy.md`, `tasks/tasks-0303-orchestrator-autonomy.md`
