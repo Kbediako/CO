@@ -47,7 +47,7 @@
      - [x] Status: `.runs/0202-orchestrator-hardening/cli/2025-10-31T22-56-34-431Z-9574035c/manifest.json`
 5. **Verification & Rollout**
    - Subtask: Guardrail runs
-     - Commands: `bash scripts/spec-guard.sh --dry-run`, `npm run lint`, `npm run test`
+     - Commands: `node scripts/spec-guard.mjs --dry-run`, `npm run lint`, `npm run test`
      - Acceptance: Commands succeed; Evidence: manifests/log snippets attached.
      - [x] Status: `.runs/0202-orchestrator-hardening/cli/2025-10-31T22-56-34-431Z-9574035c/manifest.json`
   - Subtask: Reviewer hand-off

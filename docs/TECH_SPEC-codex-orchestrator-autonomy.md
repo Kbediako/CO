@@ -104,7 +104,7 @@
   - Long-running PTY session with streaming outputs, verifying RSS <75 MB.
   - Collector offline scenarios ensuring graceful degradation.
 - Tooling:
-  - `npm run lint`, `npm run test`, `npm run eval:test` (if fixtures available), `bash scripts/spec-guard.sh --dry-run`, `npm run review`.
+  - `npm run lint`, `npm run test`, `npm run eval:test` (if fixtures available), `node scripts/spec-guard.mjs --dry-run`, `npm run review`.
 
 ## Implementation Phases
 1. Refactor approval handling into `ToolOrchestrator`; update manifests and unit tests.

@@ -21,7 +21,7 @@ Ensure every significant spec has `last_review` ≤ 30 days; refresh or re-appro
 ### APPROVAL LOGGING & MODE POLICY — Added 2025-10-16
 - Record the execution mode (`mcp` vs `cloud`) and approval rationale inside the run manifest before implementation begins.
 - Safe approval profile (`read/edit/run/network`) is mandatory; escalations require reviewer/human acknowledgement captured under `approvals` in the manifest.
-- Run `bash scripts/spec-guard.sh --dry-run` prior to code changes touching `src/**` or migrations; a failure means halt work, update the relevant spec, and capture the refreshed `last_review` date.
+- Run `node scripts/spec-guard.mjs --dry-run` prior to code changes touching `src/**` or migrations; a failure means halt work, update the relevant spec, and capture the refreshed `last_review` date.
 
 ## Added by Governance 2025-10-16
 - G1 — PRD approval must be recorded in `tasks/0001-prd-codex-orchestrator.md#approval-log-2025-10-16` with a safe approval mode run ID before downstream work starts.

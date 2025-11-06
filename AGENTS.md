@@ -6,7 +6,7 @@ Use this repository as the wrapper that coordinates multiple Codex-driven projec
 - Default execution mode is `mcp`.
 - Switch to cloud mode only if your task plan explicitly allows a parallel run and the reviewer records the override in the active run manifest.
 - Keep the safe approval profile (`read/edit/run/network`). Capture any escalation in `.runs/<task>/<timestamp>/manifest.json` under `approvals`.
-- Run `bash scripts/spec-guard.sh --dry-run` before requesting review. Update specs or refresh approvals when the guard fails.
+- Run `node scripts/spec-guard.mjs --dry-run` before requesting review. Update specs or refresh approvals when the guard fails.
 
 ## Multi-project Layout
 - Place downstream codebases or adapters under `packages/<project>` (or another top-level directory agreed upon by the team).
@@ -24,7 +24,7 @@ Use this repository as the wrapper that coordinates multiple Codex-driven projec
 | `npm run lint` | Pre-commit / review gates | Executes `npm run build:patterns` first so codemods compile. |
 | `npm run test` | Unit + integration checks | Vitest harness covering orchestrator + patterns. |
 | `npm run eval:test` | Evaluation harness smoke tests | Requires fixtures in `evaluation/fixtures/**`; optional, enable when evaluation scope exists. |
-| `bash scripts/spec-guard.sh --dry-run` | Spec freshness validation | Blocks merges when touched specs are older than 30 days. |
+| `node scripts/spec-guard.mjs --dry-run` | Spec freshness validation | Blocks merges when touched specs are older than 30 days. |
 | `npm run review` | Reviewer hand-off | Runs `codex review --manifest <latest>` using the newest run manifest under `.runs/**`. |
 
 Update the table once you wire different build pipelines or tooling.

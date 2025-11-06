@@ -23,4 +23,4 @@ jobs:
         if: ${{ github.event_name == 'pull_request' }}
         run: echo "BASE_SHA=${{ github.event.pull_request.base.sha }}" >> "$GITHUB_ENV"
       - name: Run spec guard
-        run: bash scripts/spec-guard.sh
+        run: node scripts/spec-guard.mjs

@@ -4,7 +4,7 @@
 - Export `MCP_RUNNER_TASK_ID=0303-orchestrator-autonomy` so diagnostics land in `.runs/0303-orchestrator-autonomy/cli/` and mirrors sync across `/tasks`, `docs/`, and `.agent/`.
 - Store evidence under `.runs/0303-orchestrator-autonomy/cli/<run-id>/manifest.json`, metrics in `.runs/0303-orchestrator-autonomy/metrics.json`, and summaries in `out/0303-orchestrator-autonomy/state.json`.
 - Record any approval escalations in the manifest `approvals` array and cross-link when flipping checklist items.
-- Run `bash scripts/spec-guard.sh --dry-run` plus `npm run lint`, `npm run test`, and `npm run eval:test` (if fixtures exist) before reviewer hand-off; attach the manifest path documenting these runs.
+- Run `node scripts/spec-guard.mjs --dry-run` plus `npm run lint`, `npm run test`, and `npm run eval:test` (if fixtures exist) before reviewer hand-off; attach the manifest path documenting these runs.
 
 ## Project 0202 — Codex Orchestrator Resilience Hardening
 - Existing manifests remain in `.runs/0202-orchestrator-hardening/cli/`; keep metrics/state snapshots in `.runs/0202-orchestrator-hardening/metrics.json` and `out/0202-orchestrator-hardening/state.json`.

@@ -8,7 +8,7 @@ Follow the Local MCP Harness Quickstart in .agent/readme.md. The harness already
 npx --yes @wong2/mcp-cli --config ./mcp-client.json call-tool codex-local:codex --args '{"approval_policy":"never","prompt":"Run npm run build and record the output in the current MCP run manifest. Reply only when the command finishes."}'
 npx --yes @wong2/mcp-cli --config ./mcp-client.json call-tool codex-local:codex --args '{"approval_policy":"never","prompt":"Run npm run lint and record the output in the current MCP run manifest. Reply only when the command finishes."}'
 npx --yes @wong2/mcp-cli --config ./mcp-client.json call-tool codex-local:codex --args '{"approval_policy":"never","prompt":"Run npm run test and record the output in the current MCP run manifest. Reply only when the command finishes."}'
-npx --yes @wong2/mcp-cli --config ./mcp-client.json call-tool codex-local:codex --args '{"approval_policy":"never","prompt":"Run bash scripts/spec-guard.sh --dry-run and record the output in the current MCP run manifest. Reply only when the command finishes."}'
+npx --yes @wong2/mcp-cli --config ./mcp-client.json call-tool codex-local:codex --args '{"approval_policy":"never","prompt":"Run node scripts/spec-guard.mjs --dry-run and record the output in the current MCP run manifest. Reply only when the command finishes."}'
 
 After all four commands finish, read the latest .runs/local-mcp/<timestamp>/manifest.json, summarize pass/fail status, and report the manifest path. Do not run additional pre-check commands like ls or grep before the sequence; the harness manages manifests automatically.
 ```

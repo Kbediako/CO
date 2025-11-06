@@ -2,7 +2,7 @@
 
 last_review: 2099-01-01
 
-Create mini-specs for your project under this directory. Suggested naming pattern: `0001-your-feature.md` with front matter including `last_review: YYYY-MM-DD` so `scripts/spec-guard.sh` can enforce freshness.
+Create mini-specs for your project under this directory. Suggested naming pattern: `0001-your-feature.md` with front matter including `last_review: YYYY-MM-DD` so `scripts/spec-guard.mjs` can enforce freshness.
 
 Recommended sections:
 - Summary & scope

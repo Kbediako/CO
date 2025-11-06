@@ -106,6 +106,68 @@ describe('createSchedulerPlan', () => {
     expect(plan.assignments[0]?.status).toBe('assigned');
   });
 
+  it('caps assignments to the available fan-out capacity when maxInstances is higher', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'scheduler-plan-capacity-'));
+    const env: EnvironmentPaths = {
+      repoRoot,
+      runsRoot: join(repoRoot, '.runs'),
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'autonomy-upgrade'
+    };
+
+    const pipeline: PipelineDefinition = {
+      id: 'pipeline-capped',
+      title: 'Capped Pipeline',
+      stages: [{ kind: 'command', id: 'build', title: 'Build', command: 'echo build' }],
+      tags: ['general']
+    };
+
+    const { request } = createRequest(env, pipeline, 'run-plan-capacity');
+    request.schedule.fanOut = [
+      { capability: 'general', weight: 1, maxConcurrency: 1 },
+      { capability: 'sandbox', weight: 1, maxConcurrency: 1 }
+    ];
+    request.schedule.maxInstances = 5;
+    request.schedule.minInstances = 1;
+
+    const plan = createSchedulerPlan(request, {
+      now: () => new Date('2025-11-05T02:02:00Z'),
+      instancePrefix: 'autonomy-upgrade'
+    });
+
+    expect(plan.assignments).toHaveLength(2);
+    expect(plan.assignments.map((assignment) => assignment.capability)).toEqual(['general', 'sandbox']);
+  });
+
+  it('throws when schedule minInstances exceeds available capacity', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'scheduler-plan-error-'));
+    const env: EnvironmentPaths = {
+      repoRoot,
+      runsRoot: join(repoRoot, '.runs'),
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'autonomy-upgrade'
+    };
+
+    const pipeline: PipelineDefinition = {
+      id: 'pipeline-error',
+      title: 'Error Pipeline',
+      stages: [{ kind: 'command', id: 'build', title: 'Build', command: 'echo build' }],
+      tags: ['general']
+    };
+
+    const { request } = createRequest(env, pipeline, 'run-plan-error');
+    request.schedule.fanOut = [{ capability: 'general', weight: 1, maxConcurrency: 1 }];
+    request.schedule.minInstances = 3;
+    request.schedule.maxInstances = 5;
+
+    expect(() =>
+      createSchedulerPlan(request, {
+        now: () => new Date('2025-11-05T02:03:00Z'),
+        instancePrefix: 'autonomy-upgrade'
+      })
+    ).toThrowError(/requires at least 3 instances but only 1 fan-out slot/i);
+  });
+
   it('serializes and finalizes plan outcomes', async () => {
     const repoRoot = await mkdtemp(join(tmpdir(), 'scheduler-finalize-'));
     const env: EnvironmentPaths = {

@@ -7,7 +7,7 @@ Applies to all runs executed with `MCP_RUNNER_TASK_ID=0303-orchestrator-autonomy
 - Default approval profile remains `read/edit/run/network`; do not request escalations unless the manifest history documents reviewer consent.
 - Every run must capture its manifest under `.runs/0303-orchestrator-autonomy/cli/<run-id>/manifest.json`; attach this path when updating checklists.
 - Metrics live in `.runs/0303-orchestrator-autonomy/metrics.json`; state snapshots accumulate in `out/0303-orchestrator-autonomy/state.json`.
-- Run `bash scripts/spec-guard.sh --dry-run`, `npm run lint`, `npm run test`, and `npm run eval:test` (when fixtures exist) before review. Record the manifest that proves these commands ran successfully.
+- Run `node scripts/spec-guard.mjs --dry-run`, `npm run lint`, `npm run test`, and `npm run eval:test` (when fixtures exist) before review. Record the manifest that proves these commands ran successfully.
 
 ## Escalations & Logging
 - If an approval escalation is necessary, annotate the manifest `approvals` array with approver, timestamp, and rationale.

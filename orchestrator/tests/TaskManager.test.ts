@@ -116,6 +116,114 @@ describe('TaskManager', () => {
     ]);
   });
 
+  it('skips tester and reviewer when the build fails', async () => {
+    const plan: PlanResult = {
+      items: [{ id: 'subtask-failure', description: 'Fail build' }]
+    };
+
+    const plannerFn = vi.fn(async () => plan);
+    const builderFn = vi.fn(async () => ({
+      subtaskId: 'subtask-failure',
+      artifacts: [],
+      mode: 'mcp' as const,
+      success: false,
+      notes: 'build failed',
+      runId: 'ignored'
+    } satisfies BuildResult));
+    const testerFn = vi.fn(async () => {
+      throw new Error('tester should not run when build fails');
+    });
+    const reviewerFn = vi.fn(async () => {
+      throw new Error('reviewer should not run when build fails');
+    });
+
+    const planner = new FunctionalPlannerAgent(plannerFn);
+    const builder = new FunctionalBuilderAgent(builderFn);
+    const tester = new FunctionalTesterAgent(testerFn);
+    const reviewer = new FunctionalReviewerAgent(reviewerFn);
+
+    const eventBus = new EventBus();
+    const events: string[] = [];
+    for (const type of ['plan:completed', 'build:completed', 'test:completed', 'review:completed', 'run:completed'] as const) {
+      eventBus.on(type, (event) => events.push(event.type));
+    }
+
+    const manager = new TaskManager({
+      planner,
+      builder,
+      tester,
+      reviewer,
+      eventBus,
+      runIdFactory: () => 'run-failed-build'
+    });
+
+    const result = await manager.execute(baseTask);
+
+    expect(plannerFn).toHaveBeenCalledTimes(1);
+    expect(builderFn).toHaveBeenCalledTimes(1);
+    expect(testerFn).not.toHaveBeenCalled();
+    expect(reviewerFn).not.toHaveBeenCalled();
+    expect(events).toEqual(['plan:completed', 'build:completed', 'run:completed']);
+
+    expect(result.test.reports[0]?.details).toContain('Skipped because the build stage failed.');
+    expect(result.review.summary).toBe('Review skipped: build stage failed.');
+  });
+
+  it('skips reviewer when tests fail', async () => {
+    const plan: PlanResult = {
+      items: [{ id: 'subtask-tests', description: 'Fail tests' }]
+    };
+
+    const plannerFn = vi.fn(async () => plan);
+    const builderFn = vi.fn(async () => ({
+      subtaskId: 'subtask-tests',
+      artifacts: [],
+      mode: 'mcp' as const,
+      success: true,
+      runId: 'ignored'
+    } satisfies BuildResult));
+    const testerFn = vi.fn(async () => ({
+      subtaskId: 'subtask-tests',
+      success: false,
+      reports: [{ name: 'npm test', status: 'failed', details: 'unit failure' }],
+      runId: 'ignored'
+    } satisfies TestResult));
+    const reviewerFn = vi.fn(async () => {
+      throw new Error('reviewer should not run when tests fail');
+    });
+
+    const planner = new FunctionalPlannerAgent(plannerFn);
+    const builder = new FunctionalBuilderAgent(builderFn);
+    const tester = new FunctionalTesterAgent(testerFn);
+    const reviewer = new FunctionalReviewerAgent(reviewerFn);
+
+    const eventBus = new EventBus();
+    const events: string[] = [];
+    for (const type of ['plan:completed', 'build:completed', 'test:completed', 'review:completed', 'run:completed'] as const) {
+      eventBus.on(type, (event) => events.push(event.type));
+    }
+
+    const manager = new TaskManager({
+      planner,
+      builder,
+      tester,
+      reviewer,
+      eventBus,
+      runIdFactory: () => 'run-failed-tests'
+    });
+
+    const result = await manager.execute(baseTask);
+
+    expect(plannerFn).toHaveBeenCalledTimes(1);
+    expect(builderFn).toHaveBeenCalledTimes(1);
+    expect(testerFn).toHaveBeenCalledTimes(1);
+    expect(reviewerFn).not.toHaveBeenCalled();
+    expect(events).toEqual(['plan:completed', 'build:completed', 'test:completed', 'run:completed']);
+
+    expect(result.test.success).toBe(false);
+    expect(result.review.summary).toBe('Review skipped: tests failed.');
+  });
+
   it('selects cloud mode when subtask requires cloud execution', async () => {
     const cloudTask: TaskContext = {
       ...baseTask,
@@ -172,6 +280,32 @@ describe('TaskManager', () => {
     const manager = new TaskManager({ planner, builder, tester, reviewer });
 
     await expect(manager.execute(baseTask)).rejects.toThrow('Planner returned no executable subtasks.');
+  });
+
+  it('throws when planner produces only non-runnable subtasks', async () => {
+    const plan: PlanResult = {
+      items: [
+        { id: 'blocked-1', description: 'Blocked', runnable: false },
+        { id: 'blocked-2', description: 'Still blocked', runnable: false }
+      ]
+    };
+
+    const planner = new FunctionalPlannerAgent(async () => plan);
+    const builder = new FunctionalBuilderAgent(async () => {
+      throw new Error('builder should not run');
+    });
+    const tester = new FunctionalTesterAgent(async () => {
+      throw new Error('tester should not run');
+    });
+    const reviewer = new FunctionalReviewerAgent(async () => {
+      throw new Error('reviewer should not run');
+    });
+
+    const manager = new TaskManager({ planner, builder, tester, reviewer });
+
+    await expect(manager.execute(baseTask)).rejects.toThrow(
+      'Planner returned no runnable subtasks after applying selection and target hints.'
+    );
   });
 
   it('persists run summaries when persistence is configured', async () => {

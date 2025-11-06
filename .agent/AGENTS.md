@@ -12,7 +12,7 @@
 ### Execution Modes & Approvals
 - Default run mode is `mcp`; switch to cloud only when the canonical task list flags `execution.parallel=true` and the reviewer records the override in the run manifest.
 - Honor the safe `read/edit/run/network` approval profile. Capture escalations in the manifest `approvals` array with reviewer justification and timestamp.
-- Run `bash scripts/spec-guard.sh --dry-run` prior to requesting review; a failing guard requires refreshing relevant specs (see `.agent/SOPs/specs-and-research.md`).
+- Run `node scripts/spec-guard.mjs --dry-run` prior to requesting review; a failing guard requires refreshing relevant specs (see `.agent/SOPs/specs-and-research.md`).
 
 ### Build & Test Quick Reference
 - `npm run lint` — Executes `npm run build:patterns` before linting orchestrator, adapter, and evaluation sources.
@@ -35,13 +35,13 @@
 ### Workflow Pointers
 - Always start by reviewing the relevant PRD in `/tasks` and its mirrored snapshot in `/docs`.
 - Use templates in `.agent/task/templates/` to draft PRDs, task lists, mini-specs, and research notes.
-- Run `scripts/spec-guard.sh` before opening reviews to ensure specs stay in sync with code changes.
+- Run `node scripts/spec-guard.mjs --dry-run` before opening reviews to ensure specs stay in sync with code changes.
 
 ## Project 0303 — Codex Orchestrator Autonomy Enhancements
 - Set `MCP_RUNNER_TASK_ID=0303-orchestrator-autonomy` for all diagnostics and orchestrator executions; confirm manifests land in `.runs/0303-orchestrator-autonomy/cli/`.
 - Log approvals/escalations inside each run manifest and reference the same path when you flip checkmarks in `tasks/tasks-0303-orchestrator-autonomy.md`, `docs/TASKS.md`, and `.agent/task/0303-orchestrator-autonomy.md`.
 - Keep metrics in `.runs/0303-orchestrator-autonomy/metrics.json` and summarize outcomes in `out/0303-orchestrator-autonomy/state.json`; update docs when these files change.
-- Before requesting review, run `bash scripts/spec-guard.sh --dry-run`, `npm run lint`, `npm run test`, and `npm run eval:test` (if fixtures exist), then capture the manifest path documenting those executions.
+- Before requesting review, run `node scripts/spec-guard.mjs --dry-run`, `npm run lint`, `npm run test`, and `npm run eval:test` (if fixtures exist), then capture the manifest path documenting those executions.
 - Follow `.agent/SOPs/orchestrator-autonomy.md` for guardrail, evidence, and hand-off requirements specific to Task 0303.
 
 ### Database Safety Safeguards

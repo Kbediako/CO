@@ -20,7 +20,7 @@
 - [x] Truncate error payloads in `appendCommandError` to ≤8 KiB; Evidence: `.runs/0202-orchestrator-hardening/cli/2025-10-31T22-56-34-431Z-9574035c/manifest.json`, tests `orchestrator/tests/Manifest.test.ts`.
 
 - [x] Run diagnostics (`npx codex-orchestrator start diagnostics --format json`); Evidence: `.runs/0202-orchestrator-hardening/cli/2025-10-31T22-56-34-431Z-9574035c/manifest.json`.
-- [x] Guardrails — `bash scripts/spec-guard.sh --dry-run`, `npm run lint`, `npm run test`; Evidence: `.runs/0202-orchestrator-hardening/cli/2025-10-31T22-56-34-431Z-9574035c/manifest.json`.
+- [x] Guardrails — `node scripts/spec-guard.mjs --dry-run`, `npm run lint`, `npm run test`; Evidence: `.runs/0202-orchestrator-hardening/cli/2025-10-31T22-56-34-431Z-9574035c/manifest.json`.
 - [x] Reviewer hand-off — `npm run review` executed with latest manifest; Evidence: `.runs/0202-orchestrator-hardening/cli/2025-10-31T22-56-34-431Z-9574035c/manifest.json`.
 - [x] Documentation sync — Update `docs/TASKS.md` and `.agent/task/0202-orchestrator-hardening.md` checklist mirrors with manifest paths; Evidence: `.runs/0202-orchestrator-hardening/cli/2025-10-31T22-56-34-431Z-9574035c/manifest.json`.
 

@@ -33,7 +33,7 @@
 
 ## Testing Strategy
 - Unit / Integration: Extend persistence tests to cover lock contention scenarios; add command runner tests verifying truncation and recorded summaries. Exercise heartbeat loop through mocked timers to assert awaited writes.
-- Tooling / Automation: Run `npm run lint`, `npm run test`, and `bash scripts/spec-guard.sh --dry-run`. Diagnostics manifest to be captured via `npx codex-orchestrator start diagnostics --format json`.
+- Tooling / Automation: Run `npm run lint`, `npm run test`, and `node scripts/spec-guard.mjs --dry-run`. Diagnostics manifest to be captured via `npx codex-orchestrator start diagnostics --format json`.
 - Rollback Plan: Feature flags not required; revert changes and restore previous persistence/heartbeat modules if regressions discovered.
 
 ## Documentation & Evidence

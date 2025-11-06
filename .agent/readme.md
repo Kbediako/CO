@@ -24,7 +24,7 @@ Use explicit checkboxes (`[ ]` → `[x]`) for every task and subtask tracked in 
 - [ ] `npm run lint` (always) — runs `npm run build:patterns` first.
 - [ ] `npm run test` — covers orchestrator agents, persistence, and adapter logic.
 - [ ] `npm run eval:test` — validates evaluation harness; ensure fixtures in `evaluation/fixtures/**` are in sync.
-- [ ] `bash scripts/spec-guard.sh --dry-run` — verify specs updated before review.
+- [ ] `node scripts/spec-guard.mjs --dry-run` — verify specs updated before review.
 
 ### External Pointers
 - MCP registration: `scripts/run-local-mcp.sh` launches the local server; confirm builder/tester agents produce artifacts in `.runs`.
@@ -41,4 +41,4 @@ Use explicit checkboxes (`[ ]` → `[x]`) for every task and subtask tracked in 
 ### Quick Links
 - Control files: `/.ai-dev-tasks/*`
 - Templates: `.agent/task/templates/`
-- Spec enforcement: `scripts/spec-guard.sh`
+- Spec enforcement: `scripts/spec-guard.mjs`

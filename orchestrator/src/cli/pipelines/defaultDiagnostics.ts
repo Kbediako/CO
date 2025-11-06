@@ -26,8 +26,8 @@ export const defaultDiagnosticsPipeline: PipelineDefinition = {
     {
       kind: 'command',
       id: 'spec-guard',
-      title: 'bash scripts/spec-guard.sh --dry-run',
-      command: 'bash scripts/spec-guard.sh --dry-run'
+      title: 'node scripts/spec-guard.mjs --dry-run',
+      command: 'node scripts/spec-guard.mjs --dry-run'
     }
   ]
 };

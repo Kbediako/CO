@@ -121,6 +121,14 @@ export class TaskManager {
       payload: { task, plan, build, runId }
     });
 
+    if (!build.success) {
+      const skippedTest = this.createSkippedTestResult(build, runId);
+      const skippedReview = this.createSkippedReviewResult('build-failed');
+      const runSummary = this.createRunSummary(task, mode, plan, build, skippedTest, skippedReview, runId);
+      this.eventBus.emit({ type: 'run:completed', payload: runSummary });
+      return runSummary;
+    }
+
     const test = this.normalizeTestResult(
       await this.options.tester.test({ task, build, mode, runId }),
       runId
@@ -130,6 +138,13 @@ export class TaskManager {
       type: 'test:completed',
       payload: { task, build, test, runId }
     });
+
+    if (!test.success) {
+      const skippedReview = this.createSkippedReviewResult('test-failed');
+      const runSummary = this.createRunSummary(task, mode, plan, build, test, skippedReview, runId);
+      this.eventBus.emit({ type: 'run:completed', payload: runSummary });
+      return runSummary;
+    }
 
     const review = await this.options.reviewer.review({ task, plan, build, test, mode, runId });
 
@@ -170,7 +185,9 @@ export class TaskManager {
         'Specify a target stage or update the planner configuration.'
       );
     }
-    return plan.items[0]!;
+    throw new Error(
+      'Planner returned no runnable subtasks after applying selection and target hints.'
+    );
   }
 
   private createRunSummary(
@@ -204,5 +221,39 @@ export class TaskManager {
 
   private normalizeTestResult(test: TestResult, runId: string): TestResult {
     return { ...test, runId };
+  }
+
+  private createSkippedTestResult(build: BuildResult, runId: string): TestResult {
+    return {
+      subtaskId: build.subtaskId,
+      success: false,
+      reports: [
+        {
+          name: 'tests',
+          status: 'failed',
+          details: 'Skipped because the build stage failed.'
+        }
+      ],
+      runId
+    };
+  }
+
+  private createSkippedReviewResult(reason: 'build-failed' | 'test-failed'): ReviewResult {
+    if (reason === 'build-failed') {
+      return {
+        summary: 'Review skipped: build stage failed.',
+        decision: {
+          approved: false,
+          feedback: 'Build stage failed; review skipped.'
+        }
+      };
+    }
+    return {
+      summary: 'Review skipped: tests failed.',
+      decision: {
+        approved: false,
+        feedback: 'Tests failed; review skipped.'
+      }
+    };
   }
 }

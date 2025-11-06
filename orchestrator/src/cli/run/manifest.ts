@@ -295,7 +295,7 @@ function computeGuardrailStatus(manifest: CliManifest): GuardrailStatusSnapshot 
 }
 
 function selectGuardrailCommands(manifest: CliManifest): CliManifestCommand[] {
-  return manifest.commands.filter((entry) => entry.command?.includes('scripts/spec-guard.sh'));
+  return manifest.commands.filter((entry) => entry.command?.includes('spec-guard'));
 }
 
 function formatGuardrailSummary(counts: GuardrailCounts): string {

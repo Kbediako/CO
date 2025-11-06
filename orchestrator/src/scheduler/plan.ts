@@ -31,16 +31,30 @@ export function createSchedulerPlan(
   };
 
   const slots = buildCapabilitySlots(request);
-  const targetCount = Math.min(
-    request.schedule.maxInstances,
-    Math.max(request.schedule.minInstances, slots.length)
-  );
+  const { minInstances, maxInstances } = request.schedule;
+
+  if (minInstances > maxInstances) {
+    throw new Error(
+      `Scheduler minInstances (${minInstances}) cannot exceed maxInstances (${maxInstances}).`
+    );
+  }
+
+  if (minInstances > slots.length) {
+    const capacity = slots.length;
+    const slotLabel = capacity === 1 ? 'slot' : 'slots';
+    throw new Error(
+      `Scheduler requires at least ${minInstances} instances but only ${capacity} fan-out ${slotLabel} ` +
+        'are available. Adjust the schedule fanOut or lower minInstances.'
+    );
+  }
+
+  const targetCount = Math.max(minInstances, Math.min(maxInstances, slots.length));
 
   const assignments: SchedulerAssignment[] = [];
   const capabilityCounters = new Map<string, number>();
 
   for (let i = 0; i < targetCount; i += 1) {
-    const slot = slots[i % slots.length];
+    const slot = slots[i]!;
     const counter = (capabilityCounters.get(slot.capability) ?? 0) + 1;
     capabilityCounters.set(slot.capability, counter);
 
