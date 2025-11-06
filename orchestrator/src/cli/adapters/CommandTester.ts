@@ -1,6 +1,6 @@
 import type { TesterAgent, TestInput, TestResult, TestReport } from '../../types.js';
 import type { PipelineRunExecutionResult } from '../types.js';
-import { guardrailCommandPresent } from '../run/manifest.js';
+import { ensureGuardrailStatus } from '../run/manifest.js';
 
 type ResultProvider = () => PipelineRunExecutionResult | null;
 
@@ -9,18 +9,20 @@ export class CommandTester implements TesterAgent {
 
   async test(input: TestInput): Promise<TestResult> {
     const result = this.requireResult();
-    const guardrails = guardrailCommandPresent(result.manifest);
+    const guardrailStatus = ensureGuardrailStatus(result.manifest);
     const reports: TestReport[] = [
       {
         name: 'guardrails',
-        status: guardrails ? 'passed' : 'failed',
-        details: guardrails ? 'spec-guard step succeeded' : 'spec-guard step missing or failed'
+        status: guardrailStatus.present ? 'passed' : 'failed',
+        details: guardrailStatus.present
+          ? guardrailStatus.summary
+          : guardrailStatus.recommendation ?? guardrailStatus.summary
       }
     ];
 
     return {
       subtaskId: input.build.subtaskId,
-      success: guardrails && result.success,
+      success: guardrailStatus.present && result.success,
       reports,
       runId: input.runId
     };

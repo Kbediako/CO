@@ -124,9 +124,10 @@ describe('TaskManager', () => {
 
     const plan: PlanResult = {
       items: [
-        { id: 'subtask-cloud', description: 'Run in cloud', requires_cloud: true },
+        { id: 'subtask-cloud', description: 'Run in cloud', requires_cloud: true, selected: true },
         { id: 'fallback', description: 'Local fallback' }
-      ]
+      ],
+      targetId: 'subtask-cloud'
     };
 
     const planner = new FunctionalPlannerAgent(async () => plan);

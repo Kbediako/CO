@@ -146,11 +146,31 @@ export class TaskManager {
   }
 
   private selectExecutableSubtask(plan: PlanResult): PlanItem {
-    const [first] = plan.items;
-    if (!first) {
+    if (plan.items.length === 0) {
       throw new Error('Planner returned no executable subtasks.');
     }
-    return first;
+    const selected = plan.items.find((item) => item.selected === true);
+    if (selected) {
+      return selected;
+    }
+    if (plan.targetId) {
+      const targeted = plan.items.find((item) => item.id === plan.targetId);
+      if (targeted) {
+        return targeted;
+      }
+    }
+    const runnable = plan.items.filter((item) => item.runnable !== false);
+    if (runnable.length === 1) {
+      return runnable[0]!;
+    }
+    if (runnable.length > 1) {
+      const available = runnable.map((item) => item.id).join(', ');
+      throw new Error(
+        `Planner returned multiple runnable subtasks without a selection (${available}). ` +
+        'Specify a target stage or update the planner configuration.'
+      );
+    }
+    return plan.items[0]!;
   }
 
   private createRunSummary(

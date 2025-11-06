@@ -1,7 +1,10 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
+import { createWriteStream, mkdtempSync, type WriteStream } from 'node:fs';
 import { EventEmitter } from 'node:events';
+import { join } from 'node:path';
 import { createInterface } from 'node:readline';
 import { PassThrough } from 'node:stream';
+import { tmpdir } from 'node:os';
 
 import type { JsonlEvent, RunSummaryEvent, RunSummaryEventPayload } from '../../shared/events/types.js';
 
@@ -24,10 +27,12 @@ export interface ExecCommandOptions {
 export interface ExecRunResult {
   summary: RunSummaryEvent;
   events: JsonlEvent[];
+  eventsPath: string;
   exitCode: number | null;
   status: 'succeeded' | 'failed';
   manifestPath: string;
   rawStderr: string[];
+  stderrPath: string;
 }
 
 interface InternalExecOptions extends ExecCommandOptions {
@@ -76,6 +81,13 @@ export class ExecRunHandle extends EventEmitter {
   private readonly child: ChildProcessWithoutNullStreams;
   private readonly eventsList: JsonlEvent[] = [];
   private readonly stderrLines: string[] = [];
+  private readonly eventsStream: WriteStream;
+  private readonly stderrStream: WriteStream;
+  private readonly eventsFilePath: string;
+  private readonly stderrFilePath: string;
+  private readonly maxEventBuffer = 200;
+  private readonly maxStderrBuffer = 200;
+  private streamsClosed = false;
   private summaryEvent: RunSummaryEvent | null = null;
   private readonly resultPromise: Promise<ExecRunResult>;
   private resolveResult!: (value: ExecRunResult) => void;
@@ -88,6 +100,11 @@ export class ExecRunHandle extends EventEmitter {
   ) {
     super();
     this.child = child;
+    const artifactRoot = mkdtempSync(join(tmpdir(), 'codex-exec-'));
+    this.eventsFilePath = join(artifactRoot, 'events.ndjson');
+    this.stderrFilePath = join(artifactRoot, 'stderr.log');
+    this.eventsStream = createWriteStream(this.eventsFilePath, { flags: 'a' });
+    this.stderrStream = createWriteStream(this.stderrFilePath, { flags: 'a' });
     this.resultPromise = new Promise<ExecRunResult>((resolve, reject) => {
       this.resolveResult = resolve;
       this.rejectResult = reject;
@@ -109,7 +126,11 @@ export class ExecRunHandle extends EventEmitter {
         this.emit('warning', new Error(`Failed to parse JSONL line: ${trimmed}`));
         return;
       }
+      this.eventsStream.write(`${JSON.stringify(parsed)}\n`);
       this.eventsList.push(parsed);
+      if (this.eventsList.length > this.maxEventBuffer) {
+        this.eventsList.shift();
+      }
       this.emit('event', parsed);
       if (parsed.type === 'run:summary') {
         this.summaryEvent = parsed as RunSummaryEvent;
@@ -120,16 +141,22 @@ export class ExecRunHandle extends EventEmitter {
 
     stderr.on('data', (chunk: Buffer | string) => {
       const text = chunk.toString();
+      this.stderrStream.write(text);
+      if (this.stderrLines.length >= this.maxStderrBuffer) {
+        this.stderrLines.shift();
+      }
       this.stderrLines.push(text.trim());
       this.emit('stderr', text);
     });
 
     child.once('error', (error) => {
+      this.closeStreams();
       this.emit('error', error);
       this.rejectResult(error);
     });
 
     child.once('close', (code, signal) => {
+      this.closeStreams();
       this.emit('exit', { code, signal });
       if (!this.summaryEvent) {
         const error = new Error('Exec command exited without emitting a summary event.') as Error & {
@@ -180,11 +207,22 @@ export class ExecRunHandle extends EventEmitter {
     return {
       summary: this.summaryEvent,
       events: [...this.eventsList],
+      eventsPath: this.eventsFilePath,
       exitCode: payload.result.exitCode ?? null,
       status: payload.status,
       manifestPath: payload.run.manifest,
-      rawStderr: [...this.stderrLines]
+      rawStderr: [...this.stderrLines],
+      stderrPath: this.stderrFilePath
     };
+  }
+
+  private closeStreams(): void {
+    if (this.streamsClosed) {
+      return;
+    }
+    this.streamsClosed = true;
+    this.eventsStream.end();
+    this.stderrStream.end();
   }
 }
 

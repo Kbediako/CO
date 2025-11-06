@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import type { ExecEvent, UnifiedExecRunResult } from '../../../../packages/orchestrator/src/index.js';
 import { ToolInvocationFailedError } from '../../../../packages/orchestrator/src/index.js';
 import { getCliExecRunner, getPrivacyGuard, getExecHandleService } from './execRuntime.js';
-import type { CommandStage, CliManifest, HandleRecord } from '../types.js';
+import type { CommandStage, CliManifest, HandleRecord, PrivacyDecisionRecord } from '../types.js';
 import type { ExecHandleDescriptor } from '../../../../packages/orchestrator/src/exec/handle-service.js';
 import { logger } from '../../logger.js';
 import type { EnvironmentPaths } from '../run/environment.js';
@@ -19,6 +19,7 @@ import { slugify } from '../utils/strings.js';
 import { isoTimestamp } from '../utils/time.js';
 
 const MAX_BUFFERED_OUTPUT_BYTES = 64 * 1024;
+const EMIT_COMMAND_STREAM_MIRRORS = readEnvBoolean('CODEX_ORCHESTRATOR_EMIT_COMMAND_STREAMS', false);
 
 export interface CommandRunnerContext {
   env: EnvironmentPaths;
@@ -58,6 +59,8 @@ export async function runCommandStage(
 
   const runnerLog = createWriteStream(paths.logPath, { flags: 'a' });
   const commandLog = createWriteStream(logFile, { flags: 'a' });
+  const privacyLogPath = join(paths.runDir, 'privacy-decisions.ndjson');
+  const privacyLog = createWriteStream(privacyLogPath, { flags: 'a' });
 
   const writeEvent = (message: Record<string, unknown>) => {
     const payload = `${JSON.stringify({ ...message, timestamp: isoTimestamp(), index })}\n`;
@@ -134,13 +137,23 @@ export async function runCommandStage(
           pipelineId: manifest.pipeline_id,
           runId: manifest.run_id
         });
-        updatePrivacyManifest(manifest);
+        const appendedPrivacyRecords = updatePrivacyManifest(manifest, {
+          env,
+          paths,
+          logPath: privacyLogPath
+        });
+        writePrivacyLog(privacyLog, appendedPrivacyRecords);
       }
     } catch (error) {
       if (error instanceof ToolInvocationFailedError) {
         hooks.onError?.(error);
         captureFailureHandle(manifest, stage, error);
-        updatePrivacyManifest(manifest);
+        const appendedPrivacyRecords = updatePrivacyManifest(manifest, {
+          env,
+          paths,
+          logPath: privacyLogPath
+        });
+        writePrivacyLog(privacyLog, appendedPrivacyRecords);
       }
       throw error;
     }
@@ -188,6 +201,7 @@ export async function runCommandStage(
     unsubscribe();
     runnerLog.end();
     commandLog.end();
+    privacyLog.end();
   }
 }
 
@@ -219,9 +233,14 @@ function recordHandle(
   manifest.handles = handles;
 }
 
-function updatePrivacyManifest(manifest: CliManifest): void {
+function updatePrivacyManifest(
+  manifest: CliManifest,
+  context: { env: EnvironmentPaths; paths: RunPaths; logPath: string }
+): PrivacyDecisionRecord[] {
   const metrics = getPrivacyGuard().getMetrics();
-  const decisions = metrics.decisions.map((decision) => ({
+  const existingDecisions = manifest.privacy?.decisions ?? [];
+  const newMetricsDecisions = metrics.decisions.slice(existingDecisions.length);
+  const appended = newMetricsDecisions.map((decision) => ({
     handle_id: decision.handleId,
     sequence: decision.sequence,
     action: decision.action,
@@ -229,18 +248,35 @@ function updatePrivacyManifest(manifest: CliManifest): void {
     reason: decision.reason ?? null,
     timestamp: decision.timestamp,
     stage_id: resolveHandleStage(manifest, decision.handleId)
-  }));
+  } satisfies PrivacyDecisionRecord));
 
-  manifest.privacy = {
-    mode: metrics.mode,
-    decisions,
-    totals: {
+  if (!manifest.privacy) {
+    manifest.privacy = {
+      mode: metrics.mode,
+      decisions: [...appended],
+      totals: {
+        total_frames: metrics.totalFrames,
+        redacted_frames: metrics.redactedFrames,
+        blocked_frames: metrics.blockedFrames,
+        allowed_frames: metrics.allowedFrames
+      },
+      log_path: relativeToRepo(context.env, context.logPath)
+    };
+  } else {
+    manifest.privacy.mode = metrics.mode;
+    manifest.privacy.totals = {
       total_frames: metrics.totalFrames,
       redacted_frames: metrics.redactedFrames,
       blocked_frames: metrics.blockedFrames,
       allowed_frames: metrics.allowedFrames
+    };
+    if (appended.length > 0) {
+      manifest.privacy.decisions.push(...appended);
     }
-  };
+    manifest.privacy.log_path = relativeToRepo(context.env, context.logPath);
+  }
+
+  return appended;
 }
 
 function resolveHandleStage(manifest: CliManifest, handleId: string): string | null {
@@ -274,6 +310,15 @@ function captureFailureHandle(
   }
 }
 
+function writePrivacyLog(stream: NodeJS.WritableStream, records: PrivacyDecisionRecord[]): void {
+  if (!records || records.length === 0) {
+    return;
+  }
+  for (const record of records) {
+    stream.write(`${JSON.stringify(record)}\n`);
+  }
+}
+
 function streamEvent(
   writeEvent: (payload: Record<string, unknown>) => void,
   event: ExecEvent,
@@ -303,10 +348,12 @@ function streamEvent(
         bytes: event.payload.bytes,
         data: event.payload.data
       });
-      writeEvent({
-        type: event.payload.stream === 'stdout' ? 'command:stdout' : 'command:stderr',
-        data: event.payload.data
-      });
+      if (EMIT_COMMAND_STREAM_MIRRORS) {
+        writeEvent({
+          type: event.payload.stream === 'stdout' ? 'command:stdout' : 'command:stderr',
+          data: event.payload.data
+        });
+      }
       if (event.payload.stream === 'stdout') {
         hooks.onStdout(event.payload.bytes);
       } else {
@@ -376,4 +423,19 @@ function truncate(value: string, length = 240): string {
     return value;
   }
   return `${value.slice(0, length)}…`;
+}
+
+function readEnvBoolean(name: string, fallback: boolean): boolean {
+  const raw = process.env[name];
+  if (typeof raw !== 'string') {
+    return fallback;
+  }
+  const normalized = raw.trim().toLowerCase();
+  if (['1', 'true', 'yes', 'on'].includes(normalized)) {
+    return true;
+  }
+  if (['0', 'false', 'no', 'off'].includes(normalized)) {
+    return false;
+  }
+  return fallback;
 }

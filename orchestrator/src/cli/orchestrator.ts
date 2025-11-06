@@ -4,7 +4,7 @@ import { join } from 'node:path';
 
 import { TaskManager } from '../manager.js';
 import type { ManagerOptions } from '../manager.js';
-import type { TaskContext, RunSummary, ExecutionMode } from '../types.js';
+import type { TaskContext, RunSummary, ExecutionMode, PlanItem } from '../types.js';
 import {
   CommandPlanner,
   CommandBuilder,
@@ -35,7 +35,7 @@ import {
   writeHeartbeatFile,
   finalizeStatus,
   appendSummary,
-  guardrailRecommendation,
+  ensureGuardrailStatus,
   resetForResume,
   recordResumeEvent
 } from './run/manifest.js';
@@ -65,12 +65,21 @@ import { resolveRunPaths, relativeToRepo } from './run/runPaths.js';
 import { logger } from '../logger.js';
 import { getPrivacyGuard } from './services/execRuntime.js';
 
-const HEARTBEAT_MANIFEST_THROTTLE_MS = 30_000;
 interface ExecutePipelineOptions {
   env: EnvironmentPaths;
   pipeline: PipelineDefinition;
   manifest: CliManifest;
   paths: RunPaths;
+}
+
+interface RunLifecycleContext {
+  env: EnvironmentPaths;
+  pipeline: PipelineDefinition;
+  manifest: CliManifest;
+  paths: RunPaths;
+  planner: CommandPlanner;
+  taskContext: TaskContext;
+  runId: string;
 }
 
 export class CodexOrchestrator {
@@ -81,6 +90,10 @@ export class CodexOrchestrator {
     const userConfig = await loadUserConfig(env);
     const { pipeline } = resolvePipeline(env, { pipelineId: options.pipelineId, config: userConfig });
     const metadata = await loadTaskMetadata(env);
+    const taskContext = this.createTaskContext(metadata);
+    const plannerTarget = this.resolveTargetStageId(options.targetStageId, null);
+    const planner = new CommandPlanner(pipeline, { targetStageId: plannerTarget });
+    const planPreview = await planner.plan(taskContext);
     const runId = generateRunId();
 
     const { manifest, paths } = await bootstrapManifest(runId, {
@@ -88,52 +101,19 @@ export class CodexOrchestrator {
       pipeline,
       parentRunId: options.parentRunId ?? null,
       taskSlug: metadata.slug,
-      approvalPolicy: options.approvalPolicy ?? null
+      approvalPolicy: options.approvalPolicy ?? null,
+      planTargetId: planPreview.targetId ?? null
     });
 
-    const getResult = this.createResultAccessor();
-    const executePipeline = this.createPipelineExecutor({ env, pipeline, manifest, paths }, getResult);
-
-    const manager = this.createTaskManager(runId, pipeline, executePipeline, getResult);
-    const taskContext = this.createTaskContext(metadata);
-
-    getPrivacyGuard().reset();
-
-    const controlPlaneResult = await this.guardControlPlane({
+    return await this.performRunLifecycle({
       env,
-      manifest,
-      paths,
       pipeline,
-      task: taskContext,
-      runId,
-      requestedBy: { actorId: 'codex-cli', channel: 'cli', name: 'Codex CLI' }
-    });
-
-    const schedulerPlan = await this.createSchedulerPlanForRun({
-      env,
       manifest,
       paths,
-      controlPlaneResult
+      planner,
+      taskContext,
+      runId
     });
-
-    const runSummary = await manager.execute(taskContext);
-    manager.dispose();
-
-    await this.finalizeSchedulerPlanForManifest({
-      env,
-      manifest,
-      paths,
-      plan: schedulerPlan
-    });
-
-    this.applySchedulerToRunSummary(runSummary, schedulerPlan);
-    this.applyHandlesToRunSummary(runSummary, manifest);
-    this.applyPrivacyToRunSummary(runSummary, manifest);
-    this.applyControlPlaneToRunSummary(runSummary, controlPlaneResult);
-
-    await this.persistRunSummary(env, paths, manifest, runSummary);
-
-    return { manifest, runSummary };
   }
 
   async resume(options: ResumeOptions): Promise<PipelineExecutionResult> {
@@ -143,6 +123,9 @@ export class CodexOrchestrator {
     const userConfig = await loadUserConfig(actualEnv);
     const pipeline = this.resolvePipelineForResume(actualEnv, manifest, userConfig);
     const metadata = await loadTaskMetadata(actualEnv);
+    const taskContext = this.createTaskContext(metadata);
+    const plannerTarget = this.resolveTargetStageId(options.targetStageId, manifest.plan_target_id ?? null);
+    const planner = new CommandPlanner(pipeline, { targetStageId: plannerTarget });
 
     await this.validateResumeToken(paths, manifest, options.resumeToken ?? null);
     recordResumeEvent(manifest, {
@@ -152,57 +135,20 @@ export class CodexOrchestrator {
     });
     resetForResume(manifest);
     updateHeartbeat(manifest);
+    const resumePlan = await planner.plan(taskContext);
+    manifest.plan_target_id = resumePlan.targetId ?? null;
     await saveManifest(paths, manifest);
     await writeHeartbeatFile(paths, manifest);
 
-    const getResult = this.createResultAccessor();
-    const executePipeline = this.createPipelineExecutor({
+    return await this.performRunLifecycle({
       env: actualEnv,
       pipeline,
       manifest,
-      paths
-    }, getResult);
-
-    const manager = this.createTaskManager(manifest.run_id, pipeline, executePipeline, getResult);
-    const taskContext = this.createTaskContext(metadata);
-
-    getPrivacyGuard().reset();
-
-    const controlPlaneResult = await this.guardControlPlane({
-      env: actualEnv,
-      manifest,
       paths,
-      pipeline,
-      task: taskContext,
-      runId: manifest.run_id,
-      requestedBy: { actorId: 'codex-cli', channel: 'cli', name: 'Codex CLI' }
+      planner,
+      taskContext,
+      runId: manifest.run_id
     });
-
-    const schedulerPlan = await this.createSchedulerPlanForRun({
-      env: actualEnv,
-      manifest,
-      paths,
-      controlPlaneResult
-    });
-
-    const runSummary = await manager.execute(taskContext);
-    manager.dispose();
-
-    await this.finalizeSchedulerPlanForManifest({
-      env: actualEnv,
-      manifest,
-      paths,
-      plan: schedulerPlan
-    });
-
-    this.applySchedulerToRunSummary(runSummary, schedulerPlan);
-    this.applyHandlesToRunSummary(runSummary, manifest);
-    this.applyPrivacyToRunSummary(runSummary, manifest);
-    this.applyControlPlaneToRunSummary(runSummary, controlPlaneResult);
-
-    await this.persistRunSummary(actualEnv, paths, manifest, runSummary);
-
-    return { manifest, runSummary };
   }
 
   async status(options: StatusOptions): Promise<CliManifest> {
@@ -222,7 +168,8 @@ export class CodexOrchestrator {
     const userConfig = await loadUserConfig(env);
     const { pipeline, source } = resolvePipeline(env, { pipelineId: options.pipelineId, config: userConfig });
     const metadata = await loadTaskMetadata(env);
-    const planner = new CommandPlanner(pipeline);
+    const plannerTarget = this.resolveTargetStageId(options.targetStageId, null);
+    const planner = new CommandPlanner(pipeline, { targetStageId: plannerTarget });
     const taskContext = this.createTaskContext(metadata);
     const plan = await planner.plan(taskContext);
 
@@ -270,13 +217,30 @@ export class CodexOrchestrator {
     return { ...this.baseEnv, taskId: sanitized };
   }
 
+  private resolveTargetStageId(explicit: string | undefined, fallback: string | null): string | null {
+    const normalizedExplicit = explicit?.trim();
+    if (normalizedExplicit) {
+      return normalizedExplicit;
+    }
+    const normalizedFallback = fallback?.trim();
+    if (normalizedFallback) {
+      return normalizedFallback;
+    }
+    const envTarget = process.env.CODEX_ORCHESTRATOR_TARGET_STAGE;
+    if (typeof envTarget === 'string' && envTarget.trim().length > 0) {
+      return envTarget.trim();
+    }
+    return null;
+  }
+
   private createTaskManager(
     runId: string,
     pipeline: PipelineDefinition,
     executePipeline: () => Promise<PipelineRunExecutionResult>,
-    getResult: () => PipelineRunExecutionResult | null
+    getResult: () => PipelineRunExecutionResult | null,
+    plannerInstance?: CommandPlanner
   ): TaskManager {
-    const planner = new CommandPlanner(pipeline);
+    const planner = plannerInstance ?? new CommandPlanner(pipeline);
     const builder = new CommandBuilder(executePipeline);
     const tester = new CommandTester(getResult);
     const reviewer = new CommandReviewer(getResult);
@@ -287,15 +251,43 @@ export class CodexOrchestrator {
       tester,
       reviewer,
       runIdFactory: () => runId,
-      modePolicy: () => this.determineMode(),
+      modePolicy: (task, subtask) => this.determineMode(task, subtask),
       persistence: { autoStart: true }
     };
 
     return new TaskManager(options);
   }
 
-  private determineMode(): ExecutionMode {
+  private determineMode(task: TaskContext, subtask: PlanItem): ExecutionMode {
+    if (this.requiresCloudExecution(task, subtask)) {
+      return 'cloud';
+    }
     return 'mcp';
+  }
+
+  private requiresCloudExecution(task: TaskContext, subtask: PlanItem): boolean {
+    const requiresCloudFlag = subtask.requires_cloud ?? subtask.requiresCloud;
+    if (typeof requiresCloudFlag === 'boolean') {
+      return requiresCloudFlag;
+    }
+    const metadataMode = typeof subtask.metadata?.executionMode === 'string'
+      ? (subtask.metadata.executionMode as string)
+      : typeof subtask.metadata?.mode === 'string'
+        ? (subtask.metadata.mode as string)
+        : null;
+    if (metadataMode) {
+      const normalized = metadataMode.toLowerCase();
+      if (normalized === 'cloud') {
+        return true;
+      }
+      if (normalized === 'mcp') {
+        return false;
+      }
+    }
+    if (task.metadata?.execution?.parallel) {
+      return true;
+    }
+    return false;
   }
 
   private createPipelineExecutor(
@@ -332,35 +324,91 @@ export class CodexOrchestrator {
     const { env, pipeline, manifest, paths } = options;
     const notes: string[] = [];
     let success = true;
+    manifest.guardrail_status = undefined;
+
+    const persistIntervalMs = Math.max(1000, manifest.heartbeat_interval_seconds * 1000);
+    let dirtyManifest = false;
+    let dirtyHeartbeat = false;
+    let timer: NodeJS.Timeout | null = null;
+    let timerResolver: (() => void) | null = null;
+    let lastPersistAt = 0;
+    let pendingPersist = Promise.resolve();
+
+    const flushPersist = async (): Promise<void> => {
+      if (!dirtyManifest && !dirtyHeartbeat) {
+        return;
+      }
+      const writeManifest = dirtyManifest;
+      const writeHeartbeat = dirtyHeartbeat;
+      dirtyManifest = false;
+      dirtyHeartbeat = false;
+      lastPersistAt = Date.now();
+      if (writeManifest) {
+        await saveManifest(paths, manifest);
+      }
+      if (writeHeartbeat) {
+        await writeHeartbeatFile(paths, manifest);
+      }
+    };
+
+    const schedulePersist = (
+      options: { manifest?: boolean; heartbeat?: boolean; force?: boolean } = {}
+    ): Promise<void> => {
+      const { manifest: includeManifest = false, heartbeat: includeHeartbeat = false, force = false } = options;
+      dirtyManifest = dirtyManifest || includeManifest;
+      dirtyHeartbeat = dirtyHeartbeat || includeHeartbeat;
+      if (!dirtyManifest && !dirtyHeartbeat) {
+        return pendingPersist;
+      }
+      if (force) {
+        if (timer) {
+          clearTimeout(timer);
+          timer = null;
+        }
+        if (timerResolver) {
+          const resolver = timerResolver;
+          timerResolver = null;
+          resolver();
+          return pendingPersist;
+        }
+        pendingPersist = pendingPersist.then(() => flushPersist());
+        return pendingPersist;
+      }
+      if (timer) {
+        return pendingPersist;
+      }
+      const waitMs = Math.max(0, lastPersistAt + persistIntervalMs - Date.now());
+      pendingPersist = pendingPersist
+        .then(
+          () =>
+            new Promise<void>((resolve) => {
+              timerResolver = resolve;
+              timer = setTimeout(() => {
+                timer = null;
+                timerResolver = null;
+                resolve();
+              }, waitMs);
+            })
+        )
+        .then(() => flushPersist());
+      return pendingPersist;
+    };
+
+    const pushHeartbeat = (forceManifest = false): Promise<void> => {
+      updateHeartbeat(manifest);
+      return schedulePersist({ manifest: forceManifest, heartbeat: true, force: forceManifest });
+    };
 
     manifest.status = 'in_progress';
     updateHeartbeat(manifest);
-    await saveManifest(paths, manifest);
-    await writeHeartbeatFile(paths, manifest);
-
-    let heartbeatWrite = Promise.resolve();
-    let lastHeartbeatManifestPersistMs = Date.now();
-    const enqueueHeartbeat = (forceManifest = false) => {
-      heartbeatWrite = heartbeatWrite.then(async () => {
-        updateHeartbeat(manifest);
-        try {
-          const now = Date.now();
-          if (forceManifest || now - lastHeartbeatManifestPersistMs >= HEARTBEAT_MANIFEST_THROTTLE_MS) {
-            await saveManifest(paths, manifest);
-            lastHeartbeatManifestPersistMs = now;
-          }
-          await writeHeartbeatFile(paths, manifest);
-        } catch (error) {
-          logger.warn(
-            `Heartbeat update failed for run ${manifest.run_id}: ${(error as Error)?.message ?? String(error)}`
-          );
-        }
-      });
-      return heartbeatWrite;
-    };
+    await schedulePersist({ manifest: true, heartbeat: true, force: true });
 
     const heartbeatInterval = setInterval(() => {
-      void enqueueHeartbeat(false);
+      void pushHeartbeat(false).catch((error) => {
+        logger.warn(
+          `Heartbeat update failed for run ${manifest.run_id}: ${(error as Error)?.message ?? String(error)}`
+        );
+      });
     }, manifest.heartbeat_interval_seconds * 1000);
 
     try {
@@ -377,7 +425,7 @@ export class CodexOrchestrator {
 
         entry.status = 'pending';
         entry.started_at = isoTimestamp();
-        await saveManifest(paths, manifest);
+        void schedulePersist({ manifest: true });
 
         if (stage.kind === 'command') {
           try {
@@ -388,6 +436,7 @@ export class CodexOrchestrator {
               manifest.status_detail = `stage:${stage.id}:failed`;
               appendSummary(manifest, `Stage '${stage.title}' failed with exit code ${result.exitCode}.`);
               success = false;
+              await schedulePersist({ manifest: true, force: true });
               break;
             }
           } catch (error) {
@@ -396,7 +445,7 @@ export class CodexOrchestrator {
             entry.summary = `Execution error: ${(error as Error)?.message ?? String(error)}`;
             manifest.status_detail = `stage:${stage.id}:error`;
             appendSummary(manifest, entry.summary);
-            await saveManifest(paths, manifest);
+            await schedulePersist({ manifest: true, force: true });
             success = false;
             break;
           }
@@ -419,10 +468,11 @@ export class CodexOrchestrator {
             manifest: relativeToRepo(env, resolveRunPaths(env, child.manifest.run_id).manifestPath)
           });
           notes.push(`${stage.title}: ${entry.status}`);
-          await saveManifest(paths, manifest);
+          void schedulePersist({ manifest: true });
           if (!stage.optional && entry.status === 'failed') {
             manifest.status_detail = `subpipeline:${stage.pipeline}:failed`;
             appendSummary(manifest, `Sub-pipeline '${stage.pipeline}' failed.`);
+            await schedulePersist({ manifest: true, force: true });
             success = false;
             break;
           }
@@ -430,7 +480,7 @@ export class CodexOrchestrator {
       }
     } finally {
       clearInterval(heartbeatInterval);
-      await heartbeatWrite;
+      await schedulePersist({ force: true });
     }
 
     if (success) {
@@ -439,13 +489,18 @@ export class CodexOrchestrator {
       finalizeStatus(manifest, 'failed', manifest.status_detail ?? 'pipeline-failed');
     }
 
-    const recommendation = guardrailRecommendation(manifest);
-    if (recommendation) {
-      appendSummary(manifest, recommendation);
+    const guardrailStatus = ensureGuardrailStatus(manifest);
+    if (guardrailStatus.recommendation) {
+      appendSummary(manifest, guardrailStatus.recommendation);
     }
 
-    await enqueueHeartbeat(true);
-    await saveManifest(paths, manifest);
+    updateHeartbeat(manifest);
+    await schedulePersist({ manifest: true, heartbeat: true, force: true }).catch((error) => {
+      logger.warn(
+        `Heartbeat update failed for run ${manifest.run_id}: ${(error as Error)?.message ?? String(error)}`
+      );
+    });
+    await schedulePersist({ force: true });
     await appendMetricsEntry(env, paths, manifest);
 
     return {
@@ -455,6 +510,67 @@ export class CodexOrchestrator {
       manifestPath: relativeToRepo(env, paths.manifestPath),
       logPath: relativeToRepo(env, paths.logPath)
     };
+  }
+
+  private async performRunLifecycle(context: RunLifecycleContext): Promise<PipelineExecutionResult> {
+    const { env, pipeline, manifest, paths, planner, taskContext, runId } = context;
+    const getResult = this.createResultAccessor();
+    const executePipeline = this.createPipelineExecutor({ env, pipeline, manifest, paths }, getResult);
+    const manager = this.createTaskManager(runId, pipeline, executePipeline, getResult, planner);
+    this.attachPlanTargetTracker(manager, manifest, paths);
+
+    getPrivacyGuard().reset();
+
+    const controlPlaneResult = await this.guardControlPlane({
+      env,
+      manifest,
+      paths,
+      pipeline,
+      task: taskContext,
+      runId,
+      requestedBy: { actorId: 'codex-cli', channel: 'cli', name: 'Codex CLI' }
+    });
+
+    const schedulerPlan = await this.createSchedulerPlanForRun({
+      env,
+      manifest,
+      paths,
+      controlPlaneResult
+    });
+
+    const runSummary = await manager.execute(taskContext);
+    manager.dispose();
+
+    await this.finalizeSchedulerPlanForManifest({
+      env,
+      manifest,
+      paths,
+      plan: schedulerPlan
+    });
+
+    this.applySchedulerToRunSummary(runSummary, schedulerPlan);
+    this.applyHandlesToRunSummary(runSummary, manifest);
+    this.applyPrivacyToRunSummary(runSummary, manifest);
+    this.applyControlPlaneToRunSummary(runSummary, controlPlaneResult);
+
+    await this.persistRunSummary(env, paths, manifest, runSummary);
+
+    return { manifest, runSummary };
+  }
+
+  private attachPlanTargetTracker(manager: TaskManager, manifest: CliManifest, paths: RunPaths): void {
+    manager.bus.on('plan:completed', (event) => {
+      const targetId = event.payload.plan.targetId ?? null;
+      if (manifest.plan_target_id === targetId) {
+        return;
+      }
+      manifest.plan_target_id = targetId;
+      void saveManifest(paths, manifest).catch((error) => {
+        logger.warn(
+          `Failed to persist plan target for run ${manifest.run_id}: ${(error as Error)?.message ?? String(error)}`
+        );
+      });
+    });
   }
 
   private async guardControlPlane(options: {

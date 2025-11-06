@@ -84,7 +84,8 @@ async function handleStart(orchestrator: CodexOrchestrator, rawArgs: string[]): 
     pipelineId,
     taskId: typeof flags['task'] === 'string' ? (flags['task'] as string) : undefined,
     parentRunId: typeof flags['parent-run'] === 'string' ? (flags['parent-run'] as string) : undefined,
-    approvalPolicy: typeof flags['approval-policy'] === 'string' ? (flags['approval-policy'] as string) : undefined
+    approvalPolicy: typeof flags['approval-policy'] === 'string' ? (flags['approval-policy'] as string) : undefined,
+    targetStageId: typeof flags['target'] === 'string' ? (flags['target'] as string) : undefined
   });
   const payload = {
     run_id: result.manifest.run_id,
@@ -109,7 +110,8 @@ async function handlePlan(orchestrator: CodexOrchestrator, rawArgs: string[]): P
   const format = (flags['format'] as string | undefined) === 'json' ? 'json' : 'text';
   const result = await orchestrator.plan({
     pipelineId,
-    taskId: typeof flags['task'] === 'string' ? (flags['task'] as string) : undefined
+    taskId: typeof flags['task'] === 'string' ? (flags['task'] as string) : undefined,
+    targetStageId: typeof flags['target'] === 'string' ? (flags['target'] as string) : undefined
   });
   if (format === 'json') {
     console.log(JSON.stringify(result, null, 2));
@@ -128,7 +130,8 @@ async function handleResume(orchestrator: CodexOrchestrator, rawArgs: string[]):
     runId,
     resumeToken: typeof flags['token'] === 'string' ? (flags['token'] as string) : undefined,
     actor: typeof flags['actor'] === 'string' ? (flags['actor'] as string) : undefined,
-    reason: typeof flags['reason'] === 'string' ? (flags['reason'] as string) : undefined
+    reason: typeof flags['reason'] === 'string' ? (flags['reason'] as string) : undefined,
+    targetStageId: typeof flags['target'] === 'string' ? (flags['target'] as string) : undefined
   });
   console.log(`Run resumed: ${result.manifest.run_id}`);
   console.log(`Status: ${result.manifest.status}`);
@@ -330,10 +333,12 @@ Commands:
     --parent-run <id>       Link run to parent run id.
     --approval-policy <p>   Record approval policy metadata.
     --format json           Emit machine-readable output.
+    --target <stage-id>     Focus plan/build metadata on a specific stage.
 
   plan [pipeline]           Preview pipeline stages without executing.
     --task <id>             Override task identifier.
     --format json           Emit machine-readable output.
+    --target <stage-id>     Highlight the stage chosen for orchestration.
 
   exec [command]            Run a one-off command with unified exec runtime.
     --json [compact]        Emit final JSON summary (optional compact mode).
@@ -347,6 +352,7 @@ Commands:
     --token <resume-token>  Verify the resume token before restarting.
     --actor <name>          Record who resumed the run.
     --reason <text>         Record why the run was resumed.
+    --target <stage-id>     Override stage selection before resuming.
 
   status --run <id> [--watch] [--interval N] [--format json]
 

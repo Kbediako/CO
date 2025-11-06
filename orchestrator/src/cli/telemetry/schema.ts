@@ -17,6 +17,7 @@ const RUN_STATUS = new Set(['queued', 'in_progress', 'succeeded', 'failed', 'can
 const CHILD_STATUS = new Set(['queued', 'in_progress', 'succeeded', 'failed', 'cancelled']);
 const COMMAND_KINDS = new Set(['command', 'subpipeline']);
 const RESUME_OUTCOMES = new Set(['accepted', 'blocked']);
+const PRIVACY_ACTIONS = new Set(['allow', 'redact', 'block']);
 
 export const CLI_MANIFEST_SCHEMA: JsonSchema = {
   $schema: 'http://json-schema.org/draft-07/schema#',
@@ -160,10 +161,71 @@ export const CLI_MANIFEST_SCHEMA: JsonSchema = {
       }
     },
     run_summary_path: { type: ['string', 'null'] },
+    plan_target_id: { type: ['string', 'null'] },
     instructions_hash: { type: ['string', 'null'] },
     instructions_sources: {
       type: 'array',
       items: { type: 'string', minLength: 1 }
+    },
+    privacy: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['mode', 'decisions', 'totals'],
+      properties: {
+        mode: { type: 'string', enum: ['shadow', 'enforce'] },
+        decisions: {
+          type: 'array',
+          items: {
+            type: 'object',
+            additionalProperties: false,
+            required: ['handle_id', 'sequence', 'action', 'timestamp', 'stage_id'],
+            properties: {
+              handle_id: { type: 'string', minLength: 1 },
+              sequence: { type: 'integer', minimum: 0 },
+              action: { type: 'string', enum: Array.from(PRIVACY_ACTIONS) },
+              rule: { type: ['string', 'null'] },
+              reason: { type: ['string', 'null'] },
+              timestamp: { type: 'string', minLength: 1 },
+              stage_id: { type: ['string', 'null'] }
+            }
+          }
+        },
+        totals: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['total_frames', 'redacted_frames', 'blocked_frames', 'allowed_frames'],
+          properties: {
+            total_frames: { type: 'integer', minimum: 0 },
+            redacted_frames: { type: 'integer', minimum: 0 },
+            blocked_frames: { type: 'integer', minimum: 0 },
+            allowed_frames: { type: 'integer', minimum: 0 }
+          }
+        },
+        log_path: { type: ['string', 'null'] }
+      }
+    },
+    guardrail_status: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['present', 'recommendation', 'summary', 'computed_at', 'counts'],
+      properties: {
+        present: { type: 'boolean' },
+        recommendation: { type: ['string', 'null'] },
+        summary: { type: 'string', minLength: 1 },
+        computed_at: { type: 'string', minLength: 1 },
+        counts: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['total', 'succeeded', 'failed', 'skipped', 'other'],
+          properties: {
+            total: { type: 'integer', minimum: 0 },
+            succeeded: { type: 'integer', minimum: 0 },
+            failed: { type: 'integer', minimum: 0 },
+            skipped: { type: 'integer', minimum: 0 },
+            other: { type: 'integer', minimum: 0 }
+          }
+        }
+      }
     }
   }
 };
@@ -198,6 +260,7 @@ export function validateCliManifest(candidate: unknown): ValidationResult<CliMan
   validateOptionalString(candidate, 'parent_run_id', errors);
   validateOptionalString(candidate, 'approval_policy', errors);
   validateOptionalString(candidate, 'status_detail', errors);
+  validateOptionalString(candidate, 'plan_target_id', errors);
   validateOptionalString(candidate, 'completed_at', errors);
   validateOptionalString(candidate, 'heartbeat_at', errors);
   validateOptionalString(candidate, 'summary', errors);
@@ -220,6 +283,7 @@ export function validateCliManifest(candidate: unknown): ValidationResult<CliMan
   validateChildRuns(candidate.child_runs, errors);
   validateResumeEvents(candidate.resume_events, errors);
   validateApprovals(candidate.approvals, errors);
+  validatePrivacy(candidate.privacy, errors);
 
   if (errors.length > 0) {
     return { valid: false, errors, value: null };
@@ -391,6 +455,63 @@ function validateBoolean(candidate: Record<string, unknown>, key: string, errors
   const value = candidate[key];
   if (typeof value !== 'boolean') {
     errors.push(`${key} must be a boolean`);
+  }
+}
+
+function validatePrivacy(candidate: unknown, errors: string[]): void {
+  if (candidate === undefined) {
+    return;
+  }
+  if (!isPlainObject(candidate)) {
+    errors.push('privacy must be an object when provided');
+    return;
+  }
+
+  const privacy = candidate as Record<string, unknown>;
+
+  const mode = privacy.mode;
+  if (mode !== 'shadow' && mode !== 'enforce') {
+    errors.push('privacy.mode must be either "shadow" or "enforce"');
+  }
+
+  const decisions = privacy.decisions;
+  if (!Array.isArray(decisions)) {
+    errors.push('privacy.decisions must be an array');
+  } else {
+    decisions.forEach((decision, index) => {
+      if (!isPlainObject(decision)) {
+        errors.push(`privacy.decisions[${index}] must be an object`);
+        return;
+      }
+      const decisionRecord = decision as Record<string, unknown>;
+      validateString(decisionRecord, 'handle_id', errors, `privacy.decisions[${index}]`);
+      validateNumber(decisionRecord, 'sequence', errors, { integer: true, minimum: 0, path: `privacy.decisions[${index}].sequence` });
+      const action = decisionRecord.action;
+      if (typeof action !== 'string' || !PRIVACY_ACTIONS.has(action)) {
+        errors.push(`privacy.decisions[${index}].action must be one of ${Array.from(PRIVACY_ACTIONS).join(', ')}`);
+      }
+      validateOptionalString(decisionRecord, 'rule', errors, `privacy.decisions[${index}]`);
+      validateOptionalString(decisionRecord, 'reason', errors, `privacy.decisions[${index}]`);
+      validateString(decisionRecord, 'timestamp', errors, `privacy.decisions[${index}]`);
+      if (!('stage_id' in decisionRecord) || (decisionRecord.stage_id !== null && typeof decisionRecord.stage_id !== 'string')) {
+        errors.push(`privacy.decisions[${index}].stage_id must be string or null`);
+      }
+    });
+  }
+
+  const totals = privacy.totals;
+  if (!isPlainObject(totals)) {
+    errors.push('privacy.totals must be an object');
+  } else {
+    const totalsRecord = totals as Record<string, unknown>;
+    validateNumber(totalsRecord, 'total_frames', errors, { minimum: 0, integer: true, path: 'privacy.totals.total_frames' });
+    validateNumber(totalsRecord, 'redacted_frames', errors, { minimum: 0, integer: true, path: 'privacy.totals.redacted_frames' });
+    validateNumber(totalsRecord, 'blocked_frames', errors, { minimum: 0, integer: true, path: 'privacy.totals.blocked_frames' });
+    validateNumber(totalsRecord, 'allowed_frames', errors, { minimum: 0, integer: true, path: 'privacy.totals.allowed_frames' });
+  }
+
+  if ('log_path' in privacy) {
+    validateOptionalString(privacy, 'log_path', errors, 'privacy');
   }
 }
 

@@ -22,11 +22,15 @@ export interface PlanItem {
    * Backwards-compatible alias for legacy planner outputs. Prefer `requires_cloud`.
    */
   requiresCloud?: boolean;
+  runnable?: boolean;
+  selected?: boolean;
+  metadata?: Record<string, unknown>;
 }
 
 export interface PlanResult {
   items: PlanItem[];
   notes?: string;
+  targetId?: string | null;
 }
 
 export interface BuilderInput {

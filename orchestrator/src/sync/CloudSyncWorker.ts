@@ -126,8 +126,10 @@ export class CloudSyncWorker {
   }
 
   private async appendAuditLog(entry: AuditLogEntry): Promise<void> {
-    const logDir = this.outDir;
+    const safeTaskId = sanitizeTaskId(entry.summary.taskId);
+    const logDir = join(this.outDir, safeTaskId, 'cloud-sync');
     await mkdir(logDir, { recursive: true });
+    const logPath = join(logDir, 'audit.log');
     const line = JSON.stringify({
       timestamp: new Date().toISOString(),
       taskId: entry.summary.taskId,
@@ -136,7 +138,7 @@ export class CloudSyncWorker {
       message: entry.message,
       details: entry.details
     });
-    await appendFile(join(logDir, 'audit.log'), `${line}\n`, 'utf-8');
+    await appendFile(logPath, `${line}\n`, 'utf-8');
   }
 
   private shouldRetry(error: unknown): boolean {
@@ -157,10 +159,12 @@ export class CloudSyncWorker {
     let attempt = 0;
     let delay = this.manifestInitialDelayMs;
     let lastError: unknown;
+    let lastContents: string | null = null;
     while (attempt < this.manifestReadRetries) {
       attempt += 1;
       try {
         const contents = await readFile(manifestPath, 'utf-8');
+        lastContents = contents;
         return JSON.parse(contents) as Record<string, unknown>;
       } catch (error: unknown) {
         lastError = error;
@@ -169,7 +173,24 @@ export class CloudSyncWorker {
           delay *= 2;
           continue;
         }
-        throw error;
+        break;
+      }
+    }
+    if (lastContents && lastError instanceof SyntaxError) {
+      const repaired = attemptJsonRecovery(lastContents);
+      if (repaired) {
+        try {
+          const parsed = JSON.parse(repaired) as Record<string, unknown>;
+          await this.appendAuditLog({
+            level: 'info',
+            message: 'Recovered manifest from partial JSON',
+            summary,
+            details: { strategy: 'trim-trailing', attempts: attempt }
+          });
+          return parsed;
+        } catch (parseError) {
+          lastError = parseError;
+        }
       }
     }
     throw lastError ?? new Error(`Manifest not available after ${this.manifestReadRetries} attempts`);
@@ -182,6 +203,15 @@ function shouldRetryManifestRead(error: unknown): boolean {
   }
   const code = (error as NodeJS.ErrnoException)?.code;
   return code === 'ENOENT' || code === 'EBUSY' || code === 'EMFILE';
+}
+
+function attemptJsonRecovery(contents: string): string | null {
+  const lastBrace = contents.lastIndexOf('}');
+  if (lastBrace === -1) {
+    return null;
+  }
+  const candidate = contents.slice(0, lastBrace + 1);
+  return candidate.trim().length > 0 ? candidate : null;
 }
 
 interface AuditLogEntry {

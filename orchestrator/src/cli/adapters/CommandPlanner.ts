@@ -1,18 +1,191 @@
-import type { PlannerAgent, PlanResult, TaskContext } from '../../types.js';
-import type { PipelineDefinition } from '../types.js';
+import type { PlannerAgent, PlanItem, PlanResult, TaskContext } from '../../types.js';
+import type { PipelineDefinition, PipelineStage } from '../types.js';
+
+export interface CommandPlannerOptions {
+  targetStageId?: string | null;
+}
 
 export class CommandPlanner implements PlannerAgent {
-  constructor(private readonly pipeline: PipelineDefinition) {}
+  private cachedPlan: PlanResult | null = null;
+
+  constructor(
+    private readonly pipeline: PipelineDefinition,
+    private readonly options: CommandPlannerOptions = {}
+  ) {}
 
   async plan(task: TaskContext): Promise<PlanResult> {
     void task;
+    if (!this.cachedPlan) {
+      const items = this.pipeline.stages.map((stage, index) => this.buildPlanItem(stage, index));
+      const targetId = this.resolveTargetId(items);
+      const normalizedItems = items.map((item) => ({
+        ...item,
+        selected: item.id === targetId
+      }));
+      this.cachedPlan = {
+        items: normalizedItems,
+        notes: this.pipeline.description,
+        targetId: targetId ?? null
+      };
+    }
+    return clonePlanResult(this.cachedPlan);
+  }
+
+  private buildPlanItem(stage: PipelineStage, index: number): PlanItem {
+    const stagePlanHints = extractStagePlanHints(stage);
+    const requiresCloud = resolveStageRequiresCloud(stage, stagePlanHints);
+    const runnable = resolveStageRunnable(stagePlanHints);
+    const metadata: Record<string, unknown> = {
+      pipelineId: this.pipeline.id,
+      stageId: stage.id,
+      stageKind: stage.kind,
+      index
+    };
+    if (stagePlanHints.aliases.length > 0) {
+      metadata.aliases = stagePlanHints.aliases;
+    }
+    if (stagePlanHints.defaultTarget) {
+      metadata.defaultTarget = true;
+    }
+    if (stagePlanHints.executionMode) {
+      metadata.executionMode = stagePlanHints.executionMode;
+    }
+    metadata.requiresCloud = requiresCloud;
+
     return {
-      items: this.pipeline.stages.map((stage) => ({
-        id: `${this.pipeline.id}:${stage.id}`,
-        description: stage.title,
-        requires_cloud: false
-      })),
-      notes: this.pipeline.description
+      id: `${this.pipeline.id}:${stage.id}`,
+      description: stage.title,
+      requires_cloud: requiresCloud,
+      requiresCloud,
+      runnable,
+      metadata
     };
   }
+
+  private resolveTargetId(items: PlanItem[]): string | null {
+    const explicit = this.normalizeTargetId(this.options.targetStageId ?? null, items);
+    if (explicit) {
+      return explicit;
+    }
+    const flagged = items.find((item) => item.metadata?.defaultTarget === true);
+    if (flagged) {
+      return flagged.id;
+    }
+    const runnableItems = items.filter((item) => item.runnable !== false);
+    if (runnableItems.length > 0) {
+      return runnableItems[0]!.id;
+    }
+    return items[0]?.id ?? null;
+  }
+
+  private normalizeTargetId(candidate: string | null, items: PlanItem[]): string | null {
+    if (!candidate) {
+      return null;
+    }
+    const exact = items.find((item) => item.id === candidate);
+    if (exact) {
+      return exact.id;
+    }
+    const normalized = candidate.includes(':') ? candidate.split(':').pop() ?? candidate : candidate;
+    const lowerNormalized = normalized.toLowerCase();
+    for (const item of items) {
+      const stageId = (item.metadata?.stageId as string | undefined)?.toLowerCase();
+      if (stageId && stageId === lowerNormalized) {
+        return item.id;
+      }
+      const aliases = Array.isArray(item.metadata?.aliases)
+        ? (item.metadata?.aliases as string[])
+        : [];
+      if (aliases.some((alias) => alias.toLowerCase() === lowerNormalized)) {
+        return item.id;
+      }
+    }
+    return null;
+  }
+}
+
+interface StagePlanHints {
+  runnable?: boolean;
+  defaultTarget?: boolean;
+  aliases: string[];
+  requiresCloud?: boolean;
+  executionMode?: string | null;
+}
+
+function extractStagePlanHints(stage: PipelineStage): StagePlanHints {
+  const planConfig = (stage as { plan?: Partial<StagePlanHints> & Record<string, unknown> }).plan ?? {};
+  const aliases = Array.isArray(planConfig.aliases)
+    ? planConfig.aliases.map((alias) => String(alias))
+    : [];
+  const defaultTarget = Boolean(planConfig.defaultTarget ?? planConfig.default ?? planConfig.primary);
+  const requiresCloud = typeof planConfig.requiresCloud === 'boolean'
+    ? planConfig.requiresCloud
+    : typeof planConfig.requires_cloud === 'boolean'
+      ? planConfig.requires_cloud
+      : undefined;
+  const rawExecutionMode = typeof planConfig.executionMode === 'string'
+    ? planConfig.executionMode
+    : typeof (stage as Record<string, unknown>).executionMode === 'string'
+      ? (stage as Record<string, unknown>).executionMode
+      : typeof (stage as Record<string, unknown>).execution_mode === 'string'
+        ? (stage as Record<string, unknown>).execution_mode
+        : typeof (stage as Record<string, unknown>).mode === 'string'
+          ? (stage as Record<string, unknown>).mode
+          : undefined;
+  const executionMode = typeof rawExecutionMode === 'string'
+    ? rawExecutionMode.trim().toLowerCase() || null
+    : null;
+
+  return {
+    runnable: planConfig.runnable,
+    defaultTarget,
+    aliases,
+    requiresCloud,
+    executionMode
+  };
+}
+
+function resolveStageRequiresCloud(stage: PipelineStage, hints: StagePlanHints): boolean {
+  const candidates: Array<boolean | null | undefined> = [
+    hints.requiresCloud,
+    typeof (stage as Record<string, unknown>).requires_cloud === 'boolean'
+      ? ((stage as Record<string, unknown>).requires_cloud as boolean)
+      : undefined,
+    typeof (stage as Record<string, unknown>).requiresCloud === 'boolean'
+      ? ((stage as Record<string, unknown>).requiresCloud as boolean)
+      : undefined
+  ];
+  for (const candidate of candidates) {
+    if (typeof candidate === 'boolean') {
+      return candidate;
+    }
+  }
+  if (typeof hints.executionMode === 'string') {
+    const normalized = hints.executionMode.toLowerCase();
+    if (normalized === 'cloud') {
+      return true;
+    }
+    if (normalized === 'mcp') {
+      return false;
+    }
+  }
+  return false;
+}
+
+function resolveStageRunnable(hints: StagePlanHints): boolean {
+  if (typeof hints.runnable === 'boolean') {
+    return hints.runnable;
+  }
+  return true;
+}
+
+function clonePlanResult(plan: PlanResult): PlanResult {
+  return {
+    items: plan.items.map((item) => ({
+      ...item,
+      metadata: item.metadata ? { ...item.metadata } : undefined
+    })),
+    notes: plan.notes,
+    targetId: plan.targetId ?? null
+  };
 }

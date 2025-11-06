@@ -12,6 +12,7 @@ import type { CloudRunsClient, UploadPayload, UploadResult } from '../src/sync/C
 import { CloudRunsHttpError } from '../src/sync/CloudRunsHttpClient.js';
 import { createCloudSyncWorker } from '../src/sync/createCloudSyncWorker.js';
 import type { CredentialBroker } from '../src/credentials/CredentialBroker.js';
+import { sanitizeTaskId } from '../src/persistence/sanitizeTaskId.js';
 
 const createSummary = (): RunSummary => ({
   taskId: '0001',
@@ -23,6 +24,11 @@ const createSummary = (): RunSummary => ({
   review: { summary: 'ok', decision: { approved: true } },
   timestamp: new Date().toISOString()
 });
+
+const readAuditLog = async (outDir: string, summary: RunSummary): Promise<string> => {
+  const taskDir = sanitizeTaskId(summary.taskId);
+  return await readFile(join(outDir, taskDir, 'cloud-sync', 'audit.log'), 'utf-8');
+};
 
 describe('CloudSyncWorker', () => {
   it('uploads manifest and writes audit log on success', async () => {
@@ -54,7 +60,7 @@ describe('CloudSyncWorker', () => {
       .digest('hex');
     expect(upload.mock.calls[0][0].idempotencyKey).toBe(expectedKey);
 
-    const audit = await readFile(join(outDir, 'audit.log'), 'utf-8');
+    const audit = await readAuditLog(outDir, summary);
     expect(audit).toContain('Cloud sync completed');
   });
 
@@ -88,7 +94,7 @@ describe('CloudSyncWorker', () => {
     await new Promise((resolve) => setTimeout(resolve, 80));
 
     expect(upload).toHaveBeenCalledTimes(1);
-    const audit = await readFile(join(outDir, 'audit.log'), 'utf-8');
+    const audit = await readAuditLog(outDir, summary);
     expect(audit).toContain('Cloud sync completed');
   });
 
@@ -137,7 +143,7 @@ describe('CloudSyncWorker', () => {
     await new Promise((resolve) => setTimeout(resolve, 80));
 
     expect(upload).toHaveBeenCalledTimes(1);
-    const audit = await readFile(join(outDir, 'audit.log'), 'utf-8');
+    const audit = await readAuditLog(outDir, summary);
     expect(audit).toContain('Cloud sync completed');
   });
 
@@ -169,7 +175,7 @@ describe('CloudSyncWorker', () => {
     await new Promise((resolve) => setTimeout(resolve, 60));
 
     expect(upload).toHaveBeenCalledTimes(3);
-    const audit = await readFile(join(outDir, 'audit.log'), 'utf-8');
+    const audit = await readAuditLog(outDir, summary);
     expect(audit).toContain('Cloud sync attempt failed');
     expect(audit).toContain('Cloud sync completed');
   });
@@ -228,7 +234,7 @@ describe('CloudSyncWorker', () => {
 
     expect(upload).toHaveBeenCalledTimes(1);
     expect(onError).toHaveBeenCalledWith(expect.any(CloudRunsHttpError), summary, 1);
-    const audit = await readFile(join(outDir, 'audit.log'), 'utf-8');
+    const audit = await readAuditLog(outDir, summary);
     const occurrences = audit.match(/Cloud sync attempt failed/g)?.length ?? 0;
     expect(occurrences).toBe(1);
   });
@@ -262,7 +268,7 @@ describe('CloudSyncWorker', () => {
     await new Promise((resolve) => setTimeout(resolve, 50));
 
     expect(fetchImpl).toHaveBeenCalledTimes(1);
-    const audit = await readFile(join(outDir, 'audit.log'), 'utf-8');
+    const audit = await readAuditLog(outDir, summary);
     expect(audit).toContain('Cloud sync completed');
   });
 });

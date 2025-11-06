@@ -4,8 +4,7 @@ import { join } from 'node:path';
 import type { CliManifest } from '../types.js';
 import type { EnvironmentPaths } from '../run/environment.js';
 import {
-  guardrailCommandPresent,
-  guardrailRecommendation,
+  ensureGuardrailStatus,
   appendSummary,
   upsertGuardrailSummary
 } from '../run/manifest.js';
@@ -37,7 +36,8 @@ export async function appendMetricsEntry(
 
   const commandsPassed = manifest.commands.filter((cmd) => cmd.status === 'succeeded').length;
   const commandsFailed = manifest.commands.filter((cmd) => cmd.status === 'failed').length;
-  const guardrailsPresent = guardrailCommandPresent(manifest);
+  const guardrailStatus = ensureGuardrailStatus(manifest);
+  const guardrailsPresent = guardrailStatus.present;
 
   const metricsRoot = join(env.runsRoot, env.taskId);
   const metricsPath = join(metricsRoot, 'metrics.json');
@@ -76,12 +76,9 @@ export async function appendMetricsEntry(
   await mkdir(metricsRoot, { recursive: true });
   await appendFile(metricsPath, `${JSON.stringify(entry)}\n`, 'utf8');
 
-  if (!guardrailsPresent) {
-    const recommendation = guardrailRecommendation(manifest);
-    if (recommendation) {
-      logger.warn(recommendation);
-      appendSummary(manifest, recommendation);
-    }
+  if (!guardrailsPresent && guardrailStatus.recommendation) {
+    logger.warn(guardrailStatus.recommendation);
+    appendSummary(manifest, guardrailStatus.recommendation);
   }
 
   upsertGuardrailSummary(manifest);

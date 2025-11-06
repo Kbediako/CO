@@ -25,11 +25,28 @@ export interface ManifestBootstrapOptions {
   parentRunId?: string | null;
   taskSlug: string | null;
   approvalPolicy?: string | null;
+  planTargetId?: string | null;
 }
 
 export interface HeartbeatState {
   stale: boolean;
   ageSeconds: number | null;
+}
+
+export interface GuardrailStatusSnapshot {
+  present: boolean;
+  recommendation: string | null;
+  summary: string;
+  computed_at: string;
+  counts: GuardrailCounts;
+}
+
+interface GuardrailCounts {
+  total: number;
+  succeeded: number;
+  failed: number;
+  skipped: number;
+  other: number;
 }
 
 const HEARTBEAT_INTERVAL_SECONDS = 5;
@@ -79,6 +96,7 @@ export async function bootstrapManifest(runId: string, options: ManifestBootstra
     commands,
     child_runs: [],
     run_summary_path: null,
+    plan_target_id: options.planTargetId ?? null,
     instructions_hash: null,
     instructions_sources: []
   };
@@ -193,6 +211,7 @@ export function resetForResume(manifest: CliManifest): void {
   manifest.metrics_recorded = false;
   manifest.status = 'in_progress';
   manifest.status_detail = 'resuming';
+  manifest.guardrail_status = undefined;
 }
 
 export function recordResumeEvent(
@@ -202,35 +221,41 @@ export function recordResumeEvent(
   manifest.resume_events.push({ ...event, timestamp: isoTimestamp() });
 }
 
+export function ensureGuardrailStatus(manifest: CliManifest): GuardrailStatusSnapshot {
+  if (manifest.guardrail_status) {
+    return manifest.guardrail_status;
+  }
+  const snapshot = computeGuardrailStatus(manifest);
+  manifest.guardrail_status = snapshot;
+  return snapshot;
+}
+
 export function guardrailCommandPresent(manifest: CliManifest): boolean {
-  return manifest.commands.some(
-    (entry) => entry.command?.includes('scripts/spec-guard.sh') && entry.status === 'succeeded'
-  );
+  return ensureGuardrailStatus(manifest).present;
 }
 
 export function guardrailRecommendation(manifest: CliManifest): string | null {
-  const guardrailCommands = manifest.commands.filter((entry) =>
-    entry.command?.includes('scripts/spec-guard.sh')
-  );
-  if (guardrailCommands.length === 0) {
-    return 'Guardrail command missing; run scripts/run-mcp-diagnostics.sh --no-watch to capture reviewer diagnostics.';
-  }
-  const failing = guardrailCommands.filter((entry) => entry.status !== 'succeeded');
-  if (failing.length > 0) {
-    return 'Guardrail command failed; re-run scripts/run-mcp-diagnostics.sh --no-watch to gather failure artifacts.';
-  }
-  return null;
+  return ensureGuardrailStatus(manifest).recommendation;
 }
 
 export function buildGuardrailSummary(manifest: CliManifest): string {
-  const guardrailCommands = manifest.commands.filter((entry) =>
-    entry.command?.includes('scripts/spec-guard.sh')
-  );
-  if (guardrailCommands.length === 0) {
-    return 'Guardrails: spec-guard command not found.';
-  }
+  return ensureGuardrailStatus(manifest).summary;
+}
 
-  const counts = {
+export function upsertGuardrailSummary(manifest: CliManifest): void {
+  const summary = buildGuardrailSummary(manifest);
+  const existing = manifest.summary ? manifest.summary.split('\n') : [];
+  const filtered = existing.filter((line) => !line.toLowerCase().startsWith('guardrails:'));
+  filtered.push(summary);
+  manifest.summary = filtered.join('\n').trim();
+  if (manifest.summary.length === 0) {
+    manifest.summary = summary;
+  }
+}
+
+function computeGuardrailStatus(manifest: CliManifest): GuardrailStatusSnapshot {
+  const guardrailCommands = selectGuardrailCommands(manifest);
+  const counts: GuardrailCounts = {
     total: guardrailCommands.length,
     succeeded: 0,
     failed: 0,
@@ -250,6 +275,33 @@ export function buildGuardrailSummary(manifest: CliManifest): string {
     }
   }
 
+  const present = counts.succeeded > 0;
+  let recommendation: string | null = null;
+  if (counts.total === 0) {
+    recommendation = 'Guardrail command missing; run scripts/run-mcp-diagnostics.sh --no-watch to capture reviewer diagnostics.';
+  } else if (counts.failed > 0) {
+    recommendation = 'Guardrail command failed; re-run scripts/run-mcp-diagnostics.sh --no-watch to gather failure artifacts.';
+  }
+
+  const summary = formatGuardrailSummary(counts);
+
+  return {
+    present,
+    recommendation,
+    summary,
+    computed_at: isoTimestamp(),
+    counts
+  };
+}
+
+function selectGuardrailCommands(manifest: CliManifest): CliManifestCommand[] {
+  return manifest.commands.filter((entry) => entry.command?.includes('scripts/spec-guard.sh'));
+}
+
+function formatGuardrailSummary(counts: GuardrailCounts): string {
+  if (counts.total === 0) {
+    return 'Guardrails: spec-guard command not found.';
+  }
   if (counts.failed > 0) {
     return `Guardrails: spec-guard failed (${counts.failed}/${counts.total} failed).`;
   }
@@ -272,17 +324,6 @@ export function buildGuardrailSummary(manifest: CliManifest): string {
   }
 
   return `Guardrails: spec-guard partial (${parts.join(', ')} of ${counts.total}).`;
-}
-
-export function upsertGuardrailSummary(manifest: CliManifest): void {
-  const summary = buildGuardrailSummary(manifest);
-  const existing = manifest.summary ? manifest.summary.split('\n') : [];
-  const filtered = existing.filter((line) => !line.toLowerCase().startsWith('guardrails:'));
-  filtered.push(summary);
-  manifest.summary = filtered.join('\n').trim();
-  if (manifest.summary.length === 0) {
-    manifest.summary = summary;
-  }
 }
 
 export function appendSummary(manifest: CliManifest, message: string | null | undefined): void {

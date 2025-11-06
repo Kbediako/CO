@@ -139,6 +139,7 @@ export interface PrivacyManifest {
   mode: 'shadow' | 'enforce';
   decisions: PrivacyDecisionRecord[];
   totals: PrivacyTotals;
+  log_path?: string | null;
 }
 
 export interface CliManifest {
@@ -176,12 +177,26 @@ export interface CliManifest {
   commands: CliManifestCommand[];
   child_runs: ChildRunRecord[];
   run_summary_path: string | null;
+  plan_target_id: string | null;
   instructions_hash: string | null;
   instructions_sources: string[];
   control_plane?: ControlPlaneManifestSection;
   scheduler?: SchedulerManifest;
   handles?: HandleRecord[];
   privacy?: PrivacyManifest;
+  guardrail_status?: {
+    present: boolean;
+    recommendation: string | null;
+    summary: string;
+    computed_at: string;
+    counts: {
+      total: number;
+      succeeded: number;
+      failed: number;
+      skipped: number;
+      other: number;
+    };
+  };
 }
 
 export type RunStatus = 'queued' | 'in_progress' | 'succeeded' | 'failed' | 'cancelled';
@@ -192,11 +207,13 @@ export interface StartOptions {
   parentRunId?: string | null;
   approvalPolicy?: string;
   format?: 'text' | 'json';
+  targetStageId?: string;
 }
 
 export interface PlanOptions {
   taskId?: string;
   pipelineId?: string;
+  targetStageId?: string;
 }
 
 export interface ResumeOptions {
@@ -205,6 +222,7 @@ export interface ResumeOptions {
   actor?: string;
   reason?: string;
   format?: 'text' | 'json';
+  targetStageId?: string;
 }
 
 export interface StatusOptions {
