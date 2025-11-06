@@ -19,6 +19,7 @@
     "adapters/**/*.ts",
     "evaluation/**/*.ts",
     "scripts/**/*.ts",
-    "bin/**/*.ts"
+    "bin/**/*.ts",
+    "types/**/*.d.ts"
   ]
 }

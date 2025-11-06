@@ -1,0 +1,26 @@
+metadata:
+  design:
+    enabled: false
+    capture_urls: []
+    breakpoints:
+      - id: desktop
+        width: 1280
+        height: 720
+    mask_selectors: []
+    retention:
+      days: 30
+      auto_purge: false
+    privacy:
+      allow_third_party: false
+      require_approval: true
+      approver: null
+advanced:
+  framer_motion:
+    enabled: false
+    quota_seconds: 120
+    approver: null
+  ffmpeg:
+    enabled: false
+    quota_seconds: 90
+    approver: null
+    max_duration_seconds: 120

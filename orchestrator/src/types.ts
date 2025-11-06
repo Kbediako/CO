@@ -96,7 +96,11 @@ export interface ReviewResult {
 
 import type { ControlPlaneRunSummary } from './control-plane/types.js';
 import type { SchedulerRunSummary } from './scheduler/types.js';
-import type { ToolRunRecord } from '../../packages/shared/manifest/types.js';
+import type {
+  DesignArtifactRecord,
+  DesignArtifactsSummary,
+  ToolRunRecord
+} from '../../packages/shared/manifest/types.js';
 
 export interface RunSummary {
   taskId: string;
@@ -112,6 +116,9 @@ export interface RunSummary {
   scheduler?: SchedulerRunSummary;
   handles?: RunHandleSummary[];
   privacy?: PrivacyRunSummary;
+  designArtifacts?: DesignArtifactRecord[];
+  designArtifactsSummary?: DesignArtifactsSummary;
+  designConfigSnapshot?: Record<string, unknown> | null;
 }
 
 export interface RunHandleSummary {

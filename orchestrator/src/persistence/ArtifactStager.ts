@@ -1,4 +1,4 @@
-import { access, copyFile, mkdir, rename } from 'node:fs/promises';
+import { access, copyFile, mkdir, rename, rm } from 'node:fs/promises';
 import { basename, dirname, extname, isAbsolute, join, relative, resolve } from 'node:path';
 import type { BuildArtifact } from '../types.js';
 import { sanitizeTaskId } from './sanitizeTaskId.js';
@@ -6,6 +6,8 @@ import { sanitizeTaskId } from './sanitizeTaskId.js';
 export interface StageArtifactsOptions {
   runsDir?: string;
   keepOriginal?: boolean;
+  relativeDir?: string;
+  overwrite?: boolean;
 }
 
 function sanitizeRunId(runId: string): string {
@@ -60,6 +62,9 @@ export async function stageArtifacts(params: {
   const runDir = join(runsDir, safeTaskId, sanitizeRunId(runId));
   const artifactsDir = join(runDir, 'artifacts');
   await mkdir(artifactsDir, { recursive: true });
+  const relativeSegments = options?.relativeDir ? sanitizeRelativeDir(options.relativeDir) : [];
+  const destinationRoot = relativeSegments.length > 0 ? join(artifactsDir, ...relativeSegments) : artifactsDir;
+  await mkdir(destinationRoot, { recursive: true });
 
   const results: BuildArtifact[] = [];
   for (const artifact of artifacts) {
@@ -74,8 +79,10 @@ export async function stageArtifacts(params: {
       continue;
     }
 
-    const destinationBase = join(artifactsDir, basename(sourcePath));
-    const destinationPath = await ensureUniquePath(destinationBase);
+    const destinationBase = join(destinationRoot, basename(sourcePath));
+    const destinationPath = options?.overwrite
+      ? await prepareOverwriteDestination(destinationBase)
+      : await ensureUniquePath(destinationBase);
     if (options?.keepOriginal) {
       await copyFile(sourcePath, destinationPath);
     } else {
@@ -89,4 +96,27 @@ export async function stageArtifacts(params: {
   }
 
   return results;
+}
+
+async function prepareOverwriteDestination(destinationBase: string): Promise<string> {
+  if (await pathExists(destinationBase)) {
+    await rm(destinationBase, { recursive: true, force: true });
+  }
+  return destinationBase;
+}
+
+function sanitizeRelativeDir(relativeDir: string): string[] {
+  const sanitized = relativeDir.replace(/\\+/g, '/');
+  const segments = sanitized
+    .split('/')
+    .map((segment) => segment.trim())
+    .filter((segment) => segment.length > 0);
+
+  for (const segment of segments) {
+    if (segment === '.' || segment === '..' || segment.includes('..')) {
+      throw new Error(`relativeDir contains invalid segment '${segment}'`);
+    }
+  }
+
+  return segments;
 }

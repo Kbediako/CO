@@ -4,10 +4,11 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import {
   mergeToolRunRecord,
+  persistDesignManifest,
   persistToolRunRecord,
   sanitizeToolRunRecord
 } from '../manifest/writer.js';
-import type { ToolRunRecord } from '../manifest/types.js';
+import type { DesignArtifactRecord, DesignArtifactsSummary, ToolRunRecord } from '../manifest/types.js';
 
 function createRecord(overrides: Partial<ToolRunRecord> = {}): ToolRunRecord {
   return {
@@ -146,5 +147,131 @@ describe('manifest writer', () => {
     expect(manifest.toolRuns[0].events?.[0].type).toBe('exec:begin');
     expect(manifest.toolRuns[0].events?.[1].type).toBe('exec:retry');
     expect(manifest.toolRuns[0].events?.[2].type).toBe('exec:end');
+  });
+
+  it('persists design artifacts, summary, and config snapshot', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'design-manifest-'));
+    const manifestPath = join(root, 'manifest.json');
+    const artifacts: DesignArtifactRecord[] = [
+      {
+        stage: 'extract',
+        status: 'succeeded',
+        relative_path: 'design/reference/dom.json',
+        approvals: [
+          {
+            id: 'approval-1',
+            actor: 'designer@example.com',
+            reason: 'Capture approved',
+            timestamp: '2025-01-01T00:00:00.000Z'
+          }
+        ],
+        quota: {
+          type: 'runtime',
+          limit: 60,
+          unit: 'seconds',
+          consumed: 45
+        },
+        privacy_notes: ['mask applied to .secret'],
+        metadata: { viewport: 'desktop' }
+      },
+      {
+        stage: 'visual-regression',
+        status: 'skipped',
+        relative_path: 'design/visual-regression/report.json',
+        expiry: {
+          date: '2025-02-15T00:00:00.000Z',
+          policy: 'manual-override'
+        }
+      }
+    ];
+
+    const summary: DesignArtifactsSummary = {
+      total_artifacts: 2,
+      generated_at: '2025-01-01T00:00:00.000Z',
+      storage_bytes: 1024,
+      stages: [
+        {
+          stage: 'extract',
+          succeeded: 1,
+          failed: 0,
+          skipped: 0,
+          artifacts: 1
+        },
+        {
+          stage: 'visual-regression',
+          succeeded: 0,
+          failed: 0,
+          skipped: 1
+        }
+      ]
+    };
+
+    await persistDesignManifest(
+      manifestPath,
+      {
+        artifacts,
+        summary,
+        configSnapshot: {
+          metadata: {
+            design: {
+              enabled: true,
+              retention: { days: 30, autoPurge: true }
+            }
+          }
+        }
+      },
+      {
+        retentionDays: 30,
+        now: new Date('2025-01-01T00:00:00.000Z')
+      }
+    );
+
+    const raw = await readFile(manifestPath, 'utf-8');
+    const manifest = JSON.parse(raw) as {
+      design_artifacts: DesignArtifactRecord[];
+      design_config_snapshot: Record<string, unknown>;
+      design_artifacts_summary: DesignArtifactsSummary;
+    };
+
+    expect(manifest.design_artifacts).toHaveLength(2);
+    const [first, second] = manifest.design_artifacts;
+    expect(first.expiry?.policy).toBe('design.config.retention');
+    expect(first.expiry?.date).toBe('2025-01-31T00:00:00.000Z');
+    expect(second.expiry?.policy).toBe('manual-override');
+    expect(manifest.design_config_snapshot).toMatchObject({ metadata: { design: { enabled: true } } });
+    expect(manifest.design_artifacts_summary.total_artifacts).toBe(2);
+    expect(manifest.design_artifacts_summary.stages).toHaveLength(2);
+  });
+
+  it('bounds design artifacts to 200 entries when merging', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'design-manifest-'));
+    const manifestPath = join(root, 'manifest.json');
+    const existing = {
+      design_artifacts: Array.from({ length: 199 }, (_, index) => ({
+        stage: 'components',
+        status: 'succeeded',
+        relative_path: `design/components/component-${index}.json`
+      }))
+    } satisfies { design_artifacts: DesignArtifactRecord[] };
+    await writeFile(manifestPath, JSON.stringify(existing, null, 2));
+
+    const newArtifacts: DesignArtifactRecord[] = [
+      {
+        stage: 'components',
+        status: 'succeeded',
+        relative_path: 'design/components/component-199.json'
+      },
+      {
+        stage: 'components',
+        status: 'succeeded',
+        relative_path: 'design/components/component-200.json'
+      }
+    ];
+
+    await persistDesignManifest(manifestPath, { artifacts: newArtifacts }, {});
+    const raw = await readFile(manifestPath, 'utf-8');
+    const manifest = JSON.parse(raw) as { design_artifacts: DesignArtifactRecord[] };
+    expect(manifest.design_artifacts).toHaveLength(200);
+    expect(manifest.design_artifacts[199].relative_path).toBe('design/components/component-200.json');
   });
 });

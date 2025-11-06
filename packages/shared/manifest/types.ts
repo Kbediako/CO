@@ -117,5 +117,66 @@ export interface ToolRunRecord {
 
 export interface ToolRunManifest {
   toolRuns?: ToolRunRecord[];
+  design_artifacts?: DesignArtifactRecord[];
+  design_artifacts_summary?: DesignArtifactsSummary;
+  design_config_snapshot?: Record<string, unknown> | null;
   [key: string]: unknown;
+}
+
+export type DesignArtifactStage =
+  | 'extract'
+  | 'reference'
+  | 'components'
+  | 'motion'
+  | 'video'
+  | 'visual-regression';
+
+export interface DesignArtifactApprovalRecord {
+  id: string;
+  actor: string;
+  reason: string;
+  timestamp: string;
+}
+
+export interface DesignArtifactQuota {
+  type: 'storage' | 'runtime';
+  limit: number;
+  unit: 'MB' | 'seconds';
+  consumed?: number;
+}
+
+export interface DesignArtifactExpiry {
+  date: string;
+  policy: string;
+}
+
+export interface DesignArtifactRecord {
+  stage: DesignArtifactStage;
+  status: 'succeeded' | 'skipped' | 'failed';
+  relative_path: string;
+  type?: string;
+  description?: string;
+  approvals?: DesignArtifactApprovalRecord[];
+  quota?: DesignArtifactQuota;
+  expiry?: DesignArtifactExpiry;
+  privacy_notes?: string[];
+  config_hash?: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface DesignArtifactsSummaryStageEntry {
+  stage: DesignArtifactStage;
+  succeeded: number;
+  failed: number;
+  skipped: number;
+  artifacts?: number;
+  notes?: string[];
+}
+
+export interface DesignArtifactsSummary {
+  total_artifacts: number;
+  storage_bytes?: number;
+  generated_at: string;
+  stages: DesignArtifactsSummaryStageEntry[];
+  errors?: string[];
 }

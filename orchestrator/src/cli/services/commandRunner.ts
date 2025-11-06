@@ -106,7 +106,18 @@ export async function runCommandStage(
     const persistSession = Boolean(sessionId && wantsPersist);
     const reuseSession = Boolean(sessionId && (sessionConfig.reuse ?? persistSession));
 
-    const execEnv: NodeJS.ProcessEnv = { ...process.env, ...stage.env };
+    const baseEnv: NodeJS.ProcessEnv = {
+      ...process.env,
+      CODEX_ORCHESTRATOR_TASK_ID: manifest.task_id,
+      CODEX_ORCHESTRATOR_RUN_ID: manifest.run_id,
+      CODEX_ORCHESTRATOR_PIPELINE_ID: manifest.pipeline_id,
+      CODEX_ORCHESTRATOR_MANIFEST_PATH: paths.manifestPath,
+      CODEX_ORCHESTRATOR_RUN_DIR: paths.runDir,
+      CODEX_ORCHESTRATOR_RUNS_DIR: env.runsRoot,
+      CODEX_ORCHESTRATOR_OUT_DIR: env.outRoot,
+      CODEX_ORCHESTRATOR_REPO_ROOT: env.repoRoot
+    };
+    const execEnv: NodeJS.ProcessEnv = { ...baseEnv, ...stage.env };
     const invocationId = `cli-command:${manifest.run_id}:${stage.id}:${Date.now()}`;
 
     let result: UnifiedExecRunResult;

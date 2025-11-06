@@ -77,4 +77,83 @@ describe('stageArtifacts', () => {
     expect(await exists(stagedPath)).toBe(true);
     expect(await readFile(stagedPath, 'utf8')).toBe('tricky');
   });
+
+  it('stages artifacts within a relative directory', async () => {
+    await mkdir(tempDir, { recursive: true });
+    const sourcePath = join(tempDir, 'capture.json');
+    await writeFile(sourcePath, JSON.stringify({ ok: true }), 'utf8');
+
+    const [staged] = await stageArtifacts({
+      taskId,
+      runId,
+      artifacts: [
+        {
+          path: relative(process.cwd(), sourcePath),
+          description: 'design capture snapshot'
+        }
+      ],
+      options: { runsDir, relativeDir: 'design/reference/playwright' }
+    });
+
+    const destinationPath = join(process.cwd(), staged.path);
+    expect(destinationPath).toContain(
+      `${taskId}/run-with-colon/artifacts/design/reference/playwright/capture.json`
+    );
+    expect(await exists(destinationPath)).toBe(true);
+  });
+
+  it('overwrites existing artifacts when overwrite option is enabled', async () => {
+    await mkdir(tempDir, { recursive: true });
+    const sourcePath = join(tempDir, 'component.html');
+    await writeFile(sourcePath, '<div>v1</div>', 'utf8');
+
+    const [initial] = await stageArtifacts({
+      taskId,
+      runId,
+      artifacts: [
+        {
+          path: relative(process.cwd(), sourcePath),
+          description: 'component v1'
+        }
+      ],
+      options: { runsDir, keepOriginal: true, relativeDir: 'design/components' }
+    });
+
+    await writeFile(sourcePath, '<div>v2</div>', 'utf8');
+    const [overwritten] = await stageArtifacts({
+      taskId,
+      runId,
+      artifacts: [
+        {
+          path: relative(process.cwd(), sourcePath),
+          description: 'component v2'
+        }
+      ],
+      options: { runsDir, keepOriginal: true, relativeDir: 'design/components', overwrite: true }
+    });
+
+    expect(overwritten.path).toBe(initial.path);
+    const destinationPath = join(process.cwd(), overwritten.path);
+    expect(await readFile(destinationPath, 'utf8')).toBe('<div>v2</div>');
+  });
+
+  it('throws for invalid relative directory segments', async () => {
+    await mkdir(tempDir, { recursive: true });
+    const sourcePath = join(tempDir, 'sample.txt');
+    await writeFile(sourcePath, 'invalid', 'utf8');
+
+    await expect(
+      stageArtifacts({
+        taskId,
+        runId,
+        artifacts: [
+          {
+            path: relative(process.cwd(), sourcePath),
+            description: 'invalid relative dir'
+          }
+        ],
+        options: { runsDir, relativeDir: '../outside' }
+      })
+    ).rejects.toThrow(/relativeDir/);
+  });
 });

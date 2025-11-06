@@ -1,0 +1,11 @@
+{
+  "generatedAt": "2025-11-06T11:59:59.996Z",
+  "metrics": {
+    "total": 0,
+    "failed": 0,
+    "passed": 0
+  },
+  "report": {
+    "message": "Visual regression placeholder run complete."
+  }
+}
