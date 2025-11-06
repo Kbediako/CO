@@ -65,7 +65,7 @@ describe('metricsAggregator', () => {
       { encoding: 'utf8', flag: 'w' }
     );
 
-    await updateMetricsAggregates(env, createEntry(2, 'failed'));
+    await updateMetricsAggregates(env);
 
     const baseline = JSON.parse(
       await readFile(join(metricsRoot, 'metrics', 'baseline.json'), 'utf8')

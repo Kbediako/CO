@@ -4,7 +4,7 @@ import type {
   StreamFrameGuardDecision,
   StreamFrameGuardResult,
   StreamFrameGuardContext
-} from '../../packages/orchestrator/src/exec/handle-service.js';
+} from '../../../packages/orchestrator/src/exec/handle-service.js';
 
 export type PrivacyGuardMode = 'shadow' | 'enforce';
 
@@ -108,11 +108,12 @@ export class PrivacyGuard implements StreamFrameGuard {
   }
 
   private evaluateFrame(frame: ExecStreamFrame): StreamFrameGuardDecision {
-    if (frame.event.type !== 'exec:chunk') {
+    const event = frame.event;
+    if (event.type !== 'exec:chunk') {
       return { action: 'allow' };
     }
 
-    const data = frame.event.payload.data;
+    const { data } = event.payload;
     if (!data) {
       return { action: 'allow' };
     }
@@ -137,13 +138,22 @@ export class PrivacyGuard implements StreamFrameGuard {
   }
 
   private redactFrame(frame: ExecStreamFrame): ExecStreamFrame {
-    if (frame.event.type !== 'exec:chunk') {
+    const event = frame.event;
+    if (event.type !== 'exec:chunk') {
       return frame;
     }
-    const cloned = structuredClone(frame);
-    cloned.event.payload.data = REDACTION_TOKEN;
-    cloned.event.payload.bytes = Buffer.byteLength(REDACTION_TOKEN, 'utf8');
-    return cloned;
+    const payload = {
+      ...event.payload,
+      data: REDACTION_TOKEN,
+      bytes: Buffer.byteLength(REDACTION_TOKEN, 'utf8')
+    };
+    return {
+      ...frame,
+      event: {
+        ...event,
+        payload
+      }
+    };
   }
 }
 

@@ -1,19 +1,23 @@
 import { describe, expect, it } from 'vitest';
 
 import { RemoteExecHandleService } from '../src/exec/handle-service.js';
-import type { ExecEvent } from '../../shared/events/types.js';
+import type {
+  ExecBeginEvent,
+  ExecChunkEvent,
+  ExecEndEvent,
+  ExecEvent,
+  ExecRetryEvent
+} from '../../shared/events/types.js';
 
 function createEvent(type: ExecEvent['type'], correlationId: string, attempt = 1): ExecEvent {
-  const base = {
-    type,
-    correlationId,
-    attempt,
-    timestamp: new Date('2025-11-05T00:00:00Z').toISOString()
-  } as const;
+  const timestamp = new Date('2025-11-05T00:00:00Z').toISOString();
   switch (type) {
-    case 'exec:begin':
-      return {
-        ...base,
+    case 'exec:begin': {
+      const event: ExecBeginEvent = {
+        type: 'exec:begin',
+        correlationId,
+        attempt,
+        timestamp,
         payload: {
           command: 'echo',
           args: [],
@@ -23,9 +27,14 @@ function createEvent(type: ExecEvent['type'], correlationId: string, attempt = 1
           persisted: false
         }
       };
-    case 'exec:chunk':
-      return {
-        ...base,
+      return event;
+    }
+    case 'exec:chunk': {
+      const event: ExecChunkEvent = {
+        type: 'exec:chunk',
+        correlationId,
+        attempt,
+        timestamp,
         payload: {
           stream: 'stdout',
           sequence: attempt,
@@ -33,9 +42,14 @@ function createEvent(type: ExecEvent['type'], correlationId: string, attempt = 1
           data: `frame-${attempt}`
         }
       };
-    case 'exec:end':
-      return {
-        ...base,
+      return event;
+    }
+    case 'exec:end': {
+      const event: ExecEndEvent = {
+        type: 'exec:end',
+        correlationId,
+        attempt,
+        timestamp,
         payload: {
           exitCode: 0,
           signal: null,
@@ -47,16 +61,24 @@ function createEvent(type: ExecEvent['type'], correlationId: string, attempt = 1
           status: 'succeeded'
         }
       };
-    case 'exec:retry':
-      return {
-        ...base,
+      return event;
+    }
+    case 'exec:retry': {
+      const event: ExecRetryEvent = {
+        type: 'exec:retry',
+        correlationId,
+        attempt,
+        timestamp,
         payload: {
           delayMs: 10,
           sandboxState: 'sandboxed',
           errorMessage: 'retry'
         }
       };
+      return event;
+    }
   }
+  throw new Error(`Unsupported exec event type: ${type}`);
 }
 
 describe('RemoteExecHandleService', () => {

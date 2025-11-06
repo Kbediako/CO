@@ -29,7 +29,12 @@ describe('PrivacyGuard', () => {
 
     const result = await guard.process(frame, { handleId: 'handle-1' });
     expect(result.decision.action).toBe('redact');
-    expect(result.frame?.event.payload.data).toBe('[REDACTED]');
+    const redactedEvent = result.frame?.event;
+    expect(redactedEvent?.type).toBe('exec:chunk');
+    if (redactedEvent?.type !== 'exec:chunk') {
+      throw new Error('expected exec:chunk frame');
+    }
+    expect(redactedEvent.payload.data).toBe('[REDACTED]');
     const metrics = guard.getMetrics();
     expect(metrics.redactedFrames).toBe(1);
   });

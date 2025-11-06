@@ -3,7 +3,6 @@ import { UnifiedExecRunner } from '../src/exec/unified-exec.js';
 import { ExecSessionManager, type ExecSessionHandle } from '../src/exec/session-manager.js';
 import { RemoteExecHandleService } from '../src/exec/handle-service.js';
 import { ToolOrchestrator, SandboxRetryableError, ToolInvocationFailedError } from '../src/tool-orchestrator.js';
-import { RemoteExecHandleService } from '../src/exec/handle-service.js';
 
 class TestHandle implements ExecSessionHandle {
   disposed = false;

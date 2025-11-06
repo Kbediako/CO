@@ -24,7 +24,7 @@ import {
   finalizeSchedulerPlan,
   serializeSchedulerPlan
 } from '../scheduler/index.js';
-import type { SchedulerPlan } from '../scheduler/index.js';
+import type { SchedulerPlan, SchedulerAssignmentStatus } from '../scheduler/index.js';
 import { resolveEnvironment, sanitizeTaskId } from './run/environment.js';
 import type { EnvironmentPaths } from './run/environment.js';
 import {
@@ -465,7 +465,7 @@ export class CodexOrchestrator {
     task: TaskContext;
     runId: string;
     requestedBy: { actorId: string; channel: string; name?: string };
-  }): Promise<ControlPlaneValidationResult | null> {
+  }): Promise<ControlPlaneValidationResult> {
     const mode = this.resolveControlPlaneMode();
     const driftReporter = new ControlPlaneDriftReporter({
       repoRoot: options.env.repoRoot,
