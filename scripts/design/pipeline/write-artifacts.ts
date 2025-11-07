@@ -1,5 +1,6 @@
 import { loadDesignContext } from './context.js';
 import {
+  ensureToolkitState,
   loadDesignRunState,
   saveDesignRunState,
   upsertStage
@@ -10,6 +11,7 @@ async function main(): Promise<void> {
   const context = await loadDesignContext();
   const state = await loadDesignRunState(context.statePath);
   const stageId = 'design-artifact-writer';
+  const toolkitState = ensureToolkitState(state);
 
   const retention = state.retention ?? {
     days: 30,
@@ -37,9 +39,14 @@ async function main(): Promise<void> {
     privacy,
     approvals: state.approvals,
     metrics: state.metrics,
+     toolkitArtifacts: toolkitState.artifacts,
+     toolkitSummary: (toolkitState.summary as never) ?? undefined,
     outDir: context.outRoot,
     now: new Date()
   });
+
+  toolkitState.summary =
+    (result.summary as { design_toolkit_summary?: Record<string, unknown> }).design_toolkit_summary ?? null;
 
   upsertStage(state, {
     id: stageId,

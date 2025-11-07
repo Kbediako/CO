@@ -15,7 +15,8 @@
     "test": "vitest run",
     "eval:test": "vitest run evaluation/tests",
     "test:watch": "vitest",
-    "review": "node dist/scripts/run-review.js"
+    "review": "node dist/scripts/run-review.js",
+    "design:purge-expired": "node dist/scripts/design/purgeExpired.js"
   },
   "devDependencies": {
     "@types/jscodeshift": "^0.11.6",

@@ -8,7 +8,9 @@ import {
 import type {
   DesignArtifactApprovalRecord,
   DesignArtifactRecord,
-  DesignArtifactsSummary
+  DesignArtifactsSummary,
+  DesignToolkitArtifactRecord,
+  DesignToolkitSummary
 } from '../manifest/types.js';
 
 export interface DesignWriterContext {
@@ -51,6 +53,8 @@ export interface DesignArtifactWriterOptions {
   stages: DesignStageSummary[];
   artifacts?: DesignArtifactRecord[];
   summary?: DesignArtifactsSummary;
+  toolkitArtifacts?: DesignToolkitArtifactRecord[];
+  toolkitSummary?: DesignToolkitSummary;
   configSnapshot?: Record<string, unknown> | null;
   retention: DesignRetentionMetadata;
   privacy: DesignPrivacyMetadata;
@@ -72,10 +76,16 @@ export async function writeDesignSummary(options: DesignArtifactWriterOptions): 
   const context = options.context;
   const artifacts = options.artifacts ?? [];
   const summary = options.summary ?? deriveSummary(artifacts, now);
+  const toolkitArtifacts = options.toolkitArtifacts ?? [];
+  const approvals = options.approvals ?? [];
+  const toolkitSummary =
+    options.toolkitSummary ?? (toolkitArtifacts.length > 0 ? deriveToolkitSummary(toolkitArtifacts, approvals, now) : undefined);
   const manifestUpdate: DesignManifestUpdate = {
     artifacts,
     summary,
-    configSnapshot: options.configSnapshot ?? null
+    configSnapshot: options.configSnapshot ?? null,
+    ...(toolkitArtifacts.length > 0 ? { toolkitArtifacts } : {}),
+    ...(toolkitSummary ? { toolkitSummary } : {})
   };
 
   const manifestOptions: PersistDesignManifestOptions = {
@@ -87,7 +97,7 @@ export async function writeDesignSummary(options: DesignArtifactWriterOptions): 
 
   await persistDesignManifest(context.manifestPath, manifestUpdate, manifestOptions);
 
-  const payload = buildSummaryPayload(options, summary, now);
+  const payload = buildSummaryPayload(options, summary, toolkitSummary, now);
   const summaryPath = await writeSummaryFile(options, payload);
 
   return {
@@ -100,6 +110,7 @@ export async function writeDesignSummary(options: DesignArtifactWriterOptions): 
 function buildSummaryPayload(
   options: DesignArtifactWriterOptions,
   summary: DesignArtifactsSummary,
+  toolkitSummary: DesignToolkitSummary | undefined,
   now: Date
 ): Record<string, unknown> {
   const context = options.context;
@@ -141,6 +152,16 @@ function buildSummaryPayload(
     description: artifact.description
   }));
 
+  const toolkitArtifacts = (options.toolkitArtifacts ?? []).map((artifact) => ({
+    id: artifact.id,
+    stage: artifact.stage,
+    status: artifact.status,
+    relative_path: artifact.relative_path,
+    description: artifact.description ?? null,
+    metrics: artifact.metrics ?? {},
+    retention: artifact.retention ?? null
+  }));
+
   return {
     task_id: context.taskId,
     run_id: context.runId,
@@ -161,6 +182,8 @@ function buildSummaryPayload(
     stages,
     artifacts: summaryArtifacts,
     summary,
+    design_toolkit_artifacts: toolkitArtifacts,
+    design_toolkit_summary: toolkitSummary ?? null,
     metrics: options.metrics ?? {},
     config_snapshot: options.configSnapshot ?? null
   };
@@ -211,6 +234,66 @@ function deriveSummary(artifacts: DesignArtifactRecord[], now: Date): DesignArti
     generated_at: now.toISOString(),
     stages
   };
+}
+
+function deriveToolkitSummary(
+  artifacts: DesignToolkitArtifactRecord[],
+  approvals: DesignArtifactApprovalRecord[],
+  now: Date
+): DesignToolkitSummary {
+  const stageMap = new Map<DesignToolkitArtifactRecord['stage'], { count: number; metrics: Record<string, number | string> }>();
+  const totals: Record<string, number> = {};
+
+  for (const artifact of artifacts) {
+    const entry = stageMap.get(artifact.stage) ?? { count: 0, metrics: {} };
+    entry.count += 1;
+    if (artifact.metrics) {
+      accumulateToolkitMetrics(entry.metrics, artifact.metrics);
+      accumulateNumericTotals(totals, artifact.metrics);
+    }
+    stageMap.set(artifact.stage, entry);
+  }
+
+  const stages = Array.from(stageMap.entries()).map(([stage, data]) => ({
+    stage,
+    artifacts: data.count,
+    metrics: data.metrics
+  }));
+
+  const approvalIds = approvals.map((approval) => approval.id).filter(Boolean);
+
+  return {
+    generated_at: now.toISOString(),
+    stages,
+    totals: Object.keys(totals).length > 0 ? totals : undefined,
+    approvals: approvalIds.length > 0 ? approvalIds : undefined
+  };
+}
+
+function accumulateToolkitMetrics(
+  target: Record<string, number | string>,
+  incoming: Record<string, number | string>
+): void {
+  for (const [key, value] of Object.entries(incoming)) {
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      const current = target[key];
+      if (typeof current === 'number') {
+        target[key] = current + value;
+      } else {
+        target[key] = value;
+      }
+    } else if (typeof value === 'string') {
+      target[key] = value;
+    }
+  }
+}
+
+function accumulateNumericTotals(target: Record<string, number>, incoming: Record<string, number | string>): void {
+  for (const [key, value] of Object.entries(incoming)) {
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      target[key] = (target[key] ?? 0) + value;
+    }
+  }
 }
 
 function sanitizeTaskId(value: string): string {

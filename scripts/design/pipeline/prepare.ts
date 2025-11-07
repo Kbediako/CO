@@ -22,7 +22,7 @@ async function main(): Promise<void> {
   };
 
   mergeMetrics(state, {
-    design_pipeline_id: resolveDesignPipelineId(),
+    design_pipeline_id: resolveDesignPipelineId(context.config),
     design_pipeline_enabled: designMetadata.enabled,
     capture_url_count: designMetadata.captureUrls.length,
     breakpoint_count: designMetadata.breakpoints.length

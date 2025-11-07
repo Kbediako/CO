@@ -24,3 +24,22 @@ advanced:
     quota_seconds: 90
     approver: null
     max_duration_seconds: 120
+pipelines:
+  hi_fi_design_toolkit:
+    enabled: false
+    sources:
+      - id: sample-dashboard
+        slug: sample-dashboard
+        url: https://example.com/dashboard
+        reference_url: https://example.com
+    retention:
+      days: 30
+      auto_purge: false
+    self_correction:
+      enabled: false
+      max_iterations: 1
+      provider: null
+      approval_id: null
+    publish:
+      update_tokens: true
+      run_visual_regression: true

@@ -21,5 +21,10 @@
     "scripts/**/*.ts",
     "bin/**/*.ts",
     "types/**/*.d.ts"
+  ],
+  "exclude": [
+    "packages/design-reference-tools/apps/**",
+    "packages/design-reference-tools/packages/**",
+    "packages/design-reference-tools/**/node_modules/**"
   ]
 }

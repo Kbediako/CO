@@ -3,7 +3,7 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { writeDesignSummary } from '../design-artifacts/writer.js';
-import type { DesignArtifactRecord } from '../manifest/types.js';
+import type { DesignArtifactRecord, DesignToolkitArtifactRecord } from '../manifest/types.js';
 
 describe('DesignArtifactWriter', () => {
   it('writes manifest updates and summary payload', async () => {
@@ -23,6 +23,18 @@ describe('DesignArtifactWriter', () => {
       }
     ];
 
+    const toolkitArtifacts: DesignToolkitArtifactRecord[] = [
+      {
+        id: 'dashboard-tokens',
+        stage: 'tokens',
+        status: 'succeeded',
+        relative_path: 'design-toolkit/tokens/dashboard/tokens.json',
+        metrics: {
+          token_count: 12
+        }
+      }
+    ];
+
     const result = await writeDesignSummary({
       context: {
         taskId: '0401-design-reference',
@@ -31,6 +43,7 @@ describe('DesignArtifactWriter', () => {
         repoRoot: root
       },
       artifacts,
+      toolkitArtifacts,
       stages: [
         {
           id: 'design-extract',
@@ -82,8 +95,14 @@ describe('DesignArtifactWriter', () => {
     });
 
     const manifestRaw = await readFile(manifestPath, 'utf8');
-    const manifest = JSON.parse(manifestRaw) as { design_artifacts: DesignArtifactRecord[] };
+    const manifest = JSON.parse(manifestRaw) as {
+      design_artifacts: DesignArtifactRecord[];
+      design_toolkit_artifacts: DesignToolkitArtifactRecord[];
+      design_toolkit_summary: Record<string, unknown>;
+    };
     expect(manifest.design_artifacts).toHaveLength(2);
+    expect(manifest.design_toolkit_artifacts).toHaveLength(1);
+    expect(manifest.design_toolkit_summary).toBeDefined();
     expect(result.summaryPath).toBe(
       join(outDir, '0401-design-reference', 'design', 'runs', 'run-1.json')
     );

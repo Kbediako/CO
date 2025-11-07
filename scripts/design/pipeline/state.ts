@@ -1,7 +1,8 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import type {
   DesignArtifactApprovalRecord,
-  DesignArtifactRecord
+  DesignArtifactRecord,
+  DesignToolkitArtifactRecord
 } from '../../../packages/shared/manifest/types.js';
 
 export interface StageStateArtifactSummary {
@@ -36,8 +37,33 @@ export interface DesignRunState {
   };
   approvals: DesignArtifactApprovalRecord[];
   artifacts: DesignArtifactRecord[];
+  toolkit?: ToolkitState;
   stages: StageState[];
   metrics: Record<string, unknown>;
+}
+
+export interface ToolkitContextState {
+  id: string;
+  slug: string;
+  title?: string | null;
+  url: string;
+  referenceUrl: string;
+  relativeDir: string;
+  breakpoints: string[];
+  tokensPath?: string;
+  styleguidePath?: string;
+  referencePath?: string;
+}
+
+export interface ToolkitState {
+  contexts: ToolkitContextState[];
+  artifacts: DesignToolkitArtifactRecord[];
+  retention?: {
+    days: number;
+    autoPurge: boolean;
+    policy?: string;
+  };
+  summary?: Record<string, unknown> | null;
 }
 
 export async function loadDesignRunState(path: string): Promise<DesignRunState> {
@@ -89,6 +115,26 @@ export function appendArtifacts(state: DesignRunState, artifacts: DesignArtifact
   }
 }
 
+export function appendToolkitArtifacts(state: DesignRunState, artifacts: DesignToolkitArtifactRecord[]): void {
+  const toolkit = ensureToolkitState(state);
+  for (const artifact of artifacts) {
+    const index = toolkit.artifacts.findIndex(
+      (entry) =>
+        entry.id === artifact.id &&
+        entry.stage === artifact.stage &&
+        entry.relative_path === artifact.relative_path
+    );
+    if (index >= 0) {
+      toolkit.artifacts[index] = {
+        ...toolkit.artifacts[index],
+        ...artifact
+      };
+    } else {
+      toolkit.artifacts.push({ ...artifact });
+    }
+  }
+}
+
 export function appendApprovals(state: DesignRunState, approvals: DesignArtifactApprovalRecord[]): void {
   for (const approval of approvals) {
     const exists = state.approvals.some((entry) => entry.id === approval.id);
@@ -105,6 +151,33 @@ export function mergeMetrics(state: DesignRunState, metrics: Record<string, unkn
   };
 }
 
+export function ensureToolkitState(state: DesignRunState): ToolkitState {
+  if (!state.toolkit) {
+    state.toolkit = {
+      contexts: [],
+      artifacts: []
+    };
+  }
+  return state.toolkit;
+}
+
+export function upsertToolkitContext(
+  state: DesignRunState,
+  contextRecord: ToolkitContextState
+): ToolkitContextState {
+  const toolkit = ensureToolkitState(state);
+  const index = toolkit.contexts.findIndex((entry) => entry.id === contextRecord.id);
+  if (index >= 0) {
+    toolkit.contexts[index] = {
+      ...toolkit.contexts[index],
+      ...contextRecord
+    };
+    return toolkit.contexts[index];
+  }
+  toolkit.contexts.push({ ...contextRecord });
+  return toolkit.contexts[toolkit.contexts.length - 1];
+}
+
 function sanitizeState(state: DesignRunState | null | undefined): DesignRunState {
   if (!state || typeof state !== 'object') {
     return createEmptyState();
@@ -115,6 +188,7 @@ function sanitizeState(state: DesignRunState | null | undefined): DesignRunState
     privacy: state.privacy,
     approvals: Array.isArray(state.approvals) ? [...state.approvals] : [],
     artifacts: Array.isArray(state.artifacts) ? [...state.artifacts] : [],
+    toolkit: sanitizeToolkitState(state.toolkit),
     stages: Array.isArray(state.stages) ? state.stages.map(sanitizeStage) : [],
     metrics: state.metrics && typeof state.metrics === 'object' ? { ...state.metrics } : {}
   };
@@ -124,6 +198,10 @@ function createEmptyState(): DesignRunState {
   return {
     approvals: [],
     artifacts: [],
+    toolkit: {
+      contexts: [],
+      artifacts: []
+    },
     stages: [],
     metrics: {}
   };
@@ -165,4 +243,33 @@ function mergeStageArtifacts(
     }
   }
   return records;
+}
+
+function sanitizeToolkitState(toolkit: ToolkitState | undefined): ToolkitState {
+  if (!toolkit || typeof toolkit !== 'object') {
+    return {
+      contexts: [],
+      artifacts: []
+    };
+  }
+  const contexts = Array.isArray(toolkit.contexts)
+    ? toolkit.contexts.map((context) => ({ ...context }))
+    : [];
+  const artifacts = Array.isArray(toolkit.artifacts)
+    ? toolkit.artifacts.map((artifact) => ({ ...artifact }))
+    : [];
+  const retention = toolkit.retention
+    ? {
+        days: Number(toolkit.retention.days) || 0,
+        autoPurge: Boolean(toolkit.retention.autoPurge),
+        policy: toolkit.retention.policy
+      }
+    : undefined;
+  const summary = toolkit.summary && typeof toolkit.summary === 'object' ? { ...toolkit.summary } : undefined;
+  return {
+    contexts,
+    artifacts,
+    retention,
+    summary: summary ?? null
+  };
 }

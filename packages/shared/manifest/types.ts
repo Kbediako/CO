@@ -120,6 +120,8 @@ export interface ToolRunManifest {
   design_artifacts?: DesignArtifactRecord[];
   design_artifacts_summary?: DesignArtifactsSummary;
   design_config_snapshot?: Record<string, unknown> | null;
+  design_toolkit_artifacts?: DesignToolkitArtifactRecord[];
+  design_toolkit_summary?: DesignToolkitSummary;
   [key: string]: unknown;
 }
 
@@ -179,4 +181,45 @@ export interface DesignArtifactsSummary {
   generated_at: string;
   stages: DesignArtifactsSummaryStageEntry[];
   errors?: string[];
+}
+
+export type DesignToolkitStage =
+  | 'extract'
+  | 'tokens'
+  | 'styleguide'
+  | 'reference'
+  | 'self-correct'
+  | 'publish';
+
+export interface DesignToolkitArtifactRetention {
+  days: number;
+  autoPurge: boolean;
+  expiry: string;
+  policy?: string;
+}
+
+export interface DesignToolkitArtifactRecord {
+  id: string;
+  stage: DesignToolkitStage;
+  status: 'succeeded' | 'skipped' | 'failed';
+  relative_path: string;
+  description?: string;
+  approvals?: DesignArtifactApprovalRecord[];
+  retention?: DesignToolkitArtifactRetention;
+  metrics?: Record<string, number | string>;
+  privacy_notes?: string[];
+}
+
+export interface DesignToolkitSummaryStageEntry {
+  stage: DesignToolkitStage;
+  artifacts: number;
+  metrics?: Record<string, number | string>;
+  notes?: string[];
+}
+
+export interface DesignToolkitSummary {
+  generated_at: string;
+  stages: DesignToolkitSummaryStageEntry[];
+  totals?: Record<string, number>;
+  approvals?: string[];
 }

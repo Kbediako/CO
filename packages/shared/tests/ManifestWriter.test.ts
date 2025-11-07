@@ -8,7 +8,13 @@ import {
   persistToolRunRecord,
   sanitizeToolRunRecord
 } from '../manifest/writer.js';
-import type { DesignArtifactRecord, DesignArtifactsSummary, ToolRunRecord } from '../manifest/types.js';
+import type {
+  DesignArtifactRecord,
+  DesignArtifactsSummary,
+  DesignToolkitArtifactRecord,
+  DesignToolkitSummary,
+  ToolRunRecord
+} from '../manifest/types.js';
 
 function createRecord(overrides: Partial<ToolRunRecord> = {}): ToolRunRecord {
   return {
@@ -273,5 +279,46 @@ describe('manifest writer', () => {
     const manifest = JSON.parse(raw) as { design_artifacts: DesignArtifactRecord[] };
     expect(manifest.design_artifacts).toHaveLength(200);
     expect(manifest.design_artifacts[199].relative_path).toBe('design/components/component-200.json');
+  });
+
+  it('persists design toolkit artifacts and summary', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'toolkit-manifest-'));
+    const manifestPath = join(root, 'manifest.json');
+    const toolkitArtifacts: DesignToolkitArtifactRecord[] = [
+      {
+        id: 'dashboard-tokens',
+        stage: 'tokens',
+        status: 'succeeded',
+        relative_path: 'design-toolkit/tokens/dashboard/tokens.json',
+        metrics: { token_count: 10 }
+      }
+    ];
+    const toolkitSummary: DesignToolkitSummary = {
+      generated_at: '2025-01-01T00:00:00.000Z',
+      stages: [
+        {
+          stage: 'tokens',
+          artifacts: 1,
+          metrics: { token_count: 10 }
+        }
+      ]
+    };
+
+    await persistDesignManifest(
+      manifestPath,
+      {
+        toolkitArtifacts,
+        toolkitSummary
+      },
+      {}
+    );
+
+    const raw = await readFile(manifestPath, 'utf8');
+    const manifest = JSON.parse(raw) as {
+      design_toolkit_artifacts: DesignToolkitArtifactRecord[];
+      design_toolkit_summary: DesignToolkitSummary;
+    };
+    expect(manifest.design_toolkit_artifacts).toHaveLength(1);
+    expect(manifest.design_toolkit_summary.stages[0].artifacts).toBe(1);
   });
 });

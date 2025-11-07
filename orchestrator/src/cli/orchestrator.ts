@@ -101,8 +101,8 @@ export class CodexOrchestrator {
     }
     const userConfig = await loadUserConfig(env);
     const requestedPipelineId =
-      options.pipelineId ?? (shouldActivateDesignPipeline(designConfig) ? designPipelineId() : undefined);
-    if (requestedPipelineId === designPipelineId() && process.env.DESIGN_PIPELINE === undefined) {
+      options.pipelineId ?? (shouldActivateDesignPipeline(designConfig) ? designPipelineId(designConfig) : undefined);
+    if (requestedPipelineId === designPipelineId(designConfig) && process.env.DESIGN_PIPELINE === undefined) {
       process.env.DESIGN_PIPELINE = '1';
     }
     const { pipeline } = resolvePipeline(env, {
@@ -149,7 +149,7 @@ export class CodexOrchestrator {
     }
     const userConfig = await loadUserConfig(actualEnv);
     const pipeline = this.resolvePipelineForResume(actualEnv, manifest, userConfig);
-    if (pipeline.id === designPipelineId() && process.env.DESIGN_PIPELINE === undefined) {
+    if (pipeline.id === designPipelineId(designConfig) && process.env.DESIGN_PIPELINE === undefined) {
       process.env.DESIGN_PIPELINE = '1';
     }
     const metadata = await loadTaskMetadata(actualEnv);
@@ -204,8 +204,8 @@ export class CodexOrchestrator {
     }
     const userConfig = await loadUserConfig(env);
     const requestedPipelineId =
-      options.pipelineId ?? (shouldActivateDesignPipeline(designConfig) ? designPipelineId() : undefined);
-    if (requestedPipelineId === designPipelineId() && process.env.DESIGN_PIPELINE === undefined) {
+      options.pipelineId ?? (shouldActivateDesignPipeline(designConfig) ? designPipelineId(designConfig) : undefined);
+    if (requestedPipelineId === designPipelineId(designConfig) && process.env.DESIGN_PIPELINE === undefined) {
       process.env.DESIGN_PIPELINE = '1';
     }
     const { pipeline, source } = resolvePipeline(env, {

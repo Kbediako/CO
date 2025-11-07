@@ -4,6 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "build:tokens": "node ./scripts/build-tokens.mjs",
+    "lint": "node ./scripts/lint.mjs",
     "test:visual": "node ./scripts/test-visual.mjs"
   }
 }

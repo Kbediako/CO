@@ -47,6 +47,22 @@
       },
       "created_at": "2025-11-07",
       "completed_at": null
+    },
+    {
+      "id": "0410",
+      "slug": "0410-hi-fi-design-toolkit",
+      "title": "Hi-Fi Design Toolkit Planning",
+      "path": "tasks/hi-fi-design-toolkit.md",
+      "kind": "plan",
+      "status": "in-progress",
+      "gate": {
+        "phase": "hi-fi-design-toolkit-planning",
+        "status": "in-progress",
+        "log": null,
+        "run_id": null
+      },
+      "created_at": "2025-11-07",
+      "completed_at": null
     }
   ],
   "specs": []

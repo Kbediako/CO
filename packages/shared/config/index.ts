@@ -11,5 +11,9 @@ export {
   type DesignMetadataConfig,
   type DesignPrivacyConfig,
   type DesignRetentionConfig,
-  type DesignPipelineOverrides
+  type DesignPipelineOverrides,
+  type DesignToolkitPipelineConfig,
+  type DesignToolkitSourceConfig,
+  type DesignToolkitSelfCorrectionConfig,
+  type DesignToolkitPublishConfig
 } from './designConfig.js';

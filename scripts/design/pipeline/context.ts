@@ -53,8 +53,8 @@ export async function loadDesignContext(): Promise<DesignContext> {
   };
 }
 
-export function resolveDesignPipelineId(): string {
-  return designPipelineId();
+export function resolveDesignPipelineId(result?: DesignConfigLoadResult): string {
+  return designPipelineId(result);
 }
 
 function sanitizeRunId(value: string): string {

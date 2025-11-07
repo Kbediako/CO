@@ -136,6 +136,70 @@ pipelines:
     expect(shouldActivateDesignPipeline(result, { DESIGN_REFERENCE_PIPELINE: 'true' })).toBe(true);
     expect(shouldActivateDesignPipeline(result, { DESIGN_PIPELINE: 'false' })).toBe(false);
     expect(shouldActivateDesignPipeline(result, {})).toBe(false);
-    expect(designPipelineId()).toBe('design-reference');
+    expect(designPipelineId(result)).toBe('design-reference');
+  });
+
+  it('resolves hi-fi toolkit config and pipeline activation', async () => {
+    const configPath = join(tempDir, 'design.config.yaml');
+    await writeFile(
+      configPath,
+      `metadata:
+  design:
+    enabled: false
+    capture_urls:
+      - https://example.com
+pipelines:
+  hi_fi_design_toolkit:
+    enabled: true
+    sources:
+      - id: dashboard
+        url: https://example.com/dashboard
+        reference_url: https://example.com
+        slug: dashboard
+    retention:
+      days: 7
+      auto_purge: true
+    self_correction:
+      enabled: true
+      max_iterations: 2
+      provider: remote-lab
+      approval_id: toolkit-approval
+    publish:
+      update_tokens: true
+      run_visual_regression: false
+`,
+      'utf8'
+    );
+
+    const result = await loadDesignConfig({ rootDir: tempDir });
+    expect(result.config.pipelines.hiFiDesignToolkit.enabled).toBe(true);
+    expect(result.config.pipelines.hiFiDesignToolkit.sources).toHaveLength(1);
+    expect(result.config.pipelines.hiFiDesignToolkit.retention?.days).toBe(7);
+    expect(result.config.pipelines.hiFiDesignToolkit.selfCorrection.maxIterations).toBe(2);
+    expect(result.config.pipelines.hiFiDesignToolkit.publish.runVisualRegression).toBe(false);
+    expect(designPipelineId(result)).toBe('hi-fi-design-toolkit');
+    expect(shouldActivateDesignPipeline(result)).toBe(true);
+  });
+
+  it('respects env toggles for legacy and toolkit pipelines', async () => {
+    const configPath = join(tempDir, 'design.config.yaml');
+    await writeFile(
+      configPath,
+      `metadata:
+  design:
+    enabled: true
+pipelines:
+  hi_fi_design_toolkit:
+    enabled: true
+    sources:
+      - https://example.com
+`,
+      'utf8'
+    );
+
+    const result = await loadDesignConfig({ rootDir: tempDir });
+    expect(designPipelineId(result, { DESIGN_PIPELINE: '1' } as NodeJS.ProcessEnv)).toBe('design-reference');
+    expect(shouldActivateDesignPipeline(result, { DESIGN_PIPELINE: '1' })).toBe(true);
+    expect(designPipelineId(result, { DESIGN_TOOLKIT: '1' } as NodeJS.ProcessEnv)).toBe('hi-fi-design-toolkit');
   });
 });

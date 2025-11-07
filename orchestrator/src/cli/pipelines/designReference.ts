@@ -59,6 +59,14 @@ export const designReferencePipeline: PipelineDefinition = {
     },
     {
       kind: 'command',
+      id: 'design-spec-guard',
+      title: 'Validate specs via spec-guard',
+      command: 'node scripts/spec-guard.mjs --dry-run',
+      env: { ...DESIGN_PIPELINE_ENV },
+      summaryHint: 'Ensures design specs are fresh before artifact write'
+    },
+    {
+      kind: 'command',
       id: 'design-artifact-writer',
       title: 'Persist design artifact manifests',
       command: 'node dist/scripts/design/pipeline/write-artifacts.js',

@@ -53,6 +53,38 @@ export interface DesignPipelineOverrides {
   };
 }
 
+export interface DesignToolkitSourceConfig {
+  id: string;
+  url: string;
+  referenceUrl: string;
+  slug: string;
+  title?: string | null;
+}
+
+export interface DesignToolkitSelfCorrectionConfig {
+  enabled: boolean;
+  maxIterations: number;
+  provider?: string | null;
+  approvalId?: string | null;
+  threshold?: number | null;
+}
+
+export interface DesignToolkitPublishConfig {
+  updateTokens: boolean;
+  updateComponents: boolean;
+  runVisualRegression: boolean;
+}
+
+export interface DesignToolkitPipelineConfig {
+  enabled: boolean;
+  sources: DesignToolkitSourceConfig[];
+  breakpoints: DesignBreakpoint[];
+  maskSelectors: string[];
+  retention?: (DesignRetentionConfig & { policy?: string }) | null;
+  selfCorrection: DesignToolkitSelfCorrectionConfig;
+  publish: DesignToolkitPublishConfig;
+}
+
 export interface DesignConfig {
   metadata: {
     design: DesignMetadataConfig;
@@ -60,6 +92,7 @@ export interface DesignConfig {
   advanced: DesignAdvancedConfig;
   pipelines: {
     designReference: DesignPipelineOverrides;
+    hiFiDesignToolkit: DesignToolkitPipelineConfig;
   };
 }
 
@@ -113,12 +146,42 @@ const DEFAULT_CONFIG: DesignConfig = {
         enabled: true,
         baselineDir: null
       }
+    },
+    hiFiDesignToolkit: {
+      enabled: false,
+      sources: [],
+      breakpoints: [],
+      maskSelectors: [],
+      retention: null,
+      selfCorrection: {
+        enabled: false,
+        maxIterations: 1,
+        provider: null,
+        approvalId: null,
+        threshold: null
+      },
+      publish: {
+        updateTokens: true,
+        updateComponents: true,
+        runVisualRegression: true
+      }
     }
   }
 };
 
-export function designPipelineId(): string {
-  return 'design-reference';
+const DESIGN_REFERENCE_PIPELINE_ID = 'design-reference';
+const HI_FI_TOOLKIT_PIPELINE_ID = 'hi-fi-design-toolkit';
+
+interface DesignPipelineSelection {
+  id: string;
+  shouldRun: boolean;
+}
+
+export function designPipelineId(
+  result?: DesignConfigLoadResult,
+  env: NodeJS.ProcessEnv = process.env
+): string {
+  return selectDesignPipeline(result ?? null, env).id;
 }
 
 export async function loadDesignConfig(
@@ -146,14 +209,7 @@ export function shouldActivateDesignPipeline(
   result: DesignConfigLoadResult,
   env: NodeJS.ProcessEnv = process.env
 ): boolean {
-  const envToggle = env.DESIGN_PIPELINE ?? env.DESIGN_REFERENCE_PIPELINE;
-  if (typeof envToggle === 'string') {
-    const flag = isTruthyFlag(envToggle);
-    if (flag !== null) {
-      return flag;
-    }
-  }
-  return Boolean(result.config.metadata.design.enabled);
+  return selectDesignPipeline(result, env).shouldRun;
 }
 
 function normalizeDesignConfig(raw: unknown, warnings: string[]): DesignConfig {
@@ -277,9 +333,53 @@ function normalizeDesignConfig(raw: unknown, warnings: string[]): DesignConfig {
         };
       }
     }
+
+    const hiFi = (pipelines as Record<string, unknown>)['hi_fi_design_toolkit'];
+    if (hiFi && typeof hiFi === 'object') {
+      base.pipelines.hiFiDesignToolkit = normalizeToolkitPipelineConfig(
+        hiFi as Record<string, unknown>,
+        base,
+        warnings
+      );
+    }
   }
 
   return base;
+}
+
+function selectDesignPipeline(
+  result: DesignConfigLoadResult | null,
+  env: NodeJS.ProcessEnv
+): DesignPipelineSelection {
+  const config = result?.config ?? DEFAULT_CONFIG;
+
+  const designPipelineEnv = typeof env.DESIGN_PIPELINE === 'string' ? isTruthyFlag(env.DESIGN_PIPELINE) : null;
+  if (designPipelineEnv !== null) {
+    return { id: DESIGN_REFERENCE_PIPELINE_ID, shouldRun: designPipelineEnv };
+  }
+
+  const toolkitEnv = typeof env.DESIGN_TOOLKIT === 'string' ? isTruthyFlag(env.DESIGN_TOOLKIT) : null;
+  if (toolkitEnv !== null) {
+    return { id: HI_FI_TOOLKIT_PIPELINE_ID, shouldRun: toolkitEnv };
+  }
+
+  const referenceEnv =
+    typeof env.DESIGN_REFERENCE_PIPELINE === 'string' ? isTruthyFlag(env.DESIGN_REFERENCE_PIPELINE) : null;
+  if (referenceEnv !== null) {
+    return { id: DESIGN_REFERENCE_PIPELINE_ID, shouldRun: referenceEnv };
+  }
+
+  const toolkitConfigEnabled =
+    config.pipelines.hiFiDesignToolkit.enabled && config.pipelines.hiFiDesignToolkit.sources.length > 0;
+  if (toolkitConfigEnabled) {
+    return { id: HI_FI_TOOLKIT_PIPELINE_ID, shouldRun: true };
+  }
+
+  if (config.metadata.design.enabled) {
+    return { id: DESIGN_REFERENCE_PIPELINE_ID, shouldRun: true };
+  }
+
+  return { id: DESIGN_REFERENCE_PIPELINE_ID, shouldRun: false };
 }
 
 function normalizeBreakpoints(raw: unknown, warnings: string[]): DesignBreakpoint[] {
@@ -324,6 +424,151 @@ function normalizeBreakpoints(raw: unknown, warnings: string[]): DesignBreakpoin
     result.push(breakpoint);
   });
   return result;
+}
+
+function normalizeToolkitPipelineConfig(
+  raw: Record<string, unknown>,
+  baseConfig: DesignConfig,
+  warnings: string[]
+): DesignToolkitPipelineConfig {
+  const normalized: DesignToolkitPipelineConfig = structuredClone(
+    DEFAULT_CONFIG.pipelines.hiFiDesignToolkit
+  );
+
+  normalized.enabled = coerceBoolean(raw.enabled, normalized.enabled);
+  normalized.maskSelectors = normalizeStringArray(
+    raw.mask_selectors ?? raw.maskSelectors,
+    warnings,
+    'pipelines.hi_fi_design_toolkit.mask_selectors'
+  );
+  normalized.breakpoints = normalizeBreakpoints(
+    raw.breakpoints,
+    warnings
+  );
+  normalized.sources = normalizeToolkitSources(raw.sources, warnings);
+
+  const retentionRaw = raw.retention;
+  if (retentionRaw && typeof retentionRaw === 'object') {
+    const record = retentionRaw as Record<string, unknown>;
+    const defaultRetention = baseConfig.metadata.design.retention;
+    const days =
+      coerceNumber(record.days, defaultRetention.days, {
+        min: 1,
+        field: 'pipelines.hi_fi_design_toolkit.retention.days',
+        warnings
+      }) ?? defaultRetention.days;
+    const autoPurge = coerceBoolean(record.auto_purge ?? record.autoPurge, defaultRetention.autoPurge);
+    normalized.retention = {
+      days,
+      autoPurge,
+      policy: coerceString(record.policy) ?? 'design.config.retention'
+    };
+  }
+
+  const selfCorrectionRaw = raw.self_correction ?? raw.selfCorrection;
+  if (selfCorrectionRaw && typeof selfCorrectionRaw === 'object') {
+    const record = selfCorrectionRaw as Record<string, unknown>;
+    normalized.selfCorrection = {
+      enabled: coerceBoolean(record.enabled, normalized.selfCorrection.enabled),
+      maxIterations:
+        coerceNumber(record.max_iterations ?? record.maxIterations, normalized.selfCorrection.maxIterations, {
+          min: 1,
+          field: 'pipelines.hi_fi_design_toolkit.self_correction.max_iterations',
+          warnings
+        }) ?? normalized.selfCorrection.maxIterations,
+      provider: coerceString(record.provider) ?? normalized.selfCorrection.provider ?? null,
+      approvalId: coerceString(record.approval_id ?? record.approvalId) ?? normalized.selfCorrection.approvalId ?? null,
+      threshold:
+        coerceNumber(record.threshold, normalized.selfCorrection.threshold ?? null, {
+          min: 0,
+          allowNull: true,
+          field: 'pipelines.hi_fi_design_toolkit.self_correction.threshold',
+          warnings
+        }) ?? normalized.selfCorrection.threshold ?? null
+    };
+  }
+
+  const publishRaw = raw.publish;
+  if (publishRaw && typeof publishRaw === 'object') {
+    const record = publishRaw as Record<string, unknown>;
+    normalized.publish = {
+      updateTokens: coerceBoolean(record.update_tokens ?? record.updateTokens ?? record.sync_tokens, normalized.publish.updateTokens),
+      updateComponents: coerceBoolean(
+        record.update_components ?? record.updateComponents ?? record.componentize,
+        normalized.publish.updateComponents
+      ),
+      runVisualRegression: coerceBoolean(
+        record.run_visual_regression ?? record.visual_regression,
+        normalized.publish.runVisualRegression
+      )
+    };
+  }
+
+  return normalized;
+}
+
+function normalizeToolkitSources(raw: unknown, warnings: string[]): DesignToolkitSourceConfig[] {
+  if (!raw) {
+    return [];
+  }
+  if (!Array.isArray(raw)) {
+    warnings.push('pipelines.hi_fi_design_toolkit.sources: expected array');
+    return [];
+  }
+  const result: DesignToolkitSourceConfig[] = [];
+  raw.forEach((entry, index) => {
+    if (typeof entry === 'string') {
+      const url = entry.trim();
+      if (!url) {
+        return;
+      }
+      const slug = sanitizeToolkitSlug(url, index);
+      result.push({
+        id: `source-${index + 1}`,
+        url,
+        referenceUrl: url,
+        slug,
+        title: null
+      });
+      return;
+    }
+    if (!entry || typeof entry !== 'object') {
+      warnings.push(`pipelines.hi_fi_design_toolkit.sources[${index}]: expected string or object`);
+      return;
+    }
+    const record = entry as Record<string, unknown>;
+    const url = coerceString(record.url ?? record.capture_url ?? record.source);
+    if (!url) {
+      warnings.push(`pipelines.hi_fi_design_toolkit.sources[${index}]: missing url`);
+      return;
+    }
+    const identifier =
+      coerceString(record.id ?? record.slug ?? record.name) ?? `source-${index + 1}`;
+    const slug = sanitizeToolkitSlug(coerceString(record.slug) ?? identifier, index);
+    const referenceUrl = coerceString(record.reference_url ?? record.referenceUrl) ?? url;
+    const title = coerceString(record.title);
+    result.push({
+      id: identifier,
+      url,
+      referenceUrl,
+      slug,
+      title
+    });
+  });
+  return result;
+}
+
+function sanitizeToolkitSlug(candidate: string, index: number): string {
+  const normalized = candidate
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9-_]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 48);
+  if (normalized.length > 0) {
+    return normalized;
+  }
+  return `source-${index + 1}`;
 }
 
 function normalizeAdvancedConfig(
