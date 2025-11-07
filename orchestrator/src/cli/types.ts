@@ -10,6 +10,7 @@ export interface PipelineDefinition {
   description?: string;
   stages: PipelineStage[];
   tags?: string[];
+  guardrailsRequired?: boolean;
 }
 
 export interface CommandStage {
@@ -180,6 +181,7 @@ export interface CliManifest {
   plan_target_id: string | null;
   instructions_hash: string | null;
   instructions_sources: string[];
+  guardrails_required?: boolean;
   control_plane?: ControlPlaneManifestSection;
   scheduler?: SchedulerManifest;
   handles?: HandleRecord[];

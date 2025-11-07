@@ -290,7 +290,8 @@ function createPipeline(
   return {
     id: 'exec',
     title: 'CLI Exec Command',
-    stages: [stage]
+    stages: [stage],
+    guardrailsRequired: false
   };
 }
 

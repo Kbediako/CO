@@ -98,7 +98,8 @@ export async function bootstrapManifest(runId: string, options: ManifestBootstra
     run_summary_path: null,
     plan_target_id: options.planTargetId ?? null,
     instructions_hash: null,
-    instructions_sources: []
+    instructions_sources: [],
+    guardrails_required: pipeline.guardrailsRequired !== false
   };
 
   const instructions = await loadInstructionSet(env.repoRoot);
@@ -255,6 +256,7 @@ export function upsertGuardrailSummary(manifest: CliManifest): void {
 
 function computeGuardrailStatus(manifest: CliManifest): GuardrailStatusSnapshot {
   const guardrailCommands = selectGuardrailCommands(manifest);
+  const guardrailsRequired = manifest.guardrails_required ?? true;
   const counts: GuardrailCounts = {
     total: guardrailCommands.length,
     succeeded: 0,
@@ -278,7 +280,9 @@ function computeGuardrailStatus(manifest: CliManifest): GuardrailStatusSnapshot 
   const present = counts.succeeded > 0;
   let recommendation: string | null = null;
   if (counts.total === 0) {
-    recommendation = 'Guardrail command missing; run scripts/run-mcp-diagnostics.sh --no-watch to capture reviewer diagnostics.';
+    recommendation = guardrailsRequired
+      ? 'Guardrail command missing; run scripts/run-mcp-diagnostics.sh --no-watch to capture reviewer diagnostics.'
+      : null;
   } else if (counts.failed > 0) {
     recommendation = 'Guardrail command failed; re-run scripts/run-mcp-diagnostics.sh --no-watch to gather failure artifacts.';
   }

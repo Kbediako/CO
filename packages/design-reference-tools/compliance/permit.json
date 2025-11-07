@@ -1,0 +1,14 @@
+{
+  "allowedSources": [
+    {
+      "origin": "https://example.com",
+      "license": "Proprietary — internal replication permitted by owner (you)",
+      "notes": "Only extract CSS you own or have legal rights to replicate."
+    }
+  ],
+  "policy": {
+    "storeRawCss": true,
+    "stripExternalAssets": true,
+    "rehostFonts": false
+  }
+}

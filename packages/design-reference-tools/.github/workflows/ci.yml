@@ -1,0 +1,21 @@
+name: visual-regression
+
+on:
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  vr:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - name: Install
+        run: pnpm i
+      - name: Install Playwright
+        run: pnpm -C tools/extractor exec playwright install --with-deps chromium
+      - name: Smoke
+        run: pnpm -C tools/extractor test
+      # Extend with your own scripted visual regression using self-correct.ts or Playwright test runner

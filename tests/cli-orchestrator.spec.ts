@@ -16,6 +16,7 @@ const diagnosticsConfig = {
     {
       id: 'simple',
       title: 'Simple pipeline',
+      guardrailsRequired: false,
       stages: [
         {
           kind: 'command',
@@ -28,6 +29,7 @@ const diagnosticsConfig = {
     {
       id: 'failable',
       title: 'Fail once pipeline',
+      guardrailsRequired: false,
       stages: [
         {
           kind: 'command',
@@ -40,6 +42,7 @@ const diagnosticsConfig = {
     {
       id: 'parent',
       title: 'Parent pipeline',
+      guardrailsRequired: false,
       stages: [
         {
           kind: 'subpipeline',
@@ -52,6 +55,7 @@ const diagnosticsConfig = {
     {
       id: 'optional-parent',
       title: 'Optional child pipeline',
+      guardrailsRequired: false,
       stages: [
         {
           kind: 'subpipeline',

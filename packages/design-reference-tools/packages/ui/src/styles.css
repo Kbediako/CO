@@ -1,0 +1,31 @@
+/* Consumes CSS variables from @starter/design-tokens/dist/tokens.css */
+:root {
+  color-scheme: light;
+}
+
+.ui-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: var(--global-spacing-s2);
+  border-radius: var(--global-radius-r1);
+  background: var(--semantic-accent);
+  color: white;
+  border: none;
+  font-weight: 600;
+  line-height: 1.2;
+  cursor: pointer;
+  transition: filter .15s ease-in-out, transform .02s linear;
+}
+.ui-button:hover { filter: brightness(1.05); }
+.ui-button:active { transform: translateY(1px); }
+
+.ui-card {
+  background: var(--semantic-bg);
+  color: var(--semantic-fg);
+  border-radius: var(--global-radius-r1);
+  box-shadow: var(--global-shadow-sh0);
+  padding: var(--global-spacing-s3);
+  border: 1px solid rgba(0,0,0,0.06);
+}

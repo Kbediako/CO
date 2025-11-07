@@ -1,0 +1,88 @@
+{
+  "$schema": "https://design-tokens.github.io/community-group/format/module.json",
+  "tokenSetOrder": [
+    "global",
+    "semantic"
+  ],
+  "global": {
+    "color": {
+      "color-1": {
+        "value": "#f6f394"
+      },
+      "color-2": {
+        "value": "#f6f395"
+      },
+      "color-3": {
+        "value": "#f6f396"
+      },
+      "color-4": {
+        "value": "#f6f397"
+      },
+      "color-5": {
+        "value": "#f6f398"
+      },
+      "color-6": {
+        "value": "#f6f399"
+      },
+      "color-7": {
+        "value": "#f6f39a"
+      },
+      "color-8": {
+        "value": "#f6f39b"
+      },
+      "color-9": {
+        "value": "#f6f39c"
+      },
+      "color-10": {
+        "value": "#f6f39d"
+      },
+      "color-11": {
+        "value": "#e77f3b"
+      },
+      "color-12": {
+        "value": "#e77f3c"
+      }
+    },
+    "radius": {
+      "sm": {
+        "value": "4px"
+      },
+      "md": {
+        "value": "8px"
+      },
+      "lg": {
+        "value": "16px"
+      }
+    },
+    "spacing": {
+      "xs": {
+        "value": "4px"
+      },
+      "sm": {
+        "value": "8px"
+      },
+      "md": {
+        "value": "16px"
+      },
+      "lg": {
+        "value": "24px"
+      }
+    }
+  },
+  "semantic": {
+    "foreground": {
+      "value": "{global.color.color-1.value}"
+    },
+    "background": {
+      "value": "{global.color.color-4.value}"
+    },
+    "accent": {
+      "value": "{global.color.color-8.value}"
+    }
+  },
+  "metadata": {
+    "source": "https://example.com/dashboard",
+    "generated_at": "2025-11-07T03:54:09.754Z",
+    "manifest": "/home/jr_ga/code/ASABEKO/CO/.runs/0410-hi-fi-design-toolkit/cli/2025-11-07T03-54-09-660Z-35b0a68c/manifest.json"
+  }
+}

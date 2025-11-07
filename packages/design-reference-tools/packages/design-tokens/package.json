@@ -1,0 +1,13 @@
+{
+  "name": "@starter/design-tokens",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "build": "tsx build.ts"
+  },
+  "dependencies": {
+    "fs-extra": "^11.2.0",
+    "tsx": "^4.16.0"
+  }
+}
