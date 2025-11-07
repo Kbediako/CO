@@ -20,26 +20,41 @@ advanced:
     quota_seconds: 120
     approver: null
   ffmpeg:
-    enabled: false
-    quota_seconds: 90
-    approver: null
-    max_duration_seconds: 120
+    enabled: true
+    quota_seconds: 180
+    approver: Design Review Board
+    max_duration_seconds: 180
 pipelines:
   hi_fi_design_toolkit:
-    enabled: false
+    enabled: true
     sources:
-      - id: sample-dashboard
-        slug: sample-dashboard
-        url: https://example.com/dashboard
-        reference_url: https://example.com
+      - id: soil-net
+        slug: soil-net
+        title: Soil Net public portal
+        url: https://soil-net.jp/
+        reference_url: https://soil-net.jp/
+    breakpoints:
+      - id: desktop
+        width: 1440
+        height: 900
+      - id: mobile
+        width: 428
+        height: 926
+    mask_selectors: []
     retention:
       days: 30
       auto_purge: false
     self_correction:
-      enabled: false
-      max_iterations: 1
-      provider: null
-      approval_id: null
+      enabled: true
+      max_iterations: 3
+      provider: codex-self-correction
+      approval_id: hi-fi-self-correction-2025-11
     publish:
-      update_tokens: true
-      run_visual_regression: true
+      update_tokens: false
+      update_components: false
+      run_visual_regression: false
+    live_assets:
+      keep_scripts: true
+      allow_remote_assets: true
+      max_stylesheets: 24
+      mirror_assets: true
