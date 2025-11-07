@@ -75,6 +75,13 @@ export interface DesignToolkitPublishConfig {
   runVisualRegression: boolean;
 }
 
+export interface DesignToolkitLiveAssetsConfig {
+  keepScripts: boolean;
+  allowRemoteAssets: boolean;
+  maxStylesheets?: number | null;
+  mirrorAssets: boolean;
+}
+
 export interface DesignToolkitPipelineConfig {
   enabled: boolean;
   sources: DesignToolkitSourceConfig[];
@@ -83,6 +90,7 @@ export interface DesignToolkitPipelineConfig {
   retention?: (DesignRetentionConfig & { policy?: string }) | null;
   selfCorrection: DesignToolkitSelfCorrectionConfig;
   publish: DesignToolkitPublishConfig;
+  liveAssets: DesignToolkitLiveAssetsConfig;
 }
 
 export interface DesignConfig {
@@ -164,6 +172,12 @@ const DEFAULT_CONFIG: DesignConfig = {
         updateTokens: true,
         updateComponents: true,
         runVisualRegression: true
+      },
+      liveAssets: {
+        keepScripts: false,
+        allowRemoteAssets: false,
+        maxStylesheets: null,
+        mirrorAssets: false
       }
     }
   }
@@ -353,14 +367,14 @@ function selectDesignPipeline(
 ): DesignPipelineSelection {
   const config = result?.config ?? DEFAULT_CONFIG;
 
-  const designPipelineEnv = typeof env.DESIGN_PIPELINE === 'string' ? isTruthyFlag(env.DESIGN_PIPELINE) : null;
-  if (designPipelineEnv !== null) {
-    return { id: DESIGN_REFERENCE_PIPELINE_ID, shouldRun: designPipelineEnv };
-  }
-
   const toolkitEnv = typeof env.DESIGN_TOOLKIT === 'string' ? isTruthyFlag(env.DESIGN_TOOLKIT) : null;
   if (toolkitEnv !== null) {
     return { id: HI_FI_TOOLKIT_PIPELINE_ID, shouldRun: toolkitEnv };
+  }
+
+  const designPipelineEnv = typeof env.DESIGN_PIPELINE === 'string' ? isTruthyFlag(env.DESIGN_PIPELINE) : null;
+  if (designPipelineEnv !== null) {
+    return { id: DESIGN_REFERENCE_PIPELINE_ID, shouldRun: designPipelineEnv };
   }
 
   const referenceEnv =
@@ -501,6 +515,25 @@ function normalizeToolkitPipelineConfig(
         record.run_visual_regression ?? record.visual_regression,
         normalized.publish.runVisualRegression
       )
+    };
+  }
+
+  const liveAssetsRaw = raw.live_assets ?? raw.liveAssets;
+  if (liveAssetsRaw && typeof liveAssetsRaw === 'object') {
+    const record = liveAssetsRaw as Record<string, unknown>;
+    normalized.liveAssets = {
+      keepScripts: coerceBoolean(record.keep_scripts ?? record.keepScripts, normalized.liveAssets.keepScripts),
+      allowRemoteAssets: coerceBoolean(
+        record.allow_remote_assets ?? record.allowRemoteAssets,
+        normalized.liveAssets.allowRemoteAssets
+      ),
+      maxStylesheets: coerceNumber(record.max_stylesheets ?? record.maxStylesheets, normalized.liveAssets.maxStylesheets ?? null, {
+        min: 1,
+        allowNull: true,
+        field: 'pipelines.hi_fi_design_toolkit.live_assets.max_stylesheets',
+        warnings
+      }),
+      mirrorAssets: coerceBoolean(record.mirror_assets ?? record.mirrorAssets, normalized.liveAssets.mirrorAssets)
     };
   }
 

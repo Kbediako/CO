@@ -1,5 +1,5 @@
-import { mkdir, writeFile } from 'node:fs/promises';
-import { join, relative } from 'node:path';
+import { copyFile, mkdir, writeFile } from 'node:fs/promises';
+import { dirname, join, relative } from 'node:path';
 import { tmpdir } from 'node:os';
 import { loadDesignContext } from '../context.js';
 import type { DesignContext } from '../context.js';
@@ -22,10 +22,12 @@ import {
   slugifyToolkitValue,
   type ToolkitRuntimeSource
 } from './common.js';
+import { capturePageSnapshot } from './snapshot.js';
 import type {
   DesignArtifactApprovalRecord,
   DesignToolkitArtifactRecord
 } from '../../../../packages/shared/manifest/types.js';
+import type { DesignToolkitPipelineConfig } from '../../../../packages/shared/config/index.js';
 
 async function main(): Promise<void> {
   const context = await loadDesignContext();
@@ -81,17 +83,18 @@ async function main(): Promise<void> {
   for (const source of sources) {
     try {
       ensureSourcePermitted(source.url, permit);
-      const artifact = await stageContextArtifact({
+      const contextResult = await stageContextArtifact({
         context,
         source,
         tmpRoot,
         retentionDays: toolkitState.retention?.days ?? fallbackRetention.days,
         retentionPolicy: toolkitState.retention?.policy ?? fallbackRetention.policy,
         autoPurge: toolkitState.retention?.autoPurge ?? fallbackRetention.autoPurge,
-        timestamp: now
+        timestamp: now,
+        liveAssets: pipelineConfig.liveAssets
       });
       successCount += 1;
-      stagedArtifacts.push(artifact);
+      stagedArtifacts.push(contextResult.artifact);
 
       approvals.push({
         id: `playwright-${source.slug}`,
@@ -106,8 +109,15 @@ async function main(): Promise<void> {
         title: source.title ?? null,
         url: source.url,
         referenceUrl: source.referenceUrl ?? source.url,
-        relativeDir: artifact.relative_path.split('/').slice(0, -1).join('/'),
-        breakpoints: source.breakpoints.map((bp) => bp.id)
+        relativeDir: contextResult.artifact.relative_path.split('/').slice(0, -1).join('/'),
+        breakpoints: source.breakpoints.map((bp) => bp.id),
+        snapshotHtmlPath: contextResult.paths.inlineHtmlPath,
+        snapshotRawHtmlPath: contextResult.paths.rawHtmlPath,
+        snapshotCssPath: contextResult.paths.stylesPath,
+        palettePath: contextResult.paths.palettePath,
+        sectionsPath: contextResult.paths.sectionsPath,
+        palettePreview: contextResult.palettePreview,
+        fontFamilies: contextResult.fontFamilies
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -150,6 +160,20 @@ async function main(): Promise<void> {
   console.log(`[design-toolkit-extract] staged ${successCount} / ${sources.length} sources`);
 }
 
+interface ContextArtifactResult {
+  artifact: DesignToolkitArtifactRecord;
+  paths: {
+    contextPath: string;
+    inlineHtmlPath: string;
+    rawHtmlPath: string;
+    stylesPath: string;
+    palettePath: string;
+    sectionsPath: string;
+  };
+  palettePreview: string[];
+  fontFamilies: string[];
+}
+
 async function stageContextArtifact(options: {
   context: DesignContext;
   source: ToolkitRuntimeSource;
@@ -158,26 +182,81 @@ async function stageContextArtifact(options: {
   retentionPolicy?: string;
   autoPurge: boolean;
   timestamp: Date;
-}): Promise<DesignToolkitArtifactRecord> {
-  const { context, source, tmpRoot, retentionDays, retentionPolicy, autoPurge, timestamp } = options;
-  const payload = {
+  liveAssets?: DesignToolkitPipelineConfig['liveAssets'];
+}): Promise<ContextArtifactResult> {
+  const { context, source, tmpRoot, retentionDays, retentionPolicy, autoPurge, timestamp, liveAssets } = options;
+  const snapshot = await capturePageSnapshot(source.url, {
+    keepScripts: liveAssets?.keepScripts ?? false,
+    maxStylesheets: liveAssets?.maxStylesheets ?? undefined,
+    mirrorAssets: liveAssets?.mirrorAssets ?? false
+  });
+
+  const slugDir = join(tmpRoot, source.slug);
+  await mkdir(slugDir, { recursive: true });
+
+  const contextPayload = {
     id: source.id,
     url: source.url,
     referenceUrl: source.referenceUrl,
     breakpoints: source.breakpoints,
     maskSelectors: source.maskSelectors,
-    capturedAt: timestamp.toISOString()
+    capturedAt: timestamp.toISOString(),
+    colorPalettePreview: snapshot.colorPalette.slice(0, 12),
+    fontFamilies: snapshot.fontFamilies,
+    sectionCount: snapshot.sections.length
   };
-  const filename = join(tmpRoot, `${source.slug}-context.json`);
-  await writeFile(filename, JSON.stringify(payload, null, 2), 'utf8');
 
-  const [staged] = await stageArtifacts({
+  const contextPath = join(slugDir, 'context.json');
+  const inlineHtmlPath = join(slugDir, 'inline.html');
+  const rawHtmlPath = join(slugDir, 'original.html');
+  const stylesPath = join(slugDir, 'styles.css');
+  const palettePath = join(slugDir, 'palette.json');
+  const sectionsPath = join(slugDir, 'sections.json');
+
+  await Promise.all([
+    writeFile(contextPath, `${JSON.stringify(contextPayload, null, 2)}\n`, 'utf8'),
+    writeFile(inlineHtmlPath, snapshot.inlineHtml, 'utf8'),
+    writeFile(rawHtmlPath, snapshot.originalHtml, 'utf8'),
+    writeFile(stylesPath, snapshot.aggregatedCss, 'utf8'),
+    writeFile(palettePath, `${JSON.stringify(snapshot.colorPalette, null, 2)}\n`, 'utf8'),
+    writeFile(sectionsPath, `${JSON.stringify(snapshot.sections, null, 2)}\n`, 'utf8')
+  ]);
+
+  if (snapshot.assets.length > 0) {
+    for (const asset of snapshot.assets) {
+      const assetPath = join(slugDir, asset.relativePath);
+      await mkdir(dirname(assetPath), { recursive: true });
+      await writeFile(assetPath, asset.buffer);
+    }
+  }
+
+  const stagedFiles = await stageArtifacts({
     taskId: context.taskId,
     runId: context.runId,
     artifacts: [
       {
-        path: relative(process.cwd(), filename),
+        path: relative(process.cwd(), contextPath),
         description: `Toolkit context for ${source.url}`
+      },
+      {
+        path: relative(process.cwd(), inlineHtmlPath),
+        description: `Inlined Cognition clone for ${source.url}`
+      },
+      {
+        path: relative(process.cwd(), rawHtmlPath),
+        description: `Original HTML for ${source.url}`
+      },
+      {
+        path: relative(process.cwd(), stylesPath),
+        description: `Aggregated CSS for ${source.url}`
+      },
+      {
+        path: relative(process.cwd(), palettePath),
+        description: `Color palette for ${source.url}`
+      },
+      {
+        path: relative(process.cwd(), sectionsPath),
+        description: `Section summaries for ${source.url}`
       }
     ],
     options: {
@@ -185,6 +264,18 @@ async function stageContextArtifact(options: {
       overwrite: true
     }
   });
+
+  const [contextRecord, inlineRecord, rawRecord, stylesRecord, paletteRecord, sectionsRecord] = stagedFiles;
+  const contextDir = join(process.cwd(), dirname(contextRecord.path));
+
+  if (snapshot.assets.length > 0) {
+    for (const asset of snapshot.assets) {
+      const tempPath = join(slugDir, asset.relativePath);
+      const destinationPath = join(contextDir, asset.relativePath);
+      await mkdir(dirname(destinationPath), { recursive: true });
+      await copyFile(tempPath, destinationPath);
+    }
+  }
 
   const retention = buildRetentionMetadata(
     {
@@ -196,15 +287,29 @@ async function stageContextArtifact(options: {
   );
 
   return {
-    id: source.id,
-    stage: 'extract',
-    status: 'succeeded',
-    relative_path: staged.path,
-    description: `Context snapshot for ${source.slug}`,
-    retention,
-    metrics: {
-      breakpoint_count: source.breakpoints.length
-    }
+    artifact: {
+      id: source.id,
+      stage: 'extract',
+      status: 'succeeded',
+      relative_path: contextRecord.path,
+      description: `Context snapshot for ${source.slug}`,
+      retention,
+      metrics: {
+        breakpoint_count: source.breakpoints.length,
+        color_count: snapshot.colorPalette.length,
+        section_count: snapshot.sections.length
+      }
+    },
+    paths: {
+      contextPath: contextRecord.path,
+      inlineHtmlPath: inlineRecord.path,
+      rawHtmlPath: rawRecord.path,
+      stylesPath: stylesRecord.path,
+      palettePath: paletteRecord.path,
+      sectionsPath: sectionsRecord.path
+    },
+    palettePreview: snapshot.colorPalette.slice(0, 12),
+    fontFamilies: snapshot.fontFamilies
   };
 }
 

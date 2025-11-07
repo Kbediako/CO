@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join, relative } from 'node:path';
 import { tmpdir } from 'node:os';
 import { loadDesignContext } from '../context.js';
@@ -10,7 +10,8 @@ import {
   loadDesignRunState,
   saveDesignRunState,
   upsertStage,
-  upsertToolkitContext
+  upsertToolkitContext,
+  type ToolkitContextState
 } from '../state.js';
 import { stageArtifacts } from '../../../../orchestrator/src/persistence/ArtifactStager.js';
 import { buildRetentionMetadata } from './common.js';
@@ -56,7 +57,7 @@ async function main(): Promise<void> {
 
   for (const entry of contexts) {
     try {
-      const outputs = await buildReferenceOutputs(entry.slug, entry.url, tmpRoot);
+      const outputs = await buildReferenceOutputs(entry, context.repoRoot, tmpRoot);
       const retentionMetadata = buildRetentionMetadata(retention, new Date());
 
       const [referenceArtifact] = await stageArtifacts({
@@ -181,14 +182,15 @@ async function main(): Promise<void> {
   console.log(`[design-toolkit-reference] produced references for ${processed} contexts`);
 }
 
-async function buildReferenceOutputs(slug: string, url: string, tmpRoot: string) {
-  const referenceDir = join(tmpRoot, slug, 'reference');
+async function buildReferenceOutputs(entry: ToolkitContextState, repoRoot: string, tmpRoot: string) {
+  const referenceDir = join(tmpRoot, entry.slug, 'reference');
   await mkdir(referenceDir, { recursive: true });
   const referencePath = join(referenceDir, 'index.html');
-  const sectionCount = 3;
-  const html = `<!doctype html>\n<html lang="en">\n<head>\n  <meta charset="utf-8"/>\n  <title>${slug} Reference</title>\n  <style>body{font-family:system-ui;padding:2rem;}section{margin-bottom:2rem;}</style>\n</head>\n<body>\n  <h1>${slug} Reference Page</h1>\n  <p>Generated from ${url}</p>\n  <section><h2>Typography</h2><p>Sample paragraph showcasing typography tokens.</p></section>\n  <section><h2>Controls</h2><button>Primary Action</button></section>\n  <section><h2>Cards</h2><div class="card">Component preview</div></section>\n</body>\n</html>`;
+  const sections = await loadSections(entry, repoRoot);
+  const sectionCount = sections.length;
+  const html = await buildReferenceHtml(entry, repoRoot, sections);
   await writeFile(referencePath, html, 'utf8');
-  return { referencePath, sectionCount };
+  return { referencePath, sectionCount: sectionCount > 0 ? sectionCount : 3 };
 }
 
 async function simulateSelfCorrection(slug: string, tmpRoot: string, maxIterations: number) {
@@ -225,6 +227,96 @@ async function simulateSelfCorrection(slug: string, tmpRoot: string, maxIteratio
 
 function metadataApprover(context: DesignContext) {
   return context.config.config.metadata.design.privacy.approver ?? 'design-reviewer';
+}
+
+async function loadSections(entry: ToolkitContextState, repoRoot: string) {
+  if (!entry.sectionsPath) {
+    return [] as Array<{ title: string; description: string }>;
+  }
+  try {
+    const absolute = join(repoRoot, entry.sectionsPath);
+    const raw = await readFile(absolute, 'utf8');
+    const parsed = JSON.parse(raw) as Array<{ title?: string; description?: string }>;
+    return parsed
+      .map((section) => ({
+        title: section.title ?? 'Section',
+        description: section.description ?? ''
+      }))
+      .filter((section) => section.description.length > 0);
+  } catch (error) {
+    console.warn(`[design-toolkit-reference] Failed to read sections for ${entry.slug}:`, error);
+  }
+  return [];
+}
+
+async function buildReferenceHtml(
+  entry: ToolkitContextState,
+  repoRoot: string,
+  sections: Array<{ title: string; description: string }>
+): Promise<string> {
+  if (!entry.snapshotHtmlPath) {
+    return fallbackReference(entry.slug, entry.url);
+  }
+  try {
+    const absolute = join(repoRoot, entry.snapshotHtmlPath);
+    const snapshotHtml = await readFile(absolute, 'utf8');
+    const overlay = buildOverlay(entry.url, sections);
+    const styleBlock = buildOverlayStyles();
+    const withStyles = injectIntoHead(snapshotHtml, styleBlock);
+    return injectAfterBodyOpen(withStyles, overlay);
+  } catch (error) {
+    console.warn(`[design-toolkit-reference] Failed to read snapshot for ${entry.slug}:`, error);
+    return fallbackReference(entry.slug, entry.url);
+  }
+}
+
+function fallbackReference(slug: string, url: string): string {
+  return `<!doctype html>\n<html lang="en">\n<head>\n  <meta charset="utf-8"/>\n  <title>${slug} Reference</title>\n  <style>body{font-family:system-ui;padding:2rem;}section{margin-bottom:2rem;}</style>\n</head>\n<body>\n  <div class="codex-clone-overlay">Fallback rendering for ${escapeHtml(
+    url
+  )}</div>\n  <section><h2>Snapshot unavailable</h2><p>Original capture missing; showing placeholder.</p></section>\n</body>\n</html>`;
+}
+
+function buildOverlay(sourceUrl: string, sections: Array<{ title: string; description: string }>): string {
+  const list =
+    sections.length > 0
+      ? `<ol>${sections
+          .map(
+            (section) =>
+              `<li><strong>${escapeHtml(section.title)}</strong><p>${escapeHtml(section.description)}</p></li>`
+          )
+          .join('')}</ol>`
+      : '<p>No sections detected.</p>';
+  return `<div class="codex-clone-overlay"><div class="codex-clone-banner"><strong>Hi-Fi Toolkit Clone</strong><p>Source: <a href="${escapeHtml(
+    sourceUrl
+  )}" target="_blank" rel="noreferrer">${escapeHtml(sourceUrl)}</a></p></div><div class="codex-section-outline"><h2>Captured Sections</h2>${list}</div></div>`;
+}
+
+function buildOverlayStyles(): string {
+  return `<style id="codex-clone-style">\n  .codex-clone-overlay { position: fixed; top: 1rem; right: 1rem; width: 320px; max-height: 90vh; overflow-y: auto; z-index: 9999; font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: #f2f2f2; }\n  .codex-clone-banner { background: rgba(7, 7, 12, 0.95); padding: 1rem; border-radius: 0.75rem 0.75rem 0 0; box-shadow: 0 8px 20px rgba(0,0,0,0.4); }\n  .codex-clone-banner a { color: #7dd3ff; text-decoration: none; }\n  .codex-section-outline { background: rgba(12, 12, 18, 0.92); padding: 0.75rem 1rem 1rem; border-radius: 0 0 0.75rem 0.75rem; font-size: 0.85rem; line-height: 1.4; }\n  .codex-section-outline ol { margin: 0; padding-left: 1.25rem; }\n  .codex-section-outline li { margin-bottom: 0.75rem; }\n  .codex-section-outline p { margin: 0.25rem 0 0; color: #cbd5f5; }\n  @media (max-width: 900px) { .codex-clone-overlay { position: static; width: auto; max-height: none; } }\n</style>`;
+}
+
+function injectIntoHead(html: string, snippet: string): string {
+  if (html.includes('</head>')) {
+    return html.replace('</head>', `${snippet}\n</head>`);
+  }
+  return `${snippet}\n${html}`;
+}
+
+function injectAfterBodyOpen(html: string, snippet: string): string {
+  const match = html.match(/<body[^>]*>/i);
+  if (match) {
+    return html.replace(match[0], `${match[0]}\n${snippet}\n`);
+  }
+  return `${snippet}\n${html}`;
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 main().catch((error) => {

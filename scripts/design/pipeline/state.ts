@@ -50,6 +50,13 @@ export interface ToolkitContextState {
   referenceUrl: string;
   relativeDir: string;
   breakpoints: string[];
+  snapshotHtmlPath?: string;
+  snapshotRawHtmlPath?: string;
+  snapshotCssPath?: string;
+  palettePath?: string;
+  sectionsPath?: string;
+  palettePreview?: string[];
+  fontFamilies?: string[];
   tokensPath?: string;
   styleguidePath?: string;
   referencePath?: string;

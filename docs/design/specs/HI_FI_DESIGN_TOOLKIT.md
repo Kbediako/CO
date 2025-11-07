@@ -22,6 +22,7 @@ last_review: 2025-11-07
 
 ### 3.1 Pipeline Activation & Configuration
 - Config entry: add `pipelines.hi_fi_design_toolkit` to `design.config.yaml` with `enabled`, `sources[]`, and optional overrides (breakpoints, mask selectors, retention) — identical opt-in semantics to the current design-reference pipeline so users keep the same mental model.
+- Live asset overrides: optional `live_assets` block per source toggles `keep_scripts`, `allow_remote_assets`, and `max_stylesheets` so reviewers can capture full-motion experiences when compliance approves it.
 - Activation logic:
   - Export `MCP_RUNNER_TASK_ID=0410-hi-fi-design-toolkit` before invoking orchestrator commands.
   - CLI: `npx codex-orchestrator start diagnostics --pipeline hi-fi-design-toolkit --format json` or env overrides (`DESIGN_PIPELINE=1`, helper `DESIGN_TOOLKIT=1`) force enablement even when config leaves the pipeline off, mirroring design-reference behavior.
@@ -113,3 +114,23 @@ last_review: 2025-11-07
 ## Open Questions
 - How do we enforce permit updates when new brands are added? (Proposal: pipeline fails with actionable message referencing `compliance/permit.json` and the diff to submit.)
 - Do we need encryption-at-rest for staged extractor outputs? If so, integrate with repository secrets service before implementation.
+
+## Run Notes & Next Targets
+
+### 2025-11-07 — Cognition.ai spike
+- **Manifest reference**: `.runs/0410-hi-fi-design-toolkit/cli/2025-11-07T08-50-51-966Z-c2554f30/manifest.json` (captured prior to purging `.runs/**` so future reviewers can cite the evidence even though the large artifacts were deleted).
+- **Playwright snapshot improvements**:
+  - Snapshotper rewrites Cognition’s remote asset URLs to stable local references, letting reviewers open `context/cognition-home/inline.html` offline and ensuring self-correction never calls the live site after capture time.
+  - DOM/CSS capture seeds palette + typography extraction, producing IBM Plex-based stacks and 12 key colors inside `tokens/cognition-home/tokens.json` and the generated style guide.
+  - Stage emits `sections.json` + `palette.json`, giving downstream agents structured hooks for hero/content modules while keeping privacy masks enforced by permits.
+  - Compliance gate behaved correctly — the run stalled until `https://cognition.ai` was whitelisted in `compliance/permit.json`, validating the approval workflow.
+- **Outstanding gaps**: section detection collapsed the page into a single block, gradient/shadow tokens are missing, animation masks need canvas/video coverage, only the desktop homepage was captured, and semantic aliases (`cta`, `surface`, etc.) still need to be derived from usage counts.
+- **Cleanup action**: after recording these notes, `.runs/0410-hi-fi-design-toolkit/2025-11-07T*/**`, `.runs/0410-hi-fi-design-toolkit/cli/*`, and `out/0410-hi-fi-design-toolkit/design/runs/*.json` were deleted so the workspace returns to the baseline state.
+
+### 2025-11-07 — Soil Net capture (live assets enabled)
+- **Manifest reference**: `.runs/0410-hi-fi-design-toolkit/cli/2025-11-07T12-41-35-270Z-1f9139d2/manifest.json` (Soil Net portal, live scripts/styles preserved, publish disabled).
+- **Capture summary**:
+  - Single `soil-net` source with desktop (1440×900) + mobile (428×926) breakpoints, no mask selectors so header logos + scroll hooks stay intact for fidelity testing.
+  - Permit `soil-net-2025-11-07` now authorizes live assets + optional video capture. Manifest approvals show `playwright-soil-net`; FFmpeg remains off but can be toggled later.
+  - `live_assets.keep_scripts=true` and `max_stylesheets=24` ensure scroll-triggered animations, carousels, and sticky nav transitions replay when serving the reference folder locally.
+- **Next steps**: derive semantic token aliases (CTA, surface, border), add localization metadata for Japanese sections, and trial `self_correction.enabled=true` + screenshot diffs to keep the live-clone fidelity without hitting soil-net.jp during downstream publish stages.

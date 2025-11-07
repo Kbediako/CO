@@ -4,6 +4,16 @@
       "origin": "https://example.com",
       "license": "Proprietary — internal replication permitted by owner (you)",
       "notes": "Only extract CSS you own or have legal rights to replicate."
+    },
+    {
+      "origin": "https://soil-net.jp",
+      "license": "Soil Net public site — internal design analysis only",
+      "notes": "Live assets + animations permitted for toolkit validation; do not redistribute captures externally.",
+      "approver": "Design Review Board",
+      "approval_id": "soil-net-2025-11-07",
+      "allow_playwright": true,
+      "allow_video_capture": true,
+      "allow_live_assets": true
     }
   ],
   "policy": {

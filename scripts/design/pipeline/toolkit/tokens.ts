@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join, relative } from 'node:path';
 import { tmpdir } from 'node:os';
 import { loadDesignContext } from '../context.js';
@@ -8,7 +8,8 @@ import {
   loadDesignRunState,
   saveDesignRunState,
   upsertStage,
-  upsertToolkitContext
+  upsertToolkitContext,
+  type ToolkitContextState
 } from '../state.js';
 import { stageArtifacts } from '../../../../orchestrator/src/persistence/ArtifactStager.js';
 import { buildRetentionMetadata } from './common.js';
@@ -48,7 +49,7 @@ async function main(): Promise<void> {
 
   for (const entry of contexts) {
     try {
-      const outputs = await buildTokenOutputs(entry.slug, entry.url, tmpRoot);
+      const outputs = await buildTokenOutputs({ entry, repoRoot: context.repoRoot, tmpRoot });
       const tokensRetention = buildRetentionMetadata(retention, new Date());
 
       const stagedTokens = await stageArtifacts({
@@ -152,10 +153,19 @@ async function main(): Promise<void> {
   console.log(`[design-toolkit-tokens] generated tokens for ${processed} contexts`);
 }
 
-async function buildTokenOutputs(slug: string, url: string, tmpRoot: string) {
+interface TokenBuildOptions {
+  entry: ToolkitContextState;
+  repoRoot: string;
+  tmpRoot: string;
+}
+
+async function buildTokenOutputs(options: TokenBuildOptions) {
+  const { entry, repoRoot, tmpRoot } = options;
   const tokenCount = 12;
   const semanticCount = 3;
-  const palette = Array.from({ length: tokenCount }).map((_, index) => colorFromSeed(slug, index));
+  const palette = await resolvePalette(entry, repoRoot, tokenCount);
+  const sections = await loadSections(entry, repoRoot);
+  const fonts = entry.fontFamilies && entry.fontFamilies.length > 0 ? entry.fontFamilies : ['system-ui'];
   const tokens = {
     "$schema": "https://design-tokens.github.io/community-group/format/module.json",
     tokenSetOrder: ['global', 'semantic'],
@@ -181,20 +191,20 @@ async function buildTokenOutputs(slug: string, url: string, tmpRoot: string) {
       accent: { value: '{global.color.color-8.value}' }
     },
     metadata: {
-      source: url,
-      generated_at: new Date().toISOString()
+      source: entry.url,
+      generated_at: new Date().toISOString(),
+      fonts,
+      palette_sample: palette.slice(0, 8)
     }
   };
 
   const cssVariables = palette
-    .map((hex, idx) => `  --${slug}-color-${idx + 1}: ${hex};`)
+    .map((hex, idx) => `  --${entry.slug}-color-${idx + 1}: ${hex};`)
     .join('\n');
 
-  const styleGuide = `# ${slug} Style Guide\n\nGenerated tokens for ${url}.\n\n## Palette\n${palette
-    .map((hex) => `- ${hex}`)
-    .join('\n')}\n\n## Components\n- Buttons\n- Inputs\n- Cards\n`;
+  const styleGuide = buildStyleGuide(entry, palette, fonts, sections);
 
-  const slugDir = join(tmpRoot, slug);
+  const slugDir = join(tmpRoot, entry.slug);
   await mkdir(slugDir, { recursive: true });
   const tokensPath = join(slugDir, 'tokens.json');
   const cssPath = join(slugDir, 'tokens.css');
@@ -214,6 +224,90 @@ async function buildTokenOutputs(slug: string, url: string, tmpRoot: string) {
     semanticCount,
     pageCount: 1
   };
+}
+
+async function resolvePalette(entry: ToolkitContextState, repoRoot: string, desired: number): Promise<string[]> {
+  const paletteFromFile = await loadPaletteFromFile(entry, repoRoot);
+  if (paletteFromFile.length > 0) {
+    return fillPalette(paletteFromFile, desired, entry.slug);
+  }
+  if (entry.palettePreview && entry.palettePreview.length > 0) {
+    return fillPalette(entry.palettePreview, desired, entry.slug);
+  }
+  return fillPalette([], desired, entry.slug);
+}
+
+async function loadPaletteFromFile(entry: ToolkitContextState, repoRoot: string): Promise<string[]> {
+  if (!entry.palettePath) {
+    return [];
+  }
+  try {
+    const absolute = join(repoRoot, entry.palettePath);
+    const raw = await readFile(absolute, 'utf8');
+    const parsed = JSON.parse(raw) as unknown;
+    if (Array.isArray(parsed)) {
+      return parsed
+        .map((value) => (typeof value === 'string' ? value.trim() : null))
+        .filter((value): value is string => Boolean(value));
+    }
+  } catch (error) {
+    console.warn(`[design-toolkit-tokens] Failed to read palette for ${entry.slug}:`, error);
+  }
+  return [];
+}
+
+async function loadSections(entry: ToolkitContextState, repoRoot: string) {
+  if (!entry.sectionsPath) {
+    return [] as Array<{ title: string; description: string }>;
+  }
+  try {
+    const absolute = join(repoRoot, entry.sectionsPath);
+    const raw = await readFile(absolute, 'utf8');
+    const parsed = JSON.parse(raw) as Array<{ title?: string; description?: string }>;
+    return parsed
+      .map((section) => ({
+        title: section.title ?? 'Section',
+        description: section.description ?? ''
+      }))
+      .filter((section) => section.description.length > 0);
+  } catch (error) {
+    console.warn(`[design-toolkit-tokens] Failed to read sections for ${entry.slug}:`, error);
+  }
+  return [];
+}
+
+function fillPalette(base: string[], desired: number, slug: string): string[] {
+  const palette = [...base.map(normalizeHexColor)];
+  let index = 0;
+  while (palette.length < desired) {
+    palette.push(colorFromSeed(slug, index));
+    index += 1;
+  }
+  return palette.slice(0, desired);
+}
+
+function normalizeHexColor(value: string): string {
+  if (!value.startsWith('#')) {
+    return value;
+  }
+  return value.length === 4
+    ? `#${value[1]}${value[1]}${value[2]}${value[2]}${value[3]}${value[3]}`.toLowerCase()
+    : value.toLowerCase();
+}
+
+function buildStyleGuide(
+  entry: ToolkitContextState,
+  palette: string[],
+  fonts: string[],
+  sections: Array<{ title: string; description: string }>
+): string {
+  const paletteList = palette.map((hex) => `- ${hex}`).join('\n');
+  const fontList = fonts.map((font) => `- ${font}`).join('\n');
+  const sectionList =
+    sections.length > 0
+      ? sections.map((section) => `- **${section.title}** — ${section.description}`).join('\n')
+      : '- (No sections detected)';
+  return `# ${entry.slug} Style Guide\n\nGenerated tokens for ${entry.url}.\n\n## Palette\n${paletteList}\n\n## Typography\n${fontList}\n\n## Layout Sections\n${sectionList}\n`;
 }
 
 function colorFromSeed(seed: string, index: number): string {

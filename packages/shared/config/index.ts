@@ -15,5 +15,6 @@ export {
   type DesignToolkitPipelineConfig,
   type DesignToolkitSourceConfig,
   type DesignToolkitSelfCorrectionConfig,
-  type DesignToolkitPublishConfig
+  type DesignToolkitPublishConfig,
+  type DesignToolkitLiveAssetsConfig
 } from './designConfig.js';
