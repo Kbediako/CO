@@ -3,3 +3,4 @@ export { RunManifestWriter, type RunManifestWriterOptions } from './RunManifestW
 export { PersistenceCoordinator, type PersistenceCoordinatorOptions } from './PersistenceCoordinator.js';
 export { stageArtifacts, type StageArtifactsOptions } from './ArtifactStager.js';
 export { sanitizeTaskId } from './sanitizeTaskId.js';
+export { sanitizeRunId } from './sanitizeRunId.js';

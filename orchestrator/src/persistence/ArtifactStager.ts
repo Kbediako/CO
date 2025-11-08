@@ -2,16 +2,13 @@ import { access, copyFile, mkdir, rename, rm } from 'node:fs/promises';
 import { basename, dirname, extname, isAbsolute, join, relative, resolve } from 'node:path';
 import type { BuildArtifact } from '../types.js';
 import { sanitizeTaskId } from './sanitizeTaskId.js';
+import { sanitizeRunId } from './sanitizeRunId.js';
 
 export interface StageArtifactsOptions {
   runsDir?: string;
   keepOriginal?: boolean;
   relativeDir?: string;
   overwrite?: boolean;
-}
-
-function sanitizeRunId(runId: string): string {
-  return runId.replace(/[:]/g, '-');
 }
 
 async function pathExists(path: string): Promise<boolean> {

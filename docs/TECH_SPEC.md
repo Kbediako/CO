@@ -31,6 +31,11 @@
 - Security / Privacy: No change — capped buffers reduce risk of logging excessive secrets but do not add new exposure.
 - Performance Targets: Backoff maximum wait < 3 seconds total. Bounded buffers ensure per-command memory usage stays under 128 KiB.
 
+### Identifier Guardrails
+- **Task IDs:** `sanitizeTaskId` is the single source of truth for filesystem validation. CLI `resolveEnvironment()` now calls it directly and throws a descriptive `Invalid MCP_RUNNER_TASK_ID` error when the env var includes control characters, traversal attempts, or Windows-reserved characters (`<`, `>`, `:`, `"`, `/`, `\`, `|`, `?`, `*`). There is no silent lowercasing/fallback; set the correct task ID before launching any orchestrator command.
+- **Run IDs:** A new shared `sanitizeRunId` helper mirrors the same strict rules and guards colon or control characters that previously slipped through via `replace(/:/g, '-')`. `resolveRunPaths`, `RunManifestWriter`, `ArtifactStager`, `CloudSyncWorker`, and CLI manifest bootstrap now all depend on this helper so every run directory remains under `.runs/<task-id>/...` and traversal attempts are rejected outright.
+- **Testing:** Dedicated unit tests cover control characters, traversal strings, and Windows-unsafe characters to ensure run/task IDs cannot escape `.runs/<task-id>/cli/<run-id>` or break manifest persistence. Builders/testers that throw now emit structured failure summaries so `run:completed` (and therefore persistence) always fires.
+
 ## Testing Strategy
 - Unit / Integration: Extend persistence tests to cover lock contention scenarios; add command runner tests verifying truncation and recorded summaries. Exercise heartbeat loop through mocked timers to assert awaited writes.
 - Tooling / Automation: Run `npm run lint`, `npm run test`, and `node scripts/spec-guard.mjs --dry-run`. Diagnostics manifest to be captured via `npx codex-orchestrator start diagnostics --format json`.

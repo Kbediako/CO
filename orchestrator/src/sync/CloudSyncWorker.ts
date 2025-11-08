@@ -6,6 +6,7 @@ import type { RunSummary } from '../types.js';
 import type { CloudRunsClient, UploadResult } from './CloudRunsClient.js';
 import { CloudRunsHttpError } from './CloudRunsHttpClient.js';
 import { sanitizeTaskId } from '../persistence/sanitizeTaskId.js';
+import { sanitizeRunId } from '../persistence/sanitizeRunId.js';
 
 export interface CloudSyncWorkerOptions {
   runsDir?: string;
@@ -121,7 +122,8 @@ export class CloudSyncWorker {
 
   private buildManifestPath(summary: RunSummary): string {
     const safeTaskId = sanitizeTaskId(summary.taskId);
-    const runDir = join(this.runsDir, safeTaskId, summary.runId.replace(/[:]/g, '-'));
+    const safeRunId = sanitizeRunId(summary.runId);
+    const runDir = join(this.runsDir, safeTaskId, safeRunId);
     return join(runDir, 'manifest.json');
   }
 

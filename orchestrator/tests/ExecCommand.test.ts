@@ -108,4 +108,9 @@ describe('executeExecCommand', () => {
     expect(last.type).toBe('run:summary');
     expect(last.payload.outputs.stdout).toContain('hello-jsonl');
   });
+
+  it('throws when MCP_RUNNER_TASK_ID is invalid', () => {
+    process.env.MCP_RUNNER_TASK_ID = '../bad';
+    expect(() => resolveEnvironment()).toThrow(/Invalid MCP_RUNNER_TASK_ID/);
+  });
 });

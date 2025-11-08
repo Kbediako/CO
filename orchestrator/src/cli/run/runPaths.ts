@@ -1,4 +1,5 @@
 import { join, relative } from 'node:path';
+import { sanitizeRunId } from '../../persistence/sanitizeRunId.js';
 import type { EnvironmentPaths } from './environment.js';
 
 export interface RunPaths {
@@ -15,16 +16,17 @@ export interface RunPaths {
 }
 
 export function resolveRunPaths(env: EnvironmentPaths, runId: string): RunPaths {
-  const runDir = join(env.runsRoot, env.taskId, 'cli', runId);
+  const safeRunId = sanitizeRunId(runId);
+  const runDir = join(env.runsRoot, env.taskId, 'cli', safeRunId);
   const manifestPath = join(runDir, 'manifest.json');
   const heartbeatPath = join(runDir, '.heartbeat');
   const resumeTokenPath = join(runDir, '.resume-token');
   const logPath = join(runDir, 'runner.ndjson');
   const commandsDir = join(runDir, 'commands');
   const errorsDir = join(runDir, 'errors');
-  const compatDir = join(env.runsRoot, env.taskId, 'mcp', runId);
+  const compatDir = join(env.runsRoot, env.taskId, 'mcp', safeRunId);
   const compatManifestPath = join(compatDir, 'manifest.json');
-  const localCompatDir = join(env.runsRoot, 'local-mcp', runId);
+  const localCompatDir = join(env.runsRoot, 'local-mcp', safeRunId);
 
   return {
     runDir,

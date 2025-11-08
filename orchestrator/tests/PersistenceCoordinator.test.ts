@@ -7,10 +7,11 @@ import { PersistenceCoordinator } from '../src/persistence/PersistenceCoordinato
 import { RunManifestWriter } from '../src/persistence/RunManifestWriter.js';
 import { TaskStateStore, TaskStateStoreLockError } from '../src/persistence/TaskStateStore.js';
 import type { RunSummary } from '../src/types.js';
+import { sanitizeRunId } from '../src/persistence/sanitizeRunId.js';
 
 const createRunSummary = (): RunSummary => ({
   taskId: '0001',
-  runId: 'run:2025-10-16T01:33:15Z',
+  runId: 'run-2025-10-16T01-33-15Z',
   mode: 'mcp',
   plan: {
     items: [{ id: 'subtask', description: 'Implement persistence' }],
@@ -21,14 +22,14 @@ const createRunSummary = (): RunSummary => ({
     artifacts: [],
     mode: 'mcp',
     notes: 'builder notes',
-    runId: 'run:2025-10-16T01:33:15Z',
+    runId: 'run-2025-10-16T01-33-15Z',
     success: true
   },
   test: {
     subtaskId: 'subtask',
     success: true,
     reports: [],
-    runId: 'run:2025-10-16T01:33:15Z'
+    runId: 'run-2025-10-16T01-33-15Z'
   },
   review: {
     summary: 'approved',
@@ -64,7 +65,7 @@ describe('PersistenceCoordinator', () => {
     const manifestPath = join(
       runsDir,
       summary.taskId,
-      summary.runId.replace(/[:]/g, '-'),
+      sanitizeRunId(summary.runId),
       'manifest.json'
     );
     const manifest = JSON.parse(await readFile(manifestPath, 'utf-8')) as RunSummary;
@@ -99,7 +100,7 @@ describe('PersistenceCoordinator', () => {
     const manifestPath = join(
       runsDir,
       summary.taskId,
-      summary.runId.replace(/[:]/g, '-'),
+      sanitizeRunId(summary.runId),
       'manifest.json'
     );
     const manifest = JSON.parse(await readFile(manifestPath, 'utf-8')) as RunSummary;

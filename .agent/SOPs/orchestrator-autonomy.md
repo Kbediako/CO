@@ -5,6 +5,8 @@ Applies to all runs executed with `MCP_RUNNER_TASK_ID=0303-orchestrator-autonomy
 
 ## Guardrails
 - Default approval profile remains `read/edit/run/network`; do not request escalations unless the manifest history documents reviewer consent.
+- Task IDs **must already be sanitized** before launching the CLI. `MCP_RUNNER_TASK_ID` now rejects control characters, traversal attempts, or Windows-reserved characters (`<`, `>`, `:`, `"`, `/`, `\`, `|`, `?`, `*`). Fix the identifier in your environment instead of expecting the CLI to coerce it.
+- Run IDs must come from the CLI (or the shared `sanitizeRunId` helper) so manifests, staged artifacts, and `.runs/<task-id>/cli/<run-id>/...` remain under the task directory. Invalid IDs (e.g., containing `:` or `../`) fail fast and no directories are created.
 - Every run must capture its manifest under `.runs/0303-orchestrator-autonomy/cli/<run-id>/manifest.json`; attach this path when updating checklists.
 - Metrics live in `.runs/0303-orchestrator-autonomy/metrics.json`; state snapshots accumulate in `out/0303-orchestrator-autonomy/state.json`.
 - Run `node scripts/spec-guard.mjs --dry-run`, `npm run lint`, `npm run test`, and `npm run eval:test` (when fixtures exist) before review. Record the manifest that proves these commands ran successfully.

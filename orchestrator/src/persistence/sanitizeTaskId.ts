@@ -1,3 +1,5 @@
+import { WINDOWS_FORBIDDEN_CHARACTERS } from './identifierGuards.js';
+
 /**
  * Validates task identifiers before they are used in filesystem paths.
  * Rejects traversal sequences and characters that would break directory layout.
@@ -12,6 +14,9 @@ export function sanitizeTaskId(taskId: string): string {
 
     if (codePoint !== undefined && (codePoint <= 31 || codePoint === 127)) {
       throw new Error(`Invalid task ID "${taskId}": control characters are not allowed.`);
+    }
+    if (WINDOWS_FORBIDDEN_CHARACTERS.has(char)) {
+      throw new Error(`Invalid task ID "${taskId}": character "${char}" is not allowed.`);
     }
   }
 

@@ -1,7 +1,8 @@
 import { mkdir } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
+import { sanitizeTaskId } from '../../persistence/sanitizeTaskId.js';
 
-const DEFAULT_TASK_ID = process.env.MCP_RUNNER_TASK_ID ?? '0101';
+const DEFAULT_TASK_ID = '0101';
 
 export interface EnvironmentPaths {
   repoRoot: string;
@@ -15,16 +16,22 @@ export function resolveEnvironment(): EnvironmentPaths {
   const runsRoot = resolve(process.env.CODEX_ORCHESTRATOR_RUNS_DIR ?? join(repoRoot, '.runs'));
   const outRoot = resolve(process.env.CODEX_ORCHESTRATOR_OUT_DIR ?? join(repoRoot, 'out'));
 
-  const taskId = sanitizeTaskId(process.env.MCP_RUNNER_TASK_ID ?? DEFAULT_TASK_ID);
+  const rawTaskId = process.env.MCP_RUNNER_TASK_ID ?? DEFAULT_TASK_ID;
+  const taskId = normalizeTaskId(rawTaskId);
 
   return { repoRoot, runsRoot, outRoot, taskId };
 }
 
-export function sanitizeTaskId(value: string): string {
-  if (!value) {
-    return DEFAULT_TASK_ID;
+function normalizeTaskId(value: string): string {
+  try {
+    return sanitizeTaskId(value);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (value) {
+      throw new Error(`Invalid MCP_RUNNER_TASK_ID "${value}": ${message}`);
+    }
+    throw new Error(`Invalid MCP_RUNNER_TASK_ID: ${message}`);
   }
-  return value.replace(/[^a-zA-Z0-9_-]/g, '').toLowerCase();
 }
 
 export async function ensureDirectories(paths: string[]): Promise<void> {
@@ -42,3 +49,5 @@ export function legacyRunsDir(env: EnvironmentPaths): string {
 export function localCompatibilityDir(env: EnvironmentPaths): string {
   return join(env.runsRoot, 'local-mcp');
 }
+
+export { sanitizeTaskId };

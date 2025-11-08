@@ -19,7 +19,7 @@ describe('stageArtifacts', () => {
   const tempDir = join(process.cwd(), 'temp-artifacts');
   const runsDir = join(process.cwd(), '.runs');
   const taskId = 'stage-task';
-  const runId = 'run:with:colon';
+  const runId = 'run-2025-10-16T01-33-15Z';
 
   afterEach(async () => {
     await rm(tempDir, { recursive: true, force: true });
@@ -44,14 +44,14 @@ describe('stageArtifacts', () => {
     });
 
     const destinationPath = join(process.cwd(), staged.path);
-    expect(destinationPath).toContain(`${taskId}/run-with-colon/artifacts/sample`);
+    expect(destinationPath).toContain(`${taskId}/${runId}/artifacts/sample`);
     expect(await exists(sourcePath)).toBe(false);
     expect(await exists(destinationPath)).toBe(true);
     expect(await readFile(destinationPath, 'utf8')).toBe('log-content');
   });
 
   it('does not treat similarly prefixed directories as already staged', async () => {
-    const runBaseDir = join(runsDir, taskId, 'run-with-colon');
+    const runBaseDir = join(runsDir, taskId, runId);
     const artifactsOldDir = join(runBaseDir, 'artifacts-old');
     await mkdir(artifactsOldDir, { recursive: true });
     const sourcePath = join(artifactsOldDir, 'tricky.log');
@@ -72,7 +72,7 @@ describe('stageArtifacts', () => {
 
     const stagedPath = join(process.cwd(), staged.path);
     expect(staged.path).not.toBe(relativeSource);
-    expect(stagedPath).toContain(`${taskId}/run-with-colon/artifacts/tricky`);
+    expect(stagedPath).toContain(`${taskId}/${runId}/artifacts/tricky`);
     expect(await exists(sourcePath)).toBe(false);
     expect(await exists(stagedPath)).toBe(true);
     expect(await readFile(stagedPath, 'utf8')).toBe('tricky');
@@ -96,9 +96,7 @@ describe('stageArtifacts', () => {
     });
 
     const destinationPath = join(process.cwd(), staged.path);
-    expect(destinationPath).toContain(
-      `${taskId}/run-with-colon/artifacts/design/reference/playwright/capture.json`
-    );
+    expect(destinationPath).toContain(`${taskId}/${runId}/artifacts/design/reference/playwright/capture.json`);
     expect(await exists(destinationPath)).toBe(true);
   });
 
@@ -155,5 +153,25 @@ describe('stageArtifacts', () => {
         options: { runsDir, relativeDir: '../outside' }
       })
     ).rejects.toThrow(/relativeDir/);
+  });
+
+  it('rejects unsafe run IDs', async () => {
+    await mkdir(tempDir, { recursive: true });
+    const sourcePath = join(tempDir, 'unsafe.log');
+    await writeFile(sourcePath, 'danger', 'utf8');
+
+    await expect(
+      stageArtifacts({
+        taskId,
+        runId: 'run:with:colon',
+        artifacts: [
+          {
+            path: relative(process.cwd(), sourcePath),
+            description: 'unsafe run id'
+          }
+        ],
+        options: { runsDir }
+      })
+    ).rejects.toThrow(/Invalid run ID/);
   });
 });

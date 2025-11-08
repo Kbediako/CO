@@ -50,6 +50,10 @@ Task input ─► Planner ─► Builder ─► Tester ─► Reviewer ─► Ru
 
 Use `npx codex-orchestrator resume --run <run-id>` to continue interrupted runs; the CLI verifies resume tokens, refreshes the plan, and updates the manifest safely before rerunning.
 
+### Identifier Guardrails
+- `MCP_RUNNER_TASK_ID` is no longer coerced or lowercased silently. The CLI calls the shared `sanitizeTaskId` helper and fails fast when the value contains control characters, traversal attempts, or Windows-reserved characters (`<`, `>`, `:`, `"`, `/`, `\`, `|`, `?`, `*`). Set the correct task ID in your environment *before* invoking the CLI.
+- Run IDs used for manifest or artifact storage must come from the CLI (or pass the shared `sanitizeRunId` helper). Strings with colons, control characters, or `../` are rejected to ensure every run directory lives under `.runs/<task-id>/cli/<run-id>` (and legacy `mcp` mirrors) without risking traversal.
+
 ## Pipelines & Execution Plans
 - Default pipelines live in `codex.orchestrator.json` (repository-specific) and `orchestrator/src/cli/pipelines/` (built-in defaults). Each stage is either a command (shell execution) or a nested pipeline.
 - The `CommandPlanner` inspects the selected pipeline and target stage; you can pass `--target-stage <stage-id>` or set `CODEX_ORCHESTRATOR_TARGET_STAGE` to focus on a specific step (e.g., rerun tests only).

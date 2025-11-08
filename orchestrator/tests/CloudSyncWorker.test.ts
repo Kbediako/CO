@@ -13,14 +13,15 @@ import { CloudRunsHttpError } from '../src/sync/CloudRunsHttpClient.js';
 import { createCloudSyncWorker } from '../src/sync/createCloudSyncWorker.js';
 import type { CredentialBroker } from '../src/credentials/CredentialBroker.js';
 import { sanitizeTaskId } from '../src/persistence/sanitizeTaskId.js';
+import { sanitizeRunId } from '../src/persistence/sanitizeRunId.js';
 
 const createSummary = (): RunSummary => ({
   taskId: '0001',
-  runId: 'run:2025-10-16T01:41:05Z',
+  runId: 'run-2025-10-16T01-41-05Z',
   mode: 'mcp',
   plan: { items: [], notes: undefined },
-  build: { subtaskId: 'sub', artifacts: [], mode: 'mcp', runId: 'run:2025-10-16T01:41:05Z', success: true },
-  test: { subtaskId: 'sub', success: true, reports: [], runId: 'run:2025-10-16T01:41:05Z' },
+  build: { subtaskId: 'sub', artifacts: [], mode: 'mcp', runId: 'run-2025-10-16T01-41-05Z', success: true },
+  test: { subtaskId: 'sub', success: true, reports: [], runId: 'run-2025-10-16T01-41-05Z' },
   review: { summary: 'ok', decision: { approved: true } },
   timestamp: new Date().toISOString()
 });
@@ -104,7 +105,7 @@ describe('CloudSyncWorker', () => {
     const outDir = join(root, 'out');
     const summary = createSummary();
 
-    const runDir = join(runsDir, summary.taskId, summary.runId.replace(/[:]/g, '-'));
+    const runDir = join(runsDir, summary.taskId, sanitizeRunId(summary.runId));
     await mkdir(runDir, { recursive: true });
     const manifestPath = join(runDir, 'manifest.json');
 

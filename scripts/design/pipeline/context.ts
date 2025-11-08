@@ -6,6 +6,7 @@ import {
   type DesignConfigLoadResult
 } from '../../../packages/shared/config/index.js';
 import { sanitizeTaskId } from '../../../orchestrator/src/persistence/sanitizeTaskId.js';
+import { sanitizeRunId } from '../../../orchestrator/src/persistence/sanitizeRunId.js';
 
 export interface DesignContext {
   taskId: string;
@@ -55,8 +56,4 @@ export async function loadDesignContext(): Promise<DesignContext> {
 
 export function resolveDesignPipelineId(result?: DesignConfigLoadResult): string {
   return designPipelineId(result);
-}
-
-function sanitizeRunId(value: string): string {
-  return value.replace(/[:]/g, '-');
 }

@@ -420,4 +420,90 @@ describe('TaskManager', () => {
       sanitizeSpy.mockRestore();
     }
   });
+
+  it('persists synthesized summaries when the builder throws', async () => {
+    const plan: PlanResult = {
+      items: [{ id: 'builder-error', description: 'cause builder to throw', runnable: true }]
+    };
+
+    const planner = new FunctionalPlannerAgent(async () => plan);
+    const builder = new FunctionalBuilderAgent(async () => {
+      throw new Error('builder exploded');
+    });
+    const tester = new FunctionalTesterAgent(async () => {
+      throw new Error('tester should not run');
+    });
+    const reviewer = new FunctionalReviewerAgent(async () => ({
+      summary: 'should not run',
+      decision: { approved: false }
+    }));
+    const recordRun = vi.fn().mockResolvedValue(undefined);
+    const writeManifest = vi.fn().mockResolvedValue('manifest-path');
+
+    const manager = new TaskManager({
+      planner,
+      builder,
+      tester,
+      reviewer,
+      runIdFactory: () => 'run-safe',
+      persistence: {
+        stateStore: { recordRun } as unknown as TaskStateStore,
+        manifestWriter: { write: writeManifest } as unknown as RunManifestWriter
+      }
+    });
+
+    const summary = await manager.execute(baseTask);
+    expect(summary.build.success).toBe(false);
+    expect(summary.build.notes).toContain('builder exploded');
+
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    expect(recordRun).toHaveBeenCalledWith(summary);
+    expect(writeManifest).toHaveBeenCalledWith(summary);
+  });
+
+  it('persists synthesized summaries when the tester throws', async () => {
+    const plan: PlanResult = {
+      items: [{ id: 'tester-error', description: 'cause tester to throw', runnable: true }]
+    };
+
+    const planner = new FunctionalPlannerAgent(async () => plan);
+    const builder = new FunctionalBuilderAgent(async (input) => ({
+      subtaskId: input.target.id,
+      artifacts: [],
+      mode: input.mode,
+      success: true,
+      runId: input.runId
+    }));
+    const tester = new FunctionalTesterAgent(async () => {
+      throw new Error('tester exploded');
+    });
+    const reviewer = new FunctionalReviewerAgent(async () => ({
+      summary: 'should not run',
+      decision: { approved: false }
+    }));
+    const recordRun = vi.fn().mockResolvedValue(undefined);
+    const writeManifest = vi.fn().mockResolvedValue('manifest-path');
+
+    const manager = new TaskManager({
+      planner,
+      builder,
+      tester,
+      reviewer,
+      runIdFactory: () => 'run-safe',
+      persistence: {
+        stateStore: { recordRun } as unknown as TaskStateStore,
+        manifestWriter: { write: writeManifest } as unknown as RunManifestWriter
+      }
+    });
+
+    const summary = await manager.execute(baseTask);
+    expect(summary.test.success).toBe(false);
+    expect(summary.test.reports[0]!.details).toContain('tester exploded');
+
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    expect(recordRun).toHaveBeenCalledWith(summary);
+    expect(writeManifest).toHaveBeenCalledWith(summary);
+  });
 });
