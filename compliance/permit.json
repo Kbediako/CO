@@ -14,6 +14,16 @@
       "allow_playwright": true,
       "allow_video_capture": true,
       "allow_live_assets": true
+    },
+    {
+      "origin": "https://more-nutrition.webflow.io",
+      "license": "More Nutrition marketing site — archival capture for internal review",
+      "notes": "Toolkit run 0505 mirrors the public landing page for parity validation; assets remain internal only.",
+      "approver": "Design Review Board",
+      "approval_id": "0505-more-nutrition-2025-11-09",
+      "allow_playwright": true,
+      "allow_video_capture": true,
+      "allow_live_assets": true
     }
   ],
   "policy": {

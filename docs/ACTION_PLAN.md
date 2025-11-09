@@ -3,8 +3,15 @@
 ## Task 0303 — Codex Orchestrator Autonomy Enhancements
 - Primary Doc: `docs/ACTION_PLAN-codex-orchestrator-autonomy.md`
 - Run Manifest Link: _(pending — capture first diagnostics run under `.runs/0303-orchestrator-autonomy/cli/<run-id>/manifest.json`)._
-- Metrics / State Snapshots: _(pending — populate `.runs/0303-orchestrator-autonomy/metrics.json` and `out/0303-orchestrator-autonomy/state.json` ahead of review)._
+- Metrics / State Snapshots: _(pending — populate `.runs/0303-orchestrator-autonomy/metrics.json` and `out/0303-orchestrator-autonomy/state.json` ahead of review)._ 
 - Checklist Mirror: `tasks/tasks-0303-orchestrator-autonomy.md`, `.agent/task/0303-orchestrator-autonomy.md`, `docs/TASKS.md` (0303 section).
+
+## Task 0505 — More Nutrition Pixel Archive
+- Primary Doc: `tasks/0505-more-nutrition-pixel.md`
+- Run Manifest Link: `.runs/0505-more-nutrition-pixel/cli/2025-11-09T12-25-49-931Z-decf5ae1/manifest.json`
+- Archive / Artifacts: `.runs/0505-more-nutrition-pixel/archive/2025-11-09T12-25-49Z/`
+- Findings & Follow-ups: `docs/findings/more-nutrition.md`
+- Checklist Mirror: `.agent/task/0505-more-nutrition-pixel.md`, `docs/TASKS.md` (0505 section)
 
 ---
 

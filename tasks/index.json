@@ -63,6 +63,22 @@
       },
       "created_at": "2025-11-07",
       "completed_at": null
+    },
+    {
+      "id": "0505",
+      "slug": "0505-more-nutrition-pixel",
+      "title": "More Nutrition Pixel Archive",
+      "path": "tasks/0505-more-nutrition-pixel.md",
+      "kind": "run",
+      "status": "in-progress",
+      "gate": {
+        "phase": "pixel-archive-capture",
+        "status": "succeeded",
+        "log": ".runs/0505-more-nutrition-pixel/cli/2025-11-09T12-25-49-931Z-decf5ae1/manifest.json",
+        "run_id": "2025-11-09T12-25-49-931Z-decf5ae1"
+      },
+      "created_at": "2025-11-09",
+      "completed_at": null
     }
   ],
   "specs": []

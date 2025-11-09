@@ -82,6 +82,10 @@ export interface DesignToolkitLiveAssetsConfig {
   mirrorAssets: boolean;
 }
 
+export interface DesignToolkitInteractionConfig {
+  enabled: boolean;
+}
+
 export interface DesignToolkitPipelineConfig {
   enabled: boolean;
   sources: DesignToolkitSourceConfig[];
@@ -91,6 +95,7 @@ export interface DesignToolkitPipelineConfig {
   selfCorrection: DesignToolkitSelfCorrectionConfig;
   publish: DesignToolkitPublishConfig;
   liveAssets: DesignToolkitLiveAssetsConfig;
+  interactions: DesignToolkitInteractionConfig;
 }
 
 export interface DesignConfig {
@@ -178,6 +183,9 @@ const DEFAULT_CONFIG: DesignConfig = {
         allowRemoteAssets: false,
         maxStylesheets: null,
         mirrorAssets: false
+      },
+      interactions: {
+        enabled: false
       }
     }
   }
@@ -534,6 +542,14 @@ function normalizeToolkitPipelineConfig(
         warnings
       }),
       mirrorAssets: coerceBoolean(record.mirror_assets ?? record.mirrorAssets, normalized.liveAssets.mirrorAssets)
+    };
+  }
+
+  const interactionsRaw = raw.interactions;
+  if (interactionsRaw && typeof interactionsRaw === 'object') {
+    const record = interactionsRaw as Record<string, unknown>;
+    normalized.interactions = {
+      enabled: coerceBoolean(record.enabled, normalized.interactions.enabled)
     };
   }
 

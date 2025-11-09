@@ -91,7 +91,8 @@ async function main(): Promise<void> {
         retentionPolicy: toolkitState.retention?.policy ?? fallbackRetention.policy,
         autoPurge: toolkitState.retention?.autoPurge ?? fallbackRetention.autoPurge,
         timestamp: now,
-        liveAssets: pipelineConfig.liveAssets
+        liveAssets: pipelineConfig.liveAssets,
+        interactionsEnabled: pipelineConfig.interactions?.enabled ?? false
       });
       successCount += 1;
       stagedArtifacts.push(contextResult.artifact);
@@ -183,12 +184,24 @@ async function stageContextArtifact(options: {
   autoPurge: boolean;
   timestamp: Date;
   liveAssets?: DesignToolkitPipelineConfig['liveAssets'];
+  interactionsEnabled?: boolean;
 }): Promise<ContextArtifactResult> {
-  const { context, source, tmpRoot, retentionDays, retentionPolicy, autoPurge, timestamp, liveAssets } = options;
+  const {
+    context,
+    source,
+    tmpRoot,
+    retentionDays,
+    retentionPolicy,
+    autoPurge,
+    timestamp,
+    liveAssets,
+    interactionsEnabled
+  } = options;
   const snapshot = await capturePageSnapshot(source.url, {
     keepScripts: liveAssets?.keepScripts ?? false,
     maxStylesheets: liveAssets?.maxStylesheets ?? undefined,
-    mirrorAssets: liveAssets?.mirrorAssets ?? false
+    mirrorAssets: liveAssets?.mirrorAssets ?? false,
+    runInteractions: Boolean(interactionsEnabled)
   });
 
   const slugDir = join(tmpRoot, source.slug);
