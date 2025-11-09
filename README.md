@@ -91,6 +91,28 @@ Use `npx codex-orchestrator resume --run <run-id>` to continue interrupted runs;
 
 Run `npm run build` to compile TypeScript before packaging or invoking the CLI directly from `dist/`.
 
+## Hi-Fi Design Toolkit Captures
+Use the hi-fi pipeline to snapshot complex marketing sites (motion, interactions, tokens) while keeping the repo cloneable:
+
+1. **Configure the source:** Update `design.config.yaml` → `pipelines.hi_fi_design_toolkit.sources` with the target URL, slug, title, and breakpoints. This repo currently targets Ethical Life World; swap the entry if you want to test another site.
+2. **Permit the domain:** Add (or update) the matching record in `compliance/permit.json` so Playwright, video capture, and live assets are explicitly approved for that origin.
+3. **Prep tooling:**
+   - `npm install && npm run build`
+   - `npm run setup:design-tools` (installs design-system deps) and ensure FFmpeg is available (`brew install ffmpeg` on macOS).
+4. **Run the pipeline:**
+   ```bash
+   export MCP_RUNNER_TASK_ID=<task-id>
+   npx codex-orchestrator start hi-fi-design-toolkit --format json --task <task-id>
+   ```
+   Results land under `.runs/<task-id>/cli/<run-id>/` (manifests, logs, artifacts) with human summaries mirrored to `out/<task-id>/`.
+5. **Validate the clone:** serve the staged reference directory, e.g.
+   ```bash
+   cd .runs/<task-id>/<run-id>/artifacts/design-toolkit/reference/<slug>
+   python3 -m http.server 4173
+   ```
+   The build now mirrors all `/assets/...` content and adds root shortcuts (`wp-content`, `wp-includes`, etc.) so even absolute WordPress paths work offline. A lightweight `codex-scroll-fallback` script only unlocks scrolling if the captured page never enables it.
+6. **Document learnings:** Drop run evidence into `docs/findings/<slug>.md` (see `docs/findings/ethical-life.md` for the latest example) so reviewers know which manifest, artifacts, and diffs back each finding.
+
 ## Extending the Orchestrator
 - Add new agent strategies by implementing the planner/builder/tester/reviewer interfaces and wiring them into `TaskManager`.
 - Register additional pipelines or override defaults through `codex.orchestrator.json`. Nested pipelines let you compose reusable command groups.

@@ -28,11 +28,11 @@ pipelines:
   hi_fi_design_toolkit:
     enabled: true
     sources:
-      - id: more-nutrition
-        slug: more-nutrition
-        title: More Nutrition marketing site
-        url: https://more-nutrition.webflow.io/
-        reference_url: https://more-nutrition.webflow.io/
+      - id: ethical-life-world
+        slug: ethical-life-world
+        title: Ethical Life World experience
+        url: https://ethicallifeworld.com/
+        reference_url: https://ethicallifeworld.com/
     breakpoints:
       - id: desktop
         width: 1440

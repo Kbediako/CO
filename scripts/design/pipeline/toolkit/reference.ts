@@ -1,5 +1,5 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { join, relative } from 'node:path';
+import { access, cp, mkdir, readFile, readdir, symlink, writeFile } from 'node:fs/promises';
+import { dirname, join, relative } from 'node:path';
 import { tmpdir } from 'node:os';
 import { loadDesignContext } from '../context.js';
 import type { DesignContext } from '../context.js';
@@ -74,6 +74,12 @@ async function main(): Promise<void> {
           relativeDir: `design-toolkit/reference/${entry.slug}`,
           overwrite: true
         }
+      });
+
+      await mirrorReferenceAssets({
+        entry,
+        repoRoot: context.repoRoot,
+        referenceArtifactPath: referenceArtifact.path
       });
 
       artifacts.push({
@@ -318,8 +324,9 @@ async function buildReferenceHtml(
     const snapshotHtml = await readFile(absolute, 'utf8');
     const overlay = buildOverlay(entry.url, sections);
     const styleBlock = buildOverlayStyles();
+    const scrollScript = buildScrollFallbackScript();
     const withStyles = injectIntoHead(snapshotHtml, styleBlock);
-    return injectAfterBodyOpen(withStyles, overlay);
+    return injectAfterBodyOpen(withStyles, `${overlay}\n${scrollScript}`);
   } catch (error) {
     console.warn(`[design-toolkit-reference] Failed to read snapshot for ${entry.slug}:`, error);
     return fallbackReference(entry.slug, entry.url);
@@ -351,6 +358,10 @@ function buildOverlayStyles(): string {
   return `<style id="codex-clone-style">\n  .codex-clone-overlay { position: fixed; top: 1rem; right: 1rem; width: 320px; max-height: 90vh; overflow-y: auto; z-index: 9999; font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: #f2f2f2; }\n  .codex-clone-banner { background: rgba(7, 7, 12, 0.95); padding: 1rem; border-radius: 0.75rem 0.75rem 0 0; box-shadow: 0 8px 20px rgba(0,0,0,0.4); }\n  .codex-clone-banner a { color: #7dd3ff; text-decoration: none; }\n  .codex-section-outline { background: rgba(12, 12, 18, 0.92); padding: 0.75rem 1rem 1rem; border-radius: 0 0 0.75rem 0.75rem; font-size: 0.85rem; line-height: 1.4; }\n  .codex-section-outline ol { margin: 0; padding-left: 1.25rem; }\n  .codex-section-outline li { margin-bottom: 0.75rem; }\n  .codex-section-outline p { margin: 0.25rem 0 0; color: #cbd5f5; }\n  @media (max-width: 900px) { .codex-clone-overlay { position: static; width: auto; max-height: none; } }\n</style>`;
 }
 
+function buildScrollFallbackScript(): string {
+  return `<script id="codex-scroll-fallback">(function(){\n  const html = document.documentElement;\n  const body = document.body;\n  if (!html || !body) { return; }\n  const MAX_ATTEMPTS = 8;\n  let attempts = 0;\n\n  function isLocked() {\n    if (!body) { return false; }\n    if (body.hasAttribute('data-lenis-prevent')) { return true; }\n    const bodyOverflow = window.getComputedStyle(body).overflowY;\n    const htmlOverflow = window.getComputedStyle(html).overflowY;\n    return bodyOverflow === 'hidden' || htmlOverflow === 'hidden';\n  }\n\n  function unlock() {\n    body.removeAttribute('data-lenis-prevent');\n    body.style.overflowY = 'auto';\n    body.style.removeProperty('height');\n    body.style.removeProperty('min-height');\n    html.style.overflowY = 'auto';\n    html.style.removeProperty('--vh-in-px');\n  }\n\n  function tryUnlock() {\n    if (!isLocked()) { return; }\n    attempts += 1;\n    unlock();\n    if (attempts < MAX_ATTEMPTS) {\n      setTimeout(tryUnlock, 500);\n    }\n  }\n\n  window.addEventListener('load', () => {\n    setTimeout(tryUnlock, 1200);\n  });\n  document.addEventListener('visibilitychange', () => {\n    if (document.visibilityState === 'visible') {\n      setTimeout(tryUnlock, 600);\n    }\n  });\n})();</script>`;
+}
+
 function injectIntoHead(html: string, snippet: string): string {
   if (html.includes('</head>')) {
     return html.replace('</head>', `${snippet}\n</head>`);
@@ -373,6 +384,59 @@ function escapeHtml(value: string): string {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
+}
+
+async function mirrorReferenceAssets(options: {
+  entry: ToolkitContextState;
+  repoRoot: string;
+  referenceArtifactPath: string;
+}): Promise<void> {
+  const { entry, repoRoot, referenceArtifactPath } = options;
+  const contextAssetsDir = join(repoRoot, entry.relativeDir, 'assets');
+  if (!(await directoryExists(contextAssetsDir))) {
+    return;
+  }
+  const referenceDir = dirname(join(repoRoot, referenceArtifactPath));
+  const destinationAssetsDir = join(referenceDir, 'assets');
+  await mkdir(destinationAssetsDir, { recursive: true });
+  await cp(contextAssetsDir, destinationAssetsDir, { recursive: true, force: true });
+  await mirrorTopLevelShortcuts(destinationAssetsDir, referenceDir);
+}
+
+async function directoryExists(path: string): Promise<boolean> {
+  try {
+    await access(path);
+    return true;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      return false;
+    }
+    throw error;
+  }
+}
+
+async function mirrorTopLevelShortcuts(sourceAssetsDir: string, referenceDir: string): Promise<void> {
+  const entries = await readdir(sourceAssetsDir, { withFileTypes: true });
+  for (const entry of entries) {
+    if (!entry.isDirectory()) {
+      continue;
+    }
+    const shortcutName = entry.name;
+    // Preserve "assets" prefix; only mirror top-level roots (e.g., wp-content, wp-includes).
+    if (!/^wp-/.test(shortcutName)) {
+      continue;
+    }
+    const shortcutPath = join(referenceDir, shortcutName);
+    try {
+      await symlink(join(sourceAssetsDir, shortcutName), shortcutPath);
+    } catch (error) {
+      const nodeError = error as NodeJS.ErrnoException;
+      if (nodeError.code === 'EEXIST') {
+        continue;
+      }
+      throw error;
+    }
+  }
 }
 
 main().catch((error) => {

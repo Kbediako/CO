@@ -24,6 +24,16 @@
       "allow_playwright": true,
       "allow_video_capture": true,
       "allow_live_assets": true
+    },
+    {
+      "origin": "https://ethicallifeworld.com",
+      "license": "Ethical Life World public experience — internal toolkit capture only",
+      "notes": "Approved to run high-fidelity desktop + mobile captures with motion + interaction logging; keep artifacts internal for review.",
+      "approver": "Design Review Board",
+      "approval_id": "ethicallifeworld-hi-fi-2025-11-09",
+      "allow_playwright": true,
+      "allow_video_capture": true,
+      "allow_live_assets": true
     }
   ],
   "policy": {

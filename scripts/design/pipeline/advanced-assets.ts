@@ -3,7 +3,7 @@ import { execFile } from 'node:child_process';
 import { join, relative } from 'node:path';
 import { tmpdir } from 'node:os';
 import { promisify } from 'node:util';
-import { chromium, type Page, type BrowserContext } from 'playwright';
+import { chromium, type BrowserContext } from 'playwright';
 import { loadDesignContext } from './context.js';
 import {
   appendApprovals,
@@ -371,27 +371,27 @@ async function recordInteractionVideo(
   const browser = await chromium.launch({ headless: true });
   const targetUrl = entry.referenceUrl ?? entry.url;
   let context: BrowserContext | null = null;
-  let page: Page | null = null;
   try {
-    context = await browser.newContext({
+    const activeContext = await browser.newContext({
       viewport,
       recordVideo: {
         dir: captureDir,
         size: viewport
       }
     });
-    page = await context.newPage();
+    context = activeContext;
+    const activePage = await activeContext.newPage();
     const start = Date.now();
-    await page.goto(targetUrl, { waitUntil: 'networkidle', timeout: 120_000 });
-    await page.waitForTimeout(800);
-    await runDefaultInteractions(page as unknown as InteractionPage);
+    await activePage.goto(targetUrl, { waitUntil: 'networkidle', timeout: 120_000 });
+    await activePage.waitForTimeout(800);
+    await runDefaultInteractions(activePage as unknown as InteractionPage);
     const elapsed = Date.now() - start;
     const remaining = durationSeconds * 1000 - elapsed;
     if (remaining > 0) {
-      await page.waitForTimeout(remaining);
+      await activePage.waitForTimeout(remaining);
     }
-    const video = await page.video();
-    await page.close();
+    const video = await activePage.video();
+    await activePage.close();
     const rawPath = video ? await video.path() : null;
     if (!rawPath) {
       throw new Error('Playwright finished without producing a video artifact');
