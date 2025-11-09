@@ -8,6 +8,7 @@
 
 ## Artifacts & Archive
 - [x] Artifact set mirrored — `.runs/0505-more-nutrition-pixel/archive/2025-11-09T12-25-49Z/` copies `design-toolkit/{context,tokens,styleguide,reference,diffs}` for long-term storage.
+- [x] Artifact set mirrored — `.runs/0505-more-nutrition-pixel/archive/2025-11-09T12-25-49Z/` copies `design-toolkit/{context,tokens,styleguide,reference,diffs}` for long-term storage *(folder deleted locally on 2025-11-09 to keep the repo lightweight; rerun the hi-fi pipeline to regenerate)*.
 - [x] Findings logged — `docs/findings/more-nutrition.md` summarizes automated diff metrics and residual parity gaps tied to the same manifest.
 
 ## Documentation & Mirrors

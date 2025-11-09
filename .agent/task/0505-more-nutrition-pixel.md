@@ -16,7 +16,7 @@
    - [x] Status
 2. **Artifact archive staged**
    - Tasks: Copy `.runs/0505-more-nutrition-pixel/2025-11-09T12-25-49-931Z-decf5ae1/artifacts/design-toolkit/**` into `.runs/0505-more-nutrition-pixel/archive/2025-11-09T12-25-49Z/` for desktop/mobile HTML, CSS, diffs, tokens, and style guide outputs.
-   - [x] Status — Archive path recorded in docs + tasks.
+   - [x] Status — Archive path recorded in docs + tasks *(local folder pruned on 2025-11-09 repo cleanup; rerun hi-fi toolkit to recreate physical artifacts when needed).* 
 3. **Findings + deltas logged**
    - Deliverable: `docs/findings/more-nutrition.md` with automated diff metrics (final error rate 2.59%) and residual action items.
    - [x] Status — Document references manifest + archive evidence.

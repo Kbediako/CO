@@ -9,7 +9,7 @@
 ## Task 0505 — More Nutrition Pixel Archive
 - Primary Doc: `tasks/0505-more-nutrition-pixel.md`
 - Run Manifest Link: `.runs/0505-more-nutrition-pixel/cli/2025-11-09T12-25-49-931Z-decf5ae1/manifest.json`
-- Archive Path: `.runs/0505-more-nutrition-pixel/archive/2025-11-09T12-25-49Z/`
+- Archive Path: `.runs/0505-more-nutrition-pixel/archive/2025-11-09T12-25-49Z/` *(directory pruned locally after 2025-11-09 cleanup; rerun toolkit if raw assets are needed again)*
 - Findings / Deltas: `docs/findings/more-nutrition.md`
 - Checklist Mirror: `.agent/task/0505-more-nutrition-pixel.md`, `docs/TASKS.md` (0505 section)
 

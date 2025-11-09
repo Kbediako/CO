@@ -2,7 +2,7 @@
 
 ## Run Evidence
 - **Manifest:** `archives/more-nutrition-pixel/2025-11-09/.runs/0505-more-nutrition-pixel/cli/2025-11-09T12-25-49-931Z-decf5ae1/manifest.json`
-- **Archive:** `archives/more-nutrition-pixel/2025-11-09/.runs/0505-more-nutrition-pixel/archive/2025-11-09T12-25-49Z/`
+- **Archive:** `archives/more-nutrition-pixel/2025-11-09/.runs/0505-more-nutrition-pixel/archive/2025-11-09T12-25-49Z/` *(directory pruned locally on 2025-11-09; rerun the pipeline to regenerate assets if needed)*
 - **Design summary:** `archives/more-nutrition-pixel/2025-11-09/out/0505-more-nutrition-pixel/design/runs/2025-11-09T12-25-49-931Z-decf5ae1.json`
 
 ## Snapshot
