@@ -41,6 +41,15 @@ export const hiFiDesignToolkitPipeline: PipelineDefinition = {
     },
     {
       kind: 'command',
+      id: 'design-advanced-assets',
+      title: 'Generate advanced design assets',
+      command: 'node dist/scripts/design/pipeline/advanced-assets.js',
+      env: { ...DESIGN_TOOLKIT_ENV },
+      allowFailure: true,
+      summaryHint: 'Optional motion capture via Framer Motion + FFmpeg'
+    },
+    {
+      kind: 'command',
       id: 'design-toolkit-publish',
       title: 'Publish toolkit outputs to packages/design-system',
       command: 'node dist/scripts/design/pipeline/toolkit/publish.js',

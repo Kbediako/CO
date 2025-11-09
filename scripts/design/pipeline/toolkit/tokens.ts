@@ -14,6 +14,7 @@ import {
 import { stageArtifacts } from '../../../../orchestrator/src/persistence/ArtifactStager.js';
 import { buildRetentionMetadata } from './common.js';
 import type { DesignToolkitArtifactRecord } from '../../../../packages/shared/manifest/types.js';
+import { normalizeSentenceSpacing } from './snapshot.js';
 
 async function main(): Promise<void> {
   const context = await loadDesignContext();
@@ -266,8 +267,13 @@ async function loadSections(entry: ToolkitContextState, repoRoot: string) {
     const parsed = JSON.parse(raw) as Array<{ title?: string; description?: string }>;
     return parsed
       .map((section) => ({
-        title: section.title ?? 'Section',
-        description: section.description ?? ''
+        title:
+          normalizeSentenceSpacing(section.title ?? 'Section')
+            .replace(/\s+/g, ' ')
+            .trim() || 'Section',
+        description: normalizeSentenceSpacing(section.description ?? '')
+          .replace(/\s+/g, ' ')
+          .trim()
       }))
       .filter((section) => section.description.length > 0);
   } catch (error) {

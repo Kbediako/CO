@@ -1,5 +1,6 @@
 import { Buffer } from 'node:buffer';
 import { load, type CheerioAPI } from 'cheerio';
+import type { Element } from 'domhandler';
 import { chromium, type Response } from 'playwright';
 
 export interface PageSectionSummary {
@@ -33,7 +34,21 @@ interface SnapshotOptions {
   maxStylesheets?: number;
   keepScripts?: boolean;
   mirrorAssets?: boolean;
+  runInteractions?: boolean;
 }
+
+export type InteractionElementHandle = {
+  click(options?: Record<string, unknown>): Promise<void>;
+  hover(options?: Record<string, unknown>): Promise<void>;
+};
+
+export type InteractionPage = {
+  waitForTimeout(ms: number): Promise<void>;
+  mouse: {
+    wheel: (deltaX: number, deltaY: number) => Promise<void>;
+  };
+  $(selector: string): Promise<InteractionElementHandle | null>;
+};
 
 interface CapturedAssetRecord {
   url: string;
@@ -64,6 +79,10 @@ export async function capturePageSnapshot(url: string, options?: SnapshotOptions
 
     await page.goto(url, { waitUntil: 'networkidle', timeout: 120_000 });
     await page.waitForTimeout(2000);
+
+    if (options?.runInteractions) {
+      await runDefaultInteractions(page);
+    }
     const html = await page.content();
     await Promise.all(assetTasks);
 
@@ -127,6 +146,40 @@ export async function capturePageSnapshot(url: string, options?: SnapshotOptions
     throw new Error(`Failed to render ${url} via Playwright: ${(error as Error).message}`);
   } finally {
     await browser.close();
+  }
+}
+
+export async function runDefaultInteractions(page: InteractionPage): Promise<void> {
+  try {
+    const safeWait = (ms: number) => page.waitForTimeout(ms);
+    await page.mouse.wheel(0, 1400);
+    await safeWait(600);
+    await page.mouse.wheel(0, 1400);
+    await safeWait(600);
+    await page.mouse.wheel(0, -600);
+    await safeWait(400);
+
+    const sliderSelectors = ['[data-slider="next"]', '.swiper-button-next', '.w-slider-arrow-right', '[data-scroll="next"]'];
+    for (const selector of sliderSelectors) {
+      const handle = await page.$(selector);
+      if (handle) {
+        await handle.click().catch(() => {});
+        await safeWait(350);
+      }
+    }
+
+    const hoverSelectors = ['[data-lottie]', 'video[autoplay]'];
+    for (const selector of hoverSelectors) {
+      const element = await page.$(selector);
+      if (element) {
+        await element.hover().catch(() => {});
+        await safeWait(200);
+      }
+    }
+
+    await safeWait(600);
+  } catch (error) {
+    console.warn('[snapshot] interaction macro failed', error);
   }
 }
 
@@ -403,12 +456,12 @@ function computeFontFamilies(css: string): string[] {
 
 function summarizeSections($: CheerioAPI): PageSectionSummary[] {
   const summaries: PageSectionSummary[] = [];
-  $('section').each((index, element) => {
-    const heading = $(element).find('h1, h2, h3').first().text().trim();
-    const text = $(element)
-      .text()
-      .replace(/\s+/g, ' ')
-      .trim();
+  const candidates = collectSectionCandidates($);
+
+  candidates.forEach((element, index) => {
+    const headingElement = $(element).find('h1, h2, h3').first().get(0) as Element | undefined;
+    const heading = headingElement ? extractSectionText($, headingElement) : '';
+    const text = extractSectionText($, element);
     if (text.length === 0) {
       return;
     }
@@ -419,17 +472,84 @@ function summarizeSections($: CheerioAPI): PageSectionSummary[] {
   });
 
   if (summaries.length === 0) {
-    const fallback = $('body')
-      .text()
-      .replace(/\s+/g, ' ')
-      .trim()
-      .slice(0, 280);
+    const fallback = extractSectionText($, $('body').get(0) as Element).slice(0, 280);
     if (fallback.length > 0) {
       summaries.push({ title: 'Page overview', description: fallback });
     }
   }
 
   return summaries.slice(0, 8);
+}
+
+function collectSectionCandidates($: CheerioAPI): Element[] {
+  const selectors = [
+    'section',
+    '[data-section]',
+    '[data-load-stage]',
+    '[data-load-section]',
+    '[data-scroll]',
+    '[data-anchor]',
+    '.section',
+    '[class*="section"]',
+    '.w-layout-blockcontainer',
+    'main > div'
+  ];
+  const seen = new Set<Element>();
+  const result: Element[] = [];
+
+  const addElement = (element: Element): void => {
+    if (seen.has(element)) {
+      return;
+    }
+    seen.add(element);
+    result.push(element);
+  };
+
+  for (const selector of selectors) {
+    $(selector).each((_, element) => addElement(element as Element));
+    if (result.length >= 12) {
+      break;
+    }
+  }
+
+  if (result.length === 0) {
+    $('body')
+      .children()
+      .each((_, element) => addElement(element as Element));
+  }
+
+  return result;
+}
+
+function extractSectionText($: CheerioAPI, element?: Element | null): string {
+  if (!element) {
+    return '';
+  }
+  const html = $(element).html();
+  if (!html) {
+    return normalizeSentenceSpacing(
+      $(element)
+        .text()
+        .replace(/\u00a0/g, ' ')
+    )
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+  const spaced = html.replace(/></g, '> <');
+  const wrapped = load(`<root>${spaced}</root>`);
+  const rawText = wrapped('root')
+    .text()
+    .replace(/\u00a0/g, ' ');
+  return normalizeSentenceSpacing(rawText)
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+export function normalizeSentenceSpacing(value: string): string {
+  if (!value) {
+    return '';
+  }
+  return value.replace(/([.?!%])(?!\s)(?=[A-Za-z0-9])/g, '$1 ');
 }
 
 function isSameOrigin(candidate: string, baseUrl: string): boolean {

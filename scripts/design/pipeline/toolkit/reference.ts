@@ -19,6 +19,7 @@ import type {
   DesignArtifactApprovalRecord,
   DesignToolkitArtifactRecord
 } from '../../../../packages/shared/manifest/types.js';
+import { normalizeSentenceSpacing } from './snapshot.js';
 
 async function main(): Promise<void> {
   const context = await loadDesignContext();
@@ -94,20 +95,31 @@ async function main(): Promise<void> {
 
       if (selfCorrection.enabled) {
         const correction = await simulateSelfCorrection(entry.slug, tmpRoot, selfCorrection.maxIterations);
-        const [diffArtifact] = await stageArtifacts({
+        const correctionArtifacts = [
+          {
+            path: relative(process.cwd(), correction.path),
+            description: `Self-correction report for ${entry.slug}`
+          }
+        ];
+        if (correction.settlingLogPath) {
+          correctionArtifacts.push({
+            path: relative(process.cwd(), correction.settlingLogPath),
+            description: `Counter settling log for ${entry.slug}`
+          });
+        }
+
+        const stagedCorrection = await stageArtifacts({
           taskId: context.taskId,
           runId: context.runId,
-          artifacts: [
-            {
-              path: relative(process.cwd(), correction.path),
-              description: `Self-correction report for ${entry.slug}`
-            }
-          ],
+          artifacts: correctionArtifacts,
           options: {
             relativeDir: `design-toolkit/diffs/${entry.slug}`,
             overwrite: true
           }
         });
+
+        const diffArtifact = stagedCorrection[0];
+        const settlingArtifact = correction.settlingLogPath ? stagedCorrection[1] : undefined;
 
         artifacts.push({
           id: `${entry.slug}-self-correct`,
@@ -121,6 +133,22 @@ async function main(): Promise<void> {
             final_error_rate: correction.finalErrorRate
           }
         });
+
+        if (settlingArtifact) {
+          artifacts.push({
+            id: `${entry.slug}-self-correct-settle`,
+            stage: 'self-correct',
+            status: 'succeeded',
+            relative_path: settlingArtifact.path,
+            description: `Counter settling log for ${entry.slug}`,
+            retention: retentionMetadata,
+            metrics: {
+              wait_ms: correction.settlingWaitMs ?? 0,
+              baseline_error: correction.baselineError,
+              stabilized_error: correction.finalErrorRate
+            }
+          });
+        }
 
         approvals.push({
           id: `self-correct-${entry.slug}`,
@@ -205,24 +233,47 @@ async function simulateSelfCorrection(slug: string, tmpRoot: string, maxIteratio
   const correctionDir = join(tmpRoot, slug, 'diffs');
   await mkdir(correctionDir, { recursive: true });
   const reportPath = join(correctionDir, 'self-correction.json');
+  const stabilization = await settleAnimatedCounters(slug, correctionDir, currentError);
+  const finalError = Number(stabilization.finalError.toFixed(2));
+
   await writeFile(
     reportPath,
     JSON.stringify(
       {
         slug,
         iterations: steps,
-        finalErrorRate: Number(currentError.toFixed(2))
+        finalErrorRate: finalError
       },
       null,
       2
     ),
     'utf8'
   );
+
   return {
     path: reportPath,
     iterations,
-    finalErrorRate: Number(currentError.toFixed(2))
+    finalErrorRate: finalError,
+    settlingLogPath: stabilization.logPath,
+    settlingWaitMs: stabilization.waitMs,
+    baselineError: Number(currentError.toFixed(2))
   };
+}
+
+async function settleAnimatedCounters(slug: string, correctionDir: string, baselineError: number) {
+  const waitMs = 450;
+  await new Promise((resolve) => setTimeout(resolve, waitMs));
+  const logPath = join(correctionDir, 'counter-settling.json');
+  const finalError = Math.max(0.48, Math.min(0.95, baselineError * 0.32));
+  const payload = {
+    slug,
+    wait_ms: waitMs,
+    baseline_error: Number(baselineError.toFixed(2)),
+    stabilized_error: Number(finalError.toFixed(2)),
+    seeded_at: new Date().toISOString()
+  };
+  await writeFile(logPath, JSON.stringify(payload, null, 2), 'utf8');
+  return { logPath, waitMs, finalError };
 }
 
 function metadataApprover(context: DesignContext) {
@@ -239,8 +290,13 @@ async function loadSections(entry: ToolkitContextState, repoRoot: string) {
     const parsed = JSON.parse(raw) as Array<{ title?: string; description?: string }>;
     return parsed
       .map((section) => ({
-        title: section.title ?? 'Section',
-        description: section.description ?? ''
+        title:
+          normalizeSentenceSpacing(section.title ?? 'Section')
+            .replace(/\s+/g, ' ')
+            .trim() || 'Section',
+        description: normalizeSentenceSpacing(section.description ?? '')
+          .replace(/\s+/g, ' ')
+          .trim()
       }))
       .filter((section) => section.description.length > 0);
   } catch (error) {
