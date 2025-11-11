@@ -79,6 +79,22 @@
       },
       "created_at": "2025-11-09",
       "completed_at": null
+    },
+    {
+      "id": "0506",
+      "slug": "0506-tfgrpo-integration",
+      "title": "Training-Free GRPO Integration PRD",
+      "path": "tasks/0506-prd-tfgrpo-integration.md",
+      "kind": "prd",
+      "status": "in-progress",
+      "gate": {
+        "phase": "tfgrpo-planning",
+        "status": "in-progress",
+        "log": null,
+        "run_id": null
+      },
+      "created_at": "2025-11-11",
+      "completed_at": null
     }
   ],
   "specs": []

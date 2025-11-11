@@ -36,6 +36,25 @@
           "command": "node scripts/spec-guard.mjs --dry-run"
         }
       ]
+    },
+    {
+      "id": "tfgrpo-learning",
+      "title": "TF-GRPO Learning Loop",
+      "description": "Run three TF-GRPO epochs (~100 samples, train temp 0.7, eval temp 0.3, G>=2) and capture guardrail evidence.",
+      "stages": [
+        {
+          "kind": "command",
+          "id": "tfgrpo-loop",
+          "title": "node evaluation/harness/scripts/tfgrpo-runner.mjs --epochs 3 --sample 100",
+          "command": "TFGRPO_GROUP_SIZE=2 TFGRPO_EPOCHS=3 TFGRPO_SAMPLE_SIZE=100 TFGRPO_TRAIN_TEMP=0.7 TFGRPO_EVAL_TEMP=0.3 node evaluation/harness/scripts/tfgrpo-runner.mjs"
+        },
+        {
+          "kind": "command",
+          "id": "spec-guard",
+          "title": "node scripts/spec-guard.mjs --dry-run",
+          "command": "node scripts/spec-guard.mjs --dry-run"
+        }
+      ]
     }
   ]
 }
