@@ -6,18 +6,31 @@ import process from 'node:process';
 import { createExecutionPlan } from '../../adapters/index.js';
 import type { AdapterCommandOverrides, AdapterExecutionPlan } from '../../adapters/types.js';
 import { loadScenarioById, loadScenarios } from './scenario-loader.js';
+import { buildRewarders } from './rewarders/index.js';
 import type {
   EvaluationScenario,
   EvaluationScenarioResult,
+  LearningEpochResult,
+  LearningScheduleConfig,
+  LearningScheduleOptions,
+  LearningScheduleResult,
   LoadedScenario,
   PatternAssertion,
   PatternAssertionResult,
+  Rewarder,
+  RewarderId,
+  RewardSummary,
   RunScenarioOptions,
-  ScenarioGoalResult
+  ScenarioGoalResult,
+  TfgrpoSampleMetadata
 } from './types.js';
 
 const STDIO_LIMIT = 10_000; // bytes
 const DEFAULT_TIMEOUT_MS = 30_000;
+const DEFAULT_EPOCHS = 3;
+const DEFAULT_SAMPLE_SIZE = 100;
+const DEFAULT_TRAIN_TEMP = 0.7;
+const DEFAULT_EVAL_TEMP = 0.3;
 
 function buildEnvOverrides(custom: Record<string, string> | undefined): Record<string, string> {
   const overrides = { ...(custom ?? {}) };
@@ -258,6 +271,7 @@ export async function runScenario(
   options: RunScenarioOptions = {}
 ): Promise<EvaluationScenarioResult> {
   const mode = options.mode ?? 'mcp';
+  const rewarderIds = normalizeRewarderIds(options.rewarders);
   const loaded: LoadedScenario =
     typeof scenarioId === 'string' ? await loadScenarioById(scenarioId) : { ...(scenarioId as EvaluationScenario), sourcePath: '<inline>' };
 
@@ -300,14 +314,18 @@ export async function runScenario(
       startedAt: startedAt.toISOString(),
       completedAt: completedAt.toISOString(),
       goals: goalResults,
-      patternAssertions: patternResults
+      patternAssertions: patternResults,
+      ...(options.tfgrpoSample ? { tfgrpo: options.tfgrpoSample } : {})
     };
+
+    if (rewarderIds.length > 0) {
+      const rewarders = instantiateRewarders(rewarderIds);
+      scoreResultsWithRewarders([evaluationResult], rewarders);
+    }
 
     if (options.outputDir) {
       const outputDir = path.resolve(process.cwd(), options.outputDir);
-      await ensureDirectoryExists(outputDir);
-      const target = path.join(outputDir, `${loaded.id}.json`);
-      await fs.writeFile(target, JSON.stringify(evaluationResult, null, 2));
+      await persistScenarioResult(outputDir, evaluationResult);
     }
 
     return evaluationResult;
@@ -319,13 +337,343 @@ export async function runScenario(
 export async function runAllScenarios(options: RunScenarioOptions = {}): Promise<EvaluationScenarioResult[]> {
   const scenarios = await loadScenarios();
   const results: EvaluationScenarioResult[] = [];
+  const rewarderIds = normalizeRewarderIds(options.rewarders);
+  const resolvedOutputDir = options.outputDir ? path.resolve(process.cwd(), options.outputDir) : null;
+  const scenarioOptions = {
+    ...options,
+    rewarders: undefined,
+    outputDir: resolvedOutputDir ?? undefined
+  } satisfies RunScenarioOptions;
 
   for (const scenario of scenarios) {
-    const result = await runScenario(scenario, options);
+    const result = await runScenario(scenario, scenarioOptions);
     results.push(result);
   }
 
+  if (rewarderIds.length > 0) {
+    const rewarders = instantiateRewarders(rewarderIds);
+    scoreResultsWithRewarders(results, rewarders);
+    if (resolvedOutputDir) {
+      for (const result of results) {
+        await persistScenarioResult(resolvedOutputDir, result);
+      }
+    }
+  }
+
   return results;
+}
+
+function normalizeRewarderIds(ids: RewarderId[] | undefined): RewarderId[] {
+  if (!ids || ids.length === 0) {
+    return [];
+  }
+  const normalized: RewarderId[] = [];
+  for (const id of ids) {
+    if ((id === 'gt' || id === 'relative') && !normalized.includes(id)) {
+      normalized.push(id);
+    }
+  }
+  return normalized;
+}
+
+function instantiateRewarders(ids: RewarderId[]): Rewarder[] {
+  if (ids.length === 0) {
+    return [];
+  }
+  return buildRewarders(ids);
+}
+
+function scoreResultsWithRewarders(results: EvaluationScenarioResult[], rewarders: Rewarder[]): void {
+  if (results.length === 0 || rewarders.length === 0) {
+    return;
+  }
+  for (const rewarder of rewarders) {
+    const assignments = rewarder.evaluate(results);
+    for (const result of results) {
+      const score = assignments.get(result);
+      if (!score) {
+        continue;
+      }
+      const summary = ensureRewardSummary(result);
+      summary.scores.push(score);
+      if (score.rewarderId === 'gt') {
+        summary.gtScore = score.score;
+      } else if (score.rewarderId === 'relative') {
+        summary.relativeRank = score.score;
+      }
+    }
+  }
+}
+
+function ensureRewardSummary(result: EvaluationScenarioResult): RewardSummary {
+  if (!result.reward) {
+    result.reward = {
+      gtScore: 0,
+      relativeRank: 0,
+      scores: []
+    } satisfies RewardSummary;
+  }
+  return result.reward;
+}
+
+export function applyRewarders(results: EvaluationScenarioResult[], rewarderIds: RewarderId[]): void {
+  const normalized = normalizeRewarderIds(rewarderIds);
+  if (normalized.length === 0) {
+    return;
+  }
+  const rewarders = instantiateRewarders(normalized);
+  scoreResultsWithRewarders(results, rewarders);
+}
+
+async function persistScenarioResult(outputDir: string, result: EvaluationScenarioResult): Promise<void> {
+  await ensureDirectoryExists(outputDir);
+  const target = path.join(outputDir, `${result.scenario.id}.json`);
+  await fs.writeFile(target, JSON.stringify(result, null, 2));
+}
+
+export async function runLearningSchedule(options: LearningScheduleOptions = {}): Promise<LearningScheduleResult> {
+  const config = resolveLearningScheduleConfig(options);
+  const rewarders = instantiateRewarders(config.rewarders);
+  const allScenarios = await loadScenarios();
+  const pool = selectScenarioPool(allScenarios, config.scenarioIds);
+  if (pool.length === 0) {
+    throw new Error('No evaluation scenarios available for the TF-GRPO learning schedule.');
+  }
+
+  const epochs: LearningEpochResult[] = [];
+  const rng = createDeterministicRng(config.rngSeed);
+  const scheduleOutputDir = options.outputDir ? path.resolve(process.cwd(), options.outputDir) : null;
+
+  for (let epoch = 1; epoch <= config.epochs; epoch += 1) {
+    const temperatureMode = epoch === config.epochs ? 'eval' : 'train';
+    const temperature = temperatureMode === 'train' ? config.temperatureTrain : config.temperatureEval;
+    const epochResults: EvaluationScenarioResult[] = [];
+
+    for (let sampleIndex = 0; sampleIndex < config.sampleSize; sampleIndex += 1) {
+      const scenario = pickScenario(pool, rng);
+      const tfgrpoSample: TfgrpoSampleMetadata = {
+        epoch,
+        sampleIndex,
+        sampleSize: config.sampleSize,
+        temperatureMode,
+        temperature,
+        scenarioId: scenario.id
+      };
+
+      const envOverrides = buildSampleEnv(options.env, {
+        scenarioId: scenario.id,
+        epoch,
+        sampleIndex,
+        config,
+        temperatureMode,
+        temperature
+      });
+
+      const sampleOutputDir = scheduleOutputDir
+        ? path.join(
+            scheduleOutputDir,
+            `epoch-${String(epoch).padStart(2, '0')}`,
+            `sample-${String(sampleIndex).padStart(3, '0')}`
+          )
+        : undefined;
+
+      const result = await runScenario(scenario, {
+        mode: config.mode,
+        env: envOverrides,
+        defaultTimeoutMs: options.defaultTimeoutMs,
+        tfgrpoSample,
+        outputDir: sampleOutputDir
+      });
+      epochResults.push(result);
+    }
+
+    if (rewarders.length > 0) {
+      scoreResultsWithRewarders(epochResults, rewarders);
+    }
+
+    const epochSummary: LearningEpochResult = {
+      epoch,
+      temperature,
+      temperatureMode,
+      samples: epochResults
+    };
+
+    if (scheduleOutputDir) {
+      await ensureDirectoryExists(scheduleOutputDir);
+      const epochFile = path.join(scheduleOutputDir, `epoch-${String(epoch).padStart(2, '0')}.json`);
+      await fs.writeFile(
+        epochFile,
+        JSON.stringify(
+          {
+            epoch: epochSummary.epoch,
+            temperature: epochSummary.temperature,
+            temperatureMode: epochSummary.temperatureMode,
+            sampleCount: epochSummary.samples.length,
+            rewarders: config.rewarders,
+            samples: epochSummary.samples.map((sample) => ({
+              scenarioId: sample.scenario.id,
+              reward: sample.reward ?? null,
+              tfgrpo: sample.tfgrpo ?? null,
+              goals: sample.goals.map((goal) => ({
+                goal: goal.goal,
+                status: goal.status,
+                durationMs: goal.durationMs
+              }))
+            }))
+          },
+          null,
+          2
+        )
+      );
+    }
+
+    epochs.push(epochSummary);
+  }
+
+  return {
+    config,
+    epochs
+  } satisfies LearningScheduleResult;
+}
+
+function resolveLearningScheduleConfig(options: LearningScheduleOptions): LearningScheduleConfig {
+  const env = process.env;
+  const epochs = clampToPositiveInteger(options.epochs ?? parsePositiveInteger(env.TFGRPO_EPOCHS) ?? DEFAULT_EPOCHS);
+  const sampleSize = clampToPositiveInteger(
+    options.sampleSize ?? parsePositiveInteger(env.TFGRPO_SAMPLE_SIZE) ?? DEFAULT_SAMPLE_SIZE
+  );
+  const temperatureTrain = options.temperatureTrain ?? parseFloatSafe(env.TFGRPO_TRAIN_TEMP) ?? DEFAULT_TRAIN_TEMP;
+  const temperatureEval = options.temperatureEval ?? parseFloatSafe(env.TFGRPO_EVAL_TEMP) ?? DEFAULT_EVAL_TEMP;
+  const rewarders = normalizeRewarderIds(
+    options.rewarders ?? parseRewarderList(env.TFGRPO_REWARDERS) ?? []
+  );
+  const scenarioIds = options.scenarioIds ?? parseStringList(env.TFGRPO_SCENARIOS);
+  const rngSeed = sanitizeRngSeed(options.rngSeed ?? parseInt(env.TFGRPO_SEED ?? '', 10));
+  const mode = options.mode ?? 'mcp';
+  return {
+    epochs,
+    sampleSize,
+    rewarders,
+    temperatureTrain,
+    temperatureEval,
+    mode,
+    scenarioIds: scenarioIds?.length ? scenarioIds : null,
+    rngSeed
+  } satisfies LearningScheduleConfig;
+}
+
+function parseRewarderList(value: string | undefined): RewarderId[] | null {
+  if (!value) {
+    return null;
+  }
+  const tokens = value.split(',').map((entry) => entry.trim()).filter(Boolean);
+  const ids: RewarderId[] = [];
+  for (const token of tokens) {
+    if (token === 'gt' || token === 'relative') {
+      ids.push(token);
+    }
+  }
+  return ids.length ? ids : null;
+}
+
+function parseStringList(value: string | undefined): string[] | null {
+  if (!value) {
+    return null;
+  }
+  const tokens = value.split(',').map((entry) => entry.trim()).filter(Boolean);
+  return tokens.length ? tokens : null;
+}
+
+function parsePositiveInteger(value: string | undefined): number | null {
+  if (!value) {
+    return null;
+  }
+  const parsed = Number.parseInt(value, 10);
+  if (Number.isNaN(parsed) || parsed <= 0) {
+    return null;
+  }
+  return parsed;
+}
+
+function clampToPositiveInteger(value: number): number {
+  if (!Number.isFinite(value) || value <= 0) {
+    return 1;
+  }
+  return Math.floor(value);
+}
+
+function parseFloatSafe(value: string | undefined): number | null {
+  if (!value) {
+    return null;
+  }
+  const parsed = Number.parseFloat(value);
+  if (Number.isNaN(parsed)) {
+    return null;
+  }
+  return parsed;
+}
+
+function sanitizeRngSeed(value: number | undefined): number {
+  if (!Number.isFinite(value) || value === undefined) {
+    return Date.now();
+  }
+  return Math.floor(value);
+}
+
+function selectScenarioPool(scenarios: LoadedScenario[], scenarioIds: string[] | null): LoadedScenario[] {
+  if (!scenarioIds || scenarioIds.length === 0) {
+    return scenarios;
+  }
+  const pool = scenarios.filter((scenario) => scenarioIds.includes(scenario.id));
+  if (pool.length !== scenarioIds.length) {
+    const missing = scenarioIds.filter((id) => !pool.some((scenario) => scenario.id === id));
+    throw new Error(`Unknown evaluation scenarios: ${missing.join(', ')}`);
+  }
+  return pool;
+}
+
+function createDeterministicRng(seed: number): () => number {
+  let state = seed >>> 0;
+  return () => {
+    state = (state * 1664525 + 1013904223) >>> 0;
+    return state / 0xffffffff;
+  };
+}
+
+function pickScenario(pool: LoadedScenario[], rng: () => number): LoadedScenario {
+  if (pool.length === 1) {
+    return pool[0]!;
+  }
+  const index = Math.floor(rng() * pool.length) % pool.length;
+  return pool[index]!
+}
+
+function buildSampleEnv(
+  base: Record<string, string> | undefined,
+  params: {
+    scenarioId: string;
+    epoch: number;
+    sampleIndex: number;
+    config: LearningScheduleConfig;
+    temperatureMode: 'train' | 'eval';
+    temperature: number;
+  }
+): Record<string, string> {
+  const overrides: Record<string, string> = {
+    TFGRPO_EPOCH: String(params.epoch),
+    TFGRPO_EPOCHS: String(params.config.epochs),
+    TFGRPO_SAMPLE_INDEX: String(params.sampleIndex),
+    TFGRPO_SAMPLE_SIZE: String(params.config.sampleSize),
+    TFGRPO_TEMPERATURE_MODE: params.temperatureMode,
+    TFGRPO_TEMPERATURE: params.temperature.toString(),
+    TFGRPO_TRAIN_TEMP: params.config.temperatureTrain.toString(),
+    TFGRPO_EVAL_TEMP: params.config.temperatureEval.toString(),
+    TFGRPO_SCENARIO_ID: params.scenarioId
+  };
+  if (params.config.rewarders.length > 0) {
+    overrides.TFGRPO_REWARDERS = params.config.rewarders.join(',');
+  }
+  return { ...(base ?? {}), ...overrides };
 }
 
 export { loadScenarios } from './scenario-loader.js';

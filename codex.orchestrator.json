@@ -45,8 +45,8 @@
         {
           "kind": "command",
           "id": "tfgrpo-loop",
-          "title": "node evaluation/harness/scripts/tfgrpo-runner.mjs --epochs 3 --sample 100",
-          "command": "TFGRPO_GROUP_SIZE=2 TFGRPO_EPOCHS=3 TFGRPO_SAMPLE_SIZE=100 TFGRPO_TRAIN_TEMP=0.7 TFGRPO_EVAL_TEMP=0.3 node evaluation/harness/scripts/tfgrpo-runner.mjs"
+          "title": "tfgrpo learning schedule (3 epochs, 100 samples)",
+          "command": "TFGRPO_GROUP_SIZE=2 TFGRPO_REWARDERS=gt,relative TFGRPO_EPOCHS=3 TFGRPO_SAMPLE_SIZE=100 TFGRPO_TRAIN_TEMP=0.7 TFGRPO_EVAL_TEMP=0.3 node --loader ts-node/esm evaluation/harness/scripts/tfgrpo-runner.ts"
         },
         {
           "kind": "command",

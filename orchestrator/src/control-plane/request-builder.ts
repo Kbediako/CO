@@ -17,6 +17,10 @@ const DEFAULT_BACKPRESSURE_MS = 250;
 const DEFAULT_POLICY_VERSION = '2025-10-01';
 const DEFAULT_METRIC_INTERVAL_SECONDS = 30;
 const DEFAULT_REQUIRED_DIMENSIONS = ['instanceId', 'phase', 'status'];
+const DEFAULT_TFGRPO_EPOCHS = 3;
+const DEFAULT_TFGRPO_SAMPLE_SIZE = 100;
+const DEFAULT_TFGRPO_TRAIN_TEMP = 0.7;
+const DEFAULT_TFGRPO_EVAL_TEMP = 0.3;
 
 export interface BuildRunRequestOptions {
   runId: string;
@@ -74,6 +78,18 @@ export function buildRunRequestV2(options: BuildRunRequestOptions): RunRequestV2
     policyVersion: DEFAULT_POLICY_VERSION
   };
 
+  const metadata: Record<string, unknown> = {
+    artifactRoot: manifest.artifact_root,
+    runsRoot: env.runsRoot,
+    outRoot: env.outRoot,
+    pipelineId: pipeline.id,
+    taskSlug: task.metadata?.slug ?? null
+  };
+  const tfgrpoMetadata = resolveTfgrpoMetadata();
+  if (tfgrpoMetadata) {
+    metadata.tfgrpo = tfgrpoMetadata;
+  }
+
   return {
     schema: CONTROL_PLANE_RUN_REQUEST_SCHEMA,
     version: CONTROL_PLANE_RUN_REQUEST_VERSION,
@@ -123,12 +139,46 @@ export function buildRunRequestV2(options: BuildRunRequestOptions): RunRequestV2
       channel: 'cli',
       name: 'Codex CLI'
     },
-    metadata: {
-      artifactRoot: manifest.artifact_root,
-      runsRoot: env.runsRoot,
-      outRoot: env.outRoot,
-      pipelineId: pipeline.id,
-      taskSlug: task.metadata?.slug ?? null
+    metadata
+  };
+}
+
+function resolveTfgrpoMetadata(): Record<string, unknown> | null {
+  const sampleSize = parsePositiveInteger(process.env.TFGRPO_SAMPLE_SIZE);
+  const epochs = parsePositiveInteger(process.env.TFGRPO_EPOCHS);
+  const trainTemp = parseFloatSafe(process.env.TFGRPO_TRAIN_TEMP);
+  const evalTemp = parseFloatSafe(process.env.TFGRPO_EVAL_TEMP);
+  if (sampleSize === null && epochs === null && trainTemp === null && evalTemp === null) {
+    return null;
+  }
+  return {
+    sampleSize: sampleSize ?? DEFAULT_TFGRPO_SAMPLE_SIZE,
+    epochs: epochs ?? DEFAULT_TFGRPO_EPOCHS,
+    temperature: {
+      train: trainTemp ?? DEFAULT_TFGRPO_TRAIN_TEMP,
+      eval: evalTemp ?? DEFAULT_TFGRPO_EVAL_TEMP
     }
   };
+}
+
+function parsePositiveInteger(value: string | undefined): number | null {
+  if (!value) {
+    return null;
+  }
+  const parsed = Number.parseInt(value, 10);
+  if (Number.isNaN(parsed) || parsed <= 0) {
+    return null;
+  }
+  return parsed;
+}
+
+function parseFloatSafe(value: string | undefined): number | null {
+  if (!value) {
+    return null;
+  }
+  const parsed = Number.parseFloat(value);
+  if (Number.isNaN(parsed)) {
+    return null;
+  }
+  return parsed;
 }

@@ -152,4 +152,78 @@ describe('ControlPlaneValidator', () => {
 
     await expect(validator.validate(invalidRequest)).rejects.toBeInstanceOf(ControlPlaneValidationError);
   });
+
+  it('embeds TF-GRPO temperature metadata into run requests', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'control-plane-tfgrpo-'));
+    const env: EnvironmentPaths = {
+      repoRoot,
+      runsRoot: join(repoRoot, '.runs'),
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'autonomy-upgrade'
+    };
+
+    const pipeline: PipelineDefinition = {
+      id: 'pipeline-tfgrpo',
+      title: 'Pipeline TF-GRPO',
+      stages: [{ kind: 'command', id: 'loop', title: 'Loop', command: 'echo loop' }],
+      tags: ['learning']
+    };
+
+    const manifest = createManifest('run-tfgrpo', pipeline);
+    const task: TaskContext = {
+      id: 'autonomy-upgrade',
+      title: 'Autonomy Upgrade',
+      description: 'TFGRPO test'
+    };
+
+    const originalEnv = {
+      sampleSize: process.env.TFGRPO_SAMPLE_SIZE,
+      epochs: process.env.TFGRPO_EPOCHS,
+      train: process.env.TFGRPO_TRAIN_TEMP,
+      eval: process.env.TFGRPO_EVAL_TEMP
+    };
+    process.env.TFGRPO_SAMPLE_SIZE = '150';
+    process.env.TFGRPO_EPOCHS = '5';
+    process.env.TFGRPO_TRAIN_TEMP = '0.65';
+    process.env.TFGRPO_EVAL_TEMP = '0.25';
+
+    const request = buildRunRequestV2({
+      runId: manifest.run_id,
+      task,
+      pipeline,
+      manifest,
+      env,
+      requestedBy: { actorId: 'cli', channel: 'cli' }
+    });
+
+    expect(request.metadata?.tfgrpo).toEqual({
+      sampleSize: 150,
+      epochs: 5,
+      temperature: {
+        train: 0.65,
+        eval: 0.25
+      }
+    });
+
+    if (originalEnv.sampleSize) {
+      process.env.TFGRPO_SAMPLE_SIZE = originalEnv.sampleSize;
+    } else {
+      delete process.env.TFGRPO_SAMPLE_SIZE;
+    }
+    if (originalEnv.epochs) {
+      process.env.TFGRPO_EPOCHS = originalEnv.epochs;
+    } else {
+      delete process.env.TFGRPO_EPOCHS;
+    }
+    if (originalEnv.train) {
+      process.env.TFGRPO_TRAIN_TEMP = originalEnv.train;
+    } else {
+      delete process.env.TFGRPO_TRAIN_TEMP;
+    }
+    if (originalEnv.eval) {
+      process.env.TFGRPO_EVAL_TEMP = originalEnv.eval;
+    } else {
+      delete process.env.TFGRPO_EVAL_TEMP;
+    }
+  });
 });

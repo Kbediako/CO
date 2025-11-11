@@ -2,7 +2,9 @@ import { promises as fs } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
-import { loadScenarios, runAllScenarios, runScenario } from '../harness/index.js';
+import { applyRewarders, loadScenarios, runAllScenarios, runLearningSchedule, runScenario } from '../harness/index.js';
+import type { EvaluationScenarioResult, ScenarioGoalResult } from '../harness/types.js';
+import type { AdapterGoal } from '../../adapters/types.js';
 
 const tempDirs: string[] = [];
 
@@ -41,4 +43,108 @@ describe('evaluation harness', () => {
       expect(exists).toBe(true);
     }
   }, 60000);
+
+  it('derives exact-match GT scores via rewarders', () => {
+    const passing = createScenarioResult('reward-pass', ['passed', 'passed'], [10, 12]);
+    const failing = createScenarioResult('reward-fail', ['passed', 'failed'], [5, 8]);
+
+    applyRewarders([passing, failing], ['gt']);
+
+    expect(passing.reward?.gtScore).toBe(1);
+    expect(failing.reward?.gtScore).toBeCloseTo(0.5, 3);
+    expect(failing.reward?.scores[0]?.evidence).toContain('passed 1/2');
+  });
+
+  it('computes relative ranking rewarder scores across a cohort', () => {
+    const fast = createScenarioResult('reward-fast', ['passed', 'passed'], [5, 6]);
+    fast.tfgrpo = {
+      epoch: 1,
+      sampleIndex: 0,
+      sampleSize: 2,
+      temperatureMode: 'train',
+      temperature: 0.7,
+      scenarioId: fast.scenario.id
+    };
+
+    const slow = createScenarioResult('reward-slow', ['passed', 'failed'], [12, 30]);
+    slow.tfgrpo = {
+      epoch: 1,
+      sampleIndex: 1,
+      sampleSize: 2,
+      temperatureMode: 'train',
+      temperature: 0.7,
+      scenarioId: slow.scenario.id
+    };
+
+    applyRewarders([fast, slow], ['gt', 'relative']);
+
+    expect(fast.reward?.relativeRank).toBe(1);
+    expect(slow.reward?.relativeRank).toBe(0);
+    expect(fast.reward?.scores.find((score) => score.rewarderId === 'relative')?.evidence).toContain('rank 1/2');
+  });
+
+  it('executes the TF-GRPO learning schedule loop with temperature metadata', async () => {
+    const schedule = await runLearningSchedule({
+      epochs: 3,
+      sampleSize: 1,
+      rewarders: ['gt'],
+      scenarioIds: ['typescript-smoke'],
+      rngSeed: 42
+    });
+
+    expect(schedule.config.epochs).toBe(3);
+    expect(schedule.config.sampleSize).toBe(1);
+    expect(schedule.epochs).toHaveLength(3);
+    expect(schedule.epochs[2]?.temperatureMode).toBe('eval');
+
+    for (const epoch of schedule.epochs) {
+      expect(epoch.samples).toHaveLength(1);
+      const sample = epoch.samples[0]!;
+      expect(sample.tfgrpo?.epoch).toBe(epoch.epoch);
+      expect(sample.tfgrpo?.temperatureMode).toBe(epoch.temperatureMode);
+      expect(sample.reward?.gtScore).toBeGreaterThanOrEqual(0);
+    }
+  }, 90000);
 });
+
+function createScenarioResult(
+  id: string,
+  statuses: Array<'passed' | 'failed'>,
+  durations: number[]
+): EvaluationScenarioResult {
+  const now = new Date().toISOString();
+  const goals: ScenarioGoalResult[] = statuses.map((status, index) => {
+    const goalId = GOAL_SEQUENCE[index % GOAL_SEQUENCE.length];
+    return {
+      goal: goalId,
+      command: {
+        id: goalId,
+        title: `Goal ${index}`,
+        command: 'echo',
+        args: [] as string[],
+        description: 'stub',
+        env: {} as Record<string, string>,
+        cwd: '/tmp',
+        requiresCleanFixture: false,
+        supportsParallel: true
+      },
+      status,
+      exitCode: status === 'passed' ? 0 : 1,
+      stdout: '',
+      stderr: '',
+      durationMs: durations[index] ?? 0
+    } satisfies ScenarioGoalResult;
+  });
+
+  return {
+    scenario: { id, title: id, adapterId: 'test-adapter' },
+    mode: 'mcp',
+    fixturePath: `/tmp/${id}`,
+    startedAt: now,
+    completedAt: now,
+    goals,
+    patternAssertions: []
+  };
+}
+
+const GOAL_SEQUENCE: AdapterGoal[] = ['build', 'test', 'lint'];

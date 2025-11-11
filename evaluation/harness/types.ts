@@ -7,6 +7,31 @@ import type {
 
 export type EvaluationMode = 'mcp' | 'cloud';
 
+export type RewarderId = 'gt' | 'relative';
+
+export interface RewardScore {
+  rewarderId: RewarderId;
+  score: number;
+  evidence?: string;
+}
+
+export interface RewardSummary {
+  gtScore: number;
+  relativeRank: number;
+  scores: RewardScore[];
+}
+
+export type TemperatureMode = 'train' | 'eval';
+
+export interface TfgrpoSampleMetadata {
+  epoch: number;
+  sampleIndex: number;
+  sampleSize: number;
+  temperatureMode: TemperatureMode;
+  temperature: number;
+  scenarioId: string;
+}
+
 export interface ScenarioFixtureConfig {
   path: string;
   copyToTemp?: boolean;
@@ -66,6 +91,8 @@ export interface EvaluationScenarioResult {
   completedAt: string;
   goals: ScenarioGoalResult[];
   patternAssertions: PatternAssertionResult[];
+  reward?: RewardSummary;
+  tfgrpo?: TfgrpoSampleMetadata;
 }
 
 export interface RunScenarioOptions {
@@ -73,6 +100,8 @@ export interface RunScenarioOptions {
   outputDir?: string;
   env?: Record<string, string>;
   defaultTimeoutMs?: number;
+  rewarders?: RewarderId[];
+  tfgrpoSample?: TfgrpoSampleMetadata;
 }
 
 export type LoadedScenario = EvaluationScenario & {
@@ -80,3 +109,45 @@ export type LoadedScenario = EvaluationScenario & {
 };
 
 export type { AdapterExecutionPlan };
+
+export interface Rewarder {
+  id: RewarderId;
+  evaluate(cohort: EvaluationScenarioResult[]): Map<EvaluationScenarioResult, RewardScore>;
+}
+
+export interface LearningScheduleOptions {
+  epochs?: number;
+  sampleSize?: number;
+  rewarders?: RewarderId[];
+  mode?: EvaluationMode;
+  scenarioIds?: string[];
+  rngSeed?: number;
+  temperatureTrain?: number;
+  temperatureEval?: number;
+  env?: Record<string, string>;
+  defaultTimeoutMs?: number;
+  outputDir?: string;
+}
+
+export interface LearningScheduleConfig {
+  epochs: number;
+  sampleSize: number;
+  rewarders: RewarderId[];
+  temperatureTrain: number;
+  temperatureEval: number;
+  mode: EvaluationMode;
+  scenarioIds: string[] | null;
+  rngSeed: number;
+}
+
+export interface LearningEpochResult {
+  epoch: number;
+  temperature: number;
+  temperatureMode: TemperatureMode;
+  samples: EvaluationScenarioResult[];
+}
+
+export interface LearningScheduleResult {
+  config: LearningScheduleConfig;
+  epochs: LearningEpochResult[];
+}
