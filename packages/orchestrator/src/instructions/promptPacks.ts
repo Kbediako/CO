@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import type { Dirent } from 'node:fs';
 import { readFile, readdir, stat } from 'node:fs/promises';
 import { join, relative } from 'node:path';
 
@@ -51,7 +52,7 @@ export async function loadPromptPacks(repoRoot: string): Promise<PromptPack[]> {
 
 async function discoverPromptPackManifests(repoRoot: string): Promise<string[]> {
   const baseDir = join(repoRoot, ...PROMPT_PACK_DIR);
-  let entries: Awaited<ReturnType<typeof readdir>>;
+  let entries: Dirent[];
   try {
     entries = await readdir(baseDir, { withFileTypes: true });
   } catch (error: unknown) {

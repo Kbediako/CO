@@ -70,7 +70,15 @@ export async function appendMetricsEntry(
     })),
     privacy_mode: manifest.privacy?.mode ?? null,
     privacy_events: manifest.privacy?.decisions ?? [],
-    handle_count: manifest.handles?.length ?? 0
+    handle_count: manifest.handles?.length ?? 0,
+    tfgrpo_epoch: manifest.tfgrpo?.epoch ?? null,
+    tfgrpo_group_id: manifest.tfgrpo?.group_id ?? null,
+    tfgrpo_group_size: manifest.tfgrpo?.group_size ?? null,
+    tool_calls: manifest.tfgrpo?.tool_metrics?.tool_calls ?? 0,
+    token_total: manifest.tfgrpo?.tool_metrics?.token_total ?? 0,
+    cost_usd: manifest.tfgrpo?.tool_metrics?.cost_usd ?? 0,
+    latency_ms: manifest.tfgrpo?.tool_metrics?.latency_ms ?? 0,
+    tool_stats: manifest.tfgrpo?.tool_metrics?.per_tool ?? []
   };
 
   await mkdir(metricsRoot, { recursive: true });

@@ -1,8 +1,9 @@
-import { mkdir, readFile, rename, writeFile, rm, open } from 'node:fs/promises';
+import { mkdir, readFile, rm, open } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import type { RunSummary } from '../types.js';
 import { sanitizeTaskId } from './sanitizeTaskId.js';
+import { writeAtomicFile } from './writeAtomicFile.js';
 
 interface LockRetryOptions {
   maxAttempts: number;
@@ -66,7 +67,7 @@ export class TaskStateStore {
       const snapshotPath = join(taskOutDir, 'state.json');
       const snapshot = await this.loadSnapshot(snapshotPath, safeTaskId);
       const updated = this.mergeSnapshot(snapshot, { ...summary, taskId: safeTaskId });
-      await this.writeAtomic(snapshotPath, JSON.stringify(updated, null, 2));
+      await writeAtomicFile(snapshotPath, JSON.stringify(updated, null, 2));
     } finally {
       await this.releaseLock(lockPath);
     }
@@ -194,11 +195,5 @@ export class TaskStateStore {
       }
     }
     return result;
-  }
-
-  private async writeAtomic(destination: string, contents: string): Promise<void> {
-    const tempPath = `${destination}.tmp-${Date.now()}`;
-    await writeFile(tempPath, contents, 'utf-8');
-    await rename(tempPath, destination);
   }
 }

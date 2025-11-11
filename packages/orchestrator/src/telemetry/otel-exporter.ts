@@ -1,4 +1,4 @@
-import type { JsonlEvent, RunSummaryEvent } from '../../../shared/events/types.js';
+import type { JsonlEvent, RunSummaryEvent, RunMetricSummary } from '../../../shared/events/types.js';
 
 export interface OtelExporterOptions {
   endpoint?: string | null;
@@ -107,7 +107,9 @@ class OtelTelemetrySink implements ExecTelemetrySink {
     }
     await this.flush();
     try {
-      await this.sendPayload({ kind: 'summary', summary });
+      const dimensions = buildSummaryDimensions(summary.payload.metrics);
+      const payload = dimensions ? { kind: 'summary', summary, dimensions } : { kind: 'summary', summary };
+      await this.sendPayload(payload);
     } catch (error) {
       this.handleFailure(error);
     }
@@ -153,6 +155,27 @@ class OtelTelemetrySink implements ExecTelemetrySink {
       this.logger.warn(`Telemetry disabled after ${this.consecutiveFailures} consecutive failures: ${String(error)}`);
     }
   }
+}
+
+function buildSummaryDimensions(metrics: RunMetricSummary | undefined): Record<string, unknown> | undefined {
+  if (!metrics) {
+    return undefined;
+  }
+  const dimensions: Record<string, unknown> = {
+    tool_cost_usd: metrics.costUsd,
+    latency_ms: metrics.latencyMs
+  };
+  if (metrics.tfgrpo) {
+    dimensions.tfgrpo_epoch = metrics.tfgrpo.epoch;
+    dimensions.tfgrpo_group_size = metrics.tfgrpo.groupSize;
+    dimensions.tfgrpo_group_id = metrics.tfgrpo.groupId;
+  }
+  if (metrics.perTool.length > 0) {
+    dimensions.tool_costs = Object.fromEntries(
+      metrics.perTool.map((entry) => [entry.tool, entry.costUsd])
+    );
+  }
+  return dimensions;
 }
 
 async function wait(ms: number): Promise<void> {

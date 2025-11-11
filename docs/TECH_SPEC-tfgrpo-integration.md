@@ -32,6 +32,7 @@
   }
   ```
 - **Behavior:** `recordBatch` reuses `TaskStateStore.writeAtomic` to append to `out/<task>/experiences.jsonl`, rejecting unstamped or >32-word summaries. `fetchTop` filters by domain/prompt-pack tags and enforces `experience_max_words=32`. `verifyStamp` checks the stamp header added by prompt packs before injection.
+- **Status (2025-11-11):** `orchestrator/src/persistence/ExperienceStore.ts` now implements the JSONL persistence layer + lock handling, with `orchestrator/tests/ExperienceStore.test.ts` and `orchestrator/tests/PromptExperienceInjection.test.ts` covering record merges and injection snippets. Prompt pack manifests embed formatted experience snippets sourced from `.runs/0506-tfgrpo-integration/cli/2025-11-11T05-12-24-697Z-15088fb0/manifest.json`.
 
 ### Prompt Packs & Loader Routing
 - **Location:** `packages/orchestrator/src/instructions/promptPacks.ts` (new) plus updates to `packages/orchestrator/src/instructions/loader.ts:16-40`.
@@ -58,13 +59,14 @@
   ```ts
   export interface TrajectoryFrame {
     event: ExecEvent;
+    tool: string;
     tokens: number;
     costUsd: number;
     latencyMs: number;
   }
 
-  export function summarizeTrajectory(frames: TrajectoryFrame[]): ExperienceRecord;
-  export function optimizeExperience(record: ExperienceRecord, policy: TfgrpoPolicyConfig): ExperienceRecord;
+  export function summarizeTrajectory(frames: TrajectoryFrame[]): ExperienceInput;
+  export function optimizeExperience(record: ExperienceInput, policy: TfgrpoPolicyConfig): ExperienceInput;
   ```
 - **Details:** The summarizer enforces ≤32-word summaries by tokenizing `stdout` truncations. Optimizer applies TF-GRPO heuristics (relative ranks, reward thresholds) before writing to the store. Summaries reference group IDs from scheduler assignments.
 
@@ -92,6 +94,7 @@
   - Update `orchestrator/src/cli/metrics/metricsRecorder.ts:45-88` to append `epoch` and aggregated per-tool stats, writing to `metrics.jsonl` grouped by epoch.
   - Enhance `orchestrator/src/cli/metrics/metricsAggregator.ts:74-157` to compute per-epoch averages and write `per-epoch.json`.
   - Expand `packages/orchestrator/src/telemetry/otel-exporter.ts:1-156` payloads with `tfgrpo_epoch`, `group_size`, `tool_cost_usd`, and `latency_ms` dimensions prior to OTEL export.
+- **Status (2025-11-11):** The CLI exec command now emits structured metrics + TF-GRPO context into manifests, metrics JSONL, and OTEL payloads (validated via `.runs/0506-tfgrpo-integration/cli/2025-11-11T05-12-24-697Z-15088fb0/manifest.json` and the updated Vitest suites).
 
 ### Learning Schedule Hooks
 - **Location:** `evaluation/harness/index.ts:276-319` and `evaluation/harness/types.ts:15-77`.

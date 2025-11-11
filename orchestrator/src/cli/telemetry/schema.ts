@@ -181,6 +181,68 @@ export const CLI_MANIFEST_SCHEMA: JsonSchema = {
           sources: {
             type: 'array',
             items: { type: 'string', minLength: 1 }
+          },
+          experiences: {
+            type: ['array', 'null'],
+            items: { type: 'string', minLength: 1 }
+          }
+        }
+      }
+    },
+    tfgrpo: {
+      type: ['object', 'null'],
+      additionalProperties: false,
+      properties: {
+        epoch: { type: ['integer', 'null'] },
+        group_id: { type: ['string', 'null'] },
+        group_size: { type: ['integer', 'null'], minimum: 0 },
+        tool_metrics: {
+          type: ['object', 'null'],
+          additionalProperties: false,
+          required: ['tool_calls', 'token_total', 'cost_usd', 'latency_ms', 'per_tool'],
+          properties: {
+            tool_calls: { type: 'integer', minimum: 0 },
+            token_total: { type: 'number', minimum: 0 },
+            cost_usd: { type: 'number', minimum: 0 },
+            latency_ms: { type: 'number', minimum: 0 },
+            per_tool: {
+              type: 'array',
+              items: {
+                type: 'object',
+                required: [
+                  'tool',
+                  'tokens',
+                  'cost_usd',
+                  'latency_ms',
+                  'attempts',
+                  'status',
+                  'sandbox_state'
+                ],
+                additionalProperties: false,
+                properties: {
+                  tool: { type: 'string', minLength: 1 },
+                  tokens: { type: 'number', minimum: 0 },
+                  cost_usd: { type: 'number', minimum: 0 },
+                  latency_ms: { type: 'number', minimum: 0 },
+                  attempts: { type: 'integer', minimum: 1 },
+                  status: { type: 'string', enum: ['succeeded', 'failed'] },
+                  sandbox_state: { type: 'string', enum: ['sandboxed', 'escalated', 'failed'] }
+                }
+              }
+            }
+          }
+        },
+        experiences: {
+          type: ['object', 'null'],
+          additionalProperties: false,
+          required: ['ids', 'written', 'manifest_path'],
+          properties: {
+            ids: {
+              type: 'array',
+              items: { type: 'string', minLength: 1 }
+            },
+            written: { type: 'integer', minimum: 0 },
+            manifest_path: { type: ['string', 'null'] }
           }
         }
       }
@@ -290,6 +352,7 @@ export function validateCliManifest(candidate: unknown): ValidationResult<CliMan
     errors.push('instructions_sources must contain only strings');
   }
   validatePromptPacks(candidate.prompt_packs, errors);
+  validateTfgrpo(candidate.tfgrpo, errors);
 
   validateBoolean(candidate, 'metrics_recorded', errors);
 
@@ -433,7 +496,94 @@ function validatePromptPacks(candidate: unknown, errors: string[]): void {
     } else if (!sources.every((source) => typeof source === 'string')) {
       errors.push(`prompt_packs[${index}].sources must contain strings only`);
     }
+    if (pack.experiences !== undefined && pack.experiences !== null) {
+      if (!Array.isArray(pack.experiences)) {
+        errors.push(`prompt_packs[${index}].experiences must be an array when provided`);
+      } else if (!pack.experiences.every((entry: unknown) => typeof entry === 'string')) {
+        errors.push(`prompt_packs[${index}].experiences must contain strings`);
+      }
+    }
   });
+}
+
+function validateTfgrpo(candidate: unknown, errors: string[]): void {
+  if (candidate === undefined || candidate === null) {
+    return;
+  }
+  if (!isPlainObject(candidate)) {
+    errors.push('tfgrpo must be an object when provided');
+    return;
+  }
+  const section = candidate as Record<string, unknown>;
+  validateOptionalNumber(section, 'epoch', errors, { integer: true, path: 'tfgrpo.epoch' });
+  validateOptionalString(section, 'group_id', errors, 'tfgrpo');
+  validateOptionalNumber(section, 'group_size', errors, { integer: true, path: 'tfgrpo.group_size' });
+  if ('tool_metrics' in section) {
+    validateTfgrpoToolMetrics(section.tool_metrics, errors);
+  }
+  if ('experiences' in section) {
+    validateTfgrpoExperiences(section.experiences, errors);
+  }
+}
+
+function validateTfgrpoToolMetrics(candidate: unknown, errors: string[]): void {
+  if (candidate === undefined || candidate === null) {
+    return;
+  }
+  if (!isPlainObject(candidate)) {
+    errors.push('tfgrpo.tool_metrics must be an object when provided');
+    return;
+  }
+  const metrics = candidate as Record<string, unknown>;
+  validateNumber(metrics, 'tool_calls', errors, { integer: true, minimum: 0, path: 'tfgrpo.tool_metrics.tool_calls' });
+  validateNumber(metrics, 'token_total', errors, { minimum: 0, path: 'tfgrpo.tool_metrics.token_total' });
+  validateNumber(metrics, 'cost_usd', errors, { minimum: 0, path: 'tfgrpo.tool_metrics.cost_usd' });
+  validateNumber(metrics, 'latency_ms', errors, { minimum: 0, path: 'tfgrpo.tool_metrics.latency_ms' });
+
+  const perTool = metrics.per_tool;
+  if (!Array.isArray(perTool)) {
+    errors.push('tfgrpo.tool_metrics.per_tool must be an array');
+    return;
+  }
+  perTool.forEach((entry, index) => {
+    if (!isPlainObject(entry)) {
+      errors.push(`tfgrpo.tool_metrics.per_tool[${index}] must be an object`);
+      return;
+    }
+    const record = entry as Record<string, unknown>;
+    validateString(record, 'tool', errors, `tfgrpo.tool_metrics.per_tool[${index}]`);
+    validateNumber(record, 'tokens', errors, { minimum: 0, path: `tfgrpo.tool_metrics.per_tool[${index}].tokens` });
+    validateNumber(record, 'cost_usd', errors, { minimum: 0, path: `tfgrpo.tool_metrics.per_tool[${index}].cost_usd` });
+    validateNumber(record, 'latency_ms', errors, { minimum: 0, path: `tfgrpo.tool_metrics.per_tool[${index}].latency_ms` });
+    validateNumber(record, 'attempts', errors, { integer: true, minimum: 1, path: `tfgrpo.tool_metrics.per_tool[${index}].attempts` });
+    const status = record.status;
+    if (status !== 'succeeded' && status !== 'failed') {
+      errors.push(`tfgrpo.tool_metrics.per_tool[${index}].status must be "succeeded" or "failed"`);
+    }
+    const sandbox = record.sandbox_state;
+    if (sandbox !== 'sandboxed' && sandbox !== 'escalated' && sandbox !== 'failed') {
+      errors.push(`tfgrpo.tool_metrics.per_tool[${index}].sandbox_state must be sandboxed, escalated, or failed`);
+    }
+  });
+}
+
+function validateTfgrpoExperiences(candidate: unknown, errors: string[]): void {
+  if (candidate === undefined || candidate === null) {
+    return;
+  }
+  if (!isPlainObject(candidate)) {
+    errors.push('tfgrpo.experiences must be an object when provided');
+    return;
+  }
+  const experiences = candidate as Record<string, unknown>;
+  const ids = experiences.ids;
+  if (!Array.isArray(ids)) {
+    errors.push('tfgrpo.experiences.ids must be an array');
+  } else if (!ids.every((value) => typeof value === 'string' && value.length > 0)) {
+    errors.push('tfgrpo.experiences.ids must contain non-empty strings');
+  }
+  validateNumber(experiences, 'written', errors, { integer: true, minimum: 0, path: 'tfgrpo.experiences.written' });
+  validateOptionalString(experiences, 'manifest_path', errors, 'tfgrpo.experiences');
 }
 
 function validateString(

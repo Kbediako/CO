@@ -1,6 +1,7 @@
 import type { ControlPlaneManifestSection } from '../control-plane/types.js';
 import type { SchedulerManifest } from '../scheduler/types.js';
 import type { PlanResult, RunSummary } from '../types.js';
+import type { SandboxState, ToolRunStatus } from '../../../packages/shared/manifest/types.js';
 
 export type PipelineStage = CommandStage | SubPipelineStage;
 
@@ -113,6 +114,39 @@ export interface PromptPackManifestEntry {
   stamp: string;
   experience_slots: number;
   sources: string[];
+  experiences?: string[];
+}
+
+export interface TfgrpoToolMetric {
+  tool: string;
+  tokens: number;
+  cost_usd: number;
+  latency_ms: number;
+  attempts: number;
+  status: ToolRunStatus;
+  sandbox_state: SandboxState;
+}
+
+export interface TfgrpoToolMetricsSummary {
+  tool_calls: number;
+  token_total: number;
+  cost_usd: number;
+  latency_ms: number;
+  per_tool: TfgrpoToolMetric[];
+}
+
+export interface TfgrpoExperienceSummary {
+  ids: string[];
+  written: number;
+  manifest_path: string | null;
+}
+
+export interface TfgrpoManifestSection {
+  epoch: number | null;
+  group_id: string | null;
+  group_size: number | null;
+  tool_metrics?: TfgrpoToolMetricsSummary;
+  experiences?: TfgrpoExperienceSummary;
 }
 
 export interface HandleRecord {
@@ -208,6 +242,7 @@ export interface CliManifest {
       other: number;
     };
   };
+  tfgrpo?: TfgrpoManifestSection | null;
 }
 
 export type RunStatus = 'queued' | 'in_progress' | 'succeeded' | 'failed' | 'cancelled';

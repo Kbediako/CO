@@ -18,6 +18,8 @@ import { loadInstructionSet } from '../../../../packages/orchestrator/src/instru
 import type { EnvironmentPaths } from './environment.js';
 import type { RunPaths } from './runPaths.js';
 import { resolveRunPaths, relativeToRepo } from './runPaths.js';
+import { ExperienceStore } from '../../persistence/ExperienceStore.js';
+import { formatExperienceInjections } from '../exec/experience.js';
 
 export interface ManifestBootstrapOptions {
   env: EnvironmentPaths;
@@ -100,19 +102,41 @@ export async function bootstrapManifest(runId: string, options: ManifestBootstra
     instructions_hash: null,
     instructions_sources: [],
     prompt_packs: [],
-    guardrails_required: pipeline.guardrailsRequired !== false
+    guardrails_required: pipeline.guardrailsRequired !== false,
+    tfgrpo: null
   };
 
   const instructions = await loadInstructionSet(env.repoRoot);
+  const experienceStore = new ExperienceStore({
+    outDir: env.outRoot,
+    runsDir: env.runsRoot
+  });
+  const experienceSnippets = await Promise.all(
+    instructions.promptPacks.map(async (pack) => {
+      if (!pack.experienceSlots) {
+        return [];
+      }
+      const records = await experienceStore.fetchTop({
+        domain: pack.domain,
+        limit: pack.experienceSlots,
+        taskId: env.taskId
+      });
+      return formatExperienceInjections(records, pack.experienceSlots);
+    })
+  );
   manifest.instructions_hash = instructions.hash || null;
   manifest.instructions_sources = instructions.sources.map((source) => source.path);
-  manifest.prompt_packs = instructions.promptPacks.map((pack) => ({
-    id: pack.id,
-    domain: pack.domain,
-    stamp: pack.stamp,
-    experience_slots: pack.experienceSlots,
-    sources: pack.sources.map((source) => source.path)
-  }));
+  manifest.prompt_packs = instructions.promptPacks.map((pack, index) => {
+    const experiences = experienceSnippets[index] ?? [];
+    return {
+      id: pack.id,
+      domain: pack.domain,
+      stamp: pack.stamp,
+      experience_slots: pack.experienceSlots,
+      sources: pack.sources.map((source) => source.path),
+      ...(experiences.length > 0 ? { experiences } : {})
+    };
+  });
 
   await writeJsonAtomic(paths.manifestPath, manifest);
   await writeFile(paths.resumeTokenPath, `${resumeToken}\n`, 'utf8');

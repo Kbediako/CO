@@ -18,17 +18,17 @@
    - Scope: Emit tool/token/cost/latency metrics tagged by epoch and group.
    - Files: `orchestrator/src/cli/exec/command.ts`, `orchestrator/src/cli/metrics/metricsRecorder.ts`, `orchestrator/src/cli/metrics/metricsAggregator.ts`, `packages/orchestrator/src/telemetry/otel-exporter.ts`.
    - Tests: `orchestrator/tests/MetricsAggregator.test.ts`, `orchestrator/tests/ExecCommand.test.ts`.
-   - [ ] Evidence pending TF-GRPO metrics run.
+   - [x] Evidence: `.runs/0506-tfgrpo-integration/cli/2025-11-11T05-12-24-697Z-15088fb0/manifest.json`.
 3. **PR-3 — Experience Store & Injection**
    - Scope: ExperienceStore module, ≤32-word enforcement, stamped persistence, and prompt injection.
    - Files: `orchestrator/src/persistence/TaskStateStore.ts`, `orchestrator/src/persistence/ExperienceStore.ts`, `orchestrator/src/cli/exec/experience.ts`.
    - Tests: `orchestrator/tests/ExperienceStore.test.ts`, `orchestrator/tests/PromptExperienceInjection.test.ts`.
-   - [ ] Evidence pending Experience Store dry run.
+   - [x] Evidence: `.runs/0506-tfgrpo-integration/cli/2025-11-11T05-12-24-697Z-15088fb0/manifest.json`.
 4. **PR-4 — Trajectory Summary / Optimizer**
    - Scope: Convert exec events into trajectory summaries, stamp, and optimize before persistence.
    - Files: `orchestrator/src/cli/exec/command.ts`, `orchestrator/src/cli/exec/experience.ts`.
    - Tests: `orchestrator/tests/ExecCommand.test.ts`, `orchestrator/tests/ExperienceStore.test.ts`.
-   - [ ] Evidence pending tfgrpo-learning dry run.
+   - [x] Evidence: `.runs/0506-tfgrpo-integration/cli/2025-11-11T05-12-24-697Z-15088fb0/manifest.json`.
 5. **PR-5 — Rewarders (GT + Relative Rank)**
    - Scope: Plug deterministic GT and relative ranking rewarders into the evaluation harness.
    - Files: `evaluation/harness/index.ts`, `evaluation/harness/types.ts`, `evaluation/harness/rewarders/*.ts`.

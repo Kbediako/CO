@@ -66,6 +66,31 @@ export interface JsonlEvent<TPayload = unknown> {
   payload: TPayload;
 }
 
+export interface ToolMetricSummary {
+  tool: string;
+  tokens: number;
+  costUsd: number;
+  latencyMs: number;
+  attempts: number;
+  status: ToolRunStatus;
+  sandboxState: SandboxState;
+}
+
+export interface TfgrpoMetricContext {
+  epoch: number | null;
+  groupSize: number | null;
+  groupId: string | null;
+}
+
+export interface RunMetricSummary {
+  toolCalls: number;
+  tokenTotal: number;
+  costUsd: number;
+  latencyMs: number;
+  perTool: ToolMetricSummary[];
+  tfgrpo?: TfgrpoMetricContext;
+}
+
 export interface RunSummaryEventPayload {
   status: 'succeeded' | 'failed';
   run: {
@@ -101,7 +126,7 @@ export interface RunSummaryEventPayload {
     command: string | null;
   };
   toolRun: ToolRunRecord | null;
-  metrics?: Record<string, unknown>;
+  metrics?: RunMetricSummary;
   notifications?: {
     targets: string[];
     delivered: string[];

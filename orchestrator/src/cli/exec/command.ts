@@ -4,7 +4,14 @@ import { join } from 'node:path';
 import type { EnvironmentPaths } from '../run/environment.js';
 import { relativeToRepo } from '../run/runPaths.js';
 import { bootstrapManifest, finalizeStatus, saveManifest } from '../run/manifest.js';
-import type { CommandStage, CliManifest, CliManifestCommand, RunStatus, PipelineDefinition } from '../types.js';
+import type {
+  CommandStage,
+  CliManifest,
+  CliManifestCommand,
+  RunStatus,
+  PipelineDefinition,
+  TfgrpoManifestSection
+} from '../types.js';
 import { generateRunId } from '../utils/runId.js';
 import { JsonlWriter } from '../utils/jsonlWriter.js';
 import { runCommandStage, type CommandRunHooks } from '../services/commandRunner.js';
@@ -14,7 +21,20 @@ import {
   serializeExecEvent,
   serializeRunSummaryEvent
 } from '../../../../packages/shared/events/serializer.js';
-import type { ExecEvent, RunSummaryEvent, RunSummaryEventPayload } from '../../../../packages/shared/events/types.js';
+import type {
+  ExecEvent,
+  RunSummaryEvent,
+  RunSummaryEventPayload,
+  RunMetricSummary,
+  ToolMetricSummary
+} from '../../../../packages/shared/events/types.js';
+import { ExperienceStore, type ExperienceRecord } from '../../persistence/ExperienceStore.js';
+import {
+  summarizeTrajectory,
+  optimizeExperience,
+  framesFromToolMetrics,
+  type TfgrpoPolicyConfig
+} from './experience.js';
 import type { ToolRunRecord, SandboxState, ToolRunStatus } from '../../../../packages/shared/manifest/types.js';
 import { sanitizeToolRunRecord } from '../../../../packages/shared/manifest/writer.js';
 import {
@@ -26,6 +46,7 @@ import {
   type ExecNotificationSink
 } from '../../../../packages/orchestrator/src/notifications/index.js';
 import type { RunPaths } from '../run/runPaths.js';
+import { logger } from '../../logger.js';
 
 export type ExecOutputMode = 'interactive' | 'json' | 'jsonl';
 
@@ -84,6 +105,9 @@ interface RunResultSummary {
   sandboxState: SandboxState;
 }
 
+const COST_PER_TOKEN_USD = 0.000002;
+const DEFAULT_EXPERIENCE_WORD_LIMIT = 32;
+
 export async function executeExecCommand(
   context: ExecCommandContext,
   invocation: ExecCommandInvocation
@@ -104,6 +128,10 @@ export async function executeExecCommand(
 
   const runIdFactory = context.runIdFactory ?? generateRunId;
   const env = context.env;
+  const experienceStore = new ExperienceStore({
+    outDir: env.outRoot,
+    runsDir: env.runsRoot
+  });
   const runId = runIdFactory();
   const pipeline = createPipeline(shellCommand, invocation, env);
   const stage = pipeline.stages[0] as CommandStage;
@@ -183,10 +211,6 @@ export async function executeExecCommand(
   const commandEntry = manifest.commands[0];
   const runStatus = determineRunStatus(commandEntry);
 
-  manifest.summary = commandEntry?.summary ?? manifest.summary;
-  finalizeStatus(manifest, runStatus, commandEntry?.status === 'failed' ? 'exec-failed' : null);
-  await saveManifest(paths, manifest);
-
   const summarySnapshot = runResultSummary as RunResultSummary | null;
   let resultExitCode = extractExecMetadataField(toolRecord, 'exitCode') ?? null;
   if (summarySnapshot && summarySnapshot.exitCode !== undefined) {
@@ -196,6 +220,28 @@ export async function executeExecCommand(
   if (summarySnapshot && summarySnapshot.signal !== undefined) {
     resultSignal = summarySnapshot.signal;
   }
+
+  manifest.summary = commandEntry?.summary ?? manifest.summary;
+  finalizeStatus(manifest, runStatus, commandEntry?.status === 'failed' ? 'exec-failed' : null);
+
+  const tfgrpoContext = resolveTfgrpoContext();
+  const toolMetric = buildToolMetricSnapshot(toolRecord, summarySnapshot);
+  const runMetricSummary = createRunMetricSummary(
+    toolMetric ? [toolMetric] : [],
+    tfgrpoContext
+  );
+  manifest.tfgrpo = mergeTfgrpoManifest(manifest.tfgrpo, runMetricSummary, tfgrpoContext);
+  await persistExperienceRecords({
+    store: experienceStore,
+    manifest,
+    env,
+    paths,
+    tfgrpoContext,
+    runMetrics: runMetricSummary,
+    execEvents,
+    policy: resolveExperiencePolicy()
+  });
+  await saveManifest(paths, manifest);
 
   const summaryPayload = createRunSummaryPayload({
     env,
@@ -210,7 +256,8 @@ export async function executeExecCommand(
     exitCode: resultExitCode,
     signal: resultSignal,
     notificationTargets: notificationSink.targets,
-    cwd: stage.cwd ?? null
+    cwd: stage.cwd ?? null,
+    metrics: runMetricSummary
   });
   const summaryEvent = serializeRunSummaryEvent(summaryPayload);
 
@@ -388,6 +435,7 @@ function createRunSummaryPayload(params: {
   signal: NodeJS.Signals | null;
   notificationTargets: string[];
   cwd: string | null;
+  metrics: RunMetricSummary | null;
 }): RunSummaryEventPayload {
   const {
     env,
@@ -402,7 +450,8 @@ function createRunSummaryPayload(params: {
     exitCode,
     signal,
     notificationTargets,
-    cwd
+    cwd,
+    metrics
   } = params;
   const stdout = resultSummary?.stdout ?? '';
   const stderr = resultSummary?.stderr ?? '';
@@ -452,11 +501,242 @@ function createRunSummaryPayload(params: {
       command: manifest.commands[0]?.log_path ?? null
     },
     toolRun: toolRecord,
-    metrics: undefined,
+    metrics: metrics ?? undefined,
     notifications: {
       targets: notificationTargets,
       delivered: [],
       failures: []
     }
   };
+}
+
+interface TfgrpoContext {
+  epoch: number | null;
+  groupId: string | null;
+  groupSize: number | null;
+  active: boolean;
+}
+
+function resolveTfgrpoContext(env: NodeJS.ProcessEnv = process.env): TfgrpoContext {
+  const epoch = parsePositiveInteger(env.TFGRPO_EPOCH);
+  const groupSize = parsePositiveInteger(env.TFGRPO_GROUP_SIZE);
+  const groupId = env.TFGRPO_GROUP_ID?.trim() || null;
+  return {
+    epoch,
+    groupId,
+    groupSize,
+    active: epoch !== null || groupSize !== null || groupId !== null
+  };
+}
+
+function parsePositiveInteger(value: string | undefined): number | null {
+  if (!value) {
+    return null;
+  }
+  const parsed = Number.parseInt(value, 10);
+  if (Number.isNaN(parsed) || parsed <= 0) {
+    return null;
+  }
+  return parsed;
+}
+
+function resolveExperiencePolicy(): TfgrpoPolicyConfig {
+  const configured = process.env.TFGRPO_EXPERIENCE_MAX_WORDS;
+  const parsed = configured ? Number.parseInt(configured, 10) : NaN;
+  const maxSummaryWords = Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_EXPERIENCE_WORD_LIMIT;
+  return {
+    maxSummaryWords,
+    rewardFloor: 0
+  };
+}
+
+function buildToolMetricSnapshot(
+  toolRecord: ToolRunRecord | null,
+  summary: RunResultSummary | null
+): ToolMetricSummary | null {
+  if (!toolRecord && !summary) {
+    return null;
+  }
+  const stdout = summary?.stdout ?? '';
+  const tokens = estimateTokenCount(stdout);
+  const latencyMs = summary?.durationMs ?? deriveDurationFromEvents(toolRecord);
+  const costUsd = roundCurrency(tokens * COST_PER_TOKEN_USD);
+  const attempts = toolRecord?.attemptCount ?? 1;
+  const status = toolRecord?.status ?? summary?.status ?? 'failed';
+  const sandboxState = summary?.sandboxState ?? toolRecord?.sandboxState ?? 'sandboxed';
+  const toolName = toolRecord?.tool ?? 'cli:command';
+  return {
+    tool: toolName,
+    tokens,
+    costUsd,
+    latencyMs,
+    attempts,
+    status,
+    sandboxState
+  };
+}
+
+function deriveDurationFromEvents(record: ToolRunRecord | null): number {
+  const events = record?.events;
+  if (!Array.isArray(events) || events.length === 0) {
+    return 0;
+  }
+  const first = events.find((event) => event.type === 'exec:begin');
+  const last = [...events].reverse().find((event) => event.type === 'exec:end');
+  if (!first || !last) {
+    return 0;
+  }
+  const startedAt = Date.parse(first.timestamp);
+  const completedAt = Date.parse(last.timestamp);
+  if (Number.isNaN(startedAt) || Number.isNaN(completedAt) || completedAt < startedAt) {
+    return 0;
+  }
+  return completedAt - startedAt;
+}
+
+function estimateTokenCount(output: string): number {
+  const trimmed = output.trim();
+  if (!trimmed) {
+    return 0;
+  }
+  return trimmed.split(/\s+/u).filter(Boolean).length;
+}
+
+function roundCurrency(value: number): number {
+  return Math.round(value * 1_000_000) / 1_000_000;
+}
+
+function createRunMetricSummary(
+  metrics: ToolMetricSummary[],
+  context: TfgrpoContext
+): RunMetricSummary | null {
+  const toolCalls = metrics.length;
+  if (toolCalls === 0 && !context.active) {
+    return null;
+  }
+  const tokenTotal = metrics.reduce((sum, metric) => sum + metric.tokens, 0);
+  const costUsd = roundCurrency(metrics.reduce((sum, metric) => sum + metric.costUsd, 0));
+  const latencyMs = metrics.reduce((sum, metric) => sum + metric.latencyMs, 0);
+  return {
+    toolCalls,
+    tokenTotal,
+    costUsd,
+    latencyMs,
+    perTool: metrics,
+    tfgrpo: context.active
+      ? {
+          epoch: context.epoch,
+          groupSize: context.groupSize,
+          groupId: context.groupId
+        }
+      : undefined
+  };
+}
+
+function mergeTfgrpoManifest(
+  existing: TfgrpoManifestSection | null | undefined,
+  metrics: RunMetricSummary | null,
+  context: TfgrpoContext
+): TfgrpoManifestSection | null {
+  if (!metrics && !existing && !context.active) {
+    return null;
+  }
+  const manifestMetrics = metrics
+    ? {
+        tool_calls: metrics.toolCalls,
+        token_total: metrics.tokenTotal,
+        cost_usd: metrics.costUsd,
+        latency_ms: metrics.latencyMs,
+        per_tool: metrics.perTool.map((entry) => ({
+          tool: entry.tool,
+          tokens: entry.tokens,
+          cost_usd: entry.costUsd,
+          latency_ms: entry.latencyMs,
+          attempts: entry.attempts,
+          status: entry.status,
+          sandbox_state: entry.sandboxState
+        }))
+      }
+    : existing?.tool_metrics;
+  return {
+    epoch: context.epoch ?? existing?.epoch ?? null,
+    group_id: context.groupId ?? existing?.group_id ?? null,
+    group_size: context.groupSize ?? existing?.group_size ?? null,
+    tool_metrics: manifestMetrics ?? existing?.tool_metrics,
+    experiences: existing?.experiences
+  };
+}
+
+async function persistExperienceRecords(params: {
+  store: ExperienceStore;
+  manifest: CliManifest;
+  env: EnvironmentPaths;
+  paths: RunPaths;
+  tfgrpoContext: TfgrpoContext;
+  runMetrics: RunMetricSummary | null;
+  execEvents: ExecEvent[];
+  policy: TfgrpoPolicyConfig;
+}): Promise<ExperienceRecord[] | null> {
+  const { runMetrics } = params;
+  if (!runMetrics || runMetrics.perTool.length === 0) {
+    return null;
+  }
+  const promptPack = params.manifest.prompt_packs?.[0];
+  if (!promptPack?.domain || !promptPack.stamp) {
+    return null;
+  }
+  const terminalEvent = findTerminalEvent(params.execEvents);
+  if (!terminalEvent) {
+    return null;
+  }
+  try {
+    const frames = framesFromToolMetrics(runMetrics.perTool, terminalEvent);
+    const trajectory = summarizeTrajectory({
+      runId: params.manifest.run_id,
+      taskId: params.manifest.task_id,
+      epoch: params.tfgrpoContext.epoch,
+      groupId: params.tfgrpoContext.groupId,
+      domain: promptPack.domain,
+      stampSignature: promptPack.stamp,
+      frames,
+      baseSummary: params.manifest.summary ?? undefined
+    });
+    const optimized = optimizeExperience(trajectory, params.policy);
+    const manifestPath = relativeToRepo(params.env, params.paths.manifestPath);
+    const written = await params.store.recordBatch([optimized], manifestPath);
+    if (written.length > 0) {
+      const existing = params.manifest.tfgrpo?.experiences ?? {
+        ids: [],
+        written: 0,
+        manifest_path: manifestPath
+      };
+      const summary = {
+        ids: [...existing.ids, ...written.map((record) => record.id)],
+        written: existing.written + written.length,
+        manifest_path: manifestPath
+      };
+      params.manifest.tfgrpo = {
+        ...(params.manifest.tfgrpo ?? {
+          epoch: params.tfgrpoContext.epoch,
+          group_id: params.tfgrpoContext.groupId,
+          group_size: params.tfgrpoContext.groupSize
+        }),
+        experiences: summary
+      };
+    }
+    return written;
+  } catch (error) {
+    logger.warn(`Failed to persist TF-GRPO experience: ${String(error)}`);
+    return null;
+  }
+}
+
+function findTerminalEvent(events: ExecEvent[]): ExecEvent | null {
+  for (let index = events.length - 1; index >= 0; index -= 1) {
+    const candidate = events[index];
+    if (candidate?.type === 'exec:end') {
+      return candidate;
+    }
+  }
+  return events.length > 0 ? events[events.length - 1]! : null;
 }

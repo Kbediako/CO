@@ -27,7 +27,7 @@ function createEntry(index: number, status: string): MetricsEntry {
       {
         instance_id: `inst-${index}`,
         capability: 'general',
-        status,
+        status: status === 'succeeded' ? 'succeeded' : 'failed',
         attempts: 1,
         recovery_events: 0
       }
@@ -41,7 +41,25 @@ function createEntry(index: number, status: string): MetricsEntry {
         stage_id: 'build'
       }
     ],
-    handle_count: 1
+    handle_count: 1,
+    tfgrpo_epoch: index,
+    tfgrpo_group_id: `group-${index}`,
+    tfgrpo_group_size: 2,
+    tool_calls: 1,
+    token_total: 100 + index,
+    cost_usd: 0.001 * index,
+    latency_ms: 1000 + index,
+    tool_stats: [
+      {
+        tool: 'cli:command',
+        tokens: 100 + index,
+        cost_usd: 0.001 * index,
+        latency_ms: 1000 + index,
+        attempts: 1,
+        status: status === 'succeeded' ? 'succeeded' : 'failed',
+        sandbox_state: 'sandboxed'
+      }
+    ]
   };
 }
 
@@ -86,5 +104,11 @@ describe('metricsAggregator', () => {
       await readFile(join(outRoot, env.taskId, 'metrics', 'mttr-delta.json'), 'utf8')
     );
     expect(mttr.current_mttr_seconds).toBeGreaterThan(0);
+
+    const perEpoch = JSON.parse(
+      await readFile(join(metricsRoot, 'metrics', 'per-epoch.json'), 'utf8')
+    );
+    expect(perEpoch.epochs).toHaveLength(2);
+    expect(perEpoch.epochs[0]?.tools[0]?.tool).toBe('cli:command');
   });
 });

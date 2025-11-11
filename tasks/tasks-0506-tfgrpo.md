@@ -17,34 +17,34 @@
 - Scope: Emit per-tool, per-epoch token/cost/latency metrics from exec events through the recorder, aggregator, and OTEL exporter.
 - Touched Files: `orchestrator/src/cli/exec/command.ts`, `orchestrator/src/cli/metrics/metricsRecorder.ts`, `orchestrator/src/cli/metrics/metricsAggregator.ts`, `packages/orchestrator/src/telemetry/otel-exporter.ts`, manifest schemas.
 - Acceptance Criteria:
-  - [ ] Each epoch writes `tool_calls`, `token_total`, `cost_usd`, and `latency_ms` to `metrics.jsonl` plus roll-up JSON.
-  - [ ] OTEL payloads include `tfgrpo_epoch`, `group_size`, and per-tool cost counters to feed dashboards.
-  - [ ] TF-GRPO manifests show per-tool metrics aligned with Experience Store entries.
+  - [x] Each epoch writes `tool_calls`, `token_total`, `cost_usd`, and `latency_ms` to `metrics.jsonl` plus roll-up JSON. *(Evidence: `.runs/0506-tfgrpo-integration/cli/2025-11-11T05-12-24-697Z-15088fb0/manifest.json`)*
+  - [x] OTEL payloads include `tfgrpo_epoch`, `group_size`, and per-tool cost counters to feed dashboards. *(Evidence: `.runs/0506-tfgrpo-integration/cli/2025-11-11T05-12-24-697Z-15088fb0/manifest.json`)*
+  - [x] TF-GRPO manifests show per-tool metrics aligned with Experience Store entries. *(Evidence: `.runs/0506-tfgrpo-integration/cli/2025-11-11T05-12-24-697Z-15088fb0/manifest.json`)*
 - Tests:
-  - [ ] `orchestrator/tests/MetricsAggregator.test.ts` (ToolEfficiencyMetrics.test.ts).
-  - [ ] `orchestrator/tests/ExecCommand.test.ts` (ExecToolStatsEmission.test.ts).
+  - [x] `orchestrator/tests/MetricsAggregator.test.ts` (ToolEfficiencyMetrics.test.ts).
+  - [x] `orchestrator/tests/ExecCommand.test.ts` (ExecToolStatsEmission.test.ts).
 
 ## PR-3 — Experience Store & Injection
 - Scope: Layer an Experience Store atop `TaskStateStore`, enforce ≤32-word summaries, and wire experience injection into prompt packs.
 - Touched Files: `orchestrator/src/persistence/TaskStateStore.ts`, `orchestrator/src/persistence/ExperienceStore.ts` (new), `orchestrator/src/cli/exec/experience.ts`, `.agent/prompts/hotswap-implementation.md` references.
 - Acceptance Criteria:
-  - [ ] Experiments write stamped `ExperienceRecord` entries per epoch with reward + tool stats metadata.
-  - [ ] Prompt packs fetch the top-N stamped experiences for injection, limited to stamped sources only.
-  - [ ] Experience files live under `out/0506-tfgrpo-integration/experiences.jsonl` with manifest references.
+  - [x] Experiments write stamped `ExperienceRecord` entries per epoch with reward + tool stats metadata. *(Evidence: `.runs/0506-tfgrpo-integration/cli/2025-11-11T05-12-24-697Z-15088fb0/manifest.json`)*
+  - [x] Prompt packs fetch the top-N stamped experiences for injection, limited to stamped sources only. *(Evidence: `.runs/0506-tfgrpo-integration/cli/2025-11-11T05-12-24-697Z-15088fb0/manifest.json`)*
+  - [x] Experience files live under `out/0506-tfgrpo-integration/experiences.jsonl` with manifest references. *(Evidence: `.runs/0506-tfgrpo-integration/cli/2025-11-11T05-12-24-697Z-15088fb0/manifest.json`)*
 - Tests:
-  - [ ] `orchestrator/tests/ExperienceStore.test.ts` (ExperienceStore.test.ts & ExperienceMergeOps.test.ts cases).
-  - [ ] `orchestrator/tests/PromptExperienceInjection.test.ts` (PromptExperienceInjection.test.ts).
+  - [x] `orchestrator/tests/ExperienceStore.test.ts` (ExperienceStore.test.ts & ExperienceMergeOps.test.ts cases).
+  - [x] `orchestrator/tests/PromptExperienceInjection.test.ts` (PromptExperienceInjection.test.ts).
 
 ## PR-4 — Trajectory Summary, Extractor, Optimizer
 - Scope: Convert exec event streams into trajectory summaries, extract ≤32-word experiences, and optimize them before persistence.
 - Touched Files: `orchestrator/src/cli/exec/command.ts`, `orchestrator/src/cli/exec/experience.ts`, manifest serializers, notification sinks.
 - Acceptance Criteria:
-  - [ ] Exec events accumulate per-tool frames and emit trajectory summaries tagged with epoch + group info.
-  - [ ] Optimizer enforces 32-word cap, stamps summaries, and blocks unstamped prompts.
-  - [ ] Manifests reference the exact experience IDs injected into subsequent epochs.
+  - [x] Exec events accumulate per-tool frames and emit trajectory summaries tagged with epoch + group info. *(Evidence: `.runs/0506-tfgrpo-integration/cli/2025-11-11T05-12-24-697Z-15088fb0/manifest.json`)*
+  - [x] Optimizer enforces 32-word cap, stamps summaries, and blocks unstamped prompts. *(Evidence: `.runs/0506-tfgrpo-integration/cli/2025-11-11T05-12-24-697Z-15088fb0/manifest.json`)*
+  - [x] Manifests reference the exact experience IDs injected into subsequent epochs. *(Evidence: `.runs/0506-tfgrpo-integration/cli/2025-11-11T05-12-24-697Z-15088fb0/manifest.json`)*
 - Tests:
-  - [ ] `orchestrator/tests/ExecCommand.test.ts` (TrajectorySummary.test.ts).
-  - [ ] `orchestrator/tests/ExperienceStore.test.ts` (ExperienceMergeOps.test.ts).
+  - [x] `orchestrator/tests/ExecCommand.test.ts` (TrajectorySummary.test.ts).
+  - [x] `orchestrator/tests/ExperienceStore.test.ts` (ExperienceMergeOps.test.ts).
 
 ## PR-5 — Rewarders (GT + Relative Rank)
 - Scope: Add deterministic golden-truth rewarders and group-relative ranking rewarders to the evaluation harness, feeding scores back into experiences.

@@ -67,6 +67,76 @@ describe('OtelTelemetrySink', () => {
     expect(await getPostedKind(fetchMock, 1)).toBe('summary');
   });
 
+  it('includes tfgrpo dimensions when metrics are present', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(okResponse);
+    const sink = createTelemetrySink({ endpoint: 'https://telemetry.example', fetch: fetchMock });
+
+    await sink.recordSummary({
+      type: 'run:summary',
+      timestamp: '2025-11-04T00:00:02.000Z',
+      payload: {
+        status: 'succeeded',
+        run: {
+          id: 'run-2',
+          taskId: 'task',
+          pipelineId: 'exec',
+          manifest: 'manifest.json',
+          artifactRoot: '.runs',
+          summary: 'done'
+        },
+        result: {
+          exitCode: 0,
+          signal: null,
+          durationMs: 900,
+          status: 'succeeded',
+          sandboxState: 'sandboxed',
+          correlationId: 'corr',
+          attempts: 1
+        },
+        command: {
+          argv: ['npm'],
+          shell: 'npm',
+          cwd: null,
+          sessionId: 's',
+          persisted: false
+        },
+        outputs: { stdout: '', stderr: '' },
+        logs: { runner: 'runner.ndjson', command: 'command.ndjson' },
+        toolRun: null,
+        metrics: {
+          toolCalls: 1,
+          tokenTotal: 120,
+          costUsd: 0.003,
+          latencyMs: 900,
+          perTool: [
+            {
+              tool: 'cli:command',
+              tokens: 120,
+              costUsd: 0.003,
+              latencyMs: 900,
+              attempts: 1,
+              status: 'succeeded',
+              sandboxState: 'sandboxed'
+            }
+          ],
+          tfgrpo: {
+            epoch: 1,
+            groupSize: 2,
+            groupId: 'group-a'
+          }
+        },
+        notifications: { targets: [], delivered: [], failures: [] }
+      }
+    });
+
+    const call = fetchMock.mock.calls[0];
+    expect(call).toBeDefined();
+    const body = call?.[1]?.body as string;
+    const parsed = typeof body === 'string' ? JSON.parse(body) : null;
+    expect(parsed?.dimensions?.tfgrpo_epoch).toBe(1);
+    expect(parsed?.dimensions?.tool_costs?.['cli:command']).toBeCloseTo(0.003);
+  });
+
   it('disables after exceeding failure threshold', async () => {
     const fetchMock = vi.fn().mockRejectedValue(new Error('offline'));
     const logger = { warn: vi.fn() };
