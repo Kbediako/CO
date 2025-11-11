@@ -226,4 +226,108 @@ describe('ControlPlaneValidator', () => {
       delete process.env.TFGRPO_EVAL_TEMP;
     }
   });
+
+  it('rejects TF-GRPO groupSize below guardrail when group feature is enabled', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'control-plane-group-'));
+    const env: EnvironmentPaths = {
+      repoRoot,
+      runsRoot: join(repoRoot, '.runs'),
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'autonomy-upgrade'
+    };
+
+    const pipeline: PipelineDefinition = {
+      id: 'pipeline-group',
+      title: 'Group Guardrail',
+      stages: [{ kind: 'command', id: 'build', title: 'Build', command: 'echo build' }],
+      tags: ['general']
+    };
+
+    const manifest = createManifest('run-group-guard', pipeline);
+    const task: TaskContext = {
+      id: 'autonomy-upgrade',
+      title: 'Autonomy Upgrade',
+      description: 'Group guard test'
+    };
+
+    const originalFlag = process.env.FEATURE_TFGRPO_GROUP;
+    const originalSize = process.env.TFGRPO_GROUP_SIZE;
+    process.env.FEATURE_TFGRPO_GROUP = '1';
+    process.env.TFGRPO_GROUP_SIZE = '1';
+
+    expect(() =>
+      buildRunRequestV2({
+        runId: manifest.run_id,
+        task,
+        pipeline,
+        manifest,
+        env
+      })
+    ).toThrow(/groupSize/i);
+
+    if (originalFlag === undefined) {
+      delete process.env.FEATURE_TFGRPO_GROUP;
+    } else {
+      process.env.FEATURE_TFGRPO_GROUP = originalFlag;
+    }
+    if (originalSize === undefined) {
+      delete process.env.TFGRPO_GROUP_SIZE;
+    } else {
+      process.env.TFGRPO_GROUP_SIZE = originalSize;
+    }
+  });
+
+  it('caps schedule maxInstances at the TF-GRPO group size', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'control-plane-group-cap-'));
+    const env: EnvironmentPaths = {
+      repoRoot,
+      runsRoot: join(repoRoot, '.runs'),
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'autonomy-upgrade'
+    };
+
+    const pipeline: PipelineDefinition = {
+      id: 'pipeline-group-cap',
+      title: 'Group Cap Pipeline',
+      stages: [{ kind: 'command', id: 'build', title: 'Build', command: 'echo build' }],
+      tags: ['general', 'sandbox', 'learning']
+    };
+
+    const manifest = createManifest('run-group-cap', pipeline);
+    const task: TaskContext = {
+      id: 'autonomy-upgrade',
+      title: 'Autonomy Upgrade',
+      description: 'Group cap test'
+    };
+
+    const originalFlag = process.env.FEATURE_TFGRPO_GROUP;
+    const originalSize = process.env.TFGRPO_GROUP_SIZE;
+    process.env.FEATURE_TFGRPO_GROUP = '1';
+    process.env.TFGRPO_GROUP_SIZE = '2';
+
+    try {
+      const request = buildRunRequestV2({
+        runId: manifest.run_id,
+        task,
+        pipeline,
+        manifest,
+        env
+      });
+
+      expect(request.schedule.minInstances).toBe(2);
+      expect(request.schedule.maxInstances).toBe(2);
+      expect(request.metadata?.tfgrpo).toEqual(expect.objectContaining({ groupSize: 2 }));
+    } finally {
+      if (originalFlag === undefined) {
+        delete process.env.FEATURE_TFGRPO_GROUP;
+      } else {
+        process.env.FEATURE_TFGRPO_GROUP = originalFlag;
+      }
+      if (originalSize === undefined) {
+        delete process.env.TFGRPO_GROUP_SIZE;
+      } else {
+        process.env.TFGRPO_GROUP_SIZE = originalSize;
+      }
+    }
+  });
 });

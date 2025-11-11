@@ -6,6 +6,7 @@ import {
   type RunRequestV2
 } from '../../../packages/control-plane-schemas/src/index.js';
 import type { PipelineDefinition, CliManifest } from '../cli/types.js';
+import { logger } from '../logger.js';
 import type { EnvironmentPaths } from '../cli/run/environment.js';
 import type { TaskContext } from '../types.js';
 
@@ -21,6 +22,7 @@ const DEFAULT_TFGRPO_EPOCHS = 3;
 const DEFAULT_TFGRPO_SAMPLE_SIZE = 100;
 const DEFAULT_TFGRPO_TRAIN_TEMP = 0.7;
 const DEFAULT_TFGRPO_EVAL_TEMP = 0.3;
+const DEFAULT_TFGRPO_GROUP_SIZE = 2;
 
 export interface BuildRunRequestOptions {
   runId: string;
@@ -69,9 +71,14 @@ export function buildRunRequestV2(options: BuildRunRequestOptions): RunRequestV2
     weight: 1,
     maxConcurrency: capability === 'general' ? 2 : 1
   }));
-
-  const minInstances = 1;
-  const maxInstances = Math.max(1, fanOut.length);
+  const fanOutCapacity = computeFanOutCapacity(fanOut);
+  const groupSize = resolveGroupSize(manifest);
+  const scheduleBounds = resolveScheduleBounds({
+    defaultMin: 1,
+    defaultMax: Math.max(1, fanOut.length),
+    fanOutCapacity,
+    groupSize
+  });
 
   const constraints: RunRequestConstraints = {
     privacyLevel: 'standard',
@@ -85,7 +92,7 @@ export function buildRunRequestV2(options: BuildRunRequestOptions): RunRequestV2
     pipelineId: pipeline.id,
     taskSlug: task.metadata?.slug ?? null
   };
-  const tfgrpoMetadata = resolveTfgrpoMetadata();
+  const tfgrpoMetadata = resolveTfgrpoMetadata(groupSize);
   if (tfgrpoMetadata) {
     metadata.tfgrpo = tfgrpoMetadata;
   }
@@ -111,8 +118,8 @@ export function buildRunRequestV2(options: BuildRunRequestOptions): RunRequestV2
     },
     schedule: {
       strategy: 'auto',
-      minInstances,
-      maxInstances,
+      minInstances: scheduleBounds.minInstances,
+      maxInstances: scheduleBounds.maxInstances,
       fanOut,
       recovery: {
         heartbeatIntervalSeconds: DEFAULT_HEARTBEAT_INTERVAL_SECONDS,
@@ -143,15 +150,16 @@ export function buildRunRequestV2(options: BuildRunRequestOptions): RunRequestV2
   };
 }
 
-function resolveTfgrpoMetadata(): Record<string, unknown> | null {
+function resolveTfgrpoMetadata(groupSize: number | null): Record<string, unknown> | null {
   const sampleSize = parsePositiveInteger(process.env.TFGRPO_SAMPLE_SIZE);
   const epochs = parsePositiveInteger(process.env.TFGRPO_EPOCHS);
   const trainTemp = parseFloatSafe(process.env.TFGRPO_TRAIN_TEMP);
   const evalTemp = parseFloatSafe(process.env.TFGRPO_EVAL_TEMP);
-  if (sampleSize === null && epochs === null && trainTemp === null && evalTemp === null) {
+  const hasGroupSize = groupSize !== null;
+  if (!hasGroupSize && sampleSize === null && epochs === null && trainTemp === null && evalTemp === null) {
     return null;
   }
-  return {
+  const metadata: Record<string, unknown> = {
     sampleSize: sampleSize ?? DEFAULT_TFGRPO_SAMPLE_SIZE,
     epochs: epochs ?? DEFAULT_TFGRPO_EPOCHS,
     temperature: {
@@ -159,6 +167,10 @@ function resolveTfgrpoMetadata(): Record<string, unknown> | null {
       eval: evalTemp ?? DEFAULT_TFGRPO_EVAL_TEMP
     }
   };
+  if (hasGroupSize && groupSize !== null) {
+    metadata.groupSize = groupSize;
+  }
+  return metadata;
 }
 
 function parsePositiveInteger(value: string | undefined): number | null {
@@ -181,4 +193,77 @@ function parseFloatSafe(value: string | undefined): number | null {
     return null;
   }
   return parsed;
+}
+
+function computeFanOutCapacity(
+  fanOut: Array<{ maxConcurrency?: number | null }>
+): number {
+  return fanOut.reduce((total, entry) => {
+    const capacity = entry?.maxConcurrency ?? 1;
+    return total + Math.max(1, capacity);
+  }, 0);
+}
+
+function resolveGroupSize(manifest: CliManifest, env: NodeJS.ProcessEnv = process.env): number | null {
+  const envSize = parsePositiveInteger(env.TFGRPO_GROUP_SIZE);
+  if (envSize !== null) {
+    return envSize;
+  }
+  const manifestSize =
+    typeof manifest.tfgrpo?.group_size === 'number' && Number.isFinite(manifest.tfgrpo.group_size)
+      ? manifest.tfgrpo.group_size
+      : null;
+  if (manifestSize !== null && manifestSize > 0) {
+    return manifestSize;
+  }
+  if (isFeatureEnabled(env.FEATURE_TFGRPO_GROUP)) {
+    return DEFAULT_TFGRPO_GROUP_SIZE;
+  }
+  return null;
+}
+
+function resolveScheduleBounds(params: {
+  defaultMin: number;
+  defaultMax: number;
+  fanOutCapacity: number;
+  groupSize: number | null;
+}): { minInstances: number; maxInstances: number } {
+  if (params.groupSize === null) {
+    const maxInstances = Math.min(params.defaultMax, params.fanOutCapacity);
+    return {
+      minInstances: params.defaultMin,
+      maxInstances: Math.max(params.defaultMin, maxInstances)
+    };
+  }
+  if (params.groupSize < 2) {
+    logGroupGuard(
+      `TF-GRPO groupSize ${params.groupSize} violates guardrail (must be ≥ 2). ` +
+        'Set TFGRPO_GROUP_SIZE>=2 or disable FEATURE_TFGRPO_GROUP.'
+    );
+    throw new Error('TF-GRPO groupSize guardrail violated (expected ≥ 2).');
+  }
+  if (params.groupSize > params.fanOutCapacity) {
+    logGroupGuard(
+      `TF-GRPO groupSize ${params.groupSize} exceeds available fan-out capacity (${params.fanOutCapacity}). ` +
+        'Increase pipeline fan-out or lower TFGRPO_GROUP_SIZE.'
+    );
+    throw new Error('TF-GRPO groupSize exceeds available scheduling capacity.');
+  }
+  const cappedMax = Math.min(params.fanOutCapacity, params.groupSize);
+  return {
+    minInstances: params.groupSize,
+    maxInstances: cappedMax
+  };
+}
+
+function isFeatureEnabled(value: string | undefined): boolean {
+  if (!value) {
+    return false;
+  }
+  const normalized = value.trim().toLowerCase();
+  return ['1', 'true', 'on', 'yes'].includes(normalized);
+}
+
+function logGroupGuard(message: string): void {
+  logger.error(`[control-plane.guard] ${message}`);
 }

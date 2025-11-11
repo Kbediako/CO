@@ -198,6 +198,41 @@ describe('createSchedulerPlan', () => {
     expect(manifest.assignments[0]?.attempts[0]?.recovery_checkpoints).toHaveLength(0);
   });
 
+  it('annotates assignments with tfgrpo group metadata', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'scheduler-group-meta-'));
+    const env: EnvironmentPaths = {
+      repoRoot,
+      runsRoot: join(repoRoot, '.runs'),
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'autonomy-upgrade'
+    };
+
+    const pipeline: PipelineDefinition = {
+      id: 'pipeline-group-meta',
+      title: 'Group Metadata Pipeline',
+      stages: [{ kind: 'command', id: 'build', title: 'Build', command: 'echo build' }],
+      tags: ['general']
+    };
+
+    const { request } = createRequest(env, pipeline, 'run-group-meta');
+    request.metadata = {
+      ...(request.metadata ?? {}),
+      tfgrpo: { groupSize: 2 }
+    };
+    request.schedule.minInstances = 2;
+    request.schedule.maxInstances = 2;
+    request.schedule.fanOut = [{ capability: 'general', weight: 1, maxConcurrency: 2 }];
+
+    const plan = createSchedulerPlan(request, {
+      now: () => new Date('2025-11-05T05:00:00Z'),
+      instancePrefix: 'autonomy-upgrade'
+    });
+
+    expect(plan.assignments).toHaveLength(2);
+    expect(plan.assignments[0]?.metadata.groupIndex).toBe(1);
+    expect(plan.assignments[1]?.metadata.groupIndex).toBe(2);
+  });
+
   it('builds run summary for downstream reporting', async () => {
     const repoRoot = await mkdtemp(join(tmpdir(), 'scheduler-summary-'));
     const env: EnvironmentPaths = {

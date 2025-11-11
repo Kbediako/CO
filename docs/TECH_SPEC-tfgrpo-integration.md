@@ -107,6 +107,7 @@
   - `FEATURE_TFGRPO_GROUP` (env or config) toggles grouped execution paths inside `TaskManager`.
   - `tfgrpo.groupSize` (default 2), `tfgrpo.epochs` (3), `tfgrpo.sample_size` (~100), `tfgrpo.temperature.train` (0.7), `tfgrpo.temperature.eval` (0.3), `tfgrpo.experience_max_words` (32).
   - CLI env overrides: `TFGRPO_GROUP_SIZE`, `TFGRPO_EPOCHS`, `TFGRPO_SAMPLE_SIZE`, `TFGRPO_TRAIN_TEMP`, `TFGRPO_EVAL_TEMP` (used by the pipeline stub).
+- **Diagnostics Guidance:** Run the default `diagnostics` pipeline with TF-GRPO env vars unset. The vitest suite invoked by `npm run test` includes the guardrail regression tests and will intentionally fail if `FEATURE_TFGRPO_GROUP` forces grouped execution. Use `tfgrpo-learning` (or a custom pipeline with adequate fan-out) when you need to exercise grouped TF-GRPO paths.
 
 ### Group Runner (Feature Flag)
 - **TaskManager:** Extend `orchestrator/src/manager.ts:100-157` so `selectExecutableSubtask` returns an array when `FEATURE_TFGRPO_GROUP` is enabled. New helper `executeGroup(task, plan, groupItems)` sequentially (or concurrently) runs builder/test/review per item while sharing prompt-pack refresh hooks.

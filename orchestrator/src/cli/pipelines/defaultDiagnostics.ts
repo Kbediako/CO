@@ -4,6 +4,7 @@ export const defaultDiagnosticsPipeline: PipelineDefinition = {
   id: 'diagnostics',
   title: 'Diagnostics Pipeline',
   description: 'Build, lint, test, and spec-guard the repository.',
+  tags: ['diagnostics-primary', 'diagnostics-secondary'],
   stages: [
     {
       kind: 'command',

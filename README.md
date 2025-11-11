@@ -42,6 +42,7 @@ Task input ─► Planner ─► Builder ─► Tester ─► Reviewer ─► Ru
    ```bash
    npx codex-orchestrator start diagnostics --format json
    ```
+   > Tip: keep `FEATURE_TFGRPO_GROUP`, `TFGRPO_GROUP_SIZE`, and related TF-GRPO env vars **unset** when running diagnostics. The vitest suite deliberately asserts the “groupSize ≥ capacity” guardrail and will fail if you force grouped execution. Use the `tfgrpo-learning` pipeline instead when you need grouped TF-GRPO runs.
 4. Follow the run:
    ```bash
    npx codex-orchestrator status --run <run-id> --watch --interval 10

@@ -109,7 +109,8 @@ export async function bootstrapManifest(runId: string, options: ManifestBootstra
   const instructions = await loadInstructionSet(env.repoRoot);
   const experienceStore = new ExperienceStore({
     outDir: env.outRoot,
-    runsDir: env.runsRoot
+    runsDir: env.runsRoot,
+    maxSummaryWords: instructions.experienceMaxWords
   });
   const experienceSnippets = await Promise.all(
     instructions.promptPacks.map(async (pack) => {

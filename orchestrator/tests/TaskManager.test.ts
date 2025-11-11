@@ -506,4 +506,70 @@ describe('TaskManager', () => {
     expect(recordRun).toHaveBeenCalledWith(summary);
     expect(writeManifest).toHaveBeenCalledWith(summary);
   });
+
+  it('executes all runnable subtasks when TF-GRPO group flag is enabled', async () => {
+    const originalFlag = process.env.FEATURE_TFGRPO_GROUP;
+    process.env.FEATURE_TFGRPO_GROUP = '1';
+
+    const plan: PlanResult = {
+      items: [
+        { id: 'subtask-1', description: 'Group 1' },
+        { id: 'subtask-2', description: 'Group 2' },
+        { id: 'blocked', description: 'Blocked', runnable: false },
+        { id: 'subtask-3', description: 'Group 3' }
+      ]
+    };
+
+    const builderFn = vi.fn(async (input) => ({
+      subtaskId: input.target.id,
+      artifacts: [],
+      mode: input.mode,
+      success: true,
+      runId: input.runId
+    }));
+    const testerFn = vi.fn(async (input) => ({
+      subtaskId: input.build.subtaskId,
+      success: true,
+      reports: [],
+      runId: input.runId
+    }));
+    const reviewerFn = vi.fn(async () => ({
+      summary: 'approved',
+      decision: { approved: true }
+    }));
+
+    const planner = new FunctionalPlannerAgent(async () => plan);
+    const builder = new FunctionalBuilderAgent(builderFn);
+    const tester = new FunctionalTesterAgent(testerFn);
+    const reviewer = new FunctionalReviewerAgent(reviewerFn);
+
+    const manager = new TaskManager({
+      planner,
+      builder,
+      tester,
+      reviewer,
+      runIdFactory: () => 'run-group'
+    });
+
+    try {
+      const summary = await manager.execute(baseTask);
+      expect(builderFn).toHaveBeenCalledTimes(3);
+      expect(testerFn).toHaveBeenCalledTimes(3);
+      expect(reviewerFn).toHaveBeenCalledTimes(3);
+      expect(summary.group?.enabled).toBe(true);
+      expect(summary.group?.size).toBe(3);
+      expect(summary.group?.processed).toBe(3);
+      expect(summary.group?.entries.map((entry) => entry.subtaskId)).toEqual([
+        'subtask-1',
+        'subtask-2',
+        'subtask-3'
+      ]);
+    } finally {
+      if (originalFlag === undefined) {
+        delete process.env.FEATURE_TFGRPO_GROUP;
+      } else {
+        process.env.FEATURE_TFGRPO_GROUP = originalFlag;
+      }
+    }
+  });
 });

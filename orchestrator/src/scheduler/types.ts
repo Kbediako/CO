@@ -39,6 +39,7 @@ export interface SchedulerAssignmentAttempt {
 export interface SchedulerAssignmentMetadata {
   weight: number;
   maxConcurrency: number;
+  groupIndex?: number | null;
 }
 
 export interface SchedulerAssignment {

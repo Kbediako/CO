@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { mkdtemp, writeFile, rm, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { createHash } from 'node:crypto';
 
 import { loadInstructionSet } from '../src/instructions/loader.js';
 import {
@@ -9,15 +10,21 @@ import {
   type PromptPackSectionSource
 } from '../src/instructions/promptPacks.js';
 
+async function writeStampedInstructions(path: string, content: string): Promise<void> {
+  const stamp = createHash('sha256').update(content, 'utf8').digest('hex');
+  const payload = `<!-- codex:instruction-stamp ${stamp} -->\n${content}`;
+  await writeFile(path, payload, 'utf8');
+}
+
 describe('loadInstructionSet', () => {
   it('merges instruction files in priority order', async () => {
     const root = await mkdtemp(join(tmpdir(), 'instructions-'));
     try {
-      await writeFile(join(root, 'AGENTS.md'), '# Root\nBe kind.', 'utf8');
+      await writeStampedInstructions(join(root, 'AGENTS.md'), '# Root\nBe kind.');
       await mkdir(join(root, 'docs'), { recursive: true });
-      await writeFile(join(root, 'docs', 'AGENTS.md'), '# Docs\nFollow docs.', 'utf8');
+      await writeStampedInstructions(join(root, 'docs', 'AGENTS.md'), '# Docs\nFollow docs.');
       await mkdir(join(root, '.agent'), { recursive: true });
-      await writeFile(join(root, '.agent', 'AGENTS.md'), '# Agent\nHandle task.', 'utf8');
+      await writeStampedInstructions(join(root, '.agent', 'AGENTS.md'), '# Agent\nHandle task.');
 
       const result = await loadInstructionSet(root);
       expect(result.sources.map((source) => source.path)).toEqual([
@@ -29,6 +36,7 @@ describe('loadInstructionSet', () => {
       expect(result.combined).toContain('Docs');
       expect(result.combined).toContain('Agent');
       expect(result.hash).toHaveLength(64);
+      expect(result.experienceMaxWords).toBe(32);
     } finally {
       await rm(root, { recursive: true, force: true });
     }
@@ -49,6 +57,7 @@ describe('loadInstructionSet', () => {
   it('loads prompt packs when manifests exist', async () => {
     const root = await mkdtemp(join(tmpdir(), 'instructions-prompt-pack-'));
     try {
+      await writeStampedInstructions(join(root, 'AGENTS.md'), '# Prompted\nUse tfgrpo.');
       const promptRel = '.agent/prompts/sample-pack.md';
       const promptPath = join(root, '.agent', 'prompts');
       await mkdir(promptPath, { recursive: true });

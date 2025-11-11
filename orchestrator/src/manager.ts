@@ -7,6 +7,7 @@ import type {
   PlanResult,
   PlannerAgent,
   ReviewResult,
+  RunGroupEntry,
   RunSummary,
   TaskContext,
   TesterAgent,
@@ -22,6 +23,15 @@ import { sanitizeRunId } from './persistence/sanitizeRunId.js';
 
 export type ModePolicy = (task: TaskContext, subtask: PlanItem) => ExecutionMode;
 export type RunIdFactory = (taskId: string) => string;
+
+interface PipelineRunResult {
+  target: PlanItem;
+  mode: ExecutionMode;
+  build: BuildResult;
+  test: TestResult;
+  review: ReviewResult;
+  summary: RunSummary;
+}
 
 export interface ManagerOptions {
   planner: PlannerAgent;
@@ -55,16 +65,26 @@ const defaultRunIdFactory: RunIdFactory = (taskId) => {
   return sanitizeRunId(`${taskId}-${timestamp}`);
 };
 
+function featureFlagEnabled(value: string | undefined): boolean {
+  if (!value) {
+    return false;
+  }
+  const normalized = value.trim().toLowerCase();
+  return ['1', 'true', 'on', 'yes'].includes(normalized);
+}
+
 export class TaskManager {
   private readonly eventBus: EventBus;
   private readonly modePolicy: ModePolicy;
   private readonly runIdFactory: RunIdFactory;
   private readonly persistenceCoordinator?: PersistenceCoordinator;
+  private readonly groupExecutionEnabled: boolean;
 
   constructor(private readonly options: ManagerOptions) {
     this.eventBus = options.eventBus ?? new EventBus();
     this.modePolicy = options.modePolicy ?? defaultModePolicy;
     this.runIdFactory = options.runIdFactory ?? defaultRunIdFactory;
+    this.groupExecutionEnabled = featureFlagEnabled(process.env.FEATURE_TFGRPO_GROUP);
     if (options.persistence) {
       const stateStore = options.persistence.stateStore ?? new TaskStateStore();
       const manifestWriter = options.persistence.manifestWriter ?? new RunManifestWriter();
@@ -103,35 +123,34 @@ export class TaskManager {
     if (failed) {
       return this.completeFromPlannerFailure(task, plan, runId, error);
     }
-    const subtask = this.selectExecutableSubtask(plan);
-    const mode = this.modePolicy(task, subtask);
+    const targets = this.selectExecutableSubtasks(plan);
+    const shouldRunGroup = this.groupExecutionEnabled && targets.length > 1;
+    const result = shouldRunGroup
+      ? await this.executeGroup(task, plan, targets, runId)
+      : await this.runPipelineStages(task, plan, targets[0]!, runId);
 
-    const build = await this.executeBuilder(task, plan, subtask, mode, runId);
-    if (!build.success) {
-      const skippedTest = this.createSkippedTestResult(build, runId);
-      const skippedReview = this.createSkippedReviewResult('build-failed');
-      const runSummary = this.createRunSummary(task, mode, plan, build, skippedTest, skippedReview, runId);
-      this.eventBus.emit({ type: 'run:completed', payload: runSummary });
-      return runSummary;
-    }
+    this.eventBus.emit({ type: 'run:completed', payload: result.summary });
 
-    const test = await this.executeTester(task, build, mode, runId);
-    if (!test.success) {
-      const skippedReview = this.createSkippedReviewResult('test-failed');
-      const runSummary = this.createRunSummary(task, mode, plan, build, test, skippedReview, runId);
-      this.eventBus.emit({ type: 'run:completed', payload: runSummary });
-      return runSummary;
-    }
-
-    const review = await this.executeReviewer(task, plan, build, test, mode, runId);
-    const runSummary = this.createRunSummary(task, mode, plan, build, test, review, runId);
-
-    this.eventBus.emit({ type: 'run:completed', payload: runSummary });
-
-    return runSummary;
+    return result.summary;
   }
 
-  private selectExecutableSubtask(plan: PlanResult): PlanItem {
+  private selectExecutableSubtasks(plan: PlanResult): PlanItem[] {
+    if (!this.groupExecutionEnabled) {
+      return [this.selectSingleSubtask(plan)];
+    }
+    if (plan.items.length === 0) {
+      throw new Error('Planner returned no executable subtasks.');
+    }
+    const runnable = plan.items.filter((item) => item.runnable !== false);
+    if (runnable.length === 0) {
+      throw new Error(
+        'Planner returned no runnable subtasks after applying selection and target hints.'
+      );
+    }
+    return this.prioritizeGroupTargets(plan, runnable);
+  }
+
+  private selectSingleSubtask(plan: PlanResult): PlanItem {
     if (plan.items.length === 0) {
       throw new Error('Planner returned no executable subtasks.');
     }
@@ -161,6 +180,25 @@ export class TaskManager {
     );
   }
 
+  private prioritizeGroupTargets(plan: PlanResult, runnable: PlanItem[]): PlanItem[] {
+    const prioritized: PlanItem[] = [];
+    const seen = new Set<string>();
+    const preferred =
+      (plan.targetId ? runnable.find((item) => item.id === plan.targetId) : undefined) ??
+      plan.items.find((item) => item.selected === true && item.runnable !== false);
+    if (preferred) {
+      prioritized.push(preferred);
+      seen.add(preferred.id);
+    }
+    for (const item of runnable) {
+      if (!seen.has(item.id)) {
+        prioritized.push(item);
+        seen.add(item.id);
+      }
+    }
+    return prioritized;
+  }
+
   private createRunSummary(
     task: TaskContext,
     mode: ExecutionMode,
@@ -181,6 +219,68 @@ export class TaskManager {
       review,
       timestamp
     };
+  }
+
+  private async runPipelineStages(
+    task: TaskContext,
+    plan: PlanResult,
+    target: PlanItem,
+    runId: string
+  ): Promise<PipelineRunResult> {
+    const mode = this.modePolicy(task, target);
+    const build = await this.executeBuilder(task, plan, target, mode, runId);
+    if (!build.success) {
+      const skippedTest = this.createSkippedTestResult(build, runId);
+      const skippedReview = this.createSkippedReviewResult('build-failed');
+      const summary = this.createRunSummary(task, mode, plan, build, skippedTest, skippedReview, runId);
+      return { target, mode, build, test: skippedTest, review: skippedReview, summary };
+    }
+    const test = await this.executeTester(task, build, mode, runId);
+    if (!test.success) {
+      const skippedReview = this.createSkippedReviewResult('test-failed');
+      const summary = this.createRunSummary(task, mode, plan, build, test, skippedReview, runId);
+      return { target, mode, build, test, review: skippedReview, summary };
+    }
+    const review = await this.executeReviewer(task, plan, build, test, mode, runId);
+    const summary = this.createRunSummary(task, mode, plan, build, test, review, runId);
+    return { target, mode, build, test, review, summary };
+  }
+
+  private async executeGroup(
+    task: TaskContext,
+    plan: PlanResult,
+    targets: PlanItem[],
+    runId: string
+  ): Promise<PipelineRunResult> {
+    const entries: RunGroupEntry[] = [];
+    let finalResult: PipelineRunResult | null = null;
+    for (let index = 0; index < targets.length; index += 1) {
+      const target = targets[index]!;
+      const result = await this.runPipelineStages(task, plan, target, runId);
+      entries.push({
+        index: index + 1,
+        subtaskId: target.id,
+        mode: result.mode,
+        buildSuccess: result.build.success,
+        testSuccess: result.test.success,
+        reviewApproved: Boolean(result.review.decision?.approved),
+        status: result.build.success && result.test.success ? 'succeeded' : 'failed'
+      });
+      finalResult = result;
+      if (!result.build.success || !result.test.success) {
+        break;
+      }
+    }
+    if (!finalResult) {
+      throw new Error('Group execution produced no runnable subtasks.');
+    }
+    finalResult.summary.group = {
+      enabled: true,
+      size: targets.length,
+      processed: entries.length,
+      entries
+    };
+    return finalResult;
   }
 
   private normalizeBuildResult(build: BuildResult, mode: ExecutionMode, runId: string): BuildResult {

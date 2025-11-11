@@ -23,6 +23,7 @@ export function createSchedulerPlan(
   const now = options.now ?? (() => new Date());
   const requestedAt = now().toISOString();
   const prefix = options.instancePrefix ?? request.task.id.toLowerCase();
+  const groupSize = extractTfgrpoGroupSize(request);
 
   const recovery = {
     heartbeatIntervalSeconds: request.schedule.recovery.heartbeatIntervalSeconds,
@@ -67,6 +68,7 @@ export function createSchedulerPlan(
       status: 'pending',
       recoveryCheckpoints: []
     };
+    const groupIndex = groupSize && groupSize > 0 ? ((i % groupSize) + 1) : null;
     assignments.push({
       instanceId,
       capability: slot.capability,
@@ -76,7 +78,8 @@ export function createSchedulerPlan(
       attempts: [attempt],
       metadata: {
         weight: slot.weight,
-        maxConcurrency: slot.maxConcurrency
+        maxConcurrency: slot.maxConcurrency,
+        ...(groupIndex ? { groupIndex } : {})
       }
     });
   }
@@ -200,4 +203,20 @@ function serializeAttempt(attempt: SchedulerAssignmentAttempt): SchedulerManifes
     status: attempt.status,
     recovery_checkpoints: attempt.recoveryCheckpoints
   };
+}
+
+function extractTfgrpoGroupSize(request: RunRequestV2): number | null {
+  const metadata = request.metadata;
+  if (!metadata || typeof metadata !== 'object') {
+    return null;
+  }
+  const tfgrpo = (metadata as Record<string, unknown>).tfgrpo;
+  if (!tfgrpo || typeof tfgrpo !== 'object') {
+    return null;
+  }
+  const value = (tfgrpo as Record<string, unknown>).groupSize;
+  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
+    return null;
+  }
+  return Math.trunc(value);
 }

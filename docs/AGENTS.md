@@ -1,3 +1,4 @@
+<!-- codex:instruction-stamp e73b33240169ba3af98b1eee5671f332f165f7ba77646ccfd24026a2b1fefbb1 -->
 # Repository Agent Guidance
 
 ## Project 0303 — Codex Orchestrator Autonomy Enhancements
@@ -14,6 +15,7 @@
 - Export `MCP_RUNNER_TASK_ID=0506-tfgrpo-integration` so CLI manifests land in `.runs/0506-tfgrpo-integration/cli/<run-id>/manifest.json` and mirror evidence across `/tasks`, `docs/`, and `.agent/`.
 - Reference stamped prompt packs stored in `.agent/prompts/prompt-packs/` when wiring system/inject/summarize/extract/optimize prompts; their hashes surface in the CLI manifest `prompt_packs` array for each epoch.
 - Persist experience, metrics, and OTEL artifacts under `.runs/0506-tfgrpo-integration/metrics.*` and `out/0506-tfgrpo-integration/` so reviewers can audit TF-GRPO loops end-to-end.
+- Diagnostics reminder: leave `FEATURE_TFGRPO_GROUP`, `TFGRPO_GROUP_SIZE`, and related env vars unset when running the default diagnostics pipeline. Those commands run the full vitest suite (including the guardrail tests) and intentionally fail if grouped execution is forced. Use the `tfgrpo-learning` pipeline (or custom configs) for grouped TF-GRPO validation instead.
 
 ## Instruction Chain
 - Global defaults live in `AGENTS.md`.

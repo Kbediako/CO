@@ -1,6 +1,38 @@
 {
   "pipelines": [
     {
+      "id": "diagnostics",
+      "title": "Diagnostics Pipeline",
+      "description": "Build, lint, test, and spec-guard the repository with grouped runner support.",
+      "tags": ["diagnostics-primary", "diagnostics-secondary"],
+      "stages": [
+        {
+          "kind": "command",
+          "id": "build",
+          "title": "npm run build",
+          "command": "npm run build"
+        },
+        {
+          "kind": "command",
+          "id": "lint",
+          "title": "npm run lint",
+          "command": "npm run lint"
+        },
+        {
+          "kind": "command",
+          "id": "test",
+          "title": "npm run test",
+          "command": "npm run test"
+        },
+        {
+          "kind": "command",
+          "id": "spec-guard",
+          "title": "node scripts/spec-guard.mjs --dry-run",
+          "command": "node scripts/spec-guard.mjs --dry-run"
+        }
+      ]
+    },
+    {
       "id": "diagnostics-with-eval",
       "title": "Diagnostics Pipeline (with Eval Harness)",
       "description": "Build, lint, test, run evaluation harness, and verify specs for guardrail evidence capture.",
@@ -41,6 +73,7 @@
       "id": "tfgrpo-learning",
       "title": "TF-GRPO Learning Loop",
       "description": "Run three TF-GRPO epochs (~100 samples, train temp 0.7, eval temp 0.3, G>=2) and capture guardrail evidence.",
+      "tags": ["tfgrpo-learning", "tfgrpo-learning-secondary"],
       "stages": [
         {
           "kind": "command",

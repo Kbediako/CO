@@ -119,6 +119,7 @@ export interface RunSummary {
   designArtifacts?: DesignArtifactRecord[];
   designArtifactsSummary?: DesignArtifactsSummary;
   designConfigSnapshot?: Record<string, unknown> | null;
+  group?: RunGroupSummary;
 }
 
 export interface RunHandleSummary {
@@ -136,6 +137,23 @@ export interface PrivacyRunSummary {
   redactedFrames: number;
   blockedFrames: number;
   allowedFrames: number;
+}
+
+export interface RunGroupSummary {
+  enabled: boolean;
+  size: number;
+  processed: number;
+  entries: RunGroupEntry[];
+}
+
+export interface RunGroupEntry {
+  index: number;
+  subtaskId: string;
+  mode: ExecutionMode;
+  buildSuccess: boolean;
+  testSuccess: boolean;
+  reviewApproved: boolean;
+  status: 'succeeded' | 'failed';
 }
 
 export interface PlannerAgent {
