@@ -2,6 +2,8 @@ import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { join, relative } from 'node:path';
 
+import { loadPromptPacks, type PromptPack } from './promptPacks.js';
+
 export interface InstructionSource {
   path: string;
   content: string;
@@ -11,6 +13,7 @@ export interface InstructionSet {
   hash: string;
   sources: InstructionSource[];
   combined: string;
+  promptPacks: PromptPack[];
 }
 
 export async function loadInstructionSet(repoRoot: string): Promise<InstructionSet> {
@@ -32,11 +35,13 @@ export async function loadInstructionSet(repoRoot: string): Promise<InstructionS
   const hash = combined
     ? createHash('sha256').update(combined, 'utf8').digest('hex')
     : '';
+  const promptPacks = await loadPromptPacks(repoRoot);
 
   return {
     hash,
     sources,
-    combined
+    combined,
+    promptPacks
   };
 }
 

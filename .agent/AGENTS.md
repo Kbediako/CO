@@ -17,6 +17,7 @@
 ### Build & Test Quick Reference
 - `npm run lint` — Executes `npm run build:patterns` before linting orchestrator, adapter, and evaluation sources.
 - `npm run test` — Complete Vitest suite (manager, agents, persistence, adapters).
+- `npx vitest run <pattern>` — Use this non-watch mode for focused suites; plain `npx vitest` launches an interactive watcher that never exits (we can’t press `q`), so always prefer the `run` form in automation.
 - `npm run eval:test` — Exercises evaluation harness scenarios; depends on local `python3` for cross-language fixtures.
 - `npm run build:patterns` — Compile codemods/linters/templates; run whenever `patterns/**` changes.
 - `node --loader ts-node/esm evaluation/harness/run-all.ts --mode=mcp` — Manual sweep to generate scenario artifacts for manifests.
@@ -43,6 +44,12 @@
 - Keep metrics in `.runs/0303-orchestrator-autonomy/metrics.json` and summarize outcomes in `out/0303-orchestrator-autonomy/state.json`; update docs when these files change.
 - Before requesting review, run `node scripts/spec-guard.mjs --dry-run`, `npm run lint`, `npm run test`, and `npm run eval:test` (if fixtures exist), then capture the manifest path documenting those executions.
 - Follow `.agent/SOPs/orchestrator-autonomy.md` for guardrail, evidence, and hand-off requirements specific to Task 0303.
+
+## Project 0506 — TF-GRPO Integration Foundations
+- Set `MCP_RUNNER_TASK_ID=0506-tfgrpo-integration` before invoking TF-GRPO pipelines so manifests, metrics, and state snapshots land under `.runs/0506-tfgrpo-integration/**` and `out/0506-tfgrpo-integration/**`.
+- Only use stamped prompt packs from `.agent/prompts/prompt-packs/**`; their SHA-256 signatures must match the manifest or the loader will reject the run. Manifests expose these values via the `prompt_packs` array for auditors.
+- Persist ≤32-word experiences and reward evidence inside `out/0506-tfgrpo-integration/experiences.jsonl` and cross-link the manifest path each time you flip checklist items in `tasks/tasks-0506-tfgrpo.md` and `.agent/task/0506-tfgrpo-integration.md`.
+- Guardrails still require `node scripts/spec-guard.mjs --dry-run`, `npm run lint`, and `npm run test` prior to review; attach the TF-GRPO manifest path documenting these validations.
 
 ### Database Safety Safeguards
 - Treat production data as immutable; require read-only replicas or sanitized fixtures for testing.

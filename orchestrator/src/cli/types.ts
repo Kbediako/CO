@@ -107,6 +107,14 @@ export interface ApprovalRecord {
   reason?: string;
 }
 
+export interface PromptPackManifestEntry {
+  id: string;
+  domain: string;
+  stamp: string;
+  experience_slots: number;
+  sources: string[];
+}
+
 export interface HandleRecord {
   handle_id: string;
   correlation_id: string;
@@ -181,6 +189,7 @@ export interface CliManifest {
   plan_target_id: string | null;
   instructions_hash: string | null;
   instructions_sources: string[];
+  prompt_packs?: PromptPackManifestEntry[] | null;
   guardrails_required?: boolean;
   control_plane?: ControlPlaneManifestSection;
   scheduler?: SchedulerManifest;

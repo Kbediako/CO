@@ -350,6 +350,24 @@
     "instructions_sources": {
       "type": "array",
       "items": { "type": "string", "minLength": 1 }
+    },
+    "prompt_packs": {
+      "type": ["array", "null"],
+      "items": {
+        "type": "object",
+        "required": ["id", "domain", "stamp", "experience_slots", "sources"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "domain": { "type": "string", "minLength": 1 },
+          "stamp": { "type": "string", "minLength": 1 },
+          "experience_slots": { "type": "integer", "minimum": 0 },
+          "sources": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 }
+          }
+        }
+      }
     }
   }
 }

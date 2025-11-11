@@ -12,6 +12,7 @@ During run bootstrap the orchestrator records two manifest fields:
 
 - `instructions_hash` – SHA-256 hash of the combined instruction text (`null` when no instructions are present).
 - `instructions_sources` – relative paths for every discovered file, in merge order.
+- `prompt_packs` – stamped prompt-pack metadata (id, domain, stamp, experience slots, and source paths) loaded from `.agent/prompts/prompt-packs/**`; omitted when no packs are defined.
 
 Use this hash to audit runs and detect instruction drift over time. For example, CI can compare the latest hash with a known-good value before promoting a build.
 

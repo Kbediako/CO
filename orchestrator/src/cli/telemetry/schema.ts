@@ -167,6 +167,24 @@ export const CLI_MANIFEST_SCHEMA: JsonSchema = {
       type: 'array',
       items: { type: 'string', minLength: 1 }
     },
+    prompt_packs: {
+      type: ['array', 'null'],
+      items: {
+        type: 'object',
+        required: ['id', 'domain', 'stamp', 'experience_slots', 'sources'],
+        additionalProperties: false,
+        properties: {
+          id: { type: 'string', minLength: 1 },
+          domain: { type: 'string', minLength: 1 },
+          stamp: { type: 'string', minLength: 1 },
+          experience_slots: { type: 'integer', minimum: 0 },
+          sources: {
+            type: 'array',
+            items: { type: 'string', minLength: 1 }
+          }
+        }
+      }
+    },
     privacy: {
       type: 'object',
       additionalProperties: false,
@@ -271,6 +289,7 @@ export function validateCliManifest(candidate: unknown): ValidationResult<CliMan
   } else if (!candidate.instructions_sources.every((source: unknown) => typeof source === 'string')) {
     errors.push('instructions_sources must contain only strings');
   }
+  validatePromptPacks(candidate.prompt_packs, errors);
 
   validateBoolean(candidate, 'metrics_recorded', errors);
 
@@ -383,6 +402,37 @@ function validateApprovals(candidate: unknown, errors: string[]): void {
     validateString(entry, 'actor', errors, `approvals[${index}]`);
     validateString(entry, 'timestamp', errors, `approvals[${index}]`);
     validateOptionalString(entry, 'reason', errors, `approvals[${index}]`);
+  });
+}
+
+function validatePromptPacks(candidate: unknown, errors: string[]): void {
+  if (candidate === undefined || candidate === null) {
+    return;
+  }
+  if (!Array.isArray(candidate)) {
+    errors.push('prompt_packs must be an array when provided');
+    return;
+  }
+  candidate.forEach((entry, index) => {
+    if (!isPlainObject(entry)) {
+      errors.push(`prompt_packs[${index}] must be an object`);
+      return;
+    }
+    const pack = entry as Record<string, unknown>;
+    validateString(pack, 'id', errors, `prompt_packs[${index}]`);
+    validateString(pack, 'domain', errors, `prompt_packs[${index}]`);
+    validateString(pack, 'stamp', errors, `prompt_packs[${index}]`);
+    validateNumber(pack, 'experience_slots', errors, {
+      integer: true,
+      minimum: 0,
+      path: `prompt_packs[${index}].experience_slots`
+    });
+    const sources = pack.sources;
+    if (!Array.isArray(sources)) {
+      errors.push(`prompt_packs[${index}].sources must be an array`);
+    } else if (!sources.every((source) => typeof source === 'string')) {
+      errors.push(`prompt_packs[${index}].sources must contain strings only`);
+    }
   });
 }
 

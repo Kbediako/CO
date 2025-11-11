@@ -1,0 +1,19 @@
+{
+  "id": "tfgrpo-implementation",
+  "domain": "implementation",
+  "stamp": "50b15d46c4689ef00849f6e7017bb98acdc71f522551119cb2013416e0fb9801",
+  "experienceSlots": 3,
+  "system": ".agent/prompts/hotswap-implementation.md",
+  "inject": [
+    ".agent/prompts/hotswap-implementation.md"
+  ],
+  "summarize": [
+    ".agent/prompts/hotswap-implementation.md"
+  ],
+  "extract": [
+    ".agent/prompts/hotswap-implementation.md"
+  ],
+  "optimize": [
+    ".agent/prompts/hotswap-implementation.md"
+  ]
+}

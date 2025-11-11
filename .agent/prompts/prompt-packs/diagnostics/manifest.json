@@ -1,0 +1,19 @@
+{
+  "id": "tfgrpo-diagnostics",
+  "domain": "diagnostics",
+  "stamp": "318c254d1a868bffe9e3dd78bd1b92cad7f20d130bd31c4573d2fceda333f838",
+  "experienceSlots": 1,
+  "system": ".agent/prompts/mcp-diagnostics.md",
+  "inject": [
+    ".agent/prompts/mcp-diagnostics.md"
+  ],
+  "summarize": [
+    ".agent/prompts/mcp-diagnostics.md"
+  ],
+  "extract": [
+    ".agent/prompts/mcp-diagnostics.md"
+  ],
+  "optimize": [
+    ".agent/prompts/mcp-diagnostics.md"
+  ]
+}

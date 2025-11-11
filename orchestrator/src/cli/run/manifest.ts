@@ -99,12 +99,20 @@ export async function bootstrapManifest(runId: string, options: ManifestBootstra
     plan_target_id: options.planTargetId ?? null,
     instructions_hash: null,
     instructions_sources: [],
+    prompt_packs: [],
     guardrails_required: pipeline.guardrailsRequired !== false
   };
 
   const instructions = await loadInstructionSet(env.repoRoot);
   manifest.instructions_hash = instructions.hash || null;
   manifest.instructions_sources = instructions.sources.map((source) => source.path);
+  manifest.prompt_packs = instructions.promptPacks.map((pack) => ({
+    id: pack.id,
+    domain: pack.domain,
+    stamp: pack.stamp,
+    experience_slots: pack.experienceSlots,
+    sources: pack.sources.map((source) => source.path)
+  }));
 
   await writeJsonAtomic(paths.manifestPath, manifest);
   await writeFile(paths.resumeTokenPath, `${resumeToken}\n`, 'utf8');

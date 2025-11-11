@@ -10,6 +10,11 @@
 - Existing manifests remain in `.runs/0202-orchestrator-hardening/cli/`; keep metrics/state snapshots in `.runs/0202-orchestrator-hardening/metrics.json` and `out/0202-orchestrator-hardening/state.json`.
 - Maintain checklist mirrors across `tasks/tasks-0202-orchestrator-hardening.md`, `docs/TASKS.md`, and `.agent/task/0202-orchestrator-hardening.md` when updating evidence.
 
+## Project 0506 — TF-GRPO Integration Foundations
+- Export `MCP_RUNNER_TASK_ID=0506-tfgrpo-integration` so CLI manifests land in `.runs/0506-tfgrpo-integration/cli/<run-id>/manifest.json` and mirror evidence across `/tasks`, `docs/`, and `.agent/`.
+- Reference stamped prompt packs stored in `.agent/prompts/prompt-packs/` when wiring system/inject/summarize/extract/optimize prompts; their hashes surface in the CLI manifest `prompt_packs` array for each epoch.
+- Persist experience, metrics, and OTEL artifacts under `.runs/0506-tfgrpo-integration/metrics.*` and `out/0506-tfgrpo-integration/` so reviewers can audit TF-GRPO loops end-to-end.
+
 ## Instruction Chain
 - Global defaults live in `AGENTS.md`.
 - Repository-level specifics (this file) describe project directories and guardrails.
