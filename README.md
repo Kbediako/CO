@@ -14,10 +14,20 @@ Codex Orchestrator is the coordination layer that glues together Codex-driven ag
 - **Tool orchestration:** The shared `packages/orchestrator` toolkit handles approval prompts, sandbox retries, and tool run bookkeeping used by higher-level agents.
 
 ```
-Task input ─► Planner ─► Builder ─► Tester ─► Reviewer ─► Run summary
-                         │            │            │
-                         └─ manifests, metrics, approvals, guardrails ─► .runs/, out/, cloud
+Task input ─► Planner ─► Mode policy (mcp/cloud) ─► Builder ─► Tester ─► Reviewer ─► Run summary
+                         │                    │            │            │              │
+                         │                    │            │            │              └─► Control-plane validators / Scheduler hooks / Cloud sync
+                         │                    │            │            │
+                         └─► EventBus ─► PersistenceCoordinator ─► .runs/ manifests ─► out/ audits
+                                                                   │
+                                                                   └─► Task state snapshots & guardrail evidence
+
+Group execution (when `FEATURE_TFGRPO_GROUP=on`): repeat the Builder → Tester → Reviewer stages for prioritized subtasks until a stage fails or the list completes.
 ```
+
+- **Mode policy:** Defaults to `mcp` but upgrades to `cloud` whenever a subtask flags `requires_cloud` or task metadata enables parallel execution, ensuring builders/testers run in the correct environment before artifacts are produced.
+- **Event-driven persistence:** Every `run:completed` event flows through `PersistenceCoordinator`, writing manifests under `.runs/<task-id>/<run-id>/` and keeping task-state snapshots current before downstream consumers (control-plane validators, scheduler hooks, cloud sync) ingest the data.
+- **Optional group loop:** When the TF-GRPO feature flag is on, the manager processes the prioritized subtask list serially, stopping early if any Builder or Tester stage fails so reviewers only see runnable work with passing prerequisites.
 
 ## Repository Layout
 - `orchestrator/` – Core orchestration runtime (`TaskManager`, event bus, persistence, CLI, control-plane hooks, scheduler, privacy guard).
