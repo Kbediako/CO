@@ -1,0 +1,54 @@
+{
+  "id": "plus-ex-15th",
+  "url": "https://15th.plus-ex.com/",
+  "referenceUrl": "https://15th.plus-ex.com/",
+  "breakpoints": [
+    {
+      "id": "desktop",
+      "width": 1440,
+      "height": 900
+    },
+    {
+      "id": "mobile",
+      "width": 428,
+      "height": 926
+    }
+  ],
+  "maskSelectors": [
+    "form",
+    ".contact-form",
+    ".newsletter-form",
+    "[data-guestbook-entry]"
+  ],
+  "capturedAt": "2025-11-14T10:59:24.531Z",
+  "colorPalettePreview": [
+    "#2c2c2c",
+    "#000000",
+    "#111111",
+    "#222222",
+    "#888888",
+    "#333333",
+    "#eeeeee",
+    "#1a1a1a",
+    "#676767",
+    "#dad5cb",
+    "#c5bdad",
+    "#ffffff"
+  ],
+  "fontFamilies": [
+    "Monaco",
+    "monospace",
+    "Courier New",
+    "sans-serif!important",
+    "-apple-system",
+    "BlinkMacSystemFont",
+    "Segoe UI",
+    "Roboto"
+  ],
+  "sectionCount": 8,
+  "runtimeCanvasColors": [],
+  "resolvedFonts": [
+    "neue-haas-grotesk-display",
+    "neue-haas-grotesk-text"
+  ]
+}

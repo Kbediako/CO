@@ -395,15 +395,34 @@ async function mirrorReferenceAssets(options: {
   referenceArtifactPath: string;
 }): Promise<void> {
   const { entry, repoRoot, referenceArtifactPath } = options;
-  const contextAssetsDir = join(repoRoot, entry.relativeDir, 'assets');
-  if (!(await directoryExists(contextAssetsDir))) {
+  const contextDir = join(repoRoot, entry.relativeDir);
+  if (!(await directoryExists(contextDir))) {
     return;
   }
   const referenceDir = dirname(join(repoRoot, referenceArtifactPath));
-  const destinationAssetsDir = join(referenceDir, 'assets');
-  await mkdir(destinationAssetsDir, { recursive: true });
-  await cp(contextAssetsDir, destinationAssetsDir, { recursive: true, force: true });
-  await mirrorTopLevelShortcuts(destinationAssetsDir, referenceDir);
+  await mkdir(referenceDir, { recursive: true });
+  const entries = await readdir(contextDir, { withFileTypes: true });
+  let copiedAssets = false;
+  for (const entryDir of entries) {
+    if (!entryDir.isDirectory()) {
+      continue;
+    }
+    const sourcePath = join(contextDir, entryDir.name);
+    const destinationPath = join(referenceDir, entryDir.name);
+    await cp(sourcePath, destinationPath, { recursive: true, force: true });
+    if (entryDir.name === 'assets') {
+      copiedAssets = true;
+      await mirrorTopLevelShortcuts(destinationPath, referenceDir);
+    }
+  }
+  if (!copiedAssets) {
+    const assetsPath = join(contextDir, 'assets');
+    if (await directoryExists(assetsPath)) {
+      await mkdir(join(referenceDir, 'assets'), { recursive: true });
+      await cp(assetsPath, join(referenceDir, 'assets'), { recursive: true, force: true });
+      await mirrorTopLevelShortcuts(join(referenceDir, 'assets'), referenceDir);
+    }
+  }
 }
 
 async function buildInteractionMacro(entry: ToolkitContextState, repoRoot: string): Promise<string | null> {

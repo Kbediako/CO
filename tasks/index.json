@@ -106,8 +106,8 @@
       "gate": {
         "phase": "15th-plus-hi-fi-validation",
         "status": "succeeded",
-        "log": ".runs/0520-15th-plus-hi-fi/cli/2025-11-14T10-51-49-459Z-fb52f4b5/manifest.json",
-        "run_id": "2025-11-14T10-51-49-459Z-fb52f4b5"
+        "log": ".runs/0520-15th-plus-hi-fi/cli/2025-11-14T10-59-24-271Z-88c94f4f/manifest.json",
+        "run_id": "2025-11-14T10-59-24-271Z-88c94f4f"
       },
       "created_at": "2025-11-14",
       "completed_at": "2025-11-14"
