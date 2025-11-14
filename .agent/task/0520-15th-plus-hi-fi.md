@@ -7,15 +7,15 @@
 
 ### Checklist Convention
 - Export `MCP_RUNNER_TASK_ID=0520-15th-plus-hi-fi` before invoking `codex-orchestrator` commands.
-- Cite `.runs/0520-15th-plus-hi-fi/cli/2025-11-14T10-59-24-271Z-88c94f4f/manifest.json` and `archives/hi-fi-tests/15th-plus/2025-11-14T10-59-24-271Z-88c94f4f/` whenever updating run status.
+- Cite `.runs/0520-15th-plus-hi-fi/cli/2025-11-14T11-11-13-442Z-6897b063/manifest.json` and `archives/hi-fi-tests/15th-plus/2025-11-14T11-11-13-442Z-6897b063/` whenever updating run status.
 
 ## Execution Milestones
 1. **Toolkit run completed**
    - Command: `npx codex-orchestrator start hi-fi-design-toolkit --task 0520-15th-plus-hi-fi --format json`.
-   - Evidence: `.runs/0520-15th-plus-hi-fi/cli/2025-11-14T10-59-24-271Z-88c94f4f/manifest.json` (extract → tokens → reference → spec-guard → artifact writer).
+   - Evidence: `.runs/0520-15th-plus-hi-fi/cli/2025-11-14T11-11-13-442Z-6897b063/manifest.json` (extract → tokens → reference → spec-guard → artifact writer).
    - [x] Status
 2. **Archive + reference refresh**
-   - Tasks: Copy `.runs/0520-15th-plus-hi-fi/2025-11-14T10-59-24-271Z-88c94f4f/artifacts/design-toolkit/**` into `archives/hi-fi-tests/15th-plus/2025-11-14T10-59-24-271Z-88c94f4f/`, prune `.runs/.../artifacts`, and update `reference/plus-ex-15th/README.md` + loader macro.
+   - Tasks: Copy `.runs/0520-15th-plus-hi-fi/2025-11-14T11-11-13-442Z-6897b063/artifacts/design-toolkit/**` into `archives/hi-fi-tests/15th-plus/2025-11-14T11-11-13-442Z-6897b063/`, prune `.runs/.../artifacts`, and update `reference/plus-ex-15th/README.md` + loader macro.
    - [x] Status
 3. **Local validation**
    - Procedure: `npx serve ... -l 4173` + Playwright probe verifying `[data-section]` presence and `document.body.dataset.toolkitScrollUnlocked === 'true'`; grep ensures no `/assets/assets/**` paths remain.
