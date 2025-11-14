@@ -50,6 +50,7 @@ export type InteractionPage = {
     wheel: (deltaX: number, deltaY: number) => Promise<void>;
   };
   $(selector: string): Promise<InteractionElementHandle | null>;
+  evaluate<R>(pageFunction: () => R | Promise<R>): Promise<R>;
 };
 
 interface CapturedAssetRecord {
@@ -94,6 +95,9 @@ export async function capturePageSnapshot(url: string, options?: SnapshotOptions
     absolutizeDocument($, url);
     const assetRewrite = mirrorAssets ? buildAssetRewrite(capturedAssets) : null;
     if (assetRewrite) {
+      await ensureInlineAssets(html, url, assetRewrite);
+      await ensurePortfolioAssets(html, url, assetRewrite);
+      await ensureDocumentAssets($, url, assetRewrite);
       rewriteDocumentAssets($, url, assetRewrite.map);
     }
 
@@ -125,6 +129,7 @@ export async function capturePageSnapshot(url: string, options?: SnapshotOptions
 
     let aggregatedCss = absolutizeCssUrls(inlineCss.join('\n\n'), url);
     if (assetRewrite) {
+      await ensureCssAssets(aggregatedCss, url, assetRewrite);
       aggregatedCss = rewriteCssAssetUrls(aggregatedCss, url, assetRewrite.map);
     }
     if (aggregatedCss.trim().length > 0) {
@@ -183,6 +188,39 @@ export async function runDefaultInteractions(page: InteractionPage): Promise<voi
     }
 
     await safeWait(600);
+
+    await page
+      .evaluate(() => {
+        const preload = new Set<string>();
+        const normalizePath = (value: string) => {
+          if (!value) {
+            return null;
+          }
+          const trimmed = value.trim();
+          if (/^https?:\/\//i.test(trimmed)) {
+            return trimmed;
+          }
+          if (trimmed.startsWith('/')) {
+            return trimmed;
+          }
+          if (trimmed.startsWith('assets/')) {
+            return `/${trimmed}`;
+          }
+          return `/assets/portfolio/${trimmed}`;
+        };
+        document.querySelectorAll('[data-src]').forEach((element) => {
+          const attr = element.getAttribute('data-src');
+          const resolved = normalizePath(attr ?? '');
+          if (!resolved || preload.has(resolved)) {
+            return;
+          }
+          preload.add(resolved);
+          const img = new Image();
+          img.decoding = 'async';
+          img.src = resolved;
+        });
+      })
+      .catch(() => {});
   } catch (error) {
     console.warn('[snapshot] interaction macro failed', error);
   }
@@ -217,10 +255,7 @@ function buildAssetRewrite(records: CapturedAssetRecord[]): AssetRewriteData {
   const map = new Map<string, string>();
   const assets: SnapshotAsset[] = [];
   for (const record of records) {
-    const safePath = sanitizeAssetPath(record.pathname);
-    const normalizedPath = safePath.replace(/^assets\//i, '');
-    const finalPath = normalizedPath.length > 0 ? normalizedPath : 'index.html';
-    const relativePath = `assets/${finalPath}`;
+    const relativePath = buildRelativeAssetPath(record.pathname);
     if (map.has(record.url)) {
       continue;
     }
@@ -323,6 +358,31 @@ function rewriteDocumentAssets($: CheerioAPI, baseUrl: string, assetMap: Map<str
   }
 }
 
+async function ensureDocumentAssets($: CheerioAPI, baseUrl: string, assetRewrite: AssetRewriteData): Promise<void> {
+  const selectors: Array<{ selector: string; attribute: string }> = [
+    { selector: 'img', attribute: 'src' },
+    { selector: 'script', attribute: 'src' },
+    { selector: 'link', attribute: 'href' },
+    { selector: 'video', attribute: 'poster' },
+    { selector: 'video source', attribute: 'src' },
+    { selector: 'source', attribute: 'src' },
+    { selector: 'use', attribute: 'xlink:href' }
+  ];
+
+  for (const item of selectors) {
+    const nodes = $(item.selector);
+    for (let index = 0; index < nodes.length; index += 1) {
+      const element = nodes[index];
+      const value = $(element).attr(item.attribute);
+      if (!value) {
+        continue;
+      }
+      const absolute = absolutizeUrl(value, baseUrl);
+      await fetchMissingAsset(absolute, baseUrl, assetRewrite);
+    }
+  }
+}
+
 function rewriteCssAssetUrls(css: string, baseUrl: string, assetMap: Map<string, string>): string {
   if (!css) {
     return css;
@@ -343,6 +403,66 @@ function rewriteCssAssetUrls(css: string, baseUrl: string, assetMap: Map<string,
     }
     return `url(${replacement.startsWith('.') ? replacement : `./${replacement}`})`;
   });
+}
+
+async function ensureInlineAssets(html: string, baseUrl: string, assetRewrite: AssetRewriteData): Promise<void> {
+  if (!html) {
+    return;
+  }
+  const inlineRegex = /["'`](\.{0,2}\/?assets\/[^"'`]+)["'`]/gi;
+  const pending = new Set<string>();
+  let match: RegExpExecArray | null;
+  while ((match = inlineRegex.exec(html)) !== null) {
+    const rawPath = match[1];
+    if (!rawPath) {
+      continue;
+    }
+    pending.add(rawPath);
+  }
+  for (const referencePath of pending) {
+    const absolute = absolutizeUrl(referencePath, baseUrl);
+    await fetchMissingAsset(absolute, baseUrl, assetRewrite);
+  }
+}
+
+async function ensurePortfolioAssets(html: string, baseUrl: string, assetRewrite: AssetRewriteData): Promise<void> {
+  if (!html) {
+    return;
+  }
+  const regex = /project_[^"'`\\\s]+?\.jpg/gi;
+  const matches = new Set<string>();
+  let match: RegExpExecArray | null;
+  while ((match = regex.exec(html)) !== null) {
+    const filename = match[0];
+    if (filename) {
+      matches.add(filename);
+    }
+  }
+  for (const filename of matches) {
+    const absolute = new URL(`/assets/portfolio/${filename}`, baseUrl).toString();
+    await fetchMissingAsset(absolute, baseUrl, assetRewrite);
+  }
+}
+
+async function ensureCssAssets(css: string, baseUrl: string, assetRewrite: AssetRewriteData): Promise<void> {
+  if (!css) {
+    return;
+  }
+  const urlRegex = /url\(([^)]+)\)/gi;
+  let match: RegExpExecArray | null;
+  while ((match = urlRegex.exec(css)) !== null) {
+    const rawValue = match[1];
+    if (!rawValue) {
+      continue;
+    }
+    const trimmed = rawValue.trim();
+    const unquoted = trimmed.replace(/^['"]|['"]$/g, '');
+    if (/^(data:|mailto:|#)/i.test(unquoted)) {
+      continue;
+    }
+    const absolute = absolutizeUrl(unquoted, baseUrl);
+    await fetchMissingAsset(absolute, baseUrl, assetRewrite);
+  }
 }
 
 function absolutizeUrl(value: string, baseUrl: string): string {
@@ -590,6 +710,13 @@ function sanitizeAssetPath(pathname: string): string {
   return segments.join('/');
 }
 
+function buildRelativeAssetPath(pathname: string): string {
+  const safePath = sanitizeAssetPath(pathname);
+  const normalizedPath = safePath.replace(/^assets\//i, '');
+  const finalPath = normalizedPath.length > 0 ? normalizedPath : 'index.html';
+  return `assets/${finalPath}`;
+}
+
 async function collectRuntimeMetadata(page: Page): Promise<{
   runtimeCanvasColors: string[];
   resolvedFonts: string[];
@@ -681,4 +808,36 @@ async function fetchWithHeaders(url: string, referer?: string): Promise<Response
     headers.referer = referer;
   }
   return fetch(url, { headers });
+}
+
+async function fetchMissingAsset(absoluteUrl: string, referer: string, assetRewrite: AssetRewriteData): Promise<void> {
+  if (!isSameOrigin(absoluteUrl, referer)) {
+    return;
+  }
+  const normalized = normalizeAssetUrl(absoluteUrl);
+  if (assetRewrite.map.has(normalized)) {
+    return;
+  }
+  try {
+    const response = await fetchWithHeaders(absoluteUrl, referer);
+    if (!response.ok) {
+      return;
+    }
+    const arrayBuffer = await response.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    const pathname = new URL(absoluteUrl).pathname;
+    const filename = pathname.split('/').pop() ?? '';
+    if (!filename.includes('.')) {
+      return;
+    }
+    const relativePath = buildRelativeAssetPath(pathname);
+    assetRewrite.map.set(normalized, relativePath);
+    assetRewrite.assets.push({
+      sourceUrl: normalized,
+      relativePath,
+      buffer
+    });
+  } catch (error) {
+    console.warn('[snapshot] Failed to fetch referenced asset', absoluteUrl, 'due to', error);
+  }
 }
