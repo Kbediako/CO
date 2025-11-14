@@ -712,9 +712,17 @@ function sanitizeAssetPath(pathname: string): string {
 
 function buildRelativeAssetPath(pathname: string): string {
   const safePath = sanitizeAssetPath(pathname);
-  const normalizedPath = safePath.replace(/^assets\//i, '');
-  const finalPath = normalizedPath.length > 0 ? normalizedPath : 'index.html';
-  return `assets/${finalPath}`;
+  if (safePath.length === 0) {
+    return 'index.html';
+  }
+  const lower = safePath.toLowerCase();
+  if (lower.startsWith('assets/')) {
+    return safePath;
+  }
+  if (lower.startsWith('video/')) {
+    return safePath;
+  }
+  return `assets/${safePath}`;
 }
 
 async function collectRuntimeMetadata(page: Page): Promise<{

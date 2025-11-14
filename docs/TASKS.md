@@ -197,19 +197,19 @@ Mirror status with `tasks/tasks-0506-tfgrpo.md` and `.agent/task/0506-tfgrpo-int
 
 # Task List Snapshot — PlusX 15th Anniversary Hi-Fi Clone (0520-15th-plus-hi-fi)
 
-- **Update — 2025-11-14:** Toolkit re-run captured https://15th.plus-ex.com with runtime canvas/font propagation, ScrollSmoother loader macro, and manifest `.runs/0520-15th-plus-hi-fi/cli/2025-11-14T10-37-59-022Z-869f8886/manifest.json`.
-- **Update — Archive refreshed:** `.runs/.../artifacts` copied into `archives/hi-fi-tests/15th-plus/2025-11-14T10-37-59-022Z-869f8886/` before pruning the run directory; README + loader script live in `reference/plus-ex-15th/`.
+- **Update — 2025-11-14:** Toolkit re-run captured https://15th.plus-ex.com with runtime canvas/font propagation, ScrollSmoother loader macro, and manifest `.runs/0520-15th-plus-hi-fi/cli/2025-11-14T10-51-49-459Z-fb52f4b5/manifest.json`.
+- **Update — Archive refreshed:** `.runs/.../artifacts` copied into `archives/hi-fi-tests/15th-plus/2025-11-14T10-51-49-459Z-fb52f4b5/` before pruning the run directory; README + loader script live in `reference/plus-ex-15th/`.
 - **Notes:** Compliance permit `plus-ex-15th-2025-11-14` allows live asset mirroring+ScrollSmoother unlock for localhost validation only.
 
 ## Checklist Mirror
 Mirror status with `tasks/0520-15th-plus-hi-fi.md` and `.agent/task/0520-15th-plus-hi-fi.md`. Cite the manifest + archive when flipping statuses.
 
 ### Capture & Runtime Propagation
-- [x] Hi-fi toolkit run — `npx codex-orchestrator start hi-fi-design-toolkit --task 0520-15th-plus-hi-fi --format json`; Evidence: `.runs/0520-15th-plus-hi-fi/cli/2025-11-14T10-37-59-022Z-869f8886/manifest.json`.
-- [x] Runtime metadata — `design/state.json` shows `runtimeCanvasColors`, `resolvedFonts`, `interactionScriptPath`, `interactionWaitMs` for plus-ex-15th; Evidence: `.runs/0520-15th-plus-hi-fi/cli/2025-11-14T10-37-59-022Z-869f8886/design/state.json`.
+- [x] Hi-fi toolkit run — `npx codex-orchestrator start hi-fi-design-toolkit --task 0520-15th-plus-hi-fi --format json`; Evidence: `.runs/0520-15th-plus-hi-fi/cli/2025-11-14T10-51-49-459Z-fb52f4b5/manifest.json`.
+- [x] Runtime metadata — `design/state.json` shows `runtimeCanvasColors`, `resolvedFonts`, `interactionScriptPath`, `interactionWaitMs` for plus-ex-15th; Evidence: `.runs/0520-15th-plus-hi-fi/cli/2025-11-14T10-51-49-459Z-fb52f4b5/design/state.json`.
 
 ### Archive & Reference
-- [x] Artifacts mirrored — `archives/hi-fi-tests/15th-plus/2025-11-14T10-37-59-022Z-869f8886/` retains `design-toolkit/{context,tokens,styleguide,reference,diffs,motion}`; `.runs/.../artifacts` pruned for hygiene.
+- [x] Artifacts mirrored — `archives/hi-fi-tests/15th-plus/2025-11-14T10-51-49-459Z-fb52f4b5/` retains `design-toolkit/{context,tokens,styleguide,reference,diffs,motion}`; `.runs/.../artifacts` pruned for hygiene.
 - [x] Reference README + loader — `reference/plus-ex-15th/README.md` documents serve command + archive pointer, `scripts/loader-scroll-macro.js` ships DOM-ready ScrollSmoother unlock.
 
 ### Validation & Doc Mirrors
