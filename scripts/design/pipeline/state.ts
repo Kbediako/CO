@@ -57,9 +57,13 @@ export interface ToolkitContextState {
   sectionsPath?: string;
   palettePreview?: string[];
   fontFamilies?: string[];
+  runtimeCanvasColors?: string[];
+  resolvedFonts?: string[];
   tokensPath?: string;
   styleguidePath?: string;
   referencePath?: string;
+  interactionScriptPath?: string | null;
+  interactionWaitMs?: number | null;
 }
 
 export interface ToolkitState {

@@ -1,0 +1,46 @@
+# plus-ex-15th Style Guide
+
+Generated tokens for https://15th.plus-ex.com/.
+
+## Palette
+- #2c2c2c
+- #000000
+- #111111
+- #222222
+- #888888
+- #333333
+- #eeeeee
+- #1a1a1a
+- #676767
+- #dad5cb
+- #c5bdad
+- #ffffff
+
+## Canvas Samples
+- #000000
+
+## Typography (CSS)
+- neue-haas-grotesk-display
+- neue-haas-grotesk-text
+- Monaco
+- monospace
+- Courier New
+- sans-serif!important
+- -apple-system
+- BlinkMacSystemFont
+- Segoe UI
+- Roboto
+
+## Resolved Typekit Fonts
+- neue-haas-grotesk-display
+- neue-haas-grotesk-text
+
+## Layout Sections
+- **cover** — BEYOND DESIGN INTO EXPERIENCE BEYOND DESIGN INTO EXPERI ENCE
+- **hero** — BEYOND DESIGN 2020—2025 2020—2025 Last five years of plus x Last five years of plus x INTO EXPERIENCE 2020—2025 2020—2025 BEYOND DESIGN INTO EXPERI ENCE
+- **heroVideo** — Watch full video Watch full video
+- **intro** — Plus X Creative® pioneered the integration of brand experience. We have been introducing a design solution, unifies fragmented brand elements across various touch-points. Plus X Creative® pioneered the integration of brand experience. We have been introducing a design solution, u
+- **introManifesto** — PLUS Experience Curiosity Inquisitive Empathetic Creatively Rational Long-lasting Optimal Articulate Consistency Consis-tency Intuitive
+- **introClosure** — We always focus on designing every MOMENT OF CONTACT, DIGITAL OR PHYSICAL. as an opportunity to express the brand's essence in a way that felt natural and consistent. we always focus on designing every moment of digital or physical. as an opportunity to express the brand’s essenc
+- **historyOpener** — RERE BIRTHBIRTH FROMFROM the refusal to stand still the refusal to stand still THETHE what keeps we moving is what keeps we moving is EXPERIENCEEXPERIENCE what keeps we moving is what keeps we moving is RERE BIRTHBIRTH FROMFROM THETHE EXPERIENCEEXPERIENCE the refusal to stand sti
+- **scrollContent** — The world has changed, Tremendously. 2020—2025 2020—2025 Touch-points keep multiplying space, motion, sound, and more. NEW TOUCHPOINTS The rise of new industries has expanded our scope. NEW INDUSTRIES AI and automation are reshaping how we create. NEW WORKFLOWS We don't stay yest

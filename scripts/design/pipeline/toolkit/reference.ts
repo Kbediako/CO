@@ -325,8 +325,11 @@ async function buildReferenceHtml(
     const overlay = buildOverlay(entry.url, sections);
     const styleBlock = buildOverlayStyles();
     const scrollScript = buildScrollFallbackScript();
+    const interactionScript = await buildInteractionMacro(entry, repoRoot);
     const withStyles = injectIntoHead(snapshotHtml, styleBlock);
-    return injectAfterBodyOpen(withStyles, `${overlay}\n${scrollScript}`);
+    const macroBundle = [scrollScript, interactionScript].filter(Boolean).join('\n');
+    const bodyInjection = [overlay, macroBundle].filter(Boolean).join('\n');
+    return injectAfterBodyOpen(withStyles, bodyInjection);
   } catch (error) {
     console.warn(`[design-toolkit-reference] Failed to read snapshot for ${entry.slug}:`, error);
     return fallbackReference(entry.slug, entry.url);
@@ -401,6 +404,28 @@ async function mirrorReferenceAssets(options: {
   await mkdir(destinationAssetsDir, { recursive: true });
   await cp(contextAssetsDir, destinationAssetsDir, { recursive: true, force: true });
   await mirrorTopLevelShortcuts(destinationAssetsDir, referenceDir);
+}
+
+async function buildInteractionMacro(entry: ToolkitContextState, repoRoot: string): Promise<string | null> {
+  if (!entry.interactionScriptPath) {
+    return null;
+  }
+  try {
+    const absolute = join(repoRoot, entry.interactionScriptPath);
+    const script = await readFile(absolute, 'utf8');
+    const contextPayload = JSON.stringify({
+      slug: entry.slug,
+      url: entry.url,
+      waitMs: entry.interactionWaitMs ?? null,
+      runtimeCanvasColors: entry.runtimeCanvasColors ?? [],
+      resolvedFonts: entry.resolvedFonts ?? []
+    });
+    const contextScript = `<script id="codex-interaction-context">(function(){window.macroContext=Object.assign({},window.macroContext||{},${contextPayload});})();</script>`;
+    return `${contextScript}\n<script id="codex-interaction-macro">${script.trim()}\n</script>`;
+  } catch (error) {
+    console.warn(`[design-toolkit-reference] Failed to load interaction macro for ${entry.slug}:`, error);
+    return null;
+  }
 }
 
 async function directoryExists(path: string): Promise<boolean> {

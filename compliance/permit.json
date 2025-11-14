@@ -34,6 +34,16 @@
       "allow_playwright": true,
       "allow_video_capture": true,
       "allow_live_assets": true
+    },
+    {
+      "origin": "https://15th.plus-ex.com",
+      "license": "PlusX 15th Anniversary microsite — internal toolkit capture only",
+      "notes": "Live scroll interactions + ScrollSmoother unlock permitted for localhost validation; do not redistribute mirrored assets.",
+      "approver": "Design Review Board",
+      "approval_id": "plus-ex-15th-2025-11-14",
+      "allow_playwright": true,
+      "allow_video_capture": true,
+      "allow_live_assets": true
     }
   ],
   "policy": {

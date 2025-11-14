@@ -166,7 +166,10 @@ async function buildTokenOutputs(options: TokenBuildOptions) {
   const semanticCount = 3;
   const palette = await resolvePalette(entry, repoRoot, tokenCount);
   const sections = await loadSections(entry, repoRoot);
-  const fonts = entry.fontFamilies && entry.fontFamilies.length > 0 ? entry.fontFamilies : ['system-ui'];
+  const cssFonts = entry.fontFamilies && entry.fontFamilies.length > 0 ? entry.fontFamilies : ['system-ui'];
+  const runtimeFonts = Array.isArray(entry.resolvedFonts) ? mergeUniqueStrings(entry.resolvedFonts) : [];
+  const mergedFonts = mergeUniqueStrings([...(runtimeFonts ?? []), ...cssFonts]);
+  const runtimeCanvasColors = Array.isArray(entry.runtimeCanvasColors) ? mergeUniqueStrings(entry.runtimeCanvasColors) : [];
   const tokens = {
     "$schema": "https://design-tokens.github.io/community-group/format/module.json",
     tokenSetOrder: ['global', 'semantic'],
@@ -194,8 +197,10 @@ async function buildTokenOutputs(options: TokenBuildOptions) {
     metadata: {
       source: entry.url,
       generated_at: new Date().toISOString(),
-      fonts,
-      palette_sample: palette.slice(0, 8)
+      fonts: mergedFonts,
+      runtime_fonts: runtimeFonts,
+      palette_sample: palette.slice(0, 8),
+      runtime_canvas_colors: runtimeCanvasColors
     }
   };
 
@@ -203,7 +208,7 @@ async function buildTokenOutputs(options: TokenBuildOptions) {
     .map((hex, idx) => `  --${entry.slug}-color-${idx + 1}: ${hex};`)
     .join('\n');
 
-  const styleGuide = buildStyleGuide(entry, palette, fonts, sections);
+  const styleGuide = buildStyleGuide(entry, palette, mergedFonts, sections, runtimeFonts, runtimeCanvasColors);
 
   const slugDir = join(tmpRoot, entry.slug);
   await mkdir(slugDir, { recursive: true });
@@ -305,15 +310,35 @@ function buildStyleGuide(
   entry: ToolkitContextState,
   palette: string[],
   fonts: string[],
-  sections: Array<{ title: string; description: string }>
+  sections: Array<{ title: string; description: string }>,
+  runtimeFonts: string[],
+  runtimeCanvasColors: string[]
 ): string {
   const paletteList = palette.map((hex) => `- ${hex}`).join('\n');
   const fontList = fonts.map((font) => `- ${font}`).join('\n');
+  const runtimeFontList = runtimeFonts.map((font) => `- ${font}`).join('\n');
+  const runtimeCanvasList = runtimeCanvasColors.map((hex) => `- ${hex}`).join('\n');
   const sectionList =
     sections.length > 0
       ? sections.map((section) => `- **${section.title}** — ${section.description}`).join('\n')
       : '- (No sections detected)';
-  return `# ${entry.slug} Style Guide\n\nGenerated tokens for ${entry.url}.\n\n## Palette\n${paletteList}\n\n## Typography\n${fontList}\n\n## Layout Sections\n${sectionList}\n`;
+  const canvasSection = runtimeCanvasList ? `\n## Canvas Samples\n${runtimeCanvasList}\n` : '\n';
+  const runtimeFontSection = runtimeFontList ? `\n## Resolved Typekit Fonts\n${runtimeFontList}\n` : '\n';
+  return `# ${entry.slug} Style Guide\n\nGenerated tokens for ${entry.url}.\n\n## Palette\n${paletteList}${canvasSection}\n## Typography (CSS)\n${fontList}${runtimeFontSection}\n## Layout Sections\n${sectionList}\n`;
+}
+
+function mergeUniqueStrings(values: string[]): string[] {
+  const unique: string[] = [];
+  const seen = new Set<string>();
+  for (const value of values) {
+    const text = typeof value === 'string' ? value.trim() : '';
+    if (!text || seen.has(text)) {
+      continue;
+    }
+    seen.add(text);
+    unique.push(text);
+  }
+  return unique;
 }
 
 function colorFromSeed(seed: string, index: number): string {

@@ -1,7 +1,7 @@
 import { Buffer } from 'node:buffer';
 import { load, type CheerioAPI } from 'cheerio';
 import type { Element } from 'domhandler';
-import { chromium, type Response } from 'playwright';
+import { chromium, type Page, type Response } from 'playwright';
 
 export interface PageSectionSummary {
   title: string;
@@ -20,6 +20,8 @@ export interface PageSnapshot {
   aggregatedCss: string;
   colorPalette: string[];
   fontFamilies: string[];
+  runtimeCanvasColors: string[];
+  resolvedFonts: string[];
   sections: PageSectionSummary[];
   assets: SnapshotAsset[];
 }
@@ -83,6 +85,7 @@ export async function capturePageSnapshot(url: string, options?: SnapshotOptions
     if (options?.runInteractions) {
       await runDefaultInteractions(page);
     }
+    const runtimeMetadata = await collectRuntimeMetadata(page);
     const html = await page.content();
     await Promise.all(assetTasks);
 
@@ -139,6 +142,8 @@ export async function capturePageSnapshot(url: string, options?: SnapshotOptions
       aggregatedCss,
       colorPalette,
       fontFamilies,
+      runtimeCanvasColors: runtimeMetadata.runtimeCanvasColors,
+      resolvedFonts: runtimeMetadata.resolvedFonts,
       sections,
       assets: assetRewrite?.assets ?? []
     };
@@ -213,7 +218,9 @@ function buildAssetRewrite(records: CapturedAssetRecord[]): AssetRewriteData {
   const assets: SnapshotAsset[] = [];
   for (const record of records) {
     const safePath = sanitizeAssetPath(record.pathname);
-    const relativePath = `assets/${safePath}`;
+    const normalizedPath = safePath.replace(/^assets\//i, '');
+    const finalPath = normalizedPath.length > 0 ? normalizedPath : 'index.html';
+    const relativePath = `assets/${finalPath}`;
     if (map.has(record.url)) {
       continue;
     }
@@ -581,6 +588,82 @@ function sanitizeAssetPath(pathname: string): string {
     return 'index.html';
   }
   return segments.join('/');
+}
+
+async function collectRuntimeMetadata(page: Page): Promise<{
+  runtimeCanvasColors: string[];
+  resolvedFonts: string[];
+}> {
+  try {
+    const result = await page.evaluate(() => {
+      const toHex = (value: number) => value.toString(16).padStart(2, '0');
+      const clamp = (value: number) => Math.max(0, Math.min(255, Math.round(value)));
+      const normalizeColor = (r: number, g: number, b: number) => `#${toHex(clamp(r))}${toHex(clamp(g))}${toHex(clamp(b))}`;
+      const canvasColors = new Set<string>();
+      const resolvedFonts = new Set<string>();
+
+      try {
+        if (document.fonts && typeof document.fonts.forEach === 'function') {
+          document.fonts.forEach((font) => {
+            if (font && typeof font.family === 'string') {
+              const cleaned = font.family.trim().replace(/^['"]|['"]$/g, '');
+              if (cleaned) {
+                resolvedFonts.add(cleaned);
+              }
+            }
+          });
+        }
+      } catch {
+        // Ignore document.fonts access errors.
+      }
+
+      const canvases = Array.from(document.querySelectorAll('canvas'));
+      for (const canvas of canvases) {
+        let ctx: any = null;
+        try {
+          ctx = typeof (canvas as any).getContext === 'function' ? (canvas as any).getContext('2d') : null;
+        } catch {
+          ctx = null;
+        }
+        if (!ctx) {
+          continue;
+        }
+        const width = (canvas as any).width || (canvas as any).clientWidth || 0;
+        const height = (canvas as any).height || (canvas as any).clientHeight || 0;
+        if (width === 0 || height === 0) {
+          continue;
+        }
+        const samples: Array<[number, number]> = [
+          [0, 0],
+          [Math.floor(width / 2), Math.floor(height / 2)],
+          [Math.max(0, width - 1), Math.max(0, height - 1)]
+        ];
+        for (const [x, y] of samples) {
+          try {
+            const data = ctx.getImageData(x, y, 1, 1).data;
+            if (data && data[3] > 0) {
+              canvasColors.add(normalizeColor(data[0], data[1], data[2]));
+            }
+          } catch {
+            break;
+          }
+        }
+      }
+
+      return {
+        runtimeCanvasColors: Array.from(canvasColors),
+        resolvedFonts: Array.from(resolvedFonts)
+      };
+    });
+
+    return {
+      runtimeCanvasColors: result.runtimeCanvasColors.slice(0, 12),
+      resolvedFonts: result.resolvedFonts.slice(0, 24)
+    };
+  } catch (error) {
+    console.warn('[snapshot] Failed to collect runtime metadata', error);
+    return { runtimeCanvasColors: [], resolvedFonts: [] };
+  }
 }
 
 function deriveOriginBase(pageUrl: string): string {

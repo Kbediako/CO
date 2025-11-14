@@ -84,6 +84,8 @@ export interface DesignToolkitLiveAssetsConfig {
 
 export interface DesignToolkitInteractionConfig {
   enabled: boolean;
+  scriptPath?: string | null;
+  waitMs?: number | null;
 }
 
 export interface DesignToolkitPipelineConfig {
@@ -185,7 +187,9 @@ const DEFAULT_CONFIG: DesignConfig = {
         mirrorAssets: false
       },
       interactions: {
-        enabled: false
+        enabled: false,
+        scriptPath: null,
+        waitMs: null
       }
     }
   }
@@ -549,7 +553,15 @@ function normalizeToolkitPipelineConfig(
   if (interactionsRaw && typeof interactionsRaw === 'object') {
     const record = interactionsRaw as Record<string, unknown>;
     normalized.interactions = {
-      enabled: coerceBoolean(record.enabled, normalized.interactions.enabled)
+      enabled: coerceBoolean(record.enabled, normalized.interactions.enabled),
+      scriptPath: coerceString(record.script_path ?? record.scriptPath) ?? normalized.interactions.scriptPath ?? null,
+      waitMs:
+        coerceNumber(record.wait_ms ?? record.waitMs, normalized.interactions.waitMs ?? null, {
+          min: 0,
+          allowNull: true,
+          field: 'pipelines.hi_fi_design_toolkit.interactions.wait_ms',
+          warnings
+        }) ?? normalized.interactions.waitMs ?? null
     };
   }
 

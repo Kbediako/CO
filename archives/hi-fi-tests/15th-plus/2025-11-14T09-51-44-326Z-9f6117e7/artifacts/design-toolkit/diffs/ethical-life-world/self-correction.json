@@ -1,0 +1,26 @@
+{
+  "slug": "ethical-life-world",
+  "iterations": [
+    {
+      "iteration": 1,
+      "before": 12,
+      "after": 6.6
+    },
+    {
+      "iteration": 2,
+      "before": 6.6,
+      "after": 3.63
+    },
+    {
+      "iteration": 3,
+      "before": 3.63,
+      "after": 2
+    },
+    {
+      "iteration": 4,
+      "before": 2,
+      "after": 1.1
+    }
+  ],
+  "finalErrorRate": 0.42
+}

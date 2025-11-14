@@ -33,6 +33,11 @@ pipelines:
         title: Ethical Life World experience
         url: https://ethicallifeworld.com/
         reference_url: https://ethicallifeworld.com/
+      - id: plus-ex-15th
+        slug: plus-ex-15th
+        title: PlusX 15th Anniversary microsite
+        url: https://15th.plus-ex.com/
+        reference_url: https://15th.plus-ex.com/
     breakpoints:
       - id: desktop
         width: 1440
@@ -40,13 +45,17 @@ pipelines:
       - id: mobile
         width: 428
         height: 926
-    mask_selectors: []
+    mask_selectors:
+      - form
+      - .contact-form
+      - .newsletter-form
+      - '[data-guestbook-entry]'
     retention:
       days: 30
       auto_purge: false
     self_correction:
       enabled: true
-      max_iterations: 3
+      max_iterations: 4
       provider: codex-self-correction
       approval_id: hi-fi-self-correction-2025-11
     publish:
@@ -60,3 +69,5 @@ pipelines:
       mirror_assets: true
     interactions:
       enabled: true
+      script_path: reference/plus-ex-15th/scripts/loader-scroll-macro.js
+      wait_ms: 1800

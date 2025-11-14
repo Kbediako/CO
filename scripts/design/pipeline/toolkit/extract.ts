@@ -118,7 +118,11 @@ async function main(): Promise<void> {
         palettePath: contextResult.paths.palettePath,
         sectionsPath: contextResult.paths.sectionsPath,
         palettePreview: contextResult.palettePreview,
-        fontFamilies: contextResult.fontFamilies
+        fontFamilies: contextResult.fontFamilies,
+        runtimeCanvasColors: contextResult.runtimeCanvasColors,
+        resolvedFonts: contextResult.resolvedFonts,
+        interactionScriptPath: pipelineConfig.interactions?.scriptPath ?? null,
+        interactionWaitMs: pipelineConfig.interactions?.waitMs ?? null
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -173,6 +177,8 @@ interface ContextArtifactResult {
   };
   palettePreview: string[];
   fontFamilies: string[];
+  runtimeCanvasColors: string[];
+  resolvedFonts: string[];
 }
 
 async function stageContextArtifact(options: {
@@ -216,7 +222,9 @@ async function stageContextArtifact(options: {
     capturedAt: timestamp.toISOString(),
     colorPalettePreview: snapshot.colorPalette.slice(0, 12),
     fontFamilies: snapshot.fontFamilies,
-    sectionCount: snapshot.sections.length
+    sectionCount: snapshot.sections.length,
+    runtimeCanvasColors: snapshot.runtimeCanvasColors,
+    resolvedFonts: snapshot.resolvedFonts
   };
 
   const contextPath = join(slugDir, 'context.json');
@@ -322,7 +330,9 @@ async function stageContextArtifact(options: {
       sectionsPath: sectionsRecord.path
     },
     palettePreview: snapshot.colorPalette.slice(0, 12),
-    fontFamilies: snapshot.fontFamilies
+    fontFamilies: snapshot.fontFamilies,
+    runtimeCanvasColors: snapshot.runtimeCanvasColors,
+    resolvedFonts: snapshot.resolvedFonts
   };
 }
 
