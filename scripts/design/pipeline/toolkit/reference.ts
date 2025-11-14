@@ -403,6 +403,7 @@ async function mirrorReferenceAssets(options: {
   await mkdir(referenceDir, { recursive: true });
   const entries = await readdir(contextDir, { withFileTypes: true });
   let copiedAssets = false;
+  let copiedVideo = false;
   for (const entryDir of entries) {
     if (!entryDir.isDirectory()) {
       continue;
@@ -414,6 +415,9 @@ async function mirrorReferenceAssets(options: {
       copiedAssets = true;
       await mirrorTopLevelShortcuts(destinationPath, referenceDir);
     }
+    if (entryDir.name === 'video') {
+      copiedVideo = true;
+    }
   }
   if (!copiedAssets) {
     const assetsPath = join(contextDir, 'assets');
@@ -421,6 +425,13 @@ async function mirrorReferenceAssets(options: {
       await mkdir(join(referenceDir, 'assets'), { recursive: true });
       await cp(assetsPath, join(referenceDir, 'assets'), { recursive: true, force: true });
       await mirrorTopLevelShortcuts(join(referenceDir, 'assets'), referenceDir);
+    }
+  }
+
+  if (!copiedVideo) {
+    const videoPath = join(contextDir, 'video');
+    if (await directoryExists(videoPath)) {
+      await cp(videoPath, join(referenceDir, 'video'), { recursive: true, force: true });
     }
   }
 }
