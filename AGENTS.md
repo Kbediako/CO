@@ -49,4 +49,4 @@ Update the table once you wire different build pipelines or tooling.
 - [ ] Update `.agent/` SOPs to describe project-specific guardrails, escalation paths, and run evidence locations.
 - [ ] Remove placeholder references that remain in manifests or docs before committing so downstream teams only see active project data.
 
-Once these items are complete you can treat the repo as the canonical workspace for the new project.
+Once these items are complete you can treat the repo as the canonical workspace for the new project..
