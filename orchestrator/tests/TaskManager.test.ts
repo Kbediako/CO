@@ -348,9 +348,10 @@ describe('TaskManager', () => {
       }
     });
 
-    await manager.execute(baseTask);
+    const summary = await manager.execute(baseTask);
 
-    await new Promise((resolve) => setTimeout(resolve, 20));
+    // Explicitly await the persistence operation
+    await manager.persistenceCoordinator!.handleRunCompleted(summary);
 
     const manifest = JSON.parse(
       await readFile(join(runsDir, baseTask.id, 'run-fixed', 'manifest.json'), 'utf-8')

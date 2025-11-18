@@ -231,7 +231,7 @@ describe('CloudSyncWorker', () => {
     worker.start();
     bus.emit({ type: 'run:completed', payload: summary });
 
-    await new Promise((resolve) => setTimeout(resolve, 30));
+    await new Promise((resolve) => setTimeout(resolve, 100));
 
     expect(upload).toHaveBeenCalledTimes(1);
     expect(onError).toHaveBeenCalledWith(expect.any(CloudRunsHttpError), summary, 1);

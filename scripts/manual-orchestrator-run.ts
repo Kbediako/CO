@@ -188,7 +188,7 @@ async function main(): Promise<void> {
   const runSummary = await manager.execute(task);
   console.log('\nFinal run summary:');
   console.log(JSON.stringify(runSummary, null, 2));
-  manager.dispose();
+
 
   console.log(`\nArtifacts written under: ${path.relative(repoRoot, manualRunsDir)}`);
 }

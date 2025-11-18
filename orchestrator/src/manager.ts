@@ -70,7 +70,7 @@ export class TaskManager {
   private readonly eventBus: EventBus;
   private readonly modePolicy: ModePolicy;
   private readonly runIdFactory: RunIdFactory;
-  private readonly persistenceCoordinator?: PersistenceCoordinator;
+  private readonly _persistenceCoordinator?: PersistenceCoordinator;
   private readonly groupExecutionEnabled: boolean;
 
   constructor(private readonly options: ManagerOptions) {
@@ -82,14 +82,14 @@ export class TaskManager {
       const stateStore = options.persistence.stateStore ?? new TaskStateStore();
       const manifestWriter = options.persistence.manifestWriter ?? new RunManifestWriter();
       const coordinatorOptions = options.persistence.coordinatorOptions;
-      this.persistenceCoordinator = new PersistenceCoordinator(
+      this._persistenceCoordinator = new PersistenceCoordinator(
         this.eventBus,
         stateStore,
         manifestWriter,
         coordinatorOptions
       );
       if (options.persistence.autoStart !== false) {
-        this.persistenceCoordinator.start();
+        this._persistenceCoordinator.start();
       }
     }
   }
@@ -99,15 +99,19 @@ export class TaskManager {
   }
 
   startPersistence(): void {
-    this.persistenceCoordinator?.start();
+    this._persistenceCoordinator?.start();
   }
 
   stopPersistence(): void {
-    this.persistenceCoordinator?.stop();
+    this._persistenceCoordinator?.stop();
   }
 
   dispose(): void {
     this.stopPersistence();
+  }
+
+  get persistenceCoordinator(): PersistenceCoordinator | undefined {
+    return this._persistenceCoordinator;
   }
 
   async execute(task: TaskContext): Promise<RunSummary> {

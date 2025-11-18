@@ -1,12 +1,11 @@
 import process from 'node:process';
 import { EnvironmentPaths } from '../run/environment.js';
 import { loadUserConfig, type UserConfig } from '../config/userConfig.js';
-import { resolvePipeline, type PipelineResolution } from '../pipelines/index.js';
+import { resolvePipeline } from '../pipelines/index.js';
 import {
   loadDesignConfig,
   shouldActivateDesignPipeline,
   designPipelineId,
-  type DesignConfig,
   type DesignConfigLoadResult
 } from '../../../../packages/shared/config/index.js';
 import { logger } from '../../logger.js';

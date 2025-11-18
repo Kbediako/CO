@@ -65,11 +65,7 @@ import { resolveRunPaths, relativeToRepo } from './run/runPaths.js';
 import { logger } from '../logger.js';
 import { getPrivacyGuard } from './services/execRuntime.js';
 import { PipelineResolver } from './services/pipelineResolver.js';
-import {
-  designPipelineId,
-  loadDesignConfig,
-  shouldActivateDesignPipeline
-} from '../../../packages/shared/config/index.js';
+
 
 interface ExecutePipelineOptions {
   env: EnvironmentPaths;
@@ -94,7 +90,7 @@ export class CodexOrchestrator {
   async start(options: StartOptions = {}): Promise<PipelineExecutionResult> {
     const env = this.overrideTaskId(options.taskId);
     const resolver = new PipelineResolver();
-    const { pipeline, userConfig } = await resolver.resolve(env, { pipelineId: options.pipelineId });
+    const { pipeline } = await resolver.resolve(env, { pipelineId: options.pipelineId });
     
     const metadata = await loadTaskMetadata(env);
     const taskContext = this.createTaskContext(metadata);
@@ -553,7 +549,7 @@ export class CodexOrchestrator {
     });
 
     const runSummary = await manager.execute(taskContext);
-    manager.dispose();
+
 
     await this.finalizeSchedulerPlanForManifest({
       env,
