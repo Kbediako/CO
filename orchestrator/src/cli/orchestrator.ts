@@ -64,6 +64,7 @@ import type { RunPaths } from './run/runPaths.js';
 import { resolveRunPaths, relativeToRepo } from './run/runPaths.js';
 import { logger } from '../logger.js';
 import { getPrivacyGuard } from './services/execRuntime.js';
+import { PipelineResolver } from './services/pipelineResolver.js';
 import {
   designPipelineId,
   loadDesignConfig,
@@ -92,23 +93,9 @@ export class CodexOrchestrator {
 
   async start(options: StartOptions = {}): Promise<PipelineExecutionResult> {
     const env = this.overrideTaskId(options.taskId);
-    const designConfig = await loadDesignConfig({ rootDir: env.repoRoot });
-    process.env.DESIGN_CONFIG_PATH = designConfig.path;
-    if (designConfig.warnings.length > 0) {
-      for (const warning of designConfig.warnings) {
-        logger.warn(`[design-config] ${warning}`);
-      }
-    }
-    const userConfig = await loadUserConfig(env);
-    const requestedPipelineId =
-      options.pipelineId ?? (shouldActivateDesignPipeline(designConfig) ? designPipelineId(designConfig) : undefined);
-    if (requestedPipelineId === designPipelineId(designConfig) && process.env.DESIGN_PIPELINE === undefined) {
-      process.env.DESIGN_PIPELINE = '1';
-    }
-    const { pipeline } = resolvePipeline(env, {
-      pipelineId: requestedPipelineId,
-      config: userConfig
-    });
+    const resolver = new PipelineResolver();
+    const { pipeline, userConfig } = await resolver.resolve(env, { pipelineId: options.pipelineId });
+    
     const metadata = await loadTaskMetadata(env);
     const taskContext = this.createTaskContext(metadata);
     const plannerTarget = this.resolveTargetStageId(options.targetStageId, null);
@@ -140,18 +127,14 @@ export class CodexOrchestrator {
     const env = this.baseEnv;
     const { manifest, paths } = await loadManifest(env, options.runId);
     const actualEnv = this.overrideTaskId(manifest.task_id);
-    const designConfig = await loadDesignConfig({ rootDir: actualEnv.repoRoot });
-    process.env.DESIGN_CONFIG_PATH = designConfig.path;
-    if (designConfig.warnings.length > 0) {
-      for (const warning of designConfig.warnings) {
-        logger.warn(`[design-config] ${warning}`);
-      }
-    }
+    
+    const resolver = new PipelineResolver();
+    const designConfig = await resolver.loadDesignConfig(actualEnv.repoRoot);
+    
     const userConfig = await loadUserConfig(actualEnv);
     const pipeline = this.resolvePipelineForResume(actualEnv, manifest, userConfig);
-    if (pipeline.id === designPipelineId(designConfig) && process.env.DESIGN_PIPELINE === undefined) {
-      process.env.DESIGN_PIPELINE = '1';
-    }
+    resolver.ensureDesignPipelineEnv(pipeline.id, designConfig);
+
     const metadata = await loadTaskMetadata(actualEnv);
     const taskContext = this.createTaskContext(metadata);
     const plannerTarget = this.resolveTargetStageId(options.targetStageId, manifest.plan_target_id ?? null);
@@ -195,23 +178,9 @@ export class CodexOrchestrator {
 
   async plan(options: PlanOptions = {}): Promise<PlanPreviewResult> {
     const env = this.overrideTaskId(options.taskId);
-    const designConfig = await loadDesignConfig({ rootDir: env.repoRoot });
-    process.env.DESIGN_CONFIG_PATH = designConfig.path;
-    if (designConfig.warnings.length > 0) {
-      for (const warning of designConfig.warnings) {
-        logger.warn(`[design-config] ${warning}`);
-      }
-    }
-    const userConfig = await loadUserConfig(env);
-    const requestedPipelineId =
-      options.pipelineId ?? (shouldActivateDesignPipeline(designConfig) ? designPipelineId(designConfig) : undefined);
-    if (requestedPipelineId === designPipelineId(designConfig) && process.env.DESIGN_PIPELINE === undefined) {
-      process.env.DESIGN_PIPELINE = '1';
-    }
-    const { pipeline, source } = resolvePipeline(env, {
-      pipelineId: requestedPipelineId,
-      config: userConfig
-    });
+    const resolver = new PipelineResolver();
+    const { pipeline, source } = await resolver.resolve(env, { pipelineId: options.pipelineId });
+    
     const metadata = await loadTaskMetadata(env);
     const plannerTarget = this.resolveTargetStageId(options.targetStageId, null);
     const planner = new CommandPlanner(pipeline, { targetStageId: plannerTarget });

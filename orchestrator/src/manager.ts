@@ -20,6 +20,7 @@ import { PersistenceCoordinator } from './persistence/PersistenceCoordinator.js'
 import { TaskStateStore } from './persistence/TaskStateStore.js';
 import { RunManifestWriter } from './persistence/RunManifestWriter.js';
 import { sanitizeRunId } from './persistence/sanitizeRunId.js';
+import { EnvUtils } from '../../packages/shared/config/index.js';
 
 export type ModePolicy = (task: TaskContext, subtask: PlanItem) => ExecutionMode;
 export type RunIdFactory = (taskId: string) => string;
@@ -65,14 +66,6 @@ const defaultRunIdFactory: RunIdFactory = (taskId) => {
   return sanitizeRunId(`${taskId}-${timestamp}`);
 };
 
-function featureFlagEnabled(value: string | undefined): boolean {
-  if (!value) {
-    return false;
-  }
-  const normalized = value.trim().toLowerCase();
-  return ['1', 'true', 'on', 'yes'].includes(normalized);
-}
-
 export class TaskManager {
   private readonly eventBus: EventBus;
   private readonly modePolicy: ModePolicy;
@@ -84,7 +77,7 @@ export class TaskManager {
     this.eventBus = options.eventBus ?? new EventBus();
     this.modePolicy = options.modePolicy ?? defaultModePolicy;
     this.runIdFactory = options.runIdFactory ?? defaultRunIdFactory;
-    this.groupExecutionEnabled = featureFlagEnabled(process.env.FEATURE_TFGRPO_GROUP);
+    this.groupExecutionEnabled = EnvUtils.getBoolean('FEATURE_TFGRPO_GROUP');
     if (options.persistence) {
       const stateStore = options.persistence.stateStore ?? new TaskStateStore();
       const manifestWriter = options.persistence.manifestWriter ?? new RunManifestWriter();

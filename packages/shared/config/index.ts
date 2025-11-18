@@ -19,3 +19,5 @@ export {
   type DesignToolkitLiveAssetsConfig,
   type DesignToolkitInteractionConfig
 } from './designConfig.js';
+
+export * from './env.js';

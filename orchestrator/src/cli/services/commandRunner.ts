@@ -17,9 +17,10 @@ import {
 } from '../run/manifest.js';
 import { slugify } from '../utils/strings.js';
 import { isoTimestamp } from '../utils/time.js';
+import { EnvUtils } from '../../../../packages/shared/config/index.js';
 
 const MAX_BUFFERED_OUTPUT_BYTES = 64 * 1024;
-const EMIT_COMMAND_STREAM_MIRRORS = readEnvBoolean('CODEX_ORCHESTRATOR_EMIT_COMMAND_STREAMS', false);
+const EMIT_COMMAND_STREAM_MIRRORS = EnvUtils.getBoolean('CODEX_ORCHESTRATOR_EMIT_COMMAND_STREAMS', false);
 
 export interface CommandRunnerContext {
   env: EnvironmentPaths;
@@ -434,19 +435,4 @@ function truncate(value: string, length = 240): string {
     return value;
   }
   return `${value.slice(0, length)}…`;
-}
-
-function readEnvBoolean(name: string, fallback: boolean): boolean {
-  const raw = process.env[name];
-  if (typeof raw !== 'string') {
-    return fallback;
-  }
-  const normalized = raw.trim().toLowerCase();
-  if (['1', 'true', 'yes', 'on'].includes(normalized)) {
-    return true;
-  }
-  if (['0', 'false', 'no', 'off'].includes(normalized)) {
-    return false;
-  }
-  return fallback;
 }
