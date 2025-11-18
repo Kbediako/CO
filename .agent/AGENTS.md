@@ -25,6 +25,12 @@
 - `npm run review` — Launches `codex review --manifest <latest>` using the newest manifest under `.runs/**` for reviewer workflows.
 - `codex-orchestrator plan [pipeline]` — Preview resolved pipeline stages without execution; add `--format json` for automation inputs.
 
+### Codex CLI prompts
+- Keep the prompt files `~/.codex/prompts/diagnostics.md` and `~/.codex/prompts/review-handoff.md` on every workstation (they are not checked into the repo). Each prompt wires `/prompts:<name>` to the required orchestrator commands so contributors do not have to remember the sequences manually.
+- `/prompts:diagnostics TASK=<task-id> MANIFEST=<path> [NOTES=<free text>]` exports `MCP_RUNNER_TASK_ID=$TASK`, runs `npx codex-orchestrator start diagnostics --format json`, tails `.runs/$TASK/cli/<run-id>/manifest.json` (or `status --watch`), and reminds you to mirror evidence + `$MANIFEST` references into `/tasks`, `docs/TASKS.md`, `.agent/task/...`, `.runs/$TASK/metrics.json`, and `out/$TASK/state.json`.
+- `/prompts:review-handoff TASK=<task-id> MANIFEST=<path> [NOTES=<free text>]` re-validates guardrails via `node scripts/spec-guard.mjs --dry-run`, executes `npm run lint`, `npm run test`, optional `npm run eval:test`, and `npm run review`, and ensures approvals/escalations are logged in `$MANIFEST` before checklists flip.
+- Always use these prompts before running diagnostics or prepping a review; they are the canonical way to drive the orchestrator so manifests, approvals, and docs stay in sync across machines.
+
 ### Read First Order
 1. `.agent/system/architecture.md`
 2. `.agent/system/services.md`

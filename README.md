@@ -61,6 +61,12 @@ Group execution (when `FEATURE_TFGRPO_GROUP=on`): repeat the Builder → Tester 
 
 Use `npx codex-orchestrator resume --run <run-id>` to continue interrupted runs; the CLI verifies resume tokens, refreshes the plan, and updates the manifest safely before rerunning.
 
+### Codex CLI prompts
+- The custom prompts live outside the repo at `~/.codex/prompts/diagnostics.md` and `~/.codex/prompts/review-handoff.md`. Recreate those files on every fresh machine so `/prompts:diagnostics` and `/prompts:review-handoff` are available in the Codex CLI palette.
+- `/prompts:diagnostics` takes `TASK=<task-id> MANIFEST=<path> [NOTES=<free text>]`, exports `MCP_RUNNER_TASK_ID=$TASK`, runs `npx codex-orchestrator start diagnostics --format json`, tails `.runs/$TASK/cli/<run-id>/manifest.json` (or `npx codex-orchestrator status --watch`), and records evidence to `/tasks`, `docs/TASKS.md`, `.agent/task/...`, `.runs/$TASK/metrics.json`, and `out/$TASK/state.json` using `$MANIFEST`.
+- `/prompts:review-handoff` takes `TASK=<task-id> MANIFEST=<path> [NOTES=<free text>]`, re-exports `MCP_RUNNER_TASK_ID`, runs `node scripts/spec-guard.mjs --dry-run`, `npm run lint`, `npm run test`, optional `npm run eval:test`, and `npm run review` (`codex review --manifest <latest>`). It also reminds you to log approvals in `$MANIFEST` and mirror the evidence to the same docs/metrics/state targets.
+- Always trigger diagnostics and review workflows through these prompts whenever you run the orchestrator so contributors consistently execute the required command sequences and capture auditable manifests.
+
 ### Identifier Guardrails
 - `MCP_RUNNER_TASK_ID` is no longer coerced or lowercased silently. The CLI calls the shared `sanitizeTaskId` helper and fails fast when the value contains control characters, traversal attempts, or Windows-reserved characters (`<`, `>`, `:`, `"`, `/`, `\`, `|`, `?`, `*`). Set the correct task ID in your environment *before* invoking the CLI.
 - Run IDs used for manifest or artifact storage must come from the CLI (or pass the shared `sanitizeRunId` helper). Strings with colons, control characters, or `../` are rejected to ensure every run directory lives under `.runs/<task-id>/cli/<run-id>` (and legacy `mcp` mirrors) without risking traversal.
