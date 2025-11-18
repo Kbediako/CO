@@ -12,8 +12,18 @@ You can use the `run_shell_command` tool to invoke the `gemini` executable.
 
 1.  **Non-Interactive Mode**: Subagents must run without requiring user confirmation for every tool call, as the parent agent cannot easily interact with the subagent's `stdin` dynamically.
     *   Use the `--yolo` flag to automatically accept all tool actions.
-2.  **Context**: Each subagent call starts a **fresh session**. It does not inherit memory or conversation history from the parent or previous subagent calls.
-3.  **Output**: You can capture the subagent's output (stdout) to read its results.
+2.  **Model Selection**: To ensure consistent behavior (e.g., using Gemini 3 Preview), set the `GEMINI_MODEL` environment variable or use the `--model` flag.
+    *   Verified ID: `gemini-3-pro-preview`
+3.  **Context**: Each subagent call starts a **fresh session**. It does not inherit memory or conversation history from the parent or previous subagent calls.
+4.  **Output**: You can capture the subagent's output (stdout) to read its results.
+
+## Environment Configuration
+
+To set the default model for all subagent calls (and your own interactive sessions), export the `GEMINI_MODEL` variable:
+
+```bash
+export GEMINI_MODEL="gemini-3-pro-preview"
+```
 
 ## Best Practices
 
