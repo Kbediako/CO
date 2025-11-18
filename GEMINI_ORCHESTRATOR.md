@@ -67,5 +67,18 @@ I will leverage the capabilities defined in `gemini.md` to assign "Workers" to P
 *   I will **refuse** to introduce project-specific hardcoding into the `scripts/` directory.
 *   I will **always** prefer adding a configuration option to `codex.orchestrator.json` over changing a core script logic.
 
+## 6. Learnings & Operational Notes
+
+### Shell Interactivity & Dependency Installation
+*   **The Hang Problem:** Commands like `npx` or `npm init` often pause for user input (e.g., "Need to install the following packages: ... (y/n)"). This causes the agent to hang indefinitely if not handled.
+*   **The Fix:** Always anticipate interactivity.
+    *   Use `yes | command` to pipe automatic acceptance to the process.
+    *   Use non-interactive flags where available (e.g., `--yes`, `-y`, `--force`).
+    *   *Example:* `yes | npx create-next-app@latest ...`
+
+### Tooling Awareness
+*   **Check Before Building:** Before scaffolding custom implementations, I must vigorously check `packages/` and `tasks/` for existing high-fidelity toolkits or pipelines (e.g., `design-reference-tools`).
+*   **Reinventing the Wheel:** Manually building what the engine already provides is a failure of orchestration.
+
 ---
 *This protocol ensures that `ASABEKO/CO` remains a pristine, powerful engine that can be upgraded indefinitely, while the software it builds grows safely within its designated containers.*
