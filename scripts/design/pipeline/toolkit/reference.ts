@@ -28,6 +28,7 @@ import { normalizeSentenceSpacing, runDefaultInteractions, type InteractionPage 
 const TOOLKIT_USER_AGENT =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 const DEFAULT_SELF_CORRECTION_THRESHOLD = 1.5;
+const MISMATCH_PADDING_COLOR = { r: 255, g: 0, b: 255, a: 255 };
 
 async function main(): Promise<void> {
   const context = await loadDesignContext();
@@ -114,7 +115,8 @@ async function main(): Promise<void> {
           tmpRoot,
           referenceArtifactPath: referenceArtifact.path,
           pipelineBreakpoints: context.config.config.pipelines.hiFiDesignToolkit.breakpoints,
-          threshold: selfCorrection.threshold ?? DEFAULT_SELF_CORRECTION_THRESHOLD
+          threshold: selfCorrection.threshold ?? DEFAULT_SELF_CORRECTION_THRESHOLD,
+          maxIterations: selfCorrection.maxIterations ?? 1
         });
         const correctionArtifacts = [
           {
@@ -159,6 +161,7 @@ async function main(): Promise<void> {
           retention: retentionMetadata,
           metrics: {
             iterations: correction.iterations,
+            final_iteration: correction.finalIteration,
             final_error_rate: correction.finalErrorRate,
             threshold: selfCorrection.threshold ?? DEFAULT_SELF_CORRECTION_THRESHOLD,
             threshold_passed: correction.finalErrorRate <= (selfCorrection.threshold ?? DEFAULT_SELF_CORRECTION_THRESHOLD)
@@ -177,6 +180,7 @@ async function main(): Promise<void> {
               wait_ms: correction.settlingWaitMs ?? 0,
               baseline_error: correction.baselineError,
               stabilized_error: correction.finalErrorRate,
+              final_iteration: correction.finalIteration,
               threshold: selfCorrection.threshold ?? DEFAULT_SELF_CORRECTION_THRESHOLD
             }
           });
@@ -278,6 +282,10 @@ type BreakpointDiffResult = {
   mismatchPercentage: number;
   settledMismatch?: number;
   settledDiffPath?: string;
+  clipped?: boolean;
+  referenceDimensions: { width: number; height: number };
+  cloneDimensions: { width: number; height: number };
+  iteration?: number;
 };
 
 type InteractionMacroPayload = {
@@ -292,6 +300,7 @@ async function runSelfCorrection(options: {
   referenceArtifactPath: string;
   pipelineBreakpoints: Array<{ id: string; width: number; height: number; deviceScaleFactor?: number }>;
   threshold: number;
+  maxIterations?: number;
 }): Promise<{
   path: string;
   iterations: number;
@@ -300,6 +309,8 @@ async function runSelfCorrection(options: {
   settlingWaitMs?: number;
   baselineError: number;
   assets: Array<{ path: string; description: string; role: string; breakpoint?: string }>;
+  history: Array<{ iteration: number; worstMismatch: number; averageMismatch: number }>;
+  finalIteration: number;
 }> {
   const { entry, repoRoot, tmpRoot, referenceArtifactPath, pipelineBreakpoints, threshold } = options;
   const correctionDir = join(tmpRoot, entry.slug, 'diffs');
@@ -313,24 +324,75 @@ async function runSelfCorrection(options: {
   const macro = await loadInteractionMacroForCapture(entry, repoRoot);
   const browser = await chromium.launch({ headless: true });
   const results: BreakpointDiffResult[] = [];
+  const iterationHistory: Array<{ iteration: number; worstMismatch: number; averageMismatch: number }> = [];
+  let lastResults: BreakpointDiffResult[] = [];
+  const maxIterations = Math.max(1, options.maxIterations ?? 1);
+  let bestResults: BreakpointDiffResult[] | null = null;
+  let bestWorstMismatch = Number.POSITIVE_INFINITY;
+  let bestIteration = 0;
+  let iterationsRun = 0;
   let settlingLogPath: string | undefined;
   let settlingWaitMs: number | undefined;
 
   try {
-    for (const breakpoint of breakpoints) {
-      const result = await captureBreakpointDiff({
-        browser,
-        breakpoint,
-        screenshotsDir,
-        sourceUrl,
-        cloneUrl,
-        macro,
-        waitMs: entry.interactionWaitMs ?? null
+    for (let iteration = 1; iteration <= maxIterations; iteration += 1) {
+      const iterationResults: BreakpointDiffResult[] = [];
+      for (const breakpoint of breakpoints) {
+        const result = await captureBreakpointDiff({
+          browser,
+          breakpoint,
+          screenshotsDir,
+          sourceUrl,
+          cloneUrl,
+          macro,
+          waitMs: entry.interactionWaitMs ?? null,
+          suffix: iteration > 1 ? `iter-${iteration}` : undefined,
+          iteration
+        });
+        iterationResults.push(result);
+        if (result.clipped) {
+          console.warn(
+            `[design-toolkit-reference] Detected clipped screenshot for ${entry.slug} at ${breakpoint.id}: reference ${result.referenceDimensions.width}x${result.referenceDimensions.height}, clone ${result.cloneDimensions.width}x${result.cloneDimensions.height}`
+          );
+        }
+      }
+
+      if (iterationResults.length === 0) {
+        break;
+      }
+
+      iterationsRun = iteration;
+      lastResults = iterationResults;
+      const worstMismatch = Math.max(...iterationResults.map((item) => item.mismatchPercentage ?? 0));
+      const averageMismatch =
+        iterationResults.reduce((sum, item) => sum + (item.mismatchPercentage ?? 0), 0) / iterationResults.length;
+      iterationHistory.push({
+        iteration,
+        worstMismatch: roundPercent(worstMismatch),
+        averageMismatch: roundPercent(averageMismatch)
       });
-      results.push(result);
+
+      const improved = worstMismatch + 0.001 < bestWorstMismatch;
+      if (improved) {
+        bestResults = iterationResults;
+        bestWorstMismatch = worstMismatch;
+        bestIteration = iteration;
+      }
+
+      if (threshold > 0 && worstMismatch <= threshold) {
+        break;
+      }
+      if (iteration >= maxIterations) {
+        break;
+      }
+      if (!improved && iteration >= 1) {
+        break;
+      }
     }
 
-    if (results.length > 0) {
+    const finalResults = bestResults ?? lastResults ?? results;
+    if (finalResults.length > 0) {
+      results.splice(0, results.length, ...finalResults);
       const worst = results.reduce((previous, current) =>
         (current.mismatchPercentage ?? 0) >= (previous.mismatchPercentage ?? 0) ? current : previous
       );
@@ -343,7 +405,8 @@ async function runSelfCorrection(options: {
         cloneUrl,
         macro,
         waitMs: settleWait,
-        suffix: 'settled'
+        suffix: `iter-${bestIteration || iterationsRun}-settled`,
+        iteration: bestIteration || iterationsRun
       });
       worst.settledMismatch = settled.mismatchPercentage;
       worst.settledDiffPath = settled.diffPath;
@@ -353,7 +416,8 @@ async function runSelfCorrection(options: {
         baselineError: worst.mismatchPercentage,
         stabilizedError: settled.mismatchPercentage,
         waitMs: settleWait,
-        breakpoint: settled.breakpoint
+        breakpoint: settled.breakpoint,
+        iteration: bestIteration || iterationsRun
       });
       await writeFile(settlingLog.path, JSON.stringify(settlingLog.payload, null, 2), 'utf8');
       settlingLogPath = settlingLog.path;
@@ -363,6 +427,11 @@ async function runSelfCorrection(options: {
     await browser.close();
   }
 
+  const baselineMismatch =
+    iterationHistory.length > 0
+      ? iterationHistory[0].worstMismatch
+      : (results[0]?.mismatchPercentage ?? 0);
+
   return await assembleSelfCorrectionResult({
     correctionDir,
     results,
@@ -371,7 +440,11 @@ async function runSelfCorrection(options: {
     cloneUrl,
     slug: entry.slug,
     settlingLogPath,
-    settlingWaitMs
+    settlingWaitMs,
+    iterationsRun,
+    finalIteration: bestIteration || iterationsRun || 1,
+    history: iterationHistory,
+    baselineError: baselineMismatch
   });
 }
 
@@ -384,6 +457,7 @@ async function captureBreakpointDiff(options: {
   macro?: InteractionMacroPayload | null;
   waitMs?: number | null;
   suffix?: string;
+  iteration?: number;
 }): Promise<BreakpointDiffResult> {
   const label = options.suffix ? `${options.breakpoint.id}-${options.suffix}` : options.breakpoint.id;
   const referencePath = join(options.screenshotsDir, `reference-${label}.png`);
@@ -411,16 +485,20 @@ async function captureBreakpointDiff(options: {
     blockNetwork: true
   });
 
-  const mismatchPercentage = await computeMismatch(referenceShot.image, cloneShot.image, diffPath);
+  const mismatch = await computeMismatch(referenceShot.image, cloneShot.image, diffPath);
 
   return {
     breakpoint: options.breakpoint.id,
-    width: viewport.width,
-    height: viewport.height,
+    width: mismatch.width,
+    height: mismatch.height,
     referencePath,
     clonePath,
     diffPath,
-    mismatchPercentage
+    mismatchPercentage: mismatch.percent,
+    clipped: mismatch.clipped,
+    referenceDimensions: mismatch.referenceDimensions,
+    cloneDimensions: mismatch.cloneDimensions,
+    iteration: options.iteration
   };
 }
 
@@ -482,13 +560,31 @@ function normalizeViewportConfig(breakpoint: { width: number; height: number; de
   };
 }
 
-async function computeMismatch(reference: PNG, candidate: PNG, diffPath: string): Promise<number> {
-  const width = Math.min(reference.width, candidate.width);
-  const height = Math.min(reference.height, candidate.height);
+async function computeMismatch(
+  reference: PNG,
+  candidate: PNG,
+  diffPath: string
+): Promise<{
+  percent: number;
+  width: number;
+  height: number;
+  clipped: boolean;
+  referenceDimensions: { width: number; height: number };
+  cloneDimensions: { width: number; height: number };
+}> {
+  const width = Math.max(reference.width, candidate.width);
+  const height = Math.max(reference.height, candidate.height);
   if (width === 0 || height === 0) {
     const placeholder = new PNG({ width: 1, height: 1 });
     await writeFile(diffPath, PNG.sync.write(placeholder));
-    return 100;
+    return {
+      percent: 100,
+      width: 1,
+      height: 1,
+      clipped: true,
+      referenceDimensions: { width: reference.width, height: reference.height },
+      cloneDimensions: { width: candidate.width, height: candidate.height }
+    };
   }
   const normalizedReference = normalizePngDimensions(reference, width, height);
   const normalizedCandidate = normalizePngDimensions(candidate, width, height);
@@ -503,18 +599,33 @@ async function computeMismatch(reference: PNG, candidate: PNG, diffPath: string)
   );
   const percent = (mismatchedPixels / (width * height)) * 100;
   await writeFile(diffPath, PNG.sync.write(diff));
-  return roundPercent(percent);
+  return {
+    percent: roundPercent(percent),
+    width,
+    height,
+    clipped: reference.width !== candidate.width || reference.height !== candidate.height,
+    referenceDimensions: { width: reference.width, height: reference.height },
+    cloneDimensions: { width: candidate.width, height: candidate.height }
+  };
 }
 
-function normalizePngDimensions(image: PNG, width: number, height: number): PNG {
-  if (image.width === width && image.height === height) {
+function normalizePngDimensions(image: PNG, targetWidth: number, targetHeight: number): PNG {
+  if (image.width === targetWidth && image.height === targetHeight) {
     return image;
   }
-  const output = new PNG({ width, height });
-  for (let y = 0; y < height; y += 1) {
+  const output = new PNG({ width: targetWidth, height: targetHeight });
+  for (let i = 0; i < output.data.length; i += 4) {
+    output.data[i] = MISMATCH_PADDING_COLOR.r;
+    output.data[i + 1] = MISMATCH_PADDING_COLOR.g;
+    output.data[i + 2] = MISMATCH_PADDING_COLOR.b;
+    output.data[i + 3] = MISMATCH_PADDING_COLOR.a;
+  }
+  const copyWidth = Math.min(image.width, targetWidth);
+  const copyHeight = Math.min(image.height, targetHeight);
+  for (let y = 0; y < copyHeight; y += 1) {
     const sourceStart = y * image.width * 4;
-    const targetStart = y * width * 4;
-    image.data.copy(output.data, targetStart, sourceStart, sourceStart + width * 4);
+    const targetStart = y * targetWidth * 4;
+    image.data.copy(output.data, targetStart, sourceStart, sourceStart + copyWidth * 4);
   }
   return output;
 }
@@ -598,6 +709,7 @@ async function recordSettlingLog(options: {
   stabilizedError: number;
   waitMs: number;
   breakpoint: string;
+  iteration?: number;
 }): Promise<{ path: string; payload: Record<string, unknown> }> {
   const waitMs = Math.max(0, options.waitMs);
   const path = join(options.correctionDir, 'counter-settling.json');
@@ -607,7 +719,8 @@ async function recordSettlingLog(options: {
     wait_ms: waitMs,
     baseline_error: roundPercent(options.baselineError),
     stabilized_error: roundPercent(options.stabilizedError),
-    recorded_at: new Date().toISOString()
+    recorded_at: new Date().toISOString(),
+    iteration: options.iteration ?? 1
   };
   return { path, payload };
 }
@@ -621,6 +734,10 @@ async function assembleSelfCorrectionResult(options: {
   slug: string;
   settlingLogPath?: string;
   settlingWaitMs?: number;
+  iterationsRun: number;
+  finalIteration: number;
+  history: Array<{ iteration: number; worstMismatch: number; averageMismatch: number }>;
+  baselineError: number;
 }): Promise<{
   path: string;
   iterations: number;
@@ -629,30 +746,55 @@ async function assembleSelfCorrectionResult(options: {
   settlingWaitMs?: number;
   baselineError: number;
   assets: Array<{ path: string; description: string; role: string; breakpoint?: string }>;
+  history: Array<{ iteration: number; worstMismatch: number; averageMismatch: number }>;
+  finalIteration: number;
 }> {
-  const { correctionDir, results, threshold, sourceUrl, cloneUrl, slug, settlingLogPath, settlingWaitMs } = options;
+  const {
+    correctionDir,
+    results,
+    threshold,
+    sourceUrl,
+    cloneUrl,
+    slug,
+    settlingLogPath,
+    settlingWaitMs,
+    iterationsRun,
+    finalIteration,
+    history,
+    baselineError
+  } = options;
   const reportPath = join(correctionDir, 'self-correction.json');
   const finalValues = results.map((result) => result.settledMismatch ?? result.mismatchPercentage);
   const finalErrorRate = finalValues.length > 0 ? roundPercent(Math.max(...finalValues)) : 0;
   const averageErrorRate =
     finalValues.length > 0 ? roundPercent(finalValues.reduce((sum, value) => sum + value, 0) / finalValues.length) : 0;
-  const baselineError =
+  const fallbackBaseline =
     results.length > 0 ? roundPercent(Math.max(...results.map((result) => result.mismatchPercentage))) : 0;
+  const normalizedBaseline = baselineError > 0 ? roundPercent(baselineError) : fallbackBaseline;
+  const iterations = iterationsRun > 0 ? iterationsRun : results[0]?.iteration ?? 0;
 
   const payload = {
     slug,
     reference: sourceUrl,
     clone: cloneUrl,
     threshold,
+    iterations,
+    final_iteration: finalIteration,
+    iteration_history: history,
     threshold_passed: threshold > 0 ? finalErrorRate <= threshold : null,
     average_error_rate: averageErrorRate,
     final_error_rate: finalErrorRate,
+    baseline_error_rate: normalizedBaseline,
     breakpoints: results.map((result) => ({
       id: result.breakpoint,
       width: result.width,
       height: result.height,
       mismatch_percent: result.mismatchPercentage,
       settled_mismatch_percent: result.settledMismatch ?? null,
+      reference_dimensions: result.referenceDimensions,
+      clone_dimensions: result.cloneDimensions,
+      clipped: Boolean(result.clipped),
+      iteration: result.iteration ?? null,
       reference_image: result.referencePath,
       clone_image: result.clonePath,
       diff_image: result.diffPath,
@@ -666,11 +808,13 @@ async function assembleSelfCorrectionResult(options: {
 
   return {
     path: reportPath,
-    iterations: results.length,
+    iterations,
     finalErrorRate,
     settlingLogPath,
     settlingWaitMs,
-    baselineError,
+    baselineError: normalizedBaseline,
+    history,
+    finalIteration,
     assets: buildSelfCorrectionAssets(results)
   };
 }

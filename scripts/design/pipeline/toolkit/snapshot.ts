@@ -14,6 +14,11 @@ export interface SnapshotAsset {
   buffer: Buffer;
 }
 
+export interface MissingAssetRecord {
+  url: string;
+  reason: string;
+}
+
 export interface PageSnapshot {
   originalHtml: string;
   inlineHtml: string;
@@ -24,6 +29,7 @@ export interface PageSnapshot {
   resolvedFonts: string[];
   sections: PageSectionSummary[];
   assets: SnapshotAsset[];
+  assetWarnings: MissingAssetRecord[];
 }
 
 const DEFAULT_MAX_STYLESHEETS = 24;
@@ -71,6 +77,7 @@ interface CapturedAssetRecord {
 interface AssetRewriteData {
   assets: SnapshotAsset[];
   map: Map<string, string>;
+  missing: MissingAssetRecord[];
 }
 
 function normalizeViewport(viewport?: SnapshotViewport): SnapshotViewport {
@@ -92,6 +99,31 @@ function getPageOrigin(value: string): string {
   }
 }
 
+function registerMissingAsset(options: {
+  url: string;
+  reason: string;
+  missing: MissingAssetRecord[];
+}): void {
+  const normalized = normalizeAssetUrl(options.url);
+  const existing = options.missing.find((item) => item.url === normalized);
+  if (existing) {
+    return;
+  }
+
+  options.missing.push({
+    url: normalized,
+    reason: options.reason
+  });
+}
+
+function clearMissingAsset(missing: MissingAssetRecord[], url: string): void {
+  const normalized = normalizeAssetUrl(url);
+  const index = missing.findIndex((item) => item.url === normalized);
+  if (index >= 0) {
+    missing.splice(index, 1);
+  }
+}
+
 export async function capturePageSnapshot(url: string, options?: SnapshotOptions): Promise<PageSnapshot> {
   const mirrorAssets = Boolean(options?.mirrorAssets);
   const allowRemoteAssets = Boolean(options?.allowRemoteAssets);
@@ -100,6 +132,7 @@ export async function capturePageSnapshot(url: string, options?: SnapshotOptions
   const browser = await chromium.launch({ headless: true });
   const assetTasks: Array<Promise<void>> = [];
   const capturedAssets: CapturedAssetRecord[] = [];
+  const missingAssets: MissingAssetRecord[] = [];
 
   try {
     const context = await browser.newContext({
@@ -111,7 +144,9 @@ export async function capturePageSnapshot(url: string, options?: SnapshotOptions
 
     if (mirrorAssets) {
       page.on('response', (response: Response) => {
-        assetTasks.push(captureResponseAsset(response, url, baseOrigin, capturedAssets, allowRemoteAssets));
+        assetTasks.push(
+          captureResponseAsset(response, url, baseOrigin, capturedAssets, allowRemoteAssets, missingAssets)
+        );
       });
     }
 
@@ -128,7 +163,7 @@ export async function capturePageSnapshot(url: string, options?: SnapshotOptions
     const $ = load(html);
 
     absolutizeDocument($, url);
-    const assetRewrite = mirrorAssets ? buildAssetRewrite(capturedAssets, baseOrigin) : null;
+    const assetRewrite = mirrorAssets ? buildAssetRewrite(capturedAssets, baseOrigin, missingAssets) : null;
     if (assetRewrite) {
       await ensureInlineAssets(html, url, assetRewrite, allowRemoteAssets, baseOrigin);
       await ensurePortfolioAssets(html, url, assetRewrite, allowRemoteAssets, baseOrigin);
@@ -175,6 +210,33 @@ export async function capturePageSnapshot(url: string, options?: SnapshotOptions
     const fontFamilies = computeFontFamilies(aggregatedCss).slice(0, 8);
     const sections = summarizeSections($);
     const inlineHtml = buildDocumentHtml($);
+    if (assetRewrite && assetRewrite.missing.length > 0) {
+      const missingPath = 'assets/missing-assets.json';
+      assetRewrite.assets.push({
+        sourceUrl: 'about:missing-assets',
+        relativePath: missingPath,
+        buffer: Buffer.from(JSON.stringify(assetRewrite.missing, null, 2))
+      });
+    }
+    const warnings = assetRewrite?.missing ?? missingAssets;
+    if (warnings.length > 0) {
+      console.warn(
+        `[snapshot] Missing assets while mirroring ${url}: ${warnings.length} issue${warnings.length === 1 ? '' : 's'}`
+      );
+      warnings.slice(0, 8).forEach((warning) => {
+        console.warn(
+          ' -',
+          warning.url,
+          `(${warning.reason})`
+        );
+      });
+      // Hard fail when mirroring is requested but assets are missing, to avoid shipping incomplete offline clones.
+      if (mirrorAssets) {
+        throw new Error(
+          `Missing ${warnings.length} mirrored assets for ${url}; enable network/allow_remote_assets or fix URLs before cloning`
+        );
+      }
+    }
 
     return {
       originalHtml: html,
@@ -185,7 +247,8 @@ export async function capturePageSnapshot(url: string, options?: SnapshotOptions
       runtimeCanvasColors: runtimeMetadata.runtimeCanvasColors,
       resolvedFonts: runtimeMetadata.resolvedFonts,
       sections,
-      assets: assetRewrite?.assets ?? []
+      assets: assetRewrite?.assets ?? [],
+      assetWarnings: assetRewrite?.missing ?? missingAssets
     };
   } catch (error) {
     throw new Error(`Failed to render ${url} via Playwright: ${(error as Error).message}`);
@@ -266,18 +329,30 @@ async function captureResponseAsset(
   baseUrl: string,
   baseOrigin: string,
   bucket: CapturedAssetRecord[],
-  allowRemoteAssets: boolean
+  allowRemoteAssets: boolean,
+  missingAssets: MissingAssetRecord[]
 ): Promise<void> {
   try {
-    if (!response.ok()) {
-      return;
-    }
     const request = response.request();
     if (!MIRRORABLE_RESOURCE_TYPES.has(request.resourceType())) {
       return;
     }
     const absoluteUrl = response.url();
-    if (!allowRemoteAssets && !isSameOrigin(absoluteUrl, baseUrl)) {
+    const remote = !isSameOrigin(absoluteUrl, baseUrl);
+    if (!allowRemoteAssets && remote) {
+      registerMissingAsset({
+        url: absoluteUrl,
+        reason: 'remote-blocked',
+        missing: missingAssets
+      });
+      return;
+    }
+    if (!response.ok()) {
+      registerMissingAsset({
+        url: absoluteUrl,
+        reason: `http-${response.status()}`,
+        missing: missingAssets
+      });
       return;
     }
     const parsed = new URL(absoluteUrl);
@@ -286,10 +361,19 @@ async function captureResponseAsset(
     bucket.push({ url: normalizeAssetUrl(absoluteUrl), pathname, buffer, origin: parsed.origin });
   } catch (error) {
     console.warn('[snapshot] Failed to capture asset', response.url(), 'due to', error);
+    registerMissingAsset({
+      url: response.url(),
+      reason: 'capture-error',
+      missing: missingAssets
+    });
   }
 }
 
-function buildAssetRewrite(records: CapturedAssetRecord[], baseOrigin: string): AssetRewriteData {
+function buildAssetRewrite(
+  records: CapturedAssetRecord[],
+  baseOrigin: string,
+  missingAssets: MissingAssetRecord[] = []
+): AssetRewriteData {
   const map = new Map<string, string>();
   const assets: SnapshotAsset[] = [];
   for (const record of records) {
@@ -297,10 +381,11 @@ function buildAssetRewrite(records: CapturedAssetRecord[], baseOrigin: string): 
     if (map.has(record.url)) {
       continue;
     }
+    clearMissingAsset(missingAssets, record.url);
     map.set(record.url, relativePath);
     assets.push({ sourceUrl: record.url, relativePath, buffer: record.buffer });
   }
-  return { assets, map };
+  return { assets, map, missing: missingAssets };
 }
 
 function absolutizeDocument($: CheerioAPI, baseUrl: string): void {
@@ -907,9 +992,6 @@ async function fetchMissingAsset(
   allowRemoteAssets: boolean,
   baseOrigin: string
 ): Promise<void> {
-  if (!allowRemoteAssets && !isSameOrigin(absoluteUrl, referer)) {
-    return;
-  }
   const normalized = normalizeAssetUrl(absoluteUrl);
   if (assetRewrite.map.has(normalized)) {
     return;
@@ -918,6 +1000,19 @@ async function fetchMissingAsset(
   try {
     parsed = new URL(absoluteUrl);
   } catch {
+    registerMissingAsset({
+      url: absoluteUrl,
+      reason: 'invalid-url',
+      missing: assetRewrite.missing
+    });
+    return;
+  }
+  if (!allowRemoteAssets && !isSameOrigin(absoluteUrl, referer)) {
+    registerMissingAsset({
+      url: absoluteUrl,
+      reason: 'remote-blocked',
+      missing: assetRewrite.missing
+    });
     return;
   }
   if (parsed.protocol === 'file:') {
@@ -929,6 +1024,11 @@ async function fetchMissingAsset(
   try {
     const response = await fetchWithHeaders(parsed.toString(), referer);
     if (!response.ok) {
+      registerMissingAsset({
+        url: absoluteUrl,
+        reason: `http-${response.status()}`,
+        missing: assetRewrite.missing
+      });
       return;
     }
     const arrayBuffer = await response.arrayBuffer();
@@ -936,9 +1036,15 @@ async function fetchMissingAsset(
     const pathname = parsed.pathname;
     const filename = pathname.split('/').pop() ?? '';
     if (!filename.includes('.')) {
+      registerMissingAsset({
+        url: absoluteUrl,
+        reason: 'unqualified-path',
+        missing: assetRewrite.missing
+      });
       return;
     }
     const relativePath = buildRelativeAssetPath(parsed.toString(), parsed.origin, baseOrigin);
+    clearMissingAsset(assetRewrite.missing, normalized);
     assetRewrite.map.set(normalized, relativePath);
     assetRewrite.assets.push({
       sourceUrl: normalized,
@@ -947,5 +1053,10 @@ async function fetchMissingAsset(
     });
   } catch (error) {
     console.warn('[snapshot] Failed to fetch referenced asset', absoluteUrl, 'due to', error);
+    registerMissingAsset({
+      url: absoluteUrl,
+      reason: 'fetch-error',
+      missing: assetRewrite.missing
+    });
   }
 }
