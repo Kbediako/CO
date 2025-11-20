@@ -110,6 +110,9 @@ export interface RunSummary {
   build: BuildResult;
   test: TestResult;
   review: ReviewResult;
+  builds?: BuildResult[];
+  tests?: TestResult[];
+  reviews?: ReviewResult[];
   timestamp: string;
   toolRuns?: ToolRunRecord[];
   controlPlane?: ControlPlaneRunSummary;

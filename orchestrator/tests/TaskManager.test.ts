@@ -573,4 +573,68 @@ describe('TaskManager', () => {
       }
     }
   });
+
+  it('aggregates per-subtask results in group mode summaries', async () => {
+    const originalFlag = process.env.FEATURE_TFGRPO_GROUP;
+    process.env.FEATURE_TFGRPO_GROUP = '1';
+
+    const plan: PlanResult = {
+      items: [
+        { id: 'alpha', description: 'Alpha stage' },
+        { id: 'beta', description: 'Beta stage' }
+      ]
+    };
+
+    const builder = new FunctionalBuilderAgent(async (input) => ({
+      subtaskId: input.target.id,
+      artifacts: [{ path: `${input.target.id}.diff`, description: `artifact-${input.target.id}` }],
+      mode: input.mode,
+      success: true,
+      notes: `build-${input.target.id}`,
+      runId: input.runId
+    }));
+    const tester = new FunctionalTesterAgent(async (input) => ({
+      subtaskId: input.build.subtaskId,
+      success: input.build.subtaskId !== 'beta',
+      reports: [
+        {
+          name: 'tests',
+          status: input.build.subtaskId === 'beta' ? 'failed' : 'passed',
+          details: input.build.subtaskId === 'beta' ? 'integration failure' : 'all good'
+        }
+      ],
+      runId: input.runId
+    }));
+    const reviewer = new FunctionalReviewerAgent(async (input) => ({
+      summary: `review-${input.build.subtaskId}`,
+      decision: { approved: true, feedback: input.build.subtaskId }
+    }));
+
+    const manager = new TaskManager({
+      planner: new FunctionalPlannerAgent(async () => plan),
+      builder,
+      tester,
+      reviewer,
+      runIdFactory: () => 'run-aggregate'
+    });
+
+    try {
+      const summary = await manager.execute(baseTask);
+      expect(summary.group?.processed).toBe(2);
+      expect(summary.build.subtaskId).toBe('beta');
+      expect(summary.builds?.map((build) => build.subtaskId)).toEqual(['alpha', 'beta']);
+      expect(summary.tests?.map((test) => test.subtaskId)).toEqual(['alpha', 'beta']);
+      expect(summary.reviews?.length).toBe(2);
+      expect(summary.builds?.[0]?.notes).toBe('build-alpha');
+      expect(summary.builds?.[0]?.artifacts[0]?.description).toBe('artifact-alpha');
+      expect(summary.tests?.[1]?.reports[0]?.details).toContain('integration failure');
+      expect(summary.reviews?.[1]?.summary).toContain('Review skipped');
+    } finally {
+      if (originalFlag === undefined) {
+        delete process.env.FEATURE_TFGRPO_GROUP;
+      } else {
+        process.env.FEATURE_TFGRPO_GROUP = originalFlag;
+      }
+    }
+  });
 });

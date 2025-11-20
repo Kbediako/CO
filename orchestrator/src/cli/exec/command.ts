@@ -3,7 +3,13 @@ import { join } from 'node:path';
 
 import type { EnvironmentPaths } from '../run/environment.js';
 import { relativeToRepo } from '../run/runPaths.js';
-import { bootstrapManifest, finalizeStatus, saveManifest } from '../run/manifest.js';
+import {
+  appendCommandError,
+  bootstrapManifest,
+  finalizeStatus,
+  saveManifest,
+  updateCommandStatus
+} from '../run/manifest.js';
 import type {
   CommandStage,
   CliManifest,
@@ -47,6 +53,7 @@ import {
 } from '../../../../packages/orchestrator/src/notifications/index.js';
 import type { RunPaths } from '../run/runPaths.js';
 import { logger } from '../../logger.js';
+import { isoTimestamp } from '../utils/time.js';
 
 export type ExecOutputMode = 'interactive' | 'json' | 'jsonl';
 
@@ -208,9 +215,8 @@ export async function executeExecCommand(
     commandError = error;
   }
 
-  const commandEntry = manifest.commands[0];
-  const runStatus = determineRunStatus(commandEntry);
-
+  const commandIndex = 0;
+  let commandEntry = manifest.commands[commandIndex];
   const summarySnapshot = runResultSummary as RunResultSummary | null;
   let resultExitCode = extractExecMetadataField(toolRecord, 'exitCode') ?? null;
   if (summarySnapshot && summarySnapshot.exitCode !== undefined) {
@@ -220,6 +226,27 @@ export async function executeExecCommand(
   if (summarySnapshot && summarySnapshot.signal !== undefined) {
     resultSignal = summarySnapshot.signal;
   }
+  if (commandError && resultExitCode === null) {
+    resultExitCode = 1;
+  }
+
+  if (commandError && commandEntry) {
+    commandEntry = await finalizeFailedCommandEntry({
+      env,
+      paths,
+      manifest,
+      commandEntry,
+      commandIndex,
+      error: commandError,
+      exitCode: resultExitCode,
+      signal: resultSignal,
+      toolRecord,
+      summarySnapshot,
+      shellCommand
+    });
+  }
+
+  const runStatus = determineRunStatus(commandEntry);
 
   manifest.summary = commandEntry?.summary ?? manifest.summary;
   finalizeStatus(manifest, runStatus, commandEntry?.status === 'failed' ? 'exec-failed' : null);
@@ -379,6 +406,144 @@ function streamInteractive(
   }
 }
 
+async function finalizeFailedCommandEntry(params: {
+  env: EnvironmentPaths;
+  paths: RunPaths;
+  manifest: CliManifest;
+  commandEntry: CliManifestCommand;
+  commandIndex: number;
+  error: unknown;
+  exitCode: number | null;
+  signal: NodeJS.Signals | null;
+  toolRecord: ToolRunRecord | null;
+  summarySnapshot: RunResultSummary | null;
+  shellCommand: string;
+}): Promise<CliManifestCommand> {
+  const {
+    env,
+    paths,
+    manifest,
+    commandEntry,
+    commandIndex,
+    error,
+    exitCode,
+    signal,
+    toolRecord,
+    summarySnapshot,
+    shellCommand
+  } = params;
+
+  const failureSummary = buildFailureSummary(error, exitCode, signal);
+  const updatedEntry = updateCommandStatus(manifest, commandIndex, {
+    status: 'failed',
+    completed_at: commandEntry.completed_at ?? isoTimestamp(),
+    exit_code: exitCode,
+    summary: failureSummary
+  });
+
+  const errorDetails = buildCommandErrorDetails({
+    error,
+    exitCode,
+    signal,
+    toolRecord,
+    summarySnapshot,
+    shellCommand
+  });
+  const errorFile = await appendCommandError(
+    env,
+    paths,
+    manifest,
+    updatedEntry,
+    'command-execution-error',
+    errorDetails
+  );
+
+  return updateCommandStatus(manifest, commandIndex, {
+    error_file: errorFile
+  });
+}
+
+function buildFailureSummary(
+  error: unknown,
+  exitCode: number | null,
+  signal: NodeJS.Signals | null
+): string {
+  const message = normalizeErrorMessage(error);
+  if (signal) {
+    return `Command failed with signal ${signal}${message ? `: ${message}` : ''}`;
+  }
+  if (exitCode !== null && exitCode !== undefined) {
+    return `Command failed with code ${exitCode}${message ? `: ${message}` : ''}`;
+  }
+  return message ? `Command failed: ${message}` : 'Command failed.';
+}
+
+function buildCommandErrorDetails(params: {
+  error: unknown;
+  exitCode: number | null;
+  signal: NodeJS.Signals | null;
+  toolRecord: ToolRunRecord | null;
+  summarySnapshot: RunResultSummary | null;
+  shellCommand: string;
+}): Record<string, unknown> {
+  const { error, exitCode, signal, toolRecord, summarySnapshot, shellCommand } = params;
+  const execMetadata = readExecMetadata(toolRecord);
+  const details: Record<string, unknown> = {
+    message: normalizeErrorMessage(error),
+    command: shellCommand
+  };
+
+  if (exitCode !== null && exitCode !== undefined) {
+    details.exit_code = exitCode;
+  }
+  if (signal) {
+    details.signal = signal;
+  }
+
+  const sandboxState =
+    summarySnapshot?.sandboxState ?? toolRecord?.sandboxState ?? execMetadata?.sandboxState;
+  if (sandboxState) {
+    details.sandbox_state = sandboxState;
+  }
+  const correlationId = execMetadata?.correlationId ?? null;
+  if (correlationId) {
+    details.correlation_id = correlationId;
+  }
+  if (execMetadata?.sessionId) {
+    details.session_id = execMetadata.sessionId;
+  }
+  if (typeof execMetadata?.persisted === 'boolean') {
+    details.persisted = execMetadata.persisted;
+  }
+  if (toolRecord?.id) {
+    details.tool_run_id = toolRecord.id;
+  }
+  if (toolRecord?.status) {
+    details.status = toolRecord.status;
+  }
+  if (typeof toolRecord?.attemptCount === 'number') {
+    details.attempts = toolRecord.attemptCount;
+  } else if (typeof toolRecord?.retryCount === 'number') {
+    details.attempts = toolRecord.retryCount + 1;
+  }
+
+  return details;
+}
+
+function normalizeErrorMessage(error: unknown): string {
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+  if (typeof error === 'string') {
+    return error;
+  }
+  try {
+    return JSON.stringify(error);
+  } catch {
+    return String(error);
+  }
+}
+
 function determineRunStatus(entry: CliManifestCommand | undefined): RunStatus {
   if (!entry) {
     return 'failed';
@@ -400,6 +565,7 @@ interface ExecMetadataSnapshot {
   sandboxState?: SandboxState;
   sessionId?: string;
   persisted?: boolean;
+  correlationId?: string | null;
 }
 
 function readExecMetadata(record: ToolRunRecord | null): ExecMetadataSnapshot | null {

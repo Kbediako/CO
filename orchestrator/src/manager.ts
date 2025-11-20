@@ -250,10 +250,16 @@ export class TaskManager {
     runId: string
   ): Promise<PipelineRunResult> {
     const entries: RunGroupEntry[] = [];
+    const buildResults: BuildResult[] = [];
+    const testResults: TestResult[] = [];
+    const reviewResults: ReviewResult[] = [];
     let finalResult: PipelineRunResult | null = null;
     for (let index = 0; index < targets.length; index += 1) {
       const target = targets[index]!;
       const result = await this.runPipelineStages(task, plan, target, runId);
+      buildResults.push(result.build);
+      testResults.push(result.test);
+      reviewResults.push(result.review);
       entries.push({
         index: index + 1,
         subtaskId: target.id,
@@ -277,6 +283,9 @@ export class TaskManager {
       processed: entries.length,
       entries
     };
+    finalResult.summary.builds = buildResults;
+    finalResult.summary.tests = testResults;
+    finalResult.summary.reviews = reviewResults;
     return finalResult;
   }
 

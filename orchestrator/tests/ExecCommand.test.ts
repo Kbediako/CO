@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdtemp, readFile, rm, writeFile, mkdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -7,10 +7,13 @@ import process from 'node:process';
 
 import { executeExecCommand } from '../src/cli/exec/command.js';
 import { resolveEnvironment } from '../src/cli/run/environment.js';
+import * as CommandRunner from '../src/cli/services/commandRunner.js';
 import {
   computePromptPackStamp,
   type PromptPackSectionSource
 } from '../../packages/orchestrator/src/instructions/promptPacks.js';
+import { ToolInvocationFailedError } from '../../packages/orchestrator/src/index.js';
+import type { ToolRunRecord } from '../../packages/shared/manifest/types.js';
 
 const ORIGINAL_ENV = {
   root: process.env.CODEX_ORCHESTRATOR_ROOT,
@@ -163,6 +166,95 @@ describe('executeExecCommand', () => {
     const last = JSON.parse(lines[lines.length - 1]!);
     expect(last.type).toBe('run:summary');
     expect(last.payload.outputs.stdout).toContain('hello-jsonl');
+  });
+
+  it('finalizes manifest entries when the command runner throws', async () => {
+    const stdout = new PassThrough();
+    const stderr = new PassThrough();
+    stdout.resume();
+    stderr.resume();
+
+    const env = resolveEnvironment();
+    const failureRecord: ToolRunRecord = {
+      id: 'tool-run-failure',
+      tool: 'cli:command',
+      approvalSource: 'not-required',
+      retryCount: 0,
+      sandboxState: 'sandboxed',
+      status: 'failed',
+      startedAt: new Date().toISOString(),
+      completedAt: new Date().toISOString(),
+      attemptCount: 1,
+      metadata: {
+        exec: {
+          command: process.execPath,
+          args: ['-e', 'process.exit(9)'],
+          cwd: env.repoRoot,
+          sessionId: 'session-failure',
+          persisted: false,
+          correlationId: 'corr-error',
+          exitCode: 9,
+          signal: null,
+          sandboxState: 'sandboxed'
+        }
+      },
+      events: []
+    };
+    const failure = new ToolInvocationFailedError('simulated failure', failureRecord, new Error('exec failed'));
+
+    const runSpy = vi
+      .spyOn(CommandRunner, 'runCommandStage')
+      .mockImplementationOnce(async (_context, hooks) => {
+        hooks?.onError?.(failure);
+        throw failure;
+      });
+
+    try {
+      const result = await executeExecCommand(
+        {
+          env,
+          stdout,
+          stderr,
+          runIdFactory: () => 'run-error'
+        },
+        {
+          command: process.execPath,
+          args: ['-e', 'process.exit(9)'],
+          outputMode: 'json',
+          jsonPretty: false,
+          notifyTargets: [],
+          otelEndpoint: null
+        }
+      );
+
+      const manifestPath = join(workspaceRoot, result.manifestPath);
+      const manifest = JSON.parse(await readFile(manifestPath, 'utf8')) as {
+        commands: Array<{
+          status: string;
+          exit_code: number | null;
+          summary: string | null;
+          error_file: string | null;
+          completed_at: string | null;
+        }>;
+      };
+      const entry = manifest.commands[0]!;
+      expect(entry.status).toBe('failed');
+      expect(entry.exit_code).toBe(9);
+      expect(entry.summary).toMatch(/simulated failure/i);
+      expect(entry.completed_at).toBeTruthy();
+      expect(entry.error_file).toBeTruthy();
+
+      const errorFile = join(workspaceRoot, entry.error_file as string);
+      const errorDetails = JSON.parse(
+        await readFile(errorFile, 'utf8')
+      ) as { details: { exit_code: number | null } };
+      expect(errorDetails.details.exit_code).toBe(9);
+
+      expect(result.status).toBe('failed');
+      expect(result.summaryEvent.payload.result.exitCode).toBe(9);
+    } finally {
+      runSpy.mockRestore();
+    }
   });
 
   it('throws when MCP_RUNNER_TASK_ID is invalid', () => {
