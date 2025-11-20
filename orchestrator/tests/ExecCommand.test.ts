@@ -15,6 +15,8 @@ import {
 import { ToolInvocationFailedError } from '../../packages/orchestrator/src/index.js';
 import type { ToolRunRecord } from '../../packages/shared/manifest/types.js';
 
+type OnResultPayload = Parameters<NonNullable<CommandRunner.CommandRunHooks['onResult']>>[0];
+
 const ORIGINAL_ENV = {
   root: process.env.CODEX_ORCHESTRATOR_ROOT,
   runs: process.env.CODEX_ORCHESTRATOR_RUNS_DIR,
@@ -252,6 +254,84 @@ describe('executeExecCommand', () => {
 
       expect(result.status).toBe('failed');
       expect(result.summaryEvent.payload.result.exitCode).toBe(9);
+    } finally {
+      runSpy.mockRestore();
+    }
+  });
+
+  it('propagates signals from execution results', async () => {
+    const stdout = new PassThrough();
+    const stderr = new PassThrough();
+    stdout.resume();
+    stderr.resume();
+
+    const env = resolveEnvironment();
+    const signalRecord: ToolRunRecord = {
+      id: 'tool-run-signal',
+      tool: 'cli:command',
+      approvalSource: 'prompt',
+      retryCount: 0,
+      sandboxState: 'sandboxed',
+      status: 'failed',
+      startedAt: new Date().toISOString(),
+      completedAt: new Date().toISOString(),
+      attemptCount: 1,
+      metadata: {
+        exec: {
+          command: process.execPath,
+          args: ['-e', 'process.exit(0)'],
+          cwd: env.repoRoot,
+          sessionId: 'session-signal',
+          persisted: false,
+          correlationId: 'corr-signal',
+          exitCode: null,
+          signal: 'SIGTERM',
+          sandboxState: 'sandboxed'
+        }
+      },
+      events: []
+    };
+
+    const runSpy = vi
+      .spyOn(CommandRunner, 'runCommandStage')
+      .mockImplementationOnce(async (_context, hooks) => {
+        hooks?.onResult?.({
+          correlationId: 'corr-signal',
+          stdout: '',
+          stderr: '',
+          exitCode: null,
+          signal: 'SIGTERM',
+          durationMs: 25,
+          status: 'failed',
+          sandboxState: 'sandboxed',
+          record: signalRecord
+        } as OnResultPayload);
+        return { exitCode: 143, summary: 'terminated' };
+      });
+
+    try {
+      const result = await executeExecCommand(
+        {
+          env,
+          stdout,
+          stderr,
+          runIdFactory: () => 'run-signal'
+        },
+        {
+          command: process.execPath,
+          args: ['-e', 'process.exit(0)'],
+          outputMode: 'json',
+          jsonPretty: false,
+          notifyTargets: [],
+          otelEndpoint: null
+        }
+      );
+
+      expect(result.signal).toBe('SIGTERM');
+      expect(result.exitCode).toBeNull();
+      const manifestPath = join(workspaceRoot, result.manifestPath);
+      const manifest = JSON.parse(await readFile(manifestPath, 'utf8')) as { status: string };
+      expect(manifest.status).toBe('failed');
     } finally {
       runSpy.mockRestore();
     }

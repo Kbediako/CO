@@ -10,14 +10,7 @@ import {
   saveManifest,
   updateCommandStatus
 } from '../run/manifest.js';
-import type {
-  CommandStage,
-  CliManifest,
-  CliManifestCommand,
-  RunStatus,
-  PipelineDefinition,
-  TfgrpoManifestSection
-} from '../types.js';
+import type { CommandStage, CliManifest, CliManifestCommand, RunStatus, PipelineDefinition } from '../types.js';
 import { generateRunId } from '../utils/runId.js';
 import { JsonlWriter } from '../utils/jsonlWriter.js';
 import { runCommandStage, type CommandRunHooks } from '../services/commandRunner.js';
@@ -31,17 +24,9 @@ import type {
   ExecEvent,
   RunSummaryEvent,
   RunSummaryEventPayload,
-  RunMetricSummary,
-  ToolMetricSummary
+  RunMetricSummary
 } from '../../../../packages/shared/events/types.js';
-import { ExperienceStore, type ExperienceRecord } from '../../persistence/ExperienceStore.js';
-import {
-  summarizeTrajectory,
-  optimizeExperience,
-  framesFromToolMetrics,
-  type TfgrpoPolicyConfig
-} from './experience.js';
-import type { ToolRunRecord, SandboxState, ToolRunStatus } from '../../../../packages/shared/manifest/types.js';
+import type { ToolRunRecord, SandboxState } from '../../../../packages/shared/manifest/types.js';
 import { sanitizeToolRunRecord } from '../../../../packages/shared/manifest/writer.js';
 import {
   createTelemetrySink,
@@ -52,8 +37,18 @@ import {
   type ExecNotificationSink
 } from '../../../../packages/orchestrator/src/notifications/index.js';
 import type { RunPaths } from '../run/runPaths.js';
-import { logger } from '../../logger.js';
 import { isoTimestamp } from '../utils/time.js';
+import { ExperienceStore } from '../../persistence/ExperienceStore.js';
+import {
+  createRunMetricSummary,
+  createToolMetricSnapshot,
+  mergeTfgrpoManifest,
+  persistExperienceRecords,
+  resolveExperiencePolicy,
+  resolveTfgrpoContext,
+  type TfgrpoContext
+} from './tfgrpo.js';
+import type { RunResultSummary } from './types.js';
 
 export type ExecOutputMode = 'interactive' | 'json' | 'jsonl';
 
@@ -101,19 +96,42 @@ export interface ExecRunSummary {
   toolRun: ToolRunRecord | null;
 }
 
-interface RunResultSummary {
-  correlationId: string;
-  stdout: string;
-  stderr: string;
-  exitCode: number | null;
-  signal: NodeJS.Signals | null;
-  durationMs: number;
-  status: ToolRunStatus;
-  sandboxState: SandboxState;
+interface ExecRunContext {
+  env: EnvironmentPaths;
+  invocation: ExecCommandInvocation;
+  argv: string[];
+  shellCommand: string;
+  outputMode: ExecOutputMode;
+  stdout: NodeJS.WritableStream;
+  stderr: NodeJS.WritableStream;
+  runId: string;
+  pipeline: PipelineDefinition;
+  stage: CommandStage;
+  manifest: CliManifest;
+  paths: RunPaths;
+  telemetrySink: ExecTelemetrySink;
+  notificationSink: ExecNotificationSink;
+  jsonlWriter: JsonlWriter | null;
+  experienceStore: ExperienceStore;
+  execEvents: ExecEvent[];
+  telemetryTasks: Array<Promise<void>>;
 }
 
-const COST_PER_TOKEN_USD = 0.000002;
-const DEFAULT_EXPERIENCE_WORD_LIMIT = 32;
+interface StageRunResult {
+  summary: RunResultSummary | null;
+  toolRecord: ToolRunRecord | null;
+  commandError: unknown;
+}
+
+interface CommandFinalization {
+  commandEntry: CliManifestCommand | undefined;
+  runStatus: RunStatus;
+  exitCode: number | null;
+  signal: NodeJS.Signals | null;
+  summarySnapshot: RunResultSummary | null;
+  toolRecord: ToolRunRecord | null;
+  commandError: unknown;
+}
 
 export async function executeExecCommand(
   context: ExecCommandContext,
@@ -123,6 +141,57 @@ export async function executeExecCommand(
     throw new Error('exec command requires a command to run.');
   }
 
+  const runContext = await bootstrapExecContext(context, invocation);
+  const stageResult = await runExecStage(runContext);
+  const finalization = await finalizeCommandLifecycle(runContext, stageResult);
+
+  const tfgrpoContext = resolveTfgrpoContext();
+  const runMetricSummary = await handleTfgrpoArtifacts(runContext, finalization, tfgrpoContext);
+
+  const summaryPayload = createRunSummaryPayload({
+    env: runContext.env,
+    paths: runContext.paths,
+    manifest: runContext.manifest,
+    runStatus: finalization.runStatus,
+    shellCommand: runContext.shellCommand,
+    argv: runContext.argv,
+    resultSummary: finalization.summarySnapshot,
+    toolRecord: finalization.toolRecord,
+    execEvents: runContext.execEvents,
+    exitCode: finalization.exitCode,
+    signal: finalization.signal,
+    notificationTargets: runContext.notificationSink.targets,
+    cwd: runContext.stage.cwd ?? null,
+    metrics: runMetricSummary
+  });
+  const summaryEvent = serializeRunSummaryEvent(summaryPayload);
+
+  await deliverNotifications(runContext, summaryPayload, summaryEvent);
+  recordSummaryTelemetry(runContext, summaryEvent);
+  renderRunOutput(runContext, summaryPayload, summaryEvent);
+
+  await flushTelemetry(runContext);
+  await persistRunOutputs(runContext, summaryEvent);
+  await appendMetricsEntry(runContext.env, runContext.paths, runContext.manifest);
+
+  await shutdownSinks(runContext);
+  emitCommandError(runContext, finalization.commandError);
+
+  return buildExecRunSummary({
+    manifest: runContext.manifest,
+    summaryPayload,
+    summaryEvent,
+    shellCommand: runContext.shellCommand,
+    argv: runContext.argv,
+    events: runContext.execEvents,
+    toolRecord: finalization.toolRecord
+  });
+}
+
+async function bootstrapExecContext(
+  context: ExecCommandContext,
+  invocation: ExecCommandInvocation
+): Promise<ExecRunContext> {
   const argv = [invocation.command, ...(invocation.args ?? [])];
   const shellCommand = buildShellCommand(argv);
   const stdout = context.stdout ?? process.stdout;
@@ -165,20 +234,42 @@ export async function executeExecCommand(
     });
 
   const jsonlWriter = outputMode === 'jsonl' ? new JsonlWriter(stdout) : null;
-  const execEvents: ExecEvent[] = [];
-  const telemetryTasks: Array<Promise<void>> = [];
+
+  return {
+    env,
+    invocation,
+    argv,
+    shellCommand,
+    outputMode,
+    stdout,
+    stderr,
+    runId,
+    pipeline,
+    stage,
+    manifest,
+    paths,
+    telemetrySink,
+    notificationSink,
+    jsonlWriter,
+    experienceStore,
+    execEvents: [],
+    telemetryTasks: []
+  };
+}
+
+async function runExecStage(context: ExecRunContext): Promise<StageRunResult> {
   let runResultSummary: RunResultSummary | null = null;
   let toolRecord: ToolRunRecord | null = null;
 
   const hooks: CommandRunHooks = {
     onEvent: (event) => {
-      execEvents.push(event);
+      context.execEvents.push(event);
       const serialized = serializeExecEvent(event);
-      telemetryTasks.push(Promise.resolve(telemetrySink.record(serialized)).then(() => undefined));
-      if (outputMode === 'jsonl' && jsonlWriter) {
-        jsonlWriter.write(serialized);
-      } else if (outputMode === 'interactive') {
-        streamInteractive(stdout, stderr, event);
+      context.telemetryTasks.push(Promise.resolve(context.telemetrySink.record(serialized)).then(() => undefined));
+      if (context.outputMode === 'jsonl' && context.jsonlWriter) {
+        context.jsonlWriter.write(serialized);
+      } else if (context.outputMode === 'interactive') {
+        streamInteractive(context.stdout, context.stderr, event);
       }
     },
     onResult: (result) => {
@@ -203,10 +294,10 @@ export async function executeExecCommand(
   try {
     await runCommandStage(
       {
-        env,
-        paths,
-        manifest,
-        stage,
+        env: context.env,
+        paths: context.paths,
+        manifest: context.manifest,
+        stage: context.stage,
         index: 1
       },
       hooks
@@ -215,134 +306,180 @@ export async function executeExecCommand(
     commandError = error;
   }
 
+  return {
+    summary: runResultSummary,
+    toolRecord,
+    commandError
+  };
+}
+
+async function finalizeCommandLifecycle(
+  context: ExecRunContext,
+  stageResult: StageRunResult
+): Promise<CommandFinalization> {
   const commandIndex = 0;
-  let commandEntry = manifest.commands[commandIndex];
-  const summarySnapshot = runResultSummary as RunResultSummary | null;
-  let resultExitCode = extractExecMetadataField(toolRecord, 'exitCode') ?? null;
+  let commandEntry = context.manifest.commands[commandIndex];
+  const summarySnapshot = stageResult.summary;
+  let resultExitCode = extractExecMetadataField(stageResult.toolRecord, 'exitCode') ?? null;
   if (summarySnapshot && summarySnapshot.exitCode !== undefined) {
     resultExitCode = summarySnapshot.exitCode;
   }
-  let resultSignal = extractExecMetadataField(toolRecord, 'signal') ?? null;
+  let resultSignal = extractExecMetadataField(stageResult.toolRecord, 'signal') ?? null;
   if (summarySnapshot && summarySnapshot.signal !== undefined) {
     resultSignal = summarySnapshot.signal;
   }
-  if (commandError && resultExitCode === null) {
+  if (stageResult.commandError && resultExitCode === null) {
     resultExitCode = 1;
   }
 
-  if (commandError && commandEntry) {
+  if (stageResult.commandError && commandEntry) {
     commandEntry = await finalizeFailedCommandEntry({
-      env,
-      paths,
-      manifest,
+      env: context.env,
+      paths: context.paths,
+      manifest: context.manifest,
       commandEntry,
       commandIndex,
-      error: commandError,
+      error: stageResult.commandError,
       exitCode: resultExitCode,
       signal: resultSignal,
-      toolRecord,
+      toolRecord: stageResult.toolRecord,
       summarySnapshot,
-      shellCommand
+      shellCommand: context.shellCommand
     });
   }
 
   const runStatus = determineRunStatus(commandEntry);
 
-  manifest.summary = commandEntry?.summary ?? manifest.summary;
-  finalizeStatus(manifest, runStatus, commandEntry?.status === 'failed' ? 'exec-failed' : null);
+  context.manifest.summary = commandEntry?.summary ?? context.manifest.summary;
+  finalizeStatus(context.manifest, runStatus, commandEntry?.status === 'failed' ? 'exec-failed' : null);
 
-  const tfgrpoContext = resolveTfgrpoContext();
-  const toolMetric = buildToolMetricSnapshot(toolRecord, summarySnapshot);
-  const runMetricSummary = createRunMetricSummary(
-    toolMetric ? [toolMetric] : [],
-    tfgrpoContext
-  );
-  manifest.tfgrpo = mergeTfgrpoManifest(manifest.tfgrpo, runMetricSummary, tfgrpoContext);
-  await persistExperienceRecords({
-    store: experienceStore,
-    manifest,
-    env,
-    paths,
-    tfgrpoContext,
-    runMetrics: runMetricSummary,
-    execEvents,
-    policy: resolveExperiencePolicy()
-  });
-  await saveManifest(paths, manifest);
-
-  const summaryPayload = createRunSummaryPayload({
-    env,
-    paths,
-    manifest,
+  return {
+    commandEntry,
     runStatus,
-    shellCommand,
-    argv,
-    resultSummary: summarySnapshot,
-    toolRecord,
-    execEvents,
     exitCode: resultExitCode,
     signal: resultSignal,
-    notificationTargets: notificationSink.targets,
-    cwd: stage.cwd ?? null,
-    metrics: runMetricSummary
-  });
-  const summaryEvent = serializeRunSummaryEvent(summaryPayload);
+    summarySnapshot,
+    toolRecord: stageResult.toolRecord,
+    commandError: stageResult.commandError
+  };
+}
 
-  const notificationOutcome = await notificationSink.notify(summaryEvent);
+async function handleTfgrpoArtifacts(
+  context: ExecRunContext,
+  finalization: CommandFinalization,
+  tfgrpoContext: TfgrpoContext
+): Promise<RunMetricSummary | null> {
+  const toolMetric = createToolMetricSnapshot(finalization.toolRecord, finalization.summarySnapshot);
+  const runMetricSummary = createRunMetricSummary(toolMetric ? [toolMetric] : [], tfgrpoContext);
+  context.manifest.tfgrpo = mergeTfgrpoManifest(context.manifest.tfgrpo, runMetricSummary, tfgrpoContext);
+  await persistExperienceRecords({
+    store: context.experienceStore,
+    manifest: context.manifest,
+    env: context.env,
+    paths: context.paths,
+    tfgrpoContext,
+    runMetrics: runMetricSummary,
+    execEvents: context.execEvents,
+    policy: resolveExperiencePolicy()
+  });
+  await saveManifest(context.paths, context.manifest);
+  return runMetricSummary;
+}
+
+async function deliverNotifications(
+  context: ExecRunContext,
+  summaryPayload: RunSummaryEventPayload,
+  summaryEvent: RunSummaryEvent
+): Promise<void> {
+  const notificationOutcome = await context.notificationSink.notify(summaryEvent);
   if (summaryPayload.notifications) {
     summaryPayload.notifications.delivered = notificationOutcome.delivered;
     summaryPayload.notifications.failures = notificationOutcome.failures;
   }
+}
 
-  telemetryTasks.push(Promise.resolve(telemetrySink.recordSummary(summaryEvent)).then(() => undefined));
+function recordSummaryTelemetry(context: ExecRunContext, summaryEvent: RunSummaryEvent): void {
+  context.telemetryTasks.push(
+    Promise.resolve(context.telemetrySink.recordSummary(summaryEvent)).then(() => undefined)
+  );
+}
 
-  if (outputMode === 'jsonl' && jsonlWriter) {
-    jsonlWriter.write(summaryEvent);
-  } else if (outputMode === 'json') {
-    const spacing = invocation.jsonPretty ? 2 : 0;
-    stdout.write(`${JSON.stringify(summaryEvent, null, spacing)}\n`);
-  } else if (outputMode === 'interactive') {
-    stdout.write(`\n${summaryPayload.run.id} ${summaryPayload.status.toUpperCase()}\n`);
-    stdout.write(`Manifest: ${summaryPayload.run.manifest}\n`);
-    stdout.write(`Log: ${summaryPayload.logs.runner}\n`);
+function renderRunOutput(
+  context: ExecRunContext,
+  summaryPayload: RunSummaryEventPayload,
+  summaryEvent: RunSummaryEvent
+): void {
+  if (context.outputMode === 'jsonl' && context.jsonlWriter) {
+    context.jsonlWriter.write(summaryEvent);
+    return;
   }
+  if (context.outputMode === 'json') {
+    const spacing = context.invocation.jsonPretty ? 2 : 0;
+    context.stdout.write(`${JSON.stringify(summaryEvent, null, spacing)}\n`);
+    return;
+  }
+  if (context.outputMode === 'interactive') {
+    context.stdout.write(`\n${summaryPayload.run.id} ${summaryPayload.status.toUpperCase()}\n`);
+    context.stdout.write(`Manifest: ${summaryPayload.run.manifest}\n`);
+    context.stdout.write(`Log: ${summaryPayload.logs.runner}\n`);
+  }
+}
 
-  await Promise.allSettled(telemetryTasks);
-  await telemetrySink.flush();
+async function flushTelemetry(context: ExecRunContext): Promise<void> {
+  await Promise.allSettled(context.telemetryTasks);
+  await context.telemetrySink.flush();
+}
 
-  const runSummaryPath = join(paths.runDir, 'run-summary.json');
+async function persistRunOutputs(
+  context: ExecRunContext,
+  summaryEvent: RunSummaryEvent
+): Promise<void> {
+  const runSummaryPath = join(context.paths.runDir, 'run-summary.json');
   await writeJsonAtomic(runSummaryPath, summaryEvent);
-  manifest.run_summary_path = relativeToRepo(env, runSummaryPath);
-  await saveManifest(paths, manifest);
+  context.manifest.run_summary_path = relativeToRepo(context.env, runSummaryPath);
+  await saveManifest(context.paths, context.manifest);
+}
 
-  await appendMetricsEntry(env, paths, manifest);
+async function shutdownSinks(context: ExecRunContext): Promise<void> {
+  await context.telemetrySink.shutdown();
+  await context.notificationSink.shutdown();
+}
 
-  await telemetrySink.shutdown();
-  await notificationSink.shutdown();
-
-  if (commandError) {
-    // ensure stderr receives detail if nothing was printed during run
-    if (outputMode !== 'jsonl' && outputMode !== 'json') {
-      stderr.write(
-        `Command execution failed: ${(commandError as Error)?.message ?? String(commandError)}\n`
-      );
-    }
+function emitCommandError(context: ExecRunContext, commandError: unknown): void {
+  if (!commandError) {
+    return;
   }
+  if (context.outputMode === 'jsonl' || context.outputMode === 'json') {
+    return;
+  }
+  context.stderr.write(
+    `Command execution failed: ${(commandError as Error)?.message ?? String(commandError)}\n`
+  );
+}
 
+function buildExecRunSummary(params: {
+  manifest: CliManifest;
+  summaryPayload: RunSummaryEventPayload;
+  summaryEvent: RunSummaryEvent;
+  shellCommand: string;
+  argv: string[];
+  events: ExecEvent[];
+  toolRecord: ToolRunRecord | null;
+}): ExecRunSummary {
   return {
-    runId: manifest.run_id,
-    manifestPath: summaryPayload.run.manifest,
-    logPath: summaryPayload.logs.runner,
-    status: summaryPayload.status,
-    exitCode: summaryPayload.result.exitCode,
-    signal: summaryPayload.result.signal,
-    stdout: summaryPayload.outputs.stdout,
-    stderr: summaryPayload.outputs.stderr,
-    shellCommand,
-    argv,
-    events: execEvents,
-    summaryEvent,
-    toolRun: toolRecord ?? null
+    runId: params.manifest.run_id,
+    manifestPath: params.summaryPayload.run.manifest,
+    logPath: params.summaryPayload.logs.runner,
+    status: params.summaryPayload.status,
+    exitCode: params.summaryPayload.result.exitCode,
+    signal: params.summaryPayload.result.signal,
+    stdout: params.summaryPayload.outputs.stdout,
+    stderr: params.summaryPayload.outputs.stderr,
+    shellCommand: params.shellCommand,
+    argv: params.argv,
+    events: params.events,
+    summaryEvent: params.summaryEvent,
+    toolRun: params.toolRecord ?? null
   };
 }
 
@@ -674,235 +811,4 @@ function createRunSummaryPayload(params: {
       failures: []
     }
   };
-}
-
-interface TfgrpoContext {
-  epoch: number | null;
-  groupId: string | null;
-  groupSize: number | null;
-  active: boolean;
-}
-
-function resolveTfgrpoContext(env: NodeJS.ProcessEnv = process.env): TfgrpoContext {
-  const epoch = parsePositiveInteger(env.TFGRPO_EPOCH);
-  const groupSize = parsePositiveInteger(env.TFGRPO_GROUP_SIZE);
-  const groupId = env.TFGRPO_GROUP_ID?.trim() || null;
-  return {
-    epoch,
-    groupId,
-    groupSize,
-    active: epoch !== null || groupSize !== null || groupId !== null
-  };
-}
-
-function parsePositiveInteger(value: string | undefined): number | null {
-  if (!value) {
-    return null;
-  }
-  const parsed = Number.parseInt(value, 10);
-  if (Number.isNaN(parsed) || parsed <= 0) {
-    return null;
-  }
-  return parsed;
-}
-
-function resolveExperiencePolicy(): TfgrpoPolicyConfig {
-  const configured = process.env.TFGRPO_EXPERIENCE_MAX_WORDS;
-  const parsed = configured ? Number.parseInt(configured, 10) : NaN;
-  const maxSummaryWords = Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_EXPERIENCE_WORD_LIMIT;
-  return {
-    maxSummaryWords,
-    rewardFloor: 0
-  };
-}
-
-function buildToolMetricSnapshot(
-  toolRecord: ToolRunRecord | null,
-  summary: RunResultSummary | null
-): ToolMetricSummary | null {
-  if (!toolRecord && !summary) {
-    return null;
-  }
-  const stdout = summary?.stdout ?? '';
-  const tokens = estimateTokenCount(stdout);
-  const latencyMs = summary?.durationMs ?? deriveDurationFromEvents(toolRecord);
-  const costUsd = roundCurrency(tokens * COST_PER_TOKEN_USD);
-  const attempts = toolRecord?.attemptCount ?? 1;
-  const status = toolRecord?.status ?? summary?.status ?? 'failed';
-  const sandboxState = summary?.sandboxState ?? toolRecord?.sandboxState ?? 'sandboxed';
-  const toolName = toolRecord?.tool ?? 'cli:command';
-  return {
-    tool: toolName,
-    tokens,
-    costUsd,
-    latencyMs,
-    attempts,
-    status,
-    sandboxState
-  };
-}
-
-function deriveDurationFromEvents(record: ToolRunRecord | null): number {
-  const events = record?.events;
-  if (!Array.isArray(events) || events.length === 0) {
-    return 0;
-  }
-  const first = events.find((event) => event.type === 'exec:begin');
-  const last = [...events].reverse().find((event) => event.type === 'exec:end');
-  if (!first || !last) {
-    return 0;
-  }
-  const startedAt = Date.parse(first.timestamp);
-  const completedAt = Date.parse(last.timestamp);
-  if (Number.isNaN(startedAt) || Number.isNaN(completedAt) || completedAt < startedAt) {
-    return 0;
-  }
-  return completedAt - startedAt;
-}
-
-function estimateTokenCount(output: string): number {
-  const trimmed = output.trim();
-  if (!trimmed) {
-    return 0;
-  }
-  return trimmed.split(/\s+/u).filter(Boolean).length;
-}
-
-function roundCurrency(value: number): number {
-  return Math.round(value * 1_000_000) / 1_000_000;
-}
-
-function createRunMetricSummary(
-  metrics: ToolMetricSummary[],
-  context: TfgrpoContext
-): RunMetricSummary | null {
-  const toolCalls = metrics.length;
-  if (toolCalls === 0 && !context.active) {
-    return null;
-  }
-  const tokenTotal = metrics.reduce((sum, metric) => sum + metric.tokens, 0);
-  const costUsd = roundCurrency(metrics.reduce((sum, metric) => sum + metric.costUsd, 0));
-  const latencyMs = metrics.reduce((sum, metric) => sum + metric.latencyMs, 0);
-  return {
-    toolCalls,
-    tokenTotal,
-    costUsd,
-    latencyMs,
-    perTool: metrics,
-    tfgrpo: context.active
-      ? {
-          epoch: context.epoch,
-          groupSize: context.groupSize,
-          groupId: context.groupId
-        }
-      : undefined
-  };
-}
-
-function mergeTfgrpoManifest(
-  existing: TfgrpoManifestSection | null | undefined,
-  metrics: RunMetricSummary | null,
-  context: TfgrpoContext
-): TfgrpoManifestSection | null {
-  if (!metrics && !existing && !context.active) {
-    return null;
-  }
-  const manifestMetrics = metrics
-    ? {
-        tool_calls: metrics.toolCalls,
-        token_total: metrics.tokenTotal,
-        cost_usd: metrics.costUsd,
-        latency_ms: metrics.latencyMs,
-        per_tool: metrics.perTool.map((entry) => ({
-          tool: entry.tool,
-          tokens: entry.tokens,
-          cost_usd: entry.costUsd,
-          latency_ms: entry.latencyMs,
-          attempts: entry.attempts,
-          status: entry.status,
-          sandbox_state: entry.sandboxState
-        }))
-      }
-    : existing?.tool_metrics;
-  return {
-    epoch: context.epoch ?? existing?.epoch ?? null,
-    group_id: context.groupId ?? existing?.group_id ?? null,
-    group_size: context.groupSize ?? existing?.group_size ?? null,
-    tool_metrics: manifestMetrics ?? existing?.tool_metrics,
-    experiences: existing?.experiences
-  };
-}
-
-async function persistExperienceRecords(params: {
-  store: ExperienceStore;
-  manifest: CliManifest;
-  env: EnvironmentPaths;
-  paths: RunPaths;
-  tfgrpoContext: TfgrpoContext;
-  runMetrics: RunMetricSummary | null;
-  execEvents: ExecEvent[];
-  policy: TfgrpoPolicyConfig;
-}): Promise<ExperienceRecord[] | null> {
-  const { runMetrics } = params;
-  if (!runMetrics || runMetrics.perTool.length === 0) {
-    return null;
-  }
-  const promptPack = params.manifest.prompt_packs?.[0];
-  if (!promptPack?.domain || !promptPack.stamp) {
-    return null;
-  }
-  const terminalEvent = findTerminalEvent(params.execEvents);
-  if (!terminalEvent) {
-    return null;
-  }
-  try {
-    const frames = framesFromToolMetrics(runMetrics.perTool, terminalEvent);
-    const trajectory = summarizeTrajectory({
-      runId: params.manifest.run_id,
-      taskId: params.manifest.task_id,
-      epoch: params.tfgrpoContext.epoch,
-      groupId: params.tfgrpoContext.groupId,
-      domain: promptPack.domain,
-      stampSignature: promptPack.stamp,
-      frames,
-      baseSummary: params.manifest.summary ?? undefined
-    });
-    const optimized = optimizeExperience(trajectory, params.policy);
-    const manifestPath = relativeToRepo(params.env, params.paths.manifestPath);
-    const written = await params.store.recordBatch([optimized], manifestPath);
-    if (written.length > 0) {
-      const existing = params.manifest.tfgrpo?.experiences ?? {
-        ids: [],
-        written: 0,
-        manifest_path: manifestPath
-      };
-      const summary = {
-        ids: [...existing.ids, ...written.map((record) => record.id)],
-        written: existing.written + written.length,
-        manifest_path: manifestPath
-      };
-      params.manifest.tfgrpo = {
-        ...(params.manifest.tfgrpo ?? {
-          epoch: params.tfgrpoContext.epoch,
-          group_id: params.tfgrpoContext.groupId,
-          group_size: params.tfgrpoContext.groupSize
-        }),
-        experiences: summary
-      };
-    }
-    return written;
-  } catch (error) {
-    logger.warn(`Failed to persist TF-GRPO experience: ${String(error)}`);
-    return null;
-  }
-}
-
-function findTerminalEvent(events: ExecEvent[]): ExecEvent | null {
-  for (let index = events.length - 1; index >= 0; index -= 1) {
-    const candidate = events[index];
-    if (candidate?.type === 'exec:end') {
-      return candidate;
-    }
-  }
-  return events.length > 0 ? events[events.length - 1]! : null;
 }

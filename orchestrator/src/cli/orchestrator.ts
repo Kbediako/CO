@@ -1,31 +1,16 @@
 import process from 'node:process';
 import { readFile } from 'node:fs/promises';
-import { join } from 'node:path';
 
 import { TaskManager } from '../manager.js';
 import type { ManagerOptions } from '../manager.js';
-import type { TaskContext, RunSummary, ExecutionMode, PlanItem } from '../types.js';
+import type { TaskContext, ExecutionMode, PlanItem } from '../types.js';
 import {
   CommandPlanner,
   CommandBuilder,
   CommandTester,
   CommandReviewer
 } from './adapters/index.js';
-import {
-  buildRunRequestV2,
-  ControlPlaneDriftReporter,
-  ControlPlaneValidationError,
-  ControlPlaneValidator
-} from '../control-plane/index.js';
-import type { ControlPlaneValidationResult, ControlPlaneValidationMode } from '../control-plane/types.js';
-import {
-  buildSchedulerRunSummary,
-  createSchedulerPlan,
-  finalizeSchedulerPlan,
-  serializeSchedulerPlan
-} from '../scheduler/index.js';
-import type { SchedulerPlan, SchedulerAssignmentStatus } from '../scheduler/index.js';
-import { resolveEnvironment, sanitizeTaskId } from './run/environment.js';
+import { resolveEnvironment } from './run/environment.js';
 import type { EnvironmentPaths } from './run/environment.js';
 import {
   bootstrapManifest,
@@ -48,23 +33,30 @@ import type {
   PlanOptions,
   StartOptions,
   ResumeOptions,
-  StatusOptions,
-  RunStatus
+  StatusOptions
 } from './types.js';
 import { generateRunId } from './utils/runId.js';
-import { loadUserConfig, findPipeline } from './config/userConfig.js';
-import type { UserConfig } from './config/userConfig.js';
-import { resolvePipeline } from './pipelines/index.js';
-import { loadTaskMetadata } from './tasks/taskMetadata.js';
 import { runCommandStage } from './services/commandRunner.js';
 import { appendMetricsEntry } from './metrics/metricsRecorder.js';
-import { writeJsonAtomic } from './utils/fs.js';
 import { isoTimestamp } from './utils/time.js';
 import type { RunPaths } from './run/runPaths.js';
 import { resolveRunPaths, relativeToRepo } from './run/runPaths.js';
 import { logger } from '../logger.js';
 import { getPrivacyGuard } from './services/execRuntime.js';
 import { PipelineResolver } from './services/pipelineResolver.js';
+import { ControlPlaneService } from './services/controlPlaneService.js';
+import { SchedulerService } from './services/schedulerService.js';
+import {
+  applyHandlesToRunSummary,
+  applyPrivacyToRunSummary,
+  persistRunSummary
+} from './services/runSummaryWriter.js';
+import {
+  prepareRun,
+  resolvePipelineForResume,
+  overrideTaskEnvironment
+} from './services/runPreparation.js';
+import { loadUserConfig } from './config/userConfig.js';
 
 
 interface ExecutePipelineOptions {
@@ -85,36 +77,37 @@ interface RunLifecycleContext {
 }
 
 export class CodexOrchestrator {
+  private readonly controlPlane = new ControlPlaneService();
+  private readonly scheduler = new SchedulerService();
+
   constructor(private readonly baseEnv: EnvironmentPaths = resolveEnvironment()) {}
 
   async start(options: StartOptions = {}): Promise<PipelineExecutionResult> {
-    const env = this.overrideTaskId(options.taskId);
-    const resolver = new PipelineResolver();
-    const { pipeline } = await resolver.resolve(env, { pipelineId: options.pipelineId });
-    
-    const metadata = await loadTaskMetadata(env);
-    const taskContext = this.createTaskContext(metadata);
-    const plannerTarget = this.resolveTargetStageId(options.targetStageId, null);
-    const planner = new CommandPlanner(pipeline, { targetStageId: plannerTarget });
-    const planPreview = await planner.plan(taskContext);
+    const preparation = await prepareRun({
+      baseEnv: this.baseEnv,
+      taskIdOverride: options.taskId,
+      pipelineId: options.pipelineId,
+      targetStageId: options.targetStageId ?? null,
+      planTargetFallback: null
+    });
     const runId = generateRunId();
 
     const { manifest, paths } = await bootstrapManifest(runId, {
-      env,
-      pipeline,
+      env: preparation.env,
+      pipeline: preparation.pipeline,
       parentRunId: options.parentRunId ?? null,
-      taskSlug: metadata.slug,
+      taskSlug: preparation.metadata.slug,
       approvalPolicy: options.approvalPolicy ?? null,
-      planTargetId: planPreview.targetId ?? null
+      planTargetId: preparation.planPreview?.targetId ?? preparation.plannerTargetId ?? null
     });
 
     return await this.performRunLifecycle({
-      env,
-      pipeline,
+      env: preparation.env,
+      pipeline: preparation.pipeline,
       manifest,
       paths,
-      planner,
-      taskContext,
+      planner: preparation.planner,
+      taskContext: preparation.taskContext,
       runId
     });
   }
@@ -122,20 +115,14 @@ export class CodexOrchestrator {
   async resume(options: ResumeOptions): Promise<PipelineExecutionResult> {
     const env = this.baseEnv;
     const { manifest, paths } = await loadManifest(env, options.runId);
-    const actualEnv = this.overrideTaskId(manifest.task_id);
-    
+    const actualEnv = overrideTaskEnvironment(env, manifest.task_id);
+
     const resolver = new PipelineResolver();
     const designConfig = await resolver.loadDesignConfig(actualEnv.repoRoot);
-    
+
     const userConfig = await loadUserConfig(actualEnv);
-    const pipeline = this.resolvePipelineForResume(actualEnv, manifest, userConfig);
+    const pipeline = resolvePipelineForResume(actualEnv, manifest, userConfig);
     resolver.ensureDesignPipelineEnv(pipeline.id, designConfig);
-
-    const metadata = await loadTaskMetadata(actualEnv);
-    const taskContext = this.createTaskContext(metadata);
-    const plannerTarget = this.resolveTargetStageId(options.targetStageId, manifest.plan_target_id ?? null);
-    const planner = new CommandPlanner(pipeline, { targetStageId: plannerTarget });
-
     await this.validateResumeToken(paths, manifest, options.resumeToken ?? null);
     recordResumeEvent(manifest, {
       actor: options.actor ?? 'cli',
@@ -144,18 +131,25 @@ export class CodexOrchestrator {
     });
     resetForResume(manifest);
     updateHeartbeat(manifest);
-    const resumePlan = await planner.plan(taskContext);
-    manifest.plan_target_id = resumePlan.targetId ?? null;
+    const preparation = await prepareRun({
+      baseEnv: actualEnv,
+      pipeline,
+      resolver,
+      taskIdOverride: manifest.task_id,
+      targetStageId: options.targetStageId,
+      planTargetFallback: manifest.plan_target_id ?? null
+    });
+    manifest.plan_target_id = preparation.planPreview?.targetId ?? preparation.plannerTargetId ?? null;
     await saveManifest(paths, manifest);
     await writeHeartbeatFile(paths, manifest);
 
     return await this.performRunLifecycle({
-      env: actualEnv,
+      env: preparation.env,
       pipeline,
       manifest,
       paths,
-      planner,
-      taskContext,
+      planner: preparation.planner,
+      taskContext: preparation.taskContext,
       runId: manifest.run_id
     });
   }
@@ -173,17 +167,16 @@ export class CodexOrchestrator {
   }
 
   async plan(options: PlanOptions = {}): Promise<PlanPreviewResult> {
-    const env = this.overrideTaskId(options.taskId);
-    const resolver = new PipelineResolver();
-    const { pipeline, source } = await resolver.resolve(env, { pipelineId: options.pipelineId });
-    
-    const metadata = await loadTaskMetadata(env);
-    const plannerTarget = this.resolveTargetStageId(options.targetStageId, null);
-    const planner = new CommandPlanner(pipeline, { targetStageId: plannerTarget });
-    const taskContext = this.createTaskContext(metadata);
-    const plan = await planner.plan(taskContext);
+    const preparation = await prepareRun({
+      baseEnv: this.baseEnv,
+      taskIdOverride: options.taskId,
+      pipelineId: options.pipelineId,
+      targetStageId: options.targetStageId,
+      planTargetFallback: null
+    });
+    const plan = preparation.planPreview ?? (await preparation.planner.plan(preparation.taskContext));
 
-    const stages = pipeline.stages.map((stage, index) => {
+    const stages = preparation.pipeline.stages.map((stage, index) => {
       if (stage.kind === 'command') {
         return {
           index: index + 1,
@@ -209,38 +202,14 @@ export class CodexOrchestrator {
 
     return {
       pipeline: {
-        id: pipeline.id,
-        title: pipeline.title,
-        description: pipeline.description ?? null,
-        source
+        id: preparation.pipeline.id,
+        title: preparation.pipeline.title,
+        description: preparation.pipeline.description ?? null,
+        source: preparation.pipelineSource
       },
       stages,
       plan
     };
-  }
-
-  private overrideTaskId(taskId?: string): EnvironmentPaths {
-    if (!taskId) {
-      return { ...this.baseEnv };
-    }
-    const sanitized = sanitizeTaskId(taskId);
-    return { ...this.baseEnv, taskId: sanitized };
-  }
-
-  private resolveTargetStageId(explicit: string | undefined, fallback: string | null): string | null {
-    const normalizedExplicit = explicit?.trim();
-    if (normalizedExplicit) {
-      return normalizedExplicit;
-    }
-    const normalizedFallback = fallback?.trim();
-    if (normalizedFallback) {
-      return normalizedFallback;
-    }
-    const envTarget = process.env.CODEX_ORCHESTRATOR_TARGET_STAGE;
-    if (typeof envTarget === 'string' && envTarget.trim().length > 0) {
-      return envTarget.trim();
-    }
-    return null;
   }
 
   private createTaskManager(
@@ -531,7 +500,7 @@ export class CodexOrchestrator {
 
     getPrivacyGuard().reset();
 
-    const controlPlaneResult = await this.guardControlPlane({
+    const controlPlaneResult = await this.controlPlane.guard({
       env,
       manifest,
       paths,
@@ -541,7 +510,7 @@ export class CodexOrchestrator {
       requestedBy: { actorId: 'codex-cli', channel: 'cli', name: 'Codex CLI' }
     });
 
-    const schedulerPlan = await this.createSchedulerPlanForRun({
+    const schedulerPlan = await this.scheduler.createPlanForRun({
       env,
       manifest,
       paths,
@@ -551,19 +520,18 @@ export class CodexOrchestrator {
     const runSummary = await manager.execute(taskContext);
 
 
-    await this.finalizeSchedulerPlanForManifest({
-      env,
+    await this.scheduler.finalizePlan({
       manifest,
       paths,
       plan: schedulerPlan
     });
 
-    this.applySchedulerToRunSummary(runSummary, schedulerPlan);
-    this.applyHandlesToRunSummary(runSummary, manifest);
-    this.applyPrivacyToRunSummary(runSummary, manifest);
-    this.applyControlPlaneToRunSummary(runSummary, controlPlaneResult);
+    this.scheduler.applySchedulerToRunSummary(runSummary, schedulerPlan);
+    applyHandlesToRunSummary(runSummary, manifest);
+    applyPrivacyToRunSummary(runSummary, manifest);
+    this.controlPlane.applyControlPlaneToRunSummary(runSummary, controlPlaneResult);
 
-    await this.persistRunSummary(env, paths, manifest, runSummary);
+    await persistRunSummary(env, paths, manifest, runSummary);
 
     return { manifest, runSummary };
   }
@@ -583,228 +551,6 @@ export class CodexOrchestrator {
     });
   }
 
-  private async guardControlPlane(options: {
-    env: EnvironmentPaths;
-    manifest: CliManifest;
-    paths: RunPaths;
-    pipeline: PipelineDefinition;
-    task: TaskContext;
-    runId: string;
-    requestedBy: { actorId: string; channel: string; name?: string };
-  }): Promise<ControlPlaneValidationResult> {
-    const mode = this.resolveControlPlaneMode();
-    const driftReporter = new ControlPlaneDriftReporter({
-      repoRoot: options.env.repoRoot,
-      taskId: options.env.taskId
-    });
-    const validator = new ControlPlaneValidator({ mode, driftReporter, now: () => new Date() });
-    const request = buildRunRequestV2({
-      runId: options.runId,
-      task: options.task,
-      pipeline: options.pipeline,
-      manifest: options.manifest,
-      env: options.env,
-      requestedBy: options.requestedBy,
-      now: () => new Date()
-    });
-
-    try {
-      const result = await validator.validate(request);
-      this.attachControlPlaneToManifest(options.env, options.manifest, result);
-      await saveManifest(options.paths, options.manifest);
-      return result;
-    } catch (error: unknown) {
-      if (error instanceof ControlPlaneValidationError) {
-        this.attachControlPlaneToManifest(options.env, options.manifest, error.result);
-        options.manifest.status = 'failed';
-        options.manifest.status_detail = 'control-plane-validation-failed';
-        options.manifest.completed_at = isoTimestamp();
-        appendSummary(options.manifest, `Control plane validation failed: ${error.message}`);
-        await saveManifest(options.paths, options.manifest);
-      }
-      throw error;
-    }
-  }
-
-  private attachControlPlaneToManifest(
-    env: EnvironmentPaths,
-    manifest: CliManifest,
-    result: ControlPlaneValidationResult
-  ): void {
-    const { request, outcome } = result;
-    const drift = outcome.drift
-      ? {
-          report_path: relativeToRepo(env, outcome.drift.absoluteReportPath),
-          total_samples: outcome.drift.totalSamples,
-          invalid_samples: outcome.drift.invalidSamples,
-          invalid_rate: outcome.drift.invalidRate,
-          last_sampled_at: outcome.drift.lastSampledAt,
-          mode: outcome.drift.mode
-        }
-      : undefined;
-
-    manifest.control_plane = {
-      schema_id: request.schema,
-      schema_version: request.version,
-      request_id: request.requestId,
-      validation: {
-        mode: outcome.mode,
-        status: outcome.status,
-        timestamp: outcome.timestamp,
-        errors: outcome.errors.map((error) => ({ ...error }))
-      },
-      drift,
-      enforcement: {
-        enabled: outcome.mode === 'enforce',
-        activated_at: outcome.mode === 'enforce' ? outcome.timestamp : null
-      }
-    };
-  }
-
-  private applyControlPlaneToRunSummary(
-    runSummary: RunSummary,
-    result: ControlPlaneValidationResult | null
-  ): void {
-    if (!result) {
-      return;
-    }
-    const { request, outcome } = result;
-    runSummary.controlPlane = {
-      schemaId: request.schema,
-      schemaVersion: request.version,
-      requestId: request.requestId,
-      validation: {
-        mode: outcome.mode,
-        status: outcome.status,
-        timestamp: outcome.timestamp,
-        errors: outcome.errors.map((error) => ({ ...error }))
-      },
-      drift: outcome.drift
-        ? {
-            mode: outcome.drift.mode,
-            totalSamples: outcome.drift.totalSamples,
-            invalidSamples: outcome.drift.invalidSamples,
-            invalidRate: outcome.drift.invalidRate,
-            lastSampledAt: outcome.drift.lastSampledAt
-          }
-        : undefined
-    };
-  }
-
-  private resolveControlPlaneMode(): ControlPlaneValidationMode {
-    const explicit = process.env.CODEX_CONTROL_PLANE_MODE ?? null;
-    const enforce = process.env.CODEX_CONTROL_PLANE_ENFORCE ?? null;
-    const candidate = explicit ?? enforce;
-    if (!candidate) {
-      return 'shadow';
-    }
-    const normalized = candidate.trim().toLowerCase();
-    if (['1', 'true', 'enforce', 'on', 'yes'].includes(normalized)) {
-      return 'enforce';
-    }
-    return 'shadow';
-  }
-
-  private async createSchedulerPlanForRun(options: {
-    env: EnvironmentPaths;
-    manifest: CliManifest;
-    paths: RunPaths;
-    controlPlaneResult: ControlPlaneValidationResult;
-  }): Promise<SchedulerPlan> {
-    const plan = createSchedulerPlan(options.controlPlaneResult.request, {
-      now: () => new Date(),
-      instancePrefix: sanitizeTaskId(options.env.taskId)
-    });
-    this.attachSchedulerPlanToManifest(options.env, options.manifest, plan);
-    await saveManifest(options.paths, options.manifest);
-    return plan;
-  }
-
-  private async finalizeSchedulerPlanForManifest(options: {
-    env: EnvironmentPaths;
-    manifest: CliManifest;
-    paths: RunPaths;
-    plan: SchedulerPlan;
-  }): Promise<void> {
-    const finalStatus = this.resolveSchedulerFinalStatus(options.manifest.status);
-    finalizeSchedulerPlan(options.plan, finalStatus, isoTimestamp());
-    this.attachSchedulerPlanToManifest(options.env, options.manifest, options.plan);
-    await saveManifest(options.paths, options.manifest);
-  }
-
-  private attachSchedulerPlanToManifest(
-    env: EnvironmentPaths,
-    manifest: CliManifest,
-    plan: SchedulerPlan
-  ): void {
-    manifest.scheduler = serializeSchedulerPlan(plan);
-  }
-
-  private resolveSchedulerFinalStatus(status: RunStatus): SchedulerAssignmentStatus {
-    switch (status) {
-      case 'succeeded':
-        return 'succeeded';
-      case 'in_progress':
-        return 'running';
-      default:
-        return 'failed';
-    }
-  }
-
-  private applySchedulerToRunSummary(runSummary: RunSummary, plan: SchedulerPlan): void {
-    runSummary.scheduler = buildSchedulerRunSummary(plan);
-  }
-
-  private applyHandlesToRunSummary(runSummary: RunSummary, manifest: CliManifest): void {
-    if (!manifest.handles || manifest.handles.length === 0) {
-      return;
-    }
-    runSummary.handles = manifest.handles.map((handle) => ({
-      handleId: handle.handle_id,
-      correlationId: handle.correlation_id,
-      stageId: handle.stage_id,
-      status: handle.status,
-      frameCount: handle.frame_count,
-      latestSequence: handle.latest_sequence
-    }));
-  }
-
-  private applyPrivacyToRunSummary(runSummary: RunSummary, manifest: CliManifest): void {
-    if (!manifest.privacy) {
-      return;
-    }
-    runSummary.privacy = {
-      mode: manifest.privacy.mode,
-      totalFrames: manifest.privacy.totals.total_frames,
-      redactedFrames: manifest.privacy.totals.redacted_frames,
-      blockedFrames: manifest.privacy.totals.blocked_frames,
-      allowedFrames: manifest.privacy.totals.allowed_frames
-    };
-  }
-
-  private async persistRunSummary(
-    env: EnvironmentPaths,
-    paths: RunPaths,
-    manifest: CliManifest,
-    runSummary: RunSummary
-  ): Promise<void> {
-    const summaryPath = join(paths.runDir, 'run-summary.json');
-    await writeJsonAtomic(summaryPath, runSummary);
-    manifest.run_summary_path = relativeToRepo(env, summaryPath);
-    await saveManifest(paths, manifest);
-  }
-
-  private createTaskContext(metadata: { id: string; slug: string; title: string }): TaskContext {
-    return {
-      id: metadata.id,
-      title: metadata.title,
-      description: undefined,
-      metadata: {
-        slug: metadata.slug
-      }
-    };
-  }
-
   private async validateResumeToken(paths: RunPaths, manifest: CliManifest, provided: string | null): Promise<void> {
     let stored = manifest.resume_token;
     if (!stored) {
@@ -817,19 +563,6 @@ export class CodexOrchestrator {
     if (provided && stored !== provided) {
       throw new Error('Resume token mismatch.');
     }
-  }
-
-  private resolvePipelineForResume(
-    env: EnvironmentPaths,
-    manifest: CliManifest,
-    config: UserConfig | null
-  ): PipelineDefinition {
-    const existing = findPipeline(config ?? null, manifest.pipeline_id);
-    if (existing) {
-      return existing;
-    }
-    const { pipeline } = resolvePipeline(env, { pipelineId: manifest.pipeline_id, config });
-    return pipeline;
   }
 
   private buildStatusPayload(env: EnvironmentPaths, manifest: CliManifest, paths: RunPaths): Record<string, unknown> {
