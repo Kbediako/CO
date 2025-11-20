@@ -1,9 +1,10 @@
-import { mkdir, rm } from 'node:fs/promises';
+import { mkdir, readFile, rm } from 'node:fs/promises';
 import { execFile } from 'node:child_process';
-import { join, relative } from 'node:path';
+import { isAbsolute, join, relative } from 'node:path';
 import { tmpdir } from 'node:os';
 import { promisify } from 'node:util';
 import { chromium, type BrowserContext } from 'playwright';
+import { pathToFileURL } from 'node:url';
 import { loadDesignContext } from './context.js';
 import {
   appendApprovals,
@@ -24,6 +25,8 @@ import type { DesignConfig, DesignToolkitPipelineConfig } from '../../../package
 import { runDefaultInteractions, type InteractionPage } from './toolkit/snapshot.js';
 
 const execFileAsync = promisify(execFile);
+const MOTION_USER_AGENT =
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 const DEFAULT_CAPTURE_SECONDS = 12;
 const MIN_CAPTURE_SECONDS = 4;
 
@@ -121,7 +124,7 @@ async function main(): Promise<void> {
 
     try {
       const viewport = resolveViewport(entry, pipelineConfig);
-      const capture = await recordInteractionVideo(entry, viewport, captureDuration, tmpRoot);
+      const capture = await recordInteractionVideo(entry, viewport, captureDuration, tmpRoot, context.repoRoot);
       const outputs = await transcodeMotionOutputs({
         slug: entry.slug,
         rawVideoPath: capture.rawVideoPath,
@@ -364,26 +367,44 @@ async function recordInteractionVideo(
   entry: ToolkitContextState,
   viewport: { width: number; height: number },
   durationSeconds: number,
-  tmpRoot: string
+  tmpRoot: string,
+  repoRoot: string
 ): Promise<{ rawVideoPath: string; url: string }> {
   const captureDir = join(tmpRoot, entry.slug, `${Date.now()}`);
   await mkdir(captureDir, { recursive: true });
   const browser = await chromium.launch({ headless: true });
-  const targetUrl = entry.referenceUrl ?? entry.url;
+  const targetUrl = resolveMotionTarget(entry, repoRoot);
+  const macro = await loadMotionMacro(entry, repoRoot);
   let context: BrowserContext | null = null;
   try {
     const activeContext = await browser.newContext({
       viewport,
+      userAgent: MOTION_USER_AGENT,
       recordVideo: {
         dir: captureDir,
         size: viewport
       }
     });
+    if (targetUrl.startsWith('file:')) {
+      await activeContext.route('**/*', (route) => {
+        const url = route.request().url();
+        if (url.startsWith('file:') || url.startsWith('data:')) {
+          return route.continue();
+        }
+        return route.abort();
+      });
+    }
     context = activeContext;
+    if (macro?.contextScript) {
+      await activeContext.addInitScript({ content: macro.contextScript });
+    }
     const activePage = await activeContext.newPage();
     const start = Date.now();
     await activePage.goto(targetUrl, { waitUntil: 'networkidle', timeout: 120_000 });
-    await activePage.waitForTimeout(800);
+    if (macro?.script) {
+      await activePage.addScriptTag({ content: macro.script }).catch(() => {});
+    }
+    await activePage.waitForTimeout(entry.interactionWaitMs ?? 800);
     await runDefaultInteractions(activePage as unknown as InteractionPage);
     const elapsed = Date.now() - start;
     const remaining = durationSeconds * 1000 - elapsed;
@@ -402,6 +423,42 @@ async function recordInteractionVideo(
       await context.close().catch(() => {});
     }
     await browser.close();
+  }
+}
+
+function resolveMotionTarget(entry: ToolkitContextState, repoRoot: string): string {
+  const referenceCandidate = entry.referencePath ?? entry.snapshotHtmlPath ?? null;
+  if (referenceCandidate) {
+    const absolute = isAbsolute(referenceCandidate) ? referenceCandidate : join(repoRoot, referenceCandidate);
+    return pathToFileURL(absolute).toString();
+  }
+  return entry.referenceUrl ?? entry.url;
+}
+
+async function loadMotionMacro(
+  entry: ToolkitContextState,
+  repoRoot: string
+): Promise<{ script: string; contextScript: string } | null> {
+  if (!entry.interactionScriptPath) {
+    return null;
+  }
+  try {
+    const absolute = isAbsolute(entry.interactionScriptPath)
+      ? entry.interactionScriptPath
+      : join(repoRoot, entry.interactionScriptPath);
+    const script = await readFile(absolute, 'utf8');
+    const context = {
+      slug: entry.slug,
+      url: entry.url,
+      waitMs: entry.interactionWaitMs ?? null,
+      runtimeCanvasColors: entry.runtimeCanvasColors ?? [],
+      resolvedFonts: entry.resolvedFonts ?? []
+    };
+    const contextScript = `(function(){window.macroContext=Object.assign({},window.macroContext||{},${JSON.stringify(context)});})();`;
+    return { script: script.trim(), contextScript };
+  } catch (error) {
+    console.warn(`[design-advanced-assets] Failed to load interaction macro for ${entry.slug}:`, error);
+    return null;
   }
 }
 

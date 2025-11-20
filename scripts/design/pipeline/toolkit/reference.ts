@@ -1,6 +1,10 @@
 import { access, cp, mkdir, readFile, readdir, symlink, writeFile } from 'node:fs/promises';
-import { dirname, join, relative } from 'node:path';
+import { dirname, isAbsolute, join, relative } from 'node:path';
 import { tmpdir } from 'node:os';
+import { pathToFileURL } from 'node:url';
+import pixelmatch from 'pixelmatch';
+import { chromium } from 'playwright';
+import { PNG } from 'pngjs';
 import { loadDesignContext } from '../context.js';
 import type { DesignContext } from '../context.js';
 import {
@@ -19,7 +23,11 @@ import type {
   DesignArtifactApprovalRecord,
   DesignToolkitArtifactRecord
 } from '../../../../packages/shared/manifest/types.js';
-import { normalizeSentenceSpacing } from './snapshot.js';
+import { normalizeSentenceSpacing, runDefaultInteractions, type InteractionPage } from './snapshot.js';
+
+const TOOLKIT_USER_AGENT =
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+const DEFAULT_SELF_CORRECTION_THRESHOLD = 1.5;
 
 async function main(): Promise<void> {
   const context = await loadDesignContext();
@@ -100,7 +108,14 @@ async function main(): Promise<void> {
       });
 
       if (selfCorrection.enabled) {
-        const correction = await simulateSelfCorrection(entry.slug, tmpRoot, selfCorrection.maxIterations);
+        const correction = await runSelfCorrection({
+          entry,
+          repoRoot: context.repoRoot,
+          tmpRoot,
+          referenceArtifactPath: referenceArtifact.path,
+          pipelineBreakpoints: context.config.config.pipelines.hiFiDesignToolkit.breakpoints,
+          threshold: selfCorrection.threshold ?? DEFAULT_SELF_CORRECTION_THRESHOLD
+        });
         const correctionArtifacts = [
           {
             path: relative(process.cwd(), correction.path),
@@ -113,6 +128,13 @@ async function main(): Promise<void> {
             description: `Counter settling log for ${entry.slug}`
           });
         }
+        const assetOffset = correctionArtifacts.length;
+        correction.assets.forEach((asset) =>
+          correctionArtifacts.push({
+            path: relative(process.cwd(), asset.path),
+            description: asset.description
+          })
+        );
 
         const stagedCorrection = await stageArtifacts({
           taskId: context.taskId,
@@ -126,6 +148,7 @@ async function main(): Promise<void> {
 
         const diffArtifact = stagedCorrection[0];
         const settlingArtifact = correction.settlingLogPath ? stagedCorrection[1] : undefined;
+        const evidenceArtifacts = stagedCorrection.slice(assetOffset);
 
         artifacts.push({
           id: `${entry.slug}-self-correct`,
@@ -136,7 +159,9 @@ async function main(): Promise<void> {
           retention: retentionMetadata,
           metrics: {
             iterations: correction.iterations,
-            final_error_rate: correction.finalErrorRate
+            final_error_rate: correction.finalErrorRate,
+            threshold: selfCorrection.threshold ?? DEFAULT_SELF_CORRECTION_THRESHOLD,
+            threshold_passed: correction.finalErrorRate <= (selfCorrection.threshold ?? DEFAULT_SELF_CORRECTION_THRESHOLD)
           }
         });
 
@@ -151,8 +176,24 @@ async function main(): Promise<void> {
             metrics: {
               wait_ms: correction.settlingWaitMs ?? 0,
               baseline_error: correction.baselineError,
-              stabilized_error: correction.finalErrorRate
+              stabilized_error: correction.finalErrorRate,
+              threshold: selfCorrection.threshold ?? DEFAULT_SELF_CORRECTION_THRESHOLD
             }
+          });
+        }
+
+        if (evidenceArtifacts.length > 0) {
+          evidenceArtifacts.forEach((artifactRecord, index) => {
+            const asset = correction.assets[index];
+            artifacts.push({
+              id: `${entry.slug}-self-correct-${asset?.role ?? 'asset'}-${asset?.breakpoint ?? index + 1}`,
+              stage: 'self-correct',
+              status: 'succeeded',
+              relative_path: artifactRecord.path,
+              description: asset?.description ?? artifactRecord.description ?? 'Self-correction asset',
+              retention: retentionMetadata,
+              metrics: asset?.breakpoint ? { breakpoint: asset.breakpoint } : undefined
+            });
           });
         }
 
@@ -227,59 +268,444 @@ async function buildReferenceOutputs(entry: ToolkitContextState, repoRoot: strin
   return { referencePath, sectionCount: sectionCount > 0 ? sectionCount : 3 };
 }
 
-async function simulateSelfCorrection(slug: string, tmpRoot: string, maxIterations: number) {
-  const iterations = Math.max(1, maxIterations);
-  const steps = [] as Array<{ iteration: number; before: number; after: number }>;
-  let currentError = 12;
-  for (let i = 0; i < iterations; i += 1) {
-    const nextError = Math.max(0.5, currentError * 0.6);
-    steps.push({ iteration: i + 1, before: Number(currentError.toFixed(2)), after: Number(nextError.toFixed(2)) });
-    currentError = nextError;
-  }
-  const correctionDir = join(tmpRoot, slug, 'diffs');
-  await mkdir(correctionDir, { recursive: true });
-  const reportPath = join(correctionDir, 'self-correction.json');
-  const stabilization = await settleAnimatedCounters(slug, correctionDir, currentError);
-  const finalError = Number(stabilization.finalError.toFixed(2));
+type BreakpointDiffResult = {
+  breakpoint: string;
+  width: number;
+  height: number;
+  referencePath: string;
+  clonePath: string;
+  diffPath: string;
+  mismatchPercentage: number;
+  settledMismatch?: number;
+  settledDiffPath?: string;
+};
 
-  await writeFile(
-    reportPath,
-    JSON.stringify(
-      {
-        slug,
-        iterations: steps,
-        finalErrorRate: finalError
-      },
-      null,
-      2
-    ),
-    'utf8'
-  );
+type InteractionMacroPayload = {
+  script: string;
+  contextScript: string;
+};
+
+async function runSelfCorrection(options: {
+  entry: ToolkitContextState;
+  repoRoot: string;
+  tmpRoot: string;
+  referenceArtifactPath: string;
+  pipelineBreakpoints: Array<{ id: string; width: number; height: number; deviceScaleFactor?: number }>;
+  threshold: number;
+}): Promise<{
+  path: string;
+  iterations: number;
+  finalErrorRate: number;
+  settlingLogPath?: string;
+  settlingWaitMs?: number;
+  baselineError: number;
+  assets: Array<{ path: string; description: string; role: string; breakpoint?: string }>;
+}> {
+  const { entry, repoRoot, tmpRoot, referenceArtifactPath, pipelineBreakpoints, threshold } = options;
+  const correctionDir = join(tmpRoot, entry.slug, 'diffs');
+  const screenshotsDir = join(correctionDir, 'screens');
+  await mkdir(correctionDir, { recursive: true });
+  await mkdir(screenshotsDir, { recursive: true });
+
+  const sourceUrl = entry.referenceUrl ?? entry.url;
+  const cloneUrl = resolveCloneUrl(entry, repoRoot, referenceArtifactPath);
+  const breakpoints = resolveBreakpointTargets(entry, pipelineBreakpoints);
+  const macro = await loadInteractionMacroForCapture(entry, repoRoot);
+  const browser = await chromium.launch({ headless: true });
+  const results: BreakpointDiffResult[] = [];
+  let settlingLogPath: string | undefined;
+  let settlingWaitMs: number | undefined;
+
+  try {
+    for (const breakpoint of breakpoints) {
+      const result = await captureBreakpointDiff({
+        browser,
+        breakpoint,
+        screenshotsDir,
+        sourceUrl,
+        cloneUrl,
+        macro,
+        waitMs: entry.interactionWaitMs ?? null
+      });
+      results.push(result);
+    }
+
+    if (results.length > 0) {
+      const worst = results.reduce((previous, current) =>
+        (current.mismatchPercentage ?? 0) >= (previous.mismatchPercentage ?? 0) ? current : previous
+      );
+      const settleWait = Math.max(entry.interactionWaitMs ?? 0, 650);
+      const settled = await captureBreakpointDiff({
+        browser,
+        breakpoint: breakpoints.find((bp) => bp.id === worst.breakpoint) ?? breakpoints[0],
+        screenshotsDir,
+        sourceUrl,
+        cloneUrl,
+        macro,
+        waitMs: settleWait,
+        suffix: 'settled'
+      });
+      worst.settledMismatch = settled.mismatchPercentage;
+      worst.settledDiffPath = settled.diffPath;
+      const settlingLog = await recordSettlingLog({
+        slug: entry.slug,
+        correctionDir,
+        baselineError: worst.mismatchPercentage,
+        stabilizedError: settled.mismatchPercentage,
+        waitMs: settleWait,
+        breakpoint: settled.breakpoint
+      });
+      await writeFile(settlingLog.path, JSON.stringify(settlingLog.payload, null, 2), 'utf8');
+      settlingLogPath = settlingLog.path;
+      settlingWaitMs = settleWait;
+    }
+  } finally {
+    await browser.close();
+  }
+
+  return await assembleSelfCorrectionResult({
+    correctionDir,
+    results,
+    threshold,
+    sourceUrl,
+    cloneUrl,
+    slug: entry.slug,
+    settlingLogPath,
+    settlingWaitMs
+  });
+}
+
+async function captureBreakpointDiff(options: {
+  browser: Awaited<ReturnType<typeof chromium.launch>>;
+  breakpoint: { id: string; width: number; height: number; deviceScaleFactor?: number };
+  screenshotsDir: string;
+  sourceUrl: string;
+  cloneUrl: string;
+  macro?: InteractionMacroPayload | null;
+  waitMs?: number | null;
+  suffix?: string;
+}): Promise<BreakpointDiffResult> {
+  const label = options.suffix ? `${options.breakpoint.id}-${options.suffix}` : options.breakpoint.id;
+  const referencePath = join(options.screenshotsDir, `reference-${label}.png`);
+  const clonePath = join(options.screenshotsDir, `clone-${label}.png`);
+  const diffPath = join(options.screenshotsDir, `diff-${label}.png`);
+  const viewport = normalizeViewportConfig(options.breakpoint);
+
+  const referenceShot = await captureScreenshot({
+    browser: options.browser,
+    targetUrl: options.sourceUrl,
+    outputPath: referencePath,
+    viewport,
+    macro: options.macro,
+    waitMs: options.waitMs,
+    blockNetwork: false
+  });
+
+  const cloneShot = await captureScreenshot({
+    browser: options.browser,
+    targetUrl: options.cloneUrl,
+    outputPath: clonePath,
+    viewport,
+    macro: options.macro,
+    waitMs: options.waitMs,
+    blockNetwork: true
+  });
+
+  const mismatchPercentage = await computeMismatch(referenceShot.image, cloneShot.image, diffPath);
 
   return {
-    path: reportPath,
-    iterations,
-    finalErrorRate: finalError,
-    settlingLogPath: stabilization.logPath,
-    settlingWaitMs: stabilization.waitMs,
-    baselineError: Number(currentError.toFixed(2))
+    breakpoint: options.breakpoint.id,
+    width: viewport.width,
+    height: viewport.height,
+    referencePath,
+    clonePath,
+    diffPath,
+    mismatchPercentage
   };
 }
 
-async function settleAnimatedCounters(slug: string, correctionDir: string, baselineError: number) {
-  const waitMs = 450;
-  await new Promise((resolve) => setTimeout(resolve, waitMs));
-  const logPath = join(correctionDir, 'counter-settling.json');
-  const finalError = Math.max(0.48, Math.min(0.95, baselineError * 0.32));
+async function captureScreenshot(options: {
+  browser: Awaited<ReturnType<typeof chromium.launch>>;
+  targetUrl: string;
+  outputPath: string;
+  viewport: { width: number; height: number; deviceScaleFactor?: number };
+  macro?: InteractionMacroPayload | null;
+  waitMs?: number | null;
+  blockNetwork?: boolean;
+}): Promise<{ image: PNG }> {
+  const context = await options.browser.newContext({
+    viewport: { width: options.viewport.width, height: options.viewport.height },
+    deviceScaleFactor: options.viewport.deviceScaleFactor,
+    userAgent: TOOLKIT_USER_AGENT
+  });
+
+  const enforceOffline = Boolean(options.blockNetwork && options.targetUrl.startsWith('file:'));
+  if (enforceOffline) {
+    await context.route('**/*', (route) => {
+      const requestUrl = route.request().url();
+      if (requestUrl.startsWith('file:') || requestUrl.startsWith('data:')) {
+        return route.continue();
+      }
+      return route.abort();
+    });
+  }
+
+  if (options.macro?.contextScript) {
+    await context.addInitScript({ content: options.macro.contextScript });
+  }
+
+  const page = await context.newPage();
+  await page.goto(options.targetUrl, { waitUntil: 'networkidle', timeout: 120_000 });
+
+  if (options.macro?.script) {
+    await page.addScriptTag({ content: options.macro.script }).catch(() => {});
+  }
+
+  const waitMs = options.waitMs ?? 800;
+  if (waitMs > 0) {
+    await page.waitForTimeout(waitMs);
+  }
+
+  await runDefaultInteractions(page as unknown as InteractionPage);
+
+  const buffer = await page.screenshot({ fullPage: true, path: options.outputPath });
+  await context.close();
+
+  return { image: PNG.sync.read(buffer) };
+}
+
+function normalizeViewportConfig(breakpoint: { width: number; height: number; deviceScaleFactor?: number }) {
+  return {
+    width: breakpoint.width,
+    height: breakpoint.height,
+    deviceScaleFactor: breakpoint.deviceScaleFactor
+  };
+}
+
+async function computeMismatch(reference: PNG, candidate: PNG, diffPath: string): Promise<number> {
+  const width = Math.min(reference.width, candidate.width);
+  const height = Math.min(reference.height, candidate.height);
+  if (width === 0 || height === 0) {
+    const placeholder = new PNG({ width: 1, height: 1 });
+    await writeFile(diffPath, PNG.sync.write(placeholder));
+    return 100;
+  }
+  const normalizedReference = normalizePngDimensions(reference, width, height);
+  const normalizedCandidate = normalizePngDimensions(candidate, width, height);
+  const diff = new PNG({ width, height });
+  const mismatchedPixels = pixelmatch(
+    normalizedReference.data,
+    normalizedCandidate.data,
+    diff.data,
+    width,
+    height,
+    { threshold: 0.1 }
+  );
+  const percent = (mismatchedPixels / (width * height)) * 100;
+  await writeFile(diffPath, PNG.sync.write(diff));
+  return roundPercent(percent);
+}
+
+function normalizePngDimensions(image: PNG, width: number, height: number): PNG {
+  if (image.width === width && image.height === height) {
+    return image;
+  }
+  const output = new PNG({ width, height });
+  for (let y = 0; y < height; y += 1) {
+    const sourceStart = y * image.width * 4;
+    const targetStart = y * width * 4;
+    image.data.copy(output.data, targetStart, sourceStart, sourceStart + width * 4);
+  }
+  return output;
+}
+
+function roundPercent(value: number): number {
+  return Number.isFinite(value) ? Number(value.toFixed(3)) : 0;
+}
+
+async function loadInteractionMacroForCapture(
+  entry: ToolkitContextState,
+  repoRoot: string
+): Promise<InteractionMacroPayload | null> {
+  if (!entry.interactionScriptPath) {
+    return null;
+  }
+  try {
+    const absolute = join(repoRoot, entry.interactionScriptPath);
+    const script = await readFile(absolute, 'utf8');
+    return {
+      script: script.trim(),
+      contextScript: buildMacroContextScript(entry)
+    };
+  } catch (error) {
+    console.warn(`[design-toolkit-reference] Failed to load interaction macro for ${entry.slug}:`, error);
+  }
+  return null;
+}
+
+function buildMacroContextScript(entry: ToolkitContextState): string {
+  const payload = {
+    slug: entry.slug,
+    url: entry.url,
+    waitMs: entry.interactionWaitMs ?? null,
+    runtimeCanvasColors: entry.runtimeCanvasColors ?? [],
+    resolvedFonts: entry.resolvedFonts ?? []
+  };
+  return `(function(){window.macroContext=Object.assign({},window.macroContext||{},${JSON.stringify(payload)});})();`;
+}
+
+function resolveBreakpointTargets(
+  entry: ToolkitContextState,
+  pipeline: Array<{ id: string; width: number; height: number; deviceScaleFactor?: number }>
+) {
+  const map = new Map(pipeline.map((bp) => [bp.id, bp]));
+  const resolved: Array<{ id: string; width: number; height: number; deviceScaleFactor?: number }> = [];
+  for (const id of entry.breakpoints) {
+    const match = map.get(id);
+    if (match) {
+      resolved.push(match);
+    }
+  }
+  if (resolved.length > 0) {
+    return resolved;
+  }
+  if (pipeline.length > 0) {
+    return [pipeline[0]];
+  }
+  return [{ id: 'desktop', width: 1440, height: 900 }];
+}
+
+function resolveCloneUrl(entry: ToolkitContextState, repoRoot: string, referenceArtifactPath: string): string {
+  const absoluteReference = referenceArtifactPath
+    ? isAbsolute(referenceArtifactPath)
+      ? referenceArtifactPath
+      : join(repoRoot, referenceArtifactPath)
+    : entry.snapshotHtmlPath
+      ? isAbsolute(entry.snapshotHtmlPath)
+        ? entry.snapshotHtmlPath
+        : join(repoRoot, entry.snapshotHtmlPath)
+      : null;
+  if (absoluteReference) {
+    return pathToFileURL(absoluteReference).toString();
+  }
+  return entry.referenceUrl ?? entry.url;
+}
+
+async function recordSettlingLog(options: {
+  slug: string;
+  correctionDir: string;
+  baselineError: number;
+  stabilizedError: number;
+  waitMs: number;
+  breakpoint: string;
+}): Promise<{ path: string; payload: Record<string, unknown> }> {
+  const waitMs = Math.max(0, options.waitMs);
+  const path = join(options.correctionDir, 'counter-settling.json');
+  const payload = {
+    slug: options.slug,
+    breakpoint: options.breakpoint,
+    wait_ms: waitMs,
+    baseline_error: roundPercent(options.baselineError),
+    stabilized_error: roundPercent(options.stabilizedError),
+    recorded_at: new Date().toISOString()
+  };
+  return { path, payload };
+}
+
+async function assembleSelfCorrectionResult(options: {
+  correctionDir: string;
+  results: BreakpointDiffResult[];
+  threshold: number;
+  sourceUrl: string;
+  cloneUrl: string;
+  slug: string;
+  settlingLogPath?: string;
+  settlingWaitMs?: number;
+}): Promise<{
+  path: string;
+  iterations: number;
+  finalErrorRate: number;
+  settlingLogPath?: string;
+  settlingWaitMs?: number;
+  baselineError: number;
+  assets: Array<{ path: string; description: string; role: string; breakpoint?: string }>;
+}> {
+  const { correctionDir, results, threshold, sourceUrl, cloneUrl, slug, settlingLogPath, settlingWaitMs } = options;
+  const reportPath = join(correctionDir, 'self-correction.json');
+  const finalValues = results.map((result) => result.settledMismatch ?? result.mismatchPercentage);
+  const finalErrorRate = finalValues.length > 0 ? roundPercent(Math.max(...finalValues)) : 0;
+  const averageErrorRate =
+    finalValues.length > 0 ? roundPercent(finalValues.reduce((sum, value) => sum + value, 0) / finalValues.length) : 0;
+  const baselineError =
+    results.length > 0 ? roundPercent(Math.max(...results.map((result) => result.mismatchPercentage))) : 0;
+
   const payload = {
     slug,
-    wait_ms: waitMs,
-    baseline_error: Number(baselineError.toFixed(2)),
-    stabilized_error: Number(finalError.toFixed(2)),
-    seeded_at: new Date().toISOString()
+    reference: sourceUrl,
+    clone: cloneUrl,
+    threshold,
+    threshold_passed: threshold > 0 ? finalErrorRate <= threshold : null,
+    average_error_rate: averageErrorRate,
+    final_error_rate: finalErrorRate,
+    breakpoints: results.map((result) => ({
+      id: result.breakpoint,
+      width: result.width,
+      height: result.height,
+      mismatch_percent: result.mismatchPercentage,
+      settled_mismatch_percent: result.settledMismatch ?? null,
+      reference_image: result.referencePath,
+      clone_image: result.clonePath,
+      diff_image: result.diffPath,
+      settled_diff_image: result.settledDiffPath ?? null
+    })),
+    recorded_at: new Date().toISOString(),
+    settling_log: settlingLogPath ?? null
   };
-  await writeFile(logPath, JSON.stringify(payload, null, 2), 'utf8');
-  return { logPath, waitMs, finalError };
+
+  await writeFile(reportPath, JSON.stringify(payload, null, 2), 'utf8');
+
+  return {
+    path: reportPath,
+    iterations: results.length,
+    finalErrorRate,
+    settlingLogPath,
+    settlingWaitMs,
+    baselineError,
+    assets: buildSelfCorrectionAssets(results)
+  };
+}
+
+function buildSelfCorrectionAssets(results: BreakpointDiffResult[]) {
+  const assets: Array<{ path: string; description: string; role: string; breakpoint?: string }> = [];
+  for (const result of results) {
+    assets.push({
+      path: result.referencePath,
+      description: `Reference screenshot (${result.breakpoint})`,
+      role: 'reference',
+      breakpoint: result.breakpoint
+    });
+    assets.push({
+      path: result.clonePath,
+      description: `Clone screenshot (${result.breakpoint})`,
+      role: 'clone',
+      breakpoint: result.breakpoint
+    });
+    assets.push({
+      path: result.diffPath,
+      description: `Diff heatmap (${result.breakpoint})`,
+      role: 'diff',
+      breakpoint: result.breakpoint
+    });
+    if (result.settledDiffPath) {
+      assets.push({
+        path: result.settledDiffPath,
+        description: `Settled diff (${result.breakpoint})`,
+        role: 'settled-diff',
+        breakpoint: result.breakpoint
+      });
+    }
+  }
+  return assets;
 }
 
 function metadataApprover(context: DesignContext) {
@@ -322,14 +748,15 @@ async function buildReferenceHtml(
   try {
     const absolute = join(repoRoot, entry.snapshotHtmlPath);
     const snapshotHtml = await readFile(absolute, 'utf8');
-    const overlay = buildOverlay(entry.url, sections);
-    const styleBlock = buildOverlayStyles();
-    const scrollScript = buildScrollFallbackScript();
+    const overlayEnabled = process.env.HI_FI_TOOLKIT_DEBUG_OVERLAY === '1';
+    const scrollUnlockEnabled = process.env.HI_FI_TOOLKIT_SCROLL_UNLOCK === '1';
+    const overlay = overlayEnabled ? buildOverlay(entry.url, sections) : '';
+    const styleBlock = overlayEnabled ? buildOverlayStyles() : '';
+    const scrollScript = scrollUnlockEnabled ? buildScrollFallbackScript() : '';
     const interactionScript = await buildInteractionMacro(entry, repoRoot);
-    const withStyles = injectIntoHead(snapshotHtml, styleBlock);
-    const macroBundle = [scrollScript, interactionScript].filter(Boolean).join('\n');
-    const bodyInjection = [overlay, macroBundle].filter(Boolean).join('\n');
-    return injectAfterBodyOpen(withStyles, bodyInjection);
+    const withStyles = overlay ? injectIntoHead(snapshotHtml, styleBlock) : snapshotHtml;
+    const macroBundle = [overlay, scrollScript, interactionScript].filter(Boolean).join('\n');
+    return macroBundle ? injectAfterBodyOpen(withStyles, macroBundle) : withStyles;
   } catch (error) {
     console.warn(`[design-toolkit-reference] Failed to read snapshot for ${entry.slug}:`, error);
     return fallbackReference(entry.slug, entry.url);
@@ -337,9 +764,9 @@ async function buildReferenceHtml(
 }
 
 function fallbackReference(slug: string, url: string): string {
-  return `<!doctype html>\n<html lang="en">\n<head>\n  <meta charset="utf-8"/>\n  <title>${slug} Reference</title>\n  <style>body{font-family:system-ui;padding:2rem;}section{margin-bottom:2rem;}</style>\n</head>\n<body>\n  <div class="codex-clone-overlay">Fallback rendering for ${escapeHtml(
+  return `<!doctype html>\n<html lang="en">\n<head>\n  <meta charset="utf-8"/>\n  <title>${slug} Reference</title>\n  <style>body{font-family:system-ui;padding:2rem;}section{margin-bottom:2rem;}</style>\n</head>\n<body>\n  <section aria-label="fallback"><h2>Snapshot unavailable</h2><p>Original capture for ${escapeHtml(
     url
-  )}</div>\n  <section><h2>Snapshot unavailable</h2><p>Original capture missing; showing placeholder.</p></section>\n</body>\n</html>`;
+  )} missing; showing placeholder.</p></section>\n</body>\n</html>`;
 }
 
 function buildOverlay(sourceUrl: string, sections: Array<{ title: string; description: string }>): string {
@@ -443,14 +870,7 @@ async function buildInteractionMacro(entry: ToolkitContextState, repoRoot: strin
   try {
     const absolute = join(repoRoot, entry.interactionScriptPath);
     const script = await readFile(absolute, 'utf8');
-    const contextPayload = JSON.stringify({
-      slug: entry.slug,
-      url: entry.url,
-      waitMs: entry.interactionWaitMs ?? null,
-      runtimeCanvasColors: entry.runtimeCanvasColors ?? [],
-      resolvedFonts: entry.resolvedFonts ?? []
-    });
-    const contextScript = `<script id="codex-interaction-context">(function(){window.macroContext=Object.assign({},window.macroContext||{},${contextPayload});})();</script>`;
+    const contextScript = `<script id="codex-interaction-context">${buildMacroContextScript(entry)}</script>`;
     return `${contextScript}\n<script id="codex-interaction-macro">${script.trim()}\n</script>`;
   } catch (error) {
     console.warn(`[design-toolkit-reference] Failed to load interaction macro for ${entry.slug}:`, error);

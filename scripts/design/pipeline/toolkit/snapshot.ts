@@ -26,17 +26,25 @@ export interface PageSnapshot {
   assets: SnapshotAsset[];
 }
 
-const DEFAULT_MAX_STYLESHEETS = 6;
+const DEFAULT_MAX_STYLESHEETS = 24;
 const DEFAULT_VIEWPORT = { width: 1440, height: 900 } as const;
 const USER_AGENT =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 const MIRRORABLE_RESOURCE_TYPES = new Set(['document', 'stylesheet', 'image', 'media', 'font', 'script', 'xhr']);
 
+export interface SnapshotViewport {
+  width: number;
+  height: number;
+  deviceScaleFactor?: number;
+}
+
 interface SnapshotOptions {
   maxStylesheets?: number;
   keepScripts?: boolean;
   mirrorAssets?: boolean;
+  allowRemoteAssets?: boolean;
   runInteractions?: boolean;
+  viewport?: SnapshotViewport;
 }
 
 export type InteractionElementHandle = {
@@ -57,6 +65,7 @@ interface CapturedAssetRecord {
   url: string;
   pathname: string;
   buffer: Buffer;
+  origin: string;
 }
 
 interface AssetRewriteData {
@@ -64,19 +73,45 @@ interface AssetRewriteData {
   map: Map<string, string>;
 }
 
+function normalizeViewport(viewport?: SnapshotViewport): SnapshotViewport {
+  if (viewport && viewport.width > 0 && viewport.height > 0) {
+    return {
+      width: viewport.width,
+      height: viewport.height,
+      deviceScaleFactor: viewport.deviceScaleFactor
+    };
+  }
+  return { ...DEFAULT_VIEWPORT };
+}
+
+function getPageOrigin(value: string): string {
+  try {
+    return new URL(value).origin;
+  } catch {
+    return '';
+  }
+}
+
 export async function capturePageSnapshot(url: string, options?: SnapshotOptions): Promise<PageSnapshot> {
   const mirrorAssets = Boolean(options?.mirrorAssets);
+  const allowRemoteAssets = Boolean(options?.allowRemoteAssets);
+  const viewport = normalizeViewport(options?.viewport);
+  const baseOrigin = getPageOrigin(url);
   const browser = await chromium.launch({ headless: true });
   const assetTasks: Array<Promise<void>> = [];
   const capturedAssets: CapturedAssetRecord[] = [];
 
   try {
-    const context = await browser.newContext({ userAgent: USER_AGENT, viewport: DEFAULT_VIEWPORT });
+    const context = await browser.newContext({
+      userAgent: USER_AGENT,
+      viewport,
+      deviceScaleFactor: options?.viewport?.deviceScaleFactor
+    });
     const page = await context.newPage();
 
     if (mirrorAssets) {
       page.on('response', (response: Response) => {
-        assetTasks.push(captureResponseAsset(response, url, capturedAssets));
+        assetTasks.push(captureResponseAsset(response, url, baseOrigin, capturedAssets, allowRemoteAssets));
       });
     }
 
@@ -93,11 +128,11 @@ export async function capturePageSnapshot(url: string, options?: SnapshotOptions
     const $ = load(html);
 
     absolutizeDocument($, url);
-    const assetRewrite = mirrorAssets ? buildAssetRewrite(capturedAssets) : null;
+    const assetRewrite = mirrorAssets ? buildAssetRewrite(capturedAssets, baseOrigin) : null;
     if (assetRewrite) {
-      await ensureInlineAssets(html, url, assetRewrite);
-      await ensurePortfolioAssets(html, url, assetRewrite);
-      await ensureDocumentAssets($, url, assetRewrite);
+      await ensureInlineAssets(html, url, assetRewrite, allowRemoteAssets, baseOrigin);
+      await ensurePortfolioAssets(html, url, assetRewrite, allowRemoteAssets, baseOrigin);
+      await ensureDocumentAssets($, url, assetRewrite, allowRemoteAssets, baseOrigin);
       rewriteDocumentAssets($, url, assetRewrite.map);
     }
 
@@ -129,7 +164,7 @@ export async function capturePageSnapshot(url: string, options?: SnapshotOptions
 
     let aggregatedCss = absolutizeCssUrls(inlineCss.join('\n\n'), url);
     if (assetRewrite) {
-      await ensureCssAssets(aggregatedCss, url, assetRewrite);
+      await ensureCssAssets(aggregatedCss, url, assetRewrite, allowRemoteAssets, baseOrigin);
       aggregatedCss = rewriteCssAssetUrls(aggregatedCss, url, assetRewrite.map);
     }
     if (aggregatedCss.trim().length > 0) {
@@ -229,7 +264,9 @@ export async function runDefaultInteractions(page: InteractionPage): Promise<voi
 async function captureResponseAsset(
   response: Response,
   baseUrl: string,
-  bucket: CapturedAssetRecord[]
+  baseOrigin: string,
+  bucket: CapturedAssetRecord[],
+  allowRemoteAssets: boolean
 ): Promise<void> {
   try {
     if (!response.ok()) {
@@ -240,22 +277,23 @@ async function captureResponseAsset(
       return;
     }
     const absoluteUrl = response.url();
-    if (!isSameOrigin(absoluteUrl, baseUrl)) {
+    if (!allowRemoteAssets && !isSameOrigin(absoluteUrl, baseUrl)) {
       return;
     }
+    const parsed = new URL(absoluteUrl);
     const buffer = Buffer.from(await response.body());
-    const pathname = new URL(absoluteUrl).pathname;
-    bucket.push({ url: normalizeAssetUrl(absoluteUrl), pathname, buffer });
+    const pathname = parsed.pathname;
+    bucket.push({ url: normalizeAssetUrl(absoluteUrl), pathname, buffer, origin: parsed.origin });
   } catch (error) {
     console.warn('[snapshot] Failed to capture asset', response.url(), 'due to', error);
   }
 }
 
-function buildAssetRewrite(records: CapturedAssetRecord[]): AssetRewriteData {
+function buildAssetRewrite(records: CapturedAssetRecord[], baseOrigin: string): AssetRewriteData {
   const map = new Map<string, string>();
   const assets: SnapshotAsset[] = [];
   for (const record of records) {
-    const relativePath = buildRelativeAssetPath(record.pathname);
+    const relativePath = buildRelativeAssetPath(record.url, record.origin ?? baseOrigin, baseOrigin);
     if (map.has(record.url)) {
       continue;
     }
@@ -358,7 +396,13 @@ function rewriteDocumentAssets($: CheerioAPI, baseUrl: string, assetMap: Map<str
   }
 }
 
-async function ensureDocumentAssets($: CheerioAPI, baseUrl: string, assetRewrite: AssetRewriteData): Promise<void> {
+async function ensureDocumentAssets(
+  $: CheerioAPI,
+  baseUrl: string,
+  assetRewrite: AssetRewriteData,
+  allowRemoteAssets: boolean,
+  baseOrigin: string
+): Promise<void> {
   const selectors: Array<{ selector: string; attribute: string }> = [
     { selector: 'img', attribute: 'src' },
     { selector: 'script', attribute: 'src' },
@@ -378,7 +422,7 @@ async function ensureDocumentAssets($: CheerioAPI, baseUrl: string, assetRewrite
         continue;
       }
       const absolute = absolutizeUrl(value, baseUrl);
-      await fetchMissingAsset(absolute, baseUrl, assetRewrite);
+      await fetchMissingAsset(absolute, baseUrl, assetRewrite, allowRemoteAssets, baseOrigin);
     }
   }
 }
@@ -405,7 +449,13 @@ function rewriteCssAssetUrls(css: string, baseUrl: string, assetMap: Map<string,
   });
 }
 
-async function ensureInlineAssets(html: string, baseUrl: string, assetRewrite: AssetRewriteData): Promise<void> {
+async function ensureInlineAssets(
+  html: string,
+  baseUrl: string,
+  assetRewrite: AssetRewriteData,
+  allowRemoteAssets: boolean,
+  baseOrigin: string
+): Promise<void> {
   if (!html) {
     return;
   }
@@ -421,11 +471,17 @@ async function ensureInlineAssets(html: string, baseUrl: string, assetRewrite: A
   }
   for (const referencePath of pending) {
     const absolute = absolutizeUrl(referencePath, baseUrl);
-    await fetchMissingAsset(absolute, baseUrl, assetRewrite);
+    await fetchMissingAsset(absolute, baseUrl, assetRewrite, allowRemoteAssets, baseOrigin);
   }
 }
 
-async function ensurePortfolioAssets(html: string, baseUrl: string, assetRewrite: AssetRewriteData): Promise<void> {
+async function ensurePortfolioAssets(
+  html: string,
+  baseUrl: string,
+  assetRewrite: AssetRewriteData,
+  allowRemoteAssets: boolean,
+  baseOrigin: string
+): Promise<void> {
   if (!html) {
     return;
   }
@@ -440,11 +496,17 @@ async function ensurePortfolioAssets(html: string, baseUrl: string, assetRewrite
   }
   for (const filename of matches) {
     const absolute = new URL(`/assets/portfolio/${filename}`, baseUrl).toString();
-    await fetchMissingAsset(absolute, baseUrl, assetRewrite);
+    await fetchMissingAsset(absolute, baseUrl, assetRewrite, allowRemoteAssets, baseOrigin);
   }
 }
 
-async function ensureCssAssets(css: string, baseUrl: string, assetRewrite: AssetRewriteData): Promise<void> {
+async function ensureCssAssets(
+  css: string,
+  baseUrl: string,
+  assetRewrite: AssetRewriteData,
+  allowRemoteAssets: boolean,
+  baseOrigin: string
+): Promise<void> {
   if (!css) {
     return;
   }
@@ -461,7 +523,7 @@ async function ensureCssAssets(css: string, baseUrl: string, assetRewrite: Asset
       continue;
     }
     const absolute = absolutizeUrl(unquoted, baseUrl);
-    await fetchMissingAsset(absolute, baseUrl, assetRewrite);
+    await fetchMissingAsset(absolute, baseUrl, assetRewrite, allowRemoteAssets, baseOrigin);
   }
 }
 
@@ -511,7 +573,7 @@ function absolutizeCssUrls(css: string, baseUrl: string): string {
   });
 }
 
-function computeColorPalette(css: string): string[] {
+export function computeColorPalette(css: string): string[] {
   const palette = new Set<string>();
   const hexRegex = /#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})\b/g;
   let match: RegExpExecArray | null;
@@ -566,7 +628,7 @@ function toHex(value: number): string {
   return value.toString(16).padStart(2, '0');
 }
 
-function computeFontFamilies(css: string): string[] {
+export function computeFontFamilies(css: string): string[] {
   const regex = /font-family\s*:\s*([^;{}]+)/gi;
   const families = new Set<string>();
   let match: RegExpExecArray | null;
@@ -710,19 +772,39 @@ function sanitizeAssetPath(pathname: string): string {
   return segments.join('/');
 }
 
-function buildRelativeAssetPath(pathname: string): string {
-  const safePath = sanitizeAssetPath(pathname);
-  if (safePath.length === 0) {
+function buildRelativeAssetPath(resourceUrl: string, assetOrigin: string, baseOrigin: string): string {
+  let parsed: URL | null = null;
+  try {
+    parsed = new URL(resourceUrl);
+  } catch {
+    parsed = null;
+  }
+  const safePath = sanitizeAssetPath(parsed?.pathname ?? resourceUrl);
+  const sameOrigin = assetOrigin === baseOrigin || (!assetOrigin && parsed && parsed.origin === baseOrigin);
+  const prefix = sameOrigin ? '' : `remote/${sanitizeHost(parsed?.host ?? assetOrigin)}`;
+  const qualifiedPath = prefix ? `${prefix}/${safePath}` : safePath;
+  if (qualifiedPath.length === 0) {
     return 'index.html';
   }
-  const lower = safePath.toLowerCase();
+  const lower = qualifiedPath.toLowerCase();
   if (lower.startsWith('assets/')) {
-    return safePath;
+    return qualifiedPath;
   }
   if (lower.startsWith('video/')) {
-    return safePath;
+    return qualifiedPath;
   }
-  return `assets/${safePath}`;
+  return `assets/${qualifiedPath}`;
+}
+
+function sanitizeHost(host: string): string {
+  if (!host) {
+    return 'external';
+  }
+  return host
+    .toLowerCase()
+    .replace(/[^a-z0-9.-]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-+|-+$/g, '') || 'external';
 }
 
 async function collectRuntimeMetadata(page: Page): Promise<{
@@ -818,27 +900,45 @@ async function fetchWithHeaders(url: string, referer?: string): Promise<Response
   return fetch(url, { headers });
 }
 
-async function fetchMissingAsset(absoluteUrl: string, referer: string, assetRewrite: AssetRewriteData): Promise<void> {
-  if (!isSameOrigin(absoluteUrl, referer)) {
+async function fetchMissingAsset(
+  absoluteUrl: string,
+  referer: string,
+  assetRewrite: AssetRewriteData,
+  allowRemoteAssets: boolean,
+  baseOrigin: string
+): Promise<void> {
+  if (!allowRemoteAssets && !isSameOrigin(absoluteUrl, referer)) {
     return;
   }
   const normalized = normalizeAssetUrl(absoluteUrl);
   if (assetRewrite.map.has(normalized)) {
     return;
   }
+  let parsed: URL;
   try {
-    const response = await fetchWithHeaders(absoluteUrl, referer);
+    parsed = new URL(absoluteUrl);
+  } catch {
+    return;
+  }
+  if (parsed.protocol === 'file:') {
+    return;
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    return;
+  }
+  try {
+    const response = await fetchWithHeaders(parsed.toString(), referer);
     if (!response.ok) {
       return;
     }
     const arrayBuffer = await response.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
-    const pathname = new URL(absoluteUrl).pathname;
+    const pathname = parsed.pathname;
     const filename = pathname.split('/').pop() ?? '';
     if (!filename.includes('.')) {
       return;
     }
-    const relativePath = buildRelativeAssetPath(pathname);
+    const relativePath = buildRelativeAssetPath(parsed.toString(), parsed.origin, baseOrigin);
     assetRewrite.map.set(normalized, relativePath);
     assetRewrite.assets.push({
       sourceUrl: normalized,

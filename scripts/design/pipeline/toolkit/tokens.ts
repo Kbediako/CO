@@ -14,7 +14,7 @@ import {
 import { stageArtifacts } from '../../../../orchestrator/src/persistence/ArtifactStager.js';
 import { buildRetentionMetadata } from './common.js';
 import type { DesignToolkitArtifactRecord } from '../../../../packages/shared/manifest/types.js';
-import { normalizeSentenceSpacing } from './snapshot.js';
+import { computeColorPalette, computeFontFamilies, normalizeSentenceSpacing } from './snapshot.js';
 
 async function main(): Promise<void> {
   const context = await loadDesignContext();
@@ -162,21 +162,28 @@ interface TokenBuildOptions {
 
 async function buildTokenOutputs(options: TokenBuildOptions) {
   const { entry, repoRoot, tmpRoot } = options;
-  const tokenCount = 12;
-  const semanticCount = 3;
-  const palette = await resolvePalette(entry, repoRoot, tokenCount);
-  const sections = await loadSections(entry, repoRoot);
-  const cssFonts = entry.fontFamilies && entry.fontFamilies.length > 0 ? entry.fontFamilies : ['system-ui'];
-  const runtimeFonts = Array.isArray(entry.resolvedFonts) ? mergeUniqueStrings(entry.resolvedFonts) : [];
-  const mergedFonts = mergeUniqueStrings([...(runtimeFonts ?? []), ...cssFonts]);
+  const desiredColorCount = 16;
+  const aggregatedCss = await loadAggregatedCss(entry, repoRoot);
+  const paletteFromFile = await loadPaletteFromFile(entry, repoRoot);
+  const palettePreview = Array.isArray(entry.palettePreview) ? mergeUniqueStrings(entry.palettePreview) : [];
   const runtimeCanvasColors = Array.isArray(entry.runtimeCanvasColors) ? mergeUniqueStrings(entry.runtimeCanvasColors) : [];
+  const cssColors = computeColorPalette(aggregatedCss);
+  const palette = buildPalette(
+    mergeUniqueStrings([...paletteFromFile, ...palettePreview, ...cssColors, ...runtimeCanvasColors]),
+    desiredColorCount
+  );
+  const sections = await loadSections(entry, repoRoot);
+  const cssFonts = computeFontFamilies(aggregatedCss);
+  const capturedFonts = Array.isArray(entry.fontFamilies) ? mergeUniqueStrings(entry.fontFamilies) : [];
+  const runtimeFonts = Array.isArray(entry.resolvedFonts) ? mergeUniqueStrings(entry.resolvedFonts) : [];
+  const mergedFonts = mergeUniqueStrings([...cssFonts, ...capturedFonts, ...runtimeFonts]);
+  const semanticColors = deriveSemanticColors(palette);
+  const semanticTokens = buildSemanticTokens(palette, semanticColors);
   const tokens = {
     "$schema": "https://design-tokens.github.io/community-group/format/module.json",
     tokenSetOrder: ['global', 'semantic'],
     global: {
-      color: Object.fromEntries(
-        palette.map((hex, idx) => [`color-${idx + 1}`, { value: hex }])
-      ),
+      color: buildColorTokens(palette),
       radius: {
         sm: { value: '4px' },
         md: { value: '8px' },
@@ -189,13 +196,17 @@ async function buildTokenOutputs(options: TokenBuildOptions) {
         lg: { value: '24px' }
       }
     },
-    semantic: {
-      foreground: { value: '{global.color.color-1.value}' },
-      background: { value: '{global.color.color-4.value}' },
-      accent: { value: '{global.color.color-8.value}' }
-    },
+    semantic: semanticTokens,
     metadata: {
       source: entry.url,
+      reference: entry.referenceUrl ?? entry.url,
+      css_path: entry.snapshotCssPath ?? null,
+      palette_sources: {
+        file: paletteFromFile.length,
+        extracted: cssColors.length,
+        preview: palettePreview.length,
+        runtime_canvas: runtimeCanvasColors.length
+      },
       generated_at: new Date().toISOString(),
       fonts: mergedFonts,
       runtime_fonts: runtimeFonts,
@@ -204,11 +215,22 @@ async function buildTokenOutputs(options: TokenBuildOptions) {
     }
   };
 
-  const cssVariables = palette
-    .map((hex, idx) => `  --${entry.slug}-color-${idx + 1}: ${hex};`)
-    .join('\n');
+  const cssVariables = buildCssVariables(entry.slug, palette, semanticColors);
 
-  const styleGuide = buildStyleGuide(entry, palette, mergedFonts, sections, runtimeFonts, runtimeCanvasColors);
+  const styleGuide = buildStyleGuide(
+    entry,
+    palette,
+    mergedFonts,
+    sections,
+    runtimeFonts,
+    runtimeCanvasColors,
+    semanticColors,
+    {
+      paletteFromFileCount: paletteFromFile.length,
+      palettePreviewCount: palettePreview.length,
+      cssColorCount: cssColors.length
+    }
+  );
 
   const slugDir = join(tmpRoot, entry.slug);
   await mkdir(slugDir, { recursive: true });
@@ -226,21 +248,23 @@ async function buildTokenOutputs(options: TokenBuildOptions) {
     tokensPath,
     cssPath,
     styleGuidePath,
-    tokenCount,
-    semanticCount,
+    tokenCount: palette.length,
+    semanticCount: Object.keys(semanticTokens).length,
     pageCount: 1
   };
 }
 
-async function resolvePalette(entry: ToolkitContextState, repoRoot: string, desired: number): Promise<string[]> {
-  const paletteFromFile = await loadPaletteFromFile(entry, repoRoot);
-  if (paletteFromFile.length > 0) {
-    return fillPalette(paletteFromFile, desired, entry.slug);
+async function loadAggregatedCss(entry: ToolkitContextState, repoRoot: string): Promise<string> {
+  if (!entry.snapshotCssPath) {
+    return '';
   }
-  if (entry.palettePreview && entry.palettePreview.length > 0) {
-    return fillPalette(entry.palettePreview, desired, entry.slug);
+  try {
+    const absolute = join(repoRoot, entry.snapshotCssPath);
+    return await readFile(absolute, 'utf8');
+  } catch (error) {
+    console.warn(`[design-toolkit-tokens] Failed to read aggregated CSS for ${entry.slug}:`, error);
+    return '';
   }
-  return fillPalette([], desired, entry.slug);
 }
 
 async function loadPaletteFromFile(entry: ToolkitContextState, repoRoot: string): Promise<string[]> {
@@ -287,14 +311,33 @@ async function loadSections(entry: ToolkitContextState, repoRoot: string) {
   return [];
 }
 
-function fillPalette(base: string[], desired: number, slug: string): string[] {
-  const palette = [...base.map(normalizeHexColor)];
-  let index = 0;
-  while (palette.length < desired) {
-    palette.push(colorFromSeed(slug, index));
-    index += 1;
+function buildPalette(candidates: string[], desired: number): string[] {
+  const normalized = mergeUniqueStrings(candidates.map(normalizeHexColor));
+  if (normalized.length >= desired) {
+    return normalized.slice(0, desired);
   }
-  return palette.slice(0, desired);
+  if (normalized.length === 0) {
+    return ['#111111', '#ffffff'].slice(0, desired);
+  }
+  const padded = [...normalized];
+  const anchor = normalized[normalized.length - 1];
+  padded.push(...padPalette(anchor, desired - normalized.length));
+  return padded.slice(0, desired);
+}
+
+function padPalette(anchor: string, additional: number): string[] {
+  const rgb = hexToRgb(anchor);
+  if (!rgb) {
+    return Array.from({ length: additional }, () => anchor);
+  }
+  const { h, s, l } = rgbToHsl(rgb.r, rgb.g, rgb.b);
+  const results: string[] = [];
+  for (let step = 1; step <= additional; step += 1) {
+    const offset = Math.min(0.45, step * 0.08);
+    const lightness = Math.min(1, Math.max(0, l + (step % 2 === 0 ? -offset : offset)));
+    results.push(hslToHex(h, s, lightness));
+  }
+  return results;
 }
 
 function normalizeHexColor(value: string): string {
@@ -312,7 +355,9 @@ function buildStyleGuide(
   fonts: string[],
   sections: Array<{ title: string; description: string }>,
   runtimeFonts: string[],
-  runtimeCanvasColors: string[]
+  runtimeCanvasColors: string[],
+  semanticColors: { foreground: string; background: string; accent: string },
+  paletteSources: { paletteFromFileCount: number; palettePreviewCount: number; cssColorCount: number }
 ): string {
   const paletteList = palette.map((hex) => `- ${hex}`).join('\n');
   const fontList = fonts.map((font) => `- ${font}`).join('\n');
@@ -324,7 +369,12 @@ function buildStyleGuide(
       : '- (No sections detected)';
   const canvasSection = runtimeCanvasList ? `\n## Canvas Samples\n${runtimeCanvasList}\n` : '\n';
   const runtimeFontSection = runtimeFontList ? `\n## Resolved Typekit Fonts\n${runtimeFontList}\n` : '\n';
-  return `# ${entry.slug} Style Guide\n\nGenerated tokens for ${entry.url}.\n\n## Palette\n${paletteList}${canvasSection}\n## Typography (CSS)\n${fontList}${runtimeFontSection}\n## Layout Sections\n${sectionList}\n`;
+  const paletteSourceNotes = [
+    `- Aggregated CSS colors: ${paletteSources.cssColorCount}`,
+    `- Palette file swatches: ${paletteSources.paletteFromFileCount}`,
+    `- Preview sample swatches: ${paletteSources.palettePreviewCount}`
+  ].join('\n');
+  return `# ${entry.slug} Style Guide\n\nGenerated tokens for ${entry.url}.\n\n## Palette\n${paletteList}\n\n## Semantic Roles\n- Background: ${semanticColors.background}\n- Foreground: ${semanticColors.foreground}\n- Accent: ${semanticColors.accent}\n\n## Palette Inputs\n${paletteSourceNotes}${canvasSection}\n## Typography (CSS)\n${fontList}${runtimeFontSection}\n## Layout Sections\n${sectionList}\n`;
 }
 
 function mergeUniqueStrings(values: string[]): string[] {
@@ -341,21 +391,132 @@ function mergeUniqueStrings(values: string[]): string[] {
   return unique;
 }
 
-function colorFromSeed(seed: string, index: number): string {
-  let hash = 0;
-  const text = `${seed}-${index}`;
-  for (let i = 0; i < text.length; i += 1) {
-    hash = (hash << 5) - hash + text.charCodeAt(i);
-    hash |= 0;
+function deriveSemanticColors(palette: string[]): { foreground: string; background: string; accent: string } {
+  if (palette.length === 0) {
+    return { foreground: '#0b0b0b', background: '#ffffff', accent: '#1d4ed8' };
   }
-  const r = Math.abs((hash >> 16) & 0xff);
-  const g = Math.abs((hash >> 8) & 0xff);
-  const b = Math.abs(hash & 0xff);
-  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+  const scoring = palette.map((hex) => {
+    const rgb = hexToRgb(hex);
+    if (!rgb) {
+      return { hex, lightness: 0.5, saturation: 0.5 };
+    }
+    const { l, s } = rgbToHsl(rgb.r, rgb.g, rgb.b);
+    return { hex, lightness: l, saturation: s };
+  });
+  const background = scoring.reduce((lightest, current) => (current.lightness > lightest.lightness ? current : lightest));
+  const foreground = scoring.reduce((darkest, current) => (current.lightness < darkest.lightness ? current : darkest));
+  const accentCandidate = scoring
+    .filter((entry) => entry.hex !== background.hex && entry.hex !== foreground.hex)
+    .reduce(
+      (vibrant, current) => (current.saturation > vibrant.saturation ? current : vibrant),
+      scoring[0]
+    );
+  return {
+    foreground: foreground.hex,
+    background: background.hex,
+    accent: accentCandidate.hex
+  };
 }
 
-function toHex(value: number): string {
-  return value.toString(16).padStart(2, '0');
+function buildSemanticTokens(palette: string[], semantic: { foreground: string; background: string; accent: string }) {
+  const alias = (hex: string) => {
+    const index = palette.findIndex((value) => value.toLowerCase() === hex.toLowerCase());
+    if (index >= 0) {
+      return `{global.color.color-${index + 1}.value}`;
+    }
+    return hex;
+  };
+  return {
+    foreground: { value: alias(semantic.foreground) },
+    background: { value: alias(semantic.background) },
+    accent: { value: alias(semantic.accent) }
+  };
+}
+
+function buildColorTokens(palette: string[]) {
+  return Object.fromEntries(palette.map((hex, idx) => [`color-${idx + 1}`, { value: hex }]));
+}
+
+function buildCssVariables(slug: string, palette: string[], semantic: { foreground: string; background: string; accent: string }): string {
+  const colors = palette.map((hex, idx) => `  --${slug}-color-${idx + 1}: ${hex};`);
+  const semanticVars = [
+    `  --${slug}-background: ${semantic.background};`,
+    `  --${slug}-foreground: ${semantic.foreground};`,
+    `  --${slug}-accent: ${semantic.accent};`
+  ];
+  return [...colors, ...semanticVars].join('\n');
+}
+
+function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
+  const normalized = normalizeHexColor(hex);
+  if (!/^#([0-9a-f]{6})$/i.test(normalized)) {
+    return null;
+  }
+  const value = normalized.slice(1);
+  return {
+    r: parseInt(value.slice(0, 2), 16),
+    g: parseInt(value.slice(2, 4), 16),
+    b: parseInt(value.slice(4, 6), 16)
+  };
+}
+
+function rgbToHsl(r: number, g: number, b: number): { h: number; s: number; l: number } {
+  const nr = r / 255;
+  const ng = g / 255;
+  const nb = b / 255;
+  const max = Math.max(nr, ng, nb);
+  const min = Math.min(nr, ng, nb);
+  const delta = max - min;
+  let h = 0;
+  if (delta !== 0) {
+    if (max === nr) {
+      h = ((ng - nb) / delta) % 6;
+    } else if (max === ng) {
+      h = (nb - nr) / delta + 2;
+    } else {
+      h = (nr - ng) / delta + 4;
+    }
+  }
+  h = Math.round(h * 60);
+  if (h < 0) {
+    h += 360;
+  }
+  const l = (max + min) / 2;
+  const s = delta === 0 ? 0 : delta / (1 - Math.abs(2 * l - 1));
+  return { h, s, l };
+}
+
+function hslToHex(h: number, s: number, l: number): string {
+  const c = (1 - Math.abs(2 * l - 1)) * s;
+  const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+  const m = l - c / 2;
+  let r = 0;
+  let g = 0;
+  let b = 0;
+  if (h >= 0 && h < 60) {
+    r = c;
+    g = x;
+  } else if (h >= 60 && h < 120) {
+    r = x;
+    g = c;
+  } else if (h >= 120 && h < 180) {
+    g = c;
+    b = x;
+  } else if (h >= 180 && h < 240) {
+    g = x;
+    b = c;
+  } else if (h >= 240 && h < 300) {
+    r = x;
+    b = c;
+  } else {
+    r = c;
+    b = x;
+  }
+  const toHex = (value: number) => {
+    const scaled = Math.round((value + m) * 255);
+    return scaled.toString(16).padStart(2, '0');
+  };
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
 }
 
 main().catch((error) => {

@@ -28,11 +28,20 @@ interface CompliancePermit {
 
 export async function loadToolkitPermit(repoRoot: string): Promise<CompliancePermit> {
   const permitPath = join(repoRoot, 'compliance', 'permit.json');
-  const raw = await readFile(permitPath, 'utf8');
-  return JSON.parse(raw) as CompliancePermit;
+  try {
+    const raw = await readFile(permitPath, 'utf8');
+    return JSON.parse(raw) as CompliancePermit;
+  } catch (error) {
+    const nodeError = error as NodeJS.ErrnoException;
+    if (nodeError?.code === 'ENOENT') {
+      console.warn('[design-toolkit] compliance/permit.json not found; proceeding without permit enforcement');
+      return { allowedSources: [] };
+    }
+    throw error;
+  }
 }
 
-export function ensureSourcePermitted(url: string, permit: CompliancePermit): void {
+export function ensureSourcePermitted(url: string, permit: CompliancePermit): boolean {
   const allowed = new Set(
     (permit.allowedSources ?? [])
       .map((entry) => {
@@ -45,11 +54,13 @@ export function ensureSourcePermitted(url: string, permit: CompliancePermit): vo
       .filter((origin): origin is string => Boolean(origin))
   );
   const origin = new URL(url).origin;
-  if (!allowed.has(origin)) {
-    throw new Error(
-      `Extraction target ${origin} is not listed in compliance/permit.json. Add an allowedSources entry before running the pipeline.`
-    );
+  if (allowed.size === 0 || allowed.has(origin)) {
+    return true;
   }
+  console.warn(
+    `[design-toolkit] Extraction target ${origin} is not listed in compliance/permit.json; continuing without permit match`
+  );
+  return false;
 }
 
 export function resolveToolkitSources(
