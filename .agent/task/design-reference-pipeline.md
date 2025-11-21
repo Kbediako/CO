@@ -11,8 +11,8 @@
 ## Foundation
 1. **Collateral synchronized**
    - Files: `docs/design/PRD-design-reference-pipeline.md`, `docs/design/specs/DESIGN_REFERENCE_PIPELINE.md`, `tasks/index.json`, `docs/TASKS.md`, `.agent/task/design-reference-pipeline.md`.
-   - Acceptance: Task 0401 references align, manifest placeholder `<manifest-path>` recorded.
-   - [ ] Status: _(pending)_
+   - Acceptance: Task 0401 references align, manifest recorded at `.runs/0401-design-reference/cli/2025-11-21T08-15-57-435Z-851d3781/manifest.json`.
+   - [x] Status: `Completed — .runs/0401-design-reference/cli/2025-11-21T08-15-57-435Z-851d3781/manifest.json`
 2. **Pipeline toggles wired**
    - Files: `design.config.yaml` template, config loader.
    - Commands: Document `--pipeline design-reference`, `DESIGN_PIPELINE=1`.
@@ -71,8 +71,8 @@
 3. **Reviewer hand-off**
    - Commands: `npm run review`.
    - Acceptance: Review references latest design-reference manifest; approvals logged.
-   - [ ] Status: _(pending)_
+   - [x] Status: `Completed — .runs/0401-design-reference/cli/2025-11-21T08-15-57-435Z-851d3781/manifest.json`
 
 ## Notes
 - Optional Playwright/FFmpeg installs require approval logging; record entries under `design_artifacts[].approvals`.
-- Retain `<manifest-path>` placeholders until the first run generates evidence.
+- Use `.runs/0401-design-reference/cli/2025-11-21T08-15-57-435Z-851d3781/manifest.json` as the canonical evidence path for this pipeline.
