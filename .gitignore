@@ -5,3 +5,4 @@ out/
 .DS_Store
 .vscode/settings.json
 .runs/
+**/:Zone.Identifier
