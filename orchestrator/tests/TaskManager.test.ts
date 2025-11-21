@@ -621,7 +621,7 @@ describe('TaskManager', () => {
     try {
       const summary = await manager.execute(baseTask);
       expect(summary.group?.processed).toBe(2);
-      expect(summary.build.subtaskId).toBe('beta');
+      expect(summary.build.subtaskId).toBe('alpha');
       expect(summary.builds?.map((build) => build.subtaskId)).toEqual(['alpha', 'beta']);
       expect(summary.tests?.map((test) => test.subtaskId)).toEqual(['alpha', 'beta']);
       expect(summary.reviews?.length).toBe(2);

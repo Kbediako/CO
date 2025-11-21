@@ -5,7 +5,8 @@ import type { RunPaths } from '../run/runPaths.js';
 import { relativeToRepo } from '../run/runPaths.js';
 import { writeJsonAtomic } from '../utils/fs.js';
 import { saveManifest } from '../run/manifest.js';
-import type { CliManifest, RunSummary } from '../types.js';
+import type { CliManifest } from '../types.js';
+import type { RunSummary } from '../../types.js';
 
 export function applyHandlesToRunSummary(runSummary: RunSummary, manifest: CliManifest): void {
   if (!manifest.handles || manifest.handles.length === 0) {

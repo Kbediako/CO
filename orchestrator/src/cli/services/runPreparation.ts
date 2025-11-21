@@ -5,9 +5,8 @@ import { PipelineResolver } from './pipelineResolver.js';
 import { sanitizeTaskId } from '../run/environment.js';
 import type { EnvironmentPaths } from '../run/environment.js';
 import { loadTaskMetadata } from '../tasks/taskMetadata.js';
-import type { TaskContext } from '../types.js';
+import type { TaskContext, PlanResult } from '../../types.js';
 import type { PipelineDefinition } from '../types.js';
-import type { PlanPreviewResult } from '../types.js';
 import { resolvePipeline } from '../pipelines/index.js';
 import type { UserConfig } from '../config/userConfig.js';
 import { findPipeline } from '../config/userConfig.js';
@@ -22,7 +21,7 @@ export interface RunPreparationResult {
   taskContext: TaskContext;
   metadata: { id: string; slug: string; title: string };
   resolver: PipelineResolver;
-  planPreview: PlanPreviewResult;
+  planPreview: PlanResult;
 }
 
 export interface PrepareRunOptions {
@@ -46,7 +45,7 @@ export function overrideTaskEnvironment(baseEnv: EnvironmentPaths, taskId?: stri
 }
 
 export function resolveTargetStageId(
-  explicit: string | undefined,
+  explicit: string | null | undefined,
   fallback: string | null,
   envTarget: string | undefined = process.env.CODEX_ORCHESTRATOR_TARGET_STAGE
 ): string | null {
@@ -73,7 +72,7 @@ export async function prepareRun(options: PrepareRunOptions): Promise<RunPrepara
 
   const metadata = await loadTaskMetadata(env);
   const taskContext = createTaskContext(metadata);
-  const targetId = resolveTargetStageId(options.targetStageId, options.planTargetFallback);
+  const targetId = resolveTargetStageId(options.targetStageId, options.planTargetFallback ?? null);
   const planner = options.planner ?? new CommandPlanner(resolvedPipeline.pipeline, { targetStageId: targetId });
   const planPreview = await planner.plan(taskContext);
 

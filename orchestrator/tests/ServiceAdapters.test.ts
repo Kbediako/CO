@@ -4,7 +4,8 @@ import { ControlPlaneService } from '../src/cli/services/controlPlaneService.js'
 import { SchedulerService } from '../src/cli/services/schedulerService.js';
 import type { ControlPlaneValidationResult } from '../src/control-plane/types.js';
 import type { SchedulerPlan } from '../src/scheduler/types.js';
-import type { RunSummary, CliManifest } from '../src/cli/types.js';
+import type { CliManifest } from '../src/cli/types.js';
+import type { RunSummary } from '../src/types.js';
 import type { EnvironmentPaths } from '../src/cli/run/environment.js';
 
 describe('service adapters', () => {
@@ -38,7 +39,7 @@ describe('service adapters', () => {
           lastSampledAt: null
         }
       }
-    } as ControlPlaneValidationResult;
+    } as unknown as ControlPlaneValidationResult;
 
     service.attachControlPlaneToManifest(env, manifest, result);
     expect(manifest.control_plane?.drift?.report_path).toBe('out/drift/report.json');

@@ -3,7 +3,7 @@ import { execFile } from 'node:child_process';
 import { isAbsolute, join, relative } from 'node:path';
 import { tmpdir } from 'node:os';
 import { promisify } from 'node:util';
-import { chromium, type BrowserContext } from 'playwright';
+import { chromium, type BrowserContext, type Route } from 'playwright';
 import { pathToFileURL } from 'node:url';
 import { loadDesignContext } from './context.js';
 import {
@@ -386,7 +386,7 @@ async function recordInteractionVideo(
       }
     });
     if (targetUrl.startsWith('file:')) {
-      await activeContext.route('**/*', (route) => {
+      await activeContext.route('**/*', (route: Route) => {
         const url = route.request().url();
         if (url.startsWith('file:') || url.startsWith('data:')) {
           return route.continue();

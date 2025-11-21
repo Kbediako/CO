@@ -51,8 +51,8 @@ export interface ManagerOptions {
 }
 
 const defaultModePolicy: ModePolicy = (task, subtask) => {
-  const requiresCloud = subtask.requires_cloud ?? subtask.requiresCloud;
-  if (requiresCloud) {
+  const requiresCloudFlag = resolveRequiresCloud(subtask);
+  if (requiresCloudFlag) {
     return 'cloud';
   }
   if (task.metadata?.execution?.parallel) {
@@ -60,6 +60,29 @@ const defaultModePolicy: ModePolicy = (task, subtask) => {
   }
   return 'mcp';
 };
+
+function resolveRequiresCloud(subtask: PlanItem): boolean {
+  const boolFlags = [subtask.requires_cloud, subtask.requiresCloud].filter((value) => value !== undefined);
+  for (const flag of boolFlags) {
+    if (flag === true) return true;
+    if (flag === false) return false;
+  }
+  const metadataMode = typeof subtask.metadata?.mode === 'string'
+    ? subtask.metadata.mode
+    : typeof subtask.metadata?.executionMode === 'string'
+      ? subtask.metadata.executionMode
+      : null;
+  if (metadataMode) {
+    const normalized = metadataMode.trim().toLowerCase();
+    if (['cloud', 'true', '1', 'yes'].includes(normalized)) {
+      return true;
+    }
+    if (['mcp', 'false', '0', 'no'].includes(normalized)) {
+      return false;
+    }
+  }
+  return false;
+}
 
 const defaultRunIdFactory: RunIdFactory = (taskId) => {
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -254,12 +277,16 @@ export class TaskManager {
     const testResults: TestResult[] = [];
     const reviewResults: ReviewResult[] = [];
     let finalResult: PipelineRunResult | null = null;
+    let primaryResult: PipelineRunResult | null = null;
     for (let index = 0; index < targets.length; index += 1) {
       const target = targets[index]!;
       const result = await this.runPipelineStages(task, plan, target, runId);
       buildResults.push(result.build);
       testResults.push(result.test);
       reviewResults.push(result.review);
+      if (!primaryResult) {
+        primaryResult = result;
+      }
       entries.push({
         index: index + 1,
         subtaskId: target.id,
@@ -274,19 +301,22 @@ export class TaskManager {
         break;
       }
     }
-    if (!finalResult) {
+    const summaryResult = primaryResult ?? finalResult;
+    if (!summaryResult || !primaryResult) {
       throw new Error('Group execution produced no runnable subtasks.');
     }
-    finalResult.summary.group = {
+    const groupMode = entries.some((entry) => entry.mode === 'cloud') ? 'cloud' : summaryResult.mode;
+    summaryResult.summary.mode = groupMode;
+    summaryResult.summary.group = {
       enabled: true,
       size: targets.length,
       processed: entries.length,
       entries
     };
-    finalResult.summary.builds = buildResults;
-    finalResult.summary.tests = testResults;
-    finalResult.summary.reviews = reviewResults;
-    return finalResult;
+    summaryResult.summary.builds = buildResults;
+    summaryResult.summary.tests = testResults;
+    summaryResult.summary.reviews = reviewResults;
+    return summaryResult;
   }
 
   private normalizeBuildResult(build: BuildResult, mode: ExecutionMode, runId: string): BuildResult {

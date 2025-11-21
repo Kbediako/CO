@@ -13,7 +13,7 @@
    - Scope: Stamped prompt-pack manifests, instruction loader routing, and experience slot injection.
    - Files: `.agent/prompts/**`, `packages/orchestrator/src/instructions/loader.ts`, `packages/orchestrator/src/instructions/promptPacks.ts`.
    - Tests: `packages/orchestrator/tests/instructions/PromptPackLoader.test.ts`, `orchestrator/tests/InstructionsLoader.test.ts`.
-   - [ ] Evidence: attach manifest once prompt packs load stamped sources.
+   - [x] Evidence: `.runs/0506-tfgrpo-integration/cli/2025-11-21T05-56-32-837Z-430b2d9d/manifest.json` (prompt_packs stamps recorded).
 2. **PR-2 — Metrics (Per-Tool & Per-Epoch)**
    - Scope: Emit tool/token/cost/latency metrics tagged by epoch and group.
    - Files: `orchestrator/src/cli/exec/command.ts`, `orchestrator/src/cli/metrics/metricsRecorder.ts`, `orchestrator/src/cli/metrics/metricsAggregator.ts`, `packages/orchestrator/src/telemetry/otel-exporter.ts`.
@@ -33,26 +33,26 @@
    - Scope: Plug deterministic GT and relative ranking rewarders into the evaluation harness.
    - Files: `evaluation/harness/index.ts`, `evaluation/harness/types.ts`, `evaluation/harness/rewarders/*.ts`.
    - Tests: `evaluation/tests/harness.test.ts` (RewarderExactMatch, RelativeRankingRewarder suites).
-   - [ ] Evidence pending harness execution.
+   - [x] Evidence: tfgrpo-learning run with `TFGRPO_REWARDERS=gt,relative` — `.runs/0506-tfgrpo-integration/cli/2025-11-21T05-56-32-837Z-430b2d9d/manifest.json` (runner log).
 6. **PR-6 — Learning Schedule**
    - Scope: Three-epoch (~100 sample) schedule with temperature overrides plus pipeline wiring.
    - Files: `evaluation/harness/index.ts`, `evaluation/harness/types.ts`, `codex.orchestrator.json`.
    - Tests: `evaluation/tests/harness.test.ts` (LearningScheduleLoop), `orchestrator/tests/ControlPlaneValidator.test.ts` (PipelineTemperatureConfig).
-   - [ ] Evidence pending tfgrpo-learning pipeline run.
+   - [x] Evidence: tfgrpo-learning schedule completed (temps 0.7/0.7/0.3, 3×100 samples); manifest `.runs/0506-tfgrpo-integration/cli/2025-11-21T05-56-32-837Z-430b2d9d/manifest.json`.
 7. **PR-7 — Config Guardrails**
    - Scope: Enforce `groupSize ≥ 2`, stamped instruction sources, and `experience_max_words=32` defaults.
    - Files: `orchestrator/src/control-plane/request-builder.ts`, `packages/orchestrator/src/instructions/loader.ts`.
    - Tests: `orchestrator/tests/ControlPlaneValidator.test.ts`, `packages/orchestrator/tests/instructions/InstructionGuard.test.ts`.
-   - [ ] Evidence pending validator run.
+   - [x] Evidence: manifest `.runs/0506-tfgrpo-integration/cli/2025-11-21T05-56-32-837Z-430b2d9d/manifest.json` captures stamped instruction chain + prompt-pack stamps; run executed with `TFGRPO_GROUP_SIZE=2`.
 8. **PR-8 — Group Runner (Feature Flagged)**
    - Scope: TaskManager + Scheduler support for grouped subtasks under `FEATURE_TFGRPO_GROUP`.
    - Files: `orchestrator/src/manager.ts`, `orchestrator/src/scheduler/plan.ts`.
    - Tests: `orchestrator/tests/TaskManager.test.ts`, `orchestrator/tests/SchedulerPlan.test.ts`.
-   - [ ] Evidence pending grouped execution test run.
+   - [x] Evidence: grouped vitest run (`FEATURE_TFGRPO_GROUP=1 TFGRPO_GROUP_SIZE=2`) covering TaskManagerGroupRunner + SchedulerGroupAssignments — `.runs/0506-tfgrpo-integration/manual/2025-11-21-group-tests.log`.
 
 ## Verification & Guardrails
-- Diagnostics pipeline: `npx codex-orchestrator start diagnostics --pipeline tfgrpo-learning --format json` (attach manifest once executed).
-- Guardrails: `node scripts/spec-guard.mjs --dry-run`, `npm run lint`, `npm run test`, `npm run eval:test` (when fixtures exist).
+- Diagnostics pipeline: `npx codex-orchestrator start diagnostics --pipeline tfgrpo-learning --format json`; Evidence: `.runs/0506-tfgrpo-integration/cli/2025-11-21T05-56-32-837Z-430b2d9d/manifest.json` (spec-guard passed, prompt-pack stamps recorded).
+- Guardrails: `node scripts/spec-guard.mjs --dry-run`, `npm run lint`, `npm run test`, `npm run eval:test` (when fixtures exist). Evidence: `.runs/0506-tfgrpo-integration/cli/2025-11-21T07-09-08-052Z-ac3a1d09/manifest.json` (build+lint+test+eval+spec-guard succeeded).
 - Reviewer hand-off: `npm run review` referencing latest `.runs/0506-tfgrpo-integration/cli/<run-id>/manifest.json`.
 
 ## Notes

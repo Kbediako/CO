@@ -157,7 +157,7 @@ Update checklist entries with the exact `.runs/0202-orchestrator-hardening/cli/<
 
 # Task List Snapshot — TF-GRPO Integration (0506)
 
-- **Update — 2025-11-11:** Planning collateral (PRD, Tech Spec, checklist) drafted; waiting on first `tfgrpo-learning` diagnostics run to seed `.runs/0506-tfgrpo-integration/cli/<run-id>/manifest.json` and metrics snapshots.
+- **Update — 2025-11-21:** `tfgrpo-learning` run succeeded (3 epochs, G=2, rewarders=`gt,relative`, temps 0.7/0.7/0.3) with manifest `.runs/0506-tfgrpo-integration/cli/2025-11-21T05-56-32-837Z-430b2d9d/manifest.json`; prompt-pack stamps recorded and spec-guard passed. Diagnostics-with-eval guardrail run succeeded under `.runs/0506-tfgrpo-integration/cli/2025-11-21T07-09-08-052Z-ac3a1d09/manifest.json` (build/lint/test/eval/spec-guard).
 - **Gate Status:** TF-GRPO enablement in planning; implementation gated on Experience Store + prompt pack landing behind `FEATURE_TFGRPO_GROUP`.
 - **Guardrails:** Enforce `G ≥ 2`, ≤32-word experiences, three epochs (~100 samples) with train temp 0.7 / eval temp 0.3, stamped instruction sources only, and `node scripts/spec-guard.mjs --dry-run` before review.
 
@@ -165,7 +165,7 @@ Update checklist entries with the exact `.runs/0202-orchestrator-hardening/cli/<
 Mirror status with `tasks/tasks-0506-tfgrpo.md` and `.agent/task/0506-tfgrpo-integration.md`. Flip `[ ]` to `[x]` only after attaching the manifest path (e.g., `.runs/0506-tfgrpo-integration/cli/<run-id>/manifest.json`).
 
 ### PR-1 Prompt Packs & Loader
-- [ ] Stamped prompt-pack manifests wired into `packages/orchestrator/src/instructions/loader.ts`; tests: `packages/orchestrator/tests/instructions/PromptPackLoader.test.ts`, `orchestrator/tests/InstructionsLoader.test.ts`. Evidence pending first tfgrpo-learning dry run.
+- [x] Stamped prompt-pack manifests wired into `packages/orchestrator/src/instructions/loader.ts`; tests: `packages/orchestrator/tests/instructions/PromptPackLoader.test.ts`, `orchestrator/tests/InstructionsLoader.test.ts`. Evidence: prompt_packs stamps in `.runs/0506-tfgrpo-integration/cli/2025-11-21T05-56-32-837Z-430b2d9d/manifest.json`.
 
 ### PR-2 Metrics (Per-Tool & Per-Epoch)
 - [x] Emit per-tool, per-epoch token/cost/latency metrics via exec command → recorder/aggregator/OTEL; tests: `orchestrator/tests/MetricsAggregator.test.ts`, `orchestrator/tests/ExecCommand.test.ts`. Evidence: `.runs/0506-tfgrpo-integration/cli/2025-11-11T05-12-24-697Z-15088fb0/manifest.json`.
@@ -177,22 +177,22 @@ Mirror status with `tasks/tasks-0506-tfgrpo.md` and `.agent/task/0506-tfgrpo-int
 - [x] Summarize exec events into trajectory frames, stamp, and re-inject; tests: `orchestrator/tests/ExecCommand.test.ts`, `orchestrator/tests/ExperienceStore.test.ts`. Evidence: `.runs/0506-tfgrpo-integration/cli/2025-11-11T05-12-24-697Z-15088fb0/manifest.json`.
 
 ### PR-5 Rewarders (GT + Relative Rank)
-- [ ] Evaluation harness exposes deterministic GT + relative ranking rewarders; tests: `evaluation/tests/harness.test.ts` (RewarderExactMatch, RelativeRankingRewarder suites).
+- [x] Evaluation harness exposes deterministic GT + relative ranking rewarders; tests: `evaluation/tests/harness.test.ts` (RewarderExactMatch, RelativeRankingRewarder suites). Evidence: tfgrpo-learning run used `TFGRPO_REWARDERS=gt,relative` (runner log `.runs/0506-tfgrpo-integration/cli/2025-11-21T05-56-32-837Z-430b2d9d/commands/01-tfgrpo-loop.ndjson`).
 
 ### PR-6 Learning Schedule
-- [ ] Three-epoch (~100 sample) schedule with temperature overrides and tfgrpo-learning pipeline wiring; tests: `evaluation/tests/harness.test.ts` (LearningScheduleLoop), `orchestrator/tests/ControlPlaneValidator.test.ts` (PipelineTemperatureConfig).
+- [x] Three-epoch (~100 sample) schedule with temperature overrides and tfgrpo-learning pipeline wiring; tests: `evaluation/tests/harness.test.ts` (LearningScheduleLoop), `orchestrator/tests/ControlPlaneValidator.test.ts` (PipelineTemperatureConfig). Evidence: runner log shows epochs 1–3 at temps 0.7/0.7/0.3 with 100 samples each; manifest `.runs/0506-tfgrpo-integration/cli/2025-11-21T05-56-32-837Z-430b2d9d/manifest.json`.
 
 ### PR-7 Config Guardrails
-- [ ] Request builder enforces `groupSize ≥ 2` and instruction loader filters stamped sources; tests: `orchestrator/tests/ControlPlaneValidator.test.ts`, `packages/orchestrator/tests/instructions/InstructionGuard.test.ts`.
+- [x] Request builder enforces `groupSize ≥ 2` and instruction loader filters stamped sources; tests: `orchestrator/tests/ControlPlaneValidator.test.ts`, `packages/orchestrator/tests/instructions/InstructionGuard.test.ts`. Evidence: command recorded `TFGRPO_GROUP_SIZE=2` with stamped instruction sources + prompt pack stamps in manifest `.runs/0506-tfgrpo-integration/cli/2025-11-21T05-56-32-837Z-430b2d9d/manifest.json`.
 
 ### PR-8 Group Runner (Feature Flagged)
-- [ ] TaskManager + Scheduler run grouped subtasks when `FEATURE_TFGRPO_GROUP` is set; tests: `orchestrator/tests/TaskManager.test.ts`, `orchestrator/tests/SchedulerPlan.test.ts`.
+- [x] TaskManager + Scheduler run grouped subtasks when `FEATURE_TFGRPO_GROUP` is set; tests: `orchestrator/tests/TaskManager.test.ts`, `orchestrator/tests/SchedulerPlan.test.ts`. Evidence: grouped vitest run with `FEATURE_TFGRPO_GROUP=1 TFGRPO_GROUP_SIZE=2` (`.runs/0506-tfgrpo-integration/manual/2025-11-21-group-tests.log`).
 
-- **Update — 2025-11-11:** First exec validation for TF-GRPO metrics/experiences recorded under `.runs/0506-tfgrpo-integration/cli/2025-11-11T05-12-24-697Z-15088fb0/manifest.json`; awaiting full tfgrpo-learning diagnostics loop to populate per-epoch metrics snapshots.
+- **Update — 2025-11-21:** First full tfgrpo-learning loop captured guardrail evidence and prompt-pack stamps under `.runs/0506-tfgrpo-integration/cli/2025-11-21T05-56-32-837Z-430b2d9d/manifest.json`; guardrail suite (build/lint/test/eval/spec-guard) passed under `.runs/0506-tfgrpo-integration/cli/2025-11-21T07-09-08-052Z-ac3a1d09/manifest.json`.
 
 ### Verification & Guardrails
-- [x] Diagnostics / tfgrpo-learning pipeline run recorded under `.runs/0506-tfgrpo-integration/cli/2025-11-11T05-12-24-697Z-15088fb0/manifest.json`.
-- [ ] Guardrails: `node scripts/spec-guard.mjs --dry-run`, `npm run lint`, `npm run test`, `npm run eval:test` (when fixtures exist).
+- [x] Diagnostics / tfgrpo-learning pipeline run recorded under `.runs/0506-tfgrpo-integration/cli/2025-11-21T05-56-32-837Z-430b2d9d/manifest.json` (spec-guard passed).
+- [x] Guardrails: `node scripts/spec-guard.mjs --dry-run`, `npm run lint`, `npm run test`, `npm run eval:test` (when fixtures exist). Evidence: `.runs/0506-tfgrpo-integration/cli/2025-11-21T07-09-08-052Z-ac3a1d09/manifest.json`.
 - [ ] Reviewer hand-off via `npm run review` referencing the latest TF-GRPO manifest.
 
 # Task List Snapshot — PlusX 15th Anniversary Hi-Fi Clone (0520-15th-plus-hi-fi)

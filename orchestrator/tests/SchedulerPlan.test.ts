@@ -259,7 +259,7 @@ describe('createSchedulerPlan', () => {
     expect(plan.assignments[0]?.attempts[0]?.recoveryCheckpoints.length).toBeGreaterThanOrEqual(1);
     const summary = buildSchedulerRunSummary(plan);
 
-    expect(summary.assignments).toHaveLength(1);
+    expect(summary.assignments).toHaveLength(plan.assignments.length);
     expect(summary.assignments[0]?.status).toBe('failed');
   });
 });

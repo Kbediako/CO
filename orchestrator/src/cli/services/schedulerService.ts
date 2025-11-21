@@ -11,7 +11,8 @@ import {
 import type { SchedulerPlan, SchedulerAssignmentStatus } from '../../scheduler/index.js';
 import type { ControlPlaneValidationResult } from '../../control-plane/types.js';
 import { isoTimestamp } from '../utils/time.js';
-import type { CliManifest, RunStatus, RunSummary } from '../types.js';
+import type { CliManifest, RunStatus } from '../types.js';
+import type { RunSummary } from '../../types.js';
 
 export class SchedulerService {
   constructor(private readonly now: () => Date = () => new Date()) {}

@@ -66,10 +66,11 @@ export interface PlanPreviewResult {
     id: string;
     title: string;
     description: string | null;
-    source: 'default' | 'user';
+    source: 'default' | 'user' | null;
   };
   stages: PlanPreviewStage[];
   plan: PlanResult;
+  targetId?: string | null;
 }
 
 export interface CliManifestCommand {
@@ -282,6 +283,8 @@ export interface PipelineExecutionResult {
   manifest: CliManifest;
   runSummary: RunSummary;
 }
+
+export type { TaskContext, RunSummary } from '../types.js';
 
 export interface PipelineRunExecutionResult {
   success: boolean;

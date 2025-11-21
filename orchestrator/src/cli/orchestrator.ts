@@ -176,7 +176,7 @@ export class CodexOrchestrator {
     });
     const plan = preparation.planPreview ?? (await preparation.planner.plan(preparation.taskContext));
 
-    const stages = preparation.pipeline.stages.map((stage, index) => {
+    const stages = preparation.pipeline.stages.map((stage: PipelineDefinition['stages'][number], index: number) => {
       if (stage.kind === 'command') {
         return {
           index: index + 1,
@@ -200,15 +200,23 @@ export class CodexOrchestrator {
       } as const;
     });
 
+    const pipelineSource =
+      preparation.pipelineSource === 'user'
+        ? 'user'
+        : preparation.pipelineSource === 'default'
+          ? 'default'
+          : null;
+
     return {
       pipeline: {
         id: preparation.pipeline.id,
         title: preparation.pipeline.title,
         description: preparation.pipeline.description ?? null,
-        source: preparation.pipelineSource
+        source: pipelineSource
       },
       stages,
-      plan
+      plan,
+      targetId: plan.targetId ?? null
     };
   }
 

@@ -12,7 +12,8 @@ import { relativeToRepo } from '../run/runPaths.js';
 import type { RunPaths } from '../run/runPaths.js';
 import { appendSummary, saveManifest } from '../run/manifest.js';
 import { isoTimestamp } from '../utils/time.js';
-import type { CliManifest, PipelineDefinition, RunSummary, TaskContext } from '../types.js';
+import type { CliManifest, PipelineDefinition } from '../types.js';
+import type { RunSummary, TaskContext } from '../../types.js';
 
 export interface ControlPlaneGuardOptions {
   env: EnvironmentPaths;

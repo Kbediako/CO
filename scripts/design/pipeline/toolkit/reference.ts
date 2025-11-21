@@ -3,8 +3,9 @@ import { dirname, isAbsolute, join, relative } from 'node:path';
 import { tmpdir } from 'node:os';
 import { pathToFileURL } from 'node:url';
 import pixelmatch from 'pixelmatch';
-import { chromium } from 'playwright';
+import { chromium, type Route } from 'playwright';
 import { PNG } from 'pngjs';
+type PngImage = ReturnType<typeof PNG.sync.read>;
 import { loadDesignContext } from '../context.js';
 import type { DesignContext } from '../context.js';
 import {
@@ -165,6 +166,8 @@ async function main(): Promise<void> {
             final_error_rate: correction.finalErrorRate,
             threshold: selfCorrection.threshold ?? DEFAULT_SELF_CORRECTION_THRESHOLD,
             threshold_passed: correction.finalErrorRate <= (selfCorrection.threshold ?? DEFAULT_SELF_CORRECTION_THRESHOLD)
+              ? 1
+              : 0
           }
         });
 
@@ -510,7 +513,7 @@ async function captureScreenshot(options: {
   macro?: InteractionMacroPayload | null;
   waitMs?: number | null;
   blockNetwork?: boolean;
-}): Promise<{ image: PNG }> {
+}): Promise<{ image: PngImage }> {
   const context = await options.browser.newContext({
     viewport: { width: options.viewport.width, height: options.viewport.height },
     deviceScaleFactor: options.viewport.deviceScaleFactor,
@@ -519,7 +522,7 @@ async function captureScreenshot(options: {
 
   const enforceOffline = Boolean(options.blockNetwork && options.targetUrl.startsWith('file:'));
   if (enforceOffline) {
-    await context.route('**/*', (route) => {
+    await context.route('**/*', (route: Route) => {
       const requestUrl = route.request().url();
       if (requestUrl.startsWith('file:') || requestUrl.startsWith('data:')) {
         return route.continue();
@@ -549,7 +552,7 @@ async function captureScreenshot(options: {
   const buffer = await page.screenshot({ fullPage: true, path: options.outputPath });
   await context.close();
 
-  return { image: PNG.sync.read(buffer) };
+  return { image: PNG.sync.read(buffer) as PngImage };
 }
 
 function normalizeViewportConfig(breakpoint: { width: number; height: number; deviceScaleFactor?: number }) {
@@ -561,8 +564,8 @@ function normalizeViewportConfig(breakpoint: { width: number; height: number; de
 }
 
 async function computeMismatch(
-  reference: PNG,
-  candidate: PNG,
+  reference: PngImage,
+  candidate: PngImage,
   diffPath: string
 ): Promise<{
   percent: number;
@@ -609,7 +612,7 @@ async function computeMismatch(
   };
 }
 
-function normalizePngDimensions(image: PNG, targetWidth: number, targetHeight: number): PNG {
+function normalizePngDimensions(image: PngImage, targetWidth: number, targetHeight: number): PngImage {
   if (image.width === targetWidth && image.height === targetHeight) {
     return image;
   }
