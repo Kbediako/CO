@@ -108,6 +108,11 @@ Use `npx codex-orchestrator resume --run <run-id>` to continue interrupted runs;
 
 Run `npm run build` to compile TypeScript before packaging or invoking the CLI directly from `dist/`.
 
+## Mirror Workflows
+- `npm run mirror:fetch -- --project <name> [--dry-run]`: reads `packages/<project>/mirror.config.json` (origin, routes, asset roots, rewrite/block/allow lists), caches downloads, strips tracker patterns, rewrites externals to local paths, stages into `.runs/<task>/mirror/<timestamp>/staging` and promotes to `packages/<project>/public`, and logs a manifest under `.runs/<task>/mirror/<timestamp>/manifest.json` (warns when `MCP_RUNNER_TASK_ID` is unset; honors `compliance/permit.json` when present).
+- `npm run mirror:serve -- --project <name> [--port <port>] [--csp <self|strict|off>] [--no-range]`: shared local-mirror server with traversal guard, HTML no-cache/asset immutability, optional CSP, optional Range support, and directory-listing blocks.
+- `npm run mirror:check -- --project <name> [--port <port>]`: boots a temporary mirror server when needed and verifies all configured routes with Playwright, failing on outbound hosts outside the allowlist, tracker strings (`gtag`, `google-analytics`, `facebook`, `hotjar`) in HTML/JS, unresolved assets, or non-200 responses. Keep this opt-in and trigger it when `packages/<project>/public` changes.
+
 ## Hi-Fi Design Toolkit Captures
 Use the hi-fi pipeline to snapshot complex marketing sites (motion, interactions, tokens) while keeping the repo cloneable:
 
