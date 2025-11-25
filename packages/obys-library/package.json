@@ -1,0 +1,9 @@
+{
+  "name": "obys-library-clone",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Pixel-perfect local clone of library.obys.agency for HiFi toolkit testing. Serves static assets from the bundled public directory.",
+  "scripts": {
+    "start": "node server.js"
+  }
+}
