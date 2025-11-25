@@ -1,0 +1,42 @@
+{
+  "origin": "https://library.obys.agency",
+  "routes": [
+    "/",
+    "/books",
+    "/contacts",
+    "/credits",
+    "/books/graphic-design-manual",
+    "/books/typography-br-a-manual-of-design",
+    "/books/grid-systems-principles-br-of-organizing-type",
+    "/books/the-new-typography",
+    "/books/interaction-of-color",
+    "/books/how-to",
+    "/books/type-a-visual-history-br-of-typefaces-and-graphic-styles",
+    "/books/work-for-money-br-design-for-love",
+    "/books/the-art-of-color",
+    "/books/in-the-eye-of-the-storm-br-modernism-in-ukraine",
+    "/books/the-vignelli-canon",
+    "/books/grid-systems-br-in-graphic-design",
+    "/books/year-of-yes",
+    "/books/the-geometry-of-type",
+    "/books/the-debate",
+    "/books/aesthetic-intelligence"
+  ],
+  "assetRoots": ["/assets", "/uploads", "/icons", "/"],
+  "stripPatterns": ["gtag", "google-analytics", "serviceWorker", "hotjar", "facebook"],
+  "rewriteRules": [
+    {
+      "pattern": "https://library\\.obys\\.agency",
+      "replace": ""
+    }
+  ],
+  "blocklistHosts": [
+    "www.google-analytics.com",
+    "google-analytics.com",
+    "www.googletagmanager.com",
+    "connect.facebook.net",
+    "facebook.com",
+    "script.hotjar.com"
+  ],
+  "allowlistHosts": ["library.obys.agency", "localhost", "127.0.0.1"]
+}

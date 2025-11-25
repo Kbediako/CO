@@ -16,7 +16,10 @@
     "eval:test": "vitest run evaluation/tests",
     "test:watch": "vitest",
     "review": "node dist/scripts/run-review.js",
-    "design:purge-expired": "node dist/scripts/design/purgeExpired.js"
+    "design:purge-expired": "node dist/scripts/design/purgeExpired.js",
+    "mirror:serve": "node scripts/mirror-serve.mjs",
+    "mirror:fetch": "node scripts/mirror-site.mjs",
+    "mirror:check": "node scripts/mirror-check.mjs"
   },
   "devDependencies": {
     "@types/js-yaml": "^4.0.9",
