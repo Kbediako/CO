@@ -28,16 +28,11 @@ pipelines:
   hi_fi_design_toolkit:
     enabled: true
     sources:
-      - id: ethical-life-world
-        slug: ethical-life-world
-        title: Ethical Life World experience
-        url: https://ethicallifeworld.com/
-        reference_url: https://ethicallifeworld.com/
-      - id: plus-ex-15th
-        slug: plus-ex-15th
-        title: PlusX 15th Anniversary microsite
-        url: https://15th.plus-ex.com/
-        reference_url: https://15th.plus-ex.com/
+      - id: des-obys
+        slug: des-obys
+        title: Obys Design
+        url: https://des.obys.agency/
+        reference_url: https://des.obys.agency/
     breakpoints:
       - id: desktop
         width: 1440

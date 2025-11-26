@@ -44,6 +44,16 @@
       "allow_playwright": true,
       "allow_video_capture": true,
       "allow_live_assets": true
+    },
+    {
+      "origin": "https://des.obys.agency",
+      "license": "Obys Design experience — internal toolkit capture only",
+      "notes": "Hi-fi desktop + mobile captures permitted for internal review; keep mirrored assets and recordings internal.",
+      "approver": "Design Review Board",
+      "approval_id": "des-obys-2025-11-20",
+      "allow_playwright": true,
+      "allow_video_capture": true,
+      "allow_live_assets": true
     }
   ],
   "policy": {
