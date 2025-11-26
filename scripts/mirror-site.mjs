@@ -5,6 +5,7 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import * as cheerio from "cheerio";
 
+const WAYBACK_PREFIX = "https://web.archive.org/web";
 const DEFAULT_ASSET_ROOTS = ["/wp-content", "/wp-includes", "/"];
 const DEFAULT_STRIP_PATTERNS = [
   "gtag",
@@ -15,8 +16,30 @@ const DEFAULT_STRIP_PATTERNS = [
   "pagesense",
   "serviceworker",
   "connect\\.facebook\\.net",
+  "facebook\\.com/tr",
+  "fbevents",
+  "clarity",
+  "doubleclick",
+  "googlesyndication",
+  "tiktok",
+  "pixel\\.wp\\.com",
   "cdn-cgi/challenge-platform"
 ];
+const DEFAULT_SHARE_HOST_REWRITES = {
+  "facebook.com": "https://fb.com",
+  "www.facebook.com": "https://fb.com",
+  "m.facebook.com": "https://fb.com",
+  "l.facebook.com": "https://fb.com",
+  "web.facebook.com": "https://fb.com"
+};
+const META_IMAGE_KEYS = new Set([
+  "og:image",
+  "og:image:url",
+  "og:image:secure_url",
+  "twitter:image",
+  "twitter:image:src",
+  "twitter:image:url"
+]);
 
 function parseArgs(rawArgs) {
   const args = {};
@@ -54,6 +77,19 @@ function encodeKey(input) {
   return Buffer.from(input).toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
 }
 
+function buildWaybackUrl(targetUrl) {
+  if (!targetUrl.startsWith("http")) {
+    return null;
+  }
+
+  try {
+    const parsed = new URL(targetUrl);
+    return `${WAYBACK_PREFIX}/0if_/${parsed.toString()}`;
+  } catch {
+    return null;
+  }
+}
+
 async function fileExists(target) {
   try {
     await fs.access(target);
@@ -63,30 +99,84 @@ async function fileExists(target) {
   }
 }
 
-async function fetchWithCache(url, cacheDir) {
+async function fetchWithCache(url, cacheDir, options = {}) {
+  const fetchImpl = options.fetchImpl ?? fetch;
+  const fallbackBuilder = options.fallbackBuilder ?? buildWaybackUrl;
   const key = encodeKey(url);
   const bodyPath = path.join(cacheDir, `${key}.bin`);
   const metaPath = path.join(cacheDir, `${key}.json`);
 
   if (await fileExists(bodyPath) && await fileExists(metaPath)) {
     const [body, metaRaw] = await Promise.all([fs.readFile(bodyPath), fs.readFile(metaPath, "utf8")]);
-    return { ...JSON.parse(metaRaw), body, fromCache: true };
+    const parsedMeta = JSON.parse(metaRaw);
+    return {
+      ...parsedMeta,
+      resolvedUrl: parsedMeta.resolvedUrl ?? url,
+      source: parsedMeta.source ?? "primary",
+      body,
+      fromCache: true,
+      fallback: (parsedMeta.source ?? "primary") === "wayback"
+    };
   }
 
-  const response = await fetch(url);
-  const arrayBuffer = await response.arrayBuffer();
-  const body = Buffer.from(arrayBuffer);
-  const meta = {
-    url,
-    status: response.status,
-    fetchedAt: new Date().toISOString(),
-    headers: Object.fromEntries(response.headers.entries())
+  const attempts = [];
+  let fallbackAttempted = false;
+  let fallbackUrl = null;
+
+  async function tryFetch(target, source) {
+    const response = await fetchImpl(target);
+    const arrayBuffer = await response.arrayBuffer();
+    const body = Buffer.from(arrayBuffer);
+    const meta = {
+      url,
+      resolvedUrl: target,
+      status: response.status,
+      fetchedAt: new Date().toISOString(),
+      headers: Object.fromEntries(response.headers.entries()),
+      source
+    };
+    return { meta, body };
+  }
+
+  let result = null;
+  let lastError = null;
+
+  try {
+    result = await tryFetch(url, "primary");
+  } catch (error) {
+    attempts.push({ source: "primary", error: error.message });
+    lastError = error;
+  }
+
+  if (!result || result.meta.status >= 400) {
+    fallbackUrl = fallbackBuilder?.(url);
+    if (fallbackUrl) {
+      fallbackAttempted = true;
+      try {
+        result = await tryFetch(fallbackUrl, "wayback");
+      } catch (error) {
+        attempts.push({ source: "wayback", error: error.message });
+        lastError = error;
+      }
+    }
+  }
+
+  if (!result) {
+    const failure = attempts.length ? `attempts: ${attempts.map((a) => `${a.source}=${a.error}`).join(", ")}` : lastError?.message || "unknown";
+    throw new Error(`Failed to fetch ${url}${failure ? ` (${failure})` : ""}`);
+  }
+
+  const { body, meta } = result;
+  const resolvedMeta = {
+    ...meta,
+    fallbackUrl: meta.source === "wayback" ? fallbackUrl : undefined,
+    fallbackAttempted
   };
 
   await fs.mkdir(cacheDir, { recursive: true });
-  await Promise.all([fs.writeFile(bodyPath, body), fs.writeFile(metaPath, JSON.stringify(meta, null, 2))]);
+  await Promise.all([fs.writeFile(bodyPath, body), fs.writeFile(metaPath, JSON.stringify(resolvedMeta, null, 2))]);
 
-  return { ...meta, body, fromCache: false };
+  return { ...resolvedMeta, body, fromCache: false, fallback: meta.source === "wayback" };
 }
 
 function compileStripPatterns(patterns = []) {
@@ -170,6 +260,11 @@ function buildLocalAssetPath(urlObj, originHost) {
   return prefix ? path.join(prefix, relativePath) : relativePath;
 }
 
+function shouldUseArchiveFallback(urlObj, originHost, enabled) {
+  if (!enabled) return false;
+  return Boolean(urlObj.hostname && urlObj.hostname !== originHost);
+}
+
 async function loadPermit(origin) {
   try {
     const raw = await fs.readFile(path.resolve("compliance/permit.json"), "utf8");
@@ -210,7 +305,9 @@ function normalizeConfig(config, project) {
     stripPatterns: compileStripPatterns(stripPatternsRaw),
     rewriteRules: config.rewriteRules ?? [],
     blocklistHosts: config.blocklistHosts ?? [],
-    allowlistHosts: allowlist
+    allowlistHosts: allowlist,
+    shareHostRewrites: { ...DEFAULT_SHARE_HOST_REWRITES, ...(config.shareHostRewrites ?? {}) },
+    enableArchiveFallback: config.enableArchiveFallback ?? true
   };
 }
 
@@ -264,6 +361,43 @@ function rewriteLinks($, origin, route) {
       // Ignore invalid URLs
     }
   });
+}
+
+function rewriteShareLinks($, options) {
+  const rewrites = [];
+  if (!options?.shareHostRewrites || !Object.keys(options.shareHostRewrites).length) {
+    return rewrites;
+  }
+
+  const routeBase = buildRouteBase(options.origin, options.route);
+
+  $("a[href]").each((_, el) => {
+    const href = $(el).attr("href");
+    if (!href) return;
+
+    let resolved;
+    try {
+      resolved = new URL(href, routeBase);
+    } catch {
+      return;
+    }
+
+    const mapped = options.shareHostRewrites[resolved.hostname];
+    if (!mapped) {
+      return;
+    }
+
+    const normalizedTarget = mapped.startsWith("http") ? mapped : `https://${mapped}`;
+    const replacement = new URL(resolved.pathname + resolved.search + resolved.hash, normalizedTarget);
+    const newValue = replacement.toString();
+    if (newValue === href) {
+      return;
+    }
+    $(el).attr("href", newValue);
+    rewrites.push({ from: resolved.toString(), to: newValue });
+  });
+
+  return rewrites;
 }
 
 function stripElements($, patterns, record) {
@@ -429,6 +563,30 @@ function rewriteAssets($, options) {
     });
   }
 
+  $("style").each((_, el) => {
+    const css = $(el).html() || "";
+    if (!css.trim()) return;
+    const { css: rewritten, assets } = rewriteCssUrls(css, attrOptions);
+    if (assets.length) {
+      routeAssets.push(...assets);
+    }
+    if (rewritten !== css) {
+      $(el).text(rewritten);
+    }
+  });
+
+  $("[style]").each((_, el) => {
+    const style = $(el).attr("style");
+    if (!style) return;
+    const { css: rewritten, assets } = rewriteCssUrls(style, attrOptions);
+    if (assets.length) {
+      routeAssets.push(...assets);
+    }
+    if (rewritten !== style) {
+      $(el).attr("style", rewritten);
+    }
+  });
+
   return routeAssets;
 }
 
@@ -451,6 +609,33 @@ function rewriteCssUrls(cssText, options) {
   });
 
   return { css: rewritten, assets: registeredAssets };
+}
+
+function rewriteMetaImages($, options) {
+  const metaAssets = [];
+  const routeBase = buildRouteBase(options.origin, options.route);
+  $("meta[content]").each((_, el) => {
+    const name = ($(el).attr("property") || $(el).attr("name") || "").toLowerCase();
+    if (!META_IMAGE_KEYS.has(name)) {
+      return;
+    }
+    const content = $(el).attr("content");
+    if (!content) {
+      return;
+    }
+
+    const registered = registerAsset(content, { ...options, routeBase });
+    if (!registered) {
+      $(el).attr("content", "");
+      return;
+    }
+
+    const posixPath = `/${toPosixPath(registered.localPath)}`;
+    $(el).attr("content", posixPath);
+    metaAssets.push(registered);
+  });
+
+  return metaAssets;
 }
 
 function rewriteEmojiSettings($, options) {
@@ -512,18 +697,25 @@ async function writeBuffer(destination, contents) {
 export {
   DEFAULT_ASSET_ROOTS,
   DEFAULT_STRIP_PATTERNS,
+  DEFAULT_SHARE_HOST_REWRITES,
   buildLocalAssetPath,
+  compileStripPatterns,
   normalizeConfig,
+  fetchWithCache,
+  buildWaybackUrl,
   registerAsset,
   stripElements,
   rewriteCssUrls,
+  rewriteMetaImages,
+  rewriteShareLinks,
+  rewriteAssets,
   rewriteEmojiSettings
 };
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   if (args.help || args.h) {
-    console.log("Usage: npm run mirror:fetch -- --project <name> [--config <path>] [--dry-run]");
+    console.log("Usage: npm run mirror:fetch -- --project <name> [--config <path>] [--dry-run] [--force] [--archive-fallback=false]");
     return;
   }
 
@@ -555,13 +747,16 @@ async function main() {
     return;
   }
 
+  const forcePromote = Boolean(args.force || args["force-promote"]);
+  const archiveFallback = args["archive-fallback"] === "false" || args["no-archive-fallback"] ? false : config.enableArchiveFallback;
+
   const taskId = process.env.MCP_RUNNER_TASK_ID;
   if (!taskId) {
     console.warn("[mirror:fetch] MCP_RUNNER_TASK_ID is not set; manifest will be written under .runs/adhoc");
   }
 
   const timestamp = sanitizeTimestamp(new Date().toISOString());
-  const runRoot = path.join(".runs", taskId || "adhoc", "mirror");
+  const runRoot = path.join(".runs", taskId || "adhoc", "mirror", project);
   const runDir = path.join(runRoot, timestamp);
   const manifestPath = path.join(runDir, "manifest.json");
   const stagingDir = path.join(runDir, "staging");
@@ -590,9 +785,12 @@ async function main() {
     assetRoots: config.assetRoots,
     allowlistHosts: config.allowlistHosts,
     blocklistHosts: config.blocklistHosts,
+    shareHostRewrites: config.shareHostRewrites,
     timestamp,
     taskId: taskId || null,
     dryRun,
+    archiveFallback,
+    forcePromote,
     stagingDir: stagingPublicDir,
     destination: destinationPublicDir,
     cacheDir,
@@ -611,7 +809,7 @@ async function main() {
       const routeUrl = new URL(route, config.origin).toString();
       let response;
       try {
-        response = await fetchWithCache(routeUrl, cacheDir);
+        response = await fetchWithCache(routeUrl, cacheDir, { fallbackBuilder: null });
       } catch (error) {
         warnings.push(`Failed to fetch ${routeUrl}: ${error.message}`);
         hasErrors = true;
@@ -629,8 +827,23 @@ async function main() {
       const html = Buffer.from(response.body).toString("utf8");
       const $ = cheerio.load(html, { decodeEntities: false });
       rewriteLinks($, config.origin, route);
+      const shareRewrites = rewriteShareLinks($, {
+        origin: config.origin,
+        route,
+        shareHostRewrites: config.shareHostRewrites
+      });
       stripElements($, config.stripPatterns, strippedElements);
       const routeAssets = rewriteAssets($, {
+        origin: config.origin,
+        originHost: config.originHost,
+        assetRoots: config.assetRoots,
+        allowlist: config.allowlistHosts,
+        blocklist: config.blocklistHosts,
+        assetMap,
+        warnings,
+        route
+      });
+      const metaAssets = rewriteMetaImages($, {
         origin: config.origin,
         originHost: config.originHost,
         assetRoots: config.assetRoots,
@@ -650,6 +863,17 @@ async function main() {
         warnings,
         route
       });
+
+      if (shareRewrites.length) {
+        manifest.shareLinkRewrites = manifest.shareLinkRewrites ?? [];
+        manifest.shareLinkRewrites.push(
+          ...shareRewrites.map((entry) => ({ route, from: entry.from, to: entry.to }))
+        );
+      }
+
+      if (metaAssets.length) {
+        routeAssets.push(...metaAssets);
+      }
 
       if (emojiAssets.length) {
         routeAssets.push(...emojiAssets);
@@ -671,11 +895,16 @@ async function main() {
     }
 
     for (const asset of assetMap.values()) {
+      const assetUrl = new URL(asset.url);
+      const useArchiveFallback = shouldUseArchiveFallback(assetUrl, config.originHost, archiveFallback);
       let response;
       try {
-        response = await fetchWithCache(asset.url, cacheDir);
+        response = await fetchWithCache(asset.url, cacheDir, {
+          fallbackBuilder: useArchiveFallback ? buildWaybackUrl : null
+        });
       } catch (error) {
-        warnings.push(`Failed to fetch asset ${asset.url}: ${error.message}`);
+        const suffix = useArchiveFallback ? " (wayback attempted)" : "";
+        warnings.push(`Failed to fetch asset ${asset.url}${suffix}: ${error.message}`);
         hasErrors = true;
         continue;
       }
@@ -686,7 +915,12 @@ async function main() {
         continue;
       }
 
-      const contentType = response.headers["content-type"] || "";
+      if (response.source === "wayback" && !response.fromCache) {
+        warnings.push(`Asset ${asset.url} fulfilled via web archive (${response.resolvedUrl})`);
+      }
+
+      const headers = response.headers || {};
+      const contentType = headers["content-type"] || headers["Content-Type"] || "";
       const isCss = /text\/css/i.test(contentType) || /\.css(\?|$)/i.test(asset.url);
       const isTextLike = /text|javascript|json|xml|svg/.test(contentType) || isCss;
       let contents = response.body;
@@ -726,6 +960,10 @@ async function main() {
         url: asset.url,
         localPath: asset.localPath,
         fromCache: Boolean(response.fromCache),
+        status: response.status,
+        resolvedUrl: response.resolvedUrl,
+        fetchedFrom: response.source,
+        fallbackAttempted: Boolean(response.fallbackAttempted),
         contentType,
         fromRoute: asset.fromRoute
       });
@@ -734,10 +972,17 @@ async function main() {
     manifest.stripped = strippedElements;
 
     if (!dryRun) {
-      await fs.rm(destinationPublicDir, { recursive: true, force: true });
-      await fs.mkdir(path.dirname(destinationPublicDir), { recursive: true });
-      await fs.cp(stagingPublicDir, destinationPublicDir, { recursive: true });
+      if (hasErrors && !forcePromote) {
+        manifest.promotion = { status: "skipped", reason: "errors present without --force" };
+        console.warn("[mirror:fetch] errors detected; skipping promotion to packages/<project>/public (use --force to override)");
+      } else {
+        await fs.rm(destinationPublicDir, { recursive: true, force: true });
+        await fs.mkdir(path.dirname(destinationPublicDir), { recursive: true });
+        await fs.cp(stagingPublicDir, destinationPublicDir, { recursive: true });
+        manifest.promotion = { status: "promoted", destination: destinationPublicDir };
+      }
     } else {
+      manifest.promotion = { status: "dry-run" };
       console.log("[mirror:fetch] dry-run enabled; staged output not promoted to public/");
     }
 
