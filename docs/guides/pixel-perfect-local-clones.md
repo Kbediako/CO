@@ -4,8 +4,14 @@ Use the mirror tooling to keep hi-fi site clones fully featured while staying of
 
 ## Permits & Config
 - Check `compliance/permit.json` for the origin; if a record exists it’s logged and honored, and if absent the fetch proceeds assuming authority.
-- Define the mirror in `packages/<project>/mirror.config.json` (origin, explicit `routes` list, `assetRoots`, `stripPatterns` for trackers/SW, `rewriteRules`, `blocklistHosts`/`allowlistHosts`).
+- Define the mirror in `packages/<project>/mirror.config.json` (origin, explicit `routes` list, `assetRoots`, `stripPatterns` for trackers/SW, `rewriteRules`, `blocklistHosts`/`allowlistHosts`); include tracker `stripPatterns` + `blocklistHosts` you’ve seen in the live site. See `reference/mirror.config.wp.example.json` for a WordPress-friendly template with defaults and host allowlists.
 - Export `MCP_RUNNER_TASK_ID=<task>` so manifests land under `.runs/<task>/mirror/<timestamp>/`.
+
+## Pre-flight Checklist
+- Pre-scan the live HTML/CSS with `rg`/`curl` for tracker hosts and query-suffixed assets so you can block them up front.
+- Set WP-friendly `assetRoots` (`/wp-content`, `/wp-includes`, `/`) and mirror @font-face URLs plus the emoji loader.
+- After fetch, run `rg "https://"` on `packages/<project>/public/index.html` to strip remaining absolute origins.
+- Finish with `npm run mirror:check -- --project <name>` to confirm no outbound calls, trackers, or traversal/range regressions.
 
 ## Fetch the Mirror
 - `npm run mirror:fetch -- --project <name> [--dry-run]`

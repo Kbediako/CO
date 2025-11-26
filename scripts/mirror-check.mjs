@@ -4,8 +4,19 @@ import path from "node:path";
 import { chromium } from "playwright";
 import { startMirrorServer } from "./lib/mirror-server.mjs";
 
-const TRACKER_PATTERNS = [/gtag/i, /google-analytics/i, /hotjar/i];
+const TRACKER_PATTERNS = [
+  /gtag/i,
+  /googletagmanager/i,
+  /google-analytics/i,
+  /hotjar/i,
+  /metricool/i,
+  /pagesense/i,
+  /serviceworker/i,
+  /facebook/i,
+  /cdn-cgi\/challenge-platform/i
+];
 const TEXT_CONTENT_TYPE = /(text|javascript|json|xml|svg)/i;
+const ABSOLUTE_HTTPS_REGEX = /https:\/\/[^\s"'<>]+/gi;
 
 function parseArgs(rawArgs) {
   const args = {};
@@ -86,6 +97,20 @@ function summarizeIssues(name, issues) {
   }
 }
 
+function recordAbsoluteUrls(text, route, collector) {
+  if (!text) return;
+  const matches = text.matchAll(ABSOLUTE_HTTPS_REGEX);
+  const urls = collector.get(route) ?? new Set();
+  for (const match of matches) {
+    if (match[0]) {
+      urls.add(match[0]);
+    }
+  }
+  if (urls.size) {
+    collector.set(route, urls);
+  }
+}
+
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   if (args.help || args.h) {
@@ -134,6 +159,7 @@ async function main() {
   const assetFailures = [];
   const routeFailures = [];
   const contentViolations = [];
+  const absoluteReferences = new Map();
 
   const browser = await chromium.launch({ headless: args.headless === "false" ? false : true });
   const context = await browser.newContext({ baseURL: baseUrl });
@@ -197,14 +223,12 @@ async function main() {
             .text()
             .then((body) => {
               for (const pattern of TRACKER_PATTERNS) {
-                if (pattern.source === "facebook") {
-                  continue;
-                }
                 if (pattern.test(body)) {
                   contentViolations.push(`${route}: tracker pattern "${pattern.source}" found in ${url}`);
                   break;
                 }
               }
+              recordAbsoluteUrls(body, route, absoluteReferences);
             })
             .catch(() => {})
         );
@@ -218,6 +242,7 @@ async function main() {
     }
 
     const pageContent = await page.content();
+    recordAbsoluteUrls(pageContent, route, absoluteReferences);
     for (const pattern of TRACKER_PATTERNS) {
       if (pattern.test(pageContent)) {
         contentViolations.push(`${route}: tracker pattern "${pattern.source}" found in HTML`);
@@ -237,6 +262,17 @@ async function main() {
   summarizeIssues("Outbound host violations", outboundViolations);
   summarizeIssues("Asset failures", assetFailures);
   summarizeIssues("Content violations", contentViolations);
+  const absoluteIssues = [];
+  for (const [route, urls] of absoluteReferences.entries()) {
+    for (const url of urls) {
+      absoluteIssues.push(`${route}: ${url}`);
+    }
+  }
+  if (absoluteIssues.length) {
+    summarizeIssues("Absolute https:// references", absoluteIssues);
+  } else {
+    console.log("\nAbsolute https:// references: none");
+  }
 
   const hasIssues =
     routeFailures.length || outboundViolations.length || assetFailures.length || contentViolations.length;

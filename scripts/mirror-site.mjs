@@ -2,7 +2,21 @@
 import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import * as cheerio from "cheerio";
+
+const DEFAULT_ASSET_ROOTS = ["/wp-content", "/wp-includes", "/"];
+const DEFAULT_STRIP_PATTERNS = [
+  "gtag",
+  "googletagmanager",
+  "google-analytics",
+  "hotjar",
+  "metricool",
+  "pagesense",
+  "serviceworker",
+  "connect\\.facebook\\.net",
+  "cdn-cgi/challenge-platform"
+];
 
 function parseArgs(rawArgs) {
   const args = {};
@@ -182,13 +196,18 @@ function normalizeConfig(config, project) {
   const allowlist = Array.from(
     new Set([...(config.allowlistHosts ?? []), originHost, "localhost", "127.0.0.1"])
   );
+  const assetRoots = Array.isArray(config.assetRoots) ? config.assetRoots : [...DEFAULT_ASSET_ROOTS];
+  const stripPatternsRaw = config.disableDefaultStripPatterns ? config.stripPatterns ?? [] : [
+    ...DEFAULT_STRIP_PATTERNS,
+    ...(config.stripPatterns ?? [])
+  ];
 
   return {
     origin: config.origin,
     originHost,
     routes: config.routes.map(normalizeRoute),
-    assetRoots: config.assetRoots ?? [],
-    stripPatterns: compileStripPatterns(config.stripPatterns),
+    assetRoots,
+    stripPatterns: compileStripPatterns(stripPatternsRaw),
     rewriteRules: config.rewriteRules ?? [],
     blocklistHosts: config.blocklistHosts ?? [],
     allowlistHosts: allowlist
@@ -413,10 +432,93 @@ function rewriteAssets($, options) {
   return routeAssets;
 }
 
+function rewriteCssUrls(cssText, options) {
+  const registeredAssets = [];
+  const rewritten = cssText.replace(/url\(([^)]+)\)/g, (match, rawUrl) => {
+    const cleaned = rawUrl.trim().replace(/^['"]|['"]$/g, "");
+    if (!cleaned) {
+      return match;
+    }
+
+    const isInlineRef = cleaned.startsWith("data:") || cleaned.startsWith("blob:") || cleaned.startsWith("#");
+    const registered = registerAsset(cleaned, options);
+    if (!registered) {
+      return isInlineRef ? match : 'url("")';
+    }
+
+    registeredAssets.push(registered);
+    return `url("/${toPosixPath(registered.localPath)}")`;
+  });
+
+  return { css: rewritten, assets: registeredAssets };
+}
+
+function rewriteEmojiSettings($, options) {
+  const registered = [];
+  $("script:not([src])").each((_, el) => {
+    const content = $(el).html() || "";
+    if (!content.includes("concatemoji")) {
+      return;
+    }
+
+    const doubleQuoted = content.match(/concatemoji"\s*:\s*"([^"]+)"/);
+    const singleQuoted = content.match(/concatemoji'\s*:\s*'([^']+)'/);
+    const match = doubleQuoted ?? singleQuoted;
+    if (!match?.[1]) {
+      return;
+    }
+
+    let resolved;
+    try {
+      resolved = new URL(match[1], options.origin);
+    } catch {
+      return;
+    }
+
+    if (resolved.hostname !== options.originHost) {
+      return;
+    }
+
+    const asset = registerAsset(resolved.toString(), {
+      origin: options.origin,
+      originHost: options.originHost,
+      assetRoots: options.assetRoots,
+      allowlist: options.allowlist,
+      blocklist: options.blocklist,
+      assetMap: options.assetMap,
+      warnings: options.warnings,
+      route: options.route,
+      routeBase: new URL(options.origin)
+    });
+
+    if (!asset) {
+      return;
+    }
+
+    const localPath = `/${toPosixPath(asset.localPath)}`;
+    const updated = content.replace(match[1], localPath);
+    $(el).text(updated);
+    registered.push(asset);
+  });
+
+  return registered;
+}
+
 async function writeBuffer(destination, contents) {
   await fs.mkdir(path.dirname(destination), { recursive: true });
   await fs.writeFile(destination, contents);
 }
+
+export {
+  DEFAULT_ASSET_ROOTS,
+  DEFAULT_STRIP_PATTERNS,
+  buildLocalAssetPath,
+  normalizeConfig,
+  registerAsset,
+  stripElements,
+  rewriteCssUrls,
+  rewriteEmojiSettings
+};
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
@@ -524,20 +626,34 @@ async function main() {
         continue;
       }
 
-    const html = Buffer.from(response.body).toString("utf8");
-    const $ = cheerio.load(html, { decodeEntities: false });
-    rewriteLinks($, config.origin, route);
-    stripElements($, config.stripPatterns, strippedElements);
-    const routeAssets = rewriteAssets($, {
-      origin: config.origin,
-      originHost: config.originHost,
-      assetRoots: config.assetRoots,
+      const html = Buffer.from(response.body).toString("utf8");
+      const $ = cheerio.load(html, { decodeEntities: false });
+      rewriteLinks($, config.origin, route);
+      stripElements($, config.stripPatterns, strippedElements);
+      const routeAssets = rewriteAssets($, {
+        origin: config.origin,
+        originHost: config.originHost,
+        assetRoots: config.assetRoots,
         allowlist: config.allowlistHosts,
         blocklist: config.blocklistHosts,
         assetMap,
         warnings,
         route
       });
+      const emojiAssets = rewriteEmojiSettings($, {
+        origin: config.origin,
+        originHost: config.originHost,
+        assetRoots: config.assetRoots,
+        allowlist: config.allowlistHosts,
+        blocklist: config.blocklistHosts,
+        assetMap,
+        warnings,
+        route
+      });
+
+      if (emojiAssets.length) {
+        routeAssets.push(...emojiAssets);
+      }
 
       let outputHtml = $.html();
       outputHtml = outputHtml.replaceAll(config.origin, "");
@@ -571,12 +687,29 @@ async function main() {
       }
 
       const contentType = response.headers["content-type"] || "";
-      const isText = /text|javascript|json|xml|svg/.test(contentType);
+      const isCss = /text\/css/i.test(contentType) || /\.css(\?|$)/i.test(asset.url);
+      const isTextLike = /text|javascript|json|xml|svg/.test(contentType) || isCss;
       let contents = response.body;
 
-      if (isText) {
-        const text = Buffer.from(response.body).toString("utf8").replaceAll(config.origin, "");
-        contents = Buffer.from(applyRewriteRules(text, config.rewriteRules));
+      if (isTextLike) {
+        let text = Buffer.from(response.body).toString("utf8");
+        if (isCss) {
+          const cssResult = rewriteCssUrls(text, {
+            origin: config.origin,
+            originHost: config.originHost,
+            assetRoots: config.assetRoots,
+            allowlist: config.allowlistHosts,
+            blocklist: config.blocklistHosts,
+            assetMap,
+            warnings,
+            route: asset.fromRoute,
+            routeBase: new URL(asset.url)
+          });
+          text = cssResult.css;
+        }
+        text = text.replaceAll(config.origin, "");
+        text = applyRewriteRules(text, config.rewriteRules);
+        contents = Buffer.from(text);
       }
 
       let destination;
@@ -622,6 +755,9 @@ async function main() {
   try {
     await writeBuffer(manifestPath, JSON.stringify(manifest, null, 2));
     console.log(`[mirror:fetch] wrote manifest to ${manifestPath}`);
+    console.log(
+      `[mirror:fetch] reminder: Run npm run mirror:check -- --project ${project} and rg 'https://' packages/${project}/public/index.html to spot lingering externals.`
+    );
   } catch (error) {
     console.error(`[mirror:fetch] failed to write manifest to ${manifestPath}: ${error.message}`);
     process.exitCode = 1;
@@ -632,7 +768,9 @@ async function main() {
   }
 }
 
-main().catch((error) => {
-  console.error("[mirror:fetch] unexpected failure", error);
-  process.exitCode = 1;
-});
+if (import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch((error) => {
+    console.error("[mirror:fetch] unexpected failure", error);
+    process.exitCode = 1;
+  });
+}
