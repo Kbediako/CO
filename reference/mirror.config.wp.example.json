@@ -1,0 +1,24 @@
+{
+  "origin": "https://example.test",
+  "routes": ["/", "/about/"],
+  "assetRoots": ["/wp-content", "/wp-includes", "/"],
+  "allowlistHosts": ["example.test", "s.w.org"],
+  "blocklistHosts": ["www.google-analytics.com", "www.googletagmanager.com", "script.hotjar.com"],
+  "stripPatterns": [
+    "gtag",
+    "googletagmanager",
+    "google-analytics",
+    "hotjar",
+    "metricool",
+    "pagesense",
+    "serviceworker",
+    "connect\\.facebook\\.net",
+    "cdn-cgi/challenge-platform"
+  ],
+  "rewriteRules": [
+    {
+      "pattern": "https://example\\.test",
+      "replace": ""
+    }
+  ]
+}
