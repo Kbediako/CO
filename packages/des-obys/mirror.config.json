@@ -1,0 +1,33 @@
+{
+  "origin": "https://des.obys.agency",
+  "routes": [
+    "/",
+    "/typography-principles/",
+    "/colors-combinations/",
+    "/grids/",
+    "/about/",
+    "/legal-terms/",
+    "/privacy-policy/"
+  ],
+  "assetRoots": ["/assets", "/icons", "/"],
+  "stripPatterns": ["gtag", "google-analytics", "googletagmanager", "serviceWorker", "hotjar"],
+  "rewriteRules": [
+    {
+      "pattern": "https://des\\.obys\\.agency",
+      "replace": ""
+    }
+  ],
+  "blocklistHosts": [
+    "www.google-analytics.com",
+    "google-analytics.com",
+    "www.googletagmanager.com",
+    "googletagmanager.com",
+    "connect.facebook.net",
+    "facebook.com",
+    "script.hotjar.com"
+  ],
+  "allowlistHosts": [
+    "des.obys.agency",
+    "deso-strapi-cms.onrender.com"
+  ]
+}

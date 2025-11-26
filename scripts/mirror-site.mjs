@@ -2,7 +2,7 @@
 import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
-import cheerio from "cheerio";
+import * as cheerio from "cheerio";
 
 function parseArgs(rawArgs) {
   const args = {};
@@ -364,8 +364,8 @@ function rewriteAssets($, options) {
     "manifest"
   ];
   $("link[href]").each((_, el) => {
-    const rel = ($(el).attr("rel") || "").toLowerCase();
-    const relTokens = rel.split(/\s+/).filter(Boolean);
+    const relValue = ($(el).attr("rel") || $(el).attr("ref") || "").toLowerCase();
+    const relTokens = relValue.split(/\s+/).filter(Boolean);
     if (!relTokens.some((token) => allowedLinkRels.includes(token))) {
       return;
     }
@@ -383,6 +383,8 @@ function rewriteAssets($, options) {
     { selector: "source[src]", attr: "src" },
     { selector: "source[srcset]", attr: "srcset", isSrcset: true },
     { selector: "video[src]", attr: "src" },
+    { selector: "[data-src]", attr: "data-src" },
+    { selector: "[data-srcset]", attr: "data-srcset", isSrcset: true },
     { selector: "video[poster]", attr: "poster" },
     { selector: "audio[src]", attr: "src" },
     { selector: "track[src]", attr: "src" },

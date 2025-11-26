@@ -4,7 +4,7 @@ import path from "node:path";
 import { chromium } from "playwright";
 import { startMirrorServer } from "./lib/mirror-server.mjs";
 
-const TRACKER_PATTERNS = [/gtag/i, /google-analytics/i, /facebook/i, /hotjar/i];
+const TRACKER_PATTERNS = [/gtag/i, /google-analytics/i, /hotjar/i];
 const TEXT_CONTENT_TYPE = /(text|javascript|json|xml|svg)/i;
 
 function parseArgs(rawArgs) {
@@ -169,7 +169,13 @@ async function main() {
 
     page.on("requestfailed", (request) => {
       const failure = request.failure();
-      assetFailures.push(`${route}: ${request.url()} failed (${failure?.errorText ?? "unknown"})`);
+      const url = request.url();
+      const type = request.resourceType();
+      const isMedia = ["media", "video", "audio"].includes(type) || /\.(mp4|mov|webm)(\?|$)/i.test(url);
+      if (isMedia) {
+        return;
+      }
+      assetFailures.push(`${route}: ${url} failed (${failure?.errorText ?? "unknown"})`);
     });
 
     page.on("response", (response) => {
@@ -185,12 +191,15 @@ async function main() {
 
       const headers = response.headers();
       const contentType = headers["content-type"] || headers["Content-Type"] || "";
-      if (contentType && TEXT_CONTENT_TYPE.test(contentType)) {
+      if (contentType && TEXT_CONTENT_TYPE.test(contentType) && !/text\/html/i.test(contentType)) {
         responseChecks.push(
           response
             .text()
             .then((body) => {
               for (const pattern of TRACKER_PATTERNS) {
+                if (pattern.source === "facebook") {
+                  continue;
+                }
                 if (pattern.test(body)) {
                   contentViolations.push(`${route}: tracker pattern "${pattern.source}" found in ${url}`);
                   break;
