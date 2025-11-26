@@ -1,0 +1,24 @@
+{
+  "origin": "https://eminente.art",
+  "routes": ["/"],
+  "assetRoots": ["/wp-content", "/wp-includes", "/"],
+  "stripPatterns": [
+    "gtag",
+    "google-analytics",
+    "googletagmanager",
+    "metricool",
+    "pagesense",
+    "hotjar",
+    "serviceWorker",
+    "facebook",
+    "cdn-cgi/challenge-platform"
+  ],
+  "rewriteRules": [
+    {
+      "pattern": "https://eminente\\.art",
+      "replace": ""
+    }
+  ],
+  "blocklistHosts": ["cdn-au.pagesense.io", "tracker.metricool.com"],
+  "allowlistHosts": ["eminente.art", "s.w.org"]
+}

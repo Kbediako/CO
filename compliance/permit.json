@@ -1,6 +1,16 @@
 {
   "allowedSources": [
     {
+      "origin": "https://eminente.art",
+      "license": "Owned site — cloning permitted for internal hi-fi testing",
+      "notes": "Strip trackers/service workers; keep mirrored assets internal.",
+      "approver": "Design Review Board",
+      "approval_id": "eminente-2025-11-26",
+      "allow_playwright": true,
+      "allow_video_capture": true,
+      "allow_live_assets": true
+    },
+    {
       "origin": "https://example.com",
       "license": "Proprietary — internal replication permitted by owner (you)",
       "notes": "Only extract CSS you own or have legal rights to replicate."

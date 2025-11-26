@@ -27,12 +27,7 @@ advanced:
 pipelines:
   hi_fi_design_toolkit:
     enabled: true
-    sources:
-      - id: des-obys
-        slug: des-obys
-        title: Obys Design
-        url: https://des.obys.agency/
-        reference_url: https://des.obys.agency/
+    sources: []
     breakpoints:
       - id: desktop
         width: 1440
