@@ -1,0 +1,19 @@
+{
+  "origin": "https://abetkaua.com",
+  "routes": ["/en/", "/en/about/", "/"],
+  "assetRoots": ["/wp-content", "/wp-includes", "/"],
+  "stripPatterns": ["gtag", "google-analytics", "googletagmanager", "serviceWorker"],
+  "rewriteRules": [
+    {
+      "pattern": "https://abetkaua\\.com",
+      "replace": ""
+    }
+  ],
+  "blocklistHosts": [
+    "www.google-analytics.com",
+    "google-analytics.com",
+    "www.googletagmanager.com",
+    "googletagmanager.com"
+  ],
+  "allowlistHosts": ["abetkaua.com", "abetka-strapi.onrender.com"]
+}

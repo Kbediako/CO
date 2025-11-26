@@ -1,66 +1,11 @@
 {
   "allowedSources": [
     {
-      "origin": "https://eminente.art",
+      "origin": "https://abetkaua.com",
       "license": "Owned site — cloning permitted for internal hi-fi testing",
-      "notes": "Strip trackers/service workers; keep mirrored assets internal.",
+      "notes": "Strip trackers/service workers; keep mirrored assets internal. Upstream CMS may rate-limit; use archive fallback when required.",
       "approver": "Design Review Board",
-      "approval_id": "eminente-2025-11-26",
-      "allow_playwright": true,
-      "allow_video_capture": true,
-      "allow_live_assets": true
-    },
-    {
-      "origin": "https://example.com",
-      "license": "Proprietary — internal replication permitted by owner (you)",
-      "notes": "Only extract CSS you own or have legal rights to replicate."
-    },
-    {
-      "origin": "https://soil-net.jp",
-      "license": "Soil Net public site — internal design analysis only",
-      "notes": "Live assets + animations permitted for toolkit validation; do not redistribute captures externally.",
-      "approver": "Design Review Board",
-      "approval_id": "soil-net-2025-11-07",
-      "allow_playwright": true,
-      "allow_video_capture": true,
-      "allow_live_assets": true
-    },
-    {
-      "origin": "https://more-nutrition.webflow.io",
-      "license": "More Nutrition marketing site — archival capture for internal review",
-      "notes": "Toolkit run 0505 mirrors the public landing page for parity validation; assets remain internal only.",
-      "approver": "Design Review Board",
-      "approval_id": "0505-more-nutrition-2025-11-09",
-      "allow_playwright": true,
-      "allow_video_capture": true,
-      "allow_live_assets": true
-    },
-    {
-      "origin": "https://ethicallifeworld.com",
-      "license": "Ethical Life World public experience — internal toolkit capture only",
-      "notes": "Approved to run high-fidelity desktop + mobile captures with motion + interaction logging; keep artifacts internal for review.",
-      "approver": "Design Review Board",
-      "approval_id": "ethicallifeworld-hi-fi-2025-11-09",
-      "allow_playwright": true,
-      "allow_video_capture": true,
-      "allow_live_assets": true
-    },
-    {
-      "origin": "https://15th.plus-ex.com",
-      "license": "PlusX 15th Anniversary microsite — internal toolkit capture only",
-      "notes": "Live scroll interactions + ScrollSmoother unlock permitted for localhost validation; do not redistribute mirrored assets.",
-      "approver": "Design Review Board",
-      "approval_id": "plus-ex-15th-2025-11-14",
-      "allow_playwright": true,
-      "allow_video_capture": true,
-      "allow_live_assets": true
-    },
-    {
-      "origin": "https://des.obys.agency",
-      "license": "Obys Design experience — internal toolkit capture only",
-      "notes": "Hi-fi desktop + mobile captures permitted for internal review; keep mirrored assets and recordings internal.",
-      "approver": "Design Review Board",
-      "approval_id": "des-obys-2025-11-20",
+      "approval_id": "abetka-2025-11-26",
       "allow_playwright": true,
       "allow_video_capture": true,
       "allow_live_assets": true

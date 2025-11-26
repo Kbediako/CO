@@ -1,0 +1,28 @@
+<svg width="229" height="259" viewBox="0 0 229 259" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g clip-path="url(#clip0_721_5543)">
+<rect width="229" height="259" transform="matrix(1 0 0 -1 0 259)" fill="#5E4F2B"/>
+<line opacity="0.15" y1="39.75" x2="229" y2="39.75" stroke="black" stroke-width="0.5"/>
+<line opacity="0.15" y1="212.75" x2="229" y2="212.75" stroke="black" stroke-width="0.5"/>
+<path d="M65.6025 73.4727L34 206.018H58.6894L83.3789 98.0182L166.335 207H193V45H169.298V171.655L73.5031 45H42.8882L65.6025 73.4727Z" stroke="black"/>
+<rect x="63.4694" y="71.4694" width="3.81135" height="3.81135" fill="#5E4F2B" stroke="black" stroke-width="0.938865"/>
+<rect x="40.4694" y="43.4694" width="3.81135" height="3.81135" fill="#5E4F2B" stroke="black" stroke-width="0.938865"/>
+<rect x="71.4694" y="43.4694" width="3.81135" height="3.81135" fill="#5E4F2B" stroke="black" stroke-width="0.938865"/>
+<rect x="81.4694" y="96.4694" width="3.81135" height="3.81135" fill="#5E4F2B" stroke="black" stroke-width="0.938865"/>
+<rect x="166.469" y="168.469" width="3.81135" height="3.81135" fill="#5E4F2B" stroke="black" stroke-width="0.938865"/>
+<rect x="166.469" y="43.4694" width="3.81135" height="3.81135" fill="#5E4F2B" stroke="black" stroke-width="0.938865"/>
+<rect x="191.469" y="43.4694" width="3.81135" height="3.81135" fill="#5E4F2B" stroke="black" stroke-width="0.938865"/>
+<rect opacity="0.2" x="187" y="206.046" width="8.55039" height="8.55039" transform="rotate(-45 187 206.046)" fill="black"/>
+<rect x="191.469" y="204.469" width="3.81135" height="3.81135" fill="#5E4F2B" stroke="black" stroke-width="0.938865"/>
+<rect opacity="0.2" x="160" y="206.046" width="8.55039" height="8.55039" transform="rotate(-45 160 206.046)" fill="black"/>
+<rect x="164.469" y="204.469" width="3.81135" height="3.81135" fill="#5E4F2B" stroke="black" stroke-width="0.938865"/>
+<rect opacity="0.2" x="52" y="206.046" width="8.55039" height="8.55039" transform="rotate(-45 52 206.046)" fill="black"/>
+<rect x="56.4694" y="204.469" width="3.81135" height="3.81135" fill="#5E4F2B" stroke="black" stroke-width="0.938865"/>
+<rect opacity="0.2" x="27" y="206.046" width="8.55039" height="8.55039" transform="rotate(-45 27 206.046)" fill="black"/>
+<rect x="31.4694" y="204.469" width="3.81135" height="3.81135" fill="#5E4F2B" stroke="black" stroke-width="0.938865"/>
+</g>
+<defs>
+<clipPath id="clip0_721_5543">
+<rect width="229" height="259" fill="white"/>
+</clipPath>
+</defs>
+</svg>

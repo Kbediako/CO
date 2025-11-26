@@ -1,20 +1,12 @@
 #!/usr/bin/env node
 import fs from "node:fs/promises";
 import path from "node:path";
+import * as cheerio from "cheerio";
 import { chromium } from "playwright";
+import { DEFAULT_STRIP_PATTERNS, compileStripPatterns } from "./mirror-site.mjs";
 import { startMirrorServer } from "./lib/mirror-server.mjs";
 
-const TRACKER_PATTERNS = [
-  /gtag/i,
-  /googletagmanager/i,
-  /google-analytics/i,
-  /hotjar/i,
-  /metricool/i,
-  /pagesense/i,
-  /serviceworker/i,
-  /facebook/i,
-  /cdn-cgi\/challenge-platform/i
-];
+const TRACKER_PATTERNS = compileStripPatterns(DEFAULT_STRIP_PATTERNS);
 const TEXT_CONTENT_TYPE = /(text|javascript|json|xml|svg)/i;
 const ABSOLUTE_HTTPS_REGEX = /https:\/\/[^\s"'<>]+/gi;
 
@@ -97,18 +89,104 @@ function summarizeIssues(name, issues) {
   }
 }
 
-function recordAbsoluteUrls(text, route, collector) {
+function recordAbsoluteUrls(text, route, collector, options) {
   if (!text) return;
   const matches = text.matchAll(ABSOLUTE_HTTPS_REGEX);
   const urls = collector.get(route) ?? new Set();
+
   for (const match of matches) {
-    if (match[0]) {
-      urls.add(match[0]);
+    if (!match[0]) continue;
+    try {
+      const urlObj = new URL(match[0]);
+      const isOrigin = urlObj.hostname === options.originHost;
+      const isBlocked = options.blocklist.has(urlObj.hostname);
+      if (!isOrigin && !isBlocked) {
+        continue;
+      }
+      urls.add(urlObj.toString());
+    } catch {
+      continue;
     }
   }
+
   if (urls.size) {
     collector.set(route, urls);
   }
+}
+
+function scanDomForIssues(pageContent, route, options) {
+  const absolute = new Set();
+  const trackerHits = [];
+  const $ = cheerio.load(pageContent);
+  const base = new URL(route, options.baseUrl);
+
+  const assetSelectors = [
+    { selector: "script[src]", attr: "src" },
+    { selector: "link[href]", attr: "href" },
+    { selector: "img[src]", attr: "src" },
+    { selector: "img[srcset]", attr: "srcset", isSrcset: true },
+    { selector: "source[src]", attr: "src" },
+    { selector: "source[srcset]", attr: "srcset", isSrcset: true },
+    { selector: "video[src]", attr: "src" },
+    { selector: "audio[src]", attr: "src" },
+    { selector: "track[src]", attr: "src" },
+    { selector: "iframe[src]", attr: "src" },
+    { selector: "use[href]", attr: "href" },
+    { selector: "use[xlink\\:href]", attr: "xlink:href" },
+    { selector: "[data-src]", attr: "data-src" },
+    { selector: "[data-srcset]", attr: "data-srcset", isSrcset: true }
+  ];
+
+  const trackerCandidates = [];
+
+  for (const mapping of assetSelectors) {
+    $(mapping.selector).each((_, el) => {
+      const raw = $(el).attr(mapping.attr);
+      if (!raw) return;
+      const parts = mapping.isSrcset
+        ? raw.split(",").map((part) => part.trim().split(/\s+/, 2)[0]).filter(Boolean)
+        : [raw];
+
+      for (const value of parts) {
+        const trimmed = value.trim();
+        if (!trimmed || trimmed.startsWith("#")) {
+          continue;
+        }
+        let urlObj;
+        try {
+          urlObj = new URL(trimmed, base);
+        } catch {
+          continue;
+        }
+        if (urlObj.protocol !== "http:" && urlObj.protocol !== "https:") {
+          continue;
+        }
+        const matchTarget = `${urlObj.origin}${urlObj.pathname}${urlObj.search}`;
+        trackerCandidates.push(matchTarget);
+        if (urlObj.hostname === options.originHost || options.blocklist.has(urlObj.hostname)) {
+          absolute.add(urlObj.toString());
+        }
+      }
+    });
+  }
+
+  $("script:not([src])").each((_, el) => {
+    const text = $(el).html() || "";
+    if (text.trim()) {
+      trackerCandidates.push(text);
+    }
+  });
+
+  for (const candidate of trackerCandidates) {
+    for (const pattern of TRACKER_PATTERNS) {
+      if (pattern.test(candidate)) {
+        trackerHits.push(`tracker pattern "${pattern.source}" found in ${route}`);
+        break;
+      }
+    }
+  }
+
+  return { absolute, trackerHits };
 }
 
 async function main() {
@@ -228,7 +306,10 @@ async function main() {
                   break;
                 }
               }
-              recordAbsoluteUrls(body, route, absoluteReferences);
+              recordAbsoluteUrls(body, route, absoluteReferences, {
+                originHost: config.originHost,
+                blocklist
+              });
             })
             .catch(() => {})
         );
@@ -242,12 +323,19 @@ async function main() {
     }
 
     const pageContent = await page.content();
-    recordAbsoluteUrls(pageContent, route, absoluteReferences);
-    for (const pattern of TRACKER_PATTERNS) {
-      if (pattern.test(pageContent)) {
-        contentViolations.push(`${route}: tracker pattern "${pattern.source}" found in HTML`);
+    const domScan = scanDomForIssues(pageContent, route, {
+      originHost: config.originHost,
+      blocklist,
+      baseUrl
+    });
+    if (domScan.absolute.size) {
+      const existing = absoluteReferences.get(route) ?? new Set();
+      for (const value of domScan.absolute.values()) {
+        existing.add(value);
       }
+      absoluteReferences.set(route, existing);
     }
+    contentViolations.push(...domScan.trackerHits);
 
     await Promise.all(responseChecks);
     await page.close();
@@ -275,12 +363,12 @@ async function main() {
   }
 
   const hasIssues =
-    routeFailures.length || outboundViolations.length || assetFailures.length || contentViolations.length;
+    routeFailures.length || outboundViolations.length || assetFailures.length || contentViolations.length || absoluteIssues.length;
 
   if (hasIssues) {
     process.exitCode = 1;
     console.error(
-      `[mirror:check] detected issues (${routeFailures.length} routes, ${outboundViolations.length} outbound, ${assetFailures.length} assets, ${contentViolations.length} content)`
+      `[mirror:check] detected issues (${routeFailures.length} routes, ${outboundViolations.length} outbound, ${assetFailures.length} assets, ${contentViolations.length} content, ${absoluteIssues.length} absolute)`
     );
   } else {
     console.log("[mirror:check] all routes returned 200 with no outbound or tracker violations");
