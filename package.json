@@ -9,7 +9,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "build:patterns": "tsc -p patterns/tsconfig.json",
-    "lint": "npm run build:patterns && eslint orchestrator/src orchestrator/tests packages/orchestrator/src packages/orchestrator/tests packages/shared adapters evaluation/harness evaluation/tests --ext .ts",
+    "lint": "npm run build:patterns && eslint orchestrator/src orchestrator/tests packages/orchestrator/src packages/orchestrator/tests packages/shared adapters evaluation/harness evaluation/tests --ext .ts,.tsx",
     "parallel:goals": "node --loader ts-node/esm scripts/run-parallel-goals.ts",
     "setup:design-tools": "node dist/scripts/setup-design-tools.js",
     "test": "vitest run",
@@ -25,6 +25,7 @@
     "@types/js-yaml": "^4.0.9",
     "@types/jscodeshift": "^0.11.6",
     "@types/node": "^20.11.0",
+    "@types/react": "^18.3.27",
     "@typescript-eslint/eslint-plugin": "^7.0.0",
     "@typescript-eslint/parser": "^7.0.0",
     "@typescript-eslint/utils": "^7.0.0",
@@ -44,9 +45,11 @@
     "@openai/agents-core": "0.1.10",
     "@openai/agents-openai": "0.1.10",
     "cheerio": "^1.1.2",
+    "ink": "^4.4.1",
     "js-yaml": "^4.1.0",
     "pixelmatch": "^5.3.0",
     "playwright": "^1.56.1",
-    "pngjs": "^7.0.0"
+    "pngjs": "^7.0.0",
+    "react": "^18.3.1"
   }
 }

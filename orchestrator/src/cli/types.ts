@@ -255,6 +255,7 @@ export interface StartOptions {
   approvalPolicy?: string;
   format?: 'text' | 'json';
   targetStageId?: string;
+  runEvents?: import('./events/runEvents.js').RunEventEmitter;
 }
 
 export interface PlanOptions {
@@ -270,6 +271,7 @@ export interface ResumeOptions {
   reason?: string;
   format?: 'text' | 'json';
   targetStageId?: string;
+  runEvents?: import('./events/runEvents.js').RunEventEmitter;
 }
 
 export interface StatusOptions {

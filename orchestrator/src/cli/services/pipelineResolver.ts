@@ -27,8 +27,11 @@ export class PipelineResolver {
     env: EnvironmentPaths,
     options: { pipelineId?: string }
   ): Promise<{ pipeline: PipelineDefinition; userConfig: UserConfig | null; designConfig: DesignConfigLoadResult; source: 'default' | 'user' }> {
+    logger.info(`PipelineResolver.resolve start for ${options.pipelineId ?? '<default>'}`);
     const designConfig = await this.loadDesignConfig(env.repoRoot);
+    logger.info(`PipelineResolver.resolve loaded design config from ${designConfig.path}`);
     const userConfig = await loadUserConfig(env);
+    logger.info(`PipelineResolver.resolve loaded user config`);
     
     const requestedPipelineId = options.pipelineId ?? 
       (shouldActivateDesignPipeline(designConfig) ? designPipelineId(designConfig) : undefined);
@@ -37,12 +40,19 @@ export class PipelineResolver {
       process.env.DESIGN_PIPELINE = '1';
     }
 
-    const { pipeline, source } = resolvePipeline(env, {
-      pipelineId: requestedPipelineId,
-      config: userConfig
-    });
-
-    return { pipeline, userConfig, designConfig, source };
+    try {
+      const { pipeline, source } = resolvePipeline(env, {
+        pipelineId: requestedPipelineId,
+        config: userConfig
+      });
+      logger.info(`PipelineResolver.resolve selected pipeline ${pipeline.id}`);
+      return { pipeline, userConfig, designConfig, source };
+    } catch (error) {
+      logger.error(
+        `PipelineResolver.resolve failed for ${requestedPipelineId ?? '<default>'}: ${(error as Error).message}`
+      );
+      throw error;
+    }
   }
 
   ensureDesignPipelineEnv(pipelineId: string, designConfig: DesignConfigLoadResult): void {

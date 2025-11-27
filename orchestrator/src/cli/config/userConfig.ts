@@ -3,6 +3,7 @@ import { join } from 'node:path';
 
 import type { PipelineDefinition } from '../types.js';
 import type { EnvironmentPaths } from '../run/environment.js';
+import { logger } from '../../logger.js';
 
 export interface UserConfig {
   pipelines?: PipelineDefinition[];
@@ -14,12 +15,14 @@ export async function loadUserConfig(env: EnvironmentPaths): Promise<UserConfig 
   try {
     const raw = await readFile(configPath, 'utf8');
     const parsed = JSON.parse(raw) as UserConfig;
+    logger.info(`[codex-config] Loaded user config from ${configPath}`);
     if (parsed && Array.isArray(parsed.pipelines)) {
       return parsed;
     }
     return parsed ?? null;
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      logger.warn(`[codex-config] Missing codex.orchestrator.json at ${configPath}`);
       return null;
     }
     throw error;

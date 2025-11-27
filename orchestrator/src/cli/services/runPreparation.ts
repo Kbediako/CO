@@ -11,6 +11,7 @@ import { resolvePipeline } from '../pipelines/index.js';
 import type { UserConfig } from '../config/userConfig.js';
 import { findPipeline } from '../config/userConfig.js';
 import type { CliManifest } from '../types.js';
+import { logger } from '../../logger.js';
 
 export interface RunPreparationResult {
   env: EnvironmentPaths;
@@ -64,18 +65,25 @@ export function resolveTargetStageId(
 }
 
 export async function prepareRun(options: PrepareRunOptions): Promise<RunPreparationResult> {
+  logger.info(`prepareRun start for pipeline ${options.pipelineId ?? options.pipeline?.id ?? '<default>'}`);
   const env = overrideTaskEnvironment(options.baseEnv, options.taskIdOverride);
   const resolver = options.resolver ?? new PipelineResolver();
+  logger.info(`prepareRun resolving pipeline ${options.pipelineId ?? '<default>'}`);
   const resolvedPipeline = options.pipeline
     ? { pipeline: options.pipeline, source: options.pipelineSource ?? null }
     : await resolver.resolve(env, { pipelineId: options.pipelineId });
+  logger.info(`prepareRun resolved pipeline ${resolvedPipeline.pipeline.id}`);
 
   const metadata = await loadTaskMetadata(env);
+  logger.info(`prepareRun loaded metadata for task ${metadata.id}`);
   const taskContext = createTaskContext(metadata);
   const targetId = resolveTargetStageId(options.targetStageId, options.planTargetFallback ?? null);
   const planner = options.planner ?? new CommandPlanner(resolvedPipeline.pipeline, { targetStageId: targetId });
+  logger.info(`prepareRun running planner for pipeline ${resolvedPipeline.pipeline.id}`);
   const planPreview = await planner.plan(taskContext);
+  logger.info(`prepareRun planner completed for pipeline ${resolvedPipeline.pipeline.id}`);
 
+  logger.info(`prepareRun complete for pipeline ${resolvedPipeline.pipeline.id}`);
   return {
     env,
     pipeline: resolvedPipeline.pipeline,

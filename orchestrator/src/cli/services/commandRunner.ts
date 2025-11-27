@@ -6,6 +6,7 @@ import { ToolInvocationFailedError } from '../../../../packages/orchestrator/src
 import { getCliExecRunner, getPrivacyGuard, getExecHandleService } from './execRuntime.js';
 import type { CommandStage, CliManifest, HandleRecord, PrivacyDecisionRecord } from '../types.js';
 import type { ExecHandleDescriptor } from '../../../../packages/orchestrator/src/exec/handle-service.js';
+import type { RunEventPublisher } from '../events/runEvents.js';
 import { logger } from '../../logger.js';
 import type { EnvironmentPaths } from '../run/environment.js';
 import type { RunPaths } from '../run/runPaths.js';
@@ -28,6 +29,7 @@ export interface CommandRunnerContext {
   manifest: CliManifest;
   stage: CommandStage;
   index: number;
+  events?: RunEventPublisher;
 }
 
 export interface CommandRunHooks {
@@ -45,7 +47,7 @@ export async function runCommandStage(
   context: CommandRunnerContext,
   hooks: CommandRunHooks = {}
 ): Promise<CommandRunResult> {
-  const { env, paths, manifest, stage, index } = context;
+  const { env, paths, manifest, stage, index, events } = context;
   const entryIndex = index - 1;
   const entry = updateCommandStatus(manifest, entryIndex, {
     status: 'running',
@@ -57,6 +59,14 @@ export async function runCommandStage(
   const logFile = join(paths.commandsDir, `${String(index).padStart(2, '0')}-${slugify(stage.id)}.ndjson`);
   entry.log_path = relativeToRepo(env, logFile);
   await saveManifest(paths, manifest);
+  events?.stageStarted({
+    stageId: stage.id,
+    stageIndex: index,
+    title: stage.title,
+    kind: 'command',
+    logPath: entry.log_path,
+    status: entry.status
+  });
 
   const runnerLog = createWriteStream(paths.logPath, { flags: 'a' });
   const commandLog = createWriteStream(logFile, { flags: 'a' });
@@ -97,6 +107,49 @@ export async function runCommandStage(
         stderrTruncated = stderrTruncated || stderrBytes > MAX_BUFFERED_OUTPUT_BYTES;
       }
     });
+    switch (event.type) {
+      case 'exec:begin':
+        events?.toolCall({
+          stageId: stage.id,
+          stageIndex: index,
+          toolName: 'exec',
+          status: 'started',
+          message: stage.command,
+          attempt: event.attempt
+        });
+        break;
+      case 'exec:chunk':
+        events?.log({
+          stageId: stage.id,
+          stageIndex: index,
+          level: event.payload.stream === 'stderr' ? 'error' : 'info',
+          message: event.payload.data,
+          source: event.payload.stream
+        });
+        break;
+      case 'exec:retry':
+        events?.toolCall({
+          stageId: stage.id,
+          stageIndex: index,
+          toolName: 'exec',
+          status: 'retry',
+          message: event.payload.errorMessage,
+          attempt: event.attempt
+        });
+        break;
+      case 'exec:end':
+        events?.toolCall({
+          stageId: stage.id,
+          stageIndex: index,
+          toolName: 'exec',
+          status: event.payload.status,
+          message: `exit ${event.payload.exitCode ?? 'null'}`,
+          attempt: event.attempt
+        });
+        break;
+      default:
+        break;
+    }
   };
 
   const unsubscribe = runner.on(handleEvent);
@@ -207,6 +260,16 @@ export async function runCommandStage(
     }
 
     await saveManifest(paths, manifest);
+    events?.stageCompleted({
+      stageId: stage.id,
+      stageIndex: index,
+      title: stage.title,
+      kind: 'command',
+      status: entry.status,
+      exitCode: entry.exit_code,
+      summary: entry.summary,
+      logPath: entry.log_path
+    });
 
     return { exitCode: normalizedExitCode, summary };
   } finally {

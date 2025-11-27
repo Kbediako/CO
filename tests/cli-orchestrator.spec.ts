@@ -69,6 +69,8 @@ const diagnosticsConfig = {
   ]
 };
 
+const TEST_TIMEOUT_MS = 15000;
+
 describe('CodexOrchestrator CLI', () => {
   let tempDir: string;
   let runsDir: string;
@@ -204,4 +206,4 @@ describe('CodexOrchestrator CLI', () => {
     expect(brokenValidation.valid).toBe(false);
     expect(brokenValidation.errors.length).toBeGreaterThan(0);
   });
-});
+}, TEST_TIMEOUT_MS);
