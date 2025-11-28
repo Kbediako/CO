@@ -8,20 +8,20 @@ import * as cheerio from "cheerio";
 const WAYBACK_PREFIX = "https://web.archive.org/web";
 const DEFAULT_ASSET_ROOTS = ["/wp-content", "/wp-includes", "/"];
 const DEFAULT_STRIP_PATTERNS = [
-  "gtag",
+  "\\bgtag\\b",
   "googletagmanager",
   "google-analytics",
-  "hotjar",
+  "\\bhotjar\\b",
   "metricool",
   "pagesense",
   "serviceworker",
   "connect\\.facebook\\.net",
   "facebook\\.com/tr",
   "fbevents",
-  "clarity",
+  "\\bclarity\\b",
   "doubleclick",
   "googlesyndication",
-  "tiktok",
+  "\\btiktok\\b",
   "pixel\\.wp\\.com",
   "cdn-cgi/challenge-platform"
 ];
@@ -307,7 +307,8 @@ function normalizeConfig(config, project) {
     blocklistHosts: config.blocklistHosts ?? [],
     allowlistHosts: allowlist,
     shareHostRewrites: { ...DEFAULT_SHARE_HOST_REWRITES, ...(config.shareHostRewrites ?? {}) },
-    enableArchiveFallback: config.enableArchiveFallback ?? true
+    enableArchiveFallback: config.enableArchiveFallback ?? true,
+    additionalAssets: config.additionalAssets ?? []
   };
 }
 
@@ -904,6 +905,23 @@ async function main() {
       });
     }
 
+    if (config.additionalAssets.length) {
+      console.log(`[mirror:fetch] processing ${config.additionalAssets.length} additional assets...`);
+      for (const assetUrl of config.additionalAssets) {
+        const fullUrl = assetUrl.startsWith("http") ? assetUrl : new URL(assetUrl, config.origin).toString();
+        registerAsset(fullUrl, {
+          origin: config.origin,
+          originHost: config.originHost,
+          assetRoots: config.assetRoots,
+          allowlist: config.allowlistHosts,
+          blocklist: config.blocklistHosts,
+          assetMap,
+          warnings,
+          route: "/" // attributed to root
+        });
+      }
+    }
+
     for (const asset of assetMap.values()) {
       const assetUrl = new URL(asset.url);
       const useArchiveFallback = shouldUseArchiveFallback(assetUrl, config.originHost, archiveFallback);
@@ -951,6 +969,16 @@ async function main() {
           });
           text = cssResult.css;
         }
+
+        // Generic rewrite for all known assets (crucial for JS files referencing external assets)
+        // We do this for all text files to catch references in JS, JSON, etc.
+        for (const [knownUrl, knownAsset] of assetMap.entries()) {
+          if (knownUrl === asset.url) continue; // Don't replace self
+          // Replace absolute URL with local path
+          const localRef = `/${toPosixPath(knownAsset.localPath)}`;
+          text = text.replaceAll(knownUrl, localRef);
+        }
+
         text = text.replaceAll(config.origin, "");
         text = applyRewriteRules(text, config.rewriteRules);
         contents = Buffer.from(text);

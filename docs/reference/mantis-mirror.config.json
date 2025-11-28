@@ -1,0 +1,90 @@
+{
+    "origin": "https://mantis.works",
+    "routes": [
+        "/",
+        "/about"
+    ],
+    "assetRoots": [
+        "/_next",
+        "/fonts",
+        "/images",
+        "/favicon",
+        "/",
+        "/_astro"
+    ],
+    "blocklistHosts": [
+        "google-analytics.com",
+        "googletagmanager.com",
+        "facebook.net",
+        "tiktok.com",
+        "hotjar.com",
+        "clarity.ms",
+        "service-worker.js",
+        "sw.js"
+    ],
+    "stripPatterns": [
+        "gtag",
+        "fbq",
+        "ttq",
+        "hj",
+        "clarity",
+        "insights/script.js"
+    ],
+    "rewriteRules": [
+        {
+            "pattern": "https://mantis.works",
+            "replace": ""
+        }
+    ],
+    "allowlistHosts": [
+        "mantis.works",
+        "cdn.prod.website-files.com"
+    ],
+    "additionalAssets": [
+        "_astro/BeforeEnter.BgnMWG31.js",
+        "_astro/all.xlujcirQ.js",
+        "_astro/CSSPlugin.pkypRvgD.js",
+        "_astro/ScrollTrigger.C4gmGO9R.js",
+        "_astro/index.CusZrB94.js",
+        "_astro/SplitText.Cpc1cBKW.js",
+        "_astro/AnimateModel.BzLk166y.js",
+        "_astro/index.g-Vsj8Bl.js",
+        "_astro/index.DQUP026_.js",
+        "_astro/index.xlujcirQ.js",
+        "_astro/Scroll.Bh_nL5Gi.js",
+        "_astro/tempus.B_tY_6We.js",
+        "_astro/GL.D5Drsdv4.js",
+        "_astro/Nav.DNVj5m4C.js",
+        "_astro/LinkAnimation.BShULeRV.js",
+        "_astro/GlobalLoader.BLuCG5w1.js",
+        "_astro/Sizes.BQN_B_u8.js",
+        "_astro/Time.-xfxBo17.js",
+        "_astro/ModuleLoader.D1bqs8bC.js",
+        "_astro/Debug.BIbBlFdo.js",
+        "_astro/Observer.BrF3MP3d.js",
+        "_astro/World.DG90VQLJ.js",
+        "_astro/World.Duvh4A0l.js",
+        "_astro/animationUtils.CgMHCfxP.js",
+        "_astro/AtTop.Bxuj75Jr.js",
+        "_astro/Accordion.CGV3BB-y.js",
+        "_astro/Batch.CBINLfBE.js",
+        "_astro/Button.BB4Cin8c.js",
+        "_astro/Fade.DSmXQ57k.js",
+        "_astro/Footer.CAKOwzGC.js",
+        "_astro/FooterAbout.UcaEGjCs.js",
+        "_astro/Marque.BX8svIbJ.js",
+        "_astro/Numbers.BO1Fyi00.js",
+        "_astro/Real.Bj6xwJ8W.js",
+        "_astro/RealOld.KMChwesq.js",
+        "_astro/SectionHeading.DfcbQDrO.js",
+        "_astro/Services.BbZbQse5.js",
+        "_astro/TextAnimation.CWxKvpuk.js",
+        "_astro/Time.xGh0Sm4t.js",
+        "_astro/Year.dYfOwOZE.js",
+        "_astro/model-1.B_txL4GN.glb",
+        "_astro/model-2.CJyUDGgt.glb",
+        "_astro/model-3.zeNsMlvR.glb",
+        "_astro/model-4.CykbczgT.glb",
+        "https://cdn.prod.website-files.com/6813a51163a17051e3670f66/682dafcdc3f6941210de4ad6_glow.png"
+    ]
+}
