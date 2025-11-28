@@ -336,7 +336,9 @@ function applyRewriteRules(input, rules) {
     }
     const replacement = rule.replace ?? "";
     try {
-      const regex = new RegExp(rule.pattern, "g");
+      const flags = rule.flags || "g";
+      const finalFlags = flags.includes("g") ? flags : `${flags}g`;
+      const regex = new RegExp(rule.pattern, finalFlags);
       return output.replace(regex, replacement);
     } catch {
       return output;

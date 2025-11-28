@@ -36,11 +36,25 @@ Use the mirror tooling to keep hi-fi site clones fully featured while staying of
 - Mirrors should remain fully featured and offline-ready (immutable assets, Range support, no trackers/SW).
 - Before review run: `node scripts/spec-guard.mjs --dry-run`, `npm run lint`, `npm run test`. Attach the latest mirror manifest path when updating task docs.
 
-## Troubleshooting & Common Gotchas
+## Troubleshooting & Best Practices
 - **Ad/tracker blockers:** Localhost mirrors can be broken by ad blockers (common when we strip GA/TikTok). If you see “client-side exception” with no 404s, retry in incognito or disable blockers.
 - **Worker chunks:** Next/React apps often load small worker chunks (e.g., `_next/static/chunks/825...js`). Missing workers cause silent failures. After fetch, `rg "_next/static/chunks"` and confirm every referenced file exists in `public/_next/static/chunks`.
 - **Numbered sequences:** Hero sequences frequently ship as hundreds of padded frames (`00000.avif` etc.). If you see a burst of 404s for `/images/sequence/.../00xxx.avif`, bulk-download the whole range (desktop/tablet/mobile) before serving.
-- **Video codecs:** Headless Chromium may warn `NotSupportedError: The element has no supported sources` even when real browsers play the MP4. Verify in a real browser before treating it as a blocker; mirror:check now surfaces clustered failures (sequence frames) and missing worker chunks to hint at fixes.
+- **Video codecs:** Headless Chromium may warn `NotSupportedError: The element has no supported sources` even when real browsers play the MP4. Verify in a real browser before treating it as a blocker.
 - **Preload hints:** Keep preloaded assets local (OG/Twitter images, hero video, displacement maps, stage images) so `<link rel="preload">` doesn’t point at 404s.
 - **Brittle vendor calls:** Guard optional chains in vendor bundles (e.g., GSAP timelines with `.kill()`) and bypass custom image loaders when they still try to reach the origin.
-- **Style fingerprints:** If the design will be reused, always run `npm run mirror:fingerprint -- --project <name>` and attach the resulting `style-profile.json` / `style.md` in handoffs so agents don’t default to generic boxy layouts.
+- **Style fingerprints:** If the design will be reused, always run `npm run mirror:fingerprint -- --project <name>` and attach the resulting `style-profile.json` / `style.md` in handoffs.
+- **CDN Allowlisting:** Always check the network tab or source code for external asset hosts (e.g., `cdn.prod.website-files.com`, `cloudfront.net`) and add them to `allowlistHosts` in `mirror.config.json`. Strict allowlists cause missing assets.
+- **Tracker Sanitization:**
+  - Use `stripPatterns` for broad blocking.
+  - For stubborn inline scripts, use `rewriteRules` with regex.
+  - You can now use flags in rewrite rules for case-insensitive matching:
+    ```json
+    {
+      "pattern": "gtag",
+      "replace": "void",
+      "flags": "gi"
+    }
+    ```
+  - If automated rewriting fails, use `sed` or `perl` as a final sanitization step: `find packages/<project>/public -name "*.js" -exec perl -pi -e 's/gtag/void/ig' {} +`.
+- **CSS Inlining:** `mirror:fingerprint` can extract inlined CSS from HTML files. Ensure the HTML file exists in `public/` before running the fingerprint command.
