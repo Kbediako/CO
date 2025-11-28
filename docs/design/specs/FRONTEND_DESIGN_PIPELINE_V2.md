@@ -47,6 +47,7 @@ last_review: 2025-11-27
       "similarity_level": "medium"
     }
     ```
+- Additional metadata: `do_not_copy` is always populated (logos/wordmarks/unique shapes) and `similarity_level` (`low|medium|high`) is recorded for telemetry; manifests store a `design_style_profile` entry with approvals and retention (default 30 days, override `style_profile_days` allowed).
 - Invariants: No raw brand assets stored; `do_not_copy` lists anything proprietary. Reference retention inherits Hifi/Design pipeline defaults (30 days) unless shorter window specified.
 - Manifest hooks: Manifest metadata should link the profile path and approvals (same structure used in design pipelines).
 
@@ -67,7 +68,7 @@ last_review: 2025-11-27
     "reference_style_id": "style-profile-<timestamp>"
   }
   ```
-- Invariants: Accessibility + differentiation required; reference_style_id optional (Fresh mode omits it).
+- Invariants: Accessibility + differentiation required; reference_style_id optional (Fresh mode omits it). Include a deterministic `hash` and `id` for cross-run reconciliation.
 - Manifest: Record resolved brief hash and path in manifest `design_plan.brief`.
 
 ### 3.3 Stage: aesthetic_axes_plan
@@ -90,6 +91,7 @@ last_review: 2025-11-27
     "constraints": { "accessibility": "AA", "legal": ["no logos"], "tech": ["tokens source packages/design-system"] }
   }
   ```
+- Snippet source: `snippet_version` references `prompt-snippets/frontend-aesthetics-v1.md` and includes explicit “avoid AI slop” bullets per axis.
 - Invariants: Every axis includes a positive plan + `avoid` list. Fresh vs Clone-Informed differs only by presence of Hifi-derived cues in rationale.
 - Manifest: Persist plan path + snippet version; metrics include `aesthetic_axes_completeness` (percentage of populated axes).
 
@@ -123,11 +125,23 @@ last_review: 2025-11-27
       "motion": { "pass": false, "notes": ["prefers-reduced-motion ignored"] }
     },
     "recommendations": ["swap hover scale for opacity fade"],
+    "style_overlap": {
+      "palette": 0.08,
+      "typography": 0.12,
+      "motion": 0.04,
+      "spacing": 0.06,
+      "overall": 0.12,
+      "threshold": 0.1,
+      "gate": "fail",
+      "comparison_window": ["<history-run-id>"]
+    },
+    "snippet_version": "v1",
     "status": "pass" // or "fail"
   }
   ```
 - Invariants: Must include contrast/accessibility notes; flags over-reliance on generic fonts/colors; pass/fail logged to manifest `design_guardrail`.
 - Config knobs: `guardrail.strictness` (low/medium/high), `slop_threshold` (0–1).
+- Style-overlap gate: compute per-axis similarities plus `style_overlap` (max across axes) and `style_overlap_gate` (`pass|fail`); clone-informed runs fail when `style_overlap > 0.10`, fresh runs log the score without blocking.
 
 ### 3.6 Stage: design_diversity_memory
 - Purpose: Prevent visual convergence across runs for the same task/project.
@@ -143,12 +157,13 @@ last_review: 2025-11-27
     "bounds": { "max_entries": 20 }
   }
   ```
-- Invariants: Bounded length (e.g., 20 entries) with eviction strategy (drop oldest). Guardrail uses this to adjust originality scores.
+- Invariants: Bounded length (e.g., 20 entries) with eviction strategy (drop oldest). Guardrail uses this to adjust originality scores and compute `diversity_penalty`; mirror to `out/**/design/history.json` so the summary survives raw artifact expiry.
 
 ## Assets, Locations, and Versioning
 
 ### 4.1 Frontend Aesthetics Snippet Library
 - Location proposal: `prompt-snippets/frontend-aesthetics-v1.md` (new top-level folder justified to host reusable, versioned prompt snippets distinct from stamped prompt packs). Each snippet includes `snippetVersion`, axes guidance, “avoid AI slop” rules, and accessibility defaults.
+- Content: Explicit do/do-not lists for typography, color/theme, motion, spatial composition, and background details; clone-informed guidance to reuse rhythm/palette without copying logos/wordmarks; defaults to AA contrast and motion-reduction fallbacks.
 - Versioning: Semantic versions (`v1`, `v1.1`, etc.) referenced inside `frontend-aesthetic-plan.json` and `design-review-report.json`.
 - Dependencies: Other skills/pipelines can import by version to maintain consistency.
 
@@ -162,9 +177,11 @@ last_review: 2025-11-27
   - `history/frontend-design-history.json`
 - `out/0412-frontend-design-pipeline-v2/design/runs/<run>.json`: summary writer aggregates stage paths, scores, approvals, and retention notes.
 - Manifest integration:
-  - `design_plan`: { `brief`, `aesthetic_plan`, `snippet_version`, `reference_style_id?` }
-  - `design_guardrail`: { `report_path`, `status`, `scores` }
-  - `design_history`: { `path`, `entries` }
+  - `design_plan`: `{ mode, brief: { path, hash, id }, aesthetic_plan: { path, snippet_version }, implementation: { path }, reference_style_id?, style_profile_id?, generated_at }`
+  - `design_guardrail`: `{ report_path, status, scores, style_overlap { palette, typography, motion, spacing, overall, threshold, gate, comparison_window }, snippet_version, strictness, slop_threshold }`
+  - `design_history`: `{ path, mirror_path, entries, max_entries, updated_at }`
+  - `design_style_profile`: `{ id, relative_path, similarity_level, source_url?, ingestion_run?, do_not_copy, retention_days, expiry, approvals }`
+  - `design_metrics`: telemetry mirror of guardrail + history (`aesthetic_axes_completeness`, `originality_score`, `accessibility_score`, `brief_alignment_score`, `slop_risk`, `diversity_penalty`, `similarity_to_reference`, `style_overlap`, `style_overlap_gate`, `snippet_version`)
   - `approvals`: include Hifi ingestion + any mock capture approvals.
 
 ### 4.3 Retention, Privacy, Legal
@@ -185,6 +202,7 @@ last_review: 2025-11-27
     - spacing scale cosine similarity (top 6 normalized values).
   - `style_overlap_gate`: `"pass"` | `"fail"`; clone-informed runs fail the guardrail when `style_overlap > 0.10`. Fresh runs record the score but do not gate.
   - `snippet_version`
+- Per-axis overlap values (palette/typography/motion/spacing) are mirrored inside `design-review-report.json` and manifest `design_guardrail` to validate guardrail efficacy and diversity penalties.
 - Manifest should include timestamps for each stage start/end and any approvals used.
 
 ## Configuration Knobs

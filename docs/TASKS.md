@@ -68,6 +68,7 @@ Mirror status with `tasks/hi-fi-design-toolkit.md` and `.agent/task/hi-fi-design
 # Task List Snapshot — Frontend Design Pipeline v2 (0412-frontend-design-pipeline-v2)
 
 - **Update — Planning:** Fresh + clone-informed pipeline PRD/spec drafted; awaiting diagnostics run to seed `.runs/0412-frontend-design-pipeline-v2/cli/<run-id>/manifest.json`.
+- **Update — Schema & snippet:** Manifest support for design plan/guardrail/history/style profiles plus `prompt-snippets/frontend-aesthetics-v1.md` landed; guardrail metrics/style-overlap gate documented for parity tests.
 - **Notes:** Modes differ only in aesthetic plan derivation (brief vs brief+Hifi style profile); artifacts will mirror design pipeline layouts with added guardrail/history outputs.
 
 ## Checklist Mirror

@@ -9,8 +9,14 @@ import type {
   DesignArtifactApprovalRecord,
   DesignArtifactRecord,
   DesignArtifactsSummary,
+  DesignGuardrailRecord,
+  DesignHistoryRecord,
+  DesignMetricRecord,
+  DesignPlanRecord,
+  DesignStyleProfileMetadata,
   DesignToolkitArtifactRecord,
-  DesignToolkitSummary
+  DesignToolkitSummary,
+  ToolRunManifest
 } from '../manifest/types.js';
 
 export interface DesignWriterContext {
@@ -59,6 +65,11 @@ export interface DesignArtifactWriterOptions {
   retention: DesignRetentionMetadata;
   privacy: DesignPrivacyMetadata;
   approvals?: DesignArtifactApprovalRecord[];
+  designPlan?: DesignPlanRecord | null;
+  designGuardrail?: DesignGuardrailRecord | null;
+  designHistory?: DesignHistoryRecord | null;
+  designStyleProfile?: DesignStyleProfileMetadata | null;
+  designMetrics?: DesignMetricRecord | null;
   metrics?: Record<string, unknown>;
   manifestOptions?: Partial<PersistDesignManifestOptions>;
   outDir?: string;
@@ -85,7 +96,12 @@ export async function writeDesignSummary(options: DesignArtifactWriterOptions): 
     summary,
     configSnapshot: options.configSnapshot ?? null,
     ...(toolkitArtifacts.length > 0 ? { toolkitArtifacts } : {}),
-    ...(toolkitSummary ? { toolkitSummary } : {})
+    ...(toolkitSummary ? { toolkitSummary } : {}),
+    ...(options.designPlan !== undefined ? { designPlan: options.designPlan } : {}),
+    ...(options.designGuardrail !== undefined ? { designGuardrail: options.designGuardrail } : {}),
+    ...(options.designHistory !== undefined ? { designHistory: options.designHistory } : {}),
+    ...(options.designStyleProfile !== undefined ? { designStyleProfile: options.designStyleProfile } : {}),
+    ...(options.designMetrics !== undefined ? { designMetrics: options.designMetrics } : {})
   };
 
   const manifestOptions: PersistDesignManifestOptions = {
@@ -95,9 +111,9 @@ export async function writeDesignSummary(options: DesignArtifactWriterOptions): 
     ...options.manifestOptions
   };
 
-  await persistDesignManifest(context.manifestPath, manifestUpdate, manifestOptions);
+  const manifest = await persistDesignManifest(context.manifestPath, manifestUpdate, manifestOptions);
 
-  const payload = buildSummaryPayload(options, summary, toolkitSummary, now);
+  const payload = buildSummaryPayload(options, summary, toolkitSummary, manifest, now);
   const summaryPath = await writeSummaryFile(options, payload);
 
   return {
@@ -111,6 +127,7 @@ function buildSummaryPayload(
   options: DesignArtifactWriterOptions,
   summary: DesignArtifactsSummary,
   toolkitSummary: DesignToolkitSummary | undefined,
+  manifest: ToolRunManifest,
   now: Date
 ): Record<string, unknown> {
   const context = options.context;
@@ -162,6 +179,12 @@ function buildSummaryPayload(
     retention: artifact.retention ?? null
   }));
 
+  const designMetrics = (manifest.design_metrics as DesignMetricRecord | null) ?? options.designMetrics ?? null;
+  const combinedMetrics = {
+    ...(options.metrics ?? {}),
+    ...(designMetrics ?? {})
+  };
+
   return {
     task_id: context.taskId,
     run_id: context.runId,
@@ -184,7 +207,14 @@ function buildSummaryPayload(
     summary,
     design_toolkit_artifacts: toolkitArtifacts,
     design_toolkit_summary: toolkitSummary ?? null,
-    metrics: options.metrics ?? {},
+    design_plan: (manifest.design_plan as DesignPlanRecord | null) ?? options.designPlan ?? null,
+    design_guardrail:
+      (manifest.design_guardrail as DesignGuardrailRecord | null) ?? options.designGuardrail ?? null,
+    design_history: (manifest.design_history as DesignHistoryRecord | null) ?? options.designHistory ?? null,
+    design_style_profile:
+      (manifest.design_style_profile as DesignStyleProfileMetadata | null) ?? options.designStyleProfile ?? null,
+    design_metrics: designMetrics,
+    metrics: combinedMetrics,
     config_snapshot: options.configSnapshot ?? null
   };
 }

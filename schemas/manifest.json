@@ -368,6 +368,428 @@
           }
         }
       }
+    },
+    "toolRuns": {
+      "type": ["array", "null"],
+      "items": { "$ref": "#/definitions/toolRun" }
+    },
+    "design_artifacts": {
+      "type": ["array", "null"],
+      "items": { "$ref": "#/definitions/designArtifact" }
+    },
+    "design_artifacts_summary": {
+      "anyOf": [
+        { "type": "null" },
+        { "$ref": "#/definitions/designArtifactsSummary" }
+      ]
+    },
+    "design_config_snapshot": { "type": ["object", "null"] },
+    "design_toolkit_artifacts": {
+      "type": ["array", "null"],
+      "items": { "$ref": "#/definitions/designToolkitArtifact" }
+    },
+    "design_toolkit_summary": {
+      "anyOf": [
+        { "type": "null" },
+        { "$ref": "#/definitions/designToolkitSummary" }
+      ]
+    },
+    "design_plan": {
+      "anyOf": [
+        { "type": "null" },
+        { "$ref": "#/definitions/designPlan" }
+      ]
+    },
+    "design_guardrail": {
+      "anyOf": [
+        { "type": "null" },
+        { "$ref": "#/definitions/designGuardrail" }
+      ]
+    },
+    "design_history": {
+      "anyOf": [
+        { "type": "null" },
+        { "$ref": "#/definitions/designHistory" }
+      ]
+    },
+    "design_style_profile": {
+      "anyOf": [
+        { "type": "null" },
+        { "$ref": "#/definitions/designStyleProfile" }
+      ]
+    },
+    "design_metrics": {
+      "anyOf": [
+        { "type": "null" },
+        { "$ref": "#/definitions/designMetrics" }
+      ]
+    }
+  },
+  "definitions": {
+    "toolRun": {
+      "type": "object",
+      "required": [
+        "id",
+        "tool",
+        "approvalSource",
+        "retryCount",
+        "sandboxState",
+        "status",
+        "startedAt",
+        "completedAt",
+        "attemptCount"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "tool": { "type": "string", "minLength": 1 },
+        "approvalSource": { "type": "string", "enum": ["not-required", "cache", "prompt"] },
+        "retryCount": { "type": "integer", "minimum": 0 },
+        "sandboxState": { "type": "string", "enum": ["sandboxed", "escalated", "failed"] },
+        "status": { "type": "string", "enum": ["succeeded", "failed"] },
+        "startedAt": { "type": "string", "minLength": 1 },
+        "completedAt": { "type": "string", "minLength": 1 },
+        "attemptCount": { "type": "integer", "minimum": 1 },
+        "metadata": { "type": ["object", "null"] },
+        "events": {
+          "type": ["array", "null"],
+          "items": { "$ref": "#/definitions/toolRunEvent" }
+        }
+      }
+    },
+    "toolRunEvent": {
+      "type": "object",
+      "required": ["type", "correlationId", "timestamp", "attempt"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["exec:begin", "exec:chunk", "exec:end", "exec:retry"]
+        },
+        "correlationId": { "type": "string", "minLength": 1 },
+        "timestamp": { "type": "string", "minLength": 1 },
+        "attempt": { "type": "integer", "minimum": 1 },
+        "command": { "type": ["string", "null"] },
+        "args": { "type": ["array", "null"], "items": { "type": "string" } },
+        "cwd": { "type": ["string", "null"] },
+        "sessionId": { "type": ["string", "null"] },
+        "sandboxState": { "type": ["string", "null"] },
+        "stream": { "type": ["string", "null"] },
+        "sequence": { "type": ["integer", "null"] },
+        "bytes": { "type": ["integer", "null"] },
+        "data": { "type": ["string", "null"] },
+        "exitCode": { "type": ["integer", "null"] },
+        "signal": { "type": ["string", "null"] },
+        "durationMs": { "type": ["integer", "null"] },
+        "stdout": { "type": ["string", "null"] },
+        "stderr": { "type": ["string", "null"] },
+        "delayMs": { "type": ["integer", "null"] },
+        "errorMessage": { "type": ["string", "null"] }
+      },
+      "additionalProperties": true
+    },
+    "designArtifact": {
+      "type": "object",
+      "required": ["stage", "status", "relative_path"],
+      "additionalProperties": false,
+      "properties": {
+        "stage": {
+          "type": "string",
+          "enum": [
+            "extract",
+            "reference",
+            "components",
+            "motion",
+            "video",
+            "visual-regression",
+            "style-ingestion",
+            "design-brief",
+            "aesthetic-plan",
+            "implementation",
+            "guardrail",
+            "design-history"
+          ]
+        },
+        "status": { "type": "string", "enum": ["succeeded", "skipped", "failed"] },
+        "relative_path": { "type": "string", "minLength": 1 },
+        "type": { "type": ["string", "null"] },
+        "description": { "type": ["string", "null"] },
+        "approvals": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/designArtifactApproval" }
+        },
+        "quota": { "$ref": "#/definitions/designArtifactQuota" },
+        "expiry": { "$ref": "#/definitions/designArtifactExpiry" },
+        "privacy_notes": { "type": "array", "items": { "type": "string" } },
+        "config_hash": { "type": ["string", "null"] },
+        "metadata": { "type": ["object", "null"] }
+      }
+    },
+    "designArtifactApproval": {
+      "type": "object",
+      "required": ["id", "actor", "timestamp"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "actor": { "type": "string", "minLength": 1 },
+        "reason": { "type": ["string", "null"] },
+        "timestamp": { "type": "string", "minLength": 1 }
+      }
+    },
+    "designArtifactQuota": {
+      "type": "object",
+      "required": ["type", "limit", "unit"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "type": "string", "enum": ["storage", "runtime"] },
+        "limit": { "type": "number", "minimum": 0 },
+        "unit": { "type": "string", "enum": ["MB", "seconds"] },
+        "consumed": { "type": ["number", "null"], "minimum": 0 }
+      }
+    },
+    "designArtifactExpiry": {
+      "type": "object",
+      "required": ["date", "policy"],
+      "additionalProperties": false,
+      "properties": {
+        "date": { "type": "string", "minLength": 1 },
+        "policy": { "type": "string", "minLength": 1 }
+      }
+    },
+    "designArtifactsSummary": {
+      "type": "object",
+      "required": ["total_artifacts", "generated_at", "stages"],
+      "additionalProperties": false,
+      "properties": {
+        "total_artifacts": { "type": "integer", "minimum": 0 },
+        "generated_at": { "type": "string", "minLength": 1 },
+        "storage_bytes": { "type": ["integer", "null"], "minimum": 0 },
+        "stages": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/designArtifactsSummaryStage" }
+        },
+        "errors": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "designArtifactsSummaryStage": {
+      "type": "object",
+      "required": ["stage", "succeeded", "failed", "skipped"],
+      "additionalProperties": false,
+      "properties": {
+        "stage": {
+          "type": "string",
+          "enum": [
+            "extract",
+            "reference",
+            "components",
+            "motion",
+            "video",
+            "visual-regression",
+            "style-ingestion",
+            "design-brief",
+            "aesthetic-plan",
+            "implementation",
+            "guardrail",
+            "design-history"
+          ]
+        },
+        "succeeded": { "type": "integer", "minimum": 0 },
+        "failed": { "type": "integer", "minimum": 0 },
+        "skipped": { "type": "integer", "minimum": 0 },
+        "artifacts": { "type": ["integer", "null"], "minimum": 0 },
+        "notes": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "designToolkitArtifact": {
+      "type": "object",
+      "required": ["id", "stage", "status", "relative_path"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "stage": {
+          "type": "string",
+          "enum": ["extract", "tokens", "styleguide", "reference", "self-correct", "publish"]
+        },
+        "status": { "type": "string", "enum": ["succeeded", "skipped", "failed"] },
+        "relative_path": { "type": "string", "minLength": 1 },
+        "description": { "type": ["string", "null"] },
+        "approvals": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/designArtifactApproval" }
+        },
+        "retention": {
+          "type": "object",
+          "required": ["days", "autoPurge", "expiry"],
+          "additionalProperties": false,
+          "properties": {
+            "days": { "type": "integer", "minimum": 1 },
+            "autoPurge": { "type": "boolean" },
+            "auto_purge": { "type": "boolean" },
+            "expiry": { "type": "string", "minLength": 1 },
+            "policy": { "type": ["string", "null"] }
+          }
+        },
+        "metrics": { "type": ["object", "null"] },
+        "privacy_notes": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "designToolkitSummary": {
+      "type": "object",
+      "required": ["generated_at", "stages"],
+      "additionalProperties": false,
+      "properties": {
+        "generated_at": { "type": "string", "minLength": 1 },
+        "stages": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["stage", "artifacts"],
+            "additionalProperties": false,
+            "properties": {
+              "stage": {
+                "type": "string",
+                "enum": ["extract", "tokens", "styleguide", "reference", "self-correct", "publish"]
+              },
+              "artifacts": { "type": "integer", "minimum": 0 },
+              "metrics": { "type": ["object", "null"] },
+              "notes": { "type": "array", "items": { "type": "string" } }
+            }
+          }
+        },
+        "totals": { "type": ["object", "null"] },
+        "approvals": { "type": ["array", "null"], "items": { "type": "string" } }
+      }
+    },
+    "designPlan": {
+      "type": "object",
+      "required": ["mode", "brief"],
+      "additionalProperties": false,
+      "properties": {
+        "mode": { "type": "string", "enum": ["fresh", "clone-informed"] },
+        "brief": {
+          "type": "object",
+          "required": ["path"],
+          "additionalProperties": false,
+          "properties": {
+            "path": { "type": "string", "minLength": 1 },
+            "hash": { "type": ["string", "null"] },
+            "id": { "type": ["string", "null"] }
+          }
+        },
+        "aesthetic_plan": {
+          "type": "object",
+          "required": ["path"],
+          "additionalProperties": false,
+          "properties": {
+            "path": { "type": "string", "minLength": 1 },
+            "snippet_version": { "type": ["string", "null"] },
+            "id": { "type": ["string", "null"] }
+          }
+        },
+        "implementation": {
+          "type": "object",
+          "required": ["path"],
+          "additionalProperties": false,
+          "properties": {
+            "path": { "type": "string", "minLength": 1 },
+            "complexity": { "type": ["string", "null"] }
+          }
+        },
+        "reference_style_id": { "type": ["string", "null"] },
+        "style_profile_id": { "type": ["string", "null"] },
+        "generated_at": { "type": ["string", "null"] }
+      }
+    },
+    "designStyleOverlap": {
+      "type": "object",
+      "required": ["overall"],
+      "additionalProperties": false,
+      "properties": {
+        "palette": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
+        "typography": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
+        "motion": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
+        "spacing": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
+        "overall": { "type": "number", "minimum": 0, "maximum": 1 },
+        "gate": { "type": ["string", "null"], "enum": ["pass", "fail", null] },
+        "threshold": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
+        "comparison_window": { "type": ["array", "null"], "items": { "type": "string" } },
+        "reference_style_id": { "type": ["string", "null"] }
+      }
+    },
+    "designGuardrail": {
+      "type": "object",
+      "required": ["report_path", "status"],
+      "additionalProperties": false,
+      "properties": {
+        "report_path": { "type": "string", "minLength": 1 },
+        "status": { "type": "string", "enum": ["pass", "fail"] },
+        "snippet_version": { "type": ["string", "null"] },
+        "strictness": { "type": ["string", "null"], "enum": ["low", "medium", "high", null] },
+        "slop_threshold": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
+        "mode": { "type": ["string", "null"], "enum": ["fresh", "clone-informed", null] },
+        "scores": { "type": ["object", "null"], "additionalProperties": { "type": "number" } },
+        "recommendations": { "type": "array", "items": { "type": "string" } },
+        "notes": { "type": "array", "items": { "type": "string" } },
+        "style_overlap": { "anyOf": [{ "type": "null" }, { "$ref": "#/definitions/designStyleOverlap" }] }
+      }
+    },
+    "designHistory": {
+      "type": "object",
+      "required": ["path"],
+      "additionalProperties": false,
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "mirror_path": { "type": ["string", "null"] },
+        "entries": { "type": ["integer", "null"], "minimum": 0 },
+        "max_entries": { "type": ["integer", "null"], "minimum": 1 },
+        "updated_at": { "type": ["string", "null"] },
+        "mode": { "type": ["string", "null"], "enum": ["fresh", "clone-informed", null] }
+      }
+    },
+    "designStyleProfile": {
+      "type": "object",
+      "required": ["id", "relative_path"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "relative_path": { "type": "string", "minLength": 1 },
+        "source_url": { "type": ["string", "null"] },
+        "ingestion_run": { "type": ["string", "null"] },
+        "similarity_level": { "type": ["string", "null"], "enum": ["low", "medium", "high", null] },
+        "do_not_copy": {
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "properties": {
+            "logos": { "type": "array", "items": { "type": "string" } },
+            "wordmarks": { "type": "array", "items": { "type": "string" } },
+            "unique_shapes": { "type": "array", "items": { "type": "string" } },
+            "unique_illustrations": { "type": "array", "items": { "type": "string" } },
+            "other": { "type": "array", "items": { "type": "string" } }
+          }
+        },
+        "retention_days": { "type": ["integer", "null"], "minimum": 0 },
+        "expiry": { "anyOf": [{ "type": "null" }, { "$ref": "#/definitions/designArtifactExpiry" }] },
+        "approvals": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/designArtifactApproval" }
+        },
+        "notes": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "designMetrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "aesthetic_axes_completeness": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
+        "originality_score": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
+        "accessibility_score": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
+        "brief_alignment_score": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
+        "slop_risk": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
+        "diversity_penalty": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
+        "similarity_to_reference": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
+        "style_overlap": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
+        "style_overlap_gate": { "type": ["string", "null"], "enum": ["pass", "fail", null] },
+        "snippet_version": { "type": ["string", "null"] }
+      }
     }
   }
 }

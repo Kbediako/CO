@@ -2,6 +2,11 @@ import { readFile, writeFile } from 'node:fs/promises';
 import type {
   DesignArtifactApprovalRecord,
   DesignArtifactRecord,
+  DesignGuardrailRecord,
+  DesignHistoryRecord,
+  DesignMetricRecord,
+  DesignPlanRecord,
+  DesignStyleProfileMetadata,
   DesignToolkitArtifactRecord
 } from '../../../packages/shared/manifest/types.js';
 
@@ -40,6 +45,11 @@ export interface DesignRunState {
   toolkit?: ToolkitState;
   stages: StageState[];
   metrics: Record<string, unknown>;
+  designPlan?: DesignPlanRecord | null;
+  designGuardrail?: DesignGuardrailRecord | null;
+  designHistory?: DesignHistoryRecord | null;
+  designStyleProfile?: DesignStyleProfileMetadata | null;
+  designMetrics?: DesignMetricRecord | null;
 }
 
 export interface ToolkitContextState {
@@ -201,7 +211,12 @@ function sanitizeState(state: DesignRunState | null | undefined): DesignRunState
     artifacts: Array.isArray(state.artifacts) ? [...state.artifacts] : [],
     toolkit: sanitizeToolkitState(state.toolkit),
     stages: Array.isArray(state.stages) ? state.stages.map(sanitizeStage) : [],
-    metrics: state.metrics && typeof state.metrics === 'object' ? { ...state.metrics } : {}
+    metrics: state.metrics && typeof state.metrics === 'object' ? { ...state.metrics } : {},
+    designPlan: cloneDesignValue(state.designPlan),
+    designGuardrail: cloneDesignValue(state.designGuardrail),
+    designHistory: cloneDesignValue(state.designHistory),
+    designStyleProfile: cloneDesignValue(state.designStyleProfile),
+    designMetrics: cloneDesignValue(state.designMetrics)
   };
 }
 
@@ -214,7 +229,12 @@ function createEmptyState(): DesignRunState {
       artifacts: []
     },
     stages: [],
-    metrics: {}
+    metrics: {},
+    designPlan: null,
+    designGuardrail: null,
+    designHistory: null,
+    designStyleProfile: null,
+    designMetrics: null
   };
 }
 
@@ -254,6 +274,16 @@ function mergeStageArtifacts(
     }
   }
   return records;
+}
+
+function cloneDesignValue<T>(value: T | null | undefined): T | null | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (value === null) {
+    return null;
+  }
+  return JSON.parse(JSON.stringify(value)) as T;
 }
 
 function sanitizeToolkitState(toolkit: ToolkitState | undefined): ToolkitState {

@@ -321,4 +321,109 @@ describe('manifest writer', () => {
     expect(manifest.design_toolkit_artifacts).toHaveLength(1);
     expect(manifest.design_toolkit_summary.stages[0].artifacts).toBe(1);
   });
+
+  it('persists design v2 metadata', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'design-v2-'));
+    const manifestPath = join(root, 'manifest.json');
+    const designPlan = {
+      mode: 'clone-informed' as const,
+      brief: {
+        path: 'design/brief/frontend-design-brief.json',
+        hash: 'abc123'
+      },
+      aesthetic_plan: {
+        path: 'design/aesthetic-plan/frontend-aesthetic-plan.json',
+        snippet_version: 'v1'
+      },
+      implementation: {
+        path: 'design/implementation/implementation-metadata.json',
+        complexity: 'medium'
+      },
+      reference_style_id: 'style-profile-1',
+      style_profile_id: 'style-profile-1',
+      generated_at: '2025-01-01T00:00:00.000Z'
+    };
+    const designGuardrail = {
+      report_path: 'design/guardrail/design-review-report.json',
+      status: 'fail' as const,
+      snippet_version: 'v1',
+      strictness: 'high' as const,
+      slop_threshold: 1.2,
+      scores: {
+        originality: 0.82,
+        slop_risk: 0.18
+      },
+      style_overlap: {
+        palette: 0.08,
+        typography: 0.14,
+        spacing: 0.02,
+        motion: 0.05,
+        overall: 0.2,
+        gate: 'fail' as const,
+        threshold: 0.1,
+        comparison_window: ['run-a', 'run-b'],
+        reference_style_id: 'style-profile-1'
+      },
+      recommendations: ['avoid gradients'],
+      notes: ['clone informed']
+    };
+    const designHistory = {
+      path: 'design/history/frontend-design-history.json',
+      mirror_path: 'out/0412-frontend-design-pipeline-v2/design/history.json',
+      entries: 3,
+      max_entries: 20,
+      updated_at: '2025-01-01T00:00:00.000Z'
+    };
+    const designStyleProfile = {
+      id: 'style-profile-1',
+      relative_path: 'design/style-ingestion/hifi_style_profile.json',
+      source_url: 'https://example.com',
+      similarity_level: 'medium' as const,
+      do_not_copy: {
+        logos: ['example logo']
+      },
+      approvals: [
+        {
+          id: 'approval-style',
+          actor: 'design@example.com',
+          reason: 'Style ingestion approved',
+          timestamp: '2025-01-01T00:00:00.000Z'
+        }
+      ]
+    };
+    const designMetrics = {
+      aesthetic_axes_completeness: 0.92,
+      originality_score: 0.8,
+      style_overlap: 0.2,
+      style_overlap_gate: 'fail' as const,
+      snippet_version: 'v1'
+    };
+
+    await persistDesignManifest(
+      manifestPath,
+      {
+        designPlan,
+        designGuardrail,
+        designHistory,
+        designStyleProfile,
+        designMetrics
+      },
+      {
+        retentionDays: 30,
+        now: new Date('2025-01-01T00:00:00.000Z')
+      }
+    );
+
+    const raw = await readFile(manifestPath, 'utf8');
+    const manifest = JSON.parse(raw) as Record<string, unknown>;
+    expect((manifest.design_plan as Record<string, unknown>).mode).toBe('clone-informed');
+    expect((manifest.design_plan as Record<string, unknown>).reference_style_id).toBe('style-profile-1');
+    expect((manifest.design_guardrail as Record<string, unknown>).status).toBe('fail');
+    expect(
+      ((manifest.design_guardrail as { style_overlap: { overall: number } }).style_overlap.overall)
+    ).toBeCloseTo(0.2);
+    expect((manifest.design_history as Record<string, unknown>).mirror_path).toContain('out/0412');
+    expect((manifest.design_style_profile as Record<string, unknown>).retention_days).toBe(30);
+    expect((manifest.design_metrics as Record<string, unknown>).style_overlap_gate).toBe('fail');
+  });
 });

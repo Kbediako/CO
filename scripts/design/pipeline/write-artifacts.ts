@@ -39,8 +39,13 @@ async function main(): Promise<void> {
     privacy,
     approvals: state.approvals,
     metrics: state.metrics,
-     toolkitArtifacts: toolkitState.artifacts,
-     toolkitSummary: (toolkitState.summary as never) ?? undefined,
+    designPlan: state.designPlan ?? undefined,
+    designGuardrail: state.designGuardrail ?? undefined,
+    designHistory: state.designHistory ?? undefined,
+    designStyleProfile: state.designStyleProfile ?? undefined,
+    designMetrics: state.designMetrics ?? undefined,
+    toolkitArtifacts: toolkitState.artifacts,
+    toolkitSummary: (toolkitState.summary as never) ?? undefined,
     outDir: context.outRoot,
     now: new Date()
   });

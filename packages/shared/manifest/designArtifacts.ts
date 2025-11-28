@@ -3,6 +3,12 @@ import type {
   DesignArtifactRecord,
   DesignArtifactsSummary,
   DesignArtifactsSummaryStageEntry,
+  DesignGuardrailRecord,
+  DesignHistoryRecord,
+  DesignMetricRecord,
+  DesignPlanRecord,
+  DesignStyleOverlapBreakdown,
+  DesignStyleProfileMetadata,
   DesignToolkitArtifactRecord,
   DesignToolkitSummary,
   ToolRunManifest
@@ -19,7 +25,13 @@ const DESIGN_STAGE_SET = new Set<DesignArtifactRecord['stage']>([
   'components',
   'motion',
   'video',
-  'visual-regression'
+  'visual-regression',
+  'style-ingestion',
+  'design-brief',
+  'aesthetic-plan',
+  'implementation',
+  'guardrail',
+  'design-history'
 ]);
 
 interface DesignArtifactSanitizeOptions {
@@ -34,6 +46,11 @@ export interface DesignManifestUpdate {
   configSnapshot?: Record<string, unknown> | null;
   toolkitArtifacts?: DesignToolkitArtifactRecord[];
   toolkitSummary?: DesignToolkitSummary | null;
+  designPlan?: DesignPlanRecord | null;
+  designGuardrail?: DesignGuardrailRecord | null;
+  designHistory?: DesignHistoryRecord | null;
+  designStyleProfile?: DesignStyleProfileMetadata | null;
+  designMetrics?: DesignMetricRecord | null;
 }
 
 export interface PersistDesignManifestOptions extends PersistIOOptions, DesignArtifactSanitizeOptions {}
@@ -99,6 +116,43 @@ function mergeDesignManifest(
       ...merged,
       design_toolkit_summary:
         update.toolkitSummary === null ? undefined : sanitizeToolkitSummary(update.toolkitSummary)
+    };
+  }
+
+  if (update.designPlan !== undefined) {
+    merged = {
+      ...merged,
+      design_plan: update.designPlan === null ? undefined : sanitizeDesignPlan(update.designPlan)
+    };
+  }
+
+  if (update.designGuardrail !== undefined) {
+    merged = {
+      ...merged,
+      design_guardrail:
+        update.designGuardrail === null ? undefined : sanitizeDesignGuardrail(update.designGuardrail)
+    };
+  }
+
+  if (update.designHistory !== undefined) {
+    merged = {
+      ...merged,
+      design_history: update.designHistory === null ? undefined : sanitizeDesignHistory(update.designHistory)
+    };
+  }
+
+  if (update.designStyleProfile !== undefined) {
+    merged = {
+      ...merged,
+      design_style_profile:
+        update.designStyleProfile === null ? undefined : sanitizeDesignStyleProfile(update.designStyleProfile, options)
+    };
+  }
+
+  if (update.designMetrics !== undefined) {
+    merged = {
+      ...merged,
+      design_metrics: update.designMetrics === null ? undefined : sanitizeDesignMetrics(update.designMetrics)
     };
   }
 
@@ -374,4 +428,390 @@ function sanitizeConfigSnapshot(snapshot: Record<string, unknown> | null): Recor
     throw new Error('design config snapshot must be an object or null');
   }
   return JSON.parse(JSON.stringify(snapshot));
+}
+
+function sanitizeDesignPlan(plan: unknown): DesignPlanRecord {
+  if (!plan || typeof plan !== 'object') {
+    throw new Error('design plan must be an object');
+  }
+  const record = plan as Record<string, unknown>;
+  const mode = record.mode;
+  if (mode !== 'fresh' && mode !== 'clone-informed') {
+    throw new Error(`design plan mode must be 'fresh' or 'clone-informed' (received '${String(mode)}')`);
+  }
+
+  const brief = record.brief;
+  if (!brief || typeof brief !== 'object') {
+    throw new Error('design plan requires a brief descriptor');
+  }
+  const briefRecord = brief as Record<string, unknown>;
+  const briefPath = sanitizeRelativeArtifactPath(String(briefRecord.path ?? ''));
+  const aestheticPlanRaw = record.aesthetic_plan;
+  const implementationRaw = record.implementation;
+
+  const sanitized: DesignPlanRecord = {
+    mode,
+    brief: {
+      path: briefPath
+    }
+  };
+
+  if (typeof briefRecord.hash === 'string' && briefRecord.hash.trim().length > 0) {
+    sanitized.brief.hash = briefRecord.hash.trim();
+  }
+  if (typeof briefRecord.id === 'string' && briefRecord.id.trim().length > 0) {
+    sanitized.brief.id = briefRecord.id.trim();
+  }
+
+  if (aestheticPlanRaw && typeof aestheticPlanRaw === 'object') {
+    const aestheticPlan = aestheticPlanRaw as Record<string, unknown>;
+    sanitized.aesthetic_plan = {
+      path: sanitizeRelativeArtifactPath(String(aestheticPlan.path ?? ''))
+    };
+    if (typeof aestheticPlan.snippet_version === 'string' && aestheticPlan.snippet_version.trim().length > 0) {
+      sanitized.aesthetic_plan.snippet_version = aestheticPlan.snippet_version.trim();
+    }
+    if (typeof aestheticPlan.id === 'string' && aestheticPlan.id.trim().length > 0) {
+      sanitized.aesthetic_plan.id = aestheticPlan.id.trim();
+    }
+  }
+
+  if (implementationRaw && typeof implementationRaw === 'object') {
+    const implementation = implementationRaw as Record<string, unknown>;
+    sanitized.implementation = {
+      path: sanitizeRelativeArtifactPath(String(implementation.path ?? ''))
+    };
+    if (typeof implementation.complexity === 'string' && implementation.complexity.trim().length > 0) {
+      sanitized.implementation.complexity = implementation.complexity.trim();
+    }
+  }
+
+  if (record.reference_style_id !== undefined && record.reference_style_id !== null) {
+    const value = typeof record.reference_style_id === 'string' ? record.reference_style_id.trim() : '';
+    if (value.length > 0) {
+      sanitized.reference_style_id = value;
+    } else {
+      sanitized.reference_style_id = null;
+    }
+  }
+
+  if (record.style_profile_id !== undefined && record.style_profile_id !== null) {
+    const value = typeof record.style_profile_id === 'string' ? record.style_profile_id.trim() : '';
+    if (value.length > 0) {
+      sanitized.style_profile_id = value;
+    } else {
+      sanitized.style_profile_id = null;
+    }
+  }
+
+  if (typeof record.generated_at === 'string' && isIsoDate(record.generated_at)) {
+    sanitized.generated_at = record.generated_at;
+  }
+
+  return sanitized;
+}
+
+function sanitizeDesignGuardrail(guardrail: unknown): DesignGuardrailRecord {
+  if (!guardrail || typeof guardrail !== 'object') {
+    throw new Error('design guardrail must be an object');
+  }
+  const record = guardrail as Record<string, unknown>;
+  const status = record.status;
+  if (status !== 'pass' && status !== 'fail') {
+    throw new Error(`design guardrail status must be 'pass' or 'fail' (received '${String(status)}')`);
+  }
+  const reportPath = sanitizeRelativeArtifactPath(String(record.report_path ?? ''));
+
+  const sanitized: DesignGuardrailRecord = {
+    report_path: reportPath,
+    status
+  };
+
+  if (typeof record.snippet_version === 'string' && record.snippet_version.trim().length > 0) {
+    sanitized.snippet_version = record.snippet_version.trim();
+  }
+  if (typeof record.strictness === 'string' && ['low', 'medium', 'high'].includes(record.strictness.trim())) {
+    sanitized.strictness = record.strictness.trim() as DesignGuardrailRecord['strictness'];
+  }
+  if (record.slop_threshold !== undefined) {
+    const threshold = clampScore(record.slop_threshold, false);
+    if (threshold !== null) {
+      sanitized.slop_threshold = threshold;
+    }
+  }
+  if (record.mode === 'fresh' || record.mode === 'clone-informed') {
+    sanitized.mode = record.mode;
+  }
+
+  if (record.scores && typeof record.scores === 'object') {
+    sanitized.scores = sanitizeScoreMap(record.scores as Record<string, unknown>);
+  }
+
+  if (Array.isArray(record.recommendations)) {
+    const recommendations = record.recommendations
+      .map((entry) => (typeof entry === 'string' ? entry.trim() : ''))
+      .filter((entry) => entry.length > 0);
+    if (recommendations.length > 0) {
+      sanitized.recommendations = recommendations.slice(0, 20);
+    }
+  }
+
+  if (Array.isArray(record.notes)) {
+    const notes = record.notes
+      .map((entry) => (typeof entry === 'string' ? entry.trim() : ''))
+      .filter((entry) => entry.length > 0);
+    if (notes.length > 0) {
+      sanitized.notes = notes.slice(0, 20);
+    }
+  }
+
+  if (record.style_overlap && typeof record.style_overlap === 'object') {
+    sanitized.style_overlap = sanitizeStyleOverlap(record.style_overlap as Record<string, unknown>);
+  }
+
+  return sanitized;
+}
+
+function sanitizeDesignHistory(history: unknown): DesignHistoryRecord {
+  if (!history || typeof history !== 'object') {
+    throw new Error('design history must be an object');
+  }
+  const record = history as Record<string, unknown>;
+  const path = sanitizeRelativeArtifactPath(String(record.path ?? ''));
+  const sanitized: DesignHistoryRecord = { path };
+
+  if (record.mirror_path !== undefined) {
+    const mirrorPathRaw = typeof record.mirror_path === 'string' ? record.mirror_path.trim() : '';
+    if (mirrorPathRaw.length > 0) {
+      sanitized.mirror_path = sanitizeRelativeArtifactPath(mirrorPathRaw);
+    }
+  }
+
+  const entries = coerceNonNegativeInteger(record.entries);
+  if (entries !== null) {
+    sanitized.entries = entries;
+  }
+  const maxEntries = coerceNonNegativeInteger(record.max_entries);
+  if (maxEntries !== null) {
+    sanitized.max_entries = maxEntries;
+  }
+  if (typeof record.updated_at === 'string' && isIsoDate(record.updated_at)) {
+    sanitized.updated_at = record.updated_at;
+  }
+  if (record.mode === 'fresh' || record.mode === 'clone-informed') {
+    sanitized.mode = record.mode;
+  }
+
+  return sanitized;
+}
+
+function sanitizeDesignStyleProfile(
+  profile: unknown,
+  options: DesignArtifactSanitizeOptions
+): DesignStyleProfileMetadata {
+  if (!profile || typeof profile !== 'object') {
+    throw new Error('design style profile must be an object');
+  }
+  const record = profile as Record<string, unknown>;
+  const id = typeof record.id === 'string' ? record.id.trim() : '';
+  if (!id) {
+    throw new Error('design style profile requires an id');
+  }
+  const relativePath = sanitizeRelativeArtifactPath(String(record.relative_path ?? ''));
+
+  const sanitized: DesignStyleProfileMetadata = {
+    id,
+    relative_path: relativePath
+  };
+
+  if (typeof record.source_url === 'string' && record.source_url.trim().length > 0) {
+    sanitized.source_url = record.source_url.trim();
+  }
+  if (typeof record.ingestion_run === 'string' && record.ingestion_run.trim().length > 0) {
+    sanitized.ingestion_run = record.ingestion_run.trim();
+  }
+  if (
+    typeof record.similarity_level === 'string' &&
+    ['low', 'medium', 'high'].includes(record.similarity_level.trim())
+  ) {
+    sanitized.similarity_level = record.similarity_level.trim() as DesignStyleProfileMetadata['similarity_level'];
+  }
+
+  if (record.do_not_copy && typeof record.do_not_copy === 'object') {
+    const doNotCopy = record.do_not_copy as Record<string, unknown>;
+    const doNotCopyValues = {
+      logos: sanitizeStringList(doNotCopy.logos, 20),
+      wordmarks: sanitizeStringList(doNotCopy.wordmarks, 20),
+      unique_shapes: sanitizeStringList(doNotCopy.unique_shapes, 20),
+      unique_illustrations: sanitizeStringList(doNotCopy.unique_illustrations, 20),
+      other: sanitizeStringList(doNotCopy.other, 20)
+    };
+    const hasDoNotCopyValues = Object.values(doNotCopyValues).some(
+      (entry) => Array.isArray(entry) && entry.length > 0
+    );
+    if (hasDoNotCopyValues) {
+      sanitized.do_not_copy = doNotCopyValues;
+    }
+  }
+
+  const retentionDays = coerceNonNegativeInteger(record.retention_days);
+  if (retentionDays !== null) {
+    sanitized.retention_days = retentionDays;
+  } else if (options.retentionDays !== undefined) {
+    sanitized.retention_days = Math.max(0, options.retentionDays);
+  }
+
+  if (record.expiry && typeof record.expiry === 'object') {
+    const expiry = sanitizeExpiryRecord(record.expiry);
+    if (expiry) {
+      sanitized.expiry = expiry;
+    }
+  } else {
+    const retentionForExpiry = sanitized.retention_days ?? options.retentionDays;
+    if (retentionForExpiry !== undefined) {
+      sanitized.expiry = computeExpiryRecord(retentionForExpiry, options.retentionPolicy, options.now);
+    }
+  }
+
+  if (Array.isArray(record.approvals)) {
+    const approvals = record.approvals
+      .map((entry) => sanitizeApprovalRecord(entry))
+      .filter((entry): entry is NonNullable<ReturnType<typeof sanitizeApprovalRecord>> => entry !== null);
+    if (approvals.length > 0) {
+      sanitized.approvals = approvals;
+    }
+  }
+
+  if (Array.isArray(record.notes)) {
+    const notes = sanitizeStringList(record.notes, 20);
+    if (notes && notes.length > 0) {
+      sanitized.notes = notes;
+    }
+  }
+
+  return sanitized;
+}
+
+function sanitizeDesignMetrics(metrics: unknown): DesignMetricRecord {
+  if (!metrics || typeof metrics !== 'object') {
+    throw new Error('design metrics must be an object');
+  }
+  const record = metrics as Record<string, unknown>;
+  const sanitized: DesignMetricRecord = {};
+
+  const fields: Array<keyof DesignMetricRecord> = [
+    'aesthetic_axes_completeness',
+    'originality_score',
+    'accessibility_score',
+    'brief_alignment_score',
+    'slop_risk',
+    'diversity_penalty',
+    'similarity_to_reference',
+    'style_overlap'
+  ];
+  for (const field of fields) {
+    const value = clampScore(record[field]);
+    if (value !== null) {
+      sanitized[field] = value;
+    }
+  }
+
+  if (record.style_overlap_gate === 'pass' || record.style_overlap_gate === 'fail') {
+    sanitized.style_overlap_gate = record.style_overlap_gate;
+  }
+
+  if (typeof record.snippet_version === 'string' && record.snippet_version.trim().length > 0) {
+    sanitized.snippet_version = record.snippet_version.trim();
+  }
+
+  return sanitized;
+}
+
+function sanitizeStyleOverlap(entry: Record<string, unknown>): DesignStyleOverlapBreakdown {
+  const palette = clampScore(entry.palette);
+  const typography = clampScore(entry.typography);
+  const motion = clampScore(entry.motion);
+  const spacing = clampScore(entry.spacing);
+  const threshold = clampScore(entry.threshold);
+  const overall =
+    clampScore(entry.overall) ??
+    Math.max(
+      palette ?? 0,
+      typography ?? 0,
+      motion ?? 0,
+      spacing ?? 0
+    );
+
+  const overlap: DesignStyleOverlapBreakdown = {
+    overall
+  };
+
+  if (palette !== null) overlap.palette = palette;
+  if (typography !== null) overlap.typography = typography;
+  if (motion !== null) overlap.motion = motion;
+  if (spacing !== null) overlap.spacing = spacing;
+  if (threshold !== null) overlap.threshold = threshold;
+
+  if (entry.gate === 'pass' || entry.gate === 'fail') {
+    overlap.gate = entry.gate;
+  }
+
+  if (Array.isArray(entry.comparison_window)) {
+    const windowIds = entry.comparison_window
+      .map((value) => (typeof value === 'string' ? value.trim() : ''))
+      .filter((value) => value.length > 0);
+    if (windowIds.length > 0) {
+      overlap.comparison_window = windowIds.slice(0, 20);
+    }
+  }
+
+  if (entry.reference_style_id !== undefined && entry.reference_style_id !== null) {
+    const value =
+      typeof entry.reference_style_id === 'string' ? entry.reference_style_id.trim() : '';
+    overlap.reference_style_id = value.length > 0 ? value : null;
+  }
+
+  return overlap;
+}
+
+function sanitizeScoreMap(record: Record<string, unknown>): Record<string, number> {
+  const scores: Record<string, number> = {};
+  for (const [key, value] of Object.entries(record)) {
+    if (!key) {
+      continue;
+    }
+    const numeric = clampScore(value);
+    if (numeric !== null) {
+      scores[key] = numeric;
+    }
+  }
+  return scores;
+}
+
+function clampScore(value: unknown, allowAboveOne = false): number | null {
+  if (typeof value === 'number' || typeof value === 'string') {
+    const numeric = typeof value === 'number' ? value : Number(value);
+    if (Number.isFinite(numeric)) {
+      if (allowAboveOne) {
+        return numeric;
+      }
+      if (numeric < 0) return 0;
+      if (numeric > 1) return 1;
+      return numeric;
+    }
+  }
+  return null;
+}
+
+function sanitizeStringList(value: unknown, maxEntries: number): string[] | undefined {
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+  const entries = value
+    .map((item) => (typeof item === 'string' ? item.trim() : ''))
+    .filter((item) => item.length > 0);
+  if (entries.length === 0) {
+    return undefined;
+  }
+  return entries.slice(0, maxEntries);
 }

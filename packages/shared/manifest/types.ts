@@ -122,6 +122,11 @@ export interface ToolRunManifest {
   design_config_snapshot?: Record<string, unknown> | null;
   design_toolkit_artifacts?: DesignToolkitArtifactRecord[];
   design_toolkit_summary?: DesignToolkitSummary;
+  design_plan?: DesignPlanRecord | null;
+  design_guardrail?: DesignGuardrailRecord | null;
+  design_history?: DesignHistoryRecord | null;
+  design_style_profile?: DesignStyleProfileMetadata | null;
+  design_metrics?: DesignMetricRecord | null;
   [key: string]: unknown;
 }
 
@@ -131,7 +136,13 @@ export type DesignArtifactStage =
   | 'components'
   | 'motion'
   | 'video'
-  | 'visual-regression';
+  | 'visual-regression'
+  | 'style-ingestion'
+  | 'design-brief'
+  | 'aesthetic-plan'
+  | 'implementation'
+  | 'guardrail'
+  | 'design-history';
 
 export interface DesignArtifactApprovalRecord {
   id: string;
@@ -222,4 +233,95 @@ export interface DesignToolkitSummary {
   stages: DesignToolkitSummaryStageEntry[];
   totals?: Record<string, number>;
   approvals?: string[];
+}
+
+export type DesignPipelineMode = 'fresh' | 'clone-informed';
+
+export interface DesignStyleProfileMetadata {
+  id: string;
+  relative_path: string;
+  source_url?: string;
+  ingestion_run?: string;
+  similarity_level?: 'low' | 'medium' | 'high';
+  do_not_copy?: {
+    logos?: string[];
+    wordmarks?: string[];
+    unique_shapes?: string[];
+    unique_illustrations?: string[];
+    other?: string[];
+  };
+  retention_days?: number;
+  expiry?: DesignArtifactExpiry;
+  approvals?: DesignArtifactApprovalRecord[];
+  notes?: string[];
+}
+
+export interface DesignPlanRecord {
+  mode: DesignPipelineMode;
+  brief: {
+    path: string;
+    hash?: string;
+    id?: string;
+  };
+  aesthetic_plan?: {
+    path: string;
+    snippet_version?: string;
+    id?: string;
+  };
+  implementation?: {
+    path: string;
+    complexity?: string;
+  };
+  reference_style_id?: string | null;
+  style_profile_id?: string | null;
+  generated_at?: string;
+}
+
+export type DesignGateStatus = 'pass' | 'fail';
+
+export interface DesignStyleOverlapBreakdown {
+  palette?: number;
+  typography?: number;
+  motion?: number;
+  spacing?: number;
+  overall: number;
+  gate?: DesignGateStatus;
+  threshold?: number;
+  comparison_window?: string[];
+  reference_style_id?: string | null;
+}
+
+export interface DesignGuardrailRecord {
+  report_path: string;
+  status: DesignGateStatus;
+  snippet_version?: string;
+  strictness?: 'low' | 'medium' | 'high';
+  slop_threshold?: number;
+  mode?: DesignPipelineMode;
+  scores?: Record<string, number>;
+  recommendations?: string[];
+  notes?: string[];
+  style_overlap?: DesignStyleOverlapBreakdown;
+}
+
+export interface DesignHistoryRecord {
+  path: string;
+  mirror_path?: string;
+  entries?: number;
+  max_entries?: number;
+  updated_at?: string;
+  mode?: DesignPipelineMode;
+}
+
+export interface DesignMetricRecord {
+  aesthetic_axes_completeness?: number;
+  originality_score?: number;
+  accessibility_score?: number;
+  brief_alignment_score?: number;
+  slop_risk?: number;
+  diversity_penalty?: number;
+  similarity_to_reference?: number;
+  style_overlap?: number;
+  style_overlap_gate?: DesignGateStatus;
+  snippet_version?: string;
 }
