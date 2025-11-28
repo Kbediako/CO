@@ -350,6 +350,28 @@ async function main() {
   summarizeIssues("Outbound host violations", outboundViolations);
   summarizeIssues("Asset failures", assetFailures);
   summarizeIssues("Content violations", contentViolations);
+  // Hint clusters for common foot-guns (e.g., numbered sequences or missing worker chunks)
+  const urlRegex = /(https?:\/\/[^\s)]+)/;
+  const clusterCounts = new Map();
+  const chunkMisses = [];
+  for (const failure of assetFailures) {
+    const match = failure.match(urlRegex);
+    if (!match) continue;
+    const url = match[1];
+    if (/_next\/static\/chunks\//.test(url)) {
+      chunkMisses.push(failure);
+    }
+    // Normalize numbered frames: replace 4-6 digit stems before extension.
+    const normalized = url.replace(/\/(\d{4,6})(?=\.\w+$)/, "/<frame>");
+    const current = clusterCounts.get(normalized) ?? 0;
+    clusterCounts.set(normalized, current + 1);
+  }
+  const clustered = Array.from(clusterCounts.entries())
+    .filter(([, count]) => count >= 10)
+    .map(([url, count]) => `~${count} similar failures (possible sequence/frameset): ${url}`);
+  summarizeIssues("Asset failure clusters", clustered);
+  summarizeIssues("Missing worker/chunk files", chunkMisses);
+
   const absoluteIssues = [];
   for (const [route, urls] of absoluteReferences.entries()) {
     for (const url of urls) {

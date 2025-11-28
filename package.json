@@ -19,7 +19,8 @@
     "design:purge-expired": "node dist/scripts/design/purgeExpired.js",
     "mirror:serve": "node scripts/mirror-serve.mjs",
     "mirror:fetch": "node scripts/mirror-site.mjs",
-    "mirror:check": "node scripts/mirror-check.mjs"
+    "mirror:check": "node scripts/mirror-check.mjs",
+    "mirror:fingerprint": "node scripts/mirror-style-fingerprint.mjs"
   },
   "devDependencies": {
     "@types/js-yaml": "^4.0.9",

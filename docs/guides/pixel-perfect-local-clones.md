@@ -18,6 +18,9 @@ Use the mirror tooling to keep hi-fi site clones fully featured while staying of
   - Pulls only the configured routes (no crawling), strips tracker/analytics/service-worker code via `stripPatterns`, rewrites externals to `/external/<host>/...`, localizes OG/twitter preview images, and rewrites share links off tracker-heavy hosts while keeping UI behavior.
   - Non-origin assets fall back to Web Archive when the primary host fails; cached bodies are scoped per project under `.runs/<task>/mirror/<project>/cache`. Promotion is skipped on errors unless `--force` is set; staged files live under `.runs/<task>/mirror/<project>/<timestamp>/staging` before being promoted to `packages/<project>/public`.
   - Each run logs `.runs/<task>/mirror/<project>/<timestamp>/manifest.json` with routes, assets, cache hits, fallbacks, share rewrites, and warnings.
+- After fetch, generate a style fingerprint so downstream apps can reuse the look/feel:
+  - `npm run mirror:fingerprint -- --project <name> [--outDir docs/reference]`
+  - Outputs `<project>-style-profile.json` + `<project>-style.md` summarizing fonts, palette, spacing, motion, backgrounds, component silhouettes, and do-not-copy notes.
 
 ## Serve Locally (Local Mirror)
 - `npm run mirror:serve -- --project <name> --port <port> [--csp self|strict|off] [--no-range]`
@@ -32,3 +35,12 @@ Use the mirror tooling to keep hi-fi site clones fully featured while staying of
 ## Final Guardrails
 - Mirrors should remain fully featured and offline-ready (immutable assets, Range support, no trackers/SW).
 - Before review run: `node scripts/spec-guard.mjs --dry-run`, `npm run lint`, `npm run test`. Attach the latest mirror manifest path when updating task docs.
+
+## Troubleshooting & Common Gotchas
+- **Ad/tracker blockers:** Localhost mirrors can be broken by ad blockers (common when we strip GA/TikTok). If you see “client-side exception” with no 404s, retry in incognito or disable blockers.
+- **Worker chunks:** Next/React apps often load small worker chunks (e.g., `_next/static/chunks/825...js`). Missing workers cause silent failures. After fetch, `rg "_next/static/chunks"` and confirm every referenced file exists in `public/_next/static/chunks`.
+- **Numbered sequences:** Hero sequences frequently ship as hundreds of padded frames (`00000.avif` etc.). If you see a burst of 404s for `/images/sequence/.../00xxx.avif`, bulk-download the whole range (desktop/tablet/mobile) before serving.
+- **Video codecs:** Headless Chromium may warn `NotSupportedError: The element has no supported sources` even when real browsers play the MP4. Verify in a real browser before treating it as a blocker; mirror:check now surfaces clustered failures (sequence frames) and missing worker chunks to hint at fixes.
+- **Preload hints:** Keep preloaded assets local (OG/Twitter images, hero video, displacement maps, stage images) so `<link rel="preload">` doesn’t point at 404s.
+- **Brittle vendor calls:** Guard optional chains in vendor bundles (e.g., GSAP timelines with `.kill()`) and bypass custom image loaders when they still try to reach the origin.
+- **Style fingerprints:** If the design will be reused, always run `npm run mirror:fingerprint -- --project <name>` and attach the resulting `style-profile.json` / `style.md` in handoffs so agents don’t default to generic boxy layouts.

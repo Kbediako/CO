@@ -598,10 +598,18 @@ function rewriteCssUrls(cssText, options) {
       return match;
     }
 
-    const isInlineRef = cleaned.startsWith("data:") || cleaned.startsWith("blob:") || cleaned.startsWith("#");
+    const isInlineRef =
+      cleaned.startsWith("data:") ||
+      cleaned.startsWith("blob:") ||
+      cleaned.startsWith("#") ||
+      cleaned.startsWith("%23") ||
+      (cleaned.includes("%23") && !/^https?:/i.test(cleaned));
+    if (isInlineRef) {
+      return match;
+    }
     const registered = registerAsset(cleaned, options);
     if (!registered) {
-      return isInlineRef ? match : 'url("")';
+      return 'url("")';
     }
 
     registeredAssets.push(registered);
