@@ -65,6 +65,22 @@
       "completed_at": null
     },
     {
+      "id": "0412",
+      "slug": "0412-frontend-design-pipeline-v2",
+      "title": "Frontend Design Pipeline v2 Planning",
+      "path": "tasks/frontend-design-pipeline-v2.md",
+      "kind": "plan",
+      "status": "in-progress",
+      "gate": {
+        "phase": "frontend-design-pipeline-v2-planning",
+        "status": "in-progress",
+        "log": null,
+        "run_id": null
+      },
+      "created_at": "2025-11-27",
+      "completed_at": null
+    },
+    {
       "id": "0505",
       "slug": "0505-more-nutrition-pixel",
       "title": "More Nutrition Pixel Archive",
