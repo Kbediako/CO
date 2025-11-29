@@ -155,48 +155,57 @@ async function generatePrs(options: PrGeneratorOptions) {
             }
 
             // 5. Rewrite patch paths and collect affected files
-            // Use precise regex to only target diff headers
-            let finalPatch = patch;
+            // Parse line-by-line to avoid corrupting hunk content
+            const lines = patch.split('\n');
+            const finalLines: string[] = [];
             const affectedFiles = new Set<string>();
+            let inHunk = false;
+            let cleanFixturePath = '';
 
             if (fixturePath) {
-                const cleanFixturePath = fixturePath.replace(/^\.\//, '');
+                cleanFixturePath = fixturePath.replace(/^\.\//, '');
+            }
 
-                // Rewrite 'diff --git a/... b/...'
-                finalPatch = finalPatch.replace(
-                    /^diff --git a\/(\S+) b\/(\S+)/gm,
-                    (match, p1, p2) => {
-                        const newPathA = `${cleanFixturePath}/${p1}`;
-                        const newPathB = `${cleanFixturePath}/${p2}`;
-                        // Add both paths to stage renames (old path for deletion, new path for addition)
-                        // Filter out /dev/null just in case, though usually not in diff --git header
+            for (const line of lines) {
+                let newLine = line;
+
+                if (line.startsWith('diff --git ')) {
+                    inHunk = false;
+                    // Parse paths: diff --git a/path/to/file b/path/to/file
+                    const match = line.match(/^diff --git a\/(\S+) b\/(\S+)/);
+                    if (match) {
+                        const p1 = match[1];
+                        const p2 = match[2];
+
+                        let newPathA = p1;
+                        let newPathB = p2;
+
+                        if (cleanFixturePath) {
+                            newPathA = `${cleanFixturePath}/${p1}`;
+                            newPathB = `${cleanFixturePath}/${p2}`;
+                            newLine = `diff --git a/${newPathA} b/${newPathB}`;
+                        }
+
                         if (p1 !== '/dev/null') affectedFiles.add(newPathA);
                         if (p2 !== '/dev/null') affectedFiles.add(newPathB);
-                        return `diff --git a/${newPathA} b/${newPathB}`;
                     }
-                );
-
-                // Rewrite '--- a/...'
-                finalPatch = finalPatch.replace(
-                    /^--- a\/(\S+)/gm,
-                    `--- a/${cleanFixturePath}/$1`
-                );
-
-                // Rewrite '+++ b/...'
-                finalPatch = finalPatch.replace(
-                    /^\+\+\+ b\/(\S+)/gm,
-                    `+++ b/${cleanFixturePath}/$1`
-                );
-            } else {
-                // If no fixture path, try to extract paths from original patch
-                const matches = patch.matchAll(/^diff --git a\/(\S+) b\/(\S+)/gm);
-                for (const match of matches) {
-                    const p1 = match[1];
-                    const p2 = match[2];
-                    if (p1 !== '/dev/null') affectedFiles.add(p1);
-                    if (p2 !== '/dev/null') affectedFiles.add(p2);
+                } else if (line.startsWith('@@ ')) {
+                    inHunk = true;
+                } else if (!inHunk && cleanFixturePath) {
+                    // Rewrite --- and +++ headers only if not in hunk
+                    if (line.startsWith('--- a/')) {
+                        const originalPath = line.substring(6); // '--- a/'.length
+                        newLine = `--- a/${cleanFixturePath}/${originalPath}`;
+                    } else if (line.startsWith('+++ b/')) {
+                        const originalPath = line.substring(6); // '+++ b/'.length
+                        newLine = `+++ b/${cleanFixturePath}/${originalPath}`;
+                    }
                 }
+
+                finalLines.push(newLine);
             }
+
+            const finalPatch = finalLines.join('\n');
 
             const patchFile = `solution-${scenarioId}.patch`;
             await fs.writeFile(patchFile, finalPatch);
