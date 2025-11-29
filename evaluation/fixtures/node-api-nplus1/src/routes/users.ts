@@ -5,13 +5,12 @@ export const router = Router();
 
 router.get('/users', async (req, res) => {
   const users = await db.getUsers();
-
-  // N+1 problem: fetching posts for each user individually
-  const usersWithPosts = [];
-  for (const user of users) {
-    const posts = await db.getPostsForUser(user.id);
-    usersWithPosts.push({ ...user, posts });
-  }
+  const allPosts = await db.getAllPosts();
+  
+  const usersWithPosts = users.map(user => ({
+    ...user,
+    posts: allPosts.filter(p => p.userId === user.id)
+  }));
 
   res.json(usersWithPosts);
 });
