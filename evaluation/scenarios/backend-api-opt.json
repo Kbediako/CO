@@ -1,0 +1,26 @@
+{
+    "id": "backend-api-opt",
+    "title": "Backend API Optimization (N+1)",
+    "adapterId": "typescript-default",
+    "goals": [
+        {
+            "goal": "test",
+            "timeoutMs": 30000
+        }
+    ],
+    "agentTask": {
+        "instruction": "WRITE|src/routes/users.ts|import { Router } from 'express';\nimport { db } from '../db';\n\nexport const router = Router();\n\nrouter.get('/users', async (req, res) => {\n  const users = await db.getUsers();\n  const allPosts = await db.getAllPosts();\n  \n  const usersWithPosts = users.map(user => ({\n    ...user,\n    posts: allPosts.filter(p => p.userId === user.id)\n  }));\n\n  res.json(usersWithPosts);\n});"
+    },
+    "fixture": {
+        "path": "evaluation/fixtures/node-api-nplus1",
+        "copyToTemp": true
+    },
+    "patternAssertions": [
+        {
+            "type": "diff-match",
+            "scope": "fixture",
+            "path": "src/routes/users.ts",
+            "expectedDiff": "@@ ... @@\n-    // N+1 problem: fetching posts for each user individually\n-    const usersWithPosts = [];\n-    for (const user of users) {\n-        const posts = await db.getPostsForUser(user.id);\n-        usersWithPosts.push({ ...user, posts });\n-    }\n+  const allPosts = await db.getAllPosts();\n+  \n+  const usersWithPosts = users.map(user => ({\n+    ...user,\n+    posts: allPosts.filter(p => p.userId === user.id)\n+  }));"
+        }
+    ]
+}
