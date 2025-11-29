@@ -166,9 +166,13 @@ async function generatePrs(options: PrGeneratorOptions) {
                 finalPatch = finalPatch.replace(
                     /^diff --git a\/(\S+) b\/(\S+)/gm,
                     (match, p1, p2) => {
-                        const newPath = `${cleanFixturePath}/${p1}`;
-                        affectedFiles.add(newPath);
-                        return `diff --git a/${newPath} b/${cleanFixturePath}/${p2}`;
+                        const newPathA = `${cleanFixturePath}/${p1}`;
+                        const newPathB = `${cleanFixturePath}/${p2}`;
+                        // Add both paths to stage renames (old path for deletion, new path for addition)
+                        // Filter out /dev/null just in case, though usually not in diff --git header
+                        if (p1 !== '/dev/null') affectedFiles.add(newPathA);
+                        if (p2 !== '/dev/null') affectedFiles.add(newPathB);
+                        return `diff --git a/${newPathA} b/${newPathB}`;
                     }
                 );
 
@@ -187,7 +191,10 @@ async function generatePrs(options: PrGeneratorOptions) {
                 // If no fixture path, try to extract paths from original patch
                 const matches = patch.matchAll(/^diff --git a\/(\S+) b\/(\S+)/gm);
                 for (const match of matches) {
-                    affectedFiles.add(match[1]);
+                    const p1 = match[1];
+                    const p2 = match[2];
+                    if (p1 !== '/dev/null') affectedFiles.add(p1);
+                    if (p2 !== '/dev/null') affectedFiles.add(p2);
                 }
             }
 
