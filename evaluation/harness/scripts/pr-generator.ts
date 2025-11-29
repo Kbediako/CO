@@ -181,8 +181,13 @@ async function generatePrs(options: PrGeneratorOptions) {
                         let newPathB = p2;
 
                         if (cleanFixturePath) {
-                            newPathA = `${cleanFixturePath}/${p1}`;
-                            newPathB = `${cleanFixturePath}/${p2}`;
+                            // Only rewrite if not /dev/null
+                            if (p1 !== '/dev/null') {
+                                newPathA = `${cleanFixturePath}/${p1}`;
+                            }
+                            if (p2 !== '/dev/null') {
+                                newPathB = `${cleanFixturePath}/${p2}`;
+                            }
                             newLine = `diff --git a/${newPathA} b/${newPathB}`;
                         }
 
