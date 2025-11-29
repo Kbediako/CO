@@ -93,6 +93,19 @@ async function generatePrs(options: PrGeneratorOptions) {
         }
 
         try {
+            // 0. Enforce clean worktree
+            try {
+                // Ignore untracked files (-uno)
+                const { stdout } = await execAsync('git status --porcelain -uno');
+                if (stdout.trim()) {
+                    throw new Error('Worktree is dirty. Please commit or stash changes before running.');
+                }
+            } catch (e: any) {
+                if (e.message.includes('Worktree is dirty')) throw e;
+                // If git status failed, maybe not a repo?
+                console.warn(`  Warning: Could not check git status: ${e.message}`);
+            }
+
             // 1. Checkout base branch (main) to avoid stacking
             // We assume 'main' is the base. In a real tool, this might be configurable.
             try {
@@ -141,16 +154,22 @@ async function generatePrs(options: PrGeneratorOptions) {
                 console.warn(`  Could not load scenario config for ${scenarioId}. Assuming root or manual apply.`);
             }
 
-            // 5. Rewrite patch paths
+            // 5. Rewrite patch paths and collect affected files
             // Use precise regex to only target diff headers
             let finalPatch = patch;
+            const affectedFiles = new Set<string>();
+
             if (fixturePath) {
                 const cleanFixturePath = fixturePath.replace(/^\.\//, '');
 
                 // Rewrite 'diff --git a/... b/...'
                 finalPatch = finalPatch.replace(
                     /^diff --git a\/(\S+) b\/(\S+)/gm,
-                    `diff --git a/${cleanFixturePath}/$1 b/${cleanFixturePath}/$2`
+                    (match, p1, p2) => {
+                        const newPath = `${cleanFixturePath}/${p1}`;
+                        affectedFiles.add(newPath);
+                        return `diff --git a/${newPath} b/${cleanFixturePath}/${p2}`;
+                    }
                 );
 
                 // Rewrite '--- a/...'
@@ -164,6 +183,12 @@ async function generatePrs(options: PrGeneratorOptions) {
                     /^\+\+\+ b\/(\S+)/gm,
                     `+++ b/${cleanFixturePath}/$1`
                 );
+            } else {
+                // If no fixture path, try to extract paths from original patch
+                const matches = patch.matchAll(/^diff --git a\/(\S+) b\/(\S+)/gm);
+                for (const match of matches) {
+                    affectedFiles.add(match[1]);
+                }
             }
 
             const patchFile = `solution-${scenarioId}.patch`;
@@ -176,9 +201,14 @@ async function generatePrs(options: PrGeneratorOptions) {
                 console.log(`  Applied patch successfully.`);
 
                 // 7. Commit
-                await execAsync(`git add .`);
-                await execAsync(`git commit -m "${commitMessage}"`);
-                console.log(`  Committed changes.`);
+                if (affectedFiles.size > 0) {
+                    const files = Array.from(affectedFiles).join(' ');
+                    await execAsync(`git add ${files}`);
+                    await execAsync(`git commit -m "${commitMessage}"`);
+                    console.log(`  Committed changes to: ${files}`);
+                } else {
+                    console.warn('  No files found to commit.');
+                }
             } catch (e) {
                 console.error(`  Failed to apply/commit patch: ${e}`);
                 // Cleanup
