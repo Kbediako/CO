@@ -172,27 +172,29 @@ async function generatePrs(options: PrGeneratorOptions) {
                 if (line.startsWith('diff --git ')) {
                     inHunk = false;
                     // Parse paths: diff --git a/path/to/file b/path/to/file
-                    const match = line.match(/^diff --git a\/(\S+) b\/(\S+)/);
+                    // Use generic regex to capture full tokens, handling /dev/null
+                    const match = line.match(/^diff --git (\S+) (\S+)/);
                     if (match) {
                         const p1 = match[1];
                         const p2 = match[2];
 
-                        let newPathA = p1;
-                        let newPathB = p2;
+                        let newP1 = p1;
+                        let newP2 = p2;
 
                         if (cleanFixturePath) {
-                            // Only rewrite if not /dev/null
-                            if (p1 !== '/dev/null') {
-                                newPathA = `${cleanFixturePath}/${p1}`;
+                            if (p1.startsWith('a/')) {
+                                newP1 = `a/${cleanFixturePath}/${p1.substring(2)}`;
                             }
-                            if (p2 !== '/dev/null') {
-                                newPathB = `${cleanFixturePath}/${p2}`;
+                            if (p2.startsWith('b/')) {
+                                newP2 = `b/${cleanFixturePath}/${p2.substring(2)}`;
                             }
-                            newLine = `diff --git a/${newPathA} b/${newPathB}`;
+                            newLine = `diff --git ${newP1} ${newP2}`;
                         }
 
-                        if (p1 !== '/dev/null') affectedFiles.add(newPathA);
-                        if (p2 !== '/dev/null') affectedFiles.add(newPathB);
+                        // Add to affectedFiles if it's a real file (starts with a/ or b/)
+                        // We add the REWRITTEN path (without prefix) to staging
+                        if (newP1.startsWith('a/')) affectedFiles.add(newP1.substring(2));
+                        if (newP2.startsWith('b/')) affectedFiles.add(newP2.substring(2));
                     }
                 } else if (line.startsWith('@@ ')) {
                     inHunk = true;
