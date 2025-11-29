@@ -38,6 +38,7 @@ export async function appendMetricsEntry(
   const commandsFailed = manifest.commands.filter((cmd) => cmd.status === 'failed').length;
   const guardrailStatus = ensureGuardrailStatus(manifest);
   const guardrailsPresent = guardrailStatus.present;
+  const learning = manifest.learning ?? null;
 
   const metricsRoot = join(env.runsRoot, env.taskId);
   const metricsPath = join(metricsRoot, 'metrics.json');
@@ -78,7 +79,21 @@ export async function appendMetricsEntry(
     token_total: manifest.tfgrpo?.tool_metrics?.token_total ?? 0,
     cost_usd: manifest.tfgrpo?.tool_metrics?.cost_usd ?? 0,
     latency_ms: manifest.tfgrpo?.tool_metrics?.latency_ms ?? 0,
-    tool_stats: manifest.tfgrpo?.tool_metrics?.per_tool ?? []
+    tool_stats: manifest.tfgrpo?.tool_metrics?.per_tool ?? [],
+    learning_validation_status: learning?.validation?.status ?? null,
+    learning_snapshot_status: learning?.snapshot?.status ?? null,
+    learning_scenario_status: learning?.scenario?.status ?? null,
+    learning_crystalizer_status: learning?.crystalizer?.status ?? null,
+    learning_alerts: learning?.alerts?.length ?? 0,
+    learning_group_id: learning?.validation?.grouping?.id ?? null,
+    learning_review_rejections: learning?.review?.rejections ?? 0,
+    learning_review_latency_ms: learning?.review?.latency_ms ?? null,
+    learning_regressions_detected: learning?.regressions?.detected ?? 0,
+    learning_pattern_promoted: learning?.pattern_hygiene?.promoted ?? 0,
+    learning_pattern_deprecated: learning?.pattern_hygiene?.deprecated ?? 0,
+    learning_throughput_candidates:
+      learning?.throughput?.candidates ??
+      (learning?.crystalizer?.candidate_path ? 1 : 0)
   };
 
   await mkdir(metricsRoot, { recursive: true });

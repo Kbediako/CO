@@ -103,6 +103,15 @@ export async function bootstrapManifest(runId: string, options: ManifestBootstra
     instructions_sources: [],
     prompt_packs: [],
     guardrails_required: pipeline.guardrailsRequired !== false,
+    learning: {
+      validation: {
+        mode: 'per-task',
+        grouping: null,
+        status: 'pending'
+      },
+      alerts: [],
+      approvals: []
+    },
     tfgrpo: null
   };
 

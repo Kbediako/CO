@@ -1,4 +1,5 @@
 import type { AgentTask, ScenarioGoalResult } from '../types.js';
+import type { AdapterGoal } from '../../../adapters/types.js';
 import { logger } from '../../../orchestrator/src/logger.js';
 
 import { promises as fs } from 'node:fs';
@@ -53,10 +54,12 @@ export class AgentDriver {
             logger.warn(`[AgentDriver] Failed to capture diff: ${e}`);
         }
 
+        const goalId = 'agent-task' as unknown as AdapterGoal;
+        const commandId = 'agent-driver' as unknown as AdapterGoal;
         return {
-            goal: 'agent-task' as any, // Custom goal type
+            goal: goalId,
             command: {
-                id: 'agent-driver' as any,
+                id: commandId,
                 title: 'Agent Driver',
                 description: 'Executes agent task',
                 requiresCleanFixture: false,

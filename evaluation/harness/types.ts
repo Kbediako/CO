@@ -37,6 +37,8 @@ export interface ScenarioFixtureConfig {
   copyToTemp?: boolean;
 }
 
+export type ScenarioGoalConfig = AdapterCommandOverrides & { goal: AdapterGoal };
+
 export type PatternAssertion =
   | {
       type: 'file-exists';
@@ -56,7 +58,7 @@ export interface EvaluationScenario {
   id: string;
   title: string;
   adapterId: string;
-  goals: AdapterGoal[];
+  goals: Array<AdapterGoal | ScenarioGoalConfig>;
   fixture: ScenarioFixtureConfig;
   overrides?: Partial<Record<AdapterGoal, AdapterCommandOverrides>>;
   patternAssertions?: PatternAssertion[];

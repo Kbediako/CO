@@ -16,6 +16,15 @@ function assertScenarioShape(candidate: EvaluationScenario, sourcePath: string):
   if (!candidate.fixture || typeof candidate.fixture.path !== 'string') {
     throw new Error(`Scenario '${candidate.id}' must declare a fixture.path.`);
   }
+
+  for (const goal of candidate.goals) {
+    if (typeof goal === 'string') {
+      continue;
+    }
+    if (!goal || typeof goal !== 'object' || typeof (goal as Record<string, unknown>).goal !== 'string') {
+      throw new Error(`Scenario '${candidate.id}' has an invalid goal entry in ${sourcePath}.`);
+    }
+  }
 }
 
 export async function loadScenarios(): Promise<LoadedScenario[]> {

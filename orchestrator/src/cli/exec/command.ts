@@ -49,6 +49,8 @@ import {
   type TfgrpoContext
 } from './tfgrpo.js';
 import type { RunResultSummary } from './types.js';
+import { runLearningHarvester } from '../../learning/harvester.js';
+import { synthesizeScenario } from '../../learning/runner.js';
 
 export type ExecOutputMode = 'interactive' | 'json' | 'jsonl';
 
@@ -173,6 +175,7 @@ export async function executeExecCommand(
   await flushTelemetry(runContext);
   await persistRunOutputs(runContext, summaryEvent);
   await appendMetricsEntry(runContext.env, runContext.paths, runContext.manifest);
+  await maybeTriggerLearning(runContext, finalization.runStatus);
 
   await shutdownSinks(runContext);
   emitCommandError(runContext, finalization.commandError);
@@ -402,6 +405,46 @@ function recordSummaryTelemetry(context: ExecRunContext, summaryEvent: RunSummar
   context.telemetryTasks.push(
     Promise.resolve(context.telemetrySink.recordSummary(summaryEvent)).then(() => undefined)
   );
+}
+
+async function maybeTriggerLearning(runContext: ExecRunContext, runStatus: RunStatus): Promise<void> {
+  const enabled = process.env.LEARNING_PIPELINE_ENABLED === '1';
+  const bucket = process.env.LEARNING_S3_BUCKET;
+  if (!enabled || !bucket) {
+    return;
+  }
+  if (runStatus !== 'succeeded') {
+    return;
+  }
+  try {
+    const harvester = await runLearningHarvester(runContext.manifest, {
+      repoRoot: runContext.env.repoRoot,
+      runsRoot: runContext.env.runsRoot,
+      manifestPath: runContext.paths.manifestPath,
+      taskId: runContext.env.taskId,
+      runId: runContext.manifest.run_id,
+      diffPath: null,
+      promptPath: null,
+      executionHistoryPath: runContext.paths.logPath,
+      bucket,
+      alertTargets: { slack: '#learning-alerts', pagerduty: 'learning-pipeline' }
+    });
+
+    await synthesizeScenario({
+      manifest: harvester.manifest,
+      taskId: runContext.env.taskId,
+      runId: runContext.manifest.run_id,
+      runsRoot: runContext.env.runsRoot,
+      prompt: null,
+      diff: null,
+      executionHistory: [],
+      alertTargets: { slack: '#learning-alerts', pagerduty: 'learning-pipeline' },
+      pagerDutySeverity: 'none'
+    });
+    await saveManifest(runContext.paths, harvester.manifest);
+  } catch (error) {
+    logger.warn(`[learning] auto-trigger failed: ${error instanceof Error ? error.message : String(error)}`);
+  }
 }
 
 function renderRunOutput(

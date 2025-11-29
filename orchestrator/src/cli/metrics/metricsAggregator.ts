@@ -32,6 +32,18 @@ export interface MetricsEntry {
   cost_usd: number;
   latency_ms: number;
   tool_stats: ToolMetricEntry[];
+  learning_validation_status?: string | null;
+  learning_snapshot_status?: string | null;
+  learning_scenario_status?: string | null;
+  learning_crystalizer_status?: string | null;
+  learning_alerts?: number;
+  learning_group_id?: string | null;
+  learning_review_rejections?: number;
+  learning_review_latency_ms?: number | null;
+  learning_regressions_detected?: number;
+  learning_pattern_promoted?: number;
+  learning_pattern_deprecated?: number;
+  learning_throughput_candidates?: number;
 }
 
 export interface ToolMetricEntry {
@@ -66,7 +78,8 @@ export async function updateMetricsAggregates(env: EnvironmentPaths): Promise<vo
     writePostRollout(metricsDir, entries),
     writeCompleteness(metricsDir, entries),
     writeMttrDelta(env, entries),
-    writeTfgrpoEpochAggregates(metricsDir, entries)
+    writeTfgrpoEpochAggregates(metricsDir, entries),
+    writeLearningState(env, entries)
   ]);
 }
 
@@ -197,6 +210,70 @@ async function writeTfgrpoEpochAggregates(dir: string, entries: MetricsEntry[]):
     updated_at: new Date().toISOString()
   };
   await writeFile(join(dir, 'per-epoch.json'), `${JSON.stringify(payload, null, 2)}\n`, 'utf8');
+}
+
+async function writeLearningState(env: EnvironmentPaths, entries: MetricsEntry[]): Promise<void> {
+  const validationStatuses = entries
+    .map((entry) => entry.learning_validation_status)
+    .filter((value): value is string => typeof value === 'string');
+  const validationSummary = {
+    passed: validationStatuses.filter((status) => status === 'validated').length,
+    failed: validationStatuses.filter((status) => status === 'snapshot_failed').length,
+    stalled: validationStatuses.filter((status) => status === 'stalled_snapshot').length,
+    manual: validationStatuses.filter((status) => status === 'needs_manual_scenario').length
+  };
+
+  const reviewerRejections = entries.reduce(
+    (sum, entry) => sum + (entry.learning_review_rejections ?? 0),
+    0
+  );
+  const reviewerLatencies = entries
+    .map((entry) => entry.learning_review_latency_ms)
+    .filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
+  const reviewerLatencyMs =
+    reviewerLatencies.length > 0
+      ? reviewerLatencies.reduce((sum, value) => sum + value, 0) / reviewerLatencies.length
+      : null;
+
+  const regressions = entries.reduce(
+    (sum, entry) => sum + (entry.learning_regressions_detected ?? 0),
+    0
+  );
+  const patternPromotions = entries.reduce(
+    (sum, entry) => sum + (entry.learning_pattern_promoted ?? 0),
+    0
+  );
+  const patternDeprecations = entries.reduce(
+    (sum, entry) => sum + (entry.learning_pattern_deprecated ?? 0),
+    0
+  );
+  const throughputCandidates = entries.reduce(
+    (sum, entry) => sum + (entry.learning_throughput_candidates ?? 0),
+    0
+  );
+
+  const alerts = {
+    total: entries.reduce((sum, entry) => sum + (entry.learning_alerts ?? 0), 0),
+    snapshot_failed: entries.filter((entry) => entry.learning_snapshot_status === 'snapshot_failed').length,
+    stalled_snapshot: entries.filter((entry) => entry.learning_snapshot_status === 'stalled_snapshot').length,
+    needs_manual_scenario: validationSummary.manual
+  };
+
+  const payload = {
+    updated_at: new Date().toISOString(),
+    safety: {
+      validation: validationSummary,
+      reviewer: { rejections: reviewerRejections, average_latency_ms: reviewerLatencyMs },
+      regression_detection: { detected: regressions },
+      pattern_hygiene: { promoted: patternPromotions, deprecated: patternDeprecations }
+    },
+    throughput: { candidates: throughputCandidates },
+    alerts
+  };
+
+  const outDir = join(env.outRoot, env.taskId);
+  await mkdir(outDir, { recursive: true });
+  await writeFile(join(outDir, 'state.json'), `${JSON.stringify(payload, null, 2)}\n`, 'utf8');
 }
 
 function summarizeEpoch(epoch: number, entries: MetricsEntry[]): {
