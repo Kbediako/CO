@@ -67,6 +67,8 @@ describe('LearningHarvester', () => {
     await writeFile(manifestPath, JSON.stringify({ ok: true }), 'utf8');
     const promptPath = join(repoRoot, 'prompt.txt');
     await writeFile(promptPath, 'Fix bug prompt', 'utf8');
+    const untrackedPath = join(repoRoot, 'untracked.txt');
+    await writeFile(untrackedPath, 'untracked content', 'utf8');
 
     const result = await runLearningHarvester(manifest, {
       repoRoot,
@@ -86,6 +88,12 @@ describe('LearningHarvester', () => {
     expect(storagePath).toBeTruthy();
     const storageStat = await stat(join(repoRoot, storagePath ?? ''));
     expect(storageStat.isFile()).toBe(true);
+    const { stdout: untrackedContent } = await execFileAsync('tar', [
+      '-xOf',
+      join(repoRoot, storagePath ?? ''),
+      'untracked.txt'
+    ]);
+    expect(untrackedContent.trim()).toBe('untracked content');
     expect(result.queuePayloadPath).toBeTruthy();
   });
 

@@ -238,7 +238,14 @@ async function createSnapshot(params: {
 
   await mkdir(learningDir, { recursive: true });
   const tarballPath = join(learningDir, `${runId}.tar.gz`);
-  await execFileAsync('git', ['archive', '--format=tar.gz', '-o', tarballPath, tag], { cwd: repoRoot });
+  const fileListPath = join(learningDir, 'snapshot-files.txt');
+  const { stdout: fileListRaw } = await execFileAsync('git', ['ls-files', '-z', '--cached', '--others', '--exclude-standard'], {
+    cwd: repoRoot
+  });
+  const files = fileListRaw.split('\0').filter(Boolean);
+  await writeFile(fileListPath, files.join('\n'), 'utf8');
+
+  await execFileAsync('tar', ['-czf', tarballPath, '-C', repoRoot, '-T', fileListPath]);
   const digest = await hashFile(tarballPath);
   return { tag, commitSha, tarballPath, tarballDigest: digest };
 }
