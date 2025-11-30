@@ -118,6 +118,143 @@ export interface PromptPackManifestEntry {
   experiences?: string[];
 }
 
+export type LearningValidationMode = 'per-task' | 'grouped';
+export type LearningValidationStatus =
+  | 'pending'
+  | 'validated'
+  | 'snapshot_failed'
+  | 'stalled_snapshot'
+  | 'needs_manual_scenario';
+
+export interface LearningValidationPolicy {
+  mode: LearningValidationMode;
+  grouping?: LearningGrouping | null;
+  status?: LearningValidationStatus;
+  reason?: string | null;
+  log_path?: string | null;
+  last_error?: string | null;
+  git_status_path?: string | null;
+  git_log_path?: string | null;
+}
+
+export interface LearningGrouping {
+  id: string;
+  members: string[];
+  window_hours?: number;
+}
+
+export type LearningSnapshotStatus = 'pending' | 'captured' | 'snapshot_failed' | 'stalled_snapshot';
+
+export interface LearningSnapshotManifest {
+  tag: string;
+  commit_sha: string;
+  tarball_path: string;
+  tarball_digest: string;
+  storage_path: string;
+  retention_days: number;
+  status: LearningSnapshotStatus;
+  attempts: number;
+  created_at: string;
+  last_error?: string | null;
+  git_status_path?: string | null;
+  git_log_path?: string | null;
+}
+
+export interface LearningQueueRecord {
+  snapshot_id: string;
+  diff_path: string | null;
+  prompt_path: string | null;
+  execution_history_path: string | null;
+  manifest_path: string;
+  enqueued_at: string;
+  payload_path: string;
+  status: 'queued' | 'failed';
+}
+
+export type LearningScenarioStatus = 'pending' | 'synthesized' | 'needs_manual_scenario';
+
+export interface LearningScenarioRecord {
+  path: string | null;
+  generated_at: string | null;
+  source: 'execution_history' | 'prompt' | 'diff' | 'template' | 'manual';
+  status: LearningScenarioStatus;
+  attempts: number;
+  partial_path?: string | null;
+  manual_template?: string | null;
+  approver?: string | null;
+  reason?: string | null;
+}
+
+export type LearningAlertType = 'snapshot_failed' | 'stalled_snapshot' | 'needs_manual_scenario' | 'budget_exceeded';
+
+export interface LearningAlertRecord {
+  type: LearningAlertType;
+  channel: 'slack' | 'pagerduty';
+  target: string;
+  message: string;
+  created_at: string;
+  severity?: 'info' | 'warning' | 'critical';
+}
+
+export interface LearningApprovalRecord {
+  actor: string;
+  timestamp: string;
+  reason?: string | null;
+  state: 'stalled_snapshot' | 'needs_manual_scenario' | 'requeue';
+}
+
+export interface LearningCrystalizerRecord {
+  candidate_path: string | null;
+  model: string;
+  prompt_pack: string;
+  prompt_pack_stamp: string | null;
+  budget_usd: number;
+  cost_usd: number | null;
+  status: 'pending' | 'succeeded' | 'skipped' | 'failed';
+  error?: string | null;
+  created_at: string;
+}
+
+export interface LearningReviewRecord {
+  rejections: number;
+  latency_ms: number | null;
+  last_reviewer?: string | null;
+  updated_at: string;
+}
+
+export interface LearningRegressionsRecord {
+  detected: number;
+  detail_path?: string | null;
+}
+
+export interface LearningPatternHygieneRecord {
+  promoted: number;
+  deprecated: number;
+  notes?: string[];
+  updated_at: string;
+}
+
+export interface LearningThroughputRecord {
+  candidates: number;
+  active: number;
+  deprecated: number;
+  updated_at: string;
+}
+
+export interface LearningManifestSection {
+  snapshot?: LearningSnapshotManifest | null;
+  queue?: LearningQueueRecord | null;
+  scenario?: LearningScenarioRecord | null;
+  validation?: LearningValidationPolicy | null;
+  crystalizer?: LearningCrystalizerRecord | null;
+  alerts?: LearningAlertRecord[];
+  approvals?: LearningApprovalRecord[];
+  review?: LearningReviewRecord | null;
+  regressions?: LearningRegressionsRecord | null;
+  pattern_hygiene?: LearningPatternHygieneRecord | null;
+  throughput?: LearningThroughputRecord | null;
+}
+
 export interface TfgrpoToolMetric {
   tool: string;
   tokens: number;
@@ -243,6 +380,7 @@ export interface CliManifest {
       other: number;
     };
   };
+  learning?: LearningManifestSection | null;
   tfgrpo?: TfgrpoManifestSection | null;
 }
 

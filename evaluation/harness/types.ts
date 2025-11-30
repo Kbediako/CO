@@ -37,6 +37,8 @@ export interface ScenarioFixtureConfig {
   copyToTemp?: boolean;
 }
 
+export type ScenarioGoalConfig = AdapterCommandOverrides & { goal: AdapterGoal };
+
 export type PatternAssertion =
   | {
       type: 'file-exists';
@@ -56,7 +58,7 @@ export interface EvaluationScenario {
   id: string;
   title: string;
   adapterId: string;
-  goals: AdapterGoal[];
+  goals: Array<AdapterGoal | ScenarioGoalConfig>;
   fixture: ScenarioFixtureConfig;
   overrides?: Partial<Record<AdapterGoal, AdapterCommandOverrides>>;
   patternAssertions?: PatternAssertion[];
@@ -71,6 +73,7 @@ export interface ScenarioGoalResult {
   stderr: string;
   durationMs: number;
   error?: string;
+  solutionPatch?: string;
 }
 
 export interface PatternAssertionResult {
@@ -150,4 +153,8 @@ export interface LearningEpochResult {
 export interface LearningScheduleResult {
   config: LearningScheduleConfig;
   epochs: LearningEpochResult[];
+}
+
+export interface AgentTask {
+  instruction: string;
 }

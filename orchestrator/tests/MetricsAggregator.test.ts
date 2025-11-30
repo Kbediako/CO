@@ -59,7 +59,19 @@ function createEntry(index: number, status: string): MetricsEntry {
         status: status === 'succeeded' ? 'succeeded' : 'failed',
         sandbox_state: 'sandboxed'
       }
-    ]
+    ],
+    learning_validation_status: status === 'succeeded' ? 'validated' : 'snapshot_failed',
+    learning_snapshot_status: status === 'succeeded' ? 'captured' : 'snapshot_failed',
+    learning_scenario_status: status === 'succeeded' ? 'synthesized' : 'needs_manual_scenario',
+    learning_crystalizer_status: 'succeeded',
+    learning_alerts: status === 'succeeded' ? 0 : 1,
+    learning_group_id: null,
+    learning_review_rejections: status === 'succeeded' ? 0 : 1,
+    learning_review_latency_ms: status === 'succeeded' ? 1200 : 2000,
+    learning_regressions_detected: status === 'succeeded' ? 0 : 1,
+    learning_pattern_promoted: 1,
+    learning_pattern_deprecated: 0,
+    learning_throughput_candidates: 1
   };
 }
 
@@ -110,5 +122,11 @@ describe('metricsAggregator', () => {
     );
     expect(perEpoch.epochs).toHaveLength(2);
     expect(perEpoch.epochs[0]?.tools[0]?.tool).toBe('cli:command');
+
+    const state = JSON.parse(
+      await readFile(join(outRoot, env.taskId, 'state.json'), 'utf8')
+    );
+    expect(state.safety.validation.passed).toBeGreaterThan(0);
+    expect(state.throughput.candidates).toBe(2);
   });
 });

@@ -1,0 +1,268 @@
+import { promises as fs } from 'node:fs';
+import path from 'node:path';
+import { exec } from 'node:child_process';
+import { promisify } from 'node:util';
+import { logger } from '../../../orchestrator/src/logger.js';
+interface GoalResult {
+    goal: string;
+    status: string;
+    durationMs: number;
+    solutionPatch?: string;
+}
+
+interface SampleResult {
+    scenarioId: string;
+    reward?: {
+        gtScore: number;
+    };
+    goals: GoalResult[];
+    scenario?: { id: string }; // For compatibility if full result
+}
+
+interface InputData {
+    epochs?: { samples: SampleResult[] }[];
+    samples?: SampleResult[];
+}
+
+const execAsync = promisify(exec);
+
+interface PrGeneratorOptions {
+    inputFile: string;
+    scoreThreshold: number;
+    dryRun: boolean;
+}
+
+async function generatePrs(options: PrGeneratorOptions) {
+    logger.info(`Reading input file: ${options.inputFile}`);
+    const content = await fs.readFile(options.inputFile, 'utf8');
+    const data: InputData = JSON.parse(content);
+
+    // Handle both single epoch result and full schedule result
+    const samples: SampleResult[] = data.samples || (data.epochs ? data.epochs.flatMap(e => e.samples) : []);
+
+    if (!samples.length) {
+        logger.info('No samples found.');
+        return;
+    }
+
+    logger.info(`Found ${samples.length} samples. Filtering for score >= ${options.scoreThreshold}...`);
+
+    const highQualitySamples = samples.filter(s => {
+        const gtScore = s.reward?.gtScore ?? 0;
+        return gtScore >= options.scoreThreshold;
+    });
+
+    logger.info(`Found ${highQualitySamples.length} high-quality samples.`);
+
+    // Deduplicate by scenarioId (take the highest score or first one)
+    const bestSamples = new Map<string, SampleResult>();
+    for (const sample of highQualitySamples) {
+        const scenarioId = sample.scenarioId || sample.scenario?.id;
+        if (!scenarioId) continue;
+
+        const existing = bestSamples.get(scenarioId);
+        if (!existing || (sample.reward?.gtScore ?? 0) > (existing?.reward?.gtScore ?? 0)) {
+            bestSamples.set(scenarioId, sample);
+        }
+    }
+
+    logger.info(`Processing ${bestSamples.size} unique scenarios...`);
+
+    for (const sample of bestSamples.values()) {
+        const scenarioId = sample.scenarioId || sample.scenario?.id;
+        if (!scenarioId) continue;
+
+        const score = sample.reward?.gtScore;
+        const agentTask = sample.goals.find(g => g.goal === 'agent-task');
+        const patch = agentTask?.solutionPatch;
+
+        if (!patch) {
+            logger.warn(`[${scenarioId}] High score (${score}) but no solution patch found. Skipping.`);
+            continue;
+        }
+
+        const branchName = `learning/${scenarioId}-optimization`;
+        const commitMessage = `feat: optimize ${scenarioId} (score: ${score})`;
+
+        logger.info(`[${scenarioId}] Generating PR...`);
+        logger.info(`  Branch: ${branchName}`);
+        logger.info(`  Commit: ${commitMessage}`);
+
+        if (options.dryRun) {
+            logger.info(`  [Dry Run] Would apply patch:\n${patch.slice(0, 200)}...`);
+            continue;
+        }
+
+        try {
+            // 0. Enforce clean worktree
+            try {
+                // Ignore untracked files (-uno)
+                const { stdout } = await execAsync('git status --porcelain -uno');
+                if (stdout.trim()) {
+                    throw new Error('Worktree is dirty. Please commit or stash changes before running.');
+                }
+            } catch (e) {
+                const message = e instanceof Error ? e.message : String(e);
+                if (message.includes('Worktree is dirty')) throw e;
+                // If git status failed, maybe not a repo?
+                logger.warn(`  Warning: Could not check git status: ${message}`);
+            }
+
+            // 1. Checkout base branch (main) to avoid stacking
+            // We assume 'main' is the base. In a real tool, this might be configurable.
+            try {
+                await execAsync('git checkout main');
+            } catch (e) {
+                const message = e instanceof Error ? e.message : String(e);
+                logger.warn(`  Failed to checkout main: ${message}`);
+                // If main exists but failed (e.g. dirty), we shouldn't try master.
+                // Only try master if main doesn't exist.
+                if (message.includes("did not match any file(s)")) {
+                    try {
+                        await execAsync('git checkout master');
+                    } catch (e2) {
+                        throw new Error("Could not checkout main or master. Please ensure a base branch exists.");
+                    }
+                } else {
+                    // It failed for another reason (e.g. dirty worktree).
+                    // We can try to stash? Or just warn and proceed (risky).
+                    // Let's throw to be safe.
+                    throw e;
+                }
+            }
+
+            // 2. Handle existing branch
+            try {
+                // Check if branch exists
+                await execAsync(`git show-ref --verify refs/heads/${branchName}`);
+                logger.info(`  Branch ${branchName} exists. Deleting...`);
+                await execAsync(`git branch -D ${branchName}`);
+            } catch (e) {
+                // Branch doesn't exist, ignore
+            }
+
+            // 3. Create branch
+            await execAsync(`git checkout -b ${branchName}`);
+
+            // 4. Resolve fixture path to rewrite patch
+            const scenariosDir = path.resolve(process.cwd(), 'evaluation/scenarios');
+            const scenarioPath = path.join(scenariosDir, `${scenarioId}.json`);
+
+            let fixturePath = '';
+            try {
+                const scenarioContent = await fs.readFile(scenarioPath, 'utf8');
+                const scenario = JSON.parse(scenarioContent);
+                fixturePath = scenario.fixture.path;
+            } catch (e) {
+                logger.warn(`  Could not load scenario config for ${scenarioId}. Assuming root or manual apply.`);
+            }
+
+            // 5. Rewrite patch paths and collect affected files
+            // Parse line-by-line to avoid corrupting hunk content
+            const lines = patch.split('\n');
+            const finalLines: string[] = [];
+            const affectedFiles = new Set<string>();
+            let inHunk = false;
+            let cleanFixturePath = '';
+
+            if (fixturePath) {
+                cleanFixturePath = fixturePath.replace(/^\.\//, '');
+            }
+
+            for (const line of lines) {
+                let newLine = line;
+
+                if (line.startsWith('diff --git ')) {
+                    inHunk = false;
+                    // Parse paths: diff --git a/path/to/file b/path/to/file
+                    // Use generic regex to capture full tokens, handling /dev/null
+                    const match = line.match(/^diff --git (\S+) (\S+)/);
+                    if (match) {
+                        const p1 = match[1];
+                        const p2 = match[2];
+
+                        let newP1 = p1;
+                        let newP2 = p2;
+
+                        if (cleanFixturePath) {
+                            if (p1.startsWith('a/')) {
+                                newP1 = `a/${cleanFixturePath}/${p1.substring(2)}`;
+                            }
+                            if (p2.startsWith('b/')) {
+                                newP2 = `b/${cleanFixturePath}/${p2.substring(2)}`;
+                            }
+                            newLine = `diff --git ${newP1} ${newP2}`;
+                        }
+
+                        // Add to affectedFiles if it's a real file (starts with a/ or b/)
+                        // We add the REWRITTEN path (without prefix) to staging
+                        if (newP1.startsWith('a/')) affectedFiles.add(newP1.substring(2));
+                        if (newP2.startsWith('b/')) affectedFiles.add(newP2.substring(2));
+                    }
+                } else if (line.startsWith('@@ ')) {
+                    inHunk = true;
+                } else if (!inHunk && cleanFixturePath) {
+                    // Rewrite --- and +++ headers only if not in hunk
+                    if (line.startsWith('--- a/')) {
+                        const originalPath = line.substring(6); // '--- a/'.length
+                        newLine = `--- a/${cleanFixturePath}/${originalPath}`;
+                    } else if (line.startsWith('+++ b/')) {
+                        const originalPath = line.substring(6); // '+++ b/'.length
+                        newLine = `+++ b/${cleanFixturePath}/${originalPath}`;
+                    }
+                }
+
+                finalLines.push(newLine);
+            }
+
+            const finalPatch = finalLines.join('\n');
+
+            const patchFile = `solution-${scenarioId}.patch`;
+            await fs.writeFile(patchFile, finalPatch);
+            logger.info(`  Saved rewritten patch to ${patchFile}`);
+
+            // 6. Apply patch
+            try {
+                await execAsync(`git apply ${patchFile}`);
+            logger.info(`  Applied patch successfully.`);
+
+                // 7. Commit
+                if (affectedFiles.size > 0) {
+                    const files = Array.from(affectedFiles).join(' ');
+                    await execAsync(`git add ${files}`);
+                    await execAsync(`git commit -m "${commitMessage}"`);
+                    logger.info(`  Committed changes to: ${files}`);
+                } else {
+                    logger.warn('  No files found to commit.');
+                }
+            } catch (e) {
+                logger.error(`  Failed to apply/commit patch: ${e}`);
+                // Cleanup
+                await execAsync(`git checkout -`);
+                try {
+                    await execAsync(`git branch -D ${branchName}`);
+                } catch (ignore) {
+                    void ignore;
+                }
+            }
+        } catch (e) {
+            logger.error(`  Failed to process ${scenarioId}: ${e}`);
+        }
+    }
+}
+
+// CLI
+const args = process.argv.slice(2);
+const inputFile = args[0];
+const scoreThreshold = parseFloat(args[1] || '0.8');
+const dryRun = args.includes('--dry-run');
+
+if (!inputFile) {
+    logger.error('Usage: node pr-generator.js <input-json> [threshold] [--dry-run]');
+    process.exit(1);
+}
+
+generatePrs({ inputFile, scoreThreshold, dryRun }).catch((error) => {
+    logger.error(String(error));
+    process.exitCode = 1;
+});

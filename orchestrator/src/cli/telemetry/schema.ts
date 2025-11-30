@@ -18,6 +18,20 @@ const CHILD_STATUS = new Set(['queued', 'in_progress', 'succeeded', 'failed', 'c
 const COMMAND_KINDS = new Set(['command', 'subpipeline']);
 const RESUME_OUTCOMES = new Set(['accepted', 'blocked']);
 const PRIVACY_ACTIONS = new Set(['allow', 'redact', 'block']);
+const SNAPSHOT_STATUS = new Set(['pending', 'captured', 'snapshot_failed', 'stalled_snapshot']);
+const SCENARIO_STATUS = new Set(['pending', 'synthesized', 'needs_manual_scenario']);
+const CRYSTALIZER_STATUS = new Set(['pending', 'succeeded', 'skipped', 'failed']);
+const VALIDATION_MODE = new Set(['per-task', 'grouped']);
+const VALIDATION_STATUS = new Set([
+  'pending',
+  'validated',
+  'snapshot_failed',
+  'stalled_snapshot',
+  'needs_manual_scenario'
+]);
+const ALERT_TYPES = new Set(['snapshot_failed', 'stalled_snapshot', 'needs_manual_scenario', 'budget_exceeded']);
+const ALERT_CHANNELS = new Set(['slack', 'pagerduty']);
+const APPROVAL_STATES = new Set(['stalled_snapshot', 'needs_manual_scenario', 'requeue']);
 
 export const CLI_MANIFEST_SCHEMA: JsonSchema = {
   $schema: 'http://json-schema.org/draft-07/schema#',
@@ -284,6 +298,178 @@ export const CLI_MANIFEST_SCHEMA: JsonSchema = {
         log_path: { type: ['string', 'null'] }
       }
     },
+    learning: {
+      type: ['object', 'null'],
+      additionalProperties: false,
+      properties: {
+        snapshot: {
+          type: ['object', 'null'],
+          additionalProperties: false,
+          required: [
+            'tag',
+            'commit_sha',
+            'tarball_path',
+            'tarball_digest',
+            'storage_path',
+            'retention_days',
+            'status',
+            'attempts',
+            'created_at'
+          ],
+          properties: {
+            tag: { type: 'string', minLength: 1 },
+            commit_sha: { type: 'string', minLength: 1 },
+            tarball_path: { type: 'string', minLength: 1 },
+            tarball_digest: { type: 'string', minLength: 1 },
+            storage_path: { type: 'string', minLength: 1 },
+            retention_days: { type: 'integer', minimum: 1 },
+            status: { type: 'string', enum: Array.from(SNAPSHOT_STATUS) },
+            attempts: { type: 'integer', minimum: 0 },
+            created_at: { type: 'string', minLength: 1 },
+            last_error: { type: ['string', 'null'] },
+            git_status_path: { type: ['string', 'null'] },
+            git_log_path: { type: ['string', 'null'] }
+          }
+        },
+        queue: {
+          type: ['object', 'null'],
+          additionalProperties: false,
+          required: ['snapshot_id', 'manifest_path', 'enqueued_at', 'payload_path', 'status'],
+          properties: {
+            snapshot_id: { type: 'string', minLength: 1 },
+            diff_path: { type: ['string', 'null'] },
+            prompt_path: { type: ['string', 'null'] },
+            execution_history_path: { type: ['string', 'null'] },
+            manifest_path: { type: 'string', minLength: 1 },
+            enqueued_at: { type: 'string', minLength: 1 },
+            payload_path: { type: 'string', minLength: 1 },
+            status: { type: 'string', enum: ['queued', 'failed'] }
+          }
+        },
+        scenario: {
+          type: ['object', 'null'],
+          additionalProperties: false,
+          required: ['path', 'generated_at', 'source', 'status', 'attempts'],
+          properties: {
+            path: { type: ['string', 'null'] },
+            generated_at: { type: ['string', 'null'] },
+            source: { type: 'string', enum: ['execution_history', 'prompt', 'diff', 'template', 'manual'] },
+            status: { type: 'string', enum: Array.from(SCENARIO_STATUS) },
+            attempts: { type: 'integer', minimum: 0 },
+            partial_path: { type: ['string', 'null'] },
+            manual_template: { type: ['string', 'null'] },
+            approver: { type: ['string', 'null'] },
+            reason: { type: ['string', 'null'] }
+          }
+        },
+        validation: {
+          type: ['object', 'null'],
+          additionalProperties: false,
+          properties: {
+            mode: { type: 'string', enum: Array.from(VALIDATION_MODE) },
+            grouping: {
+              type: ['object', 'null'],
+              additionalProperties: false,
+              required: ['id', 'members'],
+              properties: {
+                id: { type: 'string', minLength: 1 },
+                members: { type: 'array', items: { type: 'string', minLength: 1 } },
+                window_hours: { type: ['number', 'null'] }
+              }
+            },
+            status: { type: 'string', enum: Array.from(VALIDATION_STATUS) }
+          }
+        },
+        crystalizer: {
+          type: ['object', 'null'],
+          additionalProperties: false,
+          required: ['candidate_path', 'model', 'prompt_pack', 'prompt_pack_stamp', 'budget_usd', 'cost_usd', 'status', 'created_at'],
+          properties: {
+            candidate_path: { type: ['string', 'null'] },
+            model: { type: 'string', minLength: 1 },
+            prompt_pack: { type: 'string', minLength: 1 },
+            prompt_pack_stamp: { type: ['string', 'null'] },
+            budget_usd: { type: 'number', minimum: 0 },
+            cost_usd: { type: ['number', 'null'] },
+            status: { type: 'string', enum: Array.from(CRYSTALIZER_STATUS) },
+            error: { type: ['string', 'null'] },
+            created_at: { type: 'string', minLength: 1 }
+          }
+        },
+        alerts: {
+          type: 'array',
+          items: {
+            type: 'object',
+            additionalProperties: false,
+            required: ['type', 'channel', 'target', 'message', 'created_at'],
+            properties: {
+              type: { type: 'string', enum: Array.from(ALERT_TYPES) },
+              channel: { type: 'string', enum: Array.from(ALERT_CHANNELS) },
+              target: { type: 'string', minLength: 1 },
+              message: { type: 'string', minLength: 1 },
+              created_at: { type: 'string', minLength: 1 },
+              severity: { type: ['string', 'null'] }
+            }
+          }
+        },
+        approvals: {
+          type: 'array',
+          items: {
+            type: 'object',
+            additionalProperties: false,
+            required: ['actor', 'timestamp', 'state'],
+            properties: {
+              actor: { type: 'string', minLength: 1 },
+              timestamp: { type: 'string', minLength: 1 },
+              reason: { type: ['string', 'null'] },
+              state: { type: 'string', enum: Array.from(APPROVAL_STATES) }
+            }
+          }
+        },
+        review: {
+          type: ['object', 'null'],
+          additionalProperties: false,
+          required: ['rejections', 'latency_ms', 'updated_at'],
+          properties: {
+            rejections: { type: 'integer', minimum: 0 },
+            latency_ms: { type: ['number', 'null'] },
+            last_reviewer: { type: ['string', 'null'] },
+            updated_at: { type: 'string', minLength: 1 }
+          }
+        },
+        regressions: {
+          type: ['object', 'null'],
+          additionalProperties: false,
+          required: ['detected'],
+          properties: {
+            detected: { type: 'integer', minimum: 0 },
+            detail_path: { type: ['string', 'null'] }
+          }
+        },
+        pattern_hygiene: {
+          type: ['object', 'null'],
+          additionalProperties: false,
+          required: ['promoted', 'deprecated', 'updated_at'],
+          properties: {
+            promoted: { type: 'integer', minimum: 0 },
+            deprecated: { type: 'integer', minimum: 0 },
+            notes: { type: ['array', 'null'], items: { type: 'string' } },
+            updated_at: { type: 'string', minLength: 1 }
+          }
+        },
+        throughput: {
+          type: ['object', 'null'],
+          additionalProperties: false,
+          required: ['candidates', 'active', 'deprecated', 'updated_at'],
+          properties: {
+            candidates: { type: 'integer', minimum: 0 },
+            active: { type: 'integer', minimum: 0 },
+            deprecated: { type: 'integer', minimum: 0 },
+            updated_at: { type: 'string', minLength: 1 }
+          }
+        }
+      }
+    },
     guardrail_status: {
       type: 'object',
       additionalProperties: false,
@@ -366,6 +552,7 @@ export function validateCliManifest(candidate: unknown): ValidationResult<CliMan
   validateResumeEvents(candidate.resume_events, errors);
   validateApprovals(candidate.approvals, errors);
   validatePrivacy(candidate.privacy, errors);
+  validateLearning(candidate.learning, errors);
 
   if (errors.length > 0) {
     return { valid: false, errors, value: null };
@@ -713,6 +900,320 @@ function validatePrivacy(candidate: unknown, errors: string[]): void {
   if ('log_path' in privacy) {
     validateOptionalString(privacy, 'log_path', errors, 'privacy');
   }
+}
+
+function validateLearning(candidate: unknown, errors: string[]): void {
+  if (candidate === undefined || candidate === null) {
+    return;
+  }
+  if (!isPlainObject(candidate)) {
+    errors.push('learning must be an object when provided');
+    return;
+  }
+  const learning = candidate as Record<string, unknown>;
+  if ('snapshot' in learning) {
+    validateLearningSnapshot(learning.snapshot, errors);
+  }
+  if ('queue' in learning) {
+    validateLearningQueue(learning.queue, errors);
+  }
+  if ('scenario' in learning) {
+    validateLearningScenario(learning.scenario, errors);
+  }
+  if ('validation' in learning) {
+    validateLearningValidation(learning.validation, errors);
+  }
+  if ('crystalizer' in learning) {
+    validateLearningCrystalizer(learning.crystalizer, errors);
+  }
+  if ('alerts' in learning) {
+    validateLearningAlerts(learning.alerts, errors);
+  }
+  if ('approvals' in learning) {
+    validateLearningApprovals(learning.approvals, errors);
+  }
+  if ('review' in learning) {
+    validateLearningReview(learning.review, errors);
+  }
+  if ('regressions' in learning) {
+    validateLearningRegressions(learning.regressions, errors);
+  }
+  if ('pattern_hygiene' in learning) {
+    validateLearningPatternHygiene(learning.pattern_hygiene, errors);
+  }
+  if ('throughput' in learning) {
+    validateLearningThroughput(learning.throughput, errors);
+  }
+}
+
+function validateLearningSnapshot(candidate: unknown, errors: string[]): void {
+  if (candidate === undefined || candidate === null) {
+    return;
+  }
+  if (!isPlainObject(candidate)) {
+    errors.push('learning.snapshot must be an object when provided');
+    return;
+  }
+  const snapshot = candidate as Record<string, unknown>;
+  validateString(snapshot, 'tag', errors, 'learning.snapshot');
+  validateString(snapshot, 'commit_sha', errors, 'learning.snapshot');
+  validateString(snapshot, 'tarball_path', errors, 'learning.snapshot');
+  validateString(snapshot, 'tarball_digest', errors, 'learning.snapshot');
+  validateString(snapshot, 'storage_path', errors, 'learning.snapshot');
+  validateNumber(snapshot, 'retention_days', errors, { integer: true, minimum: 1, path: 'learning.snapshot.retention_days' });
+  validateNumber(snapshot, 'attempts', errors, { integer: true, minimum: 0, path: 'learning.snapshot.attempts' });
+  validateString(snapshot, 'created_at', errors, 'learning.snapshot');
+  const status = snapshot.status;
+  if (typeof status !== 'string' || !SNAPSHOT_STATUS.has(status)) {
+    errors.push(`learning.snapshot.status must be one of ${Array.from(SNAPSHOT_STATUS).join(', ')}`);
+  }
+  validateOptionalString(snapshot, 'last_error', errors, 'learning.snapshot');
+  validateOptionalString(snapshot, 'git_status_path', errors, 'learning.snapshot');
+  validateOptionalString(snapshot, 'git_log_path', errors, 'learning.snapshot');
+}
+
+function validateLearningQueue(candidate: unknown, errors: string[]): void {
+  if (candidate === undefined || candidate === null) {
+    return;
+  }
+  if (!isPlainObject(candidate)) {
+    errors.push('learning.queue must be an object when provided');
+    return;
+  }
+  const queue = candidate as Record<string, unknown>;
+  validateString(queue, 'snapshot_id', errors, 'learning.queue');
+  validateOptionalString(queue, 'diff_path', errors, 'learning.queue');
+  validateOptionalString(queue, 'prompt_path', errors, 'learning.queue');
+  validateOptionalString(queue, 'execution_history_path', errors, 'learning.queue');
+  validateString(queue, 'manifest_path', errors, 'learning.queue');
+  validateString(queue, 'enqueued_at', errors, 'learning.queue');
+  validateString(queue, 'payload_path', errors, 'learning.queue');
+  const status = queue.status;
+  if (status !== 'queued' && status !== 'failed') {
+    errors.push('learning.queue.status must be queued or failed');
+  }
+}
+
+function validateLearningScenario(candidate: unknown, errors: string[]): void {
+  if (candidate === undefined || candidate === null) {
+    return;
+  }
+  if (!isPlainObject(candidate)) {
+    errors.push('learning.scenario must be an object when provided');
+    return;
+  }
+  const scenario = candidate as Record<string, unknown>;
+  validateOptionalString(scenario, 'path', errors, 'learning.scenario');
+  validateOptionalString(scenario, 'generated_at', errors, 'learning.scenario');
+  validateOptionalString(scenario, 'partial_path', errors, 'learning.scenario');
+  validateOptionalString(scenario, 'manual_template', errors, 'learning.scenario');
+  validateOptionalString(scenario, 'approver', errors, 'learning.scenario');
+  validateOptionalString(scenario, 'reason', errors, 'learning.scenario');
+  validateNumber(scenario, 'attempts', errors, { integer: true, minimum: 0, path: 'learning.scenario.attempts' });
+  const source = scenario.source;
+  if (
+    source !== 'execution_history' &&
+    source !== 'prompt' &&
+    source !== 'diff' &&
+    source !== 'template' &&
+    source !== 'manual'
+  ) {
+    errors.push(
+      'learning.scenario.source must be execution_history, prompt, diff, template, or manual'
+    );
+  }
+  const status = scenario.status;
+  if (typeof status !== 'string' || !SCENARIO_STATUS.has(status)) {
+    errors.push(`learning.scenario.status must be one of ${Array.from(SCENARIO_STATUS).join(', ')}`);
+  }
+}
+
+function validateLearningValidation(candidate: unknown, errors: string[]): void {
+  if (candidate === undefined || candidate === null) {
+    return;
+  }
+  if (!isPlainObject(candidate)) {
+    errors.push('learning.validation must be an object when provided');
+    return;
+  }
+  const validation = candidate as Record<string, unknown>;
+  if ('mode' in validation) {
+    const mode = validation.mode;
+    if (typeof mode !== 'string' || !VALIDATION_MODE.has(mode)) {
+      errors.push(`learning.validation.mode must be one of ${Array.from(VALIDATION_MODE).join(', ')}`);
+    }
+  }
+  if ('status' in validation) {
+    const status = validation.status;
+    if (typeof status !== 'string' || !VALIDATION_STATUS.has(status)) {
+      errors.push(`learning.validation.status must be one of ${Array.from(VALIDATION_STATUS).join(', ')}`);
+    }
+  }
+  if ('grouping' in validation) {
+    const grouping = validation.grouping;
+    if (grouping !== null && grouping !== undefined) {
+      if (!isPlainObject(grouping)) {
+        errors.push('learning.validation.grouping must be an object when provided');
+      } else {
+        const groupRecord = grouping as Record<string, unknown>;
+        validateString(groupRecord, 'id', errors, 'learning.validation.grouping');
+        const members = groupRecord.members;
+        if (!Array.isArray(members)) {
+          errors.push('learning.validation.grouping.members must be an array');
+        } else if (!members.every((entry) => typeof entry === 'string' && entry.length > 0)) {
+          errors.push('learning.validation.grouping.members must contain non-empty strings');
+        }
+        if ('window_hours' in groupRecord && groupRecord.window_hours !== null && groupRecord.window_hours !== undefined) {
+          if (typeof groupRecord.window_hours !== 'number' || Number.isNaN(groupRecord.window_hours)) {
+            errors.push('learning.validation.grouping.window_hours must be a number when provided');
+          }
+        }
+      }
+    }
+  }
+}
+
+function validateLearningCrystalizer(candidate: unknown, errors: string[]): void {
+  if (candidate === undefined || candidate === null) {
+    return;
+  }
+  if (!isPlainObject(candidate)) {
+    errors.push('learning.crystalizer must be an object when provided');
+    return;
+  }
+  const crystal = candidate as Record<string, unknown>;
+  validateOptionalString(crystal, 'candidate_path', errors, 'learning.crystalizer');
+  validateString(crystal, 'model', errors, 'learning.crystalizer');
+  validateString(crystal, 'prompt_pack', errors, 'learning.crystalizer');
+  validateOptionalString(crystal, 'prompt_pack_stamp', errors, 'learning.crystalizer');
+  validateNumber(crystal, 'budget_usd', errors, { minimum: 0, path: 'learning.crystalizer.budget_usd' });
+  if ('cost_usd' in crystal && crystal.cost_usd !== null) {
+    validateNumber(crystal, 'cost_usd', errors, { minimum: 0, path: 'learning.crystalizer.cost_usd' });
+  }
+  validateString(crystal, 'created_at', errors, 'learning.crystalizer');
+  const status = crystal.status;
+  if (typeof status !== 'string' || !CRYSTALIZER_STATUS.has(status)) {
+    errors.push(`learning.crystalizer.status must be one of ${Array.from(CRYSTALIZER_STATUS).join(', ')}`);
+  }
+  validateOptionalString(crystal, 'error', errors, 'learning.crystalizer');
+}
+
+function validateLearningAlerts(candidate: unknown, errors: string[]): void {
+  if (candidate === undefined || candidate === null) {
+    return;
+  }
+  if (!Array.isArray(candidate)) {
+    errors.push('learning.alerts must be an array when provided');
+    return;
+  }
+  candidate.forEach((entry, index) => {
+    if (!isPlainObject(entry)) {
+      errors.push(`learning.alerts[${index}] must be an object`);
+      return;
+    }
+    const alert = entry as Record<string, unknown>;
+    validateString(alert, 'target', errors, `learning.alerts[${index}]`);
+    validateString(alert, 'message', errors, `learning.alerts[${index}]`);
+    validateString(alert, 'created_at', errors, `learning.alerts[${index}]`);
+    const type = alert.type;
+    if (typeof type !== 'string' || !ALERT_TYPES.has(type)) {
+      errors.push(`learning.alerts[${index}].type must be one of ${Array.from(ALERT_TYPES).join(', ')}`);
+    }
+    const channel = alert.channel;
+    if (typeof channel !== 'string' || !ALERT_CHANNELS.has(channel)) {
+      errors.push(
+        `learning.alerts[${index}].channel must be one of ${Array.from(ALERT_CHANNELS).join(', ')}`
+      );
+    }
+  });
+}
+
+function validateLearningApprovals(candidate: unknown, errors: string[]): void {
+  if (candidate === undefined || candidate === null) {
+    return;
+  }
+  if (!Array.isArray(candidate)) {
+    errors.push('learning.approvals must be an array when provided');
+    return;
+  }
+  candidate.forEach((entry, index) => {
+    if (!isPlainObject(entry)) {
+      errors.push(`learning.approvals[${index}] must be an object`);
+      return;
+    }
+    const approval = entry as Record<string, unknown>;
+    validateString(approval, 'actor', errors, `learning.approvals[${index}]`);
+    validateString(approval, 'timestamp', errors, `learning.approvals[${index}]`);
+    validateOptionalString(approval, 'reason', errors, `learning.approvals[${index}]`);
+    const state = approval.state;
+    if (typeof state !== 'string' || !APPROVAL_STATES.has(state)) {
+      errors.push(`learning.approvals[${index}].state must be one of ${Array.from(APPROVAL_STATES).join(', ')}`);
+    }
+  });
+}
+
+function validateLearningReview(candidate: unknown, errors: string[]): void {
+  if (candidate === undefined || candidate === null) {
+    return;
+  }
+  if (!isPlainObject(candidate)) {
+    errors.push('learning.review must be an object when provided');
+    return;
+  }
+  const review = candidate as Record<string, unknown>;
+  validateNumber(review, 'rejections', errors, { integer: true, minimum: 0, path: 'learning.review.rejections' });
+  if ('latency_ms' in review && review.latency_ms !== null) {
+    validateNumber(review, 'latency_ms', errors, { path: 'learning.review.latency_ms' });
+  }
+  validateOptionalString(review, 'last_reviewer', errors, 'learning.review');
+  validateString(review, 'updated_at', errors, 'learning.review');
+}
+
+function validateLearningRegressions(candidate: unknown, errors: string[]): void {
+  if (candidate === undefined || candidate === null) {
+    return;
+  }
+  if (!isPlainObject(candidate)) {
+    errors.push('learning.regressions must be an object when provided');
+    return;
+  }
+  const regressions = candidate as Record<string, unknown>;
+  validateNumber(regressions, 'detected', errors, { integer: true, minimum: 0, path: 'learning.regressions.detected' });
+  validateOptionalString(regressions, 'detail_path', errors, 'learning.regressions');
+}
+
+function validateLearningPatternHygiene(candidate: unknown, errors: string[]): void {
+  if (candidate === undefined || candidate === null) {
+    return;
+  }
+  if (!isPlainObject(candidate)) {
+    errors.push('learning.pattern_hygiene must be an object when provided');
+    return;
+  }
+  const hygiene = candidate as Record<string, unknown>;
+  validateNumber(hygiene, 'promoted', errors, { integer: true, minimum: 0, path: 'learning.pattern_hygiene.promoted' });
+  validateNumber(hygiene, 'deprecated', errors, { integer: true, minimum: 0, path: 'learning.pattern_hygiene.deprecated' });
+  if ('notes' in hygiene && hygiene.notes !== null) {
+    if (!Array.isArray(hygiene.notes)) {
+      errors.push('learning.pattern_hygiene.notes must be an array when provided');
+    }
+  }
+  validateString(hygiene, 'updated_at', errors, 'learning.pattern_hygiene');
+}
+
+function validateLearningThroughput(candidate: unknown, errors: string[]): void {
+  if (candidate === undefined || candidate === null) {
+    return;
+  }
+  if (!isPlainObject(candidate)) {
+    errors.push('learning.throughput must be an object when provided');
+    return;
+  }
+  const throughput = candidate as Record<string, unknown>;
+  validateNumber(throughput, 'candidates', errors, { integer: true, minimum: 0, path: 'learning.throughput.candidates' });
+  validateNumber(throughput, 'active', errors, { integer: true, minimum: 0, path: 'learning.throughput.active' });
+  validateNumber(throughput, 'deprecated', errors, { integer: true, minimum: 0, path: 'learning.throughput.deprecated' });
+  validateString(throughput, 'updated_at', errors, 'learning.throughput');
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {

@@ -22,6 +22,7 @@ import type {
   RewardSummary,
   RunScenarioOptions,
   ScenarioGoalResult,
+  ScenarioGoalConfig,
   TfgrpoSampleMetadata
 } from './types.js';
 
@@ -96,8 +97,17 @@ async function buildPlansForFixture(
   const plans: AdapterExecutionPlan[] = [];
 
   for (const goal of scenario.goals) {
-    const overrides = applyFixtureToOverrides(scenario.overrides?.[goal], fixturePath);
-    const executionPlan = createExecutionPlan(scenario.adapterId, goal, {
+    const goalId = typeof goal === 'string' ? goal : goal.goal;
+    const goalOverrides: AdapterCommandOverrides =
+      typeof goal === 'string' ? {} : { ...(goal as ScenarioGoalConfig) };
+    delete (goalOverrides as Partial<ScenarioGoalConfig>).goal;
+
+    const scenarioOverrides = scenario.overrides?.[goalId] ?? {};
+    const overrides = applyFixtureToOverrides(
+      { ...scenarioOverrides, ...goalOverrides },
+      fixturePath
+    );
+    const executionPlan = createExecutionPlan(scenario.adapterId, goalId, {
       ...overrides,
       useEvaluationDefaults: overrides.useEvaluationDefaults ?? true
     });

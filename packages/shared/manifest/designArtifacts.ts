@@ -692,6 +692,8 @@ function sanitizeDesignStyleProfile(
   return sanitized;
 }
 
+type NumericMetricField = Exclude<keyof DesignMetricRecord, 'style_overlap_gate' | 'snippet_version'>;
+
 function sanitizeDesignMetrics(metrics: unknown): DesignMetricRecord {
   if (!metrics || typeof metrics !== 'object') {
     throw new Error('design metrics must be an object');
@@ -699,7 +701,7 @@ function sanitizeDesignMetrics(metrics: unknown): DesignMetricRecord {
   const record = metrics as Record<string, unknown>;
   const sanitized: DesignMetricRecord = {};
 
-  const fields: Array<keyof DesignMetricRecord> = [
+  const fields: NumericMetricField[] = [
     'aesthetic_axes_completeness',
     'originality_score',
     'accessibility_score',
