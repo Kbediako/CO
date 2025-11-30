@@ -310,7 +310,7 @@ export const CLI_MANIFEST_SCHEMA: JsonSchema = {
             'commit_sha',
             'tarball_path',
             'tarball_digest',
-            's3_uri',
+            'storage_path',
             'retention_days',
             'status',
             'attempts',
@@ -321,7 +321,7 @@ export const CLI_MANIFEST_SCHEMA: JsonSchema = {
             commit_sha: { type: 'string', minLength: 1 },
             tarball_path: { type: 'string', minLength: 1 },
             tarball_digest: { type: 'string', minLength: 1 },
-            s3_uri: { type: 'string', minLength: 1 },
+            storage_path: { type: 'string', minLength: 1 },
             retention_days: { type: 'integer', minimum: 1 },
             status: { type: 'string', enum: Array.from(SNAPSHOT_STATUS) },
             attempts: { type: 'integer', minimum: 0 },
@@ -959,7 +959,7 @@ function validateLearningSnapshot(candidate: unknown, errors: string[]): void {
   validateString(snapshot, 'commit_sha', errors, 'learning.snapshot');
   validateString(snapshot, 'tarball_path', errors, 'learning.snapshot');
   validateString(snapshot, 'tarball_digest', errors, 'learning.snapshot');
-  validateString(snapshot, 's3_uri', errors, 'learning.snapshot');
+  validateString(snapshot, 'storage_path', errors, 'learning.snapshot');
   validateNumber(snapshot, 'retention_days', errors, { integer: true, minimum: 1, path: 'learning.snapshot.retention_days' });
   validateNumber(snapshot, 'attempts', errors, { integer: true, minimum: 0, path: 'learning.snapshot.attempts' });
   validateString(snapshot, 'created_at', errors, 'learning.snapshot');

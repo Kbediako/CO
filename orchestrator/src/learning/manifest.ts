@@ -19,11 +19,15 @@ const DEFAULT_LEARNING_SECTION: LearningManifestSection = {
 
 export function ensureLearningSection(manifest: CliManifest): LearningManifestSection {
   if (!manifest.learning) {
-    manifest.learning = { ...DEFAULT_LEARNING_SECTION };
+    manifest.learning = {
+      validation: { mode: 'per-task', grouping: null, status: 'pending' },
+      alerts: [],
+      approvals: []
+    };
     return manifest.learning;
   }
   if (!manifest.learning.validation) {
-    manifest.learning.validation = { ...DEFAULT_LEARNING_SECTION.validation };
+    manifest.learning.validation = { mode: 'per-task', grouping: null, status: 'pending' };
   } else if (!manifest.learning.validation.status) {
     manifest.learning.validation.status = 'pending';
   }

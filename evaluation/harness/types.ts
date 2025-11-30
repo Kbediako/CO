@@ -73,6 +73,7 @@ export interface ScenarioGoalResult {
   stderr: string;
   durationMs: number;
   error?: string;
+  solutionPatch?: string;
 }
 
 export interface PatternAssertionResult {
@@ -152,4 +153,8 @@ export interface LearningEpochResult {
 export interface LearningScheduleResult {
   config: LearningScheduleConfig;
   epochs: LearningEpochResult[];
+}
+
+export interface AgentTask {
+  instruction: string;
 }

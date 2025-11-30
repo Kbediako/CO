@@ -11,7 +11,7 @@
 - Pattern storage exists but does not auto-ingest validated learnings; `.agent/patterns` is canonical but not automatically populated from runs.
 
 ### Proposed Changes
-- **Harvester:** Detect task completion, tag the repo with `learning-snapshot-<uuid>` (or tarball digest) plus `SnapshotCommitSHA`, and enqueue `(SnapshotID, Diff, Prompt, ExecutionHistory, manifestPath)` for validation. Persist snapshot metadata alongside queue records for runner verification. Snapshot tarballs (when used) stored in S3 bucket `learning-snapshots` with 30-day lifecycle; git tags remain in-repo for traceability.
+- **Harvester:** Detect task completion, tag the repo with `learning-snapshot-<uuid>` (or tarball digest) plus `SnapshotCommitSHA`, and enqueue `(SnapshotID, Diff, Prompt, ExecutionHistory, manifestPath)` for validation. Persist snapshot metadata alongside queue records for runner verification. Snapshot tarballs (when used) are stored locally under `learning-snapshots/<task-id>/<run-id>.tar.gz` (inside the runs root) with a 30-day retention guideline; git tags remain in-repo for traceability.
 - **Runner + Scenario Synthesis:** Extend `tfgrpo-runner` (or equivalent pipeline) to infer scenarios from execution history, diffs, and stack templates. If heuristics fail twice, emit `needs_manual_scenario`, write partial `scenario.json` to the manifest, and require a reviewer to fill `.agent/task/templates/manual-scenario-template.md` before requeue.
 - **Validation:** Replay synthesized scenarios, record results + exit codes. On checkout/apply failures, set `stalled_snapshot`, attach git status/logs, and block automatic retries until a human requeues with explicit approver metadata.
 - **Crystalizer:** Use an LLM helper (provider: `gpt-5.1-codex-max` by default, prompt pack `prompt-packs/crystalizer-v1` with stamped hash) to produce Markdown patterns from validated patches + PRD context, writing to `.agent/patterns/candidates/` with `Problem/Solution/Rationale` sections. Per-run token/cost budget: $0.50 max; abort and alert if exceeded. Model may be overridden via `CRYSTALIZER_MODEL`. A Codex CLI-backed client is available (`createCodexCliCrystalizerClient`) for environments that rely on Codex login instead of OpenAI API keys.
@@ -19,7 +19,7 @@
 - **Governance:** Keep `.agent/patterns` as canonical; candidates remain in `candidates/` until reviewed/promoted to `active/` or moved to `deprecated/`. `docs/patterns` may link only.
 
 ### Data Flow
-1. Completion detected → Harvester tags snapshot and records `{TagName, SnapshotCommitSHA, TarballDigest}`; if tarball used, uploads to `s3://learning-snapshots/<task-id>/<run-id>.tar.gz` with 30-day retention metadata.
+1. Completion detected → Harvester tags snapshot and records `{TagName, SnapshotCommitSHA, TarballDigest}`; if tarball used, copies to `learning-snapshots/<task-id>/<run-id>.tar.gz` under the runs root with a 30-day retention guideline.
 2. Harvester enqueues validation job with pointers to diff, prompt, execution history, and manifest path.
 3. Runner verifies snapshot integrity against recorded metadata; failures mark `snapshot_failed`, retry with backoff (max 2), then alert operators.
 4. Scenario synthesis uses execution history > prompt > diff > stack templates; on repeated failure, flag `needs_manual_scenario`, alert, and wait for manual template completion + requeue.
@@ -28,7 +28,7 @@
 7. Librarian/reviewer promotes or deprecates patterns inside `.agent/patterns`, with optional doc links in `docs/patterns/`.
 
 ### Data Persistence / State Impact
-- Snapshots referenced by git tag + optional tarball digest; tarballs live in `s3://learning-snapshots` with 30-day lifecycle policy. Every run manifest under `.runs/0607-continuous-learning-pipeline/cli/<run-id>/manifest.json` must record `{TagName, SnapshotCommitSHA, TarballDigest, s3Uri}` alongside verification hashes and outcomes (`snapshot_failed`, `stalled_snapshot`, `needs_manual_scenario`, `validated`).
+- Snapshots referenced by git tag + optional tarball digest; tarballs live under `learning-snapshots/<task-id>/<run-id>.tar.gz` (within the runs root) with a 30-day retention guideline. Every run manifest under `.runs/0607-continuous-learning-pipeline/cli/<run-id>/manifest.json` must record `{TagName, SnapshotCommitSHA, TarballDigest, storage_path}` alongside verification hashes and outcomes (`snapshot_failed`, `stalled_snapshot`, `needs_manual_scenario`, `validated`).
 - Queue/runner outputs and scenarios recorded in `.runs/0607-continuous-learning-pipeline/cli/<run-id>/manifest.json`; metrics aggregated in `.runs/0607-continuous-learning-pipeline/metrics.json`.
 - Patterns stored only under `.agent/patterns/{candidates,active,deprecated}/`; any `docs/patterns` entry must point back to the canonical file.
 

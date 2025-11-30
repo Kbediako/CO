@@ -1,8 +1,8 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { join, relative } from 'node:path';
+import { copyFile, mkdir, readFile, writeFile } from 'node:fs/promises';
+import { dirname, join, relative } from 'node:path';
 
 import { isoTimestamp } from '../cli/utils/time.js';
 import type { CliManifest } from '../cli/types.js';
@@ -28,7 +28,7 @@ export interface LearningHarvesterOptions {
   executionHistoryPath?: string | null;
   maxAttempts?: number;
   backoffMs?: number[];
-  bucket?: string;
+  storageDir?: string;
   alertTargets?: { slack?: string; pagerduty?: string };
   uploader?: SnapshotUploader;
 }
@@ -54,14 +54,16 @@ export async function runLearningHarvester(
     executionHistoryPath = null,
     maxAttempts = 3,
     backoffMs = [500, 1_000],
-    bucket = 's3://learning-snapshots',
+    storageDir,
     alertTargets,
     uploader
   } = options;
 
   const learning = ensureLearningSection(manifest);
   const safeTaskId = sanitizeTaskId(taskId);
-  const learningDir = join(runsRoot, safeTaskId, 'cli', sanitizeRunId(runId), 'learning');
+  const safeRunId = sanitizeRunId(runId);
+  const learningDir = join(runsRoot, safeTaskId, 'cli', safeRunId, 'learning');
+  const storageRoot = storageDir ?? join(runsRoot, 'learning-snapshots');
   await mkdir(learningDir, { recursive: true });
 
   let snapshotPath: string | null = null;
@@ -70,11 +72,11 @@ export async function runLearningHarvester(
     try {
       const snapshot = await createSnapshot({ repoRoot, learningDir, runId });
       snapshotPath = snapshot.tarballPath;
-      const s3Uri = await uploadSnapshot({
+      const storagePath = await persistSnapshot({
         uploader,
-        bucket,
-        taskId,
-        runId,
+        storageRoot,
+        taskId: safeTaskId,
+        runId: safeRunId,
         tarballPath: snapshot.tarballPath,
         retentionDays: 30
       });
@@ -94,7 +96,7 @@ export async function runLearningHarvester(
         commit_sha: snapshot.commitSha,
         tarball_path: relative(repoRoot, snapshot.tarballPath),
         tarball_digest: snapshot.tarballDigest,
-        s3_uri: s3Uri,
+        storage_path: relative(repoRoot, storagePath),
         retention_days: 30,
         status: 'captured',
         attempts: attempt,
@@ -123,7 +125,9 @@ export async function runLearningHarvester(
         commit_sha: learning.snapshot?.commit_sha ?? 'unknown',
         tarball_path: learning.snapshot?.tarball_path ?? 'unavailable',
         tarball_digest: learning.snapshot?.tarball_digest ?? 'unavailable',
-        s3_uri: learning.snapshot?.s3_uri ?? `${bucket}/${taskId}/${runId}.tar.gz`,
+        storage_path:
+          learning.snapshot?.storage_path ??
+          relative(repoRoot, join(storageRoot, safeTaskId, `${safeRunId}.tar.gz`)),
         retention_days: 30,
         status: 'snapshot_failed',
         attempts: attempt,
@@ -168,7 +172,9 @@ export async function recordStalledSnapshot(
   const { repoRoot, runsRoot, taskId, runId, reason, alertTargets } = options;
   const learning = ensureLearningSection(manifest);
   const safeTaskId = sanitizeTaskId(taskId);
-  const runDir = join(runsRoot, safeTaskId, 'cli', sanitizeRunId(runId));
+  const safeRunId = sanitizeRunId(runId);
+  const runDir = join(runsRoot, safeTaskId, 'cli', safeRunId);
+  const storageRoot = join(runsRoot, 'learning-snapshots');
   const learningDir = join(runDir, 'learning');
   await mkdir(learningDir, { recursive: true });
   const gitStatusPath = join(learningDir, 'stalled-git-status.txt');
@@ -187,7 +193,9 @@ export async function recordStalledSnapshot(
     commit_sha: learning.snapshot?.commit_sha ?? 'unknown',
     tarball_path: learning.snapshot?.tarball_path ?? 'unavailable',
     tarball_digest: learning.snapshot?.tarball_digest ?? 'unavailable',
-    s3_uri: learning.snapshot?.s3_uri ?? `s3://learning-snapshots/${taskId}/${runId}.tar.gz`,
+    storage_path:
+      learning.snapshot?.storage_path ??
+      relative(repoRoot, join(storageRoot, safeTaskId, `${safeRunId}.tar.gz`)),
     retention_days: 30,
     status: 'stalled_snapshot',
     attempts: learning.snapshot?.attempts ?? 0,
@@ -212,7 +220,7 @@ export async function recordStalledSnapshot(
 }
 
 type SnapshotUploader = (params: {
-  bucket: string;
+  storageRoot: string;
   key: string;
   file: string;
   retentionDays: number;
@@ -240,27 +248,31 @@ async function hashFile(path: string): Promise<string> {
   return createHash('sha256').update(raw).digest('hex');
 }
 
-async function uploadSnapshot(params: {
+async function persistSnapshot(params: {
   uploader?: SnapshotUploader;
-  bucket: string;
+  storageRoot: string;
   taskId: string;
   runId: string;
   tarballPath: string;
   retentionDays: number;
 }): Promise<string> {
-  const { uploader, bucket, taskId, runId, tarballPath, retentionDays } = params;
-  const key = `${taskId}/${runId}.tar.gz`.replace(/^\/+/, '');
-  const upload = uploader ?? awsCliUploader;
-  return upload({ bucket, key, file: tarballPath, retentionDays });
+  const { uploader, storageRoot, taskId, runId, tarballPath, retentionDays } = params;
+  const key = join(taskId, `${runId}.tar.gz`);
+  const upload = uploader ?? filesystemUploader;
+  return upload({ storageRoot, key, file: tarballPath, retentionDays });
 }
 
-async function awsCliUploader(params: { bucket: string; key: string; file: string; retentionDays: number }): Promise<string> {
-  const { bucket, key, file, retentionDays } = params;
-  const normalized = bucket.startsWith('s3://') ? bucket.replace(/\/+$/, '') : `s3://${bucket.replace(/\/+$/, '')}`;
-  const uri = `${normalized}/${key}`;
-  const args = ['s3', 'cp', file, uri, '--metadata', `retention-days=${retentionDays}`];
-  await execFileAsync('aws', args, { env: { ...process.env, AWS_PAGER: '' } });
-  return uri;
+async function filesystemUploader(params: {
+  storageRoot: string;
+  key: string;
+  file: string;
+  retentionDays: number;
+}): Promise<string> {
+  const { storageRoot, key, file } = params;
+  const destination = join(storageRoot, key);
+  await mkdir(dirname(destination), { recursive: true });
+  await copyFile(file, destination);
+  return destination;
 }
 
 async function safeGit(args: string[], cwd: string): Promise<string> {

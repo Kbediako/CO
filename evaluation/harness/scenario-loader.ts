@@ -21,7 +21,8 @@ function assertScenarioShape(candidate: EvaluationScenario, sourcePath: string):
     if (typeof goal === 'string') {
       continue;
     }
-    if (!goal || typeof goal !== 'object' || typeof (goal as Record<string, unknown>).goal !== 'string') {
+    const goalRecord = goal as unknown as Record<string, unknown>;
+    if (!goal || typeof goal !== 'object' || typeof goalRecord.goal !== 'string') {
       throw new Error(`Scenario '${candidate.id}' has an invalid goal entry in ${sourcePath}.`);
     }
   }

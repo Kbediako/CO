@@ -145,7 +145,7 @@ export interface LearningSnapshotManifest {
   commit_sha: string;
   tarball_path: string;
   tarball_digest: string;
-  s3_uri: string;
+  storage_path: string;
   retention_days: number;
   status: LearningSnapshotStatus;
   attempts: number;

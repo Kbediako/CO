@@ -1,4 +1,5 @@
 /* eslint-disable patterns/prefer-logger-over-console */
+// Base logger lives at the bottom of the stack, so it writes to console directly to avoid recursive dependencies.
 
 export interface Logger {
   info(message: string, ...args: unknown[]): void;

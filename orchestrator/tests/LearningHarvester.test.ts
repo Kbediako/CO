@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { mkdtemp, writeFile } from 'node:fs/promises';
+import { mkdtemp, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { execFile } from 'node:child_process';
@@ -76,13 +76,16 @@ describe('LearningHarvester', () => {
       runId: manifest.run_id,
       promptPath,
       executionHistoryPath: null,
-      diffPath: null,
-      uploader: async ({ bucket, key }) => `${bucket.replace(/\/+$/, '')}/${key}`
+      diffPath: null
     });
 
     expect(result.manifest.learning?.snapshot?.status).toBe('captured');
     expect(result.manifest.learning?.snapshot?.tarball_digest.length).toBeGreaterThan(10);
     expect(result.manifest.learning?.queue?.snapshot_id).toBe(result.manifest.learning?.snapshot?.tag);
+    const storagePath = result.manifest.learning?.snapshot?.storage_path;
+    expect(storagePath).toBeTruthy();
+    const storageStat = await stat(join(repoRoot, storagePath ?? ''));
+    expect(storageStat.isFile()).toBe(true);
     expect(result.queuePayloadPath).toBeTruthy();
   });
 
@@ -97,8 +100,7 @@ describe('LearningHarvester', () => {
       manifestPath: join(repoRoot, 'manifest.json'),
       taskId: manifest.task_id,
       runId: manifest.run_id,
-      maxAttempts: 1,
-      uploader: async ({ bucket, key }) => `${bucket}/${key}`
+      maxAttempts: 1
     });
 
     expect(manifest.learning?.snapshot?.status).toBe('snapshot_failed');

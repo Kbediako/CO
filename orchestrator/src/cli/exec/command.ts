@@ -49,6 +49,7 @@ import {
   type TfgrpoContext
 } from './tfgrpo.js';
 import type { RunResultSummary } from './types.js';
+import { logger } from '../../logger.js';
 import { runLearningHarvester } from '../../learning/harvester.js';
 import { synthesizeScenario } from '../../learning/runner.js';
 
@@ -409,10 +410,10 @@ function recordSummaryTelemetry(context: ExecRunContext, summaryEvent: RunSummar
 
 async function maybeTriggerLearning(runContext: ExecRunContext, runStatus: RunStatus): Promise<void> {
   const enabled = process.env.LEARNING_PIPELINE_ENABLED === '1';
-  const bucket = process.env.LEARNING_S3_BUCKET;
-  if (!enabled || !bucket) {
+  if (!enabled) {
     return;
   }
+  const storageDir = process.env.LEARNING_SNAPSHOT_DIR;
   if (runStatus !== 'succeeded') {
     return;
   }
@@ -426,7 +427,7 @@ async function maybeTriggerLearning(runContext: ExecRunContext, runStatus: RunSt
       diffPath: null,
       promptPath: null,
       executionHistoryPath: runContext.paths.logPath,
-      bucket,
+      storageDir,
       alertTargets: { slack: '#learning-alerts', pagerduty: 'learning-pipeline' }
     });
 

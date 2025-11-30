@@ -157,7 +157,7 @@ export async function createCodexCliCrystalizerClient(
       const args = ['chat', '--model', options.model, '--input-file', promptPath, '--output-file', outputPath];
       await execFileAsync(binary, args, { env: { ...process.env } });
       const content = await readFile(outputPath, 'utf8');
-      return { content: content.trim(), model: options.model, costUsd: null };
+      return { content: content.trim(), model: options.model };
     }
   };
 }
