@@ -4,33 +4,41 @@ import type {
   LearningAlertRecord,
   LearningApprovalRecord,
   LearningManifestSection,
+  LearningValidationPolicy,
   LearningValidationStatus
 } from '../cli/types.js';
 
-const DEFAULT_LEARNING_SECTION: LearningManifestSection = {
-  validation: {
-    mode: 'per-task',
-    grouping: null,
-    status: 'pending'
-  },
-  alerts: [],
-  approvals: []
+const DEFAULT_VALIDATION: LearningValidationPolicy = {
+  mode: 'per-task',
+  grouping: null,
+  status: 'pending',
+  reason: null,
+  log_path: null,
+  last_error: null,
+  git_status_path: null,
+  git_log_path: null
 };
+
+function normalizeValidation(validation?: LearningValidationPolicy | null): LearningValidationPolicy {
+  return {
+    ...DEFAULT_VALIDATION,
+    ...validation,
+    mode: validation?.mode ?? 'per-task',
+    grouping: validation?.grouping ?? null,
+    status: validation?.status ?? 'pending'
+  };
+}
 
 export function ensureLearningSection(manifest: CliManifest): LearningManifestSection {
   if (!manifest.learning) {
     manifest.learning = {
-      validation: { mode: 'per-task', grouping: null, status: 'pending' },
+      validation: { ...DEFAULT_VALIDATION },
       alerts: [],
       approvals: []
     };
     return manifest.learning;
   }
-  if (!manifest.learning.validation) {
-    manifest.learning.validation = { mode: 'per-task', grouping: null, status: 'pending' };
-  } else if (!manifest.learning.validation.status) {
-    manifest.learning.validation.status = 'pending';
-  }
+  manifest.learning.validation = normalizeValidation(manifest.learning.validation);
   if (!Array.isArray(manifest.learning.alerts)) {
     manifest.learning.alerts = [];
   }
@@ -60,12 +68,13 @@ export function recordLearningApproval(manifest: CliManifest, approval: Learning
 
 export function updateLearningValidation(
   manifest: CliManifest,
-  status: LearningValidationStatus
+  status: LearningValidationStatus,
+  updates: Partial<LearningValidationPolicy> = {}
 ): LearningManifestSection {
   const section = ensureLearningSection(manifest);
   section.validation = {
-    mode: section.validation?.mode ?? 'per-task',
-    grouping: section.validation?.grouping ?? null,
+    ...normalizeValidation(section.validation),
+    ...updates,
     status
   };
   return section;

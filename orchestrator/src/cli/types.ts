@@ -130,6 +130,11 @@ export interface LearningValidationPolicy {
   mode: LearningValidationMode;
   grouping?: LearningGrouping | null;
   status?: LearningValidationStatus;
+  reason?: string | null;
+  log_path?: string | null;
+  last_error?: string | null;
+  git_status_path?: string | null;
+  git_log_path?: string | null;
 }
 
 export interface LearningGrouping {

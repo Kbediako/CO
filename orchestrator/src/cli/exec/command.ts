@@ -52,6 +52,7 @@ import type { RunResultSummary } from './types.js';
 import { logger } from '../../logger.js';
 import { runLearningHarvester } from '../../learning/harvester.js';
 import { synthesizeScenario } from '../../learning/runner.js';
+import { runScenarioValidation } from '../../learning/validator.js';
 
 export type ExecOutputMode = 'interactive' | 'json' | 'jsonl';
 
@@ -431,18 +432,34 @@ async function maybeTriggerLearning(runContext: ExecRunContext, runStatus: RunSt
       alertTargets: { slack: '#learning-alerts', pagerduty: 'learning-pipeline' }
     });
 
-    await synthesizeScenario({
+    const scenario = await synthesizeScenario({
       manifest: harvester.manifest,
       taskId: runContext.env.taskId,
       runId: runContext.manifest.run_id,
       runsRoot: runContext.env.runsRoot,
       prompt: null,
       diff: null,
-      executionHistory: [],
+      executionHistory: [
+        {
+          command: runContext.shellCommand,
+          exitCode: 0,
+          cwd: runContext.stage.cwd ?? runContext.env.repoRoot,
+          timestamp: isoTimestamp()
+        }
+      ],
       alertTargets: { slack: '#learning-alerts', pagerduty: 'learning-pipeline' },
       pagerDutySeverity: 'none'
     });
-    await saveManifest(runContext.paths, harvester.manifest);
+    const validation = await runScenarioValidation({
+      manifest: scenario.manifest,
+      repoRoot: runContext.env.repoRoot,
+      runsRoot: runContext.env.runsRoot,
+      taskId: runContext.env.taskId,
+      runId: runContext.manifest.run_id,
+      paths: runContext.paths,
+      scenarioPath: scenario.scenarioPath
+    });
+    await saveManifest(runContext.paths, validation.manifest);
   } catch (error) {
     logger.warn(`[learning] auto-trigger failed: ${error instanceof Error ? error.message : String(error)}`);
   }
