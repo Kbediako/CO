@@ -2,7 +2,8 @@
 
 ## Context
 - Link to PRD: `tasks/0607-prd-continuous-learning-pipeline.md`
-- Summary of scope: Automate post-approval learning runs (harvester → runner → crystalizer) with snapshot integrity, heuristic/manual scenario synthesis, alerting, and pattern governance rooted in `.agent/patterns`.
+- Summary of scope: Automate post-approval learning runs (harvester → runner → crystalizer) with local snapshot storage, auto validation + heuristic/manual scenario synthesis, alerting, and pattern governance rooted in `.agent/patterns`.
+- Auto trigger: Set `LEARNING_PIPELINE_ENABLED=1` (and optionally `LEARNING_SNAPSHOT_DIR=<abs-path>`) to run harvester + validation immediately after successful CLI stages.
 - Validation batching policy: validate per-task by default; allow grouped runs only when tasks touch the same service within 24h and record grouping id + membership in the manifest. Other batching requires a change request.
 
 ### Checklist Convention
@@ -14,7 +15,7 @@
    - Subtask: Immutable snapshot + queue metadata
      - Files: Harvester trigger in agent runtime, queue payload definitions, `.runs/0607-continuous-learning-pipeline/cli/<run-id>/manifest.json`
      - Commands: `npx codex-orchestrator start diagnostics --format json` (to seed manifest), `npm run test` (harvester/queue coverage)
-     - Acceptance: Snapshot tag + digest + `SnapshotCommitSHA` recorded; queue jobs include prompt/diff/history pointers; manifest logs the snapshot reference used for validation and S3 URI with 30-day retention; Evidence: `.runs/0607-continuous-learning-pipeline/cli/<run-id>/manifest.json`.
+     - Acceptance: Manifest records `learning.snapshot.{tag,commit_sha,tarball_path,tarball_digest,storage_path,retention_days}` with copies under `learning-snapshots/<task-id>/<run-id>.tar.gz`; queue jobs include prompt/diff/history pointers and `learning.queue.payload_path`; Evidence: `.runs/0607-continuous-learning-pipeline/cli/<run-id>/manifest.json`.
      - [ ] Status: Pending — update to [x] when acceptance criteria are satisfied.
    - Subtask: Failure handling + alerts for `snapshot_failed`/`stalled_snapshot`
      - Files: Harvester retry/backoff logic, notification hooks, `.runs/0607-continuous-learning-pipeline/cli/<run-id>/manifest.json`
@@ -26,7 +27,7 @@
    - Subtask: Heuristic scenario synthesis
      - Files: `tfgrpo-runner` (or equivalent) scenario builder, execution history ingestion, `.runs/0607-continuous-learning-pipeline/cli/<run-id>/manifest.json`
      - Commands: `npm run test` (scenario synthesis), targeted runner harness
-     - Acceptance: Scenarios pull from execution history > prompt > diff > templates; synthesized `scenario.json` stored in manifest; validation uses generated entrypoints; Evidence: `.runs/0607-continuous-learning-pipeline/cli/<run-id>/manifest.json`.
+     - Acceptance: Scenarios pull from execution history > prompt > diff > templates; synthesized `learning/scenario.json` stored in manifest (`learning.scenario.path`); validation auto-runs and logs to `learning/scenario-validation.log` (`learning.validation.log_path`) with status `validated` or failure states; Evidence: `.runs/0607-continuous-learning-pipeline/cli/<run-id>/manifest.json`.
      - [ ] Status: Pending — update to [x] when acceptance criteria are satisfied.
    - Subtask: Manual scenario fallback + requeue
      - Files: `.agent/task/templates/manual-scenario-template.md`, runner requeue path, `.runs/0607-continuous-learning-pipeline/cli/<run-id>/manifest.json`

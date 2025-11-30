@@ -29,6 +29,20 @@ Group execution (when `FEATURE_TFGRPO_GROUP=on`): repeat the Builder → Tester 
 - **Event-driven persistence:** Every `run:completed` event flows through `PersistenceCoordinator`, writing manifests under `.runs/<task-id>/<run-id>/` and keeping task-state snapshots current before downstream consumers (control-plane validators, scheduler hooks, cloud sync) ingest the data.
 - **Optional group loop:** When the TF-GRPO feature flag is on, the manager processes the prioritized subtask list serially, stopping early if any Builder or Tester stage fails so reviewers only see runnable work with passing prerequisites.
 
+## Learning Pipeline (local snapshots + auto validation)
+- Enabled per run with `LEARNING_PIPELINE_ENABLED=1`; after a successful stage, the CLI captures the working tree (tracked + untracked, git-ignored files excluded) into `.runs/<task-id>/cli/<run-id>/learning/<run-id>.tar.gz` and copies it to `learning-snapshots/<task-id>/<run-id>.tar.gz` (recorded as `learning.snapshot.storage_path`).
+- Manifests record the tag, commit SHA, tarball digest/path, queue payload path, and validation status (`validated`, `snapshot_failed`, `stalled_snapshot`, `needs_manual_scenario`) under `learning.*` so reviewers can audit outcomes without external storage.
+- Scenario synthesis replays the most recent successful command from the run (or prompt/diff fallback), writes `learning/scenario.json`, and automatically executes the commands; validation logs live at `learning/scenario-validation.log` and are stored in `learning.validation.log_path`.
+- Override snapshot storage with `LEARNING_SNAPSHOT_DIR=/custom/dir` when needed; the default lives under `learning-snapshots/` at the runs root.
+
+### How to run the learning pipeline locally
+- Seed a normal run and keep manifests grouped by task:
+  ```bash
+  export MCP_RUNNER_TASK_ID=<task-id>
+  LEARNING_PIPELINE_ENABLED=1 npx codex-orchestrator start diagnostics --format json
+  ```
+- The learning section is written only when the run succeeds; rerun the command with `LEARNING_SNAPSHOT_DIR=<abs-path>` to redirect tarball copies.
+
 ## Repository Layout
 - `orchestrator/` – Core orchestration runtime (`TaskManager`, event bus, persistence, CLI, control-plane hooks, scheduler, privacy guard).
 - `packages/` – Shared libraries used by downstream projects (tool orchestrator, shared manifest schema, SDK shims, control-plane schema bundle).

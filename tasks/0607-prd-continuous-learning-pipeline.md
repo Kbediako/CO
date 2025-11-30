@@ -5,7 +5,7 @@ This document proposes the architecture for a **Continuous Learning Pipeline** t
 
 ## 2. Problem Statement
 *   **Knowledge Loss:** Valuable problem-solving patterns discovered during daily tasks are often lost once the PR is merged.
-*   **Manual Friction:** The current "Learning Loop" requires manual triggering (`tfgrpo-runner`), making it an "extra step" rather than a default behavior.
+*   **Manual Friction:** The loop must default on; `LEARNING_PIPELINE_ENABLED=1` now auto-triggers harvesting + validation after approvals, replacing manual `tfgrpo-runner` invocations.
 *   **Inconsistency:** New agents/sessions start with a blank slate, often reinventing the wheel or re-introducing previously solved anti-patterns.
 
 ## 3. Goals
@@ -19,8 +19,8 @@ This document proposes the architecture for a **Continuous Learning Pipeline** t
 The pipeline consists of four distinct phases:
 
 1.  **Execution (The Work):** The agent completes a user request (e.g., "Fix bug X").
-2.  **Trigger (The Handover):** Upon user approval (or self-validation), the agent triggers a background "Learning Task." **Crucially, this captures a snapshot of the repository state to ensure consistency.**
-3.  **Validation (The Lab):** A background runner (`tfgrpo-runner`) isolates the change, creates a temporary scenario, and stress-tests/optimizes the solution to ensure it is robust and generalizable.
+2.  **Trigger (The Handover):** Upon user approval (or self-validation), the agent triggers a background "Learning Task." **Crucially, this captures a snapshot of the repository state to ensure consistency.** With `LEARNING_PIPELINE_ENABLED=1`, the harvester runs automatically after a successful CLI stage, packaging the working tree (tracked + untracked, gitignore respected) into `.runs/<task-id>/cli/<run-id>/learning/<run-id>.tar.gz` and copying it to `learning-snapshots/<task-id>/<run-id>.tar.gz` (recorded as `learning.snapshot.storage_path`).
+3.  **Validation (The Lab):** A background runner (`tfgrpo-runner`) isolates the change, creates a temporary scenario, and stress-tests/optimizes the solution to ensure it is robust and generalizable. Scenario synthesis replays the most recent successful command first, writes `learning/scenario.json`, and immediately executes the scenario; validation logs live at `learning/scenario-validation.log` (`learning.validation.log_path`) and statuses flow into `learning.validation.status` (`validated`, `snapshot_failed`, `stalled_snapshot`, `needs_manual_scenario`).
 4.  **Crystalization (The Library):** A "Crystalizer" component summarizes the validated solution into a reusable **Knowledge Artifact** (Markdown Pattern).
 
 ### 4.2. Key Components
@@ -30,18 +30,18 @@ The pipeline consists of four distinct phases:
 *   **Mechanism:** Integrated into `AgentDriver` or via a `/learn` slash command.
 *   **Snapshot Consistency:**
     *   To avoid race conditions (e.g., user rebasing or editing files after approval), the Harvester must capture an **Immutable Snapshot**.
-    *   **Method:** Create a temporary git tag (e.g., `learning-snapshot-<uuid>`) or a tarball of the working directory at the moment of approval.
-    *   The Runner will checkout this specific tag/commit before applying any logic, ensuring it validates exactly what the user approved.
+    *   **Method:** Create a temporary git tag (e.g., `learning-snapshot-<uuid>`) and a tarball of the working directory at the moment of approval (`.runs/<task-id>/cli/<run-id>/learning/<run-id>.tar.gz`) while copying to `learning-snapshots/<task-id>/<run-id>.tar.gz`.
+    *   The Runner will checkout this specific tag/commit before applying any logic, ensuring it validates exactly what the user approved; manifests record `learning.snapshot.{tag,commit_sha,tarball_path,tarball_digest,storage_path,retention_days}`.
 *   **Logic:**
     *   Detects "Task Complete" state.
-    *   **Captures Snapshot:** Tags the current commit.
+    *   **Captures Snapshot:** Tags the current commit and writes the tarball digest + `storage_path`.
     *   Extracts the relevant file changes (diff).
-    *   Queues a job for the Runner with `(SnapshotID, Diff, Prompt, ExecutionHistory)`.
+    *   Queues a job for the Runner with `(snapshot_id, diff_path, prompt_path, execution_history_path, manifest_path)` stored in `learning/queue-payload.json` (`learning.queue.payload_path`).
 *   **Failure Handling & Escalation:**
-    *   Persist `{TagName, SnapshotCommitSHA, TarballDigest}` alongside the queue record so the Runner can verify integrity before applying any patch.
-    *   If tag creation, tarball upload, or queue enqueue fails, mark the job as `snapshot_failed`, retry with backoff (max 2 attempts), and emit an alert to the operator channel before dropping the task.
+    *   Persist snapshot metadata alongside the queue record so the Runner can verify integrity before applying any patch.
+    *   If tag creation, tarball copy, or queue enqueue fails, mark the job as `snapshot_failed`, retry with backoff (max 2 attempts), and emit an alert to the operator channel before dropping the task.
     *   When the Runner cannot checkout the snapshot or apply the diff cleanly, mark the job as `stalled_snapshot` with logs, attach the failing git status to the `.runs/<task-id>/.../manifest.json`, and block re-queueing until a human approves the remediation.
-    *   Manual recovery follows `.agent/SOPs/incident-response.md`: confirm the recorded `SnapshotCommitSHA`, rebuild the tarball if needed, and re-queue with an explicit approver id to preserve the audit trail.
+    *   Manual recovery follows `.agent/SOPs/incident-response.md`: confirm the recorded `learning.snapshot.commit_sha` + `tarball_digest`, rebuild the tarball if needed, and re-queue with an explicit approver id to preserve the audit trail.
 
 #### B. The Runner (Validator & Scenario Synthesis)
 *   **Role:** Scientifically validates the pattern.
@@ -61,7 +61,7 @@ The pipeline consists of four distinct phases:
     *   **Fallback & Manual Path:**
         *   If heuristic generation fails after two attempts, mark the job as `needs_manual_scenario`, emit the partial `scenario.json` to `.runs/<task-id>/.../manifest.json`, and notify the operator channel.
         *   A human reviewer supplies the missing fields (setup commands, entrypoint, env vars, fixtures) using `.agent/task/templates/manual-scenario-template.md`, signs the manifest, and re-queues the run. No learning run proceeds without that acknowledgement.
-*   **Validation:** Runs the synthesized scenario to confirm the patch passes tests in isolation.
+*   **Validation:** Runs the synthesized scenario to confirm the patch passes tests in isolation, logging to `learning/scenario-validation.log` (`learning.validation.log_path`) and updating `learning.validation.status` to `validated`, `snapshot_failed`, `stalled_snapshot`, or `needs_manual_scenario`.
 
 #### C. The Crystalizer (Author)
 *   **Role:** Turns code into knowledge.
