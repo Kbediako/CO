@@ -1,5 +1,12 @@
 # PRD Overview — Codex Orchestrator Projects
 
+## Task 0707 — Codex Orchestrator Simplification & Build Slimdown
+- Primary Doc: `docs/PRD-codex-orchestrator-slimdown.md`
+- Run Manifest Link: `.runs/0707-orchestrator-slimdown/cli/2025-12-01T09-37-11-576Z-1a60ebea/manifest.json`.
+- Metrics / State Snapshots: _(pending — populate `.runs/0707-orchestrator-slimdown/metrics.json` and `out/0707-orchestrator-slimdown/state.json`)._
+- Checklist Mirror: `tasks/tasks-0707-orchestrator-slimdown.md`, `docs/TASKS.md` (0707 section), `.agent/task/0707-orchestrator-slimdown.md`.
+- CI/Test Coverage: documented core lane (`npm run build`, `npm run lint`, `npm run test`) vs. labeled/path-triggered full matrix (`npm run build:all`, `npm run lint`, `npm run test`, `npm run test:adapters`, `npm run test:evaluation`, `npm run eval:test` when fixtures/optional deps installed); release/RC = full matrix; local core baseline with full matrix when touching adapters/evaluation/design/patterns or prepping releases.
+
 ## Task 0303 — Codex Orchestrator Autonomy Enhancements
 - Primary Doc: `docs/PRD-codex-orchestrator-autonomy.md`
 - Run Manifest Link: _(pending — capture first diagnostics run under `.runs/0303-orchestrator-autonomy/cli/<run-id>/manifest.json`)._
