@@ -12,8 +12,8 @@ import {
 import { stageArtifacts } from '../../../orchestrator/src/persistence/ArtifactStager.js';
 import type { DesignArtifactRecord } from '../../../packages/shared/manifest/types.js';
 import type { Browser, Page } from 'playwright';
-
-type PlaywrightModule = typeof import('playwright');
+import { loadPlaywright } from './optionalDeps.js';
+type PlaywrightModule = Awaited<ReturnType<typeof loadPlaywright>>;
 
 async function main(): Promise<void> {
   const context = await loadDesignContext();
@@ -243,16 +243,6 @@ function buildDesignRecord(
     type,
     description: `${url} (${breakpointId})`
   };
-}
-
-async function loadPlaywright(): Promise<PlaywrightModule> {
-  try {
-    return (await import('playwright')) as PlaywrightModule;
-  } catch (error) {
-    throw new Error(
-      'Playwright is not installed. Run `npm run setup:design-tools` followed by `npx playwright install chromium`.'
-    );
-  }
 }
 
 function createMaskStyles(selectors: string[]): string {

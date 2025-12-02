@@ -302,7 +302,7 @@ function deriveToolkitSummary(
 
 function accumulateToolkitMetrics(
   target: Record<string, number | string>,
-  incoming: Record<string, number | string>
+  incoming: Record<string, unknown>
 ): void {
   for (const [key, value] of Object.entries(incoming)) {
     if (typeof value === 'number' && Number.isFinite(value)) {
@@ -318,7 +318,7 @@ function accumulateToolkitMetrics(
   }
 }
 
-function accumulateNumericTotals(target: Record<string, number>, incoming: Record<string, number | string>): void {
+function accumulateNumericTotals(target: Record<string, number>, incoming: Record<string, unknown>): void {
   for (const [key, value] of Object.entries(incoming)) {
     if (typeof value === 'number' && Number.isFinite(value)) {
       target[key] = (target[key] ?? 0) + value;

@@ -40,7 +40,8 @@ describe('appendCommandError', () => {
       exit_code: null,
       summary: null,
       log_path: null,
-      error_file: null
+      error_file: null,
+      sub_run_id: null
     };
 
     const longStderr = 'x'.repeat(MAX_ERROR_DETAIL_CHARS + 500);

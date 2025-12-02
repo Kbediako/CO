@@ -161,7 +161,7 @@ async function main(): Promise<void> {
         : stageNotes.length > 0
           ? stageNotes
           : undefined,
-    metrics: artifact.metrics,
+    metrics: artifact.metrics ?? undefined,
     artifacts: [
       {
         relative_path: stagedLog.path,

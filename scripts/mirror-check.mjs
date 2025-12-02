@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 import fs from "node:fs/promises";
 import path from "node:path";
-import * as cheerio from "cheerio";
-import { chromium } from "playwright";
+import { loadCheerio, loadPlaywright } from "./mirror-optional-deps.mjs";
 import { DEFAULT_STRIP_PATTERNS, compileStripPatterns } from "./mirror-site.mjs";
 import { startMirrorServer } from "./lib/mirror-server.mjs";
 
+const cheerio = await loadCheerio();
+const playwright = await loadPlaywright();
 const TRACKER_PATTERNS = compileStripPatterns(DEFAULT_STRIP_PATTERNS);
 const TEXT_CONTENT_TYPE = /(text|javascript|json|xml|svg)/i;
 const ABSOLUTE_HTTPS_REGEX = /https:\/\/[^\s"'<>]+/gi;
@@ -239,7 +240,7 @@ async function main() {
   const contentViolations = [];
   const absoluteReferences = new Map();
 
-  const browser = await chromium.launch({ headless: args.headless === "false" ? false : true });
+  const browser = await playwright.chromium.launch({ headless: args.headless === "false" ? false : true });
   const context = await browser.newContext({ baseURL: baseUrl });
 
   for (const route of config.routes) {

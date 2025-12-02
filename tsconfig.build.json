@@ -1,0 +1,26 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "noEmit": false
+  },
+  "include": [
+    "orchestrator/src/**/*.ts",
+    "orchestrator/src/**/*.tsx",
+    "packages/orchestrator/src/**/*.ts",
+    "packages/control-plane-schemas/src/**/*.ts",
+    "packages/sdk-node/src/**/*.ts",
+    "packages/shared/**/*.ts",
+    "scripts/**/*.ts",
+    "bin/**/*.ts",
+    "types/**/*.d.ts"
+  ],
+  "exclude": [
+    "adapters/**",
+    "evaluation/**",
+    "patterns/**",
+    "packages/design-reference-tools/**",
+    "packages/design-system/**",
+    "packages/design-reference-tools/**/node_modules/**"
+  ]
+}

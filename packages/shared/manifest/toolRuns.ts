@@ -40,25 +40,28 @@ export function sanitizeToolRunEvent(event: ToolRunEvent): ToolRunEvent {
   switch (event.type) {
     case 'exec:begin':
       return { ...event };
-    case 'exec:chunk':
-      if (event.sequence < 1) {
+    case 'exec:chunk': {
+      const sequence = event.sequence ?? null;
+      if (sequence === null || sequence < 1) {
         throw new Error('exec:chunk events must have a positive sequence value.');
       }
-      if (event.bytes < 0) {
+      const bytes = event.bytes ?? null;
+      if (bytes !== null && bytes < 0) {
         throw new Error('exec:chunk events must report a non-negative byte count.');
       }
-      return { ...event };
+      return { ...event, sequence, bytes };
+    }
     case 'exec:end':
       return { ...event };
-    case 'exec:retry':
-      if (event.delayMs < 0) {
+    case 'exec:retry': {
+      const delayMs = event.delayMs ?? null;
+      if (delayMs !== null && delayMs < 0) {
         throw new Error('exec:retry events must report a non-negative delay.');
       }
-      return { ...event };
-    default: {
-      const exhaustive: never = event;
-      return exhaustive;
+      return { ...event, delayMs };
     }
+    default:
+      return { ...event };
   }
 }
 

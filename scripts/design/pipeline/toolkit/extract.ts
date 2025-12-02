@@ -143,7 +143,7 @@ async function main(): Promise<void> {
       relative_path: artifact.relative_path,
       stage: 'extract',
       status: artifact.status,
-      description: artifact.description
+      description: artifact.description ?? undefined
     }))
   });
 

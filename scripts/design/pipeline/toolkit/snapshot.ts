@@ -1,7 +1,8 @@
 import { Buffer } from 'node:buffer';
-import { load, type CheerioAPI } from 'cheerio';
+import type { CheerioAPI } from 'cheerio';
 import type { Element } from 'domhandler';
-import { chromium, type Page, type Response } from 'playwright';
+import type { Page, Response } from 'playwright';
+import { loadCheerio, loadPlaywright } from '../optionalDeps.js';
 
 export interface PageSectionSummary {
   title: string;
@@ -37,6 +38,19 @@ const DEFAULT_VIEWPORT = { width: 1440, height: 900 } as const;
 const USER_AGENT =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 const MIRRORABLE_RESOURCE_TYPES = new Set(['document', 'stylesheet', 'image', 'media', 'font', 'script', 'xhr']);
+type PlaywrightModule = Awaited<ReturnType<typeof loadPlaywright>>;
+let cachedCheerio: typeof import('cheerio') | null = null;
+
+async function getCheerio(): Promise<typeof import('cheerio')> {
+  if (!cachedCheerio) {
+    cachedCheerio = await loadCheerio();
+  }
+  return cachedCheerio;
+}
+
+async function getPlaywright(): Promise<PlaywrightModule> {
+  return loadPlaywright();
+}
 
 export interface SnapshotViewport {
   width: number;
@@ -129,7 +143,8 @@ export async function capturePageSnapshot(url: string, options?: SnapshotOptions
   const allowRemoteAssets = Boolean(options?.allowRemoteAssets);
   const viewport = normalizeViewport(options?.viewport);
   const baseOrigin = getPageOrigin(url);
-  const browser = await chromium.launch({ headless: true });
+  const playwright = await getPlaywright();
+  const browser = await playwright.chromium.launch({ headless: true });
   const assetTasks: Array<Promise<void>> = [];
   const capturedAssets: CapturedAssetRecord[] = [];
   const missingAssets: MissingAssetRecord[] = [];
@@ -160,7 +175,8 @@ export async function capturePageSnapshot(url: string, options?: SnapshotOptions
     const html = await page.content();
     await Promise.all(assetTasks);
 
-    const $ = load(html);
+    const cheerio = await getCheerio();
+    const $ = cheerio.load(html);
 
     absolutizeDocument($, url);
     const assetRewrite = mirrorAssets ? buildAssetRewrite(capturedAssets, baseOrigin, missingAssets) : null;
@@ -208,7 +224,7 @@ export async function capturePageSnapshot(url: string, options?: SnapshotOptions
 
     const colorPalette = computeColorPalette(aggregatedCss).slice(0, 24);
     const fontFamilies = computeFontFamilies(aggregatedCss).slice(0, 8);
-    const sections = summarizeSections($);
+    const sections = summarizeSections(cheerio, $);
     const inlineHtml = buildDocumentHtml($);
     if (assetRewrite && assetRewrite.missing.length > 0) {
       const missingPath = 'assets/missing-assets.json';
@@ -728,14 +744,14 @@ export function computeFontFamilies(css: string): string[] {
   return Array.from(families);
 }
 
-function summarizeSections($: CheerioAPI): PageSectionSummary[] {
+function summarizeSections(cheerio: typeof import('cheerio'), $: CheerioAPI): PageSectionSummary[] {
   const summaries: PageSectionSummary[] = [];
   const candidates = collectSectionCandidates($);
 
   candidates.forEach((element, index) => {
     const headingElement = $(element).find('h1, h2, h3').first().get(0) as Element | undefined;
-    const heading = headingElement ? extractSectionText($, headingElement) : '';
-    const text = extractSectionText($, element);
+    const heading = headingElement ? extractSectionText(cheerio, $, headingElement) : '';
+    const text = extractSectionText(cheerio, $, element);
     if (text.length === 0) {
       return;
     }
@@ -746,7 +762,7 @@ function summarizeSections($: CheerioAPI): PageSectionSummary[] {
   });
 
   if (summaries.length === 0) {
-    const fallback = extractSectionText($, $('body').get(0) as Element).slice(0, 280);
+    const fallback = extractSectionText(cheerio, $, $('body').get(0) as Element).slice(0, 280);
     if (fallback.length > 0) {
       summaries.push({ title: 'Page overview', description: fallback });
     }
@@ -795,7 +811,11 @@ function collectSectionCandidates($: CheerioAPI): Element[] {
   return result;
 }
 
-function extractSectionText($: CheerioAPI, element?: Element | null): string {
+function extractSectionText(
+  cheerio: typeof import('cheerio'),
+  $: CheerioAPI,
+  element?: Element | null
+): string {
   if (!element) {
     return '';
   }
@@ -810,7 +830,7 @@ function extractSectionText($: CheerioAPI, element?: Element | null): string {
       .trim();
   }
   const spaced = html.replace(/></g, '> <');
-  const wrapped = load(`<root>${spaced}</root>`);
+  const wrapped = cheerio.load(`<root>${spaced}</root>`);
   const rawText = wrapped('root')
     .text()
     .replace(/\u00a0/g, ' ');

@@ -2,10 +2,8 @@ import { access, cp, mkdir, readFile, readdir, symlink, writeFile } from 'node:f
 import { dirname, isAbsolute, join, relative } from 'node:path';
 import { tmpdir } from 'node:os';
 import { pathToFileURL } from 'node:url';
-import pixelmatch from 'pixelmatch';
-import { chromium, type Route } from 'playwright';
-import { PNG } from 'pngjs';
-type PngImage = ReturnType<typeof PNG.sync.read>;
+import type { Route } from 'playwright';
+import { loadPixelmatch, loadPlaywright, loadPngjs } from '../optionalDeps.js';
 import { loadDesignContext } from '../context.js';
 import type { DesignContext } from '../context.js';
 import {
@@ -30,6 +28,34 @@ const TOOLKIT_USER_AGENT =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 const DEFAULT_SELF_CORRECTION_THRESHOLD = 1.5;
 const MISMATCH_PADDING_COLOR = { r: 255, g: 0, b: 255, a: 255 };
+type PlaywrightModule = Awaited<ReturnType<typeof loadPlaywright>>;
+type PlaywrightBrowser = Awaited<ReturnType<PlaywrightModule['chromium']['launch']>>;
+type PngModule = Awaited<ReturnType<typeof loadPngjs>>;
+type PngImage = ReturnType<PngModule['PNG']['sync']['read']>;
+type PixelmatchFn = (img1: Buffer, img2: Buffer, output: Buffer, width: number, height: number, options?: { threshold?: number }) => number;
+
+type DesignDeps = {
+  playwright: PlaywrightModule;
+  png: PngModule['PNG'];
+  pixelmatch: PixelmatchFn;
+};
+
+async function resolveDesignDeps(): Promise<DesignDeps> {
+  const [playwright, pngModule, pixelmatchModule] = await Promise.all([
+    loadPlaywright(),
+    loadPngjs(),
+    loadPixelmatch()
+  ]);
+  const pixelmatchFn =
+    (pixelmatchModule as unknown as { default?: PixelmatchFn }).default ??
+    (pixelmatchModule as unknown as PixelmatchFn);
+
+  return {
+    playwright,
+    png: pngModule.PNG,
+    pixelmatch: pixelmatchFn
+  };
+}
 
 async function main(): Promise<void> {
   const context = await loadDesignContext();
@@ -57,6 +83,7 @@ async function main(): Promise<void> {
   };
   const selfCorrection = context.config.config.pipelines.hiFiDesignToolkit.selfCorrection;
   const advanced = context.config.config.advanced;
+  const designDeps = selfCorrection.enabled ? await resolveDesignDeps() : null;
 
   const tmpRoot = join(tmpdir(), `design-toolkit-reference-${Date.now()}`);
   await mkdir(tmpRoot, { recursive: true });
@@ -117,7 +144,8 @@ async function main(): Promise<void> {
           referenceArtifactPath: referenceArtifact.path,
           pipelineBreakpoints: context.config.config.pipelines.hiFiDesignToolkit.breakpoints,
           threshold: selfCorrection.threshold ?? DEFAULT_SELF_CORRECTION_THRESHOLD,
-          maxIterations: selfCorrection.maxIterations ?? 1
+          maxIterations: selfCorrection.maxIterations ?? 1,
+          deps: designDeps!
         });
         const correctionArtifacts = [
           {
@@ -251,7 +279,7 @@ async function main(): Promise<void> {
       relative_path: artifact.relative_path,
       stage: artifact.stage,
       status: artifact.status,
-      description: artifact.description
+      description: artifact.description ?? undefined
     }))
   });
 
@@ -304,6 +332,7 @@ async function runSelfCorrection(options: {
   pipelineBreakpoints: Array<{ id: string; width: number; height: number; deviceScaleFactor?: number }>;
   threshold: number;
   maxIterations?: number;
+  deps: DesignDeps;
 }): Promise<{
   path: string;
   iterations: number;
@@ -325,7 +354,7 @@ async function runSelfCorrection(options: {
   const cloneUrl = resolveCloneUrl(entry, repoRoot, referenceArtifactPath);
   const breakpoints = resolveBreakpointTargets(entry, pipelineBreakpoints);
   const macro = await loadInteractionMacroForCapture(entry, repoRoot);
-  const browser = await chromium.launch({ headless: true });
+  const browser = await options.deps.playwright.chromium.launch({ headless: true });
   const results: BreakpointDiffResult[] = [];
   const iterationHistory: Array<{ iteration: number; worstMismatch: number; averageMismatch: number }> = [];
   let lastResults: BreakpointDiffResult[] = [];
@@ -343,6 +372,7 @@ async function runSelfCorrection(options: {
       for (const breakpoint of breakpoints) {
         const result = await captureBreakpointDiff({
           browser,
+          deps: options.deps,
           breakpoint,
           screenshotsDir,
           sourceUrl,
@@ -402,6 +432,7 @@ async function runSelfCorrection(options: {
       const settleWait = Math.max(entry.interactionWaitMs ?? 0, 650);
       const settled = await captureBreakpointDiff({
         browser,
+        deps: options.deps,
         breakpoint: breakpoints.find((bp) => bp.id === worst.breakpoint) ?? breakpoints[0],
         screenshotsDir,
         sourceUrl,
@@ -452,7 +483,8 @@ async function runSelfCorrection(options: {
 }
 
 async function captureBreakpointDiff(options: {
-  browser: Awaited<ReturnType<typeof chromium.launch>>;
+  browser: PlaywrightBrowser;
+  deps: DesignDeps;
   breakpoint: { id: string; width: number; height: number; deviceScaleFactor?: number };
   screenshotsDir: string;
   sourceUrl: string;
@@ -470,6 +502,7 @@ async function captureBreakpointDiff(options: {
 
   const referenceShot = await captureScreenshot({
     browser: options.browser,
+    deps: options.deps,
     targetUrl: options.sourceUrl,
     outputPath: referencePath,
     viewport,
@@ -480,6 +513,7 @@ async function captureBreakpointDiff(options: {
 
   const cloneShot = await captureScreenshot({
     browser: options.browser,
+    deps: options.deps,
     targetUrl: options.cloneUrl,
     outputPath: clonePath,
     viewport,
@@ -488,7 +522,7 @@ async function captureBreakpointDiff(options: {
     blockNetwork: true
   });
 
-  const mismatch = await computeMismatch(referenceShot.image, cloneShot.image, diffPath);
+  const mismatch = await computeMismatch(referenceShot.image, cloneShot.image, diffPath, options.deps);
 
   return {
     breakpoint: options.breakpoint.id,
@@ -506,7 +540,8 @@ async function captureBreakpointDiff(options: {
 }
 
 async function captureScreenshot(options: {
-  browser: Awaited<ReturnType<typeof chromium.launch>>;
+  browser: PlaywrightBrowser;
+  deps: DesignDeps;
   targetUrl: string;
   outputPath: string;
   viewport: { width: number; height: number; deviceScaleFactor?: number };
@@ -552,7 +587,7 @@ async function captureScreenshot(options: {
   const buffer = await page.screenshot({ fullPage: true, path: options.outputPath });
   await context.close();
 
-  return { image: PNG.sync.read(buffer) as PngImage };
+  return { image: options.deps.png.sync.read(buffer) as PngImage };
 }
 
 function normalizeViewportConfig(breakpoint: { width: number; height: number; deviceScaleFactor?: number }) {
@@ -566,7 +601,8 @@ function normalizeViewportConfig(breakpoint: { width: number; height: number; de
 async function computeMismatch(
   reference: PngImage,
   candidate: PngImage,
-  diffPath: string
+  diffPath: string,
+  deps: Pick<DesignDeps, 'png' | 'pixelmatch'>
 ): Promise<{
   percent: number;
   width: number;
@@ -575,11 +611,12 @@ async function computeMismatch(
   referenceDimensions: { width: number; height: number };
   cloneDimensions: { width: number; height: number };
 }> {
+  const { png, pixelmatch } = deps;
   const width = Math.max(reference.width, candidate.width);
   const height = Math.max(reference.height, candidate.height);
   if (width === 0 || height === 0) {
-    const placeholder = new PNG({ width: 1, height: 1 });
-    await writeFile(diffPath, PNG.sync.write(placeholder));
+    const placeholder = new png({ width: 1, height: 1 });
+    await writeFile(diffPath, png.sync.write(placeholder));
     return {
       percent: 100,
       width: 1,
@@ -589,9 +626,9 @@ async function computeMismatch(
       cloneDimensions: { width: candidate.width, height: candidate.height }
     };
   }
-  const normalizedReference = normalizePngDimensions(reference, width, height);
-  const normalizedCandidate = normalizePngDimensions(candidate, width, height);
-  const diff = new PNG({ width, height });
+  const normalizedReference = normalizePngDimensions(png, reference, width, height);
+  const normalizedCandidate = normalizePngDimensions(png, candidate, width, height);
+  const diff = new png({ width, height });
   const mismatchedPixels = pixelmatch(
     normalizedReference.data,
     normalizedCandidate.data,
@@ -601,7 +638,7 @@ async function computeMismatch(
     { threshold: 0.1 }
   );
   const percent = (mismatchedPixels / (width * height)) * 100;
-  await writeFile(diffPath, PNG.sync.write(diff));
+  await writeFile(diffPath, png.sync.write(diff));
   return {
     percent: roundPercent(percent),
     width,
@@ -612,11 +649,16 @@ async function computeMismatch(
   };
 }
 
-function normalizePngDimensions(image: PngImage, targetWidth: number, targetHeight: number): PngImage {
+function normalizePngDimensions(
+  png: DesignDeps['png'],
+  image: PngImage,
+  targetWidth: number,
+  targetHeight: number
+): PngImage {
   if (image.width === targetWidth && image.height === targetHeight) {
     return image;
   }
-  const output = new PNG({ width: targetWidth, height: targetHeight });
+  const output = new png({ width: targetWidth, height: targetHeight });
   for (let i = 0; i < output.data.length; i += 4) {
     output.data[i] = MISMATCH_PADDING_COLOR.r;
     output.data[i + 1] = MISMATCH_PADDING_COLOR.g;

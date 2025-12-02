@@ -141,7 +141,7 @@ async function main(): Promise<void> {
       relative_path: artifact.relative_path,
       stage: artifact.stage,
       status: artifact.status,
-      description: artifact.description
+      description: artifact.description ?? undefined
     }))
   });
 

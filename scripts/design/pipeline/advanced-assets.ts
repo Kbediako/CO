@@ -3,7 +3,7 @@ import { execFile } from 'node:child_process';
 import { isAbsolute, join, relative } from 'node:path';
 import { tmpdir } from 'node:os';
 import { promisify } from 'node:util';
-import { chromium, type BrowserContext, type Route } from 'playwright';
+import type { BrowserContext, Route } from 'playwright';
 import { pathToFileURL } from 'node:url';
 import { loadDesignContext } from './context.js';
 import {
@@ -23,6 +23,7 @@ import type {
 } from '../../../packages/shared/manifest/types.js';
 import type { DesignConfig, DesignToolkitPipelineConfig } from '../../../packages/shared/config/index.js';
 import { runDefaultInteractions, type InteractionPage } from './toolkit/snapshot.js';
+import { loadPlaywright } from './optionalDeps.js';
 
 const execFileAsync = promisify(execFile);
 const MOTION_USER_AGENT =
@@ -372,7 +373,8 @@ async function recordInteractionVideo(
 ): Promise<{ rawVideoPath: string; url: string }> {
   const captureDir = join(tmpRoot, entry.slug, `${Date.now()}`);
   await mkdir(captureDir, { recursive: true });
-  const browser = await chromium.launch({ headless: true });
+  const playwright = await loadPlaywright();
+  const browser = await playwright.chromium.launch({ headless: true });
   const targetUrl = resolveMotionTarget(entry, repoRoot);
   const macro = await loadMotionMacro(entry, repoRoot);
   let context: BrowserContext | null = null;

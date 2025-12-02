@@ -3,7 +3,9 @@ import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
-import * as cheerio from "cheerio";
+import { loadCheerio } from "./mirror-optional-deps.mjs";
+
+const cheerio = await loadCheerio();
 
 const WAYBACK_PREFIX = "https://web.archive.org/web";
 const DEFAULT_ASSET_ROOTS = ["/wp-content", "/wp-includes", "/"];

@@ -1,7 +1,61 @@
+const fs = require('node:fs');
 const path = require('node:path');
+const { execSync } = require('node:child_process');
+
+const repoRoot = path.resolve(__dirname, '..');
+const distPath = path.resolve(repoRoot, 'dist/patterns/linters/index.js');
+const sourceRoot = path.resolve(repoRoot, 'patterns');
+
+function getLatestMtime(targetPath) {
+  let stat;
+  try {
+    stat = fs.statSync(targetPath);
+  } catch {
+    return 0;
+  }
+
+  if (!stat.isDirectory()) {
+    return stat.mtimeMs;
+  }
+
+  const entries = fs.readdirSync(targetPath);
+  return entries.reduce((latest, entry) => {
+    const candidate = getLatestMtime(path.join(targetPath, entry));
+    return candidate > latest ? candidate : latest;
+  }, stat.mtimeMs);
+}
+
+function needsBuild() {
+  const distMtime = getLatestMtime(distPath);
+  if (distMtime === 0) {
+    return true;
+  }
+  const sourceMtime = Math.max(
+    getLatestMtime(path.join(sourceRoot, 'linters')),
+    getLatestMtime(path.join(sourceRoot, 'index.ts')),
+    getLatestMtime(path.join(sourceRoot, 'tsconfig.json'))
+  );
+  return sourceMtime > distMtime;
+}
+
+function buildPatternsIfNeeded() {
+  if (!needsBuild()) {
+    return;
+  }
+  try {
+    execSync('npm run build:patterns', {
+      cwd: repoRoot,
+      stdio: 'inherit'
+    });
+  } catch (error) {
+    throw new Error(
+      `patterns plugin failed to build dist artifacts. Run "npm run build:patterns" manually to debug. ${error?.message ?? error}`
+    );
+  }
+}
 
 function loadRules() {
-  const distPath = path.resolve(__dirname, '../dist/patterns/linters/index.js');
+  buildPatternsIfNeeded();
   try {
     // eslint-disable-next-line global-require, import/no-dynamic-require
     return require(distPath).rules;

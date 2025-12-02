@@ -33,6 +33,7 @@
     "commands",
     "child_runs",
     "run_summary_path",
+    "plan_target_id",
     "instructions_hash",
     "instructions_sources"
   ],
@@ -168,6 +169,7 @@
       }
     },
     "run_summary_path": { "type": ["string", "null"] },
+    "plan_target_id": { "type": ["string", "null"] },
     "control_plane": {
       "type": ["object", "null"],
       "additionalProperties": false,
@@ -224,6 +226,7 @@
         }
       }
     },
+    "guardrails_required": { "type": ["boolean", "null"] },
     "scheduler": {
       "type": ["object", "null"],
       "additionalProperties": false,
@@ -343,7 +346,8 @@
             "blocked_frames": { "type": "integer", "minimum": 0 },
             "allowed_frames": { "type": "integer", "minimum": 0 }
           }
-        }
+        },
+        "log_path": { "type": ["string", "null"] }
       }
     },
     "instructions_hash": { "type": ["string", "null"] },
@@ -365,6 +369,271 @@
           "sources": {
             "type": "array",
             "items": { "type": "string", "minLength": 1 }
+          },
+          "experiences": {
+            "type": ["array", "null"],
+            "items": { "type": "string", "minLength": 1 }
+          }
+        }
+      }
+    },
+    "tfgrpo": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "properties": {
+        "epoch": { "type": ["integer", "null"] },
+        "group_id": { "type": ["string", "null"] },
+        "group_size": { "type": ["integer", "null"], "minimum": 0 },
+        "tool_metrics": {
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "required": ["tool_calls", "token_total", "cost_usd", "latency_ms", "per_tool"],
+          "properties": {
+            "tool_calls": { "type": "integer", "minimum": 0 },
+            "token_total": { "type": "number", "minimum": 0 },
+            "cost_usd": { "type": "number", "minimum": 0 },
+            "latency_ms": { "type": "number", "minimum": 0 },
+            "per_tool": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "tool",
+                  "tokens",
+                  "cost_usd",
+                  "latency_ms",
+                  "attempts",
+                  "status",
+                  "sandbox_state"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "tool": { "type": "string", "minLength": 1 },
+                  "tokens": { "type": "number", "minimum": 0 },
+                  "cost_usd": { "type": "number", "minimum": 0 },
+                  "latency_ms": { "type": "number", "minimum": 0 },
+                  "attempts": { "type": "integer", "minimum": 1 },
+                  "status": { "type": "string", "enum": ["succeeded", "failed"] },
+                  "sandbox_state": { "type": "string", "enum": ["sandboxed", "escalated", "failed"] }
+                }
+              }
+            }
+          }
+        },
+        "experiences": {
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "required": ["ids", "written", "manifest_path"],
+          "properties": {
+            "ids": {
+              "type": "array",
+              "items": { "type": "string", "minLength": 1 }
+            },
+            "written": { "type": "integer", "minimum": 0 },
+            "manifest_path": { "type": ["string", "null"] }
+          }
+        }
+      }
+    },
+    "learning": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "properties": {
+        "snapshot": {
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "required": [
+            "tag",
+            "commit_sha",
+            "tarball_path",
+            "tarball_digest",
+            "storage_path",
+            "retention_days",
+            "status",
+            "attempts",
+            "created_at"
+          ],
+          "properties": {
+            "tag": { "type": "string", "minLength": 1 },
+            "commit_sha": { "type": "string", "minLength": 1 },
+            "tarball_path": { "type": "string", "minLength": 1 },
+            "tarball_digest": { "type": "string", "minLength": 1 },
+            "storage_path": { "type": "string", "minLength": 1 },
+            "retention_days": { "type": "integer", "minimum": 1 },
+            "status": { "type": "string", "enum": ["pending", "captured", "snapshot_failed", "stalled_snapshot"] },
+            "attempts": { "type": "integer", "minimum": 0 },
+            "created_at": { "type": "string", "minLength": 1 },
+            "last_error": { "type": ["string", "null"] },
+            "git_status_path": { "type": ["string", "null"] },
+            "git_log_path": { "type": ["string", "null"] }
+          }
+        },
+        "queue": {
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "required": ["snapshot_id", "manifest_path", "enqueued_at", "payload_path", "status"],
+          "properties": {
+            "snapshot_id": { "type": "string", "minLength": 1 },
+            "diff_path": { "type": ["string", "null"] },
+            "prompt_path": { "type": ["string", "null"] },
+            "execution_history_path": { "type": ["string", "null"] },
+            "manifest_path": { "type": "string", "minLength": 1 },
+            "enqueued_at": { "type": "string", "minLength": 1 },
+            "payload_path": { "type": "string", "minLength": 1 },
+            "status": { "type": "string", "enum": ["queued", "failed"] }
+          }
+        },
+        "scenario": {
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "required": ["path", "generated_at", "source", "status", "attempts"],
+          "properties": {
+            "path": { "type": ["string", "null"] },
+            "generated_at": { "type": ["string", "null"] },
+            "source": { "type": "string", "enum": ["execution_history", "prompt", "diff", "template", "manual"] },
+            "status": { "type": "string", "enum": ["pending", "synthesized", "needs_manual_scenario"] },
+            "attempts": { "type": "integer", "minimum": 0 },
+            "partial_path": { "type": ["string", "null"] },
+            "manual_template": { "type": ["string", "null"] },
+            "approver": { "type": ["string", "null"] },
+            "reason": { "type": ["string", "null"] }
+          }
+        },
+        "validation": {
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "properties": {
+            "mode": { "type": "string", "enum": ["per-task", "grouped"] },
+            "grouping": {
+              "type": ["object", "null"],
+              "additionalProperties": false,
+              "required": ["id", "members"],
+              "properties": {
+                "id": { "type": "string", "minLength": 1 },
+                "members": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+                "window_hours": { "type": ["number", "null"] }
+              }
+            },
+            "status": {
+              "type": "string",
+              "enum": ["pending", "validated", "snapshot_failed", "stalled_snapshot", "needs_manual_scenario"]
+            },
+            "reason": { "type": ["string", "null"] },
+            "log_path": { "type": ["string", "null"] },
+            "last_error": { "type": ["string", "null"] },
+            "git_status_path": { "type": ["string", "null"] },
+            "git_log_path": { "type": ["string", "null"] }
+          }
+        },
+        "crystalizer": {
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "required": ["candidate_path", "model", "prompt_pack", "prompt_pack_stamp", "budget_usd", "cost_usd", "status", "created_at"],
+          "properties": {
+            "candidate_path": { "type": ["string", "null"] },
+            "model": { "type": "string", "minLength": 1 },
+            "prompt_pack": { "type": "string", "minLength": 1 },
+            "prompt_pack_stamp": { "type": ["string", "null"] },
+            "budget_usd": { "type": "number", "minimum": 0 },
+            "cost_usd": { "type": ["number", "null"] },
+            "status": { "type": "string", "enum": ["pending", "succeeded", "skipped", "failed"] },
+            "error": { "type": ["string", "null"] },
+            "created_at": { "type": "string", "minLength": 1 }
+          }
+        },
+        "alerts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["type", "channel", "target", "message", "created_at"],
+            "properties": {
+              "type": { "type": "string", "enum": ["snapshot_failed", "stalled_snapshot", "needs_manual_scenario", "budget_exceeded"] },
+              "channel": { "type": "string", "enum": ["slack", "pagerduty"] },
+              "target": { "type": "string", "minLength": 1 },
+              "message": { "type": "string", "minLength": 1 },
+              "created_at": { "type": "string", "minLength": 1 },
+              "severity": { "type": ["string", "null"] }
+            }
+          }
+        },
+        "approvals": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["actor", "timestamp", "state"],
+            "properties": {
+              "actor": { "type": "string", "minLength": 1 },
+              "timestamp": { "type": "string", "minLength": 1 },
+              "reason": { "type": ["string", "null"] },
+              "state": { "type": "string", "enum": ["stalled_snapshot", "needs_manual_scenario", "requeue"] }
+            }
+          }
+        },
+        "review": {
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "required": ["rejections", "latency_ms", "updated_at"],
+          "properties": {
+            "rejections": { "type": "integer", "minimum": 0 },
+            "latency_ms": { "type": ["number", "null"] },
+            "last_reviewer": { "type": ["string", "null"] },
+            "updated_at": { "type": "string", "minLength": 1 }
+          }
+        },
+        "regressions": {
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "required": ["detected"],
+          "properties": {
+            "detected": { "type": "integer", "minimum": 0 },
+            "detail_path": { "type": ["string", "null"] }
+          }
+        },
+        "pattern_hygiene": {
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "required": ["promoted", "deprecated", "updated_at"],
+          "properties": {
+            "promoted": { "type": "integer", "minimum": 0 },
+            "deprecated": { "type": "integer", "minimum": 0 },
+            "notes": { "type": ["array", "null"], "items": { "type": "string" } },
+            "updated_at": { "type": "string", "minLength": 1 }
+          }
+        },
+        "throughput": {
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "required": ["candidates", "active", "deprecated", "updated_at"],
+          "properties": {
+            "candidates": { "type": "integer", "minimum": 0 },
+            "active": { "type": "integer", "minimum": 0 },
+            "deprecated": { "type": "integer", "minimum": 0 },
+            "updated_at": { "type": "string", "minLength": 1 }
+          }
+        }
+      }
+    },
+    "guardrail_status": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["present", "recommendation", "summary", "computed_at", "counts"],
+      "properties": {
+        "present": { "type": "boolean" },
+        "recommendation": { "type": ["string", "null"] },
+        "summary": { "type": "string", "minLength": 1 },
+        "computed_at": { "type": "string", "minLength": 1 },
+        "counts": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["total", "succeeded", "failed", "skipped", "other"],
+          "properties": {
+            "total": { "type": "integer", "minimum": 0 },
+            "succeeded": { "type": "integer", "minimum": 0 },
+            "failed": { "type": "integer", "minimum": 0 },
+            "skipped": { "type": "integer", "minimum": 0 },
+            "other": { "type": "integer", "minimum": 0 }
           }
         }
       }
