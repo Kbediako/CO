@@ -45,6 +45,7 @@ Use the mirror tooling to keep hi-fi site clones fully featured while staying of
 - **Brittle vendor calls:** Guard optional chains in vendor bundles (e.g., GSAP timelines with `.kill()`) and bypass custom image loaders when they still try to reach the origin.
 - **Style fingerprints:** If the design will be reused, always run `npm run mirror:fingerprint -- --project <name>` and attach the resulting `style-profile.json` / `style.md` in handoffs.
 - **CDN Allowlisting:** Always check the network tab or source code for external asset hosts (e.g., `cdn.prod.website-files.com`, `cloudfront.net`) and add them to `allowlistHosts` in `mirror.config.json`. Strict allowlists cause missing assets.
+- **Percent-encoded filenames:** Webflow and some CDNs emit filenames with `%20`/`%40` etc., but browsers request the decoded form. After fetch, run a quick decoder to rename files (`find ... -name '*%*'` or a small `path.rename(unquote(path.name))` script) so images don’t 404. Keep asset URLs absolute-from-root (`/external/...`) and serve from the site root; subpath or `file://` serving will break those references.
 - **Tracker Sanitization:**
   - Use `stripPatterns` for broad blocking.
   - For stubborn inline scripts, use `rewriteRules` with regex.
