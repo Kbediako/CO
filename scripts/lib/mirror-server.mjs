@@ -39,7 +39,7 @@ function resolveCspPolicy(policy) {
   }
 
   if (!policy || policy === "self") {
-    return "default-src 'self' data: blob:; img-src 'self' data: blob:; media-src 'self' data: blob:; font-src 'self' data: blob:; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self'; frame-ancestors 'self'; object-src 'none'; base-uri 'self'; worker-src 'self' blob: data:";
+    return "default-src 'self' data: blob:; img-src 'self' data: blob:; media-src 'self' data: blob:; font-src 'self' data: blob:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://unpkg.com; style-src 'self' 'unsafe-inline'; connect-src 'self' data: blob: https://unpkg.com; frame-ancestors 'self'; object-src 'none'; base-uri 'self'; worker-src 'self' blob: data:";
   }
 
   if (policy === "strict") {
@@ -179,8 +179,9 @@ export function createMirrorServer({ rootDir, csp, enableRange = true, log = con
     }
 
     const ext = path.extname(filePath).toLowerCase();
-    const cacheControl = ext === ".html" ? "no-cache" : "public, max-age=31536000, immutable";
-    const headers = buildHeaders({ ext, cacheControl, cspHeader, enableRange, size: stat.size });
+    const effectiveExt = ext || (pathname.startsWith("/api/") ? ".json" : "");
+    const cacheControl = effectiveExt === ".html" ? "no-cache" : "public, max-age=31536000, immutable";
+    const headers = buildHeaders({ ext: effectiveExt, cacheControl, cspHeader, enableRange, size: stat.size });
 
     try {
       if (enableRange && req.headers.range) {

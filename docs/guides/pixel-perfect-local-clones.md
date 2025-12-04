@@ -59,3 +59,6 @@ Use the mirror tooling to keep hi-fi site clones fully featured while staying of
     ```
   - If automated rewriting fails, use `sed` or `perl` as a final sanitization step: `find packages/<project>/public -name "*.js" -exec perl -pi -e 's/gtag/void/ig' {} +`.
 - **CSS Inlining:** `mirror:fingerprint` can extract inlined CSS from HTML files. Ensure the HTML file exists in `public/` before running the fingerprint command.
+- **Desktop-vs-mobile gaps:** If a section is blank only on desktop, look for missing 3D/canvas assets or CSP blocks that mobile fallbacks avoid. Check the console for 404s on split chunks and CSP violations before debugging app logic.
+- **Local decoders:** Bundle third-party decoders (e.g., Draco wasm/js) into `/public` and point loaders at those paths. If remote fallbacks remain, whitelist the host in CSP/allowlist.
+- **CSP alignment:** Default `self` CSP may break Pixi/Draco. Permit `blob:`/`data:` for connect/worker, and add `unsafe-eval` only when required by the runtime. Keep the policy as tight as possible otherwise.
