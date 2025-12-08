@@ -7,6 +7,29 @@ The Snakes Arena checklist has been retired from this workspace; reference the a
 
 > _Guardrail note:_ Minimal diagnostics or smoke-test pipelines can opt out of spec-guard enforcement by setting `guardrailsRequired: false` in their pipeline definition (e.g., inside `codex.orchestrator.json`). Standard design pipelines keep `node scripts/spec-guard.mjs --dry-run` inline so manifests such as `.runs/0410-hi-fi-design-toolkit/cli/2025-11-07T03-54-09-660Z-35b0a68c/manifest.json` continue to record guardrail evidence automatically.
 
+# Task List Snapshot — Dead Code Pruning & Evidence (0801)
+
+- **Update — Planning:** Dead-code inventory recorded (CLI helpers, learning helpers, SDK retry helper, aggregator entrypoints, evaluation harness scripts, orphaned design sample, mirror server wrapper, patterns registries, heavy archives). Await first manifest under `.runs/0801-dead-code-pruning/cli/<run-id>/manifest.json`.
+- **Notes:** Export `MCP_RUNNER_TASK_ID=0801-dead-code-pruning` before running orchestrator commands; guardrails: `node scripts/spec-guard.mjs --dry-run`, `npm run lint`, `npm run test` (and `npm run build` if touching orchestrator packages).
+
+## Checklist Mirror
+Mirror status with `tasks/tasks-0801-dead-code-pruning.md` and `.agent/task/0801-dead-code-pruning.md` (if created). Keep `[ ]` until manifest path is recorded.
+
+### Foundation
+- [ ] Diagnostics/plan manifest captured — Evidence: `.runs/0801-dead-code-pruning/cli/<run-id>/manifest.json`.
+- [ ] Metrics/state snapshots updated — Evidence: `.runs/0801-dead-code-pruning/metrics.json`, `out/0801-dead-code-pruning/state.json`.
+- [ ] PRD/spec/tasks mirrors updated with manifest links — Evidence: `.runs/0801-dead-code-pruning/cli/<run-id>/manifest.json`.
+
+### Remediation Plan
+- [ ] Unused CLI/learning/SDK helpers removed or justified — Evidence: `.runs/0801-dead-code-pruning/cli/<run-id>/manifest.json`.
+- [ ] Aggregator entrypoints/pattern registries evaluated and pruned or documented — Evidence: `.runs/0801-dead-code-pruning/cli/<run-id>/manifest.json`.
+- [ ] Evaluation harness + mirror server + design sample handled (delete/archive/justify) — Evidence: `.runs/0801-dead-code-pruning/cli/<run-id>/manifest.json`.
+- [ ] Archives decision (keep with README pointer or relocate to archive folder) — Evidence: `.runs/0801-dead-code-pruning/cli/<run-id>/manifest.json`.
+- [ ] Guardrails/tests executed — `node scripts/spec-guard.mjs --dry-run`, `npm run lint`, `npm run test` (and `npm run build` when orchestrator code touched); Evidence: `.runs/0801-dead-code-pruning/cli/<run-id>/manifest.json`.
+
+### Review & Handoff
+- [ ] Reviewer hand-off run (`npm run review --manifest <latest>`) with approvals captured — Evidence: `.runs/0801-dead-code-pruning/cli/<run-id>/manifest.json`.
+
 # Task List Snapshot — Codex Orchestrator Slimdown (0707)
 
 - **Update — Planning:** PRD + tech spec published; CI/local test coverage policy recorded (core vs full-matrix lanes). Awaiting first diagnostics manifest under `.runs/0707-orchestrator-slimdown/cli/<run-id>/manifest.json`.

@@ -1,5 +1,11 @@
 # Technical Spec Overview — Codex Orchestrator Projects
 
+## Task 0801 — Dead Code Pruning & Evidence
+- Primary Doc: `docs/TECH_SPEC-dead-code-pruning.md`
+- Run Manifest Link: _(pending — capture first diagnostics run under `.runs/0801-dead-code-pruning/cli/<run-id>/manifest.json`)._
+- Metrics / State Snapshots: _(pending — populate `.runs/0801-dead-code-pruning/metrics.json` and `out/0801-dead-code-pruning/state.json`)._
+- Checklist Mirror: `tasks/tasks-0801-dead-code-pruning.md`, `.agent/task/0801-dead-code-pruning.md`, `docs/TASKS.md` (0801 section).
+
 ## Task 0303 — Codex Orchestrator Autonomy Enhancements
 - Primary Doc: `docs/TECH_SPEC-codex-orchestrator-autonomy.md`
 - Run Manifest Link: _(pending — capture first diagnostics run under `.runs/0303-orchestrator-autonomy/cli/<run-id>/manifest.json`)._
