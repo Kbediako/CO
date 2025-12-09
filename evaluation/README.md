@@ -5,7 +5,7 @@ The evaluation harness runs adapter commands against managed fixtures to verify 
 ## Usage
 
 - `npm run eval:test` — Executes Vitest suites under `evaluation/tests/**`.
-- `node --loader ts-node/esm evaluation/harness/run-all.ts --mode=mcp --output=.runs/<task>/<run>/evaluation` — Runs every scenario and persists JSON artifacts alongside run manifests.
+- Programmatic helpers live in `evaluation/harness/index.ts` for invoking scenarios from scripts/tests; the unused CLI wrappers were removed in Task 0801.
 
 Harness helpers:
 

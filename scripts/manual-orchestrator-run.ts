@@ -10,19 +10,24 @@ import { exec as execCallback } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 
+import { TaskManager } from '../orchestrator/src/manager.js';
 import {
-  TaskManager,
   FunctionalPlannerAgent,
   FunctionalBuilderAgent,
   FunctionalTesterAgent,
-  FunctionalReviewerAgent,
-  EventBus,
-  stageArtifacts,
-  type TaskContext,
-  type PlanResult,
-  type BuildResult,
-  type TestResult
-} from '../orchestrator/src/index.js';
+  FunctionalReviewerAgent
+} from '../orchestrator/src/agents/index.js';
+import { EventBus } from '../orchestrator/src/events/EventBus.js';
+import { stageArtifacts } from '../orchestrator/src/persistence/ArtifactStager.js';
+import type {
+  TaskContext,
+  PlanResult,
+  BuilderInput,
+  TestInput,
+  ReviewInput,
+  BuildResult,
+  TestResult
+} from '../orchestrator/src/types.js';
 
 const execAsync = promisify(execCallback);
 
@@ -78,7 +83,7 @@ async function main(): Promise<void> {
     notes: 'Single pass pipeline exercising lint and tests.'
   }));
 
-  const builder = new FunctionalBuilderAgent(async ({ target, mode, runId, task }): Promise<BuildResult> => {
+  const builder = new FunctionalBuilderAgent(async ({ target, mode, runId, task }: BuilderInput): Promise<BuildResult> => {
     const lintResult = await runCommand('npm', ['run', 'lint'], 'lint.log');
     const notes: string[] = [];
     if (lintResult.ok) {
@@ -108,7 +113,7 @@ async function main(): Promise<void> {
     };
   });
 
-  const tester = new FunctionalTesterAgent(async ({ build, mode, runId, task }): Promise<TestResult> => {
+  const tester = new FunctionalTesterAgent(async ({ build, mode, runId, task }: TestInput): Promise<TestResult> => {
     const testResult = await runCommand('npm', ['run', 'test'], 'test.log');
     const [stagedTestLog] = await stageArtifacts({
       taskId: task.id,
@@ -134,7 +139,7 @@ async function main(): Promise<void> {
     };
   });
 
-  const reviewer = new FunctionalReviewerAgent(async ({ build, test }): Promise<{
+  const reviewer = new FunctionalReviewerAgent(async ({ build, test }: ReviewInput): Promise<{
     summary: string;
     decision: { approved: boolean; feedback?: string };
   }> => {
@@ -161,16 +166,19 @@ async function main(): Promise<void> {
   });
 
   const eventBus = new EventBus();
-  eventBus.on('plan:completed', (event) => {
-    console.log('[orchestrator] plan completed:', event.payload.plan.items.map((item) => item.id).join(', '));
+  eventBus.on('plan:completed', (event: any) => {
+    console.log(
+      '[orchestrator] plan completed:',
+      event.payload.plan.items.map((item: PlanResult['items'][number]) => item.id).join(', ')
+    );
   });
-  eventBus.on('build:completed', (event) => {
+  eventBus.on('build:completed', (event: any) => {
     console.log('[orchestrator] build completed:', event.payload.build.notes ?? '<no notes>');
   });
-  eventBus.on('test:completed', (event) => {
+  eventBus.on('test:completed', (event: any) => {
     console.log('[orchestrator] test completed:', event.payload.test.success ? 'success' : 'failure');
   });
-  eventBus.on('review:completed', (event) => {
+  eventBus.on('review:completed', (event: any) => {
     console.log('[orchestrator] review summary:\n', event.payload.review.summary);
   });
 

@@ -158,67 +158,6 @@ export async function runLearningHarvester(
   return { manifest, snapshotPath, queuePayloadPath };
 }
 
-export async function recordStalledSnapshot(
-  manifest: CliManifest,
-  options: {
-    repoRoot: string;
-    runsRoot: string;
-    taskId: string;
-    runId: string;
-    reason: string;
-    alertTargets?: { slack?: string; pagerduty?: string };
-  }
-): Promise<void> {
-  const { repoRoot, runsRoot, taskId, runId, reason, alertTargets } = options;
-  const learning = ensureLearningSection(manifest);
-  const safeTaskId = sanitizeTaskId(taskId);
-  const safeRunId = sanitizeRunId(runId);
-  const runDir = join(runsRoot, safeTaskId, 'cli', safeRunId);
-  const storageRoot = join(runsRoot, 'learning-snapshots');
-  const learningDir = join(runDir, 'learning');
-  await mkdir(learningDir, { recursive: true });
-  const gitStatusPath = join(learningDir, 'stalled-git-status.txt');
-  const gitLogPath = join(learningDir, 'stalled-git-log.txt');
-
-  const [statusOutput, logOutput] = await Promise.all([
-    safeGit(['status', '--short'], repoRoot).catch((error) => `git status failed: ${String(error)}`),
-    safeGit(['log', '-5', '--oneline'], repoRoot).catch((error) => `git log failed: ${String(error)}`)
-  ]);
-
-  await writeFile(gitStatusPath, statusOutput, 'utf8');
-  await writeFile(gitLogPath, logOutput, 'utf8');
-
-  learning.snapshot = {
-    tag: learning.snapshot?.tag ?? `learning-snapshot-${randomUUID()}`,
-    commit_sha: learning.snapshot?.commit_sha ?? 'unknown',
-    tarball_path: learning.snapshot?.tarball_path ?? 'unavailable',
-    tarball_digest: learning.snapshot?.tarball_digest ?? 'unavailable',
-    storage_path:
-      learning.snapshot?.storage_path ??
-      relative(repoRoot, join(storageRoot, safeTaskId, `${safeRunId}.tar.gz`)),
-    retention_days: 30,
-    status: 'stalled_snapshot',
-    attempts: learning.snapshot?.attempts ?? 0,
-    created_at: learning.snapshot?.created_at ?? isoTimestamp(),
-    last_error: reason,
-    git_status_path: relative(repoRoot, gitStatusPath),
-    git_log_path: relative(repoRoot, gitLogPath)
-  };
-  updateLearningValidation(manifest, 'stalled_snapshot');
-  appendLearningAlert(manifest, {
-    type: 'stalled_snapshot',
-    channel: 'slack',
-    target: alertTargets?.slack ?? '#learning-alerts',
-    message: `Runner stalled on snapshot ${learning.snapshot.tag}: ${reason}`
-  });
-  appendLearningAlert(manifest, {
-    type: 'stalled_snapshot',
-    channel: 'pagerduty',
-    target: alertTargets?.pagerduty ?? 'learning-pipeline',
-    message: `Runner stalled on snapshot ${taskId}/${runId}: ${reason}`
-  });
-}
-
 type SnapshotUploader = (params: {
   storageRoot: string;
   key: string;

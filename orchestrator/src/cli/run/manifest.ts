@@ -30,11 +30,6 @@ export interface ManifestBootstrapOptions {
   planTargetId?: string | null;
 }
 
-export interface HeartbeatState {
-  stale: boolean;
-  ageSeconds: number | null;
-}
-
 export interface GuardrailStatusSnapshot {
   present: boolean;
   recommendation: string | null;
@@ -227,21 +222,6 @@ function sanitizeErrorDetails(details: Record<string, unknown>): Record<string, 
   return sanitized;
 }
 
-export function computeHeartbeatState(manifest: CliManifest): HeartbeatState {
-  if (!manifest.heartbeat_at) {
-    return { ageSeconds: null, stale: false };
-  }
-  const parsed = Date.parse(manifest.heartbeat_at);
-  if (Number.isNaN(parsed)) {
-    return { ageSeconds: null, stale: false };
-  }
-  const ageMs = Date.now() - parsed;
-  return {
-    ageSeconds: Math.max(0, ageMs / 1000),
-    stale: ageMs > manifest.heartbeat_stale_after_seconds * 1000
-  };
-}
-
 export function updateHeartbeat(manifest: CliManifest): void {
   manifest.heartbeat_at = isoTimestamp();
   if (manifest.status === 'in_progress') {
@@ -271,14 +251,6 @@ export function ensureGuardrailStatus(manifest: CliManifest): GuardrailStatusSna
   const snapshot = computeGuardrailStatus(manifest);
   manifest.guardrail_status = snapshot;
   return snapshot;
-}
-
-export function guardrailCommandPresent(manifest: CliManifest): boolean {
-  return ensureGuardrailStatus(manifest).present;
-}
-
-export function guardrailRecommendation(manifest: CliManifest): string | null {
-  return ensureGuardrailStatus(manifest).recommendation;
 }
 
 export function buildGuardrailSummary(manifest: CliManifest): string {

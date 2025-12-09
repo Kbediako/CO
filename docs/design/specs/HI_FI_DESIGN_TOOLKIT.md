@@ -1,5 +1,5 @@
 ---
-last_review: 2025-11-07
+last_review: 2025-12-08
 ---
 
 # Technical Spec — Hi-Fi Design Toolkit (Task 0410)
@@ -107,7 +107,7 @@ last_review: 2025-11-07
 4. **Phase 3 (Autonomy Pilot)** — Run pipeline against two pilot properties, collect metrics in `out/0410-hi-fi-design-toolkit/design/runs/<run>.json`, and iterate on guardrails based on reviewer feedback.
 
 ## Spec Guard & Freshness
-- `node scripts/spec-guard.mjs --dry-run` already watches `docs/design/specs/**`; add Task 0410 to the guard manifest by referencing this file’s `last_review` date (set to 2025-11-07).
+- `node scripts/spec-guard.mjs --dry-run` already watches `docs/design/specs/**`; add Task 0410 to the guard manifest by referencing this file’s `last_review` date (set to 2025-12-08).
 - Implementation PRs touching toolkit code must refresh `last_review` (≤30 days) and attach the guard manifest path when seeking approval.
 - Guard fail resolution: update spec sections impacted, rerun spec guard, record manifest path in checklists before proceeding.
 

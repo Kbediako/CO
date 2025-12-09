@@ -2,8 +2,8 @@
 
 ## Task 0801 — Dead Code Pruning & Evidence
 - Primary Doc: `docs/PRD-dead-code-pruning.md`
-- Run Manifest Link: _(pending — capture first diagnostics run under `.runs/0801-dead-code-pruning/cli/<run-id>/manifest.json`)._
-- Metrics / State Snapshots: _(pending — populate `.runs/0801-dead-code-pruning/metrics.json` and `out/0801-dead-code-pruning/state.json`)._
+- Run Manifest Link: `.runs/0801-dead-code-pruning/cli/2025-12-09T03-51-52-584Z-93e9a77f/manifest.json`.
+- Metrics / State Snapshots: `.runs/0801-dead-code-pruning/metrics.json`, `out/0801-dead-code-pruning/state.json`.
 - Checklist Mirror: `tasks/tasks-0801-dead-code-pruning.md`, `docs/TASKS.md` (0801 section), `.agent/task/0801-dead-code-pruning.md` _(create if automation requires)_. 
 - CI/Test Coverage: run `npm run lint`, `npm run test`, and `node scripts/spec-guard.mjs --dry-run` before removal; add `npm run build` when touching orchestrator packages.
 

@@ -27,7 +27,7 @@ The pipeline consists of four distinct phases:
 
 #### A. The Harvester (Trigger & Snapshot)
 *   **Role:** Captures the context (Prompt), the Result (Git Diff), and the **State (Snapshot)** from a completed task.
-*   **Mechanism:** Integrated into `AgentDriver` or via a `/learn` slash command.
+*   **Mechanism:** Integrated into an AgentDriver-style runner (prototype pruned in Task 0801) or via a `/learn` slash command.
 *   **Snapshot Consistency:**
     *   To avoid race conditions (e.g., user rebasing or editing files after approval), the Harvester must capture an **Immutable Snapshot**.
     *   **Method:** Create a temporary git tag (e.g., `learning-snapshot-<uuid>`) and a tarball of the working directory at the moment of approval (`.runs/<task-id>/cli/<run-id>/learning/<run-id>.tar.gz`) while copying to `learning-snapshots/<task-id>/<run-id>.tar.gz`.

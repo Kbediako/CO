@@ -2,7 +2,6 @@ import { isoTimestamp } from '../cli/utils/time.js';
 import type {
   CliManifest,
   LearningAlertRecord,
-  LearningApprovalRecord,
   LearningManifestSection,
   LearningValidationPolicy,
   LearningValidationStatus
@@ -59,11 +58,6 @@ export function appendLearningAlert(
   };
   section.alerts = [...(section.alerts ?? []), next];
   return next;
-}
-
-export function recordLearningApproval(manifest: CliManifest, approval: LearningApprovalRecord): void {
-  const section = ensureLearningSection(manifest);
-  section.approvals = [...(section.approvals ?? []), approval];
 }
 
 export function updateLearningValidation(

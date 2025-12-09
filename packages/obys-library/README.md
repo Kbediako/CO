@@ -1,21 +1,20 @@
 # Obys Library Clone
 
-Pixel-perfect local clone of https://library.obys.agency for HiFi toolkit testing. All fonts, textures, images, and scripts are bundled in `public/` with analytics stripped.
+Pixel-perfect local clone of https://library.obys.agency for HiFi toolkit testing. The prior static payload now lives in `.runs/0801-dead-code-pruning/archive/2025-12-08T10-01-24Z/packages/obys-library/public/`.
 
 ## Run locally
 
-1. `cd packages/obys-library`
-2. `npm start` (shared mirror harness defaults to port 4173, honor `PORT`, CSP flag `MIRROR_CSP=self|strict|off`, and byte-range support for media)
-3. Open `http://localhost:4173` and interact across About/Books/Credits/Contacts and all book detail pages. Canvas, GSAP, Three.js, drawing mode, draggable nav, and particle hover are fully functional.
+1. Restore assets from the archive above or re-run the mirror fetch to repopulate `public/`.
+2. `cd packages/obys-library`
+3. `npm start` (shared mirror harness defaults to port 4173, honors `PORT`, CSP flag `MIRROR_CSP=self|strict|off`, and byte-range support for media)
+4. Open `http://localhost:4173` for the mirrored experience.
 
 ## Structure
 
-- `public/` — mirrored HTML for all routes (`/`, `/books`, `/credits`, `/contacts`, `/books/*`), assets, fonts, textures, manifests, and icons.
-- `server.js` — ESM mirror server shared with the root harness (traversal guard, HTML no-cache, immutable assets, optional CSP, optional Range).
+- `public/` — mirrored HTML for all routes; currently a README pointer until assets are restored.
 - `mirror.config.json` — origin/routes/rewrites used by the root mirror:fetch + mirror:check scripts.
 - `package.json` — scripts for serving the site; no external dependencies required.
 
 ## Notes
 
-- Google Analytics/gtag removed; no third-party trackers load.
-- Manifest/icons and offline-safe assets are served locally, so the site runs without network access once fetched.
+- Google Analytics/gtag removed; no third-party trackers load once assets are restored.

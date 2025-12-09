@@ -9,26 +9,26 @@ The Snakes Arena checklist has been retired from this workspace; reference the a
 
 # Task List Snapshot — Dead Code Pruning & Evidence (0801)
 
-- **Update — Planning:** Dead-code inventory recorded (CLI helpers, learning helpers, SDK retry helper, aggregator entrypoints, evaluation harness scripts, orphaned design sample, mirror server wrapper, patterns registries, heavy archives). Await first manifest under `.runs/0801-dead-code-pruning/cli/<run-id>/manifest.json`.
+- **Update — Planning:** Diagnostics captured at `.runs/0801-dead-code-pruning/cli/2025-12-09T03-51-52-584Z-93e9a77f/manifest.json`; dead-code deletions and archive relocations complete (archives parked under `.runs/0801-dead-code-pruning/archive/2025-12-08T10-01-24Z/` with README pointers) and guardrails/tests rerun on 2025-12-09.
 - **Notes:** Export `MCP_RUNNER_TASK_ID=0801-dead-code-pruning` before running orchestrator commands; guardrails: `node scripts/spec-guard.mjs --dry-run`, `npm run lint`, `npm run test` (and `npm run build` if touching orchestrator packages).
 
 ## Checklist Mirror
 Mirror status with `tasks/tasks-0801-dead-code-pruning.md` and `.agent/task/0801-dead-code-pruning.md` (if created). Keep `[ ]` until manifest path is recorded.
 
 ### Foundation
-- [ ] Diagnostics/plan manifest captured — Evidence: `.runs/0801-dead-code-pruning/cli/<run-id>/manifest.json`.
-- [ ] Metrics/state snapshots updated — Evidence: `.runs/0801-dead-code-pruning/metrics.json`, `out/0801-dead-code-pruning/state.json`.
-- [ ] PRD/spec/tasks mirrors updated with manifest links — Evidence: `.runs/0801-dead-code-pruning/cli/<run-id>/manifest.json`.
+- [x] Diagnostics/plan manifest captured — Evidence: `.runs/0801-dead-code-pruning/cli/2025-12-09T03-51-52-584Z-93e9a77f/manifest.json`.
+- [x] Metrics/state snapshots updated — Evidence: `.runs/0801-dead-code-pruning/metrics.json`, `out/0801-dead-code-pruning/state.json`.
+- [x] PRD/spec/tasks mirrors updated with manifest links — Evidence: `.runs/0801-dead-code-pruning/cli/2025-12-09T03-51-52-584Z-93e9a77f/manifest.json`.
 
 ### Remediation Plan
-- [ ] Unused CLI/learning/SDK helpers removed or justified — Evidence: `.runs/0801-dead-code-pruning/cli/<run-id>/manifest.json`.
-- [ ] Aggregator entrypoints/pattern registries evaluated and pruned or documented — Evidence: `.runs/0801-dead-code-pruning/cli/<run-id>/manifest.json`.
-- [ ] Evaluation harness + mirror server + design sample handled (delete/archive/justify) — Evidence: `.runs/0801-dead-code-pruning/cli/<run-id>/manifest.json`.
-- [ ] Archives decision (keep with README pointer or relocate to archive folder) — Evidence: `.runs/0801-dead-code-pruning/cli/<run-id>/manifest.json`.
-- [ ] Guardrails/tests executed — `node scripts/spec-guard.mjs --dry-run`, `npm run lint`, `npm run test` (and `npm run build` when orchestrator code touched); Evidence: `.runs/0801-dead-code-pruning/cli/<run-id>/manifest.json`.
+- [x] Unused CLI/learning/SDK helpers removed or justified — Evidence: `.runs/0801-dead-code-pruning/cli/2025-12-09T03-51-52-584Z-93e9a77f/manifest.json`.
+- [x] Aggregator entrypoints/pattern registries evaluated and pruned or documented — Evidence: `.runs/0801-dead-code-pruning/cli/2025-12-09T03-51-52-584Z-93e9a77f/manifest.json`.
+- [x] Evaluation harness + mirror server + design sample handled (delete/archive/justify) — Evidence: `.runs/0801-dead-code-pruning/cli/2025-12-09T03-51-52-584Z-93e9a77f/manifest.json`.
+- [x] Archives decision (keep with README pointer or relocate to archive folder) — Evidence: `.runs/0801-dead-code-pruning/cli/2025-12-09T03-51-52-584Z-93e9a77f/manifest.json`.
+- [x] Guardrails/tests executed — `node scripts/spec-guard.mjs --dry-run`, `npm run lint`, `npm run test` (and `npm run build` when orchestrator code touched); Evidence: `.runs/0801-dead-code-pruning/cli/2025-12-09T03-51-52-584Z-93e9a77f/manifest.json`.
 
 ### Review & Handoff
-- [ ] Reviewer hand-off run (`npm run review --manifest <latest>`) with approvals captured — Evidence: `.runs/0801-dead-code-pruning/cli/<run-id>/manifest.json`.
+- [x] Reviewer hand-off run (`npm run review --manifest <latest>`) with approvals captured — Evidence: `.runs/0801-dead-code-pruning/cli/2025-12-09T03-51-52-584Z-93e9a77f/manifest.json`.
 
 # Task List Snapshot — Codex Orchestrator Slimdown (0707)
 
@@ -276,7 +276,7 @@ Mirror status with `tasks/tasks-0506-tfgrpo.md` and `.agent/task/0506-tfgrpo-int
 # Task List Snapshot — PlusX 15th Anniversary Hi-Fi Clone (0520-15th-plus-hi-fi)
 
 - **Update — 2025-11-14:** Toolkit re-run captured https://15th.plus-ex.com with runtime canvas/font propagation, ScrollSmoother loader macro, and manifest `.runs/0520-15th-plus-hi-fi/cli/2025-11-14T11-11-13-442Z-6897b063/manifest.json`.
-- **Update — Archive refreshed:** `.runs/.../artifacts` copied into `archives/hi-fi-tests/15th-plus/2025-11-14T11-11-13-442Z-6897b063/` before pruning the run directory; README + loader script live in `reference/plus-ex-15th/`.
+- **Update — Archive refreshed:** `.runs/.../artifacts` copied into `.runs/0801-dead-code-pruning/archive/2025-12-08T10-01-24Z/archives/hi-fi-tests/15th-plus/2025-11-14T11-11-13-442Z-6897b063/` before pruning the run directory; README + loader script live in `reference/plus-ex-15th/`.
 - **Notes:** Compliance permit `plus-ex-15th-2025-11-14` allows live asset mirroring+ScrollSmoother unlock for localhost validation only.
 
 ## Checklist Mirror
@@ -287,7 +287,7 @@ Mirror status with `tasks/0520-15th-plus-hi-fi.md` and `.agent/task/0520-15th-pl
 - [x] Runtime metadata — `design/state.json` shows `runtimeCanvasColors`, `resolvedFonts`, `interactionScriptPath`, `interactionWaitMs` for plus-ex-15th; Evidence: `.runs/0520-15th-plus-hi-fi/cli/2025-11-14T11-11-13-442Z-6897b063/design/state.json`.
 
 ### Archive & Reference
-- [x] Artifacts mirrored — `archives/hi-fi-tests/15th-plus/2025-11-14T11-11-13-442Z-6897b063/` retains `design-toolkit/{context,tokens,styleguide,reference,diffs,motion}`; `.runs/.../artifacts` pruned for hygiene.
+- [x] Artifacts mirrored — `.runs/0801-dead-code-pruning/archive/2025-12-08T10-01-24Z/archives/hi-fi-tests/15th-plus/2025-11-14T11-11-13-442Z-6897b063/` retains `design-toolkit/{context,tokens,styleguide,reference,diffs,motion}`; `.runs/.../artifacts` pruned for hygiene.
 - [x] Reference README + loader — `reference/plus-ex-15th/README.md` documents serve command + archive pointer, `scripts/loader-scroll-macro.js` ships DOM-ready ScrollSmoother unlock.
 
 ### Validation & Doc Mirrors

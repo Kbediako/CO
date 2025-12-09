@@ -1,4 +1,3 @@
-import { mkdir } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { sanitizeTaskId } from '../../persistence/sanitizeTaskId.js';
 
@@ -32,22 +31,6 @@ function normalizeTaskId(value: string): string {
     }
     throw new Error(`Invalid MCP_RUNNER_TASK_ID: ${message}`);
   }
-}
-
-export async function ensureDirectories(paths: string[]): Promise<void> {
-  await Promise.all(paths.map((dir) => mkdir(dir, { recursive: true })));
-}
-
-export function taskRunsDir(env: EnvironmentPaths): string {
-  return join(env.runsRoot, env.taskId, 'cli');
-}
-
-export function legacyRunsDir(env: EnvironmentPaths): string {
-  return join(env.runsRoot, env.taskId, 'mcp');
-}
-
-export function localCompatibilityDir(env: EnvironmentPaths): string {
-  return join(env.runsRoot, 'local-mcp');
 }
 
 export { sanitizeTaskId };

@@ -3,7 +3,7 @@ const path = require('node:path');
 const { execSync } = require('node:child_process');
 
 const repoRoot = path.resolve(__dirname, '..');
-const distPath = path.resolve(repoRoot, 'dist/patterns/linters/index.js');
+const distRulePath = path.resolve(repoRoot, 'dist/patterns/linters/rules/prefer-logger-over-console.js');
 const sourceRoot = path.resolve(repoRoot, 'patterns');
 
 function getLatestMtime(targetPath) {
@@ -26,13 +26,12 @@ function getLatestMtime(targetPath) {
 }
 
 function needsBuild() {
-  const distMtime = getLatestMtime(distPath);
+  const distMtime = getLatestMtime(distRulePath);
   if (distMtime === 0) {
     return true;
   }
   const sourceMtime = Math.max(
     getLatestMtime(path.join(sourceRoot, 'linters')),
-    getLatestMtime(path.join(sourceRoot, 'index.ts')),
     getLatestMtime(path.join(sourceRoot, 'tsconfig.json'))
   );
   return sourceMtime > distMtime;
@@ -58,11 +57,15 @@ function loadRules() {
   buildPatternsIfNeeded();
   try {
     // eslint-disable-next-line global-require, import/no-dynamic-require
-    return require(distPath).rules;
+    const moduleExports = require(distRulePath);
+    const rule = moduleExports?.default ?? moduleExports;
+    return {
+      'prefer-logger-over-console': rule
+    };
   } catch (error) {
     if (error.code === 'MODULE_NOT_FOUND') {
       throw new Error(
-        `patterns plugin requires built artifacts at ${distPath}. Run "npm run build:patterns" before linting.`
+        `patterns plugin requires built artifacts at ${distRulePath}. Run "npm run build:patterns" before linting.`
       );
     }
     throw error;

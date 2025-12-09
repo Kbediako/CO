@@ -39,5 +39,7 @@ Remove unused code paths and heavy static artifacts while guaranteeing no regres
 - Manifest records: task id `0801-dead-code-pruning`, run id, tests executed, keep/remove decisions, and archive pointers.
 
 ## Evidence
-- Primary manifest: `.runs/0801-dead-code-pruning/cli/<run-id>/manifest.json`
-- Metrics/state: `.runs/0801-dead-code-pruning/metrics.json`, `out/0801-dead-code-pruning/state.json`
+- Primary manifest: `.runs/0801-dead-code-pruning/cli/2025-12-09T03-51-52-584Z-93e9a77f/manifest.json` (spec-guard now green after last_review refresh).
+- Metrics/state: `.runs/0801-dead-code-pruning/metrics.json`, `out/0801-dead-code-pruning/state.json`.
+- Static archive relocation: `.runs/0801-dead-code-pruning/archive/2025-12-08T10-01-24Z/` holds mirrors for `packages/{abetkaua,des-obys,eminente,obys-library}/public` and `archives/hi-fi-tests/` with README pointers left in place.
+- Guardrails/tests: `npm run build`, `node scripts/spec-guard.mjs --dry-run`, `npm run lint`, `npm run test`, `npm run review --manifest .runs/0801-dead-code-pruning/cli/2025-12-09T03-51-52-584Z-93e9a77f/manifest.json` (2025-12-09).

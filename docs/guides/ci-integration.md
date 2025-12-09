@@ -77,7 +77,7 @@ CI systems can parse this terminal event to publish artifacts, pull the manifest
 The Node SDK wraps the CLI to provide an event emitter and retry helpers.
 
 ```ts
-import { ExecClient } from '../packages/sdk-node/src/index.js';
+import { ExecClient } from '../packages/sdk-node/src/orchestrator.js';
 
 const client = new ExecClient({ cliPath: 'codex-orchestrator' });
 
@@ -110,6 +110,5 @@ Notable behaviors:
 
 - `run.result` resolves to the parsed summary payload plus all intermediate events.
 - `run.retry(overrides)` reruns the same command (optionally overriding flags like `taskId` or `notify`).
-- `deriveRetryOptions(summary)` converts a stored summary back into CLI options for later automation.
 
 This combination allows CI jobs to trigger a command, stream logs for real-time visibility, and deterministically resume or retry using the manifest evidence captured by the CLI.

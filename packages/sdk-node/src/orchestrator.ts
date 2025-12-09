@@ -226,20 +226,6 @@ export class ExecRunHandle extends EventEmitter {
   }
 }
 
-export function deriveRetryOptions(summary: RunSummaryEvent): ExecCommandOptions {
-  const payload = summary.payload as RunSummaryEventPayload;
-  const command = payload.command;
-  const argv = Array.isArray(command.argv) && command.argv.length > 0 ? command.argv : [command.shell];
-  const [first, ...rest] = argv;
-  return {
-    command: first ?? '',
-    args: rest,
-    cwd: command.cwd ?? undefined,
-    notify: payload.notifications?.targets ?? undefined,
-    taskId: payload.run.taskId ?? undefined
-  };
-}
-
 function buildCliArgs(options: InternalExecOptions): string[] {
   const args: string[] = ['exec', '--jsonl'];
   if (options.taskId) {

@@ -1,5 +1,5 @@
 ---
-last_review: 2025-11-07
+last_review: 2025-12-08
 ---
 
 # Technical Spec — Design Reference Pipeline (Task 0401)

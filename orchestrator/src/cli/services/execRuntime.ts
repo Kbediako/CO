@@ -75,10 +75,6 @@ export function getCliExecRunner(): UnifiedExecRunner<CliExecSessionHandle> {
   return runner;
 }
 
-export function getCliSessionManager(): ExecSessionManager<CliExecSessionHandle> {
-  return sessionManager;
-}
-
 export function getExecHandleService(): RemoteExecHandleService {
   return handleService;
 }

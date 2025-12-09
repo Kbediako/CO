@@ -45,5 +45,7 @@
 - Review: _(pending)_
 
 ## Evidence & Manifests
-- Diagnostics/plan run: _(pending)_ — set `MCP_RUNNER_TASK_ID=0801-dead-code-pruning` before running orchestrator commands; attach manifest path here.
-- Metrics/state snapshots: `_pending_` — `out/0801-dead-code-pruning/state.json`, `.runs/0801-dead-code-pruning/metrics.json`.
+- Latest diagnostics/guardrails: `.runs/0801-dead-code-pruning/cli/2025-12-09T03-51-52-584Z-93e9a77f/manifest.json` (spec-guard now green after refreshing last_review).
+- Metrics/state snapshots: `out/0801-dead-code-pruning/state.json`, `.runs/0801-dead-code-pruning/metrics.json`.
+- Static archive relocation: `.runs/0801-dead-code-pruning/archive/2025-12-08T10-01-24Z/` holds mirrors for `packages/{abetkaua,des-obys,eminente,obys-library}/public` and `archives/hi-fi-tests/`; stub READMEs remain in place.
+- Guardrails/tests: `npm run build`, `node scripts/spec-guard.mjs --dry-run`, `npm run lint`, `npm run test`, and `npm run review --manifest .runs/0801-dead-code-pruning/cli/2025-12-09T03-51-52-584Z-93e9a77f/manifest.json`.
