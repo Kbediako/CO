@@ -28,7 +28,7 @@ const privacyGuard = new PrivacyGuard({ mode: resolvePrivacyGuardMode() });
 const handleService = new RemoteExecHandleService({ guard: privacyGuard, now: () => new Date() });
 
 const cliExecutor: ExecCommandExecutor<CliExecSessionHandle> = async (request) => {
-  const child = spawn(request.command, {
+  const child = spawn(request.command, request.args ?? [], {
     cwd: request.cwd,
     env: request.env,
     shell: true,

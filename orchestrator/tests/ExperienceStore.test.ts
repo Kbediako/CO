@@ -57,6 +57,16 @@ describe('ExperienceStore', () => {
     expect(raw.trim().split('\n')).toHaveLength(1);
   });
 
+  it('does not clobber retry defaults with undefined overrides', () => {
+    const store = new ExperienceStore({
+      outDir,
+      runsDir,
+      lockRetry: { maxAttempts: undefined }
+    });
+
+    expect((store as unknown as { lockRetry: { maxAttempts: number } }).lockRetry.maxAttempts).toBe(5);
+  });
+
   it('fetches top experiences by reward and domain', async () => {
     const store = new ExperienceStore({ outDir, runsDir });
     await store.recordBatch(

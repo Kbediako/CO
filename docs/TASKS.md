@@ -21,18 +21,47 @@ Mirror status with `tasks/tasks-0901-orchestrator-issue-validation.md` and `.age
 - [x] PRD/spec/tasks mirrors updated with manifest links — Evidence: `.runs/0901-orchestrator-issue-validation/cli/2025-12-12T02-00-30-325Z-9cd0b653/manifest.json`.
 
 ### Validation
-- [ ] Issue #1 validated (sub‑pipeline error finalization).
-- [ ] Issue #2 validated (CLI exec args passthrough).
-- [ ] Issue #3 validated (session env override on reuse).
-- [ ] Issue #4 validated (retry config clobbering).
-- [ ] Issue #5 validated (`isIsoDate` strictness).
-- [ ] Issue #6 validated (instruction stamp guard behavior).
-- [ ] Issue #7 validated (timeout kill cross‑platform).
-- [ ] Issue #8 validated (temp dir cleanup).
-- [ ] Issue #9 validated (eslint plugin side‑effect build).
+- [x] Issue #1 validated (sub‑pipeline error finalization) — Evidence: `tasks/tasks-0901-orchestrator-issue-validation.md`.
+- [x] Issue #2 validated (CLI exec args passthrough) — Evidence: `tasks/tasks-0901-orchestrator-issue-validation.md`.
+- [x] Issue #3 validated (session env override on reuse) — Evidence: `tasks/tasks-0901-orchestrator-issue-validation.md`.
+- [x] Issue #4 validated (retry config clobbering) — Evidence: `tasks/tasks-0901-orchestrator-issue-validation.md`.
+- [x] Issue #5 validated (`isIsoDate` strictness) — Evidence: `tasks/tasks-0901-orchestrator-issue-validation.md`.
+- [x] Issue #6 validated (instruction stamp guard behavior) — Evidence: `tasks/tasks-0901-orchestrator-issue-validation.md`.
+- [x] Issue #7 validated (timeout kill cross‑platform) — Evidence: `tasks/tasks-0901-orchestrator-issue-validation.md`.
+- [x] Issue #8 validated (temp dir cleanup) — Evidence: `tasks/tasks-0901-orchestrator-issue-validation.md`.
+- [x] Issue #9 validated (eslint plugin side‑effect build) — Evidence: `tasks/tasks-0901-orchestrator-issue-validation.md`.
 
 ### Follow‑up Plan
-- [ ] Prioritized fix backlog created (new task/PR) with acceptance criteria.
+- [x] Prioritized fix backlog created (new task/PR) with acceptance criteria — Evidence: `tasks/tasks-0902-orchestrator-reliability-fixes.md`.
+
+# Task List Snapshot — Orchestrator Reliability Fixes (0902)
+
+- **Update — Planning:** Follow‑on hardening task from 0901; implementation underway.
+- **Notes:** Export `MCP_RUNNER_TASK_ID=0902-orchestrator-reliability-fixes` before orchestrator commands. Guardrails required: `node scripts/spec-guard.mjs --dry-run`, `npm run lint`, `npm run test`.
+
+## Checklist Mirror
+Mirror status with `tasks/tasks-0902-orchestrator-reliability-fixes.md` and `.agent/task/0902-orchestrator-reliability-fixes.md`. Keep `[ ]` until evidence is recorded.
+
+### Foundation
+- [x] Diagnostics/guardrails manifest captured — Evidence: `.runs/0902-orchestrator-reliability-fixes/cli/2025-12-12T02-34-20-318Z-847a8138/manifest.json`.
+- [x] Metrics/state snapshots updated — Evidence: `.runs/0902-orchestrator-reliability-fixes/metrics.json`, `out/0902-orchestrator-reliability-fixes/state.json`.
+- [x] PRD/spec/task mirrors updated with manifest links — Evidence: `tasks/tasks-0902-orchestrator-reliability-fixes.md`.
+
+### Fixes
+- [x] Issue #1 fixed: sub‑pipeline exceptions finalize parent manifests/stages — Evidence: `tasks/tasks-0902-orchestrator-reliability-fixes.md`.
+- [x] Issue #2 fixed: CLI exec executor forwards unified exec args — Evidence: `tasks/tasks-0902-orchestrator-reliability-fixes.md`.
+- [x] Issue #3 fixed: session reuse applies env overrides — Evidence: `tasks/tasks-0902-orchestrator-reliability-fixes.md`.
+- [x] Issue #4 fixed: retry defaults not clobbered by `undefined` spreads — Evidence: `tasks/tasks-0902-orchestrator-reliability-fixes.md`.
+- [x] Issue #5 fixed: `isIsoDate` enforces strict ISO‑8601 expectations — Evidence: `tasks/tasks-0902-orchestrator-reliability-fixes.md`.
+- [x] Issue #6 fixed: instruction loader warns+skips unstamped optional candidates — Evidence: `tasks/tasks-0902-orchestrator-reliability-fixes.md`.
+- [x] Issue #7 fixed: timeout kill is cross‑platform/Windows‑safe — Evidence: `tasks/tasks-0902-orchestrator-reliability-fixes.md`.
+- [x] Issue #8 fixed: temp dirs cleaned in crystalizer and SDK exec — Evidence: `tasks/tasks-0902-orchestrator-reliability-fixes.md`.
+- [x] Issue #9 fixed: eslint plugin no longer runs builds as side effects — Evidence: `tasks/tasks-0902-orchestrator-reliability-fixes.md`.
+
+### Guardrails
+- [x] Spec guard passes — Evidence: `.runs/0902-orchestrator-reliability-fixes/cli/2025-12-12T02-34-20-318Z-847a8138/manifest.json`.
+- [x] Lint passes — Evidence: `.runs/0902-orchestrator-reliability-fixes/cli/2025-12-12T02-34-20-318Z-847a8138/manifest.json`.
+- [x] Tests pass — Evidence: `.runs/0902-orchestrator-reliability-fixes/cli/2025-12-12T02-34-20-318Z-847a8138/manifest.json`.
 
 # Task List Snapshot — Dead Code Pruning & Evidence (0801)
 

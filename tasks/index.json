@@ -175,6 +175,22 @@
       },
       "created_at": "2025-12-12",
       "completed_at": null
+    },
+    {
+      "id": "0902",
+      "slug": "orchestrator-reliability-fixes",
+      "title": "Orchestrator Reliability Fixes",
+      "path": "tasks/tasks-0902-orchestrator-reliability-fixes.md",
+      "kind": "prd",
+      "status": "succeeded",
+      "gate": {
+        "phase": "orchestrator-reliability-fixes-implementation",
+        "status": "succeeded",
+        "log": ".runs/0902-orchestrator-reliability-fixes/cli/2025-12-12T02-34-20-318Z-847a8138/manifest.json",
+        "run_id": "2025-12-12T02-34-20-318Z-847a8138"
+      },
+      "created_at": "2025-12-12",
+      "completed_at": "2025-12-12"
     }
   ],
   "specs": []

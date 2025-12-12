@@ -1,6 +1,5 @@
 const fs = require('node:fs');
 const path = require('node:path');
-const { execSync } = require('node:child_process');
 
 const repoRoot = path.resolve(__dirname, '..');
 const distRulePath = path.resolve(repoRoot, 'dist/patterns/linters/rules/prefer-logger-over-console.js');
@@ -37,24 +36,17 @@ function needsBuild() {
   return sourceMtime > distMtime;
 }
 
-function buildPatternsIfNeeded() {
+function assertPatternsBuilt() {
   if (!needsBuild()) {
     return;
   }
-  try {
-    execSync('npm run build:patterns', {
-      cwd: repoRoot,
-      stdio: 'inherit'
-    });
-  } catch (error) {
-    throw new Error(
-      `patterns plugin failed to build dist artifacts. Run "npm run build:patterns" manually to debug. ${error?.message ?? error}`
-    );
-  }
+  throw new Error(
+    `patterns plugin requires built artifacts at ${distRulePath}. Run "npm run build:patterns" before linting.`
+  );
 }
 
 function loadRules() {
-  buildPatternsIfNeeded();
+  assertPatternsBuilt();
   try {
     // eslint-disable-next-line global-require, import/no-dynamic-require
     const moduleExports = require(distRulePath);

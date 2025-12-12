@@ -87,7 +87,11 @@ export class ExperienceStore {
       backoffFactor: 2,
       maxDelayMs: 1000
     };
-    this.lockRetry = { ...defaults, ...(options.lockRetry ?? {}) };
+    const overrides = options.lockRetry ?? {};
+    const sanitizedOverrides = Object.fromEntries(
+      Object.entries(overrides).filter(([, value]) => value !== undefined)
+    ) as Partial<LockRetryOptions>;
+    this.lockRetry = { ...defaults, ...sanitizedOverrides };
     this.now = options.now ?? (() => new Date());
   }
 

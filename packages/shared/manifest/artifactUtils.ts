@@ -18,7 +18,13 @@ export function sanitizeRelativeArtifactPath(value: string): string {
 }
 
 export function isIsoDate(value: string): boolean {
-  const date = new Date(value);
+  const trimmed = value.trim();
+  const isoPattern =
+    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?(?:Z|[+-]\d{2}:\d{2})$/;
+  if (!isoPattern.test(trimmed)) {
+    return false;
+  }
+  const date = new Date(trimmed);
   return !Number.isNaN(date.getTime());
 }
 

@@ -107,6 +107,9 @@ export class ExecSessionManager<THandle extends ExecSessionHandle> {
       const existing = this.sessions.get(id);
       if (existing) {
         existing.lastUsedAt = this.now().toISOString();
+        if (options.env !== undefined) {
+          existing.envSnapshot = envSnapshot;
+        }
         return this.createLease(existing, true, persisted);
       }
     }

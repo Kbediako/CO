@@ -52,7 +52,11 @@ export class TaskStateStore {
       backoffFactor: 2,
       maxDelayMs: 1000
     };
-    this.lockRetry = { ...defaults, ...(options.lockRetry ?? {}) };
+    const overrides = options.lockRetry ?? {};
+    const sanitizedOverrides = Object.fromEntries(
+      Object.entries(overrides).filter(([, value]) => value !== undefined)
+    ) as Partial<LockRetryOptions>;
+    this.lockRetry = { ...defaults, ...sanitizedOverrides };
   }
 
   async recordRun(summary: RunSummary): Promise<void> {

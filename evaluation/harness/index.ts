@@ -159,12 +159,17 @@ async function runCommand(
   return await new Promise<ScenarioGoalResult>((resolve) => {
     let settled = false;
     let timer: NodeJS.Timeout | undefined;
+    let forceKillTimer: NodeJS.Timeout | undefined;
     let killedByTimeout = false;
 
     const finish = (result: ScenarioGoalResult): void => {
       if (timer) {
         clearTimeout(timer);
         timer = undefined;
+      }
+      if (forceKillTimer) {
+        clearTimeout(forceKillTimer);
+        forceKillTimer = undefined;
       }
       if (!settled) {
         settled = true;
@@ -199,7 +204,22 @@ async function runCommand(
 
     timer = setTimeout(() => {
       killedByTimeout = true;
-      child.kill('SIGKILL');
+      try {
+        child.kill('SIGTERM');
+      } catch {
+        // ignore kill errors
+      }
+      if (process.platform !== 'win32') {
+        forceKillTimer = setTimeout(() => {
+          if (!child.killed) {
+            try {
+              child.kill('SIGKILL');
+            } catch {
+              // ignore kill errors
+            }
+          }
+        }, 250);
+      }
     }, timeoutMs);
 
     child.once('exit', (code) => {

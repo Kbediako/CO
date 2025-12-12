@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { mkdtemp, readFile, writeFile, mkdir } from 'node:fs/promises';
+import { mkdtemp, readFile, writeFile, mkdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
 
@@ -151,13 +151,17 @@ export async function createCodexCliCrystalizerClient(
   return {
     async generate(prompt: string, options: { model: string }) {
       const workDir = await mkdtemp(join(tmpdir(), 'crystalizer-'));
-      const promptPath = join(workDir, 'prompt.txt');
-      const outputPath = join(workDir, 'output.txt');
-      await writeFile(promptPath, prompt, 'utf8');
-      const args = ['chat', '--model', options.model, '--input-file', promptPath, '--output-file', outputPath];
-      await execFileAsync(binary, args, { env: { ...process.env } });
-      const content = await readFile(outputPath, 'utf8');
-      return { content: content.trim(), model: options.model };
+      try {
+        const promptPath = join(workDir, 'prompt.txt');
+        const outputPath = join(workDir, 'output.txt');
+        await writeFile(promptPath, prompt, 'utf8');
+        const args = ['chat', '--model', options.model, '--input-file', promptPath, '--output-file', outputPath];
+        await execFileAsync(binary, args, { env: { ...process.env } });
+        const content = await readFile(outputPath, 'utf8');
+        return { content: content.trim(), model: options.model };
+      } finally {
+        await rm(workDir, { recursive: true, force: true });
+      }
     }
   };
 }

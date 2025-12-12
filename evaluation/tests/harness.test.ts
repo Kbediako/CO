@@ -44,6 +44,30 @@ describe('evaluation harness', () => {
     }
   }, 60000);
 
+  it('marks goals failed on timeout without crashing', async () => {
+    const fixtureDir = await fs.mkdtemp(path.join(os.tmpdir(), 'codex-eval-timeout-'));
+    tempDirs.push(fixtureDir);
+
+    const scenario = {
+      id: 'timeout-inline',
+      title: 'Timeout Inline Scenario',
+      adapterId: 'typescript',
+      goals: ['build'],
+      fixture: { path: fixtureDir },
+      overrides: {
+        build: {
+          command: process.execPath,
+          args: ['-e', 'setTimeout(()=>{}, 1000)'],
+          timeoutMs: 50
+        }
+      }
+    };
+
+    const result = await runScenario(scenario, { mode: 'mcp' });
+    expect(result.goals[0]?.status).toBe('failed');
+    expect(result.goals[0]?.error).toMatch(/timed out/i);
+  });
+
   it('derives exact-match GT scores via rewarders', () => {
     const passing = createScenarioResult('reward-pass', ['passed', 'passed'], [10, 12]);
     const failing = createScenarioResult('reward-fail', ['passed', 'failed'], [5, 8]);

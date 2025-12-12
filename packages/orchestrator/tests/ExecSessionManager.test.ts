@@ -25,6 +25,22 @@ describe('ExecSessionManager', () => {
     expect(second.persisted).toBe(true);
   });
 
+  it('updates env snapshot on reuse when overrides are provided', async () => {
+    const factory = vi.fn(async ({ id }) => createHandle(id));
+    const manager = new ExecSessionManager({
+      factory,
+      baseEnv: { FOO: '1' },
+      now: () => new Date('2025-11-04T00:00:00.000Z')
+    });
+
+    const first = await manager.acquire({ id: 'shell', env: { FOO: '2' } });
+    expect(first.envSnapshot.FOO).toBe('2');
+
+    const second = await manager.acquire({ id: 'shell', env: { FOO: '3' } });
+    expect(second.reused).toBe(true);
+    expect(second.envSnapshot.FOO).toBe('3');
+  });
+
   it('creates a fresh persisted session when reuse is disabled', async () => {
     const handles: ExecSessionHandle[] = [];
     const factory = vi.fn(async ({ id }) => {

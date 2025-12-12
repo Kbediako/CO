@@ -54,6 +54,20 @@ describe('loadInstructionSet', () => {
     }
   });
 
+  it('skips unstamped optional instruction candidates', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'instructions-unstamped-'));
+    try {
+      await writeStampedInstructions(join(root, 'AGENTS.md'), '# Root\nBe kind.');
+      await mkdir(join(root, 'docs'), { recursive: true });
+      await writeFile(join(root, 'docs', 'AGENTS.md'), '# Missing Stamp\nOptional content', 'utf8');
+
+      const result = await loadInstructionSet(root);
+      expect(result.sources.map((source) => source.path)).toEqual(['AGENTS.md']);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   it('loads prompt packs when manifests exist', async () => {
     const root = await mkdtemp(join(tmpdir(), 'instructions-prompt-pack-'));
     try {

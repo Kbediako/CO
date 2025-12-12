@@ -87,6 +87,16 @@ describe('TaskStateStore', () => {
     await expect(store.recordRun(createRunSummary())).rejects.toBeInstanceOf(TaskStateStoreLockError);
   });
 
+  it('does not clobber retry defaults with undefined overrides', () => {
+    const store = new TaskStateStore({
+      runsDir,
+      outDir,
+      lockRetry: { maxAttempts: undefined }
+    });
+
+    expect((store as unknown as { lockRetry: { maxAttempts: number } }).lockRetry.maxAttempts).toBe(5);
+  });
+
   it('replaces existing runs without duplicating entries and keeps ordering intact', async () => {
     const store = new TaskStateStore({ runsDir, outDir });
 

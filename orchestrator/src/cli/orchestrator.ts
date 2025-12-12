@@ -507,42 +507,68 @@ export class CodexOrchestrator {
             logPath: entry.log_path,
             status: entry.status
           });
-          const child = await this.start({
-            taskId: env.taskId,
-            pipelineId: stage.pipeline,
-            parentRunId: manifest.run_id,
-            format: 'json'
-          });
-          entry.completed_at = isoTimestamp();
-          entry.sub_run_id = child.manifest.run_id;
-          entry.summary = child.runSummary.review.summary ?? null;
-          entry.status = child.manifest.status === 'succeeded' ? 'succeeded' : stage.optional ? 'skipped' : 'failed';
-          entry.command = null;
-          manifest.child_runs.push({
-            run_id: child.manifest.run_id,
-            pipeline_id: stage.pipeline,
-            status: child.manifest.status,
-            manifest: relativeToRepo(env, resolveRunPaths(env, child.manifest.run_id).manifestPath)
-          });
-          notes.push(`${stage.title}: ${entry.status}`);
-          await schedulePersist({ manifest: true, force: true });
-          runEvents?.stageCompleted({
-            stageId: stage.id,
-            stageIndex: entry.index,
-            title: stage.title,
-            kind: 'subpipeline',
-            status: entry.status,
-            exitCode: entry.exit_code,
-            summary: entry.summary,
-            logPath: entry.log_path,
-            subRunId: entry.sub_run_id
-          });
-          if (!stage.optional && entry.status === 'failed') {
-            manifest.status_detail = `subpipeline:${stage.pipeline}:failed`;
-            appendSummary(manifest, `Sub-pipeline '${stage.pipeline}' failed.`);
+          try {
+            const child = await this.start({
+              taskId: env.taskId,
+              pipelineId: stage.pipeline,
+              parentRunId: manifest.run_id,
+              format: 'json'
+            });
+            entry.completed_at = isoTimestamp();
+            entry.sub_run_id = child.manifest.run_id;
+            entry.summary = child.runSummary.review.summary ?? null;
+            entry.status = child.manifest.status === 'succeeded' ? 'succeeded' : stage.optional ? 'skipped' : 'failed';
+            entry.command = null;
+            manifest.child_runs.push({
+              run_id: child.manifest.run_id,
+              pipeline_id: stage.pipeline,
+              status: child.manifest.status,
+              manifest: relativeToRepo(env, resolveRunPaths(env, child.manifest.run_id).manifestPath)
+            });
+            notes.push(`${stage.title}: ${entry.status}`);
             await schedulePersist({ manifest: true, force: true });
-            success = false;
-            break;
+            runEvents?.stageCompleted({
+              stageId: stage.id,
+              stageIndex: entry.index,
+              title: stage.title,
+              kind: 'subpipeline',
+              status: entry.status,
+              exitCode: entry.exit_code,
+              summary: entry.summary,
+              logPath: entry.log_path,
+              subRunId: entry.sub_run_id
+            });
+            if (!stage.optional && entry.status === 'failed') {
+              manifest.status_detail = `subpipeline:${stage.pipeline}:failed`;
+              appendSummary(manifest, `Sub-pipeline '${stage.pipeline}' failed.`);
+              await schedulePersist({ manifest: true, force: true });
+              success = false;
+              break;
+            }
+          } catch (error) {
+            entry.completed_at = isoTimestamp();
+            entry.summary = `Sub-pipeline error: ${(error as Error)?.message ?? String(error)}`;
+            entry.status = stage.optional ? 'skipped' : 'failed';
+            entry.command = null;
+            manifest.status_detail = `subpipeline:${stage.pipeline}:error`;
+            appendSummary(manifest, entry.summary);
+            notes.push(`${stage.title}: ${entry.status}`);
+            await schedulePersist({ manifest: true, force: true });
+            runEvents?.stageCompleted({
+              stageId: stage.id,
+              stageIndex: entry.index,
+              title: stage.title,
+              kind: 'subpipeline',
+              status: entry.status,
+              exitCode: entry.exit_code,
+              summary: entry.summary,
+              logPath: entry.log_path,
+              subRunId: entry.sub_run_id
+            });
+            if (!stage.optional) {
+              success = false;
+              break;
+            }
           }
         }
       }

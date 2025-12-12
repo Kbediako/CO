@@ -1,5 +1,6 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { createWriteStream, mkdtempSync, type WriteStream } from 'node:fs';
+import { rm } from 'node:fs/promises';
 import { EventEmitter } from 'node:events';
 import { join } from 'node:path';
 import { createInterface } from 'node:readline';
@@ -85,6 +86,7 @@ export class ExecRunHandle extends EventEmitter {
   private readonly stderrStream: WriteStream;
   private readonly eventsFilePath: string;
   private readonly stderrFilePath: string;
+  private readonly artifactRoot: string;
   private readonly maxEventBuffer = 200;
   private readonly maxStderrBuffer = 200;
   private streamsClosed = false;
@@ -100,9 +102,9 @@ export class ExecRunHandle extends EventEmitter {
   ) {
     super();
     this.child = child;
-    const artifactRoot = mkdtempSync(join(tmpdir(), 'codex-exec-'));
-    this.eventsFilePath = join(artifactRoot, 'events.ndjson');
-    this.stderrFilePath = join(artifactRoot, 'stderr.log');
+    this.artifactRoot = mkdtempSync(join(tmpdir(), 'codex-exec-'));
+    this.eventsFilePath = join(this.artifactRoot, 'events.ndjson');
+    this.stderrFilePath = join(this.artifactRoot, 'stderr.log');
     this.eventsStream = createWriteStream(this.eventsFilePath, { flags: 'a' });
     this.stderrStream = createWriteStream(this.stderrFilePath, { flags: 'a' });
     this.resultPromise = new Promise<ExecRunResult>((resolve, reject) => {
@@ -223,6 +225,7 @@ export class ExecRunHandle extends EventEmitter {
     this.streamsClosed = true;
     this.eventsStream.end();
     this.stderrStream.end();
+    void rm(this.artifactRoot, { recursive: true, force: true }).catch(() => {});
   }
 }
 

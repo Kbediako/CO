@@ -24,15 +24,15 @@ export interface InstructionSet {
 
 export async function loadInstructionSet(repoRoot: string): Promise<InstructionSet> {
   const candidates = [
-    join(repoRoot, 'AGENTS.md'),
-    join(repoRoot, 'docs', 'AGENTS.md'),
-    join(repoRoot, '.agent', 'AGENTS.md')
+    { path: join(repoRoot, 'AGENTS.md'), required: true },
+    { path: join(repoRoot, 'docs', 'AGENTS.md'), required: false },
+    { path: join(repoRoot, '.agent', 'AGENTS.md'), required: false }
   ];
 
   const verifier = new InstructionStampVerifier();
   const sources: InstructionSource[] = [];
-  for (const path of candidates) {
-    const source = await readStampedInstruction(path, repoRoot, verifier);
+  for (const candidate of candidates) {
+    const source = await readStampedInstruction(candidate.path, repoRoot, verifier, candidate.required);
     if (source) {
       sources.push(source);
     }
@@ -75,7 +75,8 @@ class InstructionStampVerifier {
 async function readStampedInstruction(
   absolutePath: string,
   repoRoot: string,
-  verifier: InstructionStampVerifier
+  verifier: InstructionStampVerifier,
+  required: boolean
 ): Promise<InstructionSource | null> {
   try {
     const raw = await readFile(absolutePath, 'utf8');
@@ -96,6 +97,11 @@ async function readStampedInstruction(
   } catch (error) {
     const err = error as NodeJS.ErrnoException;
     if (err && err.code === 'ENOENT') {
+      return null;
+    }
+    if (!required) {
+      const relativePath = relative(repoRoot, absolutePath);
+      logInstructionGuard(`Skipping optional instruction ${relativePath}: ${(error as Error)?.message ?? String(error)}`);
       return null;
     }
     throw error;
