@@ -71,7 +71,7 @@ describe('PersistenceCoordinator', () => {
     const manifest = JSON.parse(await readFile(manifestPath, 'utf-8')) as RunSummary;
     expect(manifest.runId).toBe(summary.runId);
 
-    const statePath = join(outDir, summary.taskId, 'state.json');
+    const statePath = join(outDir, summary.taskId, 'runs.json');
     const state = JSON.parse(await readFile(statePath, 'utf-8'));
     expect(state.taskId).toBe(summary.taskId);
     expect(state.runs).toHaveLength(1);

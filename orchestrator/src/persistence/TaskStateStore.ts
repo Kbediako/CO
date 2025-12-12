@@ -34,7 +34,7 @@ export class TaskStateStoreLockError extends Error {
 }
 
 /**
- * Persists orchestrator run history per task under `/out/<taskId>/state.json`.
+ * Persists orchestrator run history per task under `/out/<taskId>/runs.json`.
  * Uses advisory lock files (`.runs/<taskId>.lock`) to guard concurrent writers
  * and performs atomic writes via temporary files + rename.
  */
@@ -68,7 +68,7 @@ export class TaskStateStore {
       const taskOutDir = join(this.outDir, safeTaskId);
       await this.ensureDirectory(taskOutDir);
 
-      const snapshotPath = join(taskOutDir, 'state.json');
+      const snapshotPath = join(taskOutDir, 'runs.json');
       const snapshot = await this.loadSnapshot(snapshotPath, safeTaskId);
       const updated = this.mergeSnapshot(snapshot, { ...summary, taskId: safeTaskId });
       await writeAtomicFile(snapshotPath, JSON.stringify(updated, null, 2));
@@ -127,12 +127,35 @@ export class TaskStateStore {
       return parsed;
     } catch (error: unknown) {
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-        return { taskId, lastRunAt: '', runs: [] };
+        const legacyPath = join(dirname(path), 'state.json');
+        const legacy = await this.tryLoadLegacySnapshot(legacyPath, taskId);
+        return legacy ?? { taskId, lastRunAt: '', runs: [] };
       }
       if (error instanceof SyntaxError) {
         throw new Error(`Corrupted snapshot at ${path}: ${error.message}`);
       }
       throw error;
+    }
+  }
+
+  private async tryLoadLegacySnapshot(path: string, taskId: string): Promise<TaskStateSnapshot | null> {
+    try {
+      const data = await readFile(path, 'utf-8');
+      const parsed = JSON.parse(data) as Partial<TaskStateSnapshot> | null;
+      if (
+        parsed &&
+        typeof parsed.taskId === 'string' &&
+        parsed.taskId === taskId &&
+        Array.isArray(parsed.runs)
+      ) {
+        return parsed as TaskStateSnapshot;
+      }
+      return null;
+    } catch (error: unknown) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+        return null;
+      }
+      return null;
     }
   }
 

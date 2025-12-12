@@ -66,7 +66,7 @@ describe('TaskStateStore', () => {
     await store.recordRun(newerRun);
     await store.recordRun(olderRun);
 
-    const statePath = join(outDir, newerRun.taskId, 'state.json');
+    const statePath = join(outDir, newerRun.taskId, 'runs.json');
     const state = JSON.parse(await readFile(statePath, 'utf-8')) as TaskStateSnapshot;
 
     expect(state.runs.map((run) => run.runId)).toEqual([olderRun.runId, newerRun.runId]);
@@ -129,12 +129,33 @@ describe('TaskStateStore', () => {
 
     await store.recordRun(replacement);
 
-    const statePath = join(outDir, runA.taskId, 'state.json');
+    const statePath = join(outDir, runA.taskId, 'runs.json');
     const state = JSON.parse(await readFile(statePath, 'utf-8')) as TaskStateSnapshot;
 
     expect(state.runs).toHaveLength(3);
     expect(state.runs.map((run) => run.runId)).toEqual([runA.runId, runC.runId, runB.runId]);
     expect(state.runs.find((run) => run.runId === runB.runId)?.build.notes).toBe('updated');
     expect(state.lastRunAt).toBe(replacement.timestamp);
+  });
+
+  it('ignores legacy metrics state.json when migrating snapshots', async () => {
+    const store = new TaskStateStore({ runsDir, outDir });
+    const metricsDir = join(outDir, '0001');
+    await mkdir(metricsDir, { recursive: true });
+    await writeFile(
+      join(metricsDir, 'state.json'),
+      JSON.stringify({ updated_at: '2025-12-12T00:00:00.000Z', safety: {}, throughput: {}, alerts: {} }, null, 2),
+      'utf8'
+    );
+
+    await store.recordRun(createRunSummary());
+
+    const historyPath = join(metricsDir, 'runs.json');
+    const history = JSON.parse(await readFile(historyPath, 'utf-8')) as TaskStateSnapshot;
+    expect(history.taskId).toBe('0001');
+    expect(history.runs).toHaveLength(1);
+
+    const metricsRaw = JSON.parse(await readFile(join(metricsDir, 'state.json'), 'utf-8')) as Record<string, unknown>;
+    expect(metricsRaw).not.toHaveProperty('taskId');
   });
 });

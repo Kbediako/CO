@@ -63,6 +63,27 @@ Mirror status with `tasks/tasks-0902-orchestrator-reliability-fixes.md` and `.ag
 - [x] Lint passes — Evidence: `.runs/0902-orchestrator-reliability-fixes/cli/2025-12-12T02-34-20-318Z-847a8138/manifest.json`.
 - [x] Tests pass — Evidence: `.runs/0902-orchestrator-reliability-fixes/cli/2025-12-12T02-34-20-318Z-847a8138/manifest.json`.
 
+# Task List Snapshot — TaskStateStore Run History File Fix (0903)
+
+- **Update — Planning:** Follow‑on from 0902 to remove TaskStateStore/metrics `state.json` collision.
+- **Notes:** Export `MCP_RUNNER_TASK_ID=0903-taskstate-store-run-history-fix` before orchestrator commands. Guardrails required.
+
+## Checklist Mirror
+Mirror status with `tasks/tasks-0903-taskstate-store-run-history-fix.md` and `.agent/task/0903-taskstate-store-run-history-fix.md`. Keep `[ ]` until evidence is recorded.
+
+### Foundation
+- [x] Diagnostics/guardrails manifest captured — Evidence: `.runs/0903-taskstate-store-run-history-fix/cli/2025-12-12T04-49-23-224Z-5cfceb39/manifest.json`.
+- [x] Metrics/state snapshots updated — Evidence: `.runs/0903-taskstate-store-run-history-fix/metrics.json`, `out/0903-taskstate-store-run-history-fix/state.json`.
+- [x] PRD/spec/task mirrors updated with manifest links — Evidence: `tasks/tasks-0903-taskstate-store-run-history-fix.md`.
+
+### Fix
+- [x] TaskStateStore run history uses `runs.json` without overwriting metrics `state.json`.
+
+### Guardrails
+- [x] Spec guard passes — Evidence: `.runs/0903-taskstate-store-run-history-fix/cli/2025-12-12T04-49-23-224Z-5cfceb39/manifest.json`.
+- [x] Lint passes — Evidence: `.runs/0903-taskstate-store-run-history-fix/cli/2025-12-12T04-49-23-224Z-5cfceb39/manifest.json`.
+- [x] Tests pass — Evidence: `.runs/0903-taskstate-store-run-history-fix/cli/2025-12-12T04-49-23-224Z-5cfceb39/manifest.json`.
+
 # Task List Snapshot — Dead Code Pruning & Evidence (0801)
 
 - **Update — Planning:** Diagnostics captured at `.runs/0801-dead-code-pruning/cli/2025-12-09T03-51-52-584Z-93e9a77f/manifest.json`; dead-code deletions and archive relocations complete (archives parked under `.runs/0801-dead-code-pruning/archive/2025-12-08T10-01-24Z/` with README pointers) and guardrails/tests rerun on 2025-12-09.

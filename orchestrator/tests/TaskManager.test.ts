@@ -358,7 +358,7 @@ describe('TaskManager', () => {
     );
     expect(manifest.runId).toBe('run-fixed');
 
-    const state = JSON.parse(await readFile(join(outDir, baseTask.id, 'state.json'), 'utf-8'));
+    const state = JSON.parse(await readFile(join(outDir, baseTask.id, 'runs.json'), 'utf-8'));
     expect(state.lastRunAt).toBe(manifest.timestamp);
     expect(state.runs).toHaveLength(1);
   });
