@@ -6,6 +6,12 @@
 - Metrics / State Snapshots: _(pending — populate `.runs/0303-orchestrator-autonomy/metrics.json` and `out/0303-orchestrator-autonomy/state.json` ahead of review)._ 
 - Checklist Mirror: `tasks/tasks-0303-orchestrator-autonomy.md`, `.agent/task/0303-orchestrator-autonomy.md`, `docs/TASKS.md` (0303 section).
 
+## Task 0901 — Orchestrator Issue Validation & Prioritization
+- Primary Doc: `tasks/tasks-0901-orchestrator-issue-validation.md`
+- Run Manifest Link: `.runs/0901-orchestrator-issue-validation/cli/2025-12-12T02-00-30-325Z-9cd0b653/manifest.json`.
+- Metrics / State Snapshots: `.runs/0901-orchestrator-issue-validation/metrics.json`, `out/0901-orchestrator-issue-validation/state.json`.
+- Checklist Mirror: `docs/TASKS.md` (0901 section).
+
 ## Task 0505 — More Nutrition Pixel Archive
 - Primary Doc: `tasks/0505-more-nutrition-pixel.md`
 - Run Manifest Link: `.runs/0505-more-nutrition-pixel/cli/2025-11-09T12-25-49-931Z-decf5ae1/manifest.json`

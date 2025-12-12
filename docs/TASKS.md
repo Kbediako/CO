@@ -7,6 +7,33 @@ The Snakes Arena checklist has been retired from this workspace; reference the a
 
 > _Guardrail note:_ Minimal diagnostics or smoke-test pipelines can opt out of spec-guard enforcement by setting `guardrailsRequired: false` in their pipeline definition (e.g., inside `codex.orchestrator.json`). Standard design pipelines keep `node scripts/spec-guard.mjs --dry-run` inline so manifests such as `.runs/0410-hi-fi-design-toolkit/cli/2025-11-07T03-54-09-660Z-35b0a68c/manifest.json` continue to record guardrail evidence automatically.
 
+# Task List Snapshot — Orchestrator Issue Validation & Prioritization (0901)
+
+- **Update — Planning:** Validation docs prepared; awaiting first diagnostics/plan manifest under `.runs/0901-orchestrator-issue-validation/cli/<run-id>/manifest.json`.
+- **Notes:** Export `MCP_RUNNER_TASK_ID=0901-orchestrator-issue-validation` before orchestrator commands. Validation runs should keep guardrails on: `node scripts/spec-guard.mjs --dry-run`, `npm run lint`, `npm run test`.
+
+## Checklist Mirror
+Mirror status with `tasks/tasks-0901-orchestrator-issue-validation.md` and `.agent/task/0901-orchestrator-issue-validation.md` (create if automation requires). Keep `[ ]` until evidence is recorded.
+
+### Foundation
+- [x] Diagnostics/plan manifest captured — Evidence: `.runs/0901-orchestrator-issue-validation/cli/2025-12-12T02-00-30-325Z-9cd0b653/manifest.json`.
+- [x] Metrics/state snapshots updated — Evidence: `.runs/0901-orchestrator-issue-validation/metrics.json`, `out/0901-orchestrator-issue-validation/state.json`.
+- [x] PRD/spec/tasks mirrors updated with manifest links — Evidence: `.runs/0901-orchestrator-issue-validation/cli/2025-12-12T02-00-30-325Z-9cd0b653/manifest.json`.
+
+### Validation
+- [ ] Issue #1 validated (sub‑pipeline error finalization).
+- [ ] Issue #2 validated (CLI exec args passthrough).
+- [ ] Issue #3 validated (session env override on reuse).
+- [ ] Issue #4 validated (retry config clobbering).
+- [ ] Issue #5 validated (`isIsoDate` strictness).
+- [ ] Issue #6 validated (instruction stamp guard behavior).
+- [ ] Issue #7 validated (timeout kill cross‑platform).
+- [ ] Issue #8 validated (temp dir cleanup).
+- [ ] Issue #9 validated (eslint plugin side‑effect build).
+
+### Follow‑up Plan
+- [ ] Prioritized fix backlog created (new task/PR) with acceptance criteria.
+
 # Task List Snapshot — Dead Code Pruning & Evidence (0801)
 
 - **Update — Planning:** Diagnostics captured at `.runs/0801-dead-code-pruning/cli/2025-12-09T03-51-52-584Z-93e9a77f/manifest.json`; dead-code deletions and archive relocations complete (archives parked under `.runs/0801-dead-code-pruning/archive/2025-12-08T10-01-24Z/` with README pointers) and guardrails/tests rerun on 2025-12-09.

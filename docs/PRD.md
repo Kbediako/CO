@@ -7,6 +7,12 @@
 - Checklist Mirror: `tasks/tasks-0801-dead-code-pruning.md`, `docs/TASKS.md` (0801 section), `.agent/task/0801-dead-code-pruning.md` _(create if automation requires)_. 
 - CI/Test Coverage: run `npm run lint`, `npm run test`, and `node scripts/spec-guard.mjs --dry-run` before removal; add `npm run build` when touching orchestrator packages.
 
+## Task 0901 — Orchestrator Issue Validation & Prioritization
+- Primary Doc: `docs/PRD-orchestrator-issue-validation.md`
+- Run Manifest Link: `.runs/0901-orchestrator-issue-validation/cli/2025-12-12T02-00-30-325Z-9cd0b653/manifest.json`.
+- Metrics / State Snapshots: `.runs/0901-orchestrator-issue-validation/metrics.json`, `out/0901-orchestrator-issue-validation/state.json`.
+- Checklist Mirror: `tasks/tasks-0901-orchestrator-issue-validation.md`, `docs/TASKS.md` (0901 section). `.agent/task/0901-orchestrator-issue-validation.md` _(create when activating automation)_.
+
 ## Task 0707 — Codex Orchestrator Simplification & Build Slimdown
 - Primary Doc: `docs/PRD-codex-orchestrator-slimdown.md`
 - Run Manifest Link: `.runs/0707-orchestrator-slimdown/cli/2025-12-01T09-37-11-576Z-1a60ebea/manifest.json`.

@@ -6,6 +6,12 @@
 - Metrics / State Snapshots: `.runs/0801-dead-code-pruning/metrics.json`, `out/0801-dead-code-pruning/state.json`.
 - Checklist Mirror: `tasks/tasks-0801-dead-code-pruning.md`, `.agent/task/0801-dead-code-pruning.md`, `docs/TASKS.md` (0801 section).
 
+## Task 0901 — Orchestrator Issue Validation & Prioritization
+- Primary Doc: `docs/TECH_SPEC-orchestrator-issue-validation.md`
+- Run Manifest Link: `.runs/0901-orchestrator-issue-validation/cli/2025-12-12T02-00-30-325Z-9cd0b653/manifest.json`.
+- Metrics / State Snapshots: `.runs/0901-orchestrator-issue-validation/metrics.json`, `out/0901-orchestrator-issue-validation/state.json`.
+- Checklist Mirror: `tasks/tasks-0901-orchestrator-issue-validation.md`, `docs/TASKS.md` (0901 section).
+
 ## Task 0303 — Codex Orchestrator Autonomy Enhancements
 - Primary Doc: `docs/TECH_SPEC-codex-orchestrator-autonomy.md`
 - Run Manifest Link: _(pending — capture first diagnostics run under `.runs/0303-orchestrator-autonomy/cli/<run-id>/manifest.json`)._
