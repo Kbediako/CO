@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp 705c0ee281e04da0b7157320426d44dc4f8920b02be43e74edcab9579c075baa -->
+<!-- codex:instruction-stamp 37fd0fc4c419abaa969122e45ae353b4cddb5cdf4461a8d11d97dfbeecf77e02 -->
 # Agent Enablement
 
 ## Added by Bootstrap 2025-10-16
@@ -22,7 +22,7 @@
 - `npm run eval:test` — Exercises evaluation harness scenarios; depends on local `python3` for cross-language fixtures.
 - `npm run build:patterns` — Compile codemods/linters/templates; run whenever `patterns/**` changes.
 - `node --loader ts-node/esm evaluation/harness/run-all.ts --mode=mcp` — Manual sweep to generate scenario artifacts for manifests.
-- `npm run review` — Launches `codex review --manifest <latest>` using the newest manifest under `.runs/**` for reviewer workflows.
+- `npm run review` — Launches `codex review` (defaults to `--uncommitted`) and includes the latest run manifest path as evidence in the prompt.
 - `codex-orchestrator plan [pipeline]` — Preview resolved pipeline stages without execution; add `--format json` for automation inputs.
 
 ### Codex CLI prompts

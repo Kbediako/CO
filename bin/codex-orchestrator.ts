@@ -79,6 +79,18 @@ function parseArgs(raw: string[]): { positionals: string[]; flags: ArgMap } {
   return { positionals, flags };
 }
 
+function resolveTargetStageId(flags: ArgMap): string | undefined {
+  const target = flags['target'];
+  if (typeof target === 'string' && target.trim().length > 0) {
+    return target.trim();
+  }
+  const alias = flags['target-stage'];
+  if (typeof alias === 'string' && alias.trim().length > 0) {
+    return alias.trim();
+  }
+  return undefined;
+}
+
 async function handleStart(orchestrator: CodexOrchestrator, rawArgs: string[]): Promise<void> {
   const { positionals, flags } = parseArgs(rawArgs);
   const pipelineId = positionals[0];
@@ -106,7 +118,7 @@ async function handleStart(orchestrator: CodexOrchestrator, rawArgs: string[]): 
       taskId: typeof flags['task'] === 'string' ? (flags['task'] as string) : undefined,
       parentRunId: typeof flags['parent-run'] === 'string' ? (flags['parent-run'] as string) : undefined,
       approvalPolicy: typeof flags['approval-policy'] === 'string' ? (flags['approval-policy'] as string) : undefined,
-      targetStageId: typeof flags['target'] === 'string' ? (flags['target'] as string) : undefined,
+      targetStageId: resolveTargetStageId(flags),
       runEvents
     });
     hud?.stop();
@@ -139,7 +151,7 @@ async function handlePlan(orchestrator: CodexOrchestrator, rawArgs: string[]): P
   const result = await orchestrator.plan({
     pipelineId,
     taskId: typeof flags['task'] === 'string' ? (flags['task'] as string) : undefined,
-    targetStageId: typeof flags['target'] === 'string' ? (flags['target'] as string) : undefined
+    targetStageId: resolveTargetStageId(flags)
   });
   if (format === 'json') {
     console.log(JSON.stringify(result, null, 2));
@@ -177,7 +189,7 @@ async function handleResume(orchestrator: CodexOrchestrator, rawArgs: string[]):
       resumeToken: typeof flags['token'] === 'string' ? (flags['token'] as string) : undefined,
       actor: typeof flags['actor'] === 'string' ? (flags['actor'] as string) : undefined,
       reason: typeof flags['reason'] === 'string' ? (flags['reason'] as string) : undefined,
-      targetStageId: typeof flags['target'] === 'string' ? (flags['target'] as string) : undefined,
+      targetStageId: resolveTargetStageId(flags),
       runEvents
     });
     hud?.stop();
@@ -409,14 +421,14 @@ Commands:
     --parent-run <id>       Link run to parent run id.
     --approval-policy <p>   Record approval policy metadata.
     --format json           Emit machine-readable output.
-    --target <stage-id>     Focus plan/build metadata on a specific stage.
+    --target <stage-id>     Focus plan/build metadata on a specific stage (alias: --target-stage).
     --interactive | --ui    Enable read-only HUD when running in a TTY.
     --no-interactive        Force disable HUD (default is off unless requested).
 
   plan [pipeline]           Preview pipeline stages without executing.
     --task <id>             Override task identifier.
     --format json           Emit machine-readable output.
-    --target <stage-id>     Highlight the stage chosen for orchestration.
+    --target <stage-id>     Highlight the stage chosen for orchestration (alias: --target-stage).
 
   exec [command]            Run a one-off command with unified exec runtime.
     --json [compact]        Emit final JSON summary (optional compact mode).
@@ -430,7 +442,7 @@ Commands:
     --token <resume-token>  Verify the resume token before restarting.
     --actor <name>          Record who resumed the run.
     --reason <text>         Record why the run was resumed.
-    --target <stage-id>     Override stage selection before resuming.
+    --target <stage-id>     Override stage selection before resuming (alias: --target-stage).
     --format json           Emit machine-readable output.
     --interactive | --ui    Enable read-only HUD when running in a TTY.
     --no-interactive        Force disable HUD (default is off unless requested).

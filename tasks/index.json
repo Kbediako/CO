@@ -207,6 +207,22 @@
       },
       "created_at": "2025-12-12",
       "completed_at": "2025-12-12"
+    },
+    {
+      "id": "0904",
+      "slug": "readme-codebase-alignment",
+      "title": "README vs Codebase Alignment",
+      "path": "tasks/tasks-0904-readme-codebase-alignment.md",
+      "kind": "prd",
+      "status": "succeeded",
+      "gate": {
+        "phase": "readme-codebase-alignment-implementation",
+        "status": "succeeded",
+        "log": ".runs/0904-readme-codebase-alignment/cli/2025-12-14T01-00-24-028Z-9a93c8df/manifest.json",
+        "run_id": "2025-12-14T01-00-24-028Z-9a93c8df"
+      },
+      "created_at": "2025-12-14",
+      "completed_at": "2025-12-14"
     }
   ],
   "specs": []

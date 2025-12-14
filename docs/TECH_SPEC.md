@@ -12,6 +12,12 @@
 - Metrics / State Snapshots: `.runs/0901-orchestrator-issue-validation/metrics.json`, `out/0901-orchestrator-issue-validation/state.json`.
 - Checklist Mirror: `tasks/tasks-0901-orchestrator-issue-validation.md`, `docs/TASKS.md` (0901 section).
 
+## Task 0904 — README vs Codebase Alignment
+- Primary Doc: `docs/TECH_SPEC-readme-codebase-alignment.md`
+- Run Manifest Link: _(pending — capture first diagnostics run under `.runs/0904-readme-codebase-alignment/cli/<run-id>/manifest.json`)._
+- Metrics / State Snapshots: _(pending — populate `.runs/0904-readme-codebase-alignment/metrics.json` and `out/0904-readme-codebase-alignment/state.json`)._
+- Checklist Mirror: `tasks/tasks-0904-readme-codebase-alignment.md`, `docs/TASKS.md` (0904 section), `.agent/task/0904-readme-codebase-alignment.md`.
+
 ## Task 0303 — Codex Orchestrator Autonomy Enhancements
 - Primary Doc: `docs/TECH_SPEC-codex-orchestrator-autonomy.md`
 - Run Manifest Link: _(pending — capture first diagnostics run under `.runs/0303-orchestrator-autonomy/cli/<run-id>/manifest.json`)._

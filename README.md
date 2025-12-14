@@ -10,7 +10,7 @@ Codex Orchestrator is the coordination layer that glues together Codex-driven ag
 - **Event-driven persistence:** Milestones emit typed events on `EventBus`. `PersistenceCoordinator` captures run summaries in the task state store and writes manifests so nothing is lost if the process crashes.
 - **CLI lifecycle:** `CodexOrchestrator` (in `orchestrator/src/cli/orchestrator.ts`) resolves instruction sources (`AGENTS.md`, `docs/AGENTS.md`, `.agent/AGENTS.md`), loads the chosen pipeline, executes each command stage via `runCommandStage`, and keeps heartbeats plus command status current inside the manifest (approval evidence will surface once prompt wiring lands).
 - **Control-plane & scheduler integrations:** Optional validation (`control-plane/`) and scheduling (`scheduler/`) modules enrich manifests with drift checks, plan assignments, and remote run metadata.
-- **Cloud sync:** `CloudSyncWorker` listens for `run:completed` events and uploads manifests using the `CloudRunsClient`, with retry, audit logging, and per-task isolation under `.runs/` and `out/`.
+- **Cloud sync (optional):** `orchestrator/src/sync/` includes a `CloudSyncWorker` + `CloudRunsClient`, but the default CLI does not wire cloud uploads yet—treat this as an integration point you enable explicitly.
 - **Tool orchestration:** The shared `packages/orchestrator` toolkit handles approval prompts, sandbox retries, and tool run bookkeeping used by higher-level agents.
 
 ```
@@ -26,14 +26,14 @@ Group execution (when `FEATURE_TFGRPO_GROUP=on`): repeat the Builder → Tester 
 ```
 
 - **Mode policy:** Defaults to `mcp` but upgrades to `cloud` whenever a subtask flags `requires_cloud` or task metadata enables parallel execution, ensuring builders/testers run in the correct environment before artifacts are produced.
-- **Event-driven persistence:** Every `run:completed` event flows through `PersistenceCoordinator`, writing manifests under `.runs/<task-id>/<run-id>/` and keeping task-state snapshots current before downstream consumers (control-plane validators, scheduler hooks, cloud sync) ingest the data.
+- **Event-driven persistence:** Every `run:completed` event flows through `PersistenceCoordinator`, writing manifests under `.runs/<task-id>/<run-id>/` and keeping task-state snapshots current before downstream consumers (control-plane validators, scheduler hooks, optional cloud sync) ingest the data.
 - **Optional group loop:** When the TF-GRPO feature flag is on, the manager processes the prioritized subtask list serially, stopping early if any Builder or Tester stage fails so reviewers only see runnable work with passing prerequisites.
 
 ## Learning Pipeline (local snapshots + auto validation)
-- Enabled per run with `LEARNING_PIPELINE_ENABLED=1`; after a successful stage, the CLI captures the working tree (tracked + untracked, git-ignored files excluded) into `.runs/<task-id>/cli/<run-id>/learning/<run-id>.tar.gz` and copies it to `learning-snapshots/<task-id>/<run-id>.tar.gz` (recorded as `learning.snapshot.storage_path`).
+- Enabled per run with `LEARNING_PIPELINE_ENABLED=1`; after a successful stage, the CLI captures the working tree (tracked + untracked, git-ignored files excluded) into `.runs/<task-id>/cli/<run-id>/learning/<run-id>.tar.gz` and copies it to `.runs/learning-snapshots/<task-id>/<run-id>.tar.gz` by default (recorded as `learning.snapshot.storage_path`).
 - Manifests record the tag, commit SHA, tarball digest/path, queue payload path, and validation status (`validated`, `snapshot_failed`, `stalled_snapshot`, `needs_manual_scenario`) under `learning.*` so reviewers can audit outcomes without external storage.
 - Scenario synthesis replays the most recent successful command from the run (or prompt/diff fallback), writes `learning/scenario.json`, and automatically executes the commands; validation logs live at `learning/scenario-validation.log` and are stored in `learning.validation.log_path`.
-- Override snapshot storage with `LEARNING_SNAPSHOT_DIR=/custom/dir` when needed; the default lives under `learning-snapshots/` at the runs root.
+- Override snapshot storage with `LEARNING_SNAPSHOT_DIR=/custom/dir` when needed; the default lives under `.runs/learning-snapshots/` (or `$CODEX_ORCHESTRATOR_RUNS_DIR/learning-snapshots/` when configured).
 
 ### How to run the learning pipeline locally
 - Seed a normal run and keep manifests grouped by task:
@@ -50,7 +50,7 @@ Group execution (when `FEATURE_TFGRPO_GROUP=on`): repeat the Builder → Tester 
 - `scripts/` – Operational helpers (e.g., `scripts/spec-guard.mjs` for spec freshness enforcement).
 - `tasks/`, `docs/`, `.agent/` – Project planning artifacts that must stay in sync (`[ ]` → `[x]` checklists pointing to manifest evidence).
 - `.runs/<task-id>/` – Per-task manifests, logs, metrics snapshots (`metrics.json`), and CLI run folders.
-- `out/<task-id>/` – Human-friendly summaries and cloud-sync audit logs.
+- `out/<task-id>/` – Human-friendly summaries and (when enabled) cloud-sync audit logs.
 
 ## CLI Quick Start
 1. Install dependencies and build:
@@ -66,7 +66,7 @@ Group execution (when `FEATURE_TFGRPO_GROUP=on`): repeat the Builder → Tester 
    ```bash
    npx codex-orchestrator start diagnostics --format json
    ```
-   > Tip: keep `FEATURE_TFGRPO_GROUP`, `TFGRPO_GROUP_SIZE`, and related TF-GRPO env vars **unset** when running diagnostics. The vitest suite deliberately asserts the “groupSize ≥ capacity” guardrail and will fail if you force grouped execution. Use the `tfgrpo-learning` pipeline instead when you need grouped TF-GRPO runs.
+   > Tip: keep `FEATURE_TFGRPO_GROUP`, `TFGRPO_GROUP_SIZE`, and related TF-GRPO env vars **unset** when running diagnostics. Many tests assume grouped execution is off, and the TF-GRPO guardrails require `groupSize >= 2` and `groupSize <= fanOutCapacity`. Use the `tfgrpo-learning` pipeline instead when you need grouped TF-GRPO runs.
    > HUD: add `--interactive` (or `--ui`) when stdout/stderr are TTY, TERM is not `dumb`, and CI is off to view the read-only Ink HUD. Non-interactive or JSON runs skip the HUD automatically.
 4. Follow the run:
    ```bash
@@ -79,7 +79,7 @@ Use `npx codex-orchestrator resume --run <run-id>` to continue interrupted runs;
 ### Codex CLI prompts
 - The custom prompts live outside the repo at `~/.codex/prompts/diagnostics.md` and `~/.codex/prompts/review-handoff.md`. Recreate those files on every fresh machine so `/prompts:diagnostics` and `/prompts:review-handoff` are available in the Codex CLI palette.
 - `/prompts:diagnostics` takes `TASK=<task-id> MANIFEST=<path> [NOTES=<free text>]`, exports `MCP_RUNNER_TASK_ID=$TASK`, runs `npx codex-orchestrator start diagnostics --format json`, tails `.runs/$TASK/cli/<run-id>/manifest.json` (or `npx codex-orchestrator status --watch`), and records evidence to `/tasks`, `docs/TASKS.md`, `.agent/task/...`, `.runs/$TASK/metrics.json`, and `out/$TASK/state.json` using `$MANIFEST`.
-- `/prompts:review-handoff` takes `TASK=<task-id> MANIFEST=<path> [NOTES=<free text>]`, re-exports `MCP_RUNNER_TASK_ID`, runs `node scripts/spec-guard.mjs --dry-run`, `npm run lint`, `npm run test`, optional `npm run eval:test`, and `npm run review` (`codex review --manifest <latest>`). It also reminds you to log approvals in `$MANIFEST` and mirror the evidence to the same docs/metrics/state targets.
+- `/prompts:review-handoff` takes `TASK=<task-id> MANIFEST=<path> [NOTES=<free text>]`, re-exports `MCP_RUNNER_TASK_ID`, runs `node scripts/spec-guard.mjs --dry-run`, `npm run lint`, `npm run test`, optional `npm run eval:test`, and `npm run review` (wraps `codex review` against the current diff and includes the latest run manifest path as evidence). It also reminds you to log approvals in `$MANIFEST` and mirror the evidence to the same docs/metrics/state targets.
 - Always trigger diagnostics and review workflows through these prompts whenever you run the orchestrator so contributors consistently execute the required command sequences and capture auditable manifests.
 
 ### Identifier Guardrails
@@ -88,7 +88,7 @@ Use `npx codex-orchestrator resume --run <run-id>` to continue interrupted runs;
 
 ## Pipelines & Execution Plans
 - Default pipelines live in `codex.orchestrator.json` (repository-specific) and `orchestrator/src/cli/pipelines/` (built-in defaults). Each stage is either a command (shell execution) or a nested pipeline.
-- The `CommandPlanner` inspects the selected pipeline and target stage; you can pass `--target-stage <stage-id>` or set `CODEX_ORCHESTRATOR_TARGET_STAGE` to focus on a specific step (e.g., rerun tests only).
+- The `CommandPlanner` inspects the selected pipeline and target stage; you can pass `--target <stage-id>` (alias: `--target-stage`) or set `CODEX_ORCHESTRATOR_TARGET_STAGE` to focus on a specific step (e.g., rerun tests only).
 - Stage execution records stdout/stderr logs, exit codes, optional summaries, and failure data directly into the manifest (`commands[]` array).
 - Guardrails: before review, run `node scripts/spec-guard.mjs --dry-run` to ensure specs touched in the PR are current; the orchestrator tracks guardrail outcomes in the manifest (`guardrail_status`).
 
@@ -99,12 +99,12 @@ Use `npx codex-orchestrator resume --run <run-id>` to continue interrupted runs;
 ## Control Plane, Scheduler, and Cloud Sync
 - `control-plane/` builds versioned requests (`buildRunRequestV2`) and validates manifests against remote expectations. Drift reports are appended to run summaries so reviewers see deviations.
 - `scheduler/` resolves assignments, serializes plan data, and embeds scheduler state in manifests, making it easy to coordinate multi-stage work across agents.
-- `sync/` uploads completed runs. Configure credentials through the credential broker (`orchestrator/src/credentials/`) and adjust retry/backoff behavior via `createCloudSyncWorker`.
+- `sync/` contains the cloud upload client + worker, but is not wired into the default CLI yet. Configure credentials through the credential broker (`orchestrator/src/credentials/`) and wire `createCloudSyncWorker` to an `EventBus` if you need uploads.
 
 ## Persistence & Observability
 - `TaskStateStore` writes per-task snapshots with bounded lock retries; failures degrade gracefully while still writing the main manifest.
 - `RunManifestWriter` generates the canonical manifest JSON for each run (mirrored under `.runs/`), while metrics appenders and summary writers keep `out/` up to date.
-- Heartbeat files and timestamps guard against stalled runs. `metrics/metricsRecorder.ts` aggregates command durations, exit codes, and guardrail stats for later review.
+- Heartbeat files and timestamps guard against stalled runs. `orchestrator/src/cli/metrics/metricsRecorder.ts` aggregates command durations, exit codes, and guardrail stats for later review.
 
 ## Customizing for New Projects
 - Duplicate the templates under `/tasks`, `docs/`, and `.agent/` for your task ID and keep checklist status mirrored (`[ ]` → `[x]`) with links to the manifest that proves each outcome.
@@ -119,19 +119,19 @@ Use `npx codex-orchestrator resume --run <run-id>` to continue interrupted runs;
 | `npm run test` | Vitest suite covering orchestration core, CLI services, and patterns. |
 | `npm run eval:test` | Optional evaluation harness (enable when `evaluation/fixtures/**` is populated). |
 | `node scripts/spec-guard.mjs --dry-run` | Validates spec freshness; required before review. |
-| `npm run review` | Runs `codex review --manifest <latest>` using the newest entry under `.runs/**`. |
+| `npm run review` | Runs `codex review --uncommitted` and includes the latest run manifest path as evidence in the prompt. |
 
 Run `npm run build` to compile TypeScript before packaging or invoking the CLI directly from `dist/`.
 
 ## Mirror Workflows
-- `npm run mirror:fetch -- --project <name> [--dry-run] [--force]`: reads `packages/<project>/mirror.config.json` (origin, routes, asset roots, rewrite/block/allow lists), caches downloads **per project** under `.runs/<task>/mirror/<project>/cache`, strips tracker patterns, rewrites externals to `/external/<host>/...`, localizes OG/twitter preview images, rewrites share links off tracker-heavy hosts, and stages into `.runs/<task>/mirror/<project>/<timestamp>/staging` before promoting to `packages/<project>/public`. Non-origin assets fall back to Web Archive when the primary host is down; promotion is skipped if errors are detected unless `--force` is set. Manifests live at `.runs/<task>/mirror/<project>/<timestamp>/manifest.json` (warns when `MCP_RUNNER_TASK_ID` is unset; honors `compliance/permit.json` when present).
+- `npm run mirror:fetch -- --project <name> [--dry-run] [--force]`: reads `packages/<project>/mirror.config.json` (origin, routes, asset roots, rewrite/block/allow lists), caches downloads **per project** under `.runs/<task>/mirror/<project>/cache`, strips tracker patterns, rewrites externals to `/external/<host>/...`, localizes OG/twitter preview images, rewrites share links off tracker-heavy hosts, and stages into `.runs/<task>/mirror/<project>/<timestamp>/staging/public` before promoting to `packages/<project>/public`. Non-origin assets fall back to Web Archive when the primary host is down; promotion is skipped if errors are detected unless `--force` is set. Manifests live at `.runs/<task>/mirror/<project>/<timestamp>/manifest.json` (warns when `MCP_RUNNER_TASK_ID` is unset; honors `compliance/permit.json` when present).
 - `npm run mirror:serve -- --project <name> [--port <port>] [--csp <self|strict|off>] [--no-range]`: shared local-mirror server with traversal guard, HTML no-cache/asset immutability, optional CSP, optional Range support, and directory-listing blocks.
 - `npm run mirror:check -- --project <name> [--port <port>]`: boots a temporary mirror server when needed and verifies all configured routes with Playwright, failing on outbound hosts outside the allowlist, tracker strings (gtag/gtm/analytics/hotjar/facebook/clarity/etc.), unresolved assets, absolute https:// references, or non-200 responses. Keep this opt-in and trigger it when `packages/<project>/public` changes.
 
 ## Hi-Fi Design Toolkit Captures
 Use the hi-fi pipeline to snapshot complex marketing sites (motion, interactions, tokens) while keeping the repo cloneable:
 
-1. **Configure the source:** Update `design.config.yaml` → `pipelines.hi_fi_design_toolkit.sources` with the target URL, slug, title, and breakpoints. This repo currently targets Ethical Life World; swap the entry if you want to test another site.
+1. **Configure the source:** Update `design.config.yaml` → `pipelines.hi_fi_design_toolkit.sources` with the target URL, slug, title, and breakpoints (the repo defaults to an empty `sources` list until you add one).
 2. **Permit the domain:** Add (or update) the matching record in `compliance/permit.json` so Playwright, video capture, and live assets are explicitly approved for that origin.
 3. **Prep tooling:**
    - `npm install && npm run build`
@@ -141,7 +141,7 @@ Use the hi-fi pipeline to snapshot complex marketing sites (motion, interactions
    export MCP_RUNNER_TASK_ID=<task-id>
    npx codex-orchestrator start hi-fi-design-toolkit --format json --task <task-id>
    ```
-   Results land under `.runs/<task-id>/cli/<run-id>/` (manifests, logs, artifacts) with human summaries mirrored to `out/<task-id>/`.
+   Manifests/logs/state land under `.runs/<task-id>/cli/<run-id>/`, while staged artifacts land under `.runs/<task-id>/<run-id>/artifacts/design-toolkit/` with human summaries mirrored to `out/<task-id>/`.
 5. **Validate the clone:** serve the staged reference directory, e.g.
    ```bash
    cd .runs/<task-id>/<run-id>/artifacts/design-toolkit/reference/<slug>
@@ -153,7 +153,7 @@ Use the hi-fi pipeline to snapshot complex marketing sites (motion, interactions
 ## Extending the Orchestrator
 - Add new agent strategies by implementing the planner/builder/tester/reviewer interfaces and wiring them into `TaskManager`.
 - Register additional pipelines or override defaults through `codex.orchestrator.json`. Nested pipelines let you compose reusable command groups.
-- Hook external systems by subscribing to `EventBus` events (plan/build/test/review/run) or by extending the `CloudSyncWorker` client.
+- Hook external systems by subscribing to `EventBus` events (plan/build/test/review/run) or by wiring optional integrations like `CloudSyncWorker`.
 - Leverage the shared TypeScript definitions in `packages/shared` to keep manifest, metrics, and telemetry consumers aligned.
 
 ---

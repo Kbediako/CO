@@ -84,6 +84,23 @@ Mirror status with `tasks/tasks-0903-taskstate-store-run-history-fix.md` and `.a
 - [x] Lint passes — Evidence: `.runs/0903-taskstate-store-run-history-fix/cli/2025-12-12T04-49-23-224Z-5cfceb39/manifest.json`.
 - [x] Tests pass — Evidence: `.runs/0903-taskstate-store-run-history-fix/cli/2025-12-12T04-49-23-224Z-5cfceb39/manifest.json`.
 
+# Task List Snapshot — README vs Codebase Alignment (0904)
+
+- **Update — Completed:** Diagnostics + guardrails captured at `.runs/0904-readme-codebase-alignment/cli/2025-12-14T01-00-24-028Z-9a93c8df/manifest.json`; README/SOP docs aligned to current code behavior.
+- **Notes:** Export `MCP_RUNNER_TASK_ID=0904-readme-codebase-alignment` before orchestrator commands. Guardrails required: `node scripts/spec-guard.mjs --dry-run`, `npm run lint`, `npm run test`.
+
+## Checklist Mirror
+Mirror status with `tasks/tasks-0904-readme-codebase-alignment.md` and `.agent/task/0904-readme-codebase-alignment.md`. Keep `[ ]` until evidence is recorded.
+
+### Foundation
+- [x] Diagnostics/plan manifest captured — Evidence: `.runs/0904-readme-codebase-alignment/cli/2025-12-14T01-00-24-028Z-9a93c8df/manifest.json`.
+- [x] Metrics/state snapshots updated — Evidence: `.runs/0904-readme-codebase-alignment/metrics.json`, `out/0904-readme-codebase-alignment/state.json`.
+- [x] PRD/spec/tasks mirrors drafted — Evidence: this commit.
+
+### Findings
+- [x] High-impact mismatches reconciled (lint, stage targeting, review workflow) — Evidence: `.runs/0904-readme-codebase-alignment/cli/2025-12-14T01-00-24-028Z-9a93c8df/manifest.json`.
+- [x] Remaining mismatches reconciled (paths, hi-fi toolkit docs, mirror workflow docs, cloud sync docs) — Evidence: `.runs/0904-readme-codebase-alignment/cli/2025-12-14T01-00-24-028Z-9a93c8df/manifest.json`.
+
 # Task List Snapshot — Dead Code Pruning & Evidence (0801)
 
 - **Update — Planning:** Diagnostics captured at `.runs/0801-dead-code-pruning/cli/2025-12-09T03-51-52-584Z-93e9a77f/manifest.json`; dead-code deletions and archive relocations complete (archives parked under `.runs/0801-dead-code-pruning/archive/2025-12-08T10-01-24Z/` with README pointers) and guardrails/tests rerun on 2025-12-09.
