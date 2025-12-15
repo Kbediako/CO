@@ -119,7 +119,7 @@ Use `npx codex-orchestrator resume --run <run-id>` to continue interrupted runs;
 | `npm run test` | Vitest suite covering orchestration core, CLI services, and patterns. |
 | `npm run eval:test` | Optional evaluation harness (enable when `evaluation/fixtures/**` is populated). |
 | `node scripts/spec-guard.mjs --dry-run` | Validates spec freshness; required before review. |
-| `npm run review` | Runs `codex review --uncommitted` and includes the latest run manifest path as evidence in the prompt. |
+| `npm run review` | Runs `codex review` and includes the latest run manifest path as evidence in the prompt. |
 
 Run `npm run build` to compile TypeScript before packaging or invoking the CLI directly from `dist/`.
 

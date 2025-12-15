@@ -2,12 +2,20 @@
 /**
  * Helper to launch `codex review` non-interactively with the latest run manifest
  * path included as evidence for reviewers.
+ *
+ * Note: `codex-cli` currently rejects combining diff-scoping flags (`--uncommitted`,
+ * `--base`, `--commit`) with a custom prompt. This wrapper always supplies a custom
+ * prompt (to include manifest evidence), so it invokes `codex review <PROMPT>` and
+ * embeds any requested scope hints (base/commit) into the prompt text instead.
  */
 
-import { spawn } from 'node:child_process';
+import { execFile, spawn } from 'node:child_process';
 import { readdir, stat } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
+import { promisify } from 'node:util';
+
+const execFileAsync = promisify(execFile);
 
 interface CliOptions {
   manifest?: string;
@@ -163,6 +171,12 @@ async function main(): Promise<void> {
     '',
     'Call out any remaining documentation/code mismatches or guardrail violations.'
   ];
+
+  const scopeNotes = await buildScopeNotes(options);
+  if (scopeNotes.length > 0) {
+    promptLines.push('', ...scopeNotes);
+  }
+
   if (notes) {
     promptLines.push('', 'Notes:', notes);
   }
@@ -204,18 +218,60 @@ async function hasReviewCommand(): Promise<boolean> {
 
 function buildReviewArgs(options: CliOptions, prompt: string): string[] {
   const args = ['review'];
-  if (options.commit) {
-    args.push('--commit', options.commit);
-  } else if (options.base) {
-    args.push('--base', options.base);
-  } else {
-    args.push('--uncommitted');
-  }
-
   if (options.title) {
     args.push('--title', options.title);
   }
 
   args.push(prompt);
   return args;
+}
+
+async function buildScopeNotes(options: CliOptions): Promise<string[]> {
+  const lines: string[] = [];
+  const details: string[] = [];
+
+  if (options.commit) {
+    lines.push(`Review scope hint: commit \`${options.commit}\``);
+    const summary = await tryGit([
+      'show',
+      '--no-color',
+      '--name-status',
+      '--no-patch',
+      '--format=medium',
+      options.commit
+    ]);
+    if (summary) {
+      details.push(summary);
+    }
+  } else if (options.base) {
+    lines.push(`Review scope hint: diff vs base \`${options.base}\``);
+    const diff = await tryGit(['diff', '--no-color', '--name-status', `${options.base}...HEAD`]);
+    if (diff) {
+      details.push(diff);
+    }
+  } else {
+    lines.push('Review scope hint: uncommitted working tree changes (default).');
+    const status = await tryGit(['status', '--porcelain=v1', '-b']);
+    if (status) {
+      details.push(status);
+    }
+  }
+
+  if (details.length > 0) {
+    lines.push('', 'Git scope summary:', '```', ...details, '```');
+  } else {
+    lines.push('', 'Git scope summary: unavailable (git command failed).');
+  }
+
+  return lines;
+}
+
+async function tryGit(args: string[]): Promise<string | null> {
+  try {
+    const { stdout } = await execFileAsync('git', args, { maxBuffer: 1024 * 1024 });
+    const trimmed = String(stdout ?? '').trimEnd();
+    return trimmed.length > 0 ? trimmed : null;
+  } catch {
+    return null;
+  }
 }

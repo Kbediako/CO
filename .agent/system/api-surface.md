@@ -35,7 +35,7 @@ Canonical guardrails and tooling:
 - `npm run lint`
 - `npm run test`
 - `node scripts/spec-guard.mjs --dry-run`
-- `npm run review` (runs `codex review --uncommitted` via `dist/scripts/run-review.js`)
+- `npm run review` (runs `codex review` via `dist/scripts/run-review.js`, including the latest manifest path as evidence)
 
 Mirror/design tooling:
 - `npm run mirror:fetch -- --project <name> [--dry-run] [--force]`

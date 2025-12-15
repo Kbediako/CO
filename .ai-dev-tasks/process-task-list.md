@@ -45,7 +45,7 @@ Also update `tasks/index.json` with:
 
 ## 5) Reviewer hand-off (Codex-first)
 After guardrails pass, use the Codex review primitive:
-- `npm run review` (wraps `codex review --uncommitted` and includes the latest manifest path as evidence)
+- `npm run review` (wraps `codex review` and includes the latest manifest path as evidence)
 
 ## Governance notes (when applicable)
 - If your project workflow uses approval gates, record approvals and any escalations in the run manifest `approvals` array and mirror the relevant links/anchors into your task checklist and `tasks/index.json`.

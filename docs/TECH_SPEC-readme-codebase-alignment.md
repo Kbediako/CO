@@ -54,13 +54,9 @@ Reconcile the GitHub‑facing `README.md` with the actual behavior of the CLI, s
 
 ### 8) Review workflow docs + `npm run review` do not match current `codex review`
 - Docs: `README.md` references `codex review --manifest <latest>`.
-- Code: `npm run review` runs a script that invokes `codex review <manifestPath>` and can fall back to an interactive prompt (not valid for non-interactive environments).
-- Tooling reality: current `codex review` expects flags like `--uncommitted`, `--base`, or `--commit`; `--manifest` is not a supported option.
-- Fix options:
-  - **A:** update `npm run review` to call `codex review --uncommitted` (or `--base origin/main`) and pass the manifest path as part of the review prompt text.
-  - **B:** keep manifest-driven review but implement it explicitly (e.g., pre-read the manifest and feed key evidence into the prompt) without relying on unsupported CLI flags.
-  - **C:** remove interactive fallback unless a TTY is present; otherwise fail with actionable instructions.
-- Recommendation: **A + C** (non-interactive safe by default) and update README accordingly.
+- Code: `npm run review` runs a script that invokes `codex review` with a custom prompt that includes the manifest path as evidence (non-interactive by default).
+- Tooling reality: `codex-cli` currently rejects combining diff-scoping flags (`--uncommitted`, `--base`, `--commit`) with a custom review prompt; to include manifest evidence, wrappers should call `codex review <PROMPT>` (reviews “current changes” by default) and embed any scope hints in the prompt text.
+- Fix: update `scripts/run-review.ts` to avoid unsupported flag/prompt combinations and keep the review flow non-interactive by default; update README accordingly.
 
 ### 9) Cloud sync is described as if enabled by default
 - Docs: `README.md` describes cloud sync as part of the standard flow.

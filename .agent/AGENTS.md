@@ -22,7 +22,7 @@
 - `npm run eval:test` — Exercises evaluation harness scenarios; depends on local `python3` for cross-language fixtures.
 - `npm run build:patterns` — Compile codemods/linters/templates; run whenever `patterns/**` changes.
 - `node --loader ts-node/esm evaluation/harness/run-all.ts --mode=mcp` — Manual sweep to generate scenario artifacts for manifests.
-- `npm run review` — Launches `codex review` (defaults to `--uncommitted`) and includes the latest run manifest path as evidence in the prompt.
+- `npm run review` — Launches `codex review` with a non-interactive prompt that includes the latest run manifest path as evidence (reviews “current changes” by default).
 - `codex-orchestrator plan [pipeline]` — Preview resolved pipeline stages without execution; add `--format json` for automation inputs.
 
 ### Codex CLI prompts
