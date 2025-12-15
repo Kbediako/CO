@@ -36,9 +36,11 @@
 - Tech Spec: `docs/TECH_SPEC-agentic-coding-readiness.md`
 - Action Plan: `docs/ACTION_PLAN-agentic-coding-readiness.md`
 - Task checklist: `tasks/tasks-0905-agentic-coding-readiness.md`
+- Run Manifest Link: `.runs/0905-agentic-coding-readiness/cli/2025-12-15T14-58-24-866Z-c03673e7/manifest.json`
+- Metrics / State Snapshots: `.runs/0905-agentic-coding-readiness/metrics.json`, `out/0905-agentic-coding-readiness/state.json`
 
 ## Open Questions
-- Should CI run only spec-guard + tests, or should it also build `dist/` to catch packaging drift?
+- Decision: CI runs `npm ci`, `npm run build`, `npm run lint`, `npm run test`, and `node scripts/spec-guard.mjs` (see `.github/workflows/core-lane.yml`).
 - Do we want to formalize a pinned Node version file (`.nvmrc`, `.tool-versions`) as part of onboarding consistency?
 
 ## Approvals

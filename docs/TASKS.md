@@ -103,28 +103,28 @@ Mirror status with `tasks/tasks-0904-readme-codebase-alignment.md` and `.agent/t
 
 # Task List Snapshot — Agentic Coding Readiness & Onboarding Hygiene (0905)
 
-- **Update — Planning:** PRD/spec/task list drafted; onboarding placeholders and CI workflow pending. Awaiting first diagnostics manifest under `.runs/0905-agentic-coding-readiness/cli/<run-id>/manifest.json`.
+- **Update — Completed:** Diagnostics + guardrails captured at `.runs/0905-agentic-coding-readiness/cli/2025-12-15T14-58-24-866Z-c03673e7/manifest.json`; onboarding placeholders replaced and core CI lane enabled.
 - **Notes:** Export `MCP_RUNNER_TASK_ID=0905-agentic-coding-readiness` before orchestrator commands. Guardrails required: `node scripts/spec-guard.mjs --dry-run`, `npm run build`, `npm run lint`, `npm run test`.
 
 ## Checklist Mirror
 Mirror status with `tasks/tasks-0905-agentic-coding-readiness.md` and `.agent/task/0905-agentic-coding-readiness.md`. Keep `[ ]` until evidence is recorded.
 
 ### Foundation
-- [ ] Diagnostics/plan manifest captured — Evidence: `.runs/0905-agentic-coding-readiness/cli/<run-id>/manifest.json`.
-- [ ] Metrics/state snapshots updated — Evidence: `.runs/0905-agentic-coding-readiness/metrics.json`, `out/0905-agentic-coding-readiness/state.json`.
-- [ ] PRD/spec/tasks mirrors updated with manifest links — Evidence: this commit + manifest path once captured.
+- [x] Diagnostics/plan manifest captured — Evidence: `.runs/0905-agentic-coding-readiness/cli/2025-12-15T14-58-24-866Z-c03673e7/manifest.json`.
+- [x] Metrics/state snapshots updated — Evidence: `.runs/0905-agentic-coding-readiness/metrics.json`, `out/0905-agentic-coding-readiness/state.json`.
+- [x] PRD/spec/tasks mirrors updated with manifest links — Evidence: this commit + `.runs/0905-agentic-coding-readiness/cli/2025-12-15T14-58-24-866Z-c03673e7/manifest.json`.
 
 ### Deliverables
-- [ ] Replace `.agent/system/*` placeholders with repo-specific content.
-- [ ] Replace `.ai-dev-tasks/*` placeholders with canonical workflow docs.
-- [ ] Remove stale/non-standard subagent docs; ensure guidance is Codex-first and self-consistent.
-- [ ] Enable CI workflow for core lane (build/lint/test/spec-guard).
+- [x] Replace `.agent/system/*` placeholders with repo-specific content — Evidence: this commit.
+- [x] Replace `.ai-dev-tasks/*` placeholders with canonical workflow docs — Evidence: this commit.
+- [x] Remove stale/non-standard subagent docs; ensure guidance is Codex-first and self-consistent — Evidence: this commit.
+- [x] Enable CI workflow for core lane (build/lint/test/spec-guard) — Evidence: `.github/workflows/core-lane.yml`.
 
 ### Guardrails
-- [ ] Spec guard passes — Evidence: `.runs/0905-agentic-coding-readiness/cli/<run-id>/manifest.json`.
-- [ ] Build passes — Evidence: `.runs/0905-agentic-coding-readiness/cli/<run-id>/manifest.json`.
-- [ ] Lint passes — Evidence: `.runs/0905-agentic-coding-readiness/cli/<run-id>/manifest.json`.
-- [ ] Tests pass — Evidence: `.runs/0905-agentic-coding-readiness/cli/<run-id>/manifest.json`.
+- [x] Spec guard passes — Evidence: `.runs/0905-agentic-coding-readiness/cli/2025-12-15T14-58-24-866Z-c03673e7/manifest.json`.
+- [x] Build passes — Evidence: `.runs/0905-agentic-coding-readiness/cli/2025-12-15T14-58-24-866Z-c03673e7/manifest.json`.
+- [x] Lint passes — Evidence: `.runs/0905-agentic-coding-readiness/cli/2025-12-15T14-58-24-866Z-c03673e7/manifest.json`.
+- [x] Tests pass — Evidence: `.runs/0905-agentic-coding-readiness/cli/2025-12-15T14-58-24-866Z-c03673e7/manifest.json`.
 
 # Task List Snapshot — Dead Code Pruning & Evidence (0801)
 

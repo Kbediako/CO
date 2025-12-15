@@ -21,12 +21,11 @@ Make the repository significantly more suitable for agentic coding by fixing onb
   - Replace `.ai-dev-tasks/{create-prd,generate-tasks,process-task-list}.md` with an explicit, non-interactive flow aligned to the repo’s checklist conventions and manifest evidence requirements.
 
 ### 2) Stale subagent guidance creates tooling ambiguity
-- Current: the repo had an extra subagent doc that implied a non-standard CLI dependency and diverged from the Codex-first workflow used elsewhere in this workspace.
-- Fix: remove the stale doc and any references to it; standardize on `codex exec` / `codex review` for non-interactive review and automation.
+- Current: older guidance in this workspace has, at times, implied non-standard subagent tooling; this repo should be consistently Codex-first.
+- Fix: ensure onboarding/workflow docs standardize on `codex exec` / `codex review` (and `npx codex-orchestrator ...`) for non-interactive review and automation, with no stray references to other subagent CLIs.
 
-### 3) CI guardrails are not enabled (example-only workflow)
-- Current: `.github/workflows/spec-guard.example.yml` exists but doesn’t run on PRs/push; repo health relies on local discipline.
-- Fix: add a CI workflow that runs on pull requests and pushes to main:
+### 3) CI guardrails must run on every PR
+- Fix: add a CI workflow (see `.github/workflows/core-lane.yml`) that runs on pull requests and pushes to main:
   - `npm ci`
   - `npm run build`
   - `npm run lint`

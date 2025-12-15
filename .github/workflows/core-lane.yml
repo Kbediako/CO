@@ -1,0 +1,42 @@
+name: Core Lane (Build / Lint / Test / Spec Guard)
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  core-lane:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (full history for diffs)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Node 20 LTS matches the repo’s TypeScript/@types/node baseline and local developer guidance.
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm run test
+
+      - name: Set BASE_SHA from PR base
+        if: ${{ github.event_name == 'pull_request' }}
+        run: echo "BASE_SHA=${{ github.event.pull_request.base.sha }}" >> "$GITHUB_ENV"
+
+      - name: Spec guard
+        run: node scripts/spec-guard.mjs
