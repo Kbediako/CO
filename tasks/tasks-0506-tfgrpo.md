@@ -11,7 +11,7 @@
   - [x] CLI manifests log the prompt-pack hash used in each TF-GRPO epoch. *(Evidence: prompt_packs stamps embedded in `.runs/0506-tfgrpo-integration/cli/2025-11-21T05-56-32-837Z-430b2d9d/manifest.json`.)*
 - Tests:
   - [ ] `packages/orchestrator/tests/instructions/PromptPackLoader.test.ts` (PromptPackLoader.test.ts).
-  - [ ] `orchestrator/tests/InstructionsLoader.test.ts` (PromptTemplateContract.test.ts).
+  - [ ] `packages/orchestrator/tests/InstructionsLoader.test.ts` (PromptTemplateContract.test.ts).
 
 ## PR-2 — Metrics (Per-Tool & Per-Epoch, Cost/Latency)
 - Scope: Emit per-tool, per-epoch token/cost/latency metrics from exec events through the recorder, aggregator, and OTEL exporter.

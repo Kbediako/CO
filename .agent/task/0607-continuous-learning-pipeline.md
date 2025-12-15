@@ -36,17 +36,17 @@
      - [ ] Status: Pending — update to [x] when acceptance criteria are satisfied.
 3. **Crystalizer**  
    Owner: Knowledge Capture Lead
-   - Subtask: Pattern generation to `.agent/patterns/candidates/`
-     - Files: Crystalizer script, `.agent/patterns/candidates/**`, `.runs/0607-continuous-learning-pipeline/cli/<run-id>/manifest.json`
+   - Subtask: Pattern generation to `.agent/patterns/staging/`
+     - Files: Crystalizer script, `.agent/patterns/staging/**`, `.runs/0607-continuous-learning-pipeline/cli/<run-id>/manifest.json`
      - Commands: `npm run lint`, `npm run test` (crystalizer format), `node scripts/spec-guard.mjs --dry-run`
      - Acceptance: Validated patches produce Markdown with Problem/Solution/Rationale via OpenAI `gpt-4o` + prompt pack `prompt-packs/crystalizer-v1`, enforcing $0.50/run budget; file lands in candidates with manifest link; no writes outside `.agent/patterns`; Evidence: `.runs/0607-continuous-learning-pipeline/cli/<run-id>/manifest.json`.
      - [ ] Status: Pending — update to [x] when acceptance criteria are satisfied.
 4. **Pattern governance**  
    Owner: Librarian/Reviewer
    - Subtask: Candidate review + promotion/deprecation
-     - Files: `.agent/patterns/{candidates,active,deprecated}/`, `docs/patterns/*` (links only), `.runs/0607-continuous-learning-pipeline/metrics.json`
+     - Files: `.agent/patterns/{staging,active,deprecated}/`, `docs/` (links only), `.runs/0607-continuous-learning-pipeline/metrics.json`
      - Commands: `node scripts/spec-guard.mjs --dry-run`, `npm run lint`, `npm run test`
-     - Acceptance: Governance documented; promotions/deprecations recorded with approver + manifest path; `docs/patterns` only links to canonical files; Evidence: `.runs/0607-continuous-learning-pipeline/cli/<run-id>/manifest.json`.
+     - Acceptance: Governance documented; promotions/deprecations recorded with approver + manifest path; repo docs only link to canonical files; Evidence: `.runs/0607-continuous-learning-pipeline/cli/<run-id>/manifest.json`.
      - [ ] Status: Pending — update to [x] when acceptance criteria are satisfied.
    - Subtask: Safety-first metrics + alerting
      - Files: Metrics emitters, `.runs/0607-continuous-learning-pipeline/metrics.json`, `out/0607-continuous-learning-pipeline/state.json`
@@ -58,6 +58,6 @@
 - `tasks/0607-prd-continuous-learning-pipeline.md`, `docs/TECH_SPEC-continuous-learning-pipeline.md`, `.agent/task/0607-continuous-learning-pipeline.md`, `.runs/0607-continuous-learning-pipeline/**`, `.agent/patterns/**`, `.agent/task/templates/manual-scenario-template.md`
 
 ## Notes
-- `.agent/patterns` remains the only canonical pattern store; `docs/patterns` may link back but must not host canonical copies.
+- `.agent/patterns` remains the only canonical pattern store; repo docs may link back but must not host canonical copies.
 - Use the manual scenario template for any `needs_manual_scenario` requeue; capture approver metadata in the manifest.
 - Maintain safety-first sequencing for metrics and alerts (validation + reviewer safeguards + regression detection + pattern hygiene before throughput).

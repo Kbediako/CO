@@ -98,7 +98,7 @@ Data flow:
 - Document manual rollback path (feature flags per component, revert to single-instance queue).
 
 ## Testing Strategy
-- Contract tests for typed control plane using schema fixtures under `packages/control-plane-schemas/__tests__`.
+- Contract tests for typed control plane using schema fixtures under `packages/control-plane-schemas/tests`.
 - Integration tests simulating multi-instance load via Vitest harness (`npm run test -- scheduler`).
 - Privacy guard evaluation scenarios with synthetic sensitive payloads; track precision/recall.
 - Performance benchmarks capturing scheduling latency and handle resume times.

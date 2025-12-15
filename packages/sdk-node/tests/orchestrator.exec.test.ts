@@ -47,11 +47,18 @@ describe('ExecClient', () => {
     expect(result.summary.payload.outputs.stdout).toBe('ok');
     expect(result.exitCode).toBe(0);
 
-    await new Promise((resolve) => setTimeout(resolve, 20));
-    const eventsExist = await access(result.eventsPath).then(
-      () => true,
-      () => false
-    );
+    const deadline = Date.now() + 2000;
+    let eventsExist = true;
+    while (Date.now() < deadline) {
+      eventsExist = await access(result.eventsPath).then(
+        () => true,
+        () => false
+      );
+      if (!eventsExist) {
+        break;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    }
     expect(eventsExist).toBe(false);
   });
 

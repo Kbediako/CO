@@ -17,13 +17,12 @@ This repository is primarily a Node.js/TypeScript monorepo. Most “services” 
 | --- | --- | --- | --- | --- | --- |
 | Patterns & codemods | Build artifact + tooling | `patterns/**`, `eslint-plugin-patterns/**` | Node.js | `npm run build:patterns`, `npm run lint` | `npm run lint` runs `build:patterns` first via `prelint`. |
 | Evaluation harness | Test harness | `evaluation/harness/**`, `evaluation/tests/**` | Node.js (+ optional Python) | `npm run eval:test` | Keep `vitest run` mode for CI/non-interactive runs. |
-| Mirror tooling | CLI scripts | `scripts/mirror-*.mjs` | Node.js | `npm run mirror:{fetch,serve,check}` | Used by downstream packages under `packages/<project>/public`. |
+| Mirror tooling | CLI scripts | `scripts/mirror-*.mjs` | Node.js | `npm run mirror:fetch`, `npm run mirror:serve`, `npm run mirror:check` | Used by downstream packages under `packages/<project>/public`. |
 | Legacy MCP shims | Shell scripts | `scripts/mcp-runner-*.sh`, `scripts/run-mcp-diagnostics.sh` | shell | `scripts/run-mcp-diagnostics.sh` | Backwards-compatible wrappers; prefer `codex-orchestrator` for new workflows. |
 
 ## Downstream projects (under `packages/`)
 Downstream codebases/adapters live under `packages/<project>/`. Current projects in this repo:
 - `packages/abetkaua/`
-- `packages/aim-app/`
 - `packages/control-plane-schemas/`
 - `packages/des-obys/`
 - `packages/design-reference-tools/`

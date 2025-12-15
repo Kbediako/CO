@@ -2,6 +2,7 @@ node_modules/
 dist/
 coverage/
 out/
+var/
 .DS_Store
 .vscode/settings.json
 .runs/

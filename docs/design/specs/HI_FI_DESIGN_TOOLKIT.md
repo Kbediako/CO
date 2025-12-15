@@ -89,7 +89,7 @@ last_review: 2025-12-08
 - Diagnostics command produces a manifest path recorded in both `tasks/hi-fi-design-toolkit.md` and `.agent/task/hi-fi-design-toolkit.md` before flipping `[ ]` states.
 
 ### 3.9 External Toolkit Synchronization
-- Introduce `scripts/design/toolkit/sync.mjs` to vendor the autonomous hi-fi design starter directly into `packages/design-reference-tools/` (no submodules). The sync command copies sources, records the upstream commit hash + license/permit references in manifest `external_sources`, and ensures MCP runs remain self-contained.
+- Track the vendored autonomous hi-fi design starter snapshot in `packages/design-reference-tools/VENDOR.md` alongside `packages/design-reference-tools/` (no submodules). Record upstream commit hash + license/permit references in manifest `external_sources`, and ensure MCP runs remain self-contained.
 - Provide checksum verification for the vendored directory to detect drift; mismatches fail the pipeline with remediation steps (rerun the sync script with the approved commit). Compliance data (license, permit) rides along.
 
 ## Testing Strategy

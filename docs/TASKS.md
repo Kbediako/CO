@@ -13,7 +13,7 @@ The Snakes Arena checklist has been retired from this workspace; reference the a
 - **Notes:** Export `MCP_RUNNER_TASK_ID=0901-orchestrator-issue-validation` before orchestrator commands. Validation runs should keep guardrails on: `node scripts/spec-guard.mjs --dry-run`, `npm run lint`, `npm run test`.
 
 ## Checklist Mirror
-Mirror status with `tasks/tasks-0901-orchestrator-issue-validation.md` and `.agent/task/0901-orchestrator-issue-validation.md` (create if automation requires). Keep `[ ]` until evidence is recorded.
+Mirror status with `tasks/tasks-0901-orchestrator-issue-validation.md` and `.agent/task/<id>-<slug>.md` (create if automation requires). Keep `[ ]` until evidence is recorded.
 
 ### Foundation
 - [x] Diagnostics/plan manifest captured — Evidence: `.runs/0901-orchestrator-issue-validation/cli/2025-12-12T02-00-30-325Z-9cd0b653/manifest.json`.
@@ -126,13 +126,44 @@ Mirror status with `tasks/tasks-0905-agentic-coding-readiness.md` and `.agent/ta
 - [x] Lint passes — Evidence: `.runs/0905-agentic-coding-readiness/cli/2025-12-15T14-58-24-866Z-c03673e7/manifest.json`.
 - [x] Tests pass — Evidence: `.runs/0905-agentic-coding-readiness/cli/2025-12-15T14-58-24-866Z-c03673e7/manifest.json`.
 
+# Task List Snapshot — Docs Hygiene Automation & Review Handoff Gate (0906)
+
+- **Update — Implementation complete:** Deterministic `docs:check`/`docs:sync` tooling landed and CI-gated; workflow docs require `npm run docs:check` then `npm run review` after validations — Evidence: `.runs/0906-docs-hygiene-automation/cli/2025-12-15T20-57-07-377Z-65e21144/manifest.json`.
+- **Notes:** Export `MCP_RUNNER_TASK_ID=0906-docs-hygiene-automation` before orchestrator commands. Guardrails required (in order): `node scripts/spec-guard.mjs --dry-run`, `npm run build`, `npm run lint`, `npm run test`, `npm run docs:check`, `npm run review`.
+
+<!-- docs-sync:begin 0906-docs-hygiene-automation -->
+## Checklist Mirror
+Mirror status with `tasks/tasks-0906-docs-hygiene-automation.md` and `.agent/task/0906-docs-hygiene-automation.md`. Keep `[ ]` until evidence is recorded.
+
+### Foundation
+- [x] Collateral drafted (PRD/tech spec/action plan/checklist/mini-spec) — Evidence: this commit.
+- [x] Capture implementation gate manifest — Evidence: `.runs/0906-docs-hygiene-automation/cli/2025-12-15T20-57-07-377Z-65e21144/manifest.json`.
+- [x] Metrics/state snapshots updated — Evidence: `.runs/0906-docs-hygiene-automation/metrics.json`, `out/0906-docs-hygiene-automation/state.json`.
+- [x] Mirrors updated with manifest links (`docs/TASKS.md`, `.agent/task/0906-docs-hygiene-automation.md`, `tasks/index.json`) — Evidence: this commit + `.runs/0906-docs-hygiene-automation/cli/2025-12-15T20-57-07-377Z-65e21144/manifest.json`.
+
+### Docs hygiene tool
+- [x] Add `docs:check` (deterministic lint for agentic docs) — Files: `scripts/**`, `package.json`, `.github/workflows/core-lane.yml`; Acceptance: CI fails on doc drift; Evidence: this commit.
+- [x] Add `docs:sync` (safe mirror sync for active task only) — Acceptance: updates `.agent/task/<task-id>.md` and `docs/TASKS.md` idempotently; Evidence: this commit.
+
+### Workflow docs (review handoff gate)
+- [x] Require `npm run review` after implementation guardrails in the agent-facing workflow docs — Acceptance: `AGENTS.md`, `.agent/system/conventions.md`, `.ai-dev-tasks/process-task-list.md` all reflect the same sequence; Evidence: this commit.
+
+### Guardrails & handoff
+- [x] `node scripts/spec-guard.mjs --dry-run` passes — Evidence: `.runs/0906-docs-hygiene-automation/cli/2025-12-15T20-57-07-377Z-65e21144/manifest.json`.
+- [x] `npm run build` passes — Evidence: `.runs/0906-docs-hygiene-automation/cli/2025-12-15T20-57-07-377Z-65e21144/manifest.json`.
+- [x] `npm run lint` passes — Evidence: `.runs/0906-docs-hygiene-automation/cli/2025-12-15T20-57-07-377Z-65e21144/manifest.json`.
+- [x] `npm run test` passes — Evidence: `.runs/0906-docs-hygiene-automation/cli/2025-12-15T20-57-07-377Z-65e21144/manifest.json`.
+- [x] `npm run docs:check` passes — Evidence: `.runs/0906-docs-hygiene-automation/cli/2025-12-15T20-57-07-377Z-65e21144/manifest.json`.
+- [x] `npm run review` executed with latest manifest path as evidence — Evidence: `.runs/0906-docs-hygiene-automation/cli/2025-12-15T20-57-07-377Z-65e21144/manifest.json`.
+<!-- docs-sync:end 0906-docs-hygiene-automation -->
+
 # Task List Snapshot — Dead Code Pruning & Evidence (0801)
 
 - **Update — Planning:** Diagnostics captured at `.runs/0801-dead-code-pruning/cli/2025-12-09T03-51-52-584Z-93e9a77f/manifest.json`; dead-code deletions and archive relocations complete (archives parked under `.runs/0801-dead-code-pruning/archive/2025-12-08T10-01-24Z/` with README pointers) and guardrails/tests rerun on 2025-12-09.
 - **Notes:** Export `MCP_RUNNER_TASK_ID=0801-dead-code-pruning` before running orchestrator commands; guardrails: `node scripts/spec-guard.mjs --dry-run`, `npm run lint`, `npm run test` (and `npm run build` if touching orchestrator packages).
 
 ## Checklist Mirror
-Mirror status with `tasks/tasks-0801-dead-code-pruning.md` and `.agent/task/0801-dead-code-pruning.md` (if created). Keep `[ ]` until manifest path is recorded.
+Mirror status with `tasks/tasks-0801-dead-code-pruning.md` and `.agent/task/<id>-<slug>.md` (if created). Keep `[ ]` until manifest path is recorded.
 
 ### Foundation
 - [x] Diagnostics/plan manifest captured — Evidence: `.runs/0801-dead-code-pruning/cli/2025-12-09T03-51-52-584Z-93e9a77f/manifest.json`.
@@ -362,7 +393,7 @@ Update checklist entries with the exact `.runs/0202-orchestrator-hardening/cli/<
 Mirror status with `tasks/tasks-0506-tfgrpo.md` and `.agent/task/0506-tfgrpo-integration.md`. Flip `[ ]` to `[x]` only after attaching the manifest path (e.g., `.runs/0506-tfgrpo-integration/cli/<run-id>/manifest.json`).
 
 ### PR-1 Prompt Packs & Loader
-- [x] Stamped prompt-pack manifests wired into `packages/orchestrator/src/instructions/loader.ts`; tests: `packages/orchestrator/tests/instructions/PromptPackLoader.test.ts`, `orchestrator/tests/InstructionsLoader.test.ts`. Evidence: prompt_packs stamps in `.runs/0506-tfgrpo-integration/cli/2025-11-21T05-56-32-837Z-430b2d9d/manifest.json`.
+- [x] Stamped prompt-pack manifests wired into `packages/orchestrator/src/instructions/loader.ts`; tests: `packages/orchestrator/tests/instructions/PromptPackLoader.test.ts`, `packages/orchestrator/tests/InstructionsLoader.test.ts`. Evidence: prompt_packs stamps in `.runs/0506-tfgrpo-integration/cli/2025-11-21T05-56-32-837Z-430b2d9d/manifest.json`.
 
 ### PR-2 Metrics (Per-Tool & Per-Epoch)
 - [x] Emit per-tool, per-epoch token/cost/latency metrics via exec command → recorder/aggregator/OTEL; tests: `orchestrator/tests/MetricsAggregator.test.ts`, `orchestrator/tests/ExecCommand.test.ts`. Evidence: `.runs/0506-tfgrpo-integration/cli/2025-11-11T05-12-24-697Z-15088fb0/manifest.json`.
@@ -407,7 +438,7 @@ Mirror status with `tasks/0520-15th-plus-hi-fi.md` and `.agent/task/0520-15th-pl
 
 ### Archive & Reference
 - [x] Artifacts mirrored — `.runs/0801-dead-code-pruning/archive/2025-12-08T10-01-24Z/archives/hi-fi-tests/15th-plus/2025-11-14T11-11-13-442Z-6897b063/` retains `design-toolkit/{context,tokens,styleguide,reference,diffs,motion}`; `.runs/.../artifacts` pruned for hygiene.
-- [x] Reference README + loader — `reference/plus-ex-15th/README.md` documents serve command + archive pointer, `scripts/loader-scroll-macro.js` ships DOM-ready ScrollSmoother unlock.
+- [x] Reference README + loader — `reference/plus-ex-15th/README.md` documents serve command + archive pointer, `reference/plus-ex-15th/scripts/loader-scroll-macro.js` ships DOM-ready ScrollSmoother unlock.
 
 ### Validation & Doc Mirrors
 - [x] Local validation — `npx serve ... -l 4173` + Playwright probe logged `{\"unlocked\":\"true\",\"sectionCount\":40}`; grep confirms no `/assets/assets/**` references.

@@ -1,7 +1,7 @@
 {
   "id": "tfgrpo-implementation",
   "domain": "implementation",
-  "stamp": "50b15d46c4689ef00849f6e7017bb98acdc71f522551119cb2013416e0fb9801",
+  "stamp": "fa041681a96687d27731eddd512de33a833e54293cbcfd2a59b38ca95bc615a1",
   "experienceSlots": 3,
   "system": ".agent/prompts/hotswap-implementation.md",
   "inject": [

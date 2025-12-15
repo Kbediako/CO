@@ -33,6 +33,50 @@
       ]
     },
     {
+      "id": "implementation-gate",
+      "title": "Implementation Complete Gate",
+      "description": "Runs the required implementation validations (spec-guard, build, lint, test, docs:check) and launches the Codex review handoff, writing a single manifest for evidence.",
+      "tags": ["implementation-gate"],
+      "stages": [
+        {
+          "kind": "command",
+          "id": "spec-guard",
+          "title": "node scripts/spec-guard.mjs --dry-run",
+          "command": "node scripts/spec-guard.mjs --dry-run"
+        },
+        {
+          "kind": "command",
+          "id": "build",
+          "title": "npm run build",
+          "command": "npm run build"
+        },
+        {
+          "kind": "command",
+          "id": "lint",
+          "title": "npm run lint",
+          "command": "npm run lint"
+        },
+        {
+          "kind": "command",
+          "id": "test",
+          "title": "npm run test",
+          "command": "npm run test"
+        },
+        {
+          "kind": "command",
+          "id": "docs-check",
+          "title": "npm run docs:check",
+          "command": "npm run docs:check"
+        },
+        {
+          "kind": "command",
+          "id": "review",
+          "title": "npm run review",
+          "command": "npm run review"
+        }
+      ]
+    },
+    {
       "id": "diagnostics-with-eval",
       "title": "Diagnostics Pipeline (with Eval Harness)",
       "description": "Build, lint, test, run evaluation harness, and verify specs for guardrail evidence capture.",
@@ -66,6 +110,142 @@
           "id": "spec-guard",
           "title": "node scripts/spec-guard.mjs --dry-run",
           "command": "node scripts/spec-guard.mjs --dry-run"
+        }
+      ]
+    },
+    {
+      "id": "design-reference",
+      "title": "Design Reference Pipeline",
+      "description": "Extracts design reference assets, stages Storybook-ready components, and records manifest evidence.",
+      "tags": ["design", "reference"],
+      "stages": [
+        {
+          "kind": "command",
+          "id": "design-config",
+          "title": "Resolve design configuration",
+          "command": "node dist/scripts/design/pipeline/prepare.js",
+          "env": { "DESIGN_PIPELINE": "1" }
+        },
+        {
+          "kind": "command",
+          "id": "design-extract",
+          "title": "Run Playwright design extractor",
+          "command": "node dist/scripts/design/pipeline/extract.js",
+          "env": { "DESIGN_PIPELINE": "1" }
+        },
+        {
+          "kind": "command",
+          "id": "design-reference",
+          "title": "Build motherduck reference page",
+          "command": "node dist/scripts/design/pipeline/reference.js",
+          "env": { "DESIGN_PIPELINE": "1" }
+        },
+        {
+          "kind": "command",
+          "id": "design-componentize",
+          "title": "Componentize artifacts via packages/design-system",
+          "command": "node dist/scripts/design/pipeline/componentize.js",
+          "env": { "DESIGN_PIPELINE": "1" }
+        },
+        {
+          "kind": "command",
+          "id": "design-advanced-assets",
+          "title": "Generate advanced design assets",
+          "command": "node dist/scripts/design/pipeline/advanced-assets.js",
+          "env": { "DESIGN_PIPELINE": "1" },
+          "allowFailure": true,
+          "summaryHint": "Optional Framer Motion and FFmpeg assets"
+        },
+        {
+          "kind": "command",
+          "id": "design-visual-regression",
+          "title": "Run visual regression tests",
+          "command": "node dist/scripts/design/pipeline/visual-regression.js",
+          "env": { "DESIGN_PIPELINE": "1" },
+          "allowFailure": true,
+          "summaryHint": "Visual regression diffs stored under design/visual-regression/"
+        },
+        {
+          "kind": "command",
+          "id": "design-spec-guard",
+          "title": "Validate specs via spec-guard",
+          "command": "node scripts/spec-guard.mjs --dry-run",
+          "env": { "DESIGN_PIPELINE": "1" },
+          "summaryHint": "Ensures design specs are fresh before artifact write"
+        },
+        {
+          "kind": "command",
+          "id": "design-artifact-writer",
+          "title": "Persist design artifact manifests",
+          "command": "node dist/scripts/design/pipeline/write-artifacts.js",
+          "env": { "DESIGN_PIPELINE": "1" }
+        }
+      ]
+    },
+    {
+      "id": "hi-fi-design-toolkit",
+      "title": "Hi-Fi Design Toolkit",
+      "description": "Runs the hi-fi design toolkit pipeline to extract, tokenize, self-correct, and publish design artifacts.",
+      "tags": ["design", "hi-fi"],
+      "stages": [
+        {
+          "kind": "command",
+          "id": "design-config",
+          "title": "Resolve design configuration",
+          "command": "node dist/scripts/design/pipeline/prepare.js",
+          "env": { "DESIGN_PIPELINE": "1", "DESIGN_TOOLKIT": "1" }
+        },
+        {
+          "kind": "command",
+          "id": "design-toolkit-extract",
+          "title": "Wrap external toolkit extractor",
+          "command": "node dist/scripts/design/pipeline/toolkit/extract.js",
+          "env": { "DESIGN_PIPELINE": "1", "DESIGN_TOOLKIT": "1" }
+        },
+        {
+          "kind": "command",
+          "id": "design-toolkit-tokens",
+          "title": "Generate tokens and style guides",
+          "command": "node dist/scripts/design/pipeline/toolkit/tokens.js",
+          "env": { "DESIGN_PIPELINE": "1", "DESIGN_TOOLKIT": "1" }
+        },
+        {
+          "kind": "command",
+          "id": "design-toolkit-reference",
+          "title": "Build reference pages + self-correction",
+          "command": "node dist/scripts/design/pipeline/toolkit/reference.js",
+          "env": { "DESIGN_PIPELINE": "1", "DESIGN_TOOLKIT": "1" }
+        },
+        {
+          "kind": "command",
+          "id": "design-advanced-assets",
+          "title": "Generate advanced design assets",
+          "command": "node dist/scripts/design/pipeline/advanced-assets.js",
+          "env": { "DESIGN_PIPELINE": "1", "DESIGN_TOOLKIT": "1" },
+          "allowFailure": true,
+          "summaryHint": "Optional motion capture via Framer Motion + FFmpeg"
+        },
+        {
+          "kind": "command",
+          "id": "design-toolkit-publish",
+          "title": "Publish toolkit outputs to packages/design-system",
+          "command": "node dist/scripts/design/pipeline/toolkit/publish.js",
+          "env": { "DESIGN_PIPELINE": "1", "DESIGN_TOOLKIT": "1" }
+        },
+        {
+          "kind": "command",
+          "id": "design-spec-guard",
+          "title": "Validate specs via spec-guard",
+          "command": "node scripts/spec-guard.mjs --dry-run",
+          "env": { "DESIGN_PIPELINE": "1", "DESIGN_TOOLKIT": "1" },
+          "summaryHint": "Ensures HI-FI design specs are current before artifact write"
+        },
+        {
+          "kind": "command",
+          "id": "design-artifact-writer",
+          "title": "Persist design manifests",
+          "command": "node dist/scripts/design/pipeline/write-artifacts.js",
+          "env": { "DESIGN_PIPELINE": "1", "DESIGN_TOOLKIT": "1" }
         }
       ]
     },

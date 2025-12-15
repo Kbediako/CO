@@ -13,7 +13,7 @@ _All artifacts remain under `.runs/ethicallifeworld-hi-fi/**` and `out/ethicalli
 ## Capture Snapshot & Interactions
 - Source: https://ethicallifeworld.com/ (desktop 1440×900, mobile 428×926) recorded in `context.json` alongside palette + typography extraction.
 - Interactions stayed fully enabled; the manifest privacy block reports 30/30 frames allowed with zero redactions or blocks, so the default scroll + macro clicks executed without needing manual overrides.
-- Style guide output (`STYLE_GUIDE.md`) shows four high-level sections (hero/testimonials, navigation/footer cluster, product detail, compassion story) with Inter + Sora type plus the 12-color palette noted above, and the `reference/ethical-life-world` directory now bundles an `assets/` mirror so offline servers resolve `/assets/wp-content/...` without 404s.
+- Style guide output (`STYLE_GUIDE.md`) shows four high-level sections (hero/testimonials, navigation/footer cluster, product detail, compassion story) with Inter + Sora type plus the 12-color palette noted above, and the `.runs/ethicallifeworld-hi-fi/2025-11-09T14-27-47-001Z-568278b0/artifacts/design-toolkit/reference/ethical-life-world/` directory now bundles an `assets/` mirror so offline servers resolve `/assets/wp-content/...` without 404s.
 
 ## Residual Diff & Motion Quota Usage
 - Self-correction (`self-correction.json`) converged from 12.00 → 7.20 → 4.32 → **0.83 %** across three iterations, and the counter-settling log recorded a 450 ms wait plus a stabilized error of 0.83 % — within the <1 % target but still reflecting animated testimonial churn.

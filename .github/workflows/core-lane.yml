@@ -34,6 +34,9 @@ jobs:
       - name: Test
         run: npm run test
 
+      - name: Docs hygiene
+        run: npm run docs:check
+
       - name: Set BASE_SHA from PR base
         if: ${{ github.event_name == 'pull_request' }}
         run: echo "BASE_SHA=${{ github.event.pull_request.base.sha }}" >> "$GITHUB_ENV"

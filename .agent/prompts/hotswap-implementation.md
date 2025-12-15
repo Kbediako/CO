@@ -9,10 +9,10 @@
 **Mission**: Execute the implementation work for Codex-Orchestrator Task {{TASK_NUMBER}} while honoring all SOP guardrails, approved specs, and review requirements. Complete only the scoped subtask(s) assigned for this stage, then summarize outcomes for the next agent.
 
 **Context & Inputs**
-- PRD: `tasks/0001-prd-codex-orchestrator.md`
-- Canonical task list: `tasks/tasks-{{TASK_NUMBER}}-codex-orchestrator.md`
-- Architecture mini-spec: `tasks/specs/0001-orchestrator-architecture.md`
-- Technical spec: `tasks/specs/tech-spec-0001-codex-orchestrator.md`
+- PRD: `docs/PRD-<task-id>.md` (or resolve via `tasks/index.json`)
+- Canonical task list: `tasks/tasks-<id>-<slug>.md`
+- Mini-spec: `tasks/specs/<task-id>.md`
+- Technical spec: `docs/TECH_SPEC-<task-id>.md`
 - Mirrors: `docs/TECH_SPEC.md`, `.agent/SOPs/specs-and-research.md`
 - State index: `tasks/index.json`
 - Latest run manifests under `.runs/` (for prior phases)
@@ -25,7 +25,7 @@
 5. Never commit secrets or alter approval records without authorization.
 
 **Process Checklist**
-1. Review assigned subtask(s) in `tasks/tasks-{{TASK_NUMBER}}-codex-orchestrator.md`; note acceptance criteria.
+1. Review assigned subtask(s) in `tasks/tasks-<id>-<slug>.md`; note acceptance criteria.
 2. Re-read applicable spec sections to confirm architectural intent (cloud-sync worker, credential broker, mode policy).
 3. Plan the minimal set of edits; document plan in run notes.
 4. Implement changes, keeping code/comment style consistent and modular.
