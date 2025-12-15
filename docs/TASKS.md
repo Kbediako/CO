@@ -101,6 +101,31 @@ Mirror status with `tasks/tasks-0904-readme-codebase-alignment.md` and `.agent/t
 - [x] High-impact mismatches reconciled (lint, stage targeting, review workflow) — Evidence: `.runs/0904-readme-codebase-alignment/cli/2025-12-14T01-00-24-028Z-9a93c8df/manifest.json`.
 - [x] Remaining mismatches reconciled (paths, hi-fi toolkit docs, mirror workflow docs, cloud sync docs) — Evidence: `.runs/0904-readme-codebase-alignment/cli/2025-12-14T01-00-24-028Z-9a93c8df/manifest.json`.
 
+# Task List Snapshot — Agentic Coding Readiness & Onboarding Hygiene (0905)
+
+- **Update — Planning:** PRD/spec/task list drafted; onboarding placeholders and CI workflow pending. Awaiting first diagnostics manifest under `.runs/0905-agentic-coding-readiness/cli/<run-id>/manifest.json`.
+- **Notes:** Export `MCP_RUNNER_TASK_ID=0905-agentic-coding-readiness` before orchestrator commands. Guardrails required: `node scripts/spec-guard.mjs --dry-run`, `npm run build`, `npm run lint`, `npm run test`.
+
+## Checklist Mirror
+Mirror status with `tasks/tasks-0905-agentic-coding-readiness.md` and `.agent/task/0905-agentic-coding-readiness.md`. Keep `[ ]` until evidence is recorded.
+
+### Foundation
+- [ ] Diagnostics/plan manifest captured — Evidence: `.runs/0905-agentic-coding-readiness/cli/<run-id>/manifest.json`.
+- [ ] Metrics/state snapshots updated — Evidence: `.runs/0905-agentic-coding-readiness/metrics.json`, `out/0905-agentic-coding-readiness/state.json`.
+- [ ] PRD/spec/tasks mirrors updated with manifest links — Evidence: this commit + manifest path once captured.
+
+### Deliverables
+- [ ] Replace `.agent/system/*` placeholders with repo-specific content.
+- [ ] Replace `.ai-dev-tasks/*` placeholders with canonical workflow docs.
+- [ ] Remove stale/non-standard subagent docs; ensure guidance is Codex-first and self-consistent.
+- [ ] Enable CI workflow for core lane (build/lint/test/spec-guard).
+
+### Guardrails
+- [ ] Spec guard passes — Evidence: `.runs/0905-agentic-coding-readiness/cli/<run-id>/manifest.json`.
+- [ ] Build passes — Evidence: `.runs/0905-agentic-coding-readiness/cli/<run-id>/manifest.json`.
+- [ ] Lint passes — Evidence: `.runs/0905-agentic-coding-readiness/cli/<run-id>/manifest.json`.
+- [ ] Tests pass — Evidence: `.runs/0905-agentic-coding-readiness/cli/<run-id>/manifest.json`.
+
 # Task List Snapshot — Dead Code Pruning & Evidence (0801)
 
 - **Update — Planning:** Diagnostics captured at `.runs/0801-dead-code-pruning/cli/2025-12-09T03-51-52-584Z-93e9a77f/manifest.json`; dead-code deletions and archive relocations complete (archives parked under `.runs/0801-dead-code-pruning/archive/2025-12-08T10-01-24Z/` with README pointers) and guardrails/tests rerun on 2025-12-09.

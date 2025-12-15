@@ -19,6 +19,12 @@
 - Metrics / State Snapshots: _(pending — populate `.runs/0904-readme-codebase-alignment/metrics.json` and `out/0904-readme-codebase-alignment/state.json`)._
 - Checklist Mirror: `tasks/tasks-0904-readme-codebase-alignment.md`, `docs/TASKS.md` (0904 section), `.agent/task/0904-readme-codebase-alignment.md`.
 
+## Task 0905 — Agentic Coding Readiness & Onboarding Hygiene
+- Primary Doc: `docs/PRD-agentic-coding-readiness.md`
+- Run Manifest Link: _(pending — capture first diagnostics run under `.runs/0905-agentic-coding-readiness/cli/<run-id>/manifest.json`)._
+- Metrics / State Snapshots: _(pending — populate `.runs/0905-agentic-coding-readiness/metrics.json` and `out/0905-agentic-coding-readiness/state.json`)._
+- Checklist Mirror: `tasks/tasks-0905-agentic-coding-readiness.md`, `docs/TASKS.md` (0905 section), `.agent/task/0905-agentic-coding-readiness.md`.
+
 ## Task 0707 — Codex Orchestrator Simplification & Build Slimdown
 - Primary Doc: `docs/PRD-codex-orchestrator-slimdown.md`
 - Run Manifest Link: `.runs/0707-orchestrator-slimdown/cli/2025-12-01T09-37-11-576Z-1a60ebea/manifest.json`.
