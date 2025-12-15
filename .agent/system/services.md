@@ -23,7 +23,6 @@ This repository is primarily a Node.js/TypeScript monorepo. Most “services” 
 ## Downstream projects (under `packages/`)
 Downstream codebases/adapters live under `packages/<project>/`. Current projects in this repo:
 - `packages/abetkaua/`
-- `packages/aim-app/`
 - `packages/control-plane-schemas/`
 - `packages/des-obys/`
 - `packages/design-reference-tools/`
