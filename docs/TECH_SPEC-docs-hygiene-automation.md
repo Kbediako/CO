@@ -69,7 +69,7 @@ Update agent-facing workflow docs so “implementation complete” includes:
 - `npm run build`
 - `npm run lint`
 - `npm run test`
-- `npm run docs:check` (once implemented)
+- `npm run docs:check`
 - `npm run review` (Codex-first reviewer handoff)
 
 Do not attempt to run `npm run review` automatically inside CI.
@@ -81,4 +81,4 @@ Do not attempt to run `npm run review` automatically inside CI.
 
 ## Evidence
 - Task checklist: `tasks/tasks-0906-docs-hygiene-automation.md`
-- Run manifest: `.runs/0906-docs-hygiene-automation/cli/2025-12-15T18-59-39-357Z-15e1362d/manifest.json`
+- Run manifest: `.runs/0906-docs-hygiene-automation/cli/2025-12-15T20-57-07-377Z-65e21144/manifest.json`

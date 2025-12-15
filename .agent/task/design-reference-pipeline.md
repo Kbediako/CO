@@ -23,11 +23,11 @@
 
 ## Pipeline Stages
 1. **Playwright extractor**
-   - Files: `scripts/design/extract.js`, `packages/shared/artifacts/stager.ts`.
+   - Files: `scripts/design/pipeline/extract.ts`, `orchestrator/src/persistence/ArtifactStager.ts`.
    - Acceptance: DOM/CSS/screenshots staged under `design/reference/`, privacy approvals logged.
    - [x] Status: `Completed — .runs/0401-design-reference/cli/2025-11-06T11-59-59-680Z-34fe7972/manifest.json`
 2. **Reference page builder**
-   - Files: `scripts/design/build-reference.js`, staged `motherduck.html`.
+   - Files: `scripts/design/pipeline/reference.ts`, staged `motherduck.html`.
    - Acceptance: Reference HTML + metadata staged with `relativeDir='design/reference'`.
    - [x] Status: `Completed — .runs/0401-design-reference/cli/2025-11-06T11-59-59-680Z-34fe7972/manifest.json`
 3. **Componentization**

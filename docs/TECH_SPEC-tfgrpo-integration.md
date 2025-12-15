@@ -128,7 +128,7 @@
 - Request builder refuses `groupSize < 2` and logs guardrail violations before hitting the scheduler.
 
 ## Testing Strategy
-- Prompt Packs & Loader: `packages/orchestrator/tests/instructions/PromptPackLoader.test.ts`, `orchestrator/tests/InstructionsLoader.test.ts` (PromptTemplateContract).
+- Prompt Packs & Loader: `packages/orchestrator/tests/instructions/PromptPackLoader.test.ts`, `packages/orchestrator/tests/InstructionsLoader.test.ts` (PromptTemplateContract).
 - Experience Store & Injection: `orchestrator/tests/ExperienceStore.test.ts`, `orchestrator/tests/PromptExperienceInjection.test.ts`.
 - Trajectory Summary / Extractor / Optimizer: `orchestrator/tests/ExecCommand.test.ts` (TrajectorySummary) plus `orchestrator/tests/ExperienceStore.test.ts` (ExperienceMergeOps).
 - Rewarders: `evaluation/tests/harness.test.ts` covering `RewarderExactMatch.test.ts` and `RelativeRankingRewarder.test.ts` suites.

@@ -6,9 +6,9 @@
 
 ## Goals
 - Make the “post-implementation” completion gate explicit and consistent:
-  - Run `node scripts/spec-guard.mjs --dry-run`, `npm run build`, `npm run lint`, `npm run test`, then `npm run review`.
+  - Run `node scripts/spec-guard.mjs --dry-run`, `npm run build`, `npm run lint`, `npm run test`, `npm run docs:check`, then `npm run review`.
 - Add a deterministic docs hygiene checker that detects:
-  - Broken repo-relative file references in agentic docs.
+  - Broken backticked repo-relative file references in agentic docs.
   - Stale `npm run <script>` references vs `package.json`.
   - Stale `codex-orchestrator` pipeline references vs `codex.orchestrator.json`.
 - Add a safe docs sync tool that can refresh *mirrors* for the active task:
@@ -42,7 +42,7 @@
 - Action Plan: `docs/ACTION_PLAN-docs-hygiene-automation.md`
 - Task checklist: `tasks/tasks-0906-docs-hygiene-automation.md`
 - Mini-spec: `tasks/specs/0906-docs-hygiene-automation.md`
-- Run Manifest: `.runs/0906-docs-hygiene-automation/cli/2025-12-15T18-59-39-357Z-15e1362d/manifest.json`
+- Run Manifest: `.runs/0906-docs-hygiene-automation/cli/2025-12-15T20-57-07-377Z-65e21144/manifest.json`
 - Metrics / State: `.runs/0906-docs-hygiene-automation/metrics.json`, `out/0906-docs-hygiene-automation/state.json`
 
 ## Open Questions

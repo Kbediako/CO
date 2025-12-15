@@ -4,7 +4,7 @@
 - Primary Doc: `docs/TECH_SPEC-dead-code-pruning.md`
 - Run Manifest Link: `.runs/0801-dead-code-pruning/cli/2025-12-09T03-51-52-584Z-93e9a77f/manifest.json`.
 - Metrics / State Snapshots: `.runs/0801-dead-code-pruning/metrics.json`, `out/0801-dead-code-pruning/state.json`.
-- Checklist Mirror: `tasks/tasks-0801-dead-code-pruning.md`, `.agent/task/0801-dead-code-pruning.md`, `docs/TASKS.md` (0801 section).
+- Checklist Mirror: `tasks/tasks-0801-dead-code-pruning.md`, `.agent/task/<id>-<slug>.md`, `docs/TASKS.md` (0801 section).
 
 ## Task 0901 — Orchestrator Issue Validation & Prioritization
 - Primary Doc: `docs/TECH_SPEC-orchestrator-issue-validation.md`

@@ -10,6 +10,8 @@
     "build": "tsc -p tsconfig.build.json",
     "build:all": "tsc -p tsconfig.json && npm run build:patterns",
     "build:patterns": "tsc -p patterns/tsconfig.json",
+    "docs:check": "node dist/scripts/docs-hygiene.js --check",
+    "docs:sync": "node dist/scripts/docs-hygiene.js --sync",
     "prelint": "npm run build:patterns",
     "lint": "eslint orchestrator/src orchestrator/tests packages/orchestrator/src packages/orchestrator/tests packages/shared adapters evaluation/harness evaluation/tests --ext .ts,.tsx",
     "parallel:goals": "node --loader ts-node/esm scripts/run-parallel-goals.ts",

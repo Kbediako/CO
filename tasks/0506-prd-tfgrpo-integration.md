@@ -35,7 +35,7 @@
 
 ## User Experience
 ### Users & Scenarios
-- Platform engineers configure `codex.orchestrator.json` and launch `npx codex-orchestrator start --pipeline tfgrpo-learning`, expecting three epochs with stamped experiences in prompts.
+- Platform engineers configure `codex.orchestrator.json` and launch `npx codex-orchestrator start tfgrpo-learning --format json`, expecting three epochs with stamped experiences in prompts.
 - Evaluation owners run `npm run eval:test` under the new TF-GRPO env overrides to verify rewarders and metrics prior to shipping.
 - Reviewers open `.runs/<task>/cli/<run-id>/manifest.json` to confirm per-epoch stats and see which experiences were injected.
 

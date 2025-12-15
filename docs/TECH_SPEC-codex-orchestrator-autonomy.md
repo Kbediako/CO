@@ -19,7 +19,7 @@
 ### 3.1 Tool Orchestrator Layer
 - Introduce `ToolOrchestrator` service (`packages/orchestrator/src/tool-orchestrator.ts`) that becomes the single entry point for tool invocations (shell, MCP, custom adapters).
 - Responsibilities:
-  - Load global approval cache via `packages/shared/approvals/store.ts`.
+  - Load global approval cache via `packages/orchestrator/src/tool-orchestrator.ts` (ApprovalCache / ApprovalPrompter wiring).
   - Emit structured lifecycle events (`tool:start`, `tool:retry`, `tool:complete`) through `packages/shared/events`.
   - Apply sandbox retry policy (configurable defaults: max 3 attempts, exponential backoff starting 250 ms) while honoring `approval_policy=never`.
   - Persist retry/approval metadata into manifests using `packages/shared/manifest/writer.ts`.
@@ -56,7 +56,7 @@
 - Ensure telemetry is opt-in; if disabled, exporter stubs no-op while still emitting local logs.
 
 ### 3.6 Metrics Instrumentation
-- Add orchestrator metrics collector (`packages/orchestrator/src/metrics/collector.ts`) that aggregates:
+- Add orchestrator metrics collector (`orchestrator/src/cli/metrics/metricsRecorder.ts`) that aggregates:
   - Approval reuse rate by counting tool invocations satisfied from cache vs. escalations, persisted per-run in manifest `metrics.approvalReuse`.
   - Command latency histograms (including P95) using high-resolution timers in unified exec; export to OTEL as `orchestrator.command.latency` and append to manifest summary.
   - JSONL adoption flag by marking runs invoked with `--jsonl` and recording usage statistics inside `.runs/<task-id>/metrics.json`.

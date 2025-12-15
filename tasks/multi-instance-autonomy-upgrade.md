@@ -57,7 +57,7 @@
 
 [x] TASK-402 Enforce redaction/block actions and document override workflow.  
     Owner: @privacy  
-    Acceptance: Guard decisions visible in manifests; override SOP stored in `.agent/privacy.md`; enforcement blocked until policy approval evidence is referenced in rollout manifest.  
+    Acceptance: Guard decisions visible in manifests; override SOP stored in `.agent/<privacy-sop>.md`; enforcement blocked until policy approval evidence is referenced in rollout manifest.  
     Manifest: `.runs/autonomy-upgrade/cli/2025-11-05T13-30-00Z-upgrade/manifest.json`  
 
 ## Cross-Instance Metrics

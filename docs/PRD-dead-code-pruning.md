@@ -17,11 +17,11 @@
 ## Scope & Candidates
 - CLI helper exports: `orchestrator/src/cli/run/environment.ts` (dir helpers), `orchestrator/src/cli/run/manifest.ts` (heartbeat/guardrail helpers), `orchestrator/src/cli/services/execRuntime.ts` (session manager getter).
 - Learning helpers: `orchestrator/src/learning/harvester.ts` (`recordStalledSnapshot`), `orchestrator/src/learning/manifest.ts` (`recordLearningApproval`).
-- SDK: `packages/sdk-node/src/orchestrator.ts` (`deriveRetryOptions`), `packages/sdk-node/src/index.ts` entrypoint (unused beyond docs).
-- Aggregator entrypoints: `orchestrator/src/index.ts`, `orchestrator/src/cli/index.ts`, `orchestrator/src/credentials/index.ts`, `orchestrator/src/persistence/index.ts`, `orchestrator/src/sync/index.ts` (no imports).
-- Design/system samples: `packages/design-system/src/components/hi-fi/sample-dashboard/index.ts` (orphan).
+- SDK: `packages/sdk-node/src/orchestrator.ts` (`deriveRetryOptions`), `packages/sdk-node/src/index.ts (removed)` entrypoint (unused beyond docs).
+- Aggregator entrypoints: `orchestrator/src/index.ts (removed)`, `orchestrator/src/cli/index.ts (removed)`, `orchestrator/src/credentials/index.ts (removed)`, `orchestrator/src/persistence/index.ts (removed)`, `orchestrator/src/sync/index.ts (removed)` (no imports).
+- Design/system samples: `packages/design-system/src/components/hi-fi/sample-dashboard/index.ts (removed)` (orphan).
 - Evaluation harness scripts: `evaluation/harness/{run-all.ts,driver/AgentDriver.ts,scripts/pr-generator.ts,scripts/tfgrpo-runner.ts}` (not invoked).
-- Mirror server wrapper: `packages/obys-library/server.js` (manual-only).
+- Mirror server wrapper: `packages/obys-library/server.js (removed)` (manual-only).
 - Patterns registries: `patterns/{index.ts,codemods/index.ts,linters/index.ts}` (unused).
 - Static archives: `packages/{abetkaua,des-obys,eminente,obys-library}/public/**` and `archives/hi-fi-tests/**` (keep or move behind README pointer).
 

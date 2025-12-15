@@ -43,7 +43,7 @@ last_review: 2025-12-08
   - Provide dry-run logging that lists which stages will execute and referenced capture URLs.
 
 ### 3.2 ArtifactStager Enhancements
-- Update `packages/shared/artifacts/stager.ts` (placeholder path) to accept new options: `{ relativeDir?: string, overwrite?: boolean }`.
+- Update `orchestrator/src/persistence/ArtifactStager.ts` to accept new options: `{ relativeDir?: string, overwrite?: boolean }`.
 - `relativeDir` appends to the computed run artifact root (`.runs/<task>/<run>/artifacts/`).
   - Example: `new ArtifactStager({ relativeDir: 'design/reference' })` writes to `.runs/<task>/<run>/artifacts/design/reference`.
 - Ensure `ArtifactStager` sanitizes segments, prevents `../`, and creates directories lazily.

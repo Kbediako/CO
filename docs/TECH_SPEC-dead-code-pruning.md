@@ -17,11 +17,11 @@ Remove unused code paths and heavy static artifacts while guaranteeing no regres
   - `cli/run/manifest.ts`: `computeHeartbeatState`, `guardrailCommandPresent`, `guardrailRecommendation`.
   - `cli/services/execRuntime.ts`: `getCliSessionManager` unused.
 - **Learning:** `learning/harvester.ts` (`recordStalledSnapshot`), `learning/manifest.ts` (`recordLearningApproval`) unused.
-- **SDK:** `packages/sdk-node/src/orchestrator.ts` (`deriveRetryOptions`); `packages/sdk-node/src/index.ts` exported but unconsumed in code/tests.
+- **SDK:** `packages/sdk-node/src/orchestrator.ts` (`deriveRetryOptions`); `packages/sdk-node/src/index.ts (removed)` exported but unconsumed in code/tests.
 - **Aggregators:** `orchestrator/src/{index.ts,cli/index.ts,credentials/index.ts,persistence/index.ts,sync/index.ts}` not imported anywhere.
-- **Design/System:** `packages/design-system/src/components/hi-fi/sample-dashboard/index.ts` orphaned.
-- **Evaluation Harness:** `evaluation/harness/run-all.ts`, `driver/AgentDriver.ts`, `scripts/pr-generator.ts`, `scripts/tfgrpo-runner.ts` unused.
-- **Mirror Server:** `packages/obys-library/server.js` only manual usage; no code references.
+- **Design/System:** `packages/design-system/src/components/hi-fi/sample-dashboard/index.ts (removed)` orphaned.
+- **Evaluation Harness:** `evaluation/harness/run-all.ts (removed)`, `driver/AgentDriver.ts (removed)`, `scripts/pr-generator.ts (removed)`, `scripts/tfgrpo-runner.ts (removed)` unused.
+- **Mirror Server:** `packages/obys-library/server.js (removed)` only manual usage; no code references.
 - **Patterns Registry:** `patterns/{index.ts,codemods/index.ts,linters/index.ts}` unused.
 - **Static Archives:** `packages/{abetkaua,des-obys,eminente,obys-library}/public/**`, `archives/hi-fi-tests/**` not read by code/tests; mark keep/remove decision.
 

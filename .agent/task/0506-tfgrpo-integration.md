@@ -12,7 +12,7 @@
 1. **PR-1 — Prompt Packs & Loader**
    - Scope: Stamped prompt-pack manifests, instruction loader routing, and experience slot injection.
    - Files: `.agent/prompts/**`, `packages/orchestrator/src/instructions/loader.ts`, `packages/orchestrator/src/instructions/promptPacks.ts`.
-   - Tests: `packages/orchestrator/tests/instructions/PromptPackLoader.test.ts`, `orchestrator/tests/InstructionsLoader.test.ts`.
+   - Tests: `packages/orchestrator/tests/instructions/PromptPackLoader.test.ts`, `packages/orchestrator/tests/InstructionsLoader.test.ts`.
    - [x] Evidence: `.runs/0506-tfgrpo-integration/cli/2025-11-21T05-56-32-837Z-430b2d9d/manifest.json` (prompt_packs stamps recorded).
 2. **PR-2 — Metrics (Per-Tool & Per-Epoch)**
    - Scope: Emit tool/token/cost/latency metrics tagged by epoch and group.

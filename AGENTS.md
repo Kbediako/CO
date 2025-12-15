@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp ec411c2e5ebcdcf486f772b9a0582d1c5db219b5f3b21b14d7e9ce575db1ce7e -->
+<!-- codex:instruction-stamp 979b2eae363478cee163444dd71c43a9aa9392cfe06495de4e2f76e07704a109 -->
 # Codex-Orchestrator Agent Handbook (Template)
 
 Use this repository as the wrapper that coordinates multiple Codex-driven projects. After cloning, replace placeholder metadata (task IDs, documents, SOPs) with values for each downstream initiative while keeping these shared guardrails in place.
@@ -32,12 +32,22 @@ Use this repository as the wrapper that coordinates multiple Codex-driven projec
 - Before new iterations, run the cleanup script (or manually remove stray `.runs`/`archives` folders) so the working tree returns to a clean state while leaving committed improvements intact.
 
 ## Build & Test Commands (defaults)
+Implementation work is not “complete” until you run (in order):
+1. `node scripts/spec-guard.mjs --dry-run`
+2. `npm run build`
+3. `npm run lint`
+4. `npm run test`
+5. `npm run docs:check`
+6. `npm run review`
+
 | Command | When to use | Notes |
 | --- | --- | --- |
+| `node scripts/spec-guard.mjs --dry-run` | Spec freshness validation | Blocks merges when touched specs are older than 30 days. |
+| `npm run build` | Build output | Compiles TypeScript to `dist/` (required by `docs:check`, `review`, and other wrappers). |
 | `npm run lint` | Pre-commit / review gates | Executes `npm run build:patterns` first so codemods compile. |
 | `npm run test` | Unit + integration checks | Vitest harness covering orchestrator + patterns. |
+| `npm run docs:check` | Docs hygiene gate | Deterministically validates scripts/pipelines/paths referenced in agent-facing docs. |
 | `npm run eval:test` | Evaluation harness smoke tests | Requires fixtures in `evaluation/fixtures/**`; optional, enable when evaluation scope exists. |
-| `node scripts/spec-guard.mjs --dry-run` | Spec freshness validation | Blocks merges when touched specs are older than 30 days. |
 | `npm run review` | Reviewer hand-off | Runs `codex review` (defaults to `--uncommitted`) with the latest run manifest path included as evidence in the prompt. |
 
 Update the table once you wire different build pipelines or tooling.

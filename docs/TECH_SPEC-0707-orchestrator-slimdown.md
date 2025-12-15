@@ -8,8 +8,8 @@
 ## Workstreams & Plan
 
 ### 1) Manifest single-source of truth (schema, types, validation)
-- Approach: treat `schemas/manifest.json` as canonical; generate TS types via `json-schema-to-typescript` (e.g., `scripts/generate-manifest-types.ts`) into `packages/shared/manifest/types.ts` plus any downstream consumers. Add AJV-based runtime validator (e.g., `packages/shared/manifest/validator.ts`) and swap tests to use the generated validator. Delete duplicate hand-rolled schema in `orchestrator/src/cli/telemetry/schema.ts` and wire imports to the generated types.
-- Affected files: `schemas/manifest.json`, `scripts/generate-manifest-types.ts` (new), `packages/shared/manifest/types.ts`, `packages/shared/manifest/validator.ts` (new), orchestrator manifest/telemetry modules and related tests.
+- Approach: treat `schemas/manifest.json` as canonical; generate TS types via `json-schema-to-typescript` (e.g., `scripts/generate-manifest-types.mjs`) into `packages/shared/manifest/types.ts` plus any downstream consumers. Add AJV-based runtime validator (e.g., `packages/shared/manifest/validator.ts`) and swap tests to use the generated validator. Delete duplicate hand-rolled schema in `orchestrator/src/cli/telemetry/schema.ts` and wire imports to the generated types.
+- Affected files: `schemas/manifest.json`, `scripts/generate-manifest-types.mjs`, `packages/shared/manifest/types.ts`, `packages/shared/manifest/validator.ts` (new), orchestrator manifest/telemetry modules and related tests.
 - Steps: (1) add generator script + npm script hook; (2) emit types/validator from schema and update imports; (3) remove duplicate schema file; (4) refresh tests to consume validator + generated types.
 - Validation: `npm run build` (ensures generated types compile), `npm run test -- --filter manifest` (vitest targeted), `node scripts/spec-guard.mjs --dry-run` before review.
 - Risks/Mitigations: schema drift risk—pin generator output and store in repo; runtime differences—keep validator parity tests against current fixtures; tooling friction—document regeneration in README/tech spec and in npm scripts.

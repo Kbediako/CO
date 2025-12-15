@@ -67,16 +67,16 @@ The pipeline consists of four distinct phases:
 *   **Role:** Turns code into knowledge.
 *   **Mechanism:** A new LLM-based script.
 *   **Input:** The "Best Patch" from the Runner + The original Problem Statement.
-*   **Output:** A Markdown file in `.agent/patterns/candidates/`.
+*   **Output:** A Markdown file in `.agent/patterns/staging/`.
 *   **Format:**
     *   **Problem:** Context description.
     *   **Solution:** The optimized code pattern.
     *   **Rationale:** Why this is the preferred approach.
 
 #### D. The Pattern Library (Storage & Governance)
-*   **Location:** `.agent/patterns/` is the canonical source of truth; `docs/patterns/` may host read-only summaries/links only.
+*   **Location:** `.agent/patterns/` is the canonical source of truth; repo docs (under `docs/`) may host read-only summaries/links only.
 *   **Governance (Human-in-the-Loop):**
-    *   **Candidate State:** New patterns are saved to `.agent/patterns/candidates/` by default. They are **not** loaded by agents yet.
+    *   **Candidate State:** New patterns are saved to `.agent/patterns/staging/` by default. They are **not** loaded by agents yet.
     *   **Review:** A human (or a senior "Librarian" agent) reviews candidates.
     *   **Promotion:** Validated patterns are moved to `.agent/patterns/active/`.
     *   **Deprecation:** Patterns can be moved to `deprecated/` if they become obsolete or harmful.
@@ -91,7 +91,7 @@ The pipeline consists of four distinct phases:
 4.  **Agent:** "Great! I've merged the fix. **I also noticed this is a reusable optimization pattern, so I've queued a learning run to document it.**"
 5.  *(Background)*: System captures snapshot `learning-snapshot-123`.
 6.  *(Background)*: Runner checks out snapshot, infers `npm test users.test.ts` was the verification command, and verifies the fix.
-7.  *(Background)*: Crystalizer creates `.agent/patterns/candidates/api-optimization.md`.
+7.  *(Background)*: Crystalizer creates `.agent/patterns/staging/<pattern>.md`.
 8.  *(Later)*: User reviews the candidate and promotes it to `active/`.
 9.  *(Next Week)*: **User:** "Create a `posts.ts` endpoint."
 10. **Agent:** "Checking Pattern Library... I see we use `Promise.all` for optimizations. I'll apply that pattern here."
@@ -104,7 +104,7 @@ The pipeline consists of four distinct phases:
 
 ## 7. Success Metrics
 *   **Validation Quality:** Pass/fail rate of learning runs, with root causes for failures (snapshot integrity, scenario synthesis, test failures) and time-to-resolution for `stalled_snapshot` events.
-*   **Reviewer Safeguards:** Candidate rejection rate and median review latency for `.agent/patterns/candidates/` before promotion to `active/`.
+*   **Reviewer Safeguards:** Candidate rejection rate and median review latency for `.agent/patterns/staging/` before promotion to `active/`.
 *   **Regression Detection:** Number of regressions caught during validation versus those escaping to production; time-to-detect when a candidate causes a regression.
 *   **Pattern Hygiene:** Count of deprecated patterns and instances of deprecated patterns being reintroduced, plus the cycle time to remove them from circulation.
 *   **Throughput:** Pattern count and reuse rate, monitored after the above safety metrics so volume never overrides correctness.

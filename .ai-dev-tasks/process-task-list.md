@@ -6,10 +6,11 @@ This repo’s execution loop is “evidence-first”: implement work, run a non-
 - Read `AGENTS.md`, `docs/AGENTS.md`, and `.agent/AGENTS.md` (instruction resolution is documented in `docs/guides/instructions.md`).
 - Confirm you can run the core lane locally:
   - `npm ci`
+  - `node scripts/spec-guard.mjs --dry-run`
   - `npm run build`
   - `npm run lint`
   - `npm run test`
-  - `node scripts/spec-guard.mjs --dry-run`
+  - `npm run docs:check`
 
 ## 1) Set the active task id
 Use a stable task id (`<id>-<slug>`) and export it so runs are scoped correctly:
@@ -44,7 +45,12 @@ Also update `tasks/index.json` with:
 - `gate.run_id`: `<run-id>`
 
 ## 5) Reviewer hand-off (Codex-first)
-After guardrails pass, use the Codex review primitive:
+Implementation is only “complete” once these have run (in order):
+- `node scripts/spec-guard.mjs --dry-run`
+- `npm run build`
+- `npm run lint`
+- `npm run test`
+- `npm run docs:check`
 - `npm run review` (wraps `codex review` and includes the latest manifest path as evidence)
 
 ## Governance notes (when applicable)
