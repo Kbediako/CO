@@ -126,6 +126,35 @@ Mirror status with `tasks/tasks-0905-agentic-coding-readiness.md` and `.agent/ta
 - [x] Lint passes — Evidence: `.runs/0905-agentic-coding-readiness/cli/2025-12-15T14-58-24-866Z-c03673e7/manifest.json`.
 - [x] Tests pass — Evidence: `.runs/0905-agentic-coding-readiness/cli/2025-12-15T14-58-24-866Z-c03673e7/manifest.json`.
 
+# Task List Snapshot — Docs Hygiene Automation & Review Handoff Gate (0906)
+
+- **Update — Planning:** Diagnostics + guardrails captured at `.runs/0906-docs-hygiene-automation/cli/2025-12-15T18-59-39-357Z-15e1362d/manifest.json`; planning collateral drafted; next: implement deterministic docs checks/sync and standardize the post-implementation review handoff (`npm run review`) as a completion gate.
+- **Notes:** Export `MCP_RUNNER_TASK_ID=0906-docs-hygiene-automation` before orchestrator commands. Guardrails required: `node scripts/spec-guard.mjs --dry-run`, `npm run build`, `npm run lint`, `npm run test`.
+
+## Checklist Mirror
+Mirror status with `tasks/tasks-0906-docs-hygiene-automation.md` and `.agent/task/0906-docs-hygiene-automation.md`. Keep `[ ]` until evidence is recorded.
+
+### Foundation
+- [x] Collateral drafted (PRD/tech spec/action plan/checklist/mini-spec) — Evidence: this commit.
+- [x] Capture diagnostics/guardrails manifest — Evidence: `.runs/0906-docs-hygiene-automation/cli/2025-12-15T18-59-39-357Z-15e1362d/manifest.json`.
+- [x] Metrics/state snapshots updated — Evidence: `.runs/0906-docs-hygiene-automation/metrics.json`, `out/0906-docs-hygiene-automation/state.json`.
+- [x] Mirrors updated with manifest links (`docs/TASKS.md`, `.agent/task/0906-docs-hygiene-automation.md`, `tasks/index.json`) — Evidence: this commit + `.runs/0906-docs-hygiene-automation/cli/2025-12-15T18-59-39-357Z-15e1362d/manifest.json`.
+
+### Docs hygiene tool
+- [ ] Add `docs:check` (deterministic lint for agentic docs).
+- [ ] Add `docs:sync` (safe mirror sync for active task only).
+
+### Workflow docs (review handoff gate)
+- [ ] Require `npm run review` after implementation guardrails in the agent-facing workflow docs.
+
+### Guardrails & handoff
+- [x] `node scripts/spec-guard.mjs --dry-run` passes — Evidence: `.runs/0906-docs-hygiene-automation/cli/2025-12-15T18-59-39-357Z-15e1362d/manifest.json`.
+- [x] `npm run build` passes — Evidence: `.runs/0906-docs-hygiene-automation/cli/2025-12-15T18-59-39-357Z-15e1362d/manifest.json`.
+- [x] `npm run lint` passes — Evidence: `.runs/0906-docs-hygiene-automation/cli/2025-12-15T18-59-39-357Z-15e1362d/manifest.json`.
+- [x] `npm run test` passes — Evidence: `.runs/0906-docs-hygiene-automation/cli/2025-12-15T18-59-39-357Z-15e1362d/manifest.json`.
+- [ ] `npm run docs:check` passes — Evidence: `.runs/0906-docs-hygiene-automation/cli/<run-id>/manifest.json`.
+- [ ] `npm run review` executed with latest manifest path as evidence — Evidence: `.runs/0906-docs-hygiene-automation/cli/<run-id>/manifest.json`.
+
 # Task List Snapshot — Dead Code Pruning & Evidence (0801)
 
 - **Update — Planning:** Diagnostics captured at `.runs/0801-dead-code-pruning/cli/2025-12-09T03-51-52-584Z-93e9a77f/manifest.json`; dead-code deletions and archive relocations complete (archives parked under `.runs/0801-dead-code-pruning/archive/2025-12-08T10-01-24Z/` with README pointers) and guardrails/tests rerun on 2025-12-09.
