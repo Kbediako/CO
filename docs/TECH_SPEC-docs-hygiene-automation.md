@@ -76,7 +76,7 @@ Do not attempt to run `npm run review` automatically inside CI.
 
 ## Testing strategy
 - Unit: tests for the docs hygiene tool’s parsing + rules.
-- Integration: run `npm run docs:check` and `npm run docs:sync -- --task <task-id>` in the diagnostics workflow for the task.
+- Integration: run `npm run docs:check`; after updating the canonical checklist with evidence, run `npm run docs:sync -- --task <task-id>` twice and confirm the second run is a no-op.
 - CI: ensure `docs:check` runs in the core lane workflow without requiring secrets.
 
 ## Evidence
