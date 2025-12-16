@@ -76,6 +76,31 @@ Group execution (when `FEATURE_TFGRPO_GROUP=on`): repeat the Builder → Tester 
 
 Use `npx codex-orchestrator resume --run <run-id>` to continue interrupted runs; the CLI verifies resume tokens, refreshes the plan, and updates the manifest safely before rerunning.
 
+## Parallel Runs (Meta-Orchestration)
+The orchestrator executes a single pipeline serially. “Parallelism” comes from running multiple orchestrator runs at the same time, ideally in separate git worktrees so builds/tests don’t contend for the same working tree outputs.
+
+**Recommended pattern (one worktree per workstream)**
+```bash
+git worktree add ../CO-stream-a HEAD
+git worktree add ../CO-stream-b HEAD
+
+# terminal A
+cd ../CO-stream-a
+export MCP_RUNNER_TASK_ID=<task-id>-a
+npx codex-orchestrator start diagnostics --format json
+
+# terminal B
+cd ../CO-stream-b
+export MCP_RUNNER_TASK_ID=<task-id>-b
+npx codex-orchestrator start diagnostics --format json
+```
+
+Notes:
+- Use `--task <id>` instead of exporting `MCP_RUNNER_TASK_ID` when scripting runs.
+- Use `--parent-run <run-id>` to group related runs in manifests (optional).
+- If worktrees aren’t possible, isolate artifacts with `CODEX_ORCHESTRATOR_RUNS_DIR` and `CODEX_ORCHESTRATOR_OUT_DIR`, but avoid concurrent builds/tests in the same checkout.
+- For a deeper runbook, see `.agent/SOPs/meta-orchestration.md`.
+
 ### Codex CLI prompts
 - The custom prompts live outside the repo at `~/.codex/prompts/diagnostics.md` and `~/.codex/prompts/review-handoff.md`. Recreate those files on every fresh machine so `/prompts:diagnostics` and `/prompts:review-handoff` are available in the Codex CLI palette.
 - `/prompts:diagnostics` takes `TASK=<task-id> MANIFEST=<path> [NOTES=<free text>]`, exports `MCP_RUNNER_TASK_ID=$TASK`, runs `npx codex-orchestrator start diagnostics --format json`, tails `.runs/$TASK/cli/<run-id>/manifest.json` (or `npx codex-orchestrator status --watch`), and records evidence to `/tasks`, `docs/TASKS.md`, `.agent/task/...`, `.runs/$TASK/metrics.json`, and `out/$TASK/state.json` using `$MANIFEST`.

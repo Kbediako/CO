@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp e105de149d1994f10ef06dbaf11e1f6ab2d581e5194a4991fd60ef5a77df4201 -->
+<!-- codex:instruction-stamp 32dc8254019eb7d52bfb17c32642eae3e8b6a6974255956c1320e497d81b4ba4 -->
 # Agent Enablement
 
 ## Added by Bootstrap 2025-10-16
@@ -14,6 +14,13 @@
 - Default run mode is `mcp`; switch to cloud only when the canonical task list flags `execution.parallel=true` and the reviewer records the override in the run manifest.
 - Honor the safe `read/edit/run/network` approval profile. Capture escalations in the manifest `approvals` array with reviewer justification and timestamp.
 - Run `node scripts/spec-guard.mjs --dry-run` prior to requesting review; a failing guard requires refreshing relevant specs (see `.agent/SOPs/specs-and-research.md`).
+
+### Meta-Orchestrator Mode (Parallel Workstreams)
+- Use parallel workstreams to stay within context limits: split independent work into separate runs/worktrees, then consolidate back to a single reviewed diff.
+- Keep “worker” agents single-focused (one subtask/area per run); reserve coordination, merging, and final validation for the meta-orchestrator.
+- Prefer one worktree per workstream (example: `git worktree add ../CO-<slug>-a HEAD`) and route artifacts with `MCP_RUNNER_TASK_ID=<task-id>-<stream>`.
+- If you need lineage, pass `--parent-run <run-id>` when starting sibling runs so manifests can be audited as a group.
+- If worktrees aren’t viable, use `CODEX_ORCHESTRATOR_RUNS_DIR` / `CODEX_ORCHESTRATOR_OUT_DIR` to isolate manifests and state snapshots, but treat the working tree as a shared resource (avoid concurrent builds/tests).
 
 ### Build & Test Quick Reference
 - `npm run lint` — Executes `npm run build:patterns` before linting orchestrator, adapter, and evaluation sources.

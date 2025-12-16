@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp 7d81cd0c79237adbb6e5f597b59feabea736802e745ab3a5c9d67de532ded9f1 -->
+<!-- codex:instruction-stamp 67ebd1fe6d3118782acf3052815601b591aa894cda5b2de81de95d5770d03e31 -->
 # Codex-Orchestrator Agent Handbook (Template)
 
 Use this repository as the wrapper that coordinates multiple Codex-driven projects. After cloning, replace placeholder metadata (task IDs, documents, SOPs) with values for each downstream initiative while keeping these shared guardrails in place.
@@ -8,6 +8,13 @@ Use this repository as the wrapper that coordinates multiple Codex-driven projec
 - Switch to cloud mode only if your task plan explicitly allows a parallel run and the reviewer records the override in the active run manifest.
 - Keep the safe approval profile (`read/edit/run/network`). Capture any escalation in `.runs/<task>/<timestamp>/manifest.json` under `approvals`.
 - Run `node scripts/spec-guard.mjs --dry-run` before requesting review. Update specs or refresh approvals when the guard fails.
+
+## Meta-Orchestration & Parallel Runs
+- **Definition:** “Parallel runs” means launching multiple `codex-orchestrator start ...` runs at the same time (separate processes). A single orchestrator run executes its pipeline stages serially.
+- **Primary safety rule:** run parallel work in separate worktrees/clones so builds/tests don’t fight over `node_modules/`, `dist/`, or uncommitted edits. See `.agent/SOPs/git-management.md`.
+- **Task routing:** use a distinct `MCP_RUNNER_TASK_ID` per parallel workstream so `.runs/<task-id>/` and `out/<task-id>/` remain isolated. For scripted runs, prefer `codex-orchestrator start diagnostics --task <id> --format json` (or the equivalent pipeline you need).
+- **Run lineage (optional):** pass `--parent-run <run-id>` to link related runs for later auditing; record the resulting manifest paths when you flip checklist items.
+- **Advanced isolation (when worktrees aren’t possible):** set `CODEX_ORCHESTRATOR_ROOT`, `CODEX_ORCHESTRATOR_RUNS_DIR`, and `CODEX_ORCHESTRATOR_OUT_DIR` to per-run locations, but still avoid running write-heavy pipelines concurrently in the same working tree.
 
 ## Non-interactive Commands
 - Agents do not have an interactive TTY; every command must be non-interactive or pre-seeded.
