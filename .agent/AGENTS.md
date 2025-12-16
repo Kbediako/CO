@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp 32dc8254019eb7d52bfb17c32642eae3e8b6a6974255956c1320e497d81b4ba4 -->
+<!-- codex:instruction-stamp a297bdac5f16fe5391e656bf69d4012b1a39ef7bb7fdbdfb9ac7653ad65777de -->
 # Agent Enablement
 
 ## Added by Bootstrap 2025-10-16
@@ -20,7 +20,7 @@
 - Keep “worker” agents single-focused (one subtask/area per run); reserve coordination, merging, and final validation for the meta-orchestrator.
 - Prefer one worktree per workstream (example: `git worktree add ../CO-<slug>-a HEAD`) and route artifacts with `MCP_RUNNER_TASK_ID=<task-id>-<stream>`.
 - If you need lineage, pass `--parent-run <run-id>` when starting sibling runs so manifests can be audited as a group.
-- If worktrees aren’t viable, use `CODEX_ORCHESTRATOR_RUNS_DIR` / `CODEX_ORCHESTRATOR_OUT_DIR` to isolate manifests and state snapshots, but treat the working tree as a shared resource (avoid concurrent builds/tests).
+- If worktrees aren’t viable, use `CODEX_ORCHESTRATOR_RUNS_DIR` / `CODEX_ORCHESTRATOR_OUT_DIR` (and optionally `CODEX_ORCHESTRATOR_ROOT` when invoking from outside the repo) to isolate manifests and state snapshots, but treat the working tree as a shared resource (avoid concurrent builds/tests).
 
 ### Build & Test Quick Reference
 - `npm run lint` — Executes `npm run build:patterns` before linting orchestrator, adapter, and evaluation sources.

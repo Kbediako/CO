@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp 67ebd1fe6d3118782acf3052815601b591aa894cda5b2de81de95d5770d03e31 -->
+<!-- codex:instruction-stamp dddf9f635c295ae3ef8d803a6a4bf84f9cae21fd74cf79c6cbc7a5fa9d33e0a5 -->
 # Codex-Orchestrator Agent Handbook (Template)
 
 Use this repository as the wrapper that coordinates multiple Codex-driven projects. After cloning, replace placeholder metadata (task IDs, documents, SOPs) with values for each downstream initiative while keeping these shared guardrails in place.
@@ -14,7 +14,7 @@ Use this repository as the wrapper that coordinates multiple Codex-driven projec
 - **Primary safety rule:** run parallel work in separate worktrees/clones so builds/tests don’t fight over `node_modules/`, `dist/`, or uncommitted edits. See `.agent/SOPs/git-management.md`.
 - **Task routing:** use a distinct `MCP_RUNNER_TASK_ID` per parallel workstream so `.runs/<task-id>/` and `out/<task-id>/` remain isolated. For scripted runs, prefer `codex-orchestrator start diagnostics --task <id> --format json` (or the equivalent pipeline you need).
 - **Run lineage (optional):** pass `--parent-run <run-id>` to link related runs for later auditing; record the resulting manifest paths when you flip checklist items.
-- **Advanced isolation (when worktrees aren’t possible):** set `CODEX_ORCHESTRATOR_ROOT`, `CODEX_ORCHESTRATOR_RUNS_DIR`, and `CODEX_ORCHESTRATOR_OUT_DIR` to per-run locations, but still avoid running write-heavy pipelines concurrently in the same working tree.
+- **Advanced isolation (when worktrees aren’t possible):** `CODEX_ORCHESTRATOR_ROOT` is an optional repo-root override (defaults to the current working directory). `CODEX_ORCHESTRATOR_RUNS_DIR` and `CODEX_ORCHESTRATOR_OUT_DIR` are optional directory overrides (defaults under the repo root). Even with these set, avoid running write-heavy pipelines concurrently in the same working tree.
 
 ## Non-interactive Commands
 - Agents do not have an interactive TTY; every command must be non-interactive or pre-seeded.

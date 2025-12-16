@@ -37,6 +37,7 @@ Optional: add `--parent-run <run-id>` to group related runs in the manifest grap
 
 ## When you can’t use worktrees
 You can isolate run artifacts by setting:
+- `CODEX_ORCHESTRATOR_ROOT` (optional repo root override; defaults to the current working directory)
 - `CODEX_ORCHESTRATOR_RUNS_DIR` (defaults to `.runs/`)
 - `CODEX_ORCHESTRATOR_OUT_DIR` (defaults to `out/`)
 

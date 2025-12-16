@@ -98,7 +98,7 @@ npx codex-orchestrator start diagnostics --format json
 Notes:
 - Use `--task <id>` instead of exporting `MCP_RUNNER_TASK_ID` when scripting runs.
 - Use `--parent-run <run-id>` to group related runs in manifests (optional).
-- If worktrees aren’t possible, isolate artifacts with `CODEX_ORCHESTRATOR_RUNS_DIR` and `CODEX_ORCHESTRATOR_OUT_DIR`, but avoid concurrent builds/tests in the same checkout.
+- If worktrees aren’t possible, isolate artifacts with `CODEX_ORCHESTRATOR_RUNS_DIR` and `CODEX_ORCHESTRATOR_OUT_DIR`. Use `CODEX_ORCHESTRATOR_ROOT` to point the CLI at a repo root when invoking from outside the repo (optional; defaults to the current working directory). Avoid concurrent builds/tests in the same checkout.
 - For a deeper runbook, see `.agent/SOPs/meta-orchestration.md`.
 
 ### Codex CLI prompts
