@@ -43,6 +43,22 @@ cd -
 git worktree remove ../CO-ci
 ```
 
+## Parallel worktrees for parallel runs
+When you need true parallelism (multiple runs at once), prefer separate worktrees per workstream. This avoids collisions in `node_modules/`, `dist/`, and other generated outputs.
+
+Example:
+```bash
+git worktree add ../CO-a HEAD
+git worktree add ../CO-b HEAD
+
+cd ../CO-a && MCP_RUNNER_TASK_ID=<task-id>-a npx codex-orchestrator start diagnostics --format json
+cd ../CO-b && MCP_RUNNER_TASK_ID=<task-id>-b npx codex-orchestrator start diagnostics --format json
+```
+
+Notes:
+- Use distinct task IDs per worktree so `.runs/<task-id>/` and `out/<task-id>/` stay isolated.
+- If you must share a task ID across concurrent runs, expect some lock contention while writing `out/<task-id>/runs.json`.
+
 ## Snapshot tags (learning pipeline)
 - The learning pipeline may create lightweight tags like `learning-snapshot-<uuid>` on the current commit.
 - Don’t push these tags by default.
@@ -54,4 +70,3 @@ git worktree remove ../CO-ci
 ## Safety notes
 - Avoid `git reset --hard` / `git clean -fdx` unless you’re intentionally discarding work.
 - If you need to context-switch, prefer a new worktree or `git stash -u` instead of partial commits.
-
