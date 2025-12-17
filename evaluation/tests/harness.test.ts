@@ -3,7 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
 import { applyRewarders, loadScenarios, runAllScenarios, runLearningSchedule, runScenario } from '../harness/index.js';
-import type { EvaluationScenarioResult, ScenarioGoalResult } from '../harness/types.js';
+import type { EvaluationScenario, EvaluationScenarioResult, ScenarioGoalResult } from '../harness/types.js';
 import type { AdapterGoal } from '../../adapters/types.js';
 
 const tempDirs: string[] = [];
@@ -26,6 +26,14 @@ describe('evaluation harness', () => {
     const goalStatuses = result.goals.map((goal) => goal.status);
     expect(goalStatuses.every((status) => status === 'passed')).toBe(true);
   });
+
+  it('runs backend-api-opt with diff-match assertions', async () => {
+    const result = await runScenario('backend-api-opt', { mode: 'mcp' });
+    expect(result.goals.map((goal) => goal.status)).toEqual(['passed']);
+    expect(result.patternAssertions.length).toBeGreaterThan(0);
+    expect(result.patternAssertions[0]?.assertion.type).toBe('diff-match');
+    expect(result.patternAssertions[0]?.status).toBe('passed');
+  }, 60000);
 
   it('writes results when outputDir is provided', async () => {
     const outputDir = await fs.mkdtemp(path.join(os.tmpdir(), 'codex-eval-test-'));
@@ -66,6 +74,70 @@ describe('evaluation harness', () => {
     const result = await runScenario(scenario, { mode: 'mcp' });
     expect(result.goals[0]?.status).toBe('failed');
     expect(result.goals[0]?.error).toMatch(/timed out/i);
+  });
+
+  it('fails loudly on unknown pattern assertion types', async () => {
+    const fixtureDir = await fs.mkdtemp(path.join(os.tmpdir(), 'codex-eval-unknown-assertion-'));
+    tempDirs.push(fixtureDir);
+
+    const scenario = {
+      id: 'unknown-assertion-inline',
+      title: 'Unknown Assertion Inline Scenario',
+      adapterId: 'typescript-default',
+      goals: ['build'],
+      fixture: { path: fixtureDir },
+      overrides: {
+        build: {
+          command: process.execPath,
+          args: ['-e', 'process.exit(0)'],
+          timeoutMs: 5000
+        }
+      },
+      patternAssertions: [
+        {
+          type: 'unknown-assertion',
+          scope: 'fixture',
+          path: 'README.md'
+        }
+      ]
+    };
+
+    await expect(runScenario(scenario as unknown as EvaluationScenario, { mode: 'mcp' })).rejects.toThrow(
+      /Unknown pattern assertion type/i
+    );
+  });
+
+  it('avoids mutating source fixtures when agentTask is present', async () => {
+    const fixtureDir = await fs.mkdtemp(path.join(os.tmpdir(), 'codex-eval-agenttask-source-'));
+    tempDirs.push(fixtureDir);
+
+    await fs.writeFile(path.join(fixtureDir, 'hello.txt'), 'baseline', 'utf8');
+
+    const scenario: EvaluationScenario = {
+      id: 'agenttask-copy-inline',
+      title: 'AgentTask Copy Inline Scenario',
+      adapterId: 'typescript-default',
+      goals: ['build'],
+      fixture: { path: fixtureDir },
+      agentTask: {
+        instruction: 'WRITE|hello.txt|mutated'
+      },
+      overrides: {
+        build: {
+          command: process.execPath,
+          args: ['-e', 'process.exit(0)'],
+          timeoutMs: 5000,
+          requiresCleanFixture: false,
+          useEvaluationDefaults: false
+        }
+      }
+    };
+
+    const result = await runScenario(scenario, { mode: 'mcp' });
+    expect(result.fixturePath).not.toBe(fixtureDir);
+
+    const persisted = await fs.readFile(path.join(fixtureDir, 'hello.txt'), 'utf8');
+    expect(persisted).toBe('baseline');
   });
 
   it('derives exact-match GT scores via rewarders', () => {

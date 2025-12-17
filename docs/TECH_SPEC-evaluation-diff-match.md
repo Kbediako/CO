@@ -3,13 +3,15 @@
 ## Objective
 Make `diff-match` pattern assertions real (validated and test-covered) and ensure evaluation scenarios/fixtures are aligned so assertions provide meaningful signals instead of silently no-op’ing.
 
-## Validation Report (current state)
+## Validation Report
 
-### 1) `diff-match` is a silent no-op today
+### Pre‑implementation (baseline)
+
+#### 1) `diff-match` was a silent no-op
 - Scenario declares `diff-match`: `evaluation/scenarios/backend-api-opt.json`.
-- Harness type system excludes it: `evaluation/harness/types.ts` only defines `file-exists` / `file-contains`.
-- Runtime evaluator ignores unknown types: `evaluation/harness/index.ts` only pushes results for `file-exists` and `file-contains` and has no `else` branch, so unknown assertion types yield no `PatternAssertionResult`.
-- Scenario loader does not validate `patternAssertions` shape/types: `evaluation/harness/scenario-loader.ts` only validates required top-level fields.
+- Harness type system excluded it: `evaluation/harness/types.ts` only defined `file-exists` / `file-contains`.
+- Runtime evaluator ignored unknown types: `evaluation/harness/index.ts` only pushed results for `file-exists` and `file-contains` and had no `else` branch, so unknown assertion types yielded no `PatternAssertionResult`.
+- Scenario loader did not validate `patternAssertions` shape/types: `evaluation/harness/scenario-loader.ts` only validated required top-level fields.
 
 Observed behavior (manual run):
 - Running the scenario produces `patternAssertions: []` even though the scenario declares a `diff-match` assertion.
@@ -20,28 +22,29 @@ Repro command + excerpted output:
 - Output excerpt:
   - `patternAssertions: []`
 
-### 2) `agentTask` exists in the scenario but is unused
+#### 2) `agentTask` existed in the scenario but was unused
 - `backend-api-opt` declares an `agentTask`, but the harness does not read or apply it.
 - There are no references to `agentTask` in `evaluation/harness/**` today.
 
-### 3) `backend-api-opt` fixture is incomplete for the adapter goal
+#### 3) `backend-api-opt` fixture was incomplete for the adapter goal
 - `backend-api-opt` uses adapter `typescript-default` with goal `test`, which runs `npm run test` inside the fixture.
 - `evaluation/fixtures/node-api-nplus1` contains only `src/**` and no `package.json`, so `npm run test` fails with ENOENT.
 
-Fixture contents today:
-- `evaluation/fixtures/node-api-nplus1/src/db.ts`
-- `evaluation/fixtures/node-api-nplus1/src/routes/users.ts`
-
-### 4) Scenario intent vs fixture content are misaligned
+#### 4) Scenario intent vs fixture content were misaligned
 - The `backend-api-opt` `expectedDiff` describes removing an N+1 loop and adding a “fetch all posts then map/filter” implementation.
-- The fixture file `evaluation/fixtures/node-api-nplus1/src/routes/users.ts` already contains the “fetch all posts then map/filter” implementation, so the diff described by `expectedDiff` cannot be produced against the current fixture baseline.
+- The fixture implementation and the scenario `agentTask` were out of sync, so the diff described by `expectedDiff` could not be produced against the fixture baseline.
 - The scenario `agentTask` writes a file that differs from the fixture’s current module/style conventions (e.g., `../db` vs `../db.js`, lack of TypeScript request/response types).
 
-### 5) `npm run eval:test` does not currently exercise `diff-match`
+#### 5) `npm run eval:test` did not exercise `diff-match`
 - `npm run eval:test` passes today, but the existing suite does not assert that `patternAssertions` are evaluated for `backend-api-opt`.
 - This allows `diff-match` to silently regress (or remain unimplemented) without test coverage.
 
-## Proposed Semantics
+### Post‑implementation (this PR)
+- `diff-match` assertions are validated and evaluated in `evaluation/harness/types.ts`, `evaluation/harness/index.ts`, and `evaluation/harness/scenario-loader.ts`.
+- `backend-api-opt` is runnable and deterministic: `evaluation/fixtures/node-api-nplus1` now includes a minimal `package.json` + a test that fails on the baseline N+1 implementation and passes after the scenario `agentTask` is applied.
+- `npm run eval:test` exercises `backend-api-opt` and asserts a non-empty `patternAssertions` result for `diff-match`.
+
+## Semantics
 
 ### `diff-match` assertion
 Add a new `PatternAssertion` variant:
@@ -75,8 +78,8 @@ Minimal interpreter (phase 1):
 - Support `WRITE|<relativePath>|<fileContents>`
 - Apply inside the scenario fixture working directory, creating parent directories as needed.
 
-Execution order inside `runScenario` (planned):
-1) Prepare fixture working directory (copy if needed).
+Execution order inside `runScenario`:
+1) Prepare fixture working directory (copy if needed; always copy when `agentTask` is present to avoid mutating source fixtures).
 2) Capture baseline file snapshot(s) needed for `diff-match` assertions.
 3) Apply `agentTask` (if present).
 4) Execute adapter goals (build/test/lint/etc).
@@ -85,10 +88,10 @@ Execution order inside `runScenario` (planned):
 ## Backward Compatibility + Failure Policy
 Current behavior silently skips unknown assertion types. This is unsafe for evaluation correctness.
 
-Proposed policy:
-- Unknown assertion types fail loudly.
-  - Preferred: include a `PatternAssertionResult` with `status: 'failed'` and `details: unknown assertion type`.
-  - Alternative: fail fast during scenario load with a clear error (stricter; may break existing scenario files sooner).
+Policy:
+- Unknown assertion types fail loudly:
+  - scenario loader rejects unknown types with an actionable error (`scenario id` + `sourcePath`)
+  - runtime throws if an unknown type is encountered (e.g., via an inline scenario)
 
 ## Fixture + Scenario Alignment (required for meaningful coverage)
 
@@ -118,10 +121,10 @@ Align to the fixture:
 - Unit:
   - diff normalization transforms `@@ -1,2 +3,4 @@` → `@@ ... @@`
   - substring match passes/fails as expected
-  - unknown assertion type yields a failure result
+  - unknown assertion type fails loudly (throws)
 - Integration:
   - run `backend-api-opt` end-to-end in `evaluation/tests` once fixture/scenario are aligned.
 
-## Implementation Notes (future PR)
-- Prefer a pure TypeScript diff generator (or a well-scoped dependency) to avoid shelling out to `git diff`.
+## Implementation Notes
+- Use a pure TypeScript diff generator (no `git diff`) to keep output deterministic and cross-platform.
 - Keep diff output truncation consistent with existing harness STDIO truncation patterns.

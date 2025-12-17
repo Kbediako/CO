@@ -262,15 +262,15 @@
       "title": "Evaluation Harness diff-match Assertions",
       "path": "tasks/tasks-0907-evaluation-diff-match.md",
       "kind": "prd",
-      "status": "in-progress",
+      "status": "succeeded",
       "gate": {
-        "phase": "evaluation-diff-match-planning",
+        "phase": "evaluation-diff-match-implementation",
         "status": "succeeded",
-        "log": ".runs/0907-evaluation-diff-match/cli/2025-12-17T01-06-46-905Z-070fcac1/manifest.json",
-        "run_id": "2025-12-17T01-06-46-905Z-070fcac1"
+        "log": ".runs/0907-evaluation-diff-match/cli/2025-12-17T06-39-59-393Z-761fbaf3/manifest.json",
+        "run_id": "2025-12-17T06-39-59-393Z-761fbaf3"
       },
       "created_at": "2025-12-17",
-      "completed_at": null
+      "completed_at": "2025-12-17"
     }
   ],
   "specs": []

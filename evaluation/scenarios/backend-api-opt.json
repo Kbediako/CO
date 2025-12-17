@@ -9,7 +9,7 @@
         }
     ],
     "agentTask": {
-        "instruction": "WRITE|src/routes/users.ts|import { Router } from 'express';\nimport { db } from '../db';\n\nexport const router = Router();\n\nrouter.get('/users', async (req, res) => {\n  const users = await db.getUsers();\n  const allPosts = await db.getAllPosts();\n  \n  const usersWithPosts = users.map(user => ({\n    ...user,\n    posts: allPosts.filter(p => p.userId === user.id)\n  }));\n\n  res.json(usersWithPosts);\n});"
+        "instruction": "WRITE|src/routes/users.js|const { db } = require('../db');\n\nasync function getUsersWithPosts() {\n  const users = await db.getUsers();\n\n  const allPosts = await db.getAllPosts();\n  const usersWithPosts = users.map((user) => ({\n    ...user,\n    posts: allPosts.filter((post) => post.userId === user.id)\n  }));\n\n  return usersWithPosts;\n}\n\nmodule.exports = { getUsersWithPosts };\n"
     },
     "fixture": {
         "path": "evaluation/fixtures/node-api-nplus1",
@@ -19,8 +19,8 @@
         {
             "type": "diff-match",
             "scope": "fixture",
-            "path": "src/routes/users.ts",
-            "expectedDiff": "@@ ... @@\n-    // N+1 problem: fetching posts for each user individually\n-    const usersWithPosts = [];\n-    for (const user of users) {\n-        const posts = await db.getPostsForUser(user.id);\n-        usersWithPosts.push({ ...user, posts });\n-    }\n+  const allPosts = await db.getAllPosts();\n+  \n+  const usersWithPosts = users.map(user => ({\n+    ...user,\n+    posts: allPosts.filter(p => p.userId === user.id)\n+  }));"
+            "path": "src/routes/users.js",
+            "expectedDiff": "@@ ... @@\n-  const usersWithPosts = [];\n-  for (const user of users) {\n-    const posts = await db.getPostsForUser(user.id);\n-    usersWithPosts.push({ ...user, posts });\n-  }\n+  const allPosts = await db.getAllPosts();\n+  const usersWithPosts = users.map((user) => ({\n+    ...user,\n+    posts: allPosts.filter((post) => post.userId === user.id)\n+  }));"
         }
     ]
 }
