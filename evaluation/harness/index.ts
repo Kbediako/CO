@@ -600,7 +600,11 @@ export async function runScenario(
   await fs.access(sourceFixturePath);
 
   let plans = await buildPlansForFixture(loaded, sourceFixturePath);
-  const needsCopy = Boolean(loaded.fixture.copyToTemp || plans.some((plan) => plan.command.requiresCleanFixture));
+  const needsCopy = Boolean(
+    loaded.fixture.copyToTemp ||
+      loaded.agentTask?.instruction ||
+      plans.some((plan) => plan.command.requiresCleanFixture)
+  );
 
   const { workingDir, cleanup } = await copyFixtureIfNeeded(sourceFixturePath, needsCopy);
   try {

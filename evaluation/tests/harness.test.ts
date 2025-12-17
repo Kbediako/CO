@@ -107,6 +107,39 @@ describe('evaluation harness', () => {
     );
   });
 
+  it('avoids mutating source fixtures when agentTask is present', async () => {
+    const fixtureDir = await fs.mkdtemp(path.join(os.tmpdir(), 'codex-eval-agenttask-source-'));
+    tempDirs.push(fixtureDir);
+
+    await fs.writeFile(path.join(fixtureDir, 'hello.txt'), 'baseline', 'utf8');
+
+    const scenario: EvaluationScenario = {
+      id: 'agenttask-copy-inline',
+      title: 'AgentTask Copy Inline Scenario',
+      adapterId: 'typescript-default',
+      goals: ['build'],
+      fixture: { path: fixtureDir },
+      agentTask: {
+        instruction: 'WRITE|hello.txt|mutated'
+      },
+      overrides: {
+        build: {
+          command: process.execPath,
+          args: ['-e', 'process.exit(0)'],
+          timeoutMs: 5000,
+          requiresCleanFixture: false,
+          useEvaluationDefaults: false
+        }
+      }
+    };
+
+    const result = await runScenario(scenario, { mode: 'mcp' });
+    expect(result.fixturePath).not.toBe(fixtureDir);
+
+    const persisted = await fs.readFile(path.join(fixtureDir, 'hello.txt'), 'utf8');
+    expect(persisted).toBe('baseline');
+  });
+
   it('derives exact-match GT scores via rewarders', () => {
     const passing = createScenarioResult('reward-pass', ['passed', 'passed'], [10, 12]);
     const failing = createScenarioResult('reward-fail', ['passed', 'failed'], [5, 8]);

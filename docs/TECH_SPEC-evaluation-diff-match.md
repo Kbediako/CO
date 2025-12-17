@@ -79,7 +79,7 @@ Minimal interpreter (phase 1):
 - Apply inside the scenario fixture working directory, creating parent directories as needed.
 
 Execution order inside `runScenario`:
-1) Prepare fixture working directory (copy if needed).
+1) Prepare fixture working directory (copy if needed; always copy when `agentTask` is present to avoid mutating source fixtures).
 2) Capture baseline file snapshot(s) needed for `diff-match` assertions.
 3) Apply `agentTask` (if present).
 4) Execute adapter goals (build/test/lint/etc).
