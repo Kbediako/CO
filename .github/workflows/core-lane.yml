@@ -22,6 +22,14 @@ jobs:
           node-version: 20
           cache: npm
 
+      - name: Set BASE_SHA from PR base
+        if: ${{ github.event_name == 'pull_request' }}
+        run: echo "BASE_SHA=${{ github.event.pull_request.base.sha }}" >> "$GITHUB_ENV"
+
+      - name: Diff budget
+        if: ${{ github.event_name == 'pull_request' }}
+        run: node scripts/diff-budget.mjs
+
       - name: Install dependencies
         run: npm ci
 
@@ -36,10 +44,6 @@ jobs:
 
       - name: Docs hygiene
         run: npm run docs:check
-
-      - name: Set BASE_SHA from PR base
-        if: ${{ github.event_name == 'pull_request' }}
-        run: echo "BASE_SHA=${{ github.event.pull_request.base.sha }}" >> "$GITHUB_ENV"
 
       - name: Spec guard
         run: node scripts/spec-guard.mjs

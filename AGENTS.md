@@ -22,6 +22,13 @@ Use this repository as the wrapper that coordinates multiple Codex-driven projec
 - When a tool insists on a TTY, wrap it with `expect`/`pexpect` and script each `expect`/`send` pair; do not launch unscripted interactive sessions.
 - If prompts are unknown, run a dry-run or list-questions mode first, then rerun with scripted responses. Never leave a command waiting for input.
 
+## Scope & Simplicity (anti-overengineering)
+- Default to the smallest change that solves the asked problem.
+- Prefer editing existing code over adding new abstractions, frameworks, or dependency layers.
+- Avoid broad refactors, “nice-to-have” improvements, or fixes for unrelated issues unless explicitly requested.
+- If requirements are ambiguous, stop and ask before expanding scope.
+- Keep diffs reviewable: split oversized changes, or (when unavoidable) record a justification via `DIFF_BUDGET_OVERRIDE_REASON` so reviewers can audit why the budget was exceeded.
+
 ## Multi-project Layout
 - Place downstream codebases or adapters under `packages/<project>` (or another top-level directory agreed upon by the team).
 - Store manifests, metrics, and state snapshots in `.runs/<task-id>/` and `out/<task-id>/` so each project keeps an isolated run history.
@@ -47,7 +54,8 @@ Implementation work is not “complete” until you run (in order):
 3. `npm run lint`
 4. `npm run test`
 5. `npm run docs:check`
-6. `npm run review`
+6. `node scripts/diff-budget.mjs`
+7. `npm run review`
 
 | Command | When to use | Notes |
 | --- | --- | --- |
@@ -56,8 +64,9 @@ Implementation work is not “complete” until you run (in order):
 | `npm run lint` | Pre-commit / review gates | Executes `npm run build:patterns` first so codemods compile. |
 | `npm run test` | Unit + integration checks | Vitest harness covering orchestrator + patterns. |
 | `npm run docs:check` | Docs hygiene gate | Deterministically validates scripts/pipelines/paths referenced in agent-facing docs. |
+| `node scripts/diff-budget.mjs` | Review scope guard | Fails when diffs exceed the configured budget unless `DIFF_BUDGET_OVERRIDE_REASON` is set. |
 | `npm run eval:test` | Evaluation harness smoke tests | Requires fixtures in `evaluation/fixtures/**`; optional, enable when evaluation scope exists. |
-| `npm run review` | Reviewer hand-off | Runs `codex review` (defaults to `--uncommitted`) with the latest run manifest path included as evidence in the prompt. |
+| `npm run review` | Reviewer hand-off | Runs `codex review` with task/PRD context (when available) and the latest run manifest path included as evidence; set `NOTES="<goal + summary + risks>"` for reviewer context. |
 
 Update the table once you wire different build pipelines or tooling.
 

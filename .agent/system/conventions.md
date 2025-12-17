@@ -15,7 +15,8 @@ Run these in order before marking implementation work “complete”:
 - `npm run lint` (runs `npm run build:patterns` first via `prelint`)
 - `npm run test` (Vitest in `run` mode; non-watch)
 - `npm run docs:check`
-- `npm run review` (reviewer hand-off; not run in CI)
+- `node scripts/diff-budget.mjs` (set `DIFF_BUDGET_OVERRIDE_REASON` to bypass with justification)
+- `NOTES="<goal + what changed + any risks>" npm run review` (reviewer hand-off; not run in CI)
 
 Avoid interactive/watch commands in automation:
 - `npm run test:watch` runs `vitest` in watch mode and will not exit.
