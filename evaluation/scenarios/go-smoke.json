@@ -1,0 +1,19 @@
+{
+  "id": "go-smoke",
+  "title": "Go adapter smoke fixture",
+  "adapterId": "go-module",
+  "goals": ["build", "test", "lint"],
+  "fixture": {
+    "path": "evaluation/fixtures/go-smoke",
+    "copyToTemp": true
+  },
+  "patternAssertions": [
+    {
+      "type": "file-contains",
+      "scope": "fixture",
+      "path": "README.md",
+      "includes": "Go Smoke Fixture"
+    }
+  ]
+}
+

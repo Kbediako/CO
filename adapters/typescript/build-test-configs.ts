@@ -27,7 +27,7 @@ export const typescriptAdapter: LanguageAdapter = {
       id: 'test',
       title: 'Execute unit tests with Vitest',
       command: 'npm',
-      args: ['test'],
+      args: ['run', 'test'],
       description: 'Invokes Vitest in run mode to execute the full unit test suite.',
       evaluation: {
         cwd: '{fixture}',

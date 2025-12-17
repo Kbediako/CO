@@ -51,7 +51,7 @@ describe('evaluation harness', () => {
     const scenario = {
       id: 'timeout-inline',
       title: 'Timeout Inline Scenario',
-      adapterId: 'typescript',
+      adapterId: 'typescript-default',
       goals: ['build'],
       fixture: { path: fixtureDir },
       overrides: {

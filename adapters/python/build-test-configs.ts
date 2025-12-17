@@ -13,11 +13,12 @@ export const pythonAdapter: LanguageAdapter = {
     build: {
       id: 'build',
       title: 'Install dependencies',
-      command: 'pip',
-      args: ['install', '-r', 'requirements.txt'],
+      command: 'python3',
+      args: ['-m', 'pip', 'install', '-r', 'requirements.txt'],
       description: 'Installs project dependencies declared in requirements.txt.',
       env: {
-        PIP_DISABLE_PIP_VERSION_CHECK: '1'
+        PIP_DISABLE_PIP_VERSION_CHECK: '1',
+        PIP_NO_INPUT: '1'
       },
       evaluation: {
         command: 'python3',
@@ -31,8 +32,8 @@ export const pythonAdapter: LanguageAdapter = {
     test: {
       id: 'test',
       title: 'Run pytest suite',
-      command: 'pytest',
-      args: ['-q'],
+      command: 'python3',
+      args: ['-m', 'pytest', '-q'],
       description: 'Executes the repository pytest suite in quiet mode.',
       evaluation: {
         command: 'python3',

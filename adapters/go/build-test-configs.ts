@@ -34,6 +34,19 @@ export const goAdapter: LanguageAdapter = {
         supportsParallel: true,
         timeoutMs: 20000
       }
+    },
+    lint: {
+      id: 'lint',
+      title: 'Run go vet',
+      command: 'go',
+      args: ['vet', './...'],
+      description: 'Runs `go vet` to spot suspicious constructs across packages.',
+      evaluation: {
+        cwd: '{fixture}',
+        requiresCleanFixture: true,
+        supportsParallel: true,
+        timeoutMs: 15000
+      }
     }
   },
   metadata: {
