@@ -52,6 +52,13 @@ export type PatternAssertion =
       includes: string | string[];
       scope?: 'fixture' | 'repo';
       note?: string;
+    }
+  | {
+      type: 'diff-match';
+      path: string;
+      expectedDiff: string;
+      scope?: 'fixture' | 'repo';
+      note?: string;
     };
 
 export interface EvaluationScenario {
@@ -60,6 +67,7 @@ export interface EvaluationScenario {
   adapterId: string;
   goals: Array<AdapterGoal | ScenarioGoalConfig>;
   fixture: ScenarioFixtureConfig;
+  agentTask?: AgentTask;
   overrides?: Partial<Record<AdapterGoal, AdapterCommandOverrides>>;
   patternAssertions?: PatternAssertion[];
 }

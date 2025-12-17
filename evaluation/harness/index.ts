@@ -32,6 +32,12 @@ const DEFAULT_EPOCHS = 3;
 const DEFAULT_SAMPLE_SIZE = 100;
 const DEFAULT_TRAIN_TEMP = 0.7;
 const DEFAULT_EVAL_TEMP = 0.3;
+const DIFF_PREVIEW_LIMIT = 2_500;
+
+type FileSnapshot =
+  | { status: 'present'; content: string }
+  | { status: 'missing' }
+  | { status: 'error'; error: string };
 
 function buildEnvOverrides(custom: Record<string, string> | undefined): Record<string, string> {
   const overrides = { ...(custom ?? {}) };
@@ -146,6 +152,211 @@ function truncateOutput(value: string): string {
   return value.slice(0, STDIO_LIMIT) + `\n… truncated (${value.length - STDIO_LIMIT} bytes omitted)`;
 }
 
+function normalizeLineEndings(value: string): string {
+  return value.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
+}
+
+function splitLines(value: string): string[] {
+  const normalized = normalizeLineEndings(value);
+  const lines = normalized.split('\n');
+  if (lines.length > 0 && lines[lines.length - 1] === '') {
+    lines.pop();
+  }
+  return lines;
+}
+
+function truncatePreview(value: string, limit: number): string {
+  if (value.length <= limit) {
+    return value;
+  }
+  return value.slice(0, limit) + `\n… truncated (${value.length - limit} chars omitted)`;
+}
+
+function resolveScopedPath(scopeRoot: string, relativePath: string): { targetPath: string; error?: string } {
+  const resolved = path.resolve(scopeRoot, relativePath);
+  const rel = path.relative(scopeRoot, resolved);
+  const escapesScope = rel === '..' || rel.startsWith(`..${path.sep}`) || path.isAbsolute(rel);
+  if (!escapesScope) {
+    return { targetPath: resolved };
+  }
+  return {
+    targetPath: resolved,
+    error: `Path escapes scope root: ${relativePath}`
+  };
+}
+
+async function readFileSnapshot(targetPath: string): Promise<FileSnapshot> {
+  try {
+    const content = await fs.readFile(targetPath, 'utf8');
+    return { status: 'present', content: normalizeLineEndings(content) };
+  } catch (error) {
+    if (error && typeof error === 'object' && 'code' in error) {
+      const code = (error as { code?: string }).code;
+      if (code === 'ENOENT' || code === 'ENOTDIR') {
+        return { status: 'missing' };
+      }
+    }
+    return { status: 'error', error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+function buildUnifiedDiff(oldContent: string | null, newContent: string | null, label: string): string {
+  const oldText = normalizeLineEndings(oldContent ?? '');
+  const newText = normalizeLineEndings(newContent ?? '');
+  if (oldText === newText) {
+    return '';
+  }
+
+  const oldLines = splitLines(oldText);
+  const newLines = splitLines(newText);
+  const n = oldLines.length;
+  const m = newLines.length;
+
+  const dp: number[][] = Array.from({ length: n + 1 }, () => Array(m + 1).fill(0));
+  for (let i = n - 1; i >= 0; i -= 1) {
+    for (let j = m - 1; j >= 0; j -= 1) {
+      dp[i]![j] =
+        oldLines[i] === newLines[j] ? (dp[i + 1]?.[j + 1] ?? 0) + 1 : Math.max(dp[i + 1]?.[j] ?? 0, dp[i]?.[j + 1] ?? 0);
+    }
+  }
+
+  type DiffOp = { kind: 'equal' | 'delete' | 'insert'; line: string };
+  const ops: DiffOp[] = [];
+  let i = 0;
+  let j = 0;
+  while (i < n && j < m) {
+    if (oldLines[i] === newLines[j]) {
+      ops.push({ kind: 'equal', line: oldLines[i]! });
+      i += 1;
+      j += 1;
+    } else if ((dp[i + 1]?.[j] ?? 0) >= (dp[i]?.[j + 1] ?? 0)) {
+      ops.push({ kind: 'delete', line: oldLines[i]! });
+      i += 1;
+    } else {
+      ops.push({ kind: 'insert', line: newLines[j]! });
+      j += 1;
+    }
+  }
+  while (i < n) {
+    ops.push({ kind: 'delete', line: oldLines[i]! });
+    i += 1;
+  }
+  while (j < m) {
+    ops.push({ kind: 'insert', line: newLines[j]! });
+    j += 1;
+  }
+
+  const firstChangeIndex = ops.findIndex((op) => op.kind !== 'equal');
+  if (firstChangeIndex === -1) {
+    return '';
+  }
+  let lastChangeIndex = ops.length - 1;
+  while (lastChangeIndex >= 0 && ops[lastChangeIndex]!.kind === 'equal') {
+    lastChangeIndex -= 1;
+  }
+
+  const sliced = ops.slice(firstChangeIndex, lastChangeIndex + 1);
+
+  let oldPos = 0;
+  let newPos = 0;
+  for (const op of ops.slice(0, firstChangeIndex)) {
+    if (op.kind !== 'insert') {
+      oldPos += 1;
+    }
+    if (op.kind !== 'delete') {
+      newPos += 1;
+    }
+  }
+
+  const oldCount = sliced.reduce((count, op) => count + (op.kind !== 'insert' ? 1 : 0), 0);
+  const newCount = sliced.reduce((count, op) => count + (op.kind !== 'delete' ? 1 : 0), 0);
+  const oldStart = oldCount === 0 ? oldPos : oldPos + 1;
+  const newStart = newCount === 0 && m === 0 ? 0 : newPos + 1;
+
+  const diffLines: string[] = [];
+  const normalizedLabel = label.replaceAll('\\', '/');
+  diffLines.push(`--- a/${normalizedLabel}`);
+  diffLines.push(`+++ b/${normalizedLabel}`);
+  diffLines.push(`@@ -${oldStart},${oldCount} +${newStart},${newCount} @@`);
+
+  for (const op of sliced) {
+    const prefix = op.kind === 'equal' ? ' ' : op.kind === 'delete' ? '-' : '+';
+    diffLines.push(`${prefix}${op.line}`);
+  }
+
+  return diffLines.join('\n');
+}
+
+function normalizeUnifiedDiff(diff: string): string {
+  const normalized = normalizeLineEndings(diff);
+  const lines = normalized.split('\n');
+  const filtered = lines
+    .filter((line) => !(line.startsWith('--- ') || line.startsWith('+++ ')))
+    .map((line) => (line.startsWith('@@') ? '@@ ... @@' : line));
+  while (filtered.length > 0 && filtered[filtered.length - 1] === '') {
+    filtered.pop();
+  }
+  return filtered.join('\n');
+}
+
+function parseWriteInstruction(instruction: string): { relativePath: string; content: string } {
+  const firstSep = instruction.indexOf('|');
+  const secondSep = firstSep === -1 ? -1 : instruction.indexOf('|', firstSep + 1);
+  if (firstSep === -1 || secondSep === -1) {
+    throw new Error(`Invalid agentTask instruction; expected WRITE|<path>|<content>.`);
+  }
+
+  const verb = instruction.slice(0, firstSep).trim();
+  if (verb !== 'WRITE') {
+    throw new Error(`Unsupported agentTask verb '${verb}'. Only WRITE is supported.`);
+  }
+
+  const relativePath = instruction.slice(firstSep + 1, secondSep).trim();
+  if (!relativePath) {
+    throw new Error(`Invalid agentTask instruction; missing relative path.`);
+  }
+
+  return { relativePath, content: instruction.slice(secondSep + 1) };
+}
+
+async function applyAgentTaskInstruction(instruction: string, fixtureRoot: string): Promise<void> {
+  const parsed = parseWriteInstruction(instruction);
+  const resolved = resolveScopedPath(fixtureRoot, parsed.relativePath);
+  if (resolved.error) {
+    throw new Error(`agentTask WRITE rejected: ${resolved.error}`);
+  }
+  await fs.mkdir(path.dirname(resolved.targetPath), { recursive: true });
+  await fs.writeFile(resolved.targetPath, parsed.content, 'utf8');
+}
+
+async function captureDiffBaselines(
+  assertions: PatternAssertion[] | undefined,
+  fixturePath: string
+): Promise<Map<string, FileSnapshot>> {
+  const snapshots = new Map<string, FileSnapshot>();
+  if (!assertions) {
+    return snapshots;
+  }
+
+  for (const assertion of assertions) {
+    if (assertion.type !== 'diff-match') {
+      continue;
+    }
+    const scopeRoot = assertion.scope === 'repo' ? process.cwd() : fixturePath;
+    const resolved = resolveScopedPath(scopeRoot, assertion.path);
+    if (resolved.error) {
+      snapshots.set(resolved.targetPath, { status: 'error', error: resolved.error });
+      continue;
+    }
+    if (snapshots.has(resolved.targetPath)) {
+      continue;
+    }
+    snapshots.set(resolved.targetPath, await readFileSnapshot(resolved.targetPath));
+  }
+
+  return snapshots;
+}
+
 async function runCommand(
   plan: AdapterExecutionPlan,
   cwd: string,
@@ -246,7 +457,8 @@ async function runCommand(
 
 async function evaluatePatternAssertions(
   assertions: PatternAssertion[] | undefined,
-  fixturePath: string
+  fixturePath: string,
+  baselineSnapshots: Map<string, FileSnapshot>
 ): Promise<PatternAssertionResult[]> {
   if (!assertions || assertions.length === 0) {
     return [];
@@ -255,41 +467,120 @@ async function evaluatePatternAssertions(
   const results: PatternAssertionResult[] = [];
 
   for (const assertion of assertions) {
+    const assertionType = (assertion as unknown as { type?: unknown }).type;
     const scopeRoot = assertion.scope === 'repo' ? process.cwd() : fixturePath;
-    const targetPath = path.resolve(scopeRoot, assertion.path);
+    const resolved = resolveScopedPath(scopeRoot, assertion.path);
+    if (resolved.error) {
+      results.push({
+        assertion,
+        status: 'failed',
+        details: resolved.error
+      });
+      continue;
+    }
 
-    if (assertion.type === 'file-exists') {
+    const targetPath = resolved.targetPath;
+
+    if (assertionType === 'file-exists') {
+      const typed = assertion as Extract<PatternAssertion, { type: 'file-exists' }>;
       try {
         await fs.access(targetPath);
-        results.push({ assertion, status: 'passed' });
+        results.push({ assertion: typed, status: 'passed' });
       } catch (error) {
         results.push({
-          assertion,
+          assertion: typed,
           status: 'failed',
           details: `File not found: ${targetPath} (${error instanceof Error ? error.message : error})`
         });
       }
-    } else if (assertion.type === 'file-contains') {
+    } else if (assertionType === 'file-contains') {
+      const typed = assertion as Extract<PatternAssertion, { type: 'file-contains' }>;
       try {
         const content = await fs.readFile(targetPath, 'utf8');
-        const needles = Array.isArray(assertion.includes) ? assertion.includes : [assertion.includes];
+        const needles = Array.isArray(typed.includes) ? typed.includes : [typed.includes];
         const missing = needles.filter((needle) => !content.includes(needle));
         if (missing.length === 0) {
-          results.push({ assertion, status: 'passed' });
+          results.push({ assertion: typed, status: 'passed' });
         } else {
           results.push({
-            assertion,
+            assertion: typed,
             status: 'failed',
             details: `Missing expected content: ${missing.join(', ')} in ${targetPath}`
           });
         }
       } catch (error) {
         results.push({
-          assertion,
+          assertion: typed,
           status: 'failed',
           details: `Failed to read ${targetPath}: ${error instanceof Error ? error.message : error}`
         });
       }
+    } else if (assertionType === 'diff-match') {
+      const typed = assertion as Extract<PatternAssertion, { type: 'diff-match' }>;
+      const baseline = baselineSnapshots.get(targetPath) ?? ({ status: 'missing' } satisfies FileSnapshot);
+      const final = await readFileSnapshot(targetPath);
+
+      if (baseline.status === 'error') {
+        results.push({
+          assertion: typed,
+          status: 'failed',
+          details: `Failed to capture baseline for ${targetPath}: ${baseline.error}`
+        });
+        continue;
+      }
+
+      if (final.status === 'error') {
+        results.push({
+          assertion: typed,
+          status: 'failed',
+          details: `Failed to read final contents for ${targetPath}: ${final.error}`
+        });
+        continue;
+      }
+
+      if (baseline.status === 'missing' && final.status === 'missing') {
+        results.push({
+          assertion: typed,
+          status: 'failed',
+          details: `File missing in both baseline and final state: ${targetPath}`
+        });
+        continue;
+      }
+
+      const rawDiff = buildUnifiedDiff(
+        baseline.status === 'present' ? baseline.content : null,
+        final.status === 'present' ? final.content : null,
+        typed.path
+      );
+      const normalizedDiff = normalizeUnifiedDiff(rawDiff);
+      const expected = normalizeLineEndings(typed.expectedDiff);
+
+      if (!normalizedDiff) {
+        results.push({
+          assertion: typed,
+          status: 'failed',
+          details: `Diff was empty for ${targetPath} (expected a change containing:\n${truncatePreview(expected, DIFF_PREVIEW_LIMIT)})`
+        });
+        continue;
+      }
+
+      if (normalizedDiff.includes(expected)) {
+        results.push({ assertion: typed, status: 'passed' });
+      } else {
+        results.push({
+          assertion: typed,
+          status: 'failed',
+          details:
+            `Diff did not contain expected substring for ${targetPath}\n\n` +
+            `Expected:\n${truncatePreview(expected, DIFF_PREVIEW_LIMIT)}\n\n` +
+            `Actual diff:\n${truncatePreview(normalizedDiff, DIFF_PREVIEW_LIMIT)}`
+        });
+      }
+    } else {
+      throw new Error(
+        `Unknown pattern assertion type '${String(assertionType)}' for path ${targetPath}.` +
+          ` Update evaluation/harness/types.ts and evaluation/harness/index.ts to support it.`
+      );
     }
   }
 
@@ -320,6 +611,11 @@ export async function runScenario(
     const startedAt = new Date();
     const goalResults: ScenarioGoalResult[] = [];
     const envOverrides = buildEnvOverrides(options.env);
+    const baselineSnapshots = await captureDiffBaselines(loaded.patternAssertions, workingDir);
+
+    if (loaded.agentTask?.instruction) {
+      await applyAgentTaskInstruction(loaded.agentTask.instruction, workingDir);
+    }
 
     for (const plan of plans) {
       const timeoutMs = plan.command.timeoutMs ?? options.defaultTimeoutMs ?? DEFAULT_TIMEOUT_MS;
@@ -330,7 +626,7 @@ export async function runScenario(
       }
     }
 
-    const patternResults = await evaluatePatternAssertions(loaded.patternAssertions, workingDir);
+    const patternResults = await evaluatePatternAssertions(loaded.patternAssertions, workingDir, baselineSnapshots);
 
     const completedAt = new Date();
     const evaluationResult: EvaluationScenarioResult = {

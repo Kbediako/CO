@@ -1,0 +1,8 @@
+{
+  "name": "node-api-nplus1",
+  "private": true,
+  "scripts": {
+    "test": "node test/run-tests.js"
+  }
+}
+
