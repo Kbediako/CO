@@ -11,6 +11,7 @@ This repo’s execution loop is “evidence-first”: implement work, run a non-
   - `npm run lint`
   - `npm run test`
   - `npm run docs:check`
+  - `node scripts/diff-budget.mjs`
 
 ## 1) Set the active task id
 Use a stable task id (`<id>-<slug>`) and export it so runs are scoped correctly:
@@ -51,7 +52,8 @@ Implementation is only “complete” once these have run (in order):
 - `npm run lint`
 - `npm run test`
 - `npm run docs:check`
-- `npm run review` (wraps `codex review` and includes the latest manifest path as evidence)
+- `node scripts/diff-budget.mjs`
+- `NOTES="<goal + what changed + any risks>" npm run review` (wraps `codex review`, includes task/PRD context when available, and includes the latest manifest path as evidence)
 
 ## Governance notes (when applicable)
 - If your project workflow uses approval gates, record approvals and any escalations in the run manifest `approvals` array and mirror the relevant links/anchors into your task checklist and `tasks/index.json`.

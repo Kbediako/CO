@@ -10,7 +10,7 @@
  */
 
 import { execFile, spawn } from 'node:child_process';
-import { readdir, stat } from 'node:fs/promises';
+import { readFile, readdir, stat } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import { promisify } from 'node:util';
@@ -25,6 +25,115 @@ interface CliOptions {
   commit?: string;
   title?: string;
   uncommitted?: boolean;
+}
+
+async function fileExists(filePath: string): Promise<boolean> {
+  try {
+    await stat(filePath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function resolveTaskChecklistPath(taskKey: string): Promise<string | null> {
+  const direct = path.join(process.cwd(), 'tasks', `tasks-${taskKey}.md`);
+  if (await fileExists(direct)) {
+    return direct;
+  }
+
+  if (!/^\d{4}$/.test(taskKey)) {
+    return null;
+  }
+
+  const tasksDir = path.join(process.cwd(), 'tasks');
+  let entries: string[] = [];
+  try {
+    entries = await readdir(tasksDir);
+  } catch {
+    return null;
+  }
+
+  const candidates = entries
+    .filter((name) => name.startsWith(`tasks-${taskKey}-`) && name.endsWith('.md'))
+    .map((name) => path.join(tasksDir, name))
+    .sort();
+
+  if (candidates.length === 1) {
+    return candidates[0] ?? null;
+  }
+
+  return null;
+}
+
+function extractTaskHeaderBulletLines(taskChecklist: string): string[] {
+  const lines = taskChecklist.split('\n');
+  const checklistIndex = lines.findIndex((line) => line.trim() === '## Checklist');
+  const headerLines = checklistIndex === -1 ? lines : lines.slice(0, checklistIndex);
+  return headerLines
+    .map((line) => line.trimEnd())
+    .filter((line) => line.startsWith('- '));
+}
+
+function extractBacktickedPath(line: string): string | null {
+  const match = line.match(/`([^`]+)`/);
+  return match?.[1] ?? null;
+}
+
+function extractMarkdownSection(content: string, heading: string): string[] | null {
+  const lines = content.split('\n');
+  const headingLine = `## ${heading}`;
+  const startIndex = lines.findIndex((line) => line.trim() === headingLine);
+  if (startIndex === -1) {
+    return null;
+  }
+
+  const body: string[] = [];
+  for (let index = startIndex + 1; index < lines.length; index += 1) {
+    const line = lines[index] ?? '';
+    if (line.trim().startsWith('## ')) {
+      break;
+    }
+    body.push(line);
+  }
+
+  return body;
+}
+
+async function buildTaskContext(taskKey: string): Promise<string[]> {
+  const checklistPath = await resolveTaskChecklistPath(taskKey);
+  if (!checklistPath) {
+    return [];
+  }
+
+  const relativeChecklist = path.relative(process.cwd(), checklistPath);
+  const checklist = await readFile(checklistPath, 'utf8');
+  const headerBullets = extractTaskHeaderBulletLines(checklist);
+
+  const lines: string[] = ['Task context:', `- Task checklist: \`${relativeChecklist}\``];
+  for (const bullet of headerBullets) {
+    lines.push(bullet);
+  }
+
+  const prdLine = headerBullets.find((line) => line.toLowerCase().includes('primary prd:'));
+  const prdPath = prdLine ? extractBacktickedPath(prdLine) : null;
+  if (prdPath) {
+    const absPrdPath = path.resolve(process.cwd(), prdPath);
+    if (await fileExists(absPrdPath)) {
+      const prd = await readFile(absPrdPath, 'utf8');
+      const summary = extractMarkdownSection(prd, 'Summary');
+      const summaryBullets =
+        summary
+          ?.map((line) => line.trimEnd())
+          .filter((line) => line.trim().startsWith('- '))
+          .slice(0, 6) ?? [];
+      if (summaryBullets.length > 0) {
+        lines.push('', `PRD summary (\`${prdPath}\`):`, ...summaryBullets);
+      }
+    }
+  }
+
+  return lines;
 }
 
 function parseArgs(argv: string[]): CliOptions {
@@ -150,6 +259,7 @@ async function resolveManifestPath(options: CliOptions): Promise<string> {
 
 async function main(): Promise<void> {
   const options = parseArgs(process.argv.slice(2));
+  await runDiffBudget(options);
   const manifestPath = await resolveManifestPath(options);
 
   if (!(await hasReviewCommand())) {
@@ -159,26 +269,43 @@ async function main(): Promise<void> {
   const relativeManifest = path.relative(process.cwd(), manifestPath);
   const taskLabel = process.env.TASK ?? process.env.MCP_RUNNER_TASK_ID ?? options.task ?? 'unknown-task';
   const notes = process.env.NOTES?.trim();
+  const diffBudgetOverride = process.env.DIFF_BUDGET_OVERRIDE_REASON?.trim();
 
   const promptLines = [
     `Review task: ${taskLabel}`,
     `Evidence manifest: ${relativeManifest}`,
+  ];
+
+  const taskKey = process.env.MCP_RUNNER_TASK_ID ?? options.task ?? process.env.TASK;
+  if (taskKey) {
+    const contextLines = await buildTaskContext(taskKey);
+    if (contextLines.length > 0) {
+      promptLines.push('', ...contextLines);
+    }
+  }
+
+  if (notes) {
+    promptLines.push('', 'Agent notes:', notes);
+  }
+
+  promptLines.push(
     '',
     'Please review the current changes and confirm:',
+    '- The solution is minimal and avoids unnecessary abstraction/scope',
     '- README/SOP docs match the implemented behavior',
     '- Commands/scripts are non-interactive (no TTY prompts)',
     '- Evidence + checklist mirroring requirements are satisfied',
     '',
     'Call out any remaining documentation/code mismatches or guardrail violations.'
-  ];
+  );
 
   const scopeNotes = await buildScopeNotes(options);
   if (scopeNotes.length > 0) {
     promptLines.push('', ...scopeNotes);
   }
 
-  if (notes) {
-    promptLines.push('', 'Notes:', notes);
+  if (diffBudgetOverride) {
+    promptLines.push('', `Diff budget override: ${diffBudgetOverride}`);
   }
 
   const reviewArgs = buildReviewArgs(options, promptLines.join('\n'));
@@ -264,6 +391,28 @@ async function buildScopeNotes(options: CliOptions): Promise<string[]> {
   }
 
   return lines;
+}
+
+async function runDiffBudget(options: CliOptions): Promise<void> {
+  const args = ['scripts/diff-budget.mjs'];
+
+  if (options.commit) {
+    args.push('--commit', options.commit);
+  } else if (options.base) {
+    args.push('--base', options.base);
+  }
+
+  await new Promise<void>((resolve, reject) => {
+    const child = spawn('node', args, { stdio: 'inherit', env: process.env });
+    child.once('error', (error) => reject(error instanceof Error ? error : new Error(String(error))));
+    child.once('exit', (code) => {
+      if (code === 0) {
+        resolve();
+      } else {
+        reject(new Error(`diff budget exited with code ${code}`));
+      }
+    });
+  });
 }
 
 async function tryGit(args: string[]): Promise<string | null> {
