@@ -282,8 +282,8 @@
       "gate": {
         "phase": "diff-budget-followups-planning",
         "status": "in-progress",
-        "log": null,
-        "run_id": null
+        "log": ".runs/0908-diff-budget-followups/cli/2025-12-18T13-37-52-708Z-16d46fa7/manifest.json",
+        "run_id": "2025-12-18T13-37-52-708Z-16d46fa7"
       },
       "created_at": "2025-12-17",
       "completed_at": null

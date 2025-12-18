@@ -1,27 +1,18 @@
-# Task 0908 — Diff Budget + Review Handoff Follow-ups
+# Task Checklist — Diff Budget + Review Handoff Follow-ups (0908)
 
-- MCP Task ID: `0908-diff-budget-followups`
-- Primary PRD: `docs/PRD-diff-budget-followups.md`
-- Tech Spec: `docs/TECH_SPEC-diff-budget-followups.md`
-- Action Plan: `docs/ACTION_PLAN-diff-budget-followups.md`
-- Mini-spec: `tasks/specs/0908-diff-budget-followups.md`
-- Findings / validation report: `docs/findings/validation-tasks-0908-diff-budget-followups.md`
-- Run Manifest (latest implementation gate): `.runs/0908-diff-budget-followups/cli/2025-12-18T13-37-52-708Z-16d46fa7/manifest.json`
-- Metrics/State: `.runs/0908-diff-budget-followups/metrics.json`, `out/0908-diff-budget-followups/state.json` (expected once pipelines run).
+> Set `MCP_RUNNER_TASK_ID=0908-diff-budget-followups` for orchestrator commands. Mirror status with `tasks/tasks-0908-diff-budget-followups.md` and `docs/TASKS.md`. Flip `[ ]` to `[x]` only with manifest evidence (e.g., `.runs/0908-diff-budget-followups/cli/<run-id>/manifest.json`).
 
-## Checklist
-
-### Foundation
+## Foundation
 - [x] Collateral drafted (PRD/tech spec/action plan/checklist/mini-spec) — Evidence: this PR.
 - [x] Validation report captured — Evidence: `docs/findings/validation-tasks-0908-diff-budget-followups.md`.
 - [x] Mirrors updated (`docs/TASKS.md`, `.agent/task/0908-diff-budget-followups.md`) — Evidence: this PR.
 
-### Validation (current state)
+## Validation (current state)
 - [x] Confirm CI runs diff budget but has no explicit label-based override wiring — Evidence: `docs/findings/validation-tasks-0908-diff-budget-followups.md`.
 - [x] Confirm no automated tests exist for `scripts/diff-budget.mjs` — Evidence: `docs/findings/validation-tasks-0908-diff-budget-followups.md`.
 - [x] Confirm `README.md` does not document diff-budget expectations or the recommended `NOTES="<goal + summary + risks>" npm run review` invocation — Evidence: `docs/findings/validation-tasks-0908-diff-budget-followups.md`.
 
-### Follow-ups (implementation)
+## Follow-ups (implementation)
 
 #### CI override path (without weakening default gate)
 - [ ] Add an explicit CI override path for diff-budget (PR label + required reason surfaced in logs).
@@ -51,7 +42,7 @@
     - README documents: what diff-budget is, how CI selects base (`BASE_SHA`), how to run locally, and how to override with `DIFF_BUDGET_OVERRIDE_REASON`.
     - README documents the recommended `NOTES="<goal + summary + risks>" npm run review` handoff pattern.
 
-### Guardrails & handoff (required before requesting review)
+## Guardrails & handoff (required before requesting review)
 - [x] Implementation-gate run captured (spec-guard/build/lint/test/docs:check + review) — Evidence: `.runs/0908-diff-budget-followups/cli/2025-12-18T13-37-52-708Z-16d46fa7/manifest.json`.
 - [x] Guardrails pass — Evidence: `.runs/0908-diff-budget-followups/cli/2025-12-18T13-37-52-708Z-16d46fa7/manifest.json`.
 - [x] Reviewer handoff uses explicit context — Evidence: `.runs/0908-diff-budget-followups/cli/2025-12-18T13-37-52-708Z-16d46fa7/manifest.json`.

@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp a297bdac5f16fe5391e656bf69d4012b1a39ef7bb7fdbdfb9ac7653ad65777de -->
+<!-- codex:instruction-stamp ce3d0b81138622eef477e8cdd14482bffa751e35794bcc2fd13c33428283e178 -->
 # Agent Enablement
 
 ## Added by Bootstrap 2025-10-16
