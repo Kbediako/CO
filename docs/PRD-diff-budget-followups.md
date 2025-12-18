@@ -52,7 +52,7 @@
 - Action plan: `docs/ACTION_PLAN-diff-budget-followups.md`
 - Mini-spec: `tasks/specs/0908-diff-budget-followups.md`
 - Findings / validation report: `docs/findings/validation-tasks-0908-diff-budget-followups.md`
-- Run Manifest Link: `.runs/0908-diff-budget-followups/cli/2025-12-18T13-37-52-708Z-16d46fa7/manifest.json`
+- Run Manifest Link: `.runs/0908-diff-budget-followups/cli/2025-12-18T14-04-26-998Z-f327e342/manifest.json`
 
 ## Open Questions
 - What should be the canonical “reason” source in CI?

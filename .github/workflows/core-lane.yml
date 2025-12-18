@@ -26,6 +26,67 @@ jobs:
         if: ${{ github.event_name == 'pull_request' }}
         run: echo "BASE_SHA=${{ github.event.pull_request.base.sha }}" >> "$GITHUB_ENV"
 
+      - name: Resolve diff-budget override (label + reason)
+        if: ${{ github.event_name == 'pull_request' }}
+        env:
+          DIFF_BUDGET_OVERRIDE_LABEL: diff-budget-override
+        run: |
+          node - <<'NODE'
+          const fs = require('fs');
+
+          const labelName = process.env.DIFF_BUDGET_OVERRIDE_LABEL;
+          const eventPath = process.env.GITHUB_EVENT_PATH;
+          if (!labelName || !eventPath) {
+            process.exit(0);
+          }
+
+          const event = JSON.parse(fs.readFileSync(eventPath, 'utf8'));
+          const pullRequest = event.pull_request;
+          if (!pullRequest) {
+            process.exit(0);
+          }
+
+          const labels = Array.isArray(pullRequest.labels)
+            ? pullRequest.labels.map((label) => String(label?.name ?? '')).filter(Boolean)
+            : [];
+          if (!labels.includes(labelName)) {
+            process.exit(0);
+          }
+
+          const body = String(pullRequest.body ?? '');
+          const prefix = 'Diff budget override:';
+          let reason = '';
+          for (const rawLine of body.split(/\r?\n/)) {
+            const line = rawLine.trim();
+            if (line.startsWith(prefix)) {
+              reason = line.slice(prefix.length).trim();
+              break;
+            }
+          }
+
+          if (!reason) {
+            console.error(`Diff budget override label "${labelName}" is present, but no non-empty reason was found.`);
+            console.error('Add this single line to the PR description:');
+            console.error('  Diff budget override: <reason>');
+            process.exit(1);
+          }
+
+          const envFile = process.env.GITHUB_ENV;
+          if (envFile) {
+            fs.appendFileSync(envFile, `DIFF_BUDGET_OVERRIDE_REASON<<EOF\n${reason}\nEOF\n`);
+          }
+
+          const summaryFile = process.env.GITHUB_STEP_SUMMARY;
+          if (summaryFile) {
+            fs.appendFileSync(
+              summaryFile,
+              `### Diff budget override\n\nLabel: \`${labelName}\`\n\nReason: ${reason}\n`
+            );
+          }
+
+          console.log(`Diff budget override enabled: ${reason}`);
+          NODE
+
       - name: Diff budget
         if: ${{ github.event_name == 'pull_request' }}
         run: node scripts/diff-budget.mjs
