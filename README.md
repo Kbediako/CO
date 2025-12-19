@@ -146,9 +146,33 @@ Notes:
 | `npm run eval:test` | Optional evaluation harness (enable when `evaluation/fixtures/**` is populated). |
 | `npm run docs:check` | Deterministically validates scripts/pipelines/paths referenced in agent-facing docs. |
 | `node scripts/spec-guard.mjs --dry-run` | Validates spec freshness; required before review. |
+| `node scripts/diff-budget.mjs` | Guards against oversized diffs before review (defaults: 25 files / 800 lines; supports explicit overrides). |
 | `npm run review` | Runs `codex review` and includes the latest run manifest path as evidence in the prompt. |
 
 Run `npm run build` to compile TypeScript before packaging or invoking the CLI directly from `dist/`.
+
+## Diff Budget
+
+This repo enforces a small “diff budget” via `node scripts/diff-budget.mjs` to keep PRs reviewable and avoid accidental scope creep.
+
+- Defaults: 25 changed files / 800 total lines changed (additions + deletions), excluding ignored paths.
+- CI: `.github/workflows/core-lane.yml` runs the diff budget on pull requests and sets `BASE_SHA` to the PR base commit.
+- Local: run `node scripts/diff-budget.mjs` before `npm run review` (the review wrapper runs it automatically).
+
+### Local usage
+- Working tree diff against the default base (uses `BASE_SHA`/`origin/main`/initial commit as available): `node scripts/diff-budget.mjs`
+- Explicit base: `node scripts/diff-budget.mjs --base <ref>`
+- Commit-scoped mode (ignores working tree state): `node scripts/diff-budget.mjs --commit <sha>`
+
+### Overrides (exceptional)
+- Local: `DIFF_BUDGET_OVERRIDE_REASON="..." node scripts/diff-budget.mjs`
+- CI: apply label `diff-budget-override` and add a PR body line `Diff budget override: <reason>` (label without a non-empty reason fails CI).
+
+## Review Handoff
+
+Use an explicit handoff note for reviewers:
+
+`NOTES="<goal + summary + risks>" npm run review`
 
 ## Mirror Workflows
 - `npm run mirror:fetch -- --project <name> [--dry-run] [--force]`: reads `packages/<project>/mirror.config.json` (origin, routes, asset roots, rewrite/block/allow lists), caches downloads **per project** under `.runs/<task>/mirror/<project>/cache`, strips tracker patterns, rewrites externals to `/external/<host>/...`, localizes OG/twitter preview images, rewrites share links off tracker-heavy hosts, and stages into `.runs/<task>/mirror/<project>/<timestamp>/staging/public` before promoting to `packages/<project>/public`. Non-origin assets fall back to Web Archive when the primary host is down; promotion is skipped if errors are detected unless `--force` is set. Manifests live at `.runs/<task>/mirror/<project>/<timestamp>/manifest.json` (warns when `MCP_RUNNER_TASK_ID` is unset; honors `compliance/permit.json` when present).
