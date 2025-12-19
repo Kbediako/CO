@@ -15,3 +15,13 @@
 - [ ] Patterns lint guard builds `dist/patterns/linters/index.js` only when missing/outdated.
 - [ ] Exec command modularized without behavior change (TFGRPO/learning preserved).
 - [ ] Scoped test scripts added (`test:orchestrator`, `test:adapters`, `test:evaluation`; default `npm test` = core).
+- [ ] Add characterization tests for execution-mode resolution (flags, metadata modes, parallel override).
+- [ ] Unify execution-mode logic behind a shared helper while preserving current behavior.
+- [ ] Unify task/run ID sanitization behind a shared helper with identical error messages.
+- [ ] Extract shared lock retry helper for TaskStateStore and ExperienceStore.
+- [ ] Verify atomic write helper behavior (directory creation, temp naming) before unifying.
+- [ ] Unify atomic write helpers with explicit options after verification (Needs Verification).
+- [ ] Simplify CLI pipeline result wrappers with explicit result storage.
+- [ ] Share enforcement-mode parsing between control-plane and privacy guard.
+- [ ] Verify error string expectations before centralizing error formatting.
+- [ ] Centralize error message formatting without changing prefixes or strings (Needs Verification).

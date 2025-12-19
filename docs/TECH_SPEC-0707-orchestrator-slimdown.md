@@ -58,9 +58,65 @@
 - Validation: `npm run test` (core), `npm run test:adapters`, `npm run test:evaluation` when optional deps/fixtures available.
 - Risks/Mitigations: missing coverage—note in docs which jobs still run full matrix; avoid watch mode to stay non-interactive.
 
+### 8) Simplification pass (F1-F7): duplicated logic and small indirections
+- Goal: remove duplicate logic without changing external behavior, performance, or error strings. Use characterization tests to lock behavior before refactors.
+- Scope: execution-mode resolution, ID sanitization, lock retry helpers, atomic write helpers, CLI pipeline result wrappers, enforcement-mode parsing, and error formatting.
+
+#### F1) Execution-mode resolution (manager + CLI + planner)
+- Approach: add characterization tests for the current behavior across `TaskManager` and CLI paths, then extract a shared helper that preserves the same precedence and string parsing.
+- Semantics to lock (from current drift): `requires_cloud`/`requiresCloud` flags, `metadata.mode` vs `metadata.executionMode` precedence, string parsing differences (trim + truthy/falsy synonyms vs strict "cloud"/"mcp"), and `task.metadata.execution.parallel` override behavior.
+- Affected files: `orchestrator/src/manager.ts`, `orchestrator/src/cli/orchestrator.ts`, `orchestrator/src/cli/adapters/CommandPlanner.ts`, new helper in `orchestrator/src/utils/` (or similar).
+- Steps: (1) add tests covering the full matrix of flags/modes/parallel; (2) extract a pure helper that matches current outputs; (3) replace logic in each call site; (4) re-run tests and compare results.
+- Validation: `npm run test` (ensure the new characterization tests pass).
+- Risks/Mitigations: subtle behavior drift; mitigate by test matrix and explicit precedence comments in helper.
+
+#### F2) ID sanitization (task vs run)
+- Approach: extract shared `sanitizeIdentifier(kind, value)` that keeps the same validation order and error strings, then keep thin wrappers for `sanitizeTaskId` and `sanitizeRunId`.
+- Affected files: `orchestrator/src/persistence/sanitizeTaskId.ts`, `orchestrator/src/persistence/sanitizeRunId.ts`, new shared helper.
+- Steps: (1) add helper; (2) update wrappers; (3) add tests to confirm error messages and validation order are unchanged.
+- Validation: `npm run test`.
+- Risks/Mitigations: error string changes; keep exact message templates per kind.
+
+#### F3) Lock retry helper (TaskStateStore + ExperienceStore)
+- Approach: extract a shared lock acquisition helper that handles retries and backoff; allow custom error factory so existing error classes and messages remain identical.
+- Affected files: `orchestrator/src/persistence/TaskStateStore.ts`, `orchestrator/src/persistence/ExperienceStore.ts`, new `orchestrator/src/persistence/lockFile.ts` (or similar).
+- Steps: (1) add helper with retry options; (2) refactor both stores to use it; (3) add tests for lock contention and error types.
+- Validation: `npm run test`.
+- Risks/Mitigations: concurrency behavior changes; keep same backoff config and file open mode (`wx`).
+
+#### F4) Atomic write utilities (Needs Verification)
+- Approach: unify `writeJsonAtomic` and `writeAtomicFile` behind a shared implementation with explicit options for `ensureDir`, encoding, and temp naming. Preserve current behavior where directories are or are not created.
+- Affected files: `orchestrator/src/cli/utils/fs.ts`, `orchestrator/src/persistence/writeAtomicFile.ts`, new shared helper in `orchestrator/src/utils/`.
+- Steps: (1) verify current behavior differences (directory creation, temp file naming); (2) add shared helper with explicit options; (3) update wrappers to match current behavior; (4) add tests for both modes.
+- Validation: `npm run test`.
+- Risks/Mitigations: silent behavior change when directories are missing; lock this with tests before refactor.
+
+#### F5) CLI pipeline result wrappers
+- Approach: replace the dual-purpose accessor and memoized executor with explicit result storage and a single "execute once" closure.
+- Affected files: `orchestrator/src/cli/orchestrator.ts`.
+- Steps: (1) replace `createResultAccessor` and `createPipelineExecutor` usage with explicit `result` and `executing` variables; (2) remove the helper methods.
+- Validation: `npm run test`.
+- Risks/Mitigations: ensure execution still happens once; keep the promise memoization.
+
+#### F6) Enforcement-mode parsing (control-plane + privacy guard)
+- Approach: extract a shared helper that parses `shadow` vs `enforce` with the same precedence and truthy list; use it in both control-plane and privacy guard.
+- Affected files: `orchestrator/src/cli/services/controlPlaneService.ts`, `orchestrator/src/cli/services/execRuntime.ts`, new helper in `orchestrator/src/cli/utils/` or `orchestrator/src/utils/`.
+- Steps: (1) add shared helper; (2) replace local parsers; (3) add tests covering env precedence and truthy strings.
+- Validation: `npm run test`.
+- Risks/Mitigations: env parsing drift; preserve existing truthy list and precedence.
+
+#### F7) Error message formatting (Needs Verification)
+- Approach: extract a shared `errorToString` helper and use it in both manager and CLI error formatting without changing prefixes or message text.
+- Affected files: `orchestrator/src/manager.ts`, `orchestrator/src/cli/exec/finalization.ts`, new helper in `orchestrator/src/utils/`.
+- Steps: (1) verify current CLI error formatting usage; (2) add shared helper; (3) update both call sites; (4) add tests if error strings are asserted.
+- Validation: `npm run test`.
+- Risks/Mitigations: error string changes; keep exact prefixing and message formatting.
+
 ## Evidence & Logging
 - Diagnostics/manifest capture: `MCP_RUNNER_TASK_ID=0707-orchestrator-slimdown npx codex-orchestrator start diagnostics --format json` (non-interactive) to create `.runs/0707-orchestrator-slimdown/cli/<run-id>/manifest.json`; mirror metrics to `.runs/0707-orchestrator-slimdown/metrics.json` and summary to `out/0707-orchestrator-slimdown/state.json` when runs exist.
 - Pre-review guardrails: `node scripts/spec-guard.mjs --dry-run`, `npm run lint`, `npm run test` (core), optional `npm run eval:test` if fixtures apply, `npm run review` once manifests exist.
 
 ## Open Questions
 - Any consumers of the removed agent SDKs that need shims to avoid breaking offline tooling?
+- Do any tests or external tools assert exact error string formats for manager or CLI errors?
+- Should "parallel always forces cloud" be the intended invariant, even when metadata says "mcp"?

@@ -27,3 +27,15 @@
 
 ## Scoped Test Scripts
 - [ ] Scoped test scripts wired (`test:orchestrator`, `test:adapters`, `test:evaluation`) with default `npm test` running core suites; Evidence: `.runs/0707-orchestrator-slimdown/cli/<run-id>/manifest.json`.
+
+## Simplification Pass (F1-F7)
+- [ ] Add characterization tests for execution-mode resolution (flags, metadata modes, parallel override); Evidence: `.runs/0707-orchestrator-slimdown/cli/<run-id>/manifest.json`.
+- [ ] Unify execution-mode logic behind a shared helper while preserving current behavior; Evidence: `.runs/0707-orchestrator-slimdown/cli/<run-id>/manifest.json`.
+- [ ] Unify task/run ID sanitization behind a shared helper with identical error messages; Evidence: `.runs/0707-orchestrator-slimdown/cli/<run-id>/manifest.json`.
+- [ ] Extract shared lock retry helper for TaskStateStore and ExperienceStore; Evidence: `.runs/0707-orchestrator-slimdown/cli/<run-id>/manifest.json`.
+- [ ] Verify atomic write helper behavior (directory creation, temp naming) before unifying; Evidence: `.runs/0707-orchestrator-slimdown/cli/<run-id>/manifest.json`.
+- [ ] Unify atomic write helpers with explicit options after verification (Needs Verification); Evidence: `.runs/0707-orchestrator-slimdown/cli/<run-id>/manifest.json`.
+- [ ] Simplify CLI pipeline result wrappers with explicit result storage; Evidence: `.runs/0707-orchestrator-slimdown/cli/<run-id>/manifest.json`.
+- [ ] Share enforcement-mode parsing between control-plane and privacy guard; Evidence: `.runs/0707-orchestrator-slimdown/cli/<run-id>/manifest.json`.
+- [ ] Verify error string expectations before centralizing error formatting; Evidence: `.runs/0707-orchestrator-slimdown/cli/<run-id>/manifest.json`.
+- [ ] Centralize error message formatting without changing prefixes or strings (Needs Verification); Evidence: `.runs/0707-orchestrator-slimdown/cli/<run-id>/manifest.json`.
