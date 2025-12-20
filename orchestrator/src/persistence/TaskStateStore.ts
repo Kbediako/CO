@@ -1,16 +1,9 @@
-import { mkdir, readFile, rm, open } from 'node:fs/promises';
+import { mkdir, readFile, rm } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
-import { setTimeout as delay } from 'node:timers/promises';
 import type { RunSummary } from '../types.js';
+import { acquireLockWithRetry, type LockRetryOptions } from './lockFile.js';
 import { sanitizeTaskId } from './sanitizeTaskId.js';
 import { writeAtomicFile } from './writeAtomicFile.js';
-
-interface LockRetryOptions {
-  maxAttempts: number;
-  initialDelayMs: number;
-  backoffFactor: number;
-  maxDelayMs: number;
-}
 
 export interface TaskStateStoreOptions {
   outDir?: string;
@@ -83,30 +76,17 @@ export class TaskStateStore {
   }
 
   private async acquireLock(taskId: string, lockPath: string): Promise<void> {
-    await this.ensureDirectory(dirname(lockPath));
-    const { maxAttempts, initialDelayMs, backoffFactor, maxDelayMs } = this.lockRetry;
-    let attempt = 0;
-    let delayMs = initialDelayMs;
-    while (attempt < maxAttempts) {
-      attempt += 1;
-      try {
-        const handle = await open(lockPath, 'wx');
-        await handle.close();
-        return;
-      } catch (error: unknown) {
-        if ((error as NodeJS.ErrnoException).code !== 'EEXIST') {
-          throw error;
-        }
-        if (attempt >= maxAttempts) {
-          throw new TaskStateStoreLockError(
-            `Failed to acquire task state lock for ${taskId} after ${attempt} attempts`,
-            taskId
-          );
-        }
-        await delay(Math.min(delayMs, maxDelayMs));
-        delayMs = Math.min(delayMs * backoffFactor, maxDelayMs);
-      }
-    }
+    await acquireLockWithRetry({
+      taskId,
+      lockPath,
+      retry: this.lockRetry,
+      ensureDirectory: () => this.ensureDirectory(dirname(lockPath)),
+      createError: (id, attempts) =>
+        new TaskStateStoreLockError(
+          `Failed to acquire task state lock for ${id} after ${attempts} attempts`,
+          id
+        )
+    });
   }
 
   private async releaseLock(lockPath: string): Promise<void> {

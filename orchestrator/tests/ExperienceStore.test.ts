@@ -1,10 +1,11 @@
 import { describe, expect, it, beforeEach, afterEach } from 'vitest';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
 import {
   ExperienceStore,
+  ExperienceStoreLockError,
   type ExperienceInput,
   type ExperienceRecord
 } from '../src/persistence/ExperienceStore.js';
@@ -65,6 +66,22 @@ describe('ExperienceStore', () => {
     });
 
     expect((store as unknown as { lockRetry: { maxAttempts: number } }).lockRetry.maxAttempts).toBe(5);
+  });
+
+  it('retries lock acquisition before throwing an ExperienceStoreLockError', async () => {
+    const store = new ExperienceStore({
+      outDir,
+      runsDir,
+      lockRetry: { maxAttempts: 2, initialDelayMs: 1, maxDelayMs: 1 }
+    });
+
+    await mkdir(runsDir, { recursive: true });
+    const lockPath = join(runsDir, 'task-0506.experiences.lock');
+    await writeFile(lockPath, 'locked', 'utf8');
+
+    await expect(store.recordBatch([createInput()], 'manifests/run.json')).rejects.toBeInstanceOf(
+      ExperienceStoreLockError
+    );
   });
 
   it('fetches top experiences by reward and domain', async () => {

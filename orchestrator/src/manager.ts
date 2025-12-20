@@ -20,6 +20,8 @@ import { PersistenceCoordinator } from './persistence/PersistenceCoordinator.js'
 import { TaskStateStore } from './persistence/TaskStateStore.js';
 import { RunManifestWriter } from './persistence/RunManifestWriter.js';
 import { sanitizeRunId } from './persistence/sanitizeRunId.js';
+import { normalizeErrorMessage } from './utils/errorMessage.js';
+import { createExecutionModeParser, resolveRequiresCloudFlag } from './utils/executionMode.js';
 import { EnvUtils } from '../../packages/shared/config/index.js';
 
 export type ModePolicy = (task: TaskContext, subtask: PlanItem) => ExecutionMode;
@@ -61,27 +63,24 @@ const defaultModePolicy: ModePolicy = (task, subtask) => {
   return 'mcp';
 };
 
+const managerExecutionModeParser = createExecutionModeParser({
+  trim: true,
+  lowercase: true,
+  truthyValues: ['cloud', 'true', '1', 'yes'],
+  falsyValues: ['mcp', 'false', '0', 'no']
+});
+
 function resolveRequiresCloud(subtask: PlanItem): boolean {
-  const boolFlags = [subtask.requires_cloud, subtask.requiresCloud].filter((value) => value !== undefined);
-  for (const flag of boolFlags) {
-    if (flag === true) return true;
-    if (flag === false) return false;
-  }
-  const metadataMode = typeof subtask.metadata?.mode === 'string'
-    ? subtask.metadata.mode
-    : typeof subtask.metadata?.executionMode === 'string'
-      ? subtask.metadata.executionMode
-      : null;
-  if (metadataMode) {
-    const normalized = metadataMode.trim().toLowerCase();
-    if (['cloud', 'true', '1', 'yes'].includes(normalized)) {
-      return true;
-    }
-    if (['mcp', 'false', '0', 'no'].includes(normalized)) {
-      return false;
-    }
-  }
-  return false;
+  const metadataModes = [
+    typeof subtask.metadata?.mode === 'string' ? subtask.metadata.mode : null,
+    typeof subtask.metadata?.executionMode === 'string' ? subtask.metadata.executionMode : null
+  ];
+  const requiresCloudFlag = resolveRequiresCloudFlag({
+    boolFlags: [subtask.requires_cloud, subtask.requiresCloud],
+    metadataModes,
+    parseMode: managerExecutionModeParser
+  });
+  return requiresCloudFlag ?? false;
 }
 
 const defaultRunIdFactory: RunIdFactory = (taskId) => {
@@ -525,18 +524,7 @@ export class TaskManager {
   }
 
   private formatStageError(stage: string, error: unknown): string {
-    let message: string;
-    if (error instanceof Error && error.message) {
-      message = error.message;
-    } else if (typeof error === 'string') {
-      message = error;
-    } else {
-      try {
-        message = JSON.stringify(error);
-      } catch {
-        message = String(error);
-      }
-    }
+    const message = normalizeErrorMessage(error);
     const normalizedStage = stage.charAt(0).toUpperCase() + stage.slice(1);
     return `${normalizedStage} stage error: ${message}`;
   }

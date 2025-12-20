@@ -1,5 +1,4 @@
-import { mkdir, rename, writeFile } from 'node:fs/promises';
-import { dirname } from 'node:path';
+import { writeAtomicFile as writeAtomicFileInternal } from '../../utils/atomicWrite.js';
 
 export async function writeJsonAtomic(targetPath: string, data: unknown): Promise<void> {
   const payload = `${JSON.stringify(data, null, 2)}\n`;
@@ -7,8 +6,5 @@ export async function writeJsonAtomic(targetPath: string, data: unknown): Promis
 }
 
 export async function writeFileAtomic(targetPath: string, contents: string): Promise<void> {
-  const tmpPath = `${targetPath}.tmp-${process.pid}-${Date.now()}`;
-  await mkdir(dirname(targetPath), { recursive: true });
-  await writeFile(tmpPath, contents, 'utf8');
-  await rename(tmpPath, targetPath);
+  await writeAtomicFileInternal(targetPath, contents, { ensureDir: true, encoding: 'utf8' });
 }

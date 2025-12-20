@@ -11,6 +11,9 @@ import type { SandboxState, ToolRunRecord } from '../../../../packages/shared/ma
 import type { ExecRunContext } from './context.js';
 import type { StageRunResult } from './stageRunner.js';
 import type { RunResultSummary } from './types.js';
+import { normalizeErrorMessage } from '../../utils/errorMessage.js';
+
+export { normalizeErrorMessage };
 
 export interface CommandFinalization {
   commandEntry: CliManifestCommand | undefined;
@@ -195,20 +198,6 @@ export function buildCommandErrorDetails(params: {
   }
 
   return details;
-}
-
-export function normalizeErrorMessage(error: unknown): string {
-  if (error instanceof Error && error.message) {
-    return error.message;
-  }
-  if (typeof error === 'string') {
-    return error;
-  }
-  try {
-    return JSON.stringify(error);
-  } catch {
-    return String(error);
-  }
 }
 
 export function determineRunStatus(entry: CliManifestCommand | undefined): RunStatus {

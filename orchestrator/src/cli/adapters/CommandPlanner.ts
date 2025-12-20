@@ -1,5 +1,6 @@
 import type { PlannerAgent, PlanItem, PlanResult, TaskContext } from '../../types.js';
 import type { PipelineDefinition, PipelineStage } from '../types.js';
+import { createExecutionModeParser, resolveRequiresCloudFlag } from '../../utils/executionMode.js';
 
 export interface CommandPlannerOptions {
   targetStageId?: string | null;
@@ -112,6 +113,13 @@ interface StagePlanHints {
   executionMode?: string | null;
 }
 
+const plannerExecutionModeParser = createExecutionModeParser({
+  trim: false,
+  lowercase: true,
+  truthyValues: ['cloud'],
+  falsyValues: ['mcp']
+});
+
 function extractStagePlanHints(stage: PipelineStage): StagePlanHints {
   const stageRecord = stage as unknown as Record<string, unknown>;
   const planConfig = (stageRecord.plan as (Partial<StagePlanHints> & Record<string, unknown>) | undefined) ?? {};
@@ -148,30 +156,20 @@ function extractStagePlanHints(stage: PipelineStage): StagePlanHints {
 
 function resolveStageRequiresCloud(stage: PipelineStage, hints: StagePlanHints): boolean {
   const stageRecord = stage as unknown as Record<string, unknown>;
-  const candidates: Array<boolean | null | undefined> = [
-    hints.requiresCloud,
-    typeof stageRecord.requires_cloud === 'boolean'
-      ? (stageRecord.requires_cloud as boolean)
-      : undefined,
-    typeof stageRecord.requiresCloud === 'boolean'
-      ? (stageRecord.requiresCloud as boolean)
-      : undefined
-  ];
-  for (const candidate of candidates) {
-    if (typeof candidate === 'boolean') {
-      return candidate;
-    }
-  }
-  if (typeof hints.executionMode === 'string') {
-    const normalized = hints.executionMode.toLowerCase();
-    if (normalized === 'cloud') {
-      return true;
-    }
-    if (normalized === 'mcp') {
-      return false;
-    }
-  }
-  return false;
+  const requiresCloud = resolveRequiresCloudFlag({
+    boolFlags: [
+      hints.requiresCloud,
+      typeof stageRecord.requires_cloud === 'boolean'
+        ? (stageRecord.requires_cloud as boolean)
+        : undefined,
+      typeof stageRecord.requiresCloud === 'boolean'
+        ? (stageRecord.requiresCloud as boolean)
+        : undefined
+    ],
+    metadataModes: [hints.executionMode ?? null],
+    parseMode: plannerExecutionModeParser
+  });
+  return requiresCloud ?? false;
 }
 
 function resolveStageRunnable(hints: StagePlanHints): boolean {

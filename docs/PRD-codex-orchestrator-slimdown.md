@@ -68,26 +68,26 @@
 
 ## Documentation & Evidence
 - Run Manifest Link: `.runs/0707-orchestrator-slimdown/cli/2025-12-01T09-37-11-576Z-1a60ebea/manifest.json`.
-- Metrics / State Snapshots: _(pending — `.runs/0707-orchestrator-slimdown/metrics.json`, `out/0707-orchestrator-slimdown/state.json`)._
+- Metrics / State Snapshots: `.runs/0707-orchestrator-slimdown/metrics.json`, `out/0707-orchestrator-slimdown/state.json`.
 
 ## Checklist
 - [x] Capture first diagnostics manifest path under `.runs/0707-orchestrator-slimdown/cli/2025-12-01T09-37-11-576Z-1a60ebea/manifest.json`.
-- [ ] Update metrics/state snapshots for Task 0707.
-- [ ] Implement schema unification (JSON canonical + generated types/validator).
-- [ ] Remove unused agent SDK deps from `package.json`/lockfile.
-- [ ] Add core build config/script; document optional full builds.
-- [ ] Make design deps optional with lazy loads and runtime guidance.
-- [ ] Add lint build-if-missing guard for patterns.
-- [ ] Modularize exec runner without behavior change.
-- [ ] Add scoped test scripts and update docs.
-- [ ] Add characterization tests for execution-mode resolution (covers flag precedence, string parsing, and parallel behavior).
-- [ ] Unify execution-mode logic behind a shared helper with tests locking current behavior.
-- [ ] Unify task/run ID sanitization behind a shared helper with identical error messages.
-- [ ] Extract shared lock retry helper for TaskStateStore and ExperienceStore.
-- [ ] Unify atomic-write helpers after verifying directory handling and temp-file behavior (Needs Verification).
-- [ ] Simplify CLI pipeline result wrappers with explicit result storage.
-- [ ] Share enforcement-mode parsing between control-plane and privacy guard.
-- [ ] Centralize error message formatting after confirming CLI/manager expectations (Needs Verification).
+- [x] Update metrics/state snapshots for Task 0707.
+- [x] Implement schema unification (JSON canonical + generated types/validator).
+- [x] Remove unused agent SDK deps from `package.json`/lockfile.
+- [x] Add core build config/script; document optional full builds.
+- [x] Make design deps optional with lazy loads and runtime guidance.
+- [x] Add lint build-if-missing guard for patterns.
+- [x] Modularize exec runner without behavior change.
+- [x] Add scoped test scripts and update docs.
+- [x] Add characterization tests for execution-mode resolution (covers flag precedence, string parsing, and parallel behavior).
+- [x] Unify execution-mode logic behind a shared helper with tests locking current behavior.
+- [x] Unify task/run ID sanitization behind a shared helper with identical error messages.
+- [x] Extract shared lock retry helper for TaskStateStore and ExperienceStore.
+- [x] Unify atomic-write helpers after verifying directory handling and temp-file behavior (Needs Verification).
+- [x] Simplify CLI pipeline result wrappers with explicit result storage.
+- [x] Share enforcement-mode parsing between control-plane and privacy guard.
+- [x] Centralize error message formatting after confirming CLI/manager expectations (Needs Verification).
 
 ## Open Questions
 - Any consumers of the removed agent SDKs that need shims to avoid breaking offline tooling?

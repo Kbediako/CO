@@ -1,7 +1,5 @@
-import { rename, writeFile } from 'node:fs/promises';
+import { writeAtomicFile as writeAtomicFileInternal } from '../utils/atomicWrite.js';
 
 export async function writeAtomicFile(destination: string, contents: string): Promise<void> {
-  const tempPath = `${destination}.tmp-${process.pid}-${Date.now()}`;
-  await writeFile(tempPath, contents, 'utf-8');
-  await rename(tempPath, destination);
+  await writeAtomicFileInternal(destination, contents, { ensureDir: false, encoding: 'utf-8' });
 }

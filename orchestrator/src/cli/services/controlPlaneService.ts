@@ -12,6 +12,7 @@ import { relativeToRepo } from '../run/runPaths.js';
 import type { RunPaths } from '../run/runPaths.js';
 import { appendSummary, saveManifest } from '../run/manifest.js';
 import { isoTimestamp } from '../utils/time.js';
+import { resolveEnforcementMode } from '../utils/enforcementMode.js';
 import type { CliManifest, PipelineDefinition } from '../types.js';
 import type { RunSummary, TaskContext } from '../../types.js';
 
@@ -130,15 +131,8 @@ export class ControlPlaneService {
 }
 
 export function resolveControlPlaneMode(): ControlPlaneValidationMode {
-  const explicit = process.env.CODEX_CONTROL_PLANE_MODE ?? null;
-  const enforce = process.env.CODEX_CONTROL_PLANE_ENFORCE ?? null;
-  const candidate = explicit ?? enforce;
-  if (!candidate) {
-    return 'shadow';
-  }
-  const normalized = candidate.trim().toLowerCase();
-  if (['1', 'true', 'enforce', 'on', 'yes'].includes(normalized)) {
-    return 'enforce';
-  }
-  return 'shadow';
+  return resolveEnforcementMode(
+    process.env.CODEX_CONTROL_PLANE_MODE ?? null,
+    process.env.CODEX_CONTROL_PLANE_ENFORCE ?? null
+  );
 }

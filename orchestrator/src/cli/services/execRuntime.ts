@@ -9,6 +9,7 @@ import {
 } from '../../../../packages/orchestrator/src/index.js';
 import { RemoteExecHandleService } from '../../../../packages/orchestrator/src/exec/handle-service.js';
 import { PrivacyGuard } from '../../privacy/guard.js';
+import { resolveEnforcementMode } from '../utils/enforcementMode.js';
 
 class CliExecSessionHandle implements ExecSessionHandle {
   constructor(public readonly id: string) {}
@@ -84,15 +85,8 @@ export function getPrivacyGuard(): PrivacyGuard {
 }
 
 function resolvePrivacyGuardMode(): 'shadow' | 'enforce' {
-  const explicit = process.env.CODEX_PRIVACY_GUARD_MODE ?? null;
-  const enforce = process.env.CODEX_PRIVACY_GUARD_ENFORCE ?? null;
-  const candidate = explicit ?? enforce;
-  if (!candidate) {
-    return 'shadow';
-  }
-  const normalized = candidate.trim().toLowerCase();
-  if (['1', 'true', 'enforce', 'on', 'yes'].includes(normalized)) {
-    return 'enforce';
-  }
-  return 'shadow';
+  return resolveEnforcementMode(
+    process.env.CODEX_PRIVACY_GUARD_MODE ?? null,
+    process.env.CODEX_PRIVACY_GUARD_ENFORCE ?? null
+  );
 }
