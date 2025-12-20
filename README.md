@@ -141,7 +141,7 @@ Notes:
 | Command | Purpose |
 | --- | --- |
 | `npm run build` | Compiles TypeScript to `dist/` (required by `docs:check`, `review`, and other wrappers). |
-| `npm run lint` | Lints orchestrator, adapters, shared packages. Auto-runs `npm run build:patterns` first so codemods compile. |
+| `npm run lint` | Lints orchestrator, adapters, shared packages. Auto-runs `node scripts/build-patterns-if-needed.mjs` so codemods compile when missing/outdated. |
 | `npm run test` | Vitest suite covering orchestration core, CLI services, and patterns. |
 | `npm run eval:test` | Optional evaluation harness (enable when `evaluation/fixtures/**` is populated). |
 | `npm run docs:check` | Deterministically validates scripts/pipelines/paths referenced in agent-facing docs. |
