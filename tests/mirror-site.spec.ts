@@ -1,9 +1,11 @@
-import * as cheerio from "cheerio";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import {
+const cheerio = await loadCheerioOptional();
+const describeSuite = cheerio ? describe : describe.skip;
+const mirrorSite = cheerio ? await import("../scripts/mirror-site.mjs") : null;
+const {
   DEFAULT_ASSET_ROOTS,
   DEFAULT_SHARE_HOST_REWRITES,
   buildWaybackUrl,
@@ -15,9 +17,9 @@ import {
   rewriteMetaImages,
   rewriteShareLinks,
   stripElements
-} from "../scripts/mirror-site.mjs";
+} = mirrorSite ?? {};
 
-describe("mirror-site defaults and rewrites", () => {
+describeSuite("mirror-site defaults and rewrites", () => {
   it("applies WordPress asset root defaults when assetRoots are missing", () => {
     const config = normalizeConfig({ origin: "https://example.test", routes: ["/"] }, "example");
     expect(config.assetRoots).toEqual(DEFAULT_ASSET_ROOTS);
@@ -177,3 +179,30 @@ describe("mirror-site defaults and rewrites", () => {
     await fs.rm(cacheDir, { recursive: true, force: true });
   });
 });
+
+type MissingModuleError = NodeJS.ErrnoException & { code?: string };
+
+function isModuleNotFound(error: unknown): boolean {
+  const candidate = error as MissingModuleError;
+  if (!candidate) {
+    return false;
+  }
+  const message = candidate.message ?? "";
+  return (
+    candidate.code === "ERR_MODULE_NOT_FOUND" ||
+    candidate.code === "MODULE_NOT_FOUND" ||
+    message.includes("Cannot find package") ||
+    message.includes("Cannot find module")
+  );
+}
+
+async function loadCheerioOptional(): Promise<any | null> {
+  try {
+    return await import("cheerio");
+  } catch (error) {
+    if (isModuleNotFound(error)) {
+      return null;
+    }
+    throw error;
+  }
+}

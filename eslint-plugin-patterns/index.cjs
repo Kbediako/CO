@@ -1,5 +1,6 @@
 const fs = require('node:fs');
 const path = require('node:path');
+const { spawnSync } = require('node:child_process');
 
 const repoRoot = path.resolve(__dirname, '..');
 const distRulePath = path.resolve(repoRoot, 'dist/patterns/linters/rules/prefer-logger-over-console.js');
@@ -36,17 +37,34 @@ function needsBuild() {
   return sourceMtime > distMtime;
 }
 
-function assertPatternsBuilt() {
+function buildPatterns() {
+  const tscPath = require.resolve('typescript/bin/tsc');
+  const result = spawnSync(
+    process.execPath,
+    [tscPath, '-p', path.join(sourceRoot, 'tsconfig.json')],
+    { stdio: 'inherit' }
+  );
+  if (result.status !== 0) {
+    throw new Error(
+      `patterns plugin failed to build artifacts. Run "npm run build:patterns" to inspect failures.`
+    );
+  }
+}
+
+function ensurePatternsBuilt() {
   if (!needsBuild()) {
     return;
   }
-  throw new Error(
-    `patterns plugin requires built artifacts at ${distRulePath}. Run "npm run build:patterns" before linting.`
-  );
+  buildPatterns();
+  if (needsBuild()) {
+    throw new Error(
+      `patterns plugin requires built artifacts at ${distRulePath}. Run "npm run build:patterns" before linting.`
+    );
+  }
 }
 
 function loadRules() {
-  assertPatternsBuilt();
+  ensurePatternsBuilt();
   try {
     // eslint-disable-next-line global-require, import/no-dynamic-require
     const moduleExports = require(distRulePath);

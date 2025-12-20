@@ -1,17 +1,10 @@
 import { randomBytes } from 'node:crypto';
-import { readFile, mkdir, open, rm, readdir } from 'node:fs/promises';
+import { readFile, mkdir, rm, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
-import { setTimeout as delay } from 'node:timers/promises';
 
+import { acquireLockWithRetry, type LockRetryOptions } from './lockFile.js';
 import { sanitizeTaskId } from './sanitizeTaskId.js';
 import { writeAtomicFile } from './writeAtomicFile.js';
-
-interface LockRetryOptions {
-  maxAttempts: number;
-  initialDelayMs: number;
-  backoffFactor: number;
-  maxDelayMs: number;
-}
 
 export interface ExperienceStoreOptions {
   outDir?: string;
@@ -205,30 +198,19 @@ export class ExperienceStore {
   }
 
   private async acquireLock(taskId: string, lockPath: string): Promise<void> {
-    await mkdir(this.runsDir, { recursive: true });
-    const { maxAttempts, initialDelayMs, backoffFactor, maxDelayMs } = this.lockRetry;
-    let attempt = 0;
-    let delayMs = initialDelayMs;
-    while (attempt < maxAttempts) {
-      attempt += 1;
-      try {
-        const handle = await open(lockPath, 'wx');
-        await handle.close();
-        return;
-      } catch (error: unknown) {
-        if ((error as NodeJS.ErrnoException).code !== 'EEXIST') {
-          throw error;
-        }
-        if (attempt >= maxAttempts) {
-          throw new ExperienceStoreLockError(
-            `Failed to acquire experience lock for ${taskId} after ${attempt} attempts`,
-            taskId
-          );
-        }
-        await delay(Math.min(delayMs, maxDelayMs));
-        delayMs = Math.min(delayMs * backoffFactor, maxDelayMs);
-      }
-    }
+    await acquireLockWithRetry({
+      taskId,
+      lockPath,
+      retry: this.lockRetry,
+      ensureDirectory: async () => {
+        await mkdir(this.runsDir, { recursive: true });
+      },
+      createError: (id, attempts) =>
+        new ExperienceStoreLockError(
+          `Failed to acquire experience lock for ${id} after ${attempts} attempts`,
+          id
+        )
+    });
   }
 
   private async releaseLock(lockPath: string): Promise<void> {

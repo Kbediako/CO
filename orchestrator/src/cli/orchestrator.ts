@@ -60,6 +60,7 @@ import {
 } from './services/runPreparation.js';
 import { loadUserConfig } from './config/userConfig.js';
 import { RunEventPublisher, snapshotStages, type RunEventEmitter } from './events/runEvents.js';
+import { createExecutionModeParser, resolveRequiresCloudFlag } from '../utils/executionMode.js';
 
 
 interface ExecutePipelineOptions {
@@ -80,6 +81,13 @@ interface RunLifecycleContext {
   runId: string;
   runEvents?: RunEventPublisher;
 }
+
+const cliExecutionModeParser = createExecutionModeParser({
+  trim: false,
+  lowercase: true,
+  truthyValues: ['cloud'],
+  falsyValues: ['mcp']
+});
 
 export class CodexOrchestrator {
   private readonly controlPlane = new ControlPlaneService();
@@ -295,58 +303,21 @@ export class CodexOrchestrator {
   }
 
   private requiresCloudExecution(task: TaskContext, subtask: PlanItem): boolean {
-    const requiresCloudFlag = subtask.requires_cloud ?? subtask.requiresCloud;
-    if (typeof requiresCloudFlag === 'boolean') {
+    const metadataModes = [
+      typeof subtask.metadata?.executionMode === 'string'
+        ? (subtask.metadata.executionMode as string)
+        : null,
+      typeof subtask.metadata?.mode === 'string' ? (subtask.metadata.mode as string) : null
+    ];
+    const requiresCloudFlag = resolveRequiresCloudFlag({
+      boolFlags: [subtask.requires_cloud, subtask.requiresCloud],
+      metadataModes,
+      parseMode: cliExecutionModeParser
+    });
+    if (requiresCloudFlag !== null) {
       return requiresCloudFlag;
     }
-    const metadataMode = typeof subtask.metadata?.executionMode === 'string'
-      ? (subtask.metadata.executionMode as string)
-      : typeof subtask.metadata?.mode === 'string'
-        ? (subtask.metadata.mode as string)
-        : null;
-    if (metadataMode) {
-      const normalized = metadataMode.toLowerCase();
-      if (normalized === 'cloud') {
-        return true;
-      }
-      if (normalized === 'mcp') {
-        return false;
-      }
-    }
-    if (task.metadata?.execution?.parallel) {
-      return true;
-    }
-    return false;
-  }
-
-  private createPipelineExecutor(
-    context: ExecutePipelineOptions,
-    writeResult: (result: PipelineRunExecutionResult) => void
-  ): () => Promise<PipelineRunExecutionResult> {
-    let executing: Promise<PipelineRunExecutionResult> | null = null;
-    return async () => {
-      if (!executing) {
-        executing = this.executePipeline(context).then((result) => {
-          writeResult(result);
-          return result;
-        });
-      }
-      return executing;
-    };
-  }
-
-  private createResultAccessor(): {
-    (): PipelineRunExecutionResult | null;
-    (result: PipelineRunExecutionResult): void;
-  } {
-    let value: PipelineRunExecutionResult | null = null;
-    const accessor = (result?: PipelineRunExecutionResult) => {
-      if (result) {
-        value = result;
-      }
-      return value;
-    };
-    return accessor;
+    return Boolean(task.metadata?.execution?.parallel);
   }
 
   private async executePipeline(options: ExecutePipelineOptions): Promise<PipelineRunExecutionResult> {
@@ -608,11 +579,24 @@ export class CodexOrchestrator {
 
   private async performRunLifecycle(context: RunLifecycleContext): Promise<PipelineExecutionResult> {
     const { env, pipeline, manifest, paths, planner, taskContext, runId } = context;
-    const getResult = this.createResultAccessor();
-    const executePipeline = this.createPipelineExecutor(
-      { env, pipeline, manifest, paths, runEvents: context.runEvents },
-      getResult
-    );
+    let pipelineResult: PipelineRunExecutionResult | null = null;
+    let executing: Promise<PipelineRunExecutionResult> | null = null;
+    const executePipeline = async () => {
+      if (!executing) {
+        executing = this.executePipeline({
+          env,
+          pipeline,
+          manifest,
+          paths,
+          runEvents: context.runEvents
+        }).then((result) => {
+          pipelineResult = result;
+          return result;
+        });
+      }
+      return executing;
+    };
+    const getResult = () => pipelineResult;
     const manager = this.createTaskManager(runId, pipeline, executePipeline, getResult, planner);
     this.attachPlanTargetTracker(manager, manifest, paths);
 

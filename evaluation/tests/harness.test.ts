@@ -56,7 +56,7 @@ describe('evaluation harness', () => {
     const fixtureDir = await fs.mkdtemp(path.join(os.tmpdir(), 'codex-eval-timeout-'));
     tempDirs.push(fixtureDir);
 
-    const scenario = {
+    const scenario: EvaluationScenario = {
       id: 'timeout-inline',
       title: 'Timeout Inline Scenario',
       adapterId: 'typescript-default',

@@ -190,27 +190,27 @@ Mirror status with `tasks/tasks-0707-orchestrator-slimdown.md` and `.agent/task/
 
 ### Foundation
 - [x] Diagnostics manifest captured — Evidence: `.runs/0707-orchestrator-slimdown/cli/2025-12-01T09-37-11-576Z-1a60ebea/manifest.json`.
-- [ ] Metrics/state snapshots updated — Evidence: `.runs/0707-orchestrator-slimdown/metrics.json`, `out/0707-orchestrator-slimdown/state.json`.
-- [ ] CI/test coverage policy mirrored across PRD/spec/tasks — core PR lane runs `npm run build`, `npm run lint`, `npm run test`; full-matrix PR lane (label `full-matrix` or adapters/evaluation/design/patterns paths) runs `npm run build:all`, `npm run lint`, `npm run test`, `npm run test:adapters`, `npm run test:evaluation`, `npm run eval:test` when fixtures/optional design deps installed; release/RC always full matrix; local baseline = core with full matrix locally when touching adapters/evaluation/design/patterns or release prep after `npm run setup:design-tools && npx playwright install` + fixtures (note if skipped). Evidence: `.runs/0707-orchestrator-slimdown/cli/<run-id>/manifest.json` (documentation update run).
+- [x] Metrics/state snapshots updated — Evidence: `.runs/0707-orchestrator-slimdown/metrics.json`, `out/0707-orchestrator-slimdown/state.json`.
+- [x] CI/test coverage policy mirrored across PRD/spec/tasks — core PR lane runs `npm run build`, `npm run lint`, `npm run test`; full-matrix PR lane (label `full-matrix` or adapters/evaluation/design/patterns paths) runs `npm run build:all`, `npm run lint`, `npm run test`, `npm run test:adapters`, `npm run test:evaluation`, `npm run eval:test` when fixtures/optional design deps installed; release/RC always full matrix; local baseline = core with full matrix locally when touching adapters/evaluation/design/patterns or release prep after `npm run setup:design-tools && npx playwright install` + fixtures (note if skipped). Evidence: `.runs/0707-orchestrator-slimdown/cli/2025-12-20T00-28-00-131Z-bd705bcf/manifest.json`.
 
 ### Deliverables
-- [ ] Manifest single-source + generated TS types/AJV validator; duplicate schema removed — Evidence: `.runs/0707-orchestrator-slimdown/cli/<run-id>/manifest.json`.
-- [ ] Unused agent SDK deps removed with usages pruned/shimmed — Evidence: `.runs/0707-orchestrator-slimdown/cli/<run-id>/manifest.json`.
-- [ ] Core build split (`npm run build` core, `npm run build:all` full matrix) — Evidence: `.runs/0707-orchestrator-slimdown/cli/<run-id>/manifest.json`.
-- [ ] Design deps optional/lazy across toolkits + mirror scripts with runtime guidance — Evidence: `.runs/0707-orchestrator-slimdown/cli/<run-id>/manifest.json`.
-- [ ] Patterns lint guard builds `dist/patterns/linters/index.js` only when missing/outdated — Evidence: `.runs/0707-orchestrator-slimdown/cli/<run-id>/manifest.json`.
-- [ ] Exec command modularized without behavior change — Evidence: `.runs/0707-orchestrator-slimdown/cli/<run-id>/manifest.json`.
-- [ ] Scoped test scripts added (`test:orchestrator`, `test:adapters`, `test:evaluation`; default `npm test` = core) — Evidence: `.runs/0707-orchestrator-slimdown/cli/<run-id>/manifest.json`.
-- [ ] Characterization tests for execution-mode resolution (flags, metadata modes, parallel override) — Evidence: `.runs/0707-orchestrator-slimdown/cli/<run-id>/manifest.json`.
-- [ ] Execution-mode logic unified behind a shared helper with no behavior changes — Evidence: `.runs/0707-orchestrator-slimdown/cli/<run-id>/manifest.json`.
-- [ ] Task/run ID sanitization unified behind a shared helper with identical error messages — Evidence: `.runs/0707-orchestrator-slimdown/cli/<run-id>/manifest.json`.
-- [ ] Shared lock retry helper extracted for TaskStateStore and ExperienceStore — Evidence: `.runs/0707-orchestrator-slimdown/cli/<run-id>/manifest.json`.
-- [ ] Atomic write behavior verified (directory creation, temp naming) before unification — Evidence: `.runs/0707-orchestrator-slimdown/cli/<run-id>/manifest.json`.
-- [ ] Atomic write helpers unified with explicit options after verification (Needs Verification) — Evidence: `.runs/0707-orchestrator-slimdown/cli/<run-id>/manifest.json`.
-- [ ] CLI pipeline result wrappers simplified with explicit result storage — Evidence: `.runs/0707-orchestrator-slimdown/cli/<run-id>/manifest.json`.
-- [ ] Enforcement-mode parsing shared between control-plane and privacy guard — Evidence: `.runs/0707-orchestrator-slimdown/cli/<run-id>/manifest.json`.
-- [ ] Error string expectations verified before centralizing error formatting — Evidence: `.runs/0707-orchestrator-slimdown/cli/<run-id>/manifest.json`.
-- [ ] Error message formatting centralized without changing prefixes or strings (Needs Verification) — Evidence: `.runs/0707-orchestrator-slimdown/cli/<run-id>/manifest.json`.
+- [x] Manifest single-source + generated TS types/AJV validator; duplicate schema removed — Evidence: `.runs/0707-orchestrator-slimdown/cli/2025-12-20T00-28-00-131Z-bd705bcf/manifest.json`.
+- [x] Unused agent SDK deps removed with usages pruned/shimmed — Evidence: `.runs/0707-orchestrator-slimdown/cli/2025-12-20T00-28-00-131Z-bd705bcf/manifest.json`.
+- [x] Core build split (`npm run build` core, `npm run build:all` full matrix) — Evidence: `.runs/0707-orchestrator-slimdown/cli/2025-12-20T00-28-00-131Z-bd705bcf/manifest.json`.
+- [x] Design deps optional/lazy across toolkits + mirror scripts with runtime guidance — Evidence: `.runs/0707-orchestrator-slimdown/cli/2025-12-20T00-28-00-131Z-bd705bcf/manifest.json`.
+- [x] Patterns lint guard builds `dist/patterns/linters/index.js` only when missing/outdated — Evidence: `.runs/0707-orchestrator-slimdown/cli/2025-12-20T00-28-00-131Z-bd705bcf/manifest.json`.
+- [x] Exec command modularized without behavior change — Evidence: `.runs/0707-orchestrator-slimdown/cli/2025-12-20T00-28-00-131Z-bd705bcf/manifest.json`.
+- [x] Scoped test scripts added (`test:orchestrator`, `test:adapters`, `test:evaluation`; default `npm test` = core) — Evidence: `.runs/0707-orchestrator-slimdown/cli/2025-12-20T00-28-00-131Z-bd705bcf/manifest.json`.
+- [x] Characterization tests for execution-mode resolution (flags, metadata modes, parallel override) — Evidence: `.runs/0707-orchestrator-slimdown/cli/2025-12-20T00-28-00-131Z-bd705bcf/manifest.json`.
+- [x] Execution-mode logic unified behind a shared helper with no behavior changes — Evidence: `.runs/0707-orchestrator-slimdown/cli/2025-12-20T00-28-00-131Z-bd705bcf/manifest.json`.
+- [x] Task/run ID sanitization unified behind a shared helper with identical error messages — Evidence: `.runs/0707-orchestrator-slimdown/cli/2025-12-20T00-28-00-131Z-bd705bcf/manifest.json`.
+- [x] Shared lock retry helper extracted for TaskStateStore and ExperienceStore — Evidence: `.runs/0707-orchestrator-slimdown/cli/2025-12-20T00-28-00-131Z-bd705bcf/manifest.json`.
+- [x] Atomic write behavior verified (directory creation, temp naming) before unification — Evidence: `.runs/0707-orchestrator-slimdown/cli/2025-12-20T00-28-00-131Z-bd705bcf/manifest.json`.
+- [x] Atomic write helpers unified with explicit options after verification (Needs Verification) — Evidence: `.runs/0707-orchestrator-slimdown/cli/2025-12-20T00-28-00-131Z-bd705bcf/manifest.json`.
+- [x] CLI pipeline result wrappers simplified with explicit result storage — Evidence: `.runs/0707-orchestrator-slimdown/cli/2025-12-20T00-28-00-131Z-bd705bcf/manifest.json`.
+- [x] Enforcement-mode parsing shared between control-plane and privacy guard — Evidence: `.runs/0707-orchestrator-slimdown/cli/2025-12-20T00-28-00-131Z-bd705bcf/manifest.json`.
+- [x] Error string expectations verified before centralizing error formatting — Evidence: `.runs/0707-orchestrator-slimdown/cli/2025-12-20T00-28-00-131Z-bd705bcf/manifest.json`.
+- [x] Error message formatting centralized without changing prefixes or strings (Needs Verification) — Evidence: `.runs/0707-orchestrator-slimdown/cli/2025-12-20T00-28-00-131Z-bd705bcf/manifest.json`.
 
 # Task List Snapshot — Design Reference Pipeline (0401-design-reference)
 
