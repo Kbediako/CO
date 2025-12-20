@@ -36,9 +36,13 @@ async function runDiffBudget(
   env: Record<string, string | undefined> = {}
 ): Promise<{ exitCode: number; stdout: string; stderr: string }> {
   try {
+    const mergedEnv: Record<string, string | undefined> = { ...process.env, ...env };
+    if (!('DIFF_BUDGET_OVERRIDE_REASON' in env)) {
+      delete mergedEnv.DIFF_BUDGET_OVERRIDE_REASON;
+    }
     const { stdout, stderr } = await execFileAsync('node', [scriptPath, ...args], {
       cwd: repo,
-      env: { ...process.env, ...env }
+      env: mergedEnv
     });
     return { exitCode: 0, stdout: String(stdout ?? ''), stderr: String(stderr ?? '') };
   } catch (error) {
@@ -116,4 +120,3 @@ describe('diff-budget script', () => {
     expect(result.stdout).toContain('Override accepted via DIFF_BUDGET_OVERRIDE_REASON: tests: override accepted');
   });
 });
-
