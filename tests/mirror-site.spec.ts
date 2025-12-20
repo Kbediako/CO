@@ -2,7 +2,10 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import {
+const cheerio = await loadCheerioOptional();
+const describeSuite = cheerio ? describe : describe.skip;
+const mirrorSite = cheerio ? await import("../scripts/mirror-site.mjs") : null;
+const {
   DEFAULT_ASSET_ROOTS,
   DEFAULT_SHARE_HOST_REWRITES,
   buildWaybackUrl,
@@ -14,10 +17,7 @@ import {
   rewriteMetaImages,
   rewriteShareLinks,
   stripElements
-} from "../scripts/mirror-site.mjs";
-
-const cheerio = await loadCheerioOptional();
-const describeSuite = cheerio ? describe : describe.skip;
+} = mirrorSite ?? {};
 
 describeSuite("mirror-site defaults and rewrites", () => {
   it("applies WordPress asset root defaults when assetRoots are missing", () => {
