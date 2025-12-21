@@ -18,6 +18,11 @@ declare module 'csstree' {
   export = csstree;
 }
 
+declare module 'css-tree' {
+  const csstree: any;
+  export = csstree;
+}
+
 declare module 'fs-extra' {
   const fs: any;
   export = fs;

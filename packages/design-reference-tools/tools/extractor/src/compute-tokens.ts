@@ -2,7 +2,7 @@
 import { Command } from 'commander';
 import fs from 'fs-extra';
 import path from 'path';
-import * as csstree from 'csstree';
+import * as csstree from 'css-tree';
 import tinycolor from 'tinycolor2';
 import { logStep } from './util.js';
 
