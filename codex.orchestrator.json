@@ -35,7 +35,7 @@
     {
       "id": "implementation-gate",
       "title": "Implementation Complete Gate",
-      "description": "Runs the required implementation validations (spec-guard, build, lint, test, docs:check) and launches the Codex review handoff, writing a single manifest for evidence.",
+      "description": "Runs the required implementation validations (spec-guard, build, lint, test, docs:check, diff-budget) and launches the Codex review handoff, writing a single manifest for evidence.",
       "tags": ["implementation-gate"],
       "stages": [
         {
@@ -70,9 +70,16 @@
         },
         {
           "kind": "command",
+          "id": "diff-budget",
+          "title": "node scripts/diff-budget.mjs",
+          "command": "node scripts/diff-budget.mjs"
+        },
+        {
+          "kind": "command",
           "id": "review",
           "title": "npm run review",
-          "command": "npm run review"
+          "command": "npm run review",
+          "env": { "DIFF_BUDGET_STAGE": "1" }
         }
       ]
     },

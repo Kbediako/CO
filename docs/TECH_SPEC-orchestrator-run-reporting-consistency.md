@@ -16,7 +16,7 @@ Align grouped run summaries, scheduler finalization, and metrics aggregation so 
 
 3. Metrics aggregation serialized per task
    - Files: `orchestrator/src/cli/metrics/metricsRecorder.ts`, `orchestrator/src/cli/metrics/metricsAggregator.ts`
-   - Approach: Add a lightweight lock file (for example `metrics.lock` under `.runs/<task>/`) around append + aggregate updates. Retry a small number of times with short backoff. If the lock cannot be acquired, log and skip aggregation to avoid corrupt reads while still capturing the metrics entry.
+   - Approach: Add a lightweight lock file (`metrics.lock` under `.runs/<task>/`) around append + aggregate updates with bounded retries. Before acquiring, prune stale lock files (mtime older than a few minutes). If the lock cannot be acquired, queue entries in `metrics.pending/` (one file per entry) and merge them into `metrics.json` on the next successful lock acquisition so metrics are never appended without holding the lock.
    - Tests: Extend `orchestrator/tests/MetricsAggregator.test.ts` or add a small recorder test to cover lock acquisition behavior and ensure aggregates remain valid.
 
 ## Testing Strategy
@@ -25,4 +25,4 @@ Align grouped run summaries, scheduler finalization, and metrics aggregation so 
 - Run guardrails in order: `node scripts/spec-guard.mjs --dry-run`, `npm run build`, `npm run lint`, `npm run test`, `npm run docs:check`, `node scripts/diff-budget.mjs`, `npm run review`.
 
 ## Evidence
-- Diagnostics manifest: pending `.runs/0909-orchestrator-run-reporting-consistency/cli/<run-id>/manifest.json`.
+- Implementation-gate manifest: `.runs/0909-orchestrator-run-reporting-consistency/cli/2025-12-21T08-53-32-077Z-8900ea95/manifest.json`.

@@ -198,6 +198,38 @@ describe('createSchedulerPlan', () => {
     expect(manifest.assignments[0]?.attempts[0]?.recovery_checkpoints).toHaveLength(0);
   });
 
+  it('does not set completed timestamps when final status is running', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'scheduler-finalize-running-'));
+    const env: EnvironmentPaths = {
+      repoRoot,
+      runsRoot: join(repoRoot, '.runs'),
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'autonomy-upgrade'
+    };
+
+    const pipeline: PipelineDefinition = {
+      id: 'pipeline-running',
+      title: 'Running Pipeline',
+      stages: [{ kind: 'command', id: 'build', title: 'Build', command: 'echo build' }],
+      tags: ['general']
+    };
+
+    const { request } = createRequest(env, pipeline, 'run-running');
+    const plan = createSchedulerPlan(request, {
+      now: () => new Date('2025-11-05T03:10:00Z'),
+      instancePrefix: 'autonomy-upgrade'
+    });
+
+    finalizeSchedulerPlan(plan, 'running', '2025-11-05T03:12:00Z');
+
+    const assignment = plan.assignments[0];
+    expect(assignment?.status).toBe('running');
+    expect(assignment?.completedAt).toBeNull();
+    expect(assignment?.attempts[0]?.status).toBe('running');
+    expect(assignment?.attempts[0]?.completedAt).toBeNull();
+    expect(assignment?.attempts[0]?.startedAt).toBe('2025-11-05T03:12:00Z');
+  });
+
   it('annotates assignments with tfgrpo group metadata', async () => {
     const repoRoot = await mkdtemp(join(tmpdir(), 'scheduler-group-meta-'));
     const env: EnvironmentPaths = {

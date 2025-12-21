@@ -101,16 +101,21 @@ export function finalizeSchedulerPlan(
 ): void {
   const attemptStatus: SchedulerAssignmentAttempt['status'] =
     finalStatus === 'succeeded' ? 'completed' : finalStatus === 'running' ? 'running' : 'failed';
+  const isTerminal = finalStatus !== 'running';
 
   for (const assignment of plan.assignments) {
     assignment.status = finalStatus;
-    assignment.completedAt = timestamp;
+    if (isTerminal) {
+      assignment.completedAt = timestamp;
+    }
     const latest = assignment.attempts[assignment.attempts.length - 1];
     if (latest) {
       if (!latest.startedAt) {
         latest.startedAt = timestamp;
       }
-      latest.completedAt = timestamp;
+      if (isTerminal) {
+        latest.completedAt = timestamp;
+      }
       latest.status = attemptStatus;
       if (attemptStatus === 'failed') {
         latest.recoveryCheckpoints.push({

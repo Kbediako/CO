@@ -1,10 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { mkdtemp, writeFile, readFile, mkdir } from 'node:fs/promises';
+import { mkdtemp, writeFile, readFile, mkdir, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
 import type { EnvironmentPaths } from '../src/cli/run/environment.js';
-import { updateMetricsAggregates, type MetricsEntry } from '../src/cli/metrics/metricsAggregator.js';
+import type { CliManifest } from '../src/cli/types.js';
+import { resolveRunPaths } from '../src/cli/run/runPaths.js';
+import { appendMetricsEntry } from '../src/cli/metrics/metricsRecorder.js';
+import {
+  mergePendingMetricsEntries,
+  updateMetricsAggregates,
+  type MetricsEntry
+} from '../src/cli/metrics/metricsAggregator.js';
 
 function createEntry(index: number, status: string): MetricsEntry {
   return {
@@ -75,6 +82,59 @@ function createEntry(index: number, status: string): MetricsEntry {
   };
 }
 
+function createManifest(taskId: string, runId: string): CliManifest {
+  const now = new Date().toISOString();
+  return {
+    version: 1,
+    task_id: taskId,
+    task_slug: taskId,
+    run_id: runId,
+    parent_run_id: null,
+    pipeline_id: 'pipeline',
+    pipeline_title: 'Pipeline',
+    runner: 'codex-cli',
+    approval_policy: null,
+    status: 'succeeded',
+    status_detail: null,
+    started_at: now,
+    completed_at: now,
+    updated_at: now,
+    heartbeat_at: now,
+    heartbeat_interval_seconds: 5,
+    heartbeat_stale_after_seconds: 30,
+    artifact_root: `.runs/${taskId}/cli/${runId}`,
+    compat_path: `.runs/${taskId}/cli/${runId}/compat`,
+    log_path: `.runs/${taskId}/cli/${runId}/log.ndjson`,
+    summary: null,
+    metrics_recorded: false,
+    resume_token: 'token',
+    resume_events: [],
+    approvals: [],
+    commands: [
+      {
+        index: 1,
+        id: 'spec-guard',
+        title: 'Spec Guard',
+        command: 'node scripts/spec-guard.mjs --dry-run',
+        kind: 'command',
+        status: 'succeeded',
+        started_at: now,
+        completed_at: now,
+        exit_code: 0,
+        summary: null,
+        log_path: null,
+        error_file: null,
+        sub_run_id: null
+      }
+    ],
+    child_runs: [],
+    run_summary_path: null,
+    plan_target_id: null,
+    instructions_hash: null,
+    instructions_sources: []
+  };
+}
+
 describe('metricsAggregator', () => {
   it('creates aggregate metric artifacts', async () => {
     const repoRoot = await mkdtemp(join(tmpdir(), 'metrics-aggregator-'));
@@ -128,5 +188,116 @@ describe('metricsAggregator', () => {
     );
     expect(state.safety.validation.passed).toBeGreaterThan(0);
     expect(state.throughput.candidates).toBe(2);
+  });
+
+  it('queues metrics entries when the lock is held but skips aggregation', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'metrics-aggregator-lock-'));
+    const runsRoot = join(repoRoot, '.runs');
+    const outRoot = join(repoRoot, 'out');
+    const env: EnvironmentPaths = {
+      repoRoot,
+      runsRoot,
+      outRoot,
+      taskId: 'autonomy-upgrade'
+    };
+
+    const runId = 'run-lock';
+    const paths = resolveRunPaths(env, runId);
+    const manifest = createManifest(env.taskId, runId);
+
+    const metricsRoot = join(runsRoot, env.taskId);
+    await mkdir(metricsRoot, { recursive: true });
+    await writeFile(join(metricsRoot, 'metrics.lock'), 'locked', 'utf8');
+
+    await appendMetricsEntry(env, paths, manifest);
+
+    const pendingDir = join(metricsRoot, 'metrics.pending');
+    const pendingEntries = await readdir(pendingDir);
+    expect(pendingEntries).toHaveLength(1);
+    await expect(readFile(join(metricsRoot, 'metrics.json'), 'utf8')).rejects.toMatchObject({
+      code: 'ENOENT'
+    });
+    expect(manifest.metrics_recorded).toBe(false);
+    await expect(readFile(join(metricsRoot, 'metrics', 'post-rollout.json'), 'utf8')).rejects.toMatchObject({
+      code: 'ENOENT'
+    });
+  });
+
+  it('flushes pending metrics entries on the next lock acquisition', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'metrics-aggregator-flush-'));
+    const runsRoot = join(repoRoot, '.runs');
+    const outRoot = join(repoRoot, 'out');
+    const env: EnvironmentPaths = {
+      repoRoot,
+      runsRoot,
+      outRoot,
+      taskId: 'autonomy-upgrade'
+    };
+
+    const runId = 'run-flush';
+    const paths = resolveRunPaths(env, runId);
+    const manifest = createManifest(env.taskId, runId);
+
+    const metricsRoot = join(runsRoot, env.taskId);
+    await mkdir(metricsRoot, { recursive: true });
+    const pendingDir = join(metricsRoot, 'metrics.pending');
+    await mkdir(pendingDir, { recursive: true });
+    await writeFile(
+      join(pendingDir, 'entry-1.jsonl'),
+      `${JSON.stringify(createEntry(1, 'succeeded'))}\n`,
+      { encoding: 'utf8', flag: 'w' }
+    );
+    await writeFile(
+      join(pendingDir, 'entry-2.jsonl'),
+      `${JSON.stringify(createEntry(2, 'failed'))}\n`,
+      { encoding: 'utf8', flag: 'w' }
+    );
+
+    await appendMetricsEntry(env, paths, manifest);
+
+    const metricsContent = await readFile(join(metricsRoot, 'metrics.json'), 'utf8');
+    expect(metricsContent.trim().split('\n')).toHaveLength(3);
+    const remaining = await readdir(pendingDir);
+    expect(remaining).toHaveLength(0);
+
+    const postRollout = JSON.parse(
+      await readFile(join(metricsRoot, 'metrics', 'post-rollout.json'), 'utf8')
+    );
+    expect(postRollout.total_runs).toBe(3);
+  });
+
+  it('drains per-entry pending files when merging', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'metrics-aggregator-pending-'));
+    const runsRoot = join(repoRoot, '.runs');
+    const outRoot = join(repoRoot, 'out');
+    const env: EnvironmentPaths = {
+      repoRoot,
+      runsRoot,
+      outRoot,
+      taskId: 'autonomy-upgrade'
+    };
+
+    const metricsRoot = join(runsRoot, env.taskId);
+    await mkdir(metricsRoot, { recursive: true });
+    const pendingDir = join(metricsRoot, 'metrics.pending');
+    await mkdir(pendingDir, { recursive: true });
+    await writeFile(
+      join(pendingDir, 'entry-a.jsonl'),
+      `${JSON.stringify(createEntry(1, 'succeeded'))}\n`,
+      { encoding: 'utf8', flag: 'w' }
+    );
+    await writeFile(
+      join(pendingDir, 'entry-b.jsonl'),
+      `${JSON.stringify(createEntry(2, 'failed'))}\n`,
+      { encoding: 'utf8', flag: 'w' }
+    );
+
+    const merged = await mergePendingMetricsEntries(env);
+
+    expect(merged).toBe(2);
+    const metricsContent = await readFile(join(metricsRoot, 'metrics.json'), 'utf8');
+    expect(metricsContent.trim().split('\n')).toHaveLength(2);
+    const remaining = await readdir(pendingDir);
+    expect(remaining).toHaveLength(0);
   });
 });

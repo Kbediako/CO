@@ -14,8 +14,8 @@
 
 ## Task 0909 — Orchestrator Run Reporting Consistency
 - Primary Doc: `docs/TECH_SPEC-orchestrator-run-reporting-consistency.md`
-- Run Manifest Link: _(pending — capture first diagnostics run under `.runs/0909-orchestrator-run-reporting-consistency/cli/<run-id>/manifest.json`)._
-- Metrics / State Snapshots: _(pending — populate `.runs/0909-orchestrator-run-reporting-consistency/metrics.json`, `out/0909-orchestrator-run-reporting-consistency/state.json`)._
+- Run Manifest Link: `.runs/0909-orchestrator-run-reporting-consistency/cli/2025-12-21T08-53-32-077Z-8900ea95/manifest.json`.
+- Metrics / State Snapshots: `.runs/0909-orchestrator-run-reporting-consistency/metrics.json`, `out/0909-orchestrator-run-reporting-consistency/state.json`.
 - Checklist Mirror: `tasks/tasks-0909-orchestrator-run-reporting-consistency.md`, `docs/TASKS.md` (0909 section), `.agent/task/0909-orchestrator-run-reporting-consistency.md`.
 
 ## Task 0904 — README vs Codebase Alignment

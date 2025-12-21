@@ -276,16 +276,12 @@ export class TaskManager {
     const testResults: TestResult[] = [];
     const reviewResults: ReviewResult[] = [];
     let finalResult: PipelineRunResult | null = null;
-    let primaryResult: PipelineRunResult | null = null;
     for (let index = 0; index < targets.length; index += 1) {
       const target = targets[index]!;
       const result = await this.runPipelineStages(task, plan, target, runId);
       buildResults.push(result.build);
       testResults.push(result.test);
       reviewResults.push(result.review);
-      if (!primaryResult) {
-        primaryResult = result;
-      }
       entries.push({
         index: index + 1,
         subtaskId: target.id,
@@ -300,22 +296,21 @@ export class TaskManager {
         break;
       }
     }
-    const summaryResult = primaryResult ?? finalResult;
-    if (!summaryResult || !primaryResult) {
+    if (!finalResult) {
       throw new Error('Group execution produced no runnable subtasks.');
     }
-    const groupMode = entries.some((entry) => entry.mode === 'cloud') ? 'cloud' : summaryResult.mode;
-    summaryResult.summary.mode = groupMode;
-    summaryResult.summary.group = {
+    const groupMode = entries.some((entry) => entry.mode === 'cloud') ? 'cloud' : finalResult.mode;
+    finalResult.summary.mode = groupMode;
+    finalResult.summary.group = {
       enabled: true,
       size: targets.length,
       processed: entries.length,
       entries
     };
-    summaryResult.summary.builds = buildResults;
-    summaryResult.summary.tests = testResults;
-    summaryResult.summary.reviews = reviewResults;
-    return summaryResult;
+    finalResult.summary.builds = buildResults;
+    finalResult.summary.tests = testResults;
+    finalResult.summary.reviews = reviewResults;
+    return finalResult;
   }
 
   private normalizeBuildResult(build: BuildResult, mode: ExecutionMode, runId: string): BuildResult {

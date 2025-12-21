@@ -46,5 +46,5 @@
 - Design: N/A
 
 ## Evidence and Manifests
-- Diagnostics/guardrails manifest: pending `.runs/0909-orchestrator-run-reporting-consistency/cli/<run-id>/manifest.json`.
-- Metrics/state snapshots: pending `.runs/0909-orchestrator-run-reporting-consistency/metrics.json`, `out/0909-orchestrator-run-reporting-consistency/state.json`.
+- Implementation-gate/guardrails manifest: `.runs/0909-orchestrator-run-reporting-consistency/cli/2025-12-21T08-53-32-077Z-8900ea95/manifest.json`.
+- Metrics/state snapshots: `.runs/0909-orchestrator-run-reporting-consistency/metrics.json`, `out/0909-orchestrator-run-reporting-consistency/state.json`.
