@@ -38,7 +38,8 @@ export class SchedulerService {
     plan: SchedulerPlan;
   }): Promise<void> {
     const finalStatus = this.resolveSchedulerFinalStatus(options.manifest.status);
-    finalizeSchedulerPlan(options.plan, finalStatus, isoTimestamp());
+    const finalizedAt = options.manifest.completed_at ?? isoTimestamp();
+    finalizeSchedulerPlan(options.plan, finalStatus, finalizedAt);
     this.attachSchedulerPlanToManifest(options.manifest, options.plan);
     await saveManifest(options.paths, options.manifest);
   }

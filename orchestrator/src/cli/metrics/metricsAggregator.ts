@@ -1,8 +1,10 @@
-import { readFile, writeFile, mkdir, stat } from 'node:fs/promises';
-import { join } from 'node:path';
+import type { Dirent } from 'node:fs';
+import { appendFile, mkdir, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
 
 import type { EnvironmentPaths } from '../run/environment.js';
 import type { SandboxState, ToolRunStatus } from '../../../../packages/shared/manifest/types.js';
+import { acquireLockWithRetry, type LockRetryOptions } from '../../persistence/lockFile.js';
 
 export interface MetricsEntry {
   run_id: string;
@@ -62,9 +64,186 @@ const REQUIRED_COMPLETENESS_FIELDS: Array<keyof MetricsEntry> = [
   'control_plane_status'
 ];
 
+const METRICS_LOCK_FILENAME = 'metrics.lock';
+const METRICS_PENDING_DIRNAME = 'metrics.pending';
+const DEFAULT_LOCK_STALE_MS = 5 * 60 * 1000;
+const DEFAULT_LOCK_RETRY: LockRetryOptions = {
+  maxAttempts: 4,
+  initialDelayMs: 50,
+  backoffFactor: 2,
+  maxDelayMs: 200
+};
+
+function getMetricsRoot(env: EnvironmentPaths): string {
+  return join(env.runsRoot, env.taskId);
+}
+
+function getMetricsPath(env: EnvironmentPaths): string {
+  return join(getMetricsRoot(env), 'metrics.json');
+}
+
+function getMetricsPendingDir(env: EnvironmentPaths): string {
+  return join(getMetricsRoot(env), METRICS_PENDING_DIRNAME);
+}
+
+function getMetricsLockPath(env: EnvironmentPaths): string {
+  return join(getMetricsRoot(env), METRICS_LOCK_FILENAME);
+}
+
+async function cleanupStaleMetricsLock(lockPath: string, staleMs: number): Promise<boolean> {
+  if (staleMs <= 0) {
+    return false;
+  }
+  try {
+    const stats = await stat(lockPath);
+    const ageMs = Date.now() - stats.mtimeMs;
+    if (!Number.isFinite(ageMs) || ageMs <= staleMs) {
+      return false;
+    }
+    await rm(lockPath, { force: true });
+    return true;
+  } catch (error: unknown) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      return false;
+    }
+    throw error;
+  }
+}
+
+class MetricsLockError extends Error {
+  constructor(message: string, public readonly taskId: string) {
+    super(message);
+    this.name = 'MetricsLockError';
+  }
+}
+
+export interface MetricsLockOptions {
+  retry?: Partial<LockRetryOptions>;
+  staleMs?: number;
+}
+
+async function drainMetricsEntryFile(env: EnvironmentPaths, path: string): Promise<number> {
+  let raw = '';
+  try {
+    raw = await readFile(path, 'utf8');
+  } catch (error: unknown) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      return 0;
+    }
+    throw error;
+  }
+
+  const lines = raw.trim().split('\n').filter(Boolean);
+  if (lines.length === 0) {
+    await rm(path, { force: true });
+    return 0;
+  }
+
+  await mkdir(getMetricsRoot(env), { recursive: true });
+  const payload = `${lines.join('\n')}\n`;
+  await appendFile(getMetricsPath(env), payload, 'utf8');
+  await rm(path, { force: true });
+  return lines.length;
+}
+
+export async function mergePendingMetricsEntries(env: EnvironmentPaths): Promise<number> {
+  const pendingDir = getMetricsPendingDir(env);
+  let merged = 0;
+  const staleTmpMs = DEFAULT_LOCK_STALE_MS;
+
+  for (let pass = 0; pass < 2; pass += 1) {
+    let entries: Dirent[] = [];
+    try {
+      entries = await readdir(pendingDir, { withFileTypes: true });
+    } catch (error: unknown) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+        return merged;
+      }
+      throw error;
+    }
+
+    const now = Date.now();
+    for (const entry of entries) {
+      if (!entry.isFile() || !entry.name.endsWith('.tmp')) {
+        continue;
+      }
+      const tmpPath = join(pendingDir, entry.name);
+      try {
+        const stats = await stat(tmpPath);
+        if (now - stats.mtimeMs > staleTmpMs) {
+          await rm(tmpPath, { force: true });
+        }
+      } catch (error: unknown) {
+        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+          throw error;
+        }
+      }
+    }
+
+    const files = entries
+      .filter((entry) => entry.isFile() && entry.name.endsWith('.jsonl'))
+      .map((entry) => entry.name)
+      .sort();
+
+    if (files.length === 0) {
+      break;
+    }
+
+    for (const file of files) {
+      merged += await drainMetricsEntryFile(env, join(pendingDir, file));
+    }
+  }
+
+  return merged;
+}
+
+export async function withMetricsLock<T>(
+  env: EnvironmentPaths,
+  action: () => Promise<T>,
+  options: MetricsLockOptions = {}
+): Promise<{ acquired: boolean; result?: T }> {
+  const overrides = options.retry ?? {};
+  const sanitizedOverrides = Object.fromEntries(
+    Object.entries(overrides).filter(([, value]) => value !== undefined)
+  ) as Partial<LockRetryOptions>;
+  const lockRetry = { ...DEFAULT_LOCK_RETRY, ...sanitizedOverrides };
+  const lockPath = getMetricsLockPath(env);
+  const staleMs = options.staleMs ?? DEFAULT_LOCK_STALE_MS;
+
+  await cleanupStaleMetricsLock(lockPath, staleMs);
+
+  try {
+    await acquireLockWithRetry({
+      taskId: env.taskId,
+      lockPath,
+      retry: lockRetry,
+      ensureDirectory: async () => {
+        await mkdir(dirname(lockPath), { recursive: true });
+      },
+      createError: (taskId, attempts) =>
+        new MetricsLockError(
+          `Failed to acquire metrics lock for ${taskId} after ${attempts} attempts`,
+          taskId
+        )
+    });
+  } catch (error: unknown) {
+    if (error instanceof MetricsLockError) {
+      return { acquired: false };
+    }
+    throw error;
+  }
+
+  try {
+    const result = await action();
+    return { acquired: true, result };
+  } finally {
+    await rm(lockPath, { force: true });
+  }
+}
+
 export async function updateMetricsAggregates(env: EnvironmentPaths): Promise<void> {
-  const metricsRoot = join(env.runsRoot, env.taskId);
-  const metricsPath = join(metricsRoot, 'metrics.json');
+  const metricsRoot = getMetricsRoot(env);
+  const metricsPath = getMetricsPath(env);
   const entries = await loadMetricsEntries(metricsPath);
   if (entries.length === 0) {
     return;

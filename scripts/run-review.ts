@@ -259,7 +259,11 @@ async function resolveManifestPath(options: CliOptions): Promise<string> {
 
 async function main(): Promise<void> {
   const options = parseArgs(process.argv.slice(2));
-  await runDiffBudget(options);
+  if (shouldRunDiffBudget()) {
+    await runDiffBudget(options);
+  } else {
+    console.log('[run-review] skipping diff budget (already executed by pipeline).');
+  }
   const manifestPath = await resolveManifestPath(options);
 
   if (!(await hasReviewCommand())) {
@@ -413,6 +417,18 @@ async function runDiffBudget(options: CliOptions): Promise<void> {
       }
     });
   });
+}
+
+function shouldRunDiffBudget(): boolean {
+  return !(envFlagEnabled(process.env.DIFF_BUDGET_STAGE) || envFlagEnabled(process.env.SKIP_DIFF_BUDGET));
+}
+
+function envFlagEnabled(value: string | undefined): boolean {
+  if (!value) {
+    return false;
+  }
+  const normalized = value.trim().toLowerCase();
+  return normalized === '1' || normalized === 'true' || normalized === 'yes';
 }
 
 async function tryGit(args: string[]): Promise<string | null> {

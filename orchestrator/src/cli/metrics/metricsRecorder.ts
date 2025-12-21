@@ -1,4 +1,5 @@
-import { appendFile, mkdir } from 'node:fs/promises';
+import { randomUUID } from 'node:crypto';
+import { appendFile, mkdir, rename, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import type { CliManifest } from '../types.js';
@@ -12,9 +13,10 @@ import { isoTimestamp } from '../utils/time.js';
 import { saveManifest } from '../run/manifest.js';
 import type { RunPaths } from '../run/runPaths.js';
 import { logger } from '../../logger.js';
-import { updateMetricsAggregates } from './metricsAggregator.js';
+import { mergePendingMetricsEntries, updateMetricsAggregates, withMetricsLock } from './metricsAggregator.js';
 
 const TERMINAL_STATES = new Set(['succeeded', 'failed', 'cancelled']);
+const METRICS_PENDING_DIRNAME = 'metrics.pending';
 
 export async function appendMetricsEntry(
   env: EnvironmentPaths,
@@ -42,6 +44,7 @@ export async function appendMetricsEntry(
 
   const metricsRoot = join(env.runsRoot, env.taskId);
   const metricsPath = join(metricsRoot, 'metrics.json');
+  const pendingDir = join(metricsRoot, METRICS_PENDING_DIRNAME);
 
   const entry = {
     run_id: manifest.run_id,
@@ -97,15 +100,54 @@ export async function appendMetricsEntry(
   };
 
   await mkdir(metricsRoot, { recursive: true });
-  await appendFile(metricsPath, `${JSON.stringify(entry)}\n`, 'utf8');
+  const appendEntry = async () => {
+    await appendFile(metricsPath, `${JSON.stringify(entry)}\n`, 'utf8');
+  };
+  const appendPendingEntry = async () => {
+    const safeRunId = entry.run_id.replace(/[^a-zA-Z0-9._-]+/g, '_');
+    await mkdir(pendingDir, { recursive: true });
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const pendingName = `${safeRunId}-${Date.now()}-${randomUUID()}.jsonl`;
+      const pendingPath = join(pendingDir, pendingName);
+      const tmpPath = `${pendingPath}.tmp`;
+      try {
+        await writeFile(tmpPath, `${JSON.stringify(entry)}\n`, { encoding: 'utf8', flag: 'wx' });
+        await rename(tmpPath, pendingPath);
+        return pendingPath;
+      } catch (error: unknown) {
+        if ((error as NodeJS.ErrnoException).code !== 'EEXIST') {
+          throw error;
+        }
+      }
+    }
+    throw new Error(`Failed to create pending metrics entry for ${entry.run_id}`);
+  };
+  const finalizeManifest = async (metricsRecorded: boolean) => {
+    if (!guardrailsPresent && guardrailStatus.recommendation) {
+      logger.warn(guardrailStatus.recommendation);
+      appendSummary(manifest, guardrailStatus.recommendation);
+    }
 
-  if (!guardrailsPresent && guardrailStatus.recommendation) {
-    logger.warn(guardrailStatus.recommendation);
-    appendSummary(manifest, guardrailStatus.recommendation);
+    upsertGuardrailSummary(manifest);
+    manifest.metrics_recorded = metricsRecorded;
+    await saveManifest(paths, manifest);
+  };
+
+  const { acquired } = await withMetricsLock(env, async () => {
+    await mergePendingMetricsEntries(env);
+    await appendEntry();
+    await finalizeManifest(true);
+    await updateMetricsAggregates(env);
+    const mergedAfter = await mergePendingMetricsEntries(env);
+    if (mergedAfter > 0) {
+      await updateMetricsAggregates(env);
+    }
+  });
+  if (!acquired) {
+    const pendingPath = await appendPendingEntry();
+    await finalizeManifest(false);
+    logger.warn(
+      `Metrics aggregation skipped for ${env.taskId}: queued metrics entry in ${pendingPath}.`
+    );
   }
-
-  upsertGuardrailSummary(manifest);
-  manifest.metrics_recorded = true;
-  await saveManifest(paths, manifest);
-  await updateMetricsAggregates(env);
 }
