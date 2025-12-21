@@ -36,17 +36,17 @@ Mirror status with `tasks/tasks-0901-orchestrator-issue-validation.md` and `.age
 
 # Task List Snapshot — Orchestrator Run Reporting Consistency (0909)
 
-- Update - Implementation in progress: implementation-gate/guardrails captured at `.runs/0909-orchestrator-run-reporting-consistency/cli/2025-12-21T08-53-32-077Z-8900ea95/manifest.json`.
+- Update - Implementation in progress: implementation-gate/guardrails captured at `.runs/0909-orchestrator-run-reporting-consistency/cli/2025-12-21T14-02-47-637Z-9f7c2ccb/manifest.json`.
 - Notes: Export `MCP_RUNNER_TASK_ID=0909-orchestrator-run-reporting-consistency` before orchestrator commands. Guardrails required: `node scripts/spec-guard.mjs --dry-run`, `npm run build`, `npm run lint`, `npm run test`, `npm run docs:check`, `node scripts/diff-budget.mjs`, `npm run review`.
 
 ## Checklist Mirror
 Mirror status with `tasks/tasks-0909-orchestrator-run-reporting-consistency.md` and `.agent/task/0909-orchestrator-run-reporting-consistency.md`. Keep `[ ]` until evidence is recorded.
 
 ### Foundation
-- [x] Implementation-gate/guardrails manifest captured — Evidence: `.runs/0909-orchestrator-run-reporting-consistency/cli/2025-12-21T08-53-32-077Z-8900ea95/manifest.json`.
+- [x] Implementation-gate/guardrails manifest captured — Evidence: `.runs/0909-orchestrator-run-reporting-consistency/cli/2025-12-21T14-02-47-637Z-9f7c2ccb/manifest.json`.
 - [x] Metrics/state snapshots updated — Evidence: `.runs/0909-orchestrator-run-reporting-consistency/metrics.json`, `out/0909-orchestrator-run-reporting-consistency/state.json`.
 - [x] PRD/spec/tasks mirrors updated — Evidence: this commit.
-- [x] Mini-spec reviewed and approved — Evidence: `tasks/specs/0909-orchestrator-run-reporting-consistency.md`, `.runs/0909-orchestrator-run-reporting-consistency/cli/2025-12-21T08-53-32-077Z-8900ea95/manifest.json`.
+- [x] Mini-spec reviewed and approved — Evidence: `tasks/specs/0909-orchestrator-run-reporting-consistency.md`, `.runs/0909-orchestrator-run-reporting-consistency/cli/2025-12-21T14-02-47-637Z-9f7c2ccb/manifest.json`.
 
 ### Fixes
 - [x] Grouped run summaries reflect overall outcome.
@@ -55,13 +55,13 @@ Mirror status with `tasks/tasks-0909-orchestrator-run-reporting-consistency.md` 
 - [x] Regression tests updated or added.
 
 ### Guardrails
-- [x] Spec guard passes — Evidence: `.runs/0909-orchestrator-run-reporting-consistency/cli/2025-12-21T08-53-32-077Z-8900ea95/manifest.json`.
-- [x] Build passes — Evidence: `.runs/0909-orchestrator-run-reporting-consistency/cli/2025-12-21T08-53-32-077Z-8900ea95/manifest.json`.
-- [x] Lint passes — Evidence: `.runs/0909-orchestrator-run-reporting-consistency/cli/2025-12-21T08-53-32-077Z-8900ea95/manifest.json`.
-- [x] Tests pass — Evidence: `.runs/0909-orchestrator-run-reporting-consistency/cli/2025-12-21T08-53-32-077Z-8900ea95/manifest.json`.
-- [x] Docs check passes — Evidence: `.runs/0909-orchestrator-run-reporting-consistency/cli/2025-12-21T08-53-32-077Z-8900ea95/manifest.json`.
-- [x] Diff budget passes — Evidence: `.runs/0909-orchestrator-run-reporting-consistency/cli/2025-12-21T08-53-32-077Z-8900ea95/manifest.json`.
-- [x] Review run captured — Evidence: `.runs/0909-orchestrator-run-reporting-consistency/cli/2025-12-21T08-53-32-077Z-8900ea95/manifest.json`.
+- [x] Spec guard passes — Evidence: `.runs/0909-orchestrator-run-reporting-consistency/cli/2025-12-21T14-02-47-637Z-9f7c2ccb/manifest.json`.
+- [x] Build passes — Evidence: `.runs/0909-orchestrator-run-reporting-consistency/cli/2025-12-21T14-02-47-637Z-9f7c2ccb/manifest.json`.
+- [x] Lint passes — Evidence: `.runs/0909-orchestrator-run-reporting-consistency/cli/2025-12-21T14-02-47-637Z-9f7c2ccb/manifest.json`.
+- [x] Tests pass — Evidence: `.runs/0909-orchestrator-run-reporting-consistency/cli/2025-12-21T14-02-47-637Z-9f7c2ccb/manifest.json`.
+- [x] Docs check passes — Evidence: `.runs/0909-orchestrator-run-reporting-consistency/cli/2025-12-21T14-02-47-637Z-9f7c2ccb/manifest.json`.
+- [x] Diff budget passes — Evidence: `.runs/0909-orchestrator-run-reporting-consistency/cli/2025-12-21T14-02-47-637Z-9f7c2ccb/manifest.json`.
+- [x] Review run captured — Evidence: `.runs/0909-orchestrator-run-reporting-consistency/cli/2025-12-21T14-02-47-637Z-9f7c2ccb/manifest.json`.
 
 # Task List Snapshot — Orchestrator Reliability Fixes (0902)
 

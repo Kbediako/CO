@@ -46,5 +46,5 @@
 - Design: N/A
 
 ## Evidence and Manifests
-- Implementation-gate/guardrails manifest: `.runs/0909-orchestrator-run-reporting-consistency/cli/2025-12-21T08-53-32-077Z-8900ea95/manifest.json`.
+- Implementation-gate/guardrails manifest: `.runs/0909-orchestrator-run-reporting-consistency/cli/2025-12-21T14-02-47-637Z-9f7c2ccb/manifest.json`.
 - Metrics/state snapshots: `.runs/0909-orchestrator-run-reporting-consistency/metrics.json`, `out/0909-orchestrator-run-reporting-consistency/state.json`.

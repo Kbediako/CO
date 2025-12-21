@@ -15,7 +15,7 @@
 
 ## Task 0909 — Orchestrator Run Reporting Consistency
 - Primary Doc: `docs/PRD-orchestrator-run-reporting-consistency.md`
-- Run Manifest Link: `.runs/0909-orchestrator-run-reporting-consistency/cli/2025-12-21T08-53-32-077Z-8900ea95/manifest.json`.
+- Run Manifest Link: `.runs/0909-orchestrator-run-reporting-consistency/cli/2025-12-21T14-02-47-637Z-9f7c2ccb/manifest.json`.
 - Metrics / State Snapshots: `.runs/0909-orchestrator-run-reporting-consistency/metrics.json`, `out/0909-orchestrator-run-reporting-consistency/state.json`.
 - Checklist Mirror: `tasks/tasks-0909-orchestrator-run-reporting-consistency.md`, `docs/TASKS.md` (0909 section), `.agent/task/0909-orchestrator-run-reporting-consistency.md`.
 
