@@ -19,14 +19,20 @@ Use a stable task id (`<id>-<slug>`) and export it so runs are scoped correctly:
 export MCP_RUNNER_TASK_ID=<task-id>
 ```
 
-## 2) Implement one checklist item at a time
+## 2) Capture a docs-review manifest (pre-implementation)
+Run the docs-review pipeline before implementation work begins:
+```bash
+npx codex-orchestrator start docs-review --format json --no-interactive --task <task-id>
+```
+
+## 3) Implement one checklist item at a time
 Work from the canonical checklist:
 - `tasks/tasks-<id>-<slug>.md`
 
 If the work triggers the spec policy, stop and write/update a mini-spec:
 - `.agent/SOPs/specs-and-research.md`
 
-## 3) Capture guardrail evidence via the orchestrator
+## 4) Capture guardrail evidence via the orchestrator
 Run diagnostics (non-interactive) and record the resulting run id + manifest path:
 ```bash
 npx codex-orchestrator start diagnostics --format json --no-interactive --task <task-id>
@@ -35,7 +41,7 @@ npx codex-orchestrator start diagnostics --format json --no-interactive --task <
 The evidence contract is the manifest at:
 - `.runs/<task-id>/cli/<run-id>/manifest.json`
 
-## 4) Mirror outcomes everywhere
+## 5) Mirror outcomes everywhere
 Once the checklist item is complete and you have a manifest proving it, flip `[ ] → [x]` in:
 - `tasks/tasks-<id>-<slug>.md`
 - `.agent/task/<id>-<slug>.md`
@@ -45,7 +51,7 @@ Also update `tasks/index.json` with:
 - `gate.log`: `.runs/<task-id>/cli/<run-id>/manifest.json`
 - `gate.run_id`: `<run-id>`
 
-## 5) Reviewer hand-off (Codex-first)
+## 6) Reviewer hand-off (Codex-first)
 Implementation is only “complete” once these have run (in order):
 - `node scripts/spec-guard.mjs --dry-run`
 - `npm run build`

@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp 136e98077ff0af0e5fbc5dc0c3bdae9f0006d1695d374c466c62f37f921ab0c8 -->
+<!-- codex:instruction-stamp 0543068b60d4e842dcecde08b313c47753c7698e8cc340f5c6495e4de78ccaf1 -->
 # Repository Agent Guidance
 
 ## Project 0303 — Codex Orchestrator Autonomy Enhancements
@@ -16,6 +16,10 @@
 - Reference stamped prompt packs stored in `.agent/prompts/prompt-packs/` when wiring system/inject/summarize/extract/optimize prompts; their hashes surface in the CLI manifest `prompt_packs` array for each epoch.
 - Persist experience, metrics, and OTEL artifacts under `.runs/0506-tfgrpo-integration/metrics.*` and `out/0506-tfgrpo-integration/` so reviewers can audit TF-GRPO loops end-to-end.
 - Diagnostics reminder: leave `FEATURE_TFGRPO_GROUP`, `TFGRPO_GROUP_SIZE`, and related env vars unset when running the default diagnostics pipeline. Those commands run the full vitest suite (including the guardrail tests) and intentionally fail if grouped execution is forced. Use the `tfgrpo-learning` pipeline (or custom configs) for grouped TF-GRPO validation instead.
+
+## Docs Review Gate (Pre-Implementation)
+- Before implementation work, capture a docs-review manifest via `npx codex-orchestrator start docs-review --format json --no-interactive --task <task-id>` with `MCP_RUNNER_TASK_ID` set.
+- Record the manifest path in the task checklists (`tasks/`, `.agent/task/`, `docs/TASKS.md`) and `tasks/index.json` for evidence.
 
 ## Parallel Runs (Meta-Orchestration)
 - When coordinating multiple workstreams, prefer one worktree per stream and route manifests with unique `MCP_RUNNER_TASK_ID` values; see `AGENTS.md` and `.agent/SOPs/meta-orchestration.md`.

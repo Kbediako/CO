@@ -84,6 +84,33 @@
       ]
     },
     {
+      "id": "docs-review",
+      "title": "Docs Review Gate",
+      "description": "Pre-implementation docs review: spec-guard, docs:check, and review (diff budget skipped).",
+      "tags": ["docs-review"],
+      "stages": [
+        {
+          "kind": "command",
+          "id": "spec-guard",
+          "title": "node scripts/spec-guard.mjs --dry-run",
+          "command": "node scripts/spec-guard.mjs --dry-run"
+        },
+        {
+          "kind": "command",
+          "id": "docs-check",
+          "title": "npm run docs:check",
+          "command": "npm run docs:check"
+        },
+        {
+          "kind": "command",
+          "id": "review",
+          "title": "npm run review",
+          "command": "npm run review",
+          "env": { "SKIP_DIFF_BUDGET": "1" }
+        }
+      ]
+    },
+    {
       "id": "diagnostics-with-eval",
       "title": "Diagnostics Pipeline (with Eval Harness)",
       "description": "Build, lint, test, run evaluation harness, and verify specs for guardrail evidence capture.",
