@@ -63,6 +63,37 @@ Mirror status with `tasks/tasks-0909-orchestrator-run-reporting-consistency.md` 
 - [x] Diff budget passes — Evidence: `.runs/0909-orchestrator-run-reporting-consistency/cli/2025-12-21T14-02-47-637Z-9f7c2ccb/manifest.json`.
 - [x] Review run captured — Evidence: `.runs/0909-orchestrator-run-reporting-consistency/cli/2025-12-21T14-02-47-637Z-9f7c2ccb/manifest.json`.
 
+# Task List Snapshot - Docs Review Gate (0910)
+
+- Update - Planning: PRD/tech spec/action plan/checklist drafted; docs-review manifest captured at `.runs/0910-docs-review-gate/cli/2025-12-22T14-22-14-990Z-d0b0eec7/manifest.json`.
+- Notes: Export `MCP_RUNNER_TASK_ID=0910-docs-review-gate` before orchestrator commands. Docs-review will run spec-guard, docs:check, and review with `SKIP_DIFF_BUDGET=1`.
+
+<!-- docs-sync:begin 0910-docs-review-gate -->
+## Checklist Mirror
+Mirror status with `tasks/tasks-0910-docs-review-gate.md` and `.agent/task/0910-docs-review-gate.md`. Keep `[ ]` until evidence is recorded.
+
+### Foundation
+- [x] Collateral drafted (PRD/tech spec/action plan/checklist) - Evidence: this commit.
+- [x] Mirrors created (`docs/TASKS.md`, `.agent/task/0910-docs-review-gate.md`, `tasks/index.json`) - Evidence: this commit.
+- [x] Docs-review manifest captured (pre-implementation) - Evidence: `.runs/0910-docs-review-gate/cli/2025-12-22T14-22-14-990Z-d0b0eec7/manifest.json`.
+- [x] Metrics/state snapshots updated - Evidence: `.runs/0910-docs-review-gate/metrics.json`, `out/0910-docs-review-gate/state.json`.
+- [x] `tasks/index.json` gate metadata updated with docs-review manifest - Evidence: `tasks/index.json`, `.runs/0910-docs-review-gate/cli/2025-12-22T14-22-14-990Z-d0b0eec7/manifest.json`.
+
+### Docs-review pipeline
+- [x] Add docs-review pipeline to `codex.orchestrator.json` (spec-guard, docs:check, review). - Evidence: `codex.orchestrator.json`.
+- [x] Set `SKIP_DIFF_BUDGET=1` for the docs-review review stage. - Evidence: `codex.orchestrator.json`.
+- [x] Confirm docs-review runs capture the manifest evidence for the pre-implementation review. - Evidence: `.runs/0910-docs-review-gate/cli/2025-12-22T14-22-14-990Z-d0b0eec7/manifest.json`.
+
+### Workflow docs and templates
+- [x] Update `docs/AGENTS.md` to require docs-review evidence before implementation. - Evidence: `docs/AGENTS.md`.
+- [x] Update task checklist templates to include docs-review and implementation review items. - Evidence: `.agent/task/templates/tasks-template.md`.
+- [x] Update `.agent/system/conventions.md` and `.ai-dev-tasks/process-task-list.md` if needed for consistency. - Evidence: `.agent/system/conventions.md`, `.ai-dev-tasks/process-task-list.md`.
+
+### Review handoffs
+- [x] Pre-implementation docs review completed and recorded. - Evidence: `.runs/0910-docs-review-gate/cli/2025-12-22T14-22-14-990Z-d0b0eec7/manifest.json`.
+- [x] Post-implementation review completed and recorded. - Evidence: `.runs/0910-docs-review-gate/cli/2025-12-22T14-10-10-712Z-5c987b7e/manifest.json`.
+<!-- docs-sync:end 0910-docs-review-gate -->
+
 # Task List Snapshot — Orchestrator Reliability Fixes (0902)
 
 - **Update — Planning:** Follow‑on hardening task from 0901; implementation underway.

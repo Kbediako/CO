@@ -9,6 +9,10 @@
 ### Checklist Convention
 - Start every task/subtask with `[ ]` and flip it to `[x]` when the acceptance criteria are met, citing the run manifest or log that documents completion.
 
+### Evidence Gates
+- [ ] Docs-review manifest captured (pre-implementation) - Evidence: `.runs/<task-id>/cli/<run-id>/manifest.json`.
+- [ ] Implementation review manifest captured (post-implementation) - Evidence: `.runs/<task-id>/cli/<run-id>/manifest.json`.
+
 ## Parent Tasks
 1. Parent Task Title
    - Subtask 1: Description

@@ -18,6 +18,12 @@
 - Metrics / State Snapshots: `.runs/0909-orchestrator-run-reporting-consistency/metrics.json`, `out/0909-orchestrator-run-reporting-consistency/state.json`.
 - Checklist Mirror: `tasks/tasks-0909-orchestrator-run-reporting-consistency.md`, `docs/TASKS.md` (0909 section), `.agent/task/0909-orchestrator-run-reporting-consistency.md`.
 
+## Task 0910 — Docs Review Gate (Pre/Post Implementation)
+- Primary Doc: `docs/ACTION_PLAN-docs-review-gate.md`
+- Run Manifest Link: _(pending — capture docs-review run under `.runs/0910-docs-review-gate/cli/<run-id>/manifest.json`)._
+- Metrics / State Snapshots: _(pending — populate `.runs/0910-docs-review-gate/metrics.json` and `out/0910-docs-review-gate/state.json`)._
+- Checklist Mirror: `tasks/tasks-0910-docs-review-gate.md`, `docs/TASKS.md` (0910 section), `.agent/task/0910-docs-review-gate.md`.
+
 ## Task 0904 — README vs Codebase Alignment
 - Primary Doc: `docs/ACTION_PLAN-readme-codebase-alignment.md`
 - Run Manifest Link: _(pending — capture first diagnostics run under `.runs/0904-readme-codebase-alignment/cli/<run-id>/manifest.json`)._
