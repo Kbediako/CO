@@ -1,5 +1,8 @@
 # PRD Overview — Codex Orchestrator Projects
 
+## Governance Update 2025-10-16
+- Task 0911 PRD approval recorded — `.runs/0911-orchestrator-status-ui/cli/2025-12-23T07-59-47-613Z-344689f5/manifest.json`.
+
 ## Task 0801 — Dead Code Pruning & Evidence
 - Primary Doc: `docs/PRD-dead-code-pruning.md`
 - Run Manifest Link: `.runs/0801-dead-code-pruning/cli/2025-12-09T03-51-52-584Z-93e9a77f/manifest.json`.
@@ -24,6 +27,13 @@
 - Run Manifest Link: _(pending — capture docs-review run under `.runs/0910-docs-review-gate/cli/<run-id>/manifest.json`)._
 - Metrics / State Snapshots: _(pending — populate `.runs/0910-docs-review-gate/metrics.json` and `out/0910-docs-review-gate/state.json`)._
 - Checklist Mirror: `tasks/tasks-0910-docs-review-gate.md`, `docs/TASKS.md` (0910 section), `.agent/task/0910-docs-review-gate.md`.
+
+## Task 0911 — Orchestrator Status UI
+- Primary Doc: `docs/PRD-orchestrator-status-ui.md`
+- Canonical PRD: `tasks/0911-prd-orchestrator-status-ui.md`
+- Run Manifest Link: `.runs/0911-orchestrator-status-ui/cli/2025-12-23T07-59-47-613Z-344689f5/manifest.json`.
+- Metrics / State Snapshots: _(pending — populate `.runs/0911-orchestrator-status-ui/metrics.json` and `out/0911-orchestrator-status-ui/state.json`)._
+- Checklist Mirror: `tasks/tasks-0911-orchestrator-status-ui.md`, `docs/TASKS.md` (0911 section), `.agent/task/0911-orchestrator-status-ui.md`.
 
 ## Task 0904 — README vs Codebase Alignment
 - Primary Doc: `docs/PRD-readme-codebase-alignment.md`

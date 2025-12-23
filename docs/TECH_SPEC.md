@@ -24,6 +24,13 @@
 - Metrics / State Snapshots: _(pending — populate `.runs/0910-docs-review-gate/metrics.json` and `out/0910-docs-review-gate/state.json`)._
 - Checklist Mirror: `tasks/tasks-0910-docs-review-gate.md`, `docs/TASKS.md` (0910 section), `.agent/task/0910-docs-review-gate.md`.
 
+## Task 0911 — Orchestrator Status UI
+- Primary Doc: `docs/TECH_SPEC-orchestrator-status-ui.md`
+- Canonical Spec: `tasks/specs/0911-orchestrator-status-ui.md`
+- Run Manifest Link: `.runs/0911-orchestrator-status-ui/cli/2025-12-23T07-59-47-613Z-344689f5/manifest.json`.
+- Metrics / State Snapshots: _(pending — populate `.runs/0911-orchestrator-status-ui/metrics.json` and `out/0911-orchestrator-status-ui/state.json`)._
+- Checklist Mirror: `tasks/tasks-0911-orchestrator-status-ui.md`, `docs/TASKS.md` (0911 section), `.agent/task/0911-orchestrator-status-ui.md`.
+
 ## Task 0904 — README vs Codebase Alignment
 - Primary Doc: `docs/TECH_SPEC-readme-codebase-alignment.md`
 - Run Manifest Link: _(pending — capture first diagnostics run under `.runs/0904-readme-codebase-alignment/cli/<run-id>/manifest.json`)._

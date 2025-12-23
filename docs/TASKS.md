@@ -7,6 +7,32 @@ The Snakes Arena checklist has been retired from this workspace; reference the a
 
 > _Guardrail note:_ Minimal diagnostics or smoke-test pipelines can opt out of spec-guard enforcement by setting `guardrailsRequired: false` in their pipeline definition (e.g., inside `codex.orchestrator.json`). Standard design pipelines keep `node scripts/spec-guard.mjs --dry-run` inline so manifests such as `.runs/0410-hi-fi-design-toolkit/cli/2025-11-07T03-54-09-660Z-35b0a68c/manifest.json` continue to record guardrail evidence automatically.
 
+# Task List Snapshot - Orchestrator Status UI (0911)
+
+- Update - Planning: PRD, tech spec, mini-spec, and checklist drafted; docs-review captured at `.runs/0911-orchestrator-status-ui/cli/2025-12-23T07-59-47-613Z-344689f5/manifest.json`.
+- Notes: Export `MCP_RUNNER_TASK_ID=0911-orchestrator-status-ui` before orchestrator commands. Docs-review runs `node scripts/spec-guard.mjs --dry-run`, `npm run docs:check`, and `npm run review`.
+
+## Checklist Mirror
+Mirror status with `tasks/tasks-0911-orchestrator-status-ui.md` and `.agent/task/0911-orchestrator-status-ui.md`. Keep `[ ]` until evidence is recorded.
+
+### Planning and approvals
+- [x] Mini-spec approved — Evidence: `tasks/specs/0911-orchestrator-status-ui.md`.
+- [x] PRD approval recorded in `tasks/index.json` gate metadata — Evidence: `.runs/0911-orchestrator-status-ui/cli/2025-12-23T07-59-47-613Z-344689f5/manifest.json`.
+
+### Status model and data sources
+- [x] Task bucket rules documented (active, ongoing, complete, pending).
+- [x] Codebase status signals and log sources documented.
+
+### UX layout and dark theme direction
+- [x] Layout and dark theme guidance documented.
+
+### Implementation prep
+- [x] Aggregation schema and caching strategy documented.
+
+### Implementation (future)
+- [ ] Aggregation script built.
+- [ ] Static UI and styles built.
+
 # Task List Snapshot — Orchestrator Issue Validation & Prioritization (0901)
 
 - **Update — Planning:** Validation docs prepared; awaiting first diagnostics/plan manifest under `.runs/0901-orchestrator-issue-validation/cli/<run-id>/manifest.json`.
