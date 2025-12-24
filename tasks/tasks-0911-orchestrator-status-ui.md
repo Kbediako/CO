@@ -9,7 +9,7 @@
 
 ### Evidence Gates
 - [x] Docs-review manifest captured (pre-implementation) - Evidence: `.runs/0911-orchestrator-status-ui/cli/2025-12-23T07-59-47-613Z-344689f5/manifest.json`.
-- [x] Implementation review manifest captured (post-implementation) - Evidence: `.runs/0911-orchestrator-status-ui/cli/2025-12-24T03-31-53-476Z-1a325b87/manifest.json`.
+- [x] Implementation review manifest captured (post-implementation) - Evidence: `.runs/0911-orchestrator-status-ui/cli/2025-12-24T05-07-59-073Z-e6a472e8/manifest.json`.
 
 ## Parent Tasks
 1. Planning and approvals
@@ -51,12 +51,12 @@
      - Files: scripts/status-ui-build.mjs
      - Commands: node scripts/status-ui-build.mjs
      - Acceptance: Aggregator emits JSON without errors on a sample `.runs/` tree.
-     - [x] Status: Complete - Evidence: `.runs/0911-orchestrator-status-ui/cli/2025-12-24T03-31-53-476Z-1a325b87/manifest.json`.
+     - [x] Status: Complete - Evidence: `.runs/0911-orchestrator-status-ui/cli/2025-12-24T05-07-59-073Z-e6a472e8/manifest.json`.
    - Subtask 2: Build static UI and styles for overview and run detail.
      - Files: packages/orchestrator-status-ui/index.html, packages/orchestrator-status-ui/app.js, packages/orchestrator-status-ui/styles.css
      - Commands: Optional local server command (TBD).
      - Acceptance: UI renders dark theme layout with live data updates.
-     - [x] Status: Complete - Evidence: `.runs/0911-orchestrator-status-ui/cli/2025-12-24T03-31-53-476Z-1a325b87/manifest.json`.
+     - [x] Status: Complete - Evidence: `.runs/0911-orchestrator-status-ui/cli/2025-12-24T05-07-59-073Z-e6a472e8/manifest.json`.
 
 ## Relevant Files
 - `tasks/0911-prd-orchestrator-status-ui.md`

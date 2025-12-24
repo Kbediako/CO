@@ -31,7 +31,7 @@
 ## Task 0911 — Orchestrator Status UI
 - Primary Doc: `docs/PRD-orchestrator-status-ui.md`
 - Canonical PRD: `tasks/0911-prd-orchestrator-status-ui.md`
-- Run Manifest Link: `.runs/0911-orchestrator-status-ui/cli/2025-12-24T03-31-53-476Z-1a325b87/manifest.json`.
+- Run Manifest Link: `.runs/0911-orchestrator-status-ui/cli/2025-12-24T05-07-59-073Z-e6a472e8/manifest.json`.
 - Metrics / State Snapshots: _(pending — populate `.runs/0911-orchestrator-status-ui/metrics.json` and `out/0911-orchestrator-status-ui/state.json`)._
 - Checklist Mirror: `tasks/tasks-0911-orchestrator-status-ui.md`, `docs/TASKS.md` (0911 section), `.agent/task/0911-orchestrator-status-ui.md`.
 

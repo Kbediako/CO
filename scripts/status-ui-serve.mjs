@@ -143,8 +143,10 @@ async function main() {
         pathname = dataEntry;
       }
 
-      const absolutePath = path.normalize(path.join(repoRoot, pathname));
-      if (!absolutePath.startsWith(repoRoot)) {
+      const safePath = pathname.replace(/^\/+/, '');
+      const absolutePath = path.resolve(repoRoot, safePath);
+      const relativePath = path.relative(repoRoot, absolutePath);
+      if (relativePath.startsWith('..') || path.isAbsolute(relativePath)) {
         res.writeHead(403);
         res.end('Forbidden');
         return;
