@@ -9,7 +9,7 @@
 
 ### Evidence Gates
 - [x] Docs-review manifest captured (pre-implementation) - Evidence: `.runs/0911-orchestrator-status-ui/cli/2025-12-23T07-59-47-613Z-344689f5/manifest.json`.
-- [ ] Implementation review manifest captured (post-implementation) - Evidence: `.runs/0911-orchestrator-status-ui/cli/<run-id>/manifest.json`.
+- [x] Implementation review manifest captured (post-implementation) - Evidence: `.runs/0911-orchestrator-status-ui/cli/2025-12-24T03-31-53-476Z-1a325b87/manifest.json`.
 
 ## Parent Tasks
 1. Planning and approvals
@@ -46,17 +46,17 @@
      - Commands: None (docs only).
      - Acceptance: UI data schema and refresh rules documented.
      - [x] Status: Complete - Evidence: this commit.
-5. Implementation (future)
-   - Subtask 1: Build aggregation script to emit out/0911-orchestrator-status-ui/data.json (planned).
-     - Files: scripts/status-ui-build.mjs (planned)
-     - Commands: node scripts/status-ui-build.mjs (planned)
+5. Implementation (complete)
+   - Subtask 1: Build aggregation script to emit out/0911-orchestrator-status-ui/data.json.
+     - Files: scripts/status-ui-build.mjs
+     - Commands: node scripts/status-ui-build.mjs
      - Acceptance: Aggregator emits JSON without errors on a sample `.runs/` tree.
-     - [ ] Status: Pending - update to [x] when implemented.
+     - [x] Status: Complete - Evidence: `.runs/0911-orchestrator-status-ui/cli/2025-12-24T03-31-53-476Z-1a325b87/manifest.json`.
    - Subtask 2: Build static UI and styles for overview and run detail.
-     - Files: packages/orchestrator-status-ui/index.html, packages/orchestrator-status-ui/app.js, packages/orchestrator-status-ui/styles.css (planned)
+     - Files: packages/orchestrator-status-ui/index.html, packages/orchestrator-status-ui/app.js, packages/orchestrator-status-ui/styles.css
      - Commands: Optional local server command (TBD).
      - Acceptance: UI renders dark theme layout with live data updates.
-     - [ ] Status: Pending - update to [x] when implemented.
+     - [x] Status: Complete - Evidence: `.runs/0911-orchestrator-status-ui/cli/2025-12-24T03-31-53-476Z-1a325b87/manifest.json`.
 
 ## Relevant Files
 - `tasks/0911-prd-orchestrator-status-ui.md`

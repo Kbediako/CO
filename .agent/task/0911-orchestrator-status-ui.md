@@ -1,6 +1,6 @@
 # Task Checklist - Orchestrator Status UI (0911)
 
-> Set `MCP_RUNNER_TASK_ID=0911-orchestrator-status-ui` for orchestrator commands. Mirror with `tasks/tasks-0911-orchestrator-status-ui.md` and `docs/TASKS.md`.
+> Set `MCP_RUNNER_TASK_ID=0911-orchestrator-status-ui` for orchestrator commands. Mirror with `tasks/tasks-0911-orchestrator-status-ui.md` and `docs/TASKS.md`. Flip `[ ]` to `[x]` only with manifest evidence (for example `.runs/0911-orchestrator-status-ui/cli/2025-12-24T03-31-53-476Z-1a325b87/manifest.json`).
 
 ## Planning and approvals
 - [x] Mini-spec approved — Evidence: `tasks/specs/0911-orchestrator-status-ui.md`.
@@ -16,6 +16,6 @@
 ## Implementation prep
 - [x] Aggregation schema and caching strategy documented.
 
-## Implementation (future)
-- [ ] Aggregation script built.
-- [ ] Static UI and styles built.
+## Implementation (complete)
+- [x] Aggregation script built — Evidence: `.runs/0911-orchestrator-status-ui/cli/2025-12-24T03-31-53-476Z-1a325b87/manifest.json`.
+- [x] Static UI and styles built — Evidence: `.runs/0911-orchestrator-status-ui/cli/2025-12-24T03-31-53-476Z-1a325b87/manifest.json`.

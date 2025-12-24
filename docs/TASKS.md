@@ -9,8 +9,8 @@ The Snakes Arena checklist has been retired from this workspace; reference the a
 
 # Task List Snapshot - Orchestrator Status UI (0911)
 
-- Update - Planning: PRD, tech spec, mini-spec, and checklist drafted; docs-review captured at `.runs/0911-orchestrator-status-ui/cli/2025-12-23T07-59-47-613Z-344689f5/manifest.json`.
-- Notes: Export `MCP_RUNNER_TASK_ID=0911-orchestrator-status-ui` before orchestrator commands. Docs-review runs `node scripts/spec-guard.mjs --dry-run`, `npm run docs:check`, and `npm run review`.
+- Update - Implementation complete: aggregation + dashboard shipped; implementation-gate manifest captured at `.runs/0911-orchestrator-status-ui/cli/2025-12-24T03-31-53-476Z-1a325b87/manifest.json`.
+- Notes: Export `MCP_RUNNER_TASK_ID=0911-orchestrator-status-ui` before orchestrator commands. Implementation gate runs `node scripts/spec-guard.mjs --dry-run`, `npm run build`, `npm run lint`, `npm run test`, `npm run docs:check`, `node scripts/diff-budget.mjs`, and `npm run review`.
 
 ## Checklist Mirror
 Mirror status with `tasks/tasks-0911-orchestrator-status-ui.md` and `.agent/task/0911-orchestrator-status-ui.md`. Keep `[ ]` until evidence is recorded.
@@ -29,9 +29,9 @@ Mirror status with `tasks/tasks-0911-orchestrator-status-ui.md` and `.agent/task
 ### Implementation prep
 - [x] Aggregation schema and caching strategy documented.
 
-### Implementation (future)
-- [ ] Aggregation script built.
-- [ ] Static UI and styles built.
+### Implementation (complete)
+- [x] Aggregation script built — Evidence: `.runs/0911-orchestrator-status-ui/cli/2025-12-24T03-31-53-476Z-1a325b87/manifest.json`.
+- [x] Static UI and styles built — Evidence: `.runs/0911-orchestrator-status-ui/cli/2025-12-24T03-31-53-476Z-1a325b87/manifest.json`.
 
 # Task List Snapshot — Orchestrator Issue Validation & Prioritization (0901)
 
