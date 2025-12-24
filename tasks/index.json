@@ -346,8 +346,8 @@
       "gate": {
         "phase": "review-loop-devtools-gate-implementation",
         "status": "succeeded",
-        "log": ".runs/0912-review-loop-devtools-gate/cli/2025-12-24T08-45-48-830Z-1087d10f/manifest.json",
-        "run_id": "2025-12-24T08-45-48-830Z-1087d10f"
+        "log": ".runs/0912-review-loop-devtools-gate/cli/2025-12-24T08-56-47-578Z-9b49e1ee/manifest.json",
+        "run_id": "2025-12-24T08-56-47-578Z-9b49e1ee"
       },
       "created_at": "2025-12-24",
       "completed_at": "2025-12-24"
