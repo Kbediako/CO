@@ -104,7 +104,7 @@ Notes:
 ### Codex CLI prompts
 - The custom prompts live outside the repo at `~/.codex/prompts/diagnostics.md` and `~/.codex/prompts/review-handoff.md`. Recreate those files on every fresh machine so `/prompts:diagnostics` and `/prompts:review-handoff` are available in the Codex CLI palette.
 - `/prompts:diagnostics` takes `TASK=<task-id> MANIFEST=<path> [NOTES=<free text>]`, exports `MCP_RUNNER_TASK_ID=$TASK`, runs `npx codex-orchestrator start diagnostics --format json`, tails `.runs/$TASK/cli/<run-id>/manifest.json` (or `npx codex-orchestrator status --watch`), and records evidence to `/tasks`, `docs/TASKS.md`, `.agent/task/...`, `.runs/$TASK/metrics.json`, and `out/$TASK/state.json` using `$MANIFEST`.
-- `/prompts:review-handoff` takes `TASK=<task-id> MANIFEST=<path> NOTES=<goal + summary + risks + questions>`, re-exports `MCP_RUNNER_TASK_ID`, runs `node scripts/spec-guard.mjs --dry-run`, `npm run lint`, `npm run test`, optional `npm run eval:test`, and `npm run review` (wraps `codex review` against the current diff and includes the latest run manifest path as evidence). It also reminds you to log approvals in `$MANIFEST` and mirror the evidence to the same docs/metrics/state targets.
+- `/prompts:review-handoff` takes `TASK=<task-id> MANIFEST=<path> NOTES=<goal + summary + risks + optional questions>`, re-exports `MCP_RUNNER_TASK_ID`, runs `node scripts/spec-guard.mjs --dry-run`, `npm run lint`, `npm run test`, optional `npm run eval:test`, and `npm run review` (wraps `codex review` against the current diff and includes the latest run manifest path as evidence). It also reminds you to log approvals in `$MANIFEST` and mirror the evidence to the same docs/metrics/state targets.
 - Always trigger diagnostics and review workflows through these prompts whenever you run the orchestrator so contributors consistently execute the required command sequences and capture auditable manifests.
 
 ### Identifier Guardrails
@@ -170,11 +170,11 @@ This repo enforces a small “diff budget” via `node scripts/diff-budget.mjs` 
 
 ## Review Handoff
 
-Use an explicit handoff note for reviewers (include open questions you want the reviewer to answer). `NOTES` is required for review runs:
+Use an explicit handoff note for reviewers. `NOTES` is required for review runs; questions are optional:
 
-`NOTES="<goal + summary + risks + questions>" npm run review`
+`NOTES="<goal + summary + risks + optional questions>" npm run review`
 
-Template: `Goal: ... | Summary: ... | Risks: ... | Questions: ...`
+Template: `Goal: ... | Summary: ... | Risks: ... | Questions (optional): ...`
 
 To enable Chrome DevTools for review runs, set `CODEX_REVIEW_DEVTOOLS=1` (uses `scripts/codex-devtools.sh` when executable; otherwise falls back to `codex -c ...`).
 Default to the standard `implementation-gate` for general reviews; use `implementation-gate-devtools` only when the review needs Chrome DevTools capabilities (visual/layout checks, network/perf diagnostics). After fixing review feedback, rerun the same gate and include any follow-up questions in `NOTES`.

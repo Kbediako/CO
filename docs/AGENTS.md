@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp dbc05273e364fcfec5f48df203f44516d6d9c8b07ed536ee019880e583ea0ee3 -->
+<!-- codex:instruction-stamp a420ea8498a4106628a1fe962022c1b13c22f8e1541c61aba0cdfba082c0d15b -->
 # Repository Agent Guidance
 
 ## Project 0303 — Codex Orchestrator Autonomy Enhancements
@@ -24,7 +24,7 @@
 ## DevTools Review Gate (Optional)
 - For frontend QA/visual review runs that need Chrome DevTools, use `npx codex-orchestrator start implementation-gate-devtools --format json --no-interactive --task <task-id>` so only the review handoff enables DevTools.
 - Default to `implementation-gate` for general reviews; reserve the DevTools gate for cases that need Chrome DevTools capabilities (visual/layout checks, network/perf diagnostics). After addressing review feedback, rerun the same gate until no issues remain and include any follow-up questions in `NOTES`.
-- NOTES template: `Goal: ... | Summary: ... | Risks: ... | Questions: ...`
+- NOTES template: `Goal: ... | Summary: ... | Risks: ... | Questions (optional): ...`
 - Review-loop steps live in `.agent/SOPs/review-loop.md`.
 
 ## Parallel Runs (Meta-Orchestration)

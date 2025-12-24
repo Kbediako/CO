@@ -288,7 +288,6 @@ async function main(): Promise<void> {
   const notes = process.env.NOTES?.trim();
   const diffBudgetOverride = process.env.DIFF_BUDGET_OVERRIDE_REASON?.trim();
   requireReviewNotes(notes);
-  warnMissingReviewerQuestions(notes);
 
   const promptLines = [
     `Review task: ${taskLabel}`,
@@ -465,15 +464,7 @@ function envFlagEnabled(value: string | undefined): boolean {
 
 function requireReviewNotes(notes: string | undefined): asserts notes is string {
   if (!notes) {
-    throw new Error('NOTES is required for reviews. Set NOTES="<goal + summary + risks + questions>" before running.');
-  }
-}
-
-function warnMissingReviewerQuestions(notes: string): void {
-  const hasQuestion =
-    notes.includes('?') || /\bquestions?:\b/i.test(notes) || /\bq:\b/i.test(notes);
-  if (!hasQuestion) {
-    console.warn('[run-review] warning: NOTES has no explicit questions; add reviewer questions to NOTES.');
+    throw new Error('NOTES is required for reviews. Set NOTES="<goal + summary + risks + optional questions>" before running.');
   }
 }
 
