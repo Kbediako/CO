@@ -9,14 +9,14 @@ The Snakes Arena checklist has been retired from this workspace; reference the a
 
 # Task List Snapshot — Review Loop + DevTools Review Gate (0912)
 
-- Update - Implementation complete: implementation-gate-devtools manifest captured at `.runs/0912-review-loop-devtools-gate/cli/2025-12-24T08-40-02-532Z-8dba0b34/manifest.json`.
+- Update - Implementation complete: implementation-gate-devtools manifest captured at `.runs/0912-review-loop-devtools-gate/cli/2025-12-24T08-45-48-830Z-1087d10f/manifest.json`.
 - Notes: Export `MCP_RUNNER_TASK_ID=0912-review-loop-devtools-gate` before orchestrator commands. Guardrails required: `node scripts/spec-guard.mjs --dry-run`, `npm run build`, `npm run lint`, `npm run test`, `npm run docs:check`, `node scripts/diff-budget.mjs`, `npm run review`.
 
 ## Checklist Mirror
 Mirror status with `tasks/tasks-0912-review-loop-devtools-gate.md` and `.agent/task/0912-review-loop-devtools-gate.md`. Keep `[ ]` until evidence is recorded.
 
 ### Foundation
-- [x] Implementation-gate-devtools manifest captured — Evidence: `.runs/0912-review-loop-devtools-gate/cli/2025-12-24T08-40-02-532Z-8dba0b34/manifest.json`.
+- [x] Implementation-gate-devtools manifest captured — Evidence: `.runs/0912-review-loop-devtools-gate/cli/2025-12-24T08-45-48-830Z-1087d10f/manifest.json`.
 - [x] Metrics/state snapshots updated — Evidence: `.runs/0912-review-loop-devtools-gate/metrics.json`, `out/0912-review-loop-devtools-gate/state.json`.
 - [x] Mirrors updated — Evidence: this commit + manifest above.
 
@@ -26,7 +26,7 @@ Mirror status with `tasks/tasks-0912-review-loop-devtools-gate.md` and `.agent/t
 - [x] NOTES required for review handoff with optional questions template — Evidence: `scripts/run-review.ts`, `README.md`, `AGENTS.md`, `docs/AGENTS.md`, `.agent/AGENTS.md`, `.agent/SOPs/review-loop.md`.
 
 ### Guardrails & handoff
-- [x] Spec-guard/build/lint/test/docs:check/diff-budget/review recorded — Evidence: `.runs/0912-review-loop-devtools-gate/cli/2025-12-24T08-40-02-532Z-8dba0b34/manifest.json`.
+- [x] Spec-guard/build/lint/test/docs:check/diff-budget/review recorded — Evidence: `.runs/0912-review-loop-devtools-gate/cli/2025-12-24T08-45-48-830Z-1087d10f/manifest.json`.
 
 # Task List Snapshot - Orchestrator Status UI (0911)
 

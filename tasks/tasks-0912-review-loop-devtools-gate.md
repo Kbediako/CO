@@ -1,12 +1,12 @@
 # Task 0912 — Review Loop + DevTools Review Gate
 
 - MCP Task ID: `0912-review-loop-devtools-gate`
-- Run Manifest (implementation-gate-devtools): `.runs/0912-review-loop-devtools-gate/cli/2025-12-24T08-40-02-532Z-8dba0b34/manifest.json`
+- Run Manifest (implementation-gate-devtools): `.runs/0912-review-loop-devtools-gate/cli/2025-12-24T08-45-48-830Z-1087d10f/manifest.json`
 - Metrics/State: `.runs/0912-review-loop-devtools-gate/metrics.json`, `out/0912-review-loop-devtools-gate/state.json`
 
 ## Checklist
 ### Foundation
-- [x] Implementation-gate-devtools manifest captured — Evidence: `.runs/0912-review-loop-devtools-gate/cli/2025-12-24T08-40-02-532Z-8dba0b34/manifest.json`.
+- [x] Implementation-gate-devtools manifest captured — Evidence: `.runs/0912-review-loop-devtools-gate/cli/2025-12-24T08-45-48-830Z-1087d10f/manifest.json`.
 - [x] Metrics/state snapshots updated — Evidence: `.runs/0912-review-loop-devtools-gate/metrics.json`, `out/0912-review-loop-devtools-gate/state.json`.
 - [x] Mirrors updated (`docs/TASKS.md`, `.agent/task/0912-review-loop-devtools-gate.md`, `tasks/index.json`) — Evidence: this commit + manifest above.
 
@@ -16,4 +16,4 @@
 - [x] NOTES required for review handoff with optional questions template — Evidence: `scripts/run-review.ts`, `README.md`, `AGENTS.md`, `docs/AGENTS.md`, `.agent/AGENTS.md`, `.agent/SOPs/review-loop.md`.
 
 ### Guardrails & handoff
-- [x] Spec-guard/build/lint/test/docs:check/diff-budget/review recorded — Evidence: `.runs/0912-review-loop-devtools-gate/cli/2025-12-24T08-40-02-532Z-8dba0b34/manifest.json`.
+- [x] Spec-guard/build/lint/test/docs:check/diff-budget/review recorded — Evidence: `.runs/0912-review-loop-devtools-gate/cli/2025-12-24T08-45-48-830Z-1087d10f/manifest.json`.
