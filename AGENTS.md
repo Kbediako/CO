@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp c9ba9830a467db90cef157c526fccf46686c1047fda650ffe7cda4bb6d640353 -->
+<!-- codex:instruction-stamp b034cefd3d2bcd12cf94deb5bc312f0131259243af636edd146dd57ac54a9c9f -->
 # Codex-Orchestrator Agent Handbook (Template)
 
 Use this repository as the wrapper that coordinates multiple Codex-driven projects. After cloning, replace placeholder metadata (task IDs, documents, SOPs) with values for each downstream initiative while keeping these shared guardrails in place.
@@ -66,11 +66,12 @@ Implementation work is not “complete” until you run (in order):
 | `npm run docs:check` | Docs hygiene gate | Deterministically validates scripts/pipelines/paths referenced in agent-facing docs. |
 | `node scripts/diff-budget.mjs` | Review scope guard | Fails when diffs exceed the configured budget unless `DIFF_BUDGET_OVERRIDE_REASON` is set. |
 | `npm run eval:test` | Evaluation harness smoke tests | Requires fixtures in `evaluation/fixtures/**`; optional, enable when evaluation scope exists. |
-| `npm run review` | Reviewer hand-off | Runs `codex review` with task/PRD context (when available) and the latest run manifest path included as evidence; set `NOTES="<goal + summary + risks + questions>"` for reviewer context. |
+| `npm run review` | Reviewer hand-off | Runs `codex review` with task/PRD context (when available) and the latest run manifest path included as evidence; `NOTES` is required and should include `<goal + summary + risks + questions>`. |
 
 Update the table once you wire different build pipelines or tooling.
 For DevTools-enabled frontend review runs, use `npx codex-orchestrator start implementation-gate-devtools --format json --no-interactive --task <task-id>` (sets `CODEX_REVIEW_DEVTOOLS=1` for the review handoff only).
 Default to `implementation-gate` for general reviews; reserve the DevTools gate for cases that need Chrome DevTools capabilities (visual/layout checks, network/perf diagnostics). After addressing review feedback, rerun the same review gate until no issues remain and include any follow-up questions in `NOTES`.
+NOTES template: `Goal: ... | Summary: ... | Risks: ... | Questions: ...`
 Review-loop steps live in `.agent/SOPs/review-loop.md`.
 
 ## CLI Orchestrator Quick Start

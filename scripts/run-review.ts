@@ -287,6 +287,7 @@ async function main(): Promise<void> {
   const taskLabel = process.env.TASK ?? process.env.MCP_RUNNER_TASK_ID ?? options.task ?? 'unknown-task';
   const notes = process.env.NOTES?.trim();
   const diffBudgetOverride = process.env.DIFF_BUDGET_OVERRIDE_REASON?.trim();
+  requireReviewNotes(notes);
   warnMissingReviewerQuestions(notes);
 
   const promptLines = [
@@ -462,11 +463,13 @@ function envFlagEnabled(value: string | undefined): boolean {
   return normalized === '1' || normalized === 'true' || normalized === 'yes';
 }
 
-function warnMissingReviewerQuestions(notes: string | undefined): void {
+function requireReviewNotes(notes: string | undefined): asserts notes is string {
   if (!notes) {
-    console.warn('[run-review] warning: NOTES is empty; include reviewer questions in NOTES="<goal + summary + risks + questions>".');
-    return;
+    throw new Error('NOTES is required for reviews. Set NOTES="<goal + summary + risks + questions>" before running.');
   }
+}
+
+function warnMissingReviewerQuestions(notes: string): void {
   const hasQuestion =
     notes.includes('?') || /\bquestions?:\b/i.test(notes) || /\bq:\b/i.test(notes);
   if (!hasQuestion) {
