@@ -84,6 +84,57 @@
       ]
     },
     {
+      "id": "implementation-gate-devtools",
+      "title": "Implementation Complete Gate (DevTools Review)",
+      "description": "Implementation gate with a DevTools-enabled review handoff for frontend QA/visual validation.",
+      "tags": ["implementation-gate", "devtools-review"],
+      "stages": [
+        {
+          "kind": "command",
+          "id": "spec-guard",
+          "title": "node scripts/spec-guard.mjs --dry-run",
+          "command": "node scripts/spec-guard.mjs --dry-run"
+        },
+        {
+          "kind": "command",
+          "id": "build",
+          "title": "npm run build",
+          "command": "npm run build"
+        },
+        {
+          "kind": "command",
+          "id": "lint",
+          "title": "npm run lint",
+          "command": "npm run lint"
+        },
+        {
+          "kind": "command",
+          "id": "test",
+          "title": "npm run test",
+          "command": "npm run test"
+        },
+        {
+          "kind": "command",
+          "id": "docs-check",
+          "title": "npm run docs:check",
+          "command": "npm run docs:check"
+        },
+        {
+          "kind": "command",
+          "id": "diff-budget",
+          "title": "node scripts/diff-budget.mjs",
+          "command": "node scripts/diff-budget.mjs"
+        },
+        {
+          "kind": "command",
+          "id": "review",
+          "title": "npm run review",
+          "command": "npm run review",
+          "env": { "DIFF_BUDGET_STAGE": "1", "CODEX_REVIEW_DEVTOOLS": "1" }
+        }
+      ]
+    },
+    {
       "id": "docs-review",
       "title": "Docs Review Gate",
       "description": "Pre-implementation docs review: spec-guard, docs:check, and review (diff budget skipped).",
