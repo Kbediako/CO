@@ -23,6 +23,7 @@
     "eval:test": "vitest run evaluation/tests",
     "test:watch": "vitest",
     "review": "node dist/scripts/run-review.js",
+    "status-ui": "node scripts/status-ui-serve.mjs",
     "design:purge-expired": "node dist/scripts/design/purgeExpired.js",
     "generate:manifest-types": "node scripts/generate-manifest-types.mjs",
     "mirror:serve": "node scripts/mirror-serve.mjs",
