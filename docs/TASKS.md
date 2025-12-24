@@ -7,6 +7,27 @@ The Snakes Arena checklist has been retired from this workspace; reference the a
 
 > _Guardrail note:_ Minimal diagnostics or smoke-test pipelines can opt out of spec-guard enforcement by setting `guardrailsRequired: false` in their pipeline definition (e.g., inside `codex.orchestrator.json`). Standard design pipelines keep `node scripts/spec-guard.mjs --dry-run` inline so manifests such as `.runs/0410-hi-fi-design-toolkit/cli/2025-11-07T03-54-09-660Z-35b0a68c/manifest.json` continue to record guardrail evidence automatically.
 
+# Task List Snapshot — Review Loop + DevTools Review Gate (0912)
+
+- Update - Implementation complete: implementation-gate-devtools manifest captured at `.runs/0912-review-loop-devtools-gate/cli/2025-12-24T08-40-02-532Z-8dba0b34/manifest.json`.
+- Notes: Export `MCP_RUNNER_TASK_ID=0912-review-loop-devtools-gate` before orchestrator commands. Guardrails required: `node scripts/spec-guard.mjs --dry-run`, `npm run build`, `npm run lint`, `npm run test`, `npm run docs:check`, `node scripts/diff-budget.mjs`, `npm run review`.
+
+## Checklist Mirror
+Mirror status with `tasks/tasks-0912-review-loop-devtools-gate.md` and `.agent/task/0912-review-loop-devtools-gate.md`. Keep `[ ]` until evidence is recorded.
+
+### Foundation
+- [x] Implementation-gate-devtools manifest captured — Evidence: `.runs/0912-review-loop-devtools-gate/cli/2025-12-24T08-40-02-532Z-8dba0b34/manifest.json`.
+- [x] Metrics/state snapshots updated — Evidence: `.runs/0912-review-loop-devtools-gate/metrics.json`, `out/0912-review-loop-devtools-gate/state.json`.
+- [x] Mirrors updated — Evidence: this commit + manifest above.
+
+### Workflow updates
+- [x] DevTools review gate pipeline wired — Evidence: `codex.orchestrator.json`, `scripts/run-review.ts`, `scripts/codex-devtools.sh`.
+- [x] Review-loop SOP added and linked in agent docs — Evidence: `.agent/SOPs/review-loop.md`, `AGENTS.md`, `docs/AGENTS.md`, `.agent/AGENTS.md`.
+- [x] NOTES required for review handoff with optional questions template — Evidence: `scripts/run-review.ts`, `README.md`, `AGENTS.md`, `docs/AGENTS.md`, `.agent/AGENTS.md`, `.agent/SOPs/review-loop.md`.
+
+### Guardrails & handoff
+- [x] Spec-guard/build/lint/test/docs:check/diff-budget/review recorded — Evidence: `.runs/0912-review-loop-devtools-gate/cli/2025-12-24T08-40-02-532Z-8dba0b34/manifest.json`.
+
 # Task List Snapshot - Orchestrator Status UI (0911)
 
 - Update - Implementation complete: aggregation + dashboard shipped; implementation-gate manifest captured at `.runs/0911-orchestrator-status-ui/cli/2025-12-24T05-07-59-073Z-e6a472e8/manifest.json`.
