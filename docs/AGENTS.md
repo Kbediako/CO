@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp 0543068b60d4e842dcecde08b313c47753c7698e8cc340f5c6495e4de78ccaf1 -->
+<!-- codex:instruction-stamp 463baf4db617b94c6c31d00a60b5f1a61251adf79279549ce79bfbc59ddb41b6 -->
 # Repository Agent Guidance
 
 ## Project 0303 — Codex Orchestrator Autonomy Enhancements
@@ -20,6 +20,11 @@
 ## Docs Review Gate (Pre-Implementation)
 - Before implementation work, capture a docs-review manifest via `npx codex-orchestrator start docs-review --format json --no-interactive --task <task-id>` with `MCP_RUNNER_TASK_ID` set.
 - Record the manifest path in the task checklists (`tasks/`, `.agent/task/`, `docs/TASKS.md`) and `tasks/index.json` for evidence.
+
+## DevTools Review Gate (Optional)
+- For frontend QA/visual review runs that need Chrome DevTools, use `npx codex-orchestrator start implementation-gate-devtools --format json --no-interactive --task <task-id>` so only the review handoff enables DevTools.
+- Default to `implementation-gate` for general reviews; reserve the DevTools gate for cases that need Chrome DevTools capabilities (visual/layout checks, network/perf diagnostics). After addressing review feedback, rerun the same gate until no issues remain and include any follow-up questions in `NOTES`.
+- Review-loop steps live in `.agent/SOPs/review-loop.md`.
 
 ## Parallel Runs (Meta-Orchestration)
 - When coordinating multiple workstreams, prefer one worktree per stream and route manifests with unique `MCP_RUNNER_TASK_ID` values; see `AGENTS.md` and `.agent/SOPs/meta-orchestration.md`.

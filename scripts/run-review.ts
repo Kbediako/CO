@@ -10,7 +10,8 @@
  */
 
 import { execFile, spawn } from 'node:child_process';
-import { readFile, readdir, stat } from 'node:fs/promises';
+import { constants } from 'node:fs';
+import { access, readFile, readdir, stat } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import { promisify } from 'node:util';
@@ -30,6 +31,18 @@ interface CliOptions {
 async function fileExists(filePath: string): Promise<boolean> {
   try {
     await stat(filePath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function canExecuteWrapper(wrapperPath: string): Promise<boolean> {
+  if (process.platform === 'win32') {
+    return false;
+  }
+  try {
+    await access(wrapperPath, constants.X_OK);
     return true;
   } catch {
     return false;
@@ -274,6 +287,7 @@ async function main(): Promise<void> {
   const taskLabel = process.env.TASK ?? process.env.MCP_RUNNER_TASK_ID ?? options.task ?? 'unknown-task';
   const notes = process.env.NOTES?.trim();
   const diffBudgetOverride = process.env.DIFF_BUDGET_OVERRIDE_REASON?.trim();
+  warnMissingReviewerQuestions(notes);
 
   const promptLines = [
     `Review task: ${taskLabel}`,
@@ -313,8 +327,9 @@ async function main(): Promise<void> {
   }
 
   const reviewArgs = buildReviewArgs(options, promptLines.join('\n'));
+  const { command, args } = await resolveReviewCommand(reviewArgs);
   console.log(`Launching Codex review (evidence: ${relativeManifest})`);
-  const child = spawn('codex', reviewArgs, { stdio: 'inherit', env: process.env });
+  const child = spawn(command, args, { stdio: 'inherit', env: process.env });
 
   await new Promise<void>((resolve, reject) => {
     child.once('error', (error) => reject(error instanceof Error ? error : new Error(String(error))));
@@ -355,6 +370,22 @@ function buildReviewArgs(options: CliOptions, prompt: string): string[] {
 
   args.push(prompt);
   return args;
+}
+
+async function resolveReviewCommand(reviewArgs: string[]): Promise<{ command: string; args: string[] }> {
+  if (!envFlagEnabled(process.env.CODEX_REVIEW_DEVTOOLS)) {
+    return { command: 'codex', args: reviewArgs };
+  }
+
+  const wrapperPath = path.join(process.cwd(), 'scripts', 'codex-devtools.sh');
+  if (await canExecuteWrapper(wrapperPath)) {
+    return { command: wrapperPath, args: reviewArgs };
+  }
+
+  return {
+    command: 'codex',
+    args: ['-c', 'mcp_servers.chrome-devtools.enabled=true', ...reviewArgs]
+  };
 }
 
 async function buildScopeNotes(options: CliOptions): Promise<string[]> {
@@ -429,6 +460,18 @@ function envFlagEnabled(value: string | undefined): boolean {
   }
   const normalized = value.trim().toLowerCase();
   return normalized === '1' || normalized === 'true' || normalized === 'yes';
+}
+
+function warnMissingReviewerQuestions(notes: string | undefined): void {
+  if (!notes) {
+    console.warn('[run-review] warning: NOTES is empty; include reviewer questions in NOTES="<goal + summary + risks + questions>".');
+    return;
+  }
+  const hasQuestion =
+    notes.includes('?') || /\bquestions?:\b/i.test(notes) || /\bq:\b/i.test(notes);
+  if (!hasQuestion) {
+    console.warn('[run-review] warning: NOTES has no explicit questions; add reviewer questions to NOTES.');
+  }
 }
 
 async function tryGit(args: string[]): Promise<string | null> {

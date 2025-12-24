@@ -1,0 +1,16 @@
+# Review Loop SOP
+
+Use this playbook whenever handing off a review (`npm run review` or an implementation gate) so feedback is captured and resolved until clean.
+
+## Steps
+1. Draft `NOTES` with goal, summary, risks, and explicit reviewer questions (one line each when possible).
+2. Run the appropriate gate:
+   - Default: `implementation-gate` for general reviews.
+   - Use `implementation-gate-devtools` only when Chrome DevTools capabilities are required.
+3. Record the manifest path in the relevant checklists (`tasks/`, `docs/`, `.agent/task/`).
+4. If the reviewer finds issues, fix them, update `NOTES` with follow-up questions, and rerun the same gate.
+5. Repeat until the reviewer reports no findings.
+
+## Notes
+- Keep reviewer questions concise and specific to unblock decisions.
+- Avoid switching gates mid-loop unless the reviewer explicitly requests a different toolset.

@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp f20b35064d50497e27e87ed9e7709585539a7b37968089dd9977753c86573b67 -->
+<!-- codex:instruction-stamp c9ba9830a467db90cef157c526fccf46686c1047fda650ffe7cda4bb6d640353 -->
 # Codex-Orchestrator Agent Handbook (Template)
 
 Use this repository as the wrapper that coordinates multiple Codex-driven projects. After cloning, replace placeholder metadata (task IDs, documents, SOPs) with values for each downstream initiative while keeping these shared guardrails in place.
@@ -66,9 +66,12 @@ Implementation work is not “complete” until you run (in order):
 | `npm run docs:check` | Docs hygiene gate | Deterministically validates scripts/pipelines/paths referenced in agent-facing docs. |
 | `node scripts/diff-budget.mjs` | Review scope guard | Fails when diffs exceed the configured budget unless `DIFF_BUDGET_OVERRIDE_REASON` is set. |
 | `npm run eval:test` | Evaluation harness smoke tests | Requires fixtures in `evaluation/fixtures/**`; optional, enable when evaluation scope exists. |
-| `npm run review` | Reviewer hand-off | Runs `codex review` with task/PRD context (when available) and the latest run manifest path included as evidence; set `NOTES="<goal + summary + risks>"` for reviewer context. |
+| `npm run review` | Reviewer hand-off | Runs `codex review` with task/PRD context (when available) and the latest run manifest path included as evidence; set `NOTES="<goal + summary + risks + questions>"` for reviewer context. |
 
 Update the table once you wire different build pipelines or tooling.
+For DevTools-enabled frontend review runs, use `npx codex-orchestrator start implementation-gate-devtools --format json --no-interactive --task <task-id>` (sets `CODEX_REVIEW_DEVTOOLS=1` for the review handoff only).
+Default to `implementation-gate` for general reviews; reserve the DevTools gate for cases that need Chrome DevTools capabilities (visual/layout checks, network/perf diagnostics). After addressing review feedback, rerun the same review gate until no issues remain and include any follow-up questions in `NOTES`.
+Review-loop steps live in `.agent/SOPs/review-loop.md`.
 
 ## CLI Orchestrator Quick Start
 1. Install and authenticate the Codex CLI.
