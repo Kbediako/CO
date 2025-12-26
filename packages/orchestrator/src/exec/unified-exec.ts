@@ -65,6 +65,16 @@ export interface UnifiedExecRunOptions {
   invocationId?: string;
   sandbox?: ToolSandboxOptions;
   metadata?: Record<string, unknown>;
+  eventCapture?: ExecEventCaptureOptions;
+}
+
+export interface ExecEventCaptureOptions {
+  maxChunkEvents?: number;
+}
+
+interface ExecEventCaptureState {
+  maxChunkEvents: number | null;
+  capturedChunkEvents: number;
 }
 
 export interface ExecAttemptResult {
@@ -135,10 +145,11 @@ export class UnifiedExecRunner<THandle extends ExecSessionHandle> {
     });
 
     const events: ExecEvent[] = [];
+    const captureState = createEventCaptureState(options.eventCapture);
     let chunkSequence = 0;
 
     const sandboxOptions = options.sandbox
-      ? this.decorateSandboxOptions(options.sandbox, correlationId, events, handleId)
+      ? this.decorateSandboxOptions(options.sandbox, correlationId, events, handleId, captureState)
       : undefined;
     const metadata = {
       ...options.metadata,
@@ -185,7 +196,7 @@ export class UnifiedExecRunner<THandle extends ExecSessionHandle> {
             persisted: lease.persisted
           });
 
-          await this.publishEvent(beginEvent, events, handleId);
+          await this.publishEvent(beginEvent, events, handleId, captureState);
 
           let capturedError: unknown;
           const attemptSummary: ExecAttemptResult = {
@@ -216,7 +227,7 @@ export class UnifiedExecRunner<THandle extends ExecSessionHandle> {
                   correlationId,
                   chunk: sequenced
                 });
-                void this.publishEvent(chunkEvent, events, handleId);
+                void this.publishEvent(chunkEvent, events, handleId, captureState);
               },
               onStderr: (chunk) => {
                 const sequenced = this.recordChunk(tracker, 'stderr', chunk);
@@ -226,7 +237,7 @@ export class UnifiedExecRunner<THandle extends ExecSessionHandle> {
                   correlationId,
                   chunk: sequenced
                 });
-                void this.publishEvent(chunkEvent, events, handleId);
+                void this.publishEvent(chunkEvent, events, handleId, captureState);
               }
             });
             attemptSummary.exitCode = outcome.exitCode ?? null;
@@ -248,7 +259,7 @@ export class UnifiedExecRunner<THandle extends ExecSessionHandle> {
               correlationId,
               summary: attemptSummary
             });
-            await this.publishEvent(endEvent, events, handleId);
+            await this.publishEvent(endEvent, events, handleId, captureState);
           }
 
           if (capturedError) {
@@ -329,9 +340,12 @@ export class UnifiedExecRunner<THandle extends ExecSessionHandle> {
   private async publishEvent(
     event: ExecEvent,
     sink: ExecEvent[],
-    handleId?: string
+    handleId?: string,
+    captureState?: ExecEventCaptureState | null
   ): Promise<void> {
-    sink.push(event);
+    if (shouldCaptureEvent(event, captureState)) {
+      sink.push(event);
+    }
     if (handleId && this.handleService) {
       await this.handleService.append(handleId, event);
     }
@@ -432,7 +446,8 @@ export class UnifiedExecRunner<THandle extends ExecSessionHandle> {
     input: ToolSandboxOptions,
     correlationId: string,
     events: ExecEvent[],
-    handleId?: string
+    handleId?: string,
+    captureState?: ExecEventCaptureState | null
   ): ToolSandboxOptions {
     const { onRetry, ...rest } = input;
     const decorated: ToolSandboxOptions = {
@@ -445,7 +460,7 @@ export class UnifiedExecRunner<THandle extends ExecSessionHandle> {
           sandboxState: context.sandboxState,
           error: context.error
         });
-        await this.publishEvent(retryEvent, events, handleId);
+        await this.publishEvent(retryEvent, events, handleId, captureState);
         if (onRetry) {
           await onRetry.call(input, context);
         }
@@ -540,6 +555,31 @@ export class UnifiedExecRunner<THandle extends ExecSessionHandle> {
         };
     }
   }
+}
+
+function createEventCaptureState(options?: ExecEventCaptureOptions): ExecEventCaptureState | null {
+  const maxChunkEvents = options?.maxChunkEvents ?? null;
+  if (!maxChunkEvents || maxChunkEvents <= 0) {
+    return null;
+  }
+  return { maxChunkEvents, capturedChunkEvents: 0 };
+}
+
+function shouldCaptureEvent(
+  event: ExecEvent,
+  captureState?: ExecEventCaptureState | null
+): boolean {
+  if (!captureState || captureState.maxChunkEvents === null) {
+    return true;
+  }
+  if (event.type !== 'exec:chunk') {
+    return true;
+  }
+  if (captureState.capturedChunkEvents >= captureState.maxChunkEvents) {
+    return false;
+  }
+  captureState.capturedChunkEvents += 1;
+  return true;
 }
 
 function getErrorMessage(error: unknown): string {

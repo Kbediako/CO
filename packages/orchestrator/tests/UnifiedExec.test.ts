@@ -68,6 +68,43 @@ describe('UnifiedExecRunner', () => {
     expect(execMetadata).not.toHaveProperty('envSnapshot');
   });
 
+  it('caps captured chunk events when event capture is configured', async () => {
+    const sessionManager = createSessionManager();
+    const orchestrator = new ToolOrchestrator({
+      now: () => new Date('2025-11-04T00:00:00.000Z')
+    });
+    const runner = new UnifiedExecRunner<TestHandle>({
+      orchestrator,
+      sessionManager,
+      now: createClock(),
+      executor: async (request) => {
+        request.onStdout('one');
+        request.onStdout('two');
+        request.onStdout('three');
+        return { exitCode: 0, signal: null };
+      }
+    });
+
+    const observed: string[] = [];
+    runner.on((event) => {
+      observed.push(event.type);
+    });
+
+    const result = await runner.run({
+      command: 'echo',
+      sessionId: 'shell',
+      eventCapture: {
+        maxChunkEvents: 1
+      }
+    });
+
+    const capturedChunks = result.events.filter((event) => event.type === 'exec:chunk');
+    expect(capturedChunks).toHaveLength(1);
+    expect(result.events[0]?.type).toBe('exec:begin');
+    expect(result.events[result.events.length - 1]?.type).toBe('exec:end');
+    expect(observed.filter((type) => type === 'exec:chunk')).toHaveLength(3);
+  });
+
   it('invokes sandbox retry callbacks and records multiple attempts', async () => {
     const sessionManager = createSessionManager();
     const orchestrator = new ToolOrchestrator({

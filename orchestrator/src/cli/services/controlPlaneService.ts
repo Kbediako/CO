@@ -10,7 +10,8 @@ import type { ControlPlaneValidationMode, ControlPlaneValidationResult } from '.
 import type { EnvironmentPaths } from '../run/environment.js';
 import { relativeToRepo } from '../run/runPaths.js';
 import type { RunPaths } from '../run/runPaths.js';
-import { appendSummary, saveManifest } from '../run/manifest.js';
+import { appendSummary } from '../run/manifest.js';
+import { persistManifest, type ManifestPersister } from '../run/manifestPersister.js';
 import { isoTimestamp } from '../utils/time.js';
 import { resolveEnforcementMode } from '../utils/enforcementMode.js';
 import type { CliManifest, PipelineDefinition } from '../types.js';
@@ -24,6 +25,7 @@ export interface ControlPlaneGuardOptions {
   task: TaskContext;
   runId: string;
   requestedBy: { actorId: string; channel: string; name?: string };
+  persister?: ManifestPersister;
 }
 
 export class ControlPlaneService {
@@ -52,7 +54,7 @@ export class ControlPlaneService {
     try {
       const result = await validator.validate(request);
       this.attachControlPlaneToManifest(options.env, options.manifest, result);
-      await saveManifest(options.paths, options.manifest);
+      await persistManifest(options.paths, options.manifest, options.persister, { force: true });
       return result;
     } catch (error: unknown) {
       if (error instanceof ControlPlaneValidationError) {
@@ -61,7 +63,7 @@ export class ControlPlaneService {
         options.manifest.status_detail = 'control-plane-validation-failed';
         options.manifest.completed_at = isoTimestamp();
         appendSummary(options.manifest, `Control plane validation failed: ${error.message}`);
-        await saveManifest(options.paths, options.manifest);
+        await persistManifest(options.paths, options.manifest, options.persister, { force: true });
       }
       throw error;
     }

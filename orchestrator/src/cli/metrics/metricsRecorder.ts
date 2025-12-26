@@ -10,10 +10,11 @@ import {
   upsertGuardrailSummary
 } from '../run/manifest.js';
 import { isoTimestamp } from '../utils/time.js';
-import { saveManifest } from '../run/manifest.js';
+import { persistManifest, type ManifestPersister } from '../run/manifestPersister.js';
 import type { RunPaths } from '../run/runPaths.js';
 import { logger } from '../../logger.js';
 import { mergePendingMetricsEntries, updateMetricsAggregates, withMetricsLock } from './metricsAggregator.js';
+import { EnvUtils } from '../../../../packages/shared/config/index.js';
 
 const TERMINAL_STATES = new Set(['succeeded', 'failed', 'cancelled']);
 const METRICS_PENDING_DIRNAME = 'metrics.pending';
@@ -21,7 +22,8 @@ const METRICS_PENDING_DIRNAME = 'metrics.pending';
 export async function appendMetricsEntry(
   env: EnvironmentPaths,
   paths: RunPaths,
-  manifest: CliManifest
+  manifest: CliManifest,
+  persister?: ManifestPersister
 ): Promise<void> {
   if (manifest.metrics_recorded) {
     return;
@@ -41,6 +43,14 @@ export async function appendMetricsEntry(
   const guardrailStatus = ensureGuardrailStatus(manifest);
   const guardrailsPresent = guardrailStatus.present;
   const learning = manifest.learning ?? null;
+  const privacyDecisions = manifest.privacy?.decisions ?? [];
+  const privacyEventCount = privacyDecisions.length;
+  const maxPrivacyEvents = EnvUtils.getInt('CODEX_METRICS_PRIVACY_EVENTS_MAX', -1);
+  const shouldTruncatePrivacy =
+    maxPrivacyEvents >= 0 && privacyEventCount > maxPrivacyEvents;
+  const privacyEvents = shouldTruncatePrivacy
+    ? privacyDecisions.slice(0, maxPrivacyEvents)
+    : privacyDecisions;
 
   const metricsRoot = join(env.runsRoot, env.taskId);
   const metricsPath = join(metricsRoot, 'metrics.json');
@@ -73,7 +83,10 @@ export async function appendMetricsEntry(
       )
     })),
     privacy_mode: manifest.privacy?.mode ?? null,
-    privacy_events: manifest.privacy?.decisions ?? [],
+    privacy_log_path: manifest.privacy?.log_path ?? null,
+    privacy_event_count: privacyEventCount,
+    privacy_events_truncated: shouldTruncatePrivacy ? true : undefined,
+    privacy_events: privacyEvents,
     handle_count: manifest.handles?.length ?? 0,
     tfgrpo_epoch: manifest.tfgrpo?.epoch ?? null,
     tfgrpo_group_id: manifest.tfgrpo?.group_id ?? null,
@@ -130,7 +143,7 @@ export async function appendMetricsEntry(
 
     upsertGuardrailSummary(manifest);
     manifest.metrics_recorded = metricsRecorded;
-    await saveManifest(paths, manifest);
+    await persistManifest(paths, manifest, persister, { force: true });
   };
 
   const { acquired } = await withMetricsLock(env, async () => {

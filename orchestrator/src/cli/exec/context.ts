@@ -1,7 +1,7 @@
 import process from 'node:process';
 
 import type { EnvironmentPaths } from '../run/environment.js';
-import { bootstrapManifest, saveManifest } from '../run/manifest.js';
+import { bootstrapManifest } from '../run/manifest.js';
 import type { CommandStage, CliManifest, PipelineDefinition } from '../types.js';
 import { generateRunId } from '../utils/runId.js';
 import { JsonlWriter } from '../utils/jsonlWriter.js';
@@ -16,6 +16,7 @@ import {
   createNotificationSink,
   type ExecNotificationSink
 } from '../../../../packages/orchestrator/src/notifications/index.js';
+import { ManifestPersister, persistManifest } from '../run/manifestPersister.js';
 
 export type ExecOutputMode = 'interactive' | 'json' | 'jsonl';
 
@@ -60,6 +61,7 @@ export interface ExecRunContext {
   stage: CommandStage;
   manifest: CliManifest;
   paths: RunPaths;
+  persister: ManifestPersister;
   telemetrySink: ExecTelemetrySink;
   notificationSink: ExecNotificationSink;
   jsonlWriter: JsonlWriter | null;
@@ -98,8 +100,13 @@ export async function bootstrapExecContext(
     approvalPolicy: null
   });
 
+  const persister = new ManifestPersister({
+    manifest,
+    paths,
+    persistIntervalMs: Math.max(1000, manifest.heartbeat_interval_seconds * 1000)
+  });
   manifest.status = 'in_progress';
-  await saveManifest(paths, manifest);
+  await persistManifest(paths, manifest, persister, { force: true });
 
   const telemetrySink = context.telemetrySink ?? createTelemetrySink({
     endpoint: invocation.otelEndpoint,
@@ -128,6 +135,7 @@ export async function bootstrapExecContext(
     stage,
     manifest,
     paths,
+    persister,
     telemetrySink,
     notificationSink,
     jsonlWriter,

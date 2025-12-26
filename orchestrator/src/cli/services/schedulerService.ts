@@ -1,5 +1,5 @@
 import { sanitizeTaskId } from '../run/environment.js';
-import { saveManifest } from '../run/manifest.js';
+import { persistManifest, type ManifestPersister } from '../run/manifestPersister.js';
 import type { EnvironmentPaths } from '../run/environment.js';
 import type { RunPaths } from '../run/runPaths.js';
 import {
@@ -22,13 +22,14 @@ export class SchedulerService {
     manifest: CliManifest;
     paths: RunPaths;
     controlPlaneResult: ControlPlaneValidationResult;
+    persister?: ManifestPersister;
   }): Promise<SchedulerPlan> {
     const plan = createSchedulerPlan(options.controlPlaneResult.request, {
       now: this.now,
       instancePrefix: sanitizeTaskId(options.env.taskId)
     });
     this.attachSchedulerPlanToManifest(options.manifest, plan);
-    await saveManifest(options.paths, options.manifest);
+    await persistManifest(options.paths, options.manifest, options.persister, { force: true });
     return plan;
   }
 
@@ -36,12 +37,13 @@ export class SchedulerService {
     manifest: CliManifest;
     paths: RunPaths;
     plan: SchedulerPlan;
+    persister?: ManifestPersister;
   }): Promise<void> {
     const finalStatus = this.resolveSchedulerFinalStatus(options.manifest.status);
     const finalizedAt = options.manifest.completed_at ?? isoTimestamp();
     finalizeSchedulerPlan(options.plan, finalStatus, finalizedAt);
     this.attachSchedulerPlanToManifest(options.manifest, options.plan);
-    await saveManifest(options.paths, options.manifest);
+    await persistManifest(options.paths, options.manifest, options.persister, { force: true });
   }
 
   applySchedulerToRunSummary(runSummary: RunSummary, plan: SchedulerPlan): void {

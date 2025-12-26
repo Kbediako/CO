@@ -4,7 +4,7 @@ import type { EnvironmentPaths } from '../run/environment.js';
 import type { RunPaths } from '../run/runPaths.js';
 import { relativeToRepo } from '../run/runPaths.js';
 import { writeJsonAtomic } from '../utils/fs.js';
-import { saveManifest } from '../run/manifest.js';
+import { persistManifest, type ManifestPersister } from '../run/manifestPersister.js';
 import type { CliManifest } from '../types.js';
 import type { RunSummary } from '../../types.js';
 
@@ -39,10 +39,11 @@ export async function persistRunSummary(
   env: EnvironmentPaths,
   paths: RunPaths,
   manifest: CliManifest,
-  runSummary: RunSummary
+  runSummary: RunSummary,
+  persister?: ManifestPersister
 ): Promise<void> {
   const summaryPath = join(paths.runDir, 'run-summary.json');
   await writeJsonAtomic(summaryPath, runSummary);
   manifest.run_summary_path = relativeToRepo(env, summaryPath);
-  await saveManifest(paths, manifest);
+  await persistManifest(paths, manifest, persister, { force: true });
 }

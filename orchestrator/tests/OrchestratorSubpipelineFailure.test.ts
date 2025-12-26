@@ -4,9 +4,11 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
 import { CodexOrchestrator } from '../src/cli/orchestrator.js';
+import * as CommandRunner from '../src/cli/services/commandRunner.js';
 import { resolveEnvironment } from '../src/cli/run/environment.js';
-import { bootstrapManifest } from '../src/cli/run/manifest.js';
+import { bootstrapManifest, updateCommandStatus } from '../src/cli/run/manifest.js';
 import type { PipelineDefinition } from '../src/cli/types.js';
+import { isoTimestamp } from '../src/cli/utils/time.js';
 
 const ORIGINAL_ENV = {
   root: process.env.CODEX_ORCHESTRATOR_ROOT,
@@ -26,6 +28,7 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+  vi.restoreAllMocks();
   process.env.CODEX_ORCHESTRATOR_ROOT = ORIGINAL_ENV.root;
   process.env.CODEX_ORCHESTRATOR_RUNS_DIR = ORIGINAL_ENV.runs;
   process.env.CODEX_ORCHESTRATOR_OUT_DIR = ORIGINAL_ENV.out;
@@ -75,6 +78,59 @@ describe('CodexOrchestrator subpipeline failures', () => {
 
     expect(result.success).toBe(false);
     expect(manifest.commands[0]?.status).toBe('failed');
+    expect(manifest.status).toBe('failed');
+  });
+
+  it('finalizes command stage and manifest when command stage throws', async () => {
+    const env = resolveEnvironment();
+    const pipeline: PipelineDefinition = {
+      id: 'command-parent',
+      title: 'Command Parent',
+      stages: [
+        {
+          kind: 'command',
+          id: 'fail-command',
+          title: 'Fail Command',
+          command: 'echo fail'
+        }
+      ]
+    };
+
+    const { manifest, paths } = await bootstrapManifest('run-command-parent', {
+      env,
+      pipeline,
+      parentRunId: null,
+      taskSlug: env.taskId,
+      approvalPolicy: null
+    });
+    manifest.heartbeat_interval_seconds = 1;
+    manifest.heartbeat_stale_after_seconds = 2;
+
+    vi.spyOn(CommandRunner, 'runCommandStage').mockImplementation(async ({ manifest }) => {
+      updateCommandStatus(manifest, 0, {
+        status: 'running',
+        started_at: isoTimestamp(),
+        exit_code: null,
+        summary: null
+      });
+      throw new Error('boom');
+    });
+
+    const orchestrator = new CodexOrchestrator(env);
+
+    const result = await (orchestrator as unknown as {
+      executePipeline: (options: unknown) => Promise<{ success: boolean }>;
+    }).executePipeline({
+      env,
+      pipeline,
+      manifest,
+      paths
+    });
+
+    expect(result.success).toBe(false);
+    expect(manifest.commands[0]?.status).toBe('failed');
+    expect(manifest.commands[0]?.completed_at).not.toBeNull();
+    expect(manifest.commands[0]?.summary).toContain('Execution error: boom');
     expect(manifest.status).toBe('failed');
   });
 });
