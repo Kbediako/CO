@@ -351,6 +351,22 @@
       },
       "created_at": "2025-12-24",
       "completed_at": "2025-12-24"
+    },
+    {
+      "id": "0913",
+      "slug": "orchestrator-refactor-roadmap",
+      "title": "Orchestrator Refactor Roadmap (Robustness + Performance)",
+      "path": "tasks/tasks-0913-orchestrator-refactor-roadmap.md",
+      "kind": "prd",
+      "status": "in-progress",
+      "gate": {
+        "phase": "orchestrator-refactor-roadmap-planning",
+        "status": "succeeded",
+        "log": ".runs/0913-orchestrator-refactor-roadmap/cli/2025-12-26T08-11-25-461Z-6ba85057/manifest.json",
+        "run_id": "2025-12-26T08-11-25-461Z-6ba85057"
+      },
+      "created_at": "2025-12-26",
+      "completed_at": null
     }
   ],
   "specs": []
