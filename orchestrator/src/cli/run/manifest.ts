@@ -172,10 +172,9 @@ export function updateCommandStatus(
   if (!entry) {
     throw new Error(`Manifest command index ${commandIndex} missing.`);
   }
-  const updated: CliManifestCommand = { ...entry, ...changes };
-  manifest.commands[commandIndex] = updated;
+  Object.assign(entry, changes);
   manifest.updated_at = isoTimestamp();
-  return updated;
+  return entry;
 }
 
 export async function appendCommandError(

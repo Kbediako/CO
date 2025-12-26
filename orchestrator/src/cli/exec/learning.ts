@@ -1,6 +1,6 @@
 import process from 'node:process';
 
-import { saveManifest } from '../run/manifest.js';
+import { persistManifest } from '../run/manifestPersister.js';
 import type { RunStatus } from '../types.js';
 import { isoTimestamp } from '../utils/time.js';
 import { logger } from '../../logger.js';
@@ -59,7 +59,7 @@ export async function maybeTriggerLearning(runContext: ExecRunContext, runStatus
       paths: runContext.paths,
       scenarioPath: scenario.scenarioPath
     });
-    await saveManifest(runContext.paths, validation.manifest);
+    await persistManifest(runContext.paths, validation.manifest, runContext.persister, { force: true });
   } catch (error) {
     logger.warn(`[learning] auto-trigger failed: ${error instanceof Error ? error.message : String(error)}`);
   }

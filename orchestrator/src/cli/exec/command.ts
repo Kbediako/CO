@@ -62,8 +62,9 @@ export async function executeExecCommand(
 
   await flushTelemetry(runContext);
   await persistRunOutputs(runContext, summaryEvent);
-  await appendMetricsEntry(runContext.env, runContext.paths, runContext.manifest);
+  await appendMetricsEntry(runContext.env, runContext.paths, runContext.manifest, runContext.persister);
   await maybeTriggerLearning(runContext, finalization.runStatus);
+  await runContext.persister.flush();
 
   await shutdownSinks(runContext);
   emitCommandError(runContext, finalization.commandError);

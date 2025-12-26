@@ -24,6 +24,9 @@ export interface MetricsEntry {
   scheduler_mode: string | null;
   instance_stats: Array<{ instance_id: string; capability: string; status: string; attempts: number; recovery_events: number }>;
   privacy_mode: string | null;
+  privacy_log_path?: string | null;
+  privacy_event_count?: number;
+  privacy_events_truncated?: boolean;
   privacy_events: Array<Record<string, unknown>>;
   handle_count: number;
   tfgrpo_epoch: number | null;

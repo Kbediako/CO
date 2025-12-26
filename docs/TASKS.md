@@ -656,3 +656,31 @@ Mirror status with `tasks/tasks-0908-diff-budget-followups.md` and `.agent/task/
 - [x] Guardrails pass — Evidence: `.runs/0908-diff-budget-followups/cli/2025-12-18T14-04-26-998Z-f327e342/manifest.json`.
 - [x] Reviewer handoff uses explicit context — Evidence: `.runs/0908-diff-budget-followups/cli/2025-12-18T14-04-26-998Z-f327e342/manifest.json`.
 <!-- docs-sync:end 0908-diff-budget-followups -->
+
+<!-- docs-sync:begin 0913-orchestrator-refactor-roadmap -->
+## Checklist Mirror
+Mirror status with `tasks/tasks-0913-orchestrator-refactor-roadmap.md` and `.agent/task/0913-orchestrator-refactor-roadmap.md`. Keep `[ ]` until evidence is recorded.
+
+### Foundation
+- [x] Collateral drafted (PRD/tech spec/action plan/checklist/mini-spec) - Evidence: `.runs/0913-orchestrator-refactor-roadmap/cli/2025-12-26T08-11-25-461Z-6ba85057/manifest.json`.
+- [x] Mirrors updated (`docs/TASKS.md`, `.agent/task/0913-orchestrator-refactor-roadmap.md`, `tasks/index.json`) - Evidence: `.runs/0913-orchestrator-refactor-roadmap/cli/2025-12-26T08-11-25-461Z-6ba85057/manifest.json`.
+- [x] Docs-review manifest captured (pre-implementation) - Evidence: `.runs/0913-orchestrator-refactor-roadmap/cli/2025-12-26T08-11-25-461Z-6ba85057/manifest.json`.
+- [x] Metrics/state snapshots updated - Evidence: `.runs/0913-orchestrator-refactor-roadmap/metrics.json` (JSONL), `out/0913-orchestrator-refactor-roadmap/state.json`.
+- [x] `tasks/index.json` gate metadata updated with implementation gate manifest - Evidence: `tasks/index.json`, `.runs/0913-orchestrator-refactor-roadmap/cli/2025-12-26T09-46-07-459Z-704d0f35/manifest.json`.
+
+### Refactor phases (implementation roadmap)
+- [x] Phase 1: Manifest correctness + atomic write safety (tests first, then refactor). - Evidence: `.runs/0913-orchestrator-refactor-roadmap/cli/2025-12-26T08-33-05-345Z-a9de5673/manifest.json`.
+- [x] Phase 2: Single-writer manifest persistence (coalescing persister; route direct `saveManifest` calls through it). - Evidence: `.runs/0913-orchestrator-refactor-roadmap/cli/2025-12-26T09-10-07-477Z-d616c709/manifest.json`.
+- [x] Phase 3: Bounded exec event capture (opt-in first; preserve full `.ndjson` logs/handles). - Evidence: `.runs/0913-orchestrator-refactor-roadmap/cli/2025-12-26T09-21-58-308Z-786b9c13/manifest.json`.
+- [x] Phase 4: Execution mode resolution consolidation (no behavior change; keep existing precedence). - Evidence: `.runs/0913-orchestrator-refactor-roadmap/cli/2025-12-26T09-30-43-115Z-c8450274/manifest.json`.
+- [x] Phase 5: Metrics + env hygiene (reduce metrics bloat; remove `process.env` leakage with compatibility window). - Evidence: `.runs/0913-orchestrator-refactor-roadmap/cli/2025-12-26T12-00-35-931Z-e2fe1006/manifest.json`.
+
+### Guardrails (for future implementation PRs)
+- [x] `node scripts/spec-guard.mjs --dry-run` passes - Evidence: `.runs/0913-orchestrator-refactor-roadmap/cli/2025-12-26T12-00-35-931Z-e2fe1006/manifest.json` (implementation gate).
+- [x] `npm run build` passes - Evidence: `.runs/0913-orchestrator-refactor-roadmap/cli/2025-12-26T12-00-35-931Z-e2fe1006/manifest.json` (implementation gate).
+- [x] `npm run lint` passes - Evidence: `.runs/0913-orchestrator-refactor-roadmap/cli/2025-12-26T12-00-35-931Z-e2fe1006/manifest.json` (implementation gate).
+- [x] `npm run test` passes - Evidence: `.runs/0913-orchestrator-refactor-roadmap/cli/2025-12-26T12-00-35-931Z-e2fe1006/manifest.json` (implementation gate).
+- [x] `npm run docs:check` passes - Evidence: `.runs/0913-orchestrator-refactor-roadmap/cli/2025-12-26T12-00-35-931Z-e2fe1006/manifest.json` (implementation gate).
+- [x] `node scripts/diff-budget.mjs` passes - Evidence: `.runs/0913-orchestrator-refactor-roadmap/cli/2025-12-26T12-00-35-931Z-e2fe1006/manifest.json` (implementation gate).
+- [x] `npm run review` captured with NOTES - Evidence: `.runs/0913-orchestrator-refactor-roadmap/cli/2025-12-26T12-00-35-931Z-e2fe1006/manifest.json` (implementation gate).
+<!-- docs-sync:end 0913-orchestrator-refactor-roadmap -->

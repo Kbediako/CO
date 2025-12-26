@@ -8,12 +8,15 @@ export interface AtomicWriteOptions {
   pid?: number;
 }
 
+let atomicWriteCounter = 0;
+
 export function buildAtomicTempPath(
   destination: string,
   now: () => number = Date.now,
   pid: number = process.pid
 ): string {
-  return `${destination}.tmp-${pid}-${now()}`;
+  atomicWriteCounter = (atomicWriteCounter + 1) % Number.MAX_SAFE_INTEGER;
+  return `${destination}.tmp-${pid}-${now()}-${atomicWriteCounter}`;
 }
 
 export async function writeAtomicFile(

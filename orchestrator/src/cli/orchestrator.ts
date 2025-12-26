@@ -16,15 +16,14 @@ import type { EnvironmentPaths } from './run/environment.js';
 import {
   bootstrapManifest,
   loadManifest,
-  saveManifest,
   updateHeartbeat,
-  writeHeartbeatFile,
   finalizeStatus,
   appendSummary,
   ensureGuardrailStatus,
   resetForResume,
   recordResumeEvent
 } from './run/manifest.js';
+import { ManifestPersister, persistManifest } from './run/manifestPersister.js';
 import type {
   CliManifest,
   PipelineDefinition,
@@ -60,7 +59,7 @@ import {
 } from './services/runPreparation.js';
 import { loadUserConfig } from './config/userConfig.js';
 import { RunEventPublisher, snapshotStages, type RunEventEmitter } from './events/runEvents.js';
-import { createExecutionModeParser, resolveRequiresCloudFlag } from '../utils/executionMode.js';
+import { CLI_EXECUTION_MODE_PARSER, resolveRequiresCloudPolicy } from '../utils/executionMode.js';
 
 
 interface ExecutePipelineOptions {
@@ -69,6 +68,8 @@ interface ExecutePipelineOptions {
   manifest: CliManifest;
   paths: RunPaths;
   runEvents?: RunEventPublisher;
+  persister?: ManifestPersister;
+  envOverrides?: NodeJS.ProcessEnv;
 }
 
 interface RunLifecycleContext {
@@ -80,14 +81,9 @@ interface RunLifecycleContext {
   taskContext: TaskContext;
   runId: string;
   runEvents?: RunEventPublisher;
+  persister: ManifestPersister;
+  envOverrides: NodeJS.ProcessEnv;
 }
-
-const cliExecutionModeParser = createExecutionModeParser({
-  trim: false,
-  lowercase: true,
-  truthyValues: ['cloud'],
-  falsyValues: ['mcp']
-});
 
 export class CodexOrchestrator {
   private readonly controlPlane = new ControlPlaneService();
@@ -112,6 +108,11 @@ export class CodexOrchestrator {
       approvalPolicy: options.approvalPolicy ?? null,
       planTargetId: preparation.planPreview?.targetId ?? preparation.plannerTargetId ?? null
     });
+    const persister = new ManifestPersister({
+      manifest,
+      paths,
+      persistIntervalMs: Math.max(1000, manifest.heartbeat_interval_seconds * 1000)
+    });
 
     const runEvents = this.createRunEventPublisher({
       runId,
@@ -129,7 +130,9 @@ export class CodexOrchestrator {
       planner: preparation.planner,
       taskContext: preparation.taskContext,
       runId,
-      runEvents
+      runEvents,
+      persister,
+      envOverrides: preparation.envOverrides
     });
   }
 
@@ -143,7 +146,7 @@ export class CodexOrchestrator {
 
     const userConfig = await loadUserConfig(actualEnv);
     const pipeline = resolvePipelineForResume(actualEnv, manifest, userConfig);
-    resolver.ensureDesignPipelineEnv(pipeline.id, designConfig);
+    const envOverrides = resolver.resolveDesignEnvOverrides(designConfig, pipeline.id);
     await this.validateResumeToken(paths, manifest, options.resumeToken ?? null);
     recordResumeEvent(manifest, {
       actor: options.actor ?? 'cli',
@@ -158,11 +161,16 @@ export class CodexOrchestrator {
       resolver,
       taskIdOverride: manifest.task_id,
       targetStageId: options.targetStageId,
-      planTargetFallback: manifest.plan_target_id ?? null
+      planTargetFallback: manifest.plan_target_id ?? null,
+      envOverrides
     });
     manifest.plan_target_id = preparation.planPreview?.targetId ?? preparation.plannerTargetId ?? null;
-    await saveManifest(paths, manifest);
-    await writeHeartbeatFile(paths, manifest);
+    const persister = new ManifestPersister({
+      manifest,
+      paths,
+      persistIntervalMs: Math.max(1000, manifest.heartbeat_interval_seconds * 1000)
+    });
+    await persister.schedule({ manifest: true, heartbeat: true, force: true });
 
     const runEvents = this.createRunEventPublisher({
       runId: manifest.run_id,
@@ -180,7 +188,9 @@ export class CodexOrchestrator {
       planner: preparation.planner,
       taskContext: preparation.taskContext,
       runId: manifest.run_id,
-      runEvents
+      runEvents,
+      persister,
+      envOverrides: preparation.envOverrides
     });
   }
 
@@ -303,16 +313,17 @@ export class CodexOrchestrator {
   }
 
   private requiresCloudExecution(task: TaskContext, subtask: PlanItem): boolean {
-    const metadataModes = [
-      typeof subtask.metadata?.executionMode === 'string'
-        ? (subtask.metadata.executionMode as string)
-        : null,
-      typeof subtask.metadata?.mode === 'string' ? (subtask.metadata.mode as string) : null
-    ];
-    const requiresCloudFlag = resolveRequiresCloudFlag({
+    const requiresCloudFlag = resolveRequiresCloudPolicy({
       boolFlags: [subtask.requires_cloud, subtask.requiresCloud],
-      metadataModes,
-      parseMode: cliExecutionModeParser
+      metadata: {
+        executionMode:
+          typeof subtask.metadata?.executionMode === 'string'
+            ? (subtask.metadata.executionMode as string)
+            : null,
+        mode: typeof subtask.metadata?.mode === 'string' ? (subtask.metadata.mode as string) : null
+      },
+      metadataOrder: ['executionMode', 'mode'],
+      parseMode: CLI_EXECUTION_MODE_PARSER
     });
     if (requiresCloudFlag !== null) {
       return requiresCloudFlag;
@@ -321,78 +332,21 @@ export class CodexOrchestrator {
   }
 
   private async executePipeline(options: ExecutePipelineOptions): Promise<PipelineRunExecutionResult> {
-    const { env, pipeline, manifest, paths, runEvents } = options;
+    const { env, pipeline, manifest, paths, runEvents, envOverrides } = options;
     const notes: string[] = [];
     let success = true;
     manifest.guardrail_status = undefined;
 
-    const persistIntervalMs = Math.max(1000, manifest.heartbeat_interval_seconds * 1000);
-    let dirtyManifest = false;
-    let dirtyHeartbeat = false;
-    let timer: NodeJS.Timeout | null = null;
-    let timerResolver: (() => void) | null = null;
-    let lastPersistAt = 0;
-    let pendingPersist = Promise.resolve();
-
-    const flushPersist = async (): Promise<void> => {
-      if (!dirtyManifest && !dirtyHeartbeat) {
-        return;
-      }
-      const writeManifest = dirtyManifest;
-      const writeHeartbeat = dirtyHeartbeat;
-      dirtyManifest = false;
-      dirtyHeartbeat = false;
-      lastPersistAt = Date.now();
-      if (writeManifest) {
-        await saveManifest(paths, manifest);
-      }
-      if (writeHeartbeat) {
-        await writeHeartbeatFile(paths, manifest);
-      }
-    };
-
+    const persister =
+      options.persister ??
+      new ManifestPersister({
+        manifest,
+        paths,
+        persistIntervalMs: Math.max(1000, manifest.heartbeat_interval_seconds * 1000)
+      });
     const schedulePersist = (
       options: { manifest?: boolean; heartbeat?: boolean; force?: boolean } = {}
-    ): Promise<void> => {
-      const { manifest: includeManifest = false, heartbeat: includeHeartbeat = false, force = false } = options;
-      dirtyManifest = dirtyManifest || includeManifest;
-      dirtyHeartbeat = dirtyHeartbeat || includeHeartbeat;
-      if (!dirtyManifest && !dirtyHeartbeat) {
-        return pendingPersist;
-      }
-      if (force) {
-        if (timer) {
-          clearTimeout(timer);
-          timer = null;
-        }
-        if (timerResolver) {
-          const resolver = timerResolver;
-          timerResolver = null;
-          resolver();
-          return pendingPersist;
-        }
-        pendingPersist = pendingPersist.then(() => flushPersist());
-        return pendingPersist;
-      }
-      if (timer) {
-        return pendingPersist;
-      }
-      const waitMs = Math.max(0, lastPersistAt + persistIntervalMs - Date.now());
-      pendingPersist = pendingPersist
-        .then(
-          () =>
-            new Promise<void>((resolve) => {
-              timerResolver = resolve;
-              timer = setTimeout(() => {
-                timer = null;
-                timerResolver = null;
-                resolve();
-              }, waitMs);
-            })
-        )
-        .then(() => flushPersist());
-      return pendingPersist;
-    };
+    ): Promise<void> => persister.schedule(options);
 
     const pushHeartbeat = (forceManifest = false): Promise<void> => {
       updateHeartbeat(manifest);
@@ -436,7 +390,9 @@ export class CodexOrchestrator {
               manifest,
               stage,
               index: entry.index,
-              events: runEvents
+              events: runEvents,
+              persister,
+              envOverrides
             });
             notes.push(`${stage.title}: ${result.summary}`);
             const updatedEntry = manifest.commands[i];
@@ -566,7 +522,7 @@ export class CodexOrchestrator {
       );
     });
     await schedulePersist({ force: true });
-    await appendMetricsEntry(env, paths, manifest);
+    await appendMetricsEntry(env, paths, manifest, persister);
 
     return {
       success,
@@ -578,7 +534,7 @@ export class CodexOrchestrator {
   }
 
   private async performRunLifecycle(context: RunLifecycleContext): Promise<PipelineExecutionResult> {
-    const { env, pipeline, manifest, paths, planner, taskContext, runId } = context;
+    const { env, pipeline, manifest, paths, planner, taskContext, runId, persister, envOverrides } = context;
     let pipelineResult: PipelineRunExecutionResult | null = null;
     let executing: Promise<PipelineRunExecutionResult> | null = null;
     const executePipeline = async () => {
@@ -588,7 +544,9 @@ export class CodexOrchestrator {
           pipeline,
           manifest,
           paths,
-          runEvents: context.runEvents
+          runEvents: context.runEvents,
+          persister,
+          envOverrides
         }).then((result) => {
           pipelineResult = result;
           return result;
@@ -598,7 +556,7 @@ export class CodexOrchestrator {
     };
     const getResult = () => pipelineResult;
     const manager = this.createTaskManager(runId, pipeline, executePipeline, getResult, planner);
-    this.attachPlanTargetTracker(manager, manifest, paths);
+    this.attachPlanTargetTracker(manager, manifest, paths, persister);
 
     getPrivacyGuard().reset();
 
@@ -609,14 +567,16 @@ export class CodexOrchestrator {
       pipeline,
       task: taskContext,
       runId,
-      requestedBy: { actorId: 'codex-cli', channel: 'cli', name: 'Codex CLI' }
+      requestedBy: { actorId: 'codex-cli', channel: 'cli', name: 'Codex CLI' },
+      persister
     });
 
     const schedulerPlan = await this.scheduler.createPlanForRun({
       env,
       manifest,
       paths,
-      controlPlaneResult
+      controlPlaneResult,
+      persister
     });
 
     let runSummary: RunSummary;
@@ -635,7 +595,8 @@ export class CodexOrchestrator {
     await this.scheduler.finalizePlan({
       manifest,
       paths,
-      plan: schedulerPlan
+      plan: schedulerPlan,
+      persister
     });
 
     this.scheduler.applySchedulerToRunSummary(runSummary, schedulerPlan);
@@ -643,7 +604,7 @@ export class CodexOrchestrator {
     applyPrivacyToRunSummary(runSummary, manifest);
     this.controlPlane.applyControlPlaneToRunSummary(runSummary, controlPlaneResult);
 
-    await persistRunSummary(env, paths, manifest, runSummary);
+    await persistRunSummary(env, paths, manifest, runSummary, persister);
     context.runEvents?.runCompleted({
       pipelineId: pipeline.id,
       status: manifest.status,
@@ -656,14 +617,19 @@ export class CodexOrchestrator {
     return { manifest, runSummary };
   }
 
-  private attachPlanTargetTracker(manager: TaskManager, manifest: CliManifest, paths: RunPaths): void {
+  private attachPlanTargetTracker(
+    manager: TaskManager,
+    manifest: CliManifest,
+    paths: RunPaths,
+    persister?: ManifestPersister
+  ): void {
     manager.bus.on('plan:completed', (event) => {
       const targetId = event.payload.plan.targetId ?? null;
       if (manifest.plan_target_id === targetId) {
         return;
       }
       manifest.plan_target_id = targetId;
-      void saveManifest(paths, manifest).catch((error) => {
+      void persistManifest(paths, manifest, persister, { force: true }).catch((error) => {
         logger.warn(
           `Failed to persist plan target for run ${manifest.run_id}: ${(error as Error)?.message ?? String(error)}`
         );

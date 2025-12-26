@@ -1,4 +1,4 @@
-import { saveManifest } from '../run/manifest.js';
+import { persistManifest } from '../run/manifestPersister.js';
 import type { RunMetricSummary } from '../../../../packages/shared/events/types.js';
 import {
   createRunMetricSummary,
@@ -29,6 +29,6 @@ export async function handleTfgrpoArtifacts(
     execEvents: context.execEvents,
     policy: resolveExperiencePolicy()
   });
-  await saveManifest(context.paths, context.manifest);
+  await persistManifest(context.paths, context.manifest, context.persister, { force: true });
   return runMetricSummary;
 }

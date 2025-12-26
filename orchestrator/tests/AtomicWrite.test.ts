@@ -39,10 +39,14 @@ describe('atomic write helpers', () => {
     expect(contents).toBe(`${JSON.stringify(payload, null, 2)}\n`);
   });
 
-  it('buildAtomicTempPath preserves the temp naming pattern', () => {
+  it('buildAtomicTempPath includes a unique suffix', () => {
     const targetPath = join(workspace, 'file.txt');
-    expect(buildAtomicTempPath(targetPath, () => 1234, 5678)).toBe(
-      `${targetPath}.tmp-5678-1234`
-    );
+    const prefix = `${targetPath}.tmp-5678-1234-`;
+    const first = buildAtomicTempPath(targetPath, () => 1234, 5678);
+    const second = buildAtomicTempPath(targetPath, () => 1234, 5678);
+
+    expect(first.startsWith(prefix)).toBe(true);
+    expect(second.startsWith(prefix)).toBe(true);
+    expect(first).not.toBe(second);
   });
 });

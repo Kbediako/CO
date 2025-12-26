@@ -24,6 +24,12 @@
 - Metrics / State Snapshots: _(pending — populate `.runs/0910-docs-review-gate/metrics.json` and `out/0910-docs-review-gate/state.json`)._
 - Checklist Mirror: `tasks/tasks-0910-docs-review-gate.md`, `docs/TASKS.md` (0910 section), `.agent/task/0910-docs-review-gate.md`.
 
+## Task 0913 — Orchestrator Refactor Roadmap (Robustness + Performance)
+- Primary Doc: `docs/ACTION_PLAN-orchestrator-refactor-roadmap.md`
+- Run Manifest Link: `.runs/0913-orchestrator-refactor-roadmap/cli/2025-12-26T08-11-25-461Z-6ba85057/manifest.json` _(status: `succeeded`)._
+- Metrics / State Snapshots: `.runs/0913-orchestrator-refactor-roadmap/metrics.json` (JSONL; one entry per run), `out/0913-orchestrator-refactor-roadmap/state.json` (latest snapshot)
+- Checklist Mirror: `tasks/tasks-0913-orchestrator-refactor-roadmap.md`, `docs/TASKS.md` (0913 section), `.agent/task/0913-orchestrator-refactor-roadmap.md`.
+
 ## Task 0904 — README vs Codebase Alignment
 - Primary Doc: `docs/ACTION_PLAN-readme-codebase-alignment.md`
 - Run Manifest Link: _(pending — capture first diagnostics run under `.runs/0904-readme-codebase-alignment/cli/<run-id>/manifest.json`)._

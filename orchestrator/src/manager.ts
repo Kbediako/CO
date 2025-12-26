@@ -21,7 +21,7 @@ import { TaskStateStore } from './persistence/TaskStateStore.js';
 import { RunManifestWriter } from './persistence/RunManifestWriter.js';
 import { sanitizeRunId } from './persistence/sanitizeRunId.js';
 import { normalizeErrorMessage } from './utils/errorMessage.js';
-import { createExecutionModeParser, resolveRequiresCloudFlag } from './utils/executionMode.js';
+import { MANAGER_EXECUTION_MODE_PARSER, resolveRequiresCloudPolicy } from './utils/executionMode.js';
 import { EnvUtils } from '../../packages/shared/config/index.js';
 
 export type ModePolicy = (task: TaskContext, subtask: PlanItem) => ExecutionMode;
@@ -63,22 +63,18 @@ const defaultModePolicy: ModePolicy = (task, subtask) => {
   return 'mcp';
 };
 
-const managerExecutionModeParser = createExecutionModeParser({
-  trim: true,
-  lowercase: true,
-  truthyValues: ['cloud', 'true', '1', 'yes'],
-  falsyValues: ['mcp', 'false', '0', 'no']
-});
-
 function resolveRequiresCloud(subtask: PlanItem): boolean {
-  const metadataModes = [
-    typeof subtask.metadata?.mode === 'string' ? subtask.metadata.mode : null,
-    typeof subtask.metadata?.executionMode === 'string' ? subtask.metadata.executionMode : null
-  ];
-  const requiresCloudFlag = resolveRequiresCloudFlag({
+  const requiresCloudFlag = resolveRequiresCloudPolicy({
     boolFlags: [subtask.requires_cloud, subtask.requiresCloud],
-    metadataModes,
-    parseMode: managerExecutionModeParser
+    metadata: {
+      mode: typeof subtask.metadata?.mode === 'string' ? subtask.metadata.mode : null,
+      executionMode:
+        typeof subtask.metadata?.executionMode === 'string'
+          ? subtask.metadata.executionMode
+          : null
+    },
+    metadataOrder: ['mode', 'executionMode'],
+    parseMode: MANAGER_EXECUTION_MODE_PARSER
   });
   return requiresCloudFlag ?? false;
 }

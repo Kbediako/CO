@@ -13,15 +13,16 @@ import type { RunPaths } from '../run/runPaths.js';
 import { relativeToRepo } from '../run/runPaths.js';
 import {
   appendCommandError,
-  updateCommandStatus,
-  saveManifest
+  updateCommandStatus
 } from '../run/manifest.js';
+import { persistManifest, type ManifestPersister } from '../run/manifestPersister.js';
 import { slugify } from '../utils/strings.js';
 import { isoTimestamp } from '../utils/time.js';
 import { EnvUtils } from '../../../../packages/shared/config/index.js';
 
 const MAX_BUFFERED_OUTPUT_BYTES = 64 * 1024;
 const EMIT_COMMAND_STREAM_MIRRORS = EnvUtils.getBoolean('CODEX_ORCHESTRATOR_EMIT_COMMAND_STREAMS', false);
+const MAX_CAPTURED_CHUNK_EVENTS = EnvUtils.getInt('CODEX_ORCHESTRATOR_EXEC_EVENT_MAX_CHUNKS', 0);
 
 export interface CommandRunnerContext {
   env: EnvironmentPaths;
@@ -30,6 +31,8 @@ export interface CommandRunnerContext {
   stage: CommandStage;
   index: number;
   events?: RunEventPublisher;
+  persister?: ManifestPersister;
+  envOverrides?: NodeJS.ProcessEnv;
 }
 
 export interface CommandRunHooks {
@@ -47,7 +50,7 @@ export async function runCommandStage(
   context: CommandRunnerContext,
   hooks: CommandRunHooks = {}
 ): Promise<CommandRunResult> {
-  const { env, paths, manifest, stage, index, events } = context;
+  const { env, paths, manifest, stage, index, events, persister, envOverrides } = context;
   const entryIndex = index - 1;
   const entry = updateCommandStatus(manifest, entryIndex, {
     status: 'running',
@@ -58,7 +61,7 @@ export async function runCommandStage(
 
   const logFile = join(paths.commandsDir, `${String(index).padStart(2, '0')}-${slugify(stage.id)}.ndjson`);
   entry.log_path = relativeToRepo(env, logFile);
-  await saveManifest(paths, manifest);
+  await persistManifest(paths, manifest, persister, { force: true });
   events?.stageStarted({
     stageId: stage.id,
     stageIndex: index,
@@ -162,6 +165,7 @@ export async function runCommandStage(
 
     const baseEnv: NodeJS.ProcessEnv = {
       ...process.env,
+      ...(envOverrides ?? {}),
       CODEX_ORCHESTRATOR_TASK_ID: manifest.task_id,
       CODEX_ORCHESTRATOR_RUN_ID: manifest.run_id,
       CODEX_ORCHESTRATOR_PIPELINE_ID: manifest.pipeline_id,
@@ -175,6 +179,8 @@ export async function runCommandStage(
     const invocationId = `cli-command:${manifest.run_id}:${stage.id}:${Date.now()}`;
 
     let result: UnifiedExecRunResult;
+    const eventCapture =
+      MAX_CAPTURED_CHUNK_EVENTS > 0 ? { maxChunkEvents: MAX_CAPTURED_CHUNK_EVENTS } : undefined;
     try {
       result = await runner.run({
         command: stage.command,
@@ -187,6 +193,7 @@ export async function runCommandStage(
         invocationId,
         toolId: 'cli:command',
         description: stage.title,
+        eventCapture,
         metadata: {
           stageId: stage.id,
           pipelineId: manifest.pipeline_id,
@@ -259,7 +266,7 @@ export async function runCommandStage(
       );
     }
 
-    await saveManifest(paths, manifest);
+    await persistManifest(paths, manifest, persister, { force: true });
     events?.stageCompleted({
       stageId: stage.id,
       stageIndex: index,

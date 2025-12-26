@@ -2,8 +2,8 @@ import { join } from 'node:path';
 
 import type { RunPaths } from '../run/runPaths.js';
 import { relativeToRepo } from '../run/runPaths.js';
-import { saveManifest } from '../run/manifest.js';
 import { writeJsonAtomic } from '../utils/fs.js';
+import { persistManifest } from '../run/manifestPersister.js';
 import type {
   ExecEvent,
   RunMetricSummary,
@@ -132,7 +132,7 @@ export async function persistRunOutputs(
   const runSummaryPath = join(context.paths.runDir, 'run-summary.json');
   await writeJsonAtomic(runSummaryPath, summaryEvent);
   context.manifest.run_summary_path = relativeToRepo(context.env, runSummaryPath);
-  await saveManifest(context.paths, context.manifest);
+  await persistManifest(context.paths, context.manifest, context.persister, { force: true });
 }
 
 export function emitCommandError(context: ExecRunContext, commandError: unknown): void {

@@ -14,7 +14,6 @@ import type { PipelineDefinition } from '../types.js';
 export class PipelineResolver {
   async loadDesignConfig(rootDir: string): Promise<DesignConfigLoadResult> {
     const designConfig = await loadDesignConfig({ rootDir });
-    process.env.DESIGN_CONFIG_PATH = designConfig.path;
     if (designConfig.warnings.length > 0) {
       for (const warning of designConfig.warnings) {
         logger.warn(`[design-config] ${warning}`);
@@ -26,7 +25,13 @@ export class PipelineResolver {
   async resolve(
     env: EnvironmentPaths,
     options: { pipelineId?: string }
-  ): Promise<{ pipeline: PipelineDefinition; userConfig: UserConfig | null; designConfig: DesignConfigLoadResult; source: 'default' | 'user' }> {
+  ): Promise<{
+    pipeline: PipelineDefinition;
+    userConfig: UserConfig | null;
+    designConfig: DesignConfigLoadResult;
+    source: 'default' | 'user';
+    envOverrides: NodeJS.ProcessEnv;
+  }> {
     logger.info(`PipelineResolver.resolve start for ${options.pipelineId ?? '<default>'}`);
     const designConfig = await this.loadDesignConfig(env.repoRoot);
     logger.info(`PipelineResolver.resolve loaded design config from ${designConfig.path}`);
@@ -36,9 +41,7 @@ export class PipelineResolver {
     const requestedPipelineId = options.pipelineId ?? 
       (shouldActivateDesignPipeline(designConfig) ? designPipelineId(designConfig) : undefined);
 
-    if (requestedPipelineId === designPipelineId(designConfig) && process.env.DESIGN_PIPELINE === undefined) {
-      process.env.DESIGN_PIPELINE = '1';
-    }
+    const envOverrides = this.resolveDesignEnvOverrides(designConfig, requestedPipelineId);
 
     try {
       const { pipeline, source } = resolvePipeline(env, {
@@ -46,7 +49,7 @@ export class PipelineResolver {
         config: userConfig
       });
       logger.info(`PipelineResolver.resolve selected pipeline ${pipeline.id}`);
-      return { pipeline, userConfig, designConfig, source };
+      return { pipeline, userConfig, designConfig, source, envOverrides };
     } catch (error) {
       logger.error(
         `PipelineResolver.resolve failed for ${requestedPipelineId ?? '<default>'}: ${(error as Error).message}`
@@ -55,9 +58,16 @@ export class PipelineResolver {
     }
   }
 
-  ensureDesignPipelineEnv(pipelineId: string, designConfig: DesignConfigLoadResult): void {
+  resolveDesignEnvOverrides(
+    designConfig: DesignConfigLoadResult,
+    pipelineId?: string
+  ): NodeJS.ProcessEnv {
+    const envOverrides: NodeJS.ProcessEnv = {
+      DESIGN_CONFIG_PATH: designConfig.path
+    };
     if (pipelineId === designPipelineId(designConfig) && process.env.DESIGN_PIPELINE === undefined) {
-      process.env.DESIGN_PIPELINE = '1';
+      envOverrides.DESIGN_PIPELINE = '1';
     }
+    return envOverrides;
   }
 }
