@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp 04fdc6da20bea748ceeaef1551c0749f7e09d9dd724c29df0a3a574b0e2dcc13 -->
+<!-- codex:instruction-stamp e8df52d19815aca696e349f2ef50589bbd3be3498d26c26e1f9827127d685fed -->
 # Agent Enablement
 
 ## Added by Bootstrap 2025-10-16
@@ -32,6 +32,10 @@
 - `node scripts/diff-budget.mjs` — Enforces a small-diff budget before review; set `DIFF_BUDGET_OVERRIDE_REASON` to bypass with justification.
 - `npm run review` — Launches `codex review` with a non-interactive prompt that includes the latest run manifest path as evidence (reviews “current changes” by default); `NOTES` is required and should include goal, summary, risks, and optional questions.
 - `codex-orchestrator plan [pipeline]` — Preview resolved pipeline stages without execution; add `--format json` for automation inputs.
+
+### Runtime knobs (optional)
+- `CODEX_ORCHESTRATOR_EXEC_EVENT_MAX_CHUNKS` caps the number of exec chunk events retained per command (0 disables the cap).
+- `CODEX_METRICS_PRIVACY_EVENTS_MAX` caps privacy decision events recorded in `metrics.json` (-1 disables the cap; `privacy_event_count` still tracks the full total).
 
 ### Codex CLI prompts
 - Keep the prompt files `~/.codex/prompts/diagnostics.md` and `~/.codex/prompts/review-handoff.md` on every workstation (they are not checked into the repo). Each prompt wires `/prompts:<name>` to the required orchestrator commands so contributors do not have to remember the sequences manually.
