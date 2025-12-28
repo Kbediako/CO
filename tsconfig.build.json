@@ -11,16 +11,19 @@
     "packages/control-plane-schemas/src/**/*.ts",
     "packages/sdk-node/src/**/*.ts",
     "packages/shared/**/*.ts",
-    "scripts/**/*.ts",
+    "scripts/design/pipeline/**/*.ts",
     "bin/**/*.ts",
     "types/**/*.d.ts"
   ],
   "exclude": [
+    "**/*.test.ts",
+    "**/*.spec.ts",
     "adapters/**",
     "evaluation/**",
     "patterns/**",
     "packages/design-reference-tools/**",
     "packages/design-system/**",
-    "packages/design-reference-tools/**/node_modules/**"
+    "packages/design-reference-tools/**/node_modules/**",
+    "packages/shared/tests/**"
   ]
 }

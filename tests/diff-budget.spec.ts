@@ -116,7 +116,7 @@ describe('diff-budget script', () => {
     );
 
     expect(result.exitCode).toBe(0);
-    expect(result.stdout).toContain('❌ Diff budget exceeded');
+    expect(result.stdout).toContain('⚠️ Diff budget exceeded (override applied)');
     expect(result.stdout).toContain('Override accepted via DIFF_BUDGET_OVERRIDE_REASON: tests: override accepted');
   });
 });

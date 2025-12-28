@@ -1,6 +1,9 @@
-import { Ajv as AjvCtor, type ErrorObject } from 'ajv';
+import { readFileSync, existsSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-import manifestSchema from '../../../schemas/manifest.json' with { type: 'json' };
+import { Ajv as AjvCtor, type ErrorObject } from 'ajv';
 import type { CliManifest } from './types.js';
 
 export type JsonSchema = Record<string, unknown>;
@@ -16,6 +19,7 @@ const ajv = new AjvCtor({
   strict: false
 });
 
+const manifestSchema = loadManifestSchema();
 const validate = ajv.compile<CliManifest>(manifestSchema);
 
 export const manifestValidator = validate;
@@ -50,4 +54,39 @@ function formatErrors(errors: ErrorObject<string, Record<string, unknown>, unkno
     }
     return error.message ?? 'invalid value';
   });
+}
+
+export function resolveManifestSchemaPath(options: { skipImports?: boolean; fromUrl?: string } = {}): string {
+  if (!options.skipImports) {
+    const require = createRequire(import.meta.url);
+    try {
+      return require.resolve('#co/schema/manifest');
+    } catch {
+      // fall through to fallback
+    }
+  }
+  return resolveManifestSchemaPathFallback(options.fromUrl ?? import.meta.url);
+}
+
+function resolveManifestSchemaPathFallback(fromUrl: string): string {
+  let current: string | null = dirname(fileURLToPath(fromUrl));
+  while (current) {
+    const candidate = join(current, 'package.json');
+    if (existsSync(candidate)) {
+      return join(current, 'schemas', 'manifest.json');
+    }
+    const parent = dirname(current);
+    if (parent === current) {
+      current = null;
+      continue;
+    }
+    current = parent;
+  }
+  throw new Error('Unable to locate schemas/manifest.json');
+}
+
+function loadManifestSchema(): JsonSchema {
+  const schemaPath = resolveManifestSchemaPath();
+  const raw = readFileSync(schemaPath, 'utf8');
+  return JSON.parse(raw) as JsonSchema;
 }

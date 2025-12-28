@@ -19,10 +19,12 @@ import { persistManifest, type ManifestPersister } from '../run/manifestPersiste
 import { slugify } from '../utils/strings.js';
 import { isoTimestamp } from '../utils/time.js';
 import { EnvUtils } from '../../../../packages/shared/config/index.js';
+import { findPackageRoot } from '../utils/packageInfo.js';
 
 const MAX_BUFFERED_OUTPUT_BYTES = 64 * 1024;
 const EMIT_COMMAND_STREAM_MIRRORS = EnvUtils.getBoolean('CODEX_ORCHESTRATOR_EMIT_COMMAND_STREAMS', false);
 const MAX_CAPTURED_CHUNK_EVENTS = EnvUtils.getInt('CODEX_ORCHESTRATOR_EXEC_EVENT_MAX_CHUNKS', 0);
+const PACKAGE_ROOT = findPackageRoot();
 
 export interface CommandRunnerContext {
   env: EnvironmentPaths;
@@ -173,7 +175,8 @@ export async function runCommandStage(
       CODEX_ORCHESTRATOR_RUN_DIR: paths.runDir,
       CODEX_ORCHESTRATOR_RUNS_DIR: env.runsRoot,
       CODEX_ORCHESTRATOR_OUT_DIR: env.outRoot,
-      CODEX_ORCHESTRATOR_REPO_ROOT: env.repoRoot
+      CODEX_ORCHESTRATOR_REPO_ROOT: env.repoRoot,
+      CODEX_ORCHESTRATOR_PACKAGE_ROOT: PACKAGE_ROOT
     };
     const execEnv: NodeJS.ProcessEnv = { ...baseEnv, ...stage.env };
     const invocationId = `cli-command:${manifest.run_id}:${stage.id}:${Date.now()}`;

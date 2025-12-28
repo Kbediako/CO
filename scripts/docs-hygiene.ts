@@ -519,7 +519,7 @@ async function main(): Promise<void> {
     return;
   }
 
-  console.error('Usage: node dist/scripts/docs-hygiene.js --check | --sync [--task <id>]');
+  console.error('Usage: node --loader ts-node/esm scripts/docs-hygiene.ts --check | --sync [--task <id>]');
   process.exitCode = 1;
 }
 

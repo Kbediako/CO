@@ -357,7 +357,11 @@ async function main() {
     .slice(0, 10)
     .map((entry) => `  - ${entry.filePath}: ${entry.lines}${entry.binary ? ' (binary/unknown)' : ''}`);
 
-  console.log(`❌ Diff budget exceeded (${baseRef ? `base=${baseRef}` : modeLabel})`);
+  const baseLabel = baseRef ? `base=${baseRef}` : modeLabel;
+  const exceededLabel = overrideReason
+    ? '⚠️ Diff budget exceeded (override applied)'
+    : '❌ Diff budget exceeded';
+  console.log(`${exceededLabel} (${baseLabel})`);
   for (const failure of failures) {
     console.log(` - ${failure}`);
   }

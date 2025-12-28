@@ -27,7 +27,7 @@ Use explicit checkboxes (`[ ]` → `[x]`) for every task and subtask tracked in 
 - [ ] `node scripts/spec-guard.mjs --dry-run` — verify specs updated before review.
 
 ### External Pointers
-- MCP registration: `scripts/run-local-mcp.sh` launches the local server; confirm builder/tester agents produce artifacts in `.runs`.
+- MCP registration: `codex-orchestrator mcp serve` launches the local server; confirm builder/tester agents produce artifacts in `.runs`.
 - Pattern assets: `patterns/index.json` lists available codemods/linters/templates with versions.
 - Release mirrors: `docs/PRD.md`, `docs/TECH_SPEC.md`, `docs/ACTION_PLAN.md` must reference their canonical `/tasks` counterparts after every milestone update.
 
@@ -40,5 +40,5 @@ Use explicit checkboxes (`[ ]` → `[x]`) for every task and subtask tracked in 
 
 ### Quick Links
 - Control files: `/.ai-dev-tasks/*`
-- Templates: `.agent/task/templates/`
+- Templates: `templates/`
 - Spec enforcement: `scripts/spec-guard.mjs`

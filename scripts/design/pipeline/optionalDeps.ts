@@ -1,3 +1,8 @@
+import { existsSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
+
 const DESIGN_SETUP_HINT =
   'Run "npm run setup:design-tools" and "npx playwright install" to enable design tooling.';
 
@@ -28,9 +33,31 @@ function missingDependency(specifier: string): Error {
   return new Error(`[design-tools] Missing optional dependency "${specifier}". ${DESIGN_SETUP_HINT}`);
 }
 
-async function loadOptionalDependency<T>(specifier: string): Promise<T> {
+function resolveOptionalDependency(specifier: string, cwd: string = process.cwd()): string | null {
+  const cwdPackage = join(cwd, 'package.json');
+  if (existsSync(cwdPackage)) {
+    try {
+      const cwdRequire = createRequire(cwdPackage);
+      return cwdRequire.resolve(specifier);
+    } catch {
+      // fall through
+    }
+  }
   try {
-    return (await import(specifier)) as T;
+    const selfRequire = createRequire(import.meta.url);
+    return selfRequire.resolve(specifier);
+  } catch {
+    return null;
+  }
+}
+
+async function loadOptionalDependency<T>(specifier: string): Promise<T> {
+  const resolved = resolveOptionalDependency(specifier);
+  if (!resolved) {
+    throw missingDependency(specifier);
+  }
+  try {
+    return (await import(pathToFileURL(resolved).href)) as T;
   } catch (error) {
     if (isModuleNotFound(error)) {
       throw missingDependency(specifier);
