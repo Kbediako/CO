@@ -64,6 +64,7 @@
     "@typescript-eslint/eslint-plugin": "^7.0.0",
     "@typescript-eslint/parser": "^7.0.0",
     "@typescript-eslint/utils": "^7.0.0",
+    "cheerio": "^1.1.2",
     "eslint": "^8.57.0",
     "eslint-plugin-patterns": "file:eslint-plugin-patterns",
     "jscodeshift": "^0.15.2",
