@@ -339,6 +339,21 @@ async function main(): Promise<void> {
     reviewEnv.CODEX_NO_INTERACTIVE = reviewEnv.CODEX_NO_INTERACTIVE ?? '1';
     reviewEnv.CODEX_INTERACTIVE = reviewEnv.CODEX_INTERACTIVE ?? '0';
   }
+  if (
+    nonInteractive &&
+    !envFlagEnabled(process.env.FORCE_CODEX_REVIEW) &&
+    (envFlagEnabled(process.env.CI) ||
+      envFlagEnabled(process.env.CODEX_REVIEW_NON_INTERACTIVE) ||
+      envFlagEnabled(process.env.CODEX_NON_INTERACTIVE) ||
+      envFlagEnabled(process.env.CODEX_NONINTERACTIVE))
+  ) {
+    console.log('Codex review handoff (non-interactive):');
+    console.log('---');
+    console.log(promptLines.join('\n'));
+    console.log('---');
+    console.log('Set FORCE_CODEX_REVIEW=1 to invoke `codex review` in this environment.');
+    return;
+  }
   console.log(`Launching Codex review (evidence: ${relativeManifest})`);
   const stdio: StdioOptions = nonInteractive ? ['ignore', 'inherit', 'inherit'] : 'inherit';
   const child: ChildProcess = spawn(command, args, { stdio, env: reviewEnv });

@@ -56,7 +56,7 @@
 - Action Plan: `docs/ACTION_PLAN-npm-companion-package.md`
 - Task checklist: `tasks/tasks-0914-npm-companion-package.md`
 - Mini-spec: `tasks/specs/0914-npm-companion-package.md`
-- Run Manifest (docs review): `.runs/0914-npm-companion-package/cli/2025-12-28T14-48-57-207Z-01b03374/manifest.json`
+- Run Manifest (docs review): `.runs/0914-npm-companion-package/cli/2025-12-28T16-12-48-461Z-041b4764/manifest.json`
 - Metrics / State Snapshots: `.runs/0914-npm-companion-package/metrics.json`, `out/0914-npm-companion-package/state.json`
 
 ## Open Questions

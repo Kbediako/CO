@@ -122,6 +122,7 @@ Notes:
 - To install or refresh the prompts (repo-only), run `scripts/setup-codex-prompts.sh` (use `--force` to overwrite existing files).
 - `/prompts:diagnostics` takes `TASK=<task-id> MANIFEST=<path> [NOTES=<free text>]`, exports `MCP_RUNNER_TASK_ID=$TASK`, runs `npx codex-orchestrator start diagnostics --format json`, tails `.runs/$TASK/cli/<run-id>/manifest.json` (or `npx codex-orchestrator status --watch`), and records evidence to `/tasks`, `docs/TASKS.md`, `.agent/task/...`, `.runs/$TASK/metrics.json`, and `out/$TASK/state.json` using `$MANIFEST`.
 - `/prompts:review-handoff` takes `TASK=<task-id> MANIFEST=<path> NOTES=<goal + summary + risks + optional questions>`, re-exports `MCP_RUNNER_TASK_ID`, and (repo-only) runs `node scripts/spec-guard.mjs --dry-run`, `npm run lint`, `npm run test`, optional `npm run eval:test`, plus `npm run review` (wraps `codex review` against the current diff and includes the latest run manifest path as evidence). It also reminds you to log approvals in `$MANIFEST` and mirror the evidence to the same docs/metrics/state targets.
+- In CI / `--no-interactive` pipelines, `npm run review` prints the review handoff prompt (including evidence paths) and exits successfully instead of invoking `codex review`. Set `FORCE_CODEX_REVIEW=1` to run `codex review` in those environments.
 - Always trigger diagnostics and review workflows through these prompts whenever you run the orchestrator so contributors consistently execute the required command sequences and capture auditable manifests.
 
 ### Identifier Guardrails

@@ -5,20 +5,20 @@
 - Tech Spec: `docs/TECH_SPEC-npm-companion-package.md`
 - Action Plan: `docs/ACTION_PLAN-npm-companion-package.md`
 - Mini-spec: `tasks/specs/0914-npm-companion-package.md`
-- Run Manifest (docs review): `.runs/0914-npm-companion-package/cli/2025-12-28T14-48-57-207Z-01b03374/manifest.json`
+- Run Manifest (docs review): `.runs/0914-npm-companion-package/cli/2025-12-28T16-12-48-461Z-041b4764/manifest.json`
 - Metrics/State: `.runs/0914-npm-companion-package/metrics.json`, `out/0914-npm-companion-package/state.json`
 
 ## Checklist
 
 ### Foundation
 - [x] Collateral drafted (PRD/tech spec/action plan/checklist/mini-spec) - Evidence: this commit.
-- [x] Docs-review manifest captured (pre-implementation) - Evidence: `.runs/0914-npm-companion-package/cli/2025-12-28T14-48-57-207Z-01b03374/manifest.json`.
+- [x] Docs-review manifest captured (pre-implementation) - Evidence: `.runs/0914-npm-companion-package/cli/2025-12-28T16-12-48-461Z-041b4764/manifest.json`.
 - [x] Metrics/state snapshots updated - Evidence: `.runs/0914-npm-companion-package/metrics.json`, `out/0914-npm-companion-package/state.json`.
 - [x] Mirrors updated in `docs/TASKS.md`, `.agent/task/0914-npm-companion-package.md`, and `tasks/index.json` - Evidence: this commit.
-- [x] PRD approval recorded in `tasks/index.json` gate metadata - Evidence: `.runs/0914-npm-companion-package/cli/2025-12-28T14-48-57-207Z-01b03374/manifest.json`.
+- [x] PRD approval recorded in `tasks/index.json` gate metadata - Evidence: `.runs/0914-npm-companion-package/cli/2025-12-28T16-12-48-461Z-041b4764/manifest.json`.
 
 ### Packaging & Tarball Controls
-- [x] Update package publish metadata and allowlist - Evidence: `package.json`, `.runs/0914-npm-companion-package/cli/2025-12-28T14-48-57-207Z-01b03374/manifest.json`.
+- [x] Update package publish metadata and allowlist - Evidence: `package.json`, `.runs/0914-npm-companion-package/cli/2025-12-28T16-12-48-461Z-041b4764/manifest.json`.
 - [x] Add LICENSE file for publication - Evidence: `LICENSE`, manifest.
 - [x] Add clean step and pack audit script.
 - [x] Tighten pack audit dist allowlist to runtime subtrees.

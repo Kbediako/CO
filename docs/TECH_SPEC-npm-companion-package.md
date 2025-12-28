@@ -19,7 +19,7 @@
 - `package.json` is now publishable (no `private: true`), includes a `files` allowlist, and heavy deps are optional peers; tarball contents are controlled by pack audit + allowlist.
 - `npm run build` uses `tsconfig.build.json`; `clean:dist` + `prepack` exist, but ad-hoc builds can still leave stale `dist/` unless cleaned.
 - Pack audit restricts `dist/` to runtime subtrees; the `files` allowlist mirrors those subtrees so non-runtime `dist/**` output never ships.
-- `scripts/run-review.ts` enforces a non-interactive guard in CI (stdin disabled; non-interactive env flags set).
+- `scripts/run-review.ts` enforces a non-interactive guard in CI by printing the review handoff prompt (with manifest evidence + task context) and exiting successfully; set `FORCE_CODEX_REVIEW=1` to invoke `codex review` in that mode.
 - Base logger uses `console.info` (stdout); MCP stdout-only guarantees are enforced by the `mcp serve` stdout guard.
 - Runtime schema resolution uses the `imports` alias with a fallback to `schemas/manifest.json`.
 - MCP usage still has legacy scripts in `scripts/`, but `mcp-client.json` now points at `codex-orchestrator mcp serve`.
@@ -153,7 +153,7 @@
 
 ## Documentation & Evidence
 - Linked PRD: `docs/PRD-npm-companion-package.md`
-- Run Manifest (docs review): `.runs/0914-npm-companion-package/cli/2025-12-28T14-48-57-207Z-01b03374/manifest.json`
+- Run Manifest (docs review): `.runs/0914-npm-companion-package/cli/2025-12-28T16-12-48-461Z-041b4764/manifest.json`
 - Metrics / State Snapshots: `.runs/0914-npm-companion-package/metrics.json`, `out/0914-npm-companion-package/state.json`
 
 ## Open Questions

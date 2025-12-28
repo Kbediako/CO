@@ -2,7 +2,7 @@
 
 ## Status Snapshot
 - Current Phase: Planning collateral + docs-review.
-- Run Manifest Link: `.runs/0914-npm-companion-package/cli/2025-12-28T14-48-57-207Z-01b03374/manifest.json`.
+- Run Manifest Link: `.runs/0914-npm-companion-package/cli/2025-12-28T16-12-48-461Z-041b4764/manifest.json`.
 - Metrics / State Snapshots: `.runs/0914-npm-companion-package/metrics.json`, `out/0914-npm-companion-package/state.json`.
 - Approvals / Escalations: None yet; safe `read/edit/run/network` profile expected.
 
