@@ -79,7 +79,7 @@
           "id": "review",
           "title": "npm run review",
           "command": "npm run review",
-          "env": { "DIFF_BUDGET_STAGE": "1" }
+          "env": { "DIFF_BUDGET_STAGE": "1", "CODEX_REVIEW_NON_INTERACTIVE": "1" }
         }
       ]
     },
@@ -130,7 +130,11 @@
           "id": "review",
           "title": "npm run review",
           "command": "npm run review",
-          "env": { "DIFF_BUDGET_STAGE": "1", "CODEX_REVIEW_DEVTOOLS": "1" }
+          "env": {
+            "DIFF_BUDGET_STAGE": "1",
+            "CODEX_REVIEW_DEVTOOLS": "1",
+            "CODEX_REVIEW_NON_INTERACTIVE": "1"
+          }
         }
       ]
     },
@@ -157,7 +161,7 @@
           "id": "review",
           "title": "npm run review",
           "command": "npm run review",
-          "env": { "SKIP_DIFF_BUDGET": "1" }
+          "env": { "SKIP_DIFF_BUDGET": "1", "CODEX_REVIEW_NON_INTERACTIVE": "1" }
         }
       ]
     },
