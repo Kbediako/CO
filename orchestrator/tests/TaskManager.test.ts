@@ -415,7 +415,19 @@ describe('TaskManager', () => {
       expect(sanitizeSpy).toHaveBeenCalledWith(taskWithPunctuation.id);
 
       const expectedManifestPath = join(runsDir, taskWithPunctuation.id, 'run-fixed', 'manifest.json');
-      const manifest = JSON.parse(await readFile(expectedManifestPath, 'utf-8'));
+      let manifestRaw: string | null = null;
+      for (let attempt = 0; attempt < 10; attempt += 1) {
+        try {
+          manifestRaw = await readFile(expectedManifestPath, 'utf-8');
+          break;
+        } catch {
+          await new Promise((resolve) => setTimeout(resolve, 25));
+        }
+      }
+      if (!manifestRaw) {
+        throw new Error(`Expected manifest not written: ${expectedManifestPath}`);
+      }
+      const manifest = JSON.parse(manifestRaw);
       expect(manifest.taskId).toBe(taskWithPunctuation.id);
     } finally {
       sanitizeSpy.mockRestore();

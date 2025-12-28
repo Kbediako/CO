@@ -1,6 +1,7 @@
 {
+  "templateVersion": 1,
   "mcpServers": {
-    "codex-local": {
+    "codex-orchestrator": {
       "command": "codex-orchestrator mcp serve"
     }
   }

@@ -11,6 +11,11 @@ import { resolveEnvironment, sanitizeTaskId } from '../orchestrator/src/cli/run/
 import { RunEventEmitter } from '../orchestrator/src/cli/events/runEvents.js';
 import type { HudController } from '../orchestrator/src/cli/ui/controller.js';
 import { evaluateInteractiveGate } from '../orchestrator/src/cli/utils/interactive.js';
+import { buildSelfCheckResult } from '../orchestrator/src/cli/selfCheck.js';
+import { initCodexTemplates, formatInitSummary } from '../orchestrator/src/cli/init.js';
+import { runDoctor, formatDoctorSummary } from '../orchestrator/src/cli/doctor.js';
+import { loadPackageInfo } from '../orchestrator/src/cli/utils/packageInfo.js';
+import { serveMcp } from '../orchestrator/src/cli/mcp.js';
 
 type ArgMap = Record<string, string | boolean>;
 
@@ -19,6 +24,10 @@ async function main(): Promise<void> {
   const command = args.shift();
   if (!command || command === 'help' || command === '--help' || command === '-h') {
     printHelp();
+    return;
+  }
+  if (command === '--version' || command === '-v') {
+    printVersion();
     return;
   }
 
@@ -40,6 +49,21 @@ async function main(): Promise<void> {
         break;
       case 'exec':
         await handleExec(args);
+        break;
+      case 'self-check':
+        await handleSelfCheck(args);
+        break;
+      case 'init':
+        await handleInit(args);
+        break;
+      case 'doctor':
+        await handleDoctor(args);
+        break;
+      case 'mcp':
+        await handleMcp(args);
+        break;
+      case 'version':
+        printVersion();
         break;
       default:
         console.error(`Unknown command: ${command}`);
@@ -297,6 +321,67 @@ async function handleExec(rawArgs: string[]): Promise<void> {
   }
 }
 
+async function handleSelfCheck(rawArgs: string[]): Promise<void> {
+  const { flags } = parseArgs(rawArgs);
+  const format = (flags['format'] as string | undefined) === 'json' ? 'json' : 'text';
+  const result = buildSelfCheckResult();
+  if (format === 'json') {
+    console.log(JSON.stringify(result, null, 2));
+    return;
+  }
+  console.log(`Status: ${result.status}`);
+  console.log(`Name: ${result.name}`);
+  console.log(`Version: ${result.version}`);
+  console.log(`Node: ${result.node}`);
+  console.log(`Timestamp: ${result.timestamp}`);
+}
+
+async function handleInit(rawArgs: string[]): Promise<void> {
+  const { positionals, flags } = parseArgs(rawArgs);
+  const template = positionals[0];
+  if (!template) {
+    throw new Error('init requires a template name (e.g. init codex).');
+  }
+  if (template !== 'codex') {
+    throw new Error(`Unknown init template: ${template}`);
+  }
+  const cwd = typeof flags['cwd'] === 'string' ? (flags['cwd'] as string) : process.cwd();
+  const force = Boolean(flags['force']);
+  const result = await initCodexTemplates({ template, cwd, force });
+  const summary = formatInitSummary(result, cwd);
+  for (const line of summary) {
+    console.log(line);
+  }
+}
+
+async function handleDoctor(rawArgs: string[]): Promise<void> {
+  const { flags } = parseArgs(rawArgs);
+  const format = (flags['format'] as string | undefined) === 'json' ? 'json' : 'text';
+  const result = runDoctor();
+  if (format === 'json') {
+    console.log(JSON.stringify(result, null, 2));
+    return;
+  }
+  const summary = formatDoctorSummary(result);
+  for (const line of summary) {
+    console.log(line);
+  }
+}
+
+async function handleMcp(rawArgs: string[]): Promise<void> {
+  const { positionals, flags } = parseArgs(rawArgs);
+  const subcommand = positionals.shift();
+  if (!subcommand) {
+    throw new Error('mcp requires a subcommand (serve).');
+  }
+  if (subcommand !== 'serve') {
+    throw new Error(`Unknown mcp subcommand: ${subcommand}`);
+  }
+  const repoRoot = typeof flags['repo'] === 'string' ? (flags['repo'] as string) : undefined;
+  const dryRun = Boolean(flags['dry-run']);
+  await serveMcp({ repoRoot, dryRun, extraArgs: positionals });
+}
+
 function parseExecArgs(rawArgs: string[]): ParsedExecArgs {
   const notifyTargets: string[] = [];
   let otelEndpoint: string | null = null;
@@ -449,8 +534,19 @@ Commands:
 
   status --run <id> [--watch] [--interval N] [--format json]
 
+  self-check [--format json]
+  init codex [--cwd <path>] [--force]
+  doctor [--format json]
+  mcp serve [--repo <path>] [--dry-run] [-- <extra args>]
+  version | --version
+
   help                      Show this message.
 `);
 }
 
 void main();
+
+function printVersion(): void {
+  const pkg = loadPackageInfo();
+  console.log(pkg.version ?? 'unknown');
+}

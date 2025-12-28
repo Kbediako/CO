@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp e8df52d19815aca696e349f2ef50589bbd3be3498d26c26e1f9827127d685fed -->
+<!-- codex:instruction-stamp 30ddae8c771d9d47f35ece7d18d8a156415f59e20d830920767eb5c9a8de724e -->
 # Agent Enablement
 
 ## Added by Bootstrap 2025-10-16
@@ -30,7 +30,7 @@
 - `npm run build:patterns` — Compile codemods/linters/templates; run whenever `patterns/**` changes.
 - `node --loader ts-node/esm evaluation/harness/run-all.ts --mode=mcp` — Manual sweep to generate scenario artifacts for manifests.
 - `node scripts/diff-budget.mjs` — Enforces a small-diff budget before review; set `DIFF_BUDGET_OVERRIDE_REASON` to bypass with justification.
-- `npm run review` — Launches `codex review` with a non-interactive prompt that includes the latest run manifest path as evidence (reviews “current changes” by default); `NOTES` is required and should include goal, summary, risks, and optional questions.
+- `npm run review` — Launches `codex review` with a non-interactive prompt that includes the latest run manifest path as evidence (reviews “current changes” by default); in CI or when stdin is not a TTY (or `CODEX_REVIEW_NON_INTERACTIVE`/`CODEX_NON_INTERACTIVE` is set) it prints the handoff prompt and exits unless `FORCE_CODEX_REVIEW=1`; `NOTES` is required and should include goal, summary, risks, and optional questions.
 - `codex-orchestrator plan [pipeline]` — Preview resolved pipeline stages without execution; add `--format json` for automation inputs.
 
 ### Runtime knobs (optional)

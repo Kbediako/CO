@@ -3,7 +3,7 @@ import type { PipelineDefinition } from '../types.js';
 export const defaultDiagnosticsPipeline: PipelineDefinition = {
   id: 'diagnostics',
   title: 'Diagnostics Pipeline',
-  description: 'Build, lint, test, and spec-guard the repository.',
+  description: 'Build, lint, test, and optionally run spec-guard for the repository.',
   tags: ['diagnostics-primary', 'diagnostics-secondary'],
   stages: [
     {
@@ -27,8 +27,9 @@ export const defaultDiagnosticsPipeline: PipelineDefinition = {
     {
       kind: 'command',
       id: 'spec-guard',
-      title: 'node scripts/spec-guard.mjs --dry-run',
-      command: 'node scripts/spec-guard.mjs --dry-run'
+      title: 'Optional spec-guard (if scripts/spec-guard.mjs exists)',
+      command:
+        'node "$CODEX_ORCHESTRATOR_PACKAGE_ROOT/dist/orchestrator/src/cli/utils/specGuardRunner.js" --dry-run'
     }
   ]
 };

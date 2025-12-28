@@ -47,7 +47,7 @@ Group execution (when `FEATURE_TFGRPO_GROUP=on`): repeat the Builder → Tester 
 - `orchestrator/` – Core orchestration runtime (`TaskManager`, event bus, persistence, CLI, control-plane hooks, scheduler, privacy guard).
 - `packages/` – Shared libraries used by downstream projects (tool orchestrator, shared manifest schema, SDK shims, control-plane schema bundle).
 - `patterns/`, `eslint-plugin-patterns/` – Codemod + lint infrastructure invoked during builds.
-- `scripts/` – Operational helpers (e.g., `scripts/spec-guard.mjs` for spec freshness enforcement).
+- `scripts/` – Operational helpers for repo contributors (e.g., `scripts/spec-guard.mjs`), not shipped in the npm package.
 - `tasks/`, `docs/`, `.agent/` – Project planning artifacts that must stay in sync (`[ ]` → `[x]` checklists pointing to manifest evidence).
 - `.runs/<task-id>/` – Per-task manifests, logs, metrics snapshots (`metrics.json`), and CLI run folders.
 - `out/<task-id>/` – Human-friendly summaries and (when enabled) cloud-sync audit logs.
@@ -76,6 +76,20 @@ Group execution (when `FEATURE_TFGRPO_GROUP=on`): repeat the Builder → Tester 
 
 Use `npx codex-orchestrator resume --run <run-id>` to continue interrupted runs; the CLI verifies resume tokens, refreshes the plan, and updates the manifest safely before rerunning.
 
+## Companion Package Commands
+- `codex-orchestrator mcp serve [--repo <path>] [--dry-run] [-- <extra args>]`: launch the MCP stdio server (delegates to `codex mcp-server`; stdout guard keeps protocol-only output, logs to stderr).
+- `codex-orchestrator init codex [--cwd <path>] [--force]`: copy starter templates into a repo (no overwrite unless `--force`).
+- `codex-orchestrator doctor [--format json]`: check optional tooling dependencies and print install commands.
+- `codex-orchestrator self-check --format json`: emit a safe JSON health payload for smoke tests.
+- `codex-orchestrator --version`: print the package version.
+
+## Publishing (npm)
+- Pack audit: `npm run pack:audit` (validates the tarball file list; run `npm run clean:dist && npm run build` first if `dist/` contains non-runtime artifacts).
+- Pack smoke: `npm run pack:smoke` (installs the tarball in a temp dir and runs `--help`, `--version`, `self-check`; uses network).
+- Release tags: `vX.Y.Z` or `vX.Y.Z-alpha.N` must match `package.json` version.
+- Dist-tags: stable publishes to `latest`; alpha publishes to `alpha` and uses a GitHub prerelease.
+- Publishing auth: workflow exports `NODE_AUTH_TOKEN` from `secrets.NPM_TOKEN`; if set, publish without provenance; if not, the workflow relies on OIDC (`id-token: write`) and adds `--provenance`.
+
 ## Parallel Runs (Meta-Orchestration)
 The orchestrator executes a single pipeline serially. “Parallelism” comes from running multiple orchestrator runs at the same time, ideally in separate git worktrees so builds/tests don’t contend for the same working tree outputs.
 
@@ -102,11 +116,13 @@ Notes:
 - For a deeper runbook, see `.agent/SOPs/meta-orchestration.md`.
 
 ### Codex CLI prompts
+- Note: prompt installers and guardrail scripts live under `scripts/` and are repo-only (not included in the npm package).
 - The custom prompts live outside the repo at `~/.codex/prompts/diagnostics.md` and `~/.codex/prompts/review-handoff.md`. Recreate those files on every fresh machine so `/prompts:diagnostics` and `/prompts:review-handoff` are available in the Codex CLI palette.
 - These prompts are consumed by the Codex CLI UI only; the orchestrator does not read them. Keep updates synced across machines during onboarding.
-- To install or refresh the prompts, run `scripts/setup-codex-prompts.sh` (use `--force` to overwrite existing files).
+- To install or refresh the prompts (repo-only), run `scripts/setup-codex-prompts.sh` (use `--force` to overwrite existing files).
 - `/prompts:diagnostics` takes `TASK=<task-id> MANIFEST=<path> [NOTES=<free text>]`, exports `MCP_RUNNER_TASK_ID=$TASK`, runs `npx codex-orchestrator start diagnostics --format json`, tails `.runs/$TASK/cli/<run-id>/manifest.json` (or `npx codex-orchestrator status --watch`), and records evidence to `/tasks`, `docs/TASKS.md`, `.agent/task/...`, `.runs/$TASK/metrics.json`, and `out/$TASK/state.json` using `$MANIFEST`.
-- `/prompts:review-handoff` takes `TASK=<task-id> MANIFEST=<path> NOTES=<goal + summary + risks + optional questions>`, re-exports `MCP_RUNNER_TASK_ID`, runs `node scripts/spec-guard.mjs --dry-run`, `npm run lint`, `npm run test`, optional `npm run eval:test`, and `npm run review` (wraps `codex review` against the current diff and includes the latest run manifest path as evidence). It also reminds you to log approvals in `$MANIFEST` and mirror the evidence to the same docs/metrics/state targets.
+- `/prompts:review-handoff` takes `TASK=<task-id> MANIFEST=<path> NOTES=<goal + summary + risks + optional questions>`, re-exports `MCP_RUNNER_TASK_ID`, and (repo-only) runs `node scripts/spec-guard.mjs --dry-run`, `npm run lint`, `npm run test`, optional `npm run eval:test`, plus `npm run review` (wraps `codex review` against the current diff and includes the latest run manifest path as evidence). It also reminds you to log approvals in `$MANIFEST` and mirror the evidence to the same docs/metrics/state targets.
+- In CI / `--no-interactive` pipelines (or when stdin is not a TTY), `npm run review` prints the review handoff prompt (including evidence paths) and exits successfully instead of invoking `codex review`. Set `FORCE_CODEX_REVIEW=1` to run `codex review` in those environments.
 - Always trigger diagnostics and review workflows through these prompts whenever you run the orchestrator so contributors consistently execute the required command sequences and capture auditable manifests.
 
 ### Identifier Guardrails
@@ -117,7 +133,7 @@ Notes:
 - Default pipelines live in `codex.orchestrator.json` (repository-specific) and `orchestrator/src/cli/pipelines/` (built-in defaults). Each stage is either a command (shell execution) or a nested pipeline.
 - The `CommandPlanner` inspects the selected pipeline and target stage; you can pass `--target <stage-id>` (alias: `--target-stage`) or set `CODEX_ORCHESTRATOR_TARGET_STAGE` to focus on a specific step (e.g., rerun tests only).
 - Stage execution records stdout/stderr logs, exit codes, optional summaries, and failure data directly into the manifest (`commands[]` array).
-- Guardrails: before review, run `node scripts/spec-guard.mjs --dry-run` to ensure specs touched in the PR are current; the orchestrator tracks guardrail outcomes in the manifest (`guardrail_status`).
+- Guardrails (repo-only): before review, run `node scripts/spec-guard.mjs --dry-run` to ensure specs touched in the PR are current; the orchestrator tracks guardrail outcomes in the manifest (`guardrail_status`).
 
 ## Approval & Sandbox Model
 - Approval policies (`never`, `on-request`, `auto`, or custom strings) flow through `packages/orchestrator`. Tool invocations can require approval before sandbox elevation, and all prompts/decisions are persisted.
@@ -141,22 +157,23 @@ Notes:
 - Remove placeholder references in manifests/docs before merging so downstream teams see only live project data.
 
 ## Development Workflow
+Note: the commands below assume a source checkout; `scripts/` helpers are not included in the npm package.
 | Command | Purpose |
 | --- | --- |
-| `npm run build` | Compiles TypeScript to `dist/` (required by `docs:check`, `review`, and other wrappers). |
+| `npm run build` | Compiles TypeScript to `dist/` (required for packaging and running the CLI from `dist/`). |
 | `npm run lint` | Lints orchestrator, adapters, shared packages. Auto-runs `node scripts/build-patterns-if-needed.mjs` so codemods compile when missing/outdated. |
 | `npm run test` | Vitest suite covering orchestration core, CLI services, and patterns. |
 | `npm run eval:test` | Optional evaluation harness (enable when `evaluation/fixtures/**` is populated). |
 | `npm run docs:check` | Deterministically validates scripts/pipelines/paths referenced in agent-facing docs. |
-| `node scripts/spec-guard.mjs --dry-run` | Validates spec freshness; required before review. |
-| `node scripts/diff-budget.mjs` | Guards against oversized diffs before review (defaults: 25 files / 800 lines; supports explicit overrides). |
-| `npm run review` | Runs `codex review` and includes the latest run manifest path as evidence in the prompt. |
+| `node scripts/spec-guard.mjs --dry-run` | Validates spec freshness; required before review (repo-only). |
+| `node scripts/diff-budget.mjs` | Guards against oversized diffs before review (repo-only; defaults: 25 files / 800 lines; supports explicit overrides). |
+| `npm run review` | Runs `codex review` with the latest run manifest path as evidence (repo-only; CI disables stdin; set `CODEX_REVIEW_NON_INTERACTIVE=1` to enforce locally). |
 
 Run `npm run build` to compile TypeScript before packaging or invoking the CLI directly from `dist/`.
 
 ## Diff Budget
 
-This repo enforces a small “diff budget” via `node scripts/diff-budget.mjs` to keep PRs reviewable and avoid accidental scope creep.
+This repo enforces a small “diff budget” via `node scripts/diff-budget.mjs` to keep PRs reviewable and avoid accidental scope creep (repo-only).
 
 - Defaults: 25 changed files / 800 total lines changed (additions + deletions), excluding ignored paths.
 - CI: `.github/workflows/core-lane.yml` runs the diff budget on pull requests and sets `BASE_SHA` to the PR base commit.
@@ -175,7 +192,7 @@ This repo enforces a small “diff budget” via `node scripts/diff-budget.mjs` 
 
 Use an explicit handoff note for reviewers. `NOTES` is required for review runs; questions are optional:
 
-`NOTES="<goal + summary + risks + optional questions>" npm run review`
+`NOTES="<goal + summary + risks + optional questions>" npm run review` (repo-only; CI disables stdin; set `CODEX_REVIEW_NON_INTERACTIVE=1` to enforce locally).
 
 Template: `Goal: ... | Summary: ... | Risks: ... | Questions (optional): ...`
 
@@ -218,4 +235,4 @@ Use the hi-fi pipeline to snapshot complex marketing sites (motion, interactions
 
 ---
 
-When preparing a review, always capture the latest manifest path, run `node scripts/spec-guard.mjs --dry-run`, and ensure checklist mirrors (`/tasks`, `docs/`, `.agent/`) point at the evidence generated by Codex Orchestrator. That keeps the automation trustworthy and auditable across projects.
+When preparing a review (repo-only), always capture the latest manifest path, run `node scripts/spec-guard.mjs --dry-run`, and ensure checklist mirrors (`/tasks`, `docs/`, `.agent/`) point at the evidence generated by Codex Orchestrator. That keeps the automation trustworthy and auditable across projects.

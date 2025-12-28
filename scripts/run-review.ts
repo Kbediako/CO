@@ -10,6 +10,7 @@
  */
 
 import { execFile, spawn } from 'node:child_process';
+import type { ChildProcess, StdioOptions } from 'node:child_process';
 import { constants } from 'node:fs';
 import { access, readFile, readdir, stat } from 'node:fs/promises';
 import path from 'node:path';
@@ -26,6 +27,7 @@ interface CliOptions {
   commit?: string;
   title?: string;
   uncommitted?: boolean;
+  nonInteractive?: boolean;
 }
 
 async function fileExists(filePath: string): Promise<boolean> {
@@ -185,6 +187,8 @@ function parseArgs(argv: string[]): CliOptions {
       index += 1;
     } else if (arg.startsWith('--title=')) {
       options.title = arg.split('=')[1];
+    } else if (arg === '--non-interactive') {
+      options.nonInteractive = true;
     }
   }
 
@@ -328,12 +332,37 @@ async function main(): Promise<void> {
 
   const reviewArgs = buildReviewArgs(options, promptLines.join('\n'));
   const { command, args } = await resolveReviewCommand(reviewArgs);
+  const nonInteractive = options.nonInteractive ?? shouldForceNonInteractive();
+  const reviewEnv = { ...process.env };
+  const stdinIsTTY = process.stdin?.isTTY === true;
+  if (nonInteractive) {
+    reviewEnv.CODEX_NON_INTERACTIVE = reviewEnv.CODEX_NON_INTERACTIVE ?? '1';
+    reviewEnv.CODEX_NO_INTERACTIVE = reviewEnv.CODEX_NO_INTERACTIVE ?? '1';
+    reviewEnv.CODEX_INTERACTIVE = reviewEnv.CODEX_INTERACTIVE ?? '0';
+  }
+  if (
+    nonInteractive &&
+    !envFlagEnabled(process.env.FORCE_CODEX_REVIEW) &&
+    (envFlagEnabled(process.env.CI) ||
+      !stdinIsTTY ||
+      envFlagEnabled(process.env.CODEX_REVIEW_NON_INTERACTIVE) ||
+      envFlagEnabled(process.env.CODEX_NON_INTERACTIVE) ||
+      envFlagEnabled(process.env.CODEX_NONINTERACTIVE))
+  ) {
+    console.log('Codex review handoff (non-interactive):');
+    console.log('---');
+    console.log(promptLines.join('\n'));
+    console.log('---');
+    console.log('Set FORCE_CODEX_REVIEW=1 to invoke `codex review` in this environment.');
+    return;
+  }
   console.log(`Launching Codex review (evidence: ${relativeManifest})`);
-  const child = spawn(command, args, { stdio: 'inherit', env: process.env });
+  const stdio: StdioOptions = nonInteractive ? ['ignore', 'inherit', 'inherit'] : 'inherit';
+  const child: ChildProcess = spawn(command, args, { stdio, env: reviewEnv });
 
   await new Promise<void>((resolve, reject) => {
-    child.once('error', (error) => reject(error instanceof Error ? error : new Error(String(error))));
-    child.once('exit', (code) => {
+    child.once('error', (error: Error) => reject(error instanceof Error ? error : new Error(String(error))));
+    child.once('exit', (code: number | null) => {
       if (code === 0) {
         resolve();
       } else {
@@ -460,6 +489,15 @@ function envFlagEnabled(value: string | undefined): boolean {
   }
   const normalized = value.trim().toLowerCase();
   return normalized === '1' || normalized === 'true' || normalized === 'yes';
+}
+
+function shouldForceNonInteractive(): boolean {
+  return (
+    envFlagEnabled(process.env.CI) ||
+    envFlagEnabled(process.env.CODEX_REVIEW_NON_INTERACTIVE) ||
+    envFlagEnabled(process.env.CODEX_NON_INTERACTIVE) ||
+    envFlagEnabled(process.env.CODEX_NONINTERACTIVE)
+  );
 }
 
 function requireReviewNotes(notes: string | undefined): asserts notes is string {

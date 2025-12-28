@@ -1,3 +1,8 @@
+import { existsSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
+
 const DESIGN_GUIDANCE =
   'Install optional design deps with "npm run setup:design-tools" and "npx playwright install" before running mirror commands.';
 
@@ -12,9 +17,31 @@ function isMissing(error) {
   );
 }
 
-async function loadOptional(specifier) {
+function resolveOptional(specifier, cwd = process.cwd()) {
+  const cwdPackage = join(cwd, 'package.json');
+  if (existsSync(cwdPackage)) {
+    try {
+      const cwdRequire = createRequire(cwdPackage);
+      return cwdRequire.resolve(specifier);
+    } catch {
+      // fall through
+    }
+  }
   try {
-    return await import(specifier);
+    const selfRequire = createRequire(import.meta.url);
+    return selfRequire.resolve(specifier);
+  } catch {
+    return null;
+  }
+}
+
+async function loadOptional(specifier) {
+  const resolved = resolveOptional(specifier);
+  if (!resolved) {
+    throw new Error(`[mirror] Missing optional dependency "${specifier}". ${DESIGN_GUIDANCE}`);
+  }
+  try {
+    return await import(pathToFileURL(resolved).href);
   } catch (error) {
     if (isMissing(error)) {
       throw new Error(`[mirror] Missing optional dependency "${specifier}". ${DESIGN_GUIDANCE}`);

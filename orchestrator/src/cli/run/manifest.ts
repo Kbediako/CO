@@ -294,10 +294,11 @@ function computeGuardrailStatus(manifest: CliManifest): GuardrailStatusSnapshot 
   let recommendation: string | null = null;
   if (counts.total === 0) {
     recommendation = guardrailsRequired
-      ? 'Guardrail command missing; run scripts/run-mcp-diagnostics.sh --no-watch to capture reviewer diagnostics.'
+      ? 'Guardrail command missing; run "codex-orchestrator start diagnostics --approval-policy never --format json --no-interactive" to capture reviewer diagnostics.'
       : null;
   } else if (counts.failed > 0) {
-    recommendation = 'Guardrail command failed; re-run scripts/run-mcp-diagnostics.sh --no-watch to gather failure artifacts.';
+    recommendation =
+      'Guardrail command failed; re-run "codex-orchestrator start diagnostics --approval-policy never --format json --no-interactive" to gather failure artifacts.';
   }
 
   const summary = formatGuardrailSummary(counts);

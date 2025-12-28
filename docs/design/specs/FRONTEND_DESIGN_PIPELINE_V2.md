@@ -1,5 +1,5 @@
 ---
-last_review: 2025-11-27
+last_review: 2025-12-28
 ---
 
 # Technical Spec — CO Frontend Design Pipeline v2 (Task 0412-frontend-design-pipeline-v2)
