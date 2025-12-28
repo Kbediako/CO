@@ -30,7 +30,7 @@
 - `npm run build:patterns` — Compile codemods/linters/templates; run whenever `patterns/**` changes.
 - `node --loader ts-node/esm evaluation/harness/run-all.ts --mode=mcp` — Manual sweep to generate scenario artifacts for manifests.
 - `node scripts/diff-budget.mjs` — Enforces a small-diff budget before review; set `DIFF_BUDGET_OVERRIDE_REASON` to bypass with justification.
-- `npm run review` — Launches `codex review` with a non-interactive prompt that includes the latest run manifest path as evidence (reviews “current changes” by default); `NOTES` is required and should include goal, summary, risks, and optional questions.
+- `npm run review` — Launches `codex review` with a non-interactive prompt that includes the latest run manifest path as evidence (reviews “current changes” by default); in CI or when `CODEX_REVIEW_NON_INTERACTIVE`/`CODEX_NON_INTERACTIVE` is set it prints the handoff prompt and exits unless `FORCE_CODEX_REVIEW=1`; `NOTES` is required and should include goal, summary, risks, and optional questions.
 - `codex-orchestrator plan [pipeline]` — Preview resolved pipeline stages without execution; add `--format json` for automation inputs.
 
 ### Runtime knobs (optional)
