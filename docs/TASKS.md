@@ -59,15 +59,15 @@ Mirror status with `tasks/tasks-0914-npm-companion-package.md` and `.agent/task/
 
 ### Guardrails & Handoff (post-implementation)
 - [x] `npm run review` is non-interactive in CI (flag/env enforced; fails fast on prompts).
-- [x] `node scripts/spec-guard.mjs --dry-run` passes - Evidence: `.runs/0914-npm-companion-package/cli/2025-12-28T17-15-17-941Z-013bcf5b/manifest.json`.
-- [x] `npm run build` passes - Evidence: `.runs/0914-npm-companion-package/cli/2025-12-28T17-15-17-941Z-013bcf5b/manifest.json`.
-- [x] `npm run lint` passes - Evidence: `.runs/0914-npm-companion-package/cli/2025-12-28T17-15-17-941Z-013bcf5b/manifest.json`.
-- [x] `npm run test` passes - Evidence: `.runs/0914-npm-companion-package/cli/2025-12-28T17-15-17-941Z-013bcf5b/manifest.json`.
-- [x] `npm run docs:check` passes - Evidence: `.runs/0914-npm-companion-package/cli/2025-12-28T17-15-17-941Z-013bcf5b/manifest.json`.
-- [x] `node scripts/diff-budget.mjs` passes - Evidence: `.runs/0914-npm-companion-package/cli/2025-12-28T17-15-17-941Z-013bcf5b/manifest.json`.
-- [x] Diff budget override recorded (`DIFF_BUDGET_OVERRIDE_REASON`) - Evidence: `.runs/0914-npm-companion-package/cli/2025-12-28T17-15-17-941Z-013bcf5b/commands/06-diff-budget.ndjson`.
+- [x] `node scripts/spec-guard.mjs --dry-run` passes - Evidence: `.runs/0914-npm-companion-package/cli/2025-12-28T17-26-47-817Z-8acb43f6/manifest.json`.
+- [x] `npm run build` passes - Evidence: `.runs/0914-npm-companion-package/cli/2025-12-28T17-26-47-817Z-8acb43f6/manifest.json`.
+- [x] `npm run lint` passes - Evidence: `.runs/0914-npm-companion-package/cli/2025-12-28T17-26-47-817Z-8acb43f6/manifest.json`.
+- [x] `npm run test` passes - Evidence: `.runs/0914-npm-companion-package/cli/2025-12-28T17-26-47-817Z-8acb43f6/manifest.json`.
+- [x] `npm run docs:check` passes - Evidence: `.runs/0914-npm-companion-package/cli/2025-12-28T17-26-47-817Z-8acb43f6/manifest.json`.
+- [x] `node scripts/diff-budget.mjs` passes - Evidence: `.runs/0914-npm-companion-package/cli/2025-12-28T17-26-47-817Z-8acb43f6/manifest.json`.
+- [x] Diff budget override recorded (`DIFF_BUDGET_OVERRIDE_REASON`) - Evidence: `.runs/0914-npm-companion-package/cli/2025-12-28T17-26-47-817Z-8acb43f6/commands/06-diff-budget.ndjson`.
 - Note: CI diff budget override requires label `diff-budget-override` and PR body line `Diff budget override: ...`.
-- [x] `npm run review` captured with NOTES - Evidence: `.runs/0914-npm-companion-package/cli/2025-12-28T17-15-17-941Z-013bcf5b/manifest.json`.
+- [x] `npm run review` captured with NOTES - Evidence: `.runs/0914-npm-companion-package/cli/2025-12-28T17-26-47-817Z-8acb43f6/manifest.json`.
 
 # Task List Snapshot — Review Loop + DevTools Review Gate (0912)
 

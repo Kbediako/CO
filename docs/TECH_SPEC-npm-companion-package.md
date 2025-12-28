@@ -86,6 +86,7 @@
 #### Optional heavy dependencies + doctor
 - Move Playwright-class dependencies to optional peer deps with `peerDependenciesMeta`.
 - Use dynamic import with an optional loader that resolves from CWD first, then falls back to package resolution.
+- Fall back to `import.meta.resolve` when CJS resolution fails so ESM-only optional deps still load.
 - Add `codex-orchestrator doctor`:
   - Detects missing optional deps, reports exact install commands.
   - Only installs with explicit confirmation if an install option is added.

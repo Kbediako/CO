@@ -33,22 +33,51 @@ function missingDependency(specifier: string): Error {
   return new Error(`[design-tools] Missing optional dependency "${specifier}". ${DESIGN_SETUP_HINT}`);
 }
 
-function resolveOptionalDependency(specifier: string, cwd: string = process.cwd()): string | null {
-  const cwdPackage = join(cwd, 'package.json');
-  if (existsSync(cwdPackage)) {
-    try {
-      const cwdRequire = createRequire(cwdPackage);
-      return cwdRequire.resolve(specifier);
-    } catch {
-      // fall through
-    }
-  }
+function resolveWithRequire(specifier: string, base: string): string | null {
   try {
-    const selfRequire = createRequire(import.meta.url);
-    return selfRequire.resolve(specifier);
+    const resolver = createRequire(base);
+    return resolver.resolve(specifier);
   } catch {
     return null;
   }
+}
+
+function resolveWithImportMeta(specifier: string, parentUrl: string): string | null {
+  const resolver = import.meta.resolve;
+  if (typeof resolver !== 'function') {
+    return null;
+  }
+  try {
+    return resolver(specifier, parentUrl);
+  } catch {
+    return null;
+  }
+}
+
+function resolveOptionalDependency(specifier: string, cwd: string = process.cwd()): string | null {
+  const cwdPackage = join(cwd, 'package.json');
+  if (existsSync(cwdPackage)) {
+    const cwdRequireResolved = resolveWithRequire(specifier, cwdPackage);
+    if (cwdRequireResolved) {
+      return cwdRequireResolved;
+    }
+    const cwdImportResolved = resolveWithImportMeta(specifier, pathToFileURL(cwdPackage).href);
+    if (cwdImportResolved) {
+      return cwdImportResolved;
+    }
+  }
+  const selfRequireResolved = resolveWithRequire(specifier, import.meta.url);
+  if (selfRequireResolved) {
+    return selfRequireResolved;
+  }
+  return resolveWithImportMeta(specifier, import.meta.url);
+}
+
+function toModuleUrl(resolved: string): string {
+  if (resolved.startsWith('file://') || resolved.startsWith('node:')) {
+    return resolved;
+  }
+  return pathToFileURL(resolved).href;
 }
 
 async function loadOptionalDependency<T>(specifier: string): Promise<T> {
@@ -57,7 +86,7 @@ async function loadOptionalDependency<T>(specifier: string): Promise<T> {
     throw missingDependency(specifier);
   }
   try {
-    return (await import(pathToFileURL(resolved).href)) as T;
+    return (await import(toModuleUrl(resolved))) as T;
   } catch (error) {
     if (isModuleNotFound(error)) {
       throw missingDependency(specifier);
