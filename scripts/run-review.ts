@@ -334,6 +334,7 @@ async function main(): Promise<void> {
   const { command, args } = await resolveReviewCommand(reviewArgs);
   const nonInteractive = options.nonInteractive ?? shouldForceNonInteractive();
   const reviewEnv = { ...process.env };
+  const stdinIsTTY = process.stdin?.isTTY === true;
   if (nonInteractive) {
     reviewEnv.CODEX_NON_INTERACTIVE = reviewEnv.CODEX_NON_INTERACTIVE ?? '1';
     reviewEnv.CODEX_NO_INTERACTIVE = reviewEnv.CODEX_NO_INTERACTIVE ?? '1';
@@ -343,6 +344,7 @@ async function main(): Promise<void> {
     nonInteractive &&
     !envFlagEnabled(process.env.FORCE_CODEX_REVIEW) &&
     (envFlagEnabled(process.env.CI) ||
+      !stdinIsTTY ||
       envFlagEnabled(process.env.CODEX_REVIEW_NON_INTERACTIVE) ||
       envFlagEnabled(process.env.CODEX_NON_INTERACTIVE) ||
       envFlagEnabled(process.env.CODEX_NONINTERACTIVE))

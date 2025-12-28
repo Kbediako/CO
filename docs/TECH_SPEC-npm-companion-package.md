@@ -19,7 +19,7 @@
 - `package.json` is now publishable (no `private: true`), includes a `files` allowlist, and heavy deps are optional peers; tarball contents are controlled by pack audit + allowlist.
 - `npm run build` uses `tsconfig.build.json`; `clean:dist` + `prepack` exist, but ad-hoc builds can still leave stale `dist/` unless cleaned.
 - Pack audit restricts `dist/` to runtime subtrees; the `files` allowlist mirrors those subtrees so non-runtime `dist/**` output never ships.
-- `scripts/run-review.ts` enforces a non-interactive guard in CI by printing the review handoff prompt (with manifest evidence + task context) and exiting successfully; set `FORCE_CODEX_REVIEW=1` to invoke `codex review` in that mode.
+- `scripts/run-review.ts` enforces a non-interactive guard in CI or when stdin is not a TTY by printing the review handoff prompt (with manifest evidence + task context) and exiting successfully; set `FORCE_CODEX_REVIEW=1` to invoke `codex review` in that mode.
 - Base logger uses `console.info` (stdout); MCP stdout-only guarantees are enforced by the `mcp serve` stdout guard.
 - Runtime schema resolution uses the `imports` alias with a fallback to `schemas/manifest.json`.
 - MCP usage still has legacy scripts in `scripts/`, but `mcp-client.json` now points at `codex-orchestrator mcp serve`.
