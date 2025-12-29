@@ -42,7 +42,8 @@ Applies to lead orchestrator runs in this repo and defines default decision poli
 ## PR Monitoring & Auto-Merge
 - Monitor PRs you open until checks complete and reviewers finish.
 - Prefer a background monitor (looped `gh pr view` or CI watch) so status updates continue while the primary run is idle.
-- Default window: if all required checks pass and there are no review comments/requests within 30 minutes of the last check completion, treat the PR as approved.
+- Respect the repo operating rule that explicit approval is required before advancing; the quiet window only applies when explicit approval is already recorded.
+- Default window: if all required checks pass and there are no review comments/requests within 30 minutes of the last check completion, treat the PR as approved **only when** explicit approval exists (review approval, checklist sign-off, or user instruction).
 - Do not auto-merge if the PR is draft, has a "do not merge" label, or has unresolved review feedback.
 - Merge via GitHub, delete the branch, and summarize the outcome in the main run.
 
