@@ -399,6 +399,22 @@
       },
       "created_at": "2025-12-29",
       "completed_at": "2025-12-29"
+    },
+    {
+      "id": "0916",
+      "slug": "npm-companion-package-publishability",
+      "title": "Codex Orchestrator NPM Companion Package Publishability",
+      "path": "tasks/tasks-0916-npm-companion-package-publishability.md",
+      "kind": "prd",
+      "status": "succeeded",
+      "gate": {
+        "phase": "npm-companion-package-publishability-implementation",
+        "status": "succeeded",
+        "log": ".runs/0916-npm-companion-package-publishability/cli/2025-12-29T06-49-38-980Z-85ac2153/manifest.json",
+        "run_id": "2025-12-29T06-49-38-980Z-85ac2153"
+      },
+      "created_at": "2025-12-29",
+      "completed_at": "2025-12-29"
     }
   ],
   "specs": []
