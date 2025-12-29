@@ -163,6 +163,9 @@ jobs:
             echo "No tarball found to publish." >&2
             exit 1
           fi
+          if [[ "$TARBALL_PATH" != /* ]]; then
+            TARBALL_PATH="$(pwd)/${TARBALL_PATH}"
+          fi
           if [[ -n "${NODE_AUTH_TOKEN}" ]]; then
             npm publish "$TARBALL_PATH" --tag "$DIST_TAG"
           else
