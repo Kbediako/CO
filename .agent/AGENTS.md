@@ -63,6 +63,7 @@ Note: pipelines already set `CODEX_NON_INTERACTIVE=1`; keep it for shortcut runs
 - Always start by reviewing the relevant PRD in `/tasks` and its mirrored snapshot in `/docs`.
 - Use templates in `.agent/task/templates/` to draft PRDs, task lists, mini-specs, and research notes.
 - Run `node scripts/spec-guard.mjs --dry-run` before opening reviews to ensure specs stay in sync with code changes.
+- Default decision policy and autonomy rules live in `.agent/SOPs/agent-autonomy-defaults.md`.
 
 ## Project 0303 — Codex Orchestrator Autonomy Enhancements
 - Set `MCP_RUNNER_TASK_ID=0303-orchestrator-autonomy` for all diagnostics and orchestrator executions; confirm manifests land in `.runs/0303-orchestrator-autonomy/cli/`.
