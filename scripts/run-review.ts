@@ -11,11 +11,12 @@
 
 import { execFile, spawn } from 'node:child_process';
 import type { ChildProcess, StdioOptions } from 'node:child_process';
-import { constants } from 'node:fs';
-import { access, readFile, readdir, stat } from 'node:fs/promises';
+import { readFile, readdir, stat } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import { promisify } from 'node:util';
+
+import { resolveCodexCommand } from '../orchestrator/src/cli/utils/devtools.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -33,18 +34,6 @@ interface CliOptions {
 async function fileExists(filePath: string): Promise<boolean> {
   try {
     await stat(filePath);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-async function canExecuteWrapper(wrapperPath: string): Promise<boolean> {
-  if (process.platform === 'win32') {
-    return false;
-  }
-  try {
-    await access(wrapperPath, constants.X_OK);
     return true;
   } catch {
     return false;
@@ -331,7 +320,7 @@ async function main(): Promise<void> {
   }
 
   const reviewArgs = buildReviewArgs(options, promptLines.join('\n'));
-  const { command, args } = await resolveReviewCommand(reviewArgs);
+  const { command, args } = resolveReviewCommand(reviewArgs);
   const nonInteractive = options.nonInteractive ?? shouldForceNonInteractive();
   const reviewEnv = { ...process.env };
   const stdinIsTTY = process.stdin?.isTTY === true;
@@ -401,20 +390,8 @@ function buildReviewArgs(options: CliOptions, prompt: string): string[] {
   return args;
 }
 
-async function resolveReviewCommand(reviewArgs: string[]): Promise<{ command: string; args: string[] }> {
-  if (!envFlagEnabled(process.env.CODEX_REVIEW_DEVTOOLS)) {
-    return { command: 'codex', args: reviewArgs };
-  }
-
-  const wrapperPath = path.join(process.cwd(), 'scripts', 'codex-devtools.sh');
-  if (await canExecuteWrapper(wrapperPath)) {
-    return { command: wrapperPath, args: reviewArgs };
-  }
-
-  return {
-    command: 'codex',
-    args: ['-c', 'mcp_servers.chrome-devtools.enabled=true', ...reviewArgs]
-  };
+function resolveReviewCommand(reviewArgs: string[]): { command: string; args: string[] } {
+  return resolveCodexCommand(reviewArgs, process.env);
 }
 
 async function buildScopeNotes(options: CliOptions): Promise<string[]> {

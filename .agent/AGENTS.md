@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp 30ddae8c771d9d47f35ece7d18d8a156415f59e20d830920767eb5c9a8de724e -->
+<!-- codex:instruction-stamp 5986df02b8c633beeca7ee56824a25e7ef2c1f8a685f4d41c530f62fffa30293 -->
 # Agent Enablement
 
 ## Added by Bootstrap 2025-10-16
@@ -42,6 +42,13 @@
 - `/prompts:diagnostics TASK=<task-id> MANIFEST=<path> [NOTES=<free text>]` exports `MCP_RUNNER_TASK_ID=$TASK`, runs `npx codex-orchestrator start diagnostics --format json`, tails `.runs/$TASK/cli/<run-id>/manifest.json` (or `status --watch`), and reminds you to mirror evidence + `$MANIFEST` references into `/tasks`, `docs/TASKS.md`, `.agent/task/...`, `.runs/$TASK/metrics.json`, and `out/$TASK/state.json`.
 - `/prompts:review-handoff TASK=<task-id> MANIFEST=<path> NOTES=<goal + summary + risks + optional questions>` re-validates guardrails via `node scripts/spec-guard.mjs --dry-run`, executes `npm run lint`, `npm run test`, optional `npm run eval:test`, runs `node scripts/diff-budget.mjs`, then runs `npm run review`, and ensures approvals/escalations are logged in `$MANIFEST` before checklists flip.
 - Always use these prompts before running diagnostics or prepping a review; they are the canonical way to drive the orchestrator so manifests, approvals, and docs stay in sync across machines.
+
+### Frontend Testing Pipeline (Core)
+Note: pipelines already set `CODEX_NON_INTERACTIVE=1`; keep it for shortcut runs and other automation.
+- Default-off DevTools: `CODEX_NON_INTERACTIVE=1 npx codex-orchestrator start frontend-testing --format json --no-interactive --task <task-id>`.
+- DevTools-enabled: `CODEX_NON_INTERACTIVE=1 npx codex-orchestrator start frontend-testing-devtools --format json --no-interactive --task <task-id>` or `CODEX_NON_INTERACTIVE=1 codex-orchestrator frontend-test --devtools`.
+- Shortcut: `CODEX_NON_INTERACTIVE=1 codex-orchestrator frontend-test` runs the `frontend-testing` pipeline with DevTools off unless `--devtools` is set.
+- Readiness check: `codex-orchestrator doctor --format json` reports DevTools skill availability.
 
 ### Read First Order
 1. `.agent/system/architecture.md`
