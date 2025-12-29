@@ -336,6 +336,7 @@ async function main(): Promise<void> {
       !stdinIsTTY ||
       envFlagEnabled(process.env.CODEX_REVIEW_NON_INTERACTIVE) ||
       envFlagEnabled(process.env.CODEX_NON_INTERACTIVE) ||
+      envFlagEnabled(process.env.CODEX_NO_INTERACTIVE) ||
       envFlagEnabled(process.env.CODEX_NONINTERACTIVE))
   ) {
     console.log('Codex review handoff (non-interactive):');
@@ -473,6 +474,7 @@ function shouldForceNonInteractive(): boolean {
     envFlagEnabled(process.env.CI) ||
     envFlagEnabled(process.env.CODEX_REVIEW_NON_INTERACTIVE) ||
     envFlagEnabled(process.env.CODEX_NON_INTERACTIVE) ||
+    envFlagEnabled(process.env.CODEX_NO_INTERACTIVE) ||
     envFlagEnabled(process.env.CODEX_NONINTERACTIVE)
   );
 }
