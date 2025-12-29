@@ -38,6 +38,9 @@ async function main(): Promise<void> {
       case 'start':
         await handleStart(orchestrator, args);
         break;
+      case 'frontend-test':
+        await handleFrontendTest(orchestrator, args);
+        break;
       case 'plan':
         await handlePlan(orchestrator, args);
         break;
@@ -137,6 +140,63 @@ async function handleStart(orchestrator: CodexOrchestrator, rawArgs: string[]): 
   }
 
   try {
+    const result = await orchestrator.start({
+      pipelineId,
+      taskId: typeof flags['task'] === 'string' ? (flags['task'] as string) : undefined,
+      parentRunId: typeof flags['parent-run'] === 'string' ? (flags['parent-run'] as string) : undefined,
+      approvalPolicy: typeof flags['approval-policy'] === 'string' ? (flags['approval-policy'] as string) : undefined,
+      targetStageId: resolveTargetStageId(flags),
+      runEvents
+    });
+    hud?.stop();
+
+    const payload = {
+      run_id: result.manifest.run_id,
+      status: result.manifest.status,
+      artifact_root: result.manifest.artifact_root,
+      manifest: `${result.manifest.artifact_root}/manifest.json`,
+      log_path: result.manifest.log_path
+    };
+    if (format === 'json') {
+      console.log(JSON.stringify(payload, null, 2));
+    } else {
+      console.log(`Run started: ${payload.run_id}`);
+      console.log(`Status: ${payload.status}`);
+      console.log(`Manifest: ${payload.manifest}`);
+      console.log(`Log: ${payload.log_path}`);
+    }
+  } finally {
+    hud?.stop();
+    runEvents.dispose();
+  }
+}
+
+async function handleFrontendTest(orchestrator: CodexOrchestrator, rawArgs: string[]): Promise<void> {
+  const { positionals, flags } = parseArgs(rawArgs);
+  const format = (flags['format'] as string | undefined) === 'json' ? 'json' : 'text';
+  const devtools = Boolean(flags['devtools']);
+  const interactiveRequested = Boolean(flags['interactive'] || flags['ui']);
+  const interactiveDisabled = Boolean(flags['no-interactive']);
+  const runEvents = new RunEventEmitter();
+  const gate = evaluateInteractiveGate({
+    requested: interactiveRequested,
+    disabled: interactiveDisabled,
+    format,
+    stdoutIsTTY: process.stdout.isTTY === true,
+    stderrIsTTY: process.stderr.isTTY === true,
+    term: process.env.TERM ?? null
+  });
+
+  const hud = await maybeStartHud(gate, runEvents);
+  if (!gate.enabled && interactiveRequested && !interactiveDisabled && gate.reason) {
+    console.error(`[HUD disabled] ${gate.reason}`);
+  }
+  if (positionals.length > 0) {
+    console.error(`[frontend-test] ignoring extra arguments: ${positionals.join(' ')}`);
+  }
+
+  try {
+    const pipelineId = devtools ? 'frontend-testing-devtools' : 'frontend-testing';
     const result = await orchestrator.start({
       pipelineId,
       taskId: typeof flags['task'] === 'string' ? (flags['task'] as string) : undefined,
@@ -502,6 +562,16 @@ function printHelp(): void {
 
 Commands:
   start [pipeline]          Start a new run (default pipeline is diagnostics).
+    --task <id>             Override task identifier (defaults to MCP_RUNNER_TASK_ID).
+    --parent-run <id>       Link run to parent run id.
+    --approval-policy <p>   Record approval policy metadata.
+    --format json           Emit machine-readable output.
+    --target <stage-id>     Focus plan/build metadata on a specific stage (alias: --target-stage).
+    --interactive | --ui    Enable read-only HUD when running in a TTY.
+    --no-interactive        Force disable HUD (default is off unless requested).
+
+  frontend-test             Run frontend testing pipeline.
+    --devtools             Enable Chrome DevTools MCP for this run.
     --task <id>             Override task identifier (defaults to MCP_RUNNER_TASK_ID).
     --parent-run <id>       Link run to parent run id.
     --approval-policy <p>   Record approval policy metadata.

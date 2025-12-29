@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp a420ea8498a4106628a1fe962022c1b13c22f8e1541c61aba0cdfba082c0d15b -->
+<!-- codex:instruction-stamp 4b2eab87663d306a9b1a27ee9322bd050938d780c08a43625c99302b4c47f3bb -->
 # Repository Agent Guidance
 
 ## Project 0303 — Codex Orchestrator Autonomy Enhancements
@@ -26,6 +26,13 @@
 - Default to `implementation-gate` for general reviews; reserve the DevTools gate for cases that need Chrome DevTools capabilities (visual/layout checks, network/perf diagnostics). After addressing review feedback, rerun the same gate until no issues remain and include any follow-up questions in `NOTES`.
 - NOTES template: `Goal: ... | Summary: ... | Risks: ... | Questions (optional): ...`
 - Review-loop steps live in `.agent/SOPs/review-loop.md`.
+
+## Frontend Testing Pipeline (Core)
+Note: pipelines already set `CODEX_NON_INTERACTIVE=1`; keep it for shortcut runs and other automation.
+- Default-off DevTools: `CODEX_NON_INTERACTIVE=1 npx codex-orchestrator start frontend-testing --format json --no-interactive --task <task-id>`.
+- DevTools-enabled: `CODEX_NON_INTERACTIVE=1 npx codex-orchestrator start frontend-testing-devtools --format json --no-interactive --task <task-id>` or `CODEX_NON_INTERACTIVE=1 codex-orchestrator frontend-test --devtools`.
+- Shortcut: `CODEX_NON_INTERACTIVE=1 codex-orchestrator frontend-test` runs the `frontend-testing` pipeline with DevTools off unless `--devtools` is set.
+- Readiness check: `codex-orchestrator doctor --format json` reports DevTools skill availability.
 
 ## Parallel Runs (Meta-Orchestration)
 - When coordinating multiple workstreams, prefer one worktree per stream and route manifests with unique `MCP_RUNNER_TASK_ID` values; see `AGENTS.md` and `.agent/SOPs/meta-orchestration.md`.

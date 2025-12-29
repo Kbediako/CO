@@ -1,10 +1,13 @@
 import { describe, expect, it, beforeEach, afterEach } from 'vitest';
 import { mkdtemp, rm } from 'node:fs/promises';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
+import { fileURLToPath } from 'node:url';
 
 import type { EnvironmentPaths } from '../src/cli/run/environment.js';
 import { PipelineResolver } from '../src/cli/services/pipelineResolver.js';
+import { loadUserConfig } from '../src/cli/config/userConfig.js';
+import type { PipelineDefinition } from '../src/cli/types.js';
 
 const ORIGINAL_ENV = {
   designPipeline: process.env.DESIGN_PIPELINE,
@@ -66,4 +69,43 @@ describe('PipelineResolver env overrides', () => {
     expect(result.envOverrides.DESIGN_PIPELINE).toBeUndefined();
     expect(result.envOverrides.DESIGN_CONFIG_PATH).toBe(join(workspaceRoot, 'design.config.yaml'));
   });
+
+  // Uses the real repo config to catch drift between shipped pipelines and docs.
+  it('wires frontend testing pipelines with explicit devtools opt-in', async () => {
+    const testDir = fileURLToPath(new URL('.', import.meta.url));
+    const repoRoot = resolve(testDir, '..', '..');
+    const env: EnvironmentPaths = {
+      repoRoot,
+      runsRoot: join(repoRoot, '.runs'),
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'frontend-testing'
+    };
+
+    const config = await loadUserConfig(env);
+    const frontend = config?.pipelines?.find((pipeline) => pipeline.id === 'frontend-testing');
+    const devtools = config?.pipelines?.find((pipeline) => pipeline.id === 'frontend-testing-devtools');
+
+    expect(frontend).toBeTruthy();
+    expect(devtools).toBeTruthy();
+
+    const frontendEnv = findFirstCommandEnv(frontend);
+    const devtoolsEnv = findFirstCommandEnv(devtools);
+
+    expect(frontendEnv.CODEX_REVIEW_DEVTOOLS).toBe('0');
+    expect(devtoolsEnv.CODEX_REVIEW_DEVTOOLS).toBe('1');
+    expect(frontendEnv.CODEX_NON_INTERACTIVE).toBe('1');
+    expect(devtoolsEnv.CODEX_NON_INTERACTIVE).toBe('1');
+  });
 });
+
+function findFirstCommandEnv(pipeline?: PipelineDefinition): Record<string, string> {
+  if (!pipeline) {
+    return {};
+  }
+  for (const stage of pipeline.stages) {
+    if (stage.kind === 'command') {
+      return stage.env ?? {};
+    }
+  }
+  return {};
+}

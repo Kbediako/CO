@@ -69,6 +69,46 @@ Mirror status with `tasks/tasks-0914-npm-companion-package.md` and `.agent/task/
 - Note: CI diff budget override requires label `diff-budget-override` and PR body line `Diff budget override: ...`.
 - [x] `npm run review` captured with NOTES - Evidence: `.runs/0914-npm-companion-package/cli/2025-12-28T17-26-47-817Z-8acb43f6/manifest.json`.
 
+# Task List Snapshot — Frontend Testing as Core Orchestrator Capability (0915)
+
+- Update - Implementation complete: implementation-gate manifest captured at `.runs/0915-frontend-testing-core/cli/2025-12-29T05-23-35-362Z-7d4eaa4b/manifest.json`.
+- Notes: Export `MCP_RUNNER_TASK_ID=0915-frontend-testing-core` before orchestrator commands. Guardrails required: `node scripts/spec-guard.mjs --dry-run`, `npm run build`, `npm run lint`, `npm run test`, `npm run docs:check`, `node scripts/diff-budget.mjs`, `npm run review`.
+
+## Checklist Mirror
+Mirror status with `tasks/tasks-0915-frontend-testing-core.md` and `.agent/task/0915-frontend-testing-core.md`. Keep `[ ]` until evidence is recorded.
+
+### Foundation
+- [x] Collateral drafted (PRD/tech spec/action plan/checklist/mini-spec) - Evidence: `docs/PRD-frontend-testing-core.md`, `docs/TECH_SPEC-frontend-testing-core.md`, `docs/ACTION_PLAN-frontend-testing-core.md`, `tasks/specs/0915-frontend-testing-core.md`, `tasks/tasks-0915-frontend-testing-core.md`.
+- [x] Docs-review manifest captured (pre-implementation) - Evidence: `.runs/0915-frontend-testing-core/cli/2025-12-29T02-03-32-483Z-e2d52977/manifest.json`.
+- [x] Metrics/state snapshots updated - Evidence: `.runs/0915-frontend-testing-core/metrics.json`, `out/0915-frontend-testing-core/state.json`.
+- [x] Mirrors updated in `docs/TASKS.md`, `.agent/task/0915-frontend-testing-core.md`, and `tasks/index.json` - Evidence: `docs/TASKS.md`, `.agent/task/0915-frontend-testing-core.md`, `tasks/index.json`.
+- [x] PRD approval recorded in `tasks/index.json` gate metadata - Evidence: `.runs/0915-frontend-testing-core/cli/2025-12-29T05-23-35-362Z-7d4eaa4b/manifest.json`.
+
+### Frontend Testing Surface
+- [x] Add frontend testing pipelines (`frontend-testing`, `frontend-testing-devtools`) - Evidence: `codex.orchestrator.json`, manifest.
+- [x] Add a frontend testing CLI entrypoint (compiled into `dist/**`).
+
+### DevTools Enablement (Packaged)
+- [x] Move devtools helper logic into runtime modules shipped in the npm package.
+
+### Doctor Readiness
+- [x] Extend `codex-orchestrator doctor` with DevTools readiness checks.
+
+### Documentation
+- [x] Update README and agent docs with frontend testing commands and enablement rules.
+
+### Tests
+- [x] Add tests for devtools default-off / explicit-on behavior.
+
+### Guardrails & Handoff (post-implementation)
+- [x] `node scripts/spec-guard.mjs --dry-run` passes - Evidence: `.runs/0915-frontend-testing-core/cli/2025-12-29T05-23-35-362Z-7d4eaa4b/manifest.json`.
+- [x] `npm run build` passes - Evidence: `.runs/0915-frontend-testing-core/cli/2025-12-29T05-23-35-362Z-7d4eaa4b/manifest.json`.
+- [x] `npm run lint` passes - Evidence: `.runs/0915-frontend-testing-core/cli/2025-12-29T05-23-35-362Z-7d4eaa4b/manifest.json`.
+- [x] `npm run test` passes - Evidence: `.runs/0915-frontend-testing-core/cli/2025-12-29T05-23-35-362Z-7d4eaa4b/manifest.json`.
+- [x] `npm run docs:check` passes - Evidence: `.runs/0915-frontend-testing-core/cli/2025-12-29T05-23-35-362Z-7d4eaa4b/manifest.json`.
+- [x] `node scripts/diff-budget.mjs` passes - Evidence: `.runs/0915-frontend-testing-core/cli/2025-12-29T05-23-35-362Z-7d4eaa4b/manifest.json`.
+- [x] `npm run review` captured with NOTES - Evidence: `.runs/0915-frontend-testing-core/cli/2025-12-29T05-23-35-362Z-7d4eaa4b/manifest.json`.
+
 # Task List Snapshot — Review Loop + DevTools Review Gate (0912)
 
 - Update - Implementation complete: implementation-gate-devtools manifest captured at `.runs/0912-review-loop-devtools-gate/cli/2025-12-24T08-56-47-578Z-9b49e1ee/manifest.json`.

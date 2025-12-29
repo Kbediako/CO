@@ -196,9 +196,27 @@ Use an explicit handoff note for reviewers. `NOTES` is required for review runs;
 
 Template: `Goal: ... | Summary: ... | Risks: ... | Questions (optional): ...`
 
-To enable Chrome DevTools for review runs, set `CODEX_REVIEW_DEVTOOLS=1` (uses `scripts/codex-devtools.sh` when executable; otherwise falls back to `codex -c ...`).
+To enable Chrome DevTools for review runs, set `CODEX_REVIEW_DEVTOOLS=1` (uses a codex config override; no repo scripts required).
 Default to the standard `implementation-gate` for general reviews; use `implementation-gate-devtools` only when the review needs Chrome DevTools capabilities (visual/layout checks, network/perf diagnostics). After fixing review feedback, rerun the same gate and include any follow-up questions in `NOTES`.
 To run the full implementation gate with DevTools-enabled review, use `npx codex-orchestrator start implementation-gate-devtools --format json --no-interactive --task <task-id>`.
+
+## Frontend Testing
+Frontend testing is a first-class pipeline with DevTools off by default. The shipped pipelines already set `CODEX_NON_INTERACTIVE=1`; add it explicitly for custom automation or when you want the `frontend-test` shortcut to suppress Codex prompts:
+- `CODEX_NON_INTERACTIVE=1 npx codex-orchestrator start frontend-testing --format json --no-interactive --task <task-id>`
+- `CODEX_NON_INTERACTIVE=1 npx codex-orchestrator start frontend-testing-devtools --format json --no-interactive --task <task-id>` (DevTools enabled)
+- `CODEX_NON_INTERACTIVE=1 codex-orchestrator frontend-test` (shortcut; add `--devtools` to enable DevTools)
+
+If you run the pipelines from this repo, run `npm run build` first so `dist/` stays current (the pipeline executes the compiled runner).
+
+Note: the frontend-testing pipelines toggle the shared `CODEX_REVIEW_DEVTOOLS` flag under the hood; prefer `--devtools` or the devtools pipeline instead of setting it manually.
+
+Optional prompt overrides:
+- `CODEX_FRONTEND_TEST_PROMPT` (inline prompt)
+- `CODEX_FRONTEND_TEST_PROMPT_PATH` (path to a prompt file)
+
+`--no-interactive` disables the HUD only; set `CODEX_NON_INTERACTIVE=1` when you need to suppress Codex prompts (e.g., shortcut runs or custom automation).
+
+Check readiness with `codex-orchestrator doctor --format json` (reports DevTools skill availability).
 
 ## Mirror Workflows
 - `npm run mirror:fetch -- --project <name> [--dry-run] [--force]`: reads `packages/<project>/mirror.config.json` (origin, routes, asset roots, rewrite/block/allow lists), caches downloads **per project** under `.runs/<task>/mirror/<project>/cache`, strips tracker patterns, rewrites externals to `/external/<host>/...`, localizes OG/twitter preview images, rewrites share links off tracker-heavy hosts, and stages into `.runs/<task>/mirror/<project>/<timestamp>/staging/public` before promoting to `packages/<project>/public`. Non-origin assets fall back to Web Archive when the primary host is down; promotion is skipped if errors are detected unless `--force` is set. Manifests live at `.runs/<task>/mirror/<project>/<timestamp>/manifest.json` (warns when `MCP_RUNNER_TASK_ID` is unset; honors `compliance/permit.json` when present).
