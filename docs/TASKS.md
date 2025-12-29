@@ -24,7 +24,7 @@ Mirror status with `tasks/tasks-0914-npm-companion-package.md` and `.agent/task/
 
 ### Packaging & Tarball Controls
 - [x] Update package publish metadata and allowlist - Evidence: `package.json`, `.runs/0914-npm-companion-package/cli/2025-12-28T16-12-48-461Z-041b4764/manifest.json`.
-- [x] Add LICENSE file for publication - Evidence: `LICENSE`, manifest.
+- [x] Add LICENSE file for publication - Evidence: `LICENSE`, `.runs/0916-npm-companion-package-publishability/cli/2025-12-29T06-49-38-980Z-85ac2153/manifest.json`.
 - [x] Add clean step and pack audit script.
 - [x] Tighten pack audit dist allowlist to runtime subtrees.
 - [x] Add pack smoke test for the tarball - Evidence: new script + manifest.
@@ -109,6 +109,66 @@ Mirror status with `tasks/tasks-0915-frontend-testing-core.md` and `.agent/task/
 - [x] `node scripts/diff-budget.mjs` passes - Evidence: `.runs/0915-frontend-testing-core/cli/2025-12-29T05-23-35-362Z-7d4eaa4b/manifest.json`.
 - [x] `npm run review` captured with NOTES - Evidence: `.runs/0915-frontend-testing-core/cli/2025-12-29T05-23-35-362Z-7d4eaa4b/manifest.json`.
 
+# Task List Snapshot — Codex Orchestrator NPM Companion Package Publishability (0916)
+
+- Update - Implementation complete: implementation-gate manifest captured at `.runs/0916-npm-companion-package-publishability/cli/2025-12-29T06-49-38-980Z-85ac2153/manifest.json`; pack audit manifest at `.runs/0916-npm-companion-package-publishability/cli/2025-12-29T06-51-16-666Z-6c21dcf3/manifest.json`; pack smoke manifest at `.runs/0916-npm-companion-package-publishability/cli/2025-12-29T06-51-23-421Z-7c7bab9e/manifest.json`.
+- Notes: Export `MCP_RUNNER_TASK_ID=0916-npm-companion-package-publishability` before orchestrator commands. Guardrails required: `node scripts/spec-guard.mjs --dry-run`, `npm run build`, `npm run lint`, `npm run test`, `npm run docs:check`, `node scripts/diff-budget.mjs`, `npm run review`.
+
+## Checklist Mirror
+Mirror status with `tasks/tasks-0916-npm-companion-package-publishability.md` and `.agent/task/0916-npm-companion-package-publishability.md`. Keep `[ ]` until evidence is recorded.
+
+### Foundation
+- [x] Collateral drafted (PRD/tech spec/action plan/checklist/mini-spec) - Evidence: `docs/PRD-npm-companion-package-publishability.md`, `docs/TECH_SPEC-npm-companion-package-publishability.md`, `docs/ACTION_PLAN-npm-companion-package-publishability.md`, `tasks/specs/0916-npm-companion-package-publishability.md`, `tasks/tasks-0916-npm-companion-package-publishability.md`.
+- [x] Docs-review manifest captured (pre-implementation) - Evidence: `.runs/0916-npm-companion-package-publishability/cli/2025-12-29T06-40-22-001Z-96dbf5f0/manifest.json`.
+- [x] Metrics/state snapshots updated - Evidence: `.runs/0916-npm-companion-package-publishability/metrics.json`, `out/0916-npm-companion-package-publishability/state.json`.
+- [x] Mirrors updated in `docs/TASKS.md`, `.agent/task/0916-npm-companion-package-publishability.md`, and `tasks/index.json` - Evidence: this commit.
+- [x] PRD approval recorded in `tasks/index.json` gate metadata - Evidence: `.runs/0916-npm-companion-package-publishability/cli/2025-12-29T06-40-22-001Z-96dbf5f0/manifest.json`.
+
+### Packaging & Tarball Controls
+- [x] Update package publish metadata and allowlist - Evidence: `package.json`, `.runs/0916-npm-companion-package-publishability/cli/2025-12-29T06-49-38-980Z-85ac2153/manifest.json`.
+- [x] Add LICENSE file for publication - Evidence: `LICENSE`, manifest.
+- [x] Add clean step and pack audit script - Evidence: `.runs/0916-npm-companion-package-publishability/cli/2025-12-29T06-51-16-666Z-6c21dcf3/manifest.json`.
+- [x] Tighten pack audit dist allowlist to runtime subtrees - Evidence: `.runs/0916-npm-companion-package-publishability/cli/2025-12-29T06-51-16-666Z-6c21dcf3/manifest.json`.
+- [x] Add pack smoke test for the tarball - Evidence: `.runs/0916-npm-companion-package-publishability/cli/2025-12-29T06-51-23-421Z-7c7bab9e/manifest.json`.
+- [x] Add CI gate for pack audit and smoke test - Evidence: `.github/workflows/release.yml`.
+
+### Schema Resolution & Runtime Assets
+- [x] Implement Pattern A resolver with fallback - Evidence: code + tests.
+- [x] Ensure `schemas/manifest.json` is shipped and validated - Evidence: `.runs/0916-npm-companion-package-publishability/cli/2025-12-29T06-51-16-666Z-6c21dcf3/manifest.json`.
+
+### CLI Companion Surface
+- [x] Add `codex-orchestrator mcp serve`.
+- [x] Enforce or verify downstream `codex` stdout stays protocol-only for `mcp serve`.
+- [x] Replace user-facing MCP scripts with CLI subcommands - Evidence: CLI + docs updates.
+- [x] Add `codex-orchestrator self-check --format json` - Evidence: CLI implementation + tests.
+- [x] Add `codex-orchestrator --version` output - Evidence: CLI implementation + tests.
+- [x] Verify shebang preservation and ESM consistency - Evidence: tests.
+- [x] Enforce user-controlled run dirs for all CLI outputs - Evidence: code review + tests.
+- [x] Ensure telemetry/network calls are disabled by default - Evidence: tests.
+
+### Templates & Init
+- [x] Add `templates/` with README disclaimer + version markers - Evidence: new templates.
+- [x] Add `codex-orchestrator init codex` - Evidence: CLI implementation + tests.
+
+### Optional Dependencies + Doctor
+- [x] Move Playwright-class deps to optional peer deps and add dynamic loader - Evidence: package metadata + tests.
+- [x] Add `codex-orchestrator doctor` - Evidence: CLI implementation + tests.
+
+### Release Workflow
+- [x] Add tag-driven release workflow - Evidence: workflow + release run.
+- [x] Document release asset download fallbacks - Evidence: spec update.
+- [x] Update README with companion package usage and release flow - Evidence: README change + manifest.
+
+### Guardrails & Handoff (post-implementation)
+- [x] `npm run review` is non-interactive in CI (flag/env enforced; fails fast on prompts).
+- [x] `node scripts/spec-guard.mjs --dry-run` passes - Evidence: `.runs/0916-npm-companion-package-publishability/cli/2025-12-29T06-49-38-980Z-85ac2153/manifest.json`.
+- [x] `npm run build` passes - Evidence: `.runs/0916-npm-companion-package-publishability/cli/2025-12-29T06-49-38-980Z-85ac2153/manifest.json`.
+- [x] `npm run lint` passes - Evidence: `.runs/0916-npm-companion-package-publishability/cli/2025-12-29T06-49-38-980Z-85ac2153/manifest.json`.
+- [x] `npm run test` passes - Evidence: `.runs/0916-npm-companion-package-publishability/cli/2025-12-29T06-49-38-980Z-85ac2153/manifest.json`.
+- [x] `npm run docs:check` passes - Evidence: `.runs/0916-npm-companion-package-publishability/cli/2025-12-29T06-49-38-980Z-85ac2153/manifest.json`.
+- [x] `node scripts/diff-budget.mjs` passes - Evidence: `.runs/0916-npm-companion-package-publishability/cli/2025-12-29T06-49-38-980Z-85ac2153/manifest.json`.
+- [x] `npm run review` captured with NOTES - Evidence: `.runs/0916-npm-companion-package-publishability/cli/2025-12-29T06-49-38-980Z-85ac2153/manifest.json`.
+
 # Task List Snapshot — Review Loop + DevTools Review Gate (0912)
 
 - Update - Implementation complete: implementation-gate-devtools manifest captured at `.runs/0912-review-loop-devtools-gate/cli/2025-12-24T08-56-47-578Z-9b49e1ee/manifest.json`.
@@ -159,7 +219,7 @@ Mirror status with `tasks/tasks-0911-orchestrator-status-ui.md` and `.agent/task
 
 # Task List Snapshot — Orchestrator Issue Validation & Prioritization (0901)
 
-- **Update — Planning:** Validation docs prepared; awaiting first diagnostics/plan manifest under `.runs/0901-orchestrator-issue-validation/cli/<run-id>/manifest.json`.
+- **Update — Planning:** Validation docs prepared; awaiting first diagnostics/plan manifest under `.runs/0901-orchestrator-issue-validation/cli/2025-12-29T06-49-38-980Z-85ac2153/manifest.json`.
 - **Notes:** Export `MCP_RUNNER_TASK_ID=0901-orchestrator-issue-validation` before orchestrator commands. Validation runs should keep guardrails on: `node scripts/spec-guard.mjs --dry-run`, `npm run lint`, `npm run test`.
 
 ## Checklist Mirror
@@ -392,11 +452,11 @@ Mirror status with `tasks/tasks-0801-dead-code-pruning.md` and `.agent/task/<id>
 
 # Task List Snapshot — Codex Orchestrator Slimdown (0707)
 
-- **Update — Planning:** PRD + tech spec published; CI/local test coverage policy recorded (core vs full-matrix lanes). Awaiting first diagnostics manifest under `.runs/0707-orchestrator-slimdown/cli/<run-id>/manifest.json`.
+- **Update — Planning:** PRD + tech spec published; CI/local test coverage policy recorded (core vs full-matrix lanes). Awaiting first diagnostics manifest under `.runs/0707-orchestrator-slimdown/cli/2025-12-29T06-49-38-980Z-85ac2153/manifest.json`.
 - **Notes:** Export `MCP_RUNNER_TASK_ID=0707-orchestrator-slimdown` for orchestrator commands so manifests, metrics, and `out/**` land in the correct directories.
 
 ## Checklist Mirror
-Mirror status with `tasks/tasks-0707-orchestrator-slimdown.md` and `.agent/task/0707-orchestrator-slimdown.md`. Keep `[ ]` until a manifest path such as `.runs/0707-orchestrator-slimdown/cli/<run-id>/manifest.json` is recorded.
+Mirror status with `tasks/tasks-0707-orchestrator-slimdown.md` and `.agent/task/0707-orchestrator-slimdown.md`. Keep `[ ]` until a manifest path such as `.runs/0707-orchestrator-slimdown/cli/2025-12-29T06-49-38-980Z-85ac2153/manifest.json` is recorded.
 
 ### Foundation
 - [x] Diagnostics manifest captured — Evidence: `.runs/0707-orchestrator-slimdown/cli/2025-12-01T09-37-11-576Z-1a60ebea/manifest.json`.
@@ -429,7 +489,7 @@ Mirror status with `tasks/tasks-0707-orchestrator-slimdown.md` and `.agent/task/
 - **Notes:** Optional tool setup lives behind `npm run setup:design-tools`; retention/expiry policies will reference `design.config.yaml > metadata.design.retention`.
 
 ## Checklist Mirror
-Mirror status with `tasks/design-reference-pipeline.md` and `.agent/task/design-reference-pipeline.md`. Keep `[ ]` until a manifest path such as `.runs/0401-design-reference/cli/<run-id>/manifest.json` is recorded.
+Mirror status with `tasks/design-reference-pipeline.md` and `.agent/task/design-reference-pipeline.md`. Keep `[ ]` until a manifest path such as `.runs/0401-design-reference/cli/2025-12-29T06-49-38-980Z-85ac2153/manifest.json` is recorded.
 
 ### Foundation
 - [x] Collateral synchronized — `docs/design/PRD-design-reference-pipeline.md`, `docs/design/specs/DESIGN_REFERENCE_PIPELINE.md`, `tasks/index.json`, `.agent/task/design-reference-pipeline.md`, `docs/TASKS.md`; Evidence: `.runs/0401-design-reference/cli/2025-11-21T08-15-57-435Z-851d3781/manifest.json`.
@@ -455,12 +515,12 @@ Mirror status with `tasks/design-reference-pipeline.md` and `.agent/task/design-
 
 # Task List Snapshot — Hi-Fi Design Toolkit (0410-hi-fi-design-toolkit)
 
-- **Update — Pending kickoff:** PRD, spec, and task mirrors drafted; awaiting diagnostics run to capture `.runs/0410-hi-fi-design-toolkit/cli/<run-id>/manifest.json`.
+- **Update — Pending kickoff:** PRD, spec, and task mirrors drafted; awaiting diagnostics run to capture `.runs/0410-hi-fi-design-toolkit/cli/2025-12-29T06-49-38-980Z-85ac2153/manifest.json`.
 - **Update — External toolkit:** Autonomous hi-fi design starter will be synchronized into this repo with compliance permits before extractor work begins.
 - **Notes:** Always export `MCP_RUNNER_TASK_ID=0410-hi-fi-design-toolkit` so manifests, metrics, and out files land under the correct directories.
 
 ## Checklist Mirror
-Mirror status with `tasks/hi-fi-design-toolkit.md` and `.agent/task/hi-fi-design-toolkit.md`. Keep `[ ]` until a manifest path such as `.runs/0410-hi-fi-design-toolkit/cli/<run-id>/manifest.json` is recorded.
+Mirror status with `tasks/hi-fi-design-toolkit.md` and `.agent/task/hi-fi-design-toolkit.md`. Keep `[ ]` until a manifest path such as `.runs/0410-hi-fi-design-toolkit/cli/2025-12-29T06-49-38-980Z-85ac2153/manifest.json` is recorded.
 
 ### Foundation
 - [x] Collateral minted — `docs/design/PRD-hi-fi-design-toolkit.md`, `docs/design/specs/HI_FI_DESIGN_TOOLKIT.md`, `tasks/index.json`, `.agent/task/hi-fi-design-toolkit.md`, `docs/TASKS.md`; Evidence: `.runs/0410-hi-fi-design-toolkit/cli/2025-11-07T03-19-35-861Z-962b4c81/manifest.json`.
@@ -482,36 +542,36 @@ Mirror status with `tasks/hi-fi-design-toolkit.md` and `.agent/task/hi-fi-design
 
 # Task List Snapshot — Frontend Design Pipeline v2 (0412-frontend-design-pipeline-v2)
 
-- **Update — Planning:** Fresh + clone-informed pipeline PRD/spec drafted; awaiting diagnostics run to seed `.runs/0412-frontend-design-pipeline-v2/cli/<run-id>/manifest.json`.
+- **Update — Planning:** Fresh + clone-informed pipeline PRD/spec drafted; awaiting diagnostics run to seed `.runs/0412-frontend-design-pipeline-v2/cli/2025-12-29T06-49-38-980Z-85ac2153/manifest.json`.
 - **Update — Schema & snippet:** Manifest support for design plan/guardrail/history/style profiles plus `prompt-snippets/frontend-aesthetics-v1.md` landed; guardrail metrics/style-overlap gate documented for parity tests.
 - **Notes:** Modes differ only in aesthetic plan derivation (brief vs brief+Hifi style profile); artifacts will mirror design pipeline layouts with added guardrail/history outputs.
 
 ## Checklist Mirror
-Mirror status with `tasks/frontend-design-pipeline-v2.md` and `.agent/task/frontend-design-pipeline-v2.md`. Keep `[ ]` until a manifest path such as `.runs/0412-frontend-design-pipeline-v2/cli/<run-id>/manifest.json` is recorded.
+Mirror status with `tasks/frontend-design-pipeline-v2.md` and `.agent/task/frontend-design-pipeline-v2.md`. Keep `[ ]` until a manifest path such as `.runs/0412-frontend-design-pipeline-v2/cli/2025-12-29T06-49-38-980Z-85ac2153/manifest.json` is recorded.
 
 ### Foundation
-- [ ] Collateral synchronized — `docs/design/PRD-frontend-design-pipeline-v2.md`, `docs/design/specs/FRONTEND_DESIGN_PIPELINE_V2.md`, `tasks/index.json`, `.agent/task/frontend-design-pipeline-v2.md`, `docs/TASKS.md`; Evidence: `.runs/0412-frontend-design-pipeline-v2/cli/<run-id>/manifest.json`.
-- [ ] Spec guard coverage — `node scripts/spec-guard.mjs --dry-run` watches `docs/design/specs/FRONTEND_DESIGN_PIPELINE_V2.md`; Evidence: `.runs/0412-frontend-design-pipeline-v2/cli/<run-id>/manifest.json`.
+- [ ] Collateral synchronized — `docs/design/PRD-frontend-design-pipeline-v2.md`, `docs/design/specs/FRONTEND_DESIGN_PIPELINE_V2.md`, `tasks/index.json`, `.agent/task/frontend-design-pipeline-v2.md`, `docs/TASKS.md`; Evidence: `.runs/0412-frontend-design-pipeline-v2/cli/2025-12-29T06-49-38-980Z-85ac2153/manifest.json`.
+- [ ] Spec guard coverage — `node scripts/spec-guard.mjs --dry-run` watches `docs/design/specs/FRONTEND_DESIGN_PIPELINE_V2.md`; Evidence: `.runs/0412-frontend-design-pipeline-v2/cli/2025-12-29T06-49-38-980Z-85ac2153/manifest.json`.
 
 ### Pipeline Stages
-- [ ] Style ingestion (Hifi) — `hifi_style_profile.json` emitted with approvals + similarity level; Evidence: `.runs/0412-frontend-design-pipeline-v2/cli/<run-id>/manifest.json`.
-- [ ] Design brief normalization — `frontend-design-brief.json` staged with required fields + hash; Evidence: `.runs/0412-frontend-design-pipeline-v2/cli/<run-id>/manifest.json`.
-- [ ] Aesthetic axes plan — `frontend-aesthetic-plan.json` captures axes + `avoid` lists + snippet version; Evidence: `.runs/0412-frontend-design-pipeline-v2/cli/<run-id>/manifest.json`.
-- [ ] Implementation + complexity metadata — `implementation-metadata.json` links plan to framework/density expectations; Evidence: `.runs/0412-frontend-design-pipeline-v2/cli/<run-id>/manifest.json`.
-- [ ] Aesthetics guardrail — `design-review-report.json` with originality/accessibility/brief-alignment/slop scores + pass/fail; Evidence: `.runs/0412-frontend-design-pipeline-v2/cli/<run-id>/manifest.json`.
-- [ ] Design diversity memory — `frontend-design-history.json` bounded + mirrored to `out/0412-frontend-design-pipeline-v2/design/history.json`; Evidence: `.runs/0412-frontend-design-pipeline-v2/cli/<run-id>/manifest.json`.
-- [ ] Frontend aesthetics snippet library — `prompt-snippets/frontend-aesthetics-v1.md` versioned and referenced by plans/guardrails; Evidence: `.runs/0412-frontend-design-pipeline-v2/cli/<run-id>/manifest.json`.
+- [ ] Style ingestion (Hifi) — `hifi_style_profile.json` emitted with approvals + similarity level; Evidence: `.runs/0412-frontend-design-pipeline-v2/cli/2025-12-29T06-49-38-980Z-85ac2153/manifest.json`.
+- [ ] Design brief normalization — `frontend-design-brief.json` staged with required fields + hash; Evidence: `.runs/0412-frontend-design-pipeline-v2/cli/2025-12-29T06-49-38-980Z-85ac2153/manifest.json`.
+- [ ] Aesthetic axes plan — `frontend-aesthetic-plan.json` captures axes + `avoid` lists + snippet version; Evidence: `.runs/0412-frontend-design-pipeline-v2/cli/2025-12-29T06-49-38-980Z-85ac2153/manifest.json`.
+- [ ] Implementation + complexity metadata — `implementation-metadata.json` links plan to framework/density expectations; Evidence: `.runs/0412-frontend-design-pipeline-v2/cli/2025-12-29T06-49-38-980Z-85ac2153/manifest.json`.
+- [ ] Aesthetics guardrail — `design-review-report.json` with originality/accessibility/brief-alignment/slop scores + pass/fail; Evidence: `.runs/0412-frontend-design-pipeline-v2/cli/2025-12-29T06-49-38-980Z-85ac2153/manifest.json`.
+- [ ] Design diversity memory — `frontend-design-history.json` bounded + mirrored to `out/0412-frontend-design-pipeline-v2/design/history.json`; Evidence: `.runs/0412-frontend-design-pipeline-v2/cli/2025-12-29T06-49-38-980Z-85ac2153/manifest.json`.
+- [ ] Frontend aesthetics snippet library — `prompt-snippets/frontend-aesthetics-v1.md` versioned and referenced by plans/guardrails; Evidence: `.runs/0412-frontend-design-pipeline-v2/cli/2025-12-29T06-49-38-980Z-85ac2153/manifest.json`.
 
 ### Artifacts, Guardrails, Validation
-- [ ] Artifact layout + writer — artifacts under `.runs/0412-frontend-design-pipeline-v2/cli/<run-id>/artifacts/design/**`, summary `out/0412-frontend-design-pipeline-v2/design/runs/<run>.json`; Evidence: `.runs/0412-frontend-design-pipeline-v2/cli/<run-id>/manifest.json`.
-- [ ] Manifest/schema updates — manifest sections for `design_plan`, `design_guardrail`, `design_history`, style profile metadata with approvals/retention; Evidence: `.runs/0412-frontend-design-pipeline-v2/cli/<run-id>/manifest.json`.
-- [ ] Metrics/telemetry — metrics (`aesthetic_axes_completeness`, `originality_score`, `accessibility_score`, `brief_alignment_score`, `slop_risk`, `diversity_penalty`, `similarity_to_reference`, `style_overlap`, `style_overlap_gate`, `snippet_version`) emitted to manifest + `out/**`; Evidence: `.runs/0412-frontend-design-pipeline-v2/cli/<run-id>/manifest.json`.
-- [ ] Retention/legal logging — retention enforced (style profiles may use shorter window), approvals + `do_not_copy` markers captured; Evidence: `.runs/0412-frontend-design-pipeline-v2/cli/<run-id>/manifest.json`.
-- [ ] Mode parity — Fresh vs clone-informed runs show identical stage set; manifests capture mode + reference style id; Evidence: `.runs/0412-frontend-design-pipeline-v2/cli/<run-id>/manifest.json`.
-- [ ] Guardrail efficacy — AI-slop mock fails and compliant mock passes with differing `slop_risk`; Evidence: `.runs/0412-frontend-design-pipeline-v2/cli/<run-id>/manifest.json`.
-- [ ] Style-overlap gate — Clone-informed runs compute `style_overlap` (max of palette/typography/motion/spacing similarities) and fail guardrail when >0.10; manifests + `design-review-report.json` record per-axis scores and `style_overlap_gate`; Evidence: `.runs/0412-frontend-design-pipeline-v2/cli/<run-id>/manifest.json`.
-- [ ] Diversity penalty check — history reuse increases `diversity_penalty` surfaced in guardrail report; Evidence: `.runs/0412-frontend-design-pipeline-v2/cli/<run-id>/manifest.json`.
-- [ ] Reviewer hand-off — `node scripts/spec-guard.mjs --dry-run`, `npm run lint`, `npm run test`, `npm run review` executed with latest manifest cited; Evidence: `.runs/0412-frontend-design-pipeline-v2/cli/<run-id>/manifest.json`.
+- [ ] Artifact layout + writer — artifacts under `.runs/0412-frontend-design-pipeline-v2/cli/2025-12-29T06-49-38-980Z-85ac2153/artifacts/design/**`, summary `out/0412-frontend-design-pipeline-v2/design/runs/<run>.json`; Evidence: `.runs/0412-frontend-design-pipeline-v2/cli/2025-12-29T06-49-38-980Z-85ac2153/manifest.json`.
+- [ ] Manifest/schema updates — manifest sections for `design_plan`, `design_guardrail`, `design_history`, style profile metadata with approvals/retention; Evidence: `.runs/0412-frontend-design-pipeline-v2/cli/2025-12-29T06-49-38-980Z-85ac2153/manifest.json`.
+- [ ] Metrics/telemetry — metrics (`aesthetic_axes_completeness`, `originality_score`, `accessibility_score`, `brief_alignment_score`, `slop_risk`, `diversity_penalty`, `similarity_to_reference`, `style_overlap`, `style_overlap_gate`, `snippet_version`) emitted to manifest + `out/**`; Evidence: `.runs/0412-frontend-design-pipeline-v2/cli/2025-12-29T06-49-38-980Z-85ac2153/manifest.json`.
+- [ ] Retention/legal logging — retention enforced (style profiles may use shorter window), approvals + `do_not_copy` markers captured; Evidence: `.runs/0412-frontend-design-pipeline-v2/cli/2025-12-29T06-49-38-980Z-85ac2153/manifest.json`.
+- [ ] Mode parity — Fresh vs clone-informed runs show identical stage set; manifests capture mode + reference style id; Evidence: `.runs/0412-frontend-design-pipeline-v2/cli/2025-12-29T06-49-38-980Z-85ac2153/manifest.json`.
+- [ ] Guardrail efficacy — AI-slop mock fails and compliant mock passes with differing `slop_risk`; Evidence: `.runs/0412-frontend-design-pipeline-v2/cli/2025-12-29T06-49-38-980Z-85ac2153/manifest.json`.
+- [ ] Style-overlap gate — Clone-informed runs compute `style_overlap` (max of palette/typography/motion/spacing similarities) and fail guardrail when >0.10; manifests + `design-review-report.json` record per-axis scores and `style_overlap_gate`; Evidence: `.runs/0412-frontend-design-pipeline-v2/cli/2025-12-29T06-49-38-980Z-85ac2153/manifest.json`.
+- [ ] Diversity penalty check — history reuse increases `diversity_penalty` surfaced in guardrail report; Evidence: `.runs/0412-frontend-design-pipeline-v2/cli/2025-12-29T06-49-38-980Z-85ac2153/manifest.json`.
+- [ ] Reviewer hand-off — `node scripts/spec-guard.mjs --dry-run`, `npm run lint`, `npm run test`, `npm run review` executed with latest manifest cited; Evidence: `.runs/0412-frontend-design-pipeline-v2/cli/2025-12-29T06-49-38-980Z-85ac2153/manifest.json`.
 
 # Task List Snapshot — More Nutrition Pixel Archive (0505-more-nutrition-pixel)
 
@@ -601,7 +661,7 @@ Mirror status with `tasks/tasks-0202-orchestrator-hardening.md` and `.agent/task
 - Output Bounding — `[x]` Command buffer and error truncation verified via tests; Evidence: `.runs/0202-orchestrator-hardening/cli/2025-10-31T22-56-34-431Z-9574035c/manifest.json`.
 - Guardrails & Review — `[x]` `spec-guard`, `npm run lint`, `npm run test`, and `npm run review` executed; Evidence: `.runs/0202-orchestrator-hardening/cli/2025-10-31T22-56-34-431Z-9574035c/manifest.json`.
 
-Update checklist entries with the exact `.runs/0202-orchestrator-hardening/cli/<run-id>/manifest.json` path once runs complete.
+Update checklist entries with the exact `.runs/0202-orchestrator-hardening/cli/2025-12-29T06-49-38-980Z-85ac2153/manifest.json` path once runs complete.
 
 # Task List Snapshot — TF-GRPO Integration (0506)
 
@@ -610,7 +670,7 @@ Update checklist entries with the exact `.runs/0202-orchestrator-hardening/cli/<
 - **Guardrails:** Enforce `G ≥ 2`, ≤32-word experiences, three epochs (~100 samples) with train temp 0.7 / eval temp 0.3, stamped instruction sources only, and `node scripts/spec-guard.mjs --dry-run` before review.
 
 ## Checklist Mirror
-Mirror status with `tasks/tasks-0506-tfgrpo.md` and `.agent/task/0506-tfgrpo-integration.md`. Flip `[ ]` to `[x]` only after attaching the manifest path (e.g., `.runs/0506-tfgrpo-integration/cli/<run-id>/manifest.json`).
+Mirror status with `tasks/tasks-0506-tfgrpo.md` and `.agent/task/0506-tfgrpo-integration.md`. Flip `[ ]` to `[x]` only after attaching the manifest path (e.g., `.runs/0506-tfgrpo-integration/cli/2025-12-29T06-49-38-980Z-85ac2153/manifest.json`).
 
 ### PR-1 Prompt Packs & Loader
 - [x] Stamped prompt-pack manifests wired into `packages/orchestrator/src/instructions/loader.ts`; tests: `packages/orchestrator/tests/instructions/PromptPackLoader.test.ts`, `packages/orchestrator/tests/InstructionsLoader.test.ts`. Evidence: prompt_packs stamps in `.runs/0506-tfgrpo-integration/cli/2025-11-21T05-56-32-837Z-430b2d9d/manifest.json`.
