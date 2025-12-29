@@ -59,8 +59,10 @@
 - Run Manifest (docs review): `.runs/0914-npm-companion-package/cli/2025-12-28T16-12-48-461Z-041b4764/manifest.json`
 - Metrics / State Snapshots: `.runs/0914-npm-companion-package/metrics.json`, `out/0914-npm-companion-package/state.json`
 
+## Decisions
+- Package name: `@kbediako/codex-orchestrator` (unscoped name unavailable for publish).
+
 ## Open Questions
-- Final package name/scope (`codex-orchestrator` vs a scoped package)?
 - Minimum template set for v1 (what must ship vs follow-up release)?
 - Do we expose additional MCP subcommands beyond `serve` and `self-check`?
 - Decision: publish under a proprietary license (see `LICENSE`); confirm legal approval before public release.
