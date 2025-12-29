@@ -17,6 +17,7 @@
 ## Architecture & Design
 ### Current State
 - `package.json` is now publishable (no `private: true`), includes a `files` allowlist, and heavy deps are optional peers; tarball contents are controlled by pack audit + allowlist.
+- Package name is scoped to `@kbediako/codex-orchestrator`; the installed bin remains `codex-orchestrator`.
 - `npm run build` uses `tsconfig.build.json`; `clean:dist` + `prepack` exist, but ad-hoc builds can still leave stale `dist/` unless cleaned.
 - Pack audit restricts `dist/` to runtime subtrees; the `files` allowlist mirrors those subtrees so non-runtime `dist/**` output never ships.
 - `scripts/run-review.ts` enforces a non-interactive guard in CI or when stdin is not a TTY by printing the review handoff prompt (with manifest evidence + task context) and exiting successfully; set `FORCE_CODEX_REVIEW=1` to invoke `codex review` in that mode.
