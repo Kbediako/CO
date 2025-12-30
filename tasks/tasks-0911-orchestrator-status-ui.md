@@ -8,9 +8,9 @@
 - Start every task/subtask with `[ ]` and flip it to `[x]` when the acceptance criteria are met, citing the run manifest or log that documents completion.
 
 ### Evidence Gates
-- [x] Docs-review manifest captured (pre-implementation) - Evidence: `.runs/0911-orchestrator-status-ui/cli/2025-12-30T03-39-58-898Z-f21ea629/manifest.json`.
-- [x] DevTools QA manifest captured - Evidence: `.runs/0911-orchestrator-status-ui/cli/2025-12-30T03-44-47-302Z-d69ee8eb/manifest.json`.
-- [x] Implementation review manifest captured (post-implementation) - Evidence: `.runs/0911-orchestrator-status-ui/cli/2025-12-30T03-53-09-870Z-043c91fa/manifest.json`.
+- [x] Docs-review manifest captured (pre-implementation) - Evidence: `.runs/0911-orchestrator-status-ui/cli/2025-12-30T08-23-06-106Z-3bd5e70b/manifest.json`.
+- [x] DevTools QA manifest captured - Evidence: `.runs/0911-orchestrator-status-ui/cli/2025-12-30T08-23-29-563Z-64ed4a9e/manifest.json`.
+- [x] Implementation review manifest captured (post-implementation) - Evidence: `.runs/0911-orchestrator-status-ui/cli/2025-12-30T08-31-56-263Z-44640215/manifest.json`.
 
 ## Parent Tasks
 1. Planning and approvals
@@ -72,7 +72,7 @@
 - `tasks/specs/0911-orchestrator-status-ui.md`
 - `docs/TASKS.md`
 - `.agent/task/0911-orchestrator-status-ui.md`
-- Docs-review manifest: `.runs/0911-orchestrator-status-ui/cli/2025-12-30T03-39-58-898Z-f21ea629/manifest.json`
+- Docs-review manifest: `.runs/0911-orchestrator-status-ui/cli/2025-12-30T08-23-06-106Z-3bd5e70b/manifest.json`
 
 ## Notes
 - Spec Requirements: Mini-spec required (see `tasks/specs/0911-orchestrator-status-ui.md`).

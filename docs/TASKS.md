@@ -214,6 +214,7 @@ Mirror status with `tasks/tasks-0912-review-loop-devtools-gate.md` and `.agent/t
 
 # Task List Snapshot - Orchestrator Status UI (0911)
 
+- Update - Run detail modal visibility + centering fix; docs-review/DevTools QA/implementation gate captured at `.runs/0911-orchestrator-status-ui/cli/2025-12-30T08-23-06-106Z-3bd5e70b/manifest.json`, `.runs/0911-orchestrator-status-ui/cli/2025-12-30T08-23-29-563Z-64ed4a9e/manifest.json`, `.runs/0911-orchestrator-status-ui/cli/2025-12-30T08-31-56-263Z-44640215/manifest.json`.
 - Update - Run-detail modal + footer status + signals positioning shipped; DevTools QA + implementation gate captured at `.runs/0911-orchestrator-status-ui/cli/2025-12-30T03-44-47-302Z-d69ee8eb/manifest.json` and `.runs/0911-orchestrator-status-ui/cli/2025-12-30T03-53-09-870Z-043c91fa/manifest.json`.
 - Update - Implementation complete: aggregation + dashboard shipped; DevTools QA + guardrails captured at `.runs/0911-orchestrator-status-ui/cli/2025-12-29T23-57-33-834Z-548d594f/manifest.json`, `.runs/0911-orchestrator-status-ui/cli/2025-12-30T01-23-39-016Z-e0c9d909/manifest.json`, `.runs/0911-orchestrator-status-ui/cli/2025-12-30T00-27-43-100Z-9c2b8a6d/manifest.json`, and `.runs/0911-orchestrator-status-ui/cli/2025-12-30T01-33-59-187Z-5f123a71/manifest.json`.
 - Notes: Export `MCP_RUNNER_TASK_ID=0911-orchestrator-status-ui` before orchestrator commands. Implementation gate runs `node scripts/spec-guard.mjs --dry-run`, `npm run build`, `npm run lint`, `npm run test`, `npm run docs:check`, `node scripts/diff-budget.mjs`, and `npm run review`.

@@ -598,6 +598,7 @@ body::after {
   inset: 0;
   background: rgba(4, 6, 10, 0.72);
   opacity: 0;
+  visibility: hidden;
   pointer-events: none;
   transition: opacity 0.2s var(--ease-pop);
   z-index: 52;
@@ -605,6 +606,7 @@ body::after {
 
 .run-overlay.open {
   opacity: 1;
+  visibility: visible;
   pointer-events: auto;
 }
 
@@ -619,13 +621,16 @@ body::after {
   flex-direction: column;
   gap: var(--space-3);
   opacity: 0;
+  visibility: hidden;
   pointer-events: none;
+  animation: none;
   transition: transform 0.2s var(--ease-pop), opacity 0.2s var(--ease-pop);
   z-index: 55;
 }
 
 .run-modal.open {
   opacity: 1;
+  visibility: visible;
   pointer-events: auto;
   transform: translate(-50%, -50%) scale(1);
 }
