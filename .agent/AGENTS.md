@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp d583a54f6cdb5d491ea164c7d8d7da23cf5490b3c4defbd57ba4bf6393f7b3df -->
+<!-- codex:instruction-stamp c9a52d74d0dfdaaa3fb40507e87b678f86117fa35463f39e72d5aaab3e0faa51 -->
 # Agent Enablement
 
 ## Added by Bootstrap 2025-10-16
@@ -59,6 +59,12 @@ Note: pipelines already set `CODEX_NON_INTERACTIVE=1`; keep it for shortcut runs
 5. `.agent/system/database.md`
 6. `.agent/SOPs/specs-and-research.md`
 7. `.agent/SOPs/db-migration.md`
+
+### PR Lifecycle (Top-Level Agents)
+- Open PRs for code/config changes and keep the scope tied to the active task.
+- Monitor PR checks and review feedback for 10–20 minutes after all required checks turn green.
+- If checks remain green and no new feedback arrives during the window, merge via GitHub and delete the branch.
+- Reset the window if checks restart or feedback arrives; do not merge draft PRs or PRs labeled "do not merge."
 
 ### Workflow Pointers
 - Always start by reviewing the relevant PRD in `/tasks` and its mirrored snapshot in `/docs`.

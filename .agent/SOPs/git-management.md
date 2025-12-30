@@ -13,7 +13,7 @@ This repo’s git practices prioritize cloneability, reviewability, and evidence
 ## Branching
 - Create a branch per task using the task id: `<task-id>/<slug>` (example: `0906-docs-hygiene-automation/docs-check`).
 - Keep exploratory work in throwaway branches/worktrees; only preserve what you intend to review.
-- Do not merge locally as part of an agent run; leave that to the reviewer/release process.
+- Top-level agents merge via GitHub once checks are green and no new feedback lands within a 10–20 minute monitoring window; never merge draft PRs or PRs labeled "do not merge."
 
 ## Commits
 - Commit only source/docs/config changes.

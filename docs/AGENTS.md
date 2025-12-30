@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp b5285c99885ea910f51bfecf4afca362ca6c2763b1c4572bc6f9e53b5149e692 -->
+<!-- codex:instruction-stamp 796a9f0343ee5adb73ff7565b659e6fdbbca4207eda874a152c323e8a2901200 -->
 # Repository Agent Guidance
 
 ## Project 0303 — Codex Orchestrator Autonomy Enhancements
@@ -25,6 +25,12 @@
 - Use `codex-orchestrator` pipelines for planning, implementation, validation, and review work that touches the repo.
 - Avoid ad-hoc command chains unless the work is a lightweight discovery step that does not require manifest evidence.
 - Delegate scoped investigations to subagents with distinct task ids/worktrees; capture manifest evidence and summarize in the main run.
+
+## PR Lifecycle (Top-Level Agents)
+- Open PRs for code/config changes and keep the scope tied to the active task.
+- Monitor PR checks and review feedback for 10–20 minutes after all required checks turn green.
+- If checks remain green and no new feedback arrives during the window, merge via GitHub and delete the branch.
+- Reset the window if checks restart or feedback arrives; do not merge draft PRs or PRs labeled "do not merge."
 
 ## DevTools Review Gate (Optional)
 - For frontend QA/visual review runs that need Chrome DevTools, use `npx codex-orchestrator start implementation-gate-devtools --format json --no-interactive --task <task-id>` so only the review handoff enables DevTools.
