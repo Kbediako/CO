@@ -180,7 +180,7 @@ Mirror status with `tasks/tasks-0917-devtools-readiness-orchestrator-usage.md` a
 ### Foundation
 - [x] Collateral drafted (PRD/tech spec/action plan/checklist/mini-spec) - Evidence: this commit.
 - [x] Docs-review manifest captured (pre-implementation) - Evidence: `.runs/0917-devtools-readiness-orchestrator-usage/cli/2025-12-29T22-15-44-073Z-e5467cda/manifest.json`.
-- [ ] Metrics/state snapshots updated - Evidence: `.runs/0917-devtools-readiness-orchestrator-usage/metrics.json`, `out/0917-devtools-readiness-orchestrator-usage/state.json`.
+- [x] Metrics/state snapshots updated - Evidence: `.runs/0917-devtools-readiness-orchestrator-usage/metrics.json`, `out/0917-devtools-readiness-orchestrator-usage/state.json`.
 - [x] Mirrors updated in `docs/TASKS.md`, `.agent/task/0917-devtools-readiness-orchestrator-usage.md`, and `tasks/index.json` - Evidence: this commit.
 - [x] PRD approval recorded in `tasks/index.json` gate metadata - Evidence: `.runs/0917-devtools-readiness-orchestrator-usage/cli/2025-12-29T22-15-44-073Z-e5467cda/manifest.json`.
 
