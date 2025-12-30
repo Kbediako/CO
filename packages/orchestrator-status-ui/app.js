@@ -193,7 +193,7 @@ async function loadData() {
     return;
   }
   state.loading = true;
-  setSyncStatus('Syncing...', true);
+  setSyncStatus(null, true);
   try {
     const response = await fetch(dataUrl, { cache: 'no-store' });
     if (!response.ok) {
@@ -517,9 +517,11 @@ function bucketBadge(bucket) {
 }
 
 function setSyncStatus(message, isSyncing, isError = false) {
-  const prefix = isSyncing ? 'Syncing' : 'Last update';
-  const text = isSyncing ? `${prefix}` : message;
-  elements.syncStatus.textContent = text;
+  const fallback = elements.syncStatus.textContent || '—';
+  const text = message || (isError ? 'Failed to load data' : fallback);
+  if (!isSyncing || isError) {
+    elements.syncStatus.textContent = text;
+  }
   elements.syncStatus.dataset.state = isError ? 'error' : isSyncing ? 'syncing' : 'ok';
 }
 
