@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp 7175c917d6022d5d6dfa979869e844ab8275cf0b4b138a349c339b22caedda60 -->
+<!-- codex:instruction-stamp b5285c99885ea910f51bfecf4afca362ca6c2763b1c4572bc6f9e53b5149e692 -->
 # Repository Agent Guidance
 
 ## Project 0303 — Codex Orchestrator Autonomy Enhancements
@@ -31,6 +31,7 @@
 - Default to `implementation-gate` for general reviews; reserve the DevTools gate for cases that need Chrome DevTools capabilities (visual/layout checks, network/perf diagnostics). After addressing review feedback, rerun the same gate until no issues remain and include any follow-up questions in `NOTES`.
 - NOTES template: `Goal: ... | Summary: ... | Risks: ... | Questions (optional): ...`
 - Review-loop steps live in `.agent/SOPs/review-loop.md`.
+- When writing PR summaries, avoid literal `\n` sequences; use `gh pr create --body-file` or a here-doc so line breaks render correctly in GitHub.
 
 ## Frontend Testing Pipeline (Core)
 Note: pipelines already set `CODEX_NON_INTERACTIVE=1`; keep it for shortcut runs and other automation.

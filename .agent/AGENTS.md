@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp 97798891d0a1a05956ce3357bb29368407a224d38d7c647efeed129acdc5cb2a -->
+<!-- codex:instruction-stamp d583a54f6cdb5d491ea164c7d8d7da23cf5490b3c4defbd57ba4bf6393f7b3df -->
 # Agent Enablement
 
 ## Added by Bootstrap 2025-10-16
@@ -68,6 +68,7 @@ Note: pipelines already set `CODEX_NON_INTERACTIVE=1`; keep it for shortcut runs
 - Use `.agent/task/templates/subagent-request-template.md` for subagent prompts and deliverables.
 - Orchestrator-first: use `codex-orchestrator` pipelines for planning, implementation, validation, and review; avoid ad-hoc command chains unless no manifest evidence is required.
 - Delegate scoped investigations to subagents with distinct task ids/worktrees; capture manifest evidence and summarize in the main run.
+- When writing PR summaries, avoid literal `\n` sequences; use `gh pr create --body-file` or a here-doc so line breaks render correctly in GitHub.
 
 ## Project 0303 — Codex Orchestrator Autonomy Enhancements
 - Set `MCP_RUNNER_TASK_ID=0303-orchestrator-autonomy` for all diagnostics and orchestrator executions; confirm manifests land in `.runs/0303-orchestrator-autonomy/cli/`.
