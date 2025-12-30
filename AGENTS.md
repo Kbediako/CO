@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp 5bb01b4aaf13092a422860ec310f4b2776599561e0825cbadf59c94992da59ed -->
+<!-- codex:instruction-stamp 7375755bab75c70d77fa28037f62ff2fdd3e5fd451247016733d089287fbe078 -->
 # Codex-Orchestrator Agent Handbook (Template)
 
 Use this repository as the wrapper that coordinates multiple Codex-driven projects. After cloning, replace placeholder metadata (task IDs, documents, SOPs) with values for each downstream initiative while keeping these shared guardrails in place.
@@ -8,6 +8,12 @@ Use this repository as the wrapper that coordinates multiple Codex-driven projec
 - Switch to cloud mode only if your task plan explicitly allows a parallel run and the reviewer records the override in the active run manifest.
 - Keep the safe approval profile (`read/edit/run/network`). Capture any escalation in `.runs/<task>/<timestamp>/manifest.json` under `approvals`.
 - Run `node scripts/spec-guard.mjs --dry-run` before requesting review. Update specs or refresh approvals when the guard fails.
+
+## Orchestrator-First Workflow
+- Use `codex-orchestrator` pipelines for planning, implementation, validation, and review work that touches the repo.
+- Default to `docs-review` before implementation and `implementation-gate` (or `implementation-gate-devtools`) after code changes.
+- Reserve direct shell commands for lightweight discovery or one-off checks that do not require manifest evidence.
+- Delegate scoped investigations to subagents with distinct task ids/worktrees; capture manifest evidence and summarize in the main run.
 
 ## Meta-Orchestration & Parallel Runs
 - **Definition:** “Parallel runs” means launching multiple `codex-orchestrator start ...` runs at the same time (separate processes). A single orchestrator run executes its pipeline stages serially.

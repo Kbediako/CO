@@ -57,6 +57,12 @@
      - Commands: Optional local server command (TBD).
      - Acceptance: UI renders dark theme layout with live data updates.
      - [x] Status: Complete - Evidence: `.runs/0911-orchestrator-status-ui/cli/2025-12-24T05-07-59-073Z-e6a472e8/manifest.json`.
+6. Post-launch polish
+   - Subtask 1: Refresh UI visuals, tune active/ongoing colors, add favicon, and improve keyboard selection.
+     - Files: packages/orchestrator-status-ui/styles.css, packages/orchestrator-status-ui/index.html, packages/orchestrator-status-ui/app.js, packages/orchestrator-status-ui/favicon.svg
+     - Commands: Local static server + manual QA.
+     - Acceptance: New palette applied consistently, favicon loads without 404s, and task rows are keyboard-selectable.
+     - [x] Status: Complete - Evidence: `.runs/0911-orchestrator-status-ui/cli/2025-12-29T23-57-33-834Z-548d594f/manifest.json`.
 
 ## Relevant Files
 - `tasks/0911-prd-orchestrator-status-ui.md`

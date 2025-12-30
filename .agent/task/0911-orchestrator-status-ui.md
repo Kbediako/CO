@@ -19,3 +19,6 @@
 ## Implementation (complete)
 - [x] Aggregation script built — Evidence: `.runs/0911-orchestrator-status-ui/cli/2025-12-24T05-07-59-073Z-e6a472e8/manifest.json`.
 - [x] Static UI and styles built — Evidence: `.runs/0911-orchestrator-status-ui/cli/2025-12-24T05-07-59-073Z-e6a472e8/manifest.json`.
+
+## Post-launch polish
+- [x] UI refresh, tuned status colors, favicon, and keyboard selection — Evidence: `.runs/0911-orchestrator-status-ui/cli/2025-12-29T23-57-33-834Z-548d594f/manifest.json`.

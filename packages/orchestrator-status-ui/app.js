@@ -26,6 +26,7 @@ const elements = {
 const state = {
   data: null,
   selectedTaskId: null,
+  focusedTaskId: null,
   filters: {
     task: 'all',
     bucket: 'all',
@@ -37,13 +38,52 @@ const state = {
 
 elements.dataSource.textContent = `Data source: ${dataUrl}`;
 
+function selectRow(row) {
+  if (!row || !row.dataset.taskId) {
+    return false;
+  }
+  return selectTaskById(row.dataset.taskId, true);
+}
+
+function isSelectionKey(event) {
+  return event.key === 'Enter' || event.key === ' ' || event.key === 'Space' || event.key === 'Spacebar';
+}
+
+function handleRowSelectionKey(event) {
+  if (!isSelectionKey(event)) {
+    return;
+  }
+  event.preventDefault();
+  selectRow(event.currentTarget);
+}
+
+function selectTaskById(taskId, shouldFocus) {
+  if (!taskId) {
+    return false;
+  }
+  state.selectedTaskId = taskId;
+  render();
+  if (shouldFocus) {
+    const safeId = typeof CSS !== 'undefined' && CSS.escape ? CSS.escape(taskId) : taskId.replace(/"/g, '\\"');
+    const row = elements.taskTableBody.querySelector(`tr[data-task-id="${safeId}"]`);
+    if (row) {
+      row.focus();
+    }
+  }
+  return true;
+}
+
 elements.taskTableBody.addEventListener('click', (event) => {
+  const row = event.target.closest('tr');
+  selectRow(row);
+});
+
+elements.taskTableBody.addEventListener('focusin', (event) => {
   const row = event.target.closest('tr');
   if (!row || !row.dataset.taskId) {
     return;
   }
-  state.selectedTaskId = row.dataset.taskId;
-  render();
+  state.focusedTaskId = row.dataset.taskId;
 });
 
 elements.taskFilter.addEventListener('change', (event) => {
@@ -83,7 +123,16 @@ elements.sideOverlay.addEventListener('click', () => {
 document.addEventListener('keydown', (event) => {
   if (event.key === 'Escape' && state.sideOpen) {
     setSidePanelState(false);
+    return;
   }
+  if (!isSelectionKey(event)) {
+    return;
+  }
+  if (!state.focusedTaskId) {
+    return;
+  }
+  event.preventDefault();
+  selectTaskById(state.focusedTaskId, true);
 });
 
 setInterval(() => {
@@ -205,7 +254,7 @@ function renderTaskTable(tasks) {
     .map((task) => {
       const isSelected = task.task_id === state.selectedTaskId;
       const updated = formatTimestamp(task.last_update);
-      return `<tr data-task-id="${escapeHtml(task.task_id)}" class="${isSelected ? 'selected' : ''}">
+      return `<tr data-task-id="${escapeHtml(task.task_id)}" class="${isSelected ? 'selected' : ''}" tabindex="0" aria-selected="${isSelected}">
         <td>
           <span class="task-id">${escapeHtml(task.task_id)}</span>
           <span class="task-title">${escapeHtml(task.title || '')}</span>
@@ -218,6 +267,11 @@ function renderTaskTable(tasks) {
       </tr>`;
     })
     .join('');
+
+  elements.taskTableBody.querySelectorAll('tr').forEach((row) => {
+    row.addEventListener('keydown', handleRowSelectionKey);
+    row.addEventListener('keyup', handleRowSelectionKey);
+  });
 }
 
 function renderRunDetail(run, task) {
@@ -363,7 +417,7 @@ function setSyncStatus(message, isSyncing, isError = false) {
   const prefix = isSyncing ? 'Syncing' : 'Last update';
   const text = isSyncing ? `${prefix}` : message;
   elements.syncStatus.textContent = text;
-  elements.syncStatus.style.color = isError ? '#ef4444' : '#60a5fa';
+  elements.syncStatus.dataset.state = isError ? 'error' : isSyncing ? 'syncing' : 'ok';
 }
 
 function formatTimestamp(timestamp) {

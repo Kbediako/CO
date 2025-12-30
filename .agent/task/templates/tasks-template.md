@@ -57,3 +57,4 @@
 - Spec Requirements:
 - Approvals Needed:
 - Links:
+- Subagent usage (if any): task ids + manifest paths.

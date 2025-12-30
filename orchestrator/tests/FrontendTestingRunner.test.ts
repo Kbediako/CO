@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -26,8 +26,33 @@ describe('frontend testing runner', () => {
     expect(resolved.args).toEqual(['exec', 'prompt']);
   });
 
-  it('adds the devtools config override when enabled', () => {
-    const env = { CODEX_REVIEW_DEVTOOLS: '1' } as NodeJS.ProcessEnv;
+  it('errors when devtools is enabled without readiness', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'frontend-test-'));
+    const codexHome = join(tempDir, '.codex');
+    const env = { CODEX_REVIEW_DEVTOOLS: '1', CODEX_HOME: codexHome } as NodeJS.ProcessEnv;
+    expect(() => resolveCodexCommand(['exec', 'prompt'], env)).toThrow(
+      /DevTools MCP is not ready/
+    );
+  });
+
+  it('adds the devtools config override when readiness is satisfied', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'frontend-test-'));
+    const codexHome = join(tempDir, '.codex');
+    const skillPath = join(codexHome, 'skills', 'chrome-devtools', 'SKILL.md');
+    await mkdir(join(codexHome, 'skills', 'chrome-devtools'), { recursive: true });
+    await writeFile(skillPath, '# devtools skill', 'utf8');
+    const configPath = join(codexHome, 'config.toml');
+    await writeFile(
+      configPath,
+      [
+        '[mcp_servers.chrome-devtools]',
+        'command = "npx"',
+        'args = ["-y", "chrome-devtools-mcp@latest"]'
+      ].join('\n'),
+      'utf8'
+    );
+
+    const env = { CODEX_REVIEW_DEVTOOLS: '1', CODEX_HOME: codexHome } as NodeJS.ProcessEnv;
     const resolved = resolveCodexCommand(['exec', 'prompt'], env);
     expect(resolved.command).toBe('codex');
     expect(resolved.args).toEqual(['-c', DEVTOOLS_CONFIG_OVERRIDE, 'exec', 'prompt']);

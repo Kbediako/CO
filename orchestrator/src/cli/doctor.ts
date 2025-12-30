@@ -1,8 +1,11 @@
-import { existsSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { join } from 'node:path';
 import process from 'node:process';
 
+import {
+  buildDevtoolsSetupPlan,
+  DEVTOOLS_SKILL_NAME,
+  resolveDevtoolsReadiness,
+  type DevtoolsReadiness
+} from './utils/devtools.js';
 import { resolveOptionalDependency, type OptionalResolutionSource } from './utils/optionalDeps.js';
 
 const OPTIONAL_DEPENDENCIES = [
@@ -15,8 +18,6 @@ const OPTIONAL_DEPENDENCIES = [
   { name: 'cheerio', install: 'npm install --save-dev cheerio' }
 ];
 
-const DEVTOOLS_SKILL_NAME = 'chrome-devtools';
-
 export interface DoctorDependencyStatus {
   name: string;
   status: 'ok' | 'missing';
@@ -25,11 +26,18 @@ export interface DoctorDependencyStatus {
 }
 
 export interface DoctorDevtoolsStatus {
-  status: 'ok' | 'missing';
+  status: DevtoolsReadiness['status'];
   skill: {
     name: string;
     status: 'ok' | 'missing';
     path: string;
+    install?: string[];
+  };
+  config: {
+    status: 'ok' | 'missing' | 'invalid';
+    path: string;
+    detail?: string;
+    error?: string;
     install?: string[];
   };
   enablement: string[];
@@ -56,21 +64,37 @@ export function runDoctor(cwd: string = process.cwd()): DoctorResult {
     };
   });
 
-  const codexHome = resolveCodexHome();
-  const skillPath = join(codexHome, 'skills', DEVTOOLS_SKILL_NAME, 'SKILL.md');
-  const skillInstalled = existsSync(skillPath);
+  const readiness = resolveDevtoolsReadiness();
+  const setupPlan = buildDevtoolsSetupPlan();
   const devtools: DoctorDevtoolsStatus = {
-    status: skillInstalled ? 'ok' : 'missing',
+    status: readiness.status,
     skill: {
       name: DEVTOOLS_SKILL_NAME,
-      status: skillInstalled ? 'ok' : 'missing',
-      path: skillPath,
-      install: skillInstalled
-        ? undefined
-        : [
-            `Copy the ${DEVTOOLS_SKILL_NAME} skill into ${join(codexHome, 'skills', DEVTOOLS_SKILL_NAME)}`,
-            `Expected file: ${skillPath}`
-          ]
+      status: readiness.skill.status,
+      path: readiness.skill.path,
+      install:
+        readiness.skill.status === 'ok'
+          ? undefined
+          : [
+              `Copy the ${DEVTOOLS_SKILL_NAME} skill into ${setupPlan.codexHome}/skills/${DEVTOOLS_SKILL_NAME}`,
+              `Expected file: ${readiness.skill.path}`
+            ]
+    },
+    config: {
+      status: readiness.config.status,
+      path: readiness.config.path,
+      detail: readiness.config.detail,
+      error: readiness.config.error,
+      install:
+        readiness.config.status === 'ok'
+          ? undefined
+          : [
+              'Run: codex-orchestrator devtools setup',
+              `Run: ${setupPlan.commandLine}`,
+              `Config path: ${setupPlan.configPath}`,
+              'Config snippet:',
+              ...setupPlan.configSnippet.split('\n')
+            ]
     },
     enablement: [
       'Enable DevTools for a run with CODEX_REVIEW_DEVTOOLS=1',
@@ -79,8 +103,11 @@ export function runDoctor(cwd: string = process.cwd()): DoctorResult {
   };
 
   const missing = dependencies.filter((dep) => dep.status === 'missing').map((dep) => dep.name);
-  if (!skillInstalled) {
+  if (readiness.skill.status === 'missing') {
     missing.push(DEVTOOLS_SKILL_NAME);
+  }
+  if (readiness.config.status !== 'ok') {
+    missing.push(`${DEVTOOLS_SKILL_NAME}-config`);
   }
   return {
     status: missing.length === 0 ? 'ok' : 'warning',
@@ -115,17 +142,27 @@ export function formatDoctorSummary(result: DoctorResult): string[] {
       lines.push(`    install: ${instruction}`);
     }
   }
+  if (result.devtools.config.status === 'ok') {
+    lines.push(`  - config.toml: ok (${result.devtools.config.path})`);
+  } else {
+    const label =
+      result.devtools.config.status === 'invalid'
+        ? `invalid (${result.devtools.config.path})`
+        : `missing (${result.devtools.config.path})`;
+    lines.push(`  - config.toml: ${label}`);
+    if (result.devtools.config.detail) {
+      lines.push(`    detail: ${result.devtools.config.detail}`);
+    }
+    if (result.devtools.config.error) {
+      lines.push(`    error: ${result.devtools.config.error}`);
+    }
+    for (const instruction of result.devtools.config.install ?? []) {
+      lines.push(`    install: ${instruction}`);
+    }
+  }
   for (const line of result.devtools.enablement) {
     lines.push(`  - ${line}`);
   }
 
   return lines;
-}
-
-function resolveCodexHome(): string {
-  const override = process.env.CODEX_HOME?.trim();
-  if (override) {
-    return override;
-  }
-  return join(homedir(), '.codex');
 }
