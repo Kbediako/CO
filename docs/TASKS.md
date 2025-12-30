@@ -214,6 +214,7 @@ Mirror status with `tasks/tasks-0912-review-loop-devtools-gate.md` and `.agent/t
 
 # Task List Snapshot - Orchestrator Status UI (0911)
 
+- Update - Sync control moved into a floating button beside Signals; DevTools QA + implementation gate captured at `.runs/0911-orchestrator-status-ui/cli/2025-12-30T13-07-12-110Z-ddd75a07/manifest.json` and `.runs/0911-orchestrator-status-ui/cli/2025-12-30T13-13-14-168Z-2dfae172/manifest.json`.
 - Update - Sync control reduced to icon-only refresh and dropdown arrows spaced; DevTools QA + implementation gate captured at `.runs/0911-orchestrator-status-ui/cli/2025-12-30T12-28-53-481Z-98d67187/manifest.json` and `.runs/0911-orchestrator-status-ui/cli/2025-12-30T12-42-17-014Z-af029f6d/manifest.json`.
 - Update - Signals icon-only toggle + approvals totals from design runs; docs-review/DevTools QA/implementation gate captured at `.runs/0911-orchestrator-status-ui/cli/2025-12-30T11-16-49-336Z-44f558c7/manifest.json`, `.runs/0911-orchestrator-status-ui/cli/2025-12-30T11-39-05-349Z-c07276ff/manifest.json`, `.runs/0911-orchestrator-status-ui/cli/2025-12-30T11-44-42-624Z-afae2840/manifest.json`.
 - Update - Restore focus handoff to avoid aria-hidden warning on run modal/Signals panel close; DevTools QA + implementation gate captured at `.runs/0911-orchestrator-status-ui/cli/2025-12-30T09-15-57-261Z-d7387939/manifest.json` and `.runs/0911-orchestrator-status-ui/cli/2025-12-30T09-23-34-986Z-8e6693c4/manifest.json`.
