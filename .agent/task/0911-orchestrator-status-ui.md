@@ -4,8 +4,8 @@
 
 ## Evidence gates
 - [x] Docs-review manifest captured (pre-implementation) — Evidence: `.runs/0911-orchestrator-status-ui/cli/2025-12-30T11-16-49-336Z-44f558c7/manifest.json`.
-- [x] DevTools QA manifest captured — Evidence: `.runs/0911-orchestrator-status-ui/cli/2025-12-30T13-49-22-466Z-afdb5885/manifest.json`.
-- [x] Implementation review manifest captured (post-implementation) — Evidence: `.runs/0911-orchestrator-status-ui/cli/2025-12-30T14-00-38-767Z-1c6c5ba5/manifest.json`.
+- [x] DevTools QA manifest captured — Evidence: `.runs/0911-orchestrator-status-ui/cli/2025-12-30T14-32-15-222Z-b52429cb/manifest.json`.
+- [x] Implementation review manifest captured (post-implementation) — Evidence: `.runs/0911-orchestrator-status-ui/cli/2025-12-30T14-39-43-441Z-442a873c/manifest.json`.
 
 ## Planning and approvals
 - [x] Mini-spec approved — Evidence: `tasks/specs/0911-orchestrator-status-ui.md`.
