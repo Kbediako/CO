@@ -34,7 +34,7 @@ Checklist for the run (non-interactive):
 4) Run diagnostics: `npx codex-orchestrator start diagnostics --format json`.
    - Capture `runId` and manifest path from stdout (`.runs/$TASK/cli/<run-id>/manifest.json`).
 5) Watch until completion: `npx codex-orchestrator status --run <run-id> --watch --interval 10` (or tail the manifest) and wait for a terminal state.
-6) Read the manifest, confirm command outcomes (build/lint/test/spec-guard), and note any failures or approvals.
+6) Read the manifest, confirm command outcomes (delegation-guard/build/lint/test/spec-guard), and note any failures or approvals.
 7) Mirror evidence using `$MANIFEST`: update `/tasks`, `docs/TASKS.md`, `.agent/task/...`, `.runs/$TASK/metrics.json`, and `out/$TASK/state.json` with the manifest path. Keep approval decisions logged inside the manifest.
 8) Final reply: include `task id`, `run id`, manifest path, command statuses, guardrail outcomes, and any NOTES. Do not add extra commands beyond this sequence.
 PROMPT
@@ -48,10 +48,11 @@ Checklist (non-interactive):
 1) Abort if `TASK`, `MANIFEST`, or `NOTES` is missing. Surface `NOTES` in the summary.
 2) `export MCP_RUNNER_TASK_ID="$TASK"`.
 3) Run guardrails in order:
-   a) `node scripts/spec-guard.mjs --dry-run`
-   b) `npm run lint`
-   c) `npm run test`
-   d) `npm run eval:test` (only if evaluation fixtures exist or the task calls for it)
+   a) `node scripts/delegation-guard.mjs`
+   b) `node scripts/spec-guard.mjs --dry-run`
+   c) `npm run lint`
+   d) `npm run test`
+   e) `npm run eval:test` (only if evaluation fixtures exist or the task calls for it)
 4) Run reviewer hand-off: `npm run review` (invokes `codex review` with the latest manifest path embedded). If it cannot find a manifest, use `$MANIFEST` explicitly.
 5) Keep approvals/escalations logged in the manifest; do not change past records.
 6) Mirror evidence using `$MANIFEST` into `/tasks`, `docs/TASKS.md`, `.agent/task/...`, `.runs/$TASK/metrics.json`, and `out/$TASK/state.json`.

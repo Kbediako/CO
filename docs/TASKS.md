@@ -190,6 +190,31 @@ Mirror status with `tasks/tasks-0917-devtools-readiness-orchestrator-usage.md` a
 - [x] Tests added for readiness + setup flows — Evidence: `orchestrator/tests/Doctor.test.ts`, `orchestrator/tests/DevtoolsSetup.test.ts`, `orchestrator/tests/FrontendTestingRunner.test.ts` (vitest run 2025-12-30).
 - [x] Guardrails complete — Evidence: `.runs/0917-devtools-readiness-orchestrator-usage/cli/2025-12-29T23-17-34-838Z-d96e2cf4/manifest.json`.
 
+# Task List Snapshot — Subagent Delegation Enforcement (0918)
+
+- Update - Implementation complete: docs-review + implementation gate captured at `.runs/0918-subagent-delegation-enforcement/cli/2025-12-30T16-39-51-110Z-97be9496/manifest.json` and `.runs/0918-subagent-delegation-enforcement/cli/2025-12-30T16-53-35-423Z-88c50e5f/manifest.json`.
+- Notes: Export `MCP_RUNNER_TASK_ID=0918-subagent-delegation-enforcement` before orchestrator commands. Guardrails required: `node scripts/delegation-guard.mjs`, `node scripts/spec-guard.mjs --dry-run`, `npm run build`, `npm run lint`, `npm run test`, `npm run docs:check`, `node scripts/diff-budget.mjs`, `npm run review`.
+
+## Checklist Mirror
+Mirror status with `tasks/tasks-0918-subagent-delegation-enforcement.md` and `.agent/task/0918-subagent-delegation-enforcement.md`. Keep `[ ]` until evidence is recorded.
+
+### Foundation
+- [x] Collateral drafted (PRD/tech spec/action plan/checklist) - Evidence: this commit.
+- [x] Subagent docs-review run captured - Evidence: `.runs/0918-subagent-delegation-enforcement-docs/cli/2025-12-30T16-38-34-482Z-000d8b75/manifest.json`.
+- [x] Docs-review manifest captured (pre-implementation) - Evidence: `.runs/0918-subagent-delegation-enforcement/cli/2025-12-30T16-39-51-110Z-97be9496/manifest.json`.
+- [x] Metrics/state snapshots updated - Evidence: `.runs/0918-subagent-delegation-enforcement/metrics.json`, `out/0918-subagent-delegation-enforcement/state.json`.
+- [x] Mirrors updated in `docs/TASKS.md`, `.agent/task/0918-subagent-delegation-enforcement.md`, and `tasks/index.json` - Evidence: this commit.
+- [x] PRD approval recorded in `tasks/index.json` gate metadata - Evidence: `.runs/0918-subagent-delegation-enforcement/cli/2025-12-30T16-53-35-423Z-88c50e5f/manifest.json`.
+
+### Implementation
+- [x] Delegation guard script added — Evidence: `scripts/delegation-guard.mjs`.
+- [x] Pipelines updated to run delegation guard — Evidence: `codex.orchestrator.json`.
+- [x] Agent guidance and SOPs updated for mandatory delegation — Evidence: `AGENTS.md`, `docs/AGENTS.md`, `.agent/AGENTS.md`, `.agent/SOPs/agent-autonomy-defaults.md`, `.agent/SOPs/meta-orchestration.md`.
+- [x] Templates updated to require subagent evidence — Evidence: `.agent/task/templates/tasks-template.md`, `.agent/task/templates/subagent-request-template.md`.
+
+### Guardrails & handoff
+- [x] Guardrails complete — Evidence: `.runs/0918-subagent-delegation-enforcement/cli/2025-12-30T16-53-35-423Z-88c50e5f/manifest.json`.
+
 # Task List Snapshot — Review Loop + DevTools Review Gate (0912)
 
 - Update - Implementation complete: implementation-gate-devtools manifest captured at `.runs/0912-review-loop-devtools-gate/cli/2025-12-24T08-56-47-578Z-9b49e1ee/manifest.json`.

@@ -1,5 +1,11 @@
 # Action Plan Overview — Codex Orchestrator Projects
 
+## Task 0918 — Subagent Delegation Enforcement
+- Primary Doc: `docs/ACTION_PLAN-subagent-delegation-enforcement.md`
+- Run Manifest Link: `.runs/0918-subagent-delegation-enforcement/cli/2025-12-30T16-53-35-423Z-88c50e5f/manifest.json`.
+- Metrics / State Snapshots: `.runs/0918-subagent-delegation-enforcement/metrics.json`, `out/0918-subagent-delegation-enforcement/state.json`.
+- Checklist Mirror: `tasks/tasks-0918-subagent-delegation-enforcement.md`, `docs/TASKS.md` (0918 section), `.agent/task/0918-subagent-delegation-enforcement.md`.
+
 ## Task 0303 — Codex Orchestrator Autonomy Enhancements
 - Primary Doc: `docs/ACTION_PLAN-codex-orchestrator-autonomy.md`
 - Run Manifest Link: _(pending — capture first diagnostics run under `.runs/0303-orchestrator-autonomy/cli/<run-id>/manifest.json`)._

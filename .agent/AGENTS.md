@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp c9a52d74d0dfdaaa3fb40507e87b678f86117fa35463f39e72d5aaab3e0faa51 -->
+<!-- codex:instruction-stamp 952c2a7d8c852a7d1e69691270840ca55a8947ab5be135a76ba3658fca4db513 -->
 # Agent Enablement
 
 ## Added by Bootstrap 2025-10-16
@@ -13,6 +13,7 @@
 ### Execution Modes & Approvals
 - Default run mode is `mcp`; switch to cloud only when the canonical task list flags `execution.parallel=true` and the reviewer records the override in the run manifest.
 - Honor the safe `read/edit/run/network` approval profile. Capture escalations in the manifest `approvals` array with reviewer justification and timestamp.
+- Run `node scripts/delegation-guard.mjs` prior to requesting review; if delegation is not possible, set `DELEGATION_GUARD_OVERRIDE_REASON` and record the justification in the checklist.
 - Run `node scripts/spec-guard.mjs --dry-run` prior to requesting review; a failing guard requires refreshing relevant specs (see `.agent/SOPs/specs-and-research.md`).
 
 ### Meta-Orchestrator Mode (Parallel Workstreams)
@@ -40,7 +41,7 @@
 ### Codex CLI prompts
 - Keep the prompt files `~/.codex/prompts/diagnostics.md` and `~/.codex/prompts/review-handoff.md` on every workstation (they are not checked into the repo). Each prompt wires `/prompts:<name>` to the required orchestrator commands so contributors do not have to remember the sequences manually.
 - `/prompts:diagnostics TASK=<task-id> MANIFEST=<path> [NOTES=<free text>]` exports `MCP_RUNNER_TASK_ID=$TASK`, runs `npx codex-orchestrator start diagnostics --format json`, tails `.runs/$TASK/cli/<run-id>/manifest.json` (or `status --watch`), and reminds you to mirror evidence + `$MANIFEST` references into `/tasks`, `docs/TASKS.md`, `.agent/task/...`, `.runs/$TASK/metrics.json`, and `out/$TASK/state.json`.
-- `/prompts:review-handoff TASK=<task-id> MANIFEST=<path> NOTES=<goal + summary + risks + optional questions>` re-validates guardrails via `node scripts/spec-guard.mjs --dry-run`, executes `npm run lint`, `npm run test`, optional `npm run eval:test`, runs `node scripts/diff-budget.mjs`, then runs `npm run review`, and ensures approvals/escalations are logged in `$MANIFEST` before checklists flip.
+- `/prompts:review-handoff TASK=<task-id> MANIFEST=<path> NOTES=<goal + summary + risks + optional questions>` re-validates guardrails via `node scripts/delegation-guard.mjs`, `node scripts/spec-guard.mjs --dry-run`, executes `npm run lint`, `npm run test`, optional `npm run eval:test`, runs `node scripts/diff-budget.mjs`, then runs `npm run review`, and ensures approvals/escalations are logged in `$MANIFEST` before checklists flip.
 - Always use these prompts before running diagnostics or prepping a review; they are the canonical way to drive the orchestrator so manifests, approvals, and docs stay in sync across machines.
 
 ### Frontend Testing Pipeline (Core)
@@ -69,25 +70,25 @@ Note: pipelines already set `CODEX_NON_INTERACTIVE=1`; keep it for shortcut runs
 ### Workflow Pointers
 - Always start by reviewing the relevant PRD in `/tasks` and its mirrored snapshot in `/docs`.
 - Use templates in `.agent/task/templates/` to draft PRDs, task lists, mini-specs, and research notes.
-- Run `node scripts/spec-guard.mjs --dry-run` before opening reviews to ensure specs stay in sync with code changes.
+- Run `node scripts/delegation-guard.mjs` and `node scripts/spec-guard.mjs --dry-run` before opening reviews to ensure delegation and specs stay in sync with code changes.
 - Default decision policy and autonomy rules live in `.agent/SOPs/agent-autonomy-defaults.md`.
 - Use `.agent/task/templates/subagent-request-template.md` for subagent prompts and deliverables.
 - Orchestrator-first: use `codex-orchestrator` pipelines for planning, implementation, validation, and review; avoid ad-hoc command chains unless no manifest evidence is required.
-- Delegate scoped investigations to subagents with distinct task ids/worktrees; capture manifest evidence and summarize in the main run.
+- Delegation is mandatory for top-level tasks: spawn at least one subagent run using `MCP_RUNNER_TASK_ID=<task-id>-<stream>`, capture manifest evidence, and summarize in the main run. Use `DELEGATION_GUARD_OVERRIDE_REASON` only when delegation is impossible and record the justification.
 - When writing PR summaries, avoid literal `\n` sequences; use `gh pr create --body-file` or a here-doc so line breaks render correctly in GitHub.
 
 ## Project 0303 — Codex Orchestrator Autonomy Enhancements
 - Set `MCP_RUNNER_TASK_ID=0303-orchestrator-autonomy` for all diagnostics and orchestrator executions; confirm manifests land in `.runs/0303-orchestrator-autonomy/cli/`.
 - Log approvals/escalations inside each run manifest and reference the same path when you flip checkmarks in `tasks/tasks-0303-orchestrator-autonomy.md`, `docs/TASKS.md`, and `.agent/task/0303-orchestrator-autonomy.md`.
 - Keep metrics in `.runs/0303-orchestrator-autonomy/metrics.json` and summarize outcomes in `out/0303-orchestrator-autonomy/state.json`; update docs when these files change.
-- Before requesting review, run `node scripts/spec-guard.mjs --dry-run`, `npm run lint`, `npm run test`, and `npm run eval:test` (if fixtures exist), then capture the manifest path documenting those executions.
+- Before requesting review, run `node scripts/delegation-guard.mjs`, `node scripts/spec-guard.mjs --dry-run`, `npm run lint`, `npm run test`, and `npm run eval:test` (if fixtures exist), then capture the manifest path documenting those executions.
 - Follow `.agent/SOPs/orchestrator-autonomy.md` for guardrail, evidence, and hand-off requirements specific to Task 0303.
 
 ## Project 0506 — TF-GRPO Integration Foundations
 - Set `MCP_RUNNER_TASK_ID=0506-tfgrpo-integration` before invoking TF-GRPO pipelines so manifests, metrics, and state snapshots land under `.runs/0506-tfgrpo-integration/**` and `out/0506-tfgrpo-integration/**`.
 - Only use stamped prompt packs from `.agent/prompts/prompt-packs/**`; their SHA-256 signatures must match the manifest or the loader will reject the run. Manifests expose these values via the `prompt_packs` array for auditors.
 - Persist ≤32-word experiences and reward evidence inside `out/0506-tfgrpo-integration/experiences.jsonl` and cross-link the manifest path each time you flip checklist items in `tasks/tasks-0506-tfgrpo.md` and `.agent/task/0506-tfgrpo-integration.md`.
-- Guardrails still require `node scripts/spec-guard.mjs --dry-run`, `npm run lint`, and `npm run test` prior to review; attach the TF-GRPO manifest path documenting these validations.
+- Guardrails still require `node scripts/delegation-guard.mjs`, `node scripts/spec-guard.mjs --dry-run`, `npm run lint`, and `npm run test` prior to review; attach the TF-GRPO manifest path documenting these validations.
 
 ### Database Safety Safeguards
 - Treat production data as immutable; require read-only replicas or sanitized fixtures for testing.

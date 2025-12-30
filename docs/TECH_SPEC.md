@@ -1,5 +1,11 @@
 # Technical Spec Overview — Codex Orchestrator Projects
 
+## Task 0918 — Subagent Delegation Enforcement
+- Primary Doc: `docs/TECH_SPEC-subagent-delegation-enforcement.md`
+- Run Manifest Link: `.runs/0918-subagent-delegation-enforcement/cli/2025-12-30T16-53-35-423Z-88c50e5f/manifest.json`.
+- Metrics / State Snapshots: `.runs/0918-subagent-delegation-enforcement/metrics.json`, `out/0918-subagent-delegation-enforcement/state.json`.
+- Checklist Mirror: `tasks/tasks-0918-subagent-delegation-enforcement.md`, `docs/TASKS.md` (0918 section), `.agent/task/0918-subagent-delegation-enforcement.md`.
+
 ## Task 0801 — Dead Code Pruning & Evidence
 - Primary Doc: `docs/TECH_SPEC-dead-code-pruning.md`
 - Run Manifest Link: `.runs/0801-dead-code-pruning/cli/2025-12-09T03-51-52-584Z-93e9a77f/manifest.json`.
