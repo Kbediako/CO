@@ -13,9 +13,9 @@
 - [x] Mirrors updated in `docs/TASKS.md` and `.agent/task/0920-refactor-plan-implementation.md` - Evidence: this PR.
 
 ### Phase 1: Quick wins
-- [ ] Pipeline DRY consolidation planned + scoped - Evidence: tech spec update.
-- [ ] Checklist mirror automation plan + acceptance criteria - Evidence: tech spec update.
-- [ ] Legacy wrapper consolidation plan - Evidence: tech spec update.
+- [x] Pipeline DRY consolidation implemented - Evidence: `codex.orchestrator.json`, `orchestrator/src/cli/config/userConfig.ts`, `orchestrator/tests/UserConfigStageSets.test.ts`.
+- [x] Checklist mirror automation hardened for legacy docs blocks - Evidence: `scripts/docs-hygiene.ts`, `tests/docs-hygiene.spec.ts`.
+- [x] Legacy wrapper consolidation aligned on shared CLI resolver - Evidence: `scripts/lib/orchestrator-cli.sh`, `scripts/mcp-runner-start.sh`, `scripts/mcp-runner-poll.sh`, `scripts/run-mcp-diagnostics.sh`.
 
 ### Phase 2: Structural consolidation
 - [ ] Orchestrator package boundary plan - Evidence: tech spec update.
@@ -37,3 +37,7 @@
 
 ## Subagent Evidence
 - 0920-refactor-plan-implementation-docs-verify - `.runs/0920-refactor-plan-implementation-docs-verify/cli/2025-12-30T22-02-59-928Z-ff1875b4/manifest.json`.
+- 0920-refactor-plan-implementation-docs-sync-review - `.runs/0920-refactor-plan-implementation-docs-sync-review/cli/2025-12-30T22-23-08-516Z-87e4d8de/manifest.json`.
+- 0920-refactor-plan-implementation-pipeline-review - `.runs/0920-refactor-plan-implementation-pipeline-review/cli/2025-12-30T22-22-35-494Z-895dea10/manifest.json`.
+- 0920-refactor-plan-implementation-phase2-review - `.runs/0920-refactor-plan-implementation-phase2-review/cli/2025-12-30T22-34-56-017Z-723875aa/manifest.json`.
+- 0920-refactor-plan-implementation-phase3-review - `.runs/0920-refactor-plan-implementation-phase3-review/cli/2025-12-30T22-36-11-454Z-94ac6869/manifest.json`.

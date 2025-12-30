@@ -25,8 +25,9 @@ Source of truth for requirements: `tasks/0920-prd-refactor-plan-implementation.m
 
 #### Phase 1: Quick wins
 - Consolidate pipeline stage definitions via shared templates or single-source configuration.
-- Extend `scripts/docs-hygiene.ts --sync` to fully manage `docs/TASKS.md` and `.agent/task/*.md` mirrors.
-- Deprecate legacy MCP wrappers with a single shared resolver entrypoint.
+  - Add `stageSets` to `codex.orchestrator.json` and expand them in the config loader before pipeline resolution.
+- Extend `scripts/docs-hygiene.ts --sync` to manage checklist mirrors even when `docs/TASKS.md` sections predate managed markers.
+- Deprecate legacy MCP wrappers with a single shared resolver entrypoint (thin shell helpers only).
 
 #### Phase 2: Structural consolidation
 - Reduce overlap between `orchestrator/` and `packages/orchestrator/` (merge or rename for clarity).
@@ -62,8 +63,11 @@ Source of truth for requirements: `tasks/0920-prd-refactor-plan-implementation.m
 - Refactor Plan: `docs/REFRACTOR_PLAN.md`
 
 ## Open Questions
-- Which optional modules are actively used and must remain in the default runtime?
-- How should checklist managed blocks be introduced to avoid docs-hygiene failures?
+- Optional modules usage still needs downstream confirmation; in-repo usage indicates:
+  - Control-plane + scheduler run on every CLI pipeline.
+  - Learning is gated by `LEARNING_PIPELINE_ENABLED`.
+  - Cloud sync worker is not wired in CLI paths (no in-repo references).
+- Checklist managed blocks are now inserted during docs-hygiene sync when legacy sections are detected; confirm if reviewers want manual checkpoints.
 
 ## Approvals
 - Engineering: Pending
