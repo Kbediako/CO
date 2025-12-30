@@ -9,7 +9,7 @@
 
 ### Evidence Gates
 - [x] Docs-review manifest captured (pre-implementation) - Evidence: `.runs/0911-orchestrator-status-ui/cli/2025-12-23T07-59-47-613Z-344689f5/manifest.json`.
-- [x] Implementation review manifest captured (post-implementation) - Evidence: `.runs/0911-orchestrator-status-ui/cli/2025-12-24T05-07-59-073Z-e6a472e8/manifest.json`.
+- [x] Implementation review manifest captured (post-implementation) - Evidence: `.runs/0911-orchestrator-status-ui/cli/2025-12-30T00-27-43-100Z-9c2b8a6d/manifest.json`.
 
 ## Parent Tasks
 1. Planning and approvals
@@ -62,7 +62,7 @@
      - Files: packages/orchestrator-status-ui/styles.css, packages/orchestrator-status-ui/index.html, packages/orchestrator-status-ui/app.js, packages/orchestrator-status-ui/favicon.svg
      - Commands: Local static server + manual QA.
      - Acceptance: New palette applied consistently, favicon loads without 404s, and task rows are keyboard-selectable.
-     - [x] Status: Complete - Evidence: `.runs/0911-orchestrator-status-ui/cli/2025-12-29T23-57-33-834Z-548d594f/manifest.json`.
+     - [x] Status: Complete - Evidence: `.runs/0911-orchestrator-status-ui/cli/2025-12-29T23-57-33-834Z-548d594f/manifest.json`, `.runs/0911-orchestrator-status-ui/cli/2025-12-30T00-27-43-100Z-9c2b8a6d/manifest.json`.
 
 ## Relevant Files
 - `tasks/0911-prd-orchestrator-status-ui.md`
