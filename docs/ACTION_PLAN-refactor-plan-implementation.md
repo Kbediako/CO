@@ -1,8 +1,8 @@
 # Action Plan - Refactor Plan Implementation (Task 0920)
 
 ## Status Snapshot
-- Current Phase: Planning
-- Run Manifest Link: TBD
+- Current Phase: Phase 1 (Quick wins) complete
+- Run Manifest Link: `.runs/0920-refactor-plan-implementation/cli/2025-12-30T22-52-59-791Z-dd3e243a/manifest.json`
 - Approvals / Escalations: record in `tasks/index.json`
 
 ## Evidence Notes

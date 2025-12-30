@@ -24,7 +24,7 @@
 - [ ] Compatibility shim plan - Evidence: tech spec update.
 
 ## Validation + handoff
-- [ ] Implementation-gate manifest captured (post-implementation) - Evidence: `.runs/0920-refactor-plan-implementation/cli/<run-id>/manifest.json`.
+- [x] Implementation-gate manifest captured (post-implementation) - Evidence: `.runs/0920-refactor-plan-implementation/cli/2025-12-30T22-52-59-791Z-dd3e243a/manifest.json`.
 
 ## Relevant Files
 - `docs/REFRACTOR_PLAN.md`

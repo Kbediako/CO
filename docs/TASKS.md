@@ -221,7 +221,7 @@ Mirror status with `tasks/tasks-0918-subagent-delegation-enforcement.md` and `.a
 
 # Task List Snapshot — Refactor Plan Implementation Docs (0920)
 
-- Update - Planning collateral drafted (PRD/tech spec/action plan/checklist/mini-spec); docs-review manifest captured at `.runs/0920-refactor-plan-implementation/cli/2025-12-30T22-03-29-881Z-82e0a68d/manifest.json`.
+- Update - Phase 1 quick wins shipped; docs-review manifest captured at `.runs/0920-refactor-plan-implementation/cli/2025-12-30T22-03-29-881Z-82e0a68d/manifest.json`; implementation-gate manifest captured at `.runs/0920-refactor-plan-implementation/cli/2025-12-30T22-52-59-791Z-dd3e243a/manifest.json`.
 
 <!-- docs-sync:begin 0920-refactor-plan-implementation -->
 ## Checklist Mirror
@@ -249,7 +249,7 @@ Mirror status with `tasks/tasks-0920-refactor-plan-implementation.md` and `.agen
 - [ ] Compatibility shim plan - Evidence: tech spec update.
 
 ### Validation + handoff
-- [ ] Implementation-gate manifest captured (post-implementation) - Evidence: `.runs/0920-refactor-plan-implementation/cli/<run-id>/manifest.json`.
+- [x] Implementation-gate manifest captured (post-implementation) - Evidence: `.runs/0920-refactor-plan-implementation/cli/2025-12-30T22-52-59-791Z-dd3e243a/manifest.json`.
 
 ## Relevant Files
 - `docs/REFRACTOR_PLAN.md`
