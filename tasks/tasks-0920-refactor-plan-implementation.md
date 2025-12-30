@@ -9,7 +9,7 @@
 - [x] Tech spec drafted - Evidence: `docs/TECH_SPEC-refactor-plan-implementation.md`.
 - [x] Action plan drafted - Evidence: `docs/ACTION_PLAN-refactor-plan-implementation.md`.
 - [x] Mini-spec stub created - Evidence: `tasks/specs/0920-refactor-plan-implementation.md`.
-- [x] Docs-review manifest captured (pre-implementation) - Evidence: `.runs/0920-refactor-plan-implementation/cli/2025-12-30T22-03-29-881Z-82e0a68d/manifest.json`.
+- [x] Docs-review manifest captured (pre-implementation) - Evidence: `.runs/0920-refactor-plan-implementation/cli/2025-12-30T22-03-29-881Z-82e0a68d/manifest.json`, `.runs/0920-refactor-plan-implementation/cli/2025-12-30T23-18-24-223Z-413557d2/manifest.json`.
 - [x] Mirrors updated in `docs/TASKS.md` and `.agent/task/0920-refactor-plan-implementation.md` - Evidence: this PR.
 
 ### Phase 1: Quick wins
@@ -18,15 +18,15 @@
 - [x] Legacy wrapper consolidation aligned on shared CLI resolver - Evidence: `scripts/lib/orchestrator-cli.sh`, `scripts/mcp-runner-start.sh`, `scripts/mcp-runner-poll.sh`, `scripts/run-mcp-diagnostics.sh`.
 
 ### Phase 2: Structural consolidation
-- [ ] Orchestrator package boundary plan - Evidence: tech spec update.
-- [ ] Shared package reduction plan - Evidence: tech spec update.
+- [x] Orchestrator package boundary plan - Evidence: `packages/orchestrator/src/index.ts`, `orchestrator/src/cli/services/execRuntime.ts`, `orchestrator/src/cli/services/commandRunner.ts`, `orchestrator/src/privacy/guard.ts`.
+- [x] Shared package reduction plan - Evidence: `packages/orchestrator/src/exec/stdio.ts`, `packages/shared/streams/stdio.ts`, `packages/orchestrator/src/exec/unified-exec.ts`.
 
 ### Phase 3: Optional modularization
-- [ ] Optional module extraction plan - Evidence: tech spec update.
-- [ ] Compatibility shim plan - Evidence: tech spec update.
+- [x] Optional module extraction plan - Evidence: `orchestrator/src/cli/exec/learning.ts`.
+- [x] Compatibility shim plan - Evidence: `packages/shared/streams/stdio.ts`.
 
 ### Validation + handoff
-- [x] Implementation-gate manifest captured (post-implementation) - Evidence: `.runs/0920-refactor-plan-implementation/cli/2025-12-30T22-52-59-791Z-dd3e243a/manifest.json`.
+- [x] Implementation-gate manifest captured (post-implementation) - Evidence: `.runs/0920-refactor-plan-implementation/cli/2025-12-30T22-52-59-791Z-dd3e243a/manifest.json`, `.runs/0920-refactor-plan-implementation/cli/2025-12-30T23-23-30-858Z-95cd6736/manifest.json`.
 
 ## Relevant Files
 - `docs/REFRACTOR_PLAN.md`

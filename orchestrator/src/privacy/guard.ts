@@ -4,7 +4,7 @@ import type {
   StreamFrameGuardDecision,
   StreamFrameGuardResult,
   StreamFrameGuardContext
-} from '../../../packages/orchestrator/src/exec/handle-service.js';
+} from '../../../packages/orchestrator/src/index.js';
 
 export type PrivacyGuardMode = 'shadow' | 'enforce';
 
