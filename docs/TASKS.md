@@ -215,6 +215,10 @@ Mirror status with `tasks/tasks-0918-subagent-delegation-enforcement.md` and `.a
 ### Guardrails & handoff
 - [x] Guardrails complete — Evidence: `.runs/0918-subagent-delegation-enforcement/cli/2025-12-30T16-53-35-423Z-88c50e5f/manifest.json`.
 
+# Task List Snapshot — Repo-wide Refactor Plan (0919)
+
+- Update - Refactor plan drafted at `docs/REFRACTOR_PLAN.md`; docs-review manifest captured at `.runs/0919-refactor-plan/cli/2025-12-30T21-31-09-111Z-12be34c7/manifest.json`.
+
 # Task List Snapshot — Review Loop + DevTools Review Gate (0912)
 
 - Update - Implementation complete: implementation-gate-devtools manifest captured at `.runs/0912-review-loop-devtools-gate/cli/2025-12-24T08-56-47-578Z-9b49e1ee/manifest.json`.
