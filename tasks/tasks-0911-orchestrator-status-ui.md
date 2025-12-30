@@ -8,9 +8,9 @@
 - Start every task/subtask with `[ ]` and flip it to `[x]` when the acceptance criteria are met, citing the run manifest or log that documents completion.
 
 ### Evidence Gates
-- [x] Docs-review manifest captured (pre-implementation) - Evidence: `.runs/0911-orchestrator-status-ui/cli/2025-12-30T08-23-06-106Z-3bd5e70b/manifest.json`.
-- [x] DevTools QA manifest captured - Evidence: `.runs/0911-orchestrator-status-ui/cli/2025-12-30T09-15-57-261Z-d7387939/manifest.json`.
-- [x] Implementation review manifest captured (post-implementation) - Evidence: `.runs/0911-orchestrator-status-ui/cli/2025-12-30T09-23-34-986Z-8e6693c4/manifest.json`.
+- [x] Docs-review manifest captured (pre-implementation) - Evidence: `.runs/0911-orchestrator-status-ui/cli/2025-12-30T11-16-49-336Z-44f558c7/manifest.json`.
+- [x] DevTools QA manifest captured - Evidence: `.runs/0911-orchestrator-status-ui/cli/2025-12-30T11-39-05-349Z-c07276ff/manifest.json`.
+- [x] Implementation review manifest captured (post-implementation) - Evidence: `.runs/0911-orchestrator-status-ui/cli/2025-12-30T11-44-42-624Z-afae2840/manifest.json`.
 
 ## Parent Tasks
 1. Planning and approvals

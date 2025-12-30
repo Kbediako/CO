@@ -669,8 +669,11 @@ body::after {
   z-index: 40;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 10px 16px;
+  justify-content: center;
+  gap: 0;
+  padding: 10px 12px;
+  min-width: 44px;
+  min-height: 44px;
   border-radius: 999px;
   border: 1px solid var(--border);
   background: linear-gradient(140deg, rgba(242, 163, 58, 0.2), rgba(12, 16, 22, 0.96));
