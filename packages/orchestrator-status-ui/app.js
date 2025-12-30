@@ -301,6 +301,9 @@ function renderTaskTable(tasks) {
     .map((task) => {
       const isSelected = task.task_id === state.selectedTaskId;
       const updated = formatTimestamp(task.last_update);
+      const approvalsPending = Number(task.approvals_pending || 0);
+      const approvalsTotal = Number(task.approvals_total || 0);
+      const approvalsDisplay = approvalsPending > 0 ? approvalsPending : approvalsTotal;
       return `<tr data-task-id="${escapeHtml(task.task_id)}" class="${isSelected ? 'selected' : ''}" tabindex="0" aria-selected="${isSelected}">
         <td>
           <span class="task-id">${escapeHtml(task.task_id)}</span>
@@ -309,7 +312,7 @@ function renderTaskTable(tasks) {
         <td>${bucketBadge(task.bucket)}</td>
         <td><span class="status-pill">${escapeHtml(task.status || 'unknown')}</span></td>
         <td>${escapeHtml(updated)}</td>
-        <td>${Number(task.approvals_pending || 0)}</td>
+        <td>${approvalsDisplay}</td>
         <td>${escapeHtml(task.summary || '—')}</td>
       </tr>`;
     })
@@ -354,6 +357,10 @@ function renderRunDetail(run, task) {
     : '<div class="muted">No stage data available.</div>';
 
   const heartbeatLabel = run.heartbeat_at ? (run.heartbeat_stale ? 'Stale' : 'Fresh') : '—';
+  const approvalsPending = Number(run.approvals_pending || 0);
+  const approvalsTotal = Number(run.approvals_total || 0);
+  const approvalsLabel =
+    approvalsTotal > 0 ? `${approvalsPending} pending / ${approvalsTotal} total` : `${approvalsPending} pending`;
 
   elements.runDetail.innerHTML = `
     <div class="key-value">
@@ -372,7 +379,7 @@ function renderRunDetail(run, task) {
       <div class="key">Completed</div>
       <div class="value">${escapeHtml(formatTimestamp(run.completed_at))}</div>
       <div class="key">Approvals</div>
-      <div class="value">${Number(run.approvals_pending || 0)} pending</div>
+      <div class="value">${approvalsLabel}</div>
       <div class="key">Heartbeat</div>
       <div class="value">${heartbeatLabel}</div>
     </div>

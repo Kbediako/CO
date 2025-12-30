@@ -159,6 +159,13 @@ function countPendingApprovals(approvals) {
   return approvals.filter((entry) => isPendingApproval(entry)).length;
 }
 
+function countTotalApprovals(approvals) {
+  if (!Array.isArray(approvals)) {
+    return 0;
+  }
+  return approvals.length;
+}
+
 function isPendingApproval(entry) {
   if (!entry || typeof entry !== 'object') {
     return false;
@@ -180,6 +187,41 @@ function isPendingApproval(entry) {
     return true;
   }
   return false;
+}
+
+function approvalKey(entry) {
+  if (!entry || typeof entry !== 'object') {
+    return null;
+  }
+  const id = entry.id ?? entry.approval_id ?? entry.approvalId;
+  if (typeof id === 'string' && id.trim()) {
+    return id.trim();
+  }
+  const actor = typeof entry.actor === 'string' ? entry.actor.trim() : '';
+  const timestamp = typeof entry.timestamp === 'string' ? entry.timestamp.trim() : '';
+  if (actor || timestamp) {
+    return `${actor}|${timestamp}`;
+  }
+  return null;
+}
+
+function mergeApprovals(primary, secondary) {
+  const merged = Array.isArray(primary) ? [...primary] : [];
+  if (!Array.isArray(secondary)) {
+    return merged;
+  }
+  const seen = new Set(merged.map(approvalKey).filter(Boolean));
+  for (const entry of secondary) {
+    const key = approvalKey(entry);
+    if (key && seen.has(key)) {
+      continue;
+    }
+    if (key) {
+      seen.add(key);
+    }
+    merged.push(entry);
+  }
+  return merged;
 }
 
 function hasStartedCommands(commands) {
@@ -369,10 +411,73 @@ function normalizeLegacyManifest(manifest, manifestPath, taskKey) {
   };
 }
 
+function deriveDesignStatus(stages) {
+  if (!Array.isArray(stages) || stages.length === 0) {
+    return 'succeeded';
+  }
+  const statuses = stages.map((stage) => normalizeStatus(stage?.status));
+  if (statuses.some((status) => status === 'failed')) {
+    return 'failed';
+  }
+  if (statuses.some((status) => status && !['succeeded', 'skipped'].includes(status))) {
+    return 'in_progress';
+  }
+  return 'succeeded';
+}
+
+function normalizeDesignRun(run, runIdFallback) {
+  const runId = run?.run_id ?? run?.runId ?? runIdFallback ?? null;
+  const taskId = run?.task_id ?? run?.taskId ?? null;
+  const generatedAt = run?.generated_at ?? run?.summary?.generated_at ?? null;
+  const stages = Array.isArray(run?.stages)
+    ? run.stages.map((stage) => ({
+        id: stage?.id ?? stage?.stage ?? stage?.title ?? 'stage',
+        title: stage?.title ?? stage?.id ?? stage?.stage ?? 'Stage',
+        status: stage?.status ?? 'pending',
+        started_at: stage?.started_at ?? null,
+        completed_at: stage?.completed_at ?? null,
+        duration_ms: durationMs(stage?.started_at, stage?.completed_at)
+      }))
+    : [];
+
+  return {
+    task_id: taskId,
+    run_id: runId,
+    status: deriveDesignStatus(run?.stages),
+    status_detail: null,
+    started_at: generatedAt,
+    completed_at: generatedAt,
+    updated_at: generatedAt,
+    heartbeat_at: null,
+    heartbeat_stale_after_seconds: null,
+    approvals: Array.isArray(run?.approvals) ? run.approvals : [],
+    commands: [],
+    stages,
+    summary: null,
+    links: {
+      manifest: run?.manifest ?? null,
+      log: null
+    },
+    source: 'design'
+  };
+}
+
 async function listDirectories(dirPath) {
   try {
     const entries = await fs.readdir(dirPath, { withFileTypes: true });
     return entries.filter((entry) => entry.isDirectory()).map((entry) => entry.name);
+  } catch (error) {
+    if (error.code === 'ENOENT') {
+      return [];
+    }
+    throw error;
+  }
+}
+
+async function listFiles(dirPath) {
+  try {
+    const entries = await fs.readdir(dirPath, { withFileTypes: true });
+    return entries.filter((entry) => entry.isFile()).map((entry) => entry.name);
   } catch (error) {
     if (error.code === 'ENOENT') {
       return [];
@@ -399,6 +504,25 @@ function selectLatestRunRecord(runs) {
     return String(b?.runId ?? '').localeCompare(String(a?.runId ?? ''));
   });
   return sorted[0] ?? null;
+}
+
+async function resolveLatestDesignRun(taskKey) {
+  const runsPath = path.join(outRoot, taskKey, 'design', 'runs');
+  const runFiles = (await listFiles(runsPath)).filter((name) => name.endsWith('.json'));
+  if (runFiles.length === 0) {
+    return null;
+  }
+  const runIds = runFiles.map((name) => name.replace(/\.json$/, ''));
+  const latestRunId = pickLatestRunId(runIds);
+  if (!latestRunId) {
+    return null;
+  }
+  const runPath = path.join(runsPath, `${latestRunId}.json`);
+  const run = await readJson(runPath);
+  if (!run) {
+    return null;
+  }
+  return { run, runPath, runId: latestRunId };
 }
 
 function findManifestArtifactPath(runRecord) {
@@ -485,6 +609,23 @@ async function resolveLatestRun(taskKey) {
   }
 
   return null;
+}
+
+function shouldMergeDesignApprovals(run, designRun) {
+  if (!run || !designRun) {
+    return false;
+  }
+  if (run.source === 'design') {
+    return false;
+  }
+  const runId = run.run_id ?? null;
+  const designRunId = designRun.run_id ?? designRun.runId ?? null;
+  if (runId && designRunId && runId === designRunId) {
+    return true;
+  }
+  const runManifest = run.links?.manifest ?? null;
+  const designManifest = designRun.manifest ?? null;
+  return Boolean(runManifest && designManifest && runManifest === designManifest);
 }
 
 async function resolveLatestRunForTask(candidates) {
@@ -767,11 +908,24 @@ async function buildDataset(options) {
     }
 
     const resolved = await resolveLatestRunForTask(resolveTaskCandidates(item));
+    const designRun = await resolveLatestDesignRun(taskKey);
     let normalizedRun =
       resolved.run && resolved.run.task_id && resolved.run.task_id !== taskKey
         ? { ...resolved.run, task_id: taskKey }
         : resolved.run;
     let resolvedKey = resolved.resolvedKey;
+
+    if (!normalizedRun && designRun?.run) {
+      normalizedRun = normalizeDesignRun(designRun.run, designRun.runId);
+      resolvedKey = taskKey;
+    }
+
+    if (normalizedRun && designRun?.run && shouldMergeDesignApprovals(normalizedRun, designRun.run)) {
+      normalizedRun = {
+        ...normalizedRun,
+        approvals: mergeApprovals(normalizedRun.approvals, designRun.run.approvals)
+      };
+    }
 
     if (!normalizedRun) {
       const syntheticRun = buildSyntheticRunFromTask(item, taskKey);
@@ -783,6 +937,7 @@ async function buildDataset(options) {
     const bucketInfo = classifyTaskBucket(normalizedRun, { now });
     const summary = buildTaskSummary(normalizedRun);
     const lastUpdate = normalizedRun?.updated_at ?? normalizedRun?.completed_at ?? normalizedRun?.started_at ?? null;
+    const approvalsTotal = countTotalApprovals(normalizedRun?.approvals);
 
     const taskEntry = {
       task_id: taskKey,
@@ -793,6 +948,7 @@ async function buildDataset(options) {
       last_update: lastUpdate,
       latest_run_id: normalizedRun?.run_id ?? null,
       approvals_pending: bucketInfo.approvals_pending,
+      approvals_total: approvalsTotal,
       summary
     };
 
@@ -802,6 +958,7 @@ async function buildDataset(options) {
         ...normalizedRun,
         links,
         approvals_pending: bucketInfo.approvals_pending,
+        approvals_total: approvalsTotal,
         heartbeat_stale: bucketInfo.heartbeat_stale
       };
 

@@ -214,6 +214,7 @@ Mirror status with `tasks/tasks-0912-review-loop-devtools-gate.md` and `.agent/t
 
 # Task List Snapshot - Orchestrator Status UI (0911)
 
+- Update - Signals icon-only toggle + approvals totals from design runs; docs-review/DevTools QA/implementation gate captured at `.runs/0911-orchestrator-status-ui/cli/2025-12-30T11-16-49-336Z-44f558c7/manifest.json`, `.runs/0911-orchestrator-status-ui/cli/2025-12-30T11-39-05-349Z-c07276ff/manifest.json`, `.runs/0911-orchestrator-status-ui/cli/2025-12-30T11-44-42-624Z-afae2840/manifest.json`.
 - Update - Restore focus handoff to avoid aria-hidden warning on run modal/Signals panel close; DevTools QA + implementation gate captured at `.runs/0911-orchestrator-status-ui/cli/2025-12-30T09-15-57-261Z-d7387939/manifest.json` and `.runs/0911-orchestrator-status-ui/cli/2025-12-30T09-23-34-986Z-8e6693c4/manifest.json`.
 - Update - Run detail modal visibility + centering fix; docs-review/DevTools QA/implementation gate captured at `.runs/0911-orchestrator-status-ui/cli/2025-12-30T08-23-06-106Z-3bd5e70b/manifest.json`, `.runs/0911-orchestrator-status-ui/cli/2025-12-30T08-23-29-563Z-64ed4a9e/manifest.json`, `.runs/0911-orchestrator-status-ui/cli/2025-12-30T08-31-56-263Z-44640215/manifest.json`.
 - Update - Run-detail modal + footer status + signals positioning shipped; DevTools QA + implementation gate captured at `.runs/0911-orchestrator-status-ui/cli/2025-12-30T03-44-47-302Z-d69ee8eb/manifest.json` and `.runs/0911-orchestrator-status-ui/cli/2025-12-30T03-53-09-870Z-043c91fa/manifest.json`.
