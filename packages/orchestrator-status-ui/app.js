@@ -49,6 +49,17 @@ function isSelectionKey(event) {
   return event.key === 'Enter' || event.key === ' ' || event.key === 'Space' || event.key === 'Spacebar';
 }
 
+function isEditableTarget(target) {
+  if (!target || target.nodeType !== Node.ELEMENT_NODE) {
+    return false;
+  }
+  if (target.isContentEditable) {
+    return true;
+  }
+  const tagName = target.tagName;
+  return tagName === 'INPUT' || tagName === 'TEXTAREA' || tagName === 'SELECT';
+}
+
 function handleRowSelectionKey(event) {
   if (!isSelectionKey(event)) {
     return;
@@ -84,6 +95,13 @@ elements.taskTableBody.addEventListener('focusin', (event) => {
     return;
   }
   state.focusedTaskId = row.dataset.taskId;
+});
+
+elements.taskTableBody.addEventListener('focusout', (event) => {
+  const nextFocus = event.relatedTarget;
+  if (!nextFocus || !elements.taskTableBody.contains(nextFocus)) {
+    state.focusedTaskId = null;
+  }
 });
 
 elements.taskFilter.addEventListener('change', (event) => {
@@ -123,6 +141,9 @@ elements.sideOverlay.addEventListener('click', () => {
 document.addEventListener('keydown', (event) => {
   if (event.key === 'Escape' && state.sideOpen) {
     setSidePanelState(false);
+    return;
+  }
+  if (isEditableTarget(event.target)) {
     return;
   }
   if (!isSelectionKey(event)) {

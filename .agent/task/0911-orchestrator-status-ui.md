@@ -21,4 +21,4 @@
 - [x] Static UI and styles built — Evidence: `.runs/0911-orchestrator-status-ui/cli/2025-12-24T05-07-59-073Z-e6a472e8/manifest.json`.
 
 ## Post-launch polish
-- [x] UI refresh, tuned status colors, favicon, and keyboard selection — Evidence: `.runs/0911-orchestrator-status-ui/cli/2025-12-29T23-57-33-834Z-548d594f/manifest.json`, `.runs/0911-orchestrator-status-ui/cli/2025-12-30T00-27-43-100Z-9c2b8a6d/manifest.json`.
+- [x] UI refresh, tuned status colors, favicon, and keyboard selection — Evidence: `.runs/0911-orchestrator-status-ui/cli/2025-12-29T23-57-33-834Z-548d594f/manifest.json`, `.runs/0911-orchestrator-status-ui/cli/2025-12-30T01-23-39-016Z-e0c9d909/manifest.json`, `.runs/0911-orchestrator-status-ui/cli/2025-12-30T00-27-43-100Z-9c2b8a6d/manifest.json`, `.runs/0911-orchestrator-status-ui/cli/2025-12-30T01-33-59-187Z-5f123a71/manifest.json`.
