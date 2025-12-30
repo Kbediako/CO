@@ -16,7 +16,7 @@
 ### Current State
 - DevTools support exists only in the review gate (`implementation-gate-devtools`) and uses `CODEX_REVIEW_DEVTOOLS=1`.
 - The repo contains a devtools helper script (`scripts/codex-devtools.sh`), but `scripts/` is not shipped in the npm package.
-- `doctor` checks optional deps (Playwright-class), but does not validate DevTools MCP/skill availability.
+- `doctor` reports DevTools MCP/skill readiness (config + skill presence), but does not perform a live MCP handshake.
 - Users do not have a dedicated, documented frontend testing pipeline.
 
 ### Proposed Changes
@@ -39,7 +39,7 @@
 
 #### Doctor readiness checks
 - Extend `codex-orchestrator doctor` to:
-  - Detect the DevTools MCP/skill availability (e.g., `chrome-devtools`).
+  - Detect the DevTools MCP/skill availability (e.g., `chrome-devtools`) and MCP config presence.
   - Emit actionable setup steps (expected skill path + `codex` CLI configuration example).
   - Report Playwright-class optional deps when needed for browser flows.
   - Note: readiness is a filesystem/skill presence check, not a live MCP handshake.
@@ -91,7 +91,7 @@
 - Metrics / State Snapshots: `.runs/0915-frontend-testing-core/metrics.json`, `out/0915-frontend-testing-core/state.json`
 
 ## Open Questions
-- Do we require a hard failure when devtools are missing, or allow a non-devtools fallback run?
+- None. Devtools-enabled runs hard-fail when readiness is missing (no fallback).
 
 ## Approvals
 - Engineering: approved (2025-12-29)

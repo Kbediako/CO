@@ -14,6 +14,7 @@ import { evaluateInteractiveGate } from '../orchestrator/src/cli/utils/interacti
 import { buildSelfCheckResult } from '../orchestrator/src/cli/selfCheck.js';
 import { initCodexTemplates, formatInitSummary } from '../orchestrator/src/cli/init.js';
 import { runDoctor, formatDoctorSummary } from '../orchestrator/src/cli/doctor.js';
+import { formatDevtoolsSetupSummary, runDevtoolsSetup } from '../orchestrator/src/cli/devtoolsSetup.js';
 import { loadPackageInfo } from '../orchestrator/src/cli/utils/packageInfo.js';
 import { serveMcp } from '../orchestrator/src/cli/mcp.js';
 
@@ -61,6 +62,9 @@ async function main(): Promise<void> {
         break;
       case 'doctor':
         await handleDoctor(args);
+        break;
+      case 'devtools':
+        await handleDevtools(args);
         break;
       case 'mcp':
         await handleMcp(args);
@@ -428,6 +432,31 @@ async function handleDoctor(rawArgs: string[]): Promise<void> {
   }
 }
 
+async function handleDevtools(rawArgs: string[]): Promise<void> {
+  const { positionals, flags } = parseArgs(rawArgs);
+  const subcommand = positionals.shift();
+  if (!subcommand) {
+    throw new Error('devtools requires a subcommand (setup).');
+  }
+  if (subcommand !== 'setup') {
+    throw new Error(`Unknown devtools subcommand: ${subcommand}`);
+  }
+  const format = (flags['format'] as string | undefined) === 'json' ? 'json' : 'text';
+  const apply = Boolean(flags['yes']);
+  if (format === 'json' && apply) {
+    throw new Error('devtools setup does not support --format json with --yes.');
+  }
+  const result = await runDevtoolsSetup({ apply });
+  if (format === 'json') {
+    console.log(JSON.stringify(result, null, 2));
+    return;
+  }
+  const summary = formatDevtoolsSetupSummary(result);
+  for (const line of summary) {
+    console.log(line);
+  }
+}
+
 async function handleMcp(rawArgs: string[]): Promise<void> {
   const { positionals, flags } = parseArgs(rawArgs);
   const subcommand = positionals.shift();
@@ -607,6 +636,9 @@ Commands:
   self-check [--format json]
   init codex [--cwd <path>] [--force]
   doctor [--format json]
+  devtools setup          Print DevTools MCP setup instructions.
+    --yes                 Apply setup by running "codex mcp add ...".
+    --format json         Emit machine-readable output (dry-run only).
   mcp serve [--repo <path>] [--dry-run] [-- <extra args>]
   version | --version
 

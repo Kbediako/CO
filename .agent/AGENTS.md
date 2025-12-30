@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp 5986df02b8c633beeca7ee56824a25e7ef2c1f8a685f4d41c530f62fffa30293 -->
+<!-- codex:instruction-stamp d583a54f6cdb5d491ea164c7d8d7da23cf5490b3c4defbd57ba4bf6393f7b3df -->
 # Agent Enablement
 
 ## Added by Bootstrap 2025-10-16
@@ -48,7 +48,8 @@ Note: pipelines already set `CODEX_NON_INTERACTIVE=1`; keep it for shortcut runs
 - Default-off DevTools: `CODEX_NON_INTERACTIVE=1 npx codex-orchestrator start frontend-testing --format json --no-interactive --task <task-id>`.
 - DevTools-enabled: `CODEX_NON_INTERACTIVE=1 npx codex-orchestrator start frontend-testing-devtools --format json --no-interactive --task <task-id>` or `CODEX_NON_INTERACTIVE=1 codex-orchestrator frontend-test --devtools`.
 - Shortcut: `CODEX_NON_INTERACTIVE=1 codex-orchestrator frontend-test` runs the `frontend-testing` pipeline with DevTools off unless `--devtools` is set.
-- Readiness check: `codex-orchestrator doctor --format json` reports DevTools skill availability.
+- Readiness check: `codex-orchestrator doctor --format json` reports DevTools skill + MCP config availability.
+- Setup helper: `codex-orchestrator devtools setup` prints setup steps (`--yes` to apply).
 
 ### Read First Order
 1. `.agent/system/architecture.md`
@@ -65,6 +66,9 @@ Note: pipelines already set `CODEX_NON_INTERACTIVE=1`; keep it for shortcut runs
 - Run `node scripts/spec-guard.mjs --dry-run` before opening reviews to ensure specs stay in sync with code changes.
 - Default decision policy and autonomy rules live in `.agent/SOPs/agent-autonomy-defaults.md`.
 - Use `.agent/task/templates/subagent-request-template.md` for subagent prompts and deliverables.
+- Orchestrator-first: use `codex-orchestrator` pipelines for planning, implementation, validation, and review; avoid ad-hoc command chains unless no manifest evidence is required.
+- Delegate scoped investigations to subagents with distinct task ids/worktrees; capture manifest evidence and summarize in the main run.
+- When writing PR summaries, avoid literal `\n` sequences; use `gh pr create --body-file` or a here-doc so line breaks render correctly in GitHub.
 
 ## Project 0303 — Codex Orchestrator Autonomy Enhancements
 - Set `MCP_RUNNER_TASK_ID=0303-orchestrator-autonomy` for all diagnostics and orchestrator executions; confirm manifests land in `.runs/0303-orchestrator-autonomy/cli/`.

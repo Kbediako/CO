@@ -169,6 +169,27 @@ Mirror status with `tasks/tasks-0916-npm-companion-package-publishability.md` an
 - [x] `node scripts/diff-budget.mjs` passes - Evidence: `.runs/0916-npm-companion-package-publishability/cli/2025-12-29T06-49-38-980Z-85ac2153/manifest.json`.
 - [x] `npm run review` captured with NOTES - Evidence: `.runs/0916-npm-companion-package-publishability/cli/2025-12-29T06-49-38-980Z-85ac2153/manifest.json`.
 
+# Task List Snapshot — DevTools Readiness + Orchestrator Usage Discipline (0917)
+
+- Update - Implementation complete: devtools readiness checks + setup helper shipped; guardrails captured at `.runs/0917-devtools-readiness-orchestrator-usage/cli/2025-12-29T23-17-34-838Z-d96e2cf4/manifest.json`.
+- Notes: Export `MCP_RUNNER_TASK_ID=0917-devtools-readiness-orchestrator-usage` before orchestrator commands. Guardrails required: `node scripts/spec-guard.mjs --dry-run`, `npm run build`, `npm run lint`, `npm run test`, `npm run docs:check`, `node scripts/diff-budget.mjs`, `npm run review`.
+
+## Checklist Mirror
+Mirror status with `tasks/tasks-0917-devtools-readiness-orchestrator-usage.md` and `.agent/task/0917-devtools-readiness-orchestrator-usage.md`. Keep `[ ]` until evidence is recorded.
+
+### Foundation
+- [x] Collateral drafted (PRD/tech spec/action plan/checklist/mini-spec) - Evidence: this commit.
+- [x] Docs-review manifest captured (pre-implementation) - Evidence: `.runs/0917-devtools-readiness-orchestrator-usage/cli/2025-12-29T22-15-44-073Z-e5467cda/manifest.json`.
+- [ ] Metrics/state snapshots updated - Evidence: `.runs/0917-devtools-readiness-orchestrator-usage/metrics.json`, `out/0917-devtools-readiness-orchestrator-usage/state.json`.
+- [x] Mirrors updated in `docs/TASKS.md`, `.agent/task/0917-devtools-readiness-orchestrator-usage.md`, and `tasks/index.json` - Evidence: this commit.
+- [x] PRD approval recorded in `tasks/index.json` gate metadata - Evidence: `.runs/0917-devtools-readiness-orchestrator-usage/cli/2025-12-29T22-15-44-073Z-e5467cda/manifest.json`.
+
+### Implementation
+- [x] DevTools readiness checks + setup helper added — Evidence: `orchestrator/src/cli/utils/devtools.ts`, `orchestrator/src/cli/doctor.ts`, `orchestrator/src/cli/devtoolsSetup.ts`, `bin/codex-orchestrator.ts`.
+- [x] Orchestrator-first SOP + agent docs updated — Evidence: `.agent/SOPs/agent-autonomy-defaults.md`, `.agent/AGENTS.md`, `docs/AGENTS.md`, `AGENTS.md`.
+- [x] Tests added for readiness + setup flows — Evidence: `orchestrator/tests/Doctor.test.ts`, `orchestrator/tests/DevtoolsSetup.test.ts`, `orchestrator/tests/FrontendTestingRunner.test.ts` (vitest run 2025-12-30).
+- [x] Guardrails complete — Evidence: `.runs/0917-devtools-readiness-orchestrator-usage/cli/2025-12-29T23-17-34-838Z-d96e2cf4/manifest.json`.
+
 # Task List Snapshot — Review Loop + DevTools Review Gate (0912)
 
 - Update - Implementation complete: implementation-gate-devtools manifest captured at `.runs/0912-review-loop-devtools-gate/cli/2025-12-24T08-56-47-578Z-9b49e1ee/manifest.json`.
@@ -193,7 +214,7 @@ Mirror status with `tasks/tasks-0912-review-loop-devtools-gate.md` and `.agent/t
 
 # Task List Snapshot - Orchestrator Status UI (0911)
 
-- Update - Implementation complete: aggregation + dashboard shipped; implementation-gate manifest captured at `.runs/0911-orchestrator-status-ui/cli/2025-12-24T05-07-59-073Z-e6a472e8/manifest.json`.
+- Update - Implementation complete: aggregation + dashboard shipped; DevTools QA + guardrails captured at `.runs/0911-orchestrator-status-ui/cli/2025-12-29T23-57-33-834Z-548d594f/manifest.json`, `.runs/0911-orchestrator-status-ui/cli/2025-12-30T01-23-39-016Z-e0c9d909/manifest.json`, `.runs/0911-orchestrator-status-ui/cli/2025-12-30T00-27-43-100Z-9c2b8a6d/manifest.json`, and `.runs/0911-orchestrator-status-ui/cli/2025-12-30T01-33-59-187Z-5f123a71/manifest.json`.
 - Notes: Export `MCP_RUNNER_TASK_ID=0911-orchestrator-status-ui` before orchestrator commands. Implementation gate runs `node scripts/spec-guard.mjs --dry-run`, `npm run build`, `npm run lint`, `npm run test`, `npm run docs:check`, `node scripts/diff-budget.mjs`, and `npm run review`.
 
 ## Checklist Mirror
@@ -216,6 +237,9 @@ Mirror status with `tasks/tasks-0911-orchestrator-status-ui.md` and `.agent/task
 ### Implementation (complete)
 - [x] Aggregation script built — Evidence: `.runs/0911-orchestrator-status-ui/cli/2025-12-24T05-07-59-073Z-e6a472e8/manifest.json`.
 - [x] Static UI and styles built — Evidence: `.runs/0911-orchestrator-status-ui/cli/2025-12-24T05-07-59-073Z-e6a472e8/manifest.json`.
+
+### Post-launch polish
+- [x] UI refresh, status palette tuning, favicon, and keyboard selection — Evidence: `.runs/0911-orchestrator-status-ui/cli/2025-12-29T23-57-33-834Z-548d594f/manifest.json`, `.runs/0911-orchestrator-status-ui/cli/2025-12-30T01-23-39-016Z-e0c9d909/manifest.json`, `.runs/0911-orchestrator-status-ui/cli/2025-12-30T00-27-43-100Z-9c2b8a6d/manifest.json`, `.runs/0911-orchestrator-status-ui/cli/2025-12-30T01-33-59-187Z-5f123a71/manifest.json`.
 
 # Task List Snapshot — Orchestrator Issue Validation & Prioritization (0901)
 

@@ -80,6 +80,7 @@ Use `npx codex-orchestrator resume --run <run-id>` to continue interrupted runs;
 - `codex-orchestrator mcp serve [--repo <path>] [--dry-run] [-- <extra args>]`: launch the MCP stdio server (delegates to `codex mcp-server`; stdout guard keeps protocol-only output, logs to stderr).
 - `codex-orchestrator init codex [--cwd <path>] [--force]`: copy starter templates into a repo (no overwrite unless `--force`).
 - `codex-orchestrator doctor [--format json]`: check optional tooling dependencies and print install commands.
+- `codex-orchestrator devtools setup [--yes]`: print DevTools MCP setup instructions (`--yes` applies `codex mcp add ...`).
 - `codex-orchestrator self-check --format json`: emit a safe JSON health payload for smoke tests.
 - `codex-orchestrator --version`: print the package version.
 
@@ -216,7 +217,7 @@ Optional prompt overrides:
 
 `--no-interactive` disables the HUD only; set `CODEX_NON_INTERACTIVE=1` when you need to suppress Codex prompts (e.g., shortcut runs or custom automation).
 
-Check readiness with `codex-orchestrator doctor --format json` (reports DevTools skill availability).
+Check readiness with `codex-orchestrator doctor --format json` (reports DevTools skill + MCP config availability). Use `codex-orchestrator devtools setup` to print setup steps.
 
 ## Mirror Workflows
 - `npm run mirror:fetch -- --project <name> [--dry-run] [--force]`: reads `packages/<project>/mirror.config.json` (origin, routes, asset roots, rewrite/block/allow lists), caches downloads **per project** under `.runs/<task>/mirror/<project>/cache`, strips tracker patterns, rewrites externals to `/external/<host>/...`, localizes OG/twitter preview images, rewrites share links off tracker-heavy hosts, and stages into `.runs/<task>/mirror/<project>/<timestamp>/staging/public` before promoting to `packages/<project>/public`. Non-origin assets fall back to Web Archive when the primary host is down; promotion is skipped if errors are detected unless `--force` is set. Manifests live at `.runs/<task>/mirror/<project>/<timestamp>/manifest.json` (warns when `MCP_RUNNER_TASK_ID` is unset; honors `compliance/permit.json` when present).
