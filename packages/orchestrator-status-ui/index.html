@@ -35,17 +35,6 @@
             <label for="searchInput">Search</label>
             <input id="searchInput" type="search" placeholder="Task, status, summary" />
           </div>
-          <div class="control">
-            <label>Sync</label>
-            <button id="refreshBtn" class="icon-button" type="button" aria-label="Refresh" title="Refresh">
-              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                <path d="M4 4v6h6" />
-                <path d="M20 20v-6h-6" />
-                <path d="M20 14a8 8 0 0 0-14-4" />
-                <path d="M4 10a8 8 0 0 0 14 4" />
-              </svg>
-            </button>
-          </div>
         </div>
       </header>
 
@@ -127,9 +116,26 @@
           <div id="activityPanel" class="panel-body"></div>
         </details>
       </aside>
-      <button id="sideToggle" class="side-toggle" type="button" aria-controls="sidePanel" aria-expanded="false" aria-label="Signals">
-        <span class="side-toggle-icon" aria-hidden="true">≡</span>
-      </button>
+      <div class="floating-controls">
+        <button id="refreshBtn" class="floating-toggle refresh-toggle" type="button" aria-label="Refresh" title="Refresh">
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M4 4v6h6" />
+            <path d="M20 20v-6h-6" />
+            <path d="M20 14a8 8 0 0 0-14-4" />
+            <path d="M4 10a8 8 0 0 0 14 4" />
+          </svg>
+        </button>
+        <button
+          id="sideToggle"
+          class="floating-toggle side-toggle"
+          type="button"
+          aria-controls="sidePanel"
+          aria-expanded="false"
+          aria-label="Signals"
+        >
+          <span class="side-toggle-icon" aria-hidden="true">≡</span>
+        </button>
+      </div>
 
       <footer class="footer">
         <div class="footer-left">
