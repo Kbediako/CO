@@ -217,7 +217,7 @@ Mirror status with `tasks/tasks-0918-subagent-delegation-enforcement.md` and `.a
 
 # Task List Snapshot — Repo-wide Refactor Plan (0919)
 
-- Update - Refactor plan drafted at `docs/REFRACTOR_PLAN.md`; docs-review manifest captured at `.runs/0919-refactor-plan/cli/2025-12-30T21-31-09-111Z-12be34c7/manifest.json`.
+- Update - Refactor plan drafted at `docs/REFRACTOR_PLAN.md`; docs-review manifest captured at `.runs/0919-refactor-plan/cli/2025-12-30T21-31-09-111Z-12be34c7/manifest.json`; implementation-gate manifest captured at `.runs/0919-refactor-plan/cli/2025-12-30T21-51-39-458Z-a9a82bc7/manifest.json`.
 
 # Task List Snapshot — Review Loop + DevTools Review Gate (0912)
 

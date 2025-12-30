@@ -9,5 +9,9 @@
 - [x] docs/TASKS.md updated with manifest path - Evidence: `docs/TASKS.md`.
 - [x] Task metadata recorded in `tasks/index.json` - Evidence: `tasks/index.json`.
 
+## Validation + handoff
+- [x] Implementation-gate manifest captured - Evidence: `.runs/0919-refactor-plan/cli/2025-12-30T21-51-39-458Z-a9a82bc7/manifest.json`.
+
 ## Subagent evidence
 - 0919-refactor-plan-research - `.runs/0919-refactor-plan-research/cli/2025-12-30T21-28-47-484Z-79893352/manifest.json`.
+- 0919-refactor-plan-docs-verify - `.runs/0919-refactor-plan-docs-verify/cli/2025-12-30T21-50-27-238Z-9ab17d8b/manifest.json`.

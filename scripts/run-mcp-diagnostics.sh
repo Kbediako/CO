@@ -45,11 +45,8 @@ while (($#)); do
 done
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-CLI="${ROOT}/node_modules/.bin/codex-orchestrator"
-
-if [[ ! -x "$CLI" ]]; then
-  CLI="${ROOT}/dist/bin/codex-orchestrator.js"
-fi
+source "${ROOT}/scripts/lib/orchestrator-cli.sh"
+CLI="$(resolve_orchestrator_cli "$ROOT")"
 
 START_ARGS=(start diagnostics "--approval-policy" "$APPROVAL_POLICY" --format json)
 START_OUTPUT="$(node "$CLI" "${START_ARGS[@]}")"

@@ -2,11 +2,8 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-CLI="${ROOT}/node_modules/.bin/codex-orchestrator"
-
-if [[ ! -x "$CLI" ]]; then
-  CLI="${ROOT}/dist/bin/codex-orchestrator.js"
-fi
+source "${ROOT}/scripts/lib/orchestrator-cli.sh"
+CLI="$(resolve_orchestrator_cli "$ROOT")"
 
 if [[ "${1:-}" == "--resume" ]]; then
   shift

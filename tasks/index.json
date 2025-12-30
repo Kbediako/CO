@@ -456,10 +456,10 @@
       "kind": "plan",
       "status": "succeeded",
       "gate": {
-        "phase": "refactor-plan-docs",
+        "phase": "refactor-plan-implementation",
         "status": "succeeded",
-        "log": ".runs/0919-refactor-plan/cli/2025-12-30T21-31-09-111Z-12be34c7/manifest.json",
-        "run_id": "2025-12-30T21-31-09-111Z-12be34c7"
+        "log": ".runs/0919-refactor-plan/cli/2025-12-30T21-51-39-458Z-a9a82bc7/manifest.json",
+        "run_id": "2025-12-30T21-51-39-458Z-a9a82bc7"
       },
       "created_at": "2025-12-30",
       "completed_at": "2025-12-30"
