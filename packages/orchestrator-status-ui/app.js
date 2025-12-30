@@ -37,7 +37,9 @@ const state = {
   },
   loading: false,
   sideOpen: false,
-  runOpen: false
+  runOpen: false,
+  sideReturnFocus: null,
+  runReturnFocus: null
 };
 
 elements.dataSource.textContent = `Data source: ${dataUrl}`;
@@ -445,6 +447,11 @@ function toggleSidePanel() {
 }
 
 function setSidePanelState(isOpen) {
+  if (isOpen) {
+    state.sideReturnFocus = captureActiveElement();
+  } else {
+    focusOutsideContainer(elements.sidePanel, state.sideReturnFocus, elements.sideToggle);
+  }
   state.sideOpen = isOpen;
   document.body.classList.toggle('side-open', isOpen);
   elements.sidePanel.classList.toggle('open', isOpen);
@@ -458,6 +465,13 @@ function openRunModal() {
 }
 
 function setRunModalState(isOpen) {
+  if (isOpen) {
+    state.runReturnFocus = captureActiveElement();
+  } else {
+    const fallbackRow =
+      elements.taskTableBody.querySelector('tr.selected') || elements.taskTableBody.querySelector('tr');
+    focusOutsideContainer(elements.runModal, state.runReturnFocus, fallbackRow);
+  }
   state.runOpen = isOpen;
   document.body.classList.toggle('modal-open', isOpen);
   elements.runModal.classList.toggle('open', isOpen);
@@ -466,6 +480,27 @@ function setRunModalState(isOpen) {
   elements.runOverlay.setAttribute('aria-hidden', String(!isOpen));
   if (isOpen) {
     elements.runClose.focus();
+  }
+}
+
+function captureActiveElement() {
+  return document.activeElement instanceof HTMLElement ? document.activeElement : null;
+}
+
+function focusOutsideContainer(container, preferred, fallback) {
+  const candidates = [preferred, fallback];
+  for (const candidate of candidates) {
+    if (!candidate || typeof candidate.focus !== 'function') {
+      continue;
+    }
+    if (container && container.contains(candidate)) {
+      continue;
+    }
+    if (!document.contains(candidate)) {
+      continue;
+    }
+    candidate.focus();
+    return;
   }
 }
 

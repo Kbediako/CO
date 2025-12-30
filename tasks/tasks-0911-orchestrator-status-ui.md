@@ -9,8 +9,8 @@
 
 ### Evidence Gates
 - [x] Docs-review manifest captured (pre-implementation) - Evidence: `.runs/0911-orchestrator-status-ui/cli/2025-12-30T08-23-06-106Z-3bd5e70b/manifest.json`.
-- [x] DevTools QA manifest captured - Evidence: `.runs/0911-orchestrator-status-ui/cli/2025-12-30T08-23-29-563Z-64ed4a9e/manifest.json`.
-- [x] Implementation review manifest captured (post-implementation) - Evidence: `.runs/0911-orchestrator-status-ui/cli/2025-12-30T08-31-56-263Z-44640215/manifest.json`.
+- [x] DevTools QA manifest captured - Evidence: `.runs/0911-orchestrator-status-ui/cli/2025-12-30T09-15-57-261Z-d7387939/manifest.json`.
+- [x] Implementation review manifest captured (post-implementation) - Evidence: `.runs/0911-orchestrator-status-ui/cli/2025-12-30T09-23-34-986Z-8e6693c4/manifest.json`.
 
 ## Parent Tasks
 1. Planning and approvals
