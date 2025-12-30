@@ -14,6 +14,9 @@ const elements = {
   kpiPending: document.getElementById('kpi-pending'),
   taskTableBody: document.getElementById('taskTableBody'),
   runDetail: document.getElementById('runDetail'),
+  runOverlay: document.getElementById('runOverlay'),
+  runModal: document.getElementById('runModal'),
+  runClose: document.getElementById('runClose'),
   codebasePanel: document.getElementById('codebasePanel'),
   activityPanel: document.getElementById('activityPanel'),
   dataSource: document.getElementById('dataSource'),
@@ -33,7 +36,8 @@ const state = {
     search: ''
   },
   loading: false,
-  sideOpen: false
+  sideOpen: false,
+  runOpen: false
 };
 
 elements.dataSource.textContent = `Data source: ${dataUrl}`;
@@ -42,7 +46,11 @@ function selectRow(row) {
   if (!row || !row.dataset.taskId) {
     return false;
   }
-  return selectTaskById(row.dataset.taskId, true);
+  const selected = selectTaskById(row.dataset.taskId, true);
+  if (selected) {
+    openRunModal();
+  }
+  return selected;
 }
 
 function isSelectionKey(event) {
@@ -126,6 +134,14 @@ elements.refreshBtn.addEventListener('click', () => {
   loadData();
 });
 
+elements.runClose.addEventListener('click', () => {
+  setRunModalState(false);
+});
+
+elements.runOverlay.addEventListener('click', () => {
+  setRunModalState(false);
+});
+
 elements.sideToggle.addEventListener('click', () => {
   toggleSidePanel();
 });
@@ -139,9 +155,15 @@ elements.sideOverlay.addEventListener('click', () => {
 });
 
 document.addEventListener('keydown', (event) => {
-  if (event.key === 'Escape' && state.sideOpen) {
-    setSidePanelState(false);
-    return;
+  if (event.key === 'Escape') {
+    if (state.runOpen) {
+      setRunModalState(false);
+      return;
+    }
+    if (state.sideOpen) {
+      setSidePanelState(false);
+      return;
+    }
   }
   if (isEditableTarget(event.target)) {
     return;
@@ -153,7 +175,9 @@ document.addEventListener('keydown', (event) => {
     return;
   }
   event.preventDefault();
-  selectTaskById(state.focusedTaskId, true);
+  if (selectTaskById(state.focusedTaskId, true)) {
+    openRunModal();
+  }
 });
 
 setInterval(() => {
@@ -427,6 +451,22 @@ function setSidePanelState(isOpen) {
   elements.sideOverlay.classList.toggle('open', isOpen);
   elements.sidePanel.setAttribute('aria-hidden', String(!isOpen));
   elements.sideToggle.setAttribute('aria-expanded', String(isOpen));
+}
+
+function openRunModal() {
+  setRunModalState(true);
+}
+
+function setRunModalState(isOpen) {
+  state.runOpen = isOpen;
+  document.body.classList.toggle('modal-open', isOpen);
+  elements.runModal.classList.toggle('open', isOpen);
+  elements.runOverlay.classList.toggle('open', isOpen);
+  elements.runModal.setAttribute('aria-hidden', String(!isOpen));
+  elements.runOverlay.setAttribute('aria-hidden', String(!isOpen));
+  if (isOpen) {
+    elements.runClose.focus();
+  }
 }
 
 function bucketBadge(bucket) {

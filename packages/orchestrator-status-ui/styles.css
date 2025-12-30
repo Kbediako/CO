@@ -32,6 +32,9 @@
   --space-4: 16px;
   --space-5: 24px;
   --space-6: 32px;
+  --footer-clearance: 56px;
+  --side-toggle-bottom: calc(var(--space-4) + var(--footer-clearance));
+  --side-panel-bottom: calc(var(--side-toggle-bottom) + 68px);
   --font-display: "Space Grotesk", "IBM Plex Sans", sans-serif;
   --font-body: "IBM Plex Sans", "Space Grotesk", sans-serif;
   --font-mono: "JetBrains Mono", "Fira Code", monospace;
@@ -60,7 +63,8 @@ body {
   line-height: 1.6;
 }
 
-body.side-open {
+body.side-open,
+body.modal-open {
   overflow: hidden;
 }
 
@@ -257,26 +261,30 @@ body::after {
   box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.35), 0 8px 0 rgba(6, 8, 12, 0.8);
 }
 
-.control.status {
-  justify-content: flex-end;
-  background: linear-gradient(160deg, rgba(12, 16, 22, 0.96), rgba(10, 13, 18, 0.98));
+.footer-left {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
 }
 
-.status-label {
-  font-size: 0.64rem;
-}
-
-.status-value {
-  font-size: 0.86rem;
-  color: var(--accent);
+.footer-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   font-family: var(--font-mono);
 }
 
-.status-value[data-state="syncing"] {
+.footer-status {
+  font-family: inherit;
+  color: var(--text);
+}
+
+.footer-status[data-state="syncing"] {
   color: var(--accent-2);
 }
 
-.status-value[data-state="error"] {
+.footer-status[data-state="error"] {
   color: var(--danger);
 }
 
@@ -395,30 +403,18 @@ body::after {
 
 .main-grid {
   display: grid;
-  grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-4);
   align-items: stretch;
 }
 
-.task-panel,
-.run-panel {
+.task-panel {
   min-height: clamp(520px, 72vh, 820px);
 }
 
 .task-panel {
   display: flex;
   flex-direction: column;
-}
-
-.run-panel {
-  display: flex;
-  flex-direction: column;
-}
-
-.run-panel .panel-body {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
 }
 
 .panel-header {
@@ -597,10 +593,74 @@ body::after {
   font-family: var(--font-mono);
 }
 
+.run-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(4, 6, 10, 0.72);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s var(--ease-pop);
+  z-index: 52;
+}
+
+.run-overlay.open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.run-modal {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%) scale(0.98);
+  width: min(920px, 92vw);
+  max-height: min(82vh, 760px);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  opacity: 0;
+  pointer-events: none;
+  transition: transform 0.2s var(--ease-pop), opacity 0.2s var(--ease-pop);
+  z-index: 55;
+}
+
+.run-modal.open {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translate(-50%, -50%) scale(1);
+}
+
+.run-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.run-modal-header .panel-header {
+  margin-bottom: 0;
+}
+
+.run-modal-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 6px;
+}
+
+.run-close {
+  border: 1px solid var(--border);
+  background: rgba(14, 18, 24, 0.9);
+  color: var(--text);
+  border-radius: 6px;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
 .side-toggle {
   position: fixed;
   right: 20px;
-  bottom: 20px;
+  bottom: var(--side-toggle-bottom);
   z-index: 40;
   display: inline-flex;
   align-items: center;
@@ -646,7 +706,7 @@ body::after {
 .side-panel {
   position: fixed;
   right: 20px;
-  bottom: 88px;
+  bottom: var(--side-panel-bottom);
   width: min(380px, 92vw);
   max-height: min(72vh, 640px);
   background: linear-gradient(150deg, rgba(20, 26, 34, 0.98), rgba(12, 16, 22, 0.98));
@@ -760,6 +820,9 @@ body::after {
 .footer {
   display: flex;
   justify-content: space-between;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
   color: var(--muted);
   font-size: 0.78rem;
   padding-top: var(--space-2);
@@ -796,13 +859,15 @@ body::after {
   .main-grid {
     grid-template-columns: 1fr;
   }
-  .task-panel,
-  .run-panel {
+  .task-panel {
     min-height: auto;
   }
 }
 
 @media (max-width: 720px) {
+  :root {
+    --footer-clearance: 72px;
+  }
   .app {
     padding: var(--space-4);
   }
@@ -820,15 +885,21 @@ body::after {
     flex-direction: column;
     gap: var(--space-2);
   }
+  .run-modal {
+    width: 94vw;
+    max-height: 86vh;
+    padding: var(--space-4);
+  }
+  .run-modal-body {
+    padding-right: 0;
+  }
   .side-panel {
     right: 12px;
-    bottom: 76px;
     width: calc(100vw - 24px);
     max-height: 70vh;
   }
   .side-toggle {
     right: 12px;
-    bottom: 12px;
   }
 }
 
