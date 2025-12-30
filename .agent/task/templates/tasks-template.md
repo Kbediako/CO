@@ -57,4 +57,4 @@
 - Spec Requirements:
 - Approvals Needed:
 - Links:
-- Subagent usage (if any): task ids + manifest paths.
+- Subagent usage (required): task ids + manifest paths (use `<task-id>-<stream>` naming).

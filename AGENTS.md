@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp 4bf1016d862165922686c6b347a11d70a9f6f7b4334a16a95c0d95262d9bb46c -->
+<!-- codex:instruction-stamp 2c315c7e433f5b1319a2230804da917aa8d241bc9ff04c6c35d2984aa277ef94 -->
 # Codex-Orchestrator Agent Handbook (Template)
 
 Use this repository as the wrapper that coordinates multiple Codex-driven projects. After cloning, replace placeholder metadata (task IDs, documents, SOPs) with values for each downstream initiative while keeping these shared guardrails in place.
@@ -7,13 +7,14 @@ Use this repository as the wrapper that coordinates multiple Codex-driven projec
 - Default execution mode is `mcp`.
 - Switch to cloud mode only if your task plan explicitly allows a parallel run and the reviewer records the override in the active run manifest.
 - Keep the safe approval profile (`read/edit/run/network`). Capture any escalation in `.runs/<task>/<timestamp>/manifest.json` under `approvals`.
+- Run `node scripts/delegation-guard.mjs` before requesting review; if delegation is not possible, set `DELEGATION_GUARD_OVERRIDE_REASON` and record the rationale in the task checklist.
 - Run `node scripts/spec-guard.mjs --dry-run` before requesting review. Update specs or refresh approvals when the guard fails.
 
 ## Orchestrator-First Workflow
 - Use `codex-orchestrator` pipelines for planning, implementation, validation, and review work that touches the repo.
 - Default to `docs-review` before implementation and `implementation-gate` (or `implementation-gate-devtools`) after code changes.
 - Reserve direct shell commands for lightweight discovery or one-off checks that do not require manifest evidence.
-- Delegate scoped investigations to subagents with distinct task ids/worktrees; capture manifest evidence and summarize in the main run.
+- Delegation is mandatory for top-level tasks: spawn at least one subagent run using `MCP_RUNNER_TASK_ID=<task-id>-<stream>`, capture manifest evidence, and summarize in the main run. Use `DELEGATION_GUARD_OVERRIDE_REASON` only when delegation is impossible and record the justification.
 
 ## Meta-Orchestration & Parallel Runs
 - **Definition:** “Parallel runs” means launching multiple `codex-orchestrator start ...` runs at the same time (separate processes). A single orchestrator run executes its pipeline stages serially.
@@ -39,6 +40,7 @@ Use this repository as the wrapper that coordinates multiple Codex-driven projec
 - Place downstream codebases or adapters under `packages/<project>` (or another top-level directory agreed upon by the team).
 - Store manifests, metrics, and state snapshots in `.runs/<task-id>/` and `out/<task-id>/` so each project keeps an isolated run history.
 - Set `MCP_RUNNER_TASK_ID=<task-id>` before launching orchestrator commands; this routes artifacts to the correct project directory.
+- Subagent task IDs must use the `<task-id>-<stream>` prefix so delegation evidence can be audited.
 - Log escalations and guardrail outcomes for each project run inside the associated manifest so reviewers can audit approvals per downstream codebase.
 
 ## Checklist Convention
@@ -62,16 +64,18 @@ Use this repository as the wrapper that coordinates multiple Codex-driven projec
 
 ## Build & Test Commands (defaults)
 Implementation work is not “complete” until you run (in order):
-1. `node scripts/spec-guard.mjs --dry-run`
-2. `npm run build`
-3. `npm run lint`
-4. `npm run test`
-5. `npm run docs:check`
-6. `node scripts/diff-budget.mjs`
-7. `npm run review`
+1. `node scripts/delegation-guard.mjs`
+2. `node scripts/spec-guard.mjs --dry-run`
+3. `npm run build`
+4. `npm run lint`
+5. `npm run test`
+6. `npm run docs:check`
+7. `node scripts/diff-budget.mjs`
+8. `npm run review`
 
 | Command | When to use | Notes |
 | --- | --- | --- |
+| `node scripts/delegation-guard.mjs` | Delegation enforcement | Requires at least one subagent manifest for top-level tasks; set `DELEGATION_GUARD_OVERRIDE_REASON` to bypass. |
 | `node scripts/spec-guard.mjs --dry-run` | Spec freshness validation | Blocks merges when touched specs are older than 30 days. |
 | `npm run build` | Build output | Compiles TypeScript to `dist/` (required by `docs:check`, `review`, and other wrappers). |
 | `npm run lint` | Pre-commit / review gates | Executes `npm run build:patterns` first so codemods compile. |

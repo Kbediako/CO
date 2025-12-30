@@ -7,6 +7,7 @@ Use this playbook when you (the coordinating agent) need to run multiple workstr
 2. **One task id per workstream.** Route artifacts with `MCP_RUNNER_TASK_ID=<task-id>-<stream>` (or pass `--task <id>` to `codex-orchestrator start <pipeline>`).
 3. **Workers stay narrow.** Each worker run should own a single area/subtask; the meta-orchestrator owns integration and final gates.
 4. **Evidence is first-class.** Record each run’s `.runs/<task-id>/cli/<run-id>/manifest.json` in your checklist notes.
+5. **Delegation is required.** Every top-level task must have at least one worker run before review gates proceed (use `DELEGATION_GUARD_OVERRIDE_REASON` only when delegation is impossible).
 
 ## Worktree setup
 ```bash

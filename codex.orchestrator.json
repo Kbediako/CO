@@ -8,6 +8,12 @@
       "stages": [
         {
           "kind": "command",
+          "id": "delegation-guard",
+          "title": "node scripts/delegation-guard.mjs",
+          "command": "node scripts/delegation-guard.mjs"
+        },
+        {
+          "kind": "command",
           "id": "build",
           "title": "npm run build",
           "command": "npm run build"
@@ -38,6 +44,12 @@
       "description": "Runs the required implementation validations (spec-guard, build, lint, test, docs:check, diff-budget) and launches the Codex review handoff, writing a single manifest for evidence.",
       "tags": ["implementation-gate"],
       "stages": [
+        {
+          "kind": "command",
+          "id": "delegation-guard",
+          "title": "node scripts/delegation-guard.mjs",
+          "command": "node scripts/delegation-guard.mjs"
+        },
         {
           "kind": "command",
           "id": "spec-guard",
@@ -95,6 +107,12 @@
       "stages": [
         {
           "kind": "command",
+          "id": "delegation-guard",
+          "title": "node scripts/delegation-guard.mjs",
+          "command": "node scripts/delegation-guard.mjs"
+        },
+        {
+          "kind": "command",
           "id": "spec-guard",
           "title": "node scripts/spec-guard.mjs --dry-run",
           "command": "node scripts/spec-guard.mjs --dry-run"
@@ -148,6 +166,12 @@
       "description": "Pre-implementation docs review: spec-guard, docs:check, and review (diff budget skipped).",
       "tags": ["docs-review"],
       "stages": [
+        {
+          "kind": "command",
+          "id": "delegation-guard",
+          "title": "node scripts/delegation-guard.mjs",
+          "command": "node scripts/delegation-guard.mjs"
+        },
         {
           "kind": "command",
           "id": "spec-guard",
@@ -208,6 +232,12 @@
       "stages": [
         {
           "kind": "command",
+          "id": "delegation-guard",
+          "title": "node scripts/delegation-guard.mjs",
+          "command": "node scripts/delegation-guard.mjs"
+        },
+        {
+          "kind": "command",
           "id": "build",
           "title": "npm run build",
           "command": "npm run build"
@@ -244,6 +274,12 @@
       "description": "Extracts design reference assets, stages Storybook-ready components, and records manifest evidence.",
       "tags": ["design", "reference"],
       "stages": [
+        {
+          "kind": "command",
+          "id": "delegation-guard",
+          "title": "node scripts/delegation-guard.mjs",
+          "command": "node scripts/delegation-guard.mjs"
+        },
         {
           "kind": "command",
           "id": "design-config",
@@ -315,6 +351,12 @@
       "stages": [
         {
           "kind": "command",
+          "id": "delegation-guard",
+          "title": "node scripts/delegation-guard.mjs",
+          "command": "node scripts/delegation-guard.mjs"
+        },
+        {
+          "kind": "command",
           "id": "design-config",
           "title": "Resolve design configuration",
           "command": "node dist/scripts/design/pipeline/prepare.js",
@@ -380,6 +422,12 @@
       "description": "Run three TF-GRPO epochs (~100 samples, train temp 0.7, eval temp 0.3, G>=2) and capture guardrail evidence.",
       "tags": ["tfgrpo-learning", "tfgrpo-learning-secondary"],
       "stages": [
+        {
+          "kind": "command",
+          "id": "delegation-guard",
+          "title": "node scripts/delegation-guard.mjs",
+          "command": "node scripts/delegation-guard.mjs"
+        },
         {
           "kind": "command",
           "id": "tfgrpo-loop",

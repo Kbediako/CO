@@ -2,6 +2,7 @@
 
 ## Task Id
 <id>
+- Naming: `<parent-task-id>-<stream>` (required for delegation guard)
 
 ## Objective
 <goal>

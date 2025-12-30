@@ -1,11 +1,11 @@
-<!-- codex:instruction-stamp 796a9f0343ee5adb73ff7565b659e6fdbbca4207eda874a152c323e8a2901200 -->
+<!-- codex:instruction-stamp ad489ce104a3a7c724423629c1e0199ad434ab5d83f5c794f092f09237decad7 -->
 # Repository Agent Guidance
 
 ## Project 0303 — Codex Orchestrator Autonomy Enhancements
 - Export `MCP_RUNNER_TASK_ID=0303-orchestrator-autonomy` so diagnostics land in `.runs/0303-orchestrator-autonomy/cli/` and mirrors sync across `/tasks`, `docs/`, and `.agent/`.
 - Store evidence under `.runs/0303-orchestrator-autonomy/cli/<run-id>/manifest.json`, metrics in `.runs/0303-orchestrator-autonomy/metrics.json`, and summaries in `out/0303-orchestrator-autonomy/state.json`.
 - Record any approval escalations in the manifest `approvals` array and cross-link when flipping checklist items.
-- Run `node scripts/spec-guard.mjs --dry-run` plus `npm run lint`, `npm run test`, `npm run eval:test` (if fixtures exist), and `node scripts/diff-budget.mjs` before reviewer hand-off; attach the manifest path documenting these runs.
+- Run `node scripts/delegation-guard.mjs`, `node scripts/spec-guard.mjs --dry-run`, `npm run lint`, `npm run test`, `npm run eval:test` (if fixtures exist), and `node scripts/diff-budget.mjs` before reviewer hand-off; attach the manifest path documenting these runs.
 
 ## Project 0202 — Codex Orchestrator Resilience Hardening
 - Existing manifests remain in `.runs/0202-orchestrator-hardening/cli/`; keep metrics/state snapshots in `.runs/0202-orchestrator-hardening/metrics.json` and `out/0202-orchestrator-hardening/state.json`.
@@ -24,7 +24,7 @@
 ## Orchestrator-First Default
 - Use `codex-orchestrator` pipelines for planning, implementation, validation, and review work that touches the repo.
 - Avoid ad-hoc command chains unless the work is a lightweight discovery step that does not require manifest evidence.
-- Delegate scoped investigations to subagents with distinct task ids/worktrees; capture manifest evidence and summarize in the main run.
+- Delegation is mandatory for top-level tasks: spawn at least one subagent run using `MCP_RUNNER_TASK_ID=<task-id>-<stream>`, capture manifest evidence, and summarize in the main run. Use `DELEGATION_GUARD_OVERRIDE_REASON` only when delegation is impossible and record the justification.
 
 ## PR Lifecycle (Top-Level Agents)
 - Open PRs for code/config changes and keep the scope tied to the active task.

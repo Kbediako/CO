@@ -431,6 +431,22 @@
       },
       "created_at": "2025-12-30",
       "completed_at": "2025-12-30"
+    },
+    {
+      "id": "0918",
+      "slug": "subagent-delegation-enforcement",
+      "title": "Subagent Delegation Enforcement",
+      "path": "tasks/0918-prd-subagent-delegation-enforcement.md",
+      "kind": "prd",
+      "status": "succeeded",
+      "gate": {
+        "phase": "subagent-delegation-enforcement-implementation",
+        "status": "succeeded",
+        "log": ".runs/0918-subagent-delegation-enforcement/cli/2025-12-30T16-53-35-423Z-88c50e5f/manifest.json",
+        "run_id": "2025-12-30T16-53-35-423Z-88c50e5f"
+      },
+      "created_at": "2025-12-31",
+      "completed_at": "2025-12-31"
     }
   ],
   "specs": []
