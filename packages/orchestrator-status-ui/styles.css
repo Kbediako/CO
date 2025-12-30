@@ -742,17 +742,6 @@ body::after {
   line-height: 1;
 }
 
-.refresh-toggle svg {
-  width: 18px;
-  height: 18px;
-  display: block;
-  stroke: currentColor;
-  stroke-width: 2;
-  fill: none;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
 .side-overlay {
   position: fixed;
   inset: 0;

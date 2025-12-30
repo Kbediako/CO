@@ -6,7 +6,6 @@ const elements = {
   taskFilter: document.getElementById('taskFilter'),
   bucketFilter: document.getElementById('bucketFilter'),
   searchInput: document.getElementById('searchInput'),
-  refreshBtn: document.getElementById('refreshBtn'),
   syncStatus: document.getElementById('syncStatus'),
   kpiActive: document.getElementById('kpi-active'),
   kpiOngoing: document.getElementById('kpi-ongoing'),
@@ -130,10 +129,6 @@ elements.bucketFilter.addEventListener('change', (event) => {
 elements.searchInput.addEventListener('input', (event) => {
   state.filters.search = event.target.value;
   render();
-});
-
-elements.refreshBtn.addEventListener('click', () => {
-  loadData();
 });
 
 elements.runClose.addEventListener('click', () => {
