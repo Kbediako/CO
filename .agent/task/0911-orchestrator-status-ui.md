@@ -2,6 +2,11 @@
 
 > Set `MCP_RUNNER_TASK_ID=0911-orchestrator-status-ui` for orchestrator commands. Mirror with `tasks/tasks-0911-orchestrator-status-ui.md` and `docs/TASKS.md`. Flip `[ ]` to `[x]` only with manifest evidence (for example `.runs/0911-orchestrator-status-ui/cli/2025-12-24T05-07-59-073Z-e6a472e8/manifest.json`).
 
+## Evidence gates
+- [x] Docs-review manifest captured (pre-implementation) — Evidence: `.runs/0911-orchestrator-status-ui/cli/2025-12-30T03-39-58-898Z-f21ea629/manifest.json`.
+- [x] DevTools QA manifest captured — Evidence: `.runs/0911-orchestrator-status-ui/cli/2025-12-30T03-44-47-302Z-d69ee8eb/manifest.json`.
+- [x] Implementation review manifest captured (post-implementation) — Evidence: `.runs/0911-orchestrator-status-ui/cli/2025-12-30T03-53-09-870Z-043c91fa/manifest.json`.
+
 ## Planning and approvals
 - [x] Mini-spec approved — Evidence: `tasks/specs/0911-orchestrator-status-ui.md`.
 - [x] PRD approval recorded in `tasks/index.json` gate metadata — Evidence: `.runs/0911-orchestrator-status-ui/cli/2025-12-23T07-59-47-613Z-344689f5/manifest.json`.

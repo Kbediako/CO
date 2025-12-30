@@ -39,10 +39,6 @@
             <label>Sync</label>
             <button id="refreshBtn" type="button">Refresh</button>
           </div>
-          <div class="control status">
-            <span class="status-label">Last update</span>
-            <span id="syncStatus" class="status-value" role="status" aria-live="polite">Waiting...</span>
-          </div>
         </div>
       </header>
 
@@ -88,12 +84,23 @@
             </table>
           </div>
         </div>
-
-        <div class="panel run-panel">
-          <div class="panel-header">Run Detail</div>
-          <div id="runDetail" class="panel-body"></div>
-        </div>
       </section>
+
+      <div id="runOverlay" class="run-overlay" aria-hidden="true"></div>
+      <div
+        id="runModal"
+        class="panel run-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-hidden="true"
+        aria-labelledby="runModalTitle"
+      >
+        <div class="run-modal-header">
+          <div id="runModalTitle" class="panel-header">Run Detail</div>
+          <button id="runClose" class="run-close" type="button" aria-label="Close run details">Close</button>
+        </div>
+        <div id="runDetail" class="panel-body run-modal-body"></div>
+      </div>
 
       <div id="sideOverlay" class="side-overlay" aria-hidden="true"></div>
       <aside id="sidePanel" class="side-panel" aria-hidden="true">
@@ -119,7 +126,13 @@
       </button>
 
       <footer class="footer">
-        <span id="dataSource">Data source: loading...</span>
+        <div class="footer-left">
+          <span id="dataSource">Data source: loading...</span>
+          <span class="footer-item">
+            Last update
+            <span id="syncStatus" class="footer-status" role="status" aria-live="polite">Waiting...</span>
+          </span>
+        </div>
         <span class="footer-note">Auto-refresh every few seconds</span>
       </footer>
     </div>
