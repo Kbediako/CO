@@ -14,7 +14,7 @@ import type {
   ExecEvent,
   ExecRetryEvent
 } from '../../../shared/events/types.js';
-import { createStdioTracker, type SequencedStdioChunk, type StdioStream } from '../../../shared/streams/stdio.js';
+import { createStdioTracker, type SequencedStdioChunk, type StdioStream } from './stdio.js';
 import { ExecSessionManager, type ExecSessionHandle, type ExecSessionLease } from './session-manager.js';
 import { RemoteExecHandleService, type ExecHandleDescriptor } from './handle-service.js';
 

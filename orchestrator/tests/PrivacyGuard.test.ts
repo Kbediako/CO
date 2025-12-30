@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { PrivacyGuard } from '../src/privacy/guard.js';
-import type { ExecStreamFrame } from '../../packages/orchestrator/src/exec/handle-service.js';
+import type { ExecStreamFrame } from '../../packages/orchestrator/src/index.js';
 
 function buildChunkFrame(data: string): ExecStreamFrame {
   return {

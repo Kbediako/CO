@@ -30,12 +30,18 @@ Source of truth for requirements: `tasks/0920-prd-refactor-plan-implementation.m
 - Deprecate legacy MCP wrappers with a single shared resolver entrypoint (thin shell helpers only).
 
 #### Phase 2: Structural consolidation
-- Reduce overlap between `orchestrator/` and `packages/orchestrator/` (merge or rename for clarity).
-- Collapse `packages/shared` where it is only used internally.
+- Reduce overlap between `orchestrator/` and `packages/orchestrator/` by tightening the public surface:
+  - Export handle-service types from `packages/orchestrator/src/index.ts` and update CLI imports to avoid deep package paths.
+- Collapse `packages/shared` where it is only used internally:
+  - Move `packages/shared/streams/stdio.ts` into packages/orchestrator/src/exec/stdio.ts.
+  - Keep a compatibility re-export in `packages/shared/streams/stdio.ts` during the transition.
 
 #### Phase 3: Optional modularization
-- Move optional modules into dynamic imports or standalone packages.
-- Preserve compatibility with feature flags and shims during transition.
+- Move optional modules into dynamic imports to avoid eager loading:
+  - Gate `orchestrator/src/learning/*` behind a lazy import in `orchestrator/src/cli/exec/learning.ts`.
+- Preserve compatibility with feature flags and shims during transition:
+  - Keep `LEARNING_PIPELINE_ENABLED` semantics unchanged.
+  - Maintain shim exports for relocated shared utilities until downstream usage is updated.
 
 ## Data Persistence / State Impact
 - Preserve manifest and checklist evidence paths during refactors.

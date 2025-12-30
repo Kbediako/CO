@@ -5,7 +5,7 @@ import type { ExecEvent, UnifiedExecRunResult } from '../../../../packages/orche
 import { ToolInvocationFailedError } from '../../../../packages/orchestrator/src/index.js';
 import { getCliExecRunner, getPrivacyGuard, getExecHandleService } from './execRuntime.js';
 import type { CommandStage, CliManifest, HandleRecord, PrivacyDecisionRecord } from '../types.js';
-import type { ExecHandleDescriptor } from '../../../../packages/orchestrator/src/exec/handle-service.js';
+import type { ExecHandleDescriptor } from '../../../../packages/orchestrator/src/index.js';
 import type { RunEventPublisher } from '../events/runEvents.js';
 import { logger } from '../../logger.js';
 import type { EnvironmentPaths } from '../run/environment.js';

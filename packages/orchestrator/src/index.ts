@@ -31,3 +31,12 @@ export {
   type ExecRetryEvent,
   type ExecCommandExecutor
 } from './exec/unified-exec.js';
+export {
+  RemoteExecHandleService,
+  type ExecHandleDescriptor,
+  type ExecStreamFrame,
+  type StreamFrameGuard,
+  type StreamFrameGuardContext,
+  type StreamFrameGuardDecision,
+  type StreamFrameGuardResult
+} from './exec/handle-service.js';

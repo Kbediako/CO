@@ -33,7 +33,7 @@
   - Supports opt-out flag for commands that require clean PTY contexts.
 - Update unified exec runner (`packages/orchestrator/src/exec/unified-exec.ts`) to:
   - Emit `exec:begin` and `exec:end` events with correlation IDs.
-  - Stream stdout/stderr incrementally using new adapters in `packages/shared/streams/stdio.ts` that timestamp and sequence chunks.
+  - Stream stdout/stderr incrementally using adapters in `packages/orchestrator/src/exec/stdio.ts` that timestamp and sequence chunks.
   - Surface sandbox retry attempts through orchestrator callbacks.
 - Ensure non-PTY commands share the same streaming interface; unify buffering logic to cap in-memory data (<64 KiB per stream by default).
 

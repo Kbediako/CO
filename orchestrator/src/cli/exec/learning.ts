@@ -4,9 +4,6 @@ import { persistManifest } from '../run/manifestPersister.js';
 import type { RunStatus } from '../types.js';
 import { isoTimestamp } from '../utils/time.js';
 import { logger } from '../../logger.js';
-import { runLearningHarvester } from '../../learning/harvester.js';
-import { synthesizeScenario } from '../../learning/runner.js';
-import { runScenarioValidation } from '../../learning/validator.js';
 import type { ExecRunContext } from './context.js';
 
 export async function maybeTriggerLearning(runContext: ExecRunContext, runStatus: RunStatus): Promise<void> {
@@ -19,6 +16,11 @@ export async function maybeTriggerLearning(runContext: ExecRunContext, runStatus
     return;
   }
   try {
+    const [{ runLearningHarvester }, { synthesizeScenario }, { runScenarioValidation }] = await Promise.all([
+      import('../../learning/harvester.js'),
+      import('../../learning/runner.js'),
+      import('../../learning/validator.js')
+    ]);
     const harvester = await runLearningHarvester(runContext.manifest, {
       repoRoot: runContext.env.repoRoot,
       runsRoot: runContext.env.runsRoot,

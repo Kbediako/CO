@@ -5,9 +5,9 @@ import {
   UnifiedExecRunner,
   ToolOrchestrator,
   type ExecCommandExecutor,
-  type ExecSessionHandle
+  type ExecSessionHandle,
+  RemoteExecHandleService
 } from '../../../../packages/orchestrator/src/index.js';
-import { RemoteExecHandleService } from '../../../../packages/orchestrator/src/exec/handle-service.js';
 import { PrivacyGuard } from '../../privacy/guard.js';
 import { resolveEnforcementMode } from '../utils/enforcementMode.js';
 
