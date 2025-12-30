@@ -231,14 +231,20 @@ function replaceManagedBlock(content: string, taskKey: string, replacementBody: 
   const begin = `<!-- docs-sync:begin ${taskKey} -->`;
   const end = `<!-- docs-sync:end ${taskKey} -->`;
   const block = `${begin}\n${replacementBody.trimEnd()}\n${end}`;
+  const taskId = taskKey.split('-')[0];
 
   const beginIndex = content.indexOf(begin);
   const endIndex = content.indexOf(end);
 
   if (beginIndex === -1 && endIndex === -1) {
-    if (content.includes(`(${taskKey.split('-')[0]})`)) {
+    const updatedLegacy = replaceLegacyTaskBlock(content, taskId, block);
+    if (updatedLegacy) {
+      return updatedLegacy;
+    }
+
+    if (content.includes(`(${taskId})`)) {
       throw new Error(
-        `docs/TASKS.md contains a task section for ${taskKey} but is missing managed markers (${begin} / ${end}).`
+        `docs/TASKS.md contains a task section for ${taskKey} but the checklist mirror block could not be located.`
       );
     }
 
@@ -252,6 +258,50 @@ function replaceManagedBlock(content: string, taskKey: string, replacementBody: 
 
   const afterEnd = endIndex + end.length;
   return `${content.slice(0, beginIndex)}${block}${content.slice(afterEnd)}`;
+}
+
+function replaceLegacyTaskBlock(content: string, taskId: string, block: string): string | null {
+  const lines = content.split('\n');
+  const sectionStart = lines.findIndex((line) => isTaskHeader(line, taskId));
+  if (sectionStart === -1) {
+    return null;
+  }
+
+  const sectionEnd = findNextTopLevelHeading(lines, sectionStart + 1);
+  const sectionLines = lines.slice(sectionStart, sectionEnd);
+  const checklistIndex = sectionLines.findIndex((line) => line.trim() === '## Checklist Mirror');
+  const blockLines = block.split('\n');
+
+  const newSectionLines =
+    checklistIndex === -1 ? sectionLines.slice() : sectionLines.slice(0, checklistIndex);
+
+  if (newSectionLines.length > 0 && newSectionLines[newSectionLines.length - 1]?.trim() !== '') {
+    newSectionLines.push('');
+  }
+  newSectionLines.push(...blockLines);
+
+  return [
+    ...lines.slice(0, sectionStart),
+    ...newSectionLines,
+    ...lines.slice(sectionEnd)
+  ].join('\n');
+}
+
+function isTaskHeader(line: string, taskId: string): boolean {
+  const trimmed = line.trim();
+  if (!trimmed.startsWith('# ')) {
+    return false;
+  }
+  return new RegExp(`\\(${escapeRegExp(taskId)}\\)\\s*$`).test(trimmed);
+}
+
+function findNextTopLevelHeading(lines: string[], startIndex: number): number {
+  for (let index = startIndex; index < lines.length; index += 1) {
+    if (lines[index]?.startsWith('# ')) {
+      return index;
+    }
+  }
+  return lines.length;
 }
 
 async function resolveTaskIdentity(repoRoot: string, taskArg: string): Promise<{ id: string; slug: string }> {

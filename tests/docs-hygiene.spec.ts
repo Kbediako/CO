@@ -158,4 +158,66 @@ describe('docs hygiene tooling', () => {
     expect(firstTasks).toContain('### Foundation');
     expect(firstTasks).toContain('Mirror status with `tasks/tasks-0906-docs-hygiene-automation.md`');
   });
+
+  it('repairs legacy docs/TASKS sections missing managed markers', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-hygiene-legacy-'));
+    createdDirs.push(repoRoot);
+
+    await mkdir(join(repoRoot, 'tasks'), { recursive: true });
+    await mkdir(join(repoRoot, 'docs'), { recursive: true });
+    await mkdir(join(repoRoot, '.agent', 'task'), { recursive: true });
+
+    await writeFile(
+      join(repoRoot, 'tasks', 'index.json'),
+      JSON.stringify(
+        {
+          items: [
+            {
+              id: '0906',
+              slug: 'docs-hygiene-automation',
+              path: 'tasks/tasks-0906-docs-hygiene-automation.md'
+            }
+          ]
+        },
+        null,
+        2
+      ),
+      'utf8'
+    );
+
+    await writeFile(
+      join(repoRoot, 'tasks', 'tasks-0906-docs-hygiene-automation.md'),
+      [
+        '# Task 0906 — Docs Hygiene Automation & Review Handoff Gate',
+        '',
+        '## Checklist',
+        '### Foundation',
+        '- [x] Collateral drafted — Evidence: this commit.',
+        ''
+      ].join('\n'),
+      'utf8'
+    );
+
+    await writeFile(
+      join(repoRoot, 'docs', 'TASKS.md'),
+      [
+        '# Task List Snapshot — Docs Hygiene Automation & Review Handoff Gate (0906)',
+        '',
+        '- Notes.',
+        '',
+        '## Checklist Mirror',
+        'Old content',
+        ''
+      ].join('\n'),
+      'utf8'
+    );
+
+    await runDocsSync(repoRoot, '0906-docs-hygiene-automation');
+    const updatedTasks = await readFile(join(repoRoot, 'docs', 'TASKS.md'), 'utf8');
+
+    expect(updatedTasks).toContain('<!-- docs-sync:begin 0906-docs-hygiene-automation -->');
+    expect(updatedTasks).toContain('<!-- docs-sync:end 0906-docs-hygiene-automation -->');
+    expect(updatedTasks).toContain('### Foundation');
+    expect(updatedTasks).not.toContain('Old content');
+  });
 });

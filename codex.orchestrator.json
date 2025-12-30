@@ -1,4 +1,26 @@
 {
+  "stageSets": {
+    "build-lint-test": [
+      {
+        "kind": "command",
+        "id": "build",
+        "title": "npm run build",
+        "command": "npm run build"
+      },
+      {
+        "kind": "command",
+        "id": "lint",
+        "title": "npm run lint",
+        "command": "npm run lint"
+      },
+      {
+        "kind": "command",
+        "id": "test",
+        "title": "npm run test",
+        "command": "npm run test"
+      }
+    ]
+  },
   "pipelines": [
     {
       "id": "diagnostics",
@@ -13,22 +35,8 @@
           "command": "node scripts/delegation-guard.mjs"
         },
         {
-          "kind": "command",
-          "id": "build",
-          "title": "npm run build",
-          "command": "npm run build"
-        },
-        {
-          "kind": "command",
-          "id": "lint",
-          "title": "npm run lint",
-          "command": "npm run lint"
-        },
-        {
-          "kind": "command",
-          "id": "test",
-          "title": "npm run test",
-          "command": "npm run test"
+          "kind": "stage-set",
+          "ref": "build-lint-test"
         },
         {
           "kind": "command",
@@ -57,22 +65,8 @@
           "command": "node scripts/spec-guard.mjs --dry-run"
         },
         {
-          "kind": "command",
-          "id": "build",
-          "title": "npm run build",
-          "command": "npm run build"
-        },
-        {
-          "kind": "command",
-          "id": "lint",
-          "title": "npm run lint",
-          "command": "npm run lint"
-        },
-        {
-          "kind": "command",
-          "id": "test",
-          "title": "npm run test",
-          "command": "npm run test"
+          "kind": "stage-set",
+          "ref": "build-lint-test"
         },
         {
           "kind": "command",
@@ -118,22 +112,8 @@
           "command": "node scripts/spec-guard.mjs --dry-run"
         },
         {
-          "kind": "command",
-          "id": "build",
-          "title": "npm run build",
-          "command": "npm run build"
-        },
-        {
-          "kind": "command",
-          "id": "lint",
-          "title": "npm run lint",
-          "command": "npm run lint"
-        },
-        {
-          "kind": "command",
-          "id": "test",
-          "title": "npm run test",
-          "command": "npm run test"
+          "kind": "stage-set",
+          "ref": "build-lint-test"
         },
         {
           "kind": "command",
@@ -237,22 +217,8 @@
           "command": "node scripts/delegation-guard.mjs"
         },
         {
-          "kind": "command",
-          "id": "build",
-          "title": "npm run build",
-          "command": "npm run build"
-        },
-        {
-          "kind": "command",
-          "id": "lint",
-          "title": "npm run lint",
-          "command": "npm run lint"
-        },
-        {
-          "kind": "command",
-          "id": "test",
-          "title": "npm run test",
-          "command": "npm run test"
+          "kind": "stage-set",
+          "ref": "build-lint-test"
         },
         {
           "kind": "command",

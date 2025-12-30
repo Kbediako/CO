@@ -470,12 +470,12 @@
       "title": "Refactor Plan Implementation Docs",
       "path": "tasks/0920-prd-refactor-plan-implementation.md",
       "kind": "prd",
-      "status": "approved",
+      "status": "in-progress",
       "gate": {
-        "phase": "refactor-plan-implementation-planning",
-        "status": "approved",
-        "log": ".runs/0920-refactor-plan-implementation/cli/2025-12-30T22-03-29-881Z-82e0a68d/manifest.json",
-        "run_id": "2025-12-30T22-03-29-881Z-82e0a68d"
+        "phase": "refactor-plan-implementation-phase1",
+        "status": "succeeded",
+        "log": ".runs/0920-refactor-plan-implementation/cli/2025-12-30T22-52-59-791Z-dd3e243a/manifest.json",
+        "run_id": "2025-12-30T22-52-59-791Z-dd3e243a"
       },
       "completed_at": null
     }
