@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp f8cf55aeee12e438de2cb66c73157b2c715d25203f3e0b06011d864a4d64e91f -->
+<!-- codex:instruction-stamp 4bf1016d862165922686c6b347a11d70a9f6f7b4334a16a95c0d95262d9bb46c -->
 # Codex-Orchestrator Agent Handbook (Template)
 
 Use this repository as the wrapper that coordinates multiple Codex-driven projects. After cloning, replace placeholder metadata (task IDs, documents, SOPs) with values for each downstream initiative while keeping these shared guardrails in place.
@@ -53,6 +53,12 @@ Use this repository as the wrapper that coordinates multiple Codex-driven projec
 - Git workflow details: `.agent/SOPs/git-management.md`.
 - Keep `reference/` lean by storing only the active snapshot plus the automation scripts (loader macros, serve README). Serve-from-archive instructions should point to the canonical timestamped folder so reviewers can reproduce results without keeping every raw asset in the repo.
 - Before new iterations, run the cleanup script (or manually remove stray `.runs`/`archives` folders) so the working tree returns to a clean state while leaving committed improvements intact.
+
+## PR Lifecycle (Top-Level Agents)
+- Open PRs for code/config changes and keep the scope tied to the active task.
+- Monitor PR checks and review feedback for 10–20 minutes after all required checks turn green (use a background loop when possible).
+- If checks remain green and no new feedback arrives during the window, merge via GitHub and delete the branch.
+- Reset the window if checks restart or feedback arrives; do not merge draft PRs or PRs labeled "do not merge."
 
 ## Build & Test Commands (defaults)
 Implementation work is not “complete” until you run (in order):
