@@ -219,6 +219,10 @@ Mirror status with `tasks/tasks-0918-subagent-delegation-enforcement.md` and `.a
 
 - Update - Refactor plan drafted at `docs/REFRACTOR_PLAN.md`; docs-review manifest captured at `.runs/0919-refactor-plan/cli/2025-12-30T21-31-09-111Z-12be34c7/manifest.json`; implementation-gate manifest captured at `.runs/0919-refactor-plan/cli/2025-12-30T21-51-39-458Z-a9a82bc7/manifest.json`.
 
+# Task List Snapshot — Refactor Plan Implementation Docs (0920)
+
+- Update - Planning collateral drafted (PRD/tech spec/action plan/checklist/mini-spec); docs-review manifest captured at `.runs/0920-refactor-plan-implementation/cli/2025-12-30T22-03-29-881Z-82e0a68d/manifest.json`.
+
 # Task List Snapshot — Review Loop + DevTools Review Gate (0912)
 
 - Update - Implementation complete: implementation-gate-devtools manifest captured at `.runs/0912-review-loop-devtools-gate/cli/2025-12-24T08-56-47-578Z-9b49e1ee/manifest.json`.

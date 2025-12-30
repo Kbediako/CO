@@ -463,6 +463,21 @@
       },
       "created_at": "2025-12-30",
       "completed_at": "2025-12-30"
+    },
+    {
+      "id": "0920",
+      "slug": "refactor-plan-implementation",
+      "title": "Refactor Plan Implementation Docs",
+      "path": "tasks/0920-prd-refactor-plan-implementation.md",
+      "kind": "prd",
+      "status": "approved",
+      "gate": {
+        "phase": "refactor-plan-implementation-planning",
+        "status": "approved",
+        "log": ".runs/0920-refactor-plan-implementation/cli/2025-12-30T22-03-29-881Z-82e0a68d/manifest.json",
+        "run_id": "2025-12-30T22-03-29-881Z-82e0a68d"
+      },
+      "completed_at": null
     }
   ],
   "specs": []
