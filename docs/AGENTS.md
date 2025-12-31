@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp a27667180510f90371af25711ed3af4df2dd97b6ecf0f15aeb48bf7abeb8bc68 -->
+<!-- codex:instruction-stamp f1d409fa5832cb388b64bb606a2c4b67cbbf69b3dceb722b918e0515b5d28cf9 -->
 # Repository Agent Guidance
 
 ## Project 0303 — Codex Orchestrator Autonomy Enhancements
@@ -22,6 +22,7 @@
 - Record the manifest path in the task checklists (`tasks/`, `.agent/task/`, `docs/TASKS.md`) and `tasks/index.json` for evidence.
 - The docs-review pipeline runs `npm run docs:freshness` after `npm run docs:check` and emits `out/<task-id>/docs-freshness.json`.
 - If `docs:check` fails with `tasks-file-too-large`, the tasks archive automation workflow will open a PR and sync payloads to `task-archives`; use `npm run docs:archive-tasks` for manual fallback.
+- Implementation docs archiving follows `docs/implementation-docs-archive-policy.json`; the automation workflow syncs payloads to `doc-archives` and opens a PR with stubs. Use `npm run docs:archive-implementation` for manual fallback.
 
 ## Orchestrator-First Default
 - Use `codex-orchestrator` pipelines for planning, implementation, validation, and review work that touches the repo.
