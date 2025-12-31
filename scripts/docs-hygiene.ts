@@ -6,7 +6,8 @@ import process from 'node:process';
 export type DocsCheckRule =
   | 'npm-script-missing'
   | 'pipeline-id-missing'
-  | 'backticked-path-missing';
+  | 'backticked-path-missing'
+  | 'tasks-file-too-large';
 
 export interface DocsCheckError {
   file: string;
@@ -85,14 +86,18 @@ async function collectMarkdownFilesRecursively(repoRoot: string, relativeDir: st
 }
 
 export async function runDocsCheck(repoRoot: string): Promise<DocsCheckError[]> {
-  const [docFiles, npmScripts, pipelineIds, repoRootEntries] = await Promise.all([
+  const [docFiles, npmScripts, pipelineIds, repoRootEntries, tasksSizeError] = await Promise.all([
     collectDocFiles(repoRoot),
     loadNpmScripts(repoRoot),
     loadOrchestratorPipelines(repoRoot),
-    loadRepoRootEntries(repoRoot)
+    loadRepoRootEntries(repoRoot),
+    checkTasksFileSize(repoRoot)
   ]);
 
   const errors: DocsCheckError[] = [];
+  if (tasksSizeError) {
+    errors.push(tasksSizeError);
+  }
 
   for (const file of docFiles) {
     const abs = path.join(repoRoot, file);
@@ -143,6 +148,36 @@ export async function runDocsCheck(repoRoot: string): Promise<DocsCheckError[]> 
   }
 
   return dedupeErrors(errors);
+}
+
+async function checkTasksFileSize(repoRoot: string): Promise<DocsCheckError | null> {
+  const policyPath = path.join(repoRoot, 'docs', 'tasks-archive-policy.json');
+  if (!(await exists(policyPath))) {
+    return null;
+  }
+  const tasksPath = path.join(repoRoot, 'docs', 'TASKS.md');
+  if (!(await exists(tasksPath))) {
+    return null;
+  }
+
+  const raw = await readFile(policyPath, 'utf8');
+  const policy = JSON.parse(raw) as { max_lines?: number };
+  const maxLines = Number.isFinite(policy?.max_lines) ? Number(policy.max_lines) : NaN;
+  if (!Number.isInteger(maxLines) || maxLines <= 0) {
+    return null;
+  }
+
+  const tasksRaw = await readFile(tasksPath, 'utf8');
+  const lineCount = tasksRaw.split('\n').length;
+  if (lineCount <= maxLines) {
+    return null;
+  }
+
+  return {
+    file: 'docs/TASKS.md',
+    rule: 'tasks-file-too-large',
+    reference: `lines=${lineCount} max=${maxLines}`
+  };
 }
 
 export async function runDocsSync(repoRoot: string, taskArg: string): Promise<void> {
