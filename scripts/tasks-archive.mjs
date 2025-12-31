@@ -118,8 +118,33 @@ function headerMatchesTask(headerKey, taskKey) {
   return false;
 }
 
+function parseHeaderSections(lines) {
+  const sections = [];
+  let startIndex = null;
+  let taskKey = null;
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index];
+    if (!line.startsWith('# Task List Snapshot')) {
+      continue;
+    }
+    if (startIndex !== null && taskKey) {
+      sections.push({ taskKey, start: startIndex, end: index - 1 });
+    }
+    startIndex = index;
+    taskKey = extractSnapshotKey(line);
+  }
+
+  if (startIndex !== null && taskKey) {
+    sections.push({ taskKey, start: startIndex, end: lines.length - 1 });
+  }
+
+  return sections;
+}
+
 function parseTaskSections(lines) {
   const sections = [];
+  const covered = new Array(lines.length).fill(false);
 
   for (let index = 0; index < lines.length; index += 1) {
     const line = lines[index];
@@ -166,7 +191,24 @@ function parseTaskSections(lines) {
     }
 
     sections.push({ taskKey, start: startIndex, end: endIndex });
+    for (let cursor = startIndex; cursor <= endIndex; cursor += 1) {
+      covered[cursor] = true;
+    }
     index = endIndex;
+  }
+
+  const headerSections = parseHeaderSections(lines);
+  for (const section of headerSections) {
+    let overlaps = false;
+    for (let cursor = section.start; cursor <= section.end; cursor += 1) {
+      if (covered[cursor]) {
+        overlaps = true;
+        break;
+      }
+    }
+    if (!overlaps) {
+      sections.push(section);
+    }
   }
 
   sections.sort((a, b) => a.start - b.start);
@@ -184,19 +226,40 @@ function parseDate(value) {
   return value;
 }
 
+function parseRunIdDate(runId) {
+  if (typeof runId !== 'string') {
+    return null;
+  }
+  const match = runId.match(/^(\d{4}-\d{2}-\d{2})T/);
+  if (!match) {
+    return null;
+  }
+  return match[1];
+}
+
 function loadTaskIndex(raw) {
   const data = JSON.parse(raw);
   const items = Array.isArray(data?.items) ? data.items : [];
   const map = new Map();
   for (const item of items) {
+    const id = typeof item?.id === 'string' ? item.id.trim() : '';
     const key = normalizeTaskKey(item);
     if (!key) {
       continue;
     }
-    map.set(key, {
+    const gateStatus = typeof item?.gate?.status === 'string' ? item.gate.status : '';
+    const completedAt =
+      parseDate(item.completed_at) ??
+      (gateStatus === 'succeeded' ? parseDate(parseRunIdDate(item?.gate?.run_id)) : null);
+    const entry = {
       status: typeof item.status === 'string' ? item.status : '',
-      completedAt: parseDate(item.completed_at)
-    });
+      gateStatus,
+      completedAt
+    };
+    map.set(key, entry);
+    if (id) {
+      map.set(id, entry);
+    }
   }
   return map;
 }
@@ -298,7 +361,8 @@ async function main() {
   const candidates = [];
   for (const section of sections) {
     const entry = taskIndex.get(section.taskKey);
-    if (!entry || entry.status !== 'succeeded' || !entry.completedAt) {
+    const eligibleStatus = entry?.status === 'succeeded' || entry?.gateStatus === 'succeeded';
+    if (!entry || !eligibleStatus || !entry.completedAt) {
       continue;
     }
     candidates.push({

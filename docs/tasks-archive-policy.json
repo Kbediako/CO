@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "max_lines": 950,
+  "max_lines": 450,
   "archive_branch": "task-archives",
   "archive_file_pattern": "docs/TASKS-archive-YYYY.md",
   "repo_url": "https://github.com/Kbediako/CO"
