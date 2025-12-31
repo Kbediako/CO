@@ -11,6 +11,7 @@
 ## Evidence Notes
 - `metrics.json` is NDJSON (one JSON object per line; parse line-by-line).
 - `out/<task-id>/docs-freshness.json` stores the audit report output.
+- Diff budget override applied for the registry baseline; recorded in the implementation-gate manifest.
 
 ## Milestones & Tasks
 1. Planning + collateral
