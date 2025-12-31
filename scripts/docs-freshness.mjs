@@ -141,6 +141,13 @@ function parseReviewDate(raw) {
   if (Number.isNaN(date.getTime())) {
     return null;
   }
+  if (
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== month ||
+    date.getUTCDate() !== day
+  ) {
+    return null;
+  }
   return date;
 }
 
