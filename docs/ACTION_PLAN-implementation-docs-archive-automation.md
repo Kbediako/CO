@@ -11,6 +11,7 @@
 ## Evidence Notes
 - Pre-change docs-review used `DELEGATION_GUARD_OVERRIDE_REASON` because the task was not yet registered in `tasks/index.json`.
 - Initial archive scan reported 0 stray candidates; report: `out/0926-implementation-docs-archive-automation/docs-archive-report.json`.
+- Diff budget override applied for CI via PR label `diff-budget-override` and PR body note.
 
 ## Milestones & Tasks
 1. Planning + collateral
