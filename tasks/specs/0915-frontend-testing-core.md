@@ -4,7 +4,7 @@ title: Frontend Testing Core Capability
 relates_to: docs/PRD-frontend-testing-core.md
 risk: medium
 owners:
-  - Unassigned
+  - TBD
 last_review: 2025-12-29
 ---
 

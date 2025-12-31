@@ -46,7 +46,7 @@ Source of truth for requirements: `tasks/0921-prd-docs-freshness-sweep.md`.
 - Task checklist: `tasks/tasks-0921-docs-freshness-sweep.md`
 
 ## Open Questions (for review agent)
-- None. Owner placeholders set to `Unassigned` where no owner is defined.
+- Confirm whether to replace remaining `owners: - TBD` entries in `tasks/specs/*.md` with named owners or leave them as placeholders.
 
 ## Approvals
 - Engineering: Pending

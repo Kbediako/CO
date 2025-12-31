@@ -489,8 +489,8 @@
       "gate": {
         "phase": "docs-freshness-sweep-docs-review",
         "status": "succeeded",
-        "log": ".runs/0921-docs-freshness-sweep/cli/2025-12-31T00-09-56-620Z-9f528ad7/manifest.json",
-        "run_id": "2025-12-31T00-09-56-620Z-9f528ad7"
+        "log": ".runs/0921-docs-freshness-sweep/cli/2025-12-31T00-16-17-694Z-323952cf/manifest.json",
+        "run_id": "2025-12-31T00-16-17-694Z-323952cf"
       },
       "created_at": "2025-12-30",
       "completed_at": "2025-12-31"

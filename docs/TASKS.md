@@ -268,7 +268,7 @@ Mirror status with `tasks/tasks-0920-refactor-plan-implementation.md` and `.agen
 
 # Task List Snapshot — Documentation Freshness Sweep (0921)
 
-- Update - Docs freshness sweep complete; post-change docs-review manifest recorded at `.runs/0921-docs-freshness-sweep/cli/2025-12-31T00-09-56-620Z-9f528ad7/manifest.json`.
+- Update - Docs freshness sweep complete; post-change docs-review manifest recorded at `.runs/0921-docs-freshness-sweep/cli/2025-12-31T00-16-17-694Z-323952cf/manifest.json`.
 
 <!-- docs-sync:begin 0921-docs-freshness-sweep -->
 ## Checklist Mirror
@@ -283,12 +283,12 @@ Mirror status with `tasks/tasks-0921-docs-freshness-sweep.md` and `.agent/task/0
 - [x] Mirrors updated in `docs/TASKS.md` and `.agent/task/0921-docs-freshness-sweep.md` - Evidence: `docs/TASKS.md`, `.agent/task/0921-docs-freshness-sweep.md`.
 
 ### Docs audit + updates
-- [x] Docs-hygiene check run and issues triaged - Evidence: `.runs/0921-docs-freshness-sweep/cli/2025-12-31T00-09-56-620Z-9f528ad7/manifest.json`.
-- [x] Stale references updated (paths/scripts/placeholders) - Evidence: `docs/TECH_SPEC-agentic-coding-readiness.md`, `docs/design/specs/DESIGN_REFERENCE_PIPELINE.md`, `tasks/specs/0914-npm-companion-package.md`.
+- [x] Docs-hygiene check run and issues triaged - Evidence: `.runs/0921-docs-freshness-sweep/cli/2025-12-31T00-16-17-694Z-323952cf/manifest.json`.
+- [x] Stale references updated (paths/scripts/placeholders) - Evidence: `docs/TECH_SPEC-agentic-coding-readiness.md`, `docs/design/specs/DESIGN_REFERENCE_PIPELINE.md`.
 - [x] Spec review metadata refreshed as needed - Evidence: `docs/design/specs/DESIGN_REFERENCE_PIPELINE.md`, `tasks/specs/0921-docs-freshness-sweep.md`.
 
 ### Validation + handoff
-- [x] Docs-review manifest captured (post-change) - Evidence: `.runs/0921-docs-freshness-sweep/cli/2025-12-31T00-09-56-620Z-9f528ad7/manifest.json`.
+- [x] Docs-review manifest captured (post-change) - Evidence: `.runs/0921-docs-freshness-sweep/cli/2025-12-31T00-16-17-694Z-323952cf/manifest.json`.
 
 ## Relevant Files
 - `docs/PRD-docs-freshness-sweep.md`

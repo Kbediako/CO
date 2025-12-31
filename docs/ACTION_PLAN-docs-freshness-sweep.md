@@ -3,7 +3,7 @@
 ## Status Snapshot
 - Current Phase: Completed
 - Run Manifest Link (pre-change): `.runs/0921-docs-freshness-sweep/cli/2025-12-30T23-47-14-831Z-435ea063/manifest.json`
-- Run Manifest Link (post-change): `.runs/0921-docs-freshness-sweep/cli/2025-12-31T00-09-56-620Z-9f528ad7/manifest.json`
+- Run Manifest Link (post-change): `.runs/0921-docs-freshness-sweep/cli/2025-12-31T00-16-17-694Z-323952cf/manifest.json`
 - Approvals / Escalations: record in `tasks/index.json`
 
 ## Evidence Notes
