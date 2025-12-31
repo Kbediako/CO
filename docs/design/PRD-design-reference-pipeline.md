@@ -23,10 +23,10 @@
 - Metrics / State Snapshots: `out/0401-design-reference/design/state.json` (placeholder for pipeline summary), `.runs/0401-design-reference/metrics.json` (initialize during first pipeline execution).
 
 ## Stakeholders
-- Product: Design Platform Enablement (TBD)
-- Engineering: Experience Foundations (TBD)
-- Design Systems: packages/design-system maintainers (TBD)
-- Security & Privacy: Data Governance partner responsible for artifact retention reviews (TBD)
+- Product: Design Platform Enablement (unassigned)
+- Engineering: Experience Foundations (unassigned)
+- Design Systems: packages/design-system maintainers (unassigned)
+- Security & Privacy: Data Governance partner responsible for artifact retention reviews (unassigned)
 
 ## Metrics & Guardrails
 - Primary Success Metrics:

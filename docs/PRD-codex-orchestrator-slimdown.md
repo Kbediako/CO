@@ -28,8 +28,8 @@
 - Changing public APIs, outputs, error strings, or performance characteristics.
 
 ## Stakeholders
-- Product: Platform Enablement (TBD)
-- Engineering: Orchestrator Reliability (TBD)
+- Product: Platform Enablement (unassigned)
+- Engineering: Orchestrator Reliability (unassigned)
 - Design: N/A (CLI/runtime scope)
 
 ## Metrics & Guardrails

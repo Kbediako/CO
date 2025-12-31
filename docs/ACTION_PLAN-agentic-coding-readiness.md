@@ -21,5 +21,5 @@
   - Mitigation: put the core lane in CI and keep docs pointing to source-of-truth scripts/configs.
 
 ## Next Review
-- Date: TBD
-- Agenda: confirm CI signal quality (runtime, flake rate) and decide whether to add an optional local Node pin file (`.nvmrc` / `.tool-versions`).
+- Date: Not scheduled (complete).
+- Agenda: Optional CI signal recheck if flake rate increases.

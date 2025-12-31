@@ -34,5 +34,5 @@
   - Mitigation: doctor command with exact install guidance.
 
 ## Next Review
-- Date: TBD
-- Agenda: Release readiness / publish coordination (if required).
+- Date: Not scheduled (complete).
+- Agenda: Post-release check-in if publish coordination resumes.

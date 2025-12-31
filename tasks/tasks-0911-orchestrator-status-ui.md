@@ -55,7 +55,7 @@
      - [x] Status: Complete - Evidence: `.runs/0911-orchestrator-status-ui/cli/2025-12-24T05-07-59-073Z-e6a472e8/manifest.json`.
    - Subtask 2: Build static UI and styles for overview and run detail.
      - Files: packages/orchestrator-status-ui/index.html, packages/orchestrator-status-ui/app.js, packages/orchestrator-status-ui/styles.css
-     - Commands: Optional local server command (TBD).
+     - Commands: `npm run status-ui -- [options]`.
      - Acceptance: UI renders dark theme layout with live data updates.
      - [x] Status: Complete - Evidence: `.runs/0911-orchestrator-status-ui/cli/2025-12-24T05-07-59-073Z-e6a472e8/manifest.json`.
 6. Post-launch polish
