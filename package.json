@@ -12,6 +12,7 @@
     "dist/packages/**",
     "dist/scripts/design/pipeline/**",
     "dist/types/**",
+    "codex.orchestrator.json",
     "schemas/**",
     "templates/**",
     "README.md",

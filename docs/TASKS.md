@@ -375,42 +375,6 @@ Mirror status with `tasks/tasks-0506-tfgrpo.md` and `.agent/task/0506-tfgrpo-int
 
 
 
-# Task List Snapshot — Implementation Docs Archive Automation (0926)
-
-<!-- docs-sync:begin 0926-implementation-docs-archive-automation -->
-## Checklist Mirror
-Mirror status with `tasks/tasks-0926-implementation-docs-archive-automation.md` and `.agent/task/0926-implementation-docs-archive-automation.md`. Keep `[ ]` until evidence is recorded.
-
-### Foundation
-- [x] PRD drafted and mirrored in `docs/` - Evidence: `tasks/0926-prd-implementation-docs-archive-automation.md`, `docs/PRD-implementation-docs-archive-automation.md`.
-- [x] Tech spec drafted - Evidence: `docs/TECH_SPEC-implementation-docs-archive-automation.md`.
-- [x] Action plan drafted - Evidence: `docs/ACTION_PLAN-implementation-docs-archive-automation.md`.
-- [x] Mini-spec stub created - Evidence: `tasks/specs/0926-implementation-docs-archive-automation.md`.
-- [x] Docs-review manifest captured (pre-change) - Evidence: `.runs/0926-implementation-docs-archive-automation/cli/2025-12-31T05-58-03-469Z-748bdbc3/manifest.json`.
-- [x] Mirrors updated in `docs/TASKS.md` and `.agent/task/0926-implementation-docs-archive-automation.md` - Evidence: `docs/TASKS.md`, `.agent/task/0926-implementation-docs-archive-automation.md`.
-- [x] Delegation guard override recorded for pre-change docs-review - Evidence: `.runs/0926-implementation-docs-archive-automation/cli/2025-12-31T05-58-03-469Z-748bdbc3/manifest.json`.
-
-### Archive automation
-- [x] Implementation-docs archive policy added - Evidence: `docs/implementation-docs-archive-policy.json`.
-- [x] Archive script implemented - Evidence: `scripts/implementation-docs-archive.mjs`.
-- [x] Workflow added for implementation-docs archiving - Evidence: `.github/workflows/implementation-docs-archive-automation.yml`.
-- [x] Agent guidance updated for archive automation and fallback - Evidence: `AGENTS.md`, `docs/AGENTS.md`, `.agent/AGENTS.md`.
-- [x] Tasks archive policy line threshold updated - Evidence: `docs/tasks-archive-policy.json`, `docs/TECH_SPEC-tasks-archive-policy.md`.
-- [x] Archive payloads synced to archive branches - Evidence: `doc-archives` branch and `task-archives` branch commit `4ee20c0`.
-
-### Validation + handoff
-- [x] Docs-review manifest captured (post-change) - Evidence: `.runs/0926-implementation-docs-archive-automation/cli/2025-12-31T06-21-23-157Z-aac3d325/manifest.json`.
-- [x] Implementation review manifest captured (post-implementation) - Evidence: `.runs/0926-implementation-docs-archive-automation/cli/2025-12-31T06-22-12-129Z-8d132792/manifest.json`.
-- [x] Review agent run captured (subagent) - Evidence: `.runs/0926-implementation-docs-archive-automation-review/cli/2025-12-31T06-20-44-602Z-0e74240c/manifest.json`.
-
-## Relevant Files
-- `docs/implementation-docs-archive-policy.json`
-- `scripts/implementation-docs-archive.mjs`
-- `.github/workflows/implementation-docs-archive-automation.yml`
-
-## Subagent Evidence
-- `.runs/0926-implementation-docs-archive-automation-review/cli/2025-12-31T06-20-44-602Z-0e74240c/manifest.json` (review agent docs-review run).
-<!-- docs-sync:end 0926-implementation-docs-archive-automation -->
 
 # Task List Snapshot — Implementation Docs Archive Allowlist (0927)
 
@@ -445,3 +409,37 @@ Mirror status with `tasks/tasks-0927-implementation-docs-archive-allowlist.md` a
 ## Subagent Evidence
 - `.runs/0927-implementation-docs-archive-allowlist-review/cli/2025-12-31T07-44-08-552Z-31e64c57/manifest.json` (review agent docs-review run).
 <!-- docs-sync:end 0927-implementation-docs-archive-allowlist -->
+
+# Task List Snapshot - Repo Refactor Simplification (0928)
+
+<!-- docs-sync:begin 0928-repo-refactor-simplification -->
+## Checklist Mirror
+Mirror status with `tasks/tasks-0928-repo-refactor-simplification.md` and `.agent/task/0928-repo-refactor-simplification.md`. Keep `[ ]` until evidence is recorded.
+
+### Foundation
+- [x] PRD drafted and mirrored in `docs/` - Evidence: `tasks/0928-prd-repo-refactor-simplification.md`, `docs/PRD-repo-refactor-simplification.md`.
+- [x] Tech spec drafted - Evidence: `docs/TECH_SPEC-repo-refactor-simplification.md`.
+- [x] Action plan drafted - Evidence: `docs/ACTION_PLAN-repo-refactor-simplification.md`.
+- [x] Mini-spec stub created - Evidence: `tasks/specs/0928-repo-refactor-simplification.md`.
+- [x] Docs-review manifest captured (pre-change) - Evidence: `.runs/0928-repo-refactor-simplification/cli/2025-12-31T13-37-33-341Z-84ae525a/manifest.json`.
+- [x] Mirrors updated in `docs/TASKS.md` and `.agent/task/0928-repo-refactor-simplification.md` - Evidence: `docs/TASKS.md`, `.agent/task/0928-repo-refactor-simplification.md`.
+- [x] Review agent run captured (subagent) - Evidence: `.runs/0928-repo-refactor-simplification-review/cli/2025-12-31T13-36-57-134Z-e6f7152a/manifest.json`.
+
+### Refactor implementation
+- [x] codex.orchestrator.json updated for portable dist commands + optional spec-guard.
+- [x] User config loader fallback added with source labeling.
+- [x] Pipeline resolution simplified; redundant built-in pipeline TS files removed.
+- [x] Package files list updated to include codex.orchestrator.json.
+
+### Validation + handoff
+- [x] Implementation review manifest captured (post-implementation) - Evidence: `.runs/0928-repo-refactor-simplification/cli/2025-12-31T13-53-53-066Z-26a878bb/manifest.json`.
+
+## Relevant Files
+- `codex.orchestrator.json`
+- `orchestrator/src/cli/config/userConfig.ts`
+- `orchestrator/src/cli/pipelines/index.ts`
+- `package.json`
+
+## Subagent Evidence
+- `.runs/0928-repo-refactor-simplification-review/cli/2025-12-31T13-36-57-134Z-e6f7152a/manifest.json` (review agent docs-review run).
+<!-- docs-sync:end 0928-repo-refactor-simplification -->

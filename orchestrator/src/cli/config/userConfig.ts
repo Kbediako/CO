@@ -4,15 +4,18 @@ import { join } from 'node:path';
 import type { PipelineDefinition, PipelineStage } from '../types.js';
 import type { EnvironmentPaths } from '../run/environment.js';
 import { logger } from '../../logger.js';
+import { findPackageRoot } from '../utils/packageInfo.js';
 
 export interface UserConfig {
   pipelines?: PipelineDefinition[];
   defaultPipeline?: string;
+  source?: 'repo' | 'package';
 }
 
 type StageSetRef = { kind: 'stage-set'; ref: string };
 type ConfigStage = PipelineStage | StageSetRef;
 type ConfigPipelineDefinition = Omit<PipelineDefinition, 'stages'> & { stages: ConfigStage[] };
+type ConfigSource = 'repo' | 'package';
 
 interface ConfigFile {
   pipelines?: ConfigPipelineDefinition[];
@@ -21,19 +24,26 @@ interface ConfigFile {
 }
 
 export async function loadUserConfig(env: EnvironmentPaths): Promise<UserConfig | null> {
-  const configPath = join(env.repoRoot, 'codex.orchestrator.json');
-  try {
-    const raw = await readFile(configPath, 'utf8');
-    const parsed = JSON.parse(raw) as ConfigFile;
-    logger.info(`[codex-config] Loaded user config from ${configPath}`);
-    return normalizeUserConfig(parsed);
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-      logger.warn(`[codex-config] Missing codex.orchestrator.json at ${configPath}`);
-      return null;
-    }
-    throw error;
+  const repoConfigPath = join(env.repoRoot, 'codex.orchestrator.json');
+  const repoConfig = await readConfig(repoConfigPath);
+  if (repoConfig) {
+    logger.info(`[codex-config] Loaded user config from ${repoConfigPath}`);
+    return normalizeUserConfig(repoConfig, 'repo');
   }
+  logger.warn(`[codex-config] Missing codex.orchestrator.json at ${repoConfigPath}`);
+
+  const packageRoot = findPackageRoot();
+  const packageConfigPath = join(packageRoot, 'codex.orchestrator.json');
+  if (packageConfigPath === repoConfigPath) {
+    return null;
+  }
+  const packageConfig = await readConfig(packageConfigPath);
+  if (packageConfig) {
+    logger.info(`[codex-config] Loaded user config from ${packageConfigPath}`);
+    return normalizeUserConfig(packageConfig, 'package');
+  }
+  logger.warn(`[codex-config] Missing codex.orchestrator.json at ${packageConfigPath}`);
+  return null;
 }
 
 export function findPipeline(config: UserConfig | null, id: string): PipelineDefinition | null {
@@ -43,7 +53,7 @@ export function findPipeline(config: UserConfig | null, id: string): PipelineDef
   return config.pipelines.find((pipeline) => pipeline.id === id) ?? null;
 }
 
-function normalizeUserConfig(config: ConfigFile | null): UserConfig | null {
+function normalizeUserConfig(config: ConfigFile | null, source: ConfigSource): UserConfig | null {
   if (!config) {
     return null;
   }
@@ -51,7 +61,19 @@ function normalizeUserConfig(config: ConfigFile | null): UserConfig | null {
   const pipelines = Array.isArray(config.pipelines)
     ? config.pipelines.map((pipeline) => expandPipelineStages(pipeline, stageSets))
     : config.pipelines;
-  return { pipelines, defaultPipeline: config.defaultPipeline };
+  return { pipelines, defaultPipeline: config.defaultPipeline, source };
+}
+
+async function readConfig(configPath: string): Promise<ConfigFile | null> {
+  try {
+    const raw = await readFile(configPath, 'utf8');
+    return JSON.parse(raw) as ConfigFile;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      return null;
+    }
+    throw error;
+  }
 }
 
 function normalizeStageSets(
