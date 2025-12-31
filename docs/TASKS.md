@@ -990,7 +990,7 @@ Mirror status with `tasks/tasks-0913-orchestrator-refactor-roadmap.md` and `.age
 
 # Task List Snapshot — Docs Freshness Systemization (0922)
 
-- Update - Planning collateral drafted; post-change docs-review manifest captured at `.runs/0922-docs-freshness-systemization/cli/2025-12-31T00-55-04-017Z-96c4de4c/manifest.json`.
+- Update - Implementation complete; implementation-gate manifest captured at `.runs/0922-docs-freshness-systemization/cli/2025-12-31T01-47-16-423Z-a744a2c1/manifest.json` (diff budget override recorded).
 - Update - Review agent docs-review run succeeded at `.runs/0922-docs-freshness-systemization-review/cli/2025-12-31T01-00-39-132Z-2653b56a/manifest.json`.
 - Notes: Export `MCP_RUNNER_TASK_ID=0922-docs-freshness-systemization` before orchestrator commands.
 
@@ -1007,19 +1007,19 @@ Mirror status with `tasks/tasks-0922-docs-freshness-systemization.md` and `.agen
 - [x] Mirrors updated in `docs/TASKS.md` and `.agent/task/0922-docs-freshness-systemization.md` - Evidence: `docs/TASKS.md`, `.agent/task/0922-docs-freshness-systemization.md`.
 
 ### Systemization design
-- [ ] Docs registry schema defined and seeded - Evidence: `docs/<docs-freshness-registry>.json`.
-- [ ] Freshness audit script implemented - Evidence: `scripts/<docs-freshness>.mjs`.
-- [ ] planned npm script `docs:freshness` wired - Evidence: `package.json`.
-- [ ] Freshness report output defined - Evidence: `docs/TECH_SPEC-docs-freshness-systemization.md`.
+- [x] Docs registry schema defined and seeded - Evidence: `docs/docs-freshness-registry.json`.
+- [x] Freshness audit script implemented - Evidence: `scripts/docs-freshness.mjs`.
+- [x] `npm run docs:freshness` wired - Evidence: `package.json`.
+- [x] Freshness report output defined - Evidence: `docs/TECH_SPEC-docs-freshness-systemization.md`.
 
 ### Pipeline integration
-- [ ] `docs-review` includes docs-freshness stage - Evidence: `codex.orchestrator.json`.
-- [ ] `implementation-gate` includes docs-freshness stage - Evidence: `codex.orchestrator.json`.
-- [ ] Agent docs updated with the new audit step - Evidence: `AGENTS.md`, `docs/AGENTS.md`, `.agent/AGENTS.md`.
+- [x] `docs-review` includes docs-freshness stage - Evidence: `codex.orchestrator.json`.
+- [x] `implementation-gate` includes docs-freshness stage - Evidence: `codex.orchestrator.json`.
+- [x] Agent docs updated with the new audit step - Evidence: `AGENTS.md`, `docs/AGENTS.md`, `.agent/AGENTS.md`.
 
 ### Validation + handoff
-- [x] Docs-review manifest captured (post-change) - Evidence: `.runs/0922-docs-freshness-systemization/cli/2025-12-31T00-55-04-017Z-96c4de4c/manifest.json`.
-- [ ] Implementation review manifest captured (post-implementation) - Evidence: `.runs/0922-docs-freshness-systemization/cli/<run-id>/manifest.json`.
+- [x] Docs-review manifest captured (post-change) - Evidence: `.runs/0922-docs-freshness-systemization/cli/2025-12-31T01-19-09-402Z-2a0217a3/manifest.json`.
+- [x] Implementation review manifest captured (post-implementation) - Evidence: `.runs/0922-docs-freshness-systemization/cli/2025-12-31T01-47-16-423Z-a744a2c1/manifest.json`.
 
 ## Relevant Files
 - `docs/PRD-docs-freshness-systemization.md`

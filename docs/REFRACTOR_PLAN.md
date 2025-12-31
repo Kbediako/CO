@@ -78,11 +78,11 @@
 - Record current pipeline usage and entrypoints in a short inventory note.
 
 ### Phase 1: Quick wins
-- For doc-only changes: run `docs-review` (spec-guard + docs:check + review).
-- For script/tooling changes: run `diagnostics` plus targeted script smoke tests (`npm run docs:check`, `node scripts/*` as needed).
+- For doc-only changes: run `docs-review` (spec-guard + docs:check + docs:freshness + review).
+- For script/tooling changes: run `diagnostics` plus targeted script smoke tests (`npm run docs:check`, `npm run docs:freshness`, `node scripts/*` as needed).
 
 ### Phase 2: Structural consolidation
-- Run `implementation-gate` for each tranche (spec-guard, build, lint, test, docs:check, diff-budget, review).
+- Run `implementation-gate` for each tranche (spec-guard, build, lint, test, docs:check, docs:freshness, diff-budget, review).
 - Add targeted unit tests for pipeline resolution, instruction loader, and checklist sync tooling.
 
 ### Phase 3: Optional feature modularization

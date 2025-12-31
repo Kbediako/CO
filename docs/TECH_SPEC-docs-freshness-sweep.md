@@ -33,12 +33,13 @@ Source of truth for requirements: `tasks/0921-prd-docs-freshness-sweep.md`.
 ## Operational Considerations
 - Failure Modes:
   - docs:check fails on missing paths or scripts.
+  - docs:freshness fails on missing registry coverage or stale docs.
   - spec-guard fails on stale specs.
 - Observability:
   - Use docs-review manifests as evidence.
 
 ## Testing Strategy
-- Run `docs-review` before and after updates (spec-guard + docs:check + review).
+- Run `docs-review` before and after updates (spec-guard + docs:check + docs:freshness + review).
 
 ## Documentation & Evidence
 - PRD: `docs/PRD-docs-freshness-sweep.md`

@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp 2c315c7e433f5b1319a2230804da917aa8d241bc9ff04c6c35d2984aa277ef94 -->
+<!-- codex:instruction-stamp d2083ab8bf9a85af86f02b006e9f9f4e7fbb1f9c6fb83627e5d2b7a06b8a7e82 -->
 # Codex-Orchestrator Agent Handbook (Template)
 
 Use this repository as the wrapper that coordinates multiple Codex-driven projects. After cloning, replace placeholder metadata (task IDs, documents, SOPs) with values for each downstream initiative while keeping these shared guardrails in place.
@@ -70,8 +70,9 @@ Implementation work is not “complete” until you run (in order):
 4. `npm run lint`
 5. `npm run test`
 6. `npm run docs:check`
-7. `node scripts/diff-budget.mjs`
-8. `npm run review`
+7. `npm run docs:freshness`
+8. `node scripts/diff-budget.mjs`
+9. `npm run review`
 
 | Command | When to use | Notes |
 | --- | --- | --- |
@@ -81,6 +82,7 @@ Implementation work is not “complete” until you run (in order):
 | `npm run lint` | Pre-commit / review gates | Executes `npm run build:patterns` first so codemods compile. |
 | `npm run test` | Unit + integration checks | Vitest harness covering orchestrator + patterns. |
 | `npm run docs:check` | Docs hygiene gate | Deterministically validates scripts/pipelines/paths referenced in agent-facing docs. |
+| `npm run docs:freshness` | Docs freshness gate | Validates registry coverage + review recency and emits `out/<task-id>/docs-freshness.json`. |
 | `node scripts/diff-budget.mjs` | Review scope guard | Fails when diffs exceed the configured budget unless `DIFF_BUDGET_OVERRIDE_REASON` is set. |
 | `npm run eval:test` | Evaluation harness smoke tests | Requires fixtures in `evaluation/fixtures/**`; optional, enable when evaluation scope exists. |
 | `npm run review` | Reviewer hand-off | Runs `codex review` with task/PRD context (when available) and the latest run manifest path included as evidence; `NOTES` is required and should include `<goal + summary + risks>` plus optional questions. |

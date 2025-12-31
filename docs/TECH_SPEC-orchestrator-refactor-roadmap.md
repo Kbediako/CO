@@ -65,7 +65,7 @@
     - Exec event bounding behavior (opt-in mode) without breaking existing small-output behavior.
     - A manifest persistence “single writer” invariant (no overlapping atomic writes).
 - Tooling / Automation:
-  - Docs review gate: `codex-orchestrator start docs-review` (spec-guard, docs:check, review).
+  - Docs review gate: `codex-orchestrator start docs-review` (spec-guard, docs:check, docs:freshness, review).
   - Implementation gates (future): `codex-orchestrator start implementation-gate` after code changes land.
 - Rollback Plan:
   - Use opt-in flags for the highest-risk behavior changes (bounded event capture, metrics payload reduction) until validated in practice.

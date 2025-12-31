@@ -19,8 +19,8 @@ last_review: 2025-12-31
 
 ## Proposed Changes
 - Architecture / design adjustments:
-  - Add `docs/<docs-freshness-registry>.json` to track docs coverage.
-  - Add `scripts/<docs-freshness>.mjs` plus planned npm script `docs:freshness`.
+  - Add `docs/docs-freshness-registry.json` to track docs coverage.
+  - Add `scripts/docs-freshness.mjs` plus `npm run docs:freshness`.
   - Add `docs-freshness` stage to docs-review and implementation-gate pipelines.
 - Data model updates:
   - New registry schema and `out/<task-id>/docs-freshness.json` report.
@@ -43,7 +43,7 @@ last_review: 2025-12-31
   - Switch audit to enforcement mode once coverage is complete.
 
 ## Open Questions
-- What freshness cadence should be the default for active docs?
+- Confirm the default freshness cadence for active docs (current assumption: 90 days).
 
 ## Approvals
 - Reviewer:

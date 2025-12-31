@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp 952c2a7d8c852a7d1e69691270840ca55a8947ab5be135a76ba3658fca4db513 -->
+<!-- codex:instruction-stamp 9eb4bf8084a223a2e4602e35aaaab965275fd3c077ff235e30d228c762435998 -->
 # Agent Enablement
 
 ## Added by Bootstrap 2025-10-16
@@ -28,6 +28,7 @@
 - `npm run test` — Complete Vitest suite (manager, agents, persistence, adapters).
 - `npx vitest run <pattern>` — Use this non-watch mode for focused suites; plain `npx vitest` launches an interactive watcher that never exits (we can’t press `q`), so always prefer the `run` form in automation.
 - `npm run eval:test` — Exercises evaluation harness scenarios; depends on local `python3` for cross-language fixtures.
+- `npm run docs:freshness` — Docs freshness audit; writes `out/<task-id>/docs-freshness.json`.
 - `npm run build:patterns` — Compile codemods/linters/templates; run whenever `patterns/**` changes.
 - `node --loader ts-node/esm evaluation/harness/run-all.ts --mode=mcp` — Manual sweep to generate scenario artifacts for manifests.
 - `node scripts/diff-budget.mjs` — Enforces a small-diff budget before review; set `DIFF_BUDGET_OVERRIDE_REASON` to bypass with justification.
