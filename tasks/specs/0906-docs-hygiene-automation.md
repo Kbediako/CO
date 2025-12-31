@@ -4,7 +4,8 @@ title: Docs Hygiene Automation & Review Handoff Gate
 relates_to: Task 0906 (docs hygiene automation)
 risk: low
 owners:
-  - Platform Enablement
+  - Codex (top-level agent)
+  - Review agent
 last_review: 2025-12-15
 ---
 

@@ -4,7 +4,8 @@ title: Refactor Plan Implementation
 relates_to: docs/PRD-refactor-plan-implementation.md
 risk: high
 owners:
-  - TBD
+  - Codex (top-level agent)
+  - Review agent
 last_review: 2025-12-30
 ---
 

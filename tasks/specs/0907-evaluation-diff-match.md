@@ -4,7 +4,8 @@ title: Evaluation Harness diff-match Assertions
 relates_to: Task 0907 (evaluation-diff-match)
 risk: low
 owners:
-  - Platform Enablement
+  - Codex (top-level agent)
+  - Review agent
 last_review: 2025-12-17
 ---
 

@@ -4,7 +4,8 @@ title: Diff Budget + Review Handoff Follow-ups
 relates_to: Task 0908 (diff-budget-followups)
 risk: medium
 owners:
-  - Platform Enablement
+  - Codex (top-level agent)
+  - Review agent
 last_review: 2025-12-18
 ---
 

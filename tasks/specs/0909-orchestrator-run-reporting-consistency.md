@@ -4,7 +4,8 @@ title: Orchestrator Run Reporting Consistency
 relates_to: Task 0909 / docs/PRD-orchestrator-run-reporting-consistency.md
 risk: medium
 owners:
-  - Platform Enablement
+  - Codex (top-level agent)
+  - Review agent
 last_review: 2025-12-21
 ---
 
