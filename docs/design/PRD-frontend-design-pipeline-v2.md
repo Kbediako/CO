@@ -49,10 +49,10 @@
 - Metrics / State Snapshots: `.runs/0412-frontend-design-pipeline-v2/metrics.json`, `out/0412-frontend-design-pipeline-v2/state.json` (initialized in first pipeline run).
 
 ## Stakeholders
-- Product/Design Platform: TBD
-- Engineering (Design Systems & Orchestrator): TBD
-- Compliance/Privacy: TBD (approvals required for Hifi captures and style profile retention)
-- Accessibility Review: TBD
+- Product/Design Platform: Unassigned
+- Engineering (Design Systems & Orchestrator): Unassigned
+- Compliance/Privacy: Unassigned (approvals required for Hifi captures and style profile retention)
+- Accessibility Review: Unassigned
 
 ## Metrics & Guardrails
 - Success Metrics: ≥90% of runs emit valid `frontend-aesthetic-plan.json`; ≥95% of guardrail runs flag AI-slop violations (generic fonts/gradients) when seeded with intentionally bland inputs; clone-informed runs show <10% style overlap with prior project history per `frontend-design-history.json` heuristics.

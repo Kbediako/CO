@@ -24,9 +24,9 @@
 - Metrics / State Snapshots (placeholders): `.runs/0407-orchestrator-interactive-hud/metrics.json`, `out/0407-orchestrator-interactive-hud/state.json`.
 
 ## Stakeholders
-- Product: Platform Enablement (TBD)
-- Engineering: Orchestrator Foundations (TBD)
-- Design: CLI/TUI experience (TBD)
+- Product: Platform Enablement (unassigned)
+- Engineering: Orchestrator Foundations (unassigned)
+- Design: CLI/TUI experience (unassigned)
 
 ## Metrics & Guardrails
 - Success Metrics: parity (byte-for-byte manifests/metrics) between interactive/non-interactive; HUD overhead ≤100 ms per stage transition; TTY detection disables HUD correctly in CI/non-TTY environments.

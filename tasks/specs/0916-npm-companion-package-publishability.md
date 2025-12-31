@@ -4,7 +4,7 @@ title: NPM Companion Package Publishability (Sterile Tarball)
 relates_to: docs/PRD-npm-companion-package-publishability.md
 risk: medium
 owners:
-  - TBD
+  - Unassigned
 last_review: 2025-12-29
 ---
 

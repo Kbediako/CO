@@ -4,7 +4,7 @@ title: NPM Companion Package Publishability
 relates_to: docs/PRD-npm-companion-package.md
 risk: medium
 owners:
-  - TBD
+  - Unassigned
 last_review: 2025-12-28
 ---
 

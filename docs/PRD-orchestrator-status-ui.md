@@ -20,9 +20,9 @@ Source of truth: `tasks/0911-prd-orchestrator-status-ui.md`.
 - No changes to orchestrator pipeline behavior or manifests.
 
 ## Stakeholders
-- Product: Platform Enablement (TBD)
-- Engineering: Orchestrator Foundations (TBD)
-- Design: Monitoring UI (TBD)
+- Product: Platform Enablement (unassigned)
+- Engineering: Orchestrator Foundations (unassigned)
+- Design: Monitoring UI (unassigned)
 
 ## Metrics & Guardrails
 - Primary Success Metrics:

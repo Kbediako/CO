@@ -38,5 +38,5 @@
   - Mitigation: use feature flags and dynamic imports with a deprecation window.
 
 ## Next Review
-- Date: TBD
-- Agenda: confirm Phase 1 completion and guardrail status.
+- Date: Not scheduled (complete).
+- Agenda: Post-rollout regression check if new issues surface.

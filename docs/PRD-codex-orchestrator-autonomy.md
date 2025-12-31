@@ -22,8 +22,8 @@
 - Metrics / State Snapshots: `.runs/0303-orchestrator-autonomy/metrics.json`, `out/0303-orchestrator-autonomy/state.json` (refreshed with 2025-11-04T00:46:22Z diagnostics-with-eval run).
 
 ## Stakeholders
-- Product: Platform Enablement (TBD)
-- Engineering: Orchestrator Foundations (TBD)
+- Product: Platform Enablement (unassigned)
+- Engineering: Orchestrator Foundations (unassigned)
 - Design: N/A (CLI and programmatic interfaces only)
 
 ## Metrics & Guardrails

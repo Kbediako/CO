@@ -1,5 +1,5 @@
 ---
-last_review: 2025-12-08
+last_review: 2025-12-31
 ---
 
 # Technical Spec — Design Reference Pipeline (Task 0401)
@@ -34,7 +34,7 @@ last_review: 2025-12-08
     - `advanced` section toggles for `framer_motion`, `ffmpeg` with `quota_seconds` and `approver`.
   - CLI override: `--pipeline design-reference` or environment `DESIGN_PIPELINE=1` enabling the pipeline even if config disabled.
 - Loader Implementation:
-  - Extend existing config loader (`packages/shared/config/index.ts`, TBD exact module) to parse `design.config.yaml`; fall back to defaults when missing.
+  - Extend existing config loader (`packages/shared/config/designConfig.ts`, re-exported via `packages/shared/config/index.ts`) to parse `design.config.yaml`; fall back to defaults when missing.
   - Normalize booleans/quotas; validate breakpoints and URLs (reject invalid protocols).
   - Persist resolved configuration snapshot into manifest metadata under `design_artifacts.config`.
 - Pipeline Activation Logic:
@@ -152,7 +152,7 @@ last_review: 2025-12-08
 ### 5.2 Retention & Privacy Policies
 - Retention enforcement strategies:
   - Record `expiry.date` for each artifact based on retention days; cleanup job removes expired assets.
-  - Provide CLI reminder to run `npm run design:purge-expired` (TBD) if automatic cleanup not yet implemented.
+  - Provide CLI reminder to run `npm run design:purge-expired` if automatic cleanup is not yet implemented.
 - Privacy logging:
   - For any capture skipping mask selectors or enabling third-party resources, append `privacy_notes`.
   - Manifest should include `approvals` entries referencing review records stored in `.runs/<task-id>/<run>/manifest.json#approvals`.

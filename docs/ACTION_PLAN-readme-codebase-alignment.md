@@ -19,5 +19,5 @@
   - Mitigation: prioritize compatibility shims or script fixes over doc-only changes when the workflow is expected to be executable.
 
 ## Next Review
-- Date: TBD
-- Agenda: confirm decision on doc-vs-code alignment for each mismatch and approve implementation plan.
+- Date: Not scheduled (complete).
+- Agenda: Post-merge spot check if README drift resurfaces.

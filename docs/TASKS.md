@@ -265,6 +265,40 @@ Mirror status with `tasks/tasks-0920-refactor-plan-implementation.md` and `.agen
 - 0920-refactor-plan-implementation-phase2-review - `.runs/0920-refactor-plan-implementation-phase2-review/cli/2025-12-30T22-34-56-017Z-723875aa/manifest.json`.
 - 0920-refactor-plan-implementation-phase3-review - `.runs/0920-refactor-plan-implementation-phase3-review/cli/2025-12-30T22-36-11-454Z-94ac6869/manifest.json`.
 <!-- docs-sync:end 0920-refactor-plan-implementation -->
+
+# Task List Snapshot — Documentation Freshness Sweep (0921)
+
+- Update - Docs freshness sweep complete; post-change docs-review manifest recorded at `.runs/0921-docs-freshness-sweep/cli/2025-12-31T00-09-56-620Z-9f528ad7/manifest.json`.
+
+<!-- docs-sync:begin 0921-docs-freshness-sweep -->
+## Checklist Mirror
+Mirror status with `tasks/tasks-0921-docs-freshness-sweep.md` and `.agent/task/0921-docs-freshness-sweep.md`. Keep `[ ]` until evidence is recorded.
+
+### Foundation
+- [x] PRD drafted and mirrored in `docs/` - Evidence: `tasks/0921-prd-docs-freshness-sweep.md`, `docs/PRD-docs-freshness-sweep.md`.
+- [x] Tech spec drafted - Evidence: `docs/TECH_SPEC-docs-freshness-sweep.md`.
+- [x] Action plan drafted - Evidence: `docs/ACTION_PLAN-docs-freshness-sweep.md`.
+- [x] Mini-spec stub created - Evidence: `tasks/specs/0921-docs-freshness-sweep.md`.
+- [x] Docs-review manifest captured (pre-change) - Evidence: `.runs/0921-docs-freshness-sweep/cli/2025-12-30T23-47-14-831Z-435ea063/manifest.json`.
+- [x] Mirrors updated in `docs/TASKS.md` and `.agent/task/0921-docs-freshness-sweep.md` - Evidence: `docs/TASKS.md`, `.agent/task/0921-docs-freshness-sweep.md`.
+
+### Docs audit + updates
+- [x] Docs-hygiene check run and issues triaged - Evidence: `.runs/0921-docs-freshness-sweep/cli/2025-12-31T00-09-56-620Z-9f528ad7/manifest.json`.
+- [x] Stale references updated (paths/scripts/placeholders) - Evidence: `docs/TECH_SPEC-agentic-coding-readiness.md`, `docs/design/specs/DESIGN_REFERENCE_PIPELINE.md`, `tasks/specs/0914-npm-companion-package.md`.
+- [x] Spec review metadata refreshed as needed - Evidence: `docs/design/specs/DESIGN_REFERENCE_PIPELINE.md`, `tasks/specs/0921-docs-freshness-sweep.md`.
+
+### Validation + handoff
+- [x] Docs-review manifest captured (post-change) - Evidence: `.runs/0921-docs-freshness-sweep/cli/2025-12-31T00-09-56-620Z-9f528ad7/manifest.json`.
+
+## Relevant Files
+- `docs/PRD-docs-freshness-sweep.md`
+- `docs/TECH_SPEC-docs-freshness-sweep.md`
+- `docs/ACTION_PLAN-docs-freshness-sweep.md`
+- `tasks/specs/0921-docs-freshness-sweep.md`
+
+## Subagent Evidence
+- `.runs/0921-docs-freshness-sweep-audit/cli/2025-12-30T23-46-16-546Z-80d99bd8/manifest.json` (docs-review guardrail run).
+<!-- docs-sync:end 0921-docs-freshness-sweep -->
 # Task List Snapshot — Review Loop + DevTools Review Gate (0912)
 
 - Update - Implementation complete: implementation-gate-devtools manifest captured at `.runs/0912-review-loop-devtools-gate/cli/2025-12-24T08-56-47-578Z-9b49e1ee/manifest.json`.
