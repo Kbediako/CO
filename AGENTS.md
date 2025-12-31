@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp 7f14fafd5eddc7a477952dfcc5087e6f01f8c4590dd65be8df516af529b94fb0 -->
+<!-- codex:instruction-stamp 67591e8104fa18b9e99d46150ac699141c0c1990486e55d917dbf9b788b6bfc8 -->
 # Codex-Orchestrator Agent Handbook (Template)
 
 Use this repository as the wrapper that coordinates multiple Codex-driven projects. After cloning, replace placeholder metadata (task IDs, documents, SOPs) with values for each downstream initiative while keeping these shared guardrails in place.
@@ -53,7 +53,7 @@ Use this repository as the wrapper that coordinates multiple Codex-driven projec
 - Before opening/updating a PR, validate in a clean worktree/clone (no untracked files) so local-only directories don’t mask CI failures (e.g., `docs:check` only sees tracked paths). Quick pattern: `git worktree add ../CO-ci HEAD` then run the core lane commands in `../CO-ci/`.
 - When writing PR summaries, avoid literal `\n` sequences; use `gh pr create --body-file` or a here-doc so line breaks render correctly in GitHub.
 - Git workflow details: `.agent/SOPs/git-management.md`.
-- Keep `docs/TASKS.md` under the line threshold in `docs/tasks-archive-policy.json`; run `npm run docs:archive-tasks` and push archive payloads to the `task-archives` branch when needed.
+- Keep `docs/TASKS.md` under the line threshold in `docs/tasks-archive-policy.json`; the tasks archive automation workflow opens a PR and updates the `task-archives` branch when the limit is exceeded. Use `npm run docs:archive-tasks` for manual fallback.
 - Keep `reference/` lean by storing only the active snapshot plus the automation scripts (loader macros, serve README). Serve-from-archive instructions should point to the canonical timestamped folder so reviewers can reproduce results without keeping every raw asset in the repo.
 - Before new iterations, run the cleanup script (or manually remove stray `.runs`/`archives` folders) so the working tree returns to a clean state while leaving committed improvements intact.
 

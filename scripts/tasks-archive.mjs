@@ -93,6 +93,31 @@ function parsePolicy(raw, policyPath) {
   };
 }
 
+function extractSnapshotKey(line) {
+  if (typeof line !== 'string') {
+    return null;
+  }
+  const match = line.match(/^# Task List Snapshot(?: —|-)\s+.*\(([^)]+)\)\s*$/);
+  if (!match) {
+    return null;
+  }
+  return match[1].trim();
+}
+
+function headerMatchesTask(headerKey, taskKey) {
+  if (!headerKey || !taskKey) {
+    return false;
+  }
+  if (headerKey === taskKey) {
+    return true;
+  }
+  const idMatch = taskKey.match(/^(\d{4})/);
+  if (idMatch && headerKey === idMatch[1]) {
+    return true;
+  }
+  return false;
+}
+
 function parseTaskSections(lines) {
   const sections = [];
 
@@ -117,10 +142,26 @@ function parseTaskSections(lines) {
     }
 
     let startIndex = index;
+    let headerLine = null;
     for (let cursor = index; cursor >= 0; cursor -= 1) {
-      if (lines[cursor].startsWith('# Task List Snapshot — ')) {
-        startIndex = cursor;
+      if (lines[cursor].startsWith('# Task List Snapshot')) {
+        headerLine = lines[cursor];
+        if (headerMatchesTask(extractSnapshotKey(headerLine), taskKey)) {
+          startIndex = cursor;
+        }
         break;
+      }
+    }
+    if (headerLine && startIndex === index) {
+      const headerKey = extractSnapshotKey(headerLine);
+      if (headerKey) {
+        console.warn(
+          `Archive warning: snapshot header (${headerKey}) does not match task key (${taskKey}); archiving docs-sync block only.`
+        );
+      } else {
+        console.warn(
+          `Archive warning: snapshot header is missing a key for task (${taskKey}); archiving docs-sync block only.`
+        );
       }
     }
 

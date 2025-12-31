@@ -367,6 +367,13 @@
       "cadence_days": 90
     },
     {
+      "path": ".agent/task/0925-tasks-archive-automation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
       "path": ".agent/task/ACTION_PLAN_TEMPLATE.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -620,6 +627,13 @@
     },
     {
       "path": "docs/ACTION_PLAN-tasks-archive-policy.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/ACTION_PLAN-tasks-archive-automation.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2025-12-31",
@@ -920,6 +934,13 @@
       "cadence_days": 90
     },
     {
+      "path": "docs/PRD-tasks-archive-automation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
       "path": "docs/PRD-taskstate-store-run-history-fix.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -1172,6 +1193,13 @@
       "cadence_days": 90
     },
     {
+      "path": "docs/TECH_SPEC-tasks-archive-automation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
       "path": "docs/TECH_SPEC-taskstate-store-run-history-fix.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -1305,6 +1333,13 @@
       "cadence_days": 90
     },
     {
+      "path": "tasks/0925-prd-tasks-archive-automation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
       "path": "tasks/design-reference-pipeline.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -1432,6 +1467,13 @@
     },
     {
       "path": "tasks/specs/0924-tasks-archive-policy.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/specs/0925-tasks-archive-automation.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2025-12-31",
@@ -1649,6 +1691,13 @@
     },
     {
       "path": "tasks/tasks-0924-tasks-archive-policy.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/tasks-0925-tasks-archive-automation.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2025-12-31",

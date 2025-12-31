@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp 31d975de97a3ac5c1412af39c9a2818442b6509e3f584f0266db161c997b527b -->
+<!-- codex:instruction-stamp 5b44f138a1f5b1c1fe918529abfd9e6c74c08342f1f8672712df0991b2021fad -->
 # Agent Enablement
 
 ## Added by Bootstrap 2025-10-16
@@ -77,7 +77,7 @@ Note: pipelines already set `CODEX_NON_INTERACTIVE=1`; keep it for shortcut runs
 - Orchestrator-first: use `codex-orchestrator` pipelines for planning, implementation, validation, and review; avoid ad-hoc command chains unless no manifest evidence is required.
 - Delegation is mandatory for top-level tasks: spawn at least one subagent run using `MCP_RUNNER_TASK_ID=<task-id>-<stream>`, capture manifest evidence, and summarize in the main run. Use `DELEGATION_GUARD_OVERRIDE_REASON` only when delegation is impossible and record the justification.
 - When writing PR summaries, avoid literal `\n` sequences; use `gh pr create --body-file` or a here-doc so line breaks render correctly in GitHub.
-- Keep `docs/TASKS.md` under the line threshold in `docs/tasks-archive-policy.json`; run `npm run docs:archive-tasks` and push archive payloads to the `task-archives` branch when needed.
+- Keep `docs/TASKS.md` under the line threshold in `docs/tasks-archive-policy.json`; the tasks archive automation workflow opens a PR and updates the `task-archives` branch when the limit is exceeded. Use `npm run docs:archive-tasks` for manual fallback.
 
 ## Project 0303 — Codex Orchestrator Autonomy Enhancements
 - Set `MCP_RUNNER_TASK_ID=0303-orchestrator-autonomy` for all diagnostics and orchestrator executions; confirm manifests land in `.runs/0303-orchestrator-autonomy/cli/`.
