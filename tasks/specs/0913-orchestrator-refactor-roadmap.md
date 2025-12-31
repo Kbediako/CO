@@ -4,7 +4,8 @@ title: Orchestrator Refactor Roadmap (Robustness + Performance)
 relates_to: Task 0913 — docs/PRD-orchestrator-refactor-roadmap.md
 risk: medium
 owners:
-  - Orchestrator maintainers
+  - Codex (top-level agent)
+  - Review agent
 last_review: 2025-12-26
 ---
 

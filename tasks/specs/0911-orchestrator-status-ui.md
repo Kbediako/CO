@@ -4,7 +4,8 @@ title: Orchestrator Status UI
 relates_to: tasks/0911-prd-orchestrator-status-ui.md
 risk: medium
 owners:
-  - Platform Enablement
+  - Codex (top-level agent)
+  - Review agent
 last_review: 2025-12-23
 ---
 

@@ -4,7 +4,8 @@ title: DevTools Readiness + Orchestrator Usage Discipline
 relates_to: tasks/0917-prd-devtools-readiness-orchestrator-usage.md
 risk: medium
 owners:
-  - Platform Enablement
+  - Codex (top-level agent)
+  - Review agent
 last_review: 2025-12-30
 ---
 

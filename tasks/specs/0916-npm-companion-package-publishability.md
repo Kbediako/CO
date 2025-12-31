@@ -4,7 +4,8 @@ title: NPM Companion Package Publishability (Sterile Tarball)
 relates_to: docs/PRD-npm-companion-package-publishability.md
 risk: medium
 owners:
-  - TBD
+  - Codex (top-level agent)
+  - Review agent
 last_review: 2025-12-29
 ---
 

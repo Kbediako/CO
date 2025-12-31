@@ -4,7 +4,8 @@ title: Documentation Freshness Sweep
 relates_to: docs/PRD-docs-freshness-sweep.md
 risk: low
 owners:
-  - TBD
+  - Codex (top-level agent)
+  - Review agent
 last_review: 2025-12-31
 ---
 
