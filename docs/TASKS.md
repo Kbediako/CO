@@ -991,6 +991,7 @@ Mirror status with `tasks/tasks-0913-orchestrator-refactor-roadmap.md` and `.age
 # Task List Snapshot — Docs Freshness Systemization (0922)
 
 - Update - Planning collateral drafted; post-change docs-review manifest captured at `.runs/0922-docs-freshness-systemization/cli/2025-12-31T00-55-04-017Z-96c4de4c/manifest.json`.
+- Update - Review agent docs-review run succeeded at `.runs/0922-docs-freshness-systemization-review/cli/2025-12-31T01-00-39-132Z-2653b56a/manifest.json`.
 - Notes: Export `MCP_RUNNER_TASK_ID=0922-docs-freshness-systemization` before orchestrator commands.
 
 <!-- docs-sync:begin 0922-docs-freshness-systemization -->
@@ -1028,4 +1029,5 @@ Mirror status with `tasks/tasks-0922-docs-freshness-systemization.md` and `.agen
 
 ## Subagent Evidence
 - `.runs/0922-docs-freshness-systemization-audit/cli/2025-12-31T00-42-01-230Z-ed54d009/manifest.json` (docs-review guardrail run).
+- `.runs/0922-docs-freshness-systemization-review/cli/2025-12-31T01-00-39-132Z-2653b56a/manifest.json` (review agent docs-review run).
 <!-- docs-sync:end 0922-docs-freshness-systemization -->

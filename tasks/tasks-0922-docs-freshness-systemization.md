@@ -35,3 +35,4 @@
 
 ## Subagent Evidence
 - `.runs/0922-docs-freshness-systemization-audit/cli/2025-12-31T00-42-01-230Z-ed54d009/manifest.json` (docs-review guardrail run).
+- `.runs/0922-docs-freshness-systemization-review/cli/2025-12-31T01-00-39-132Z-2653b56a/manifest.json` (review agent docs-review run).
