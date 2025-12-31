@@ -18,8 +18,8 @@
 - [x] Archive branch updated with payload - Evidence: `task-archives` branch commit `e2ac1a3`.
 
 ## Validation + handoff
-- [x] Docs-review manifest captured (post-change) - Evidence: `.runs/0924-tasks-archive-policy/cli/2025-12-31T03-33-03-522Z-3a356439/manifest.json`.
-- [x] Implementation review manifest captured (post-implementation) - Evidence: `.runs/0924-tasks-archive-policy/cli/2025-12-31T03-33-41-190Z-792bce37/manifest.json`.
+- [x] Docs-review manifest captured (post-change) - Evidence: `.runs/0924-tasks-archive-policy/cli/2025-12-31T03-44-10-466Z-162524c7/manifest.json`.
+- [x] Implementation review manifest captured (post-implementation) - Evidence: `.runs/0924-tasks-archive-policy/cli/2025-12-31T03-44-46-114Z-0005ee2c/manifest.json`.
 - [x] Review agent run captured (subagent) - Evidence: `.runs/0924-tasks-archive-policy-review/cli/2025-12-31T03-24-18-440Z-4aef69f1/manifest.json`.
 
 ## Relevant Files

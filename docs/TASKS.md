@@ -879,8 +879,8 @@ Mirror status with `tasks/tasks-0923-docs-freshness-date-validation.md` and `.ag
 # Task List Snapshot — Tasks Archive Policy (0924)
 
 - Update - Pre-change docs-review manifest captured at `.runs/0924-tasks-archive-policy/cli/2025-12-31T03-13-05-921Z-731779ca/manifest.json` (delegation guard override recorded).
-- Update - Post-change docs-review manifest captured at `.runs/0924-tasks-archive-policy/cli/2025-12-31T03-33-03-522Z-3a356439/manifest.json`.
-- Update - Implementation-gate manifest captured at `.runs/0924-tasks-archive-policy/cli/2025-12-31T03-33-41-190Z-792bce37/manifest.json` (diff budget override recorded).
+- Update - Post-change docs-review manifest captured at `.runs/0924-tasks-archive-policy/cli/2025-12-31T03-44-10-466Z-162524c7/manifest.json`.
+- Update - Implementation-gate manifest captured at `.runs/0924-tasks-archive-policy/cli/2025-12-31T03-44-46-114Z-0005ee2c/manifest.json` (diff budget override recorded).
 - Update - Review agent docs-review run succeeded at `.runs/0924-tasks-archive-policy-review/cli/2025-12-31T03-24-18-440Z-4aef69f1/manifest.json`.
 - Notes: Export `MCP_RUNNER_TASK_ID=0924-tasks-archive-policy` before orchestrator commands.
 
@@ -904,8 +904,8 @@ Mirror status with `tasks/tasks-0924-tasks-archive-policy.md` and `.agent/task/0
 - [x] Archive branch updated with payload - Evidence: `task-archives` branch commit `e2ac1a3`.
 
 ### Validation + handoff
-- [x] Docs-review manifest captured (post-change) - Evidence: `.runs/0924-tasks-archive-policy/cli/2025-12-31T03-33-03-522Z-3a356439/manifest.json`.
-- [x] Implementation review manifest captured (post-implementation) - Evidence: `.runs/0924-tasks-archive-policy/cli/2025-12-31T03-33-41-190Z-792bce37/manifest.json`.
+- [x] Docs-review manifest captured (post-change) - Evidence: `.runs/0924-tasks-archive-policy/cli/2025-12-31T03-44-10-466Z-162524c7/manifest.json`.
+- [x] Implementation review manifest captured (post-implementation) - Evidence: `.runs/0924-tasks-archive-policy/cli/2025-12-31T03-44-46-114Z-0005ee2c/manifest.json`.
 - [x] Review agent run captured (subagent) - Evidence: `.runs/0924-tasks-archive-policy-review/cli/2025-12-31T03-24-18-440Z-4aef69f1/manifest.json`.
 
 ## Relevant Files

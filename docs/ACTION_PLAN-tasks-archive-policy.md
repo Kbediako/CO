@@ -1,10 +1,10 @@
 # Action Plan — Tasks Archive Policy (Task 0924)
 
 ## Status Snapshot
-- Current Phase: Implementation complete
+- Current Phase: Complete
 - Run Manifest Link (pre-change docs-review): `.runs/0924-tasks-archive-policy/cli/2025-12-31T03-13-05-921Z-731779ca/manifest.json`
-- Run Manifest Link (post-change docs-review): `.runs/0924-tasks-archive-policy/cli/2025-12-31T03-33-03-522Z-3a356439/manifest.json`
-- Run Manifest Link (implementation-gate): `.runs/0924-tasks-archive-policy/cli/2025-12-31T03-33-41-190Z-792bce37/manifest.json`
+- Run Manifest Link (post-change docs-review): `.runs/0924-tasks-archive-policy/cli/2025-12-31T03-44-10-466Z-162524c7/manifest.json`
+- Run Manifest Link (implementation-gate): `.runs/0924-tasks-archive-policy/cli/2025-12-31T03-44-46-114Z-0005ee2c/manifest.json`
 - Approvals / Escalations: record in `tasks/index.json`
 
 ## Evidence Notes
