@@ -1,8 +1,5 @@
 import type { PipelineDefinition } from '../types.js';
 import type { EnvironmentPaths } from '../run/environment.js';
-import { defaultDiagnosticsPipeline } from './defaultDiagnostics.js';
-import { designReferencePipeline } from './designReference.js';
-import { hiFiDesignToolkitPipeline } from './hiFiDesignToolkit.js';
 import type { UserConfig } from '../config/userConfig.js';
 import { findPipeline } from '../config/userConfig.js';
 
@@ -11,39 +8,65 @@ export interface PipelineResolution {
   source: 'default' | 'user';
 }
 
-const builtinPipelines = new Map<string, PipelineDefinition>([
-  [defaultDiagnosticsPipeline.id, defaultDiagnosticsPipeline],
-  [designReferencePipeline.id, designReferencePipeline],
-  [hiFiDesignToolkitPipeline.id, hiFiDesignToolkitPipeline]
-]);
+const fallbackDiagnosticsPipeline: PipelineDefinition = {
+  id: 'diagnostics',
+  title: 'Diagnostics Pipeline',
+  description: 'Build, lint, test, and optionally run spec-guard for the repository.',
+  tags: ['diagnostics-primary', 'diagnostics-secondary'],
+  stages: [
+    {
+      kind: 'command',
+      id: 'build',
+      title: 'npm run build',
+      command: 'npm run build'
+    },
+    {
+      kind: 'command',
+      id: 'lint',
+      title: 'npm run lint',
+      command: 'npm run lint'
+    },
+    {
+      kind: 'command',
+      id: 'test',
+      title: 'npm run test',
+      command: 'npm run test'
+    },
+    {
+      kind: 'command',
+      id: 'spec-guard',
+      title: 'Optional spec-guard (if scripts/spec-guard.mjs exists)',
+      command:
+        'node "$CODEX_ORCHESTRATOR_PACKAGE_ROOT/dist/orchestrator/src/cli/utils/specGuardRunner.js" --dry-run'
+    }
+  ]
+};
 
-function getBuiltinPipeline(id: string | undefined): PipelineDefinition | null {
-  if (!id) {
-    return null;
-  }
-  return builtinPipelines.get(id) ?? null;
+function resolveConfigSource(config: UserConfig | null): 'default' | 'user' {
+  return config?.source === 'package' ? 'default' : 'user';
 }
 
 export function resolvePipeline(
-  env: EnvironmentPaths,
+  _env: EnvironmentPaths,
   options: { pipelineId?: string; config: UserConfig | null }
 ): PipelineResolution {
   const { pipelineId, config } = options;
+  const configSource = resolveConfigSource(config);
   if (pipelineId) {
     const fromUser = findPipeline(config, pipelineId);
     if (fromUser) {
-      return { pipeline: fromUser, source: 'user' };
+      return { pipeline: fromUser, source: configSource };
     }
-    const builtin = getBuiltinPipeline(pipelineId);
-    if (builtin) {
-      return { pipeline: builtin, source: 'default' };
+    if (pipelineId === fallbackDiagnosticsPipeline.id) {
+      return { pipeline: fallbackDiagnosticsPipeline, source: 'default' };
     }
     throw new Error(`Pipeline '${pipelineId}' not found.`);
   }
 
-  const defaultId = config?.defaultPipeline ?? defaultDiagnosticsPipeline.id;
+  const defaultId = config?.defaultPipeline ?? fallbackDiagnosticsPipeline.id;
   const userPipeline = findPipeline(config, defaultId);
-  const chosen = userPipeline ?? getBuiltinPipeline(defaultId) ?? defaultDiagnosticsPipeline;
-  const source: 'default' | 'user' = userPipeline ? 'user' : 'default';
-  return { pipeline: chosen, source };
+  if (userPipeline) {
+    return { pipeline: userPipeline, source: configSource };
+  }
+  return { pipeline: fallbackDiagnosticsPipeline, source: 'default' };
 }

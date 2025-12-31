@@ -26,7 +26,10 @@
       "id": "diagnostics",
       "title": "Diagnostics Pipeline",
       "description": "Build, lint, test, and spec-guard the repository with grouped runner support.",
-      "tags": ["diagnostics-primary", "diagnostics-secondary"],
+      "tags": [
+        "diagnostics-primary",
+        "diagnostics-secondary"
+      ],
       "stages": [
         {
           "kind": "command",
@@ -42,7 +45,7 @@
           "kind": "command",
           "id": "spec-guard",
           "title": "node scripts/spec-guard.mjs --dry-run",
-          "command": "node scripts/spec-guard.mjs --dry-run"
+          "command": "node \"$CODEX_ORCHESTRATOR_PACKAGE_ROOT/dist/orchestrator/src/cli/utils/specGuardRunner.js\" --dry-run"
         }
       ]
     },
@@ -50,7 +53,9 @@
       "id": "implementation-gate",
       "title": "Implementation Complete Gate",
       "description": "Runs the required implementation validations (spec-guard, build, lint, test, docs:check, docs:freshness, diff-budget) and launches the Codex review handoff, writing a single manifest for evidence.",
-      "tags": ["implementation-gate"],
+      "tags": [
+        "implementation-gate"
+      ],
       "stages": [
         {
           "kind": "command",
@@ -103,7 +108,10 @@
       "id": "implementation-gate-devtools",
       "title": "Implementation Complete Gate (DevTools Review)",
       "description": "Implementation gate with a DevTools-enabled review handoff for frontend QA/visual validation.",
-      "tags": ["implementation-gate", "devtools-review"],
+      "tags": [
+        "implementation-gate",
+        "devtools-review"
+      ],
       "stages": [
         {
           "kind": "command",
@@ -156,7 +164,9 @@
       "id": "docs-review",
       "title": "Docs Review Gate",
       "description": "Pre-implementation docs review: spec-guard, docs:check, docs:freshness, and review (diff budget skipped).",
-      "tags": ["docs-review"],
+      "tags": [
+        "docs-review"
+      ],
       "stages": [
         {
           "kind": "command",
@@ -187,7 +197,10 @@
           "id": "review",
           "title": "npm run review",
           "command": "npm run review",
-          "env": { "SKIP_DIFF_BUDGET": "1", "CODEX_REVIEW_NON_INTERACTIVE": "1" }
+          "env": {
+            "SKIP_DIFF_BUDGET": "1",
+            "CODEX_REVIEW_NON_INTERACTIVE": "1"
+          }
         }
       ]
     },
@@ -195,15 +208,20 @@
       "id": "frontend-testing",
       "title": "Frontend Testing",
       "description": "Runs the frontend testing runner (DevTools off by default).",
-      "tags": ["frontend-testing"],
+      "tags": [
+        "frontend-testing"
+      ],
       "guardrailsRequired": false,
       "stages": [
         {
           "kind": "command",
           "id": "frontend-testing",
           "title": "Run frontend testing",
-          "command": "node dist/orchestrator/src/cli/frontendTestingRunner.js",
-          "env": { "CODEX_REVIEW_DEVTOOLS": "0", "CODEX_NON_INTERACTIVE": "1" }
+          "command": "node \"$CODEX_ORCHESTRATOR_PACKAGE_ROOT/dist/orchestrator/src/cli/frontendTestingRunner.js\"",
+          "env": {
+            "CODEX_REVIEW_DEVTOOLS": "0",
+            "CODEX_NON_INTERACTIVE": "1"
+          }
         }
       ]
     },
@@ -211,15 +229,21 @@
       "id": "frontend-testing-devtools",
       "title": "Frontend Testing (DevTools)",
       "description": "Runs the frontend testing runner with Chrome DevTools enabled.",
-      "tags": ["frontend-testing", "devtools"],
+      "tags": [
+        "frontend-testing",
+        "devtools"
+      ],
       "guardrailsRequired": false,
       "stages": [
         {
           "kind": "command",
           "id": "frontend-testing",
           "title": "Run frontend testing (DevTools enabled)",
-          "command": "node dist/orchestrator/src/cli/frontendTestingRunner.js",
-          "env": { "CODEX_REVIEW_DEVTOOLS": "1", "CODEX_NON_INTERACTIVE": "1" }
+          "command": "node \"$CODEX_ORCHESTRATOR_PACKAGE_ROOT/dist/orchestrator/src/cli/frontendTestingRunner.js\"",
+          "env": {
+            "CODEX_REVIEW_DEVTOOLS": "1",
+            "CODEX_NON_INTERACTIVE": "1"
+          }
         }
       ]
     },
@@ -256,7 +280,10 @@
       "id": "design-reference",
       "title": "Design Reference Pipeline",
       "description": "Extracts design reference assets, stages Storybook-ready components, and records manifest evidence.",
-      "tags": ["design", "reference"],
+      "tags": [
+        "design",
+        "reference"
+      ],
       "stages": [
         {
           "kind": "command",
@@ -268,36 +295,46 @@
           "kind": "command",
           "id": "design-config",
           "title": "Resolve design configuration",
-          "command": "node dist/scripts/design/pipeline/prepare.js",
-          "env": { "DESIGN_PIPELINE": "1" }
+          "command": "node \"$CODEX_ORCHESTRATOR_PACKAGE_ROOT/dist/scripts/design/pipeline/prepare.js\"",
+          "env": {
+            "DESIGN_PIPELINE": "1"
+          }
         },
         {
           "kind": "command",
           "id": "design-extract",
           "title": "Run Playwright design extractor",
-          "command": "node dist/scripts/design/pipeline/extract.js",
-          "env": { "DESIGN_PIPELINE": "1" }
+          "command": "node \"$CODEX_ORCHESTRATOR_PACKAGE_ROOT/dist/scripts/design/pipeline/extract.js\"",
+          "env": {
+            "DESIGN_PIPELINE": "1"
+          }
         },
         {
           "kind": "command",
           "id": "design-reference",
           "title": "Build motherduck reference page",
-          "command": "node dist/scripts/design/pipeline/reference.js",
-          "env": { "DESIGN_PIPELINE": "1" }
+          "command": "node \"$CODEX_ORCHESTRATOR_PACKAGE_ROOT/dist/scripts/design/pipeline/reference.js\"",
+          "env": {
+            "DESIGN_PIPELINE": "1"
+          }
         },
         {
           "kind": "command",
           "id": "design-componentize",
           "title": "Componentize artifacts via packages/design-system",
-          "command": "node dist/scripts/design/pipeline/componentize.js",
-          "env": { "DESIGN_PIPELINE": "1" }
+          "command": "node \"$CODEX_ORCHESTRATOR_PACKAGE_ROOT/dist/scripts/design/pipeline/componentize.js\"",
+          "env": {
+            "DESIGN_PIPELINE": "1"
+          }
         },
         {
           "kind": "command",
           "id": "design-advanced-assets",
           "title": "Generate advanced design assets",
-          "command": "node dist/scripts/design/pipeline/advanced-assets.js",
-          "env": { "DESIGN_PIPELINE": "1" },
+          "command": "node \"$CODEX_ORCHESTRATOR_PACKAGE_ROOT/dist/scripts/design/pipeline/advanced-assets.js\"",
+          "env": {
+            "DESIGN_PIPELINE": "1"
+          },
           "allowFailure": true,
           "summaryHint": "Optional Framer Motion and FFmpeg assets"
         },
@@ -305,8 +342,10 @@
           "kind": "command",
           "id": "design-visual-regression",
           "title": "Run visual regression tests",
-          "command": "node dist/scripts/design/pipeline/visual-regression.js",
-          "env": { "DESIGN_PIPELINE": "1" },
+          "command": "node \"$CODEX_ORCHESTRATOR_PACKAGE_ROOT/dist/scripts/design/pipeline/visual-regression.js\"",
+          "env": {
+            "DESIGN_PIPELINE": "1"
+          },
           "allowFailure": true,
           "summaryHint": "Visual regression diffs stored under design/visual-regression/"
         },
@@ -314,16 +353,20 @@
           "kind": "command",
           "id": "design-spec-guard",
           "title": "Validate specs via spec-guard",
-          "command": "node scripts/spec-guard.mjs --dry-run",
-          "env": { "DESIGN_PIPELINE": "1" },
+          "command": "node \"$CODEX_ORCHESTRATOR_PACKAGE_ROOT/dist/orchestrator/src/cli/utils/specGuardRunner.js\" --dry-run",
+          "env": {
+            "DESIGN_PIPELINE": "1"
+          },
           "summaryHint": "Ensures design specs are fresh before artifact write"
         },
         {
           "kind": "command",
           "id": "design-artifact-writer",
           "title": "Persist design artifact manifests",
-          "command": "node dist/scripts/design/pipeline/write-artifacts.js",
-          "env": { "DESIGN_PIPELINE": "1" }
+          "command": "node \"$CODEX_ORCHESTRATOR_PACKAGE_ROOT/dist/scripts/design/pipeline/write-artifacts.js\"",
+          "env": {
+            "DESIGN_PIPELINE": "1"
+          }
         }
       ]
     },
@@ -331,7 +374,10 @@
       "id": "hi-fi-design-toolkit",
       "title": "Hi-Fi Design Toolkit",
       "description": "Runs the hi-fi design toolkit pipeline to extract, tokenize, self-correct, and publish design artifacts.",
-      "tags": ["design", "hi-fi"],
+      "tags": [
+        "design",
+        "hi-fi"
+      ],
       "stages": [
         {
           "kind": "command",
@@ -343,36 +389,51 @@
           "kind": "command",
           "id": "design-config",
           "title": "Resolve design configuration",
-          "command": "node dist/scripts/design/pipeline/prepare.js",
-          "env": { "DESIGN_PIPELINE": "1", "DESIGN_TOOLKIT": "1" }
+          "command": "node \"$CODEX_ORCHESTRATOR_PACKAGE_ROOT/dist/scripts/design/pipeline/prepare.js\"",
+          "env": {
+            "DESIGN_PIPELINE": "1",
+            "DESIGN_TOOLKIT": "1"
+          }
         },
         {
           "kind": "command",
           "id": "design-toolkit-extract",
           "title": "Wrap external toolkit extractor",
-          "command": "node dist/scripts/design/pipeline/toolkit/extract.js",
-          "env": { "DESIGN_PIPELINE": "1", "DESIGN_TOOLKIT": "1" }
+          "command": "node \"$CODEX_ORCHESTRATOR_PACKAGE_ROOT/dist/scripts/design/pipeline/toolkit/extract.js\"",
+          "env": {
+            "DESIGN_PIPELINE": "1",
+            "DESIGN_TOOLKIT": "1"
+          }
         },
         {
           "kind": "command",
           "id": "design-toolkit-tokens",
           "title": "Generate tokens and style guides",
-          "command": "node dist/scripts/design/pipeline/toolkit/tokens.js",
-          "env": { "DESIGN_PIPELINE": "1", "DESIGN_TOOLKIT": "1" }
+          "command": "node \"$CODEX_ORCHESTRATOR_PACKAGE_ROOT/dist/scripts/design/pipeline/toolkit/tokens.js\"",
+          "env": {
+            "DESIGN_PIPELINE": "1",
+            "DESIGN_TOOLKIT": "1"
+          }
         },
         {
           "kind": "command",
           "id": "design-toolkit-reference",
           "title": "Build reference pages + self-correction",
-          "command": "node dist/scripts/design/pipeline/toolkit/reference.js",
-          "env": { "DESIGN_PIPELINE": "1", "DESIGN_TOOLKIT": "1" }
+          "command": "node \"$CODEX_ORCHESTRATOR_PACKAGE_ROOT/dist/scripts/design/pipeline/toolkit/reference.js\"",
+          "env": {
+            "DESIGN_PIPELINE": "1",
+            "DESIGN_TOOLKIT": "1"
+          }
         },
         {
           "kind": "command",
           "id": "design-advanced-assets",
           "title": "Generate advanced design assets",
-          "command": "node dist/scripts/design/pipeline/advanced-assets.js",
-          "env": { "DESIGN_PIPELINE": "1", "DESIGN_TOOLKIT": "1" },
+          "command": "node \"$CODEX_ORCHESTRATOR_PACKAGE_ROOT/dist/scripts/design/pipeline/advanced-assets.js\"",
+          "env": {
+            "DESIGN_PIPELINE": "1",
+            "DESIGN_TOOLKIT": "1"
+          },
           "allowFailure": true,
           "summaryHint": "Optional motion capture via Framer Motion + FFmpeg"
         },
@@ -380,23 +441,32 @@
           "kind": "command",
           "id": "design-toolkit-publish",
           "title": "Publish toolkit outputs to packages/design-system",
-          "command": "node dist/scripts/design/pipeline/toolkit/publish.js",
-          "env": { "DESIGN_PIPELINE": "1", "DESIGN_TOOLKIT": "1" }
+          "command": "node \"$CODEX_ORCHESTRATOR_PACKAGE_ROOT/dist/scripts/design/pipeline/toolkit/publish.js\"",
+          "env": {
+            "DESIGN_PIPELINE": "1",
+            "DESIGN_TOOLKIT": "1"
+          }
         },
         {
           "kind": "command",
           "id": "design-spec-guard",
           "title": "Validate specs via spec-guard",
-          "command": "node scripts/spec-guard.mjs --dry-run",
-          "env": { "DESIGN_PIPELINE": "1", "DESIGN_TOOLKIT": "1" },
+          "command": "node \"$CODEX_ORCHESTRATOR_PACKAGE_ROOT/dist/orchestrator/src/cli/utils/specGuardRunner.js\" --dry-run",
+          "env": {
+            "DESIGN_PIPELINE": "1",
+            "DESIGN_TOOLKIT": "1"
+          },
           "summaryHint": "Ensures HI-FI design specs are current before artifact write"
         },
         {
           "kind": "command",
           "id": "design-artifact-writer",
           "title": "Persist design manifests",
-          "command": "node dist/scripts/design/pipeline/write-artifacts.js",
-          "env": { "DESIGN_PIPELINE": "1", "DESIGN_TOOLKIT": "1" }
+          "command": "node \"$CODEX_ORCHESTRATOR_PACKAGE_ROOT/dist/scripts/design/pipeline/write-artifacts.js\"",
+          "env": {
+            "DESIGN_PIPELINE": "1",
+            "DESIGN_TOOLKIT": "1"
+          }
         }
       ]
     },
@@ -404,7 +474,10 @@
       "id": "tfgrpo-learning",
       "title": "TF-GRPO Learning Loop",
       "description": "Run three TF-GRPO epochs (~100 samples, train temp 0.7, eval temp 0.3, G>=2) and capture guardrail evidence.",
-      "tags": ["tfgrpo-learning", "tfgrpo-learning-secondary"],
+      "tags": [
+        "tfgrpo-learning",
+        "tfgrpo-learning-secondary"
+      ],
       "stages": [
         {
           "kind": "command",

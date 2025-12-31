@@ -590,6 +590,22 @@
       },
       "created_at": "2025-12-31",
       "completed_at": "2025-12-31"
+    },
+    {
+      "id": "0928",
+      "slug": "repo-refactor-simplification",
+      "title": "Repo-wide Refactor Simplification",
+      "path": "tasks/0928-prd-repo-refactor-simplification.md",
+      "kind": "prd",
+      "status": "in-progress",
+      "gate": {
+        "phase": "repo-refactor-simplification-implementation",
+        "status": "succeeded",
+        "log": ".runs/0928-repo-refactor-simplification/cli/2025-12-31T13-53-53-066Z-26a878bb/manifest.json",
+        "run_id": "2025-12-31T13-53-53-066Z-26a878bb"
+      },
+      "created_at": "2025-12-31",
+      "completed_at": null
     }
   ],
   "specs": []
