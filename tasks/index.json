@@ -542,6 +542,22 @@
       },
       "created_at": "2025-12-31",
       "completed_at": "2025-12-31"
+    },
+    {
+      "id": "0925",
+      "slug": "tasks-archive-automation",
+      "title": "Tasks Archive Automation",
+      "path": "tasks/0925-prd-tasks-archive-automation.md",
+      "kind": "prd",
+      "status": "succeeded",
+      "gate": {
+        "phase": "tasks-archive-automation-implementation",
+        "status": "succeeded",
+        "log": ".runs/0925-tasks-archive-automation/cli/2025-12-31T05-05-34-058Z-6b103aff/manifest.json",
+        "run_id": "2025-12-31T05-05-34-058Z-6b103aff"
+      },
+      "created_at": "2025-12-31",
+      "completed_at": "2025-12-31"
     }
   ],
   "specs": []
