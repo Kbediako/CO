@@ -381,6 +381,13 @@
       "cadence_days": 90
     },
     {
+      "path": ".agent/task/0927-implementation-docs-archive-allowlist.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
       "path": ".agent/task/ACTION_PLAN_TEMPLATE.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -571,6 +578,13 @@
     },
     {
       "path": "docs/ACTION_PLAN-frontend-testing-core.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/ACTION_PLAN-implementation-docs-archive-allowlist.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2025-12-31",
@@ -878,6 +892,13 @@
       "cadence_days": 90
     },
     {
+      "path": "docs/PRD-implementation-docs-archive-allowlist.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
       "path": "docs/PRD-implementation-docs-archive-automation.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -1144,6 +1165,13 @@
       "cadence_days": 90
     },
     {
+      "path": "docs/TECH_SPEC-implementation-docs-archive-allowlist.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
       "path": "docs/TECH_SPEC-implementation-docs-archive-automation.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -1382,6 +1410,13 @@
       "cadence_days": 90
     },
     {
+      "path": "tasks/0927-prd-implementation-docs-archive-allowlist.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
       "path": "tasks/design-reference-pipeline.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -1523,6 +1558,13 @@
     },
     {
       "path": "tasks/specs/0926-implementation-docs-archive-automation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/specs/0927-implementation-docs-archive-allowlist.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2025-12-31",
@@ -1754,6 +1796,13 @@
     },
     {
       "path": "tasks/tasks-0926-implementation-docs-archive-automation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/tasks-0927-implementation-docs-archive-allowlist.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2025-12-31",

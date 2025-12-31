@@ -34,6 +34,8 @@ Automate archiving of implementation documentation so completed task artifacts m
   - `archived_cadence_days`: cadence for archived docs in the registry.
   - `doc_patterns`: glob-like patterns for implementation docs (PRD/TECH_SPEC/ACTION_PLAN, task checklists, mini-specs, mirrors).
   - `exclude_paths`: explicit paths that should never be archived (e.g., `docs/PRD.md`).
+  - `allowlist_task_keys`: task keys whose linked docs should never be archived.
+  - `allowlist_paths`: glob-style path patterns that should never be archived.
 
 ### Archiver script
 - Script: `scripts/implementation-docs-archive.mjs`.
@@ -42,8 +44,8 @@ Automate archiving of implementation documentation so completed task artifacts m
   - `tasks/index.json`.
   - `docs/docs-freshness-registry.json`.
 - Selection logic:
-  - Task-linked docs: resolve doc references from task PRDs plus standard mirrors (`tasks/tasks-*`, `tasks/specs/*`, `.agent/task/*`). Archive only when task status is `succeeded` and retention or line thresholds are met (or the registry marks the doc as archived).
-  - Stray docs: match policy doc patterns not referenced by tasks. Archive when `last_review` age exceeds `stray_retain_days` or line threshold is exceeded (or the registry marks them archived).
+  - Task-linked docs: resolve doc references from task PRDs plus standard mirrors (`tasks/tasks-*`, `tasks/specs/*`, `.agent/task/*`). Skip allowlisted task keys or paths; otherwise archive only when task status is `succeeded` and retention or line thresholds are met (or the registry marks the doc as archived).
+  - Stray docs: match policy doc patterns not referenced by tasks. Skip allowlisted paths; otherwise archive when `last_review` age exceeds `stray_retain_days` or line threshold is exceeded (or the registry marks them archived).
 - Outputs:
   - Archive payloads written to `out/<task-id>/docs-archive/**` (full content at original paths).
   - Report written to `out/<task-id>/docs-archive-report.json` listing archived, skipped, and stray candidates.

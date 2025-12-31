@@ -66,6 +66,16 @@ function parseArgs(argv) {
   return options;
 }
 
+function normalizeStringList(value) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value
+    .filter((entry) => typeof entry === 'string')
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+}
+
 async function exists(target) {
   try {
     await stat(target);
@@ -183,6 +193,8 @@ function parsePolicy(raw, policyPath) {
     throw new Error(`Policy doc_patterns is missing in ${policyPath}`);
   }
   const excludePaths = Array.isArray(data?.exclude_paths) ? data.exclude_paths : [];
+  const allowlistTaskKeys = normalizeStringList(data?.allowlist_task_keys);
+  const allowlistPaths = normalizeStringList(data?.allowlist_paths);
 
   return {
     archiveBranch,
@@ -192,7 +204,9 @@ function parsePolicy(raw, policyPath) {
     maxLines,
     archivedCadenceDays,
     docPatterns,
-    excludePaths
+    excludePaths,
+    allowlistTaskKeys,
+    allowlistPaths
   };
 }
 
@@ -304,6 +318,8 @@ async function main() {
 
   const docRegexes = policy.docPatterns.map((pattern) => globToRegExp(pattern));
   const excludeSet = new Set(policy.excludePaths);
+  const allowlistTaskKeys = new Set(policy.allowlistTaskKeys);
+  const allowlistPathRegexes = policy.allowlistPaths.map((pattern) => globToRegExp(pattern));
 
   const today = new Date();
   today.setUTCHours(0, 0, 0, 0);
@@ -363,6 +379,16 @@ async function main() {
         ageDays
       });
     }
+  }
+
+  function getAllowlistReason(relativePath, taskKey) {
+    if (taskKey && allowlistTaskKeys.has(taskKey)) {
+      return 'allowlist_task_key';
+    }
+    if (matchesAnyPattern(relativePath, allowlistPathRegexes)) {
+      return 'allowlist_path';
+    }
+    return null;
   }
 
   const allDocs = await collectDocFiles(repoRoot);
@@ -465,6 +491,17 @@ async function main() {
     const lineCount = content.split('\n').length;
     const registryEntry = registryMap.get(relativePath);
     const status = typeof registryEntry?.status === 'string' ? registryEntry.status : '';
+    const allowlistReason = getAllowlistReason(relativePath, candidate.taskKey);
+
+    if (allowlistReason) {
+      report.skipped.push({
+        path: relativePath,
+        reason: allowlistReason,
+        context: { ...candidate, lineCount }
+      });
+      report.totals.skipped += 1;
+      continue;
+    }
 
     const eligibleReasons = [];
     if (status === 'archived' || status === 'deprecated') {
@@ -515,6 +552,13 @@ async function main() {
       lineCount
     };
     report.stray_candidates.push({ path: relativePath, context: strayContext });
+
+    const allowlistReason = getAllowlistReason(relativePath, null);
+    if (allowlistReason) {
+      report.skipped.push({ path: relativePath, reason: allowlistReason, context: strayContext });
+      report.totals.skipped += 1;
+      continue;
+    }
 
     const eligibleReasons = [];
     if (status === 'archived' || status === 'deprecated') {
