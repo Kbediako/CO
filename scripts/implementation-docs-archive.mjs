@@ -245,16 +245,18 @@ function extractDocReferences(content, docRegexes) {
 
 function buildStubContent({ headerLine, archiveUrl, archivedAt, archiveBranch, relativePath }) {
   const title = headerLine || `# Archived Document`;
-  const lines = [
-    title,
-    '',
+  const lines = [title, ''];
+  if (relativePath.startsWith('tasks/specs/')) {
+    lines.push(`last_review: ${archivedAt}`, '');
+  }
+  lines.push(
     ARCHIVE_MARKER,
     `> Archived on ${archivedAt}. Full content: ${archiveUrl}`,
     '',
     `- Archive branch: ${archiveBranch}`,
     `- Archive path: ${relativePath}`,
     ''
-  ];
+  );
   return lines.join('\n');
 }
 
