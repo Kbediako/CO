@@ -7,7 +7,7 @@
 - [x] Update mirrors - `docs/TASKS.md`, `.agent/task/0910-docs-review-gate.md`, `tasks/index.json`
 
 ## Phase 1 - Docs-review pipeline
-1. Add a docs-review pipeline to `codex.orchestrator.json` (spec-guard, docs:check, review).
+1. Add a docs-review pipeline to `codex.orchestrator.json` (spec-guard, docs:check, docs:freshness, review).
 2. Set `SKIP_DIFF_BUDGET=1` for the review stage in that pipeline.
 3. Validate the pipeline produces a manifest and uses the existing review prompt.
 

@@ -11,7 +11,7 @@ This repo optimizes for agentic, evidence-backed changes. Conventions here are i
 ## Docs-review gate (pre-implementation, non-interactive)
 Capture a docs-review manifest before implementation work starts:
 - `MCP_RUNNER_TASK_ID=<task-id> npx codex-orchestrator start docs-review --format json --no-interactive --task <task-id>`
-- The pipeline runs `node scripts/spec-guard.mjs --dry-run`, `npm run docs:check`, and `npm run review` with `SKIP_DIFF_BUDGET=1`.
+- The pipeline runs `node scripts/spec-guard.mjs --dry-run`, `npm run docs:check`, `npm run docs:freshness`, and `npm run review` with `SKIP_DIFF_BUDGET=1`.
 
 ## Implementation complete gate (non-interactive)
 Run these in order before marking implementation work “complete”:
@@ -20,6 +20,7 @@ Run these in order before marking implementation work “complete”:
 - `npm run lint` (runs `npm run build:patterns` first via `prelint`)
 - `npm run test` (Vitest in `run` mode; non-watch)
 - `npm run docs:check`
+- `npm run docs:freshness`
 - `node scripts/diff-budget.mjs` (set `DIFF_BUDGET_OVERRIDE_REASON` to bypass with justification)
 - `NOTES="<goal + what changed + any risks>" npm run review` (reviewer hand-off; not run in CI)
 

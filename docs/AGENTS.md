@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp ad489ce104a3a7c724423629c1e0199ad434ab5d83f5c794f092f09237decad7 -->
+<!-- codex:instruction-stamp 835e44d9879f7341977b64aafed0a09f0182da5dc26e8bcf54e750fd4c677132 -->
 # Repository Agent Guidance
 
 ## Project 0303 — Codex Orchestrator Autonomy Enhancements
@@ -20,6 +20,7 @@
 ## Docs Review Gate (Pre-Implementation)
 - Before implementation work, capture a docs-review manifest via `npx codex-orchestrator start docs-review --format json --no-interactive --task <task-id>` with `MCP_RUNNER_TASK_ID` set.
 - Record the manifest path in the task checklists (`tasks/`, `.agent/task/`, `docs/TASKS.md`) and `tasks/index.json` for evidence.
+- The docs-review pipeline runs `npm run docs:freshness` after `npm run docs:check` and emits `out/<task-id>/docs-freshness.json`.
 
 ## Orchestrator-First Default
 - Use `codex-orchestrator` pipelines for planning, implementation, validation, and review work that touches the repo.

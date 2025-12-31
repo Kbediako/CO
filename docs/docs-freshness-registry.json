@@ -1,0 +1,1553 @@
+{
+  "version": 1,
+  "generated_at": "2025-12-31",
+  "entries": [
+    {
+      "path": ".agent/AGENTS.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/SOPs/agent-autonomy-defaults.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/SOPs/db-migration.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/SOPs/deploy.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/SOPs/git-management.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/SOPs/incident-response.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/SOPs/meta-orchestration.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/SOPs/orchestrator-autonomy.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/SOPs/postmortems.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/SOPs/review-loop.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/SOPs/rollback.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/SOPs/specs-and-research.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/prompts/crystalizer.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/prompts/hotswap-implementation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/prompts/mcp-diagnostics.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/readme.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/system/api-surface.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/system/architecture.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/system/conventions.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/system/database.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/system/services.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/task/0202-orchestrator-hardening.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/task/0303-orchestrator-autonomy.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/task/0407-orchestrator-interactive-hud.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/task/0505-more-nutrition-pixel.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/task/0506-tfgrpo-integration.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/task/0520-15th-plus-hi-fi.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/task/0607-continuous-learning-pipeline.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/task/0707-orchestrator-slimdown.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/task/0902-orchestrator-reliability-fixes.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/task/0903-taskstate-store-run-history-fix.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/task/0904-readme-codebase-alignment.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/task/0905-agentic-coding-readiness.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/task/0906-docs-hygiene-automation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/task/0907-evaluation-diff-match.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/task/0908-diff-budget-followups.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/task/0909-orchestrator-run-reporting-consistency.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/task/0910-docs-review-gate.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/task/0911-orchestrator-status-ui.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/task/0912-review-loop-devtools-gate.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/task/0913-orchestrator-refactor-roadmap.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/task/0914-npm-companion-package.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/task/0915-frontend-testing-core.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/task/0916-npm-companion-package-publishability.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/task/0917-devtools-readiness-orchestrator-usage.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/task/0918-subagent-delegation-enforcement.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/task/0919-refactor-plan.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/task/0920-refactor-plan-implementation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/task/0921-docs-freshness-sweep.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/task/0922-docs-freshness-systemization.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/task/ACTION_PLAN_TEMPLATE.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/task/PRD_TEMPLATE.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/task/TECH_SPEC_TEMPLATE.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/task/design-reference-pipeline.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/task/frontend-design-pipeline-v2.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/task/hi-fi-design-toolkit.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/task/templates/manual-scenario-template.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/task/templates/mini-spec-template.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/task/templates/prd-template.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/task/templates/research-note-template.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/task/templates/subagent-request-template.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/task/templates/tasks-template.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": ".ai-dev-tasks/create-prd.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": ".ai-dev-tasks/generate-tasks.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": ".ai-dev-tasks/process-task-list.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "AGENTS.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "README.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/ACTION_PLAN-agentic-coding-readiness.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/ACTION_PLAN-codex-orchestrator-autonomy.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/ACTION_PLAN-codex-orchestrator-interactive-hud.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/ACTION_PLAN-devtools-readiness-orchestrator-usage.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/ACTION_PLAN-diff-budget-followups.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/ACTION_PLAN-docs-freshness-sweep.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/ACTION_PLAN-docs-freshness-systemization.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/ACTION_PLAN-docs-hygiene-automation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/ACTION_PLAN-docs-review-gate.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/ACTION_PLAN-evaluation-diff-match.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/ACTION_PLAN-frontend-testing-core.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/ACTION_PLAN-npm-companion-package-publishability.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/ACTION_PLAN-npm-companion-package.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/ACTION_PLAN-orchestrator-refactor-roadmap.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/ACTION_PLAN-orchestrator-reliability-fixes.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/ACTION_PLAN-orchestrator-run-reporting-consistency.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/ACTION_PLAN-readme-codebase-alignment.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/ACTION_PLAN-refactor-plan-implementation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/ACTION_PLAN-subagent-delegation-enforcement.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/ACTION_PLAN-taskstate-store-run-history-fix.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/ACTION_PLAN.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/AGENTS.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/PRD-agentic-coding-readiness.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/PRD-codex-orchestrator-autonomy.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/PRD-codex-orchestrator-interactive-hud.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/PRD-codex-orchestrator-slimdown.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/PRD-dead-code-pruning.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/PRD-devtools-readiness-orchestrator-usage.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/PRD-diff-budget-followups.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/PRD-docs-freshness-sweep.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/PRD-docs-freshness-systemization.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/PRD-docs-hygiene-automation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/PRD-docs-review-gate.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/PRD-evaluation-diff-match.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/PRD-frontend-testing-core.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/PRD-npm-companion-package-publishability.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/PRD-npm-companion-package.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/PRD-orchestrator-issue-validation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/PRD-orchestrator-refactor-roadmap.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/PRD-orchestrator-reliability-fixes.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/PRD-orchestrator-run-reporting-consistency.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/PRD-orchestrator-status-ui.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/PRD-readme-codebase-alignment.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/PRD-refactor-plan-implementation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/PRD-subagent-delegation-enforcement.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/PRD-taskstate-store-run-history-fix.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/PRD.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/PRD_AUTONOMY_UPGRADE.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/REFRACTOR_PLAN.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/TASKS.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/TECH_SPEC-0707-orchestrator-slimdown.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/TECH_SPEC-agentic-coding-readiness.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/TECH_SPEC-codex-orchestrator-autonomy.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/TECH_SPEC-codex-orchestrator-interactive-hud.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/TECH_SPEC-continuous-learning-pipeline.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/TECH_SPEC-dead-code-pruning.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/TECH_SPEC-devtools-readiness-orchestrator-usage.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/TECH_SPEC-diff-budget-followups.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/TECH_SPEC-docs-freshness-sweep.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/TECH_SPEC-docs-freshness-systemization.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/TECH_SPEC-docs-hygiene-automation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/TECH_SPEC-docs-review-gate.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/TECH_SPEC-evaluation-diff-match.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/TECH_SPEC-frontend-testing-core.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/TECH_SPEC-npm-companion-package-publishability.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/TECH_SPEC-npm-companion-package.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/TECH_SPEC-orchestrator-issue-validation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/TECH_SPEC-orchestrator-refactor-roadmap.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/TECH_SPEC-orchestrator-reliability-fixes.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/TECH_SPEC-orchestrator-run-reporting-consistency.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/TECH_SPEC-orchestrator-status-ui.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/TECH_SPEC-readme-codebase-alignment.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/TECH_SPEC-refactor-plan-implementation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/TECH_SPEC-subagent-delegation-enforcement.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/TECH_SPEC-taskstate-store-run-history-fix.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/TECH_SPEC-tfgrpo-integration.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/TECH_SPEC.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/TECH_SPEC_AUTONOMY_UPGRADE.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/design/PRD-design-reference-pipeline.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/design/PRD-frontend-design-pipeline-v2.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/design/PRD-hi-fi-design-toolkit.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/design/notes/2025-11-13-15th-plus.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/design/specs/DESIGN_REFERENCE_PIPELINE.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/design/specs/FRONTEND_DESIGN_PIPELINE_V2.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/design/specs/HI_FI_DESIGN_TOOLKIT.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/findings/ethical-life.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/findings/more-nutrition.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/findings/validation-tasks-0908-diff-budget-followups.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/guides/ci-integration.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/guides/instructions.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/guides/pixel-perfect-local-clones.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/reference/aim-style.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/reference/glyphic-style.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/reference/mantis-style.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/specs/exec-jsonl.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/0202-prd-orchestrator-hardening.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/0303-prd-orchestrator-autonomy.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/0407-prd-orchestrator-interactive-hud.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/0505-more-nutrition-pixel.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/0506-prd-tfgrpo-integration.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/0520-15th-plus-hi-fi.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/0607-prd-continuous-learning-pipeline.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/0911-prd-orchestrator-status-ui.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "archived",
+      "last_review": "2025-12-31",
+      "cadence_days": 365
+    },
+    {
+      "path": "tasks/0917-prd-devtools-readiness-orchestrator-usage.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "archived",
+      "last_review": "2025-12-31",
+      "cadence_days": 365
+    },
+    {
+      "path": "tasks/0918-prd-subagent-delegation-enforcement.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "archived",
+      "last_review": "2025-12-31",
+      "cadence_days": 365
+    },
+    {
+      "path": "tasks/0920-prd-refactor-plan-implementation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "archived",
+      "last_review": "2025-12-31",
+      "cadence_days": 365
+    },
+    {
+      "path": "tasks/0921-prd-docs-freshness-sweep.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "archived",
+      "last_review": "2025-12-31",
+      "cadence_days": 365
+    },
+    {
+      "path": "tasks/0922-prd-docs-freshness-systemization.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/design-reference-pipeline.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/frontend-design-pipeline-v2.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/hi-fi-design-toolkit.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/multi-instance-autonomy-upgrade.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/specs/0906-docs-hygiene-automation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "archived",
+      "last_review": "2025-12-31",
+      "cadence_days": 365
+    },
+    {
+      "path": "tasks/specs/0907-evaluation-diff-match.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "archived",
+      "last_review": "2025-12-31",
+      "cadence_days": 365
+    },
+    {
+      "path": "tasks/specs/0908-diff-budget-followups.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "archived",
+      "last_review": "2025-12-31",
+      "cadence_days": 365
+    },
+    {
+      "path": "tasks/specs/0909-orchestrator-run-reporting-consistency.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/specs/0911-orchestrator-status-ui.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "archived",
+      "last_review": "2025-12-31",
+      "cadence_days": 365
+    },
+    {
+      "path": "tasks/specs/0913-orchestrator-refactor-roadmap.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/specs/0914-npm-companion-package.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/specs/0915-frontend-testing-core.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "archived",
+      "last_review": "2025-12-31",
+      "cadence_days": 365
+    },
+    {
+      "path": "tasks/specs/0916-npm-companion-package-publishability.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "archived",
+      "last_review": "2025-12-31",
+      "cadence_days": 365
+    },
+    {
+      "path": "tasks/specs/0917-devtools-readiness-orchestrator-usage.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "archived",
+      "last_review": "2025-12-31",
+      "cadence_days": 365
+    },
+    {
+      "path": "tasks/specs/0920-refactor-plan-implementation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "archived",
+      "last_review": "2025-12-31",
+      "cadence_days": 365
+    },
+    {
+      "path": "tasks/specs/0921-docs-freshness-sweep.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "archived",
+      "last_review": "2025-12-31",
+      "cadence_days": 365
+    },
+    {
+      "path": "tasks/specs/0922-docs-freshness-systemization.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/specs/README.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/tasks-0202-orchestrator-hardening.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/tasks-0303-orchestrator-autonomy.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/tasks-0407-orchestrator-interactive-hud.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/tasks-0506-tfgrpo.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/tasks-0707-orchestrator-slimdown.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/tasks-0801-dead-code-pruning.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/tasks-0901-orchestrator-issue-validation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/tasks-0902-orchestrator-reliability-fixes.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "archived",
+      "last_review": "2025-12-31",
+      "cadence_days": 365
+    },
+    {
+      "path": "tasks/tasks-0903-taskstate-store-run-history-fix.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "archived",
+      "last_review": "2025-12-31",
+      "cadence_days": 365
+    },
+    {
+      "path": "tasks/tasks-0904-readme-codebase-alignment.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "archived",
+      "last_review": "2025-12-31",
+      "cadence_days": 365
+    },
+    {
+      "path": "tasks/tasks-0905-agentic-coding-readiness.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "archived",
+      "last_review": "2025-12-31",
+      "cadence_days": 365
+    },
+    {
+      "path": "tasks/tasks-0906-docs-hygiene-automation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "archived",
+      "last_review": "2025-12-31",
+      "cadence_days": 365
+    },
+    {
+      "path": "tasks/tasks-0907-evaluation-diff-match.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "archived",
+      "last_review": "2025-12-31",
+      "cadence_days": 365
+    },
+    {
+      "path": "tasks/tasks-0908-diff-budget-followups.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "archived",
+      "last_review": "2025-12-31",
+      "cadence_days": 365
+    },
+    {
+      "path": "tasks/tasks-0909-orchestrator-run-reporting-consistency.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/tasks-0910-docs-review-gate.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "archived",
+      "last_review": "2025-12-31",
+      "cadence_days": 365
+    },
+    {
+      "path": "tasks/tasks-0911-orchestrator-status-ui.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "archived",
+      "last_review": "2025-12-31",
+      "cadence_days": 365
+    },
+    {
+      "path": "tasks/tasks-0912-review-loop-devtools-gate.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "archived",
+      "last_review": "2025-12-31",
+      "cadence_days": 365
+    },
+    {
+      "path": "tasks/tasks-0913-orchestrator-refactor-roadmap.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/tasks-0914-npm-companion-package.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/tasks-0915-frontend-testing-core.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "archived",
+      "last_review": "2025-12-31",
+      "cadence_days": 365
+    },
+    {
+      "path": "tasks/tasks-0916-npm-companion-package-publishability.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "archived",
+      "last_review": "2025-12-31",
+      "cadence_days": 365
+    },
+    {
+      "path": "tasks/tasks-0917-devtools-readiness-orchestrator-usage.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "archived",
+      "last_review": "2025-12-31",
+      "cadence_days": 365
+    },
+    {
+      "path": "tasks/tasks-0918-subagent-delegation-enforcement.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "archived",
+      "last_review": "2025-12-31",
+      "cadence_days": 365
+    },
+    {
+      "path": "tasks/tasks-0919-refactor-plan.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "archived",
+      "last_review": "2025-12-31",
+      "cadence_days": 365
+    },
+    {
+      "path": "tasks/tasks-0920-refactor-plan-implementation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "archived",
+      "last_review": "2025-12-31",
+      "cadence_days": 365
+    },
+    {
+      "path": "tasks/tasks-0921-docs-freshness-sweep.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "archived",
+      "last_review": "2025-12-31",
+      "cadence_days": 365
+    },
+    {
+      "path": "tasks/tasks-0922-docs-freshness-systemization.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    }
+  ]
+}

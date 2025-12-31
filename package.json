@@ -32,6 +32,7 @@
     "build:patterns": "tsc -p patterns/tsconfig.json",
     "clean:dist": "node scripts/clean-dist.mjs",
     "docs:check": "node --loader ts-node/esm scripts/docs-hygiene.ts --check",
+    "docs:freshness": "node scripts/docs-freshness.mjs --check",
     "docs:sync": "node --loader ts-node/esm scripts/docs-hygiene.ts --sync",
     "prelint": "node scripts/build-patterns-if-needed.mjs",
     "lint": "eslint orchestrator/src orchestrator/tests packages/orchestrator/src packages/orchestrator/tests packages/shared adapters evaluation/harness evaluation/tests --ext .ts,.tsx",

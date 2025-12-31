@@ -36,13 +36,18 @@
   - A contributor updates doc metadata in the registry (owner, last_review) to satisfy the audit before review handoff.
 
 ## Technical Considerations
-- Add a docs registry file (proposed: `docs/<docs-freshness-registry>.json`) with per-doc metadata.
-- Add `scripts/<docs-freshness>.mjs` plus an npm script (planned npm script `docs:freshness`) for local runs.
+- Add a docs registry file (`docs/docs-freshness-registry.json`) with per-doc metadata.
+- Add `scripts/docs-freshness.mjs` plus an npm script (`npm run docs:freshness`) for local runs.
 - Add a `docs-freshness` stage to `docs-review` and `implementation-gate` pipelines.
 
+## Assumptions
+- Default freshness cadence for active docs is 90 days.
+- Archived docs are excluded from freshness enforcement.
+- Deprecated docs follow the per-entry cadence when used (seeded at 180 days).
+
 ## Open Questions (for review agent)
-- What freshness SLA should be enforced for active docs (30/60/90 days)?
-- Should archived docs be excluded entirely or require a slower cadence?
+- Confirm the default freshness cadence for active docs (current assumption: 90 days).
+- Confirm whether archived docs should remain excluded from freshness enforcement.
 
 ## Approvals
 - Product: Pending

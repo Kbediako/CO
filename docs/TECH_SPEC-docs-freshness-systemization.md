@@ -20,7 +20,14 @@ Systemize a post-work docs freshness audit that verifies coverage, ownership, an
 ## Design
 
 ### Registry file
-- Proposed location: `docs/<docs-freshness-registry>.json`.
+- Location: `docs/docs-freshness-registry.json`.
+- Top-level fields:
+  - `version` (integer)
+  - `generated_at` (YYYY-MM-DD)
+  - `entries` (array)
+- Scope:
+  - Markdown docs under `.agent/`, `.ai-dev-tasks/`, `docs/`, and `tasks/`.
+  - Root docs: `README.md` and `AGENTS.md`.
 - Each entry:
   - `path` (repo-relative)
   - `owner` (string)
@@ -34,16 +41,17 @@ Systemize a post-work docs freshness audit that verifies coverage, ownership, an
   - `deprecated` docs require a review cadence but can allow longer windows.
 
 ### Audit script
-- Script: `scripts/<docs-freshness>.mjs`.
+- Script: `scripts/docs-freshness.mjs`.
 - Behavior:
   - Load registry; validate schema and required fields.
-  - Enumerate docs under `.agent/`, `.ai-dev-tasks/`, `docs/`, and `tasks/`.
+  - Enumerate markdown docs under `.agent/`, `.ai-dev-tasks/`, `docs/`, `tasks/`, plus root docs.
   - Ensure every doc in scope is present in the registry (no missing coverage).
   - Check that registry entries reference existing files.
   - Enforce freshness windows for `active` and `deprecated` docs.
   - Emit a JSON report to `out/<task-id>/docs-freshness.json` with pass/fail summaries.
 - CLI:
-  - planned npm script `docs:freshness` maps to `node scripts/docs-freshness.mjs --check`.
+  - `npm run docs:freshness` maps to `node scripts/docs-freshness.mjs --check`.
+  - Optional overrides: `--registry <path>` and `--report <path>`.
 
 ### Pipeline integration
 - Add a `docs-freshness` stage to:
@@ -58,7 +66,7 @@ Systemize a post-work docs freshness audit that verifies coverage, ownership, an
 
 ## Testing Strategy
 - Unit: registry schema validation and date calculations.
-- Integration: planned npm script `docs:freshness` on a seeded registry.
+- Integration: `npm run docs:freshness` on a seeded registry.
 - Pipeline: verify docs-review and implementation-gate include the new stage.
 
 ## Documentation & Evidence
@@ -67,9 +75,14 @@ Systemize a post-work docs freshness audit that verifies coverage, ownership, an
 - Task checklist: `tasks/tasks-0922-docs-freshness-systemization.md`
 - Mini-spec: `tasks/specs/0922-docs-freshness-systemization.md`
 
+## Assumptions
+- Default cadence for active docs: 90 days.
+- Archived docs are excluded from freshness enforcement (cadence retained for tracking only).
+- Deprecated docs use per-entry cadence (seeded at 180 days when used).
+
 ## Open Questions (for review agent)
-- What is the default freshness window for `active` docs?
-- Do we require owners for `deprecated` docs, or allow a global owner?
+- Confirm the default freshness window for `active` docs (current assumption: 90 days).
+- Confirm whether deprecated docs should require explicit owners.
 
 ## Approvals
 - Engineering: Pending
