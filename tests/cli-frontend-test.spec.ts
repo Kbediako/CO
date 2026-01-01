@@ -60,20 +60,6 @@ describe('codex-orchestrator frontend-test', () => {
               command: "node -e \"console.log('ok')\""
             }
           ]
-        },
-        {
-          id: 'frontend-testing-devtools',
-          title: 'Frontend Testing (DevTools)',
-          guardrailsRequired: false,
-          stages: [
-            {
-              kind: 'command',
-              id: 'echo',
-              title: 'echo',
-              command: "node -e \"console.log('ok-devtools')\"",
-              env: { CODEX_REVIEW_DEVTOOLS: '1' }
-            }
-          ]
         }
       ]
     };
@@ -86,6 +72,7 @@ describe('codex-orchestrator frontend-test', () => {
 
   it('selects the devtools pipeline when requested', async () => {
     tempDir = await mkdtemp(join(tmpdir(), 'frontend-test-cli-'));
+    const markerPath = join(tempDir, 'devtools.txt');
     const config = {
       pipelines: [
         {
@@ -95,23 +82,9 @@ describe('codex-orchestrator frontend-test', () => {
           stages: [
             {
               kind: 'command',
-              id: 'echo',
-              title: 'echo',
-              command: "node -e \"console.log('ok')\""
-            }
-          ]
-        },
-        {
-          id: 'frontend-testing-devtools',
-          title: 'Frontend Testing (DevTools)',
-          guardrailsRequired: false,
-          stages: [
-            {
-              kind: 'command',
-              id: 'echo',
-              title: 'echo',
-              command: "node -e \"console.log('ok-devtools')\"",
-              env: { CODEX_REVIEW_DEVTOOLS: '1' }
+              id: 'mark-devtools',
+              title: 'mark-devtools',
+              command: `node -e "require('fs').writeFileSync('${markerPath}', process.env.CODEX_REVIEW_DEVTOOLS ?? '')"`
             }
           ]
         }
@@ -121,6 +94,8 @@ describe('codex-orchestrator frontend-test', () => {
 
     const { manifestPath } = await runFrontendTest(['--devtools']);
     const manifest = JSON.parse(await readFile(manifestPath, 'utf8')) as { pipeline_id?: string };
-    expect(manifest.pipeline_id).toBe('frontend-testing-devtools');
+    expect(manifest.pipeline_id).toBe('frontend-testing');
+    const marker = await readFile(markerPath, 'utf8');
+    expect(marker.trim()).toBe('1');
   }, TEST_TIMEOUT);
 });

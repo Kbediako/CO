@@ -199,10 +199,14 @@ async function handleFrontendTest(orchestrator: CodexOrchestrator, rawArgs: stri
     console.error(`[frontend-test] ignoring extra arguments: ${positionals.join(' ')}`);
   }
 
+  const originalDevtools = process.env.CODEX_REVIEW_DEVTOOLS;
+  if (devtools) {
+    process.env.CODEX_REVIEW_DEVTOOLS = '1';
+  }
+
   try {
-    const pipelineId = devtools ? 'frontend-testing-devtools' : 'frontend-testing';
     const result = await orchestrator.start({
-      pipelineId,
+      pipelineId: 'frontend-testing',
       taskId: typeof flags['task'] === 'string' ? (flags['task'] as string) : undefined,
       parentRunId: typeof flags['parent-run'] === 'string' ? (flags['parent-run'] as string) : undefined,
       approvalPolicy: typeof flags['approval-policy'] === 'string' ? (flags['approval-policy'] as string) : undefined,
@@ -227,6 +231,13 @@ async function handleFrontendTest(orchestrator: CodexOrchestrator, rawArgs: stri
       console.log(`Log: ${payload.log_path}`);
     }
   } finally {
+    if (devtools) {
+      if (originalDevtools === undefined) {
+        delete process.env.CODEX_REVIEW_DEVTOOLS;
+      } else {
+        process.env.CODEX_REVIEW_DEVTOOLS = originalDevtools;
+      }
+    }
     hud?.stop();
     runEvents.dispose();
   }

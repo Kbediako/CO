@@ -14,7 +14,7 @@
 
 ## Architecture & Design
 ### Current State
-- DevTools support exists only in the review gate (`implementation-gate-devtools`) and uses `CODEX_REVIEW_DEVTOOLS=1`.
+- DevTools support exists only in the review gate and uses `CODEX_REVIEW_DEVTOOLS=1`.
 - The repo contains a devtools helper script (`scripts/codex-devtools.sh`), but `scripts/` is not shipped in the npm package.
 - `doctor` reports DevTools MCP/skill readiness (config + skill presence), but does not perform a live MCP handshake.
 - Users do not have a dedicated, documented frontend testing pipeline.
@@ -22,13 +22,11 @@
 ### Proposed Changes
 #### Frontend testing pipeline + entrypoint
 - Add a frontend testing pipeline in `codex.orchestrator.json`:
-  - `frontend-testing`: default pipeline with DevTools disabled.
-  - `frontend-testing` explicitly sets `CODEX_REVIEW_DEVTOOLS=0` to avoid inheriting a global devtools override.
-  - Both frontend-testing pipelines set `CODEX_NON_INTERACTIVE=1` to prevent Codex prompts in automation.
-  - `frontend-testing-devtools`: devtools-enabled variant that sets `CODEX_REVIEW_DEVTOOLS=1` (or equivalent flag).
+  - `frontend-testing`: default pipeline with DevTools disabled unless explicitly enabled via `CODEX_REVIEW_DEVTOOLS=1`.
+  - The frontend testing pipeline sets `CODEX_NON_INTERACTIVE=1` to prevent Codex prompts in automation.
 - Add a CLI shortcut (`codex-orchestrator frontend-test`) that selects the pipeline and supports `--devtools`.
-- `--devtools` maps to `CODEX_REVIEW_DEVTOOLS=1` (or a dedicated frontend-testing flag) for the run.
-- Devtools state is inferred by pipeline id/run context; no manifest schema change required.
+- `--devtools` maps to `CODEX_REVIEW_DEVTOOLS=1` for the run.
+- Devtools state is inferred by env flag/run context; no manifest schema change required.
 - Pipeline stage runs `node dist/orchestrator/src/cli/frontendTestingRunner.js`, which shells out to `codex exec` using a prompt from `CODEX_FRONTEND_TEST_PROMPT` or `CODEX_FRONTEND_TEST_PROMPT_PATH`.
 
 #### DevTools enablement logic (packaged)
@@ -47,10 +45,10 @@
 
 #### Documentation updates
 - Update README and agent docs with frontend testing commands and DevTools enablement rules.
-- Document the default-off behavior and the explicit enablement path (`frontend-testing-devtools` or `--devtools`).
+- Document the default-off behavior and the explicit enablement path (`CODEX_REVIEW_DEVTOOLS=1` or `--devtools`).
 
 ### Data Persistence / State Impact
-- No manifest schema changes required; devtools state is inferred from pipeline id and run context.
+- No manifest schema changes required; devtools state is inferred from env flags and run context.
 - Output files continue to live under `.runs/<task-id>/` or configured run roots.
 
 ### External Dependencies
@@ -76,13 +74,13 @@
 - Unit / Integration:
   - DevTools enablement logic tests (default-off, explicit-on).
   - `doctor` output includes devtools readiness and install guidance.
-  - Pipeline tests verify `frontend-testing` pins `CODEX_REVIEW_DEVTOOLS=0` + `CODEX_NON_INTERACTIVE=1`, while `frontend-testing-devtools` sets `CODEX_REVIEW_DEVTOOLS=1` + `CODEX_NON_INTERACTIVE=1`.
+  - Pipeline tests verify `frontend-testing` sets `CODEX_NON_INTERACTIVE=1` and devtools is opt-in via `CODEX_REVIEW_DEVTOOLS=1`.
 - Tooling / Automation:
   - Add CLI smoke test for `frontend-testing` in non-devtools mode (no external deps required).
-  - Optional CI path for `frontend-testing-devtools` when DevTools skill is available.
+  - Optional CI path for devtools-enabled frontend testing when DevTools skill is available.
   - No live frontend-testing pipeline run is required for this change; unit/CLI tests cover behavior without external Codex/DevTools dependencies.
 - Rollback Plan:
-  - Revert new pipeline and CLI entrypoint; keep `implementation-gate-devtools` unchanged.
+  - Revert new pipeline and CLI entrypoint; keep review gating behavior unchanged.
 
 ## Documentation & Evidence
 - Linked PRD: `docs/PRD-frontend-testing-core.md`

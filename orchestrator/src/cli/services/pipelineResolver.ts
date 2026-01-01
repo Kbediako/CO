@@ -11,6 +11,11 @@ import {
 import { logger } from '../../logger.js';
 import type { PipelineDefinition } from '../types.js';
 
+const DEVTOOLS_PIPELINE_ALIASES = new Map<string, string>([
+  ['implementation-gate-devtools', 'implementation-gate'],
+  ['frontend-testing-devtools', 'frontend-testing']
+]);
+
 export class PipelineResolver {
   async loadDesignConfig(rootDir: string): Promise<DesignConfigLoadResult> {
     const designConfig = await loadDesignConfig({ rootDir });
@@ -38,10 +43,19 @@ export class PipelineResolver {
     const userConfig = await loadUserConfig(env);
     logger.info(`PipelineResolver.resolve loaded user config`);
     
-    const requestedPipelineId = options.pipelineId ?? 
+    const pipelineCandidate =
+      options.pipelineId ??
       (shouldActivateDesignPipeline(designConfig) ? designPipelineId(designConfig) : undefined);
+    const resolvedAlias = this.resolvePipelineAlias(pipelineCandidate);
+    const requestedPipelineId = resolvedAlias.pipelineId;
 
     const envOverrides = this.resolveDesignEnvOverrides(designConfig, requestedPipelineId);
+    if (resolvedAlias.devtoolsRequested) {
+      envOverrides.CODEX_REVIEW_DEVTOOLS = '1';
+      logger.warn(
+        `[pipeline] ${resolvedAlias.aliasId} is deprecated; use ${requestedPipelineId} with CODEX_REVIEW_DEVTOOLS=1.`
+      );
+    }
 
     try {
       const { pipeline, source } = resolvePipeline(env, {
@@ -69,5 +83,20 @@ export class PipelineResolver {
       envOverrides.DESIGN_PIPELINE = '1';
     }
     return envOverrides;
+  }
+
+  resolvePipelineAlias(pipelineId?: string): {
+    pipelineId?: string;
+    devtoolsRequested: boolean;
+    aliasId?: string;
+  } {
+    if (!pipelineId) {
+      return { pipelineId, devtoolsRequested: false };
+    }
+    const target = DEVTOOLS_PIPELINE_ALIASES.get(pipelineId);
+    if (!target) {
+      return { pipelineId, devtoolsRequested: false };
+    }
+    return { pipelineId: target, devtoolsRequested: true, aliasId: pipelineId };
   }
 }

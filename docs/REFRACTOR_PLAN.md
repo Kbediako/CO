@@ -28,7 +28,7 @@
 4. Humans mirror outcomes into `tasks/tasks-*.md`, `docs/TASKS.md`, and `.agent/task/*.md`.
 
 ## Over-engineered or redundant areas (with evidence)
-- Duplicate pipeline definitions and stage repetition: pipelines live in `codex.orchestrator.json` and also in `orchestrator/src/cli/pipelines/*`, while `diagnostics`, `implementation-gate`, `implementation-gate-devtools`, and `docs-review` repeat the same stage lists in `codex.orchestrator.json`.
+- Duplicate pipeline definitions and stage repetition: pipelines live in `codex.orchestrator.json` and also in `orchestrator/src/cli/pipelines/*`, while `diagnostics`, `implementation-gate`, and `docs-review` repeat the same stage lists in `codex.orchestrator.json`.
 - Triple instruction layers with overlapping content: `AGENTS.md`, `docs/AGENTS.md`, `.agent/AGENTS.md` are concatenated per `docs/guides/instructions.md`.
 - Manual checklist mirroring across three locations: `tasks/tasks-*.md`, `docs/TASKS.md`, `.agent/task/*.md` (documented in `.agent/system/architecture.md` and `.agent/system/conventions.md`).
 - Legacy MCP runner shims removed in favor of the CLI `codex-orchestrator mcp serve`; legacy migration/metrics scripts are retired, leaving `scripts/status-ui-build.mjs` as the remaining legacy-focused helper.

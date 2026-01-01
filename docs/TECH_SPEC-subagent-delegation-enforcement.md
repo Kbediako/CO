@@ -31,7 +31,7 @@ Source of truth for requirements: `tasks/0918-prd-subagent-delegation-enforcemen
   - Respect `CODEX_ORCHESTRATOR_RUNS_DIR` if set; otherwise use `.runs/`.
 
 #### Pipeline integration
-- Add `node scripts/delegation-guard.mjs` to the core pipelines (`docs-review`, `implementation-gate`, `implementation-gate-devtools`, diagnostics) ahead of spec-guard so failures are captured early.
+- Add `node scripts/delegation-guard.mjs` to the core pipelines (`docs-review`, `implementation-gate`, diagnostics) ahead of spec-guard so failures are captured early.
 - Ensure delegation guard is treated as a required gate for top-level runs.
 
 #### Documentation + template updates

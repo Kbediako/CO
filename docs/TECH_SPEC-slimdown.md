@@ -25,7 +25,7 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
 
 ### 3) Pipeline duplication
 - Remove devtools variants that differ only by env toggles:
-  - `implementation-gate-devtools` and `frontend-testing-devtools` in `codex.orchestrator.json`.
+  - `implementation-gate-devtools` and `frontend-testing-devtools` in `codex.orchestrator.json` (replace with aliases + `CODEX_REVIEW_DEVTOOLS=1`).
 - Replace with a single pipeline + documented env override (`CODEX_REVIEW_DEVTOOLS=1`) or a CLI flag.
 - Preconditions: update README, `.agent` SOPs, and frontend-testing/devtools PRDs + TECH_SPECs that explicitly call out the devtools pipeline IDs.
 
@@ -35,7 +35,7 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
 - Preconditions: update `.runs/README.md` (metrics summary + migrations pointers) and any reviewer guidance referencing these scripts.
 
 ### 5) Optional: adapter parallel-goals harness
-- If unused, remove `scripts/run-parallel-goals.ts` and the `parallel:goals` npm script.
+- If unused, remove scripts/run-parallel-goals.ts and the `parallel:goals` npm script.
 
 ## Expected Line Reductions by Phase (Estimate)
 - Phase 1 (wrapper cleanup): remove 5-6 wrapper/harness scripts.
@@ -82,7 +82,7 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
 - Consolidate devtools pipelines to a single path (document `CODEX_REVIEW_DEVTOOLS=1` / `--devtools` entrypoint).
 - Remove `implementation-gate-devtools` + `frontend-testing-devtools` from `codex.orchestrator.json` after pre-delete checks.
 - Update docs/SOPs/PRDs listing the devtools pipeline IDs (see `docs/findings/slimdown-audit.md` map).
-- Remove `scripts/run-parallel-goals.ts` + `parallel:goals` npm script if still unused.
+- Remove scripts/run-parallel-goals.ts + `parallel:goals` npm script if still unused.
 - Phase 3 doc update list (primary references):
   - `README.md`, `.agent/AGENTS.md`, `.agent/SOPs/review-loop.md`, `.agent/SOPs/agent-autonomy-defaults.md`
   - `docs/AGENTS.md`, `docs/PRD-frontend-testing-core.md`, `docs/TECH_SPEC-frontend-testing-core.md`
@@ -102,7 +102,7 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
 1) Inventory devtools pipeline references (use the list above) and decide the canonical replacement path (`CODEX_REVIEW_DEVTOOLS=1` or `--devtools`).
 2) Add a compatibility path (alias or explicit error messaging) before removing pipeline IDs.
 3) Remove `implementation-gate-devtools` + `frontend-testing-devtools` from `codex.orchestrator.json`; update docs/SOPs/PRDs.
-4) Remove `scripts/run-parallel-goals.ts` + `parallel:goals` npm script if still unused.
+4) Remove scripts/run-parallel-goals.ts + `parallel:goals` npm script if still unused.
 5) Validate with `codex-orchestrator start implementation-gate` and `frontend-testing` using `CODEX_REVIEW_DEVTOOLS=1`.
 
 ### Phase 3 per-file doc update checklist (draft)

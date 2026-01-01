@@ -41,7 +41,6 @@
     "lint": "eslint orchestrator/src orchestrator/tests packages/orchestrator/src packages/orchestrator/tests packages/shared adapters evaluation/harness evaluation/tests --ext .ts,.tsx",
     "pack:audit": "node scripts/pack-audit.mjs",
     "pack:smoke": "node scripts/pack-smoke.mjs",
-    "parallel:goals": "node --loader ts-node/esm scripts/run-parallel-goals.ts",
     "prepack": "npm run clean:dist && npm run build && npm run pack:audit",
     "setup:design-tools": "node --loader ts-node/esm scripts/setup-design-tools.ts",
     "test": "npm run test:orchestrator",
