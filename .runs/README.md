@@ -8,7 +8,7 @@ This directory stores per-task run manifests, transient logs, and reviewer-facin
   - `manifest.json` — per-command status, heartbeat metadata, resume token, metrics bookkeeping (`metrics_recorded`), and run-level summary guidance (diagnostics recommendations when guardrails are missing or failing).
   - `runner.ndjson` — aggregated stdout/stderr events from the CLI run (one JSON object per line).
   - `.heartbeat` — last heartbeat timestamp written every 10 seconds while the runner is active.
-  - `.resume-token` — the 32-byte token required by `codex-orchestrator resume --run <run-id>` to reattach to a run.
+  - `.resume-token` — the 32-byte token required by `scripts/mcp-runner-start.sh --resume` to reattach to a run.
   - `commands/<index>-<slug>.ndjson` — command-level streaming logs captured as newline-delimited JSON.
   - `errors/<index>-<slug>.json` — structured failure artifacts with raw tool payloads and summaries when commands return malformed responses or non-zero exit codes (referenced via `manifest.commands[].error_file`).
 - `.runs/<task-id>/mcp/<run-id>/` — compatibility pointer re-created during each run/migration for downstream tooling that still expects the legacy MCP hierarchy.
@@ -24,5 +24,5 @@ This directory stores per-task run manifests, transient logs, and reviewer-facin
 - Resume events are tracked in `manifest.resume_events[]` with actor/reason metadata to help reviewers trace handoffs.
 - Failed commands produce dedicated error artifacts under `errors/` so reviewers can inspect malformed payloads without replaying the run.
 - When the spec-guard command is missing or fails, the CLI logs a recommendation to rerun diagnostics and records the guidance in `manifest.summary` for reviewer follow-through.
-- Use `codex-orchestrator start diagnostics --format json --no-interactive` and `codex-orchestrator status --run <run-id> --watch --interval 10` to capture and follow diagnostics.
+- `scripts/run-mcp-diagnostics.sh` proxies to `codex-orchestrator` and tails status when invoked with `--watch`.
 - Reviewers should cite the metrics summary alongside the specific run manifest when validating checklist entries.

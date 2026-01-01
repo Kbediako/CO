@@ -13,7 +13,7 @@
 ## Phase 1: Quick wins
 - [x] Pipeline DRY consolidation implemented - Evidence: `codex.orchestrator.json`, `orchestrator/src/cli/config/userConfig.ts`, `orchestrator/tests/UserConfigStageSets.test.ts`.
 - [x] Checklist mirror automation hardened for legacy docs blocks - Evidence: `scripts/docs-hygiene.ts`, `tests/docs-hygiene.spec.ts`.
-- [x] Legacy wrapper consolidation aligned on shared CLI resolver - Evidence: `bin/codex-orchestrator.ts`, `orchestrator/src/cli/mcp.ts`, `mcp-client.json`.
+- [x] Legacy wrapper consolidation aligned on shared CLI resolver - Evidence: `scripts/lib/orchestrator-cli.sh`, `scripts/mcp-runner-start.sh`, `scripts/mcp-runner-poll.sh`, `scripts/run-mcp-diagnostics.sh`.
 
 ## Phase 2: Structural consolidation
 - [x] Orchestrator package boundary plan - Evidence: `packages/orchestrator/src/index.ts`, `orchestrator/src/cli/services/execRuntime.ts`, `orchestrator/src/cli/services/commandRunner.ts`, `orchestrator/src/privacy/guard.ts`.

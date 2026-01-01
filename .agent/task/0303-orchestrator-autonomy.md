@@ -98,7 +98,7 @@
      - Acceptance: Append path avoids full rescan; Evidence: `.runs/0303-orchestrator-autonomy/cli/2025-11-06T07-19-49-813Z-8dd5ff38/manifest.json`, tests `orchestrator/tests/TaskStateStore.test.ts`.
      - [x] Status: _completed 2025-11-06_
    - Subtask: Guardrails rerun
-     - Commands: `npm run test`, `node scripts/spec-guard.mjs --dry-run`, `codex-orchestrator start diagnostics --approval-policy never --format json --no-interactive`
+     - Commands: `npm run test`, `node scripts/spec-guard.mjs --dry-run`, `scripts/run-mcp-diagnostics.sh --no-watch`
      - Acceptance: Diagnostics manifest captures successful guardrail execution; Evidence: `.runs/0303-orchestrator-autonomy/cli/2025-11-06T07-19-49-813Z-8dd5ff38/manifest.json`.
      - [x] Status: _completed 2025-11-06_
 
