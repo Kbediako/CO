@@ -1,10 +1,12 @@
-import { mkdir, rename, writeFile } from 'node:fs/promises';
-import { dirname, join, relative as relativePath } from 'node:path';
+import { join, relative as relativePath } from 'node:path';
 import {
   persistDesignManifest,
   type DesignManifestUpdate,
   type PersistDesignManifestOptions
 } from '../manifest/writer.js';
+import { writeJsonAtomic } from '../../../orchestrator/src/cli/utils/fs.js';
+import { sanitizeTaskId } from '../../../orchestrator/src/persistence/sanitizeTaskId.js';
+import { sanitizeRunId } from '../../../orchestrator/src/persistence/sanitizeRunId.js';
 import type {
   DesignArtifactApprovalRecord,
   DesignArtifactRecord,
@@ -324,19 +326,4 @@ function accumulateNumericTotals(target: Record<string, number>, incoming: Recor
       target[key] = (target[key] ?? 0) + value;
     }
   }
-}
-
-function sanitizeTaskId(value: string): string {
-  return value.replace(/[^a-zA-Z0-9_-]/g, '').toLowerCase();
-}
-
-function sanitizeRunId(value: string): string {
-  return value.replace(/[:]/g, '-');
-}
-
-async function writeJsonAtomic(targetPath: string, payload: unknown): Promise<void> {
-  const tmpPath = `${targetPath}.tmp-${process.pid}-${Date.now()}`;
-  await mkdir(dirname(targetPath), { recursive: true });
-  await writeFile(tmpPath, `${JSON.stringify(payload, null, 2)}\n`, 'utf8');
-  await rename(tmpPath, targetPath);
 }

@@ -3,7 +3,10 @@ import { join } from 'node:path';
 import { loadDesignConfig } from '../../packages/shared/config/index.js';
 
 async function main(): Promise<void> {
-  const repoRoot = process.env.CODEX_ORCHESTRATOR_REPO_ROOT ?? process.cwd();
+  const repoRoot =
+    process.env.CODEX_ORCHESTRATOR_ROOT ??
+    process.env.CODEX_ORCHESTRATOR_REPO_ROOT ??
+    process.cwd();
   const runsRoot = process.env.CODEX_ORCHESTRATOR_RUNS_DIR ?? join(repoRoot, '.runs');
   const taskId = process.env.MCP_RUNNER_TASK_ID ?? '0410-hi-fi-design-toolkit';
   const targetDir = join(runsRoot, taskId, 'cli');

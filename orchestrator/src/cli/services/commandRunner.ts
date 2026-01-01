@@ -175,7 +175,7 @@ export async function runCommandStage(
       CODEX_ORCHESTRATOR_RUN_DIR: paths.runDir,
       CODEX_ORCHESTRATOR_RUNS_DIR: env.runsRoot,
       CODEX_ORCHESTRATOR_OUT_DIR: env.outRoot,
-      CODEX_ORCHESTRATOR_REPO_ROOT: env.repoRoot,
+      CODEX_ORCHESTRATOR_ROOT: env.repoRoot,
       CODEX_ORCHESTRATOR_PACKAGE_ROOT: PACKAGE_ROOT
     };
     const execEnv: NodeJS.ProcessEnv = { ...baseEnv, ...stage.env };

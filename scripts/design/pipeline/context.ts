@@ -22,15 +22,19 @@ export interface DesignContext {
 }
 
 export async function loadDesignContext(): Promise<DesignContext> {
-  const repoRoot = process.env.CODEX_ORCHESTRATOR_REPO_ROOT ?? process.cwd();
+  const repoRoot =
+    process.env.CODEX_ORCHESTRATOR_ROOT ??
+    process.env.CODEX_ORCHESTRATOR_REPO_ROOT ??
+    process.cwd();
   const runsRoot = process.env.CODEX_ORCHESTRATOR_RUNS_DIR ?? join(repoRoot, '.runs');
   const outRoot = process.env.CODEX_ORCHESTRATOR_OUT_DIR ?? join(repoRoot, 'out');
 
   const taskId = sanitizeTaskId(
     process.env.CODEX_ORCHESTRATOR_TASK_ID ?? process.env.MCP_RUNNER_TASK_ID ?? 'unknown-task'
   );
-  const runId = process.env.CODEX_ORCHESTRATOR_RUN_ID ?? 'run-local';
-  const runDir = process.env.CODEX_ORCHESTRATOR_RUN_DIR ?? join(runsRoot, taskId, sanitizeRunId(runId));
+  const rawRunId = process.env.CODEX_ORCHESTRATOR_RUN_ID ?? 'run-local';
+  const runId = sanitizeRunId(rawRunId);
+  const runDir = process.env.CODEX_ORCHESTRATOR_RUN_DIR ?? join(runsRoot, taskId, runId);
   const manifestPath = process.env.CODEX_ORCHESTRATOR_MANIFEST_PATH ?? join(runDir, 'manifest.json');
   const designConfigPath = process.env.DESIGN_CONFIG_PATH ?? join(repoRoot, 'design.config.yaml');
 

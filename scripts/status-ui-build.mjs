@@ -6,6 +6,7 @@
 import fs from 'fs/promises';
 import path from 'path';
 import { execFile } from 'node:child_process';
+import { register } from 'node:module';
 import { promisify } from 'node:util';
 import { fileURLToPath } from 'url';
 
@@ -19,6 +20,19 @@ const TERMINAL_RUN_STATUSES = new Set(['succeeded', 'failed', 'cancelled', 'canc
 const repoRoot = path.resolve(process.env.CODEX_ORCHESTRATOR_ROOT ?? process.cwd());
 const runsRoot = path.resolve(process.env.CODEX_ORCHESTRATOR_RUNS_DIR ?? path.join(repoRoot, '.runs'));
 const outRoot = path.resolve(process.env.CODEX_ORCHESTRATOR_OUT_DIR ?? path.join(repoRoot, 'out'));
+
+let writeJsonAtomicPromise = null;
+
+async function loadWriteJsonAtomic() {
+  if (!writeJsonAtomicPromise) {
+    writeJsonAtomicPromise = (async () => {
+      register('ts-node/esm', new URL('..', import.meta.url));
+      const module = await import('../orchestrator/src/cli/utils/fs.js');
+      return module.writeJsonAtomic;
+    })();
+  }
+  return writeJsonAtomicPromise;
+}
 
 function isoTimestamp(date = new Date()) {
   return date.toISOString();
@@ -48,12 +62,6 @@ async function readJson(filePath) {
   }
 }
 
-async function writeJsonAtomic(targetPath, data) {
-  const tmpPath = `${targetPath}.tmp`;
-  await fs.mkdir(path.dirname(targetPath), { recursive: true });
-  await fs.writeFile(tmpPath, `${JSON.stringify(data, null, 2)}\n`, 'utf8');
-  await fs.rename(tmpPath, targetPath);
-}
 
 function buildTaskKey(item) {
   const id = item?.id ?? '';
@@ -1007,6 +1015,7 @@ async function main() {
     return;
   }
   const payload = await buildDataset(options);
+  const writeJsonAtomic = await loadWriteJsonAtomic();
   await writeJsonAtomic(options.output, payload);
   if (!options.quiet) {
     console.log(`Status UI data written to ${path.relative(repoRoot, options.output)}`);
