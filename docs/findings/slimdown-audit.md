@@ -24,6 +24,10 @@
   - scripts/mcp-runner-metrics.js produces `metrics-summary.json`, while the orchestrator already aggregates metrics in `orchestrator/src/cli/metrics/metricsAggregator.ts`.
 - Optional harnesses may be unused or redundant.
   - scripts/manual-orchestrator-run.ts and scripts/run-parallel-goals.ts duplicate orchestrator pipeline execution.
+- Archive automation workflows duplicate step logic.
+  - Files: .github/workflows/tasks-archive-automation.yml and .github/workflows/implementation-docs-archive-automation.yml share the same checkout/setup/run/diff/PR flow.
+- CLI HUD/output handling is repeated across multiple commands.
+  - `bin/codex-orchestrator.ts` repeats the interactive gate + run output formatting in start/resume/frontend-test.
 
 ## Quick wins (low risk)
 - Remove redundant CLI/MCP wrapper scripts and document the single preferred CLI entrypoint.
@@ -46,6 +50,8 @@
 - Standardize repo/run/out path resolution and env variable names.
 - Remove devtools pipeline duplicates and rely on an env flag or CLI switch.
 - Evaluate whether scripts/run-parallel-goals.ts is still required; remove if unused.
+- Consolidate archive automation workflows into a shared base.
+- Deduplicate HUD/output logic in the CLI entrypoint.
 
 ## Suggested removals (ranked)
 1) Legacy MCP wrappers: scripts/mcp-runner-start.sh, scripts/mcp-runner-poll.sh, scripts/run-mcp-diagnostics.sh, scripts/agents_mcp_runner.mjs.
@@ -53,3 +59,4 @@
 3) Legacy migration/metrics scripts: scripts/mcp-runner-migrate.js, scripts/mcp-runner-metrics.js.
 4) Devtools pipeline duplicates in `codex.orchestrator.json` (keep one pipeline, toggle via env).
 5) Optional parallel goals harness: scripts/run-parallel-goals.ts and `parallel:goals` npm script (if unused).
+6) Archive automation workflow duplication via a reusable base workflow.
