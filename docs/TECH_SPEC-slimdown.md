@@ -58,7 +58,7 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
 - `scripts/pack-audit.mjs` and `scripts/pack-smoke.mjs` share identical `npm pack` parsing; consolidate the shared `runPack` helper.
 
 ### 10) Wrapper script cleanup
-- Remove `scripts/codex-devtools.sh` (one-line wrapper) and replace docs with the canonical `codex -c 'mcp_servers.chrome-devtools.enabled=true' ...` invocation.
+- Remove the codex-devtools wrapper (one-line wrapper) and replace docs with the canonical `codex -c 'mcp_servers.chrome-devtools.enabled=true' ...` invocation.
 
 ### 11) CLI arg parsing + run discovery helpers
 - Extract a shared `parseArgs` helper for scripts that repeat the same `--flag` / `--flag=value` parsing.
@@ -82,6 +82,10 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
 ### 15) Slugify helper reuse
 - Replace design pipeline slugify variants with a shared helper (move to `packages/shared/utils/strings.ts` and re-export in orchestrator).
 
+### 16) Guardrail stage-set reuse
+- Replace repeated delegation/spec-guard command blocks in `docs-review`, `implementation-gate`, `tfgrpo-learning`, and design pipelines with stage-set references.
+- Align the shared spec-guard stage to invoke `scripts/spec-guard.mjs --dry-run` directly (no dist-only wrapper).
+
 ## Expected Line Reductions by Phase (Estimate)
 - Phase 1 (wrapper cleanup): remove 5-6 wrapper/harness scripts.
   - Estimated reduction: ~360 to 500 lines.
@@ -95,6 +99,8 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
   - Estimated reduction: ~180 to 260 lines.
 - Phase 6 (CLI args + mirror overlap + pipeline/adapters): shared arg parsing + mirror/permit helpers + pipeline stage sets + adapter defaults.
   - Estimated reduction: ~160 to 240 lines.
+- Phase 7 (guardrail stage-set reuse): replace repeated delegation/spec-guard command blocks and align spec-guard invocation.
+  - Estimated reduction: ~40 to 80 lines.
 
 ## Validation Steps per Phase
 
@@ -159,7 +165,7 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
 ### Phase 5 checklist
 - Consolidate shared doc tooling helpers (doc collection, task-key normalization, date parsing, toPosix).
 - Consolidate pack script `runPack` helper shared by pack-audit + pack-smoke.
-- Remove `scripts/codex-devtools.sh` after updating docs that reference it.
+- Remove the codex-devtools wrapper after updating docs that reference it.
 
 ### Phase 6 checklist
 - Consolidate shared CLI arg parsing across scripts (guardrails, docs, mirror, status UI, review).
@@ -169,6 +175,11 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
 - Introduce stage sets for shared design/diagnostics pipeline stages.
 - Consolidate adapter build/test/lint command defaults.
 - Replace design pipeline slugify variants with a shared helper.
+
+### Phase 7 checklist
+- Replace repeated delegation-guard command blocks with `delegation-guard-stage` in pipelines.
+- Replace repeated spec-guard command blocks with the shared spec-guard stage set.
+- Align spec-guard stage command to call `scripts/spec-guard.mjs --dry-run`.
 
 ### Phase 2 runbook (ordered)
 1) Confirm no external consumers for legacy scripts (repo + CI scan) and verify `.runs/` artifacts remain sufficient without `metrics-summary.json` / migrations logs.
@@ -196,7 +207,7 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
 1) Extract shared doc tooling helpers into `scripts/lib/` (doc collection, task-key normalization, date parsing, toPosix).
 2) Replace local duplicates in docs-hygiene, docs-freshness, tasks-archive, implementation-docs-archive, and delegation-guard.
 3) Deduplicate pack `runPack` helper across pack-audit + pack-smoke.
-4) Update docs to remove references to `scripts/codex-devtools.sh`, then delete the wrapper script.
+4) Update docs to remove references to the codex-devtools wrapper, then delete the wrapper script.
 5) Run full guardrails and record manifest evidence.
 
 ### Phase 6 runbook (ordered)
@@ -208,6 +219,12 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
 6) Extract adapter command defaults and reuse across go/python/typescript adapters.
 7) Replace design pipeline slugify variants with the shared helper.
 8) Run full guardrails and record manifest evidence.
+
+### Phase 7 runbook (ordered)
+1) Replace delegation-guard command blocks in pipelines with `delegation-guard-stage`.
+2) Replace spec-guard command blocks in pipelines with the shared spec-guard stage set.
+3) Align the spec-guard stage command to call `scripts/spec-guard.mjs --dry-run`.
+4) Run full guardrails and record manifest evidence.
 
 ### Phase 3 per-file doc update checklist (draft)
 - `README.md`: replace devtools pipeline IDs with the new path; update example commands.

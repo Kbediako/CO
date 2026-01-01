@@ -4,6 +4,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import { parseArgs, hasFlag } from './lib/cli-args.js';
+import { normalizeTaskKey, parseDateString } from './lib/docs-helpers.js';
 
 const DEFAULT_POLICY_PATH = 'docs/tasks-archive-policy.json';
 const TASKS_PATH = 'docs/TASKS.md';
@@ -21,26 +22,6 @@ Options:
   -h, --help       Show this help message`);
 }
 
-function normalizeTaskKey(item) {
-  if (!item || typeof item !== 'object') {
-    return null;
-  }
-  const id = typeof item.id === 'string' ? item.id.trim() : '';
-  const slug = typeof item.slug === 'string' ? item.slug.trim() : '';
-  if (slug && id && slug.startsWith(`${id}-`)) {
-    return slug;
-  }
-  if (id && slug) {
-    return `${id}-${slug}`;
-  }
-  if (slug) {
-    return slug;
-  }
-  if (id) {
-    return id;
-  }
-  return null;
-}
 
 function parsePolicy(raw, policyPath) {
   const data = JSON.parse(raw);
@@ -192,16 +173,6 @@ function parseTaskSections(lines) {
   return sections;
 }
 
-function parseDate(value) {
-  if (typeof value !== 'string') {
-    return null;
-  }
-  const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if (!match) {
-    return null;
-  }
-  return value;
-}
 
 function parseRunIdDate(runId) {
   if (typeof runId !== 'string') {
@@ -226,8 +197,10 @@ function loadTaskIndex(raw) {
     }
     const gateStatus = typeof item?.gate?.status === 'string' ? item.gate.status : '';
     const completedAt =
-      parseDate(item.completed_at) ??
-      (gateStatus === 'succeeded' ? parseDate(parseRunIdDate(item?.gate?.run_id)) : null);
+      parseDateString(item.completed_at) ??
+      (gateStatus === 'succeeded'
+        ? parseDateString(parseRunIdDate(item?.gate?.run_id))
+        : null);
     const entry = {
       status: typeof item.status === 'string' ? item.status : '',
       gateStatus,

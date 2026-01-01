@@ -19,6 +19,8 @@
   - `implementation-gate` vs `implementation-gate-devtools` and `frontend-testing` vs `frontend-testing-devtools` (now consolidated via aliases + `CODEX_REVIEW_DEVTOOLS=1`).
 - Pipeline definitions also exist in code for fallback behavior.
   - `orchestrator/src/cli/pipelines/index.ts` defines `fallbackDiagnosticsPipeline`, which overlaps the `diagnostics` pipeline in `codex.orchestrator.json`.
+- Guardrail pipelines repeat delegation/spec-guard command blocks despite existing stage sets.
+  - `docs-review`, `implementation-gate`, `tfgrpo-learning`, `design-reference`, and `hi-fi-design-toolkit` embed the same guardrail commands inline.
 - Legacy migration and metrics scripts overlap with newer CLI behavior.
   - scripts/mcp-runner-migrate.js writes compat pointers similar to `orchestrator/src/cli/run/manifest.ts`.
   - scripts/mcp-runner-metrics.js produces `metrics-summary.json`, while the orchestrator already aggregates metrics in `orchestrator/src/cli/metrics/metricsAggregator.ts`.
@@ -35,8 +37,8 @@
   - `toPosix` variants appear in `scripts/docs-hygiene.ts`, `scripts/docs-freshness.mjs`, and `scripts/implementation-docs-archive.mjs`.
 - Pack scripts duplicate the same npm pack parsing logic.
   - `scripts/pack-audit.mjs` and `scripts/pack-smoke.mjs` both implement identical `runPack` helpers.
-- One-line wrapper scripts still exist.
-  - `scripts/codex-devtools.sh` only forwards `codex -c 'mcp_servers.chrome-devtools.enabled=true' ...`.
+- One-line wrapper scripts existed during the audit.
+  - scripts/codex-devtools.sh only forwarded `codex -c 'mcp_servers.chrome-devtools.enabled=true' ...`.
 - Mirror tooling repeats CLI arg parsing and config validation.
   - `scripts/mirror-site.mjs` and `scripts/mirror-check.mjs` both parse `mirror.config.json` and normalize routes/allowlists; `mirror-serve.mjs` and `mirror-style-fingerprint.mjs` reimplement the same `parseArgs` loop.
 - Optional dependency loading is duplicated.
@@ -58,10 +60,11 @@
 - Remove redundant CLI/MCP wrapper scripts and document the single preferred CLI entrypoint.
 - Drop scripts/manual-orchestrator-run.ts if no active usage remains.
 - Retire scripts/mcp-runner-migrate.js and scripts/mcp-runner-metrics.js once their outputs are verified as unused.
-- Remove the `scripts/codex-devtools.sh` wrapper after updating the one doc reference.
+- Remove the codex-devtools wrapper after updating the one doc reference.
 - Consolidate the shared `runPack` helper used by pack-audit + pack-smoke.
 - Extract a shared CLI arg parser used by guardrails/docs/mirror/status scripts.
 - Centralize mirror config parsing/validation and optional dependency loading (low-risk utility extraction).
+- Reuse guardrail stage sets across pipelines to drop repeated delegation/spec-guard command blocks.
 
 ## Usage signals (still referenced)
 - Legacy MCP wrapper scripts were referenced as compatibility shims in `.agent/readme.md`, `.agent/system/services.md`, `.runs/README.md`, and `docs/REFRACTOR_PLAN.md`, plus listed in `tasks/tasks-0914-npm-companion-package.md` (Phase 1 updates remove these references).
@@ -73,7 +76,7 @@
 - `scripts/status-ui-build.mjs` is referenced by `scripts/status-ui-serve.mjs` and `docs/TECH_SPEC-orchestrator-status-ui.md` (do not remove; only consolidate helpers).
 - scripts/run-parallel-goals.ts appeared only in `package.json` (`parallel:goals`) with no doc references.
 - DevTools pipeline IDs (`implementation-gate-devtools`, `frontend-testing-devtools`) were referenced widely (README, `.agent` SOPs, PRDs/TECH_SPECs for frontend testing/devtools readiness). High-impact references include: `README.md`, `.agent/SOPs/review-loop.md`, `.agent/AGENTS.md`, `docs/AGENTS.md`, `docs/PRD-frontend-testing-core.md`, `docs/TECH_SPEC-frontend-testing-core.md`, `docs/PRD-devtools-readiness-orchestrator-usage.md`, `docs/TECH_SPEC-devtools-readiness-orchestrator-usage.md`, `docs/ACTION_PLAN-frontend-testing-core.md`, `.agent/task/0912-review-loop-devtools-gate.md`, and `.agent/task/0915-frontend-testing-core.md`.
-- `scripts/codex-devtools.sh` is referenced in `docs/TECH_SPEC-frontend-testing-core.md` only.
+- scripts/codex-devtools.sh was referenced in `docs/TECH_SPEC-frontend-testing-core.md` only (reference removed alongside wrapper cleanup).
 - `scripts/pack-audit.mjs` and `scripts/pack-smoke.mjs` are invoked via `npm run pack:audit` / `npm run pack:smoke` in `package.json`.
 
 ## Deeper refactors (moderate risk)
@@ -101,9 +104,10 @@
 6) Archive automation workflow duplication via a reusable base workflow.
 7) Doc tooling helper duplication in docs-freshness/docs-hygiene/tasks-archive/implementation-docs-archive scripts.
 8) Pack script helper duplication (`pack-audit` + `pack-smoke`).
-9) `scripts/codex-devtools.sh` wrapper script (replace with direct `codex -c ...`).
+9) codex-devtools wrapper script (replace with direct `codex -c ...`).
 10) Shared CLI arg parsing + `.runs` discovery helpers (guardrails/status/review).
 11) Mirror config/permit + optional dependency helper consolidation.
 12) Design/diagnostics pipeline stage-set reuse.
 13) Adapter command defaults builder (reduce `build-test-configs` duplication).
 14) Shared slugify helper across design pipeline + orchestrator.
+15) Guardrail stage-set reuse for delegation/spec-guard blocks in pipelines.

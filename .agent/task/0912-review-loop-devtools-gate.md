@@ -8,7 +8,7 @@
 - [x] Mirrors updated (`docs/TASKS.md`, `.agent/task/0912-review-loop-devtools-gate.md`, `tasks/index.json`) — Evidence: this commit + manifest above.
 
 ## Workflow updates
-- [x] DevTools review gate pipeline wired — Evidence: `codex.orchestrator.json`, `scripts/run-review.ts`, `scripts/codex-devtools.sh`.
+- [x] DevTools review gate pipeline wired — Evidence: `codex.orchestrator.json`, `scripts/run-review.ts`, `CODEX_REVIEW_DEVTOOLS=1`.
 - [x] Review-loop SOP added and linked in agent docs — Evidence: `.agent/SOPs/review-loop.md`, `AGENTS.md`, `docs/AGENTS.md`, `.agent/AGENTS.md`.
 - [x] NOTES required for review handoff with optional questions template — Evidence: `scripts/run-review.ts`, `README.md`, `AGENTS.md`, `docs/AGENTS.md`, `.agent/AGENTS.md`, `.agent/SOPs/review-loop.md`.
 - [x] Prompt installer added for onboarding — Evidence: `scripts/setup-codex-prompts.sh`, `README.md`.

@@ -4,6 +4,7 @@ import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import process from 'node:process';
 import { parseArgs, hasFlag } from './lib/cli-args.js';
+import { normalizeTaskKey } from './lib/docs-helpers.js';
 import { findSubagentManifests, resolveRepoRoot, resolveRunsDir } from './lib/run-manifests.js';
 
 function showUsage() {
@@ -24,26 +25,6 @@ Options:
   -h, --help  Show this help message`);
 }
 
-function normalizeTaskKey(item) {
-  if (!item || typeof item !== 'object') {
-    return null;
-  }
-  const id = typeof item.id === 'string' ? item.id.trim() : '';
-  const slug = typeof item.slug === 'string' ? item.slug.trim() : '';
-  if (slug && id && slug.startsWith(`${id}-`)) {
-    return slug;
-  }
-  if (id && slug) {
-    return `${id}-${slug}`;
-  }
-  if (slug) {
-    return slug;
-  }
-  if (id) {
-    return id;
-  }
-  return null;
-}
 
 async function loadTaskKeys(taskIndexPath) {
   const raw = await readFile(taskIndexPath, 'utf8');

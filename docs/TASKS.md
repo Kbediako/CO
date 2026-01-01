@@ -14,17 +14,21 @@ Archived task snapshots live on the task-archives branch.
 # Task List Snapshot — Slimdown Audit (0101)
 - Update - Planning: PRD/tech spec/findings/checklist drafted; docs-review manifest captured at `.runs/0101-slimdown-audit/cli/2026-01-01T06-52-39-251Z-006dbf53/manifest.json`.
 - Update - Planning: Phase 5 consolidation targets (docs tooling, pack helpers, wrapper cleanup) and Phase 6 consolidation targets (CLI args, mirror overlap, pipelines/adapters) captured; subagent diagnostics at `.runs/0101-slimdown-audit-pass3/cli/2026-01-01T13-19-30-562Z-fb8559df/manifest.json`, `.runs/0101-slimdown-audit-phase6/cli/2026-01-01T13-58-29-786Z-01202b8e/manifest.json`.
+- Update - Planning: Phase 7 guardrail stage-set reuse targets captured; docs-review manifest at `.runs/0101-slimdown-audit/cli/2026-01-01T15-58-20-481Z-0ed04072/manifest.json`; subagent diagnostics at `.runs/0101-slimdown-audit-scout/cli/2026-01-01T15-58-52-966Z-2f8ac345/manifest.json`.
 - Notes: Export `MCP_RUNNER_TASK_ID=0101-slimdown-audit` before orchestrator commands.
 ## Checklist Mirror
 Mirror status with `tasks/tasks-0101-slimdown-audit.md` and `.agent/task/0101-slimdown-audit.md`. Keep `[ ]` until evidence is recorded.
 - [x] Docs + checklist drafted - Evidence: `docs/PRD-slimdown.md`, `docs/TECH_SPEC-slimdown.md`, `docs/findings/slimdown-audit.md`, `tasks/tasks-0101-slimdown-audit.md`.
 - [x] Phase 5 consolidation targets captured - Evidence: `docs/TECH_SPEC-slimdown.md`, `docs/findings/slimdown-audit.md`.
 - [x] Phase 6 consolidation targets captured - Evidence: `docs/TECH_SPEC-slimdown.md`, `docs/findings/slimdown-audit.md`.
-- [x] Docs-review manifest captured - Evidence: `.runs/0101-slimdown-audit/cli/2026-01-01T06-52-39-251Z-006dbf53/manifest.json`, `.runs/0101-slimdown-audit/cli/2026-01-01T14-09-05-816Z-0c732c0b/manifest.json`, `.runs/0101-slimdown-audit/cli/2026-01-01T14-36-24-243Z-95cbbe20/manifest.json`.
-- [x] Implementation-gate manifest captured - Evidence: `.runs/0101-slimdown-audit/cli/2026-01-01T11-12-06-081Z-b957f1cf/manifest.json`, `.runs/0101-slimdown-audit/cli/2026-01-01T14-09-41-854Z-46f3b7ea/manifest.json`, `.runs/0101-slimdown-audit/cli/2026-01-01T15-30-21-816Z-3ab2817f/manifest.json`.
-- [x] Diff budget check passed (override recorded for Phase 6 consolidation scope) - Evidence: `.runs/0101-slimdown-audit/cli/2026-01-01T11-12-06-081Z-b957f1cf/manifest.json`, `.runs/0101-slimdown-audit/cli/2026-01-01T14-09-41-854Z-46f3b7ea/manifest.json`, `.runs/0101-slimdown-audit/cli/2026-01-01T15-30-21-816Z-3ab2817f/manifest.json`.
+- [x] Phase 7 consolidation targets captured - Evidence: `docs/TECH_SPEC-slimdown.md`, `docs/findings/slimdown-audit.md`.
+- [x] Phase 5 consolidations executed - Evidence: `.runs/0101-slimdown-audit/cli/2026-01-01T16-30-31-721Z-35c24301/manifest.json`.
+- [x] Phase 7 consolidations executed - Evidence: `.runs/0101-slimdown-audit/cli/2026-01-01T16-30-31-721Z-35c24301/manifest.json`.
+- [x] Docs-review manifest captured - Evidence: `.runs/0101-slimdown-audit/cli/2026-01-01T06-52-39-251Z-006dbf53/manifest.json`, `.runs/0101-slimdown-audit/cli/2026-01-01T14-09-05-816Z-0c732c0b/manifest.json`, `.runs/0101-slimdown-audit/cli/2026-01-01T14-36-24-243Z-95cbbe20/manifest.json`, `.runs/0101-slimdown-audit/cli/2026-01-01T15-58-20-481Z-0ed04072/manifest.json`.
+- [x] Implementation-gate manifest captured - Evidence: `.runs/0101-slimdown-audit/cli/2026-01-01T11-12-06-081Z-b957f1cf/manifest.json`, `.runs/0101-slimdown-audit/cli/2026-01-01T14-09-41-854Z-46f3b7ea/manifest.json`, `.runs/0101-slimdown-audit/cli/2026-01-01T15-30-21-816Z-3ab2817f/manifest.json`, `.runs/0101-slimdown-audit/cli/2026-01-01T16-30-31-721Z-35c24301/manifest.json`.
+- [x] Diff budget check passed (override recorded for Phase 6 consolidation scope) - Evidence: `.runs/0101-slimdown-audit/cli/2026-01-01T11-12-06-081Z-b957f1cf/manifest.json`, `.runs/0101-slimdown-audit/cli/2026-01-01T14-09-41-854Z-46f3b7ea/manifest.json`, `.runs/0101-slimdown-audit/cli/2026-01-01T15-30-21-816Z-3ab2817f/manifest.json`, `.runs/0101-slimdown-audit/cli/2026-01-01T16-30-31-721Z-35c24301/manifest.json`.
 - [x] Frontend-testing manifest captured (DevTools) - Evidence: `.runs/0101-slimdown-audit/cli/2026-01-01T10-10-36-969Z-c65778ef/manifest.json`.
-- [x] Subagent review captured - Evidence: `.runs/0101-slimdown-audit-review/cli/2026-01-01T04-44-27-502Z-9688b054/manifest.json`, `.runs/0101-slimdown-audit-nextsteps/cli/2026-01-01T05-38-23-619Z-961fd034/manifest.json`, `.runs/0101-slimdown-audit-usage/cli/2026-01-01T06-08-57-842Z-dee29417/manifest.json`, `.runs/0101-slimdown-audit-nextphase/cli/2026-01-01T06-22-49-653Z-3e9e326e/manifest.json`, `.runs/0101-slimdown-audit-usage2/cli/2026-01-01T10-04-09-470Z-2a8c0e1b/manifest.json`, `.runs/0101-slimdown-audit-slimdown2/cli/2026-01-01T11-00-20-245Z-fca96825/manifest.json`, `.runs/0101-slimdown-audit-pass3/cli/2026-01-01T13-19-30-562Z-fb8559df/manifest.json`, `.runs/0101-slimdown-audit-phase6/cli/2026-01-01T13-58-29-786Z-01202b8e/manifest.json`, `.runs/0101-slimdown-audit-impl1/cli/2026-01-01T14-37-01-370Z-7538c896/manifest.json`.
+- [x] Subagent review captured - Evidence: `.runs/0101-slimdown-audit-review/cli/2026-01-01T04-44-27-502Z-9688b054/manifest.json`, `.runs/0101-slimdown-audit-nextsteps/cli/2026-01-01T05-38-23-619Z-961fd034/manifest.json`, `.runs/0101-slimdown-audit-usage/cli/2026-01-01T06-08-57-842Z-dee29417/manifest.json`, `.runs/0101-slimdown-audit-nextphase/cli/2026-01-01T06-22-49-653Z-3e9e326e/manifest.json`, `.runs/0101-slimdown-audit-usage2/cli/2026-01-01T10-04-09-470Z-2a8c0e1b/manifest.json`, `.runs/0101-slimdown-audit-slimdown2/cli/2026-01-01T11-00-20-245Z-fca96825/manifest.json`, `.runs/0101-slimdown-audit-pass3/cli/2026-01-01T13-19-30-562Z-fb8559df/manifest.json`, `.runs/0101-slimdown-audit-phase6/cli/2026-01-01T13-58-29-786Z-01202b8e/manifest.json`, `.runs/0101-slimdown-audit-impl1/cli/2026-01-01T14-37-01-370Z-7538c896/manifest.json`, `.runs/0101-slimdown-audit-scout/cli/2026-01-01T15-58-52-966Z-2f8ac345/manifest.json`.
 
 # Task List Snapshot — Codex Orchestrator NPM Companion Package (0914)
 
@@ -380,39 +384,6 @@ Mirror status with `tasks/tasks-0506-tfgrpo.md` and `.agent/task/0506-tfgrpo-int
 - [x] Diagnostics / tfgrpo-learning pipeline run recorded under `.runs/0506-tfgrpo-integration/cli/2025-11-21T05-56-32-837Z-430b2d9d/manifest.json` (spec-guard passed).
 - [x] Guardrails: `node scripts/spec-guard.mjs --dry-run`, `npm run lint`, `npm run test`, `npm run eval:test` (when fixtures exist). Evidence: `.runs/0506-tfgrpo-integration/cli/2025-11-21T07-09-08-052Z-ac3a1d09/manifest.json`.
 - [ ] Reviewer hand-off via `npm run review` referencing the latest TF-GRPO manifest.
-# Task List Snapshot — Implementation Docs Archive Allowlist (0927)
-
-<!-- docs-sync:begin 0927-implementation-docs-archive-allowlist -->
-## Checklist Mirror
-Mirror status with `tasks/tasks-0927-implementation-docs-archive-allowlist.md` and `.agent/task/0927-implementation-docs-archive-allowlist.md`. Keep `[ ]` until evidence is recorded.
-
-### Foundation
-- [x] PRD drafted and mirrored in `docs/` - Evidence: `tasks/0927-prd-implementation-docs-archive-allowlist.md`, `docs/PRD-implementation-docs-archive-allowlist.md`.
-- [x] Tech spec drafted - Evidence: `docs/TECH_SPEC-implementation-docs-archive-allowlist.md`.
-- [x] Action plan drafted - Evidence: `docs/ACTION_PLAN-implementation-docs-archive-allowlist.md`.
-- [x] Mini-spec stub created - Evidence: `tasks/specs/0927-implementation-docs-archive-allowlist.md`.
-- [x] Docs-review manifest captured (pre-change) - Evidence: `.runs/0927-implementation-docs-archive-allowlist/cli/2025-12-31T07-34-54-456Z-dfb518d8/manifest.json`.
-- [x] Mirrors updated in `docs/TASKS.md` and `.agent/task/0927-implementation-docs-archive-allowlist.md` - Evidence: `docs/TASKS.md`, `.agent/task/0927-implementation-docs-archive-allowlist.md`.
-- [x] Delegation guard override recorded for pre-change docs-review - Evidence: `.runs/0927-implementation-docs-archive-allowlist/cli/2025-12-31T07-34-54-456Z-dfb518d8/manifest.json`.
-
-### Allowlist update
-- [x] Policy allowlist fields added - Evidence: `docs/implementation-docs-archive-policy.json`.
-- [x] Archiver allowlist logic implemented - Evidence: `scripts/implementation-docs-archive.mjs`.
-- [x] Archive policy spec updated for allowlist - Evidence: `docs/TECH_SPEC-implementation-docs-archive-automation.md`.
-
-### Validation + handoff
-- [x] Docs-review manifest captured (post-change) - Evidence: `.runs/0927-implementation-docs-archive-allowlist/cli/2025-12-31T07-44-44-267Z-fd2c1a98/manifest.json`.
-- [x] Implementation review manifest captured (post-implementation) - Evidence: `.runs/0927-implementation-docs-archive-allowlist/cli/2025-12-31T07-45-19-629Z-0e122538/manifest.json`.
-- [x] Review agent run captured (subagent) - Evidence: `.runs/0927-implementation-docs-archive-allowlist-review/cli/2025-12-31T07-44-08-552Z-31e64c57/manifest.json`.
-
-## Relevant Files
-- `docs/implementation-docs-archive-policy.json`
-- `scripts/implementation-docs-archive.mjs`
-- `docs/TECH_SPEC-implementation-docs-archive-automation.md`
-
-## Subagent Evidence
-- `.runs/0927-implementation-docs-archive-allowlist-review/cli/2025-12-31T07-44-08-552Z-31e64c57/manifest.json` (review agent docs-review run).
-<!-- docs-sync:end 0927-implementation-docs-archive-allowlist -->
 
 # Task List Snapshot - Repo Refactor Simplification (0928)
 

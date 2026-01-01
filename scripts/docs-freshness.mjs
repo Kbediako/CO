@@ -1,13 +1,11 @@
 #!/usr/bin/env node
 
-import { access, mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
+import { access, mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import { parseArgs, hasFlag } from './lib/cli-args.js';
+import { collectDocFiles, computeAgeInDays, parseIsoDate, toPosixPath } from './lib/docs-helpers.js';
 
-const DOC_ROOTS = ['.agent', '.ai-dev-tasks', 'docs', 'tasks'];
-const DOC_ROOT_FILES = ['README.md', 'AGENTS.md'];
-const EXCLUDED_DIR_NAMES = new Set(['.runs', 'out', 'archives', 'node_modules', 'dist']);
 const DEFAULT_REGISTRY_PATH = 'docs/docs-freshness-registry.json';
 const STATUS_VALUES = new Set(['active', 'archived', 'deprecated']);
 const OWNER_PLACEHOLDERS = new Set(['tbd', 'unassigned', 'owner']);
@@ -34,84 +32,6 @@ async function exists(target) {
   }
 }
 
-function toPosix(p) {
-  return p.split(path.sep).join('/');
-}
-
-async function collectMarkdownFiles(repoRoot, relativeDir) {
-  const absDir = path.join(repoRoot, relativeDir);
-  const entries = await readdir(absDir, { withFileTypes: true });
-  const results = [];
-
-  for (const entry of entries) {
-    const relPath = path.join(relativeDir, entry.name);
-    if (entry.isDirectory()) {
-      if (EXCLUDED_DIR_NAMES.has(entry.name)) {
-        continue;
-      }
-      results.push(...(await collectMarkdownFiles(repoRoot, relPath)));
-      continue;
-    }
-
-    if (entry.isFile() && entry.name.toLowerCase().endsWith('.md')) {
-      results.push(toPosix(relPath));
-    }
-  }
-
-  return results;
-}
-
-async function collectDocFiles(repoRoot) {
-  const results = [];
-
-  for (const file of DOC_ROOT_FILES) {
-    const abs = path.join(repoRoot, file);
-    if (await exists(abs)) {
-      results.push(toPosix(file));
-    }
-  }
-
-  for (const dir of DOC_ROOTS) {
-    const abs = path.join(repoRoot, dir);
-    if (await exists(abs)) {
-      results.push(...(await collectMarkdownFiles(repoRoot, dir)));
-    }
-  }
-
-  results.sort();
-  return results;
-}
-
-function parseReviewDate(raw) {
-  if (typeof raw !== 'string') {
-    return null;
-  }
-  const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if (!match) {
-    return null;
-  }
-  const [, yearStr, monthStr, dayStr] = match;
-  const year = Number(yearStr);
-  const month = Number(monthStr) - 1;
-  const day = Number(dayStr);
-  const date = new Date(Date.UTC(year, month, day));
-  if (Number.isNaN(date.getTime())) {
-    return null;
-  }
-  if (
-    date.getUTCFullYear() !== year ||
-    date.getUTCMonth() !== month ||
-    date.getUTCDate() !== day
-  ) {
-    return null;
-  }
-  return date;
-}
-
-function computeAgeInDays(from, to) {
-  const msPerDay = 24 * 60 * 60 * 1000;
-  return Math.floor((to.getTime() - from.getTime()) / msPerDay);
-}
 
 function normalizeOwner(value) {
   if (typeof value !== 'string') {
@@ -173,7 +93,7 @@ async function main() {
     const owner = normalizeOwner(entry?.owner);
     const status = typeof entry?.status === 'string' ? entry.status : '';
     const cadenceDays = Number.isFinite(entry?.cadence_days) ? Number(entry.cadence_days) : NaN;
-    const reviewDate = parseReviewDate(entry?.last_review);
+    const reviewDate = parseIsoDate(entry?.last_review);
 
     if (!entryPath) {
       issues.push('missing path');
@@ -233,7 +153,7 @@ async function main() {
     version: 1,
     generated_at: new Date().toISOString(),
     task_id: process.env.MCP_RUNNER_TASK_ID || null,
-    registry_path: toPosix(path.relative(repoRoot, registryPath)),
+    registry_path: toPosixPath(path.relative(repoRoot, registryPath)),
     totals: {
       docs_scanned: docFiles.length,
       registry_entries: registryEntries.length,
