@@ -2,7 +2,8 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "outDir": "dist",
-    "noEmit": false
+    "noEmit": false,
+    "allowJs": true
   },
   "include": [
     "orchestrator/src/**/*.ts",
@@ -12,6 +13,7 @@
     "packages/sdk-node/src/**/*.ts",
     "packages/shared/**/*.ts",
     "scripts/design/pipeline/**/*.ts",
+    "scripts/design/pipeline/**/*.js",
     "bin/**/*.ts",
     "types/**/*.d.ts"
   ],

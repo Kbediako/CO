@@ -1,4 +1,5 @@
 import type { LanguageAdapter } from '../types.js';
+import { withFixtureEvaluation } from '../lib/command-defaults.js';
 
 export const goAdapter: LanguageAdapter = {
   id: 'go-module',
@@ -15,12 +16,10 @@ export const goAdapter: LanguageAdapter = {
       command: 'go',
       args: ['build', './...'],
       description: 'Compiles all Go packages within the module to ensure sources are valid.',
-      evaluation: {
-        cwd: '{fixture}',
-        requiresCleanFixture: true,
+      evaluation: withFixtureEvaluation({
         supportsParallel: true,
         timeoutMs: 15000
-      }
+      })
     },
     test: {
       id: 'test',
@@ -28,12 +27,10 @@ export const goAdapter: LanguageAdapter = {
       command: 'go',
       args: ['test', './...'],
       description: 'Runs unit tests across all Go packages with default settings.',
-      evaluation: {
-        cwd: '{fixture}',
-        requiresCleanFixture: true,
+      evaluation: withFixtureEvaluation({
         supportsParallel: true,
         timeoutMs: 20000
-      }
+      })
     },
     lint: {
       id: 'lint',
@@ -41,12 +38,10 @@ export const goAdapter: LanguageAdapter = {
       command: 'go',
       args: ['vet', './...'],
       description: 'Runs `go vet` to spot suspicious constructs across packages.',
-      evaluation: {
-        cwd: '{fixture}',
-        requiresCleanFixture: true,
+      evaluation: withFixtureEvaluation({
         supportsParallel: true,
         timeoutMs: 15000
-      }
+      })
     }
   },
   metadata: {

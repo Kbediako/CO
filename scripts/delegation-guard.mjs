@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 
-import { access, readFile, readdir } from 'node:fs/promises';
-import { isAbsolute, join, resolve } from 'node:path';
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import process from 'node:process';
+import { parseArgs, hasFlag } from './lib/cli-args.js';
+import { findSubagentManifests, resolveRepoRoot, resolveRunsDir } from './lib/run-manifests.js';
 
 function showUsage() {
   console.log(`Usage: node scripts/delegation-guard.mjs [--dry-run]
@@ -20,23 +22,6 @@ Escape hatch:
 Options:
   --dry-run   Report failures without exiting non-zero
   -h, --help  Show this help message`);
-}
-
-function parseArgs(argv) {
-  let dryRun = false;
-  for (const arg of argv) {
-    if (arg === '--dry-run') {
-      dryRun = true;
-    } else if (arg === '-h' || arg === '--help') {
-      showUsage();
-      process.exit(0);
-    } else {
-      console.error(`Unknown option: ${arg}`);
-      showUsage();
-      process.exit(2);
-    }
-  }
-  return { dryRun };
 }
 
 function normalizeTaskKey(item) {
@@ -69,71 +54,21 @@ async function loadTaskKeys(taskIndexPath) {
     .filter((key) => typeof key === 'string' && key.length > 0);
 }
 
-function resolveRepoRoot() {
-  const configured = process.env.CODEX_ORCHESTRATOR_ROOT;
-  if (!configured) {
-    return process.cwd();
-  }
-  if (isAbsolute(configured)) {
-    return configured;
-  }
-  return resolve(process.cwd(), configured);
-}
-
-function resolveRunsDir(repoRoot) {
-  const configured = process.env.CODEX_ORCHESTRATOR_RUNS_DIR || '.runs';
-  if (isAbsolute(configured)) {
-    return configured;
-  }
-  return resolve(repoRoot, configured);
-}
-
-async function findSubagentManifests(runsDir, taskId) {
-  let entries;
-  try {
-    entries = await readdir(runsDir, { withFileTypes: true });
-  } catch (error) {
-    const message =
-      error && typeof error === 'object' && error !== null && 'message' in error
-        ? error.message
-        : String(error);
-    return { found: [], error: `Unable to read runs directory (${message})` };
-  }
-
-  const prefix = `${taskId}-`;
-  const found = [];
-
-  for (const entry of entries) {
-    if (!entry.isDirectory() || !entry.name.startsWith(prefix)) {
-      continue;
-    }
-    const cliDir = join(runsDir, entry.name, 'cli');
-    let runDirs;
-    try {
-      runDirs = await readdir(cliDir, { withFileTypes: true });
-    } catch {
-      continue;
-    }
-
-    for (const runDir of runDirs) {
-      if (!runDir.isDirectory()) {
-        continue;
-      }
-      const manifestPath = join(cliDir, runDir.name, 'manifest.json');
-      try {
-        await access(manifestPath);
-        found.push(manifestPath);
-      } catch {
-        // ignore missing manifest
-      }
-    }
-  }
-
-  return { found, error: null };
-}
-
 async function main() {
-  const { dryRun } = parseArgs(process.argv.slice(2));
+  const { args, positionals } = parseArgs(process.argv.slice(2));
+  if (hasFlag(args, 'h') || hasFlag(args, 'help')) {
+    showUsage();
+    process.exit(0);
+  }
+  const knownFlags = new Set(['dry-run', 'h', 'help']);
+  const unknown = Object.keys(args).filter((key) => !knownFlags.has(key));
+  if (unknown.length > 0 || positionals.length > 0) {
+    const label = unknown[0] ? `--${unknown[0]}` : positionals[0];
+    console.error(`Unknown option: ${label}`);
+    showUsage();
+    process.exit(2);
+  }
+  const dryRun = hasFlag(args, 'dry-run');
 
   const overrideReason = (process.env.DELEGATION_GUARD_OVERRIDE_REASON || '').trim();
   if (overrideReason) {

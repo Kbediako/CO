@@ -5,27 +5,10 @@
  */
 import fs from "node:fs/promises";
 import path from "node:path";
+import { parseArgs, hasFlag } from "./lib/cli-args.js";
 
-function parseArgs(rawArgs) {
-  const args = {};
-  for (let i = 0; i < rawArgs.length; i += 1) {
-    const arg = rawArgs[i];
-    if (!arg.startsWith("--")) continue;
-    const [flag, value] = arg.split("=");
-    const key = flag.replace(/^--/, "");
-    if (value !== undefined) {
-      args[key] = value;
-      continue;
-    }
-    const next = rawArgs[i + 1];
-    if (next && !next.startsWith("--")) {
-      args[key] = next;
-      i += 1;
-    } else {
-      args[key] = true;
-    }
-  }
-  return args;
+function showUsage() {
+  console.log("Usage: node scripts/mirror-style-fingerprint.mjs --project <name> [--outDir docs/reference]");
 }
 
 async function collectFiles(dir, ext = ".css") {
@@ -188,8 +171,22 @@ function aggregateBackgrounds(css) {
 }
 
 async function main() {
-  const args = parseArgs(process.argv.slice(2));
-  const project = args.project;
+  const { args, positionals } = parseArgs(process.argv.slice(2));
+  if (hasFlag(args, "help") || hasFlag(args, "h")) {
+    showUsage();
+    return;
+  }
+  const knownFlags = new Set(["project", "outDir", "h", "help"]);
+  const unknown = Object.keys(args).filter((key) => !knownFlags.has(key));
+  if (unknown.length > 0 || positionals.length > 0) {
+    const label = unknown[0] ? `--${unknown[0]}` : positionals[0];
+    console.error(`Unknown option: ${label}`);
+    showUsage();
+    process.exitCode = 2;
+    return;
+  }
+
+  const project = typeof args.project === "string" ? args.project : null;
   if (!project) {
     console.error("Missing required --project argument (e.g. --project glyphic)");
     process.exitCode = 1;
@@ -254,7 +251,8 @@ async function main() {
     notes: "Heuristics derived from mirrored CSS; refine manually if needed."
   };
 
-  const outDir = path.resolve(args.outDir ?? path.join("docs", "reference"));
+  const outDirInput = typeof args.outDir === "string" ? args.outDir : path.join("docs", "reference");
+  const outDir = path.resolve(outDirInput);
   await fs.mkdir(outDir, { recursive: true });
 
   const jsonPath = path.join(outDir, `${project}-style-profile.json`);

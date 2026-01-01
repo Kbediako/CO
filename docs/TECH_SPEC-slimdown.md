@@ -62,22 +62,25 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
 
 ### 11) CLI arg parsing + run discovery helpers
 - Extract a shared `parseArgs` helper for scripts that repeat the same `--flag` / `--flag=value` parsing.
+- Extend the shared parser to mirror tooling (`scripts/mirror-check.mjs`, `scripts/mirror-serve.mjs`, `scripts/mirror-style-fingerprint.mjs`).
 - Centralize `.runs` manifest discovery used by `scripts/run-review.ts`, `scripts/status-ui-build.mjs`, and `scripts/delegation-guard.mjs`.
 
 ### 12) Mirror + design tooling overlap
 - Share optional dependency loading between `scripts/design/pipeline/optionalDeps.ts` and `scripts/mirror-optional-deps.mjs`.
 - Consolidate compliance permit parsing between `scripts/design/pipeline/toolkit/common.ts` and `scripts/mirror-site.mjs`.
 - Share mirror config parsing/validation between `scripts/mirror-site.mjs` and `scripts/mirror-check.mjs`; reuse CLI arg parsing for mirror-serve/fingerprint.
+- Ensure shared JS helpers (permit + optional-deps) are shipped in `dist/` for design pipeline stages.
 
 ### 13) Pipeline stage duplication (design + diagnostics)
-- Use stage sets for shared design stages across `design-reference` and `hi-fi-design-toolkit`.
-- Collapse `diagnostics-with-eval` into `diagnostics` plus an optional eval stage flag or shared stage set.
+- Use stage sets for shared design stages across `design-reference` and `hi-fi-design-toolkit` (spec-guard + artifact writer).
+- Use stage sets for shared diagnostics guardrails (delegation + spec-guard), keeping eval between build/lint/test and spec-guard.
+- Note: stage sets cannot include nested stage-set refs (enforced by `orchestrator/src/cli/config/userConfig.ts`).
 
 ### 14) Adapter command defaults
-- Extract shared defaults/builders for `adapters/*/build-test-configs.ts` to reduce repeated command scaffolding.
+- Extract shared defaults/builders for `adapters/*/build-test-configs.ts` to reduce repeated command scaffolding (fixture cwd + clean fixture).
 
 ### 15) Slugify helper reuse
-- Replace design pipeline slugify variants with a shared helper (reuse `orchestrator/src/cli/utils/strings.ts` or move to `packages/shared`).
+- Replace design pipeline slugify variants with a shared helper (move to `packages/shared/utils/strings.ts` and re-export in orchestrator).
 
 ## Expected Line Reductions by Phase (Estimate)
 - Phase 1 (wrapper cleanup): remove 5-6 wrapper/harness scripts.
@@ -162,6 +165,7 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
 - Consolidate shared CLI arg parsing across scripts (guardrails, docs, mirror, status UI, review).
 - Centralize `.runs` manifest discovery used by status UI + run-review + delegation-guard.
 - Deduplicate optional dependency loading and compliance permit parsing between design + mirror tooling.
+- Ensure shared JS helpers are included in `dist/` (permit + optional-deps).
 - Introduce stage sets for shared design/diagnostics pipeline stages.
 - Consolidate adapter build/test/lint command defaults.
 - Replace design pipeline slugify variants with a shared helper.
@@ -199,10 +203,11 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
 1) Introduce a shared `parseArgs` helper and migrate scripts with identical CLI parsing.
 2) Extract `.runs` manifest discovery helpers for status UI + run-review + delegation-guard.
 3) Consolidate mirror config/permit + optional dependency helpers (share between design + mirror tooling).
-4) Add stage sets for shared design/diagnostics stages and replace duplicated stage blocks.
-5) Extract adapter command defaults and reuse across go/python/typescript adapters.
-6) Replace design pipeline slugify variants with the shared helper.
-7) Run full guardrails and record manifest evidence.
+4) Update build output to include shared JS helpers (permit + optional-deps).
+5) Add stage sets for shared design/diagnostics stages and replace duplicated stage blocks.
+6) Extract adapter command defaults and reuse across go/python/typescript adapters.
+7) Replace design pipeline slugify variants with the shared helper.
+8) Run full guardrails and record manifest evidence.
 
 ### Phase 3 per-file doc update checklist (draft)
 - `README.md`: replace devtools pipeline IDs with the new path; update example commands.

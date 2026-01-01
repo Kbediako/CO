@@ -9,6 +9,8 @@ import { execFile } from 'node:child_process';
 import { register } from 'node:module';
 import { promisify } from 'node:util';
 import { fileURLToPath } from 'url';
+import { parseArgs, hasFlag } from './lib/cli-args.js';
+import { listDirectories, parseRunIdTimestamp, pickLatestRunId, resolveRepoRoot, resolveRunsDir } from './lib/run-manifests.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -17,8 +19,8 @@ const DEFAULT_LOG_LINE_LIMIT = 200;
 const DEFAULT_LOG_BYTE_LIMIT = 100 * 1024;
 const TERMINAL_RUN_STATUSES = new Set(['succeeded', 'failed', 'cancelled', 'canceled']);
 
-const repoRoot = path.resolve(process.env.CODEX_ORCHESTRATOR_ROOT ?? process.cwd());
-const runsRoot = path.resolve(process.env.CODEX_ORCHESTRATOR_RUNS_DIR ?? path.join(repoRoot, '.runs'));
+const repoRoot = resolveRepoRoot();
+const runsRoot = resolveRunsDir(repoRoot);
 const outRoot = path.resolve(process.env.CODEX_ORCHESTRATOR_OUT_DIR ?? path.join(repoRoot, 'out'));
 
 let writeJsonAtomicPromise = null;
@@ -126,38 +128,6 @@ function buildSyntheticRunFromTask(item, taskKey) {
     },
     source: 'index'
   };
-}
-
-function parseRunIdTimestamp(runId) {
-  if (typeof runId !== 'string') {
-    return null;
-  }
-  const match = runId.match(/^(\d{4}-\d{2}-\d{2})T(\d{2})-(\d{2})-(\d{2})-(\d{3})Z/);
-  if (!match) {
-    return null;
-  }
-  const [, datePart, hour, minute, second, millis] = match;
-  const iso = `${datePart}T${hour}:${minute}:${second}.${millis}Z`;
-  const parsed = new Date(iso);
-  if (Number.isNaN(parsed.getTime())) {
-    return null;
-  }
-  return parsed;
-}
-
-function pickLatestRunId(runIds) {
-  if (!Array.isArray(runIds) || runIds.length === 0) {
-    return null;
-  }
-  const sorted = [...runIds].sort((a, b) => {
-    const aTime = parseRunIdTimestamp(a)?.getTime();
-    const bTime = parseRunIdTimestamp(b)?.getTime();
-    if (aTime != null && bTime != null) {
-      return bTime - aTime;
-    }
-    return b.localeCompare(a);
-  });
-  return sorted[0] ?? null;
 }
 
 function countPendingApprovals(approvals) {
@@ -468,18 +438,6 @@ function normalizeDesignRun(run, runIdFallback) {
     },
     source: 'design'
   };
-}
-
-async function listDirectories(dirPath) {
-  try {
-    const entries = await fs.readdir(dirPath, { withFileTypes: true });
-    return entries.filter((entry) => entry.isDirectory()).map((entry) => entry.name);
-  } catch (error) {
-    if (error.code === 'ENOENT') {
-      return [];
-    }
-    throw error;
-  }
 }
 
 async function listFiles(dirPath) {
@@ -829,59 +787,6 @@ function buildActivity(runs) {
     .slice(0, 30);
 }
 
-function parseArgs(argv) {
-  const options = {
-    includeLogs: false,
-    logLines: DEFAULT_LOG_LINE_LIMIT,
-    logBytes: DEFAULT_LOG_BYTE_LIMIT,
-    output: path.join(outRoot, OUTPUT_TASK_ID, 'data.json'),
-    taskFilter: null,
-    quiet: false
-  };
-
-  for (let index = 0; index < argv.length; index += 1) {
-    const arg = argv[index];
-    if (arg === '--include-logs') {
-      options.includeLogs = true;
-    } else if (arg === '--log-lines') {
-      options.logLines = Number(argv[index + 1]);
-      index += 1;
-    } else if (arg.startsWith('--log-lines=')) {
-      options.logLines = Number(arg.split('=')[1]);
-    } else if (arg === '--log-bytes') {
-      options.logBytes = Number(argv[index + 1]);
-      index += 1;
-    } else if (arg.startsWith('--log-bytes=')) {
-      options.logBytes = Number(arg.split('=')[1]);
-    } else if (arg === '--output') {
-      options.output = argv[index + 1] ?? options.output;
-      index += 1;
-    } else if (arg.startsWith('--output=')) {
-      options.output = arg.split('=')[1];
-    } else if (arg === '--task') {
-      options.taskFilter = argv[index + 1] ?? null;
-      index += 1;
-    } else if (arg.startsWith('--task=')) {
-      options.taskFilter = arg.split('=')[1];
-    } else if (arg === '--quiet') {
-      options.quiet = true;
-    } else if (arg === '--help' || arg === '-h') {
-      options.help = true;
-    } else {
-      throw new Error(`Unknown option: ${arg}`);
-    }
-  }
-
-  if (!Number.isFinite(options.logLines) || options.logLines <= 0) {
-    options.logLines = DEFAULT_LOG_LINE_LIMIT;
-  }
-  if (!Number.isFinite(options.logBytes) || options.logBytes <= 0) {
-    options.logBytes = DEFAULT_LOG_BYTE_LIMIT;
-  }
-
-  return options;
-}
-
 function printHelp() {
   console.log('Usage: node scripts/status-ui-build.mjs [options]');
   console.log('');
@@ -1009,11 +914,46 @@ async function decorateRunLinks(taskKey, links = {}) {
 }
 
 async function main() {
-  const options = parseArgs(process.argv.slice(2));
-  if (options.help) {
+  const { args, positionals } = parseArgs(process.argv.slice(2));
+  if (hasFlag(args, 'h') || hasFlag(args, 'help')) {
     printHelp();
     return;
   }
+  const knownFlags = new Set([
+    'include-logs',
+    'log-lines',
+    'log-bytes',
+    'output',
+    'task',
+    'quiet',
+    'h',
+    'help'
+  ]);
+  const unknown = Object.keys(args).filter((key) => !knownFlags.has(key));
+  if (unknown.length > 0 || positionals.length > 0) {
+    const label = unknown[0] ? `--${unknown[0]}` : positionals[0];
+    throw new Error(`Unknown option: ${label}`);
+  }
+
+  const options = {
+    includeLogs: hasFlag(args, 'include-logs'),
+    logLines: Number(typeof args['log-lines'] === 'string' ? args['log-lines'] : DEFAULT_LOG_LINE_LIMIT),
+    logBytes: Number(typeof args['log-bytes'] === 'string' ? args['log-bytes'] : DEFAULT_LOG_BYTE_LIMIT),
+    output:
+      typeof args.output === 'string'
+        ? args.output
+        : path.join(outRoot, OUTPUT_TASK_ID, 'data.json'),
+    taskFilter: typeof args.task === 'string' ? args.task : null,
+    quiet: hasFlag(args, 'quiet')
+  };
+
+  if (!Number.isFinite(options.logLines) || options.logLines <= 0) {
+    options.logLines = DEFAULT_LOG_LINE_LIMIT;
+  }
+  if (!Number.isFinite(options.logBytes) || options.logBytes <= 0) {
+    options.logBytes = DEFAULT_LOG_BYTE_LIMIT;
+  }
+
   const payload = await buildDataset(options);
   const writeJsonAtomic = await loadWriteJsonAtomic();
   await writeJsonAtomic(options.output, payload);

@@ -1,4 +1,5 @@
 import type { LanguageAdapter } from '../types.js';
+import { withFixtureEvaluation } from '../lib/command-defaults.js';
 
 export const pythonAdapter: LanguageAdapter = {
   id: 'python-pytest',
@@ -20,14 +21,12 @@ export const pythonAdapter: LanguageAdapter = {
         PIP_DISABLE_PIP_VERSION_CHECK: '1',
         PIP_NO_INPUT: '1'
       },
-      evaluation: {
+      evaluation: withFixtureEvaluation({
         command: 'python3',
         args: ['scripts/build.py'],
-        cwd: '{fixture}',
-        requiresCleanFixture: true,
         supportsParallel: false,
         timeoutMs: 15000
-      }
+      })
     },
     test: {
       id: 'test',
@@ -35,14 +34,12 @@ export const pythonAdapter: LanguageAdapter = {
       command: 'python3',
       args: ['-m', 'pytest', '-q'],
       description: 'Executes the repository pytest suite in quiet mode.',
-      evaluation: {
+      evaluation: withFixtureEvaluation({
         command: 'python3',
         args: ['scripts/test.py'],
-        cwd: '{fixture}',
-        requiresCleanFixture: true,
         supportsParallel: false,
         timeoutMs: 15000
-      }
+      })
     }
   },
   metadata: {

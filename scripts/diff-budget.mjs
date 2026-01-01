@@ -5,6 +5,7 @@ import { readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import { promisify } from 'node:util';
+import { parseArgs, hasFlag } from './lib/cli-args.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -48,52 +49,6 @@ Options:
   --max-files   Maximum number of changed files (ignored paths excluded)
   --max-lines   Maximum total lines changed (additions + deletions; ignored paths excluded)
   -h, --help    Show this help message`);
-}
-
-function parseArgs(argv) {
-  const options = {
-    dryRun: false,
-    commit: undefined,
-    base: undefined,
-    maxFiles: undefined,
-    maxLines: undefined
-  };
-
-  for (let index = 0; index < argv.length; index += 1) {
-    const arg = argv[index];
-    if (arg === '--dry-run') {
-      options.dryRun = true;
-    } else if (arg === '--commit') {
-      options.commit = argv[index + 1];
-      index += 1;
-    } else if (arg.startsWith('--commit=')) {
-      options.commit = arg.split('=')[1];
-    } else if (arg === '--base') {
-      options.base = argv[index + 1];
-      index += 1;
-    } else if (arg.startsWith('--base=')) {
-      options.base = arg.split('=')[1];
-    } else if (arg === '--max-files') {
-      options.maxFiles = argv[index + 1];
-      index += 1;
-    } else if (arg.startsWith('--max-files=')) {
-      options.maxFiles = arg.split('=')[1];
-    } else if (arg === '--max-lines') {
-      options.maxLines = argv[index + 1];
-      index += 1;
-    } else if (arg.startsWith('--max-lines=')) {
-      options.maxLines = arg.split('=')[1];
-    } else if (arg === '-h' || arg === '--help') {
-      showUsage();
-      process.exit(0);
-    } else {
-      console.error(`Unknown option: ${arg}`);
-      showUsage();
-      process.exit(2);
-    }
-  }
-
-  return options;
 }
 
 function parseNumber(value, fallback) {
@@ -250,7 +205,28 @@ async function countUntrackedLines(filePath) {
 }
 
 async function main() {
-  const cliOptions = parseArgs(process.argv.slice(2));
+  const { args, positionals } = parseArgs(process.argv.slice(2));
+  if (hasFlag(args, 'h') || hasFlag(args, 'help')) {
+    showUsage();
+    return;
+  }
+  const knownFlags = new Set(['dry-run', 'commit', 'base', 'max-files', 'max-lines', 'h', 'help']);
+  const unknown = Object.keys(args).filter((key) => !knownFlags.has(key));
+  if (unknown.length > 0 || positionals.length > 0) {
+    const label = unknown[0] ? `--${unknown[0]}` : positionals[0];
+    console.error(`Unknown option: ${label}`);
+    showUsage();
+    process.exitCode = 2;
+    return;
+  }
+
+  const cliOptions = {
+    dryRun: hasFlag(args, 'dry-run'),
+    commit: typeof args.commit === 'string' ? args.commit : undefined,
+    base: typeof args.base === 'string' ? args.base : undefined,
+    maxFiles: typeof args['max-files'] === 'string' ? args['max-files'] : undefined,
+    maxLines: typeof args['max-lines'] === 'string' ? args['max-lines'] : undefined
+  };
   const maxFiles = parseNumber(cliOptions.maxFiles ?? process.env.DIFF_BUDGET_MAX_FILES, DEFAULT_MAX_FILES);
   const maxLines = parseNumber(cliOptions.maxLines ?? process.env.DIFF_BUDGET_MAX_LINES, DEFAULT_MAX_LINES);
 

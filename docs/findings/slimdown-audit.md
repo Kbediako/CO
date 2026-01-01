@@ -41,6 +41,7 @@
   - `scripts/mirror-site.mjs` and `scripts/mirror-check.mjs` both parse `mirror.config.json` and normalize routes/allowlists; `mirror-serve.mjs` and `mirror-style-fingerprint.mjs` reimplement the same `parseArgs` loop.
 - Optional dependency loading is duplicated.
   - `scripts/design/pipeline/optionalDeps.ts` and `scripts/mirror-optional-deps.mjs` both resolve/load Playwright + Cheerio with similar error handling.
+- Shared optional-deps/permit helpers should ship in `dist/` so design pipeline stages can import them post-build.
 - Compliance permit parsing is duplicated.
   - `scripts/design/pipeline/toolkit/common.ts` and `scripts/mirror-site.mjs` both read `compliance/permit.json` to validate allowed sources.
 - `.runs` manifest discovery is duplicated across tooling glue.

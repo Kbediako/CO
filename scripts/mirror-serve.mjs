@@ -2,34 +2,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { startMirrorServer, resolveCspPolicy } from "./lib/mirror-server.mjs";
-
-function parseArgs(rawArgs) {
-  const args = {};
-  for (let i = 0; i < rawArgs.length; i += 1) {
-    const arg = rawArgs[i];
-    if (!arg.startsWith("--")) {
-      continue;
-    }
-
-    const [flag, value] = arg.split("=");
-    const key = flag.replace(/^--/, "");
-
-    if (value !== undefined) {
-      args[key] = value;
-      continue;
-    }
-
-    const next = rawArgs[i + 1];
-    if (next && !next.startsWith("--")) {
-      args[key] = next;
-      i += 1;
-    } else {
-      args[key] = true;
-    }
-  }
-
-  return args;
-}
+import { parseArgs, hasFlag } from "./lib/cli-args.js";
 
 async function ensureDirExists(dir) {
   try {
@@ -54,22 +27,32 @@ function buildCsp(option) {
 }
 
 async function main() {
-  const args = parseArgs(process.argv.slice(2));
-  if (args.help || args.h) {
+  const { args, positionals } = parseArgs(process.argv.slice(2));
+  if (hasFlag(args, "help") || hasFlag(args, "h")) {
     console.log("Usage: npm run mirror:serve -- --project <name> [--port <port>] [--csp <policy>] [--no-range]");
     return;
   }
+  const knownFlags = new Set(["project", "port", "csp", "no-range", "range", "h", "help"]);
+  const unknown = Object.keys(args).filter((key) => !knownFlags.has(key));
+  if (unknown.length > 0 || positionals.length > 0) {
+    const label = unknown[0] ? `--${unknown[0]}` : positionals[0];
+    console.error(`Unknown option: ${label}`);
+    printHelp();
+    process.exitCode = 2;
+    return;
+  }
 
-  const project = args.project;
+  const project = typeof args.project === "string" ? args.project : null;
   if (!project) {
     console.error("Missing required --project argument (e.g. --project obys-library)");
     process.exitCode = 1;
     return;
   }
 
-  const port = Number(args.port ?? process.env.PORT ?? 4173) || 4173;
-  const enableRange = args["no-range"] ? false : args.range === "false" ? false : true;
-  const cspHeader = buildCsp(args.csp);
+  const portInput = typeof args.port === "string" ? args.port : process.env.PORT ?? 4173;
+  const port = Number(portInput) || 4173;
+  const enableRange = hasFlag(args, "no-range") ? false : args.range === "false" ? false : true;
+  const cspHeader = buildCsp(typeof args.csp === "string" ? args.csp : undefined);
   const rootDir = path.resolve(process.cwd(), "packages", project, "public");
 
   try {

@@ -3,6 +3,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
+import { parseArgs, hasFlag } from './lib/cli-args.js';
 
 const DEFAULT_POLICY_PATH = 'docs/tasks-archive-policy.json';
 const TASKS_PATH = 'docs/TASKS.md';
@@ -18,30 +19,6 @@ Options:
   --out <path>     Output path pattern for archive payload (must include YYYY)
   --dry-run        Report changes without writing files
   -h, --help       Show this help message`);
-}
-
-function parseArgs(argv) {
-  const options = { policyPath: DEFAULT_POLICY_PATH, outPath: null, dryRun: false };
-  for (let index = 0; index < argv.length; index += 1) {
-    const arg = argv[index];
-    if (arg === '--policy') {
-      options.policyPath = argv[index + 1];
-      index += 1;
-    } else if (arg === '--out') {
-      options.outPath = argv[index + 1];
-      index += 1;
-    } else if (arg === '--dry-run') {
-      options.dryRun = true;
-    } else if (arg === '-h' || arg === '--help') {
-      showUsage();
-      process.exit(0);
-    } else {
-      console.error(`Unknown option: ${arg}`);
-      showUsage();
-      process.exit(2);
-    }
-  }
-  return options;
 }
 
 function normalizeTaskKey(item) {
@@ -336,7 +313,24 @@ function extractArchivedTaskKeys(content) {
 
 async function main() {
   const repoRoot = process.cwd();
-  const options = parseArgs(process.argv.slice(2));
+  const { args, positionals } = parseArgs(process.argv.slice(2));
+  if (hasFlag(args, 'h') || hasFlag(args, 'help')) {
+    showUsage();
+    process.exit(0);
+  }
+  const knownFlags = new Set(['policy', 'out', 'dry-run', 'h', 'help']);
+  const unknown = Object.keys(args).filter((key) => !knownFlags.has(key));
+  if (unknown.length > 0 || positionals.length > 0) {
+    const label = unknown[0] ? `--${unknown[0]}` : positionals[0];
+    console.error(`Unknown option: ${label}`);
+    showUsage();
+    process.exit(2);
+  }
+  const options = {
+    policyPath: typeof args.policy === 'string' ? args.policy : DEFAULT_POLICY_PATH,
+    outPath: typeof args.out === 'string' ? args.out : null,
+    dryRun: hasFlag(args, 'dry-run')
+  };
   const policyPath = path.resolve(repoRoot, options.policyPath);
   const tasksPath = path.resolve(repoRoot, TASKS_PATH);
 

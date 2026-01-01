@@ -2,6 +2,7 @@
 import { access, readFile, readdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
+import { parseArgs as parseCliArgs } from './lib/cli-args.js';
 
 export type DocsCheckRule =
   | 'npm-script-missing'
@@ -366,24 +367,6 @@ async function resolveTaskIdentity(repoRoot: string, taskArg: string): Promise<{
   return { id: numericId, slug: item.slug };
 }
 
-function parseArgs(argv: string[]): CliOptions {
-  const options: CliOptions = { mode: null };
-  for (let index = 0; index < argv.length; index += 1) {
-    const arg = argv[index];
-    if (arg === '--check') {
-      options.mode = 'check';
-    } else if (arg === '--sync') {
-      options.mode = 'sync';
-    } else if (arg === '--task') {
-      options.task = argv[index + 1];
-      index += 1;
-    } else if (arg.startsWith('--task=')) {
-      options.task = arg.split('=')[1];
-    }
-  }
-  return options;
-}
-
 async function loadNpmScripts(repoRoot: string): Promise<Set<string>> {
   const pkgPath = path.join(repoRoot, 'package.json');
   const raw = await readFile(pkgPath, 'utf8');
@@ -577,7 +560,20 @@ function dedupeErrors(errors: DocsCheckError[]): DocsCheckError[] {
 
 async function main(): Promise<void> {
   const repoRoot = process.cwd();
-  const options = parseArgs(process.argv.slice(2));
+  const { args, entries } = parseCliArgs(process.argv.slice(2));
+  const options: CliOptions = { mode: null };
+  for (const entry of entries) {
+    if (entry.key === 'check') {
+      options.mode = 'check';
+    } else if (entry.key === 'sync') {
+      options.mode = 'sync';
+    } else if (entry.key === 'task' && typeof entry.value === 'string') {
+      options.task = entry.value;
+    }
+  }
+  if (!options.task && typeof args.task === 'string') {
+    options.task = args.task;
+  }
 
   if (options.mode === 'check') {
     const errors = await runDocsCheck(repoRoot);

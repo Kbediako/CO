@@ -11,6 +11,7 @@ import {
 } from './state.js';
 import { stageArtifacts } from '../../../orchestrator/src/persistence/ArtifactStager.js';
 import type { DesignArtifactRecord } from '../../../packages/shared/manifest/types.js';
+import { slugify as sharedSlugify } from '../../../packages/shared/utils/strings.js';
 import type { Browser, Page } from 'playwright';
 import { loadPlaywright } from './optionalDeps.js';
 type PlaywrightModule = Awaited<ReturnType<typeof loadPlaywright>>;
@@ -288,11 +289,13 @@ function defaultBreakpoints() {
 }
 
 function slugify(value: string): string {
-  return value
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 60) || 'capture';
+  return sharedSlugify(value, {
+    fallback: 'capture',
+    maxLength: 60,
+    lowercase: true,
+    pattern: /[^a-z0-9]+/g,
+    collapseDashes: true
+  });
 }
 
 function sanitizeSegment(value: string): string {

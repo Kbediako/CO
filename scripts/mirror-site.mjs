@@ -4,6 +4,8 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { loadCheerio } from "./mirror-optional-deps.mjs";
+import { parseArgs, hasFlag } from "./lib/cli-args.js";
+import { findPermitEntry, loadPermitFile } from "./design/pipeline/permit.js";
 
 const cheerio = await loadCheerio();
 
@@ -42,34 +44,6 @@ const META_IMAGE_KEYS = new Set([
   "twitter:image:src",
   "twitter:image:url"
 ]);
-
-function parseArgs(rawArgs) {
-  const args = {};
-  for (let i = 0; i < rawArgs.length; i += 1) {
-    const arg = rawArgs[i];
-    if (!arg.startsWith("--")) {
-      continue;
-    }
-
-    const [flag, value] = arg.split("=");
-    const key = flag.replace(/^--/, "");
-
-    if (value !== undefined) {
-      args[key] = value;
-      continue;
-    }
-
-    const next = rawArgs[i + 1];
-    if (next && !next.startsWith("--")) {
-      args[key] = next;
-      i += 1;
-    } else {
-      args[key] = true;
-    }
-  }
-
-  return args;
-}
 
 function sanitizeTimestamp(value) {
   return value.replace(/[:]/g, "-");
@@ -267,20 +241,6 @@ function shouldUseArchiveFallback(urlObj, originHost, enabled) {
   return Boolean(urlObj.hostname && urlObj.hostname !== originHost);
 }
 
-async function loadPermit(origin) {
-  try {
-    const raw = await fs.readFile(path.resolve("compliance/permit.json"), "utf8");
-    const parsed = JSON.parse(raw);
-    const match = parsed.allowedSources?.find((entry) => entry.origin === origin);
-    if (match) {
-      return { status: "found", entry: match };
-    }
-    return { status: "missing" };
-  } catch (error) {
-    return { status: "unavailable", error: error.message };
-  }
-}
-
 function normalizeConfig(config, project) {
   if (!config.origin) {
     throw new Error(`mirror.config.json for ${project} is missing required "origin"`);
@@ -312,6 +272,27 @@ function normalizeConfig(config, project) {
     enableArchiveFallback: config.enableArchiveFallback ?? true,
     additionalAssets: config.additionalAssets ?? []
   };
+}
+
+function resolveMirrorConfigPath(project, providedPath) {
+  return path.resolve(providedPath ?? path.join("packages", project, "mirror.config.json"));
+}
+
+async function loadMirrorConfig(project, providedPath) {
+  const configPath = resolveMirrorConfigPath(project, providedPath);
+  let rawConfig;
+  try {
+    rawConfig = JSON.parse(await fs.readFile(configPath, "utf8"));
+  } catch (error) {
+    throw new Error(`Failed to read config at ${configPath}: ${error.message}`);
+  }
+
+  try {
+    const config = normalizeConfig(rawConfig, project);
+    return { config, configPath };
+  } catch (error) {
+    throw new Error(`Invalid config: ${error.message}`);
+  }
 }
 
 function allowedHost(urlObj, allowlist, blocklist) {
@@ -713,6 +694,8 @@ export {
   DEFAULT_SHARE_HOST_REWRITES,
   buildLocalAssetPath,
   compileStripPatterns,
+  loadMirrorConfig,
+  resolveMirrorConfigPath,
   normalizeConfig,
   fetchWithCache,
   buildWaybackUrl,
@@ -726,42 +709,34 @@ export {
 };
 
 async function main() {
-  const args = parseArgs(process.argv.slice(2));
-  if (args.help || args.h) {
+  const { args } = parseArgs(process.argv.slice(2));
+  if (hasFlag(args, "help") || hasFlag(args, "h")) {
     console.log("Usage: npm run mirror:fetch -- --project <name> [--config <path>] [--dry-run] [--force] [--archive-fallback=false]");
     return;
   }
 
-  const project = args.project;
+  const project = typeof args.project === "string" ? args.project : null;
   if (!project) {
     console.error("Missing required --project argument (e.g. --project obys-library)");
     process.exitCode = 1;
     return;
   }
 
-  const dryRun = Boolean(args["dry-run"]);
-  const configPath = path.resolve(args.config ?? path.join("packages", project, "mirror.config.json"));
-
-  let rawConfig;
-  try {
-    rawConfig = JSON.parse(await fs.readFile(configPath, "utf8"));
-  } catch (error) {
-    console.error(`[mirror:fetch] Failed to read config at ${configPath}: ${error.message}`);
-    process.exitCode = 1;
-    return;
-  }
-
+  const dryRun = hasFlag(args, "dry-run");
   let config;
   try {
-    config = normalizeConfig(rawConfig, project);
+    const result = await loadMirrorConfig(project, args.config);
+    config = result.config;
   } catch (error) {
-    console.error(`[mirror:fetch] Invalid config: ${error.message}`);
+    console.error(`[mirror:fetch] ${error.message}`);
     process.exitCode = 1;
     return;
   }
 
-  const forcePromote = Boolean(args.force || args["force-promote"]);
-  const archiveFallback = args["archive-fallback"] === "false" || args["no-archive-fallback"] ? false : config.enableArchiveFallback;
+  const forcePromote = hasFlag(args, "force") || hasFlag(args, "force-promote");
+  const archiveFallback = args["archive-fallback"] === "false" || hasFlag(args, "no-archive-fallback")
+    ? false
+    : config.enableArchiveFallback;
 
   const taskId = process.env.MCP_RUNNER_TASK_ID;
   if (!taskId) {
@@ -780,7 +755,15 @@ async function main() {
   await fs.mkdir(stagingPublicDir, { recursive: true });
   await fs.mkdir(cacheDir, { recursive: true });
 
-  const permit = await loadPermit(config.origin);
+  const permitResult = await loadPermitFile(repoRoot);
+  const permitEntry = permitResult.status === "found" ? findPermitEntry(permitResult.permit, config.origin) : null;
+  const permit =
+    permitResult.status === "error"
+      ? { status: "unavailable", error: permitResult.error }
+      : permitEntry
+        ? { status: "found", entry: permitEntry }
+        : { status: "missing" };
+
   if (permit.status === "found") {
     console.log(`[mirror:fetch] permit located for ${config.origin} (approval_id=${permit.entry?.approval_id ?? "n/a"})`);
   } else if (permit.status === "missing") {
