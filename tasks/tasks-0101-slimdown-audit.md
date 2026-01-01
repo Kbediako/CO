@@ -69,7 +69,7 @@
 - [ ] Phase 6 consolidation executed (CLI args, mirror optional deps/permit, pipeline stage sets, adapter defaults, slugify reuse).
 
 ### Validation + Handoff
-- [x] Docs-review manifest captured (if doc-only changes) - Evidence: `.runs/0101-slimdown-audit/cli/2026-01-01T06-52-39-251Z-006dbf53/manifest.json`, `.runs/0101-slimdown-audit/cli/2026-01-01T13-26-06-022Z-4694024f/manifest.json`, `.runs/0101-slimdown-audit/cli/2026-01-01T14-00-31-046Z-9fd0381b/manifest.json`.
-- [x] Implementation-gate manifest captured after code changes - Evidence: `.runs/0101-slimdown-audit/cli/2026-01-01T11-12-06-081Z-b957f1cf/manifest.json`, `.runs/0101-slimdown-audit/cli/2026-01-01T14-01-08-714Z-b41bac0a/manifest.json`.
-- [x] Diff budget check passed - Evidence: `.runs/0101-slimdown-audit/cli/2026-01-01T11-12-06-081Z-b957f1cf/manifest.json`, `.runs/0101-slimdown-audit/cli/2026-01-01T14-01-08-714Z-b41bac0a/manifest.json`.
+- [x] Docs-review manifest captured (if doc-only changes) - Evidence: `.runs/0101-slimdown-audit/cli/2026-01-01T06-52-39-251Z-006dbf53/manifest.json`, `.runs/0101-slimdown-audit/cli/2026-01-01T14-09-05-816Z-0c732c0b/manifest.json`.
+- [x] Implementation-gate manifest captured after code changes - Evidence: `.runs/0101-slimdown-audit/cli/2026-01-01T11-12-06-081Z-b957f1cf/manifest.json`, `.runs/0101-slimdown-audit/cli/2026-01-01T14-09-41-854Z-46f3b7ea/manifest.json`.
+- [x] Diff budget check passed - Evidence: `.runs/0101-slimdown-audit/cli/2026-01-01T11-12-06-081Z-b957f1cf/manifest.json`, `.runs/0101-slimdown-audit/cli/2026-01-01T14-09-41-854Z-46f3b7ea/manifest.json`.
 - [x] Frontend-testing manifest captured with DevTools enabled - Evidence: `.runs/0101-slimdown-audit/cli/2026-01-01T10-10-36-969Z-c65778ef/manifest.json`.
