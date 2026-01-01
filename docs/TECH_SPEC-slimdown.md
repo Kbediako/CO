@@ -37,6 +37,13 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
 ### 5) Optional: adapter parallel-goals harness
 - If unused, remove scripts/run-parallel-goals.ts and the `parallel:goals` npm script.
 
+### 6) Archive workflow duplication
+- Consolidate tasks + implementation-docs archive workflows via a shared base workflow to reduce repeated setup/sync/PR steps.
+- Keep the existing workflow filenames as thin wrappers for stable references in docs and task checklists.
+
+### 7) CLI entrypoint duplication
+- Deduplicate HUD gating and run output formatting across start/resume/frontend-test in `bin/codex-orchestrator.ts`.
+
 ## Expected Line Reductions by Phase (Estimate)
 - Phase 1 (wrapper cleanup): remove 5-6 wrapper/harness scripts.
   - Estimated reduction: ~360 to 500 lines.
@@ -44,6 +51,8 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
   - Estimated reduction: ~350 to 420 lines.
 - Phase 3 (pipeline and harness simplification): remove devtools pipeline duplicates and optional parallel-goals harness.
   - Estimated reduction: ~250 to 350 lines.
+- Phase 4 (workflow + CLI dedupe): consolidate archive automation workflows and CLI HUD/output helpers.
+  - Estimated reduction: ~80 to 140 lines.
 
 ## Validation Steps per Phase
 
@@ -63,6 +72,10 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
 - Re-run full guardrails as above.
 - Validate pipeline IDs and devtools behavior using `codex-orchestrator start implementation-gate` and `frontend-testing` with `CODEX_REVIEW_DEVTOOLS=1`.
 - Pre-delete checks: ensure no automation still calls `implementation-gate-devtools` / `frontend-testing-devtools`; add an explicit error or alias if needed to guide callers to the new path.
+
+### Phase 4
+- Re-run full guardrails as above.
+- Validate archive automation workflows still open PRs and sync archive branches (dry-run locally if needed).
 
 ## Execution Checklists (Draft)
 
@@ -89,6 +102,10 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
   - `docs/PRD-devtools-readiness-orchestrator-usage.md`, `docs/TECH_SPEC-devtools-readiness-orchestrator-usage.md`, `docs/ACTION_PLAN-frontend-testing-core.md`
   - `.agent/task/0912-review-loop-devtools-gate.md`, `.agent/task/0915-frontend-testing-core.md`
 
+### Phase 4 checklist
+- Introduce a reusable archive automation workflow and update the existing archive workflows to call it.
+- Deduplicate CLI HUD/output handling in `bin/codex-orchestrator.ts`.
+
 ### Phase 2 runbook (ordered)
 1) Confirm no external consumers for legacy scripts (repo + CI scan) and verify `.runs/` artifacts remain sufficient without `metrics-summary.json` / migrations logs.
 2) Consolidate helper utilities:
@@ -104,6 +121,12 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
 3) Remove `implementation-gate-devtools` + `frontend-testing-devtools` from `codex.orchestrator.json`; update docs/SOPs/PRDs.
 4) Remove scripts/run-parallel-goals.ts + `parallel:goals` npm script if still unused.
 5) Validate with `codex-orchestrator start implementation-gate` and `frontend-testing` using `CODEX_REVIEW_DEVTOOLS=1`.
+
+### Phase 4 runbook (ordered)
+1) Add a reusable archive automation workflow for shared checkout/setup/sync/PR steps.
+2) Update tasks + implementation-docs archive workflow wrappers to call the shared workflow.
+3) Deduplicate CLI HUD/output handling across start/resume/frontend-test.
+4) Run full guardrails and record manifest evidence.
 
 ### Phase 3 per-file doc update checklist (draft)
 - `README.md`: replace devtools pipeline IDs with the new path; update example commands.

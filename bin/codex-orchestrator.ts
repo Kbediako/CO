@@ -19,6 +19,15 @@ import { loadPackageInfo } from '../orchestrator/src/cli/utils/packageInfo.js';
 import { serveMcp } from '../orchestrator/src/cli/mcp.js';
 
 type ArgMap = Record<string, string | boolean>;
+type OutputFormat = 'json' | 'text';
+
+interface RunOutputPayload {
+  run_id: string;
+  status: string;
+  artifact_root: string;
+  manifest: string;
+  log_path: string | null;
+}
 
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
@@ -125,25 +134,8 @@ function resolveTargetStageId(flags: ArgMap): string | undefined {
 async function handleStart(orchestrator: CodexOrchestrator, rawArgs: string[]): Promise<void> {
   const { positionals, flags } = parseArgs(rawArgs);
   const pipelineId = positionals[0];
-  const format = (flags['format'] as string | undefined) === 'json' ? 'json' : 'text';
-  const interactiveRequested = Boolean(flags['interactive'] || flags['ui']);
-  const interactiveDisabled = Boolean(flags['no-interactive']);
-  const runEvents = new RunEventEmitter();
-  const gate = evaluateInteractiveGate({
-    requested: interactiveRequested,
-    disabled: interactiveDisabled,
-    format,
-    stdoutIsTTY: process.stdout.isTTY === true,
-    stderrIsTTY: process.stderr.isTTY === true,
-    term: process.env.TERM ?? null
-  });
-
-  const hud = await maybeStartHud(gate, runEvents);
-  if (!gate.enabled && interactiveRequested && !interactiveDisabled && gate.reason) {
-    console.error(`[HUD disabled] ${gate.reason}`);
-  }
-
-  try {
+  const format: OutputFormat = (flags['format'] as string | undefined) === 'json' ? 'json' : 'text';
+  await withRunUi(flags, format, async (runEvents) => {
     const result = await orchestrator.start({
       pipelineId,
       taskId: typeof flags['task'] === 'string' ? (flags['task'] as string) : undefined,
@@ -152,49 +144,14 @@ async function handleStart(orchestrator: CodexOrchestrator, rawArgs: string[]): 
       targetStageId: resolveTargetStageId(flags),
       runEvents
     });
-    hud?.stop();
-
-    const payload = {
-      run_id: result.manifest.run_id,
-      status: result.manifest.status,
-      artifact_root: result.manifest.artifact_root,
-      manifest: `${result.manifest.artifact_root}/manifest.json`,
-      log_path: result.manifest.log_path
-    };
-    if (format === 'json') {
-      console.log(JSON.stringify(payload, null, 2));
-    } else {
-      console.log(`Run started: ${payload.run_id}`);
-      console.log(`Status: ${payload.status}`);
-      console.log(`Manifest: ${payload.manifest}`);
-      console.log(`Log: ${payload.log_path}`);
-    }
-  } finally {
-    hud?.stop();
-    runEvents.dispose();
-  }
+    emitRunOutput(result, format, 'Run started');
+  });
 }
 
 async function handleFrontendTest(orchestrator: CodexOrchestrator, rawArgs: string[]): Promise<void> {
   const { positionals, flags } = parseArgs(rawArgs);
-  const format = (flags['format'] as string | undefined) === 'json' ? 'json' : 'text';
+  const format: OutputFormat = (flags['format'] as string | undefined) === 'json' ? 'json' : 'text';
   const devtools = Boolean(flags['devtools']);
-  const interactiveRequested = Boolean(flags['interactive'] || flags['ui']);
-  const interactiveDisabled = Boolean(flags['no-interactive']);
-  const runEvents = new RunEventEmitter();
-  const gate = evaluateInteractiveGate({
-    requested: interactiveRequested,
-    disabled: interactiveDisabled,
-    format,
-    stdoutIsTTY: process.stdout.isTTY === true,
-    stderrIsTTY: process.stderr.isTTY === true,
-    term: process.env.TERM ?? null
-  });
-
-  const hud = await maybeStartHud(gate, runEvents);
-  if (!gate.enabled && interactiveRequested && !interactiveDisabled && gate.reason) {
-    console.error(`[HUD disabled] ${gate.reason}`);
-  }
   if (positionals.length > 0) {
     console.error(`[frontend-test] ignoring extra arguments: ${positionals.join(' ')}`);
   }
@@ -205,31 +162,17 @@ async function handleFrontendTest(orchestrator: CodexOrchestrator, rawArgs: stri
   }
 
   try {
-    const result = await orchestrator.start({
-      pipelineId: 'frontend-testing',
-      taskId: typeof flags['task'] === 'string' ? (flags['task'] as string) : undefined,
-      parentRunId: typeof flags['parent-run'] === 'string' ? (flags['parent-run'] as string) : undefined,
-      approvalPolicy: typeof flags['approval-policy'] === 'string' ? (flags['approval-policy'] as string) : undefined,
-      targetStageId: resolveTargetStageId(flags),
-      runEvents
+    await withRunUi(flags, format, async (runEvents) => {
+      const result = await orchestrator.start({
+        pipelineId: 'frontend-testing',
+        taskId: typeof flags['task'] === 'string' ? (flags['task'] as string) : undefined,
+        parentRunId: typeof flags['parent-run'] === 'string' ? (flags['parent-run'] as string) : undefined,
+        approvalPolicy: typeof flags['approval-policy'] === 'string' ? (flags['approval-policy'] as string) : undefined,
+        targetStageId: resolveTargetStageId(flags),
+        runEvents
+      });
+      emitRunOutput(result, format, 'Run started');
     });
-    hud?.stop();
-
-    const payload = {
-      run_id: result.manifest.run_id,
-      status: result.manifest.status,
-      artifact_root: result.manifest.artifact_root,
-      manifest: `${result.manifest.artifact_root}/manifest.json`,
-      log_path: result.manifest.log_path
-    };
-    if (format === 'json') {
-      console.log(JSON.stringify(payload, null, 2));
-    } else {
-      console.log(`Run started: ${payload.run_id}`);
-      console.log(`Status: ${payload.status}`);
-      console.log(`Manifest: ${payload.manifest}`);
-      console.log(`Log: ${payload.log_path}`);
-    }
   } finally {
     if (devtools) {
       if (originalDevtools === undefined) {
@@ -238,8 +181,6 @@ async function handleFrontendTest(orchestrator: CodexOrchestrator, rawArgs: stri
         process.env.CODEX_REVIEW_DEVTOOLS = originalDevtools;
       }
     }
-    hud?.stop();
-    runEvents.dispose();
   }
 }
 
@@ -265,24 +206,8 @@ async function handleResume(orchestrator: CodexOrchestrator, rawArgs: string[]):
   if (!runId) {
     throw new Error('resume requires --run <run-id>.');
   }
-  const format = (flags['format'] as string | undefined) === 'json' ? 'json' : 'text';
-  const interactiveRequested = Boolean(flags['interactive'] || flags['ui']);
-  const interactiveDisabled = Boolean(flags['no-interactive']);
-  const runEvents = new RunEventEmitter();
-  const gate = evaluateInteractiveGate({
-    requested: interactiveRequested,
-    disabled: interactiveDisabled,
-    format,
-    stdoutIsTTY: process.stdout.isTTY === true,
-    stderrIsTTY: process.stderr.isTTY === true,
-    term: process.env.TERM ?? null
-  });
-  const hud = await maybeStartHud(gate, runEvents);
-  if (!gate.enabled && interactiveRequested && !interactiveDisabled && gate.reason) {
-    console.error(`[HUD disabled] ${gate.reason}`);
-  }
-
-  try {
+  const format: OutputFormat = (flags['format'] as string | undefined) === 'json' ? 'json' : 'text';
+  await withRunUi(flags, format, async (runEvents) => {
     const result = await orchestrator.resume({
       runId,
       resumeToken: typeof flags['token'] === 'string' ? (flags['token'] as string) : undefined,
@@ -291,26 +216,8 @@ async function handleResume(orchestrator: CodexOrchestrator, rawArgs: string[]):
       targetStageId: resolveTargetStageId(flags),
       runEvents
     });
-    hud?.stop();
-    const payload = {
-      run_id: result.manifest.run_id,
-      status: result.manifest.status,
-      artifact_root: result.manifest.artifact_root,
-      manifest: `${result.manifest.artifact_root}/manifest.json`,
-      log_path: result.manifest.log_path
-    };
-    if (format === 'json') {
-      console.log(JSON.stringify(payload, null, 2));
-    } else {
-      console.log(`Run resumed: ${payload.run_id}`);
-      console.log(`Status: ${payload.status}`);
-      console.log(`Manifest: ${payload.manifest}`);
-      console.log(`Log: ${payload.log_path}`);
-    }
-  } finally {
-    hud?.stop();
-    runEvents.dispose();
-  }
+    emitRunOutput(result, format, 'Run resumed');
+  });
 }
 
 async function handleStatus(orchestrator: CodexOrchestrator, rawArgs: string[]): Promise<void> {
@@ -345,6 +252,54 @@ async function maybeStartHud(
   }
   const { startHud } = await import('../orchestrator/src/cli/ui/controller.js');
   return startHud({ emitter, footerNote: 'interactive HUD (read-only)' });
+}
+
+async function withRunUi(
+  flags: ArgMap,
+  format: OutputFormat,
+  action: (runEvents: RunEventEmitter) => Promise<void>
+): Promise<void> {
+  const interactiveRequested = Boolean(flags['interactive'] || flags['ui']);
+  const interactiveDisabled = Boolean(flags['no-interactive']);
+  const runEvents = new RunEventEmitter();
+  const gate = evaluateInteractiveGate({
+    requested: interactiveRequested,
+    disabled: interactiveDisabled,
+    format,
+    stdoutIsTTY: process.stdout.isTTY === true,
+    stderrIsTTY: process.stderr.isTTY === true,
+    term: process.env.TERM ?? null
+  });
+
+  const hud = await maybeStartHud(gate, runEvents);
+  if (!gate.enabled && interactiveRequested && !interactiveDisabled && gate.reason) {
+    console.error(`[HUD disabled] ${gate.reason}`);
+  }
+
+  try {
+    await action(runEvents);
+  } finally {
+    hud?.stop();
+    runEvents.dispose();
+  }
+}
+
+function emitRunOutput(result: { manifest: { run_id: string; status: string; artifact_root: string; log_path: string | null } }, format: OutputFormat, label: string): void {
+  const payload: RunOutputPayload = {
+    run_id: result.manifest.run_id,
+    status: result.manifest.status,
+    artifact_root: result.manifest.artifact_root,
+    manifest: `${result.manifest.artifact_root}/manifest.json`,
+    log_path: result.manifest.log_path
+  };
+  if (format === 'json') {
+    console.log(JSON.stringify(payload, null, 2));
+    return;
+  }
+  console.log(`${label}: ${payload.run_id}`);
+  console.log(`Status: ${payload.status}`);
+  console.log(`Manifest: ${payload.manifest}`);
+  console.log(`Log: ${payload.log_path}`);
 }
 
 interface ParsedExecArgs {

@@ -12,93 +12,28 @@ on:
       - tasks/index.json
       - scripts/implementation-docs-archive.mjs
 
-permissions:
-  contents: write
-  pull-requests: write
-
 concurrency:
   group: implementation-docs-archive-automation
   cancel-in-progress: false
 
 jobs:
   archive:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout (full history for diffs)
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+    uses: ./.github/workflows/archive-automation-base.yml
+    permissions:
+      contents: write
+      pull-requests: write
+    secrets: inherit
+    with:
+      run_command: node scripts/implementation-docs-archive.mjs
+      task_id: implementation-docs-archive-automation
+      archive_branch: doc-archives
+      archive_out_dir: out/implementation-docs-archive-automation/docs-archive
+      archive_glob: '*'
+      archive_dest_dir: '.'
+      pr_commit_message: "Archive implementation docs"
+      pr_title: "Archive implementation docs"
+      pr_body: |
+        Automated implementation docs archive update.
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Run implementation docs archive
-        env:
-          MCP_RUNNER_TASK_ID: implementation-docs-archive-automation
-        run: node scripts/implementation-docs-archive.mjs
-
-      - name: Detect changes
-        id: changes
-        run: |
-          if git diff --quiet; then
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Sync archive branch payloads
-        if: steps.changes.outputs.changed == 'true'
-        env:
-          ARCHIVE_BRANCH: doc-archives
-          ARCHIVE_OUT_DIR: out/implementation-docs-archive-automation/docs-archive
-        run: |
-          set -euo pipefail
-
-          if ! ls "$ARCHIVE_OUT_DIR" >/dev/null 2>&1; then
-            echo "No archive payloads found in $ARCHIVE_OUT_DIR; skipping archive branch update."
-            exit 0
-          fi
-
-          ROOT_DIR="$PWD"
-          WORKTREE_DIR="${ROOT_DIR}-doc-archives"
-
-          git fetch origin "$ARCHIVE_BRANCH":"$ARCHIVE_BRANCH"
-          git worktree add "$WORKTREE_DIR" "$ARCHIVE_BRANCH"
-
-          cp -R "$ARCHIVE_OUT_DIR"/. "$WORKTREE_DIR"/
-
-          cd "$WORKTREE_DIR"
-          if [ -z "$(git status --porcelain)" ]; then
-            echo "Archive branch already up to date."
-            cd "$ROOT_DIR"
-            git worktree remove "$WORKTREE_DIR"
-            exit 0
-          fi
-
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add .
-          git commit -m "Update implementation docs archive payload"
-          git push origin "$ARCHIVE_BRANCH"
-
-          cd "$ROOT_DIR"
-          git worktree remove "$WORKTREE_DIR"
-
-      - name: Create PR for implementation docs stubs
-        if: steps.changes.outputs.changed == 'true'
-        uses: peter-evans/create-pull-request@v6
-        with:
-          commit-message: "Archive implementation docs"
-          title: "Archive implementation docs"
-          body: |
-            Automated implementation docs archive update.
-
-            Archive payloads were pushed to the doc-archives branch.
-          branch: automation/implementation-docs-archive
-          delete-branch: true
+        Archive payloads were pushed to the doc-archives branch.
+      pr_branch: automation/implementation-docs-archive
