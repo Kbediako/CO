@@ -37,6 +37,21 @@
   - `scripts/pack-audit.mjs` and `scripts/pack-smoke.mjs` both implement identical `runPack` helpers.
 - One-line wrapper scripts still exist.
   - `scripts/codex-devtools.sh` only forwards `codex -c 'mcp_servers.chrome-devtools.enabled=true' ...`.
+- Mirror tooling repeats CLI arg parsing and config validation.
+  - `scripts/mirror-site.mjs` and `scripts/mirror-check.mjs` both parse `mirror.config.json` and normalize routes/allowlists; `mirror-serve.mjs` and `mirror-style-fingerprint.mjs` reimplement the same `parseArgs` loop.
+- Optional dependency loading is duplicated.
+  - `scripts/design/pipeline/optionalDeps.ts` and `scripts/mirror-optional-deps.mjs` both resolve/load Playwright + Cheerio with similar error handling.
+- Compliance permit parsing is duplicated.
+  - `scripts/design/pipeline/toolkit/common.ts` and `scripts/mirror-site.mjs` both read `compliance/permit.json` to validate allowed sources.
+- `.runs` manifest discovery is duplicated across tooling glue.
+  - `scripts/status-ui-build.mjs`, `scripts/run-review.ts`, and `scripts/delegation-guard.mjs` all scan `.runs` directories with slightly different heuristics.
+- CLI arg parsing helpers are duplicated across guardrail + docs scripts.
+  - `scripts/spec-guard.mjs`, `scripts/delegation-guard.mjs`, `scripts/diff-budget.mjs`, `scripts/docs-freshness.mjs`, `scripts/tasks-archive.mjs`, and `scripts/implementation-docs-archive.mjs` each implement bespoke `parseArgs`.
+- Design pipeline stages are duplicated across pipelines.
+  - `codex.orchestrator.json` repeats shared stages between `design-reference` and `hi-fi-design-toolkit`; `diagnostics` and `diagnostics-with-eval` also repeat guardrail blocks.
+- Adapter command scaffolding is duplicated across `adapters/*/build-test-configs.ts`.
+- Slugify helpers are duplicated across design pipeline and orchestrator.
+  - `scripts/design/pipeline/extract.ts`, `scripts/design/pipeline/toolkit/common.ts`, and `orchestrator/src/cli/utils/strings.ts` each implement similar slugification logic.
 
 ## Quick wins (low risk)
 - Remove redundant CLI/MCP wrapper scripts and document the single preferred CLI entrypoint.
@@ -44,6 +59,8 @@
 - Retire scripts/mcp-runner-migrate.js and scripts/mcp-runner-metrics.js once their outputs are verified as unused.
 - Remove the `scripts/codex-devtools.sh` wrapper after updating the one doc reference.
 - Consolidate the shared `runPack` helper used by pack-audit + pack-smoke.
+- Extract a shared CLI arg parser used by guardrails/docs/mirror/status scripts.
+- Centralize mirror config parsing/validation and optional dependency loading (low-risk utility extraction).
 
 ## Usage signals (still referenced)
 - Legacy MCP wrapper scripts were referenced as compatibility shims in `.agent/readme.md`, `.agent/system/services.md`, `.runs/README.md`, and `docs/REFRACTOR_PLAN.md`, plus listed in `tasks/tasks-0914-npm-companion-package.md` (Phase 1 updates remove these references).
@@ -68,6 +85,11 @@
 - Consolidate doc tooling helpers and remove duplicate implementations in docs scripts.
 - Deduplicate `npm pack` helper logic across pack scripts.
 - Remove one-line wrapper scripts and keep canonical CLI invocations.
+- Consolidate `.runs` manifest discovery used by status UI, review tooling, and delegation guard.
+- Consolidate mirror/design optional dependency + permit parsing utilities.
+- Reduce pipeline duplication via shared stage sets (design pipelines + diagnostics-with-eval).
+- Extract shared adapter command defaults to reduce duplication across language adapters.
+- Reuse a single slugify helper across design pipeline and orchestrator tooling.
 
 ## Suggested removals (ranked)
 1) Legacy MCP wrappers: scripts/mcp-runner-start.sh, scripts/mcp-runner-poll.sh, scripts/run-mcp-diagnostics.sh, scripts/agents_mcp_runner.mjs.
@@ -79,3 +101,8 @@
 7) Doc tooling helper duplication in docs-freshness/docs-hygiene/tasks-archive/implementation-docs-archive scripts.
 8) Pack script helper duplication (`pack-audit` + `pack-smoke`).
 9) `scripts/codex-devtools.sh` wrapper script (replace with direct `codex -c ...`).
+10) Shared CLI arg parsing + `.runs` discovery helpers (guardrails/status/review).
+11) Mirror config/permit + optional dependency helper consolidation.
+12) Design/diagnostics pipeline stage-set reuse.
+13) Adapter command defaults builder (reduce `build-test-configs` duplication).
+14) Shared slugify helper across design pipeline + orchestrator.
