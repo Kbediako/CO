@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generated_at": "2025-12-31",
+  "generated_at": "2026-01-01",
   "entries": [
     {
       "path": ".agent/AGENTS.md",
@@ -147,6 +147,13 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/task/0101-slimdown-audit.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-01",
       "cadence_days": 90
     },
     {
@@ -766,6 +773,13 @@
       "cadence_days": 90
     },
     {
+      "path": "docs/findings/slimdown-audit.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-01",
+      "cadence_days": 90
+    },
+    {
       "path": "docs/findings/validation-tasks-0908-diff-budget-followups.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -987,6 +1001,13 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/PRD-slimdown.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-01",
       "cadence_days": 90
     },
     {
@@ -1267,6 +1288,13 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/TECH_SPEC-slimdown.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-01",
       "cadence_days": 90
     },
     {
@@ -1617,6 +1645,13 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/tasks-0101-slimdown-audit.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-01",
       "cadence_days": 90
     },
     {

@@ -6,13 +6,21 @@
 The Snakes Arena checklist has been retired from this workspace; reference the archived manifests in `/Users/asabeko/Documents/snakes-arena-backup/.runs/` if historical evidence is needed.
 
 > _Guardrail note:_ Minimal diagnostics or smoke-test pipelines can opt out of spec-guard enforcement by setting `guardrailsRequired: false` in their pipeline definition (e.g., inside `codex.orchestrator.json`). Standard design pipelines keep `node scripts/spec-guard.mjs --dry-run` inline so manifests such as `.runs/0410-hi-fi-design-toolkit/cli/2025-11-07T03-54-09-660Z-35b0a68c/manifest.json` continue to record guardrail evidence automatically.
-
-
 <!-- tasks-archive-index:begin -->
 ## Archive index
 Archived task snapshots live on the task-archives branch.
 - 2025: https://github.com/Kbediako/CO/blob/task-archives/docs/TASKS-archive-2025.md
 <!-- tasks-archive-index:end -->
+# Task List Snapshot — Slimdown Audit (0101)
+- Update - Planning: PRD/tech spec/findings/checklist drafted; docs-review manifest captured at `.runs/0101-slimdown-audit/cli/2026-01-01T06-52-39-251Z-006dbf53/manifest.json`.
+- Notes: Export `MCP_RUNNER_TASK_ID=0101-slimdown-audit` before orchestrator commands.
+## Checklist Mirror
+Mirror status with `tasks/tasks-0101-slimdown-audit.md` and `.agent/task/0101-slimdown-audit.md`. Keep `[ ]` until evidence is recorded.
+- [x] Docs + checklist drafted - Evidence: `docs/PRD-slimdown.md`, `docs/TECH_SPEC-slimdown.md`, `docs/findings/slimdown-audit.md`, `tasks/tasks-0101-slimdown-audit.md`.
+- [x] Docs-review manifest captured - Evidence: `.runs/0101-slimdown-audit/cli/2026-01-01T06-52-39-251Z-006dbf53/manifest.json`.
+- [x] Implementation-gate manifest captured - Evidence: `.runs/0101-slimdown-audit/cli/2026-01-01T05-57-43-325Z-cf23c380/manifest.json`.
+- [x] Diff budget override recorded - Evidence: `.runs/0101-slimdown-audit/cli/2026-01-01T05-57-43-325Z-cf23c380/manifest.json`.
+- [x] Subagent review captured - Evidence: `.runs/0101-slimdown-audit-review/cli/2026-01-01T04-44-27-502Z-9688b054/manifest.json`, `.runs/0101-slimdown-audit-nextsteps/cli/2026-01-01T05-38-23-619Z-961fd034/manifest.json`, `.runs/0101-slimdown-audit-usage/cli/2026-01-01T06-08-57-842Z-dee29417/manifest.json`, `.runs/0101-slimdown-audit-nextphase/cli/2026-01-01T06-22-49-653Z-3e9e326e/manifest.json`.
 
 # Task List Snapshot — Codex Orchestrator NPM Companion Package (0914)
 
@@ -368,14 +376,6 @@ Mirror status with `tasks/tasks-0506-tfgrpo.md` and `.agent/task/0506-tfgrpo-int
 - [x] Diagnostics / tfgrpo-learning pipeline run recorded under `.runs/0506-tfgrpo-integration/cli/2025-11-21T05-56-32-837Z-430b2d9d/manifest.json` (spec-guard passed).
 - [x] Guardrails: `node scripts/spec-guard.mjs --dry-run`, `npm run lint`, `npm run test`, `npm run eval:test` (when fixtures exist). Evidence: `.runs/0506-tfgrpo-integration/cli/2025-11-21T07-09-08-052Z-ac3a1d09/manifest.json`.
 - [ ] Reviewer hand-off via `npm run review` referencing the latest TF-GRPO manifest.
-
-
-
-
-
-
-
-
 # Task List Snapshot — Implementation Docs Archive Allowlist (0927)
 
 <!-- docs-sync:begin 0927-implementation-docs-archive-allowlist -->
