@@ -257,9 +257,9 @@
     {
       "path": ".agent/task/0908-diff-budget-followups.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2025-12-31",
-      "cadence_days": 90
+      "status": "archived",
+      "last_review": "2026-01-01",
+      "cadence_days": 365
     },
     {
       "path": ".agent/task/0909-orchestrator-run-reporting-consistency.md",
