@@ -19,7 +19,7 @@
 - [x] PRD approval recorded in `tasks/index.json` gate metadata - Evidence: `.runs/0915-frontend-testing-core/cli/2025-12-29T05-23-35-362Z-7d4eaa4b/manifest.json`.
 
 ### Frontend Testing Surface
-- [x] Add frontend testing pipelines (`frontend-testing`, `frontend-testing-devtools`).
+- [x] Add frontend testing pipeline (`frontend-testing`) with devtools enablement via `CODEX_REVIEW_DEVTOOLS=1` / `--devtools`.
 - [x] Add frontend testing CLI entrypoint.
 
 ### DevTools Enablement (Packaged)

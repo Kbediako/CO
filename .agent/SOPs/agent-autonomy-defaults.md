@@ -10,7 +10,7 @@ Applies to lead orchestrator runs in this repo and defines default decision poli
 
 ## Orchestrator-First Workflow
 - Use `codex-orchestrator` pipelines for planning, implementation, validation, and review work that touches the repo.
-- Default to `docs-review` before implementation and `implementation-gate` (or `implementation-gate-devtools`) after code changes.
+- Default to `docs-review` before implementation and `implementation-gate` after code changes (set `CODEX_REVIEW_DEVTOOLS=1` when DevTools are required).
 - Use direct shell commands only for lightweight discovery or targeted one-off checks that do not need manifest evidence.
 - Record exceptions in the task checklist and include rationale in review NOTES if guardrail evidence is skipped.
 

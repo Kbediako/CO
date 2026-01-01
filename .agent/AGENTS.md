@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp 488a0bb80e9136b2201e0f02ddfda1f209b2997cbd90ef5c804820b409a4f9ff -->
+<!-- codex:instruction-stamp 7a8878a6964b701d5683b0ce4bd131ce80f4e48485b028c2e806c6b39a618cc3 -->
 # Agent Enablement
 
 ## Added by Bootstrap 2025-10-16
@@ -48,7 +48,7 @@
 ### Frontend Testing Pipeline (Core)
 Note: pipelines already set `CODEX_NON_INTERACTIVE=1`; keep it for shortcut runs and other automation.
 - Default-off DevTools: `CODEX_NON_INTERACTIVE=1 npx codex-orchestrator start frontend-testing --format json --no-interactive --task <task-id>`.
-- DevTools-enabled: `CODEX_NON_INTERACTIVE=1 npx codex-orchestrator start frontend-testing-devtools --format json --no-interactive --task <task-id>` or `CODEX_NON_INTERACTIVE=1 codex-orchestrator frontend-test --devtools`.
+- DevTools-enabled: `CODEX_NON_INTERACTIVE=1 CODEX_REVIEW_DEVTOOLS=1 npx codex-orchestrator start frontend-testing --format json --no-interactive --task <task-id>` or `CODEX_NON_INTERACTIVE=1 codex-orchestrator frontend-test --devtools`.
 - Shortcut: `CODEX_NON_INTERACTIVE=1 codex-orchestrator frontend-test` runs the `frontend-testing` pipeline with DevTools off unless `--devtools` is set.
 - Readiness check: `codex-orchestrator doctor --format json` reports DevTools skill + MCP config availability.
 - Setup helper: `codex-orchestrator devtools setup` prints setup steps (`--yes` to apply).

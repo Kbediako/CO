@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp f1d409fa5832cb388b64bb606a2c4b67cbbf69b3dceb722b918e0515b5d28cf9 -->
+<!-- codex:instruction-stamp 4cb3c9d54fc7d7ef9d77928c1a9b9560e2998369be602d31064dfd0262c92100 -->
 # Repository Agent Guidance
 
 ## Project 0303 — Codex Orchestrator Autonomy Enhancements
@@ -36,8 +36,8 @@
 - Reset the window if checks restart or feedback arrives; do not merge draft PRs or PRs labeled "do not merge."
 
 ## DevTools Review Gate (Optional)
-- For frontend QA/visual review runs that need Chrome DevTools, use `npx codex-orchestrator start implementation-gate-devtools --format json --no-interactive --task <task-id>` so only the review handoff enables DevTools.
-- Default to `implementation-gate` for general reviews; reserve the DevTools gate for cases that need Chrome DevTools capabilities (visual/layout checks, network/perf diagnostics). After addressing review feedback, rerun the same gate until no issues remain and include any follow-up questions in `NOTES`.
+- For frontend QA/visual review runs that need Chrome DevTools, use `CODEX_REVIEW_DEVTOOLS=1 npx codex-orchestrator start implementation-gate --format json --no-interactive --task <task-id>` so only the review handoff enables DevTools.
+- Default to `implementation-gate` for general reviews; reserve DevTools only for cases that need Chrome DevTools capabilities (visual/layout checks, network/perf diagnostics). After addressing review feedback, rerun the same gate until no issues remain and include any follow-up questions in `NOTES`.
 - NOTES template: `Goal: ... | Summary: ... | Risks: ... | Questions (optional): ...`
 - Review-loop steps live in `.agent/SOPs/review-loop.md`.
 - When writing PR summaries, avoid literal `\n` sequences; use `gh pr create --body-file` or a here-doc so line breaks render correctly in GitHub.
@@ -45,7 +45,7 @@
 ## Frontend Testing Pipeline (Core)
 Note: pipelines already set `CODEX_NON_INTERACTIVE=1`; keep it for shortcut runs and other automation.
 - Default-off DevTools: `CODEX_NON_INTERACTIVE=1 npx codex-orchestrator start frontend-testing --format json --no-interactive --task <task-id>`.
-- DevTools-enabled: `CODEX_NON_INTERACTIVE=1 npx codex-orchestrator start frontend-testing-devtools --format json --no-interactive --task <task-id>` or `CODEX_NON_INTERACTIVE=1 codex-orchestrator frontend-test --devtools`.
+- DevTools-enabled: `CODEX_NON_INTERACTIVE=1 CODEX_REVIEW_DEVTOOLS=1 npx codex-orchestrator start frontend-testing --format json --no-interactive --task <task-id>` or `CODEX_NON_INTERACTIVE=1 codex-orchestrator frontend-test --devtools`.
 - Shortcut: `CODEX_NON_INTERACTIVE=1 codex-orchestrator frontend-test` runs the `frontend-testing` pipeline with DevTools off unless `--devtools` is set.
 - Readiness check: `codex-orchestrator doctor --format json` reports DevTools skill + MCP config availability.
 - Setup helper: `codex-orchestrator devtools setup` prints setup steps (`--yes` to apply).

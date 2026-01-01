@@ -6,7 +6,7 @@ Use this playbook whenever handing off a review (`npm run review` or an implemen
 1. Draft `NOTES` with goal, summary, risks, and optional reviewer questions (one line each when possible). `NOTES` is required for review runs.
 2. Run the appropriate gate:
    - Default: `implementation-gate` for general reviews.
-   - Use `implementation-gate-devtools` only when Chrome DevTools capabilities are required.
+   - Enable DevTools by setting `CODEX_REVIEW_DEVTOOLS=1` only when Chrome DevTools capabilities are required.
 3. Record the manifest path in the relevant checklists (`tasks/`, `docs/`, `.agent/task/`).
 4. If the reviewer finds issues, fix them, update `NOTES` with follow-up questions (when needed), and rerun the same gate.
 5. Repeat until the reviewer reports no findings.

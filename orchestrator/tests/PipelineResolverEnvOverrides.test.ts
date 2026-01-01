@@ -71,7 +71,7 @@ describe('PipelineResolver env overrides', () => {
   });
 
   // Uses the real repo config to catch drift between shipped pipelines and docs.
-  it('wires frontend testing pipelines with explicit devtools opt-in', async () => {
+  it('wires frontend testing pipeline with explicit devtools opt-in', async () => {
     const testDir = fileURLToPath(new URL('.', import.meta.url));
     const repoRoot = resolve(testDir, '..', '..');
     const env: EnvironmentPaths = {
@@ -83,18 +83,17 @@ describe('PipelineResolver env overrides', () => {
 
     const config = await loadUserConfig(env);
     const frontend = config?.pipelines?.find((pipeline) => pipeline.id === 'frontend-testing');
-    const devtools = config?.pipelines?.find((pipeline) => pipeline.id === 'frontend-testing-devtools');
-
     expect(frontend).toBeTruthy();
-    expect(devtools).toBeTruthy();
+    expect(config?.pipelines?.find((pipeline) => pipeline.id === 'frontend-testing-devtools')).toBeFalsy();
 
     const frontendEnv = findFirstCommandEnv(frontend);
-    const devtoolsEnv = findFirstCommandEnv(devtools);
-
-    expect(frontendEnv.CODEX_REVIEW_DEVTOOLS).toBe('0');
-    expect(devtoolsEnv.CODEX_REVIEW_DEVTOOLS).toBe('1');
+    expect(frontendEnv.CODEX_REVIEW_DEVTOOLS).toBeUndefined();
     expect(frontendEnv.CODEX_NON_INTERACTIVE).toBe('1');
-    expect(devtoolsEnv.CODEX_NON_INTERACTIVE).toBe('1');
+
+    const resolver = new PipelineResolver();
+    const resolved = await resolver.resolve(env, { pipelineId: 'frontend-testing-devtools' });
+    expect(resolved.pipeline.id).toBe('frontend-testing');
+    expect(resolved.envOverrides.CODEX_REVIEW_DEVTOOLS).toBe('1');
   });
 });
 

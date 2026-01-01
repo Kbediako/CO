@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp 099d60811455957abd284d71cf3138e745837c20a8a5d124141bbf5a9799626a -->
+<!-- codex:instruction-stamp e683f23c39dba7e15044cfac0b4175c3d74959f297a11bb2c3e2d3bcfefeca56 -->
 # Codex-Orchestrator Agent Handbook (Template)
 
 Use this repository as the wrapper that coordinates multiple Codex-driven projects. After cloning, replace placeholder metadata (task IDs, documents, SOPs) with values for each downstream initiative while keeping these shared guardrails in place.
@@ -12,7 +12,7 @@ Use this repository as the wrapper that coordinates multiple Codex-driven projec
 
 ## Orchestrator-First Workflow
 - Use `codex-orchestrator` pipelines for planning, implementation, validation, and review work that touches the repo.
-- Default to `docs-review` before implementation and `implementation-gate` (or `implementation-gate-devtools`) after code changes.
+- Default to `docs-review` before implementation and `implementation-gate` after code changes (set `CODEX_REVIEW_DEVTOOLS=1` when DevTools are required).
 - Reserve direct shell commands for lightweight discovery or one-off checks that do not require manifest evidence.
 - Delegation is mandatory for top-level tasks: spawn at least one subagent run using `MCP_RUNNER_TASK_ID=<task-id>-<stream>`, capture manifest evidence, and summarize in the main run. Use `DELEGATION_GUARD_OVERRIDE_REASON` only when delegation is impossible and record the justification.
 
@@ -90,8 +90,8 @@ Implementation work is not “complete” until you run (in order):
 | `npm run review` | Reviewer hand-off | Runs `codex review` with task/PRD context (when available) and the latest run manifest path included as evidence; `NOTES` is required and should include `<goal + summary + risks>` plus optional questions. |
 
 Update the table once you wire different build pipelines or tooling.
-For DevTools-enabled frontend review runs, use `npx codex-orchestrator start implementation-gate-devtools --format json --no-interactive --task <task-id>` (sets `CODEX_REVIEW_DEVTOOLS=1` for the review handoff only).
-Default to `implementation-gate` for general reviews; reserve the DevTools gate for cases that need Chrome DevTools capabilities (visual/layout checks, network/perf diagnostics). After addressing review feedback, rerun the same review gate until no issues remain and include any follow-up questions in `NOTES`.
+For DevTools-enabled frontend review runs, use `CODEX_REVIEW_DEVTOOLS=1 npx codex-orchestrator start implementation-gate --format json --no-interactive --task <task-id>`.
+Default to `implementation-gate` for general reviews; reserve DevTools only when review needs Chrome DevTools capabilities (visual/layout checks, network/perf diagnostics). After addressing review feedback, rerun the same review gate until no issues remain and include any follow-up questions in `NOTES`.
 NOTES template: `Goal: ... | Summary: ... | Risks: ... | Questions (optional): ...`
 Review-loop steps live in `.agent/SOPs/review-loop.md`.
 

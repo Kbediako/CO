@@ -98,63 +98,6 @@
           "command": "npm run review",
           "env": {
             "DIFF_BUDGET_STAGE": "1",
-            "CODEX_REVIEW_NON_INTERACTIVE": "1",
-            "CODEX_REVIEW_DEVTOOLS": "0"
-          }
-        }
-      ]
-    },
-    {
-      "id": "implementation-gate-devtools",
-      "title": "Implementation Complete Gate (DevTools Review)",
-      "description": "Implementation gate with a DevTools-enabled review handoff for frontend QA/visual validation.",
-      "tags": [
-        "implementation-gate",
-        "devtools-review"
-      ],
-      "stages": [
-        {
-          "kind": "command",
-          "id": "delegation-guard",
-          "title": "node scripts/delegation-guard.mjs",
-          "command": "node scripts/delegation-guard.mjs"
-        },
-        {
-          "kind": "command",
-          "id": "spec-guard",
-          "title": "node scripts/spec-guard.mjs --dry-run",
-          "command": "node scripts/spec-guard.mjs --dry-run"
-        },
-        {
-          "kind": "stage-set",
-          "ref": "build-lint-test"
-        },
-        {
-          "kind": "command",
-          "id": "docs-check",
-          "title": "npm run docs:check",
-          "command": "npm run docs:check"
-        },
-        {
-          "kind": "command",
-          "id": "docs-freshness",
-          "title": "npm run docs:freshness",
-          "command": "npm run docs:freshness"
-        },
-        {
-          "kind": "command",
-          "id": "diff-budget",
-          "title": "node scripts/diff-budget.mjs",
-          "command": "node scripts/diff-budget.mjs"
-        },
-        {
-          "kind": "command",
-          "id": "review",
-          "title": "npm run review",
-          "command": "npm run review",
-          "env": {
-            "DIFF_BUDGET_STAGE": "1",
-            "CODEX_REVIEW_DEVTOOLS": "1",
             "CODEX_REVIEW_NON_INTERACTIVE": "1"
           }
         }
@@ -219,29 +162,6 @@
           "title": "Run frontend testing",
           "command": "node \"$CODEX_ORCHESTRATOR_PACKAGE_ROOT/dist/orchestrator/src/cli/frontendTestingRunner.js\"",
           "env": {
-            "CODEX_REVIEW_DEVTOOLS": "0",
-            "CODEX_NON_INTERACTIVE": "1"
-          }
-        }
-      ]
-    },
-    {
-      "id": "frontend-testing-devtools",
-      "title": "Frontend Testing (DevTools)",
-      "description": "Runs the frontend testing runner with Chrome DevTools enabled.",
-      "tags": [
-        "frontend-testing",
-        "devtools"
-      ],
-      "guardrailsRequired": false,
-      "stages": [
-        {
-          "kind": "command",
-          "id": "frontend-testing",
-          "title": "Run frontend testing (DevTools enabled)",
-          "command": "node \"$CODEX_ORCHESTRATOR_PACKAGE_ROOT/dist/orchestrator/src/cli/frontendTestingRunner.js\"",
-          "env": {
-            "CODEX_REVIEW_DEVTOOLS": "1",
             "CODEX_NON_INTERACTIVE": "1"
           }
         }

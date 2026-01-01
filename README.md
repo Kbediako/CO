@@ -200,18 +200,18 @@ Use an explicit handoff note for reviewers. `NOTES` is required for review runs;
 Template: `Goal: ... | Summary: ... | Risks: ... | Questions (optional): ...`
 
 To enable Chrome DevTools for review runs, set `CODEX_REVIEW_DEVTOOLS=1` (uses a codex config override; no repo scripts required).
-Default to the standard `implementation-gate` for general reviews; use `implementation-gate-devtools` only when the review needs Chrome DevTools capabilities (visual/layout checks, network/perf diagnostics). After fixing review feedback, rerun the same gate and include any follow-up questions in `NOTES`.
-To run the full implementation gate with DevTools-enabled review, use `npx codex-orchestrator start implementation-gate-devtools --format json --no-interactive --task <task-id>`.
+Default to the standard `implementation-gate` for general reviews; enable DevTools only when the review needs Chrome DevTools capabilities (visual/layout checks, network/perf diagnostics). After fixing review feedback, rerun the same gate and include any follow-up questions in `NOTES`.
+To run the full implementation gate with DevTools-enabled review, use `CODEX_REVIEW_DEVTOOLS=1 npx codex-orchestrator start implementation-gate --format json --no-interactive --task <task-id>`.
 
 ## Frontend Testing
 Frontend testing is a first-class pipeline with DevTools off by default. The shipped pipelines already set `CODEX_NON_INTERACTIVE=1`; add it explicitly for custom automation or when you want the `frontend-test` shortcut to suppress Codex prompts:
 - `CODEX_NON_INTERACTIVE=1 npx codex-orchestrator start frontend-testing --format json --no-interactive --task <task-id>`
-- `CODEX_NON_INTERACTIVE=1 npx codex-orchestrator start frontend-testing-devtools --format json --no-interactive --task <task-id>` (DevTools enabled)
+- `CODEX_NON_INTERACTIVE=1 CODEX_REVIEW_DEVTOOLS=1 npx codex-orchestrator start frontend-testing --format json --no-interactive --task <task-id>` (DevTools enabled)
 - `CODEX_NON_INTERACTIVE=1 codex-orchestrator frontend-test` (shortcut; add `--devtools` to enable DevTools)
 
 If you run the pipelines from this repo, run `npm run build` first so `dist/` stays current (the pipeline executes the compiled runner).
 
-Note: the frontend-testing pipelines toggle the shared `CODEX_REVIEW_DEVTOOLS` flag under the hood; prefer `--devtools` or the devtools pipeline instead of setting it manually.
+Note: the frontend-testing pipeline reads the shared `CODEX_REVIEW_DEVTOOLS` flag; prefer `--devtools` or `CODEX_REVIEW_DEVTOOLS=1` for explicit enablement.
 
 Optional prompt overrides:
 - `CODEX_FRONTEND_TEST_PROMPT` (inline prompt)
