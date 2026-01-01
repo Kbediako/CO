@@ -30,12 +30,12 @@
     ],
     "diagnostics-spec-guard": [
       {
-        "kind": "command",
-        "id": "spec-guard",
-        "title": "node scripts/spec-guard.mjs --dry-run",
-        "command": "node \"$CODEX_ORCHESTRATOR_PACKAGE_ROOT/dist/orchestrator/src/cli/utils/specGuardRunner.js\" --dry-run"
-      }
-    ],
+      "kind": "command",
+      "id": "spec-guard",
+      "title": "node scripts/spec-guard.mjs --dry-run",
+      "command": "node scripts/spec-guard.mjs --dry-run"
+    }
+  ],
     "design-artifacts": [
       {
         "kind": "command",
@@ -91,16 +91,12 @@
       ],
       "stages": [
         {
-          "kind": "command",
-          "id": "delegation-guard",
-          "title": "node scripts/delegation-guard.mjs",
-          "command": "node scripts/delegation-guard.mjs"
+          "kind": "stage-set",
+          "ref": "delegation-guard-stage"
         },
         {
-          "kind": "command",
-          "id": "spec-guard",
-          "title": "node scripts/spec-guard.mjs --dry-run",
-          "command": "node scripts/spec-guard.mjs --dry-run"
+          "kind": "stage-set",
+          "ref": "diagnostics-spec-guard"
         },
         {
           "kind": "stage-set",
@@ -145,16 +141,12 @@
       ],
       "stages": [
         {
-          "kind": "command",
-          "id": "delegation-guard",
-          "title": "node scripts/delegation-guard.mjs",
-          "command": "node scripts/delegation-guard.mjs"
+          "kind": "stage-set",
+          "ref": "delegation-guard-stage"
         },
         {
-          "kind": "command",
-          "id": "spec-guard",
-          "title": "node scripts/spec-guard.mjs --dry-run",
-          "command": "node scripts/spec-guard.mjs --dry-run"
+          "kind": "stage-set",
+          "ref": "diagnostics-spec-guard"
         },
         {
           "kind": "command",
@@ -235,10 +227,8 @@
       ],
       "stages": [
         {
-          "kind": "command",
-          "id": "delegation-guard",
-          "title": "node scripts/delegation-guard.mjs",
-          "command": "node scripts/delegation-guard.mjs"
+          "kind": "stage-set",
+          "ref": "delegation-guard-stage"
         },
         {
           "kind": "command",
@@ -314,10 +304,8 @@
       ],
       "stages": [
         {
-          "kind": "command",
-          "id": "delegation-guard",
-          "title": "node scripts/delegation-guard.mjs",
-          "command": "node scripts/delegation-guard.mjs"
+          "kind": "stage-set",
+          "ref": "delegation-guard-stage"
         },
         {
           "kind": "command",
@@ -397,10 +385,8 @@
       ],
       "stages": [
         {
-          "kind": "command",
-          "id": "delegation-guard",
-          "title": "node scripts/delegation-guard.mjs",
-          "command": "node scripts/delegation-guard.mjs"
+          "kind": "stage-set",
+          "ref": "delegation-guard-stage"
         },
         {
           "kind": "command",
@@ -409,10 +395,8 @@
           "command": "TFGRPO_GROUP_SIZE=2 TFGRPO_REWARDERS=gt,relative TFGRPO_EPOCHS=3 TFGRPO_SAMPLE_SIZE=100 TFGRPO_TRAIN_TEMP=0.7 TFGRPO_EVAL_TEMP=0.3 node --loader ts-node/esm evaluation/harness/scripts/tfgrpo-runner.ts"
         },
         {
-          "kind": "command",
-          "id": "spec-guard",
-          "title": "node scripts/spec-guard.mjs --dry-run",
-          "command": "node scripts/spec-guard.mjs --dry-run"
+          "kind": "stage-set",
+          "ref": "diagnostics-spec-guard"
         }
       ]
     }

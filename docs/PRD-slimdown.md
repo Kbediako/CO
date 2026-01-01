@@ -9,6 +9,7 @@
 - Mirror and design tooling duplicate optional dependency loading and compliance permit parsing.
 - Guardrail/status/mirror scripts repeat the same CLI arg parsing and `.runs` manifest discovery logic.
 - Pipeline definitions and adapters repeat stage/command blocks with minimal differences.
+- Guardrail pipelines (docs-review, implementation-gate, tfgrpo-learning, design) still repeat delegation/spec-guard blocks instead of reusing stage sets.
 - Slugify helpers diverge across design pipeline and orchestrator tooling.
 - Adapter build/test definitions repeat identical evaluation defaults (fixture cwd + clean fixture enforcement).
 
@@ -22,6 +23,7 @@
 - Consolidate CLI arg parsing + `.runs` discovery helpers used by guardrails, status UI, and review tooling.
 - Share optional dependency loading + compliance permit evaluation between design and mirror tooling.
 - Reduce pipeline and adapter duplication by sharing common stage/command definitions.
+- Reuse guardrail stage sets for delegation/spec-guard across pipelines to avoid repeated command blocks.
 - Reuse a configurable slugify helper across design pipeline and orchestrator tooling.
 - Consolidate adapter evaluation defaults (fixture cwd + clean fixture enforcement) into shared helpers.
 

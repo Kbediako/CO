@@ -1,15 +1,15 @@
 #!/usr/bin/env node
 
-import { mkdir, readFile, readdir, stat, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import { parseArgs, hasFlag } from './lib/cli-args.js';
+import { collectMarkdownFiles, computeAgeInDays, normalizeTaskKey, parseIsoDate, toPosixPath } from './lib/docs-helpers.js';
 
 const DEFAULT_POLICY_PATH = 'docs/implementation-docs-archive-policy.json';
 const DEFAULT_REGISTRY_PATH = 'docs/docs-freshness-registry.json';
 const TASKS_INDEX_PATH = 'tasks/index.json';
 const ARCHIVE_MARKER = '<!-- docs-archive:stub -->';
-const EXCLUDED_DIR_NAMES = new Set(['.runs', 'out', 'archives', 'node_modules', 'dist']);
 const DEFAULT_OWNER = 'Codex (top-level agent), Review agent';
 
 function showUsage() {
@@ -45,67 +45,11 @@ async function exists(target) {
   }
 }
 
-function toPosix(p) {
-  return p.split(path.sep).join('/');
-}
-
-function normalizeTaskKey(item) {
-  if (!item || typeof item !== 'object') {
-    return null;
-  }
-  const id = typeof item.id === 'string' ? item.id.trim() : '';
-  const slug = typeof item.slug === 'string' ? item.slug.trim() : '';
-  if (slug && id && slug.startsWith(`${id}-`)) {
-    return slug;
-  }
-  if (id && slug) {
-    return `${id}-${slug}`;
-  }
-  if (slug) {
-    return slug;
-  }
-  if (id) {
-    return id;
-  }
-  return null;
-}
-
-function parseDate(raw) {
-  if (typeof raw !== 'string') {
-    return null;
-  }
-  const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if (!match) {
-    return null;
-  }
-  const [, yearStr, monthStr, dayStr] = match;
-  const year = Number(yearStr);
-  const month = Number(monthStr) - 1;
-  const day = Number(dayStr);
-  const date = new Date(Date.UTC(year, month, day));
-  if (Number.isNaN(date.getTime())) {
-    return null;
-  }
-  if (
-    date.getUTCFullYear() !== year ||
-    date.getUTCMonth() !== month ||
-    date.getUTCDate() !== day
-  ) {
-    return null;
-  }
-  return date;
-}
-
 function formatDate(date) {
   const year = date.getUTCFullYear();
   const month = String(date.getUTCMonth() + 1).padStart(2, '0');
   const day = String(date.getUTCDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
-}
-
-function computeAgeInDays(from, to) {
-  const msPerDay = 24 * 60 * 60 * 1000;
-  return Math.floor((to.getTime() - from.getTime()) / msPerDay);
 }
 
 function globToRegExp(pattern) {
@@ -170,28 +114,6 @@ function parsePolicy(raw, policyPath) {
   };
 }
 
-async function collectMarkdownFiles(repoRoot, relativeDir) {
-  const absDir = path.join(repoRoot, relativeDir);
-  const entries = await readdir(absDir, { withFileTypes: true });
-  const results = [];
-
-  for (const entry of entries) {
-    const relPath = path.join(relativeDir, entry.name);
-    if (entry.isDirectory()) {
-      if (EXCLUDED_DIR_NAMES.has(entry.name)) {
-        continue;
-      }
-      results.push(...(await collectMarkdownFiles(repoRoot, relPath)));
-      continue;
-    }
-
-    if (entry.isFile() && entry.name.toLowerCase().endsWith('.md')) {
-      results.push(toPosix(relPath));
-    }
-  }
-
-  return results;
-}
 
 async function collectDocFiles(repoRoot) {
   const roots = ['docs', 'tasks', '.agent/task'];
@@ -315,7 +237,7 @@ async function main() {
     const docPaths = new Set();
 
     if (typeof item.path === 'string' && item.path.trim()) {
-      const normalized = toPosix(item.path.trim());
+      const normalized = toPosixPath(item.path.trim());
       docPaths.add(normalized);
       const abs = path.resolve(repoRoot, normalized);
       if (await exists(abs)) {
@@ -341,7 +263,7 @@ async function main() {
     }
 
     const status = typeof item.status === 'string' ? item.status : '';
-    const completedDate = parseDate(item.completed_at);
+    const completedDate = parseIsoDate(item.completed_at);
     if (status !== 'succeeded' || !completedDate) {
       continue;
     }
@@ -391,7 +313,7 @@ async function main() {
     version: 1,
     generated_at: new Date().toISOString(),
     task_id: process.env.MCP_RUNNER_TASK_ID || null,
-    policy_path: toPosix(path.relative(repoRoot, policyPath)),
+    policy_path: toPosixPath(path.relative(repoRoot, policyPath)),
     totals: {
       task_candidates: taskCandidates.length,
       stray_candidates: strayCandidates.length,
@@ -522,7 +444,7 @@ async function main() {
     const lineCount = content.split('\n').length;
     const registryEntry = registryMap.get(relativePath);
     const status = typeof registryEntry?.status === 'string' ? registryEntry.status : '';
-    const reviewDate = parseDate(registryEntry?.last_review ?? null);
+    const reviewDate = parseIsoDate(registryEntry?.last_review ?? null);
 
     const strayContext = {
       type: 'stray',

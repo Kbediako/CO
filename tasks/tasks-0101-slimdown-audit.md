@@ -31,7 +31,7 @@
 1) Extract shared doc tooling helpers into `scripts/lib/` (doc collection, task-key normalization, date parsing, toPosix).
 2) Replace local duplicates in docs-hygiene, docs-freshness, tasks-archive, implementation-docs-archive, and delegation-guard.
 3) Deduplicate pack `runPack` helper across pack-audit + pack-smoke.
-4) Update docs to remove references to `scripts/codex-devtools.sh`, then delete the wrapper script.
+4) Update docs to remove references to the codex-devtools wrapper, then delete the wrapper script.
 5) Run full guardrails (spec-guard → build/lint/test → docs gates → diff budget → review).
 
 ### Phase 6 Runbook (draft)
@@ -44,14 +44,21 @@
 7) Reuse a single slugify helper across design pipeline + orchestrator.
 8) Run full guardrails (spec-guard → build/lint/test → docs gates → diff budget → review).
 
+### Phase 7 Runbook (draft)
+1) Replace delegation-guard command blocks in pipelines with `delegation-guard-stage`.
+2) Replace spec-guard command blocks in pipelines with the shared spec-guard stage set.
+3) Align the spec-guard stage command to call `scripts/spec-guard.mjs --dry-run`.
+4) Run full guardrails (spec-guard → build/lint/test → docs gates → diff budget → review).
+
 ### Planning
 - [x] Confirm consolidation targets and phase sequencing - Evidence: `docs/TECH_SPEC-slimdown.md`.
 - [x] Identify doc updates needed for removed scripts - Evidence: `docs/findings/slimdown-audit.md`.
 - [x] Phase 5 consolidation targets captured - Evidence: `docs/TECH_SPEC-slimdown.md`, `docs/findings/slimdown-audit.md`.
 - [x] Phase 6 consolidation targets captured - Evidence: `docs/TECH_SPEC-slimdown.md`, `docs/findings/slimdown-audit.md`.
+- [x] Phase 7 consolidation targets captured - Evidence: `docs/TECH_SPEC-slimdown.md`, `docs/findings/slimdown-audit.md`.
 
 ### Delegation
-- [x] Subagent run captured - Evidence: `.runs/0101-slimdown-audit-review/cli/2026-01-01T04-44-27-502Z-9688b054/manifest.json`, `.runs/0101-slimdown-audit-nextsteps/cli/2026-01-01T05-38-23-619Z-961fd034/manifest.json`, `.runs/0101-slimdown-audit-usage/cli/2026-01-01T06-08-57-842Z-dee29417/manifest.json`, `.runs/0101-slimdown-audit-nextphase/cli/2026-01-01T06-22-49-653Z-3e9e326e/manifest.json`, `.runs/0101-slimdown-audit-usage2/cli/2026-01-01T10-04-09-470Z-2a8c0e1b/manifest.json`, `.runs/0101-slimdown-audit-slimdown2/cli/2026-01-01T11-00-20-245Z-fca96825/manifest.json`, `.runs/0101-slimdown-audit-pass3/cli/2026-01-01T13-19-30-562Z-fb8559df/manifest.json`, `.runs/0101-slimdown-audit-phase6/cli/2026-01-01T13-58-29-786Z-01202b8e/manifest.json`, `.runs/0101-slimdown-audit-impl1/cli/2026-01-01T14-37-01-370Z-7538c896/manifest.json`.
+- [x] Subagent run captured - Evidence: `.runs/0101-slimdown-audit-review/cli/2026-01-01T04-44-27-502Z-9688b054/manifest.json`, `.runs/0101-slimdown-audit-nextsteps/cli/2026-01-01T05-38-23-619Z-961fd034/manifest.json`, `.runs/0101-slimdown-audit-usage/cli/2026-01-01T06-08-57-842Z-dee29417/manifest.json`, `.runs/0101-slimdown-audit-nextphase/cli/2026-01-01T06-22-49-653Z-3e9e326e/manifest.json`, `.runs/0101-slimdown-audit-usage2/cli/2026-01-01T10-04-09-470Z-2a8c0e1b/manifest.json`, `.runs/0101-slimdown-audit-slimdown2/cli/2026-01-01T11-00-20-245Z-fca96825/manifest.json`, `.runs/0101-slimdown-audit-pass3/cli/2026-01-01T13-19-30-562Z-fb8559df/manifest.json`, `.runs/0101-slimdown-audit-phase6/cli/2026-01-01T13-58-29-786Z-01202b8e/manifest.json`, `.runs/0101-slimdown-audit-impl1/cli/2026-01-01T14-37-01-370Z-7538c896/manifest.json`, `.runs/0101-slimdown-audit-scout/cli/2026-01-01T15-58-52-966Z-2f8ac345/manifest.json`.
 
 ### Implementation
 - [x] Phase 1 deletions executed (wrappers and manual harness) - Evidence: `.runs/0101-slimdown-audit/cli/2026-01-01T05-57-43-325Z-cf23c380/manifest.json`.
@@ -67,10 +74,17 @@
 - [x] Phase 4 automation + CLI simplifications executed.
   - [x] Consolidate archive automation workflows via a reusable base workflow.
   - [x] Deduplicate HUD/output handling in `bin/codex-orchestrator.ts`.
+- [x] Phase 5 consolidations executed (docs helpers, pack helper, wrapper cleanup) - Evidence: `.runs/0101-slimdown-audit/cli/2026-01-01T16-30-31-721Z-35c24301/manifest.json`.
+  - [x] Consolidate shared doc tooling helpers (doc collection, task-key normalization, date parsing, toPosix).
+  - [x] Deduplicate pack `runPack` helper across pack-audit + pack-smoke.
+  - [x] Remove codex-devtools wrapper and update references.
 - [x] Phase 6 consolidation executed (CLI args, mirror optional deps/permit, pipeline stage sets, adapter defaults, slugify reuse) - Evidence: `.runs/0101-slimdown-audit/cli/2026-01-01T15-30-21-816Z-3ab2817f/manifest.json`.
+- [x] Phase 7 consolidation executed (guardrail stage-set reuse) - Evidence: `.runs/0101-slimdown-audit/cli/2026-01-01T16-30-31-721Z-35c24301/manifest.json`.
+  - [x] Replace delegation-guard/spec-guard command blocks with shared stage sets.
+  - [x] Align spec-guard stage command to `scripts/spec-guard.mjs --dry-run`.
 
 ### Validation + Handoff
-- [x] Docs-review manifest captured (if doc-only changes) - Evidence: `.runs/0101-slimdown-audit/cli/2026-01-01T06-52-39-251Z-006dbf53/manifest.json`, `.runs/0101-slimdown-audit/cli/2026-01-01T14-09-05-816Z-0c732c0b/manifest.json`, `.runs/0101-slimdown-audit/cli/2026-01-01T14-36-24-243Z-95cbbe20/manifest.json`.
-- [x] Implementation-gate manifest captured after code changes - Evidence: `.runs/0101-slimdown-audit/cli/2026-01-01T11-12-06-081Z-b957f1cf/manifest.json`, `.runs/0101-slimdown-audit/cli/2026-01-01T14-09-41-854Z-46f3b7ea/manifest.json`, `.runs/0101-slimdown-audit/cli/2026-01-01T15-30-21-816Z-3ab2817f/manifest.json`.
-- [x] Diff budget check passed (override recorded for Phase 6 consolidation scope) - Evidence: `.runs/0101-slimdown-audit/cli/2026-01-01T11-12-06-081Z-b957f1cf/manifest.json`, `.runs/0101-slimdown-audit/cli/2026-01-01T14-09-41-854Z-46f3b7ea/manifest.json`, `.runs/0101-slimdown-audit/cli/2026-01-01T15-30-21-816Z-3ab2817f/manifest.json`.
+- [x] Docs-review manifest captured (if doc-only changes) - Evidence: `.runs/0101-slimdown-audit/cli/2026-01-01T06-52-39-251Z-006dbf53/manifest.json`, `.runs/0101-slimdown-audit/cli/2026-01-01T14-09-05-816Z-0c732c0b/manifest.json`, `.runs/0101-slimdown-audit/cli/2026-01-01T14-36-24-243Z-95cbbe20/manifest.json`, `.runs/0101-slimdown-audit/cli/2026-01-01T15-58-20-481Z-0ed04072/manifest.json`.
+- [x] Implementation-gate manifest captured after code changes - Evidence: `.runs/0101-slimdown-audit/cli/2026-01-01T11-12-06-081Z-b957f1cf/manifest.json`, `.runs/0101-slimdown-audit/cli/2026-01-01T14-09-41-854Z-46f3b7ea/manifest.json`, `.runs/0101-slimdown-audit/cli/2026-01-01T15-30-21-816Z-3ab2817f/manifest.json`, `.runs/0101-slimdown-audit/cli/2026-01-01T16-30-31-721Z-35c24301/manifest.json`.
+- [x] Diff budget check passed (override recorded for Phase 6 consolidation scope) - Evidence: `.runs/0101-slimdown-audit/cli/2026-01-01T11-12-06-081Z-b957f1cf/manifest.json`, `.runs/0101-slimdown-audit/cli/2026-01-01T14-09-41-854Z-46f3b7ea/manifest.json`, `.runs/0101-slimdown-audit/cli/2026-01-01T15-30-21-816Z-3ab2817f/manifest.json`, `.runs/0101-slimdown-audit/cli/2026-01-01T16-30-31-721Z-35c24301/manifest.json`.
 - [x] Frontend-testing manifest captured with DevTools enabled - Evidence: `.runs/0101-slimdown-audit/cli/2026-01-01T10-10-36-969Z-c65778ef/manifest.json`.

@@ -3,6 +3,7 @@ import { access, readFile, readdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import { parseArgs as parseCliArgs } from './lib/cli-args.js';
+import { collectDocFiles, toPosixPath } from './lib/docs-helpers.js';
 
 export type DocsCheckRule =
   | 'npm-script-missing'
@@ -16,10 +17,6 @@ export interface DocsCheckError {
   reference: string;
 }
 
-const DOC_ROOTS = ['.agent', '.ai-dev-tasks', 'docs', 'tasks'] as const;
-const DOC_ROOT_FILES = ['README.md', 'AGENTS.md'] as const;
-
-const EXCLUDED_DIR_NAMES = new Set(['.runs', 'out', 'archives', 'node_modules', 'dist']);
 const EXCLUDED_BACKTICKED_PATH_PREFIXES = [
   '.runs/',
   'out/',
@@ -39,51 +36,6 @@ interface TasksIndex {
 interface CliOptions {
   mode: 'check' | 'sync' | null;
   task?: string;
-}
-
-export async function collectDocFiles(repoRoot: string): Promise<string[]> {
-  const results: string[] = [];
-
-  for (const file of DOC_ROOT_FILES) {
-    const abs = path.join(repoRoot, file);
-    if (await exists(abs)) {
-      results.push(toPosixPath(file));
-    }
-  }
-
-  for (const dir of DOC_ROOTS) {
-    const abs = path.join(repoRoot, dir);
-    if (await exists(abs)) {
-      const files = await collectMarkdownFilesRecursively(repoRoot, dir);
-      results.push(...files);
-    }
-  }
-
-  results.sort();
-  return results;
-}
-
-async function collectMarkdownFilesRecursively(repoRoot: string, relativeDir: string): Promise<string[]> {
-  const absDir = path.join(repoRoot, relativeDir);
-  const entries = await readdir(absDir, { withFileTypes: true });
-  const results: string[] = [];
-
-  for (const entry of entries) {
-    const relPath = path.join(relativeDir, entry.name);
-    if (entry.isDirectory()) {
-      if (EXCLUDED_DIR_NAMES.has(entry.name)) {
-        continue;
-      }
-      results.push(...(await collectMarkdownFilesRecursively(repoRoot, relPath)));
-      continue;
-    }
-
-    if (entry.isFile() && entry.name.toLowerCase().endsWith('.md')) {
-      results.push(toPosixPath(relPath));
-    }
-  }
-
-  return results;
 }
 
 export async function runDocsCheck(repoRoot: string): Promise<DocsCheckError[]> {
@@ -512,10 +464,6 @@ function stripTrailingLineHint(value: string): string {
   }
   const base = match[1];
   return base ?? value;
-}
-
-function toPosixPath(value: string): string {
-  return value.split(path.sep).join(path.posix.sep);
 }
 
 async function exists(absPath: string): Promise<boolean> {

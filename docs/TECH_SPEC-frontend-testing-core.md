@@ -15,7 +15,7 @@
 ## Architecture & Design
 ### Current State
 - DevTools support exists only in the review gate and uses `CODEX_REVIEW_DEVTOOLS=1`.
-- The repo contains a devtools helper script (`scripts/codex-devtools.sh`), but `scripts/` is not shipped in the npm package.
+- DevTools enablement relies on `CODEX_REVIEW_DEVTOOLS=1` or `codex -c 'mcp_servers.chrome-devtools.enabled=true' ...`; repo-only wrapper scripts are not shipped in the npm package.
 - `doctor` reports DevTools MCP/skill readiness (config + skill presence), but does not perform a live MCP handshake.
 - Users do not have a dedicated, documented frontend testing pipeline.
 
