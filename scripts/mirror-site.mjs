@@ -5,6 +5,7 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { loadCheerio } from "./mirror-optional-deps.mjs";
 import { parseArgs, hasFlag } from "./lib/cli-args.js";
+import { resolveRepoRoot } from "./lib/run-manifests.js";
 import { findPermitEntry, loadPermitFile } from "./design/pipeline/permit.js";
 
 const cheerio = await loadCheerio();
@@ -755,6 +756,7 @@ async function main() {
   await fs.mkdir(stagingPublicDir, { recursive: true });
   await fs.mkdir(cacheDir, { recursive: true });
 
+  const repoRoot = resolveRepoRoot();
   const permitResult = await loadPermitFile(repoRoot);
   const permitEntry = permitResult.status === "found" ? findPermitEntry(permitResult.permit, config.origin) : null;
   const permit =
