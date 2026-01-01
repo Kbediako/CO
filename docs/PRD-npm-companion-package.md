@@ -48,7 +48,7 @@
 
 ## Technical Considerations
 - Runtime currently depends on `schemas/manifest.json` and a manual scenario template under `.agent/task/templates/`; packaging must include schemas and provide templates under `templates/` with explicit init.
-- MCP usage today relies on scripts in `scripts/` (e.g., `run-local-mcp.sh`); these must become CLI subcommands and remain outside the published tarball.
+- MCP usage relies on `codex-orchestrator mcp serve`; legacy repo-only scripts are removed and remain outside the published tarball.
 - The module system is ESM (`type: module`) with NodeNext resolution; dist/bin currently preserves the shebang and must continue to do so.
 
 ## Documentation & Evidence

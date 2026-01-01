@@ -31,7 +31,7 @@
 - Duplicate pipeline definitions and stage repetition: pipelines live in `codex.orchestrator.json` and also in `orchestrator/src/cli/pipelines/*`, while `diagnostics`, `implementation-gate`, `implementation-gate-devtools`, and `docs-review` repeat the same stage lists in `codex.orchestrator.json`.
 - Triple instruction layers with overlapping content: `AGENTS.md`, `docs/AGENTS.md`, `.agent/AGENTS.md` are concatenated per `docs/guides/instructions.md`.
 - Manual checklist mirroring across three locations: `tasks/tasks-*.md`, `docs/TASKS.md`, `.agent/task/*.md` (documented in `.agent/system/architecture.md` and `.agent/system/conventions.md`).
-- Legacy MCP runner shims and migration support: shell wrappers (`scripts/mcp-runner-start.sh`, `scripts/mcp-runner-poll.sh`, `scripts/run-mcp-diagnostics.sh`, `scripts/run-local-mcp.sh`) coexist with the CLI `codex-orchestrator mcp serve`, plus legacy handling in `scripts/mcp-runner-migrate.js` and `scripts/status-ui-build.mjs`.
+- Legacy MCP runner shims and migration support: shell wrappers were removed in Phase 1; use `codex-orchestrator mcp serve` plus `codex-orchestrator start/status/resume`. Legacy handling remains in `scripts/mcp-runner-migrate.js` and `scripts/status-ui-build.mjs`.
 - Overlapping orchestration layers: `orchestrator/src/**` plus `packages/orchestrator/**` and `packages/shared/**` add multiple internal layers for a single runtime surface (see `.agent/system/architecture.md`).
 - Optional features embedded in core: `orchestrator/src/control-plane`, `orchestrator/src/scheduler`, `orchestrator/src/sync`, `orchestrator/src/learning` are optional (README notes cloud sync is not wired) but enlarge the default runtime surface.
 
@@ -44,7 +44,7 @@
 - Checklist auto-sync: extend `scripts/docs-hygiene.ts` (or add a small generator) to produce `docs/TASKS.md` and `.agent/task/*.md` from `tasks/tasks-*.md` and `tasks/index.json`.
   - Impact: high (removes manual mirroring work).
   - Effort: medium.
-- Legacy MCP wrapper consolidation: keep one thin wrapper that delegates to `codex-orchestrator mcp serve`, and mark other shell scripts as deprecated for one release.
+- Legacy MCP wrapper removal: standardize on `codex-orchestrator mcp serve` and drop repo-only shims.
   - Impact: medium (reduces surface area, fewer entrypoints).
   - Effort: low.
 - Mirror tooling aggregation: fold `scripts/mirror-*.mjs` into a single CLI namespace (for example, `codex-orchestrator mirror ...`) and keep script aliases temporarily.

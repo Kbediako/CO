@@ -1,0 +1,144 @@
+# Technical Spec - Slimdown Audit (Task 0101-slimdown-audit)
+
+Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
+
+## Consolidation Targets (Delete or Merge)
+
+### 1) Legacy CLI and MCP wrappers
+- Delete redundant wrappers that duplicate the orchestrator CLI (Phase 1 completed; files removed):
+  - scripts/mcp-runner-start.sh
+  - scripts/mcp-runner-poll.sh
+  - scripts/run-mcp-diagnostics.sh
+  - scripts/agents_mcp_runner.mjs
+  - scripts/run-local-mcp.sh (fold behavior into `codex-orchestrator mcp` if logging is still required)
+  - scripts/manual-orchestrator-run.ts
+- Update docs and READMEs to call `codex-orchestrator start|status|resume|mcp` directly.
+- Preconditions: update `.runs/README.md`, `.agent/readme.md`, `.agent/system/services.md`, `docs/REFRACTOR_PLAN.md`, and `tasks/tasks-0914-npm-companion-package.md` before deletion (done as part of Phase 1).
+
+### 2) Duplicate helper utilities
+- Atomic writes:
+  - Replace local `writeJsonAtomic` implementations in `scripts/mcp-runner-metrics.js`, `scripts/mcp-runner-migrate.js`, `scripts/status-ui-build.mjs`, and `packages/shared/design-artifacts/writer.ts` with the canonical helper (`orchestrator/src/cli/utils/fs.ts` or a shared helper extracted to `packages/shared`).
+- Task/run ID sanitization:
+  - Remove local `sanitizeTaskId`/`sanitizeRunId` in `packages/shared/design-artifacts/writer.ts` and reuse `orchestrator/src/persistence/sanitizeTaskId.ts` and `sanitizeRunId.ts` (or a shared helper moved to `packages/shared`).
+- Environment path resolution:
+  - Standardize on `CODEX_ORCHESTRATOR_ROOT` and a shared resolver for `repoRoot`, `runsRoot`, `outRoot` (currently duplicated across multiple scripts).
+
+### 3) Pipeline duplication
+- Remove devtools variants that differ only by env toggles:
+  - `implementation-gate-devtools` and `frontend-testing-devtools` in `codex.orchestrator.json`.
+- Replace with a single pipeline + documented env override (`CODEX_REVIEW_DEVTOOLS=1`) or a CLI flag.
+- Preconditions: update README, `.agent` SOPs, and frontend-testing/devtools PRDs + TECH_SPECs that explicitly call out the devtools pipeline IDs.
+
+### 4) Legacy migration and metrics scripts
+- Retire `scripts/mcp-runner-migrate.js` once all legacy `.runs/local-mcp` data is migrated (compat pointers already written by the CLI).
+- Retire `scripts/mcp-runner-metrics.js` if metrics summaries are replaced by orchestrator aggregates or no longer consumed.
+- Preconditions: update `.runs/README.md` (metrics summary + migrations pointers) and any reviewer guidance referencing these scripts.
+
+### 5) Optional: adapter parallel-goals harness
+- If unused, remove `scripts/run-parallel-goals.ts` and the `parallel:goals` npm script.
+
+## Expected Line Reductions by Phase (Estimate)
+- Phase 1 (wrapper cleanup): remove 5-6 wrapper/harness scripts.
+  - Estimated reduction: ~360 to 500 lines.
+- Phase 2 (legacy scripts + helper consolidation): remove migration/metrics scripts and dedupe helper functions.
+  - Estimated reduction: ~350 to 420 lines.
+- Phase 3 (pipeline and harness simplification): remove devtools pipeline duplicates and optional parallel-goals harness.
+  - Estimated reduction: ~250 to 350 lines.
+
+## Validation Steps per Phase
+
+### Phase 1
+- Update docs referencing removed scripts.
+- Run `node scripts/spec-guard.mjs --dry-run`.
+- Run `npm run build`, `npm run lint`, `npm run test`.
+- Run `npm run docs:check` and `npm run docs:freshness`.
+- Run `node scripts/diff-budget.mjs` and `npm run review` with manifest evidence.
+
+### Phase 2
+- Re-run full guardrails as above.
+- Add or update targeted unit tests if helper behavior changes.
+- Pre-delete checks: confirm no active consumers of `scripts/mcp-runner-migrate.js` / `scripts/mcp-runner-metrics.js` (repo search + CI/workflow scan), and verify `.runs/` artifacts remain sufficient without legacy summaries.
+
+### Phase 3
+- Re-run full guardrails as above.
+- Validate pipeline IDs and devtools behavior using `codex-orchestrator start implementation-gate` and `frontend-testing` with `CODEX_REVIEW_DEVTOOLS=1`.
+- Pre-delete checks: ensure no automation still calls `implementation-gate-devtools` / `frontend-testing-devtools`; add an explicit error or alias if needed to guide callers to the new path.
+
+## Execution Checklists (Draft)
+
+### Phase 2 checklist
+- Replace `writeJsonAtomic` duplicates in `scripts/status-ui-build.mjs` + `packages/shared/design-artifacts/writer.ts` with `orchestrator/src/cli/utils/fs.ts`.
+- Swap `sanitizeTaskId` / `sanitizeRunId` in `packages/shared/design-artifacts/writer.ts` to use `orchestrator/src/persistence/sanitizeTaskId.ts` + `sanitizeRunId.ts`.
+- Standardize env path resolution (prefer `CODEX_ORCHESTRATOR_ROOT` + shared resolver).
+- Remove `scripts/mcp-runner-migrate.js` + `scripts/mcp-runner-metrics.js` after pre-delete checks.
+- Update `.runs/README.md` + any reviewer guidance to drop metrics/migrations references.
+- Phase 2 file targets (non-exhaustive):
+  - `scripts/mcp-runner-migrate.js`, `scripts/mcp-runner-metrics.js`
+  - `scripts/status-ui-build.mjs`, `packages/shared/design-artifacts/writer.ts`
+  - `scripts/design/pipeline/context.ts`, `scripts/design/purgeExpired.ts`, `orchestrator/src/cli/services/commandRunner.ts` (env var consistency)
+  - `docs/REFRACTOR_PLAN.md`, `.runs/README.md` (remove legacy script references)
+
+### Phase 3 checklist
+- Consolidate devtools pipelines to a single path (document `CODEX_REVIEW_DEVTOOLS=1` / `--devtools` entrypoint).
+- Remove `implementation-gate-devtools` + `frontend-testing-devtools` from `codex.orchestrator.json` after pre-delete checks.
+- Update docs/SOPs/PRDs listing the devtools pipeline IDs (see `docs/findings/slimdown-audit.md` map).
+- Remove `scripts/run-parallel-goals.ts` + `parallel:goals` npm script if still unused.
+- Phase 3 doc update list (primary references):
+  - `README.md`, `.agent/AGENTS.md`, `.agent/SOPs/review-loop.md`, `.agent/SOPs/agent-autonomy-defaults.md`
+  - `docs/AGENTS.md`, `docs/PRD-frontend-testing-core.md`, `docs/TECH_SPEC-frontend-testing-core.md`
+  - `docs/PRD-devtools-readiness-orchestrator-usage.md`, `docs/TECH_SPEC-devtools-readiness-orchestrator-usage.md`, `docs/ACTION_PLAN-frontend-testing-core.md`
+  - `.agent/task/0912-review-loop-devtools-gate.md`, `.agent/task/0915-frontend-testing-core.md`
+
+### Phase 2 runbook (ordered)
+1) Confirm no external consumers for legacy scripts (repo + CI scan) and verify `.runs/` artifacts remain sufficient without `metrics-summary.json` / migrations logs.
+2) Consolidate helper utilities:
+   - Move `packages/shared/design-artifacts/writer.ts` to import `writeJsonAtomic`, `sanitizeTaskId`, `sanitizeRunId`.
+   - Update `scripts/status-ui-build.mjs` to use the canonical `writeJsonAtomic`.
+3) Normalize env path resolution to `CODEX_ORCHESTRATOR_ROOT` (remove `CODEX_ORCHESTRATOR_REPO_ROOT` usage in design scripts and ensure subprocess env stays consistent).
+4) Delete `scripts/mcp-runner-migrate.js` + `scripts/mcp-runner-metrics.js`; update `.runs/README.md` + `docs/REFRACTOR_PLAN.md`.
+5) Run full guardrails (spec-guard → build/lint/test → docs gates → diff budget → review).
+
+### Phase 3 runbook (ordered)
+1) Inventory devtools pipeline references (use the list above) and decide the canonical replacement path (`CODEX_REVIEW_DEVTOOLS=1` or `--devtools`).
+2) Add a compatibility path (alias or explicit error messaging) before removing pipeline IDs.
+3) Remove `implementation-gate-devtools` + `frontend-testing-devtools` from `codex.orchestrator.json`; update docs/SOPs/PRDs.
+4) Remove `scripts/run-parallel-goals.ts` + `parallel:goals` npm script if still unused.
+5) Validate with `codex-orchestrator start implementation-gate` and `frontend-testing` using `CODEX_REVIEW_DEVTOOLS=1`.
+
+### Phase 3 per-file doc update checklist (draft)
+- `README.md`: replace devtools pipeline IDs with the new path; update example commands.
+- `.agent/AGENTS.md`: swap devtools pipeline guidance to the new path.
+- `.agent/SOPs/review-loop.md`: remove mentions of `implementation-gate-devtools`.
+- `.agent/SOPs/agent-autonomy-defaults.md`: replace `implementation-gate-devtools` references.
+- `docs/AGENTS.md`: update devtools command examples.
+- `docs/PRD-frontend-testing-core.md`: remove devtools pipeline ID references; document new enablement path.
+- `docs/TECH_SPEC-frontend-testing-core.md`: replace pipeline ID references; update validation notes.
+- `docs/PRD-devtools-readiness-orchestrator-usage.md`: swap to new devtools path.
+- `docs/TECH_SPEC-devtools-readiness-orchestrator-usage.md`: update preflight guidance to new path.
+- `docs/ACTION_PLAN-frontend-testing-core.md`: remove devtools pipeline ID in the plan.
+- `.agent/task/0912-review-loop-devtools-gate.md`: update evidence notes if the pipeline ID changes.
+- `.agent/task/0915-frontend-testing-core.md`: update references to devtools pipeline creation.
+  - `docs/findings/slimdown-audit.md`: refresh the devtools reference map after consolidation.
+  - Edit notes:
+    - `README.md`: update the DevTools gate section and frontend-testing examples to use `CODEX_REVIEW_DEVTOOLS=1` or `--devtools`.
+    - `.agent/AGENTS.md` + `docs/AGENTS.md`: replace devtools pipeline IDs in the “DevTools-enabled” command examples.
+    - `.agent/SOPs/review-loop.md` + `.agent/SOPs/agent-autonomy-defaults.md`: swap devtools pipeline IDs in gate guidance.
+    - Frontend testing specs/PRDs: replace devtools pipeline IDs in enablement + validation sections.
+
+## Consolidated Handoff Checklist (Phase 2 → Phase 3)
+1) Phase 2 prechecks + repo scan complete; `.runs/` artifacts confirmed sufficient without legacy summaries.
+2) Helper consolidation done (atomic writes, sanitizers, env vars).
+3) Legacy scripts removed (`mcp-runner-migrate.js`, `mcp-runner-metrics.js`) + docs updated.
+4) DevTools consolidation plan chosen (alias vs explicit error).
+5) DevTools pipeline IDs removed; docs/SOPs updated per checklist.
+6) Optional `parallel:goals` harness removed (if unused).
+7) Full guardrails run and evidence recorded.
+
+## DevTools Consolidation Decision (Draft)
+- Option A: Alias old pipeline IDs to the new path for one release window.
+  - Pros: smoothest migration, no hard failures.
+  - Cons: prolongs duplication and hidden usage.
+- Option B: Hard error with a clear message and recommended replacement command.
+  - Pros: forces migration, removes ambiguity quickly.
+  - Cons: breaks any untracked automation immediately.
+- Recommendation: start with Option A for one cycle (warn), then move to Option B once usage drops to zero.

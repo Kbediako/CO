@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generated_at": "2025-12-31",
+  "generated_at": "2026-01-01",
   "entries": [
     {
       "path": ".agent/AGENTS.md",
@@ -111,7 +111,7 @@
       "path": ".agent/readme.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2025-12-31",
+      "last_review": "2026-01-01",
       "cadence_days": 90
     },
     {
@@ -146,7 +146,14 @@
       "path": ".agent/system/services.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2025-12-31",
+      "last_review": "2026-01-01",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/task/0101-slimdown-audit.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-01",
       "cadence_days": 90
     },
     {
@@ -160,7 +167,7 @@
       "path": ".agent/task/0303-orchestrator-autonomy.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2025-12-31",
+      "last_review": "2026-01-01",
       "cadence_days": 90
     },
     {
@@ -335,7 +342,7 @@
       "path": ".agent/task/0920-refactor-plan-implementation.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2025-12-31",
+      "last_review": "2026-01-01",
       "cadence_days": 90
     },
     {
@@ -738,6 +745,13 @@
       "cadence_days": 90
     },
     {
+      "path": "docs/PRD-slimdown.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-01",
+      "cadence_days": 90
+    },
+    {
       "path": "docs/PRD-dead-code-pruning.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -832,7 +846,7 @@
       "path": "docs/PRD-npm-companion-package.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2025-12-31",
+      "last_review": "2026-01-01",
       "cadence_days": 90
     },
     {
@@ -937,14 +951,14 @@
       "path": "docs/REFRACTOR_PLAN.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2025-12-31",
+      "last_review": "2026-01-01",
       "cadence_days": 90
     },
     {
       "path": "docs/TASKS.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2025-12-31",
+      "last_review": "2026-01-01",
       "cadence_days": 90
     },
     {
@@ -952,6 +966,13 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/TECH_SPEC-slimdown.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-01",
       "cadence_days": 90
     },
     {
@@ -1246,6 +1267,13 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/findings/slimdown-audit.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-01",
       "cadence_days": 90
     },
     {
@@ -1620,6 +1648,13 @@
       "cadence_days": 90
     },
     {
+      "path": "tasks/tasks-0101-slimdown-audit.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-01",
+      "cadence_days": 90
+    },
+    {
       "path": "tasks/tasks-0202-orchestrator-hardening.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -1756,7 +1791,7 @@
       "path": "tasks/tasks-0914-npm-companion-package.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2025-12-31",
+      "last_review": "2026-01-01",
       "cadence_days": 90
     },
     {
