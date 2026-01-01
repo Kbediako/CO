@@ -17,6 +17,8 @@ import process from 'node:process';
 import { promisify } from 'node:util';
 
 import { resolveCodexCommand } from '../orchestrator/src/cli/utils/devtools.js';
+import { parseArgs as parseCliArgs, hasFlag } from './lib/cli-args.js';
+import { collectManifests } from './lib/run-manifests.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -142,43 +144,33 @@ async function buildTaskContext(taskKey: string): Promise<string[]> {
 
 function parseArgs(argv: string[]): CliOptions {
   const options: CliOptions = { runsDir: path.join(process.cwd(), '.runs') };
-  for (let index = 0; index < argv.length; index += 1) {
-    const arg = argv[index];
-    if (arg === '--manifest') {
-      options.manifest = argv[index + 1];
-      index += 1;
-    } else if (arg.startsWith('--manifest=')) {
-      options.manifest = arg.split('=')[1];
-    } else if (arg === '--runs-dir') {
-      options.runsDir = argv[index + 1] ?? options.runsDir;
-      index += 1;
-    } else if (arg.startsWith('--runs-dir=')) {
-      options.runsDir = arg.split('=')[1];
-    } else if (arg === '--task') {
-      options.task = argv[index + 1];
-      index += 1;
-    } else if (arg.startsWith('--task=')) {
-      options.task = arg.split('=')[1];
-    } else if (arg === '--uncommitted') {
+  const { args, entries } = parseCliArgs(argv);
+
+  for (const entry of entries) {
+    if (entry.key === 'manifest' && typeof entry.value === 'string') {
+      options.manifest = entry.value;
+    } else if (entry.key === 'runs-dir' && typeof entry.value === 'string') {
+      options.runsDir = entry.value;
+    } else if (entry.key === 'task' && typeof entry.value === 'string') {
+      options.task = entry.value;
+    } else if (entry.key === 'base' && typeof entry.value === 'string') {
+      options.base = entry.value;
+    } else if (entry.key === 'commit' && typeof entry.value === 'string') {
+      options.commit = entry.value;
+    } else if (entry.key === 'title' && typeof entry.value === 'string') {
+      options.title = entry.value;
+    } else if (entry.key === 'uncommitted') {
       options.uncommitted = true;
-    } else if (arg === '--base') {
-      options.base = argv[index + 1];
-      index += 1;
-    } else if (arg.startsWith('--base=')) {
-      options.base = arg.split('=')[1];
-    } else if (arg === '--commit') {
-      options.commit = argv[index + 1];
-      index += 1;
-    } else if (arg.startsWith('--commit=')) {
-      options.commit = arg.split('=')[1];
-    } else if (arg === '--title') {
-      options.title = argv[index + 1];
-      index += 1;
-    } else if (arg.startsWith('--title=')) {
-      options.title = arg.split('=')[1];
-    } else if (arg === '--non-interactive') {
+    } else if (entry.key === 'non-interactive') {
       options.nonInteractive = true;
     }
+  }
+
+  if (hasFlag(args, 'uncommitted')) {
+    options.uncommitted = true;
+  }
+  if (hasFlag(args, 'non-interactive')) {
+    options.nonInteractive = true;
   }
 
   if (!options.manifest) {
@@ -189,53 +181,6 @@ function parseArgs(argv: string[]): CliOptions {
   }
 
   return options;
-}
-
-async function collectManifests(runsDir: string, taskFilter?: string): Promise<string[]> {
-  const results: string[] = [];
-  let taskIds: string[] = [];
-  try {
-    taskIds = await readdir(runsDir);
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-      return results;
-    }
-    throw error;
-  }
-
-  for (const taskId of taskIds) {
-    if (taskFilter && taskFilter !== taskId) {
-      continue;
-    }
-    const taskPath = path.join(runsDir, taskId);
-    const cliPath = path.join(taskPath, 'cli');
-    const legacyPath = taskPath;
-
-    const candidates: Array<{ root: string; runIds: string[] }> = [];
-    try {
-      const cliRunIds = await readdir(cliPath);
-      candidates.push({ root: cliPath, runIds: cliRunIds });
-    } catch {
-      // Ignore missing CLI directory; fall back to legacy layout.
-    }
-
-    if (candidates.length === 0) {
-      try {
-        const legacyRunIds = await readdir(legacyPath);
-        candidates.push({ root: legacyPath, runIds: legacyRunIds });
-      } catch {
-        continue;
-      }
-    }
-
-    for (const candidate of candidates) {
-      for (const runId of candidate.runIds) {
-        const manifestPath = path.join(candidate.root, runId, 'manifest.json');
-        results.push(manifestPath);
-      }
-    }
-  }
-  return results;
 }
 
 async function resolveManifestPath(options: CliOptions): Promise<string> {

@@ -1,5 +1,5 @@
-import { readFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { buildAllowedOriginSet, loadPermitFile } from '../permit.js';
+import { slugify as sharedSlugify } from '../../../../packages/shared/utils/strings.js';
 import type {
   DesignBreakpoint,
   DesignMetadataConfig,
@@ -22,37 +22,25 @@ export interface ToolkitRetentionMetadata extends ToolkitRetentionPolicy {
   expiry: string;
 }
 
-interface CompliancePermit {
+export async function loadToolkitPermit(repoRoot: string): Promise<{
   allowedSources?: Array<{ origin: string; [key: string]: unknown }>;
-}
-
-export async function loadToolkitPermit(repoRoot: string): Promise<CompliancePermit> {
-  const permitPath = join(repoRoot, 'compliance', 'permit.json');
-  try {
-    const raw = await readFile(permitPath, 'utf8');
-    return JSON.parse(raw) as CompliancePermit;
-  } catch (error) {
-    const nodeError = error as NodeJS.ErrnoException;
-    if (nodeError?.code === 'ENOENT') {
-      console.warn('[design-toolkit] compliance/permit.json not found; proceeding without permit enforcement');
-      return { allowedSources: [] };
-    }
-    throw error;
+}> {
+  const permitResult = await loadPermitFile(repoRoot);
+  if (permitResult.status === 'missing') {
+    console.warn('[design-toolkit] compliance/permit.json not found; proceeding without permit enforcement');
+    return { allowedSources: [] };
   }
+  if (permitResult.status === 'error') {
+    throw new Error(permitResult.error ?? 'Unable to read compliance/permit.json');
+  }
+  return permitResult.permit ?? { allowedSources: [] };
 }
 
-export function ensureSourcePermitted(url: string, permit: CompliancePermit): boolean {
-  const allowed = new Set(
-    (permit.allowedSources ?? [])
-      .map((entry) => {
-        try {
-          return new URL(entry.origin).origin;
-        } catch {
-          return null;
-        }
-      })
-      .filter((origin): origin is string => Boolean(origin))
-  );
+export function ensureSourcePermitted(
+  url: string,
+  permit: { allowedSources?: Array<{ origin: string; [key: string]: unknown }> }
+): boolean {
+  const allowed = buildAllowedOriginSet(permit);
   const origin = new URL(url).origin;
   if (allowed.size === 0 || allowed.has(origin)) {
     return true;
@@ -103,15 +91,14 @@ export function buildRetentionMetadata(retention: ToolkitRetentionPolicy, now: D
 }
 
 export function slugifyToolkitValue(value: string, index: number): string {
-  const normalized = value
-    .toLowerCase()
-    .replace(/[^a-z0-9-_]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 48);
-  if (normalized.length > 0) {
-    return normalized;
-  }
-  return `source-${index + 1}`;
+  const normalized = sharedSlugify(value, {
+    fallback: '',
+    maxLength: 48,
+    lowercase: true,
+    pattern: /[^a-z0-9-_]+/g,
+    collapseDashes: false
+  });
+  return normalized.length > 0 ? normalized : `source-${index + 1}`;
 }
 
 function defaultBreakpoints(): DesignBreakpoint[] {

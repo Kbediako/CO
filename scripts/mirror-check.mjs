@@ -2,7 +2,8 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { loadCheerio, loadPlaywright } from "./mirror-optional-deps.mjs";
-import { DEFAULT_STRIP_PATTERNS, compileStripPatterns } from "./mirror-site.mjs";
+import { parseArgs, hasFlag } from "./lib/cli-args.js";
+import { DEFAULT_STRIP_PATTERNS, compileStripPatterns, loadMirrorConfig } from "./mirror-site.mjs";
 import { startMirrorServer } from "./lib/mirror-server.mjs";
 
 const cheerio = await loadCheerio();
@@ -10,66 +11,6 @@ const playwright = await loadPlaywright();
 const TRACKER_PATTERNS = compileStripPatterns(DEFAULT_STRIP_PATTERNS);
 const TEXT_CONTENT_TYPE = /(text|javascript|json|xml|svg)/i;
 const ABSOLUTE_HTTPS_REGEX = /https:\/\/[^\s"'<>]+/gi;
-
-function parseArgs(rawArgs) {
-  const args = {};
-  for (let i = 0; i < rawArgs.length; i += 1) {
-    const arg = rawArgs[i];
-    if (!arg.startsWith("--")) {
-      continue;
-    }
-
-    const [flag, value] = arg.split("=");
-    const key = flag.replace(/^--/, "");
-
-    if (value !== undefined) {
-      args[key] = value;
-      continue;
-    }
-
-    const next = rawArgs[i + 1];
-    if (next && !next.startsWith("--")) {
-      args[key] = next;
-      i += 1;
-    } else {
-      args[key] = true;
-    }
-  }
-
-  return args;
-}
-
-async function readConfig(project, providedPath) {
-  const configPath = path.resolve(providedPath ?? path.join("packages", project, "mirror.config.json"));
-  const raw = JSON.parse(await fs.readFile(configPath, "utf8"));
-
-  if (!raw.origin) {
-    throw new Error(`mirror.config.json for ${project} is missing required "origin"`);
-  }
-
-  if (!Array.isArray(raw.routes) || !raw.routes.length) {
-    throw new Error(`mirror.config.json for ${project} requires a non-empty "routes" array`);
-  }
-
-  const originHost = new URL(raw.origin).hostname;
-  const allowlistHosts = Array.from(
-    new Set([...(raw.allowlistHosts ?? []), originHost, "localhost", "127.0.0.1"])
-  );
-
-  const routes = raw.routes.map((route) => {
-    const parsed = new URL(route, "http://localhost");
-    return parsed.pathname || "/";
-  });
-
-  return {
-    configPath,
-    origin: raw.origin,
-    routes,
-    allowlistHosts,
-    blocklistHosts: raw.blocklistHosts ?? [],
-    originHost
-  };
-}
 
 async function ensurePublicDir(project) {
   const publicDir = path.resolve("packages", project, "public");
@@ -191,13 +132,21 @@ function scanDomForIssues(pageContent, route, options) {
 }
 
 async function main() {
-  const args = parseArgs(process.argv.slice(2));
-  if (args.help || args.h) {
-    console.log("Usage: npm run mirror:check -- --project <name> [--port <port>] [--config <path>] [--headless=false]");
+  const { args, positionals } = parseArgs(process.argv.slice(2));
+  if (hasFlag(args, "help") || hasFlag(args, "h")) {
+    console.log("Usage: npm run mirror:check -- --project <name> [--port <port>] [--config <path>] [--headless=false] [--csp <policy>]");
+    return;
+  }
+  const knownFlags = new Set(["project", "port", "config", "headless", "csp", "h", "help"]);
+  const unknown = Object.keys(args).filter((key) => !knownFlags.has(key));
+  if (unknown.length > 0 || positionals.length > 0) {
+    const label = unknown[0] ? `--${unknown[0]}` : positionals[0];
+    console.error(`Unknown option: ${label}`);
+    process.exitCode = 2;
     return;
   }
 
-  const project = args.project;
+  const project = typeof args.project === "string" ? args.project : null;
   if (!project) {
     console.error("Missing required --project argument (e.g. --project obys-library)");
     process.exitCode = 1;
@@ -206,22 +155,23 @@ async function main() {
 
   let config;
   try {
-    config = await readConfig(project, args.config);
+    const result = await loadMirrorConfig(project, args.config);
+    config = result.config;
   } catch (error) {
-    console.error(`[mirror:check] Unable to read config: ${error.message}`);
+    console.error(`[mirror:check] ${error.message}`);
     process.exitCode = 1;
     return;
   }
 
   let serverHandle = null;
-  let port = args.port ? Number(args.port) : null;
+  let port = typeof args.port === "string" ? Number(args.port) : null;
 
   if (!port) {
     const publicDir = await ensurePublicDir(project);
     serverHandle = await startMirrorServer({
       rootDir: publicDir,
       port: 0,
-      csp: args.csp ?? "self",
+      csp: typeof args.csp === "string" ? args.csp : "self",
       enableRange: true,
       log: () => {}
     });

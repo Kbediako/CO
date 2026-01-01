@@ -9,6 +9,7 @@ import { promisify } from 'node:util';
 import path from 'node:path';
 import fs from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
+import { parseArgs, hasFlag } from './lib/cli-args.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -32,49 +33,6 @@ const contentTypes = new Map([
   ['.jpeg', 'image/jpeg']
 ]);
 
-function parseArgs(argv) {
-  const options = {
-    port: DEFAULT_PORT,
-    host: DEFAULT_HOST,
-    refreshMs: DEFAULT_REFRESH_MS
-  };
-
-  for (let index = 0; index < argv.length; index += 1) {
-    const arg = argv[index];
-    if (arg === '--port') {
-      options.port = Number(argv[index + 1]);
-      index += 1;
-    } else if (arg.startsWith('--port=')) {
-      options.port = Number(arg.split('=')[1]);
-    } else if (arg === '--host') {
-      options.host = argv[index + 1] ?? options.host;
-      index += 1;
-    } else if (arg.startsWith('--host=')) {
-      options.host = arg.split('=')[1];
-    } else if (arg === '--refresh') {
-      options.refreshMs = Number(argv[index + 1]);
-      index += 1;
-    } else if (arg.startsWith('--refresh=')) {
-      options.refreshMs = Number(arg.split('=')[1]);
-    } else if (arg === '--no-refresh') {
-      options.refreshMs = 0;
-    } else if (arg === '--help' || arg === '-h') {
-      options.help = true;
-    } else {
-      throw new Error(`Unknown option: ${arg}`);
-    }
-  }
-
-  if (!Number.isFinite(options.port) || options.port <= 0) {
-    options.port = DEFAULT_PORT;
-  }
-  if (!Number.isFinite(options.refreshMs) || options.refreshMs < 0) {
-    options.refreshMs = DEFAULT_REFRESH_MS;
-  }
-
-  return options;
-}
-
 function printHelp() {
   console.log('Usage: npm run status-ui -- [options]');
   console.log('');
@@ -92,10 +50,31 @@ async function runBuild() {
 }
 
 async function main() {
-  const options = parseArgs(process.argv.slice(2));
-  if (options.help) {
+  const { args, positionals } = parseArgs(process.argv.slice(2));
+  if (hasFlag(args, 'h') || hasFlag(args, 'help')) {
     printHelp();
     return;
+  }
+  const knownFlags = new Set(['port', 'host', 'refresh', 'no-refresh', 'h', 'help']);
+  const unknown = Object.keys(args).filter((key) => !knownFlags.has(key));
+  if (unknown.length > 0 || positionals.length > 0) {
+    const label = unknown[0] ? `--${unknown[0]}` : positionals[0];
+    throw new Error(`Unknown option: ${label}`);
+  }
+
+  const options = {
+    port: Number(typeof args.port === 'string' ? args.port : DEFAULT_PORT),
+    host: typeof args.host === 'string' ? args.host : DEFAULT_HOST,
+    refreshMs: hasFlag(args, 'no-refresh')
+      ? 0
+      : Number(typeof args.refresh === 'string' ? args.refresh : DEFAULT_REFRESH_MS)
+  };
+
+  if (!Number.isFinite(options.port) || options.port <= 0) {
+    options.port = DEFAULT_PORT;
+  }
+  if (!Number.isFinite(options.refreshMs) || options.refreshMs < 0) {
+    options.refreshMs = DEFAULT_REFRESH_MS;
   }
 
   let lastBuildAt = 0;

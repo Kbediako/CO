@@ -3,6 +3,7 @@
 import { access, mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
+import { parseArgs, hasFlag } from './lib/cli-args.js';
 
 const DOC_ROOTS = ['.agent', '.ai-dev-tasks', 'docs', 'tasks'];
 const DOC_ROOT_FILES = ['README.md', 'AGENTS.md'];
@@ -22,50 +23,6 @@ Options:
   --warn             Emit failures but exit 0
   --check            Alias for default behavior
   -h, --help         Show this help message`);
-}
-
-function parseArgs(argv) {
-  const options = {
-    registryPath: DEFAULT_REGISTRY_PATH,
-    reportPath: null,
-    warnOnly: false
-  };
-
-  for (let i = 0; i < argv.length; i += 1) {
-    const arg = argv[i];
-    if (arg === '--registry') {
-      const next = argv[i + 1];
-      if (!next) {
-        throw new Error('Missing value for --registry');
-      }
-      options.registryPath = next;
-      i += 1;
-      continue;
-    }
-    if (arg === '--report') {
-      const next = argv[i + 1];
-      if (!next) {
-        throw new Error('Missing value for --report');
-      }
-      options.reportPath = next;
-      i += 1;
-      continue;
-    }
-    if (arg === '--warn') {
-      options.warnOnly = true;
-      continue;
-    }
-    if (arg === '--check') {
-      continue;
-    }
-    if (arg === '-h' || arg === '--help') {
-      showUsage();
-      process.exit(0);
-    }
-    throw new Error(`Unknown option: ${arg}`);
-  }
-
-  return options;
 }
 
 async function exists(target) {
@@ -172,7 +129,23 @@ async function loadRegistry(registryPath) {
 
 async function main() {
   const repoRoot = process.cwd();
-  const options = parseArgs(process.argv.slice(2));
+  const { args, positionals } = parseArgs(process.argv.slice(2));
+  if (hasFlag(args, 'h') || hasFlag(args, 'help')) {
+    showUsage();
+    return;
+  }
+  const knownFlags = new Set(['registry', 'report', 'warn', 'check', 'h', 'help']);
+  const unknown = Object.keys(args).filter((key) => !knownFlags.has(key));
+  if (unknown.length > 0 || positionals.length > 0) {
+    const label = unknown[0] ? `--${unknown[0]}` : positionals[0];
+    throw new Error(`Unknown option: ${label}`);
+  }
+
+  const options = {
+    registryPath: typeof args.registry === 'string' ? args.registry : DEFAULT_REGISTRY_PATH,
+    reportPath: typeof args.report === 'string' ? args.report : null,
+    warnOnly: hasFlag(args, 'warn')
+  };
   const registryPath = path.resolve(repoRoot, options.registryPath);
 
   if (!(await exists(registryPath))) {

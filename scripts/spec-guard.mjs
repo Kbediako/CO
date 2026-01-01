@@ -4,6 +4,7 @@ import { execFile } from 'node:child_process';
 import { readFile, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
+import { parseArgs, hasFlag } from './lib/cli-args.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -18,23 +19,6 @@ Checks include:
 Options:
   --dry-run   Report failures without exiting non-zero
   -h, --help  Show this help message`);
-}
-
-function parseArgs(argv) {
-  let dryRun = false;
-  for (const arg of argv) {
-    if (arg === '--dry-run') {
-      dryRun = true;
-    } else if (arg === '-h' || arg === '--help') {
-      showUsage();
-      process.exit(0);
-    } else {
-      console.error(`Unknown option: ${arg}`);
-      showUsage();
-      process.exit(2);
-    }
-  }
-  return { dryRun };
 }
 
 async function verifyGitRef(ref) {
@@ -204,7 +188,20 @@ async function checkSpecFreshness(specFiles) {
 }
 
 async function main() {
-  const { dryRun } = parseArgs(process.argv.slice(2));
+  const { args, positionals } = parseArgs(process.argv.slice(2));
+  if (hasFlag(args, 'h') || hasFlag(args, 'help')) {
+    showUsage();
+    process.exit(0);
+  }
+  const knownFlags = new Set(['dry-run', 'h', 'help']);
+  const unknown = Object.keys(args).filter((key) => !knownFlags.has(key));
+  if (unknown.length > 0 || positionals.length > 0) {
+    const label = unknown[0] ? `--${unknown[0]}` : positionals[0];
+    console.error(`Unknown option: ${label}`);
+    showUsage();
+    process.exit(2);
+  }
+  const dryRun = hasFlag(args, 'dry-run');
   const baseRef = await resolveBaseRef();
   const changedFiles = await listChangedFiles(baseRef);
 

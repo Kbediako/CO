@@ -19,6 +19,43 @@
         "title": "npm run test",
         "command": "npm run test"
       }
+    ],
+    "delegation-guard-stage": [
+      {
+        "kind": "command",
+        "id": "delegation-guard",
+        "title": "node scripts/delegation-guard.mjs",
+        "command": "node scripts/delegation-guard.mjs"
+      }
+    ],
+    "diagnostics-spec-guard": [
+      {
+        "kind": "command",
+        "id": "spec-guard",
+        "title": "node scripts/spec-guard.mjs --dry-run",
+        "command": "node \"$CODEX_ORCHESTRATOR_PACKAGE_ROOT/dist/orchestrator/src/cli/utils/specGuardRunner.js\" --dry-run"
+      }
+    ],
+    "design-artifacts": [
+      {
+        "kind": "command",
+        "id": "design-spec-guard",
+        "title": "Validate specs via spec-guard",
+        "command": "node \"$CODEX_ORCHESTRATOR_PACKAGE_ROOT/dist/orchestrator/src/cli/utils/specGuardRunner.js\" --dry-run",
+        "env": {
+          "DESIGN_PIPELINE": "1"
+        },
+        "summaryHint": "Ensures design specs are fresh before artifact write"
+      },
+      {
+        "kind": "command",
+        "id": "design-artifact-writer",
+        "title": "Persist design artifact manifests",
+        "command": "node \"$CODEX_ORCHESTRATOR_PACKAGE_ROOT/dist/scripts/design/pipeline/write-artifacts.js\"",
+        "env": {
+          "DESIGN_PIPELINE": "1"
+        }
+      }
     ]
   },
   "pipelines": [
@@ -32,20 +69,16 @@
       ],
       "stages": [
         {
-          "kind": "command",
-          "id": "delegation-guard",
-          "title": "node scripts/delegation-guard.mjs",
-          "command": "node scripts/delegation-guard.mjs"
+          "kind": "stage-set",
+          "ref": "delegation-guard-stage"
         },
         {
           "kind": "stage-set",
           "ref": "build-lint-test"
         },
         {
-          "kind": "command",
-          "id": "spec-guard",
-          "title": "node scripts/spec-guard.mjs --dry-run",
-          "command": "node \"$CODEX_ORCHESTRATOR_PACKAGE_ROOT/dist/orchestrator/src/cli/utils/specGuardRunner.js\" --dry-run"
+          "kind": "stage-set",
+          "ref": "diagnostics-spec-guard"
         }
       ]
     },
@@ -173,10 +206,8 @@
       "description": "Build, lint, test, run evaluation harness, and verify specs for guardrail evidence capture.",
       "stages": [
         {
-          "kind": "command",
-          "id": "delegation-guard",
-          "title": "node scripts/delegation-guard.mjs",
-          "command": "node scripts/delegation-guard.mjs"
+          "kind": "stage-set",
+          "ref": "delegation-guard-stage"
         },
         {
           "kind": "stage-set",
@@ -189,10 +220,8 @@
           "command": "npm run eval:test"
         },
         {
-          "kind": "command",
-          "id": "spec-guard",
-          "title": "node scripts/spec-guard.mjs --dry-run",
-          "command": "node scripts/spec-guard.mjs --dry-run"
+          "kind": "stage-set",
+          "ref": "diagnostics-spec-guard"
         }
       ]
     },
@@ -270,23 +299,8 @@
           "summaryHint": "Visual regression diffs stored under design/visual-regression/"
         },
         {
-          "kind": "command",
-          "id": "design-spec-guard",
-          "title": "Validate specs via spec-guard",
-          "command": "node \"$CODEX_ORCHESTRATOR_PACKAGE_ROOT/dist/orchestrator/src/cli/utils/specGuardRunner.js\" --dry-run",
-          "env": {
-            "DESIGN_PIPELINE": "1"
-          },
-          "summaryHint": "Ensures design specs are fresh before artifact write"
-        },
-        {
-          "kind": "command",
-          "id": "design-artifact-writer",
-          "title": "Persist design artifact manifests",
-          "command": "node \"$CODEX_ORCHESTRATOR_PACKAGE_ROOT/dist/scripts/design/pipeline/write-artifacts.js\"",
-          "env": {
-            "DESIGN_PIPELINE": "1"
-          }
+          "kind": "stage-set",
+          "ref": "design-artifacts"
         }
       ]
     },
@@ -368,25 +382,8 @@
           }
         },
         {
-          "kind": "command",
-          "id": "design-spec-guard",
-          "title": "Validate specs via spec-guard",
-          "command": "node \"$CODEX_ORCHESTRATOR_PACKAGE_ROOT/dist/orchestrator/src/cli/utils/specGuardRunner.js\" --dry-run",
-          "env": {
-            "DESIGN_PIPELINE": "1",
-            "DESIGN_TOOLKIT": "1"
-          },
-          "summaryHint": "Ensures HI-FI design specs are current before artifact write"
-        },
-        {
-          "kind": "command",
-          "id": "design-artifact-writer",
-          "title": "Persist design manifests",
-          "command": "node \"$CODEX_ORCHESTRATOR_PACKAGE_ROOT/dist/scripts/design/pipeline/write-artifacts.js\"",
-          "env": {
-            "DESIGN_PIPELINE": "1",
-            "DESIGN_TOOLKIT": "1"
-          }
+          "kind": "stage-set",
+          "ref": "design-artifacts"
         }
       ]
     },
