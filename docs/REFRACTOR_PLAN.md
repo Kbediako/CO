@@ -31,7 +31,7 @@
 - Duplicate pipeline definitions and stage repetition: pipelines live in `codex.orchestrator.json` and also in `orchestrator/src/cli/pipelines/*`, while `diagnostics`, `implementation-gate`, `implementation-gate-devtools`, and `docs-review` repeat the same stage lists in `codex.orchestrator.json`.
 - Triple instruction layers with overlapping content: `AGENTS.md`, `docs/AGENTS.md`, `.agent/AGENTS.md` are concatenated per `docs/guides/instructions.md`.
 - Manual checklist mirroring across three locations: `tasks/tasks-*.md`, `docs/TASKS.md`, `.agent/task/*.md` (documented in `.agent/system/architecture.md` and `.agent/system/conventions.md`).
-- Legacy MCP runner shims removed in favor of the CLI `codex-orchestrator mcp serve`, leaving legacy handling in `scripts/mcp-runner-migrate.js` and `scripts/status-ui-build.mjs`.
+- Legacy MCP runner shims removed in favor of the CLI `codex-orchestrator mcp serve`; legacy migration/metrics scripts are retired, leaving `scripts/status-ui-build.mjs` as the remaining legacy-focused helper.
 - Overlapping orchestration layers: `orchestrator/src/**` plus `packages/orchestrator/**` and `packages/shared/**` add multiple internal layers for a single runtime surface (see `.agent/system/architecture.md`).
 - Optional features embedded in core: `orchestrator/src/control-plane`, `orchestrator/src/scheduler`, `orchestrator/src/sync`, `orchestrator/src/learning` are optional (README notes cloud sync is not wired) but enlarge the default runtime surface.
 

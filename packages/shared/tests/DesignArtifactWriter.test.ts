@@ -96,7 +96,7 @@ describe('DesignArtifactWriter', () => {
     const result = await writeDesignSummary({
       context: {
         taskId: '0401-design-reference',
-        runId: 'run:1',
+        runId: 'run-1',
         manifestPath,
         repoRoot: root
       },

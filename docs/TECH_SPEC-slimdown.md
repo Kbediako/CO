@@ -17,7 +17,7 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
 
 ### 2) Duplicate helper utilities
 - Atomic writes:
-  - Replace local `writeJsonAtomic` implementations in `scripts/mcp-runner-metrics.js`, `scripts/mcp-runner-migrate.js`, `scripts/status-ui-build.mjs`, and `packages/shared/design-artifacts/writer.ts` with the canonical helper (`orchestrator/src/cli/utils/fs.ts` or a shared helper extracted to `packages/shared`).
+  - Replace local `writeJsonAtomic` implementations in scripts/mcp-runner-metrics.js, scripts/mcp-runner-migrate.js, `scripts/status-ui-build.mjs`, and `packages/shared/design-artifacts/writer.ts` with the canonical helper (`orchestrator/src/cli/utils/fs.ts` or a shared helper extracted to `packages/shared`).
 - Task/run ID sanitization:
   - Remove local `sanitizeTaskId`/`sanitizeRunId` in `packages/shared/design-artifacts/writer.ts` and reuse `orchestrator/src/persistence/sanitizeTaskId.ts` and `sanitizeRunId.ts` (or a shared helper moved to `packages/shared`).
 - Environment path resolution:
@@ -30,8 +30,8 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
 - Preconditions: update README, `.agent` SOPs, and frontend-testing/devtools PRDs + TECH_SPECs that explicitly call out the devtools pipeline IDs.
 
 ### 4) Legacy migration and metrics scripts
-- Retire `scripts/mcp-runner-migrate.js` once all legacy `.runs/local-mcp` data is migrated (compat pointers already written by the CLI).
-- Retire `scripts/mcp-runner-metrics.js` if metrics summaries are replaced by orchestrator aggregates or no longer consumed.
+- Retire scripts/mcp-runner-migrate.js once all legacy `.runs/local-mcp` data is migrated (compat pointers already written by the CLI).
+- Retire scripts/mcp-runner-metrics.js if metrics summaries are replaced by orchestrator aggregates or no longer consumed.
 - Preconditions: update `.runs/README.md` (metrics summary + migrations pointers) and any reviewer guidance referencing these scripts.
 
 ### 5) Optional: adapter parallel-goals harness
@@ -57,7 +57,7 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
 ### Phase 2
 - Re-run full guardrails as above.
 - Add or update targeted unit tests if helper behavior changes.
-- Pre-delete checks: confirm no active consumers of `scripts/mcp-runner-migrate.js` / `scripts/mcp-runner-metrics.js` (repo search + CI/workflow scan), and verify `.runs/` artifacts remain sufficient without legacy summaries.
+- Pre-delete checks: confirm no active consumers of scripts/mcp-runner-migrate.js / scripts/mcp-runner-metrics.js (repo search + CI/workflow scan), and verify `.runs/` artifacts remain sufficient without legacy summaries.
 
 ### Phase 3
 - Re-run full guardrails as above.
@@ -70,10 +70,10 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
 - Replace `writeJsonAtomic` duplicates in `scripts/status-ui-build.mjs` + `packages/shared/design-artifacts/writer.ts` with `orchestrator/src/cli/utils/fs.ts`.
 - Swap `sanitizeTaskId` / `sanitizeRunId` in `packages/shared/design-artifacts/writer.ts` to use `orchestrator/src/persistence/sanitizeTaskId.ts` + `sanitizeRunId.ts`.
 - Standardize env path resolution (prefer `CODEX_ORCHESTRATOR_ROOT` + shared resolver).
-- Remove `scripts/mcp-runner-migrate.js` + `scripts/mcp-runner-metrics.js` after pre-delete checks.
+- Remove scripts/mcp-runner-migrate.js + scripts/mcp-runner-metrics.js after pre-delete checks.
 - Update `.runs/README.md` + any reviewer guidance to drop metrics/migrations references.
 - Phase 2 file targets (non-exhaustive):
-  - `scripts/mcp-runner-migrate.js`, `scripts/mcp-runner-metrics.js`
+  - scripts/mcp-runner-migrate.js, scripts/mcp-runner-metrics.js
   - `scripts/status-ui-build.mjs`, `packages/shared/design-artifacts/writer.ts`
   - `scripts/design/pipeline/context.ts`, `scripts/design/purgeExpired.ts`, `orchestrator/src/cli/services/commandRunner.ts` (env var consistency)
   - `docs/REFRACTOR_PLAN.md`, `.runs/README.md` (remove legacy script references)
@@ -95,7 +95,7 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
    - Move `packages/shared/design-artifacts/writer.ts` to import `writeJsonAtomic`, `sanitizeTaskId`, `sanitizeRunId`.
    - Update `scripts/status-ui-build.mjs` to use the canonical `writeJsonAtomic`.
 3) Normalize env path resolution to `CODEX_ORCHESTRATOR_ROOT` (remove `CODEX_ORCHESTRATOR_REPO_ROOT` usage in design scripts and ensure subprocess env stays consistent).
-4) Delete `scripts/mcp-runner-migrate.js` + `scripts/mcp-runner-metrics.js`; update `.runs/README.md` + `docs/REFRACTOR_PLAN.md`.
+4) Delete scripts/mcp-runner-migrate.js + scripts/mcp-runner-metrics.js; update `.runs/README.md` + `docs/REFRACTOR_PLAN.md`.
 5) Run full guardrails (spec-guard → build/lint/test → docs gates → diff budget → review).
 
 ### Phase 3 runbook (ordered)
@@ -128,7 +128,7 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
 ## Consolidated Handoff Checklist (Phase 2 → Phase 3)
 1) Phase 2 prechecks + repo scan complete; `.runs/` artifacts confirmed sufficient without legacy summaries.
 2) Helper consolidation done (atomic writes, sanitizers, env vars).
-3) Legacy scripts removed (`mcp-runner-migrate.js`, `mcp-runner-metrics.js`) + docs updated.
+3) Legacy scripts removed (mcp-runner-migrate.js, mcp-runner-metrics.js) + docs updated.
 4) DevTools consolidation plan chosen (alias vs explicit error).
 5) DevTools pipeline IDs removed; docs/SOPs updated per checklist.
 6) Optional `parallel:goals` harness removed (if unused).
