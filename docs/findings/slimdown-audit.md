@@ -28,11 +28,22 @@
   - Files: .github/workflows/tasks-archive-automation.yml and .github/workflows/implementation-docs-archive-automation.yml share the same checkout/setup/run/diff/PR flow.
 - CLI HUD/output handling is repeated across multiple commands.
   - `bin/codex-orchestrator.ts` repeats the interactive gate + run output formatting in start/resume/frontend-test.
+- Documentation tooling repeats the same helper logic across multiple scripts.
+  - `collectMarkdownFiles` appears in `scripts/docs-hygiene.ts`, `scripts/docs-freshness.mjs`, and `scripts/implementation-docs-archive.mjs`.
+  - `normalizeTaskKey` is duplicated in `scripts/delegation-guard.mjs`, `scripts/tasks-archive.mjs`, and `scripts/implementation-docs-archive.mjs`.
+  - `parseDate`/`computeAgeInDays` appear in both `scripts/docs-freshness.mjs` and `scripts/implementation-docs-archive.mjs`.
+  - `toPosix` variants appear in `scripts/docs-hygiene.ts`, `scripts/docs-freshness.mjs`, and `scripts/implementation-docs-archive.mjs`.
+- Pack scripts duplicate the same npm pack parsing logic.
+  - `scripts/pack-audit.mjs` and `scripts/pack-smoke.mjs` both implement identical `runPack` helpers.
+- One-line wrapper scripts still exist.
+  - `scripts/codex-devtools.sh` only forwards `codex -c 'mcp_servers.chrome-devtools.enabled=true' ...`.
 
 ## Quick wins (low risk)
 - Remove redundant CLI/MCP wrapper scripts and document the single preferred CLI entrypoint.
 - Drop scripts/manual-orchestrator-run.ts if no active usage remains.
 - Retire scripts/mcp-runner-migrate.js and scripts/mcp-runner-metrics.js once their outputs are verified as unused.
+- Remove the `scripts/codex-devtools.sh` wrapper after updating the one doc reference.
+- Consolidate the shared `runPack` helper used by pack-audit + pack-smoke.
 
 ## Usage signals (still referenced)
 - Legacy MCP wrapper scripts were referenced as compatibility shims in `.agent/readme.md`, `.agent/system/services.md`, `.runs/README.md`, and `docs/REFRACTOR_PLAN.md`, plus listed in `tasks/tasks-0914-npm-companion-package.md` (Phase 1 updates remove these references).
@@ -44,6 +55,8 @@
 - `scripts/status-ui-build.mjs` is referenced by `scripts/status-ui-serve.mjs` and `docs/TECH_SPEC-orchestrator-status-ui.md` (do not remove; only consolidate helpers).
 - scripts/run-parallel-goals.ts appeared only in `package.json` (`parallel:goals`) with no doc references.
 - DevTools pipeline IDs (`implementation-gate-devtools`, `frontend-testing-devtools`) were referenced widely (README, `.agent` SOPs, PRDs/TECH_SPECs for frontend testing/devtools readiness). High-impact references include: `README.md`, `.agent/SOPs/review-loop.md`, `.agent/AGENTS.md`, `docs/AGENTS.md`, `docs/PRD-frontend-testing-core.md`, `docs/TECH_SPEC-frontend-testing-core.md`, `docs/PRD-devtools-readiness-orchestrator-usage.md`, `docs/TECH_SPEC-devtools-readiness-orchestrator-usage.md`, `docs/ACTION_PLAN-frontend-testing-core.md`, `.agent/task/0912-review-loop-devtools-gate.md`, and `.agent/task/0915-frontend-testing-core.md`.
+- `scripts/codex-devtools.sh` is referenced in `docs/TECH_SPEC-frontend-testing-core.md` only.
+- `scripts/pack-audit.mjs` and `scripts/pack-smoke.mjs` are invoked via `npm run pack:audit` / `npm run pack:smoke` in `package.json`.
 
 ## Deeper refactors (moderate risk)
 - Consolidate atomic write and ID sanitization helpers across scripts and packages.
@@ -52,6 +65,9 @@
 - Evaluate whether scripts/run-parallel-goals.ts is still required; remove if unused.
 - Consolidate archive automation workflows into a shared base.
 - Deduplicate HUD/output logic in the CLI entrypoint.
+- Consolidate doc tooling helpers and remove duplicate implementations in docs scripts.
+- Deduplicate `npm pack` helper logic across pack scripts.
+- Remove one-line wrapper scripts and keep canonical CLI invocations.
 
 ## Suggested removals (ranked)
 1) Legacy MCP wrappers: scripts/mcp-runner-start.sh, scripts/mcp-runner-poll.sh, scripts/run-mcp-diagnostics.sh, scripts/agents_mcp_runner.mjs.
@@ -60,3 +76,6 @@
 4) Devtools pipeline duplicates in `codex.orchestrator.json` (keep one pipeline, toggle via env).
 5) Optional parallel goals harness: scripts/run-parallel-goals.ts and `parallel:goals` npm script (if unused).
 6) Archive automation workflow duplication via a reusable base workflow.
+7) Doc tooling helper duplication in docs-freshness/docs-hygiene/tasks-archive/implementation-docs-archive scripts.
+8) Pack script helper duplication (`pack-audit` + `pack-smoke`).
+9) `scripts/codex-devtools.sh` wrapper script (replace with direct `codex -c ...`).
