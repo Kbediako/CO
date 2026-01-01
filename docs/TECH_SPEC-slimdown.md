@@ -44,6 +44,22 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
 ### 7) CLI entrypoint duplication
 - Deduplicate HUD gating and run output formatting across start/resume/frontend-test in `bin/codex-orchestrator.ts`.
 
+### 8) Documentation tooling duplication
+- Consolidate shared helpers across docs scripts (collection, path normalization, task-key normalization, date parsing).
+- Targets with duplicated logic:
+  - `scripts/docs-hygiene.ts` (collect markdown, toPosixPath)
+  - `scripts/docs-freshness.mjs` (collect markdown, toPosix, parseDate/computeAgeInDays)
+  - `scripts/tasks-archive.mjs` (normalizeTaskKey)
+  - `scripts/implementation-docs-archive.mjs` (collect markdown, toPosix, normalizeTaskKey, parseDate/computeAgeInDays)
+  - `scripts/delegation-guard.mjs` (normalizeTaskKey)
+- Expected approach: extract small shared helpers under `scripts/lib/` and remove duplicate implementations to keep behavior identical.
+
+### 9) Pack script duplication
+- `scripts/pack-audit.mjs` and `scripts/pack-smoke.mjs` share identical `npm pack` parsing; consolidate the shared `runPack` helper.
+
+### 10) Wrapper script cleanup
+- Remove `scripts/codex-devtools.sh` (one-line wrapper) and replace docs with the canonical `codex -c 'mcp_servers.chrome-devtools.enabled=true' ...` invocation.
+
 ## Expected Line Reductions by Phase (Estimate)
 - Phase 1 (wrapper cleanup): remove 5-6 wrapper/harness scripts.
   - Estimated reduction: ~360 to 500 lines.
@@ -53,6 +69,8 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
   - Estimated reduction: ~250 to 350 lines.
 - Phase 4 (workflow + CLI dedupe): consolidate archive automation workflows and CLI HUD/output helpers.
   - Estimated reduction: ~80 to 140 lines.
+- Phase 5 (docs + pack helper consolidation + wrapper removal): extract shared doc tooling helpers, dedupe pack scripts, and drop one-line wrappers.
+  - Estimated reduction: ~180 to 260 lines.
 
 ## Validation Steps per Phase
 
@@ -76,6 +94,10 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
 ### Phase 4
 - Re-run full guardrails as above.
 - Validate archive automation workflows still open PRs and sync archive branches (dry-run locally if needed).
+
+### Phase 5
+- Re-run full guardrails as above.
+- Validate docs tooling outputs remain identical (docs:check, docs:freshness, archive scripts in dry-run).
 
 ## Execution Checklists (Draft)
 
@@ -106,6 +128,11 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
 - Introduce a reusable archive automation workflow and update the existing archive workflows to call it.
 - Deduplicate CLI HUD/output handling in `bin/codex-orchestrator.ts`.
 
+### Phase 5 checklist
+- Consolidate shared doc tooling helpers (doc collection, task-key normalization, date parsing, toPosix).
+- Consolidate pack script `runPack` helper shared by pack-audit + pack-smoke.
+- Remove `scripts/codex-devtools.sh` after updating docs that reference it.
+
 ### Phase 2 runbook (ordered)
 1) Confirm no external consumers for legacy scripts (repo + CI scan) and verify `.runs/` artifacts remain sufficient without `metrics-summary.json` / migrations logs.
 2) Consolidate helper utilities:
@@ -127,6 +154,13 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
 2) Update tasks + implementation-docs archive workflow wrappers to call the shared workflow.
 3) Deduplicate CLI HUD/output handling across start/resume/frontend-test.
 4) Run full guardrails and record manifest evidence.
+
+### Phase 5 runbook (ordered)
+1) Extract shared doc tooling helpers into `scripts/lib/` (doc collection, task-key normalization, date parsing, toPosix).
+2) Replace local duplicates in docs-hygiene, docs-freshness, tasks-archive, implementation-docs-archive, and delegation-guard.
+3) Deduplicate pack `runPack` helper across pack-audit + pack-smoke.
+4) Update docs to remove references to `scripts/codex-devtools.sh`, then delete the wrapper script.
+5) Run full guardrails and record manifest evidence.
 
 ### Phase 3 per-file doc update checklist (draft)
 - `README.md`: replace devtools pipeline IDs with the new path; update example commands.
