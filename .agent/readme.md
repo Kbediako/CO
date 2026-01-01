@@ -35,7 +35,6 @@ Use explicit checkboxes (`[ ]` → `[x]`) for every task and subtask tracked in 
 - **Run diagnostics:** `npx codex-orchestrator start diagnostics --format json` executes the default build/lint/test/spec-guard pipeline and prints the run id plus manifest path under `.runs/<task>/cli/<run-id>/`.
 - **Monitor progress:** `npx codex-orchestrator status --run <run-id> --watch --interval 10` streams status updates until the run reaches a terminal state. Use `--format json` to feed automation.
 - **Resume a run:** `npx codex-orchestrator resume --run <run-id>` resets stale heartbeats, rewinds failed stages, and restarts the pipeline without touching successful commands.
-- **Legacy shims:** Existing scripts (`scripts/mcp-runner-start.sh`, `scripts/mcp-runner-poll.sh`, `scripts/run-mcp-diagnostics.sh`) now delegate to the CLI so older docs continue to work. Prefer the `codex-orchestrator` binary for new workflows.
 - **Custom pipelines:** Define additional pipelines in `codex.orchestrator.json` and invoke them with `codex-orchestrator start <pipeline-id>`. Nested sub-pipelines automatically record child manifests and `parentRunId` lineage.
 
 ### Quick Links
