@@ -1,10 +1,17 @@
 #!/usr/bin/env node
 
-import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import { parseArgs, hasFlag } from './lib/cli-args.js';
-import { collectMarkdownFiles, computeAgeInDays, normalizeTaskKey, parseIsoDate, toPosixPath } from './lib/docs-helpers.js';
+import {
+  collectMarkdownFiles,
+  computeAgeInDays,
+  normalizeTaskKey,
+  parseIsoDate,
+  pathExists,
+  toPosixPath
+} from './lib/docs-helpers.js';
 import { resolveEnvironmentPaths } from './lib/run-manifests.js';
 
 const DEFAULT_POLICY_PATH = 'docs/implementation-docs-archive-policy.json';
@@ -35,15 +42,6 @@ function normalizeStringList(value) {
     .filter((entry) => typeof entry === 'string')
     .map((entry) => entry.trim())
     .filter(Boolean);
-}
-
-async function exists(target) {
-  try {
-    await stat(target);
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 function formatDate(date) {
@@ -121,7 +119,7 @@ async function collectDocFiles(repoRoot) {
   const results = [];
   for (const root of roots) {
     const abs = path.join(repoRoot, root);
-    if (await exists(abs)) {
+    if (await pathExists(abs)) {
       results.push(...(await collectMarkdownFiles(repoRoot, root)));
     }
   }
@@ -241,7 +239,7 @@ async function main() {
       const normalized = toPosixPath(item.path.trim());
       docPaths.add(normalized);
       const abs = path.resolve(repoRoot, normalized);
-      if (await exists(abs)) {
+      if (await pathExists(abs)) {
         const content = await readFile(abs, 'utf8');
         for (const ref of extractDocReferences(content, docRegexes)) {
           docPaths.add(ref);
@@ -332,7 +330,7 @@ async function main() {
     context
   }) {
     const absPath = path.resolve(repoRoot, relativePath);
-    if (!(await exists(absPath))) {
+    if (!(await pathExists(absPath))) {
       report.skipped.push({ path: relativePath, reason: 'missing_on_disk', context });
       report.totals.skipped += 1;
       return;
@@ -383,7 +381,7 @@ async function main() {
   for (const candidate of taskCandidates) {
     const relativePath = candidate.path;
     const absPath = path.resolve(repoRoot, relativePath);
-    if (!(await exists(absPath))) {
+    if (!(await pathExists(absPath))) {
       report.skipped.push({ path: relativePath, reason: 'missing_on_disk', context: candidate });
       report.totals.skipped += 1;
       continue;
@@ -435,7 +433,7 @@ async function main() {
 
   for (const relativePath of strayCandidates) {
     const absPath = path.resolve(repoRoot, relativePath);
-    if (!(await exists(absPath))) {
+    if (!(await pathExists(absPath))) {
       report.skipped.push({ path: relativePath, reason: 'missing_on_disk', context: { type: 'stray' } });
       report.totals.skipped += 1;
       continue;

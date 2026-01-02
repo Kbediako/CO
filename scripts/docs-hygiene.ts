@@ -1,8 +1,8 @@
 #!/usr/bin/env node
-import { access, readFile, readdir, writeFile } from 'node:fs/promises';
+import { readFile, readdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { parseArgs as parseCliArgs } from './lib/cli-args.js';
-import { collectDocFiles, toPosixPath } from './lib/docs-helpers.js';
+import { collectDocFiles, pathExists, toPosixPath } from './lib/docs-helpers.js';
 import { resolveEnvironmentPaths } from './lib/run-manifests.js';
 
 export type DocsCheckRule =
@@ -94,7 +94,7 @@ export async function runDocsCheck(repoRoot: string): Promise<DocsCheckError[]> 
         continue;
       }
 
-      if (!(await exists(resolved))) {
+      if (!(await pathExists(resolved))) {
         errors.push({ file, rule: 'backticked-path-missing', reference: normalized });
       }
     }
@@ -105,11 +105,11 @@ export async function runDocsCheck(repoRoot: string): Promise<DocsCheckError[]> 
 
 async function checkTasksFileSize(repoRoot: string): Promise<DocsCheckError | null> {
   const policyPath = path.join(repoRoot, 'docs', 'tasks-archive-policy.json');
-  if (!(await exists(policyPath))) {
+  if (!(await pathExists(policyPath))) {
     return null;
   }
   const tasksPath = path.join(repoRoot, 'docs', 'TASKS.md');
-  if (!(await exists(tasksPath))) {
+  if (!(await pathExists(tasksPath))) {
     return null;
   }
 
@@ -312,7 +312,7 @@ async function resolveTaskIdentity(repoRoot: string, taskArg: string): Promise<{
   }
 
   const canonicalTasksPath = path.join(repoRoot, 'tasks', `tasks-${numericId}-${item.slug}.md`);
-  if (!(await exists(canonicalTasksPath))) {
+  if (!(await pathExists(canonicalTasksPath))) {
     throw new Error(`Canonical source task file is missing: tasks/tasks-${numericId}-${item.slug}.md`);
   }
 
@@ -464,15 +464,6 @@ function stripTrailingLineHint(value: string): string {
   }
   const base = match[1];
   return base ?? value;
-}
-
-async function exists(absPath: string): Promise<boolean> {
-  try {
-    await access(absPath);
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 async function writeFileIfChanged(filePath: string, content: string): Promise<void> {

@@ -24,5 +24,8 @@ Phase 12 consolidation executed:
 Phase 13 consolidation executed:
 - Remaining script-side env resolver call sites (mirror/docs/guardrail/design helpers + spec-guard runner) now route through `resolveEnvironmentPaths`.
 
+Phase 14 consolidation executed:
+- Docs tooling now reuses the shared `pathExists` helper for path checks, reducing per-script duplication.
+
 ## Usage signals (still referenced)
 - `scripts/status-ui-build.mjs` is referenced by `scripts/status-ui-serve.mjs` and `docs/TECH_SPEC-orchestrator-status-ui.md` (do not remove; only consolidate helpers).

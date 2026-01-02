@@ -1,10 +1,16 @@
 #!/usr/bin/env node
 
-import { access, mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import { parseArgs, hasFlag } from './lib/cli-args.js';
-import { collectDocFiles, computeAgeInDays, parseIsoDate, toPosixPath } from './lib/docs-helpers.js';
+import {
+  collectDocFiles,
+  computeAgeInDays,
+  parseIsoDate,
+  pathExists,
+  toPosixPath
+} from './lib/docs-helpers.js';
 import { resolveEnvironmentPaths } from './lib/run-manifests.js';
 
 const DEFAULT_REGISTRY_PATH = 'docs/docs-freshness-registry.json';
@@ -23,16 +29,6 @@ Options:
   --check            Alias for default behavior
   -h, --help         Show this help message`);
 }
-
-async function exists(target) {
-  try {
-    await access(target);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 
 function normalizeOwner(value) {
   if (typeof value !== 'string') {
@@ -69,7 +65,7 @@ async function main() {
   };
   const registryPath = path.resolve(repoRoot, options.registryPath);
 
-  if (!(await exists(registryPath))) {
+  if (!(await pathExists(registryPath))) {
     console.error(`Registry not found: ${options.registryPath}`);
     process.exit(1);
   }
@@ -128,7 +124,7 @@ async function main() {
 
     if (entryPath) {
       const abs = path.resolve(repoRoot, entryPath);
-      if (!(await exists(abs))) {
+      if (!(await pathExists(abs))) {
         missingOnDisk.push(entryPath);
       }
     }
