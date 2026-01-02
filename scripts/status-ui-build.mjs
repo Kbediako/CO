@@ -15,9 +15,7 @@ import {
   listDirectories,
   parseRunIdTimestamp,
   pickLatestRunId,
-  resolveOutDir,
-  resolveRepoRoot,
-  resolveRunsDir
+  resolveEnvironmentPaths
 } from './lib/run-manifests.js';
 
 const execFileAsync = promisify(execFile);
@@ -27,9 +25,7 @@ const DEFAULT_LOG_LINE_LIMIT = 200;
 const DEFAULT_LOG_BYTE_LIMIT = 100 * 1024;
 const TERMINAL_RUN_STATUSES = new Set(['succeeded', 'failed', 'cancelled', 'canceled']);
 
-const repoRoot = resolveRepoRoot();
-const runsRoot = resolveRunsDir(repoRoot);
-const outRoot = resolveOutDir(repoRoot);
+const { repoRoot, runsRoot, outRoot } = resolveEnvironmentPaths();
 
 let writeJsonAtomicPromise = null;
 
