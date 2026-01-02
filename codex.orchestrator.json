@@ -30,12 +30,12 @@
     ],
     "diagnostics-spec-guard": [
       {
-      "kind": "command",
-      "id": "spec-guard",
-      "title": "node scripts/spec-guard.mjs --dry-run",
-      "command": "node scripts/spec-guard.mjs --dry-run"
-    }
-  ],
+        "kind": "command",
+        "id": "spec-guard",
+        "title": "node scripts/spec-guard.mjs --dry-run",
+        "command": "node \"$CODEX_ORCHESTRATOR_PACKAGE_ROOT/dist/orchestrator/src/cli/utils/specGuardRunner.js\" --dry-run"
+      }
+    ],
     "design-artifacts": [
       {
         "kind": "command",

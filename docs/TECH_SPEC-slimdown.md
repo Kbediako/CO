@@ -84,7 +84,7 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
 
 ### 16) Guardrail stage-set reuse
 - Replace repeated delegation/spec-guard command blocks in `docs-review`, `implementation-gate`, `tfgrpo-learning`, and design pipelines with stage-set references.
-- Align the shared spec-guard stage to invoke `scripts/spec-guard.mjs --dry-run` directly (no dist-only wrapper).
+- Align the shared spec-guard stage to invoke the packaged spec-guard runner (skips cleanly when `scripts/spec-guard.mjs` is absent).
 
 ## Expected Line Reductions by Phase (Estimate)
 - Phase 1 (wrapper cleanup): remove 5-6 wrapper/harness scripts.
@@ -106,7 +106,7 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
 
 ### Phase 1
 - Update docs referencing removed scripts.
-- Run `node scripts/spec-guard.mjs --dry-run`.
+- Run the packaged spec-guard runner (`node "$CODEX_ORCHESTRATOR_PACKAGE_ROOT/dist/orchestrator/src/cli/utils/specGuardRunner.js" --dry-run`), or `node scripts/spec-guard.mjs --dry-run` when the script exists in-repo.
 - Run `npm run build`, `npm run lint`, `npm run test`.
 - Run `npm run docs:check` and `npm run docs:freshness`.
 - Run `node scripts/diff-budget.mjs` and `npm run review` with manifest evidence.
@@ -179,7 +179,7 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
 ### Phase 7 checklist
 - Replace repeated delegation-guard command blocks with `delegation-guard-stage` in pipelines.
 - Replace repeated spec-guard command blocks with the shared spec-guard stage set.
-- Align spec-guard stage command to call `scripts/spec-guard.mjs --dry-run`.
+- Align spec-guard stage command to call the spec-guard runner wrapper (package-safe).
 
 ### Phase 2 runbook (ordered)
 1) Confirm no external consumers for legacy scripts (repo + CI scan) and verify `.runs/` artifacts remain sufficient without `metrics-summary.json` / migrations logs.
@@ -223,7 +223,7 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
 ### Phase 7 runbook (ordered)
 1) Replace delegation-guard command blocks in pipelines with `delegation-guard-stage`.
 2) Replace spec-guard command blocks in pipelines with the shared spec-guard stage set.
-3) Align the spec-guard stage command to call `scripts/spec-guard.mjs --dry-run`.
+3) Align the spec-guard stage command to call the spec-guard runner wrapper (package-safe).
 4) Run full guardrails and record manifest evidence.
 
 ### Phase 3 per-file doc update checklist (draft)
