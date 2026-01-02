@@ -4,8 +4,10 @@ import { join } from 'node:path';
 import process from 'node:process';
 
 import { logger } from '../../logger.js';
+import { resolveRepoRoot } from '../../../../scripts/lib/run-manifests.js';
 
-const specGuardPath = join(process.cwd(), 'scripts', 'spec-guard.mjs');
+const repoRoot = resolveRepoRoot();
+const specGuardPath = join(repoRoot, 'scripts', 'spec-guard.mjs');
 
 if (!existsSync(specGuardPath)) {
   logger.warn(`[spec-guard] skipped: ${specGuardPath} not found`);

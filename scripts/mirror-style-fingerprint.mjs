@@ -6,6 +6,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { parseArgs, hasFlag } from "./lib/cli-args.js";
+import { resolveRepoRoot } from "./lib/run-manifests.js";
 
 function showUsage() {
   console.log("Usage: node scripts/mirror-style-fingerprint.mjs --project <name> [--outDir docs/reference]");
@@ -171,6 +172,7 @@ function aggregateBackgrounds(css) {
 }
 
 async function main() {
+  const repoRoot = resolveRepoRoot();
   const { args, positionals } = parseArgs(process.argv.slice(2));
   if (hasFlag(args, "help") || hasFlag(args, "h")) {
     showUsage();
@@ -193,7 +195,7 @@ async function main() {
     return;
   }
 
-  const publicDir = path.resolve("packages", project, "public");
+  const publicDir = path.resolve(repoRoot, "packages", project, "public");
   const cssDir = path.join(publicDir, "_next", "static", "css");
   const exists = await fs.stat(publicDir).catch(() => null);
   if (!exists || !exists.isDirectory()) {
@@ -233,7 +235,7 @@ async function main() {
   const fingerprint = {
     project,
     generatedAt: new Date().toISOString(),
-    sourceCssFiles: cssFiles.map((f) => path.relative(process.cwd(), f)),
+    sourceCssFiles: cssFiles.map((f) => path.relative(repoRoot, f)),
     fonts: { families: fonts },
     colors,
     spacingScale,
@@ -252,7 +254,7 @@ async function main() {
   };
 
   const outDirInput = typeof args.outDir === "string" ? args.outDir : path.join("docs", "reference");
-  const outDir = path.resolve(outDirInput);
+  const outDir = path.resolve(repoRoot, outDirInput);
   await fs.mkdir(outDir, { recursive: true });
 
   const jsonPath = path.join(outDir, `${project}-style-profile.json`);

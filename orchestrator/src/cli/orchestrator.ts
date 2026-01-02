@@ -5,6 +5,8 @@ import { join } from 'node:path';
 import { TaskManager } from '../manager.js';
 import type { ManagerOptions } from '../manager.js';
 import type { TaskContext, ExecutionMode, PlanItem } from '../types.js';
+import { RunManifestWriter } from '../persistence/RunManifestWriter.js';
+import { TaskStateStore } from '../persistence/TaskStateStore.js';
 import {
   CommandPlanner,
   CommandBuilder,
@@ -285,12 +287,15 @@ export class CodexOrchestrator {
     pipeline: PipelineDefinition,
     executePipeline: () => Promise<PipelineRunExecutionResult>,
     getResult: () => PipelineRunExecutionResult | null,
-    plannerInstance?: CommandPlanner
+    plannerInstance: CommandPlanner | undefined,
+    env: EnvironmentPaths
   ): TaskManager {
     const planner = plannerInstance ?? new CommandPlanner(pipeline);
     const builder = new CommandBuilder(executePipeline);
     const tester = new CommandTester(getResult);
     const reviewer = new CommandReviewer(getResult);
+    const stateStore = new TaskStateStore({ outDir: env.outRoot, runsDir: env.runsRoot });
+    const manifestWriter = new RunManifestWriter({ runsDir: env.runsRoot });
 
     const options: ManagerOptions = {
       planner,
@@ -299,7 +304,7 @@ export class CodexOrchestrator {
       reviewer,
       runIdFactory: () => runId,
       modePolicy: (task, subtask) => this.determineMode(task, subtask),
-      persistence: { autoStart: true }
+      persistence: { autoStart: true, stateStore, manifestWriter }
     };
 
     return new TaskManager(options);
@@ -555,7 +560,7 @@ export class CodexOrchestrator {
       return executing;
     };
     const getResult = () => pipelineResult;
-    const manager = this.createTaskManager(runId, pipeline, executePipeline, getResult, planner);
+    const manager = this.createTaskManager(runId, pipeline, executePipeline, getResult, planner, env);
     this.attachPlanTargetTracker(manager, manifest, paths, persister);
 
     getPrivacyGuard().reset();

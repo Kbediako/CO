@@ -3,6 +3,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { startMirrorServer, resolveCspPolicy } from "./lib/mirror-server.mjs";
 import { parseArgs, hasFlag } from "./lib/cli-args.js";
+import { resolveRepoRoot } from "./lib/run-manifests.js";
 
 async function ensureDirExists(dir) {
   try {
@@ -18,15 +19,8 @@ async function ensureDirExists(dir) {
   }
 }
 
-function buildCsp(option) {
-  if (option === undefined) {
-    return resolveCspPolicy("self");
-  }
-
-  return resolveCspPolicy(option);
-}
-
 async function main() {
+  const repoRoot = resolveRepoRoot();
   const { args, positionals } = parseArgs(process.argv.slice(2));
   if (hasFlag(args, "help") || hasFlag(args, "h")) {
     console.log("Usage: npm run mirror:serve -- --project <name> [--port <port>] [--csp <policy>] [--no-range]");
@@ -37,7 +31,6 @@ async function main() {
   if (unknown.length > 0 || positionals.length > 0) {
     const label = unknown[0] ? `--${unknown[0]}` : positionals[0];
     console.error(`Unknown option: ${label}`);
-    printHelp();
     process.exitCode = 2;
     return;
   }
@@ -52,8 +45,8 @@ async function main() {
   const portInput = typeof args.port === "string" ? args.port : process.env.PORT ?? 4173;
   const port = Number(portInput) || 4173;
   const enableRange = hasFlag(args, "no-range") ? false : args.range === "false" ? false : true;
-  const cspHeader = buildCsp(typeof args.csp === "string" ? args.csp : undefined);
-  const rootDir = path.resolve(process.cwd(), "packages", project, "public");
+  const cspHeader = resolveCspPolicy(typeof args.csp === "string" ? args.csp : "self");
+  const rootDir = path.resolve(repoRoot, "packages", project, "public");
 
   try {
     await ensureDirExists(rootDir);

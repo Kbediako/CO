@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 import { access, readFile, readdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import process from 'node:process';
 import { parseArgs as parseCliArgs } from './lib/cli-args.js';
 import { collectDocFiles, toPosixPath } from './lib/docs-helpers.js';
+import { resolveRepoRoot } from './lib/run-manifests.js';
 
 export type DocsCheckRule =
   | 'npm-script-missing'
@@ -507,7 +507,7 @@ function dedupeErrors(errors: DocsCheckError[]): DocsCheckError[] {
 }
 
 async function main(): Promise<void> {
-  const repoRoot = process.cwd();
+  const repoRoot = resolveRepoRoot();
   const { args, entries } = parseCliArgs(process.argv.slice(2));
   const options: CliOptions = { mode: null };
   for (const entry of entries) {

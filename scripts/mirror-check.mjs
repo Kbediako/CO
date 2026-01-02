@@ -5,6 +5,7 @@ import { loadCheerio, loadPlaywright } from "./mirror-optional-deps.mjs";
 import { parseArgs, hasFlag } from "./lib/cli-args.js";
 import { DEFAULT_STRIP_PATTERNS, compileStripPatterns, loadMirrorConfig } from "./mirror-site.mjs";
 import { startMirrorServer } from "./lib/mirror-server.mjs";
+import { resolveRepoRoot } from "./lib/run-manifests.js";
 
 const cheerio = await loadCheerio();
 const playwright = await loadPlaywright();
@@ -12,8 +13,8 @@ const TRACKER_PATTERNS = compileStripPatterns(DEFAULT_STRIP_PATTERNS);
 const TEXT_CONTENT_TYPE = /(text|javascript|json|xml|svg)/i;
 const ABSOLUTE_HTTPS_REGEX = /https:\/\/[^\s"'<>]+/gi;
 
-async function ensurePublicDir(project) {
-  const publicDir = path.resolve("packages", project, "public");
+async function ensurePublicDir(repoRoot, project) {
+  const publicDir = path.resolve(repoRoot, "packages", project, "public");
   const stat = await fs.stat(publicDir);
   if (!stat.isDirectory()) {
     throw new Error(`Expected public directory at ${publicDir}`);
@@ -132,6 +133,7 @@ function scanDomForIssues(pageContent, route, options) {
 }
 
 async function main() {
+  const repoRoot = resolveRepoRoot();
   const { args, positionals } = parseArgs(process.argv.slice(2));
   if (hasFlag(args, "help") || hasFlag(args, "h")) {
     console.log("Usage: npm run mirror:check -- --project <name> [--port <port>] [--config <path>] [--headless=false] [--csp <policy>]");
@@ -167,7 +169,7 @@ async function main() {
   let port = typeof args.port === "string" ? Number(args.port) : null;
 
   if (!port) {
-    const publicDir = await ensurePublicDir(project);
+    const publicDir = await ensurePublicDir(repoRoot, project);
     serverHandle = await startMirrorServer({
       rootDir: publicDir,
       port: 0,
