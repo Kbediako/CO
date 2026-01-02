@@ -15,6 +15,7 @@
 - Static file serving logic is duplicated between status UI and mirror tooling, including content-type maps and path safety checks.
 - The diagnostics pipeline is defined twice (config + code fallback), increasing drift risk when stages change.
 - Repo/run/out path resolution and small helper logic (date math, path normalization) are reimplemented across orchestrator, design, and scripts with slightly different env fallbacks.
+- Docs archive/freshness/review tooling and mirror fetch still hardcode `.runs`/`out` roots, ignoring `CODEX_ORCHESTRATOR_*` envs.
 - Status UI dataset build logic duplicates task key normalization behavior already shared elsewhere.
 
 ## Target Outcomes
@@ -33,6 +34,7 @@
 - Consolidate static file serving helpers and repo/run/out path resolution to avoid drift, including remaining script-level helper duplicates.
 - Reduce pipeline duplication by consolidating docs-review checks and removing redundant fallback pipelines.
 - Reuse shared task-key normalization in status UI dataset generation to remove drift.
+- Align docs archive/freshness/run-review/mirror outputs with shared repo/run/out resolvers to honor configured env roots.
 
 ## Non-goals
 - No behavior changes to pipeline sequencing, manifest schema, or core orchestrator logic.

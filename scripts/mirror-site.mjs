@@ -6,7 +6,7 @@ import { pathToFileURL } from "node:url";
 import { loadCheerio } from "./mirror-optional-deps.mjs";
 import { parseArgs, hasFlag } from "./lib/cli-args.js";
 import { toPosixPath } from "./lib/docs-helpers.js";
-import { resolveRepoRoot } from "./lib/run-manifests.js";
+import { resolveRepoRoot, resolveRunsDir } from "./lib/run-manifests.js";
 import { findPermitEntry, loadPermitFile } from "./design/pipeline/permit.js";
 
 const cheerio = await loadCheerio();
@@ -737,23 +737,24 @@ async function main() {
     : config.enableArchiveFallback;
 
   const taskId = process.env.MCP_RUNNER_TASK_ID;
+  const repoRoot = resolveRepoRoot();
+  const runsRoot = resolveRunsDir(repoRoot);
   if (!taskId) {
-    console.warn("[mirror:fetch] MCP_RUNNER_TASK_ID is not set; manifest will be written under .runs/adhoc");
+    console.warn(`[mirror:fetch] MCP_RUNNER_TASK_ID is not set; manifest will be written under ${runsRoot}/adhoc`);
   }
 
   const timestamp = sanitizeTimestamp(new Date().toISOString());
-  const runRoot = path.join(".runs", taskId || "adhoc", "mirror", project);
+  const runRoot = path.join(runsRoot, taskId || "adhoc", "mirror", project);
   const runDir = path.join(runRoot, timestamp);
   const manifestPath = path.join(runDir, "manifest.json");
   const stagingDir = path.join(runDir, "staging");
   const stagingPublicDir = path.join(stagingDir, "public");
   const cacheDir = path.join(runRoot, "cache");
-  const destinationPublicDir = path.resolve("packages", project, "public");
+  const destinationPublicDir = path.resolve(repoRoot, "packages", project, "public");
 
   await fs.mkdir(stagingPublicDir, { recursive: true });
   await fs.mkdir(cacheDir, { recursive: true });
 
-  const repoRoot = resolveRepoRoot();
   const permitResult = await loadPermitFile(repoRoot);
   const permitEntry = permitResult.status === "found" ? findPermitEntry(permitResult.permit, config.origin) : null;
   const permit =

@@ -110,6 +110,10 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
 ### 22) Status UI task-key normalization
 - `scripts/status-ui-build.mjs` duplicates task-key normalization logic; reuse the shared `normalizeTaskKey` helper for task index entries.
 
+### 23) Docs + review/mirror path resolution
+- `scripts/run-review.ts` and `scripts/mirror-site.mjs` still hardcode `.runs` roots; reuse `scripts/lib/run-manifests.js` helpers so `CODEX_ORCHESTRATOR_RUNS_DIR` and `CODEX_ORCHESTRATOR_ROOT` are honored.
+- Docs archive/freshness tooling (`scripts/docs-freshness.mjs`, `scripts/tasks-archive.mjs`, `scripts/implementation-docs-archive.mjs`) still writes to `out/` directly; use `resolveOutDir` to honor `CODEX_ORCHESTRATOR_OUT_DIR`.
+
 ## Expected Line Reductions by Phase (Estimate)
 - Phase 1 (wrapper cleanup): remove 5-6 wrapper/harness scripts.
   - Estimated reduction: ~360 to 500 lines.
@@ -133,6 +137,8 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
   - Estimated reduction: ~10 to 25 lines.
 - Phase 11 (status UI task-key normalization): drop local task-key helper in status UI build.
   - Estimated reduction: ~5 to 10 lines.
+- Phase 12 (docs + run/out resolver alignment): reuse shared repo/run/out resolvers in docs tooling and review/mirror helpers.
+  - Estimated reduction: ~10 to 25 lines.
 
 ## Validation Steps per Phase
 
@@ -179,6 +185,9 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
 
 ### Phase 11
 - Re-run implementation-gate to confirm status UI data output is unchanged.
+
+### Phase 12
+- Re-run implementation-gate to confirm docs archive/freshness outputs and mirror/run-review paths honor configured env roots.
 
 
 ## Execution Checklists (Draft)
@@ -303,6 +312,11 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
 ### Phase 11 runbook (ordered)
 1) Replace status UI task-key helper with `normalizeTaskKey`.
 2) Run implementation-gate and record manifest evidence.
+
+### Phase 12 runbook (ordered)
+1) Reuse `resolveRepoRoot` + `resolveRunsDir` in `scripts/run-review.ts` and `scripts/mirror-site.mjs`.
+2) Reuse `resolveOutDir` for docs archive/freshness tooling outputs.
+3) Run implementation-gate and record manifest evidence.
 
 ### Phase 3 per-file doc update checklist (draft)
 - `README.md`: replace devtools pipeline IDs with the new path; update example commands.
