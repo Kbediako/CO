@@ -99,8 +99,8 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
 - Remove the duplicate definition or source it from the config to avoid drift.
 
 ### 20) Environment path resolution duplication
-- Repo/runs/out path resolution is implemented in `orchestrator/src/cli/run/environment.ts` and `scripts/lib/run-manifests.js` (plus script consumers).
-- Consolidate the orchestrator resolver to use `scripts/lib/run-manifests.js` and ship `scripts/lib` in `dist/` so the package runtime keeps a single source of truth.
+- Repo/runs/out path resolution and directory listing helpers are implemented in `orchestrator/src/cli/run/environment.ts`, `orchestrator/src/persistence/ExperienceStore.ts`, and `scripts/lib/run-manifests.js`.
+- Consolidate the orchestrator resolver to use shared run-manifest helpers (`resolveEnvironmentPaths`, `listDirectories`) and ship `scripts/lib` in `dist/` so the package runtime keeps a single source of truth.
 
 ### 21) Script helper drift (micro-duplication)
 - `scripts/spec-guard.mjs` still defines local date math; reuse `computeAgeInDays` from `scripts/lib/docs-helpers.js`.
@@ -131,7 +131,7 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
   - Estimated reduction: ~40 to 80 lines.
 - Phase 8 (docs-review checks + static server + fallback cleanup + env resolver): consolidate shared checks and server/path helpers.
   - Estimated reduction: ~60 to 120 lines.
-- Phase 9 (resolver unification): remove remaining parallel resolver path and ship shared resolver in dist.
+- Phase 9 (resolver unification): remove remaining parallel resolver path + directory listing helper and ship shared resolver in dist.
   - Estimated reduction: ~10 to 30 lines.
 - Phase 10 (script helper drift cleanup): reuse shared date/path/env helpers in remaining scripts.
   - Estimated reduction: ~10 to 25 lines.
@@ -177,7 +177,7 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
 - Validate diagnostics pipeline resolution when config is present (no fallback drift).
 
 ### Phase 9
-- Re-run implementation-gate to confirm env resolution still matches script expectations.
+- Re-run implementation-gate to confirm env resolution + directory listing match script expectations.
 - Validate packaged CLI can resolve repo/runs/out with `CODEX_ORCHESTRATOR_ROOT` + `CODEX_ORCHESTRATOR_RUNS_DIR` + `CODEX_ORCHESTRATOR_OUT_DIR`.
 
 ### Phase 10
@@ -244,7 +244,7 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
 - Consolidate repo/runs/out path resolution (or rewire scripts to use a shared resolver).
 
 ### Phase 9 checklist
-- Replace the orchestrator environment resolver with the shared `scripts/lib/run-manifests.js` helpers.
+- Replace the orchestrator environment resolver + directory listing helper with the shared `scripts/lib/run-manifests.js` helpers.
 - Include `scripts/lib` in `dist/` packaging so the resolver is available in the published CLI.
 
 ### Phase 2 runbook (ordered)
