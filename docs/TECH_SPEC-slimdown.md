@@ -107,6 +107,9 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
 - `scripts/mirror-site.mjs` reimplements `toPosixPath`; reuse the shared helper to avoid divergent path normalization.
 - `scripts/design/purgeExpired.ts` and `scripts/tasks-archive.mjs` hand-roll run metadata/paths; reuse `scripts/lib/run-manifests.js` utilities to honor the same env defaults.
 
+### 22) Status UI task-key normalization
+- `scripts/status-ui-build.mjs` duplicates task-key normalization logic; reuse the shared `normalizeTaskKey` helper for task index entries.
+
 ## Expected Line Reductions by Phase (Estimate)
 - Phase 1 (wrapper cleanup): remove 5-6 wrapper/harness scripts.
   - Estimated reduction: ~360 to 500 lines.
@@ -126,6 +129,10 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
   - Estimated reduction: ~60 to 120 lines.
 - Phase 9 (resolver unification): remove remaining parallel resolver path and ship shared resolver in dist.
   - Estimated reduction: ~10 to 30 lines.
+- Phase 10 (script helper drift cleanup): reuse shared date/path/env helpers in remaining scripts.
+  - Estimated reduction: ~10 to 25 lines.
+- Phase 11 (status UI task-key normalization): drop local task-key helper in status UI build.
+  - Estimated reduction: ~5 to 10 lines.
 
 ## Validation Steps per Phase
 
@@ -166,6 +173,12 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
 ### Phase 9
 - Re-run implementation-gate to confirm env resolution still matches script expectations.
 - Validate packaged CLI can resolve repo/runs/out with `CODEX_ORCHESTRATOR_ROOT` + `CODEX_ORCHESTRATOR_RUNS_DIR` + `CODEX_ORCHESTRATOR_OUT_DIR`.
+
+### Phase 10
+- Re-run implementation-gate after helper reuse.
+
+### Phase 11
+- Re-run implementation-gate to confirm status UI data output is unchanged.
 
 
 ## Execution Checklists (Draft)
@@ -285,6 +298,10 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
 
 ### Phase 10 runbook (ordered)
 1) Reuse shared helpers in spec-guard, mirror-site, and design purge/tasks-archive via `scripts/lib/docs-helpers.js` + `scripts/lib/run-manifests.js`.
+2) Run implementation-gate and record manifest evidence.
+
+### Phase 11 runbook (ordered)
+1) Replace status UI task-key helper with `normalizeTaskKey`.
 2) Run implementation-gate and record manifest evidence.
 
 ### Phase 3 per-file doc update checklist (draft)

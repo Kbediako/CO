@@ -10,6 +10,7 @@ import { register } from 'node:module';
 import { promisify } from 'node:util';
 import { fileURLToPath } from 'url';
 import { parseArgs, hasFlag } from './lib/cli-args.js';
+import { normalizeTaskKey } from './lib/docs-helpers.js';
 import {
   listDirectories,
   parseRunIdTimestamp,
@@ -71,24 +72,8 @@ async function readJson(filePath) {
   }
 }
 
-
-function buildTaskKey(item) {
-  const id = item?.id ?? '';
-  const slug = item?.slug ?? '';
-  if (!id) {
-    return slug;
-  }
-  if (!slug) {
-    return id;
-  }
-  if (slug.startsWith(`${id}-`)) {
-    return slug;
-  }
-  return `${id}-${slug}`;
-}
-
 function resolveTaskCandidates(item) {
-  const candidates = [buildTaskKey(item), item?.slug, item?.id]
+  const candidates = [normalizeTaskKey(item), item?.slug, item?.id]
     .filter((value) => typeof value === 'string')
     .map((value) => value.trim())
     .filter(Boolean);
@@ -819,7 +804,7 @@ async function buildDataset(options) {
   const now = new Date();
 
   for (const item of index.items) {
-    const taskKey = buildTaskKey(item);
+    const taskKey = normalizeTaskKey(item);
     if (!taskKey) {
       continue;
     }
@@ -976,11 +961,4 @@ if (path.resolve(process.argv[1] ?? '') === fileURLToPath(import.meta.url)) {
   });
 }
 
-export {
-  buildTaskKey,
-  classifyTaskBucket,
-  countPendingApprovals,
-  isHeartbeatStale,
-  isHeartbeatFresh,
-  parseRunIdTimestamp
-};
+export { classifyTaskBucket, countPendingApprovals, isHeartbeatStale, isHeartbeatFresh, parseRunIdTimestamp };
