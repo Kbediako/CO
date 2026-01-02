@@ -12,6 +12,9 @@
 - Guardrail pipelines (docs-review, implementation-gate, tfgrpo-learning, design) still repeat delegation/spec-guard blocks instead of reusing stage sets.
 - Slugify helpers diverge across design pipeline and orchestrator tooling.
 - Adapter build/test definitions repeat identical evaluation defaults (fixture cwd + clean fixture enforcement).
+- Static file serving logic is duplicated between status UI and mirror tooling, including content-type maps and path safety checks.
+- The diagnostics pipeline is defined twice (config + code fallback), increasing drift risk when stages change.
+- Repo/run/out path resolution is reimplemented across orchestrator, design, and scripts with slightly different env fallbacks.
 
 ## Target Outcomes
 - Remove redundant wrappers and legacy runner scripts where the CLI already provides the same behavior.
@@ -26,6 +29,8 @@
 - Reuse guardrail stage sets for delegation/spec-guard across pipelines to avoid repeated command blocks.
 - Reuse a configurable slugify helper across design pipeline and orchestrator tooling.
 - Consolidate adapter evaluation defaults (fixture cwd + clean fixture enforcement) into shared helpers.
+- Consolidate static file serving helpers and repo/run/out path resolution to avoid drift.
+- Reduce pipeline duplication by consolidating docs-review tail stages and removing redundant fallback pipelines.
 
 ## Non-goals
 - No behavior changes to pipeline sequencing, manifest schema, or core orchestrator logic.

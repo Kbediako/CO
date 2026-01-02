@@ -86,6 +86,22 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
 - Replace repeated delegation/spec-guard command blocks in `docs-review`, `implementation-gate`, `tfgrpo-learning`, and design pipelines with stage-set references.
 - Align the shared spec-guard stage to invoke the packaged spec-guard runner (skips cleanly when `scripts/spec-guard.mjs` is absent).
 
+### 17) Docs-review tail stage-set reuse
+- `docs-review` and `implementation-gate` repeat the same `docs:check`, `docs:freshness`, `diff-budget`, and `review` stages.
+- Extract a shared stage-set for the docs-review tail and reference it in both pipelines.
+
+### 18) Static file server duplication (status UI + mirror)
+- `scripts/status-ui-serve.mjs` duplicates the static file server logic in `scripts/lib/mirror-server.mjs` (content-type map, path safety, 404/403 handling).
+- Reuse the mirror server helper for status UI serving, or move the shared pieces into a single helper to reduce drift.
+
+### 19) Diagnostics fallback duplication
+- `orchestrator/src/cli/pipelines/index.ts` defines a fallback diagnostics pipeline that duplicates `codex.orchestrator.json`.
+- Remove the duplicate definition or source it from the config to avoid drift.
+
+### 20) Environment path resolution duplication
+- Repo/runs/out path resolution is implemented in `orchestrator/src/cli/run/environment.ts`, `scripts/lib/run-manifests.js`, `scripts/status-ui-serve.mjs`, and `scripts/design/pipeline/context.ts`.
+- Consolidate onto a single helper or shared resolver so env var defaults stay aligned.
+
 ## Expected Line Reductions by Phase (Estimate)
 - Phase 1 (wrapper cleanup): remove 5-6 wrapper/harness scripts.
   - Estimated reduction: ~360 to 500 lines.
@@ -101,6 +117,8 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
   - Estimated reduction: ~160 to 240 lines.
 - Phase 7 (guardrail stage-set reuse): replace repeated delegation/spec-guard command blocks and align spec-guard invocation.
   - Estimated reduction: ~40 to 80 lines.
+- Phase 8 (docs-review tail + static server + fallback cleanup + env resolver): consolidate tail stages and server/path helpers.
+  - Estimated reduction: ~60 to 120 lines.
 
 ## Validation Steps per Phase
 
@@ -132,6 +150,11 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
 ### Phase 6
 - Re-run full guardrails as above.
 - Validate mirror tools, design pipeline, and adapter commands still behave identically (smoke runs or dry-run flags).
+
+### Phase 8
+- Re-run docs-review and implementation-gate.
+- Smoke status-ui-serve and mirror-serve to confirm static serving behavior is unchanged.
+- Validate diagnostics pipeline resolution when config is present (no fallback drift).
 
 ## Execution Checklists (Draft)
 
@@ -181,6 +204,12 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
 - Replace repeated spec-guard command blocks with the shared spec-guard stage set.
 - Align spec-guard stage command to call the spec-guard runner wrapper (package-safe).
 
+### Phase 8 checklist
+- Extract a docs-review tail stage-set and use it in `docs-review` + `implementation-gate`.
+- Reuse static file server helper between status UI and mirror tooling.
+- Remove or centralize the fallback diagnostics pipeline definition.
+- Consolidate repo/runs/out path resolution (or rewire scripts to use a shared resolver).
+
 ### Phase 2 runbook (ordered)
 1) Confirm no external consumers for legacy scripts (repo + CI scan) and verify `.runs/` artifacts remain sufficient without `metrics-summary.json` / migrations logs.
 2) Consolidate helper utilities:
@@ -225,6 +254,13 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
 2) Replace spec-guard command blocks in pipelines with the shared spec-guard stage set.
 3) Align the spec-guard stage command to call the spec-guard runner wrapper (package-safe).
 4) Run full guardrails and record manifest evidence.
+
+### Phase 8 runbook (ordered)
+1) Add a docs-review tail stage-set and reference it from `docs-review` + `implementation-gate`.
+2) Reuse static file serving helpers between status UI and mirror tooling.
+3) Remove or source the fallback diagnostics pipeline from config.
+4) Consolidate repo/runs/out path resolution across scripts + design context.
+5) Run full guardrails and record manifest evidence.
 
 ### Phase 3 per-file doc update checklist (draft)
 - `README.md`: replace devtools pipeline IDs with the new path; update example commands.
