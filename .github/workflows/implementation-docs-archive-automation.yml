@@ -37,5 +37,6 @@ jobs:
 
         Archive payloads were pushed to the doc-archives branch.
       pr_branch: automation/implementation-docs-archive
-      pr_token: ${{ secrets.ARCHIVE_AUTOMERGE_TOKEN }}
       enable_auto_merge: true
+    secrets:
+      pr_token: ${{ secrets.ARCHIVE_AUTOMERGE_TOKEN }}

@@ -38,14 +38,13 @@ on:
       pr_branch:
         required: true
         type: string
-      pr_token:
-        required: false
-        type: string
-        default: ''
       enable_auto_merge:
         required: false
         type: boolean
         default: false
+    secrets:
+      pr_token:
+        required: false
 
 jobs:
   archive:
@@ -143,7 +142,7 @@ jobs:
         id: cpr
         uses: peter-evans/create-pull-request@v6
         with:
-          token: ${{ inputs.pr_token != '' && inputs.pr_token || github.token }}
+          token: ${{ secrets.pr_token != '' && secrets.pr_token || github.token }}
           commit-message: ${{ inputs.pr_commit_message }}
           title: ${{ inputs.pr_title }}
           body: ${{ inputs.pr_body }}
@@ -151,14 +150,14 @@ jobs:
           delete-branch: true
 
       - name: Auto-merge skipped (missing token)
-        if: steps.changes.outputs.changed == 'true' && inputs.enable_auto_merge && inputs.pr_token == ''
+        if: steps.changes.outputs.changed == 'true' && inputs.enable_auto_merge && secrets.pr_token == ''
         run: |
           echo "Auto-merge token is missing; set ARCHIVE_AUTOMERGE_TOKEN to enable automatic merges." >> "$GITHUB_STEP_SUMMARY"
 
       - name: Enable auto-merge
-        if: steps.changes.outputs.changed == 'true' && inputs.enable_auto_merge && inputs.pr_token != '' && steps.cpr.outputs.pull-request-number != ''
+        if: steps.changes.outputs.changed == 'true' && inputs.enable_auto_merge && secrets.pr_token != '' && steps.cpr.outputs.pull-request-number != ''
         uses: peter-evans/enable-pull-request-automerge@v3
         with:
-          token: ${{ inputs.pr_token }}
+          token: ${{ secrets.pr_token }}
           pull-request-number: ${{ steps.cpr.outputs.pull-request-number }}
           merge-method: merge
