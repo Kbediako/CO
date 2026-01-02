@@ -11,12 +11,11 @@ import { fileURLToPath } from 'node:url';
 import { parseArgs, hasFlag } from './lib/cli-args.js';
 import { createStaticFileHandler, normalizePathname } from './lib/mirror-server.mjs';
 import { toPosixPath } from './lib/docs-helpers.js';
-import { resolveOutDir, resolveRepoRoot } from './lib/run-manifests.js';
+import { resolveEnvironmentPaths } from './lib/run-manifests.js';
 
 const execFileAsync = promisify(execFile);
 
-const repoRoot = resolveRepoRoot();
-const outRoot = resolveOutDir(repoRoot);
+const { repoRoot, outRoot } = resolveEnvironmentPaths();
 const buildScript = path.join(repoRoot, 'scripts', 'status-ui-build.mjs');
 const uiEntry = `/${toPosixPath(
   path.relative(repoRoot, path.join(repoRoot, 'packages', 'orchestrator-status-ui', 'index.html'))
