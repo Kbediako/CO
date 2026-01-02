@@ -38,5 +38,6 @@ jobs:
 
         Archive payloads were pushed to the task-archives branch.
       pr_branch: automation/tasks-archive
-      pr_token: ${{ secrets.ARCHIVE_AUTOMERGE_TOKEN }}
       enable_auto_merge: true
+    secrets:
+      pr_token: ${{ secrets.ARCHIVE_AUTOMERGE_TOKEN }}
