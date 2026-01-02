@@ -18,9 +18,11 @@ import { promisify } from 'node:util';
 
 import { resolveCodexCommand } from '../orchestrator/src/cli/utils/devtools.js';
 import { parseArgs as parseCliArgs, hasFlag } from './lib/cli-args.js';
-import { collectManifests } from './lib/run-manifests.js';
+import { collectManifests, resolveRepoRoot, resolveRunsDir } from './lib/run-manifests.js';
 
 const execFileAsync = promisify(execFile);
+const repoRoot = resolveRepoRoot();
+const defaultRunsDir = resolveRunsDir(repoRoot);
 
 interface CliOptions {
   manifest?: string;
@@ -43,7 +45,7 @@ async function fileExists(filePath: string): Promise<boolean> {
 }
 
 async function resolveTaskChecklistPath(taskKey: string): Promise<string | null> {
-  const direct = path.join(process.cwd(), 'tasks', `tasks-${taskKey}.md`);
+  const direct = path.join(repoRoot, 'tasks', `tasks-${taskKey}.md`);
   if (await fileExists(direct)) {
     return direct;
   }
@@ -52,7 +54,7 @@ async function resolveTaskChecklistPath(taskKey: string): Promise<string | null>
     return null;
   }
 
-  const tasksDir = path.join(process.cwd(), 'tasks');
+  const tasksDir = path.join(repoRoot, 'tasks');
   let entries: string[] = [];
   try {
     entries = await readdir(tasksDir);
@@ -112,7 +114,7 @@ async function buildTaskContext(taskKey: string): Promise<string[]> {
     return [];
   }
 
-  const relativeChecklist = path.relative(process.cwd(), checklistPath);
+  const relativeChecklist = path.relative(repoRoot, checklistPath);
   const checklist = await readFile(checklistPath, 'utf8');
   const headerBullets = extractTaskHeaderBulletLines(checklist);
 
@@ -124,7 +126,7 @@ async function buildTaskContext(taskKey: string): Promise<string[]> {
   const prdLine = headerBullets.find((line) => line.toLowerCase().includes('primary prd:'));
   const prdPath = prdLine ? extractBacktickedPath(prdLine) : null;
   if (prdPath) {
-    const absPrdPath = path.resolve(process.cwd(), prdPath);
+    const absPrdPath = path.resolve(repoRoot, prdPath);
     if (await fileExists(absPrdPath)) {
       const prd = await readFile(absPrdPath, 'utf8');
       const summary = extractMarkdownSection(prd, 'Summary');
@@ -143,14 +145,14 @@ async function buildTaskContext(taskKey: string): Promise<string[]> {
 }
 
 function parseArgs(argv: string[]): CliOptions {
-  const options: CliOptions = { runsDir: path.join(process.cwd(), '.runs') };
+  const options: CliOptions = { runsDir: defaultRunsDir };
   const { args, entries } = parseCliArgs(argv);
 
   for (const entry of entries) {
     if (entry.key === 'manifest' && typeof entry.value === 'string') {
-      options.manifest = entry.value;
+      options.manifest = path.resolve(repoRoot, entry.value);
     } else if (entry.key === 'runs-dir' && typeof entry.value === 'string') {
-      options.runsDir = entry.value;
+      options.runsDir = path.resolve(repoRoot, entry.value);
     } else if (entry.key === 'task' && typeof entry.value === 'string') {
       options.task = entry.value;
     } else if (entry.key === 'base' && typeof entry.value === 'string') {
@@ -176,7 +178,7 @@ function parseArgs(argv: string[]): CliOptions {
   if (!options.manifest) {
     const envManifest = process.env.MANIFEST ?? process.env.CODEX_ORCHESTRATOR_MANIFEST_PATH;
     if (envManifest && envManifest.trim().length > 0) {
-      options.manifest = envManifest.trim();
+      options.manifest = path.resolve(repoRoot, envManifest.trim());
     }
   }
 
@@ -185,7 +187,7 @@ function parseArgs(argv: string[]): CliOptions {
 
 async function resolveManifestPath(options: CliOptions): Promise<string> {
   if (options.manifest) {
-    return path.resolve(process.cwd(), options.manifest);
+    return options.manifest;
   }
 
   const manifests = await collectManifests(options.runsDir, options.task);
@@ -221,7 +223,7 @@ async function main(): Promise<void> {
     throw new Error('codex CLI is missing the `review` subcommand (or is not installed).');
   }
 
-  const relativeManifest = path.relative(process.cwd(), manifestPath);
+  const relativeManifest = path.relative(repoRoot, manifestPath);
   const taskLabel = process.env.TASK ?? process.env.MCP_RUNNER_TASK_ID ?? options.task ?? 'unknown-task';
   const notes = process.env.NOTES?.trim();
   const diffBudgetOverride = process.env.DIFF_BUDGET_OVERRIDE_REASON?.trim();
@@ -390,7 +392,7 @@ async function runDiffBudget(options: CliOptions): Promise<void> {
   }
 
   await new Promise<void>((resolve, reject) => {
-    const child = spawn('node', args, { stdio: 'inherit', env: process.env });
+    const child = spawn('node', args, { stdio: 'inherit', env: process.env, cwd: repoRoot });
     child.once('error', (error) => reject(error instanceof Error ? error : new Error(String(error))));
     child.once('exit', (code) => {
       if (code === 0) {
@@ -432,7 +434,7 @@ function requireReviewNotes(notes: string | undefined): asserts notes is string 
 
 async function tryGit(args: string[]): Promise<string | null> {
   try {
-    const { stdout } = await execFileAsync('git', args, { maxBuffer: 1024 * 1024 });
+    const { stdout } = await execFileAsync('git', args, { maxBuffer: 1024 * 1024, cwd: repoRoot });
     const trimmed = String(stdout ?? '').trimEnd();
     return trimmed.length > 0 ? trimmed : null;
   } catch {

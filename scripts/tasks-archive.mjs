@@ -5,7 +5,7 @@ import path from 'node:path';
 import process from 'node:process';
 import { parseArgs, hasFlag } from './lib/cli-args.js';
 import { normalizeTaskKey, parseDateString } from './lib/docs-helpers.js';
-import { parseRunIdTimestamp } from './lib/run-manifests.js';
+import { parseRunIdTimestamp, resolveOutDir, resolveRepoRoot } from './lib/run-manifests.js';
 
 const DEFAULT_POLICY_PATH = 'docs/tasks-archive-policy.json';
 const TASKS_PATH = 'docs/TASKS.md';
@@ -275,7 +275,8 @@ function extractArchivedTaskKeys(content) {
 }
 
 async function main() {
-  const repoRoot = process.cwd();
+  const repoRoot = resolveRepoRoot();
+  const outRoot = resolveOutDir(repoRoot);
   const { args, positionals } = parseArgs(process.argv.slice(2));
   if (hasFlag(args, 'h') || hasFlag(args, 'help')) {
     showUsage();
@@ -384,7 +385,7 @@ async function main() {
   const archiveFileName = path.basename(policy.archivePattern);
   const outPattern = options.outPath
     ? path.resolve(repoRoot, options.outPath)
-    : path.resolve(repoRoot, 'out', taskId, archiveFileName);
+    : path.join(outRoot, taskId, archiveFileName);
   if (!outPattern.includes('YYYY')) {
     throw new Error('Archive output path must include YYYY.');
   }
