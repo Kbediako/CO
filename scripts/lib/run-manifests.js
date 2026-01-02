@@ -2,6 +2,8 @@ import { access, readdir } from 'node:fs/promises';
 import { isAbsolute, join, resolve } from 'node:path';
 import process from 'node:process';
 
+const DEFAULT_TASK_ID = '0101';
+
 export function resolveRepoRoot() {
   const configured =
     process.env.CODEX_ORCHESTRATOR_ROOT || process.env.CODEX_ORCHESTRATOR_REPO_ROOT;
@@ -28,6 +30,14 @@ export function resolveOutDir(repoRoot) {
     return configured;
   }
   return resolve(repoRoot, configured);
+}
+
+export function resolveEnvironmentPaths() {
+  const repoRoot = resolveRepoRoot();
+  const runsRoot = resolveRunsDir(repoRoot);
+  const outRoot = resolveOutDir(repoRoot);
+  const taskId = process.env.MCP_RUNNER_TASK_ID ?? DEFAULT_TASK_ID;
+  return { repoRoot, runsRoot, outRoot, taskId };
 }
 
 export async function listDirectories(dirPath) {

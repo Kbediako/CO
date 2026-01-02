@@ -1,7 +1,8 @@
 import { randomBytes } from 'node:crypto';
-import { readFile, mkdir, rm, readdir } from 'node:fs/promises';
+import { readFile, mkdir, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 
+import { listDirectories } from '../../../scripts/lib/run-manifests.js';
 import { acquireLockWithRetry, type LockRetryOptions } from './lockFile.js';
 import { sanitizeTaskId } from './sanitizeTaskId.js';
 import { writeAtomicFile } from './writeAtomicFile.js';
@@ -245,18 +246,6 @@ export class ExperienceStore {
   private generateId(): string {
     const suffix = randomBytes(3).toString('hex');
     return `exp-${Date.now().toString(36)}-${suffix}`;
-  }
-}
-
-async function listDirectories(path: string): Promise<string[]> {
-  try {
-    const entries = await readdir(path, { withFileTypes: true });
-    return entries.filter((entry) => entry.isDirectory()).map((entry) => entry.name);
-  } catch (error: unknown) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-      return [];
-    }
-    throw error;
   }
 }
 

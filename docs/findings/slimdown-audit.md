@@ -10,7 +10,7 @@ Phase 8 consolidations executed:
 - Script-side repo/runs/out resolution now flows through `scripts/lib/run-manifests.js` (design context + status UI).
 
 Phase 9 consolidation executed:
-- Orchestrator env resolution now reuses `scripts/lib/run-manifests.js` and ships the resolver in `dist/`.
+- Orchestrator env resolution now uses shared run-manifests helpers (`resolveEnvironmentPaths`, `listDirectories`) and ships the resolver in `dist/`.
 
 Phase 10 consolidation executed:
 - Spec-guard, mirror fetch, and design purge/tasks archive now reuse shared helpers (`scripts/lib/docs-helpers.js`, `scripts/lib/run-manifests.js`).

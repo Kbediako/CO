@@ -1,7 +1,5 @@
-import { resolveOutDir, resolveRepoRoot, resolveRunsDir } from '../../../../scripts/lib/run-manifests.js';
+import { resolveEnvironmentPaths } from '../../../../scripts/lib/run-manifests.js';
 import { sanitizeTaskId } from '../../persistence/sanitizeTaskId.js';
-
-const DEFAULT_TASK_ID = '0101';
 
 export interface EnvironmentPaths {
   repoRoot: string;
@@ -11,14 +9,8 @@ export interface EnvironmentPaths {
 }
 
 export function resolveEnvironment(): EnvironmentPaths {
-  const repoRoot = resolveRepoRoot();
-  const runsRoot = resolveRunsDir(repoRoot);
-  const outRoot = resolveOutDir(repoRoot);
-
-  const rawTaskId = process.env.MCP_RUNNER_TASK_ID ?? DEFAULT_TASK_ID;
-  const taskId = normalizeTaskId(rawTaskId);
-
-  return { repoRoot, runsRoot, outRoot, taskId };
+  const { repoRoot, runsRoot, outRoot, taskId: rawTaskId } = resolveEnvironmentPaths();
+  return { repoRoot, runsRoot, outRoot, taskId: normalizeTaskId(rawTaskId) };
 }
 
 function normalizeTaskId(value: string): string {
