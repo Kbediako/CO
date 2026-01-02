@@ -2,7 +2,7 @@ import { randomBytes } from 'node:crypto';
 import { readFile, mkdir, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 
-import { listDirectories } from '../../../scripts/lib/run-manifests.js';
+import { listDirectories, resolveEnvironmentPaths } from '../../../scripts/lib/run-manifests.js';
 import { acquireLockWithRetry, type LockRetryOptions } from './lockFile.js';
 import { sanitizeTaskId } from './sanitizeTaskId.js';
 import { writeAtomicFile } from './writeAtomicFile.js';
@@ -72,8 +72,9 @@ export class ExperienceStore {
   private readonly now: () => Date;
 
   constructor(options: ExperienceStoreOptions = {}) {
-    this.outDir = options.outDir ?? join(process.cwd(), 'out');
-    this.runsDir = options.runsDir ?? join(process.cwd(), '.runs');
+    const envPaths = resolveEnvironmentPaths();
+    this.outDir = options.outDir ?? envPaths.outRoot;
+    this.runsDir = options.runsDir ?? envPaths.runsRoot;
     this.maxWords = Math.max(1, options.maxSummaryWords ?? DEFAULT_MAX_WORDS);
     const defaults: LockRetryOptions = {
       maxAttempts: 5,
