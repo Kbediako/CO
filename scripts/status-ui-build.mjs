@@ -10,7 +10,14 @@ import { register } from 'node:module';
 import { promisify } from 'node:util';
 import { fileURLToPath } from 'url';
 import { parseArgs, hasFlag } from './lib/cli-args.js';
-import { listDirectories, parseRunIdTimestamp, pickLatestRunId, resolveRepoRoot, resolveRunsDir } from './lib/run-manifests.js';
+import {
+  listDirectories,
+  parseRunIdTimestamp,
+  pickLatestRunId,
+  resolveOutDir,
+  resolveRepoRoot,
+  resolveRunsDir
+} from './lib/run-manifests.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -21,7 +28,7 @@ const TERMINAL_RUN_STATUSES = new Set(['succeeded', 'failed', 'cancelled', 'canc
 
 const repoRoot = resolveRepoRoot();
 const runsRoot = resolveRunsDir(repoRoot);
-const outRoot = path.resolve(process.env.CODEX_ORCHESTRATOR_OUT_DIR ?? path.join(repoRoot, 'out'));
+const outRoot = resolveOutDir(repoRoot);
 
 let writeJsonAtomicPromise = null;
 

@@ -7,31 +7,28 @@ import http from 'node:http';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import path from 'node:path';
-import fs from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { parseArgs, hasFlag } from './lib/cli-args.js';
+import {
+  createStaticFileHandler,
+  isPathInside,
+  normalizePathname
+} from './lib/mirror-server.mjs';
+import { toPosixPath } from './lib/docs-helpers.js';
+import { resolveOutDir, resolveRepoRoot } from './lib/run-manifests.js';
 
 const execFileAsync = promisify(execFile);
 
-const repoRoot = path.resolve(process.env.CODEX_ORCHESTRATOR_ROOT ?? process.cwd());
+const repoRoot = resolveRepoRoot();
+const outRoot = resolveOutDir(repoRoot);
 const buildScript = path.join(repoRoot, 'scripts', 'status-ui-build.mjs');
-const uiEntry = '/packages/orchestrator-status-ui/index.html';
-const dataEntry = '/out/0911-orchestrator-status-ui/data.json';
-
-const DEFAULT_PORT = 4178;
-const DEFAULT_HOST = 'localhost';
-const DEFAULT_REFRESH_MS = 4000;
-
-const contentTypes = new Map([
-  ['.html', 'text/html; charset=utf-8'],
-  ['.css', 'text/css; charset=utf-8'],
-  ['.js', 'text/javascript; charset=utf-8'],
-  ['.json', 'application/json; charset=utf-8'],
-  ['.svg', 'image/svg+xml'],
-  ['.png', 'image/png'],
-  ['.jpg', 'image/jpeg'],
-  ['.jpeg', 'image/jpeg']
-]);
+const uiEntry = `/${toPosixPath(
+  path.relative(repoRoot, path.join(repoRoot, 'packages', 'orchestrator-status-ui', 'index.html'))
+)}`;
+const safeOutRoot = isPathInside(outRoot, repoRoot) ? outRoot : path.join(repoRoot, 'out');
+const dataEntry = `/${toPosixPath(
+  path.relative(repoRoot, path.join(safeOutRoot, '0911-orchestrator-status-ui', 'data.json'))
+)}`;
 
 function printHelp() {
   console.log('Usage: npm run status-ui -- [options]');
@@ -63,18 +60,18 @@ async function main() {
   }
 
   const options = {
-    port: Number(typeof args.port === 'string' ? args.port : DEFAULT_PORT),
-    host: typeof args.host === 'string' ? args.host : DEFAULT_HOST,
+    port: Number(typeof args.port === 'string' ? args.port : 4178),
+    host: typeof args.host === 'string' ? args.host : 'localhost',
     refreshMs: hasFlag(args, 'no-refresh')
       ? 0
-      : Number(typeof args.refresh === 'string' ? args.refresh : DEFAULT_REFRESH_MS)
+      : Number(typeof args.refresh === 'string' ? args.refresh : 4000)
   };
 
   if (!Number.isFinite(options.port) || options.port <= 0) {
-    options.port = DEFAULT_PORT;
+    options.port = 4178;
   }
   if (!Number.isFinite(options.refreshMs) || options.refreshMs < 0) {
-    options.refreshMs = DEFAULT_REFRESH_MS;
+    options.refreshMs = 4000;
   }
 
   let lastBuildAt = 0;
@@ -109,59 +106,38 @@ async function main() {
     console.error(error.message ?? error);
   }
 
-  const server = http.createServer(async (req, res) => {
-    try {
-      const url = new URL(req.url ?? '/', `http://${req.headers.host ?? options.host}`);
-      let pathname = decodeURIComponent(url.pathname);
-      if (pathname === '/' || pathname === '') {
-        res.writeHead(302, { Location: uiEntry });
-        res.end();
-        return;
+  const { handler: staticHandler } = createStaticFileHandler({
+    rootDir: repoRoot,
+    cspHeader: null,
+    enableRange: false,
+    cacheControl: () => 'no-store',
+    resolvePathname: async (req) => {
+      const pathname = normalizePathname(req.url ?? '/');
+      if (!pathname) {
+        return null;
       }
       if (pathname === '/data.json') {
-        pathname = dataEntry;
-      }
-
-      const safePath = pathname.replace(/^\/+/, '');
-      const absolutePath = path.resolve(repoRoot, safePath);
-      const relativePath = path.relative(repoRoot, absolutePath);
-      if (relativePath.startsWith('..') || path.isAbsolute(relativePath)) {
-        res.writeHead(403);
-        res.end('Forbidden');
-        return;
-      }
-
-      if (pathname === dataEntry) {
         await ensureFresh();
+        return dataEntry;
       }
-
-      let stat;
-      try {
-        stat = await fs.stat(absolutePath);
-      } catch {
-        res.writeHead(404);
-        res.end('Not found');
-        return;
-      }
-
-      let filePath = absolutePath;
-      if (stat.isDirectory()) {
-        filePath = path.join(absolutePath, 'index.html');
-      }
-
-      const ext = path.extname(filePath).toLowerCase();
-      const contentType = contentTypes.get(ext) ?? 'application/octet-stream';
-      const contents = await fs.readFile(filePath);
-
-      res.writeHead(200, {
-        'Content-Type': contentType,
-        'Cache-Control': 'no-store'
-      });
-      res.end(contents);
-    } catch (error) {
-      res.writeHead(500);
-      res.end(error.message ?? 'Server error');
+      return pathname;
     }
+  });
+
+  const server = http.createServer(async (req, res) => {
+    const pathname = normalizePathname(req.url ?? '/');
+    if (!pathname) {
+      res.writeHead(404);
+      res.end('Not found');
+      return;
+    }
+    if (pathname === '/' || pathname === '') {
+      res.writeHead(302, { Location: uiEntry });
+      res.end();
+      return;
+    }
+
+    await staticHandler(req, res);
   });
 
   server.listen(options.port, options.host, () => {

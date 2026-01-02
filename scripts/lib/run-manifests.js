@@ -3,7 +3,8 @@ import { isAbsolute, join, resolve } from 'node:path';
 import process from 'node:process';
 
 export function resolveRepoRoot() {
-  const configured = process.env.CODEX_ORCHESTRATOR_ROOT;
+  const configured =
+    process.env.CODEX_ORCHESTRATOR_ROOT || process.env.CODEX_ORCHESTRATOR_REPO_ROOT;
   if (!configured) {
     return process.cwd();
   }
@@ -15,6 +16,14 @@ export function resolveRepoRoot() {
 
 export function resolveRunsDir(repoRoot) {
   const configured = process.env.CODEX_ORCHESTRATOR_RUNS_DIR || '.runs';
+  if (isAbsolute(configured)) {
+    return configured;
+  }
+  return resolve(repoRoot, configured);
+}
+
+export function resolveOutDir(repoRoot) {
+  const configured = process.env.CODEX_ORCHESTRATOR_OUT_DIR || 'out';
   if (isAbsolute(configured)) {
     return configured;
   }
