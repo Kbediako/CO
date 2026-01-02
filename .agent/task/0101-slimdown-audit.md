@@ -13,6 +13,7 @@
 - [x] Phase 5 consolidation targets captured - Evidence: `docs/TECH_SPEC-slimdown.md`, `docs/findings/slimdown-audit.md`.
 - [x] Phase 6 consolidation targets captured - Evidence: `docs/TECH_SPEC-slimdown.md`, `docs/findings/slimdown-audit.md`.
 - [x] Phase 7 consolidation targets captured - Evidence: `docs/TECH_SPEC-slimdown.md`, `docs/findings/slimdown-audit.md`.
+- [x] Phase 8 consolidation targets captured - Evidence: `docs/TECH_SPEC-slimdown.md`, `docs/findings/slimdown-audit.md`.
 
 ## Phase 2 Runbook (draft)
 1) Confirm no external consumers of legacy scripts (repo + CI scan) and verify `.runs/` artifacts remain sufficient without legacy summaries.
@@ -51,8 +52,15 @@
 3) Align the spec-guard stage command to call the spec-guard runner wrapper (package-safe).
 4) Run full guardrails (spec-guard → build/lint/test → docs gates → diff budget → review).
 
+## Phase 8 Runbook (draft)
+1) Extract a docs-review tail stage-set for docs-check/docs-freshness/diff-budget/review and use it in `docs-review` + `implementation-gate`.
+2) Reuse static file serving helpers between status UI and mirror tooling.
+3) Remove or centralize the fallback diagnostics pipeline definition.
+4) Consolidate repo/runs/out path resolution across scripts + design context.
+5) Run full guardrails (spec-guard → build/lint/test → docs gates → diff budget → review).
+
 ## Delegation
-- [x] Subagent run captured - Evidence: `.runs/0101-slimdown-audit-review/cli/2026-01-01T04-44-27-502Z-9688b054/manifest.json`, `.runs/0101-slimdown-audit-nextsteps/cli/2026-01-01T05-38-23-619Z-961fd034/manifest.json`, `.runs/0101-slimdown-audit-usage/cli/2026-01-01T06-08-57-842Z-dee29417/manifest.json`, `.runs/0101-slimdown-audit-nextphase/cli/2026-01-01T06-22-49-653Z-3e9e326e/manifest.json`, `.runs/0101-slimdown-audit-usage2/cli/2026-01-01T10-04-09-470Z-2a8c0e1b/manifest.json`, `.runs/0101-slimdown-audit-slimdown2/cli/2026-01-01T11-00-20-245Z-fca96825/manifest.json`, `.runs/0101-slimdown-audit-pass3/cli/2026-01-01T13-19-30-562Z-fb8559df/manifest.json`, `.runs/0101-slimdown-audit-phase6/cli/2026-01-01T13-58-29-786Z-01202b8e/manifest.json`, `.runs/0101-slimdown-audit-impl1/cli/2026-01-01T14-37-01-370Z-7538c896/manifest.json`, `.runs/0101-slimdown-audit-scout/cli/2026-01-01T15-58-52-966Z-2f8ac345/manifest.json`.
+- [x] Subagent run captured - Evidence: `.runs/0101-slimdown-audit-review/cli/2026-01-01T04-44-27-502Z-9688b054/manifest.json`, `.runs/0101-slimdown-audit-nextsteps/cli/2026-01-01T05-38-23-619Z-961fd034/manifest.json`, `.runs/0101-slimdown-audit-usage/cli/2026-01-01T06-08-57-842Z-dee29417/manifest.json`, `.runs/0101-slimdown-audit-nextphase/cli/2026-01-01T06-22-49-653Z-3e9e326e/manifest.json`, `.runs/0101-slimdown-audit-usage2/cli/2026-01-01T10-04-09-470Z-2a8c0e1b/manifest.json`, `.runs/0101-slimdown-audit-slimdown2/cli/2026-01-01T11-00-20-245Z-fca96825/manifest.json`, `.runs/0101-slimdown-audit-pass3/cli/2026-01-01T13-19-30-562Z-fb8559df/manifest.json`, `.runs/0101-slimdown-audit-phase6/cli/2026-01-01T13-58-29-786Z-01202b8e/manifest.json`, `.runs/0101-slimdown-audit-impl1/cli/2026-01-01T14-37-01-370Z-7538c896/manifest.json`, `.runs/0101-slimdown-audit-scout/cli/2026-01-01T15-58-52-966Z-2f8ac345/manifest.json`, `.runs/0101-slimdown-audit-scout2/cli/2026-01-02T06-46-06-627Z-0e162446/manifest.json`.
 
 ## Implementation
 - [x] Phase 1 deletions executed (wrappers and manual harness) - Evidence: `.runs/0101-slimdown-audit/cli/2026-01-01T05-57-43-325Z-cf23c380/manifest.json`.
@@ -78,7 +86,7 @@
   - [x] Align spec-guard stage command to the spec-guard runner wrapper (package-safe).
 
 ## Validation + Handoff
-- [x] Docs-review manifest captured (if doc-only changes) - Evidence: `.runs/0101-slimdown-audit/cli/2026-01-01T06-52-39-251Z-006dbf53/manifest.json`, `.runs/0101-slimdown-audit/cli/2026-01-01T14-09-05-816Z-0c732c0b/manifest.json`, `.runs/0101-slimdown-audit/cli/2026-01-01T14-36-24-243Z-95cbbe20/manifest.json`, `.runs/0101-slimdown-audit/cli/2026-01-01T15-58-20-481Z-0ed04072/manifest.json`, `.runs/0101-slimdown-audit/cli/2026-01-01T16-52-59-234Z-249b7bd8/manifest.json`, `.runs/0101-slimdown-audit/cli/2026-01-02T01-45-50-306Z-0b3346ae/manifest.json`, `.runs/0101-slimdown-audit/cli/2026-01-02T01-52-56-143Z-9ad8920d/manifest.json`, `.runs/0101-slimdown-audit/cli/2026-01-02T02-20-52-639Z-d06c3655/manifest.json`, `.runs/0101-slimdown-audit/cli/2026-01-02T02-41-59-440Z-885c79db/manifest.json`, `.runs/0101-slimdown-audit/cli/2026-01-02T04-12-32-043Z-4e121dac/manifest.json`.
+- [x] Docs-review manifest captured (if doc-only changes) - Evidence: `.runs/0101-slimdown-audit/cli/2026-01-01T06-52-39-251Z-006dbf53/manifest.json`, `.runs/0101-slimdown-audit/cli/2026-01-01T14-09-05-816Z-0c732c0b/manifest.json`, `.runs/0101-slimdown-audit/cli/2026-01-01T14-36-24-243Z-95cbbe20/manifest.json`, `.runs/0101-slimdown-audit/cli/2026-01-01T15-58-20-481Z-0ed04072/manifest.json`, `.runs/0101-slimdown-audit/cli/2026-01-01T16-52-59-234Z-249b7bd8/manifest.json`, `.runs/0101-slimdown-audit/cli/2026-01-02T01-45-50-306Z-0b3346ae/manifest.json`, `.runs/0101-slimdown-audit/cli/2026-01-02T01-52-56-143Z-9ad8920d/manifest.json`, `.runs/0101-slimdown-audit/cli/2026-01-02T02-20-52-639Z-d06c3655/manifest.json`, `.runs/0101-slimdown-audit/cli/2026-01-02T02-41-59-440Z-885c79db/manifest.json`, `.runs/0101-slimdown-audit/cli/2026-01-02T04-12-32-043Z-4e121dac/manifest.json`, `.runs/0101-slimdown-audit/cli/2026-01-02T06-55-04-213Z-55d3f4a1/manifest.json`.
 - [x] Review-loop SOP updated to monitor inline review threads - Evidence: `.runs/0101-slimdown-audit/cli/2026-01-02T02-20-52-639Z-d06c3655/manifest.json`, `.runs/0101-slimdown-audit/cli/2026-01-02T02-41-59-440Z-885c79db/manifest.json`, `.runs/0101-slimdown-audit/cli/2026-01-02T04-12-32-043Z-4e121dac/manifest.json`.
 - [x] Review-loop SOP updated to scale post-green monitoring time by complexity - Evidence: `.runs/0101-slimdown-audit/cli/2026-01-02T02-41-59-440Z-885c79db/manifest.json`, `.runs/0101-slimdown-audit/cli/2026-01-02T04-12-32-043Z-4e121dac/manifest.json`.
 - [x] Review-loop SOP updated with explicit complexity rubric - Evidence: `.runs/0101-slimdown-audit/cli/2026-01-02T04-12-32-043Z-4e121dac/manifest.json`.
