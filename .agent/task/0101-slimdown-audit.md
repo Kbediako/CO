@@ -48,7 +48,7 @@
 ## Phase 7 Runbook (draft)
 1) Replace delegation-guard command blocks in pipelines with `delegation-guard-stage`.
 2) Replace spec-guard command blocks in pipelines with the shared spec-guard stage set.
-3) Align the spec-guard stage command to call `scripts/spec-guard.mjs --dry-run`.
+3) Align the spec-guard stage command to call the spec-guard runner wrapper (package-safe).
 4) Run full guardrails (spec-guard → build/lint/test → docs gates → diff budget → review).
 
 ## Delegation
@@ -75,10 +75,10 @@
 - [x] Phase 6 consolidation executed (CLI args, mirror optional deps/permit, pipeline stage sets, adapter defaults, slugify reuse) - Evidence: `.runs/0101-slimdown-audit/cli/2026-01-01T15-30-21-816Z-3ab2817f/manifest.json`.
 - [x] Phase 7 consolidation executed (guardrail stage-set reuse) - Evidence: `.runs/0101-slimdown-audit/cli/2026-01-01T16-30-31-721Z-35c24301/manifest.json`.
   - [x] Replace delegation-guard/spec-guard command blocks with shared stage sets.
-  - [x] Align spec-guard stage command to `scripts/spec-guard.mjs --dry-run`.
+  - [x] Align spec-guard stage command to the spec-guard runner wrapper (package-safe).
 
 ## Validation + Handoff
-- [x] Docs-review manifest captured (if doc-only changes) - Evidence: `.runs/0101-slimdown-audit/cli/2026-01-01T06-52-39-251Z-006dbf53/manifest.json`, `.runs/0101-slimdown-audit/cli/2026-01-01T14-09-05-816Z-0c732c0b/manifest.json`, `.runs/0101-slimdown-audit/cli/2026-01-01T14-36-24-243Z-95cbbe20/manifest.json`, `.runs/0101-slimdown-audit/cli/2026-01-01T15-58-20-481Z-0ed04072/manifest.json`, `.runs/0101-slimdown-audit/cli/2026-01-01T16-52-59-234Z-249b7bd8/manifest.json`.
-- [x] Implementation-gate manifest captured after code changes - Evidence: `.runs/0101-slimdown-audit/cli/2026-01-01T11-12-06-081Z-b957f1cf/manifest.json`, `.runs/0101-slimdown-audit/cli/2026-01-01T14-09-41-854Z-46f3b7ea/manifest.json`, `.runs/0101-slimdown-audit/cli/2026-01-01T15-30-21-816Z-3ab2817f/manifest.json`, `.runs/0101-slimdown-audit/cli/2026-01-01T16-30-31-721Z-35c24301/manifest.json`, `.runs/0101-slimdown-audit/cli/2026-01-01T16-53-34-477Z-50756963/manifest.json`.
-- [x] Diff budget check passed (override recorded for Phase 6 consolidation scope) - Evidence: `.runs/0101-slimdown-audit/cli/2026-01-01T11-12-06-081Z-b957f1cf/manifest.json`, `.runs/0101-slimdown-audit/cli/2026-01-01T14-09-41-854Z-46f3b7ea/manifest.json`, `.runs/0101-slimdown-audit/cli/2026-01-01T15-30-21-816Z-3ab2817f/manifest.json`, `.runs/0101-slimdown-audit/cli/2026-01-01T16-30-31-721Z-35c24301/manifest.json`, `.runs/0101-slimdown-audit/cli/2026-01-01T16-53-34-477Z-50756963/manifest.json`.
+- [x] Docs-review manifest captured (if doc-only changes) - Evidence: `.runs/0101-slimdown-audit/cli/2026-01-01T06-52-39-251Z-006dbf53/manifest.json`, `.runs/0101-slimdown-audit/cli/2026-01-01T14-09-05-816Z-0c732c0b/manifest.json`, `.runs/0101-slimdown-audit/cli/2026-01-01T14-36-24-243Z-95cbbe20/manifest.json`, `.runs/0101-slimdown-audit/cli/2026-01-01T15-58-20-481Z-0ed04072/manifest.json`, `.runs/0101-slimdown-audit/cli/2026-01-01T16-52-59-234Z-249b7bd8/manifest.json`, `.runs/0101-slimdown-audit/cli/2026-01-02T01-45-50-306Z-0b3346ae/manifest.json`, `.runs/0101-slimdown-audit/cli/2026-01-02T01-52-56-143Z-9ad8920d/manifest.json`.
+- [x] Implementation-gate manifest captured after code changes - Evidence: `.runs/0101-slimdown-audit/cli/2026-01-01T11-12-06-081Z-b957f1cf/manifest.json`, `.runs/0101-slimdown-audit/cli/2026-01-01T14-09-41-854Z-46f3b7ea/manifest.json`, `.runs/0101-slimdown-audit/cli/2026-01-01T15-30-21-816Z-3ab2817f/manifest.json`, `.runs/0101-slimdown-audit/cli/2026-01-01T16-30-31-721Z-35c24301/manifest.json`, `.runs/0101-slimdown-audit/cli/2026-01-01T16-53-34-477Z-50756963/manifest.json`, `.runs/0101-slimdown-audit/cli/2026-01-02T01-46-31-523Z-0a37d3fe/manifest.json`.
+- [x] Diff budget check passed (override recorded for Phase 6 consolidation scope) - Evidence: `.runs/0101-slimdown-audit/cli/2026-01-01T11-12-06-081Z-b957f1cf/manifest.json`, `.runs/0101-slimdown-audit/cli/2026-01-01T14-09-41-854Z-46f3b7ea/manifest.json`, `.runs/0101-slimdown-audit/cli/2026-01-01T15-30-21-816Z-3ab2817f/manifest.json`, `.runs/0101-slimdown-audit/cli/2026-01-01T16-30-31-721Z-35c24301/manifest.json`, `.runs/0101-slimdown-audit/cli/2026-01-01T16-53-34-477Z-50756963/manifest.json`, `.runs/0101-slimdown-audit/cli/2026-01-02T01-46-31-523Z-0a37d3fe/manifest.json`.
 - [x] Frontend-testing manifest captured with DevTools enabled - Evidence: `.runs/0101-slimdown-audit/cli/2026-01-01T10-10-36-969Z-c65778ef/manifest.json`.
