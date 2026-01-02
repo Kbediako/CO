@@ -9,11 +9,7 @@ import { promisify } from 'node:util';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs, hasFlag } from './lib/cli-args.js';
-import {
-  createStaticFileHandler,
-  isPathInside,
-  normalizePathname
-} from './lib/mirror-server.mjs';
+import { createStaticFileHandler, normalizePathname } from './lib/mirror-server.mjs';
 import { toPosixPath } from './lib/docs-helpers.js';
 import { resolveOutDir, resolveRepoRoot } from './lib/run-manifests.js';
 
@@ -25,9 +21,8 @@ const buildScript = path.join(repoRoot, 'scripts', 'status-ui-build.mjs');
 const uiEntry = `/${toPosixPath(
   path.relative(repoRoot, path.join(repoRoot, 'packages', 'orchestrator-status-ui', 'index.html'))
 )}`;
-const safeOutRoot = isPathInside(outRoot, repoRoot) ? outRoot : path.join(repoRoot, 'out');
 const dataEntry = `/${toPosixPath(
-  path.relative(repoRoot, path.join(safeOutRoot, '0911-orchestrator-status-ui', 'data.json'))
+  path.relative(outRoot, path.join(outRoot, '0911-orchestrator-status-ui', 'data.json'))
 )}`;
 
 function printHelp() {
@@ -106,38 +101,66 @@ async function main() {
     console.error(error.message ?? error);
   }
 
-  const { handler: staticHandler } = createStaticFileHandler({
+  const { handler: uiHandler } = createStaticFileHandler({
     rootDir: repoRoot,
     cspHeader: null,
     enableRange: false,
     cacheControl: () => 'no-store',
     resolvePathname: async (req) => {
+      return normalizePathname(req.url ?? '/');
+    }
+  });
+
+  const { handler: dataHandler } = createStaticFileHandler({
+    rootDir: outRoot,
+    cspHeader: null,
+    enableRange: false,
+    cacheControl: () => 'no-store',
+    resolvePathname: async (req) => {
       const pathname = normalizePathname(req.url ?? '/');
-      if (!pathname) {
-        return null;
-      }
       if (pathname === '/data.json') {
-        await ensureFresh();
         return dataEntry;
       }
-      return pathname;
+      return null;
     }
   });
 
   const server = http.createServer(async (req, res) => {
-    const pathname = normalizePathname(req.url ?? '/');
+    const rawUrl = req.url ?? '/';
+    const pathname = normalizePathname(rawUrl);
     if (!pathname) {
       res.writeHead(404);
       res.end('Not found');
       return;
     }
     if (pathname === '/' || pathname === '') {
-      res.writeHead(302, { Location: uiEntry });
+      let search = '';
+      try {
+        const parsed = new URL(rawUrl, `http://${options.host}`);
+        const params = new URLSearchParams(parsed.search);
+        if (!params.has('data')) {
+          params.set('data', '/data.json');
+        }
+        const serialized = params.toString();
+        if (serialized) {
+          search = `?${serialized}`;
+        }
+      } catch {
+        // Fall back to default data override.
+        search = '?data=/data.json';
+      }
+      res.writeHead(302, { Location: `${uiEntry}${search}` });
       res.end();
       return;
     }
 
-    await staticHandler(req, res);
+    if (pathname === '/data.json') {
+      await ensureFresh();
+      await dataHandler(req, res);
+      return;
+    }
+
+    await uiHandler(req, res);
   });
 
   server.listen(options.port, options.host, () => {
