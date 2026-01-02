@@ -1,12 +1,7 @@
 import { resolveEnvironmentPaths } from '../../../../scripts/lib/run-manifests.js';
 import { sanitizeTaskId } from '../../persistence/sanitizeTaskId.js';
 
-export interface EnvironmentPaths {
-  repoRoot: string;
-  runsRoot: string;
-  outRoot: string;
-  taskId: string;
-}
+export type EnvironmentPaths = ReturnType<typeof resolveEnvironmentPaths>;
 
 export function resolveEnvironment(): EnvironmentPaths {
   const { repoRoot, runsRoot, outRoot, taskId: rawTaskId } = resolveEnvironmentPaths();

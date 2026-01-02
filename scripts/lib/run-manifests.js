@@ -4,7 +4,7 @@ import process from 'node:process';
 
 const DEFAULT_TASK_ID = '0101';
 
-export function resolveRepoRoot() {
+function resolveRepoRoot() {
   const configured =
     process.env.CODEX_ORCHESTRATOR_ROOT || process.env.CODEX_ORCHESTRATOR_REPO_ROOT;
   if (!configured) {
@@ -16,7 +16,7 @@ export function resolveRepoRoot() {
   return resolve(process.cwd(), configured);
 }
 
-export function resolveRunsDir(repoRoot) {
+function resolveRunsDir(repoRoot) {
   const configured = process.env.CODEX_ORCHESTRATOR_RUNS_DIR || '.runs';
   if (isAbsolute(configured)) {
     return configured;
@@ -24,7 +24,7 @@ export function resolveRunsDir(repoRoot) {
   return resolve(repoRoot, configured);
 }
 
-export function resolveOutDir(repoRoot) {
+function resolveOutDir(repoRoot) {
   const configured = process.env.CODEX_ORCHESTRATOR_OUT_DIR || 'out';
   if (isAbsolute(configured)) {
     return configured;

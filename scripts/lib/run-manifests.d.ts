@@ -1,6 +1,3 @@
-export function resolveRepoRoot(): string;
-export function resolveRunsDir(repoRoot: string): string;
-export function resolveOutDir(repoRoot: string): string;
 export function resolveEnvironmentPaths(): {
   repoRoot: string;
   runsRoot: string;

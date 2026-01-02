@@ -27,5 +27,8 @@ Phase 13 consolidation executed:
 Phase 14 consolidation executed:
 - Docs tooling now reuses the shared `pathExists` helper for path checks, reducing per-script duplication.
 
+Phase 15 consolidation executed:
+- Run-manifests now trims unused resolver exports (resolveRepoRoot/resolveRunsDir/resolveOutDir), and the CLI env resolver reuses the shared return type.
+
 ## Usage signals (still referenced)
 - `scripts/status-ui-build.mjs` is referenced by `scripts/status-ui-serve.mjs` and `docs/TECH_SPEC-orchestrator-status-ui.md` (do not remove; only consolidate helpers).

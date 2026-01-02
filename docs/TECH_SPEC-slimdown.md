@@ -122,6 +122,11 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
 - Docs scripts still define local `exists` helpers for path checks; reuse a shared `pathExists` helper in `scripts/lib/docs-helpers.js` to reduce drift.
 - Target docs-hygiene, docs-freshness, and implementation-docs-archive.
 
+### 26) Run-manifests resolver surface trim
+- `scripts/lib/run-manifests.js` still exports `resolveRepoRoot` / `resolveRunsDir` / `resolveOutDir` even though call sites now use `resolveEnvironmentPaths`.
+- Trim the export surface to just `resolveEnvironmentPaths` and reuse its return type in `orchestrator/src/cli/run/environment.ts` to keep env resolution wired to the shared resolver.
+- Phase 15 executes this target (resolver API trim).
+
 ## Expected Line Reductions by Phase (Estimate)
 - Phase 1 (wrapper cleanup): remove 5-6 wrapper/harness scripts.
   - Estimated reduction: ~360 to 500 lines.
@@ -150,6 +155,8 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
 - Phase 13 (env resolver call-site consolidation): replace remaining resolveRepoRoot/resolveRunsDir/resolveOutDir uses with resolveEnvironmentPaths across scripts/runner helpers.
   - Estimated reduction: ~10 to 20 lines.
 - Phase 14 (docs helper consolidation): reuse shared path-existence helper across docs scripts.
+  - Estimated reduction: ~5 to 10 lines.
+- Phase 15 (resolver API trim): drop unused run-manifest resolver exports and reuse the shared env type.
   - Estimated reduction: ~5 to 10 lines.
 
 ## Validation Steps per Phase
@@ -206,6 +213,9 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
 
 ### Phase 14
 - Re-run implementation-gate after docs helper reuse to confirm docs tooling behavior remains unchanged.
+
+### Phase 15
+- Re-run implementation-gate after resolver API trimming to confirm env resolution remains unchanged.
 
 ## Execution Checklists (Draft)
 
@@ -272,7 +282,7 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
    - Update `scripts/status-ui-build.mjs` to use the canonical `writeJsonAtomic`.
 3) Normalize env path resolution to `CODEX_ORCHESTRATOR_ROOT` (remove `CODEX_ORCHESTRATOR_REPO_ROOT` usage in design scripts and ensure subprocess env stays consistent).
 4) Delete scripts/mcp-runner-migrate.js + scripts/mcp-runner-metrics.js; update `.runs/README.md` + `docs/REFRACTOR_PLAN.md`.
-5) Run full guardrails (spec-guard → build/lint/test → docs gates → diff budget → review).
+5) Run full guardrails (spec-guard → build/lint/test → documentation gate → diff budget → review).
 
 ### Phase 3 runbook (ordered)
 1) Inventory devtools pipeline references (use the list above) and decide the canonical replacement path (`CODEX_REVIEW_DEVTOOLS=1` or `--devtools`).
@@ -332,6 +342,10 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
 
 ### Phase 12 runbook (ordered)
 1) Reuse shared repo/run/out resolvers across run-review, mirror tooling (fetch/check/serve/fingerprint), docs tooling (hygiene/freshness/archives), guardrail runners, and CLI persistence outputs.
+2) Run implementation-gate and record manifest evidence.
+
+### Phase 15 runbook (ordered)
+1) Trim run-manifest resolver exports to `resolveEnvironmentPaths` only and reuse its return type in `orchestrator/src/cli/run/environment.ts`.
 2) Run implementation-gate and record manifest evidence.
 
 ### Phase 3 per-file doc update checklist (draft)
