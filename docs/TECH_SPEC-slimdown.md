@@ -102,6 +102,11 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
 - Repo/runs/out path resolution is implemented in `orchestrator/src/cli/run/environment.ts` and `scripts/lib/run-manifests.js` (plus script consumers).
 - Consolidate the orchestrator resolver to use `scripts/lib/run-manifests.js` and ship `scripts/lib` in `dist/` so the package runtime keeps a single source of truth.
 
+### 21) Script helper drift (micro-duplication)
+- `scripts/spec-guard.mjs` still defines local date math; reuse `computeAgeInDays` from `scripts/lib/docs-helpers.js`.
+- `scripts/mirror-site.mjs` reimplements `toPosixPath`; reuse the shared helper to avoid divergent path normalization.
+- `scripts/design/purgeExpired.ts` and `scripts/tasks-archive.mjs` hand-roll run metadata/paths; reuse `scripts/lib/run-manifests.js` utilities to honor the same env defaults.
+
 ## Expected Line Reductions by Phase (Estimate)
 - Phase 1 (wrapper cleanup): remove 5-6 wrapper/harness scripts.
   - Estimated reduction: ~360 to 500 lines.
@@ -161,6 +166,7 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
 ### Phase 9
 - Re-run implementation-gate to confirm env resolution still matches script expectations.
 - Validate packaged CLI can resolve repo/runs/out with `CODEX_ORCHESTRATOR_ROOT` + `CODEX_ORCHESTRATOR_RUNS_DIR` + `CODEX_ORCHESTRATOR_OUT_DIR`.
+
 
 ## Execution Checklists (Draft)
 
@@ -276,6 +282,10 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
 1) Rewire `orchestrator/src/cli/run/environment.ts` to use `scripts/lib/run-manifests.js` for repo/runs/out resolution.
 2) Ensure `dist/` includes `scripts/lib` so the resolver is available in packaged runs.
 3) Run implementation-gate and record manifest evidence.
+
+### Phase 10 runbook (ordered)
+1) Reuse shared helpers in spec-guard, mirror-site, and design purge/tasks-archive via `scripts/lib/docs-helpers.js` + `scripts/lib/run-manifests.js`.
+2) Run implementation-gate and record manifest evidence.
 
 ### Phase 3 per-file doc update checklist (draft)
 - `README.md`: replace devtools pipeline IDs with the new path; update example commands.

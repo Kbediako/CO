@@ -5,6 +5,7 @@ import { readFile, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { parseArgs, hasFlag } from './lib/cli-args.js';
+import { computeAgeInDays, parseIsoDate } from './lib/docs-helpers.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -116,28 +117,6 @@ async function listSpecFiles() {
   return files.sort();
 }
 
-function parseReviewDate(raw) {
-  const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if (!match) {
-    return null;
-  }
-  const [, yearStr, monthStr, dayStr] = match;
-  const year = Number(yearStr);
-  const month = Number(monthStr) - 1;
-  const day = Number(dayStr);
-  const date = new Date(Date.UTC(year, month, day));
-  if (Number.isNaN(date.getTime())) {
-    return null;
-  }
-  return date;
-}
-
-function computeAgeInDays(from, to) {
-  const msPerDay = 24 * 60 * 60 * 1000;
-  const diff = to.getTime() - from.getTime();
-  return Math.floor(diff / msPerDay);
-}
-
 async function checkSpecFreshness(specFiles) {
   const failures = [];
   const today = new Date();
@@ -170,7 +149,7 @@ async function checkSpecFreshness(specFiles) {
     }
 
     const rawValue = reviewLine.split(':', 2)[1]?.trim() ?? '';
-    const reviewDate = parseReviewDate(rawValue);
+    const reviewDate = parseIsoDate(rawValue);
     if (!reviewDate) {
       failures.push(`${file}: invalid last_review date '${rawValue}'`);
       continue;
