@@ -99,8 +99,8 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
 - Remove the duplicate definition or source it from the config to avoid drift.
 
 ### 20) Environment path resolution duplication
-- Repo/runs/out path resolution and directory listing helpers are implemented in `orchestrator/src/cli/run/environment.ts`, `orchestrator/src/persistence/ExperienceStore.ts`, `scripts/status-ui-build.mjs`, and `scripts/lib/run-manifests.js`.
-- Consolidate the orchestrator resolver and status UI builder to use shared run-manifest helpers (`resolveEnvironmentPaths`, `listDirectories`) and ship `scripts/lib` in `dist/` so the package runtime keeps a single source of truth.
+- Repo/runs/out path resolution and directory listing helpers are implemented in `orchestrator/src/cli/run/environment.ts`, `orchestrator/src/persistence/ExperienceStore.ts`, `scripts/status-ui-build.mjs`, `scripts/status-ui-serve.mjs`, `scripts/run-review.ts`, and `scripts/lib/run-manifests.js`.
+- Consolidate the orchestrator resolver plus status UI build/serve and run-review to use shared run-manifest helpers (`resolveEnvironmentPaths`, `listDirectories`) and ship `scripts/lib` in `dist/` so the package runtime keeps a single source of truth.
 
 ### 21) Script helper drift (micro-duplication)
 - `scripts/spec-guard.mjs` still defines local date math; reuse `computeAgeInDays` from `scripts/lib/docs-helpers.js`.
@@ -244,7 +244,7 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
 - Consolidate repo/runs/out path resolution (or rewire scripts to use a shared resolver).
 
 ### Phase 9 checklist
-- Replace the orchestrator environment resolver + directory listing helper with the shared `scripts/lib/run-manifests.js` helpers (including status UI build + ExperienceStore defaults).
+- Replace the orchestrator environment resolver + directory listing helper with the shared `scripts/lib/run-manifests.js` helpers (including status UI build/serve, run-review defaults, and ExperienceStore defaults).
 - Include `scripts/lib` in `dist/` packaging so the resolver is available in the published CLI.
 
 ### Phase 2 runbook (ordered)

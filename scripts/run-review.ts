@@ -18,11 +18,10 @@ import { promisify } from 'node:util';
 
 import { resolveCodexCommand } from '../orchestrator/src/cli/utils/devtools.js';
 import { parseArgs as parseCliArgs, hasFlag } from './lib/cli-args.js';
-import { collectManifests, resolveRepoRoot, resolveRunsDir } from './lib/run-manifests.js';
+import { collectManifests, resolveEnvironmentPaths } from './lib/run-manifests.js';
 
 const execFileAsync = promisify(execFile);
-const repoRoot = resolveRepoRoot();
-const defaultRunsDir = resolveRunsDir(repoRoot);
+const { repoRoot, runsRoot: defaultRunsDir } = resolveEnvironmentPaths();
 
 interface CliOptions {
   manifest?: string;
