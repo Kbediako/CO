@@ -14,6 +14,7 @@
     "packages/shared/**/*.ts",
     "scripts/design/pipeline/**/*.ts",
     "scripts/design/pipeline/**/*.js",
+    "scripts/lib/**/*.js",
     "bin/**/*.ts",
     "types/**/*.d.ts"
   ],

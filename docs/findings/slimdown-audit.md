@@ -9,8 +9,11 @@ Phase 8 consolidations executed:
 - Fallback diagnostics pipeline definition removed; diagnostics pipeline is sourced from `codex.orchestrator.json`.
 - Script-side repo/runs/out resolution now flows through `scripts/lib/run-manifests.js` (design context + status UI).
 
+Phase 9 consolidation executed:
+- Orchestrator env resolution now reuses `scripts/lib/run-manifests.js` and ships the resolver in `dist/`.
+
 ## Remaining opportunities
-- If needed, consider unifying the orchestrator resolver (`orchestrator/src/cli/run/environment.ts`) with `scripts/lib/run-manifests.js` to remove the last parallel path resolver.
+- No remaining resolver duplicates identified after Phase 9.
 
 ## Usage signals (still referenced)
 - `scripts/status-ui-build.mjs` is referenced by `scripts/status-ui-serve.mjs` and `docs/TECH_SPEC-orchestrator-status-ui.md` (do not remove; only consolidate helpers).

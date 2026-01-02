@@ -21,7 +21,7 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
 - Task/run ID sanitization:
   - Remove local `sanitizeTaskId`/`sanitizeRunId` in `packages/shared/design-artifacts/writer.ts` and reuse `orchestrator/src/persistence/sanitizeTaskId.ts` and `sanitizeRunId.ts` (or a shared helper moved to `packages/shared`).
 - Environment path resolution:
-  - Standardize on `CODEX_ORCHESTRATOR_ROOT` and a shared resolver for `repoRoot`, `runsRoot`, `outRoot` (currently duplicated across multiple scripts).
+  - Standardize on `CODEX_ORCHESTRATOR_ROOT` and a shared resolver for `repoRoot`, `runsRoot`, `outRoot` (ensure orchestrator and scripts share one implementation).
 
 ### 3) Pipeline duplication
 - Remove devtools variants that differ only by env toggles:
@@ -100,7 +100,7 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
 
 ### 20) Environment path resolution duplication
 - Repo/runs/out path resolution is implemented in `orchestrator/src/cli/run/environment.ts` and `scripts/lib/run-manifests.js` (plus script consumers).
-- Consolidate script-side resolution onto `scripts/lib/run-manifests.js` and keep env defaults aligned with the orchestrator resolver.
+- Consolidate the orchestrator resolver to use `scripts/lib/run-manifests.js` and ship `scripts/lib` in `dist/` so the package runtime keeps a single source of truth.
 
 ## Expected Line Reductions by Phase (Estimate)
 - Phase 1 (wrapper cleanup): remove 5-6 wrapper/harness scripts.
@@ -119,6 +119,8 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
   - Estimated reduction: ~40 to 80 lines.
 - Phase 8 (docs-review checks + static server + fallback cleanup + env resolver): consolidate shared checks and server/path helpers.
   - Estimated reduction: ~60 to 120 lines.
+- Phase 9 (resolver unification): remove remaining parallel resolver path and ship shared resolver in dist.
+  - Estimated reduction: ~10 to 30 lines.
 
 ## Validation Steps per Phase
 
@@ -155,6 +157,10 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
 - Re-run docs-review and implementation-gate.
 - Smoke status-ui-serve and mirror-serve to confirm static serving behavior is unchanged.
 - Validate diagnostics pipeline resolution when config is present (no fallback drift).
+
+### Phase 9
+- Re-run implementation-gate to confirm env resolution still matches script expectations.
+- Validate packaged CLI can resolve repo/runs/out with `CODEX_ORCHESTRATOR_ROOT` + `CODEX_ORCHESTRATOR_RUNS_DIR` + `CODEX_ORCHESTRATOR_OUT_DIR`.
 
 ## Execution Checklists (Draft)
 
@@ -210,6 +216,10 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
 - Remove or centralize the fallback diagnostics pipeline definition.
 - Consolidate repo/runs/out path resolution (or rewire scripts to use a shared resolver).
 
+### Phase 9 checklist
+- Replace the orchestrator environment resolver with the shared `scripts/lib/run-manifests.js` helpers.
+- Include `scripts/lib` in `dist/` packaging so the resolver is available in the published CLI.
+
 ### Phase 2 runbook (ordered)
 1) Confirm no external consumers for legacy scripts (repo + CI scan) and verify `.runs/` artifacts remain sufficient without `metrics-summary.json` / migrations logs.
 2) Consolidate helper utilities:
@@ -261,6 +271,11 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
 3) Remove or source the fallback diagnostics pipeline from config.
 4) Consolidate repo/runs/out path resolution across scripts + design context.
 5) Run full guardrails and record manifest evidence.
+
+### Phase 9 runbook (ordered)
+1) Rewire `orchestrator/src/cli/run/environment.ts` to use `scripts/lib/run-manifests.js` for repo/runs/out resolution.
+2) Ensure `dist/` includes `scripts/lib` so the resolver is available in packaged runs.
+3) Run implementation-gate and record manifest evidence.
 
 ### Phase 3 per-file doc update checklist (draft)
 - `README.md`: replace devtools pipeline IDs with the new path; update example commands.

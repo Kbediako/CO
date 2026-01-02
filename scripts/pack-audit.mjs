@@ -19,6 +19,7 @@ const DIST_ALLOWED_PREFIXES = [
   'dist/orchestrator/',
   'dist/packages/',
   'dist/scripts/design/pipeline/',
+  'dist/scripts/lib/',
   'dist/types/'
 ];
 
