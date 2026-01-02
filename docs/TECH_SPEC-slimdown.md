@@ -358,8 +358,8 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
 2) Run implementation-gate and record manifest evidence.
 
 ### Phase 16 runbook (ordered)
-1) Replace local file existence helpers in status UI build, run-review, mirror-site, and design visual regression with `pathExists`.
-2) Run implementation-gate and record manifest evidence.
+- [x] Replace local file existence helpers in status UI build, run-review, mirror-site, and design visual regression with `pathExists`.
+- [x] Run implementation-gate and record manifest evidence - Evidence: `.runs/0101-slimdown-audit/cli/2026-01-02T19-27-43-563Z-d6350a14/manifest.json`.
 
 ### Phase 3 per-file doc update checklist (draft)
 - `README.md`: replace devtools pipeline IDs with the new path; update example commands.
