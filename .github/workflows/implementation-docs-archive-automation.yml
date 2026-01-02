@@ -22,7 +22,6 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
-    secrets: inherit
     with:
       run_command: node scripts/implementation-docs-archive.mjs
       task_id: implementation-docs-archive-automation
