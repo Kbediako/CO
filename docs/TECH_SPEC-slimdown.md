@@ -125,6 +125,7 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
 ### 26) Run-manifests resolver surface trim
 - `scripts/lib/run-manifests.js` still exports `resolveRepoRoot` / `resolveRunsDir` / `resolveOutDir` even though call sites now use `resolveEnvironmentPaths`.
 - Trim the export surface to just `resolveEnvironmentPaths` and reuse its return type in `orchestrator/src/cli/run/environment.ts` to keep env resolution wired to the shared resolver.
+- Phase 15 executes this target (resolver API trim).
 
 ## Expected Line Reductions by Phase (Estimate)
 - Phase 1 (wrapper cleanup): remove 5-6 wrapper/harness scripts.
