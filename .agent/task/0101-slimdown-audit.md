@@ -27,7 +27,7 @@
 2) Consolidate helper utilities (atomic writes + sanitizers).
 3) Normalize env path resolution to `CODEX_ORCHESTRATOR_ROOT`.
 4) Delete legacy mcp-runner migrate/metrics scripts and update `.runs/README.md` + `docs/REFRACTOR_PLAN.md`.
-5) Run full guardrails (spec-guard → build/lint/test → docs gates → diff budget → review).
+5) Run full guardrails (spec-guard → build/lint/test → documentation gate → diff budget → review).
 
 ## Phase 3 Runbook (draft)
 1) Inventory devtools pipeline references (use `docs/findings/slimdown-audit.md` map) and decide the canonical replacement path (`CODEX_REVIEW_DEVTOOLS=1` or `--devtools`).
@@ -41,7 +41,7 @@
 2) Replace local duplicates in docs-hygiene, docs-freshness, tasks-archive, implementation-docs-archive, and delegation-guard.
 3) Deduplicate pack `runPack` helper across pack-audit + pack-smoke.
 4) Update docs to remove references to the codex-devtools wrapper, then delete the wrapper script.
-5) Run full guardrails (spec-guard → build/lint/test → docs gates → diff budget → review).
+5) Run full guardrails (spec-guard → build/lint/test → documentation gate → diff budget → review).
 
 ## Phase 6 Runbook (draft)
 1) Extract shared CLI arg parsing for guardrail/docs/mirror/status scripts.
@@ -51,52 +51,52 @@
 5) Reduce pipeline duplication with shared stage sets (design + diagnostics-with-eval).
 6) Extract adapter command defaults (go/python/typescript) into shared helpers.
 7) Reuse a single slugify helper across design pipeline + orchestrator.
-8) Run full guardrails (spec-guard → build/lint/test → docs gates → diff budget → review).
+8) Run full guardrails (spec-guard → build/lint/test → documentation gate → diff budget → review).
 
 ## Phase 7 Runbook (draft)
 1) Replace delegation-guard command blocks in pipelines with `delegation-guard-stage`.
 2) Replace spec-guard command blocks in pipelines with the shared spec-guard stage set.
 3) Align the spec-guard stage command to call the spec-guard runner wrapper (package-safe).
-4) Run full guardrails (spec-guard → build/lint/test → docs gates → diff budget → review).
+4) Run full guardrails (spec-guard → build/lint/test → documentation gate → diff budget → review).
 
 ## Phase 8 Runbook (draft)
 1) Extract a docs-review checks stage-set (`docs:check` + `docs:freshness`) and use it in `docs-review` + `implementation-gate`.
 2) Reuse static file serving helpers between status UI and mirror tooling.
 3) Remove or centralize the fallback diagnostics pipeline definition.
 4) Consolidate repo/runs/out path resolution across scripts + design context.
-5) Run full guardrails (spec-guard → build/lint/test → docs gates → diff budget → review).
+5) Run full guardrails (spec-guard → build/lint/test → documentation gate → diff budget → review).
 
 ## Phase 9 Runbook (draft)
 1) Rewire `orchestrator/src/cli/run/environment.ts` to use `scripts/lib/run-manifests.js` (and reuse `listDirectories` in `ExperienceStore` + `resolveEnvironmentPaths` in status UI build/serve + run-review).
 2) Ensure `dist/` ships `scripts/lib` for packaged resolution parity.
-3) Run full guardrails (spec-guard → build/lint/test → docs gates → diff budget → review).
+3) Run full guardrails (spec-guard → build/lint/test → documentation gate → diff budget → review).
 
 ## Phase 10 Runbook (draft)
 1) Reuse shared date math in spec-guard (`computeAgeInDays`).
 2) Replace `toPosixPath` in mirror fetch tooling with the shared helper.
 3) Rewire design purge + tasks archive run-id parsing to use `scripts/lib/run-manifests.js`.
-4) Run full guardrails (spec-guard → build/lint/test → docs gates → diff budget → review).
+4) Run full guardrails (spec-guard → build/lint/test → documentation gate → diff budget → review).
 
 ## Phase 11 Runbook (draft)
 1) Replace status UI task-key helper with shared `normalizeTaskKey`.
-2) Run full guardrails (spec-guard → build/lint/test → docs gates → diff budget → review).
+2) Run full guardrails (spec-guard → build/lint/test → documentation gate → diff budget → review).
 
 ## Phase 12 Runbook (draft)
 1) Reuse shared repo/run resolvers in `scripts/run-review.ts` + `scripts/mirror-site.mjs`.
 2) Reuse `resolveOutDir` for docs archive/freshness tooling outputs.
-3) Run full guardrails (spec-guard → build/lint/test → docs gates → diff budget → review).
+3) Run full guardrails (spec-guard → build/lint/test → documentation gate → diff budget → review).
 
 ## Phase 13 Runbook (draft)
 1) Replace remaining `resolveRepoRoot`/`resolveRunsDir`/`resolveOutDir` call sites with `resolveEnvironmentPaths`.
-2) Run full guardrails (spec-guard → build/lint/test → docs gates → diff budget → review).
+2) Run full guardrails (spec-guard → build/lint/test → documentation gate → diff budget → review).
 
 ## Phase 14 Runbook (draft)
 1) Replace local docs path existence helpers with shared `pathExists` in `scripts/lib/docs-helpers.js`.
-2) Run full guardrails (spec-guard → build/lint/test → docs gates → diff budget → review).
+2) Run full guardrails (spec-guard → build/lint/test → documentation gate → diff budget → review).
 
 ## Phase 15 Runbook (draft)
 1) Trim run-manifests resolver exports and reuse `resolveEnvironmentPaths` return type in `orchestrator/src/cli/run/environment.ts`.
-2) Run full guardrails (spec-guard → build/lint/test → docs gates → diff budget → review).
+2) Run full guardrails (spec-guard → build/lint/test → documentation gate → diff budget → review).
 
 ## Delegation
 - [x] Subagent run captured - Evidence: `.runs/0101-slimdown-audit-review/cli/2026-01-01T04-44-27-502Z-9688b054/manifest.json`, `.runs/0101-slimdown-audit-nextsteps/cli/2026-01-01T05-38-23-619Z-961fd034/manifest.json`, `.runs/0101-slimdown-audit-usage/cli/2026-01-01T06-08-57-842Z-dee29417/manifest.json`, `.runs/0101-slimdown-audit-nextphase/cli/2026-01-01T06-22-49-653Z-3e9e326e/manifest.json`, `.runs/0101-slimdown-audit-usage2/cli/2026-01-01T10-04-09-470Z-2a8c0e1b/manifest.json`, `.runs/0101-slimdown-audit-slimdown2/cli/2026-01-01T11-00-20-245Z-fca96825/manifest.json`, `.runs/0101-slimdown-audit-pass3/cli/2026-01-01T13-19-30-562Z-fb8559df/manifest.json`, `.runs/0101-slimdown-audit-phase6/cli/2026-01-01T13-58-29-786Z-01202b8e/manifest.json`, `.runs/0101-slimdown-audit-impl1/cli/2026-01-01T14-37-01-370Z-7538c896/manifest.json`, `.runs/0101-slimdown-audit-scout/cli/2026-01-01T15-58-52-966Z-2f8ac345/manifest.json`, `.runs/0101-slimdown-audit-scout2/cli/2026-01-02T06-46-06-627Z-0e162446/manifest.json`, `.runs/0101-slimdown-audit-resolver/cli/2026-01-02T09-00-37-249Z-e98a2f15/manifest.json`, `.runs/0101-slimdown-audit-scout3/cli/2026-01-02T09-57-29-698Z-58860366/manifest.json`, `.runs/0101-slimdown-audit-scout4/cli/2026-01-02T10-55-12-120Z-5e7504b1/manifest.json`, `.runs/0101-slimdown-audit-hunt1/cli/2026-01-02T12-30-19-247Z-b99ceeb5/manifest.json`, `.runs/0101-slimdown-audit-hunt2/cli/2026-01-02T13-46-37-874Z-01efddfc/manifest.json`, `.runs/0101-slimdown-audit-hunt3/cli/2026-01-02T14-40-21-824Z-a1fa2df3/manifest.json`, `.runs/0101-slimdown-audit-hunt4/cli/2026-01-02T15-29-57-838Z-c6b88cf6/manifest.json`, `.runs/0101-slimdown-audit-hunt5/cli/2026-01-02T16-12-20-495Z-64aabefa/manifest.json`, `.runs/0101-slimdown-audit-hunt6/cli/2026-01-02T16-48-09-519Z-6db698f3/manifest.json`, `.runs/0101-slimdown-audit-hunt7/cli/2026-01-02T17-28-55-010Z-bb65bf5e/manifest.json`, `.runs/0101-slimdown-audit-hunt8/cli/2026-01-02T18-13-24-956Z-63ce6e71/manifest.json`.

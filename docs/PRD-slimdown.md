@@ -45,4 +45,4 @@
 - Net-negative diff across scripts and configs (delete more than add).
 - Fewer distinct CLI/MCP entrypoints documented (single recommended path).
 - One canonical implementation each for atomic JSON writes and task/run ID sanitization.
-- Guardrails and tests remain green after each phase (build/lint/test/docs gates).
+- Guardrails and tests remain green after each phase (build/lint/test/documentation gate).

@@ -282,7 +282,7 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
    - Update `scripts/status-ui-build.mjs` to use the canonical `writeJsonAtomic`.
 3) Normalize env path resolution to `CODEX_ORCHESTRATOR_ROOT` (remove `CODEX_ORCHESTRATOR_REPO_ROOT` usage in design scripts and ensure subprocess env stays consistent).
 4) Delete scripts/mcp-runner-migrate.js + scripts/mcp-runner-metrics.js; update `.runs/README.md` + `docs/REFRACTOR_PLAN.md`.
-5) Run full guardrails (spec-guard → build/lint/test → docs gates → diff budget → review).
+5) Run full guardrails (spec-guard → build/lint/test → documentation gate → diff budget → review).
 
 ### Phase 3 runbook (ordered)
 1) Inventory devtools pipeline references (use the list above) and decide the canonical replacement path (`CODEX_REVIEW_DEVTOOLS=1` or `--devtools`).

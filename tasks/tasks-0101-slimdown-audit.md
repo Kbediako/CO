@@ -18,7 +18,7 @@
 2) Consolidate helper utilities (atomic writes + sanitizers).
 3) Normalize env path resolution to `CODEX_ORCHESTRATOR_ROOT`.
 4) Delete legacy mcp-runner migrate/metrics scripts and update `.runs/README.md` + `docs/REFRACTOR_PLAN.md`.
-5) Run full guardrails (spec-guard → build/lint/test → docs gates → diff budget → review).
+5) Run full guardrails (spec-guard → build/lint/test → documentation gate → diff budget → review).
 
 ### Phase 3 Runbook (draft)
 1) Inventory devtools pipeline references (use `docs/findings/slimdown-audit.md` map) and decide the canonical replacement path (`CODEX_REVIEW_DEVTOOLS=1` or `--devtools`).
@@ -32,7 +32,7 @@
 2) Replace local duplicates in docs-hygiene, docs-freshness, tasks-archive, implementation-docs-archive, and delegation-guard.
 3) Deduplicate pack `runPack` helper across pack-audit + pack-smoke.
 4) Update docs to remove references to the codex-devtools wrapper, then delete the wrapper script.
-5) Run full guardrails (spec-guard → build/lint/test → docs gates → diff budget → review).
+5) Run full guardrails (spec-guard → build/lint/test → documentation gate → diff budget → review).
 
 ### Phase 6 Runbook (draft)
 1) Extract shared CLI arg parsing for guardrail/docs/mirror/status scripts.
@@ -42,52 +42,52 @@
 5) Reduce pipeline duplication with shared stage sets (design + diagnostics-with-eval).
 6) Extract adapter command defaults (go/python/typescript) into shared helpers.
 7) Reuse a single slugify helper across design pipeline + orchestrator.
-8) Run full guardrails (spec-guard → build/lint/test → docs gates → diff budget → review).
+8) Run full guardrails (spec-guard → build/lint/test → documentation gate → diff budget → review).
 
 ### Phase 7 Runbook (draft)
 1) Replace delegation-guard command blocks in pipelines with `delegation-guard-stage`.
 2) Replace spec-guard command blocks in pipelines with the shared spec-guard stage set.
 3) Align the spec-guard stage command to call the spec-guard runner wrapper (package-safe).
-4) Run full guardrails (spec-guard → build/lint/test → docs gates → diff budget → review).
+4) Run full guardrails (spec-guard → build/lint/test → documentation gate → diff budget → review).
 
 ### Phase 8 Runbook (draft)
 1) Extract a docs-review checks stage-set (`docs:check` + `docs:freshness`) and use it in `docs-review` + `implementation-gate`.
 2) Reuse static file serving helpers between status UI and mirror tooling.
 3) Remove or centralize the fallback diagnostics pipeline definition.
 4) Consolidate repo/runs/out path resolution across scripts + design context.
-5) Run full guardrails (spec-guard → build/lint/test → docs gates → diff budget → review).
+5) Run full guardrails (spec-guard → build/lint/test → documentation gate → diff budget → review).
 
 ### Phase 9 Runbook (draft)
 1) Rewire `orchestrator/src/cli/run/environment.ts` to use `scripts/lib/run-manifests.js` (and reuse `listDirectories` in `ExperienceStore` + `resolveEnvironmentPaths` in status UI build/serve + run-review).
 2) Ensure `dist/` ships `scripts/lib` for packaged resolution parity.
-3) Run full guardrails (spec-guard → build/lint/test → docs gates → diff budget → review).
+3) Run full guardrails (spec-guard → build/lint/test → documentation gate → diff budget → review).
 
 ### Phase 10 Runbook (draft)
 1) Reuse shared date math in spec-guard (`computeAgeInDays`).
 2) Replace `toPosixPath` in mirror fetch tooling with the shared helper.
 3) Rewire design purge + tasks archive run-id parsing to use `scripts/lib/run-manifests.js`.
-4) Run full guardrails (spec-guard → build/lint/test → docs gates → diff budget → review).
+4) Run full guardrails (spec-guard → build/lint/test → documentation gate → diff budget → review).
 
 ### Phase 11 Runbook (draft)
 1) Replace status UI task-key helper with shared `normalizeTaskKey`.
-2) Run full guardrails (spec-guard → build/lint/test → docs gates → diff budget → review).
+2) Run full guardrails (spec-guard → build/lint/test → documentation gate → diff budget → review).
 
 ### Phase 12 Runbook (draft)
 1) Reuse shared repo/run resolvers in `scripts/run-review.ts` + `scripts/mirror-site.mjs`.
 2) Reuse `resolveOutDir` for docs archive/freshness tooling outputs.
-3) Run full guardrails (spec-guard → build/lint/test → docs gates → diff budget → review).
+3) Run full guardrails (spec-guard → build/lint/test → documentation gate → diff budget → review).
 
 ### Phase 13 Runbook (draft)
 1) Replace remaining `resolveRepoRoot`/`resolveRunsDir`/`resolveOutDir` call sites with `resolveEnvironmentPaths`.
-2) Run full guardrails (spec-guard → build/lint/test → docs gates → diff budget → review).
+2) Run full guardrails (spec-guard → build/lint/test → documentation gate → diff budget → review).
 
 ### Phase 14 Runbook (draft)
 1) Replace local docs path existence helpers with shared `pathExists` in `scripts/lib/docs-helpers.js`.
-2) Run full guardrails (spec-guard → build/lint/test → docs gates → diff budget → review).
+2) Run full guardrails (spec-guard → build/lint/test → documentation gate → diff budget → review).
 
 ### Phase 15 Runbook (draft)
 1) Trim run-manifests resolver exports and reuse `resolveEnvironmentPaths` return type in `orchestrator/src/cli/run/environment.ts`.
-2) Run full guardrails (spec-guard → build/lint/test → docs gates → diff budget → review).
+2) Run full guardrails (spec-guard → build/lint/test → documentation gate → diff budget → review).
 
 ### Planning
 - [x] Confirm consolidation targets and phase sequencing - Evidence: `docs/TECH_SPEC-slimdown.md`.
