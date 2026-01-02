@@ -87,8 +87,8 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
 - Align the shared spec-guard stage to invoke the packaged spec-guard runner (skips cleanly when `scripts/spec-guard.mjs` is absent).
 
 ### 17) Docs-review tail stage-set reuse
-- `docs-review` and `implementation-gate` repeat the same `docs:check`, `docs:freshness`, `diff-budget`, and `review` stages.
-- Extract a shared stage-set for the docs-review tail and reference it in both pipelines.
+- `docs-review` and `implementation-gate` repeat the same `docs:check` + `docs:freshness` stages.
+- Extract a shared stage-set for the docs-review checks and reference it in both pipelines (keep diff-budget + review stages where they are).
 
 ### 18) Static file server duplication (status UI + mirror)
 - `scripts/status-ui-serve.mjs` duplicates the static file server logic in `scripts/lib/mirror-server.mjs` (content-type map, path safety, 404/403 handling).
@@ -99,8 +99,8 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
 - Remove the duplicate definition or source it from the config to avoid drift.
 
 ### 20) Environment path resolution duplication
-- Repo/runs/out path resolution is implemented in `orchestrator/src/cli/run/environment.ts`, `scripts/lib/run-manifests.js`, `scripts/status-ui-serve.mjs`, and `scripts/design/pipeline/context.ts`.
-- Consolidate onto a single helper or shared resolver so env var defaults stay aligned.
+- Repo/runs/out path resolution is implemented in `orchestrator/src/cli/run/environment.ts` and `scripts/lib/run-manifests.js` (plus script consumers).
+- Consolidate script-side resolution onto `scripts/lib/run-manifests.js` and keep env defaults aligned with the orchestrator resolver.
 
 ## Expected Line Reductions by Phase (Estimate)
 - Phase 1 (wrapper cleanup): remove 5-6 wrapper/harness scripts.
@@ -117,7 +117,7 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
   - Estimated reduction: ~160 to 240 lines.
 - Phase 7 (guardrail stage-set reuse): replace repeated delegation/spec-guard command blocks and align spec-guard invocation.
   - Estimated reduction: ~40 to 80 lines.
-- Phase 8 (docs-review tail + static server + fallback cleanup + env resolver): consolidate tail stages and server/path helpers.
+- Phase 8 (docs-review checks + static server + fallback cleanup + env resolver): consolidate shared checks and server/path helpers.
   - Estimated reduction: ~60 to 120 lines.
 
 ## Validation Steps per Phase
@@ -205,7 +205,7 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
 - Align spec-guard stage command to call the spec-guard runner wrapper (package-safe).
 
 ### Phase 8 checklist
-- Extract a docs-review tail stage-set and use it in `docs-review` + `implementation-gate`.
+- Extract a docs-review checks stage-set (`docs:check` + `docs:freshness`) and use it in `docs-review` + `implementation-gate`.
 - Reuse static file server helper between status UI and mirror tooling.
 - Remove or centralize the fallback diagnostics pipeline definition.
 - Consolidate repo/runs/out path resolution (or rewire scripts to use a shared resolver).
@@ -256,7 +256,7 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
 4) Run full guardrails and record manifest evidence.
 
 ### Phase 8 runbook (ordered)
-1) Add a docs-review tail stage-set and reference it from `docs-review` + `implementation-gate`.
+1) Add a docs-review checks stage-set (`docs:check` + `docs:freshness`) and reference it from `docs-review` + `implementation-gate`.
 2) Reuse static file serving helpers between status UI and mirror tooling.
 3) Remove or source the fallback diagnostics pipeline from config.
 4) Consolidate repo/runs/out path resolution across scripts + design context.

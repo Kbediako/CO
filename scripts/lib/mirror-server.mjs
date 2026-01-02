@@ -28,9 +28,9 @@ const MIME_TYPES = {
   ".manifest": "text/cache-manifest"
 };
 
-function isPathInside(child, parent) {
+export function isPathInside(child, parent) {
   const relative = path.relative(parent, child);
-  return relative && !relative.startsWith("..") && !path.isAbsolute(relative);
+  return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
 }
 
 function resolveCspPolicy(policy) {
@@ -95,7 +95,7 @@ function writeMethodNotAllowed(res) {
   res.end("Method not allowed");
 }
 
-function normalizePathname(url) {
+export function normalizePathname(url) {
   try {
     const parsed = new URL(url, "http://localhost");
     return decodeURIComponent(parsed.pathname);
@@ -143,12 +143,30 @@ function parseRangeHeader(rangeHeader, size) {
   return { start, end };
 }
 
-export function createMirrorServer({ rootDir, csp, enableRange = true, log = console.log }) {
-  const resolvedRoot = path.resolve(rootDir);
-  const cspHeader = resolveCspPolicy(csp);
+function defaultCacheControl({ ext }) {
+  return ext === ".html" ? "no-cache" : "public, max-age=31536000, immutable";
+}
 
-  const server = http.createServer(async (req, res) => {
-    const pathname = normalizePathname(req.url || "");
+export function createStaticFileHandler({
+  rootDir,
+  cspHeader,
+  enableRange = true,
+  log = console.log,
+  resolvePathname,
+  cacheControl
+}) {
+  const resolvedRoot = path.resolve(rootDir);
+  const resolveCacheControl =
+    typeof cacheControl === "function"
+      ? cacheControl
+      : typeof cacheControl === "string"
+        ? () => cacheControl
+        : defaultCacheControl;
+
+  const handler = async (req, res) => {
+    const pathname = resolvePathname
+      ? await resolvePathname(req)
+      : normalizePathname(req.url || "");
     if (!pathname) {
       writeNotFound(res);
       return;
@@ -160,7 +178,9 @@ export function createMirrorServer({ rootDir, csp, enableRange = true, log = con
     }
 
     const candidates = buildCandidatePaths(resolvedRoot, pathname);
-    const insideRoot = candidates.map((candidate) => path.resolve(candidate)).filter((candidate) => isPathInside(candidate, resolvedRoot));
+    const insideRoot = candidates
+      .map((candidate) => path.resolve(candidate))
+      .filter((candidate) => isPathInside(candidate, resolvedRoot));
     if (!insideRoot.length) {
       writeForbidden(res);
       return;
@@ -180,8 +200,21 @@ export function createMirrorServer({ rootDir, csp, enableRange = true, log = con
 
     const ext = path.extname(filePath).toLowerCase();
     const effectiveExt = ext || (pathname.startsWith("/api/") ? ".json" : "");
-    const cacheControl = effectiveExt === ".html" ? "no-cache" : "public, max-age=31536000, immutable";
-    const headers = buildHeaders({ ext: effectiveExt, cacheControl, cspHeader, enableRange, size: stat.size });
+    let cacheHeader = resolveCacheControl({
+      ext: effectiveExt,
+      pathname,
+      filePath
+    });
+    if (!cacheHeader) {
+      cacheHeader = defaultCacheControl({ ext: effectiveExt });
+    }
+    const headers = buildHeaders({
+      ext: effectiveExt,
+      cacheControl: cacheHeader,
+      cspHeader,
+      enableRange,
+      size: stat.size
+    });
 
     try {
       if (enableRange && req.headers.range) {
@@ -227,11 +260,29 @@ export function createMirrorServer({ rootDir, csp, enableRange = true, log = con
       res.statusCode = 500;
       res.end("Server error");
     }
+  };
+
+  return {
+    handler,
+    root: resolvedRoot,
+    csp: cspHeader,
+    enableRange
+  };
+}
+
+export function createMirrorServer({ rootDir, csp, enableRange = true, log = console.log }) {
+  const cspHeader = resolveCspPolicy(csp);
+  const { handler, root } = createStaticFileHandler({
+    rootDir,
+    cspHeader,
+    enableRange,
+    log
   });
+  const server = http.createServer(handler);
 
   return {
     server,
-    root: resolvedRoot,
+    root,
     csp: cspHeader,
     enableRange
   };

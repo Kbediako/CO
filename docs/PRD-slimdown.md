@@ -30,7 +30,7 @@
 - Reuse a configurable slugify helper across design pipeline and orchestrator tooling.
 - Consolidate adapter evaluation defaults (fixture cwd + clean fixture enforcement) into shared helpers.
 - Consolidate static file serving helpers and repo/run/out path resolution to avoid drift.
-- Reduce pipeline duplication by consolidating docs-review tail stages and removing redundant fallback pipelines.
+- Reduce pipeline duplication by consolidating docs-review checks and removing redundant fallback pipelines.
 
 ## Non-goals
 - No behavior changes to pipeline sequencing, manifest schema, or core orchestrator logic.

@@ -36,6 +36,20 @@
         "command": "node \"$CODEX_ORCHESTRATOR_PACKAGE_ROOT/dist/orchestrator/src/cli/utils/specGuardRunner.js\" --dry-run"
       }
     ],
+    "docs-review-checks": [
+      {
+        "kind": "command",
+        "id": "docs-check",
+        "title": "npm run docs:check",
+        "command": "npm run docs:check"
+      },
+      {
+        "kind": "command",
+        "id": "docs-freshness",
+        "title": "npm run docs:freshness",
+        "command": "npm run docs:freshness"
+      }
+    ],
     "design-artifacts": [
       {
         "kind": "command",
@@ -103,16 +117,8 @@
           "ref": "build-lint-test"
         },
         {
-          "kind": "command",
-          "id": "docs-check",
-          "title": "npm run docs:check",
-          "command": "npm run docs:check"
-        },
-        {
-          "kind": "command",
-          "id": "docs-freshness",
-          "title": "npm run docs:freshness",
-          "command": "npm run docs:freshness"
+          "kind": "stage-set",
+          "ref": "docs-review-checks"
         },
         {
           "kind": "command",
@@ -149,16 +155,8 @@
           "ref": "diagnostics-spec-guard"
         },
         {
-          "kind": "command",
-          "id": "docs-check",
-          "title": "npm run docs:check",
-          "command": "npm run docs:check"
-        },
-        {
-          "kind": "command",
-          "id": "docs-freshness",
-          "title": "npm run docs:freshness",
-          "command": "npm run docs:freshness"
+          "kind": "stage-set",
+          "ref": "docs-review-checks"
         },
         {
           "kind": "command",
