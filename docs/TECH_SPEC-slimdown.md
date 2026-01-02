@@ -129,7 +129,7 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
 ### 27) Path existence helper reuse (script-side)
 - Non-doc scripts still define local file existence helpers; reuse the shared `pathExists` helper from `scripts/lib/docs-helpers.js`.
 - Targets: `scripts/status-ui-build.mjs`, `scripts/run-review.ts`, `scripts/mirror-site.mjs`, `scripts/design/pipeline/visual-regression.ts`.
-- Phase 15 executes this target (resolver API trim).
+- Phase 16 executes this target (pathExists reuse in scripts).
 
 ## Expected Line Reductions by Phase (Estimate)
 - Phase 1 (wrapper cleanup): remove 5-6 wrapper/harness scripts.
