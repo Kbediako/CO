@@ -137,7 +137,7 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
   - Estimated reduction: ~10 to 25 lines.
 - Phase 11 (status UI task-key normalization): drop local task-key helper in status UI build.
   - Estimated reduction: ~5 to 10 lines.
-- Phase 12 (docs + run/out resolver alignment): reuse shared repo/run/out resolvers in docs tooling and review/mirror helpers.
+- Phase 12 (env root alignment): reuse shared repo/run/out resolvers across docs tooling, mirror helpers, guardrail runners, and CLI persistence outputs.
   - Estimated reduction: ~10 to 25 lines.
 
 ## Validation Steps per Phase
@@ -187,8 +187,7 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
 - Re-run implementation-gate to confirm status UI data output is unchanged.
 
 ### Phase 12
-- Re-run implementation-gate to confirm docs archive/freshness outputs and mirror/run-review paths honor configured env roots.
-
+- Re-run implementation-gate to confirm docs tooling, mirror helpers, guardrail runners, and CLI persistence outputs honor configured env roots.
 
 ## Execution Checklists (Draft)
 
@@ -314,9 +313,8 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
 2) Run implementation-gate and record manifest evidence.
 
 ### Phase 12 runbook (ordered)
-1) Reuse `resolveRepoRoot` + `resolveRunsDir` in `scripts/run-review.ts` and `scripts/mirror-site.mjs`.
-2) Reuse `resolveOutDir` for docs archive/freshness tooling outputs.
-3) Run implementation-gate and record manifest evidence.
+1) Reuse shared repo/run/out resolvers across run-review, mirror tooling (fetch/check/serve/fingerprint), docs tooling (hygiene/freshness/archives), guardrail runners, and CLI persistence outputs.
+2) Run implementation-gate and record manifest evidence.
 
 ### Phase 3 per-file doc update checklist (draft)
 - `README.md`: replace devtools pipeline IDs with the new path; update example commands.

@@ -19,11 +19,7 @@ Phase 11 consolidation executed:
 - Status UI dataset build now reuses the shared `normalizeTaskKey` helper.
 
 Phase 12 consolidation executed:
-- `scripts/run-review.ts` + `scripts/mirror-site.mjs` now reuse `resolveRepoRoot` / `resolveRunsDir` for run locations.
-- Docs archive/freshness tooling now uses `resolveOutDir` (`scripts/docs-freshness.mjs`, `scripts/tasks-archive.mjs`, `scripts/implementation-docs-archive.mjs`).
-
-## Remaining opportunities
-None logged at this time; continue scanning for additional duplication and resolver drift.
+- Run-review + mirror tooling (fetch/check/serve/style-fingerprint) now reuse shared repo/run resolvers for run locations and public paths; docs tooling + guardrail runners now use shared repo/out resolvers (`scripts/docs-hygiene.ts`, docs archive/freshness scripts, spec-guard runner) and CLI persistence outputs honor env roots.
 
 ## Usage signals (still referenced)
 - `scripts/status-ui-build.mjs` is referenced by `scripts/status-ui-serve.mjs` and `docs/TECH_SPEC-orchestrator-status-ui.md` (do not remove; only consolidate helpers).
