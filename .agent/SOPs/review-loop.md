@@ -8,7 +8,10 @@ Use this playbook whenever handing off a review (`npm run review` or an implemen
    - Default: `implementation-gate` for general reviews.
    - Enable DevTools by setting `CODEX_REVIEW_DEVTOOLS=1` only when Chrome DevTools capabilities are required.
 3. Record the manifest path in the relevant checklists (`tasks/`, `docs/`, `.agent/task/`).
-4. Monitor checks and reviewer feedback for at least 10 minutes after checks go green. Scale the watch window based on PR complexity (e.g., +5–10 minutes for medium changes, +15–20 minutes for large/complex changes) because the Codex connector can lag.
+4. Monitor checks and reviewer feedback for at least 10 minutes after checks go green. Scale the watch window based on PR complexity because the Codex connector can lag:
+   - Small: ≤50 LOC net, ≤3 files, no pipeline/guardrail changes → 10 min.
+   - Medium: 51–200 LOC or 4–10 files, touches scripts/docs/pipelines → 15–20 min.
+   - Large: >200 LOC, >10 files, touches CI/guardrails/release paths or adds deps → 25–30 min.
 5. If the reviewer finds issues, fix them, update `NOTES` with follow-up questions (when needed), and rerun the same gate.
 6. Repeat until the reviewer reports no findings.
 
