@@ -149,13 +149,23 @@ jobs:
           branch: ${{ inputs.pr_branch }}
           delete-branch: true
 
+      - name: Check auto-merge token
+        if: steps.changes.outputs.changed == 'true' && inputs.enable_auto_merge
+        id: pr_token
+        run: |
+          if [ -n "${{ secrets.pr_token }}" ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Auto-merge skipped (missing token)
-        if: steps.changes.outputs.changed == 'true' && inputs.enable_auto_merge && secrets.pr_token == ''
+        if: steps.changes.outputs.changed == 'true' && inputs.enable_auto_merge && steps.pr_token.outputs.present == 'false'
         run: |
           echo "Auto-merge token is missing; set ARCHIVE_AUTOMERGE_TOKEN to enable automatic merges." >> "$GITHUB_STEP_SUMMARY"
 
       - name: Enable auto-merge
-        if: steps.changes.outputs.changed == 'true' && inputs.enable_auto_merge && secrets.pr_token != '' && steps.cpr.outputs.pull-request-number != ''
+        if: steps.changes.outputs.changed == 'true' && inputs.enable_auto_merge && steps.pr_token.outputs.present == 'true' && steps.cpr.outputs.pull-request-number != ''
         uses: peter-evans/enable-pull-request-automerge@v3
         with:
           token: ${{ secrets.pr_token }}
