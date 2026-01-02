@@ -853,7 +853,7 @@ async function buildDataset(options) {
 
       if (options.includeLogs && runEntry.links?.log) {
         const logPath = path.resolve(repoRoot, runEntry.links.log);
-        if (await pathExists(logPath)) {
+        if (await pathExists(logPath, { allowMissingOnly: true })) {
           runEntry.logs = {
             runner: await readLogTail(logPath, { maxBytes: options.logBytes, maxLines: options.logLines })
           };
