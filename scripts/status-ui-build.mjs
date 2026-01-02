@@ -804,7 +804,7 @@ async function buildDataset(options) {
   const now = new Date();
 
   for (const item of index.items) {
-    const taskKey = buildTaskKey(item);
+    const taskKey = normalizeTaskKey(item);
     if (!taskKey) {
       continue;
     }
