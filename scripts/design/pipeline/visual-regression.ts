@@ -1,6 +1,5 @@
 import { spawn } from 'node:child_process';
-import { access, mkdir, readFile, writeFile } from 'node:fs/promises';
-import { constants } from 'node:fs';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join, relative } from 'node:path';
 import { tmpdir } from 'node:os';
 import { loadDesignContext } from './context.js';
@@ -12,6 +11,7 @@ import {
 } from './state.js';
 import { stageArtifacts } from '../../../orchestrator/src/persistence/ArtifactStager.js';
 import type { DesignArtifactRecord } from '../../../packages/shared/manifest/types.js';
+import { pathExists } from '../../lib/docs-helpers.js';
 
 const DESIGN_SYSTEM_DIR = 'packages/design-system';
 const SUMMARY_FILE = join(DESIGN_SYSTEM_DIR, '.codex', 'visual-regression-summary.json');
@@ -100,15 +100,6 @@ async function main(): Promise<void> {
   await saveDesignRunState(context.statePath, state);
   const statusText = exitCode === 0 ? 'passed' : 'failed';
   console.log(`[design-visual-regression] ${statusText}; summary staged at ${staged.path}`);
-}
-
-async function pathExists(path: string): Promise<boolean> {
-  try {
-    await access(path, constants.F_OK);
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 async function runVisualRegression(): Promise<number> {

@@ -30,5 +30,8 @@ Phase 14 consolidation executed:
 Phase 15 consolidation executed:
 - Run-manifests now trims unused resolver exports (resolveRepoRoot/resolveRunsDir/resolveOutDir), and the CLI env resolver reuses the shared return type.
 
+Phase 16 consolidation executed:
+- Script-side file existence helpers now reuse `pathExists` (`scripts/status-ui-build.mjs`, `scripts/run-review.ts`, `scripts/mirror-site.mjs`, `scripts/design/pipeline/visual-regression.ts`).
+
 ## Usage signals (still referenced)
 - `scripts/status-ui-build.mjs` is referenced by `scripts/status-ui-serve.mjs` and `docs/TECH_SPEC-orchestrator-status-ui.md` (do not remove; only consolidate helpers).

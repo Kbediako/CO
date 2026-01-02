@@ -5,7 +5,7 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { loadCheerio } from "./mirror-optional-deps.mjs";
 import { parseArgs, hasFlag } from "./lib/cli-args.js";
-import { toPosixPath } from "./lib/docs-helpers.js";
+import { pathExists, toPosixPath } from "./lib/docs-helpers.js";
 import { resolveEnvironmentPaths } from "./lib/run-manifests.js";
 import { findPermitEntry, loadPermitFile } from "./design/pipeline/permit.js";
 
@@ -68,15 +68,6 @@ function buildWaybackUrl(targetUrl) {
   }
 }
 
-async function fileExists(target) {
-  try {
-    await fs.access(target);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 async function fetchWithCache(url, cacheDir, options = {}) {
   const fetchImpl = options.fetchImpl ?? fetch;
   const fallbackBuilder = options.fallbackBuilder ?? buildWaybackUrl;
@@ -84,7 +75,7 @@ async function fetchWithCache(url, cacheDir, options = {}) {
   const bodyPath = path.join(cacheDir, `${key}.bin`);
   const metaPath = path.join(cacheDir, `${key}.json`);
 
-  if (await fileExists(bodyPath) && await fileExists(metaPath)) {
+  if (await pathExists(bodyPath) && await pathExists(metaPath)) {
     const [body, metaRaw] = await Promise.all([fs.readFile(bodyPath), fs.readFile(metaPath, "utf8")]);
     const parsedMeta = JSON.parse(metaRaw);
     return {

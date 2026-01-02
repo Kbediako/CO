@@ -18,6 +18,7 @@ import { promisify } from 'node:util';
 
 import { resolveCodexCommand } from '../orchestrator/src/cli/utils/devtools.js';
 import { parseArgs as parseCliArgs, hasFlag } from './lib/cli-args.js';
+import { pathExists } from './lib/docs-helpers.js';
 import { collectManifests, resolveEnvironmentPaths } from './lib/run-manifests.js';
 
 const execFileAsync = promisify(execFile);
@@ -34,18 +35,9 @@ interface CliOptions {
   nonInteractive?: boolean;
 }
 
-async function fileExists(filePath: string): Promise<boolean> {
-  try {
-    await stat(filePath);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 async function resolveTaskChecklistPath(taskKey: string): Promise<string | null> {
   const direct = path.join(repoRoot, 'tasks', `tasks-${taskKey}.md`);
-  if (await fileExists(direct)) {
+  if (await pathExists(direct)) {
     return direct;
   }
 
@@ -126,7 +118,7 @@ async function buildTaskContext(taskKey: string): Promise<string[]> {
   const prdPath = prdLine ? extractBacktickedPath(prdLine) : null;
   if (prdPath) {
     const absPrdPath = path.resolve(repoRoot, prdPath);
-    if (await fileExists(absPrdPath)) {
+    if (await pathExists(absPrdPath)) {
       const prd = await readFile(absPrdPath, 'utf8');
       const summary = extractMarkdownSection(prd, 'Summary');
       const summaryBullets =
