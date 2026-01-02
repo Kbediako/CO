@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import process from 'node:process';
 import { parseArgs, hasFlag } from './lib/cli-args.js';
 import { normalizeTaskKey } from './lib/docs-helpers.js';
-import { findSubagentManifests, resolveRepoRoot, resolveRunsDir } from './lib/run-manifests.js';
+import { findSubagentManifests, resolveEnvironmentPaths } from './lib/run-manifests.js';
 
 function showUsage() {
   console.log(`Usage: node scripts/delegation-guard.mjs [--dry-run]
@@ -65,7 +65,7 @@ async function main() {
     failures.push('MCP_RUNNER_TASK_ID is required for delegation guard');
   }
 
-  const repoRoot = resolveRepoRoot();
+  const { repoRoot, runsRoot: runsDir } = resolveEnvironmentPaths();
   const taskIndexPath = join(repoRoot, 'tasks', 'index.json');
   let taskKeys = [];
   try {
@@ -93,7 +93,6 @@ async function main() {
       console.log('Delegation guard: OK (subagent runs are exempt).');
       return;
     } else {
-      const runsDir = resolveRunsDir(repoRoot);
       const { found, error } = await findSubagentManifests(runsDir, taskId);
       if (error) {
         failures.push(error);

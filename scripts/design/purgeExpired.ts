@@ -1,11 +1,10 @@
 import { readdir, rm, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { loadDesignConfig } from '../../packages/shared/config/index.js';
-import { resolveRepoRoot, resolveRunsDir } from '../lib/run-manifests.js';
+import { resolveEnvironmentPaths } from '../lib/run-manifests.js';
 
 async function main(): Promise<void> {
-  const repoRoot = resolveRepoRoot();
-  const runsRoot = resolveRunsDir(repoRoot);
+  const { repoRoot, runsRoot } = resolveEnvironmentPaths();
   const taskId = process.env.MCP_RUNNER_TASK_ID ?? '0410-hi-fi-design-toolkit';
   const targetDir = join(runsRoot, taskId, 'cli');
 

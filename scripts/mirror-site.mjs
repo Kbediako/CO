@@ -6,7 +6,7 @@ import { pathToFileURL } from "node:url";
 import { loadCheerio } from "./mirror-optional-deps.mjs";
 import { parseArgs, hasFlag } from "./lib/cli-args.js";
 import { toPosixPath } from "./lib/docs-helpers.js";
-import { resolveRepoRoot, resolveRunsDir } from "./lib/run-manifests.js";
+import { resolveEnvironmentPaths } from "./lib/run-manifests.js";
 import { findPermitEntry, loadPermitFile } from "./design/pipeline/permit.js";
 
 const cheerio = await loadCheerio();
@@ -737,8 +737,7 @@ async function main() {
     : config.enableArchiveFallback;
 
   const taskId = process.env.MCP_RUNNER_TASK_ID;
-  const repoRoot = resolveRepoRoot();
-  const runsRoot = resolveRunsDir(repoRoot);
+  const { repoRoot, runsRoot } = resolveEnvironmentPaths();
   if (!taskId) {
     console.warn(`[mirror:fetch] MCP_RUNNER_TASK_ID is not set; manifest will be written under ${runsRoot}/adhoc`);
   }

@@ -7,7 +7,7 @@ import {
 } from '../../../packages/shared/config/index.js';
 import { sanitizeTaskId } from '../../../orchestrator/src/persistence/sanitizeTaskId.js';
 import { sanitizeRunId } from '../../../orchestrator/src/persistence/sanitizeRunId.js';
-import { resolveOutDir, resolveRepoRoot, resolveRunsDir } from '../../lib/run-manifests.js';
+import { resolveEnvironmentPaths } from '../../lib/run-manifests.js';
 
 export interface DesignContext {
   taskId: string;
@@ -23,9 +23,7 @@ export interface DesignContext {
 }
 
 export async function loadDesignContext(): Promise<DesignContext> {
-  const repoRoot = resolveRepoRoot();
-  const runsRoot = resolveRunsDir(repoRoot);
-  const outRoot = resolveOutDir(repoRoot);
+  const { repoRoot, runsRoot, outRoot } = resolveEnvironmentPaths();
 
   const taskId = sanitizeTaskId(
     process.env.CODEX_ORCHESTRATOR_TASK_ID ?? process.env.MCP_RUNNER_TASK_ID ?? 'unknown-task'

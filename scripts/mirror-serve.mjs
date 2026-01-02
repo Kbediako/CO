@@ -3,7 +3,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { startMirrorServer, resolveCspPolicy } from "./lib/mirror-server.mjs";
 import { parseArgs, hasFlag } from "./lib/cli-args.js";
-import { resolveRepoRoot } from "./lib/run-manifests.js";
+import { resolveEnvironmentPaths } from "./lib/run-manifests.js";
 
 async function ensureDirExists(dir) {
   try {
@@ -20,7 +20,7 @@ async function ensureDirExists(dir) {
 }
 
 async function main() {
-  const repoRoot = resolveRepoRoot();
+  const { repoRoot } = resolveEnvironmentPaths();
   const { args, positionals } = parseArgs(process.argv.slice(2));
   if (hasFlag(args, "help") || hasFlag(args, "h")) {
     console.log("Usage: npm run mirror:serve -- --project <name> [--port <port>] [--csp <policy>] [--no-range]");

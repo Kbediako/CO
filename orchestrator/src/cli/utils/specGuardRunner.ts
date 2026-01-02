@@ -4,9 +4,9 @@ import { join } from 'node:path';
 import process from 'node:process';
 
 import { logger } from '../../logger.js';
-import { resolveRepoRoot } from '../../../../scripts/lib/run-manifests.js';
+import { resolveEnvironmentPaths } from '../../../../scripts/lib/run-manifests.js';
 
-const repoRoot = resolveRepoRoot();
+const { repoRoot } = resolveEnvironmentPaths();
 const specGuardPath = join(repoRoot, 'scripts', 'spec-guard.mjs');
 
 if (!existsSync(specGuardPath)) {

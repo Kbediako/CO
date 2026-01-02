@@ -5,7 +5,7 @@ import path from 'node:path';
 import process from 'node:process';
 import { parseArgs, hasFlag } from './lib/cli-args.js';
 import { collectDocFiles, computeAgeInDays, parseIsoDate, toPosixPath } from './lib/docs-helpers.js';
-import { resolveOutDir, resolveRepoRoot } from './lib/run-manifests.js';
+import { resolveEnvironmentPaths } from './lib/run-manifests.js';
 
 const DEFAULT_REGISTRY_PATH = 'docs/docs-freshness-registry.json';
 const STATUS_VALUES = new Set(['active', 'archived', 'deprecated']);
@@ -49,8 +49,7 @@ async function loadRegistry(registryPath) {
 }
 
 async function main() {
-  const repoRoot = resolveRepoRoot();
-  const outRoot = resolveOutDir(repoRoot);
+  const { repoRoot, outRoot } = resolveEnvironmentPaths();
   const { args, positionals } = parseArgs(process.argv.slice(2));
   if (hasFlag(args, 'h') || hasFlag(args, 'help')) {
     showUsage();

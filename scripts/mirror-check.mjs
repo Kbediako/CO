@@ -5,7 +5,7 @@ import { loadCheerio, loadPlaywright } from "./mirror-optional-deps.mjs";
 import { parseArgs, hasFlag } from "./lib/cli-args.js";
 import { DEFAULT_STRIP_PATTERNS, compileStripPatterns, loadMirrorConfig } from "./mirror-site.mjs";
 import { startMirrorServer } from "./lib/mirror-server.mjs";
-import { resolveRepoRoot } from "./lib/run-manifests.js";
+import { resolveEnvironmentPaths } from "./lib/run-manifests.js";
 
 const cheerio = await loadCheerio();
 const playwright = await loadPlaywright();
@@ -133,7 +133,7 @@ function scanDomForIssues(pageContent, route, options) {
 }
 
 async function main() {
-  const repoRoot = resolveRepoRoot();
+  const { repoRoot } = resolveEnvironmentPaths();
   const { args, positionals } = parseArgs(process.argv.slice(2));
   if (hasFlag(args, "help") || hasFlag(args, "h")) {
     console.log("Usage: npm run mirror:check -- --project <name> [--port <port>] [--config <path>] [--headless=false] [--csp <policy>]");
