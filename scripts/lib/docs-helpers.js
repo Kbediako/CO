@@ -5,7 +5,7 @@ const DOC_ROOTS = ['.agent', '.ai-dev-tasks', 'docs', 'tasks'];
 const DOC_ROOT_FILES = ['README.md', 'AGENTS.md'];
 const EXCLUDED_DIR_NAMES = new Set(['.runs', 'out', 'archives', 'node_modules', 'dist']);
 
-async function exists(target) {
+export async function pathExists(target) {
   try {
     await access(target);
     return true;
@@ -46,14 +46,14 @@ export async function collectDocFiles(repoRoot) {
 
   for (const file of DOC_ROOT_FILES) {
     const abs = path.join(repoRoot, file);
-    if (await exists(abs)) {
+    if (await pathExists(abs)) {
       results.push(toPosixPath(file));
     }
   }
 
   for (const dir of DOC_ROOTS) {
     const abs = path.join(repoRoot, dir);
-    if (await exists(abs)) {
+    if (await pathExists(abs)) {
       results.push(...(await collectMarkdownFiles(repoRoot, dir)));
     }
   }

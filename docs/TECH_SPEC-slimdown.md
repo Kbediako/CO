@@ -118,6 +118,10 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
 - Several scripts still call `resolveRepoRoot` + `resolveRunsDir`/`resolveOutDir` directly; collapse these to `resolveEnvironmentPaths()` to keep env resolution consistent and reduce per-script boilerplate.
 - Target remaining mirror/docs/guardrail/design helpers and the spec-guard runner so all script-side env paths flow through the same resolver surface.
 
+### 25) Docs helper path existence checks
+- Docs scripts still define local `exists` helpers for path checks; reuse a shared `pathExists` helper in `scripts/lib/docs-helpers.js` to reduce drift.
+- Target docs-hygiene, docs-freshness, and implementation-docs-archive.
+
 ## Expected Line Reductions by Phase (Estimate)
 - Phase 1 (wrapper cleanup): remove 5-6 wrapper/harness scripts.
   - Estimated reduction: ~360 to 500 lines.
@@ -145,6 +149,8 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
   - Estimated reduction: ~10 to 25 lines.
 - Phase 13 (env resolver call-site consolidation): replace remaining resolveRepoRoot/resolveRunsDir/resolveOutDir uses with resolveEnvironmentPaths across scripts/runner helpers.
   - Estimated reduction: ~10 to 20 lines.
+- Phase 14 (docs helper consolidation): reuse shared path-existence helper across docs scripts.
+  - Estimated reduction: ~5 to 10 lines.
 
 ## Validation Steps per Phase
 
@@ -197,6 +203,9 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
 
 ### Phase 13
 - Re-run implementation-gate to confirm the remaining script-side env resolver call sites still honor configured defaults.
+
+### Phase 14
+- Re-run implementation-gate after docs helper reuse to confirm docs tooling behavior remains unchanged.
 
 ## Execution Checklists (Draft)
 
