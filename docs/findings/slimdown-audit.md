@@ -21,5 +21,8 @@ Phase 11 consolidation executed:
 Phase 12 consolidation executed:
 - Run-review + mirror tooling (fetch/check/serve/style-fingerprint) now reuse shared repo/run resolvers for run locations and public paths; docs tooling + guardrail runners now use shared repo/out resolvers (`scripts/docs-hygiene.ts`, docs archive/freshness scripts, spec-guard runner) and CLI persistence outputs honor env roots.
 
+Phase 13 consolidation executed:
+- Remaining script-side env resolver call sites (mirror/docs/guardrail/design helpers + spec-guard runner) now route through `resolveEnvironmentPaths`.
+
 ## Usage signals (still referenced)
 - `scripts/status-ui-build.mjs` is referenced by `scripts/status-ui-serve.mjs` and `docs/TECH_SPEC-orchestrator-status-ui.md` (do not remove; only consolidate helpers).

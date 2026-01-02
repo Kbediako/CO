@@ -114,6 +114,10 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
 - `scripts/run-review.ts` and `scripts/mirror-site.mjs` still hardcode `.runs` roots; reuse `scripts/lib/run-manifests.js` helpers so `CODEX_ORCHESTRATOR_RUNS_DIR` and `CODEX_ORCHESTRATOR_ROOT` are honored.
 - Docs archive/freshness tooling (`scripts/docs-freshness.mjs`, `scripts/tasks-archive.mjs`, `scripts/implementation-docs-archive.mjs`) still writes to `out/` directly; use `resolveOutDir` to honor `CODEX_ORCHESTRATOR_OUT_DIR`.
 
+### 24) Remaining env resolver call sites
+- Several scripts still call `resolveRepoRoot` + `resolveRunsDir`/`resolveOutDir` directly; collapse these to `resolveEnvironmentPaths()` to keep env resolution consistent and reduce per-script boilerplate.
+- Target remaining mirror/docs/guardrail/design helpers and the spec-guard runner so all script-side env paths flow through the same resolver surface.
+
 ## Expected Line Reductions by Phase (Estimate)
 - Phase 1 (wrapper cleanup): remove 5-6 wrapper/harness scripts.
   - Estimated reduction: ~360 to 500 lines.
@@ -139,6 +143,8 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
   - Estimated reduction: ~5 to 10 lines.
 - Phase 12 (env root alignment): reuse shared repo/run/out resolvers across docs tooling, mirror helpers, guardrail runners, and CLI persistence outputs.
   - Estimated reduction: ~10 to 25 lines.
+- Phase 13 (env resolver call-site consolidation): replace remaining resolveRepoRoot/resolveRunsDir/resolveOutDir uses with resolveEnvironmentPaths across scripts/runner helpers.
+  - Estimated reduction: ~10 to 20 lines.
 
 ## Validation Steps per Phase
 
@@ -188,6 +194,9 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
 
 ### Phase 12
 - Re-run implementation-gate to confirm docs tooling, mirror helpers, guardrail runners, and CLI persistence outputs honor configured env roots.
+
+### Phase 13
+- Re-run implementation-gate to confirm the remaining script-side env resolver call sites still honor configured defaults.
 
 ## Execution Checklists (Draft)
 

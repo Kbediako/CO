@@ -6,7 +6,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { parseArgs, hasFlag } from "./lib/cli-args.js";
-import { resolveRepoRoot } from "./lib/run-manifests.js";
+import { resolveEnvironmentPaths } from "./lib/run-manifests.js";
 
 function showUsage() {
   console.log("Usage: node scripts/mirror-style-fingerprint.mjs --project <name> [--outDir docs/reference]");
@@ -172,7 +172,7 @@ function aggregateBackgrounds(css) {
 }
 
 async function main() {
-  const repoRoot = resolveRepoRoot();
+  const { repoRoot } = resolveEnvironmentPaths();
   const { args, positionals } = parseArgs(process.argv.slice(2));
   if (hasFlag(args, "help") || hasFlag(args, "h")) {
     showUsage();
