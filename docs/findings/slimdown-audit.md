@@ -15,8 +15,11 @@ Phase 9 consolidation executed:
 Phase 10 consolidation executed:
 - Spec-guard, mirror fetch, and design purge/tasks archive now reuse shared helpers (`scripts/lib/docs-helpers.js`, `scripts/lib/run-manifests.js`).
 
+Phase 11 consolidation executed:
+- Status UI dataset build now reuses the shared `normalizeTaskKey` helper.
+
 ## Remaining opportunities
-- No remaining helper/resolver duplicates identified after Phase 10.
+- None currently identified.
 
 ## Usage signals (still referenced)
 - `scripts/status-ui-build.mjs` is referenced by `scripts/status-ui-serve.mjs` and `docs/TECH_SPEC-orchestrator-status-ui.md` (do not remove; only consolidate helpers).
