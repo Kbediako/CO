@@ -14,7 +14,7 @@
 - Adapter build/test definitions repeat identical evaluation defaults (fixture cwd + clean fixture enforcement).
 - Static file serving logic is duplicated between status UI and mirror tooling, including content-type maps and path safety checks.
 - The diagnostics pipeline is defined twice (config + code fallback), increasing drift risk when stages change.
-- Repo/run/out path resolution is reimplemented across orchestrator, design, and scripts with slightly different env fallbacks.
+- Repo/run/out path resolution and small helper logic (date math, path normalization) are reimplemented across orchestrator, design, and scripts with slightly different env fallbacks.
 
 ## Target Outcomes
 - Remove redundant wrappers and legacy runner scripts where the CLI already provides the same behavior.
@@ -29,7 +29,7 @@
 - Reuse guardrail stage sets for delegation/spec-guard across pipelines to avoid repeated command blocks.
 - Reuse a configurable slugify helper across design pipeline and orchestrator tooling.
 - Consolidate adapter evaluation defaults (fixture cwd + clean fixture enforcement) into shared helpers.
-- Consolidate static file serving helpers and repo/run/out path resolution to avoid drift.
+- Consolidate static file serving helpers and repo/run/out path resolution to avoid drift, including remaining script-level helper duplicates.
 - Reduce pipeline duplication by consolidating docs-review checks and removing redundant fallback pipelines.
 
 ## Non-goals

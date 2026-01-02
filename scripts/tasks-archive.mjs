@@ -5,6 +5,7 @@ import path from 'node:path';
 import process from 'node:process';
 import { parseArgs, hasFlag } from './lib/cli-args.js';
 import { normalizeTaskKey, parseDateString } from './lib/docs-helpers.js';
+import { parseRunIdTimestamp } from './lib/run-manifests.js';
 
 const DEFAULT_POLICY_PATH = 'docs/tasks-archive-policy.json';
 const TASKS_PATH = 'docs/TASKS.md';
@@ -174,17 +175,6 @@ function parseTaskSections(lines) {
 }
 
 
-function parseRunIdDate(runId) {
-  if (typeof runId !== 'string') {
-    return null;
-  }
-  const match = runId.match(/^(\d{4}-\d{2}-\d{2})T/);
-  if (!match) {
-    return null;
-  }
-  return match[1];
-}
-
 function loadTaskIndex(raw) {
   const data = JSON.parse(raw);
   const items = Array.isArray(data?.items) ? data.items : [];
@@ -196,11 +186,11 @@ function loadTaskIndex(raw) {
       continue;
     }
     const gateStatus = typeof item?.gate?.status === 'string' ? item.gate.status : '';
+    const runTimestamp = parseRunIdTimestamp(item?.gate?.run_id);
+    const runDate = runTimestamp ? runTimestamp.toISOString().slice(0, 10) : null;
     const completedAt =
       parseDateString(item.completed_at) ??
-      (gateStatus === 'succeeded'
-        ? parseDateString(parseRunIdDate(item?.gate?.run_id))
-        : null);
+      (gateStatus === 'succeeded' ? parseDateString(runDate) : null);
     const entry = {
       status: typeof item.status === 'string' ? item.status : '',
       gateStatus,

@@ -5,6 +5,7 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { loadCheerio } from "./mirror-optional-deps.mjs";
 import { parseArgs, hasFlag } from "./lib/cli-args.js";
+import { toPosixPath } from "./lib/docs-helpers.js";
 import { resolveRepoRoot } from "./lib/run-manifests.js";
 import { findPermitEntry, loadPermitFile } from "./design/pipeline/permit.js";
 
@@ -213,10 +214,6 @@ function buildRouteBase(origin, route) {
   }
 
   return base;
-}
-
-function toPosixPath(input) {
-  return input.split(path.sep).join("/");
 }
 
 function hashSuffix(input) {

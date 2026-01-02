@@ -12,8 +12,11 @@ Phase 8 consolidations executed:
 Phase 9 consolidation executed:
 - Orchestrator env resolution now reuses `scripts/lib/run-manifests.js` and ships the resolver in `dist/`.
 
+Phase 10 consolidation executed:
+- Spec-guard, mirror fetch, and design purge/tasks archive now reuse shared helpers (`scripts/lib/docs-helpers.js`, `scripts/lib/run-manifests.js`).
+
 ## Remaining opportunities
-- No remaining resolver duplicates identified after Phase 9.
+- No remaining helper/resolver duplicates identified after Phase 10.
 
 ## Usage signals (still referenced)
 - `scripts/status-ui-build.mjs` is referenced by `scripts/status-ui-serve.mjs` and `docs/TECH_SPEC-orchestrator-status-ui.md` (do not remove; only consolidate helpers).
