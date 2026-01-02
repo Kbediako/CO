@@ -1,4 +1,4 @@
-import { join, resolve } from 'node:path';
+import { resolveOutDir, resolveRepoRoot, resolveRunsDir } from '../../../../scripts/lib/run-manifests.js';
 import { sanitizeTaskId } from '../../persistence/sanitizeTaskId.js';
 
 const DEFAULT_TASK_ID = '0101';
@@ -11,9 +11,9 @@ export interface EnvironmentPaths {
 }
 
 export function resolveEnvironment(): EnvironmentPaths {
-  const repoRoot = resolve(process.env.CODEX_ORCHESTRATOR_ROOT ?? process.cwd());
-  const runsRoot = resolve(process.env.CODEX_ORCHESTRATOR_RUNS_DIR ?? join(repoRoot, '.runs'));
-  const outRoot = resolve(process.env.CODEX_ORCHESTRATOR_OUT_DIR ?? join(repoRoot, 'out'));
+  const repoRoot = resolveRepoRoot();
+  const runsRoot = resolveRunsDir(repoRoot);
+  const outRoot = resolveOutDir(repoRoot);
 
   const rawTaskId = process.env.MCP_RUNNER_TASK_ID ?? DEFAULT_TASK_ID;
   const taskId = normalizeTaskId(rawTaskId);
