@@ -126,14 +126,30 @@ async function main() {
   });
 
   const server = http.createServer(async (req, res) => {
-    const pathname = normalizePathname(req.url ?? '/');
+    const rawUrl = req.url ?? '/';
+    const pathname = normalizePathname(rawUrl);
     if (!pathname) {
       res.writeHead(404);
       res.end('Not found');
       return;
     }
     if (pathname === '/' || pathname === '') {
-      res.writeHead(302, { Location: uiEntry });
+      let search = '';
+      try {
+        const parsed = new URL(rawUrl, `http://${options.host}`);
+        const params = new URLSearchParams(parsed.search);
+        if (!params.has('data')) {
+          params.set('data', '/data.json');
+        }
+        const serialized = params.toString();
+        if (serialized) {
+          search = `?${serialized}`;
+        }
+      } catch {
+        // Fall back to default data override.
+        search = '?data=/data.json';
+      }
+      res.writeHead(302, { Location: `${uiEntry}${search}` });
       res.end();
       return;
     }
