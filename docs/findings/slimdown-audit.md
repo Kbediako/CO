@@ -41,7 +41,6 @@ Phase 18 consolidation executed:
 - Design pipeline optional-deps wrapper removed; pipeline scripts import `optional-deps.js` directly.
 
 Phase 19 consolidation executed:
-- Removed orchestrator agent/adapter re-export shims; call sites import the concrete modules directly.
 - Inlined `WINDOWS_FORBIDDEN_CHARACTERS` into `sanitizeIdentifier` and dropped the persistence `writeAtomicFile` + JSONL writer shims.
 
 Phase 20 consolidation executed:

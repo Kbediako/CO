@@ -142,8 +142,7 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
 ### 30) Optional deps wrapper cleanup
 - The optional-deps wrapper only re-exported helpers with types; import `scripts/design/pipeline/optional-deps.js` directly and drop the wrapper to reduce script surface area.
 
-### 31) Agent/adapter shim cleanup
-- Agent and CLI adapter index shims are re-exports only; import from concrete modules (for example `orchestrator/src/agents/planner.ts` and `orchestrator/src/cli/adapters/CommandPlanner.ts`) instead.
+### 31) Persistence + JSONL shim cleanup
 - Inline `WINDOWS_FORBIDDEN_CHARACTERS` into `orchestrator/src/persistence/sanitizeIdentifier.ts` and drop the persistence `writeAtomicFile` + JSONL writer shims (import `writeAtomicFile` from `orchestrator/src/utils/atomicWrite.ts` in `ExperienceStore`/`TaskStateStore`).
 
 ### 32) Control-plane + scheduler shim cleanup
@@ -186,7 +185,7 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
   - Estimated reduction: ~5 to 10 lines.
 - Phase 18 (guardrail detection + optional-deps wrapper): normalize guardrail detection and remove the optional-deps wrapper.
   - Estimated reduction: ~5 to 15 lines.
-- Phase 19 (agent/adapter shims + identifier guard): drop re-export shims and inline single-use constant.
+- Phase 19 (persistence + JSONL shims + identifier guard): drop persistence/JSONL shims and inline single-use constant.
   - Estimated reduction: ~10 to 20 lines.
 - Phase 20 (control-plane + scheduler shims): remove index re-exports and update imports/tests.
   - Estimated reduction: ~15 to 30 lines.
@@ -256,7 +255,7 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
 - Re-run docs-review and implementation-gate to confirm guardrail summaries and design pipeline imports remain stable.
 
 ### Phase 19
-- Re-run implementation-gate after removing the shim modules and inlining the identifier guard constant.
+- Re-run implementation-gate after removing persistence/JSONL shim modules and inlining the identifier guard constant.
 
 ### Phase 20
 - Re-run implementation-gate after removing control-plane/scheduler index shims and normalizing guardrail detection.
@@ -406,7 +405,7 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
 - [x] Run implementation-gate and record manifest evidence - Evidence: `.runs/0101-slimdown-audit/cli/2026-01-03T04-14-39-520Z-2b87960a/manifest.json`.
 
 ### Phase 19 runbook (ordered)
-- [x] Remove agent/adapter shims and persistence shim helpers; inline the identifier guard constant.
+- [x] Remove persistence writeAtomicFile/JSONL writer shims; inline the identifier guard constant.
 - [x] Run implementation-gate and record manifest evidence - Evidence: `.runs/0101-slimdown-audit/cli/2026-01-03T05-44-22-728Z-b10e19d2/manifest.json`.
 
 ### Phase 20 runbook (ordered)
