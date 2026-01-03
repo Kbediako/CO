@@ -16,10 +16,10 @@ Phase 0 - Baseline invariants + regression tripwires
 - Work: add characterization tests for execution-mode resolution, task/run ID sanitization, env/path resolution, and pipeline selection edge cases; capture baseline manifests for diagnostics/docs-review/implementation-gate/frontend-testing.
 - Exit: characterization tests pass; baseline manifests linked in task docs; no new dependencies.
 
-Phase 1 - Delete clearly-dead wrappers and legacy harnesses
+Phase 1 - Delete clearly dead wrappers and legacy harnesses
 - Entry: Phase 0 exit criteria met; repo/CI/docs scans show no references.
 - Work: remove legacy mcp-runner migrate/metrics scripts, obsolete wrappers, and unused harness scripts (only after docs updated).
-- Exit: zero references remain; docs updated; core lane green with a post-change manifest.
+- Exit: ensure zero references remain; docs updated; core lane green with a post-change manifest.
 
 Phase 2 - Consolidate duplicated helpers
 - Entry: Phase 1 merged; tests cover helper-visible behavior.
@@ -45,6 +45,24 @@ Phase 6 - Final guardrail pass + documentation update
 - Entry: Phases 0-5 merged or staged.
 - Work: run full guardrail chain; update checklists/mirrors with manifest paths.
 - Exit: evidence manifests captured; diff budget adhered to (or explicit override recorded); docs reflect actual usage.
+
+## Extended Phases (7–20) — Legacy Runbook Alignment
+Phases 7–20 are already defined in the runbooks under `tasks/tasks-0101-slimdown-audit.md`. This section keeps numbering consistent with the task checklist. Entry/exit for each phase is the corresponding runbook plus a full guardrail pass with manifest evidence.
+
+Phase 7 - Guardrail stage-set reuse (delegation/spec-guard stage sets).
+Phase 8 - Docs-review stage-set reuse, static server reuse, fallback diagnostics, resolver alignment.
+Phase 9 - Resolver unification and dist shipping parity.
+Phase 10 - Script helper drift cleanup (date math, toPosixPath, run-manifests reuse).
+Phase 11 - Status UI task-key normalization.
+Phase 12 - Docs + run/out resolver alignment (run-review, mirror, docs outputs).
+Phase 13 - Env resolver call-site consolidation.
+Phase 14 - Docs helper pathExists reuse.
+Phase 15 - Resolver API trim.
+Phase 16 - Script-side pathExists reuse.
+Phase 17 - CLI environment resolver wrapper removal.
+Phase 18 - Guardrail detection normalization + optional-deps wrapper removal.
+Phase 19 - Persistence/JSONL shim cleanup + identifier guard inline.
+Phase 20 - Guardrail detection normalization + control-plane/scheduler shim cleanup.
 
 ## Candidate Audit Areas (safe deletions/consolidations)
 - Legacy scripts and wrappers: old mcp-runner migrate/metrics, codex-devtools wrapper, unused parallel-goals harness.
@@ -87,13 +105,13 @@ Reference integrity checks:
 - verify `package.json`, `codex.orchestrator.json`, and docs/SOPs have no dead references
 
 ## Do-Not-Do List (no regressions)
-- Do not change public APIs, CLI flags, defaults, or user-facing strings.
-- Do not change pipeline IDs or stage order for public pipelines.
-- Do not change manifest schema or evidence path conventions.
-- Do not add dependencies.
-- Do not mix refactors with broad formatting-only changes.
-- Do not remove legacy entrypoints without evidence they are unused.
-- Do not change optional dependency behavior.
+- Public APIs, CLI flags, defaults, and user-facing strings must not change.
+- Pipeline IDs and stage order for public pipelines must remain stable.
+- Manifest schema and evidence path conventions must not change.
+- New dependencies must not be added.
+- Refactors and formatting-only changes must not be mixed.
+- Legacy entrypoints must not be removed without evidence of disuse.
+- Optional dependency behavior must not change.
 
 ## Next Review
 - Date: TBD
