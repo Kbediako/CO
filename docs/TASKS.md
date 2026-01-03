@@ -442,3 +442,8 @@ Mirror status with `tasks/tasks-0506-tfgrpo.md` and `.agent/task/0506-tfgrpo-int
 - [ ] Reviewer hand-off via `npm run review` referencing the latest TF-GRPO manifest.
 
 # Task List Snapshot - Repo Refactor Simplification (0928)
+- Update - Implementation: pipeline resolution simplification + portable dist commands shipped; implementation-gate manifest at `.runs/0928-repo-refactor-simplification/cli/2025-12-31T13-53-53-066Z-26a878bb/manifest.json`.
+- Notes: Export `MCP_RUNNER_TASK_ID=0928-repo-refactor-simplification` before orchestrator commands.
+
+## Checklist Mirror
+Mirror status with `tasks/tasks-0928-repo-refactor-simplification.md` and `.agent/task/0928-repo-refactor-simplification.md`. Keep `[ ]` until evidence is recorded.
