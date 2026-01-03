@@ -22,7 +22,7 @@ export async function runExecStage(context: ExecRunContext): Promise<StageRunRes
       const serialized = serializeExecEvent(event);
       context.telemetryTasks.push(Promise.resolve(context.telemetrySink.record(serialized)).then(() => undefined));
       if (context.outputMode === 'jsonl' && context.jsonlWriter) {
-        context.jsonlWriter.write(serialized);
+        context.jsonlWriter(serialized);
       } else if (context.outputMode === 'interactive') {
         streamInteractive(context.stdout, context.stderr, event);
       }

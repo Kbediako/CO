@@ -317,12 +317,8 @@ function selectGuardrailCommands(manifest: CliManifest): CliManifestCommand[] {
     const id = entry.id?.toLowerCase() ?? '';
     const title = entry.title?.toLowerCase() ?? '';
     const command = entry.command?.toLowerCase() ?? '';
-    return (
-      id.includes('spec-guard') ||
-      title.includes('spec-guard') ||
-      command.includes('spec-guard') ||
-      command.includes('specguardrunner')
-    );
+    const haystack = `${id} ${title} ${command}`;
+    return haystack.includes('spec-guard') || haystack.includes('specguardrunner');
   });
 }
 

@@ -1,11 +1,8 @@
 import process from 'node:process';
 
-import {
-  buildRunRequestV2,
-  ControlPlaneDriftReporter,
-  ControlPlaneValidationError,
-  ControlPlaneValidator
-} from '../../control-plane/index.js';
+import { ControlPlaneDriftReporter } from '../../control-plane/drift-reporter.js';
+import { buildRunRequestV2 } from '../../control-plane/request-builder.js';
+import { ControlPlaneValidationError, ControlPlaneValidator } from '../../control-plane/validator.js';
 import type { ControlPlaneValidationMode, ControlPlaneValidationResult } from '../../control-plane/types.js';
 import type { EnvironmentPaths } from '../run/environment.js';
 import { relativeToRepo } from '../run/runPaths.js';

@@ -1,11 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { TaskManager } from '../src/manager.js';
-import {
-  FunctionalPlannerAgent,
-  FunctionalBuilderAgent,
-  FunctionalTesterAgent,
-  FunctionalReviewerAgent
-} from '../src/agents/index.js';
+import { FunctionalPlannerAgent } from '../src/agents/planner.js';
+import { FunctionalBuilderAgent } from '../src/agents/builder.js';
+import { FunctionalTesterAgent } from '../src/agents/tester.js';
+import { FunctionalReviewerAgent } from '../src/agents/reviewer.js';
 import type { TaskContext } from '../src/types.js';
 import { normalizeErrorMessage } from '../src/utils/errorMessage.js';
 

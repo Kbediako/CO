@@ -4,12 +4,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { EventBus } from '../src/events/EventBus.js';
 import { TaskManager } from '../src/manager.js';
-import {
-  FunctionalPlannerAgent,
-  FunctionalBuilderAgent,
-  FunctionalTesterAgent,
-  FunctionalReviewerAgent
-} from '../src/agents/index.js';
+import { FunctionalPlannerAgent } from '../src/agents/planner.js';
+import { FunctionalBuilderAgent } from '../src/agents/builder.js';
+import { FunctionalTesterAgent } from '../src/agents/tester.js';
+import { FunctionalReviewerAgent } from '../src/agents/reviewer.js';
 import { TaskStateStore } from '../src/persistence/TaskStateStore.js';
 import { RunManifestWriter } from '../src/persistence/RunManifestWriter.js';
 import * as Sanitize from '../src/persistence/sanitizeTaskId.js';

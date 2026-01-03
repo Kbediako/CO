@@ -3,7 +3,7 @@ import { dirname, join } from 'node:path';
 import type { RunSummary } from '../types.js';
 import { acquireLockWithRetry, type LockRetryOptions } from './lockFile.js';
 import { sanitizeTaskId } from './sanitizeTaskId.js';
-import { writeAtomicFile } from './writeAtomicFile.js';
+import { writeAtomicFile } from '../utils/atomicWrite.js';
 
 export interface TaskStateStoreOptions {
   outDir?: string;

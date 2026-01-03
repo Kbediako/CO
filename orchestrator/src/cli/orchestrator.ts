@@ -7,12 +7,10 @@ import type { ManagerOptions } from '../manager.js';
 import type { TaskContext, ExecutionMode, PlanItem } from '../types.js';
 import { RunManifestWriter } from '../persistence/RunManifestWriter.js';
 import { TaskStateStore } from '../persistence/TaskStateStore.js';
-import {
-  CommandPlanner,
-  CommandBuilder,
-  CommandTester,
-  CommandReviewer
-} from './adapters/index.js';
+import { CommandPlanner } from './adapters/CommandPlanner.js';
+import { CommandBuilder } from './adapters/CommandBuilder.js';
+import { CommandTester } from './adapters/CommandTester.js';
+import { CommandReviewer } from './adapters/CommandReviewer.js';
 import { resolveEnvironmentPaths } from '../../../scripts/lib/run-manifests.js';
 import { normalizeEnvironmentPaths } from './run/environment.js';
 import type { EnvironmentPaths } from './run/environment.js';

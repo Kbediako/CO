@@ -1,6 +1,6 @@
 import process from 'node:process';
 
-import { CommandPlanner } from '../adapters/index.js';
+import { CommandPlanner } from '../adapters/CommandPlanner.js';
 import { PipelineResolver } from './pipelineResolver.js';
 import { sanitizeTaskId } from '../run/environment.js';
 import type { EnvironmentPaths } from '../run/environment.js';

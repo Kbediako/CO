@@ -7,8 +7,8 @@ import {
   createSchedulerPlan,
   finalizeSchedulerPlan,
   serializeSchedulerPlan
-} from '../../scheduler/index.js';
-import type { SchedulerPlan, SchedulerAssignmentStatus } from '../../scheduler/index.js';
+} from '../../scheduler/plan.js';
+import type { SchedulerPlan, SchedulerAssignmentStatus } from '../../scheduler/types.js';
 import type { ControlPlaneValidationResult } from '../../control-plane/types.js';
 import { isoTimestamp } from '../utils/time.js';
 import type { CliManifest, RunStatus } from '../types.js';
