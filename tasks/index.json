@@ -622,6 +622,22 @@
       },
       "created_at": "2025-12-31",
       "completed_at": null
+    },
+    {
+      "id": "0929",
+      "slug": "oracle-browser-guidance",
+      "title": "Oracle Browser Login Guidance",
+      "path": "tasks/tasks-0929-oracle-browser-guidance.md",
+      "kind": "run",
+      "status": "succeeded",
+      "gate": {
+        "phase": "oracle-browser-guidance-implementation",
+        "status": "succeeded",
+        "log": ".runs/0929-oracle-browser-guidance/cli/2026-01-03T02-09-29-710Z-6ff114c2/manifest.json",
+        "run_id": "2026-01-03T02-09-29-710Z-6ff114c2"
+      },
+      "created_at": "2026-01-03",
+      "completed_at": "2026-01-03"
     }
   ],
   "specs": []
