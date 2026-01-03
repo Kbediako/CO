@@ -696,6 +696,13 @@
       "cadence_days": 90
     },
     {
+      "path": "docs/ACTION_PLAN-slimdown.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-03",
+      "cadence_days": 90
+    },
+    {
       "path": "docs/ACTION_PLAN-subagent-delegation-enforcement.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",

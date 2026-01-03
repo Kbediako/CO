@@ -148,6 +148,16 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
 ### 20) Control-plane + scheduler shim cleanup
 - Remove the control-plane and scheduler index re-exports; import concrete modules directly in services and tests.
 
+## Implementation Plan (No Regression)
+See `docs/ACTION_PLAN-slimdown.md` for the step-by-step execution plan. Summary:
+- Phase 0: Baseline invariants + characterization tests + baseline manifests.
+- Phase 1: Delete clearly-dead wrappers and legacy harnesses after reference scans.
+- Phase 2: Consolidate duplicated helpers (atomic writes, sanitizers, pathExists, toPosix, date math).
+- Phase 3: Normalize env/path resolution (repo/runs/out) and ensure dist parity.
+- Phase 4: Deduplicate pipeline stage-sets without changing IDs or stage order.
+- Phase 5: Remove shims/index indirection once imports are stabilized.
+- Phase 6: Final guardrail pass + documentation updates with manifest evidence.
+
 ## Expected Line Reductions by Phase (Estimate)
 - Phase 1 (wrapper cleanup): remove 5-6 wrapper/harness scripts.
   - Estimated reduction: ~360 to 500 lines.

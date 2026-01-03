@@ -5,6 +5,7 @@
 ## Foundation
 - [x] PRD drafted - Evidence: `docs/PRD-slimdown.md`.
 - [x] Tech spec drafted - Evidence: `docs/TECH_SPEC-slimdown.md`.
+- [x] Action plan drafted - Evidence: `docs/ACTION_PLAN-slimdown.md`.
 - [x] Findings audit drafted - Evidence: `docs/findings/slimdown-audit.md`.
 
 ## Planning
