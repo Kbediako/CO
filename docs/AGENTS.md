@@ -28,6 +28,7 @@
 - Use `codex-orchestrator` pipelines for planning, implementation, validation, and review work that touches the repo.
 - Avoid ad-hoc command chains unless the work is a lightweight discovery step that does not require manifest evidence.
 - Delegation is mandatory for top-level tasks: spawn at least one subagent run using `MCP_RUNNER_TASK_ID=<task-id>-<stream>`, capture manifest evidence, and summarize in the main run. Use `DELEGATION_GUARD_OVERRIDE_REASON` only when delegation is impossible and record the justification.
+- Follow `.agent/SOPs/oracle-usage.md` for Oracle runs (4-file limit, unique basenames, DevTools inspection flow).
 
 ## PR Lifecycle (Top-Level Agents)
 - Open PRs for code/config changes and keep the scope tied to the active task.
