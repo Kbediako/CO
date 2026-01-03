@@ -9,8 +9,8 @@ The Snakes Arena checklist has been retired from this workspace; reference the a
 <!-- tasks-archive-index:begin -->
 ## Archive index
 Archived task snapshots live on the task-archives branch.
-- 2025: https://github.com/Kbediako/CO/blob/task-archives/docs/TASKS-archive-2025.md
-- 2026: https://github.com/Kbediako/CO/blob/task-archives/docs/TASKS-archive-2026.md
+- 2025: <https://github.com/Kbediako/CO/blob/task-archives/docs/TASKS-archive-2025.md>
+- 2026: <https://github.com/Kbediako/CO/blob/task-archives/docs/TASKS-archive-2026.md>
 <!-- tasks-archive-index:end -->
 # Task List Snapshot — Slimdown Audit (0101)
 - Update - Planning: PRD/tech spec/findings/checklist drafted; docs-review manifest captured at `.runs/0101-slimdown-audit/cli/2026-01-01T06-52-39-251Z-006dbf53/manifest.json`.
