@@ -125,7 +125,11 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
 ### 26) Run-manifests resolver surface trim
 - `scripts/lib/run-manifests.js` still exports `resolveRepoRoot` / `resolveRunsDir` / `resolveOutDir` even though call sites now use `resolveEnvironmentPaths`.
 - Trim the export surface to just `resolveEnvironmentPaths` and reuse its return type in `orchestrator/src/cli/run/environment.ts` to keep env resolution wired to the shared resolver.
-- Phase 15 executes this target (resolver API trim).
+
+### 27) Path existence helper reuse (script-side)
+- Non-doc scripts still define local file existence helpers; reuse the shared `pathExists` helper from `scripts/lib/docs-helpers.js`.
+- Targets: `scripts/status-ui-build.mjs`, `scripts/run-review.ts`, `scripts/mirror-site.mjs`, `scripts/design/pipeline/visual-regression.ts`.
+- Phase 16 executes this target (pathExists reuse in scripts).
 
 ## Expected Line Reductions by Phase (Estimate)
 - Phase 1 (wrapper cleanup): remove 5-6 wrapper/harness scripts.
@@ -158,6 +162,8 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
   - Estimated reduction: ~5 to 10 lines.
 - Phase 15 (resolver API trim): drop unused run-manifest resolver exports and reuse the shared env type.
   - Estimated reduction: ~5 to 10 lines.
+- Phase 16 (pathExists reuse in scripts): remove local file existence helpers in status UI, mirror, review, and design scripts.
+  - Estimated reduction: ~10 to 20 lines.
 
 ## Validation Steps per Phase
 
@@ -216,6 +222,9 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
 
 ### Phase 15
 - Re-run implementation-gate after resolver API trimming to confirm env resolution remains unchanged.
+
+### Phase 16
+- Re-run implementation-gate after consolidating path existence helpers in scripts.
 
 ## Execution Checklists (Draft)
 
@@ -347,6 +356,10 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
 ### Phase 15 runbook (ordered)
 1) Trim run-manifest resolver exports to `resolveEnvironmentPaths` only and reuse its return type in `orchestrator/src/cli/run/environment.ts`.
 2) Run implementation-gate and record manifest evidence.
+
+### Phase 16 runbook (ordered)
+- [x] Replace local file existence helpers in status UI build, run-review, mirror-site, and design visual regression with `pathExists`.
+- [x] Run implementation-gate and record manifest evidence - Evidence: `.runs/0101-slimdown-audit/cli/2026-01-02T19-56-02-736Z-5bac93fd/manifest.json`.
 
 ### Phase 3 per-file doc update checklist (draft)
 - `README.md`: replace devtools pipeline IDs with the new path; update example commands.

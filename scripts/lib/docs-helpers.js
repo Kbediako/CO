@@ -5,11 +5,15 @@ const DOC_ROOTS = ['.agent', '.ai-dev-tasks', 'docs', 'tasks'];
 const DOC_ROOT_FILES = ['README.md', 'AGENTS.md'];
 const EXCLUDED_DIR_NAMES = new Set(['.runs', 'out', 'archives', 'node_modules', 'dist']);
 
-export async function pathExists(target) {
+export async function pathExists(target, options = {}) {
+  const { allowMissingOnly = false } = options;
   try {
     await access(target);
     return true;
-  } catch {
+  } catch (error) {
+    if (allowMissingOnly && error?.code !== 'ENOENT') {
+      throw error;
+    }
     return false;
   }
 }

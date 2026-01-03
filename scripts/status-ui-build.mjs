@@ -10,7 +10,7 @@ import { register } from 'node:module';
 import { promisify } from 'node:util';
 import { fileURLToPath } from 'url';
 import { parseArgs, hasFlag } from './lib/cli-args.js';
-import { normalizeTaskKey } from './lib/docs-helpers.js';
+import { normalizeTaskKey, pathExists } from './lib/docs-helpers.js';
 import {
   listDirectories,
   parseRunIdTimestamp,
@@ -42,18 +42,6 @@ async function loadWriteJsonAtomic() {
 
 function isoTimestamp(date = new Date()) {
   return date.toISOString();
-}
-
-async function fileExists(filePath) {
-  try {
-    await fs.stat(filePath);
-    return true;
-  } catch (error) {
-    if (error.code === 'ENOENT') {
-      return false;
-    }
-    throw error;
-  }
 }
 
 async function readJson(filePath) {
@@ -865,7 +853,7 @@ async function buildDataset(options) {
 
       if (options.includeLogs && runEntry.links?.log) {
         const logPath = path.resolve(repoRoot, runEntry.links.log);
-        if (await fileExists(logPath)) {
+        if (await pathExists(logPath, { allowMissingOnly: true })) {
           runEntry.logs = {
             runner: await readLogTail(logPath, { maxBytes: options.logBytes, maxLines: options.logLines })
           };
@@ -896,8 +884,8 @@ async function decorateRunLinks(taskKey, links = {}) {
   return {
     manifest: links?.manifest ?? null,
     log: links?.log ?? null,
-    metrics: (await fileExists(metricsPath)) ? path.relative(repoRoot, metricsPath) : null,
-    state: (await fileExists(statePath)) ? path.relative(repoRoot, statePath) : null
+    metrics: (await pathExists(metricsPath)) ? path.relative(repoRoot, metricsPath) : null,
+    state: (await pathExists(statePath)) ? path.relative(repoRoot, statePath) : null
   };
 }
 
