@@ -9,8 +9,8 @@ The Snakes Arena checklist has been retired from this workspace; reference the a
 <!-- tasks-archive-index:begin -->
 ## Archive index
 Archived task snapshots live on the task-archives branch.
-- 2025: https://github.com/Kbediako/CO/blob/task-archives/docs/TASKS-archive-2025.md
-- 2026: https://github.com/Kbediako/CO/blob/task-archives/docs/TASKS-archive-2026.md
+- 2025: [task-archives/docs/TASKS-archive-2025.md](https://github.com/Kbediako/CO/blob/task-archives/docs/TASKS-archive-2025.md)
+- 2026: [task-archives/docs/TASKS-archive-2026.md](https://github.com/Kbediako/CO/blob/task-archives/docs/TASKS-archive-2026.md)
 <!-- tasks-archive-index:end -->
 # Task List Snapshot — Review Comment Capture Guardrail (0930)
 
@@ -106,6 +106,7 @@ Mirror status with `tasks/tasks-0101-slimdown-audit.md` and `.agent/task/0101-sl
 - Update - Validation: shim revert validation + checklist sync; docs-review manifest at `.runs/0101-slimdown-audit/cli/2026-01-03T06-47-13-568Z-f47b1970/manifest.json`; subagent diagnostics at `.runs/0101-slimdown-audit-hunt21/cli/2026-01-03T06-47-48-713Z-d7b1ad8c/manifest.json`.
 - Update - Implementation: shim revert + checklist sync validated; implementation-gate manifest at `.runs/0101-slimdown-audit/cli/2026-01-03T06-52-44-894Z-47e39b73/manifest.json`.
 - Update - Maintenance: tasks archive + Phase 19/20 header renumber; docs-review manifest at `.runs/0101-slimdown-audit/cli/2026-01-03T07-11-40-945Z-7f3ab0bf/manifest.json`.
+- Update - Maintenance: archive index links normalized; docs-review manifest at `.runs/0101-slimdown-audit/cli/2026-01-03T07-17-56-725Z-a701a5aa/manifest.json`.
 
 # Task List Snapshot — Codex Orchestrator NPM Companion Package (0914)
 
