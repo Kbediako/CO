@@ -5,7 +5,8 @@ import { tmpdir } from 'node:os';
 
 import { CodexOrchestrator } from '../src/cli/orchestrator.js';
 import * as CommandRunner from '../src/cli/services/commandRunner.js';
-import { resolveEnvironment } from '../src/cli/run/environment.js';
+import { resolveEnvironmentPaths } from '../../scripts/lib/run-manifests.js';
+import { normalizeEnvironmentPaths } from '../src/cli/run/environment.js';
 import { bootstrapManifest, updateCommandStatus } from '../src/cli/run/manifest.js';
 import type { PipelineDefinition } from '../src/cli/types.js';
 import { isoTimestamp } from '../src/cli/utils/time.js';
@@ -38,7 +39,7 @@ afterEach(async () => {
 
 describe('CodexOrchestrator subpipeline failures', () => {
   it('finalizes parent stage and manifest when subpipeline throws', async () => {
-    const env = resolveEnvironment();
+    const env = normalizeEnvironmentPaths(resolveEnvironmentPaths());
     const pipeline: PipelineDefinition = {
       id: 'parent',
       title: 'Parent Pipeline',
@@ -82,7 +83,7 @@ describe('CodexOrchestrator subpipeline failures', () => {
   });
 
   it('finalizes command stage and manifest when command stage throws', async () => {
-    const env = resolveEnvironment();
+    const env = normalizeEnvironmentPaths(resolveEnvironmentPaths());
     const pipeline: PipelineDefinition = {
       id: 'command-parent',
       title: 'Command Parent',

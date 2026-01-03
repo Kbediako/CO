@@ -4,7 +4,8 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import process from 'node:process';
 
-import { resolveEnvironment } from '../src/cli/run/environment.js';
+import { resolveEnvironmentPaths } from '../../scripts/lib/run-manifests.js';
+import { normalizeEnvironmentPaths } from '../src/cli/run/environment.js';
 import { bootstrapManifest } from '../src/cli/run/manifest.js';
 import { ManifestPersister } from '../src/cli/run/manifestPersister.js';
 import type { PipelineDefinition } from '../src/cli/types.js';
@@ -36,7 +37,7 @@ afterEach(async () => {
 
 describe('ManifestPersister', () => {
   it('serializes manifest writes', async () => {
-    const env = resolveEnvironment();
+    const env = normalizeEnvironmentPaths(resolveEnvironmentPaths());
     const pipeline: PipelineDefinition = {
       id: 'persister',
       title: 'Persister Pipeline',
@@ -91,7 +92,7 @@ describe('ManifestPersister', () => {
   });
 
   it('coalesces pending manifest writes', async () => {
-    const env = resolveEnvironment();
+    const env = normalizeEnvironmentPaths(resolveEnvironmentPaths());
     const pipeline: PipelineDefinition = {
       id: 'persister-coalesce',
       title: 'Persister Coalesce Pipeline',

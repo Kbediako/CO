@@ -118,7 +118,8 @@ vi.mock('../src/cli/services/execRuntime.js', () => {
 
 import { RunEventEmitter, RunEventPublisher, type RunEvent } from '../src/cli/events/runEvents.js';
 import { runCommandStage } from '../src/cli/services/commandRunner.js';
-import { resolveEnvironment } from '../src/cli/run/environment.js';
+import { resolveEnvironmentPaths } from '../../scripts/lib/run-manifests.js';
+import { normalizeEnvironmentPaths } from '../src/cli/run/environment.js';
 import { bootstrapManifest } from '../src/cli/run/manifest.js';
 import type { CommandStage, PipelineDefinition } from '../src/cli/types.js';
 
@@ -149,7 +150,7 @@ afterEach(async () => {
 
 describe('RunEvents publisher', () => {
   it('emits stage lifecycle and log events from command stages after manifest writes', async () => {
-    const env = resolveEnvironment();
+    const env = normalizeEnvironmentPaths(resolveEnvironmentPaths());
     const pipeline: PipelineDefinition = {
       id: 'pipeline-run-events',
       title: 'Run Events',
@@ -214,7 +215,7 @@ describe('RunEvents publisher', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2025-01-01T00:00:00Z'));
     try {
-      const env = resolveEnvironment();
+      const env = normalizeEnvironmentPaths(resolveEnvironmentPaths());
       const pipeline: PipelineDefinition = {
         id: 'pipeline-run-events',
         title: 'Run Events',

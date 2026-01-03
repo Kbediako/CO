@@ -13,7 +13,8 @@ import {
   CommandTester,
   CommandReviewer
 } from './adapters/index.js';
-import { resolveEnvironment } from './run/environment.js';
+import { resolveEnvironmentPaths } from '../../../scripts/lib/run-manifests.js';
+import { normalizeEnvironmentPaths } from './run/environment.js';
 import type { EnvironmentPaths } from './run/environment.js';
 import {
   bootstrapManifest,
@@ -63,6 +64,8 @@ import { loadUserConfig } from './config/userConfig.js';
 import { RunEventPublisher, snapshotStages, type RunEventEmitter } from './events/runEvents.js';
 import { CLI_EXECUTION_MODE_PARSER, resolveRequiresCloudPolicy } from '../utils/executionMode.js';
 
+const resolveBaseEnvironment = (): EnvironmentPaths =>
+  normalizeEnvironmentPaths(resolveEnvironmentPaths());
 
 interface ExecutePipelineOptions {
   env: EnvironmentPaths;
@@ -91,7 +94,7 @@ export class CodexOrchestrator {
   private readonly controlPlane = new ControlPlaneService();
   private readonly scheduler = new SchedulerService();
 
-  constructor(private readonly baseEnv: EnvironmentPaths = resolveEnvironment()) {}
+  constructor(private readonly baseEnv: EnvironmentPaths = resolveBaseEnvironment()) {}
 
   async start(options: StartOptions = {}): Promise<PipelineExecutionResult> {
     const preparation = await prepareRun({
