@@ -1,8 +1,8 @@
 # Action Plan - Slimdown Audit (Task 0101-slimdown-audit)
 
 ## Status Snapshot
-- Current Phase: Phase 2 (helper consolidation underway)
-- Run Manifest Link: docs-review `.runs/0101-slimdown-audit/cli/2026-01-03T16-53-16-126Z-c2694b63/manifest.json`; implementation-gate `.runs/0101-slimdown-audit/cli/2026-01-03T16-07-07-173Z-61412973/manifest.json`; subagent diagnostics `.runs/0101-slimdown-audit-phase2scan/cli/2026-01-03T16-05-01-798Z-570d564c/manifest.json`.
+- Current Phase: Phase 2 (helper consolidation, env resolver cleanup)
+- Run Manifest Link: docs-review `.runs/0101-slimdown-audit/cli/2026-01-03T17-58-18-128Z-e4ee9d1f/manifest.json`; implementation-gate `.runs/0101-slimdown-audit/cli/2026-01-03T17-59-01-839Z-0bed253b/manifest.json`; subagent diagnostics `.runs/0101-slimdown-audit-phase3scan/cli/2026-01-03T17-56-17-000Z-8a2830d3/manifest.json`.
 - Approvals / Escalations: record in `tasks/index.json`
 
 ## Evidence Notes
