@@ -638,6 +638,22 @@
       },
       "created_at": "2026-01-03",
       "completed_at": "2026-01-03"
+    },
+    {
+      "id": "0930",
+      "slug": "review-comment-capture",
+      "title": "Review Comment Capture Guardrail",
+      "path": "tasks/tasks-0930-review-comment-capture.md",
+      "kind": "run",
+      "status": "succeeded",
+      "gate": {
+        "phase": "review-comment-capture-implementation",
+        "status": "succeeded",
+        "log": ".runs/0930-review-comment-capture/cli/2026-01-03T03-13-23-200Z-b94f3622/manifest.json",
+        "run_id": "2026-01-03T03-13-23-200Z-b94f3622"
+      },
+      "created_at": "2026-01-03",
+      "completed_at": "2026-01-03"
     }
   ],
   "specs": []
