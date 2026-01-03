@@ -5,8 +5,7 @@ import process from 'node:process';
 const DEFAULT_TASK_ID = '0101';
 
 function resolveRepoRoot() {
-  const configured =
-    process.env.CODEX_ORCHESTRATOR_ROOT || process.env.CODEX_ORCHESTRATOR_REPO_ROOT;
+  const configured = process.env.CODEX_ORCHESTRATOR_ROOT;
   if (!configured) {
     return process.cwd();
   }

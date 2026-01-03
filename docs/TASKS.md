@@ -28,6 +28,7 @@ Mirror status with `tasks/tasks-0931-oracle-devtools-standardization.md` and `.a
 - [x] Implementation-gate manifest captured - Evidence: `.runs/0931-oracle-devtools-standardization/cli/2026-01-03T08-14-41-487Z-df2a6972/manifest.json`.
 
 # Task List Snapshot — Slimdown Audit (0101)
+- Update - Implementation: remove legacy `CODEX_ORCHESTRATOR_REPO_ROOT` fallback in run-manifests resolver; docs-review manifest at `.runs/0101-slimdown-audit/cli/2026-01-03T17-58-18-128Z-e4ee9d1f/manifest.json`; implementation-gate manifest at `.runs/0101-slimdown-audit/cli/2026-01-03T17-59-01-839Z-0bed253b/manifest.json`; subagent diagnostics at `.runs/0101-slimdown-audit-phase3scan/cli/2026-01-03T17-56-17-000Z-8a2830d3/manifest.json`.
 - Update - Maintenance: docs/TASKS archive to clear docs:check line limit; docs-review manifest at `.runs/0101-slimdown-audit/cli/2026-01-03T16-53-16-126Z-c2694b63/manifest.json`.
 - Update - Implementation: Phase 2 helper consolidation (date parsing) executed; docs-review manifest at `.runs/0101-slimdown-audit/cli/2026-01-03T16-06-21-829Z-3a4283cd/manifest.json`; implementation-gate manifest at `.runs/0101-slimdown-audit/cli/2026-01-03T16-07-07-173Z-61412973/manifest.json`; subagent diagnostics at `.runs/0101-slimdown-audit-phase2scan/cli/2026-01-03T16-05-01-798Z-570d564c/manifest.json`.
 - Update - Planning: PRD/tech spec/findings/checklist drafted; docs-review manifest captured at `.runs/0101-slimdown-audit/cli/2026-01-01T06-52-39-251Z-006dbf53/manifest.json`.
