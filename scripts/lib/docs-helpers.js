@@ -99,14 +99,11 @@ export function parseDateString(value) {
 }
 
 export function parseIsoDate(raw) {
-  if (typeof raw !== 'string') {
+  const normalized = parseDateString(raw);
+  if (!normalized) {
     return null;
   }
-  const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if (!match) {
-    return null;
-  }
-  const [, yearStr, monthStr, dayStr] = match;
+  const [yearStr, monthStr, dayStr] = normalized.split('-');
   const year = Number(yearStr);
   const month = Number(monthStr) - 1;
   const day = Number(dayStr);

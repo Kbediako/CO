@@ -42,6 +42,7 @@ Mirror status with `tasks/tasks-0931-oracle-devtools-standardization.md` and `.a
 - [x] Implementation-gate manifest captured - Evidence: `.runs/0931-oracle-devtools-standardization/cli/2026-01-03T08-14-41-487Z-df2a6972/manifest.json`.
 
 # Task List Snapshot — Slimdown Audit (0101)
+- Update - Implementation: Phase 2 helper consolidation (date parsing) executed; docs-review manifest at `.runs/0101-slimdown-audit/cli/2026-01-03T16-06-21-829Z-3a4283cd/manifest.json`; implementation-gate manifest at `.runs/0101-slimdown-audit/cli/2026-01-03T16-07-07-173Z-61412973/manifest.json`; subagent diagnostics at `.runs/0101-slimdown-audit-phase2scan/cli/2026-01-03T16-05-01-798Z-570d564c/manifest.json`.
 - Update - Planning: PRD/tech spec/findings/checklist drafted; docs-review manifest captured at `.runs/0101-slimdown-audit/cli/2026-01-01T06-52-39-251Z-006dbf53/manifest.json`.
 - Update - Planning: Action plan captured; docs-review manifest at `.runs/0101-slimdown-audit/cli/2026-01-03T14-36-37-744Z-18a8bb03/manifest.json`; implementation-gate manifest at `.runs/0101-slimdown-audit/cli/2026-01-03T14-37-13-914Z-98c9b1f0/manifest.json`.
 - Update - Planning: Phase 5 consolidation targets (docs tooling, pack helpers, wrapper cleanup) and Phase 6 consolidation targets (CLI args, mirror overlap, pipelines/adapters) captured; subagent diagnostics at `.runs/0101-slimdown-audit-pass3/cli/2026-01-01T13-19-30-562Z-fb8559df/manifest.json`, `.runs/0101-slimdown-audit-phase6/cli/2026-01-01T13-58-29-786Z-01202b8e/manifest.json`.
