@@ -142,10 +142,10 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
 ### 30) Optional deps wrapper cleanup
 - The optional-deps wrapper only re-exported helpers with types; import `scripts/design/pipeline/optional-deps.js` directly and drop the wrapper to reduce script surface area.
 
-### 31) Persistence + JSONL shim cleanup
+### 19) Persistence + JSONL shim cleanup
 - Inline `WINDOWS_FORBIDDEN_CHARACTERS` into `orchestrator/src/persistence/sanitizeIdentifier.ts` and drop the persistence `writeAtomicFile` + JSONL writer shims (import `writeAtomicFile` from `orchestrator/src/utils/atomicWrite.ts` in `ExperienceStore`/`TaskStateStore`).
 
-### 32) Control-plane + scheduler shim cleanup
+### 20) Control-plane + scheduler shim cleanup
 - Remove the control-plane and scheduler index re-exports; import concrete modules directly in services and tests.
 
 ## Expected Line Reductions by Phase (Estimate)

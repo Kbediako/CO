@@ -9,8 +9,8 @@ The Snakes Arena checklist has been retired from this workspace; reference the a
 <!-- tasks-archive-index:begin -->
 ## Archive index
 Archived task snapshots live on the task-archives branch.
-- 2025: <https://github.com/Kbediako/CO/blob/task-archives/docs/TASKS-archive-2025.md>
-- 2026: <https://github.com/Kbediako/CO/blob/task-archives/docs/TASKS-archive-2026.md>
+- 2025: https://github.com/Kbediako/CO/blob/task-archives/docs/TASKS-archive-2025.md
+- 2026: https://github.com/Kbediako/CO/blob/task-archives/docs/TASKS-archive-2026.md
 <!-- tasks-archive-index:end -->
 # Task List Snapshot — Review Comment Capture Guardrail (0930)
 
@@ -103,8 +103,9 @@ Mirror status with `tasks/tasks-0101-slimdown-audit.md` and `.agent/task/0101-sl
 - Update - Fix: guardrail summary detection normalized + optional-deps wrapper removed; docs-review manifest at `.runs/0101-slimdown-audit/cli/2026-01-03T04-13-58-327Z-45a18714/manifest.json`; implementation-gate manifest at `.runs/0101-slimdown-audit/cli/2026-01-03T04-14-39-520Z-2b87960a/manifest.json`; subagent diagnostics at `.runs/0101-slimdown-audit-hunt11/cli/2026-01-03T04-02-04-863Z-95fa88e1/manifest.json`.
 - Update - Implementation: Phase 19 shim cleanup (jsonlWriter + persistence writeAtomicFile + identifier guard inline); docs-review manifest at `.runs/0101-slimdown-audit/cli/2026-01-03T05-03-38-728Z-9004e3c2/manifest.json`; implementation-gate manifest at `.runs/0101-slimdown-audit/cli/2026-01-03T05-44-22-728Z-b10e19d2/manifest.json`; subagent diagnostics at `.runs/0101-slimdown-audit-hunt19/cli/2026-01-03T05-04-12-933Z-8d2ce2c1/manifest.json`.
 - Update - Implementation: Phase 20 guardrail detection normalization + control-plane/scheduler shim cleanup; docs-review manifest at `.runs/0101-slimdown-audit/cli/2026-01-03T06-02-59-806Z-350c4e02/manifest.json`; implementation-gate manifest at `.runs/0101-slimdown-audit/cli/2026-01-03T06-13-29-437Z-8bebc30a/manifest.json`; subagent diagnostics at `.runs/0101-slimdown-audit-hunt20/cli/2026-01-03T06-05-24-408Z-82a12564/manifest.json`.
-- Update - Validation: docs-review rerun after shim revert + checklist sync; manifest at `.runs/0101-slimdown-audit/cli/2026-01-03T06-47-13-568Z-f47b1970/manifest.json`; subagent diagnostics at `.runs/0101-slimdown-audit-hunt21/cli/2026-01-03T06-47-48-713Z-d7b1ad8c/manifest.json`.
+- Update - Validation: shim revert validation + checklist sync; docs-review manifest at `.runs/0101-slimdown-audit/cli/2026-01-03T06-47-13-568Z-f47b1970/manifest.json`; subagent diagnostics at `.runs/0101-slimdown-audit-hunt21/cli/2026-01-03T06-47-48-713Z-d7b1ad8c/manifest.json`.
 - Update - Implementation: shim revert + checklist sync validated; implementation-gate manifest at `.runs/0101-slimdown-audit/cli/2026-01-03T06-52-44-894Z-47e39b73/manifest.json`.
+- Update - Maintenance: tasks archive + Phase 19/20 header renumber; docs-review manifest at `.runs/0101-slimdown-audit/cli/2026-01-03T07-11-40-945Z-7f3ab0bf/manifest.json`.
 
 # Task List Snapshot — Codex Orchestrator NPM Companion Package (0914)
 
@@ -423,28 +424,3 @@ Mirror status with `tasks/tasks-0506-tfgrpo.md` and `.agent/task/0506-tfgrpo-int
 - [x] Diagnostics / tfgrpo-learning pipeline run recorded under `.runs/0506-tfgrpo-integration/cli/2025-11-21T05-56-32-837Z-430b2d9d/manifest.json` (spec-guard passed).
 - [x] Guardrails: `node scripts/spec-guard.mjs --dry-run`, `npm run lint`, `npm run test`, `npm run eval:test` (when fixtures exist). Evidence: `.runs/0506-tfgrpo-integration/cli/2025-11-21T07-09-08-052Z-ac3a1d09/manifest.json`.
 - [ ] Reviewer hand-off via `npm run review` referencing the latest TF-GRPO manifest.
-
-# Task List Snapshot — Repo Refactor Simplification (0928)
-- Update - Implementation: pipeline resolution simplification + portable dist commands shipped; implementation-gate manifest at `.runs/0928-repo-refactor-simplification/cli/2025-12-31T13-53-53-066Z-26a878bb/manifest.json`.
-- Notes: Export `MCP_RUNNER_TASK_ID=0928-repo-refactor-simplification` before orchestrator commands.
-
-## Checklist Mirror
-Mirror status with `tasks/tasks-0928-repo-refactor-simplification.md` and `.agent/task/0928-repo-refactor-simplification.md`. Keep `[ ]` until evidence is recorded.
-
-### Foundation
-- [x] PRD drafted and mirrored in `docs/` - Evidence: `tasks/0928-prd-repo-refactor-simplification.md`, `docs/PRD-repo-refactor-simplification.md`.
-- [x] Tech spec drafted - Evidence: `docs/TECH_SPEC-repo-refactor-simplification.md`.
-- [x] Action plan drafted - Evidence: `docs/ACTION_PLAN-repo-refactor-simplification.md`.
-- [x] Mini-spec stub created - Evidence: `tasks/specs/0928-repo-refactor-simplification.md`.
-- [x] Docs-review manifest captured (pre-change) - Evidence: `.runs/0928-repo-refactor-simplification/cli/2025-12-31T13-37-33-341Z-84ae525a/manifest.json`.
-- [x] Mirrors updated in `docs/TASKS.md` and `.agent/task/0928-repo-refactor-simplification.md` - Evidence: `docs/TASKS.md`, `.agent/task/0928-repo-refactor-simplification.md`.
-- [x] Review agent run captured (subagent) - Evidence: `.runs/0928-repo-refactor-simplification-review/cli/2025-12-31T13-36-57-134Z-e6f7152a/manifest.json`.
-
-### Refactor implementation
-- [x] `codex.orchestrator.json` updated for portable dist commands + optional spec-guard.
-- [x] User config loader fallback added with source labeling.
-- [x] Pipeline resolution simplified; redundant built-in pipeline TS files removed.
-- [x] Package files list updated to include `codex.orchestrator.json`.
-
-### Validation + handoff
-- [x] Implementation review manifest captured (post-implementation) - Evidence: `.runs/0928-repo-refactor-simplification/cli/2025-12-31T13-53-53-066Z-26a878bb/manifest.json`.
