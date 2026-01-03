@@ -41,7 +41,7 @@
 - Align docs archive/freshness/run-review/mirror outputs with shared repo/run/out resolvers to honor configured env roots.
 - Reuse the shared path existence helper across status UI, mirror, review, and design scripts.
 - Collapse CLI environment resolution onto shared run-manifests helpers and keep only a single task-id normalization path.
-- Treat spec-guard runner invocations as guardrail evidence so manifests do not emit false missing-guardrail summaries.
+- Treat spec-guard runner invocations as guardrail evidence, so manifests do not emit false missing-guardrail summaries.
 - Remove the design optional-deps wrapper and import `optional-deps.js` directly.
 
 ## Non-goals
