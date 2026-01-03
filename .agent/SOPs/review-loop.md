@@ -12,9 +12,10 @@ Use this playbook whenever handing off a review (`npm run review` or an implemen
    - Small: ≤50 LOC net, ≤3 files, no pipeline/guardrail changes → 10 min.
    - Medium: 51–200 LOC or 4–10 files, touches scripts/docs/pipelines → 15–20 min.
    - Large: >200 LOC, >10 files, touches CI/guardrails/release paths or adds deps → 25–30 min.
-5. For Codex connector review comments, respond in-thread (not a top-level PR comment), react with 👍 once addressed, and resolve the review thread.
-6. If the reviewer finds issues, fix them, update `NOTES` with follow-up questions (when needed), and rerun the same gate.
-7. Repeat until the reviewer reports no findings.
+5. Check inline review comments/threads (not just review summaries). Use `gh pr view <number> --comments` or `gh api repos/<owner>/<repo>/pulls/<number>/comments` and ensure no unresolved items remain.
+6. For Codex connector review comments, respond in-thread (not a top-level PR comment), react with 👍 once addressed, and resolve the review thread.
+7. If the reviewer finds issues, fix them, update `NOTES` with follow-up questions (when needed), and rerun the same gate.
+8. Repeat until the reviewer reports no findings.
 
 ## Notes
 - Keep reviewer questions concise and specific to unblock decisions.

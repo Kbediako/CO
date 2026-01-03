@@ -12,6 +12,20 @@ Archived task snapshots live on the task-archives branch.
 - 2025: <https://github.com/Kbediako/CO/blob/task-archives/docs/TASKS-archive-2025.md>
 - 2026: <https://github.com/Kbediako/CO/blob/task-archives/docs/TASKS-archive-2026.md>
 <!-- tasks-archive-index:end -->
+# Task List Snapshot — Review Comment Capture Guardrail (0930)
+
+- Update - SOP: review-loop requires checking inline review comments via `gh pr view <number> --comments` or `gh api repos/<owner>/<repo>/pulls/<number>/comments`; docs-review manifest at `.runs/0930-review-comment-capture/cli/2026-01-03T03-12-48-606Z-0de27c83/manifest.json`; implementation-gate manifest at `.runs/0930-review-comment-capture/cli/2026-01-03T03-13-23-200Z-b94f3622/manifest.json`; diagnostics manifest at `.runs/0930-review-comment-capture/cli/2026-01-03T03-04-30-100Z-4e07affd/manifest.json`; subagent diagnostics at `.runs/0930-review-comment-capture-scout/cli/2026-01-03T03-03-09-095Z-37636c9b/manifest.json`.
+- Notes: Export `MCP_RUNNER_TASK_ID=0930-review-comment-capture` before orchestrator commands.
+
+## Checklist Mirror
+Mirror status with `tasks/tasks-0930-review-comment-capture.md` and `.agent/task/0930-review-comment-capture.md`. Keep `[ ]` until evidence is recorded.
+- [x] Diagnostics manifest captured - Evidence: `.runs/0930-review-comment-capture/cli/2026-01-03T03-04-30-100Z-4e07affd/manifest.json`.
+- [x] Docs-review manifest captured - Evidence: `.runs/0930-review-comment-capture/cli/2026-01-03T03-12-48-606Z-0de27c83/manifest.json`.
+- [x] Subagent diagnostics captured - Evidence: `.runs/0930-review-comment-capture-scout/cli/2026-01-03T03-03-09-095Z-37636c9b/manifest.json`.
+- [x] Implementation-gate manifest captured - Evidence: `.runs/0930-review-comment-capture/cli/2026-01-03T03-13-23-200Z-b94f3622/manifest.json`.
+- [x] Review-loop SOP updated to require inline review comment checks - Evidence: `.agent/SOPs/review-loop.md`.
+- [x] Task 0928 checklist mirror expanded - Evidence: `docs/TASKS.md`.
+
 # Task List Snapshot — Slimdown Audit (0101)
 - Update - Planning: PRD/tech spec/findings/checklist drafted; docs-review manifest captured at `.runs/0101-slimdown-audit/cli/2026-01-01T06-52-39-251Z-006dbf53/manifest.json`.
 - Update - Planning: Phase 5 consolidation targets (docs tooling, pack helpers, wrapper cleanup) and Phase 6 consolidation targets (CLI args, mirror overlap, pipelines/adapters) captured; subagent diagnostics at `.runs/0101-slimdown-audit-pass3/cli/2026-01-01T13-19-30-562Z-fb8559df/manifest.json`, `.runs/0101-slimdown-audit-phase6/cli/2026-01-01T13-58-29-786Z-01202b8e/manifest.json`.
@@ -147,43 +161,6 @@ Mirror status with `tasks/tasks-0914-npm-companion-package.md` and `.agent/task/
 - [x] Diff budget override recorded (`DIFF_BUDGET_OVERRIDE_REASON`) - Evidence: `.runs/0914-npm-companion-package/cli/2025-12-28T17-26-47-817Z-8acb43f6/commands/06-diff-budget.ndjson`.
 - Note: CI diff budget override requires label `diff-budget-override` and PR body line `Diff budget override: ...`.
 - [x] `npm run review` captured with NOTES - Evidence: `.runs/0914-npm-companion-package/cli/2025-12-28T17-26-47-817Z-8acb43f6/manifest.json`.
-
-# Task List Snapshot - Orchestrator Status UI (0911)
-
-- Update - Manual refresh control removed to keep auto-refresh only; DevTools QA + implementation gate captured at `.runs/0911-orchestrator-status-ui/cli/2025-12-30T14-32-15-222Z-b52429cb/manifest.json` and `.runs/0911-orchestrator-status-ui/cli/2025-12-30T14-39-43-441Z-442a873c/manifest.json`.
-- Update - Last update timestamp holds steady during sync with subtle pulse indicator; DevTools QA + implementation gate captured at `.runs/0911-orchestrator-status-ui/cli/2025-12-30T13-49-22-466Z-afdb5885/manifest.json` and `.runs/0911-orchestrator-status-ui/cli/2025-12-30T14-00-38-767Z-1c6c5ba5/manifest.json`.
-- Update - Sync control moved into a floating button beside Signals; DevTools QA + implementation gate captured at `.runs/0911-orchestrator-status-ui/cli/2025-12-30T13-07-12-110Z-ddd75a07/manifest.json` and `.runs/0911-orchestrator-status-ui/cli/2025-12-30T13-13-14-168Z-2dfae172/manifest.json`.
-- Update - Sync control reduced to icon-only refresh and dropdown arrows spaced; DevTools QA + implementation gate captured at `.runs/0911-orchestrator-status-ui/cli/2025-12-30T12-28-53-481Z-98d67187/manifest.json` and `.runs/0911-orchestrator-status-ui/cli/2025-12-30T12-42-17-014Z-af029f6d/manifest.json`.
-- Update - Signals icon-only toggle + approvals totals from design runs; docs-review/DevTools QA/implementation gate captured at `.runs/0911-orchestrator-status-ui/cli/2025-12-30T11-16-49-336Z-44f558c7/manifest.json`, `.runs/0911-orchestrator-status-ui/cli/2025-12-30T11-39-05-349Z-c07276ff/manifest.json`, `.runs/0911-orchestrator-status-ui/cli/2025-12-30T11-44-42-624Z-afae2840/manifest.json`.
-- Update - Restore focus handoff to avoid aria-hidden warning on run modal/Signals panel close; DevTools QA + implementation gate captured at `.runs/0911-orchestrator-status-ui/cli/2025-12-30T09-15-57-261Z-d7387939/manifest.json` and `.runs/0911-orchestrator-status-ui/cli/2025-12-30T09-23-34-986Z-8e6693c4/manifest.json`.
-- Update - Run detail modal visibility + centering fix; docs-review/DevTools QA/implementation gate captured at `.runs/0911-orchestrator-status-ui/cli/2025-12-30T08-23-06-106Z-3bd5e70b/manifest.json`, `.runs/0911-orchestrator-status-ui/cli/2025-12-30T08-23-29-563Z-64ed4a9e/manifest.json`, `.runs/0911-orchestrator-status-ui/cli/2025-12-30T08-31-56-263Z-44640215/manifest.json`.
-- Update - Run-detail modal + footer status + signals positioning shipped; DevTools QA + implementation gate captured at `.runs/0911-orchestrator-status-ui/cli/2025-12-30T03-44-47-302Z-d69ee8eb/manifest.json` and `.runs/0911-orchestrator-status-ui/cli/2025-12-30T03-53-09-870Z-043c91fa/manifest.json`.
-- Update - Implementation complete: aggregation + dashboard shipped; DevTools QA + guardrails captured at `.runs/0911-orchestrator-status-ui/cli/2025-12-29T23-57-33-834Z-548d594f/manifest.json`, `.runs/0911-orchestrator-status-ui/cli/2025-12-30T01-23-39-016Z-e0c9d909/manifest.json`, `.runs/0911-orchestrator-status-ui/cli/2025-12-30T00-27-43-100Z-9c2b8a6d/manifest.json`, and `.runs/0911-orchestrator-status-ui/cli/2025-12-30T01-33-59-187Z-5f123a71/manifest.json`.
-- Notes: Export `MCP_RUNNER_TASK_ID=0911-orchestrator-status-ui` before orchestrator commands. Implementation gate runs `node scripts/spec-guard.mjs --dry-run`, `npm run build`, `npm run lint`, `npm run test`, `npm run docs:check`, `node scripts/diff-budget.mjs`, and `npm run review`.
-
-## Checklist Mirror
-Mirror status with `tasks/tasks-0911-orchestrator-status-ui.md` and `.agent/task/0911-orchestrator-status-ui.md`. Keep `[ ]` until evidence is recorded.
-
-### Planning and approvals
-- [x] Mini-spec approved — Evidence: `tasks/specs/0911-orchestrator-status-ui.md`.
-- [x] PRD approval recorded in `tasks/index.json` gate metadata — Evidence: `.runs/0911-orchestrator-status-ui/cli/2025-12-23T07-59-47-613Z-344689f5/manifest.json`.
-
-### Status model and data sources
-- [x] Task bucket rules documented (active, ongoing, complete, pending).
-- [x] Codebase status signals and log sources documented.
-
-### UX layout and dark theme direction
-- [x] Layout and dark theme guidance documented.
-
-### Implementation prep
-- [x] Aggregation schema and caching strategy documented.
-
-### Implementation (complete)
-- [x] Aggregation script built — Evidence: `.runs/0911-orchestrator-status-ui/cli/2025-12-24T05-07-59-073Z-e6a472e8/manifest.json`.
-- [x] Static UI and styles built — Evidence: `.runs/0911-orchestrator-status-ui/cli/2025-12-24T05-07-59-073Z-e6a472e8/manifest.json`.
-
-### Post-launch polish
-- [x] UI refresh, status palette tuning, favicon, and keyboard selection — Evidence: `.runs/0911-orchestrator-status-ui/cli/2025-12-29T23-57-33-834Z-548d594f/manifest.json`, `.runs/0911-orchestrator-status-ui/cli/2025-12-30T01-23-39-016Z-e0c9d909/manifest.json`, `.runs/0911-orchestrator-status-ui/cli/2025-12-30T00-27-43-100Z-9c2b8a6d/manifest.json`, `.runs/0911-orchestrator-status-ui/cli/2025-12-30T01-33-59-187Z-5f123a71/manifest.json`.
 
 # Task List Snapshot — Dead Code Pruning & Evidence (0801)
 
@@ -441,9 +418,27 @@ Mirror status with `tasks/tasks-0506-tfgrpo.md` and `.agent/task/0506-tfgrpo-int
 - [x] Guardrails: `node scripts/spec-guard.mjs --dry-run`, `npm run lint`, `npm run test`, `npm run eval:test` (when fixtures exist). Evidence: `.runs/0506-tfgrpo-integration/cli/2025-11-21T07-09-08-052Z-ac3a1d09/manifest.json`.
 - [ ] Reviewer hand-off via `npm run review` referencing the latest TF-GRPO manifest.
 
-# Task List Snapshot - Repo Refactor Simplification (0928)
+# Task List Snapshot — Repo Refactor Simplification (0928)
 - Update - Implementation: pipeline resolution simplification + portable dist commands shipped; implementation-gate manifest at `.runs/0928-repo-refactor-simplification/cli/2025-12-31T13-53-53-066Z-26a878bb/manifest.json`.
 - Notes: Export `MCP_RUNNER_TASK_ID=0928-repo-refactor-simplification` before orchestrator commands.
 
 ## Checklist Mirror
 Mirror status with `tasks/tasks-0928-repo-refactor-simplification.md` and `.agent/task/0928-repo-refactor-simplification.md`. Keep `[ ]` until evidence is recorded.
+
+### Foundation
+- [x] PRD drafted and mirrored in `docs/` - Evidence: `tasks/0928-prd-repo-refactor-simplification.md`, `docs/PRD-repo-refactor-simplification.md`.
+- [x] Tech spec drafted - Evidence: `docs/TECH_SPEC-repo-refactor-simplification.md`.
+- [x] Action plan drafted - Evidence: `docs/ACTION_PLAN-repo-refactor-simplification.md`.
+- [x] Mini-spec stub created - Evidence: `tasks/specs/0928-repo-refactor-simplification.md`.
+- [x] Docs-review manifest captured (pre-change) - Evidence: `.runs/0928-repo-refactor-simplification/cli/2025-12-31T13-37-33-341Z-84ae525a/manifest.json`.
+- [x] Mirrors updated in `docs/TASKS.md` and `.agent/task/0928-repo-refactor-simplification.md` - Evidence: `docs/TASKS.md`, `.agent/task/0928-repo-refactor-simplification.md`.
+- [x] Review agent run captured (subagent) - Evidence: `.runs/0928-repo-refactor-simplification-review/cli/2025-12-31T13-36-57-134Z-e6f7152a/manifest.json`.
+
+### Refactor implementation
+- [x] `codex.orchestrator.json` updated for portable dist commands + optional spec-guard.
+- [x] User config loader fallback added with source labeling.
+- [x] Pipeline resolution simplified; redundant built-in pipeline TS files removed.
+- [x] Package files list updated to include `codex.orchestrator.json`.
+
+### Validation + handoff
+- [x] Implementation review manifest captured (post-implementation) - Evidence: `.runs/0928-repo-refactor-simplification/cli/2025-12-31T13-53-53-066Z-26a878bb/manifest.json`.
