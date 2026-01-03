@@ -66,7 +66,7 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
 - Centralize `.runs` manifest discovery used by `scripts/run-review.ts`, `scripts/status-ui-build.mjs`, and `scripts/delegation-guard.mjs`.
 
 ### 12) Mirror + design tooling overlap
-- Share optional dependency loading between `scripts/design/pipeline/optionalDeps.ts` and `scripts/mirror-optional-deps.mjs`.
+- Share optional dependency loading between `scripts/design/pipeline/optional-deps.js` and `scripts/mirror-optional-deps.mjs`.
 - Consolidate compliance permit parsing between `scripts/design/pipeline/toolkit/common.ts` and `scripts/mirror-site.mjs`.
 - Share mirror config parsing/validation between `scripts/mirror-site.mjs` and `scripts/mirror-check.mjs`; reuse CLI arg parsing for mirror-serve/fingerprint.
 - Ensure shared JS helpers (permit + optional-deps) are shipped in `dist/` for design pipeline stages.
@@ -136,6 +136,12 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
 - Resolve CLI environment paths directly via `scripts/lib/run-manifests.js` and keep `environment.ts` as a type + task-id normalization helper only.
 - Phase 17 executes this target (environment resolver unification).
 
+### 29) Guardrail detection normalization
+- Guardrail summaries only recognize `spec-guard` substrings in command text; include spec-guard stage IDs/titles and the packaged spec-guard runner invocation so manifests no longer emit false missing-guardrail summaries.
+
+### 30) Optional deps wrapper cleanup
+- The optional-deps wrapper only re-exported helpers with types; import `scripts/design/pipeline/optional-deps.js` directly and drop the wrapper to reduce script surface area.
+
 ## Expected Line Reductions by Phase (Estimate)
 - Phase 1 (wrapper cleanup): remove 5-6 wrapper/harness scripts.
   - Estimated reduction: ~360 to 500 lines.
@@ -171,6 +177,8 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
   - Estimated reduction: ~10 to 20 lines.
 - Phase 17 (environment resolver wrapper): drop the CLI resolver wrapper and rely on shared run-manifests paths.
   - Estimated reduction: ~5 to 10 lines.
+- Phase 18 (guardrail detection + optional-deps wrapper): normalize guardrail detection and remove the optional-deps wrapper.
+  - Estimated reduction: ~5 to 15 lines.
 
 ## Validation Steps per Phase
 
@@ -232,6 +240,9 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
 
 ### Phase 16
 - Re-run implementation-gate after consolidating path existence helpers in scripts.
+
+### Phase 18
+- Re-run docs-review and implementation-gate to confirm guardrail summaries and design pipeline imports remain stable.
 
 ## Execution Checklists (Draft)
 
@@ -371,6 +382,11 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
 ### Phase 17 runbook (ordered)
 - [x] Resolve CLI environment paths directly via `resolveEnvironmentPaths` and keep `environment.ts` for type + task-id normalization only.
 - [x] Run implementation-gate and record manifest evidence - Evidence: `.runs/0101-slimdown-audit/cli/2026-01-03T00-43-23-233Z-849e7395/manifest.json`.
+
+### Phase 18 runbook (ordered)
+- [x] Normalize guardrail summary detection to include spec-guard runner commands.
+- [x] Remove the optional-deps wrapper by importing `scripts/design/pipeline/optional-deps.js` directly.
+- [x] Run implementation-gate and record manifest evidence - Evidence: `.runs/0101-slimdown-audit/cli/2026-01-03T04-14-39-520Z-2b87960a/manifest.json`.
 
 ### Phase 3 per-file doc update checklist (draft)
 - `README.md`: replace devtools pipeline IDs with the new path; update example commands.

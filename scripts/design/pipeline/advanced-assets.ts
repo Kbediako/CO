@@ -23,7 +23,7 @@ import type {
 } from '../../../packages/shared/manifest/types.js';
 import type { DesignConfig, DesignToolkitPipelineConfig } from '../../../packages/shared/config/index.js';
 import { runDefaultInteractions, type InteractionPage } from './toolkit/snapshot.js';
-import { loadPlaywright } from './optionalDeps.js';
+import { loadPlaywright } from './optional-deps.js';
 
 const execFileAsync = promisify(execFile);
 const MOTION_USER_AGENT =

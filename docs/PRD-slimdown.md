@@ -19,6 +19,8 @@
 - Docs archive/freshness/review tooling and mirror fetch still hardcode `.runs`/`out` roots, ignoring `CODEX_ORCHESTRATOR_*` envs.
 - Status UI dataset build logic duplicates task key normalization behavior already shared elsewhere.
 - Multiple scripts still define one-off file existence helpers despite a shared `pathExists` utility.
+- Guardrail summary detection only keys off `spec-guard` substrings in command text, so packaged spec-guard runner stages are misreported as missing.
+- Design pipeline optional dependency wrapper re-exports `optional-deps.js` without adding behavior, keeping an extra file in sync.
 
 ## Target Outcomes
 - Remove redundant wrappers and legacy runner scripts where the CLI already provides the same behavior.
@@ -39,6 +41,8 @@
 - Align docs archive/freshness/run-review/mirror outputs with shared repo/run/out resolvers to honor configured env roots.
 - Reuse the shared path existence helper across status UI, mirror, review, and design scripts.
 - Collapse CLI environment resolution onto shared run-manifests helpers and keep only a single task-id normalization path.
+- Treat spec-guard runner invocations as guardrail evidence, so manifests do not emit false missing-guardrail summaries.
+- Remove the design optional-deps wrapper and import `optional-deps.js` directly.
 
 ## Non-goals
 - No behavior changes to pipeline sequencing, manifest schema, or core orchestrator logic.

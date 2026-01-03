@@ -13,7 +13,7 @@ import { stageArtifacts } from '../../../orchestrator/src/persistence/ArtifactSt
 import type { DesignArtifactRecord } from '../../../packages/shared/manifest/types.js';
 import { slugify as sharedSlugify } from '../../../packages/shared/utils/strings.js';
 import type { Browser, Page } from 'playwright';
-import { loadPlaywright } from './optionalDeps.js';
+import { loadPlaywright } from './optional-deps.js';
 type PlaywrightModule = Awaited<ReturnType<typeof loadPlaywright>>;
 
 async function main(): Promise<void> {
