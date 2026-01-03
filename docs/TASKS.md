@@ -28,6 +28,7 @@ Mirror status with `tasks/tasks-0931-oracle-devtools-standardization.md` and `.a
 - [x] Implementation-gate manifest captured - Evidence: `.runs/0931-oracle-devtools-standardization/cli/2026-01-03T08-14-41-487Z-df2a6972/manifest.json`.
 
 # Task List Snapshot — Slimdown Audit (0101)
+- Update - Validation: docs-review rerun after Phase 6 status checklist fix; manifest at `.runs/0101-slimdown-audit/cli/2026-01-03T19-18-50-704Z-783d9ad9/manifest.json`.
 - Update - Validation: Phase 6 final guardrail pass captured; docs-review manifest at `.runs/0101-slimdown-audit/cli/2026-01-03T18-58-28-347Z-1e1709bb/manifest.json`; implementation-gate manifest at `.runs/0101-slimdown-audit/cli/2026-01-03T18-59-01-699Z-c2f0e210/manifest.json`.
 - Update - Closeout: Phase 6 status snapshot refreshed; docs-review manifest at `.runs/0101-slimdown-audit/cli/2026-01-03T18-30-10-751Z-b4856059/manifest.json`; implementation-gate manifest at `.runs/0101-slimdown-audit/cli/2026-01-03T17-59-01-839Z-0bed253b/manifest.json`; subagent diagnostics at `.runs/0101-slimdown-audit-phase3scan/cli/2026-01-03T17-56-17-000Z-8a2830d3/manifest.json`.
 - Update - Implementation: remove legacy `CODEX_ORCHESTRATOR_REPO_ROOT` fallback in run-manifests resolver; docs-review manifest at `.runs/0101-slimdown-audit/cli/2026-01-03T17-58-18-128Z-e4ee9d1f/manifest.json`; implementation-gate manifest at `.runs/0101-slimdown-audit/cli/2026-01-03T17-59-01-839Z-0bed253b/manifest.json`; subagent diagnostics at `.runs/0101-slimdown-audit-phase3scan/cli/2026-01-03T17-56-17-000Z-8a2830d3/manifest.json`.
