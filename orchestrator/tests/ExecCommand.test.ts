@@ -6,7 +6,8 @@ import { PassThrough } from 'node:stream';
 import process from 'node:process';
 
 import { executeExecCommand } from '../src/cli/exec/command.js';
-import { resolveEnvironment } from '../src/cli/run/environment.js';
+import { resolveEnvironmentPaths } from '../../scripts/lib/run-manifests.js';
+import { normalizeEnvironmentPaths } from '../src/cli/run/environment.js';
 import * as CommandRunner from '../src/cli/services/commandRunner.js';
 import {
   computePromptPackStamp,
@@ -16,6 +17,8 @@ import { ToolInvocationFailedError } from '../../packages/orchestrator/src/index
 import type { ToolRunRecord } from '../../packages/shared/manifest/types.js';
 
 type OnResultPayload = Parameters<NonNullable<CommandRunner.CommandRunHooks['onResult']>>[0];
+
+const resolveEnvironment = () => normalizeEnvironmentPaths(resolveEnvironmentPaths());
 
 const ORIGINAL_ENV = {
   root: process.env.CODEX_ORCHESTRATOR_ROOT,

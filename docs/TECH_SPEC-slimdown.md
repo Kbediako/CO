@@ -131,6 +131,11 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
 - Targets: `scripts/status-ui-build.mjs`, `scripts/run-review.ts`, `scripts/mirror-site.mjs`, `scripts/design/pipeline/visual-regression.ts`.
 - Phase 16 executes this target (pathExists reuse in scripts).
 
+### 28) CLI environment resolver wrapper
+- `orchestrator/src/cli/run/environment.ts` still wraps shared run-manifests path resolution, keeping a parallel resolver entrypoint.
+- Resolve CLI environment paths directly via `scripts/lib/run-manifests.js` and keep `environment.ts` as a type + task-id normalization helper only.
+- Phase 17 executes this target (environment resolver unification).
+
 ## Expected Line Reductions by Phase (Estimate)
 - Phase 1 (wrapper cleanup): remove 5-6 wrapper/harness scripts.
   - Estimated reduction: ~360 to 500 lines.
@@ -164,6 +169,8 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
   - Estimated reduction: ~5 to 10 lines.
 - Phase 16 (pathExists reuse in scripts): remove local file existence helpers in status UI, mirror, review, and design scripts.
   - Estimated reduction: ~10 to 20 lines.
+- Phase 17 (environment resolver wrapper): drop the CLI resolver wrapper and rely on shared run-manifests paths.
+  - Estimated reduction: ~5 to 10 lines.
 
 ## Validation Steps per Phase
 
@@ -360,6 +367,10 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
 ### Phase 16 runbook (ordered)
 - [x] Replace local file existence helpers in status UI build, run-review, mirror-site, and design visual regression with `pathExists`.
 - [x] Run implementation-gate and record manifest evidence - Evidence: `.runs/0101-slimdown-audit/cli/2026-01-02T19-56-02-736Z-5bac93fd/manifest.json`.
+
+### Phase 17 runbook (ordered)
+- [x] Resolve CLI environment paths directly via `resolveEnvironmentPaths` and keep `environment.ts` for type + task-id normalization only.
+- [x] Run implementation-gate and record manifest evidence - Evidence: `.runs/0101-slimdown-audit/cli/2026-01-03T00-43-23-233Z-849e7395/manifest.json`.
 
 ### Phase 3 per-file doc update checklist (draft)
 - `README.md`: replace devtools pipeline IDs with the new path; update example commands.

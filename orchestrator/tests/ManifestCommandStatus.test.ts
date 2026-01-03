@@ -4,7 +4,8 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import process from 'node:process';
 
-import { resolveEnvironment } from '../src/cli/run/environment.js';
+import { resolveEnvironmentPaths } from '../../scripts/lib/run-manifests.js';
+import { normalizeEnvironmentPaths } from '../src/cli/run/environment.js';
 import { bootstrapManifest, updateCommandStatus } from '../src/cli/run/manifest.js';
 import type { PipelineDefinition } from '../src/cli/types.js';
 
@@ -35,7 +36,7 @@ afterEach(async () => {
 
 describe('updateCommandStatus', () => {
   it('preserves entry references so later updates are retained', async () => {
-    const env = resolveEnvironment();
+    const env = normalizeEnvironmentPaths(resolveEnvironmentPaths());
     const pipeline: PipelineDefinition = {
       id: 'manifest-entry',
       title: 'Manifest Entry Pipeline',

@@ -8,7 +8,8 @@ import { CodexOrchestrator } from '../orchestrator/src/cli/orchestrator.js';
 import { getTelemetrySchemas, validateCliManifest } from '../orchestrator/src/cli/telemetry/schema.js';
 import { formatPlanPreview } from '../orchestrator/src/cli/utils/planFormatter.js';
 import { resolveRunPaths } from '../orchestrator/src/cli/run/runPaths.js';
-import { resolveEnvironment } from '../orchestrator/src/cli/run/environment.js';
+import { resolveEnvironmentPaths } from '../scripts/lib/run-manifests.js';
+import { normalizeEnvironmentPaths } from '../orchestrator/src/cli/run/environment.js';
 
 const diagnosticsConfig = {
   defaultPipeline: 'simple',
@@ -153,7 +154,7 @@ describe('CodexOrchestrator CLI', () => {
     const child = parent.manifest.child_runs[0];
     expect(child.status).toBe('succeeded');
 
-    const env = resolveEnvironment();
+    const env = normalizeEnvironmentPaths(resolveEnvironmentPaths());
     const childPaths = resolveRunPaths(env, child.run_id);
     const childManifest = JSON.parse(await fs.readFile(childPaths.manifestPath, 'utf8'));
     expect(childManifest.parent_run_id).toBe(parent.manifest.run_id);

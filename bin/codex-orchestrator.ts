@@ -7,7 +7,8 @@ import {
   executeExecCommand,
   type ExecOutputMode
 } from '../orchestrator/src/cli/exec/command.js';
-import { resolveEnvironment, sanitizeTaskId } from '../orchestrator/src/cli/run/environment.js';
+import { resolveEnvironmentPaths } from '../scripts/lib/run-manifests.js';
+import { normalizeEnvironmentPaths, sanitizeTaskId } from '../orchestrator/src/cli/run/environment.js';
 import { RunEventEmitter } from '../orchestrator/src/cli/events/runEvents.js';
 import type { HudController } from '../orchestrator/src/cli/ui/controller.js';
 import { evaluateInteractiveGate } from '../orchestrator/src/cli/utils/interactive.js';
@@ -322,7 +323,7 @@ async function handleExec(rawArgs: string[]): Promise<void> {
   const outputMode: ExecOutputMode =
     parsed.requestedMode ?? (isInteractive ? 'interactive' : 'jsonl');
 
-  const env = resolveEnvironment();
+  const env = normalizeEnvironmentPaths(resolveEnvironmentPaths());
   if (parsed.taskId) {
     env.taskId = sanitizeTaskId(parsed.taskId);
   }
