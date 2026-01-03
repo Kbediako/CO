@@ -11,6 +11,19 @@ The Snakes Arena checklist has been retired from this workspace; reference the a
 Archived task snapshots live on the task-archives branch.
 - 2025: https://github.com/Kbediako/CO/blob/task-archives/docs/TASKS-archive-2025.md
 <!-- tasks-archive-index:end -->
+# Task List Snapshot — Oracle Browser Login Guidance (0929)
+
+- Update - Docs: Oracle browser-only guidance and Keychain login wait steps added to `AGENTS.md`; docs-review manifest at `.runs/0929-oracle-browser-guidance/cli/2026-01-03T02-08-55-106Z-06106595/manifest.json`; implementation-gate manifest at `.runs/0929-oracle-browser-guidance/cli/2026-01-03T02-09-29-710Z-6ff114c2/manifest.json`; diagnostics manifest at `.runs/0929-oracle-browser-guidance/cli/2026-01-03T02-06-50-715Z-9f59099d/manifest.json`; subagent diagnostics at `.runs/0929-oracle-browser-guidance-scout/cli/2026-01-03T02-05-31-949Z-d8a97638/manifest.json`.
+- Notes: Export `MCP_RUNNER_TASK_ID=0929-oracle-browser-guidance` before orchestrator commands.
+
+## Checklist Mirror
+Mirror status with `tasks/tasks-0929-oracle-browser-guidance.md` and `.agent/task/0929-oracle-browser-guidance.md`. Keep `[ ]` until evidence is recorded.
+- [x] Diagnostics manifest captured - Evidence: `.runs/0929-oracle-browser-guidance/cli/2026-01-03T02-06-50-715Z-9f59099d/manifest.json`.
+- [x] Docs-review manifest captured - Evidence: `.runs/0929-oracle-browser-guidance/cli/2026-01-03T02-08-55-106Z-06106595/manifest.json`.
+- [x] Subagent diagnostics captured - Evidence: `.runs/0929-oracle-browser-guidance-scout/cli/2026-01-03T02-05-31-949Z-d8a97638/manifest.json`.
+- [x] Implementation-gate manifest captured - Evidence: `.runs/0929-oracle-browser-guidance/cli/2026-01-03T02-09-29-710Z-6ff114c2/manifest.json`.
+- [x] AGENTS.md updated with Oracle browser-only guidance - Evidence: `AGENTS.md`.
+
 # Task List Snapshot — Slimdown Audit (0101)
 - Update - Planning: PRD/tech spec/findings/checklist drafted; docs-review manifest captured at `.runs/0101-slimdown-audit/cli/2026-01-01T06-52-39-251Z-006dbf53/manifest.json`.
 - Update - Planning: Phase 5 consolidation targets (docs tooling, pack helpers, wrapper cleanup) and Phase 6 consolidation targets (CLI args, mirror overlap, pipelines/adapters) captured; subagent diagnostics at `.runs/0101-slimdown-audit-pass3/cli/2026-01-01T13-19-30-562Z-fb8559df/manifest.json`, `.runs/0101-slimdown-audit-phase6/cli/2026-01-01T13-58-29-786Z-01202b8e/manifest.json`.

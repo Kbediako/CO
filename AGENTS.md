@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp e683f23c39dba7e15044cfac0b4175c3d74959f297a11bb2c3e2d3bcfefeca56 -->
+<!-- codex:instruction-stamp c5500ceec6fb83f9fcbca5cde4661e514fc06cd5b35d6158c451995d70942d47 -->
 # Codex-Orchestrator Agent Handbook (Template)
 
 Use this repository as the wrapper that coordinates multiple Codex-driven projects. After cloning, replace placeholder metadata (task IDs, documents, SOPs) with values for each downstream initiative while keeping these shared guardrails in place.
@@ -15,6 +15,12 @@ Use this repository as the wrapper that coordinates multiple Codex-driven projec
 - Default to `docs-review` before implementation and `implementation-gate` after code changes (set `CODEX_REVIEW_DEVTOOLS=1` when DevTools are required).
 - Reserve direct shell commands for lightweight discovery or one-off checks that do not require manifest evidence.
 - Delegation is mandatory for top-level tasks: spawn at least one subagent run using `MCP_RUNNER_TASK_ID=<task-id>-<stream>`, capture manifest evidence, and summarize in the main run. Use `DELEGATION_GUARD_OVERRIDE_REASON` only when delegation is impossible and record the justification.
+
+## Oracle (External Assistant)
+- Oracle bundles a prompt plus the right files so another AI (GPT 5 Pro + more) can answer. Use when stuck/bugs/reviewing.
+- Run `npx -y @steipete/oracle --help` once per session before first use.
+- Use browser mode only (`--engine browser`). Do not use API runs.
+- If browser mode fails due to missing ChatGPT cookies, approve the macOS Keychain prompt and ensure ChatGPT is signed in for the active Chrome profile; retry with `--browser-cookie-wait 5` or `--browser-manual-login`.
 
 ## Meta-Orchestration & Parallel Runs
 - **Definition:** “Parallel runs” means launching multiple `codex-orchestrator start ...` runs at the same time (separate processes). A single orchestrator run executes its pipeline stages serially.
