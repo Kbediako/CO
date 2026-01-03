@@ -1,8 +1,8 @@
 # Action Plan - Slimdown Audit (Task 0101-slimdown-audit)
 
 ## Status Snapshot
-- Current Phase: Planning (no-regression plan captured)
-- Run Manifest Link: TBD (capture docs-review before implementation)
+- Current Phase: Phase 0 (baseline tripwires captured)
+- Run Manifest Link: diagnostics `.runs/0101-slimdown-audit/cli/2026-01-03T14-35-17-804Z-5847db03/manifest.json`; docs-review `.runs/0101-slimdown-audit/cli/2026-01-03T14-36-37-744Z-18a8bb03/manifest.json`; implementation-gate `.runs/0101-slimdown-audit/cli/2026-01-03T14-37-13-914Z-98c9b1f0/manifest.json`; frontend-testing `.runs/0101-slimdown-audit/cli/2026-01-03T14-38-54-188Z-b84d0ef4/manifest.json`.
 - Approvals / Escalations: record in `tasks/index.json`
 
 ## Evidence Notes
