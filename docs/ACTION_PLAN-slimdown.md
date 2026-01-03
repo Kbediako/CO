@@ -2,7 +2,7 @@
 
 ## Status Snapshot
 - Current Phase: Phase 2 (helper consolidation underway)
-- Run Manifest Link: docs-review `.runs/0101-slimdown-audit/cli/2026-01-03T16-06-21-829Z-3a4283cd/manifest.json`; implementation-gate `.runs/0101-slimdown-audit/cli/2026-01-03T16-07-07-173Z-61412973/manifest.json`; subagent diagnostics `.runs/0101-slimdown-audit-phase2scan/cli/2026-01-03T16-05-01-798Z-570d564c/manifest.json`.
+- Run Manifest Link: docs-review `.runs/0101-slimdown-audit/cli/2026-01-03T16-53-16-126Z-c2694b63/manifest.json`; implementation-gate `.runs/0101-slimdown-audit/cli/2026-01-03T16-07-07-173Z-61412973/manifest.json`; subagent diagnostics `.runs/0101-slimdown-audit-phase2scan/cli/2026-01-03T16-05-01-798Z-570d564c/manifest.json`.
 - Approvals / Escalations: record in `tasks/index.json`
 
 ## Evidence Notes

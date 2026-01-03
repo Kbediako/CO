@@ -9,23 +9,9 @@ The Snakes Arena checklist has been retired from this workspace; reference the a
 <!-- tasks-archive-index:begin -->
 ## Archive index
 Archived task snapshots live on the task-archives branch.
-- 2025: [task-archives/docs/TASKS-archive-2025.md](https://github.com/Kbediako/CO/blob/task-archives/docs/TASKS-archive-2025.md)
-- 2026: [task-archives/docs/TASKS-archive-2026.md](https://github.com/Kbediako/CO/blob/task-archives/docs/TASKS-archive-2026.md)
+- 2025: https://github.com/Kbediako/CO/blob/task-archives/docs/TASKS-archive-2025.md
+- 2026: https://github.com/Kbediako/CO/blob/task-archives/docs/TASKS-archive-2026.md
 <!-- tasks-archive-index:end -->
-# Task List Snapshot — Review Comment Capture Guardrail (0930)
-
-- Update - SOP: review-loop requires checking inline review comments via `gh pr view <number> --comments` or `gh api repos/<owner>/<repo>/pulls/<number>/comments`; docs-review manifest at `.runs/0930-review-comment-capture/cli/2026-01-03T03-12-48-606Z-0de27c83/manifest.json`; implementation-gate manifest at `.runs/0930-review-comment-capture/cli/2026-01-03T03-13-23-200Z-b94f3622/manifest.json`; diagnostics manifest at `.runs/0930-review-comment-capture/cli/2026-01-03T03-04-30-100Z-4e07affd/manifest.json`; subagent diagnostics at `.runs/0930-review-comment-capture-scout/cli/2026-01-03T03-03-09-095Z-37636c9b/manifest.json`.
-- Notes: Export `MCP_RUNNER_TASK_ID=0930-review-comment-capture` before orchestrator commands.
-
-## Checklist Mirror
-Mirror status with `tasks/tasks-0930-review-comment-capture.md` and `.agent/task/0930-review-comment-capture.md`. Keep `[ ]` until evidence is recorded.
-- [x] Diagnostics manifest captured - Evidence: `.runs/0930-review-comment-capture/cli/2026-01-03T03-04-30-100Z-4e07affd/manifest.json`.
-- [x] Docs-review manifest captured - Evidence: `.runs/0930-review-comment-capture/cli/2026-01-03T03-12-48-606Z-0de27c83/manifest.json`.
-- [x] Subagent diagnostics captured - Evidence: `.runs/0930-review-comment-capture-scout/cli/2026-01-03T03-03-09-095Z-37636c9b/manifest.json`.
-- [x] Implementation-gate manifest captured - Evidence: `.runs/0930-review-comment-capture/cli/2026-01-03T03-13-23-200Z-b94f3622/manifest.json`.
-- [x] Review-loop SOP updated to require inline review comment checks - Evidence: `.agent/SOPs/review-loop.md`.
-- [x] Task 0928 checklist mirror expanded - Evidence: `docs/TASKS.md`.
-
 # Task List Snapshot — Oracle DevTools Standardization (0931)
 
 - Update - SOP: Oracle + DevTools usage standardized (4-file max, unique basenames, DevTools inspection flow); docs-review manifest at `.runs/0931-oracle-devtools-standardization/cli/2026-01-03T08-06-02-907Z-96bd7ade/manifest.json`; devtools-enabled frontend testing run at `.runs/0931-oracle-devtools-standardization/cli/2026-01-03T08-06-38-295Z-e3601ce9/manifest.json`; implementation-gate manifest at `.runs/0931-oracle-devtools-standardization/cli/2026-01-03T08-14-41-487Z-df2a6972/manifest.json`; subagent diagnostics at `.runs/0931-oracle-devtools-standardization-scout/cli/2026-01-03T07-58-33-122Z-5422cb1b/manifest.json`.
@@ -42,6 +28,7 @@ Mirror status with `tasks/tasks-0931-oracle-devtools-standardization.md` and `.a
 - [x] Implementation-gate manifest captured - Evidence: `.runs/0931-oracle-devtools-standardization/cli/2026-01-03T08-14-41-487Z-df2a6972/manifest.json`.
 
 # Task List Snapshot — Slimdown Audit (0101)
+- Update - Maintenance: docs/TASKS archive to clear docs:check line limit; docs-review manifest at `.runs/0101-slimdown-audit/cli/2026-01-03T16-53-16-126Z-c2694b63/manifest.json`.
 - Update - Implementation: Phase 2 helper consolidation (date parsing) executed; docs-review manifest at `.runs/0101-slimdown-audit/cli/2026-01-03T16-06-21-829Z-3a4283cd/manifest.json`; implementation-gate manifest at `.runs/0101-slimdown-audit/cli/2026-01-03T16-07-07-173Z-61412973/manifest.json`; subagent diagnostics at `.runs/0101-slimdown-audit-phase2scan/cli/2026-01-03T16-05-01-798Z-570d564c/manifest.json`.
 - Update - Planning: PRD/tech spec/findings/checklist drafted; docs-review manifest captured at `.runs/0101-slimdown-audit/cli/2026-01-01T06-52-39-251Z-006dbf53/manifest.json`.
 - Update - Planning: Action plan captured; docs-review manifest at `.runs/0101-slimdown-audit/cli/2026-01-03T14-36-37-744Z-18a8bb03/manifest.json`; implementation-gate manifest at `.runs/0101-slimdown-audit/cli/2026-01-03T14-37-13-914Z-98c9b1f0/manifest.json`.
