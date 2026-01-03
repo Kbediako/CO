@@ -19,7 +19,7 @@ Phase 0 - Baseline invariants + regression tripwires
 Phase 1 - Delete clearly dead wrappers and legacy harnesses
 - Entry: Phase 0 exit criteria met; repo/CI/docs scans show no references.
 - Work: remove legacy mcp-runner migrate/metrics scripts, obsolete wrappers, and unused harness scripts (only after docs updated).
-- Exit: ensure zero references remain; docs updated; core lane green with a post-change manifest.
+- Exit: ensure zero references to it remain; docs updated; core lane green with a post-change manifest.
 
 Phase 2 - Consolidate duplicated helpers
 - Entry: Phase 1 merged; tests cover helper-visible behavior.
