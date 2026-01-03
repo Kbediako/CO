@@ -168,7 +168,7 @@
 
 #### Optional peer deps + loader
 - [x] Move Playwright-class deps to optional peer deps and add dynamic loader - Evidence: package metadata + tests.
-  - Files: `package.json`, `scripts/design/pipeline/optionalDeps.ts`, `packages/shared/**`
+  - Files: `package.json`, `scripts/design/pipeline/optional-deps.js`, `packages/shared/**`
   - Acceptance:
     - Optional loader resolves from CWD first, then from the package.
     - Clear error message with install instructions when missing.

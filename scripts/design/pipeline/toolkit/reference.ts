@@ -3,7 +3,7 @@ import { dirname, isAbsolute, join, relative } from 'node:path';
 import { tmpdir } from 'node:os';
 import { pathToFileURL } from 'node:url';
 import type { Route } from 'playwright';
-import { loadPixelmatch, loadPlaywright, loadPngjs } from '../optionalDeps.js';
+import { loadPixelmatch, loadPlaywright, loadPngjs } from '../optional-deps.js';
 import { loadDesignContext } from '../context.js';
 import type { DesignContext } from '../context.js';
 import {

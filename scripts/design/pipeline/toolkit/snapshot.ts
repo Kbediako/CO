@@ -2,7 +2,7 @@ import { Buffer } from 'node:buffer';
 import type { CheerioAPI } from 'cheerio';
 import type { Element } from 'domhandler';
 import type { Page, Response } from 'playwright';
-import { loadCheerio, loadPlaywright } from '../optionalDeps.js';
+import { loadCheerio, loadPlaywright } from '../optional-deps.js';
 
 export interface PageSectionSummary {
   title: string;

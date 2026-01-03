@@ -36,5 +36,9 @@ Phase 16 consolidation executed:
 Phase 17 consolidation executed:
 - CLI environment resolution now routes directly through `resolveEnvironmentPaths`, leaving `orchestrator/src/cli/run/environment.ts` as a task-id normalization + type helper only.
 
+Phase 18 consolidation executed:
+- Guardrail summary detection now recognizes spec-guard runner stages (ID/title/runner command) to avoid false missing-guardrail summaries.
+- Design pipeline optional-deps wrapper removed; pipeline scripts import `optional-deps.js` directly.
+
 ## Usage signals (still referenced)
 - `scripts/status-ui-build.mjs` is referenced by `scripts/status-ui-serve.mjs` and `docs/TECH_SPEC-orchestrator-status-ui.md` (do not remove; only consolidate helpers).

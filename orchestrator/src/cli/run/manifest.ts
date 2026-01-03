@@ -313,7 +313,17 @@ function computeGuardrailStatus(manifest: CliManifest): GuardrailStatusSnapshot 
 }
 
 function selectGuardrailCommands(manifest: CliManifest): CliManifestCommand[] {
-  return manifest.commands.filter((entry) => entry.command?.includes('spec-guard'));
+  return manifest.commands.filter((entry) => {
+    const id = entry.id?.toLowerCase() ?? '';
+    const title = entry.title?.toLowerCase() ?? '';
+    const command = entry.command?.toLowerCase() ?? '';
+    return (
+      id.includes('spec-guard') ||
+      title.includes('spec-guard') ||
+      command.includes('spec-guard') ||
+      command.includes('specguardrunner')
+    );
+  });
 }
 
 function formatGuardrailSummary(counts: GuardrailCounts): string {
