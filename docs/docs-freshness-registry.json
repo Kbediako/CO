@@ -80,17 +80,17 @@
       "cadence_days": 90
     },
     {
-      "path": ".agent/SOPs/orchestrator-autonomy.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2025-12-31",
-      "cadence_days": 90
-    },
-    {
       "path": ".agent/SOPs/oracle-usage.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-01-03",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/SOPs/orchestrator-autonomy.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
       "cadence_days": 90
     },
     {
