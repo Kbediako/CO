@@ -2,7 +2,7 @@ import { describe, expect, it, beforeEach, afterEach } from 'vitest';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { writeAtomicFile } from '../src/persistence/writeAtomicFile.js';
+import { writeAtomicFile } from '../src/utils/atomicWrite.js';
 import { writeFileAtomic, writeJsonAtomic } from '../src/cli/utils/fs.js';
 import { buildAtomicTempPath } from '../src/utils/atomicWrite.js';
 

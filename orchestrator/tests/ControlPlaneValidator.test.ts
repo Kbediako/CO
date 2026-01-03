@@ -3,11 +3,8 @@ import { mkdtemp } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
-import {
-  ControlPlaneDriftReporter,
-  ControlPlaneValidationError,
-  ControlPlaneValidator
-} from '../src/control-plane/index.js';
+import { ControlPlaneDriftReporter } from '../src/control-plane/drift-reporter.js';
+import { ControlPlaneValidationError, ControlPlaneValidator } from '../src/control-plane/validator.js';
 import { buildRunRequestV2 } from '../src/control-plane/request-builder.js';
 import type { EnvironmentPaths } from '../src/cli/run/environment.js';
 import type { CliManifest, PipelineDefinition } from '../src/cli/types.js';

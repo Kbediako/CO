@@ -40,5 +40,12 @@ Phase 18 consolidation executed:
 - Guardrail summary detection now recognizes spec-guard runner stages (ID/title/runner command) to avoid false missing-guardrail summaries.
 - Design pipeline optional-deps wrapper removed; pipeline scripts import `optional-deps.js` directly.
 
+Phase 19 consolidation executed:
+- Inlined `WINDOWS_FORBIDDEN_CHARACTERS` into `sanitizeIdentifier` and dropped the persistence `writeAtomicFile` + JSONL writer shims.
+
+Phase 20 consolidation executed:
+- Control-plane and scheduler index shims removed; services/tests import concrete modules directly.
+- Guardrail summary detection now matches spec-guard runner commands across ID/title/command strings.
+
 ## Usage signals (still referenced)
 - `scripts/status-ui-build.mjs` is referenced by `scripts/status-ui-serve.mjs` and `docs/TECH_SPEC-orchestrator-status-ui.md` (do not remove; only consolidate helpers).

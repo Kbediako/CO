@@ -142,6 +142,12 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
 ### 30) Optional deps wrapper cleanup
 - The optional-deps wrapper only re-exported helpers with types; import `scripts/design/pipeline/optional-deps.js` directly and drop the wrapper to reduce script surface area.
 
+### 19) Persistence + JSONL shim cleanup
+- Inline `WINDOWS_FORBIDDEN_CHARACTERS` into `orchestrator/src/persistence/sanitizeIdentifier.ts` and drop the persistence `writeAtomicFile` + JSONL writer shims (import `writeAtomicFile` from `orchestrator/src/utils/atomicWrite.ts` in `ExperienceStore`/`TaskStateStore`).
+
+### 20) Control-plane + scheduler shim cleanup
+- Remove the control-plane and scheduler index re-exports; import concrete modules directly in services and tests.
+
 ## Expected Line Reductions by Phase (Estimate)
 - Phase 1 (wrapper cleanup): remove 5-6 wrapper/harness scripts.
   - Estimated reduction: ~360 to 500 lines.
@@ -179,6 +185,10 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
   - Estimated reduction: ~5 to 10 lines.
 - Phase 18 (guardrail detection + optional-deps wrapper): normalize guardrail detection and remove the optional-deps wrapper.
   - Estimated reduction: ~5 to 15 lines.
+- Phase 19 (persistence + JSONL shims + identifier guard): drop persistence/JSONL shims and inline single-use constant.
+  - Estimated reduction: ~10 to 20 lines.
+- Phase 20 (control-plane + scheduler shims): remove index re-exports and update imports/tests.
+  - Estimated reduction: ~15 to 30 lines.
 
 ## Validation Steps per Phase
 
@@ -243,6 +253,12 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
 
 ### Phase 18
 - Re-run docs-review and implementation-gate to confirm guardrail summaries and design pipeline imports remain stable.
+
+### Phase 19
+- Re-run implementation-gate after removing persistence/JSONL shim modules and inlining the identifier guard constant.
+
+### Phase 20
+- Re-run implementation-gate after removing control-plane/scheduler index shims and normalizing guardrail detection.
 
 ## Execution Checklists (Draft)
 
@@ -387,6 +403,14 @@ Source of truth for requirements: `tasks/tasks-0101-slimdown-audit.md`.
 - [x] Normalize guardrail summary detection to include spec-guard runner commands.
 - [x] Remove the optional-deps wrapper by importing `scripts/design/pipeline/optional-deps.js` directly.
 - [x] Run implementation-gate and record manifest evidence - Evidence: `.runs/0101-slimdown-audit/cli/2026-01-03T04-14-39-520Z-2b87960a/manifest.json`.
+
+### Phase 19 runbook (ordered)
+- [x] Remove persistence writeAtomicFile/JSONL writer shims; inline the identifier guard constant.
+- [x] Run implementation-gate and record manifest evidence - Evidence: `.runs/0101-slimdown-audit/cli/2026-01-03T05-44-22-728Z-b10e19d2/manifest.json`.
+
+### Phase 20 runbook (ordered)
+- [x] Normalize guardrail summary detection matching and remove control-plane/scheduler index shims.
+- [x] Run implementation-gate and record manifest evidence - Evidence: `.runs/0101-slimdown-audit/cli/2026-01-03T06-13-29-437Z-8bebc30a/manifest.json`.
 
 ### Phase 3 per-file doc update checklist (draft)
 - `README.md`: replace devtools pipeline IDs with the new path; update example commands.

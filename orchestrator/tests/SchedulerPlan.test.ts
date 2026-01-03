@@ -9,7 +9,7 @@ import {
   createSchedulerPlan,
   finalizeSchedulerPlan,
   serializeSchedulerPlan
-} from '../src/scheduler/index.js';
+} from '../src/scheduler/plan.js';
 import type { EnvironmentPaths } from '../src/cli/run/environment.js';
 import type { CliManifest, PipelineDefinition } from '../src/cli/types.js';
 import type { TaskContext } from '../src/types.js';

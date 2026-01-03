@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { listDirectories, resolveEnvironmentPaths } from '../../../scripts/lib/run-manifests.js';
 import { acquireLockWithRetry, type LockRetryOptions } from './lockFile.js';
 import { sanitizeTaskId } from './sanitizeTaskId.js';
-import { writeAtomicFile } from './writeAtomicFile.js';
+import { writeAtomicFile } from '../utils/atomicWrite.js';
 
 export interface ExperienceStoreOptions {
   outDir?: string;

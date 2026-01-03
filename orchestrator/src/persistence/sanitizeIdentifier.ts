@@ -1,6 +1,5 @@
-import { WINDOWS_FORBIDDEN_CHARACTERS } from './identifierGuards.js';
-
 type IdentifierKind = 'task' | 'run';
+const WINDOWS_FORBIDDEN_CHARACTERS = new Set(['<', '>', ':', '"', '|', '?', '*']);
 
 export function sanitizeIdentifier(kind: IdentifierKind, value: string): string {
   const label = kind === 'task' ? 'task' : 'run';

@@ -6,6 +6,7 @@
 - Several scripts encode inconsistent task/run ID handling and environment variable names, making runs less repeatable.
 - Documentation tooling (freshness, hygiene, archiving) reimplements the same doc-collection, task-key normalization, and date parsing logic across multiple scripts.
 - One-line wrapper scripts still exist for CLI flags, adding extra entrypoints with no unique behavior.
+- Small re-export shims (agents/adapters/control-plane/scheduler) and single-constant helper modules add extra files without unique behavior.
 - Mirror and design tooling duplicate optional dependency loading and compliance permit parsing.
 - Guardrail/status/mirror scripts repeat the same CLI arg parsing and `.runs` manifest discovery logic.
 - Pipeline definitions and adapters repeat stage/command blocks with minimal differences.
@@ -29,6 +30,7 @@
 - Standardize task/run environment handling across orchestrator, scripts, and design tooling.
 - Consolidate documentation tooling helpers (doc collection, task-key normalization, date parsing) into shared utilities.
 - Retire wrapper scripts that only forward CLI flags, keeping one canonical invocation path.
+- Inline single-use helper constants and remove agent/adapter/control-plane/scheduler re-export shims.
 - Consolidate CLI arg parsing + `.runs` discovery helpers used by guardrails, status UI, and review tooling.
 - Share optional dependency loading + compliance permit evaluation between design and mirror tooling.
 - Reduce pipeline and adapter duplication by sharing common stage/command definitions.

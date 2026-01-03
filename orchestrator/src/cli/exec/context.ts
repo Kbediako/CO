@@ -4,10 +4,9 @@ import type { EnvironmentPaths } from '../run/environment.js';
 import { bootstrapManifest } from '../run/manifest.js';
 import type { CommandStage, CliManifest, PipelineDefinition } from '../types.js';
 import { generateRunId } from '../utils/runId.js';
-import { JsonlWriter } from '../utils/jsonlWriter.js';
 import type { RunPaths } from '../run/runPaths.js';
 import { ExperienceStore } from '../../persistence/ExperienceStore.js';
-import type { ExecEvent } from '../../../../packages/shared/events/types.js';
+import type { ExecEvent, JsonlEvent } from '../../../../packages/shared/events/types.js';
 import {
   createTelemetrySink,
   type ExecTelemetrySink
@@ -70,6 +69,8 @@ export interface ExecRunContext {
   telemetryTasks: Array<Promise<void>>;
 }
 
+type JsonlWriter = (event: JsonlEvent<unknown>) => void;
+
 export async function bootstrapExecContext(
   context: ExecCommandContext,
   invocation: ExecCommandInvocation
@@ -120,7 +121,12 @@ export async function bootstrapExecContext(
       envTargets: envNotifications
     });
 
-  const jsonlWriter = outputMode === 'jsonl' ? new JsonlWriter(stdout) : null;
+  const jsonlWriter =
+    outputMode === 'jsonl'
+      ? (event: JsonlEvent<unknown>) => {
+          stdout.write(`${JSON.stringify(event)}\n`);
+        }
+      : null;
 
   return {
     env,

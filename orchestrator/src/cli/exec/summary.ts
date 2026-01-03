@@ -110,7 +110,7 @@ export function renderRunOutput(
   summaryEvent: RunSummaryEvent
 ): void {
   if (context.outputMode === 'jsonl' && context.jsonlWriter) {
-    context.jsonlWriter.write(summaryEvent);
+    context.jsonlWriter(summaryEvent);
     return;
   }
   if (context.outputMode === 'json') {
