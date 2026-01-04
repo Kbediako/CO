@@ -17,6 +17,22 @@
       "completed_at": null
     },
     {
+      "id": "0102",
+      "slug": "0102-slimdown-cycle-2",
+      "title": "Slimdown Refactor Cycle 2 (Documentation)",
+      "path": "tasks/tasks-0102-slimdown-cycle-2.md",
+      "kind": "plan",
+      "status": "in-progress",
+      "gate": {
+        "phase": "slimdown-cycle-2-planning",
+        "status": "in-progress",
+        "log": null,
+        "run_id": null
+      },
+      "created_at": "2026-01-04",
+      "completed_at": null
+    },
+    {
       "id": "0202",
       "slug": "orchestrator-hardening",
       "title": "Codex Orchestrator Resilience Hardening PRD",
