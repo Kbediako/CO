@@ -164,6 +164,13 @@
       "cadence_days": 90
     },
     {
+      "path": ".agent/task/0102-slimdown-cycle-2.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-04",
+      "cadence_days": 90
+    },
+    {
       "path": ".agent/task/0202-orchestrator-hardening.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -703,6 +710,13 @@
       "cadence_days": 90
     },
     {
+      "path": "docs/ACTION_PLAN-slimdown-cycle-2.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-04",
+      "cadence_days": 90
+    },
+    {
       "path": "docs/ACTION_PLAN-subagent-delegation-enforcement.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -1046,6 +1060,13 @@
       "cadence_days": 90
     },
     {
+      "path": "docs/PRD-slimdown-cycle-2.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-04",
+      "cadence_days": 90
+    },
+    {
       "path": "docs/PRD-subagent-delegation-enforcement.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -1330,6 +1351,13 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-01-01",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/TECH_SPEC-slimdown-cycle-2.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-04",
       "cadence_days": 90
     },
     {
@@ -1687,6 +1715,13 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-01-01",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/tasks-0102-slimdown-cycle-2.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-04",
       "cadence_days": 90
     },
     {
