@@ -15,7 +15,7 @@
 
 ## Phase 0 Evidence
 - [ ] Diagnostics manifest captured (baseline) - Evidence: `.runs/0102-slimdown-cycle-2/cli/<run-id>/manifest.json` (record pipeline name + run id).
-- [ ] docs-review manifest captured (baseline) - Evidence: `.runs/0102-slimdown-cycle-2/cli/<run-id>/manifest.json` (record pipeline name + run id).
+- [x] docs-review manifest captured (baseline) - Evidence: `.runs/0102-slimdown-cycle-2/cli/2026-01-04T13-46-59-386Z-05090c17/manifest.json`.
 - [ ] implementation-gate manifest captured (optional baseline) - Evidence: `.runs/0102-slimdown-cycle-2/cli/<run-id>/manifest.json` (record pipeline name + run id).
 - [ ] Baseline pack file list captured (`npm pack --dry-run`) - Evidence: task doc entry or note.
 
@@ -49,5 +49,5 @@
 - [ ] Subagent inventory run captured - Evidence: `.runs/0102-slimdown-cycle-2-inventory/cli/<run-id>/manifest.json`.
 
 ## Validation + Handoff
-- [ ] docs-review manifest captured - Evidence: `.runs/0102-slimdown-cycle-2/cli/<run-id>/manifest.json`.
+- [x] docs-review manifest captured - Evidence: `.runs/0102-slimdown-cycle-2/cli/2026-01-04T13-46-59-386Z-05090c17/manifest.json`.
 - [ ] Mirrors updated in `docs/TASKS.md`, `tasks/tasks-0102-slimdown-cycle-2.md`, `.agent/task/0102-slimdown-cycle-2.md`.

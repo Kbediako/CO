@@ -27,7 +27,7 @@
 
 ### Phase 0 Evidence
 - [ ] Diagnostics manifest captured (baseline) - Evidence: `.runs/0102-slimdown-cycle-2/cli/<run-id>/manifest.json` (record pipeline name + run id).
-- [ ] docs-review manifest captured (baseline) - Evidence: `.runs/0102-slimdown-cycle-2/cli/<run-id>/manifest.json` (record pipeline name + run id).
+- [x] docs-review manifest captured (baseline) - Evidence: `.runs/0102-slimdown-cycle-2/cli/2026-01-04T13-46-59-386Z-05090c17/manifest.json`.
 - [ ] implementation-gate manifest captured (optional baseline) - Evidence: `.runs/0102-slimdown-cycle-2/cli/<run-id>/manifest.json` (record pipeline name + run id).
 - [ ] frontend-testing manifest captured (required when touching pipelines/workflows/packaging; optional baseline) - Evidence: `.runs/0102-slimdown-cycle-2/cli/<run-id>/manifest.json` (record pipeline name + run id).
 - [ ] Baseline pack file list captured (`npm pack --dry-run`) - Evidence: task doc entry or note.
@@ -85,7 +85,7 @@
 ## Evidence Log
 ### Baseline Manifests
 - Diagnostics: (run-id + manifest path)
-- docs-review: (run-id + manifest path)
+- docs-review: 2026-01-04T13-46-59-386Z-05090c17 (`.runs/0102-slimdown-cycle-2/cli/2026-01-04T13-46-59-386Z-05090c17/manifest.json`)
 - Implementation-gate (optional): (run-id + manifest path)
 - frontend-testing (if applicable): (run-id + manifest path)
 
