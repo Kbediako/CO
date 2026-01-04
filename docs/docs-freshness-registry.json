@@ -703,17 +703,17 @@
       "cadence_days": 90
     },
     {
-      "path": "docs/ACTION_PLAN-slimdown.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-01-03",
-      "cadence_days": 90
-    },
-    {
       "path": "docs/ACTION_PLAN-slimdown-cycle-2.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-01-04",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/ACTION_PLAN-slimdown.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-03",
       "cadence_days": 90
     },
     {
@@ -1053,17 +1053,17 @@
       "cadence_days": 90
     },
     {
-      "path": "docs/PRD-slimdown.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-01-01",
-      "cadence_days": 90
-    },
-    {
       "path": "docs/PRD-slimdown-cycle-2.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-01-04",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/PRD-slimdown.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-01",
       "cadence_days": 90
     },
     {
@@ -1347,17 +1347,17 @@
       "cadence_days": 90
     },
     {
-      "path": "docs/TECH_SPEC-slimdown.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-01-01",
-      "cadence_days": 90
-    },
-    {
       "path": "docs/TECH_SPEC-slimdown-cycle-2.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-01-04",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/TECH_SPEC-slimdown.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-01",
       "cadence_days": 90
     },
     {
