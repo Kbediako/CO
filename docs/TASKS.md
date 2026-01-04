@@ -12,20 +12,16 @@ Archived task snapshots live on the task-archives branch.
 - 2025: https://github.com/Kbediako/CO/blob/task-archives/docs/TASKS-archive-2025.md
 - 2026: https://github.com/Kbediako/CO/blob/task-archives/docs/TASKS-archive-2026.md
 <!-- tasks-archive-index:end -->
-# Task List Snapshot — Oracle DevTools Standardization (0931)
+# Task List Snapshot — Recursive Language Model Orchestrator (0105)
 
-- Update - SOP: Oracle + DevTools usage standardized (4-file max, unique basenames, DevTools inspection flow); docs-review manifest at `.runs/0931-oracle-devtools-standardization/cli/2026-01-03T08-06-02-907Z-96bd7ade/manifest.json`; devtools-enabled frontend testing run at `.runs/0931-oracle-devtools-standardization/cli/2026-01-03T08-06-38-295Z-e3601ce9/manifest.json`; implementation-gate manifest at `.runs/0931-oracle-devtools-standardization/cli/2026-01-03T08-14-41-487Z-df2a6972/manifest.json`; subagent diagnostics at `.runs/0931-oracle-devtools-standardization-scout/cli/2026-01-03T07-58-33-122Z-5422cb1b/manifest.json`.
-- Notes: Export `MCP_RUNNER_TASK_ID=0931-oracle-devtools-standardization` before orchestrator commands.
+- Update - Planning: PRD/tech spec/action plan/mini-spec/checklist drafted; docs-review manifest at `.runs/0105-rlm-orchestrator/cli/2026-01-04T17-25-13-940Z-0db8bb3c/manifest.json`.
+- Notes: Export `MCP_RUNNER_TASK_ID=0105-rlm-orchestrator` before orchestrator commands.
 
 ## Checklist Mirror
-Mirror status with `tasks/tasks-0931-oracle-devtools-standardization.md` and `.agent/task/0931-oracle-devtools-standardization.md`. Keep `[ ]` until evidence is recorded.
-- [x] Docs-review manifest captured - Evidence: `.runs/0931-oracle-devtools-standardization/cli/2026-01-03T08-06-02-907Z-96bd7ade/manifest.json`.
-- [x] Subagent diagnostics captured - Evidence: `.runs/0931-oracle-devtools-standardization-scout/cli/2026-01-03T07-58-33-122Z-5422cb1b/manifest.json`.
-- [x] Mirrors updated in `docs/TASKS.md` and `tasks/tasks-0931-oracle-devtools-standardization.md` - Evidence: `docs/TASKS.md`, `tasks/tasks-0931-oracle-devtools-standardization.md`, `.agent/task/0931-oracle-devtools-standardization.md`, `tasks/index.json`.
-- [x] Oracle + DevTools SOP published (batching, Chrome DevTools inspection, MCP readiness) - Evidence: `.agent/SOPs/oracle-usage.md`.
-- [x] Agent guidance updated to reference the SOP - Evidence: `.agent/AGENTS.md`, `docs/AGENTS.md`.
-- [x] DevTools-enabled frontend testing run captured (`CODEX_REVIEW_DEVTOOLS=1`) - Evidence: `.runs/0931-oracle-devtools-standardization/cli/2026-01-03T08-06-38-295Z-e3601ce9/manifest.json`.
-- [x] Implementation-gate manifest captured - Evidence: `.runs/0931-oracle-devtools-standardization/cli/2026-01-03T08-14-41-487Z-df2a6972/manifest.json`.
+Mirror status with `tasks/tasks-0105-rlm-orchestrator.md` and `.agent/task/0105-rlm-orchestrator.md`. Keep `[ ]` until evidence is recorded.
+- [x] Collateral drafted (PRD/tech spec/action plan/checklist/mini-spec) - Evidence: `docs/PRD-rlm-orchestrator.md`, `docs/TECH_SPEC-rlm-orchestrator.md`, `docs/ACTION_PLAN-rlm-orchestrator.md`, `tasks/tasks-0105-rlm-orchestrator.md`, `tasks/specs/0105-rlm-orchestrator.md`.
+- [x] Docs-review manifest captured (pre-implementation) - Evidence: `.runs/0105-rlm-orchestrator/cli/2026-01-04T17-25-13-940Z-0db8bb3c/manifest.json`.
+- [x] Mirrors updated in `docs/TASKS.md`, `tasks/tasks-0105-rlm-orchestrator.md`, and `.agent/task/0105-rlm-orchestrator.md` - Evidence: `docs/TASKS.md`, `tasks/tasks-0105-rlm-orchestrator.md`, `.agent/task/0105-rlm-orchestrator.md`, `tasks/index.json`.
 
 # Task List Snapshot — Slimdown Audit (0101)
 - Update - Validation: docs-review rerun after Phase 6 status checklist fix; manifest at `.runs/0101-slimdown-audit/cli/2026-01-03T19-18-50-704Z-783d9ad9/manifest.json`.

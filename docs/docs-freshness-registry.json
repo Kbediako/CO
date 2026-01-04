@@ -171,6 +171,13 @@
       "cadence_days": 90
     },
     {
+      "path": ".agent/task/0105-rlm-orchestrator.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-04",
+      "cadence_days": 90
+    },
+    {
       "path": ".agent/task/0202-orchestrator-hardening.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -703,6 +710,13 @@
       "cadence_days": 90
     },
     {
+      "path": "docs/ACTION_PLAN-rlm-orchestrator.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-04",
+      "cadence_days": 90
+    },
+    {
       "path": "docs/ACTION_PLAN-slimdown.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -1053,6 +1067,13 @@
       "cadence_days": 90
     },
     {
+      "path": "docs/PRD-rlm-orchestrator.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-04",
+      "cadence_days": 90
+    },
+    {
       "path": "docs/PRD-slimdown.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -1347,6 +1368,13 @@
       "cadence_days": 90
     },
     {
+      "path": "docs/TECH_SPEC-rlm-orchestrator.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-04",
+      "cadence_days": 90
+    },
+    {
       "path": "docs/TECH_SPEC-slimdown.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -1571,6 +1599,13 @@
       "cadence_days": 90
     },
     {
+      "path": "tasks/specs/0105-rlm-orchestrator.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-04",
+      "cadence_days": 90
+    },
+    {
       "path": "tasks/specs/0906-docs-hygiene-automation.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "archived",
@@ -1719,6 +1754,13 @@
     },
     {
       "path": "tasks/tasks-0102-slimdown-cycle-2.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-04",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/tasks-0105-rlm-orchestrator.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-01-04",

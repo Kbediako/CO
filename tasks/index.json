@@ -33,6 +33,22 @@
       "completed_at": null
     },
     {
+      "id": "0105",
+      "slug": "0105-rlm-orchestrator",
+      "title": "Recursive Language Model Orchestrator (Documentation)",
+      "path": "tasks/tasks-0105-rlm-orchestrator.md",
+      "kind": "plan",
+      "status": "in-progress",
+      "gate": {
+        "phase": "rlm-orchestrator-planning",
+        "status": "succeeded",
+        "log": ".runs/0105-rlm-orchestrator/cli/2026-01-04T17-25-13-940Z-0db8bb3c/manifest.json",
+        "run_id": "2026-01-04T17-25-13-940Z-0db8bb3c"
+      },
+      "created_at": "2026-01-04",
+      "completed_at": null
+    },
+    {
       "id": "0202",
       "slug": "orchestrator-hardening",
       "title": "Codex Orchestrator Resilience Hardening PRD",
