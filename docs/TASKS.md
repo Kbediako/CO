@@ -12,28 +12,20 @@ Archived task snapshots live on the task-archives branch.
 - 2025: https://github.com/Kbediako/CO/blob/task-archives/docs/TASKS-archive-2025.md
 - 2026: https://github.com/Kbediako/CO/blob/task-archives/docs/TASKS-archive-2026.md
 <!-- tasks-archive-index:end -->
-# Task List Snapshot — Recursive Language Model Orchestrator (0105)
+# Task List Snapshot — Recursive Language Model Orchestrator (0105-rlm-orchestrator)
 
-- Update - Planning: PRD/tech spec/action plan/mini-spec/checklist drafted; docs-review manifest at `.runs/0105-rlm-orchestrator/cli/2026-01-05T01-34-37-751Z-8297b912/manifest.json`.
-- Update - Implementation: RLM CLI + pipeline + runner delivered; implementation-gate manifest at `.runs/0105-rlm-orchestrator/cli/2026-01-05T02-28-20-190Z-5dd73dc0/manifest.json`; subagent diagnostics at `.runs/0105-rlm-orchestrator-subagent/cli/2026-01-05T01-33-04-231Z-f1060b4e/manifest.json`.
-- Notes: Export `MCP_RUNNER_TASK_ID=0105-rlm-orchestrator` before orchestrator commands.
+- **Update — 2026-01-05:** Release SOP added, pack audit allowlist fixed, and npm release published at version 0.1.3 (tag `v0.1.3`); workflow run `https://github.com/Kbediako/CO/actions/runs/20708675207`.
+- **Update — 2026-01-05:** Full-matrix local validation completed (design tools + Playwright deps, build:all, test:adapters, test:evaluation, eval:test); manifests `.runs/0105-rlm-orchestrator/cli/2026-01-05T08-00-14-953Z-b0b3f296/manifest.json`, `.runs/0105-rlm-orchestrator/cli/2026-01-05T08-00-21-194Z-d17b95ea/manifest.json`, `.runs/0105-rlm-orchestrator/cli/2026-01-05T08-00-28-570Z-d7d66471/manifest.json`, `.runs/0105-rlm-orchestrator/cli/2026-01-05T08-00-37-278Z-240b3d4b/manifest.json`, `.runs/0105-rlm-orchestrator/cli/2026-01-05T08-00-44-319Z-2aa70554/manifest.json`, `.runs/0105-rlm-orchestrator/cli/2026-01-05T08-00-55-091Z-6a986777/manifest.json`.
+- **Gate Status:** Implementation + release gates succeeded; docs-review manifests `.runs/0105-rlm-orchestrator/cli/2026-01-05T01-34-37-751Z-8297b912/manifest.json`, `.runs/0105-rlm-orchestrator/cli/2026-01-05T07-32-22-901Z-ebcffeea/manifest.json`; implementation-gate manifests `.runs/0105-rlm-orchestrator/cli/2026-01-05T02-28-20-190Z-5dd73dc0/manifest.json`, `.runs/0105-rlm-orchestrator/cli/2026-01-05T07-33-16-123Z-a1794c38/manifest.json`.
+- **Notes:** Metrics at `.runs/0105-rlm-orchestrator/metrics.json`; state snapshot at `out/0105-rlm-orchestrator/state.json`.
+
 ## Checklist Mirror
-Mirror status with `tasks/tasks-0105-rlm-orchestrator.md` and `.agent/task/0105-rlm-orchestrator.md`. Keep `[ ]` until evidence is recorded.
-- [x] Collateral drafted (PRD/tech spec/action plan/checklist/mini-spec) - Evidence: `docs/PRD-rlm-orchestrator.md`, `docs/TECH_SPEC-rlm-orchestrator.md`, `docs/ACTION_PLAN-rlm-orchestrator.md`, `tasks/tasks-0105-rlm-orchestrator.md`, `tasks/specs/0105-rlm-orchestrator.md`.
-- [x] Docs-review manifest captured (pre-implementation) - Evidence: `.runs/0105-rlm-orchestrator/cli/2026-01-05T01-34-37-751Z-8297b912/manifest.json`.
-- [x] Mirrors updated in `docs/TASKS.md`, `tasks/tasks-0105-rlm-orchestrator.md`, `.agent/task/0105-rlm-orchestrator.md`, and `tasks/index.json` - Evidence: `docs/TASKS.md`, `tasks/tasks-0105-rlm-orchestrator.md`, `.agent/task/0105-rlm-orchestrator.md`, `tasks/index.json`.
-
-### Implementation Planning
-- [x] CLI entrypoint + pipeline shape agreed. Evidence: `bin/codex-orchestrator.ts`, `codex.orchestrator.json`.
-- [x] Task-id/run-id resolution agreed for ad-hoc runs. Evidence: `bin/codex-orchestrator.ts`.
-- [x] `rlm` vs `start <pipeline-id>` behavior agreed (blocking vs detach, run-id output). Evidence: `docs/TECH_SPEC-rlm-orchestrator.md`, `bin/codex-orchestrator.ts`.
-- [x] Built-in pipeline packaging agreed (no repo config required). Evidence: `codex.orchestrator.json`, `orchestrator/src/cli/rlmRunner.ts`.
-- [x] Built-in `rlm` pipeline precedence vs local `codex.orchestrator.json` clarified (override vs disable). Evidence: `orchestrator/src/cli/services/pipelineResolver.ts`, `orchestrator/src/cli/config/userConfig.ts`.
-- [x] `rlm` vs `start <pipeline-id>` blocking/detach semantics + exit code retrieval documented. Evidence: `docs/TECH_SPEC-rlm-orchestrator.md`, `bin/codex-orchestrator.ts`.
-- [x] Validator auto-detect heuristics agreed. Evidence: `docs/TECH_SPEC-rlm-orchestrator.md`, `orchestrator/src/cli/rlm/validator.ts`.
-- [x] `--validator none` semantics + exit codes agreed. Evidence: `docs/TECH_SPEC-rlm-orchestrator.md`, `orchestrator/src/cli/rlm/runner.ts`.
-- [x] Loop stop conditions agreed (validator pass, max iterations, optional time cap). Evidence: `docs/TECH_SPEC-rlm-orchestrator.md`, `orchestrator/src/cli/rlm/runner.ts`.
-- [x] Tests/fixtures scope agreed. Evidence: `docs/TECH_SPEC-rlm-orchestrator.md`, `orchestrator/tests/RlmLoop.test.ts`, `orchestrator/tests/RlmValidator.test.ts`.
+Mirror status with `tasks/tasks-0105-rlm-orchestrator.md` and `.agent/task/0105-rlm-orchestrator.md`.
+- [x] Collateral drafted + mirrors synced. Evidence: `docs/PRD-rlm-orchestrator.md`, `docs/TECH_SPEC-rlm-orchestrator.md`, `docs/ACTION_PLAN-rlm-orchestrator.md`, `tasks/tasks-0105-rlm-orchestrator.md`, `.agent/task/0105-rlm-orchestrator.md`, `tasks/index.json`.
+- [x] Implementation gate succeeded. Evidence: `.runs/0105-rlm-orchestrator/cli/2026-01-05T02-28-20-190Z-5dd73dc0/manifest.json`.
+- [x] Release completed (0.1.3 + tag + publish). Evidence: `package.json`, `package-lock.json`, `.runs/0105-rlm-orchestrator/cli/2026-01-05T07-33-16-123Z-a1794c38/manifest.json`, `https://github.com/Kbediako/CO/actions/runs/20708675207`.
+- [x] Full-matrix local validation completed. Evidence: `.runs/0105-rlm-orchestrator/cli/2026-01-05T08-00-14-953Z-b0b3f296/manifest.json`, `.runs/0105-rlm-orchestrator/cli/2026-01-05T08-00-21-194Z-d17b95ea/manifest.json`, `.runs/0105-rlm-orchestrator/cli/2026-01-05T08-00-28-570Z-d7d66471/manifest.json`, `.runs/0105-rlm-orchestrator/cli/2026-01-05T08-00-37-278Z-240b3d4b/manifest.json`, `.runs/0105-rlm-orchestrator/cli/2026-01-05T08-00-44-319Z-2aa70554/manifest.json`, `.runs/0105-rlm-orchestrator/cli/2026-01-05T08-00-55-091Z-6a986777/manifest.json`.
+- [x] Task docs sync + archive run validated. Evidence: `.runs/0105-rlm-orchestrator/cli/2026-01-05T08-18-47-735Z-09ebcb99/manifest.json`, `.runs/0105-rlm-orchestrator/cli/2026-01-05T08-19-22-832Z-5878f595/manifest.json`.
 
 # Task List Snapshot — Slimdown Audit (0101)
 - Update - Validation: docs-review rerun after Phase 6 status checklist fix; manifest at `.runs/0101-slimdown-audit/cli/2026-01-03T19-18-50-704Z-783d9ad9/manifest.json`.
