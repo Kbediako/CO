@@ -12,3 +12,5 @@
 
 ## Validation + Handoff
 - [x] Implementation-gate manifest captured - Evidence: `.runs/0934-orchestrator-persistence-throughput/cli/2026-01-05T19-26-37-274Z-8ede48e3/manifest.json`.
+- [x] `npm run docs:check` passes - Evidence: `.runs/0934-orchestrator-persistence-throughput/cli/2026-01-05T19-26-37-274Z-8ede48e3/manifest.json`.
+- [x] `npm run docs:freshness` passes - Evidence: `.runs/0934-orchestrator-persistence-throughput/cli/2026-01-05T19-26-37-274Z-8ede48e3/manifest.json`.

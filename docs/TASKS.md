@@ -17,6 +17,8 @@ Mirror status with `tasks/tasks-0934-orchestrator-persistence-throughput.md` and
 - [x] Discovery: diagnostics + RLM runs captured with hotspot summary. Evidence: `.runs/0934-orchestrator-persistence-throughput/cli/2026-01-05T19-16-11-839Z-134db404/manifest.json`, `.runs/0934-orchestrator-persistence-throughput/cli/2026-01-05T19-17-31-497Z-6f7af799/manifest.json`.
 - [x] Implementation: targeted fix + tests applied. Evidence: `.runs/0934-orchestrator-persistence-throughput/cli/2026-01-05T19-26-37-274Z-8ede48e3/manifest.json`.
 - [x] Validation: implementation-gate manifest captured. Evidence: `.runs/0934-orchestrator-persistence-throughput/cli/2026-01-05T19-26-37-274Z-8ede48e3/manifest.json`.
+- [x] Validation: `npm run docs:check` passes. Evidence: `.runs/0934-orchestrator-persistence-throughput/cli/2026-01-05T19-26-37-274Z-8ede48e3/manifest.json`.
+- [x] Validation: `npm run docs:freshness` passes. Evidence: `.runs/0934-orchestrator-persistence-throughput/cli/2026-01-05T19-26-37-274Z-8ede48e3/manifest.json`.
 # Task List Snapshot — ExperienceStore JSONL Line Repair (0933-orchestrator-experience-jsonl-repair)
 - **Update — 2026-01-05:** Implementation + implementation-gate completed; manifest `.runs/0933-orchestrator-experience-jsonl-repair/cli/2026-01-05T18-48-07-086Z-d1ec7ec4/manifest.json`. Notes: export `MCP_RUNNER_TASK_ID=0933-orchestrator-experience-jsonl-repair`; guardrails required: `node scripts/spec-guard.mjs --dry-run`, `npm run build`, `npm run lint`, `npm run test`, `npm run docs:check`, `npm run docs:freshness`, `node scripts/diff-budget.mjs`, `npm run review`.
 ## Checklist Mirror
