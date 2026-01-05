@@ -734,6 +734,22 @@
       },
       "created_at": "2026-01-05",
       "completed_at": null
+    },
+    {
+      "id": "0934",
+      "slug": "orchestrator-persistence-throughput",
+      "title": "Orchestrator Persistence Throughput",
+      "path": "tasks/tasks-0934-orchestrator-persistence-throughput.md",
+      "kind": "prd",
+      "status": "in-progress",
+      "gate": {
+        "phase": "orchestrator-persistence-throughput-planning",
+        "status": "approved",
+        "log": ".runs/0934-orchestrator-persistence-throughput/cli/2026-01-05T19-14-40-500Z-2e4b8f16/manifest.json",
+        "run_id": "2026-01-05T19-14-40-500Z-2e4b8f16"
+      },
+      "created_at": "2026-01-05",
+      "completed_at": null
     }
   ],
   "specs": []
