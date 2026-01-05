@@ -38,6 +38,22 @@ const createRunSummary = (): RunSummary => ({
   timestamp: new Date().toISOString()
 });
 
+type Deferred<T> = {
+  promise: Promise<T>;
+  resolve: (value: T) => void;
+  reject: (error: unknown) => void;
+};
+
+const createDeferred = <T,>(): Deferred<T> => {
+  let resolve!: (value: T) => void;
+  let reject!: (error: unknown) => void;
+  const promise = new Promise<T>((promiseResolve, promiseReject) => {
+    resolve = promiseResolve;
+    reject = promiseReject;
+  });
+  return { promise, resolve, reject };
+};
+
 describe('PersistenceCoordinator', () => {
   let root: string;
   let runsDir: string;
@@ -105,6 +121,44 @@ describe('PersistenceCoordinator', () => {
     );
     const manifest = JSON.parse(await readFile(manifestPath, 'utf-8')) as RunSummary;
     expect(manifest.runId).toBe(summary.runId);
+  });
+
+  it('starts manifest write without waiting for task snapshot', async () => {
+    const stateDeferred = createDeferred<void>();
+    const manifestDeferred = createDeferred<string>();
+    const recordRun = vi.fn(() => stateDeferred.promise);
+    const write = vi.fn(() => manifestDeferred.promise);
+    const stateStore = { recordRun } as TaskStateStore;
+    const manifestWriter = { write } as RunManifestWriter;
+    const coordinator = new PersistenceCoordinator(new EventBus(), stateStore, manifestWriter);
+
+    const summary = createRunSummary();
+    const runPromise = coordinator.handleRunCompleted(summary);
+
+    expect(recordRun).toHaveBeenCalledWith(summary);
+    expect(write).toHaveBeenCalledWith(summary);
+
+    stateDeferred.resolve();
+    manifestDeferred.resolve('manifest.json');
+
+    await runPromise;
+  });
+
+  it('prioritizes manifest errors when both writes fail', async () => {
+    const stateError = new Error('state failure');
+    const manifestError = new Error('manifest failure');
+    const recordRun = vi.fn(() => Promise.reject(stateError));
+    const write = vi.fn(() => Promise.reject(manifestError));
+    const stateStore = { recordRun } as TaskStateStore;
+    const manifestWriter = { write } as RunManifestWriter;
+    const onError = vi.fn();
+    const coordinator = new PersistenceCoordinator(new EventBus(), stateStore, manifestWriter, { onError });
+
+    const summary = createRunSummary();
+    await coordinator.handleRunCompleted(summary);
+
+    expect(onError).toHaveBeenCalledTimes(1);
+    expect(onError).toHaveBeenCalledWith(manifestError, summary);
   });
 
   it('registers run:completed listener via start()', async () => {

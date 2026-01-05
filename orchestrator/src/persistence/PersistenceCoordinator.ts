@@ -42,9 +42,13 @@ export class PersistenceCoordinator {
   async handleRunCompleted(summary: RunSummary): Promise<void> {
     let stateStoreError: unknown | null = null;
 
-    try {
-      await this.stateStore.recordRun(summary);
-    } catch (error: unknown) {
+    const [stateResult, manifestResult] = await Promise.allSettled([
+      this.stateStore.recordRun(summary),
+      this.manifestWriter.write(summary)
+    ]);
+
+    if (stateResult.status === 'rejected') {
+      const error = stateResult.reason;
       stateStoreError = error;
       if (error instanceof TaskStateStoreLockError) {
         logger.warn(
@@ -58,9 +62,8 @@ export class PersistenceCoordinator {
       }
     }
 
-    try {
-      await this.manifestWriter.write(summary);
-    } catch (error: unknown) {
+    if (manifestResult.status === 'rejected') {
+      const error = manifestResult.reason;
       this.options.onError?.(error, summary);
       if (!this.options.onError) {
         logger.error(
