@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+import { readFile } from 'node:fs/promises';
+import { basename, join } from 'node:path';
 import process from 'node:process';
 
 import { CodexOrchestrator } from '../orchestrator/src/cli/orchestrator.js';
@@ -17,6 +19,7 @@ import { initCodexTemplates, formatInitSummary } from '../orchestrator/src/cli/i
 import { runDoctor, formatDoctorSummary } from '../orchestrator/src/cli/doctor.js';
 import { formatDevtoolsSetupSummary, runDevtoolsSetup } from '../orchestrator/src/cli/devtoolsSetup.js';
 import { loadPackageInfo } from '../orchestrator/src/cli/utils/packageInfo.js';
+import { slugify } from '../orchestrator/src/cli/utils/strings.js';
 import { serveMcp } from '../orchestrator/src/cli/mcp.js';
 
 type ArgMap = Record<string, string | boolean>;
@@ -54,6 +57,9 @@ async function main(): Promise<void> {
         break;
       case 'plan':
         await handlePlan(orchestrator, args);
+        break;
+      case 'rlm':
+        await handleRlm(orchestrator, args);
         break;
       case 'resume':
         await handleResume(orchestrator, args);
@@ -132,14 +138,96 @@ function resolveTargetStageId(flags: ArgMap): string | undefined {
   return undefined;
 }
 
+function readStringFlag(flags: ArgMap, key: string): string | undefined {
+  const value = flags[key];
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
+function applyRlmEnvOverrides(flags: ArgMap, goal?: string): void {
+  if (goal) {
+    process.env.RLM_GOAL = goal;
+  }
+  const validator = readStringFlag(flags, 'validator');
+  if (validator) {
+    process.env.RLM_VALIDATOR = validator;
+  }
+  const maxIterations = readStringFlag(flags, 'max-iterations');
+  if (maxIterations) {
+    process.env.RLM_MAX_ITERATIONS = maxIterations;
+  }
+  const maxMinutes = readStringFlag(flags, 'max-minutes');
+  if (maxMinutes) {
+    process.env.RLM_MAX_MINUTES = maxMinutes;
+  }
+  const roles = readStringFlag(flags, 'roles');
+  if (roles) {
+    process.env.RLM_ROLES = roles;
+  }
+}
+
+function resolveRlmTaskId(taskFlag?: string): string {
+  if (taskFlag) {
+    return sanitizeTaskId(taskFlag);
+  }
+  const envTask = process.env.MCP_RUNNER_TASK_ID?.trim();
+  if (envTask) {
+    return sanitizeTaskId(envTask);
+  }
+  const { repoRoot } = resolveEnvironmentPaths();
+  const repoName = basename(repoRoot);
+  const slug = slugify(repoName, 'adhoc');
+  return sanitizeTaskId(`rlm-${slug}`);
+}
+
+async function waitForManifestCompletion(manifestPath: string, intervalMs = 2000): Promise<any> {
+  const terminal = new Set(['succeeded', 'failed', 'cancelled']);
+  while (true) {
+    const raw = await readFile(manifestPath, 'utf8');
+    const manifest = JSON.parse(raw);
+    if (terminal.has(manifest.status)) {
+      return manifest;
+    }
+    await new Promise((resolve) => setTimeout(resolve, intervalMs));
+  }
+}
+
+async function readRlmState(statePath: string): Promise<{ exitCode: number; status: string } | null> {
+  try {
+    const raw = await readFile(statePath, 'utf8');
+    const parsed = JSON.parse(raw);
+    if (!parsed?.final) {
+      return null;
+    }
+    return { exitCode: parsed.final.exitCode, status: parsed.final.status };
+  } catch {
+    return null;
+  }
+}
+
 async function handleStart(orchestrator: CodexOrchestrator, rawArgs: string[]): Promise<void> {
   const { positionals, flags } = parseArgs(rawArgs);
   const pipelineId = positionals[0];
   const format: OutputFormat = (flags['format'] as string | undefined) === 'json' ? 'json' : 'text';
+  if (pipelineId === 'rlm') {
+    const goal = readStringFlag(flags, 'goal');
+    applyRlmEnvOverrides(flags, goal);
+  }
   await withRunUi(flags, format, async (runEvents) => {
+    let taskIdOverride = typeof flags['task'] === 'string' ? (flags['task'] as string) : undefined;
+    if (pipelineId === 'rlm') {
+      taskIdOverride = resolveRlmTaskId(taskIdOverride);
+      process.env.MCP_RUNNER_TASK_ID = taskIdOverride;
+      if (format !== 'json') {
+        console.log(`Task: ${taskIdOverride}`);
+      }
+    }
     const result = await orchestrator.start({
       pipelineId,
-      taskId: typeof flags['task'] === 'string' ? (flags['task'] as string) : undefined,
+      taskId: taskIdOverride,
       parentRunId: typeof flags['parent-run'] === 'string' ? (flags['parent-run'] as string) : undefined,
       approvalPolicy: typeof flags['approval-policy'] === 'string' ? (flags['approval-policy'] as string) : undefined,
       targetStageId: resolveTargetStageId(flags),
@@ -199,6 +287,57 @@ async function handlePlan(orchestrator: CodexOrchestrator, rawArgs: string[]): P
     return;
   }
   process.stdout.write(`${formatPlanPreview(result)}\n`);
+}
+
+async function handleRlm(orchestrator: CodexOrchestrator, rawArgs: string[]): Promise<void> {
+  const { positionals, flags } = parseArgs(rawArgs);
+  const goalFromArgs = positionals.length > 0 ? positionals.join(' ') : undefined;
+  const goal = goalFromArgs ?? readStringFlag(flags, 'goal') ?? process.env.RLM_GOAL?.trim();
+  if (!goal) {
+    throw new Error('rlm requires a goal. Use: codex-orchestrator rlm \"<goal>\".');
+  }
+
+  const taskFlag = typeof flags['task'] === 'string' ? (flags['task'] as string) : undefined;
+  const taskId = resolveRlmTaskId(taskFlag);
+  process.env.MCP_RUNNER_TASK_ID = taskId;
+  applyRlmEnvOverrides(flags, goal);
+
+  console.log(`Task: ${taskId}`);
+
+  let startResult: { manifest: { run_id: string; status: string; artifact_root: string; log_path: string | null } } | null = null;
+  await withRunUi(flags, 'text', async (runEvents) => {
+    startResult = await orchestrator.start({
+      pipelineId: 'rlm',
+      taskId,
+      parentRunId: typeof flags['parent-run'] === 'string' ? (flags['parent-run'] as string) : undefined,
+      approvalPolicy: typeof flags['approval-policy'] === 'string' ? (flags['approval-policy'] as string) : undefined,
+      runEvents
+    });
+    emitRunOutput(startResult, 'text', 'Run started');
+  });
+
+  if (!startResult) {
+    throw new Error('rlm run failed to start.');
+  }
+
+  const resolvedStart = startResult as {
+    manifest: { run_id: string; status: string; artifact_root: string; log_path: string | null };
+  };
+  const { repoRoot } = resolveEnvironmentPaths();
+  const manifestPath = join(repoRoot, resolvedStart.manifest.artifact_root, 'manifest.json');
+  const manifest = await waitForManifestCompletion(manifestPath);
+  const statePath = join(repoRoot, resolvedStart.manifest.artifact_root, 'rlm', 'state.json');
+  const rlmState = await readRlmState(statePath);
+
+  if (rlmState) {
+    console.log(`RLM status: ${rlmState.status}`);
+    process.exitCode = rlmState.exitCode;
+    return;
+  }
+
+  console.log(`RLM status: ${manifest.status}`);
+  console.error('RLM state file missing; treating as internal error.');
+  process.exitCode = 10;
 }
 
 async function handleResume(orchestrator: CodexOrchestrator, rawArgs: string[]): Promise<void> {
@@ -563,6 +702,22 @@ Commands:
     --approval-policy <p>   Record approval policy metadata.
     --format json           Emit machine-readable output.
     --target <stage-id>     Focus plan/build metadata on a specific stage (alias: --target-stage).
+    --goal "<goal>"         When pipeline is rlm, set the RLM goal.
+    --validator <cmd|none>  When pipeline is rlm, set the validator command.
+    --max-iterations <n>    When pipeline is rlm, override max iterations.
+    --max-minutes <n>       When pipeline is rlm, override max minutes.
+    --roles <single|triad>  When pipeline is rlm, set role split.
+    --interactive | --ui    Enable read-only HUD when running in a TTY.
+    --no-interactive        Force disable HUD (default is off unless requested).
+
+  rlm "<goal>"              Run RLM loop until validator passes.
+    --task <id>             Override task identifier.
+    --validator <cmd|none>  Set validator command or disable validation.
+    --max-iterations <n>    Override max iterations (0 = unlimited with validator).
+    --max-minutes <n>       Optional time-based guardrail in minutes.
+    --roles <single|triad>  Choose single or triad role split.
+    --parent-run <id>       Link run to parent run id.
+    --approval-policy <p>   Record approval policy metadata.
     --interactive | --ui    Enable read-only HUD when running in a TTY.
     --no-interactive        Force disable HUD (default is off unless requested).
 

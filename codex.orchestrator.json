@@ -97,6 +97,24 @@
       ]
     },
     {
+      "id": "rlm",
+      "title": "RLM Runner",
+      "description": "Runs the recursive language model loop with validator gating.",
+      "tags": [
+        "rlm"
+      ],
+      "guardrailsRequired": false,
+      "stages": [
+        {
+          "kind": "command",
+          "id": "rlm-runner",
+          "title": "Run RLM loop",
+          "command": "node \"$CODEX_ORCHESTRATOR_PACKAGE_ROOT/dist/orchestrator/src/cli/rlmRunner.js\"",
+          "summaryHint": "RLM loop completed"
+        }
+      ]
+    },
+    {
       "id": "implementation-gate",
       "title": "Implementation Complete Gate",
       "description": "Runs the required implementation validations (spec-guard, build, lint, test, docs:check, docs:freshness, diff-budget) and launches the Codex review handoff, writing a single manifest for evidence.",

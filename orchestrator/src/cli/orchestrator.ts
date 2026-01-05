@@ -60,7 +60,7 @@ import {
   resolvePipelineForResume,
   overrideTaskEnvironment
 } from './services/runPreparation.js';
-import { loadUserConfig } from './config/userConfig.js';
+import { loadPackageConfig, loadUserConfig } from './config/userConfig.js';
 import { RunEventPublisher, snapshotStages, type RunEventEmitter } from './events/runEvents.js';
 import { CLI_EXECUTION_MODE_PARSER, resolveRequiresCloudPolicy } from '../utils/executionMode.js';
 
@@ -150,7 +150,11 @@ export class CodexOrchestrator {
     const designConfig = await resolver.loadDesignConfig(actualEnv.repoRoot);
 
     const userConfig = await loadUserConfig(actualEnv);
-    const pipeline = resolvePipelineForResume(actualEnv, manifest, userConfig);
+    const fallbackConfig =
+      manifest.pipeline_id === 'rlm' && userConfig?.source === 'repo'
+        ? await loadPackageConfig(actualEnv)
+        : null;
+    const pipeline = resolvePipelineForResume(actualEnv, manifest, userConfig, fallbackConfig);
     const envOverrides = resolver.resolveDesignEnvOverrides(designConfig, pipeline.id);
     await this.validateResumeToken(paths, manifest, options.resumeToken ?? null);
     recordResumeEvent(manifest, {
