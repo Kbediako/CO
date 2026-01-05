@@ -2,6 +2,15 @@
 
 ## Governance Update 2025-10-16
 - Task 0911 PRD approval recorded — `.runs/0911-orchestrator-status-ui/cli/2025-12-23T07-59-47-613Z-344689f5/manifest.json`.
+- Task 0932 PRD approval recorded — `.runs/0932-orchestrator-performance-reliability/cli/2026-01-05T16-12-04-477Z-51bd9a65/manifest.json`.
+
+
+## Task 0932 — Orchestrator Performance & Reliability Loop
+- Primary Doc: `docs/PRD-orchestrator-performance-reliability.md`
+- Run Manifest Link: `.runs/0932-orchestrator-performance-reliability/cli/2026-01-05T16-12-04-477Z-51bd9a65/manifest.json`.
+- Metrics / State Snapshots: `.runs/0932-orchestrator-performance-reliability/metrics.json`, `out/0932-orchestrator-performance-reliability/state.json`.
+- Checklist Mirror: `tasks/tasks-0932-orchestrator-performance-reliability.md`, `docs/TASKS.md` (0932 section), `.agent/task/0932-orchestrator-performance-reliability.md`.
+- Mini-spec: `tasks/specs/0932-orchestrator-performance-reliability.md`.
 
 ## Task 0918 — Subagent Delegation Enforcement
 - Primary Doc: `docs/PRD-subagent-delegation-enforcement.md`

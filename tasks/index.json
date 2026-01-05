@@ -702,6 +702,22 @@
       },
       "created_at": "2026-01-03",
       "completed_at": "2026-01-03"
+    },
+    {
+      "id": "0932",
+      "slug": "orchestrator-performance-reliability",
+      "title": "Orchestrator Performance & Reliability Loop",
+      "path": "tasks/tasks-0932-orchestrator-performance-reliability.md",
+      "kind": "prd",
+      "status": "in-progress",
+      "gate": {
+        "phase": "orchestrator-performance-reliability-planning",
+        "status": "approved",
+        "log": ".runs/0932-orchestrator-performance-reliability/cli/2026-01-05T16-12-04-477Z-51bd9a65/manifest.json",
+        "run_id": "2026-01-05T16-12-04-477Z-51bd9a65"
+      },
+      "created_at": "2026-01-05",
+      "completed_at": null
     }
   ],
   "specs": []

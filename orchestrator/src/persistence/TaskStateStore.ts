@@ -43,7 +43,8 @@ export class TaskStateStore {
       maxAttempts: 5,
       initialDelayMs: 100,
       backoffFactor: 2,
-      maxDelayMs: 1000
+      maxDelayMs: 1000,
+      staleMs: 5 * 60 * 1000
     };
     const overrides = options.lockRetry ?? {};
     const sanitizedOverrides = Object.fromEntries(

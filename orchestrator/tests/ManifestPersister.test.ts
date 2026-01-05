@@ -132,4 +132,56 @@ describe('ManifestPersister', () => {
 
     expect(callCount).toBe(1);
   });
+
+  it('recovers from failed manifest writes', async () => {
+    const env = normalizeEnvironmentPaths(resolveEnvironmentPaths());
+    const pipeline: PipelineDefinition = {
+      id: 'persister-retry',
+      title: 'Persister Retry Pipeline',
+      stages: [
+        {
+          kind: 'command',
+          id: 'stage',
+          title: 'Stage',
+          command: 'echo ok'
+        }
+      ]
+    };
+
+    const { manifest, paths } = await bootstrapManifest('run-persister-retry', {
+      env,
+      pipeline,
+      parentRunId: null,
+      taskSlug: env.taskId,
+      approvalPolicy: null
+    });
+
+    let attempts = 0;
+    const persister = new ManifestPersister({
+      manifest,
+      paths,
+      persistIntervalMs: 0,
+      writeManifest: async () => {
+        attempts += 1;
+        if (attempts === 1) {
+          throw new Error('write failed');
+        }
+      },
+      writeHeartbeat: async () => {}
+    });
+
+    let caught: Error | null = null;
+    try {
+      await persister.schedule({ manifest: true, force: true });
+    } catch (error) {
+      caught = error as Error;
+    }
+
+    expect(caught?.message).toBe('write failed');
+
+    await persister.schedule();
+    await persister.flush();
+
+    expect(attempts).toBe(2);
+  });
 });

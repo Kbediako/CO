@@ -84,6 +84,35 @@ describe('ExperienceStore', () => {
     );
   });
 
+  it('appends new records without parsing existing file contents', async () => {
+    const store = new ExperienceStore({ outDir, runsDir });
+    const taskDir = join(outDir, 'task-0506');
+    await mkdir(taskDir, { recursive: true });
+    const filePath = join(taskDir, 'experiences.jsonl');
+    await writeFile(filePath, '{not-json}\n', 'utf8');
+
+    await store.recordBatch([createInput({ runId: 'run-append' })], 'manifests/run.json');
+
+    const raw = await readFile(filePath, 'utf8');
+    const lines = raw.split('\n').filter(Boolean);
+    expect(lines).toHaveLength(2);
+    expect(lines[1]).toContain('"runId":"run-append"');
+  });
+
+  it('skips malformed lines when fetching top experiences', async () => {
+    const store = new ExperienceStore({ outDir, runsDir });
+    const taskDir = join(outDir, 'task-0506');
+    await mkdir(taskDir, { recursive: true });
+    const filePath = join(taskDir, 'experiences.jsonl');
+    await writeFile(filePath, '{not-json}\n', 'utf8');
+
+    await store.recordBatch([createInput({ runId: 'run-top' })], 'manifests/run.json');
+
+    const top = await store.fetchTop({ domain: 'implementation', limit: 1, taskId: 'task-0506' });
+    expect(top).toHaveLength(1);
+    expect(top[0]?.runId).toBe('run-top');
+  });
+
   it('fetches top experiences by reward and domain', async () => {
     const store = new ExperienceStore({ outDir, runsDir });
     await store.recordBatch(

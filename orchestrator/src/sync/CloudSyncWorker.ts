@@ -71,7 +71,7 @@ export class CloudSyncWorker {
       manifest = await this.readManifestWithRetry(summary);
     } catch (error: unknown) {
       this.options.onError?.(error, summary, 0);
-      await this.appendAuditLog({
+      await this.safeAppendAuditLog({
         level: 'error',
         message: 'Failed to read manifest before sync',
         summary,
@@ -95,7 +95,7 @@ export class CloudSyncWorker {
           idempotencyKey
         });
         this.options.onSuccess?.(result, summary);
-        await this.appendAuditLog({
+        await this.safeAppendAuditLog({
           level: 'info',
           message: 'Cloud sync completed',
           summary,
@@ -104,7 +104,7 @@ export class CloudSyncWorker {
         return;
       } catch (error: unknown) {
         this.options.onError?.(error, summary, attempt);
-        await this.appendAuditLog({
+        await this.safeAppendAuditLog({
           level: 'error',
           message: 'Cloud sync attempt failed',
           summary,
@@ -141,6 +141,18 @@ export class CloudSyncWorker {
       details: entry.details
     });
     await appendFile(logPath, `${line}\n`, 'utf-8');
+  }
+
+  private async safeAppendAuditLog(entry: AuditLogEntry): Promise<void> {
+    try {
+      await this.appendAuditLog(entry);
+    } catch (error) {
+      try {
+        this.options.onError?.(error, entry.summary, 0);
+      } catch {
+        // swallow audit log failures
+      }
+    }
   }
 
   private shouldRetry(error: unknown): boolean {
@@ -183,7 +195,7 @@ export class CloudSyncWorker {
       if (repaired) {
         try {
           const parsed = JSON.parse(repaired) as Record<string, unknown>;
-          await this.appendAuditLog({
+          await this.safeAppendAuditLog({
             level: 'info',
             message: 'Recovered manifest from partial JSON',
             summary,

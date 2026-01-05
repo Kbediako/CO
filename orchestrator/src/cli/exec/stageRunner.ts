@@ -1,4 +1,4 @@
-import { runCommandStage, type CommandRunHooks } from '../services/commandRunner.js';
+import { runCommandStage, type CommandRunHooks, MAX_CAPTURED_CHUNK_EVENTS } from '../services/commandRunner.js';
 import { serializeExecEvent } from '../../../../packages/shared/events/serializer.js';
 import type { ExecEvent } from '../../../../packages/shared/events/types.js';
 import type { ToolRunRecord } from '../../../../packages/shared/manifest/types.js';
@@ -15,16 +15,44 @@ export interface StageRunResult {
 export async function runExecStage(context: ExecRunContext): Promise<StageRunResult> {
   let runResultSummary: RunResultSummary | null = null;
   let toolRecord: ToolRunRecord | null = null;
+  const maxChunkEvents = MAX_CAPTURED_CHUNK_EVENTS;
+  let capturedChunkEvents = 0;
+
+  const shouldCaptureEvent = (event: ExecEvent): boolean => {
+    if (maxChunkEvents <= 0) {
+      return true;
+    }
+    if (event.type !== 'exec:chunk') {
+      return true;
+    }
+    if (capturedChunkEvents >= maxChunkEvents) {
+      return false;
+    }
+    capturedChunkEvents += 1;
+    return true;
+  };
 
   const hooks: CommandRunHooks = {
     onEvent: (event) => {
-      context.execEvents.push(event);
-      const serialized = serializeExecEvent(event);
-      context.telemetryTasks.push(Promise.resolve(context.telemetrySink.record(serialized)).then(() => undefined));
+      const captureEvent = shouldCaptureEvent(event);
+      let serialized: ReturnType<typeof serializeExecEvent> | null = null;
+      const getSerialized = () => {
+        if (!serialized) {
+          serialized = serializeExecEvent(event);
+        }
+        return serialized;
+      };
+
       if (context.outputMode === 'jsonl' && context.jsonlWriter) {
-        context.jsonlWriter(serialized);
+        context.jsonlWriter(getSerialized());
       } else if (context.outputMode === 'interactive') {
         streamInteractive(context.stdout, context.stderr, event);
+      }
+
+      if (captureEvent) {
+        context.execEvents.push(event);
+        const payload = getSerialized();
+        context.telemetryTasks.push(Promise.resolve(context.telemetrySink.record(payload)).then(() => undefined));
       }
     },
     onResult: (result) => {

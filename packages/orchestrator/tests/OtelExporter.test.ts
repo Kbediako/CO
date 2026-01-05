@@ -67,6 +67,40 @@ describe('OtelTelemetrySink', () => {
     expect(await getPostedKind(fetchMock, 1)).toBe('summary');
   });
 
+  it('drops oldest events when queue exceeds max', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(okResponse);
+    const sink = createTelemetrySink({ endpoint: 'https://telemetry.example', fetch: fetchMock, maxQueueSize: 2 });
+    for (const [sequence, data] of [[1, 'one'], [2, 'two'], [3, 'three']] as const) {
+      await sink.record(buildChunkEvent(sequence, data));
+    }
+    await sink.flush();
+    const sequences = ((await getPostedPayload(fetchMock, 0))?.events ?? []).map(
+      (event: { payload?: { sequence?: number } }) => event.payload?.sequence
+    );
+    expect(sequences).toEqual([2, 3]);
+  });
+
+  it('caps the queue after flush failures while recording new events', async () => {
+    let rejectFetch!: (error: Error) => void;
+    const fetchMock = vi.fn().mockImplementation(() => new Promise<Response>((_resolve, reject) => { rejectFetch = reject; }));
+    const sink = createTelemetrySink({ endpoint: 'https://telemetry.example', fetch: fetchMock, maxQueueSize: 2, backoffMs: 0 });
+    for (const [sequence, data] of [[1, 'one'], [2, 'two']] as const) {
+      await sink.record(buildChunkEvent(sequence, data));
+    }
+    const flushPromise = sink.flush();
+    for (const [sequence, data] of [[3, 'three'], [4, 'four']] as const) {
+      await sink.record(buildChunkEvent(sequence, data));
+    }
+    rejectFetch(new Error('offline'));
+    await flushPromise;
+    fetchMock.mockResolvedValueOnce(okResponse);
+    await sink.flush();
+    const sequences = ((await getPostedPayload(fetchMock, 1))?.events ?? []).map(
+      (event: { payload?: { sequence?: number } }) => event.payload?.sequence
+    );
+    expect(sequences).toEqual([3, 4]);
+  });
+
   it('includes tfgrpo dimensions when metrics are present', async () => {
     const fetchMock = vi.fn().mockResolvedValue(okResponse);
     const sink = createTelemetrySink({ endpoint: 'https://telemetry.example', fetch: fetchMock });
@@ -194,4 +228,38 @@ async function getPostedKind(fetchMock: ReturnType<typeof vi.fn>, index: number)
     return JSON.parse(body.toString()).kind;
   }
   return undefined;
+}
+
+async function getPostedPayload(
+  fetchMock: ReturnType<typeof vi.fn>,
+  index: number
+): Promise<Record<string, unknown> | undefined> {
+  const call = fetchMock.mock.calls[index];
+  if (!call) {
+    return undefined;
+  }
+  const requestInit = call[1] as RequestInit;
+  const body = requestInit?.body;
+  if (typeof body === 'string') {
+    return JSON.parse(body) as Record<string, unknown>;
+  }
+  if (body instanceof Buffer) {
+    return JSON.parse(body.toString()) as Record<string, unknown>;
+  }
+  return undefined;
+}
+
+function buildChunkEvent(sequence: number, data: string) {
+  return {
+    type: 'exec:chunk',
+    timestamp: '2025-11-04T00:00:00.000Z',
+    payload: {
+      attempt: 1,
+      correlationId: 'corr',
+      stream: 'stdout',
+      sequence,
+      bytes: data.length,
+      data
+    }
+  };
 }
