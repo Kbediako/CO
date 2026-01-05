@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp c5500ceec6fb83f9fcbca5cde4661e514fc06cd5b35d6158c451995d70942d47 -->
+<!-- codex:instruction-stamp f77240aaeca758345a36fd504a47bcbee88c805bac60fdddebb737dc23ae8e1b -->
 # Codex-Orchestrator Agent Handbook (Template)
 
 Use this repository as the wrapper that coordinates multiple Codex-driven projects. After cloning, replace placeholder metadata (task IDs, documents, SOPs) with values for each downstream initiative while keeping these shared guardrails in place.
@@ -69,6 +69,18 @@ Use this repository as the wrapper that coordinates multiple Codex-driven projec
 - Monitor PR checks and review feedback for 10–20 minutes after all required checks turn green (use a background loop when possible).
 - If checks remain green and no new feedback arrives during the window, merge via GitHub and delete the branch.
 - Reset the window if checks restart or feedback arrives; do not merge draft PRs or PRs labeled "do not merge."
+
+## GitHub Agent Review Replies
+- Always reply directly in the original review discussion thread (line comment), not just top-level PR comments.
+- Tag the agent explicitly (e.g., `@coderabbitai`) and mention what changed plus the commit SHA.
+- CLI/API example for replying to a review comment:
+```
+gh api -X POST repos/<org>/<repo>/pulls/<pr>/comments \
+  -f body='@coderabbitai Fixed … (commit abc123). Please re-review/resolve.' \
+  -F in_reply_to=<comment_id>
+```
+- If thread reply via API fails due to permissions, fall back to a line comment on the same diff hunk, still tagging the agent.
+- After replying, check `gh pr view <pr> --json reviewDecision` and wait for it to flip to `APPROVED` before merging.
 
 ## Build & Test Commands (defaults)
 Implementation work is not “complete” until you run (in order):

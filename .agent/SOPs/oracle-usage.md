@@ -3,16 +3,11 @@
 ## Goal
 Standardize Oracle runs (browser mode) with reliable file batching, unique filenames, and Chrome DevTools observability.
 
-## Warning (uploads currently broken)
-- Uploads are broken: spinner stalls indefinitely and `fileCount` stays `0`.
-- This reproduces with `--browser-manual-login` (manual login did not help).
-- Do not use attachments; use inline or `--render --copy` only.
-
 ## Oracle run rules (must follow)
 1) Max 4 files per Oracle run. Do not exceed four `--file` entries.
 2) Do not upload files with duplicate basenames (e.g., two `manifest.json`).
 3) Keep the Chrome window open until Oracle completes. Closing it ends the run.
-4) Use inline-only: `--browser-inline-files` or `--browser-attachments never`; if too large, use `--render --copy` and paste manually.
+4) Prefer uploads: `--browser-attachments always`; if uploads fail, use inline or `--render --copy` and paste manually.
 
 ## Preflight checklist
 - Run once per session: `npx -y @steipete/oracle --help`.
@@ -26,14 +21,9 @@ Standardize Oracle runs (browser mode) with reliable file batching, unique filen
   - `cp path/a/manifest.json /tmp/oracle-batch/manifest-run-a.json`
   - `cp path/b/manifest.json /tmp/oracle-batch/manifest-run-b.json`
 
-## File attachment workaround (current issue)
-Symptoms (observed):
-- Upload spinner appears but never completes (attachment stays pending).
-- `fileCount` stays `0` even when an attachment appears in the UI.
-- `--browser-manual-login` (persistent profile) did not resolve the stall; prompt commit still failed.
-
-Reliable workflow (no uploads):
-- Force inline with `--browser-inline-files` (or `--browser-attachments never`).
+## Uploads + fallback
+- Default to attachments with `--browser-attachments always`.
+- If uploads fail or are blocked, use inline (`--browser-inline-files` or `--browser-attachments never`).
 - If inline is too large, use `--render --copy` and paste manually.
 - Hard inline cap: 255k chars. Recommend <=200k chars for safety. 256k+ fails with ChatGPT “message too long”.
 - Troubleshooting: if DevTools opens a non-Oracle tab, use list/select to target the ChatGPT tab.
@@ -43,6 +33,7 @@ Reliable workflow (no uploads):
 npx -y @steipete/oracle --engine browser --model gpt-5.2-pro \
   --browser-port 9222 \
   --browser-cookie-wait 5 \
+  --browser-attachments always \
   --slug "<short-slug>" \
   -p "<prompt>" \
   --file "<file1>" \
@@ -93,4 +84,4 @@ Suggested MCP flow (tool names only):
 ## Notes
 - Always keep Oracle runs to 4 files max, and avoid duplicate basenames.
 - Use `--render --copy` for manual paste if browser runs fail repeatedly.
-- If uploads stall, fall back to inline or manual paste until the UI automation is fixed upstream.
+- If uploads fail, fall back to inline or manual paste.
