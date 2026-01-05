@@ -99,6 +99,22 @@ describe('ExperienceStore', () => {
     expect(lines[1]).toContain('"runId":"run-append"');
   });
 
+  it('inserts a newline when the existing file is missing a trailing line break', async () => {
+    const store = new ExperienceStore({ outDir, runsDir });
+    const taskDir = join(outDir, 'task-0506');
+    await mkdir(taskDir, { recursive: true });
+    const filePath = join(taskDir, 'experiences.jsonl');
+    await writeFile(filePath, '{"runId":"run-old"}', 'utf8');
+
+    await store.recordBatch([createInput({ runId: 'run-new' })], 'manifests/run.json');
+
+    const raw = await readFile(filePath, 'utf8');
+    const lines = raw.split('\n').filter(Boolean);
+    expect(lines).toHaveLength(2);
+    expect(lines[0]).toContain('"runId":"run-old"');
+    expect(lines[1]).toContain('"runId":"run-new"');
+  });
+
   it('skips malformed lines when fetching top experiences', async () => {
     const store = new ExperienceStore({ outDir, runsDir });
     const taskDir = join(outDir, 'task-0506');

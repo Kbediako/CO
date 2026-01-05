@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import { createReadStream } from 'node:fs';
-import { appendFile, mkdir, rm } from 'node:fs/promises';
+import { appendFile, mkdir, open, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { createInterface } from 'node:readline';
 
@@ -108,6 +108,7 @@ export class ExperienceStore {
       await mkdir(targetDir, { recursive: true });
       const filePath = join(targetDir, 'experiences.jsonl');
       const nextRecords = inputs.map((input) => this.prepareRecord(input, manifestPath));
+      await this.ensureTrailingNewline(filePath);
       const payload = nextRecords.map((record) => JSON.stringify(record)).join('\n');
       await appendFile(filePath, `${payload}\n`, 'utf8');
       return nextRecords;
@@ -229,6 +230,32 @@ export class ExperienceStore {
         } catch {
           continue;
         }
+      }
+    } catch (error: unknown) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+        return;
+      }
+      throw error;
+    }
+  }
+
+  private async ensureTrailingNewline(filePath: string): Promise<void> {
+    try {
+      const handle = await open(filePath, 'r');
+      let needsNewline = false;
+      try {
+        const { size } = await handle.stat();
+        if (size === 0) {
+          return;
+        }
+        const buffer = Buffer.alloc(1);
+        await handle.read(buffer, 0, 1, size - 1);
+        needsNewline = buffer[0] !== 0x0a;
+      } finally {
+        await handle.close();
+      }
+      if (needsNewline) {
+        await appendFile(filePath, '\n', 'utf8');
       }
     } catch (error: unknown) {
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') {

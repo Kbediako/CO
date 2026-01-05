@@ -718,6 +718,22 @@
       },
       "created_at": "2026-01-05",
       "completed_at": null
+    },
+    {
+      "id": "0933",
+      "slug": "orchestrator-experience-jsonl-repair",
+      "title": "ExperienceStore JSONL Line Repair",
+      "path": "tasks/tasks-0933-orchestrator-experience-jsonl-repair.md",
+      "kind": "prd",
+      "status": "in-progress",
+      "gate": {
+        "phase": "orchestrator-experience-jsonl-repair-planning",
+        "status": "approved",
+        "log": ".runs/0933-orchestrator-experience-jsonl-repair/cli/2026-01-05T18-26-16-547Z-91ff2f7d/manifest.json",
+        "run_id": "2026-01-05T18-26-16-547Z-91ff2f7d"
+      },
+      "created_at": "2026-01-05",
+      "completed_at": null
     }
   ],
   "specs": []
