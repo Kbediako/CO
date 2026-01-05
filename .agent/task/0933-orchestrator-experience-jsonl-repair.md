@@ -8,7 +8,7 @@
 - [x] Diagnostics + RLM runs captured with hotspot summary - Evidence: `.runs/0933-orchestrator-experience-jsonl-repair/cli/2026-01-05T18-27-56-032Z-7c590fdf/manifest.json`, `.runs/0933-orchestrator-experience-jsonl-repair/cli/2026-01-05T18-29-14-158Z-3055a7e3/manifest.json`, `tasks/tasks-0933-orchestrator-experience-jsonl-repair.md`.
 
 ## Implementation
-- [x] Targeted reliability fix + tests applied - Evidence: code changes, `.runs/0933-orchestrator-experience-jsonl-repair/cli/2026-01-05T18-37-23-857Z-9d920209/manifest.json`.
+- [x] Targeted reliability fix + tests applied - Evidence: code changes, `.runs/0933-orchestrator-experience-jsonl-repair/cli/2026-01-05T18-48-07-086Z-d1ec7ec4/manifest.json`.
 
 ## Validation + Handoff
-- [x] Implementation-gate manifest captured - Evidence: `.runs/0933-orchestrator-experience-jsonl-repair/cli/2026-01-05T18-37-23-857Z-9d920209/manifest.json`.
+- [x] Implementation-gate manifest captured - Evidence: `.runs/0933-orchestrator-experience-jsonl-repair/cli/2026-01-05T18-48-07-086Z-d1ec7ec4/manifest.json`.
