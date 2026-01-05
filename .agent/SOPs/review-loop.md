@@ -13,9 +13,21 @@ Use this playbook whenever handing off a review (`npm run review` or an implemen
    - Medium: 51–200 LOC or 4–10 files, touches scripts/docs/pipelines → 15–20 min.
    - Large: >200 LOC, >10 files, touches CI/guardrails/release paths or adds deps → 25–30 min.
 5. Check inline review comments/threads (not just review summaries). Use `gh pr view <number> --comments` or `gh api repos/<owner>/<repo>/pulls/<number>/comments` and ensure no unresolved items remain.
-6. For Codex connector review comments, respond in-thread (not a top-level PR comment), react with 👍 once addressed, and resolve the review thread.
+6. For GitHub agent review comments (CodeRabbit, Copilot, Codex connector), respond in-thread, react with 👍 once addressed, and resolve the review thread.
 7. If the reviewer finds issues, fix them, update `NOTES` with follow-up questions (when needed), and rerun the same gate.
 8. Repeat until the reviewer reports no findings.
+
+## GitHub agent review replies
+- Always reply directly in the original review discussion thread (line comment), not just top-level PR comments.
+- Tag the agent explicitly (e.g., `@coderabbitai`), and mention what changed plus the commit SHA.
+- CLI/API example for replying to a review comment:
+```bash
+gh api -X POST repos/<org>/<repo>/pulls/<pr>/comments \
+  -f body='@coderabbitai Fixed … (commit abc123). Please re-review/resolve.' \
+  -F in_reply_to=<comment_id>
+```
+- If a thread reply via API fails due to permissions, fall back to a line comment on the same diff hunk, still tagging the agent.
+- After replying, check `gh pr view <pr> --json reviewDecision` and wait for it to flip to `APPROVED` before merging.
 
 ## Notes
 - Keep reviewer questions concise and specific to unblock decisions.
@@ -23,7 +35,6 @@ Use this playbook whenever handing off a review (`npm run review` or an implemen
 - Inline review comments live in review threads; use the API to list them when monitoring:
   - `gh api repos/<owner>/<repo>/pulls/<number>/comments`
   - Or GraphQL (reviewThreads) if you need thread context.
-- Reply to an inline comment with `gh api -X POST repos/<owner>/<repo>/pulls/<number>/comments/<comment_id>/replies -f body='...'`.
 - Resolve threads via GraphQL: `resolveReviewThread` with the thread id from `reviewThreads`.
 
 ## Template

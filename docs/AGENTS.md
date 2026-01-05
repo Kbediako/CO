@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp 4cb3c9d54fc7d7ef9d77928c1a9b9560e2998369be602d31064dfd0262c92100 -->
+<!-- codex:instruction-stamp 660bde868cf0293dd9b72fe2f09f3138b47bdc995070d56b3edfa54da0c974b0 -->
 # Repository Agent Guidance
 
 ## Project 0303 — Codex Orchestrator Autonomy Enhancements
@@ -35,6 +35,18 @@
 - Monitor PR checks and review feedback for 10–20 minutes after all required checks turn green.
 - If checks remain green and no new feedback arrives during the window, merge via GitHub and delete the branch.
 - Reset the window if checks restart or feedback arrives; do not merge draft PRs or PRs labeled "do not merge."
+
+## GitHub Agent Review Replies
+- Always reply directly in the original review discussion thread (line comment), not just top-level PR comments.
+- Tag the agent explicitly (e.g., `@coderabbitai`), and mention what changed plus the commit SHA.
+- CLI/API example for replying to a review comment:
+```bash
+gh api -X POST repos/<org>/<repo>/pulls/<pr>/comments \
+  -f body='@coderabbitai Fixed … (commit abc123). Please re-review/resolve.' \
+  -F in_reply_to=<comment_id>
+```
+- If a thread reply via API fails due to permissions, fall back to a line comment on the same diff hunk, still tagging the agent.
+- After replying, check `gh pr view <pr> --json reviewDecision` and wait for it to flip to `APPROVED` before merging.
 
 ## DevTools Review Gate (Optional)
 - For frontend QA/visual review runs that need Chrome DevTools, use `CODEX_REVIEW_DEVTOOLS=1 npx codex-orchestrator start implementation-gate --format json --no-interactive --task <task-id>` so only the review handoff enables DevTools.
