@@ -25,6 +25,7 @@ node scripts/update-instruction-stamp.mjs --check .agent/AGENTS.md
 ## Notes
 - Commit stamp updates in the same PR as the content change.
 - After updating stamps, run `docs-review` and `implementation-gate` (when code/scripts changed).
+- Core lane CI runs `node scripts/update-instruction-stamp.mjs --check` to catch drift.
 
 ## Escalation
 - If `--check` fails in CI, run the update locally and commit the corrected stamp.
