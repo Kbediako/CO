@@ -8,7 +8,7 @@
 - [x] Diagnostics + RLM runs captured with hotspot summary - Evidence: `.runs/0932-orchestrator-performance-reliability/cli/2026-01-05T16-14-28-095Z-416cf9bb/manifest.json`, `.runs/0932-orchestrator-performance-reliability/cli/2026-01-05T16-16-02-146Z-e87b271d/manifest.json`, `tasks/tasks-0932-orchestrator-performance-reliability.md`.
 
 ## Implementation
-- [x] Targeted performance/reliability fixes + tests/benchmarks applied - Evidence: code changes, `.runs/0932-orchestrator-performance-reliability/cli/2026-01-05T17-45-32-410Z-721b9f98/manifest.json`.
+- [x] Targeted performance/reliability fixes + tests/benchmarks applied - Evidence: code changes, `.runs/0932-orchestrator-performance-reliability/cli/2026-01-05T17-52-00-108Z-be984007/manifest.json`.
 
 ## Validation + Handoff
-- [x] Implementation-gate manifest captured - Evidence: `.runs/0932-orchestrator-performance-reliability/cli/2026-01-05T17-45-32-410Z-721b9f98/manifest.json`.
+- [x] Implementation-gate manifest captured - Evidence: `.runs/0932-orchestrator-performance-reliability/cli/2026-01-05T17-52-00-108Z-be984007/manifest.json`.
