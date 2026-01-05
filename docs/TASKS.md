@@ -15,14 +15,13 @@ Archived task snapshots live on the task-archives branch.
 # Task List Snapshot — Recursive Language Model Orchestrator (0105)
 
 - Update - Planning: PRD/tech spec/action plan/mini-spec/checklist drafted; docs-review manifest at `.runs/0105-rlm-orchestrator/cli/2026-01-05T01-34-37-751Z-8297b912/manifest.json`.
-- Update - Implementation: RLM CLI + pipeline + runner delivered; implementation-gate manifest at `.runs/0105-rlm-orchestrator/cli/2026-01-05T02-11-21-335Z-59fc8cb8/manifest.json`; subagent diagnostics at `.runs/0105-rlm-orchestrator-subagent/cli/2026-01-05T01-33-04-231Z-f1060b4e/manifest.json`.
+- Update - Implementation: RLM CLI + pipeline + runner delivered; implementation-gate manifest at `.runs/0105-rlm-orchestrator/cli/2026-01-05T02-28-20-190Z-5dd73dc0/manifest.json`; subagent diagnostics at `.runs/0105-rlm-orchestrator-subagent/cli/2026-01-05T01-33-04-231Z-f1060b4e/manifest.json`.
 - Notes: Export `MCP_RUNNER_TASK_ID=0105-rlm-orchestrator` before orchestrator commands.
-
 ## Checklist Mirror
 Mirror status with `tasks/tasks-0105-rlm-orchestrator.md` and `.agent/task/0105-rlm-orchestrator.md`. Keep `[ ]` until evidence is recorded.
 - [x] Collateral drafted (PRD/tech spec/action plan/checklist/mini-spec) - Evidence: `docs/PRD-rlm-orchestrator.md`, `docs/TECH_SPEC-rlm-orchestrator.md`, `docs/ACTION_PLAN-rlm-orchestrator.md`, `tasks/tasks-0105-rlm-orchestrator.md`, `tasks/specs/0105-rlm-orchestrator.md`.
 - [x] Docs-review manifest captured (pre-implementation) - Evidence: `.runs/0105-rlm-orchestrator/cli/2026-01-05T01-34-37-751Z-8297b912/manifest.json`.
-- [x] Mirrors updated in `docs/TASKS.md`, `tasks/tasks-0105-rlm-orchestrator.md`, and `.agent/task/0105-rlm-orchestrator.md` - Evidence: `docs/TASKS.md`, `tasks/tasks-0105-rlm-orchestrator.md`, `.agent/task/0105-rlm-orchestrator.md`, `tasks/index.json`.
+- [x] Mirrors updated in `docs/TASKS.md`, `tasks/tasks-0105-rlm-orchestrator.md`, `.agent/task/0105-rlm-orchestrator.md`, and `tasks/index.json` - Evidence: `docs/TASKS.md`, `tasks/tasks-0105-rlm-orchestrator.md`, `.agent/task/0105-rlm-orchestrator.md`, `tasks/index.json`.
 
 ### Implementation Planning
 - [x] CLI entrypoint + pipeline shape agreed. Evidence: `bin/codex-orchestrator.ts`, `codex.orchestrator.json`.

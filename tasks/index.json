@@ -42,8 +42,8 @@
       "gate": {
         "phase": "rlm-orchestrator-implementation",
         "status": "succeeded",
-        "log": ".runs/0105-rlm-orchestrator/cli/2026-01-05T02-11-21-335Z-59fc8cb8/manifest.json",
-        "run_id": "2026-01-05T02-11-21-335Z-59fc8cb8"
+        "log": ".runs/0105-rlm-orchestrator/cli/2026-01-05T02-28-20-190Z-5dd73dc0/manifest.json",
+        "run_id": "2026-01-05T02-28-20-190Z-5dd73dc0"
       },
       "created_at": "2026-01-04",
       "completed_at": null
