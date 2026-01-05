@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp 056d7e2d2baa43451d677b375008bcb801edb22d4d410949d2cd3bedfd1a4c09 -->
+<!-- codex:instruction-stamp a1590027e376e01fe598cee98eec14e10a82e22fe12774ccfcc0b40ed4ddadf8 -->
 # Agent Enablement
 
 ## Added by Bootstrap 2025-10-16
@@ -77,6 +77,7 @@ Note: pipelines already set `CODEX_NON_INTERACTIVE=1`; keep it for shortcut runs
 - Orchestrator-first: use `codex-orchestrator` pipelines for planning, implementation, validation, and review; avoid ad-hoc command chains unless no manifest evidence is required.
 - Delegation is mandatory for top-level tasks: spawn at least one subagent run using `MCP_RUNNER_TASK_ID=<task-id>-<stream>`, capture manifest evidence, and summarize in the main run. Use `DELEGATION_GUARD_OVERRIDE_REASON` only when delegation is impossible and record the justification.
 - Oracle runs must follow `.agent/SOPs/oracle-usage.md` (4-file max per run, no duplicate basenames, DevTools inspection flow).
+- When editing any `AGENTS.md` file, refresh the instruction stamp with `node scripts/update-instruction-stamp.mjs` (see `.agent/SOPs/instruction-stamps.md`).
 - When writing PR summaries, avoid literal `\n` sequences; use `gh pr create --body-file` or a here-doc so line breaks render correctly in GitHub.
 - Keep `docs/TASKS.md` under the line threshold in `docs/tasks-archive-policy.json`; the tasks archive automation workflow opens a PR and updates the `task-archives` branch when the limit is exceeded. Use `npm run docs:archive-tasks` for manual fallback.
 - Archive implementation docs using `docs/implementation-docs-archive-policy.json`; the automation workflow syncs payloads to `doc-archives` and opens a PR with stubs. Use `npm run docs:archive-implementation` for manual fallback.

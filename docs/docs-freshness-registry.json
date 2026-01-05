@@ -2,13 +2,13 @@
   "version": 1,
   "generated_at": "2026-01-05",
   "entries": [
-    {
-      "path": ".agent/AGENTS.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2025-12-31",
-      "cadence_days": 90
-    },
+  {
+    "path": ".agent/AGENTS.md",
+    "owner": "Codex (top-level agent), Review agent",
+    "status": "active",
+    "last_review": "2026-01-05",
+    "cadence_days": 90
+  },
     {
       "path": ".agent/prompts/crystalizer.md",
       "owner": "Codex (top-level agent), Review agent",
@@ -58,17 +58,24 @@
       "last_review": "2025-12-31",
       "cadence_days": 90
     },
-    {
-      "path": ".agent/SOPs/git-management.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2025-12-31",
-      "cadence_days": 90
-    },
-    {
-      "path": ".agent/SOPs/incident-response.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+  {
+    "path": ".agent/SOPs/git-management.md",
+    "owner": "Codex (top-level agent), Review agent",
+    "status": "active",
+    "last_review": "2025-12-31",
+    "cadence_days": 90
+  },
+  {
+    "path": ".agent/SOPs/instruction-stamps.md",
+    "owner": "Codex (top-level agent), Review agent",
+    "status": "active",
+    "last_review": "2026-01-05",
+    "cadence_days": 90
+  },
+  {
+    "path": ".agent/SOPs/incident-response.md",
+    "owner": "Codex (top-level agent), Review agent",
+    "status": "active",
       "last_review": "2025-12-31",
       "cadence_days": 90
     },
