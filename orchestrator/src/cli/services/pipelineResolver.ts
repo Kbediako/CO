@@ -1,6 +1,6 @@
 import process from 'node:process';
 import { EnvironmentPaths } from '../run/environment.js';
-import { loadUserConfig, type UserConfig } from '../config/userConfig.js';
+import { loadPackageConfig, loadUserConfig, type UserConfig } from '../config/userConfig.js';
 import { resolvePipeline } from '../pipelines/index.js';
 import {
   loadDesignConfig,
@@ -65,6 +65,17 @@ export class PipelineResolver {
       logger.info(`PipelineResolver.resolve selected pipeline ${pipeline.id}`);
       return { pipeline, userConfig, designConfig, source, envOverrides };
     } catch (error) {
+      if (requestedPipelineId === 'rlm' && userConfig?.source === 'repo') {
+        const packageConfig = await loadPackageConfig(env);
+        if (packageConfig) {
+          const { pipeline, source } = resolvePipeline(env, {
+            pipelineId: requestedPipelineId,
+            config: packageConfig
+          });
+          logger.info(`PipelineResolver.resolve selected package pipeline ${pipeline.id}`);
+          return { pipeline, userConfig: packageConfig, designConfig, source, envOverrides };
+        }
+      }
       logger.error(
         `PipelineResolver.resolve failed for ${requestedPipelineId ?? '<default>'}: ${(error as Error).message}`
       );

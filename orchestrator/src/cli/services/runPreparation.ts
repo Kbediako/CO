@@ -107,11 +107,18 @@ export async function prepareRun(options: PrepareRunOptions): Promise<RunPrepara
 export function resolvePipelineForResume(
   env: EnvironmentPaths,
   manifest: CliManifest,
-  config: UserConfig | null
+  config: UserConfig | null,
+  fallbackConfig: UserConfig | null = null
 ): PipelineDefinition {
   const existing = findPipeline(config ?? null, manifest.pipeline_id);
   if (existing) {
     return existing;
+  }
+  if (manifest.pipeline_id === 'rlm' && fallbackConfig) {
+    const fallback = findPipeline(fallbackConfig, manifest.pipeline_id);
+    if (fallback) {
+      return fallback;
+    }
   }
   const { pipeline } = resolvePipeline(env, { pipelineId: manifest.pipeline_id, config });
   return pipeline;

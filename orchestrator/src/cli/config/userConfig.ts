@@ -23,7 +23,7 @@ interface ConfigFile {
   stageSets?: Record<string, PipelineStage[]>;
 }
 
-export async function loadUserConfig(env: EnvironmentPaths): Promise<UserConfig | null> {
+export async function loadRepoConfig(env: EnvironmentPaths): Promise<UserConfig | null> {
   const repoConfigPath = join(env.repoRoot, 'codex.orchestrator.json');
   const repoConfig = await readConfig(repoConfigPath);
   if (repoConfig) {
@@ -31,7 +31,11 @@ export async function loadUserConfig(env: EnvironmentPaths): Promise<UserConfig 
     return normalizeUserConfig(repoConfig, 'repo');
   }
   logger.warn(`[codex-config] Missing codex.orchestrator.json at ${repoConfigPath}`);
+  return null;
+}
 
+export async function loadPackageConfig(env: EnvironmentPaths): Promise<UserConfig | null> {
+  const repoConfigPath = join(env.repoRoot, 'codex.orchestrator.json');
   const packageRoot = findPackageRoot();
   const packageConfigPath = join(packageRoot, 'codex.orchestrator.json');
   if (packageConfigPath === repoConfigPath) {
@@ -44,6 +48,14 @@ export async function loadUserConfig(env: EnvironmentPaths): Promise<UserConfig 
   }
   logger.warn(`[codex-config] Missing codex.orchestrator.json at ${packageConfigPath}`);
   return null;
+}
+
+export async function loadUserConfig(env: EnvironmentPaths): Promise<UserConfig | null> {
+  const repoConfig = await loadRepoConfig(env);
+  if (repoConfig) {
+    return repoConfig;
+  }
+  return await loadPackageConfig(env);
 }
 
 export function findPipeline(config: UserConfig | null, id: string): PipelineDefinition | null {
