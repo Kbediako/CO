@@ -149,7 +149,7 @@ Notes:
 - `TaskStateStore` writes per-task snapshots with bounded lock retries; failures degrade gracefully while still writing the main manifest.
 - `RunManifestWriter` generates the canonical manifest JSON for each run (mirrored under `.runs/`), while metrics appenders and summary writers keep `out/` up to date.
 - Heartbeat files and timestamps guard against stalled runs. `orchestrator/src/cli/metrics/metricsRecorder.ts` aggregates command durations, exit codes, and guardrail stats for later review.
-- Optional caps: `CODEX_ORCHESTRATOR_EXEC_EVENT_MAX_CHUNKS` limits captured exec chunk events per command (0 = no cap), and `CODEX_METRICS_PRIVACY_EVENTS_MAX` limits privacy decision events stored in `metrics.json` (-1 = no cap; `privacy_event_count` still reflects total).
+- Optional caps: `CODEX_ORCHESTRATOR_EXEC_EVENT_MAX_CHUNKS` limits captured exec chunk events per command (defaults to 500; set 0 for no cap), `CODEX_ORCHESTRATOR_TELEMETRY_MAX_EVENTS` caps in-memory telemetry events queued before flush (defaults to 1000; set 0 for no cap), and `CODEX_METRICS_PRIVACY_EVENTS_MAX` limits privacy decision events stored in `metrics.json` (-1 = no cap; `privacy_event_count` still reflects total).
 
 ## Customizing for New Projects
 - Duplicate the templates under `/tasks`, `docs/`, and `.agent/` for your task ID and keep checklist status mirrored (`[ ]` → `[x]`) with links to the manifest that proves each outcome.

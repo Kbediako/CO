@@ -42,6 +42,7 @@ export class ManifestPersister {
   }
 
   schedule(options: PersistRequest = {}): Promise<void> {
+    this.pendingPersist = this.pendingPersist.catch(() => undefined);
     const { manifest: includeManifest = false, heartbeat: includeHeartbeat = false, force = false } = options;
     this.dirtyManifest = this.dirtyManifest || includeManifest;
     this.dirtyHeartbeat = this.dirtyHeartbeat || includeHeartbeat;
@@ -97,12 +98,18 @@ export class ManifestPersister {
     const writeHeartbeat = this.dirtyHeartbeat;
     this.dirtyManifest = false;
     this.dirtyHeartbeat = false;
-    this.lastPersistAt = this.now();
-    if (writeManifest) {
-      await this.writeManifest(this.paths, this.manifest);
-    }
-    if (writeHeartbeat) {
-      await this.writeHeartbeat(this.paths, this.manifest);
+    try {
+      if (writeManifest) {
+        await this.writeManifest(this.paths, this.manifest);
+      }
+      if (writeHeartbeat) {
+        await this.writeHeartbeat(this.paths, this.manifest);
+      }
+      this.lastPersistAt = this.now();
+    } catch (error) {
+      this.dirtyManifest = this.dirtyManifest || writeManifest;
+      this.dirtyHeartbeat = this.dirtyHeartbeat || writeHeartbeat;
+      throw error;
     }
   }
 }

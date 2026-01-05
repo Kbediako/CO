@@ -7,6 +7,7 @@ export interface OtelExporterOptions {
   maxFailures?: number;
   backoffMs?: number;
   maxBackoffMs?: number;
+  maxQueueSize?: number;
   fetch?: typeof fetch;
   logger?: { warn(message: string): void };
 }
@@ -38,6 +39,7 @@ export function createTelemetrySink(options: OtelExporterOptions = {}): ExecTele
     maxFailures: options.maxFailures ?? DEFAULT_MAX_FAILURES,
     backoffMs: options.backoffMs ?? DEFAULT_BACKOFF_MS,
     maxBackoffMs: options.maxBackoffMs ?? DEFAULT_MAX_BACKOFF_MS,
+    maxQueueSize: options.maxQueueSize,
     fetch: fetchImpl,
     logger: options.logger ?? console
   });
@@ -67,6 +69,7 @@ interface OtelTelemetryConfig {
   maxFailures: number;
   backoffMs: number;
   maxBackoffMs: number;
+  maxQueueSize?: number;
   fetch: typeof fetch;
   logger: { warn(message: string): void };
 }
@@ -79,6 +82,7 @@ class OtelTelemetrySink implements ExecTelemetrySink {
   private readonly maxFailures: number;
   private readonly backoffMs: number;
   private readonly maxBackoffMs: number;
+  private readonly maxQueueSize: number | null;
 
   private queue: JsonlEvent[] = [];
   private disabled = false;
@@ -92,11 +96,18 @@ class OtelTelemetrySink implements ExecTelemetrySink {
     this.maxFailures = config.maxFailures;
     this.backoffMs = config.backoffMs;
     this.maxBackoffMs = config.maxBackoffMs;
+    this.maxQueueSize = normalizeQueueSize(config.maxQueueSize);
   }
 
   async record(event: JsonlEvent): Promise<void> {
     if (this.disabled) {
       return;
+    }
+    if (this.maxQueueSize !== null && this.queue.length >= this.maxQueueSize) {
+      const overflow = this.queue.length - this.maxQueueSize + 1;
+      if (overflow > 0) {
+        this.queue.splice(0, overflow);
+      }
     }
     this.queue.push(event);
   }
@@ -185,4 +196,15 @@ async function wait(ms: number): Promise<void> {
   await new Promise<void>((resolve) => {
     setTimeout(resolve, ms);
   });
+}
+
+function normalizeQueueSize(value?: number): number | null {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return null;
+  }
+  const normalized = Math.floor(value);
+  if (normalized <= 0) {
+    return null;
+  }
+  return normalized;
 }

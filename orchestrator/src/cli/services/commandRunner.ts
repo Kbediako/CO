@@ -23,7 +23,7 @@ import { findPackageRoot } from '../utils/packageInfo.js';
 
 const MAX_BUFFERED_OUTPUT_BYTES = 64 * 1024;
 const EMIT_COMMAND_STREAM_MIRRORS = EnvUtils.getBoolean('CODEX_ORCHESTRATOR_EMIT_COMMAND_STREAMS', false);
-const MAX_CAPTURED_CHUNK_EVENTS = EnvUtils.getInt('CODEX_ORCHESTRATOR_EXEC_EVENT_MAX_CHUNKS', 0);
+export const MAX_CAPTURED_CHUNK_EVENTS = EnvUtils.getInt('CODEX_ORCHESTRATOR_EXEC_EVENT_MAX_CHUNKS', 500);
 const PACKAGE_ROOT = findPackageRoot();
 
 export interface CommandRunnerContext {

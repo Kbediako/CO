@@ -67,6 +67,60 @@ describe('OtelTelemetrySink', () => {
     expect(await getPostedKind(fetchMock, 1)).toBe('summary');
   });
 
+  it('drops oldest events when queue exceeds max', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(okResponse);
+    const sink = createTelemetrySink({
+      endpoint: 'https://telemetry.example',
+      fetch: fetchMock,
+      maxQueueSize: 2
+    });
+
+    await sink.record({
+      type: 'exec:chunk',
+      timestamp: '2025-11-04T00:00:00.000Z',
+      payload: {
+        attempt: 1,
+        correlationId: 'corr',
+        stream: 'stdout',
+        sequence: 1,
+        bytes: 4,
+        data: 'one'
+      }
+    });
+    await sink.record({
+      type: 'exec:chunk',
+      timestamp: '2025-11-04T00:00:00.050Z',
+      payload: {
+        attempt: 1,
+        correlationId: 'corr',
+        stream: 'stdout',
+        sequence: 2,
+        bytes: 4,
+        data: 'two'
+      }
+    });
+    await sink.record({
+      type: 'exec:chunk',
+      timestamp: '2025-11-04T00:00:00.100Z',
+      payload: {
+        attempt: 1,
+        correlationId: 'corr',
+        stream: 'stdout',
+        sequence: 3,
+        bytes: 5,
+        data: 'three'
+      }
+    });
+
+    await sink.flush();
+
+    const payload = await getPostedPayload(fetchMock, 0);
+    const events = (payload?.events ?? []) as Array<{ payload?: { sequence?: number } }>;
+    expect(events.length).toBe(2);
+    const sequences = events.map((event) => event.payload?.sequence);
+    expect(sequences).toEqual([2, 3]);
+  });
+
   it('includes tfgrpo dimensions when metrics are present', async () => {
     const fetchMock = vi.fn().mockResolvedValue(okResponse);
     const sink = createTelemetrySink({ endpoint: 'https://telemetry.example', fetch: fetchMock });
@@ -192,6 +246,25 @@ async function getPostedKind(fetchMock: ReturnType<typeof vi.fn>, index: number)
   }
   if (body instanceof Buffer) {
     return JSON.parse(body.toString()).kind;
+  }
+  return undefined;
+}
+
+async function getPostedPayload(
+  fetchMock: ReturnType<typeof vi.fn>,
+  index: number
+): Promise<Record<string, unknown> | undefined> {
+  const call = fetchMock.mock.calls[index];
+  if (!call) {
+    return undefined;
+  }
+  const requestInit = call[1] as RequestInit;
+  const body = requestInit?.body;
+  if (typeof body === 'string') {
+    return JSON.parse(body) as Record<string, unknown>;
+  }
+  if (body instanceof Buffer) {
+    return JSON.parse(body.toString()) as Record<string, unknown>;
   }
   return undefined;
 }

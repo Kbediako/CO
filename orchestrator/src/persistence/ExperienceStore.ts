@@ -1,11 +1,12 @@
 import { randomBytes } from 'node:crypto';
-import { readFile, mkdir, rm } from 'node:fs/promises';
+import { createReadStream } from 'node:fs';
+import { appendFile, mkdir, rm } from 'node:fs/promises';
 import { join } from 'node:path';
+import { createInterface } from 'node:readline';
 
 import { listDirectories, resolveEnvironmentPaths } from '../../../scripts/lib/run-manifests.js';
 import { acquireLockWithRetry, type LockRetryOptions } from './lockFile.js';
 import { sanitizeTaskId } from './sanitizeTaskId.js';
-import { writeAtomicFile } from '../utils/atomicWrite.js';
 
 export interface ExperienceStoreOptions {
   outDir?: string;
@@ -80,7 +81,8 @@ export class ExperienceStore {
       maxAttempts: 5,
       initialDelayMs: 100,
       backoffFactor: 2,
-      maxDelayMs: 1000
+      maxDelayMs: 1000,
+      staleMs: 5 * 60 * 1000
     };
     const overrides = options.lockRetry ?? {};
     const sanitizedOverrides = Object.fromEntries(
@@ -105,10 +107,9 @@ export class ExperienceStore {
       const targetDir = join(this.outDir, taskId);
       await mkdir(targetDir, { recursive: true });
       const filePath = join(targetDir, 'experiences.jsonl');
-      const existing = await this.readRecords(filePath);
       const nextRecords = inputs.map((input) => this.prepareRecord(input, manifestPath));
-      const serialized = [...existing, ...nextRecords].map((record) => JSON.stringify(record)).join('\n');
-      await writeAtomicFile(filePath, `${serialized}\n`);
+      const payload = nextRecords.map((record) => JSON.stringify(record)).join('\n');
+      await appendFile(filePath, `${payload}\n`, 'utf8');
       return nextRecords;
     } finally {
       await this.releaseLock(lockPath);
@@ -125,36 +126,27 @@ export class ExperienceStore {
     if (limit === 0) {
       return [];
     }
-    const allRecords = taskFilter
-      ? await this.readRecords(join(this.outDir, taskFilter, 'experiences.jsonl'))
-      : await this.readAllRecords();
-    const filtered = allRecords.filter((record) => {
+    const collector = createTopKCollector(limit, params.minReward);
+    const applyRecord = (record: ExperienceRecord) => {
       if (record.domain !== safeDomain) {
-        return false;
+        return;
       }
       if (taskFilter && record.taskId !== taskFilter) {
-        return false;
+        return;
       }
-      return true;
-    });
-    const scored = filtered
-      .map((record) => ({
-        record,
-        score: record.reward.gtScore + record.reward.relativeRank
-      }))
-      .filter((entry) => {
-        if (params.minReward === undefined) {
-          return true;
-        }
-        return entry.score >= params.minReward;
-      })
-      .sort((a, b) => {
-        if (b.score === a.score) {
-          return b.record.createdAt.localeCompare(a.record.createdAt);
-        }
-        return b.score - a.score;
-      });
-    return scored.slice(0, limit).map((entry) => entry.record);
+      collector.add(record);
+    };
+
+    if (taskFilter) {
+      await this.scanRecords(join(this.outDir, taskFilter, 'experiences.jsonl'), applyRecord);
+    } else {
+      const directories = await listDirectories(this.outDir);
+      for (const dir of directories) {
+        await this.scanRecords(join(this.outDir, dir, 'experiences.jsonl'), applyRecord);
+      }
+    }
+
+    return collector.finalize();
   }
 
   verifyStamp(record: ExperienceRecord): boolean {
@@ -219,35 +211,96 @@ export class ExperienceStore {
     await rm(lockPath, { force: true });
   }
 
-  private async readRecords(filePath: string): Promise<ExperienceRecord[]> {
+  private async scanRecords(
+    filePath: string,
+    onRecord: (record: ExperienceRecord) => void
+  ): Promise<void> {
     try {
-      const raw = await readFile(filePath, 'utf8');
-      return raw
-        .split('\n')
-        .filter(Boolean)
-        .map((line) => JSON.parse(line) as ExperienceRecord);
+      const stream = createReadStream(filePath, { encoding: 'utf8' });
+      const reader = createInterface({ input: stream, crlfDelay: Infinity });
+      for await (const line of reader) {
+        const trimmed = line.trim();
+        if (!trimmed) {
+          continue;
+        }
+        try {
+          const record = JSON.parse(trimmed) as ExperienceRecord;
+          onRecord(record);
+        } catch {
+          continue;
+        }
+      }
     } catch (error: unknown) {
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-        return [];
+        return;
       }
       throw error;
     }
-  }
-
-  private async readAllRecords(): Promise<ExperienceRecord[]> {
-    const directories = await listDirectories(this.outDir);
-    const all: ExperienceRecord[] = [];
-    for (const dir of directories) {
-      const filePath = join(this.outDir, dir, 'experiences.jsonl');
-      all.push(...(await this.readRecords(filePath)));
-    }
-    return all;
   }
 
   private generateId(): string {
     const suffix = randomBytes(3).toString('hex');
     return `exp-${Date.now().toString(36)}-${suffix}`;
   }
+}
+
+function createTopKCollector(limit: number, minReward?: number): {
+  add: (record: ExperienceRecord) => void;
+  finalize: () => ExperienceRecord[];
+} {
+  const entries: Array<{ record: ExperienceRecord; score: number }> = [];
+  const threshold = typeof minReward === 'number' ? minReward : null;
+
+  const compare = (
+    a: { record: ExperienceRecord; score: number },
+    b: { record: ExperienceRecord; score: number }
+  ): number => {
+    if (a.score !== b.score) {
+      return a.score - b.score;
+    }
+    const aTime = a.record.createdAt ?? '';
+    const bTime = b.record.createdAt ?? '';
+    return aTime.localeCompare(bTime);
+  };
+
+  const add = (record: ExperienceRecord) => {
+    const score = record.reward.gtScore + record.reward.relativeRank;
+    if (threshold !== null && score < threshold) {
+      return;
+    }
+    const entry = { record, score };
+    if (entries.length === 0) {
+      entries.push(entry);
+      return;
+    }
+    const worst = entries[0];
+    if (entries.length >= limit && worst && compare(entry, worst) <= 0) {
+      return;
+    }
+    let index = 0;
+    while (index < entries.length && compare(entries[index]!, entry) <= 0) {
+      index += 1;
+    }
+    entries.splice(index, 0, entry);
+    if (entries.length > limit) {
+      entries.shift();
+    }
+  };
+
+  const finalize = () =>
+    entries
+      .slice()
+      .sort((a, b) => {
+        if (a.score !== b.score) {
+          return b.score - a.score;
+        }
+        const aTime = a.record.createdAt ?? '';
+        const bTime = b.record.createdAt ?? '';
+        return bTime.localeCompare(aTime);
+      })
+      .map((entry) => entry.record);
+
+  return { add, finalize };
 }
 
 function truncateSummary(value: string, maxWords: number): string {

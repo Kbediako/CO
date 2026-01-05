@@ -1,6 +1,6 @@
 import { describe, expect, it, beforeEach } from 'vitest';
 import { join } from 'node:path';
-import { mkdtemp, readFile, writeFile, mkdir } from 'node:fs/promises';
+import { mkdtemp, readFile, writeFile, mkdir, utimes } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { TaskStateStore, TaskStateStoreLockError } from '../src/persistence/TaskStateStore.js';
 import type { RunSummary } from '../src/types.js';
@@ -85,6 +85,22 @@ describe('TaskStateStore', () => {
     await writeFile(lockPath, 'locked', 'utf-8');
 
     await expect(store.recordRun(createRunSummary())).rejects.toBeInstanceOf(TaskStateStoreLockError);
+  });
+
+  it('clears stale lock files before retrying', async () => {
+    const store = new TaskStateStore({
+      runsDir,
+      outDir,
+      lockRetry: { maxAttempts: 1, initialDelayMs: 1, maxDelayMs: 1, staleMs: 1 }
+    });
+
+    await mkdir(runsDir, { recursive: true });
+    const lockPath = join(runsDir, '0001.lock');
+    await writeFile(lockPath, 'locked', 'utf-8');
+    const past = new Date(Date.now() - 60_000);
+    await utimes(lockPath, past, past);
+
+    await expect(store.recordRun(createRunSummary())).resolves.toBeUndefined();
   });
 
   it('does not clobber retry defaults with undefined overrides', () => {

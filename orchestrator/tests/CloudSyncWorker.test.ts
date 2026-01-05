@@ -65,6 +65,33 @@ describe('CloudSyncWorker', () => {
     expect(audit).toContain('Cloud sync completed');
   });
 
+  it('does not fail when audit log writes throw', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'cloud-sync-audit-fail-'));
+    const runsDir = join(root, 'runs');
+    const outDir = join(root, 'out');
+    const summary = createSummary();
+
+    const writer = new RunManifestWriter({ runsDir });
+    await writer.write(summary);
+
+    const bus = new EventBus();
+    const upload = vi.fn<[UploadPayload], Promise<UploadResult>>().mockResolvedValue({
+      status: 'success',
+      runId: summary.runId
+    });
+    const onError = vi.fn();
+    const worker = new CloudSyncWorker(bus, { uploadManifest: upload }, { runsDir, outDir, onError });
+    const workerWithLog = worker as unknown as {
+      appendAuditLog: (entry: Record<string, unknown>) => Promise<void>;
+    };
+    workerWithLog.appendAuditLog = vi.fn().mockRejectedValue(new Error('audit failed'));
+
+    await expect(worker.handleRunCompleted(summary)).resolves.toBeUndefined();
+
+    expect(upload).toHaveBeenCalledTimes(1);
+    expect(onError).toHaveBeenCalledWith(expect.any(Error), summary, 0);
+  });
+
   it('waits for manifest to appear before syncing', async () => {
     const root = await mkdtemp(join(tmpdir(), 'cloud-sync-wait-'));
     const runsDir = join(root, 'runs');

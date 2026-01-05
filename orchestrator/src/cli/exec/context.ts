@@ -7,6 +7,7 @@ import { generateRunId } from '../utils/runId.js';
 import type { RunPaths } from '../run/runPaths.js';
 import { ExperienceStore } from '../../persistence/ExperienceStore.js';
 import type { ExecEvent, JsonlEvent } from '../../../../packages/shared/events/types.js';
+import { EnvUtils } from '../../../../packages/shared/config/index.js';
 import {
   createTelemetrySink,
   type ExecTelemetrySink
@@ -71,6 +72,8 @@ export interface ExecRunContext {
 
 type JsonlWriter = (event: JsonlEvent<unknown>) => void;
 
+const MAX_TELEMETRY_EVENTS = EnvUtils.getInt('CODEX_ORCHESTRATOR_TELEMETRY_MAX_EVENTS', 1000);
+
 export async function bootstrapExecContext(
   context: ExecCommandContext,
   invocation: ExecCommandInvocation
@@ -111,7 +114,8 @@ export async function bootstrapExecContext(
 
   const telemetrySink = context.telemetrySink ?? createTelemetrySink({
     endpoint: invocation.otelEndpoint,
-    enabled: Boolean(invocation.otelEndpoint)
+    enabled: Boolean(invocation.otelEndpoint),
+    maxQueueSize: MAX_TELEMETRY_EVENTS
   });
   const envNotifications = parseNotificationEnv(process.env.CODEX_ORCHESTRATOR_NOTIFY);
   const notificationSink =
