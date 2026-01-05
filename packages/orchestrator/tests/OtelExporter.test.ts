@@ -121,6 +121,41 @@ describe('OtelTelemetrySink', () => {
     expect(sequences).toEqual([2, 3]);
   });
 
+  it('caps the queue after flush failures while recording new events', async () => {
+    let rejectFetch: (error: Error) => void = () => undefined;
+    const fetchMock = vi.fn().mockImplementation(
+      () =>
+        new Promise<Response>((_resolve, reject) => {
+          rejectFetch = reject;
+        })
+    );
+    const sink = createTelemetrySink({
+      endpoint: 'https://telemetry.example',
+      fetch: fetchMock,
+      maxQueueSize: 2,
+      backoffMs: 0
+    });
+
+    await sink.record(buildChunkEvent(1, 'one'));
+    await sink.record(buildChunkEvent(2, 'two'));
+
+    const flushPromise = sink.flush();
+
+    await sink.record(buildChunkEvent(3, 'three'));
+    await sink.record(buildChunkEvent(4, 'four'));
+
+    rejectFetch(new Error('offline'));
+    await flushPromise;
+
+    fetchMock.mockResolvedValueOnce(okResponse);
+    await sink.flush();
+
+    const payload = await getPostedPayload(fetchMock, 1);
+    const events = (payload?.events ?? []) as Array<{ payload?: { sequence?: number } }>;
+    expect(events.length).toBe(2);
+    expect(events.map((event) => event.payload?.sequence)).toEqual([3, 4]);
+  });
+
   it('includes tfgrpo dimensions when metrics are present', async () => {
     const fetchMock = vi.fn().mockResolvedValue(okResponse);
     const sink = createTelemetrySink({ endpoint: 'https://telemetry.example', fetch: fetchMock });
@@ -267,4 +302,19 @@ async function getPostedPayload(
     return JSON.parse(body.toString()) as Record<string, unknown>;
   }
   return undefined;
+}
+
+function buildChunkEvent(sequence: number, data: string) {
+  return {
+    type: 'exec:chunk',
+    timestamp: '2025-11-04T00:00:00.000Z',
+    payload: {
+      attempt: 1,
+      correlationId: 'corr',
+      stream: 'stdout',
+      sequence,
+      bytes: data.length,
+      data
+    }
+  };
 }

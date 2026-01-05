@@ -103,13 +103,8 @@ class OtelTelemetrySink implements ExecTelemetrySink {
     if (this.disabled) {
       return;
     }
-    if (this.maxQueueSize !== null && this.queue.length >= this.maxQueueSize) {
-      const overflow = this.queue.length - this.maxQueueSize + 1;
-      if (overflow > 0) {
-        this.queue.splice(0, overflow);
-      }
-    }
     this.queue.push(event);
+    this.trimQueue();
   }
 
   async recordSummary(summary: RunSummaryEvent): Promise<void> {
@@ -136,6 +131,7 @@ class OtelTelemetrySink implements ExecTelemetrySink {
       this.consecutiveFailures = 0;
     } catch (error) {
       this.queue.unshift(...batch);
+      this.trimQueue();
       this.handleFailure(error);
     }
   }
@@ -165,6 +161,13 @@ class OtelTelemetrySink implements ExecTelemetrySink {
       this.disabled = true;
       this.logger.warn(`Telemetry disabled after ${this.consecutiveFailures} consecutive failures: ${String(error)}`);
     }
+  }
+
+  private trimQueue(): void {
+    if (this.maxQueueSize === null || this.queue.length <= this.maxQueueSize) {
+      return;
+    }
+    this.queue.splice(0, this.queue.length - this.maxQueueSize);
   }
 }
 
