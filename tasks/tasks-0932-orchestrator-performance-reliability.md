@@ -19,10 +19,10 @@
 - [x] Diagnostics + RLM runs captured with hotspot summary - Evidence: `.runs/0932-orchestrator-performance-reliability/cli/2026-01-05T16-14-28-095Z-416cf9bb/manifest.json`, `.runs/0932-orchestrator-performance-reliability/cli/2026-01-05T16-16-02-146Z-e87b271d/manifest.json`, `tasks/tasks-0932-orchestrator-performance-reliability.md`.
 
 ### Implementation
-- [x] Targeted performance/reliability fixes + tests/benchmarks applied - Evidence: code changes, `.runs/0932-orchestrator-performance-reliability/cli/2026-01-05T17-52-00-108Z-be984007/manifest.json`.
+- [x] Targeted performance/reliability fixes + tests/benchmarks applied - Evidence: code changes, `.runs/0932-orchestrator-performance-reliability/cli/2026-01-05T17-59-19-572Z-568222e3/manifest.json`.
 
 ### Validation + Handoff
-- [x] Implementation-gate manifest captured - Evidence: `.runs/0932-orchestrator-performance-reliability/cli/2026-01-05T17-52-00-108Z-be984007/manifest.json`.
+- [x] Implementation-gate manifest captured - Evidence: `.runs/0932-orchestrator-performance-reliability/cli/2026-01-05T17-59-19-572Z-568222e3/manifest.json`.
 
 
 ## Hotspot Summary (RLM)
@@ -34,7 +34,7 @@
 - Metrics aggregation (`orchestrator/src/cli/metrics/metricsAggregator.ts`): recomputes aggregates from full metrics history each run.
 - Cloud sync (`orchestrator/src/sync/CloudSyncWorker.ts`): audit log writes can throw without handling.
 
-**Candidate fixes**
+## Candidate fixes
 - Cap exec chunk capture by default (set `CODEX_ORCHESTRATOR_EXEC_EVENT_MAX_CHUNKS`, truncate chunk data) and buffer append writes off the hot path.
 - Bound telemetry queues with drop-oldest or sampling and periodic flush + jittered backoff.
 - Persist dirty flags only after successful writes; keep `pendingPersist` usable and retry with backoff.
