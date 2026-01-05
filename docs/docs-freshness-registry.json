@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generated_at": "2026-01-04",
+  "generated_at": "2026-01-05",
   "entries": [
     {
       "path": ".agent/AGENTS.md",
@@ -98,6 +98,13 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/SOPs/release.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-05",
       "cadence_days": 90
     },
     {
