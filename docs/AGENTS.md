@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp 6122b1798cd6568198f578c1c15cc4b9f1b215d960c24c56267e6da746cbc7d0 -->
+<!-- codex:instruction-stamp 660bde868cf0293dd9b72fe2f09f3138b47bdc995070d56b3edfa54da0c974b0 -->
 # Repository Agent Guidance
 
 ## Project 0303 — Codex Orchestrator Autonomy Enhancements
@@ -38,14 +38,14 @@
 
 ## GitHub Agent Review Replies
 - Always reply directly in the original review discussion thread (line comment), not just top-level PR comments.
-- Tag the agent explicitly (e.g., `@coderabbitai`) and mention what changed plus the commit SHA.
+- Tag the agent explicitly (e.g., `@coderabbitai`), and mention what changed plus the commit SHA.
 - CLI/API example for replying to a review comment:
-```
+```bash
 gh api -X POST repos/<org>/<repo>/pulls/<pr>/comments \
   -f body='@coderabbitai Fixed … (commit abc123). Please re-review/resolve.' \
   -F in_reply_to=<comment_id>
 ```
-- If thread reply via API fails due to permissions, fall back to a line comment on the same diff hunk, still tagging the agent.
+- If a thread reply via API fails due to permissions, fall back to a line comment on the same diff hunk, still tagging the agent.
 - After replying, check `gh pr view <pr> --json reviewDecision` and wait for it to flip to `APPROVED` before merging.
 
 ## DevTools Review Gate (Optional)

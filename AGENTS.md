@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp f77240aaeca758345a36fd504a47bcbee88c805bac60fdddebb737dc23ae8e1b -->
+<!-- codex:instruction-stamp 171f0158bb4c3139829c2f56d52848b67e9ddf8b5786bc8285b6cd5b23ad0c3d -->
 # Codex-Orchestrator Agent Handbook (Template)
 
 Use this repository as the wrapper that coordinates multiple Codex-driven projects. After cloning, replace placeholder metadata (task IDs, documents, SOPs) with values for each downstream initiative while keeping these shared guardrails in place.
@@ -72,14 +72,14 @@ Use this repository as the wrapper that coordinates multiple Codex-driven projec
 
 ## GitHub Agent Review Replies
 - Always reply directly in the original review discussion thread (line comment), not just top-level PR comments.
-- Tag the agent explicitly (e.g., `@coderabbitai`) and mention what changed plus the commit SHA.
+- Tag the agent explicitly (e.g., `@coderabbitai`), and mention what changed plus the commit SHA.
 - CLI/API example for replying to a review comment:
-```
+```bash
 gh api -X POST repos/<org>/<repo>/pulls/<pr>/comments \
   -f body='@coderabbitai Fixed … (commit abc123). Please re-review/resolve.' \
   -F in_reply_to=<comment_id>
 ```
-- If thread reply via API fails due to permissions, fall back to a line comment on the same diff hunk, still tagging the agent.
+- If a thread reply via API fails due to permissions, fall back to a line comment on the same diff hunk, still tagging the agent.
 - After replying, check `gh pr view <pr> --json reviewDecision` and wait for it to flip to `APPROVED` before merging.
 
 ## Build & Test Commands (defaults)

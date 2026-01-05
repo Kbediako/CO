@@ -19,14 +19,14 @@ Use this playbook whenever handing off a review (`npm run review` or an implemen
 
 ## GitHub agent review replies
 - Always reply directly in the original review discussion thread (line comment), not just top-level PR comments.
-- Tag the agent explicitly (e.g., `@coderabbitai`) and mention what changed plus the commit SHA.
+- Tag the agent explicitly (e.g., `@coderabbitai`), and mention what changed plus the commit SHA.
 - CLI/API example for replying to a review comment:
-```
+```bash
 gh api -X POST repos/<org>/<repo>/pulls/<pr>/comments \
   -f body='@coderabbitai Fixed … (commit abc123). Please re-review/resolve.' \
   -F in_reply_to=<comment_id>
 ```
-- If thread reply via API fails due to permissions, fall back to a line comment on the same diff hunk, still tagging the agent.
+- If a thread reply via API fails due to permissions, fall back to a line comment on the same diff hunk, still tagging the agent.
 - After replying, check `gh pr view <pr> --json reviewDecision` and wait for it to flip to `APPROVED` before merging.
 
 ## Notes
