@@ -91,6 +91,9 @@ jobs:
         if: ${{ github.event_name == 'pull_request' }}
         run: node scripts/diff-budget.mjs
 
+      - name: Instruction stamp check
+        run: node scripts/update-instruction-stamp.mjs --check
+
       - name: Install dependencies
         run: npm ci
 
