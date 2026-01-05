@@ -101,6 +101,13 @@
       "cadence_days": 90
     },
     {
+      "path": ".agent/SOPs/release.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-05",
+      "cadence_days": 90
+    },
+    {
       "path": ".agent/SOPs/review-loop.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
