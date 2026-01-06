@@ -773,17 +773,17 @@
       "cadence_days": 90
     },
     {
-      "path": "docs/ACTION_PLAN-orchestrator-performance-reliability.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-01-05",
-      "cadence_days": 90
-    },
-    {
       "path": "docs/ACTION_PLAN-orchestrator-performance-reliability-loop-2.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-01-06",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/ACTION_PLAN-orchestrator-performance-reliability.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-05",
       "cadence_days": 90
     },
     {
@@ -1179,17 +1179,17 @@
       "cadence_days": 90
     },
     {
-      "path": "docs/PRD-orchestrator-performance-reliability.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-01-05",
-      "cadence_days": 90
-    },
-    {
       "path": "docs/PRD-orchestrator-performance-reliability-loop-2.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-01-06",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/PRD-orchestrator-performance-reliability.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-05",
       "cadence_days": 90
     },
     {
@@ -1536,17 +1536,17 @@
       "cadence_days": 90
     },
     {
-      "path": "docs/TECH_SPEC-orchestrator-performance-reliability.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-01-05",
-      "cadence_days": 90
-    },
-    {
       "path": "docs/TECH_SPEC-orchestrator-performance-reliability-loop-2.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-01-06",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/TECH_SPEC-orchestrator-performance-reliability.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-05",
       "cadence_days": 90
     },
     {
