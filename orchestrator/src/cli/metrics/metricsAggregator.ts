@@ -125,28 +125,16 @@ export interface MetricsLockOptions {
   staleMs?: number;
 }
 
-async function drainMetricsEntryFile(env: EnvironmentPaths, path: string): Promise<number> {
-  let raw = '';
+async function readMetricsEntryLines(path: string): Promise<string[]> {
   try {
-    raw = await readFile(path, 'utf8');
+    const raw = await readFile(path, 'utf8');
+    return raw.trim().split('\n').filter(Boolean);
   } catch (error: unknown) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-      return 0;
+      return [];
     }
     throw error;
   }
-
-  const lines = raw.trim().split('\n').filter(Boolean);
-  if (lines.length === 0) {
-    await rm(path, { force: true });
-    return 0;
-  }
-
-  await mkdir(getMetricsRoot(env), { recursive: true });
-  const payload = `${lines.join('\n')}\n`;
-  await appendFile(getMetricsPath(env), payload, 'utf8');
-  await rm(path, { force: true });
-  return lines.length;
 }
 
 export async function mergePendingMetricsEntries(env: EnvironmentPaths): Promise<number> {
@@ -192,9 +180,29 @@ export async function mergePendingMetricsEntries(env: EnvironmentPaths): Promise
       break;
     }
 
+    const payloadLines: string[] = [];
+    const filesToRemove: string[] = [];
+
     for (const file of files) {
-      merged += await drainMetricsEntryFile(env, join(pendingDir, file));
+      const filePath = join(pendingDir, file);
+      const lines = await readMetricsEntryLines(filePath);
+      if (lines.length === 0) {
+        await rm(filePath, { force: true });
+        continue;
+      }
+      payloadLines.push(...lines);
+      filesToRemove.push(filePath);
+      merged += lines.length;
     }
+
+    if (payloadLines.length === 0) {
+      continue;
+    }
+
+    await mkdir(getMetricsRoot(env), { recursive: true });
+    const payload = `${payloadLines.join('\n')}\n`;
+    await appendFile(getMetricsPath(env), payload, 'utf8');
+    await Promise.all(filesToRemove.map((filePath) => rm(filePath, { force: true })));
   }
 
   return merged;
