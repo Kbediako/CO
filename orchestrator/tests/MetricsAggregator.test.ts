@@ -190,6 +190,35 @@ describe('metricsAggregator', () => {
     expect(state.throughput.candidates).toBe(2);
   });
 
+  it('ignores whitespace-only lines in metrics.json when aggregating', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'metrics-aggregator-whitespace-root-'));
+    const runsRoot = join(repoRoot, '.runs');
+    const outRoot = join(repoRoot, 'out');
+    const env: EnvironmentPaths = {
+      repoRoot,
+      runsRoot,
+      outRoot,
+      taskId: 'autonomy-upgrade'
+    };
+
+    const metricsRoot = join(runsRoot, env.taskId);
+    await mkdir(metricsRoot, { recursive: true });
+    await writeFile(
+      join(metricsRoot, 'metrics.json'),
+      `${JSON.stringify(createEntry(1, 'succeeded'))}\n  \n\t\n${JSON.stringify(
+        createEntry(2, 'failed')
+      )}\n`,
+      { encoding: 'utf8', flag: 'w' }
+    );
+
+    await updateMetricsAggregates(env);
+
+    const postRollout = JSON.parse(
+      await readFile(join(metricsRoot, 'metrics', 'post-rollout.json'), 'utf8')
+    );
+    expect(postRollout.total_runs).toBe(2);
+  });
+
   it('queues metrics entries when the lock is held but skips aggregation', async () => {
     const repoRoot = await mkdtemp(join(tmpdir(), 'metrics-aggregator-lock-'));
     const runsRoot = join(repoRoot, '.runs');
@@ -299,6 +328,92 @@ describe('metricsAggregator', () => {
     expect(metricsContent.trim().split('\n')).toHaveLength(2);
     const remaining = await readdir(pendingDir);
     expect(remaining).toHaveLength(0);
+  });
+
+  it('skips whitespace-only lines when merging pending entries', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'metrics-aggregator-whitespace-'));
+    const runsRoot = join(repoRoot, '.runs');
+    const outRoot = join(repoRoot, 'out');
+    const env: EnvironmentPaths = {
+      repoRoot,
+      runsRoot,
+      outRoot,
+      taskId: 'autonomy-upgrade'
+    };
+
+    const metricsRoot = join(runsRoot, env.taskId);
+    await mkdir(metricsRoot, { recursive: true });
+    const pendingDir = join(metricsRoot, 'metrics.pending');
+    await mkdir(pendingDir, { recursive: true });
+    await writeFile(
+      join(pendingDir, 'entry-whitespace.jsonl'),
+      `  \n${JSON.stringify(createEntry(1, 'succeeded'))}\n\t\n${JSON.stringify(
+        createEntry(2, 'failed')
+      )}\n\n`,
+      { encoding: 'utf8', flag: 'w' }
+    );
+
+    const merged = await mergePendingMetricsEntries(env);
+
+    expect(merged).toBe(2);
+    const metricsContent = await readFile(join(metricsRoot, 'metrics.json'), 'utf8');
+    const lines = metricsContent.split('\n').filter((line) => line.length > 0);
+    expect(lines).toHaveLength(2);
+    const runIds = lines.map((line) => (JSON.parse(line) as MetricsEntry).run_id);
+    expect(runIds).toEqual(['run-1', 'run-2']);
+    const remaining = await readdir(pendingDir);
+    expect(remaining).toHaveLength(0);
+  });
+
+  it('streams multi-line pending files while preserving order', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'metrics-aggregator-stream-'));
+    const runsRoot = join(repoRoot, '.runs');
+    const outRoot = join(repoRoot, 'out');
+    const env: EnvironmentPaths = {
+      repoRoot,
+      runsRoot,
+      outRoot,
+      taskId: 'autonomy-upgrade'
+    };
+
+    const previousLines = process.env.CODEX_METRICS_PENDING_BATCH_MAX_LINES;
+    try {
+      process.env.CODEX_METRICS_PENDING_BATCH_MAX_LINES = '2';
+
+      const metricsRoot = join(runsRoot, env.taskId);
+      await mkdir(metricsRoot, { recursive: true });
+      const pendingDir = join(metricsRoot, 'metrics.pending');
+      await mkdir(pendingDir, { recursive: true });
+      await writeFile(
+        join(pendingDir, 'entry-multi.jsonl'),
+        [
+          JSON.stringify(createEntry(1, 'succeeded')),
+          JSON.stringify(createEntry(2, 'failed')),
+          JSON.stringify(createEntry(3, 'succeeded')),
+          JSON.stringify(createEntry(4, 'failed')),
+          JSON.stringify(createEntry(5, 'succeeded'))
+        ].join('\n') + '\n',
+        { encoding: 'utf8', flag: 'w' }
+      );
+
+      const merged = await mergePendingMetricsEntries(env);
+
+      expect(merged).toBe(5);
+      const metricsContent = await readFile(join(metricsRoot, 'metrics.json'), 'utf8');
+      const runIds = metricsContent
+        .trim()
+        .split('\n')
+        .map((line) => (JSON.parse(line) as MetricsEntry).run_id);
+      expect(runIds).toEqual(['run-1', 'run-2', 'run-3', 'run-4', 'run-5']);
+      const remaining = await readdir(pendingDir);
+      expect(remaining).toHaveLength(0);
+    } finally {
+      if (previousLines === undefined) {
+        delete process.env.CODEX_METRICS_PENDING_BATCH_MAX_LINES;
+      } else {
+        process.env.CODEX_METRICS_PENDING_BATCH_MAX_LINES = previousLines;
+      }
+    }
   });
 
   it('flushes pending metrics in bounded batches while preserving order', async () => {
