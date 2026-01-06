@@ -32,7 +32,7 @@
 - Dependencies / Integrations: Node.js fs/promises, EnvUtils (for optional caps).
 
 ## Open Questions
-- What default caps (bytes/lines) are safe across typical environments?
+- Resolved: defaults set to 500 lines and 1 MB (configurable via `CODEX_METRICS_PENDING_BATCH_MAX_LINES` and `CODEX_METRICS_PENDING_BATCH_MAX_BYTES`).
 
 ## Approvals
 - Product:

@@ -2,7 +2,7 @@
 
 ## Status Snapshot
 - Current Phase: Implementation complete
-- Run Manifest Link: `.runs/0937-metrics-pending-batch-cap/cli/2026-01-06T03-03-47-139Z-66555024/manifest.json`
+- Run Manifest Link: `.runs/0937-metrics-pending-batch-cap/cli/2026-01-06T03-45-37-676Z-6e49461f/manifest.json`
 - Metrics / State Snapshots: `.runs/0937-metrics-pending-batch-cap/metrics.json`, `out/0937-metrics-pending-batch-cap/state.json`
 
 ## Milestones & Tasks
