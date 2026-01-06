@@ -14,3 +14,4 @@
 - [x] Implementation-gate manifest captured - Evidence: `.runs/0936-metrics-pending-io-batching/cli/2026-01-06T01-50-32-842Z-b559ee97/manifest.json`.
 - [x] Validation: `npm run docs:check` passes. Evidence: `.runs/0936-metrics-pending-io-batching/cli/2026-01-06T01-50-32-842Z-b559ee97/manifest.json`.
 - [x] Validation: `npm run docs:freshness` passes. Evidence: `.runs/0936-metrics-pending-io-batching/cli/2026-01-06T01-50-32-842Z-b559ee97/manifest.json`, `out/0936-metrics-pending-io-batching/docs-freshness.json`.
+- [x] Validation: `npm run review` executed with NOTES recorded. Evidence: `.runs/0936-metrics-pending-io-batching/cli/2026-01-06T01-50-32-842Z-b559ee97/manifest.json`. NOTES: "Goal: Address docs registry duplicates + revalidate docs checks for 0936 | Summary: remove duplicate entries, rerun implementation-gate for docs:check/docs:freshness evidence | Risks: none known | Questions (optional): none".
