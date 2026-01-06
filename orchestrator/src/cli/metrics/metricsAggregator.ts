@@ -1,6 +1,6 @@
 import type { Dirent } from 'node:fs';
 import { createReadStream } from 'node:fs';
-import { appendFile, mkdir, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
+import { appendFile, mkdir, open, readFile, readdir, rm, stat } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { createInterface } from 'node:readline';
 
@@ -8,6 +8,7 @@ import type { EnvironmentPaths } from '../run/environment.js';
 import type { SandboxState, ToolRunStatus } from '../../../../packages/shared/manifest/types.js';
 import { acquireLockWithRetry, type LockRetryOptions } from '../../persistence/lockFile.js';
 import { EnvUtils } from '../../../../packages/shared/config/index.js';
+import { writeJsonAtomic } from '../utils/fs.js';
 
 export interface MetricsEntry {
   run_id: string;
@@ -69,6 +70,40 @@ const REQUIRED_COMPLETENESS_FIELDS: Array<keyof MetricsEntry> = [
   'privacy_events',
   'control_plane_status'
 ];
+
+type CompletenessField = (typeof REQUIRED_COMPLETENESS_FIELDS)[number];
+
+interface EpochAggregate {
+  runs: number;
+  tool_calls: number;
+  token_total: number;
+  cost_usd: number;
+  latency_ms: number;
+  group_size_sum: number;
+  group_size_count: number;
+  tool_stats: Map<string, { runs: number; tokens: number; costUsd: number; latencyMs: number }>;
+}
+
+interface MetricsAggregationState {
+  totalRuns: number;
+  succeededRuns: number;
+  baselineEntry: MetricsEntry | null;
+  missingCounts: Record<CompletenessField, number>;
+  durationSum: number;
+  durationCount: number;
+  epochs: Map<number, EpochAggregate>;
+  validationSummary: { passed: number; failed: number; stalled: number; manual: number };
+  reviewerRejections: number;
+  reviewerLatencySum: number;
+  reviewerLatencyCount: number;
+  regressions: number;
+  patternPromotions: number;
+  patternDeprecations: number;
+  throughputCandidates: number;
+  alertsTotal: number;
+  alertsSnapshotFailed: number;
+  alertsStalledSnapshot: number;
+}
 
 const METRICS_LOCK_FILENAME = 'metrics.lock';
 const METRICS_PENDING_DIRNAME = 'metrics.pending';
@@ -237,6 +272,7 @@ export async function mergePendingMetricsEntries(env: EnvironmentPaths): Promise
     const flushBatch = async () => {
       if (payloadLines.length > 0) {
         const payload = `${payloadLines.join('\n')}\n`;
+        await ensureMetricsTrailingNewline(metricsPath);
         await appendFile(metricsPath, payload, 'utf8');
       }
       if (filesToRemove.length > 0) {
@@ -275,6 +311,30 @@ export async function mergePendingMetricsEntries(env: EnvironmentPaths): Promise
   }
 
   return merged;
+}
+
+export async function ensureMetricsTrailingNewline(path: string): Promise<void> {
+  try {
+    const handle = await open(path, 'r');
+    try {
+      const stats = await handle.stat();
+      if (stats.size === 0) {
+        return;
+      }
+      const buffer = Buffer.alloc(1);
+      await handle.read(buffer, 0, 1, stats.size - 1);
+      if (buffer[0] !== 0x0a) {
+        await appendFile(path, '\n', 'utf8');
+      }
+    } finally {
+      await handle.close();
+    }
+  } catch (error: unknown) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      return;
+    }
+    throw error;
+  }
 }
 
 export async function withMetricsLock<T>(
@@ -324,22 +384,34 @@ export async function withMetricsLock<T>(
 export async function updateMetricsAggregates(env: EnvironmentPaths): Promise<void> {
   const metricsRoot = getMetricsRoot(env);
   const metricsPath = getMetricsPath(env);
-  const entries = await loadMetricsEntries(metricsPath);
-  if (entries.length === 0) {
+  const state = createAggregationState();
+  await streamMetricsEntryLines(metricsPath, async (line) => {
+    const trimmed = line.trim();
+    if (!trimmed) {
+      return;
+    }
+    try {
+      const entry = JSON.parse(trimmed) as MetricsEntry;
+      accumulateMetricsEntry(state, entry);
+    } catch {
+      return;
+    }
+  });
+  if (state.totalRuns === 0 || !state.baselineEntry) {
     return;
   }
 
   const metricsDir = join(metricsRoot, 'metrics');
   await mkdir(metricsDir, { recursive: true });
 
-  await ensureBaseline(metricsDir, entries[0]!);
+  await ensureBaseline(metricsDir, state.baselineEntry);
 
   await Promise.all([
-    writePostRollout(metricsDir, entries),
-    writeCompleteness(metricsDir, entries),
-    writeMttrDelta(env, entries),
-    writeTfgrpoEpochAggregates(metricsDir, entries),
-    writeLearningState(env, entries)
+    writePostRollout(metricsDir, state),
+    writeCompleteness(metricsDir, state),
+    writeMttrDelta(env, state),
+    writeTfgrpoEpochAggregates(metricsDir, state),
+    writeLearningState(env, state)
   ]);
 }
 
@@ -361,12 +433,12 @@ async function ensureBaseline(dir: string, entry: MetricsEntry): Promise<void> {
     duration_seconds: entry.duration_seconds,
     completion_rate: entry.status === 'succeeded' ? 1 : 0
   };
-  await writeFile(baselinePath, `${JSON.stringify(baseline, null, 2)}\n`, 'utf8');
+  await writeJsonAtomic(baselinePath, baseline);
 }
 
-async function writePostRollout(dir: string, entries: MetricsEntry[]): Promise<void> {
-  const totalRuns = entries.length;
-  const succeededRuns = entries.filter((entry) => entry.status === 'succeeded').length;
+async function writePostRollout(dir: string, state: MetricsAggregationState): Promise<void> {
+  const totalRuns = state.totalRuns;
+  const succeededRuns = state.succeededRuns;
   const completionRate = totalRuns > 0 ? succeededRuns / totalRuns : 0;
   const payload = {
     total_runs: totalRuns,
@@ -375,52 +447,33 @@ async function writePostRollout(dir: string, entries: MetricsEntry[]): Promise<v
     meets_threshold: completionRate >= 0.95,
     updated_at: new Date().toISOString()
   };
-  await writeFile(join(dir, 'post-rollout.json'), `${JSON.stringify(payload, null, 2)}\n`, 'utf8');
+  await writeJsonAtomic(join(dir, 'post-rollout.json'), payload);
 }
 
-async function writeCompleteness(dir: string, entries: MetricsEntry[]): Promise<void> {
-  const fieldChecks = REQUIRED_COMPLETENESS_FIELDS.length * entries.length;
+async function writeCompleteness(dir: string, state: MetricsAggregationState): Promise<void> {
+  const fieldChecks = REQUIRED_COMPLETENESS_FIELDS.length * state.totalRuns;
   if (fieldChecks === 0) {
     return;
   }
 
-  const missingCounts: Record<string, number> = Object.fromEntries(
-    REQUIRED_COMPLETENESS_FIELDS.map((field) => [field, 0])
-  );
-
-  for (const entry of entries) {
-    if (!Array.isArray(entry.instance_stats) || entry.instance_stats.length === 0) {
-      missingCounts.instance_stats += 1;
-    }
-    if (!Array.isArray(entry.privacy_events) || entry.privacy_events.length === 0) {
-      missingCounts.privacy_events += 1;
-    }
-    if (!entry.control_plane_status || entry.control_plane_status === 'unknown') {
-      missingCounts.control_plane_status += 1;
-    }
-  }
-
-  const totalMissing = Object.values(missingCounts).reduce((sum, value) => sum + value, 0);
+  const totalMissing = Object.values(state.missingCounts).reduce((sum, value) => sum + value, 0);
   const ratio = totalMissing / fieldChecks;
   const payload = {
     checked_fields: REQUIRED_COMPLETENESS_FIELDS,
-    missing_counts: missingCounts,
+    missing_counts: state.missingCounts,
     missing_field_ratio: ratio,
     meets_threshold: ratio < 0.05,
     updated_at: new Date().toISOString()
   };
 
-  await writeFile(join(dir, 'completeness.json'), `${JSON.stringify(payload, null, 2)}\n`, 'utf8');
+  await writeJsonAtomic(join(dir, 'completeness.json'), payload);
 }
 
-async function writeMttrDelta(env: EnvironmentPaths, entries: MetricsEntry[]): Promise<void> {
-  const durations = entries
-    .map((entry) => entry.duration_seconds)
-    .filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
-  if (durations.length === 0) {
+async function writeMttrDelta(env: EnvironmentPaths, state: MetricsAggregationState): Promise<void> {
+  if (state.durationCount === 0) {
     return;
   }
-  const currentMttr = average(durations);
+  const currentMttr = state.durationSum / state.durationCount;
 
   const metricsDir = join(env.runsRoot, env.taskId, 'metrics');
   const baselinePath = join(metricsDir, 'baseline.json');
@@ -446,177 +499,225 @@ async function writeMttrDelta(env: EnvironmentPaths, entries: MetricsEntry[]): P
 
   const outDir = join(env.outRoot, env.taskId, 'metrics');
   await mkdir(outDir, { recursive: true });
-  await writeFile(join(outDir, 'mttr-delta.json'), `${JSON.stringify(payload, null, 2)}\n`, 'utf8');
+  await writeJsonAtomic(join(outDir, 'mttr-delta.json'), payload);
 }
 
-async function writeTfgrpoEpochAggregates(dir: string, entries: MetricsEntry[]): Promise<void> {
-  const grouped = new Map<number, MetricsEntry[]>();
-  for (const entry of entries) {
-    if (typeof entry.tfgrpo_epoch !== 'number') {
-      continue;
-    }
-    const bucket = grouped.get(entry.tfgrpo_epoch) ?? [];
-    bucket.push(entry);
-    grouped.set(entry.tfgrpo_epoch, bucket);
-  }
-  if (grouped.size === 0) {
+async function writeTfgrpoEpochAggregates(
+  dir: string,
+  state: MetricsAggregationState
+): Promise<void> {
+  if (state.epochs.size === 0) {
     return;
   }
-  const epochs = Array.from(grouped.entries())
+  const epochs = Array.from(state.epochs.entries())
     .sort(([a], [b]) => a - b)
-    .map(([epoch, group]) => summarizeEpoch(epoch, group));
+    .map(([epoch, aggregate]) => ({
+      epoch,
+      runs: aggregate.runs,
+      tool_calls: aggregate.tool_calls,
+      token_total: aggregate.token_total,
+      cost_usd: roundCurrency(aggregate.cost_usd),
+      latency_ms: aggregate.latency_ms,
+      group_size_avg:
+        aggregate.group_size_count > 0
+          ? aggregate.group_size_sum / aggregate.group_size_count
+          : null,
+      tools: Array.from(aggregate.tool_stats.entries()).map(([tool, toolAggregate]) => ({
+        tool,
+        runs: toolAggregate.runs,
+        tokens: toolAggregate.tokens,
+        cost_usd: roundCurrency(toolAggregate.costUsd),
+        latency_ms: toolAggregate.latencyMs
+      }))
+    }));
   const payload = {
     epochs,
     updated_at: new Date().toISOString()
   };
-  await writeFile(join(dir, 'per-epoch.json'), `${JSON.stringify(payload, null, 2)}\n`, 'utf8');
+  await writeJsonAtomic(join(dir, 'per-epoch.json'), payload);
 }
 
-async function writeLearningState(env: EnvironmentPaths, entries: MetricsEntry[]): Promise<void> {
-  const validationStatuses = entries
-    .map((entry) => entry.learning_validation_status)
-    .filter((value): value is string => typeof value === 'string');
-  const validationSummary = {
-    passed: validationStatuses.filter((status) => status === 'validated').length,
-    failed: validationStatuses.filter((status) => status === 'snapshot_failed').length,
-    stalled: validationStatuses.filter((status) => status === 'stalled_snapshot').length,
-    manual: validationStatuses.filter((status) => status === 'needs_manual_scenario').length
-  };
-
-  const reviewerRejections = entries.reduce(
-    (sum, entry) => sum + (entry.learning_review_rejections ?? 0),
-    0
-  );
-  const reviewerLatencies = entries
-    .map((entry) => entry.learning_review_latency_ms)
-    .filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
+async function writeLearningState(env: EnvironmentPaths, state: MetricsAggregationState): Promise<void> {
   const reviewerLatencyMs =
-    reviewerLatencies.length > 0
-      ? reviewerLatencies.reduce((sum, value) => sum + value, 0) / reviewerLatencies.length
+    state.reviewerLatencyCount > 0
+      ? state.reviewerLatencySum / state.reviewerLatencyCount
       : null;
 
-  const regressions = entries.reduce(
-    (sum, entry) => sum + (entry.learning_regressions_detected ?? 0),
-    0
-  );
-  const patternPromotions = entries.reduce(
-    (sum, entry) => sum + (entry.learning_pattern_promoted ?? 0),
-    0
-  );
-  const patternDeprecations = entries.reduce(
-    (sum, entry) => sum + (entry.learning_pattern_deprecated ?? 0),
-    0
-  );
-  const throughputCandidates = entries.reduce(
-    (sum, entry) => sum + (entry.learning_throughput_candidates ?? 0),
-    0
-  );
-
   const alerts = {
-    total: entries.reduce((sum, entry) => sum + (entry.learning_alerts ?? 0), 0),
-    snapshot_failed: entries.filter((entry) => entry.learning_snapshot_status === 'snapshot_failed').length,
-    stalled_snapshot: entries.filter((entry) => entry.learning_snapshot_status === 'stalled_snapshot').length,
-    needs_manual_scenario: validationSummary.manual
+    total: state.alertsTotal,
+    snapshot_failed: state.alertsSnapshotFailed,
+    stalled_snapshot: state.alertsStalledSnapshot,
+    needs_manual_scenario: state.validationSummary.manual
   };
 
   const payload = {
     updated_at: new Date().toISOString(),
     safety: {
-      validation: validationSummary,
-      reviewer: { rejections: reviewerRejections, average_latency_ms: reviewerLatencyMs },
-      regression_detection: { detected: regressions },
-      pattern_hygiene: { promoted: patternPromotions, deprecated: patternDeprecations }
+      validation: state.validationSummary,
+      reviewer: { rejections: state.reviewerRejections, average_latency_ms: reviewerLatencyMs },
+      regression_detection: { detected: state.regressions },
+      pattern_hygiene: { promoted: state.patternPromotions, deprecated: state.patternDeprecations }
     },
-    throughput: { candidates: throughputCandidates },
+    throughput: { candidates: state.throughputCandidates },
     alerts
   };
 
   const outDir = join(env.outRoot, env.taskId);
   await mkdir(outDir, { recursive: true });
-  await writeFile(join(outDir, 'state.json'), `${JSON.stringify(payload, null, 2)}\n`, 'utf8');
+  await writeJsonAtomic(join(outDir, 'state.json'), payload);
 }
 
-function summarizeEpoch(epoch: number, entries: MetricsEntry[]): {
-  epoch: number;
-  runs: number;
-  tool_calls: number;
-  token_total: number;
-  cost_usd: number;
-  latency_ms: number;
-  group_size_avg: number | null;
-  tools: Array<{ tool: string; runs: number; tokens: number; cost_usd: number; latency_ms: number }>;
-} {
-  const runs = entries.length;
-  const toolCalls = entries.reduce((sum, entry) => sum + (entry.tool_calls ?? 0), 0);
-  const tokenTotal = entries.reduce((sum, entry) => sum + (entry.token_total ?? 0), 0);
-  const costUsd = roundCurrency(entries.reduce((sum, entry) => sum + (entry.cost_usd ?? 0), 0));
-  const latencyMs = entries.reduce((sum, entry) => sum + (entry.latency_ms ?? 0), 0);
-  const groupSizes = entries
-    .map((entry) => entry.tfgrpo_group_size)
-    .filter((value): value is number => typeof value === 'number');
-  const groupSizeAvg =
-    groupSizes.length > 0 ? groupSizes.reduce((sum, value) => sum + value, 0) / groupSizes.length : null;
+function createAggregationState(): MetricsAggregationState {
+  const missingCounts = Object.fromEntries(
+    REQUIRED_COMPLETENESS_FIELDS.map((field) => [field, 0])
+  ) as Record<CompletenessField, number>;
   return {
-    epoch,
-    runs,
-    tool_calls: toolCalls,
-    token_total: tokenTotal,
-    cost_usd: costUsd,
-    latency_ms: latencyMs,
-    group_size_avg: groupSizeAvg,
-    tools: aggregateToolStats(entries)
+    totalRuns: 0,
+    succeededRuns: 0,
+    baselineEntry: null,
+    missingCounts,
+    durationSum: 0,
+    durationCount: 0,
+    epochs: new Map<number, EpochAggregate>(),
+    validationSummary: {
+      passed: 0,
+      failed: 0,
+      stalled: 0,
+      manual: 0
+    },
+    reviewerRejections: 0,
+    reviewerLatencySum: 0,
+    reviewerLatencyCount: 0,
+    regressions: 0,
+    patternPromotions: 0,
+    patternDeprecations: 0,
+    throughputCandidates: 0,
+    alertsTotal: 0,
+    alertsSnapshotFailed: 0,
+    alertsStalledSnapshot: 0
   };
 }
 
-function aggregateToolStats(
-  entries: MetricsEntry[]
-): Array<{ tool: string; runs: number; tokens: number; cost_usd: number; latency_ms: number }> {
-  const aggregates = new Map<string, { runs: number; tokens: number; costUsd: number; latencyMs: number }>();
-  for (const entry of entries) {
-    const stats = entry.tool_stats ?? [];
+function accumulateMetricsEntry(state: MetricsAggregationState, entry: MetricsEntry): void {
+  state.totalRuns += 1;
+  if (!state.baselineEntry) {
+    state.baselineEntry = entry;
+  }
+  if (entry.status === 'succeeded') {
+    state.succeededRuns += 1;
+  }
+
+  if (!Array.isArray(entry.instance_stats) || entry.instance_stats.length === 0) {
+    state.missingCounts.instance_stats += 1;
+  }
+  if (!Array.isArray(entry.privacy_events) || entry.privacy_events.length === 0) {
+    state.missingCounts.privacy_events += 1;
+  }
+  if (!entry.control_plane_status || entry.control_plane_status === 'unknown') {
+    state.missingCounts.control_plane_status += 1;
+  }
+
+  if (typeof entry.duration_seconds === 'number' && Number.isFinite(entry.duration_seconds)) {
+    state.durationSum += entry.duration_seconds;
+    state.durationCount += 1;
+  }
+
+  if (typeof entry.tfgrpo_epoch === 'number') {
+    const aggregate = getEpochAggregate(state.epochs, entry.tfgrpo_epoch);
+    aggregate.runs += 1;
+    aggregate.tool_calls += typeof entry.tool_calls === 'number' ? entry.tool_calls : 0;
+    aggregate.token_total += typeof entry.token_total === 'number' ? entry.token_total : 0;
+    aggregate.cost_usd += typeof entry.cost_usd === 'number' ? entry.cost_usd : 0;
+    aggregate.latency_ms += typeof entry.latency_ms === 'number' ? entry.latency_ms : 0;
+    if (typeof entry.tfgrpo_group_size === 'number' && Number.isFinite(entry.tfgrpo_group_size)) {
+      aggregate.group_size_sum += entry.tfgrpo_group_size;
+      aggregate.group_size_count += 1;
+    }
+
+    const stats = Array.isArray(entry.tool_stats) ? entry.tool_stats : [];
     for (const stat of stats) {
       if (typeof stat.tool !== 'string' || !stat.tool) {
         continue;
       }
-      const current = aggregates.get(stat.tool) ?? { runs: 0, tokens: 0, costUsd: 0, latencyMs: 0 };
+      const current =
+        aggregate.tool_stats.get(stat.tool) ?? { runs: 0, tokens: 0, costUsd: 0, latencyMs: 0 };
       current.runs += 1;
       current.tokens += typeof stat.tokens === 'number' ? stat.tokens : 0;
       current.costUsd += typeof stat.cost_usd === 'number' ? stat.cost_usd : 0;
       current.latencyMs += typeof stat.latency_ms === 'number' ? stat.latency_ms : 0;
-      aggregates.set(stat.tool, current);
+      aggregate.tool_stats.set(stat.tool, current);
     }
   }
-  return Array.from(aggregates.entries()).map(([tool, aggregate]) => ({
-    tool,
-    runs: aggregate.runs,
-    tokens: aggregate.tokens,
-    cost_usd: roundCurrency(aggregate.costUsd),
-    latency_ms: aggregate.latencyMs
-  }));
-}
 
-async function loadMetricsEntries(path: string): Promise<MetricsEntry[]> {
-  try {
-    const raw = await readFile(path, 'utf8');
-    return raw
-      .trim()
-      .split('\n')
-      .filter((line) => line.trim().length > 0)
-      .map((line) => JSON.parse(line) as MetricsEntry);
-  } catch (error: unknown) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-      return [];
+  if (typeof entry.learning_validation_status === 'string') {
+    switch (entry.learning_validation_status) {
+      case 'validated':
+        state.validationSummary.passed += 1;
+        break;
+      case 'snapshot_failed':
+        state.validationSummary.failed += 1;
+        break;
+      case 'stalled_snapshot':
+        state.validationSummary.stalled += 1;
+        break;
+      case 'needs_manual_scenario':
+        state.validationSummary.manual += 1;
+        break;
+      default:
+        break;
     }
-    throw error;
+  }
+
+  if (typeof entry.learning_review_rejections === 'number') {
+    state.reviewerRejections += entry.learning_review_rejections;
+  }
+  if (
+    typeof entry.learning_review_latency_ms === 'number' &&
+    Number.isFinite(entry.learning_review_latency_ms)
+  ) {
+    state.reviewerLatencySum += entry.learning_review_latency_ms;
+    state.reviewerLatencyCount += 1;
+  }
+  if (typeof entry.learning_regressions_detected === 'number') {
+    state.regressions += entry.learning_regressions_detected;
+  }
+  if (typeof entry.learning_pattern_promoted === 'number') {
+    state.patternPromotions += entry.learning_pattern_promoted;
+  }
+  if (typeof entry.learning_pattern_deprecated === 'number') {
+    state.patternDeprecations += entry.learning_pattern_deprecated;
+  }
+  if (typeof entry.learning_throughput_candidates === 'number') {
+    state.throughputCandidates += entry.learning_throughput_candidates;
+  }
+  if (typeof entry.learning_alerts === 'number') {
+    state.alertsTotal += entry.learning_alerts;
+  }
+  if (entry.learning_snapshot_status === 'snapshot_failed') {
+    state.alertsSnapshotFailed += 1;
+  }
+  if (entry.learning_snapshot_status === 'stalled_snapshot') {
+    state.alertsStalledSnapshot += 1;
   }
 }
 
-function average(values: number[]): number {
-  if (values.length === 0) {
-    return 0;
+function getEpochAggregate(epochs: Map<number, EpochAggregate>, epoch: number): EpochAggregate {
+  const existing = epochs.get(epoch);
+  if (existing) {
+    return existing;
   }
-  const sum = values.reduce((total, value) => total + value, 0);
-  return sum / values.length;
+  const created: EpochAggregate = {
+    runs: 0,
+    tool_calls: 0,
+    token_total: 0,
+    cost_usd: 0,
+    latency_ms: 0,
+    group_size_sum: 0,
+    group_size_count: 0,
+    tool_stats: new Map()
+  };
+  epochs.set(epoch, created);
+  return created;
 }
 
 function roundCurrency(value: number): number {
