@@ -76,7 +76,7 @@
 
 ### Runtime option precedence (highest wins)
 1. CLI flags
-2. Environment variables (e.g., `RLM_GOAL`, `RLM_VALIDATOR`, `RLM_MAX_ITERATIONS`)
+2. Environment variables (e.g., `RLM_GOAL`, `RLM_VALIDATOR`, `RLM_MAX_ITERATIONS`, `RLM_MAX_MINUTES`)
 3. Pipeline input defaults (from the selected `rlm` pipeline definition)
 4. Built-in defaults (internal fallbacks)
 
@@ -102,13 +102,13 @@ Always print the resolved task id in the CLI output.
 ## Stop Conditions
 - Validator exit code = 0 → success.
 - Max iterations reached with failing validator → exit 3; `final.status = max_iterations` (unless `--validator none`).
-- Budget = `maxIterations` (default 88), plus optional `maxMinutes` when supported.
+- Budget = `maxIterations` (default 88; `0` or `unlimited`/`unbounded`/`infinite`/`infinity` means unbounded) plus `maxMinutes` (default 48 hours; set `0` to disable the time cap).
 - If `--validator none`, run is budgeted and exits 0 when the budget completes; non-zero only on internal errors or invalid configuration.
 - If `maxMinutes` is reached with a validator still failing → treat as budget exhaustion (exit 3; `final.status = max_minutes`).
 - If `maxMinutes` is reached with `--validator none` → treat as successful budget completion (exit 0; `final.status = budget_complete`).
 - If `--validator none` and `maxIterations=0` and no time cap is set → exit 5 with guidance (prevent unbounded runs).
 - Optional: no changes + validator still failing → failure with reason.
-- Default max iterations: 88; `0` means unlimited (requires validator or time cap).
+- Default max iterations: 88; `0` (or `unlimited` alias) means unlimited (requires validator or time cap).
 
 ## Exit Codes (proposed)
 - 0: validator passed OR budget completed with `--validator none`
@@ -133,7 +133,7 @@ Notes:
 - `no_validator` is reserved for auto-detect failure / no selection (exit 2), not for successful `--validator none` runs.
 
 Optional keys:
-- `maxMinutes` (time-based guardrail; may be null/omitted until implemented)
+- `maxMinutes` (time-based guardrail; defaults to 48 hours when unset; set to `0` to disable)
 
 ## Failure Modes
 - Auto validator not found or ambiguous:

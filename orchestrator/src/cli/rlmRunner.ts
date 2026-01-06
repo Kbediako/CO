@@ -23,6 +23,8 @@ import type {
 
 const execAsync = promisify(exec);
 const DEFAULT_MAX_ITERATIONS = 88;
+const DEFAULT_MAX_MINUTES = 48 * 60;
+const UNBOUNDED_ITERATION_ALIASES = new Set(['unbounded', 'unlimited', 'infinite', 'infinity']);
 
 interface ParsedArgs {
   goal?: string;
@@ -142,6 +144,17 @@ function parsePositiveInt(value: string | undefined, fallback: number): number |
     return null;
   }
   return parsed;
+}
+
+function parseMaxIterations(value: string | undefined, fallback: number): number | null {
+  if (!value) {
+    return fallback;
+  }
+  const normalized = value.trim().toLowerCase();
+  if (UNBOUNDED_ITERATION_ALIASES.has(normalized)) {
+    return 0;
+  }
+  return parsePositiveInt(value, fallback);
 }
 
 function parseRoles(value: string | undefined, fallback: RlmRoles): RlmRoles | null {
@@ -298,8 +311,11 @@ async function main(): Promise<void> {
   const goal = (parsedArgs.goal ?? env.RLM_GOAL)?.trim();
 
   const roles = parseRoles(parsedArgs.roles ?? env.RLM_ROLES, 'single');
-  const maxIterations = parsePositiveInt(parsedArgs.maxIterations ?? env.RLM_MAX_ITERATIONS, DEFAULT_MAX_ITERATIONS);
-  const maxMinutes = parsePositiveInt(parsedArgs.maxMinutes ?? env.RLM_MAX_MINUTES, 0);
+  const maxIterations = parseMaxIterations(
+    parsedArgs.maxIterations ?? env.RLM_MAX_ITERATIONS,
+    DEFAULT_MAX_ITERATIONS
+  );
+  const maxMinutes = parsePositiveInt(parsedArgs.maxMinutes ?? env.RLM_MAX_MINUTES, DEFAULT_MAX_MINUTES);
 
   if (!goal) {
     const state: RlmState = {
@@ -344,7 +360,7 @@ async function main(): Promise<void> {
       final: { status: 'invalid_config', exitCode: 5 }
     };
     await writeTerminalState(runDir, state);
-    console.error('Invalid max iterations value.');
+    console.error('Invalid max iterations value. Use a non-negative integer or "unlimited".');
     process.exitCode = 5;
     return;
   }
@@ -460,3 +476,10 @@ if (entry && entry === self) {
     process.exitCode = 10;
   });
 }
+
+export const __test__ = {
+  parseMaxIterations,
+  parsePositiveInt,
+  DEFAULT_MAX_ITERATIONS,
+  DEFAULT_MAX_MINUTES
+};
