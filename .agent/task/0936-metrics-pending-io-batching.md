@@ -8,7 +8,9 @@
 - [x] Diagnostics + RLM runs captured with hotspot summary - Evidence: `.runs/0936-metrics-pending-io-batching/cli/2026-01-06T01-09-05-710Z-4370fedb/manifest.json`, `.runs/0936-metrics-pending-io-batching/cli/2026-01-06T01-10-29-482Z-91498de9/manifest.json`, `tasks/tasks-0936-metrics-pending-io-batching.md`.
 
 ## Implementation
-- [x] Targeted performance fix + tests applied - Evidence: code changes, `.runs/0936-metrics-pending-io-batching/cli/2026-01-06T01-15-46-636Z-e3b8d1a0/manifest.json`.
+- [x] Targeted performance fix + tests applied - Evidence: code changes, `.runs/0936-metrics-pending-io-batching/cli/2026-01-06T01-50-32-842Z-b559ee97/manifest.json`.
 
 ## Validation + Handoff
-- [x] Implementation-gate manifest captured - Evidence: `.runs/0936-metrics-pending-io-batching/cli/2026-01-06T01-15-46-636Z-e3b8d1a0/manifest.json`.
+- [x] Implementation-gate manifest captured - Evidence: `.runs/0936-metrics-pending-io-batching/cli/2026-01-06T01-50-32-842Z-b559ee97/manifest.json`.
+- [x] Validation: `npm run docs:check` passes. Evidence: `.runs/0936-metrics-pending-io-batching/cli/2026-01-06T01-50-32-842Z-b559ee97/manifest.json`.
+- [x] Validation: `npm run docs:freshness` passes. Evidence: `.runs/0936-metrics-pending-io-batching/cli/2026-01-06T01-50-32-842Z-b559ee97/manifest.json`, `out/0936-metrics-pending-io-batching/docs-freshness.json`.

@@ -2,7 +2,7 @@
 
 ## Status Snapshot
 - Current Phase: Validation + Handoff
-- Run Manifest Link: `.runs/0936-metrics-pending-io-batching/cli/2026-01-06T01-15-46-636Z-e3b8d1a0/manifest.json`
+- Run Manifest Link: `.runs/0936-metrics-pending-io-batching/cli/2026-01-06T01-50-32-842Z-b559ee97/manifest.json`
 - Metrics / State Snapshots: `.runs/0936-metrics-pending-io-batching/metrics.json`, `out/0936-metrics-pending-io-batching/state.json`
 
 ## Milestones & Tasks
