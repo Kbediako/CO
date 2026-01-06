@@ -98,19 +98,46 @@ export class ManifestPersister {
     const writeHeartbeat = this.dirtyHeartbeat;
     this.dirtyManifest = false;
     this.dirtyHeartbeat = false;
-    try {
-      if (writeManifest) {
-        await this.writeManifest(this.paths, this.manifest);
-      }
-      if (writeHeartbeat) {
-        await this.writeHeartbeat(this.paths, this.manifest);
-      }
-      this.lastPersistAt = this.now();
-    } catch (error) {
-      this.dirtyManifest = this.dirtyManifest || writeManifest;
-      this.dirtyHeartbeat = this.dirtyHeartbeat || writeHeartbeat;
-      throw error;
+
+    const tasks: Array<{ kind: 'manifest' | 'heartbeat'; promise: Promise<void> }> = [];
+    if (writeManifest) {
+      tasks.push({
+        kind: 'manifest',
+        promise: Promise.resolve().then(() => this.writeManifest(this.paths, this.manifest))
+      });
     }
+    if (writeHeartbeat) {
+      tasks.push({
+        kind: 'heartbeat',
+        promise: Promise.resolve().then(() => this.writeHeartbeat(this.paths, this.manifest))
+      });
+    }
+
+    const results = await Promise.allSettled(tasks.map((task) => task.promise));
+    let manifestError: unknown = null;
+    let heartbeatError: unknown = null;
+    let manifestFailed = false;
+    let heartbeatFailed = false;
+
+    results.forEach((result, index) => {
+      if (result.status === 'rejected') {
+        if (tasks[index].kind === 'manifest') {
+          this.dirtyManifest = true;
+          manifestFailed = true;
+          manifestError = result.reason;
+        } else {
+          this.dirtyHeartbeat = true;
+          heartbeatFailed = true;
+          heartbeatError = result.reason;
+        }
+      }
+    });
+
+    if (manifestFailed || heartbeatFailed) {
+      throw manifestFailed ? manifestError : heartbeatError;
+    }
+
+    this.lastPersistAt = this.now();
   }
 }
 

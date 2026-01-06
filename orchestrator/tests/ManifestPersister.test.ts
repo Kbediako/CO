@@ -91,6 +91,60 @@ describe('ManifestPersister', () => {
     expect(maxInFlight).toBe(1);
   });
 
+  it('overlaps manifest and heartbeat writes', async () => {
+    const env = normalizeEnvironmentPaths(resolveEnvironmentPaths());
+    const pipeline: PipelineDefinition = {
+      id: 'persister-overlap',
+      title: 'Persister Overlap Pipeline',
+      stages: [
+        {
+          kind: 'command',
+          id: 'stage',
+          title: 'Stage',
+          command: 'echo ok'
+        }
+      ]
+    };
+
+    const { manifest, paths } = await bootstrapManifest('run-persister-overlap', {
+      env,
+      pipeline,
+      parentRunId: null,
+      taskSlug: env.taskId,
+      approvalPolicy: null
+    });
+
+    let inFlight = 0;
+    let maxInFlight = 0;
+    const enter = (): void => {
+      inFlight += 1;
+      maxInFlight = Math.max(maxInFlight, inFlight);
+    };
+    const exit = (): void => {
+      inFlight -= 1;
+    };
+
+    const persister = new ManifestPersister({
+      manifest,
+      paths,
+      persistIntervalMs: 0,
+      writeManifest: async () => {
+        enter();
+        await new Promise<void>((resolve) => setTimeout(resolve, 5));
+        exit();
+      },
+      writeHeartbeat: async () => {
+        enter();
+        await new Promise<void>((resolve) => setTimeout(resolve, 5));
+        exit();
+      }
+    });
+
+    await persister.schedule({ manifest: true, heartbeat: true, force: true });
+
+    expect(maxInFlight).toBe(2);
+  });
+
   it('coalesces pending manifest writes', async () => {
     const env = normalizeEnvironmentPaths(resolveEnvironmentPaths());
     const pipeline: PipelineDefinition = {
@@ -183,5 +237,58 @@ describe('ManifestPersister', () => {
     await persister.flush();
 
     expect(attempts).toBe(2);
+  });
+
+  it('retries only the failed channel', async () => {
+    const env = normalizeEnvironmentPaths(resolveEnvironmentPaths());
+    const pipeline: PipelineDefinition = {
+      id: 'persister-retry-channel',
+      title: 'Persister Retry Channel Pipeline',
+      stages: [
+        {
+          kind: 'command',
+          id: 'stage',
+          title: 'Stage',
+          command: 'echo ok'
+        }
+      ]
+    };
+
+    const { manifest, paths } = await bootstrapManifest('run-persister-retry-channel', {
+      env,
+      pipeline,
+      parentRunId: null,
+      taskSlug: env.taskId,
+      approvalPolicy: null
+    });
+
+    let manifestCalls = 0;
+    let heartbeatCalls = 0;
+    let heartbeatShouldFail = true;
+
+    const persister = new ManifestPersister({
+      manifest,
+      paths,
+      persistIntervalMs: 0,
+      writeManifest: async () => {
+        manifestCalls += 1;
+      },
+      writeHeartbeat: async () => {
+        heartbeatCalls += 1;
+        if (heartbeatShouldFail) {
+          heartbeatShouldFail = false;
+          throw new Error('heartbeat failed');
+        }
+      }
+    });
+
+    await expect(
+      persister.schedule({ manifest: true, heartbeat: true, force: true })
+    ).rejects.toThrow('heartbeat failed');
+
+    await persister.flush();
+
+    expect(manifestCalls).toBe(1);
+    expect(heartbeatCalls).toBe(2);
   });
 });
