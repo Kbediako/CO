@@ -13,6 +13,9 @@ describe('rlmRunner config parsing', () => {
     expect(parseMaxIterations('unlimited', DEFAULT_MAX_ITERATIONS)).toBe(0);
     expect(parseMaxIterations('UNBOUNDED', DEFAULT_MAX_ITERATIONS)).toBe(0);
     expect(parseMaxIterations('infinite', DEFAULT_MAX_ITERATIONS)).toBe(0);
+    expect(parseMaxIterations('infinity', DEFAULT_MAX_ITERATIONS)).toBe(0);
+    expect(parseMaxIterations('  unlimited  ', DEFAULT_MAX_ITERATIONS)).toBe(0);
+    expect(parseMaxIterations('UnLiMiTeD', DEFAULT_MAX_ITERATIONS)).toBe(0);
   });
 
   it('parses numeric iteration values', () => {

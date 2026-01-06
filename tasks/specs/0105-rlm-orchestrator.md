@@ -13,8 +13,8 @@ last_review: 2026-01-06
 - Task-id resolution documented for ad-hoc runs (`--task` → `MCP_RUNNER_TASK_ID` → default).
 - Validator auto-detected by default; explicit override supported.
 - Auto-detect failure stops with guidance to supply `--validator "<cmd>"` or `--validator none`.
-- Default max iterations = 88, with override (`0` or `unlimited` = unlimited).
-- Default max minutes = 48 hours; override via `--max-minutes` / `RLM_MAX_MINUTES` (set `0` to disable when a validator is present).
+- Default max iterations = 88, with override (`0` or `unlimited`/`unbounded`/`infinite`/`infinity` = unlimited).
+- Default max minutes = 48 hours; override via `--max-minutes` / `RLM_MAX_MINUTES` (set `0` to disable when a validator is present; invalid to disable when `--validator none` with `maxIterations=0`, exit 5).
 - Artifacts written per iteration (validator logs + status/diff summaries).
 
 ## Risks & Mitigations

@@ -360,7 +360,9 @@ async function main(): Promise<void> {
       final: { status: 'invalid_config', exitCode: 5 }
     };
     await writeTerminalState(runDir, state);
-    console.error('Invalid max iterations value. Use a non-negative integer or "unlimited".');
+    console.error(
+      'Invalid max iterations value. Use a non-negative integer or one of "unlimited", "unbounded", "infinite", "infinity".'
+    );
     process.exitCode = 5;
     return;
   }
@@ -465,6 +467,14 @@ async function main(): Promise<void> {
   const finalStatus = result.state.final?.status ?? 'unknown';
   const iterationCount = result.state.iterations.length;
   console.log(`RLM completed: status=${finalStatus} iterations=${iterationCount} exit=${result.exitCode}`);
+  const hasTimeCap = maxMinutes !== null && maxMinutes > 0;
+  const unboundedBudgetInvalid =
+    validatorCommand === null && maxIterations === 0 && !hasTimeCap;
+  if (finalStatus === 'invalid_config' && unboundedBudgetInvalid) {
+    console.error(
+      'Invalid configuration: --validator none with unbounded iterations and --max-minutes 0 would run forever. Fix: set --max-minutes / RLM_MAX_MINUTES to a positive value (default 2880), set --max-iterations to a positive value, or provide a validator.'
+    );
+  }
   process.exitCode = result.exitCode;
 }
 

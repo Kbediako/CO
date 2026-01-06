@@ -2,7 +2,7 @@
 
 ## Status Snapshot
 - Current Phase: Validation + Handoff
-- Run Manifest Link: `.runs/0939-orchestrator-performance-reliability-loop-2/cli/2026-01-06T11-18-00-343Z-6ee17f0e/manifest.json`
+- Run Manifest Link: `.runs/0939-orchestrator-performance-reliability-loop-2/cli/2026-01-06T14-16-06-983Z-5122db4a/manifest.json`
 - Post-change diagnostics manifest: `.runs/0939-orchestrator-performance-reliability-loop-2/cli/2026-01-06T09-37-07-569Z-4f1a7a79/manifest.json`
 - Post-change RLM manifest: `.runs/0939-orchestrator-performance-reliability-loop-2/cli/2026-01-06T10-02-37-053Z-a853796a/manifest.json`
 - Metrics / State Snapshots: `.runs/0939-orchestrator-performance-reliability-loop-2/metrics.json`, `out/0939-orchestrator-performance-reliability-loop-2/state.json`
@@ -14,13 +14,13 @@ This Action Plan is a living document. Keep **Progress**, **Surprises & Discover
 - [x] (2026-01-06) Diagnostics + RLM baseline captured; hotspot identified (metrics aggregation full-file reads).
 - [x] (2026-01-06) ExecPlan guidance applied to PRD/TECH_SPEC/ACTION_PLAN (evidence + idempotence sections).
 - [x] (2026-01-06) Capture before/after runtime + manifest write counts in Artifacts and Notes.
-- [x] (2026-01-06) Implemented streaming aggregation + atomic writes; added crash-safe newline guard + regression tests. Evidence: `.runs/0939-orchestrator-performance-reliability-loop-2/cli/2026-01-06T11-18-00-343Z-6ee17f0e/manifest.json`.
+- [x] (2026-01-06) Implemented streaming aggregation + atomic writes; added crash-safe newline guard + regression tests. Evidence: `.runs/0939-orchestrator-performance-reliability-loop-2/cli/2026-01-06T14-16-06-983Z-5122db4a/manifest.json`.
 - [x] (2026-01-06) Re-ran diagnostics + RLM; confirm improvement. Evidence: `.runs/0939-orchestrator-performance-reliability-loop-2/cli/2026-01-06T09-37-07-569Z-4f1a7a79/manifest.json`, `.runs/0939-orchestrator-performance-reliability-loop-2/cli/2026-01-06T10-02-37-053Z-a853796a/manifest.json`.
 - [x] (2026-01-06) Run implementation gate and link evidence.
 - [x] (2026-01-06) Write Outcomes & Retrospective.
 
 ## Surprises & Discoveries
-- Observation (pre-fix): `RLM_MAX_ITERATIONS=unlimited` failed parsing in `rlmRunner` (expected numeric), so the rerun used the existing `0` sentinel plus a time budget when the validator is disabled. `rlmRunner` now accepts `unlimited`/`unbounded` aliases.
+- Observation: `RLM_MAX_ITERATIONS=unlimited` previously failed parsing in `rlmRunner` (expected numeric only), so the rerun used the existing `0` sentinel plus a time budget when the validator was disabled. This PR adds support for unbounded aliases (`unlimited`/`unbounded`/`infinite`/`infinity`) in `rlmRunner`.
   Evidence: `.runs/0939-orchestrator-performance-reliability-loop-2/cli/2026-01-06T09-38-29-984Z-19f2ff13/manifest.json`, `~/.oracle/sessions/rlm-max-iterations/output.log`.
 - Observation: Metrics aggregation must guard missing trailing newline to avoid JSON concatenation on append; added newline guard + truncated-line tolerance.
   Evidence: `orchestrator/src/cli/metrics/metricsAggregator.ts`, `orchestrator/src/cli/metrics/metricsRecorder.ts`, `orchestrator/tests/MetricsAggregator.test.ts`, `~/.oracle/sessions/metrics-agg-review/output.log`.
@@ -60,7 +60,7 @@ Gate:
 - Post-change diagnostics manifest: `.runs/0939-orchestrator-performance-reliability-loop-2/cli/2026-01-06T09-37-07-569Z-4f1a7a79/manifest.json`
 - Post-change RLM manifest: `.runs/0939-orchestrator-performance-reliability-loop-2/cli/2026-01-06T10-02-37-053Z-a853796a/manifest.json`
 - Failed RLM (pre-fix unlimited parse) manifest: `.runs/0939-orchestrator-performance-reliability-loop-2/cli/2026-01-06T09-38-29-984Z-19f2ff13/manifest.json`
-- Implementation gate manifest: `.runs/0939-orchestrator-performance-reliability-loop-2/cli/2026-01-06T11-18-00-343Z-6ee17f0e/manifest.json`
+- Implementation gate manifest: `.runs/0939-orchestrator-performance-reliability-loop-2/cli/2026-01-06T14-16-06-983Z-5122db4a/manifest.json`
 - Oracle review logs: `~/.oracle/sessions/metrics-agg-review/output.log`, `~/.oracle/sessions/rlm-max-iterations/output.log`
 - Metrics summary: `.runs/0939-orchestrator-performance-reliability-loop-2/metrics.json`
 - State snapshot: `out/0939-orchestrator-performance-reliability-loop-2/state.json`

@@ -1,6 +1,6 @@
 import type { Dirent } from 'node:fs';
 import { createReadStream } from 'node:fs';
-import { appendFile, mkdir, open, readFile, readdir, rm, stat } from 'node:fs/promises';
+import { appendFile, mkdir, open, readFile, readdir, rename, rm, stat } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { createInterface } from 'node:readline';
 
@@ -88,6 +88,7 @@ interface MetricsAggregationState {
   totalRuns: number;
   succeededRuns: number;
   baselineEntry: MetricsEntry | null;
+  seenRunIds: Set<string>;
   missingCounts: Record<CompletenessField, number>;
   durationSum: number;
   durationCount: number;
@@ -194,6 +195,81 @@ async function streamMetricsEntryLines(
   return count;
 }
 
+function isMetricsEntryCandidate(value: unknown): value is MetricsEntry {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return false;
+  }
+  const candidate = value as { run_id?: unknown; status?: unknown; recorded_at?: unknown };
+  if (typeof candidate.run_id !== 'string' || candidate.run_id.trim().length === 0) {
+    return false;
+  }
+  if (typeof candidate.status !== 'string' || candidate.status.trim().length === 0) {
+    return false;
+  }
+  if (typeof candidate.recorded_at !== 'string' || candidate.recorded_at.trim().length === 0) {
+    return false;
+  }
+  return true;
+}
+
+function parseMetricsEntry(line: string): MetricsEntry | null {
+  const trimmed = line.trim();
+  if (!trimmed) {
+    return null;
+  }
+  try {
+    const parsed = JSON.parse(trimmed);
+    return isMetricsEntryCandidate(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+async function promotePendingTmpFile(tmpPath: string, pendingDir: string): Promise<boolean> {
+  let lineCount = 0;
+  let invalid = false;
+  try {
+    await streamMetricsEntryLines(tmpPath, async (line) => {
+      lineCount += 1;
+      if (!parseMetricsEntry(line)) {
+        invalid = true;
+        throw new Error('invalid metrics entry');
+      }
+    });
+  } catch (error: unknown) {
+    if (invalid) {
+      return false;
+    }
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      return false;
+    }
+    throw error;
+  }
+  if (lineCount === 0) {
+    return false;
+  }
+
+  const targetPath = tmpPath.replace(/\.tmp$/, '');
+  try {
+    await rename(tmpPath, targetPath);
+    return true;
+  } catch (error: unknown) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code === 'ENOENT') {
+      return false;
+    }
+    if (code === 'EEXIST') {
+      const recoveryPath = join(
+        pendingDir,
+        `recovered-${Date.now()}-${Math.random().toString(36).slice(2)}.jsonl`
+      );
+      await rename(tmpPath, recoveryPath);
+      return true;
+    }
+    throw error;
+  }
+}
+
 function normalizeBatchLimit(value: number): number {
   if (!Number.isFinite(value) || value <= 0) {
     return Number.POSITIVE_INFINITY;
@@ -236,6 +312,7 @@ export async function mergePendingMetricsEntries(env: EnvironmentPaths): Promise
     }
 
     const now = Date.now();
+    let promotedTmp = false;
     for (const entry of entries) {
       if (!entry.isFile() || !entry.name.endsWith('.tmp')) {
         continue;
@@ -244,11 +321,17 @@ export async function mergePendingMetricsEntries(env: EnvironmentPaths): Promise
       try {
         const stats = await stat(tmpPath);
         if (now - stats.mtimeMs > staleTmpMs) {
-          await rm(tmpPath, { force: true });
+          const promoted = await promotePendingTmpFile(tmpPath, pendingDir);
+          if (promoted) {
+            promotedTmp = true;
+          }
+          if (!promoted) {
+            await rm(tmpPath, { force: true });
+          }
         }
       } catch (error: unknown) {
-        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
-          throw error;
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+        throw error;
         }
       }
     }
@@ -259,7 +342,10 @@ export async function mergePendingMetricsEntries(env: EnvironmentPaths): Promise
       .sort();
 
     if (files.length === 0) {
-      break;
+      if (!promotedTmp) {
+        break;
+      }
+      continue;
     }
 
     await mkdir(metricsRoot, { recursive: true });
@@ -386,16 +472,15 @@ export async function updateMetricsAggregates(env: EnvironmentPaths): Promise<vo
   const metricsPath = getMetricsPath(env);
   const state = createAggregationState();
   await streamMetricsEntryLines(metricsPath, async (line) => {
-    const trimmed = line.trim();
-    if (!trimmed) {
+    const entry = parseMetricsEntry(line);
+    if (!entry) {
       return;
     }
-    try {
-      const entry = JSON.parse(trimmed) as MetricsEntry;
-      accumulateMetricsEntry(state, entry);
-    } catch {
+    if (state.seenRunIds.has(entry.run_id)) {
       return;
     }
+    state.seenRunIds.add(entry.run_id);
+    accumulateMetricsEntry(state, entry);
   });
   if (state.totalRuns === 0 || !state.baselineEntry) {
     return;
@@ -575,6 +660,7 @@ function createAggregationState(): MetricsAggregationState {
     totalRuns: 0,
     succeededRuns: 0,
     baselineEntry: null,
+    seenRunIds: new Set(),
     missingCounts,
     durationSum: 0,
     durationCount: 0,

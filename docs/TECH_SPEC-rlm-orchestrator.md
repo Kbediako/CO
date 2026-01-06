@@ -102,13 +102,13 @@ Always print the resolved task id in the CLI output.
 ## Stop Conditions
 - Validator exit code = 0 → success.
 - Max iterations reached with failing validator → exit 3; `final.status = max_iterations` (unless `--validator none`).
-- Budget = `maxIterations` (default 88; `0` or `unlimited`/`unbounded`/`infinite`/`infinity` means unbounded) plus `maxMinutes` (default 48 hours; set `0` to disable the time cap).
+- Budget = `maxIterations` (default 88; `0` or `unlimited`/`unbounded`/`infinite`/`infinity` means unbounded) plus `maxMinutes` (default 48 hours; set `0` to disable the time cap when a validator is present; invalid to disable when `--validator none` with `maxIterations=0`).
 - If `--validator none`, run is budgeted and exits 0 when the budget completes; non-zero only on internal errors or invalid configuration.
-- If `maxMinutes` is reached with a validator still failing → treat as budget exhaustion (exit 3; `final.status = max_minutes`).
-- If `maxMinutes` is reached with `--validator none` → treat as successful budget completion (exit 0; `final.status = budget_complete`).
-- If `--validator none` and `maxIterations=0` and no time cap is set → exit 5 with guidance (prevent unbounded runs).
+- When `maxMinutes` is reached with a validator still failing, treat it as budget exhaustion (exit 3; `final.status = max_minutes`).
+- When `maxMinutes` is reached with `--validator none`, treat it as successful budget completion (exit 0; `final.status = budget_complete`).
+- When `--validator none` is combined with `maxIterations=0` and no time cap is set, exit 5 (prevent unbounded runs).
 - Optional: no changes + validator still failing → failure with reason.
-- Default max iterations: 88; `0` (or `unlimited` alias) means unlimited (requires validator or time cap).
+- Default max iterations: 88; `0` (or `unlimited`/`unbounded`/`infinite`/`infinity` aliases) means unlimited (requires validator or time cap).
 
 ## Exit Codes (proposed)
 - 0: validator passed OR budget completed with `--validator none`
@@ -133,7 +133,7 @@ Notes:
 - `no_validator` is reserved for auto-detect failure / no selection (exit 2), not for successful `--validator none` runs.
 
 Optional keys:
-- `maxMinutes` (time-based guardrail; defaults to 48 hours when unset; set to `0` to disable)
+- `maxMinutes` (time-based guardrail; defaults to 48 hours when unset; set to `0` to disable when a validator is present; invalid to disable when `--validator none` with `maxIterations=0`)
 
 ## Failure Modes
 - Auto validator not found or ambiguous:
@@ -142,7 +142,7 @@ Optional keys:
 - Validator spawn error / command not found:
   - TTY: prompt for explicit `--validator "<cmd>"` or `--validator none`.
   - Non-interactive: exit 4 with guidance.
-- Invalid configuration (e.g., `--validator none` with unbounded budget) → exit 5 with guidance.
+- Invalid configuration (e.g., `--validator none` with unbounded budget) → exit 5.
 - Infinite loop risk when `maxIterations=0` → recommend optional time-based cap (and forbid `--validator none` without a cap).
 
 ## Testing Strategy
