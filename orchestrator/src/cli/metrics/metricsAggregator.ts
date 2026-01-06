@@ -5,6 +5,7 @@ import { dirname, join } from 'node:path';
 import type { EnvironmentPaths } from '../run/environment.js';
 import type { SandboxState, ToolRunStatus } from '../../../../packages/shared/manifest/types.js';
 import { acquireLockWithRetry, type LockRetryOptions } from '../../persistence/lockFile.js';
+import { EnvUtils } from '../../../../packages/shared/config/index.js';
 
 export interface MetricsEntry {
   run_id: string;
@@ -70,6 +71,8 @@ const REQUIRED_COMPLETENESS_FIELDS: Array<keyof MetricsEntry> = [
 const METRICS_LOCK_FILENAME = 'metrics.lock';
 const METRICS_PENDING_DIRNAME = 'metrics.pending';
 const DEFAULT_LOCK_STALE_MS = 5 * 60 * 1000;
+const DEFAULT_PENDING_BATCH_MAX_LINES = 500;
+const DEFAULT_PENDING_BATCH_MAX_BYTES = 1024 * 1024;
 const DEFAULT_LOCK_RETRY: LockRetryOptions = {
   maxAttempts: 4,
   initialDelayMs: 50,
@@ -128,7 +131,7 @@ export interface MetricsLockOptions {
 async function readMetricsEntryLines(path: string): Promise<string[]> {
   try {
     const raw = await readFile(path, 'utf8');
-    return raw.trim().split('\n').filter(Boolean);
+    return raw.split('\n').filter((line) => line.length > 0);
   } catch (error: unknown) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
       return [];
@@ -137,10 +140,35 @@ async function readMetricsEntryLines(path: string): Promise<string[]> {
   }
 }
 
+function normalizeBatchLimit(value: number): number {
+  if (!Number.isFinite(value) || value <= 0) {
+    return Number.POSITIVE_INFINITY;
+  }
+  return value;
+}
+
+function getPendingBatchLimits(): { maxLines: number; maxBytes: number } {
+  const maxLines = EnvUtils.getInt(
+    'CODEX_METRICS_PENDING_BATCH_MAX_LINES',
+    DEFAULT_PENDING_BATCH_MAX_LINES
+  );
+  const maxBytes = EnvUtils.getInt(
+    'CODEX_METRICS_PENDING_BATCH_MAX_BYTES',
+    DEFAULT_PENDING_BATCH_MAX_BYTES
+  );
+  return {
+    maxLines: normalizeBatchLimit(maxLines),
+    maxBytes: normalizeBatchLimit(maxBytes)
+  };
+}
+
 export async function mergePendingMetricsEntries(env: EnvironmentPaths): Promise<number> {
   const pendingDir = getMetricsPendingDir(env);
+  const metricsRoot = getMetricsRoot(env);
+  const metricsPath = getMetricsPath(env);
   let merged = 0;
   const staleTmpMs = DEFAULT_LOCK_STALE_MS;
+  const { maxLines: maxBatchLines, maxBytes: maxBatchBytes } = getPendingBatchLimits();
 
   for (let pass = 0; pass < 2; pass += 1) {
     let entries: Dirent[] = [];
@@ -180,8 +208,25 @@ export async function mergePendingMetricsEntries(env: EnvironmentPaths): Promise
       break;
     }
 
-    const payloadLines: string[] = [];
-    const filesToRemove: string[] = [];
+    await mkdir(metricsRoot, { recursive: true });
+
+    let payloadLines: string[] = [];
+    let filesToRemove: string[] = [];
+    let payloadLineCount = 0;
+    let payloadBytes = 0;
+
+    const flushBatch = async () => {
+      if (payloadLines.length === 0) {
+        return;
+      }
+      const payload = `${payloadLines.join('\n')}\n`;
+      await appendFile(metricsPath, payload, 'utf8');
+      await Promise.all(filesToRemove.map((filePath) => rm(filePath, { force: true })));
+      payloadLines = [];
+      filesToRemove = [];
+      payloadLineCount = 0;
+      payloadBytes = 0;
+    };
 
     for (const file of files) {
       const filePath = join(pendingDir, file);
@@ -190,19 +235,25 @@ export async function mergePendingMetricsEntries(env: EnvironmentPaths): Promise
         await rm(filePath, { force: true });
         continue;
       }
+
+      const lineBytes = lines.reduce(
+        (sum, line) => sum + Buffer.byteLength(line, 'utf8') + 1,
+        0
+      );
+      const wouldExceedLines = payloadLineCount + lines.length > maxBatchLines;
+      const wouldExceedBytes = payloadBytes + lineBytes > maxBatchBytes;
+      if (payloadLines.length > 0 && (wouldExceedLines || wouldExceedBytes)) {
+        await flushBatch();
+      }
+
       payloadLines.push(...lines);
       filesToRemove.push(filePath);
+      payloadLineCount += lines.length;
+      payloadBytes += lineBytes;
       merged += lines.length;
     }
 
-    if (payloadLines.length === 0) {
-      continue;
-    }
-
-    await mkdir(getMetricsRoot(env), { recursive: true });
-    const payload = `${payloadLines.join('\n')}\n`;
-    await appendFile(getMetricsPath(env), payload, 'utf8');
-    await Promise.all(filesToRemove.map((filePath) => rm(filePath, { force: true })));
+    await flushBatch();
   }
 
   return merged;
