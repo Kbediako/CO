@@ -493,6 +493,13 @@
       "cadence_days": 90
     },
     {
+      "path": ".agent/task/0937-metrics-pending-batch-cap.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-06",
+      "cadence_days": 90
+    },
+    {
       "path": ".agent/task/ACTION_PLAN_TEMPLATE.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -704,6 +711,13 @@
     },
     {
       "path": "docs/ACTION_PLAN-manifest-persister-throughput.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-06",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/ACTION_PLAN-metrics-pending-batch-cap.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-01-06",
@@ -1088,6 +1102,13 @@
       "cadence_days": 90
     },
     {
+      "path": "docs/PRD-metrics-pending-batch-cap.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-06",
+      "cadence_days": 90
+    },
+    {
       "path": "docs/PRD-metrics-pending-io-batching.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -1418,6 +1439,13 @@
     },
     {
       "path": "docs/TECH_SPEC-manifest-persister-throughput.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-06",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/TECH_SPEC-metrics-pending-batch-cap.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-01-06",
@@ -1928,6 +1956,13 @@
       "cadence_days": 90
     },
     {
+      "path": "tasks/specs/0937-metrics-pending-batch-cap.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-06",
+      "cadence_days": 90
+    },
+    {
       "path": "tasks/specs/README.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -2244,27 +2279,6 @@
     },
     {
       "path": "tasks/tasks-0936-metrics-pending-io-batching.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-01-06",
-      "cadence_days": 90
-    },
-    {
-      "path": "docs/PRD-metrics-pending-batch-cap.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-01-06",
-      "cadence_days": 90
-    },
-    {
-      "path": "docs/TECH_SPEC-metrics-pending-batch-cap.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-01-06",
-      "cadence_days": 90
-    },
-    {
-      "path": "docs/ACTION_PLAN-metrics-pending-batch-cap.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-01-06",
