@@ -306,16 +306,16 @@
     {
       "path": ".agent/task/0910-docs-review-gate.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2025-12-31",
-      "cadence_days": 90
+      "status": "archived",
+      "last_review": "2026-01-06",
+      "cadence_days": 365
     },
     {
       "path": ".agent/task/0911-orchestrator-status-ui.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2025-12-31",
-      "cadence_days": 90
+      "status": "archived",
+      "last_review": "2026-01-06",
+      "cadence_days": 365
     },
     {
       "path": ".agent/task/0912-review-loop-devtools-gate.md",
@@ -476,6 +476,13 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-01-05",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/task/0935-manifest-persister-throughput.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-06",
       "cadence_days": 90
     },
     {
@@ -686,6 +693,13 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/ACTION_PLAN-manifest-persister-throughput.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-06",
       "cadence_days": 90
     },
     {
@@ -1053,6 +1067,13 @@
       "cadence_days": 90
     },
     {
+      "path": "docs/PRD-manifest-persister-throughput.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-06",
+      "cadence_days": 90
+    },
+    {
       "path": "docs/PRD-npm-companion-package-publishability.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -1372,6 +1393,13 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/TECH_SPEC-manifest-persister-throughput.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-06",
       "cadence_days": 90
     },
     {
@@ -1858,6 +1886,13 @@
       "cadence_days": 90
     },
     {
+      "path": "tasks/specs/0935-manifest-persister-throughput.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-06",
+      "cadence_days": 90
+    },
+    {
       "path": "tasks/specs/README.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -2166,42 +2201,7 @@
       "cadence_days": 90
     },
     {
-      "path": "docs/PRD-manifest-persister-throughput.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-01-06",
-      "cadence_days": 90
-    },
-    {
-      "path": "docs/TECH_SPEC-manifest-persister-throughput.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-01-06",
-      "cadence_days": 90
-    },
-    {
-      "path": "docs/ACTION_PLAN-manifest-persister-throughput.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-01-06",
-      "cadence_days": 90
-    },
-    {
       "path": "tasks/tasks-0935-manifest-persister-throughput.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-01-06",
-      "cadence_days": 90
-    },
-    {
-      "path": "tasks/specs/0935-manifest-persister-throughput.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-01-06",
-      "cadence_days": 90
-    },
-    {
-      "path": ".agent/task/0935-manifest-persister-throughput.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-01-06",
