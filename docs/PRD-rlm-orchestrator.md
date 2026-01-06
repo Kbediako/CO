@@ -10,7 +10,8 @@
 - Support self-refine / critique loops and tool-augmented recursion.
 - Optional role split (planner / critic / reviser) with subagent support when available.
 - Validator gate auto-detected by default; allow explicit override.
-- Default max iterations = 88; allow `0` for unlimited, with optional safety brakes.
+- Default max iterations = 88; allow `0` or `unlimited`/`unbounded`/`infinite`/`infinity` for unbounded iterations, with safety brakes via a time cap.
+- Default max minutes = 48 hours; users can override via `--max-minutes` / `RLM_MAX_MINUTES` (set `0` to disable the time cap only when a validator is present; if the validator is absent and iterations are unbounded, the time cap cannot be disabled and `0` exits 5).
 - Define task-id resolution for ad-hoc runs (flag/env fallback with safe default).
 
 ## Non-Goals
@@ -63,7 +64,7 @@
 
 ## Open Questions
 - Should we ship a separate alias binary (e.g., `codex-rlm`) alongside the main CLI?
-- Do we enforce a time-based guardrail (e.g., `--max-minutes`) even when iterations are unlimited?
+- Time-based guardrail defaults to 48 hours; consider shorter presets for CI or release configs.
 - How do we best expose subagent usage across different Codex runtimes?
 
 ## Approvals

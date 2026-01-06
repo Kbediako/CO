@@ -12,7 +12,7 @@
 
 ### Foundation
 - [x] Collateral drafted (PRD/tech spec/action plan/checklist/mini-spec) - Evidence: `docs/PRD-orchestrator-performance-reliability-loop-2.md`, `docs/TECH_SPEC-orchestrator-performance-reliability-loop-2.md`, `docs/ACTION_PLAN-orchestrator-performance-reliability-loop-2.md`, `tasks/tasks-0939-orchestrator-performance-reliability-loop-2.md`, `tasks/specs/0939-orchestrator-performance-reliability-loop-2.md`.
-- [x] Subagent diagnostics captured - Evidence: `.runs/0939-orchestrator-performance-reliability-loop-2-scout/cli/2026-01-06T06-46-31-169Z-88ce91ef/manifest.json`, `.runs/0939-orchestrator-performance-reliability-loop-2-scout2/cli/2026-01-06T08-48-58-894Z-60645a3f/manifest.json`.
+- [x] Subagent diagnostics captured - Evidence: `.runs/0939-orchestrator-performance-reliability-loop-2-scout/cli/2026-01-06T06-46-31-169Z-88ce91ef/manifest.json`, `.runs/0939-orchestrator-performance-reliability-loop-2-scout2/cli/2026-01-06T08-48-58-894Z-60645a3f/manifest.json`, `.runs/0939-orchestrator-performance-reliability-loop-2-scout3/cli/2026-01-06T10-56-53-776Z-8753ed99/manifest.json`, `.runs/0939-orchestrator-performance-reliability-loop-2-scout4/cli/2026-01-06T11-06-47-950Z-68cfc942/manifest.json`, `.runs/0939-orchestrator-performance-reliability-loop-2-scout5/cli/2026-01-06T12-33-48-126Z-69596774/manifest.json`.
 - [x] Docs-review manifest captured; mirrors updated; PRD approval recorded; docs freshness registry + metrics/state snapshots updated - Evidence: `.runs/0939-orchestrator-performance-reliability-loop-2/cli/2026-01-06T07-49-03-214Z-a31732c2/manifest.json`, `docs/TASKS.md`, `.agent/task/0939-orchestrator-performance-reliability-loop-2.md`, `tasks/index.json`, `docs/docs-freshness-registry.json`, `.runs/0939-orchestrator-performance-reliability-loop-2/metrics.json`, `out/0939-orchestrator-performance-reliability-loop-2/state.json`.
 
 ### Discovery (Diagnostics + RLM)
@@ -22,7 +22,7 @@
 - [x] Targeted performance/reliability fixes + tests/benchmarks applied - Evidence: `.runs/0939-orchestrator-performance-reliability-loop-2/cli/2026-01-06T09-26-22-129Z-c2f9cb47/manifest.json`.
 
 ### Validation + Handoff
-- [x] Implementation-gate manifest captured - Evidence: `.runs/0939-orchestrator-performance-reliability-loop-2/cli/2026-01-06T09-26-22-129Z-c2f9cb47/manifest.json`.
+- [x] Implementation-gate manifest captured - Evidence: `.runs/0939-orchestrator-performance-reliability-loop-2/cli/2026-01-06T14-16-06-983Z-5122db4a/manifest.json`.
 
 
 ## Hotspot Summary (RLM)
@@ -44,4 +44,4 @@
 - Spec Requirements: performance work requires a mini-spec; keep `last_review` current.
 - Approvals Needed: PRD approval captured in `tasks/index.json` gate metadata before implementation.
 - Subagent usage (required): capture at least one subagent manifest under `.runs/0939-orchestrator-performance-reliability-loop-2-*/cli/<run-id>/manifest.json`.
-- RLM rerun with `RLM_MAX_ITERATIONS=unlimited` failed (invalid max iterations); rerun succeeded with `RLM_MAX_ITERATIONS=0` + `RLM_MAX_MINUTES=10` per Oracle guidance.
+- RLM rerun (pre-fix) with `RLM_MAX_ITERATIONS=unlimited` failed (invalid max iterations); rerun succeeded with `RLM_MAX_ITERATIONS=0` + `RLM_MAX_MINUTES=10` per Oracle guidance. Post-fix: `rlmRunner` now accepts unbounded aliases (`unlimited`/`unbounded`/`infinite`/`infinity`, mapped to 0 iterations) with a 48-hour time cap as the safety boundary.

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { mkdtemp, writeFile, readFile, mkdir, readdir } from 'node:fs/promises';
+import { mkdtemp, writeFile, readFile, mkdir, readdir, utimes } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
@@ -335,6 +335,37 @@ describe('metricsAggregator', () => {
     expect(postRollout.total_runs).toBe(1);
   });
 
+  it('deduplicates metrics entries by run_id', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'metrics-aggregator-dedupe-'));
+    const runsRoot = join(repoRoot, '.runs');
+    const outRoot = join(repoRoot, 'out');
+    const env: EnvironmentPaths = {
+      repoRoot,
+      runsRoot,
+      outRoot,
+      taskId: 'autonomy-upgrade'
+    };
+
+    const metricsRoot = join(runsRoot, env.taskId);
+    await mkdir(metricsRoot, { recursive: true });
+    const first = createEntry(1, 'succeeded');
+    const duplicate = createEntry(2, 'failed');
+    duplicate.run_id = first.run_id;
+    await writeFile(
+      join(metricsRoot, 'metrics.json'),
+      `${JSON.stringify(first)}\n${JSON.stringify(duplicate)}\n`,
+      { encoding: 'utf8', flag: 'w' }
+    );
+
+    await updateMetricsAggregates(env);
+
+    const postRollout = JSON.parse(
+      await readFile(join(metricsRoot, 'metrics', 'post-rollout.json'), 'utf8')
+    );
+    expect(postRollout.total_runs).toBe(1);
+    expect(postRollout.succeeded_runs).toBe(1);
+  });
+
   it('queues metrics entries when the lock is held but skips aggregation', async () => {
     const repoRoot = await mkdtemp(join(tmpdir(), 'metrics-aggregator-lock-'));
     const runsRoot = join(repoRoot, '.runs');
@@ -442,6 +473,41 @@ describe('metricsAggregator', () => {
     expect(merged).toBe(2);
     const metricsContent = await readFile(join(metricsRoot, 'metrics.json'), 'utf8');
     expect(metricsContent.trim().split('\n')).toHaveLength(2);
+    const remaining = await readdir(pendingDir);
+    expect(remaining).toHaveLength(0);
+  });
+
+  it('recovers stale pending tmp files instead of dropping them', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'metrics-aggregator-tmp-recover-'));
+    const runsRoot = join(repoRoot, '.runs');
+    const outRoot = join(repoRoot, 'out');
+    const env: EnvironmentPaths = {
+      repoRoot,
+      runsRoot,
+      outRoot,
+      taskId: 'autonomy-upgrade'
+    };
+
+    const metricsRoot = join(runsRoot, env.taskId);
+    await mkdir(metricsRoot, { recursive: true });
+    const pendingDir = join(metricsRoot, 'metrics.pending');
+    await mkdir(pendingDir, { recursive: true });
+    const tmpPath = join(pendingDir, 'entry-stale.jsonl.tmp');
+    await writeFile(tmpPath, `${JSON.stringify(createEntry(1, 'succeeded'))}\n`, {
+      encoding: 'utf8',
+      flag: 'w'
+    });
+    await utimes(tmpPath, 0, 0);
+
+    const merged = await mergePendingMetricsEntries(env);
+
+    expect(merged).toBe(1);
+    const metricsContent = await readFile(join(metricsRoot, 'metrics.json'), 'utf8');
+    const runIds = metricsContent
+      .trim()
+      .split('\n')
+      .map((line) => (JSON.parse(line) as MetricsEntry).run_id);
+    expect(runIds).toEqual(['run-1']);
     const remaining = await readdir(pendingDir);
     expect(remaining).toHaveLength(0);
   });
