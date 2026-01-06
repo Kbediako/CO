@@ -2169,14 +2169,14 @@
       "path": "docs/PRD-manifest-persister-throughput.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-01-05",
+      "last_review": "2026-01-06",
       "cadence_days": 90
     },
     {
       "path": "docs/TECH_SPEC-manifest-persister-throughput.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-01-05",
+      "last_review": "2026-01-06",
       "cadence_days": 90
     },
     {
@@ -2197,7 +2197,7 @@
       "path": "tasks/specs/0935-manifest-persister-throughput.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-01-05",
+      "last_review": "2026-01-06",
       "cadence_days": 90
     },
     {
