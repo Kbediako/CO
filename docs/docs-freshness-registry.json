@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generated_at": "2026-01-05",
+  "generated_at": "2026-01-06",
   "entries": [
     {
       "path": ".agent/AGENTS.md",
@@ -2160,20 +2160,6 @@
     },
     {
       "path": "tasks/tasks-0934-orchestrator-persistence-throughput.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-01-05",
-      "cadence_days": 90
-    },
-    {
-      "path": "tasks/specs/0934-orchestrator-persistence-throughput.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-01-05",
-      "cadence_days": 90
-    },
-    {
-      "path": ".agent/task/0934-orchestrator-persistence-throughput.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-01-05",

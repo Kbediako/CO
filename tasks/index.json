@@ -761,8 +761,8 @@
       "gate": {
         "phase": "manifest-persister-throughput-planning",
         "status": "approved",
-        "log": ".runs/0935-manifest-persister-throughput/cli/2026-01-05T23-46-36-191Z-4e81654f/manifest.json",
-        "run_id": "2026-01-05T23-46-36-191Z-4e81654f"
+        "log": ".runs/0935-manifest-persister-throughput/cli/2026-01-06T00-27-16-820Z-ca34f41d/manifest.json",
+        "run_id": "2026-01-06T00-27-16-820Z-ca34f41d"
       },
       "created_at": "2026-01-05",
       "completed_at": null
