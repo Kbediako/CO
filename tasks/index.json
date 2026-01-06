@@ -766,6 +766,22 @@
       },
       "created_at": "2026-01-05",
       "completed_at": null
+    },
+    {
+      "id": "0936",
+      "slug": "metrics-pending-io-batching",
+      "title": "Metrics Pending IO Batching",
+      "path": "tasks/tasks-0936-metrics-pending-io-batching.md",
+      "kind": "prd",
+      "status": "in-progress",
+      "gate": {
+        "phase": "metrics-pending-io-batching-planning",
+        "status": "approved",
+        "log": ".runs/0936-metrics-pending-io-batching/cli/2026-01-06T01-06-48-284Z-792d4ebb/manifest.json",
+        "run_id": "2026-01-06T01-06-48-284Z-792d4ebb"
+      },
+      "created_at": "2026-01-06",
+      "completed_at": null
     }
   ],
   "specs": []

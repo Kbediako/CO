@@ -150,11 +150,8 @@ export async function appendMetricsEntry(
     await mergePendingMetricsEntries(env);
     await appendEntry();
     await finalizeManifest(true);
+    await mergePendingMetricsEntries(env);
     await updateMetricsAggregates(env);
-    const mergedAfter = await mergePendingMetricsEntries(env);
-    if (mergedAfter > 0) {
-      await updateMetricsAggregates(env);
-    }
   });
   if (!acquired) {
     const pendingPath = await appendPendingEntry();
