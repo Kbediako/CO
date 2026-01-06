@@ -472,6 +472,13 @@
       "cadence_days": 90
     },
     {
+      "path": ".agent/task/0934-orchestrator-persistence-throughput.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-05",
+      "cadence_days": 90
+    },
+    {
       "path": ".agent/task/ACTION_PLAN_TEMPLATE.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -704,6 +711,13 @@
     },
     {
       "path": "docs/ACTION_PLAN-orchestrator-performance-reliability.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-05",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/ACTION_PLAN-orchestrator-persistence-throughput.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-01-05",
@@ -1074,6 +1088,13 @@
       "cadence_days": 90
     },
     {
+      "path": "docs/PRD-orchestrator-persistence-throughput.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-05",
+      "cadence_days": 90
+    },
+    {
       "path": "docs/PRD-orchestrator-refactor-roadmap.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -1383,6 +1404,13 @@
     },
     {
       "path": "docs/TECH_SPEC-orchestrator-performance-reliability.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-05",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/TECH_SPEC-orchestrator-persistence-throughput.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-01-05",
@@ -1823,6 +1851,13 @@
       "cadence_days": 90
     },
     {
+      "path": "tasks/specs/0934-orchestrator-persistence-throughput.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-05",
+      "cadence_days": 90
+    },
+    {
       "path": "tasks/specs/README.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -2118,27 +2153,6 @@
     },
     {
       "path": "tasks/tasks-0933-orchestrator-experience-jsonl-repair.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-01-05",
-      "cadence_days": 90
-    },
-    {
-      "path": "docs/PRD-orchestrator-persistence-throughput.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-01-05",
-      "cadence_days": 90
-    },
-    {
-      "path": "docs/TECH_SPEC-orchestrator-persistence-throughput.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-01-05",
-      "cadence_days": 90
-    },
-    {
-      "path": "docs/ACTION_PLAN-orchestrator-persistence-throughput.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-01-05",
