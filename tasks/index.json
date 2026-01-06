@@ -832,5 +832,22 @@
       "completed_at": null
     }
   ],
-  "specs": []
+  "specs": [
+    {
+      "id": "20260106-0939-perf-reliability-loop-2",
+      "title": "Orchestrator Performance & Reliability Loop 2",
+      "relates_to": "tasks/tasks-0939-orchestrator-performance-reliability-loop-2.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-01-06",
+      "paths": {
+        "spec": "tasks/specs/0939-orchestrator-performance-reliability-loop-2.md",
+        "task": "tasks/tasks-0939-orchestrator-performance-reliability-loop-2.md",
+        "agent_task": ".agent/task/0939-orchestrator-performance-reliability-loop-2.md",
+        "docs": "docs/TECH_SPEC-orchestrator-performance-reliability-loop-2.md"
+      }
+    }
+  ]
 }

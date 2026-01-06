@@ -12,7 +12,7 @@ This Action Plan is a living document. Keep **Progress**, **Surprises & Discover
 - [x] (2026-01-06) Diagnostics + RLM baseline captured; hotspot identified (metrics aggregation full-file reads).
 - [x] (2026-01-06) ExecPlan guidance applied to PRD/TECH_SPEC/ACTION_PLAN (evidence + idempotence sections).
 - [ ] Capture before/after runtime + manifest write counts in Artifacts and Notes.
-- [ ] Implement smallest viable fix (streaming + atomic writes) and add regression guard.
+- [ ] Implement the smallest viable fix (streaming + atomic writes) and add regression guard.
 - [ ] Re-run diagnostics + RLM; confirm improvement.
 - [ ] Run implementation gate and link evidence.
 - [ ] Write Outcomes & Retrospective.

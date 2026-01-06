@@ -13,7 +13,7 @@ last_review: 2026-01-06
 - Constraints: Keep diffs small, avoid major refactors, and preserve pipeline behavior.
 
 ## Proposed Changes
-- Architecture / design adjustments:
+- Architectural design adjustments:
   - Stream `metrics.json` line-by-line to compute aggregates without full-file reads.
   - Use atomic writes for aggregate outputs to avoid partial files on crash.
 - Data model updates: None.
@@ -33,5 +33,5 @@ last_review: 2026-01-06
 - Do we need incremental aggregate state or log rotation in a future loop if streaming alone is insufficient?
 
 ## Approvals
-- Reviewer:
-- Date:
+- Reviewer: TBD
+- Date: TBD
