@@ -13,7 +13,12 @@ import { isoTimestamp } from '../utils/time.js';
 import { persistManifest, type ManifestPersister } from '../run/manifestPersister.js';
 import type { RunPaths } from '../run/runPaths.js';
 import { logger } from '../../logger.js';
-import { mergePendingMetricsEntries, updateMetricsAggregates, withMetricsLock } from './metricsAggregator.js';
+import {
+  ensureMetricsTrailingNewline,
+  mergePendingMetricsEntries,
+  updateMetricsAggregates,
+  withMetricsLock
+} from './metricsAggregator.js';
 import { EnvUtils } from '../../../../packages/shared/config/index.js';
 
 const TERMINAL_STATES = new Set(['succeeded', 'failed', 'cancelled']);
@@ -114,6 +119,7 @@ export async function appendMetricsEntry(
 
   await mkdir(metricsRoot, { recursive: true });
   const appendEntry = async () => {
+    await ensureMetricsTrailingNewline(metricsPath);
     await appendFile(metricsPath, `${JSON.stringify(entry)}\n`, 'utf8');
   };
   const appendPendingEntry = async () => {
