@@ -1,6 +1,8 @@
 import type { Dirent } from 'node:fs';
+import { createReadStream } from 'node:fs';
 import { appendFile, mkdir, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
+import { createInterface } from 'node:readline';
 
 import type { EnvironmentPaths } from '../run/environment.js';
 import type { SandboxState, ToolRunStatus } from '../../../../packages/shared/manifest/types.js';
@@ -128,16 +130,33 @@ export interface MetricsLockOptions {
   staleMs?: number;
 }
 
-async function readMetricsEntryLines(path: string): Promise<string[]> {
+async function streamMetricsEntryLines(
+  path: string,
+  onLine: (line: string) => Promise<void>
+): Promise<number> {
+  let count = 0;
+  let reader: ReturnType<typeof createInterface> | undefined;
+  let stream: ReturnType<typeof createReadStream> | undefined;
   try {
-    const raw = await readFile(path, 'utf8');
-    return raw.split('\n').filter((line) => line.length > 0);
+    stream = createReadStream(path, { encoding: 'utf8' });
+    reader = createInterface({ input: stream, crlfDelay: Infinity });
+    for await (const line of reader) {
+      if (line.trim().length === 0) {
+        continue;
+      }
+      count += 1;
+      await onLine(line);
+    }
   } catch (error: unknown) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-      return [];
+      return 0;
     }
     throw error;
+  } finally {
+    reader?.close();
+    stream?.destroy();
   }
+  return count;
 }
 
 function normalizeBatchLimit(value: number): number {
@@ -216,12 +235,13 @@ export async function mergePendingMetricsEntries(env: EnvironmentPaths): Promise
     let payloadBytes = 0;
 
     const flushBatch = async () => {
-      if (payloadLines.length === 0) {
-        return;
+      if (payloadLines.length > 0) {
+        const payload = `${payloadLines.join('\n')}\n`;
+        await appendFile(metricsPath, payload, 'utf8');
       }
-      const payload = `${payloadLines.join('\n')}\n`;
-      await appendFile(metricsPath, payload, 'utf8');
-      await Promise.all(filesToRemove.map((filePath) => rm(filePath, { force: true })));
+      if (filesToRemove.length > 0) {
+        await Promise.all(filesToRemove.map((filePath) => rm(filePath, { force: true })));
+      }
       payloadLines = [];
       filesToRemove = [];
       payloadLineCount = 0;
@@ -230,27 +250,25 @@ export async function mergePendingMetricsEntries(env: EnvironmentPaths): Promise
 
     for (const file of files) {
       const filePath = join(pendingDir, file);
-      const lines = await readMetricsEntryLines(filePath);
-      if (lines.length === 0) {
+      const fileLineCount = await streamMetricsEntryLines(filePath, async (line) => {
+        const lineBytes = Buffer.byteLength(line, 'utf8') + 1;
+        const wouldExceedLines = payloadLineCount + 1 > maxBatchLines;
+        const wouldExceedBytes = payloadBytes + lineBytes > maxBatchBytes;
+        if (payloadLines.length > 0 && (wouldExceedLines || wouldExceedBytes)) {
+          await flushBatch();
+        }
+        payloadLines.push(line);
+        payloadLineCount += 1;
+        payloadBytes += lineBytes;
+        merged += 1;
+      });
+
+      if (fileLineCount === 0) {
         await rm(filePath, { force: true });
         continue;
       }
 
-      const lineBytes = lines.reduce(
-        (sum, line) => sum + Buffer.byteLength(line, 'utf8') + 1,
-        0
-      );
-      const wouldExceedLines = payloadLineCount + lines.length > maxBatchLines;
-      const wouldExceedBytes = payloadBytes + lineBytes > maxBatchBytes;
-      if (payloadLines.length > 0 && (wouldExceedLines || wouldExceedBytes)) {
-        await flushBatch();
-      }
-
-      payloadLines.push(...lines);
       filesToRemove.push(filePath);
-      payloadLineCount += lines.length;
-      payloadBytes += lineBytes;
-      merged += lines.length;
     }
 
     await flushBatch();
@@ -314,8 +332,9 @@ export async function updateMetricsAggregates(env: EnvironmentPaths): Promise<vo
   const metricsDir = join(metricsRoot, 'metrics');
   await mkdir(metricsDir, { recursive: true });
 
+  await ensureBaseline(metricsDir, entries[0]!);
+
   await Promise.all([
-    ensureBaseline(metricsDir, entries[0]!),
     writePostRollout(metricsDir, entries),
     writeCompleteness(metricsDir, entries),
     writeMttrDelta(env, entries),
@@ -582,7 +601,7 @@ async function loadMetricsEntries(path: string): Promise<MetricsEntry[]> {
     return raw
       .trim()
       .split('\n')
-      .filter(Boolean)
+      .filter((line) => line.trim().length > 0)
       .map((line) => JSON.parse(line) as MetricsEntry);
   } catch (error: unknown) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') {

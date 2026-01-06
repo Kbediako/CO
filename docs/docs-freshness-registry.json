@@ -2290,6 +2290,48 @@
       "status": "active",
       "last_review": "2026-01-06",
       "cadence_days": 90
+    },
+    {
+      "path": "docs/PRD-metrics-pending-streaming-merge.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-06",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/TECH_SPEC-metrics-pending-streaming-merge.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-06",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/ACTION_PLAN-metrics-pending-streaming-merge.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-06",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/tasks-0938-metrics-pending-streaming-merge.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-06",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/specs/0938-metrics-pending-streaming-merge.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-06",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/task/0938-metrics-pending-streaming-merge.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-06",
+      "cadence_days": 90
     }
   ]
 }
