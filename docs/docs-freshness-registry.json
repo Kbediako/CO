@@ -507,6 +507,13 @@
       "cadence_days": 90
     },
     {
+      "path": ".agent/task/0939-orchestrator-performance-reliability-loop-2.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-06",
+      "cadence_days": 90
+    },
+    {
       "path": ".agent/task/ACTION_PLAN_TEMPLATE.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -770,6 +777,13 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-01-05",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/ACTION_PLAN-orchestrator-performance-reliability-loop-2.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-06",
       "cadence_days": 90
     },
     {
@@ -1172,6 +1186,13 @@
       "cadence_days": 90
     },
     {
+      "path": "docs/PRD-orchestrator-performance-reliability-loop-2.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-06",
+      "cadence_days": 90
+    },
+    {
       "path": "docs/PRD-orchestrator-persistence-throughput.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -1519,6 +1540,13 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-01-05",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/TECH_SPEC-orchestrator-performance-reliability-loop-2.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-06",
       "cadence_days": 90
     },
     {
@@ -1998,6 +2026,13 @@
       "cadence_days": 90
     },
     {
+      "path": "tasks/specs/0939-orchestrator-performance-reliability-loop-2.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-06",
+      "cadence_days": 90
+    },
+    {
       "path": "tasks/specs/README.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -2328,6 +2363,13 @@
     },
     {
       "path": "tasks/tasks-0938-metrics-pending-streaming-merge.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-06",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/tasks-0939-orchestrator-performance-reliability-loop-2.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-01-06",
