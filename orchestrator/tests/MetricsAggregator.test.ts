@@ -300,4 +300,64 @@ describe('metricsAggregator', () => {
     const remaining = await readdir(pendingDir);
     expect(remaining).toHaveLength(0);
   });
+
+  it('flushes pending metrics in bounded batches while preserving order', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'metrics-aggregator-batch-'));
+    const runsRoot = join(repoRoot, '.runs');
+    const outRoot = join(repoRoot, 'out');
+    const env: EnvironmentPaths = {
+      repoRoot,
+      runsRoot,
+      outRoot,
+      taskId: 'autonomy-upgrade'
+    };
+
+    const previousLines = process.env.CODEX_METRICS_PENDING_BATCH_MAX_LINES;
+    try {
+      process.env.CODEX_METRICS_PENDING_BATCH_MAX_LINES = '2';
+
+      const metricsRoot = join(runsRoot, env.taskId);
+      await mkdir(metricsRoot, { recursive: true });
+      const pendingDir = join(metricsRoot, 'metrics.pending');
+      await mkdir(pendingDir, { recursive: true });
+      await writeFile(
+        join(pendingDir, 'entry-1.jsonl'),
+        `${JSON.stringify(createEntry(1, 'succeeded'))}\n`,
+        { encoding: 'utf8', flag: 'w' }
+      );
+      await writeFile(
+        join(pendingDir, 'entry-2.jsonl'),
+        `${JSON.stringify(createEntry(2, 'failed'))}\n`,
+        { encoding: 'utf8', flag: 'w' }
+      );
+      await writeFile(
+        join(pendingDir, 'entry-3.jsonl'),
+        `${JSON.stringify(createEntry(3, 'succeeded'))}\n`,
+        { encoding: 'utf8', flag: 'w' }
+      );
+      await writeFile(
+        join(pendingDir, 'entry-4.jsonl'),
+        `${JSON.stringify(createEntry(4, 'failed'))}\n`,
+        { encoding: 'utf8', flag: 'w' }
+      );
+
+      const merged = await mergePendingMetricsEntries(env);
+
+      expect(merged).toBe(4);
+      const metricsContent = await readFile(join(metricsRoot, 'metrics.json'), 'utf8');
+      const runIds = metricsContent
+        .trim()
+        .split('\n')
+        .map((line) => (JSON.parse(line) as MetricsEntry).run_id);
+      expect(runIds).toEqual(['run-1', 'run-2', 'run-3', 'run-4']);
+      const remaining = await readdir(pendingDir);
+      expect(remaining).toHaveLength(0);
+    } finally {
+      if (previousLines === undefined) {
+        delete process.env.CODEX_METRICS_PENDING_BATCH_MAX_LINES;
+      } else {
+        process.env.CODEX_METRICS_PENDING_BATCH_MAX_LINES = previousLines;
+      }
+    }
+  });
 });
