@@ -888,7 +888,7 @@
       "path": "docs/ACTION_PLAN.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2025-12-31",
+      "last_review": "2026-01-07",
       "cadence_days": 90
     },
     {
@@ -1301,7 +1301,7 @@
       "path": "docs/PRD.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-01-05",
+      "last_review": "2026-01-07",
       "cadence_days": 90
     },
     {
@@ -1665,7 +1665,7 @@
       "path": "docs/TECH_SPEC.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2025-12-31",
+      "last_review": "2026-01-07",
       "cadence_days": 90
     },
     {
