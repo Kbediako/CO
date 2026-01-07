@@ -125,7 +125,7 @@ Budgets (runaway prevention):
 - rlm.wall_clock_timeout_ms (default 1800000)
 - Optional: rlm.budget_usd / rlm.budget_tokens (best-effort; for guardrail not optimization)
 - Defaults are enforced even when config omits them; unset/zero values use defaults unless explicitly overridden.
-- Default exceed action:
+- Default action when exceeded:
   - iterations/subcalls/timeout -> pause
   - usd/tokens -> pause (overrideable)
 - When exceeded: emit rlm_budget_exceeded and transition to paused with actionable message; no further subcalls.
