@@ -4,6 +4,16 @@
 - Task 0911 PRD approval recorded — `.runs/0911-orchestrator-status-ui/cli/2025-12-23T07-59-47-613Z-344689f5/manifest.json`.
 - Task 0932 PRD approval recorded — `.runs/0932-orchestrator-performance-reliability/cli/2026-01-05T16-12-04-477Z-51bd9a65/manifest.json`.
 
+## Governance Update 2026-01-07
+- Task 0940 PRD approval recorded — `.runs/0940-delegation-autonomy-platform/cli/2026-01-07T00-11-49-275Z-65784bb1/manifest.json`.
+
+## Task 0940 — Codex Delegation Autonomy Platform
+- Primary Doc: `docs/PRD-delegation-autonomy-platform.md`
+- Run Manifest Link: `.runs/0940-delegation-autonomy-platform/cli/2026-01-07T00-11-49-275Z-65784bb1/manifest.json`.
+- Metrics / State Snapshots: `.runs/0940-delegation-autonomy-platform/metrics.json`, `out/0940-delegation-autonomy-platform/state.json`.
+- Checklist Mirror: `tasks/tasks-0940-delegation-autonomy-platform.md`, `docs/TASKS.md` (0940 section), `.agent/task/0940-delegation-autonomy-platform.md`.
+- Mini-spec: `tasks/specs/0940-delegation-autonomy-platform.md`.
+
 
 ## Task 0932 — Orchestrator Performance & Reliability Loop
 - Primary Doc: `docs/PRD-orchestrator-performance-reliability.md`

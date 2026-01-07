@@ -830,6 +830,22 @@
       },
       "created_at": "2026-01-06",
       "completed_at": null
+    },
+    {
+      "id": "0940",
+      "slug": "delegation-autonomy-platform",
+      "title": "Codex Delegation Autonomy Platform",
+      "path": "tasks/tasks-0940-delegation-autonomy-platform.md",
+      "kind": "prd",
+      "status": "approved",
+      "gate": {
+        "phase": "delegation-autonomy-platform-planning",
+        "status": "approved",
+        "log": ".runs/0940-delegation-autonomy-platform/cli/2026-01-07T00-11-49-275Z-65784bb1/manifest.json",
+        "run_id": "2026-01-07T00-11-49-275Z-65784bb1"
+      },
+      "created_at": "2026-01-06",
+      "completed_at": null
     }
   ],
   "specs": [
@@ -847,6 +863,22 @@
         "task": "tasks/tasks-0939-orchestrator-performance-reliability-loop-2.md",
         "agent_task": ".agent/task/0939-orchestrator-performance-reliability-loop-2.md",
         "docs": "docs/TECH_SPEC-orchestrator-performance-reliability-loop-2.md"
+      }
+    },
+    {
+      "id": "20260106-0940-delegation-autonomy-platform",
+      "title": "Codex Delegation Autonomy Platform",
+      "relates_to": "tasks/tasks-0940-delegation-autonomy-platform.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-01-07",
+      "paths": {
+        "spec": "tasks/specs/0940-delegation-autonomy-platform.md",
+        "task": "tasks/tasks-0940-delegation-autonomy-platform.md",
+        "agent_task": ".agent/task/0940-delegation-autonomy-platform.md",
+        "docs": "docs/TECH_SPEC-delegation-autonomy-platform.md"
       }
     }
   ]
