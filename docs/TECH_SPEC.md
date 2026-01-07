@@ -1,5 +1,12 @@
 # Technical Spec Overview — Codex Orchestrator Projects
 
+## Task 0940 — Codex Delegation Autonomy Platform
+- Primary Doc: `docs/TECH_SPEC-delegation-autonomy-platform.md`
+- Run Manifest Link: `.runs/0940-delegation-autonomy-platform/cli/2026-01-07T00-11-49-275Z-65784bb1/manifest.json`.
+- Metrics / State Snapshots: `.runs/0940-delegation-autonomy-platform/metrics.json`, `out/0940-delegation-autonomy-platform/state.json`.
+- Checklist Mirror: `tasks/tasks-0940-delegation-autonomy-platform.md`, `docs/TASKS.md` (0940 section), `.agent/task/0940-delegation-autonomy-platform.md`.
+- Mini-spec: `tasks/specs/0940-delegation-autonomy-platform.md`.
+
 ## Task 0918 — Subagent Delegation Enforcement
 - Primary Doc: `docs/TECH_SPEC-subagent-delegation-enforcement.md`
 - Run Manifest Link: `.runs/0918-subagent-delegation-enforcement/cli/2025-12-30T16-53-35-423Z-88c50e5f/manifest.json`.
