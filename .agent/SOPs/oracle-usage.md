@@ -11,9 +11,10 @@ Standardize Oracle runs (browser mode) with reliable file batching and unique fi
 5) Prefer attachments-first workflow: `--browser-attachments always`; if attachments fail, use inline or `--render --copy` and paste manually.
 
 ## Preflight checklist
-- Run once per session: `/Users/kbediako/Code/oracle/scripts/oracle-local.sh --help`.
+- Ensure the Oracle repo is available (default: `../oracle` next to this repo) or set `ORACLE_ROOT=/path/to/oracle`.
+- Run once per session: `./scripts/oracle-local.sh --help`.
 - Dry-run to confirm file count + sizes:
-  - `/Users/kbediako/Code/oracle/scripts/oracle-local.sh --dry-run summary --files-report -p "<prompt>" --file "<path1>" --file "<path2>"`
+  - `./scripts/oracle-local.sh --dry-run summary --files-report -p "<prompt>" --file "<path1>" --file "<path2>"`
 
 ## Batching strategy (repo policy: 4-file max)
 - If you need more than 4 `--file` entries, split into multiple runs and label them clearly with `--slug`.
@@ -30,7 +31,7 @@ Standardize Oracle runs (browser mode) with reliable file batching and unique fi
 
 ## Canonical Oracle command (browser mode)
 ```
-/Users/kbediako/Code/oracle/scripts/oracle-local.sh --engine browser --model gpt-5.2-pro \
+./scripts/oracle-local.sh --engine browser --model gpt-5.2-pro \
   --browser-port 9222 \
   --browser-cookie-wait 5 \
   --browser-attachments always \
@@ -43,8 +44,8 @@ Standardize Oracle runs (browser mode) with reliable file batching and unique fi
 ```
 
 ## Session recovery
-- List sessions: `/Users/kbediako/Code/oracle/scripts/oracle-local.sh status --hours 24`
-- Reattach: `/Users/kbediako/Code/oracle/scripts/oracle-local.sh session <id> --render`
+- List sessions: `./scripts/oracle-local.sh status --hours 24`
+- Reattach: `./scripts/oracle-local.sh session <id> --render`
 
 ## Notes
 - Always keep Oracle runs to the repo policy (4 `--file` entries max) and avoid duplicate basenames.
