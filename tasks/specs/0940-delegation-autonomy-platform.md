@@ -47,5 +47,5 @@ last_review: 2026-01-07
 - Should GitHub tooling be split into a separate MCP server later?
 
 ## Approvals
-- Reviewer: TBD
-- Date: TBD
+- Reviewer: Codex
+- Date: 2026-01-07
