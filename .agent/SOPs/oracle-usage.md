@@ -31,6 +31,7 @@ Standardize Oracle runs (browser mode) with reliable file batching and unique fi
 - Hard inline cap: 255k chars. Recommend <=200k chars for safety. 256k+ fails with ChatGPT “message too long”.
 
 ## Canonical Oracle command (browser mode)
+Example with 4 files. You can include up to 18 attachments (target) or 20 (hard cap).
 ```
 ./scripts/oracle-local.sh --engine browser --model gpt-5.2-pro \
   --browser-port 9222 \
