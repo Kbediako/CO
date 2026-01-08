@@ -1,0 +1,40 @@
+name: Automation Branch Cleanup
+
+on:
+  pull_request:
+    types: [closed]
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  cleanup:
+    if: >-
+      github.event.pull_request.merged == true &&
+      github.event.pull_request.base.ref == 'main' &&
+      startsWith(github.event.pull_request.head.ref, 'automation/')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete automation branch
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const pr = context.payload.pull_request;
+            if (pr.head.repo.full_name !== `${owner}/${repo}`) {
+              core.info('Head repo is fork; skipping branch deletion.');
+              return;
+            }
+            const ref = `heads/${pr.head.ref}`;
+            core.info(`Deleting ${ref}...`);
+            try {
+              await github.rest.git.deleteRef({ owner, repo, ref });
+              core.info('Branch deleted.');
+            } catch (error) {
+              if (error.status === 404 || error.status === 422) {
+                core.info('Branch already deleted.');
+                return;
+              }
+              throw error;
+            }
