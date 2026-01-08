@@ -44,7 +44,7 @@
    - Ship delegation-first skill guidance for top-level Codex.
    - Specify question queue mechanism + lifecycle (delegate.question.enqueue + delegate.question.poll API surface, authz, pause/expiry behavior) for escalations to the parent run.
    - Define Docker-unavailable behavior (fail-fast with guidance; explicit dev-mode fallback only when repo allows).
-   - Define restricted child tool surface (delegate.question.* and optional delegate.status only) to enable escalations without enabling nested delegation; question_only scopes delegate.* tools only, while github.* visibility remains repo-gated.
+   - Define restricted child tool surface (delegate.question.* and optional delegate.status) to enable escalations without enabling nested delegation; question_only scopes delegate.* tools, while GitHub.* visibility remains repo-gated.
    - Define delegation_token handling + redaction (runner-injected, never logged; tool_called redactions).
    - Define confirm-to-act lifecycle (pause/dedupe/persistence/expiry) for tool-originated destructive actions.
    - Add explicit confirm-to-act replay path (runner replays approved actions; model never supplies confirm_nonce).

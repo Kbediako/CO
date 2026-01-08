@@ -44,7 +44,7 @@ last_review: 2026-01-08
 - Each run emits events.jsonl (append-only, versioned schema with monotonic seq).
 - events.jsonl includes policy change events for rlm.policy overrides.
 - Parent runs expose a question queue for delegate escalations; UI/TUI can answer/close questions with events emitted.
-- Child runs have a restricted delegation surface (delegate.question.* and optional delegate.status only) unless nested delegation is explicitly enabled; question_only scopes delegate.* tools only, while github.* visibility remains repo-gated.
+- Child runs have a restricted delegation surface (delegate.question.* and optional delegate.status) unless nested delegation is explicitly enabled; question_only scopes delegate.* tools, while GitHub.* visibility remains repo-gated.
 - delegation_token handling is defined (runner-injected, never logged) with explicit redaction rules for tool_called/events.
 - Confirm-to-act semantics include a defined pause/dedupe/persistence/expiry lifecycle for tool-originated actions.
 - Confirm-to-act replay path is explicit: runner replays approved actions with confirm_nonce out-of-band; model-supplied nonce is rejected.

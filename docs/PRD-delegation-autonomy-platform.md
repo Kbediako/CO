@@ -81,7 +81,7 @@
 - Deep recursion defaults are subject to a benchmark gate; planned default is depth=4, but the shipping default remains depth=1 until the gate passes (per-run override allowed).
 - RLM trace visibility: the UI can show a per-run RLM trajectory (iterations, subcalls, key searches) with large blobs stored as runner-written artifacts (not sandbox-writable) and referenced from events.jsonl.
 - Delegated runs can enqueue escalation questions to the parent run via delegate.question.enqueue and delegate.question.poll; auto-pause/expiry behavior and response delivery are defined, with UI/TUI visibility and response history.
-- Child runs use delegate.mode=question_only (delegate.question.* and optional delegate.status) while mcp_servers.delegation.enabled=true remains the enable gate; full delegation tools stay disabled unless nested delegation is explicitly enabled. question_only scopes only delegate.* tools; github.* visibility remains governed by repo policy.
+- Child runs use delegate.mode=question_only (delegate.question.* and optional delegate.status) while mcp_servers.delegation.enabled=true remains the enable gate; full delegation tools stay disabled unless nested delegation is explicitly enabled. question_only scopes delegate.* tools; GitHub.* visibility remains governed by repo policy.
 - Confirm-to-act requests are persisted as pending items, trigger a well-defined pause/resolve lifecycle, and expire with explicit events.
 - paths.allowed_roots defaults are documented (repo root when unset) and cannot be expanded by higher-precedence config layers.
 - Production vs dev-mode gating is explicit (defaults to prod), and dev-only features require opt-in.
