@@ -4,6 +4,7 @@
 - Problem Statement: Codex lacks a first-class delegation tool surface, a unified control UI, and a default autonomy policy that is auditable and steerable across multiple repos.
 - Desired Outcome: Ship a plugin-style MCP server plus UI (web + TUI) that enables delegate.spawn, always-on RLM reasoning, and real-time observability with user-controlled per-run feature flags plus read-only visibility into global/repo flags and GitHub workflow support.
 - Definition (RLM): In this PRD, "RLM" means a REPL/sandbox-driven inference loop where large context (repos/docs/logs) lives outside the model context window and is inspected programmatically (peek/search/chunk), with optional recursive sub-calls over snippets for semantic work. It is not "just a longer prompt" or summarization-only.
+- Definition (Question Queue): delegated runs can enqueue questions to the parent run; questions have IDs, status (queued/answered/expired/dismissed), and optional TTL. Parent UI/TUI surfaces the queue; default behavior may auto-pause the child until answered or an expiry fallback is applied. Dismissed means the parent closes a question without an answer.
 
 ## Goals
 - Provide a minimal delegation MCP tool surface (delegate.spawn, delegate.status, delegate.pause (pause/resume via paused=true/false), delegate.cancel, delegate.question.enqueue, delegate.question.poll) that Codex can enable per run; GitHub tools remain optional and repo-gated.
@@ -76,11 +77,11 @@
 - RLM trace visibility requires context access via instrumented APIs; direct filesystem reads are not supported in production.
 - RLM long-context handling does not require stuffing full repo/doc corpora into the model prompt; it uses programmatic inspection + snippet sub-calls and can operate over contexts beyond the model window.
 - RLM budget enforcement: if budgets are exceeded, the run transitions to a defined terminal/paused state with an actionable UI message (rlm_budget_exceeded) and no further subcalls are made.
-- RLM recursion depth cap is defined and configurable; shipping default is depth=1 until the benchmark gate passes, with deeper recursion available only via explicit per-run override; exceeding the cap yields a clear event and no further subcalls.
+- RLM recursion depth cap is defined and configurable; shipping default is depth=1 until the benchmark gate passes, with deeper recursion available only via explicit per-run override; exceeding the cap yields rlm_budget_exceeded and transitions the run to paused (no further subcalls).
 - Deep recursion defaults are subject to a benchmark gate; planned default is depth=4, but the shipping default remains depth=1 until the gate passes (per-run override allowed).
 - RLM trace visibility: the UI can show a per-run RLM trajectory (iterations, subcalls, key searches) with large blobs stored as runner-written artifacts (not sandbox-writable) and referenced from events.jsonl.
 - Delegated runs can enqueue escalation questions to the parent run via delegate.question.enqueue and delegate.question.poll; auto-pause/expiry behavior and response delivery are defined, with UI/TUI visibility and response history.
-- Child runs use delegate.mode=question_only (delegate.question.* and optional delegate.status) while mcp_servers.delegation.enabled=true remains the enable gate; full delegation tools stay disabled unless nested delegation is explicitly enabled.
+- Child runs use delegate.mode=question_only (delegate.question.* and optional delegate.status) while mcp_servers.delegation.enabled=true remains the enable gate; full delegation tools stay disabled unless nested delegation is explicitly enabled. question_only scopes only delegate.* tools; github.* visibility remains governed by repo policy.
 - Confirm-to-act requests are persisted as pending items, trigger a well-defined pause/resolve lifecycle, and expire with explicit events.
 - paths.allowed_roots defaults are documented (repo root when unset) and cannot be expanded by higher-precedence config layers.
 - Production vs dev-mode gating is explicit (defaults to prod), and dev-only features require opt-in.

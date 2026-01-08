@@ -5,7 +5,7 @@ relates_to: tasks/tasks-0940-delegation-autonomy-platform.md
 risk: high
 owners:
   - Codex
-last_review: 2026-01-07
+last_review: 2026-01-08
 ---
 
 ## Summary
@@ -17,6 +17,7 @@ last_review: 2026-01-07
   - Add MCP server entrypoint with delegate.* tool surface.
   - Add events.jsonl per run and UI control endpoints.
   - Add an escalation question queue for parent runs (events-driven, UI/TUI surfaced).
+  - Question queue definition: delegated runs can enqueue questions to the parent run; questions have IDs, status (queued/answered/expired/dismissed), and optional TTL. Parent UI/TUI surfaces the queue; default behavior may auto-pause the child until answered or an expiry fallback is applied. Dismissed means the parent closes a question without an answer.
   - Define the question queue API surface (delegate.question.enqueue and delegate.question.poll) and relay path via the delegation server.
   - Extend status UI into a control center and add a TUI.
 - Data model updates: introduce events.jsonl; keep manifests backward compatible.
@@ -38,12 +39,12 @@ last_review: 2026-01-07
 - MCP host supports codex_private for runner-injected secrets (confirm_nonce, delegation_token).
 - Delegated runs default to RLM-on; override rules and timing documented and tested.
 - RLM budgets and sandbox defaults are defined; budget-exceeded behavior is enforced and testable.
-- RLM recursion depth cap (rlm.max_subcall_depth) is defined and configurable; shipping default is depth=1 until the benchmark gate passes, with deeper recursion only via explicit per-run override.
+- RLM recursion depth cap (rlm.max_subcall_depth) is defined and configurable; shipping default is depth=1 until the benchmark gate passes, with deeper recursion only via explicit per-run override (opt-in, not default behavior).
 - Delegation-first behavior is shipped (delegation-first skill/guidance) so top-level Codex is biased toward spawning delegates and staying in oversight mode.
 - Each run emits events.jsonl (append-only, versioned schema with monotonic seq).
 - events.jsonl includes policy change events for rlm.policy overrides.
 - Parent runs expose a question queue for delegate escalations; UI/TUI can answer/close questions with events emitted.
-- Child runs have a restricted delegation surface (delegate.question.* only) unless nested delegation is explicitly enabled.
+- Child runs have a restricted delegation surface (delegate.question.* and optional delegate.status only) unless nested delegation is explicitly enabled; question_only scopes delegate.* tools only, while github.* visibility remains repo-gated.
 - delegation_token handling is defined (runner-injected, never logged) with explicit redaction rules for tool_called/events.
 - Confirm-to-act semantics include a defined pause/dedupe/persistence/expiry lifecycle for tool-originated actions.
 - Confirm-to-act replay path is explicit: runner replays approved actions with confirm_nonce out-of-band; model-supplied nonce is rejected.
