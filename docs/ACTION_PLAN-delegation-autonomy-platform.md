@@ -2,7 +2,7 @@
 
 ## Status Snapshot
 - Current Phase: Planning
-- Run Manifest Link: `.runs/0940-delegation-autonomy-platform/cli/2026-01-07T00-11-49-275Z-65784bb1/manifest.json`
+- Run Manifest Link: `.runs/0940-delegation-autonomy-platform/cli/2026-01-07T16-22-23-363Z-a6f5b94f/manifest.json`
 - Metrics / State Snapshots: `.runs/0940-delegation-autonomy-platform/metrics.json`, `out/0940-delegation-autonomy-platform/state.json`
 - Approvals / Escalations: record in tasks/index.json
 
@@ -13,10 +13,22 @@
 ## Milestones & Tasks
 1. Planning + collateral
    - Draft PRD, TECH_SPEC, ACTION_PLAN, mini-spec, and task checklist.
-   - Update tasks/index.json, docs/PRD.md, docs/TECH_SPEC.md, docs/ACTION_PLAN.md, docs/TASKS.md, docs/docs-freshness-registry.json, .agent/task mirror.
+   - Update tasks/index.json, docs/PRD-delegation-autonomy-platform.md, docs/TECH_SPEC-delegation-autonomy-platform.md, docs/ACTION_PLAN-delegation-autonomy-platform.md, docs/TASKS.md, docs/docs-freshness-registry.json, .agent/task mirror.
    - Spec clarifications captured; validate implementation matches:
      - Enablement model: delegate tools enabled only via mcp_servers.delegation.enabled=true per run.
      - Policy-change events: rlm_policy_changed with payload { old_policy, new_policy, effective_at }.
+     - Control-plane ownership: runner hosts HTTP API + event stream; UI/TUI are clients only.
+     - Secret injection: runner tool host injects confirm_nonce/delegation_token out-of-band; model-supplied secrets are rejected.
+     - Secret injection dependency (decision): implement codex_private envelope in MCP host (Codex CLI/shared library) before v1; track owner + milestone explicitly.
+     - Dependency (hard gate): codex_private support in the MCP host (Codex CLI/shared host library). DRI: Codex CLI Platform. Milestone gate: required before Step 2 (Delegation MCP server) and v1 sign-off.
+     - Control-plane addressing/auth: runner writes control_endpoint.json; delegation server uses token from file (never model-visible).
+     - Web UI auth: runner serves UI assets and issues same-origin session token (no filesystem reads in browser).
+     - Event stream: runner SSE/WebSocket is canonical; events.jsonl tailing is fallback/proxy only.
+     - Multi-repo scope: allowlist-based discovery; default current repo only.
+     - GitHub tool exposure: register github.* tools only when repo config enables; optionally only allowlisted ops.
+     - Auth distribution: token generation/storage, TUI/UI retrieval, and 401 failure mode.
+     - Repo-capped config evaluation rules for safety-critical keys (runner.mode, rlm.environment, ui.bind_host, sandbox.network, delegate.tool_profile/allowed_tool_servers).
+     - Normative event timelines for confirm-to-act, question queue, and pause/resume flows.
    - Capture docs-review manifest.
 2. Delegation MCP server
    - Implement delegate.* tool surface in the npm package.
@@ -26,20 +38,34 @@
 3. RLM policy + delegation-first behavior
    - Make RLM always-on for delegated runs.
    - Define RLM runtime mechanics (externalized context, REPL, recursive sub-calls) and sandbox defaults.
+   - Set deep-recursion defaults (rlm.max_subcall_depth) as a Codex-chosen baseline; document divergence from the RLM paper (depth=1) and plan internal validation.
    - Enforce sandbox isolation: artifacts/scratch RW only; events/manifest/control never mounted; repo access via context APIs.
    - Add RLM budgets (max_iterations, max_subcalls, wall_clock_timeout_ms) and document budget-exceeded behavior.
    - Ship delegation-first skill guidance for top-level Codex.
-   - Add question queue for escalations to the parent run.
+   - Specify question queue mechanism + lifecycle (delegate.question.enqueue + delegate.question.poll API surface, authz, pause/expiry behavior) for escalations to the parent run.
+   - Define Docker-unavailable behavior (fail-fast with guidance; explicit dev-mode fallback only when repo allows).
+   - Define restricted child tool surface (delegate.question.* only) to enable escalations without enabling nested delegation.
+   - Define delegation_token handling + redaction (runner-injected, never logged; tool_called redactions).
+   - Define confirm-to-act lifecycle (pause/dedupe/persistence/expiry) for tool-originated destructive actions.
+   - Add explicit confirm-to-act replay path (runner replays approved actions; model never supplies confirm_nonce).
+   - Define default paths.allowed_roots behavior when repo config is absent.
+   - Define prod vs dev gating (runner.mode defaults, allowed REPL/mounts).
+   - Document safety-critical config keys that are repo-capped (runner.mode, rlm.environment, sandbox/network, repo mounts, delegate.tool_profile/allowed_tool_servers).
+   - Add deep-recursion benchmark gate + fallback default (planned default depth=4; shipping default depth=1 until benchmarks pass):
+     - Run internal multi-repo multi-hop suite + adversarial “subcall explosion” tests.
+     - Success gate: within rlm.max_subcalls/iterations budgets, stable completion on ≥90% of suite, no runaway subcall spikes.
+     - If gate fails, keep default depth=1 and allow deeper recursion only via explicit per-run override.
 4. Event stream + run control
    - Emit events.jsonl per run and update manifest summaries.
    - Emit RLM trajectory events (repl_exec, subcall_started/completed, budget_exceeded) with artifact references.
    - Emit RLM context inspection events (context_search/peek/chunk_read) via REPL helpers.
-   - Define control.json request schema + runner polling behavior for pause/resume/cancel.
+   - Define control.json request schema (latest_action + feature_toggles with request_id/requested_by inside latest_action) + runner polling behavior for pause/resume/cancel.
+   - Clarify feature toggle persistence (per-run control state; no repo config writes; apply at resume boundary).
    - Add control endpoints for pause/resume/cancel.
 5. UI + TUI
    - Extend status UI into a control center with live events.
    - Add TUI for quick monitoring and controls.
-   - Add settings pages for global + repo flags.
+   - Add settings pages for global + repo flags (read-only in v1; edits happen via config outside the UI).
 6. GitHub workflows
    - Integrate gh/API-based GitHub actions behind repo flags.
    - Enforce per-operation allowlist from repo config only (no global grant); add deny-by-default tests.

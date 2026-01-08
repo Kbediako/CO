@@ -2,7 +2,7 @@
 
 ## Task 0940 — Codex Delegation Autonomy Platform
 - Primary Doc: `docs/TECH_SPEC-delegation-autonomy-platform.md`
-- Run Manifest Link: `.runs/0940-delegation-autonomy-platform/cli/2026-01-07T00-11-49-275Z-65784bb1/manifest.json`.
+- Run Manifest Link: `.runs/0940-delegation-autonomy-platform/cli/2026-01-07T16-22-23-363Z-a6f5b94f/manifest.json`.
 - Metrics / State Snapshots: `.runs/0940-delegation-autonomy-platform/metrics.json`, `out/0940-delegation-autonomy-platform/state.json`.
 - Checklist Mirror: `tasks/tasks-0940-delegation-autonomy-platform.md`, `docs/TASKS.md` (0940 section), `.agent/task/0940-delegation-autonomy-platform.md`.
 - Mini-spec: `tasks/specs/0940-delegation-autonomy-platform.md`.
