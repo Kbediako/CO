@@ -226,7 +226,7 @@ Policy:
   - off requires explicit confirmation.
   - auto uses a lightweight plan loop for small context and enables full RLM when context density/size warrants it.
   - policy changes apply at run start or resume boundary (no hot reload mid-step).
-- Deep recursion is supported; rlm.max_subcall_depth defines the maximum nested sub-call depth (multi-level, not capped at one). The RLM paper used depth=1, so depth>1 is a deliberate divergence that must be validated via internal benchmarks. Planned default is depth=4, but shipping default remains depth=1 until the benchmark gate passes (per-run overrides allowed).
+- Deep recursion is supported; rlm.max_subcall_depth defines the maximum nested sub-call depth (multi-level, not capped at one). The RLM paper used depth=1, so depth>1 is a deliberate divergence that must be validated via internal benchmarks. Planned default is depth=4, but shipping default remains depth=1 until the benchmark gate passes (per-run overrides allowed). V1 default behavior is depth=1; deeper recursion is opt-in via explicit per-run override and is out-of-scope for the default path.
 - RLM policy changes emit rlm_policy_changed events and are summarized in the manifest.
 - Ship delegation-first skill guidance to bias top-level Codex toward delegation and oversight.
 
@@ -246,7 +246,7 @@ Budgets (runaway prevention):
   - iterations/subcalls/subcall_depth/timeout -> pause
   - usd/tokens -> pause (overrideable)
 - When exceeded: emit rlm_budget_exceeded and transition to paused with actionable message; no further subcalls.
-- Depth-cap handling (explicit): if a subcall would exceed rlm.max_subcall_depth, emit rlm_budget_exceeded with budget_type=subcall_depth, include limit + observed depth, and skip the subcall.
+- Depth-cap handling (explicit): if a subcall would exceed rlm.max_subcall_depth, emit rlm_budget_exceeded with budget_type=subcall_depth, include limit + observed depth, and transition the run to paused (no further subcalls).
 
 Execution environment (REPL / sandbox):
 - Canonical run directory layout (normative):

@@ -517,7 +517,7 @@
       "path": ".agent/task/0940-delegation-autonomy-platform.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-01-07",
+      "last_review": "2026-01-08",
       "cadence_days": 90
     },
     {
@@ -657,7 +657,7 @@
       "path": "docs/ACTION_PLAN-delegation-autonomy-platform.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-01-07",
+      "last_review": "2026-01-08",
       "cadence_days": 90
     },
     {
@@ -1063,7 +1063,7 @@
       "path": "docs/PRD-delegation-autonomy-platform.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-01-07",
+      "last_review": "2026-01-08",
       "cadence_days": 90
     },
     {
@@ -1427,7 +1427,7 @@
       "path": "docs/TECH_SPEC-delegation-autonomy-platform.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-01-07",
+      "last_review": "2026-01-08",
       "cadence_days": 90
     },
     {
@@ -2064,7 +2064,7 @@
       "path": "tasks/specs/0940-delegation-autonomy-platform.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-01-07",
+      "last_review": "2026-01-08",
       "cadence_days": 90
     },
     {
@@ -2414,7 +2414,7 @@
       "path": "tasks/tasks-0940-delegation-autonomy-platform.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-01-07",
+      "last_review": "2026-01-08",
       "cadence_days": 90
     }
   ]
