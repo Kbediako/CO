@@ -857,8 +857,8 @@
       "gate": {
         "phase": "oracle-attachment-cap-update-implementation",
         "status": "succeeded",
-        "log": ".runs/0941-oracle-attachment-cap-update/cli/2026-01-09T14-42-35-033Z-b93a6339/manifest.json",
-        "run_id": "2026-01-09T14-42-35-033Z-b93a6339"
+        "log": ".runs/0941-oracle-attachment-cap-update/cli/2026-01-09T14-54-23-194Z-c048c2ef/manifest.json",
+        "run_id": "2026-01-09T14-54-23-194Z-c048c2ef"
       },
       "created_at": "2026-01-09",
       "completed_at": "2026-01-09"

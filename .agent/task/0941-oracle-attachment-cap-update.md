@@ -14,7 +14,7 @@
 - [x] Agent guidance updated to mention 11 attachment cap - Evidence: `.agent/AGENTS.md`, `docs/AGENTS.md`.
 
 ### Validation + handoff
-- [x] Implementation-gate manifest captured - Evidence: `.runs/0941-oracle-attachment-cap-update/cli/2026-01-09T14-42-35-033Z-b93a6339/manifest.json`.
+- [x] Implementation-gate manifest captured - Evidence: `.runs/0941-oracle-attachment-cap-update/cli/2026-01-09T14-54-23-194Z-c048c2ef/manifest.json`.
 
 ## Relevant Files
 - `.agent/SOPs/oracle-usage.md`
