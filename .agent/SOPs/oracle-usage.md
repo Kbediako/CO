@@ -4,7 +4,7 @@
 Standardize Oracle runs (browser mode) with reliable file batching and unique filenames.
 
 ## Oracle run rules (must follow)
-1) Tool limits: hard cap 20 attachments; target 18 (≈10% under cap). If 21+ files are provided, Oracle auto-bundles.
+1) Tool limits: hard cap 11 attachments.
 2) Do not upload files with duplicate basenames (e.g., two `manifest.json`).
 3) Keep the Chrome window open until Oracle completes. Closing it ends the run.
 4) Prefer attachments-first workflow: `--browser-attachments always`; if attachments fail, use inline or `--render --copy` and paste manually.
@@ -16,9 +16,7 @@ Standardize Oracle runs (browser mode) with reliable file batching and unique fi
   - `./scripts/oracle-local.sh --dry-run summary --files-report -p "<prompt>" --file "<path1>" --file "<path2>"`
 
 ## Batching strategy (tool limits)
-- Stay at or under 18 attachments per run when possible.
-- If you need more than 18 attachments, split into multiple runs and label them clearly with `--slug`.
-- Hard cap is 20 attachments; if 21+ files are provided, Oracle auto-bundles.
+- Hard cap is 11 attachments per run.
 - If basenames collide (e.g., `manifest.json`), copy and rename to a temp directory:
   - `mkdir -p /tmp/oracle-batch`
   - `cp path/a/manifest.json /tmp/oracle-batch/manifest-run-a.json`
@@ -31,7 +29,7 @@ Standardize Oracle runs (browser mode) with reliable file batching and unique fi
 - Hard inline cap: 255k chars. Recommend <=200k chars for safety. 256k+ fails with ChatGPT “message too long”.
 
 ## Canonical Oracle command (browser mode)
-Example with 4 files. You can include up to 18 attachments (target) or 20 (hard cap).
+Example with 4 files. You can include up to 11 attachments.
 ```
 ./scripts/oracle-local.sh --engine browser --model gpt-5.2-pro \
   --browser-port 9222 \
@@ -50,6 +48,6 @@ Example with 4 files. You can include up to 18 attachments (target) or 20 (hard 
 - Reattach: `./scripts/oracle-local.sh session <id> --render`
 
 ## Notes
-- Always keep Oracle runs within tool limits (hard cap 20 attachments; target 18; 21+ auto-bundles) and avoid duplicate basenames.
+- Always keep Oracle runs within tool limits (hard cap 11 attachments) and avoid duplicate basenames.
 - Use `--render --copy` for manual paste if browser runs fail repeatedly.
 - If attachments fail, fall back to inline or manual paste.
