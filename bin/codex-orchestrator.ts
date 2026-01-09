@@ -21,6 +21,7 @@ import { formatDevtoolsSetupSummary, runDevtoolsSetup } from '../orchestrator/sr
 import { loadPackageInfo } from '../orchestrator/src/cli/utils/packageInfo.js';
 import { slugify } from '../orchestrator/src/cli/utils/strings.js';
 import { serveMcp } from '../orchestrator/src/cli/mcp.js';
+import { startDelegationServer } from '../orchestrator/src/cli/delegationServer.js';
 
 type ArgMap = Record<string, string | boolean>;
 type OutputFormat = 'json' | 'text';
@@ -84,6 +85,10 @@ async function main(): Promise<void> {
         break;
       case 'mcp':
         await handleMcp(args);
+        break;
+      case 'delegate-server':
+      case 'delegation-server':
+        await handleDelegationServer(args);
         break;
       case 'version':
         printVersion();
@@ -577,6 +582,16 @@ async function handleMcp(rawArgs: string[]): Promise<void> {
   await serveMcp({ repoRoot, dryRun, extraArgs: positionals });
 }
 
+async function handleDelegationServer(rawArgs: string[]): Promise<void> {
+  const { flags } = parseArgs(rawArgs);
+  const repoRoot = typeof flags['repo'] === 'string' ? (flags['repo'] as string) : process.cwd();
+  const modeFlag = typeof flags['mode'] === 'string' ? (flags['mode'] as string) : undefined;
+  const envMode = process.env.CODEX_DELEGATE_MODE?.trim();
+  const resolvedMode = modeFlag ?? envMode ?? 'full';
+  const mode = resolvedMode === 'question_only' ? 'question_only' : 'full';
+  await startDelegationServer({ repoRoot, mode });
+}
+
 function parseExecArgs(rawArgs: string[]): ParsedExecArgs {
   const notifyTargets: string[] = [];
   let otelEndpoint: string | null = null;
@@ -762,6 +777,9 @@ Commands:
     --yes                 Apply setup by running "codex mcp add ...".
     --format json         Emit machine-readable output (dry-run only).
   mcp serve [--repo <path>] [--dry-run] [-- <extra args>]
+  delegate-server         Run the delegation MCP server (stdio).
+    --repo <path>         Repo root for config + manifests (default cwd).
+    --mode <full|question_only>  Limit tool surface for child runs.
   version | --version
 
   help                      Show this message.

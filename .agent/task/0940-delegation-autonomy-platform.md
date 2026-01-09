@@ -8,7 +8,7 @@
 - [ ] Diagnostics + RLM runs captured with baseline summary - Evidence: `.runs/0940-delegation-autonomy-platform/cli/<run-id>/manifest.json`.
 
 ## Implementation
-- [ ] Delegation MCP server, RLM policy, UI/TUI, and GitHub integration implemented with tests - Evidence: `.runs/0940-delegation-autonomy-platform/cli/<run-id>/manifest.json`.
+- [x] Delegation MCP server, RLM policy, UI/TUI, and GitHub integration implemented with tests - Evidence: `.runs/0940-delegation-autonomy-platform/cli/2026-01-09T17-39-04-072Z-fba13b4b/manifest.json`, `.runs/0940-delegation-autonomy-platform/cli/2026-01-09T17-41-46-365Z-45c0d078/manifest.json` (pause/resume events in `events.jsonl`), `.runs/0940-delegation-autonomy-platform/cli/2026-01-09T17-44-00-530Z-ccc0c9a5/manifest.json` (question/confirmation events in `events.jsonl`, `questions.json`).
 
 ## Validation + Handoff
-- [ ] Implementation-gate manifest captured - Evidence: `.runs/0940-delegation-autonomy-platform/cli/<run-id>/manifest.json`.
+- [x] Implementation-gate manifest captured - Evidence: `.runs/0940-delegation-autonomy-platform/cli/2026-01-09T17-39-04-072Z-fba13b4b/manifest.json`.

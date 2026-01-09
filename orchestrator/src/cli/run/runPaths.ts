@@ -8,6 +8,12 @@ export interface RunPaths {
   heartbeatPath: string;
   resumeTokenPath: string;
   logPath: string;
+  eventsPath: string;
+  controlPath: string;
+  controlAuthPath: string;
+  controlEndpointPath: string;
+  confirmationsPath: string;
+  questionsPath: string;
   commandsDir: string;
   errorsDir: string;
   compatDir: string;
@@ -22,6 +28,12 @@ export function resolveRunPaths(env: EnvironmentPaths, runId: string): RunPaths 
   const heartbeatPath = join(runDir, '.heartbeat');
   const resumeTokenPath = join(runDir, '.resume-token');
   const logPath = join(runDir, 'runner.ndjson');
+  const eventsPath = join(runDir, 'events.jsonl');
+  const controlPath = join(runDir, 'control.json');
+  const controlAuthPath = join(runDir, 'control_auth.json');
+  const controlEndpointPath = join(runDir, 'control_endpoint.json');
+  const confirmationsPath = join(runDir, 'confirmations.json');
+  const questionsPath = join(runDir, 'questions.json');
   const commandsDir = join(runDir, 'commands');
   const errorsDir = join(runDir, 'errors');
   const compatDir = join(env.runsRoot, env.taskId, 'mcp', safeRunId);
@@ -34,6 +46,12 @@ export function resolveRunPaths(env: EnvironmentPaths, runId: string): RunPaths 
     heartbeatPath,
     resumeTokenPath,
     logPath,
+    eventsPath,
+    controlPath,
+    controlAuthPath,
+    controlEndpointPath,
+    confirmationsPath,
+    questionsPath,
     commandsDir,
     errorsDir,
     compatDir,

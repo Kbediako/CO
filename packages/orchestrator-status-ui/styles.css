@@ -892,6 +892,114 @@ body::after {
   font-size: 0.88rem;
 }
 
+.control-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+.control-actions-inline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  align-items: center;
+}
+
+.control-button {
+  border: 1px solid var(--border-soft);
+  background: rgba(20, 26, 34, 0.8);
+  color: var(--text);
+  padding: 6px 14px;
+  border-radius: var(--radius-1);
+  font-size: var(--fs-2);
+  cursor: pointer;
+  transition: transform 0.15s ease, border-color 0.15s ease;
+}
+
+.control-button:hover {
+  transform: translateY(-1px);
+  border-color: var(--accent);
+}
+
+.control-button.danger {
+  background: rgba(248, 113, 113, 0.18);
+  border-color: rgba(248, 113, 113, 0.5);
+}
+
+.control-button.subtle {
+  background: rgba(56, 70, 92, 0.35);
+  border-color: rgba(120, 140, 170, 0.4);
+}
+
+.control-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.control-row {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border-radius: var(--radius-1);
+  border: 1px solid var(--border-soft);
+  background: var(--panel-2);
+}
+
+.control-title {
+  font-weight: 600;
+}
+
+.panel-subtle {
+  color: var(--muted);
+  font-size: var(--fs-1);
+  margin-bottom: var(--space-2);
+}
+
+.event-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  max-height: 220px;
+  overflow-y: auto;
+  padding: var(--space-2);
+  border-radius: var(--radius-1);
+  border: 1px solid var(--border-soft);
+  background: var(--panel-2);
+  font-family: var(--font-mono);
+  font-size: var(--fs-1);
+}
+
+.event-item {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding-bottom: var(--space-1);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.event-item:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.event-meta {
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.event-time {
+  color: var(--muted);
+  font-size: var(--fs-1);
+}
+
+.small {
+  font-size: var(--fs-1);
+}
+
 @keyframes rise {
   from {
     opacity: 0;

@@ -1,6 +1,10 @@
 const params = new URLSearchParams(window.location.search);
 const dataUrl = params.get('data') || '../../out/0911-orchestrator-status-ui/data.json';
 const refreshMs = clampNumber(Number(params.get('refresh') || 4000), 2000, 5000);
+const controlBase = params.get('control');
+const controlToken = params.get('token');
+const controlUrl = controlBase ? controlBase.replace(/\/+$/, '') : null;
+const controlEnabled = Boolean(controlUrl);
 
 const elements = {
   taskFilter: document.getElementById('taskFilter'),
@@ -29,6 +33,13 @@ const state = {
   data: null,
   selectedTaskId: null,
   focusedTaskId: null,
+  control: {
+    enabled: controlEnabled,
+    events: [],
+    confirmations: [],
+    questions: [],
+    status: null
+  },
   filters: {
     task: 'all',
     bucket: 'all',
@@ -182,6 +193,9 @@ setInterval(() => {
 }, refreshMs);
 
 loadData();
+if (controlEnabled) {
+  initControl();
+}
 
 async function loadData() {
   if (state.loading) {
@@ -203,6 +217,142 @@ async function loadData() {
     state.loading = false;
     render();
   }
+}
+
+function initControl() {
+  const eventUrl = buildControlUrl('/events');
+  if (eventUrl && window.EventSource) {
+    const source = new EventSource(eventUrl);
+    source.onmessage = (event) => {
+      try {
+        const parsed = JSON.parse(event.data);
+        state.control.events.unshift(parsed);
+        state.control.events = state.control.events.slice(0, 120);
+        render();
+      } catch {
+        // ignore parse errors
+      }
+    };
+    source.onerror = () => {
+      state.control.status = 'disconnected';
+      render();
+    };
+  }
+
+  setInterval(() => {
+    loadControlData();
+  }, 5000);
+  loadControlData();
+}
+
+async function loadControlData() {
+  const confirmationsUrl = buildControlUrl('/confirmations');
+  const questionsUrl = buildControlUrl('/questions');
+  if (!confirmationsUrl || !questionsUrl) {
+    return;
+  }
+  try {
+    const [confirmRes, questionRes] = await Promise.all([
+      fetch(confirmationsUrl, { cache: 'no-store' }),
+      fetch(questionsUrl, { cache: 'no-store' })
+    ]);
+    if (confirmRes.ok) {
+      const payload = await confirmRes.json();
+      state.control.confirmations = Array.isArray(payload.pending) ? payload.pending : [];
+    }
+    if (questionRes.ok) {
+      const payload = await questionRes.json();
+      state.control.questions = Array.isArray(payload.questions) ? payload.questions : [];
+    }
+    state.control.status = 'connected';
+  } catch {
+    state.control.status = 'disconnected';
+  } finally {
+    render();
+  }
+}
+
+function buildControlUrl(pathname) {
+  if (!controlUrl) {
+    return null;
+  }
+  const url = new URL(controlUrl + pathname);
+  if (controlToken) {
+    url.searchParams.set('token', controlToken);
+  }
+  return url.toString();
+}
+
+async function sendControlAction(action) {
+  if (action === 'cancel') {
+    await requestCancel();
+    return;
+  }
+  const url = buildControlUrl('/control/action');
+  if (!url) {
+    return;
+  }
+  await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action, requested_by: 'ui' })
+  });
+}
+
+async function requestCancel() {
+  const url = buildControlUrl('/confirmations/create');
+  if (!url) {
+    return;
+  }
+  await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'cancel', tool: 'ui.cancel', params: {} })
+  });
+  loadControlData();
+}
+
+async function approveConfirmation(requestId) {
+  const url = buildControlUrl('/confirmations/approve');
+  if (!url) {
+    return;
+  }
+  await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ request_id: requestId, actor: 'ui' })
+  });
+  loadControlData();
+}
+
+async function answerQuestion(questionId) {
+  const url = buildControlUrl('/questions/answer');
+  if (!url) {
+    return;
+  }
+  const answer = window.prompt('Answer for question ' + questionId + ':');
+  if (!answer) {
+    return;
+  }
+  await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ question_id: questionId, answer, answered_by: 'ui' })
+  });
+  loadControlData();
+}
+
+async function dismissQuestion(questionId) {
+  const url = buildControlUrl('/questions/dismiss');
+  if (!url) {
+    return;
+  }
+  await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ question_id: questionId, dismissed_by: 'ui' })
+  });
+  loadControlData();
 }
 
 function render() {
@@ -357,6 +507,8 @@ function renderRunDetail(run, task) {
   const approvalsLabel =
     approvalsTotal > 0 ? `${approvalsPending} pending / ${approvalsTotal} total` : `${approvalsPending} pending`;
 
+  const controlMarkup = state.control.enabled ? buildControlMarkup(run) : '';
+
   elements.runDetail.innerHTML = `
     <div class="key-value">
       <div class="key">Task</div>
@@ -393,7 +545,127 @@ function renderRunDetail(run, task) {
         <div class="value">${escapeHtml(run.links?.state || '—')}</div>
       </div>
     </div>
+    ${controlMarkup}
   `;
+
+  if (state.control.enabled) {
+    wireControlHandlers();
+  }
+}
+
+function buildControlMarkup(run) {
+  const events = state.control.events.slice(0, 12);
+  const confirmations = state.control.confirmations || [];
+  const questions = state.control.questions || [];
+  const eventsMarkup = events.length
+    ? `<div class="event-list">${events
+        .map(
+          (entry) => `<div class="event-item">
+            <div class="event-meta">${escapeHtml(entry.event || 'event')}</div>
+            <div class="event-time">${escapeHtml(formatTimestamp(entry.timestamp))}</div>
+          </div>`
+        )
+        .join('')}</div>`
+    : '<div class="muted">No events yet.</div>';
+
+  const confirmationsMarkup = confirmations.length
+    ? `<div class="control-list">${confirmations
+        .map(
+          (item) => `<div class="control-row">
+            <div>
+              <div class="control-title">${escapeHtml(item.action || item.tool || 'confirmation')}</div>
+              <div class="muted small">${escapeHtml(item.request_id || '')}</div>
+            </div>
+            <button class="control-button" data-confirm-id="${escapeHtml(item.request_id || '')}">Approve</button>
+          </div>`
+        )
+        .join('')}</div>`
+    : '<div class="muted">No confirmations pending.</div>';
+
+  const questionsMarkup = questions.length
+    ? `<div class="control-list">${questions
+        .map(
+          (item) => `<div class="control-row">
+            <div>
+              <div class="control-title">${escapeHtml(item.prompt || 'Question')}</div>
+              <div class="muted small">${escapeHtml(item.question_id || '')} • ${escapeHtml(item.status || '')}</div>
+            </div>
+            <div class="control-actions-inline">
+              <button class="control-button" data-question-id="${escapeHtml(item.question_id || '')}">Answer</button>
+              <button class="control-button subtle" data-question-dismiss-id="${escapeHtml(
+                item.question_id || ''
+              )}">Dismiss</button>
+            </div>
+          </div>`
+        )
+        .join('')}</div>`
+    : '<div class="muted">No questions queued.</div>';
+
+  return `
+    <div>
+      <div class="panel-header">Run Controls</div>
+      <div class="control-actions">
+        <button class="control-button" data-action="pause">Pause</button>
+        <button class="control-button" data-action="resume">Resume</button>
+        <button class="control-button danger" data-action="cancel">Cancel</button>
+      </div>
+      <div class="panel-subtle">Control status: ${escapeHtml(state.control.status || 'unknown')}</div>
+    </div>
+    <div>
+      <div class="panel-header">Confirmations</div>
+      ${confirmationsMarkup}
+    </div>
+    <div>
+      <div class="panel-header">Questions</div>
+      ${questionsMarkup}
+    </div>
+    <div>
+      <div class="panel-header">Live Events</div>
+      ${eventsMarkup}
+    </div>
+  `;
+}
+
+function wireControlHandlers() {
+  const actionButtons = elements.runDetail.querySelectorAll('[data-action]');
+  actionButtons.forEach((button) => {
+    button.addEventListener('click', () => {
+      const action = button.getAttribute('data-action');
+      if (action) {
+        sendControlAction(action);
+      }
+    });
+  });
+
+  const confirmButtons = elements.runDetail.querySelectorAll('[data-confirm-id]');
+  confirmButtons.forEach((button) => {
+    button.addEventListener('click', () => {
+      const requestId = button.getAttribute('data-confirm-id');
+      if (requestId) {
+        approveConfirmation(requestId);
+      }
+    });
+  });
+
+  const questionButtons = elements.runDetail.querySelectorAll('[data-question-id]');
+  questionButtons.forEach((button) => {
+    button.addEventListener('click', () => {
+      const questionId = button.getAttribute('data-question-id');
+      if (questionId) {
+        answerQuestion(questionId);
+      }
+    });
+  });
+
+  const dismissButtons = elements.runDetail.querySelectorAll('[data-question-dismiss-id]');
+  dismissButtons.forEach((button) => {
+    button.addEventListener('click', () => {
+      const questionId = button.getAttribute('data-question-dismiss-id');
+      if (questionId) {
+        dismissQuestion(questionId);
+      }
+    });
+  });
 }
 
 function renderCodebase(codebase) {
