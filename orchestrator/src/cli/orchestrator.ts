@@ -49,6 +49,7 @@ import { logger } from '../logger.js';
 import { getPrivacyGuard } from './services/execRuntime.js';
 import { PipelineResolver } from './services/pipelineResolver.js';
 import { ControlPlaneService } from './services/controlPlaneService.js';
+import { ControlWatcher } from './control/controlWatcher.js';
 import { SchedulerService } from './services/schedulerService.js';
 import {
   applyHandlesToRunSummary,
@@ -61,11 +62,46 @@ import {
   overrideTaskEnvironment
 } from './services/runPreparation.js';
 import { loadPackageConfig, loadUserConfig } from './config/userConfig.js';
-import { RunEventPublisher, snapshotStages, type RunEventEmitter } from './events/runEvents.js';
+import {
+  loadDelegationConfigFiles,
+  computeEffectiveDelegationConfig,
+  parseDelegationConfigOverride,
+  splitDelegationConfigOverrides,
+  type DelegationConfigLayer
+} from './config/delegationConfig.js';
+import { ControlServer } from './control/controlServer.js';
+import { RunEventEmitter, RunEventPublisher, snapshotStages } from './events/runEvents.js';
+import { RunEventStream, attachRunEventAdapter } from './events/runEventStream.js';
 import { CLI_EXECUTION_MODE_PARSER, resolveRequiresCloudPolicy } from '../utils/executionMode.js';
 
 const resolveBaseEnvironment = (): EnvironmentPaths =>
   normalizeEnvironmentPaths(resolveEnvironmentPaths());
+
+const CONFIG_OVERRIDE_ENV_KEYS = ['CODEX_CONFIG_OVERRIDES', 'CODEX_MCP_CONFIG_OVERRIDES'];
+
+function collectDelegationEnvOverrides(env: NodeJS.ProcessEnv = process.env): DelegationConfigLayer[] {
+  const layers: DelegationConfigLayer[] = [];
+  for (const key of CONFIG_OVERRIDE_ENV_KEYS) {
+    const raw = env[key];
+    if (!raw) {
+      continue;
+    }
+    const values = splitDelegationConfigOverrides(raw);
+    for (const value of values) {
+      try {
+        const layer = parseDelegationConfigOverride(value, 'env');
+        if (layer) {
+          layers.push(layer);
+        }
+      } catch (error) {
+        logger.warn(
+          `Invalid delegation config override (env): ${(error as Error)?.message ?? String(error)}`
+        );
+      }
+    }
+  }
+  return layers;
+}
 
 interface ExecutePipelineOptions {
   env: EnvironmentPaths;
@@ -73,6 +109,8 @@ interface ExecutePipelineOptions {
   manifest: CliManifest;
   paths: RunPaths;
   runEvents?: RunEventPublisher;
+  eventStream?: RunEventStream;
+  onEventEntry?: (entry: import('./events/runEventStream.js').RunEventStreamEntry) => void;
   persister?: ManifestPersister;
   envOverrides?: NodeJS.ProcessEnv;
 }
@@ -86,6 +124,8 @@ interface RunLifecycleContext {
   taskContext: TaskContext;
   runId: string;
   runEvents?: RunEventPublisher;
+  eventStream?: RunEventStream;
+  onEventEntry?: (entry: import('./events/runEventStream.js').RunEventStreamEntry) => void;
   persister: ManifestPersister;
   envOverrides: NodeJS.ProcessEnv;
 }
@@ -119,26 +159,66 @@ export class CodexOrchestrator {
       persistIntervalMs: Math.max(1000, manifest.heartbeat_interval_seconds * 1000)
     });
 
+    const emitter = options.runEvents ?? new RunEventEmitter();
+    const eventStream = await RunEventStream.create({
+      paths,
+      taskId: manifest.task_id,
+      runId,
+      pipelineId: preparation.pipeline.id,
+      pipelineTitle: preparation.pipeline.title
+    });
+    const configFiles = await loadDelegationConfigFiles({ repoRoot: preparation.env.repoRoot });
+    const envOverrideLayers = collectDelegationEnvOverrides();
+    const layers = [configFiles.global, configFiles.repo, ...envOverrideLayers].filter(
+      Boolean
+    ) as DelegationConfigLayer[];
+    const effectiveConfig = computeEffectiveDelegationConfig({
+      repoRoot: preparation.env.repoRoot,
+      layers
+    });
+    const controlServer = effectiveConfig.ui.controlEnabled
+      ? await ControlServer.start({
+          paths,
+          config: effectiveConfig,
+          eventStream,
+          runId
+        })
+      : null;
+    const onEventEntry = (entry: import('./events/runEventStream.js').RunEventStreamEntry) => {
+      controlServer?.broadcast(entry);
+    };
+    const onStreamError = (error: Error, payload: { event: string }) => {
+      logger.warn(`Failed to append run event ${payload.event}: ${error.message}`);
+    };
+    const detachStream = attachRunEventAdapter(emitter, eventStream, onEventEntry, onStreamError);
     const runEvents = this.createRunEventPublisher({
       runId,
       pipeline: preparation.pipeline,
       manifest,
       paths,
-      emitter: options.runEvents
+      emitter
     });
 
-    return await this.performRunLifecycle({
-      env: preparation.env,
-      pipeline: preparation.pipeline,
-      manifest,
-      paths,
-      planner: preparation.planner,
-      taskContext: preparation.taskContext,
-      runId,
-      runEvents,
-      persister,
-      envOverrides: preparation.envOverrides
-    });
+    try {
+      return await this.performRunLifecycle({
+        env: preparation.env,
+        pipeline: preparation.pipeline,
+        manifest,
+        paths,
+        planner: preparation.planner,
+        taskContext: preparation.taskContext,
+        runId,
+        runEvents,
+        eventStream,
+        onEventEntry,
+        persister,
+        envOverrides: preparation.envOverrides
+      });
+    } finally {
+      detachStream();
+      await eventStream.close();
+      await controlServer?.close();
+    }
   }
 
   async resume(options: ResumeOptions): Promise<PipelineExecutionResult> {
@@ -181,26 +261,66 @@ export class CodexOrchestrator {
     });
     await persister.schedule({ manifest: true, heartbeat: true, force: true });
 
+    const emitter = options.runEvents ?? new RunEventEmitter();
+    const eventStream = await RunEventStream.create({
+      paths,
+      taskId: manifest.task_id,
+      runId: manifest.run_id,
+      pipelineId: pipeline.id,
+      pipelineTitle: pipeline.title
+    });
+    const configFiles = await loadDelegationConfigFiles({ repoRoot: preparation.env.repoRoot });
+    const envOverrideLayers = collectDelegationEnvOverrides();
+    const layers = [configFiles.global, configFiles.repo, ...envOverrideLayers].filter(
+      Boolean
+    ) as DelegationConfigLayer[];
+    const effectiveConfig = computeEffectiveDelegationConfig({
+      repoRoot: preparation.env.repoRoot,
+      layers
+    });
+    const controlServer = effectiveConfig.ui.controlEnabled
+      ? await ControlServer.start({
+          paths,
+          config: effectiveConfig,
+          eventStream,
+          runId: manifest.run_id
+        })
+      : null;
+    const onEventEntry = (entry: import('./events/runEventStream.js').RunEventStreamEntry) => {
+      controlServer?.broadcast(entry);
+    };
+    const onStreamError = (error: Error, payload: { event: string }) => {
+      logger.warn(`Failed to append run event ${payload.event}: ${error.message}`);
+    };
+    const detachStream = attachRunEventAdapter(emitter, eventStream, onEventEntry, onStreamError);
     const runEvents = this.createRunEventPublisher({
       runId: manifest.run_id,
       pipeline,
       manifest,
       paths,
-      emitter: options.runEvents
+      emitter
     });
 
-    return await this.performRunLifecycle({
-      env: preparation.env,
-      pipeline,
-      manifest,
-      paths,
-      planner: preparation.planner,
-      taskContext: preparation.taskContext,
-      runId: manifest.run_id,
-      runEvents,
-      persister,
-      envOverrides: preparation.envOverrides
-    });
+    try {
+      return await this.performRunLifecycle({
+        env: preparation.env,
+        pipeline,
+        manifest,
+        paths,
+        planner: preparation.planner,
+        taskContext: preparation.taskContext,
+        runId: manifest.run_id,
+        runEvents,
+        eventStream,
+        onEventEntry,
+        persister,
+        envOverrides: preparation.envOverrides
+      });
+    } finally {
+      detachStream();
+      await eventStream.close();
+      await controlServer?.close();
+    }
   }
 
   async status(options: StatusOptions): Promise<CliManifest> {
@@ -365,6 +485,14 @@ export class CodexOrchestrator {
       return schedulePersist({ manifest: forceManifest, heartbeat: true, force: forceManifest });
     };
 
+    const controlWatcher = new ControlWatcher({
+      paths,
+      manifest,
+      eventStream: options.eventStream,
+      onEntry: options.onEventEntry,
+      persist: () => schedulePersist({ manifest: true, force: true })
+    });
+
     manifest.status = 'in_progress';
     updateHeartbeat(manifest);
     await schedulePersist({ manifest: true, heartbeat: true, force: true });
@@ -380,6 +508,13 @@ export class CodexOrchestrator {
 
     try {
       for (let i = 0; i < pipeline.stages.length; i += 1) {
+        await controlWatcher.sync();
+        await controlWatcher.waitForResume();
+        if (controlWatcher.isCanceled()) {
+          manifest.status_detail = 'run-canceled';
+          success = false;
+          break;
+        }
         const stage = pipeline.stages[i];
         const entry = manifest.commands[i];
         if (!entry) {
@@ -516,7 +651,11 @@ export class CodexOrchestrator {
       await schedulePersist({ force: true });
     }
 
-    if (success) {
+    await controlWatcher.sync();
+
+    if (controlWatcher.isCanceled()) {
+      finalizeStatus(manifest, 'cancelled', manifest.status_detail ?? 'run-canceled');
+    } else if (success) {
       finalizeStatus(manifest, 'succeeded');
     } else {
       finalizeStatus(manifest, 'failed', manifest.status_detail ?? 'pipeline-failed');
@@ -557,6 +696,8 @@ export class CodexOrchestrator {
           manifest,
           paths,
           runEvents: context.runEvents,
+          eventStream: context.eventStream,
+          onEventEntry: context.onEventEntry,
           persister,
           envOverrides
         }).then((result) => {

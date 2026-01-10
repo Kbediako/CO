@@ -21,6 +21,8 @@ import { formatDevtoolsSetupSummary, runDevtoolsSetup } from '../orchestrator/sr
 import { loadPackageInfo } from '../orchestrator/src/cli/utils/packageInfo.js';
 import { slugify } from '../orchestrator/src/cli/utils/strings.js';
 import { serveMcp } from '../orchestrator/src/cli/mcp.js';
+import { startDelegationServer } from '../orchestrator/src/cli/delegationServer.js';
+import { splitDelegationConfigOverrides } from '../orchestrator/src/cli/config/delegationConfig.js';
 
 type ArgMap = Record<string, string | boolean>;
 type OutputFormat = 'json' | 'text';
@@ -84,6 +86,10 @@ async function main(): Promise<void> {
         break;
       case 'mcp':
         await handleMcp(args);
+        break;
+      case 'delegate-server':
+      case 'delegation-server':
+        await handleDelegationServer(args);
         break;
       case 'version':
         printVersion();
@@ -577,6 +583,35 @@ async function handleMcp(rawArgs: string[]): Promise<void> {
   await serveMcp({ repoRoot, dryRun, extraArgs: positionals });
 }
 
+async function handleDelegationServer(rawArgs: string[]): Promise<void> {
+  const { flags } = parseArgs(rawArgs);
+  const repoRoot = typeof flags['repo'] === 'string' ? (flags['repo'] as string) : process.cwd();
+  const modeFlag = typeof flags['mode'] === 'string' ? (flags['mode'] as string) : undefined;
+  const overrideFlag =
+    typeof flags['config'] === 'string'
+      ? (flags['config'] as string)
+      : typeof flags['config-override'] === 'string'
+        ? (flags['config-override'] as string)
+        : undefined;
+  const envMode = process.env.CODEX_DELEGATE_MODE?.trim();
+  const resolvedMode = modeFlag ?? envMode;
+  let mode: 'full' | 'question_only' | undefined;
+  if (resolvedMode) {
+    if (resolvedMode === 'full' || resolvedMode === 'question_only') {
+      mode = resolvedMode;
+    } else {
+      console.warn(`Invalid delegate mode "${resolvedMode}". Falling back to config default.`);
+    }
+  }
+  const configOverrides = overrideFlag
+    ? splitDelegationConfigOverrides(overrideFlag).map((value) => ({
+        source: 'cli' as const,
+        value
+      }))
+    : [];
+  await startDelegationServer({ repoRoot, mode, configOverrides });
+}
+
 function parseExecArgs(rawArgs: string[]): ParsedExecArgs {
   const notifyTargets: string[] = [];
   let otelEndpoint: string | null = null;
@@ -762,6 +797,10 @@ Commands:
     --yes                 Apply setup by running "codex mcp add ...".
     --format json         Emit machine-readable output (dry-run only).
   mcp serve [--repo <path>] [--dry-run] [-- <extra args>]
+  delegate-server         Run the delegation MCP server (stdio).
+    --repo <path>         Repo root for config + manifests (default cwd).
+    --mode <full|question_only>  Limit tool surface for child runs.
+    --config "<key>=<value>[;...]"  Apply config overrides (repeat via separators).
   version | --version
 
   help                      Show this message.

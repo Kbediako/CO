@@ -58,6 +58,23 @@ describe('frontend testing runner', () => {
     expect(resolved.args).toEqual(['-c', DEVTOOLS_CONFIG_OVERRIDE, 'exec', 'prompt']);
   });
 
+  it('appends config overrides from env', () => {
+    const env = {
+      CODEX_MCP_CONFIG_OVERRIDES:
+        'mcp_servers.delegation.enabled=true; mcp_servers.chrome-devtools.enabled=true'
+    } as NodeJS.ProcessEnv;
+    const resolved = resolveCodexCommand(['exec', 'prompt'], env);
+    expect(resolved.command).toBe('codex');
+    expect(resolved.args).toEqual([
+      '-c',
+      'mcp_servers.delegation.enabled=true',
+      '-c',
+      'mcp_servers.chrome-devtools.enabled=true',
+      'exec',
+      'prompt'
+    ]);
+  });
+
   it('loads frontend testing prompt from a file when provided', async () => {
     tempDir = await mkdtemp(join(tmpdir(), 'frontend-test-'));
     const promptPath = join(tempDir, 'prompt.txt');

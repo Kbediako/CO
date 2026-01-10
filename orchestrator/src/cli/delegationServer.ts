@@ -1,0 +1,1507 @@
+import { spawn } from 'node:child_process';
+import { randomBytes } from 'node:crypto';
+import { realpathSync } from 'node:fs';
+import { chmod, readFile } from 'node:fs/promises';
+import { basename, dirname, isAbsolute, resolve } from 'node:path';
+import process from 'node:process';
+
+import {
+  loadDelegationConfigFiles,
+  computeEffectiveDelegationConfig,
+  parseDelegationConfigOverride,
+  splitDelegationConfigOverrides,
+  type DelegationConfigLayer
+} from './config/delegationConfig.js';
+import { logger } from '../logger.js';
+import { writeJsonAtomic } from './utils/fs.js';
+
+interface McpRequest {
+  jsonrpc: '2.0';
+  id?: string | number | null;
+  method: string;
+  params?: Record<string, unknown>;
+  codex_private?: Record<string, unknown>;
+}
+
+interface McpResponse {
+  jsonrpc: '2.0';
+  id: string | number | null;
+  result?: unknown;
+  error?: { code: number; message: string; data?: unknown };
+}
+
+interface DelegationServerOptions {
+  repoRoot: string;
+  mode?: 'full' | 'question_only';
+  configOverrides?: ConfigOverride[];
+}
+
+const PROTOCOL_VERSION = '2024-11-05';
+const QUESTION_POLL_INTERVAL_MS = 500;
+const DEFAULT_SPAWN_TIMEOUT_MS = 5 * 60 * 1000;
+const DEFAULT_GH_TIMEOUT_MS = 60_000;
+const DEFAULT_DELEGATION_TOKEN_RETRY_MS = 2000;
+const DEFAULT_DELEGATION_TOKEN_RETRY_INTERVAL_MS = 200;
+const DELEGATION_TOKEN_HEADER = 'x-codex-delegation-token';
+const DELEGATION_RUN_HEADER = 'x-codex-delegation-run-id';
+const DELEGATION_TOKEN_FILE = 'delegation_token.json';
+const CSRF_HEADER = 'x-csrf-token';
+const LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost', '::1']);
+const CONFIG_OVERRIDE_ENV_KEYS = ['CODEX_CONFIG_OVERRIDES', 'CODEX_MCP_CONFIG_OVERRIDES'];
+
+interface ConfigOverride {
+  source: 'env' | 'cli';
+  value: string;
+}
+
+export async function startDelegationServer(options: DelegationServerOptions): Promise<void> {
+  const repoRoot = resolve(options.repoRoot);
+  const configFiles = await loadDelegationConfigFiles({ repoRoot });
+  const envOverrides = collectConfigOverridesFromEnv();
+  const overrideLayers = buildConfigOverrideLayers([...envOverrides, ...(options.configOverrides ?? [])]);
+  const layers = [configFiles.global, configFiles.repo, ...overrideLayers].filter(Boolean) as DelegationConfigLayer[];
+  const effectiveConfig = computeEffectiveDelegationConfig({ repoRoot, layers });
+  const mode = options.mode ?? effectiveConfig.delegate.mode ?? 'full';
+  const allowNested = effectiveConfig.delegate.allowNested ?? false;
+  const githubEnabled = effectiveConfig.github.enabled;
+  const allowedGithubOps = new Set(effectiveConfig.github.operations);
+  const allowedRoots = effectiveConfig.paths.allowedRoots;
+  const allowedHosts = effectiveConfig.ui.allowedBindHosts;
+  const toolProfile = effectiveConfig.delegate.toolProfile;
+
+  const tools = buildToolList({ mode, githubEnabled, allowedGithubOps });
+
+  const handler = async (request: McpRequest): Promise<unknown> => {
+    switch (request.method) {
+      case 'initialize':
+        return {
+          protocolVersion: PROTOCOL_VERSION,
+          serverInfo: { name: 'codex-delegation', version: '0.1.0' },
+          capabilities: { tools: {} }
+        };
+      case 'tools/list':
+        return { tools };
+    case 'tools/call':
+      return await handleToolCall(request, {
+        repoRoot,
+        mode,
+        allowNested,
+        githubEnabled,
+        allowedGithubOps,
+        allowedRoots,
+        allowedHosts,
+        toolProfile,
+        expiryFallback: effectiveConfig.delegate.expiryFallback
+      });
+      default:
+        throw new Error(`Unsupported method: ${request.method}`);
+    }
+  };
+
+  await runJsonRpcServer(handler);
+}
+
+function buildToolList(options: {
+  mode: 'full' | 'question_only';
+  githubEnabled: boolean;
+  allowedGithubOps: Set<string>;
+}): Array<{ name: string; description: string; inputSchema: Record<string, unknown> }> {
+  const tools: Array<{ name: string; description: string; inputSchema: Record<string, unknown> }> = [];
+  const includeFull = options.mode !== 'question_only';
+
+  if (includeFull) {
+    tools.push(toolDefinition('delegate.spawn', 'Spawn a delegated run', {
+      type: 'object',
+      properties: {
+        task_id: { type: 'string' },
+        pipeline: { type: 'string' },
+        repo: { type: 'string' },
+        parent_run_id: { type: 'string' },
+        parent_manifest_path: { type: 'string' },
+        env: { type: 'object', additionalProperties: { type: 'string' } },
+        delegate_mode: { type: 'string', enum: ['full', 'question_only'] }
+      },
+      required: ['pipeline', 'repo']
+    }));
+    tools.push(toolDefinition('delegate.pause', 'Pause or resume a run', {
+      type: 'object',
+      properties: {
+        manifest_path: { type: 'string' },
+        paused: { type: 'boolean' }
+      },
+      required: ['manifest_path', 'paused']
+    }));
+    tools.push(toolDefinition('delegate.cancel', 'Cancel a run (confirmation required)', {
+      type: 'object',
+      properties: {
+        manifest_path: { type: 'string' }
+      },
+      required: ['manifest_path']
+    }));
+  }
+
+  tools.push(toolDefinition('delegate.status', 'Fetch run status', {
+    type: 'object',
+    properties: {
+      manifest_path: { type: 'string' }
+    },
+    required: ['manifest_path']
+  }));
+
+  tools.push(toolDefinition('delegate.question.enqueue', 'Enqueue a question to the parent run', {
+    type: 'object',
+    properties: {
+      parent_manifest_path: { type: 'string' },
+      parent_run_id: { type: 'string' },
+      parent_task_id: { type: 'string' },
+      from_manifest_path: { type: 'string' },
+      prompt: { type: 'string' },
+      urgency: { type: 'string', enum: ['low', 'med', 'high'] },
+      expires_in_ms: { type: 'number' },
+      auto_pause: { type: 'boolean' }
+    },
+    required: ['parent_manifest_path', 'prompt']
+  }));
+  tools.push(toolDefinition('delegate.question.poll', 'Poll for a question answer', {
+    type: 'object',
+    properties: {
+      parent_manifest_path: { type: 'string' },
+      question_id: { type: 'string' },
+      wait_ms: { type: 'number' }
+    },
+    required: ['parent_manifest_path', 'question_id']
+  }));
+
+  if (options.githubEnabled) {
+    if (options.allowedGithubOps.has('open_pr')) {
+      tools.push(toolDefinition('github.open_pr', 'Open a pull request', {
+        type: 'object',
+        properties: {
+          repo: { type: 'string' },
+          title: { type: 'string' },
+          body: { type: 'string' },
+          base: { type: 'string' },
+          head: { type: 'string' },
+          draft: { type: 'boolean' }
+        },
+        required: ['title']
+      }));
+    }
+    if (options.allowedGithubOps.has('comment')) {
+      tools.push(toolDefinition('github.comment', 'Create a PR/issue comment', {
+        type: 'object',
+        properties: {
+          repo: { type: 'string' },
+          issue_number: { type: 'number' },
+          body: { type: 'string' }
+        },
+        required: ['issue_number', 'body']
+      }));
+    }
+    if (options.allowedGithubOps.has('review')) {
+      tools.push(toolDefinition('github.review', 'Submit a PR review', {
+        type: 'object',
+        properties: {
+          repo: { type: 'string' },
+          pull_number: { type: 'number' },
+          event: { type: 'string', enum: ['APPROVE', 'REQUEST_CHANGES', 'COMMENT'] },
+          body: { type: 'string' }
+        },
+        required: ['pull_number', 'event']
+      }));
+    }
+    if (options.allowedGithubOps.has('get_checks')) {
+      tools.push(toolDefinition('github.get_checks', 'Fetch PR checks', {
+        type: 'object',
+        properties: {
+          repo: { type: 'string' },
+          pull_number: { type: 'number' }
+        },
+        required: ['pull_number']
+      }));
+    }
+    if (options.allowedGithubOps.has('merge')) {
+      tools.push(toolDefinition('github.merge', 'Merge a PR', {
+        type: 'object',
+        properties: {
+          manifest_path: { type: 'string' },
+          repo: { type: 'string' },
+          pull_number: { type: 'number' },
+          method: { type: 'string', enum: ['merge', 'squash', 'rebase'] },
+          delete_branch: { type: 'boolean' }
+        },
+        required: ['pull_number']
+      }));
+    }
+  }
+
+  return tools;
+}
+
+function toolDefinition(name: string, description: string, inputSchema: Record<string, unknown>) {
+  return { name, description, inputSchema };
+}
+
+async function handleToolCall(
+  request: McpRequest,
+  context: {
+    repoRoot: string;
+    mode: 'full' | 'question_only';
+    allowNested: boolean;
+    githubEnabled: boolean;
+    allowedGithubOps: Set<string>;
+    allowedRoots: string[];
+    allowedHosts: string[];
+    toolProfile: string[];
+    expiryFallback: 'pause' | 'resume' | 'fail';
+  }
+): Promise<unknown> {
+  const params = asRecord(request.params);
+  const toolName = readStringValue(params, 'name');
+  if (!toolName) {
+    throw new Error('Invalid tool call: missing name');
+  }
+  const input = asRecord(params.arguments);
+
+  if (context.mode === 'question_only' && isRestrictedTool(toolName)) {
+    await reportSecurityViolation(
+      'delegate_mode_violation',
+      `Tool ${toolName} blocked in question_only mode.`,
+      toolName,
+      context.allowedHosts
+    );
+    throw new Error('delegate_mode_forbidden');
+  }
+
+  if (containsSecret(input, 'confirm_nonce')) {
+    await reportSecurityViolation('confirm_nonce_present', 'Model supplied confirm_nonce.', toolName, context.allowedHosts);
+    throw new Error('confirm_nonce must be injected by the runner');
+  }
+  if (containsSecret(input, 'delegation_token')) {
+    await reportSecurityViolation(
+      'delegation_token_present',
+      'Model supplied delegation_token.',
+      toolName,
+      context.allowedHosts
+    );
+    throw new Error('delegation_token must be injected by the runner');
+  }
+
+  switch (toolName) {
+    case 'delegate.status':
+      return wrapResult(await handleDelegateStatus(input, context.allowedRoots, context.allowedHosts));
+    case 'delegate.pause':
+      return wrapResult(await handleDelegatePause(input, context.allowedRoots, context.allowedHosts));
+    case 'delegate.cancel':
+      return wrapResult(await handleDelegateCancel(input, request, context.allowedRoots, context.allowedHosts));
+    case 'delegate.spawn':
+      return wrapResult(
+        await handleDelegateSpawn(
+          input,
+          context.repoRoot,
+          context.allowNested,
+          context.allowedRoots,
+          context.allowedHosts,
+          context.toolProfile
+        )
+      );
+    case 'delegate.question.enqueue':
+      return wrapResult(
+        await handleQuestionEnqueue(
+          input,
+          request,
+          context.allowedRoots,
+          context.allowedHosts,
+          context.expiryFallback
+        )
+      );
+    case 'delegate.question.poll':
+      return wrapResult(
+        await handleQuestionPoll(
+          input,
+          request,
+          context.allowedRoots,
+          context.allowedHosts,
+          context.expiryFallback
+        )
+      );
+    case 'github.open_pr':
+    case 'github.comment':
+    case 'github.review':
+    case 'github.get_checks':
+    case 'github.merge':
+      return wrapResult(await handleGithubCall(toolName, input, request, context));
+    default:
+      throw new Error(`Unknown tool: ${toolName}`);
+  }
+}
+
+function wrapResult(payload: unknown): { content: Array<{ type: 'text'; text: string }>; isError: false } {
+  return {
+    content: [
+      {
+        type: 'text',
+        text: typeof payload === 'string' ? payload : JSON.stringify(payload, null, 2)
+      }
+    ],
+    isError: false
+  };
+}
+
+async function handleDelegateStatus(
+  input: Record<string, unknown>,
+  allowedRoots: string[],
+  allowedHosts: string[]
+): Promise<Record<string, unknown>> {
+  const manifestPath = resolveManifestPath(readStringValue(input, 'manifest_path', 'manifestPath'), allowedRoots);
+  const raw = await readFile(manifestPath, 'utf8');
+  const manifest = JSON.parse(raw) as {
+    status: string;
+    run_id: string;
+    task_id: string;
+    status_detail?: string;
+    log_path?: string | null;
+  };
+  const eventsPath = resolve(dirname(manifestPath), 'events.jsonl');
+  await assertControlEndpoint(manifestPath, allowedHosts);
+  return {
+    run_id: manifest.run_id,
+    task_id: manifest.task_id,
+    status: manifest.status,
+    status_detail: manifest.status_detail ?? null,
+    manifest_path: manifestPath,
+    events_path: eventsPath,
+    log_path: manifest.log_path ?? null
+  };
+}
+
+async function handleDelegatePause(
+  input: Record<string, unknown>,
+  allowedRoots: string[],
+  allowedHosts: string[]
+): Promise<unknown> {
+  const manifestPath = resolveManifestPath(readStringValue(input, 'manifest_path', 'manifestPath'), allowedRoots);
+  const paused = readBooleanValue(input, 'paused') ?? false;
+  return await callControlEndpoint(
+    manifestPath,
+    '/control/action',
+    {
+      action: paused ? 'pause' : 'resume',
+      requested_by: 'delegate'
+    },
+    undefined,
+    { allowedHosts }
+  );
+}
+
+async function handleDelegateCancel(
+  input: Record<string, unknown>,
+  request: McpRequest,
+  allowedRoots: string[],
+  allowedHosts: string[]
+): Promise<unknown> {
+  const manifestPath = resolveManifestPath(readStringValue(input, 'manifest_path', 'manifestPath'), allowedRoots);
+  const privateNonce = request.codex_private?.confirm_nonce;
+  if (!privateNonce) {
+    return await callControlEndpoint(
+      manifestPath,
+      '/confirmations/create',
+      {
+        action: 'cancel',
+        tool: 'delegate.cancel',
+        params: { manifest_path: manifestPath }
+      },
+      undefined,
+      { allowedHosts }
+    );
+  }
+
+  try {
+    return await callControlEndpoint(
+      manifestPath,
+      '/control/action',
+      {
+        action: 'cancel',
+        requested_by: 'delegate',
+        confirm_nonce: String(privateNonce),
+        tool: 'delegate.cancel',
+        params: { manifest_path: manifestPath }
+      },
+      undefined,
+      { allowedHosts }
+    );
+  } catch {
+    return await callControlEndpoint(
+      manifestPath,
+      '/confirmations/create',
+      {
+        action: 'cancel',
+        tool: 'delegate.cancel',
+        params: { manifest_path: manifestPath }
+      },
+      undefined,
+      { allowedHosts }
+    );
+  }
+}
+
+async function handleDelegateSpawn(
+  input: Record<string, unknown>,
+  repoRoot: string,
+  allowNested: boolean,
+  allowedRoots: string[],
+  allowedHosts: string[],
+  toolProfile: string[]
+): Promise<Record<string, unknown>> {
+  const pipeline = requireString(readStringValue(input, 'pipeline'), 'pipeline');
+  const repo = readStringValue(input, 'repo') ?? repoRoot ?? process.cwd();
+  const resolvedRepo = resolve(repo);
+  if (!isPathWithinRoots(resolvedRepo, allowedRoots)) {
+    throw new Error('repo_not_permitted');
+  }
+  const taskId = readStringValue(input, 'task_id', 'taskId');
+  const args = ['start', pipeline, '--format', 'json', '--no-interactive'];
+  if (taskId) {
+    args.push('--task', taskId);
+  }
+  const parentRunId = readStringValue(input, 'parent_run_id', 'parentRunId') ?? process.env.CODEX_ORCHESTRATOR_RUN_ID;
+  if (parentRunId) {
+    args.push('--parent-run', parentRunId);
+  }
+  const requestedMode = readStringValue(input, 'delegate_mode', 'delegateMode') ?? 'question_only';
+  const childMode = allowNested && requestedMode === 'full' ? 'full' : 'question_only';
+
+  const envOverrides = readStringMap(input, 'env');
+  const delegationToken = randomBytes(32).toString('hex');
+  const parentManifestPath = resolveParentManifestPath(input, allowedRoots);
+  const mcpOverrides = buildDelegateMcpOverrides(toolProfile);
+  const childEnv = {
+    ...process.env,
+    ...(envOverrides ?? {}),
+    CODEX_DELEGATE_MODE: childMode,
+    ...(parentManifestPath ? { CODEX_DELEGATION_PARENT_MANIFEST_PATH: parentManifestPath } : {}),
+    ...(mcpOverrides.length > 0 ? { CODEX_MCP_CONFIG_OVERRIDES: mcpOverrides.join(';') } : {})
+  };
+
+  const child = spawn('codex-orchestrator', args, { cwd: repo, env: childEnv });
+  const output = await collectOutput(child, DEFAULT_SPAWN_TIMEOUT_MS);
+  const parsed = safeJsonParse(output.stdout);
+  const parsedRecord = asRecord(parsed);
+  const manifestPath = readStringValue(parsedRecord, 'manifest');
+  if (!manifestPath) {
+    return { status: 'spawn_failed', stdout: output.stdout.trim(), stderr: output.stderr.trim() };
+  }
+  const runId = readStringValue(parsedRecord, 'run_id', 'runId');
+  const logPath = readStringValue(parsedRecord, 'log_path', 'logPath');
+  const eventsPath = `${dirname(manifestPath)}/events.jsonl`;
+  const resolvedManifestPath = resolveSpawnManifestPath(manifestPath, resolvedRepo);
+
+  if (resolvedManifestPath) {
+    await persistDelegationToken(resolvedManifestPath, delegationToken, {
+      parentRunId: parentRunId ?? null,
+      childRunId: runId ?? null
+    });
+  }
+
+  if (parentManifestPath && parentRunId && runId) {
+    try {
+      await callControlEndpoint(
+        parentManifestPath,
+        '/delegation/register',
+        {
+          token: delegationToken,
+          parent_run_id: parentRunId,
+          child_run_id: runId
+        },
+        undefined,
+        { allowedHosts }
+      );
+    } catch (error) {
+      logger.warn(`Failed to register delegation token: ${(error as Error)?.message ?? error}`);
+    }
+  }
+
+  return {
+    run_id: runId,
+    manifest_path: manifestPath,
+    log_path: logPath,
+    events_path: eventsPath
+  };
+}
+
+async function handleQuestionEnqueue(
+  input: Record<string, unknown>,
+  request: McpRequest,
+  allowedRoots: string[],
+  allowedHosts: string[],
+  expiryFallback: 'pause' | 'resume' | 'fail'
+): Promise<unknown> {
+  const parentManifestPath = resolveParentManifestPath(input, allowedRoots);
+  if (!parentManifestPath) {
+    throw new Error('parent_manifest_path is required');
+  }
+
+  const delegationToken = await resolveDelegationToken(request, allowedRoots, {
+    retryMs: DEFAULT_DELEGATION_TOKEN_RETRY_MS,
+    intervalMs: DEFAULT_DELEGATION_TOKEN_RETRY_INTERVAL_MS
+  });
+  const childRunId = process.env.CODEX_ORCHESTRATOR_RUN_ID ?? readStringValue(input, 'from_run_id', 'fromRunId') ?? '';
+
+  if (!delegationToken) {
+    throw new Error('delegation_token missing');
+  }
+
+  const autoPause = readBooleanValue(input, 'auto_pause', 'autoPause') ?? true;
+  const manifestFromEnv = process.env.CODEX_ORCHESTRATOR_MANIFEST_PATH;
+  const manifestFromInput = readStringValue(input, 'from_manifest_path', 'fromManifestPath');
+  const childManifestPath = manifestFromEnv ?? manifestFromInput;
+  const result = await callControlEndpointWithRetry(
+    parentManifestPath,
+    '/questions/enqueue',
+    {
+      parent_run_id: readStringValue(input, 'parent_run_id', 'parentRunId') ?? '',
+      parent_task_id: readStringValue(input, 'parent_task_id', 'parentTaskId') ?? null,
+      from_run_id: childRunId,
+      from_manifest_path: childManifestPath ?? null,
+      prompt: requireString(readStringValue(input, 'prompt'), 'prompt'),
+      urgency: readStringValue(input, 'urgency') ?? 'med',
+      expires_in_ms: readNumberValue(input, 'expires_in_ms', 'expiresInMs'),
+      auto_pause: autoPause,
+      expiry_fallback: expiryFallback
+    },
+    {
+      [DELEGATION_TOKEN_HEADER]: delegationToken,
+      [DELEGATION_RUN_HEADER]: childRunId
+    },
+    {
+      allowedHosts,
+      allowedRoots,
+      retryMs: DEFAULT_DELEGATION_TOKEN_RETRY_MS,
+      retryIntervalMs: DEFAULT_DELEGATION_TOKEN_RETRY_INTERVAL_MS
+    }
+  );
+
+  if (autoPause && manifestFromEnv) {
+    const resolvedManifest = resolveRunManifestPath(manifestFromEnv, allowedRoots, 'manifest_path');
+    await callControlEndpoint(
+      resolvedManifest,
+      '/control/action',
+      {
+        action: 'pause',
+        requested_by: 'delegate',
+        reason: 'awaiting_question_answer'
+      },
+      undefined,
+      { allowedHosts, allowedRoots }
+    );
+  }
+
+  return {
+    ...result,
+    fallback_action: expiryFallback
+  };
+}
+
+async function handleQuestionPoll(
+  input: Record<string, unknown>,
+  request: McpRequest,
+  allowedRoots: string[],
+  allowedHosts: string[],
+  expiryFallback: 'pause' | 'resume' | 'fail'
+): Promise<unknown> {
+  const parentManifestPath = resolveParentManifestPath(input, allowedRoots);
+  if (!parentManifestPath) {
+    throw new Error('parent_manifest_path is required');
+  }
+
+  const delegationToken = await resolveDelegationToken(request, allowedRoots, {
+    retryMs: DEFAULT_DELEGATION_TOKEN_RETRY_MS,
+    intervalMs: DEFAULT_DELEGATION_TOKEN_RETRY_INTERVAL_MS
+  });
+  const childRunId = process.env.CODEX_ORCHESTRATOR_RUN_ID ?? readStringValue(input, 'from_run_id', 'fromRunId') ?? '';
+
+  if (!delegationToken) {
+    throw new Error('delegation_token missing');
+  }
+
+  const questionId = requireString(readStringValue(input, 'question_id', 'questionId'), 'question_id');
+  const waitMs = readNumberValue(input, 'wait_ms', 'waitMs') ?? 0;
+  const deadline = Date.now() + (Number.isFinite(waitMs) ? waitMs : 0);
+  const maxIterations = waitMs > 0 ? Math.max(1, Math.ceil(waitMs / QUESTION_POLL_INTERVAL_MS)) : 1;
+
+  for (let iteration = 0; iteration < maxIterations; iteration += 1) {
+    const record = await callControlEndpointWithRetry(
+      parentManifestPath,
+      `/questions/${questionId}`,
+      null,
+      {
+        [DELEGATION_TOKEN_HEADER]: delegationToken,
+        [DELEGATION_RUN_HEADER]: childRunId
+      },
+      {
+        allowedHosts,
+        allowedRoots,
+        retryMs: DEFAULT_DELEGATION_TOKEN_RETRY_MS,
+        retryIntervalMs: DEFAULT_DELEGATION_TOKEN_RETRY_INTERVAL_MS
+      }
+    );
+    const status = readStringValue(record, 'status');
+    if (status !== 'queued' || waitMs <= 0 || Date.now() >= deadline) {
+      const expiresAt = readStringValue(record, 'expires_at', 'expiresAt');
+      if (status === 'expired') {
+        await applyQuestionFallback(expiryFallback, allowedHosts, allowedRoots);
+      }
+      return {
+        ...record,
+        expired_at: status === 'expired' ? expiresAt ?? null : null,
+        fallback_action: status === 'expired' ? expiryFallback : null
+      };
+    }
+    await delay(QUESTION_POLL_INTERVAL_MS);
+  }
+
+  const record = await callControlEndpoint(
+    parentManifestPath,
+    `/questions/${questionId}`,
+    null,
+    {
+      [DELEGATION_TOKEN_HEADER]: delegationToken,
+      [DELEGATION_RUN_HEADER]: childRunId
+    },
+    { allowedHosts }
+  );
+  return {
+    ...record,
+    expired_at: null,
+    fallback_action: null
+  };
+}
+
+async function handleGithubCall(
+  toolName: string,
+  input: Record<string, unknown>,
+  request: McpRequest,
+  context: {
+    githubEnabled: boolean;
+    allowedGithubOps: Set<string>;
+    allowedRoots: string[];
+    allowedHosts: string[];
+  }
+): Promise<unknown> {
+  const op = toolName.replace('github.', '');
+  if (!context.githubEnabled || !context.allowedGithubOps.has(op)) {
+    throw new Error('github_operation_disallowed');
+  }
+
+  if (toolName === 'github.merge') {
+    const privateNonce = request.codex_private?.confirm_nonce;
+    const manifestPath = resolveManifestPath(
+      readStringValue(input, 'manifest_path', 'manifestPath') ?? process.env.CODEX_ORCHESTRATOR_MANIFEST_PATH,
+      context.allowedRoots
+    );
+    if (!privateNonce) {
+      return await callControlEndpoint(manifestPath, '/confirmations/create', {
+        action: 'merge',
+        tool: toolName,
+        params: { ...input, manifest_path: manifestPath }
+      }, undefined, { allowedHosts: context.allowedHosts });
+    }
+
+    try {
+      await callControlEndpoint(manifestPath, '/confirmations/validate', {
+        confirm_nonce: String(privateNonce),
+        tool: toolName,
+        params: { ...input, manifest_path: manifestPath }
+      }, undefined, { allowedHosts: context.allowedHosts });
+    } catch {
+      return await callControlEndpoint(manifestPath, '/confirmations/create', {
+        action: 'merge',
+        tool: toolName,
+        params: { ...input, manifest_path: manifestPath }
+      }, undefined, { allowedHosts: context.allowedHosts });
+    }
+  }
+
+  switch (toolName) {
+    case 'github.open_pr':
+      return await runGh([
+        'pr',
+        'create',
+        ...(readStringValue(input, 'title') ? ['--title', readStringValue(input, 'title') as string] : []),
+        ...(readStringValue(input, 'body') ? ['--body', readStringValue(input, 'body') as string] : ['--body', '']),
+        ...(readStringValue(input, 'base') ? ['--base', readStringValue(input, 'base') as string] : []),
+        ...(readStringValue(input, 'head') ? ['--head', readStringValue(input, 'head') as string] : []),
+        ...(readBooleanValue(input, 'draft') ? ['--draft'] : []),
+        ...(readStringValue(input, 'repo') ? ['--repo', readStringValue(input, 'repo') as string] : [])
+      ]);
+    case 'github.comment':
+      return await runGh([
+        'issue',
+        'comment',
+        String(requireNumber(readNumberValue(input, 'issue_number', 'issueNumber'), 'issue_number')),
+        ...(readStringValue(input, 'body') ? ['--body', readStringValue(input, 'body') as string] : []),
+        ...(readStringValue(input, 'repo') ? ['--repo', readStringValue(input, 'repo') as string] : [])
+      ]);
+    case 'github.review':
+      return await runGh([
+        'pr',
+        'review',
+        String(requireNumber(readNumberValue(input, 'pull_number', 'pullNumber'), 'pull_number')),
+        ...(readStringValue(input, 'event') === 'APPROVE' ? ['--approve'] : []),
+        ...(readStringValue(input, 'event') === 'REQUEST_CHANGES' ? ['--request-changes'] : []),
+        ...(readStringValue(input, 'event') === 'COMMENT' ? ['--comment'] : []),
+        ...(readStringValue(input, 'body') ? ['--body', readStringValue(input, 'body') as string] : []),
+        ...(readStringValue(input, 'repo') ? ['--repo', readStringValue(input, 'repo') as string] : [])
+      ]);
+    case 'github.get_checks': {
+      const pullNumber = requireNumber(readNumberValue(input, 'pull_number', 'pullNumber'), 'pull_number');
+      const result = await runGh([
+        'pr',
+        'view',
+        String(pullNumber),
+        ...(readStringValue(input, 'repo') ? ['--repo', readStringValue(input, 'repo') as string] : []),
+        '--json',
+        'statusCheckRollup'
+      ]);
+      return safeJsonParse(result.stdout) ?? result;
+    }
+    case 'github.merge': {
+      const mergeNumber = requireNumber(readNumberValue(input, 'pull_number', 'pullNumber'), 'pull_number');
+      return await runGh([
+        'pr',
+        'merge',
+        String(mergeNumber),
+        ...(readStringValue(input, 'method') === 'squash'
+          ? ['--squash']
+          : readStringValue(input, 'method') === 'rebase'
+            ? ['--rebase']
+            : ['--merge']),
+        ...(readBooleanValue(input, 'delete_branch', 'deleteBranch') ? ['--delete-branch'] : []),
+        ...(readStringValue(input, 'repo') ? ['--repo', readStringValue(input, 'repo') as string] : [])
+      ]);
+    }
+    default:
+      throw new Error(`Unsupported GitHub tool: ${toolName}`);
+  }
+}
+
+export async function callControlEndpointWithRetry(
+  manifestPath: string,
+  endpoint: string,
+  payload: Record<string, unknown> | null,
+  extraHeaders: Record<string, string> = {},
+  options: { allowedHosts?: string[]; allowedRoots?: string[]; retryMs?: number; retryIntervalMs?: number } = {}
+): Promise<Record<string, unknown>> {
+  const retryMs = options.retryMs ?? 0;
+  const retryIntervalMs = options.retryIntervalMs ?? DEFAULT_DELEGATION_TOKEN_RETRY_INTERVAL_MS;
+  const deadline = Date.now() + retryMs;
+  let attempt = 0;
+
+  while (attempt === 0 || Date.now() < deadline) {
+    try {
+      return await callControlEndpoint(manifestPath, endpoint, payload, extraHeaders, options);
+    } catch (error) {
+      if (!shouldRetryControlError(error) || Date.now() >= deadline) {
+        throw error;
+      }
+      attempt += 1;
+      await delay(retryIntervalMs * Math.min(4, attempt));
+    }
+  }
+  throw new Error('control endpoint retry exhausted');
+}
+
+async function callControlEndpoint(
+  manifestPath: string,
+  endpoint: string,
+  payload: Record<string, unknown> | null,
+  extraHeaders: Record<string, string> = {},
+  options: { allowedHosts?: string[]; allowedRoots?: string[] } = {}
+): Promise<Record<string, unknown>> {
+  const { baseUrl, token } = await loadControlEndpoint(manifestPath, options);
+  const url = new URL(endpoint, baseUrl);
+  const res = await fetch(url.toString(), {
+    method: payload ? 'POST' : 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+      [CSRF_HEADER]: token,
+      ...extraHeaders
+    },
+    body: payload ? JSON.stringify(payload) : undefined
+  });
+  if (!res.ok) {
+    const raw = await res.text();
+    let errorCode: string | null = null;
+    let message = raw;
+    try {
+      const parsed = JSON.parse(raw) as { error?: unknown };
+      if (parsed && typeof parsed === 'object' && typeof parsed.error === 'string') {
+        errorCode = parsed.error;
+        message = parsed.error;
+      }
+    } catch {
+      // ignore parse errors
+    }
+    const error = new Error(`control endpoint error: ${res.status} ${message}`);
+    (error as Error & { code?: string }).code = errorCode ?? undefined;
+    throw error;
+  }
+  return (await res.json()) as Record<string, unknown>;
+}
+
+function shouldRetryControlError(error: unknown): boolean {
+  const code = (error as { code?: string } | null)?.code;
+  if (code === 'delegation_token_invalid') {
+    return true;
+  }
+  const message = (error as Error | null)?.message ?? '';
+  return message.includes('delegation_token_invalid');
+}
+
+export async function loadControlEndpoint(
+  manifestPath: string,
+  options: { allowedHosts?: string[]; allowedRoots?: string[] } = {}
+): Promise<{ baseUrl: URL; token: string }> {
+  const resolvedManifest = resolveRunManifestPath(manifestPath, options.allowedRoots, 'manifest_path');
+  const runDir = dirname(resolvedManifest);
+  const endpointPath = resolve(runDir, 'control_endpoint.json');
+  const raw = await readFile(endpointPath, 'utf8');
+  const endpointInfo = JSON.parse(raw) as { base_url?: string; token_path?: string };
+  const baseUrl = validateControlBaseUrl(endpointInfo.base_url, options.allowedHosts);
+  const tokenPath = resolveControlTokenPath(endpointInfo.token_path, runDir);
+  const token = await readControlToken(tokenPath);
+  return { baseUrl, token };
+}
+
+async function assertControlEndpoint(manifestPath: string, allowedHosts: string[]): Promise<void> {
+  await loadControlEndpoint(manifestPath, { allowedHosts });
+}
+
+function validateControlBaseUrl(raw: unknown, allowedHosts?: string[]): URL {
+  if (typeof raw !== 'string' || raw.trim().length === 0) {
+    throw new Error('control base_url missing');
+  }
+  let parsed: URL;
+  try {
+    parsed = new URL(raw);
+  } catch {
+    throw new Error('control base_url invalid');
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    throw new Error('control base_url invalid');
+  }
+  if (parsed.username || parsed.password) {
+    throw new Error('control base_url invalid');
+  }
+  const allowed = normalizeAllowedHosts(allowedHosts);
+  if (allowed.size > 0 && !allowed.has(parsed.hostname.toLowerCase())) {
+    throw new Error('control base_url not permitted');
+  }
+  return parsed;
+}
+
+function normalizeAllowedHosts(allowedHosts?: string[]): Set<string> {
+  const values = allowedHosts && allowedHosts.length > 0 ? allowedHosts : Array.from(LOOPBACK_HOSTS);
+  return new Set(values.map((entry) => entry.toLowerCase()));
+}
+
+function resolveControlTokenPath(tokenPath: unknown, runDir: string): string {
+  const fallback = resolve(runDir, 'control_auth.json');
+  const raw = typeof tokenPath === 'string' ? tokenPath.trim() : '';
+  const resolved = raw ? resolve(runDir, raw) : fallback;
+  if (!isPathWithinRoots(resolved, [runDir])) {
+    throw new Error('control auth path invalid');
+  }
+  return resolved;
+}
+
+async function readControlToken(tokenPath: string): Promise<string> {
+  const tokenRaw = await readFile(tokenPath, 'utf8');
+  const parsedToken = safeJsonParse(tokenRaw);
+  const tokenValue =
+    parsedToken && typeof parsedToken === 'object' && !Array.isArray(parsedToken)
+      ? (parsedToken as Record<string, unknown>).token
+      : null;
+  const token =
+    typeof tokenValue === 'string' && tokenValue.trim().length > 0
+      ? tokenValue.trim()
+      : tokenRaw.trim();
+  if (!token) {
+    throw new Error('control auth token missing');
+  }
+  return token;
+}
+
+async function runGh(args: string[], timeoutMs = DEFAULT_GH_TIMEOUT_MS): Promise<{ stdout: string; stderr: string }> {
+  return new Promise((resolvePromise, reject) => {
+    const child = spawn('gh', args, { stdio: ['ignore', 'pipe', 'pipe'] });
+    let stdout = '';
+    let stderr = '';
+    let settled = false;
+
+    const timer = setTimeout(() => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      child.kill('SIGTERM');
+      setTimeout(() => child.kill('SIGKILL'), 5000);
+      reject(new Error('gh command timed out'));
+    }, timeoutMs);
+
+    child.stdout?.on('data', (chunk) => {
+      stdout += chunk.toString();
+    });
+    child.stderr?.on('data', (chunk) => {
+      stderr += chunk.toString();
+    });
+    child.on('error', (error) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      clearTimeout(timer);
+      reject(error);
+    });
+    child.on('exit', (code) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      clearTimeout(timer);
+      if (code === 0) {
+        resolvePromise({ stdout, stderr });
+      } else {
+        reject(new Error(stderr.trim() || `gh exited with code ${code}`));
+      }
+    });
+  });
+}
+
+async function runJsonRpcServer(handler: (request: McpRequest) => Promise<unknown>): Promise<void> {
+  let buffer = Buffer.alloc(0);
+  let expectedLength: number | null = null;
+
+  process.stdin.on('data', (chunk) => {
+    buffer = Buffer.concat([buffer, Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)]);
+    processBuffer().catch((error) => {
+      logger.error(`Failed to process MCP buffer: ${(error as Error)?.message ?? error}`);
+    });
+  });
+
+  process.stdin.on('end', () => {
+    process.exitCode = 0;
+  });
+
+  async function processBuffer() {
+    while (buffer.length > 0) {
+      if (expectedLength !== null) {
+        if (buffer.length < expectedLength) {
+          return;
+        }
+        const body = buffer.slice(0, expectedLength);
+        buffer = buffer.slice(expectedLength);
+        expectedLength = null;
+        await handleMessage(body.toString('utf8'));
+        continue;
+      }
+
+      const headerEnd = buffer.indexOf('\r\n\r\n');
+      if (headerEnd === -1) {
+        return;
+      }
+      const header = buffer.slice(0, headerEnd).toString('utf8');
+      const match = /Content-Length:\s*(\d+)/i.exec(header);
+      if (!match) {
+        buffer = buffer.slice(headerEnd + 4);
+        continue;
+      }
+      expectedLength = Number(match[1]);
+      buffer = buffer.slice(headerEnd + 4);
+    }
+  }
+
+  async function handleMessage(raw: string) {
+    let request: McpRequest;
+    try {
+      request = JSON.parse(raw) as McpRequest;
+    } catch (error) {
+      logger.error(`Failed to parse MCP message: ${(error as Error)?.message ?? error}`);
+      return;
+    }
+    if (typeof request.method !== 'string') {
+      return;
+    }
+    const id = request.id ?? null;
+    try {
+      const result = await handler(request);
+      if (id !== null && typeof id !== 'undefined') {
+        sendResponse({ jsonrpc: '2.0', id, result });
+      }
+    } catch (error) {
+      if (id !== null && typeof id !== 'undefined') {
+        sendResponse({
+          jsonrpc: '2.0',
+          id,
+          error: { code: -32603, message: (error as Error)?.message ?? String(error) }
+        });
+      }
+    }
+  }
+}
+
+function sendResponse(response: McpResponse): void {
+  const payload = Buffer.from(JSON.stringify(response), 'utf8');
+  const header = Buffer.from(`Content-Length: ${payload.length}\r\n\r\n`, 'utf8');
+  process.stdout.write(Buffer.concat([header, payload]));
+}
+
+function safeJsonParse(text: string): unknown | null {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function collectOutput(
+  child: ReturnType<typeof spawn>,
+  timeoutMs: number
+): Promise<{ stdout: string; stderr: string }> {
+  let stdout = '';
+  let stderr = '';
+  let settled = false;
+  let rejectPromise: ((error: Error) => void) | null = null;
+
+  const timer = setTimeout(() => {
+    if (settled) {
+      return;
+    }
+    settled = true;
+    child.kill('SIGTERM');
+    setTimeout(() => child.kill('SIGKILL'), 5000);
+    rejectPromise?.(new Error('delegate.spawn timed out'));
+  }, timeoutMs);
+
+  child.stdout?.on('data', (chunk) => {
+    stdout += chunk.toString();
+  });
+  child.stderr?.on('data', (chunk) => {
+    stderr += chunk.toString();
+  });
+
+  await new Promise<void>((resolvePromise, reject) => {
+    rejectPromise = reject;
+    child.once('error', (error) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      clearTimeout(timer);
+      reject(error);
+    });
+    child.once('exit', (code, signal) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      clearTimeout(timer);
+      if (code === 0 && !signal) {
+        resolvePromise();
+        return;
+      }
+      reject(
+        new Error(
+          `delegate.spawn exited with code ${code ?? 'null'} (${signal ?? 'no signal'}): ${stderr.trim()}`
+        )
+      );
+    });
+  });
+  return { stdout, stderr };
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return {};
+  }
+  return value as Record<string, unknown>;
+}
+
+function readStringValue(record: Record<string, unknown>, ...keys: string[]): string | undefined {
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === 'string' && value.trim().length > 0) {
+      return value.trim();
+    }
+  }
+  return undefined;
+}
+
+function readNumberValue(record: Record<string, unknown>, ...keys: string[]): number | undefined {
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return value;
+    }
+    if (typeof value === 'string' && value.trim().length > 0) {
+      const parsed = Number(value);
+      if (Number.isFinite(parsed)) {
+        return parsed;
+      }
+    }
+  }
+  return undefined;
+}
+
+function readBooleanValue(record: Record<string, unknown>, ...keys: string[]): boolean | undefined {
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === 'boolean') {
+      return value;
+    }
+  }
+  return undefined;
+}
+
+function readStringMap(record: Record<string, unknown>, key: string): Record<string, string> | undefined {
+  const raw = record[key];
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    return undefined;
+  }
+  const entries: Record<string, string> = {};
+  for (const [entryKey, entryValue] of Object.entries(raw as Record<string, unknown>)) {
+    if (typeof entryValue === 'string') {
+      entries[entryKey] = entryValue;
+    }
+  }
+  return Object.keys(entries).length > 0 ? entries : undefined;
+}
+
+function requireString(value: string | undefined, field: string): string {
+  if (!value) {
+    throw new Error(`${field} is required`);
+  }
+  return value;
+}
+
+function requireNumber(value: number | undefined, field: string): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    throw new Error(`${field} is required`);
+  }
+  return value;
+}
+
+function isRestrictedTool(toolName: string): boolean {
+  return toolName === 'delegate.spawn' || toolName === 'delegate.pause' || toolName === 'delegate.cancel';
+}
+
+function containsSecret(record: Record<string, unknown>, key: string): boolean {
+  return Object.prototype.hasOwnProperty.call(record, key);
+}
+
+async function reportSecurityViolation(
+  kind: string,
+  summary: string,
+  toolName?: string,
+  allowedHosts?: string[]
+): Promise<void> {
+  const manifestPath = process.env.CODEX_ORCHESTRATOR_MANIFEST_PATH;
+  if (!manifestPath) {
+    return;
+  }
+  try {
+    await callControlEndpoint(
+      resolve(manifestPath),
+      '/security/violation',
+      {
+        kind,
+        summary: toolName ? `${summary} Tool=${toolName}` : summary,
+        severity: 'high'
+      },
+      undefined,
+      { allowedHosts }
+    );
+  } catch {
+    // ignore
+  }
+}
+
+export async function resolveDelegationToken(
+  request: McpRequest,
+  allowedRoots?: string[],
+  options: { retryMs?: number; intervalMs?: number } = {}
+): Promise<string | null> {
+  const privateToken = request.codex_private?.delegation_token;
+  if (privateToken) {
+    return String(privateToken);
+  }
+  const tokenPath = resolveDelegationTokenPath(allowedRoots);
+  if (!tokenPath) {
+    return null;
+  }
+  const retryMs = options.retryMs ?? 0;
+  const intervalMs = options.intervalMs ?? DEFAULT_DELEGATION_TOKEN_RETRY_INTERVAL_MS;
+  const deadline = Date.now() + retryMs;
+  let token = await readDelegationTokenFile(tokenPath);
+  while (!token && Date.now() < deadline) {
+    await delay(intervalMs);
+    token = await readDelegationTokenFile(tokenPath);
+  }
+  return token;
+}
+
+function resolveDelegationTokenPath(allowedRoots?: string[]): string | null {
+  const explicit = process.env.CODEX_DELEGATION_TOKEN_PATH?.trim();
+  const manifestPath = process.env.CODEX_ORCHESTRATOR_MANIFEST_PATH?.trim();
+  let runDir: string | null = null;
+
+  if (manifestPath) {
+    try {
+      const resolvedManifest = resolveRunManifestPath(manifestPath, allowedRoots, 'manifest_path');
+      runDir = dirname(resolvedManifest);
+    } catch {
+      return null;
+    }
+  }
+
+  if (explicit) {
+    if (!runDir && !isAbsolute(explicit)) {
+      return null;
+    }
+    const resolvedToken =
+      runDir && !isAbsolute(explicit) ? resolve(runDir, explicit) : resolve(explicit);
+    if (runDir) {
+      if (!isPathWithinRoots(resolvedToken, [runDir])) {
+        return null;
+      }
+    } else if (allowedRoots && allowedRoots.length > 0 && !isPathWithinRoots(resolvedToken, allowedRoots)) {
+      return null;
+    }
+    return resolvedToken;
+  }
+
+  if (runDir) {
+    return resolve(runDir, DELEGATION_TOKEN_FILE);
+  }
+
+  return null;
+}
+
+async function readDelegationTokenFile(tokenPath: string): Promise<string | null> {
+  try {
+    const raw = await readFile(tokenPath, 'utf8');
+    const parsed = safeJsonParse(raw);
+    const tokenValue =
+      parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+        ? (parsed as Record<string, unknown>).token
+        : null;
+    const token =
+      typeof tokenValue === 'string' && tokenValue.trim().length > 0 ? tokenValue.trim() : raw.trim();
+    return token || null;
+  } catch {
+    return null;
+  }
+}
+
+function buildDelegateMcpOverrides(toolProfile: string[]): string[] {
+  const overrides: string[] = ['mcp_servers.delegation.enabled=true'];
+  for (const entry of toolProfile) {
+    const trimmed = entry.trim();
+    if (!trimmed) {
+      continue;
+    }
+    overrides.push(`mcp_servers.${trimmed}.enabled=true`);
+  }
+  return dedupeOverrides(overrides);
+}
+
+function dedupeOverrides(overrides: string[]): string[] {
+  return Array.from(new Set(overrides.filter((override) => override.trim().length > 0)));
+}
+
+function collectConfigOverridesFromEnv(env: NodeJS.ProcessEnv = process.env): ConfigOverride[] {
+  const overrides: ConfigOverride[] = [];
+  for (const key of CONFIG_OVERRIDE_ENV_KEYS) {
+    const raw = env[key];
+    if (!raw) {
+      continue;
+    }
+    for (const value of splitDelegationConfigOverrides(raw)) {
+      overrides.push({ source: 'env', value });
+    }
+  }
+  return overrides;
+}
+
+function buildConfigOverrideLayers(overrides: ConfigOverride[]): DelegationConfigLayer[] {
+  const layers: DelegationConfigLayer[] = [];
+  for (const override of overrides) {
+    try {
+      const parsed = parseDelegationConfigOverride(override.value, override.source);
+      if (parsed) {
+        layers.push(parsed);
+      }
+    } catch (error) {
+      logger.warn(
+        `Invalid delegation config override (${override.source}): ${(error as Error)?.message ?? String(error)}`
+      );
+    }
+  }
+  return layers;
+}
+
+function resolveParentManifestPath(input: Record<string, unknown>, allowedRoots: string[]): string | null {
+  const envPath = process.env.CODEX_DELEGATION_PARENT_MANIFEST_PATH?.trim();
+  const rawPath = envPath ?? readStringValue(input, 'parent_manifest_path', 'parentManifestPath');
+  if (!rawPath) {
+    return null;
+  }
+  return resolveRunManifestPath(rawPath, allowedRoots, 'parent_manifest_path');
+}
+
+function resolveManifestPath(value: string | undefined, allowedRoots: string[]): string {
+  const raw = requireString(value, 'manifest_path');
+  return resolveRunManifestPath(raw, allowedRoots, 'manifest_path');
+}
+
+export function resolveRunManifestPath(
+  rawPath: string,
+  allowedRoots: string[] | undefined,
+  label = 'manifest_path'
+): string {
+  const resolved = resolve(rawPath);
+  assertRunManifestPath(resolved, label);
+  if (allowedRoots && !isPathWithinRoots(resolved, allowedRoots)) {
+    throw new Error(`${label} not permitted`);
+  }
+  return resolved;
+}
+
+function assertRunManifestPath(pathname: string, label: string): void {
+  if (basename(pathname) !== 'manifest.json') {
+    throw new Error(`${label} invalid`);
+  }
+  const runDir = dirname(pathname);
+  const cliDir = dirname(runDir);
+  if (basename(cliDir) !== 'cli') {
+    throw new Error(`${label} invalid`);
+  }
+  const taskDir = dirname(cliDir);
+  const runsDir = dirname(taskDir);
+  if (basename(runsDir) !== '.runs') {
+    throw new Error(`${label} invalid`);
+  }
+  if (!basename(runDir) || !basename(taskDir)) {
+    throw new Error(`${label} invalid`);
+  }
+}
+
+function isPathWithinRoots(pathname: string, roots: string[]): boolean {
+  const resolved = realpathSafe(pathname);
+  return roots.some((root) => {
+    const resolvedRoot = realpathSafe(root);
+    if (resolvedRoot === resolved) {
+      return true;
+    }
+    const normalizedRoot = resolvedRoot.endsWith('/') ? resolvedRoot : `${resolvedRoot}/`;
+    return resolved.startsWith(normalizedRoot);
+  });
+}
+
+function realpathSafe(pathname: string): string {
+  try {
+    return realpathSync(pathname);
+  } catch {
+    return resolve(pathname);
+  }
+}
+
+function resolveSpawnManifestPath(manifestPath: string, repoRoot: string): string | null {
+  if (!manifestPath) {
+    return null;
+  }
+  const resolved = isAbsolute(manifestPath) ? manifestPath : resolve(repoRoot, manifestPath);
+  try {
+    assertRunManifestPath(resolved, 'manifest_path');
+    return resolved;
+  } catch {
+    return null;
+  }
+}
+
+async function persistDelegationToken(
+  manifestPath: string,
+  token: string,
+  info: { parentRunId: string | null; childRunId: string | null }
+): Promise<void> {
+  const tokenPath = resolve(dirname(manifestPath), DELEGATION_TOKEN_FILE);
+  try {
+    await writeJsonAtomic(tokenPath, {
+      token,
+      parent_run_id: info.parentRunId,
+      child_run_id: info.childRunId,
+      created_at: new Date().toISOString()
+    });
+    await chmod(tokenPath, 0o600).catch(() => undefined);
+  } catch (error) {
+    logger.warn(`Failed to persist delegation token: ${(error as Error)?.message ?? error}`);
+  }
+}
+
+async function isRunAwaitingQuestion(
+  manifestPath: string,
+  allowedRoots?: string[]
+): Promise<boolean> {
+  try {
+    const resolvedManifest = resolveRunManifestPath(manifestPath, allowedRoots, 'manifest_path');
+    const controlPath = resolve(dirname(resolvedManifest), 'control.json');
+    const raw = await readFile(controlPath, 'utf8');
+    const snapshot = safeJsonParse(raw) as Record<string, unknown> | null;
+    const latest =
+      snapshot && snapshot.latest_action && typeof snapshot.latest_action === 'object'
+        ? (snapshot.latest_action as Record<string, unknown>)
+        : null;
+    if (!latest) {
+      return false;
+    }
+    return latest.action === 'pause' && latest.reason === 'awaiting_question_answer';
+  } catch {
+    return false;
+  }
+}
+
+export async function applyQuestionFallback(
+  fallback: 'pause' | 'resume' | 'fail',
+  allowedHosts?: string[],
+  allowedRoots?: string[]
+): Promise<void> {
+  const manifestPath = process.env.CODEX_ORCHESTRATOR_MANIFEST_PATH;
+  if (!manifestPath) {
+    return;
+  }
+  const shouldResolve = await isRunAwaitingQuestion(manifestPath, allowedRoots);
+  if (!shouldResolve) {
+    return;
+  }
+  const action = fallback === 'pause' ? 'pause' : fallback === 'resume' ? 'resume' : 'fail';
+  try {
+    await callControlEndpoint(
+      resolveRunManifestPath(manifestPath, allowedRoots, 'manifest_path'),
+      '/control/action',
+      {
+        action,
+        requested_by: 'delegate',
+        reason: 'question_expired'
+      },
+      undefined,
+      { allowedHosts, allowedRoots }
+    );
+  } catch {
+    // ignore
+  }
+}
