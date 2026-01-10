@@ -107,20 +107,27 @@ export class RunEventStream {
 export function attachRunEventAdapter(
   emitter: RunEventEmitter,
   stream: RunEventStream,
-  onEntry?: (entry: RunEventStreamEntry) => void
+  onEntry?: (entry: RunEventStreamEntry) => void,
+  onError?: (error: Error, payload: { event: string; actor: string; payload: Record<string, unknown> }) => void
 ): () => void {
   return emitter.on('*', (event) => {
     const mapped = mapRunEvent(event);
     if (!mapped) {
       return;
     }
-    void stream.append(mapped).then((entry) => {
-      onEntry?.(entry);
-    });
+    void stream
+      .append(mapped)
+      .then((entry) => {
+        onEntry?.(entry);
+      })
+      .catch((error) => {
+        onError?.(error as Error, mapped);
+      });
   });
 }
 
 function mapRunEvent(event: RunEvent): { event: string; actor: string; payload: Record<string, unknown> } | null {
+  // The public event stream uses "step_*" naming for pipeline stages to match UI terminology.
   switch (event.type) {
     case 'run:started':
       return {
@@ -219,17 +226,25 @@ function mapRunEvent(event: RunEvent): { event: string; actor: string; payload: 
 async function readLastSeq(pathname: string): Promise<number> {
   try {
     const raw = await readFile(pathname, 'utf8');
-    const trimmed = raw.trim();
-    if (!trimmed) {
+    if (!raw.trim()) {
       return 0;
     }
-    const lines = trimmed.split('\n');
-    const last = lines[lines.length - 1];
-    if (!last) {
-      return 0;
+    const lines = raw.split('\n');
+    for (let index = lines.length - 1; index >= 0; index -= 1) {
+      const line = lines[index]?.trim();
+      if (!line) {
+        continue;
+      }
+      try {
+        const parsed = JSON.parse(line) as { seq?: number };
+        if (typeof parsed.seq === 'number' && Number.isFinite(parsed.seq)) {
+          return parsed.seq;
+        }
+      } catch {
+        continue;
+      }
     }
-    const parsed = JSON.parse(last) as { seq?: number };
-    return typeof parsed.seq === 'number' && Number.isFinite(parsed.seq) ? parsed.seq : 0;
+    return 0;
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
       return 0;

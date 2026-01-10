@@ -7,6 +7,7 @@ import { EnvUtils } from '../../../../packages/shared/config/env.js';
 
 export const DEVTOOLS_SKILL_NAME = 'chrome-devtools';
 export const DEVTOOLS_CONFIG_OVERRIDE = 'mcp_servers.chrome-devtools.enabled=true';
+const CONFIG_OVERRIDE_ENV_KEYS = ['CODEX_MCP_CONFIG_OVERRIDES', 'CODEX_CONFIG_OVERRIDES'];
 const DEVTOOLS_CONFIG_FILENAME = 'config.toml';
 const DEVTOOLS_MCP_COMMAND = [
   'mcp',
@@ -121,16 +122,21 @@ export function resolveCodexCommand(
   args: string[],
   env: NodeJS.ProcessEnv = process.env
 ): { command: string; args: string[] } {
+  const overrides = parseConfigOverrides(env);
+
   if (!isDevtoolsEnabled(env)) {
-    return { command: 'codex', args };
+    return { command: 'codex', args: applyConfigOverrides(overrides, args) };
   }
+
   const readiness = resolveDevtoolsReadiness(env);
   if (readiness.status !== 'ok') {
     throw new Error(formatDevtoolsPreflightError(readiness));
   }
+
+  const mergedOverrides = dedupeOverrides([DEVTOOLS_CONFIG_OVERRIDE, ...overrides]);
   return {
     command: 'codex',
-    args: ['-c', DEVTOOLS_CONFIG_OVERRIDE, ...args]
+    args: applyConfigOverrides(mergedOverrides, args)
   };
 }
 
@@ -231,6 +237,37 @@ function hasDevtoolsConfigEntry(raw: string): boolean {
   }
 
   return false;
+}
+
+function parseConfigOverrides(env: NodeJS.ProcessEnv): string[] {
+  const overrides: string[] = [];
+  for (const key of CONFIG_OVERRIDE_ENV_KEYS) {
+    const raw = env[key];
+    if (!raw) {
+      continue;
+    }
+    const parts = raw
+      .split(/[,;\n]/)
+      .map((part) => part.trim())
+      .filter((part) => part.length > 0);
+    overrides.push(...parts);
+  }
+  return dedupeOverrides(overrides);
+}
+
+function applyConfigOverrides(overrides: string[], args: string[]): string[] {
+  if (overrides.length === 0) {
+    return args;
+  }
+  const configArgs: string[] = [];
+  for (const override of overrides) {
+    configArgs.push('-c', override);
+  }
+  return [...configArgs, ...args];
+}
+
+function dedupeOverrides(overrides: string[]): string[] {
+  return Array.from(new Set(overrides.filter((override) => override.trim().length > 0)));
 }
 
 function stripTomlComment(line: string): string {

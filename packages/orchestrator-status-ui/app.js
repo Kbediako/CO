@@ -1,15 +1,17 @@
 const params = new URLSearchParams(window.location.search);
-const dataUrl = params.get('data') || '../../out/0911-orchestrator-status-ui/data.json';
+const runnerHosted = isRunnerHosted();
+const dataUrl =
+  params.get('data') || (runnerHosted ? '/ui/data.json' : '../../out/0911-orchestrator-status-ui/data.json');
 const refreshMs = clampNumber(Number(params.get('refresh') || 4000), 2000, 5000);
-const controlBase = params.get('control');
-const controlToken = params.get('token');
-const controlUrl = controlBase ? controlBase.replace(/\/+$/, '') : null;
-const controlEnabled = Boolean(controlUrl);
+const initialControlBase = runnerHosted ? window.location.origin : null;
+const controlEnabled = Boolean(runnerHosted && initialControlBase);
 
 const elements = {
   taskFilter: document.getElementById('taskFilter'),
   bucketFilter: document.getElementById('bucketFilter'),
   searchInput: document.getElementById('searchInput'),
+  controlStatus: document.getElementById('controlStatus'),
+  controlHint: document.getElementById('controlHint'),
   syncStatus: document.getElementById('syncStatus'),
   kpiActive: document.getElementById('kpi-active'),
   kpiOngoing: document.getElementById('kpi-ongoing'),
@@ -20,6 +22,13 @@ const elements = {
   runOverlay: document.getElementById('runOverlay'),
   runModal: document.getElementById('runModal'),
   runClose: document.getElementById('runClose'),
+  questionOverlay: document.getElementById('questionOverlay'),
+  questionModal: document.getElementById('questionModal'),
+  questionClose: document.getElementById('questionClose'),
+  questionPrompt: document.getElementById('questionPrompt'),
+  questionAnswer: document.getElementById('questionAnswer'),
+  questionSubmit: document.getElementById('questionSubmit'),
+  questionDismiss: document.getElementById('questionDismiss'),
   codebasePanel: document.getElementById('codebasePanel'),
   activityPanel: document.getElementById('activityPanel'),
   dataSource: document.getElementById('dataSource'),
@@ -35,10 +44,13 @@ const state = {
   focusedTaskId: null,
   control: {
     enabled: controlEnabled,
+    baseUrl: initialControlBase,
+    token: '',
+    session: runnerHosted,
     events: [],
     confirmations: [],
     questions: [],
-    status: null
+    status: controlEnabled ? 'connecting' : 'disabled'
   },
   filters: {
     task: 'all',
@@ -48,11 +60,20 @@ const state = {
   loading: false,
   sideOpen: false,
   runOpen: false,
+  questionOpen: false,
   sideReturnFocus: null,
-  runReturnFocus: null
+  runReturnFocus: null,
+  questionReturnFocus: null,
+  activeQuestionId: null,
+  activeQuestionPrompt: ''
 };
 
+let controlPollTimer = null;
+let controlStreamAbort = null;
+let controlReconnectTimer = null;
+
 elements.dataSource.textContent = `Data source: ${dataUrl}`;
+renderControlHeader();
 
 function selectRow(row) {
   if (!row || !row.dataset.taskId) {
@@ -142,12 +163,29 @@ elements.searchInput.addEventListener('input', (event) => {
   render();
 });
 
+
 elements.runClose.addEventListener('click', () => {
   setRunModalState(false);
 });
 
 elements.runOverlay.addEventListener('click', () => {
   setRunModalState(false);
+});
+
+elements.questionClose.addEventListener('click', () => {
+  setQuestionModalState(false);
+});
+
+elements.questionOverlay.addEventListener('click', () => {
+  setQuestionModalState(false);
+});
+
+elements.questionSubmit.addEventListener('click', () => {
+  submitQuestionAnswer();
+});
+
+elements.questionDismiss.addEventListener('click', () => {
+  dismissActiveQuestion();
 });
 
 elements.sideToggle.addEventListener('click', () => {
@@ -164,6 +202,10 @@ elements.sideOverlay.addEventListener('click', () => {
 
 document.addEventListener('keydown', (event) => {
   if (event.key === 'Escape') {
+    if (state.questionOpen) {
+      setQuestionModalState(false);
+      return;
+    }
     if (state.runOpen) {
       setRunModalState(false);
       return;
@@ -193,18 +235,23 @@ setInterval(() => {
 }, refreshMs);
 
 loadData();
-if (controlEnabled) {
-  initControl();
-}
+initControl();
 
 async function loadData() {
+  if (state.control.session && !state.control.token) {
+    return;
+  }
   if (state.loading) {
     return;
   }
   state.loading = true;
   setSyncStatus(null, true);
   try {
-    const response = await fetch(dataUrl, { cache: 'no-store' });
+    const headers = buildDataHeaders();
+    const response = await fetch(dataUrl, {
+      cache: 'no-store',
+      ...(headers ? { headers } : {})
+    });
     if (!response.ok) {
       throw new Error(`Failed to load data (${response.status})`);
     }
@@ -219,30 +266,51 @@ async function loadData() {
   }
 }
 
-function initControl() {
-  const eventUrl = buildControlUrl('/events');
-  if (eventUrl && window.EventSource) {
-    const source = new EventSource(eventUrl);
-    source.onmessage = (event) => {
-      try {
-        const parsed = JSON.parse(event.data);
-        state.control.events.unshift(parsed);
-        state.control.events = state.control.events.slice(0, 120);
-        render();
-      } catch {
-        // ignore parse errors
-      }
-    };
-    source.onerror = () => {
-      state.control.status = 'disconnected';
-      render();
-    };
+async function initControl() {
+  stopControlSession();
+  if (!state.control.enabled || !state.control.baseUrl) {
+    state.control.status = 'disabled';
+    render();
+    return;
   }
 
-  setInterval(() => {
+  state.control.status = 'connecting';
+  render();
+
+  if (state.control.session) {
+    const token = await fetchSessionToken();
+    if (!token) {
+      state.control.status = 'unauthorized';
+      state.control.token = '';
+      render();
+      return;
+    }
+    state.control.token = token;
+  }
+
+  connectControlStream();
+  controlPollTimer = setInterval(() => {
     loadControlData();
   }, 5000);
   loadControlData();
+}
+
+async function fetchSessionToken() {
+  const url = buildControlUrl('/auth/session');
+  if (!url) {
+    render();
+    return null;
+  }
+  try {
+    const response = await fetch(url, { method: 'POST', cache: 'no-store' });
+    if (!response.ok) {
+      return null;
+    }
+    const payload = await response.json();
+    return typeof payload.token === 'string' ? payload.token : null;
+  } catch {
+    return null;
+  }
 }
 
 async function loadControlData() {
@@ -252,10 +320,15 @@ async function loadControlData() {
     return;
   }
   try {
+    const headers = buildControlHeaders(false);
     const [confirmRes, questionRes] = await Promise.all([
-      fetch(confirmationsUrl, { cache: 'no-store' }),
-      fetch(questionsUrl, { cache: 'no-store' })
+      fetch(confirmationsUrl, { cache: 'no-store', headers }),
+      fetch(questionsUrl, { cache: 'no-store', headers })
     ]);
+    if (confirmRes.status === 401 || questionRes.status === 401) {
+      await handleControlUnauthorized();
+      return;
+    }
     if (confirmRes.ok) {
       const payload = await confirmRes.json();
       state.control.confirmations = Array.isArray(payload.pending) ? payload.pending : [];
@@ -264,7 +337,7 @@ async function loadControlData() {
       const payload = await questionRes.json();
       state.control.questions = Array.isArray(payload.questions) ? payload.questions : [];
     }
-    state.control.status = 'connected';
+    state.control.status = confirmRes.ok || questionRes.ok ? 'connected' : 'disconnected';
   } catch {
     state.control.status = 'disconnected';
   } finally {
@@ -272,15 +345,177 @@ async function loadControlData() {
   }
 }
 
+async function handleControlUnauthorized() {
+  if (state.control.session) {
+    await initControl();
+    return;
+  }
+  state.control.status = 'unauthorized';
+  state.control.token = '';
+  render();
+}
+
 function buildControlUrl(pathname) {
-  if (!controlUrl) {
+  if (!state.control.baseUrl) {
     return null;
   }
-  const url = new URL(controlUrl + pathname);
-  if (controlToken) {
-    url.searchParams.set('token', controlToken);
+  const rawBase = state.control.baseUrl.trim();
+  if (!rawBase) {
+    return null;
   }
-  return url.toString();
+  const normalizedBase = /^https?:\/\//i.test(rawBase) ? rawBase : `http://${rawBase}`;
+  try {
+    const url = new URL(pathname, normalizedBase);
+    return url.toString();
+  } catch {
+    return null;
+  }
+}
+
+function buildControlHeaders(includeCsrf) {
+  const token = state.control.token;
+  if (!token) {
+    return {};
+  }
+  const headers = {
+    Authorization: `Bearer ${token}`
+  };
+  if (includeCsrf) {
+    headers['x-csrf-token'] = token;
+  }
+  return headers;
+}
+
+function buildDataHeaders() {
+  if (!state.control.token) {
+    return null;
+  }
+  try {
+    const url = new URL(dataUrl, window.location.origin);
+    if (url.origin === window.location.origin) {
+      return buildControlHeaders(false);
+    }
+  } catch {
+    // ignore
+  }
+  return null;
+}
+
+
+function stopControlSession() {
+  state.control.token = '';
+  if (controlPollTimer) {
+    clearInterval(controlPollTimer);
+    controlPollTimer = null;
+  }
+  if (controlReconnectTimer) {
+    clearTimeout(controlReconnectTimer);
+    controlReconnectTimer = null;
+  }
+  stopControlStream();
+}
+
+function stopControlStream() {
+  if (controlStreamAbort) {
+    controlStreamAbort.abort();
+    controlStreamAbort = null;
+  }
+}
+
+async function connectControlStream() {
+  const eventUrl = buildControlUrl('/events');
+  if (!eventUrl || !state.control.token) {
+    return;
+  }
+  stopControlStream();
+
+  const controller = new AbortController();
+  controlStreamAbort = controller;
+  const headers = buildControlHeaders(false);
+  fetch(eventUrl, { cache: 'no-store', headers, signal: controller.signal })
+    .then(async (response) => {
+      if (!response.ok || !response.body) {
+        if (!controller.signal.aborted) {
+          if (response.status === 401 || response.status === 403) {
+            await handleControlUnauthorized();
+            return;
+          }
+          state.control.status = 'disconnected';
+          render();
+          scheduleControlReconnect();
+        }
+        return;
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      state.control.status = 'connected';
+      render();
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) {
+          break;
+        }
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() ?? '';
+        for (const line of lines) {
+          handleSseLine(line);
+        }
+      }
+
+      if (!controller.signal.aborted) {
+        state.control.status = 'disconnected';
+        render();
+        scheduleControlReconnect();
+      }
+    })
+    .catch(() => {
+      if (controller.signal.aborted) {
+        return;
+      }
+      state.control.status = 'disconnected';
+      render();
+      scheduleControlReconnect();
+    });
+}
+
+function scheduleControlReconnect() {
+  if (!state.control.enabled) {
+    return;
+  }
+  if (controlReconnectTimer) {
+    clearTimeout(controlReconnectTimer);
+  }
+  controlReconnectTimer = setTimeout(() => {
+    if (state.control.enabled) {
+      connectControlStream();
+    }
+  }, 5000);
+}
+
+function handleSseLine(line) {
+  const trimmed = line.trim();
+  if (!trimmed || trimmed.startsWith(':')) {
+    return;
+  }
+  if (!trimmed.startsWith('data:')) {
+    return;
+  }
+  const payload = trimmed.slice('data:'.length).trim();
+  if (!payload) {
+    return;
+  }
+  try {
+    const parsed = JSON.parse(payload);
+    state.control.events.unshift(parsed);
+    state.control.events = state.control.events.slice(0, 120);
+    render();
+  } catch {
+    // ignore parse errors
+  }
 }
 
 async function sendControlAction(action) {
@@ -292,11 +527,15 @@ async function sendControlAction(action) {
   if (!url) {
     return;
   }
-  await fetch(url, {
+  const response = await fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...buildControlHeaders(true) },
     body: JSON.stringify({ action, requested_by: 'ui' })
   });
+  if (response.status === 401 || response.status === 403) {
+    state.control.status = 'unauthorized';
+    render();
+  }
 }
 
 async function requestCancel() {
@@ -304,11 +543,15 @@ async function requestCancel() {
   if (!url) {
     return;
   }
-  await fetch(url, {
+  const response = await fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...buildControlHeaders(true) },
     body: JSON.stringify({ action: 'cancel', tool: 'ui.cancel', params: {} })
   });
+  if (response.status === 401 || response.status === 403) {
+    state.control.status = 'unauthorized';
+    render();
+  }
   loadControlData();
 }
 
@@ -317,28 +560,54 @@ async function approveConfirmation(requestId) {
   if (!url) {
     return;
   }
-  await fetch(url, {
+  const response = await fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...buildControlHeaders(true) },
     body: JSON.stringify({ request_id: requestId, actor: 'ui' })
   });
+  if (response.status === 401 || response.status === 403) {
+    state.control.status = 'unauthorized';
+    render();
+  }
   loadControlData();
 }
 
-async function answerQuestion(questionId) {
+function answerQuestion(questionId) {
+  const record = (state.control.questions || []).find((item) => item.question_id === questionId);
+  state.activeQuestionId = questionId;
+  state.activeQuestionPrompt = record?.prompt || '';
+  if (elements.questionPrompt) {
+    elements.questionPrompt.textContent = state.activeQuestionPrompt || 'No prompt provided.';
+  }
+  if (elements.questionAnswer) {
+    elements.questionAnswer.value = '';
+  }
+  setQuestionModalState(true);
+}
+
+async function submitQuestionAnswer() {
+  const questionId = state.activeQuestionId;
+  if (!questionId) {
+    return;
+  }
   const url = buildControlUrl('/questions/answer');
   if (!url) {
     return;
   }
-  const answer = window.prompt('Answer for question ' + questionId + ':');
+  const answer = elements.questionAnswer ? elements.questionAnswer.value : '';
   if (!answer) {
     return;
   }
-  await fetch(url, {
+  const response = await fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...buildControlHeaders(true) },
     body: JSON.stringify({ question_id: questionId, answer, answered_by: 'ui' })
   });
+  if (response.status === 401 || response.status === 403) {
+    state.control.status = 'unauthorized';
+    render();
+  }
+  setQuestionModalState(false);
   loadControlData();
 }
 
@@ -347,15 +616,29 @@ async function dismissQuestion(questionId) {
   if (!url) {
     return;
   }
-  await fetch(url, {
+  const response = await fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...buildControlHeaders(true) },
     body: JSON.stringify({ question_id: questionId, dismissed_by: 'ui' })
   });
+  if (response.status === 401 || response.status === 403) {
+    state.control.status = 'unauthorized';
+    render();
+  }
   loadControlData();
 }
 
+async function dismissActiveQuestion() {
+  const questionId = state.activeQuestionId;
+  if (!questionId) {
+    return;
+  }
+  await dismissQuestion(questionId);
+  setQuestionModalState(false);
+}
+
 function render() {
+  renderControlHeader();
   if (!state.data) {
     renderEmpty();
     return;
@@ -384,6 +667,26 @@ function renderEmpty() {
   elements.runDetail.innerHTML = '<div class="muted">No data loaded.</div>';
   elements.codebasePanel.innerHTML = '<div class="muted">No git data available.</div>';
   elements.activityPanel.innerHTML = '<div class="muted">No activity yet.</div>';
+}
+
+function renderControlHeader() {
+  if (!elements.controlStatus) {
+    return;
+  }
+  const label = formatControlStatus(state.control.status, state.control.enabled);
+  elements.controlStatus.textContent = label;
+  if (!elements.controlHint) {
+    return;
+  }
+  if (!state.control.enabled) {
+    elements.controlHint.textContent = 'Open the run at /ui to enable controls.';
+    return;
+  }
+  if (state.control.status === 'unauthorized') {
+    elements.controlHint.textContent = 'Session expired. Reconnecting...';
+    return;
+  }
+  elements.controlHint.textContent = 'Session auth via the runner control plane.';
 }
 
 function renderKpis(tasks) {
@@ -507,7 +810,7 @@ function renderRunDetail(run, task) {
   const approvalsLabel =
     approvalsTotal > 0 ? `${approvalsPending} pending / ${approvalsTotal} total` : `${approvalsPending} pending`;
 
-  const controlMarkup = state.control.enabled ? buildControlMarkup(run) : '';
+  const controlMarkup = state.control.baseUrl ? buildControlMarkup(run) : '';
 
   elements.runDetail.innerHTML = `
     <div class="key-value">
@@ -548,12 +851,13 @@ function renderRunDetail(run, task) {
     ${controlMarkup}
   `;
 
-  if (state.control.enabled) {
+  if (state.control.enabled && state.control.token) {
     wireControlHandlers();
   }
 }
 
 function buildControlMarkup(run) {
+  const controlsDisabled = !state.control.enabled || !state.control.token;
   const events = state.control.events.slice(0, 12);
   const confirmations = state.control.confirmations || [];
   const questions = state.control.questions || [];
@@ -576,7 +880,9 @@ function buildControlMarkup(run) {
               <div class="control-title">${escapeHtml(item.action || item.tool || 'confirmation')}</div>
               <div class="muted small">${escapeHtml(item.request_id || '')}</div>
             </div>
-            <button class="control-button" data-confirm-id="${escapeHtml(item.request_id || '')}">Approve</button>
+            <button class="control-button" data-confirm-id="${escapeHtml(
+              item.request_id || ''
+            )}" ${controlsDisabled ? 'disabled' : ''}>Approve</button>
           </div>`
         )
         .join('')}</div>`
@@ -591,10 +897,12 @@ function buildControlMarkup(run) {
               <div class="muted small">${escapeHtml(item.question_id || '')} • ${escapeHtml(item.status || '')}</div>
             </div>
             <div class="control-actions-inline">
-              <button class="control-button" data-question-id="${escapeHtml(item.question_id || '')}">Answer</button>
+              <button class="control-button" data-question-id="${escapeHtml(
+                item.question_id || ''
+              )}" ${controlsDisabled ? 'disabled' : ''}>Answer</button>
               <button class="control-button subtle" data-question-dismiss-id="${escapeHtml(
                 item.question_id || ''
-              )}">Dismiss</button>
+              )}" ${controlsDisabled ? 'disabled' : ''}>Dismiss</button>
             </div>
           </div>`
         )
@@ -605,11 +913,16 @@ function buildControlMarkup(run) {
     <div>
       <div class="panel-header">Run Controls</div>
       <div class="control-actions">
-        <button class="control-button" data-action="pause">Pause</button>
-        <button class="control-button" data-action="resume">Resume</button>
-        <button class="control-button danger" data-action="cancel">Cancel</button>
+        <button class="control-button" data-action="pause" ${controlsDisabled ? 'disabled' : ''}>Pause</button>
+        <button class="control-button" data-action="resume" ${controlsDisabled ? 'disabled' : ''}>Resume</button>
+        <button class="control-button danger" data-action="cancel" ${controlsDisabled ? 'disabled' : ''}>Cancel</button>
       </div>
       <div class="panel-subtle">Control status: ${escapeHtml(state.control.status || 'unknown')}</div>
+      ${
+        controlsDisabled
+          ? '<div class="muted small">Open this run at /ui to enable controls.</div>'
+          : ''
+      }
     </div>
     <div>
       <div class="panel-header">Confirmations</div>
@@ -747,7 +1060,7 @@ function setRunModalState(isOpen) {
     focusOutsideContainer(elements.runModal, state.runReturnFocus, fallbackRow);
   }
   state.runOpen = isOpen;
-  document.body.classList.toggle('modal-open', isOpen);
+  updateModalStateClass();
   elements.runModal.classList.toggle('open', isOpen);
   elements.runOverlay.classList.toggle('open', isOpen);
   elements.runModal.setAttribute('aria-hidden', String(!isOpen));
@@ -755,6 +1068,35 @@ function setRunModalState(isOpen) {
   if (isOpen) {
     elements.runClose.focus();
   }
+}
+
+function setQuestionModalState(isOpen) {
+  if (isOpen) {
+    state.questionReturnFocus = captureActiveElement();
+  } else {
+    focusOutsideContainer(elements.questionModal, state.questionReturnFocus, elements.runModal);
+    state.activeQuestionId = null;
+    state.activeQuestionPrompt = '';
+    if (elements.questionAnswer) {
+      elements.questionAnswer.value = '';
+    }
+    if (elements.questionPrompt) {
+      elements.questionPrompt.textContent = '';
+    }
+  }
+  state.questionOpen = isOpen;
+  updateModalStateClass();
+  elements.questionModal.classList.toggle('open', isOpen);
+  elements.questionOverlay.classList.toggle('open', isOpen);
+  elements.questionModal.setAttribute('aria-hidden', String(!isOpen));
+  elements.questionOverlay.setAttribute('aria-hidden', String(!isOpen));
+  if (isOpen && elements.questionAnswer) {
+    elements.questionAnswer.focus();
+  }
+}
+
+function updateModalStateClass() {
+  document.body.classList.toggle('modal-open', state.runOpen || state.questionOpen);
 }
 
 function captureActiveElement() {
@@ -808,6 +1150,26 @@ function formatTimestamp(timestamp) {
   });
 }
 
+function formatControlStatus(status, enabled) {
+  if (!enabled) {
+    return 'Read-only';
+  }
+  switch (status) {
+    case 'connected':
+      return 'Connected';
+    case 'connecting':
+      return 'Connecting';
+    case 'unauthorized':
+      return 'Session expired';
+    case 'disconnected':
+      return 'Disconnected';
+    case 'disabled':
+      return 'Read-only';
+    default:
+      return status || 'Control';
+  }
+}
+
 function escapeHtml(value) {
   if (value === null || value === undefined) {
     return '';
@@ -825,4 +1187,11 @@ function clampNumber(value, min, max) {
     return min;
   }
   return Math.min(Math.max(value, min), max);
+}
+
+function isRunnerHosted() {
+  if (window.location.protocol !== 'http:' && window.location.protocol !== 'https:') {
+    return false;
+  }
+  return window.location.pathname.startsWith('/ui');
 }

@@ -22,6 +22,7 @@ import { loadPackageInfo } from '../orchestrator/src/cli/utils/packageInfo.js';
 import { slugify } from '../orchestrator/src/cli/utils/strings.js';
 import { serveMcp } from '../orchestrator/src/cli/mcp.js';
 import { startDelegationServer } from '../orchestrator/src/cli/delegationServer.js';
+import { splitDelegationConfigOverrides } from '../orchestrator/src/cli/config/delegationConfig.js';
 
 type ArgMap = Record<string, string | boolean>;
 type OutputFormat = 'json' | 'text';
@@ -586,10 +587,29 @@ async function handleDelegationServer(rawArgs: string[]): Promise<void> {
   const { flags } = parseArgs(rawArgs);
   const repoRoot = typeof flags['repo'] === 'string' ? (flags['repo'] as string) : process.cwd();
   const modeFlag = typeof flags['mode'] === 'string' ? (flags['mode'] as string) : undefined;
+  const overrideFlag =
+    typeof flags['config'] === 'string'
+      ? (flags['config'] as string)
+      : typeof flags['config-override'] === 'string'
+        ? (flags['config-override'] as string)
+        : undefined;
   const envMode = process.env.CODEX_DELEGATE_MODE?.trim();
-  const resolvedMode = modeFlag ?? envMode ?? 'full';
-  const mode = resolvedMode === 'question_only' ? 'question_only' : 'full';
-  await startDelegationServer({ repoRoot, mode });
+  const resolvedMode = modeFlag ?? envMode;
+  let mode: 'full' | 'question_only' | undefined;
+  if (resolvedMode) {
+    if (resolvedMode === 'full' || resolvedMode === 'question_only') {
+      mode = resolvedMode;
+    } else {
+      console.warn(`Invalid delegate mode "${resolvedMode}". Falling back to config default.`);
+    }
+  }
+  const configOverrides = overrideFlag
+    ? splitDelegationConfigOverrides(overrideFlag).map((value) => ({
+        source: 'cli' as const,
+        value
+      }))
+    : [];
+  await startDelegationServer({ repoRoot, mode, configOverrides });
 }
 
 function parseExecArgs(rawArgs: string[]): ParsedExecArgs {
@@ -780,6 +800,7 @@ Commands:
   delegate-server         Run the delegation MCP server (stdio).
     --repo <path>         Repo root for config + manifests (default cwd).
     --mode <full|question_only>  Limit tool surface for child runs.
+    --config "<key>=<value>[;...]"  Apply config overrides (repeat via separators).
   version | --version
 
   help                      Show this message.

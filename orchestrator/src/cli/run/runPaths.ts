@@ -14,6 +14,7 @@ export interface RunPaths {
   controlEndpointPath: string;
   confirmationsPath: string;
   questionsPath: string;
+  delegationTokensPath: string;
   commandsDir: string;
   errorsDir: string;
   compatDir: string;
@@ -34,6 +35,7 @@ export function resolveRunPaths(env: EnvironmentPaths, runId: string): RunPaths 
   const controlEndpointPath = join(runDir, 'control_endpoint.json');
   const confirmationsPath = join(runDir, 'confirmations.json');
   const questionsPath = join(runDir, 'questions.json');
+  const delegationTokensPath = join(runDir, 'delegation_tokens.json');
   const commandsDir = join(runDir, 'commands');
   const errorsDir = join(runDir, 'errors');
   const compatDir = join(env.runsRoot, env.taskId, 'mcp', safeRunId);
@@ -52,6 +54,7 @@ export function resolveRunPaths(env: EnvironmentPaths, runId: string): RunPaths 
     controlEndpointPath,
     confirmationsPath,
     questionsPath,
+    delegationTokensPath,
     commandsDir,
     errorsDir,
     compatDir,

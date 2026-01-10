@@ -5,6 +5,7 @@ import type { RunPaths } from '../run/runPaths.js';
 import { isoTimestamp } from '../utils/time.js';
 import type { RunEventStream, RunEventStreamEntry } from '../events/runEventStream.js';
 import { appendSummary } from '../run/manifest.js';
+import { logger } from '../../logger.js';
 
 interface ControlFile {
   control_seq?: number;
@@ -12,7 +13,9 @@ interface ControlFile {
     request_id?: string | null;
     requested_by?: string | null;
     requested_at?: string | null;
-    action?: 'pause' | 'resume' | 'cancel';
+    action?: 'pause' | 'resume' | 'cancel' | 'fail';
+    reason?: string | null;
+    confirm_nonce?: unknown;
   } | null;
 }
 
@@ -23,6 +26,7 @@ export interface ControlWatcherOptions {
   onEntry?: (entry: RunEventStreamEntry) => void;
   persist: () => Promise<void>;
   now?: () => string;
+  pollIntervalMs?: number;
 }
 
 export class ControlWatcher {
@@ -32,9 +36,13 @@ export class ControlWatcher {
   private readonly eventStream?: RunEventStream;
   private readonly onEntry?: (entry: RunEventStreamEntry) => void;
   private readonly now: () => string;
+  private readonly pollIntervalMs: number;
   private lastControlSeq = 0;
   private paused = false;
+  private lastPauseRequestId: string | null = null;
+  private lastPauseReason: string | null = null;
   private cancelRequested = false;
+  private failureRequested = false;
 
   constructor(options: ControlWatcherOptions) {
     this.paths = options.paths;
@@ -43,10 +51,15 @@ export class ControlWatcher {
     this.eventStream = options.eventStream;
     this.onEntry = options.onEntry;
     this.now = options.now ?? isoTimestamp;
+    this.pollIntervalMs = options.pollIntervalMs ?? 1000;
   }
 
   isCanceled(): boolean {
     return this.cancelRequested;
+  }
+
+  isFailed(): boolean {
+    return this.failureRequested;
   }
 
   async sync(): Promise<void> {
@@ -59,7 +72,24 @@ export class ControlWatcher {
       return;
     }
     this.lastControlSeq = controlSeq;
-    const action = snapshot.latest_action?.action;
+    const latest = snapshot.latest_action;
+    if (latest && typeof latest === 'object' && 'confirm_nonce' in latest) {
+      await this.safeAppend({
+        event: 'security_violation',
+        actor: 'runner',
+        payload: {
+          kind: 'confirm_nonce_present',
+          summary: 'confirm_nonce present in control action',
+          severity: 'high',
+          related_request_id: latest.request_id ?? null,
+          details_redacted: true
+        },
+        timestamp: this.now()
+      });
+      return;
+    }
+
+    const action = latest?.action;
     if (!action) {
       return;
     }
@@ -74,6 +104,10 @@ export class ControlWatcher {
     }
     if (action === 'cancel') {
       await this.handleCancel(snapshot);
+      return;
+    }
+    if (action === 'fail') {
+      await this.handleFail(snapshot);
     }
   }
 
@@ -81,46 +115,52 @@ export class ControlWatcher {
     if (!this.paused) {
       return;
     }
-    while (this.paused && !this.cancelRequested) {
-      await delay(1000);
+    while (this.paused && !this.cancelRequested && !this.failureRequested) {
+      await delay(this.pollIntervalMs);
       await this.sync();
     }
   }
 
   private async handlePause(snapshot: ControlFile): Promise<void> {
-    if (this.paused) {
+    const nextRequestId = snapshot.latest_action?.request_id ?? null;
+    const nextReason = snapshot.latest_action?.reason ?? null;
+    if (this.paused && nextRequestId === this.lastPauseRequestId && nextReason === this.lastPauseReason) {
       return;
     }
+    const wasPaused = this.paused;
     this.paused = true;
-    this.manifest.status_detail = 'paused';
-    appendSummary(this.manifest, 'Run paused by control request.');
-    await this.persist();
-    const entry = await this.eventStream?.append({
+    this.lastPauseRequestId = nextRequestId;
+    this.lastPauseReason = nextReason;
+    const nextDetail = nextReason ?? 'paused';
+    if (!wasPaused || this.manifest.status_detail !== nextDetail) {
+      this.manifest.status_detail = nextDetail;
+      if (!wasPaused) {
+        appendSummary(this.manifest, 'Run paused by control request.');
+      }
+      await this.persist();
+    }
+    await this.safeAppend({
       event: 'pause_requested',
       actor: snapshot.latest_action?.requested_by ?? 'user',
       payload: {
         request_id: snapshot.latest_action?.request_id ?? null,
         control_seq: snapshot.control_seq ?? null,
-        requested_by: snapshot.latest_action?.requested_by ?? null
+        requested_by: snapshot.latest_action?.requested_by ?? null,
+        reason: snapshot.latest_action?.reason ?? null
       },
       timestamp: this.now()
     });
-    if (entry) {
-      this.onEntry?.(entry);
-    }
-    const pausedEntry = await this.eventStream?.append({
+    await this.safeAppend({
       event: 'run_paused',
       actor: 'runner',
       payload: {
         reason: 'control_request',
         request_id: snapshot.latest_action?.request_id ?? null,
-        control_seq: snapshot.control_seq ?? null
+        control_seq: snapshot.control_seq ?? null,
+        requested_reason: snapshot.latest_action?.reason ?? null
       },
       timestamp: this.now()
     });
-    if (pausedEntry) {
-      this.onEntry?.(pausedEntry);
-    }
   }
 
   private async handleResume(snapshot: ControlFile): Promise<void> {
@@ -128,22 +168,22 @@ export class ControlWatcher {
       return;
     }
     this.paused = false;
+    this.lastPauseRequestId = null;
+    this.lastPauseReason = null;
     this.manifest.status_detail = null;
     appendSummary(this.manifest, 'Run resumed by control request.');
     await this.persist();
-    const entry = await this.eventStream?.append({
+    await this.safeAppend({
       event: 'run_resumed',
       actor: 'runner',
       payload: {
         request_id: snapshot.latest_action?.request_id ?? null,
         control_seq: snapshot.control_seq ?? null,
-        requested_by: snapshot.latest_action?.requested_by ?? null
+        requested_by: snapshot.latest_action?.requested_by ?? null,
+        requested_reason: snapshot.latest_action?.reason ?? null
       },
       timestamp: this.now()
     });
-    if (entry) {
-      this.onEntry?.(entry);
-    }
   }
 
   private async handleCancel(snapshot: ControlFile): Promise<void> {
@@ -153,18 +193,51 @@ export class ControlWatcher {
     this.cancelRequested = true;
     appendSummary(this.manifest, 'Run cancellation requested.');
     await this.persist();
-    const entry = await this.eventStream?.append({
+    await this.safeAppend({
       event: 'run_canceled',
       actor: 'runner',
       payload: {
         request_id: snapshot.latest_action?.request_id ?? null,
         control_seq: snapshot.control_seq ?? null,
-        requested_by: snapshot.latest_action?.requested_by ?? null
+        requested_by: snapshot.latest_action?.requested_by ?? null,
+        requested_reason: snapshot.latest_action?.reason ?? null
       },
       timestamp: this.now()
     });
-    if (entry) {
-      this.onEntry?.(entry);
+  }
+
+  private async handleFail(snapshot: ControlFile): Promise<void> {
+    if (this.failureRequested) {
+      return;
+    }
+    this.failureRequested = true;
+    this.manifest.status_detail = snapshot.latest_action?.reason ?? 'control_failed';
+    appendSummary(this.manifest, 'Run failed by control request.');
+    await this.persist();
+    await this.safeAppend({
+      event: 'run_failed',
+      actor: 'runner',
+      payload: {
+        reason: 'control_request',
+        request_id: snapshot.latest_action?.request_id ?? null,
+        control_seq: snapshot.control_seq ?? null,
+        requested_by: snapshot.latest_action?.requested_by ?? null,
+        requested_reason: snapshot.latest_action?.reason ?? null
+      },
+      timestamp: this.now()
+    });
+  }
+
+  private async safeAppend(
+    entry: Parameters<NonNullable<RunEventStream['append']>>[0]
+  ): Promise<void> {
+    try {
+      const appended = await this.eventStream?.append(entry);
+      if (appended) {
+        this.onEntry?.(appended);
+      }
+    } catch (error) {
+      logger.warn(`[ControlWatcher] Failed to append event: ${(error as Error)?.message ?? String(error)}`);
     }
   }
 }
@@ -177,6 +250,7 @@ async function readControlFile(pathname: string): Promise<ControlFile | null> {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
       return null;
     }
+    logger.warn(`[ControlWatcher] Failed to read control file: ${(error as Error)?.message ?? String(error)}`);
     return null;
   }
 }

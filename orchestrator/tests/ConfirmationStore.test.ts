@@ -25,7 +25,7 @@ describe('ConfirmationStore', () => {
   });
 
   it('dedupes confirmation requests with identical digests', () => {
-    const store = new ConfirmationStore({ now, expiresInMs: 1000, maxPending: 3 });
+    const store = new ConfirmationStore({ runId: 'run-1', now, expiresInMs: 1000, maxPending: 3 });
     const first = store.create({
       action: 'cancel',
       tool: actionInput.tool,
@@ -37,28 +37,47 @@ describe('ConfirmationStore', () => {
       params: actionInput.params
     });
 
-    expect(first.request_id).toBe(second.request_id);
+    expect(first.confirmation.request_id).toBe(second.confirmation.request_id);
+    expect(first.wasCreated).toBe(true);
+    expect(second.wasCreated).toBe(false);
     expect(store.listPending()).toHaveLength(1);
   });
 
-  it('approves and consumes confirmations', () => {
-    const store = new ConfirmationStore({ now, expiresInMs: 1000, maxPending: 3 });
+  it('issues and validates nonces, enforcing single-use', () => {
+    const store = new ConfirmationStore({ runId: 'run-1', now, expiresInMs: 1000, maxPending: 3 });
     const request = store.create({
       action: 'cancel',
       tool: actionInput.tool,
       params: actionInput.params
-    });
+    }).confirmation;
     store.approve(request.request_id, 'ui');
-    const nonce = store.consume(request.request_id);
+    const nonce = store.issue(request.request_id);
 
-    expect(nonce.confirm_nonce).toMatch(/^[a-f0-9]{64}$/);
+    expect(nonce.confirm_nonce).toMatch(/^[A-Za-z0-9_-]+\.[a-f0-9]{64}$/);
     expect(nonce.nonce_id).toMatch(/^nonce-/);
+    const validation = store.validateNonce({
+      confirmNonce: nonce.confirm_nonce,
+      tool: actionInput.tool,
+      params: actionInput.params
+    });
+
+    expect(validation.request.request_id).toBe(request.request_id);
     expect(store.listPending()).toHaveLength(0);
+    expect(store.snapshot().consumed_nonce_ids).toContain(nonce.nonce_id);
+
+    expect(() =>
+      store.validateNonce({
+        confirmNonce: nonce.confirm_nonce,
+        tool: actionInput.tool,
+        params: actionInput.params
+      })
+    ).toThrowError(/nonce_already_consumed/);
   });
 
   it('expires pending confirmations after TTL', () => {
     let current = new Date('2026-01-01T00:00:00Z').getTime();
     const store = new ConfirmationStore({
+      runId: 'run-1',
       now: () => new Date(current),
       expiresInMs: 1000,
       maxPending: 3

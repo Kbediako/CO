@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import process from 'node:process';
@@ -122,5 +122,56 @@ describe('RunEventStream', () => {
     ]);
     expect(lines[0].seq).toBe(1);
     expect(lines[lines.length - 1].seq).toBe(lines.length);
+  });
+
+  it('recovers from truncated last line when initializing', async () => {
+    const env = normalizeEnvironmentPaths(resolveEnvironmentPaths());
+    const pipeline: PipelineDefinition = {
+      id: 'pipeline-run-event-truncated',
+      title: 'Run Event Stream',
+      stages: [
+        {
+          kind: 'command',
+          id: 'stage-one',
+          title: 'Echo ok',
+          command: 'echo ok'
+        }
+      ]
+    };
+
+    const { manifest, paths } = await bootstrapManifest('run-event-truncated', {
+      env,
+      pipeline,
+      parentRunId: null,
+      taskSlug: env.taskId,
+      approvalPolicy: null
+    });
+
+    const lineOne = JSON.stringify({
+      schema_version: 1,
+      seq: 1,
+      timestamp: '2026-01-01T00:00:00Z',
+      task_id: manifest.task_id,
+      run_id: manifest.run_id,
+      event: 'run_started',
+      actor: 'runner',
+      payload: {}
+    });
+    await rm(paths.eventsPath, { force: true });
+    await writeFile(paths.eventsPath, `${lineOne}\n{"seq": 2`, 'utf8');
+
+    const stream = await RunEventStream.create({
+      paths,
+      taskId: manifest.task_id,
+      runId: manifest.run_id,
+      pipelineId: pipeline.id,
+      pipelineTitle: pipeline.title,
+      now: () => '2026-01-01T00:00:00Z'
+    });
+
+    const entry = await stream.append({ event: 'run_completed', actor: 'runner', payload: {} });
+    await stream.close();
+
+    expect(entry.seq).toBe(2);
   });
 });

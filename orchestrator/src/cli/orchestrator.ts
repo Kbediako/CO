@@ -65,6 +65,8 @@ import { loadPackageConfig, loadUserConfig } from './config/userConfig.js';
 import {
   loadDelegationConfigFiles,
   computeEffectiveDelegationConfig,
+  parseDelegationConfigOverride,
+  splitDelegationConfigOverrides,
   type DelegationConfigLayer
 } from './config/delegationConfig.js';
 import { ControlServer } from './control/controlServer.js';
@@ -74,6 +76,32 @@ import { CLI_EXECUTION_MODE_PARSER, resolveRequiresCloudPolicy } from '../utils/
 
 const resolveBaseEnvironment = (): EnvironmentPaths =>
   normalizeEnvironmentPaths(resolveEnvironmentPaths());
+
+const CONFIG_OVERRIDE_ENV_KEYS = ['CODEX_CONFIG_OVERRIDES', 'CODEX_MCP_CONFIG_OVERRIDES'];
+
+function collectDelegationEnvOverrides(env: NodeJS.ProcessEnv = process.env): DelegationConfigLayer[] {
+  const layers: DelegationConfigLayer[] = [];
+  for (const key of CONFIG_OVERRIDE_ENV_KEYS) {
+    const raw = env[key];
+    if (!raw) {
+      continue;
+    }
+    const values = splitDelegationConfigOverrides(raw);
+    for (const value of values) {
+      try {
+        const layer = parseDelegationConfigOverride(value, 'env');
+        if (layer) {
+          layers.push(layer);
+        }
+      } catch (error) {
+        logger.warn(
+          `Invalid delegation config override (env): ${(error as Error)?.message ?? String(error)}`
+        );
+      }
+    }
+  }
+  return layers;
+}
 
 interface ExecutePipelineOptions {
   env: EnvironmentPaths;
@@ -140,7 +168,10 @@ export class CodexOrchestrator {
       pipelineTitle: preparation.pipeline.title
     });
     const configFiles = await loadDelegationConfigFiles({ repoRoot: preparation.env.repoRoot });
-    const layers = [configFiles.global, configFiles.repo].filter(Boolean) as DelegationConfigLayer[];
+    const envOverrideLayers = collectDelegationEnvOverrides();
+    const layers = [configFiles.global, configFiles.repo, ...envOverrideLayers].filter(
+      Boolean
+    ) as DelegationConfigLayer[];
     const effectiveConfig = computeEffectiveDelegationConfig({
       repoRoot: preparation.env.repoRoot,
       layers
@@ -156,7 +187,10 @@ export class CodexOrchestrator {
     const onEventEntry = (entry: import('./events/runEventStream.js').RunEventStreamEntry) => {
       controlServer?.broadcast(entry);
     };
-    const detachStream = attachRunEventAdapter(emitter, eventStream, onEventEntry);
+    const onStreamError = (error: Error, payload: { event: string }) => {
+      logger.warn(`Failed to append run event ${payload.event}: ${error.message}`);
+    };
+    const detachStream = attachRunEventAdapter(emitter, eventStream, onEventEntry, onStreamError);
     const runEvents = this.createRunEventPublisher({
       runId,
       pipeline: preparation.pipeline,
@@ -236,7 +270,10 @@ export class CodexOrchestrator {
       pipelineTitle: pipeline.title
     });
     const configFiles = await loadDelegationConfigFiles({ repoRoot: preparation.env.repoRoot });
-    const layers = [configFiles.global, configFiles.repo].filter(Boolean) as DelegationConfigLayer[];
+    const envOverrideLayers = collectDelegationEnvOverrides();
+    const layers = [configFiles.global, configFiles.repo, ...envOverrideLayers].filter(
+      Boolean
+    ) as DelegationConfigLayer[];
     const effectiveConfig = computeEffectiveDelegationConfig({
       repoRoot: preparation.env.repoRoot,
       layers
@@ -252,7 +289,10 @@ export class CodexOrchestrator {
     const onEventEntry = (entry: import('./events/runEventStream.js').RunEventStreamEntry) => {
       controlServer?.broadcast(entry);
     };
-    const detachStream = attachRunEventAdapter(emitter, eventStream, onEventEntry);
+    const onStreamError = (error: Error, payload: { event: string }) => {
+      logger.warn(`Failed to append run event ${payload.event}: ${error.message}`);
+    };
+    const detachStream = attachRunEventAdapter(emitter, eventStream, onEventEntry, onStreamError);
     const runEvents = this.createRunEventPublisher({
       runId: manifest.run_id,
       pipeline,

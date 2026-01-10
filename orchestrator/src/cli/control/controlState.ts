@@ -2,7 +2,8 @@ export interface ControlAction {
   request_id?: string | null;
   requested_by: string;
   requested_at: string;
-  action: 'pause' | 'resume' | 'cancel';
+  action: 'pause' | 'resume' | 'cancel' | 'fail';
+  reason?: string | null;
 }
 
 export interface ControlState {
@@ -34,13 +35,19 @@ export class ControlStateStore {
     };
   }
 
-  updateAction(input: { action: ControlAction['action']; requestedBy: string; requestId?: string | null }): void {
+  updateAction(input: {
+    action: ControlAction['action'];
+    requestedBy: string;
+    requestId?: string | null;
+    reason?: string | null;
+  }): void {
     this.state.control_seq += 1;
     this.state.latest_action = {
       request_id: input.requestId ?? null,
       requested_by: input.requestedBy,
       requested_at: this.now(),
-      action: input.action
+      action: input.action,
+      reason: input.reason ?? null
     };
   }
 

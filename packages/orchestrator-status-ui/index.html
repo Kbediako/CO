@@ -35,6 +35,11 @@
             <label for="searchInput">Search</label>
             <input id="searchInput" type="search" placeholder="Task, status, summary" />
           </div>
+          <div class="control control-wide">
+            <label for="controlStatus">Control</label>
+            <div id="controlStatus" class="control-status">Runner-managed</div>
+            <div id="controlHint" class="control-hint">Open the run at /ui to enable controls.</div>
+          </div>
         </div>
       </header>
 
@@ -96,6 +101,30 @@
           <button id="runClose" class="run-close" type="button" aria-label="Close run details">Close</button>
         </div>
         <div id="runDetail" class="panel-body run-modal-body"></div>
+      </div>
+
+      <div id="questionOverlay" class="question-overlay" aria-hidden="true"></div>
+      <div
+        id="questionModal"
+        class="panel question-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-hidden="true"
+        aria-labelledby="questionModalTitle"
+      >
+        <div class="question-modal-header">
+          <div id="questionModalTitle" class="panel-header">Answer Question</div>
+          <button id="questionClose" class="question-close" type="button" aria-label="Close question">Close</button>
+        </div>
+        <div class="question-modal-body">
+          <div id="questionPrompt" class="question-prompt"></div>
+          <label class="question-label" for="questionAnswer">Answer</label>
+          <textarea id="questionAnswer" rows="4" placeholder="Type your response..."></textarea>
+          <div class="question-actions">
+            <button id="questionSubmit" class="control-button" type="button">Submit</button>
+            <button id="questionDismiss" class="control-button subtle" type="button">Dismiss</button>
+          </div>
+        </div>
       </div>
 
       <div id="sideOverlay" class="side-overlay" aria-hidden="true"></div>

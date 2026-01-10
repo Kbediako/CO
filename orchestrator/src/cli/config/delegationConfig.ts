@@ -1,3 +1,4 @@
+import { realpathSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { homedir } from 'node:os';
@@ -226,6 +227,10 @@ export function computeEffectiveDelegationConfig(options: {
       ...(merged.sandbox ?? {})
     }
   };
+
+  if (effective.delegate.mode !== 'full' && effective.delegate.mode !== 'question_only') {
+    effective.delegate.mode = defaults.delegate.mode;
+  }
 
   const repoAllowedRoots =
     typeof repoLayer?.paths?.allowedRoots !== 'undefined' ? repoLayer.paths.allowedRoots : [options.repoRoot];
@@ -496,10 +501,11 @@ function resolveCodexHome(env: NodeJS.ProcessEnv): string {
 }
 
 function normalizeRoots(roots: string[]): string[] {
-  return roots
+  const normalized = roots
     .filter((root) => typeof root === 'string')
-    .map((root) => resolve(root))
+    .map((root) => realpathSafe(resolve(root)))
     .filter((root) => root.length > 0);
+  return Array.from(new Set(normalized));
 }
 
 function intersectExact(cap: string[], requested: string[]): string[] {
@@ -514,9 +520,9 @@ function intersectRoots(cap: string[], requested: string[]): string[] {
   if (cap.length === 0 || requested.length === 0) {
     return [];
   }
-  const resolvedCap = cap.map((root) => resolve(root));
+  const resolvedCap = cap.map((root) => realpathSafe(resolve(root)));
   return requested
-    .map((root) => resolve(root))
+    .map((root) => realpathSafe(resolve(root)))
     .filter((candidate) => resolvedCap.some((allowed) => isWithinRoot(allowed, candidate)));
 }
 
@@ -528,6 +534,39 @@ function isWithinRoot(root: string, candidate: string): boolean {
   return candidate.startsWith(normalizedRoot);
 }
 
+function realpathSafe(pathname: string): string {
+  try {
+    return realpathSync(pathname);
+  } catch {
+    return pathname;
+  }
+}
+
 export function resolveConfigDir(pathname: string): string {
   return dirname(pathname);
+}
+
+export function splitDelegationConfigOverrides(raw: string | null | undefined): string[] {
+  if (!raw) {
+    return [];
+  }
+  return raw
+    .split(/[,;\n]/)
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0);
+}
+
+export function parseDelegationConfigOverride(
+  value: string,
+  source: ConfigSource
+): DelegationConfigLayer | null {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+  const parsed = toml.parse(trimmed);
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    return null;
+  }
+  return normalizeLayer(parsed as Record<string, unknown>, source);
 }
