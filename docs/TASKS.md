@@ -5,8 +5,8 @@
 <!-- tasks-archive-index:begin -->
 ## Archive index
 Archived task snapshots live on the task-archives branch.
-- 2025: https://github.com/Kbediako/CO/blob/task-archives/docs/TASKS-archive-2025.md
-- 2026: https://github.com/Kbediako/CO/blob/task-archives/docs/TASKS-archive-2026.md
+- 2025: [docs/TASKS-archive-2025](https://github.com/Kbediako/CO/blob/task-archives/docs/TASKS-archive-2025.md)
+- 2026: [docs/TASKS-archive-2026](https://github.com/Kbediako/CO/blob/task-archives/docs/TASKS-archive-2026.md)
 <!-- tasks-archive-index:end -->
 # Task List Snapshot — Codex Delegation Autonomy Platform (0940-delegation-autonomy-platform)
 - **Update — 2026-01-08:** Docs-review complete via `.runs/0940-delegation-autonomy-platform/cli/2026-01-08T09-15-22-109Z-e577581a/manifest.json`; subagent diagnostics via `.runs/0940-delegation-autonomy-platform-docs-scout/cli/2026-01-08T08-50-17-654Z-e6012ee4/manifest.json`. Notes: export `MCP_RUNNER_TASK_ID=0940-delegation-autonomy-platform`; guardrails required: `node scripts/spec-guard.mjs --dry-run`, `npm run build`, `npm run lint`, `npm run test`, `npm run docs:check`, `npm run docs:freshness`, `node scripts/diff-budget.mjs`, `npm run review`. Checklist mirror: `tasks/tasks-0940-delegation-autonomy-platform.md`, `.agent/task/0940-delegation-autonomy-platform.md`.
