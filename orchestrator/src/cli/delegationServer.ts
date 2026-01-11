@@ -38,6 +38,7 @@ interface DelegationServerOptions {
 
 const PROTOCOL_VERSION = '2024-11-05';
 const QUESTION_POLL_INTERVAL_MS = 500;
+const MAX_QUESTION_POLL_WAIT_MS = 10_000;
 const DEFAULT_SPAWN_TIMEOUT_MS = 5 * 60 * 1000;
 const DEFAULT_GH_TIMEOUT_MS = 60_000;
 const DEFAULT_DELEGATION_TOKEN_RETRY_MS = 2000;
@@ -56,6 +57,17 @@ const DELEGATION_TOKEN_FILE = 'delegation_token.json';
 const CSRF_HEADER = 'x-csrf-token';
 const LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost', '::1']);
 const CONFIG_OVERRIDE_ENV_KEYS = ['CODEX_CONFIG_OVERRIDES', 'CODEX_MCP_CONFIG_OVERRIDES'];
+const CONFIRMATION_ERROR_CODES = new Set([
+  'confirmation_required',
+  'missing_confirm_nonce',
+  'confirmation_invalid',
+  'confirmation_scope_mismatch',
+  'confirmation_request_not_found',
+  'confirmation_not_approved',
+  'confirmation_expired',
+  'nonce_already_consumed'
+]);
+const TOOL_PROFILE_ENTRY_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]*$/;
 
 interface ConfigOverride {
   source: 'env' | 'cli';
@@ -438,7 +450,10 @@ async function handleDelegateCancel(
       undefined,
       { allowedHosts }
     );
-  } catch {
+  } catch (error) {
+    if (!isConfirmationError(error)) {
+      throw error;
+    }
     return await callControlEndpoint(
       manifestPath,
       '/confirmations/create',
@@ -633,8 +648,9 @@ async function handleQuestionPoll(
   }
 
   const questionId = requireString(readStringValue(input, 'question_id', 'questionId'), 'question_id');
-  const waitMs = readNumberValue(input, 'wait_ms', 'waitMs') ?? 0;
-  const deadline = Date.now() + (Number.isFinite(waitMs) ? waitMs : 0);
+  const requestedWaitMs = readNumberValue(input, 'wait_ms', 'waitMs') ?? 0;
+  const waitMs = clampQuestionPollWaitMs(requestedWaitMs);
+  const deadline = Date.now() + waitMs;
   const maxIterations = waitMs > 0 ? Math.max(1, Math.ceil(waitMs / QUESTION_POLL_INTERVAL_MS)) : 1;
 
   for (let iteration = 0; iteration < maxIterations; iteration += 1) {
@@ -721,7 +737,10 @@ async function handleGithubCall(
         tool: toolName,
         params: { ...input, manifest_path: manifestPath }
       }, undefined, { allowedHosts: context.allowedHosts });
-    } catch {
+    } catch (error) {
+      if (!isConfirmationError(error)) {
+        throw error;
+      }
       return await callControlEndpoint(manifestPath, '/confirmations/create', {
         action: 'merge',
         tool: toolName,
@@ -887,6 +906,23 @@ function shouldRetryControlError(error: unknown): boolean {
   }
   const message = (error as Error | null)?.message ?? '';
   return message.includes('delegation_token_invalid');
+}
+
+function isConfirmationError(error: unknown): boolean {
+  const code = (error as { code?: string } | null)?.code;
+  if (code && CONFIRMATION_ERROR_CODES.has(code)) {
+    return true;
+  }
+  const message = (error as Error | null)?.message ?? '';
+  if (!message) {
+    return false;
+  }
+  for (const candidate of CONFIRMATION_ERROR_CODES) {
+    if (message.includes(candidate)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 export async function loadControlEndpoint(
@@ -1207,8 +1243,18 @@ export const __test__ = {
   parseSpawnOutput,
   handleDelegateSpawn,
   MAX_MCP_MESSAGE_BYTES,
-  MAX_MCP_HEADER_BYTES
+  MAX_MCP_HEADER_BYTES,
+  MAX_QUESTION_POLL_WAIT_MS,
+  QUESTION_POLL_INTERVAL_MS,
+  clampQuestionPollWaitMs
 };
+
+function clampQuestionPollWaitMs(value: number): number {
+  if (!Number.isFinite(value) || value <= 0) {
+    return 0;
+  }
+  return Math.min(value, MAX_QUESTION_POLL_WAIT_MS);
+}
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -1456,13 +1502,24 @@ async function readDelegationTokenFile(tokenPath: string): Promise<string | null
 function buildDelegateMcpOverrides(toolProfile: string[]): string[] {
   const overrides: string[] = ['mcp_servers.delegation.enabled=true'];
   for (const entry of toolProfile) {
-    const trimmed = entry.trim();
-    if (!trimmed) {
+    const sanitized = sanitizeToolProfileEntry(entry);
+    if (!sanitized) {
       continue;
     }
-    overrides.push(`mcp_servers.${trimmed}.enabled=true`);
+    overrides.push(`mcp_servers.${sanitized}.enabled=true`);
   }
   return dedupeOverrides(overrides);
+}
+
+function sanitizeToolProfileEntry(entry: string): string | null {
+  const trimmed = entry.trim();
+  if (!trimmed) {
+    return null;
+  }
+  if (!TOOL_PROFILE_ENTRY_PATTERN.test(trimmed)) {
+    return null;
+  }
+  return trimmed;
 }
 
 function dedupeOverrides(overrides: string[]): string[] {

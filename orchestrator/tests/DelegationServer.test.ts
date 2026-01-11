@@ -21,7 +21,10 @@ const {
   handleDelegateSpawn,
   handleToolCall,
   MAX_MCP_MESSAGE_BYTES,
-  MAX_MCP_HEADER_BYTES
+  MAX_MCP_HEADER_BYTES,
+  MAX_QUESTION_POLL_WAIT_MS,
+  QUESTION_POLL_INTERVAL_MS,
+  clampQuestionPollWaitMs
 } = delegationServerTest;
 const ORIGINAL_EXIT_CODE = process.exitCode;
 
@@ -56,6 +59,41 @@ async function setupRun(options: { baseUrl?: string; tokenPath?: string } = {}) 
     'utf8'
   );
   return { root, runDir, manifestPath, tokenPath };
+}
+
+function collectMcpResponses(stream: PassThrough, expectedCount: number): Promise<Record<string, unknown>[]> {
+  return new Promise((resolve) => {
+    let buffer = Buffer.alloc(0);
+    const responses: Record<string, unknown>[] = [];
+    const onData = (chunk: Buffer | string) => {
+      buffer = Buffer.concat([buffer, Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)]);
+      while (buffer.length > 0) {
+        const headerEnd = buffer.indexOf('\r\n\r\n');
+        if (headerEnd === -1) {
+          break;
+        }
+        const header = buffer.slice(0, headerEnd).toString('utf8');
+        const match = header.match(/Content-Length:\s*(\d+)/i);
+        if (!match) {
+          return;
+        }
+        const length = Number(match[1]);
+        const bodyStart = headerEnd + 4;
+        if (buffer.length < bodyStart + length) {
+          break;
+        }
+        const body = buffer.slice(bodyStart, bodyStart + length).toString('utf8');
+        responses.push(JSON.parse(body) as Record<string, unknown>);
+        buffer = buffer.slice(bodyStart + length);
+        if (responses.length >= expectedCount) {
+          stream.off('data', onData);
+          resolve(responses);
+          return;
+        }
+      }
+    };
+    stream.on('data', onData);
+  });
 }
 
 describe('delegation server manifest validation', () => {
@@ -290,6 +328,14 @@ describe('delegation server question helpers', () => {
       await new Promise<void>((resolve) => stalledServer.close(() => resolve()));
       await rm(root, { recursive: true, force: true });
     }
+  });
+
+  it('clamps question poll wait_ms to a safe maximum', () => {
+    expect(clampQuestionPollWaitMs(MAX_QUESTION_POLL_WAIT_MS * 5)).toBe(MAX_QUESTION_POLL_WAIT_MS);
+    expect(clampQuestionPollWaitMs(MAX_QUESTION_POLL_WAIT_MS)).toBe(MAX_QUESTION_POLL_WAIT_MS);
+    expect(clampQuestionPollWaitMs(0)).toBe(0);
+    expect(clampQuestionPollWaitMs(-25)).toBe(0);
+    expect(clampQuestionPollWaitMs(QUESTION_POLL_INTERVAL_MS)).toBe(QUESTION_POLL_INTERVAL_MS);
   });
 
   it('applies resume fallback only when awaiting question', async () => {
@@ -634,6 +680,280 @@ describe('delegation server spawn validation', () => {
       await rm(outsideRoot, { recursive: true, force: true });
     }
   });
+
+  it('filters unsafe tool profile entries when building MCP overrides', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'delegation-spawn-repo-'));
+    try {
+      const runDir = join(repoRoot, '.runs', 'task-0940', 'cli', 'run-1');
+      await mkdir(runDir, { recursive: true });
+      const manifestPath = join(runDir, 'manifest.json');
+      await writeFile(manifestPath, JSON.stringify({}), 'utf8');
+
+      const child = new MockChildProcess();
+      spawnMock.mockReturnValue(child as unknown);
+
+      const spawnPromise = handleDelegateSpawn(
+        { pipeline: 'diagnostics', repo: repoRoot },
+        repoRoot,
+        false,
+        [repoRoot],
+        ['127.0.0.1'],
+        ['shell', 'good_tool', 'bad;tool', 'bad\nline', 'bad=tool', 'bad/tool']
+      );
+
+      await new Promise((resolve) => setImmediate(resolve));
+      const spawnArgs = spawnMock.mock.calls[0]?.[2] as { env?: NodeJS.ProcessEnv } | undefined;
+      const overrides = spawnArgs?.env?.CODEX_MCP_CONFIG_OVERRIDES?.split(';') ?? [];
+      expect(overrides).toContain('mcp_servers.delegation.enabled=true');
+      expect(overrides).toContain('mcp_servers.shell.enabled=true');
+      expect(overrides).toContain('mcp_servers.good_tool.enabled=true');
+      expect(overrides.join(';')).not.toContain('bad;tool');
+      expect(overrides.join(';')).not.toContain('bad\nline');
+      expect(overrides.join(';')).not.toContain('bad=tool');
+      expect(overrides.join(';')).not.toContain('bad/tool');
+
+      const stdout = JSON.stringify({
+        run_id: 'run-1',
+        status: 'completed',
+        manifest: relative(repoRoot, manifestPath)
+      });
+      child.stdout.write(stdout);
+      child.emit('exit', 0);
+
+      await spawnPromise;
+    } finally {
+      await rm(repoRoot, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('delegation server confirmation fallback', () => {
+  it('creates confirmations only for confirmation-specific cancel errors', async () => {
+    let actionCalls = 0;
+    let createCalls = 0;
+    const server = http.createServer((req, res) => {
+      if (req.url === '/control/action') {
+        actionCalls += 1;
+        res.writeHead(409, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'confirmation_invalid' }));
+        return;
+      }
+      if (req.url === '/confirmations/create') {
+        createCalls += 1;
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ request_id: 'req-1' }));
+        return;
+      }
+      res.writeHead(404);
+      res.end();
+    });
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    const address = server.address();
+    const port = typeof address === 'string' || !address ? 0 : address.port;
+    const baseUrl = `http://127.0.0.1:${port}`;
+
+    const { root, manifestPath } = await setupRun({ baseUrl });
+
+    try {
+      const response = await handleToolCall(
+        {
+          jsonrpc: '2.0',
+          method: 'tools/call',
+          params: {
+            name: 'delegate.cancel',
+            arguments: { manifest_path: manifestPath }
+          },
+          codex_private: { confirm_nonce: 'nonce' }
+        },
+        {
+          repoRoot: process.cwd(),
+          mode: 'full',
+          allowNested: false,
+          githubEnabled: false,
+          allowedGithubOps: new Set<string>(),
+          allowedRoots: [root],
+          allowedHosts: ['127.0.0.1'],
+          toolProfile: [],
+          expiryFallback: 'pause'
+        }
+      );
+      const payload = JSON.parse(response.content[0].text) as Record<string, unknown>;
+      expect(payload.request_id).toBe('req-1');
+      expect(actionCalls).toBe(1);
+      expect(createCalls).toBe(1);
+    } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('does not create confirmations on generic cancel errors', async () => {
+    let createCalls = 0;
+    const server = http.createServer((req, res) => {
+      if (req.url === '/control/action') {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'unexpected_failure' }));
+        return;
+      }
+      if (req.url === '/confirmations/create') {
+        createCalls += 1;
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ request_id: 'req-2' }));
+        return;
+      }
+      res.writeHead(404);
+      res.end();
+    });
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    const address = server.address();
+    const port = typeof address === 'string' || !address ? 0 : address.port;
+    const baseUrl = `http://127.0.0.1:${port}`;
+
+    const { root, manifestPath } = await setupRun({ baseUrl });
+
+    try {
+      await expect(
+        handleToolCall(
+          {
+            jsonrpc: '2.0',
+            method: 'tools/call',
+            params: {
+              name: 'delegate.cancel',
+              arguments: { manifest_path: manifestPath }
+            },
+            codex_private: { confirm_nonce: 'nonce' }
+          },
+          {
+            repoRoot: process.cwd(),
+            mode: 'full',
+            allowNested: false,
+            githubEnabled: false,
+            allowedGithubOps: new Set<string>(),
+            allowedRoots: [root],
+            allowedHosts: ['127.0.0.1'],
+            toolProfile: [],
+            expiryFallback: 'pause'
+          }
+        )
+      ).rejects.toThrow('control endpoint error');
+      expect(createCalls).toBe(0);
+    } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('creates confirmations for confirmation-specific github merge errors', async () => {
+    let createCalls = 0;
+    const server = http.createServer((req, res) => {
+      if (req.url === '/confirmations/validate') {
+        res.writeHead(409, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'confirmation_invalid' }));
+        return;
+      }
+      if (req.url === '/confirmations/create') {
+        createCalls += 1;
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ request_id: 'req-3' }));
+        return;
+      }
+      res.writeHead(404);
+      res.end();
+    });
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    const address = server.address();
+    const port = typeof address === 'string' || !address ? 0 : address.port;
+    const baseUrl = `http://127.0.0.1:${port}`;
+
+    const { root, manifestPath } = await setupRun({ baseUrl });
+
+    try {
+      const response = await handleToolCall(
+        {
+          jsonrpc: '2.0',
+          method: 'tools/call',
+          params: {
+            name: 'github.merge',
+            arguments: { manifest_path: manifestPath, pull_number: 321 }
+          },
+          codex_private: { confirm_nonce: 'nonce' }
+        },
+        {
+          repoRoot: process.cwd(),
+          mode: 'full',
+          allowNested: false,
+          githubEnabled: true,
+          allowedGithubOps: new Set(['merge']),
+          allowedRoots: [root],
+          allowedHosts: ['127.0.0.1'],
+          toolProfile: [],
+          expiryFallback: 'pause'
+        }
+      );
+      const payload = JSON.parse(response.content[0].text) as Record<string, unknown>;
+      expect(payload.request_id).toBe('req-3');
+      expect(createCalls).toBe(1);
+    } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('avoids confirmation fallback on generic github merge errors', async () => {
+    let createCalls = 0;
+    const server = http.createServer((req, res) => {
+      if (req.url === '/confirmations/validate') {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'unexpected_failure' }));
+        return;
+      }
+      if (req.url === '/confirmations/create') {
+        createCalls += 1;
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ request_id: 'req-3' }));
+        return;
+      }
+      res.writeHead(404);
+      res.end();
+    });
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    const address = server.address();
+    const port = typeof address === 'string' || !address ? 0 : address.port;
+    const baseUrl = `http://127.0.0.1:${port}`;
+
+    const { root, manifestPath } = await setupRun({ baseUrl });
+
+    try {
+      await expect(
+        handleToolCall(
+          {
+            jsonrpc: '2.0',
+            method: 'tools/call',
+            params: {
+              name: 'github.merge',
+              arguments: { manifest_path: manifestPath, pull_number: 123 }
+            },
+            codex_private: { confirm_nonce: 'nonce' }
+          },
+          {
+            repoRoot: process.cwd(),
+            mode: 'full',
+            allowNested: false,
+            githubEnabled: true,
+            allowedGithubOps: new Set(['merge']),
+            allowedRoots: [root],
+            allowedHosts: ['127.0.0.1'],
+            toolProfile: [],
+            expiryFallback: 'pause'
+          }
+        )
+      ).rejects.toThrow('control endpoint error');
+      expect(createCalls).toBe(0);
+    } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+      await rm(root, { recursive: true, force: true });
+    }
+  });
 });
 
 describe('delegation server secret guards', () => {
@@ -765,6 +1085,86 @@ describe('delegation server MCP framing', () => {
     const response = await responsePromise;
     expect(receivedMethod).toBe('delegate.status');
     expect(response).toEqual({ jsonrpc: '2.0', id: 2, result: { ok: true } });
+
+    input.end();
+  });
+
+  it('handles payload bodies split across chunks', async () => {
+    process.exitCode = undefined;
+    const input = new PassThrough();
+    const output = new PassThrough();
+    let receivedMethod: string | null = null;
+    await runJsonRpcServer(async (request) => {
+      receivedMethod = request.method;
+      return { ok: true };
+    }, { stdin: input, stdout: output });
+
+    const payload = JSON.stringify({ jsonrpc: '2.0', id: 3, method: 'delegate.status', params: {} });
+    const header = `Content-Length: ${Buffer.byteLength(payload)}\r\n\r\n`;
+    const responsePromise = collectMcpResponses(output, 1);
+    const splitIndex = Math.floor(payload.length / 2);
+
+    input.write(`${header}${payload.slice(0, splitIndex)}`);
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(process.exitCode).toBeUndefined();
+
+    input.write(payload.slice(splitIndex));
+    const [response] = await responsePromise;
+    expect(receivedMethod).toBe('delegate.status');
+    expect(response).toEqual({ jsonrpc: '2.0', id: 3, result: { ok: true } });
+
+    input.end();
+  });
+
+  it('parses multiple MCP messages coalesced in one chunk', async () => {
+    process.exitCode = undefined;
+    const input = new PassThrough();
+    const output = new PassThrough();
+    const receivedMethods: string[] = [];
+    await runJsonRpcServer(async (request) => {
+      receivedMethods.push(request.method);
+      return { ok: true };
+    }, { stdin: input, stdout: output });
+
+    const payloadA = JSON.stringify({ jsonrpc: '2.0', id: 4, method: 'delegate.status', params: {} });
+    const payloadB = JSON.stringify({ jsonrpc: '2.0', id: 5, method: 'delegate.status', params: {} });
+    const frameA = `Content-Length: ${Buffer.byteLength(payloadA)}\r\n\r\n${payloadA}`;
+    const frameB = `Content-Length: ${Buffer.byteLength(payloadB)}\r\n\r\n${payloadB}`;
+
+    const responsePromise = collectMcpResponses(output, 2);
+    input.write(`${frameA}${frameB}`);
+    const responses = await responsePromise;
+
+    expect(receivedMethods).toEqual(['delegate.status', 'delegate.status']);
+    expect(responses[0]).toEqual({ jsonrpc: '2.0', id: 4, result: { ok: true } });
+    expect(responses[1]).toEqual({ jsonrpc: '2.0', id: 5, result: { ok: true } });
+
+    input.end();
+  });
+
+  it('recovers after invalid JSON and continues processing', async () => {
+    process.exitCode = undefined;
+    const input = new PassThrough();
+    const output = new PassThrough();
+    const receivedMethods: string[] = [];
+    await runJsonRpcServer(async (request) => {
+      receivedMethods.push(request.method);
+      return { ok: true };
+    }, { stdin: input, stdout: output });
+
+    const badPayload = '{not-json';
+    const badFrame = `Content-Length: ${Buffer.byteLength(badPayload)}\r\n\r\n${badPayload}`;
+    const goodPayload = JSON.stringify({ jsonrpc: '2.0', id: 6, method: 'delegate.status', params: {} });
+    const goodFrame = `Content-Length: ${Buffer.byteLength(goodPayload)}\r\n\r\n${goodPayload}`;
+
+    const responsePromise = collectMcpResponses(output, 1);
+    input.write(`${badFrame}${goodFrame}`);
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(process.exitCode).toBeUndefined();
+
+    const [response] = await responsePromise;
+    expect(receivedMethods).toEqual(['delegate.status']);
+    expect(response).toEqual({ jsonrpc: '2.0', id: 6, result: { ok: true } });
 
     input.end();
   });

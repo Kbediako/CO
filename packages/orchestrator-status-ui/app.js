@@ -209,9 +209,19 @@ elements.sideOverlay.addEventListener('click', () => {
 });
 
 document.addEventListener('keydown', (event) => {
-  if (event.key === 'Tab' && state.questionOpen) {
-    if (trapQuestionFocus(event)) {
-      return;
+  if (event.key === 'Tab') {
+    if (state.questionOpen) {
+      if (trapQuestionFocus(event)) {
+        return;
+      }
+    } else if (state.runOpen) {
+      if (trapRunFocus(event)) {
+        return;
+      }
+    } else if (state.sideOpen) {
+      if (trapSideFocus(event)) {
+        return;
+      }
     }
   }
   if (event.key === 'Escape') {
@@ -1133,18 +1143,30 @@ function focusOutsideContainer(container, preferred, fallback) {
   }
 }
 
+function trapRunFocus(event) {
+  return trapFocus(event, elements.runModal);
+}
+
+function trapSideFocus(event) {
+  return trapFocus(event, elements.sidePanel);
+}
+
 function trapQuestionFocus(event) {
-  if (!elements.questionModal) {
+  return trapFocus(event, elements.questionModal);
+}
+
+function trapFocus(event, container) {
+  if (!container) {
     return false;
   }
-  const focusable = getFocusableElements(elements.questionModal);
+  const focusable = getFocusableElements(container);
   if (focusable.length === 0) {
     return false;
   }
   const first = focusable[0];
   const last = focusable[focusable.length - 1];
   const active = document.activeElement;
-  if (!elements.questionModal.contains(active)) {
+  if (!container.contains(active)) {
     event.preventDefault();
     (event.shiftKey ? last : first).focus();
     return true;
