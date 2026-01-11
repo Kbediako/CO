@@ -91,6 +91,73 @@ describe('ControlWatcher', () => {
     }
   });
 
+  it('emits security_violation for confirmNonce variants', async () => {
+    const { root, paths } = await createRunRoot('task-0940');
+    await writeFile(
+      paths.controlPath,
+      JSON.stringify({
+        run_id: 'run-1',
+        control_seq: 1,
+        latest_action: {
+          request_id: 'req-2',
+          requested_by: 'user',
+          requested_at: '2026-01-01T00:00:00Z',
+          action: 'resume',
+          reason: 'manual',
+          confirmNonce: 'bad'
+        }
+      }),
+      'utf8'
+    );
+
+    const manifest = {
+      run_id: 'run-1',
+      task_id: 'task-0940',
+      status: 'in_progress',
+      status_detail: null,
+      started_at: '2026-01-01T00:00:00Z',
+      updated_at: '2026-01-01T00:00:00Z'
+    } as CliManifest;
+
+    const events: RunEventStreamEntry[] = [];
+    const eventStream = {
+      append: async (entry: { event: string; actor: string; payload: Record<string, unknown> }) => {
+        const record: RunEventStreamEntry = {
+          schema_version: 1,
+          seq: events.length + 1,
+          timestamp: '2026-01-01T00:00:00Z',
+          task_id: 'task-0940',
+          run_id: 'run-1',
+          event: entry.event,
+          actor: entry.actor,
+          payload: entry.payload
+        };
+        events.push(record);
+        return record;
+      },
+      close: async () => undefined
+    } as unknown as import('../src/cli/events/runEventStream.js').RunEventStream;
+
+    const watcher = new ControlWatcher({
+      paths,
+      manifest,
+      eventStream,
+      persist: async () => undefined,
+      now: () => '2026-01-01T00:00:00Z'
+    });
+
+    try {
+      await watcher.sync();
+      const securityEvent = events.find((entry) => entry.event === 'security_violation');
+      expect(securityEvent).toBeTruthy();
+      expect(securityEvent?.payload).toMatchObject({
+        kind: 'confirm_nonce_present'
+      });
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   it('does not throw when event stream append fails', async () => {
     const { root, paths } = await createRunRoot('task-0940');
     await writeFile(

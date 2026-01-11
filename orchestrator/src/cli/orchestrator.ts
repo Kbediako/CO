@@ -160,46 +160,52 @@ export class CodexOrchestrator {
     });
 
     const emitter = options.runEvents ?? new RunEventEmitter();
-    const eventStream = await RunEventStream.create({
-      paths,
-      taskId: manifest.task_id,
-      runId,
-      pipelineId: preparation.pipeline.id,
-      pipelineTitle: preparation.pipeline.title
-    });
-    const configFiles = await loadDelegationConfigFiles({ repoRoot: preparation.env.repoRoot });
-    const envOverrideLayers = collectDelegationEnvOverrides();
-    const layers = [configFiles.global, configFiles.repo, ...envOverrideLayers].filter(
-      Boolean
-    ) as DelegationConfigLayer[];
-    const effectiveConfig = computeEffectiveDelegationConfig({
-      repoRoot: preparation.env.repoRoot,
-      layers
-    });
-    const controlServer = effectiveConfig.ui.controlEnabled
-      ? await ControlServer.start({
-          paths,
-          config: effectiveConfig,
-          eventStream,
-          runId
-        })
-      : null;
-    const onEventEntry = (entry: import('./events/runEventStream.js').RunEventStreamEntry) => {
-      controlServer?.broadcast(entry);
-    };
-    const onStreamError = (error: Error, payload: { event: string }) => {
-      logger.warn(`Failed to append run event ${payload.event}: ${error.message}`);
-    };
-    const detachStream = attachRunEventAdapter(emitter, eventStream, onEventEntry, onStreamError);
-    const runEvents = this.createRunEventPublisher({
-      runId,
-      pipeline: preparation.pipeline,
-      manifest,
-      paths,
-      emitter
-    });
+    let eventStream: RunEventStream | null = null;
+    let controlServer: ControlServer | null = null;
+    let detachStream: (() => void) | null = null;
+    let onEventEntry: ((entry: import('./events/runEventStream.js').RunEventStreamEntry) => void) | undefined;
 
     try {
+      const stream = await RunEventStream.create({
+        paths,
+        taskId: manifest.task_id,
+        runId,
+        pipelineId: preparation.pipeline.id,
+        pipelineTitle: preparation.pipeline.title
+      });
+      eventStream = stream;
+      const configFiles = await loadDelegationConfigFiles({ repoRoot: preparation.env.repoRoot });
+      const envOverrideLayers = collectDelegationEnvOverrides();
+      const layers = [configFiles.global, configFiles.repo, ...envOverrideLayers].filter(
+        Boolean
+      ) as DelegationConfigLayer[];
+      const effectiveConfig = computeEffectiveDelegationConfig({
+        repoRoot: preparation.env.repoRoot,
+        layers
+      });
+      controlServer = effectiveConfig.ui.controlEnabled
+        ? await ControlServer.start({
+            paths,
+            config: effectiveConfig,
+            eventStream: stream,
+            runId
+          })
+        : null;
+      onEventEntry = (entry: import('./events/runEventStream.js').RunEventStreamEntry) => {
+        controlServer?.broadcast(entry);
+      };
+      const onStreamError = (error: Error, payload: { event: string }) => {
+        logger.warn(`Failed to append run event ${payload.event}: ${error.message}`);
+      };
+      detachStream = attachRunEventAdapter(emitter, stream, onEventEntry, onStreamError);
+      const runEvents = this.createRunEventPublisher({
+        runId,
+        pipeline: preparation.pipeline,
+        manifest,
+        paths,
+        emitter
+      });
+
       return await this.performRunLifecycle({
         env: preparation.env,
         pipeline: preparation.pipeline,
@@ -209,15 +215,33 @@ export class CodexOrchestrator {
         taskContext: preparation.taskContext,
         runId,
         runEvents,
-        eventStream,
+        eventStream: stream,
         onEventEntry,
         persister,
         envOverrides: preparation.envOverrides
       });
     } finally {
-      detachStream();
-      await eventStream.close();
-      await controlServer?.close();
+      if (detachStream) {
+        try {
+          detachStream();
+        } catch (error) {
+          logger.warn(`Failed to detach run event stream: ${(error as Error)?.message ?? String(error)}`);
+        }
+      }
+      if (controlServer) {
+        try {
+          await controlServer.close();
+        } catch (error) {
+          logger.warn(`Failed to close control server: ${(error as Error)?.message ?? String(error)}`);
+        }
+      }
+      if (eventStream) {
+        try {
+          await eventStream.close();
+        } catch (error) {
+          logger.warn(`Failed to close run event stream: ${(error as Error)?.message ?? String(error)}`);
+        }
+      }
     }
   }
 
@@ -262,46 +286,52 @@ export class CodexOrchestrator {
     await persister.schedule({ manifest: true, heartbeat: true, force: true });
 
     const emitter = options.runEvents ?? new RunEventEmitter();
-    const eventStream = await RunEventStream.create({
-      paths,
-      taskId: manifest.task_id,
-      runId: manifest.run_id,
-      pipelineId: pipeline.id,
-      pipelineTitle: pipeline.title
-    });
-    const configFiles = await loadDelegationConfigFiles({ repoRoot: preparation.env.repoRoot });
-    const envOverrideLayers = collectDelegationEnvOverrides();
-    const layers = [configFiles.global, configFiles.repo, ...envOverrideLayers].filter(
-      Boolean
-    ) as DelegationConfigLayer[];
-    const effectiveConfig = computeEffectiveDelegationConfig({
-      repoRoot: preparation.env.repoRoot,
-      layers
-    });
-    const controlServer = effectiveConfig.ui.controlEnabled
-      ? await ControlServer.start({
-          paths,
-          config: effectiveConfig,
-          eventStream,
-          runId: manifest.run_id
-        })
-      : null;
-    const onEventEntry = (entry: import('./events/runEventStream.js').RunEventStreamEntry) => {
-      controlServer?.broadcast(entry);
-    };
-    const onStreamError = (error: Error, payload: { event: string }) => {
-      logger.warn(`Failed to append run event ${payload.event}: ${error.message}`);
-    };
-    const detachStream = attachRunEventAdapter(emitter, eventStream, onEventEntry, onStreamError);
-    const runEvents = this.createRunEventPublisher({
-      runId: manifest.run_id,
-      pipeline,
-      manifest,
-      paths,
-      emitter
-    });
+    let eventStream: RunEventStream | null = null;
+    let controlServer: ControlServer | null = null;
+    let detachStream: (() => void) | null = null;
+    let onEventEntry: ((entry: import('./events/runEventStream.js').RunEventStreamEntry) => void) | undefined;
 
     try {
+      const stream = await RunEventStream.create({
+        paths,
+        taskId: manifest.task_id,
+        runId: manifest.run_id,
+        pipelineId: pipeline.id,
+        pipelineTitle: pipeline.title
+      });
+      eventStream = stream;
+      const configFiles = await loadDelegationConfigFiles({ repoRoot: preparation.env.repoRoot });
+      const envOverrideLayers = collectDelegationEnvOverrides();
+      const layers = [configFiles.global, configFiles.repo, ...envOverrideLayers].filter(
+        Boolean
+      ) as DelegationConfigLayer[];
+      const effectiveConfig = computeEffectiveDelegationConfig({
+        repoRoot: preparation.env.repoRoot,
+        layers
+      });
+      controlServer = effectiveConfig.ui.controlEnabled
+        ? await ControlServer.start({
+            paths,
+            config: effectiveConfig,
+            eventStream: stream,
+            runId: manifest.run_id
+          })
+        : null;
+      onEventEntry = (entry: import('./events/runEventStream.js').RunEventStreamEntry) => {
+        controlServer?.broadcast(entry);
+      };
+      const onStreamError = (error: Error, payload: { event: string }) => {
+        logger.warn(`Failed to append run event ${payload.event}: ${error.message}`);
+      };
+      detachStream = attachRunEventAdapter(emitter, stream, onEventEntry, onStreamError);
+      const runEvents = this.createRunEventPublisher({
+        runId: manifest.run_id,
+        pipeline,
+        manifest,
+        paths,
+        emitter
+      });
+
       return await this.performRunLifecycle({
         env: preparation.env,
         pipeline,
@@ -311,15 +341,33 @@ export class CodexOrchestrator {
         taskContext: preparation.taskContext,
         runId: manifest.run_id,
         runEvents,
-        eventStream,
+        eventStream: stream,
         onEventEntry,
         persister,
         envOverrides: preparation.envOverrides
       });
     } finally {
-      detachStream();
-      await eventStream.close();
-      await controlServer?.close();
+      if (detachStream) {
+        try {
+          detachStream();
+        } catch (error) {
+          logger.warn(`Failed to detach run event stream: ${(error as Error)?.message ?? String(error)}`);
+        }
+      }
+      if (controlServer) {
+        try {
+          await controlServer.close();
+        } catch (error) {
+          logger.warn(`Failed to close control server: ${(error as Error)?.message ?? String(error)}`);
+        }
+      }
+      if (eventStream) {
+        try {
+          await eventStream.close();
+        } catch (error) {
+          logger.warn(`Failed to close run event stream: ${(error as Error)?.message ?? String(error)}`);
+        }
+      }
     }
   }
 

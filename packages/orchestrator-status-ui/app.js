@@ -172,21 +172,29 @@ elements.runOverlay.addEventListener('click', () => {
   setRunModalState(false);
 });
 
-elements.questionClose.addEventListener('click', () => {
-  setQuestionModalState(false);
-});
+if (elements.questionClose) {
+  elements.questionClose.addEventListener('click', () => {
+    setQuestionModalState(false);
+  });
+}
 
-elements.questionOverlay.addEventListener('click', () => {
-  setQuestionModalState(false);
-});
+if (elements.questionOverlay) {
+  elements.questionOverlay.addEventListener('click', () => {
+    setQuestionModalState(false);
+  });
+}
 
-elements.questionSubmit.addEventListener('click', () => {
-  submitQuestionAnswer();
-});
+if (elements.questionSubmit) {
+  elements.questionSubmit.addEventListener('click', () => {
+    submitQuestionAnswer();
+  });
+}
 
-elements.questionDismiss.addEventListener('click', () => {
-  dismissActiveQuestion();
-});
+if (elements.questionDismiss) {
+  elements.questionDismiss.addEventListener('click', () => {
+    dismissActiveQuestion();
+  });
+}
 
 elements.sideToggle.addEventListener('click', () => {
   toggleSidePanel();
@@ -201,6 +209,11 @@ elements.sideOverlay.addEventListener('click', () => {
 });
 
 document.addEventListener('keydown', (event) => {
+  if (event.key === 'Tab' && state.questionOpen) {
+    if (trapQuestionFocus(event)) {
+      return;
+    }
+  }
   if (event.key === 'Escape') {
     if (state.questionOpen) {
       setQuestionModalState(false);
@@ -1118,6 +1131,46 @@ function focusOutsideContainer(container, preferred, fallback) {
     candidate.focus();
     return;
   }
+}
+
+function trapQuestionFocus(event) {
+  if (!elements.questionModal) {
+    return false;
+  }
+  const focusable = getFocusableElements(elements.questionModal);
+  if (focusable.length === 0) {
+    return false;
+  }
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  const active = document.activeElement;
+  if (!elements.questionModal.contains(active)) {
+    event.preventDefault();
+    (event.shiftKey ? last : first).focus();
+    return true;
+  }
+  if (event.shiftKey) {
+    if (active === first) {
+      event.preventDefault();
+      last.focus();
+      return true;
+    }
+    return false;
+  }
+  if (active === last) {
+    event.preventDefault();
+    first.focus();
+    return true;
+  }
+  return false;
+}
+
+function getFocusableElements(container) {
+  return Array.from(
+    container.querySelectorAll(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+    )
+  ).filter((el) => el instanceof HTMLElement && !el.hasAttribute('disabled') && el.getAttribute('aria-hidden') !== 'true');
 }
 
 function bucketBadge(bucket) {

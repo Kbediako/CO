@@ -1,7 +1,5 @@
 import { createWriteStream } from 'node:fs';
 import { mkdir, readFile } from 'node:fs/promises';
-import { once } from 'node:events';
-
 import type { RunEvent, RunEventEmitter } from './runEvents.js';
 import type { RunPaths } from '../run/runPaths.js';
 import { isoTimestamp } from '../utils/time.js';
@@ -35,6 +33,7 @@ export class RunEventStream {
   private readonly taskId: string;
   private readonly runId: string;
   private writeQueue: Promise<void> = Promise.resolve();
+  private streamError: Error | null = null;
 
   private constructor(
     stream: ReturnType<typeof createWriteStream>,
@@ -45,6 +44,9 @@ export class RunEventStream {
     this.runId = options.runId;
     this.now = options.now;
     this.seq = options.initialSeq;
+    this.stream.on('error', (error) => {
+      this.streamError = error;
+    });
   }
 
   static async create(options: RunEventStreamOptions): Promise<RunEventStream> {
@@ -65,6 +67,9 @@ export class RunEventStream {
     payload?: Record<string, unknown> | null;
     timestamp?: string;
   }): Promise<RunEventStreamEntry> {
+    if (this.streamError) {
+      throw this.streamError;
+    }
     const entry: RunEventStreamEntry = {
       schema_version: SCHEMA_VERSION,
       seq: this.nextSeq(),
@@ -76,26 +81,58 @@ export class RunEventStream {
       payload: input.payload ?? null
     };
     const line = `${JSON.stringify(entry)}\n`;
-    this.writeQueue = this.writeQueue.then(
-      () =>
-        new Promise<void>((resolve, reject) => {
-          this.stream.write(line, (error) => {
-            if (error) {
-              reject(error);
-              return;
-            }
-            resolve();
-          });
-        })
-    );
+    this.writeQueue = this.writeQueue
+      .then(
+        () =>
+          new Promise<void>((resolve, reject) => {
+            this.stream.write(line, (error) => {
+              if (error) {
+                reject(error);
+                return;
+              }
+              resolve();
+            });
+          })
+      )
+      .catch((error) => {
+        this.streamError = error as Error;
+        throw error;
+      });
     await this.writeQueue;
+    if (this.streamError) {
+      throw this.streamError;
+    }
     return entry;
   }
 
   async close(): Promise<void> {
-    await this.writeQueue;
-    this.stream.end();
-    await once(this.stream, 'finish');
+    try {
+      await this.writeQueue;
+    } catch {
+      // Allow close to proceed even if a prior write failed.
+    }
+    if (this.streamError) {
+      this.stream.destroy();
+      return;
+    }
+    await new Promise<void>((resolve, reject) => {
+      const onFinish = () => {
+        cleanup();
+        resolve();
+      };
+      const onError = (error: Error) => {
+        cleanup();
+        this.stream.destroy();
+        reject(error);
+      };
+      const cleanup = () => {
+        this.stream.off('finish', onFinish);
+        this.stream.off('error', onError);
+      };
+      this.stream.once('finish', onFinish);
+      this.stream.once('error', onError);
+      this.stream.end();
+    });
   }
 
   private nextSeq(): number {

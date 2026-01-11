@@ -73,7 +73,12 @@ export class ControlWatcher {
     }
     this.lastControlSeq = controlSeq;
     const latest = snapshot.latest_action;
-    if (latest && typeof latest === 'object' && 'confirm_nonce' in latest) {
+    if (
+      latest &&
+      typeof latest === 'object' &&
+      (Object.prototype.hasOwnProperty.call(latest, 'confirm_nonce') ||
+        Object.prototype.hasOwnProperty.call(latest, 'confirmNonce'))
+    ) {
       await this.safeAppend({
         event: 'security_violation',
         actor: 'runner',

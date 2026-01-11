@@ -2,7 +2,7 @@ import http from 'node:http';
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { existsSync, realpathSync } from 'node:fs';
 import { chmod, readFile } from 'node:fs/promises';
-import { basename, dirname, join, relative, resolve } from 'node:path';
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { writeJsonAtomic } from '../utils/fs.js';
@@ -27,6 +27,7 @@ interface ControlServerOptions {
 const MAX_BODY_BYTES = 1024 * 1024;
 const EXPIRY_INTERVAL_MS = 15_000;
 const SESSION_TTL_MS = 15 * 60 * 1000;
+const CHILD_CONTROL_TIMEOUT_MS = 15_000;
 const CSRF_HEADER = 'x-csrf-token';
 const DELEGATION_TOKEN_HEADER = 'x-codex-delegation-token';
 const DELEGATION_RUN_HEADER = 'x-codex-delegation-run-id';
@@ -205,37 +206,64 @@ export class ControlServer {
     });
 
     const host = options.config.ui.bindHost;
-    await new Promise<void>((resolve) => {
-      server.listen(0, host, () => resolve());
+    await new Promise<void>((resolve, reject) => {
+      const onError = (error: Error) => {
+        server.off('error', onError);
+        try {
+          server.close(() => undefined);
+        } catch {
+          // Ignore close errors on a server that failed to bind.
+        }
+        reject(error);
+      };
+      server.once('error', onError);
+      server.listen(0, host, () => {
+        server.off('error', onError);
+        resolve();
+      });
     });
     const address = server.address();
     const port = typeof address === 'string' || !address ? 0 : address.port;
     instance.baseUrl = `http://${formatHostForUrl(host)}:${port}`;
-
-    await writeJsonAtomic(options.paths.controlAuthPath, {
-      token,
-      created_at: isoTimestamp()
+    server.on('error', (error) => {
+      logger.error(`Control server error: ${(error as Error)?.message ?? String(error)}`);
     });
-    await chmod(options.paths.controlAuthPath, 0o600).catch(() => undefined);
-    await writeJsonAtomic(options.paths.controlEndpointPath, {
-      base_url: instance.baseUrl,
-      token_path: options.paths.controlAuthPath
-    });
-    await chmod(options.paths.controlEndpointPath, 0o600).catch(() => undefined);
-    await writeJsonAtomic(options.paths.controlPath, controlStore.snapshot());
 
-    instance.expiryTimer = setInterval(() => {
-      expireConfirmations({
-        ...instance.buildContext(options.config, token),
-        req: null,
-        res: null
-      }).catch(() => undefined);
-      expireQuestions({
-        ...instance.buildContext(options.config, token),
-        req: null,
-        res: null
-      }).catch(() => undefined);
-    }, EXPIRY_INTERVAL_MS);
+    try {
+      await writeJsonAtomic(options.paths.controlAuthPath, {
+        token,
+        created_at: isoTimestamp()
+      });
+      await chmod(options.paths.controlAuthPath, 0o600).catch(() => undefined);
+      await writeJsonAtomic(options.paths.controlEndpointPath, {
+        base_url: instance.baseUrl,
+        token_path: options.paths.controlAuthPath
+      });
+      await chmod(options.paths.controlEndpointPath, 0o600).catch(() => undefined);
+      await writeJsonAtomic(options.paths.controlPath, controlStore.snapshot());
+
+      instance.expiryTimer = setInterval(() => {
+        expireConfirmations({
+          ...instance.buildContext(options.config, token),
+          req: null,
+          res: null
+        }).catch(() => undefined);
+        expireQuestions({
+          ...instance.buildContext(options.config, token),
+          req: null,
+          res: null
+        }).catch(() => undefined);
+      }, EXPIRY_INTERVAL_MS);
+    } catch (error) {
+      if (instance.expiryTimer) {
+        clearInterval(instance.expiryTimer);
+        instance.expiryTimer = null;
+      }
+      await new Promise<void>((resolve) => {
+        server.close(() => resolve());
+      });
+      throw error;
+    }
 
     return instance;
   }
@@ -1142,12 +1170,54 @@ function parseExpiryFallback(value: string | undefined): 'pause' | 'resume' | 'f
 }
 
 function readDelegationHeaders(req: http.IncomingMessage): { token: string; childRunId: string } | null {
-  const token = req.headers[DELEGATION_TOKEN_HEADER] as string | undefined;
-  const childRunId = req.headers[DELEGATION_RUN_HEADER] as string | undefined;
+  const token = readHeaderValue(req.headers[DELEGATION_TOKEN_HEADER]);
+  const childRunId = readHeaderValue(req.headers[DELEGATION_RUN_HEADER]);
   if (!token || !childRunId) {
     return null;
   }
   return { token, childRunId };
+}
+
+function readHeaderValue(value: string | string[] | undefined): string | null {
+  if (Array.isArray(value)) {
+    const values: string[] = [];
+    for (const entry of value) {
+      if (typeof entry !== 'string') {
+        continue;
+      }
+      const parts = entry.split(',');
+      for (const part of parts) {
+        const trimmed = part.trim();
+        if (trimmed) {
+          values.push(trimmed);
+        }
+      }
+    }
+    return readUniqueHeaderValue(values);
+  }
+  if (typeof value === 'string') {
+    const parts = value.split(',');
+    const values: string[] = [];
+    for (const part of parts) {
+      const trimmed = part.trim();
+      if (trimmed) {
+        values.push(trimmed);
+      }
+    }
+    return readUniqueHeaderValue(values);
+  }
+  return null;
+}
+
+function readUniqueHeaderValue(values: string[]): string | null {
+  if (values.length === 0) {
+    return null;
+  }
+  const unique = new Set(values);
+  if (unique.size > 1) {
+    return null;
+  }
+  return values[0];
 }
 
 function validateDelegation(
@@ -1237,15 +1307,28 @@ async function callChildControlEndpoint(
 ): Promise<void> {
   const { baseUrl, token } = await loadControlEndpoint(manifestPath, context);
   const url = new URL('/control/action', baseUrl);
-  const res = await fetch(url.toString(), {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-      [CSRF_HEADER]: token
-    },
-    body: JSON.stringify(payload)
-  });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), CHILD_CONTROL_TIMEOUT_MS);
+  let res: Awaited<ReturnType<typeof fetch>>;
+  try {
+    res = await fetch(url.toString(), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+        [CSRF_HEADER]: token
+      },
+      body: JSON.stringify(payload),
+      signal: controller.signal
+    });
+  } catch (error) {
+    if ((error as Error)?.name === 'AbortError') {
+      throw new Error('child control request timeout');
+    }
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
   if (!res.ok) {
     const message = await res.text();
     throw new Error(`child control error: ${res.status} ${message}`);
@@ -1386,14 +1469,20 @@ function assertRunManifestPath(pathname: string, label: string): void {
 }
 
 function isPathWithinRoots(pathname: string, roots: string[]): boolean {
-  const resolved = realpathSafe(pathname);
+  const resolved = normalizePath(realpathSafe(pathname));
   return roots.some((root) => {
-    const resolvedRoot = realpathSafe(root);
+    const resolvedRoot = normalizePath(realpathSafe(root));
     if (resolvedRoot === resolved) {
       return true;
     }
-    const normalizedRoot = resolvedRoot.endsWith('/') ? resolvedRoot : `${resolvedRoot}/`;
-    return resolved.startsWith(normalizedRoot);
+    const relativePath = relative(resolvedRoot, resolved);
+    if (!relativePath) {
+      return true;
+    }
+    if (isAbsolute(relativePath)) {
+      return false;
+    }
+    return !relativePath.startsWith(`..${sep}`) && relativePath !== '..';
   });
 }
 
@@ -1403,6 +1492,10 @@ function realpathSafe(pathname: string): string {
   } catch {
     return resolve(pathname);
   }
+}
+
+function normalizePath(pathname: string): string {
+  return process.platform === 'win32' ? pathname.toLowerCase() : pathname;
 }
 
 async function buildUiDataset(context: RequestContext): Promise<Record<string, unknown>> {
@@ -1547,3 +1640,8 @@ function resolveUiContentType(assetPath: string): string {
   }
   return 'application/octet-stream';
 }
+
+export const __test__ = {
+  readDelegationHeaders,
+  callChildControlEndpoint
+};
