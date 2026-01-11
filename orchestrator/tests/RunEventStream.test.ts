@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -29,10 +29,26 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
-  process.env.CODEX_ORCHESTRATOR_ROOT = ORIGINAL_ENV.root;
-  process.env.CODEX_ORCHESTRATOR_RUNS_DIR = ORIGINAL_ENV.runs;
-  process.env.CODEX_ORCHESTRATOR_OUT_DIR = ORIGINAL_ENV.out;
-  process.env.MCP_RUNNER_TASK_ID = ORIGINAL_ENV.task;
+  if (ORIGINAL_ENV.root === undefined) {
+    delete process.env.CODEX_ORCHESTRATOR_ROOT;
+  } else {
+    process.env.CODEX_ORCHESTRATOR_ROOT = ORIGINAL_ENV.root;
+  }
+  if (ORIGINAL_ENV.runs === undefined) {
+    delete process.env.CODEX_ORCHESTRATOR_RUNS_DIR;
+  } else {
+    process.env.CODEX_ORCHESTRATOR_RUNS_DIR = ORIGINAL_ENV.runs;
+  }
+  if (ORIGINAL_ENV.out === undefined) {
+    delete process.env.CODEX_ORCHESTRATOR_OUT_DIR;
+  } else {
+    process.env.CODEX_ORCHESTRATOR_OUT_DIR = ORIGINAL_ENV.out;
+  }
+  if (ORIGINAL_ENV.task === undefined) {
+    delete process.env.MCP_RUNNER_TASK_ID;
+  } else {
+    process.env.MCP_RUNNER_TASK_ID = ORIGINAL_ENV.task;
+  }
   await rm(workspaceRoot, { recursive: true, force: true });
 });
 
@@ -173,5 +189,94 @@ describe('RunEventStream', () => {
     await stream.close();
 
     expect(entry.seq).toBe(2);
+  });
+
+  it('closes after a prior write failure', async () => {
+    const env = normalizeEnvironmentPaths(resolveEnvironmentPaths());
+    const pipeline: PipelineDefinition = {
+      id: 'pipeline-run-event-failure',
+      title: 'Run Event Stream',
+      stages: [
+        {
+          kind: 'command',
+          id: 'stage-one',
+          title: 'Echo ok',
+          command: 'echo ok'
+        }
+      ]
+    };
+
+    const { manifest, paths } = await bootstrapManifest('run-event-failure', {
+      env,
+      pipeline,
+      parentRunId: null,
+      taskSlug: env.taskId,
+      approvalPolicy: null
+    });
+
+    const stream = await RunEventStream.create({
+      paths,
+      taskId: manifest.task_id,
+      runId: manifest.run_id,
+      pipelineId: pipeline.id,
+      pipelineTitle: pipeline.title,
+      now: () => '2026-01-01T00:00:00Z'
+    });
+
+    const streamImpl = stream as unknown as { stream: { write: (line: string, cb: (err?: Error) => void) => boolean } };
+    const writeSpy = vi.spyOn(streamImpl.stream, 'write').mockImplementation((_line, cb) => {
+      cb(new Error('write failed'));
+      return false;
+    });
+
+    try {
+      await expect(stream.append({ event: 'run_completed', actor: 'runner', payload: {} })).rejects.toThrow(
+        'write failed'
+      );
+      await expect(stream.close()).resolves.toBeUndefined();
+    } finally {
+      writeSpy.mockRestore();
+    }
+  });
+
+  it('surfaces stream error events without hanging on close', async () => {
+    const env = normalizeEnvironmentPaths(resolveEnvironmentPaths());
+    const pipeline: PipelineDefinition = {
+      id: 'pipeline-run-event-error',
+      title: 'Run Event Stream',
+      stages: [
+        {
+          kind: 'command',
+          id: 'stage-one',
+          title: 'Echo ok',
+          command: 'echo ok'
+        }
+      ]
+    };
+
+    const { manifest, paths } = await bootstrapManifest('run-event-error', {
+      env,
+      pipeline,
+      parentRunId: null,
+      taskSlug: env.taskId,
+      approvalPolicy: null
+    });
+
+    const stream = await RunEventStream.create({
+      paths,
+      taskId: manifest.task_id,
+      runId: manifest.run_id,
+      pipelineId: pipeline.id,
+      pipelineTitle: pipeline.title,
+      now: () => '2026-01-01T00:00:00Z'
+    });
+
+    const streamImpl = stream as unknown as { stream: { emit: (event: string, error: Error) => void } };
+    streamImpl.stream.emit('error', new Error('stream exploded'));
+
+    await expect(stream.append({ event: 'run_completed', actor: 'runner', payload: {} })).rejects.toThrow(
+      'stream exploded'
+    );
+    await expect(stream.close()).resolves.toBeUndefined();
   });
 });

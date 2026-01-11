@@ -1,8 +1,11 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import http from 'node:http';
-import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
+import { EventEmitter } from 'node:events';
+import { access, mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join, relative } from 'node:path';
 import { tmpdir } from 'node:os';
+import { PassThrough } from 'node:stream';
+import type { Socket } from 'node:net';
 import {
   applyQuestionFallback,
   callControlEndpointWithRetry,
@@ -10,6 +13,31 @@ import {
   resolveDelegationToken,
   resolveRunManifestPath
 } from '../src/cli/delegationServer.js';
+import { __test__ as delegationServerTest } from '../src/cli/delegationServer.js';
+
+const {
+  runJsonRpcServer,
+  parseSpawnOutput,
+  handleDelegateSpawn,
+  handleToolCall,
+  MAX_MCP_MESSAGE_BYTES,
+  MAX_MCP_HEADER_BYTES
+} = delegationServerTest;
+const ORIGINAL_EXIT_CODE = process.exitCode;
+
+let spawnMock: ReturnType<typeof vi.fn>;
+
+vi.mock('node:child_process', () => ({
+  spawn: (...args: unknown[]) => spawnMock(...args)
+}));
+
+beforeEach(() => {
+  spawnMock = vi.fn();
+});
+
+afterEach(() => {
+  process.exitCode = ORIGINAL_EXIT_CODE;
+});
 
 async function setupRun(options: { baseUrl?: string; tokenPath?: string } = {}) {
   const root = await mkdtemp(join(tmpdir(), 'delegation-server-'));
@@ -227,6 +255,39 @@ describe('delegation server question helpers', () => {
       expect(calls).toBeGreaterThan(1);
     } finally {
       await new Promise<void>((resolve) => parentServer.close(() => resolve()));
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('times out control endpoint requests', async () => {
+    const sockets = new Set<Socket>();
+    const stalledServer = http.createServer(() => {
+      // Intentionally do not respond to trigger timeout.
+    });
+    stalledServer.on('connection', (socket) => {
+      sockets.add(socket);
+      socket.on('close', () => sockets.delete(socket));
+    });
+    await new Promise<void>((resolve) => stalledServer.listen(0, '127.0.0.1', resolve));
+    const address = stalledServer.address();
+    const port = typeof address === 'string' || !address ? 0 : address.port;
+    const baseUrl = `http://127.0.0.1:${port}`;
+
+    const { root, manifestPath } = await setupRun({ baseUrl });
+
+    try {
+      await expect(
+        callControlEndpointWithRetry(
+          manifestPath,
+          '/questions',
+          null,
+          {},
+          { allowedHosts: ['127.0.0.1'], retryMs: 0, timeoutMs: 200 }
+        )
+      ).rejects.toThrow('control endpoint request timeout');
+    } finally {
+      sockets.forEach((socket) => socket.destroy());
+      await new Promise<void>((resolve) => stalledServer.close(() => resolve()));
       await rm(root, { recursive: true, force: true });
     }
   });
@@ -449,3 +510,321 @@ describe('delegation server question helpers', () => {
     }
   });
 });
+
+describe('delegation server spawn output parsing', () => {
+  it('extracts JSON payload after log lines', () => {
+    const stdout = [
+      '[Codex-Orchestrator] prepareRun start for pipeline diagnostics',
+      '[Codex-Orchestrator] prepareRun complete for pipeline diagnostics',
+      '{',
+      '  "run_id": "run-123",',
+      '  "status": "completed",',
+      '  "manifest": ".runs/task/cli/run-123/manifest.json"',
+      '}'
+    ].join('\n');
+    const parsed = parseSpawnOutput(stdout);
+    expect(parsed).toMatchObject({
+      run_id: 'run-123',
+      status: 'completed',
+      manifest: '.runs/task/cli/run-123/manifest.json'
+    });
+  });
+
+  it('extracts JSON payload before trailing logs', () => {
+    const stdout = [
+      '[Codex-Orchestrator] prepareRun start for pipeline diagnostics',
+      '{',
+      '  "run_id": "run-456",',
+      '  "status": "completed",',
+      '  "manifest": ".runs/task/cli/run-456/manifest.json"',
+      '}',
+      '[Codex-Orchestrator] post-run cleanup complete'
+    ].join('\n');
+    const parsed = parseSpawnOutput(stdout);
+    expect(parsed).toMatchObject({
+      run_id: 'run-456',
+      status: 'completed',
+      manifest: '.runs/task/cli/run-456/manifest.json'
+    });
+  });
+});
+
+describe('delegation server spawn validation', () => {
+  it('returns absolute manifest paths when spawn output is relative', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'delegation-spawn-repo-'));
+    try {
+      const runDir = join(repoRoot, '.runs', 'task-0940', 'cli', 'run-1');
+      await mkdir(runDir, { recursive: true });
+      const manifestPath = join(runDir, 'manifest.json');
+      await writeFile(manifestPath, JSON.stringify({}), 'utf8');
+
+      const child = new MockChildProcess();
+      spawnMock.mockReturnValue(child as unknown);
+
+      const repoArg = relative(process.cwd(), repoRoot);
+      const spawnPromise = handleDelegateSpawn(
+        { pipeline: 'diagnostics', repo: repoArg },
+        repoRoot,
+        false,
+        [repoRoot],
+        ['127.0.0.1'],
+        []
+      );
+
+      await new Promise((resolve) => setImmediate(resolve));
+      const stdout = JSON.stringify({
+        run_id: 'run-1',
+        status: 'completed',
+        manifest: relative(repoRoot, manifestPath)
+      });
+      child.stdout.write(stdout);
+      child.emit('exit', 0);
+
+      const result = await spawnPromise;
+      expect(spawnMock).toHaveBeenCalled();
+      const spawnArgs = spawnMock.mock.calls[0]?.[2] as { cwd?: string } | undefined;
+      expect(spawnArgs?.cwd).toBe(repoRoot);
+      expect(result).toMatchObject({
+        run_id: 'run-1',
+        manifest_path: manifestPath,
+        events_path: join(runDir, 'events.jsonl')
+      });
+      const tokenRaw = await readFile(join(runDir, 'delegation_token.json'), 'utf8');
+      expect(tokenRaw).toContain('token');
+    } finally {
+      await rm(repoRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('returns spawn_failed when manifest path is outside allowed roots', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'delegation-spawn-repo-'));
+    const outsideRoot = await mkdtemp(join(tmpdir(), 'delegation-spawn-outside-'));
+    try {
+      const runDir = join(outsideRoot, '.runs', 'task-0940', 'cli', 'run-1');
+      await mkdir(runDir, { recursive: true });
+      const manifestPath = join(runDir, 'manifest.json');
+      await writeFile(manifestPath, JSON.stringify({}), 'utf8');
+
+      const child = new MockChildProcess();
+      spawnMock.mockReturnValue(child as unknown);
+
+      const spawnPromise = handleDelegateSpawn(
+        { pipeline: 'diagnostics', repo: repoRoot },
+        repoRoot,
+        false,
+        [repoRoot],
+        ['127.0.0.1'],
+        []
+      );
+
+      await new Promise((resolve) => setImmediate(resolve));
+      const stdout = JSON.stringify({
+        run_id: 'run-1',
+        status: 'completed',
+        manifest: manifestPath
+      });
+      child.stdout.write(stdout);
+      child.emit('exit', 0);
+
+      const result = await spawnPromise;
+      expect(result).toEqual({ status: 'spawn_failed', stdout, stderr: '' });
+      await expect(access(join(runDir, 'delegation_token.json'))).rejects.toThrow();
+    } finally {
+      await rm(repoRoot, { recursive: true, force: true });
+      await rm(outsideRoot, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('delegation server secret guards', () => {
+  it('rejects camelCase confirmNonce in tool inputs', async () => {
+    const previousManifest = process.env.CODEX_ORCHESTRATOR_MANIFEST_PATH;
+    delete process.env.CODEX_ORCHESTRATOR_MANIFEST_PATH;
+    try {
+      await expect(
+        handleToolCall(
+          {
+            jsonrpc: '2.0',
+            method: 'tools/call',
+            params: {
+              name: 'delegate.status',
+              arguments: { confirmNonce: 'bad' }
+            }
+          },
+          {
+            repoRoot: process.cwd(),
+            mode: 'full',
+            allowNested: false,
+            githubEnabled: false,
+            allowedGithubOps: new Set<string>(),
+            allowedRoots: [process.cwd()],
+            allowedHosts: ['127.0.0.1'],
+            toolProfile: [],
+            expiryFallback: 'pause'
+          }
+        )
+      ).rejects.toThrow('confirm_nonce must be injected by the runner');
+    } finally {
+      if (previousManifest) {
+        process.env.CODEX_ORCHESTRATOR_MANIFEST_PATH = previousManifest;
+      } else {
+        delete process.env.CODEX_ORCHESTRATOR_MANIFEST_PATH;
+      }
+    }
+  });
+});
+
+describe('delegation server MCP framing', () => {
+  it('parses framed requests and writes framed responses', async () => {
+    process.exitCode = undefined;
+    const input = new PassThrough();
+    const output = new PassThrough();
+    let receivedMethod: string | null = null;
+    await runJsonRpcServer(async (request) => {
+      receivedMethod = request.method;
+      return { ok: true };
+    }, { stdin: input, stdout: output });
+
+    const payload = JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'delegate.status', params: {} });
+    const responsePromise = new Promise<Record<string, unknown>>((resolve) => {
+      let buffer = Buffer.alloc(0);
+      output.on('data', (chunk) => {
+        buffer = Buffer.concat([buffer, Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)]);
+        const headerEnd = buffer.indexOf('\r\n\r\n');
+        if (headerEnd === -1) {
+          return;
+        }
+        const header = buffer.slice(0, headerEnd).toString('utf8');
+        const match = header.match(/Content-Length:\s*(\d+)/i);
+        if (!match) {
+          return;
+        }
+        const length = Number(match[1]);
+        const bodyStart = headerEnd + 4;
+        if (buffer.length < bodyStart + length) {
+          return;
+        }
+        const body = buffer.slice(bodyStart, bodyStart + length).toString('utf8');
+        resolve(JSON.parse(body) as Record<string, unknown>);
+      });
+    });
+
+    input.write(`Content-Length: ${Buffer.byteLength(payload)}\r\n\r\n${payload}`);
+    const response = await responsePromise;
+    expect(receivedMethod).toBe('delegate.status');
+    expect(response).toEqual({ jsonrpc: '2.0', id: 1, result: { ok: true } });
+
+    input.end();
+  });
+
+  it('allows delimiter split across chunks without rejecting', async () => {
+    process.exitCode = undefined;
+    const input = new PassThrough();
+    const output = new PassThrough();
+    let receivedMethod: string | null = null;
+    await runJsonRpcServer(async (request) => {
+      receivedMethod = request.method;
+      return { ok: true };
+    }, { stdin: input, stdout: output });
+
+    const payload = JSON.stringify({ jsonrpc: '2.0', id: 2, method: 'delegate.status', params: {} });
+    const headerBase = `Content-Length: ${Buffer.byteLength(payload)}\r\n`;
+    const fillerLength = Math.max(0, MAX_MCP_HEADER_BYTES - headerBase.length);
+    const header = `${headerBase}${'a'.repeat(fillerLength)}`;
+    expect(Buffer.byteLength(header)).toBe(MAX_MCP_HEADER_BYTES);
+
+    const responsePromise = new Promise<Record<string, unknown>>((resolve) => {
+      let buffer = Buffer.alloc(0);
+      output.on('data', (chunk) => {
+        buffer = Buffer.concat([buffer, Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)]);
+        const headerEnd = buffer.indexOf('\r\n\r\n');
+        if (headerEnd === -1) {
+          return;
+        }
+        const headerValue = buffer.slice(0, headerEnd).toString('utf8');
+        const match = headerValue.match(/Content-Length:\s*(\d+)/i);
+        if (!match) {
+          return;
+        }
+        const length = Number(match[1]);
+        const bodyStart = headerEnd + 4;
+        if (buffer.length < bodyStart + length) {
+          return;
+        }
+        const body = buffer.slice(bodyStart, bodyStart + length).toString('utf8');
+        resolve(JSON.parse(body) as Record<string, unknown>);
+      });
+    });
+
+    input.write(header);
+    input.write('\r\n');
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(process.exitCode).toBeUndefined();
+
+    input.write(`\r\n${payload}`);
+    const response = await responsePromise;
+    expect(receivedMethod).toBe('delegate.status');
+    expect(response).toEqual({ jsonrpc: '2.0', id: 2, result: { ok: true } });
+
+    input.end();
+  });
+
+  it('keeps non-zero exitCode after oversized payloads', async () => {
+    process.exitCode = undefined;
+    const input = new PassThrough();
+    const output = new PassThrough();
+    await runJsonRpcServer(async () => ({}), { stdin: input, stdout: output });
+
+    input.write(`Content-Length: ${MAX_MCP_MESSAGE_BYTES + 1}\r\n\r\n`);
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(process.exitCode).toBe(1);
+
+    input.end();
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(process.exitCode).toBe(1);
+  });
+
+  it('rejects oversized headers without terminators', async () => {
+    process.exitCode = undefined;
+    const input = new PassThrough();
+    await runJsonRpcServer(async () => ({}), { stdin: input, stdout: new PassThrough() });
+
+    input.write(Buffer.alloc(MAX_MCP_HEADER_BYTES + 1, 'a'));
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(process.exitCode).toBe(1);
+
+    input.end();
+  });
+
+  it('rejects multiple Content-Length headers', async () => {
+    process.exitCode = undefined;
+    const input = new PassThrough();
+    await runJsonRpcServer(async () => ({}), { stdin: input, stdout: new PassThrough() });
+
+    input.write('Content-Length: 1\r\nContent-Length: 2\r\n\r\n');
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(process.exitCode).toBe(1);
+
+    input.end();
+  });
+
+  it('rejects missing Content-Length headers', async () => {
+    process.exitCode = undefined;
+    const input = new PassThrough();
+    await runJsonRpcServer(async () => ({}), { stdin: input, stdout: new PassThrough() });
+
+    input.write('Content-Type: application/json\r\n\r\n{}');
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(process.exitCode).toBe(1);
+
+    input.end();
+  });
+});
+
+class MockChildProcess extends EventEmitter {
+  stdout = new PassThrough();
+  stderr = new PassThrough();
+  kill(): boolean {
+    return true;
+  }
+}

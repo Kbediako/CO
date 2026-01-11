@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { realpathSync } from 'node:fs';
 import { chmod, readFile } from 'node:fs/promises';
-import { basename, dirname, isAbsolute, resolve } from 'node:path';
+import { basename, dirname, isAbsolute, relative, resolve, sep } from 'node:path';
 import process from 'node:process';
 
 import {
@@ -42,6 +42,14 @@ const DEFAULT_SPAWN_TIMEOUT_MS = 5 * 60 * 1000;
 const DEFAULT_GH_TIMEOUT_MS = 60_000;
 const DEFAULT_DELEGATION_TOKEN_RETRY_MS = 2000;
 const DEFAULT_DELEGATION_TOKEN_RETRY_INTERVAL_MS = 200;
+const DEFAULT_CONTROL_ENDPOINT_TIMEOUT_MS = 15_000;
+const MAX_MCP_MESSAGE_BYTES = 1024 * 1024;
+const MAX_MCP_HEADER_BYTES = 16 * 1024;
+const MCP_HEADER_DELIMITER = '\r\n\r\n';
+const MCP_HEADER_DELIMITER_BYTES = MCP_HEADER_DELIMITER.length;
+const MCP_HEADER_DELIMITER_BUFFER = Buffer.from(MCP_HEADER_DELIMITER, 'utf8');
+const MAX_MCP_BUFFER_BYTES =
+  (MAX_MCP_MESSAGE_BYTES + MAX_MCP_HEADER_BYTES + MCP_HEADER_DELIMITER_BYTES) * 2;
 const DELEGATION_TOKEN_HEADER = 'x-codex-delegation-token';
 const DELEGATION_RUN_HEADER = 'x-codex-delegation-run-id';
 const DELEGATION_TOKEN_FILE = 'delegation_token.json';
@@ -273,11 +281,11 @@ async function handleToolCall(
     throw new Error('delegate_mode_forbidden');
   }
 
-  if (containsSecret(input, 'confirm_nonce')) {
+  if (containsSecret(input, 'confirm_nonce') || containsSecret(input, 'confirmNonce')) {
     await reportSecurityViolation('confirm_nonce_present', 'Model supplied confirm_nonce.', toolName, context.allowedHosts);
     throw new Error('confirm_nonce must be injected by the runner');
   }
-  if (containsSecret(input, 'delegation_token')) {
+  if (containsSecret(input, 'delegation_token') || containsSecret(input, 'delegationToken')) {
     await reportSecurityViolation(
       'delegation_token_present',
       'Model supplied delegation_token.',
@@ -483,25 +491,25 @@ async function handleDelegateSpawn(
     ...(mcpOverrides.length > 0 ? { CODEX_MCP_CONFIG_OVERRIDES: mcpOverrides.join(';') } : {})
   };
 
-  const child = spawn('codex-orchestrator', args, { cwd: repo, env: childEnv });
+  const child = spawn('codex-orchestrator', args, { cwd: resolvedRepo, env: childEnv });
   const output = await collectOutput(child, DEFAULT_SPAWN_TIMEOUT_MS);
-  const parsed = safeJsonParse(output.stdout);
-  const parsedRecord = asRecord(parsed);
+  const parsedRecord = parseSpawnOutput(output.stdout);
   const manifestPath = readStringValue(parsedRecord, 'manifest');
   if (!manifestPath) {
     return { status: 'spawn_failed', stdout: output.stdout.trim(), stderr: output.stderr.trim() };
   }
   const runId = readStringValue(parsedRecord, 'run_id', 'runId');
   const logPath = readStringValue(parsedRecord, 'log_path', 'logPath');
-  const eventsPath = `${dirname(manifestPath)}/events.jsonl`;
-  const resolvedManifestPath = resolveSpawnManifestPath(manifestPath, resolvedRepo);
-
-  if (resolvedManifestPath) {
-    await persistDelegationToken(resolvedManifestPath, delegationToken, {
-      parentRunId: parentRunId ?? null,
-      childRunId: runId ?? null
-    });
+  const resolvedManifestPath = resolveSpawnManifestPath(manifestPath, resolvedRepo, allowedRoots);
+  if (!resolvedManifestPath) {
+    return { status: 'spawn_failed', stdout: output.stdout.trim(), stderr: output.stderr.trim() };
   }
+  const eventsPath = `${dirname(resolvedManifestPath)}/events.jsonl`;
+
+  await persistDelegationToken(resolvedManifestPath, delegationToken, {
+    parentRunId: parentRunId ?? null,
+    childRunId: runId ?? null
+  });
 
   if (parentManifestPath && parentRunId && runId) {
     try {
@@ -523,7 +531,7 @@ async function handleDelegateSpawn(
 
   return {
     run_id: runId,
-    manifest_path: manifestPath,
+    manifest_path: resolvedManifestPath,
     log_path: logPath,
     events_path: eventsPath
   };
@@ -790,7 +798,13 @@ export async function callControlEndpointWithRetry(
   endpoint: string,
   payload: Record<string, unknown> | null,
   extraHeaders: Record<string, string> = {},
-  options: { allowedHosts?: string[]; allowedRoots?: string[]; retryMs?: number; retryIntervalMs?: number } = {}
+  options: {
+    allowedHosts?: string[];
+    allowedRoots?: string[];
+    retryMs?: number;
+    retryIntervalMs?: number;
+    timeoutMs?: number;
+  } = {}
 ): Promise<Record<string, unknown>> {
   const retryMs = options.retryMs ?? 0;
   const retryIntervalMs = options.retryIntervalMs ?? DEFAULT_DELEGATION_TOKEN_RETRY_INTERVAL_MS;
@@ -816,20 +830,36 @@ async function callControlEndpoint(
   endpoint: string,
   payload: Record<string, unknown> | null,
   extraHeaders: Record<string, string> = {},
-  options: { allowedHosts?: string[]; allowedRoots?: string[] } = {}
+  options: { allowedHosts?: string[]; allowedRoots?: string[]; timeoutMs?: number } = {}
 ): Promise<Record<string, unknown>> {
   const { baseUrl, token } = await loadControlEndpoint(manifestPath, options);
   const url = new URL(endpoint, baseUrl);
-  const res = await fetch(url.toString(), {
-    method: payload ? 'POST' : 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-      [CSRF_HEADER]: token,
-      ...extraHeaders
-    },
-    body: payload ? JSON.stringify(payload) : undefined
-  });
+  const timeoutMs = options.timeoutMs ?? DEFAULT_CONTROL_ENDPOINT_TIMEOUT_MS;
+  const controller = new AbortController();
+  const timer = timeoutMs > 0 ? setTimeout(() => controller.abort(), timeoutMs) : null;
+  let res: Response;
+  try {
+    res = await fetch(url.toString(), {
+      method: payload ? 'POST' : 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+        [CSRF_HEADER]: token,
+        ...extraHeaders
+      },
+      body: payload ? JSON.stringify(payload) : undefined,
+      signal: controller.signal
+    });
+  } catch (error) {
+    if ((error as Error)?.name === 'AbortError') {
+      throw new Error('control endpoint request timeout');
+    }
+    throw error;
+  } finally {
+    if (timer) {
+      clearTimeout(timer);
+    }
+  }
   if (!res.ok) {
     const raw = await res.text();
     let errorCode: string | null = null;
@@ -979,23 +1009,52 @@ async function runGh(args: string[], timeoutMs = DEFAULT_GH_TIMEOUT_MS): Promise
   });
 }
 
-async function runJsonRpcServer(handler: (request: McpRequest) => Promise<unknown>): Promise<void> {
+async function runJsonRpcServer(
+  handler: (request: McpRequest) => Promise<unknown>,
+  options: { stdin?: NodeJS.ReadableStream; stdout?: NodeJS.WritableStream } = {}
+): Promise<void> {
   let buffer = Buffer.alloc(0);
   let expectedLength: number | null = null;
+  let processing = Promise.resolve();
+  let halted = false;
+  const input = options.stdin ?? process.stdin;
+  const output = options.stdout ?? process.stdout;
 
-  process.stdin.on('data', (chunk) => {
+  const handleProtocolViolation = (message: string) => {
+    if (halted) {
+      return;
+    }
+    halted = true;
+    logger.warn(message);
+    process.exitCode = 1;
+    buffer = Buffer.alloc(0);
+    expectedLength = null;
+    if (typeof (input as { pause?: () => void }).pause === 'function') {
+      input.pause();
+    }
+  };
+
+  input.on('data', (chunk) => {
+    if (halted) {
+      return;
+    }
     buffer = Buffer.concat([buffer, Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)]);
-    processBuffer().catch((error) => {
-      logger.error(`Failed to process MCP buffer: ${(error as Error)?.message ?? error}`);
-    });
-  });
-
-  process.stdin.on('end', () => {
-    process.exitCode = 0;
+    if (buffer.length > MAX_MCP_BUFFER_BYTES) {
+      handleProtocolViolation(`Rejecting MCP buffer larger than ${MAX_MCP_BUFFER_BYTES} bytes`);
+      return;
+    }
+    processing = processing
+      .then(() => processBuffer())
+      .catch((error) => {
+        logger.error(`Failed to process MCP buffer: ${(error as Error)?.message ?? error}`);
+      });
   });
 
   async function processBuffer() {
     while (buffer.length > 0) {
+      if (halted) {
+        return;
+      }
       if (expectedLength !== null) {
         if (buffer.length < expectedLength) {
           return;
@@ -1009,15 +1068,39 @@ async function runJsonRpcServer(handler: (request: McpRequest) => Promise<unknow
 
       const headerEnd = buffer.indexOf('\r\n\r\n');
       if (headerEnd === -1) {
+        if (buffer.length > MAX_MCP_HEADER_BYTES) {
+          const overflow = buffer.slice(MAX_MCP_HEADER_BYTES);
+          const allowedPrefix = MCP_HEADER_DELIMITER_BUFFER.subarray(0, overflow.length);
+          if (overflow.length > MCP_HEADER_DELIMITER_BYTES || !overflow.equals(allowedPrefix)) {
+            handleProtocolViolation(`Rejecting MCP header larger than ${MAX_MCP_HEADER_BYTES} bytes`);
+          }
+        }
+        return;
+      }
+      if (headerEnd > MAX_MCP_HEADER_BYTES) {
+        handleProtocolViolation(`Rejecting MCP header larger than ${MAX_MCP_HEADER_BYTES} bytes`);
         return;
       }
       const header = buffer.slice(0, headerEnd).toString('utf8');
-      const match = /Content-Length:\s*(\d+)/i.exec(header);
-      if (!match) {
-        buffer = buffer.slice(headerEnd + 4);
-        continue;
+      const parsed = parseContentLengthHeader(header);
+      if (parsed.error) {
+        handleProtocolViolation(parsed.error);
+        return;
       }
-      expectedLength = Number(match[1]);
+      if (parsed.length === null) {
+        handleProtocolViolation('Missing Content-Length header in MCP message');
+        return;
+      }
+      const length = parsed.length;
+      if (!Number.isFinite(length) || length < 0) {
+        handleProtocolViolation('Invalid Content-Length for MCP payload');
+        return;
+      }
+      if (length > MAX_MCP_MESSAGE_BYTES) {
+        handleProtocolViolation(`Rejecting MCP payload (${length} bytes) larger than ${MAX_MCP_MESSAGE_BYTES}`);
+        return;
+      }
+      expectedLength = length;
       buffer = buffer.slice(headerEnd + 4);
     }
   }
@@ -1037,7 +1120,7 @@ async function runJsonRpcServer(handler: (request: McpRequest) => Promise<unknow
     try {
       const result = await handler(request);
       if (id !== null && typeof id !== 'undefined') {
-        sendResponse({ jsonrpc: '2.0', id, result });
+        sendResponse({ jsonrpc: '2.0', id, result }, output);
       }
     } catch (error) {
       if (id !== null && typeof id !== 'undefined') {
@@ -1045,16 +1128,40 @@ async function runJsonRpcServer(handler: (request: McpRequest) => Promise<unknow
           jsonrpc: '2.0',
           id,
           error: { code: -32603, message: (error as Error)?.message ?? String(error) }
-        });
+        }, output);
       }
     }
   }
 }
 
-function sendResponse(response: McpResponse): void {
+function parseContentLengthHeader(header: string): { length: number | null; error?: string } {
+  const lines = header.split(/\r?\n/);
+  let contentLength: number | null = null;
+  for (const line of lines) {
+    const separator = line.indexOf(':');
+    if (separator === -1) {
+      continue;
+    }
+    const name = line.slice(0, separator).trim().toLowerCase();
+    if (name !== 'content-length') {
+      continue;
+    }
+    if (contentLength !== null) {
+      return { length: null, error: 'Multiple Content-Length headers in MCP message' };
+    }
+    const value = line.slice(separator + 1).trim();
+    if (!/^\d+$/.test(value)) {
+      return { length: null, error: 'Invalid Content-Length header in MCP message' };
+    }
+    contentLength = Number(value);
+  }
+  return { length: contentLength };
+}
+
+function sendResponse(response: McpResponse, output: NodeJS.WritableStream = process.stdout): void {
   const payload = Buffer.from(JSON.stringify(response), 'utf8');
   const header = Buffer.from(`Content-Length: ${payload.length}\r\n\r\n`, 'utf8');
-  process.stdout.write(Buffer.concat([header, payload]));
+  output.write(Buffer.concat([header, payload]));
 }
 
 function safeJsonParse(text: string): unknown | null {
@@ -1064,6 +1171,44 @@ function safeJsonParse(text: string): unknown | null {
     return null;
   }
 }
+
+function parseSpawnOutput(stdout: string): Record<string, unknown> {
+  const trimmed = stdout.trim();
+  if (!trimmed) {
+    return {};
+  }
+  const direct = safeJsonParse(trimmed);
+  if (direct && typeof direct === 'object' && !Array.isArray(direct)) {
+    return direct as Record<string, unknown>;
+  }
+  const lines = trimmed.split(/\r?\n/);
+  for (let i = lines.length - 1; i >= 0; i -= 1) {
+    if (!lines[i].trim().startsWith('{')) {
+      continue;
+    }
+    for (let j = lines.length - 1; j >= i; j -= 1) {
+      if (!lines[j].includes('}')) {
+        continue;
+      }
+      const candidate = lines.slice(i, j + 1).join('\n');
+      const parsed = safeJsonParse(candidate);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        return parsed as Record<string, unknown>;
+      }
+    }
+  }
+  return {};
+}
+
+export const __test__ = {
+  runJsonRpcServer,
+  handleToolCall,
+  parseContentLengthHeader,
+  parseSpawnOutput,
+  handleDelegateSpawn,
+  MAX_MCP_MESSAGE_BYTES,
+  MAX_MCP_HEADER_BYTES
+};
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -1402,14 +1547,20 @@ function assertRunManifestPath(pathname: string, label: string): void {
 }
 
 function isPathWithinRoots(pathname: string, roots: string[]): boolean {
-  const resolved = realpathSafe(pathname);
+  const resolved = normalizePath(realpathSafe(pathname));
   return roots.some((root) => {
-    const resolvedRoot = realpathSafe(root);
+    const resolvedRoot = normalizePath(realpathSafe(root));
     if (resolvedRoot === resolved) {
       return true;
     }
-    const normalizedRoot = resolvedRoot.endsWith('/') ? resolvedRoot : `${resolvedRoot}/`;
-    return resolved.startsWith(normalizedRoot);
+    const relativePath = relative(resolvedRoot, resolved);
+    if (!relativePath) {
+      return true;
+    }
+    if (isAbsolute(relativePath)) {
+      return false;
+    }
+    return !relativePath.startsWith(`..${sep}`) && relativePath !== '..';
   });
 }
 
@@ -1421,13 +1572,24 @@ function realpathSafe(pathname: string): string {
   }
 }
 
-function resolveSpawnManifestPath(manifestPath: string, repoRoot: string): string | null {
+function normalizePath(pathname: string): string {
+  return process.platform === 'win32' ? pathname.toLowerCase() : pathname;
+}
+
+function resolveSpawnManifestPath(
+  manifestPath: string,
+  repoRoot: string,
+  allowedRoots?: string[]
+): string | null {
   if (!manifestPath) {
     return null;
   }
   const resolved = isAbsolute(manifestPath) ? manifestPath : resolve(repoRoot, manifestPath);
   try {
     assertRunManifestPath(resolved, 'manifest_path');
+    if (allowedRoots && !isPathWithinRoots(resolved, allowedRoots)) {
+      return null;
+    }
     return resolved;
   } catch {
     return null;

@@ -1,12 +1,20 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import http from 'node:http';
 import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
-import { ControlServer, formatHostForUrl, isLoopbackAddress } from '../src/cli/control/controlServer.js';
+import * as fsUtils from '../src/cli/utils/fs.js';
+import {
+  ControlServer,
+  formatHostForUrl,
+  isLoopbackAddress,
+  __test__ as controlServerTest
+} from '../src/cli/control/controlServer.js';
 import { computeEffectiveDelegationConfig } from '../src/cli/config/delegationConfig.js';
 import { resolveRunPaths } from '../src/cli/run/runPaths.js';
+
+const { readDelegationHeaders, callChildControlEndpoint } = controlServerTest;
 
 async function createRunRoot(taskId: string) {
   const root = await mkdtemp(join(tmpdir(), 'control-server-'));
@@ -34,6 +42,78 @@ describe('ControlServer', () => {
     expect(isLoopbackAddress('::1')).toBe(true);
     expect(isLoopbackAddress('::ffff:127.0.0.1')).toBe(true);
     expect(isLoopbackAddress('192.168.0.1')).toBe(false);
+  });
+
+  it('parses delegation headers from string arrays', () => {
+    const req = {
+      headers: {
+        'x-codex-delegation-token': [' token '],
+        'x-codex-delegation-run-id': [' child-run ']
+      }
+    } as http.IncomingMessage;
+
+    const parsed = readDelegationHeaders(req);
+    expect(parsed).toEqual({ token: 'token', childRunId: 'child-run' });
+  });
+
+  it('parses delegation headers from comma-separated string arrays', () => {
+    const req = {
+      headers: {
+        'x-codex-delegation-token': [' token , token '],
+        'x-codex-delegation-run-id': [' child-run ']
+      }
+    } as http.IncomingMessage;
+
+    const parsed = readDelegationHeaders(req);
+    expect(parsed).toEqual({ token: 'token', childRunId: 'child-run' });
+  });
+
+  it('parses delegation headers from comma-separated strings', () => {
+    const req = {
+      headers: {
+        'x-codex-delegation-token': ' token , token ',
+        'x-codex-delegation-run-id': ' child-run '
+      }
+    } as http.IncomingMessage;
+
+    const parsed = readDelegationHeaders(req);
+    expect(parsed).toEqual({ token: 'token', childRunId: 'child-run' });
+  });
+
+  it('rejects ambiguous delegation headers', () => {
+    const req = {
+      headers: {
+        'x-codex-delegation-token': ['token-a', 'token-b'],
+        'x-codex-delegation-run-id': ['child-run']
+      }
+    } as http.IncomingMessage;
+
+    const parsed = readDelegationHeaders(req);
+    expect(parsed).toBeNull();
+  });
+
+  it('rejects comma-separated delegation headers in string arrays with different values', () => {
+    const req = {
+      headers: {
+        'x-codex-delegation-token': ['token-a, token-b'],
+        'x-codex-delegation-run-id': ['child-run']
+      }
+    } as http.IncomingMessage;
+
+    const parsed = readDelegationHeaders(req);
+    expect(parsed).toBeNull();
+  });
+
+  it('rejects comma-separated delegation headers with different values', () => {
+    const req = {
+      headers: {
+        'x-codex-delegation-token': 'token-a, token-b',
+        'x-codex-delegation-run-id': 'child-run'
+      }
+    } as http.IncomingMessage;
+
+    const parsed = readDelegationHeaders(req);
+    expect(parsed).toBeNull();
   });
 
   it('issues session tokens via POST with no-store', async () => {
@@ -424,6 +504,202 @@ describe('ControlServer', () => {
       expect(raw).not.toContain('nope');
     } finally {
       await server.close();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('closes the server if control metadata writes fail', async () => {
+    const { root, env, paths } = await createRunRoot('task-0940');
+    const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
+    const originalCreateServer = http.createServer;
+    let createdServer: http.Server | null = null;
+    const createServerSpy = vi.spyOn(http, 'createServer').mockImplementation((...args) => {
+      const server = originalCreateServer(...(args as Parameters<typeof originalCreateServer>));
+      createdServer = server;
+      return server;
+    });
+    const writeSpy = vi.spyOn(fsUtils, 'writeJsonAtomic').mockRejectedValueOnce(new Error('boom'));
+
+    try {
+      await expect(
+        ControlServer.start({
+          paths,
+          config,
+          runId: 'run-1'
+        })
+      ).rejects.toThrow('boom');
+      expect(createdServer).toBeTruthy();
+      expect(createdServer?.listening).toBe(false);
+    } finally {
+      createServerSpy.mockRestore();
+      writeSpy.mockRestore();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('fails when server listen emits an error', async () => {
+    const { root, env, paths } = await createRunRoot('task-0940');
+    const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
+    const originalCreateServer = http.createServer;
+    let createdServer: http.Server | null = null;
+    const createServerSpy = vi.spyOn(http, 'createServer').mockImplementation((...args) => {
+      const server = originalCreateServer(...(args as Parameters<typeof originalCreateServer>));
+      createdServer = server;
+      vi.spyOn(server, 'listen').mockImplementation((...listenArgs: unknown[]) => {
+        void listenArgs;
+        process.nextTick(() => {
+          server.emit('error', new Error('listen-failed'));
+        });
+        return server;
+      });
+      return server;
+    });
+
+    try {
+      await expect(
+        ControlServer.start({
+          paths,
+          config,
+          runId: 'run-1'
+        })
+      ).rejects.toThrow('listen-failed');
+      expect(createdServer).toBeTruthy();
+      expect(createdServer?.listening).toBe(false);
+    } finally {
+      createServerSpy.mockRestore();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('sends child control actions to child endpoints', async () => {
+    const { root, env, paths } = await createRunRoot('task-0940');
+    const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
+    const tokenPath = join(paths.runDir, 'control_auth.json');
+    const endpointPath = join(paths.runDir, 'control_endpoint.json');
+    await writeFile(paths.manifestPath, JSON.stringify({ run_id: 'child-run' }), 'utf8');
+    await writeFile(tokenPath, JSON.stringify({ token: 'child-token' }), 'utf8');
+
+    let receivedAction: Record<string, unknown> | null = null;
+    const childServer = http.createServer(async (req, res) => {
+      if (req.url === '/control/action' && req.method === 'POST') {
+        let body = '';
+        for await (const chunk of req) {
+          body += chunk.toString();
+        }
+        receivedAction = JSON.parse(body || '{}') as Record<string, unknown>;
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ status: 'ok' }));
+        return;
+      }
+      res.writeHead(404);
+      res.end();
+    });
+    await new Promise<void>((resolve) => childServer.listen(0, '127.0.0.1', resolve));
+    const childAddress = childServer.address();
+    const childPort = typeof childAddress === 'string' || !childAddress ? 0 : childAddress.port;
+    const childBaseUrl = `http://127.0.0.1:${childPort}`;
+    await writeFile(
+      endpointPath,
+      JSON.stringify({ base_url: childBaseUrl, token_path: tokenPath }),
+      'utf8'
+    );
+
+    try {
+      const context = { config } as Parameters<typeof callChildControlEndpoint>[0];
+      await callChildControlEndpoint(context, paths.manifestPath, { action: 'resume' });
+      expect(receivedAction?.action).toBe('resume');
+    } finally {
+      await new Promise<void>((resolve) => childServer.close(() => resolve()));
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects child control error responses', async () => {
+    const { root, env, paths } = await createRunRoot('task-0940');
+    const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
+    const tokenPath = join(paths.runDir, 'control_auth.json');
+    const endpointPath = join(paths.runDir, 'control_endpoint.json');
+    await writeFile(paths.manifestPath, JSON.stringify({ run_id: 'child-run' }), 'utf8');
+    await writeFile(tokenPath, JSON.stringify({ token: 'child-token' }), 'utf8');
+
+    const childServer = http.createServer((req, res) => {
+      if (req.url === '/control/action' && req.method === 'POST') {
+        res.writeHead(500, { 'Content-Type': 'text/plain' });
+        res.end('nope');
+        return;
+      }
+      res.writeHead(404);
+      res.end();
+    });
+    await new Promise<void>((resolve) => childServer.listen(0, '127.0.0.1', resolve));
+    const childAddress = childServer.address();
+    const childPort = typeof childAddress === 'string' || !childAddress ? 0 : childAddress.port;
+    const childBaseUrl = `http://127.0.0.1:${childPort}`;
+    await writeFile(
+      endpointPath,
+      JSON.stringify({ base_url: childBaseUrl, token_path: tokenPath }),
+      'utf8'
+    );
+
+    try {
+      const context = { config } as Parameters<typeof callChildControlEndpoint>[0];
+      await expect(
+        callChildControlEndpoint(context, paths.manifestPath, { action: 'resume' })
+      ).rejects.toThrow('child control error: 500 nope');
+    } finally {
+      await new Promise<void>((resolve) => childServer.close(() => resolve()));
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('times out child control requests', async () => {
+    const { root, env, paths } = await createRunRoot('task-0940');
+    const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
+    const tokenPath = join(paths.runDir, 'control_auth.json');
+    const endpointPath = join(paths.runDir, 'control_endpoint.json');
+    await writeFile(paths.manifestPath, JSON.stringify({ run_id: 'child-run' }), 'utf8');
+    await writeFile(tokenPath, JSON.stringify({ token: 'child-token' }), 'utf8');
+    await writeFile(
+      endpointPath,
+      JSON.stringify({ base_url: 'http://127.0.0.1:8123', token_path: tokenPath }),
+      'utf8'
+    );
+
+    const originalFetch = global.fetch;
+    const setTimeoutSpy = vi.spyOn(global, 'setTimeout').mockImplementation(
+      ((handler: TimerHandler, _timeout?: number, ...args: unknown[]) => {
+        queueMicrotask(() => {
+          if (typeof handler === 'function') {
+            handler(...args);
+          }
+        });
+        return 0 as unknown as NodeJS.Timeout;
+      }) as typeof setTimeout
+    );
+    global.fetch = vi.fn((_url, options) => {
+      const signal = (options as { signal?: AbortSignal } | undefined)?.signal;
+      return new Promise((_, reject) => {
+        const abortHandler = () => {
+          const error = new Error('aborted');
+          (error as Error & { name?: string }).name = 'AbortError';
+          reject(error);
+        };
+        if (signal?.aborted) {
+          abortHandler();
+          return;
+        }
+        signal?.addEventListener('abort', abortHandler);
+      });
+    }) as typeof fetch;
+
+    try {
+      const context = { config } as Parameters<typeof callChildControlEndpoint>[0];
+      await expect(
+        callChildControlEndpoint(context, paths.manifestPath, { action: 'resume' })
+      ).rejects.toThrow('child control request timeout');
+    } finally {
+      setTimeoutSpy.mockRestore();
+      global.fetch = originalFetch;
       await rm(root, { recursive: true, force: true });
     }
   });
@@ -1102,6 +1378,69 @@ describe('ControlServer', () => {
       expect(payload.error).toBe('delegation_run_mismatch');
     } finally {
       await parentServer.close();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects question enqueue when manifest path is outside allowed run roots', async () => {
+    const { root, env, paths } = await createRunRoot('parent-task');
+    const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
+    config.ui.allowedRunRoots = [paths.runDir];
+
+    const outsideRoot = await mkdtemp(join(tmpdir(), 'control-server-outside-'));
+    const childRunDir = join(outsideRoot, '.runs', 'child-task', 'cli', 'child-run');
+    await mkdir(childRunDir, { recursive: true });
+    const childManifestPath = join(childRunDir, 'manifest.json');
+    await writeFile(childManifestPath, JSON.stringify({ run_id: 'child-run' }), 'utf8');
+
+    const parentServer = await ControlServer.start({
+      paths,
+      config,
+      runId: 'parent-run'
+    });
+
+    try {
+      const parentToken = await readToken(paths.controlAuthPath);
+      const baseUrl = parentServer.getBaseUrl() ?? '';
+
+      await fetch(new URL('/delegation/register', baseUrl), {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${parentToken}`,
+          'x-csrf-token': parentToken,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          token: 'delegation-token',
+          parent_run_id: 'parent-run',
+          child_run_id: 'child-run'
+        })
+      });
+
+      const enqueueRes = await fetch(new URL('/questions/enqueue', baseUrl), {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${parentToken}`,
+          'x-csrf-token': parentToken,
+          'Content-Type': 'application/json',
+          'x-codex-delegation-token': 'delegation-token',
+          'x-codex-delegation-run-id': 'child-run'
+        },
+        body: JSON.stringify({
+          parent_run_id: 'parent-run',
+          from_manifest_path: childManifestPath,
+          prompt: 'Outside root',
+          urgency: 'med',
+          auto_pause: true
+        })
+      });
+
+      expect(enqueueRes.status).toBe(400);
+      const payload = (await enqueueRes.json()) as { error?: string };
+      expect(payload.error).toBe('invalid_manifest_path');
+    } finally {
+      await parentServer.close();
+      await rm(outsideRoot, { recursive: true, force: true });
       await rm(root, { recursive: true, force: true });
     }
   });

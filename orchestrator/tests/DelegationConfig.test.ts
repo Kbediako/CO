@@ -94,6 +94,60 @@ describe('delegation config layering', () => {
     expect(result.paths.allowedRoots).toEqual(['/repo/docs']);
   });
 
+  it('caps ui.allowedRunRoots to the repo allowlist', () => {
+    const result = computeEffectiveDelegationConfig({
+      repoRoot,
+      layers: [
+        makeLayer({
+          source: 'repo',
+          ui: { allowedRunRoots: ['/repo', '/shared'] }
+        }),
+        makeLayer({
+          source: 'env',
+          ui: { allowedRunRoots: ['/shared', '/other'] }
+        })
+      ]
+    });
+
+    expect(result.ui.allowedRunRoots).toEqual(['/shared']);
+  });
+
+  it('keeps ui.allowedRunRoots empty when overrides fall outside the repo cap', () => {
+    const result = computeEffectiveDelegationConfig({
+      repoRoot,
+      layers: [
+        makeLayer({
+          source: 'repo',
+          ui: { allowedRunRoots: ['/repo'] }
+        }),
+        makeLayer({
+          source: 'env',
+          ui: { allowedRunRoots: ['/other'] }
+        })
+      ]
+    });
+
+    expect(result.ui.allowedRunRoots).toEqual([]);
+  });
+
+  it('treats an explicit empty repo allowedRunRoots as a denylist', () => {
+    const result = computeEffectiveDelegationConfig({
+      repoRoot,
+      layers: [
+        makeLayer({
+          source: 'repo',
+          ui: { allowedRunRoots: [] }
+        }),
+        makeLayer({
+          source: 'env',
+          ui: { allowedRunRoots: ['/repo'] }
+        })
+      ]
+    });
+
+    expect(result.ui.allowedRunRoots).toEqual([]);
+  });
+
   it('treats an explicit empty repo allowedRoots as a denylist', () => {
     const result = computeEffectiveDelegationConfig({
       repoRoot,
@@ -172,6 +226,18 @@ describe('delegation config layering', () => {
   it('splits delegation config overrides from env strings', () => {
     const overrides = splitDelegationConfigOverrides('delegate.allow_nested=true;ui.bind_host="127.0.0.1"');
     expect(overrides).toEqual(['delegate.allow_nested=true', 'ui.bind_host="127.0.0.1"']);
+  });
+
+  it('preserves TOML arrays when splitting overrides', () => {
+    const overrides = splitDelegationConfigOverrides(
+      'ui.allowed_run_roots=["/a","/b"],delegate.allow_nested=true'
+    );
+    expect(overrides).toEqual(['ui.allowed_run_roots=["/a","/b"]', 'delegate.allow_nested=true']);
+  });
+
+  it('treats whitespace-only override strings for string arrays as empty lists', () => {
+    const layer = parseDelegationConfigOverride('ui.allowed_run_roots="   "', 'env');
+    expect(layer?.ui?.allowedRunRoots).toEqual([]);
   });
 
   it('applies CLI overrides after env overrides', () => {

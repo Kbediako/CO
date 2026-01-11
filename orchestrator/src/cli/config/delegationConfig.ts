@@ -2,7 +2,9 @@ import { realpathSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { homedir } from 'node:os';
-import { dirname, isAbsolute, join, resolve } from 'node:path';
+import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
+
+import { logger } from '../../logger.js';
 
 const require = createRequire(import.meta.url);
 const toml = require('@iarna/toml');
@@ -262,6 +264,19 @@ export function computeEffectiveDelegationConfig(options: {
     ? requestedBindHost
     : repoAllowedBindHosts[0] ?? defaults.ui.bindHost;
 
+  const repoAllowedRunRoots =
+    typeof repoLayer?.ui?.allowedRunRoots !== 'undefined' ? repoLayer.ui.allowedRunRoots : [options.repoRoot];
+  const repoCapRunRoots = normalizeRoots(repoAllowedRunRoots);
+  const hasRunRootsOverride =
+    typeof repoLayer?.ui?.allowedRunRoots !== 'undefined' || typeof merged.ui?.allowedRunRoots !== 'undefined';
+  const requestedRunRoots =
+    typeof merged.ui?.allowedRunRoots !== 'undefined' ? merged.ui.allowedRunRoots : repoCapRunRoots;
+  const candidateRunRoots = normalizeRoots(requestedRunRoots);
+  effective.ui.allowedRunRoots = intersectRoots(repoCapRunRoots, candidateRunRoots);
+  if (hasRunRootsOverride && effective.ui.allowedRunRoots.length === 0 && repoCapRunRoots.length > 0) {
+    logger.warn('ui.allowedRunRoots override produced empty intersection with repo cap; UI run access disabled.');
+  }
+
   const repoAllowNetwork = Boolean(repoLayer?.sandbox?.network ?? defaults.sandbox.network);
   effective.sandbox.network = repoAllowNetwork && Boolean(merged.sandbox?.network ?? defaults.sandbox.network);
 
@@ -269,7 +284,7 @@ export function computeEffectiveDelegationConfig(options: {
   effective.github.enabled = githubEnabled;
   effective.github.operations = githubEnabled ? [...(repoLayer?.github?.operations ?? [])] : [];
 
-  if (effective.ui.allowedRunRoots.length === 0) {
+  if (!hasRunRootsOverride && effective.ui.allowedRunRoots.length === 0) {
     effective.ui.allowedRunRoots = [options.repoRoot];
   }
 
@@ -475,12 +490,13 @@ function asString(value: unknown): string | undefined {
 }
 
 function asStringArray(value: unknown): string[] | undefined {
-  if (!value) return undefined;
+  if (value === null || typeof value === 'undefined') return undefined;
   if (Array.isArray(value)) {
     return value.filter((entry) => typeof entry === 'string' && entry.trim().length > 0).map((entry) => entry.trim());
   }
   if (typeof value === 'string') {
-    return [value.trim()];
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? [trimmed] : [];
   }
   return undefined;
 }
@@ -527,11 +543,19 @@ function intersectRoots(cap: string[], requested: string[]): string[] {
 }
 
 function isWithinRoot(root: string, candidate: string): boolean {
-  if (root === candidate) {
+  const normalizedRoot = normalizePath(realpathSafe(resolve(root)));
+  const normalizedCandidate = normalizePath(realpathSafe(resolve(candidate)));
+  if (normalizedRoot === normalizedCandidate) {
     return true;
   }
-  const normalizedRoot = root.endsWith('/') ? root : `${root}/`;
-  return candidate.startsWith(normalizedRoot);
+  const relativePath = relative(normalizedRoot, normalizedCandidate);
+  if (!relativePath) {
+    return true;
+  }
+  if (isAbsolute(relativePath)) {
+    return false;
+  }
+  return !relativePath.startsWith(`..${sep}`) && relativePath !== '..';
 }
 
 function realpathSafe(pathname: string): string {
@@ -542,6 +566,10 @@ function realpathSafe(pathname: string): string {
   }
 }
 
+function normalizePath(pathname: string): string {
+  return process.platform === 'win32' ? pathname.toLowerCase() : pathname;
+}
+
 export function resolveConfigDir(pathname: string): string {
   return dirname(pathname);
 }
@@ -550,10 +578,57 @@ export function splitDelegationConfigOverrides(raw: string | null | undefined): 
   if (!raw) {
     return [];
   }
-  return raw
-    .split(/[,;\n]/)
-    .map((part) => part.trim())
-    .filter((part) => part.length > 0);
+  const entries: string[] = [];
+  let current = '';
+  let bracketDepth = 0;
+  let inSingle = false;
+  let inDouble = false;
+  let escaping = false;
+
+  const flush = () => {
+    const trimmed = current.trim();
+    if (trimmed) {
+      entries.push(trimmed);
+    }
+    current = '';
+  };
+
+  for (const char of raw) {
+    if (escaping) {
+      current += char;
+      escaping = false;
+      continue;
+    }
+    if ((inSingle || inDouble) && char === '\\') {
+      current += char;
+      escaping = true;
+      continue;
+    }
+    if (!inDouble && char === '\'') {
+      inSingle = !inSingle;
+      current += char;
+      continue;
+    }
+    if (!inSingle && char === '"') {
+      inDouble = !inDouble;
+      current += char;
+      continue;
+    }
+    if (!inSingle && !inDouble) {
+      if (char === '[') {
+        bracketDepth += 1;
+      } else if (char === ']') {
+        bracketDepth = Math.max(0, bracketDepth - 1);
+      }
+      if (bracketDepth === 0 && (char === ',' || char === ';' || char === '\n')) {
+        flush();
+        continue;
+      }
+    }
+    current += char;
+  }
+  flush();
+  return entries;
 }
 
 export function parseDelegationConfigOverride(
