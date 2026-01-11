@@ -61,10 +61,44 @@ async function setupRun(options: { baseUrl?: string; tokenPath?: string } = {}) 
   return { root, runDir, manifestPath, tokenPath };
 }
 
-function collectMcpResponses(stream: PassThrough, expectedCount: number): Promise<Record<string, unknown>[]> {
-  return new Promise((resolve) => {
+function collectMcpResponses(
+  stream: PassThrough,
+  expectedCount: number,
+  options: { timeoutMs?: number } = {}
+): Promise<Record<string, unknown>[]> {
+  const timeoutMs = options.timeoutMs ?? 2000;
+  return new Promise((resolve, reject) => {
     let buffer = Buffer.alloc(0);
     const responses: Record<string, unknown>[] = [];
+    let settled = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const cleanup = () => {
+      stream.off('data', onData);
+      stream.off('end', onEnd);
+      stream.off('error', onError);
+      if (timer) {
+        clearTimeout(timer);
+      }
+    };
+    const finalize = (error?: Error) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      cleanup();
+      if (error) {
+        reject(error);
+      } else {
+        resolve(responses);
+      }
+    };
+
+    const onEnd = () => {
+      finalize(new Error('MCP response stream ended before expected responses'));
+    };
+    const onError = (error: unknown) => {
+      finalize(error instanceof Error ? error : new Error(String(error)));
+    };
     const onData = (chunk: Buffer | string) => {
       buffer = Buffer.concat([buffer, Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)]);
       while (buffer.length > 0) {
@@ -75,6 +109,7 @@ function collectMcpResponses(stream: PassThrough, expectedCount: number): Promis
         const header = buffer.slice(0, headerEnd).toString('utf8');
         const match = header.match(/Content-Length:\s*(\d+)/i);
         if (!match) {
+          finalize(new Error('Missing Content-Length header in MCP response'));
           return;
         }
         const length = Number(match[1]);
@@ -83,16 +118,24 @@ function collectMcpResponses(stream: PassThrough, expectedCount: number): Promis
           break;
         }
         const body = buffer.slice(bodyStart, bodyStart + length).toString('utf8');
-        responses.push(JSON.parse(body) as Record<string, unknown>);
+        try {
+          responses.push(JSON.parse(body) as Record<string, unknown>);
+        } catch (error) {
+          finalize(error instanceof Error ? error : new Error('Failed to parse MCP response'));
+          return;
+        }
         buffer = buffer.slice(bodyStart + length);
         if (responses.length >= expectedCount) {
-          stream.off('data', onData);
-          resolve(responses);
+          finalize();
           return;
         }
       }
     };
+
+    timer = timeoutMs > 0 ? setTimeout(() => finalize(new Error('MCP response collection timed out')), timeoutMs) : null;
     stream.on('data', onData);
+    stream.on('end', onEnd);
+    stream.on('error', onError);
   });
 }
 
@@ -336,6 +379,60 @@ describe('delegation server question helpers', () => {
     expect(clampQuestionPollWaitMs(0)).toBe(0);
     expect(clampQuestionPollWaitMs(-25)).toBe(0);
     expect(clampQuestionPollWaitMs(QUESTION_POLL_INTERVAL_MS)).toBe(QUESTION_POLL_INTERVAL_MS);
+  });
+
+  it('bounds question poll request time by wait_ms', async () => {
+    const sockets = new Set<Socket>();
+    const stalledServer = http.createServer(() => {
+      // Intentionally never respond to trigger timeout.
+    });
+    stalledServer.on('connection', (socket) => {
+      sockets.add(socket);
+      socket.on('close', () => sockets.delete(socket));
+    });
+    await new Promise<void>((resolve) => stalledServer.listen(0, '127.0.0.1', resolve));
+    const address = stalledServer.address();
+    const port = typeof address === 'string' || !address ? 0 : address.port;
+    const baseUrl = `http://127.0.0.1:${port}`;
+
+    const { root, manifestPath } = await setupRun({ baseUrl });
+    const start = Date.now();
+
+    try {
+      await expect(
+        handleToolCall(
+          {
+            jsonrpc: '2.0',
+            method: 'tools/call',
+            params: {
+              name: 'delegate.question.poll',
+              arguments: {
+                parent_manifest_path: manifestPath,
+                question_id: 'q-1',
+                wait_ms: 200
+              }
+            },
+            codex_private: { delegation_token: 'secret-token' }
+          },
+          {
+            repoRoot: process.cwd(),
+            mode: 'full',
+            allowNested: false,
+            githubEnabled: false,
+            allowedGithubOps: new Set<string>(),
+            allowedRoots: [root],
+            allowedHosts: ['127.0.0.1'],
+            toolProfile: [],
+            expiryFallback: 'pause'
+          }
+        )
+      ).rejects.toThrow('control endpoint request timeout');
+      expect(Date.now() - start).toBeLessThan(2000);
+    } finally {
+      sockets.forEach((socket) => socket.destroy());
+      await new Promise<void>((resolve) => stalledServer.close(() => resolve()));
+      await rm(root, { recursive: true, force: true });
+    }
   });
 
   it('applies resume fallback only when awaiting question', async () => {

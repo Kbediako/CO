@@ -654,6 +654,11 @@ async function handleQuestionPoll(
   const maxIterations = waitMs > 0 ? Math.max(1, Math.ceil(waitMs / QUESTION_POLL_INTERVAL_MS)) : 1;
 
   for (let iteration = 0; iteration < maxIterations; iteration += 1) {
+    const remainingMs = waitMs > 0 ? Math.max(0, deadline - Date.now()) : null;
+    const timeoutMs =
+      remainingMs === null ? undefined : Math.max(1, Math.min(DEFAULT_CONTROL_ENDPOINT_TIMEOUT_MS, remainingMs));
+    const retryMs =
+      remainingMs === null ? DEFAULT_DELEGATION_TOKEN_RETRY_MS : Math.min(DEFAULT_DELEGATION_TOKEN_RETRY_MS, remainingMs);
     const record = await callControlEndpointWithRetry(
       parentManifestPath,
       `/questions/${questionId}`,
@@ -665,8 +670,9 @@ async function handleQuestionPoll(
       {
         allowedHosts,
         allowedRoots,
-        retryMs: DEFAULT_DELEGATION_TOKEN_RETRY_MS,
-        retryIntervalMs: DEFAULT_DELEGATION_TOKEN_RETRY_INTERVAL_MS
+        retryMs,
+        retryIntervalMs: DEFAULT_DELEGATION_TOKEN_RETRY_INTERVAL_MS,
+        ...(timeoutMs !== undefined ? { timeoutMs } : {})
       }
     );
     const status = readStringValue(record, 'status');
@@ -684,6 +690,9 @@ async function handleQuestionPoll(
     await delay(QUESTION_POLL_INTERVAL_MS);
   }
 
+  const remainingMs = waitMs > 0 ? Math.max(0, deadline - Date.now()) : null;
+  const timeoutMs =
+    remainingMs === null ? undefined : Math.max(1, Math.min(DEFAULT_CONTROL_ENDPOINT_TIMEOUT_MS, remainingMs));
   const record = await callControlEndpoint(
     parentManifestPath,
     `/questions/${questionId}`,
@@ -692,7 +701,10 @@ async function handleQuestionPoll(
       [DELEGATION_TOKEN_HEADER]: delegationToken,
       [DELEGATION_RUN_HEADER]: childRunId
     },
-    { allowedHosts }
+    {
+      allowedHosts,
+      ...(timeoutMs !== undefined ? { timeoutMs } : {})
+    }
   );
   return {
     ...record,
@@ -910,19 +922,7 @@ function shouldRetryControlError(error: unknown): boolean {
 
 function isConfirmationError(error: unknown): boolean {
   const code = (error as { code?: string } | null)?.code;
-  if (code && CONFIRMATION_ERROR_CODES.has(code)) {
-    return true;
-  }
-  const message = (error as Error | null)?.message ?? '';
-  if (!message) {
-    return false;
-  }
-  for (const candidate of CONFIRMATION_ERROR_CODES) {
-    if (message.includes(candidate)) {
-      return true;
-    }
-  }
-  return false;
+  return !!(code && CONFIRMATION_ERROR_CODES.has(code));
 }
 
 export async function loadControlEndpoint(
