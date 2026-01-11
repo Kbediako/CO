@@ -214,12 +214,15 @@ document.addEventListener('keydown', (event) => {
       if (trapQuestionFocus(event)) {
         return;
       }
-    } else if (state.runOpen) {
-      if (trapRunFocus(event)) {
-        return;
+    } else {
+      const containers = [];
+      if (state.runOpen) {
+        containers.push(elements.runModal);
       }
-    } else if (state.sideOpen) {
-      if (trapSideFocus(event)) {
+      if (state.sideOpen) {
+        containers.push(elements.sidePanel);
+      }
+      if (trapFocus(event, containers)) {
         return;
       }
     }
@@ -1143,30 +1146,24 @@ function focusOutsideContainer(container, preferred, fallback) {
   }
 }
 
-function trapRunFocus(event) {
-  return trapFocus(event, elements.runModal);
-}
-
-function trapSideFocus(event) {
-  return trapFocus(event, elements.sidePanel);
-}
-
 function trapQuestionFocus(event) {
   return trapFocus(event, elements.questionModal);
 }
 
-function trapFocus(event, container) {
+function trapFocus(event, containerOrContainers) {
+  const containers = Array.isArray(containerOrContainers) ? containerOrContainers : [containerOrContainers];
+  const container = containers[0];
   if (!container) {
     return false;
   }
-  const focusable = getFocusableElements(container);
+  const focusable = containers.flatMap((candidate) => (candidate ? getFocusableElements(candidate) : []));
   if (focusable.length === 0) {
     return false;
   }
   const first = focusable[0];
   const last = focusable[focusable.length - 1];
   const active = document.activeElement;
-  if (!container.contains(active)) {
+  if (!containers.some((candidate) => candidate && candidate.contains(active))) {
     event.preventDefault();
     (event.shiftKey ? last : first).focus();
     return true;
