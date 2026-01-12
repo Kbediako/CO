@@ -873,8 +873,8 @@
       "gate": {
         "phase": "delegation-release-plan-planning",
         "status": "approved",
-        "log": ".runs/0942-delegation-release-plan/cli/2026-01-12T04-34-03-900Z-dd844372/manifest.json",
-        "run_id": "2026-01-12T04-34-03-900Z-dd844372"
+        "log": ".runs/0942-delegation-release-plan/cli/2026-01-12T07-13-22-468Z-3877ad2f/manifest.json",
+        "run_id": "2026-01-12T07-13-22-468Z-3877ad2f"
       },
       "created_at": "2026-01-12",
       "completed_at": null
