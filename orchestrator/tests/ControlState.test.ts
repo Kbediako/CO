@@ -9,10 +9,16 @@ describe('ControlStateStore', () => {
     });
 
     store.updateAction({ action: 'pause', requestedBy: 'ui' });
-    expect(store.snapshot().feature_toggles?.rlm?.policy).toBe('always');
+    expect(
+      (store.snapshot().feature_toggles as { rlm?: { policy?: string } } | undefined)?.rlm?.policy
+    ).toBe('always');
 
     store.updateFeatureToggles({ rlm: { policy: 'off' } });
-    expect(store.snapshot().latest_action?.action).toBe('pause');
-    expect(store.snapshot().feature_toggles?.rlm?.policy).toBe('off');
+    expect((store.snapshot().latest_action as { action?: string } | undefined)?.action).toBe(
+      'pause'
+    );
+    expect(
+      (store.snapshot().feature_toggles as { rlm?: { policy?: string } } | undefined)?.rlm?.policy
+    ).toBe('off');
   });
 });

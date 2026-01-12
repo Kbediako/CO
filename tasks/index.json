@@ -862,6 +862,22 @@
       },
       "created_at": "2026-01-09",
       "completed_at": "2026-01-09"
+    },
+    {
+      "id": "0942",
+      "slug": "delegation-release-plan",
+      "title": "Delegation NPM Release Plan",
+      "path": "tasks/tasks-0942-delegation-release-plan.md",
+      "kind": "prd",
+      "status": "approved",
+      "gate": {
+        "phase": "delegation-release-plan-planning",
+        "status": "approved",
+        "log": ".runs/0942-delegation-release-plan/cli/2026-01-12T04-26-14-937Z-556faaa6/manifest.json",
+        "run_id": "2026-01-12T04-26-14-937Z-556faaa6"
+      },
+      "created_at": "2026-01-12",
+      "completed_at": null
     }
   ],
   "specs": [

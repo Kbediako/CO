@@ -74,9 +74,10 @@ describe('OtelTelemetrySink', () => {
       await sink.record(buildChunkEvent(sequence, data));
     }
     await sink.flush();
-    const sequences = ((await getPostedPayload(fetchMock, 0))?.events ?? []).map(
-      (event: { payload?: { sequence?: number } }) => event.payload?.sequence
-    );
+    const payload = (await getPostedPayload(fetchMock, 0)) as
+      | { events?: Array<{ payload?: { sequence?: number } }> }
+      | undefined;
+    const sequences = (payload?.events ?? []).map((event) => event.payload?.sequence);
     expect(sequences).toEqual([2, 3]);
   });
 
@@ -95,9 +96,10 @@ describe('OtelTelemetrySink', () => {
     await flushPromise;
     fetchMock.mockResolvedValueOnce(okResponse);
     await sink.flush();
-    const sequences = ((await getPostedPayload(fetchMock, 1))?.events ?? []).map(
-      (event: { payload?: { sequence?: number } }) => event.payload?.sequence
-    );
+    const payload = (await getPostedPayload(fetchMock, 1)) as
+      | { events?: Array<{ payload?: { sequence?: number } }> }
+      | undefined;
+    const sequences = (payload?.events ?? []).map((event) => event.payload?.sequence);
     expect(sequences).toEqual([3, 4]);
   });
 

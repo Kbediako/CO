@@ -50,7 +50,7 @@ describe('ControlServer', () => {
         'x-codex-delegation-token': [' token '],
         'x-codex-delegation-run-id': [' child-run ']
       }
-    } as http.IncomingMessage;
+    } as unknown as http.IncomingMessage;
 
     const parsed = readDelegationHeaders(req);
     expect(parsed).toEqual({ token: 'token', childRunId: 'child-run' });
@@ -62,7 +62,7 @@ describe('ControlServer', () => {
         'x-codex-delegation-token': [' token , token '],
         'x-codex-delegation-run-id': [' child-run ']
       }
-    } as http.IncomingMessage;
+    } as unknown as http.IncomingMessage;
 
     const parsed = readDelegationHeaders(req);
     expect(parsed).toEqual({ token: 'token', childRunId: 'child-run' });
@@ -74,7 +74,7 @@ describe('ControlServer', () => {
         'x-codex-delegation-token': ' token , token ',
         'x-codex-delegation-run-id': ' child-run '
       }
-    } as http.IncomingMessage;
+    } as unknown as http.IncomingMessage;
 
     const parsed = readDelegationHeaders(req);
     expect(parsed).toEqual({ token: 'token', childRunId: 'child-run' });
@@ -86,7 +86,7 @@ describe('ControlServer', () => {
         'x-codex-delegation-token': ['token-a', 'token-b'],
         'x-codex-delegation-run-id': ['child-run']
       }
-    } as http.IncomingMessage;
+    } as unknown as http.IncomingMessage;
 
     const parsed = readDelegationHeaders(req);
     expect(parsed).toBeNull();
@@ -98,7 +98,7 @@ describe('ControlServer', () => {
         'x-codex-delegation-token': ['token-a, token-b'],
         'x-codex-delegation-run-id': ['child-run']
       }
-    } as http.IncomingMessage;
+    } as unknown as http.IncomingMessage;
 
     const parsed = readDelegationHeaders(req);
     expect(parsed).toBeNull();
@@ -110,7 +110,7 @@ describe('ControlServer', () => {
         'x-codex-delegation-token': 'token-a, token-b',
         'x-codex-delegation-run-id': 'child-run'
       }
-    } as http.IncomingMessage;
+    } as unknown as http.IncomingMessage;
 
     const parsed = readDelegationHeaders(req);
     expect(parsed).toBeNull();
@@ -529,7 +529,7 @@ describe('ControlServer', () => {
         })
       ).rejects.toThrow('boom');
       expect(createdServer).toBeTruthy();
-      expect(createdServer?.listening).toBe(false);
+      expect((createdServer as http.Server | null)?.listening).toBe(false);
     } finally {
       createServerSpy.mockRestore();
       writeSpy.mockRestore();
@@ -564,7 +564,7 @@ describe('ControlServer', () => {
         })
       ).rejects.toThrow('listen-failed');
       expect(createdServer).toBeTruthy();
-      expect(createdServer?.listening).toBe(false);
+      expect((createdServer as http.Server | null)?.listening).toBe(false);
     } finally {
       createServerSpy.mockRestore();
       await rm(root, { recursive: true, force: true });
@@ -607,7 +607,7 @@ describe('ControlServer', () => {
     try {
       const context = { config } as Parameters<typeof callChildControlEndpoint>[0];
       await callChildControlEndpoint(context, paths.manifestPath, { action: 'resume' });
-      expect(receivedAction?.action).toBe('resume');
+      expect((receivedAction as { action?: string } | null)?.action).toBe('resume');
     } finally {
       await new Promise<void>((resolve) => childServer.close(() => resolve()));
       await rm(root, { recursive: true, force: true });
@@ -674,7 +674,7 @@ describe('ControlServer', () => {
           }
         });
         return 0 as unknown as NodeJS.Timeout;
-      }) as typeof setTimeout
+      }) as unknown as typeof setTimeout
     );
     global.fetch = vi.fn((_url, options) => {
       const signal = (options as { signal?: AbortSignal } | undefined)?.signal;
@@ -971,8 +971,8 @@ describe('ControlServer', () => {
         body: JSON.stringify({ question_id: questionId, answer: 'Approved', answered_by: 'ui' })
       });
 
-      expect(receivedAction?.action).toBe('resume');
-      expect(receivedAction?.requested_by).toBe('parent');
+      expect((receivedAction as { action?: string } | null)?.action).toBe('resume');
+      expect((receivedAction as { requested_by?: string } | null)?.requested_by).toBe('parent');
     } finally {
       await new Promise<void>((resolve) => childServer.close(() => resolve()));
       await parentServer.close();
@@ -1313,8 +1313,8 @@ describe('ControlServer', () => {
         }
       });
 
-      expect(receivedAction?.action).toBe('pause');
-      expect(receivedAction?.reason).toBe('question_expired');
+      expect((receivedAction as { action?: string } | null)?.action).toBe('pause');
+      expect((receivedAction as { reason?: string } | null)?.reason).toBe('question_expired');
     } finally {
       await new Promise<void>((resolve) => childServer.close(() => resolve()));
       await parentServer.close();

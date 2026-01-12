@@ -477,7 +477,7 @@ describe('delegation server question helpers', () => {
 
     try {
       await applyQuestionFallback('resume', ['127.0.0.1']);
-      expect(receivedAction?.action).toBe('resume');
+      expect((receivedAction as { action?: string } | null)?.action).toBe('resume');
     } finally {
       if (previousManifestPath) {
         process.env.CODEX_ORCHESTRATOR_MANIFEST_PATH = previousManifestPath;
@@ -585,8 +585,8 @@ describe('delegation server question helpers', () => {
 
     try {
       await applyQuestionFallback('pause', ['127.0.0.1'], [root]);
-      expect(receivedAction?.action).toBe('pause');
-      expect(receivedAction?.reason).toBe('question_expired');
+      expect((receivedAction as { action?: string } | null)?.action).toBe('pause');
+      expect((receivedAction as { reason?: string } | null)?.reason).toBe('question_expired');
     } finally {
       if (previousManifestPath) {
         process.env.CODEX_ORCHESTRATOR_MANIFEST_PATH = previousManifestPath;
@@ -640,8 +640,8 @@ describe('delegation server question helpers', () => {
 
     try {
       await applyQuestionFallback('fail', ['127.0.0.1'], [root]);
-      expect(receivedAction?.action).toBe('fail');
-      expect(receivedAction?.reason).toBe('question_expired');
+      expect((receivedAction as { action?: string } | null)?.action).toBe('fail');
+      expect((receivedAction as { reason?: string } | null)?.reason).toBe('question_expired');
     } finally {
       if (previousManifestPath) {
         process.env.CODEX_ORCHESTRATOR_MANIFEST_PATH = previousManifestPath;
@@ -852,7 +852,7 @@ describe('delegation server confirmation fallback', () => {
     const { root, manifestPath } = await setupRun({ baseUrl });
 
     try {
-      const response = await handleToolCall(
+      const response = (await handleToolCall(
         {
           jsonrpc: '2.0',
           method: 'tools/call',
@@ -873,7 +873,7 @@ describe('delegation server confirmation fallback', () => {
           toolProfile: [],
           expiryFallback: 'pause'
         }
-      );
+      )) as { content: Array<{ text: string }> };
       const payload = JSON.parse(response.content[0].text) as Record<string, unknown>;
       expect(payload.request_id).toBe('req-1');
       expect(actionCalls).toBe(1);
@@ -965,7 +965,7 @@ describe('delegation server confirmation fallback', () => {
     const { root, manifestPath } = await setupRun({ baseUrl });
 
     try {
-      const response = await handleToolCall(
+      const response = (await handleToolCall(
         {
           jsonrpc: '2.0',
           method: 'tools/call',
@@ -986,7 +986,7 @@ describe('delegation server confirmation fallback', () => {
           toolProfile: [],
           expiryFallback: 'pause'
         }
-      );
+      )) as { content: Array<{ text: string }> };
       const payload = JSON.parse(response.content[0].text) as Record<string, unknown>;
       expect(payload.request_id).toBe('req-3');
       expect(createCalls).toBe(1);

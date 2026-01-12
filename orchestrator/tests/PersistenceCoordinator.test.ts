@@ -128,8 +128,8 @@ describe('PersistenceCoordinator', () => {
     const manifestDeferred = createDeferred<string>();
     const recordRun = vi.fn(() => stateDeferred.promise);
     const write = vi.fn(() => manifestDeferred.promise);
-    const stateStore = { recordRun } as TaskStateStore;
-    const manifestWriter = { write } as RunManifestWriter;
+    const stateStore = { recordRun } as unknown as TaskStateStore;
+    const manifestWriter = { write } as unknown as RunManifestWriter;
     const coordinator = new PersistenceCoordinator(new EventBus(), stateStore, manifestWriter);
 
     const summary = createRunSummary();
@@ -149,8 +149,8 @@ describe('PersistenceCoordinator', () => {
     const manifestError = new Error('manifest failure');
     const recordRun = vi.fn(() => Promise.reject(stateError));
     const write = vi.fn(() => Promise.reject(manifestError));
-    const stateStore = { recordRun } as TaskStateStore;
-    const manifestWriter = { write } as RunManifestWriter;
+    const stateStore = { recordRun } as unknown as TaskStateStore;
+    const manifestWriter = { write } as unknown as RunManifestWriter;
     const onError = vi.fn();
     const coordinator = new PersistenceCoordinator(new EventBus(), stateStore, manifestWriter, { onError });
 

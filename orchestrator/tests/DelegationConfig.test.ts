@@ -10,8 +10,10 @@ import {
 
 const repoRoot = '/repo';
 
-function makeLayer(input: Record<string, unknown>) {
-  return input as Parameters<typeof computeEffectiveDelegationConfig>[0]['layers'][number];
+type DelegationConfigLayer = Parameters<typeof computeEffectiveDelegationConfig>[0]['layers'][number];
+
+function makeLayer(input: DelegationConfigLayer) {
+  return input;
 }
 
 describe('delegation config layering', () => {

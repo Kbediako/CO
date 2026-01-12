@@ -10,6 +10,7 @@ import type { RunPaths } from '../src/cli/run/runPaths.js';
 import type { CliManifest } from '../src/cli/types.js';
 import type { CommandPlanner } from '../src/cli/adapters/index.js';
 import type { PipelineResolver } from '../src/cli/services/pipelineResolver.js';
+import type { PlanResult } from '../src/types.js';
 import { RunEventStream } from '../src/cli/events/runEventStream.js';
 import { ControlServer } from '../src/cli/control/controlServer.js';
 import * as runPreparation from '../src/cli/services/runPreparation.js';
@@ -72,7 +73,7 @@ describe('CodexOrchestrator cleanup ordering', () => {
       taskContext: { id: env.taskId, title: 'Task', metadata: {} },
       metadata: { id: env.taskId, slug: env.taskId, title: 'Task' },
       resolver: {} as PipelineResolver,
-      planPreview: null
+      planPreview: { items: [] } as PlanResult
     });
     vi.spyOn(manifestModule, 'bootstrapManifest').mockResolvedValue({ manifest, paths });
     vi.spyOn(RunEventStream, 'create').mockResolvedValue({
@@ -80,13 +81,13 @@ describe('CodexOrchestrator cleanup ordering', () => {
       close: async () => {
         order.push('eventStream.close');
       }
-    } as RunEventStream);
+    } as unknown as RunEventStream);
     vi.spyOn(ControlServer, 'start').mockResolvedValue({
       broadcast: () => undefined,
       close: async () => {
         order.push('controlServer.close');
       }
-    } as ControlServer);
+    } as unknown as ControlServer);
 
     const orchestrator = new CodexOrchestrator(env);
     vi.spyOn(orchestrator as unknown as { performRunLifecycle: () => Promise<void> }, 'performRunLifecycle')
