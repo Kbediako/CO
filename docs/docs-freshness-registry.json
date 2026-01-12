@@ -341,16 +341,16 @@
     {
       "path": ".agent/task/0915-frontend-testing-core.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2025-12-31",
-      "cadence_days": 90
+      "status": "archived",
+      "last_review": "2026-01-12",
+      "cadence_days": 365
     },
     {
       "path": ".agent/task/0916-npm-companion-package-publishability.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2025-12-31",
-      "cadence_days": 90
+      "status": "archived",
+      "last_review": "2026-01-12",
+      "cadence_days": 365
     },
     {
       "path": ".agent/task/0917-devtools-readiness-orchestrator-usage.md",
