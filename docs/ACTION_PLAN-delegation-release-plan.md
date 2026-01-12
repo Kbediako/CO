@@ -1,10 +1,10 @@
 # Action Plan - Delegation NPM Release Plan (Task 0942)
 
 ## Status Snapshot
-- Current Phase: Release execution (full matrix + pack validation complete; tag/publish pending)
+- Current Phase: Release published (tag + workflow complete)
 - Run Manifest Link: (docs-review run recorded in task checklist)
 - Metrics / State Snapshots: `.runs/0942-delegation-release-plan/metrics.json`, `out/0942-delegation-release-plan/state.json`
-- Approvals / Escalations: None (build:all + pack audit/smoke passed)
+- Approvals / Escalations: Release workflow succeeded (https://github.com/Kbediako/CO/actions/runs/20908106047)
 
 ## Milestones & Tasks
 1. Release delta audit
