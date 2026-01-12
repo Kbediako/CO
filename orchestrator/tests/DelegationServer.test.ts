@@ -1162,6 +1162,29 @@ describe('delegation server MCP framing', () => {
     input.end();
   });
 
+  it('ignores blank JSONL lines with CRLF delimiters', async () => {
+    process.exitCode = undefined;
+    const input = new PassThrough();
+    const output = new PassThrough();
+    const receivedMethods: string[] = [];
+    await runJsonRpcServer(async (request) => {
+      receivedMethods.push(request.method);
+      return { ok: true };
+    }, { stdin: input, stdout: output });
+
+    const payloadA = JSON.stringify({ jsonrpc: '2.0', id: 14, method: 'delegate.status', params: {} });
+    const payloadB = JSON.stringify({ jsonrpc: '2.0', id: 15, method: 'delegate.status', params: {} });
+    const responsePromise = collectMcpResponses(output, 2);
+
+    input.write(`${payloadA}\r\n\r\n${payloadB}\r\n`);
+    const responses = await responsePromise;
+    expect(receivedMethods).toEqual(['delegate.status', 'delegate.status']);
+    expect(responses[0]).toEqual({ jsonrpc: '2.0', id: 14, result: { ok: true } });
+    expect(responses[1]).toEqual({ jsonrpc: '2.0', id: 15, result: { ok: true } });
+
+    input.end();
+  });
+
   it('recovers after invalid JSONL and continues processing', async () => {
     process.exitCode = undefined;
     const input = new PassThrough();

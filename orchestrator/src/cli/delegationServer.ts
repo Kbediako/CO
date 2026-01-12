@@ -1163,6 +1163,19 @@ async function runJsonRpcServer(
         return;
       }
       if (parsed.length === null) {
+        const lines = header.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+        if (lines.length === 0) {
+          buffer = buffer.slice(headerEnd + 4);
+          continue;
+        }
+        const allJsonLike = lines.every((line) => line.startsWith('{') || line.startsWith('['));
+        if (allJsonLike) {
+          buffer = buffer.slice(headerEnd + 4);
+          for (const line of lines) {
+            await handleMessage(line);
+          }
+          continue;
+        }
         handleProtocolViolation('Missing Content-Length header in MCP message');
         return;
       }

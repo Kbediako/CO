@@ -30,7 +30,7 @@
 ### Patch Release 0.1.5 (Framing Fix)
 - [x] JSONL framing support implemented + tested - Evidence: `orchestrator/src/cli/delegationServer.ts`, `orchestrator/tests/DelegationServer.test.ts`.
 - [x] Version bump to 0.1.5 - Evidence: `package.json`, `package-lock.json`.
-- [x] Implementation-gate manifest captured - Evidence: `.runs/0942-delegation-release-plan/cli/2026-01-12T07-56-58-069Z-225abb4e/manifest.json`.
+- [x] Implementation-gate manifest captured - Evidence: `.runs/0942-delegation-release-plan/cli/2026-01-12T08-48-13-968Z-b57fb5f2/manifest.json`.
 - [x] Pack audit + smoke complete - Evidence: `out/0942-delegation-release-plan/pack-audit.log`, `out/0942-delegation-release-plan/pack-smoke.log`.
 - [ ] Tag + publish complete - Evidence: (pending).
 

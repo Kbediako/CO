@@ -47,8 +47,8 @@
   - Release SOP sequence: `node scripts/delegation-guard.mjs`, `node scripts/spec-guard.mjs --dry-run`, `npm run build`, `npm run lint`, `npm run test`, `npm run docs:check`, `npm run docs:freshness`, `node scripts/diff-budget.mjs`, `npm run review`.
   - Release validation: `npm run clean:dist && npm run build`, `npm run pack:audit`, `npm run pack:smoke`.
 - Rollback Plan:
-- If publish fails, fix and retag; do not publish from non-release artifacts.
-- If regression found post-release, publish a patch (0.1.6) and update release notes.
+- If publishing fails, fix and retag; do not publish from non-release artifacts.
+- If a regression is found post-release, publish a patch (0.1.6) and update release notes.
 
 ## Documentation & Evidence
 - Linked PRD: `docs/PRD-delegation-release-plan.md`
