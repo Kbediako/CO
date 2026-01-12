@@ -1092,6 +1092,98 @@ describe('delegation server secret guards', () => {
 });
 
 describe('delegation server MCP framing', () => {
+  it('parses JSONL requests and writes framed responses', async () => {
+    process.exitCode = undefined;
+    const input = new PassThrough();
+    const output = new PassThrough();
+    let receivedMethod: string | null = null;
+    await runJsonRpcServer(async (request) => {
+      receivedMethod = request.method;
+      return { ok: true };
+    }, { stdin: input, stdout: output });
+
+    const payload = JSON.stringify({ jsonrpc: '2.0', id: 0, method: 'delegate.status', params: {} });
+    const responsePromise = collectMcpResponses(output, 1);
+
+    input.write(`${payload}\n`);
+    const [response] = await responsePromise;
+    expect(receivedMethod).toBe('delegate.status');
+    expect(response).toEqual({ jsonrpc: '2.0', id: 0, result: { ok: true } });
+
+    input.end();
+  });
+
+  it('handles JSONL messages split across chunks', async () => {
+    process.exitCode = undefined;
+    const input = new PassThrough();
+    const output = new PassThrough();
+    let receivedMethod: string | null = null;
+    await runJsonRpcServer(async (request) => {
+      receivedMethod = request.method;
+      return { ok: true };
+    }, { stdin: input, stdout: output });
+
+    const payload = JSON.stringify({ jsonrpc: '2.0', id: 10, method: 'delegate.status', params: {} });
+    const splitIndex = Math.floor(payload.length / 2);
+    const responsePromise = collectMcpResponses(output, 1);
+
+    input.write(payload.slice(0, splitIndex));
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(process.exitCode).toBeUndefined();
+
+    input.write(`${payload.slice(splitIndex)}\n`);
+    const [response] = await responsePromise;
+    expect(receivedMethod).toBe('delegate.status');
+    expect(response).toEqual({ jsonrpc: '2.0', id: 10, result: { ok: true } });
+
+    input.end();
+  });
+
+  it('parses multiple JSONL messages coalesced in one chunk', async () => {
+    process.exitCode = undefined;
+    const input = new PassThrough();
+    const output = new PassThrough();
+    const receivedMethods: string[] = [];
+    await runJsonRpcServer(async (request) => {
+      receivedMethods.push(request.method);
+      return { ok: true };
+    }, { stdin: input, stdout: output });
+
+    const payloadA = JSON.stringify({ jsonrpc: '2.0', id: 11, method: 'delegate.status', params: {} });
+    const payloadB = JSON.stringify({ jsonrpc: '2.0', id: 12, method: 'delegate.status', params: {} });
+    const responsePromise = collectMcpResponses(output, 2);
+
+    input.write(`${payloadA}\n${payloadB}\n`);
+    const responses = await responsePromise;
+    expect(receivedMethods).toEqual(['delegate.status', 'delegate.status']);
+    expect(responses[0]).toEqual({ jsonrpc: '2.0', id: 11, result: { ok: true } });
+    expect(responses[1]).toEqual({ jsonrpc: '2.0', id: 12, result: { ok: true } });
+
+    input.end();
+  });
+
+  it('recovers after invalid JSONL and continues processing', async () => {
+    process.exitCode = undefined;
+    const input = new PassThrough();
+    const output = new PassThrough();
+    const receivedMethods: string[] = [];
+    await runJsonRpcServer(async (request) => {
+      receivedMethods.push(request.method);
+      return { ok: true };
+    }, { stdin: input, stdout: output });
+
+    const badPayload = '{not-json';
+    const goodPayload = JSON.stringify({ jsonrpc: '2.0', id: 13, method: 'delegate.status', params: {} });
+    const responsePromise = collectMcpResponses(output, 1);
+
+    input.write(`${badPayload}\n${goodPayload}\n`);
+    const [response] = await responsePromise;
+    expect(receivedMethods).toEqual(['delegate.status']);
+    expect(response).toEqual({ jsonrpc: '2.0', id: 13, result: { ok: true } });
+
+    input.end();
+  });
+
   it('parses framed requests and writes framed responses', async () => {
     process.exitCode = undefined;
     const input = new PassThrough();
@@ -1130,6 +1222,32 @@ describe('delegation server MCP framing', () => {
     const response = await responsePromise;
     expect(receivedMethod).toBe('delegate.status');
     expect(response).toEqual({ jsonrpc: '2.0', id: 1, result: { ok: true } });
+
+    input.end();
+  });
+
+  it('does not treat header lines as JSONL when Content-Type precedes Content-Length', async () => {
+    process.exitCode = undefined;
+    const input = new PassThrough();
+    const output = new PassThrough();
+    let receivedMethod: string | null = null;
+    await runJsonRpcServer(async (request) => {
+      receivedMethod = request.method;
+      return { ok: true };
+    }, { stdin: input, stdout: output });
+
+    const payload = JSON.stringify({ jsonrpc: '2.0', id: 2, method: 'delegate.status', params: {} });
+    const responsePromise = collectMcpResponses(output, 1);
+
+    input.write('Content-Type: application/vscode-jsonrpc; charset=utf-8\r\n');
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(process.exitCode).toBeUndefined();
+    expect(receivedMethod).toBeNull();
+
+    input.write(`Content-Length: ${Buffer.byteLength(payload)}\r\n\r\n${payload}`);
+    const [response] = await responsePromise;
+    expect(receivedMethod).toBe('delegate.status');
+    expect(response).toEqual({ jsonrpc: '2.0', id: 2, result: { ok: true } });
 
     input.end();
   });

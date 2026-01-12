@@ -1,36 +1,39 @@
 # Action Plan - Delegation NPM Release Plan (Task 0942)
 
 ## Status Snapshot
-- Current Phase: Release published (tag + workflow complete)
+- Current Phase: Patch release prep (framing fix in progress)
 - Run Manifest Link: (docs-review run recorded in task checklist)
 - Metrics / State Snapshots: `.runs/0942-delegation-release-plan/metrics.json`, `out/0942-delegation-release-plan/state.json`
-- Approvals / Escalations: Release workflow succeeded (https://github.com/Kbediako/CO/actions/runs/20908106047)
+- Approvals / Escalations: PRD approved; 0.1.5 tag/publish pending.
 
 ## Milestones & Tasks
 1. Release delta audit
-   - Compare `package.json` on main vs npm 0.1.3.
-   - Confirm delegation features are absent from the 0.1.3 tarball.
+   - Compare npm 0.1.4 behavior vs main (delegation MCP handshake).
+   - Confirm JSONL framing mismatch causes handshake timeout.
    - Review pack audit allowlist for delegation/runtime assets.
 2. Release preparation
-   - Decide version bump and tag strategy (approved: 0.1.4, no prerelease).
-   - Draft release notes/changelog for delegation features and new dependencies.
+   - Decide version bump and tag strategy (approved: 0.1.5, no prerelease).
+   - Draft release notes/changelog for framing compatibility fix.
    - Confirm release gate sequence per `.agent/SOPs/release.md`.
-3. Release execution
+3. Implementation + validation
+   - Implement JSONL framing support in delegation MCP server.
+   - Add/adjust unit tests for JSONL framing.
+4. Release execution
    - Update version, tag, and run release SOP gate.
    - Monitor GitHub release workflow and publish comms.
 
 ## Changelog Draft (for release notes)
-- Added delegation MCP server (delegate.spawn/pause/cancel/status + question queue).
-- Added confirm-to-act enforcement with runner-injected nonces and validation.
-- Added delegation config parsing + canonicalized confirmation payloads.
-- Added dependencies `@iarna/toml` and `canonicalize`.
+- Fixed delegation MCP server to accept JSONL framing from Codex CLI, preventing handshake timeouts.
+- Preserved existing delegation tool surface and confirm-to-act behavior.
 
 ## Risks & Mitigations
 - Risk: Tag/version mismatch blocks release workflow.
   - Mitigation: validate version before tagging.
 - Risk: Pack audit fails due to new dist paths.
   - Mitigation: run `npm run pack:audit` + `npm run pack:smoke` pre-tag.
-- Risk: Users unaware of new config gating.
+- Risk: JSONL parsing could mis-handle partial frames.
+  - Mitigation: unit tests for split/combined frames; maintain size caps and invalid JSON recovery.
+- Risk: Users unaware of config gating.
   - Mitigation: highlight config flags + opt-in behavior in release notes.
 
 ## Comms Plan
@@ -39,4 +42,4 @@
 
 ## Next Review
 - Date: 2026-01-13
-- Agenda: post-release verification + comms follow-through.
+- Agenda: patch release status + comms follow-through.

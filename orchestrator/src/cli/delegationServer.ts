@@ -1104,6 +1104,45 @@ async function runJsonRpcServer(
 
       const headerEnd = buffer.indexOf('\r\n\r\n');
       if (headerEnd === -1) {
+        const newlineIndex = buffer.indexOf('\n');
+        if (newlineIndex !== -1) {
+          const lineBuffer = buffer.slice(0, newlineIndex);
+          const line = lineBuffer.toString('utf8').trim();
+          buffer = buffer.slice(newlineIndex + 1);
+          if (!line) {
+            continue;
+          }
+          const normalizedLine = line.trimStart();
+          const looksLikeHeaderLine = /^[A-Za-z0-9-]+:/.test(normalizedLine);
+          const looksLikeJson = normalizedLine.startsWith('{') || normalizedLine.startsWith('[');
+          const isContentLength = normalizedLine.toLowerCase().startsWith('content-length:');
+          let restoredHeader = false;
+          if (!looksLikeJson && looksLikeHeaderLine) {
+            // Fall through to header-size checks for partial Content-Length frames (and other header lines).
+            buffer = Buffer.concat([Buffer.from(lineBuffer), Buffer.from('\n'), buffer]);
+            restoredHeader = true;
+          } else if (!isContentLength) {
+            const lineBytes = Buffer.byteLength(line, 'utf8');
+            if (lineBytes > MAX_MCP_MESSAGE_BYTES) {
+              handleProtocolViolation(
+                `Rejecting MCP payload (${lineBytes} bytes) larger than ${MAX_MCP_MESSAGE_BYTES}`
+              );
+              return;
+            }
+            await handleMessage(line);
+            continue;
+          }
+          if (!restoredHeader && isContentLength) {
+            // Fall through to header-size checks for partial Content-Length frames.
+            buffer = Buffer.concat([Buffer.from(lineBuffer), Buffer.from('\n'), buffer]);
+          }
+        } else if (buffer.length > MAX_MCP_MESSAGE_BYTES) {
+          handleProtocolViolation(
+            `Rejecting MCP payload (${buffer.length} bytes) larger than ${MAX_MCP_MESSAGE_BYTES}`
+          );
+          return;
+        }
+
         if (buffer.length > MAX_MCP_HEADER_BYTES) {
           const overflow = buffer.slice(MAX_MCP_HEADER_BYTES);
           const allowedPrefix = MCP_HEADER_DELIMITER_BUFFER.subarray(0, overflow.length);
