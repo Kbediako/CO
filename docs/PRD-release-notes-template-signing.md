@@ -35,4 +35,4 @@
 - Release: Approved (2026-01-12)
 
 ## Open Questions
-- Decide on the exact label taxonomy for release note categories (Overview/Bug Fixes/Other) before implementing the template.
+- ~~Decide on the exact label taxonomy for release note categories (Overview/Bug Fixes/Other) before implementing the template.~~ Resolved: see `.github/release.yml` for the implemented taxonomy.

@@ -4,7 +4,7 @@
 This spec defines the release notes template structure and the signing requirements for release commits/tags. The release notes template file is added as part of this task.
 
 ## Proposed Release Notes Template (Design)
-- File: .github/release.yml (to be added in a follow-up PR).
+- File: .github/release.yml (added in this PR).
 - Changelog categories (example):
   - Overview: `release`, `feature`, `enhancement`
   - Bug Fixes: `bug`, `fix`, `regression`
