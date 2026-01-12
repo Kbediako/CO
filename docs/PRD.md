@@ -7,6 +7,16 @@
 ## Governance Update 2026-01-07
 - Task 0940 PRD approval recorded — `.runs/0940-delegation-autonomy-platform/cli/2026-01-07T16-22-23-363Z-a6f5b94f/manifest.json`.
 
+## Governance Update 2026-01-12
+- Task 0944 PRD approval recorded — `.runs/0944-delegation-mcp-framing-compat-fix/cli/2026-01-12T10-33-01-419Z-2b3cd73f/manifest.json`.
+
+## Task 0944 — Delegation MCP Framing Compatibility Fix
+- Primary Doc: `docs/PRD-delegation-mcp-framing-compat-fix.md`
+- Run Manifest Link: `.runs/0944-delegation-mcp-framing-compat-fix/cli/2026-01-12T10-33-01-419Z-2b3cd73f/manifest.json`.
+- Metrics / State Snapshots: `.runs/0944-delegation-mcp-framing-compat-fix/metrics.json`, `out/0944-delegation-mcp-framing-compat-fix/state.json`.
+- Checklist Mirror: `tasks/tasks-0944-delegation-mcp-framing-compat-fix.md`, `docs/TASKS.md` (0944 section), `.agent/task/0944-delegation-mcp-framing-compat-fix.md`.
+- Mini-spec: `tasks/specs/0944-delegation-mcp-framing-compat-fix.md`.
+
 ## Task 0940 — Codex Delegation Autonomy Platform
 - Primary Doc: `docs/PRD-delegation-autonomy-platform.md`
 - Run Manifest Link: `.runs/0940-delegation-autonomy-platform/cli/2026-01-07T16-22-23-363Z-a6f5b94f/manifest.json`.

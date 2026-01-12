@@ -894,6 +894,22 @@
       },
       "created_at": "2026-01-12",
       "completed_at": null
+    },
+    {
+      "id": "0944",
+      "slug": "delegation-mcp-framing-compat-fix",
+      "title": "Delegation MCP Framing Compatibility Fix",
+      "path": "tasks/tasks-0944-delegation-mcp-framing-compat-fix.md",
+      "kind": "prd",
+      "status": "approved",
+      "gate": {
+        "phase": "delegation-mcp-framing-compat-fix-planning",
+        "status": "approved",
+        "log": ".runs/0944-delegation-mcp-framing-compat-fix/cli/2026-01-12T10-33-01-419Z-2b3cd73f/manifest.json",
+        "run_id": "2026-01-12T10-33-01-419Z-2b3cd73f"
+      },
+      "created_at": "2026-01-12",
+      "completed_at": null
     }
   ],
   "specs": [
@@ -927,6 +943,22 @@
         "task": "tasks/tasks-0940-delegation-autonomy-platform.md",
         "agent_task": ".agent/task/0940-delegation-autonomy-platform.md",
         "docs": "docs/TECH_SPEC-delegation-autonomy-platform.md"
+      }
+    },
+    {
+      "id": "20260112-0944-delegation-mcp-framing-compat-fix",
+      "title": "Delegation MCP Framing Compatibility Fix",
+      "relates_to": "tasks/tasks-0944-delegation-mcp-framing-compat-fix.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-01-12",
+      "paths": {
+        "spec": "tasks/specs/0944-delegation-mcp-framing-compat-fix.md",
+        "task": "tasks/tasks-0944-delegation-mcp-framing-compat-fix.md",
+        "agent_task": ".agent/task/0944-delegation-mcp-framing-compat-fix.md",
+        "docs": "docs/TECH_SPEC-delegation-mcp-framing-compat-fix.md"
       }
     }
   ]

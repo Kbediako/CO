@@ -542,6 +542,13 @@
       "cadence_days": 90
     },
     {
+      "path": ".agent/task/0944-delegation-mcp-framing-compat-fix.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-12",
+      "cadence_days": 90
+    },
+    {
       "path": ".agent/task/ACTION_PLAN_TEMPLATE.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -872,6 +879,13 @@
     },
     {
       "path": "docs/ACTION_PLAN-release-notes-template-signing.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-12",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/ACTION_PLAN-delegation-mcp-framing-compat-fix.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-01-12",
@@ -1312,6 +1326,13 @@
       "cadence_days": 90
     },
     {
+      "path": "docs/PRD-delegation-mcp-framing-compat-fix.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-12",
+      "cadence_days": 90
+    },
+    {
       "path": "docs/PRD-repo-refactor-simplification.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -1684,6 +1705,13 @@
     },
     {
       "path": "docs/TECH_SPEC-release-notes-template-signing.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-12",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/TECH_SPEC-delegation-mcp-framing-compat-fix.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-01-12",
@@ -2131,6 +2159,13 @@
       "cadence_days": 90
     },
     {
+      "path": "tasks/specs/0944-delegation-mcp-framing-compat-fix.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-12",
+      "cadence_days": 90
+    },
+    {
       "path": "tasks/specs/README.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -2496,6 +2531,13 @@
     },
     {
       "path": "tasks/tasks-0943-release-notes-template-signing.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-12",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/tasks-0944-delegation-mcp-framing-compat-fix.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-01-12",
