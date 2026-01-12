@@ -1,0 +1,26 @@
+changelog:
+  categories:
+    - title: "Overview"
+      labels:
+        - "release"
+        - "feature"
+        - "enhancement"
+    - title: "Bug Fixes"
+      labels:
+        - "bug"
+        - "fix"
+        - "regression"
+    - title: "Dependencies"
+      labels:
+        - "deps"
+        - "dependencies"
+    - title: "Documentation"
+      labels:
+        - "docs"
+        - "documentation"
+    - title: "Chores"
+      labels:
+        - "chore"
+    - title: "Other Changes"
+      labels:
+        - "*"

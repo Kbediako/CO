@@ -878,6 +878,22 @@
       },
       "created_at": "2026-01-12",
       "completed_at": null
+    },
+    {
+      "id": "0943",
+      "slug": "release-notes-template-signing",
+      "title": "Release Notes Template + Signed Tags",
+      "path": "tasks/tasks-0943-release-notes-template-signing.md",
+      "kind": "prd",
+      "status": "approved",
+      "gate": {
+        "phase": "release-notes-template-signing-planning",
+        "status": "approved",
+        "log": ".runs/0943-release-notes-template-signing/cli/2026-01-12T06-29-14-923Z-c4423862/manifest.json",
+        "run_id": "2026-01-12T06-29-14-923Z-c4423862"
+      },
+      "created_at": "2026-01-12",
+      "completed_at": null
     }
   ],
   "specs": [
