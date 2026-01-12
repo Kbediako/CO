@@ -1185,6 +1185,42 @@ describe('delegation server MCP framing', () => {
     input.end();
   });
 
+  it('writes JSONL error responses for JSONL requests', async () => {
+    process.exitCode = undefined;
+    const input = new PassThrough();
+    const output = new PassThrough();
+    await runJsonRpcServer(async () => {
+      throw new Error('boom');
+    }, { stdin: input, stdout: output });
+
+    const payload = JSON.stringify({ jsonrpc: '2.0', id: 21, method: 'delegate.status', params: {} });
+    const responsePromise = collectJsonlResponses(output, 1);
+
+    input.write(`${payload}\n`);
+    const [response] = await responsePromise;
+    expect(response).toEqual({ jsonrpc: '2.0', id: 21, error: { code: -32603, message: 'boom' } });
+
+    input.end();
+  });
+
+  it('writes framed error responses for framed requests', async () => {
+    process.exitCode = undefined;
+    const input = new PassThrough();
+    const output = new PassThrough();
+    await runJsonRpcServer(async () => {
+      throw new Error('boom');
+    }, { stdin: input, stdout: output });
+
+    const payload = JSON.stringify({ jsonrpc: '2.0', id: 22, method: 'delegate.status', params: {} });
+    const responsePromise = collectMcpResponses(output, 1);
+
+    input.write(`Content-Length: ${Buffer.byteLength(payload, 'utf8')}\r\n\r\n${payload}`);
+    const [response] = await responsePromise;
+    expect(response).toEqual({ jsonrpc: '2.0', id: 22, error: { code: -32603, message: 'boom' } });
+
+    input.end();
+  });
+
   it('handles JSONL messages split across chunks', async () => {
     process.exitCode = undefined;
     const input = new PassThrough();
