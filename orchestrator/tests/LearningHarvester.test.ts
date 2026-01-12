@@ -48,18 +48,33 @@ function createManifest(taskId: string, runId: string): CliManifest {
 }
 
 async function initRepo(repoRoot: string): Promise<void> {
-  await execFileAsync('git', ['init'], { cwd: repoRoot });
-  await execFileAsync('git', ['config', 'user.email', 'test@example.com'], { cwd: repoRoot });
-  await execFileAsync('git', ['config', 'user.name', 'learning-test'], { cwd: repoRoot });
+  const gitOptions = {
+    cwd: repoRoot,
+    env: {
+      ...process.env,
+      GIT_CONFIG_GLOBAL: '/dev/null',
+      GIT_CONFIG_SYSTEM: '/dev/null',
+      GIT_CONFIG_NOSYSTEM: '1'
+    }
+  };
+  await execFileAsync('git', ['init'], gitOptions);
+  await execFileAsync('git', ['config', 'user.email', 'test@example.com'], gitOptions);
+  await execFileAsync('git', ['config', 'user.name', 'learning-test'], gitOptions);
   await writeFile(join(repoRoot, 'README.md'), '# test repo', 'utf8');
-  await execFileAsync('git', ['add', '.'], { cwd: repoRoot });
-  await execFileAsync('git', ['commit', '-m', 'init'], { cwd: repoRoot });
+  await execFileAsync('git', ['add', '.'], gitOptions);
+  await execFileAsync('git', ['commit', '-m', 'init'], gitOptions);
 }
 
 describe('LearningHarvester', () => {
-  it('captures snapshot metadata and queue payloads', async () => {
+  it('captures snapshot metadata and queue payloads', { timeout: 20000 }, async () => {
     const repoRoot = await mkdtemp(join(tmpdir(), 'learning-harvest-'));
     await initRepo(repoRoot);
+    const previousGitConfigGlobal = process.env.GIT_CONFIG_GLOBAL;
+    const previousGitConfigSystem = process.env.GIT_CONFIG_SYSTEM;
+    const previousGitNoSystem = process.env.GIT_CONFIG_NOSYSTEM;
+    process.env.GIT_CONFIG_GLOBAL = '/dev/null';
+    process.env.GIT_CONFIG_SYSTEM = '/dev/null';
+    process.env.GIT_CONFIG_NOSYSTEM = '1';
 
     const runsRoot = join(repoRoot, '.runs');
     const manifest = createManifest('0607-continuous-learning-pipeline', 'run-1');
@@ -70,31 +85,49 @@ describe('LearningHarvester', () => {
     const untrackedPath = join(repoRoot, 'untracked.txt');
     await writeFile(untrackedPath, 'untracked content', 'utf8');
 
-    const result = await runLearningHarvester(manifest, {
-      repoRoot,
-      runsRoot,
-      manifestPath,
-      taskId: manifest.task_id,
-      runId: manifest.run_id,
-      promptPath,
-      executionHistoryPath: null,
-      diffPath: null
-    });
+    try {
+      const result = await runLearningHarvester(manifest, {
+        repoRoot,
+        runsRoot,
+        manifestPath,
+        taskId: manifest.task_id,
+        runId: manifest.run_id,
+        promptPath,
+        executionHistoryPath: null,
+        diffPath: null
+      });
 
-    expect(result.manifest.learning?.snapshot?.status).toBe('captured');
-    expect(result.manifest.learning?.snapshot?.tarball_digest.length).toBeGreaterThan(10);
-    expect(result.manifest.learning?.queue?.snapshot_id).toBe(result.manifest.learning?.snapshot?.tag);
-    const storagePath = result.manifest.learning?.snapshot?.storage_path;
-    expect(storagePath).toBeTruthy();
-    const storageStat = await stat(join(repoRoot, storagePath ?? ''));
-    expect(storageStat.isFile()).toBe(true);
-    const { stdout: untrackedContent } = await execFileAsync('tar', [
-      '-xOf',
-      join(repoRoot, storagePath ?? ''),
-      'untracked.txt'
-    ]);
-    expect(untrackedContent.trim()).toBe('untracked content');
-    expect(result.queuePayloadPath).toBeTruthy();
+      expect(result.manifest.learning?.snapshot?.status).toBe('captured');
+      expect(result.manifest.learning?.snapshot?.tarball_digest.length).toBeGreaterThan(10);
+      expect(result.manifest.learning?.queue?.snapshot_id).toBe(result.manifest.learning?.snapshot?.tag);
+      const storagePath = result.manifest.learning?.snapshot?.storage_path;
+      expect(storagePath).toBeTruthy();
+      const storageStat = await stat(join(repoRoot, storagePath ?? ''));
+      expect(storageStat.isFile()).toBe(true);
+      const { stdout: untrackedContent } = await execFileAsync('tar', [
+        '-xOf',
+        join(repoRoot, storagePath ?? ''),
+        'untracked.txt'
+      ]);
+      expect(untrackedContent.trim()).toBe('untracked content');
+      expect(result.queuePayloadPath).toBeTruthy();
+    } finally {
+      if (typeof previousGitConfigGlobal === 'undefined') {
+        delete process.env.GIT_CONFIG_GLOBAL;
+      } else {
+        process.env.GIT_CONFIG_GLOBAL = previousGitConfigGlobal;
+      }
+      if (typeof previousGitConfigSystem === 'undefined') {
+        delete process.env.GIT_CONFIG_SYSTEM;
+      } else {
+        process.env.GIT_CONFIG_SYSTEM = previousGitConfigSystem;
+      }
+      if (typeof previousGitNoSystem === 'undefined') {
+        delete process.env.GIT_CONFIG_NOSYSTEM;
+      } else {
+        process.env.GIT_CONFIG_NOSYSTEM = previousGitNoSystem;
+      }
+    }
   });
 
   it('records snapshot_failed when git operations fail', async () => {

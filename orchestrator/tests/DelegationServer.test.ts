@@ -139,6 +139,78 @@ function collectMcpResponses(
   });
 }
 
+function collectJsonlResponses(
+  stream: PassThrough,
+  expectedCount: number,
+  options: { timeoutMs?: number } = {}
+): Promise<Record<string, unknown>[]> {
+  const timeoutMs = options.timeoutMs ?? 2000;
+  return new Promise((resolve, reject) => {
+    let buffer = '';
+    const responses: Record<string, unknown>[] = [];
+    let settled = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const cleanup = () => {
+      stream.off('data', onData);
+      stream.off('end', onEnd);
+      stream.off('error', onError);
+      if (timer) {
+        clearTimeout(timer);
+      }
+    };
+    const finalize = (error?: Error) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      cleanup();
+      if (error) {
+        reject(error);
+      } else {
+        resolve(responses);
+      }
+    };
+
+    const onEnd = () => {
+      const leftover = buffer.trim();
+      if (leftover.length > 0) {
+        finalize(new Error('MCP response stream ended with partial JSONL payload'));
+        return;
+      }
+      finalize(new Error('MCP response stream ended before expected responses'));
+    };
+    const onError = (error: unknown) => {
+      finalize(error instanceof Error ? error : new Error(String(error)));
+    };
+    const onData = (chunk: Buffer | string) => {
+      buffer += Buffer.isBuffer(chunk) ? chunk.toString('utf8') : chunk;
+      const lines = buffer.split(/\r?\n/);
+      buffer = lines.pop() ?? '';
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed) {
+          continue;
+        }
+        try {
+          responses.push(JSON.parse(trimmed) as Record<string, unknown>);
+        } catch (error) {
+          finalize(error instanceof Error ? error : new Error('Failed to parse MCP JSONL response'));
+          return;
+        }
+        if (responses.length >= expectedCount) {
+          finalize();
+          return;
+        }
+      }
+    };
+
+    timer = timeoutMs > 0 ? setTimeout(() => finalize(new Error('MCP response collection timed out')), timeoutMs) : null;
+    stream.on('data', onData);
+    stream.on('end', onEnd);
+    stream.on('error', onError);
+  });
+}
+
 describe('delegation server manifest validation', () => {
   it('resolves a run manifest path within allowed roots', async () => {
     const { root, manifestPath } = await setupRun();
@@ -1092,7 +1164,7 @@ describe('delegation server secret guards', () => {
 });
 
 describe('delegation server MCP framing', () => {
-  it('parses JSONL requests and writes framed responses', async () => {
+  it('parses JSONL requests and writes JSONL responses', async () => {
     process.exitCode = undefined;
     const input = new PassThrough();
     const output = new PassThrough();
@@ -1103,7 +1175,7 @@ describe('delegation server MCP framing', () => {
     }, { stdin: input, stdout: output });
 
     const payload = JSON.stringify({ jsonrpc: '2.0', id: 0, method: 'delegate.status', params: {} });
-    const responsePromise = collectMcpResponses(output, 1);
+    const responsePromise = collectJsonlResponses(output, 1);
 
     input.write(`${payload}\n`);
     const [response] = await responsePromise;
@@ -1125,7 +1197,7 @@ describe('delegation server MCP framing', () => {
 
     const payload = JSON.stringify({ jsonrpc: '2.0', id: 10, method: 'delegate.status', params: {} });
     const splitIndex = Math.floor(payload.length / 2);
-    const responsePromise = collectMcpResponses(output, 1);
+    const responsePromise = collectJsonlResponses(output, 1);
 
     input.write(payload.slice(0, splitIndex));
     await new Promise((resolve) => setImmediate(resolve));
@@ -1151,7 +1223,7 @@ describe('delegation server MCP framing', () => {
 
     const payloadA = JSON.stringify({ jsonrpc: '2.0', id: 11, method: 'delegate.status', params: {} });
     const payloadB = JSON.stringify({ jsonrpc: '2.0', id: 12, method: 'delegate.status', params: {} });
-    const responsePromise = collectMcpResponses(output, 2);
+    const responsePromise = collectJsonlResponses(output, 2);
 
     input.write(`${payloadA}\n${payloadB}\n`);
     const responses = await responsePromise;
@@ -1174,7 +1246,7 @@ describe('delegation server MCP framing', () => {
 
     const payloadA = JSON.stringify({ jsonrpc: '2.0', id: 14, method: 'delegate.status', params: {} });
     const payloadB = JSON.stringify({ jsonrpc: '2.0', id: 15, method: 'delegate.status', params: {} });
-    const responsePromise = collectMcpResponses(output, 2);
+    const responsePromise = collectJsonlResponses(output, 2);
 
     input.write(`${payloadA}\r\n\r\n${payloadB}\r\n`);
     const responses = await responsePromise;
@@ -1197,7 +1269,7 @@ describe('delegation server MCP framing', () => {
 
     const badPayload = '{not-json';
     const goodPayload = JSON.stringify({ jsonrpc: '2.0', id: 13, method: 'delegate.status', params: {} });
-    const responsePromise = collectMcpResponses(output, 1);
+    const responsePromise = collectJsonlResponses(output, 1);
 
     input.write(`${badPayload}\n${goodPayload}\n`);
     const [response] = await responsePromise;

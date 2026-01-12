@@ -74,6 +74,8 @@ interface ConfigOverride {
   value: string;
 }
 
+type ResponseFormat = 'framed' | 'jsonl';
+
 export async function startDelegationServer(options: DelegationServerOptions): Promise<void> {
   const repoRoot = resolve(options.repoRoot);
   const configFiles = await loadDelegationConfigFiles({ repoRoot });
@@ -1098,7 +1100,7 @@ async function runJsonRpcServer(
         const body = buffer.slice(0, expectedLength);
         buffer = buffer.slice(expectedLength);
         expectedLength = null;
-        await handleMessage(body.toString('utf8'));
+        await handleMessage(body.toString('utf8'), 'framed');
         continue;
       }
 
@@ -1129,7 +1131,7 @@ async function runJsonRpcServer(
               );
               return;
             }
-            await handleMessage(line);
+            await handleMessage(line, 'jsonl');
             continue;
           }
           if (!restoredHeader && isContentLength) {
@@ -1172,7 +1174,7 @@ async function runJsonRpcServer(
         if (allJsonLike) {
           buffer = buffer.slice(headerEnd + 4);
           for (const line of lines) {
-            await handleMessage(line);
+            await handleMessage(line, 'jsonl');
           }
           continue;
         }
@@ -1193,7 +1195,7 @@ async function runJsonRpcServer(
     }
   }
 
-  async function handleMessage(raw: string) {
+  async function handleMessage(raw: string, format: ResponseFormat) {
     let request: McpRequest;
     try {
       request = JSON.parse(raw) as McpRequest;
@@ -1208,15 +1210,19 @@ async function runJsonRpcServer(
     try {
       const result = await handler(request);
       if (id !== null && typeof id !== 'undefined') {
-        sendResponse({ jsonrpc: '2.0', id, result }, output);
+        sendResponse({ jsonrpc: '2.0', id, result }, output, format);
       }
     } catch (error) {
       if (id !== null && typeof id !== 'undefined') {
-        sendResponse({
-          jsonrpc: '2.0',
-          id,
-          error: { code: -32603, message: (error as Error)?.message ?? String(error) }
-        }, output);
+        sendResponse(
+          {
+            jsonrpc: '2.0',
+            id,
+            error: { code: -32603, message: (error as Error)?.message ?? String(error) }
+          },
+          output,
+          format
+        );
       }
     }
   }
@@ -1246,10 +1252,19 @@ function parseContentLengthHeader(header: string): { length: number | null; erro
   return { length: contentLength };
 }
 
-function sendResponse(response: McpResponse, output: NodeJS.WritableStream = process.stdout): void {
-  const payload = Buffer.from(JSON.stringify(response), 'utf8');
-  const header = Buffer.from(`Content-Length: ${payload.length}\r\n\r\n`, 'utf8');
-  output.write(Buffer.concat([header, payload]));
+function sendResponse(
+  response: McpResponse,
+  output: NodeJS.WritableStream = process.stdout,
+  format: ResponseFormat = 'framed'
+): void {
+  const payload = JSON.stringify(response);
+  if (format === 'jsonl') {
+    output.write(`${payload}\n`);
+    return;
+  }
+  const buffer = Buffer.from(payload, 'utf8');
+  const header = Buffer.from(`Content-Length: ${buffer.length}\r\n\r\n`, 'utf8');
+  output.write(Buffer.concat([header, buffer]));
 }
 
 function safeJsonParse(text: string): unknown | null {
