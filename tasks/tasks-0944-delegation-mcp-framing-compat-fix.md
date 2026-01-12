@@ -25,7 +25,7 @@
 - [x] Implementation-gate manifest captured - Evidence: `.runs/0944-delegation-mcp-framing-compat-fix/cli/2026-01-12T13-40-38-573Z-1662cf67/manifest.json`.
 - [x] Pack audit + smoke complete - Evidence: `out/0944-delegation-mcp-framing-compat-fix/pack-audit.log`, `out/0944-delegation-mcp-framing-compat-fix/pack-smoke.log`.
 - [x] Tag + publish 0.1.6 complete - Evidence: tag `v0.1.6`, workflow `https://github.com/Kbediako/CO/actions/runs/20918428368`.
-- [x] Version bumped to 0.1.7 for patch release prep - Evidence: `package.json`, `package-lock.json`.
+- [x] Version bumped + tag created for 0.1.7 patch release prep - Evidence: `package.json`, `package-lock.json`, tag `v0.1.7`.
 
 ## Notes
 - Guardrails required: `node scripts/spec-guard.mjs --dry-run`, `npm run build`, `npm run lint`, `npm run test`, `npm run docs:check`, `npm run docs:freshness`, `node scripts/diff-budget.mjs`, `npm run review` (per `.agent/SOPs/release.md`).
