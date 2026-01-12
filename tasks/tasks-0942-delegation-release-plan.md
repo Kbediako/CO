@@ -37,7 +37,7 @@
 - [x] Version bump to 0.1.5 - Evidence: `package.json`, `package-lock.json`.
 - [x] Implementation-gate manifest captured - Evidence: `.runs/0942-delegation-release-plan/cli/2026-01-12T08-48-13-968Z-b57fb5f2/manifest.json`.
 - [x] Pack audit + smoke complete - Evidence: `out/0942-delegation-release-plan/pack-audit.log`, `out/0942-delegation-release-plan/pack-smoke.log`.
-- [ ] Tag + publish complete - Evidence: (pending).
+- [x] Tag + publish complete - Evidence: tag `v0.1.5`, workflow `https://github.com/Kbediako/CO/actions/runs/20914409679`.
 
 ## Notes
 - Guardrails required: `node scripts/spec-guard.mjs --dry-run`, `npm run build`, `npm run lint`, `npm run test`, `npm run docs:check`, `npm run docs:freshness`, `node scripts/diff-budget.mjs`, `npm run review` (per `.agent/SOPs/release.md`).

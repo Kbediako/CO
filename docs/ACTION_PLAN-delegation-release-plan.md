@@ -1,10 +1,10 @@
 # Action Plan - Delegation NPM Release Plan (Task 0942)
 
 ## Status Snapshot
-- Current Phase: Patch release prep (framing fix in progress)
+- Current Phase: Patch release complete (v0.1.5 published)
 - Run Manifest Link: (docs-review run recorded in task checklist)
 - Metrics / State Snapshots: `.runs/0942-delegation-release-plan/metrics.json`, `out/0942-delegation-release-plan/state.json`
-- Approvals / Escalations: PRD approved; 0.1.5 tag/publish pending.
+- Approvals / Escalations: PRD approved; JSONL framing fix merged; v0.1.5 tag/publish complete (workflow https://github.com/Kbediako/CO/actions/runs/20914409679).
 
 ## Milestones & Tasks
 1. Release delta audit
