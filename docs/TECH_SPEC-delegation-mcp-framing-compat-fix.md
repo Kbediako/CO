@@ -18,7 +18,7 @@
 
 ### Error Handling
 - JSON parse errors still log and continue as today.
-- Protocol violations still halt the server as today.
+- Protocol violations still halt the server as it does today.
 
 ### Data Persistence / State Impact
 - None.
