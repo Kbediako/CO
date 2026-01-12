@@ -689,6 +689,13 @@
       "cadence_days": 90
     },
     {
+      "path": "docs/ACTION_PLAN-delegation-mcp-framing-compat-fix.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-12",
+      "cadence_days": 90
+    },
+    {
       "path": "docs/ACTION_PLAN-delegation-release-plan.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -879,13 +886,6 @@
     },
     {
       "path": "docs/ACTION_PLAN-release-notes-template-signing.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-01-12",
-      "cadence_days": 90
-    },
-    {
-      "path": "docs/ACTION_PLAN-delegation-mcp-framing-compat-fix.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-01-12",
@@ -1116,6 +1116,13 @@
       "cadence_days": 90
     },
     {
+      "path": "docs/PRD-delegation-mcp-framing-compat-fix.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-12",
+      "cadence_days": 90
+    },
+    {
       "path": "docs/PRD-delegation-release-plan.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -1326,13 +1333,6 @@
       "cadence_days": 90
     },
     {
-      "path": "docs/PRD-delegation-mcp-framing-compat-fix.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-01-12",
-      "cadence_days": 90
-    },
-    {
       "path": "docs/PRD-repo-refactor-simplification.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -1498,6 +1498,13 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-01-08",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/TECH_SPEC-delegation-mcp-framing-compat-fix.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-12",
       "cadence_days": 90
     },
     {
@@ -1705,13 +1712,6 @@
     },
     {
       "path": "docs/TECH_SPEC-release-notes-template-signing.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-01-12",
-      "cadence_days": 90
-    },
-    {
-      "path": "docs/TECH_SPEC-delegation-mcp-framing-compat-fix.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-01-12",
