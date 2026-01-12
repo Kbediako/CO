@@ -212,6 +212,11 @@ Nested delegation policy:
 - When false, the spawner sets mcp_servers.delegation.enabled=true with delegate.mode=question_only (no spawn/pause/cancel).
 - When true, the spawner sets delegate.mode=full to allow nested delegation.
 
+Operational limits / guardrails:
+- `delegate.question.poll` clamps wait_ms to MAX_QUESTION_POLL_WAIT_MS (10s); per-poll timeout is bounded by remaining wait_ms.
+- Confirmation fallback is restricted to confirmation error codes only (`error.code` check).
+- Tool profile entries used for MCP overrides must match `^[A-Za-z0-9_-]+$` (alnum + `_`/`-`); reject entries containing `;`, `/`, `\n`, `=` and similar.
+
 #### 2) RLM Always-On Policy (RLM runtime definition + controls)
 
 Definition:
