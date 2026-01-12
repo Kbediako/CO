@@ -24,6 +24,16 @@ Archived task snapshots live on the task-archives branch.
 - [x] Discovery: package.json vs npm delta + delegation feature presence + pack audit review captured. Evidence: `docs/PRD-delegation-release-plan.md`, `docs/TECH_SPEC-delegation-release-plan.md`.
 - [x] Release Plan: version/tag strategy + changelog + risks/comms captured. Evidence: `docs/TECH_SPEC-delegation-release-plan.md`, `docs/ACTION_PLAN-delegation-release-plan.md`.
 - [x] Release Execution: tag + publish complete. Evidence: `out/0942-delegation-release-plan/build-all.log`, `out/0942-delegation-release-plan/test-adapters.log`, `out/0942-delegation-release-plan/test-evaluation.log`, `out/0942-delegation-release-plan/eval-test.log`, `out/0942-delegation-release-plan/pack-audit.log`, `out/0942-delegation-release-plan/pack-smoke.log`, workflow `https://github.com/Kbediako/CO/actions/runs/20908106047`.
+# Task List Snapshot — Release Notes Template + Signed Tags (0943-release-notes-template-signing)
+- **Update — 2026-01-12:** Docs-review complete via `.runs/0943-release-notes-template-signing/cli/2026-01-12T06-13-35-254Z-25108ef8/manifest.json`; implementation-gate via `.runs/0943-release-notes-template-signing/cli/2026-01-12T06-14-15-991Z-b126eab2/manifest.json`; subagent diagnostics via `.runs/0943-release-notes-template-signing-scout/cli/2026-01-12T05-13-45-823Z-b64b8852/manifest.json`. Notes: export `MCP_RUNNER_TASK_ID=0943-release-notes-template-signing`; guardrails required: `node scripts/delegation-guard.mjs`, `node scripts/spec-guard.mjs --dry-run`. Checklist mirror: `tasks/tasks-0943-release-notes-template-signing.md`, `.agent/task/0943-release-notes-template-signing.md`.
+- [x] Foundation: collateral drafted. Evidence: `docs/PRD-release-notes-template-signing.md`, `docs/TECH_SPEC-release-notes-template-signing.md`, `docs/ACTION_PLAN-release-notes-template-signing.md`, `tasks/tasks-0943-release-notes-template-signing.md`, `.agent/task/0943-release-notes-template-signing.md`.
+- [x] Foundation: subagent diagnostics captured. Evidence: `.runs/0943-release-notes-template-signing-scout/cli/2026-01-12T05-13-45-823Z-b64b8852/manifest.json`.
+- [x] Foundation: docs-review manifest captured; mirrors updated; docs registry/metrics/state snapshots updated. Evidence: `.runs/0943-release-notes-template-signing/cli/2026-01-12T06-13-35-254Z-25108ef8/manifest.json`, `docs/TASKS.md`, `.agent/task/0943-release-notes-template-signing.md`, `tasks/index.json`, `docs/docs-freshness-registry.json`, `.runs/0943-release-notes-template-signing/metrics.json`, `out/0943-release-notes-template-signing/state.json`.
+- [x] Planning: release notes template plan (label taxonomy + catch-all) + signed tag guardrails (`git tag -v`, `--verify-tag`, Verified check). Evidence: `docs/TECH_SPEC-release-notes-template-signing.md`, `docs/ACTION_PLAN-release-notes-template-signing.md`, `.agent/SOPs/release.md`.
+- [x] Implementation: .github/release.yml added with categories + catch-all. Evidence: `.github/release.yml`, `.runs/0943-release-notes-template-signing/cli/2026-01-12T06-14-15-991Z-b126eab2/manifest.json`.
+- [x] Validation: implementation-gate manifest captured. Evidence: `.runs/0943-release-notes-template-signing/cli/2026-01-12T06-14-15-991Z-b126eab2/manifest.json`.
+- [x] Implementation: align repo label taxonomy to template categories. Evidence: `out/0943-release-notes-template-signing/label-audit.json`.
+- [x] Validation: dry-run release notes output + template lookup behavior confirmed. Evidence: `out/0943-release-notes-template-signing/release-notes-dry-run.json`.
 # Task List Snapshot — Orchestrator Performance & Reliability Loop 2 (0939-orchestrator-performance-reliability-loop-2)
 - **Update — 2026-01-06:** Implementation-gate complete via `.runs/0939-orchestrator-performance-reliability-loop-2/cli/2026-01-06T14-16-06-983Z-5122db4a/manifest.json`; docs-review via `.runs/0939-orchestrator-performance-reliability-loop-2/cli/2026-01-06T07-49-03-214Z-a31732c2/manifest.json`; subagent diagnostics via `.runs/0939-orchestrator-performance-reliability-loop-2-scout/cli/2026-01-06T06-46-31-169Z-88ce91ef/manifest.json`, `.runs/0939-orchestrator-performance-reliability-loop-2-scout2/cli/2026-01-06T08-48-58-894Z-60645a3f/manifest.json`, `.runs/0939-orchestrator-performance-reliability-loop-2-scout3/cli/2026-01-06T10-56-53-776Z-8753ed99/manifest.json`, `.runs/0939-orchestrator-performance-reliability-loop-2-scout4/cli/2026-01-06T11-06-47-950Z-68cfc942/manifest.json`, `.runs/0939-orchestrator-performance-reliability-loop-2-scout5/cli/2026-01-06T12-33-48-126Z-69596774/manifest.json`; diagnostics + RLM via `.runs/0939-orchestrator-performance-reliability-loop-2/cli/2026-01-06T06-51-26-814Z-8229d14a/manifest.json`, `.runs/0939-orchestrator-performance-reliability-loop-2/cli/2026-01-06T06-53-37-814Z-c285a360/manifest.json`, `.runs/0939-orchestrator-performance-reliability-loop-2/cli/2026-01-06T09-37-07-569Z-4f1a7a79/manifest.json`, `.runs/0939-orchestrator-performance-reliability-loop-2/cli/2026-01-06T10-02-37-053Z-a853796a/manifest.json`. Notes: export `MCP_RUNNER_TASK_ID=0939-orchestrator-performance-reliability-loop-2`; guardrails required: `node scripts/spec-guard.mjs --dry-run`, `npm run build`, `npm run lint`, `npm run test`, `npm run docs:check`, `npm run docs:freshness`, `node scripts/diff-budget.mjs`, `npm run review`. Checklist mirror: `tasks/tasks-0939-orchestrator-performance-reliability-loop-2.md`, `.agent/task/0939-orchestrator-performance-reliability-loop-2.md` (keep `[ ]` until evidence). [x] Foundation: `.runs/0939-orchestrator-performance-reliability-loop-2-scout/cli/2026-01-06T06-46-31-169Z-88ce91ef/manifest.json`, `.runs/0939-orchestrator-performance-reliability-loop-2-scout2/cli/2026-01-06T08-48-58-894Z-60645a3f/manifest.json`, `.runs/0939-orchestrator-performance-reliability-loop-2-scout3/cli/2026-01-06T10-56-53-776Z-8753ed99/manifest.json`, `.runs/0939-orchestrator-performance-reliability-loop-2-scout4/cli/2026-01-06T11-06-47-950Z-68cfc942/manifest.json`, `.runs/0939-orchestrator-performance-reliability-loop-2-scout5/cli/2026-01-06T12-33-48-126Z-69596774/manifest.json`, `.runs/0939-orchestrator-performance-reliability-loop-2/cli/2026-01-06T07-49-03-214Z-a31732c2/manifest.json`, `docs/TASKS.md`, `.agent/task/0939-orchestrator-performance-reliability-loop-2.md`, `tasks/index.json`, `docs/docs-freshness-registry.json`, `.runs/0939-orchestrator-performance-reliability-loop-2/metrics.json`, `out/0939-orchestrator-performance-reliability-loop-2/state.json`. [x] Discovery: `.runs/0939-orchestrator-performance-reliability-loop-2/cli/2026-01-06T06-51-26-814Z-8229d14a/manifest.json`, `.runs/0939-orchestrator-performance-reliability-loop-2/cli/2026-01-06T06-53-37-814Z-c285a360/manifest.json`, `.runs/0939-orchestrator-performance-reliability-loop-2/cli/2026-01-06T09-37-07-569Z-4f1a7a79/manifest.json`, `.runs/0939-orchestrator-performance-reliability-loop-2/cli/2026-01-06T10-02-37-053Z-a853796a/manifest.json`. [x] Implementation: `.runs/0939-orchestrator-performance-reliability-loop-2/cli/2026-01-06T14-16-06-983Z-5122db4a/manifest.json`. [x] Validation: `.runs/0939-orchestrator-performance-reliability-loop-2/cli/2026-01-06T14-16-06-983Z-5122db4a/manifest.json`.
 # Task List Snapshot — Metrics Pending Streaming Merge (0938-metrics-pending-streaming-merge)
@@ -170,20 +180,16 @@ Mirror status with `tasks/tasks-0914-npm-companion-package.md` and `.agent/task/
 - [x] Verify shebang preservation and ESM consistency - Evidence: tests.
 - [x] Enforce user-controlled run dirs for all CLI outputs - Evidence: code review + tests.
 - [x] Ensure telemetry/network calls are disabled by default - Evidence: tests.
-
 ### Templates & Init
 - [x] Add `templates/` with README disclaimer + version markers - Evidence: new templates.
 - [x] Add `codex-orchestrator init codex` - Evidence: CLI implementation + tests.
-
 ### Optional Dependencies + Doctor
 - [x] Move Playwright-class deps to optional peer deps and add dynamic loader - Evidence: package metadata + tests.
 - [x] Add `codex-orchestrator doctor` - Evidence: CLI implementation + tests.
-
 ### Release Workflow
 - [x] Add tag-driven release workflow - Evidence: workflow + release run.
 - [x] Document release asset download fallbacks - Evidence: spec update.
 - [x] Update README with companion package usage and release flow - Evidence: README change + manifest.
-
 ### Guardrails & Handoff (post-implementation)
 - [x] `npm run review` is non-interactive in CI (flag/env enforced; fails fast on prompts).
 - [x] `node scripts/spec-guard.mjs --dry-run` passes - Evidence: `.runs/0914-npm-companion-package/cli/2025-12-28T17-26-47-817Z-8acb43f6/manifest.json`.
@@ -195,32 +201,24 @@ Mirror status with `tasks/tasks-0914-npm-companion-package.md` and `.agent/task/
 - [x] Diff budget override recorded (`DIFF_BUDGET_OVERRIDE_REASON`) - Evidence: `.runs/0914-npm-companion-package/cli/2025-12-28T17-26-47-817Z-8acb43f6/commands/06-diff-budget.ndjson`.
 - Note: CI diff budget override requires label `diff-budget-override` and PR body line `Diff budget override: ...`.
 - [x] `npm run review` captured with NOTES - Evidence: `.runs/0914-npm-companion-package/cli/2025-12-28T17-26-47-817Z-8acb43f6/manifest.json`.
-
 # Task List Snapshot — Dead Code Pruning & Evidence (0801)
-
 - **Update — Planning:** Diagnostics captured at `.runs/0801-dead-code-pruning/cli/2025-12-09T03-51-52-584Z-93e9a77f/manifest.json`; dead-code deletions and archive relocations complete (archives parked under `.runs/0801-dead-code-pruning/archive/2025-12-08T10-01-24Z/` with README pointers) and guardrails/tests rerun on 2025-12-09.
 - **Notes:** Export `MCP_RUNNER_TASK_ID=0801-dead-code-pruning` before running orchestrator commands; guardrails: `node scripts/spec-guard.mjs --dry-run`, `npm run lint`, `npm run test` (and `npm run build` if touching orchestrator packages).
-
 ## Checklist Mirror
 Mirror status with `tasks/tasks-0801-dead-code-pruning.md` and `.agent/task/<id>-<slug>.md` (if created). Keep `[ ]` until manifest path is recorded.
-
 ### Foundation
 - [x] Diagnostics/plan manifest captured — Evidence: `.runs/0801-dead-code-pruning/cli/2025-12-09T03-51-52-584Z-93e9a77f/manifest.json`.
 - [x] Metrics/state snapshots updated — Evidence: `.runs/0801-dead-code-pruning/metrics.json`, `out/0801-dead-code-pruning/state.json`.
 - [x] PRD/spec/tasks mirrors updated with manifest links — Evidence: `.runs/0801-dead-code-pruning/cli/2025-12-09T03-51-52-584Z-93e9a77f/manifest.json`.
-
 ### Remediation Plan
 - [x] Unused CLI/learning/SDK helpers removed or justified — Evidence: `.runs/0801-dead-code-pruning/cli/2025-12-09T03-51-52-584Z-93e9a77f/manifest.json`.
 - [x] Aggregator entrypoints/pattern registries evaluated and pruned or documented — Evidence: `.runs/0801-dead-code-pruning/cli/2025-12-09T03-51-52-584Z-93e9a77f/manifest.json`.
 - [x] Evaluation harness + mirror server + design sample handled (delete/archive/justify) — Evidence: `.runs/0801-dead-code-pruning/cli/2025-12-09T03-51-52-584Z-93e9a77f/manifest.json`.
 - [x] Archives decision (keep with README pointer or relocate to archive folder) — Evidence: `.runs/0801-dead-code-pruning/cli/2025-12-09T03-51-52-584Z-93e9a77f/manifest.json`.
 - [x] Guardrails/tests executed — `node scripts/spec-guard.mjs --dry-run`, `npm run lint`, `npm run test` (and `npm run build` when orchestrator code touched); Evidence: `.runs/0801-dead-code-pruning/cli/2025-12-09T03-51-52-584Z-93e9a77f/manifest.json`.
-
 ### Review & Handoff
 - [x] Reviewer hand-off run (`npm run review --manifest <latest>`) with approvals captured — Evidence: `.runs/0801-dead-code-pruning/cli/2025-12-09T03-51-52-584Z-93e9a77f/manifest.json`.
-
 # Task List Snapshot — Codex Orchestrator Slimdown (0707)
-
 - **Update — Planning:** PRD + tech spec published; CI/local test coverage policy recorded (core vs full-matrix lanes). Awaiting first diagnostics manifest under `.runs/0707-orchestrator-slimdown/cli/2025-12-29T06-49-38-980Z-85ac2153/manifest.json`.
 - **Notes:** Export `MCP_RUNNER_TASK_ID=0707-orchestrator-slimdown` for orchestrator commands so manifests, metrics, and `out/**` land in the correct directories.
 

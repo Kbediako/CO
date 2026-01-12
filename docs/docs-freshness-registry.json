@@ -111,7 +111,7 @@
       "path": ".agent/SOPs/release.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-01-05",
+      "last_review": "2026-01-12",
       "cadence_days": 90
     },
     {
@@ -535,6 +535,13 @@
       "cadence_days": 90
     },
     {
+      "path": ".agent/task/0943-release-notes-template-signing.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-12",
+      "cadence_days": 90
+    },
+    {
       "path": ".agent/task/ACTION_PLAN_TEMPLATE.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -676,6 +683,13 @@
     },
     {
       "path": "docs/ACTION_PLAN-delegation-release-plan.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-12",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/ACTION_PLAN-release-notes-template-signing.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-01-12",
@@ -1095,6 +1109,13 @@
       "cadence_days": 90
     },
     {
+      "path": "docs/PRD-release-notes-template-signing.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-12",
+      "cadence_days": 90
+    },
+    {
       "path": "docs/PRD-devtools-readiness-orchestrator-usage.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -1460,6 +1481,13 @@
     },
     {
       "path": "docs/TECH_SPEC-delegation-release-plan.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-12",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/TECH_SPEC-release-notes-template-signing.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-01-12",
@@ -2461,6 +2489,13 @@
     },
     {
       "path": "tasks/tasks-0942-delegation-release-plan.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-12",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/tasks-0943-release-notes-template-signing.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-01-12",
