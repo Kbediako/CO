@@ -43,7 +43,7 @@ Run the delegation MCP server over stdio:
 ```bash
 codex-orchestrator delegate-server --repo /path/to/repo
 ```
-Optional: add `--mode question_only` to expose only `delegate.question.*` + `delegate.status` (no `delegate.spawn/pause/cancel`).
+Optional: add `--mode question_only` to disable `delegate.spawn/pause/cancel`, keeping only `delegate.question.*` + `delegate.status` in the delegate namespace. GitHub tools remain available when GitHub integration is enabled.
 
 Register it with Codex once, then enable per run:
 ```bash
