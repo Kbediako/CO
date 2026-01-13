@@ -570,6 +570,13 @@
       "cadence_days": 90
     },
     {
+      "path": ".agent/task/0948-skills-auto-install.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-13",
+      "cadence_days": 90
+    },
+    {
       "path": ".agent/task/ACTION_PLAN_TEMPLATE.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -1414,6 +1421,13 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-01-07",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/README.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-13",
       "cadence_days": 90
     },
     {
@@ -2580,20 +2594,6 @@
     },
     {
       "path": "tasks/tasks-0947-delegation-skill-ship.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-01-13",
-      "cadence_days": 90
-    },
-    {
-      "path": "docs/README.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-01-13",
-      "cadence_days": 90
-    },
-    {
-      "path": ".agent/task/0948-skills-auto-install.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-01-13",
