@@ -18,6 +18,7 @@ import { buildSelfCheckResult } from '../orchestrator/src/cli/selfCheck.js';
 import { initCodexTemplates, formatInitSummary } from '../orchestrator/src/cli/init.js';
 import { runDoctor, formatDoctorSummary } from '../orchestrator/src/cli/doctor.js';
 import { formatDevtoolsSetupSummary, runDevtoolsSetup } from '../orchestrator/src/cli/devtoolsSetup.js';
+import { formatSkillsInstallSummary, installSkills } from '../orchestrator/src/cli/skills.js';
 import { loadPackageInfo } from '../orchestrator/src/cli/utils/packageInfo.js';
 import { slugify } from '../orchestrator/src/cli/utils/strings.js';
 import { serveMcp } from '../orchestrator/src/cli/mcp.js';
@@ -83,6 +84,9 @@ async function main(): Promise<void> {
         break;
       case 'devtools':
         await handleDevtools(args);
+        break;
+      case 'skills':
+        await handleSkills(args);
         break;
       case 'mcp':
         await handleMcp(args);
@@ -569,6 +573,33 @@ async function handleDevtools(rawArgs: string[]): Promise<void> {
   }
 }
 
+async function handleSkills(rawArgs: string[]): Promise<void> {
+  const { positionals, flags } = parseArgs(rawArgs);
+  const subcommand = positionals[0];
+  const wantsHelp = flags['help'] === true || subcommand === 'help' || subcommand === '--help';
+  if (!subcommand || wantsHelp) {
+    printSkillsHelp();
+    return;
+  }
+
+  switch (subcommand) {
+    case 'install': {
+      const format: OutputFormat = (flags['format'] as string | undefined) === 'json' ? 'json' : 'text';
+      const force = flags['force'] === true;
+      const codexHome = readStringFlag(flags, 'codex-home');
+      const result = await installSkills({ force, codexHome });
+      if (format === 'json') {
+        console.log(JSON.stringify(result, null, 2));
+      } else {
+        console.log(formatSkillsInstallSummary(result).join('\n'));
+      }
+      return;
+    }
+    default:
+      throw new Error(`Unknown skills command: ${subcommand}`);
+  }
+}
+
 async function handleMcp(rawArgs: string[]): Promise<void> {
   const { positionals, flags } = parseArgs(rawArgs);
   const subcommand = positionals.shift();
@@ -796,6 +827,10 @@ Commands:
   devtools setup          Print DevTools MCP setup instructions.
     --yes                 Apply setup by running "codex mcp add ...".
     --format json         Emit machine-readable output (dry-run only).
+  skills install          Install bundled skills into $CODEX_HOME/skills.
+    --force               Overwrite existing skill files.
+    --codex-home <path>   Override the target Codex home directory.
+    --format json         Emit machine-readable output.
   mcp serve [--repo <path>] [--dry-run] [-- <extra args>]
   delegate-server         Run the delegation MCP server (stdio).
     --repo <path>         Repo root for config + manifests (default cwd).
@@ -812,4 +847,15 @@ void main();
 function printVersion(): void {
   const pkg = loadPackageInfo();
   console.log(pkg.version ?? 'unknown');
+}
+
+function printSkillsHelp(): void {
+  console.log(`Usage: codex-orchestrator skills <command> [options]
+
+Commands:
+  install                   Install bundled skills into $CODEX_HOME/skills.
+    --force                 Overwrite existing skill files.
+    --codex-home <path>     Override the target Codex home directory.
+    --format json           Emit machine-readable output.
+`);
 }

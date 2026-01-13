@@ -958,6 +958,22 @@
       },
       "created_at": "2026-01-13",
       "completed_at": "2026-01-13"
+    },
+    {
+      "id": "0948",
+      "slug": "skills-auto-install",
+      "title": "Skills Auto-Install Helper + Release Readme Focus",
+      "path": "tasks/tasks-0948-skills-auto-install.md",
+      "kind": "run",
+      "status": "succeeded",
+      "gate": {
+        "phase": "skills-auto-install-implementation",
+        "status": "succeeded",
+        "log": ".runs/0948-skills-auto-install/cli/2026-01-13T01-36-28-976Z-661613e5/manifest.json",
+        "run_id": "2026-01-13T01-36-28-976Z-661613e5"
+      },
+      "created_at": "2026-01-13",
+      "completed_at": "2026-01-13"
     }
   ],
   "specs": [

@@ -8,6 +8,11 @@ Archived task snapshots live on the task-archives branch.
 - 2025: [docs/TASKS-archive-2025](https://github.com/Kbediako/CO/blob/task-archives/docs/TASKS-archive-2025.md)
 - 2026: [docs/TASKS-archive-2026](https://github.com/Kbediako/CO/blob/task-archives/docs/TASKS-archive-2026.md)
 <!-- tasks-archive-index:end -->
+# Task List Snapshot — Skills Auto-Install Helper + Release README (0948-skills-auto-install)
+- **Update — 2026-01-13:** Docs-review complete via `.runs/0948-skills-auto-install/cli/2026-01-13T01-26-07-866Z-e6863e7b/manifest.json`; implementation-gate via `.runs/0948-skills-auto-install/cli/2026-01-13T01-36-28-976Z-661613e5/manifest.json`; subagent diagnostics via `.runs/0948-skills-auto-install-subagent/cli/2026-01-13T01-20-41-668Z-d0c091c9/manifest.json`. Notes: export `MCP_RUNNER_TASK_ID=0948-skills-auto-install`; guardrails required: `node scripts/delegation-guard.mjs`, `node scripts/spec-guard.mjs --dry-run`, `npm run docs:check`, `npm run docs:freshness`, `npm run review`; diff budget override recorded in implementation-gate run. Checklist mirror: `tasks/tasks-0948-skills-auto-install.md`, `.agent/task/0948-skills-auto-install.md`.
+- [x] Foundation: subagent + docs-review + mirrors + docs registry updates. Evidence: `.runs/0948-skills-auto-install-subagent/cli/2026-01-13T01-20-41-668Z-d0c091c9/manifest.json`, `.runs/0948-skills-auto-install/cli/2026-01-13T01-26-07-866Z-e6863e7b/manifest.json`, `docs/TASKS.md`, `.agent/task/0948-skills-auto-install.md`, `tasks/tasks-0948-skills-auto-install.md`, `tasks/index.json`, `docs/docs-freshness-registry.json`.
+- [x] Implementation: auto-install helper + README focus + release notes template updates. Evidence: `orchestrator/src/cli/skills.ts`, `bin/codex-orchestrator.ts`, `orchestrator/tests/SkillsInstall.test.ts`, `README.md`, `docs/README.md`, `.github/workflows/release.yml`.
+- [x] Validation: implementation-gate manifest captured. Evidence: `.runs/0948-skills-auto-install/cli/2026-01-13T01-36-28-976Z-661613e5/manifest.json`.
 # Task List Snapshot — Delegation Skill Ship (0947-delegation-skill-ship)
 - **Update — 2026-01-13:** Docs-review complete via `.runs/0947-delegation-skill-ship/cli/2026-01-13T00-24-47-193Z-742a71c7/manifest.json`; implementation-gate via `.runs/0947-delegation-skill-ship/cli/2026-01-13T00-35-31-776Z-ca886a3f/manifest.json`; subagent diagnostics via `.runs/0947-delegation-skill-ship-subagent/cli/2026-01-13T00-22-35-053Z-5d911955/manifest.json`. Notes: export `MCP_RUNNER_TASK_ID=0947-delegation-skill-ship`; guardrails required: `node scripts/delegation-guard.mjs`, `node scripts/spec-guard.mjs --dry-run`, `npm run build`, `npm run lint`, `npm run test`, `npm run docs:check`, `npm run docs:freshness`, `node scripts/diff-budget.mjs`, `npm run review`. Checklist mirror: `tasks/tasks-0947-delegation-skill-ship.md`, `.agent/task/0947-delegation-skill-ship.md`.
 - [x] Foundation: subagent + docs-review + mirrors + docs registry updates. Evidence: `.runs/0947-delegation-skill-ship-subagent/cli/2026-01-13T00-22-35-053Z-5d911955/manifest.json`, `.runs/0947-delegation-skill-ship/cli/2026-01-13T00-24-47-193Z-742a71c7/manifest.json`, `docs/TASKS.md`, `.agent/task/0947-delegation-skill-ship.md`, `tasks/tasks-0947-delegation-skill-ship.md`, `tasks/index.json`, `docs/docs-freshness-registry.json`, `.runs/0947-delegation-skill-ship/metrics.json`, `out/0947-delegation-skill-ship/state.json`.
@@ -250,21 +255,16 @@ Mirror status with `tasks/tasks-0707-orchestrator-slimdown.md` and `.agent/task/
 - [x] Enforcement-mode parsing shared between control-plane and privacy guard — Evidence: `.runs/0707-orchestrator-slimdown/cli/2025-12-20T00-28-00-131Z-bd705bcf/manifest.json`.
 - [x] Error string expectations verified before centralizing error formatting — Evidence: `.runs/0707-orchestrator-slimdown/cli/2025-12-20T00-28-00-131Z-bd705bcf/manifest.json`.
 - [x] Error message formatting centralized without changing prefixes or strings (Needs Verification) — Evidence: `.runs/0707-orchestrator-slimdown/cli/2025-12-20T00-28-00-131Z-bd705bcf/manifest.json`.
-
 # Task List Snapshot — Design Reference Pipeline (0401-design-reference)
-
 - **Update — 2025-11-21:** Diagnostics + review run captured at `.runs/0401-design-reference/cli/2025-11-21T08-15-57-435Z-851d3781/manifest.json`; use this evidence path across mirrors.
 - **Update — Configuration planning:** `design.config.yaml` schema drafted alongside pipeline toggles documentation; manifest reference set to `.runs/0401-design-reference/cli/2025-11-21T08-15-57-435Z-851d3781/manifest.json`.
 - **Notes:** Optional tool setup lives behind `npm run setup:design-tools`; retention/expiry policies will reference `design.config.yaml > metadata.design.retention`.
-
 ## Checklist Mirror
 Mirror status with `tasks/design-reference-pipeline.md` and `.agent/task/design-reference-pipeline.md`. Keep `[ ]` until a manifest path such as `.runs/0401-design-reference/cli/2025-12-29T06-49-38-980Z-85ac2153/manifest.json` is recorded.
-
 ### Foundation
 - [x] Collateral synchronized — `docs/design/PRD-design-reference-pipeline.md`, `docs/design/specs/DESIGN_REFERENCE_PIPELINE.md`, `tasks/index.json`, `.agent/task/design-reference-pipeline.md`, `docs/TASKS.md`; Evidence: `.runs/0401-design-reference/cli/2025-11-21T08-15-57-435Z-851d3781/manifest.json`.
 - [x] Pipeline toggles wired — `design.config.yaml` template + CLI/ENV triggers (`--pipeline design-reference`, `DESIGN_PIPELINE=1`) documented; Evidence: `.runs/0401-design-reference/cli/2025-11-06T11-59-59-680Z-34fe7972/manifest.json`.
 - [x] Setup tooling — `npm run setup:design-tools` captures Playwright/FFmpeg optional installs without impacting baseline CI; Evidence: `.runs/0401-design-reference/cli/2025-11-06T11-59-59-680Z-34fe7972/manifest.json`.
-
 ### Pipeline Stages
 - [x] Playwright extractor implemented — stages DOM/CSS/screenshots with privacy approvals logged; Evidence: `.runs/0401-design-reference/cli/2025-11-06T11-59-59-680Z-34fe7972/manifest.json`.
 - [x] Reference page builder shipped — `motherduck.html` staged under `design/reference/`; Evidence: `.runs/0401-design-reference/cli/2025-11-06T11-59-59-680Z-34fe7972/manifest.json`.
