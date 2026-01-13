@@ -22,7 +22,7 @@ const DIST_ALLOWED_PREFIXES = [
   'dist/scripts/lib/',
   'dist/types/'
 ];
-const EXPLICIT_ALLOWED_FILES = new Set(['docs/assets/setup.gif']);
+const EXPLICIT_ALLOWED_FILES = new Set(['docs/assets/setup.gif', 'docs/README.md']);
 
 const FORBIDDEN_PREFIXES = [
   '.agent/',
