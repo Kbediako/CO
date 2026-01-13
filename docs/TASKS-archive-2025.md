@@ -1,566 +1,156 @@
 # Task Archive — 2025
 
-- Generated: 2025-12-31T06:15:38.865Z
+- Generated: 2026-01-13T03:34:01.281Z
 - Source: docs/TASKS.md on main
-- Policy: docs/tasks-archive-policy.json
-# Task List Snapshot — More Nutrition Pixel Archive (0505-more-nutrition-pixel)
+- Policy: manual-trim (target 225 lines)
+# Task List Snapshot — Dead Code Pruning & Evidence (0801)
+- **Update — Planning:** Diagnostics captured at `.runs/0801-dead-code-pruning/cli/2025-12-09T03-51-52-584Z-93e9a77f/manifest.json`; dead-code deletions and archive relocations complete (archives parked under `.runs/0801-dead-code-pruning/archive/2025-12-08T10-01-24Z/` with README pointers) and guardrails/tests rerun on 2025-12-09.
+- **Notes:** Export `MCP_RUNNER_TASK_ID=0801-dead-code-pruning` before running orchestrator commands; guardrails: `node scripts/spec-guard.mjs --dry-run`, `npm run lint`, `npm run test` (and `npm run build` if touching orchestrator packages).
+## Checklist Mirror
+Mirror status with `tasks/tasks-0801-dead-code-pruning.md` and `.agent/task/<id>-<slug>.md` (if created). Keep `[ ]` until manifest path is recorded.
+### Foundation
+- [x] Diagnostics/plan manifest captured — Evidence: `.runs/0801-dead-code-pruning/cli/2025-12-09T03-51-52-584Z-93e9a77f/manifest.json`.
+- [x] Metrics/state snapshots updated — Evidence: `.runs/0801-dead-code-pruning/metrics.json`, `out/0801-dead-code-pruning/state.json`.
+- [x] PRD/spec/tasks mirrors updated with manifest links — Evidence: `.runs/0801-dead-code-pruning/cli/2025-12-09T03-51-52-584Z-93e9a77f/manifest.json`.
+### Remediation Plan
+- [x] Unused CLI/learning/SDK helpers removed or justified — Evidence: `.runs/0801-dead-code-pruning/cli/2025-12-09T03-51-52-584Z-93e9a77f/manifest.json`.
+- [x] Aggregator entrypoints/pattern registries evaluated and pruned or documented — Evidence: `.runs/0801-dead-code-pruning/cli/2025-12-09T03-51-52-584Z-93e9a77f/manifest.json`.
+- [x] Evaluation harness + mirror server + design sample handled (delete/archive/justify) — Evidence: `.runs/0801-dead-code-pruning/cli/2025-12-09T03-51-52-584Z-93e9a77f/manifest.json`.
+- [x] Archives decision (keep with README pointer or relocate to archive folder) — Evidence: `.runs/0801-dead-code-pruning/cli/2025-12-09T03-51-52-584Z-93e9a77f/manifest.json`.
+- [x] Guardrails/tests executed — `node scripts/spec-guard.mjs --dry-run`, `npm run lint`, `npm run test` (and `npm run build` when orchestrator code touched); Evidence: `.runs/0801-dead-code-pruning/cli/2025-12-09T03-51-52-584Z-93e9a77f/manifest.json`.
+### Review & Handoff
+- [x] Reviewer hand-off run (`npm run review --manifest <latest>`) with approvals captured — Evidence: `.runs/0801-dead-code-pruning/cli/2025-12-09T03-51-52-584Z-93e9a77f/manifest.json`.
 
-- **Update — 2025-11-09:** Hi-fi design toolkit run captured https://more-nutrition.webflow.io and logged manifest `.runs/0505-more-nutrition-pixel/cli/2025-11-09T12-25-49-931Z-decf5ae1/manifest.json` with full stage telemetry (interactions enabled for scroll/slider playback).
-- **Update — Archive minted:** Toolkit outputs mirrored into `.runs/0505-more-nutrition-pixel/archive/2025-11-09T12-25-49Z/` (context, tokens, style guide, reference, diffs) for desktop + mobile snapshots. *Note: directory pruned from the working copy on 2025-11-09 to keep the repo lean; rerun hi-fi pipeline to regenerate artifacts if needed.*
-- **Notes:** Automated self-correction stopped at a 2.59% residual error rate; findings captured in `docs/findings/more-nutrition.md` to track spacing + slider gaps.
+# Task List Snapshot — Design Reference Pipeline (0401-design-reference)
+- **Update — 2025-11-21:** Diagnostics + review run captured at `.runs/0401-design-reference/cli/2025-11-21T08-15-57-435Z-851d3781/manifest.json`; use this evidence path across mirrors.
+- **Update — Configuration planning:** `design.config.yaml` schema drafted alongside pipeline toggles documentation; manifest reference set to `.runs/0401-design-reference/cli/2025-11-21T08-15-57-435Z-851d3781/manifest.json`.
+- **Notes:** Optional tool setup lives behind `npm run setup:design-tools`; retention/expiry policies will reference `design.config.yaml > metadata.design.retention`.
+## Checklist Mirror
+Mirror status with `tasks/design-reference-pipeline.md` and `.agent/task/design-reference-pipeline.md`. Keep `[ ]` until a manifest path such as `.runs/0401-design-reference/cli/2025-12-29T06-49-38-980Z-85ac2153/manifest.json` is recorded.
+### Foundation
+- [x] Collateral synchronized — `docs/design/PRD-design-reference-pipeline.md`, `docs/design/specs/DESIGN_REFERENCE_PIPELINE.md`, `tasks/index.json`, `.agent/task/design-reference-pipeline.md`, `docs/TASKS.md`; Evidence: `.runs/0401-design-reference/cli/2025-11-21T08-15-57-435Z-851d3781/manifest.json`.
+- [x] Pipeline toggles wired — `design.config.yaml` template + CLI/ENV triggers (`--pipeline design-reference`, `DESIGN_PIPELINE=1`) documented; Evidence: `.runs/0401-design-reference/cli/2025-11-06T11-59-59-680Z-34fe7972/manifest.json`.
+- [x] Setup tooling — `npm run setup:design-tools` captures Playwright/FFmpeg optional installs without impacting baseline CI; Evidence: `.runs/0401-design-reference/cli/2025-11-06T11-59-59-680Z-34fe7972/manifest.json`.
+### Pipeline Stages
+- [x] Playwright extractor implemented — stages DOM/CSS/screenshots with privacy approvals logged; Evidence: `.runs/0401-design-reference/cli/2025-11-06T11-59-59-680Z-34fe7972/manifest.json`.
+- [x] Reference page builder shipped — `motherduck.html` staged under `design/reference/`; Evidence: `.runs/0401-design-reference/cli/2025-11-06T11-59-59-680Z-34fe7972/manifest.json`.
+- [x] Componentization stage delivered — `packages/design-system` assets staged under `design/components/`; Evidence: `.runs/0401-design-reference/cli/2025-11-06T11-59-59-680Z-34fe7972/manifest.json`.
+- [x] Advanced assets optionality — Framer Motion + FFmpeg outputs gated by config quotas; Evidence: `.runs/0401-design-reference/cli/2025-11-06T11-59-59-680Z-34fe7972/manifest.json`.
+### Manifest & Guardrails
+- [x] Manifest schema updates — `packages/shared/manifest/types.ts` + `packages/shared/manifest/writer.ts` persist `design_artifacts`; Evidence: `.runs/0401-design-reference/cli/2025-11-06T11-59-59-680Z-34fe7972/manifest.json`.
+- [x] DesignArtifactWriter output — `out/0401-design-reference/design/runs/<run>.json` summary written with retention/privacy fields; Evidence: `.runs/0401-design-reference/cli/2025-11-06T11-59-59-680Z-34fe7972/manifest.json`.
+- [x] Retention & privacy controls — expiry automation/docs and approval logging established; Evidence: `.runs/0401-design-reference/cli/2025-11-06T11-59-59-680Z-34fe7972/manifest.json`.
+- [x] Guardrail integration — `scripts/spec-guard.mjs` covers `docs/design/specs/**`; `npm --prefix packages/design-system run test:visual` hooked into pipeline; Evidence: `.runs/0401-design-reference/cli/2025-11-06T11-59-59-680Z-34fe7972/manifest.json`.
+### Verification & Approvals
+- [x] Visual regression evidence — diff artifacts + pass/fail summaries staged under `design/visual-regression/`; Evidence: `.runs/0401-design-reference/cli/2025-11-06T11-59-59-680Z-34fe7972/manifest.json`.
+- [x] Diagnostics run — `npx codex-orchestrator start diagnostics --pipeline design-reference --format json`; Evidence: `.runs/0401-design-reference/cli/2025-11-06T11-59-59-680Z-34fe7972/manifest.json`.
+- [x] Reviewer hand-off — `npm run review` references latest design-reference manifest and approvals; Evidence: `.runs/0401-design-reference/cli/2025-11-21T08-15-57-435Z-851d3781/manifest.json`.
+
+# Task List Snapshot — Codex Orchestrator Autonomy Enhancements (0303)
+
+- **Update — 2025-11-05:** Multi-instance autonomy upgrade validation run recorded; manifest `.runs/autonomy-upgrade/cli/2025-11-05T13-30-00Z-upgrade/manifest.json` captures control-plane enforcement, scheduler fan-out, streaming handles, and privacy guard enforcement.
+- **Update — 2025-11-06:** Efficiency optimizations (guard decision pruning, replay window reuse, stdio sliding buffer, `mergeSnapshot` O(1) append) validated; manifest `.runs/0303-orchestrator-autonomy/cli/2025-11-06T07-19-49-813Z-8dd5ff38/manifest.json`.
+- **Update — 2025-11-04:** Unified exec runtime (session manager + event streaming) completed; manifest `.runs/0303-orchestrator-autonomy/cli/2025-11-04T01-59-37-568Z-8065982c/manifest.json`.
+- **Update — 2025-11-04:** CLI command stages now emit unified exec lifecycle events with streaming logs; manifest `.runs/0303-orchestrator-autonomy/cli/2025-11-04T04-55-02-406Z-9663b24b/manifest.json`.
+- **Update — 2025-11-04:** Tool orchestrator layer implemented with manifest evidence `.runs/0303-orchestrator-autonomy/cli/2025-11-04T01-16-58-286Z-eeec1865/manifest.json`.
+- **Update — 2025-11-04:** Diagnostics run `2025-11-04T01-59-37-568Z-8065982c` captured guardrail execution; manifest at `.runs/0303-orchestrator-autonomy/cli/2025-11-04T01-59-37-568Z-8065982c/manifest.json`.
+- **Gate Status:** Planning approved — greenlight to begin ToolOrchestrator implementation. Evidence: `.runs/0303-orchestrator-autonomy/cli/2025-11-04T00-46-22-699Z-8be8efb9/manifest.json`.
+- **Notes:** Upgrade metrics recorded at `.runs/autonomy-upgrade/metrics.json` with aggregates in `.runs/autonomy-upgrade/metrics/post-rollout.json`, `.runs/autonomy-upgrade/metrics/completeness.json`, and MTTR delta tracked in `out/autonomy-upgrade/metrics/mttr-delta.json`. Legacy diagnostics remain at `.runs/0303-orchestrator-autonomy/metrics.json`; state snapshot refreshed at `out/0303-orchestrator-autonomy/state.json`.
 
 ## Checklist Mirror
-Mirror status with `tasks/0505-more-nutrition-pixel.md` and `.agent/task/0505-more-nutrition-pixel.md`. Keep `[ ]` until manifest + archive references are recorded.
-
-### Capture & Evidence
-- [x] Hi-fi pipeline run — `npx codex-orchestrator start hi-fi-design-toolkit --task 0505-more-nutrition-pixel --format json`; Evidence: `.runs/0505-more-nutrition-pixel/cli/2025-11-09T12-25-49-931Z-decf5ae1/manifest.json`.
-- [x] Toolkit summary — `out/0505-more-nutrition-pixel/design/runs/2025-11-09T12-25-49-931Z-decf5ae1.json` logs approvals, breakpoints, token counts, and self-correction deltas.
-
-### Artifacts & Findings
-- [x] Archive staged — `.runs/0505-more-nutrition-pixel/archive/2025-11-09T12-25-49Z/` copies `design-toolkit/{context,tokens,styleguide,reference,diffs}` *(local copy removed on 2025-11-09 cleanup; rerun capture to recreate)*.
-- [x] Findings doc — `docs/findings/more-nutrition.md` lists residual parity gaps, diff metrics, and next actions referencing the same manifest.
-
-### Documentation Sync
-- [x] Mirrors refreshed — `tasks/index.json`, `tasks/0505-more-nutrition-pixel.md`, `.agent/task/0505-more-nutrition-pixel.md`, `docs/PRD.md`, `docs/TECH_SPEC.md`, and `docs/ACTION_PLAN.md` cite the manifest + archive path for Task 0505.
-
-
-# Task List Snapshot — Orchestrator Issue Validation & Prioritization (0901)
-
-- **Update — Planning:** Validation docs prepared; awaiting first diagnostics/plan manifest under `.runs/0901-orchestrator-issue-validation/cli/2025-12-29T06-49-38-980Z-85ac2153/manifest.json`.
-- **Notes:** Export `MCP_RUNNER_TASK_ID=0901-orchestrator-issue-validation` before orchestrator commands. Validation runs should keep guardrails on: `node scripts/spec-guard.mjs --dry-run`, `npm run lint`, `npm run test`.
-
-## Checklist Mirror
-Mirror status with `tasks/tasks-0901-orchestrator-issue-validation.md` and `.agent/task/<id>-<slug>.md` (create if automation requires). Keep `[ ]` until evidence is recorded.
+Mirror status with `tasks/tasks-0303-orchestrator-autonomy.md` and `.agent/task/0303-orchestrator-autonomy.md`. Each `[x]` entry must cite the manifest path that satisfied the acceptance criteria.
 
 ### Foundation
-- [x] Diagnostics/plan manifest captured — Evidence: `.runs/0901-orchestrator-issue-validation/cli/2025-12-12T02-00-30-325Z-9cd0b653/manifest.json`.
-- [x] Metrics/state snapshots updated — Evidence: `.runs/0901-orchestrator-issue-validation/metrics.json`, `out/0901-orchestrator-issue-validation/state.json`.
-- [x] PRD/spec/tasks mirrors updated with manifest links — Evidence: `.runs/0901-orchestrator-issue-validation/cli/2025-12-12T02-00-30-325Z-9cd0b653/manifest.json`.
+- [x] Synchronize collateral — `tasks/index.json`, `docs/PRD-codex-orchestrator-autonomy.md`, `docs/TECH_SPEC-codex-orchestrator-autonomy.md`, `docs/ACTION_PLAN-codex-orchestrator-autonomy.md`, `.agent/task/0303-orchestrator-autonomy.md` reference Task 0303; Evidence: `.runs/0303-orchestrator-autonomy/cli/2025-11-03T23-58-59-546Z-49371323/manifest.json` (diagnostics run 2025-11-03T23:58:59Z).
+- [x] Prepare run directories — Initialize `.runs/0303-orchestrator-autonomy/cli/` via diagnostics run; Evidence: `.runs/0303-orchestrator-autonomy/cli/2025-11-03T23-58-59-546Z-49371323/manifest.json`.
+- [x] Environment defaults — `MCP_RUNNER_TASK_ID` exported in shell / CI and recorded in diagnostics manifest task id + approval profile; Evidence: `.runs/0303-orchestrator-autonomy/cli/2025-11-04T00-31-05-908Z-9d1b561c/manifest.json` (manifest records `approval_policy: read/edit/run/network`).
 
-### Validation
-- [x] Issue #1 validated (sub‑pipeline error finalization) — Evidence: `tasks/tasks-0901-orchestrator-issue-validation.md`.
-- [x] Issue #2 validated (CLI exec args passthrough) — Evidence: `tasks/tasks-0901-orchestrator-issue-validation.md`.
-- [x] Issue #3 validated (session env override on reuse) — Evidence: `tasks/tasks-0901-orchestrator-issue-validation.md`.
-- [x] Issue #4 validated (retry config clobbering) — Evidence: `tasks/tasks-0901-orchestrator-issue-validation.md`.
-- [x] Issue #5 validated (`isIsoDate` strictness) — Evidence: `tasks/tasks-0901-orchestrator-issue-validation.md`.
-- [x] Issue #6 validated (instruction stamp guard behavior) — Evidence: `tasks/tasks-0901-orchestrator-issue-validation.md`.
-- [x] Issue #7 validated (timeout kill cross‑platform) — Evidence: `tasks/tasks-0901-orchestrator-issue-validation.md`.
-- [x] Issue #8 validated (temp dir cleanup) — Evidence: `tasks/tasks-0901-orchestrator-issue-validation.md`.
-- [x] Issue #9 validated (eslint plugin side‑effect build) — Evidence: `tasks/tasks-0901-orchestrator-issue-validation.md`.
+### Tool Orchestrator Layer
+- [x] Implement centralized `ToolOrchestrator` service with approval cache reuse and sandbox retry policy; Evidence: `.runs/0303-orchestrator-autonomy/cli/2025-11-04T01-16-58-286Z-eeec1865/manifest.json`.
+- [x] Persist approval/retry metadata into manifests (`toolRuns[].approvalSource`, `toolRuns[].retryCount`, `toolRuns[].sandboxState`) with unit coverage; Evidence: `.runs/0303-orchestrator-autonomy/cli/2025-11-04T01-16-58-286Z-eeec1865/manifest.json`.
 
-### Follow‑up Plan
-- [x] Prioritized fix backlog created (new task/PR) with acceptance criteria — Evidence: `tasks/tasks-0902-orchestrator-reliability-fixes.md`.
+### Unified Exec Runtime
+- [x] Build `ExecSessionManager` supporting reusable PTY handles, opt-out flows, and environment snapshots; Evidence: `.runs/0303-orchestrator-autonomy/cli/2025-11-04T01-59-37-568Z-8065982c/manifest.json`.
+- [x] Update unified exec runner to emit `exec:begin|chunk|end` events, stream stdout/stderr under 64 KiB caps, and honor sandbox retries; Evidence: `.runs/0303-orchestrator-autonomy/cli/2025-11-04T01-59-37-568Z-8065982c/manifest.json`.
+### CLI & SDK Interfaces
+- [x] Ship `codex-orchestrator exec` command with `--json`, `--jsonl`, `--otel-endpoint`, and `--notify` support mirroring Codex CLI; Evidence: `.runs/0303-orchestrator-autonomy/cli/2025-11-04T04-55-02-406Z-9663b24b/manifest.json`. 
+- [x] Extend Node.js SDK to spawn the exec command, stream JSONL events, and expose resume/retry helpers; Evidence: `.runs/0303-orchestrator-autonomy/cli/2025-11-04T04-55-02-406Z-9663b24b/manifest.json`. 
 
+### Telemetry & Notifications
+- [x] Implement OTEL exporter module with graceful retry/backoff and manifest metrics; Evidence: `.runs/0303-orchestrator-autonomy/cli/2025-11-04T04-55-02-406Z-9663b24b/manifest.json`. 
+- [x] Add notification hooks for summarized run events with configuration precedence (CLI > env > config); Evidence: `.runs/0303-orchestrator-autonomy/cli/2025-11-04T04-55-02-406Z-9663b24b/manifest.json`. 
 
+### Instruction Hierarchy & Schema
+- [x] Deliver hierarchical instruction loader merging `AGENTS.md` → `docs/AGENTS.md` → `.agent/AGENTS.md`, recording hashes in manifest metadata; Evidence: `.runs/0303-orchestrator-autonomy/cli/2025-11-04T04-55-02-406Z-9663b24b/manifest.json`. 
+- [x] Update manifest/config schemas for new fields and document JSONL event format; Evidence: `.runs/0303-orchestrator-autonomy/cli/2025-11-04T04-55-02-406Z-9663b24b/manifest.json`. 
 
-# Task List Snapshot — Orchestrator Reliability Fixes (0902)
+### Efficiency Optimizations
+- [x] Prune `handle.decisions` along with the frame buffer to keep guard metadata bounded; Evidence: `.runs/0303-orchestrator-autonomy/cli/2025-11-06T07-19-49-813Z-8dd5ff38/manifest.json`, tests `packages/orchestrator/tests/HandleService.test.ts`.
+- [x] Replay subscriptions and snapshots reuse the stored frame window (O(replayed frames) per observer); Evidence: `.runs/0303-orchestrator-autonomy/cli/2025-11-06T07-19-49-813Z-8dd5ff38/manifest.json`, tests `packages/orchestrator/tests/HandleService.test.ts`.
+- [x] Replace quadratic stdio concatenation with an O(chunk) sliding window; Evidence: `.runs/0303-orchestrator-autonomy/cli/2025-11-06T07-19-49-813Z-8dd5ff38/manifest.json`, tests `packages/shared/tests/StdioTracker.test.ts`.
+- [x] Make `TaskStateStore.mergeSnapshot` O(1) for append-only runs while keeping replacements ordered; Evidence: `.runs/0303-orchestrator-autonomy/cli/2025-11-06T07-19-49-813Z-8dd5ff38/manifest.json`, tests `orchestrator/tests/TaskStateStore.test.ts`.
+- [x] Diagnostics + guardrails rerun after efficiency fixes (`npm run test`, `node scripts/spec-guard.mjs --dry-run`); Evidence: `.runs/0303-orchestrator-autonomy/cli/2025-11-06T07-19-49-813Z-8dd5ff38/manifest.json`.
 
-- **Update — Planning:** Follow‑on hardening task from 0901; implementation underway.
-- **Notes:** Export `MCP_RUNNER_TASK_ID=0902-orchestrator-reliability-fixes` before orchestrator commands. Guardrails required: `node scripts/spec-guard.mjs --dry-run`, `npm run lint`, `npm run test`.
+### Verification & Guardrails
+- [x] Run diagnostics (`npx codex-orchestrator start diagnostics --format json`) and record manifest link; Evidence: `.runs/0303-orchestrator-autonomy/cli/2025-11-04T00-44-59-137Z-de57c4d7/manifest.json`.
+- [x] Guardrails — `node scripts/spec-guard.mjs --dry-run`, `npm run lint`, `npm run test`, `npm run eval:test` (when fixtures ready); Evidence: `.runs/0303-orchestrator-autonomy/cli/2025-11-04T04-55-02-406Z-9663b24b/manifest.json` (diagnostics run captures guardrail execution summary).
+- [x] Reviewer hand-off — Execute `npm run review` using latest manifest; Evidence: `.runs/0303-orchestrator-autonomy/cli/2025-11-04T00-31-05-908Z-9d1b561c/manifest.json` (review outcome “Skip for now” logged).
 
-## Checklist Mirror
-Mirror status with `tasks/tasks-0902-orchestrator-reliability-fixes.md` and `.agent/task/0902-orchestrator-reliability-fixes.md`. Keep `[ ]` until evidence is recorded.
-
-### Foundation
-- [x] Diagnostics/guardrails manifest captured — Evidence: `.runs/0902-orchestrator-reliability-fixes/cli/2025-12-12T02-34-20-318Z-847a8138/manifest.json`.
-- [x] Metrics/state snapshots updated — Evidence: `.runs/0902-orchestrator-reliability-fixes/metrics.json`, `out/0902-orchestrator-reliability-fixes/state.json`.
-- [x] PRD/spec/task mirrors updated with manifest links — Evidence: `tasks/tasks-0902-orchestrator-reliability-fixes.md`.
-
-### Fixes
-- [x] Issue #1 fixed: sub‑pipeline exceptions finalize parent manifests/stages — Evidence: `tasks/tasks-0902-orchestrator-reliability-fixes.md`.
-- [x] Issue #2 fixed: CLI exec executor forwards unified exec args — Evidence: `tasks/tasks-0902-orchestrator-reliability-fixes.md`.
-- [x] Issue #3 fixed: session reuse applies env overrides — Evidence: `tasks/tasks-0902-orchestrator-reliability-fixes.md`.
-- [x] Issue #4 fixed: retry defaults not clobbered by `undefined` spreads — Evidence: `tasks/tasks-0902-orchestrator-reliability-fixes.md`.
-- [x] Issue #5 fixed: `isIsoDate` enforces strict ISO‑8601 expectations — Evidence: `tasks/tasks-0902-orchestrator-reliability-fixes.md`.
-- [x] Issue #6 fixed: instruction loader warns+skips unstamped optional candidates — Evidence: `tasks/tasks-0902-orchestrator-reliability-fixes.md`.
-- [x] Issue #7 fixed: timeout kill is cross‑platform/Windows‑safe — Evidence: `tasks/tasks-0902-orchestrator-reliability-fixes.md`.
-- [x] Issue #8 fixed: temp dirs cleaned in crystalizer and SDK exec — Evidence: `tasks/tasks-0902-orchestrator-reliability-fixes.md`.
-- [x] Issue #9 fixed: eslint plugin no longer runs builds as side effects — Evidence: `tasks/tasks-0902-orchestrator-reliability-fixes.md`.
-
-### Guardrails
-- [x] Spec guard passes — Evidence: `.runs/0902-orchestrator-reliability-fixes/cli/2025-12-12T02-34-20-318Z-847a8138/manifest.json`.
-- [x] Lint passes — Evidence: `.runs/0902-orchestrator-reliability-fixes/cli/2025-12-12T02-34-20-318Z-847a8138/manifest.json`.
-- [x] Tests pass — Evidence: `.runs/0902-orchestrator-reliability-fixes/cli/2025-12-12T02-34-20-318Z-847a8138/manifest.json`.
+---
 
 
-# Task List Snapshot — TaskStateStore Run History File Fix (0903)
+# Task List Snapshot — Orchestrator Resilience Hardening (0202)
 
-- **Update — Planning:** Follow‑on from 0902 to remove TaskStateStore/metrics `state.json` collision.
-- **Notes:** Export `MCP_RUNNER_TASK_ID=0903-taskstate-store-run-history-fix` before orchestrator commands. Guardrails required.
+- **Update — 2025-10-31:** Diagnostics run `2025-10-31T22-56-34-431Z-9574035c` succeeded; manifest recorded under `.runs/0202-orchestrator-hardening/cli/2025-10-31T22-56-34-431Z-9574035c/manifest.json`.
+- **Gate Status:** Resilience enhancements implemented; awaiting reviewer sign-off.
+- **Notes:** Metrics appended to `.runs/0202-orchestrator-hardening/metrics.json`; state snapshot refreshed at `out/0202-orchestrator-hardening/state.json`.
 
 ## Checklist Mirror
-Mirror status with `tasks/tasks-0903-taskstate-store-run-history-fix.md` and `.agent/task/0903-taskstate-store-run-history-fix.md`. Keep `[ ]` until evidence is recorded.
+Mirror status with `tasks/tasks-0202-orchestrator-hardening.md` and `.agent/task/0202-orchestrator-hardening.md`. Each `[x]` entry must cite the manifest path that satisfied the acceptance criteria.
 
-### Foundation
-- [x] Diagnostics/guardrails manifest captured — Evidence: `.runs/0903-taskstate-store-run-history-fix/cli/2025-12-12T04-49-23-224Z-5cfceb39/manifest.json`.
-- [x] Metrics/state snapshots updated — Evidence: `.runs/0903-taskstate-store-run-history-fix/metrics.json`, `out/0903-taskstate-store-run-history-fix/state.json`.
-- [x] PRD/spec/task mirrors updated with manifest links — Evidence: `tasks/tasks-0903-taskstate-store-run-history-fix.md`.
+- Documentation Sync — `[x]` Collateral references Task 0202 and ties to diagnostics manifest; Evidence: `.runs/0202-orchestrator-hardening/cli/2025-10-31T22-56-34-431Z-9574035c/manifest.json`.
+- Persistence Reliability — `[x]` Lock retry/backoff shipped with passing tests; Evidence: `.runs/0202-orchestrator-hardening/cli/2025-10-31T22-56-34-431Z-9574035c/manifest.json`.
+- Heartbeat Safety — `[x]` Awaited heartbeat queue implemented; Evidence: `.runs/0202-orchestrator-hardening/cli/2025-10-31T22-56-34-431Z-9574035c/manifest.json`.
+- Output Bounding — `[x]` Command buffer and error truncation verified via tests; Evidence: `.runs/0202-orchestrator-hardening/cli/2025-10-31T22-56-34-431Z-9574035c/manifest.json`.
+- Guardrails & Review — `[x]` `spec-guard`, `npm run lint`, `npm run test`, and `npm run review` executed; Evidence: `.runs/0202-orchestrator-hardening/cli/2025-10-31T22-56-34-431Z-9574035c/manifest.json`.
 
-### Fix
-- [x] TaskStateStore run history uses `runs.json` without overwriting metrics `state.json`.
+Update checklist entries with the exact `.runs/0202-orchestrator-hardening/cli/2025-12-29T06-49-38-980Z-85ac2153/manifest.json` path once runs complete.
 
-### Guardrails
-- [x] Spec guard passes — Evidence: `.runs/0903-taskstate-store-run-history-fix/cli/2025-12-12T04-49-23-224Z-5cfceb39/manifest.json`.
-- [x] Lint passes — Evidence: `.runs/0903-taskstate-store-run-history-fix/cli/2025-12-12T04-49-23-224Z-5cfceb39/manifest.json`.
-- [x] Tests pass — Evidence: `.runs/0903-taskstate-store-run-history-fix/cli/2025-12-12T04-49-23-224Z-5cfceb39/manifest.json`.
+# Task List Snapshot — TF-GRPO Integration (0506)
 
-
-# Task List Snapshot — README vs Codebase Alignment (0904)
-
-- **Update — Completed:** Diagnostics + guardrails captured at `.runs/0904-readme-codebase-alignment/cli/2025-12-14T01-00-24-028Z-9a93c8df/manifest.json`; README/SOP docs aligned to current code behavior.
-- **Notes:** Export `MCP_RUNNER_TASK_ID=0904-readme-codebase-alignment` before orchestrator commands. Guardrails required: `node scripts/spec-guard.mjs --dry-run`, `npm run lint`, `npm run test`.
+- **Update — 2025-11-21:** `tfgrpo-learning` run succeeded (3 epochs, G=2, rewarders=`gt,relative`, temps 0.7/0.7/0.3) with manifest `.runs/0506-tfgrpo-integration/cli/2025-11-21T05-56-32-837Z-430b2d9d/manifest.json`; prompt-pack stamps recorded and spec-guard passed. Diagnostics-with-eval guardrail run succeeded under `.runs/0506-tfgrpo-integration/cli/2025-11-21T07-09-08-052Z-ac3a1d09/manifest.json` (build/lint/test/eval/spec-guard).
+- **Gate Status:** TF-GRPO enablement in planning; implementation gated on Experience Store + prompt pack landing behind `FEATURE_TFGRPO_GROUP`.
+- **Guardrails:** Enforce `G ≥ 2`, ≤32-word experiences, three epochs (~100 samples) with train temp 0.7 / eval temp 0.3, stamped instruction sources only, and `node scripts/spec-guard.mjs --dry-run` before review.
 
 ## Checklist Mirror
-Mirror status with `tasks/tasks-0904-readme-codebase-alignment.md` and `.agent/task/0904-readme-codebase-alignment.md`. Keep `[ ]` until evidence is recorded.
+Mirror status with `tasks/tasks-0506-tfgrpo.md` and `.agent/task/0506-tfgrpo-integration.md`. Flip `[ ]` to `[x]` only after attaching the manifest path (e.g., `.runs/0506-tfgrpo-integration/cli/2025-12-29T06-49-38-980Z-85ac2153/manifest.json`).
 
-### Foundation
-- [x] Diagnostics/plan manifest captured — Evidence: `.runs/0904-readme-codebase-alignment/cli/2025-12-14T01-00-24-028Z-9a93c8df/manifest.json`.
-- [x] Metrics/state snapshots updated — Evidence: `.runs/0904-readme-codebase-alignment/metrics.json`, `out/0904-readme-codebase-alignment/state.json`.
-- [x] PRD/spec/tasks mirrors drafted — Evidence: this commit.
+### PR-1 Prompt Packs & Loader
+- [x] Stamped prompt-pack manifests wired into `packages/orchestrator/src/instructions/loader.ts`; tests: `packages/orchestrator/tests/instructions/PromptPackLoader.test.ts`, `packages/orchestrator/tests/InstructionsLoader.test.ts`. Evidence: prompt_packs stamps in `.runs/0506-tfgrpo-integration/cli/2025-11-21T05-56-32-837Z-430b2d9d/manifest.json`.
 
-### Findings
-- [x] High-impact mismatches reconciled (lint, stage targeting, review workflow) — Evidence: `.runs/0904-readme-codebase-alignment/cli/2025-12-14T01-00-24-028Z-9a93c8df/manifest.json`.
-- [x] Remaining mismatches reconciled (paths, hi-fi toolkit docs, mirror workflow docs, cloud sync docs) — Evidence: `.runs/0904-readme-codebase-alignment/cli/2025-12-14T01-00-24-028Z-9a93c8df/manifest.json`.
+### PR-2 Metrics (Per-Tool & Per-Epoch)
+- [x] Emit per-tool, per-epoch token/cost/latency metrics via exec command → recorder/aggregator/OTEL; tests: `orchestrator/tests/MetricsAggregator.test.ts`, `orchestrator/tests/ExecCommand.test.ts`. Evidence: `.runs/0506-tfgrpo-integration/cli/2025-11-11T05-12-24-697Z-15088fb0/manifest.json`.
 
+### PR-3 Experience Store & Injection
+- [x] Persist ≤32-word stamped experiences and inject them into prompt packs; tests: `orchestrator/tests/ExperienceStore.test.ts`, `orchestrator/tests/PromptExperienceInjection.test.ts`. Evidence: `.runs/0506-tfgrpo-integration/cli/2025-11-11T05-12-24-697Z-15088fb0/manifest.json`.
+### PR-4 Trajectory Summary & Optimizer
+- [x] Summarize exec events into trajectory frames, stamp, and re-inject; tests: `orchestrator/tests/ExecCommand.test.ts`, `orchestrator/tests/ExperienceStore.test.ts`. Evidence: `.runs/0506-tfgrpo-integration/cli/2025-11-11T05-12-24-697Z-15088fb0/manifest.json`.
+### PR-5 Rewarders (GT + Relative Rank)
+- [x] Evaluation harness exposes deterministic GT + relative ranking rewarders; tests: `evaluation/tests/harness.test.ts` (RewarderExactMatch, RelativeRankingRewarder suites). Evidence: tfgrpo-learning run used `TFGRPO_REWARDERS=gt,relative` (runner log `.runs/0506-tfgrpo-integration/cli/2025-11-21T05-56-32-837Z-430b2d9d/commands/01-tfgrpo-loop.ndjson`).
 
-# Task List Snapshot — Agentic Coding Readiness & Onboarding Hygiene (0905)
+### PR-6 Learning Schedule
+- [x] Three-epoch (~100 sample) schedule with temperature overrides and tfgrpo-learning pipeline wiring; tests: `evaluation/tests/harness.test.ts` (LearningScheduleLoop), `orchestrator/tests/ControlPlaneValidator.test.ts` (PipelineTemperatureConfig). Evidence: runner log shows epochs 1–3 at temps 0.7/0.7/0.3 with 100 samples each; manifest `.runs/0506-tfgrpo-integration/cli/2025-11-21T05-56-32-837Z-430b2d9d/manifest.json`.
 
-- **Update — Completed:** Diagnostics + guardrails captured at `.runs/0905-agentic-coding-readiness/cli/2025-12-15T14-58-24-866Z-c03673e7/manifest.json`; onboarding placeholders replaced and core CI lane enabled.
-- **Notes:** Export `MCP_RUNNER_TASK_ID=0905-agentic-coding-readiness` before orchestrator commands. Guardrails required: `node scripts/spec-guard.mjs --dry-run`, `npm run build`, `npm run lint`, `npm run test`.
+### PR-7 Config Guardrails
+- [x] Request builder enforces `groupSize ≥ 2` and instruction loader filters stamped sources; tests: `orchestrator/tests/ControlPlaneValidator.test.ts`, `packages/orchestrator/tests/instructions/InstructionGuard.test.ts`. Evidence: command recorded `TFGRPO_GROUP_SIZE=2` with stamped instruction sources + prompt pack stamps in manifest `.runs/0506-tfgrpo-integration/cli/2025-11-21T05-56-32-837Z-430b2d9d/manifest.json`.
 
-## Checklist Mirror
-Mirror status with `tasks/tasks-0905-agentic-coding-readiness.md` and `.agent/task/0905-agentic-coding-readiness.md`. Keep `[ ]` until evidence is recorded.
+### PR-8 Group Runner (Feature Flagged)
+- [x] TaskManager + Scheduler run grouped subtasks when `FEATURE_TFGRPO_GROUP` is set; tests: `orchestrator/tests/TaskManager.test.ts`, `orchestrator/tests/SchedulerPlan.test.ts`. Evidence: grouped vitest run with `FEATURE_TFGRPO_GROUP=1 TFGRPO_GROUP_SIZE=2` (`.runs/0506-tfgrpo-integration/manual/2025-11-21-group-tests.log`).
 
-### Foundation
-- [x] Diagnostics/plan manifest captured — Evidence: `.runs/0905-agentic-coding-readiness/cli/2025-12-15T14-58-24-866Z-c03673e7/manifest.json`.
-- [x] Metrics/state snapshots updated — Evidence: `.runs/0905-agentic-coding-readiness/metrics.json`, `out/0905-agentic-coding-readiness/state.json`.
-- [x] PRD/spec/tasks mirrors updated with manifest links — Evidence: this commit + `.runs/0905-agentic-coding-readiness/cli/2025-12-15T14-58-24-866Z-c03673e7/manifest.json`.
+- **Update — 2025-11-21:** First full tfgrpo-learning loop captured guardrail evidence and prompt-pack stamps under `.runs/0506-tfgrpo-integration/cli/2025-11-21T05-56-32-837Z-430b2d9d/manifest.json`; guardrail suite (build/lint/test/eval/spec-guard) passed under `.runs/0506-tfgrpo-integration/cli/2025-11-21T07-09-08-052Z-ac3a1d09/manifest.json`.
 
-### Deliverables
-- [x] Replace `.agent/system/*` placeholders with repo-specific content — Evidence: this commit.
-- [x] Replace `.ai-dev-tasks/*` placeholders with canonical workflow docs — Evidence: this commit.
-- [x] Remove stale/non-standard subagent docs; ensure guidance is Codex-first and self-consistent — Evidence: this commit.
-- [x] Enable CI workflow for core lane (build/lint/test/spec-guard) — Evidence: `.github/workflows/core-lane.yml`.
+### Verification & Guardrails
+- [x] Diagnostics / tfgrpo-learning pipeline run recorded under `.runs/0506-tfgrpo-integration/cli/2025-11-21T05-56-32-837Z-430b2d9d/manifest.json` (spec-guard passed).
+- [x] Guardrails: `node scripts/spec-guard.mjs --dry-run`, `npm run lint`, `npm run test`, `npm run eval:test` (when fixtures exist). Evidence: `.runs/0506-tfgrpo-integration/cli/2025-11-21T07-09-08-052Z-ac3a1d09/manifest.json`.
+- [ ] Reviewer hand-off via `npm run review` referencing the latest TF-GRPO manifest.
 
-### Guardrails
-- [x] Spec guard passes — Evidence: `.runs/0905-agentic-coding-readiness/cli/2025-12-15T14-58-24-866Z-c03673e7/manifest.json`.
-- [x] Build passes — Evidence: `.runs/0905-agentic-coding-readiness/cli/2025-12-15T14-58-24-866Z-c03673e7/manifest.json`.
-- [x] Lint passes — Evidence: `.runs/0905-agentic-coding-readiness/cli/2025-12-15T14-58-24-866Z-c03673e7/manifest.json`.
-- [x] Tests pass — Evidence: `.runs/0905-agentic-coding-readiness/cli/2025-12-15T14-58-24-866Z-c03673e7/manifest.json`.
-
-
-
-# Task List Snapshot — Review Loop + DevTools Review Gate (0912)
-
-- Update - Implementation complete: implementation-gate-devtools manifest captured at `.runs/0912-review-loop-devtools-gate/cli/2025-12-24T08-56-47-578Z-9b49e1ee/manifest.json`.
-- Notes: Export `MCP_RUNNER_TASK_ID=0912-review-loop-devtools-gate` before orchestrator commands. Guardrails required: `node scripts/spec-guard.mjs --dry-run`, `npm run build`, `npm run lint`, `npm run test`, `npm run docs:check`, `node scripts/diff-budget.mjs`, `npm run review`.
-
-## Checklist Mirror
-Mirror status with `tasks/tasks-0912-review-loop-devtools-gate.md` and `.agent/task/0912-review-loop-devtools-gate.md`. Keep `[ ]` until evidence is recorded.
-
-### Foundation
-- [x] Implementation-gate-devtools manifest captured — Evidence: `.runs/0912-review-loop-devtools-gate/cli/2025-12-24T08-56-47-578Z-9b49e1ee/manifest.json`.
-- [x] Metrics/state snapshots updated — Evidence: `.runs/0912-review-loop-devtools-gate/metrics.json`, `out/0912-review-loop-devtools-gate/state.json`.
-- [x] Mirrors updated — Evidence: this commit + manifest above.
-
-### Workflow updates
-- [x] DevTools review gate pipeline wired — Evidence: `codex.orchestrator.json`, `scripts/run-review.ts`, `scripts/codex-devtools.sh`.
-- [x] Review-loop SOP added and linked in agent docs — Evidence: `.agent/SOPs/review-loop.md`, `AGENTS.md`, `docs/AGENTS.md`, `.agent/AGENTS.md`.
-- [x] NOTES required for review handoff with optional questions template — Evidence: `scripts/run-review.ts`, `README.md`, `AGENTS.md`, `docs/AGENTS.md`, `.agent/AGENTS.md`, `.agent/SOPs/review-loop.md`.
-- [x] Prompt installer added for onboarding — Evidence: `scripts/setup-codex-prompts.sh`, `README.md`.
-
-### Guardrails & handoff
-- [x] Spec-guard/build/lint/test/docs:check/diff-budget/review recorded — Evidence: `.runs/0912-review-loop-devtools-gate/cli/2025-12-24T08-56-47-578Z-9b49e1ee/manifest.json`.
-
-
-# Task List Snapshot — Orchestrator Refactor Roadmap (0913)
-
-- Notes: Export `MCP_RUNNER_TASK_ID=0913-orchestrator-refactor-roadmap` before orchestrator commands.
-
-<!-- docs-sync:begin 0913-orchestrator-refactor-roadmap -->
-## Checklist Mirror
-Mirror status with `tasks/tasks-0913-orchestrator-refactor-roadmap.md` and `.agent/task/0913-orchestrator-refactor-roadmap.md`. Keep `[ ]` until evidence is recorded.
-
-### Foundation
-- [x] Collateral drafted (PRD/tech spec/action plan/checklist/mini-spec) - Evidence: `.runs/0913-orchestrator-refactor-roadmap/cli/2025-12-26T08-11-25-461Z-6ba85057/manifest.json`.
-- [x] Mirrors updated (`docs/TASKS.md`, `.agent/task/0913-orchestrator-refactor-roadmap.md`, `tasks/index.json`) - Evidence: `.runs/0913-orchestrator-refactor-roadmap/cli/2025-12-26T08-11-25-461Z-6ba85057/manifest.json`.
-- [x] Docs-review manifest captured (pre-implementation) - Evidence: `.runs/0913-orchestrator-refactor-roadmap/cli/2025-12-26T08-11-25-461Z-6ba85057/manifest.json`.
-- [x] Metrics/state snapshots updated - Evidence: `.runs/0913-orchestrator-refactor-roadmap/metrics.json` (JSONL), `out/0913-orchestrator-refactor-roadmap/state.json`.
-- [x] `tasks/index.json` gate metadata updated with implementation gate manifest - Evidence: `tasks/index.json`, `.runs/0913-orchestrator-refactor-roadmap/cli/2025-12-26T09-46-07-459Z-704d0f35/manifest.json`.
-
-### Refactor phases (implementation roadmap)
-- [x] Phase 1: Manifest correctness + atomic write safety (tests first, then refactor). - Evidence: `.runs/0913-orchestrator-refactor-roadmap/cli/2025-12-26T08-33-05-345Z-a9de5673/manifest.json`.
-- [x] Phase 2: Single-writer manifest persistence (coalescing persister; route direct `saveManifest` calls through it). - Evidence: `.runs/0913-orchestrator-refactor-roadmap/cli/2025-12-26T09-10-07-477Z-d616c709/manifest.json`.
-- [x] Phase 3: Bounded exec event capture (opt-in first; preserve full `.ndjson` logs/handles). - Evidence: `.runs/0913-orchestrator-refactor-roadmap/cli/2025-12-26T09-21-58-308Z-786b9c13/manifest.json`.
-- [x] Phase 4: Execution mode resolution consolidation (no behavior change; keep existing precedence). - Evidence: `.runs/0913-orchestrator-refactor-roadmap/cli/2025-12-26T09-30-43-115Z-c8450274/manifest.json`.
-- [x] Phase 5: Metrics + env hygiene (reduce metrics bloat; remove `process.env` leakage with compatibility window). - Evidence: `.runs/0913-orchestrator-refactor-roadmap/cli/2025-12-26T12-00-35-931Z-e2fe1006/manifest.json`.
-
-### Guardrails (for future implementation PRs)
-- [x] `node scripts/spec-guard.mjs --dry-run` passes - Evidence: `.runs/0913-orchestrator-refactor-roadmap/cli/2025-12-26T12-00-35-931Z-e2fe1006/manifest.json` (implementation gate).
-- [x] `npm run build` passes - Evidence: `.runs/0913-orchestrator-refactor-roadmap/cli/2025-12-26T12-00-35-931Z-e2fe1006/manifest.json` (implementation gate).
-- [x] `npm run lint` passes - Evidence: `.runs/0913-orchestrator-refactor-roadmap/cli/2025-12-26T12-00-35-931Z-e2fe1006/manifest.json` (implementation gate).
-- [x] `npm run test` passes - Evidence: `.runs/0913-orchestrator-refactor-roadmap/cli/2025-12-26T12-00-35-931Z-e2fe1006/manifest.json` (implementation gate).
-- [x] `npm run docs:check` passes - Evidence: `.runs/0913-orchestrator-refactor-roadmap/cli/2025-12-26T12-00-35-931Z-e2fe1006/manifest.json` (implementation gate).
-- [x] `node scripts/diff-budget.mjs` passes - Evidence: `.runs/0913-orchestrator-refactor-roadmap/cli/2025-12-26T12-00-35-931Z-e2fe1006/manifest.json` (implementation gate).
-- [x] `npm run review` captured with NOTES - Evidence: `.runs/0913-orchestrator-refactor-roadmap/cli/2025-12-26T12-00-35-931Z-e2fe1006/manifest.json` (implementation gate).
-<!-- docs-sync:end 0913-orchestrator-refactor-roadmap -->
-
-# Task List Snapshot — Frontend Testing as Core Orchestrator Capability (0915)
-
-- Update - Implementation complete: implementation-gate manifest captured at `.runs/0915-frontend-testing-core/cli/2025-12-29T05-23-35-362Z-7d4eaa4b/manifest.json`.
-- Notes: Export `MCP_RUNNER_TASK_ID=0915-frontend-testing-core` before orchestrator commands. Guardrails required: `node scripts/spec-guard.mjs --dry-run`, `npm run build`, `npm run lint`, `npm run test`, `npm run docs:check`, `node scripts/diff-budget.mjs`, `npm run review`.
-
-## Checklist Mirror
-Mirror status with `tasks/tasks-0915-frontend-testing-core.md` and `.agent/task/0915-frontend-testing-core.md`. Keep `[ ]` until evidence is recorded.
-
-### Foundation
-- [x] Collateral drafted (PRD/tech spec/action plan/checklist/mini-spec) - Evidence: `docs/PRD-frontend-testing-core.md`, `docs/TECH_SPEC-frontend-testing-core.md`, `docs/ACTION_PLAN-frontend-testing-core.md`, `tasks/specs/0915-frontend-testing-core.md`, `tasks/tasks-0915-frontend-testing-core.md`.
-- [x] Docs-review manifest captured (pre-implementation) - Evidence: `.runs/0915-frontend-testing-core/cli/2025-12-29T02-03-32-483Z-e2d52977/manifest.json`.
-- [x] Metrics/state snapshots updated - Evidence: `.runs/0915-frontend-testing-core/metrics.json`, `out/0915-frontend-testing-core/state.json`.
-- [x] Mirrors updated in `docs/TASKS.md`, `.agent/task/0915-frontend-testing-core.md`, and `tasks/index.json` - Evidence: `docs/TASKS.md`, `.agent/task/0915-frontend-testing-core.md`, `tasks/index.json`.
-- [x] PRD approval recorded in `tasks/index.json` gate metadata - Evidence: `.runs/0915-frontend-testing-core/cli/2025-12-29T05-23-35-362Z-7d4eaa4b/manifest.json`.
-
-### Frontend Testing Surface
-- [x] Add frontend testing pipelines (`frontend-testing`, `frontend-testing-devtools`) - Evidence: `codex.orchestrator.json`, manifest.
-- [x] Add a frontend testing CLI entrypoint (compiled into `dist/**`).
-
-### DevTools Enablement (Packaged)
-- [x] Move devtools helper logic into runtime modules shipped in the npm package.
-
-### Doctor Readiness
-- [x] Extend `codex-orchestrator doctor` with DevTools readiness checks.
-
-### Documentation
-- [x] Update README and agent docs with frontend testing commands and enablement rules.
-
-### Tests
-- [x] Add tests for devtools default-off / explicit-on behavior.
-
-### Guardrails & Handoff (post-implementation)
-- [x] `node scripts/spec-guard.mjs --dry-run` passes - Evidence: `.runs/0915-frontend-testing-core/cli/2025-12-29T05-23-35-362Z-7d4eaa4b/manifest.json`.
-- [x] `npm run build` passes - Evidence: `.runs/0915-frontend-testing-core/cli/2025-12-29T05-23-35-362Z-7d4eaa4b/manifest.json`.
-- [x] `npm run lint` passes - Evidence: `.runs/0915-frontend-testing-core/cli/2025-12-29T05-23-35-362Z-7d4eaa4b/manifest.json`.
-- [x] `npm run test` passes - Evidence: `.runs/0915-frontend-testing-core/cli/2025-12-29T05-23-35-362Z-7d4eaa4b/manifest.json`.
-- [x] `npm run docs:check` passes - Evidence: `.runs/0915-frontend-testing-core/cli/2025-12-29T05-23-35-362Z-7d4eaa4b/manifest.json`.
-- [x] `node scripts/diff-budget.mjs` passes - Evidence: `.runs/0915-frontend-testing-core/cli/2025-12-29T05-23-35-362Z-7d4eaa4b/manifest.json`.
-- [x] `npm run review` captured with NOTES - Evidence: `.runs/0915-frontend-testing-core/cli/2025-12-29T05-23-35-362Z-7d4eaa4b/manifest.json`.
-
-
-# Task List Snapshot — Codex Orchestrator NPM Companion Package Publishability (0916)
-
-- Update - Implementation complete: implementation-gate manifest captured at `.runs/0916-npm-companion-package-publishability/cli/2025-12-29T06-49-38-980Z-85ac2153/manifest.json`; pack audit manifest at `.runs/0916-npm-companion-package-publishability/cli/2025-12-29T06-51-16-666Z-6c21dcf3/manifest.json`; pack smoke manifest at `.runs/0916-npm-companion-package-publishability/cli/2025-12-29T06-51-23-421Z-7c7bab9e/manifest.json`.
-- Notes: Export `MCP_RUNNER_TASK_ID=0916-npm-companion-package-publishability` before orchestrator commands. Guardrails required: `node scripts/spec-guard.mjs --dry-run`, `npm run build`, `npm run lint`, `npm run test`, `npm run docs:check`, `node scripts/diff-budget.mjs`, `npm run review`.
-
-## Checklist Mirror
-Mirror status with `tasks/tasks-0916-npm-companion-package-publishability.md` and `.agent/task/0916-npm-companion-package-publishability.md`. Keep `[ ]` until evidence is recorded.
-
-### Foundation
-- [x] Collateral drafted (PRD/tech spec/action plan/checklist/mini-spec) - Evidence: `docs/PRD-npm-companion-package-publishability.md`, `docs/TECH_SPEC-npm-companion-package-publishability.md`, `docs/ACTION_PLAN-npm-companion-package-publishability.md`, `tasks/specs/0916-npm-companion-package-publishability.md`, `tasks/tasks-0916-npm-companion-package-publishability.md`.
-- [x] Docs-review manifest captured (pre-implementation) - Evidence: `.runs/0916-npm-companion-package-publishability/cli/2025-12-29T06-40-22-001Z-96dbf5f0/manifest.json`.
-- [x] Metrics/state snapshots updated - Evidence: `.runs/0916-npm-companion-package-publishability/metrics.json`, `out/0916-npm-companion-package-publishability/state.json`.
-- [x] Mirrors updated in `docs/TASKS.md`, `.agent/task/0916-npm-companion-package-publishability.md`, and `tasks/index.json` - Evidence: this commit.
-- [x] PRD approval recorded in `tasks/index.json` gate metadata - Evidence: `.runs/0916-npm-companion-package-publishability/cli/2025-12-29T06-40-22-001Z-96dbf5f0/manifest.json`.
-
-### Packaging & Tarball Controls
-- [x] Update package publish metadata and allowlist - Evidence: `package.json`, `.runs/0916-npm-companion-package-publishability/cli/2025-12-29T06-49-38-980Z-85ac2153/manifest.json`.
-- [x] Add LICENSE file for publication - Evidence: `LICENSE`, manifest.
-- [x] Add clean step and pack audit script - Evidence: `.runs/0916-npm-companion-package-publishability/cli/2025-12-29T06-51-16-666Z-6c21dcf3/manifest.json`.
-- [x] Tighten pack audit dist allowlist to runtime subtrees - Evidence: `.runs/0916-npm-companion-package-publishability/cli/2025-12-29T06-51-16-666Z-6c21dcf3/manifest.json`.
-- [x] Add pack smoke test for the tarball - Evidence: `.runs/0916-npm-companion-package-publishability/cli/2025-12-29T06-51-23-421Z-7c7bab9e/manifest.json`.
-- [x] Add CI gate for pack audit and smoke test - Evidence: `.github/workflows/release.yml`.
-
-### Schema Resolution & Runtime Assets
-- [x] Implement Pattern A resolver with fallback - Evidence: code + tests.
-- [x] Ensure `schemas/manifest.json` is shipped and validated - Evidence: `.runs/0916-npm-companion-package-publishability/cli/2025-12-29T06-51-16-666Z-6c21dcf3/manifest.json`.
-
-### CLI Companion Surface
-- [x] Add `codex-orchestrator mcp serve`.
-- [x] Enforce or verify downstream `codex` stdout stays protocol-only for `mcp serve`.
-- [x] Replace user-facing MCP scripts with CLI subcommands - Evidence: CLI + docs updates.
-- [x] Add `codex-orchestrator self-check --format json` - Evidence: CLI implementation + tests.
-- [x] Add `codex-orchestrator --version` output - Evidence: CLI implementation + tests.
-- [x] Verify shebang preservation and ESM consistency - Evidence: tests.
-- [x] Enforce user-controlled run dirs for all CLI outputs - Evidence: code review + tests.
-- [x] Ensure telemetry/network calls are disabled by default - Evidence: tests.
-
-### Templates & Init
-- [x] Add `templates/` with README disclaimer + version markers - Evidence: new templates.
-- [x] Add `codex-orchestrator init codex` - Evidence: CLI implementation + tests.
-
-### Optional Dependencies + Doctor
-- [x] Move Playwright-class deps to optional peer deps and add dynamic loader - Evidence: package metadata + tests.
-- [x] Add `codex-orchestrator doctor` - Evidence: CLI implementation + tests.
-
-### Release Workflow
-- [x] Add tag-driven release workflow - Evidence: workflow + release run.
-- [x] Document release asset download fallbacks - Evidence: spec update.
-- [x] Update README with companion package usage and release flow - Evidence: README change + manifest.
-
-### Guardrails & Handoff (post-implementation)
-- [x] `npm run review` is non-interactive in CI (flag/env enforced; fails fast on prompts).
-- [x] `node scripts/spec-guard.mjs --dry-run` passes - Evidence: `.runs/0916-npm-companion-package-publishability/cli/2025-12-29T06-49-38-980Z-85ac2153/manifest.json`.
-- [x] `npm run build` passes - Evidence: `.runs/0916-npm-companion-package-publishability/cli/2025-12-29T06-49-38-980Z-85ac2153/manifest.json`.
-- [x] `npm run lint` passes - Evidence: `.runs/0916-npm-companion-package-publishability/cli/2025-12-29T06-49-38-980Z-85ac2153/manifest.json`.
-- [x] `npm run test` passes - Evidence: `.runs/0916-npm-companion-package-publishability/cli/2025-12-29T06-49-38-980Z-85ac2153/manifest.json`.
-- [x] `npm run docs:check` passes - Evidence: `.runs/0916-npm-companion-package-publishability/cli/2025-12-29T06-49-38-980Z-85ac2153/manifest.json`.
-- [x] `node scripts/diff-budget.mjs` passes - Evidence: `.runs/0916-npm-companion-package-publishability/cli/2025-12-29T06-49-38-980Z-85ac2153/manifest.json`.
-- [x] `npm run review` captured with NOTES - Evidence: `.runs/0916-npm-companion-package-publishability/cli/2025-12-29T06-49-38-980Z-85ac2153/manifest.json`.
-
-
-# Task List Snapshot — DevTools Readiness + Orchestrator Usage Discipline (0917)
-
-- Update - Implementation complete: devtools readiness checks + setup helper shipped; guardrails captured at `.runs/0917-devtools-readiness-orchestrator-usage/cli/2025-12-29T23-17-34-838Z-d96e2cf4/manifest.json`.
-- Notes: Export `MCP_RUNNER_TASK_ID=0917-devtools-readiness-orchestrator-usage` before orchestrator commands. Guardrails required: `node scripts/spec-guard.mjs --dry-run`, `npm run build`, `npm run lint`, `npm run test`, `npm run docs:check`, `node scripts/diff-budget.mjs`, `npm run review`.
-
-## Checklist Mirror
-Mirror status with `tasks/tasks-0917-devtools-readiness-orchestrator-usage.md` and `.agent/task/0917-devtools-readiness-orchestrator-usage.md`. Keep `[ ]` until evidence is recorded.
-
-### Foundation
-- [x] Collateral drafted (PRD/tech spec/action plan/checklist/mini-spec) - Evidence: this commit.
-- [x] Docs-review manifest captured (pre-implementation) - Evidence: `.runs/0917-devtools-readiness-orchestrator-usage/cli/2025-12-29T22-15-44-073Z-e5467cda/manifest.json`.
-- [x] Metrics/state snapshots updated - Evidence: `.runs/0917-devtools-readiness-orchestrator-usage/metrics.json`, `out/0917-devtools-readiness-orchestrator-usage/state.json`.
-- [x] Mirrors updated in `docs/TASKS.md`, `.agent/task/0917-devtools-readiness-orchestrator-usage.md`, and `tasks/index.json` - Evidence: this commit.
-- [x] PRD approval recorded in `tasks/index.json` gate metadata - Evidence: `.runs/0917-devtools-readiness-orchestrator-usage/cli/2025-12-29T22-15-44-073Z-e5467cda/manifest.json`.
-
-### Implementation
-- [x] DevTools readiness checks + setup helper added — Evidence: `orchestrator/src/cli/utils/devtools.ts`, `orchestrator/src/cli/doctor.ts`, `orchestrator/src/cli/devtoolsSetup.ts`, `bin/codex-orchestrator.ts`.
-- [x] Orchestrator-first SOP + agent docs updated — Evidence: `.agent/SOPs/agent-autonomy-defaults.md`, `.agent/AGENTS.md`, `docs/AGENTS.md`, `AGENTS.md`.
-- [x] Tests added for readiness + setup flows — Evidence: `orchestrator/tests/Doctor.test.ts`, `orchestrator/tests/DevtoolsSetup.test.ts`, `orchestrator/tests/FrontendTestingRunner.test.ts` (vitest run 2025-12-30).
-- [x] Guardrails complete — Evidence: `.runs/0917-devtools-readiness-orchestrator-usage/cli/2025-12-29T23-17-34-838Z-d96e2cf4/manifest.json`.
-
-
-# Task List Snapshot — Repo-wide Refactor Plan (0919)
-
-- Update - Refactor plan drafted at `docs/REFRACTOR_PLAN.md`; docs-review manifest captured at `.runs/0919-refactor-plan/cli/2025-12-30T21-31-09-111Z-12be34c7/manifest.json`; implementation-gate manifest captured at `.runs/0919-refactor-plan/cli/2025-12-30T21-51-39-458Z-a9a82bc7/manifest.json`.
-
-
-
-# Task List Snapshot — Subagent Delegation Enforcement (0918)
-
-- Update - Implementation complete: docs-review + implementation gate captured at `.runs/0918-subagent-delegation-enforcement/cli/2025-12-30T16-39-51-110Z-97be9496/manifest.json` and `.runs/0918-subagent-delegation-enforcement/cli/2025-12-30T16-53-35-423Z-88c50e5f/manifest.json`.
-- Notes: Export `MCP_RUNNER_TASK_ID=0918-subagent-delegation-enforcement` before orchestrator commands. Guardrails required: `node scripts/delegation-guard.mjs`, `node scripts/spec-guard.mjs --dry-run`, `npm run build`, `npm run lint`, `npm run test`, `npm run docs:check`, `node scripts/diff-budget.mjs`, `npm run review`.
-
-## Checklist Mirror
-Mirror status with `tasks/tasks-0918-subagent-delegation-enforcement.md` and `.agent/task/0918-subagent-delegation-enforcement.md`. Keep `[ ]` until evidence is recorded.
-
-### Foundation
-- [x] Collateral drafted (PRD/tech spec/action plan/checklist) - Evidence: this commit.
-- [x] Subagent docs-review run captured - Evidence: `.runs/0918-subagent-delegation-enforcement-docs/cli/2025-12-30T16-38-34-482Z-000d8b75/manifest.json`.
-- [x] Docs-review manifest captured (pre-implementation) - Evidence: `.runs/0918-subagent-delegation-enforcement/cli/2025-12-30T16-39-51-110Z-97be9496/manifest.json`.
-- [x] Metrics/state snapshots updated - Evidence: `.runs/0918-subagent-delegation-enforcement/metrics.json`, `out/0918-subagent-delegation-enforcement/state.json`.
-- [x] Mirrors updated in `docs/TASKS.md`, `.agent/task/0918-subagent-delegation-enforcement.md`, and `tasks/index.json` - Evidence: this commit.
-- [x] PRD approval recorded in `tasks/index.json` gate metadata - Evidence: `.runs/0918-subagent-delegation-enforcement/cli/2025-12-30T16-53-35-423Z-88c50e5f/manifest.json`.
-
-### Implementation
-- [x] Delegation guard script added — Evidence: `scripts/delegation-guard.mjs`.
-- [x] Pipelines updated to run delegation guard — Evidence: `codex.orchestrator.json`.
-- [x] Agent guidance and SOPs updated for mandatory delegation — Evidence: `AGENTS.md`, `docs/AGENTS.md`, `.agent/AGENTS.md`, `.agent/SOPs/agent-autonomy-defaults.md`, `.agent/SOPs/meta-orchestration.md`.
-- [x] Templates updated to require subagent evidence — Evidence: `.agent/task/templates/tasks-template.md`, `.agent/task/templates/subagent-request-template.md`.
-
-### Guardrails & handoff
-- [x] Guardrails complete — Evidence: `.runs/0918-subagent-delegation-enforcement/cli/2025-12-30T16-53-35-423Z-88c50e5f/manifest.json`.
-
-
-# Task List Snapshot — Documentation Freshness Sweep (0921)
-
-- Update - Docs freshness sweep complete; post-change docs-review manifest recorded at `.runs/0921-docs-freshness-sweep/cli/2025-12-31T00-16-17-694Z-323952cf/manifest.json`.
-
-<!-- docs-sync:begin 0921-docs-freshness-sweep -->
-## Checklist Mirror
-Mirror status with `tasks/tasks-0921-docs-freshness-sweep.md` and `.agent/task/0921-docs-freshness-sweep.md`. Keep `[ ]` until evidence is recorded.
-
-### Foundation
-- [x] PRD drafted and mirrored in `docs/` - Evidence: `tasks/0921-prd-docs-freshness-sweep.md`, `docs/PRD-docs-freshness-sweep.md`.
-- [x] Tech spec drafted - Evidence: `docs/TECH_SPEC-docs-freshness-sweep.md`.
-- [x] Action plan drafted - Evidence: `docs/ACTION_PLAN-docs-freshness-sweep.md`.
-- [x] Mini-spec stub created - Evidence: `tasks/specs/0921-docs-freshness-sweep.md`.
-- [x] Docs-review manifest captured (pre-change) - Evidence: `.runs/0921-docs-freshness-sweep/cli/2025-12-30T23-47-14-831Z-435ea063/manifest.json`.
-- [x] Mirrors updated in `docs/TASKS.md` and `.agent/task/0921-docs-freshness-sweep.md` - Evidence: `docs/TASKS.md`, `.agent/task/0921-docs-freshness-sweep.md`.
-
-### Docs audit + updates
-- [x] Docs-hygiene check run and issues triaged - Evidence: `.runs/0921-docs-freshness-sweep/cli/2025-12-31T00-16-17-694Z-323952cf/manifest.json`.
-- [x] Stale references updated (paths/scripts/placeholders) - Evidence: `docs/TECH_SPEC-agentic-coding-readiness.md`, `docs/design/specs/DESIGN_REFERENCE_PIPELINE.md`.
-- [x] Spec review metadata refreshed as needed - Evidence: `docs/design/specs/DESIGN_REFERENCE_PIPELINE.md`, `tasks/specs/0921-docs-freshness-sweep.md`.
-
-### Validation + handoff
-- [x] Docs-review manifest captured (post-change) - Evidence: `.runs/0921-docs-freshness-sweep/cli/2025-12-31T00-16-17-694Z-323952cf/manifest.json`.
-
-## Relevant Files
-- `docs/PRD-docs-freshness-sweep.md`
-- `docs/TECH_SPEC-docs-freshness-sweep.md`
-- `docs/ACTION_PLAN-docs-freshness-sweep.md`
-- `tasks/specs/0921-docs-freshness-sweep.md`
-
-## Subagent Evidence
-- `.runs/0921-docs-freshness-sweep-audit/cli/2025-12-30T23-46-16-546Z-80d99bd8/manifest.json` (docs-review guardrail run).
-<!-- docs-sync:end 0921-docs-freshness-sweep -->
-
-# Task List Snapshot — Docs Freshness Systemization (0922)
-
-- Update - Implementation complete; implementation-gate manifest captured at `.runs/0922-docs-freshness-systemization/cli/2025-12-31T01-47-16-423Z-a744a2c1/manifest.json` (diff budget override recorded).
-- Update - Review agent docs-review run succeeded at `.runs/0922-docs-freshness-systemization-review/cli/2025-12-31T01-00-39-132Z-2653b56a/manifest.json`.
-- Notes: Export `MCP_RUNNER_TASK_ID=0922-docs-freshness-systemization` before orchestrator commands.
-
-<!-- docs-sync:begin 0922-docs-freshness-systemization -->
-## Checklist Mirror
-Mirror status with `tasks/tasks-0922-docs-freshness-systemization.md` and `.agent/task/0922-docs-freshness-systemization.md`. Keep `[ ]` until evidence is recorded.
-
-### Foundation
-- [x] PRD drafted and mirrored in `docs/` - Evidence: `tasks/0922-prd-docs-freshness-systemization.md`, `docs/PRD-docs-freshness-systemization.md`.
-- [x] Tech spec drafted - Evidence: `docs/TECH_SPEC-docs-freshness-systemization.md`.
-- [x] Action plan drafted - Evidence: `docs/ACTION_PLAN-docs-freshness-systemization.md`.
-- [x] Mini-spec stub created - Evidence: `tasks/specs/0922-docs-freshness-systemization.md`.
-- [x] Docs-review manifest captured (pre-change) - Evidence: `.runs/0922-docs-freshness-systemization/cli/2025-12-31T00-42-33-187Z-aad19fd0/manifest.json`.
-- [x] Mirrors updated in `docs/TASKS.md` and `.agent/task/0922-docs-freshness-systemization.md` - Evidence: `docs/TASKS.md`, `.agent/task/0922-docs-freshness-systemization.md`.
-
-### Systemization design
-- [x] Docs registry schema defined and seeded - Evidence: `docs/docs-freshness-registry.json`.
-- [x] Freshness audit script implemented - Evidence: `scripts/docs-freshness.mjs`.
-- [x] `npm run docs:freshness` wired - Evidence: `package.json`.
-- [x] Freshness report output defined - Evidence: `docs/TECH_SPEC-docs-freshness-systemization.md`.
-
-### Pipeline integration
-- [x] `docs-review` includes docs-freshness stage - Evidence: `codex.orchestrator.json`.
-- [x] `implementation-gate` includes docs-freshness stage - Evidence: `codex.orchestrator.json`.
-- [x] Agent docs updated with the new audit step - Evidence: `AGENTS.md`, `docs/AGENTS.md`, `.agent/AGENTS.md`.
-
-### Validation + handoff
-- [x] Docs-review manifest captured (post-change) - Evidence: `.runs/0922-docs-freshness-systemization/cli/2025-12-31T01-19-09-402Z-2a0217a3/manifest.json`.
-- [x] Implementation review manifest captured (post-implementation) - Evidence: `.runs/0922-docs-freshness-systemization/cli/2025-12-31T01-47-16-423Z-a744a2c1/manifest.json`.
-
-## Relevant Files
-- `docs/PRD-docs-freshness-systemization.md`
-- `docs/TECH_SPEC-docs-freshness-systemization.md`
-- `docs/ACTION_PLAN-docs-freshness-systemization.md`
-- `tasks/specs/0922-docs-freshness-systemization.md`
-
-## Subagent Evidence
-- `.runs/0922-docs-freshness-systemization-audit/cli/2025-12-31T00-42-01-230Z-ed54d009/manifest.json` (docs-review guardrail run).
-- `.runs/0922-docs-freshness-systemization-review/cli/2025-12-31T01-00-39-132Z-2653b56a/manifest.json` (review agent docs-review run).
-<!-- docs-sync:end 0922-docs-freshness-systemization -->
-
-# Task List Snapshot — Docs Freshness Date Validation (0923)
-
-- Update - Pre-change docs-review manifest captured at `.runs/0923-docs-freshness-date-validation/cli/2025-12-31T02-34-45-786Z-8652d794/manifest.json` (delegation guard override recorded).
-- Update - Post-change docs-review manifest captured at `.runs/0923-docs-freshness-date-validation/cli/2025-12-31T02-40-46-229Z-1f8b81a5/manifest.json`.
-- Update - Implementation-gate manifest captured at `.runs/0923-docs-freshness-date-validation/cli/2025-12-31T02-41-19-365Z-8a773ab1/manifest.json`.
-- Update - Review agent docs-review run succeeded at `.runs/0923-docs-freshness-date-validation-review/cli/2025-12-31T02-40-12-873Z-2ef0b53f/manifest.json`.
-- Notes: Export `MCP_RUNNER_TASK_ID=0923-docs-freshness-date-validation` before orchestrator commands.
-
-<!-- docs-sync:begin 0923-docs-freshness-date-validation -->
-## Checklist Mirror
-Mirror status with `tasks/tasks-0923-docs-freshness-date-validation.md` and `.agent/task/0923-docs-freshness-date-validation.md`. Keep `[ ]` until evidence is recorded.
-
-### Foundation
-- [x] PRD drafted and mirrored in `docs/` - Evidence: `tasks/0923-prd-docs-freshness-date-validation.md`, `docs/PRD-docs-freshness-date-validation.md`.
-- [x] Tech spec drafted - Evidence: `docs/TECH_SPEC-docs-freshness-date-validation.md`.
-- [x] Action plan drafted - Evidence: `docs/ACTION_PLAN-docs-freshness-date-validation.md`.
-- [x] Mini-spec stub created - Evidence: `tasks/specs/0923-docs-freshness-date-validation.md`.
-- [x] Docs-review manifest captured (pre-change) - Evidence: `.runs/0923-docs-freshness-date-validation/cli/2025-12-31T02-34-45-786Z-8652d794/manifest.json`.
-- [x] Mirrors updated in `docs/TASKS.md` and `.agent/task/0923-docs-freshness-date-validation.md` - Evidence: `docs/TASKS.md`, `.agent/task/0923-docs-freshness-date-validation.md`.
-- [x] Delegation guard override recorded for pre-change docs-review - Evidence: `.runs/0923-docs-freshness-date-validation/cli/2025-12-31T02-34-45-786Z-8652d794/manifest.json`.
-
-### Implementation
-- [x] Strict `last_review` validation implemented - Evidence: `scripts/docs-freshness.mjs`.
-- [x] Docs updated to note strict date validation - Evidence: `docs/TECH_SPEC-docs-freshness-date-validation.md`.
-- [x] Docs freshness registry updated for new task docs - Evidence: `docs/docs-freshness-registry.json`.
-
-### Validation + handoff
-- [x] Docs-review manifest captured (post-change) - Evidence: `.runs/0923-docs-freshness-date-validation/cli/2025-12-31T02-40-46-229Z-1f8b81a5/manifest.json`.
-- [x] Implementation review manifest captured (post-implementation) - Evidence: `.runs/0923-docs-freshness-date-validation/cli/2025-12-31T02-41-19-365Z-8a773ab1/manifest.json`.
-- [x] Review agent run captured (subagent) - Evidence: `.runs/0923-docs-freshness-date-validation-review/cli/2025-12-31T02-40-12-873Z-2ef0b53f/manifest.json`.
-
-## Relevant Files
-- `docs/PRD-docs-freshness-date-validation.md`
-- `docs/TECH_SPEC-docs-freshness-date-validation.md`
-- `docs/ACTION_PLAN-docs-freshness-date-validation.md`
-- `tasks/specs/0923-docs-freshness-date-validation.md`
-
-## Subagent Evidence
-- `.runs/0923-docs-freshness-date-validation-review/cli/2025-12-31T02-40-12-873Z-2ef0b53f/manifest.json` (review agent docs-review run).
-<!-- docs-sync:end 0923-docs-freshness-date-validation -->
-
-# Task List Snapshot — Tasks Archive Policy (0924)
-
-- Update - Pre-change docs-review manifest captured at `.runs/0924-tasks-archive-policy/cli/2025-12-31T03-13-05-921Z-731779ca/manifest.json` (delegation guard override recorded).
-- Update - Post-change docs-review manifest captured at `.runs/0924-tasks-archive-policy/cli/2025-12-31T03-44-10-466Z-162524c7/manifest.json`.
-- Update - Implementation-gate manifest captured at `.runs/0924-tasks-archive-policy/cli/2025-12-31T03-44-46-114Z-0005ee2c/manifest.json` (diff budget override recorded).
-- Update - Review agent docs-review run succeeded at `.runs/0924-tasks-archive-policy-review/cli/2025-12-31T03-24-18-440Z-4aef69f1/manifest.json`.
-- Notes: Export `MCP_RUNNER_TASK_ID=0924-tasks-archive-policy` before orchestrator commands.
-
-<!-- docs-sync:begin 0924-tasks-archive-policy -->
-## Checklist Mirror
-Mirror status with `tasks/tasks-0924-tasks-archive-policy.md` and `.agent/task/0924-tasks-archive-policy.md`. Keep `[ ]` until evidence is recorded.
-
-### Foundation
-- [x] PRD drafted and mirrored in `docs/` - Evidence: `tasks/0924-prd-tasks-archive-policy.md`, `docs/PRD-tasks-archive-policy.md`.
-- [x] Tech spec drafted - Evidence: `docs/TECH_SPEC-tasks-archive-policy.md`.
-- [x] Action plan drafted - Evidence: `docs/ACTION_PLAN-tasks-archive-policy.md`.
-- [x] Mini-spec stub created - Evidence: `tasks/specs/0924-tasks-archive-policy.md`.
-- [x] Docs-review manifest captured (pre-change) - Evidence: `.runs/0924-tasks-archive-policy/cli/2025-12-31T03-13-05-921Z-731779ca/manifest.json`.
-- [x] Mirrors updated in `docs/TASKS.md` and `.agent/task/0924-tasks-archive-policy.md` - Evidence: `docs/TASKS.md`, `.agent/task/0924-tasks-archive-policy.md`.
-- [x] Delegation guard override recorded for pre-change docs-review - Evidence: `.runs/0924-tasks-archive-policy/cli/2025-12-31T03-13-05-921Z-731779ca/manifest.json`.
-
-### Archive policy + tooling
-- [x] Archive policy config added - Evidence: `docs/tasks-archive-policy.json`.
-- [x] Archive script implemented - Evidence: `scripts/tasks-archive.mjs`.
-- [x] `docs/TASKS.md` archive index added and initial archive run applied - Evidence: `docs/TASKS.md`, `out/0924-tasks-archive-policy/TASKS-archive-2025.md`.
-- [x] Archive branch updated with payload - Evidence: `task-archives` branch commit `e2ac1a3`.
-
-### Validation + handoff
-- [x] Docs-review manifest captured (post-change) - Evidence: `.runs/0924-tasks-archive-policy/cli/2025-12-31T03-44-10-466Z-162524c7/manifest.json`.
-- [x] Implementation review manifest captured (post-implementation) - Evidence: `.runs/0924-tasks-archive-policy/cli/2025-12-31T03-44-46-114Z-0005ee2c/manifest.json`.
-- [x] Review agent run captured (subagent) - Evidence: `.runs/0924-tasks-archive-policy-review/cli/2025-12-31T03-24-18-440Z-4aef69f1/manifest.json`.
-
-## Relevant Files
-- `docs/PRD-tasks-archive-policy.md`
-- `docs/TECH_SPEC-tasks-archive-policy.md`
-- `docs/ACTION_PLAN-tasks-archive-policy.md`
-- `tasks/specs/0924-tasks-archive-policy.md`
-
-## Subagent Evidence
-- `.runs/0924-tasks-archive-policy-review/cli/2025-12-31T03-24-18-440Z-4aef69f1/manifest.json` (review agent docs-review run).
-<!-- docs-sync:end 0924-tasks-archive-policy -->
-
-# Task List Snapshot — Tasks Archive Automation (0925)
-
-- Update - Pre-change docs-review manifest captured at `.runs/0925-tasks-archive-automation/cli/2025-12-31T04-49-55-774Z-bf7c0600/manifest.json` (delegation guard override recorded).
-- Update - Post-change docs-review manifest captured at `.runs/0925-tasks-archive-automation/cli/2025-12-31T05-04-46-898Z-82dd0288/manifest.json`.
-- Update - Implementation-gate manifest captured at `.runs/0925-tasks-archive-automation/cli/2025-12-31T05-05-34-058Z-6b103aff/manifest.json`.
-- Update - Review agent docs-review run succeeded at `.runs/0925-tasks-archive-automation-review/cli/2025-12-31T05-03-45-338Z-0dcb0ceb/manifest.json`.
-- Notes: Export `MCP_RUNNER_TASK_ID=0925-tasks-archive-automation` before orchestrator commands.
-
-<!-- docs-sync:begin 0925-tasks-archive-automation -->
-## Checklist Mirror
-Mirror status with `tasks/tasks-0925-tasks-archive-automation.md` and `.agent/task/0925-tasks-archive-automation.md`. Keep `[ ]` until evidence is recorded.
-
-### Foundation
-- [x] PRD drafted and mirrored in `docs/` - Evidence: `tasks/0925-prd-tasks-archive-automation.md`, `docs/PRD-tasks-archive-automation.md`.
-- [x] Tech spec drafted - Evidence: `docs/TECH_SPEC-tasks-archive-automation.md`.
-- [x] Action plan drafted - Evidence: `docs/ACTION_PLAN-tasks-archive-automation.md`.
-- [x] Mini-spec stub created - Evidence: `tasks/specs/0925-tasks-archive-automation.md`.
-- [x] Docs-review manifest captured (pre-change) - Evidence: `.runs/0925-tasks-archive-automation/cli/2025-12-31T04-49-55-774Z-bf7c0600/manifest.json`.
-- [x] Mirrors updated in `docs/TASKS.md` and `.agent/task/0925-tasks-archive-automation.md` - Evidence: `docs/TASKS.md`, `.agent/task/0925-tasks-archive-automation.md`.
-- [x] Delegation guard override recorded for pre-change docs-review - Evidence: `.runs/0925-tasks-archive-automation/cli/2025-12-31T04-49-55-774Z-bf7c0600/manifest.json`.
-
-### Automation workflow
-- [x] Workflow added to run the archive script and open a PR - Evidence: `.github/workflows/tasks-archive-automation.yml`.
-- [x] Archive payload sync to `task-archives` branch documented - Evidence: `docs/TECH_SPEC-tasks-archive-automation.md`.
-- [x] Agent guidance updated for automation and fallback - Evidence: `AGENTS.md`, `docs/AGENTS.md`, `.agent/AGENTS.md`.
-
-### Archive safety fix
-- [x] Snapshot header match check added to the archive script - Evidence: `scripts/tasks-archive.mjs`.
-
-### Validation + handoff
-- [x] Docs-review manifest captured (post-change) - Evidence: `.runs/0925-tasks-archive-automation/cli/2025-12-31T05-04-46-898Z-82dd0288/manifest.json`.
-- [x] Implementation review manifest captured (post-implementation) - Evidence: `.runs/0925-tasks-archive-automation/cli/2025-12-31T05-05-34-058Z-6b103aff/manifest.json`.
-- [x] Review agent run captured (subagent) - Evidence: `.runs/0925-tasks-archive-automation-review/cli/2025-12-31T05-03-45-338Z-0dcb0ceb/manifest.json`.
-
-## Relevant Files
-- `docs/tasks-archive-policy.json`
-- `scripts/tasks-archive.mjs`
-- `.github/workflows/tasks-archive-automation.yml`
-
-## Subagent Evidence
-- `.runs/0925-tasks-archive-automation-review/cli/2025-12-31T05-03-45-338Z-0dcb0ceb/manifest.json` (review agent docs-review run).
-<!-- docs-sync:end 0925-tasks-archive-automation -->
