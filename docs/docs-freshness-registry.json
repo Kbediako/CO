@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generated_at": "2026-01-12",
+  "generated_at": "2026-01-13",
   "entries": [
     {
       "path": ".agent/AGENTS.md",
@@ -355,9 +355,9 @@
     {
       "path": ".agent/task/0917-devtools-readiness-orchestrator-usage.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2025-12-31",
-      "cadence_days": 90
+      "status": "archived",
+      "last_review": "2026-01-13",
+      "cadence_days": 365
     },
     {
       "path": ".agent/task/0918-subagent-delegation-enforcement.md",
@@ -369,16 +369,16 @@
     {
       "path": ".agent/task/0919-refactor-plan.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2025-12-31",
-      "cadence_days": 90
+      "status": "archived",
+      "last_review": "2026-01-13",
+      "cadence_days": 365
     },
     {
       "path": ".agent/task/0920-refactor-plan-implementation.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2025-12-31",
-      "cadence_days": 90
+      "status": "archived",
+      "last_review": "2026-01-13",
+      "cadence_days": 365
     },
     {
       "path": ".agent/task/0921-docs-freshness-sweep.md",
