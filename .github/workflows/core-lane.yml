@@ -8,6 +8,7 @@ on:
 
 jobs:
   core-lane:
+    name: Core Lane
     runs-on: ubuntu-latest
     steps:
       - name: Checkout (full history for diffs)
