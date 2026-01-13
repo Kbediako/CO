@@ -17,6 +17,7 @@
     "schemas/**",
     "templates/**",
     "skills/**",
+    "docs/assets/setup.gif",
     "README.md",
     "LICENSE"
   ],
