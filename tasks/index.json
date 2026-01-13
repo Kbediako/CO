@@ -910,6 +910,54 @@
       },
       "created_at": "2026-01-12",
       "completed_at": null
+    },
+    {
+      "id": "0945",
+      "slug": "delegation-network-enable",
+      "title": "Delegation Network Enablement",
+      "path": "tasks/tasks-0945-delegation-network-enable.md",
+      "kind": "run",
+      "status": "succeeded",
+      "gate": {
+        "phase": "delegation-network-enable-implementation",
+        "status": "succeeded",
+        "log": ".runs/0945-delegation-network-enable/cli/2026-01-12T15-06-10-157Z-00ad9b56/manifest.json",
+        "run_id": "2026-01-12T15-06-10-157Z-00ad9b56"
+      },
+      "created_at": "2026-01-12",
+      "completed_at": "2026-01-12"
+    },
+    {
+      "id": "0946",
+      "slug": "delegation-skill-bundle",
+      "title": "Delegation Skill Bundle",
+      "path": "tasks/tasks-0946-delegation-skill-bundle.md",
+      "kind": "run",
+      "status": "succeeded",
+      "gate": {
+        "phase": "delegation-skill-bundle-implementation",
+        "status": "succeeded",
+        "log": ".runs/0946-delegation-skill-bundle/cli/2026-01-12T15-53-16-764Z-2a73ade3/manifest.json",
+        "run_id": "2026-01-12T15-53-16-764Z-2a73ade3"
+      },
+      "created_at": "2026-01-12",
+      "completed_at": "2026-01-12"
+    },
+    {
+      "id": "0947",
+      "slug": "delegation-skill-ship",
+      "title": "Delegation Skill Ship",
+      "path": "tasks/tasks-0947-delegation-skill-ship.md",
+      "kind": "run",
+      "status": "succeeded",
+      "gate": {
+        "phase": "delegation-skill-ship-implementation",
+        "status": "succeeded",
+        "log": ".runs/0947-delegation-skill-ship/cli/2026-01-13T00-35-31-776Z-ca886a3f/manifest.json",
+        "run_id": "2026-01-13T00-35-31-776Z-ca886a3f"
+      },
+      "created_at": "2026-01-13",
+      "completed_at": "2026-01-13"
     }
   ],
   "specs": [

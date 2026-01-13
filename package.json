@@ -1,6 +1,6 @@
 {
   "name": "@kbediako/codex-orchestrator",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "license": "SEE LICENSE IN LICENSE",
   "type": "module",
   "bin": {
@@ -15,6 +15,7 @@
     "dist/types/**",
     "schemas/**",
     "templates/**",
+    "skills/**",
     "README.md",
     "LICENSE"
   ],

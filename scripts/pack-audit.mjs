@@ -12,7 +12,7 @@ const REQUIRED_FILES = [
   'LICENSE'
 ];
 
-const ALLOWED_PREFIXES = ['dist/', 'schemas/', 'templates/'];
+const ALLOWED_PREFIXES = ['dist/', 'schemas/', 'templates/', 'skills/'];
 const ALLOWED_ROOT_FILES = new Set(['README.md', 'LICENSE', 'package.json']);
 const DIST_ALLOWED_PREFIXES = [
   'dist/bin/',

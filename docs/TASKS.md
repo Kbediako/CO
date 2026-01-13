@@ -8,6 +8,21 @@ Archived task snapshots live on the task-archives branch.
 - 2025: [docs/TASKS-archive-2025](https://github.com/Kbediako/CO/blob/task-archives/docs/TASKS-archive-2025.md)
 - 2026: [docs/TASKS-archive-2026](https://github.com/Kbediako/CO/blob/task-archives/docs/TASKS-archive-2026.md)
 <!-- tasks-archive-index:end -->
+# Task List Snapshot — Delegation Skill Ship (0947-delegation-skill-ship)
+- **Update — 2026-01-13:** Docs-review complete via `.runs/0947-delegation-skill-ship/cli/2026-01-13T00-24-47-193Z-742a71c7/manifest.json`; implementation-gate via `.runs/0947-delegation-skill-ship/cli/2026-01-13T00-35-31-776Z-ca886a3f/manifest.json`; subagent diagnostics via `.runs/0947-delegation-skill-ship-subagent/cli/2026-01-13T00-22-35-053Z-5d911955/manifest.json`. Notes: export `MCP_RUNNER_TASK_ID=0947-delegation-skill-ship`; guardrails required: `node scripts/delegation-guard.mjs`, `node scripts/spec-guard.mjs --dry-run`, `npm run build`, `npm run lint`, `npm run test`, `npm run docs:check`, `npm run docs:freshness`, `node scripts/diff-budget.mjs`, `npm run review`. Checklist mirror: `tasks/tasks-0947-delegation-skill-ship.md`, `.agent/task/0947-delegation-skill-ship.md`.
+- [x] Foundation: subagent + docs-review + mirrors + docs registry updates. Evidence: `.runs/0947-delegation-skill-ship-subagent/cli/2026-01-13T00-22-35-053Z-5d911955/manifest.json`, `.runs/0947-delegation-skill-ship/cli/2026-01-13T00-24-47-193Z-742a71c7/manifest.json`, `docs/TASKS.md`, `.agent/task/0947-delegation-skill-ship.md`, `tasks/tasks-0947-delegation-skill-ship.md`, `tasks/index.json`, `docs/docs-freshness-registry.json`, `.runs/0947-delegation-skill-ship/metrics.json`, `out/0947-delegation-skill-ship/state.json`.
+- [x] Implementation: delegation skill shipped in npm package files list. Evidence: `package.json`, `skills/delegation-usage/SKILL.md`, `skills/delegation-usage/DELEGATION_GUIDE.md`.
+- [x] Validation: implementation-gate manifest captured. Evidence: `.runs/0947-delegation-skill-ship/cli/2026-01-13T00-35-31-776Z-ca886a3f/manifest.json`.
+# Task List Snapshot — Delegation Skill Bundle (0946-delegation-skill-bundle)
+- **Update — 2026-01-12:** Docs-review complete via `.runs/0946-delegation-skill-bundle/cli/2026-01-12T15-52-40-947Z-cbe95d52/manifest.json`; implementation-gate via `.runs/0946-delegation-skill-bundle/cli/2026-01-12T15-53-16-764Z-2a73ade3/manifest.json`; subagent diagnostics via `.runs/0946-delegation-skill-bundle-subagent/cli/2026-01-12T15-49-49-530Z-1edd6742/manifest.json`. Notes: export `MCP_RUNNER_TASK_ID=0946-delegation-skill-bundle`; guardrails required: `node scripts/delegation-guard.mjs`, `node scripts/spec-guard.mjs --dry-run`, `npm run build`, `npm run lint`, `npm run test`, `npm run docs:check`, `npm run docs:freshness`, `node scripts/diff-budget.mjs`, `npm run review`. Checklist mirror: `tasks/tasks-0946-delegation-skill-bundle.md`, `.agent/task/0946-delegation-skill-bundle.md`.
+- [x] Foundation: subagent + docs-review + mirrors + docs registry updates. Evidence: `.runs/0946-delegation-skill-bundle-subagent/cli/2026-01-12T15-49-49-530Z-1edd6742/manifest.json`, `.runs/0946-delegation-skill-bundle/cli/2026-01-12T15-52-40-947Z-cbe95d52/manifest.json`, `docs/TASKS.md`, `.agent/task/0946-delegation-skill-bundle.md`, `tasks/tasks-0946-delegation-skill-bundle.md`, `tasks/index.json`, `docs/docs-freshness-registry.json`, `.runs/0946-delegation-skill-bundle/metrics.json`, `out/0946-delegation-skill-bundle/state.json`.
+- [x] Implementation: delegation skill bundled in repo with guide. Evidence: `skills/delegation-usage/SKILL.md`, `skills/delegation-usage/DELEGATION_GUIDE.md`.
+- [x] Validation: implementation-gate manifest captured. Evidence: `.runs/0946-delegation-skill-bundle/cli/2026-01-12T15-53-16-764Z-2a73ade3/manifest.json`.
+# Task List Snapshot — Delegation Network Enablement (0945-delegation-network-enable)
+- **Update — 2026-01-12:** Docs-review complete via `.runs/0945-delegation-network-enable/cli/2026-01-12T15-05-27-459Z-d223e67f/manifest.json`; implementation-gate via `.runs/0945-delegation-network-enable/cli/2026-01-12T15-06-10-157Z-00ad9b56/manifest.json`; subagent diagnostics via `.runs/0945-delegation-network-enable-subagent/cli/2026-01-12T15-01-24-348Z-db034e44/manifest.json`. Notes: export `MCP_RUNNER_TASK_ID=0945-delegation-network-enable`; guardrails required: `node scripts/delegation-guard.mjs`, `node scripts/spec-guard.mjs --dry-run`, `npm run build`, `npm run lint`, `npm run test`, `npm run docs:check`, `npm run docs:freshness`, `node scripts/diff-budget.mjs`, `npm run review`. Checklist mirror: `tasks/tasks-0945-delegation-network-enable.md`, `.agent/task/0945-delegation-network-enable.md`.
+- [x] Foundation: subagent + docs-review + mirrors + docs registry updates. Evidence: `.runs/0945-delegation-network-enable-subagent/cli/2026-01-12T15-01-24-348Z-db034e44/manifest.json`, `.runs/0945-delegation-network-enable/cli/2026-01-12T15-05-27-459Z-d223e67f/manifest.json`, `docs/TASKS.md`, `.agent/task/0945-delegation-network-enable.md`, `tasks/tasks-0945-delegation-network-enable.md`, `tasks/index.json`, `docs/docs-freshness-registry.json`, `.runs/0945-delegation-network-enable/metrics.json`, `out/0945-delegation-network-enable/state.json`.
+- [x] Implementation: repo delegation config enables sandbox network. Evidence: `.codex/orchestrator.toml`.
+- [x] Validation: implementation-gate manifest captured. Evidence: `.runs/0945-delegation-network-enable/cli/2026-01-12T15-06-10-157Z-00ad9b56/manifest.json`.
 # Task List Snapshot — Codex Delegation Autonomy Platform (0940-delegation-autonomy-platform)
 - **Update — 2026-01-08:** Docs-review complete via `.runs/0940-delegation-autonomy-platform/cli/2026-01-08T09-15-22-109Z-e577581a/manifest.json`; subagent diagnostics via `.runs/0940-delegation-autonomy-platform-docs-scout/cli/2026-01-08T08-50-17-654Z-e6012ee4/manifest.json`. Notes: export `MCP_RUNNER_TASK_ID=0940-delegation-autonomy-platform`; guardrails required: `node scripts/spec-guard.mjs --dry-run`, `npm run build`, `npm run lint`, `npm run test`, `npm run docs:check`, `npm run docs:freshness`, `node scripts/diff-budget.mjs`, `npm run review`. Checklist mirror: `tasks/tasks-0940-delegation-autonomy-platform.md`, `.agent/task/0940-delegation-autonomy-platform.md`.
 - **Update — 2026-01-09:** Implementation-gate complete via `.runs/0940-delegation-autonomy-platform/cli/2026-01-09T17-39-04-072Z-fba13b4b/manifest.json`; manual control-plane E2E runs captured via `.runs/0940-delegation-autonomy-platform/cli/2026-01-09T17-41-46-365Z-45c0d078/manifest.json` (pause/resume events in `events.jsonl`) and `.runs/0940-delegation-autonomy-platform/cli/2026-01-09T17-44-00-530Z-ccc0c9a5/manifest.json` (question/confirmation events in `events.jsonl`, `questions.json`). Notes: diff budget override recorded in the implementation-gate run.
@@ -108,19 +123,7 @@ Archived task snapshots live on the task-archives branch.
 Mirror status with `tasks/tasks-0101-slimdown-audit.md` and `.agent/task/0101-slimdown-audit.md`. Keep `[ ]` until evidence is recorded.
 - [x] Docs + checklist drafted - Evidence: `docs/PRD-slimdown.md`, `docs/TECH_SPEC-slimdown.md`, `docs/findings/slimdown-audit.md`, `tasks/tasks-0101-slimdown-audit.md`.
 - [x] Action plan drafted - Evidence: `docs/ACTION_PLAN-slimdown.md`.
-- [x] Phase 5 consolidation targets captured - Evidence: `docs/TECH_SPEC-slimdown.md`, `docs/findings/slimdown-audit.md`.
-- [x] Phase 6 consolidation targets captured - Evidence: `docs/TECH_SPEC-slimdown.md`, `docs/findings/slimdown-audit.md`.
-- [x] Phase 7 consolidation targets captured - Evidence: `docs/TECH_SPEC-slimdown.md`, `docs/findings/slimdown-audit.md`.
-- [x] Phase 8 consolidation targets captured - Evidence: `docs/TECH_SPEC-slimdown.md`, `docs/findings/slimdown-audit.md`.
-- [x] Phase 9 consolidation targets captured - Evidence: `docs/TECH_SPEC-slimdown.md`, `docs/findings/slimdown-audit.md`.
-- [x] Phase 10 consolidation targets captured - Evidence: `docs/TECH_SPEC-slimdown.md`, `docs/findings/slimdown-audit.md`.
-- [x] Phase 11 consolidation targets captured - Evidence: `docs/TECH_SPEC-slimdown.md`, `docs/findings/slimdown-audit.md`.
-- [x] Phase 12 consolidation targets captured - Evidence: `docs/TECH_SPEC-slimdown.md`, `docs/findings/slimdown-audit.md`.
-- [x] Phase 13 consolidation targets captured - Evidence: `docs/TECH_SPEC-slimdown.md`, `docs/findings/slimdown-audit.md`.
-- [x] Phase 14 consolidation targets captured - Evidence: `docs/TECH_SPEC-slimdown.md`, `docs/findings/slimdown-audit.md`.
-- [x] Phase 15 consolidation targets captured - Evidence: `docs/TECH_SPEC-slimdown.md`, `docs/findings/slimdown-audit.md`.
-- [x] Phase 16 consolidation targets captured - Evidence: `docs/TECH_SPEC-slimdown.md`, `docs/findings/slimdown-audit.md`.
-- [x] Phase 17 consolidation targets captured - Evidence: `docs/TECH_SPEC-slimdown.md`, `docs/findings/slimdown-audit.md`.
+- [x] Phase 5–17 consolidation targets captured - Evidence: `docs/TECH_SPEC-slimdown.md`, `docs/findings/slimdown-audit.md`.
 - [x] Phase 3 pipeline and harness simplifications executed - Evidence: `.runs/0101-slimdown-audit/cli/2026-01-01T11-12-06-081Z-b957f1cf/manifest.json`.
 - [x] Phase 4 automation + CLI simplifications executed - Evidence: `.runs/0101-slimdown-audit/cli/2026-01-01T14-09-41-854Z-46f3b7ea/manifest.json`.
 - [x] Phase 5 consolidations executed - Evidence: `.runs/0101-slimdown-audit/cli/2026-01-01T16-30-31-721Z-35c24301/manifest.json`.
@@ -223,15 +226,12 @@ Mirror status with `tasks/tasks-0801-dead-code-pruning.md` and `.agent/task/<id>
 # Task List Snapshot — Codex Orchestrator Slimdown (0707)
 - **Update — Planning:** PRD + tech spec published; CI/local test coverage policy recorded (core vs full-matrix lanes). Awaiting first diagnostics manifest under `.runs/0707-orchestrator-slimdown/cli/2025-12-29T06-49-38-980Z-85ac2153/manifest.json`.
 - **Notes:** Export `MCP_RUNNER_TASK_ID=0707-orchestrator-slimdown` for orchestrator commands so manifests, metrics, and `out/**` land in the correct directories.
-
 ## Checklist Mirror
 Mirror status with `tasks/tasks-0707-orchestrator-slimdown.md` and `.agent/task/0707-orchestrator-slimdown.md`. Keep `[ ]` until a manifest path such as `.runs/0707-orchestrator-slimdown/cli/2025-12-29T06-49-38-980Z-85ac2153/manifest.json` is recorded.
-
 ### Foundation
 - [x] Diagnostics manifest captured — Evidence: `.runs/0707-orchestrator-slimdown/cli/2025-12-01T09-37-11-576Z-1a60ebea/manifest.json`.
 - [x] Metrics/state snapshots updated — Evidence: `.runs/0707-orchestrator-slimdown/metrics.json`, `out/0707-orchestrator-slimdown/state.json`.
 - [x] CI/test coverage policy mirrored across PRD/spec/tasks — core PR lane runs `npm run build`, `npm run lint`, `npm run test`; full-matrix PR lane (label `full-matrix` or adapters/evaluation/design/patterns paths) runs `npm run build:all`, `npm run lint`, `npm run test`, `npm run test:adapters`, `npm run test:evaluation`, `npm run eval:test` when fixtures/optional design deps installed; release/RC always full matrix; local baseline = core with full matrix locally when touching adapters/evaluation/design/patterns or release prep after `npm run setup:design-tools && npx playwright install` + fixtures (note if skipped). Evidence: `.runs/0707-orchestrator-slimdown/cli/2025-12-20T00-28-00-131Z-bd705bcf/manifest.json`.
-
 ### Deliverables
 - [x] Manifest single-source + generated TS types/AJV validator; duplicate schema removed — Evidence: `.runs/0707-orchestrator-slimdown/cli/2025-12-20T00-28-00-131Z-bd705bcf/manifest.json`.
 - [x] Unused agent SDK deps removed with usages pruned/shimmed — Evidence: `.runs/0707-orchestrator-slimdown/cli/2025-12-20T00-28-00-131Z-bd705bcf/manifest.json`.
