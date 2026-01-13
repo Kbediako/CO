@@ -4,7 +4,7 @@ Use this guide for deeper context on delegation behavior, tool surfaces, and tro
 
 ## Mental model
 
-- The delegation MCP server is a local stdio process (`codex-orchestrator delegation-server`).
+- The delegation MCP server is a local stdio process (`codex-orchestrator delegate-server`; `delegation-server` is an alias).
 - It does **not** provide general tools itself; it only exposes `delegate.*` + optional `github.*` tools.
 - Child runs get tools based on `delegate.mode` + `delegate.tool_profile` + repo caps.
 
@@ -25,6 +25,17 @@ Notes:
 - If the run needs `delegate.spawn/pause/cancel`, add `-c 'delegate.mode=full'`.
 - If it only needs `delegate.question.*` (and optional `delegate.status`), add `-c 'delegate.mode=question_only'`.
 - Non-interactive runs can still require approvals; resolve them via the UI/TUI and the run will resume.
+- `codex exec` does **not** create `.runs/<task>/cli/<run>/manifest.json` on its own. If the child must call `delegate.question.*` or `delegate.status/pause/cancel`, pass a real manifest path (e.g., run `codex-orch start diagnostics --format json --task <task-id>` and reuse the manifest path; or `export MCP_RUNNER_TASK_ID=<task-id>` if you prefer env vars).
+
+## Runner + task id (short form)
+
+Prefer a direct task flag instead of an exported env var:
+
+```
+codex-orch start diagnostics --format json --task <task-id>
+```
+
+This produces `.runs/<task-id>/cli/<run-id>/manifest.json`, which you can reuse as `parent_manifest_path` for question queue calls.
 
 ## Minimal tool surface
 
@@ -43,7 +54,7 @@ Delegation MCP expects JSONL. Use `codex-orchestrator >= 0.1.8`.
 
 - Check: `codex-orchestrator --version`
 - Update global: `npm i -g @kbediako/codex-orchestrator@0.1.8`
-- Or pin via npx: `npx -y @kbediako/codex-orchestrator@0.1.8 delegation-server`
+- Or pin via npx: `npx -y @kbediako/codex-orchestrator@0.1.8 delegate-server`
 
 ## Common failures
 

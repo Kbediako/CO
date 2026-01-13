@@ -21,37 +21,53 @@ Node.js >= 20 is required.
 
 ## Quick start
 
-1. Set a task id so artifacts are grouped under `.runs/<task-id>/`:
+1. Run a pipeline with a task id so artifacts are grouped under `.runs/<task-id>/`:
    ```bash
-   export MCP_RUNNER_TASK_ID=<task-id>
+   codex-orch start diagnostics --format json --task <task-id>
    ```
-2. Run a pipeline:
-   ```bash
-   codex-orch start diagnostics --format json
-   ```
-3. Watch status:
+   The command prints the `run_id` plus the manifest path under `.runs/<task-id>/cli/<run-id>/manifest.json`.
+2. Watch status:
    ```bash
    codex-orch status --run <run-id> --watch --interval 10
    ```
-4. Resume if needed:
+3. Resume if needed:
    ```bash
    codex-orch resume --run <run-id>
    ```
    > Tip: if you prefer `npx`, replace `codex-orch` with `npx @kbediako/codex-orchestrator`.
+   > Tip: for multiple commands, you can also `export MCP_RUNNER_TASK_ID=<task-id>` once.
 
 ## Delegation MCP server
 
 Run the delegation MCP server over stdio:
 ```bash
-codex-orchestrator delegate-server --repo /path/to/repo --mode question_only
+codex-orchestrator delegate-server --repo /path/to/repo
 ```
+Optional: add `--mode question_only` to expose only `delegate.question.*` + `delegate.status` (no `delegate.spawn/pause/cancel`).
 
 Register it with Codex once, then enable per run:
 ```bash
 codex mcp add delegation -- codex-orchestrator delegate-server --repo /path/to/repo
 codex -c 'mcp_servers.delegation.enabled=true' ...
 ```
-`delegate-server` is an alias for `delegation-server` if you see both names in older docs.
+`delegate-server` is the canonical name; `delegation-server` is supported as an alias (older docs may use it).
+
+## Delegation flow
+
+```mermaid
+flowchart LR
+  A["Parent Codex run\n(MCP disabled by default)"]
+  B["Background Codex run\n(delegation enabled)"]
+  C["Delegation MCP server"]
+  D["delegate.spawn"]
+  E["Child run"]
+  F["delegate.question.enqueue / poll\n(optional back to parent)"]
+  G["Artifacts\n.runs/<task-id>/cli/<run-id>/manifest.json"]
+
+  A --> B --> C --> D --> E
+  E -. optional .-> F -.-> A
+  E --> G
+```
 
 ## Skills (bundled)
 

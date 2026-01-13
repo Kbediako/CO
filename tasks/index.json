@@ -990,6 +990,22 @@
       },
       "created_at": "2026-01-13",
       "completed_at": "2026-01-13"
+    },
+    {
+      "id": "0950",
+      "slug": "delegation-mermaid-archive",
+      "title": "Delegation Mermaid + Task Archive Trim",
+      "path": "tasks/tasks-0950-delegation-mermaid-archive.md",
+      "kind": "run",
+      "status": "succeeded",
+      "gate": {
+        "phase": "delegation-mermaid-archive-implementation",
+        "status": "succeeded",
+        "log": ".runs/0950-delegation-mermaid-archive/cli/2026-01-13T05-23-06-540Z-e7ce1041/manifest.json",
+        "run_id": "2026-01-13T05-23-06-540Z-e7ce1041"
+      },
+      "created_at": "2026-01-13",
+      "completed_at": "2026-01-13"
     }
   ],
   "specs": [
