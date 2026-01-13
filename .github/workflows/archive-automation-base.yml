@@ -165,9 +165,16 @@ jobs:
           echo "Auto-merge token is missing; set ARCHIVE_AUTOMERGE_TOKEN to enable automatic merges." >> "$GITHUB_STEP_SUMMARY"
 
       - name: Enable auto-merge
+        id: auto_merge
+        continue-on-error: true
         if: steps.changes.outputs.changed == 'true' && inputs.enable_auto_merge && steps.pr_token.outputs.present == 'true' && steps.cpr.outputs.pull-request-number != ''
         uses: peter-evans/enable-pull-request-automerge@v3
         with:
           token: ${{ secrets.pr_token }}
           pull-request-number: ${{ steps.cpr.outputs.pull-request-number }}
           merge-method: merge
+
+      - name: Auto-merge skipped (branch protection not configured)
+        if: steps.auto_merge.outcome == 'failure'
+        run: |
+          echo "Auto-merge could not be enabled (likely missing protected branch rules or repo auto-merge settings). PR remains open for manual merge." >> "$GITHUB_STEP_SUMMARY"

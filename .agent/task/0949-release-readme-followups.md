@@ -13,6 +13,7 @@
 - [x] README + repo guide aligned with scoped npx + alias + wording fixes — Evidence: `README.md`, `docs/README.md`.
 - [x] Release notes extraction stops at `##` headings — Evidence: `.github/workflows/release.yml`.
 - [x] Short CLI alias shipped + version bump — Evidence: `package.json`, `package-lock.json`.
+- [x] Archive auto-merge failure no longer fails the workflow — Evidence: `.github/workflows/archive-automation-base.yml`.
 
 ### Validation + handoff
 - [x] Implementation-gate manifest captured — Evidence: `.runs/0949-release-readme-followups/cli/2026-01-13T02-26-54-969Z-dd0727c2/manifest.json`.
