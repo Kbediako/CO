@@ -8,31 +8,36 @@ Codex Orchestrator is the CLI + runtime that coordinates Codex-driven runs, pipe
   ```bash
   npm i -g @kbediako/codex-orchestrator
   ```
+- After install, use either `codex-orchestrator` or the short alias `codex-orch`:
+  ```bash
+  codex-orchestrator --version
+  ```
 - Or run via npx:
   ```bash
-  npx codex-orchestrator --version
+  npx @kbediako/codex-orchestrator --version
   ```
 
 Node.js >= 20 is required.
 
 ## Quick start
 
-1. Set a task id so artifacts land under `.runs/<task-id>/`:
+1. Set a task id so artifacts are grouped under `.runs/<task-id>/`:
    ```bash
    export MCP_RUNNER_TASK_ID=<task-id>
    ```
 2. Run a pipeline:
    ```bash
-   npx codex-orchestrator start diagnostics --format json
+   codex-orch start diagnostics --format json
    ```
 3. Watch status:
    ```bash
-   npx codex-orchestrator status --run <run-id> --watch --interval 10
+   codex-orch status --run <run-id> --watch --interval 10
    ```
 4. Resume if needed:
    ```bash
-   npx codex-orchestrator resume --run <run-id>
+   codex-orch resume --run <run-id>
    ```
+   > Tip: if you prefer `npx`, replace `codex-orch` with `npx @kbediako/codex-orchestrator`.
 
 ## Delegation MCP server
 
@@ -43,9 +48,10 @@ codex-orchestrator delegate-server --repo /path/to/repo --mode question_only
 
 Register it with Codex once, then enable per run:
 ```bash
-codex mcp add delegation -- codex-orchestrator delegation-server --repo /path/to/repo
+codex mcp add delegation -- codex-orchestrator delegate-server --repo /path/to/repo
 codex -c 'mcp_servers.delegation.enabled=true' ...
 ```
+`delegate-server` is an alias for `delegation-server` if you see both names in older docs.
 
 ## Skills (bundled)
 
@@ -58,7 +64,7 @@ Options:
 - `--force` overwrites existing files.
 - `--codex-home <path>` targets a different Codex home directory.
 
-Current bundled skills:
+Bundled skills (may vary by release):
 - `delegation-usage`
 
 ## DevTools readiness
@@ -90,5 +96,5 @@ codex-orchestrator devtools setup
 
 ## Repository + contributor guide
 
-Repo internals, development workflows, and deeper architecture notes live here:
+Repo internals, development workflows, and deeper architecture notes live in the GitHub repository:
 - `docs/README.md`

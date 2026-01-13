@@ -1,10 +1,11 @@
 {
   "name": "@kbediako/codex-orchestrator",
-  "version": "0.1.9",
+  "version": "0.1.10",
   "license": "SEE LICENSE IN LICENSE",
   "type": "module",
   "bin": {
-    "codex-orchestrator": "dist/bin/codex-orchestrator.js"
+    "codex-orchestrator": "dist/bin/codex-orchestrator.js",
+    "codex-orch": "dist/bin/codex-orchestrator.js"
   },
   "files": [
     "dist/bin/**",

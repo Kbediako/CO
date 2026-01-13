@@ -2605,6 +2605,20 @@
       "status": "active",
       "last_review": "2026-01-13",
       "cadence_days": 90
+    },
+    {
+      "path": ".agent/task/0949-release-readme-followups.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-13",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/tasks-0949-release-readme-followups.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-13",
+      "cadence_days": 90
     }
   ]
 }

@@ -41,7 +41,7 @@ Group execution (when `FEATURE_TFGRPO_GROUP=on`): repeat the Builder → Tester 
 - Seed a normal run and keep manifests grouped by task:
   ```bash
   export MCP_RUNNER_TASK_ID=<task-id>
-  LEARNING_PIPELINE_ENABLED=1 npx codex-orchestrator start diagnostics --format json
+  LEARNING_PIPELINE_ENABLED=1 npx @kbediako/codex-orchestrator start diagnostics --format json
   ```
 - The learning section is written only when the run succeeds; rerun the command with `LEARNING_SNAPSHOT_DIR=<abs-path>` to redirect tarball copies.
 
@@ -66,17 +66,17 @@ Group execution (when `FEATURE_TFGRPO_GROUP=on`): repeat the Builder → Tester 
    ```
 3. Launch diagnostics (defaults to the configured pipeline):
    ```bash
-   npx codex-orchestrator start diagnostics --format json
+   npx @kbediako/codex-orchestrator start diagnostics --format json
    ```
    > Tip: keep `FEATURE_TFGRPO_GROUP`, `TFGRPO_GROUP_SIZE`, and related TF-GRPO env vars **unset** when running diagnostics. Many tests assume grouped execution is off, and the TF-GRPO guardrails require `groupSize >= 2` and `groupSize <= fanOutCapacity`. Use the `tfgrpo-learning` pipeline instead when you need grouped TF-GRPO runs.
    > HUD: add `--interactive` (or `--ui`) when stdout/stderr are TTY, TERM is not `dumb`, and CI is off to view the read-only Ink HUD. Non-interactive or JSON runs skip the HUD automatically.
 4. Follow the run:
    ```bash
-   npx codex-orchestrator status --run <run-id> --watch --interval 10
+   npx @kbediako/codex-orchestrator status --run <run-id> --watch --interval 10
    ```
 5. Attach the CLI manifest path (`.runs/<task-id>/cli/<run-id>/manifest.json`) when you complete checklist items; the TaskManager summary lives at `.runs/<task-id>/<run-id>/manifest.json`, metrics aggregate in `.runs/<task-id>/metrics.json`, and summaries land in `out/<task-id>/state.json`.
 
-Use `npx codex-orchestrator resume --run <run-id>` to continue interrupted runs; the CLI verifies resume tokens, refreshes the plan, and updates the manifest safely before rerunning.
+Use `npx @kbediako/codex-orchestrator resume --run <run-id>` to continue interrupted runs; the CLI verifies resume tokens, refreshes the plan, and updates the manifest safely before rerunning.
 
 ## Companion Package Commands
 - `codex-orchestrator mcp serve [--repo <path>] [--dry-run] [-- <extra args>]`: launch the MCP stdio server (delegates to `codex mcp-server`; stdout guard keeps protocol-only output, logs to stderr).
@@ -105,12 +105,12 @@ git worktree add ../CO-stream-b HEAD
 # terminal A
 cd ../CO-stream-a
 export MCP_RUNNER_TASK_ID=<task-id>-a
-npx codex-orchestrator start diagnostics --format json
+npx @kbediako/codex-orchestrator start diagnostics --format json
 
 # terminal B
 cd ../CO-stream-b
 export MCP_RUNNER_TASK_ID=<task-id>-b
-npx codex-orchestrator start diagnostics --format json
+npx @kbediako/codex-orchestrator start diagnostics --format json
 ```
 
 Notes:
@@ -124,7 +124,7 @@ Notes:
 - The custom prompts live outside the repo at `~/.codex/prompts/diagnostics.md` and `~/.codex/prompts/review-handoff.md`. Recreate those files on every fresh machine so `/prompts:diagnostics` and `/prompts:review-handoff` are available in the Codex CLI palette.
 - These prompts are consumed by the Codex CLI UI only; the orchestrator does not read them. Keep updates synced across machines during onboarding.
 - To install or refresh the prompts (repo-only), run `scripts/setup-codex-prompts.sh` (use `--force` to overwrite existing files).
-- `/prompts:diagnostics` takes `TASK=<task-id> MANIFEST=<path> [NOTES=<free text>]`, exports `MCP_RUNNER_TASK_ID=$TASK`, runs `npx codex-orchestrator start diagnostics --format json`, tails `.runs/$TASK/cli/<run-id>/manifest.json` (or `npx codex-orchestrator status --watch`), and records evidence to `/tasks`, `docs/TASKS.md`, `.agent/task/...`, `.runs/$TASK/metrics.json`, and `out/$TASK/state.json` using `$MANIFEST`.
+- `/prompts:diagnostics` takes `TASK=<task-id> MANIFEST=<path> [NOTES=<free text>]`, exports `MCP_RUNNER_TASK_ID=$TASK`, runs `npx @kbediako/codex-orchestrator start diagnostics --format json`, tails `.runs/$TASK/cli/<run-id>/manifest.json` (or `npx @kbediako/codex-orchestrator status --watch`), and records evidence to `/tasks`, `docs/TASKS.md`, `.agent/task/...`, `.runs/$TASK/metrics.json`, and `out/$TASK/state.json` using `$MANIFEST`.
 - `/prompts:review-handoff` takes `TASK=<task-id> MANIFEST=<path> NOTES=<goal + summary + risks + optional questions>`, re-exports `MCP_RUNNER_TASK_ID`, and (repo-only) runs `node scripts/delegation-guard.mjs`, `node scripts/spec-guard.mjs --dry-run`, `npm run lint`, `npm run test`, optional `npm run eval:test`, plus `npm run review` (wraps `codex review` against the current diff and includes the latest run manifest path as evidence). It also reminds you to log approvals in `$MANIFEST` and mirror the evidence to the same docs/metrics/state targets.
 - In CI / `--no-interactive` pipelines (or when stdin is not a TTY), `npm run review` prints the review handoff prompt (including evidence paths) and exits successfully instead of invoking `codex review`. Set `FORCE_CODEX_REVIEW=1` to run `codex review` in those environments.
 - Always trigger diagnostics and review workflows through these prompts whenever you run the orchestrator so contributors consistently execute the required command sequences and capture auditable manifests.
@@ -209,12 +209,12 @@ Template: `Goal: ... | Summary: ... | Risks: ... | Questions (optional): ...`
 
 To enable Chrome DevTools for review runs, set `CODEX_REVIEW_DEVTOOLS=1` (uses a codex config override; no repo scripts required).
 Default to the standard `implementation-gate` for general reviews; enable DevTools only when the review needs Chrome DevTools capabilities (visual/layout checks, network/perf diagnostics). After fixing review feedback, rerun the same gate and include any follow-up questions in `NOTES`.
-To run the full implementation gate with DevTools-enabled review, use `CODEX_REVIEW_DEVTOOLS=1 npx codex-orchestrator start implementation-gate --format json --no-interactive --task <task-id>`.
+To run the full implementation gate with DevTools-enabled review, use `CODEX_REVIEW_DEVTOOLS=1 npx @kbediako/codex-orchestrator start implementation-gate --format json --no-interactive --task <task-id>`.
 
 ## Frontend Testing
 Frontend testing is a first-class pipeline with DevTools off by default. The shipped pipelines already set `CODEX_NON_INTERACTIVE=1`; add it explicitly for custom automation or when you want the `frontend-test` shortcut to suppress Codex prompts:
-- `CODEX_NON_INTERACTIVE=1 npx codex-orchestrator start frontend-testing --format json --no-interactive --task <task-id>`
-- `CODEX_NON_INTERACTIVE=1 CODEX_REVIEW_DEVTOOLS=1 npx codex-orchestrator start frontend-testing --format json --no-interactive --task <task-id>` (DevTools enabled)
+- `CODEX_NON_INTERACTIVE=1 npx @kbediako/codex-orchestrator start frontend-testing --format json --no-interactive --task <task-id>`
+- `CODEX_NON_INTERACTIVE=1 CODEX_REVIEW_DEVTOOLS=1 npx @kbediako/codex-orchestrator start frontend-testing --format json --no-interactive --task <task-id>` (DevTools enabled)
 - `CODEX_NON_INTERACTIVE=1 codex-orchestrator frontend-test` (shortcut; add `--devtools` to enable DevTools)
 
 If you run the pipelines from this repo, run `npm run build` first so `dist/` stays current (the pipeline executes the compiled runner).
@@ -245,7 +245,7 @@ Use the hi-fi pipeline to snapshot complex marketing sites (motion, interactions
 4. **Run the pipeline:**
    ```bash
    export MCP_RUNNER_TASK_ID=<task-id>
-   npx codex-orchestrator start hi-fi-design-toolkit --format json --task <task-id>
+   npx @kbediako/codex-orchestrator start hi-fi-design-toolkit --format json --task <task-id>
    ```
    Manifests/logs/state land under `.runs/<task-id>/cli/<run-id>/`, while staged artifacts land under `.runs/<task-id>/<run-id>/artifacts/design-toolkit/` with human summaries mirrored to `out/<task-id>/`.
 5. **Validate the clone:** serve the staged reference directory, e.g.

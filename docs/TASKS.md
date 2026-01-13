@@ -8,6 +8,11 @@ Archived task snapshots live on the task-archives branch.
 - 2025: [docs/TASKS-archive-2025](https://github.com/Kbediako/CO/blob/task-archives/docs/TASKS-archive-2025.md)
 - 2026: [docs/TASKS-archive-2026](https://github.com/Kbediako/CO/blob/task-archives/docs/TASKS-archive-2026.md)
 <!-- tasks-archive-index:end -->
+# Task List Snapshot — Release README + Notes Follow-ups (0949-release-readme-followups)
+- **Update — 2026-01-13:** Docs-review complete via `.runs/0949-release-readme-followups/cli/2026-01-13T02-26-19-647Z-2684eb72/manifest.json`; implementation-gate via `.runs/0949-release-readme-followups/cli/2026-01-13T02-26-54-969Z-dd0727c2/manifest.json`; subagent diagnostics via `.runs/0949-release-readme-followups-subagent/cli/2026-01-13T02-22-59-108Z-9d9cde36/manifest.json`. Notes: export `MCP_RUNNER_TASK_ID=0949-release-readme-followups`; guardrails required: `node scripts/delegation-guard.mjs`, `node scripts/spec-guard.mjs --dry-run`, `npm run build`, `npm run lint`, `npm run test`, `npm run docs:check`, `npm run docs:freshness`, `node scripts/diff-budget.mjs`, `npm run review`. Checklist mirror: `tasks/tasks-0949-release-readme-followups.md`, `.agent/task/0949-release-readme-followups.md`.
+- [x] Foundation: subagent + docs-review + mirrors + docs registry updates. Evidence: `.runs/0949-release-readme-followups-subagent/cli/2026-01-13T02-22-59-108Z-9d9cde36/manifest.json`, `.runs/0949-release-readme-followups/cli/2026-01-13T02-26-19-647Z-2684eb72/manifest.json`, `docs/TASKS.md`, `.agent/task/0949-release-readme-followups.md`, `tasks/tasks-0949-release-readme-followups.md`, `tasks/index.json`, `docs/docs-freshness-registry.json`.
+- [x] Implementation: README + repo guide wording + short alias + release notes parsing fix. Evidence: `README.md`, `docs/README.md`, `package.json`, `package-lock.json`, `.github/workflows/release.yml`.
+- [x] Validation: implementation-gate manifest captured. Evidence: `.runs/0949-release-readme-followups/cli/2026-01-13T02-26-54-969Z-dd0727c2/manifest.json`.
 # Task List Snapshot — Skills Auto-Install Helper + Release README (0948-skills-auto-install)
 - **Update — 2026-01-13:** Docs-review complete via `.runs/0948-skills-auto-install/cli/2026-01-13T01-26-07-866Z-e6863e7b/manifest.json`; implementation-gate via `.runs/0948-skills-auto-install/cli/2026-01-13T01-36-28-976Z-661613e5/manifest.json`; subagent diagnostics via `.runs/0948-skills-auto-install-subagent/cli/2026-01-13T01-20-41-668Z-d0c091c9/manifest.json`. Notes: export `MCP_RUNNER_TASK_ID=0948-skills-auto-install`; guardrails required: `node scripts/delegation-guard.mjs`, `node scripts/spec-guard.mjs --dry-run`, `npm run docs:check`, `npm run docs:freshness`, `npm run review`; diff budget override recorded in implementation-gate run. Checklist mirror: `tasks/tasks-0948-skills-auto-install.md`, `.agent/task/0948-skills-auto-install.md`.
 - [x] Foundation: subagent + docs-review + mirrors + docs registry updates. Evidence: `.runs/0948-skills-auto-install-subagent/cli/2026-01-13T01-20-41-668Z-d0c091c9/manifest.json`, `.runs/0948-skills-auto-install/cli/2026-01-13T01-26-07-866Z-e6863e7b/manifest.json`, `docs/TASKS.md`, `.agent/task/0948-skills-auto-install.md`, `tasks/tasks-0948-skills-auto-install.md`, `tasks/index.json`, `docs/docs-freshness-registry.json`.
@@ -270,20 +275,16 @@ Mirror status with `tasks/design-reference-pipeline.md` and `.agent/task/design-
 - [x] Reference page builder shipped — `motherduck.html` staged under `design/reference/`; Evidence: `.runs/0401-design-reference/cli/2025-11-06T11-59-59-680Z-34fe7972/manifest.json`.
 - [x] Componentization stage delivered — `packages/design-system` assets staged under `design/components/`; Evidence: `.runs/0401-design-reference/cli/2025-11-06T11-59-59-680Z-34fe7972/manifest.json`.
 - [x] Advanced assets optionality — Framer Motion + FFmpeg outputs gated by config quotas; Evidence: `.runs/0401-design-reference/cli/2025-11-06T11-59-59-680Z-34fe7972/manifest.json`.
-
 ### Manifest & Guardrails
 - [x] Manifest schema updates — `packages/shared/manifest/types.ts` + `packages/shared/manifest/writer.ts` persist `design_artifacts`; Evidence: `.runs/0401-design-reference/cli/2025-11-06T11-59-59-680Z-34fe7972/manifest.json`.
 - [x] DesignArtifactWriter output — `out/0401-design-reference/design/runs/<run>.json` summary written with retention/privacy fields; Evidence: `.runs/0401-design-reference/cli/2025-11-06T11-59-59-680Z-34fe7972/manifest.json`.
 - [x] Retention & privacy controls — expiry automation/docs and approval logging established; Evidence: `.runs/0401-design-reference/cli/2025-11-06T11-59-59-680Z-34fe7972/manifest.json`.
 - [x] Guardrail integration — `scripts/spec-guard.mjs` covers `docs/design/specs/**`; `npm --prefix packages/design-system run test:visual` hooked into pipeline; Evidence: `.runs/0401-design-reference/cli/2025-11-06T11-59-59-680Z-34fe7972/manifest.json`.
-
 ### Verification & Approvals
 - [x] Visual regression evidence — diff artifacts + pass/fail summaries staged under `design/visual-regression/`; Evidence: `.runs/0401-design-reference/cli/2025-11-06T11-59-59-680Z-34fe7972/manifest.json`.
 - [x] Diagnostics run — `npx codex-orchestrator start diagnostics --pipeline design-reference --format json`; Evidence: `.runs/0401-design-reference/cli/2025-11-06T11-59-59-680Z-34fe7972/manifest.json`.
 - [x] Reviewer hand-off — `npm run review` references latest design-reference manifest and approvals; Evidence: `.runs/0401-design-reference/cli/2025-11-21T08-15-57-435Z-851d3781/manifest.json`.
-
 # Task List Snapshot — Hi-Fi Design Toolkit (0410-hi-fi-design-toolkit)
-
 - **Update — Pending kickoff:** PRD, spec, and task mirrors drafted; awaiting diagnostics run to capture `.runs/0410-hi-fi-design-toolkit/cli/2025-12-29T06-49-38-980Z-85ac2153/manifest.json`.
 - **Update — External toolkit:** Autonomous hi-fi design starter will be synchronized into this repo with compliance permits before extractor work begins.
 - **Notes:** Always export `MCP_RUNNER_TASK_ID=0410-hi-fi-design-toolkit` so manifests, metrics, and out files land under the correct directories.

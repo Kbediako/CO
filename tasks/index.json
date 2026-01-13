@@ -974,6 +974,22 @@
       },
       "created_at": "2026-01-13",
       "completed_at": "2026-01-13"
+    },
+    {
+      "id": "0949",
+      "slug": "release-readme-followups",
+      "title": "Release README + Notes Follow-ups",
+      "path": "tasks/tasks-0949-release-readme-followups.md",
+      "kind": "run",
+      "status": "succeeded",
+      "gate": {
+        "phase": "release-readme-followups-implementation",
+        "status": "succeeded",
+        "log": ".runs/0949-release-readme-followups/cli/2026-01-13T02-26-54-969Z-dd0727c2/manifest.json",
+        "run_id": "2026-01-13T02-26-54-969Z-dd0727c2"
+      },
+      "created_at": "2026-01-13",
+      "completed_at": "2026-01-13"
     }
   ],
   "specs": [
