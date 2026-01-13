@@ -1,5 +1,7 @@
 # Codex Orchestrator
 
+![Setup demo](docs/assets/setup.gif)
+
 Codex Orchestrator is the CLI + runtime that coordinates Codex-driven runs, pipelines, and delegation MCP tooling. The npm release focuses on running pipelines locally, emitting auditable manifests, and hosting the delegation server.
 
 ## Install
