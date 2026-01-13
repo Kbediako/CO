@@ -22,6 +22,7 @@ const DIST_ALLOWED_PREFIXES = [
   'dist/scripts/lib/',
   'dist/types/'
 ];
+const EXPLICIT_ALLOWED_FILES = new Set(['docs/assets/setup.gif']);
 
 const FORBIDDEN_PREFIXES = [
   '.agent/',
@@ -98,6 +99,9 @@ async function main() {
     }
 
     for (const filePath of filePaths) {
+      if (EXPLICIT_ALLOWED_FILES.has(filePath)) {
+        continue;
+      }
       if (FORBIDDEN_PREFIXES.some((prefix) => filePath.startsWith(prefix))) {
         errors.push(`forbidden path: ${filePath}`);
         continue;
