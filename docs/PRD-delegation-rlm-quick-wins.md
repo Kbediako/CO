@@ -25,18 +25,18 @@
 - No subagent manifests found → expected paths + fix guidance are shown.
 - Detected candidate manifests (if any) are listed with short rejection reasons (cap 3).
 - `DELEGATION_GUARD_OVERRIDE_REASON` is surfaced in diagnostics when set.
-- `delegate.spawn` supports `start_only: boolean` (default `true`). When `start_only=true`, it requires `task_id` and returns `{ run_id, manifest_path, events_path, log_path }` within tool-call limits (target < 10s) **after the child manifest exists** (no stdout parsing), even while the child continues running. When `start_only=false`, legacy wait-for-exit behavior is preserved.
+- `delegate.spawn` supports `start_only: boolean` (default `true`). When `start_only=true`, it requires `task_id`, spawns the child detached with stdio not inherited, and polls `.runs/<task-id>/cli/*/manifest.json` until a new manifest exists (no stdout parsing). It returns `{ run_id, manifest_path, events_path, log_path }` within tool-call limits (target < 10s) while the child continues running, and persists the delegation token before returning. When `start_only=false`, legacy wait-for-exit behavior is preserved.
 - Delegation token is persisted early enough for question queue usage during long-running child execution.
 - Implementation docs archive stubs in PR #165 resolve to actual files on `doc-archives` (or the archived content is restored inline when automation cannot run).
 - Core Lane diff budget for PR #165 passes via a justified override or a smaller/split diff.
-- Context externalization: RLM writes a context object under `.runs/<task>/cli/<run>/rlm/context/` containing `source.txt` + `index.json` with `version`, `object_id`, `created_at`, `source.path`, `source.byte_length`, `chunking.target_bytes`, `chunking.overlap_bytes`, `chunking.strategy`, and chunk records (`id`, `start`, `end`, `sha256`).
+- Context externalization: RLM writes a context object under `.runs/<task>/cli/<run>/rlm/context/` as `{source.txt,index.json}` (no `<object_id>` subfolder). `index.json` contains `version`, `object_id`, `created_at`, `source.path`, `source.byte_length`, `chunking.target_bytes`, `chunking.overlap_bytes`, `chunking.strategy`, and chunk records (`id`, `start`, `end`, `sha256`).
 - Pointer syntax is `ctx:<object_id>#chunk:<chunk_id>` for all reads/snippets.
 - Pointer-only contract: the planner/root prompt never includes the full context. The runner logs `planner_prompt_bytes` per iteration in `rlm/state.json` with an upper bound of ≤ 32 KB (configurable).
 - Bounded reads: each iteration enforces budgets (defaults): `RLM_MAX_CHUNK_READS_PER_ITERATION` ≤ 8, `RLM_MAX_BYTES_PER_CHUNK_READ` ≤ 8 KB, `RLM_MAX_SUBCALLS_PER_ITERATION` ≤ 4; runner clamps and logs any overages.
 - Runner-scheduled subcalls: chunk processing happens via runner-created subcalls over pointer IDs; the model does not emit O(N) chunk reads.
 - Symbolic recursion cycle demo: a synthetic context ≥ 50 MB completes **at least one** cycle (planner → ≥1 subcall → runner returns artifact refs → next planner step or `intent=final`). Evidence recorded in `rlm/state.json` with subcall artifact references.
-- `rlm/state.json` includes required top-level keys: `version`, `mode`, `context`, `symbolic_iterations` (additive to existing fields).
-- Defaulting: `RLM_MODE=auto` by default. Context source precedence: if `RLM_CONTEXT_PATH` is set, use it; otherwise build context from the effective prompt text. If `RLM_MODE=symbolic`, require a valid context source or fail `invalid_config`. If `RLM_MODE=auto`, resolve to `symbolic` when delegated (`CODEX_DELEGATION_PARENT_MANIFEST_PATH`) **or** `RLM_CONTEXT_PATH` is set **or** context bytes ≥ `RLM_SYMBOLIC_MIN_BYTES`; otherwise `iterative`. Override env remains available for debugging.
+- `rlm/state.json` includes required top-level keys: `version`, `mode`, `context`, `symbolic_iterations` (additive to existing fields; do not use `context_object_id` or `symbolic:{iterations}` variants).
+- Defaulting: `RLM_MODE=auto` by default. `delegated` means `CODEX_DELEGATION_PARENT_MANIFEST_PATH` is set. `context_source` is `RLM_CONTEXT_PATH` if set, else the effective prompt text; compute `context_bytes` from the chosen source. If `RLM_MODE=symbolic`, require a valid context source or fail `invalid_config`. If `RLM_MODE=auto`, resolve to `symbolic` when `delegated` **or** `RLM_CONTEXT_PATH` is set **or** `context_bytes` ≥ `RLM_SYMBOLIC_MIN_BYTES` (default 1 MB); otherwise `iterative`. Override env remains available for debugging.
 
 ## Non-Goals
 - Changing delegation policy or bypass rules.

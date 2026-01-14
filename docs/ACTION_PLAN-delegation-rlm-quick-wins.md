@@ -36,15 +36,16 @@
 
 ## Phase 3 — Implementation (TRUE RLM symbolic)
 - Implement context builder:
+  - `context_source` is `RLM_CONTEXT_PATH` if set, else the effective prompt text; compute `context_bytes` from the chosen source.
   - Ingest `RLM_CONTEXT_PATH` (raw file or prebuilt context object dir).
-  - Write `.runs/.../rlm/context/{source.txt,index.json}`.
+  - Write `.runs/.../rlm/context/{source.txt,index.json}` (no `<object_id>` subfolder).
 - Implement planner protocol:
   - Planner prompt template that returns JSON only (`schema_version=1`).
   - JSON parse + one repair retry on failure; otherwise exit with `invalid_config`.
 - Implement runner executor:
   - Execute `searches`, then `reads`, then `subcalls` with per-iteration budgets.
   - Store subcall artifacts under `.runs/.../rlm/subcalls/...`.
-  - Extend `rlm/state.json` with `{ version, mode, context: { object_id, index_path, chunk_count }, symbolic_iterations: [...] }`.
+  - Extend `rlm/state.json` with required top-level keys `{ version, mode, context: { object_id, index_path, chunk_count }, symbolic_iterations: [...] }` (no `context_object_id` or `symbolic:{iterations}` variants).
 - Define subcall execution profile:
   - Single completion, no tools, no repo writes.
   - Concurrency limited by `RLM_MAX_CONCURRENCY`.
@@ -73,6 +74,8 @@ python - <<'PY'
 import json, os
 state_path = os.path.join(".runs/0951-delegation-rlm-quick-wins/cli/<run-id>", "rlm", "state.json")
 state = json.load(open(state_path))
+assert state.get("version") is not None
+assert state.get("mode")
 assert state.get("context", {}).get("object_id")
 assert state.get("symbolic_iterations")
 subcalls = state["symbolic_iterations"][0].get("subcalls", [])
@@ -115,11 +118,11 @@ PY
   - Core Lane diff budget passes (override or split change).
 - Validation checklist (true RLM artifacts):
   - `rlm/context/index.json` exists with correct `chunk_count`.
-  - `rlm/state.json` contains `context.object_id`, `planner_prompt_bytes`, and at least one `subcalls[]` entry with artifact paths.
+  - `rlm/state.json` contains required top-level keys `version`, `mode`, `context`, `symbolic_iterations`, plus `planner_prompt_bytes` and at least one `subcalls[]` entry with artifact paths.
   - `planner_prompt_bytes` ≤ `RLM_MAX_PLANNER_PROMPT_BYTES` and any truncation is recorded in `rlm/state.json`.
   - Logs/manifests show bounded subcalls and chunk reads.
   - Prompt snapshots or prompt byte logs show bounded top-level prompt size.
-  - `RLM_MODE=auto` by default. Context source precedence: if `RLM_CONTEXT_PATH` is set, use it; otherwise build context from the effective prompt text. If `RLM_MODE=symbolic`, require a valid context source or fail `invalid_config`. If `RLM_MODE=auto`, resolve to `symbolic` when delegated (`CODEX_DELEGATION_PARENT_MANIFEST_PATH`) **or** `RLM_CONTEXT_PATH` is set **or** context bytes ≥ `RLM_SYMBOLIC_MIN_BYTES`; otherwise `iterative`.
+  - `RLM_MODE=auto` by default. `delegated` means `CODEX_DELEGATION_PARENT_MANIFEST_PATH` is set. `context_source` is `RLM_CONTEXT_PATH` if set, else the effective prompt text; compute `context_bytes` from the chosen source. If `RLM_MODE=symbolic`, require a valid context source or fail `invalid_config`. If `RLM_MODE=auto`, resolve to `symbolic` when `delegated` **or** `RLM_CONTEXT_PATH` is set **or** `context_bytes` ≥ `RLM_SYMBOLIC_MIN_BYTES` (default 1 MB); otherwise `iterative`.
 
 ## Phase 5 — Evidence + Mirrors
 - Update `docs/TASKS.md`, `tasks/tasks-0951-delegation-rlm-quick-wins.md`, `.agent/task/0951-delegation-rlm-quick-wins.md` with manifest links.

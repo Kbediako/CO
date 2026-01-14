@@ -38,8 +38,8 @@
 - Update delegation usage docs (`skills/delegation-usage/*` and `docs/delegation-runner-workflow.md`) to clarify `delegate.mode` vs `delegate_mode`, recommend RLM depth/time overrides, and document the current `delegate.spawn` long-run timeout limitation + workaround.
 - Add async/start-only behavior to `delegate.spawn` with explicit parameter `start_only: boolean` (default `true`) that:
   - Requires `task_id` when `start_only=true` (return an error if missing) so polling is deterministic.
-  - Spawns `codex-orchestrator start <pipeline> --format json --no-interactive --task <task_id>` in the background (detached/unref; stdio ignored or drained so the parent tool call can return).
-  - Polls `<runs_root>/<task_id>/cli/*/manifest.json` for a newly created manifest (created after `spawnTime`) with a 10s target timeout (configurable).
+  - Spawns `codex-orchestrator start <pipeline> --format json --no-interactive --task <task_id>` detached/unref; child stdio must not be inherited (redirect or drain so the parent tool call can return).
+  - Polls `<runs_root>/<task_id>/cli/*/manifest.json` for a newly created manifest (created after `spawnTime`) with a 10s target timeout (configurable). Do **not** rely on stdout parsing.
   - Reads `run_id` + `manifest_path` from the manifest and returns those plus derived `{ events_path, log_path }`.
   - Persists the delegation token as soon as `manifest_path` is known; do not wait for child exit.
   - Continues draining/ignoring child stdout/stderr after returning to avoid pipe backpressure.
@@ -58,11 +58,11 @@
   - Provide a diff-budget strategy (split changes or set `DIFF_BUDGET_OVERRIDE_REASON` with a rationale in automation).
 
 ### True RLM Architecture (symbolic recursion)
-- **Context object**: write the large prompt into a structured file (e.g., JSON with chunk index) stored under `.runs/<task>/cli/<run>/rlm/`.
+- **Context object**: write the large prompt into a structured file stored under `.runs/<task>/cli/<run>/rlm/context/` as `{source.txt,index.json}` (no `<object_id>` subfolder).
 - **Pointer-based access**: provide helper APIs to `search`, `peek`, and `read` by chunk id or byte range.
 - **Runner‑scheduled subcalls**: the runner creates subcalls over chunks and dispatches them, rather than requiring the model to emit O(N) tool calls.
 - **Artifacts**: subcall inputs/outputs are saved as artifacts and referenced in `rlm/state.json` with their pointer IDs.
-- **Delegation integration**: with `RLM_MODE=auto`, delegated runs resolve to `symbolic` when a valid context source is available; standalone `rlm` can opt in with `RLM_MODE=symbolic` or `RLM_CONTEXT_PATH`.
+- **Delegation integration**: with `RLM_MODE=auto` (default), resolve to `symbolic` when delegated (`CODEX_DELEGATION_PARENT_MANIFEST_PATH` set) **or** `RLM_CONTEXT_PATH` is set **or** `context_bytes` ≥ `RLM_SYMBOLIC_MIN_BYTES` (default 1 MB); otherwise resolve to `iterative`. Standalone `rlm` can still opt in with `RLM_MODE=symbolic` or `RLM_CONTEXT_PATH`.
 
 ### Async/start-only `delegate.spawn`: intended algorithm
 1) Accept `start_only?: boolean` (default `true`). When `start_only=false`, preserve legacy wait-for-exit behavior.
@@ -79,12 +79,11 @@ Stdio / MCP safety:
 - In `start_only` mode, do **not** buffer child stdout/stderr in memory. Either discard or redirect to files so pipes cannot fill and stall the child.
 
 #### Context object format (v1)
-Single context per run, stored directly under `.runs/<task>/cli/<run>/rlm/context/`.
+Single context per run, stored directly under `.runs/<task>/cli/<run>/rlm/context/` (no `<object_id>` subfolder).
 On-disk layout:
 - `.runs/<task>/cli/<run>/rlm/context/`
   - `source.txt` (raw externalized context)
   - `index.json` (chunk table + metadata)
-  - `pointers.md` (optional human-readable mapping)
 
 `index.json` (v1 schema, normative):
 - Required top-level keys: `version`, `object_id`, `created_at`, `source`, `chunking`, `chunks`.
@@ -113,10 +112,11 @@ Pointer syntax:
 - `ctx:<object_id>#chunk:<chunk_id>` (example: `ctx:sha256:abcd...#chunk:c000042`)
 
 #### Context ingestion contract (v1)
+- `context_source` is `RLM_CONTEXT_PATH` if set, else the effective prompt text; compute `context_bytes` from the chosen source.
 - `RLM_CONTEXT_PATH` may point to:
   - A raw text file (runner builds a new context object under `.runs/.../rlm/context/`), or
   - An existing context object directory containing `index.json` + `source.txt` (runner uses it directly).
-- Context source precedence: if `RLM_CONTEXT_PATH` is set, use it; otherwise build the context from the effective prompt text so symbolic mode can run without requiring `RLM_CONTEXT_PATH` for small prompts.
+- When `context_source` is a context object directory, `context_bytes` comes from `index.json` (`source.byte_length`) or the `source.txt` byte length.
 - Context is treated as UTF-8 bytes. All offsets in `index.json` are **byte offsets** into `source.txt`.
 - If decoding fails, the runner stores bytes and uses a lossy UTF-8 decode for previews, but all slicing remains byte-based.
 
@@ -214,7 +214,7 @@ Budgets enforced by runner:
 - `RLM_MAX_SUBCALL_INPUT_BYTES` (default 120000)
 - `RLM_MAX_PLANNER_PROMPT_BYTES` (default 32768; measured as UTF-8 bytes). If the assembled planner prompt would exceed this limit, omit lowest-priority excerpts (search results, then read excerpts) until within budget; record truncation in `rlm/state.json`.
 - Optional `RLM_MAX_CONCURRENCY`
-- `RLM_SYMBOLIC_MIN_BYTES` (default 1048576)
+- `RLM_SYMBOLIC_MIN_BYTES` (default 1 MB / 1048576 bytes)
 - Chunking defaults: `target_bytes=65536`, `overlap_bytes=4096`.
 
 #### Context helper APIs (v1)
@@ -252,12 +252,10 @@ Budgets enforced by runner:
 #### Mode selection (delegation vs standalone)
 - `RLM_MODE=iterative|symbolic|auto`
 - Default: `RLM_MODE=auto` everywhere.
+- `delegated` means `CODEX_DELEGATION_PARENT_MANIFEST_PATH` is set.
 - Define `context_source` as: `RLM_CONTEXT_PATH` if set, else the effective prompt text. Use `context_bytes` from the chosen source.
 - If `RLM_MODE=symbolic`: require a valid `context_source` or exit with `invalid_config`.
-- If `RLM_MODE=auto`: resolve to `symbolic` when delegated (`CODEX_DELEGATION_PARENT_MANIFEST_PATH`) **or** `RLM_CONTEXT_PATH` is set **or** `context_bytes` ≥ `RLM_SYMBOLIC_MIN_BYTES`; otherwise resolve to `iterative`.
-- Fallback:
-  - If `RLM_MODE=auto` and context build fails, fall back to iterative with warning.
-  - If `RLM_MODE=symbolic` and context build fails, hard-fail with actionable error.
+- If `RLM_MODE=auto`: resolve to `symbolic` when `delegated` **or** `RLM_CONTEXT_PATH` is set **or** `context_bytes` ≥ `RLM_SYMBOLIC_MIN_BYTES` (default 1 MB); otherwise resolve to `iterative`.
 
 #### Symbolic mode scope + exit behavior
 - Scope: v1 symbolic mode is analysis-only (planner JSON protocol + runner-managed reads/searches/subcalls). No repo writes and no validator loop.
@@ -277,7 +275,7 @@ Budgets enforced by runner:
 
 `rlm/state.json` v1 extension (normative, additive):
 - Compatibility: extend the existing `RlmState` structure in-place; do not remove or rename existing fields.
-- Required keys: `version`, `mode`, `context`, `symbolic_iterations`.
+- Required top-level keys: `version`, `mode`, `context`, `symbolic_iterations` (do not use `context_object_id` or `symbolic:{iterations}` variants).
 - `context` requires: `object_id`, `index_path`, `chunk_count`.
 - Each `symbolic_iterations[]` entry requires: `planner_prompt_bytes`, `reads[]`, `subcalls[]`.
   - `reads[]` entries record `pointer` + `offset` **or** `start_byte`, plus `bytes`.
