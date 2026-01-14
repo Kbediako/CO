@@ -1,46 +1,9 @@
----
-id: 20251231-docs-freshness-date-validation
-title: Docs Freshness Date Validation
-relates_to: docs/PRD-docs-freshness-date-validation.md
-risk: low
-owners:
-  - Codex (top-level agent)
-  - Review agent
-last_review: 2025-12-31
----
+# Archived Document
 
-## Added by Bootstrap 2025-10-16
+last_review: 2026-01-14
 
-## Summary
-- Objective: Reject malformed `last_review` dates in docs freshness registry validation.
-- Constraints:
-  - No external date parsing dependencies.
-  - No schema changes to the registry format.
+<!-- docs-archive:stub -->
+> Archived on 2026-01-14. Full content: https://github.com/Kbediako/CO/blob/doc-archives/tasks/specs/0923-docs-freshness-date-validation.md
 
-## Proposed Changes
-- Architecture / design adjustments:
-  - Tighten `parseReviewDate` to verify UTC components match the parsed year/month/day.
-- Data model updates:
-  - None.
-- External dependencies:
-  - None.
-
-## Impact Assessment
-- User impact: invalid dates are flagged early, avoiding false passes.
-- Operational risk: low; valid entries remain unchanged.
-- Security / privacy: no new data flows.
-
-## Rollout Plan
-- Prerequisites:
-  - Registry entries reviewed for malformed dates.
-- Testing strategy:
-  - Run `npm run docs:freshness` and implementation-gate guardrails.
-- Launch steps:
-  - Merge after review-agent approval.
-
-## Open Questions
-- None.
-
-## Approvals
-- Reviewer:
-- Date:
+- Archive branch: doc-archives
+- Archive path: tasks/specs/0923-docs-freshness-date-validation.md
