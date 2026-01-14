@@ -1,7 +1,7 @@
 import { exec } from 'node:child_process';
 import { spawn } from 'node:child_process';
-import { mkdir, writeFile } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
+import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
+import { join, relative, resolve } from 'node:path';
 import process from 'node:process';
 import { promisify } from 'node:util';
 import { createInterface } from 'node:readline/promises';
@@ -12,9 +12,14 @@ import { resolveCodexCommand } from './utils/devtools.js';
 import { detectValidator } from './rlm/validator.js';
 import { buildRlmPrompt } from './rlm/prompt.js';
 import { runRlmLoop } from './rlm/runner.js';
+import { buildContextObject, ContextStore, type ContextSource } from './rlm/context.js';
+import { runSymbolicLoop, type SymbolicBudgets } from './rlm/symbolic.js';
 import type {
   RlmAgentInput,
   RlmAgentResult,
+  RlmContextInfo,
+  RlmFinalStatus,
+  RlmMode,
   RlmRoles,
   RlmState,
   RlmValidatorResult,
@@ -24,6 +29,20 @@ import type {
 const execAsync = promisify(exec);
 const DEFAULT_MAX_ITERATIONS = 88;
 const DEFAULT_MAX_MINUTES = 48 * 60;
+const DEFAULT_SYMBOLIC_MIN_BYTES = 1024 * 1024;
+const DEFAULT_CHUNK_TARGET_BYTES = 65536;
+const DEFAULT_CHUNK_OVERLAP_BYTES = 4096;
+const DEFAULT_MAX_SUBCALLS_PER_ITERATION = 4;
+const DEFAULT_MAX_SEARCHES_PER_ITERATION = 4;
+const DEFAULT_MAX_CHUNK_READS_PER_ITERATION = 8;
+const DEFAULT_MAX_BYTES_PER_CHUNK_READ = 8192;
+const DEFAULT_MAX_SNIPPETS_PER_SUBCALL = 8;
+const DEFAULT_MAX_BYTES_PER_SNIPPET = 8192;
+const DEFAULT_MAX_SUBCALL_INPUT_BYTES = 120000;
+const DEFAULT_MAX_PLANNER_PROMPT_BYTES = 32768;
+const DEFAULT_SEARCH_TOP_K = 20;
+const DEFAULT_MAX_PREVIEW_BYTES = 512;
+const DEFAULT_MAX_CONCURRENCY = 4;
 const UNBOUNDED_ITERATION_ALIASES = new Set(['unbounded', 'unlimited', 'infinite', 'infinity']);
 
 interface ParsedArgs {
@@ -179,6 +198,93 @@ function normalizeValidator(value: string | undefined): string | null {
   return trimmed;
 }
 
+function buildBaseState(params: {
+  goal: string;
+  validator: string | null;
+  roles: RlmRoles;
+  maxIterations: number;
+  maxMinutes: number | null;
+  mode: RlmMode;
+  context: RlmContextInfo;
+}): RlmState {
+  return {
+    version: 1,
+    mode: params.mode,
+    context: params.context,
+    symbolic_iterations: [],
+    goal: params.goal,
+    validator: params.validator,
+    roles: params.roles,
+    maxIterations: params.maxIterations,
+    maxMinutes: params.maxMinutes ?? null,
+    iterations: []
+  };
+}
+
+function resolveRlmMode(
+  rawMode: string | undefined,
+  options: {
+    delegated: boolean;
+    contextBytes: number;
+    hasContextPath: boolean;
+    symbolicMinBytes: number;
+  }
+): RlmMode | null {
+  const normalized = (rawMode ?? 'auto').trim().toLowerCase();
+  if (normalized === 'iterative') {
+    return 'iterative';
+  }
+  if (normalized === 'symbolic') {
+    return 'symbolic';
+  }
+  if (normalized !== 'auto') {
+    return null;
+  }
+  if (
+    options.delegated ||
+    options.hasContextPath ||
+    options.contextBytes >= options.symbolicMinBytes
+  ) {
+    return 'symbolic';
+  }
+  return 'iterative';
+}
+
+async function resolveContextSource(
+  env: NodeJS.ProcessEnv,
+  fallbackText: string
+): Promise<{ source: ContextSource; bytes: number }> {
+  const rawPath = env.RLM_CONTEXT_PATH?.trim();
+  if (rawPath) {
+    const resolvedPath = resolve(rawPath);
+    const info = await stat(resolvedPath);
+    if (info.isDirectory()) {
+      const indexPath = join(resolvedPath, 'index.json');
+      const sourcePath = join(resolvedPath, 'source.txt');
+      const rawIndex = await readFile(indexPath, 'utf8');
+      const parsed = JSON.parse(rawIndex) as { source?: { byte_length?: number } };
+      const byteLength =
+        typeof parsed?.source?.byte_length === 'number'
+          ? parsed.source.byte_length
+          : (await stat(sourcePath)).size;
+      return {
+        source: { type: 'dir', value: resolvedPath },
+        bytes: byteLength
+      };
+    }
+    if (info.isFile()) {
+      return { source: { type: 'file', value: resolvedPath }, bytes: info.size };
+    }
+    throw new Error('context_source invalid');
+  }
+
+  const text = fallbackText ?? '';
+  return {
+    source: { type: 'text', value: text },
+    bytes: Buffer.byteLength(text, 'utf8')
+  };
+}
+
 async function promptForValidator(candidates: ValidatorCandidate[]): Promise<string | null> {
   const rl = createInterface({ input: process.stdin, output: process.stdout });
   try {
@@ -228,6 +334,18 @@ async function runCodexAgent(
   subagentsEnabled: boolean
 ): Promise<RlmAgentResult> {
   const prompt = buildRlmPrompt(input);
+  const output = await runCodexCompletion(prompt, env, repoRoot, nonInteractive, subagentsEnabled, true);
+  return { output };
+}
+
+async function runCodexCompletion(
+  prompt: string,
+  env: NodeJS.ProcessEnv,
+  repoRoot: string,
+  nonInteractive: boolean,
+  subagentsEnabled: boolean,
+  mirrorOutput: boolean
+): Promise<string> {
   const { command, args } = resolveCodexCommand(['exec', prompt], env);
   const childEnv: NodeJS.ProcessEnv = { ...process.env, ...env };
 
@@ -236,21 +354,25 @@ async function runCodexAgent(
     childEnv.CODEX_NO_INTERACTIVE = childEnv.CODEX_NO_INTERACTIVE ?? '1';
     childEnv.CODEX_INTERACTIVE = childEnv.CODEX_INTERACTIVE ?? '0';
   }
-  if (subagentsEnabled) {
-    childEnv.CODEX_SUBAGENTS = childEnv.CODEX_SUBAGENTS ?? '1';
-  }
+  childEnv.CODEX_SUBAGENTS = subagentsEnabled ? '1' : '0';
 
   const child = spawn(command, args, { cwd: repoRoot, env: childEnv, stdio: ['ignore', 'pipe', 'pipe'] });
   let stdout = '';
   let stderr = '';
 
   child.stdout?.on('data', (chunk) => {
-    stdout += chunk.toString();
-    process.stdout.write(chunk);
+    const text = chunk.toString();
+    stdout += text;
+    if (mirrorOutput) {
+      process.stdout.write(chunk);
+    }
   });
   child.stderr?.on('data', (chunk) => {
-    stderr += chunk.toString();
-    process.stderr.write(chunk);
+    const text = chunk.toString();
+    stderr += text;
+    if (mirrorOutput) {
+      process.stderr.write(chunk);
+    }
   });
 
   await new Promise<void>((resolvePromise, reject) => {
@@ -264,8 +386,7 @@ async function runCodexAgent(
     });
   });
 
-  const output = [stdout.trim(), stderr.trim()].filter(Boolean).join('\n');
-  return { output };
+  return [stdout.trim(), stderr.trim()].filter(Boolean).join('\n');
 }
 
 function normalizeExitCode(code: number | string | undefined): number {
@@ -316,127 +437,248 @@ async function main(): Promise<void> {
     DEFAULT_MAX_ITERATIONS
   );
   const maxMinutes = parsePositiveInt(parsedArgs.maxMinutes ?? env.RLM_MAX_MINUTES, DEFAULT_MAX_MINUTES);
+  const resolvedMaxMinutes = maxMinutes && maxMinutes > 0 ? maxMinutes : null;
+  const fallbackContext: RlmContextInfo = {
+    object_id: 'unknown',
+    index_path: '',
+    chunk_count: 0
+  };
+  const fallbackMode: RlmMode = 'iterative';
+
+  const writeStateAndExit = async (
+    status: RlmFinalStatus,
+    exitCode: number,
+    message: string,
+    overrides: Partial<{
+      goal: string;
+      validator: string | null;
+      roles: RlmRoles;
+      maxIterations: number;
+      maxMinutes: number | null;
+      mode: RlmMode;
+      context: RlmContextInfo;
+    }> = {}
+  ): Promise<void> => {
+    const state = buildBaseState({
+      goal: overrides.goal ?? goal ?? '',
+      validator: overrides.validator ?? null,
+      roles: overrides.roles ?? roles ?? 'single',
+      maxIterations: overrides.maxIterations ?? maxIterations ?? DEFAULT_MAX_ITERATIONS,
+      maxMinutes: overrides.maxMinutes ?? resolvedMaxMinutes,
+      mode: overrides.mode ?? fallbackMode,
+      context: overrides.context ?? fallbackContext
+    });
+    state.final = { status, exitCode };
+    await writeTerminalState(runDir, state);
+    if (message) {
+      console.error(message);
+    }
+    process.exitCode = exitCode;
+  };
 
   if (!goal) {
-    const state: RlmState = {
-      goal: '',
-      validator: null,
-      roles: roles ?? 'single',
-      maxIterations: maxIterations ?? DEFAULT_MAX_ITERATIONS,
-      maxMinutes: maxMinutes && maxMinutes > 0 ? maxMinutes : null,
-      iterations: [],
-      final: { status: 'invalid_config', exitCode: 5 }
-    };
-    await writeTerminalState(runDir, state);
-    console.error('RLM goal is required. Set RLM_GOAL or pass --goal.');
-    process.exitCode = 5;
+    await writeStateAndExit(
+      'invalid_config',
+      5,
+      'RLM goal is required. Set RLM_GOAL or pass --goal.'
+    );
     return;
   }
 
   if (!roles) {
-    const state: RlmState = {
+    await writeStateAndExit('invalid_config', 5, 'Invalid RLM roles value. Use "single" or "triad".', {
       goal,
-      validator: null,
-      roles: 'single',
-      maxIterations: maxIterations ?? DEFAULT_MAX_ITERATIONS,
-      maxMinutes: maxMinutes && maxMinutes > 0 ? maxMinutes : null,
-      iterations: [],
-      final: { status: 'invalid_config', exitCode: 5 }
-    };
-    await writeTerminalState(runDir, state);
-    console.error('Invalid RLM roles value. Use "single" or "triad".');
-    process.exitCode = 5;
+      roles: 'single'
+    });
     return;
   }
 
   if (maxIterations === null) {
-    const state: RlmState = {
-      goal,
-      validator: null,
-      roles,
-      maxIterations: DEFAULT_MAX_ITERATIONS,
-      maxMinutes: maxMinutes && maxMinutes > 0 ? maxMinutes : null,
-      iterations: [],
-      final: { status: 'invalid_config', exitCode: 5 }
-    };
-    await writeTerminalState(runDir, state);
-    console.error(
-      'Invalid max iterations value. Use a non-negative integer or one of "unlimited", "unbounded", "infinite", "infinity".'
+    await writeStateAndExit(
+      'invalid_config',
+      5,
+      'Invalid max iterations value. Use a non-negative integer or one of "unlimited", "unbounded", "infinite", "infinity".',
+      {
+        goal,
+        roles,
+        maxIterations: DEFAULT_MAX_ITERATIONS
+      }
     );
-    process.exitCode = 5;
     return;
   }
 
   if (maxMinutes === null) {
-    const state: RlmState = {
+    await writeStateAndExit('invalid_config', 5, 'Invalid max minutes value.', {
       goal,
-      validator: null,
       roles,
       maxIterations,
-      maxMinutes: null,
-      iterations: [],
-      final: { status: 'invalid_config', exitCode: 5 }
-    };
-    await writeTerminalState(runDir, state);
-    console.error('Invalid max minutes value.');
-    process.exitCode = 5;
+      maxMinutes: null
+    });
     return;
   }
+
+  const symbolicMinBytes = parsePositiveInt(env.RLM_SYMBOLIC_MIN_BYTES, DEFAULT_SYMBOLIC_MIN_BYTES);
+  if (symbolicMinBytes === null) {
+    await writeStateAndExit('invalid_config', 5, 'Invalid RLM_SYMBOLIC_MIN_BYTES value.', {
+      goal,
+      roles,
+      maxIterations,
+      maxMinutes: resolvedMaxMinutes
+    });
+    return;
+  }
+
+  let contextSource: ContextSource;
+  let contextBytes: number;
+  try {
+    const resolved = await resolveContextSource(env, goal);
+    contextSource = resolved.source;
+    contextBytes = resolved.bytes;
+  } catch (error) {
+    await writeStateAndExit(
+      'invalid_config',
+      5,
+      `Invalid RLM_CONTEXT_PATH (${error instanceof Error ? error.message : String(error)}).`,
+      {
+        goal,
+        roles,
+        maxIterations,
+        maxMinutes: resolvedMaxMinutes
+      }
+    );
+    return;
+  }
+
+  const delegated = Boolean(env.CODEX_DELEGATION_PARENT_MANIFEST_PATH?.trim());
+  const hasContextPath = Boolean(env.RLM_CONTEXT_PATH?.trim());
+  const mode = resolveRlmMode(env.RLM_MODE, {
+    delegated,
+    contextBytes,
+    hasContextPath,
+    symbolicMinBytes
+  });
+  if (!mode) {
+    await writeStateAndExit('invalid_config', 5, 'Invalid RLM_MODE value. Use auto, iterative, or symbolic.', {
+      goal,
+      roles,
+      maxIterations,
+      maxMinutes: resolvedMaxMinutes
+    });
+    return;
+  }
+
+  const chunkTargetBytes = parsePositiveInt(env.RLM_CHUNK_TARGET_BYTES, DEFAULT_CHUNK_TARGET_BYTES);
+  if (!chunkTargetBytes || chunkTargetBytes <= 0) {
+    await writeStateAndExit('invalid_config', 5, 'Invalid RLM_CHUNK_TARGET_BYTES value.', {
+      goal,
+      roles,
+      maxIterations,
+      maxMinutes: resolvedMaxMinutes,
+      mode
+    });
+    return;
+  }
+
+  const chunkOverlapBytes = parsePositiveInt(env.RLM_CHUNK_OVERLAP_BYTES, DEFAULT_CHUNK_OVERLAP_BYTES);
+  if (chunkOverlapBytes === null || chunkOverlapBytes < 0) {
+    await writeStateAndExit('invalid_config', 5, 'Invalid RLM_CHUNK_OVERLAP_BYTES value.', {
+      goal,
+      roles,
+      maxIterations,
+      maxMinutes: resolvedMaxMinutes,
+      mode
+    });
+    return;
+  }
+
+  const rlmRoot = join(runDir, 'rlm');
+  let contextObject: Awaited<ReturnType<typeof buildContextObject>>;
+  try {
+    contextObject = await buildContextObject({
+      source: contextSource,
+      targetDir: join(rlmRoot, 'context'),
+      chunking: {
+        targetBytes: chunkTargetBytes,
+        overlapBytes: chunkOverlapBytes,
+        strategy: 'byte'
+      }
+    });
+  } catch (error) {
+    await writeStateAndExit(
+      'invalid_config',
+      5,
+      `Invalid context source (${error instanceof Error ? error.message : String(error)}).`,
+      {
+        goal,
+        roles,
+        maxIterations,
+        maxMinutes: resolvedMaxMinutes,
+        mode
+      }
+    );
+    return;
+  }
+
+  const contextInfo: RlmContextInfo = {
+    object_id: contextObject.index.object_id,
+    index_path: relative(repoRoot, contextObject.indexPath),
+    chunk_count: contextObject.index.chunks.length
+  };
 
   const validatorOverride = normalizeValidator(parsedArgs.validator ?? env.RLM_VALIDATOR);
   const isInteractive = !shouldForceNonInteractive(env);
 
   let validatorCommand: string | null = null;
-  if (validatorOverride && validatorOverride.toLowerCase() !== 'auto') {
-    if (validatorOverride.toLowerCase() === 'none') {
-      validatorCommand = null;
+  if (mode === 'symbolic') {
+    if (validatorOverride && validatorOverride.toLowerCase() !== 'auto') {
+      validatorCommand = validatorOverride.toLowerCase() === 'none' ? null : validatorOverride;
     } else {
-      validatorCommand = validatorOverride;
+      validatorCommand = null;
     }
   } else {
-    const detection = await detectValidator(repoRoot);
-    if (detection.status === 'selected' && detection.command) {
-      validatorCommand = detection.command;
-      console.log(`Validator: ${detection.command} (${detection.reason ?? 'auto-detect'})`);
-    } else if (detection.status === 'ambiguous') {
-      if (isInteractive) {
-        validatorCommand = await promptForValidator(detection.candidates);
+    if (validatorOverride && validatorOverride.toLowerCase() !== 'auto') {
+      if (validatorOverride.toLowerCase() === 'none') {
+        validatorCommand = null;
       } else {
-        const candidates = detection.candidates
-          .map((candidate) => `- ${candidate.command} (${candidate.reason})`)
-          .join('\n');
-        const state: RlmState = {
-          goal,
-          validator: null,
-          roles,
-          maxIterations,
-          maxMinutes: maxMinutes && maxMinutes > 0 ? maxMinutes : null,
-          iterations: [],
-          final: { status: 'no_validator', exitCode: 2 }
-        };
-        await writeTerminalState(runDir, state);
-        console.error('Validator auto-detect ambiguous. Provide --validator or --validator none.');
-        console.error(candidates);
-        process.exitCode = 2;
-        return;
+        validatorCommand = validatorOverride;
       }
     } else {
-      if (isInteractive) {
-        validatorCommand = await promptForValidatorCommand();
+      const detection = await detectValidator(repoRoot);
+      if (detection.status === 'selected' && detection.command) {
+        validatorCommand = detection.command;
+        console.log(`Validator: ${detection.command} (${detection.reason ?? 'auto-detect'})`);
+      } else if (detection.status === 'ambiguous') {
+        if (isInteractive) {
+          validatorCommand = await promptForValidator(detection.candidates);
+        } else {
+          const candidates = detection.candidates
+            .map((candidate) => `- ${candidate.command} (${candidate.reason})`)
+            .join('\n');
+          await writeStateAndExit('no_validator', 2, 'Validator auto-detect ambiguous. Provide --validator or --validator none.', {
+            goal,
+            roles,
+            maxIterations,
+            maxMinutes: resolvedMaxMinutes,
+            mode,
+            context: contextInfo
+          });
+          console.error(candidates);
+          return;
+        }
       } else {
-        const state: RlmState = {
-          goal,
-          validator: null,
-          roles,
-          maxIterations,
-          maxMinutes: maxMinutes && maxMinutes > 0 ? maxMinutes : null,
-          iterations: [],
-          final: { status: 'no_validator', exitCode: 2 }
-        };
-        await writeTerminalState(runDir, state);
-        console.error('Validator auto-detect failed. Provide --validator or --validator none.');
-        process.exitCode = 2;
-        return;
+        if (isInteractive) {
+          validatorCommand = await promptForValidatorCommand();
+        } else {
+          await writeStateAndExit('no_validator', 2, 'Validator auto-detect failed. Provide --validator or --validator none.', {
+            goal,
+            roles,
+            maxIterations,
+            maxMinutes: resolvedMaxMinutes,
+            mode,
+            context: contextInfo
+          });
+          return;
+        }
       }
     }
   }
@@ -450,15 +692,94 @@ async function main(): Promise<void> {
   const subagentsEnabled = envFlagEnabled(env.CODEX_SUBAGENTS) || envFlagEnabled(env.RLM_SUBAGENTS);
   const nonInteractive = shouldForceNonInteractive(env);
 
+  if (mode === 'symbolic') {
+    const budgets: SymbolicBudgets = {
+      maxSubcallsPerIteration:
+        parsePositiveInt(env.RLM_MAX_SUBCALLS_PER_ITERATION, DEFAULT_MAX_SUBCALLS_PER_ITERATION) ??
+        0,
+      maxSearchesPerIteration:
+        parsePositiveInt(env.RLM_MAX_SEARCHES_PER_ITERATION, DEFAULT_MAX_SEARCHES_PER_ITERATION) ?? 0,
+      maxChunkReadsPerIteration:
+        parsePositiveInt(env.RLM_MAX_CHUNK_READS_PER_ITERATION, DEFAULT_MAX_CHUNK_READS_PER_ITERATION) ??
+        0,
+      maxBytesPerChunkRead:
+        parsePositiveInt(env.RLM_MAX_BYTES_PER_CHUNK_READ, DEFAULT_MAX_BYTES_PER_CHUNK_READ) ?? 0,
+      maxSnippetsPerSubcall:
+        parsePositiveInt(env.RLM_MAX_SNIPPETS_PER_SUBCALL, DEFAULT_MAX_SNIPPETS_PER_SUBCALL) ?? 0,
+      maxBytesPerSnippet:
+        parsePositiveInt(env.RLM_MAX_BYTES_PER_SNIPPET, DEFAULT_MAX_BYTES_PER_SNIPPET) ?? 0,
+      maxSubcallInputBytes:
+        parsePositiveInt(env.RLM_MAX_SUBCALL_INPUT_BYTES, DEFAULT_MAX_SUBCALL_INPUT_BYTES) ?? 0,
+      maxPlannerPromptBytes:
+        parsePositiveInt(env.RLM_MAX_PLANNER_PROMPT_BYTES, DEFAULT_MAX_PLANNER_PROMPT_BYTES) ?? 0,
+      searchTopK: parsePositiveInt(env.RLM_SEARCH_TOP_K, DEFAULT_SEARCH_TOP_K) ?? 0,
+      maxPreviewBytes: parsePositiveInt(env.RLM_MAX_PREVIEW_BYTES, DEFAULT_MAX_PREVIEW_BYTES) ?? 0,
+      maxConcurrency: parsePositiveInt(env.RLM_MAX_CONCURRENCY, DEFAULT_MAX_CONCURRENCY) ?? 0
+    };
+
+    const invalidBudget = Object.entries(budgets).find(([, value]) => !value || value <= 0);
+    if (invalidBudget) {
+      await writeStateAndExit('invalid_config', 5, `Invalid ${invalidBudget[0]} value.`, {
+        goal,
+        roles,
+        maxIterations,
+        maxMinutes: resolvedMaxMinutes,
+        mode,
+        context: contextInfo,
+        validator: validatorCommand ?? 'none'
+      });
+      return;
+    }
+
+    const baseState = buildBaseState({
+      goal,
+      validator: validatorCommand ?? 'none',
+      roles,
+      maxIterations,
+      maxMinutes: resolvedMaxMinutes,
+      mode,
+      context: contextInfo
+    });
+
+    const contextStore = new ContextStore(contextObject);
+    const result = await runSymbolicLoop({
+      goal,
+      baseState,
+      maxIterations,
+      maxMinutes: resolvedMaxMinutes,
+      repoRoot,
+      runDir: rlmRoot,
+      contextStore,
+      budgets,
+      runPlanner: (prompt, _attempt) => {
+        void _attempt;
+        return runCodexCompletion(prompt, env, repoRoot, nonInteractive, false, false);
+      },
+      runSubcall: (prompt, _meta) => {
+        void _meta;
+        return runCodexCompletion(prompt, env, repoRoot, nonInteractive, false, false);
+      },
+      logger: (line) => logger.info(line)
+    });
+
+    const finalStatus = result.state.final?.status ?? 'unknown';
+    const iterationCount = result.state.symbolic_iterations.length;
+    console.log(`RLM completed: status=${finalStatus} symbolic_iterations=${iterationCount} exit=${result.exitCode}`);
+    process.exitCode = result.exitCode;
+    return;
+  }
+
   const result = await runRlmLoop({
+    mode,
+    context: contextInfo,
     goal,
     validatorCommand,
     maxIterations,
-    maxMinutes: maxMinutes && maxMinutes > 0 ? maxMinutes : null,
+    maxMinutes: resolvedMaxMinutes,
     roles,
     subagentsEnabled,
     repoRoot,
-    runDir: join(runDir, 'rlm'),
+    runDir: rlmRoot,
     runAgent: (input) => runCodexAgent(input, env, repoRoot, nonInteractive, subagentsEnabled),
     runValidator: (command) => runValidatorCommand(command, repoRoot),
     logger: (line) => logger.info(line)
@@ -467,9 +788,8 @@ async function main(): Promise<void> {
   const finalStatus = result.state.final?.status ?? 'unknown';
   const iterationCount = result.state.iterations.length;
   console.log(`RLM completed: status=${finalStatus} iterations=${iterationCount} exit=${result.exitCode}`);
-  const hasTimeCap = maxMinutes !== null && maxMinutes > 0;
-  const unboundedBudgetInvalid =
-    validatorCommand === null && maxIterations === 0 && !hasTimeCap;
+  const hasTimeCap = resolvedMaxMinutes !== null && resolvedMaxMinutes > 0;
+  const unboundedBudgetInvalid = validatorCommand === null && maxIterations === 0 && !hasTimeCap;
   if (finalStatus === 'invalid_config' && unboundedBudgetInvalid) {
     console.error(
       'Invalid configuration: --validator none with unbounded iterations and --max-minutes 0 would run forever. Fix: set --max-minutes / RLM_MAX_MINUTES to a positive value (default 2880), set --max-iterations to a positive value, or provide a validator.'
@@ -490,6 +810,8 @@ if (entry && entry === self) {
 export const __test__ = {
   parseMaxIterations,
   parsePositiveInt,
+  resolveRlmMode,
   DEFAULT_MAX_ITERATIONS,
-  DEFAULT_MAX_MINUTES
+  DEFAULT_MAX_MINUTES,
+  DEFAULT_SYMBOLIC_MIN_BYTES
 };

@@ -107,7 +107,7 @@ Guidance for background runs:
 - Keep `delegate.tool_profile` minimal; avoid networked tools unless required.
 - Nested delegation is off by default; only use `full` when `delegate.allow_nested=true` and you intend recursion.
 - **Important:** `delegate.mode` (server tool surface) is different from `delegate_mode` (input to `delegate.spawn` for the *child* run).
-- **Note:** `delegate.spawn` is synchronous (waits for the child run to exit; server timeout is 5 minutes). Tool-call timeouts (often ~60s) can fail first, so keep delegated runs short or run long jobs outside delegation until async spawn is available.
+- **Note:** `delegate.spawn` defaults to `start_only=true` and returns once a new manifest is detected; set `start_only=false` for legacy synchronous behavior (waits for child exit), which is subject to tool-call timeouts.
 
 #### Minimal-context delegate instruction template
 
@@ -150,7 +150,7 @@ repeat:
 ## Common pitfalls
 
 - **Long waits:** `wait_ms` never blocks longer than 10s per call; use polling.
-- **Long-running delegate.spawn:** Child runs that take longer than the tool-call timeout can fail even if the server timeout is higher. Workaround: split work into shorter delegated runs or run long jobs outside delegation (no question queue) until async spawn is supported.
+- **Long-running delegate.spawn:** Prefer `start_only=true` (default) to avoid tool-call timeouts. If you must use `start_only=false`, keep runs short or run long jobs outside delegation (no question queue).
 - **Tool profile mismatch:** child tool profile must be allowed by repo policy; invalid or unsafe names are ignored.
 - **Confirmation misuse:** never pass `confirm_nonce` from model/tool input; it is runner‑injected only.
 - **Secrets exposure:** never include secrets/tokens/PII in delegate prompts or files.

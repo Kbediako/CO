@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { readFile } from 'node:fs/promises';
+import { access, readFile, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import process from 'node:process';
 import { parseArgs, hasFlag } from './lib/cli-args.js';
@@ -25,14 +25,71 @@ Options:
   -h, --help  Show this help message`);
 }
 
-
-async function loadTaskKeys(taskIndexPath) {
+async function loadTaskIndex(taskIndexPath) {
   const raw = await readFile(taskIndexPath, 'utf8');
   const parsed = JSON.parse(raw);
   const items = Array.isArray(parsed?.items) ? parsed.items : [];
-  return items
+  const keys = items
     .map((item) => normalizeTaskKey(item))
     .filter((key) => typeof key === 'string' && key.length > 0);
+  return { items, keys };
+}
+
+function pickExampleTaskId(keys) {
+  if (!Array.isArray(keys) || keys.length === 0) {
+    return '<task-id>';
+  }
+  return keys[keys.length - 1];
+}
+
+async function collectSubagentCandidates(runsDir, taskId) {
+  const candidates = [];
+  const prefix = `${taskId}-`;
+  let entries;
+  try {
+    entries = await readdir(runsDir, { withFileTypes: true });
+  } catch {
+    return candidates;
+  }
+
+  for (const entry of entries) {
+    if (!entry.isDirectory() || !entry.name.startsWith(prefix)) {
+      continue;
+    }
+    const cliDir = join(runsDir, entry.name, 'cli');
+    let runDirs;
+    try {
+      runDirs = await readdir(cliDir, { withFileTypes: true });
+    } catch {
+      candidates.push({ path: cliDir, reason: 'missing cli directory' });
+      if (candidates.length >= 3) {
+        return candidates;
+      }
+      continue;
+    }
+
+    const runEntries = runDirs.filter((run) => run.isDirectory());
+    if (runEntries.length === 0) {
+      candidates.push({ path: cliDir, reason: 'no run directories' });
+      if (candidates.length >= 3) {
+        return candidates;
+      }
+      continue;
+    }
+
+    for (const runEntry of runEntries) {
+      const manifestPath = join(cliDir, runEntry.name, 'manifest.json');
+      try {
+        await access(manifestPath);
+      } catch {
+        candidates.push({ path: manifestPath, reason: 'manifest.json missing' });
+        if (candidates.length >= 3) {
+          return candidates;
+        }
+      }
+    }
+  }
+  return candidates;
 }
 
 async function main() {
@@ -60,22 +117,27 @@ async function main() {
 
   const taskId = (process.env.MCP_RUNNER_TASK_ID || '').trim();
   const failures = [];
-
-  if (!taskId) {
-    failures.push('MCP_RUNNER_TASK_ID is required for delegation guard');
-  }
-
+  let candidateManifests = [];
   const { repoRoot, runsRoot: runsDir } = resolveEnvironmentPaths();
   const taskIndexPath = join(repoRoot, 'tasks', 'index.json');
   let taskKeys = [];
+  let exampleTaskId = '<task-id>';
+  let taskIndexReadable = true;
   try {
-    taskKeys = await loadTaskKeys(taskIndexPath);
+    const taskIndex = await loadTaskIndex(taskIndexPath);
+    taskKeys = taskIndex.keys;
+    exampleTaskId = pickExampleTaskId(taskIndex.keys);
   } catch (error) {
     const message =
       error && typeof error === 'object' && error !== null && 'message' in error
         ? error.message
         : String(error);
+    taskIndexReadable = false;
     failures.push(`Unable to read tasks/index.json (${message})`);
+  }
+
+  if (!taskId) {
+    failures.push(`MCP_RUNNER_TASK_ID is required for delegation guard (example: export MCP_RUNNER_TASK_ID=${exampleTaskId})`);
   }
 
   if (taskId && taskKeys.length > 0) {
@@ -98,6 +160,7 @@ async function main() {
         failures.push(error);
       }
       if (found.length === 0) {
+        candidateManifests = await collectSubagentCandidates(runsDir, taskId);
         failures.push(
           `No subagent manifests found for '${taskId}'. Expected at least one under ${runsDir}/${taskId}-*/cli/<run-id>/manifest.json`
         );
@@ -106,12 +169,36 @@ async function main() {
         return;
       }
     }
+  } else if (taskId && taskIndexReadable) {
+    failures.push(
+      `MCP_RUNNER_TASK_ID '${taskId}' is not registered in tasks/index.json (add it or use a parent task prefix)`
+    );
   }
 
   if (failures.length > 0) {
     console.log('Delegation guard: issues detected');
     for (const message of failures) {
       console.log(` - ${message}`);
+    }
+    if (candidateManifests.length > 0) {
+      console.log('Candidate manifests (rejected):');
+      for (const candidate of candidateManifests.slice(0, 3)) {
+        console.log(` - ${candidate.path} (${candidate.reason})`);
+      }
+    }
+    if (taskId || taskIndexReadable) {
+      const expectedTaskId = taskId || exampleTaskId;
+      console.log('Expected subagent manifests:');
+      console.log(` - ${runsDir}/${expectedTaskId}-*/cli/<run-id>/manifest.json`);
+    }
+    console.log('Fix guidance:');
+    if (!taskId) {
+      console.log(` - export MCP_RUNNER_TASK_ID=${exampleTaskId}`);
+    } else {
+      console.log(` - Use MCP_RUNNER_TASK_ID="${taskId}-<stream>" for subagent runs.`);
+      console.log(
+        ` - Example: MCP_RUNNER_TASK_ID=${taskId}-guard npx codex-orchestrator start diagnostics --format json --task ${taskId}-guard`
+      );
     }
     if (dryRun) {
       console.log('Dry run: exiting successfully despite failures.');

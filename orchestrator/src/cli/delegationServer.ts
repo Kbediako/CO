@@ -1,8 +1,8 @@
 import { spawn } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { realpathSync } from 'node:fs';
-import { chmod, readFile } from 'node:fs/promises';
-import { basename, dirname, isAbsolute, relative, resolve, sep } from 'node:path';
+import { access, chmod, readFile, readdir, stat } from 'node:fs/promises';
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import process from 'node:process';
 
 import {
@@ -40,6 +40,8 @@ const PROTOCOL_VERSION = '2024-11-05';
 const QUESTION_POLL_INTERVAL_MS = 500;
 const MAX_QUESTION_POLL_WAIT_MS = 10_000;
 const DEFAULT_SPAWN_TIMEOUT_MS = 5 * 60 * 1000;
+const DEFAULT_SPAWN_START_TIMEOUT_MS = 10_000;
+const DEFAULT_SPAWN_START_POLL_INTERVAL_MS = 200;
 const DEFAULT_GH_TIMEOUT_MS = 60_000;
 const DEFAULT_DELEGATION_TOKEN_RETRY_MS = 2000;
 const DEFAULT_DELEGATION_TOKEN_RETRY_INTERVAL_MS = 200;
@@ -141,7 +143,8 @@ function buildToolList(options: {
         parent_run_id: { type: 'string' },
         parent_manifest_path: { type: 'string' },
         env: { type: 'object', additionalProperties: { type: 'string' } },
-        delegate_mode: { type: 'string', enum: ['full', 'question_only'] }
+        delegate_mode: { type: 'string', enum: ['full', 'question_only'] },
+        start_only: { type: 'boolean' }
       },
       required: ['pipeline', 'repo']
     }));
@@ -481,10 +484,16 @@ async function handleDelegateSpawn(
   const pipeline = requireString(readStringValue(input, 'pipeline'), 'pipeline');
   const repo = readStringValue(input, 'repo') ?? repoRoot ?? process.cwd();
   const resolvedRepo = resolve(repo);
+  const resolvedRepoRoot = realpathSafe(resolvedRepo);
   if (!isPathWithinRoots(resolvedRepo, allowedRoots)) {
     throw new Error('repo_not_permitted');
   }
   const taskId = readStringValue(input, 'task_id', 'taskId');
+  const startOnly = readBooleanValue(input, 'start_only', 'startOnly');
+  const resolvedStartOnly = startOnly ?? true;
+  if (resolvedStartOnly && !taskId) {
+    throw new Error('task_id is required when start_only=true');
+  }
   const args = ['start', pipeline, '--format', 'json', '--no-interactive'];
   if (taskId) {
     args.push('--task', taskId);
@@ -500,27 +509,126 @@ async function handleDelegateSpawn(
   const delegationToken = randomBytes(32).toString('hex');
   const parentManifestPath = resolveParentManifestPath(input, allowedRoots);
   const mcpOverrides = buildDelegateMcpOverrides(toolProfile);
-  const childEnv = {
+  const childEnv: NodeJS.ProcessEnv = {
     ...process.env,
     ...(envOverrides ?? {}),
     CODEX_DELEGATE_MODE: childMode,
     ...(parentManifestPath ? { CODEX_DELEGATION_PARENT_MANIFEST_PATH: parentManifestPath } : {}),
     ...(mcpOverrides.length > 0 ? { CODEX_MCP_CONFIG_OVERRIDES: mcpOverrides.join(';') } : {})
   };
+  if (!envOverrides || !Object.prototype.hasOwnProperty.call(envOverrides, 'CODEX_ORCHESTRATOR_ROOT')) {
+    childEnv.CODEX_ORCHESTRATOR_ROOT = resolvedRepoRoot;
+  }
 
-  const child = spawn('codex-orchestrator', args, { cwd: resolvedRepo, env: childEnv });
-  const output = await collectOutput(child, DEFAULT_SPAWN_TIMEOUT_MS);
-  const parsedRecord = parseSpawnOutput(output.stdout);
-  const manifestPath = readStringValue(parsedRecord, 'manifest');
-  if (!manifestPath) {
-    return { status: 'spawn_failed', stdout: output.stdout.trim(), stderr: output.stderr.trim() };
+  if (!resolvedStartOnly) {
+    const child = spawn('codex-orchestrator', args, { cwd: resolvedRepo, env: childEnv });
+    const output = await collectOutput(child, DEFAULT_SPAWN_TIMEOUT_MS);
+    const parsedRecord = parseSpawnOutput(output.stdout);
+    const manifestPath = readStringValue(parsedRecord, 'manifest');
+    if (!manifestPath) {
+      return { status: 'spawn_failed', stdout: output.stdout.trim(), stderr: output.stderr.trim() };
+    }
+    const runId = readStringValue(parsedRecord, 'run_id', 'runId');
+    const logPath = readStringValue(parsedRecord, 'log_path', 'logPath');
+    const resolvedManifestPath = resolveSpawnManifestPath(manifestPath, resolvedRepo, allowedRoots);
+    if (!resolvedManifestPath) {
+      return { status: 'spawn_failed', stdout: output.stdout.trim(), stderr: output.stderr.trim() };
+    }
+    const eventsPath = `${dirname(resolvedManifestPath)}/events.jsonl`;
+
+    await persistDelegationToken(resolvedManifestPath, delegationToken, {
+      parentRunId: parentRunId ?? null,
+      childRunId: runId ?? null
+    });
+
+    if (parentManifestPath && parentRunId && runId) {
+      try {
+        await callControlEndpoint(
+          parentManifestPath,
+          '/delegation/register',
+          {
+            token: delegationToken,
+            parent_run_id: parentRunId,
+            child_run_id: runId
+          },
+          undefined,
+          { allowedHosts }
+        );
+      } catch (error) {
+        logger.warn(`Failed to register delegation token: ${(error as Error)?.message ?? error}`);
+      }
+    }
+
+    return {
+      run_id: runId,
+      manifest_path: resolvedManifestPath,
+      log_path: logPath,
+      events_path: eventsPath
+    };
   }
-  const runId = readStringValue(parsedRecord, 'run_id', 'runId');
-  const logPath = readStringValue(parsedRecord, 'log_path', 'logPath');
-  const resolvedManifestPath = resolveSpawnManifestPath(manifestPath, resolvedRepo, allowedRoots);
+
+  const runsRepoRoot = resolveRepoRootForRuns(resolvedRepo, childEnv);
+  const runsRoot = resolveRunsRoot(runsRepoRoot, childEnv);
+  if (!isPathWithinRoots(runsRoot, allowedRoots)) {
+    throw new Error('runs_root not permitted');
+  }
+
+  const taskRunsRoot = join(runsRoot, taskId as string, 'cli');
+  const baselineRunIds = new Set(await listRunIds(taskRunsRoot));
+  const spawnStart = Date.now();
+
+  const child = spawn('codex-orchestrator', args, {
+    cwd: resolvedRepo,
+    env: childEnv,
+    detached: true,
+    stdio: ['ignore', 'ignore', 'ignore']
+  });
+  let spawnError: Error | null = null;
+  child.once('error', (error) => {
+    spawnError = error instanceof Error ? error : new Error(String(error));
+  });
+  child.unref();
+
+  const timeoutMs = resolveSpawnStartTimeoutMs(childEnv);
+  const manifestInfo = await pollForSpawnManifest({
+    taskId: taskId as string,
+    taskRunsRoot,
+    baselineRunIds,
+    spawnStart,
+    timeoutMs,
+    intervalMs: DEFAULT_SPAWN_START_POLL_INTERVAL_MS,
+    getSpawnError: () => spawnError
+  });
+
+  if (!manifestInfo) {
+    const candidates = await collectSpawnCandidates(taskRunsRoot, taskId as string);
+    return {
+      status: 'spawn_failed',
+      task_id: taskId,
+      runs_root: runsRoot,
+      expected_manifest_glob: join(taskRunsRoot, '*', 'manifest.json'),
+      candidates,
+      error: (spawnError as Error | null)?.message ?? null
+    };
+  }
+
+  const resolvedManifestPath = resolveSpawnManifestPath(manifestInfo.manifestPath, resolvedRepo, allowedRoots);
   if (!resolvedManifestPath) {
-    return { status: 'spawn_failed', stdout: output.stdout.trim(), stderr: output.stderr.trim() };
+    return {
+      status: 'spawn_failed',
+      task_id: taskId,
+      runs_root: runsRoot,
+      expected_manifest_glob: join(taskRunsRoot, '*', 'manifest.json'),
+      candidates: [
+        {
+          path: manifestInfo.manifestPath,
+          reason: 'manifest_path not permitted'
+        }
+      ]
+    };
   }
+
+  const runId = manifestInfo.runId;
   const eventsPath = `${dirname(resolvedManifestPath)}/events.jsonl`;
 
   await persistDelegationToken(resolvedManifestPath, delegationToken, {
@@ -549,7 +657,7 @@ async function handleDelegateSpawn(
   return {
     run_id: runId,
     manifest_path: resolvedManifestPath,
-    log_path: logPath,
+    log_path: manifestInfo.logPath ?? null,
     events_path: eventsPath
   };
 }
@@ -1325,6 +1433,174 @@ function clampQuestionPollWaitMs(value: number): number {
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function resolveRepoRootForRuns(repoRoot: string, env: NodeJS.ProcessEnv): string {
+  const configured = env.CODEX_ORCHESTRATOR_ROOT?.trim();
+  if (!configured) {
+    return repoRoot;
+  }
+  return isAbsolute(configured) ? configured : resolve(repoRoot, configured);
+}
+
+function resolveRunsRoot(repoRoot: string, env: NodeJS.ProcessEnv): string {
+  const configured = env.CODEX_ORCHESTRATOR_RUNS_DIR?.trim();
+  if (!configured) {
+    return resolve(repoRoot, '.runs');
+  }
+  return isAbsolute(configured) ? configured : resolve(repoRoot, configured);
+}
+
+function resolveSpawnStartTimeoutMs(env: NodeJS.ProcessEnv): number {
+  const raw = env.CODEX_DELEGATION_SPAWN_START_TIMEOUT_MS ?? env.DELEGATION_SPAWN_START_TIMEOUT_MS;
+  if (!raw) {
+    return DEFAULT_SPAWN_START_TIMEOUT_MS;
+  }
+  const parsed = Number.parseInt(raw, 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return DEFAULT_SPAWN_START_TIMEOUT_MS;
+  }
+  return parsed;
+}
+
+async function listRunIds(taskRunsRoot: string): Promise<string[]> {
+  try {
+    const entries = await readdir(taskRunsRoot, { withFileTypes: true });
+    return entries.filter((entry) => entry.isDirectory()).map((entry) => entry.name);
+  } catch {
+    return [];
+  }
+}
+
+async function findSpawnManifest(params: {
+  taskId: string;
+  taskRunsRoot: string;
+  baselineRunIds: Set<string>;
+  spawnStart: number;
+}): Promise<{ runId: string; manifestPath: string; logPath: string | null } | null> {
+  let entries: Array<import('node:fs').Dirent>;
+  try {
+    entries = await readdir(params.taskRunsRoot, { withFileTypes: true });
+  } catch {
+    return null;
+  }
+
+  const candidates: Array<{ runId: string; manifestPath: string; mtimeMs: number }> = [];
+  for (const entry of entries) {
+    if (!entry.isDirectory()) {
+      continue;
+    }
+    const runId = entry.name;
+    const manifestPath = join(params.taskRunsRoot, runId, 'manifest.json');
+    let stats;
+    try {
+      stats = await stat(manifestPath);
+    } catch {
+      continue;
+    }
+    if (params.baselineRunIds.has(runId) && stats.mtimeMs < params.spawnStart) {
+      continue;
+    }
+    candidates.push({ runId, manifestPath, mtimeMs: stats.mtimeMs });
+  }
+
+  candidates.sort((a, b) => b.mtimeMs - a.mtimeMs);
+  for (const candidate of candidates) {
+    try {
+      const raw = await readFile(candidate.manifestPath, 'utf8');
+      const parsed = JSON.parse(raw) as { run_id?: string; task_id?: string; log_path?: string | null };
+      if (parsed.task_id && parsed.task_id !== params.taskId) {
+        continue;
+      }
+      const runId = typeof parsed.run_id === 'string' && parsed.run_id.trim()
+        ? parsed.run_id.trim()
+        : candidate.runId;
+      if (!runId) {
+        continue;
+      }
+      const logPath =
+        typeof parsed.log_path === 'string' && parsed.log_path.trim().length > 0
+          ? parsed.log_path.trim()
+          : null;
+      return { runId, manifestPath: candidate.manifestPath, logPath };
+    } catch {
+      continue;
+    }
+  }
+
+  return null;
+}
+
+async function pollForSpawnManifest(params: {
+  taskId: string;
+  taskRunsRoot: string;
+  baselineRunIds: Set<string>;
+  spawnStart: number;
+  timeoutMs: number;
+  intervalMs: number;
+  getSpawnError: () => Error | null;
+}): Promise<{ runId: string; manifestPath: string; logPath: string | null } | null> {
+  const deadline = Date.now() + params.timeoutMs;
+  while (Date.now() <= deadline) {
+    if (params.getSpawnError()) {
+      return null;
+    }
+    const manifest = await findSpawnManifest(params);
+    if (manifest) {
+      return manifest;
+    }
+    await delay(params.intervalMs);
+  }
+  return null;
+}
+
+async function collectSpawnCandidates(
+  taskRunsRoot: string,
+  taskId: string
+): Promise<Array<{ path: string; reason: string }>> {
+  let entries: Array<import('node:fs').Dirent>;
+  try {
+    entries = await readdir(taskRunsRoot, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+
+  const candidates: Array<{ path: string; reason: string }> = [];
+  for (const entry of entries) {
+    if (!entry.isDirectory()) {
+      continue;
+    }
+    const manifestPath = join(taskRunsRoot, entry.name, 'manifest.json');
+    try {
+      await access(manifestPath);
+    } catch {
+      candidates.push({ path: manifestPath, reason: 'manifest.json missing' });
+      if (candidates.length >= 3) {
+        return candidates;
+      }
+      continue;
+    }
+
+    try {
+      const raw = await readFile(manifestPath, 'utf8');
+      const parsed = JSON.parse(raw) as { run_id?: string; task_id?: string };
+      if (parsed.task_id && parsed.task_id !== taskId) {
+        candidates.push({ path: manifestPath, reason: 'task_id mismatch' });
+      } else if (!parsed.run_id) {
+        candidates.push({ path: manifestPath, reason: 'run_id missing' });
+      } else {
+        candidates.push({ path: manifestPath, reason: 'manifest present but not selected' });
+      }
+    } catch {
+      candidates.push({ path: manifestPath, reason: 'manifest unreadable' });
+    }
+
+    if (candidates.length >= 3) {
+      return candidates;
+    }
+  }
+
+  return candidates;
 }
 
 async function collectOutput(

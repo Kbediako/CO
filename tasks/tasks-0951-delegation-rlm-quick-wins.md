@@ -11,14 +11,14 @@
 - [x] Docs-review manifest captured; mirrors/registry updated — Evidence: `.runs/0951-delegation-rlm-quick-wins/cli/2026-01-14T08-58-56-755Z-012d15a6/manifest.json`, `.runs/0951-delegation-rlm-quick-wins/cli/2026-01-14T15-22-18-273Z-9854bb46/manifest.json`, `docs/TASKS.md`, `.agent/task/0951-delegation-rlm-quick-wins.md`, `tasks/index.json`, `docs/docs-freshness-registry.json`.
 
 ### Implementation
-- [ ] Delegation guard emits actionable diagnostics — Evidence: `scripts/delegation-guard.mjs`.
+- [x] Delegation guard emits actionable diagnostics — Evidence: `scripts/delegation-guard.mjs`, `tests/delegation-guard.spec.ts`, `.runs/0951-delegation-rlm-quick-wins-guard/cli/2026-01-14T15-58-07-762Z-a73202dc/manifest.json`.
 - [ ] Troubleshooting note added to review-loop SOP (optional) — Evidence: `.agent/SOPs/review-loop.md`.
-- [ ] Async/start-only `delegate.spawn` supports long-running runs without tool-call timeout — Evidence: `orchestrator/src/cli/delegationServer.ts`.
-- [ ] True RLM behavior implemented (context object + symbolic recursion) — Evidence: `orchestrator/src/cli/rlmRunner.ts`, `orchestrator/src/cli/rlm/`.
-- [ ] Implementation-docs archive automation fixes for PR #165 (doc-archives payloads + diff budget strategy) — Evidence: `.github/workflows/*`, `scripts/docs-archive*`, `docs/implementation-docs-archive-policy.json`.
+- [x] Async/start-only `delegate.spawn` supports long-running runs without tool-call timeout — Evidence: `orchestrator/src/cli/delegationServer.ts`, `orchestrator/tests/DelegationServer.test.ts`, `.runs/0951-delegation-rlm-quick-wins-spawn/cli/2026-01-14T16-03-07-761Z-79208415/manifest.json`.
+- [x] True RLM behavior implemented (context object + symbolic recursion) — Evidence: `orchestrator/src/cli/rlmRunner.ts`, `orchestrator/src/cli/rlm/context.ts`, `orchestrator/src/cli/rlm/symbolic.ts`, `orchestrator/tests/RlmSymbolic.test.ts`, `orchestrator/tests/RlmRunnerMode.test.ts`, `.runs/0951-delegation-rlm-quick-wins/cli/2026-01-14T17-34-02-271Z-3ba18482/rlm/state.json`.
+- [x] Implementation-docs archive automation fixes for PR #165 (doc-archives payloads + diff budget strategy) — Evidence: `.github/workflows/archive-automation-base.yml`, `.github/workflows/implementation-docs-archive-automation.yml`, `scripts/implementation-docs-archive.mjs`, `tests/implementation-docs-archive.spec.ts`, `docs/implementation-docs-archive-policy.json`.
 
 ### Validation + handoff
-- [ ] Implementation-gate manifest captured — Evidence: `.runs/0951-delegation-rlm-quick-wins/cli/<run-id>/manifest.json`.
+- [x] Implementation-gate manifest captured — Evidence: `.runs/0951-delegation-rlm-quick-wins/cli/2026-01-14T17-50-59-905Z-405494a1/manifest.json`.
 
 ## Relevant Files
 - `scripts/delegation-guard.mjs`

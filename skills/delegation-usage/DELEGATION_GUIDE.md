@@ -85,14 +85,12 @@ codex mcp add delegation \
 For the `rlm` pipeline specifically, use:
 - `RLM_MAX_MINUTES=240` for a 4-hour cap.
 
-## Long-running delegate.spawn (current limitation)
+## delegate.spawn start-only (default)
 
-- `delegate.spawn` waits for the child process to exit and enforces a 5-minute server timeout.
-- Some tool runtimes impose shorter tool-call timeouts (often ~60s), which can fail the call before the child finishes.
-- Workarounds:
-  - Keep delegated runs short and split work across multiple spawns.
-  - Run long jobs outside delegation (`codex-orchestrator start ...`) and monitor logs directly. You can still use `delegate.status/pause/cancel` if you have the manifest path, but question queue requires `delegate.spawn`.
-- Recommended follow-up: add an async/“start-only” mode that returns `run_id`/`manifest_path` immediately and lets the parent poll.
+- `delegate.spawn` defaults to `start_only=true` (requires `task_id`).
+- The server spawns the child detached and polls for a new manifest under `.runs/<task-id>/cli/*/manifest.json`.
+- It returns `{ run_id, manifest_path, events_path, log_path }` once the manifest is detected.
+- Use `start_only=false` for legacy synchronous behavior (waits for child exit) and beware tool-call timeouts.
 
 ## Repo-scoped config
 
