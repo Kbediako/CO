@@ -24,6 +24,11 @@ Optional (only if you need it):
 - Add `-c 'features.skills=false'` for a minimal, deterministic background run.
 - Add `-c 'delegate.mode=question_only'` when the child only needs `delegate.question.*` (and optional `delegate.status`).
 - Add `-c 'delegate.mode=full'` when the child needs `delegate.spawn/pause/cancel` (nested delegation / run control).
+- If `delegate.spawn` is missing, re-register the MCP server with full mode (server config controls tool surface):
+  - `codex mcp remove delegation`
+  - `codex mcp add delegation --env 'CODEX_MCP_CONFIG_OVERRIDES=delegate.mode="full"' -- codex-orchestrator delegate-server --repo /path/to/repo`
+- To raise RLM budgets for delegated runs, re-register with an override (TOML-quoted):
+  - `codex mcp add delegation --env 'CODEX_MCP_CONFIG_OVERRIDES=rlm.max_subcall_depth=8;rlm.wall_clock_timeout_ms=14400000' -- codex-orchestrator delegate-server --repo /path/to/repo`
 
 For deeper background patterns and troubleshooting, see `DELEGATION_GUIDE.md`.
 For runner + delegation coordination (short `--task` flow), see `docs/delegation-runner-workflow.md`.
@@ -101,6 +106,8 @@ Guidance for background runs:
   - `github.*` tools are not gated by `delegate.tool_profile`; they are controlled by repo GitHub allowlists.
 - Keep `delegate.tool_profile` minimal; avoid networked tools unless required.
 - Nested delegation is off by default; only use `full` when `delegate.allow_nested=true` and you intend recursion.
+- **Important:** `delegate.mode` (server tool surface) is different from `delegate_mode` (input to `delegate.spawn` for the *child* run).
+- **Note:** `delegate.spawn` is synchronous (waits for the child run to exit; server timeout is 5 minutes). Tool-call timeouts (often ~60s) can fail first, so keep delegated runs short or run long jobs outside delegation until async spawn is available.
 
 #### Minimal-context delegate instruction template
 
@@ -143,6 +150,7 @@ repeat:
 ## Common pitfalls
 
 - **Long waits:** `wait_ms` never blocks longer than 10s per call; use polling.
+- **Long-running delegate.spawn:** Child runs that take longer than the tool-call timeout can fail even if the server timeout is higher. Workaround: split work into shorter delegated runs or run long jobs outside delegation (no question queue) until async spawn is supported.
 - **Tool profile mismatch:** child tool profile must be allowed by repo policy; invalid or unsafe names are ignored.
 - **Confirmation misuse:** never pass `confirm_nonce` from model/tool input; it is runner‑injected only.
 - **Secrets exposure:** never include secrets/tokens/PII in delegate prompts or files.

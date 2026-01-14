@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generated_at": "2026-01-13",
+  "generated_at": "2026-01-14",
   "entries": [
     {
       "path": ".agent/AGENTS.md",
@@ -1007,7 +1007,7 @@
       "path": "docs/delegation-runner-workflow.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-01-13",
+      "last_review": "2026-01-14",
       "cadence_days": 90
     },
     {
@@ -1497,7 +1497,7 @@
       "path": "docs/TASKS.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-01-12",
+      "last_review": "2026-01-14",
       "cadence_days": 90
     },
     {
@@ -2639,6 +2639,55 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-01-13",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/PRD-delegation-rlm-quick-wins.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-14",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/TECH_SPEC-delegation-rlm-quick-wins.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-14",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/ACTION_PLAN-delegation-rlm-quick-wins.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-14",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/tasks-0951-delegation-rlm-quick-wins.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-14",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/task/0951-delegation-rlm-quick-wins.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-14",
+      "cadence_days": 90
+    },
+    {
+      "path": "skills/delegation-usage/SKILL.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-14",
+      "cadence_days": 90
+    },
+    {
+      "path": "skills/delegation-usage/DELEGATION_GUIDE.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-14",
       "cadence_days": 90
     }
   ]
