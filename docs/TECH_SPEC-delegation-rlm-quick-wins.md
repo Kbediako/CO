@@ -36,11 +36,11 @@
 - Keep success-path output unchanged to avoid noisy logs.
 - Optional: Add a short troubleshooting note to `.agent/SOPs/review-loop.md` referencing the new diagnostics.
 - Update delegation usage docs (`skills/delegation-usage/*` and `docs/delegation-runner-workflow.md`) to clarify `delegate.mode` vs `delegate_mode`, recommend RLM depth/time overrides, and document the current `delegate.spawn` long-run timeout limitation + workaround.
-- Add async/start-only behavior to `delegate.spawn` with explicit parameter `start_only: boolean` (default `false`) that:
+- Add async/start-only behavior to `delegate.spawn` with explicit parameter `start_only: boolean` (default `true`) that:
   - Requires `task_id` when `start_only=true` (return an error if missing) so polling is deterministic.
   - Spawns `codex-orchestrator start <pipeline> --format json --no-interactive --task <task_id>` in the background (detached/unref; stdio ignored or drained so the parent tool call can return).
   - Polls `<runs_root>/<task_id>/cli/*/manifest.json` for a newly created manifest (created after `spawnTime`) with a 10s target timeout (configurable).
-  - Reads `run_id` + `manifest_path` from the manifest and returns those (plus derived `events_path` and `log_path`).
+  - Reads `run_id` + `manifest_path` from the manifest and returns those plus derived `{ events_path, log_path }`.
   - Persists the delegation token as soon as `manifest_path` is known; do not wait for child exit.
   - Continues draining/ignoring child stdout/stderr after returning to avoid pipe backpressure.
   - Keeps the child process running in the background without blocking the tool call; use `delegate.status` for progress.
@@ -62,10 +62,10 @@
 - **Pointer-based access**: provide helper APIs to `search`, `peek`, and `read` by chunk id or byte range.
 - **Runner‑scheduled subcalls**: the runner creates subcalls over chunks and dispatches them, rather than requiring the model to emit O(N) tool calls.
 - **Artifacts**: subcall inputs/outputs are saved as artifacts and referenced in `rlm/state.json` with their pointer IDs.
-- **Delegation integration**: default to true RLM for delegated runs; standalone `rlm` can opt in with `RLM_MODE=symbolic` or `RLM_CONTEXT_PATH`.
+- **Delegation integration**: with `RLM_MODE=auto`, delegated runs resolve to `symbolic` when a valid context source is available; standalone `rlm` can opt in with `RLM_MODE=symbolic` or `RLM_CONTEXT_PATH`.
 
 ### Async/start-only `delegate.spawn`: intended algorithm
-1) Accept `start_only?: boolean` (default `false`).
+1) Accept `start_only?: boolean` (default `true`). When `start_only=false`, preserve legacy wait-for-exit behavior.
 2) If `start_only=true`, require `task_id` (error if missing).
 3) Snapshot existing `.runs/<task_id>/cli/` directories before spawn.
 4) Spawn `codex-orchestrator start <pipeline> --format json --no-interactive --task <task_id>` detached/unref.
@@ -91,6 +91,7 @@ On-disk layout:
 - `source` requires: `path`, `byte_length`.
 - `chunking` requires: `target_bytes`, `overlap_bytes`, `strategy`.
 - Each `chunks[]` entry requires: `id`, `start`, `end`, `sha256`.
+The schema above is normative for v1; PRD acceptance criteria and tests must match these keys and names.
 
 Example:
 ```
@@ -115,6 +116,7 @@ Pointer syntax:
 - `RLM_CONTEXT_PATH` may point to:
   - A raw text file (runner builds a new context object under `.runs/.../rlm/context/`), or
   - An existing context object directory containing `index.json` + `source.txt` (runner uses it directly).
+- Context source precedence: if `RLM_CONTEXT_PATH` is set, use it; otherwise build the context from the effective prompt text so symbolic mode can run without requiring `RLM_CONTEXT_PATH` for small prompts.
 - Context is treated as UTF-8 bytes. All offsets in `index.json` are **byte offsets** into `source.txt`.
 - If decoding fails, the runner stores bytes and uses a lossy UTF-8 decode for previews, but all slicing remains byte-based.
 
@@ -130,7 +132,7 @@ Pointer syntax:
   "schema_version": 1,
   "intent": "continue",
   "reads": [
-    { "pointer": "ctx:...#chunk:c000010", "bytes": 4096, "reason": "inspect failure section" }
+    { "pointer": "ctx:...#chunk:c000010", "offset": 0, "bytes": 4096, "reason": "inspect failure section" }
   ],
   "searches": [
     { "query": "validator failure", "top_k": 10, "reason": "locate failing tests" }
@@ -138,7 +140,10 @@ Pointer syntax:
   "subcalls": [
     {
       "purpose": "summarize",
-      "pointers": ["ctx:...#chunk:c000010", "ctx:...#chunk:c000011"],
+      "snippets": [
+        { "pointer": "ctx:...#chunk:c000010", "offset": 0, "bytes": 2048 },
+        { "start_byte": 123456, "bytes": 2048 }
+      ],
       "max_input_bytes": 120000,
       "expected_output": "short summary"
     }
@@ -162,7 +167,8 @@ Pointer syntax:
   "schema_version": 1,
   "intent": "continue | final | pause | fail",
   "reads": [
-    { "pointer": "ctx:<object_id>#chunk:<chunk_id>", "bytes": 4096, "reason": "..." }
+    { "pointer": "ctx:<object_id>#chunk:<chunk_id>", "offset": 0, "bytes": 4096, "reason": "..." },
+    { "start_byte": 123456, "bytes": 4096, "reason": "..." }
   ],
   "searches": [
     { "query": "...", "top_k": 20, "reason": "..." }
@@ -170,7 +176,13 @@ Pointer syntax:
   "subcalls": [
     {
       "purpose": "summarize | extract | classify | verify",
-      "pointers": ["ctx:<object_id>#chunk:<chunk_id>", "..."],
+      "snippets": [
+        { "pointer": "ctx:<object_id>#chunk:<chunk_id>", "offset": 0, "bytes": 2048 },
+        { "start_byte": 123456, "bytes": 2048 }
+      ],
+      "spans": [
+        { "start_byte": 123456, "end_byte": 124000 }
+      ],
       "max_input_bytes": 120000,
       "model": "optional",
       "expected_output": "short summary | json | bullet list"
@@ -181,9 +193,11 @@ Pointer syntax:
 ```
 - Validation rules:
   - `intent` must be one of `continue|final|pause|fail`.
-  - Each `reads[]` entry requires `pointer` + `bytes` (bytes clamped to `RLM_MAX_BYTES_PER_CHUNK_READ`).
+  - Each `reads[]` entry requires `bytes` and **either** (`pointer` + `offset`) **or** `start_byte`. Offsets are relative to the chunk start; `start_byte` is absolute into `source.txt`. Bytes are clamped to `RLM_MAX_BYTES_PER_CHUNK_READ`.
   - Each `searches[]` entry requires `query`; `top_k` defaults to `RLM_SEARCH_TOP_K`.
-  - Each `subcalls[]` entry requires `purpose` (allowed: `summarize|extract|classify|verify`), non-empty `pointers`, and `max_input_bytes`.
+  - Each `subcalls[]` entry requires `purpose` (allowed: `summarize|extract|classify|verify`), `max_input_bytes`, and either non-empty `snippets[]` **or** non-empty `spans[]`.
+    - Each `snippets[]` entry requires `bytes` and **either** (`pointer` + `offset`) **or** `start_byte`.
+    - Each `spans[]` entry requires `start_byte` + `end_byte`.
 - Validation + recovery:
   - If JSON parse fails, record `plan_parse_error` in `rlm/state.json` and retry planner once with an explicit “return valid JSON only” repair prompt. If it fails twice, hard-fail with `invalid_config`.
   - If schema validation fails, record `plan_validation_error` and retry once with a repair prompt; if it fails twice, hard-fail with actionable error.
@@ -195,14 +209,18 @@ Budgets enforced by runner:
 - `RLM_MAX_SUBCALLS_PER_ITERATION` (default 4)
 - `RLM_MAX_CHUNK_READS_PER_ITERATION` (default 8)
 - `RLM_MAX_BYTES_PER_CHUNK_READ` (default 8192)
+- `RLM_MAX_SNIPPETS_PER_SUBCALL` (default 8)
+- `RLM_MAX_BYTES_PER_SNIPPET` (default 8192)
+- `RLM_MAX_SUBCALL_INPUT_BYTES` (default 120000)
 - `RLM_MAX_PLANNER_PROMPT_BYTES` (default 32768; measured as UTF-8 bytes). If the assembled planner prompt would exceed this limit, omit lowest-priority excerpts (search results, then read excerpts) until within budget; record truncation in `rlm/state.json`.
 - Optional `RLM_MAX_CONCURRENCY`
 - `RLM_SYMBOLIC_MIN_BYTES` (default 1048576)
 - Chunking defaults: `target_bytes=65536`, `overlap_bytes=4096`.
 
 #### Context helper APIs (v1)
-- `context.read(pointer, bytes=RLM_MAX_BYTES_PER_CHUNK_READ)` (bytes are clamped to `RLM_MAX_BYTES_PER_CHUNK_READ`)
-  - Read returns at most `bytes` and is clamped to the chunk boundaries; invalid pointers raise a deterministic error.
+- `context.read(pointer, offset=0, bytes=RLM_MAX_BYTES_PER_CHUNK_READ)` (bytes are clamped to `RLM_MAX_BYTES_PER_CHUNK_READ`)
+  - Offset is relative to chunk start; read returns at most `bytes` and is clamped to the chunk boundaries; invalid pointers raise a deterministic error.
+- `context.read_span(start_byte, bytes)` (absolute into `source.txt`; bytes clamped to `RLM_MAX_BYTES_PER_CHUNK_READ`)
 - `context.peek(pointer, bytes=256)` (optional)
 - `context.search(query, top_k=RLM_SEARCH_TOP_K)`
   - Deterministic case-insensitive substring scan over chunk text.
@@ -213,12 +231,18 @@ Budgets enforced by runner:
 { "pointer": "...", "start_byte": 123, "end_byte": 456, "score": 17, "preview": "..." }
 ```
   - `start_byte`/`end_byte` are byte offsets into `source.txt`.
+  - Use `start_byte` to form precise `reads[]` or `snippets[]` without re-scanning the chunk.
   - `preview` is capped at `RLM_MAX_PREVIEW_BYTES`.
 
 #### Subcall execution contract (v1)
 - Subcalls are runner-scheduled **single-completion** invocations over pointer-resolved text (not a full tool-enabled Codex session).
 - Depth = 1 only for this milestone.
 - Behavioral contract: no tools and no repo writes (enforcement can follow later).
+- Input assembly (normative):
+  - For each subcall, build inputs from `snippets[]` (or `spans[]`) in order.
+  - Clamp each snippet to `RLM_MAX_BYTES_PER_SNIPPET` and cap snippet count at `RLM_MAX_SNIPPETS_PER_SUBCALL`.
+  - Clamp total subcall input bytes to `min(subcall.max_input_bytes, RLM_MAX_SUBCALL_INPUT_BYTES)`; drop or truncate trailing snippets to fit.
+  - Record any clamping/truncation in `rlm/state.json` for auditability.
 - Runner may execute subcalls concurrently up to `RLM_MAX_CONCURRENCY`.
 - Subcall artifacts are written under:
   - `.runs/<task>/cli/<run>/rlm/subcalls/<iter>/<subcall_id>/{input.json,prompt.txt,output.txt,meta.json}`
@@ -228,14 +252,20 @@ Budgets enforced by runner:
 #### Mode selection (delegation vs standalone)
 - `RLM_MODE=iterative|symbolic|auto`
 - Default: `RLM_MODE=auto` everywhere.
-- `auto` resolves to `symbolic` when:
-  - run is delegated (detected by `CODEX_DELEGATION_PARENT_MANIFEST_PATH`), OR
-  - `RLM_CONTEXT_PATH` is provided, OR
-  - input/context exceeds `RLM_SYMBOLIC_MIN_BYTES` (default 1MB).
-- Otherwise `auto` resolves to `iterative`.
+- Define `context_source` as: `RLM_CONTEXT_PATH` if set, else the effective prompt text. Use `context_bytes` from the chosen source.
+- If `RLM_MODE=symbolic`: require a valid `context_source` or exit with `invalid_config`.
+- If `RLM_MODE=auto`: resolve to `symbolic` when delegated (`CODEX_DELEGATION_PARENT_MANIFEST_PATH`) **or** `RLM_CONTEXT_PATH` is set **or** `context_bytes` ≥ `RLM_SYMBOLIC_MIN_BYTES`; otherwise resolve to `iterative`.
 - Fallback:
   - If `RLM_MODE=auto` and context build fails, fall back to iterative with warning.
   - If `RLM_MODE=symbolic` and context build fails, hard-fail with actionable error.
+
+#### Symbolic mode scope + exit behavior
+- Scope: v1 symbolic mode is analysis-only (planner JSON protocol + runner-managed reads/searches/subcalls). No repo writes and no validator loop.
+- Exit codes:
+  - `intent=final` → exit 0
+  - `invalid_config` (e.g., missing required context or repeated plan repair failure) → exit 5
+  - budget exhaustion → exit 3
+  - internal error → exit 10
 
 ### Data Persistence / State Impact
 - Guard diagnostics: no persistent state changes.
@@ -246,9 +276,12 @@ Budgets enforced by runner:
 - No global state; all artifacts are run-scoped for auditability.
 
 `rlm/state.json` v1 extension (normative, additive):
-- Required keys: `mode`, `context`, `symbolic_iterations`.
+- Compatibility: extend the existing `RlmState` structure in-place; do not remove or rename existing fields.
+- Required keys: `version`, `mode`, `context`, `symbolic_iterations`.
 - `context` requires: `object_id`, `index_path`, `chunk_count`.
 - Each `symbolic_iterations[]` entry requires: `planner_prompt_bytes`, `reads[]`, `subcalls[]`.
+  - `reads[]` entries record `pointer` + `offset` **or** `start_byte`, plus `bytes`.
+  - `subcalls[]` entries record `snippets[]` (or `spans[]`) and any clamping/truncation metadata.
 - Each `subcalls[]` entry requires `artifact_paths` with `input`, `prompt`, `output`, `meta`.
 
 Example `rlm/state.json` (additive v1; existing fields remain valid):
@@ -266,19 +299,22 @@ Example `rlm/state.json` (additive v1; existing fields remain valid):
       "iteration": 0,
       "planner_prompt_bytes": 24380,
       "reads": [
-        { "pointer": "ctx:sha256:...#chunk:c000010", "bytes": 4096 }
+        { "pointer": "ctx:sha256:...#chunk:c000010", "offset": 0, "bytes": 4096 }
       ],
       "subcalls": [
         {
           "id": "sc0001",
           "purpose": "summarize",
-          "pointers": ["ctx:sha256:...#chunk:c000010"],
+          "snippets": [
+            { "pointer": "ctx:sha256:...#chunk:c000010", "offset": 0, "bytes": 2048 }
+          ],
           "artifact_paths": {
             "input": ".runs/<task>/cli/<run>/rlm/subcalls/0/sc0001/input.json",
             "prompt": ".runs/<task>/cli/<run>/rlm/subcalls/0/sc0001/prompt.txt",
             "output": ".runs/<task>/cli/<run>/rlm/subcalls/0/sc0001/output.txt",
             "meta": ".runs/<task>/cli/<run>/rlm/subcalls/0/sc0001/meta.json"
           },
+          "clamped": { "snippets": false, "bytes": false },
           "status": "succeeded"
         }
       ]
