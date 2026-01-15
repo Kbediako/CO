@@ -121,6 +121,7 @@ export interface RlmState {
   final?: {
     status: RlmFinalStatus;
     exitCode: number;
+    final_answer?: string;
   };
 }
 

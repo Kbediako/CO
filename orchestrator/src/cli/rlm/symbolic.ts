@@ -75,6 +75,41 @@ function byteLength(value: string): number {
   return Buffer.byteLength(value ?? '', 'utf8');
 }
 
+function truncateUtf8ToBytes(value: string, maxBytes: number): string {
+  if (!Number.isFinite(maxBytes) || maxBytes <= 0) {
+    return '';
+  }
+  const limit = Math.floor(maxBytes);
+  if (limit <= 0) {
+    return '';
+  }
+  const buffer = Buffer.from(value ?? '', 'utf8');
+  if (buffer.length <= limit) {
+    return value ?? '';
+  }
+  let end = limit;
+  let start = end - 1;
+  while (start >= 0 && (buffer[start] & 0b1100_0000) === 0b1000_0000) {
+    start -= 1;
+  }
+  if (start < 0) {
+    return '';
+  }
+  const lead = buffer[start];
+  let length = 1;
+  if ((lead & 0b1111_1000) === 0b1111_0000) {
+    length = 4;
+  } else if ((lead & 0b1111_0000) === 0b1110_0000) {
+    length = 3;
+  } else if ((lead & 0b1110_0000) === 0b1100_0000) {
+    length = 2;
+  }
+  if (start + length > end) {
+    end = start;
+  }
+  return buffer.slice(0, end).toString('utf8');
+}
+
 function toNumber(value: unknown): number | null {
   if (typeof value === 'number' && Number.isFinite(value)) {
     return value;
@@ -129,6 +164,11 @@ function validatePlan(
   }
   if (!['continue', 'final', 'pause', 'fail'].includes(plan.intent)) {
     throw new Error('plan_validation_error');
+  }
+  if (plan.intent === 'final') {
+    if (typeof plan.final_answer !== 'string' || plan.final_answer.trim().length === 0) {
+      throw new Error('plan_validation_error');
+    }
   }
 
   const reads: RlmSymbolicRead[] = [];
@@ -325,10 +365,9 @@ function buildPlannerPrompt(params: {
     }
   }
 
-  const buffer = Buffer.from(promptString, 'utf8');
-  if (buffer.length > maxBytes) {
+  if (byteLength(promptString) > maxBytes) {
     truncation = { ...truncation, prompt_truncated: true };
-    promptString = buffer.subarray(0, maxBytes).toString('utf8');
+    promptString = truncateUtf8ToBytes(promptString, maxBytes);
   }
 
   return { prompt: promptString, truncation };
@@ -447,7 +486,7 @@ export async function runSymbolicLoop(options: SymbolicLoopOptions): Promise<Rlm
           truncation: promptResult.truncation
         });
         await writeState(statePath, state);
-        return await finalize({ status: 'passed', exitCode: 0 });
+        return await finalize({ status: 'passed', exitCode: 0, final_answer: plan.final_answer });
       }
 
       if (plan.intent === 'pause' || plan.intent === 'fail') {
@@ -495,13 +534,13 @@ export async function runSymbolicLoop(options: SymbolicLoopOptions): Promise<Rlm
           );
           readExcerpts.push({
             pointer: read.pointer,
-            excerpt: result.text.slice(0, options.budgets.maxBytesPerChunkRead)
+            excerpt: truncateUtf8ToBytes(result.text, options.budgets.maxBytesPerChunkRead)
           });
         } else if (typeof read.start_byte === 'number') {
           const result = await options.contextStore.readSpan(read.start_byte, read.bytes);
           readExcerpts.push({
             pointer: `start_byte:${read.start_byte}`,
-            excerpt: result.text.slice(0, options.budgets.maxBytesPerChunkRead)
+            excerpt: truncateUtf8ToBytes(result.text, options.budgets.maxBytesPerChunkRead)
           });
         }
         reads.push(read);
@@ -556,7 +595,7 @@ export async function runSymbolicLoop(options: SymbolicLoopOptions): Promise<Rlm
           if (nextBytes > maxInput) {
             const remaining = Math.max(0, maxInput - totalBytes);
             if (remaining > 0) {
-              const truncated = Buffer.from(text, 'utf8').subarray(0, remaining).toString('utf8');
+              const truncated = truncateUtf8ToBytes(text, remaining);
               snippetBlocks.push(truncated);
             }
             clipped = true;
@@ -621,7 +660,7 @@ export async function runSymbolicLoop(options: SymbolicLoopOptions): Promise<Rlm
 
         currentSubcallOutputs.push({
           id: subcallId,
-          output: output.slice(0, options.budgets.maxBytesPerSnippet)
+          output: truncateUtf8ToBytes(output, options.budgets.maxBytesPerSnippet)
         });
       }
       priorSubcalls = currentSubcallOutputs;

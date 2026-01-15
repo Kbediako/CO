@@ -93,12 +93,14 @@ describe('symbolic rlm loop', () => {
     });
 
     expect(result.exitCode).toBe(0);
+    expect(result.state.final?.final_answer).toBe('done');
     expect(result.state.symbolic_iterations.length).toBeGreaterThan(0);
     const firstIteration = result.state.symbolic_iterations[0];
     expect(firstIteration.planner_prompt_bytes).toBeLessThanOrEqual(budgets.maxPlannerPromptBytes);
     expect(firstIteration.subcalls.length).toBe(1);
     const artifacts = firstIteration.subcalls[0]?.artifact_paths;
     expect(artifacts?.output).toBeTruthy();
+    expect(artifacts).toBeDefined();
     const outputText = await readFile(join(repoRoot, artifacts.output), 'utf8');
     expect(outputText).toContain('summary output');
   });
