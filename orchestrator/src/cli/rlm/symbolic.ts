@@ -110,6 +110,33 @@ function truncateUtf8ToBytes(value: string, maxBytes: number): string {
   return buffer.slice(0, end).toString('utf8');
 }
 
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  maxConcurrency: number,
+  worker: (item: T, index: number) => Promise<R>
+): Promise<R[]> {
+  if (items.length === 0) {
+    return [];
+  }
+  const limit = Math.max(1, Math.floor(maxConcurrency));
+  const results: R[] = new Array(items.length);
+  let nextIndex = 0;
+
+  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (true) {
+      const currentIndex = nextIndex;
+      if (currentIndex >= items.length) {
+        return;
+      }
+      nextIndex += 1;
+      results[currentIndex] = await worker(items[currentIndex], currentIndex);
+    }
+  });
+
+  await Promise.all(workers);
+  return results;
+}
+
 function toNumber(value: unknown): number | null {
   if (typeof value === 'number' && Number.isFinite(value)) {
     return value;
@@ -551,12 +578,17 @@ export async function runSymbolicLoop(options: SymbolicLoopOptions): Promise<Rlm
       const subcallRoot = join(runDir, 'subcalls', String(iteration));
       await mkdir(subcallRoot, { recursive: true });
 
-      let subcallIndex = 0;
-      const currentSubcallOutputs: Array<{ id: string; output: string }> = [];
-      for (const rawSubcall of validation.subcalls) {
-        subcallIndex += 1;
-        const subcallId = `sc${String(subcallIndex).padStart(4, '0')}`;
-        const subcallDir = join(subcallRoot, subcallId);
+      const subcallPlans = validation.subcalls.map((rawSubcall, index) => {
+        const subcallId = `sc${String(index + 1).padStart(4, '0')}`;
+        return {
+          rawSubcall,
+          subcallId,
+          subcallDir: join(subcallRoot, subcallId)
+        };
+      });
+      const maxConcurrency = Math.max(1, Math.floor(options.budgets.maxConcurrency));
+      const subcallResults = await mapWithConcurrency(subcallPlans, maxConcurrency, async (plan) => {
+        const { rawSubcall, subcallId, subcallDir } = plan;
         await mkdir(subcallDir, { recursive: true });
 
         const maxSnippets = options.budgets.maxSnippetsPerSubcall;
@@ -639,31 +671,36 @@ export async function runSymbolicLoop(options: SymbolicLoopOptions): Promise<Rlm
 
         const relativeBase = (filePath: string) => relative(options.repoRoot, filePath);
 
-        subcalls.push({
-          id: subcallId,
-          purpose: rawSubcall.purpose,
-          snippets: rawSubcall.snippets.length > 0 ? rawSubcall.snippets : undefined,
-          spans: rawSubcall.spans.length > 0 ? rawSubcall.spans : undefined,
-          max_input_bytes: rawSubcall.max_input_bytes,
-          artifact_paths: {
-            input: relativeBase(inputPath),
-            prompt: relativeBase(promptPath),
-            output: relativeBase(outputPath),
-            meta: relativeBase(metaPath)
+        return {
+          subcall: {
+            id: subcallId,
+            purpose: rawSubcall.purpose,
+            snippets: rawSubcall.snippets.length > 0 ? rawSubcall.snippets : undefined,
+            spans: rawSubcall.spans.length > 0 ? rawSubcall.spans : undefined,
+            max_input_bytes: rawSubcall.max_input_bytes,
+            artifact_paths: {
+              input: relativeBase(inputPath),
+              prompt: relativeBase(promptPath),
+              output: relativeBase(outputPath),
+              meta: relativeBase(metaPath)
+            },
+            clamped: {
+              snippets: clampedSnippets,
+              bytes: clipped || maxInputClamped
+            },
+            status: 'succeeded'
           },
-          clamped: {
-            snippets: clampedSnippets,
-            bytes: clipped || maxInputClamped
-          },
-          status: 'succeeded'
-        });
+          output: {
+            id: subcallId,
+            output: truncateUtf8ToBytes(output, options.budgets.maxBytesPerSnippet)
+          }
+        };
+      });
 
-        currentSubcallOutputs.push({
-          id: subcallId,
-          output: truncateUtf8ToBytes(output, options.budgets.maxBytesPerSnippet)
-        });
+      for (const result of subcallResults) {
+        subcalls.push(result.subcall);
       }
-      priorSubcalls = currentSubcallOutputs;
+      priorSubcalls = subcallResults.map((result) => result.output);
 
       state.symbolic_iterations.push({
         iteration,
