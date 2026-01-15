@@ -95,6 +95,10 @@ export async function runRlmLoop(options: RlmLoopOptions): Promise<RlmLoopResult
   const log = options.logger ?? (() => undefined);
 
   const state: RlmState = {
+    version: 1,
+    mode: options.mode,
+    context: options.context,
+    symbolic_iterations: [],
     goal: options.goal,
     validator: options.validatorCommand ?? 'none',
     roles: options.roles,

@@ -35,7 +35,10 @@ jobs:
         Automated implementation docs archive update.
 
         Archive payloads were pushed to the doc-archives branch.
+        Diff budget override: Automated implementation docs archive update (stubs + archive payloads).
+      pr_labels: diff-budget-override
       pr_branch: automation/implementation-docs-archive
       enable_auto_merge: true
+      fail_on_missing_payloads: true
     secrets:
       pr_token: ${{ secrets.ARCHIVE_AUTOMERGE_TOKEN }}

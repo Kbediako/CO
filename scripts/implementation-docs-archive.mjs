@@ -324,11 +324,7 @@ async function main() {
     stray_candidates: []
   };
 
-  async function archiveDoc({
-    relativePath,
-    reason,
-    context
-  }) {
+  async function archiveDoc({ relativePath, reason, context }) {
     const absPath = path.resolve(repoRoot, relativePath);
     if (!(await pathExists(absPath))) {
       report.skipped.push({ path: relativePath, reason: 'missing_on_disk', context });
@@ -345,19 +341,23 @@ async function main() {
 
     const lines = content.split('\n');
     const headerLine = lines.find((line) => line.trim().startsWith('# ')) || null;
-    const archiveUrl = `${policy.repoUrl}/blob/${policy.archiveBranch}/${relativePath}`;
+    const archiveRelativePath = toPosixPath(relativePath);
+    const archiveUrl = `${policy.repoUrl}/blob/${policy.archiveBranch}/${archiveRelativePath}`;
     const stub = buildStubContent({
       headerLine,
       archiveUrl,
       archivedAt: todayString,
       archiveBranch: policy.archiveBranch,
-      relativePath
+      relativePath: archiveRelativePath
     });
 
     if (!options.dryRun) {
       const payloadPath = path.join(archivePayloadRoot, relativePath);
       await mkdir(path.dirname(payloadPath), { recursive: true });
       await writeFile(payloadPath, content);
+      if (!(await pathExists(payloadPath))) {
+        throw new Error(`Archive payload missing after write: ${payloadPath}`);
+      }
       await writeFile(absPath, stub);
     }
 

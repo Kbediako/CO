@@ -35,10 +35,18 @@ on:
       pr_body:
         required: true
         type: string
+      pr_labels:
+        required: false
+        type: string
+        default: ''
       pr_branch:
         required: true
         type: string
       enable_auto_merge:
+        required: false
+        type: boolean
+        default: false
+      fail_on_missing_payloads:
         required: false
         type: boolean
         default: false
@@ -99,10 +107,15 @@ jobs:
           ARCHIVE_OUT_DIR: ${{ inputs.archive_out_dir }}
           ARCHIVE_GLOB: ${{ inputs.archive_glob }}
           ARCHIVE_DEST_DIR: ${{ inputs.archive_dest_dir }}
+          FAIL_ON_MISSING_PAYLOADS: ${{ inputs.fail_on_missing_payloads }}
         run: |
           set -euo pipefail
 
           if ! ls "$ARCHIVE_OUT_DIR"/$ARCHIVE_GLOB >/dev/null 2>&1; then
+            if [ "$FAIL_ON_MISSING_PAYLOADS" = "true" ]; then
+              echo "Archive payloads missing in $ARCHIVE_OUT_DIR/$ARCHIVE_GLOB; failing to avoid stub-only updates."
+              exit 1
+            fi
             echo "No archive payloads found in $ARCHIVE_OUT_DIR/$ARCHIVE_GLOB; skipping archive branch update."
             exit 0
           fi
@@ -146,6 +159,7 @@ jobs:
           commit-message: ${{ inputs.pr_commit_message }}
           title: ${{ inputs.pr_title }}
           body: ${{ inputs.pr_body }}
+          labels: ${{ inputs.pr_labels }}
           branch: ${{ inputs.pr_branch }}
           delete-branch: true
 

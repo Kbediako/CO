@@ -20,6 +20,12 @@ describe('rlm loop', () => {
     const validatorResults = [1, 0];
 
     const result = await runRlmLoop({
+      mode: 'iterative',
+      context: {
+        object_id: 'sha256:test',
+        index_path: '.runs/test/rlm/context/index.json',
+        chunk_count: 1
+      },
       goal: 'Fix tests',
       validatorCommand: 'npm test',
       maxIterations: 5,
@@ -45,6 +51,12 @@ describe('rlm loop', () => {
     tempDir = await mkdtemp(join(tmpdir(), 'rlm-loop-'));
 
     const result = await runRlmLoop({
+      mode: 'iterative',
+      context: {
+        object_id: 'sha256:test',
+        index_path: '.runs/test/rlm/context/index.json',
+        chunk_count: 1
+      },
       goal: 'Fix tests',
       validatorCommand: 'npm test',
       maxIterations: 2,

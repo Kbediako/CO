@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import http from 'node:http';
 import { EventEmitter } from 'node:events';
-import { access, mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
-import { join, relative } from 'node:path';
+import { access, mkdtemp, mkdir, readFile, realpath, rm, writeFile } from 'node:fs/promises';
+import { dirname, join, relative } from 'node:path';
 import { tmpdir } from 'node:os';
 import { PassThrough } from 'node:stream';
 import type { Socket } from 'node:net';
@@ -778,7 +778,7 @@ describe('delegation server spawn validation', () => {
 
       const repoArg = relative(process.cwd(), repoRoot);
       const spawnPromise = handleDelegateSpawn(
-        { pipeline: 'diagnostics', repo: repoArg },
+        { pipeline: 'diagnostics', repo: repoArg, start_only: false },
         repoRoot,
         false,
         [repoRoot],
@@ -824,7 +824,7 @@ describe('delegation server spawn validation', () => {
       spawnMock.mockReturnValue(child as unknown);
 
       const spawnPromise = handleDelegateSpawn(
-        { pipeline: 'diagnostics', repo: repoRoot },
+        { pipeline: 'diagnostics', repo: repoRoot, start_only: false },
         repoRoot,
         false,
         [repoRoot],
@@ -862,7 +862,7 @@ describe('delegation server spawn validation', () => {
       spawnMock.mockReturnValue(child as unknown);
 
       const spawnPromise = handleDelegateSpawn(
-        { pipeline: 'diagnostics', repo: repoRoot },
+        { pipeline: 'diagnostics', repo: repoRoot, start_only: false },
         repoRoot,
         false,
         [repoRoot],
@@ -890,6 +890,187 @@ describe('delegation server spawn validation', () => {
       child.emit('exit', 0);
 
       await spawnPromise;
+    } finally {
+      await rm(repoRoot, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('delegation server spawn start_only', () => {
+  it('requires task_id when start_only is true', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'delegation-spawn-repo-'));
+    try {
+      await expect(
+        handleDelegateSpawn(
+          { pipeline: 'diagnostics', repo: repoRoot },
+          repoRoot,
+          false,
+          [repoRoot],
+          ['127.0.0.1'],
+          []
+        )
+      ).rejects.toThrow('task_id');
+    } finally {
+      await rm(repoRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('returns manifest info after polling when start_only is true', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'delegation-spawn-repo-'));
+    const taskId = 'task-0940';
+    const runId = 'run-1';
+    try {
+      const runDir = join(repoRoot, '.runs', taskId, 'cli', runId);
+      const manifestPath = join(runDir, 'manifest.json');
+
+      const child = new MockChildProcess();
+      const unrefSpy = vi.spyOn(child, 'unref');
+      spawnMock.mockReturnValue(child as unknown);
+
+      const spawnPromise = handleDelegateSpawn(
+        {
+          pipeline: 'diagnostics',
+          repo: repoRoot,
+          task_id: taskId,
+          start_only: true,
+          env: { CODEX_ORCHESTRATOR_RUNS_DIR: '.runs' }
+        },
+        repoRoot,
+        false,
+        [repoRoot],
+        ['127.0.0.1'],
+        []
+      );
+
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      await mkdir(runDir, { recursive: true });
+      await writeFile(
+        manifestPath,
+        JSON.stringify({ run_id: runId, task_id: taskId, log_path: 'logs/child.log' }),
+        'utf8'
+      );
+
+      const result = await spawnPromise;
+      const resolvedManifestPath = await realpath(manifestPath);
+      const resolvedRunDir = dirname(resolvedManifestPath);
+      const spawnArgs = spawnMock.mock.calls[0]?.[2] as { detached?: boolean; stdio?: unknown } | undefined;
+      expect(spawnArgs?.detached).toBe(true);
+      expect(spawnArgs?.stdio).toEqual(['ignore', 'ignore', 'ignore']);
+      expect(unrefSpy).toHaveBeenCalled();
+      expect(result).toMatchObject({
+        run_id: runId,
+        manifest_path: resolvedManifestPath,
+        events_path: join(resolvedRunDir, 'events.jsonl'),
+        log_path: 'logs/child.log'
+      });
+      const tokenRaw = await readFile(join(runDir, 'delegation_token.json'), 'utf8');
+      expect(tokenRaw).toContain('token');
+    } finally {
+      await rm(repoRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('ignores baseline manifests updated after spawn start', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'delegation-spawn-repo-'));
+    const taskId = 'task-0940';
+    const baselineRunId = 'baseline-run';
+    const newRunId = 'run-2';
+    try {
+      const baselineDir = join(repoRoot, '.runs', taskId, 'cli', baselineRunId);
+      const baselineManifest = join(baselineDir, 'manifest.json');
+      await mkdir(baselineDir, { recursive: true });
+      await writeFile(
+        baselineManifest,
+        JSON.stringify({ run_id: baselineRunId, task_id: taskId, log_path: 'logs/baseline.log' }),
+        'utf8'
+      );
+
+      const child = new MockChildProcess();
+      spawnMock.mockReturnValue(child as unknown);
+
+      const spawnPromise = handleDelegateSpawn(
+        {
+          pipeline: 'diagnostics',
+          repo: repoRoot,
+          task_id: taskId,
+          start_only: true,
+          env: { CODEX_ORCHESTRATOR_RUNS_DIR: '.runs' }
+        },
+        repoRoot,
+        false,
+        [repoRoot],
+        ['127.0.0.1'],
+        []
+      );
+
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      const newRunDir = join(repoRoot, '.runs', taskId, 'cli', newRunId);
+      const newManifest = join(newRunDir, 'manifest.json');
+      await mkdir(newRunDir, { recursive: true });
+      await writeFile(
+        newManifest,
+        JSON.stringify({ run_id: newRunId, task_id: taskId, log_path: 'logs/new.log' }),
+        'utf8'
+      );
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      await writeFile(
+        baselineManifest,
+        JSON.stringify({ run_id: baselineRunId, task_id: taskId, log_path: 'logs/baseline.log' }),
+        'utf8'
+      );
+
+      const result = await spawnPromise;
+      const resolvedManifestPath = await realpath(newManifest);
+      expect(result).toMatchObject({
+        run_id: newRunId,
+        manifest_path: resolvedManifestPath
+      });
+    } finally {
+      await rm(repoRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('accepts custom runs roots when start_only is true', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'delegation-spawn-repo-'));
+    const taskId = 'task-0940';
+    const runId = 'run-1';
+    const runsDir = 'custom_runs';
+    try {
+      const runDir = join(repoRoot, runsDir, taskId, 'cli', runId);
+      const manifestPath = join(runDir, 'manifest.json');
+
+      const child = new MockChildProcess();
+      spawnMock.mockReturnValue(child as unknown);
+
+      const spawnPromise = handleDelegateSpawn(
+        {
+          pipeline: 'diagnostics',
+          repo: repoRoot,
+          task_id: taskId,
+          start_only: true,
+          env: { CODEX_ORCHESTRATOR_RUNS_DIR: runsDir }
+        },
+        repoRoot,
+        false,
+        [repoRoot],
+        ['127.0.0.1'],
+        []
+      );
+
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      await mkdir(runDir, { recursive: true });
+      await writeFile(
+        manifestPath,
+        JSON.stringify({ run_id: runId, task_id: taskId, log_path: 'logs/child.log' }),
+        'utf8'
+      );
+
+      const result = await spawnPromise;
+      const resolvedManifestPath = await realpath(manifestPath);
+      expect(result).toMatchObject({
+        run_id: runId,
+        manifest_path: resolvedManifestPath
+      });
     } finally {
       await rm(repoRoot, { recursive: true, force: true });
     }
@@ -1570,6 +1751,9 @@ describe('delegation server MCP framing', () => {
 class MockChildProcess extends EventEmitter {
   stdout = new PassThrough();
   stderr = new PassThrough();
+  unref(): void {
+    // noop for test
+  }
   kill(): boolean {
     return true;
   }
