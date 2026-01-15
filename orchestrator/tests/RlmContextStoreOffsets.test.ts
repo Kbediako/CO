@@ -32,13 +32,40 @@ describe('ContextStore search offsets', () => {
     const results = await store.search(query, 5, 32);
     expect(results.length).toBeGreaterThan(0);
     expect(results[0].start_byte).toBe(expectedStart);
-    expect(results[0].end_byte).toBe(expectedStart + queryBytes.length);
+    expect(results[0].match_bytes).toBe(queryBytes.length);
+    expect(results[0].offset).toBe(expectedStart);
 
     const span = await store.readSpan(results[0].start_byte, queryBytes.length);
     expect(span.text).toBe(query);
 
     const asciiResults = await store.search('PREFIX', 5, 16);
     expect(asciiResults[0].start_byte).toBe(0);
+    expect(asciiResults[0].offset).toBe(0);
+  });
+
+  it('uses byte offsets when chunk boundaries split codepoints', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'rlm-context-'));
+    const text = 'aa€bb';
+    const contextObject = await buildContextObject({
+      source: { type: 'text', value: text },
+      targetDir: join(tempDir, 'context'),
+      chunking: { targetBytes: 4, overlapBytes: 0, strategy: 'byte' }
+    });
+
+    const store = new ContextStore(contextObject);
+    const query = 'bb';
+    const queryBytes = Buffer.from(query, 'utf8');
+    const expectedStart = Buffer.from(text, 'utf8').indexOf(queryBytes);
+    const chunk = contextObject.index.chunks.find(
+      (entry) => expectedStart >= entry.start && expectedStart < entry.end
+    );
+    expect(chunk).toBeTruthy();
+
+    const results = await store.search(query, 5, 16);
+    expect(results.length).toBeGreaterThan(0);
+    expect(results[0].start_byte).toBe(expectedStart);
+    expect(results[0].match_bytes).toBe(queryBytes.length);
+    expect(results[0].offset).toBe(expectedStart - (chunk?.start ?? 0));
   });
 
   it('throws when chunk targetBytes is non-positive', async () => {
