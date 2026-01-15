@@ -54,6 +54,7 @@ Automate archiving of implementation documentation so completed task artifacts m
   - Include a `<!-- docs-archive:stub -->` marker to prevent repeated archiving.
 - Registry updates:
   - Mark archived docs as `status: archived` and refresh `last_review`.
+  - No-op runs leave the registry unchanged to avoid stub-only diffs when no archives are produced.
 
 ### Workflow automation
 - Workflow file: `.github/workflows/implementation-docs-archive-automation.yml`.
