@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generated_at": "2026-01-13",
+  "generated_at": "2026-01-15",
   "entries": [
     {
       "path": ".agent/AGENTS.md",
@@ -362,9 +362,9 @@
     {
       "path": ".agent/task/0918-subagent-delegation-enforcement.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2025-12-31",
-      "cadence_days": 90
+      "status": "archived",
+      "last_review": "2026-01-15",
+      "cadence_days": 365
     },
     {
       "path": ".agent/task/0919-refactor-plan.md",
@@ -383,51 +383,51 @@
     {
       "path": ".agent/task/0921-docs-freshness-sweep.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2025-12-31",
-      "cadence_days": 90
+      "status": "archived",
+      "last_review": "2026-01-15",
+      "cadence_days": 365
     },
     {
       "path": ".agent/task/0922-docs-freshness-systemization.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2025-12-31",
-      "cadence_days": 90
+      "status": "archived",
+      "last_review": "2026-01-15",
+      "cadence_days": 365
     },
     {
       "path": ".agent/task/0923-docs-freshness-date-validation.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2025-12-31",
-      "cadence_days": 90
+      "status": "archived",
+      "last_review": "2026-01-15",
+      "cadence_days": 365
     },
     {
       "path": ".agent/task/0924-tasks-archive-policy.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2025-12-31",
-      "cadence_days": 90
+      "status": "archived",
+      "last_review": "2026-01-15",
+      "cadence_days": 365
     },
     {
       "path": ".agent/task/0925-tasks-archive-automation.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2025-12-31",
-      "cadence_days": 90
+      "status": "archived",
+      "last_review": "2026-01-15",
+      "cadence_days": 365
     },
     {
       "path": ".agent/task/0926-implementation-docs-archive-automation.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2025-12-31",
-      "cadence_days": 90
+      "status": "archived",
+      "last_review": "2026-01-15",
+      "cadence_days": 365
     },
     {
       "path": ".agent/task/0927-implementation-docs-archive-allowlist.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2025-12-31",
-      "cadence_days": 90
+      "status": "archived",
+      "last_review": "2026-01-15",
+      "cadence_days": 365
     },
     {
       "path": ".agent/task/0928-repo-refactor-simplification.md",
@@ -1937,44 +1937,44 @@
     {
       "path": "tasks/0922-prd-docs-freshness-systemization.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2025-12-31",
-      "cadence_days": 90
+      "status": "archived",
+      "last_review": "2026-01-15",
+      "cadence_days": 365
     },
     {
       "path": "tasks/0923-prd-docs-freshness-date-validation.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2025-12-31",
-      "cadence_days": 90
+      "status": "archived",
+      "last_review": "2026-01-15",
+      "cadence_days": 365
     },
     {
       "path": "tasks/0924-prd-tasks-archive-policy.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2025-12-31",
-      "cadence_days": 90
+      "status": "archived",
+      "last_review": "2026-01-15",
+      "cadence_days": 365
     },
     {
       "path": "tasks/0925-prd-tasks-archive-automation.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2025-12-31",
-      "cadence_days": 90
+      "status": "archived",
+      "last_review": "2026-01-15",
+      "cadence_days": 365
     },
     {
       "path": "tasks/0926-prd-implementation-docs-archive-automation.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2025-12-31",
-      "cadence_days": 90
+      "status": "archived",
+      "last_review": "2026-01-15",
+      "cadence_days": 365
     },
     {
       "path": "tasks/0927-prd-implementation-docs-archive-allowlist.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2025-12-31",
-      "cadence_days": 90
+      "status": "archived",
+      "last_review": "2026-01-15",
+      "cadence_days": 365
     },
     {
       "path": "tasks/0928-prd-repo-refactor-simplification.md",
@@ -2105,44 +2105,44 @@
     {
       "path": "tasks/specs/0922-docs-freshness-systemization.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2025-12-31",
-      "cadence_days": 90
+      "status": "archived",
+      "last_review": "2026-01-15",
+      "cadence_days": 365
     },
     {
       "path": "tasks/specs/0923-docs-freshness-date-validation.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2025-12-31",
-      "cadence_days": 90
+      "status": "archived",
+      "last_review": "2026-01-15",
+      "cadence_days": 365
     },
     {
       "path": "tasks/specs/0924-tasks-archive-policy.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2025-12-31",
-      "cadence_days": 90
+      "status": "archived",
+      "last_review": "2026-01-15",
+      "cadence_days": 365
     },
     {
       "path": "tasks/specs/0925-tasks-archive-automation.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2025-12-31",
-      "cadence_days": 90
+      "status": "archived",
+      "last_review": "2026-01-15",
+      "cadence_days": 365
     },
     {
       "path": "tasks/specs/0926-implementation-docs-archive-automation.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2025-12-31",
-      "cadence_days": 90
+      "status": "archived",
+      "last_review": "2026-01-15",
+      "cadence_days": 365
     },
     {
       "path": "tasks/specs/0927-implementation-docs-archive-allowlist.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2025-12-31",
-      "cadence_days": 90
+      "status": "archived",
+      "last_review": "2026-01-15",
+      "cadence_days": 365
     },
     {
       "path": "tasks/specs/0928-repo-refactor-simplification.md",
@@ -2441,44 +2441,44 @@
     {
       "path": "tasks/tasks-0922-docs-freshness-systemization.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2025-12-31",
-      "cadence_days": 90
+      "status": "archived",
+      "last_review": "2026-01-15",
+      "cadence_days": 365
     },
     {
       "path": "tasks/tasks-0923-docs-freshness-date-validation.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2025-12-31",
-      "cadence_days": 90
+      "status": "archived",
+      "last_review": "2026-01-15",
+      "cadence_days": 365
     },
     {
       "path": "tasks/tasks-0924-tasks-archive-policy.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2025-12-31",
-      "cadence_days": 90
+      "status": "archived",
+      "last_review": "2026-01-15",
+      "cadence_days": 365
     },
     {
       "path": "tasks/tasks-0925-tasks-archive-automation.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2025-12-31",
-      "cadence_days": 90
+      "status": "archived",
+      "last_review": "2026-01-15",
+      "cadence_days": 365
     },
     {
       "path": "tasks/tasks-0926-implementation-docs-archive-automation.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2025-12-31",
-      "cadence_days": 90
+      "status": "archived",
+      "last_review": "2026-01-15",
+      "cadence_days": 365
     },
     {
       "path": "tasks/tasks-0927-implementation-docs-archive-allowlist.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2025-12-31",
-      "cadence_days": 90
+      "status": "archived",
+      "last_review": "2026-01-15",
+      "cadence_days": 365
     },
     {
       "path": "tasks/tasks-0928-repo-refactor-simplification.md",
