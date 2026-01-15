@@ -50,7 +50,7 @@ This produces `.runs/<task-id>/cli/<run-id>/manifest.json`, which you can reuse 
 
 Fix by re-registering the server with a TOML-quoted override:
 
-```
+```bash
 codex mcp remove delegation
 codex mcp add delegation \
   --env 'CODEX_MCP_CONFIG_OVERRIDES=delegate.mode="full"' \
@@ -64,7 +64,7 @@ codex mcp add delegation \
 
 Example: enable spawn on the server, but keep the child in question-only mode.
 
-```
+```json
 delegate.spawn({
   "pipeline": "rlm",
   "repo": "/path/to/repo",
@@ -76,7 +76,7 @@ delegate.spawn({
 
 If you want deeper recursion or longer wall-clock time for delegated runs, set RLM budgets on the delegation server:
 
-```
+```bash
 codex mcp add delegation \
   --env 'CODEX_MCP_CONFIG_OVERRIDES=rlm.max_subcall_depth=8;rlm.wall_clock_timeout_ms=14400000' \
   -- codex-orchestrator delegate-server --repo /path/to/repo

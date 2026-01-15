@@ -305,8 +305,8 @@ export class ContextStore {
     if (!chunk) {
       throw new Error('context chunk missing');
     }
-    const safeOffset = Number.isFinite(offset) && offset > 0 ? Math.floor(offset) : 0;
-    const safeBytes = Number.isFinite(bytes) && bytes > 0 ? Math.floor(bytes) : 0;
+    const safeOffset = Number.isFinite(offset) ? Math.max(0, Math.floor(offset)) : 0;
+    const safeBytes = Number.isFinite(bytes) ? Math.max(0, Math.floor(bytes)) : 0;
     const maxBytes = Math.max(0, Math.min(safeBytes, chunk.end - chunk.start));
     const absoluteStart = Math.min(chunk.end, chunk.start + safeOffset);
     const remaining = Math.max(0, chunk.end - absoluteStart);
@@ -320,9 +320,10 @@ export class ContextStore {
   }
 
   async readSpan(startByte: number, bytes: number): Promise<{ text: string; startByte: number; endByte: number }> {
-    const safeStart = Math.max(0, Math.floor(startByte));
-    const safeBytes = Number.isFinite(bytes) && bytes > 0 ? Math.floor(bytes) : 0;
-    const length = Math.max(0, Math.min(safeBytes, this.context.index.source.byte_length - safeStart));
+    const safeStart = Number.isFinite(startByte) ? Math.max(0, Math.floor(startByte)) : 0;
+    const safeBytes = Number.isFinite(bytes) ? Math.max(0, Math.floor(bytes)) : 0;
+    const remaining = Math.max(0, this.context.index.source.byte_length - safeStart);
+    const length = Math.min(safeBytes, remaining);
     const slice = await readSpanBytes(this.context.sourcePath, safeStart, length);
     return {
       text: slice.toString('utf8'),

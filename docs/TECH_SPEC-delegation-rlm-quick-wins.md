@@ -93,7 +93,7 @@ On-disk layout:
 The schema above is normative for v1; PRD acceptance criteria and tests must match these keys and names.
 
 Example:
-```
+```json
 {
   "version": 1,
   "object_id": "sha256:<hex>",
@@ -127,7 +127,7 @@ Pointer syntax:
 2) Plan step (small prompt)
 - Call planner with goal + repo summary + context metadata (not full content).
 - Planner returns structured JSON plan:
-```
+```json
 {
   "schema_version": 1,
   "intent": "continue",
@@ -162,7 +162,7 @@ Pointer syntax:
 #### Planner protocol (normative)
 - The planner must output a single JSON object per step (no surrounding prose).
 - Schema (v1) — required fields: `schema_version`, `intent`. `reads`, `searches`, `subcalls` may be omitted or empty.
-```
+```json
 {
   "schema_version": 1,
   "intent": "continue | final | pause | fail",
@@ -229,9 +229,9 @@ Budgets enforced by runner:
   - Sorted by: descending hit count → ascending first-hit byte offset → ascending chunk id.
   - Default `RLM_SEARCH_TOP_K=20`.
   - Returns up to `top_k` hits with:
-```
-{ "pointer": "...", "start_byte": 123, "end_byte": 456, "score": 17, "preview": "..." }
-```
+    ```json
+    { "pointer": "...", "start_byte": 123, "end_byte": 456, "score": 17, "preview": "..." }
+    ```
   - `start_byte`/`end_byte` are byte offsets into `source.txt`.
   - Use `start_byte` to form precise `reads[]` or `snippets[]` without re-scanning the chunk.
   - `preview` is capped at `RLM_MAX_PREVIEW_BYTES`.
@@ -286,7 +286,7 @@ Budgets enforced by runner:
 - Each `subcalls[]` entry requires `artifact_paths` with `input`, `prompt`, `output`, `meta`.
 
 Example `rlm/state.json` (additive v1; existing fields remain valid):
-```
+```json
 {
   "version": 1,
   "mode": "symbolic",
@@ -385,7 +385,7 @@ Example `rlm/state.json` (additive v1; existing fields remain valid):
 
 ## Appendix — Example Output Schema (draft)
 
-```
+```text
 Delegation guard: issues detected
  - Missing: MCP_RUNNER_TASK_ID
  - Expected manifests: <runs-root>/<task-id>-*/cli/<run-id>/manifest.json

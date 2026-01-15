@@ -58,7 +58,7 @@
   - Run `codex-orchestrator rlm` (or pipeline) with `RLM_CONTEXT_PATH=<file>`.
   - Verify `rlm/state.json` and subcall artifacts reference pointers (no full prompt stuffing).
 - Demo commands (example):
-```
+```bash
 python - <<'PY'
 path = "/tmp/rlm-context.txt"
 with open(path, "wb") as f:
@@ -138,7 +138,7 @@ PY
 
 ## Appendix — Example Diagnostic Block (draft)
 
-```
+```text
 Delegation guard: issues detected
  - Missing: MCP_RUNNER_TASK_ID
  - Expected manifests: <runs-root>/<task-id>-*/cli/<run-id>/manifest.json
