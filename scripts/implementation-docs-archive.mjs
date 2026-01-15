@@ -492,13 +492,18 @@ async function main() {
 
   report.totals.stray_candidates = report.stray_candidates.length;
 
-  registry.entries = Array.from(registryMap.values()).sort((a, b) => a.path.localeCompare(b.path));
-  registry.generated_at = todayString;
+  const shouldUpdateRegistry = report.totals.archived > 0;
+  if (shouldUpdateRegistry) {
+    registry.entries = Array.from(registryMap.values()).sort((a, b) => a.path.localeCompare(b.path));
+    registry.generated_at = todayString;
+  }
 
   if (!options.dryRun) {
     await mkdir(archiveOutRoot, { recursive: true });
     await writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`);
-    await writeFile(registryPath, `${JSON.stringify(registry, null, 2)}\n`);
+    if (shouldUpdateRegistry) {
+      await writeFile(registryPath, `${JSON.stringify(registry, null, 2)}\n`);
+    }
   }
 
   console.log(`Archived docs: ${report.totals.archived}`);
