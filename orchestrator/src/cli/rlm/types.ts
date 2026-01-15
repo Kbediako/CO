@@ -43,6 +43,17 @@ export interface RlmSymbolicSearch {
   query: string;
   top_k?: number;
   reason?: string;
+  clamped_top_k?: boolean;
+  hits?: RlmSymbolicSearchHit[];
+}
+
+export interface RlmSymbolicSearchHit {
+  pointer: string;
+  offset: number;
+  start_byte: number;
+  match_bytes: number;
+  score: number;
+  preview: string;
 }
 
 export interface RlmSymbolicSnippet {

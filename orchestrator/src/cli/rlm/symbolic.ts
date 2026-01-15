@@ -7,6 +7,7 @@ import type {
   RlmSymbolicIteration,
   RlmSymbolicRead,
   RlmSymbolicSearch,
+  RlmSymbolicSearchHit,
   RlmSymbolicSnippet,
   RlmSymbolicSpan,
   RlmSymbolicSubcall
@@ -224,11 +225,14 @@ function validatePlan(
     if (!query) {
       throw new Error('plan_validation_error');
     }
-    const topK = toNumber(entry?.top_k);
+    const requestedTopK = toNumber(entry?.top_k);
+    const normalizedTopK = requestedTopK && requestedTopK > 0 ? Math.floor(requestedTopK) : budgets.searchTopK;
+    const clampedTopK = Math.min(normalizedTopK, budgets.searchTopK);
     searches.push({
       query,
-      top_k: topK && topK > 0 ? Math.floor(topK) : budgets.searchTopK,
-      reason: typeof entry?.reason === 'string' ? entry.reason : undefined
+      top_k: clampedTopK,
+      reason: typeof entry?.reason === 'string' ? entry.reason : undefined,
+      clamped_top_k: normalizedTopK > budgets.searchTopK
     });
   }
 
@@ -331,7 +335,7 @@ function buildPlannerPrompt(params: {
   contextStore: ContextStore;
   budgets: SymbolicBudgets;
   priorReads: Array<{ pointer: string; excerpt: string }>;
-  priorSearches: Array<{ query: string; results: Array<{ pointer: string; preview: string }> }>;
+  priorSearches: Array<{ query: string; results: RlmSymbolicSearchHit[] }>;
   priorSubcalls: Array<{ id: string; output: string }>;
 }): { prompt: string; truncation: RlmSymbolicIteration['truncation'] } {
   const { goal, contextStore, budgets, priorReads, priorSearches, priorSubcalls } = params;
@@ -364,11 +368,17 @@ function buildPlannerPrompt(params: {
 
   const sections: Array<{ key: keyof NonNullable<RlmSymbolicIteration['truncation']>; lines: string[] }> = [];
   if (priorSearches.length > 0) {
-    const lines = ['Prior search results:'];
+    const lines = ['Prior search results (JSONL):'];
     for (const entry of priorSearches) {
-      lines.push(`- query: ${entry.query}`);
       for (const result of entry.results) {
-        lines.push(`  - ${result.pointer}: ${result.preview}`);
+        lines.push(JSON.stringify({
+          pointer: result.pointer,
+          offset: result.offset,
+          start_byte: result.start_byte,
+          match_bytes: result.match_bytes,
+          score: result.score,
+          preview: result.preview
+        }));
       }
     }
     sections.push({ key: 'searches_dropped', lines });
@@ -448,7 +458,7 @@ export async function runSymbolicLoop(options: SymbolicLoopOptions): Promise<Rlm
   const timeExceeded = (): boolean => deadline !== null && Date.now() >= deadline;
 
   let priorReads: Array<{ pointer: string; excerpt: string }> = [];
-  let priorSearches: Array<{ query: string; results: Array<{ pointer: string; preview: string }> }> = [];
+  let priorSearches: Array<{ query: string; results: RlmSymbolicSearchHit[] }> = [];
   let priorSubcalls: Array<{ id: string; output: string }> = [];
 
   const finalize = async (status: RlmState['final']): Promise<RlmLoopResult> => {
@@ -561,19 +571,24 @@ export async function runSymbolicLoop(options: SymbolicLoopOptions): Promise<Rlm
         return await finalize({ status: 'invalid_config', exitCode: 5 });
       }
 
-      const currentSearches: Array<{ query: string; results: Array<{ pointer: string; preview: string }> }> = [];
+      const currentSearches: Array<{ query: string; results: RlmSymbolicSearchHit[] }> = [];
       for (const search of validation.searches) {
-        const topK = search.top_k ?? options.budgets.searchTopK;
         const results = await options.contextStore.search(
           search.query,
-          topK,
+          search.top_k ?? options.budgets.searchTopK,
           options.budgets.maxPreviewBytes
         );
         currentSearches.push({
           query: search.query,
-          results: results.map((hit) => ({ pointer: hit.pointer, preview: hit.preview }))
+          results
         });
-        searches.push(search);
+        searches.push({
+          query: search.query,
+          top_k: search.top_k,
+          reason: search.reason,
+          clamped_top_k: search.clamped_top_k,
+          hits: results
+        });
       }
       priorSearches = currentSearches;
 
@@ -620,8 +635,10 @@ export async function runSymbolicLoop(options: SymbolicLoopOptions): Promise<Rlm
         const maxSnippets = options.budgets.maxSnippetsPerSubcall;
         const rawSnippets = rawSubcall.snippets;
         const rawSpans = rawSubcall.spans;
-        const snippets = rawSnippets.slice(0, maxSnippets);
-        const unclampedSpans = rawSpans.slice(0, maxSnippets);
+        const snippetCap = Math.max(0, Math.floor(maxSnippets));
+        const snippets = rawSnippets.slice(0, snippetCap);
+        const remaining = Math.max(0, snippetCap - snippets.length);
+        const unclampedSpans = rawSpans.slice(0, remaining);
         const clampedSnippets = rawSnippets.length > snippets.length || rawSpans.length > unclampedSpans.length;
 
         let spanBytesClamped = false;

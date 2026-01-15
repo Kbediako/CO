@@ -77,22 +77,26 @@ function clampOverlap(targetBytes: number, overlapBytes: number): number {
   return overlapBytes;
 }
 
-function foldAscii(value: string): string {
-  let changed = false;
-  let output = '';
-  for (let i = 0; i < value.length; i += 1) {
-    const code = value.charCodeAt(i);
-    if (code >= 65 && code <= 90) {
-      if (!changed) {
-        output = value.slice(0, i);
-        changed = true;
-      }
-      output += String.fromCharCode(code + 32);
-    } else if (changed) {
-      output += value[i];
+function foldAsciiBytes(buffer: Buffer): Buffer {
+  let needsFold = false;
+  for (let i = 0; i < buffer.length; i += 1) {
+    const byte = buffer[i] ?? 0;
+    if (byte >= 65 && byte <= 90) {
+      needsFold = true;
+      break;
     }
   }
-  return changed ? output : value;
+  if (!needsFold) {
+    return buffer;
+  }
+  const output = Buffer.from(buffer);
+  for (let i = 0; i < output.length; i += 1) {
+    const byte = output[i] ?? 0;
+    if (byte >= 65 && byte <= 90) {
+      output[i] = byte + 32;
+    }
+  }
+  return output;
 }
 
 function buildChunks(source: Buffer, targetBytes: number, overlapBytes: number): ContextChunk[] {
@@ -332,20 +336,44 @@ export class ContextStore {
     };
   }
 
-  async search(query: string, topK: number, previewBytes: number): Promise<Array<{ pointer: string; start_byte: number; end_byte: number; score: number; preview: string }>> {
+  async search(
+    query: string,
+    topK: number,
+    previewBytes: number
+  ): Promise<Array<{
+    pointer: string;
+    offset: number;
+    start_byte: number;
+    match_bytes: number;
+    score: number;
+    preview: string;
+  }>> {
     const trimmed = query.trim();
     if (!trimmed) {
       return [];
     }
-    const foldedQuery = foldAscii(trimmed);
+    const queryBytes = Buffer.from(trimmed, 'utf8');
+    if (queryBytes.length === 0) {
+      return [];
+    }
+    const foldedQuery = foldAsciiBytes(queryBytes);
     const matchLength = foldedQuery.length;
+    const matchBytes = queryBytes.length;
     const safePreviewBytes = Math.max(0, Math.floor(previewBytes));
-    const hits: Array<{ pointer: string; start_byte: number; end_byte: number; score: number; preview: string; firstHit: number; chunkId: string }> = [];
+    const hits: Array<{
+      pointer: string;
+      offset: number;
+      start_byte: number;
+      match_bytes: number;
+      score: number;
+      preview: string;
+      firstHit: number;
+      chunkId: string;
+    }> = [];
 
     for (const chunk of this.context.index.chunks) {
       const slice = await readSpanBytes(this.context.sourcePath, chunk.start, chunk.end - chunk.start);
-      const text = slice.toString('utf8');
-      const foldedText = foldAscii(text);
+      const foldedText = foldAsciiBytes(slice);
       let count = 0;
       let firstHit = -1;
       let offset = foldedText.indexOf(foldedQuery);
@@ -359,14 +387,13 @@ export class ContextStore {
       if (count === 0) {
         continue;
       }
-      const prefixBytes = Buffer.byteLength(text.slice(0, firstHit), 'utf8');
-      const matchBytes = Buffer.byteLength(text.slice(firstHit, firstHit + matchLength), 'utf8');
-      const absoluteStart = chunk.start + prefixBytes;
-      const previewSlice = slice.subarray(prefixBytes, Math.min(slice.length, prefixBytes + safePreviewBytes));
+      const absoluteStart = chunk.start + firstHit;
+      const previewSlice = slice.subarray(firstHit, Math.min(slice.length, firstHit + safePreviewBytes));
       hits.push({
         pointer: `${DEFAULT_POINTER_PREFIX}${this.context.index.object_id}${DEFAULT_CHUNK_PREFIX}${chunk.id}`,
+        offset: firstHit,
         start_byte: absoluteStart,
-        end_byte: absoluteStart + matchBytes,
+        match_bytes: matchBytes,
         score: count,
         preview: previewSlice.toString('utf8'),
         firstHit: absoluteStart,
@@ -384,10 +411,11 @@ export class ContextStore {
       return a.chunkId.localeCompare(b.chunkId);
     });
 
-    return hits.slice(0, Math.max(0, topK)).map(({ pointer, start_byte, end_byte, score, preview }) => ({
+    return hits.slice(0, Math.max(0, Math.floor(topK))).map(({ pointer, offset, start_byte, match_bytes, score, preview }) => ({
       pointer,
+      offset,
       start_byte,
-      end_byte,
+      match_bytes,
       score,
       preview
     }));
