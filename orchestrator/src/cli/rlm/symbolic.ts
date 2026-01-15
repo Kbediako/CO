@@ -306,6 +306,26 @@ function validatePlan(
   };
 }
 
+function validatePlanPointers(validation: PlannerValidationResult, contextStore: ContextStore): void {
+  const ensurePointer = (pointer?: string) => {
+    if (!pointer) {
+      return;
+    }
+    if (!contextStore.validatePointer(pointer)) {
+      throw new Error('plan_validation_error');
+    }
+  };
+
+  for (const read of validation.reads) {
+    ensurePointer(read.pointer);
+  }
+  for (const subcall of validation.subcalls) {
+    for (const snippet of subcall.snippets) {
+      ensurePointer(snippet.pointer);
+    }
+  }
+}
+
 function buildPlannerPrompt(params: {
   goal: string;
   contextStore: ContextStore;
@@ -457,6 +477,7 @@ export async function runSymbolicLoop(options: SymbolicLoopOptions): Promise<Rlm
       let plan: PlannerPlan | null = null;
       let validation: PlannerValidationResult | null = null;
       const plannerErrors: string[] = [];
+      const hasPriorSubcalls = priorSubcalls.length > 0;
 
       for (let attempt = 0; attempt < 2; attempt += 1) {
         const raw = await options.runPlanner(
@@ -474,16 +495,24 @@ export async function runSymbolicLoop(options: SymbolicLoopOptions): Promise<Rlm
           }
           return await finalize({ status: 'invalid_config', exitCode: 5 });
         }
+        let validationError: string | null = null;
         try {
           validation = validatePlan(plan, options.budgets);
-          break;
+          validatePlanPointers(validation, options.contextStore);
         } catch {
-          plannerErrors.push('plan_validation_error');
+          validationError = 'plan_validation_error';
+        }
+        if (!validationError && plan.intent === 'final' && !hasPriorSubcalls) {
+          validationError = 'final_requires_subcall';
+        }
+        if (validationError) {
+          plannerErrors.push(validationError);
           if (attempt === 0) {
             continue;
           }
           return await finalize({ status: 'invalid_config', exitCode: 5 });
         }
+        break;
       }
 
       if (!plan || !validation) {
@@ -563,7 +592,7 @@ export async function runSymbolicLoop(options: SymbolicLoopOptions): Promise<Rlm
         } else if (typeof read.start_byte === 'number') {
           const result = await options.contextStore.readSpan(read.start_byte, read.bytes);
           readExcerpts.push({
-            pointer: `start_byte:${read.start_byte}`,
+            pointer: `start_byte=${read.start_byte} bytes=${read.bytes}`,
             excerpt: truncateUtf8ToBytes(result.text, options.budgets.maxBytesPerChunkRead)
           });
         }
@@ -589,9 +618,25 @@ export async function runSymbolicLoop(options: SymbolicLoopOptions): Promise<Rlm
         await mkdir(subcallDir, { recursive: true });
 
         const maxSnippets = options.budgets.maxSnippetsPerSubcall;
-        const snippets = rawSubcall.snippets.slice(0, maxSnippets);
-        const spans = rawSubcall.spans.slice(0, maxSnippets);
-        const clampedSnippets = rawSubcall.snippets.length > snippets.length || rawSubcall.spans.length > spans.length;
+        const rawSnippets = rawSubcall.snippets;
+        const rawSpans = rawSubcall.spans;
+        const snippets = rawSnippets.slice(0, maxSnippets);
+        const unclampedSpans = rawSpans.slice(0, maxSnippets);
+        const clampedSnippets = rawSnippets.length > snippets.length || rawSpans.length > unclampedSpans.length;
+
+        let spanBytesClamped = false;
+        const spans = unclampedSpans.map((span) => {
+          const spanBytes = Math.max(0, span.end_byte - span.start_byte);
+          const cappedBytes = Math.min(spanBytes, options.budgets.maxBytesPerSnippet);
+          const endByte = span.start_byte + cappedBytes;
+          if (endByte < span.end_byte) {
+            spanBytesClamped = true;
+          }
+          return {
+            start_byte: span.start_byte,
+            end_byte: endByte
+          };
+        });
 
         const resolvedSnippets: Array<{ meta: RlmSymbolicSnippet | RlmSymbolicSpan; text: string }> = [];
         for (const snippet of snippets) {
@@ -608,8 +653,8 @@ export async function runSymbolicLoop(options: SymbolicLoopOptions): Promise<Rlm
           }
         }
         for (const span of spans) {
-          const bytes = span.end_byte - span.start_byte;
-          const result = await options.contextStore.readSpan(span.start_byte, bytes);
+          const spanBytes = Math.max(0, span.end_byte - span.start_byte);
+          const result = await options.contextStore.readSpan(span.start_byte, spanBytes);
           resolvedSnippets.push({ meta: span, text: result.text });
         }
 
@@ -641,6 +686,7 @@ export async function runSymbolicLoop(options: SymbolicLoopOptions): Promise<Rlm
           ...snippetBlocks.map((text, idx) => `Snippet ${idx + 1}:\n${text}`)
         ];
         const subcallPrompt = promptLines.join('\n\n');
+        const promptBytes = byteLength(subcallPrompt);
 
         const output = await options.runSubcall(subcallPrompt, { id: subcallId, purpose: rawSubcall.purpose });
 
@@ -653,8 +699,8 @@ export async function runSymbolicLoop(options: SymbolicLoopOptions): Promise<Rlm
           id: subcallId,
           purpose: rawSubcall.purpose,
           max_input_bytes: maxInput,
-          snippets: rawSubcall.snippets,
-          spans: rawSubcall.spans
+          snippets,
+          spans
         }, null, 2), 'utf8');
         await writeFile(promptPath, subcallPrompt, 'utf8');
         await writeFile(outputPath, output, 'utf8');
@@ -662,7 +708,7 @@ export async function runSymbolicLoop(options: SymbolicLoopOptions): Promise<Rlm
           id: subcallId,
           purpose: rawSubcall.purpose,
           status: 'succeeded',
-          input_bytes: totalBytes,
+          input_bytes: promptBytes,
           clipped
         }, null, 2), 'utf8');
 
@@ -672,8 +718,8 @@ export async function runSymbolicLoop(options: SymbolicLoopOptions): Promise<Rlm
           subcall: {
             id: subcallId,
             purpose: rawSubcall.purpose,
-            snippets: rawSubcall.snippets.length > 0 ? rawSubcall.snippets : undefined,
-            spans: rawSubcall.spans.length > 0 ? rawSubcall.spans : undefined,
+            snippets: snippets.length > 0 ? snippets : undefined,
+            spans: spans.length > 0 ? spans : undefined,
             max_input_bytes: rawSubcall.max_input_bytes,
             artifact_paths: {
               input: relativeBase(inputPath),
@@ -683,7 +729,7 @@ export async function runSymbolicLoop(options: SymbolicLoopOptions): Promise<Rlm
             },
             clamped: {
               snippets: clampedSnippets,
-              bytes: clipped || maxInputClamped
+              bytes: clipped || maxInputClamped || spanBytesClamped
             },
             status: 'succeeded'
           },

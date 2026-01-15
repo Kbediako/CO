@@ -77,16 +77,39 @@ function clampOverlap(targetBytes: number, overlapBytes: number): number {
   return overlapBytes;
 }
 
+function foldAscii(value: string): string {
+  let changed = false;
+  let output = '';
+  for (let i = 0; i < value.length; i += 1) {
+    const code = value.charCodeAt(i);
+    if (code >= 65 && code <= 90) {
+      if (!changed) {
+        output = value.slice(0, i);
+        changed = true;
+      }
+      output += String.fromCharCode(code + 32);
+    } else if (changed) {
+      output += value[i];
+    }
+  }
+  return changed ? output : value;
+}
+
 function buildChunks(source: Buffer, targetBytes: number, overlapBytes: number): ContextChunk[] {
   const chunks: ContextChunk[] = [];
   if (source.length === 0) {
     return chunks;
   }
-  const overlap = clampOverlap(targetBytes, overlapBytes);
+  const safeTarget = Number.isFinite(targetBytes) ? Math.floor(targetBytes) : 0;
+  if (safeTarget <= 0) {
+    throw new Error('context chunk target_bytes must be > 0');
+  }
+  const safeOverlap = Number.isFinite(overlapBytes) ? Math.floor(overlapBytes) : 0;
+  const overlap = clampOverlap(safeTarget, safeOverlap);
   let index = 0;
   let start = 0;
   while (start < source.length) {
-    const end = Math.min(start + targetBytes, source.length);
+    const end = Math.min(start + safeTarget, source.length);
     const slice = source.subarray(start, end);
     index += 1;
     const id = `c${String(index).padStart(6, '0')}`;
@@ -256,6 +279,20 @@ export class ContextStore {
     return this.context.index.source.byte_length;
   }
 
+  validatePointer(pointer: string): { objectId: string; chunkId: string } | null {
+    const parsed = parseContextPointer(pointer);
+    if (!parsed) {
+      return null;
+    }
+    if (parsed.objectId !== this.context.index.object_id) {
+      return null;
+    }
+    if (!this.chunkMap.has(parsed.chunkId)) {
+      return null;
+    }
+    return parsed;
+  }
+
   async read(pointer: string, offset: number, bytes: number): Promise<{ text: string; startByte: number; endByte: number }> {
     const parsed = parseContextPointer(pointer);
     if (!parsed) {
@@ -299,32 +336,36 @@ export class ContextStore {
     if (!trimmed) {
       return [];
     }
-    const lowerQuery = trimmed.toLowerCase();
+    const foldedQuery = foldAscii(trimmed);
+    const matchLength = foldedQuery.length;
+    const safePreviewBytes = Math.max(0, Math.floor(previewBytes));
     const hits: Array<{ pointer: string; start_byte: number; end_byte: number; score: number; preview: string; firstHit: number; chunkId: string }> = [];
 
     for (const chunk of this.context.index.chunks) {
       const slice = await readSpanBytes(this.context.sourcePath, chunk.start, chunk.end - chunk.start);
       const text = slice.toString('utf8');
-      const lowerText = text.toLowerCase();
+      const foldedText = foldAscii(text);
       let count = 0;
       let firstHit = -1;
-      let offset = lowerText.indexOf(lowerQuery);
+      let offset = foldedText.indexOf(foldedQuery);
       while (offset !== -1) {
         if (firstHit === -1) {
           firstHit = offset;
         }
         count += 1;
-        offset = lowerText.indexOf(lowerQuery, offset + lowerQuery.length);
+        offset = foldedText.indexOf(foldedQuery, offset + matchLength);
       }
       if (count === 0) {
         continue;
       }
-      const absoluteStart = chunk.start + firstHit;
-      const previewSlice = slice.subarray(firstHit, Math.min(slice.length, firstHit + previewBytes));
+      const prefixBytes = Buffer.byteLength(text.slice(0, firstHit), 'utf8');
+      const matchBytes = Buffer.byteLength(text.slice(firstHit, firstHit + matchLength), 'utf8');
+      const absoluteStart = chunk.start + prefixBytes;
+      const previewSlice = slice.subarray(prefixBytes, Math.min(slice.length, prefixBytes + safePreviewBytes));
       hits.push({
         pointer: `${DEFAULT_POINTER_PREFIX}${this.context.index.object_id}${DEFAULT_CHUNK_PREFIX}${chunk.id}`,
         start_byte: absoluteStart,
-        end_byte: absoluteStart + lowerQuery.length,
+        end_byte: absoluteStart + matchBytes,
         score: count,
         preview: previewSlice.toString('utf8'),
         firstHit: absoluteStart,

@@ -33,10 +33,13 @@
 - Pointer syntax is `ctx:<object_id>#chunk:<chunk_id>` for all reads/snippets.
 - Pointer-only contract: the planner/root prompt never includes the full context. The runner logs `planner_prompt_bytes` per iteration in `rlm/state.json` with an upper bound of ≤ 32 KB (configurable).
 - Bounded reads: each iteration enforces budgets (defaults): `RLM_MAX_CHUNK_READS_PER_ITERATION` ≤ 8, `RLM_MAX_BYTES_PER_CHUNK_READ` ≤ 8 KB, `RLM_MAX_SUBCALLS_PER_ITERATION` ≤ 4; runner clamps and logs any overages.
+- Search semantics: `context.search` uses deterministic ASCII-only case-insensitive substring matching (A–Z only) so byte offsets remain stable; non-ASCII matches are case-sensitive.
 - Runner-scheduled subcalls: chunk processing happens via runner-created subcalls over pointer IDs; the model does not emit O(N) chunk reads.
 - Symbolic recursion cycle demo: a synthetic context ≥ 50 MB completes **at least one** cycle (planner → ≥1 subcall → runner returns artifact refs → next planner step or `intent=final`). Evidence recorded in `rlm/state.json` with subcall artifact references.
+- Final gating: the runner rejects `intent=final` until at least one subcall has executed; early finals are treated as `plan_validation_error` and retried once.
 - `rlm/state.json` includes required top-level keys: `version`, `mode`, `context`, `symbolic_iterations` (additive to existing fields; do not use `context_object_id` or `symbolic:{iterations}` variants).
 - Defaulting: `RLM_MODE=auto` by default. `delegated` means `CODEX_DELEGATION_PARENT_MANIFEST_PATH` is set. `context_source` is `RLM_CONTEXT_PATH` if set, else the effective prompt text; compute `context_bytes` from the chosen source. If `RLM_MODE=symbolic`, require a valid context source or fail `invalid_config`. If `RLM_MODE=auto`, resolve to `symbolic` when `delegated` **or** `RLM_CONTEXT_PATH` is set **or** `context_bytes` ≥ `RLM_SYMBOLIC_MIN_BYTES` (default 1 MB); otherwise `iterative`. Override env remains available for debugging.
+- Subcall span cap: spans are clamped to `RLM_MAX_BYTES_PER_SNIPPET` (same cap as snippets) and clamping is recorded in state.
 
 ## Non-Goals
 - Changing delegation policy or bypass rules.

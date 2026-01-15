@@ -44,11 +44,15 @@
   - JSON parse + one repair retry on failure; otherwise exit with `invalid_config`.
 - Implement runner executor:
   - Execute `searches`, then `reads`, then `subcalls` with per-iteration budgets.
+  - Enforce ASCII-only case-insensitive search semantics (A–Z only) so byte offsets remain stable.
+  - Reject `intent=final` until at least one subcall has executed; treat early finals as `plan_validation_error` and retry once.
+  - Validate pointers (syntax + object_id match) during plan validation to enable planner retry loops.
   - Store subcall artifacts under `.runs/.../rlm/subcalls/...`.
   - Extend `rlm/state.json` with required top-level keys `{ version, mode, context: { object_id, index_path, chunk_count }, symbolic_iterations: [...] }` (no `context_object_id` or `symbolic:{iterations}` variants).
 - Define subcall execution profile:
   - Single completion, no tools, no repo writes.
   - Concurrency limited by `RLM_MAX_CONCURRENCY`.
+  - Clamp span byte ranges to `RLM_MAX_BYTES_PER_SNIPPET` (same cap as snippets) and log clamping in state.
 - Demo harness:
   - Script or documented command to generate ≥50 MB synthetic context.
   - Run `codex-orchestrator rlm` (or pipeline) with `RLM_CONTEXT_PATH=<file>`.

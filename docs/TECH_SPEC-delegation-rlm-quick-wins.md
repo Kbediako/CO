@@ -194,13 +194,15 @@ Pointer syntax:
 - Validation rules:
   - `intent` must be one of `continue|final|pause|fail`.
   - Each `reads[]` entry requires `bytes` and **either** (`pointer` + `offset`) **or** `start_byte`. Offsets are relative to the chunk start; `start_byte` is absolute into `source.txt`. Bytes are clamped to `RLM_MAX_BYTES_PER_CHUNK_READ`.
+  - Pointer entries must parse and the `object_id` must match the active context; invalid pointers are treated as `plan_validation_error` (and retried once).
   - Each `searches[]` entry requires `query`; `top_k` defaults to `RLM_SEARCH_TOP_K`.
   - Each `subcalls[]` entry requires `purpose` (allowed: `summarize|extract|classify|verify`), `max_input_bytes`, and either non-empty `snippets[]` **or** non-empty `spans[]`.
     - Each `snippets[]` entry requires `bytes` and **either** (`pointer` + `offset`) **or** `start_byte`.
-    - Each `spans[]` entry requires `start_byte` + `end_byte`.
+    - Each `spans[]` entry requires `start_byte` + `end_byte` and is clamped to `RLM_MAX_BYTES_PER_SNIPPET`.
 - Validation + recovery:
   - If JSON parse fails, record `plan_parse_error` in `rlm/state.json` and retry planner once with an explicit “return valid JSON only” repair prompt. If it fails twice, hard-fail with `invalid_config`.
   - If schema validation fails, record `plan_validation_error` and retry once with a repair prompt; if it fails twice, hard-fail with actionable error.
+  - If `intent=final` is returned before any subcall has executed, record `plan_validation_error` and retry once with guidance to run at least one subcall.
   - Clamp `reads`, `searches`, `subcalls` counts to per-iteration budgets and record any clamping in state.
   - Unknown `purpose` values are rejected (or mapped to `summarize`) deterministically.
 - A **symbolic recursion cycle** is: planner step → runner executes ≥1 subcall → runner feeds back subcall outputs (artifact refs + bounded excerpts) → next planner step or `intent=final`.
@@ -210,7 +212,7 @@ Budgets enforced by runner:
 - `RLM_MAX_CHUNK_READS_PER_ITERATION` (default 8)
 - `RLM_MAX_BYTES_PER_CHUNK_READ` (default 8192)
 - `RLM_MAX_SNIPPETS_PER_SUBCALL` (default 8)
-- `RLM_MAX_BYTES_PER_SNIPPET` (default 8192)
+- `RLM_MAX_BYTES_PER_SNIPPET` (default 8192; applies to snippets and spans)
 - `RLM_MAX_SUBCALL_INPUT_BYTES` (default 120000)
 - `RLM_MAX_PLANNER_PROMPT_BYTES` (default 32768; measured as UTF-8 bytes). If the assembled planner prompt would exceed this limit, omit lowest-priority excerpts (search results, then read excerpts) until within budget; record truncation in `rlm/state.json`.
 - Optional `RLM_MAX_CONCURRENCY`
@@ -223,7 +225,7 @@ Budgets enforced by runner:
 - `context.read_span(start_byte, bytes)` (absolute into `source.txt`; bytes clamped to `RLM_MAX_BYTES_PER_CHUNK_READ`)
 - `context.peek(pointer, bytes=256)` (optional)
 - `context.search(query, top_k=RLM_SEARCH_TOP_K)`
-  - Deterministic case-insensitive substring scan over chunk text.
+  - Deterministic ASCII-only case-insensitive substring scan over chunk text (A–Z only; non-ASCII is case-sensitive).
   - Sorted by: descending hit count → ascending first-hit byte offset → ascending chunk id.
   - Default `RLM_SEARCH_TOP_K=20`.
   - Returns up to `top_k` hits with:
@@ -241,6 +243,7 @@ Budgets enforced by runner:
 - Input assembly (normative):
   - For each subcall, build inputs from `snippets[]` (or `spans[]`) in order.
   - Clamp each snippet to `RLM_MAX_BYTES_PER_SNIPPET` and cap snippet count at `RLM_MAX_SNIPPETS_PER_SUBCALL`.
+  - Clamp each span to `RLM_MAX_BYTES_PER_SNIPPET`.
   - Clamp total subcall input bytes to `min(subcall.max_input_bytes, RLM_MAX_SUBCALL_INPUT_BYTES)`; drop or truncate trailing snippets to fit.
   - Record any clamping/truncation in `rlm/state.json` for auditability.
 - Runner may execute subcalls concurrently up to `RLM_MAX_CONCURRENCY`.

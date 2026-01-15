@@ -969,6 +969,112 @@ describe('delegation server spawn start_only', () => {
       await rm(repoRoot, { recursive: true, force: true });
     }
   });
+
+  it('ignores baseline manifests updated after spawn start', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'delegation-spawn-repo-'));
+    const taskId = 'task-0940';
+    const baselineRunId = 'baseline-run';
+    const newRunId = 'run-2';
+    try {
+      const baselineDir = join(repoRoot, '.runs', taskId, 'cli', baselineRunId);
+      const baselineManifest = join(baselineDir, 'manifest.json');
+      await mkdir(baselineDir, { recursive: true });
+      await writeFile(
+        baselineManifest,
+        JSON.stringify({ run_id: baselineRunId, task_id: taskId, log_path: 'logs/baseline.log' }),
+        'utf8'
+      );
+
+      const child = new MockChildProcess();
+      spawnMock.mockReturnValue(child as unknown);
+
+      const spawnPromise = handleDelegateSpawn(
+        {
+          pipeline: 'diagnostics',
+          repo: repoRoot,
+          task_id: taskId,
+          start_only: true,
+          env: { CODEX_ORCHESTRATOR_RUNS_DIR: '.runs' }
+        },
+        repoRoot,
+        false,
+        [repoRoot],
+        ['127.0.0.1'],
+        []
+      );
+
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      const newRunDir = join(repoRoot, '.runs', taskId, 'cli', newRunId);
+      const newManifest = join(newRunDir, 'manifest.json');
+      await mkdir(newRunDir, { recursive: true });
+      await writeFile(
+        newManifest,
+        JSON.stringify({ run_id: newRunId, task_id: taskId, log_path: 'logs/new.log' }),
+        'utf8'
+      );
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      await writeFile(
+        baselineManifest,
+        JSON.stringify({ run_id: baselineRunId, task_id: taskId, log_path: 'logs/baseline.log' }),
+        'utf8'
+      );
+
+      const result = await spawnPromise;
+      const resolvedManifestPath = await realpath(newManifest);
+      expect(result).toMatchObject({
+        run_id: newRunId,
+        manifest_path: resolvedManifestPath
+      });
+    } finally {
+      await rm(repoRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('accepts custom runs roots when start_only is true', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'delegation-spawn-repo-'));
+    const taskId = 'task-0940';
+    const runId = 'run-1';
+    const runsDir = 'custom_runs';
+    try {
+      const runDir = join(repoRoot, runsDir, taskId, 'cli', runId);
+      const manifestPath = join(runDir, 'manifest.json');
+
+      const child = new MockChildProcess();
+      spawnMock.mockReturnValue(child as unknown);
+
+      const spawnPromise = handleDelegateSpawn(
+        {
+          pipeline: 'diagnostics',
+          repo: repoRoot,
+          task_id: taskId,
+          start_only: true,
+          env: { CODEX_ORCHESTRATOR_RUNS_DIR: runsDir }
+        },
+        repoRoot,
+        false,
+        [repoRoot],
+        ['127.0.0.1'],
+        []
+      );
+
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      await mkdir(runDir, { recursive: true });
+      await writeFile(
+        manifestPath,
+        JSON.stringify({ run_id: runId, task_id: taskId, log_path: 'logs/child.log' }),
+        'utf8'
+      );
+
+      const result = await spawnPromise;
+      const resolvedManifestPath = await realpath(manifestPath);
+      expect(result).toMatchObject({
+        run_id: runId,
+        manifest_path: resolvedManifestPath
+      });
+    } finally {
+      await rm(repoRoot, { recursive: true, force: true });
+    }
+  });
 });
 
 describe('delegation server confirmation fallback', () => {

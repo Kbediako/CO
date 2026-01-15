@@ -574,7 +574,7 @@ async function handleDelegateSpawn(
   }
 
   const taskRunsRoot = join(runsRoot, taskId as string, 'cli');
-  const baselineRunIds = new Set(await listRunIds(taskRunsRoot));
+  const baselineRuns = await snapshotRunManifests(taskRunsRoot);
   const spawnStart = Date.now();
 
   const child = spawn('codex-orchestrator', args, {
@@ -584,8 +584,25 @@ async function handleDelegateSpawn(
     stdio: ['ignore', 'ignore', 'ignore']
   });
   let spawnError: Error | null = null;
+  const recordSpawnError = (message: string) => {
+    if (!spawnError) {
+      spawnError = new Error(message);
+    }
+  };
   child.once('error', (error) => {
     spawnError = error instanceof Error ? error : new Error(String(error));
+  });
+  child.once('exit', (code, signal) => {
+    if (code === 0 && !signal) {
+      return;
+    }
+    recordSpawnError(`delegate.spawn child exited with code ${code ?? 'null'} (${signal ?? 'no signal'})`);
+  });
+  child.once('close', (code, signal) => {
+    if (code === 0 && !signal) {
+      return;
+    }
+    recordSpawnError(`delegate.spawn child closed with code ${code ?? 'null'} (${signal ?? 'no signal'})`);
   });
   child.unref();
 
@@ -593,7 +610,7 @@ async function handleDelegateSpawn(
   const manifestInfo = await pollForSpawnManifest({
     taskId: taskId as string,
     taskRunsRoot,
-    baselineRunIds,
+    baselineRuns,
     spawnStart,
     timeoutMs,
     intervalMs: DEFAULT_SPAWN_START_POLL_INTERVAL_MS,
@@ -1463,19 +1480,40 @@ function resolveSpawnStartTimeoutMs(env: NodeJS.ProcessEnv): number {
   return parsed;
 }
 
-async function listRunIds(taskRunsRoot: string): Promise<string[]> {
+async function snapshotRunManifests(
+  taskRunsRoot: string
+): Promise<Map<string, { manifestExists: boolean }>> {
+  const snapshot = new Map<string, { manifestExists: boolean }>();
+  let entries: Array<import('node:fs').Dirent>;
   try {
-    const entries = await readdir(taskRunsRoot, { withFileTypes: true });
-    return entries.filter((entry) => entry.isDirectory()).map((entry) => entry.name);
+    entries = await readdir(taskRunsRoot, { withFileTypes: true });
   } catch {
-    return [];
+    return snapshot;
   }
+
+  await Promise.all(entries.map(async (entry) => {
+    if (!entry.isDirectory()) {
+      return;
+    }
+    const runId = entry.name;
+    const manifestPath = join(taskRunsRoot, runId, 'manifest.json');
+    let exists = false;
+    try {
+      await access(manifestPath);
+      exists = true;
+    } catch {
+      exists = false;
+    }
+    snapshot.set(runId, { manifestExists: exists });
+  }));
+
+  return snapshot;
 }
 
 async function findSpawnManifest(params: {
   taskId: string;
   taskRunsRoot: string;
-  baselineRunIds: Set<string>;
+  baselineRuns: Map<string, { manifestExists: boolean }>;
   spawnStart: number;
 }): Promise<{ runId: string; manifestPath: string; logPath: string | null } | null> {
   let entries: Array<import('node:fs').Dirent>;
@@ -1498,7 +1536,11 @@ async function findSpawnManifest(params: {
     } catch {
       continue;
     }
-    if (params.baselineRunIds.has(runId) && stats.mtimeMs < params.spawnStart) {
+    const baseline = params.baselineRuns.get(runId);
+    if (baseline?.manifestExists) {
+      continue;
+    }
+    if (stats.mtimeMs < params.spawnStart) {
       continue;
     }
     candidates.push({ runId, manifestPath, mtimeMs: stats.mtimeMs });
@@ -1534,7 +1576,7 @@ async function findSpawnManifest(params: {
 async function pollForSpawnManifest(params: {
   taskId: string;
   taskRunsRoot: string;
-  baselineRunIds: Set<string>;
+  baselineRuns: Map<string, { manifestExists: boolean }>;
   spawnStart: number;
   timeoutMs: number;
   intervalMs: number;
@@ -1938,10 +1980,7 @@ function assertRunManifestPath(pathname: string, label: string): void {
   }
   const taskDir = dirname(cliDir);
   const runsDir = dirname(taskDir);
-  if (basename(runsDir) !== '.runs') {
-    throw new Error(`${label} invalid`);
-  }
-  if (!basename(runDir) || !basename(taskDir)) {
+  if (!basename(runDir) || !basename(taskDir) || !basename(runsDir)) {
     throw new Error(`${label} invalid`);
   }
 }

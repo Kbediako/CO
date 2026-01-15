@@ -1460,10 +1460,7 @@ function assertRunManifestPath(pathname: string, label: string): void {
   }
   const taskDir = dirname(cliDir);
   const runsDir = dirname(taskDir);
-  if (basename(runsDir) !== '.runs') {
-    throw new Error(`${label} invalid`);
-  }
-  if (!basename(runDir) || !basename(taskDir)) {
+  if (!basename(runDir) || !basename(taskDir) || !basename(runsDir)) {
     throw new Error(`${label} invalid`);
   }
 }
