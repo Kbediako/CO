@@ -58,36 +58,42 @@ codex -c 'mcp_servers.delegation.enabled=true' ...
 
 RLM (Recursive Language Model) is the long-horizon loop used by the `rlm` pipeline (`codex-orchestrator rlm "<goal>"` or `codex-orchestrator start rlm --goal "<goal>"`). Delegated runs only enter RLM when the child is launched with the `rlm` pipeline (or the rlm runner directly). In auto mode it resolves to symbolic when delegated, when `RLM_CONTEXT_PATH` is set, or when the context exceeds `RLM_SYMBOLIC_MIN_BYTES`; otherwise it stays iterative. The runner writes state to `.runs/<task-id>/cli/<run-id>/rlm/state.json` and stops when the validator passes or budgets are exhausted.
 
+### Delegation flow
 ```mermaid
-flowchart LR
-  A["Parent run\n(MCP disabled)"]
-  B["Background run\n(delegation enabled)"]
+flowchart TB
+  A["Parent run<br/>(MCP disabled)"]
+  B["Background run<br/>(delegation enabled)"]
   C["Delegation MCP server"]
   D["delegate.spawn"]
-  E["Child run\n(pipeline resolved)"]
+  E["Child run<br/>(pipeline resolved)"]
   N{Pipeline = rlm?}
-  P["Standard pipeline\n(plan/build/test/review)"]
-
-  subgraph R["RLM loop"]
-    F["Resolve mode\n(auto -> iterative/symbolic)"]
-    G{Symbolic?}
-    H["Context store\n(chunk + search)"]
-    I["Planner JSON\n(select subcalls)"]
-    J["Subcalls\n(tool + edits)"]
-    K["Validator\n(test command)"]
-    L["State + artifacts\n.runs/<task-id>/cli/<run-id>/rlm/state.json"]
-    M["Exit status"]
-  end
+  P["Standard pipeline<br/>(plan/build/test/review)"]
+  RLM["RLM pipeline<br/>(see next chart)"]
 
   A --> B --> C --> D --> E --> N
-  N -- yes --> F --> G
+  N -- yes --> RLM
   N -- no --> P
+  E -. optional .-> Q["delegate.question.enqueue/poll"] -.-> A
+```
+
+### RLM loop
+```mermaid
+flowchart TB
+  F["Resolve mode<br/>(auto -> iterative/symbolic)"]
+  G{Symbolic?}
+  H["Context store<br/>(chunk + search)"]
+  I["Planner JSON<br/>(select subcalls)"]
+  J["Subcalls<br/>(tool + edits)"]
+  K["Validator<br/>(test command)"]
+  L["State + artifacts<br/>.runs/&lt;task-id&gt;/cli/&lt;run-id&gt;/rlm/state.json"]
+  M["Exit status"]
+
+  F --> G
   G -- yes --> H --> I --> J --> K
   G -- no --> J
   J --> K
   K --> L --> M
   K -- fail & budget left --> F
-  E -. optional .-> Q["delegate.question.enqueue/poll"] -.-> A
 ```
 
 ## Skills (bundled)
