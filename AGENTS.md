@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp 3844d10fb5a85cd23580646f64d14ec2b2275102192305e97e4bd56a6e3f61e0 -->
+<!-- codex:instruction-stamp 11feb58f599afcc1aabc0827d2490e2a710f229cf51fd7f8cea1ae7f040f75e5 -->
 # Codex-Orchestrator Agent Handbook (Template)
 
 Use this repository as the wrapper that coordinates multiple Codex-driven projects. After cloning, replace placeholder metadata (task IDs, documents, SOPs) with values for each downstream initiative while keeping these shared guardrails in place.
@@ -15,6 +15,11 @@ Use this repository as the wrapper that coordinates multiple Codex-driven projec
 - Default to `docs-review` before implementation and `implementation-gate` after code changes (set `CODEX_REVIEW_DEVTOOLS=1` when DevTools are required).
 - Reserve direct shell commands for lightweight discovery or one-off checks that do not require manifest evidence.
 - Delegation is mandatory for top-level tasks: spawn at least one subagent run using `MCP_RUNNER_TASK_ID=<task-id>-<stream>`, capture manifest evidence, and summarize in the main run. Use `DELEGATION_GUARD_OVERRIDE_REASON` only when delegation is impossible and record the justification.
+
+## Docs-First (Spec-Driven)
+- Before any repo edits (code, scripts, config, or docs), create or refresh implementation docs (PRD/TECH_SPEC/ACTION_PLAN or mini-spec).
+- Link mini-specs in `tasks/index.json` and update `last_review` dates as part of the docs-first step.
+- If docs are missing or stale, STOP and request approval before editing files.
 
 ## Oracle (External Assistant)
 - Oracle bundles a prompt plus the right files so another AI (GPT 5 Pro + more) can answer. Use when stuck/bugs/reviewing.

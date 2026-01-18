@@ -16,6 +16,7 @@ When scoped work meets any trigger in `.agent/SOPs/specs-and-research.md`, creat
 2) Track approvals: default mode is safe `read/edit/run/network`. Log any escalations and mode overrides in `.runs/<task>/<timestamp>/manifest.json`.
 3) Update the active `/tasks/tasks-*.md` file after each meaningful change and pause for review.
 4) Execute only one subtask at a time and wait for explicit approval before advancing.
+5) Docs-first: create or refresh implementation docs (PRD/TECH_SPEC/ACTION_PLAN or mini-spec) before editing any files.
 
 ### Checklist Convention
 Use explicit checkboxes (`[ ]` → `[x]`) for every task and subtask tracked in `/tasks` or mirror docs. Flip the marker to `[x]` as soon as the work is complete and reference the supporting run manifest or log alongside the checkbox note.

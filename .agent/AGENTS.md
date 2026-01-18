@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp e63de7e7dc95f095f551e9d030a28bb71137b783f196453e5ce5fbf7a92d327e -->
+<!-- codex:instruction-stamp 32394a4e2f70bb986abbe0b9d2d94fe8ad5c3c70b211577bf2bf63fba089c6cc -->
 # Agent Enablement
 
 ## Added by Bootstrap 2025-10-16
@@ -41,14 +41,15 @@
 
 ### Codex CLI prompts
 - Keep the prompt files `~/.codex/prompts/diagnostics.md` and `~/.codex/prompts/review-handoff.md` on every workstation (they are not checked into the repo). Each prompt wires `/prompts:<name>` to the required orchestrator commands so contributors do not have to remember the sequences manually.
-- `/prompts:diagnostics TASK=<task-id> MANIFEST=<path> [NOTES=<free text>]` exports `MCP_RUNNER_TASK_ID=$TASK`, runs `npx codex-orchestrator start diagnostics --format json`, tails `.runs/$TASK/cli/<run-id>/manifest.json` (or `status --watch`), and reminds you to mirror evidence + `$MANIFEST` references into `/tasks`, `docs/TASKS.md`, `.agent/task/...`, `.runs/$TASK/metrics.json`, and `out/$TASK/state.json`.
+- `/prompts:diagnostics TASK=<task-id> MANIFEST=<path> [NOTES=<free text>]` exports `MCP_RUNNER_TASK_ID=$TASK`, runs `npx @kbediako/codex-orchestrator start diagnostics --format json`, tails `.runs/$TASK/cli/<run-id>/manifest.json` (or `npx @kbediako/codex-orchestrator status --run <run-id> --watch --interval 10`), and reminds you to mirror evidence + `$MANIFEST` references into `/tasks`, `docs/TASKS.md`, `.agent/task/...`, `.runs/$TASK/metrics.json`, and `out/$TASK/state.json`.
 - `/prompts:review-handoff TASK=<task-id> MANIFEST=<path> NOTES=<goal + summary + risks + optional questions>` re-validates guardrails via `node scripts/delegation-guard.mjs`, `node scripts/spec-guard.mjs --dry-run`, executes `npm run lint`, `npm run test`, optional `npm run eval:test`, runs `node scripts/diff-budget.mjs`, then runs `npm run review`, and ensures approvals/escalations are logged in `$MANIFEST` before checklists flip.
+- Standalone review (outside pipelines): use `codex review` (non-interactive) and run it often during implementation; prefer a custom prompt for WIP checks. See `docs/standalone-review-guide.md`. For manifest evidence, run `TASK=<task-id> NOTES="..." MANIFEST=<path> npm run review -- --manifest <path>` (or ensure `MCP_RUNNER_TASK_ID` is already set); in non-interactive/CI (`CODEX_REVIEW_NON_INTERACTIVE=1`, `CODEX_NON_INTERACTIVE=1`, or `CODEX_NO_INTERACTIVE=1`) it prints the handoff prompt unless `FORCE_CODEX_REVIEW=1` is set.
 - Always use these prompts before running diagnostics or prepping a review; they are the canonical way to drive the orchestrator so manifests, approvals, and docs stay in sync across machines.
 
 ### Frontend Testing Pipeline (Core)
 Note: pipelines already set `CODEX_NON_INTERACTIVE=1`; keep it for shortcut runs and other automation.
-- Default-off DevTools: `CODEX_NON_INTERACTIVE=1 npx codex-orchestrator start frontend-testing --format json --no-interactive --task <task-id>`.
-- DevTools-enabled: `CODEX_NON_INTERACTIVE=1 CODEX_REVIEW_DEVTOOLS=1 npx codex-orchestrator start frontend-testing --format json --no-interactive --task <task-id>` or `CODEX_NON_INTERACTIVE=1 codex-orchestrator frontend-test --devtools`.
+- Default-off DevTools: `CODEX_NON_INTERACTIVE=1 npx @kbediako/codex-orchestrator start frontend-testing --format json --no-interactive --task <task-id>`.
+- DevTools-enabled: `CODEX_NON_INTERACTIVE=1 CODEX_REVIEW_DEVTOOLS=1 npx @kbediako/codex-orchestrator start frontend-testing --format json --no-interactive --task <task-id>` or `CODEX_NON_INTERACTIVE=1 codex-orchestrator frontend-test --devtools`.
 - Shortcut: `CODEX_NON_INTERACTIVE=1 codex-orchestrator frontend-test` runs the `frontend-testing` pipeline with DevTools off unless `--devtools` is set.
 - Readiness check: `codex-orchestrator doctor --format json` reports DevTools skill + MCP config availability.
 - Setup helper: `codex-orchestrator devtools setup` prints setup steps (`--yes` to apply).
@@ -70,6 +71,7 @@ Note: pipelines already set `CODEX_NON_INTERACTIVE=1`; keep it for shortcut runs
 
 ### Workflow Pointers
 - Always start by reviewing the relevant PRD in `/tasks` and its mirrored snapshot in `/docs`.
+- Docs-first: create or refresh implementation docs (PRD/TECH_SPEC/ACTION_PLAN or mini-spec) before editing any files.
 - Use templates in `.agent/task/templates/` to draft PRDs, task lists, mini-specs, and research notes.
 - Run `node scripts/delegation-guard.mjs` and `node scripts/spec-guard.mjs --dry-run` before opening reviews to ensure delegation and specs stay in sync with code changes.
 - Default decision policy and autonomy rules live in `.agent/SOPs/agent-autonomy-defaults.md`.

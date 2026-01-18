@@ -1,5 +1,10 @@
 # Technical Spec - Recursive Language Model Orchestrator (Task 0105)
 
+## Status (Legacy)
+This spec captures the original iterative RLM plan. True RLM (symbolic context + planner/subcalls) shipped under task 0951. Use:
+- `docs/TECH_SPEC-delegation-rlm-quick-wins.md`
+- `docs/FOLLOWUP-0951-true-rlm-symbolic.md`
+
 ## Overview
 - Objective: Add a portable RLM runner that turns Codex into a self-refining orchestrator loop for any repo, with validator-gated termination and optional role splits.
 - In Scope:

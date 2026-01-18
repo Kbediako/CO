@@ -30,13 +30,14 @@ Use this as `/prompts:diagnostics` with required vars: `TASK=<task-id> MANIFEST=
 Checklist for the run (non-interactive):
 1) Abort if `TASK` or `MANIFEST` is missing. Optionally record `NOTES` in the manifest summary.
 2) `export MCP_RUNNER_TASK_ID="$TASK"` (do not lowercase or mutate).
-3) Ensure TFGRPO/feature flags stay unset for baseline diagnostics (e.g., `FEATURE_TFGRPO_GROUP` must be empty).
-4) Run diagnostics: `npx codex-orchestrator start diagnostics --format json`.
+3) Confirm `TASK` is registered in `tasks/index.json` (or use an existing registered task id). For top-level tasks, run a delegated subagent with `MCP_RUNNER_TASK_ID=<task-id>-<stream>` so delegation-guard can find manifests; otherwise set `DELEGATION_GUARD_OVERRIDE_REASON` and record it in the manifest.
+4) Ensure TFGRPO/feature flags stay unset for baseline diagnostics (e.g., `FEATURE_TFGRPO_GROUP` must be empty).
+5) Run diagnostics: `npx @kbediako/codex-orchestrator start diagnostics --format json`.
    - Capture `runId` and manifest path from stdout (`.runs/$TASK/cli/<run-id>/manifest.json`).
-5) Watch until completion: `npx codex-orchestrator status --run <run-id> --watch --interval 10` (or tail the manifest) and wait for a terminal state.
-6) Read the manifest, confirm command outcomes (delegation-guard/build/lint/test/spec-guard), and note any failures or approvals.
-7) Mirror evidence using `$MANIFEST`: update `/tasks`, `docs/TASKS.md`, `.agent/task/...`, `.runs/$TASK/metrics.json`, and `out/$TASK/state.json` with the manifest path. Keep approval decisions logged inside the manifest.
-8) Final reply: include `task id`, `run id`, manifest path, command statuses, guardrail outcomes, and any NOTES. Do not add extra commands beyond this sequence.
+6) Watch until completion: `npx @kbediako/codex-orchestrator status --run <run-id> --watch --interval 10` (or tail the manifest) and wait for a terminal state.
+7) Read the manifest, confirm command outcomes (delegation-guard/build/lint/test/spec-guard), and note any failures or approvals.
+8) Mirror evidence using `$MANIFEST`: update `/tasks`, `docs/TASKS.md`, `.agent/task/...`, `.runs/$TASK/metrics.json`, and `out/$TASK/state.json` with the manifest path. Keep approval decisions logged inside the manifest.
+9) Final reply: include `task id`, `run id`, manifest path, command statuses, guardrail outcomes, and any NOTES. Do not add extra commands beyond this sequence.
 PROMPT
 
 write_prompt "review-handoff.md" <<'PROMPT'

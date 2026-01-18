@@ -115,6 +115,7 @@ npx @kbediako/codex-orchestrator start diagnostics --format json
 
 Notes:
 - Use `--task <id>` instead of exporting `MCP_RUNNER_TASK_ID` when scripting runs.
+- Release usage relies on the scoped package (`npx @kbediako/codex-orchestrator`); for local dev, use the repo CLI (`codex-orch` or `node ./bin/codex-orchestrator.ts`) so your changes are picked up. The unscoped `npx codex-orchestrator` is not published.
 - Use `--parent-run <run-id>` to group related runs in manifests (optional).
 - If worktrees aren’t possible, isolate artifacts with `CODEX_ORCHESTRATOR_RUNS_DIR` and `CODEX_ORCHESTRATOR_OUT_DIR`. Use `CODEX_ORCHESTRATOR_ROOT` to point the CLI at a repo root when invoking from outside the repo (optional; defaults to the current working directory). Avoid concurrent builds/tests in the same checkout.
 - For a deeper runbook, see `.agent/SOPs/meta-orchestration.md`.
@@ -122,9 +123,11 @@ Notes:
 ### Codex CLI prompts
 - Note: prompt installers and guardrail scripts live under `scripts/` and are repo-only (not included in the npm package).
 - The custom prompts live outside the repo at `~/.codex/prompts/diagnostics.md` and `~/.codex/prompts/review-handoff.md`. Recreate those files on every fresh machine so `/prompts:diagnostics` and `/prompts:review-handoff` are available in the Codex CLI palette.
+- Canonical diagnostics prompt + output expectations: `docs/diagnostics-prompt-guide.md` (keep in sync with `scripts/setup-codex-prompts.sh`).
+- Standalone review guidance (Codex CLI `codex review`): `docs/standalone-review-guide.md`.
 - These prompts are consumed by the Codex CLI UI only; the orchestrator does not read them. Keep updates synced across machines during onboarding.
 - To install or refresh the prompts (repo-only), run `scripts/setup-codex-prompts.sh` (use `--force` to overwrite existing files).
-- `/prompts:diagnostics` takes `TASK=<task-id> MANIFEST=<path> [NOTES=<free text>]`, exports `MCP_RUNNER_TASK_ID=$TASK`, runs `npx @kbediako/codex-orchestrator start diagnostics --format json`, tails `.runs/$TASK/cli/<run-id>/manifest.json` (or `npx @kbediako/codex-orchestrator status --watch`), and records evidence to `/tasks`, `docs/TASKS.md`, `.agent/task/...`, `.runs/$TASK/metrics.json`, and `out/$TASK/state.json` using `$MANIFEST`.
+- `/prompts:diagnostics` takes `TASK=<task-id> MANIFEST=<path> [NOTES=<free text>]`, exports `MCP_RUNNER_TASK_ID=$TASK`, runs `npx @kbediako/codex-orchestrator start diagnostics --format json`, tails `.runs/$TASK/cli/<run-id>/manifest.json` (or `npx @kbediako/codex-orchestrator status --run <run-id> --watch --interval 10`), and records evidence to `/tasks`, `docs/TASKS.md`, `.agent/task/...`, `.runs/$TASK/metrics.json`, and `out/$TASK/state.json` using `$MANIFEST`.
 - `/prompts:review-handoff` takes `TASK=<task-id> MANIFEST=<path> NOTES=<goal + summary + risks + optional questions>`, re-exports `MCP_RUNNER_TASK_ID`, and (repo-only) runs `node scripts/delegation-guard.mjs`, `node scripts/spec-guard.mjs --dry-run`, `npm run lint`, `npm run test`, optional `npm run eval:test`, plus `npm run review` (wraps `codex review` against the current diff and includes the latest run manifest path as evidence). It also reminds you to log approvals in `$MANIFEST` and mirror the evidence to the same docs/metrics/state targets.
 - In CI / `--no-interactive` pipelines (or when stdin is not a TTY), `npm run review` prints the review handoff prompt (including evidence paths) and exits successfully instead of invoking `codex review`. Set `FORCE_CODEX_REVIEW=1` to run `codex review` in those environments.
 - Always trigger diagnostics and review workflows through these prompts whenever you run the orchestrator so contributors consistently execute the required command sequences and capture auditable manifests.

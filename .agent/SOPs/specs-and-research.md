@@ -10,6 +10,12 @@
 - Performance or SLO risk including indexes, caching, or fan-out.
 - Novel or first-time pattern introduced into the codebase.
 
+### DOCS-FIRST REQUIREMENT (Added 2026-01-18)
+- Before any repo edits (code, scripts, config, or docs), create or refresh the relevant implementation docs.
+- Minimum acceptable doc is a mini-spec stub under `tasks/specs/<id>-<slug>.md` linked from `tasks/index.json`.
+- For larger or multi-step work, update the matching PRD/TECH_SPEC/ACTION_PLAN before edits.
+- If docs are missing or stale, STOP and request approval before touching files.
+
 ### PROCESS HOOKS
 - Phase A (PRD): create a stub `tasks/specs/<id>-<slug>.md` when any trigger applies and link it from the PRD.
 - Phase B (Tasks): for each parent task with a spec, add a first subtask "Write/Update mini-spec and obtain approval" before implementation work.
