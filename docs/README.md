@@ -115,6 +115,7 @@ npx @kbediako/codex-orchestrator start diagnostics --format json
 
 Notes:
 - Use `--task <id>` instead of exporting `MCP_RUNNER_TASK_ID` when scripting runs.
+- Release usage relies on the scoped package (`npx @kbediako/codex-orchestrator`); for local dev, use the repo CLI (`codex-orch` or `node ./bin/codex-orchestrator.ts`) so your changes are picked up. The unscoped `npx codex-orchestrator` is not published.
 - Use `--parent-run <run-id>` to group related runs in manifests (optional).
 - If worktrees aren’t possible, isolate artifacts with `CODEX_ORCHESTRATOR_RUNS_DIR` and `CODEX_ORCHESTRATOR_OUT_DIR`. Use `CODEX_ORCHESTRATOR_ROOT` to point the CLI at a repo root when invoking from outside the repo (optional; defaults to the current working directory). Avoid concurrent builds/tests in the same checkout.
 - For a deeper runbook, see `.agent/SOPs/meta-orchestration.md`.
