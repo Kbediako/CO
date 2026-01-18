@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp 236228a2d15e9c94bb7f3a618adf21b483b46ffca62f12b243da8c9516e7b300 -->
+<!-- codex:instruction-stamp 5996168604d65a59deb6487008b5b7ad25fe7fd5f3a7161ba376bdc02b867dea -->
 # Repository Agent Guidance
 
 ## Project 0303 — Codex Orchestrator Autonomy Enhancements
@@ -23,6 +23,11 @@
 - The docs-review pipeline runs `npm run docs:freshness` after `npm run docs:check` and emits `out/<task-id>/docs-freshness.json`.
 - If `docs:check` fails with `tasks-file-too-large`, the tasks archive automation workflow will open a PR and sync payloads to `task-archives`; use `npm run docs:archive-tasks` for manual fallback.
 - Implementation docs archiving follows `docs/implementation-docs-archive-policy.json`; the automation workflow syncs payloads to `doc-archives` and opens a PR with stubs. Use `npm run docs:archive-implementation` for manual fallback.
+
+## Docs-First Requirement
+- Before any repo edits (code, scripts, config, or docs), create or refresh implementation docs (PRD/TECH_SPEC/ACTION_PLAN or mini-spec).
+- Link mini-specs in `tasks/index.json` and update `last_review` dates before editing files.
+- If docs are missing or stale, STOP and request approval before touching files.
 
 ## Orchestrator-First Default
 - Use `codex-orchestrator` pipelines for planning, implementation, validation, and review work that touches the repo.

@@ -1,5 +1,10 @@
 # Action Plan - Recursive Language Model Orchestrator (Task 0105)
 
+## Status (Legacy)
+This action plan reflects the initial RLM MVP work. The shipped symbolic RLM work lives under task 0951. Use:
+- `docs/ACTION_PLAN-delegation-rlm-quick-wins.md`
+- `docs/FOLLOWUP-0951-true-rlm-symbolic.md`
+
 ## Status Snapshot
 - Current Phase: Planning collateral + docs-review.
 - Run Manifest Link: `.runs/0105-rlm-orchestrator/cli/2026-01-04T17-25-13-940Z-0db8bb3c/manifest.json`.

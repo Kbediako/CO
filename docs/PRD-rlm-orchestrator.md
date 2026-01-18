@@ -1,5 +1,11 @@
 # PRD - Recursive Language Model Orchestrator (Task 0105)
 
+## Status (Legacy)
+This PRD reflects the original iterative RLM scope. True RLM (symbolic context + planner/subcalls) shipped under task 0951. Use:
+- `docs/PRD-delegation-rlm-quick-wins.md`
+- `docs/TECH_SPEC-delegation-rlm-quick-wins.md`
+- `docs/FOLLOWUP-0951-true-rlm-symbolic.md`
+
 ## Summary
 - Problem Statement: Codex can act as an orchestrator today, but the repo’s capabilities are locked inside this codebase and require heavyweight setup. We need a portable RLM loop (self-refine + tool recursion + optional role splits) that can run against any repo with minimal setup and produce auditable artifacts.
 - Desired Outcome: Ship an RLM runner that works via `npx` in any repo, can optionally run as a pipeline, and stops on validator pass while supporting longer-horizon runs (subagents/role splits).

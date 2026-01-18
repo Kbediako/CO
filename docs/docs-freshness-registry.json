@@ -1,12 +1,12 @@
 {
   "version": 1,
-  "generated_at": "2026-01-14",
+  "generated_at": "2026-01-18",
   "entries": [
     {
       "path": ".agent/AGENTS.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-01-05",
+      "last_review": "2026-01-18",
       "cadence_days": 90
     },
     {
@@ -34,7 +34,7 @@
       "path": ".agent/readme.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2025-12-31",
+      "last_review": "2026-01-18",
       "cadence_days": 90
     },
     {
@@ -132,7 +132,7 @@
       "path": ".agent/SOPs/specs-and-research.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2025-12-31",
+      "last_review": "2026-01-18",
       "cadence_days": 90
     },
     {
@@ -713,7 +713,7 @@
       "path": "AGENTS.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2025-12-31",
+      "last_review": "2026-01-18",
       "cadence_days": 90
     },
     {
@@ -965,7 +965,7 @@
       "path": "docs/ACTION_PLAN-rlm-orchestrator.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-01-04",
+      "last_review": "2026-01-18",
       "cadence_days": 90
     },
     {
@@ -1021,7 +1021,7 @@
       "path": "docs/AGENTS.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2025-12-31",
+      "last_review": "2026-01-18",
       "cadence_days": 90
     },
     {
@@ -1204,6 +1204,13 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-01-14",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/FOLLOWUP-0951-true-rlm-symbolic.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-18",
       "cadence_days": 90
     },
     {
@@ -1420,7 +1427,7 @@
       "path": "docs/PRD-rlm-orchestrator.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-01-04",
+      "last_review": "2026-01-18",
       "cadence_days": 90
     },
     {
@@ -1476,7 +1483,21 @@
       "path": "docs/README.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-01-13",
+      "last_review": "2026-01-18",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/diagnostics-prompt-guide.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-18",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/standalone-review-guide.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-18",
       "cadence_days": 90
     },
     {
@@ -1819,7 +1840,7 @@
       "path": "docs/TECH_SPEC-rlm-orchestrator.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-01-04",
+      "last_review": "2026-01-18",
       "cadence_days": 90
     },
     {
@@ -1882,7 +1903,7 @@
       "path": "README.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-01-05",
+      "last_review": "2026-01-18",
       "cadence_days": 90
     },
     {
