@@ -439,23 +439,23 @@
     {
       "path": ".agent/task/0929-oracle-browser-guidance.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-01-03",
-      "cadence_days": 90
+      "status": "archived",
+      "last_review": "2026-01-18",
+      "cadence_days": 365
     },
     {
       "path": ".agent/task/0930-review-comment-capture.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-01-03",
-      "cadence_days": 90
+      "status": "archived",
+      "last_review": "2026-01-18",
+      "cadence_days": 365
     },
     {
       "path": ".agent/task/0931-oracle-devtools-standardization.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-01-03",
-      "cadence_days": 90
+      "status": "archived",
+      "last_review": "2026-01-18",
+      "cadence_days": 365
     },
     {
       "path": ".agent/task/0932-orchestrator-performance-reliability.md",
@@ -1081,6 +1081,13 @@
       "cadence_days": 90
     },
     {
+      "path": "docs/diagnostics-prompt-guide.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-18",
+      "cadence_days": 90
+    },
+    {
       "path": "docs/findings/ethical-life.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -1106,6 +1113,13 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/FOLLOWUP-0951-true-rlm-symbolic.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-18",
       "cadence_days": 90
     },
     {
@@ -1204,13 +1218,6 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-01-14",
-      "cadence_days": 90
-    },
-    {
-      "path": "docs/FOLLOWUP-0951-true-rlm-symbolic.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-01-18",
       "cadence_days": 90
     },
     {
@@ -1487,20 +1494,6 @@
       "cadence_days": 90
     },
     {
-      "path": "docs/diagnostics-prompt-guide.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-01-18",
-      "cadence_days": 90
-    },
-    {
-      "path": "docs/standalone-review-guide.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-01-18",
-      "cadence_days": 90
-    },
-    {
       "path": "docs/reference/aim-style.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -1533,6 +1526,13 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/standalone-review-guide.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-18",
       "cadence_days": 90
     },
     {
@@ -2560,23 +2560,23 @@
     {
       "path": "tasks/tasks-0929-oracle-browser-guidance.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-01-03",
-      "cadence_days": 90
+      "status": "archived",
+      "last_review": "2026-01-18",
+      "cadence_days": 365
     },
     {
       "path": "tasks/tasks-0930-review-comment-capture.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-01-03",
-      "cadence_days": 90
+      "status": "archived",
+      "last_review": "2026-01-18",
+      "cadence_days": 365
     },
     {
       "path": "tasks/tasks-0931-oracle-devtools-standardization.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-01-03",
-      "cadence_days": 90
+      "status": "archived",
+      "last_review": "2026-01-18",
+      "cadence_days": 365
     },
     {
       "path": "tasks/tasks-0932-orchestrator-performance-reliability.md",
