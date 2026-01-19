@@ -77,7 +77,7 @@ jobs:
 
           function extractSection(text, heading) {
             if (!text) return null;
-            const lines = text.split('\\n');
+            const lines = text.split('\n');
             const header = `### ${heading}`;
             const start = lines.findIndex((line) => line.trim() === header);
             if (start === -1) return null;
@@ -92,13 +92,13 @@ jobs:
               }
               collected.push(line);
             }
-            const trimmed = collected.join('\\n').trim();
+            const trimmed = collected.join('\n').trim();
             return trimmed.length > 0 ? trimmed : null;
           }
 
           const overview = extractSection(body, 'Overview') ?? '- No labeled overview items.';
           const bugFixes = extractSection(body, 'Bug Fixes') ?? '- No labeled bug fixes.';
-          const full = body.length > 0 ? `## Full Changelog\\n\\n${body}` : '## Full Changelog\\n\\nNo changes.';
+          const full = body.length > 0 ? `## Full Changelog\n\n${body}` : '## Full Changelog\n\nNo changes.';
 
           const output = [
             '## Release Overview',
@@ -108,7 +108,7 @@ jobs:
             bugFixes,
             '',
             full
-          ].join('\\n');
+          ].join('\n');
 
           fs.writeFileSync('release-notes.md', output);
           NODE
