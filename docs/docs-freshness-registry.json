@@ -1711,6 +1711,13 @@
       "cadence_days": 90
     },
     {
+      "path": "docs/TECH_SPEC-standalone-review-docs-first-ship.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-19",
+      "cadence_days": 90
+    },
+    {
       "path": "docs/TECH_SPEC-slimdown-cycle-2.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",

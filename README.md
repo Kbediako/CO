@@ -47,7 +47,7 @@ codex-orchestrator delegate-server --repo /path/to/repo
 ```
 Optional: add `--mode question_only` to disable `delegate.spawn/pause/cancel`, keeping only `delegate.question.*` + `delegate.status` in the delegate namespace. GitHub tools remain available when GitHub integration is enabled.
 
-Register it with Codex once. Delegation MCP is enabled by default (the only MCP enabled by default). If you’ve disabled it for a run, re-enable per run:
+Register it with Codex once. Delegation MCP is enabled by default (the only MCP enabled by default). To override the default or re-enable after disabling:
 ```bash
 codex mcp add delegation -- codex-orchestrator delegate-server --repo /path/to/repo
 codex -c 'mcp_servers.delegation.enabled=true' ...

@@ -16,7 +16,8 @@
 - Docs-freshness registry updates for new templates/docs.
 
 ## Validation
-- Checks / tests: Standalone review (`codex review --uncommitted`) and manifest evidence for delegation/subagent run if required.
+- Checks / tests: `node scripts/delegation-guard.mjs`, `node scripts/spec-guard.mjs --dry-run`, `node scripts/diff-budget.mjs` (override if needed), `npm run build`, `npm run lint`, `npm run test`, `npm run docs:check`, `npm run docs:freshness`, `npm run review` (or `codex review --uncommitted` for standalone checks).
+- Evidence: capture manifests for delegation/subagent runs and review gates; mirror approvals in PRD/TECH_SPEC + task checklists.
 - Rollback plan: Revert doc/template changes and restore prior guidance if needed.
 
 ## Risks & Mitigations

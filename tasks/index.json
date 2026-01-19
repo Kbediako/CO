@@ -1118,7 +1118,7 @@
         "spec": "tasks/specs/0953-standalone-review-docs-first-ship.md",
         "task": "tasks/tasks-0953-standalone-review-docs-first-ship.md",
         "agent_task": ".agent/task/0953-standalone-review-docs-first-ship.md",
-        "docs": "tasks/specs/0953-standalone-review-docs-first-ship.md"
+        "docs": "docs/TECH_SPEC-standalone-review-docs-first-ship.md"
       }
     }
   ]

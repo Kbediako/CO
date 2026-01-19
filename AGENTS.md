@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp ebdf9d5ee2f260edfd4f7c5f5cc2ab4872fb6a05859dd80f73a5b5add48e76d7 -->
+<!-- codex:instruction-stamp a04aa4d38d5de6c385bffe62029e6e59fffc07f0fa23e905903bb4dec10e27a9 -->
 # Codex-Orchestrator Agent Handbook (Template)
 
 Use this repository as the wrapper that coordinates multiple Codex-driven projects. After cloning, replace placeholder metadata (task IDs, documents, SOPs) with values for each downstream initiative while keeping these shared guardrails in place.
@@ -19,7 +19,7 @@ Use this repository as the wrapper that coordinates multiple Codex-driven projec
 - Once a task id exists, prefer delegation for research, review, and planning work. Use `codex exec` only for pre-task triage (no task id yet) or when delegation is genuinely unavailable (technical/blocking limitation or explicit operational block), and set `DELEGATION_GUARD_OVERRIDE_REASON` with a clear justification.
 - Keep delegation MCP enabled by default (only MCP on by default). Enable other MCPs only when relevant to the task.
 - Avoid hard dependencies on a specific MCP server; use whatever MCPs are available and relevant to the specific task.
-- Bundled skills under `skills/` ship to downstream users; if you have global skills installed, treat those as the primary reference.
+- Bundled skills under `skills/` ship to downstream users; agents should prefer global skills (if installed) and fall back to bundled skills. Example: use `$CODEX_HOME/skills/docs-first` when present, otherwise use `skills/docs-first/SKILL.md`.
 
 ## Docs-First (Spec-Driven)
 - Before any repo edits (code, scripts, config, or docs), create or refresh PRD + TECH_SPEC + ACTION_PLAN + the task checklist.

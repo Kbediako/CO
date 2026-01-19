@@ -9,6 +9,11 @@ import { computeAgeInDays, parseIsoDate } from './lib/docs-helpers.js';
 
 const execFileAsync = promisify(execFile);
 
+/**
+ * Print usage information and available command-line options for the spec-guard script.
+ *
+ * Describes the checks the script performs (code/migration changes require a spec update in tasks/specs or tasks/index.json; TECH_SPEC last_review must be within 30 days) and documents the supported options (--dry-run, -h/--help).
+ */
 function showUsage() {
   console.log(`Usage: node scripts/spec-guard.mjs [--dry-run]
 
@@ -92,6 +97,13 @@ function isSpecPath(file) {
   );
 }
 
+/**
+ * Collects spec Markdown files from the repository spec directories.
+ *
+ * Searches 'tasks/specs' and 'docs/design/specs' for regular files ending with `.md`, ignores `README.md`, and skips directories that do not exist.
+ * @returns {string[]} Sorted list of file paths to spec Markdown files.
+ * @throws {Error} Re-throws filesystem errors encountered while reading a directory, except when the directory is missing (`ENOENT`), which is ignored.
+ */
 async function listSpecFiles() {
   const specDirs = ['tasks/specs', 'docs/design/specs'];
   const files = [];
