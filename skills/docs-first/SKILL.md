@@ -1,6 +1,6 @@
 ---
 name: docs-first
-description: Use when a task requires a spec-driven workflow: draft/refresh PRD + TECH_SPEC + ACTION_PLAN + tasks, link TECH_SPEC in tasks/index.json, and run docs-review before implementation.
+description: "Use when a task requires a spec-driven workflow: draft/refresh PRD + TECH_SPEC + ACTION_PLAN + tasks, link TECH_SPEC in tasks/index.json, and run docs-review before implementation."
 ---
 
 # Docs-First (Spec-Driven)
