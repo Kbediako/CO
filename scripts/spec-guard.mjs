@@ -9,13 +9,18 @@ import { computeAgeInDays, parseIsoDate } from './lib/docs-helpers.js';
 
 const execFileAsync = promisify(execFile);
 
+/**
+ * Print usage information and available command-line options for the spec-guard script.
+ *
+ * Describes the checks the script performs (code/migration changes require a spec update in tasks/specs or tasks/index.json; TECH_SPEC last_review must be within 30 days) and documents the supported options (--dry-run, -h/--help).
+ */
 function showUsage() {
   console.log(`Usage: node scripts/spec-guard.mjs [--dry-run]
 
 Ensures that implementation changes adhere to Codex-Orchestrator spec guardrails.
 Checks include:
   • Code/migration edits must accompany a spec update under tasks/specs or tasks/index.json
-  • Mini-spec last_review dates must be ≤30 days old
+  • TECH_SPEC last_review dates must be ≤30 days old
 
 Options:
   --dry-run   Report failures without exiting non-zero
@@ -92,6 +97,13 @@ function isSpecPath(file) {
   );
 }
 
+/**
+ * Collects spec Markdown files from the repository spec directories.
+ *
+ * Searches 'tasks/specs' and 'docs/design/specs' for regular files ending with `.md`, ignores `README.md`, and skips directories that do not exist.
+ * @returns {string[]} Sorted list of file paths to spec Markdown files.
+ * @throws {Error} Re-throws filesystem errors encountered while reading a directory, except when the directory is missing (`ENOENT`), which is ignored.
+ */
 async function listSpecFiles() {
   const specDirs = ['tasks/specs', 'docs/design/specs'];
   const files = [];
@@ -100,9 +112,13 @@ async function listSpecFiles() {
     try {
       const entries = await readdir(dir, { withFileTypes: true });
       for (const entry of entries) {
-        if (entry.isFile() && entry.name.endsWith('.md')) {
-          files.push(join(dir, entry.name));
+        if (!entry.isFile() || !entry.name.endsWith('.md')) {
+          continue;
         }
+        if (entry.name === 'README.md') {
+          continue;
+        }
+        files.push(join(dir, entry.name));
       }
     } catch (error) {
       const code =

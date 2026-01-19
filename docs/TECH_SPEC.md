@@ -5,7 +5,7 @@
 - Run Manifest Link: `.runs/0940-delegation-autonomy-platform/cli/2026-01-07T16-22-23-363Z-a6f5b94f/manifest.json`.
 - Metrics / State Snapshots: `.runs/0940-delegation-autonomy-platform/metrics.json`, `out/0940-delegation-autonomy-platform/state.json`.
 - Checklist Mirror: `tasks/tasks-0940-delegation-autonomy-platform.md`, `docs/TASKS.md` (0940 section), `.agent/task/0940-delegation-autonomy-platform.md`.
-- Mini-spec: `tasks/specs/0940-delegation-autonomy-platform.md`.
+- TECH_SPEC: `tasks/specs/0940-delegation-autonomy-platform.md`.
 
 ## Task 0918 — Subagent Delegation Enforcement
 - Primary Doc: `docs/TECH_SPEC-subagent-delegation-enforcement.md`

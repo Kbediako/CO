@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp 5996168604d65a59deb6487008b5b7ad25fe7fd5f3a7161ba376bdc02b867dea -->
+<!-- codex:instruction-stamp 8eecb2243f54bf19484f7e4f954492f4b514d0525e82b7b9758d658bb21bb082 -->
 # Repository Agent Guidance
 
 ## Project 0303 — Codex Orchestrator Autonomy Enhancements
@@ -25,15 +25,29 @@
 - Implementation docs archiving follows `docs/implementation-docs-archive-policy.json`; the automation workflow syncs payloads to `doc-archives` and opens a PR with stubs. Use `npm run docs:archive-implementation` for manual fallback.
 
 ## Docs-First Requirement
-- Before any repo edits (code, scripts, config, or docs), create or refresh implementation docs (PRD/TECH_SPEC/ACTION_PLAN or mini-spec).
-- Link mini-specs in `tasks/index.json` and update `last_review` dates before editing files.
+- Before any repo edits (code, scripts, config, or docs), create or refresh PRD + TECH_SPEC + ACTION_PLAN + the task checklist.
+- Link TECH_SPECs in `tasks/index.json` and update `last_review` dates before editing files.
 - If docs are missing or stale, STOP and request approval before touching files.
+- Use `.agent/task/templates/tech-spec-template.md` for TECH_SPECs and `.agent/task/templates/action-plan-template.md` for ACTION_PLANs.
+- Prefer the global `docs-first` skill when installed; bundled skills ship for downstream release packaging.
+- Translate the user request into the PRD and update it as you learn new constraints or scope changes.
 
 ## Orchestrator-First Default
 - Use `codex-orchestrator` pipelines for planning, implementation, validation, and review work that touches the repo.
 - Avoid ad-hoc command chains unless the work is a lightweight discovery step that does not require manifest evidence.
-- Delegation is mandatory for top-level tasks: spawn at least one subagent run using `MCP_RUNNER_TASK_ID=<task-id>-<stream>`, capture manifest evidence, and summarize in the main run. Use `DELEGATION_GUARD_OVERRIDE_REASON` only when delegation is impossible and record the justification.
+- Before implementation, run a standalone review of the task/spec against the user’s intent and record the approval in the spec + checklist notes. If anything is vague, infer with a subagent and self-approve or offer options; only ask the user when truly blocked.
+- Delegation is mandatory for top-level tasks once a task id exists: spawn at least one subagent run using `MCP_RUNNER_TASK_ID=<task-id>-<stream>`, capture manifest evidence, and summarize in the main run. Use `DELEGATION_GUARD_OVERRIDE_REASON` only when delegation is impossible and record the justification.
+- Once a task id exists, prefer delegation for research, review, and planning work. Use `codex exec` only for pre-task triage (no task id yet) or when delegation is genuinely unavailable (technical/blocking limitation or explicit operational block), and set `DELEGATION_GUARD_OVERRIDE_REASON` with a clear justification.
+- Keep delegation MCP enabled by default (only MCP on by default). Enable other MCPs only when relevant to the task.
+- Avoid hard dependencies on a specific MCP server; use whatever MCPs are available and relevant to the specific task.
 - Follow `.agent/SOPs/oracle-usage.md` for Oracle runs (tool cap: 11 attachments; unique basenames; attachments-first workflow).
+
+## Standalone Reviews (Ad-hoc)
+- Use `codex review` for fast checks during implementation; prefer a targeted prompt.
+- Capture the standalone review approval (even if “no issues”) in the spec/task notes before implementation begins.
+- For manifest-backed review evidence, run `npm run review` with the manifest path.
+- See `docs/standalone-review-guide.md` for the canonical workflow.
+- Prefer the global `standalone-review` skill when installed; bundled skills ship for downstream release packaging.
 
 ## PR Lifecycle (Top-Level Agents)
 - Open PRs for code/config changes and keep the scope tied to the active task.

@@ -12,6 +12,13 @@ This guide is the canonical reference for ad-hoc reviews outside pipelines. Use 
 - Run a quick standalone review after each meaningful chunk of work to catch issues early.
 - Prefer a custom focus prompt for targeted checks, for example:
   `codex review "Focus on correctness, regressions, and edge cases in the files I just touched; ignore style; list missing tests."`
+- Capture key findings in the PRD/TECH_SPEC or task notes so context survives compaction.
+- Before implementation begins, run a standalone review of the task/spec against the user’s intent and record the approval (or issues) in the spec/task notes.
+
+## Eval-driven mindset
+- Define the review criteria up front (correctness, regressions, edge cases, missing tests).
+- Keep prompts short and explicit; list the exact files or behaviors you want checked.
+- When you need repeatable results, turn the review into a checklist or a small eval run and compare outcomes over time.
 
 ## With manifest evidence (repo-only)
 If you need the latest run manifest referenced in the review prompt, use the wrapper:

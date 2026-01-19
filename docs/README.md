@@ -80,10 +80,10 @@ Use `npx @kbediako/codex-orchestrator resume --run <run-id>` to continue interru
 
 ## Companion Package Commands
 - `codex-orchestrator mcp serve [--repo <path>] [--dry-run] [-- <extra args>]`: launch the MCP stdio server (delegates to `codex mcp-server`; stdout guard keeps protocol-only output, logs to stderr).
-- `codex-orchestrator init codex [--cwd <path>] [--force]`: copy starter templates into a repo (no overwrite unless `--force`).
+- `codex-orchestrator init codex [--cwd <path>] [--force]`: copy starter templates into a repo (includes `mcp-client.json` and `AGENTS.md`; no overwrite unless `--force`).
 - `codex-orchestrator doctor [--format json]`: check optional tooling dependencies and print install commands.
 - `codex-orchestrator devtools setup [--yes]`: print DevTools MCP setup instructions (`--yes` applies `codex mcp add ...`).
-- `codex-orchestrator skills install [--force] [--codex-home <path>]`: install bundled skills into `$CODEX_HOME/skills`.
+- `codex-orchestrator skills install [--force] [--codex-home <path>]`: install bundled skills into `$CODEX_HOME/skills` (global skills remain the primary reference when installed).
 - `codex-orchestrator self-check --format json`: emit a safe JSON health payload for smoke tests.
 - `codex-orchestrator --version`: print the package version.
 
@@ -164,7 +164,7 @@ Notes:
 
 ## Customizing for New Projects
 - Duplicate the templates under `/tasks`, `docs/`, and `.agent/` for your task ID and keep checklist status mirrored (`[ ]` → `[x]`) with links to the manifest that proves each outcome.
-- Update `docs/PRD.md`, `docs/TECH_SPEC.md`, and `docs/ACTION_PLAN.md` with project details and evidence paths (`.runs/<task-id>/...`).
+- Update `docs/PRD-<slug>.md`, `tasks/specs/<id>-<slug>.md`, and `docs/ACTION_PLAN-<slug>.md` with project details and evidence paths (`.runs/<task-id>/...`).
 - Refresh `.agent/` SOPs with task-specific guardrails, escalation contacts, and artifact locations.
 - Remove placeholder references in manifests/docs before merging so downstream teams see only live project data.
 

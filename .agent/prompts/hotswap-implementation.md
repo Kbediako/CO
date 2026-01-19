@@ -9,18 +9,19 @@
 **Mission**: Execute the implementation work for Codex-Orchestrator Task {{TASK_NUMBER}} while honoring all SOP guardrails, approved specs, and review requirements. Complete only the scoped subtask(s) assigned for this stage, then summarize outcomes for the next agent.
 
 **Context & Inputs**
-- PRD: `docs/PRD-<task-id>.md` (or resolve via `tasks/index.json`)
+- PRD: `docs/PRD-<slug>.md` (or resolve via `tasks/index.json`)
+- ACTION_PLAN: `docs/ACTION_PLAN-<slug>.md`
+- TECH_SPEC (canonical): `tasks/specs/<id>-<slug>.md`
+- TECH_SPEC mirror (if present): `docs/TECH_SPEC-<slug>.md`
 - Canonical task list: `tasks/tasks-<id>-<slug>.md`
-- Mini-spec: `tasks/specs/<task-id>.md`
-- Technical spec: `docs/TECH_SPEC-<task-id>.md`
-- Mirrors: `docs/TECH_SPEC.md`, `.agent/SOPs/specs-and-research.md`
+- Mirrors: `docs/TASKS.md`, `.agent/SOPs/specs-and-research.md`
 - State index: `tasks/index.json`
 - Latest run manifests under `.runs/` (for prior phases)
 
 **Guardrails**
 1. Respect the one-subtask rule; do not start parallel work streams.
 2. Keep commands within approved modes (`read/edit/run/network`); request escalation only if policy allows.
-3. Preserve spec freshness—abort if relevant mini-spec `last_review` exceeds 30 days.
+3. Preserve spec freshness—abort if the TECH_SPEC `last_review` exceeds 30 days.
 4. Capture diffs and logs under `.runs/{{TASK_NUMBER}}/` using the existing manifest schema.
 5. Never commit secrets or alter approval records without authorization.
 

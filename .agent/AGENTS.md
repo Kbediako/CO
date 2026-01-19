@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp 32394a4e2f70bb986abbe0b9d2d94fe8ad5c3c70b211577bf2bf63fba089c6cc -->
+<!-- codex:instruction-stamp a719b662a5a6d76956ac60f4ee485884ed6dc0bc4d87c0d4787a74330b13293b -->
 # Agent Enablement
 
 ## Added by Bootstrap 2025-10-16
@@ -15,6 +15,8 @@
 - Honor the safe `read/edit/run/network` approval profile. Capture escalations in the manifest `approvals` array with reviewer justification and timestamp.
 - Run `node scripts/delegation-guard.mjs` prior to requesting review; if delegation is not possible, set `DELEGATION_GUARD_OVERRIDE_REASON` and record the justification in the checklist.
 - Run `node scripts/spec-guard.mjs --dry-run` prior to requesting review; a failing guard requires refreshing relevant specs (see `.agent/SOPs/specs-and-research.md`).
+- Before implementation, run a standalone review of the task/spec against the user’s intent and record the approval in the spec + checklist notes.
+- Keep delegation MCP enabled by default (only MCP on by default). Enable other MCPs only when relevant to the task.
 
 ### Meta-Orchestrator Mode (Parallel Workstreams)
 - Use parallel workstreams to stay within context limits: split independent work into separate runs/worktrees, then consolidate back to a single reviewed diff.
@@ -70,14 +72,17 @@ Note: pipelines already set `CODEX_NON_INTERACTIVE=1`; keep it for shortcut runs
 - Reset the window if checks restart or feedback arrives; do not merge draft PRs or PRs labeled "do not merge."
 
 ### Workflow Pointers
-- Always start by reviewing the relevant PRD in `/tasks` and its mirrored snapshot in `/docs`.
-- Docs-first: create or refresh implementation docs (PRD/TECH_SPEC/ACTION_PLAN or mini-spec) before editing any files.
-- Use templates in `.agent/task/templates/` to draft PRDs, task lists, mini-specs, and research notes.
+- Always start by reviewing the relevant PRD in `docs/PRD-<slug>.md` and the TECH_SPEC in `tasks/specs/<id>-<slug>.md`.
+- Docs-first: create or refresh PRD + TECH_SPEC + ACTION_PLAN + the task checklist before editing any files.
+- Use templates in `.agent/task/templates/` to draft PRDs, TECH_SPECs, ACTION_PLANs, task lists, and research notes.
+- Prefer the bundled `docs-first` and `standalone-review` skills when applicable.
 - Run `node scripts/delegation-guard.mjs` and `node scripts/spec-guard.mjs --dry-run` before opening reviews to ensure delegation and specs stay in sync with code changes.
 - Default decision policy and autonomy rules live in `.agent/SOPs/agent-autonomy-defaults.md`.
 - Use `.agent/task/templates/subagent-request-template.md` for subagent prompts and deliverables.
 - Orchestrator-first: use `codex-orchestrator` pipelines for planning, implementation, validation, and review; avoid ad-hoc command chains unless no manifest evidence is required.
-- Delegation is mandatory for top-level tasks: spawn at least one subagent run using `MCP_RUNNER_TASK_ID=<task-id>-<stream>`, capture manifest evidence, and summarize in the main run. Use `DELEGATION_GUARD_OVERRIDE_REASON` only when delegation is impossible and record the justification.
+- Delegation is mandatory for top-level tasks once a task id exists: spawn at least one subagent run using `MCP_RUNNER_TASK_ID=<task-id>-<stream>`, capture manifest evidence, and summarize in the main run. Use `DELEGATION_GUARD_OVERRIDE_REASON` only when delegation is impossible (technical/blocking limitation or explicit operational block) and record the justification.
+- Once a task id exists, prefer delegation for research, review, and planning work. Use `codex exec` only for pre-task triage (no task id yet) or when delegation is genuinely unavailable (technical/blocking limitation or explicit operational block), and set `DELEGATION_GUARD_OVERRIDE_REASON` with a clear justification.
+- Avoid hard dependencies on a specific MCP server; use whatever MCPs are available and relevant to the task.
 - Oracle runs must follow `.agent/SOPs/oracle-usage.md` (tool cap: 11 attachments; unique basenames; attachments-first workflow).
 - When editing any `AGENTS.md` file, refresh the instruction stamp with `node scripts/update-instruction-stamp.mjs` (see `.agent/SOPs/instruction-stamps.md`).
 - When writing PR summaries, avoid literal `\n` sequences; use `gh pr create --body-file` or a here-doc so line breaks render correctly in GitHub.

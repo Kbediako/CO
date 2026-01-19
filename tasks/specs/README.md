@@ -1,13 +1,14 @@
 # Spec Templates
 
-last_review: 2099-01-01
-
-Create mini-specs for your project under this directory. Suggested naming pattern: `0001-your-feature.md` with front matter including `last_review: YYYY-MM-DD` so `scripts/spec-guard.mjs` can enforce freshness.
+Store TECH_SPECs for every task under this directory (canonical technical requirements). Suggested naming pattern: `0001-your-feature.md` with front matter including `last_review: YYYY-MM-DD` so `scripts/spec-guard.mjs` can enforce freshness.
+Note: this README is informational and excluded from spec-guard freshness checks.
 
 Recommended sections:
 - Summary & scope
-- Acceptance criteria
+- Technical requirements
+- Architecture / data notes
+- Validation plan
 - Risks & mitigations
 - Review decisions (include approvers + dates)
 
-Add or remove files as needed. Until you create a spec, `spec-guard` will treat this directory as empty and skip freshness checks.
+Specs are required in this repo. PRD (intent) lives in `docs/PRD-*.md`, ACTION_PLAN (sequencing) lives in `docs/ACTION_PLAN-*.md`, and the task checklist lives in `tasks/tasks-*.md`.

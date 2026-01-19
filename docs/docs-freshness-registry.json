@@ -1,47 +1,19 @@
 {
   "version": 1,
-  "generated_at": "2026-01-18",
+  "generated_at": "2026-01-19",
   "entries": [
     {
       "path": ".agent/AGENTS.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-01-18",
-      "cadence_days": 90
-    },
-    {
-      "path": ".agent/prompts/crystalizer.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2025-12-31",
-      "cadence_days": 90
-    },
-    {
-      "path": ".agent/prompts/hotswap-implementation.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2025-12-31",
-      "cadence_days": 90
-    },
-    {
-      "path": ".agent/prompts/mcp-diagnostics.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2025-12-31",
-      "cadence_days": 90
-    },
-    {
-      "path": ".agent/readme.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-01-18",
+      "last_review": "2026-01-19",
       "cadence_days": 90
     },
     {
       "path": ".agent/SOPs/agent-autonomy-defaults.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2025-12-31",
+      "last_review": "2026-01-19",
       "cadence_days": 90
     },
     {
@@ -55,7 +27,7 @@
       "path": ".agent/SOPs/deploy.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2025-12-31",
+      "last_review": "2026-01-19",
       "cadence_days": 90
     },
     {
@@ -132,7 +104,35 @@
       "path": ".agent/SOPs/specs-and-research.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-01-18",
+      "last_review": "2026-01-19",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/prompts/crystalizer.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/prompts/hotswap-implementation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-19",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/prompts/mcp-diagnostics.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/readme.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-19",
       "cadence_days": 90
     },
     {
@@ -605,7 +605,28 @@
       "cadence_days": 90
     },
     {
+      "path": ".agent/task/0953-standalone-review-docs-first-ship.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-19",
+      "cadence_days": 90
+    },
+    {
       "path": ".agent/task/ACTION_PLAN_TEMPLATE.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/task/PRD_TEMPLATE.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/task/TECH_SPEC_TEMPLATE.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2025-12-31",
@@ -633,17 +654,10 @@
       "cadence_days": 90
     },
     {
-      "path": ".agent/task/PRD_TEMPLATE.md",
+      "path": ".agent/task/templates/action-plan-template.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2025-12-31",
-      "cadence_days": 90
-    },
-    {
-      "path": ".agent/task/TECH_SPEC_TEMPLATE.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2025-12-31",
+      "last_review": "2026-01-19",
       "cadence_days": 90
     },
     {
@@ -654,17 +668,10 @@
       "cadence_days": 90
     },
     {
-      "path": ".agent/task/templates/mini-spec-template.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2025-12-31",
-      "cadence_days": 90
-    },
-    {
       "path": ".agent/task/templates/prd-template.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2025-12-31",
+      "last_review": "2026-01-19",
       "cadence_days": 90
     },
     {
@@ -685,7 +692,14 @@
       "path": ".agent/task/templates/tasks-template.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2025-12-31",
+      "last_review": "2026-01-19",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/task/templates/tech-spec-template.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-19",
       "cadence_days": 90
     },
     {
@@ -713,7 +727,14 @@
       "path": "AGENTS.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-01-18",
+      "last_review": "2026-01-19",
+      "cadence_days": 90
+    },
+    {
+      "path": "README.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-19",
       "cadence_days": 90
     },
     {
@@ -983,6 +1004,13 @@
       "cadence_days": 90
     },
     {
+      "path": "docs/ACTION_PLAN-standalone-review-docs-first-ship.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-19",
+      "cadence_days": 90
+    },
+    {
       "path": "docs/ACTION_PLAN-subagent-delegation-enforcement.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -1021,98 +1049,7 @@
       "path": "docs/AGENTS.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-01-18",
-      "cadence_days": 90
-    },
-    {
-      "path": "docs/delegation-runner-workflow.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-01-14",
-      "cadence_days": 90
-    },
-    {
-      "path": "docs/design/notes/2025-11-13-15th-plus.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2025-12-31",
-      "cadence_days": 90
-    },
-    {
-      "path": "docs/design/PRD-design-reference-pipeline.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2025-12-31",
-      "cadence_days": 90
-    },
-    {
-      "path": "docs/design/PRD-frontend-design-pipeline-v2.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2025-12-31",
-      "cadence_days": 90
-    },
-    {
-      "path": "docs/design/PRD-hi-fi-design-toolkit.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2025-12-31",
-      "cadence_days": 90
-    },
-    {
-      "path": "docs/design/specs/DESIGN_REFERENCE_PIPELINE.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2025-12-31",
-      "cadence_days": 90
-    },
-    {
-      "path": "docs/design/specs/FRONTEND_DESIGN_PIPELINE_V2.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2025-12-31",
-      "cadence_days": 90
-    },
-    {
-      "path": "docs/design/specs/HI_FI_DESIGN_TOOLKIT.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-01-08",
-      "cadence_days": 90
-    },
-    {
-      "path": "docs/diagnostics-prompt-guide.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-01-18",
-      "cadence_days": 90
-    },
-    {
-      "path": "docs/findings/ethical-life.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2025-12-31",
-      "cadence_days": 90
-    },
-    {
-      "path": "docs/findings/more-nutrition.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2025-12-31",
-      "cadence_days": 90
-    },
-    {
-      "path": "docs/findings/slimdown-audit.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-01-01",
-      "cadence_days": 90
-    },
-    {
-      "path": "docs/findings/validation-tasks-0908-diff-budget-followups.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2025-12-31",
+      "last_review": "2026-01-19",
       "cadence_days": 90
     },
     {
@@ -1120,41 +1057,6 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-01-18",
-      "cadence_days": 90
-    },
-    {
-      "path": "docs/guides/ci-integration.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2025-12-31",
-      "cadence_days": 90
-    },
-    {
-      "path": "docs/guides/instructions.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2025-12-31",
-      "cadence_days": 90
-    },
-    {
-      "path": "docs/guides/pixel-perfect-local-clones.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2025-12-31",
-      "cadence_days": 90
-    },
-    {
-      "path": "docs/implementation-docs-archive-policy.json",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2025-12-31",
-      "cadence_days": 90
-    },
-    {
-      "path": "docs/PRD_AUTONOMY_UPGRADE.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2025-12-31",
       "cadence_days": 90
     },
     {
@@ -1196,14 +1098,14 @@
       "path": "docs/PRD-delegation-autonomy-platform.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-01-08",
+      "last_review": "2026-01-19",
       "cadence_days": 90
     },
     {
       "path": "docs/PRD-delegation-mcp-framing-compat-fix.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-01-12",
+      "last_review": "2026-01-19",
       "cadence_days": 90
     },
     {
@@ -1452,6 +1354,13 @@
       "cadence_days": 90
     },
     {
+      "path": "docs/PRD-standalone-review-docs-first-ship.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-19",
+      "cadence_days": 90
+    },
+    {
       "path": "docs/PRD-subagent-delegation-enforcement.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -1483,35 +1392,21 @@
       "path": "docs/PRD.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-01-07",
+      "last_review": "2026-01-19",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/PRD_AUTONOMY_UPGRADE.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
       "cadence_days": 90
     },
     {
       "path": "docs/README.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-01-18",
-      "cadence_days": 90
-    },
-    {
-      "path": "docs/reference/aim-style.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2025-12-31",
-      "cadence_days": 90
-    },
-    {
-      "path": "docs/reference/glyphic-style.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2025-12-31",
-      "cadence_days": 90
-    },
-    {
-      "path": "docs/reference/mantis-style.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2025-12-31",
+      "last_review": "2026-01-19",
       "cadence_days": 90
     },
     {
@@ -1522,38 +1417,10 @@
       "cadence_days": 90
     },
     {
-      "path": "docs/specs/exec-jsonl.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2025-12-31",
-      "cadence_days": 90
-    },
-    {
-      "path": "docs/standalone-review-guide.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-01-18",
-      "cadence_days": 90
-    },
-    {
-      "path": "docs/tasks-archive-policy.json",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2025-12-31",
-      "cadence_days": 90
-    },
-    {
       "path": "docs/TASKS.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-01-14",
-      "cadence_days": 90
-    },
-    {
-      "path": "docs/TECH_SPEC_AUTONOMY_UPGRADE.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2025-12-31",
+      "last_review": "2026-01-19",
       "cadence_days": 90
     },
     {
@@ -1602,7 +1469,7 @@
       "path": "docs/TECH_SPEC-delegation-autonomy-platform.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-01-08",
+      "last_review": "2026-01-19",
       "cadence_days": 90
     },
     {
@@ -1844,6 +1711,13 @@
       "cadence_days": 90
     },
     {
+      "path": "docs/TECH_SPEC-standalone-review-docs-first-ship.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-19",
+      "cadence_days": 90
+    },
+    {
       "path": "docs/TECH_SPEC-slimdown-cycle-2.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -1896,28 +1770,203 @@
       "path": "docs/TECH_SPEC.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-01-07",
+      "last_review": "2026-01-19",
       "cadence_days": 90
     },
     {
-      "path": "README.md",
+      "path": "docs/TECH_SPEC_AUTONOMY_UPGRADE.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/delegation-runner-workflow.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-19",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/design/PRD-design-reference-pipeline.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/design/PRD-frontend-design-pipeline-v2.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/design/PRD-hi-fi-design-toolkit.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/design/notes/2025-11-13-15th-plus.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/design/specs/DESIGN_REFERENCE_PIPELINE.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/design/specs/FRONTEND_DESIGN_PIPELINE_V2.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/design/specs/HI_FI_DESIGN_TOOLKIT.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-08",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/diagnostics-prompt-guide.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-01-18",
       "cadence_days": 90
     },
     {
+      "path": "docs/findings/ethical-life.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/findings/more-nutrition.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/findings/slimdown-audit.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-01",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/findings/validation-tasks-0908-diff-budget-followups.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/guides/ci-integration.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/guides/instructions.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-19",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/guides/pixel-perfect-local-clones.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/implementation-docs-archive-policy.json",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/reference/aim-style.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/reference/glyphic-style.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/reference/mantis-style.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/specs/exec-jsonl.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/standalone-review-guide.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-19",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/tasks-archive-policy.json",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
       "path": "skills/delegation-usage/DELEGATION_GUIDE.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-01-14",
+      "last_review": "2026-01-19",
       "cadence_days": 90
     },
     {
       "path": "skills/delegation-usage/SKILL.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-01-14",
+      "last_review": "2026-01-19",
+      "cadence_days": 90
+    },
+    {
+      "path": "skills/docs-first/SKILL.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-19",
+      "cadence_days": 90
+    },
+    {
+      "path": "skills/standalone-review/SKILL.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-19",
       "cadence_days": 90
     },
     {
@@ -2281,7 +2330,7 @@
       "path": "tasks/specs/0940-delegation-autonomy-platform.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-01-08",
+      "last_review": "2026-01-19",
       "cadence_days": 90
     },
     {
@@ -2292,10 +2341,17 @@
       "cadence_days": 90
     },
     {
+      "path": "tasks/specs/0953-standalone-review-docs-first-ship.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-19",
+      "cadence_days": 90
+    },
+    {
       "path": "tasks/specs/README.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2025-12-31",
+      "last_review": "2026-01-19",
       "cadence_days": 90
     },
     {
@@ -2723,6 +2779,20 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-01-15",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/tasks-0953-standalone-review-docs-first-ship.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-19",
+      "cadence_days": 90
+    },
+    {
+      "path": "templates/codex/AGENTS.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-19",
       "cadence_days": 90
     }
   ]

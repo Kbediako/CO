@@ -6,6 +6,11 @@
 - Problem Statement:
 - Desired Outcome:
 
+## User Request Translation (Context Anchor)
+- User intent / needs (in your own words):
+- Success criteria / acceptance:
+- Constraints / non-goals:
+
 ## Goals
 - 
 

@@ -5,12 +5,12 @@ relates_to: tasks/tasks-0940-delegation-autonomy-platform.md
 risk: high
 owners:
   - Codex
-last_review: 2026-01-08
+last_review: 2026-01-19
 ---
 
 ## Summary
 - Objective: Deliver a delegate-first control plane (MCP tools + UI) with always-on RLM and real-time observability.
-- Constraints: Keep tool surface minimal; default to safe, explicit enablement; avoid remote dependencies.
+- Constraints: Keep tool surface minimal; default to safe, explicit enablement for non-delegation MCPs while delegation stays enabled by default; avoid remote dependencies.
 
 ## Proposed Changes
 - Architectural design adjustments:
@@ -31,11 +31,11 @@ last_review: 2026-01-08
 ## Rollout Plan
 - Prerequisites: docs approval + delegation tool contract finalized + MCP host support for codex_private (hard gate for runner-injected secrets).
 - Testing strategy: tool contract tests, UI integration tests, config precedence tests.
-- Launch steps: staged rollout by milestone; keep default flags disabled until verified.
+- Launch steps: staged rollout by milestone; keep non-delegation flags disabled until verified (delegation remains enabled by default).
 
 ## Definition of Done
 - MCP server shipped and exposes delegate.spawn/status/pause/cancel.
-- Delegate tools disabled by default; enabled per run via CLI override (mcp_servers.delegation.enabled=true).
+- Delegate tools enabled by default (only MCP on by default); can be disabled per run via mcp_servers.delegation.enabled=false.
 - MCP host supports codex_private for runner-injected secrets (confirm_nonce, delegation_token).
 - Delegated runs default to RLM-on; override rules and timing documented and tested.
 - RLM budgets and sandbox defaults are defined; budget-exceeded behavior is enforced and testable.

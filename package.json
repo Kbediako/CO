@@ -1,6 +1,6 @@
 {
   "name": "@kbediako/codex-orchestrator",
-  "version": "0.1.11",
+  "version": "0.1.12",
   "license": "SEE LICENSE IN LICENSE",
   "type": "module",
   "bin": {
