@@ -38,7 +38,7 @@ last_review: 2026-01-19
 - Conflict audit captured via `codex exec` as a lightweight audit (no manifest emitted); output at `out/0953-conflict-audit/codex-exec-summary.md`.
 - `codex exec` does not emit `.runs/**` manifests, even when `MCP_RUNNER_TASK_ID` is set; use `codex-orchestrator start <pipeline> --task <id>` for manifest-backed evidence.
 - Delegation subagent run created a manifest at `.runs/0953-standalone-review-docs-first-ship-audit/cli/2026-01-19T05-53-04-728Z-62111065/manifest.json` (delegate.spawn timed out before returning, but the run was created).
-- Standalone review (`codex review --uncommitted`) flagged an invalid `last_review` placeholder and missing tracked docs/templates; resolved by setting `tasks/specs/README.md` to `last_review: 2026-01-19` and adding the new PRD/ACTION_PLAN/templates. Approval recorded here and mirrored to the task checklists (no manifest emitted).
+- Standalone review (`codex review --uncommitted`) flagged an invalid `last_review` placeholder and missing tracked docs/templates; resolved by excluding `tasks/specs/README.md` from spec-guard freshness checks (informational README) and adding the new PRD/ACTION_PLAN/templates. Approval recorded here and mirrored to the task checklists (no manifest emitted).
 
 ## Approvals
 - Reviewer: Codex (standalone review)
