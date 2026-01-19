@@ -1,13 +1,12 @@
-<!-- codex:instruction-stamp 7130bddb0376a4ca793e03628cd8f5d8a5f4a30b63662cda1e71aad2dea67a22 -->
+<!-- codex:instruction-stamp 7477a786938b5c7f883b7d21a0954b48a1ddbbc3dcabd052b347b303cb3075a4 -->
 # Agent Instructions (Template)
 
 ## Orchestrator-first workflow
 - Use `codex-orchestrator` pipelines for planning, implementation, validation, and review.
 - Default to `docs-review` before implementation and `implementation-gate` after code changes.
 - Before implementation, run a standalone review of the task/spec against the user’s intent and record the approval in the spec + checklist notes.
-- Delegation is mandatory for top-level tasks: spawn at least one subagent run using `MCP_RUNNER_TASK_ID=<task-id>-<stream>`, capture manifest evidence, and summarize in the main run. Use `DELEGATION_GUARD_OVERRIDE_REASON` only when delegation is impossible and record the justification.
-- Prefer delegation for research, review, and planning work once a task id exists.
-- Use `codex exec` only for pre-task triage (no task id yet) or when delegation is unavailable.
+- Delegation is mandatory for top-level tasks once a task id exists: spawn at least one subagent run using `MCP_RUNNER_TASK_ID=<task-id>-<stream>`, capture manifest evidence, and summarize in the main run. Use `DELEGATION_GUARD_OVERRIDE_REASON` only when delegation is impossible (technical/blocking limitation or explicit operational block) and record the justification.
+- Once a task id exists, prefer delegation for research, review, and planning work. Use `codex exec` only for pre-task triage (no task id yet) or when delegation is genuinely unavailable (technical/blocking limitation or explicit operational block), and set `DELEGATION_GUARD_OVERRIDE_REASON` with a clear justification.
 - Keep delegation MCP enabled by default (only MCP on by default). Enable other MCPs only when relevant to the task.
 
 ## Docs-first (spec-driven)
@@ -27,4 +26,4 @@
 ## Instruction stamp
 - If you edit this file, refresh the instruction stamp.
 - One-liner:
-  `node -e "const fs=require('fs');const crypto=require('crypto');const p='AGENTS.md';const raw=fs.readFileSync(p,'utf8');const body=raw.replace(/^<!--\\s*codex:instruction-stamp\\s+[a-f0-9]{64}\\s*-->\\r?\\n?/i,'');const hash=crypto.createHash('sha256').update(body,'utf8').digest('hex');fs.writeFileSync(p,'<!-- codex:instruction-stamp '+hash+' -->\\n'+body);"`
+  `node -e "const fs=require('fs');const crypto=require('crypto');const p=fs.existsSync('templates/codex/AGENTS.md')?'templates/codex/AGENTS.md':'AGENTS.md';const raw=fs.readFileSync(p,'utf8');const body=raw.replace(/^<!--\\s*codex:instruction-stamp\\s+[a-f0-9]{64}\\s*-->\\r?\\n?/i,'');const hash=crypto.createHash('sha256').update(body,'utf8').digest('hex');fs.writeFileSync(p,'<!-- codex:instruction-stamp '+hash+' -->\\n'+body);"`

@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp d044d87ee01a4abc3791a58440a166bde0597a5f18bb7a2d8c7d0edd1735aaf2 -->
+<!-- codex:instruction-stamp 7d81864f85f1ea145717448bc3ebe57492963d29bf466b59df99bb4acedb1418 -->
 # Codex-Orchestrator Agent Handbook (Template)
 
 Use this repository as the wrapper that coordinates multiple Codex-driven projects. After cloning, replace placeholder metadata (task IDs, documents, SOPs) with values for each downstream initiative while keeping these shared guardrails in place.
@@ -16,7 +16,7 @@ Use this repository as the wrapper that coordinates multiple Codex-driven projec
 - Before implementation, run a standalone review of the task/spec against the user’s intent and record the approval in the spec + checklist notes. If anything is vague, infer with a subagent and self-approve or offer options; only ask the user when truly blocked.
 - Reserve direct shell commands for lightweight discovery or one-off checks that do not require manifest evidence.
 - Delegation is mandatory for top-level tasks: spawn at least one subagent run using `MCP_RUNNER_TASK_ID=<task-id>-<stream>`, capture manifest evidence, and summarize in the main run. Use `DELEGATION_GUARD_OVERRIDE_REASON` only when delegation is impossible and record the justification.
-- Prefer delegation for research, review, and planning work once a task id exists; use `codex exec` only for pre-task triage (no task id yet) or when delegation is unavailable.
+- Once a task id exists, prefer delegation for research, review, and planning work. Use `codex exec` only for pre-task triage (no task id yet) or when delegation is genuinely unavailable (technical/blocking limitation or explicit operational block), and set `DELEGATION_GUARD_OVERRIDE_REASON` with a clear justification.
 - Keep delegation MCP enabled by default (only MCP on by default). Enable other MCPs only when relevant to the task.
 - Avoid hard dependencies on a specific MCP server; use whatever MCPs are available and relevant to the specific task.
 - Bundled skills under `skills/` ship to downstream users; if you have global skills installed, treat those as the primary reference.

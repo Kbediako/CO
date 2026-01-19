@@ -1,6 +1,6 @@
 # ACTION_PLAN Template
 
-## Added by Bootstrap 2025-10-16
+## Added by Bootstrap (refresh as needed)
 
 ## Summary
 - Goal:

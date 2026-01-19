@@ -8,7 +8,7 @@ owners:
 last_review: <YYYY-MM-DD>
 ---
 
-## Added by Bootstrap 2025-10-16
+## Added by Bootstrap (refresh as needed)
 
 ## Summary
 - Objective:

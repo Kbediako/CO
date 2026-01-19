@@ -100,9 +100,13 @@ async function listSpecFiles() {
     try {
       const entries = await readdir(dir, { withFileTypes: true });
       for (const entry of entries) {
-        if (entry.isFile() && entry.name.endsWith('.md')) {
-          files.push(join(dir, entry.name));
+        if (!entry.isFile() || !entry.name.endsWith('.md')) {
+          continue;
         }
+        if (entry.name === 'README.md') {
+          continue;
+        }
+        files.push(join(dir, entry.name));
       }
     } catch (error) {
       const code =

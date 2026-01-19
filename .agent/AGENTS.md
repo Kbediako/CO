@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp 73cf8dce499685ea194d8da8a11bfc405ea08f157cf4f7e9a540408404095882 -->
+<!-- codex:instruction-stamp a719b662a5a6d76956ac60f4ee485884ed6dc0bc4d87c0d4787a74330b13293b -->
 # Agent Enablement
 
 ## Added by Bootstrap 2025-10-16
@@ -80,8 +80,8 @@ Note: pipelines already set `CODEX_NON_INTERACTIVE=1`; keep it for shortcut runs
 - Default decision policy and autonomy rules live in `.agent/SOPs/agent-autonomy-defaults.md`.
 - Use `.agent/task/templates/subagent-request-template.md` for subagent prompts and deliverables.
 - Orchestrator-first: use `codex-orchestrator` pipelines for planning, implementation, validation, and review; avoid ad-hoc command chains unless no manifest evidence is required.
-- Delegation is mandatory for top-level tasks: spawn at least one subagent run using `MCP_RUNNER_TASK_ID=<task-id>-<stream>`, capture manifest evidence, and summarize in the main run. Use `DELEGATION_GUARD_OVERRIDE_REASON` only when delegation is impossible and record the justification.
-- Prefer delegation for research, review, and planning work once a task id exists; use `codex exec` only for pre-task triage (no task id yet) or when delegation is unavailable.
+- Delegation is mandatory for top-level tasks once a task id exists: spawn at least one subagent run using `MCP_RUNNER_TASK_ID=<task-id>-<stream>`, capture manifest evidence, and summarize in the main run. Use `DELEGATION_GUARD_OVERRIDE_REASON` only when delegation is impossible (technical/blocking limitation or explicit operational block) and record the justification.
+- Once a task id exists, prefer delegation for research, review, and planning work. Use `codex exec` only for pre-task triage (no task id yet) or when delegation is genuinely unavailable (technical/blocking limitation or explicit operational block), and set `DELEGATION_GUARD_OVERRIDE_REASON` with a clear justification.
 - Avoid hard dependencies on a specific MCP server; use whatever MCPs are available and relevant to the task.
 - Oracle runs must follow `.agent/SOPs/oracle-usage.md` (tool cap: 11 attachments; unique basenames; attachments-first workflow).
 - When editing any `AGENTS.md` file, refresh the instruction stamp with `node scripts/update-instruction-stamp.mjs` (see `.agent/SOPs/instruction-stamps.md`).

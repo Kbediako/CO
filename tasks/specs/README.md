@@ -1,8 +1,7 @@
 # Spec Templates
 
-last_review: 2026-01-19
-
 Store TECH_SPECs for every task under this directory (canonical technical requirements). Suggested naming pattern: `0001-your-feature.md` with front matter including `last_review: YYYY-MM-DD` so `scripts/spec-guard.mjs` can enforce freshness.
+Note: this README is informational and excluded from spec-guard freshness checks.
 
 Recommended sections:
 - Summary & scope
