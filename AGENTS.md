@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp 11feb58f599afcc1aabc0827d2490e2a710f229cf51fd7f8cea1ae7f040f75e5 -->
+<!-- codex:instruction-stamp d044d87ee01a4abc3791a58440a166bde0597a5f18bb7a2d8c7d0edd1735aaf2 -->
 # Codex-Orchestrator Agent Handbook (Template)
 
 Use this repository as the wrapper that coordinates multiple Codex-driven projects. After cloning, replace placeholder metadata (task IDs, documents, SOPs) with values for each downstream initiative while keeping these shared guardrails in place.
@@ -13,13 +13,27 @@ Use this repository as the wrapper that coordinates multiple Codex-driven projec
 ## Orchestrator-First Workflow
 - Use `codex-orchestrator` pipelines for planning, implementation, validation, and review work that touches the repo.
 - Default to `docs-review` before implementation and `implementation-gate` after code changes (set `CODEX_REVIEW_DEVTOOLS=1` when DevTools are required).
+- Before implementation, run a standalone review of the task/spec against the user’s intent and record the approval in the spec + checklist notes. If anything is vague, infer with a subagent and self-approve or offer options; only ask the user when truly blocked.
 - Reserve direct shell commands for lightweight discovery or one-off checks that do not require manifest evidence.
 - Delegation is mandatory for top-level tasks: spawn at least one subagent run using `MCP_RUNNER_TASK_ID=<task-id>-<stream>`, capture manifest evidence, and summarize in the main run. Use `DELEGATION_GUARD_OVERRIDE_REASON` only when delegation is impossible and record the justification.
+- Prefer delegation for research, review, and planning work once a task id exists; use `codex exec` only for pre-task triage (no task id yet) or when delegation is unavailable.
+- Keep delegation MCP enabled by default (only MCP on by default). Enable other MCPs only when relevant to the task.
+- Avoid hard dependencies on a specific MCP server; use whatever MCPs are available and relevant to the specific task.
+- Bundled skills under `skills/` ship to downstream users; if you have global skills installed, treat those as the primary reference.
 
 ## Docs-First (Spec-Driven)
-- Before any repo edits (code, scripts, config, or docs), create or refresh implementation docs (PRD/TECH_SPEC/ACTION_PLAN or mini-spec).
-- Link mini-specs in `tasks/index.json` and update `last_review` dates as part of the docs-first step.
+- Before any repo edits (code, scripts, config, or docs), create or refresh PRD + TECH_SPEC + ACTION_PLAN + the task checklist.
+- Link TECH_SPECs in `tasks/index.json` and update `last_review` dates as part of the docs-first step.
 - If docs are missing or stale, STOP and request approval before editing files.
+- Use `.agent/task/templates/tech-spec-template.md` for TECH_SPECs and `.agent/task/templates/action-plan-template.md` for ACTION_PLANs.
+- Prefer the bundled `docs-first` skill for consistent steps.
+- Translate the user request into the PRD and update it as you learn new constraints or scope changes.
+
+## Standalone Reviews (Ad-hoc)
+- Use `codex review` for quick reviews during implementation; prefer a targeted prompt.
+- When you need manifest-backed review evidence, run `npm run review` with the manifest path.
+- See `docs/standalone-review-guide.md` for the canonical workflow.
+- Prefer the bundled `standalone-review` skill for ad-hoc review steps.
 
 ## Oracle (External Assistant)
 - Oracle bundles a prompt plus the right files so another AI (GPT 5 Pro + more) can answer. Use when stuck/bugs/reviewing.
@@ -65,7 +79,7 @@ Use this repository as the wrapper that coordinates multiple Codex-driven projec
 - When writing PR summaries, avoid literal `\n` sequences; use `gh pr create --body-file` or a here-doc so line breaks render correctly in GitHub.
 - Git workflow details: `.agent/SOPs/git-management.md`.
 - Keep `docs/TASKS.md` under the line threshold in `docs/tasks-archive-policy.json`; the tasks archive automation workflow opens a PR and updates the `task-archives` branch when the limit is exceeded. Use `npm run docs:archive-tasks` for manual fallback.
-- Archive implementation docs (PRD/TECH_SPEC/ACTION_PLAN, task checklists, mini-specs, mirrors) using `docs/implementation-docs-archive-policy.json`; the automation workflow syncs payloads to `doc-archives` and opens a PR with stubs. Use `npm run docs:archive-implementation` for manual fallback.
+- Archive implementation docs (PRD/TECH_SPEC/ACTION_PLAN, task checklists, mirrors) using `docs/implementation-docs-archive-policy.json`; the automation workflow syncs payloads to `doc-archives` and opens a PR with stubs. Use `npm run docs:archive-implementation` for manual fallback.
 - Keep `reference/` lean by storing only the active snapshot plus the automation scripts (loader macros, serve README). Serve-from-archive instructions should point to the canonical timestamped folder so reviewers can reproduce results without keeping every raw asset in the repo.
 - Before new iterations, run the cleanup script (or manually remove stray `.runs`/`archives` folders) so the working tree returns to a clean state while leaving committed improvements intact.
 
@@ -127,7 +141,7 @@ Review-loop steps live in `.agent/SOPs/review-loop.md`.
 
 ## Customization Checklist for New Projects
 - [ ] Duplicate `/tasks` files and rename them for the new PRD / task identifiers, updating links to `.runs/<task-id>/...` manifests.
-- [ ] Refresh `docs/PRD.md`, `docs/TECH_SPEC.md`, and `docs/ACTION_PLAN.md` with project-specific content and manifest evidence.
+- [ ] Refresh `docs/PRD-<slug>.md`, `tasks/specs/<id>-<slug>.md`, and `docs/ACTION_PLAN-<slug>.md` with project-specific content and manifest evidence.
 - [ ] Update `.agent/` SOPs to describe project-specific guardrails, escalation paths, and run evidence locations.
 - [ ] Remove placeholder references that remain in manifests or docs before committing so downstream teams only see active project data.
 

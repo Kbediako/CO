@@ -3,13 +3,17 @@
 ## Added by Bootstrap 2025-10-16
 
 ## Context
-- Link to PRD:
+- MCP Task ID:
+- Primary PRD:
+- TECH_SPEC:
+- ACTION_PLAN:
 - Summary of scope:
 
 ### Checklist Convention
-- Start every task/subtask with `[ ]` and flip it to `[x]` when the acceptance criteria are met, citing the run manifest or log that documents completion.
+- Start every task/subtask with `[ ]` and flip it to `[x]` when the acceptance criteria are met, citing evidence (manifest or log when required; standalone review approvals can cite spec/task notes).
 
 ### Evidence Gates
+- [ ] Standalone review approval captured (pre-implementation) - Evidence: spec/task notes (no manifest).
 - [ ] Docs-review manifest captured (pre-implementation) - Evidence: `.runs/<task-id>/cli/<run-id>/manifest.json`.
 - [ ] Implementation review manifest captured (post-implementation) - Evidence: `.runs/<task-id>/cli/<run-id>/manifest.json`.
 
@@ -54,7 +58,7 @@
 - 
 
 ## Notes
-- Spec Requirements:
+- PRD/TECH_SPEC/ACTION_PLAN Requirements:
 - Approvals Needed:
 - Links:
 - Subagent usage (required): task ids + manifest paths (use `<task-id>-<stream>` naming).

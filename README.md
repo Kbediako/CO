@@ -47,7 +47,7 @@ codex-orchestrator delegate-server --repo /path/to/repo
 ```
 Optional: add `--mode question_only` to disable `delegate.spawn/pause/cancel`, keeping only `delegate.question.*` + `delegate.status` in the delegate namespace. GitHub tools remain available when GitHub integration is enabled.
 
-Register it with Codex once, then enable per run:
+Register it with Codex once; keep delegation MCP enabled by default (only MCP on by default). If you’ve disabled it for a run, re-enable per run:
 ```bash
 codex mcp add delegation -- codex-orchestrator delegate-server --repo /path/to/repo
 codex -c 'mcp_servers.delegation.enabled=true' ...
@@ -61,8 +61,7 @@ RLM (Recursive Language Model) is the long-horizon loop used by the `rlm` pipeli
 ### Delegation flow
 ```mermaid
 flowchart TB
-  A["Parent run<br/>(MCP disabled)"]
-  B["Background run<br/>(delegation enabled)"]
+  A["Parent run<br/>(delegation MCP enabled)"]
   C["Delegation MCP server"]
   D["delegate.spawn"]
   E["Child run<br/>(pipeline resolved)"]
@@ -70,7 +69,7 @@ flowchart TB
   P["Standard pipeline<br/>(plan/build/test/review)"]
   RLM["RLM pipeline<br/>(see next chart)"]
 
-  A --> B --> C --> D --> E --> N
+  A --> C --> D --> E --> N
   N -- yes --> RLM
   N -- no --> P
   E -. optional .-> Q["delegate.question.enqueue/poll"] -.-> A
@@ -98,7 +97,7 @@ flowchart TB
 
 ## Skills (bundled)
 
-The release ships skills under `skills/`. Install them into `$CODEX_HOME/skills`:
+The release ships skills under `skills/` for downstream packaging. If you already have global skills installed, treat those as the primary reference and use bundled skills as the shipped fallback. Install bundled skills into `$CODEX_HOME/skills`:
 ```bash
 codex-orchestrator skills install
 ```
@@ -109,6 +108,8 @@ Options:
 
 Bundled skills (may vary by release):
 - `delegation-usage`
+- `standalone-review`
+- `docs-first`
 
 ## DevTools readiness
 
@@ -127,6 +128,7 @@ codex-orchestrator devtools setup
 - `codex-orchestrator start <pipeline>` — run a pipeline.
 - `codex-orchestrator plan <pipeline>` — preview pipeline stages.
 - `codex-orchestrator exec <cmd>` — run a one-off command with the exec runtime.
+- `codex-orchestrator init codex` — install starter templates (`mcp-client.json`, `AGENTS.md`) into a repo.
 - `codex-orchestrator self-check --format json` — JSON health payload.
 - `codex-orchestrator mcp serve` — Codex MCP stdio server.
 

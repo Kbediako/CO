@@ -15,7 +15,7 @@ function showUsage() {
 Ensures that implementation changes adhere to Codex-Orchestrator spec guardrails.
 Checks include:
   • Code/migration edits must accompany a spec update under tasks/specs or tasks/index.json
-  • Mini-spec last_review dates must be ≤30 days old
+  • TECH_SPEC last_review dates must be ≤30 days old
 
 Options:
   --dry-run   Report failures without exiting non-zero

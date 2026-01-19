@@ -6,17 +6,17 @@
 Follow the ai-dev-tasks loop: draft a PRD, expand it into a task list, and process one approved subtask at a time. The control playbooks in `/.ai-dev-tasks` (`create-prd.md`, `generate-tasks.md`, `process-task-list.md`) define each phase.
 
 ### Source of Truth
-Keep `/tasks` as the canonical record for PRDs, task lists, specs, research notes, and the manifest. Human-facing mirrors in `/docs` must explicitly point back to the `/tasks` originals.
+Keep `/tasks` as the canonical record for task checklists and TECH_SPECs, while PRDs and ACTION_PLANs live in `/docs`. Mirrors in `/docs` and `/tasks` should cross-link so reviewers can trace intent, requirements, and evidence.
 
-### Mini-Spec Policy
-When scoped work meets any trigger in `.agent/SOPs/specs-and-research.md`, create or refresh a mini-spec before implementation. Link specs from their parent PRDs and subtask lists.
+### Spec Policy
+Always create or refresh PRD + TECH_SPEC + ACTION_PLAN + the task checklist before implementation. Depth scales with scope, but all four artifacts are required (see `.agent/SOPs/specs-and-research.md`).
 
 ### Operating Rules
 1) Read `.agent/AGENTS.md` and all docs under `.agent/system/` before drafting plans or executing tasks.
 2) Track approvals: default mode is safe `read/edit/run/network`. Log any escalations and mode overrides in `.runs/<task>/<timestamp>/manifest.json`.
 3) Update the active `/tasks/tasks-*.md` file after each meaningful change and pause for review.
-4) Execute only one subtask at a time and wait for explicit approval before advancing.
-5) Docs-first: create or refresh implementation docs (PRD/TECH_SPEC/ACTION_PLAN or mini-spec) before editing any files.
+4) Execute only one subtask at a time and wait for explicit approval before advancing (standalone review approval is acceptable).
+5) Docs-first: create or refresh PRD + TECH_SPEC + ACTION_PLAN + the task checklist before editing any files.
 
 ### Checklist Convention
 Use explicit checkboxes (`[ ]` → `[x]`) for every task and subtask tracked in `/tasks` or mirror docs. Flip the marker to `[x]` as soon as the work is complete and reference the supporting run manifest or log alongside the checkbox note.
@@ -30,7 +30,7 @@ Use explicit checkboxes (`[ ]` → `[x]`) for every task and subtask tracked in 
 ### External Pointers
 - MCP registration: `codex-orchestrator mcp serve` launches the local server; confirm builder/tester agents produce artifacts in `.runs`.
 - Pattern assets: `patterns/index.json` lists available codemods/linters/templates with versions.
-- Release mirrors: `docs/PRD.md`, `docs/TECH_SPEC.md`, `docs/ACTION_PLAN.md` must reference their canonical `/tasks` counterparts after every milestone update.
+- Release mirrors: `docs/PRD-<slug>.md`, `tasks/specs/<id>-<slug>.md`, `docs/ACTION_PLAN-<slug>.md` must cross-link after every milestone update.
 
 ### CLI Orchestrator Quickstart
 - **Run diagnostics:** `npx codex-orchestrator start diagnostics --format json` executes the default build/lint/test/spec-guard pipeline and prints the run id plus manifest path under `.runs/<task>/cli/<run-id>/`.

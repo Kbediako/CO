@@ -12,7 +12,7 @@
 
 ## Non-Goals
 - Adding new delegation features or expanding the tool surface.
-- Changing external configuration defaults (delegation remains disabled by default).
+- Changing external configuration defaults (delegation remains enabled by default; this work does not alter that policy).
 - Altering packaging allowlist or release workflow semantics.
 
 ## Stakeholders
@@ -26,7 +26,7 @@
 - Patch release 0.1.6 published with passing pack audit + smoke tests.
 - Guardrails:
 - Keep MCP framing behavior backward compatible for Content-Length framed clients.
-- Delegation features remain opt-in via config flags.
+- Delegation features remain gated by config flags (can be disabled per run when needed).
 
 ## User Experience
 - Personas:

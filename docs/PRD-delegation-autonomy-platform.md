@@ -34,13 +34,13 @@
 
 ## Metrics & Guardrails
 - Primary Success Metrics:
-  - Users can install once and see delegate tools available in Codex when starting a run with mcp_servers.delegation.enabled=true (disabled by default otherwise).
+  - Users can install once and see delegate tools available in Codex by default; mcp_servers.delegation.enabled remains the per-run gate (default true, can be set false when needed).
   - Delegated runs are auditable via manifests + event streams, with UI reflecting live status within 2-5s.
   - RLM runs by default on every delegated pipeline without manual toggles.
   - Users can pause/resume/cancel runs from the UI or TUI.
   - GitHub workflow actions succeed when enabled and are blocked when repo config disallows them.
 - Guardrails / Error Budgets:
-  - Delegate tools are disabled by default and only enabled per run.
+  - Delegate tools are enabled by default (only MCP on by default) and can be disabled per run when safety constraints require it.
   - UI actions require explicit confirmation for destructive operations.
   - Repo allowlists prevent unsafe filesystem access.
   - paths.allowed_roots cannot be expanded by global/CLI/env config beyond repo policy (repo is the cap).
@@ -59,7 +59,7 @@
   - Confirmation nonces must never be exposed to the REPL/sandbox filesystem or stdout and must not be written into events.jsonl (log nonce_id only).
 
 ## Acceptance Criteria
-- Delegate tools are available only when the MCP server is enabled per run; disabled by default globally.
+- Delegate tools are available only when the MCP server is enabled per run; enabled by default globally but can be turned off per run.
 - Pause/resume/cancel semantics are defined and consistent with the tool surface.
 - events.jsonl has a documented schema, ordering guarantees, and a single-writer policy.
 - RLM is always-on by default for delegated runs; policy override rules and timing are documented.
@@ -116,12 +116,12 @@
 - Tech Spec: docs/TECH_SPEC-delegation-autonomy-platform.md
 - Action Plan: docs/ACTION_PLAN-delegation-autonomy-platform.md
 - Task checklist: tasks/tasks-0940-delegation-autonomy-platform.md
-- Mini-spec: tasks/specs/0940-delegation-autonomy-platform.md
+- TECH_SPEC: tasks/specs/0940-delegation-autonomy-platform.md
 - RLM reference repo: https://github.com/alexzhang13/rlm
 
 ## Decisions
 - RLM runs by default for every delegated run.
-- Delegate tools are minimal and disabled by default in global config.
+- Delegate tools are minimal and enabled by default in global config (only MCP on by default).
 - UI includes run controls and per-run feature toggles; global + repo flags are visible read-only (config-owned).
 - GitHub integration is first-class but gated by repo config.
 - V1 depends on MCP host support for a private envelope (codex_private) to carry runner-injected secrets.

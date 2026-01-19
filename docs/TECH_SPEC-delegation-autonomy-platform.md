@@ -457,7 +457,7 @@ Authz + safety:
 
 #### 6) Config Layering (Global + Repo)
 - Global config: CODEX_HOME/config.toml (or ~/.codex/config.toml)
-  - Register MCP server disabled by default.
+  - Register MCP server enabled by default (only MCP on by default; disable only when required).
 - Global defaults: delegate.allow_nested, delegate.tool_profile, rlm.policy.
 - Repo config: .codex/orchestrator.toml
   - Repo-specific overrides, allowlists, and GitHub settings.
@@ -656,7 +656,7 @@ open http://127.0.0.1:<runner-port>/ui
 ## Documentation & Evidence
 - Linked PRD: docs/PRD-delegation-autonomy-platform.md
 - Action Plan: docs/ACTION_PLAN-delegation-autonomy-platform.md
-- Mini-spec: tasks/specs/0940-delegation-autonomy-platform.md
+- TECH_SPEC: tasks/specs/0940-delegation-autonomy-platform.md
 - Task checklist: tasks/tasks-0940-delegation-autonomy-platform.md
 
 ## Open Questions

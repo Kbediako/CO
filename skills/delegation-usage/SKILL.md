@@ -1,17 +1,17 @@
 ---
 name: delegation-usage
-description: Use when enabling or operating the Codex delegation MCP server and tools (delegate.spawn, delegate.question.*, delegate.cancel, github.merge confirmation flow), or when configuring delegation mode/tool_profile to delegate work while keeping MCP disabled by default.
+description: Use when operating the Codex delegation MCP server and tools (delegate.spawn, delegate.question.*, delegate.cancel, github.merge confirmation flow), or when configuring delegation mode/tool_profile with delegation MCP enabled by default.
 ---
 
 # Delegation Usage
 
 ## Overview
 
-Use this skill to enable and operate delegation MCP tools without leaving the MCP server on by default. It focuses on safe, minimal‑context use: only enable delegation when you intend to delegate work.
+Use this skill to operate delegation MCP tools with delegation enabled by default (the only MCP on by default). Disable it only when required by safety constraints, and keep other MCPs off unless they are relevant to the task.
 
 ## Quick-start workflow (canned)
 
-Use this when delegation is off in the current run and you want a background Codex run to handle delegation:
+Use this when delegation tools are missing in the current run (MCP disabled) and you want a background Codex run to handle delegation:
 
 ```
 codex exec \
@@ -24,6 +24,7 @@ Optional (only if you need it):
 - Add `-c 'features.skills=false'` for a minimal, deterministic background run.
 - Add `-c 'delegate.mode=question_only'` when the child only needs `delegate.question.*` (and optional `delegate.status`).
 - Add `-c 'delegate.mode=full'` when the child needs `delegate.spawn/pause/cancel` (nested delegation / run control).
+- If the task needs external docs or APIs, enable only the relevant MCP server for that environment.
 - If `delegate.spawn` is missing, re-register the MCP server with full mode (server config controls tool surface):
   - `codex mcp remove delegation`
   - `codex mcp add delegation --env 'CODEX_MCP_CONFIG_OVERRIDES=delegate.mode="full"' -- codex-orchestrator delegate-server --repo /path/to/repo`
@@ -35,12 +36,13 @@ For runner + delegation coordination (short `--task` flow), see `docs/delegation
 
 ## Delegation‑first policy
 
-- Default to delegation unless the task is trivial.
+- Default to delegation for top-level tasks and any non-trivial work.
 - Delegate when the work spans >1 domain, touches more than ~2 files, needs verification/research, or is likely to run >10 minutes.
 - Spawn one delegate per workstream with narrow scope and acceptance criteria.
+- Keep delegation MCP enabled by default; enable other MCPs only when relevant to the task.
 - Use `delegate.mode=question_only` unless the child truly needs full tool access.
 - Ask delegates for short, structured summaries and to write details into files/artifacts instead of long chat dumps.
-- Skip delegation only for tiny single‑file edits or when delegation overhead outweighs the work.
+- Use `codex exec` only for pre-task triage (no task id yet) or when delegation is unavailable; copy outcomes into the spec once it exists.
 
 ## Workflow
 
@@ -55,7 +57,7 @@ For runner + delegation coordination (short `--task` flow), see `docs/delegation
   - `codex -c 'mcp_servers.delegation.enabled=true' ...`
   - Prefer using a background terminal (non-interactive) so you can continue without asking the user to relaunch.
 - If delegation is unavailable and the user asked to delegate, **do not get stuck**:
-  - Explain delegation is disabled in this run and give the enable command above.
+  - Explain delegation is disabled or not registered in this run and give the enable command above.
   - Unless they explicitly want a delegation test, proceed locally using background tools (terminal commands or built-in tools) and deliver the result.
 
 ### 0a) Version guard (JSONL handshake)
@@ -64,6 +66,7 @@ For runner + delegation coordination (short `--task` flow), see `docs/delegation
   - `codex-orchestrator --version` should be `>= 0.1.8`
 - If not, update global install: `npm i -g @kbediako/codex-orchestrator@0.1.8`
 - Alternative: pin the MCP server to `npx -y @kbediako/codex-orchestrator@0.1.8` for deterministic behavior.
+- Note: if your installed CLI is older than the docs (e.g., 0.1.11 while docs target a newer release), use the pinned `npx` version or upgrade after the release ships.
 
 ### 0b) Background terminal bootstrap (required when MCP is disabled)
 
@@ -72,7 +75,6 @@ When `delegate.*` is missing in the current session, immediately spawn a **backg
 ```
 codex exec \
   -c mcp_servers.delegation.enabled=true \
-  -c mcp_servers.openaiDeveloperDocs.enabled=true \
   "Use delegate.* tools to <task>. Return a short summary and any artifacts."
 ```
 
@@ -82,13 +84,13 @@ Guidance for background runs:
 - If you need a multi-step run, use `codex exec resume --last "<follow-up>"` to continue the same session.
 - Non-interactive runs can still hit `confirmation_required`; approvals happen via the UI/TUI and the run resumes after approval.
 - `codex exec` does **not** create an orchestrator manifest. If the child must call `delegate.question.*` or `delegate.status/pause/cancel`, pass a real `.runs/<task>/cli/<run>/manifest.json` via `parent_manifest_path`/`manifest_path` (e.g., run `codex-orch start diagnostics --format json --task <task-id>` to get one; or use `export MCP_RUNNER_TASK_ID=<task-id>` if you prefer env vars).
+- Setting `MCP_RUNNER_TASK_ID` does not cause `codex exec` to emit `.runs/**` manifests; use `codex-orchestrator start <pipeline> --task <id>` when manifest evidence is required.
 
-### 1) Enable delegation only for the run you need
+### 1) Keep delegation enabled by default
 
-- Keep `mcp_servers.delegation.enabled = false` in `~/.codex/config.toml`.
-- Enable per run:
-  - Example: `codex -c 'mcp_servers.delegation.enabled=true' ...`
-- Using `-c` keeps your default config unchanged, so delegation is off again next run.
+- Set `mcp_servers.delegation.enabled = true` in `~/.codex/config.toml` (only MCP on by default).
+- Disable delegation only when required by safety or environment constraints; re-enable per run with:
+  - `codex -c 'mcp_servers.delegation.enabled=true' ...`
 - Prefer `codex-orch start <pipeline> --format json --task <task-id>` over `export MCP_RUNNER_TASK_ID=...` for a shorter, explicit task id.
 
 ### 2) Spawn a delegate run (delegate.spawn)

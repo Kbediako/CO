@@ -15,14 +15,14 @@
 - Run Manifest Link: `.runs/0944-delegation-mcp-framing-compat-fix/cli/2026-01-12T10-33-01-419Z-2b3cd73f/manifest.json`.
 - Metrics / State Snapshots: `.runs/0944-delegation-mcp-framing-compat-fix/metrics.json`, `out/0944-delegation-mcp-framing-compat-fix/state.json`.
 - Checklist Mirror: `tasks/tasks-0944-delegation-mcp-framing-compat-fix.md`, `docs/TASKS.md` (0944 section), `.agent/task/0944-delegation-mcp-framing-compat-fix.md`.
-- Mini-spec: `tasks/specs/0944-delegation-mcp-framing-compat-fix.md`.
+- TECH_SPEC: `tasks/specs/0944-delegation-mcp-framing-compat-fix.md`.
 
 ## Task 0940 — Codex Delegation Autonomy Platform
 - Primary Doc: `docs/PRD-delegation-autonomy-platform.md`
 - Run Manifest Link: `.runs/0940-delegation-autonomy-platform/cli/2026-01-07T16-22-23-363Z-a6f5b94f/manifest.json`.
 - Metrics / State Snapshots: `.runs/0940-delegation-autonomy-platform/metrics.json`, `out/0940-delegation-autonomy-platform/state.json`.
 - Checklist Mirror: `tasks/tasks-0940-delegation-autonomy-platform.md`, `docs/TASKS.md` (0940 section), `.agent/task/0940-delegation-autonomy-platform.md`.
-- Mini-spec: `tasks/specs/0940-delegation-autonomy-platform.md`.
+- TECH_SPEC: `tasks/specs/0940-delegation-autonomy-platform.md`.
 
 
 ## Task 0932 — Orchestrator Performance & Reliability Loop
@@ -30,7 +30,7 @@
 - Run Manifest Link: `.runs/0932-orchestrator-performance-reliability/cli/2026-01-05T16-12-04-477Z-51bd9a65/manifest.json`.
 - Metrics / State Snapshots: `.runs/0932-orchestrator-performance-reliability/metrics.json`, `out/0932-orchestrator-performance-reliability/state.json`.
 - Checklist Mirror: `tasks/tasks-0932-orchestrator-performance-reliability.md`, `docs/TASKS.md` (0932 section), `.agent/task/0932-orchestrator-performance-reliability.md`.
-- Mini-spec: `tasks/specs/0932-orchestrator-performance-reliability.md`.
+- TECH_SPEC: `tasks/specs/0932-orchestrator-performance-reliability.md`.
 
 ## Task 0918 — Subagent Delegation Enforcement
 - Primary Doc: `docs/PRD-subagent-delegation-enforcement.md`
@@ -75,7 +75,7 @@
 - Run Manifest Link: `.runs/0913-orchestrator-refactor-roadmap/cli/2025-12-26T08-11-25-461Z-6ba85057/manifest.json` _(status: `succeeded`)._
 - Metrics / State Snapshots: `.runs/0913-orchestrator-refactor-roadmap/metrics.json` (JSONL; one entry per run), `out/0913-orchestrator-refactor-roadmap/state.json` (latest snapshot)
 - Checklist Mirror: `tasks/tasks-0913-orchestrator-refactor-roadmap.md`, `docs/TASKS.md` (0913 section), `.agent/task/0913-orchestrator-refactor-roadmap.md`.
-- Mini-spec: `tasks/specs/0913-orchestrator-refactor-roadmap.md`.
+- TECH_SPEC: `tasks/specs/0913-orchestrator-refactor-roadmap.md`.
 
 ## Task 0904 — README vs Codebase Alignment
 - Primary Doc: `docs/PRD-readme-codebase-alignment.md`

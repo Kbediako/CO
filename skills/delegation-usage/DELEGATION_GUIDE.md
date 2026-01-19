@@ -7,10 +7,11 @@ Use this guide for deeper context on delegation behavior, tool surfaces, and tro
 - The delegation MCP server is a local stdio process (`codex-orchestrator delegate-server`; `delegation-server` is an alias).
 - It does **not** provide general tools itself; it only exposes `delegate.*` + optional `github.*` tools.
 - Child runs get tools based on `delegate.mode` + `delegate.tool_profile` + repo caps.
+- Delegation MCP stays enabled by default (only MCP on by default); disable it only when required by safety constraints.
 
 ## Background-run pattern (preferred)
 
-When delegation is disabled in the current session, spawn a background run:
+When delegation tools are missing in the current session (MCP disabled), spawn a background run:
 
 ```
 codex exec \
@@ -21,11 +22,17 @@ codex exec \
 Notes:
 - `codex exec` is non-interactive; progress goes to stderr, final message to stdout.
 - Add `-c 'features.skills=false'` for minimal background runs.
+- If the task needs external docs/APIs, enable only the relevant MCP server for your environment.
 - Use `-o /path/to/output.txt` if you want the final summary captured in a file.
 - If the run needs `delegate.spawn/pause/cancel`, add `-c 'delegate.mode=full'`.
 - If it only needs `delegate.question.*` (and optional `delegate.status`), add `-c 'delegate.mode=question_only'`.
 - Non-interactive runs can still require approvals; resolve them via the UI/TUI and the run will resume.
 - `codex exec` does **not** create `.runs/<task>/cli/<run>/manifest.json` on its own. If the child must call `delegate.question.*` or `delegate.status/pause/cancel`, pass a real manifest path (e.g., run `codex-orch start diagnostics --format json --task <task-id>` and reuse the manifest path; or `export MCP_RUNNER_TASK_ID=<task-id>` if you prefer env vars).
+- Setting `MCP_RUNNER_TASK_ID` does not make `codex exec` emit `.runs/**` manifests; use `codex-orchestrator start <pipeline> --task <id>` when manifest evidence is required.
+
+## Pre-task triage (no task id yet)
+
+If you need a fast answer before a task id exists, use `codex exec` directly and copy the summary into the spec once it’s created. Once a task id exists, prefer delegation so the work is tied to a manifest.
 
 ## Runner + task id (short form)
 
@@ -103,6 +110,7 @@ Delegation MCP expects JSONL. Use `codex-orchestrator >= 0.1.8`.
 - Check: `codex-orchestrator --version`
 - Update global: `npm i -g @kbediako/codex-orchestrator@0.1.8`
 - Or pin via npx: `npx -y @kbediako/codex-orchestrator@0.1.8 delegate-server`
+- If your installed CLI is behind the docs (e.g., 0.1.11 while docs target a newer release), use the pinned `npx` version or upgrade after the release ships.
 
 ## Common failures
 

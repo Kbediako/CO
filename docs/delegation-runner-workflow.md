@@ -1,16 +1,16 @@
 # Delegation + Runner Workflow
 
-Use this workflow to keep delegation MCP off by default while still enabling short, reliable delegated runs with clear manifests.
+Use this workflow with delegation MCP enabled by default (the only MCP on by default). Disable it only when required by safety constraints. If older PRDs mention “disabled by default,” treat this guide and `AGENTS.md` as the current policy.
 
 ## 0) Register the delegation server once (required)
 
-You must register the delegation MCP server once before per-run enabling works:
+You must register the delegation MCP server once so delegate tools are available:
 
 ```bash
 codex mcp add delegation -- codex-orchestrator delegate-server --repo /path/to/repo
 ```
 
-If you skip this, `-c 'mcp_servers.delegation.enabled=true'` will not activate tools.
+If you skip this, `delegate.*` tools will not be available even if the MCP is enabled.
 
 ### 0a) Enable delegate.spawn (server mode)
 
@@ -61,9 +61,9 @@ If you plan to run multiple commands in the same task, you can still set the env
 export MCP_RUNNER_TASK_ID=<task-id>
 ```
 
-## 2) Delegate only when needed (background run)
+## 2) Background run when delegation tools are missing
 
-When delegation is required and MCP is off in the current session, use a background run:
+When delegation tools are missing in the current session (MCP disabled), use a background run:
 
 ```bash
 codex exec \
@@ -73,7 +73,20 @@ codex exec \
 
 Notes:
 - `codex exec` does **not** create a manifest. If the child needs `delegate.question.*` or `delegate.status/pause/cancel`, pass a real manifest path (next step).
+- Setting `MCP_RUNNER_TASK_ID` does not cause `codex exec` to emit `.runs/**` manifests; use a `codex-orchestrator start <pipeline> --task <id>` run when evidence is required.
 - Add `-c 'features.skills=false'` for a minimal, deterministic background run.
+
+### 2a) Pre-task triage (no task id yet)
+
+When you need a fast answer before a task id exists, use a lightweight exec run and copy the summary into the spec once it’s created:
+
+```bash
+codex exec \
+  -c 'mcp_servers.<your-mcp>.enabled=true' \
+  "Answer the question and cite the relevant docs section names."
+```
+
+If a task id already exists, prefer delegation so the run is tied to a manifest. Use `codex exec` only when delegation is unavailable.
 
 ## 3) Wire parent/child manifest paths (questions + status)
 
@@ -96,6 +109,7 @@ codex mcp add delegation -- codex-orchestrator delegate-server --repo /path/to/r
 
 ## 5) Summary
 
+- Delegation MCP stays enabled by default (only MCP on by default); disable only when necessary.
 - Prefer `--task <id>` over `export MCP_RUNNER_TASK_ID=...` for a human-friendly, agent-first workflow.
-- Use `codex exec` for delegation only when needed.
+- Use `codex exec` only for pre-task triage (no task id yet) or when delegation is unavailable.
 - Pass the manifest path whenever you need `delegate.question.*` or run control APIs.
