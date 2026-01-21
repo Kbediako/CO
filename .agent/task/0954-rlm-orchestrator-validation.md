@@ -26,6 +26,7 @@
 
 ### Validation + handoff
 - [x] Docs-review manifest captured — Evidence: `.runs/0954-rlm-orchestrator-validation/cli/2026-01-20T00-30-29-792Z-9e030d6d/manifest.json`.
+- [x] Guardrail evidence captured (eval:test + diff-budget) — Evidence: `out/0954-rlm-orchestrator-validation/guardrails/eval-test.log`, `out/0954-rlm-orchestrator-validation/guardrails/diff-budget.log`.
 
 ## Relevant Files
 - `tasks/specs/0954-rlm-orchestrator-validation.md`

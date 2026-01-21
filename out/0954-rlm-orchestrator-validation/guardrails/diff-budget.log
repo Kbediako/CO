@@ -1,0 +1,16 @@
+⚠️ Diff budget exceeded (override applied) (base=origin/main)
+ - changed files 50 > 25
+ - total lines changed 3744 > 800
+Top changed files:
+  - evaluation/benchmarks/rlm-oolong-pairs.mjs: 682
+  - evaluation/benchmarks/oolong-shared.mjs: 603
+  - evaluation/benchmarks/rlm-oolong.mjs: 447
+  - evaluation/benchmarks/rlm-context-scale.mjs: 259
+  - scripts/plot-rlm-accuracy.py: 183
+  - evaluation/benchmarks/oolong-fetch.py: 142
+  - tasks/specs/0954-rlm-orchestrator-validation.md: 113
+  - evaluation/tests/harness.test.ts: 66
+  - evaluation/fixtures/rlm-oolong-pairs/README.md: 62
+  - evaluation/fixtures/rlm-oolong/README.md: 61
+
+Override accepted via DIFF_BUDGET_OVERRIDE_REASON: RLM benchmark scaffolding + fixtures/docs required for validation request
