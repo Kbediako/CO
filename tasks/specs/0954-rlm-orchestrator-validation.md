@@ -37,7 +37,7 @@ last_review: 2026-01-20
   - None.
 - External dependencies / integrations:
   - Optional OOLONG dataset downloads (HF) via helper script; local sample fixtures for CI.
-  - Dataset sources: `oolongbench/oolong-synth` (linear OOLONG); OOLONG-Pairs can optionally apply `dataset_filter` (for example `trec_coarse`) via the HF fixture config.
+  - Dataset sources: `oolongbench/oolong-synth@49898a421f4b14f2c9cae084d2d270f930ff4c90` (linear OOLONG); OOLONG-Pairs can optionally apply `dataset_filter` (for example `trec_coarse`) via the HF fixture config. The evaluation fixtures (for example `evaluation/fixtures/rlm-oolong/fixture.hf.json`) pin this revision to ensure reproducibility and stable cache behavior.
   - Cache outputs under `out/<task-id>/datasets/` to avoid repeated network downloads.
 
 ## Evaluation Method Notes
