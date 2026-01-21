@@ -47,7 +47,9 @@ const datasetConfig = config.dataset ? { ...config.dataset } : { source: 'local'
 if (!datasetConfig.source) {
   datasetConfig.source = 'local';
 }
-const maxRowsPerLength = typeof config.max_rows_per_length === 'number' ? config.max_rows_per_length : 1;
+const maxRowsPerLength = typeof config.max_rows_per_length === 'number'
+  ? Math.max(1, Math.floor(config.max_rows_per_length))
+  : 1;
 const baselineMaxTokens = typeof config.baseline_max_context_tokens === 'number'
   ? config.baseline_max_context_tokens
   : 131000;

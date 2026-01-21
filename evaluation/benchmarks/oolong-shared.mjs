@@ -533,10 +533,14 @@ async function fetchRowsFromHf(datasetConfig, requiredFields) {
     throw new Error(`Failed to fetch OOLONG dataset rows: ${message}`);
   }
 
-  const raw = await fs.readFile(outputPath, 'utf8');
-  await fs.rm(outputPath, { force: true });
-  const payload = JSON.parse(raw);
-  return { raw, payload };
+  let raw = '';
+  try {
+    raw = await fs.readFile(outputPath, 'utf8');
+    const payload = JSON.parse(raw);
+    return { raw, payload };
+  } finally {
+    await fs.rm(outputPath, { force: true });
+  }
 }
 
 export async function loadRowsWithFallback(fixturePath, datasetConfig, requiredFields, options = {}) {

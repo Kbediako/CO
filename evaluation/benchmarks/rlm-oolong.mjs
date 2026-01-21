@@ -55,7 +55,9 @@ if (!datasetConfig.source) {
 const taskTypes = Array.isArray(config.task_types) && config.task_types.length > 0
   ? config.task_types
   : DEFAULT_TASK_TYPES;
-const maxRowsPerLength = typeof config.max_rows_per_length === 'number' ? config.max_rows_per_length : 1;
+const maxRowsPerLength = typeof config.max_rows_per_length === 'number'
+  ? Math.max(1, Math.floor(config.max_rows_per_length))
+  : 1;
 const baselineMaxTokens = typeof config.baseline_max_context_tokens === 'number'
   ? config.baseline_max_context_tokens
   : 131000;

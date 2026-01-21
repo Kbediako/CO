@@ -6,7 +6,7 @@
 - ACTION_PLAN: `docs/ACTION_PLAN-rlm-orchestrator-validation.md`
 - Summary of scope: Define deterministic RLM test matrix (unit/integration/eval) and fixtures for correctness, determinism, and scalability.
 
-> Set `MCP_RUNNER_TASK_ID=0954-rlm-orchestrator-validation` for orchestrator commands. Mirror with `docs/TASKS.md` and `.agent/task/0954-rlm-orchestrator-validation.md`. Flip `[ ]` to `[x]` only with evidence (manifest or log when required; standalone review approvals can cite spec/task notes).
+> Set `MCP_RUNNER_TASK_ID=0954-rlm-orchestrator-validation` for orchestrator commands. Guardrails required: `node scripts/delegation-guard.mjs`, `node scripts/spec-guard.mjs --dry-run`, `npm run build`, `npm run lint`, `npm run test`, `npm run eval:test`, `npm run docs:check`, `npm run docs:freshness`, `node scripts/diff-budget.mjs`, `npm run review`. Mirror with `docs/TASKS.md` and `.agent/task/0954-rlm-orchestrator-validation.md`. Flip `[ ]` to `[x]` only with evidence (manifest or log when required; standalone review approvals can cite spec/task notes).
 
 ## Checklist
 

@@ -13,21 +13,21 @@ Uses `sample.json` to keep CI deterministic and offline.
 ### Hugging Face (optional)
 Use `fixture.hf.json` (or set `"dataset.source": "hf"` in `fixture.json`) and ensure the Python `datasets` package is installed:
 
-```
+```bash
 python3 -m pip install datasets
 ```
 
 The fetch helper pulls rows from `oolongbench/oolong-synth` and filters to the configured task types.
-By default the HF config does not restrict `dataset_filter`; set `"dataset.dataset_filter"` (for example `trec_coarse`)
+By default, the HF config does not restrict `dataset_filter`; set `"dataset.dataset_filter"` (for example `trec_coarse`)
 to narrow the dataset if you want to reduce variance.
 To measure sampling variance, set `"dataset.sample_seed"` to enable deterministic reservoir sampling across the
 full split. Seeded configs `fixture.hf.seed1.json` through `fixture.hf.seed5.json` are provided as examples.
 
 Example run:
-```
-node --loader ts-node/esm evaluation/benchmarks/rlm-oolong.mjs \\
-  --fixture evaluation/fixtures/rlm-oolong \\
-  --config evaluation/fixtures/rlm-oolong/fixture.hf.json \\
+```bash
+node --loader ts-node/esm evaluation/benchmarks/rlm-oolong.mjs \
+  --fixture evaluation/fixtures/rlm-oolong \
+  --config evaluation/fixtures/rlm-oolong/fixture.hf.json \
   --output out/<task-id>/rlm-oolong/results.json
 ```
 If `--output` is omitted, the benchmark writes to `/tmp/codex-rlm-oolong/results-<timestamp>.json`.
@@ -44,14 +44,14 @@ To validate determinism, set `"repeatability.runs": 2` (or higher). The output i
 ## Plotting
 Generate a PNG with the provided helper:
 
-```
+```bash
 python3 -m pip install matplotlib
 python3 scripts/plot-rlm-accuracy.py --input out/<task-id>/rlm-oolong/results.json --output out/<task-id>/graphs/oolong-accuracy.png --title "OOLONG Accuracy vs Context Length"
 ```
 
 To aggregate multiple runs and add a mean +/- std ribbon, pass multiple inputs:
 
-```
+```bash
 python3 scripts/plot-rlm-accuracy.py \
   --input out/<task-id>/rlm-oolong-hf-run1/results.json \
   --input out/<task-id>/rlm-oolong-hf-run2/results.json \

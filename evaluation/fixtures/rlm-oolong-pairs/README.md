@@ -13,7 +13,7 @@ Uses `sample.json` to keep CI deterministic and offline.
 ### Hugging Face (optional)
 Use `fixture.hf.json` (or set `"dataset.source": "hf"` in `fixture.json`) and install the Python `datasets` package:
 
-```
+```bash
 python3 -m pip install datasets
 ```
 
@@ -26,7 +26,7 @@ full split. Seeded configs `fixture.hf.seed1.json` through `fixture.hf.seed5.jso
 
 To aggregate multiple runs and add a mean +/- std ribbon, pass multiple inputs:
 
-```
+```bash
 python3 scripts/plot-rlm-accuracy.py \
   --input out/<task-id>/rlm-oolong-pairs-hf-run1/results.json \
   --input out/<task-id>/rlm-oolong-pairs-hf-run2/results.json \
@@ -36,10 +36,10 @@ python3 scripts/plot-rlm-accuracy.py \
 ```
 
 Example run:
-```
-node --loader ts-node/esm evaluation/benchmarks/rlm-oolong-pairs.mjs \\
-  --fixture evaluation/fixtures/rlm-oolong-pairs \\
-  --config evaluation/fixtures/rlm-oolong-pairs/fixture.hf.json \\
+```bash
+node --loader ts-node/esm evaluation/benchmarks/rlm-oolong-pairs.mjs \
+  --fixture evaluation/fixtures/rlm-oolong-pairs \
+  --config evaluation/fixtures/rlm-oolong-pairs/fixture.hf.json \
   --output out/<task-id>/rlm-oolong-pairs/results.json
 ```
 If `--output` is omitted, the benchmark writes to `/tmp/codex-rlm-oolong-pairs/results-<timestamp>.json`.
@@ -56,7 +56,7 @@ To validate determinism, set `"repeatability.runs": 2` (or higher). The output i
 ## Plotting
 Generate a PNG with the provided helper:
 
-```
+```bash
 python3 -m pip install matplotlib
 python3 scripts/plot-rlm-accuracy.py --input out/<task-id>/rlm-oolong-pairs/results.json --output out/<task-id>/graphs/oolong-pairs-accuracy.png --title "OOLONG-Pairs Accuracy vs Context Length"
 ```

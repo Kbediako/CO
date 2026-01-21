@@ -60,10 +60,20 @@ const insertRatios = Array.isArray(config.insert_ratios) && config.insert_ratios
   ? config.insert_ratios
   : (typeof config.insert_ratio === 'number' ? [config.insert_ratio] : DEFAULT_INSERT_RATIOS);
 const trials = typeof config.trials === 'number' && config.trials > 0 ? Math.floor(config.trials) : insertRatios.length;
-const baselineMaxChars =
-  typeof config.baseline_max_context_chars === 'number'
-    ? Math.floor(config.baseline_max_context_chars)
-    : (typeof config.baseline_max_context_tokens === 'number' ? Math.floor(config.baseline_max_context_tokens) : null);
+const baselineMaxChars = Number.isFinite(config.baseline_max_context_chars)
+  ? Math.floor(config.baseline_max_context_chars)
+  : null;
+if (baselineMaxChars === null) {
+  if (config.baseline_max_context_tokens !== undefined && config.baseline_max_context_tokens !== null) {
+    throw new Error(
+      'baseline_max_context_tokens is not supported for rlm-context-scale; use baseline_max_context_chars.'
+    );
+  }
+  throw new Error('baseline_max_context_chars is required for rlm-context-scale.');
+}
+if (baselineMaxChars < 1) {
+  throw new Error('baseline_max_context_chars must be >= 1.');
+}
 const chunking = { ...DEFAULT_CHUNKING, ...(config.chunking ?? {}) };
 const budgets = { ...DEFAULT_BUDGETS, ...(config.budgets ?? {}) };
 const maxIterations = typeof config.maxIterations === 'number' ? config.maxIterations : 2;
