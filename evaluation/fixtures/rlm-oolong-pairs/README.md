@@ -39,8 +39,10 @@ Example run:
 ```
 node --loader ts-node/esm evaluation/benchmarks/rlm-oolong-pairs.mjs \\
   --fixture evaluation/fixtures/rlm-oolong-pairs \\
-  --config evaluation/fixtures/rlm-oolong-pairs/fixture.hf.json
+  --config evaluation/fixtures/rlm-oolong-pairs/fixture.hf.json \\
+  --output out/<task-id>/rlm-oolong-pairs/results.json
 ```
+If `--output` is omitted, the benchmark writes to `/tmp/codex-rlm-oolong-pairs/results-<timestamp>.json`.
 For large runs, set `"dataset.cache_path"` (for example `out/<task-id>/datasets/oolong-pairs.json`) to reuse a cached JSON payload.
 Paths are resolved relative to the repo root unless you prefix with `./` or `../` to force fixture-relative paths.
 

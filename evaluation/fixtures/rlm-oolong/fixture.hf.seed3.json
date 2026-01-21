@@ -30,6 +30,7 @@
     "source": "hf",
     "name": "oolongbench/oolong-synth",
     "split": "validation",
+    "revision": "49898a421f4b14f2c9cae084d2d270f930ff4c90",
     "config": "default",
     "dataset_filter": null,
     "task_groups": [

@@ -48,13 +48,13 @@ last_review: 2026-01-20
 
 ## Validation Plan
 ### Unit tests
-- Required fixtures:
+- Planned fixtures (placeholders in this PR; populate when unit tests land):
   - `orchestrator/tests/fixtures/rlm-contexts/{small,medium,large}.txt`
   - `orchestrator/tests/fixtures/rlm-plans/*.json`
   - `orchestrator/tests/fixtures/rlm-expected/*.json`
 - Commands:
   - `npm run test:orchestrator`
-- Success criteria:
+- Success criteria (once fixtures/tests are added):
   - State snapshots match expected fixtures; repeated runs produce identical hashes.
 - Failure criteria:
   - Any mismatch in expected state, missing artifacts, or nondeterministic outputs.
