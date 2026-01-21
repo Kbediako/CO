@@ -118,9 +118,9 @@ def main():
             if scale_f1:
                 raise SystemExit("Wilson intervals require accuracy-style metrics with sample_count")
             for idx in range(len(x_vals)):
-                base_success = 0.0
+                base_success = 0
                 base_total = 0
-                rlm_success = 0.0
+                rlm_success = 0
                 rlm_total = 0
                 for _, base_vals, rlm_vals, denom_counts in normalized:
                     denom_count = denom_counts[idx]
@@ -128,8 +128,10 @@ def main():
                         raise SystemExit("Missing sample_count/task_count for Wilson intervals")
                     base_total += denom_count
                     rlm_total += denom_count
-                    base_success += (base_vals[idx] / 100.0) * denom_count
-                    rlm_success += (rlm_vals[idx] / 100.0) * denom_count
+                    base_hits = int(round((base_vals[idx] / 100.0) * denom_count))
+                    rlm_hits = int(round((rlm_vals[idx] / 100.0) * denom_count))
+                    base_success += max(0, min(base_hits, denom_count))
+                    rlm_success += max(0, min(rlm_hits, denom_count))
 
                 base_mean, base_low, base_high = wilson_interval(base_success, base_total)
                 rlm_mean, rlm_low, rlm_high = wilson_interval(rlm_success, rlm_total)
