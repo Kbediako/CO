@@ -658,7 +658,7 @@ function hasAny(user, labels) {
 function allDatesAfter(user, label, date) {
   const dates = user.dates.get(label) ?? [];
   if (dates.length === 0) {
-    return true;
+    return false;
   }
   return dates.every((value) => value.getTime() > date.getTime());
 }
@@ -666,7 +666,7 @@ function allDatesAfter(user, label, date) {
 function allDatesBefore(user, label, date) {
   const dates = user.dates.get(label) ?? [];
   if (dates.length === 0) {
-    return true;
+    return false;
   }
   return dates.every((value) => value.getTime() < date.getTime());
 }
