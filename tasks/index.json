@@ -1054,6 +1054,22 @@
       },
       "created_at": "2026-01-19",
       "completed_at": "2026-01-19"
+    },
+    {
+      "id": "0954",
+      "slug": "rlm-orchestrator-validation",
+      "title": "RLM Orchestrator Validation",
+      "path": "tasks/tasks-0954-rlm-orchestrator-validation.md",
+      "kind": "run",
+      "status": "in-progress",
+      "gate": {
+        "phase": "rlm-orchestrator-validation-planning",
+        "status": "succeeded",
+        "log": ".runs/0954-rlm-orchestrator-validation/cli/2026-01-20T00-30-29-792Z-9e030d6d/manifest.json",
+        "run_id": "2026-01-20T00-30-29-792Z-9e030d6d"
+      },
+      "created_at": "2026-01-20",
+      "completed_at": null
     }
   ],
   "specs": [
@@ -1119,6 +1135,22 @@
         "task": "tasks/tasks-0953-standalone-review-docs-first-ship.md",
         "agent_task": ".agent/task/0953-standalone-review-docs-first-ship.md",
         "docs": "docs/TECH_SPEC-standalone-review-docs-first-ship.md"
+      }
+    },
+    {
+      "id": "20260120-0954-rlm-orchestrator-validation",
+      "title": "RLM Orchestrator Validation",
+      "relates_to": "tasks/tasks-0954-rlm-orchestrator-validation.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-01-20",
+      "paths": {
+        "spec": "tasks/specs/0954-rlm-orchestrator-validation.md",
+        "task": "tasks/tasks-0954-rlm-orchestrator-validation.md",
+        "agent_task": ".agent/task/0954-rlm-orchestrator-validation.md",
+        "docs": "docs/TECH_SPEC-rlm-orchestrator-validation.md"
       }
     }
   ]

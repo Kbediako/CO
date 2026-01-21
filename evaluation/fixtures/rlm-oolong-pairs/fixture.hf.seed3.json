@@ -1,0 +1,50 @@
+{
+  "sizes": [
+    8000,
+    16000,
+    33000,
+    66000,
+    131000,
+    262000,
+    524000,
+    1000000
+  ],
+  "max_rows_per_length": 100,
+  "length_tolerance": 0.05,
+  "baseline_max_context_tokens": 16000,
+  "synthetic": {
+    "enabled": false
+  },
+  "fallback": {
+    "length_tolerance": 0.05,
+    "write_cache": true
+  },
+  "repeatability": {
+    "runs": 2
+  },
+  "dataset": {
+    "source": "hf",
+    "name": "oolongbench/oolong-synth",
+    "split": "validation",
+    "config": "default",
+    "dataset_filter": null,
+    "task_groups": [
+      "user"
+    ],
+    "max_rows_per_length": 100,
+    "length_tolerance": 0.05,
+    "sample_seed": 3
+  },
+  "rlm": {
+    "chunking": {
+      "targetBytes": 65536,
+      "overlapBytes": 2048,
+      "strategy": "byte"
+    },
+    "budgets": {
+      "maxSubcallsPerIteration": 2,
+      "maxBytesPerSnippet": 65536,
+      "maxSubcallInputBytes": 131072
+    }
+  }
+}

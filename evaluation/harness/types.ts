@@ -112,6 +112,7 @@ export interface RunScenarioOptions {
   env?: Record<string, string>;
   defaultTimeoutMs?: number;
   rewarders?: RewarderId[];
+  scenarioIds?: string[];
   tfgrpoSample?: TfgrpoSampleMetadata;
 }
 

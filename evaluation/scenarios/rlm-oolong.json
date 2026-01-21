@@ -1,0 +1,24 @@
+{
+  "id": "rlm-oolong",
+  "title": "RLM OOLONG linear aggregation benchmark",
+  "adapterId": "typescript-default",
+  "goals": ["build"],
+  "fixture": {
+    "path": "evaluation/fixtures/rlm-oolong"
+  },
+  "overrides": {
+    "build": {
+      "command": "node",
+      "args": [
+        "--loader",
+        "ts-node/esm",
+        "../../benchmarks/rlm-oolong.mjs",
+        "--fixture",
+        "{fixture}"
+      ],
+      "timeoutMs": 120000,
+      "requiresCleanFixture": false,
+      "useEvaluationDefaults": false
+    }
+  }
+}

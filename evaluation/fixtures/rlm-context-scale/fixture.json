@@ -1,0 +1,26 @@
+{
+  "sizes": [8000, 16000, 33000, 66000, 131000, 262000, 524000, 1000000],
+  "needle": "<<NEEDLE:ORCH-RLM>>",
+  "insert_ratios": [0.1, 0.3, 0.5, 0.7, 0.9],
+  "trials": 5,
+  "baseline_max_context_chars": 8000,
+  "chunking": {
+    "targetBytes": 1024,
+    "overlapBytes": 0,
+    "strategy": "byte"
+  },
+  "budgets": {
+    "maxSubcallsPerIteration": 1,
+    "maxSearchesPerIteration": 1,
+    "maxChunkReadsPerIteration": 1,
+    "maxBytesPerChunkRead": 1024,
+    "maxSnippetsPerSubcall": 1,
+    "maxBytesPerSnippet": 128,
+    "maxSubcallInputBytes": 512,
+    "maxPlannerPromptBytes": 8192,
+    "searchTopK": 5,
+    "maxPreviewBytes": 64,
+    "maxConcurrency": 1
+  },
+  "maxIterations": 2
+}
