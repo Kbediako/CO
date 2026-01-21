@@ -5,10 +5,10 @@
 
  RUN  v1.6.1 /Users/kbediako/Code/CO
 
- ✓ evaluation/tests/harness.test.ts  (13 tests | 3 skipped) 2907ms
+ ✓ evaluation/tests/harness.test.ts  (13 tests | 3 skipped) 2955ms
 
  Test Files  1 passed (1)
       Tests  10 passed | 3 skipped (13)
-   Start at  22:46:44
-   Duration  3.07s (transform 40ms, setup 0ms, collect 48ms, tests 2.91s, environment 0ms, prepare 23ms)
+   Start at  01:10:16
+   Duration  3.13s (transform 45ms, setup 0ms, collect 50ms, tests 2.96s, environment 0ms, prepare 40ms)
 

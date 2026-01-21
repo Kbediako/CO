@@ -13,4 +13,4 @@ Top changed files:
   - evaluation/fixtures/rlm-oolong-pairs/README.md: 62
   - evaluation/fixtures/rlm-oolong/README.md: 61
 
-Override accepted via DIFF_BUDGET_OVERRIDE_REASON: RLM evaluation scaffolding spans multiple files; override to capture updated review evidence after cwd fix.
+Override accepted via DIFF_BUDGET_OVERRIDE_REASON: RLM evaluation scaffolding spans multiple files; override to capture updated review evidence after predicate fix.
