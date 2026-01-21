@@ -1,0 +1,26 @@
+[
+  {
+    "context_window_id": "oolong-sample-8000",
+    "context_len": 8000,
+    "context_window_text_with_labels": "The following lines contain 4 text messages, one per line. Each line consists of a date, a user id, and an instance.\nDate: Jan 02, 2023 || User: 10001 || Instance: Hello world || Label: ham\nDate: Jan 03, 2023 || User: 10002 || Instance: Free prize || Label: spam\nDate: Jan 04, 2023 || User: 10002 || Instance: Buy now || Label: spam\nDate: Jan 05, 2023 || User: 10003 || Instance: Limited deal || Label: spam\nRecall: the preceding lines contain 4 text messages, one per line.",
+    "question": "Based on the context, which of the labels is the most common? Give your final answer in the form \"Label: answer\" where answer is one of the labels: spam, ham.",
+    "answer": "['spam']",
+    "task": "TASK_TYPE.MOST_FREQ",
+    "task_group": "counting",
+    "input_subset": false,
+    "answer_type": "label",
+    "dataset": "sample"
+  },
+  {
+    "context_window_id": "oolong-sample-16000",
+    "context_len": 16000,
+    "context_window_text_with_labels": "The following lines contain 5 text messages, one per line. Each line consists of a date, a user id, and an instance.\nDate: Feb 01, 2023 || User: 20001 || Instance: Quick note || Label: ham\nDate: Feb 02, 2023 || User: 20002 || Instance: Prize offer || Label: spam\nDate: Feb 03, 2023 || User: 20003 || Instance: Buy now || Label: spam\nDate: Feb 04, 2023 || User: 20004 || Instance: Limited time || Label: spam\nDate: Feb 05, 2023 || User: 20005 || Instance: Reminder || Label: ham\nRecall: the preceding lines contain 5 text messages, one per line.",
+    "question": "Based on the context, which of the labels is the least common? Give your final answer in the form \"Label: answer\" where answer is one of the labels: spam, ham.",
+    "answer": "['ham']",
+    "task": "TASK_TYPE.LEAST_FREQ",
+    "task_group": "counting",
+    "input_subset": false,
+    "answer_type": "label",
+    "dataset": "sample"
+  }
+]

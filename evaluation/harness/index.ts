@@ -665,13 +665,18 @@ export async function runScenario(
 }
 
 export async function runAllScenarios(options: RunScenarioOptions = {}): Promise<EvaluationScenarioResult[]> {
-  const scenarios = await loadScenarios();
+  let scenarios = await loadScenarios();
+  if (Array.isArray(options.scenarioIds) && options.scenarioIds.length > 0) {
+    const allowed = new Set(options.scenarioIds);
+    scenarios = scenarios.filter((scenario) => allowed.has(scenario.id));
+  }
   const results: EvaluationScenarioResult[] = [];
   const rewarderIds = normalizeRewarderIds(options.rewarders);
   const resolvedOutputDir = options.outputDir ? path.resolve(process.cwd(), options.outputDir) : null;
   const scenarioOptions = {
     ...options,
     rewarders: undefined,
+    scenarioIds: undefined,
     outputDir: resolvedOutputDir ?? undefined
   } satisfies RunScenarioOptions;
 

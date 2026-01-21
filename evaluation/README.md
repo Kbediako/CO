@@ -10,7 +10,7 @@ The evaluation harness runs adapter commands against managed fixtures to verify 
 Harness helpers:
 
 - `runScenario(id, options)` — Load a scenario from `evaluation/scenarios/*.json`, run adapter goals sequentially, and return a structured result.
-- `runAllScenarios(options)` — Execute every registered scenario in order.
+- `runAllScenarios(options)` — Execute every registered scenario in order (or pass `scenarioIds` to limit the run).
 
 Scenario options include:
 

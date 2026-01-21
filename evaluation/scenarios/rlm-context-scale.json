@@ -1,0 +1,26 @@
+{
+  "id": "rlm-context-scale",
+  "title": "RLM context scale benchmark",
+  "adapterId": "typescript-default",
+  "goals": ["build"],
+  "fixture": {
+    "path": "evaluation/fixtures/rlm-context-scale"
+  },
+  "overrides": {
+    "build": {
+      "command": "node",
+      "args": [
+        "--loader",
+        "ts-node/esm",
+        "../../benchmarks/rlm-context-scale.mjs",
+        "--fixture",
+        "{fixture}"
+      ],
+      "timeoutMs": 60000,
+      "cwd": "{fixture}",
+      "requiresCleanFixture": false,
+      "supportsParallel": false,
+      "useEvaluationDefaults": false
+    }
+  }
+}

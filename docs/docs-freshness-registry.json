@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generated_at": "2026-01-19",
+  "generated_at": "2026-01-20",
   "entries": [
     {
       "path": ".agent/AGENTS.md",
@@ -612,6 +612,13 @@
       "cadence_days": 90
     },
     {
+      "path": ".agent/task/0954-rlm-orchestrator-validation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-20",
+      "cadence_days": 90
+    },
+    {
       "path": ".agent/task/ACTION_PLAN_TEMPLATE.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -990,6 +997,13 @@
       "cadence_days": 90
     },
     {
+      "path": "docs/ACTION_PLAN-rlm-orchestrator-validation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-20",
+      "cadence_days": 90
+    },
+    {
       "path": "docs/ACTION_PLAN-slimdown-cycle-2.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -1337,6 +1351,13 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-01-18",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/PRD-rlm-orchestrator-validation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-20",
       "cadence_days": 90
     },
     {
@@ -1708,6 +1729,13 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-01-18",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/TECH_SPEC-rlm-orchestrator-validation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-20",
       "cadence_days": 90
     },
     {
@@ -2348,6 +2376,13 @@
       "cadence_days": 90
     },
     {
+      "path": "tasks/specs/0954-rlm-orchestrator-validation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-20",
+      "cadence_days": 90
+    },
+    {
       "path": "tasks/specs/README.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -2786,6 +2821,13 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-01-19",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/tasks-0954-rlm-orchestrator-validation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-20",
       "cadence_days": 90
     },
     {

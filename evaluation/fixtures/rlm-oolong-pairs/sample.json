@@ -1,0 +1,8 @@
+[
+  {
+    "context_window_id": "oolong-pairs-sample-8000",
+    "context_len": 8000,
+    "context_window_text_with_labels": "The following lines contain 14 questions, one per line. Each line consists of a date, a user id, and an instance.\nDate: Feb 02, 2023 || User: 1001 || Instance: The answer is 42 || Label: numeric value\nDate: Feb 03, 2023 || User: 1001 || Instance: Another number || Label: numeric value\nDate: Apr 15, 2023 || User: 1001 || Instance: Visiting Paris || Label: location\nDate: Jan 10, 2023 || User: 1002 || Instance: Amazon announced || Label: entity\nDate: Jan 11, 2023 || User: 1002 || Instance: NASA mission || Label: entity\nDate: May 01, 2023 || User: 1002 || Instance: Mr. Smith || Label: human being\nDate: May 02, 2023 || User: 1002 || Instance: NYC trip || Label: location\nDate: May 03, 2023 || User: 1002 || Instance: LA flight || Label: location\nDate: May 04, 2023 || User: 1002 || Instance: ASAP acronym || Label: abbreviation\nDate: Mar 20, 2023 || User: 1003 || Instance: The concept of justice || Label: description and abstract concept\nDate: Mar 21, 2023 || User: 1003 || Instance: UNICEF || Label: entity\nDate: Mar 22, 2023 || User: 1003 || Instance: CPU || Label: abbreviation\nDate: Mar 23, 2023 || User: 1003 || Instance: 7 || Label: numeric value\nDate: Mar 24, 2023 || User: 1003 || Instance: Jane Doe || Label: human being\nRecall: the preceding lines contain 14 questions, one per line.",
+    "dataset": "sample"
+  }
+]

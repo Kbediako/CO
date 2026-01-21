@@ -144,3 +144,14 @@ codex-orchestrator devtools setup
 Repo internals, development workflows, and deeper architecture notes live in the GitHub repository:
 - `docs/README.md`
 - `docs/diagnostics-prompt-guide.md` (first-run diagnostics prompt + expected outputs)
+
+## RLM benchmark graphs
+
+Seeded OOLONG accuracy curves (Wilson 95% CI, runs=5). In these runs, the baseline accuracy degrades as context length grows, while RLM stays near the ceiling across the tested lengths.
+
+<table>
+  <tr>
+    <td><img src="docs/assets/oolong-baseline-seeded-wilson95-runs5.png" alt="Baseline OOLONG seeded Wilson 95% CI" width="420"></td>
+    <td><img src="docs/assets/oolong-rlm-seeded-wilson95-runs5.png" alt="RLM OOLONG seeded Wilson 95% CI" width="420"></td>
+  </tr>
+</table>

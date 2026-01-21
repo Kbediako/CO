@@ -7,6 +7,8 @@ import type { EvaluationScenario, EvaluationScenarioResult, ScenarioGoalResult }
 import type { AdapterGoal } from '../../adapters/types.js';
 
 const tempDirs: string[] = [];
+const runBenchmarks = process.env.EVAL_BENCHMARKS === '1';
+const benchIt = runBenchmarks ? it : it.skip;
 
 afterAll(async () => {
   for (const dir of tempDirs) {
@@ -27,6 +29,64 @@ describe('evaluation harness', () => {
     expect(goalStatuses.every((status) => status === 'passed')).toBe(true);
   });
 
+  benchIt('runs the RLM context scale benchmark scenario', async () => {
+    const result = await runScenario('rlm-context-scale', { mode: 'mcp' });
+    const goal = result.goals[0];
+    expect(goal?.status).toBe('passed');
+    expect(goal?.stdout).toContain('Wrote ');
+
+    const match = goal?.stdout?.match(/Wrote\s+(.+)/);
+    expect(match).not.toBeNull();
+    if (match?.[1]) {
+      const outputPath = match[1].trim();
+      const payload = JSON.parse(await fs.readFile(outputPath, 'utf8'));
+      const last = payload.results?.at(-1);
+      expect(last?.context_length).toBe(1000000);
+      expect(last?.baseline_correct_pct).toBeLessThan(100);
+      expect(last?.rlm_correct_pct).toBe(100);
+      expect(last?.baseline_correct_pct).toBeLessThan(last?.rlm_correct_pct);
+      await fs.rm(outputPath, { force: true });
+    }
+  }, 180000);
+
+  benchIt('runs the RLM OOLONG benchmark scenario', async () => {
+    const result = await runScenario('rlm-oolong', { mode: 'mcp' });
+    const goal = result.goals[0];
+    expect(goal?.status).toBe('passed');
+    expect(goal?.stdout).toContain('Wrote ');
+
+    const match = goal?.stdout?.match(/Wrote\s+(.+)/);
+    expect(match).not.toBeNull();
+    if (match?.[1]) {
+      const outputPath = match[1].trim();
+      const payload = JSON.parse(await fs.readFile(outputPath, 'utf8'));
+      const last = payload.results?.at(-1);
+      expect(last?.context_length).toBe(1000000);
+      expect(last?.baseline_correct_pct).toBeLessThan(100);
+      expect(last?.baseline_correct_pct).toBeLessThan(last?.rlm_correct_pct);
+      await fs.rm(outputPath, { force: true });
+    }
+  }, 180000);
+
+  benchIt('runs the RLM OOLONG-Pairs benchmark scenario', async () => {
+    const result = await runScenario('rlm-oolong-pairs', { mode: 'mcp' });
+    const goal = result.goals[0];
+    expect(goal?.status).toBe('passed');
+    expect(goal?.stdout).toContain('Wrote ');
+
+    const match = goal?.stdout?.match(/Wrote\s+(.+)/);
+    expect(match).not.toBeNull();
+    if (match?.[1]) {
+      const outputPath = match[1].trim();
+      const payload = JSON.parse(await fs.readFile(outputPath, 'utf8'));
+      const last = payload.results?.at(-1);
+      expect(last?.context_length).toBe(1000000);
+      expect(last?.baseline_perfect_pct).toBeLessThan(100);
+      expect(last?.baseline_perfect_pct).toBeLessThan(last?.rlm_perfect_pct);
+      await fs.rm(outputPath, { force: true });
+    }
+  }, 180000);
+
   it('runs backend-api-opt with diff-match assertions', async () => {
     const result = await runScenario('backend-api-opt', { mode: 'mcp' });
     expect(result.goals.map((goal) => goal.status)).toEqual(['passed']);
@@ -39,7 +99,11 @@ describe('evaluation harness', () => {
     const outputDir = await fs.mkdtemp(path.join(os.tmpdir(), 'codex-eval-test-'));
     tempDirs.push(outputDir);
 
-    const results = await runAllScenarios({ outputDir, mode: 'mcp' });
+    const results = await runAllScenarios({
+      outputDir,
+      mode: 'mcp',
+      scenarioIds: ['typescript-smoke', 'backend-api-opt']
+    });
     expect(results.length).toBeGreaterThanOrEqual(2);
 
     for (const scenario of results) {

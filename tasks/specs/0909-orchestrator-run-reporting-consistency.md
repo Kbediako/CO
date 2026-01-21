@@ -6,7 +6,7 @@ risk: medium
 owners:
   - Codex (top-level agent)
   - Review agent
-last_review: 2025-12-21
+last_review: 2026-01-21
 ---
 
 ## Summary

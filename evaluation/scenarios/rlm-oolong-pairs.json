@@ -1,0 +1,25 @@
+{
+  "id": "rlm-oolong-pairs",
+  "title": "RLM OOLONG-Pairs benchmark",
+  "adapterId": "typescript-default",
+  "goals": ["build"],
+  "fixture": {
+    "path": "evaluation/fixtures/rlm-oolong-pairs"
+  },
+  "overrides": {
+    "build": {
+      "command": "node",
+      "args": [
+        "--loader",
+        "ts-node/esm",
+        "../../benchmarks/rlm-oolong-pairs.mjs",
+        "--fixture",
+        "{fixture}"
+      ],
+      "timeoutMs": 120000,
+      "cwd": "{fixture}",
+      "requiresCleanFixture": false,
+      "useEvaluationDefaults": false
+    }
+  }
+}
