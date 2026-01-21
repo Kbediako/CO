@@ -17,6 +17,7 @@
         "{fixture}"
       ],
       "timeoutMs": 60000,
+      "cwd": "{fixture}",
       "requiresCleanFixture": false,
       "supportsParallel": false,
       "useEvaluationDefaults": false
