@@ -139,7 +139,8 @@ async function runBenchmark(bucketMap) {
   const runResults = [];
   for (const size of sizes) {
     const bucket = bucketMap.get(size) ?? [];
-    const limited = sortRowsDeterministically(bucket).slice(0, maxRowsPerLength);
+    const filtered = bucket.filter((row) => taskTypes.includes(row.task ?? ''));
+    const limited = sortRowsDeterministically(filtered).slice(0, maxRowsPerLength);
     if (limited.length === 0) {
       const note = fallbackNotes.get(size);
       const notes = note ? `no matching samples; ${note}` : 'no matching samples';
@@ -165,9 +166,6 @@ async function runBenchmark(bucketMap) {
       const contextText = row.context_window_text_with_labels ?? row.context_window_text ?? '';
       const question = row.question ?? '';
       const taskType = row.task ?? '';
-      if (!taskTypes.includes(taskType)) {
-        continue;
-      }
 
       const gold = parseGoldAnswer(row.answer);
 

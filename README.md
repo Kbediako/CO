@@ -147,7 +147,7 @@ Repo internals, development workflows, and deeper architecture notes live in the
 
 ## RLM benchmark graphs
 
-Seeded OOLONG accuracy curves (Wilson 95% CI, runs=5):
+Seeded OOLONG accuracy curves (Wilson 95% CI, runs=5). In these runs, the baseline accuracy degrades as context length grows, while RLM stays near the ceiling across the tested lengths.
 
 <table>
   <tr>
