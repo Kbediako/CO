@@ -18,7 +18,8 @@
       ],
       "timeoutMs": 60000,
       "requiresCleanFixture": false,
-      "supportsParallel": false
+      "supportsParallel": false,
+      "useEvaluationDefaults": false
     }
   }
 }

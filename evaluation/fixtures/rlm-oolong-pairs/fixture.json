@@ -2,6 +2,7 @@
   "sizes": [8000, 16000, 33000, 66000, 131000, 262000, 524000, 1000000],
   "max_rows_per_length": 1,
   "length_tolerance": 0,
+  "length_tolerance_note": "Top-level tolerance controls grouping; dataset.length_tolerance controls HF fetch filtering.",
   "baseline_max_context_tokens": 8000,
   "synthetic": {
     "enabled": true,
@@ -24,7 +25,8 @@
     "dataset_filter": "trec_coarse",
     "task_groups": [],
     "max_rows_per_length": 1,
-    "length_tolerance": 0.01
+    "length_tolerance": 0.01,
+    "length_tolerance_note": "Looser fetch tolerance reduces empty buckets when sampling HF rows."
   },
   "rlm": {
     "chunking": {
