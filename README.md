@@ -149,6 +149,9 @@ Repo internals, development workflows, and deeper architecture notes live in the
 
 Seeded OOLONG accuracy curves (Wilson 95% CI, runs=5):
 
-![Baseline OOLONG seeded Wilson 95% CI](docs/assets/oolong-baseline-seeded-wilson95-runs5.png)
-
-![RLM OOLONG seeded Wilson 95% CI](docs/assets/oolong-rlm-seeded-wilson95-runs5.png)
+<table>
+  <tr>
+    <td><img src="docs/assets/oolong-baseline-seeded-wilson95-runs5.png" alt="Baseline OOLONG seeded Wilson 95% CI" width="420"></td>
+    <td><img src="docs/assets/oolong-rlm-seeded-wilson95-runs5.png" alt="RLM OOLONG seeded Wilson 95% CI" width="420"></td>
+  </tr>
+</table>
