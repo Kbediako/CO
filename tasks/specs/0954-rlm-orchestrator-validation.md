@@ -60,8 +60,8 @@ last_review: 2026-01-20
   - Any mismatch in expected state, missing artifacts, or nondeterministic outputs.
 
 ### Integration tests
-- Required fixtures:
-  - `evaluation/fixtures/rlm-runner` (context + validator scripts)
+- Planned fixtures (placeholder; add when integration suite lands):
+  - Context + validator scripts bundled with the integration harness (TBD)
   - Stubbed agent/planner outputs
 - Commands:
   - `npm run build`
