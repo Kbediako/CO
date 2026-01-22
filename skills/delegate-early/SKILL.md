@@ -35,7 +35,7 @@ Use this skill when a task can be split into parallel streams or when the main c
 ## Prompt patterns
 - Research: “Find X, cite Y, return 3 bullets + risks.”
 - Review: “Inspect files A/B for regressions; list issues by severity.”
-- Planning: “Draft a 3–5 step plan, call out unknowns.”
+- Planning: “Draft a 3–5-step plan, call out unknowns.”
 
 ## Escalation rules
 - If delegation is impossible, set override reason and document it in the task checklist.

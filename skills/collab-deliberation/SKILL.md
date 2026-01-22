@@ -12,7 +12,7 @@ Use this skill when the user asks for brainstorming, multiple approaches, pros/c
 1) Clarify the decision: summarize the goal, constraints, and success criteria.
 2) Generate options: 3–5 distinct approaches with short descriptions.
 3) Compare tradeoffs: cost, risk, speed, maintenance, and alignment with guardrails.
-4) Recommend: pick a best path and explain why.
+4) Recommend: choose a recommended approach and explain why.
 5) Open questions: list 1–3 questions that would change the recommendation.
 
 ## Guardrails

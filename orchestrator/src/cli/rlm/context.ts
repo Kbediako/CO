@@ -298,6 +298,8 @@ export class ContextStore {
     if (index >= 0 && index < chunks.length) {
       return chunks[index]?.id ?? null;
     }
+    // Some upstream pointers are 1-based. Tolerate that legacy form by
+    // mapping index=N to chunks[N-1] when the 0-based lookup is out of range.
     const fallback = index - 1;
     if (fallback >= 0 && fallback < chunks.length) {
       return chunks[fallback]?.id ?? null;

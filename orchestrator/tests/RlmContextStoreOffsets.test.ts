@@ -98,4 +98,25 @@ describe('ContextStore search offsets', () => {
     const data = await store.read(numericPointer, 0, 5);
     expect(data.text.length).toBeGreaterThan(0);
   });
+
+  it('accepts legacy 1-based numeric chunk pointers', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'rlm-context-'));
+    const text = 'alpha beta gamma delta epsilon zeta eta theta iota kappa';
+    const contextObject = await buildContextObject({
+      source: { type: 'text', value: text },
+      targetDir: join(tempDir, 'context'),
+      chunking: { targetBytes: 8, overlapBytes: 0, strategy: 'byte' }
+    });
+
+    const store = new ContextStore(contextObject);
+    const objectId = contextObject.index.object_id;
+    const lastIndex = contextObject.index.chunks.length - 1;
+    const lastChunkId = contextObject.index.chunks[lastIndex]?.id ?? '';
+    const legacyPointer = `ctx:${objectId}#chunk:${contextObject.index.chunks.length}`;
+    const resolved = store.validatePointer(legacyPointer);
+
+    expect(resolved?.chunkId).toBe(lastChunkId);
+    const data = await store.read(legacyPointer, 0, 5);
+    expect(data.text.length).toBeGreaterThan(0);
+  });
 });

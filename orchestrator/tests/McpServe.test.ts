@@ -72,7 +72,11 @@ describe('serveMcp', () => {
       stdoutWrites = stdoutSpy.mock.calls.map((call) => call[0]);
       stderrWriteCount = stderrSpy.mock.calls.length;
     } finally {
-      process.env.CODEX_CLI_BIN = previousCodexBin;
+      if (previousCodexBin === undefined) {
+        delete process.env.CODEX_CLI_BIN;
+      } else {
+        process.env.CODEX_CLI_BIN = previousCodexBin;
+      }
       stdoutSpy.mockRestore();
       stderrSpy.mockRestore();
     }

@@ -2,7 +2,7 @@
 
 ## Summary
 - Problem Statement: Codex CLI v0.88.0 introduces collab/multi-agent collaboration modes, but the CO orchestrator does not yet surface or leverage these capabilities for pipelines or RLM workflows. Official CLI releases also do not emit collab JSONL events, limiting CO’s ability to consume them as a plugin.
-- Desired Outcome: The orchestrator can configure collaboration modes per run/stage, leverage multi-agent control where it adds value (especially RLM), capture collab activity in manifests/telemetry, publish guidance on MCP vs collab usage, and improve long-running accuracy via context-rot mitigation. CO should offer a managed, patched Codex CLI install path so official users can opt-in without replacing the system binary.
+- Desired Outcome: The orchestrator can configure collaboration modes per run/stage, leverage multi-agent control where it adds value (especially RLM), capture collab activity in manifests/telemetry, publish guidance on MCP vs collab usage, and improve long-running accuracy via context-rot mitigation. CO should offer a managed, patched Codex CLI install path so official users can opt in without replacing the system binary.
 
 ## User Request Translation (Context Anchor)
 - User intent / needs (in your own words): Research collab multi-agent support in Codex CLI v0.88.0 and determine the updates needed to the orchestrator; include RLM impacts and whether MCP remains the best orchestration option. Enable CO init to provision a patched Codex CLI so official users can access collab JSONL without modifying their system install.
