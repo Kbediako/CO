@@ -3,6 +3,7 @@ import { isAbsolute, join, resolve } from 'node:path';
 import process from 'node:process';
 
 const DEFAULT_TASK_ID = '0101';
+const DEFAULT_RUN_LAYOUT = 'cli';
 
 function resolveRepoRoot() {
   const configured = process.env.CODEX_ORCHESTRATOR_ROOT;
@@ -37,6 +38,20 @@ export function resolveEnvironmentPaths() {
   const outRoot = resolveOutDir(repoRoot);
   const taskId = process.env.MCP_RUNNER_TASK_ID ?? DEFAULT_TASK_ID;
   return { repoRoot, runsRoot, outRoot, taskId };
+}
+
+export function resolveRunDir(options) {
+  const { runsRoot, taskId, runId, layout = DEFAULT_RUN_LAYOUT } = options ?? {};
+  if (!runsRoot || !taskId || !runId) {
+    throw new Error('resolveRunDir requires runsRoot, taskId, and runId');
+  }
+  if (layout !== 'cli' && layout !== 'legacy') {
+    throw new Error(`resolveRunDir received unsupported layout: ${layout}`);
+  }
+  if (layout === 'legacy') {
+    return join(runsRoot, taskId, runId);
+  }
+  return join(runsRoot, taskId, 'cli', runId);
 }
 
 export async function listDirectories(dirPath) {

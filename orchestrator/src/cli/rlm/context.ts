@@ -283,6 +283,30 @@ export class ContextStore {
     return this.context.index.source.byte_length;
   }
 
+  private resolveChunkId(chunkId: string): string | null {
+    if (this.chunkMap.has(chunkId)) {
+      return chunkId;
+    }
+    if (!/^\d+$/.test(chunkId)) {
+      return null;
+    }
+    const index = Number.parseInt(chunkId, 10);
+    if (!Number.isFinite(index)) {
+      return null;
+    }
+    const chunks = this.context.index.chunks;
+    if (index >= 0 && index < chunks.length) {
+      return chunks[index]?.id ?? null;
+    }
+    // Some upstream pointers are 1-based. Tolerate that legacy form by
+    // mapping index=N to chunks[N-1] when the 0-based lookup is out of range.
+    const fallback = index - 1;
+    if (fallback >= 0 && fallback < chunks.length) {
+      return chunks[fallback]?.id ?? null;
+    }
+    return null;
+  }
+
   validatePointer(pointer: string): { objectId: string; chunkId: string } | null {
     const parsed = parseContextPointer(pointer);
     if (!parsed) {
@@ -291,10 +315,11 @@ export class ContextStore {
     if (parsed.objectId !== this.context.index.object_id) {
       return null;
     }
-    if (!this.chunkMap.has(parsed.chunkId)) {
+    const resolvedChunkId = this.resolveChunkId(parsed.chunkId);
+    if (!resolvedChunkId) {
       return null;
     }
-    return parsed;
+    return { objectId: parsed.objectId, chunkId: resolvedChunkId };
   }
 
   async read(pointer: string, offset: number, bytes: number): Promise<{ text: string; startByte: number; endByte: number }> {
@@ -305,7 +330,11 @@ export class ContextStore {
     if (parsed.objectId !== this.context.index.object_id) {
       throw new Error('context object mismatch');
     }
-    const chunk = this.chunkMap.get(parsed.chunkId);
+    const resolvedChunkId = this.resolveChunkId(parsed.chunkId);
+    if (!resolvedChunkId) {
+      throw new Error('context chunk missing');
+    }
+    const chunk = this.chunkMap.get(resolvedChunkId);
     if (!chunk) {
       throw new Error('context chunk missing');
     }

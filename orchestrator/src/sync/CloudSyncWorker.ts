@@ -7,6 +7,7 @@ import type { CloudRunsClient, UploadResult } from './CloudRunsClient.js';
 import { CloudRunsHttpError } from './CloudRunsHttpClient.js';
 import { sanitizeTaskId } from '../persistence/sanitizeTaskId.js';
 import { sanitizeRunId } from '../persistence/sanitizeRunId.js';
+import { resolveRunDir } from '../../../scripts/lib/run-manifests.js';
 
 export interface CloudSyncWorkerOptions {
   runsDir?: string;
@@ -120,11 +121,25 @@ export class CloudSyncWorker {
     }
   }
 
-  private buildManifestPath(summary: RunSummary): string {
+  private buildManifestPaths(summary: RunSummary): { primary: string; fallback: string } {
     const safeTaskId = sanitizeTaskId(summary.taskId);
     const safeRunId = sanitizeRunId(summary.runId);
-    const runDir = join(this.runsDir, safeTaskId, safeRunId);
-    return join(runDir, 'manifest.json');
+    const primaryRunDir = resolveRunDir({
+      runsRoot: this.runsDir,
+      taskId: safeTaskId,
+      runId: safeRunId,
+      layout: 'cli'
+    });
+    const fallbackRunDir = resolveRunDir({
+      runsRoot: this.runsDir,
+      taskId: safeTaskId,
+      runId: safeRunId,
+      layout: 'legacy'
+    });
+    return {
+      primary: join(primaryRunDir, 'manifest.json'),
+      fallback: join(fallbackRunDir, 'manifest.json')
+    };
   }
 
   private async appendAuditLog(entry: AuditLogEntry): Promise<void> {
@@ -169,7 +184,7 @@ export class CloudSyncWorker {
   }
 
   private async readManifestWithRetry(summary: RunSummary): Promise<Record<string, unknown>> {
-    const manifestPath = this.buildManifestPath(summary);
+    const { primary, fallback } = this.buildManifestPaths(summary);
     let attempt = 0;
     let delay = this.manifestInitialDelayMs;
     let lastError: unknown;
@@ -177,12 +192,22 @@ export class CloudSyncWorker {
     while (attempt < this.manifestReadRetries) {
       attempt += 1;
       try {
-        const contents = await readFile(manifestPath, 'utf-8');
+        const contents = await readFile(primary, 'utf-8');
         lastContents = contents;
         return JSON.parse(contents) as Record<string, unknown>;
       } catch (error: unknown) {
-        lastError = error;
-        if (shouldRetryManifestRead(error) && attempt < this.manifestReadRetries) {
+        let candidateError: unknown = error;
+        if (isMissingPathError(error)) {
+          try {
+            const contents = await readFile(fallback, 'utf-8');
+            lastContents = contents;
+            return JSON.parse(contents) as Record<string, unknown>;
+          } catch (fallbackError: unknown) {
+            candidateError = fallbackError;
+          }
+        }
+        lastError = candidateError;
+        if (shouldRetryManifestRead(candidateError) && attempt < this.manifestReadRetries) {
           await new Promise((resolve) => setTimeout(resolve, delay));
           delay *= 2;
           continue;
@@ -217,6 +242,11 @@ function shouldRetryManifestRead(error: unknown): boolean {
   }
   const code = (error as NodeJS.ErrnoException)?.code;
   return code === 'ENOENT' || code === 'EBUSY' || code === 'EMFILE';
+}
+
+function isMissingPathError(error: unknown): boolean {
+  const code = (error as NodeJS.ErrnoException)?.code;
+  return code === 'ENOENT' || code === 'ENOTDIR';
 }
 
 function attemptJsonRecovery(contents: string): string | null {

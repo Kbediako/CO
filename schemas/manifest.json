@@ -154,6 +154,10 @@
         }
       }
     },
+    "collab_tool_calls": {
+      "type": ["array", "null"],
+      "items": { "$ref": "#/definitions/collabToolCall" }
+    },
     "child_runs": {
       "type": "array",
       "items": {
@@ -755,6 +759,41 @@
         "errorMessage": { "type": ["string", "null"] }
       },
       "additionalProperties": true
+    },
+    "collabToolCall": {
+      "type": "object",
+      "required": [
+        "observed_at",
+        "stage_id",
+        "command_index",
+        "event_type",
+        "item_id",
+        "tool",
+        "status",
+        "sender_thread_id",
+        "receiver_thread_ids"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "observed_at": { "type": "string", "minLength": 1 },
+        "stage_id": { "type": "string", "minLength": 1 },
+        "command_index": { "type": "integer", "minimum": 1 },
+        "event_type": { "type": "string", "enum": ["item.started", "item.completed", "item.updated"] },
+        "item_id": { "type": "string", "minLength": 1 },
+        "tool": { "type": "string", "minLength": 1 },
+        "status": { "type": "string", "enum": ["in_progress", "completed", "failed"] },
+        "sender_thread_id": { "type": "string", "minLength": 1 },
+        "receiver_thread_ids": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "prompt": { "type": ["string", "null"] },
+        "agents_states": {
+          "type": ["object", "null"],
+          "additionalProperties": true
+        }
+      }
     },
     "designArtifact": {
       "type": "object",

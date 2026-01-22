@@ -7,7 +7,7 @@ import {
 } from '../../../packages/shared/config/index.js';
 import { sanitizeTaskId } from '../../../orchestrator/src/persistence/sanitizeTaskId.js';
 import { sanitizeRunId } from '../../../orchestrator/src/persistence/sanitizeRunId.js';
-import { resolveEnvironmentPaths } from '../../lib/run-manifests.js';
+import { resolveEnvironmentPaths, resolveRunDir } from '../../lib/run-manifests.js';
 
 export interface DesignContext {
   taskId: string;
@@ -30,7 +30,9 @@ export async function loadDesignContext(): Promise<DesignContext> {
   );
   const rawRunId = process.env.CODEX_ORCHESTRATOR_RUN_ID ?? 'run-local';
   const runId = sanitizeRunId(rawRunId);
-  const runDir = process.env.CODEX_ORCHESTRATOR_RUN_DIR ?? join(runsRoot, taskId, runId);
+  const runDir =
+    process.env.CODEX_ORCHESTRATOR_RUN_DIR ??
+    resolveRunDir({ runsRoot, taskId, runId, layout: 'cli' });
   const manifestPath = process.env.CODEX_ORCHESTRATOR_MANIFEST_PATH ?? join(runDir, 'manifest.json');
   const designConfigPath = process.env.DESIGN_CONFIG_PATH ?? join(repoRoot, 'design.config.yaml');
 

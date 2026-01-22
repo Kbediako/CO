@@ -22,6 +22,8 @@ Key flags:
 
 Every invocation writes a manifest to the task-specific runs directory. The JSONL stream always ends with a summary event:
 
+Note: if the command itself runs `codex exec --json --enable collab`, the collab JSONL lines appear on stdout inside `exec:chunk` events. The orchestrator also extracts them into `manifest.collab_tool_calls` for easier downstream consumption.
+
 ```json
 {
   "type": "run:summary",

@@ -39,6 +39,27 @@ Node.js >= 20 is required.
    > Tip: if you prefer `npx`, replace `codex-orch` with `npx @kbediako/codex-orchestrator`.
    > Tip: for multiple commands, you can also `export MCP_RUNNER_TASK_ID=<task-id>` once.
 
+## Downstream init (recommended)
+
+Use this when you want Codex to drive work inside another repo with the CO defaults.
+
+1. Install templates:
+   ```bash
+   codex-orchestrator init codex --cwd /path/to/repo
+   ```
+   One-shot (templates + CO-managed Codex CLI):
+   ```bash
+   codex-orchestrator init codex --codex-cli --yes
+   ```
+2. Register the delegation MCP server (one-time per machine):
+   ```bash
+   codex mcp add delegation -- codex-orchestrator delegate-server --repo /path/to/repo
+   ```
+3. Optional (collab JSONL parity): set up a CO-managed Codex CLI:
+   ```bash
+   codex-orchestrator codex setup
+   ```
+
 ## Delegation MCP server
 
 Run the delegation MCP server over stdio:
@@ -57,6 +78,7 @@ codex -c 'mcp_servers.delegation.enabled=true' ...
 ## Delegation + RLM flow
 
 RLM (Recursive Language Model) is the long-horizon loop used by the `rlm` pipeline (`codex-orchestrator rlm "<goal>"` or `codex-orchestrator start rlm --goal "<goal>"`). Delegated runs only enter RLM when the child is launched with the `rlm` pipeline (or the rlm runner directly). In auto mode it resolves to symbolic when delegated, when `RLM_CONTEXT_PATH` is set, or when the context exceeds `RLM_SYMBOLIC_MIN_BYTES`; otherwise it stays iterative. The runner writes state to `.runs/<task-id>/cli/<run-id>/rlm/state.json` and stops when the validator passes or budgets are exhausted.
+Symbolic subcalls can optionally use collab tools when `RLM_SYMBOLIC_COLLAB=1` (requires a collab-enabled Codex CLI via `codex setup`). Collab tool calls parsed from `codex exec --json --enable collab` are stored in `manifest.collab_tool_calls` (bounded by `CODEX_ORCHESTRATOR_COLLAB_MAX_EVENTS`, set to `0` to disable).
 
 ### Delegation flow
 ```mermaid
@@ -82,7 +104,7 @@ flowchart TB
   G{Symbolic?}
   H["Context store<br/>(chunk + search)"]
   I["Planner JSON<br/>(select subcalls)"]
-  J["Subcalls<br/>(tool + edits)"]
+  J["Subcalls<br/>(tool + edits, collab optional)"]
   K["Validator<br/>(test command)"]
   L["State + artifacts<br/>.runs/&lt;task-id&gt;/cli/&lt;run-id&gt;/rlm/state.json"]
   M["Exit status"]
@@ -110,6 +132,9 @@ Bundled skills (may vary by release):
 - `delegation-usage`
 - `standalone-review`
 - `docs-first`
+- `collab-evals`
+- `collab-deliberation`
+- `delegate-early`
 
 ## DevTools readiness
 
@@ -129,6 +154,9 @@ codex-orchestrator devtools setup
 - `codex-orchestrator plan <pipeline>` — preview pipeline stages.
 - `codex-orchestrator exec <cmd>` — run a one-off command with the exec runtime.
 - `codex-orchestrator init codex` — install starter templates (`mcp-client.json`, `AGENTS.md`) into a repo.
+- `codex-orchestrator init codex --codex-cli --yes --codex-source <path>` — also provision a CO-managed Codex CLI binary (build-from-source default; set `CODEX_CLI_SOURCE` to avoid passing `--codex-source` every time).
+- `codex-orchestrator init codex --codex-cli --yes --codex-download-url <url> --codex-download-sha256 <sha>` — opt-in to a prebuilt Codex CLI download.
+- `codex-orchestrator codex setup` — plan/apply a CO-managed Codex CLI install (for collab JSONL parity; use `--download-url` + `--download-sha256` for prebuilts).
 - `codex-orchestrator self-check --format json` — JSON health payload.
 - `codex-orchestrator mcp serve` — Codex MCP stdio server.
 
@@ -144,6 +172,7 @@ codex-orchestrator devtools setup
 Repo internals, development workflows, and deeper architecture notes live in the GitHub repository:
 - `docs/README.md`
 - `docs/diagnostics-prompt-guide.md` (first-run diagnostics prompt + expected outputs)
+- `docs/guides/collab-vs-mcp.md` (agent-first decision guide)
 
 ## RLM benchmark graphs
 

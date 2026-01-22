@@ -24,6 +24,7 @@ import { findPackageRoot } from '../utils/packageInfo.js';
 const MAX_BUFFERED_OUTPUT_BYTES = 64 * 1024;
 const EMIT_COMMAND_STREAM_MIRRORS = EnvUtils.getBoolean('CODEX_ORCHESTRATOR_EMIT_COMMAND_STREAMS', false);
 export const MAX_CAPTURED_CHUNK_EVENTS = EnvUtils.getInt('CODEX_ORCHESTRATOR_EXEC_EVENT_MAX_CHUNKS', 500);
+const MAX_COLLAB_TOOL_CALLS = EnvUtils.getInt('CODEX_ORCHESTRATOR_COLLAB_MAX_EVENTS', 200);
 const PACKAGE_ROOT = findPackageRoot();
 
 export interface CommandRunnerContext {
@@ -47,6 +48,8 @@ interface CommandRunResult {
   exitCode: number;
   summary: string;
 }
+
+type CollabToolCallRecord = NonNullable<CliManifest['collab_tool_calls']>[number];
 
 export async function runCommandStage(
   context: CommandRunnerContext,
@@ -93,6 +96,35 @@ export async function runCommandStage(
   let stderrBytes = 0;
   let stdoutTruncated = false;
   let stderrTruncated = false;
+  let collabBuffer = '';
+  let collabCount = manifest.collab_tool_calls?.length ?? 0;
+
+  const recordCollabToolCall = (record: CollabToolCallRecord) => {
+    if (MAX_COLLAB_TOOL_CALLS <= 0) {
+      return;
+    }
+    if (collabCount >= MAX_COLLAB_TOOL_CALLS) {
+      return;
+    }
+    if (!manifest.collab_tool_calls) {
+      manifest.collab_tool_calls = [];
+    }
+    manifest.collab_tool_calls.push(record);
+    collabCount += 1;
+    void persister?.schedule({ manifest: true });
+  };
+
+  const ingestCollabStdout = (data: string) => {
+    collabBuffer += data;
+    const lines = collabBuffer.split('\n');
+    collabBuffer = lines.pop() ?? '';
+    for (const line of lines) {
+      const record = parseCollabToolCallLine(line, stage.id, entry.index);
+      if (record) {
+        recordCollabToolCall(record);
+      }
+    }
+  };
 
   const handleEvent = (event: ExecEvent) => {
     if (!activeCorrelationId) {
@@ -131,6 +163,9 @@ export async function runCommandStage(
           message: event.payload.data,
           source: event.payload.stream
         });
+        if (event.payload.stream === 'stdout') {
+          ingestCollabStdout(event.payload.data);
+        }
         break;
       case 'exec:retry':
         events?.toolCall({
@@ -243,6 +278,14 @@ export async function runCommandStage(
     entry.exit_code = normalizedExitCode;
     entry.summary = summary;
     entry.status = result.status === 'succeeded' ? 'succeeded' : stage.allowFailure ? 'skipped' : 'failed';
+
+    if (collabBuffer.trim()) {
+      const record = parseCollabToolCallLine(collabBuffer, stage.id, entry.index);
+      if (record) {
+        recordCollabToolCall(record);
+      }
+      collabBuffer = '';
+    }
 
     if (entry.status === 'failed') {
       const errorDetails: Record<string, unknown> = {
@@ -508,4 +551,60 @@ function truncate(value: string, length = 240): string {
     return value;
   }
   return `${value.slice(0, length)}…`;
+}
+
+function parseCollabToolCallLine(
+  line: string,
+  stageId: string,
+  commandIndex: number
+): CollabToolCallRecord | null {
+  const trimmed = line.trim();
+  if (!trimmed || !trimmed.includes('"collab_tool_call"')) {
+    return null;
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(trimmed);
+  } catch {
+    return null;
+  }
+  if (!parsed || typeof parsed !== 'object') {
+    return null;
+  }
+  const record = parsed as Record<string, unknown>;
+  const eventType = record.type;
+  if (eventType !== 'item.started' && eventType !== 'item.completed' && eventType !== 'item.updated') {
+    return null;
+  }
+  const item = record.item as Record<string, unknown> | undefined;
+  if (!item || item.type !== 'collab_tool_call') {
+    return null;
+  }
+  const receiverThreadIds = Array.isArray(item.receiver_thread_ids)
+    ? item.receiver_thread_ids.filter((entry) => typeof entry === 'string')
+    : [];
+
+  return {
+    observed_at: isoTimestamp(),
+    stage_id: stageId,
+    command_index: commandIndex,
+    event_type: eventType,
+    item_id: typeof item.id === 'string' ? item.id : 'unknown',
+    tool: typeof item.tool === 'string' ? item.tool : 'unknown',
+    status: normalizeCollabStatus(item.status),
+    sender_thread_id: typeof item.sender_thread_id === 'string' ? item.sender_thread_id : 'unknown',
+    receiver_thread_ids: receiverThreadIds,
+    prompt: typeof item.prompt === 'string' ? item.prompt : null,
+    agents_states:
+      item.agents_states && typeof item.agents_states === 'object'
+        ? (item.agents_states as Record<string, unknown>)
+        : null
+  };
+}
+
+function normalizeCollabStatus(value: unknown): CollabToolCallRecord['status'] {
+  if (value === 'completed' || value === 'failed' || value === 'in_progress') {
+    return value;
+  }
+  return 'in_progress';
 }

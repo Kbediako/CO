@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp a04aa4d38d5de6c385bffe62029e6e59fffc07f0fa23e905903bb4dec10e27a9 -->
+<!-- codex:instruction-stamp 3da6a81c53ff6ce87764fe9f31e3b298ad6ec61b7593652e07fb15fd0b19056d -->
 # Codex-Orchestrator Agent Handbook (Template)
 
 Use this repository as the wrapper that coordinates multiple Codex-driven projects. After cloning, replace placeholder metadata (task IDs, documents, SOPs) with values for each downstream initiative while keeping these shared guardrails in place.
@@ -9,6 +9,12 @@ Use this repository as the wrapper that coordinates multiple Codex-driven projec
 - Keep the safe approval profile (`read/edit/run/network`). Capture any escalation in `.runs/<task>/<timestamp>/manifest.json` under `approvals`.
 - Run `node scripts/delegation-guard.mjs` before requesting review; if delegation is not possible, set `DELEGATION_GUARD_OVERRIDE_REASON` and record the rationale in the task checklist.
 - Run `node scripts/spec-guard.mjs --dry-run` before requesting review. Update specs or refresh approvals when the guard fails.
+
+## MCP vs Collab (Decision Rule)
+- Default to MCP for approvals, tool routing, delegation, external integrations, and audit trails.
+- Use collab only for intra-run brainstorming, role-split planning, or parallel subcalls.
+- Collab means auxiliary assistant agents inside a run; enable it via `RLM_SYMBOLIC_COLLAB=1` (see `docs/guides/collab-vs-mcp.md`).
+- The “top-level Codex” is the MCP-run agent the user is interacting with; collab agents are assistants and do not represent the run.
 
 ## Orchestrator-First Workflow
 - Use `codex-orchestrator` pipelines for planning, implementation, validation, and review work that touches the repo.
@@ -31,7 +37,7 @@ Use this repository as the wrapper that coordinates multiple Codex-driven projec
 
 ## Standalone Reviews (Ad-hoc)
 - Use `codex review` for quick reviews during implementation; prefer a targeted prompt.
-- When you need manifest-backed review evidence, run `npm run review` with the manifest path.
+- When you need manifest-backed review evidence, run `TASK=<task-id> NOTES="Goal: ... | Summary: ... | Risks: ..." MANIFEST=<path> npm run review -- --manifest <path>`.
 - See `docs/standalone-review-guide.md` for the canonical workflow.
 - Prefer the bundled `standalone-review` skill for ad-hoc review steps.
 

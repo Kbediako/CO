@@ -338,15 +338,15 @@ async function runCodexAgent(
   return { output };
 }
 
-async function runCodexCompletion(
-  prompt: string,
+async function runCodexExec(
+  args: string[],
   env: NodeJS.ProcessEnv,
   repoRoot: string,
   nonInteractive: boolean,
   subagentsEnabled: boolean,
   mirrorOutput: boolean
-): Promise<string> {
-  const { command, args } = resolveCodexCommand(['exec', prompt], env);
+): Promise<{ stdout: string; stderr: string }> {
+  const { command, args: resolvedArgs } = resolveCodexCommand(args, env);
   const childEnv: NodeJS.ProcessEnv = { ...process.env, ...env };
 
   if (nonInteractive) {
@@ -356,7 +356,7 @@ async function runCodexCompletion(
   }
   childEnv.CODEX_SUBAGENTS = subagentsEnabled ? '1' : '0';
 
-  const child = spawn(command, args, { cwd: repoRoot, env: childEnv, stdio: ['ignore', 'pipe', 'pipe'] });
+  const child = spawn(command, resolvedArgs, { cwd: repoRoot, env: childEnv, stdio: ['ignore', 'pipe', 'pipe'] });
   let stdout = '';
   let stderr = '';
 
@@ -386,7 +386,84 @@ async function runCodexCompletion(
     });
   });
 
+  return { stdout, stderr };
+}
+
+async function runCodexCompletion(
+  prompt: string,
+  env: NodeJS.ProcessEnv,
+  repoRoot: string,
+  nonInteractive: boolean,
+  subagentsEnabled: boolean,
+  mirrorOutput: boolean
+): Promise<string> {
+  const { stdout, stderr } = await runCodexExec(
+    ['exec', prompt],
+    env,
+    repoRoot,
+    nonInteractive,
+    subagentsEnabled,
+    mirrorOutput
+  );
   return [stdout.trim(), stderr.trim()].filter(Boolean).join('\n');
+}
+
+async function runCodexJsonlCompletion(
+  prompt: string,
+  env: NodeJS.ProcessEnv,
+  repoRoot: string,
+  nonInteractive: boolean,
+  mirrorOutput: boolean,
+  extraArgs: string[] = []
+): Promise<string> {
+  const { stdout, stderr } = await runCodexExec(
+    ['exec', '--json', ...extraArgs, prompt],
+    env,
+    repoRoot,
+    nonInteractive,
+    false,
+    mirrorOutput
+  );
+  const message = extractAgentMessageFromJsonl(stdout);
+  if (message) {
+    return message;
+  }
+  return [stdout.trim(), stderr.trim()].filter(Boolean).join('\n');
+}
+
+function extractAgentMessageFromJsonl(raw: string): string | null {
+  let lastMessage: string | null = null;
+  const lines = raw.split(/\r?\n/);
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed.startsWith('{')) {
+      continue;
+    }
+    try {
+      const parsed = JSON.parse(trimmed) as { type?: string; item?: { type?: string; text?: string } };
+      if (
+        (parsed.type === 'item.completed' || parsed.type === 'item.updated') &&
+        parsed.item?.type === 'agent_message' &&
+        typeof parsed.item.text === 'string'
+      ) {
+        lastMessage = parsed.item.text;
+      }
+    } catch {
+      // ignore parse errors for non-json lines
+    }
+  }
+  return lastMessage;
+}
+
+function buildCollabSubcallPrompt(prompt: string): string {
+  return [
+    'Use collab tools to spawn a sub-agent with the prompt below.',
+    'Wait for the sub-agent, then close it.',
+    'Return only the sub-agent response text and nothing else.',
+    '',
+    'Sub-agent prompt:',
+    prompt
+  ].join('\n');
 }
 
 function normalizeExitCode(code: number | string | undefined): number {
@@ -690,6 +767,7 @@ async function main(): Promise<void> {
   }
 
   const subagentsEnabled = envFlagEnabled(env.CODEX_SUBAGENTS) || envFlagEnabled(env.RLM_SUBAGENTS);
+  const symbolicCollabEnabled = envFlagEnabled(env.RLM_SYMBOLIC_COLLAB);
   const nonInteractive = shouldForceNonInteractive(env);
 
   if (mode === 'symbolic') {
@@ -753,11 +831,20 @@ async function main(): Promise<void> {
       budgets,
       runPlanner: (prompt, _attempt) => {
         void _attempt;
-        return runCodexCompletion(prompt, env, repoRoot, nonInteractive, false, false);
+        return runCodexJsonlCompletion(prompt, env, repoRoot, nonInteractive, false);
       },
       runSubcall: (prompt, _meta) => {
         void _meta;
-        return runCodexCompletion(prompt, env, repoRoot, nonInteractive, false, false);
+        if (!symbolicCollabEnabled) {
+          return runCodexCompletion(prompt, env, repoRoot, nonInteractive, false, false);
+        }
+        const collabPrompt = buildCollabSubcallPrompt(prompt);
+        return runCodexJsonlCompletion(collabPrompt, env, repoRoot, nonInteractive, true, [
+          '--enable',
+          'collab',
+          '--sandbox',
+          'read-only'
+        ]);
       },
       logger: (line) => logger.info(line)
     });

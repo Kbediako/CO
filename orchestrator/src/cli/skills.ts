@@ -3,7 +3,7 @@ import { copyFile, mkdir, readdir, stat } from 'node:fs/promises';
 import { dirname, join, relative, resolve } from 'node:path';
 import process from 'node:process';
 
-import { resolveCodexHome } from './utils/devtools.js';
+import { resolveCodexHome } from './utils/codexPaths.js';
 import { findPackageRoot } from './utils/packageInfo.js';
 
 export interface SkillsInstallOptions {

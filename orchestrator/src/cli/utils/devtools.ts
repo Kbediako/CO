@@ -1,9 +1,10 @@
 import { existsSync, readFileSync } from 'node:fs';
-import { homedir } from 'node:os';
 import { join } from 'node:path';
 import process from 'node:process';
 
 import { EnvUtils } from '../../../../packages/shared/config/env.js';
+import { resolveCodexCliBin } from './codexCli.js';
+import { resolveCodexHome } from './codexPaths.js';
 
 export const DEVTOOLS_SKILL_NAME = 'chrome-devtools';
 export const DEVTOOLS_CONFIG_OVERRIDE = 'mcp_servers.chrome-devtools.enabled=true';
@@ -62,14 +63,6 @@ export function isDevtoolsEnabled(env: NodeJS.ProcessEnv = process.env): boolean
   return EnvUtils.isTrue(raw.trim().toLowerCase());
 }
 
-export function resolveCodexHome(env: NodeJS.ProcessEnv = process.env): string {
-  const override = env.CODEX_HOME?.trim();
-  if (override) {
-    return override;
-  }
-  return join(homedir(), '.codex');
-}
-
 export function resolveCodexConfigPath(env: NodeJS.ProcessEnv = process.env): string {
   return join(resolveCodexHome(env), DEVTOOLS_CONFIG_FILENAME);
 }
@@ -107,13 +100,14 @@ export function resolveDevtoolsReadiness(env: NodeJS.ProcessEnv = process.env): 
 export function buildDevtoolsSetupPlan(env: NodeJS.ProcessEnv = process.env): DevtoolsSetupPlan {
   const codexHome = resolveCodexHome(env);
   const configPath = resolveCodexConfigPath(env);
+  const command = resolveCodexCliBin(env);
   const args = [...DEVTOOLS_MCP_COMMAND];
   return {
     codexHome,
     configPath,
-    command: 'codex',
+    command,
     args,
-    commandLine: ['codex', ...args].join(' '),
+    commandLine: [command, ...args].join(' '),
     configSnippet: DEVTOOLS_CONFIG_SNIPPET
   };
 }
@@ -125,7 +119,8 @@ export function resolveCodexCommand(
   const overrides = parseConfigOverrides(env);
 
   if (!isDevtoolsEnabled(env)) {
-    return { command: 'codex', args: applyConfigOverrides(overrides, args) };
+    const command = resolveCodexCliBin(env);
+    return { command, args: applyConfigOverrides(overrides, args) };
   }
 
   const readiness = resolveDevtoolsReadiness(env);
@@ -134,8 +129,9 @@ export function resolveCodexCommand(
   }
 
   const mergedOverrides = dedupeOverrides([DEVTOOLS_CONFIG_OVERRIDE, ...overrides]);
+  const command = resolveCodexCliBin(env);
   return {
-    command: 'codex',
+    command,
     args: applyConfigOverrides(mergedOverrides, args)
   };
 }

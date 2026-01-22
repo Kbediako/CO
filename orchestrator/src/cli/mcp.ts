@@ -3,6 +3,7 @@ import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import process from 'node:process';
 import { logger } from '../logger.js';
+import { resolveCodexCliBin } from './utils/codexCli.js';
 
 const MCP_HEADER_TOKEN = 'Content-Length:';
 const MCP_HEADER_DELIMITER = '\r\n\r\n';
@@ -21,12 +22,13 @@ export async function serveMcp(options: McpServeOptions): Promise<void> {
 
   if (options.dryRun) {
     logger.warn(`[mcp] repo root: ${repoRoot}`);
-    logger.warn('[mcp] codex CLI must be available in PATH.');
+    logger.warn(`[mcp] codex CLI must be available at: ${resolveCodexCliBin()}`);
     return;
   }
 
   const args = ['-C', repoRoot, 'mcp-server', ...options.extraArgs];
-  const child = spawn('codex', args, { stdio: ['inherit', 'pipe', 'pipe'] });
+  const command = resolveCodexCliBin();
+  const child = spawn(command, args, { stdio: ['inherit', 'pipe', 'pipe'] });
   if (child.stdout) {
     if (isStrictMcpStdout()) {
       attachMcpStdoutGuard(child.stdout);

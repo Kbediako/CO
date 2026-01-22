@@ -148,29 +148,168 @@ function toNumber(value: unknown): number | null {
   return null;
 }
 
-function extractJsonCandidate(raw: string): string | null {
+function extractJsonCandidates(raw: string): string[] {
   const trimmed = raw.trim();
   if (!trimmed) {
+    return [];
+  }
+  const candidates: string[] = [];
+  let start = -1;
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+
+  for (let index = 0; index < trimmed.length; index += 1) {
+    const char = trimmed[index];
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+      if (char === '\\') {
+        escaped = true;
+        continue;
+      }
+      if (char === '"') {
+        inString = false;
+      }
+      continue;
+    }
+
+    if (char === '"') {
+      inString = true;
+      continue;
+    }
+    if (char === '{') {
+      if (depth === 0) {
+        start = index;
+      }
+      depth += 1;
+      continue;
+    }
+    if (char === '}') {
+      if (depth > 0) {
+        depth -= 1;
+        if (depth === 0 && start >= 0) {
+          candidates.push(trimmed.slice(start, index + 1));
+          start = -1;
+        }
+      }
+    }
+  }
+
+  return candidates;
+}
+
+function normalizePlannerPlan(value: unknown): PlannerPlan | null {
+  if (!value || typeof value !== 'object') {
     return null;
   }
-  if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
-    return trimmed;
+  const record = value as Record<string, unknown>;
+  const schemaVersion = record.schema_version;
+  const normalizedSchemaVersion =
+    typeof schemaVersion === 'string' ? Number(schemaVersion) : schemaVersion;
+  if (normalizedSchemaVersion !== 1) {
+    return null;
   }
-  const start = trimmed.indexOf('{');
-  const end = trimmed.lastIndexOf('}');
-  if (start >= 0 && end > start) {
-    return trimmed.slice(start, end + 1);
+  if (typeof record.intent !== 'string') {
+    return null;
+  }
+  if (typeof schemaVersion === 'string' && Number.isFinite(normalizedSchemaVersion)) {
+    record.schema_version = normalizedSchemaVersion;
+  }
+  return record as unknown as PlannerPlan;
+}
+
+function unwrapPlannerPlan(value: unknown): PlannerPlan | null {
+  const direct = normalizePlannerPlan(value);
+  if (direct) {
+    return direct;
+  }
+  if (Array.isArray(value)) {
+    for (let index = value.length - 1; index >= 0; index -= 1) {
+      const normalized = normalizePlannerPlan(value[index]);
+      if (normalized) {
+        return normalized;
+      }
+    }
+  }
+  if (value && typeof value === 'object') {
+    const record = value as Record<string, unknown>;
+    if (record.plan) {
+      const normalized = normalizePlannerPlan(record.plan);
+      if (normalized) {
+        return normalized;
+      }
+    }
+    const plans = record.plans;
+    if (Array.isArray(plans)) {
+      for (let index = plans.length - 1; index >= 0; index -= 1) {
+        const normalized = normalizePlannerPlan(plans[index]);
+        if (normalized) {
+          return normalized;
+        }
+      }
+    }
   }
   return null;
 }
 
 function parsePlannerOutput(raw: string): PlannerPlan {
-  const candidate = extractJsonCandidate(raw);
-  if (!candidate) {
-    throw new Error('plan_parse_error');
+  const candidates = extractJsonCandidates(raw);
+  for (let index = candidates.length - 1; index >= 0; index -= 1) {
+    const candidate = candidates[index];
+    try {
+      const parsed = JSON.parse(candidate) as unknown;
+      const normalized = unwrapPlannerPlan(parsed);
+      if (normalized) {
+        return normalized;
+      }
+    } catch {
+      // ignore parse errors and try earlier candidates
+    }
   }
-  const parsed = JSON.parse(candidate) as PlannerPlan;
-  return parsed;
+
+  if (!candidates.length) {
+    try {
+      const parsed = JSON.parse(raw.trim()) as unknown;
+      const normalized = unwrapPlannerPlan(parsed);
+      if (normalized) {
+        return normalized;
+      }
+    } catch {
+      // fall through
+    }
+  }
+
+  throw new Error('plan_parse_error');
+}
+
+function buildPlannerRetryPrompt(prompt: string, errors: string[]): string {
+  const headerLines = ['Return valid JSON only.'];
+  if (errors.includes('final_requires_subcall')) {
+    headerLines.push('Do not return intent=final until after at least one subcall.');
+  }
+  if (errors.length > 0) {
+    headerLines.push(`Previous error: ${errors.join('; ')}`);
+  }
+  return `${headerLines.join(' ')}\n\n${prompt}`;
+}
+
+async function recordPlannerFailure(params: {
+  runDir: string;
+  iteration: number;
+  attempt: number;
+  errors: string[];
+  raw: string;
+}): Promise<void> {
+  const raw = params.raw ?? '';
+  const plannerDir = join(params.runDir, 'planner');
+  await mkdir(plannerDir, { recursive: true });
+  const filename = `iteration-${params.iteration}-attempt-${params.attempt + 1}.txt`;
+  const header = params.errors.length ? `# errors: ${params.errors.join('; ')}\n` : '';
+  const body = raw.length > 0 ? raw : '[empty planner output]';
+  await writeFile(join(plannerDir, filename), `${header}${body}`, 'utf8');
 }
 
 function normalizePurpose(raw: unknown): { value: string; replaced: boolean } {
@@ -491,15 +630,20 @@ export async function runSymbolicLoop(options: SymbolicLoopOptions): Promise<Rlm
 
       for (let attempt = 0; attempt < 2; attempt += 1) {
         const raw = await options.runPlanner(
-          attempt === 0
-            ? plannerPrompt
-            : `Return valid JSON only. Previous error: ${plannerErrors.join('; ')}\n\n${plannerPrompt}`,
+          attempt === 0 ? plannerPrompt : buildPlannerRetryPrompt(plannerPrompt, plannerErrors),
           attempt
         );
         try {
           plan = parsePlannerOutput(raw);
         } catch {
           plannerErrors.push('plan_parse_error');
+          await recordPlannerFailure({
+            runDir: options.runDir,
+            iteration,
+            attempt,
+            errors: plannerErrors,
+            raw
+          });
           if (attempt === 0) {
             continue;
           }
@@ -517,6 +661,13 @@ export async function runSymbolicLoop(options: SymbolicLoopOptions): Promise<Rlm
         }
         if (validationError) {
           plannerErrors.push(validationError);
+          await recordPlannerFailure({
+            runDir: options.runDir,
+            iteration,
+            attempt,
+            errors: plannerErrors,
+            raw
+          });
           if (attempt === 0) {
             continue;
           }

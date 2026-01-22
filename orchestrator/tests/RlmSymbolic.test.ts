@@ -4,9 +4,11 @@ import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
 
 import { buildContextObject, ContextStore } from '../src/cli/rlm/context.js';
-import { runSymbolicLoop } from '../src/cli/rlm/symbolic.js';
+import { runSymbolicLoop, __test__ as symbolicTest } from '../src/cli/rlm/symbolic.js';
 import type { RlmState } from '../src/cli/rlm/types.js';
 import type { SymbolicBudgets } from '../src/cli/rlm/symbolic.js';
+
+const { parsePlannerOutput } = symbolicTest;
 
 let tempDir: string | null = null;
 
@@ -539,5 +541,28 @@ describe('symbolic rlm loop', () => {
     expect(result.state.final?.final_answer).toBe('done');
     expect(result.state.symbolic_iterations[0].planner_errors).toContain('final_requires_subcall');
     expect(result.state.symbolic_iterations[0].subcalls.length).toBeGreaterThan(0);
+  });
+});
+
+describe('planner output parsing', () => {
+  it('selects the last valid plan from noisy output', () => {
+    const raw = [
+      'preamble text',
+      '{"note":"ignore"}',
+      '```json',
+      '{"schema_version":1,"intent":"continue","subcalls":[]}',
+      '```',
+      '{"schema_version":1,"intent":"final","final_answer":"done"}'
+    ].join('\n');
+
+    const plan = parsePlannerOutput(raw);
+    expect(plan.intent).toBe('final');
+    expect(plan.final_answer).toBe('done');
+  });
+
+  it('normalizes schema_version strings when parsing', () => {
+    const raw = '{"schema_version":"1","intent":"continue","subcalls":[]}';
+    const plan = parsePlannerOutput(raw);
+    expect(plan.schema_version).toBe(1);
   });
 });
