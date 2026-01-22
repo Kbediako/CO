@@ -21,6 +21,7 @@ Codex Orchestrator is the coordination layer that glues together Codex-driven ag
 
 ## Release Notes
 - Shipped skills note: `docs/release-notes-template-addendum.md`.
+- Optional overview override: add and commit a release overview file at .github/release-overview.md before tagging; the release workflow uses it when present.
 
 ## How It Works
 - **Planner → Builder → Tester → Reviewer:** The core `TaskManager` (see `orchestrator/src/manager.ts`) wires together agent interfaces that decide *what* to run (planner), execute the selected pipeline stage (builder), verify results (tester), and give a final decision (reviewer).

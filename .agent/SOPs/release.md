@@ -34,6 +34,7 @@
    - Stable tags publish to `latest`; alpha tags publish to `alpha` and create a prerelease.
    - Confirm GitHub shows Verified for the tag/commit.
    - If .github/release.yml exists, verify Overview/Bug Fixes sections render as expected.
+   - Optional: before tagging, add and commit a release overview override file at .github/release-overview.md with a short narrative summary (remove after release).
 7. Record release status, workflow links, and any follow-ups in `/tasks` and docs checklists.
 
 If the release workflow fails, fix the issue and re-tag after updating metadata; do not publish from non-release artifacts.

@@ -96,9 +96,44 @@ jobs:
             return trimmed.length > 0 ? trimmed : null;
           }
 
-          const overview = extractSection(body, 'Overview') ?? '- No labeled overview items.';
+          function extractCompareLine(text) {
+            if (!text) return null;
+            const line = text.split('\n').find((item) => item.trim().startsWith('**Full Changelog**:'));
+            return line && line.trim().length > 0 ? line.trim() : null;
+          }
+
+          function stripSection(text, heading) {
+            if (!text) return text;
+            const lines = text.split('\n');
+            const header = `### ${heading}`;
+            const start = lines.findIndex((line) => line.trim() === header);
+            if (start === -1) return text;
+            let end = lines.length;
+            for (let i = start + 1; i < lines.length; i += 1) {
+              const line = lines[i];
+              if (line.startsWith('### ') || line.startsWith('## ')) {
+                end = i;
+                break;
+              }
+            }
+            return [...lines.slice(0, start), ...lines.slice(end)].join('\n').trim();
+          }
+
+          let overview = extractSection(body, 'Overview') ?? '- No labeled overview items.';
+          const overridePath = '.github/release-overview.md';
+          if (fs.existsSync(overridePath)) {
+            const override = fs.readFileSync(overridePath, 'utf8').trim();
+            if (override.length > 0) {
+              overview = override;
+            }
+          }
           const bugFixes = extractSection(body, 'Bug Fixes') ?? '- No labeled bug fixes.';
-          const full = body.length > 0 ? `## Full Changelog\n\n${body}` : '## Full Changelog\n\nNo changes.';
+          const compareLine = extractCompareLine(body);
+          let bodyWithoutOverview = stripSection(body, 'Overview');
+          if (compareLine && !bodyWithoutOverview.includes(compareLine)) {
+            bodyWithoutOverview = `${bodyWithoutOverview}\n\n${compareLine}`.trim();
+          }
+          const full = bodyWithoutOverview.length > 0 ? `## Full Changelog\n\n${bodyWithoutOverview}` : '## Full Changelog\n\nNo changes.';
 
           const output = [
             '## Release Overview',
