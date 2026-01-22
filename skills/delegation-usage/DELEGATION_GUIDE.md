@@ -106,12 +106,12 @@ If you need delegation to respect a repo’s `.codex/orchestrator.toml` (e.g., s
 
 ## Version guard (JSONL handshake)
 
-Delegation MCP expects JSONL. Use the docs’ minimum `codex-orchestrator` version or newer.
+Delegation MCP expects JSONL. Use `codex-orchestrator` 0.1.12 or newer.
 
 - Check: `codex-orchestrator --version`
-- Update global: `npm i -g @kbediako/codex-orchestrator@<min-version>`
-- Or pin via npx: `npx -y @kbediako/codex-orchestrator@<min-version> delegate-server`
-- If your installed CLI is behind the docs, prefer upgrading or pinning to the docs’ minimum.
+- Update global: `npm i -g @kbediako/codex-orchestrator@0.1.12`
+- Or pin via npx: `npx -y @kbediako/codex-orchestrator@0.1.12 delegate-server`
+- If your installed CLI is behind 0.1.12, prefer upgrading or pinning to the docs’ minimum.
 
 ## Common failures
 

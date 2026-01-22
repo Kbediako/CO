@@ -64,11 +64,11 @@ For runner + delegation coordination (short `--task` flow), see `docs/delegation
 
 ### 0a) Version guard (JSONL handshake)
 
-- Delegation MCP uses JSONL; ensure the server binary meets the docs’ minimum version:
-  - `codex-orchestrator --version` should be `>=` the docs’ minimum.
-- If not, update global install: `npm i -g @kbediako/codex-orchestrator@<min-version>`
-- Alternative: pin the MCP server to `npx -y @kbediako/codex-orchestrator@<min-version>` for deterministic behavior.
-- Note: if your installed CLI is older than the docs, prefer upgrading or pinning to the docs’ minimum.
+- Delegation MCP uses JSONL; ensure the server binary meets the docs’ minimum version (0.1.12):
+  - `codex-orchestrator --version` should be `>= 0.1.12`.
+- If not, update global install: `npm i -g @kbediako/codex-orchestrator@0.1.12`
+- Alternative: pin the MCP server to `npx -y @kbediako/codex-orchestrator@0.1.12` for deterministic behavior.
+- Note: if your installed CLI is older than 0.1.12, prefer upgrading or pinning to the docs’ minimum.
 
 ### 0b) Background terminal bootstrap (required when MCP is disabled)
 

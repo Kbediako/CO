@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp 0f33a7a84b1aa216df1e5a9712f4b96314674aadb2fc94f0c508180b10879006 -->
+<!-- codex:instruction-stamp 088cbc02c9cbb36c9a0f5ccdbefc734c56039e48f6602f4011f6b3b65664f96e -->
 # Codex-Orchestrator Agent Handbook (Template)
 
 Use this repository as the wrapper that coordinates multiple Codex-driven projects. After cloning, replace placeholder metadata (task IDs, documents, SOPs) with values for each downstream initiative while keeping these shared guardrails in place.
@@ -13,7 +13,7 @@ Use this repository as the wrapper that coordinates multiple Codex-driven projec
 ## MCP vs Collab (Decision Rule)
 - Default to MCP for approvals, tool routing, delegation, external integrations, and audit trails.
 - Use collab only for intra-run brainstorming, role-split planning, or parallel subcalls.
-- If unsure, choose MCP. Collab is opt-in (`--enable collab` / `RLM_SYMBOLIC_COLLAB=1`).
+- If unsure, choose MCP. Collab is an opt-in (`--enable collab` / `RLM_SYMBOLIC_COLLAB=1`).
 - The “top-level Codex” is the MCP-run agent the user is interacting with; collab agents are assistants and do not represent the run.
 
 ## Orchestrator-First Workflow

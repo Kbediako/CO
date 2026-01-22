@@ -100,7 +100,10 @@ export async function runCommandStage(
   let collabCount = manifest.collab_tool_calls?.length ?? 0;
 
   const recordCollabToolCall = (record: CollabToolCallRecord) => {
-    if (MAX_COLLAB_TOOL_CALLS > 0 && collabCount >= MAX_COLLAB_TOOL_CALLS) {
+    if (MAX_COLLAB_TOOL_CALLS <= 0) {
+      return;
+    }
+    if (collabCount >= MAX_COLLAB_TOOL_CALLS) {
       return;
     }
     if (!manifest.collab_tool_calls) {

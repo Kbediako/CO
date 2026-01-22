@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp ce57b3a2e0165942d6b8b360b625b56caba84c2910e1af32d268297bc8faf94c -->
+<!-- codex:instruction-stamp a3dbc34510350a872a55a0f52575fe452f3617a461d5392ef61269d0ed11b8ce -->
 # Repository Agent Guidance
 
 ## Project 0303 — Codex Orchestrator Autonomy Enhancements
@@ -45,7 +45,7 @@
 ## MCP vs Collab (Decision Rule)
 - Default to MCP for approvals, tool routing, delegation, external integrations, and audit trails.
 - Use collab only for intra-run brainstorming, role-split planning, or parallel subcalls.
-- If unsure, choose MCP. Collab is opt-in (`--enable collab` / `RLM_SYMBOLIC_COLLAB=1`).
+- If unsure, choose MCP. Collab is an opt-in (`--enable collab` / `RLM_SYMBOLIC_COLLAB=1`).
 - The “top-level Codex” is the MCP-run agent the user is interacting with; collab agents are assistants and do not represent the run.
 
 ## Standalone Reviews (Ad-hoc)

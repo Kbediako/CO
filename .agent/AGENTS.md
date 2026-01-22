@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp 4a03f3c60e4dd152c89641b7c41c4f88094230655012865483ec08563cdcaa66 -->
+<!-- codex:instruction-stamp d1d4534e7adc7428cce73b8a67673715defbd7656f9d3cb5f54f5506c2a8ca4f -->
 # Agent Enablement
 
 ## Added by Bootstrap 2025-10-16
@@ -21,7 +21,7 @@
 ### MCP vs Collab (Decision Rule)
 - Default to MCP for approvals, tool routing, delegation, external integrations, and audit trails.
 - Use collab only for intra-run brainstorming, role-split planning, or parallel subcalls.
-- If unsure, choose MCP. Collab is opt-in (`--enable collab` / `RLM_SYMBOLIC_COLLAB=1`).
+- If unsure, choose MCP. Collab is an opt-in (`--enable collab` / `RLM_SYMBOLIC_COLLAB=1`).
 - The “top-level Codex” is the MCP-run agent the user is interacting with; collab agents are assistants and do not represent the run.
 
 ### Meta-Orchestrator Mode (Parallel Workstreams)

@@ -22,7 +22,7 @@ export async function serveMcp(options: McpServeOptions): Promise<void> {
 
   if (options.dryRun) {
     logger.warn(`[mcp] repo root: ${repoRoot}`);
-    logger.warn('[mcp] codex CLI must be available in PATH.');
+    logger.warn(`[mcp] codex CLI must be available at: ${resolveCodexCliBin()}`);
     return;
   }
 

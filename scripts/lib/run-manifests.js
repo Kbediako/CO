@@ -45,6 +45,9 @@ export function resolveRunDir(options) {
   if (!runsRoot || !taskId || !runId) {
     throw new Error('resolveRunDir requires runsRoot, taskId, and runId');
   }
+  if (layout !== 'cli' && layout !== 'legacy') {
+    throw new Error(`resolveRunDir received unsupported layout: ${layout}`);
+  }
   if (layout === 'legacy') {
     return join(runsRoot, taskId, runId);
   }

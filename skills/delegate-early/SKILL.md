@@ -24,11 +24,12 @@ Use this skill when a task can be split into parallel streams or when the main c
 ## Required conventions
 - Use `MCP_RUNNER_TASK_ID=<task-id>-<stream>` for subagents.
 - Record manifest paths and summarize findings in the main run.
+- Run `node scripts/delegation-guard.mjs` before review handoff to verify delegation evidence.
 
 ## Minimal delegation workflow
 1) Name streams and write 1–2 sentence goals for each.
 2) Spawn subagents with clear, bounded prompts.
-3) Wait for results; summarize and merge into the main plan.
+3) Wait for subagent completion; retrieve manifest evidence and summarize findings into the main plan.
 4) Proceed with implementation.
 
 ## Prompt patterns
@@ -40,7 +41,7 @@ Use this skill when a task can be split into parallel streams or when the main c
 - If delegation is impossible, set override reason and document it in the task checklist.
 
 ## Subagent summary format
-- Findings
-- Risks
-- Open questions
-- Evidence (manifest path)
+- **Findings**: Key results and conclusions from the subagent run
+- **Risks**: Issues, blockers, or concerns
+- **Open questions**: Unresolved items requiring follow-up
+- **Evidence**: Manifest path (e.g., `.runs/<task-id>-<stream>/cli/<timestamp>/manifest.json`)
