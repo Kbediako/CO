@@ -83,5 +83,8 @@ export function formatInitSummary(result: InitResult, cwd: string): string[] {
   if (lines.length === 0) {
     lines.push('No files written.');
   }
+  lines.push('Next steps (recommended):');
+  lines.push(`  - codex mcp add delegation -- codex-orchestrator delegate-server --repo ${cwd}`);
+  lines.push('  - codex-orchestrator codex setup  # optional: CO-managed Codex CLI for collab JSONL');
   return lines;
 }

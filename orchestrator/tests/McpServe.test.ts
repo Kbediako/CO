@@ -55,6 +55,8 @@ describe('serveMcp', () => {
     tempDir = await mkdtemp(path.join(os.tmpdir(), 'codex-mcp-'));
     const child = new MockChildProcess();
     spawnMock.mockReturnValue(child as unknown);
+    const previousCodexBin = process.env.CODEX_CLI_BIN;
+    process.env.CODEX_CLI_BIN = 'codex';
 
     const stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
     const stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
@@ -70,6 +72,7 @@ describe('serveMcp', () => {
       stdoutWrites = stdoutSpy.mock.calls.map((call) => call[0]);
       stderrWriteCount = stderrSpy.mock.calls.length;
     } finally {
+      process.env.CODEX_CLI_BIN = previousCodexBin;
       stdoutSpy.mockRestore();
       stderrSpy.mockRestore();
     }

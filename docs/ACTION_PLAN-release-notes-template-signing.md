@@ -21,6 +21,7 @@
 - Use GitHub release notes template with explicit sections for Overview/Bug Fixes plus a catch-all.
 - Keep `--generate-notes` in the workflow.
 - Validate labels for consistent categorization.
+- Addendum: include a short “Shipped skills” bullet when new bundled skills are added (see `docs/release-notes-template-addendum.md`).
 
 ## Risks & Mitigations
 - Risk: Template added without label alignment -> empty sections.

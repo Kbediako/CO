@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp a04aa4d38d5de6c385bffe62029e6e59fffc07f0fa23e905903bb4dec10e27a9 -->
+<!-- codex:instruction-stamp 0f33a7a84b1aa216df1e5a9712f4b96314674aadb2fc94f0c508180b10879006 -->
 # Codex-Orchestrator Agent Handbook (Template)
 
 Use this repository as the wrapper that coordinates multiple Codex-driven projects. After cloning, replace placeholder metadata (task IDs, documents, SOPs) with values for each downstream initiative while keeping these shared guardrails in place.
@@ -9,6 +9,12 @@ Use this repository as the wrapper that coordinates multiple Codex-driven projec
 - Keep the safe approval profile (`read/edit/run/network`). Capture any escalation in `.runs/<task>/<timestamp>/manifest.json` under `approvals`.
 - Run `node scripts/delegation-guard.mjs` before requesting review; if delegation is not possible, set `DELEGATION_GUARD_OVERRIDE_REASON` and record the rationale in the task checklist.
 - Run `node scripts/spec-guard.mjs --dry-run` before requesting review. Update specs or refresh approvals when the guard fails.
+
+## MCP vs Collab (Decision Rule)
+- Default to MCP for approvals, tool routing, delegation, external integrations, and audit trails.
+- Use collab only for intra-run brainstorming, role-split planning, or parallel subcalls.
+- If unsure, choose MCP. Collab is opt-in (`--enable collab` / `RLM_SYMBOLIC_COLLAB=1`).
+- The “top-level Codex” is the MCP-run agent the user is interacting with; collab agents are assistants and do not represent the run.
 
 ## Orchestrator-First Workflow
 - Use `codex-orchestrator` pipelines for planning, implementation, validation, and review work that touches the repo.

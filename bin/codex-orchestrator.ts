@@ -18,6 +18,7 @@ import { buildSelfCheckResult } from '../orchestrator/src/cli/selfCheck.js';
 import { initCodexTemplates, formatInitSummary } from '../orchestrator/src/cli/init.js';
 import { runDoctor, formatDoctorSummary } from '../orchestrator/src/cli/doctor.js';
 import { formatDevtoolsSetupSummary, runDevtoolsSetup } from '../orchestrator/src/cli/devtoolsSetup.js';
+import { formatCodexCliSetupSummary, runCodexCliSetup } from '../orchestrator/src/cli/codexCliSetup.js';
 import { formatSkillsInstallSummary, installSkills } from '../orchestrator/src/cli/skills.js';
 import { loadPackageInfo } from '../orchestrator/src/cli/utils/packageInfo.js';
 import { slugify } from '../orchestrator/src/cli/utils/strings.js';
@@ -81,6 +82,9 @@ async function main(): Promise<void> {
         break;
       case 'doctor':
         await handleDoctor(args);
+        break;
+      case 'codex':
+        await handleCodex(args);
         break;
       case 'devtools':
         await handleDevtools(args);
@@ -532,6 +536,26 @@ async function handleInit(rawArgs: string[]): Promise<void> {
   for (const line of summary) {
     console.log(line);
   }
+
+  if (flags['codex-cli'] === true) {
+    const apply = Boolean(flags['yes']);
+    const source = readStringFlag(flags, 'codex-source');
+    const ref = readStringFlag(flags, 'codex-ref');
+    const downloadUrl = readStringFlag(flags, 'codex-download-url');
+    const downloadSha256 = readStringFlag(flags, 'codex-download-sha256');
+    const cliForce = Boolean(flags['codex-force']);
+    const setupResult = await runCodexCliSetup({
+      apply,
+      force: cliForce,
+      source,
+      ref,
+      downloadUrl,
+      downloadSha256
+    });
+    for (const line of formatCodexCliSetupSummary(setupResult)) {
+      console.log(line);
+    }
+  }
 }
 
 async function handleDoctor(rawArgs: string[]): Promise<void> {
@@ -568,6 +592,40 @@ async function handleDevtools(rawArgs: string[]): Promise<void> {
     return;
   }
   const summary = formatDevtoolsSetupSummary(result);
+  for (const line of summary) {
+    console.log(line);
+  }
+}
+
+async function handleCodex(rawArgs: string[]): Promise<void> {
+  const { positionals, flags } = parseArgs(rawArgs);
+  const subcommand = positionals.shift();
+  if (!subcommand) {
+    throw new Error('codex requires a subcommand (setup).');
+  }
+  if (subcommand !== 'setup') {
+    throw new Error(`Unknown codex subcommand: ${subcommand}`);
+  }
+  const format: OutputFormat = (flags['format'] as string | undefined) === 'json' ? 'json' : 'text';
+  const apply = Boolean(flags['yes']);
+  const source = readStringFlag(flags, 'source');
+  const ref = readStringFlag(flags, 'ref');
+  const downloadUrl = readStringFlag(flags, 'download-url');
+  const downloadSha256 = readStringFlag(flags, 'download-sha256');
+  const force = Boolean(flags['force']);
+  const result = await runCodexCliSetup({
+    apply,
+    force,
+    source,
+    ref,
+    downloadUrl,
+    downloadSha256
+  });
+  if (format === 'json') {
+    console.log(JSON.stringify(result, null, 2));
+    return;
+  }
+  const summary = formatCodexCliSetupSummary(result);
   for (const line of summary) {
     console.log(line);
   }
@@ -823,7 +881,22 @@ Commands:
 
   self-check [--format json]
   init codex [--cwd <path>] [--force]
+    --codex-cli            Also run CO-managed Codex CLI setup (plan unless --yes).
+    --codex-source <path>  Build from local Codex repo (or git URL).
+    --codex-ref <ref>      Git ref (branch/tag/sha) when building from repo.
+    --codex-download-url <url>  Download a prebuilt codex binary.
+    --codex-download-sha256 <sha>  Expected SHA256 for the prebuilt download.
+    --codex-force          Overwrite existing CO-managed codex binary.
+    --yes                  Apply codex CLI setup (otherwise plan only).
   doctor [--format json]
+  codex setup
+    --source <path>        Build from local Codex repo (or git URL).
+    --ref <ref>            Git ref (branch/tag/sha) when building from repo.
+    --download-url <url>   Download a prebuilt codex binary.
+    --download-sha256 <sha>  Expected SHA256 for the prebuilt download.
+    --force                Overwrite existing CO-managed codex binary.
+    --yes                  Apply setup (otherwise plan only).
+    --format json          Emit machine-readable output.
   devtools setup          Print DevTools MCP setup instructions.
     --yes                 Apply setup by running "codex mcp add ...".
     --format json         Emit machine-readable output (dry-run only).

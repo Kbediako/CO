@@ -4,6 +4,12 @@ export function resolveEnvironmentPaths(): {
   outRoot: string;
   taskId: string;
 };
+export function resolveRunDir(options: {
+  runsRoot: string;
+  taskId: string;
+  runId: string;
+  layout?: 'cli' | 'legacy';
+}): string;
 export function listDirectories(dirPath: string): Promise<string[]>;
 export function parseRunIdTimestamp(runId: string): Date | null;
 export function pickLatestRunId(runIds: string[]): string | null;

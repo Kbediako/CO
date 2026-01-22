@@ -6,6 +6,22 @@ Codex Orchestrator is the coordination layer that glues together Codex-driven ag
 
 > **At a glance:** Every run starts from a task description, writes the active CLI manifest to `.runs/<task-id>/cli/<run-id>/manifest.json`, emits a persisted run summary at `.runs/<task-id>/<run-id>/manifest.json`, mirrors human-readable data to `out/<task-id>/`, and can optionally sync to a remote control plane. Pipelines define the concrete commands (build, lint, test, etc.) that execute for a given task.
 
+## Evaluation & Metrics
+- Evaluation playbook: `docs/guides/evaluation-playbook.md`.
+- Metrics reference: `docs/reference/metrics-collab-context-rot.md`.
+
+## Collab vs MCP
+- Decision guide: `docs/guides/collab-vs-mcp.md`.
+
+## Downstream init
+- See `README.md` for the recommended quick-start flow.
+
+## Upstream Sync
+- Codex CLI sync strategy: `docs/guides/upstream-codex-cli-sync.md`.
+
+## Release Notes
+- Shipped skills note: `docs/release-notes-template-addendum.md`.
+
 ## How It Works
 - **Planner → Builder → Tester → Reviewer:** The core `TaskManager` (see `orchestrator/src/manager.ts`) wires together agent interfaces that decide *what* to run (planner), execute the selected pipeline stage (builder), verify results (tester), and give a final decision (reviewer).
 - **Execution modes:** Each plan item can flag `requires_cloud` and task metadata can set `execution.parallel`; the mode policy picks `mcp` (local MCP runtime) or `cloud` execution accordingly.
@@ -159,6 +175,7 @@ Notes:
 ## Persistence & Observability
 - `TaskStateStore` writes per-task snapshots with bounded lock retries; failures degrade gracefully while still writing the main manifest.
 - `RunManifestWriter` generates the canonical manifest JSON for each run (mirrored under `.runs/`), while metrics appenders and summary writers keep `out/` up to date.
+- `collab_tool_calls` in the manifest captures collab tool call JSONL lines extracted from command stdout (bounded by `CODEX_ORCHESTRATOR_COLLAB_MAX_EVENTS`, default 200; set 0 to disable capture).
 - Heartbeat files and timestamps guard against stalled runs. `orchestrator/src/cli/metrics/metricsRecorder.ts` aggregates command durations, exit codes, and guardrail stats for later review.
 - Optional caps: `CODEX_ORCHESTRATOR_EXEC_EVENT_MAX_CHUNKS` limits captured exec chunk events per command (defaults to 500; set 0 for no cap), `CODEX_ORCHESTRATOR_TELEMETRY_MAX_EVENTS` caps in-memory telemetry events queued before flush (defaults to 1000; set 0 for no cap), and `CODEX_METRICS_PRIVACY_EVENTS_MAX` limits privacy decision events stored in `metrics.json` (-1 = no cap; `privacy_event_count` still reflects total).
 

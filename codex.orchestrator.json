@@ -415,6 +415,32 @@
           "ref": "diagnostics-spec-guard"
         }
       ]
+    },
+    {
+      "id": "pause-eval",
+      "title": "Pause/Resume Eval",
+      "description": "Utility pipeline for long pause/resume evaluations (sleep + resume marker).",
+      "tags": [
+        "eval",
+        "pause-resume"
+      ],
+      "guardrailsRequired": false,
+      "stages": [
+        {
+          "kind": "command",
+          "id": "pause-window",
+          "title": "Sleep to allow pause",
+          "command": "sleep 120",
+          "summaryHint": "Pause window elapsed"
+        },
+        {
+          "kind": "command",
+          "id": "resume-marker",
+          "title": "Resume marker",
+          "command": "node -e \"console.log('resume-ok')\"",
+          "summaryHint": "Resume marker written"
+        }
+      ]
     }
   ]
 }

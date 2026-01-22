@@ -9,6 +9,8 @@ description: Use when operating the Codex delegation MCP server and tools (deleg
 
 Use this skill to operate delegation MCP tools with delegation enabled by default (the only MCP on by default). Disable it only when required by safety constraints, and keep other MCPs off unless they are relevant to the task.
 
+Collab multi-agent mode is separate from delegation. For symbolic RLM subcalls that use collab tools, set `RLM_SYMBOLIC_COLLAB=1` and ensure a collab-capable Codex CLI; collab tool calls are recorded in `manifest.collab_tool_calls`. If collab tools are unavailable in your CLI build, skip collab steps; delegation still works independently.
+
 ## Quick-start workflow (canned)
 
 Use this when delegation tools are missing in the current run (MCP disabled) and you want a background Codex run to handle delegation:
@@ -62,11 +64,11 @@ For runner + delegation coordination (short `--task` flow), see `docs/delegation
 
 ### 0a) Version guard (JSONL handshake)
 
-- Delegation MCP uses JSONL; ensure the server binary is **0.1.8+**:
-  - `codex-orchestrator --version` should be `>= 0.1.8`
-- If not, update global install: `npm i -g @kbediako/codex-orchestrator@0.1.8`
-- Alternative: pin the MCP server to `npx -y @kbediako/codex-orchestrator@0.1.8` for deterministic behavior.
-- Note: if your installed CLI is older than the docs (e.g., 0.1.11 while docs target a newer release), use the pinned `npx` version or upgrade after the release ships.
+- Delegation MCP uses JSONL; ensure the server binary meets the docs’ minimum version:
+  - `codex-orchestrator --version` should be `>=` the docs’ minimum.
+- If not, update global install: `npm i -g @kbediako/codex-orchestrator@<min-version>`
+- Alternative: pin the MCP server to `npx -y @kbediako/codex-orchestrator@<min-version>` for deterministic behavior.
+- Note: if your installed CLI is older than the docs, prefer upgrading or pinning to the docs’ minimum.
 
 ### 0b) Background terminal bootstrap (required when MCP is disabled)
 
@@ -83,6 +85,7 @@ Guidance for background runs:
 - Use `--json` for JSONL events, or `-o <path>` to write the final message to a file while still printing to stdout.
 - If you need a multi-step run, use `codex exec resume --last "<follow-up>"` to continue the same session.
 - Non-interactive runs can still hit `confirmation_required`; approvals happen via the UI/TUI and the run resumes after approval.
+- Use this only for non-manifest evidence; for manifest-required workflows, use `codex-orchestrator start ...`.
 - `codex exec` does **not** create an orchestrator manifest. If the child must call `delegate.question.*` or `delegate.status/pause/cancel`, pass a real `.runs/<task>/cli/<run>/manifest.json` via `parent_manifest_path`/`manifest_path` (e.g., run `codex-orch start diagnostics --format json --task <task-id>` to get one; or use `export MCP_RUNNER_TASK_ID=<task-id>` if you prefer env vars).
 - Setting `MCP_RUNNER_TASK_ID` does not cause `codex exec` to emit `.runs/**` manifests; use `codex-orchestrator start <pipeline> --task <id>` when manifest evidence is required.
 
@@ -106,6 +109,7 @@ Guidance for background runs:
   - If the repo omits `delegate.allowed_tool_servers`, the cap defaults to `[]` and extra tools are ignored.
   - Names must match `^[A-Za-z0-9_-]+$`; invalid entries (e.g., `;`, `/`, `\n`, `=`) are ignored.
   - `github.*` tools are not gated by `delegate.tool_profile`; they are controlled by repo GitHub allowlists.
+- If the child cannot access expected tools, recheck repo `delegate.allowed_tool_servers` (it may have changed).
 - Keep `delegate.tool_profile` minimal; avoid networked tools unless required.
 - Nested delegation is off by default; only use `full` when `delegate.allow_nested=true` and you intend recursion.
 - **Important:** `delegate.mode` (server tool surface) is different from `delegate_mode` (input to `delegate.spawn` for the *child* run).

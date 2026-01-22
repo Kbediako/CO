@@ -8,6 +8,7 @@ Use this guide for deeper context on delegation behavior, tool surfaces, and tro
 - It does **not** provide general tools itself; it only exposes `delegate.*` + optional `github.*` tools.
 - Child runs get tools based on `delegate.mode` + `delegate.tool_profile` + repo caps.
 - Delegation MCP stays enabled by default (only MCP on by default); disable it only when required by safety constraints.
+- Collab multi-agent mode is separate from delegation; for symbolic RLM subcalls set `RLM_SYMBOLIC_COLLAB=1` and ensure a collab-capable Codex CLI. Collab tool calls are recorded in `manifest.collab_tool_calls`. If collab tools are unavailable in your CLI build, skip collab steps; delegation still works independently.
 
 ## Background-run pattern (preferred)
 
@@ -105,12 +106,12 @@ If you need delegation to respect a repo’s `.codex/orchestrator.toml` (e.g., s
 
 ## Version guard (JSONL handshake)
 
-Delegation MCP expects JSONL. Use `codex-orchestrator >= 0.1.8`.
+Delegation MCP expects JSONL. Use the docs’ minimum `codex-orchestrator` version or newer.
 
 - Check: `codex-orchestrator --version`
-- Update global: `npm i -g @kbediako/codex-orchestrator@0.1.8`
-- Or pin via npx: `npx -y @kbediako/codex-orchestrator@0.1.8 delegate-server`
-- If your installed CLI is behind the docs (e.g., 0.1.11 while docs target a newer release), use the pinned `npx` version or upgrade after the release ships.
+- Update global: `npm i -g @kbediako/codex-orchestrator@<min-version>`
+- Or pin via npx: `npx -y @kbediako/codex-orchestrator@<min-version> delegate-server`
+- If your installed CLI is behind the docs, prefer upgrading or pinning to the docs’ minimum.
 
 ## Common failures
 

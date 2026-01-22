@@ -78,4 +78,24 @@ describe('ContextStore search offsets', () => {
       })
     ).rejects.toThrow('target_bytes');
   });
+
+  it('accepts numeric chunk pointers', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'rlm-context-'));
+    const text = 'alpha beta gamma delta epsilon';
+    const contextObject = await buildContextObject({
+      source: { type: 'text', value: text },
+      targetDir: join(tempDir, 'context'),
+      chunking: { targetBytes: 8, overlapBytes: 0, strategy: 'byte' }
+    });
+
+    const store = new ContextStore(contextObject);
+    const objectId = contextObject.index.object_id;
+    const firstChunkId = contextObject.index.chunks[0]?.id ?? '';
+    const numericPointer = `ctx:${objectId}#chunk:0`;
+    const resolved = store.validatePointer(numericPointer);
+
+    expect(resolved?.chunkId).toBe(firstChunkId);
+    const data = await store.read(numericPointer, 0, 5);
+    expect(data.text.length).toBeGreaterThan(0);
+  });
 });

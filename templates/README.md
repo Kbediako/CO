@@ -10,3 +10,7 @@ initializer:
 
 The initializer copies the contents of templates/codex/ into your working
 repository and will not overwrite files unless you pass --force.
+
+Next steps (recommended):
+  codex mcp add delegation -- codex-orchestrator delegate-server --repo /path/to/repo
+  codex-orchestrator codex setup   # optional: CO-managed Codex CLI for collab JSONL

@@ -20,7 +20,7 @@ afterEach(async () => {
 
 describe('frontend testing runner', () => {
   it('resolves codex command without devtools by default', () => {
-    const env = { CODEX_REVIEW_DEVTOOLS: undefined } as NodeJS.ProcessEnv;
+    const env = { CODEX_REVIEW_DEVTOOLS: undefined, CODEX_CLI_BIN: 'codex' } as NodeJS.ProcessEnv;
     const resolved = resolveCodexCommand(['exec', 'prompt'], env);
     expect(resolved.command).toBe('codex');
     expect(resolved.args).toEqual(['exec', 'prompt']);
@@ -29,7 +29,11 @@ describe('frontend testing runner', () => {
   it('errors when devtools is enabled without readiness', async () => {
     tempDir = await mkdtemp(join(tmpdir(), 'frontend-test-'));
     const codexHome = join(tempDir, '.codex');
-    const env = { CODEX_REVIEW_DEVTOOLS: '1', CODEX_HOME: codexHome } as NodeJS.ProcessEnv;
+    const env = {
+      CODEX_REVIEW_DEVTOOLS: '1',
+      CODEX_HOME: codexHome,
+      CODEX_CLI_BIN: 'codex'
+    } as NodeJS.ProcessEnv;
     expect(() => resolveCodexCommand(['exec', 'prompt'], env)).toThrow(
       /DevTools MCP is not ready/
     );
@@ -52,7 +56,11 @@ describe('frontend testing runner', () => {
       'utf8'
     );
 
-    const env = { CODEX_REVIEW_DEVTOOLS: '1', CODEX_HOME: codexHome } as NodeJS.ProcessEnv;
+    const env = {
+      CODEX_REVIEW_DEVTOOLS: '1',
+      CODEX_HOME: codexHome,
+      CODEX_CLI_BIN: 'codex'
+    } as NodeJS.ProcessEnv;
     const resolved = resolveCodexCommand(['exec', 'prompt'], env);
     expect(resolved.command).toBe('codex');
     expect(resolved.args).toEqual(['-c', DEVTOOLS_CONFIG_OVERRIDE, 'exec', 'prompt']);
@@ -61,7 +69,8 @@ describe('frontend testing runner', () => {
   it('appends config overrides from env', () => {
     const env = {
       CODEX_MCP_CONFIG_OVERRIDES:
-        'mcp_servers.delegation.enabled=true; mcp_servers.chrome-devtools.enabled=true'
+        'mcp_servers.delegation.enabled=true; mcp_servers.chrome-devtools.enabled=true',
+      CODEX_CLI_BIN: 'codex'
     } as NodeJS.ProcessEnv;
     const resolved = resolveCodexCommand(['exec', 'prompt'], env);
     expect(resolved.command).toBe('codex');

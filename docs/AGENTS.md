@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp 8eecb2243f54bf19484f7e4f954492f4b514d0525e82b7b9758d658bb21bb082 -->
+<!-- codex:instruction-stamp ce57b3a2e0165942d6b8b360b625b56caba84c2910e1af32d268297bc8faf94c -->
 # Repository Agent Guidance
 
 ## Project 0303 — Codex Orchestrator Autonomy Enhancements
@@ -41,6 +41,12 @@
 - Keep delegation MCP enabled by default (only MCP on by default). Enable other MCPs only when relevant to the task.
 - Avoid hard dependencies on a specific MCP server; use whatever MCPs are available and relevant to the specific task.
 - Follow `.agent/SOPs/oracle-usage.md` for Oracle runs (tool cap: 11 attachments; unique basenames; attachments-first workflow).
+
+## MCP vs Collab (Decision Rule)
+- Default to MCP for approvals, tool routing, delegation, external integrations, and audit trails.
+- Use collab only for intra-run brainstorming, role-split planning, or parallel subcalls.
+- If unsure, choose MCP. Collab is opt-in (`--enable collab` / `RLM_SYMBOLIC_COLLAB=1`).
+- The “top-level Codex” is the MCP-run agent the user is interacting with; collab agents are assistants and do not represent the run.
 
 ## Standalone Reviews (Ad-hoc)
 - Use `codex review` for fast checks during implementation; prefer a targeted prompt.

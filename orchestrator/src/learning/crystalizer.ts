@@ -6,6 +6,7 @@ import { join, relative } from 'node:path';
 
 import type { CliManifest } from '../cli/types.js';
 import { isoTimestamp } from '../cli/utils/time.js';
+import { resolveCodexCliBin } from '../cli/utils/codexCli.js';
 import { slugify } from '../cli/utils/strings.js';
 import { appendLearningAlert, ensureLearningSection } from './manifest.js';
 import {
@@ -145,7 +146,7 @@ function composePrompt(
 }
 
 export async function createCodexCliCrystalizerClient(
-  binary = process.env.CODEX_CLI_BIN ?? 'codex'
+  binary = resolveCodexCliBin(process.env)
 ): Promise<CrystalizerClient> {
   const execFileAsync = promisify(execFile);
   return {

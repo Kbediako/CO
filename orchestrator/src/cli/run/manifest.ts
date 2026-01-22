@@ -91,6 +91,7 @@ export async function bootstrapManifest(runId: string, options: ManifestBootstra
     resume_events: [],
     approvals: [],
     commands,
+    collab_tool_calls: [],
     child_runs: [],
     run_summary_path: null,
     plan_target_id: options.planTargetId ?? null,

@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp a719b662a5a6d76956ac60f4ee485884ed6dc0bc4d87c0d4787a74330b13293b -->
+<!-- codex:instruction-stamp 4a03f3c60e4dd152c89641b7c41c4f88094230655012865483ec08563cdcaa66 -->
 # Agent Enablement
 
 ## Added by Bootstrap 2025-10-16
@@ -17,6 +17,12 @@
 - Run `node scripts/spec-guard.mjs --dry-run` prior to requesting review; a failing guard requires refreshing relevant specs (see `.agent/SOPs/specs-and-research.md`).
 - Before implementation, run a standalone review of the task/spec against the user’s intent and record the approval in the spec + checklist notes.
 - Keep delegation MCP enabled by default (only MCP on by default). Enable other MCPs only when relevant to the task.
+
+### MCP vs Collab (Decision Rule)
+- Default to MCP for approvals, tool routing, delegation, external integrations, and audit trails.
+- Use collab only for intra-run brainstorming, role-split planning, or parallel subcalls.
+- If unsure, choose MCP. Collab is opt-in (`--enable collab` / `RLM_SYMBOLIC_COLLAB=1`).
+- The “top-level Codex” is the MCP-run agent the user is interacting with; collab agents are assistants and do not represent the run.
 
 ### Meta-Orchestrator Mode (Parallel Workstreams)
 - Use parallel workstreams to stay within context limits: split independent work into separate runs/worktrees, then consolidate back to a single reviewed diff.

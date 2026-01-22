@@ -69,6 +69,7 @@ export interface CodexOrchestratorCLIManifest {
     error_file: string | null;
     sub_run_id: string | null;
   }[];
+  collab_tool_calls?: CollabToolCall[] | null;
   child_runs: {
     run_id: string;
     pipeline_id: string;
@@ -321,6 +322,21 @@ export interface CodexOrchestratorCLIManifest {
   design_history?: null | DesignHistory;
   design_style_profile?: null | DesignStyleProfile;
   design_metrics?: null | DesignMetrics;
+}
+export interface CollabToolCall {
+  observed_at: string;
+  stage_id: string;
+  command_index: number;
+  event_type: "item.started" | "item.completed" | "item.updated";
+  item_id: string;
+  tool: string;
+  status: "in_progress" | "completed" | "failed";
+  sender_thread_id: string;
+  receiver_thread_ids: string[];
+  prompt?: string | null;
+  agents_states?: {
+    [k: string]: unknown;
+  } | null;
 }
 export interface ToolRun {
   id: string;
