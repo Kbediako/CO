@@ -8,7 +8,7 @@ Use this guide for deeper context on delegation behavior, tool surfaces, and tro
 - It does **not** provide general tools itself; it only exposes `delegate.*` + optional `github.*` tools.
 - Child runs get tools based on `delegate.mode` + `delegate.tool_profile` + repo caps.
 - Delegation MCP stays enabled by default (only MCP on by default); disable it only when required by safety constraints.
-- Collab multi-agent mode is separate from delegation; for symbolic RLM subcalls set `RLM_SYMBOLIC_COLLAB=1` and ensure a collab-capable Codex CLI. Collab tool calls are recorded in `manifest.collab_tool_calls`. If collab tools are unavailable in your CLI build, skip collab steps; delegation still works independently.
+- Collab multi-agent mode is separate from delegation; for symbolic RLM subcalls, set `RLM_SYMBOLIC_COLLAB=1` and ensure a collab-capable Codex CLI. Collab tool calls are recorded in `manifest.collab_tool_calls`. If collab tools are unavailable in your CLI build, skip collab steps; delegation still works independently.
 
 ## Background-run pattern (preferred)
 

@@ -69,6 +69,7 @@ For runner + delegation coordination (short `--task` flow), see `docs/delegation
 - If not, update global install: `npm i -g @kbediako/codex-orchestrator@0.1.12`
 - Alternative: pin the MCP server to `npx -y @kbediako/codex-orchestrator@0.1.12` for deterministic behavior.
 - Note: if your installed CLI is older than 0.1.12, prefer upgrading or pinning to the docs’ minimum.
+- Keep the version pins in this section in sync with the docs’ minimum (currently 0.1.12).
 
 ### 0b) Background terminal bootstrap (required when MCP is disabled)
 

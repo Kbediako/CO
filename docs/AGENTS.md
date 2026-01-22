@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp a3dbc34510350a872a55a0f52575fe452f3617a461d5392ef61269d0ed11b8ce -->
+<!-- codex:instruction-stamp 2d93ab233e1893b32428875d58671a0f03b2438ba7a5c5e75076df26cda6f538 -->
 # Repository Agent Guidance
 
 ## Project 0303 — Codex Orchestrator Autonomy Enhancements
@@ -45,13 +45,13 @@
 ## MCP vs Collab (Decision Rule)
 - Default to MCP for approvals, tool routing, delegation, external integrations, and audit trails.
 - Use collab only for intra-run brainstorming, role-split planning, or parallel subcalls.
-- If unsure, choose MCP. Collab is an opt-in (`--enable collab` / `RLM_SYMBOLIC_COLLAB=1`).
+- Collab means auxiliary assistant agents inside a run; enable it via `RLM_SYMBOLIC_COLLAB=1` (see `docs/guides/collab-vs-mcp.md`).
 - The “top-level Codex” is the MCP-run agent the user is interacting with; collab agents are assistants and do not represent the run.
 
 ## Standalone Reviews (Ad-hoc)
 - Use `codex review` for fast checks during implementation; prefer a targeted prompt.
 - Capture the standalone review approval (even if “no issues”) in the spec/task notes before implementation begins.
-- For manifest-backed review evidence, run `npm run review` with the manifest path.
+- For manifest-backed review evidence, run `TASK=<task-id> NOTES="Goal: ... | Summary: ... | Risks: ..." MANIFEST=<path> npm run review -- --manifest <path>`.
 - See `docs/standalone-review-guide.md` for the canonical workflow.
 - Prefer the global `standalone-review` skill when installed; bundled skills ship for downstream release packaging.
 

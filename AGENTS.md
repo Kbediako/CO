@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp 088cbc02c9cbb36c9a0f5ccdbefc734c56039e48f6602f4011f6b3b65664f96e -->
+<!-- codex:instruction-stamp 3da6a81c53ff6ce87764fe9f31e3b298ad6ec61b7593652e07fb15fd0b19056d -->
 # Codex-Orchestrator Agent Handbook (Template)
 
 Use this repository as the wrapper that coordinates multiple Codex-driven projects. After cloning, replace placeholder metadata (task IDs, documents, SOPs) with values for each downstream initiative while keeping these shared guardrails in place.
@@ -13,7 +13,7 @@ Use this repository as the wrapper that coordinates multiple Codex-driven projec
 ## MCP vs Collab (Decision Rule)
 - Default to MCP for approvals, tool routing, delegation, external integrations, and audit trails.
 - Use collab only for intra-run brainstorming, role-split planning, or parallel subcalls.
-- If unsure, choose MCP. Collab is an opt-in (`--enable collab` / `RLM_SYMBOLIC_COLLAB=1`).
+- Collab means auxiliary assistant agents inside a run; enable it via `RLM_SYMBOLIC_COLLAB=1` (see `docs/guides/collab-vs-mcp.md`).
 - The “top-level Codex” is the MCP-run agent the user is interacting with; collab agents are assistants and do not represent the run.
 
 ## Orchestrator-First Workflow
@@ -37,7 +37,7 @@ Use this repository as the wrapper that coordinates multiple Codex-driven projec
 
 ## Standalone Reviews (Ad-hoc)
 - Use `codex review` for quick reviews during implementation; prefer a targeted prompt.
-- When you need manifest-backed review evidence, run `npm run review` with the manifest path.
+- When you need manifest-backed review evidence, run `TASK=<task-id> NOTES="Goal: ... | Summary: ... | Risks: ..." MANIFEST=<path> npm run review -- --manifest <path>`.
 - See `docs/standalone-review-guide.md` for the canonical workflow.
 - Prefer the bundled `standalone-review` skill for ad-hoc review steps.
 
