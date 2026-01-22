@@ -78,7 +78,7 @@ codex -c 'mcp_servers.delegation.enabled=true' ...
 ## Delegation + RLM flow
 
 RLM (Recursive Language Model) is the long-horizon loop used by the `rlm` pipeline (`codex-orchestrator rlm "<goal>"` or `codex-orchestrator start rlm --goal "<goal>"`). Delegated runs only enter RLM when the child is launched with the `rlm` pipeline (or the rlm runner directly). In auto mode it resolves to symbolic when delegated, when `RLM_CONTEXT_PATH` is set, or when the context exceeds `RLM_SYMBOLIC_MIN_BYTES`; otherwise it stays iterative. The runner writes state to `.runs/<task-id>/cli/<run-id>/rlm/state.json` and stops when the validator passes or budgets are exhausted.
-Symbolic subcalls can optionally use collab tools when `RLM_SYMBOLIC_COLLAB=1` (requires a collab-enabled Codex CLI via `codex setup`). Collab tool calls parsed from `codex exec --json --enable collab` are stored in `manifest.collab_tool_calls` (bounded by `CODEX_ORCHESTRATOR_COLLAB_MAX_EVENTS`, set to `0` to disable).
+Symbolic subcalls can optionally use collab tools when `RLM_SYMBOLIC_COLLAB=1` (requires a collab-enabled Codex CLI via `codex-orchestrator codex setup`). Collab tool calls parsed from `codex exec --json --enable collab` are stored in `manifest.collab_tool_calls` (bounded by `CODEX_ORCHESTRATOR_COLLAB_MAX_EVENTS`, set to `0` to disable).
 
 ### Delegation flow
 ```mermaid

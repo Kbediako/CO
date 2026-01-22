@@ -1,7 +1,7 @@
 {
   "name": "@kbediako/codex-orchestrator",
-  "version": "0.1.12",
-  "license": "SEE LICENSE IN LICENSE",
+  "version": "0.1.13",
+  "license": "MIT",
   "type": "module",
   "bin": {
     "codex-orchestrator": "dist/bin/codex-orchestrator.js",

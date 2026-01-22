@@ -102,7 +102,8 @@ export async function runCodexCliSetup(
   }
 
   const install = await writeCodexCliConfig(plan, env);
-  return { status: 'applied', plan, readiness, install };
+  const updatedReadiness = resolveCodexCliReadiness(env);
+  return { status: 'applied', plan, readiness: updatedReadiness, install };
 }
 
 export function formatCodexCliSetupSummary(result: CodexCliSetupResult): string[] {
@@ -250,7 +251,13 @@ async function runCommand(
   options: { cwd?: string } = {}
 ): Promise<void> {
   await new Promise<void>((resolvePromise, reject) => {
-    const child = spawn(command, args, { stdio: 'inherit', cwd: options.cwd });
+    const env = { ...process.env };
+    if (process.stdin?.isTTY !== true) {
+      env.GIT_TERMINAL_PROMPT = env.GIT_TERMINAL_PROMPT ?? '0';
+      env.GIT_ASKPASS = env.GIT_ASKPASS ?? 'echo';
+      env.GCM_INTERACTIVE = env.GCM_INTERACTIVE ?? 'never';
+    }
+    const child = spawn(command, args, { stdio: 'inherit', cwd: options.cwd, env });
     child.once('error', (error) => reject(error instanceof Error ? error : new Error(String(error))));
     child.once('exit', (code) => {
       if (code === 0) {
