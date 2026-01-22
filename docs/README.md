@@ -1,6 +1,6 @@
 # Codex Orchestrator (Repository Guide)
 
-This document covers repository internals, contributor workflows, and deeper architecture. For end‑user install and usage instructions, see the main `README.md`.
+> **Internal/Contributor guide:** This document covers repository internals and workflow details. End‑user installation and usage live in `README.md`.
 
 Codex Orchestrator is the coordination layer that glues together Codex-driven agents, run pipelines, approval policies, and evidence capture for multi-stage automation projects. It wraps a reusable orchestration core with a CLI that produces auditable manifests, integrates with control-plane validators, and syncs run results to downstream systems.
 
@@ -258,7 +258,7 @@ Check readiness with `codex-orchestrator doctor --format json` (reports DevTools
 Use the hi-fi pipeline to snapshot complex marketing sites (motion, interactions, tokens) while keeping the repo cloneable:
 
 1. **Configure the source:** Update `design.config.yaml` → `pipelines.hi_fi_design_toolkit.sources` with the target URL, slug, title, and breakpoints (the repo defaults to an empty `sources` list until you add one).
-2. **Permit the domain:** Add (or update) the matching record in `compliance/permit.json` so Playwright, video capture, and live assets are explicitly approved for that origin.
+2. **Permit the domain:** Copy `compliance/permit.example.json` to `compliance/permit.json`, then add (or update) the matching record so Playwright, video capture, and live assets are explicitly approved for that origin.
 3. **Prep tooling:**
    - `npm install && npm run build`
    - `npm run setup:design-tools` (installs design-system deps) and ensure FFmpeg is available (`brew install ffmpeg` on macOS).

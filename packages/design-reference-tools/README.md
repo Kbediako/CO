@@ -6,7 +6,7 @@ This scaffold wires up the three phases you outlined:
 2) **Artifact Creation** — generate a pixel‑checked reference page and a Style Guide (MD).
 3) **Autonomous Application** — publish tokens, ship reusable components, and integrate into a Next.js app for on‑brand generation (including Framer Motion primitives).
 
-> ⚠️ **Licensing**: Only run extraction against sources you own or have permission to replicate. See `compliance/permit.json`.
+> ⚠️ **Licensing**: Only run extraction against sources you own or have permission to replicate. Copy `compliance/permit.example.json` to `compliance/permit.json` and keep it updated.
 
 ## Quickstart
 
@@ -42,6 +42,5 @@ tools/extractor/              # CSS extraction + tokenization + reference gen + 
 tools/styleguide/             # Style Guide generator (Markdown)
 prompts/                      # LLM prompt templates that force high‑fidelity usage
 .github/workflows/ci.yml      # Visual regression for PRs
-compliance/permit.json        # List of allowed sources + licenses
+compliance/permit.json        # List of allowed sources + licenses (copy from permit.example.json)
 ```
-

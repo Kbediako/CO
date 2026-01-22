@@ -169,7 +169,7 @@ codex-orchestrator devtools setup
 
 ## Repository + contributor guide
 
-Repo internals, development workflows, and deeper architecture notes live in the GitHub repository:
+Repo internals, development workflows, and deeper architecture notes (contributor/internal) live in the GitHub repository:
 - `docs/README.md`
 - `docs/diagnostics-prompt-guide.md` (first-run diagnostics prompt + expected outputs)
 - `docs/guides/collab-vs-mcp.md` (agent-first decision guide)

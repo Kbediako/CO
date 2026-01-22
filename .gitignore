@@ -7,3 +7,5 @@ var/
 .vscode/settings.json
 .runs/
 **/:Zone.Identifier
+compliance/permit.json
+compliance/permit.local.json

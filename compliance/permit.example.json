@@ -1,0 +1,19 @@
+{
+  "allowedSources": [
+    {
+      "origin": "https://example.com",
+      "license": "Example-only permit (replace with your approved source and license)",
+      "notes": "Template entry. Replace with real approvals before running extractions.",
+      "approver": "Approval Board",
+      "approval_id": "example-approval-0000-00-00",
+      "allow_playwright": false,
+      "allow_video_capture": false,
+      "allow_live_assets": false
+    }
+  ],
+  "policy": {
+    "storeRawCss": true,
+    "stripExternalAssets": true,
+    "rehostFonts": false
+  }
+}

@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp 3da6a81c53ff6ce87764fe9f31e3b298ad6ec61b7593652e07fb15fd0b19056d -->
+<!-- codex:instruction-stamp 545f11aae1e36fd402414c8b792d271bf53112a0ea8a79a0bc87a869a97198c9 -->
 # Codex-Orchestrator Agent Handbook (Template)
 
 Use this repository as the wrapper that coordinates multiple Codex-driven projects. After cloning, replace placeholder metadata (task IDs, documents, SOPs) with values for each downstream initiative while keeping these shared guardrails in place.
@@ -43,7 +43,7 @@ Use this repository as the wrapper that coordinates multiple Codex-driven projec
 
 ## Oracle (External Assistant)
 - Oracle bundles a prompt plus the right files so another AI (GPT 5 Pro + more) can answer. Use when stuck/bugs/reviewing.
-- Run `${ORACLE_LOCAL_PATH:-/path/to/oracle/scripts/oracle-local.sh} --help` once per session before first use. Set `ORACLE_LOCAL_PATH` to your local Oracle repo (e.g., `/Users/kbediako/Code/oracle/scripts/oracle-local.sh`).
+- Run `${ORACLE_LOCAL_PATH:-/path/to/oracle/scripts/oracle-local.sh} --help` once per session before first use. Set `ORACLE_LOCAL_PATH` to your local Oracle repo (e.g., `/path/to/oracle/scripts/oracle-local.sh`).
 - Use browser mode only (`--engine browser`). Do not use API runs.
 - If browser mode fails due to missing ChatGPT cookies, approve the macOS Keychain prompt and ensure ChatGPT is signed in for the active Chrome profile; retry with `--browser-cookie-wait 5` or `--browser-manual-login`.
 
