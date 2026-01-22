@@ -75,6 +75,9 @@
     "eslint-plugin-patterns": "file:eslint-plugin-patterns",
     "jscodeshift": "^0.15.2",
     "json-schema-to-typescript": "^14.0.0",
+    "pixelmatch": "^7.1.0",
+    "playwright": "^1.57.0",
+    "pngjs": "^7.0.0",
     "ts-node": "^10.9.2",
     "typescript": "^5.4.0",
     "vitest": "^1.3.1"
