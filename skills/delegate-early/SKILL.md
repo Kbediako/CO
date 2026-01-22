@@ -38,7 +38,7 @@ Use this skill when a task can be split into parallel streams or when the main c
 - Planning: “Draft a 3–5-step plan, call out unknowns.”
 
 ## Escalation rules
-- If delegation is impossible, set override reason and document it in the task checklist.
+- If delegation is impossible, set `DELEGATION_GUARD_OVERRIDE_REASON` and document it in the task checklist.
 
 ## Subagent summary format
 - **Findings**: Key results and conclusions from the subagent run

@@ -14,7 +14,7 @@
 - Specify event/manifest updates to capture collab activity.
 - Clarify MCP vs collab roles in the orchestration stack.
 - Ensure long-running multi-hour/multi-day workflows remain accurate with context-rot mitigation.
-- Provide a CO-managed installation path for a patched Codex CLI and default to it when configured.
+- Provide a CO-managed installation path for a patched Codex CLI, and default to it when configured.
 
 ## Non-Goals
 - Shipping a full refactor in this task.
