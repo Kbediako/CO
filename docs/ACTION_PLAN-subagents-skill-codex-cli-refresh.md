@@ -19,6 +19,10 @@
 - Checks / tests: `node scripts/delegation-guard.mjs`, `node scripts/spec-guard.mjs --dry-run`, `npm run build`, `npm run lint`, `npm run test`, `npm run docs:check`, `npm run docs:freshness`, `node scripts/diff-budget.mjs`, `npm run review`.
 - Rollback plan: Remove script and docs entries; delete global skill + global AGENTS.md if needed.
 
+## Evidence
+- Docs-review: `.runs/0956-subagents-skill-codex-cli-refresh/cli/2026-01-23T01-56-28-788Z-ee539ceb/manifest.json` — results of `docs:check` + `docs:freshness`.
+- Implementation-gate: `.runs/0956-subagents-skill-codex-cli-refresh/cli/2026-01-23T01-58-35-130Z-8146c3ea/manifest.json` — `node scripts/delegation-guard.mjs`, `node scripts/spec-guard.mjs --dry-run`, `npm run build`, `npm run lint`, `npm run test`, `npm run docs:check`, `npm run docs:freshness`, `node scripts/diff-budget.mjs`, `npm run review`.
+
 ## Risks & Mitigations
 - Risk: Script defaults don’t match downstream repo location. Mitigation: require `CODEX_REPO`/`CODEX_CLI_SOURCE` overrides and document defaults.
 - Risk: Global guidance conflicts with repo AGENTS. Mitigation: keep global AGENTS short and link to specific skills.

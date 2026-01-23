@@ -18,7 +18,7 @@
 
 ### Implementation
 - [x] Add repo-relative Codex CLI refresh helper + README entry — Evidence: `scripts/codex-cli-refresh.sh`, `README.md`.
-- [x] Create global subagent-first skill + global AGENTS guidance — Evidence: `~/.codex/skills/subagents-first/SKILL.md`, `~/.codex/AGENTS.md`.
+- [x] Create global subagent-first skill + global AGENTS guidance — Evidence: `reference/0956-subagents-skill-codex-cli-refresh/global-guidance-manifest.md`.
 
 ### Validation + handoff
 - [x] Docs-review manifest captured — Evidence: `.runs/0956-subagents-skill-codex-cli-refresh/cli/2026-01-23T01-56-28-788Z-ee539ceb/manifest.json`.

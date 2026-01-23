@@ -11,7 +11,7 @@
 
 ## Goals
 - Create a repo-relative `scripts/codex-cli-refresh.sh` for downstream use.
-- Provide a global subagent-first skill that links to `delegate-early` and `delegation-usage`.
+- Provide a global subagent-first skill that links to `delegate-early` and `delegation-usage`, with fallback to bundled skills when globals are unavailable.
 - Add a global `~/.codex/AGENTS.md` emphasizing constant subagent usage and linking to the three skills.
 
 ## Non-Goals
@@ -38,6 +38,10 @@
 
 ## Open Questions
 - None.
+
+## Evidence
+- Docs-review: `.runs/0956-subagents-skill-codex-cli-refresh/cli/2026-01-23T01-56-28-788Z-ee539ceb/manifest.json` — docs checks for this PRD/TECH_SPEC/ACTION_PLAN and related skill guidance.
+- Implementation-gate: `.runs/0956-subagents-skill-codex-cli-refresh/cli/2026-01-23T01-58-35-130Z-8146c3ea/manifest.json` — build/lint/test/docs/review evidence covering the subagent guidance updates.
 
 ## Approvals
 - Product:

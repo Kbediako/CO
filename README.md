@@ -63,7 +63,7 @@ Use this when you want Codex to drive work inside another repo with the CO defau
    ```bash
    scripts/codex-cli-refresh.sh --repo /path/to/codex
    ```
-   Set `CODEX_REPO` or `CODEX_CLI_SOURCE` to avoid passing `--repo` each time.
+   Repo-only helper (not included in npm package). Set `CODEX_REPO` or `CODEX_CLI_SOURCE` to avoid passing `--repo` each time.
 
 ## Delegation MCP server
 

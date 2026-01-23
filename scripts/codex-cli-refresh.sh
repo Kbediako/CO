@@ -22,6 +22,11 @@ USAGE
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --repo)
+      if [[ -z "${2:-}" || "${2:-}" == "-"* ]]; then
+        echo "Missing value for --repo" >&2
+        usage >&2
+        exit 1
+      fi
       REPO="$2"
       shift 2
       ;;
@@ -117,7 +122,7 @@ else
   SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
   REPO_ROOT=$(cd "$SCRIPT_DIR/.." && pwd)
   FALLBACK="$REPO_ROOT/dist/bin/codex-orchestrator.js"
-  if [[ -x "$FALLBACK" ]]; then
+  if [[ -f "$FALLBACK" ]]; then
     node "$FALLBACK" codex setup --source "$REPO" --yes --force
   else
     echo "codex-orchestrator not found on PATH and fallback binary missing." >&2

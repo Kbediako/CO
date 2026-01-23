@@ -38,8 +38,13 @@ last_review: 2026-01-23
   - Dry-run script on a clean repo (no upstream changes) to confirm fast exit.
 - Rollout verification:
   - Confirm README references the script and environment overrides.
-  - Verify global skill and `~/.codex/AGENTS.md` exist locally.
+  - Verify global skill and `~/.codex/AGENTS.md` content via repo evidence.
 - Monitoring / alerts: N/A.
+- Evidence:
+  - Help output: `reference/0956-subagents-skill-codex-cli-refresh/codex-cli-refresh-help.txt`.
+  - Dry-run output (fast exit): `reference/0956-subagents-skill-codex-cli-refresh/codex-cli-refresh-dry-run.txt`.
+  - README reference: `reference/0956-subagents-skill-codex-cli-refresh/README-snippet.txt`.
+  - Global guidance snapshot: `reference/0956-subagents-skill-codex-cli-refresh/global-guidance-manifest.md`.
 
 ## Open Questions
 - None.

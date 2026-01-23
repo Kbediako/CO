@@ -1,0 +1,8 @@
+Usage: scripts/codex-cli-refresh.sh [--repo <path>] [--no-push] [--force-rebuild]
+
+Sync upstream Codex, optionally push the fork, and rebuild the CO-managed Codex CLI.
+
+Options:
+  --repo <path>      Path to codex repo (default: $CODEX_REPO, $CODEX_CLI_SOURCE, or ~/Code/codex)
+  --no-push          Do not push updates to origin/main
+  --force-rebuild    Rebuild codex CLI even if no new upstream commits
