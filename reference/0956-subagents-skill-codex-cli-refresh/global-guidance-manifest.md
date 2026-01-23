@@ -23,7 +23,7 @@ Default to subagents for all non-trivial work. Coordinate with the existing dele
 ## Core rules
 - Always spawn at least one subagent for any task that touches multiple files, needs validation, or could exceed ~10 minutes.
 - Keep each subagent scope narrow and ask for short, structured summaries.
-- ALWAYS wait for all subagents and background terminals to complete before yeiling.
+- ALWAYS wait for all subagents and background terminals to complete before yielding.
 
 ## Workflow
 1) Use `delegate-early` to choose streams and spawn subagents quickly.
@@ -46,7 +46,7 @@ This global guidance enforces constant subagent usage across runs.
 
 ## Core policy
 - Default to subagents for any non-trivial task (multi-file, validation, research, or >10 minutes).
-- ALWAYS wait for all subagents and background terminals to complete before yeiling.
+- ALWAYS wait for all subagents and background terminals to complete before yielding.
 
 ## Skill references (use together)
 - `subagents-first`: `$CODEX_HOME/skills/subagents-first/SKILL.md`
