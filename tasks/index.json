@@ -1086,6 +1086,22 @@
       },
       "created_at": "2026-01-21",
       "completed_at": null
+    },
+    {
+      "id": "0956",
+      "slug": "subagents-skill-codex-cli-refresh",
+      "title": "Subagents Skill + Codex CLI Refresh Helper",
+      "path": "tasks/tasks-0956-subagents-skill-codex-cli-refresh.md",
+      "kind": "prd",
+      "status": "in-progress",
+      "gate": {
+        "phase": "subagents-skill-codex-cli-refresh-planning",
+        "status": "in-progress",
+        "log": null,
+        "run_id": null
+      },
+      "created_at": "2026-01-23",
+      "completed_at": null
     }
   ],
   "specs": [
@@ -1183,6 +1199,22 @@
         "task": "tasks/tasks-0955-collab-orchestrator-integration.md",
         "agent_task": ".agent/task/0955-collab-orchestrator-integration.md",
         "docs": "docs/TECH_SPEC-collab-orchestrator-integration.md"
+      }
+    },
+    {
+      "id": "20260123-0956-subagents-skill-codex-cli-refresh",
+      "title": "Subagents Skill + Codex CLI Refresh Helper",
+      "relates_to": "tasks/tasks-0956-subagents-skill-codex-cli-refresh.md",
+      "risk": "low",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-01-23",
+      "paths": {
+        "spec": "tasks/specs/0956-subagents-skill-codex-cli-refresh.md",
+        "task": "tasks/tasks-0956-subagents-skill-codex-cli-refresh.md",
+        "agent_task": ".agent/task/0956-subagents-skill-codex-cli-refresh.md",
+        "docs": "docs/TECH_SPEC-subagents-skill-codex-cli-refresh.md"
       }
     }
   ]
