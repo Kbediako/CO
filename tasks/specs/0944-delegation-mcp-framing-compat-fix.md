@@ -5,7 +5,7 @@ relates_to: tasks/tasks-0944-delegation-mcp-framing-compat-fix.md
 risk: medium
 owners:
   - Codex
-last_review: 2026-01-12
+last_review: 2026-02-13
 ---
 
 ## Summary
