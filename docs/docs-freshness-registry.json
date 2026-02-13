@@ -551,44 +551,44 @@
     {
       "path": ".agent/task/0945-delegation-network-enable.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-01-12",
-      "cadence_days": 90
+      "status": "archived",
+      "last_review": "2026-02-01",
+      "cadence_days": 365
     },
     {
       "path": ".agent/task/0946-delegation-skill-bundle.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-01-12",
-      "cadence_days": 90
+      "status": "archived",
+      "last_review": "2026-02-01",
+      "cadence_days": 365
     },
     {
       "path": ".agent/task/0947-delegation-skill-ship.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-01-13",
-      "cadence_days": 90
+      "status": "archived",
+      "last_review": "2026-02-01",
+      "cadence_days": 365
     },
     {
       "path": ".agent/task/0948-skills-auto-install.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-01-13",
-      "cadence_days": 90
+      "status": "archived",
+      "last_review": "2026-02-01",
+      "cadence_days": 365
     },
     {
       "path": ".agent/task/0949-release-readme-followups.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-01-13",
-      "cadence_days": 90
+      "status": "archived",
+      "last_review": "2026-02-01",
+      "cadence_days": 365
     },
     {
       "path": ".agent/task/0950-delegation-mermaid-archive.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-01-13",
-      "cadence_days": 90
+      "status": "archived",
+      "last_review": "2026-02-01",
+      "cadence_days": 365
     },
     {
       "path": ".agent/task/0951-delegation-rlm-quick-wins.md",
@@ -2910,44 +2910,44 @@
     {
       "path": "tasks/tasks-0945-delegation-network-enable.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-01-12",
-      "cadence_days": 90
+      "status": "archived",
+      "last_review": "2026-02-01",
+      "cadence_days": 365
     },
     {
       "path": "tasks/tasks-0946-delegation-skill-bundle.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-01-12",
-      "cadence_days": 90
+      "status": "archived",
+      "last_review": "2026-02-01",
+      "cadence_days": 365
     },
     {
       "path": "tasks/tasks-0947-delegation-skill-ship.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-01-13",
-      "cadence_days": 90
+      "status": "archived",
+      "last_review": "2026-02-01",
+      "cadence_days": 365
     },
     {
       "path": "tasks/tasks-0948-skills-auto-install.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-01-13",
-      "cadence_days": 90
+      "status": "archived",
+      "last_review": "2026-02-01",
+      "cadence_days": 365
     },
     {
       "path": "tasks/tasks-0949-release-readme-followups.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-01-13",
-      "cadence_days": 90
+      "status": "archived",
+      "last_review": "2026-02-01",
+      "cadence_days": 365
     },
     {
       "path": "tasks/tasks-0950-delegation-mermaid-archive.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-01-13",
-      "cadence_days": 90
+      "status": "archived",
+      "last_review": "2026-02-01",
+      "cadence_days": 365
     },
     {
       "path": "tasks/tasks-0951-delegation-rlm-quick-wins.md",
