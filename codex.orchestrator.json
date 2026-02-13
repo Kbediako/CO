@@ -24,8 +24,8 @@
       {
         "kind": "command",
         "id": "delegation-guard",
-        "title": "node scripts/delegation-guard.mjs",
-        "command": "node scripts/delegation-guard.mjs"
+        "title": "Run delegation guard",
+        "command": "node \"$CODEX_ORCHESTRATOR_PACKAGE_ROOT/dist/orchestrator/src/cli/utils/delegationGuardRunner.js\""
       }
     ],
     "diagnostics-spec-guard": [
