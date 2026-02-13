@@ -269,6 +269,98 @@ describe('delegation server manifest validation', () => {
   });
 });
 
+describe('delegation server status behavior', () => {
+  it('returns terminal status without requiring control endpoint files', async () => {
+    const { root, runDir, manifestPath } = await setupRun();
+    try {
+      await rm(join(runDir, 'control_endpoint.json'), { force: true });
+      await writeFile(
+        manifestPath,
+        JSON.stringify({
+          run_id: 'run-1',
+          task_id: 'task-0940',
+          status: 'failed',
+          status_detail: 'stage:delegation-guard:failed',
+          log_path: '.runs/task-0940/cli/run-1/runner.ndjson'
+        }),
+        'utf8'
+      );
+
+      const response = (await handleToolCall(
+        {
+          jsonrpc: '2.0',
+          method: 'tools/call',
+          params: {
+            name: 'delegate.status',
+            arguments: { manifest_path: manifestPath }
+          }
+        },
+        {
+          repoRoot: process.cwd(),
+          mode: 'full',
+          allowNested: false,
+          githubEnabled: false,
+          allowedGithubOps: new Set<string>(),
+          allowedRoots: [root],
+          allowedHosts: ['127.0.0.1'],
+          toolProfile: [],
+          expiryFallback: 'pause'
+        }
+      )) as { content: Array<{ text: string }> };
+
+      const payload = JSON.parse(response.content[0].text) as Record<string, unknown>;
+      expect(payload.status).toBe('failed');
+      expect(payload.run_id).toBe('run-1');
+      expect(payload.task_id).toBe('task-0940');
+      expect(payload.events_path).toBe(join(runDir, 'events.jsonl'));
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('still requires control endpoint files while runs are active', async () => {
+    const { root, runDir, manifestPath } = await setupRun();
+    try {
+      await rm(join(runDir, 'control_endpoint.json'), { force: true });
+      await writeFile(
+        manifestPath,
+        JSON.stringify({
+          run_id: 'run-1',
+          task_id: 'task-0940',
+          status: 'running'
+        }),
+        'utf8'
+      );
+
+      await expect(
+        handleToolCall(
+          {
+            jsonrpc: '2.0',
+            method: 'tools/call',
+            params: {
+              name: 'delegate.status',
+              arguments: { manifest_path: manifestPath }
+            }
+          },
+          {
+            repoRoot: process.cwd(),
+            mode: 'full',
+            allowNested: false,
+            githubEnabled: false,
+            allowedGithubOps: new Set<string>(),
+            allowedRoots: [root],
+            allowedHosts: ['127.0.0.1'],
+            toolProfile: [],
+            expiryFallback: 'pause'
+          }
+        )
+      ).rejects.toThrow('control_endpoint.json');
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+});
+
 describe('delegation server question helpers', () => {
   it('loads delegation token from run directory when codex_private is missing', async () => {
     const { root, runDir, manifestPath } = await setupRun();

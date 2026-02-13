@@ -54,6 +54,7 @@ codex-orch start diagnostics --format json --task <task-id>
 This creates a run manifest under `.runs/<task-id>/cli/<run-id>/manifest.json`.
 - Use it as `parent_manifest_path` for `delegate.question.*`.
 - Use it as `manifest_path` for `delegate.status/pause/cancel`.
+- Child stage commands now inherit `MCP_RUNNER_TASK_ID=<manifest.task_id>` automatically, so `node scripts/delegation-guard.mjs` evaluates the delegated task stream correctly without extra env wiring.
 
 If you plan to run multiple commands in the same task, you can still set the env var once:
 
@@ -113,3 +114,4 @@ codex mcp add delegation -- codex-orchestrator delegate-server --repo /path/to/r
 - Prefer `--task <id>` over `export MCP_RUNNER_TASK_ID=...` for a human-friendly, agent-first workflow.
 - Use `codex exec` only for pre-task triage (no task id yet) or when delegation is unavailable.
 - Pass the manifest path whenever you need `delegate.question.*` or run control APIs.
+- `delegate.status` enforcement: active runs still require a valid `control_endpoint.json`; terminal runs (`succeeded`/`failed`/`cancelled`) can be read from manifest state even when control endpoint files are gone.
