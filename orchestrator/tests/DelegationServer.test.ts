@@ -279,7 +279,7 @@ describe('delegation server status behavior', () => {
         JSON.stringify({
           run_id: 'run-1',
           task_id: 'task-0940',
-          status: 'failed',
+          status: 'canceled',
           status_detail: 'stage:delegation-guard:failed',
           log_path: '.runs/task-0940/cli/run-1/runner.ndjson'
         }),
@@ -309,7 +309,7 @@ describe('delegation server status behavior', () => {
       )) as { content: Array<{ text: string }> };
 
       const payload = JSON.parse(response.content[0].text) as Record<string, unknown>;
-      expect(payload.status).toBe('failed');
+      expect(payload.status).toBe('canceled');
       expect(payload.run_id).toBe('run-1');
       expect(payload.task_id).toBe('task-0940');
       expect(payload.events_path).toBe(join(runDir, 'events.jsonl'));

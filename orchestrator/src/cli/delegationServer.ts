@@ -70,7 +70,7 @@ const CONFIRMATION_ERROR_CODES = new Set([
   'nonce_already_consumed'
 ]);
 const TOOL_PROFILE_ENTRY_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]*$/;
-const TERMINAL_RUN_STATUSES = new Set(['succeeded', 'failed', 'cancelled']);
+const TERMINAL_RUN_STATUSES = new Set(['succeeded', 'failed', 'cancelled', 'canceled']);
 
 interface ConfigOverride {
   source: 'env' | 'cli';
