@@ -438,12 +438,13 @@ async function waitForChildExit(child: ChildProcess, timeoutMs: number | null): 
     let settled = false;
     let timeoutHandle: NodeJS.Timeout | undefined;
     let killHandle: NodeJS.Timeout | undefined;
+    let hardKillArmed = false;
 
     const cleanup = () => {
       if (timeoutHandle) {
         clearTimeout(timeoutHandle);
       }
-      if (killHandle) {
+      if (killHandle && !hardKillArmed) {
         clearTimeout(killHandle);
       }
       child.removeListener('error', onError);
@@ -488,11 +489,11 @@ async function waitForChildExit(child: ChildProcess, timeoutMs: number | null): 
 
         // Ask codex review to exit first, then force-kill after a short grace period.
         child.kill('SIGTERM');
+        hardKillArmed = true;
         killHandle = setTimeout(() => {
-          if (settled) {
-            return;
+          if (child.exitCode === null) {
+            child.kill('SIGKILL');
           }
-          child.kill('SIGKILL');
         }, 5000);
         killHandle.unref();
 

@@ -156,6 +156,7 @@ interface ExecutePipelineOptions {
   manifest: CliManifest;
   paths: RunPaths;
   mode: ExecutionMode;
+  executionModeOverride?: ExecutionMode;
   target: PlanItem;
   task: TaskContext;
   runEvents?: RunEventPublisher;
@@ -178,6 +179,7 @@ interface RunLifecycleContext {
   onEventEntry?: (entry: import('./events/runEventStream.js').RunEventStreamEntry) => void;
   persister: ManifestPersister;
   envOverrides: NodeJS.ProcessEnv;
+  executionModeOverride?: ExecutionMode;
 }
 
 export class CodexOrchestrator {
@@ -268,7 +270,8 @@ export class CodexOrchestrator {
         eventStream: stream,
         onEventEntry,
         persister,
-        envOverrides: preparation.envOverrides
+        envOverrides: preparation.envOverrides,
+        executionModeOverride: options.executionMode
       });
     } finally {
       if (detachStream) {
@@ -513,7 +516,8 @@ export class CodexOrchestrator {
     executePipeline: PipelineExecutor,
     getResult: () => PipelineRunExecutionResult | null,
     plannerInstance: CommandPlanner | undefined,
-    env: EnvironmentPaths
+    env: EnvironmentPaths,
+    modeOverride?: ExecutionMode
   ): TaskManager {
     const planner = plannerInstance ?? new CommandPlanner(pipeline);
     const builder = new CommandBuilder(executePipeline);
@@ -528,14 +532,21 @@ export class CodexOrchestrator {
       tester,
       reviewer,
       runIdFactory: () => runId,
-      modePolicy: (task, subtask) => this.determineMode(task, subtask),
+      modePolicy: (task, subtask) => this.determineMode(task, subtask, modeOverride),
       persistence: { autoStart: true, stateStore, manifestWriter }
     };
 
     return new TaskManager(options);
   }
 
-  private determineMode(task: TaskContext, subtask: PlanItem): ExecutionMode {
+  private determineMode(
+    task: TaskContext,
+    subtask: PlanItem,
+    overrideMode?: ExecutionMode
+  ): ExecutionMode {
+    if (overrideMode) {
+      return overrideMode;
+    }
     if (this.requiresCloudExecution(task, subtask)) {
       return 'cloud';
     }
@@ -688,7 +699,8 @@ export class CodexOrchestrator {
               taskId: env.taskId,
               pipelineId: stage.pipeline,
               parentRunId: manifest.run_id,
-              format: 'json'
+              format: 'json',
+              executionMode: options.executionModeOverride
             });
             entry.completed_at = isoTimestamp();
             entry.sub_run_id = child.manifest.run_id;
@@ -1037,7 +1049,18 @@ export class CodexOrchestrator {
   }
 
   private async performRunLifecycle(context: RunLifecycleContext): Promise<PipelineExecutionResult> {
-    const { env, pipeline, manifest, paths, planner, taskContext, runId, persister, envOverrides } = context;
+    const {
+      env,
+      pipeline,
+      manifest,
+      paths,
+      planner,
+      taskContext,
+      runId,
+      persister,
+      envOverrides,
+      executionModeOverride
+    } = context;
     let latestPipelineResult: PipelineRunExecutionResult | null = null;
     const executingByKey = new Map<string, Promise<PipelineRunExecutionResult>>();
     const executePipeline: PipelineExecutor = async (input) => {
@@ -1052,6 +1075,7 @@ export class CodexOrchestrator {
         manifest,
         paths,
         mode: input.mode,
+        executionModeOverride,
         target: input.target,
         task: taskContext,
         runEvents: context.runEvents,
@@ -1067,7 +1091,15 @@ export class CodexOrchestrator {
       return executing;
     };
     const getResult = () => latestPipelineResult;
-    const manager = this.createTaskManager(runId, pipeline, executePipeline, getResult, planner, env);
+    const manager = this.createTaskManager(
+      runId,
+      pipeline,
+      executePipeline,
+      getResult,
+      planner,
+      env,
+      executionModeOverride
+    );
     this.attachPlanTargetTracker(manager, manifest, paths, persister);
 
     getPrivacyGuard().reset();

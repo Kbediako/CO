@@ -265,6 +265,7 @@ export class CodexCloudTaskExecutor {
 
       return { success, summary, notes, cloudExecution };
     } catch (error) {
+      // Preserve non-queued status to reflect last known remote state at failure time.
       cloudExecution.status = cloudExecution.status === 'queued' ? 'failed' : cloudExecution.status;
       cloudExecution.diff_status = 'unavailable';
       cloudExecution.error = (error as Error)?.message ?? String(error);

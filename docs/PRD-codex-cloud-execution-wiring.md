@@ -51,19 +51,20 @@
 ## Technical Considerations
 - Architectural Notes:
   - Add a cloud execution adapter layer for launch, status polling, diff retrieval, and apply workflows.
-  - Map cloud responses into existing `BuildResult/TestResult/ReviewResult/RunSummary` shapes.
-  - Extend manifest schema with a cloud execution section.
+  - Map cloud responses into the existing `BuildResult/TestResult/ReviewResult/RunSummary` shapes.
+  - Extend the manifest schema to include a cloud execution section.
 - Dependencies / Integrations:
-  - Codex CLI cloud commands/endpoints (`codex cloud exec/status/diff/apply`).
-  - Existing CO persistence (`RunManifestWriter`, `TaskStateStore`) and event streams.
+  - Codex CLI cloud commands/endpoints (`codex cloud exec / status / diff / apply`).
+  - Existing CO persistence (`RunManifestWriter` and `TaskStateStore`) and event streams.
 
 ## Open Questions
-- Should cloud diff retrieval be mandatory for successful cloud-mode completion or optional by policy flag?
-- Should cloud apply be exposed only as an explicit follow-up command or as a pipeline stage option?
+- Should cloud diff retrieval be mandatory for successful cloud-mode completion, or optional via policy flag?
+- Should the cloud apply command be exposed only as an explicit follow-up command, or as a pipeline stage option?
 - How should long-poll cancellation semantics map into existing control server pause/cancel behavior?
 
 ## Evidence
-- Planning scout (subagent): internal explorer agent output captured in this run.
+- Planning scout (subagent): `.runs/0957-codex-cloud-execution-wiring-scout/cli/2026-02-13T09-44-14-289Z-f07a93cd/manifest.json`.
+- Implementation docs archive tracking: `docs/implementation-docs-archive-policy.json` (automation syncs archived payloads to `doc-archives` branch when archival triggers are met).
 
 ## Approvals
 - Product:

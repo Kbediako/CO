@@ -42,6 +42,11 @@
 - Rollback plan:
   - Feature-guard cloud dispatch path and revert to local-only routing if regressions appear.
 
+## Evidence
+- Docs-review: `.runs/0957-codex-cloud-execution-wiring/cli/2026-02-13T09-47-41-178Z-453a5990/manifest.json`
+- Implementation-gate: `.runs/0957-codex-cloud-execution-wiring/cli/2026-02-13T10-10-02-475Z-9fa15611/manifest.json`
+- Cloud canary: `.runs/0957-cloud-canary-local2/cli/2026-02-13T10-47-30-259Z-6eecdc1a/manifest.json`
+
 ## Risks and Mitigations
 - Risk: Cloud API behavior divergence from assumptions.
   - Mitigation: adapter layer with clear error taxonomy and integration tests.

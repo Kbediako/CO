@@ -11,7 +11,7 @@ last_review: 2026-02-13
 ## Summary
 - Objective: Route orchestrator cloud mode through real Codex Cloud task execution while preserving CO manifest and review workflows.
 - Scope: Orchestrator mode routing, cloud execution adapters, status polling/retries, manifest schema updates, and phased rollout/test strategy.
-- Constraints: Preserve local mode compatibility; keep apply explicit; avoid scope expansion beyond cloud wiring.
+- Constraints: Preserve local-mode compatibility; require explicit apply; do not expand scope beyond cloud wiring.
 
 ## Technical Requirements
 - Functional requirements:
@@ -32,6 +32,7 @@ last_review: 2026-02-13
   - `TaskManager`/CLI mode policy must dispatch to a cloud executor path.
   - Manifest schema must include a `cloud_execution` section (nullable for local runs).
   - Event stream should expose cloud status transitions for observability.
+  - Manifest evidence should include docs-review and implementation-gate run manifests for audit traceability.
 
 ## Architecture and Data
 - Architecture / design adjustments:
@@ -94,8 +95,13 @@ last_review: 2026-02-13
   - Track cloud launch latency, polling retries, terminal status distribution, and diff/apply success rates.
 
 ## Open Questions
-- Should apply be modeled as a separate CLI command only, or optionally as a post-run stage?
+- Should cloud apply be modeled as a separate CLI command only, or optionally as a post-run stage?
 - Should diff absence be warning or failure by default policy?
+
+## Evidence
+- Docs-review: `.runs/0957-codex-cloud-execution-wiring/cli/2026-02-13T09-47-41-178Z-453a5990/manifest.json`
+- Implementation-gate: `.runs/0957-codex-cloud-execution-wiring/cli/2026-02-13T10-10-02-475Z-9fa15611/manifest.json`
+- Cloud canary: `.runs/0957-cloud-canary-local2/cli/2026-02-13T10-47-30-259Z-6eecdc1a/manifest.json`
 
 ## Approvals
 - Reviewer: Codex (self)

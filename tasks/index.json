@@ -1232,6 +1232,22 @@
         "agent_task": ".agent/task/0956-subagents-skill-codex-cli-refresh.md",
         "docs": "docs/TECH_SPEC-subagents-skill-codex-cli-refresh.md"
       }
+    },
+    {
+      "id": "20260213-0957-codex-cloud-execution-wiring",
+      "title": "Codex Cloud Execution Wiring",
+      "relates_to": "tasks/tasks-0957-codex-cloud-execution-wiring.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-02-13",
+      "paths": {
+        "spec": "tasks/specs/0957-codex-cloud-execution-wiring.md",
+        "task": "tasks/tasks-0957-codex-cloud-execution-wiring.md",
+        "agent_task": ".agent/task/0957-codex-cloud-execution-wiring.md",
+        "docs": "docs/TECH_SPEC-codex-cloud-execution-wiring.md"
+      }
     }
   ]
 }

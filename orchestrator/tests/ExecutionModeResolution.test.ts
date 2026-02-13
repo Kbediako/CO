@@ -91,6 +91,29 @@ function resolveCliRequiresCloud(
   return method.call(orchestrator, task, makePlanItem(itemOverrides));
 }
 
+function resolveCliModeWithOverride(
+  taskMetadata: TaskContext['metadata'] | undefined,
+  itemOverrides: Partial<PlanItem>,
+  overrideMode: ExecutionMode
+): ExecutionMode {
+  const root = tmpdir();
+  const orchestrator = new CodexOrchestrator({
+    repoRoot: root,
+    runsRoot: join(root, 'runs'),
+    outRoot: join(root, 'out'),
+    taskId: 'task-1'
+  });
+  const method = (orchestrator as unknown as {
+    determineMode: (task: TaskContext, subtask: PlanItem, mode?: ExecutionMode) => ExecutionMode;
+  }).determineMode;
+  const task: TaskContext = {
+    id: baseTask.id,
+    title: baseTask.title,
+    ...(taskMetadata !== undefined ? { metadata: taskMetadata } : {})
+  };
+  return method.call(orchestrator, task, makePlanItem(itemOverrides), overrideMode);
+}
+
 async function resolvePlannerItem(stageOverrides: Record<string, unknown>): Promise<PlanItem> {
   const stage = {
     kind: 'command',
@@ -164,6 +187,24 @@ describe('execution-mode resolution', () => {
       { metadata: { executionMode: 'mcp', mode: 'cloud' } }
     );
     expect(requiresCloud).toBe(false);
+  });
+
+  it('cli mode override forces cloud execution', () => {
+    const mode = resolveCliModeWithOverride(
+      { execution: { parallel: false } },
+      { metadata: { executionMode: 'mcp' } },
+      'cloud'
+    );
+    expect(mode).toBe('cloud');
+  });
+
+  it('cli mode override forces mcp execution', () => {
+    const mode = resolveCliModeWithOverride(
+      { execution: { parallel: true } },
+      { requires_cloud: true },
+      'mcp'
+    );
+    expect(mode).toBe('mcp');
   });
 
   it('planner trims executionMode and maps it to requires_cloud', async () => {
