@@ -155,7 +155,8 @@ jobs:
         id: cpr
         uses: peter-evans/create-pull-request@v6
         with:
-          token: ${{ secrets.pr_token != '' && secrets.pr_token || github.token }}
+          # Use the workflow token for git + PR operations; optional PAT is reserved for auto-merge.
+          token: ${{ github.token }}
           commit-message: ${{ inputs.pr_commit_message }}
           title: ${{ inputs.pr_title }}
           body: ${{ inputs.pr_body }}
