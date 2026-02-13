@@ -255,10 +255,14 @@ jobs:
           fi
 
           # Prefer trusted publishing (OIDC) so releases do not depend on long-lived tokens.
+          # Use a temporary token-free npmrc to avoid accidental NODE_AUTH_TOKEN-based auth.
+          OIDC_NPMRC="$(mktemp)"
+          printf 'registry=https://registry.npmjs.org/\n' > "$OIDC_NPMRC"
           set +e
-          npm publish "$TARBALL_PATH" --tag "$DIST_TAG" --provenance
+          NODE_AUTH_TOKEN= NPM_CONFIG_USERCONFIG="$OIDC_NPMRC" npm publish "$TARBALL_PATH" --tag "$DIST_TAG" --provenance
           OIDC_STATUS=$?
           set -e
+          rm -f "$OIDC_NPMRC"
           if [[ $OIDC_STATUS -eq 0 ]]; then
             exit 0
           fi
