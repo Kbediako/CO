@@ -242,8 +242,9 @@ jobs:
 
       - name: Publish to npm
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
+          set -euo pipefail
           TARBALL_PATH=$(ls release-assets/*.tgz | head -n 1)
           if [[ -z "$TARBALL_PATH" ]]; then
             echo "No tarball found to publish." >&2
@@ -252,8 +253,28 @@ jobs:
           if [[ "$TARBALL_PATH" != /* ]]; then
             TARBALL_PATH="$(pwd)/${TARBALL_PATH}"
           fi
-          if [[ -n "${NODE_AUTH_TOKEN}" ]]; then
-            npm publish "$TARBALL_PATH" --tag "$DIST_TAG"
-          else
-            npm publish "$TARBALL_PATH" --tag "$DIST_TAG" --provenance
+
+          # Prefer trusted publishing (OIDC) so releases do not depend on long-lived tokens.
+          set +e
+          npm publish "$TARBALL_PATH" --tag "$DIST_TAG" --provenance
+          OIDC_STATUS=$?
+          set -e
+          if [[ $OIDC_STATUS -eq 0 ]]; then
+            exit 0
           fi
+
+          echo "OIDC publish failed (exit ${OIDC_STATUS}); falling back to NPM_TOKEN if available."
+          if [[ -z "${NPM_TOKEN:-}" ]]; then
+            echo "::error::Publish failed via OIDC and secrets.NPM_TOKEN is not set. Configure npm trusted publishing for this package or set an npm automation token in secrets.NPM_TOKEN."
+            exit "$OIDC_STATUS"
+          fi
+
+          PUBLISH_LOG="$(mktemp)"
+          set +e
+          NODE_AUTH_TOKEN="$NPM_TOKEN" npm publish "$TARBALL_PATH" --tag "$DIST_TAG" 2>&1 | tee "$PUBLISH_LOG"
+          TOKEN_STATUS=${PIPESTATUS[0]}
+          set -e
+          if [[ $TOKEN_STATUS -ne 0 ]] && grep -q "npm error code EOTP" "$PUBLISH_LOG"; then
+            echo "::error::secrets.NPM_TOKEN requires OTP. Use an npm automation token or configure npm trusted publishing for this package."
+          fi
+          exit "$TOKEN_STATUS"

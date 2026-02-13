@@ -98,8 +98,8 @@
 - Publish from immutable tarball attached to the GitHub Release asset.
 - Prefer npm trusted publishing (OIDC) and provenance if available.
 - Release workflow runs `npm run clean:dist` before `npm run build` to avoid stale `dist/**` artifacts in the tarball.
-- Publish job uses `NODE_AUTH_TOKEN` (set from `secrets.NPM_TOKEN`) when present (no provenance); if the token is absent, publish via OIDC with `id-token: write` + `--provenance`.
-- Decision: keep the NPM token fallback until trusted publishing is fully configured; OIDC remains the preferred path.
+- Publish job attempts OIDC trusted publishing first (`id-token: write` + `--provenance`), then falls back to `secrets.NPM_TOKEN` when OIDC is unavailable.
+- Decision: keep the NPM token fallback until trusted publishing is fully configured; `secrets.NPM_TOKEN` must be an npm automation token (not OTP-gated).
 
 #### Release portability (required in workflow docs)
 - Preferred download method (with retries):
