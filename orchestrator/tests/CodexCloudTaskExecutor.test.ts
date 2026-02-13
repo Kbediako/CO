@@ -74,6 +74,60 @@ describe('CodexCloudTaskExecutor', () => {
     expect(runner).toHaveBeenCalledTimes(5);
   });
 
+  it('treats non-zero pending status responses as in-progress and keeps polling', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'cloud-exec-pending-nonzero-'));
+    const runner = vi
+      .fn<Parameters<CloudCommandRunner>, ReturnType<CloudCommandRunner>>()
+      .mockResolvedValueOnce({
+        exitCode: 0,
+        stdout: `Submitted: ${TASK_ID}\n`,
+        stderr: ''
+      })
+      .mockResolvedValueOnce({
+        exitCode: 0,
+        stdout: JSON.stringify({ tasks: [{ id: TASK_ID, url: `https://chatgpt.com/codex/tasks/${TASK_ID}` }] }),
+        stderr: ''
+      })
+      .mockResolvedValueOnce({
+        exitCode: 1,
+        stdout: '[PENDING] test task\n',
+        stderr: 'no diff\n'
+      })
+      .mockResolvedValueOnce({
+        exitCode: 0,
+        stdout: '[READY] test task\n',
+        stderr: ''
+      })
+      .mockResolvedValueOnce({
+        exitCode: 0,
+        stdout: 'diff --git a/file.txt b/file.txt\n+hello\n',
+        stderr: ''
+      });
+
+    const executor = new CodexCloudTaskExecutor({
+      commandRunner: runner,
+      now: () => '2026-02-13T00:00:00.000Z',
+      sleepFn: async () => {}
+    });
+
+    const result = await executor.execute({
+      codexBin: 'codex',
+      prompt: 'Fix the issue',
+      environmentId: 'env_123',
+      repoRoot: root,
+      runDir: join(root, '.runs', 'task', 'cli', 'run-1'),
+      pollIntervalSeconds: 1,
+      timeoutSeconds: 60,
+      attempts: 1
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.cloudExecution.status).toBe('ready');
+    expect(result.cloudExecution.diff_status).toBe('available');
+    expect(result.cloudExecution.poll_count).toBe(2);
+    expect(runner).toHaveBeenCalledTimes(5);
+  });
+
   it('fails gracefully when task id cannot be parsed', async () => {
     const root = await mkdtemp(join(tmpdir(), 'cloud-exec-parse-failure-'));
     const runner = vi

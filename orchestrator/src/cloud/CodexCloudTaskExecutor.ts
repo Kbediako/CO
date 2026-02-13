@@ -199,7 +199,12 @@ export class CodexCloudTaskExecutor {
         const statusResult = await runCloudCommand(['cloud', 'status', taskId]);
         cloudExecution.last_polled_at = this.now();
         cloudExecution.poll_count += 1;
-        if (statusResult.exitCode !== 0) {
+        const token = parseCloudStatusToken(`${statusResult.stdout}\n${statusResult.stderr}`);
+        const mapped = mapCloudStatusToken(token);
+
+        // `codex cloud status` may return a non-zero exit while the task is still pending.
+        // Treat non-zero as a retry only when no recognizable status token is present.
+        if (statusResult.exitCode !== 0 && mapped === 'unknown') {
           statusRetries += 1;
           if (statusRetries > STATUS_RETRY_LIMIT) {
             throw new Error(
@@ -211,9 +216,9 @@ export class CodexCloudTaskExecutor {
         }
         statusRetries = 0;
 
-        const token = parseCloudStatusToken(`${statusResult.stdout}\n${statusResult.stderr}`);
-        const mapped = mapCloudStatusToken(token);
-        cloudExecution.status = mapped;
+        if (mapped !== 'unknown') {
+          cloudExecution.status = mapped;
+        }
 
         if (mapped === 'ready') {
           notes.push(`Cloud task completed: ${taskId}`);
