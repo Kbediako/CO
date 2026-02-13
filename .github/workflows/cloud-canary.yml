@@ -17,7 +17,8 @@ jobs:
       contents: read
     env:
       CLOUD_CANARY_TASK_ID: ci-cloud-canary-${{ github.run_id }}
-      CODEX_CLOUD_CANARY_REQUIRED: ${{ github.event_name != 'pull_request' && '1' || '0' }}
+      # Enforce canary only when cloud credentials are configured for this repo.
+      CODEX_CLOUD_CANARY_REQUIRED: ${{ github.event_name != 'pull_request' && secrets.CODEX_CLOUD_ENV_ID != '' && (secrets.CODEX_API_KEY != '' || secrets.OPENAI_API_KEY != '') && '1' || '0' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
