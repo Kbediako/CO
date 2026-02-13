@@ -29,6 +29,7 @@ Notes:
 - Set `TASK` or `MCP_RUNNER_TASK_ID` so the review prompt includes task context instead of `unknown-task`.
 - In CI or when `CODEX_REVIEW_NON_INTERACTIVE=1`/`CODEX_NON_INTERACTIVE=1` (or `CODEX_NO_INTERACTIVE=1`) is set, the wrapper prints a “review handoff” prompt and exits unless `FORCE_CODEX_REVIEW=1` is set.
 - To force execution in those environments: `FORCE_CODEX_REVIEW=1 CODEX_REVIEW_NON_INTERACTIVE=1 TASK=<task-id> NOTES="..." MANIFEST=<path> npm run review -- --manifest <path>`.
+- Forced non-interactive runs enforce a timeout (`CODEX_REVIEW_TIMEOUT_SECONDS`, default `900`); set `CODEX_REVIEW_TIMEOUT_SECONDS=0` to disable.
 
 ## Expected outputs
 - `codex review`: prioritized findings; no working tree edits.

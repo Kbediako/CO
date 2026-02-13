@@ -23,6 +23,7 @@ import { collectManifests, resolveEnvironmentPaths } from './lib/run-manifests.j
 
 const execFileAsync = promisify(execFile);
 const { repoRoot, runsRoot: defaultRunsDir } = resolveEnvironmentPaths();
+const DEFAULT_NON_INTERACTIVE_REVIEW_TIMEOUT_SECONDS = 15 * 60;
 
 interface CliOptions {
   manifest?: string;
@@ -287,17 +288,14 @@ async function main(): Promise<void> {
   console.log(`Launching Codex review (evidence: ${relativeManifest})`);
   const stdio: StdioOptions = nonInteractive ? ['ignore', 'inherit', 'inherit'] : 'inherit';
   const child: ChildProcess = spawn(command, args, { stdio, env: reviewEnv });
+  const timeoutMs = resolveReviewTimeoutMs(nonInteractive);
+  if (timeoutMs !== null) {
+    console.log(
+      `[run-review] enforcing codex review timeout at ${Math.round(timeoutMs / 1000)}s (set CODEX_REVIEW_TIMEOUT_SECONDS=0 to disable).`
+    );
+  }
 
-  await new Promise<void>((resolve, reject) => {
-    child.once('error', (error: Error) => reject(error instanceof Error ? error : new Error(String(error))));
-    child.once('exit', (code: number | null) => {
-      if (code === 0) {
-        resolve();
-      } else {
-        reject(new Error(`codex review exited with code ${code}`));
-      }
-    });
-  });
+  await waitForChildExit(child, timeoutMs);
 }
 
 main().catch((error) => {
@@ -408,13 +406,103 @@ function envFlagEnabled(value: string | undefined): boolean {
 }
 
 function shouldForceNonInteractive(): boolean {
+  const stdinIsTTY = process.stdin?.isTTY === true;
   return (
+    !stdinIsTTY ||
     envFlagEnabled(process.env.CI) ||
     envFlagEnabled(process.env.CODEX_REVIEW_NON_INTERACTIVE) ||
     envFlagEnabled(process.env.CODEX_NON_INTERACTIVE) ||
     envFlagEnabled(process.env.CODEX_NO_INTERACTIVE) ||
     envFlagEnabled(process.env.CODEX_NONINTERACTIVE)
   );
+}
+
+function resolveReviewTimeoutMs(nonInteractive: boolean): number | null {
+  const configured = process.env.CODEX_REVIEW_TIMEOUT_SECONDS?.trim();
+  if (!configured) {
+    return nonInteractive ? DEFAULT_NON_INTERACTIVE_REVIEW_TIMEOUT_SECONDS * 1000 : null;
+  }
+
+  const parsedSeconds = Number(configured);
+  if (!Number.isFinite(parsedSeconds)) {
+    throw new Error('CODEX_REVIEW_TIMEOUT_SECONDS must be a finite number.');
+  }
+  if (parsedSeconds <= 0) {
+    return null;
+  }
+  return Math.round(parsedSeconds * 1000);
+}
+
+async function waitForChildExit(child: ChildProcess, timeoutMs: number | null): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    let settled = false;
+    let timeoutHandle: NodeJS.Timeout | undefined;
+    let killHandle: NodeJS.Timeout | undefined;
+
+    const cleanup = () => {
+      if (timeoutHandle) {
+        clearTimeout(timeoutHandle);
+      }
+      if (killHandle) {
+        clearTimeout(killHandle);
+      }
+      child.removeListener('error', onError);
+      child.removeListener('exit', onExit);
+    };
+
+    const settleWithError = (error: Error) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      cleanup();
+      reject(error);
+    };
+
+    const onError = (error: Error) => {
+      settleWithError(error instanceof Error ? error : new Error(String(error)));
+    };
+
+    const onExit = (code: number | null, signal: NodeJS.Signals | null) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      cleanup();
+      if (code === 0) {
+        resolve();
+        return;
+      }
+      const suffix = signal ? ` (signal ${signal})` : '';
+      reject(new Error(`codex review exited with code ${code}${suffix}`));
+    };
+
+    child.once('error', onError);
+    child.once('exit', onExit);
+
+    if (timeoutMs !== null) {
+      timeoutHandle = setTimeout(() => {
+        if (settled) {
+          return;
+        }
+
+        // Ask codex review to exit first, then force-kill after a short grace period.
+        child.kill('SIGTERM');
+        killHandle = setTimeout(() => {
+          if (settled) {
+            return;
+          }
+          child.kill('SIGKILL');
+        }, 5000);
+        killHandle.unref();
+
+        settleWithError(
+          new Error(`codex review timed out after ${Math.round(timeoutMs / 1000)}s (set CODEX_REVIEW_TIMEOUT_SECONDS=0 to disable).`)
+        );
+      }, timeoutMs);
+      timeoutHandle.unref();
+    }
+  });
 }
 
 function requireReviewNotes(notes: string | undefined): asserts notes is string {

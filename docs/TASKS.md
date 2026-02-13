@@ -9,6 +9,17 @@ Archived task snapshots live on the task-archives branch.
 - 2025: https://github.com/Kbediako/CO/blob/task-archives/docs/TASKS-archive-2025.md
 - 2026: https://github.com/Kbediako/CO/blob/task-archives/docs/TASKS-archive-2026.md
 <!-- tasks-archive-index:end -->
+# Task List Snapshot - Codex Cloud Execution Wiring (0957-codex-cloud-execution-wiring)
+- **Update - 2026-02-13:** Task created; export `MCP_RUNNER_TASK_ID=0957-codex-cloud-execution-wiring`; guardrails required: `node scripts/delegation-guard.mjs`, `node scripts/spec-guard.mjs --dry-run`, `npm run build`, `npm run lint`, `npm run test`, `npm run docs:check`, `npm run docs:freshness`, `node scripts/diff-budget.mjs`, `npm run review`. Checklist mirror: `tasks/tasks-0957-codex-cloud-execution-wiring.md`, `.agent/task/0957-codex-cloud-execution-wiring.md`.
+- **Update - 2026-02-13:** Cloud execution wiring implemented and validated; non-interactive review wrapper stabilized (no-TTY handoff + forced timeout). Evidence: `.runs/0957-codex-cloud-execution-wiring/cli/2026-02-13T10-10-02-475Z-9fa15611/manifest.json`, `scripts/run-review.ts`.
+- [x] Foundation: task scaffolding + mirrors registered. Evidence: `docs/TASKS.md`, `tasks/index.json`, `tasks/tasks-0957-codex-cloud-execution-wiring.md`, `.agent/task/0957-codex-cloud-execution-wiring.md`.
+- [x] Foundation: PRD + TECH_SPEC + ACTION_PLAN drafted. Evidence: `docs/PRD-codex-cloud-execution-wiring.md`, `tasks/specs/0957-codex-cloud-execution-wiring.md`, `docs/ACTION_PLAN-codex-cloud-execution-wiring.md`, `docs/TECH_SPEC-codex-cloud-execution-wiring.md`.
+- [x] Foundation: planning scout completed and integrated into spec. Evidence: explorer subagent output in this run.
+- [x] Foundation: standalone review approval captured (pre-implementation). Evidence: `tasks/specs/0957-codex-cloud-execution-wiring.md`.
+- [x] Foundation: delegation subagent run captured. Evidence: `.runs/0957-codex-cloud-execution-wiring-scout/cli/2026-02-13T09-44-14-289Z-f07a93cd/manifest.json`.
+- [x] Validation: docs-review manifest captured. Evidence: `.runs/0957-codex-cloud-execution-wiring/cli/2026-02-13T09-47-41-178Z-453a5990/manifest.json`.
+- [x] Validation: implementation-gate manifest captured. Evidence: `.runs/0957-codex-cloud-execution-wiring/cli/2026-02-13T10-10-02-475Z-9fa15611/manifest.json`.
+
 # Task List Snapshot — Subagents Skill + Codex CLI Refresh Helper (0956-subagents-skill-codex-cli-refresh)
 - **Update — 2026-01-23:** Task created; export `MCP_RUNNER_TASK_ID=0956-subagents-skill-codex-cli-refresh`; guardrails required: `node scripts/delegation-guard.mjs`, `node scripts/spec-guard.mjs --dry-run`, `npm run build`, `npm run lint`, `npm run test`, `npm run docs:check`, `npm run docs:freshness`, `node scripts/diff-budget.mjs`, `npm run review`. Checklist mirror: `tasks/tasks-0956-subagents-skill-codex-cli-refresh.md`, `.agent/task/0956-subagents-skill-codex-cli-refresh.md`.
 - [x] Foundation: task scaffolding + mirrors registered. Evidence: `docs/TASKS.md`, `tasks/index.json`, `tasks/tasks-0956-subagents-skill-codex-cli-refresh.md`, `.agent/task/0956-subagents-skill-codex-cli-refresh.md`.

@@ -317,6 +317,51 @@
         }
       }
     },
+    "cloud_execution": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": [
+        "task_id",
+        "environment_id",
+        "status",
+        "status_url",
+        "submitted_at",
+        "completed_at",
+        "last_polled_at",
+        "poll_count",
+        "poll_interval_seconds",
+        "timeout_seconds",
+        "attempts",
+        "diff_path",
+        "diff_url",
+        "diff_status",
+        "apply_status",
+        "log_path",
+        "error"
+      ],
+      "properties": {
+        "task_id": { "type": ["string", "null"] },
+        "environment_id": { "type": ["string", "null"] },
+        "status": {
+          "type": "string",
+          "enum": ["queued", "running", "ready", "error", "failed", "cancelled", "unknown"]
+        },
+        "status_url": { "type": ["string", "null"] },
+        "submitted_at": { "type": ["string", "null"] },
+        "completed_at": { "type": ["string", "null"] },
+        "last_polled_at": { "type": ["string", "null"] },
+        "poll_count": { "type": "integer", "minimum": 0 },
+        "poll_interval_seconds": { "type": "integer", "minimum": 1 },
+        "timeout_seconds": { "type": "integer", "minimum": 1 },
+        "attempts": { "type": "integer", "minimum": 1 },
+        "diff_path": { "type": ["string", "null"] },
+        "diff_url": { "type": ["string", "null"] },
+        "diff_status": { "type": "string", "enum": ["pending", "available", "unavailable"] },
+        "apply_status": { "type": "string", "enum": ["not_requested", "succeeded", "failed"] },
+        "log_path": { "type": ["string", "null"] },
+        "error": { "type": ["string", "null"] }
+      }
+    },
     "privacy": {
       "type": ["object", "null"],
       "additionalProperties": false,

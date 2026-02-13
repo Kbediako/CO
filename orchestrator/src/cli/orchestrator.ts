@@ -11,7 +11,8 @@ import {
   CommandPlanner,
   CommandBuilder,
   CommandTester,
-  CommandReviewer
+  CommandReviewer,
+  type PipelineExecutor
 } from './adapters/index.js';
 import { resolveEnvironmentPaths } from '../../../scripts/lib/run-manifests.js';
 import { normalizeEnvironmentPaths } from './run/environment.js';
@@ -54,6 +55,7 @@ import { SchedulerService } from './services/schedulerService.js';
 import {
   applyHandlesToRunSummary,
   applyPrivacyToRunSummary,
+  applyCloudExecutionToRunSummary,
   persistRunSummary
 } from './services/runSummaryWriter.js';
 import {
@@ -73,11 +75,16 @@ import { ControlServer } from './control/controlServer.js';
 import { RunEventEmitter, RunEventPublisher, snapshotStages } from './events/runEvents.js';
 import { RunEventStream, attachRunEventAdapter } from './events/runEventStream.js';
 import { CLI_EXECUTION_MODE_PARSER, resolveRequiresCloudPolicy } from '../utils/executionMode.js';
+import { resolveCodexCliBin } from './utils/codexCli.js';
+import { CodexCloudTaskExecutor } from '../cloud/CodexCloudTaskExecutor.js';
 
 const resolveBaseEnvironment = (): EnvironmentPaths =>
   normalizeEnvironmentPaths(resolveEnvironmentPaths());
 
 const CONFIG_OVERRIDE_ENV_KEYS = ['CODEX_CONFIG_OVERRIDES', 'CODEX_MCP_CONFIG_OVERRIDES'];
+const DEFAULT_CLOUD_POLL_INTERVAL_SECONDS = 10;
+const DEFAULT_CLOUD_TIMEOUT_SECONDS = 1800;
+const DEFAULT_CLOUD_ATTEMPTS = 1;
 
 function collectDelegationEnvOverrides(env: NodeJS.ProcessEnv = process.env): DelegationConfigLayer[] {
   const layers: DelegationConfigLayer[] = [];
@@ -103,11 +110,54 @@ function collectDelegationEnvOverrides(env: NodeJS.ProcessEnv = process.env): De
   return layers;
 }
 
+function readCloudString(value: unknown): string | null {
+  return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
+}
+
+function readCloudNumber(raw: string | undefined, fallback: number): number {
+  if (!raw) {
+    return fallback;
+  }
+  const parsed = Number.parseInt(raw, 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return fallback;
+  }
+  return parsed;
+}
+
+function resolveCloudEnvironmentId(
+  task: TaskContext,
+  target: PlanItem,
+  envOverrides?: NodeJS.ProcessEnv
+): string | null {
+  const metadata = (target.metadata ?? {}) as Record<string, unknown>;
+  const taskMetadata = (task.metadata ?? {}) as Record<string, unknown>;
+  const taskCloud = (taskMetadata.cloud ?? null) as Record<string, unknown> | null;
+
+  const candidates: Array<string | null> = [
+    readCloudString(metadata.cloudEnvId),
+    readCloudString(metadata.cloud_env_id),
+    readCloudString(metadata.envId),
+    readCloudString(metadata.environmentId),
+    readCloudString(taskCloud?.envId),
+    readCloudString(taskCloud?.environmentId),
+    readCloudString(taskMetadata.cloudEnvId),
+    readCloudString(taskMetadata.cloud_env_id),
+    readCloudString(envOverrides?.CODEX_CLOUD_ENV_ID),
+    readCloudString(process.env.CODEX_CLOUD_ENV_ID)
+  ];
+
+  return candidates.find((candidate) => candidate !== null) ?? null;
+}
+
 interface ExecutePipelineOptions {
   env: EnvironmentPaths;
   pipeline: PipelineDefinition;
   manifest: CliManifest;
   paths: RunPaths;
+  mode: ExecutionMode;
+  target: PlanItem;
+  task: TaskContext;
   runEvents?: RunEventPublisher;
   eventStream?: RunEventStream;
   onEventEntry?: (entry: import('./events/runEventStream.js').RunEventStreamEntry) => void;
@@ -460,7 +510,7 @@ export class CodexOrchestrator {
   private createTaskManager(
     runId: string,
     pipeline: PipelineDefinition,
-    executePipeline: () => Promise<PipelineRunExecutionResult>,
+    executePipeline: PipelineExecutor,
     getResult: () => PipelineRunExecutionResult | null,
     plannerInstance: CommandPlanner | undefined,
     env: EnvironmentPaths
@@ -512,6 +562,10 @@ export class CodexOrchestrator {
   }
 
   private async executePipeline(options: ExecutePipelineOptions): Promise<PipelineRunExecutionResult> {
+    if (options.mode === 'cloud') {
+      return await this.executeCloudPipeline(options);
+    }
+
     const { env, pipeline, manifest, paths, runEvents, envOverrides } = options;
     const notes: string[] = [];
     let success = true;
@@ -732,30 +786,287 @@ export class CodexOrchestrator {
     };
   }
 
+  private async executeCloudPipeline(options: ExecutePipelineOptions): Promise<PipelineRunExecutionResult> {
+    const { env, pipeline, manifest, paths, runEvents, target, task, envOverrides } = options;
+    const notes: string[] = [];
+    let success = true;
+    manifest.guardrail_status = undefined;
+
+    const persister =
+      options.persister ??
+      new ManifestPersister({
+        manifest,
+        paths,
+        persistIntervalMs: Math.max(1000, manifest.heartbeat_interval_seconds * 1000)
+      });
+    const schedulePersist = (
+      persistOptions: { manifest?: boolean; heartbeat?: boolean; force?: boolean } = {}
+    ): Promise<void> => persister.schedule(persistOptions);
+
+    const pushHeartbeat = (forceManifest = false): Promise<void> => {
+      updateHeartbeat(manifest);
+      return schedulePersist({ manifest: forceManifest, heartbeat: true, force: forceManifest });
+    };
+
+    const controlWatcher = new ControlWatcher({
+      paths,
+      manifest,
+      eventStream: options.eventStream,
+      onEntry: options.onEventEntry,
+      persist: () => schedulePersist({ manifest: true, force: true })
+    });
+
+    manifest.status = 'in_progress';
+    updateHeartbeat(manifest);
+    await schedulePersist({ manifest: true, heartbeat: true, force: true });
+    runEvents?.runStarted(snapshotStages(manifest, pipeline), manifest.status);
+
+    const heartbeatInterval = setInterval(() => {
+      void pushHeartbeat(false).catch((error) => {
+        logger.warn(
+          `Heartbeat update failed for run ${manifest.run_id}: ${(error as Error)?.message ?? String(error)}`
+        );
+      });
+    }, manifest.heartbeat_interval_seconds * 1000);
+
+    const targetStageId = this.resolveTargetStageId(target, pipeline);
+    const targetStage = targetStageId
+      ? pipeline.stages.find((stage) => stage.id === targetStageId)
+      : undefined;
+    const targetEntry = targetStageId
+      ? manifest.commands.find((command) => command.id === targetStageId)
+      : undefined;
+
+    try {
+      await controlWatcher.sync();
+      await controlWatcher.waitForResume();
+      if (controlWatcher.isCanceled()) {
+        manifest.status_detail = 'run-canceled';
+        success = false;
+      } else if (!targetStage || targetStage.kind !== 'command' || !targetEntry) {
+        success = false;
+        manifest.status_detail = 'cloud-target-missing';
+        const detail = targetStageId
+          ? `Cloud execution target "${targetStageId}" could not be resolved to a command stage.`
+          : `Cloud execution target "${target.id}" could not be resolved.`;
+        appendSummary(manifest, detail);
+        notes.push(detail);
+      } else {
+        for (let i = 0; i < manifest.commands.length; i += 1) {
+          const entry = manifest.commands[i];
+          if (!entry || entry.id === targetStageId) {
+            continue;
+          }
+          entry.status = 'skipped';
+          entry.started_at = entry.started_at ?? isoTimestamp();
+          entry.completed_at = isoTimestamp();
+          entry.summary = `Skipped in cloud mode (target stage: ${targetStageId}).`;
+        }
+
+        const environmentId = resolveCloudEnvironmentId(task, target, envOverrides);
+        if (!environmentId) {
+          success = false;
+          manifest.status_detail = 'cloud-env-missing';
+          const detail =
+            'Cloud execution requested but no environment id is configured. Set CODEX_CLOUD_ENV_ID or provide target metadata.cloudEnvId.';
+          manifest.cloud_execution = {
+            task_id: null,
+            environment_id: null,
+            status: 'failed',
+            status_url: null,
+            submitted_at: null,
+            completed_at: isoTimestamp(),
+            last_polled_at: null,
+            poll_count: 0,
+            poll_interval_seconds: DEFAULT_CLOUD_POLL_INTERVAL_SECONDS,
+            timeout_seconds: DEFAULT_CLOUD_TIMEOUT_SECONDS,
+            attempts: DEFAULT_CLOUD_ATTEMPTS,
+            diff_path: null,
+            diff_url: null,
+            diff_status: 'unavailable',
+            apply_status: 'not_requested',
+            log_path: null,
+            error: detail
+          };
+          appendSummary(manifest, detail);
+          notes.push(detail);
+          targetEntry.status = 'failed';
+          targetEntry.started_at = targetEntry.started_at ?? isoTimestamp();
+          targetEntry.completed_at = isoTimestamp();
+          targetEntry.exit_code = 1;
+          targetEntry.summary = detail;
+        } else {
+          targetEntry.status = 'running';
+          targetEntry.started_at = isoTimestamp();
+          await schedulePersist({ manifest: true, force: true });
+          runEvents?.stageStarted({
+            stageId: targetStage.id,
+            stageIndex: targetEntry.index,
+            title: targetStage.title,
+            kind: 'command',
+            logPath: targetEntry.log_path,
+            status: targetEntry.status
+          });
+
+          const executor = new CodexCloudTaskExecutor();
+          const prompt = this.buildCloudPrompt(task, target, pipeline, targetStage);
+          const pollIntervalSeconds = readCloudNumber(
+            envOverrides?.CODEX_CLOUD_POLL_INTERVAL_SECONDS ?? process.env.CODEX_CLOUD_POLL_INTERVAL_SECONDS,
+            DEFAULT_CLOUD_POLL_INTERVAL_SECONDS
+          );
+          const timeoutSeconds = readCloudNumber(
+            envOverrides?.CODEX_CLOUD_TIMEOUT_SECONDS ?? process.env.CODEX_CLOUD_TIMEOUT_SECONDS,
+            DEFAULT_CLOUD_TIMEOUT_SECONDS
+          );
+          const attempts = readCloudNumber(
+            envOverrides?.CODEX_CLOUD_EXEC_ATTEMPTS ?? process.env.CODEX_CLOUD_EXEC_ATTEMPTS,
+            DEFAULT_CLOUD_ATTEMPTS
+          );
+          const branch =
+            readCloudString(envOverrides?.CODEX_CLOUD_BRANCH) ??
+            readCloudString(process.env.CODEX_CLOUD_BRANCH);
+          const codexBin = resolveCodexCliBin({ ...process.env, ...(envOverrides ?? {}) });
+          const cloudResult = await executor.execute({
+            codexBin,
+            prompt,
+            environmentId,
+            repoRoot: env.repoRoot,
+            runDir: paths.runDir,
+            pollIntervalSeconds,
+            timeoutSeconds,
+            attempts,
+            branch,
+            env: envOverrides
+          });
+
+          success = cloudResult.success;
+          notes.push(...cloudResult.notes);
+          manifest.cloud_execution = cloudResult.cloudExecution;
+          targetEntry.log_path = cloudResult.cloudExecution.log_path;
+          targetEntry.completed_at = isoTimestamp();
+          targetEntry.exit_code = cloudResult.success ? 0 : 1;
+          targetEntry.status = cloudResult.success ? 'succeeded' : 'failed';
+          targetEntry.summary = cloudResult.summary;
+          if (!cloudResult.success) {
+            manifest.status_detail = `cloud:${targetStage.id}:failed`;
+            appendSummary(manifest, cloudResult.summary);
+          }
+          await schedulePersist({ manifest: true, force: true });
+          runEvents?.stageCompleted({
+            stageId: targetStage.id,
+            stageIndex: targetEntry.index,
+            title: targetStage.title,
+            kind: 'command',
+            status: targetEntry.status,
+            exitCode: targetEntry.exit_code,
+            summary: targetEntry.summary,
+            logPath: targetEntry.log_path
+          });
+        }
+      }
+    } finally {
+      clearInterval(heartbeatInterval);
+      await schedulePersist({ force: true });
+    }
+
+    await controlWatcher.sync();
+
+    if (controlWatcher.isCanceled()) {
+      finalizeStatus(manifest, 'cancelled', manifest.status_detail ?? 'run-canceled');
+    } else if (success) {
+      finalizeStatus(manifest, 'succeeded');
+    } else {
+      finalizeStatus(manifest, 'failed', manifest.status_detail ?? 'cloud-execution-failed');
+    }
+
+    updateHeartbeat(manifest);
+    await schedulePersist({ manifest: true, heartbeat: true, force: true }).catch((error) => {
+      logger.warn(
+        `Heartbeat update failed for run ${manifest.run_id}: ${(error as Error)?.message ?? String(error)}`
+      );
+    });
+    await schedulePersist({ force: true });
+    await appendMetricsEntry(env, paths, manifest, persister);
+
+    return {
+      success,
+      notes,
+      manifest,
+      manifestPath: relativeToRepo(env, paths.manifestPath),
+      logPath: relativeToRepo(env, paths.logPath)
+    };
+  }
+
+  private resolveTargetStageId(target: PlanItem, pipeline: PipelineDefinition): string | null {
+    const metadataStageId =
+      typeof target.metadata?.stageId === 'string' ? (target.metadata.stageId as string) : null;
+    if (metadataStageId && pipeline.stages.some((stage) => stage.id === metadataStageId)) {
+      return metadataStageId;
+    }
+
+    if (target.id.includes(':')) {
+      const suffix = target.id.split(':').pop() ?? null;
+      if (suffix && pipeline.stages.some((stage) => stage.id === suffix)) {
+        return suffix;
+      }
+    }
+
+    if (pipeline.stages.some((stage) => stage.id === target.id)) {
+      return target.id;
+    }
+    return null;
+  }
+
+  private buildCloudPrompt(
+    task: TaskContext,
+    target: PlanItem,
+    pipeline: PipelineDefinition,
+    stage: PipelineDefinition['stages'][number]
+  ): string {
+    const lines = [
+      `Task ID: ${task.id}`,
+      `Task title: ${task.title}`,
+      task.description ? `Task description: ${task.description}` : null,
+      `Pipeline: ${pipeline.id}`,
+      `Target stage: ${stage.id} (${target.description})`,
+      '',
+      'Apply the required repository changes for this target stage and produce a diff.'
+    ].filter((line): line is string => Boolean(line));
+
+    return lines.join('\n');
+  }
+
   private async performRunLifecycle(context: RunLifecycleContext): Promise<PipelineExecutionResult> {
     const { env, pipeline, manifest, paths, planner, taskContext, runId, persister, envOverrides } = context;
-    let pipelineResult: PipelineRunExecutionResult | null = null;
-    let executing: Promise<PipelineRunExecutionResult> | null = null;
-    const executePipeline = async () => {
-      if (!executing) {
-        executing = this.executePipeline({
-          env,
-          pipeline,
-          manifest,
-          paths,
-          runEvents: context.runEvents,
-          eventStream: context.eventStream,
-          onEventEntry: context.onEventEntry,
-          persister,
-          envOverrides
-        }).then((result) => {
-          pipelineResult = result;
-          return result;
-        });
+    let latestPipelineResult: PipelineRunExecutionResult | null = null;
+    const executingByKey = new Map<string, Promise<PipelineRunExecutionResult>>();
+    const executePipeline: PipelineExecutor = async (input) => {
+      const key = `${input.mode}:${input.target.id}`;
+      const existing = executingByKey.get(key);
+      if (existing) {
+        return existing;
       }
+      const executing = this.executePipeline({
+        env,
+        pipeline,
+        manifest,
+        paths,
+        mode: input.mode,
+        target: input.target,
+        task: taskContext,
+        runEvents: context.runEvents,
+        eventStream: context.eventStream,
+        onEventEntry: context.onEventEntry,
+        persister,
+        envOverrides
+      }).then((result) => {
+        latestPipelineResult = result;
+        return result;
+      });
+      executingByKey.set(key, executing);
       return executing;
     };
-    const getResult = () => pipelineResult;
+    const getResult = () => latestPipelineResult;
     const manager = this.createTaskManager(runId, pipeline, executePipeline, getResult, planner, env);
     this.attachPlanTargetTracker(manager, manifest, paths, persister);
 
@@ -803,6 +1114,7 @@ export class CodexOrchestrator {
     this.scheduler.applySchedulerToRunSummary(runSummary, schedulerPlan);
     applyHandlesToRunSummary(runSummary, manifest);
     applyPrivacyToRunSummary(runSummary, manifest);
+    applyCloudExecutionToRunSummary(runSummary, manifest);
     this.controlPlane.applyControlPlaneToRunSummary(runSummary, controlPlaneResult);
 
     await persistRunSummary(env, paths, manifest, runSummary, persister);
@@ -864,7 +1176,8 @@ export class CodexOrchestrator {
       log_path: manifest.log_path,
       heartbeat_at: manifest.heartbeat_at,
       commands: manifest.commands,
-      child_runs: manifest.child_runs
+      child_runs: manifest.child_runs,
+      cloud_execution: manifest.cloud_execution ?? null
     };
   }
 
@@ -876,6 +1189,12 @@ export class CodexOrchestrator {
     logger.info(`Started: ${manifest.started_at}`);
     logger.info(`Completed: ${manifest.completed_at ?? 'in-progress'}`);
     logger.info(`Manifest: ${manifest.artifact_root}/manifest.json`);
+    if (manifest.cloud_execution?.task_id) {
+      logger.info(
+        `Cloud: ${manifest.cloud_execution.task_id} [${manifest.cloud_execution.status}]` +
+          (manifest.cloud_execution.status_url ? ` ${manifest.cloud_execution.status_url}` : '')
+      );
+    }
     logger.info('Commands:');
     for (const command of manifest.commands) {
       const summary = command.summary ? ` — ${command.summary}` : '';
