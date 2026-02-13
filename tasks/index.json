@@ -1118,6 +1118,22 @@
       },
       "created_at": "2026-02-13",
       "completed_at": null
+    },
+    {
+      "id": "0958",
+      "slug": "cloud-canary-ci",
+      "title": "Cloud Execution Canary CI Coverage",
+      "path": "tasks/tasks-0958-cloud-canary-ci.md",
+      "kind": "prd",
+      "status": "in-progress",
+      "gate": {
+        "phase": "cloud-canary-ci-implementation",
+        "status": "succeeded",
+        "log": ".runs/0958-cloud-canary-ci/cli/2026-02-13T13-09-22-859Z-a9289881/manifest.json",
+        "run_id": "2026-02-13T13-09-22-859Z-a9289881"
+      },
+      "created_at": "2026-02-13",
+      "completed_at": null
     }
   ],
   "specs": [
@@ -1247,6 +1263,22 @@
         "task": "tasks/tasks-0957-codex-cloud-execution-wiring.md",
         "agent_task": ".agent/task/0957-codex-cloud-execution-wiring.md",
         "docs": "docs/TECH_SPEC-codex-cloud-execution-wiring.md"
+      }
+    },
+    {
+      "id": "20260213-0958-cloud-canary-ci",
+      "title": "Cloud Execution Canary CI Coverage",
+      "relates_to": "tasks/tasks-0958-cloud-canary-ci.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-02-13",
+      "paths": {
+        "spec": "tasks/specs/0958-cloud-canary-ci.md",
+        "task": "tasks/tasks-0958-cloud-canary-ci.md",
+        "agent_task": ".agent/task/0958-cloud-canary-ci.md",
+        "docs": "docs/TECH_SPEC-cloud-canary-ci.md"
       }
     }
   ]

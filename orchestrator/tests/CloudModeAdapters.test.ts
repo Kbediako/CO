@@ -22,6 +22,7 @@ function makeResult(status: 'ready' | 'failed'): PipelineRunExecutionResult {
     manifestPath: '.runs/task/cli/run-1/manifest.json',
     logPath: '.runs/task/cli/run-1/runner.ndjson',
     manifest: {
+      status_detail: status === 'failed' ? 'cloud-env-missing' : null,
       cloud_execution: {
         task_id: 'task_e_1234567890abcdef1234567890abcdef',
         environment_id: 'env-1',
@@ -79,5 +80,7 @@ describe('cloud mode adapters', () => {
     expect(result.decision.approved).toBe(false);
     expect(result.summary).toContain('Cloud task');
     expect(result.summary).toContain('Cloud status URL');
+    expect(result.summary).toContain('Failure class: configuration');
+    expect(result.decision.feedback).toContain('Failure class: configuration');
   });
 });

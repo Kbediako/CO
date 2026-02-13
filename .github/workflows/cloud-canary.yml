@@ -1,0 +1,58 @@
+name: Cloud Canary
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+  schedule:
+    - cron: '17 9 * * *'
+
+jobs:
+  cloud-canary:
+    name: Cloud Canary
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      CLOUD_CANARY_TASK_ID: ci-cloud-canary-${{ github.run_id }}
+      CODEX_CLOUD_CANARY_REQUIRED: ${{ github.event_name != 'pull_request' && '1' || '0' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Install Codex CLI (best effort)
+        run: npm install -g @openai/codex || true
+
+      - name: Run cloud canary
+        env:
+          CODEX_CLOUD_ENV_ID: ${{ secrets.CODEX_CLOUD_ENV_ID }}
+          CODEX_CLOUD_BRANCH: main
+          CODEX_API_KEY: ${{ secrets.CODEX_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: npm run ci:cloud-canary
+
+      - name: Upload cloud canary artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cloud-canary-${{ github.run_id }}
+          path: |
+            .runs/${{ env.CLOUD_CANARY_TASK_ID }}/cli/
+            out/${{ env.CLOUD_CANARY_TASK_ID }}/
+          if-no-files-found: ignore

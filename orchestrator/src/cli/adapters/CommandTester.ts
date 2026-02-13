@@ -1,6 +1,7 @@
 import type { TesterAgent, TestInput, TestResult, TestReport } from '../../types.js';
 import type { PipelineRunExecutionResult } from '../types.js';
 import { ensureGuardrailStatus } from '../run/manifest.js';
+import { diagnoseCloudFailure } from './cloudFailureDiagnostics.js';
 
 type ResultProvider = () => PipelineRunExecutionResult | null;
 
@@ -12,19 +13,28 @@ export class CommandTester implements TesterAgent {
     if (input.mode === 'cloud') {
       const cloudExecution = result.manifest.cloud_execution;
       const status = cloudExecution?.status ?? 'unknown';
+      const passed = status === 'ready' && result.success;
+      const diagnosis = diagnoseCloudFailure({
+        status,
+        statusDetail: result.manifest.status_detail ?? null,
+        error: cloudExecution?.error ?? null
+      });
+      const failureDetails =
+        cloudExecution?.error ??
+        `Cloud task status: ${status}${cloudExecution?.task_id ? ` (${cloudExecution.task_id})` : ''}`;
       const reports: TestReport[] = [
         {
           name: 'cloud-task',
-          status: status === 'ready' ? 'passed' : 'failed',
-          details:
-            cloudExecution?.error ??
-            `Cloud task status: ${status}${cloudExecution?.task_id ? ` (${cloudExecution.task_id})` : ''}`
+          status: passed ? 'passed' : 'failed',
+          details: passed
+            ? failureDetails
+            : `${failureDetails}\nFailure class: ${diagnosis.category}. ${diagnosis.guidance}`
         }
       ];
 
       return {
         subtaskId: input.build.subtaskId,
-        success: status === 'ready' && result.success,
+        success: passed,
         reports,
         runId: input.runId
       };

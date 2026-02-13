@@ -9,6 +9,17 @@ Archived task snapshots live on the task-archives branch.
 - 2025: https://github.com/Kbediako/CO/blob/task-archives/docs/TASKS-archive-2025.md
 - 2026: https://github.com/Kbediako/CO/blob/task-archives/docs/TASKS-archive-2026.md
 <!-- tasks-archive-index:end -->
+# Task List Snapshot - Cloud Execution Canary CI Coverage (0958-cloud-canary-ci)
+- **Update - 2026-02-13:** Task created; export `MCP_RUNNER_TASK_ID=0958-cloud-canary-ci`; guardrails required: `node scripts/delegation-guard.mjs`, `node scripts/spec-guard.mjs --dry-run`, `npm run build`, `npm run lint`, `npm run test`, `npm run docs:check`, `npm run docs:freshness`, `node scripts/diff-budget.mjs`, `npm run review`. Checklist mirror: `tasks/tasks-0958-cloud-canary-ci.md`, `.agent/task/0958-cloud-canary-ci.md`.
+- **Update - 2026-02-13:** Cloud canary branch resolution fixed (`CODEX_CLOUD_BRANCH=main` default in canary path), diagnostics hardened, and cloud canary run validated. Evidence: `.runs/0958-cloud-canary-ci-local8/cli/2026-02-13T12-32-10-598Z-8519cfd2/manifest.json`, `.runs/0958-cloud-canary-ci-local8/cli/2026-02-13T12-32-10-598Z-8519cfd2/cloud/commands.ndjson`.
+- [x] Foundation: task scaffolding + mirrors registered. Evidence: `docs/TASKS.md`, `tasks/index.json`, `tasks/tasks-0958-cloud-canary-ci.md`, `.agent/task/0958-cloud-canary-ci.md`.
+- [x] Foundation: PRD + TECH_SPEC + ACTION_PLAN drafted. Evidence: `docs/PRD-cloud-canary-ci.md`, `tasks/specs/0958-cloud-canary-ci.md`, `docs/ACTION_PLAN-cloud-canary-ci.md`, `docs/TECH_SPEC-cloud-canary-ci.md`.
+- [x] Foundation: planning scout completed and integrated into spec. Evidence: `.runs/0958-cloud-canary-ci-scout/cli/2026-02-13T12-05-36-992Z-d291cfe9/manifest.json`.
+- [x] Foundation: standalone review approval captured (pre-implementation). Evidence: `tasks/specs/0958-cloud-canary-ci.md`.
+- [x] Foundation: delegation subagent run captured. Evidence: `.runs/0958-cloud-canary-ci-scout/cli/2026-02-13T12-05-36-992Z-d291cfe9/manifest.json`.
+- [x] Validation: docs-review manifest captured. Evidence: `.runs/0958-cloud-canary-ci/cli/2026-02-13T12-07-32-909Z-8cf7dbba/manifest.json`.
+- [x] Validation: implementation-gate manifest captured. Evidence: `.runs/0958-cloud-canary-ci/cli/2026-02-13T13-09-22-859Z-a9289881/manifest.json`.
+
 # Task List Snapshot - Codex Cloud Execution Wiring (0957-codex-cloud-execution-wiring)
 - **Update - 2026-02-13:** Task created; export `MCP_RUNNER_TASK_ID=0957-codex-cloud-execution-wiring`; guardrails required: `node scripts/delegation-guard.mjs`, `node scripts/spec-guard.mjs --dry-run`, `npm run build`, `npm run lint`, `npm run test`, `npm run docs:check`, `npm run docs:freshness`, `node scripts/diff-budget.mjs`, `npm run review`. Checklist mirror: `tasks/tasks-0957-codex-cloud-execution-wiring.md`, `.agent/task/0957-codex-cloud-execution-wiring.md`.
 - **Update - 2026-02-13:** Cloud execution wiring implemented and validated; non-interactive review wrapper stabilized (no-TTY handoff + forced timeout). Evidence: `.runs/0957-codex-cloud-execution-wiring/cli/2026-02-13T10-10-02-475Z-9fa15611/manifest.json`, `scripts/run-review.ts`.

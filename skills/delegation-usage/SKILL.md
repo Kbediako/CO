@@ -158,6 +158,7 @@ repeat:
 
 - **Long waits:** `wait_ms` never blocks longer than 10s per call; use polling.
 - **Long-running delegate.spawn:** Prefer `start_only=true` (default) to avoid tool-call timeouts. If you must use `start_only=false`, keep runs short or run long jobs outside delegation (no question queue).
+- **Cloud run branch mismatch:** cloud-mode orchestration against a local-only branch can fail with `couldn't find remote ref ...`; set `CODEX_CLOUD_BRANCH` to a pushed branch (typically `main`) before cloud execution.
 - **Tool profile mismatch:** child tool profile must be allowed by repo policy; invalid or unsafe names are ignored.
 - **Confirmation misuse:** never pass `confirm_nonce` from model/tool input; it is runner‑injected only.
 - **Secrets exposure:** never include secrets/tokens/PII in delegate prompts or files.

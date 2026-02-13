@@ -14,6 +14,7 @@ This repo’s git practices prioritize cloneability, reviewability, and evidence
 - Create a branch per task using the task id: `<task-id>/<slug>` (example: `0906-docs-hygiene-automation/docs-check`).
 - Keep exploratory work in throwaway branches/worktrees; only preserve what you intend to review.
 - Top-level agents merge via GitHub once checks are green and no new feedback lands within a 10–20 minute monitoring window; never merge draft PRs or PRs labeled "do not merge."
+- For cloud-mode runs, ensure the branch exists on the remote. If your working branch is local-only, set `CODEX_CLOUD_BRANCH` to a pushed branch (typically `main`) before invoking cloud execution.
 
 ## Commits
 - Commit only source/docs/config changes.

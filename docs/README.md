@@ -197,6 +197,7 @@ Note: the commands below assume a source checkout; `scripts/` helpers are not in
 | `npm run eval:test` | Optional evaluation harness (enable when `evaluation/fixtures/**` is populated). |
 | `npm run docs:check` | Deterministically validates scripts/pipelines/paths referenced in agent-facing docs. |
 | `npm run docs:freshness` | Validates docs registry coverage + review recency; writes `out/<task-id>/docs-freshness.json`. |
+| `npm run ci:cloud-canary` | Runs the cloud canary harness (`scripts/cloud-canary-ci.mjs`) to verify cloud lifecycle manifest + run-summary evidence; credential-gated by `CODEX_CLOUD_ENV_ID` and optional auth secrets (`CODEX_CLOUD_BRANCH` defaults to `main`). |
 | `node scripts/delegation-guard.mjs` | Enforces subagent delegation evidence before review (repo-only). |
 | `node scripts/spec-guard.mjs --dry-run` | Validates spec freshness; required before review (repo-only). |
 | `node scripts/diff-budget.mjs` | Guards against oversized diffs before review (repo-only; defaults: 25 files / 800 lines; supports explicit overrides). |
