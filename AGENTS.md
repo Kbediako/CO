@@ -1,11 +1,14 @@
-<!-- codex:instruction-stamp 8079bfd8379f9e4ec185c7c25d0308bca1e41d65261c9d33f43d1f77f5f570ed -->
+<!-- codex:instruction-stamp 73c1e22afab49f8a1f787e2291116afaea4e8ec9da2400de4c19d073f3a66fc3 -->
 # Codex-Orchestrator Agent Handbook (Template)
 
 Use this repository as the wrapper that coordinates multiple Codex-driven projects. After cloning, replace placeholder metadata (task IDs, documents, SOPs) with values for each downstream initiative while keeping these shared guardrails in place.
 
 ## Execution Modes & Approvals
 - Default execution mode is `mcp`.
-- Switch to cloud mode only if your task plan explicitly allows a parallel run and the reviewer records the override in the active run manifest.
+- Switch to cloud mode only if your task plan explicitly allows it and the reviewer records the override in the active run manifest.
+- Prefer cloud mode when work is long-running, highly parallel, or blocked by local resource constraints.
+- Before cloud mode, run a quick preflight: remote branch exists, setup commands are non-interactive, and required secrets/variables are available.
+- If cloud preflight fails (for example, missing cloud environment wiring), continue in local `mcp` mode and record the fallback reason in checklist/manifests.
 - Keep the safe approval profile (`read/edit/run/network`). Capture any escalation in `.runs/<task>/<timestamp>/manifest.json` under `approvals`.
 - Run `node scripts/delegation-guard.mjs` before requesting review; if delegation is not possible, set `DELEGATION_GUARD_OVERRIDE_REASON` and record the rationale in the task checklist.
 - Run `node scripts/spec-guard.mjs --dry-run` before requesting review. Update specs or refresh approvals when the guard fails.
@@ -23,14 +26,14 @@ Use this repository as the wrapper that coordinates multiple Codex-driven projec
   - Auth/secrets/PII boundary touched.
   - Direct production customer/financial/legal impact.
   - Conflicting intent on a high-impact change.
-- Otherwise score these criteria `0..2` each: reversibility, external impact, security/privacy boundary, blast radius, requirement clarity, verification strength, time pressure.
+- Otherwise, score these criteria `0..2` each: reversibility, external impact, security/privacy boundary, blast radius, requirement clarity, verification strength, time pressure.
 - Run **full deliberation** when risk score is `>=7` or at least two criteria score `2`.
 - Deliberation time budgets (soft/hard cap):
   - `T0` quick (`<=15m`): `5s / 12s`
   - `T1` standard (`15m..2h`): `20s / 45s`
   - `T2` complex (`2h..8h`): `60s / 120s`
   - `T3` long-horizon (`>8h`): `120s / 300s`
-- On soft cap: stop branching and move to execution with best current plan. On hard cap: disable auto-deliberation for the current stage and continue execution.
+- On soft cap: stop branching and move to execution with the best current plan. On hard cap: disable auto-deliberation for the current stage and continue execution.
 - Review-signal policy:
   - `P0` critical findings are hard-stop.
   - `P1` high findings are hard-stop only when high-signal (clear evidence or corroboration).
@@ -61,6 +64,12 @@ Use this repository as the wrapper that coordinates multiple Codex-driven projec
 - When you need manifest-backed review evidence, run `TASK=<task-id> NOTES="Goal: ... | Summary: ... | Risks: ..." MANIFEST=<path> npm run review -- --manifest <path>`.
 - See `docs/standalone-review-guide.md` for the canonical workflow.
 - Prefer the bundled `standalone-review` skill for ad-hoc review steps.
+- Before merge for non-trivial changes, run one explicit elegance/minimality review pass and remove avoidable complexity.
+
+## Completion Discipline (Patience-First)
+- For CI checks, review agents, cloud jobs, and orchestrator runs, wait/poll until terminal state before reporting completion.
+- Keep polling windows active after green checks and reset the window if checks restart or new feedback arrives.
+- Do not hand off an in-progress workflow unless the user explicitly asks to stop early.
 
 ## Oracle (External Assistant)
 - Oracle bundles a prompt plus the right files so another AI (GPT 5 Pro + more) can answer. Use when stuck/bugs/reviewing.

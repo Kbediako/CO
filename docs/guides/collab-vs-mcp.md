@@ -24,6 +24,14 @@
 - Do not use collab as a replacement for MCP when you need approvals, sandbox enforcement, or manifest-grade auditability.
 - Collab can be enabled per-run and should remain off by default unless explicitly required.
 
+## Cloud Mode (When Relevant)
+- Prefer cloud mode for long-running, highly parallel, or locally constrained work.
+- Run a preflight before cloud launch:
+  - The branch/ref exists on the remote the cloud runner will fetch.
+  - Setup commands are non-interactive.
+  - Required cloud secrets/variables are available.
+- If cloud preflight fails (for example, repo has no cloud env setup yet), run in local `mcp` mode and record the fallback reason in checklist/manifests.
+
 ## Deliberation Default v1
 - Deliberation is auto-triggered for high-impact or high-ambiguity work.
 - Keep MCP as the lead plane; collab/delegated subagents are used to generate/challenge options.
@@ -41,6 +49,7 @@
 Criteria: reversibility, external impact, security/privacy boundary, blast radius, requirement clarity, verification strength, time pressure.
 
 ### Deliberation budgets
+
 | Class | Horizon | Soft cap | Hard cap |
 | --- | --- | --- | --- |
 | `T0` | `<=15m` | `5s` | `12s` |

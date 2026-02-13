@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp 2d93ab233e1893b32428875d58671a0f03b2438ba7a5c5e75076df26cda6f538 -->
+<!-- codex:instruction-stamp d5c155ff17bfc862d0c60d779d47a020723957be36ed4cc40943aeca113826b3 -->
 # Repository Agent Guidance
 
 ## Project 0303 — Codex Orchestrator Autonomy Enhancements
@@ -35,6 +35,8 @@
 ## Orchestrator-First Default
 - Use `codex-orchestrator` pipelines for planning, implementation, validation, and review work that touches the repo.
 - Avoid ad-hoc command chains unless the work is a lightweight discovery step that does not require manifest evidence.
+- Use cloud mode when work is long-running/parallel and cloud prerequisites are ready; otherwise stay in local `mcp` mode.
+- Cloud preflight: confirm remote branch availability, non-interactive setup commands, and required cloud secrets/variables; if missing, record local fallback rationale in checklist/manifests.
 - Before implementation, run a standalone review of the task/spec against the user’s intent and record the approval in the spec + checklist notes. If anything is vague, infer with a subagent and self-approve or offer options; only ask the user when truly blocked.
 - Delegation is mandatory for top-level tasks once a task id exists: spawn at least one subagent run using `MCP_RUNNER_TASK_ID=<task-id>-<stream>`, capture manifest evidence, and summarize in the main run. Use `DELEGATION_GUARD_OVERRIDE_REASON` only when delegation is impossible and record the justification.
 - Once a task id exists, prefer delegation for research, review, and planning work. Use `codex exec` only for pre-task triage (no task id yet) or when delegation is genuinely unavailable (technical/blocking limitation or explicit operational block), and set `DELEGATION_GUARD_OVERRIDE_REASON` with a clear justification.
@@ -54,10 +56,12 @@
 - For manifest-backed review evidence, run `TASK=<task-id> NOTES="Goal: ... | Summary: ... | Risks: ..." MANIFEST=<path> npm run review -- --manifest <path>`.
 - See `docs/standalone-review-guide.md` for the canonical workflow.
 - Prefer the global `standalone-review` skill when installed; bundled skills ship for downstream release packaging.
+- Before merge for non-trivial changes, run one explicit elegance/minimality review pass and simplify avoidable complexity.
 
 ## PR Lifecycle (Top-Level Agents)
 - Open PRs for code/config changes and keep the scope tied to the active task.
 - Monitor PR checks and review feedback for 10–20 minutes after all required checks turn green.
+- Maintain polling until checks and reviews reach terminal status; reset the waiting window if checks restart or new feedback appears.
 - If checks remain green and no new feedback arrives during the window, merge via GitHub and delete the branch.
 - Reset the window if checks restart or feedback arrives; do not merge draft PRs or PRs labeled "do not merge."
 

@@ -1,9 +1,11 @@
-<!-- codex:instruction-stamp 3b8a882d37bb1e89cfe23fddfca70eef37e5134324ea61963800fd1a7484115d -->
+<!-- codex:instruction-stamp 2408396e5cc9b25d5522b7064010a36a43007508072f3e0f051ab042370928a1 -->
 # Agent Instructions (Template)
 
 ## Orchestrator-first workflow
 - Use `codex-orchestrator` pipelines for planning, implementation, validation, and review.
 - Default to `docs-review` before implementation and `implementation-gate` after code changes.
+- Prefer cloud mode when runs are long-running/parallel and cloud prerequisites are ready.
+- Before cloud mode, verify branch availability, non-interactive setup commands, and required secrets/variables; if missing, run in local `mcp` mode and record why.
 - Before implementation, run a standalone review of the task/spec against the user’s intent and record the approval in the spec + checklist notes.
 - Delegation is mandatory for top-level tasks once a task id exists: spawn at least one subagent run using `MCP_RUNNER_TASK_ID=<task-id>-<stream>`, capture manifest evidence, and summarize in the main run. Use `DELEGATION_GUARD_OVERRIDE_REASON` only when delegation is impossible (technical/blocking limitation or explicit operational block) and record the justification.
 - Once a task id exists, prefer delegation for research, review, and planning work. Use `codex exec` only for pre-task triage (no task id yet) or when delegation is genuinely unavailable (technical/blocking limitation or explicit operational block), and set `DELEGATION_GUARD_OVERRIDE_REASON` with a clear justification.
@@ -18,6 +20,7 @@
 - Use `codex review` for quick checks during implementation.
 - Capture standalone review approval in the spec/task notes before implementation begins.
 - When you need manifest-backed review evidence, run `npm run review` with the manifest path.
+- Before merge for non-trivial changes, run one explicit elegance/minimality review pass and simplify avoidable complexity.
 
 ## Delegation (recommended)
 - For non-trivial work, spawn at least one subagent run using `MCP_RUNNER_TASK_ID=<task-id>-<stream>`.
@@ -30,7 +33,7 @@
   - Auth/secrets/PII boundary changes.
   - Direct production customer/financial/legal impact.
   - Conflicting intent on high-impact changes.
-- Otherwise use a simple risk score (`0..2` each): reversibility, external impact, security/privacy boundary, blast radius, requirement clarity, verification strength, time pressure.
+- Otherwise, use a simple risk score (`0..2` each): reversibility, external impact, security/privacy boundary, blast radius, requirement clarity, verification strength, time pressure.
 - Require full deliberation when score `>=7` or two or more criteria score `2`.
 - Time budgets for auto-deliberation:
   - `T0` quick: `5s / 12s` (soft/hard)
@@ -43,6 +46,11 @@
   - `P0` critical findings are hard-stop.
   - `P1` high findings are hard-stop only when high-signal (clear evidence or corroboration).
   - `P2/P3` findings are tracked follow-ups.
+
+## Completion discipline (patience-first)
+- Wait/poll for terminal state on long-running operations (CI checks, reviews, cloud jobs, orchestrator runs) before reporting completion.
+- Reset waiting windows when checks restart or new feedback appears.
+- Do not hand off mid-flight work unless the user explicitly asks to stop.
 
 ## Instruction stamp
 - If you edit this file, refresh the instruction stamp.

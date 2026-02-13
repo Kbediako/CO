@@ -16,6 +16,12 @@ Use this playbook whenever handing off a review (`npm run review` or an implemen
 6. For GitHub agent review comments (CodeRabbit, Copilot, Codex connector), respond in-thread, react with 👍 once addressed, and resolve the review thread.
 7. If the reviewer finds issues, fix them, update `NOTES` with follow-up questions (when needed), and rerun the same gate.
 8. Repeat until the reviewer reports no findings.
+9. For non-trivial changes, run one final elegance/minimality review pass and remove avoidable complexity before merge.
+
+## Completion discipline (patience-first)
+- Wait/poll until terminal status for checks, review agents, and cloud/orchestrator runs before handoff.
+- If checks restart or new comments arrive, reset the watch window.
+- Do not hand off mid-flight work unless the user explicitly asks to stop early.
 
 ## Severity and deliberation policy (required)
 - Treat `P0` critical findings as hard-stop.
@@ -25,7 +31,7 @@ Use this playbook whenever handing off a review (`npm run review` or an implemen
 - Treat `P2/P3` findings as tracked follow-ups unless they are promoted by new evidence.
 - If findings indicate high-risk/high-ambiguity work, run a deliberation pass before continuing:
   - Hard-stop triggers: irreversible/destructive change with unclear rollback; auth/secrets/PII boundary changes; direct production customer/financial/legal impact; conflicting high-impact intent.
-  - Otherwise deliberate when risk score (`0..2` per criterion: reversibility, external impact, security/privacy boundary, blast radius, requirement clarity, verification strength, time pressure) is `>=7` or two or more criteria score `2`.
+  - Otherwise, deliberate when risk score (`0..2` per criterion: reversibility, external impact, security/privacy boundary, blast radius, requirement clarity, verification strength, time pressure) is `>=7` or two or more criteria score `2`.
 
 ## GitHub agent review replies
 - Always reply directly in the original review discussion thread (line comment), not just top-level PR comments.
