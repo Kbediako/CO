@@ -1,6 +1,6 @@
 {
   "name": "@kbediako/codex-orchestrator",
-  "version": "0.1.14-alpha.1",
+  "version": "0.1.14",
   "license": "MIT",
   "type": "module",
   "bin": {
