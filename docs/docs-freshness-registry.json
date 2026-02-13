@@ -607,9 +607,9 @@
     {
       "path": ".agent/task/0953-standalone-review-docs-first-ship.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-01-19",
-      "cadence_days": 90
+      "status": "archived",
+      "last_review": "2026-02-13",
+      "cadence_days": 365
     },
     {
       "path": ".agent/task/0954-rlm-orchestrator-validation.md",
@@ -2525,9 +2525,9 @@
     {
       "path": "tasks/specs/0953-standalone-review-docs-first-ship.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-01-19",
-      "cadence_days": 90
+      "status": "archived",
+      "last_review": "2026-02-13",
+      "cadence_days": 365
     },
     {
       "path": "tasks/specs/0954-rlm-orchestrator-validation.md",
@@ -3001,9 +3001,9 @@
     {
       "path": "tasks/tasks-0953-standalone-review-docs-first-ship.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-01-19",
-      "cadence_days": 90
+      "status": "archived",
+      "last_review": "2026-02-13",
+      "cadence_days": 365
     },
     {
       "path": "tasks/tasks-0954-rlm-orchestrator-validation.md",
