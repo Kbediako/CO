@@ -1,5 +1,6 @@
 import type { ReviewerAgent, ReviewInput, ReviewResult } from '../../types.js';
 import type { PipelineRunExecutionResult } from '../types.js';
+import { diagnoseCloudFailure } from './cloudFailureDiagnostics.js';
 
 type ResultProvider = () => PipelineRunExecutionResult | null;
 
@@ -12,19 +13,36 @@ export class CommandReviewer implements ReviewerAgent {
       const cloudExecution = result.manifest.cloud_execution;
       const status = cloudExecution?.status ?? 'unknown';
       const cloudTask = cloudExecution?.task_id ?? '<unknown>';
+      const approved = status === 'ready' && result.success;
+      const diagnosis = diagnoseCloudFailure({
+        status,
+        statusDetail: result.manifest.status_detail ?? null,
+        error: cloudExecution?.error ?? null
+      });
       const summaryLines = [
-        status === 'ready'
+        approved
           ? `Cloud task ${cloudTask} completed successfully.`
           : `Cloud task ${cloudTask} did not complete successfully (${status}).`,
         `Manifest: ${result.manifestPath}`,
         `Runner log: ${result.logPath}`,
         ...(cloudExecution?.status_url ? [`Cloud status URL: ${cloudExecution.status_url}`] : [])
       ];
+      if (!approved) {
+        summaryLines.push(`Failure class: ${diagnosis.category}`);
+        summaryLines.push(`Guidance: ${diagnosis.guidance}`);
+      }
+      const feedbackLines = [cloudExecution?.error ?? (result.notes.join('\n') || undefined)].filter(
+        (line): line is string => Boolean(line && line.trim().length > 0)
+      );
+      if (!approved) {
+        feedbackLines.push(`Failure class: ${diagnosis.category}`);
+        feedbackLines.push(`Guidance: ${diagnosis.guidance}`);
+      }
       return {
         summary: summaryLines.join('\n'),
         decision: {
-          approved: status === 'ready' && result.success,
-          feedback: cloudExecution?.error ?? (result.notes.join('\n') || undefined)
+          approved,
+          feedback: feedbackLines.length > 0 ? feedbackLines.join('\n') : undefined
         }
       };
     }

@@ -25,6 +25,7 @@ Use this skill when a task needs a spec-driven workflow. The objective is to cre
 
 3) Run docs-review before implementation
 - `npx codex-orchestrator start docs-review --format json --no-interactive --task <task-id>`
+- If running in cloud mode, ensure the branch exists on remote. For local-only branches, set `CODEX_CLOUD_BRANCH=main` (or another pushed branch).
 - Link the manifest path in the checklists.
 
 4) Implement and validate

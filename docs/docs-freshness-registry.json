@@ -640,6 +640,13 @@
       "cadence_days": 90
     },
     {
+      "path": ".agent/task/0958-cloud-canary-ci.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-13",
+      "cadence_days": 90
+    },
+    {
       "path": ".agent/task/ACTION_PLAN_TEMPLATE.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -763,6 +770,13 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/ACTION_PLAN-cloud-canary-ci.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-13",
       "cadence_days": 90
     },
     {
@@ -1270,6 +1284,13 @@
       "cadence_days": 90
     },
     {
+      "path": "docs/PRD-cloud-canary-ci.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-13",
+      "cadence_days": 90
+    },
+    {
       "path": "docs/PRD-codex-cloud-execution-wiring.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -1722,6 +1743,13 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/TECH_SPEC-cloud-canary-ci.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-13",
       "cadence_days": 90
     },
     {
@@ -2530,6 +2558,13 @@
       "cadence_days": 90
     },
     {
+      "path": "tasks/specs/0958-cloud-canary-ci.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-13",
+      "cadence_days": 90
+    },
+    {
       "path": "tasks/specs/README.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -2993,6 +3028,13 @@
     },
     {
       "path": "tasks/tasks-0957-codex-cloud-execution-wiring.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-13",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/tasks-0958-cloud-canary-ci.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-02-13",
