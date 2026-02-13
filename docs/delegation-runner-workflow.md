@@ -62,6 +62,20 @@ If you plan to run multiple commands in the same task, you can still set the env
 export MCP_RUNNER_TASK_ID=<task-id>
 ```
 
+### 1a) Guard profile for task-less runs
+
+The built-in delegation-guard stage now runs through a package utility (`delegationGuardRunner`) that supports profile-based behavior:
+
+- `strict`: enforce delegation guard requirements exactly (missing task id fails).
+- `warn`: bypass delegation evidence checks when `MCP_RUNNER_TASK_ID` is missing.
+- `auto` (default): strict for CO-style repos (`AGENTS.md` + `tasks/index.json` + `docs/TASKS.md`), warn otherwise.
+
+Override per run when needed:
+
+```bash
+CODEX_ORCHESTRATOR_GUARD_PROFILE=warn codex-orch start diagnostics --format json
+```
+
 ## 2) Background run when delegation tools are missing
 
 When delegation tools are missing in the current session (MCP disabled), use a background run:

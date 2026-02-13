@@ -80,6 +80,11 @@ codex -c 'mcp_servers.delegation.enabled=true' ...
 ```
 `delegate-server` is the canonical name; `delegation-server` is supported as an alias (older docs may use it).
 
+Delegation guard profile:
+- `CODEX_ORCHESTRATOR_GUARD_PROFILE=auto` (default): strict in CO-style repos, warn in lightweight repos.
+- Set `CODEX_ORCHESTRATOR_GUARD_PROFILE=warn` for ad-hoc/no-task-id runs.
+- Set `CODEX_ORCHESTRATOR_GUARD_PROFILE=strict` to enforce full delegation evidence checks.
+
 ## Delegation + RLM flow
 
 RLM (Recursive Language Model) is the long-horizon loop used by the `rlm` pipeline (`codex-orchestrator rlm "<goal>"` or `codex-orchestrator start rlm --goal "<goal>"`). Delegated runs only enter RLM when the child is launched with the `rlm` pipeline (or the rlm runner directly). In auto mode it resolves to symbolic when delegated, when `RLM_CONTEXT_PATH` is set, or when the context exceeds `RLM_SYMBOLIC_MIN_BYTES`; otherwise it stays iterative. The runner writes state to `.runs/<task-id>/cli/<run-id>/rlm/state.json` and stops when the validator passes or budgets are exhausted.

@@ -24,7 +24,9 @@ Use this skill when a task can be split into parallel streams or when the main c
 ## Required conventions
 - Use `MCP_RUNNER_TASK_ID=<task-id>-<stream>` for subagents.
 - Record manifest paths and summarize findings in the main run.
-- Run `node scripts/delegation-guard.mjs` before review handoff to verify delegation evidence.
+- Before review handoff, run the delegation guard stage via the packaged runner:
+  `node "$CODEX_ORCHESTRATOR_PACKAGE_ROOT/dist/orchestrator/src/cli/utils/delegationGuardRunner.js"`.
+  For ad-hoc runs without task IDs, set `CODEX_ORCHESTRATOR_GUARD_PROFILE=warn`.
 
 ## Minimal delegation workflow
 1) Name streams and write 1–2 sentence goals for each.
