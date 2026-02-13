@@ -160,6 +160,12 @@ function tail(text, maxLines = 40) {
     .trim();
 }
 
+function redactSecrets(text, secrets) {
+  return secrets
+    .filter((secret) => typeof secret === 'string' && secret.trim().length > 0)
+    .reduce((value, secret) => value.split(secret).join('***'), String(text ?? ''));
+}
+
 async function waitForManifest(manifestPath, timeoutMs = DEFAULT_MANIFEST_WAIT_MS) {
   const deadline = Date.now() + timeoutMs;
   let latest = null;
@@ -341,9 +347,7 @@ async function main() {
       const diffPath = resolveRepoPath(repoRoot, cloudExecution.diff_path);
       assert(Boolean(diffPath && existsSync(diffPath)), `Cloud diff artifact missing at ${cloudExecution.diff_path}.`);
     }
-    if (cloudExecution.status !== 'ready') {
-      warnings.push(`Cloud task reached terminal non-ready status: ${cloudExecution.status}.`);
-    }
+    assert(cloudExecution.status === 'ready', `Cloud task reached terminal non-ready status: ${cloudExecution.status}.`);
   }
 
   assert(Boolean(runSummaryPath && hasRunSummary), 'Run summary file missing.');
@@ -392,6 +396,11 @@ async function main() {
   }
 
   const header = skipEligible ? '## Cloud Canary (Credential-Gated Skip)' : '## Cloud Canary (Failed)';
+  const redactedStderr = redactSecrets(tail(execution.stderr, 80), [
+    process.env.CODEX_API_KEY,
+    process.env.OPENAI_API_KEY,
+    process.env.GITHUB_TOKEN
+  ]);
   const details = [
     header,
     '',
@@ -403,7 +412,7 @@ async function main() {
     `Run summary: ${runSummaryPath ?? '<unresolved>'}`,
     `Runner stderr (tail):`,
     '```',
-    tail(execution.stderr, 80) || '<empty>',
+    redactedStderr || '<empty>',
     '```'
   ];
   console.error(details.join('\n'));

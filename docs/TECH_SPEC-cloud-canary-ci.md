@@ -1,10 +1,19 @@
-# Technical Spec - Cloud Execution Canary CI Coverage (Task 0958)
+---
+id: 20260213-0958-cloud-canary-ci
+title: Cloud Execution Canary CI Coverage
+relates_to: tasks/tasks-0958-cloud-canary-ci.md
+risk: medium
+owners:
+  - Codex
+last_review: 2026-02-13
+---
+
+## Added by Bootstrap (refresh as needed)
 
 ## Summary
 - Objective: Add CI canary coverage for cloud execution mode to catch wiring regressions early.
 - Scope: Canary trigger path, manifest assertions, diagnostics, and rollout policy.
-- Constraints: Preserve local path behavior and keep cloud apply explicit.
-- Canonical TECH_SPEC: `tasks/specs/0958-cloud-canary-ci.md`.
+- Constraints: Preserve local path behavior and keep cloud apply explicitly controlled.
 
 ## Technical Requirements
 - Functional requirements:
@@ -33,18 +42,16 @@
   - Standard guardrail sequence for touched files.
 - Rollout verification:
   - Capture canary evidence links in task docs.
+  - Planning scout / delegation: `.runs/0958-cloud-canary-ci-scout/cli/2026-02-13T12-05-36-992Z-d291cfe9/manifest.json`
+  - Docs-review (pre-implementation): `.runs/0958-cloud-canary-ci/cli/2026-02-13T12-07-32-909Z-8cf7dbba/manifest.json`
+  - Implementation-gate: `.runs/0958-cloud-canary-ci/cli/2026-02-13T13-09-22-859Z-a9289881/manifest.json`
+  - Cloud canary pass with branch pinning: `.runs/0958-cloud-canary-ci-local8/cli/2026-02-13T12-32-10-598Z-8519cfd2/manifest.json`
 - Monitoring / alerts:
   - Watch canary pass/fail trend and recurrent error classes.
 
 ## Open Questions
 - Merge-gating policy for cloud canary.
 - Required branch cadence (every PR vs schedule).
-
-## Evidence
-- Planning scout / delegation: `.runs/0958-cloud-canary-ci-scout/cli/2026-02-13T12-05-36-992Z-d291cfe9/manifest.json`
-- Docs-review (pre-implementation): `.runs/0958-cloud-canary-ci/cli/2026-02-13T12-07-32-909Z-8cf7dbba/manifest.json`
-- Implementation-gate: `.runs/0958-cloud-canary-ci/cli/2026-02-13T13-09-22-859Z-a9289881/manifest.json`
-- Cloud canary pass with branch pinning: `.runs/0958-cloud-canary-ci-local8/cli/2026-02-13T12-32-10-598Z-8519cfd2/manifest.json`
 
 ## Approvals
 - Reviewer: Codex (self)

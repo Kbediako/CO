@@ -73,7 +73,7 @@ last_review: 2026-02-13
 - Implementation-gate: `.runs/0958-cloud-canary-ci/cli/2026-02-13T13-09-22-859Z-a9289881/manifest.json`
 - Cloud canary pass with branch pinning: `.runs/0958-cloud-canary-ci-local8/cli/2026-02-13T12-32-10-598Z-8519cfd2/manifest.json`
 - Cloud command log proving `--branch main`: `.runs/0958-cloud-canary-ci-local8/cli/2026-02-13T12-32-10-598Z-8519cfd2/cloud/commands.ndjson`
-- Standalone review: `codex review --uncommitted` (2026-02-13, no blocking findings)
+- Reviewer hand-off (`npm run review` with `NOTES`): `.runs/0958-cloud-canary-ci/cli/2026-02-13T13-09-22-859Z-a9289881/manifest.json`
 
 ## Approvals
 - Reviewer: Codex (self)
