@@ -1102,6 +1102,22 @@
       },
       "created_at": "2026-01-23",
       "completed_at": null
+    },
+    {
+      "id": "0957",
+      "slug": "codex-cloud-execution-wiring",
+      "title": "Codex Cloud Execution Wiring",
+      "path": "tasks/tasks-0957-codex-cloud-execution-wiring.md",
+      "kind": "prd",
+      "status": "in-progress",
+      "gate": {
+        "phase": "codex-cloud-execution-wiring-planning",
+        "status": "succeeded",
+        "log": ".runs/0957-codex-cloud-execution-wiring/cli/2026-02-13T09-47-41-178Z-453a5990/manifest.json",
+        "run_id": "2026-02-13T09-47-41-178Z-453a5990"
+      },
+      "created_at": "2026-02-13",
+      "completed_at": null
     }
   ],
   "specs": [
@@ -1215,6 +1231,22 @@
         "task": "tasks/tasks-0956-subagents-skill-codex-cli-refresh.md",
         "agent_task": ".agent/task/0956-subagents-skill-codex-cli-refresh.md",
         "docs": "docs/TECH_SPEC-subagents-skill-codex-cli-refresh.md"
+      }
+    },
+    {
+      "id": "20260213-0957-codex-cloud-execution-wiring",
+      "title": "Codex Cloud Execution Wiring",
+      "relates_to": "tasks/tasks-0957-codex-cloud-execution-wiring.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-02-13",
+      "paths": {
+        "spec": "tasks/specs/0957-codex-cloud-execution-wiring.md",
+        "task": "tasks/tasks-0957-codex-cloud-execution-wiring.md",
+        "agent_task": ".agent/task/0957-codex-cloud-execution-wiring.md",
+        "docs": "docs/TECH_SPEC-codex-cloud-execution-wiring.md"
       }
     }
   ]

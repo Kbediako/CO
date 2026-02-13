@@ -74,7 +74,10 @@ describe('CodexOrchestrator subpipeline failures', () => {
       env,
       pipeline,
       manifest,
-      paths
+      paths,
+      mode: 'mcp',
+      task: { id: env.taskId, title: 'Task' },
+      target: { id: 'parent:child', description: 'Child', metadata: { stageId: 'child' } }
     });
 
     expect(result.success).toBe(false);
@@ -125,7 +128,10 @@ describe('CodexOrchestrator subpipeline failures', () => {
       env,
       pipeline,
       manifest,
-      paths
+      paths,
+      mode: 'mcp',
+      task: { id: env.taskId, title: 'Task' },
+      target: { id: 'command-parent:fail-command', description: 'Fail Command', metadata: { stageId: 'fail-command' } }
     });
 
     expect(result.success).toBe(false);

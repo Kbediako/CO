@@ -232,6 +232,7 @@ export class TaskManager {
       build,
       test,
       review,
+      cloudExecution: build.cloudExecution ?? null,
       timestamp
     };
   }

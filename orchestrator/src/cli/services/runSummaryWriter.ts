@@ -35,6 +35,31 @@ export function applyPrivacyToRunSummary(runSummary: RunSummary, manifest: CliMa
   };
 }
 
+export function applyCloudExecutionToRunSummary(runSummary: RunSummary, manifest: CliManifest): void {
+  if (!manifest.cloud_execution) {
+    return;
+  }
+  runSummary.cloudExecution = {
+    taskId: manifest.cloud_execution.task_id,
+    environmentId: manifest.cloud_execution.environment_id,
+    status: manifest.cloud_execution.status,
+    statusUrl: manifest.cloud_execution.status_url,
+    submittedAt: manifest.cloud_execution.submitted_at,
+    completedAt: manifest.cloud_execution.completed_at,
+    lastPolledAt: manifest.cloud_execution.last_polled_at,
+    pollCount: manifest.cloud_execution.poll_count,
+    pollIntervalSeconds: manifest.cloud_execution.poll_interval_seconds,
+    timeoutSeconds: manifest.cloud_execution.timeout_seconds,
+    attempts: manifest.cloud_execution.attempts,
+    diffPath: manifest.cloud_execution.diff_path,
+    diffUrl: manifest.cloud_execution.diff_url,
+    diffStatus: manifest.cloud_execution.diff_status,
+    applyStatus: manifest.cloud_execution.apply_status,
+    logPath: manifest.cloud_execution.log_path,
+    error: manifest.cloud_execution.error
+  };
+}
+
 export async function persistRunSummary(
   env: EnvironmentPaths,
   paths: RunPaths,

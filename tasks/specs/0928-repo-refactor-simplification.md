@@ -6,7 +6,7 @@ risk: low
 owners:
   - Codex (top-level agent)
   - Review agent
-last_review: 2025-12-31
+last_review: 2026-02-13
 ---
 
 ## Summary

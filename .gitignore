@@ -8,3 +8,4 @@ var/
 .runs/
 **/:Zone.Identifier
 compliance/permit.local.json
+error.log

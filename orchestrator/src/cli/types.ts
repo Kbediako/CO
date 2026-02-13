@@ -128,6 +128,7 @@ export interface StartOptions {
   approvalPolicy?: string;
   format?: 'text' | 'json';
   targetStageId?: string;
+  executionMode?: 'mcp' | 'cloud';
   runEvents?: import('./events/runEvents.js').RunEventEmitter;
 }
 

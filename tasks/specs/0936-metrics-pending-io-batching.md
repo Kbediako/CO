@@ -5,7 +5,7 @@ relates_to: docs/PRD-metrics-pending-io-batching.md
 risk: low
 owners:
   - Codex (top-level agent)
-last_review: 2026-01-06
+last_review: 2026-02-13
 ---
 
 ## Summary
