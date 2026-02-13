@@ -23,3 +23,34 @@
 ## Notes
 - Do not use collab as a replacement for MCP when you need approvals, sandbox enforcement, or manifest-grade auditability.
 - Collab can be enabled per-run and should remain off by default unless explicitly required.
+
+## Deliberation Default v1
+- Deliberation is auto-triggered for high-impact or high-ambiguity work.
+- Keep MCP as the lead plane; collab/delegated subagents are used to generate/challenge options.
+
+### Full deliberation triggers
+- Any hard-stop trigger:
+  - Irreversible/destructive change with unclear rollback.
+  - Auth/secrets/PII boundary touched.
+  - Direct production customer/financial/legal impact.
+  - Conflicting intent on high-impact work.
+- Or risk score threshold:
+  - Score `>=7` across 7 criteria (`0..2` each), or
+  - At least two criteria score `2`.
+
+Criteria: reversibility, external impact, security/privacy boundary, blast radius, requirement clarity, verification strength, time pressure.
+
+### Deliberation budgets
+| Class | Horizon | Soft cap | Hard cap |
+| --- | --- | --- | --- |
+| `T0` | `<=15m` | `5s` | `12s` |
+| `T1` | `15m..2h` | `20s` | `45s` |
+| `T2` | `2h..8h` | `60s` | `120s` |
+| `T3` | `>8h` | `120s` | `300s` |
+
+On soft cap, stop branching and execute the best current plan. On hard cap, disable auto-deliberation for that stage and continue execution.
+
+### Review signal policy
+- `P0` critical findings are hard-stop.
+- `P1` high findings are hard-stop only when high-signal (clear evidence or corroboration).
+- `P2/P3` findings are tracked follow-ups, not hard-stop.

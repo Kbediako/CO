@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp 545f11aae1e36fd402414c8b792d271bf53112a0ea8a79a0bc87a869a97198c9 -->
+<!-- codex:instruction-stamp 8079bfd8379f9e4ec185c7c25d0308bca1e41d65261c9d33f43d1f77f5f570ed -->
 # Codex-Orchestrator Agent Handbook (Template)
 
 Use this repository as the wrapper that coordinates multiple Codex-driven projects. After cloning, replace placeholder metadata (task IDs, documents, SOPs) with values for each downstream initiative while keeping these shared guardrails in place.
@@ -15,6 +15,27 @@ Use this repository as the wrapper that coordinates multiple Codex-driven projec
 - Use collab only for intra-run brainstorming, role-split planning, or parallel subcalls.
 - Collab means auxiliary assistant agents inside a run; enable it via `RLM_SYMBOLIC_COLLAB=1` (see `docs/guides/collab-vs-mcp.md`).
 - The “top-level Codex” is the MCP-run agent the user is interacting with; collab agents are assistants and do not represent the run.
+
+## Deliberation Default (Agent-First)
+- Deliberation is the default for high-ambiguity or high-impact work. Keep MCP as the top-level control plane and use collab/delegated subagents to explore options.
+- Run **full deliberation** when any hard-stop trigger is true:
+  - Irreversible/destructive change with unclear rollback.
+  - Auth/secrets/PII boundary touched.
+  - Direct production customer/financial/legal impact.
+  - Conflicting intent on a high-impact change.
+- Otherwise score these criteria `0..2` each: reversibility, external impact, security/privacy boundary, blast radius, requirement clarity, verification strength, time pressure.
+- Run **full deliberation** when risk score is `>=7` or at least two criteria score `2`.
+- Deliberation time budgets (soft/hard cap):
+  - `T0` quick (`<=15m`): `5s / 12s`
+  - `T1` standard (`15m..2h`): `20s / 45s`
+  - `T2` complex (`2h..8h`): `60s / 120s`
+  - `T3` long-horizon (`>8h`): `120s / 300s`
+- On soft cap: stop branching and move to execution with best current plan. On hard cap: disable auto-deliberation for the current stage and continue execution.
+- Review-signal policy:
+  - `P0` critical findings are hard-stop.
+  - `P1` high findings are hard-stop only when high-signal (clear evidence or corroboration).
+  - `P2/P3` findings are tracked follow-ups, not hard-stop.
+- If you bypass mandatory deliberation, record a reason in checklist/manifests using the same evidence discipline as other guardrail overrides.
 
 ## Orchestrator-First Workflow
 - Use `codex-orchestrator` pipelines for planning, implementation, validation, and review work that touches the repo.

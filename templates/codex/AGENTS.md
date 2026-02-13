@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp 7477a786938b5c7f883b7d21a0954b48a1ddbbc3dcabd052b347b303cb3075a4 -->
+<!-- codex:instruction-stamp 3b8a882d37bb1e89cfe23fddfca70eef37e5134324ea61963800fd1a7484115d -->
 # Agent Instructions (Template)
 
 ## Orchestrator-first workflow
@@ -22,6 +22,27 @@
 ## Delegation (recommended)
 - For non-trivial work, spawn at least one subagent run using `MCP_RUNNER_TASK_ID=<task-id>-<stream>`.
 - If delegation is not possible, record the reason in the task checklist.
+
+## Deliberation Default (agent-first)
+- Keep MCP as the lead control plane. Use collab/delegated subagents for deliberation when ambiguity or impact is high.
+- Run full deliberation on any hard-stop trigger:
+  - Irreversible/destructive changes with unclear rollback.
+  - Auth/secrets/PII boundary changes.
+  - Direct production customer/financial/legal impact.
+  - Conflicting intent on high-impact changes.
+- Otherwise use a simple risk score (`0..2` each): reversibility, external impact, security/privacy boundary, blast radius, requirement clarity, verification strength, time pressure.
+- Require full deliberation when score `>=7` or two or more criteria score `2`.
+- Time budgets for auto-deliberation:
+  - `T0` quick: `5s / 12s` (soft/hard)
+  - `T1` standard: `20s / 45s`
+  - `T2` complex: `60s / 120s`
+  - `T3` long-horizon: `120s / 300s`
+- On soft cap: stop branching and execute the best current plan.
+- On hard cap: disable auto-deliberation for that stage and continue execution.
+- Review-signal policy:
+  - `P0` critical findings are hard-stop.
+  - `P1` high findings are hard-stop only when high-signal (clear evidence or corroboration).
+  - `P2/P3` findings are tracked follow-ups.
 
 ## Instruction stamp
 - If you edit this file, refresh the instruction stamp.

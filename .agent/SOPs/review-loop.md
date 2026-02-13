@@ -17,6 +17,16 @@ Use this playbook whenever handing off a review (`npm run review` or an implemen
 7. If the reviewer finds issues, fix them, update `NOTES` with follow-up questions (when needed), and rerun the same gate.
 8. Repeat until the reviewer reports no findings.
 
+## Severity and deliberation policy (required)
+- Treat `P0` critical findings as hard-stop.
+- Treat `P1` high findings as hard-stop only when high-signal:
+  - Clear evidence (repro, failing test, or direct code-path proof), or
+  - Corroboration from two independent reviewers/signals.
+- Treat `P2/P3` findings as tracked follow-ups unless they are promoted by new evidence.
+- If findings indicate high-risk/high-ambiguity work, run a deliberation pass before continuing:
+  - Hard-stop triggers: irreversible/destructive change with unclear rollback; auth/secrets/PII boundary changes; direct production customer/financial/legal impact; conflicting high-impact intent.
+  - Otherwise deliberate when risk score (`0..2` per criterion: reversibility, external impact, security/privacy boundary, blast radius, requirement clarity, verification strength, time pressure) is `>=7` or two or more criteria score `2`.
+
 ## GitHub agent review replies
 - Always reply directly in the original review discussion thread (line comment), not just top-level PR comments.
 - Tag the agent explicitly (e.g., `@coderabbitai`), and mention what changed plus the commit SHA.
