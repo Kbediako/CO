@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generated_at": "2026-02-01",
+  "generated_at": "2026-02-13",
   "entries": [
     {
       "path": ".agent/AGENTS.md",
@@ -633,6 +633,13 @@
       "cadence_days": 90
     },
     {
+      "path": ".agent/task/0957-codex-cloud-execution-wiring.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-13",
+      "cadence_days": 90
+    },
+    {
       "path": ".agent/task/ACTION_PLAN_TEMPLATE.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -756,6 +763,13 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/ACTION_PLAN-codex-cloud-execution-wiring.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-13",
       "cadence_days": 90
     },
     {
@@ -1256,6 +1270,13 @@
       "cadence_days": 90
     },
     {
+      "path": "docs/PRD-codex-cloud-execution-wiring.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-13",
+      "cadence_days": 90
+    },
+    {
       "path": "docs/PRD-codex-orchestrator-autonomy.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -1701,6 +1722,13 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/TECH_SPEC-codex-cloud-execution-wiring.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-13",
       "cadence_days": 90
     },
     {
@@ -2495,6 +2523,13 @@
       "cadence_days": 90
     },
     {
+      "path": "tasks/specs/0957-codex-cloud-execution-wiring.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-13",
+      "cadence_days": 90
+    },
+    {
       "path": "tasks/specs/README.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -2954,6 +2989,13 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-01-23",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/tasks-0957-codex-cloud-execution-wiring.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-13",
       "cadence_days": 90
     },
     {

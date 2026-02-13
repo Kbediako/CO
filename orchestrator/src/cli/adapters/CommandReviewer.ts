@@ -7,8 +7,28 @@ export class CommandReviewer implements ReviewerAgent {
   constructor(private readonly getResult: ResultProvider) {}
 
   async review(input: ReviewInput): Promise<ReviewResult> {
-    void input;
     const result = this.requireResult();
+    if (input.mode === 'cloud') {
+      const cloudExecution = result.manifest.cloud_execution;
+      const status = cloudExecution?.status ?? 'unknown';
+      const cloudTask = cloudExecution?.task_id ?? '<unknown>';
+      const summaryLines = [
+        status === 'ready'
+          ? `Cloud task ${cloudTask} completed successfully.`
+          : `Cloud task ${cloudTask} did not complete successfully (${status}).`,
+        `Manifest: ${result.manifestPath}`,
+        `Runner log: ${result.logPath}`,
+        ...(cloudExecution?.status_url ? [`Cloud status URL: ${cloudExecution.status_url}`] : [])
+      ];
+      return {
+        summary: summaryLines.join('\n'),
+        decision: {
+          approved: status === 'ready' && result.success,
+          feedback: cloudExecution?.error ?? (result.notes.join('\n') || undefined)
+        }
+      };
+    }
+
     const summaryLines = [
       result.success
         ? 'Diagnostics pipeline succeeded.'

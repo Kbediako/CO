@@ -142,6 +142,25 @@ export interface CodexOrchestratorCLIManifest {
       }[];
     }[];
   } | null;
+  cloud_execution?: {
+    task_id: string | null;
+    environment_id: string | null;
+    status: "queued" | "running" | "ready" | "error" | "failed" | "cancelled" | "unknown";
+    status_url: string | null;
+    submitted_at: string | null;
+    completed_at: string | null;
+    last_polled_at: string | null;
+    poll_count: number;
+    poll_interval_seconds: number;
+    timeout_seconds: number;
+    attempts: number;
+    diff_path: string | null;
+    diff_url: string | null;
+    diff_status: "pending" | "available" | "unavailable";
+    apply_status: "not_requested" | "succeeded" | "failed";
+    log_path: string | null;
+    error: string | null;
+  } | null;
   privacy?: {
     mode: "shadow" | "enforce";
     decisions: {

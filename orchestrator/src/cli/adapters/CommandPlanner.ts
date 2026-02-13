@@ -51,6 +51,9 @@ export class CommandPlanner implements PlannerAgent {
     if (stagePlanHints.executionMode) {
       metadata.executionMode = stagePlanHints.executionMode;
     }
+    if (stagePlanHints.cloudEnvId) {
+      metadata.cloudEnvId = stagePlanHints.cloudEnvId;
+    }
     metadata.requiresCloud = requiresCloud;
 
     return {
@@ -111,6 +114,7 @@ interface StagePlanHints {
   aliases: string[];
   requiresCloud?: boolean;
   executionMode?: string | null;
+  cloudEnvId?: string | null;
 }
 
 function extractStagePlanHints(stage: PipelineStage): StagePlanHints {
@@ -137,13 +141,26 @@ function extractStagePlanHints(stage: PipelineStage): StagePlanHints {
   const executionMode = typeof rawExecutionMode === 'string'
     ? rawExecutionMode.trim().toLowerCase() || null
     : null;
+  const rawCloudEnvId = typeof planConfig.cloudEnvId === 'string'
+    ? planConfig.cloudEnvId
+    : typeof planConfig.cloud_env_id === 'string'
+      ? planConfig.cloud_env_id
+      : typeof stageRecord.cloudEnvId === 'string'
+        ? (stageRecord.cloudEnvId as string)
+        : typeof stageRecord.cloud_env_id === 'string'
+          ? (stageRecord.cloud_env_id as string)
+          : undefined;
+  const cloudEnvId = typeof rawCloudEnvId === 'string'
+    ? rawCloudEnvId.trim() || null
+    : null;
 
   return {
     runnable: planConfig.runnable,
     defaultTarget,
     aliases,
     requiresCloud,
-    executionMode
+    executionMode,
+    cloudEnvId
   };
 }
 

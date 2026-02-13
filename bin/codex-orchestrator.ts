@@ -28,6 +28,7 @@ import { splitDelegationConfigOverrides } from '../orchestrator/src/cli/config/d
 
 type ArgMap = Record<string, string | boolean>;
 type OutputFormat = 'json' | 'text';
+type ExecutionModeOption = 'mcp' | 'cloud';
 
 interface RunOutputPayload {
   run_id: string;
@@ -161,6 +162,28 @@ function readStringFlag(flags: ArgMap, key: string): string | undefined {
   return trimmed.length > 0 ? trimmed : undefined;
 }
 
+function resolveExecutionModeFlag(flags: ArgMap): ExecutionModeOption | undefined {
+  const cloudShortcut = flags['cloud'] === true;
+  const rawMode = readStringFlag(flags, 'execution-mode');
+
+  if (cloudShortcut) {
+    if (rawMode && rawMode.toLowerCase() !== 'cloud') {
+      throw new Error('Cannot combine --cloud with --execution-mode values other than cloud.');
+    }
+    return 'cloud';
+  }
+
+  if (!rawMode) {
+    return undefined;
+  }
+
+  const normalized = rawMode.toLowerCase();
+  if (normalized !== 'mcp' && normalized !== 'cloud') {
+    throw new Error('Invalid --execution-mode value. Expected one of: mcp, cloud.');
+  }
+  return normalized;
+}
+
 function applyRlmEnvOverrides(flags: ArgMap, goal?: string): void {
   if (goal) {
     process.env.RLM_GOAL = goal;
@@ -226,6 +249,7 @@ async function handleStart(orchestrator: CodexOrchestrator, rawArgs: string[]): 
   const { positionals, flags } = parseArgs(rawArgs);
   const pipelineId = positionals[0];
   const format: OutputFormat = (flags['format'] as string | undefined) === 'json' ? 'json' : 'text';
+  const executionMode = resolveExecutionModeFlag(flags);
   if (pipelineId === 'rlm') {
     const goal = readStringFlag(flags, 'goal');
     applyRlmEnvOverrides(flags, goal);
@@ -245,6 +269,7 @@ async function handleStart(orchestrator: CodexOrchestrator, rawArgs: string[]): 
       parentRunId: typeof flags['parent-run'] === 'string' ? (flags['parent-run'] as string) : undefined,
       approvalPolicy: typeof flags['approval-policy'] === 'string' ? (flags['approval-policy'] as string) : undefined,
       targetStageId: resolveTargetStageId(flags),
+      executionMode,
       runEvents
     });
     emitRunOutput(result, format, 'Run started');
@@ -825,6 +850,8 @@ Commands:
     --parent-run <id>       Link run to parent run id.
     --approval-policy <p>   Record approval policy metadata.
     --format json           Emit machine-readable output.
+    --execution-mode <mcp|cloud>  Force execution mode for this run and child subpipelines.
+    --cloud                 Shortcut for --execution-mode cloud.
     --target <stage-id>     Focus plan/build metadata on a specific stage (alias: --target-stage).
     --goal "<goal>"         When pipeline is rlm, set the RLM goal.
     --validator <cmd|none>  When pipeline is rlm, set the validator command.

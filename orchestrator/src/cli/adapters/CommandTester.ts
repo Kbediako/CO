@@ -9,6 +9,27 @@ export class CommandTester implements TesterAgent {
 
   async test(input: TestInput): Promise<TestResult> {
     const result = this.requireResult();
+    if (input.mode === 'cloud') {
+      const cloudExecution = result.manifest.cloud_execution;
+      const status = cloudExecution?.status ?? 'unknown';
+      const reports: TestReport[] = [
+        {
+          name: 'cloud-task',
+          status: status === 'ready' ? 'passed' : 'failed',
+          details:
+            cloudExecution?.error ??
+            `Cloud task status: ${status}${cloudExecution?.task_id ? ` (${cloudExecution.task_id})` : ''}`
+        }
+      ];
+
+      return {
+        subtaskId: input.build.subtaskId,
+        success: status === 'ready' && result.success,
+        reports,
+        runId: input.runId
+      };
+    }
+
     const guardrailStatus = ensureGuardrailStatus(result.manifest);
     const reports: TestReport[] = [
       {

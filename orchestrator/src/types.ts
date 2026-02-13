@@ -53,6 +53,7 @@ export interface BuildResult {
   runId: string;
   success: boolean;
   notes?: string;
+  cloudExecution?: CloudExecutionSummary | null;
 }
 
 export interface TestInput {
@@ -110,6 +111,7 @@ export interface RunSummary {
   build: BuildResult;
   test: TestResult;
   review: ReviewResult;
+  cloudExecution?: CloudExecutionSummary | null;
   builds?: BuildResult[];
   tests?: TestResult[];
   reviews?: ReviewResult[];
@@ -123,6 +125,26 @@ export interface RunSummary {
   designArtifactsSummary?: DesignArtifactsSummary;
   designConfigSnapshot?: Record<string, unknown> | null;
   group?: RunGroupSummary;
+}
+
+export interface CloudExecutionSummary {
+  taskId: string | null;
+  environmentId: string | null;
+  status: 'queued' | 'running' | 'ready' | 'error' | 'failed' | 'cancelled' | 'unknown';
+  statusUrl: string | null;
+  submittedAt: string | null;
+  completedAt: string | null;
+  lastPolledAt: string | null;
+  pollCount: number;
+  pollIntervalSeconds: number;
+  timeoutSeconds: number;
+  attempts: number;
+  diffPath: string | null;
+  diffUrl: string | null;
+  diffStatus: 'pending' | 'available' | 'unavailable';
+  applyStatus: 'not_requested' | 'succeeded' | 'failed';
+  logPath: string | null;
+  error: string | null;
 }
 
 export interface RunHandleSummary {
