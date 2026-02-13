@@ -109,7 +109,7 @@ Use `npx @kbediako/codex-orchestrator resume --run <run-id>` to continue interru
 - Pack smoke: `npm run pack:smoke` (installs the tarball in a temp dir and runs `--help`, `--version`, `self-check`; uses network).
 - Release tags: `vX.Y.Z` or `vX.Y.Z-alpha.N` must match `package.json` version.
 - Dist-tags: stable publishes to `latest`; alpha publishes to `alpha` and uses a GitHub prerelease.
-- Publishing auth: workflow exports `NODE_AUTH_TOKEN` from `secrets.NPM_TOKEN`; if set, publish without provenance; if not, the workflow relies on OIDC (`id-token: write`) and adds `--provenance`.
+- Publishing auth: workflow attempts OIDC trusted publishing first (`id-token: write` + `--provenance`), then falls back to `secrets.NPM_TOKEN` when OIDC is unavailable. `secrets.NPM_TOKEN` must be an npm automation token (not a token that requires OTP).
 
 ## Parallel Runs (Meta-Orchestration)
 The orchestrator executes a single pipeline serially. “Parallelism” comes from running multiple orchestrator runs at the same time, ideally in separate git worktrees so builds/tests don’t contend for the same working tree outputs.
