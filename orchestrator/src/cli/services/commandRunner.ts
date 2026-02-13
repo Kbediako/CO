@@ -203,6 +203,7 @@ export async function runCommandStage(
     const baseEnv: NodeJS.ProcessEnv = {
       ...process.env,
       ...(envOverrides ?? {}),
+      MCP_RUNNER_TASK_ID: manifest.task_id,
       CODEX_ORCHESTRATOR_TASK_ID: manifest.task_id,
       CODEX_ORCHESTRATOR_RUN_ID: manifest.run_id,
       CODEX_ORCHESTRATOR_PIPELINE_ID: manifest.pipeline_id,
