@@ -3,7 +3,7 @@
 ## Summary
 - Goal: Deliver a low-friction, validated Codex alignment workflow and clarify custom CLI requirements.
 - Scope: docs-first scaffolding, delegated scout evidence, script/docs updates, automated gates, and manual E2E validation.
-- Assumptions: local codex fork path remains `/Users/kbediako/Code/codex`.
+- Assumptions: local codex fork path is available via `${CODEX_DIR}` (example: `export CODEX_DIR=~/Code/codex`).
 
 ## Milestones and Sequencing
 1) Docs-first scaffolding + checklist mirrors + task index registration.

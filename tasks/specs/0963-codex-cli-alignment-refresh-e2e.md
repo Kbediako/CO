@@ -15,7 +15,7 @@ last_review: 2026-02-14
 
 ## Technical Requirements
 - Functional requirements:
-  - Clarify and implement a reliable local alignment workflow for `/Users/kbediako/Code/codex`.
+  - Clarify and implement a reliable local alignment workflow for `${CODEX_DIR}` (for example `export CODEX_DIR=~/Code/codex`; otherwise substitute your local codex fork path directly in commands).
   - Preserve `codex-orchestrator codex setup` managed install path.
   - Update refresh/setup docs to clearly state when custom/managed CLI is optional vs required.
   - Validate end-to-end manually and capture evidence artifacts.

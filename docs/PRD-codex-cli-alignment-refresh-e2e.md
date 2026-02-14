@@ -7,7 +7,7 @@
 ## User Request Translation (Context Anchor)
 - User intent / needs (in your own words): Plan and execute local Codex alignment, investigate the refresh/jsonl path, decide whether custom CLI is still required, and validate everything manually end-to-end.
 - Success criteria / acceptance:
-  - Local `/Users/kbediako/Code/codex` is aligned to `upstream/main`.
+  - Local codex fork at `${CODEX_DIR}` is aligned to `upstream/main`.
   - CO refresh/setup workflow works from one low-friction path.
   - Docs clearly separate stock CLI path vs managed/custom CLI path.
   - Manual E2E evidence covers refresh + orchestrator behavior.
@@ -54,7 +54,7 @@
   - `scripts/codex-cli-refresh.sh`
   - `orchestrator/src/cli/codexCliSetup.ts`
   - `README.md`
-  - local fork: `/Users/kbediako/Code/codex`
+  - local fork: `${CODEX_DIR}` (example: `export CODEX_DIR=~/Code/codex`)
 
 ## Open Questions
 - Resolved (2026-02-14): refresh script now includes explicit align-only mode (`--align-only`).
