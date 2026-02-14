@@ -67,6 +67,7 @@ On soft cap, stop branching and execute the best current plan. On hard cap, disa
   - `RLM_SYMBOLIC_DELIBERATION_MAX_RUNS=12` (per-run cap)
   - `RLM_SYMBOLIC_DELIBERATION_MAX_SUMMARY_BYTES=2048` (bounded planner context injection)
   - `RLM_SYMBOLIC_DELIBERATION_INCLUDE_IN_PLANNER=1` (inject latest brief into planner prompt)
+  - `RLM_SYMBOLIC_DELIBERATION_LOG=0` (default; set `1` to persist deliberation prompt/output/meta artifacts)
 - When `RLM_SYMBOLIC_COLLAB=1`, deliberation runs through collab lifecycle (`spawn_agent` → `wait` → `close_agent`) with read-only sandboxing.
 
 ### Review signal policy

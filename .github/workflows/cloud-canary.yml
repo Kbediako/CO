@@ -37,8 +37,13 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Install Codex CLI (best effort)
-        run: npm install -g @openai/codex || true
+      - name: Install Codex CLI
+        if: env.CODEX_CLOUD_CANARY_REQUIRED == '1'
+        run: npm install -g @openai/codex
+
+      - name: Verify Codex CLI availability
+        if: env.CODEX_CLOUD_CANARY_REQUIRED == '1'
+        run: codex --version
 
       - name: Run cloud canary
         env:

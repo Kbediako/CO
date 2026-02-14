@@ -8,7 +8,7 @@ import { isoTimestamp } from '../cli/utils/time.js';
 
 const TASK_ID_PATTERN = /\btask_[a-z]_[a-f0-9]+\b/i;
 const MAX_LOG_CHARS = 32 * 1024;
-const STATUS_RETRY_LIMIT = 3;
+const STATUS_RETRY_LIMIT = 12;
 const STATUS_RETRY_BACKOFF_MS = 1500;
 const DEFAULT_LIST_LIMIT = 20;
 
@@ -203,6 +203,8 @@ export class CodexCloudTaskExecutor {
 
       const timeoutAt = Date.now() + cloudExecution.timeout_seconds * 1000;
       let statusRetries = 0;
+      let lastKnownStatus: CloudExecutionManifest['status'] = cloudExecution.status;
+      let loggedNonZeroStatus = false;
       while (Date.now() < timeoutAt) {
         const statusResult = await runCloudCommand(['cloud', 'status', taskId]);
         cloudExecution.last_polled_at = this.now();
@@ -222,10 +224,17 @@ export class CodexCloudTaskExecutor {
           await this.sleepFn(STATUS_RETRY_BACKOFF_MS * statusRetries);
           continue;
         }
+        if (statusResult.exitCode !== 0 && mapped !== 'unknown' && !loggedNonZeroStatus) {
+          notes.push(
+            `Cloud status returned exit ${statusResult.exitCode} with remote status ${mapped}; continuing to poll.`
+          );
+          loggedNonZeroStatus = true;
+        }
         statusRetries = 0;
 
         if (mapped !== 'unknown') {
           cloudExecution.status = mapped;
+          lastKnownStatus = mapped;
         }
 
         if (mapped === 'ready') {
@@ -241,7 +250,7 @@ export class CodexCloudTaskExecutor {
 
       if (cloudExecution.status === 'running' || cloudExecution.status === 'queued') {
         cloudExecution.status = 'failed';
-        cloudExecution.error = `Timed out waiting for cloud task completion after ${cloudExecution.timeout_seconds}s.`;
+        cloudExecution.error = `Timed out waiting for cloud task completion after ${cloudExecution.timeout_seconds}s (last remote status: ${lastKnownStatus}, polls: ${cloudExecution.poll_count}).`;
       }
 
       if (cloudExecution.status === 'ready') {

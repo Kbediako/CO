@@ -291,11 +291,11 @@ async function resolveContextSource(
 async function promptForValidator(candidates: ValidatorCandidate[]): Promise<string | null> {
   const rl = createInterface({ input: process.stdin, output: process.stdout });
   try {
-    console.log('Validator auto-detect found multiple candidates:');
+    logger.info('Validator auto-detect found multiple candidates:');
     candidates.forEach((candidate, index) => {
-      console.log(`  ${index + 1}) ${candidate.command} (${candidate.reason})`);
+      logger.info(`  ${index + 1}) ${candidate.command} (${candidate.reason})`);
     });
-    console.log('  n) none');
+    logger.info('  n) none');
     const answer = (await rl.question('Select validator [1-n or n for none]: ')).trim().toLowerCase();
     if (!answer || answer === 'n' || answer === 'none') {
       return null;
@@ -736,7 +736,7 @@ async function main(): Promise<void> {
     state.final = { status, exitCode };
     await writeTerminalState(runDir, state);
     if (message) {
-      console.error(message);
+      logger.error(message);
     }
     process.exitCode = exitCode;
   };
@@ -911,7 +911,7 @@ async function main(): Promise<void> {
       const detection = await detectValidator(repoRoot);
       if (detection.status === 'selected' && detection.command) {
         validatorCommand = detection.command;
-        console.log(`Validator: ${detection.command} (${detection.reason ?? 'auto-detect'})`);
+        logger.info(`Validator: ${detection.command} (${detection.reason ?? 'auto-detect'})`);
       } else if (detection.status === 'ambiguous') {
         if (isInteractive) {
           validatorCommand = await promptForValidator(detection.candidates);
@@ -925,9 +925,9 @@ async function main(): Promise<void> {
             maxIterations,
             maxMinutes: resolvedMaxMinutes,
             mode,
-            context: contextInfo
-          });
-          console.error(candidates);
+              context: contextInfo
+            });
+          logger.error(candidates);
           return;
         }
       } else {
@@ -949,9 +949,9 @@ async function main(): Promise<void> {
   }
 
   if (validatorCommand === null) {
-    console.log('Validator: none');
+    logger.info('Validator: none');
   } else {
-    console.log(`Validator: ${validatorCommand}`);
+    logger.info(`Validator: ${validatorCommand}`);
   }
 
   const subagentsEnabled = envFlagEnabled(env.CODEX_SUBAGENTS) || envFlagEnabled(env.RLM_SUBAGENTS);
@@ -964,6 +964,7 @@ async function main(): Promise<void> {
     env.RLM_SYMBOLIC_DELIBERATION_INCLUDE_IN_PLANNER === undefined
       ? true
       : envFlagEnabled(env.RLM_SYMBOLIC_DELIBERATION_INCLUDE_IN_PLANNER);
+  const symbolicDeliberationLogArtifacts = envFlagEnabled(env.RLM_SYMBOLIC_DELIBERATION_LOG);
   const nonInteractive = shouldForceNonInteractive(env);
 
   if (mode === 'symbolic') {
@@ -1105,6 +1106,7 @@ async function main(): Promise<void> {
         maxRuns: deliberationMaxRuns,
         maxSummaryBytes: deliberationMaxSummaryBytes,
         includeInPlannerPrompt: symbolicDeliberationIncludeInPlanner,
+        logArtifacts: symbolicDeliberationLogArtifacts,
         run: (prompt, _meta) => {
           void _meta;
           if (!symbolicCollabEnabled) {
@@ -1126,7 +1128,7 @@ async function main(): Promise<void> {
 
     const finalStatus = result.state.final?.status ?? 'unknown';
     const iterationCount = result.state.symbolic_iterations.length;
-    console.log(`RLM completed: status=${finalStatus} symbolic_iterations=${iterationCount} exit=${result.exitCode}`);
+    logger.info(`RLM completed: status=${finalStatus} symbolic_iterations=${iterationCount} exit=${result.exitCode}`);
     process.exitCode = result.exitCode;
     return;
   }
@@ -1149,11 +1151,11 @@ async function main(): Promise<void> {
 
   const finalStatus = result.state.final?.status ?? 'unknown';
   const iterationCount = result.state.iterations.length;
-  console.log(`RLM completed: status=${finalStatus} iterations=${iterationCount} exit=${result.exitCode}`);
+  logger.info(`RLM completed: status=${finalStatus} iterations=${iterationCount} exit=${result.exitCode}`);
   const hasTimeCap = resolvedMaxMinutes !== null && resolvedMaxMinutes > 0;
   const unboundedBudgetInvalid = validatorCommand === null && maxIterations === 0 && !hasTimeCap;
   if (finalStatus === 'invalid_config' && unboundedBudgetInvalid) {
-    console.error(
+    logger.error(
       'Invalid configuration: --validator none with unbounded iterations and --max-minutes 0 would run forever. Fix: set --max-minutes / RLM_MAX_MINUTES to a positive value (default 2880), set --max-iterations to a positive value, or provide a validator.'
     );
   }

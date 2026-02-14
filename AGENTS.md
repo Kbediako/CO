@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp 73c1e22afab49f8a1f787e2291116afaea4e8ec9da2400de4c19d073f3a66fc3 -->
+<!-- codex:instruction-stamp ca12820f4d5f054bc013fe138058213b1fc251b72d5ab6629937397dcba2f91c -->
 # Codex-Orchestrator Agent Handbook (Template)
 
 Use this repository as the wrapper that coordinates multiple Codex-driven projects. After cloning, replace placeholder metadata (task IDs, documents, SOPs) with values for each downstream initiative while keeping these shared guardrails in place.
@@ -58,6 +58,7 @@ Use this repository as the wrapper that coordinates multiple Codex-driven projec
 - Use `.agent/task/templates/tech-spec-template.md` for TECH_SPECs and `.agent/task/templates/action-plan-template.md` for ACTION_PLANs.
 - Prefer the bundled `docs-first` skill for consistent steps.
 - Translate the user request into the PRD and update it as you learn new constraints or scope changes.
+- For low-risk tiny changes, use the bounded micro-task path in `docs/micro-task-path.md` (still requires task/spec evidence).
 
 ## Standalone Reviews (Ad-hoc)
 - Use `codex review` for quick reviews during implementation; prefer a targeted prompt.
