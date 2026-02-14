@@ -78,6 +78,9 @@ export interface RlmSymbolicSubcallArtifacts {
 export interface RlmSymbolicSubcall {
   id: string;
   purpose: string;
+  parent_pointer?: string;
+  output_pointer?: string;
+  output_var?: string;
   snippets?: RlmSymbolicSnippet[];
   spans?: RlmSymbolicSpan[];
   max_input_bytes: number;
@@ -87,6 +90,15 @@ export interface RlmSymbolicSubcall {
     bytes: boolean;
   };
   status?: string;
+}
+
+export interface RlmSymbolicVariableBinding {
+  name: string;
+  pointer: string;
+  iteration: number;
+  subcall_id: string;
+  output_bytes: number;
+  output_path: string;
 }
 
 export interface RlmSymbolicDeliberationArtifacts {
@@ -110,6 +122,7 @@ export interface RlmSymbolicIteration {
   planner_prompt_bytes: number;
   reads: RlmSymbolicRead[];
   subcalls: RlmSymbolicSubcall[];
+  variable_bindings?: RlmSymbolicVariableBinding[];
   deliberation?: RlmSymbolicDeliberation;
   searches?: RlmSymbolicSearch[];
   planner_errors?: string[];

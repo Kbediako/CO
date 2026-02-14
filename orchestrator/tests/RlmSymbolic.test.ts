@@ -100,11 +100,115 @@ describe('symbolic rlm loop', () => {
     const firstIteration = result.state.symbolic_iterations[0];
     expect(firstIteration.planner_prompt_bytes).toBeLessThanOrEqual(budgets.maxPlannerPromptBytes);
     expect(firstIteration.subcalls.length).toBe(1);
+    expect(firstIteration.subcalls[0]?.output_pointer).toBe('subcall:1:sc0001');
     const artifacts = firstIteration.subcalls[0]?.artifact_paths;
     expect(artifacts?.output).toBeTruthy();
     expect(artifacts).toBeDefined();
     const outputText = await readFile(join(repoRoot, artifacts.output), 'utf8');
     expect(outputText).toContain('summary output');
+  });
+
+  it('chains via subcall pointers and records lineage metadata', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'rlm-symbolic-'));
+    const repoRoot = tempDir;
+    const runDir = join(repoRoot, 'rlm');
+    const contextObject = await buildContextObject({
+      source: { type: 'text', value: 'alpha beta gamma delta epsilon' },
+      targetDir: join(runDir, 'context'),
+      chunking: { targetBytes: 64, overlapBytes: 0, strategy: 'byte' }
+    });
+
+    const baseState: RlmState = {
+      version: 1,
+      mode: 'symbolic',
+      context: {
+        object_id: contextObject.index.object_id,
+        index_path: relative(repoRoot, contextObject.indexPath),
+        chunk_count: contextObject.index.chunks.length
+      },
+      symbolic_iterations: [],
+      goal: 'Chain subcall outputs',
+      validator: 'none',
+      roles: 'single',
+      maxIterations: 3,
+      maxMinutes: null,
+      iterations: []
+    };
+
+    const budgets: SymbolicBudgets = {
+      maxSubcallsPerIteration: 1,
+      maxSearchesPerIteration: 0,
+      maxChunkReadsPerIteration: 0,
+      maxBytesPerChunkRead: 64,
+      maxSnippetsPerSubcall: 1,
+      maxBytesPerSnippet: 64,
+      maxSubcallInputBytes: 512,
+      maxPlannerPromptBytes: 4096,
+      searchTopK: 5,
+      maxPreviewBytes: 32,
+      maxConcurrency: 1
+    };
+
+    const pointer = `ctx:${contextObject.index.object_id}#chunk:${contextObject.index.chunks[0].id}`;
+    const plans = [
+      JSON.stringify({
+        schema_version: 1,
+        intent: 'continue',
+        subcalls: [
+          { purpose: 'summarize', snippets: [{ pointer, offset: 0, bytes: 8 }], max_input_bytes: 256 }
+        ]
+      }),
+      JSON.stringify({
+        schema_version: 1,
+        intent: 'continue',
+        subcalls: [
+          {
+            purpose: 'summarize',
+            parent_pointer: 'subcall:1:sc0001',
+            snippets: [{ pointer: 'subcall:1:sc0001', offset: 0, bytes: 6 }],
+            max_input_bytes: 256
+          }
+        ]
+      }),
+      JSON.stringify({ schema_version: 1, intent: 'final', final_answer: 'done' })
+    ];
+    let planIndex = 0;
+    const plannerPrompts: string[] = [];
+    const subcallPrompts: string[] = [];
+
+    const result = await runSymbolicLoop({
+      goal: baseState.goal,
+      baseState,
+      maxIterations: 3,
+      maxMinutes: null,
+      repoRoot,
+      runDir,
+      contextStore: new ContextStore(contextObject),
+      budgets,
+      runPlanner: async (prompt) => {
+        plannerPrompts.push(prompt);
+        return plans[planIndex++] ?? plans[plans.length - 1];
+      },
+      runSubcall: async (prompt, meta) => {
+        subcallPrompts.push(prompt);
+        if (meta.id === 'sc0001') {
+          return 'FIRST_SUBCALL_OUTPUT';
+        }
+        return 'SECOND_SUBCALL_OUTPUT';
+      }
+    });
+
+    expect(result.exitCode).toBe(0);
+    expect(result.state.final?.final_answer).toBe('done');
+    expect(plannerPrompts[1]).toContain('Prior subcall references:');
+    expect(plannerPrompts[1]).toContain('subcall:1:sc0001');
+    expect(subcallPrompts[1]).toContain('FIRST_');
+
+    const firstSubcall = result.state.symbolic_iterations[0]?.subcalls[0];
+    const secondSubcall = result.state.symbolic_iterations[1]?.subcalls[0];
+    expect(firstSubcall?.output_pointer).toBe('subcall:1:sc0001');
+    expect(secondSubcall?.parent_pointer).toBe('subcall:1:sc0001');
+    expect(secondSubcall?.output_pointer).toBe('subcall:2:sc0001');
   });
 
   it('auto-runs deliberation and injects the brief into planner prompts', async () => {
@@ -728,6 +832,174 @@ describe('symbolic rlm loop', () => {
     expect(result.state.final?.final_answer).toBe('done');
     expect(result.state.symbolic_iterations[0].planner_errors).toContain('final_requires_subcall');
     expect(result.state.symbolic_iterations[0].subcalls.length).toBeGreaterThan(0);
+  });
+
+  it('resolves final_var from a prior subcall output_var binding', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'rlm-symbolic-'));
+    const repoRoot = tempDir;
+    const runDir = join(repoRoot, 'rlm');
+    const contextObject = await buildContextObject({
+      source: { type: 'text', value: 'alpha beta gamma delta epsilon' },
+      targetDir: join(runDir, 'context'),
+      chunking: { targetBytes: 32, overlapBytes: 0, strategy: 'byte' }
+    });
+
+    const baseState: RlmState = {
+      version: 1,
+      mode: 'symbolic',
+      context: {
+        object_id: contextObject.index.object_id,
+        index_path: relative(repoRoot, contextObject.indexPath),
+        chunk_count: contextObject.index.chunks.length
+      },
+      symbolic_iterations: [],
+      goal: 'Summarize context',
+      validator: 'none',
+      roles: 'single',
+      maxIterations: 2,
+      maxMinutes: null,
+      iterations: []
+    };
+
+    const budgets: SymbolicBudgets = {
+      maxSubcallsPerIteration: 1,
+      maxSearchesPerIteration: 0,
+      maxChunkReadsPerIteration: 0,
+      maxBytesPerChunkRead: 64,
+      maxSnippetsPerSubcall: 1,
+      maxBytesPerSnippet: 64,
+      maxSubcallInputBytes: 512,
+      maxPlannerPromptBytes: 4096,
+      searchTopK: 5,
+      maxPreviewBytes: 32,
+      maxConcurrency: 1
+    };
+
+    const pointer = `ctx:${contextObject.index.object_id}#chunk:${contextObject.index.chunks[0].id}`;
+    const plans = [
+      JSON.stringify({
+        schema_version: 1,
+        intent: 'continue',
+        subcalls: [
+          {
+            purpose: 'summarize',
+            snippets: [{ pointer, offset: 0, bytes: 8 }],
+            output_var: 'summary',
+            max_input_bytes: 256
+          }
+        ]
+      }),
+      JSON.stringify({ schema_version: 1, intent: 'final', final_var: 'summary' })
+    ];
+    let planIndex = 0;
+
+    const result = await runSymbolicLoop({
+      goal: baseState.goal,
+      baseState,
+      maxIterations: 2,
+      maxMinutes: null,
+      repoRoot,
+      runDir,
+      contextStore: new ContextStore(contextObject),
+      budgets,
+      runPlanner: async () => plans[planIndex++] ?? plans[plans.length - 1],
+      runSubcall: async () => 'summary output from variable'
+    });
+
+    expect(result.exitCode).toBe(0);
+    expect(result.state.final?.final_answer).toBe('summary output from variable');
+    const firstIteration = result.state.symbolic_iterations[0];
+    expect(firstIteration.subcalls[0]?.output_var).toBe('summary');
+    expect(firstIteration.variable_bindings?.[0]).toEqual(
+      expect.objectContaining({
+        name: 'summary',
+        pointer: 'subcall:1:sc0001',
+        subcall_id: 'sc0001'
+      })
+    );
+  });
+
+  it('retries then fails when final_var is unbound', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'rlm-symbolic-'));
+    const repoRoot = tempDir;
+    const runDir = join(repoRoot, 'rlm');
+    const contextObject = await buildContextObject({
+      source: { type: 'text', value: 'alpha beta gamma delta epsilon' },
+      targetDir: join(runDir, 'context'),
+      chunking: { targetBytes: 32, overlapBytes: 0, strategy: 'byte' }
+    });
+
+    const baseState: RlmState = {
+      version: 1,
+      mode: 'symbolic',
+      context: {
+        object_id: contextObject.index.object_id,
+        index_path: relative(repoRoot, contextObject.indexPath),
+        chunk_count: contextObject.index.chunks.length
+      },
+      symbolic_iterations: [],
+      goal: 'Summarize context',
+      validator: 'none',
+      roles: 'single',
+      maxIterations: 2,
+      maxMinutes: null,
+      iterations: []
+    };
+
+    const budgets: SymbolicBudgets = {
+      maxSubcallsPerIteration: 1,
+      maxSearchesPerIteration: 0,
+      maxChunkReadsPerIteration: 0,
+      maxBytesPerChunkRead: 64,
+      maxSnippetsPerSubcall: 1,
+      maxBytesPerSnippet: 64,
+      maxSubcallInputBytes: 512,
+      maxPlannerPromptBytes: 4096,
+      searchTopK: 5,
+      maxPreviewBytes: 32,
+      maxConcurrency: 1
+    };
+
+    const pointer = `ctx:${contextObject.index.object_id}#chunk:${contextObject.index.chunks[0].id}`;
+    const plans = [
+      JSON.stringify({
+        schema_version: 1,
+        intent: 'continue',
+        subcalls: [
+          {
+            purpose: 'summarize',
+            snippets: [{ pointer, offset: 0, bytes: 8 }],
+            output_var: 'summary',
+            max_input_bytes: 256
+          }
+        ]
+      }),
+      JSON.stringify({ schema_version: 1, intent: 'final', final_var: 'missing' }),
+      JSON.stringify({ schema_version: 1, intent: 'final', final_var: 'missing' })
+    ];
+    let planIndex = 0;
+    const plannerPrompts: string[] = [];
+
+    const result = await runSymbolicLoop({
+      goal: baseState.goal,
+      baseState,
+      maxIterations: 2,
+      maxMinutes: null,
+      repoRoot,
+      runDir,
+      contextStore: new ContextStore(contextObject),
+      budgets,
+      runPlanner: async (prompt) => {
+        plannerPrompts.push(prompt);
+        return plans[planIndex++] ?? plans[plans.length - 1];
+      },
+      runSubcall: async () => 'summary output from variable'
+    });
+
+    expect(result.exitCode).toBe(5);
+    expect(result.state.final?.status).toBe('invalid_config');
+    expect(plannerPrompts.length).toBe(3);
+    expect(plannerPrompts[2]).toContain('final_var_unbound');
   });
 });
 
