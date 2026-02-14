@@ -46,6 +46,7 @@ describe('evaluateInteractiveGate', () => {
     const result = evaluateInteractiveGate({
       requested: true,
       env: { CI: 'true' } as NodeJS.ProcessEnv,
+      term: 'xterm-256color',
       stdoutIsTTY: true,
       stderrIsTTY: true
     });

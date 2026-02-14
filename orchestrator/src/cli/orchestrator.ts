@@ -77,6 +77,7 @@ import { RunEventStream, attachRunEventAdapter } from './events/runEventStream.j
 import { CLI_EXECUTION_MODE_PARSER, resolveRequiresCloudPolicy } from '../utils/executionMode.js';
 import { resolveCodexCliBin } from './utils/codexCli.js';
 import { CodexCloudTaskExecutor } from '../cloud/CodexCloudTaskExecutor.js';
+import { persistPipelineExperience } from './services/pipelineExperience.js';
 
 const resolveBaseEnvironment = (): EnvironmentPaths =>
   normalizeEnvironmentPaths(resolveEnvironmentPaths());
@@ -123,6 +124,23 @@ function readCloudNumber(raw: string | undefined, fallback: number): number {
     return fallback;
   }
   return parsed;
+}
+
+function readCloudFeatureList(raw: string | null | undefined): string[] {
+  if (!raw) {
+    return [];
+  }
+  const seen = new Set<string>();
+  const features: string[] = [];
+  for (const token of raw.split(/[,\s]+/u)) {
+    const feature = token.trim();
+    if (!feature || seen.has(feature)) {
+      continue;
+    }
+    seen.add(feature);
+    features.push(feature);
+  }
+  return features;
 }
 
 function resolveCloudEnvironmentId(
@@ -786,6 +804,7 @@ export class CodexOrchestrator {
         `Heartbeat update failed for run ${manifest.run_id}: ${(error as Error)?.message ?? String(error)}`
       );
     });
+    await persistPipelineExperience({ env, pipeline, manifest, paths });
     await schedulePersist({ force: true });
     await appendMetricsEntry(env, paths, manifest, persister);
 
@@ -937,6 +956,14 @@ export class CodexOrchestrator {
           const branch =
             readCloudString(envOverrides?.CODEX_CLOUD_BRANCH) ??
             readCloudString(process.env.CODEX_CLOUD_BRANCH);
+          const enableFeatures = readCloudFeatureList(
+            readCloudString(envOverrides?.CODEX_CLOUD_ENABLE_FEATURES) ??
+              readCloudString(process.env.CODEX_CLOUD_ENABLE_FEATURES)
+          );
+          const disableFeatures = readCloudFeatureList(
+            readCloudString(envOverrides?.CODEX_CLOUD_DISABLE_FEATURES) ??
+              readCloudString(process.env.CODEX_CLOUD_DISABLE_FEATURES)
+          );
           const codexBin = resolveCodexCliBin({ ...process.env, ...(envOverrides ?? {}) });
           const cloudResult = await executor.execute({
             codexBin,
@@ -948,6 +975,8 @@ export class CodexOrchestrator {
             timeoutSeconds,
             attempts,
             branch,
+            enableFeatures,
+            disableFeatures,
             env: envOverrides
           });
 
@@ -997,6 +1026,7 @@ export class CodexOrchestrator {
         `Heartbeat update failed for run ${manifest.run_id}: ${(error as Error)?.message ?? String(error)}`
       );
     });
+    await persistPipelineExperience({ env, pipeline, manifest, paths });
     await schedulePersist({ force: true });
     await appendMetricsEntry(env, paths, manifest, persister);
 

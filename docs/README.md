@@ -53,6 +53,8 @@ Group execution (when `FEATURE_TFGRPO_GROUP=on`): repeat the Builder → Tester 
 - Manifests record the tag, commit SHA, tarball digest/path, queue payload path, and validation status (`validated`, `snapshot_failed`, `stalled_snapshot`, `needs_manual_scenario`) under `learning.*` so reviewers can audit outcomes without external storage.
 - Scenario synthesis replays the most recent successful command from the run (or prompt/diff fallback), writes `learning/scenario.json`, and automatically executes the commands; validation logs live at `learning/scenario-validation.log` and are stored in `learning.validation.log_path`.
 - Override snapshot storage with `LEARNING_SNAPSHOT_DIR=/custom/dir` when needed; the default lives under `.runs/learning-snapshots/` (or `$CODEX_ORCHESTRATOR_RUNS_DIR/learning-snapshots/` when configured).
+- Successful pipeline runs also persist lightweight experience records in `out/<task-id>/experiences.jsonl` using prompt-pack domains, so future runs can inject higher-signal context without requiring learning snapshots.
+- Prompt-pack injections apply a minimum reward threshold (`TFGRPO_EXPERIENCE_MIN_REWARD`, default `0.1`) to avoid re-injecting low-signal records.
 
 ### How to run the learning pipeline locally
 - Seed a normal run and keep manifests grouped by task:
@@ -199,7 +201,7 @@ Note: the commands below assume a source checkout; `scripts/` helpers are not in
 | `npm run eval:test` | Optional evaluation harness (enable when `evaluation/fixtures/**` is populated). |
 | `npm run docs:check` | Deterministically validates scripts/pipelines/paths referenced in agent-facing docs. |
 | `npm run docs:freshness` | Validates docs registry coverage + review recency; writes `out/<task-id>/docs-freshness.json`. |
-| `npm run ci:cloud-canary` | Runs the cloud canary harness (`scripts/cloud-canary-ci.mjs`) to verify cloud lifecycle manifest + run-summary evidence; credential-gated by `CODEX_CLOUD_ENV_ID` and optional auth secrets (`CODEX_CLOUD_BRANCH` defaults to `main`). |
+| `npm run ci:cloud-canary` | Runs the cloud canary harness (`scripts/cloud-canary-ci.mjs`) to verify cloud lifecycle manifest + run-summary evidence; credential-gated by `CODEX_CLOUD_ENV_ID` and optional auth secrets (`CODEX_CLOUD_BRANCH` defaults to `main`). Feature flags can be passed through with `CODEX_CLOUD_ENABLE_FEATURES` / `CODEX_CLOUD_DISABLE_FEATURES` (comma- or space-delimited, e.g. `sqlite,memory_tool`). |
 | `node scripts/delegation-guard.mjs` | Enforces subagent delegation evidence before review (repo-only). |
 | `node scripts/spec-guard.mjs --dry-run` | Validates spec freshness; required before review (repo-only). |
 | `node scripts/diff-budget.mjs` | Guards against oversized diffs before review (repo-only; defaults: 25 files / 800 lines; supports explicit overrides). |

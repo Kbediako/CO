@@ -197,6 +197,71 @@ describe('CodexCloudTaskExecutor', () => {
     expect(result.cloudExecution.status).toBe('failed');
     expect(result.cloudExecution.diff_status).toBe('unavailable');
   });
+
+  it('passes branch and feature toggles through to cloud exec', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'cloud-exec-flags-'));
+    const runner = vi
+      .fn<Parameters<CloudCommandRunner>, ReturnType<CloudCommandRunner>>()
+      .mockResolvedValueOnce({
+        exitCode: 0,
+        stdout: `Submitted: ${TASK_ID}\n`,
+        stderr: ''
+      })
+      .mockResolvedValueOnce({
+        exitCode: 0,
+        stdout: JSON.stringify({ tasks: [{ id: TASK_ID, url: `https://chatgpt.com/codex/tasks/${TASK_ID}` }] }),
+        stderr: ''
+      })
+      .mockResolvedValueOnce({
+        exitCode: 0,
+        stdout: '[READY] test task\n',
+        stderr: ''
+      })
+      .mockResolvedValueOnce({
+        exitCode: 0,
+        stdout: '',
+        stderr: ''
+      });
+
+    const executor = new CodexCloudTaskExecutor({
+      commandRunner: runner,
+      now: () => '2026-02-13T00:00:00.000Z',
+      sleepFn: async () => {}
+    });
+
+    await executor.execute({
+      codexBin: 'codex',
+      prompt: 'Fix the issue',
+      environmentId: 'env_123',
+      repoRoot: root,
+      runDir: join(root, '.runs', 'task', 'cli', 'run-1'),
+      pollIntervalSeconds: 1,
+      timeoutSeconds: 60,
+      attempts: 1,
+      branch: 'main',
+      enableFeatures: ['sqlite', 'memory_tool', 'sqlite'],
+      disableFeatures: ['js_repl']
+    });
+
+    expect(runner).toHaveBeenCalledTimes(4);
+    expect(runner.mock.calls[0]?.[0].args).toEqual([
+      'cloud',
+      'exec',
+      '--env',
+      'env_123',
+      '--attempts',
+      '1',
+      '--branch',
+      'main',
+      '--enable',
+      'sqlite',
+      '--enable',
+      'memory_tool',
+      '--disable',
+      'js_repl',
+      'Fix the issue'
+    ]);
+  });
 });
 
 describe('cloud task parsing helpers', () => {

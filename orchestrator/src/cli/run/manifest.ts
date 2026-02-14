@@ -49,6 +49,7 @@ interface GuardrailCounts {
 const HEARTBEAT_INTERVAL_SECONDS = 5;
 const HEARTBEAT_STALE_AFTER_SECONDS = 30;
 const MAX_ERROR_DETAIL_CHARS = 8 * 1024;
+const DEFAULT_MIN_EXPERIENCE_REWARD = 0.1;
 
 export async function bootstrapManifest(runId: string, options: ManifestBootstrapOptions): Promise<{
   manifest: CliManifest;
@@ -123,9 +124,11 @@ export async function bootstrapManifest(runId: string, options: ManifestBootstra
       if (!pack.experienceSlots) {
         return [];
       }
+      const minReward = resolveExperienceMinReward();
       const records = await experienceStore.fetchTop({
         domain: pack.domain,
         limit: pack.experienceSlots,
+        minReward,
         taskId: env.taskId
       });
       return formatExperienceInjections(records, pack.experienceSlots);
@@ -221,6 +224,18 @@ function sanitizeErrorDetails(details: Record<string, unknown>): Record<string, 
     }
   }
   return sanitized;
+}
+
+function resolveExperienceMinReward(env: NodeJS.ProcessEnv = process.env): number {
+  const raw = env.TFGRPO_EXPERIENCE_MIN_REWARD;
+  if (!raw || !raw.trim()) {
+    return DEFAULT_MIN_EXPERIENCE_REWARD;
+  }
+  const parsed = Number.parseFloat(raw);
+  if (!Number.isFinite(parsed)) {
+    return DEFAULT_MIN_EXPERIENCE_REWARD;
+  }
+  return parsed;
 }
 
 export function updateHeartbeat(manifest: CliManifest): void {

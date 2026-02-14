@@ -433,9 +433,11 @@ describe('executeExecCommand', () => {
     const lines = serialized.trim().split('\n');
     expect(lines).toHaveLength(1);
     const stored = JSON.parse(lines[0] as string) as {
+      reward: { gtScore: number };
       toolStats: Array<{ tool: string }>;
     };
     expect(stored.toolStats[0]?.tool).toBe('cli:command');
+    expect(stored.reward.gtScore).toBe(1);
 
     const manifestPath = join(workspaceRoot, result.manifestPath);
     const manifest = JSON.parse(await readFile(manifestPath, 'utf8')) as {
