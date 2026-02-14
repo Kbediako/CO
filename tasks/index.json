@@ -1198,6 +1198,22 @@
       },
       "created_at": "2026-02-14",
       "completed_at": null
+    },
+    {
+      "id": "0963",
+      "slug": "0963-codex-cli-alignment-refresh-e2e",
+      "title": "Codex CLI Alignment + Refresh E2E",
+      "path": "tasks/tasks-0963-codex-cli-alignment-refresh-e2e.md",
+      "kind": "plan",
+      "status": "in-progress",
+      "gate": {
+        "phase": "codex-cli-alignment-refresh-e2e-implementation",
+        "status": "succeeded",
+        "log": ".runs/0963-codex-cli-alignment-refresh-e2e/cli/2026-02-14T22-06-33-925Z-1460cf12/manifest.json",
+        "run_id": "2026-02-14T22-06-33-925Z-1460cf12"
+      },
+      "created_at": "2026-02-14",
+      "completed_at": null
     }
   ],
   "specs": [
@@ -1407,6 +1423,22 @@
         "task": "tasks/tasks-0962-release-cloud-rlm-hardening.md",
         "agent_task": ".agent/task/0962-release-cloud-rlm-hardening.md",
         "docs": "docs/TECH_SPEC-release-cloud-rlm-hardening.md"
+      }
+    },
+    {
+      "id": "20260214-0963-codex-cli-alignment-refresh-e2e",
+      "title": "Codex CLI Alignment + Refresh E2E",
+      "relates_to": "tasks/tasks-0963-codex-cli-alignment-refresh-e2e.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-02-14",
+      "paths": {
+        "spec": "tasks/specs/0963-codex-cli-alignment-refresh-e2e.md",
+        "task": "tasks/tasks-0963-codex-cli-alignment-refresh-e2e.md",
+        "agent_task": ".agent/task/0963-codex-cli-alignment-refresh-e2e.md",
+        "docs": "docs/TECH_SPEC-codex-cli-alignment-refresh-e2e.md"
       }
     }
   ]

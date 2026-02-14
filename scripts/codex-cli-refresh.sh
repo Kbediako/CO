@@ -5,10 +5,11 @@ REPO_DEFAULT="$HOME/Code/codex"
 REPO=""
 PUSH=1
 FORCE_REBUILD=0
+ALIGN_ONLY=0
 
 usage() {
   cat <<'USAGE'
-Usage: scripts/codex-cli-refresh.sh [--repo <path>] [--no-push] [--force-rebuild]
+Usage: scripts/codex-cli-refresh.sh [--repo <path>] [--no-push] [--force-rebuild] [--align-only]
 
 Sync upstream Codex, optionally push the fork, and rebuild the CO-managed Codex CLI.
 
@@ -16,6 +17,7 @@ Options:
   --repo <path>      Path to codex repo (default: $CODEX_REPO, $CODEX_CLI_SOURCE, or ~/Code/codex)
   --no-push          Do not push updates to origin/main
   --force-rebuild    Rebuild codex CLI even if no new upstream commits
+  --align-only       Align fork only (skip CO-managed CLI rebuild; mutually exclusive with --force-rebuild)
 USAGE
 }
 
@@ -38,6 +40,10 @@ while [[ $# -gt 0 ]]; do
       FORCE_REBUILD=1
       shift
       ;;
+    --align-only)
+      ALIGN_ONLY=1
+      shift
+      ;;
     -h|--help)
       usage
       exit 0
@@ -48,7 +54,13 @@ while [[ $# -gt 0 ]]; do
       exit 1
       ;;
   esac
- done
+done
+
+if [[ "$ALIGN_ONLY" -eq 1 && "$FORCE_REBUILD" -eq 1 ]]; then
+  echo "Error: --align-only and --force-rebuild are mutually exclusive." >&2
+  usage >&2
+  exit 1
+fi
 
 if [[ -z "$REPO" ]]; then
   if [[ -n "${CODEX_REPO:-}" ]]; then
@@ -108,6 +120,12 @@ if [[ "$PUSH" -eq 1 ]]; then
   else
     echo "[codex-cli-refresh] origin remote missing; skipping push."
   fi
+fi
+
+if [[ "$ALIGN_ONLY" -eq 1 ]]; then
+  echo "[codex-cli-refresh] Skipping rebuild (--align-only)."
+  echo "[codex-cli-refresh] To rebuild managed CLI later: codex-orchestrator codex setup --source \"$REPO\" --yes --force"
+  exit 0
 fi
 
 if [[ "$BEFORE" == "$AFTER" && "$FORCE_REBUILD" -eq 0 ]]; then
