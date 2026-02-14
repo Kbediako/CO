@@ -62,6 +62,7 @@
     "eval:test": "vitest run evaluation/tests",
     "test:watch": "vitest",
     "review": "node --loader ts-node/esm scripts/run-review.ts",
+    "pr:watch-merge": "node scripts/pr-monitor-merge.mjs",
     "status-ui": "node scripts/status-ui-serve.mjs",
     "design:purge-expired": "node --loader ts-node/esm scripts/design/purgeExpired.ts",
     "generate:manifest-types": "node scripts/generate-manifest-types.mjs",

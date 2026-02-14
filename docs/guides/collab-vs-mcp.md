@@ -59,6 +59,16 @@ Criteria: reversibility, external impact, security/privacy boundary, blast radiu
 
 On soft cap, stop branching and execute the best current plan. On hard cap, disable auto-deliberation for that stage and continue execution.
 
+### Symbolic RLM auto-deliberation knobs
+- Symbolic runs auto-trigger deliberation by default to keep planning context synchronized.
+- Runtime knobs:
+  - `RLM_SYMBOLIC_DELIBERATION=1` (default; set `0` to disable)
+  - `RLM_SYMBOLIC_DELIBERATION_INTERVAL=2` (run cadence in iterations)
+  - `RLM_SYMBOLIC_DELIBERATION_MAX_RUNS=12` (per-run cap)
+  - `RLM_SYMBOLIC_DELIBERATION_MAX_SUMMARY_BYTES=2048` (bounded planner context injection)
+  - `RLM_SYMBOLIC_DELIBERATION_INCLUDE_IN_PLANNER=1` (inject latest brief into planner prompt)
+- When `RLM_SYMBOLIC_COLLAB=1`, deliberation runs through collab lifecycle (`spawn_agent` → `wait` → `close_agent`) with read-only sandboxing.
+
 ### Review signal policy
 - `P0` critical findings are hard-stop.
 - `P1` high findings are hard-stop only when high-signal (clear evidence or corroboration).

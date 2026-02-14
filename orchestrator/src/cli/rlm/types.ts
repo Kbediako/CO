@@ -89,11 +89,28 @@ export interface RlmSymbolicSubcall {
   status?: string;
 }
 
+export interface RlmSymbolicDeliberationArtifacts {
+  prompt: string;
+  output: string;
+  meta: string;
+}
+
+export interface RlmSymbolicDeliberation {
+  status: 'ran' | 'skipped' | 'error';
+  reason: string;
+  strategy: 'collab' | 'single-agent';
+  prompt_bytes?: number;
+  output_bytes?: number;
+  artifact_paths?: RlmSymbolicDeliberationArtifacts;
+  error?: string;
+}
+
 export interface RlmSymbolicIteration {
   iteration: number;
   planner_prompt_bytes: number;
   reads: RlmSymbolicRead[];
   subcalls: RlmSymbolicSubcall[];
+  deliberation?: RlmSymbolicDeliberation;
   searches?: RlmSymbolicSearch[];
   planner_errors?: string[];
   clamped?: {
@@ -105,6 +122,7 @@ export interface RlmSymbolicIteration {
     searches_dropped?: boolean;
     reads_dropped?: boolean;
     subcalls_dropped?: boolean;
+    deliberation_dropped?: boolean;
     prompt_truncated?: boolean;
   };
 }

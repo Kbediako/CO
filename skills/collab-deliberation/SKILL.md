@@ -28,6 +28,19 @@ Use this skill when the user asks for brainstorming, tradeoffs, option compariso
 - On soft cap: stop branching and execute the best current plan.
 - On hard cap: disable auto-deliberation for that stage and continue execution.
 
+## Auto-trigger cadence (required)
+- Run deliberation at task bootstrap for non-trivial work.
+- Re-run deliberation after each meaningful chunk (default: behavior change or about 2+ files touched).
+- Re-run deliberation when external feedback lands (PR review, bot findings, CI failures).
+- Re-run deliberation when ambiguity/risk increases mid-flight (new constraints, conflicting evidence, high-signal `P1` or any `P0` finding).
+- Re-run deliberation at least every 45 minutes during active implementation.
+- If orchestration uses symbolic RLM, keep runtime auto-deliberation enabled:
+  - `RLM_SYMBOLIC_DELIBERATION=1` (default)
+  - `RLM_SYMBOLIC_DELIBERATION_INTERVAL` (default `2`)
+  - `RLM_SYMBOLIC_DELIBERATION_MAX_RUNS` (default `12`)
+  - `RLM_SYMBOLIC_DELIBERATION_MAX_SUMMARY_BYTES` (default `2048`)
+  - `RLM_SYMBOLIC_DELIBERATION_INCLUDE_IN_PLANNER=1` (default)
+
 ## Workflow (required)
 1) Frame the decision.
 - Write a one-sentence decision statement.
@@ -69,3 +82,4 @@ Use this skill when the user asks for brainstorming, tradeoffs, option compariso
 - Do not implement or modify code unless explicitly asked.
 - Do not present uncertainty as certainty.
 - Keep outputs concise and action-oriented.
+- If collab subagents are used, close lifecycle loops per id (`spawn_agent` -> `wait` -> `close_agent`) before finishing.

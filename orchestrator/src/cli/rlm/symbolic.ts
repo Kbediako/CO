@@ -4,6 +4,7 @@ import { join, relative } from 'node:path';
 import type {
   RlmLoopResult,
   RlmState,
+  RlmSymbolicDeliberation,
   RlmSymbolicIteration,
   RlmSymbolicRead,
   RlmSymbolicSearch,
@@ -41,6 +42,15 @@ export interface SymbolicLoopOptions {
   budgets: SymbolicBudgets;
   runPlanner: (prompt: string, attempt: number) => Promise<string>;
   runSubcall: (prompt: string, meta: { id: string; purpose: string }) => Promise<string>;
+  deliberation?: {
+    enabled: boolean;
+    strategy: 'collab' | 'single-agent';
+    minIntervalIterations: number;
+    maxRuns: number;
+    maxSummaryBytes: number;
+    includeInPlannerPrompt: boolean;
+    run: (prompt: string, meta: { iteration: number; reason: string }) => Promise<string>;
+  };
   now?: () => string;
   logger?: (line: string) => void;
 }
@@ -71,6 +81,8 @@ interface PlannerValidationResult {
     subcalls: boolean;
   };
 }
+
+type DeliberationReason = 'bootstrap' | 'cadence' | 'planner_recovery' | 'no_subcall_progress';
 
 function byteLength(value: string): number {
   return Buffer.byteLength(value ?? '', 'utf8');
@@ -476,8 +488,9 @@ function buildPlannerPrompt(params: {
   priorReads: Array<{ pointer: string; excerpt: string }>;
   priorSearches: Array<{ query: string; results: RlmSymbolicSearchHit[] }>;
   priorSubcalls: Array<{ id: string; output: string }>;
+  deliberationBrief?: string | null;
 }): { prompt: string; truncation: RlmSymbolicIteration['truncation'] } {
-  const { goal, contextStore, budgets, priorReads, priorSearches, priorSubcalls } = params;
+  const { goal, contextStore, budgets, priorReads, priorSearches, priorSubcalls, deliberationBrief } = params;
 
   const baseLines: string[] = [
     'You are a symbolic RLM planner. Return JSON only (no prose).',
@@ -536,6 +549,12 @@ function buildPlannerPrompt(params: {
     }
     sections.push({ key: 'subcalls_dropped', lines });
   }
+  if (typeof deliberationBrief === 'string' && deliberationBrief.trim().length > 0) {
+    sections.push({
+      key: 'deliberation_dropped',
+      lines: ['Deliberation brief:', deliberationBrief.trim()]
+    });
+  }
 
   let truncation: NonNullable<RlmSymbolicIteration['truncation']> = {};
   let prompt = [...baseLines];
@@ -564,6 +583,164 @@ function buildPlannerPrompt(params: {
   }
 
   return { prompt: promptString, truncation };
+}
+
+function formatDeliberationReason(reason: DeliberationReason): string {
+  switch (reason) {
+    case 'bootstrap':
+      return 'bootstrap';
+    case 'cadence':
+      return 'cadence';
+    case 'planner_recovery':
+      return 'planner_recovery';
+    case 'no_subcall_progress':
+      return 'no_subcall_progress';
+    default:
+      return 'cadence';
+  }
+}
+
+function selectDeliberationReason(params: {
+  iteration: number;
+  previousIteration: RlmSymbolicIteration | null;
+  lastDeliberationIteration: number;
+  minIntervalIterations: number;
+}): DeliberationReason | null {
+  if (params.iteration === 1) {
+    return 'bootstrap';
+  }
+  if ((params.previousIteration?.planner_errors?.length ?? 0) > 0) {
+    return 'planner_recovery';
+  }
+  const noSearches = (params.previousIteration?.searches?.length ?? 0) === 0;
+  const noReads = (params.previousIteration?.reads?.length ?? 0) === 0;
+  const noSubcalls = (params.previousIteration?.subcalls?.length ?? 0) === 0;
+  if (noSearches && noReads && noSubcalls) {
+    return 'no_subcall_progress';
+  }
+  const minInterval = Math.max(1, Math.floor(params.minIntervalIterations));
+  if (
+    params.lastDeliberationIteration <= 0 ||
+    params.iteration - params.lastDeliberationIteration >= minInterval
+  ) {
+    return 'cadence';
+  }
+  return null;
+}
+
+function buildDeliberationPrompt(params: {
+  goal: string;
+  iteration: number;
+  reason: DeliberationReason;
+  contextStore: ContextStore;
+  priorReads: Array<{ pointer: string; excerpt: string }>;
+  priorSearches: Array<{ query: string; results: RlmSymbolicSearchHit[] }>;
+  priorSubcalls: Array<{ id: string; output: string }>;
+  maxSummaryBytes: number;
+}): string {
+  const maxBytes = Math.max(256, Math.floor(params.maxSummaryBytes));
+  const lines: string[] = [
+    'You are a deliberation coordinator for an iterative symbolic planning loop.',
+    `Goal: ${params.goal}`,
+    `Iteration: ${params.iteration}`,
+    `Trigger: ${formatDeliberationReason(params.reason)}`,
+    `Context object_id: ${params.contextStore.objectId}`,
+    `Context chunks: ${params.contextStore.chunkCount}`,
+    'Respond with exactly four labeled lines:',
+    'Decision focus: <what to optimize next>',
+    'Risks: <top failure modes to avoid>',
+    'Context gaps: <missing evidence/plans>',
+    'Planner directives: <3 concise directives>',
+    `Keep total output under ${maxBytes} bytes and avoid markdown tables.`
+  ];
+  if (params.priorSearches.length > 0) {
+    const latestSearch = params.priorSearches[params.priorSearches.length - 1];
+    const hitCount = latestSearch?.results?.length ?? 0;
+    lines.push(
+      `Latest search: query="${latestSearch?.query ?? ''}" hits=${hitCount}`
+    );
+  }
+  if (params.priorReads.length > 0) {
+    const latestRead = params.priorReads[params.priorReads.length - 1];
+    lines.push(`Latest read pointer: ${latestRead?.pointer ?? ''}`);
+  }
+  if (params.priorSubcalls.length > 0) {
+    const latestSubcall = params.priorSubcalls[params.priorSubcalls.length - 1];
+    lines.push(`Latest subcall id: ${latestSubcall?.id ?? ''}`);
+    lines.push(`Latest subcall output: ${truncateUtf8ToBytes(latestSubcall?.output ?? '', 320)}`);
+  }
+  return lines.join('\n');
+}
+
+async function runDeliberationStep(params: {
+  options: NonNullable<SymbolicLoopOptions['deliberation']>;
+  goal: string;
+  iteration: number;
+  reason: DeliberationReason;
+  runDir: string;
+  repoRoot: string;
+  contextStore: ContextStore;
+  priorReads: Array<{ pointer: string; excerpt: string }>;
+  priorSearches: Array<{ query: string; results: RlmSymbolicSearchHit[] }>;
+  priorSubcalls: Array<{ id: string; output: string }>;
+}): Promise<{ record: RlmSymbolicDeliberation; brief: string }> {
+  const prompt = buildDeliberationPrompt({
+    goal: params.goal,
+    iteration: params.iteration,
+    reason: params.reason,
+    contextStore: params.contextStore,
+    priorReads: params.priorReads,
+    priorSearches: params.priorSearches,
+    priorSubcalls: params.priorSubcalls,
+    maxSummaryBytes: params.options.maxSummaryBytes
+  });
+  const promptBytes = byteLength(prompt);
+  const deliberationDir = join(params.runDir, 'deliberation');
+  await mkdir(deliberationDir, { recursive: true });
+  const baseName = `iteration-${String(params.iteration).padStart(4, '0')}`;
+  const promptPath = join(deliberationDir, `${baseName}-prompt.txt`);
+  const outputPath = join(deliberationDir, `${baseName}-output.txt`);
+  const metaPath = join(deliberationDir, `${baseName}-meta.json`);
+  await writeFile(promptPath, prompt, 'utf8');
+
+  const output = await params.options.run(prompt, {
+    iteration: params.iteration,
+    reason: formatDeliberationReason(params.reason)
+  });
+  const brief = truncateUtf8ToBytes(output ?? '', params.options.maxSummaryBytes);
+  const outputBytes = byteLength(brief);
+  await writeFile(outputPath, brief, 'utf8');
+  await writeFile(
+    metaPath,
+    JSON.stringify(
+      {
+        iteration: params.iteration,
+        reason: formatDeliberationReason(params.reason),
+        strategy: params.options.strategy,
+        prompt_bytes: promptBytes,
+        output_bytes: outputBytes
+      },
+      null,
+      2
+    ),
+    'utf8'
+  );
+
+  return {
+    record: {
+      status: 'ran',
+      reason: formatDeliberationReason(params.reason),
+      strategy: params.options.strategy,
+      prompt_bytes: promptBytes,
+      output_bytes: outputBytes,
+      artifact_paths: {
+        prompt: relative(params.repoRoot, promptPath),
+        output: relative(params.repoRoot, outputPath),
+        meta: relative(params.repoRoot, metaPath)
+      }
+    },
+    brief
+  };
 }
 
 async function writeState(path: string, state: RlmState): Promise<void> {
@@ -599,6 +776,9 @@ export async function runSymbolicLoop(options: SymbolicLoopOptions): Promise<Rlm
   let priorReads: Array<{ pointer: string; excerpt: string }> = [];
   let priorSearches: Array<{ query: string; results: RlmSymbolicSearchHit[] }> = [];
   let priorSubcalls: Array<{ id: string; output: string }> = [];
+  let lastDeliberationIteration = 0;
+  let deliberationRuns = 0;
+  let latestDeliberationBrief: string | null = null;
 
   const finalize = async (status: RlmState['final']): Promise<RlmLoopResult> => {
     state.final = status ?? { status: 'error', exitCode: 10 };
@@ -612,13 +792,84 @@ export async function runSymbolicLoop(options: SymbolicLoopOptions): Promise<Rlm
         return await finalize({ status: 'max_minutes', exitCode: 3 });
       }
 
+      const previousIteration = state.symbolic_iterations[state.symbolic_iterations.length - 1] ?? null;
+      let deliberation: RlmSymbolicDeliberation | undefined;
+      const deliberationOptions = options.deliberation;
+      if (!deliberationOptions?.enabled) {
+        if (deliberationOptions) {
+          deliberation = {
+            status: 'skipped',
+            reason: 'disabled',
+            strategy: deliberationOptions.strategy
+          };
+        }
+      } else {
+        const reason = selectDeliberationReason({
+          iteration,
+          previousIteration,
+          lastDeliberationIteration,
+          minIntervalIterations: deliberationOptions.minIntervalIterations
+        });
+        if (!reason) {
+          deliberation = {
+            status: 'skipped',
+            reason: 'not_due',
+            strategy: deliberationOptions.strategy
+          };
+        } else if (deliberationRuns >= deliberationOptions.maxRuns) {
+          deliberation = {
+            status: 'skipped',
+            reason: 'max_runs_reached',
+            strategy: deliberationOptions.strategy
+          };
+        } else {
+          deliberationRuns += 1;
+          try {
+            const result = await runDeliberationStep({
+              options: deliberationOptions,
+              goal: options.goal,
+              iteration,
+              reason,
+              runDir,
+              repoRoot: options.repoRoot,
+              contextStore: options.contextStore,
+              priorReads,
+              priorSearches,
+              priorSubcalls
+            });
+            deliberation = result.record;
+            latestDeliberationBrief = result.brief;
+            lastDeliberationIteration = iteration;
+            log(
+              `Deliberation ${formatDeliberationReason(reason)} ran for iteration ${iteration} (${result.record.strategy}).`
+            );
+          } catch (error) {
+            deliberation = {
+              status: 'error',
+              reason: formatDeliberationReason(reason),
+              strategy: deliberationOptions.strategy,
+              error: error instanceof Error ? error.message : String(error)
+            };
+            log(
+              `Deliberation ${formatDeliberationReason(reason)} failed for iteration ${iteration}: ${
+                deliberation.error
+              }`
+            );
+          }
+        }
+      }
+
       const promptResult = buildPlannerPrompt({
         goal: options.goal,
         contextStore: options.contextStore,
         budgets: options.budgets,
         priorReads,
         priorSearches,
-        priorSubcalls
+        priorSubcalls,
+        deliberationBrief:
+          deliberationOptions?.enabled && deliberationOptions.includeInPlannerPrompt
+            ? latestDeliberationBrief
+            : null
       });
       const plannerPrompt = promptResult.prompt;
       const plannerPromptBytes = byteLength(plannerPrompt);
@@ -690,6 +941,7 @@ export async function runSymbolicLoop(options: SymbolicLoopOptions): Promise<Rlm
           planner_prompt_bytes: plannerPromptBytes,
           reads,
           subcalls,
+          deliberation,
           searches,
           planner_errors: plannerErrors.length > 0 ? plannerErrors : undefined,
           clamped: {
@@ -709,6 +961,7 @@ export async function runSymbolicLoop(options: SymbolicLoopOptions): Promise<Rlm
           planner_prompt_bytes: plannerPromptBytes,
           reads,
           subcalls,
+          deliberation,
           searches,
           planner_errors: plannerErrors.length > 0 ? plannerErrors : undefined,
           clamped: {
@@ -918,6 +1171,7 @@ export async function runSymbolicLoop(options: SymbolicLoopOptions): Promise<Rlm
         planner_prompt_bytes: plannerPromptBytes,
         reads,
         subcalls,
+        deliberation,
         searches,
         planner_errors: plannerErrors.length > 0 ? plannerErrors : undefined,
         clamped: {
