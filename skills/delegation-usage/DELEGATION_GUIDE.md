@@ -122,7 +122,11 @@ Delegation MCP expects JSONL. Keep `codex-orchestrator` aligned with the current
 - Check: `codex-orchestrator --version`
 - Update global: `npm i -g @kbediako/codex-orchestrator@latest`
 - Or pin via npx: `npx -y @kbediako/codex-orchestrator@<version> delegate-server`
-- If using a custom Codex fork, fast-forward from `upstream/main` regularly and rebuild to avoid protocol drift.
+- Stock `codex` is the default path. If using a custom Codex fork, fast-forward from `upstream/main` regularly.
+- CO repo checkout only (helper is not shipped in npm): `scripts/codex-cli-refresh.sh --repo /path/to/codex --align-only`
+- CO repo checkout only (managed rebuild helper): `scripts/codex-cli-refresh.sh --repo /path/to/codex --force-rebuild`
+- Add `--no-push` only when you intentionally want local-only alignment without updating `origin/main`.
+- npm-safe alternative (no repo helper): `codex-orchestrator codex setup --source /path/to/codex --yes --force`
 
 ## Common failures
 

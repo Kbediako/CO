@@ -81,7 +81,11 @@ For runner + delegation coordination (short `--task` flow), see `docs/delegation
   - Check installed version: `codex-orchestrator --version`
   - Preferred update path: `npm i -g @kbediako/codex-orchestrator@latest`
   - Deterministic pin path (for reproducible environments): `npx -y @kbediako/codex-orchestrator@<version> delegate-server`
-- If using a custom Codex fork, fast-forward it regularly from `upstream/main` and rebuild the managed CLI to avoid delegation/collab protocol drift.
+- Stock `codex` is the default path. If you use a custom Codex fork, fast-forward it regularly from `upstream/main`.
+- CO repo checkout only (helper is not shipped in npm): `scripts/codex-cli-refresh.sh --repo /path/to/codex --align-only`
+- CO repo checkout only (managed rebuild helper): `scripts/codex-cli-refresh.sh --repo /path/to/codex --force-rebuild`
+- Add `--no-push` only when you intentionally want local-only alignment without updating `origin/main`.
+- npm-safe alternative (no repo helper): `codex-orchestrator codex setup --source /path/to/codex --yes --force`
 
 ### 0b) Background terminal bootstrap (required when MCP is disabled)
 

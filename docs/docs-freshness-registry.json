@@ -675,6 +675,13 @@
       "cadence_days": 90
     },
     {
+      "path": ".agent/task/0963-codex-cli-alignment-refresh-e2e.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-14",
+      "cadence_days": 90
+    },
+    {
       "path": ".agent/task/ACTION_PLAN_TEMPLATE.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -805,6 +812,13 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-02-13",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/ACTION_PLAN-codex-cli-alignment-refresh-e2e.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-14",
       "cadence_days": 90
     },
     {
@@ -1315,7 +1329,7 @@
       "path": "docs/guides/upstream-codex-cli-sync.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-01-22",
+      "last_review": "2026-02-14",
       "cadence_days": 90
     },
     {
@@ -1351,6 +1365,13 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-02-13",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/PRD-codex-cli-alignment-refresh-e2e.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-14",
       "cadence_days": 90
     },
     {
@@ -1819,7 +1840,7 @@
       "path": "docs/TASKS.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-01-22",
+      "last_review": "2026-02-14",
       "cadence_days": 90
     },
     {
@@ -1848,6 +1869,13 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-02-13",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/TECH_SPEC-codex-cli-alignment-refresh-e2e.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-14",
       "cadence_days": 90
     },
     {
@@ -2246,21 +2274,21 @@
       "path": "README.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-01-22",
+      "last_review": "2026-02-14",
       "cadence_days": 90
     },
     {
       "path": "skills/delegation-usage/DELEGATION_GUIDE.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-01-19",
+      "last_review": "2026-02-14",
       "cadence_days": 90
     },
     {
       "path": "skills/delegation-usage/SKILL.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-01-19",
+      "last_review": "2026-02-14",
       "cadence_days": 90
     },
     {
@@ -2713,6 +2741,13 @@
     },
     {
       "path": "tasks/specs/0962-release-cloud-rlm-hardening.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-14",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/specs/0963-codex-cli-alignment-refresh-e2e.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-02-14",
@@ -3217,6 +3252,13 @@
     },
     {
       "path": "tasks/tasks-0962-release-cloud-rlm-hardening.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-14",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/tasks-0963-codex-cli-alignment-refresh-e2e.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-02-14",

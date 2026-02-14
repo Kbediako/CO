@@ -31,3 +31,11 @@
   - Upstream delta summary
   - CO patches added/removed
   - Migration notes
+
+## Local operator flow (CO)
+- Default path (stock CLI): align the fork and skip managed rebuild:
+  - `scripts/codex-cli-refresh.sh --repo /path/to/codex --align-only`
+- Managed/pinned path (optional): align and rebuild CO-managed CLI:
+  - `scripts/codex-cli-refresh.sh --repo /path/to/codex --force-rebuild`
+- Add `--no-push` only when you intentionally want local-only alignment without updating `origin/main`.
+- Use managed/pinned CLI when you need a custom fork behavior or reproducible binary control. For routine usage, stock `codex` is sufficient when required features are enabled (`codex features list`).

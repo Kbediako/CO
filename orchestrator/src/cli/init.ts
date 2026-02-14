@@ -85,6 +85,6 @@ export function formatInitSummary(result: InitResult, cwd: string): string[] {
   }
   lines.push('Next steps (recommended):');
   lines.push(`  - codex mcp add delegation -- codex-orchestrator delegate-server --repo ${cwd}`);
-  lines.push('  - codex-orchestrator codex setup  # optional: CO-managed Codex CLI for collab JSONL');
+  lines.push('  - codex-orchestrator codex setup  # optional: managed/pinned Codex CLI (stock CLI works by default)');
   return lines;
 }
