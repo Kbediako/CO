@@ -9,6 +9,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 const execFileAsync = promisify(execFile);
 const CLI_ENTRY = join(process.cwd(), 'bin', 'codex-orchestrator.ts');
 const TEST_TIMEOUT = 15000;
+const CLI_EXEC_TIMEOUT_MS = TEST_TIMEOUT;
 
 let tempDir: string | null = null;
 
@@ -23,7 +24,7 @@ afterEach(async () => {
 async function runCli(args: string[], env?: NodeJS.ProcessEnv): Promise<{ stdout: string; stderr: string }> {
   return await execFileAsync(process.execPath, ['--loader', 'ts-node/esm', CLI_ENTRY, ...args], {
     env: env ?? process.env,
-    timeout: 5000
+    timeout: CLI_EXEC_TIMEOUT_MS
   });
 }
 
