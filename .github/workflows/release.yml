@@ -90,7 +90,7 @@ jobs:
       - name: Checkout release tag commit
         run: |
           set -euo pipefail
-          git checkout --detach "${{ steps.meta.outputs.tag }}"
+          git checkout --detach "refs/tags/${{ steps.meta.outputs.tag }}"
 
       - name: Configure tag verification keys
         env:

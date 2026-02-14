@@ -968,7 +968,7 @@ async function runDeliberationStep(params: {
   const promptBytes = byteLength(prompt);
 
   const shouldLogArtifacts = params.options.logArtifacts === true;
-  let artifactPaths: RlmSymbolicDeliberation['artifact_paths'];
+  let artifactPaths: RlmSymbolicDeliberation['artifact_paths'] | undefined;
   let outputPath: string | null = null;
   let metaPath: string | null = null;
   if (shouldLogArtifacts) {

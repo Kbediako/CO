@@ -1193,8 +1193,8 @@
       "gate": {
         "phase": "release-cloud-rlm-hardening-implementation",
         "status": "in-progress",
-        "log": null,
-        "run_id": null
+        "log": ".runs/0962-release-cloud-rlm-hardening/cli/2026-02-14T12-47-55-237Z-d45ad3bb/manifest.json",
+        "run_id": "2026-02-14T12-47-55-237Z-d45ad3bb"
       },
       "created_at": "2026-02-14",
       "completed_at": null
