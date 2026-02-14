@@ -133,11 +133,27 @@ describe('pipeline experience helpers', () => {
             log_path: null,
             error_file: null,
             sub_run_id: null
+          },
+          {
+            index: 2,
+            id: 'review-subpipeline',
+            title: 'Review Subpipeline',
+            command: null,
+            kind: 'subpipeline',
+            status: 'succeeded',
+            started_at: null,
+            completed_at: null,
+            exit_code: null,
+            summary: 'subpipeline review succeeded',
+            log_path: null,
+            error_file: null,
+            sub_run_id: 'child-run-1'
           }
         ]
       }
     );
     expect(summary).toContain('Gate checks passed.');
     expect(summary).toContain('build succeeded');
+    expect(summary).toContain('subpipeline review succeeded');
   });
 });

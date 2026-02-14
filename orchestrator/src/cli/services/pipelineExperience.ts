@@ -115,7 +115,7 @@ export function summarizePipelineOutcome(
   }
 
   const stageHighlights = manifest.commands
-    .filter((command) => command.kind === 'command' && command.status === 'succeeded')
+    .filter((command) => command.status === 'succeeded')
     .map((command) => normalizeSummary(command.summary ?? command.title))
     .filter((value) => value.length > 0)
     .slice(0, 2);
