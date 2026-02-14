@@ -9,7 +9,17 @@ description: Use when operating the Codex delegation MCP server and tools (deleg
 
 Use this skill to operate delegation MCP tools with delegation enabled by default (the only MCP on by default). Disable it only when required by safety constraints, and keep other MCPs off unless they are relevant to the task.
 
+`delegation-usage` is the canonical delegation workflow skill. If `delegate-early` is present, treat it as a compatibility alias that should redirect to this skill.
+
 Collab multi-agent mode is separate from delegation. For symbolic RLM subcalls that use collab tools, set `RLM_SYMBOLIC_COLLAB=1` and ensure a collab-capable Codex CLI; collab tool calls are recorded in `manifest.collab_tool_calls`. If collab tools are unavailable in your CLI build, skip collab steps; delegation still works independently.
+
+## Collab realities in delegated runs (current behavior)
+
+- `spawn_agent` accepts one input style per call: either `message` (plain text) or `items` (structured input).
+- Do not send both `message` and `items` in the same `spawn_agent` call.
+- Spawn returns an `agent_id` (thread id). Current TUI collab rendering is id-based; do not depend on custom visible agent names.
+- Subagents spawned through collab run with approval effectively set to `never`; design child tasks to avoid approval/escalation requirements.
+- Collab spawn depth is bounded. Near/at max depth, recursive delegation can fail or collab can be disabled in children; prefer shallow parent fan-out.
 
 ## Quick-start workflow (canned)
 
@@ -64,12 +74,11 @@ For runner + delegation coordination (short `--task` flow), see `docs/delegation
 
 ### 0a) Version guard (JSONL handshake)
 
-- Delegation MCP uses JSONL; ensure the server binary meets the docs’ minimum version (0.1.12):
-  - `codex-orchestrator --version` should be `>= 0.1.12`.
-- If not, update global install: `npm i -g @kbediako/codex-orchestrator@0.1.12`
-- Alternative: pin the MCP server to `npx -y @kbediako/codex-orchestrator@0.1.12` for deterministic behavior.
-- Note: if your installed CLI is older than 0.1.12, prefer upgrading or pinning to the docs’ minimum.
-- Keep the version pins in this section in sync with the docs’ minimum (currently 0.1.12).
+- Delegation MCP uses JSONL; keep `codex-orchestrator` aligned with the current release line.
+  - Check installed version: `codex-orchestrator --version`
+  - Preferred update path: `npm i -g @kbediako/codex-orchestrator@latest`
+  - Deterministic pin path (for reproducible environments): `npx -y @kbediako/codex-orchestrator@<version> delegate-server`
+- If using a custom Codex fork, fast-forward it regularly from `upstream/main` and rebuild the managed CLI to avoid delegation/collab protocol drift.
 
 ### 0b) Background terminal bootstrap (required when MCP is disabled)
 
@@ -163,3 +172,5 @@ repeat:
 - **Confirmation misuse:** never pass `confirm_nonce` from model/tool input; it is runner‑injected only.
 - **Secrets exposure:** never include secrets/tokens/PII in delegate prompts or files.
 - **Missing control files:** delegate tools rely on `control_endpoint.json` in the run directory; older runs may not have it.
+- **Collab payload mismatch:** `spawn_agent` rejects calls that include both `message` and `items`.
+- **Collab UI assumptions:** agent rows/records are id-based today; use explicit stream role text in prompts/artifacts for operator clarity.

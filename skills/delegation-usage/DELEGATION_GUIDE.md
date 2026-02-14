@@ -1,6 +1,7 @@
 # Delegation Guide (Detailed)
 
 Use this guide for deeper context on delegation behavior, tool surfaces, and troubleshooting.
+`delegation-usage` is the canonical delegation workflow; `delegate-early` should be treated as a compatibility alias.
 
 ## Mental model
 
@@ -106,12 +107,12 @@ If you need delegation to respect a repo’s `.codex/orchestrator.toml` (e.g., s
 
 ## Version guard (JSONL handshake)
 
-Delegation MCP expects JSONL. Use `codex-orchestrator` 0.1.12 or newer.
+Delegation MCP expects JSONL. Keep `codex-orchestrator` aligned with the current release line.
 
 - Check: `codex-orchestrator --version`
-- Update global: `npm i -g @kbediako/codex-orchestrator@0.1.12`
-- Or pin via npx: `npx -y @kbediako/codex-orchestrator@0.1.12 delegate-server`
-- If your installed CLI is behind 0.1.12, prefer upgrading or pinning to the docs’ minimum.
+- Update global: `npm i -g @kbediako/codex-orchestrator@latest`
+- Or pin via npx: `npx -y @kbediako/codex-orchestrator@<version> delegate-server`
+- If using a custom Codex fork, fast-forward from `upstream/main` regularly and rebuild to avoid protocol drift.
 
 ## Common failures
 
@@ -120,3 +121,5 @@ Delegation MCP expects JSONL. Use `codex-orchestrator` 0.1.12 or newer.
 - **Tool profile ignored**: The repo’s `delegate.allowed_tool_servers` may be empty, or names are invalid.
 - **Missing control files**: delegate tools rely on `control_endpoint.json` in the run directory.
 - **Run identifiers**: status/pause/cancel require `manifest_path`; question queue requires `parent_manifest_path`.
+- **Collab payload mismatch**: `spawn_agent` calls fail if they include both `message` and `items`.
+- **Collab depth limits**: recursive collab fan-out can fail near max depth; prefer shallow parent fan-out.

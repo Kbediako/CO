@@ -647,6 +647,13 @@
       "cadence_days": 90
     },
     {
+      "path": ".agent/task/0959-experience-prompt-injection-delegation-skill-harmonization.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-14",
+      "cadence_days": 90
+    },
+    {
       "path": ".agent/task/ACTION_PLAN_TEMPLATE.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -889,6 +896,13 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/ACTION_PLAN-experience-prompt-injection-and-delegation-skill-harmonization.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-14",
       "cadence_days": 90
     },
     {
@@ -1417,6 +1431,13 @@
       "cadence_days": 90
     },
     {
+      "path": "docs/PRD-experience-prompt-injection-and-delegation-skill-harmonization.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-14",
+      "cadence_days": 90
+    },
+    {
       "path": "docs/PRD-frontend-testing-core.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -1876,6 +1897,13 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/TECH_SPEC-experience-prompt-injection-and-delegation-skill-harmonization.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-14",
       "cadence_days": 90
     },
     {
@@ -2565,6 +2593,13 @@
       "cadence_days": 90
     },
     {
+      "path": "tasks/specs/0959-experience-prompt-injection-delegation-skill-harmonization.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-14",
+      "cadence_days": 90
+    },
+    {
       "path": "tasks/specs/README.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -3038,6 +3073,13 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-02-13",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/tasks-0959-experience-prompt-injection-delegation-skill-harmonization.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-14",
       "cadence_days": 90
     },
     {
