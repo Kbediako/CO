@@ -10,6 +10,10 @@ This guide is the canonical reference for ad-hoc reviews outside pipelines. Use 
 
 ## Use during implementation (recommended)
 - Run a quick standalone review after each meaningful chunk of work to catch issues early.
+- Use this default trigger heuristic so reviews stay useful (not noisy):
+  - run when 2+ files changed since the previous review, or
+  - run when about 40+ changed lines accumulate, or
+  - run immediately for any workflow/security/release file touch.
 - Prefer a custom focus prompt for targeted checks, for example:
   `codex review "Focus on correctness, regressions, and edge cases in the files I just touched; ignore style; list missing tests."`
 - Capture key findings in the PRD/TECH_SPEC or task notes so context survives compaction.

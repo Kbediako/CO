@@ -4,8 +4,13 @@ on:
   push:
     tags:
       - 'v*.*.*'
-      - 'v*.*.*-alpha.*'
+      - 'v*.*.*-*'
   workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing release tag to publish (vX.Y.Z or vX.Y.Z-prerelease.N)'
+        required: false
+        type: string
 
 permissions:
   contents: write
@@ -14,6 +19,9 @@ jobs:
   build-release:
     runs-on: ubuntu-latest
     outputs:
+      tag: ${{ steps.meta.outputs.tag }}
+      tag_version: ${{ steps.meta.outputs.tag_version }}
+      tag_sha: ${{ steps.meta.outputs.tag_sha }}
       tarball: ${{ steps.pack.outputs.tarball }}
       dist_tag: ${{ steps.meta.outputs.dist_tag }}
       prerelease: ${{ steps.meta.outputs.prerelease }}
@@ -30,21 +38,115 @@ jobs:
       - name: Resolve release metadata
         id: meta
         run: |
-          TAG="${GITHUB_REF_NAME}"
-          if [[ "${TAG}" == *"-alpha."* ]]; then
-            echo "dist_tag=alpha" >> "$GITHUB_OUTPUT"
+          set -euo pipefail
+          TAG=""
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            INPUT_TAG="${{ inputs.tag }}"
+            if [[ -n "${INPUT_TAG}" ]]; then
+              TAG="${INPUT_TAG}"
+            elif [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+              TAG="${GITHUB_REF_NAME}"
+            else
+              echo "::error::workflow_dispatch requires a tag ref or inputs.tag (example: v0.1.17)." >&2
+              exit 1
+            fi
+          else
+            TAG="${GITHUB_REF_NAME}"
+          fi
+
+          TAG="${TAG#refs/tags/}"
+          if [[ ! "${TAG}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z][0-9A-Za-z.-]*)?$ ]]; then
+            echo "::error::Invalid release tag '${TAG}'. Expected vX.Y.Z or vX.Y.Z-prerelease." >&2
+            exit 1
+          fi
+
+          if ! git rev-parse --verify "refs/tags/${TAG}" >/dev/null 2>&1; then
+            echo "::error::Tag ${TAG} is not available in this checkout." >&2
+            exit 1
+          fi
+
+          TAG_VERSION="${TAG#v}"
+          TAG_SHA="$(git rev-list -n 1 "${TAG}")"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "tag_version=${TAG_VERSION}" >> "$GITHUB_OUTPUT"
+          echo "tag_sha=${TAG_SHA}" >> "$GITHUB_OUTPUT"
+
+          if [[ "${TAG_VERSION}" == *-* ]]; then
+            PRERELEASE_LABEL="${TAG_VERSION#*-}"
+            DIST_TAG_RAW="${PRERELEASE_LABEL%%[.-]*}"
+            DIST_TAG="$(printf '%s' "${DIST_TAG_RAW}" | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9._-' '-')"
+            DIST_TAG="${DIST_TAG#-}"
+            DIST_TAG="${DIST_TAG%-}"
+            if [[ -z "${DIST_TAG}" || "${DIST_TAG}" =~ ^[0-9] ]]; then
+              DIST_TAG="next"
+            fi
+            echo "dist_tag=${DIST_TAG}" >> "$GITHUB_OUTPUT"
             echo "prerelease=true" >> "$GITHUB_OUTPUT"
           else
             echo "dist_tag=latest" >> "$GITHUB_OUTPUT"
             echo "prerelease=false" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Checkout release tag commit
+        run: |
+          set -euo pipefail
+          git checkout --detach "refs/tags/${{ steps.meta.outputs.tag }}"
+
+      - name: Configure tag verification keys
+        env:
+          RELEASE_SIGNING_PUBLIC_KEYS: ${{ secrets.RELEASE_SIGNING_PUBLIC_KEYS }}
+          RELEASE_SIGNING_ALLOWED_SIGNERS: ${{ secrets.RELEASE_SIGNING_ALLOWED_SIGNERS }}
+        run: |
+          set -euo pipefail
+          if [[ -n "${RELEASE_SIGNING_PUBLIC_KEYS:-}" && -n "${RELEASE_SIGNING_ALLOWED_SIGNERS:-}" ]]; then
+            echo "::error::Set only one signing secret: RELEASE_SIGNING_PUBLIC_KEYS (GPG) or RELEASE_SIGNING_ALLOWED_SIGNERS (SSH)." >&2
+            exit 1
+          fi
+          configured=0
+          if [[ -n "${RELEASE_SIGNING_PUBLIC_KEYS:-}" ]]; then
+            printf '%s\n' "${RELEASE_SIGNING_PUBLIC_KEYS}" | gpg --batch --import
+            configured=1
+          fi
+          if [[ -n "${RELEASE_SIGNING_ALLOWED_SIGNERS:-}" ]]; then
+            mkdir -p "${RUNNER_TEMP}/signing"
+            ALLOWED_SIGNERS_FILE="${RUNNER_TEMP}/signing/allowed_signers"
+            printf '%s\n' "${RELEASE_SIGNING_ALLOWED_SIGNERS}" > "${ALLOWED_SIGNERS_FILE}"
+            git config --global gpg.format ssh
+            git config --global gpg.ssh.allowedSignersFile "${ALLOWED_SIGNERS_FILE}"
+            configured=1
+          fi
+          if [[ "${configured}" -ne 1 ]]; then
+            echo "::error::Missing signing verification material. Set RELEASE_SIGNING_PUBLIC_KEYS (GPG) or RELEASE_SIGNING_ALLOWED_SIGNERS (SSH) repository secrets." >&2
+            exit 1
+          fi
+
+      - name: Enforce signed annotated tag
+        run: |
+          set -euo pipefail
+          TAG="${{ steps.meta.outputs.tag }}"
+          TAG_TYPE="$(git cat-file -t "refs/tags/${TAG}" 2>/dev/null || true)"
+          if [[ "${TAG_TYPE}" != "tag" ]]; then
+            echo "::error::Tag ${TAG} is lightweight. Create a signed annotated tag." >&2
+            exit 1
+          fi
+          TAG_PAYLOAD="$(git cat-file -p "refs/tags/${TAG}")"
+          if ! printf '%s\n' "${TAG_PAYLOAD}" | grep -Eq '^-----BEGIN (PGP|SSH) SIGNATURE-----'; then
+            echo "::error::Tag ${TAG} is not cryptographically signed." >&2
+            exit 1
+          fi
+          if git verify-tag "${TAG}" >/dev/null 2>&1; then
+            echo "Tag ${TAG} signature verified."
+          else
+            echo "::error::Tag ${TAG} signature verification failed." >&2
+            exit 1
+          fi
+
       - name: Ensure tag matches package version
         run: |
-          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          TAG_VERSION="${{ steps.meta.outputs.tag_version }}"
           PKG_VERSION=$(node -e "const pkg=require('./package.json'); console.log(pkg.version);")
           if [[ "${TAG_VERSION}" != "${PKG_VERSION}" ]]; then
-            echo "Tag ${GITHUB_REF_NAME} does not match package.json version ${PKG_VERSION}" >&2
+            echo "Tag ${{ steps.meta.outputs.tag }} does not match package.json version ${PKG_VERSION}" >&2
             exit 1
           fi
 
@@ -66,10 +168,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          TAG="${GITHUB_REF_NAME}"
+          TAG="${{ steps.meta.outputs.tag }}"
           gh api "repos/${GITHUB_REPOSITORY}/releases/generate-notes" \
             -f tag_name="$TAG" \
-            -f target_commitish="${GITHUB_SHA}" > release-notes.json
+            -f target_commitish="${{ steps.meta.outputs.tag_sha }}" > release-notes.json
           node - <<'NODE'
           const fs = require('fs');
           const data = JSON.parse(fs.readFileSync('release-notes.json', 'utf8'));
@@ -152,7 +254,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          TAG="${GITHUB_REF_NAME}"
+          TAG="${{ steps.meta.outputs.tag }}"
           FLAGS=""
           if [[ "${{ steps.meta.outputs.prerelease }}" == "true" ]]; then
             FLAGS="--prerelease"
@@ -176,7 +278,8 @@ jobs:
       contents: read
       id-token: write
     env:
-      TAG: ${{ github.ref_name }}
+      TAG: ${{ needs.build-release.outputs.tag }}
+      TAG_VERSION: ${{ needs.build-release.outputs.tag_version }}
       DIST_TAG: ${{ needs.build-release.outputs.dist_tag }}
       TARBALL_NAME: ${{ needs.build-release.outputs.tarball }}
     steps:
@@ -245,6 +348,15 @@ jobs:
         with:
           name: release-tarball
           path: release-assets
+
+      - name: Verify release tarball availability
+        run: |
+          set -euo pipefail
+          if ! ls release-assets/*.tgz >/dev/null 2>&1; then
+            echo "::error::Release asset download did not produce a .tgz tarball for ${TAG}."
+            echo "::error::Check release asset upload/download steps before publish."
+            exit 1
+          fi
 
       - name: Publish to npm
         env:

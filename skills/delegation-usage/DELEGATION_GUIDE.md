@@ -81,6 +81,16 @@ delegate.spawn({
 })
 ```
 
+## Collab lifecycle hygiene (required)
+
+When using collab tools (`spawn_agent` / `wait` / `close_agent`):
+
+- Treat each spawned `agent_id` as a resource that must be closed.
+- For every successful spawn, run `wait` then `close_agent` for the same id.
+- Keep a local list of spawned ids and run a final cleanup pass before returning.
+- On timeout/error paths, still close known ids before reporting failure.
+- If you see `agent thread limit reached`, stop spawning immediately, close known ids, and retry only after cleanup.
+
 ## RLM budget overrides (recommended defaults)
 
 If you want deeper recursion or longer wall-clock time for delegated runs, set RLM budgets on the delegation server:
@@ -123,3 +133,4 @@ Delegation MCP expects JSONL. Keep `codex-orchestrator` aligned with the current
 - **Run identifiers**: status/pause/cancel require `manifest_path`; question queue requires `parent_manifest_path`.
 - **Collab payload mismatch**: `spawn_agent` calls fail if they include both `message` and `items`.
 - **Collab depth limits**: recursive collab fan-out can fail near max depth; prefer shallow parent fan-out.
+- **Collab lifecycle leaks**: missing `close_agent` calls can exhaust thread slots and block future spawns (`agent thread limit reached`).

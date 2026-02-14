@@ -50,6 +50,7 @@ export interface SymbolicLoopOptions {
     maxRuns: number;
     maxSummaryBytes: number;
     includeInPlannerPrompt: boolean;
+    logArtifacts?: boolean;
     run: (prompt: string, meta: { iteration: number; reason: string }) => Promise<string>;
   };
   now?: () => string;
@@ -829,6 +830,46 @@ function formatDeliberationReason(reason: DeliberationReason): string {
   }
 }
 
+type DeliberationRunError = Error & {
+  artifactPaths?: RlmSymbolicDeliberation['artifact_paths'];
+};
+
+function attachDeliberationArtifactPaths(
+  error: unknown,
+  artifactPaths: RlmSymbolicDeliberation['artifact_paths'] | undefined
+): DeliberationRunError {
+  const normalized = error instanceof Error ? error : new Error(String(error));
+  if (artifactPaths) {
+    (normalized as DeliberationRunError).artifactPaths = artifactPaths;
+  }
+  return normalized as DeliberationRunError;
+}
+
+function extractDeliberationArtifactPaths(
+  error: unknown
+): RlmSymbolicDeliberation['artifact_paths'] | undefined {
+  if (!error || typeof error !== 'object') {
+    return undefined;
+  }
+  const rawPaths = (error as { artifactPaths?: unknown }).artifactPaths;
+  if (!rawPaths || typeof rawPaths !== 'object') {
+    return undefined;
+  }
+  const typed = rawPaths as Partial<NonNullable<RlmSymbolicDeliberation['artifact_paths']>>;
+  if (
+    typeof typed.prompt !== 'string' ||
+    typeof typed.output !== 'string' ||
+    typeof typed.meta !== 'string'
+  ) {
+    return undefined;
+  }
+  return {
+    prompt: typed.prompt,
+    output: typed.output,
+    meta: typed.meta
+  };
+}
+
 function selectDeliberationReason(params: {
   iteration: number;
   previousIteration: RlmSymbolicIteration | null;
@@ -925,36 +966,76 @@ async function runDeliberationStep(params: {
     maxSummaryBytes: params.options.maxSummaryBytes
   });
   const promptBytes = byteLength(prompt);
-  const deliberationDir = join(params.runDir, 'deliberation');
-  await mkdir(deliberationDir, { recursive: true });
-  const baseName = `iteration-${String(params.iteration).padStart(4, '0')}`;
-  const promptPath = join(deliberationDir, `${baseName}-prompt.txt`);
-  const outputPath = join(deliberationDir, `${baseName}-output.txt`);
-  const metaPath = join(deliberationDir, `${baseName}-meta.json`);
-  await writeFile(promptPath, prompt, 'utf8');
 
-  const output = await params.options.run(prompt, {
-    iteration: params.iteration,
-    reason: formatDeliberationReason(params.reason)
-  });
+  const shouldLogArtifacts = params.options.logArtifacts === true;
+  let artifactPaths: RlmSymbolicDeliberation['artifact_paths'] | undefined;
+  let outputPath: string | null = null;
+  let metaPath: string | null = null;
+  if (shouldLogArtifacts) {
+    const deliberationDir = join(params.runDir, 'deliberation');
+    await mkdir(deliberationDir, { recursive: true });
+    const baseName = `iteration-${String(params.iteration).padStart(4, '0')}`;
+    const promptPath = join(deliberationDir, `${baseName}-prompt.txt`);
+    outputPath = join(deliberationDir, `${baseName}-output.txt`);
+    metaPath = join(deliberationDir, `${baseName}-meta.json`);
+    await writeFile(promptPath, prompt, 'utf8');
+    artifactPaths = {
+      prompt: relative(params.repoRoot, promptPath),
+      output: relative(params.repoRoot, outputPath),
+      meta: relative(params.repoRoot, metaPath)
+    };
+  }
+
+  let output: string;
+  try {
+    output = await params.options.run(prompt, {
+      iteration: params.iteration,
+      reason: formatDeliberationReason(params.reason)
+    });
+  } catch (error) {
+    if (shouldLogArtifacts && outputPath && metaPath) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      await writeFile(outputPath, '', 'utf8');
+      await writeFile(
+        metaPath,
+        JSON.stringify(
+          {
+            iteration: params.iteration,
+            reason: formatDeliberationReason(params.reason),
+            strategy: params.options.strategy,
+            prompt_bytes: promptBytes,
+            output_bytes: 0,
+            error: errorMessage
+          },
+          null,
+          2
+        ),
+        'utf8'
+      );
+    }
+    throw attachDeliberationArtifactPaths(error, artifactPaths);
+  }
+
   const brief = truncateUtf8ToBytes(output ?? '', params.options.maxSummaryBytes);
   const outputBytes = byteLength(brief);
-  await writeFile(outputPath, brief, 'utf8');
-  await writeFile(
-    metaPath,
-    JSON.stringify(
-      {
-        iteration: params.iteration,
-        reason: formatDeliberationReason(params.reason),
-        strategy: params.options.strategy,
-        prompt_bytes: promptBytes,
-        output_bytes: outputBytes
-      },
-      null,
-      2
-    ),
-    'utf8'
-  );
+  if (shouldLogArtifacts && outputPath && metaPath) {
+    await writeFile(outputPath, brief, 'utf8');
+    await writeFile(
+      metaPath,
+      JSON.stringify(
+        {
+          iteration: params.iteration,
+          reason: formatDeliberationReason(params.reason),
+          strategy: params.options.strategy,
+          prompt_bytes: promptBytes,
+          output_bytes: outputBytes
+        },
+        null,
+        2
+      ),
+      'utf8'
+    );
+  }
 
   return {
     record: {
@@ -963,11 +1044,7 @@ async function runDeliberationStep(params: {
       strategy: params.options.strategy,
       prompt_bytes: promptBytes,
       output_bytes: outputBytes,
-      artifact_paths: {
-        prompt: relative(params.repoRoot, promptPath),
-        output: relative(params.repoRoot, outputPath),
-        meta: relative(params.repoRoot, metaPath)
-      }
+      artifact_paths: artifactPaths
     },
     brief
   };
@@ -1080,6 +1157,7 @@ export async function runSymbolicLoop(options: SymbolicLoopOptions): Promise<Rlm
               status: 'error',
               reason: formatDeliberationReason(reason),
               strategy: deliberationOptions.strategy,
+              artifact_paths: extractDeliberationArtifactPaths(error),
               error: error instanceof Error ? error.message : String(error)
             };
             log(

@@ -303,8 +303,97 @@ describe('symbolic rlm loop', () => {
 
     expect(result.state.symbolic_iterations[0]?.deliberation?.status).toBe('ran');
     expect(result.state.symbolic_iterations[0]?.deliberation?.reason).toBe('bootstrap');
+    expect(result.state.symbolic_iterations[0]?.deliberation?.artifact_paths).toBeUndefined();
     expect(result.state.symbolic_iterations[1]?.deliberation?.status).toBe('skipped');
     expect(result.state.symbolic_iterations[1]?.deliberation?.reason).toBe('not_due');
+  });
+
+  it('persists deliberation artifacts when logging is enabled', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'rlm-symbolic-'));
+    const repoRoot = tempDir;
+    const runDir = join(repoRoot, 'rlm');
+    const contextObject = await buildContextObject({
+      source: { type: 'text', value: 'alpha beta gamma delta epsilon' },
+      targetDir: join(runDir, 'context'),
+      chunking: { targetBytes: 32, overlapBytes: 0, strategy: 'byte' }
+    });
+
+    const baseState: RlmState = {
+      version: 1,
+      mode: 'symbolic',
+      context: {
+        object_id: contextObject.index.object_id,
+        index_path: relative(repoRoot, contextObject.indexPath),
+        chunk_count: contextObject.index.chunks.length
+      },
+      symbolic_iterations: [],
+      goal: 'Summarize context',
+      validator: 'none',
+      roles: 'single',
+      maxIterations: 2,
+      maxMinutes: null,
+      iterations: []
+    };
+
+    const budgets: SymbolicBudgets = {
+      maxSubcallsPerIteration: 1,
+      maxSearchesPerIteration: 0,
+      maxChunkReadsPerIteration: 0,
+      maxBytesPerChunkRead: 64,
+      maxSnippetsPerSubcall: 1,
+      maxBytesPerSnippet: 64,
+      maxSubcallInputBytes: 512,
+      maxPlannerPromptBytes: 4096,
+      searchTopK: 5,
+      maxPreviewBytes: 32,
+      maxConcurrency: 1
+    };
+
+    const pointer = `ctx:${contextObject.index.object_id}#chunk:${contextObject.index.chunks[0].id}`;
+    const plans = [
+      JSON.stringify({
+        schema_version: 1,
+        intent: 'continue',
+        subcalls: [
+          { purpose: 'summarize', snippets: [{ pointer, offset: 0, bytes: 8 }], max_input_bytes: 256 }
+        ]
+      }),
+      JSON.stringify({ schema_version: 1, intent: 'final', final_answer: 'done' })
+    ];
+    let planIndex = 0;
+
+    const result = await runSymbolicLoop({
+      goal: baseState.goal,
+      baseState,
+      maxIterations: 2,
+      maxMinutes: null,
+      repoRoot,
+      runDir,
+      contextStore: new ContextStore(contextObject),
+      budgets,
+      runPlanner: async () => plans[planIndex++] ?? plans[plans.length - 1],
+      runSubcall: async () => 'summary output',
+      deliberation: {
+        enabled: true,
+        strategy: 'single-agent',
+        minIntervalIterations: 10,
+        maxRuns: 1,
+        maxSummaryBytes: 512,
+        includeInPlannerPrompt: true,
+        logArtifacts: true,
+        run: async () =>
+          'Decision focus: keep validating context\nRisks: stale context\nContext gaps: none\nPlanner directives: run one targeted subcall'
+      }
+    });
+
+    expect(result.exitCode).toBe(0);
+    const artifacts = result.state.symbolic_iterations[0]?.deliberation?.artifact_paths;
+    expect(artifacts?.prompt).toBeTruthy();
+    expect(artifacts?.output).toBeTruthy();
+    expect(artifacts?.meta).toBeTruthy();
+    await expect(readFile(join(repoRoot, artifacts?.prompt ?? ''), 'utf8')).resolves.toContain('Goal:');
+    await expect(readFile(join(repoRoot, artifacts?.output ?? ''), 'utf8')).resolves.toContain('Decision focus:');
+    await expect(readFile(join(repoRoot, artifacts?.meta ?? ''), 'utf8')).resolves.toContain('"iteration": 1');
   });
 
   it('records deliberation errors but continues the symbolic loop', async () => {
@@ -383,6 +472,7 @@ describe('symbolic rlm loop', () => {
         maxRuns: 1,
         maxSummaryBytes: 512,
         includeInPlannerPrompt: true,
+        logArtifacts: true,
         run: async () => {
           throw new Error('deliberation unavailable');
         }
@@ -394,6 +484,15 @@ describe('symbolic rlm loop', () => {
     expect(result.state.symbolic_iterations[0]?.deliberation?.status).toBe('error');
     expect(result.state.symbolic_iterations[0]?.deliberation?.reason).toBe('bootstrap');
     expect(result.state.symbolic_iterations[0]?.deliberation?.error).toContain('deliberation unavailable');
+    const artifacts = result.state.symbolic_iterations[0]?.deliberation?.artifact_paths;
+    expect(artifacts?.prompt).toBeTruthy();
+    expect(artifacts?.output).toBeTruthy();
+    expect(artifacts?.meta).toBeTruthy();
+    await expect(readFile(join(repoRoot, artifacts?.prompt ?? ''), 'utf8')).resolves.toContain('Goal:');
+    await expect(readFile(join(repoRoot, artifacts?.output ?? ''), 'utf8')).resolves.toBe('');
+    await expect(readFile(join(repoRoot, artifacts?.meta ?? ''), 'utf8')).resolves.toContain(
+      '"error": "deliberation unavailable"'
+    );
     expect(result.state.symbolic_iterations[1]?.deliberation?.status).toBe('skipped');
     expect(result.state.symbolic_iterations[1]?.deliberation?.reason).toBe('max_runs_reached');
   });
@@ -893,6 +992,7 @@ describe('symbolic rlm loop', () => {
     ];
     let planIndex = 0;
     const plannerPrompts: string[] = [];
+    const deliberationCalls: Array<{ iteration: number; reason: string }> = [];
 
     const result = await runSymbolicLoop({
       goal: baseState.goal,
@@ -907,10 +1007,23 @@ describe('symbolic rlm loop', () => {
         plannerPrompts.push(prompt);
         return plans[planIndex++] ?? plans[plans.length - 1];
       },
-      runSubcall: async () => 'summary output from variable'
+      runSubcall: async () => 'summary output from variable',
+      deliberation: {
+        enabled: true,
+        strategy: 'single-agent',
+        minIntervalIterations: 10,
+        maxRuns: 1,
+        maxSummaryBytes: 512,
+        includeInPlannerPrompt: true,
+        run: async (_prompt, meta) => {
+          deliberationCalls.push(meta);
+          return 'Decision focus: resolve final_var correctly\nRisks: missing output_var mapping\nContext gaps: none\nPlanner directives: keep output_var in summaries';
+        }
+      }
     });
 
     expect(result.exitCode).toBe(0);
+    expect(deliberationCalls).toEqual([{ iteration: 1, reason: 'bootstrap' }]);
     expect(result.state.final?.final_answer).toBe('summary output from variable');
     const firstIteration = result.state.symbolic_iterations[0];
     expect(firstIteration.subcalls[0]?.output_var).toBe('summary');

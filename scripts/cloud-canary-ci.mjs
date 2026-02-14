@@ -77,6 +77,14 @@ function classifyFailure(signal) {
   };
 }
 
+function normalizeCloudBranch(rawBranch) {
+  const trimmed = String(rawBranch ?? '').trim();
+  if (!trimmed) {
+    return '';
+  }
+  return trimmed.replace(/^refs\/heads\//, '');
+}
+
 async function runCommand(command, args, { env = process.env, cwd = process.cwd(), timeoutMs = DEFAULT_TIMEOUT_MS } = {}) {
   return await new Promise((resolve) => {
     const child = spawn(command, args, {
@@ -242,7 +250,8 @@ async function main() {
   const taskId = process.env.CLOUD_CANARY_TASK_ID?.trim() || process.env.MCP_RUNNER_TASK_ID?.trim() || DEFAULT_TASK_ID;
   const required = envFlagEnabled(process.env.CODEX_CLOUD_CANARY_REQUIRED);
   const notes = process.env.CLOUD_CANARY_NOTES?.trim() || DEFAULT_NOTES;
-  const cloudBranch = process.env.CLOUD_CANARY_BRANCH?.trim() || process.env.CODEX_CLOUD_BRANCH?.trim() || 'main';
+  const cloudBranchRaw = process.env.CLOUD_CANARY_BRANCH?.trim() || process.env.CODEX_CLOUD_BRANCH?.trim() || 'main';
+  const cloudBranch = normalizeCloudBranch(cloudBranchRaw);
   const preflightIssues = [];
   const orchestratorBinPath = join(repoRoot, 'dist', 'bin', 'codex-orchestrator.js');
 
@@ -257,12 +266,27 @@ async function main() {
   if (codexCheck.exitCode !== 0) {
     preflightIssues.push('Codex CLI is unavailable (`codex --version` failed).');
   }
+  if (!cloudBranch) {
+    preflightIssues.push('Cloud branch is empty after normalization.');
+  } else {
+    const branchCheck = await runCommand('git', ['ls-remote', '--exit-code', '--heads', 'origin', cloudBranch], {
+      cwd: repoRoot,
+      timeoutMs: 10000
+    });
+    if (branchCheck.exitCode !== 0) {
+      preflightIssues.push(
+        `Cloud branch '${cloudBranch}' was not found on origin. Push it first or set CLOUD_CANARY_BRANCH/CODEX_CLOUD_BRANCH to an existing remote branch.`
+      );
+    }
+  }
 
   if (preflightIssues.length > 0) {
     const summaryLines = [
       '## Cloud Canary (Skipped)',
       '',
       ...preflightIssues.map((issue) => `- ${issue}`),
+      '',
+      `Cloud branch: ${cloudBranch || '<unset>'}`,
       '',
       `Required mode: ${required ? 'yes' : 'no'}`
     ];

@@ -16,6 +16,7 @@ Use this skill when a task needs a spec-driven workflow. The objective is to cre
 - TECH_SPEC: capture technical requirements (use `.agent/task/templates/tech-spec-template.md`; stored under `tasks/specs/<id>-<slug>.md`).
 - ACTION_PLAN: capture sequencing/milestones (use `.agent/task/templates/action-plan-template.md`).
 - Depth scales with scope, but all three docs are required.
+- For low-risk tiny edits, follow the bounded shortcut in `docs/micro-task-path.md` instead of long-form rewrites (still requires task/spec evidence).
 
 2) Register the TECH_SPEC and task
 - Add the TECH_SPEC to `tasks/index.json` (including `last_review`).

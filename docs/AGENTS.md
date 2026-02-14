@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp d5c155ff17bfc862d0c60d779d47a020723957be36ed4cc40943aeca113826b3 -->
+<!-- codex:instruction-stamp 564e7e9e915ccaa163ad8198458c7d96385b437f7bf4343a5e1538d3c455294e -->
 # Repository Agent Guidance
 
 ## Project 0303 — Codex Orchestrator Autonomy Enhancements
@@ -31,6 +31,7 @@
 - Use `.agent/task/templates/tech-spec-template.md` for TECH_SPECs and `.agent/task/templates/action-plan-template.md` for ACTION_PLANs.
 - Prefer the global `docs-first` skill when installed; bundled skills ship for downstream release packaging.
 - Translate the user request into the PRD and update it as you learn new constraints or scope changes.
+- For low-risk tiny changes, apply the bounded micro-task path in `docs/micro-task-path.md` instead of full-length collateral rewrites (still requires task/spec evidence).
 
 ## Orchestrator-First Default
 - Use `codex-orchestrator` pipelines for planning, implementation, validation, and review work that touches the repo.

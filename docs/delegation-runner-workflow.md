@@ -8,6 +8,7 @@ Symbolic RLM runs now enable auto-deliberation by default for context management
 - `RLM_SYMBOLIC_DELIBERATION_MAX_RUNS=12`
 - `RLM_SYMBOLIC_DELIBERATION_MAX_SUMMARY_BYTES=2048`
 - `RLM_SYMBOLIC_DELIBERATION_INCLUDE_IN_PLANNER=1`
+- `RLM_SYMBOLIC_DELIBERATION_LOG=0` (default; set to `1` to persist deliberation prompt/output/meta artifacts)
 
 ## 0) Register the delegation server once (required)
 

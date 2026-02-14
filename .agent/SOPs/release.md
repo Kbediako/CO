@@ -31,7 +31,10 @@
 5.1. If using `gh release create` manually, require a pre-existing signed tag and pass `--verify-tag` to prevent auto-created unsigned tags.
 6. Monitor the tag-driven workflow in `.github/workflows/release.yml`:
    - Confirms tag/version match, builds, runs pack audit/smoke, creates GitHub Release, and publishes to npm.
+   - For manual dispatch, pass `inputs.tag=vX.Y.Z` (or prerelease tag) so workflow metadata resolves against a real tag.
    - Stable tags publish to `latest`; alpha tags publish to `alpha` and create a prerelease.
+   - Repository secrets must provide signer verification material for CI tag checks: `RELEASE_SIGNING_PUBLIC_KEYS` (GPG) or `RELEASE_SIGNING_ALLOWED_SIGNERS` (SSH).
+   - Workflow blocks lightweight/unsigned tags before packaging/publish.
    - Confirm GitHub shows Verified for the tag/commit.
    - If .github/release.yml exists, verify Overview/Bug Fixes sections render as expected.
    - Optional: before tagging, add and commit a release overview override file at .github/release-overview.md with a short narrative summary (remove after release).

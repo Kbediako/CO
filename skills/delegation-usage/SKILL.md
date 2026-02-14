@@ -20,6 +20,9 @@ Collab multi-agent mode is separate from delegation. For symbolic RLM subcalls t
 - Spawn returns an `agent_id` (thread id). Current TUI collab rendering is id-based; do not depend on custom visible agent names.
 - Subagents spawned through collab run with approval effectively set to `never`; design child tasks to avoid approval/escalation requirements.
 - Collab spawn depth is bounded. Near/at max depth, recursive delegation can fail or collab can be disabled in children; prefer shallow parent fan-out.
+- **Lifecycle is mandatory:** for every successful `spawn_agent`, run `wait` and then `close_agent` for that same id before task completion.
+- Keep a local list of spawned ids and run a final cleanup pass so no agent id is left unclosed on timeout/error paths.
+- If spawn fails with `agent thread limit reached`, stop spawning, close any known ids first, then surface a concise recovery note.
 
 ## Quick-start workflow (canned)
 
@@ -174,3 +177,4 @@ repeat:
 - **Missing control files:** delegate tools rely on `control_endpoint.json` in the run directory; older runs may not have it.
 - **Collab payload mismatch:** `spawn_agent` rejects calls that include both `message` and `items`.
 - **Collab UI assumptions:** agent rows/records are id-based today; use explicit stream role text in prompts/artifacts for operator clarity.
+- **Collab lifecycle leaks:** missing `close_agent` calls accumulate open threads and can trigger `agent thread limit reached`; always finish `spawn -> wait -> close_agent` per id.
