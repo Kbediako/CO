@@ -235,7 +235,7 @@ function resolveExperienceMinReward(env: NodeJS.ProcessEnv = process.env): numbe
   if (!Number.isFinite(parsed)) {
     return DEFAULT_MIN_EXPERIENCE_REWARD;
   }
-  return parsed;
+  return Math.max(0, parsed);
 }
 
 export function updateHeartbeat(manifest: CliManifest): void {
