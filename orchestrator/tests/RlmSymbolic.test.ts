@@ -276,7 +276,7 @@ describe('symbolic rlm loop', () => {
         enabled: true,
         strategy: 'single-agent',
         minIntervalIterations: 1,
-        maxRuns: 2,
+        maxRuns: 1,
         maxSummaryBytes: 512,
         includeInPlannerPrompt: true,
         run: async () => {
@@ -290,6 +290,8 @@ describe('symbolic rlm loop', () => {
     expect(result.state.symbolic_iterations[0]?.deliberation?.status).toBe('error');
     expect(result.state.symbolic_iterations[0]?.deliberation?.reason).toBe('bootstrap');
     expect(result.state.symbolic_iterations[0]?.deliberation?.error).toContain('deliberation unavailable');
+    expect(result.state.symbolic_iterations[1]?.deliberation?.status).toBe('skipped');
+    expect(result.state.symbolic_iterations[1]?.deliberation?.reason).toBe('max_runs_reached');
   });
 
   it('renders JSONL search hits and records clamped top_k', async () => {

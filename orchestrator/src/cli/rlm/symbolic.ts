@@ -823,6 +823,7 @@ export async function runSymbolicLoop(options: SymbolicLoopOptions): Promise<Rlm
             strategy: deliberationOptions.strategy
           };
         } else {
+          deliberationRuns += 1;
           try {
             const result = await runDeliberationStep({
               options: deliberationOptions,
@@ -839,7 +840,6 @@ export async function runSymbolicLoop(options: SymbolicLoopOptions): Promise<Rlm
             deliberation = result.record;
             latestDeliberationBrief = result.brief;
             lastDeliberationIteration = iteration;
-            deliberationRuns += 1;
             log(
               `Deliberation ${formatDeliberationReason(reason)} ran for iteration ${iteration} (${result.record.strategy}).`
             );

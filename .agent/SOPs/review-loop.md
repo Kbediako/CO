@@ -13,6 +13,14 @@ Use this playbook whenever handing off a review (`npm run review` or an implemen
    - Medium: 51–200 LOC or 4–10 files, touches scripts/docs/pipelines → 15–20 min.
    - Large: >200 LOC, >10 files, touches CI/guardrails/release paths or adds deps → 25–30 min.
    - Preferred monitor command: `npm run pr:watch-merge -- --pr <number> --quiet-minutes <window>` (add `--auto-merge` when merge is approved).
+   - Escalation path:
+     - Escalate when merge attempts fail twice, required checks stay flaky for >30 minutes or >3 restarts, or any security/privacy finding appears.
+     - Notify repository maintainers/owners in the PR thread first; if unresolved after one watch window, open a follow-up issue and link it from the PR.
+     - Preferred contact method: GitHub PR thread with `@` mentions to maintainers/owners, then linked issue for tracking.
+   - Run evidence locations:
+     - CI evidence: failing/passing GitHub Actions job logs and artifacts linked from the PR checks tab.
+     - Runtime evidence: orchestrator manifests/logs under `.runs/<task-id>/cli/<run-id>/` and any monitor log capture (for example `/tmp/pr-watch.log`).
+     - Record evidence links in the PR thread (or run manifest notes), use UTC timestamps + PR number in filenames, and carry the same links into any follow-up issue.
 5. Check inline review comments/threads (not just review summaries). Use `gh pr view <number> --comments` or `gh api repos/<owner>/<repo>/pulls/<number>/comments` and ensure no unresolved items remain.
 6. For GitHub agent review comments (CodeRabbit, Copilot, Codex connector), respond in-thread, react with 👍 once addressed, and resolve the review thread.
 7. If the reviewer finds issues, fix them, update `NOTES` with follow-up questions (when needed), and rerun the same gate.
@@ -20,7 +28,7 @@ Use this playbook whenever handing off a review (`npm run review` or an implemen
 9. For non-trivial changes, run one final elegance/minimality review pass and remove avoidable complexity before merge.
 
 ## Completion discipline (patience-first)
-- Wait/poll until terminal status for checks, review agents, and cloud/orchestrator runs before handoff. Use `npm run pr:watch-merge` for PR monitoring so polling persists even during long waits.
+- Wait/poll until terminal status for checks, review agents, and cloud/orchestrator runs before handoff. Use `npm run pr:watch-merge` for PR monitoring, so polling persists even during long waits.
 - If checks restart or new comments arrive, reset the watch window.
 - Do not hand off mid-flight work unless the user explicitly asks to stop early.
 
