@@ -607,9 +607,9 @@
     {
       "path": ".agent/task/0953-standalone-review-docs-first-ship.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-01-19",
-      "cadence_days": 90
+      "status": "archived",
+      "last_review": "2026-02-14",
+      "cadence_days": 365
     },
     {
       "path": ".agent/task/0954-rlm-orchestrator-validation.md",
@@ -662,6 +662,13 @@
     },
     {
       "path": ".agent/task/0961-recursive-rlm-enhancements.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-14",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/task/0962-release-cloud-rlm-hardening.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-02-14",
@@ -1060,6 +1067,13 @@
       "cadence_days": 90
     },
     {
+      "path": "docs/ACTION_PLAN-release-cloud-rlm-hardening.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-14",
+      "cadence_days": 90
+    },
+    {
       "path": "docs/ACTION_PLAN-release-notes-template-signing.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -1309,6 +1323,13 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/micro-task-path.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-14",
       "cadence_days": 90
     },
     {
@@ -1620,6 +1641,13 @@
       "cadence_days": 90
     },
     {
+      "path": "docs/PRD-release-cloud-rlm-hardening.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-14",
+      "cadence_days": 90
+    },
+    {
       "path": "docs/PRD-release-notes-template-signing.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -1757,6 +1785,13 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-01-22",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/skills-release.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-14",
       "cadence_days": 90
     },
     {
@@ -2100,6 +2135,13 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/TECH_SPEC-release-cloud-rlm-hardening.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-14",
       "cadence_days": 90
     },
     {
@@ -2609,9 +2651,9 @@
     {
       "path": "tasks/specs/0953-standalone-review-docs-first-ship.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-01-19",
-      "cadence_days": 90
+      "status": "archived",
+      "last_review": "2026-02-14",
+      "cadence_days": 365
     },
     {
       "path": "tasks/specs/0954-rlm-orchestrator-validation.md",
@@ -2664,6 +2706,13 @@
     },
     {
       "path": "tasks/specs/0961-recursive-rlm-enhancements.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-14",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/specs/0962-release-cloud-rlm-hardening.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-02-14",
@@ -3106,9 +3155,9 @@
     {
       "path": "tasks/tasks-0953-standalone-review-docs-first-ship.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-01-19",
-      "cadence_days": 90
+      "status": "archived",
+      "last_review": "2026-02-14",
+      "cadence_days": 365
     },
     {
       "path": "tasks/tasks-0954-rlm-orchestrator-validation.md",
@@ -3167,41 +3216,6 @@
       "cadence_days": 90
     },
     {
-      "path": "templates/codex/AGENTS.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-01-19",
-      "cadence_days": 90
-    },
-    {
-      "path": "docs/PRD-release-cloud-rlm-hardening.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-02-14",
-      "cadence_days": 90
-    },
-    {
-      "path": "docs/TECH_SPEC-release-cloud-rlm-hardening.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-02-14",
-      "cadence_days": 90
-    },
-    {
-      "path": "docs/ACTION_PLAN-release-cloud-rlm-hardening.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-02-14",
-      "cadence_days": 90
-    },
-    {
-      "path": "tasks/specs/0962-release-cloud-rlm-hardening.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-02-14",
-      "cadence_days": 90
-    },
-    {
       "path": "tasks/tasks-0962-release-cloud-rlm-hardening.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -3209,24 +3223,10 @@
       "cadence_days": 90
     },
     {
-      "path": ".agent/task/0962-release-cloud-rlm-hardening.md",
+      "path": "templates/codex/AGENTS.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-02-14",
-      "cadence_days": 90
-    },
-    {
-      "path": "docs/micro-task-path.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-02-14",
-      "cadence_days": 90
-    },
-    {
-      "path": "docs/skills-release.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-02-14",
+      "last_review": "2026-01-19",
       "cadence_days": 90
     }
   ]
