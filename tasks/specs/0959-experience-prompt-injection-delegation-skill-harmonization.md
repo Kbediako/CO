@@ -29,7 +29,7 @@ last_review: 2026-02-14
 ## Architecture and Data
 - Architecture / design adjustments:
   - Prompt composition update in orchestrator cloud path.
-  - Skill wording update in bundled markdown docs.
+  - Skill wording update in bundled Markdown docs.
 - Data model changes / migrations:
   - None.
 - External dependencies / integrations:

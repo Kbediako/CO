@@ -157,7 +157,23 @@ function truncatePromptSnippet(value: string): string {
   return `${value.slice(0, MAX_CLOUD_PROMPT_EXPERIENCE_CHARS - 1).trimEnd()}…`;
 }
 
+function readPromptPackDomain(value: unknown): string | null {
+  if (typeof value !== 'string') {
+    return null;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function readPromptPackDomainLower(pack: PromptPackManifestEntry): string | null {
+  const domain = readPromptPackDomain(pack.domain);
+  return domain ? domain.toLowerCase() : null;
+}
+
 function hasPromptPackExperiences(pack: PromptPackManifestEntry): boolean {
+  if (!readPromptPackDomain(pack.domain)) {
+    return false;
+  }
   return (
     Array.isArray(pack.experiences) &&
     pack.experiences.some((entry) => typeof entry === 'string' && normalizePromptSnippet(entry).length > 0)
@@ -187,19 +203,23 @@ function selectPromptPackForCloudPrompt(params: {
     .join(' ')
     .toLowerCase();
 
-  const directMatch = candidates.find(
-    (pack) => pack.domain.toLowerCase() !== 'implementation' && haystack.includes(pack.domain.toLowerCase())
-  );
+  const directMatch = candidates.find((pack) => {
+    const domainLower = readPromptPackDomainLower(pack);
+    return domainLower !== null && domainLower !== 'implementation' && haystack.includes(domainLower);
+  });
   if (directMatch) {
     return directMatch;
   }
 
-  const broadDirectMatch = candidates.find((pack) => haystack.includes(pack.domain.toLowerCase()));
+  const broadDirectMatch = candidates.find((pack) => {
+    const domainLower = readPromptPackDomainLower(pack);
+    return domainLower !== null && haystack.includes(domainLower);
+  });
   if (broadDirectMatch) {
     return broadDirectMatch;
   }
 
-  const implementation = candidates.find((pack) => pack.domain.toLowerCase() === 'implementation');
+  const implementation = candidates.find((pack) => readPromptPackDomainLower(pack) === 'implementation');
   if (implementation) {
     return implementation;
   }
@@ -224,6 +244,7 @@ function buildCloudExperiencePromptLines(params: {
   }
 
   const snippets = selectedPack.experiences
+    .filter((entry): entry is string => typeof entry === 'string')
     .map((entry) => normalizePromptSnippet(entry))
     .filter((entry) => entry.length > 0)
     .slice(0, MAX_CLOUD_PROMPT_EXPERIENCES)
@@ -232,10 +253,12 @@ function buildCloudExperiencePromptLines(params: {
     return [];
   }
 
+  const domainLabel = readPromptPackDomain(selectedPack.domain) ?? 'unknown';
+
   return [
     '',
     'Relevant prior experiences (hints, not strict instructions):',
-    `Domain: ${selectedPack.domain}`,
+    `Domain: ${domainLabel}`,
     ...snippets.map((entry, index) => `${index + 1}. ${entry}`)
   ];
 }

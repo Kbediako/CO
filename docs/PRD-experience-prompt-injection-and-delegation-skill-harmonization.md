@@ -61,7 +61,9 @@
 - Should future iterations inject experience snippets into additional non-cloud prompt paths (for example RLM loops) as a separate follow-up?
 
 ## Evidence
-- Pending implementation.
+- Cloud prompt experience injection shipped in `orchestrator/src/cli/orchestrator.ts` with targeted coverage in `orchestrator/tests/CloudPrompt.test.ts`.
+- Delegation skill canonicalization shipped in `skills/delegation-usage/SKILL.md`, `skills/delegation-usage/DELEGATION_GUIDE.md`, and `skills/delegate-early/SKILL.md`.
+- Manifest-backed validation captured in `.runs/0959-experience-prompt-injection-delegation-skill-harmonization-scout/cli/2026-02-14T03-17-20-574Z-02f71ef8/manifest.json`, `.runs/0959-experience-prompt-injection-delegation-skill-harmonization/cli/2026-02-14T03-20-41-027Z-c35101dd/manifest.json`, and `.runs/0959-experience-prompt-injection-delegation-skill-harmonization/cli/2026-02-14T03-21-12-811Z-a6b02bbb/manifest.json`.
 
 ## Approvals
 - Product: User approved implementation path
