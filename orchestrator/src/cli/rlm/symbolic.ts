@@ -107,6 +107,7 @@ type PriorSubcallSummary = {
   pointer: string;
   preview: string;
   output_bytes: number;
+  output_var?: string;
 };
 const SUBCALL_POINTER_PREFIX = 'subcall:';
 
@@ -613,10 +614,11 @@ function validatePlanPointers(
 
 function formatSubcallSummary(entry: PriorSubcallSummary): string {
   const preview = truncateUtf8ToBytes(entry.preview ?? '', 160).replace(/\s+/g, ' ').trim();
+  const outputVarSuffix = entry.output_var ? ` output_var=${entry.output_var}` : '';
   if (!preview) {
-    return `${entry.id}: ${entry.pointer} (${entry.output_bytes} bytes)`;
+    return `${entry.id}: ${entry.pointer} (${entry.output_bytes} bytes)${outputVarSuffix}`;
   }
-  return `${entry.id}: ${entry.pointer} (${entry.output_bytes} bytes) preview="${preview}"`;
+  return `${entry.id}: ${entry.pointer} (${entry.output_bytes} bytes)${outputVarSuffix} preview="${preview}"`;
 }
 
 function buildPointerReferenceHint(): string {
@@ -1407,7 +1409,8 @@ export async function runSymbolicLoop(options: SymbolicLoopOptions): Promise<Rlm
             id: subcallId,
             pointer: outputPointer,
             preview: outputPreview,
-            output_bytes: byteLength(output)
+            output_bytes: byteLength(output),
+            output_var: rawSubcall.output_var
           },
           binding:
             rawSubcall.output_var

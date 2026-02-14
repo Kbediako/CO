@@ -892,6 +892,7 @@ describe('symbolic rlm loop', () => {
       JSON.stringify({ schema_version: 1, intent: 'final', final_var: 'summary' })
     ];
     let planIndex = 0;
+    const plannerPrompts: string[] = [];
 
     const result = await runSymbolicLoop({
       goal: baseState.goal,
@@ -902,7 +903,10 @@ describe('symbolic rlm loop', () => {
       runDir,
       contextStore: new ContextStore(contextObject),
       budgets,
-      runPlanner: async () => plans[planIndex++] ?? plans[plans.length - 1],
+      runPlanner: async (prompt) => {
+        plannerPrompts.push(prompt);
+        return plans[planIndex++] ?? plans[plans.length - 1];
+      },
       runSubcall: async () => 'summary output from variable'
     });
 
@@ -917,6 +921,7 @@ describe('symbolic rlm loop', () => {
         subcall_id: 'sc0001'
       })
     );
+    expect(plannerPrompts[1]).toContain('output_var=summary');
   });
 
   it('retries then fails when final_var is unbound', async () => {
