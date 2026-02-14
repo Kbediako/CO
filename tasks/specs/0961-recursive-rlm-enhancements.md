@@ -48,10 +48,15 @@ last_review: 2026-02-14
     - prompt-context assertion proving pointer summary inclusion and bounded prior-output verbosity.
     - variable handoff test (`output_var` capture + `final_var` resolution).
   - Run required guardrail checks per AGENTS.
+  - Manifest evidence for this task:
+    - docs-review: `.runs/0961-recursive-rlm-enhancements/cli/2026-02-14T10-04-42-551Z-3102e10d/manifest.json`
+    - implementation-gate: `.runs/0961-recursive-rlm-enhancements/cli/2026-02-14T10-05-13-113Z-975d57f0/manifest.json`
+    - delegation scout: `.runs/0961-recursive-rlm-enhancements-scout/cli/2026-02-14T09-35-29-030Z-6cd6fe7a/manifest.json`
 - Rollout verification:
   - Manual symbolic run confirms state/artifact pointer fields appear as expected.
 - Monitoring / alerts:
-  - Existing run manifest and `rlm/state.json` inspection.
+  - Inspect the implementation manifest for this task: `.runs/0961-recursive-rlm-enhancements/cli/2026-02-14T10-05-13-113Z-975d57f0/manifest.json`.
+  - For symbolic runtime audits, inspect the per-run symbolic state artifact at `.runs/0961-recursive-rlm-enhancements/cli/<run-id>/rlm/state.json` and related subcall artifacts under `.runs/0961-recursive-rlm-enhancements/cli/<run-id>/rlm/subcalls/`.
 
 ## Open Questions
 - None blocking.
