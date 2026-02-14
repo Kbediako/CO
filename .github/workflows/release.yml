@@ -90,7 +90,11 @@ jobs:
       - name: Checkout release tag commit
         run: |
           set -euo pipefail
-          git checkout --detach "refs/tags/${{ steps.meta.outputs.tag }}"
+          TAG="${{ steps.meta.outputs.tag }}"
+          # actions/checkout can peel tag refs to the commit SHA on tag push events.
+          # Refetching the tag ref restores the annotated tag object for verification.
+          git fetch --force origin "refs/tags/${TAG}:refs/tags/${TAG}"
+          git checkout --detach "refs/tags/${TAG}"
 
       - name: Configure tag verification keys
         env:
