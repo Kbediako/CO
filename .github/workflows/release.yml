@@ -98,6 +98,10 @@ jobs:
           RELEASE_SIGNING_ALLOWED_SIGNERS: ${{ secrets.RELEASE_SIGNING_ALLOWED_SIGNERS }}
         run: |
           set -euo pipefail
+          if [[ -n "${RELEASE_SIGNING_PUBLIC_KEYS:-}" && -n "${RELEASE_SIGNING_ALLOWED_SIGNERS:-}" ]]; then
+            echo "::error::Set only one signing secret: RELEASE_SIGNING_PUBLIC_KEYS (GPG) or RELEASE_SIGNING_ALLOWED_SIGNERS (SSH)." >&2
+            exit 1
+          fi
           configured=0
           if [[ -n "${RELEASE_SIGNING_PUBLIC_KEYS:-}" ]]; then
             printf '%s\n' "${RELEASE_SIGNING_PUBLIC_KEYS}" | gpg --batch --import
