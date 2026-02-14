@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generated_at": "2026-02-13",
+  "generated_at": "2026-02-14",
   "entries": [
     {
       "path": ".agent/AGENTS.md",
@@ -661,6 +661,13 @@
       "cadence_days": 90
     },
     {
+      "path": ".agent/task/0961-recursive-rlm-enhancements.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-14",
+      "cadence_days": 90
+    },
+    {
       "path": ".agent/task/ACTION_PLAN_TEMPLATE.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -1036,6 +1043,13 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/ACTION_PLAN-recursive-rlm-enhancements.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-14",
       "cadence_days": 90
     },
     {
@@ -1592,6 +1606,13 @@
       "cadence_days": 90
     },
     {
+      "path": "docs/PRD-recursive-rlm-enhancements.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-14",
+      "cadence_days": 90
+    },
+    {
       "path": "docs/PRD-refactor-plan-implementation.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -2065,6 +2086,13 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/TECH_SPEC-recursive-rlm-enhancements.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-14",
       "cadence_days": 90
     },
     {
@@ -2635,6 +2663,13 @@
       "cadence_days": 90
     },
     {
+      "path": "tasks/specs/0961-recursive-rlm-enhancements.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-14",
+      "cadence_days": 90
+    },
+    {
       "path": "tasks/specs/README.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -3119,6 +3154,13 @@
     },
     {
       "path": "tasks/tasks-0960-delegation-skills-optimization-patch-release.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-14",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/tasks-0961-recursive-rlm-enhancements.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-02-14",

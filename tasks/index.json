@@ -1166,6 +1166,22 @@
       },
       "created_at": "2026-02-14",
       "completed_at": null
+    },
+    {
+      "id": "0961",
+      "slug": "0961-recursive-rlm-enhancements",
+      "title": "Recursive RLM Enhancements",
+      "path": "tasks/tasks-0961-recursive-rlm-enhancements.md",
+      "kind": "plan",
+      "status": "in-progress",
+      "gate": {
+        "phase": "recursive-rlm-enhancements-implementation",
+        "status": "succeeded",
+        "log": ".runs/0961-recursive-rlm-enhancements/cli/2026-02-14T10-05-13-113Z-975d57f0/manifest.json",
+        "run_id": "2026-02-14T10-05-13-113Z-975d57f0"
+      },
+      "created_at": "2026-02-14",
+      "completed_at": null
     }
   ],
   "specs": [
@@ -1343,6 +1359,22 @@
         "task": "tasks/tasks-0960-delegation-skills-optimization-patch-release.md",
         "agent_task": ".agent/task/0960-delegation-skills-optimization-patch-release.md",
         "docs": "docs/TECH_SPEC-delegation-skills-optimization-patch-release.md"
+      }
+    },
+    {
+      "id": "20260214-0961-recursive-rlm-enhancements",
+      "title": "Recursive RLM Enhancements",
+      "relates_to": "tasks/tasks-0961-recursive-rlm-enhancements.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-02-14",
+      "paths": {
+        "spec": "tasks/specs/0961-recursive-rlm-enhancements.md",
+        "task": "tasks/tasks-0961-recursive-rlm-enhancements.md",
+        "agent_task": ".agent/task/0961-recursive-rlm-enhancements.md",
+        "docs": "docs/TECH_SPEC-recursive-rlm-enhancements.md"
       }
     }
   ]

@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join, relative } from 'node:path';
 
 import type {
@@ -11,7 +11,8 @@ import type {
   RlmSymbolicSearchHit,
   RlmSymbolicSnippet,
   RlmSymbolicSpan,
-  RlmSymbolicSubcall
+  RlmSymbolicSubcall,
+  RlmSymbolicVariableBinding
 } from './types.js';
 import { ContextStore } from './context.js';
 
@@ -62,6 +63,7 @@ interface PlannerPlan {
   searches?: Array<Record<string, unknown>>;
   subcalls?: Array<Record<string, unknown>>;
   final_answer?: string;
+  final_var?: string;
 }
 
 interface PlannerValidationResult {
@@ -71,6 +73,8 @@ interface PlannerValidationResult {
   subcalls: Array<{
     id: string;
     purpose: string;
+    parent_pointer?: string;
+    output_var?: string;
     snippets: RlmSymbolicSnippet[];
     spans: RlmSymbolicSpan[];
     max_input_bytes: number;
@@ -83,6 +87,28 @@ interface PlannerValidationResult {
 }
 
 type DeliberationReason = 'bootstrap' | 'cadence' | 'planner_recovery' | 'no_subcall_progress';
+type SubcallPointerRecord = {
+  pointer: string;
+  iteration: number;
+  subcallId: string;
+  outputPath: string;
+  outputBytes: number;
+};
+type VariableBindingRecord = {
+  name: string;
+  pointer: string;
+  iteration: number;
+  subcallId: string;
+  outputPath: string;
+  outputBytes: number;
+};
+type PriorSubcallSummary = {
+  id: string;
+  pointer: string;
+  preview: string;
+  output_bytes: number;
+};
+const SUBCALL_POINTER_PREFIX = 'subcall:';
 
 function byteLength(value: string): number {
   return Buffer.byteLength(value ?? '', 'utf8');
@@ -121,6 +147,53 @@ function truncateUtf8ToBytes(value: string, maxBytes: number): string {
     end = start;
   }
   return buffer.slice(0, end).toString('utf8');
+}
+
+function isContextPointer(pointer: string): boolean {
+  return pointer.startsWith('ctx:');
+}
+
+function parseSubcallPointer(pointer: string): { iteration: number; subcallId: string } | null {
+  if (!pointer.startsWith(SUBCALL_POINTER_PREFIX)) {
+    return null;
+  }
+  const body = pointer.slice(SUBCALL_POINTER_PREFIX.length);
+  const separatorIndex = body.indexOf(':');
+  if (separatorIndex <= 0 || separatorIndex >= body.length - 1) {
+    return null;
+  }
+  const iterationRaw = body.slice(0, separatorIndex);
+  const subcallId = body.slice(separatorIndex + 1);
+  const iteration = Number.parseInt(iterationRaw, 10);
+  if (!Number.isFinite(iteration) || iteration <= 0 || !subcallId) {
+    return null;
+  }
+  return { iteration, subcallId };
+}
+
+function buildSubcallPointer(iteration: number, subcallId: string): string {
+  return `${SUBCALL_POINTER_PREFIX}${iteration}:${subcallId}`;
+}
+
+async function readSubcallPointerSnippet(
+  pointerStore: Map<string, SubcallPointerRecord>,
+  pointer: string,
+  offset: number,
+  bytes: number
+): Promise<string> {
+  const record = pointerStore.get(pointer);
+  if (!record) {
+    throw new Error('plan_validation_error');
+  }
+  const raw = await readFile(record.outputPath, 'utf8');
+  const sourceBytes = Buffer.from(raw, 'utf8');
+  const safeOffset = Math.max(0, Math.floor(offset));
+  const safeBytes = Math.max(0, Math.floor(bytes));
+  if (safeOffset >= sourceBytes.length || safeBytes <= 0) {
+    return '';
+  }
+  const end = Math.min(sourceBytes.length, safeOffset + safeBytes);
+  return sourceBytes.subarray(safeOffset, end).toString('utf8');
 }
 
 async function mapWithConcurrency<T, R>(
@@ -302,6 +375,9 @@ function buildPlannerRetryPrompt(prompt: string, errors: string[]): string {
   if (errors.includes('final_requires_subcall')) {
     headerLines.push('Do not return intent=final until after at least one subcall.');
   }
+  if (errors.includes('final_var_unbound')) {
+    headerLines.push('Use final_var only when it matches a previously declared subcalls[].output_var.');
+  }
   if (errors.length > 0) {
     headerLines.push(`Previous error: ${errors.join('; ')}`);
   }
@@ -341,9 +417,27 @@ function validatePlan(
   if (!['continue', 'final', 'pause', 'fail'].includes(plan.intent)) {
     throw new Error('plan_validation_error');
   }
+  const finalVarRaw = plan.final_var;
+  const finalVar =
+    typeof finalVarRaw === 'string' && finalVarRaw.trim().length > 0
+      ? finalVarRaw.trim()
+      : undefined;
+  if (finalVarRaw !== undefined && !finalVar) {
+    throw new Error('plan_validation_error');
+  }
+  if (finalVar) {
+    plan.final_var = finalVar;
+  }
   if (plan.intent === 'final') {
-    if (typeof plan.final_answer !== 'string' || plan.final_answer.trim().length === 0) {
+    const finalAnswer =
+      typeof plan.final_answer === 'string' && plan.final_answer.trim().length > 0
+        ? plan.final_answer.trim()
+        : null;
+    if (!finalAnswer && !finalVar) {
       throw new Error('plan_validation_error');
+    }
+    if (finalAnswer) {
+      plan.final_answer = finalAnswer;
     }
   }
 
@@ -391,6 +485,25 @@ function validatePlan(
   const rawSubcalls = Array.isArray(plan.subcalls) ? plan.subcalls : [];
   for (const entry of rawSubcalls) {
     const purposeInfo = normalizePurpose(entry?.purpose);
+    const parentPointerRaw = entry?.parent_pointer;
+    if (parentPointerRaw !== undefined && typeof parentPointerRaw !== 'string') {
+      throw new Error('plan_validation_error');
+    }
+    const outputVarRaw = entry?.output_var;
+    if (outputVarRaw !== undefined && typeof outputVarRaw !== 'string') {
+      throw new Error('plan_validation_error');
+    }
+    const parentPointer =
+      typeof parentPointerRaw === 'string' && parentPointerRaw.trim().length > 0
+        ? parentPointerRaw.trim()
+        : undefined;
+    const outputVar =
+      typeof outputVarRaw === 'string' && outputVarRaw.trim().length > 0
+        ? outputVarRaw.trim()
+        : undefined;
+    if (outputVarRaw !== undefined && !outputVar) {
+      throw new Error('plan_validation_error');
+    }
     const maxInputBytes = toNumber(entry?.max_input_bytes);
     if (!maxInputBytes || maxInputBytes <= 0) {
       throw new Error('plan_validation_error');
@@ -438,6 +551,8 @@ function validatePlan(
     subcalls.push({
       id: '',
       purpose: purposeInfo.value,
+      parent_pointer: parentPointer,
+      output_var: outputVar,
       snippets,
       spans,
       max_input_bytes: Math.floor(maxInputBytes)
@@ -461,24 +576,134 @@ function validatePlan(
   };
 }
 
-function validatePlanPointers(validation: PlannerValidationResult, contextStore: ContextStore): void {
+function validatePlanPointers(
+  validation: PlannerValidationResult,
+  contextStore: ContextStore,
+  subcallPointers: Map<string, SubcallPointerRecord>
+): void {
   const ensurePointer = (pointer?: string) => {
     if (!pointer) {
       return;
     }
-    if (!contextStore.validatePointer(pointer)) {
-      throw new Error('plan_validation_error');
+    if (isContextPointer(pointer)) {
+      if (!contextStore.validatePointer(pointer)) {
+        throw new Error('plan_validation_error');
+      }
+      return;
     }
+    if (parseSubcallPointer(pointer)) {
+      if (!subcallPointers.has(pointer)) {
+        throw new Error('plan_validation_error');
+      }
+      return;
+    }
+    throw new Error('plan_validation_error');
   };
 
   for (const read of validation.reads) {
     ensurePointer(read.pointer);
   }
   for (const subcall of validation.subcalls) {
+    ensurePointer(subcall.parent_pointer);
     for (const snippet of subcall.snippets) {
       ensurePointer(snippet.pointer);
     }
   }
+}
+
+function formatSubcallSummary(entry: PriorSubcallSummary): string {
+  const preview = truncateUtf8ToBytes(entry.preview ?? '', 160).replace(/\s+/g, ' ').trim();
+  if (!preview) {
+    return `${entry.id}: ${entry.pointer} (${entry.output_bytes} bytes)`;
+  }
+  return `${entry.id}: ${entry.pointer} (${entry.output_bytes} bytes) preview="${preview}"`;
+}
+
+function buildPointerReferenceHint(): string {
+  return 'ctx:<object_id>#chunk:<chunk_id> | subcall:<iteration>:<subcall_id>';
+}
+
+function buildSubcallHints(): string {
+  return '"parent_pointer": "optional pointer for recursion lineage", "output_var": "optional variable name",';
+}
+
+function hasSubcallPointer(pointer: string): boolean {
+  return parseSubcallPointer(pointer) !== null;
+}
+
+async function resolveSnippetText(params: {
+  snippet: RlmSymbolicSnippet;
+  contextStore: ContextStore;
+  subcallPointers: Map<string, SubcallPointerRecord>;
+}): Promise<string> {
+  const { snippet, contextStore, subcallPointers } = params;
+  if (snippet.pointer) {
+    if (isContextPointer(snippet.pointer)) {
+      const result = await contextStore.read(
+        snippet.pointer,
+        snippet.offset ?? 0,
+        snippet.bytes
+      );
+      return result.text;
+    }
+    if (hasSubcallPointer(snippet.pointer)) {
+      return readSubcallPointerSnippet(
+        subcallPointers,
+        snippet.pointer,
+        snippet.offset ?? 0,
+        snippet.bytes
+      );
+    }
+    throw new Error('plan_validation_error');
+  }
+  if (typeof snippet.start_byte === 'number') {
+    const result = await contextStore.readSpan(snippet.start_byte, snippet.bytes);
+    return result.text;
+  }
+  throw new Error('plan_validation_error');
+}
+
+async function resolveReadExcerpt(params: {
+  read: RlmSymbolicRead;
+  contextStore: ContextStore;
+  subcallPointers: Map<string, SubcallPointerRecord>;
+  maxBytes: number;
+}): Promise<{ pointer: string; excerpt: string } | null> {
+  const { read, contextStore, subcallPointers, maxBytes } = params;
+  if (read.pointer) {
+    if (isContextPointer(read.pointer)) {
+      const result = await contextStore.read(
+        read.pointer,
+        read.offset ?? 0,
+        read.bytes
+      );
+      return {
+        pointer: read.pointer,
+        excerpt: truncateUtf8ToBytes(result.text, maxBytes)
+      };
+    }
+    if (hasSubcallPointer(read.pointer)) {
+      const text = await readSubcallPointerSnippet(
+        subcallPointers,
+        read.pointer,
+        read.offset ?? 0,
+        read.bytes
+      );
+      return {
+        pointer: read.pointer,
+        excerpt: truncateUtf8ToBytes(text, maxBytes)
+      };
+    }
+    throw new Error('plan_validation_error');
+  }
+  if (typeof read.start_byte === 'number') {
+    const result = await contextStore.readSpan(read.start_byte, read.bytes);
+    return {
+      pointer: `start_byte=${read.start_byte} bytes=${read.bytes}`,
+      excerpt: truncateUtf8ToBytes(result.text, maxBytes)
+    };
+  }
+  return null;
 }
 
 function buildPlannerPrompt(params: {
@@ -487,7 +712,7 @@ function buildPlannerPrompt(params: {
   budgets: SymbolicBudgets;
   priorReads: Array<{ pointer: string; excerpt: string }>;
   priorSearches: Array<{ query: string; results: RlmSymbolicSearchHit[] }>;
-  priorSubcalls: Array<{ id: string; output: string }>;
+  priorSubcalls: PriorSubcallSummary[];
   deliberationBrief?: string | null;
 }): { prompt: string; truncation: RlmSymbolicIteration['truncation'] } {
   const { goal, contextStore, budgets, priorReads, priorSearches, priorSubcalls, deliberationBrief } = params;
@@ -497,16 +722,17 @@ function buildPlannerPrompt(params: {
     `Goal: ${goal}`,
     `Context object_id: ${contextStore.objectId}`,
     `Chunk count: ${contextStore.chunkCount}`,
-    `Pointer format: ctx:<object_id>#chunk:<chunk_id>`,
+    `Pointer format: ${buildPointerReferenceHint()}`,
     '',
     'Schema (v1):',
     '{',
     '  "schema_version": 1,',
     '  "intent": "continue | final | pause | fail",',
-    '  "reads": [{ "pointer": "ctx:<object_id>#chunk:<chunk_id>", "offset": 0, "bytes": 4096, "reason": "..." }],',
+    `  "reads": [{ "pointer": "${buildPointerReferenceHint()}", "offset": 0, "bytes": 4096, "reason": "..." }],`,
     '  "searches": [{ "query": "...", "top_k": 20, "reason": "..." }],',
-    '  "subcalls": [{ "purpose": "summarize | extract | classify | verify", "snippets": [{ "pointer": "ctx:<object_id>#chunk:<chunk_id>", "offset": 0, "bytes": 2048 }], "max_input_bytes": 120000, "expected_output": "short summary" }],',
-    '  "final_answer": "required when intent=final"',
+    `  "subcalls": [{ "purpose": "summarize | extract | classify | verify", ${buildSubcallHints()} "snippets": [{ "pointer": "${buildPointerReferenceHint()}", "offset": 0, "bytes": 2048 }], "max_input_bytes": 120000, "expected_output": "short summary" }],`,
+    '  "final_answer": "required when intent=final unless final_var is set",',
+    '  "final_var": "optional variable name bound by subcalls[].output_var"',
     '}',
     '',
     'Constraints:',
@@ -514,6 +740,7 @@ function buildPlannerPrompt(params: {
     `- Max bytes per read: ${budgets.maxBytesPerChunkRead}.`,
     `- Max bytes per snippet: ${budgets.maxBytesPerSnippet}.`,
     '- Do not include full context; use pointers.',
+    '- Prefer prior subcall pointers for recursive chaining.',
     '- Request at least one subcall before intent=final.',
     ''
   ];
@@ -543,9 +770,9 @@ function buildPlannerPrompt(params: {
     sections.push({ key: 'reads_dropped', lines });
   }
   if (priorSubcalls.length > 0) {
-    const lines = ['Prior subcall outputs:'];
+    const lines = ['Prior subcall references:'];
     for (const entry of priorSubcalls) {
-      lines.push(`- ${entry.id}: ${entry.output}`);
+      lines.push(`- ${formatSubcallSummary(entry)}`);
     }
     sections.push({ key: 'subcalls_dropped', lines });
   }
@@ -635,7 +862,7 @@ function buildDeliberationPrompt(params: {
   contextStore: ContextStore;
   priorReads: Array<{ pointer: string; excerpt: string }>;
   priorSearches: Array<{ query: string; results: RlmSymbolicSearchHit[] }>;
-  priorSubcalls: Array<{ id: string; output: string }>;
+  priorSubcalls: PriorSubcallSummary[];
   maxSummaryBytes: number;
 }): string {
   const maxBytes = Math.max(256, Math.floor(params.maxSummaryBytes));
@@ -667,7 +894,8 @@ function buildDeliberationPrompt(params: {
   if (params.priorSubcalls.length > 0) {
     const latestSubcall = params.priorSubcalls[params.priorSubcalls.length - 1];
     lines.push(`Latest subcall id: ${latestSubcall?.id ?? ''}`);
-    lines.push(`Latest subcall output: ${truncateUtf8ToBytes(latestSubcall?.output ?? '', 320)}`);
+    lines.push(`Latest subcall pointer: ${latestSubcall?.pointer ?? ''}`);
+    lines.push(`Latest subcall preview: ${truncateUtf8ToBytes(latestSubcall?.preview ?? '', 320)}`);
   }
   return lines.join('\n');
 }
@@ -682,7 +910,7 @@ async function runDeliberationStep(params: {
   contextStore: ContextStore;
   priorReads: Array<{ pointer: string; excerpt: string }>;
   priorSearches: Array<{ query: string; results: RlmSymbolicSearchHit[] }>;
-  priorSubcalls: Array<{ id: string; output: string }>;
+  priorSubcalls: PriorSubcallSummary[];
 }): Promise<{ record: RlmSymbolicDeliberation; brief: string }> {
   const prompt = buildDeliberationPrompt({
     goal: params.goal,
@@ -775,7 +1003,9 @@ export async function runSymbolicLoop(options: SymbolicLoopOptions): Promise<Rlm
 
   let priorReads: Array<{ pointer: string; excerpt: string }> = [];
   let priorSearches: Array<{ query: string; results: RlmSymbolicSearchHit[] }> = [];
-  let priorSubcalls: Array<{ id: string; output: string }> = [];
+  let priorSubcalls: PriorSubcallSummary[] = [];
+  const subcallPointers = new Map<string, SubcallPointerRecord>();
+  const variableBindings = new Map<string, VariableBindingRecord>();
   let lastDeliberationIteration = 0;
   let deliberationRuns = 0;
   let latestDeliberationBrief: string | null = null;
@@ -903,12 +1133,17 @@ export async function runSymbolicLoop(options: SymbolicLoopOptions): Promise<Rlm
         let validationError: string | null = null;
         try {
           validation = validatePlan(plan, options.budgets);
-          validatePlanPointers(validation, options.contextStore);
+          validatePlanPointers(validation, options.contextStore, subcallPointers);
         } catch {
           validationError = 'plan_validation_error';
         }
         if (!validationError && plan.intent === 'final' && !hasPriorSubcalls) {
           validationError = 'final_requires_subcall';
+        }
+        if (!validationError && plan.intent === 'final' && plan.final_var) {
+          if (!variableBindings.has(plan.final_var)) {
+            validationError = 'final_var_unbound';
+          }
         }
         if (validationError) {
           plannerErrors.push(validationError);
@@ -934,8 +1169,21 @@ export async function runSymbolicLoop(options: SymbolicLoopOptions): Promise<Rlm
       const reads: RlmSymbolicRead[] = [];
       const subcalls: RlmSymbolicSubcall[] = [];
       const searches: RlmSymbolicSearch[] = [];
+      const iterationVariableBindings: RlmSymbolicVariableBinding[] = [];
 
       if (plan.intent === 'final') {
+        let finalAnswer = plan.final_answer;
+        if (plan.final_var) {
+          const binding = variableBindings.get(plan.final_var);
+          if (!binding) {
+            return await finalize({ status: 'invalid_config', exitCode: 5 });
+          }
+          try {
+            finalAnswer = await readFile(binding.outputPath, 'utf8');
+          } catch {
+            return await finalize({ status: 'invalid_config', exitCode: 5 });
+          }
+        }
         state.symbolic_iterations.push({
           iteration,
           planner_prompt_bytes: plannerPromptBytes,
@@ -952,7 +1200,7 @@ export async function runSymbolicLoop(options: SymbolicLoopOptions): Promise<Rlm
           truncation: promptResult.truncation
         });
         await writeState(statePath, state);
-        return await finalize({ status: 'passed', exitCode: 0, final_answer: plan.final_answer });
+        return await finalize({ status: 'passed', exitCode: 0, final_answer: finalAnswer });
       }
 
       if (plan.intent === 'pause' || plan.intent === 'fail') {
@@ -998,22 +1246,14 @@ export async function runSymbolicLoop(options: SymbolicLoopOptions): Promise<Rlm
 
       const readExcerpts: Array<{ pointer: string; excerpt: string }> = [];
       for (const read of validation.reads) {
-        if (read.pointer) {
-          const result = await options.contextStore.read(
-            read.pointer,
-            read.offset ?? 0,
-            read.bytes
-          );
-          readExcerpts.push({
-            pointer: read.pointer,
-            excerpt: truncateUtf8ToBytes(result.text, options.budgets.maxBytesPerChunkRead)
-          });
-        } else if (typeof read.start_byte === 'number') {
-          const result = await options.contextStore.readSpan(read.start_byte, read.bytes);
-          readExcerpts.push({
-            pointer: `start_byte=${read.start_byte} bytes=${read.bytes}`,
-            excerpt: truncateUtf8ToBytes(result.text, options.budgets.maxBytesPerChunkRead)
-          });
+        const excerpt = await resolveReadExcerpt({
+          read,
+          contextStore: options.contextStore,
+          subcallPointers,
+          maxBytes: options.budgets.maxBytesPerChunkRead
+        });
+        if (excerpt) {
+          readExcerpts.push(excerpt);
         }
         reads.push(read);
       }
@@ -1061,17 +1301,12 @@ export async function runSymbolicLoop(options: SymbolicLoopOptions): Promise<Rlm
 
         const resolvedSnippets: Array<{ meta: RlmSymbolicSnippet | RlmSymbolicSpan; text: string }> = [];
         for (const snippet of snippets) {
-          if (snippet.pointer) {
-            const result = await options.contextStore.read(
-              snippet.pointer,
-              snippet.offset ?? 0,
-              snippet.bytes
-            );
-            resolvedSnippets.push({ meta: snippet, text: result.text });
-          } else if (typeof snippet.start_byte === 'number') {
-            const result = await options.contextStore.readSpan(snippet.start_byte, snippet.bytes);
-            resolvedSnippets.push({ meta: snippet, text: result.text });
-          }
+          const text = await resolveSnippetText({
+            snippet,
+            contextStore: options.contextStore,
+            subcallPointers
+          });
+          resolvedSnippets.push({ meta: snippet, text });
         }
         for (const span of spans) {
           const spanBytes = Math.max(0, span.end_byte - span.start_byte);
@@ -1115,10 +1350,13 @@ export async function runSymbolicLoop(options: SymbolicLoopOptions): Promise<Rlm
         const promptPath = join(subcallDir, 'prompt.txt');
         const outputPath = join(subcallDir, 'output.txt');
         const metaPath = join(subcallDir, 'meta.json');
+        const outputPointer = buildSubcallPointer(iteration, subcallId);
 
         await writeFile(inputPath, JSON.stringify({
           id: subcallId,
           purpose: rawSubcall.purpose,
+          parent_pointer: rawSubcall.parent_pointer,
+          output_var: rawSubcall.output_var,
           max_input_bytes: maxInput,
           snippets,
           spans
@@ -1134,11 +1372,22 @@ export async function runSymbolicLoop(options: SymbolicLoopOptions): Promise<Rlm
         }, null, 2), 'utf8');
 
         const relativeBase = (filePath: string) => relative(options.repoRoot, filePath);
+        const outputPreview = truncateUtf8ToBytes(output, options.budgets.maxPreviewBytes);
+        subcallPointers.set(outputPointer, {
+          pointer: outputPointer,
+          iteration,
+          subcallId,
+          outputPath,
+          outputBytes: byteLength(output)
+        });
 
         return {
           subcall: {
             id: subcallId,
             purpose: rawSubcall.purpose,
+            parent_pointer: rawSubcall.parent_pointer,
+            output_pointer: outputPointer,
+            output_var: rawSubcall.output_var,
             snippets: snippets.length > 0 ? snippets : undefined,
             spans: spans.length > 0 ? spans : undefined,
             max_input_bytes: rawSubcall.max_input_bytes,
@@ -1156,13 +1405,37 @@ export async function runSymbolicLoop(options: SymbolicLoopOptions): Promise<Rlm
           },
           output: {
             id: subcallId,
-            output: truncateUtf8ToBytes(output, options.budgets.maxBytesPerSnippet)
-          }
+            pointer: outputPointer,
+            preview: outputPreview,
+            output_bytes: byteLength(output)
+          },
+          binding:
+            rawSubcall.output_var
+              ? {
+                  name: rawSubcall.output_var,
+                  pointer: outputPointer,
+                  iteration,
+                  subcallId,
+                  outputPath,
+                  outputBytes: byteLength(output)
+                }
+              : null
         };
       });
 
       for (const result of subcallResults) {
         subcalls.push(result.subcall);
+        if (result.binding) {
+          variableBindings.set(result.binding.name, result.binding);
+          iterationVariableBindings.push({
+            name: result.binding.name,
+            pointer: result.binding.pointer,
+            iteration: result.binding.iteration,
+            subcall_id: result.binding.subcallId,
+            output_bytes: result.binding.outputBytes,
+            output_path: relative(options.repoRoot, result.binding.outputPath)
+          });
+        }
       }
       priorSubcalls = subcallResults.map((result) => result.output);
 
@@ -1171,6 +1444,8 @@ export async function runSymbolicLoop(options: SymbolicLoopOptions): Promise<Rlm
         planner_prompt_bytes: plannerPromptBytes,
         reads,
         subcalls,
+        variable_bindings:
+          iterationVariableBindings.length > 0 ? iterationVariableBindings : undefined,
         deliberation,
         searches,
         planner_errors: plannerErrors.length > 0 ? plannerErrors : undefined,
