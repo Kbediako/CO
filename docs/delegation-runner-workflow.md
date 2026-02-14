@@ -2,6 +2,13 @@
 
 Use this workflow with delegation MCP enabled by default (the only MCP on by default). Disable it only when required by safety constraints. If older PRDs mention “disabled by default,” treat this guide and `AGENTS.md` as the current policy. Collab multi-agent mode is separate from delegation; for symbolic RLM subcalls that use collab tools, set `RLM_SYMBOLIC_COLLAB=1` and ensure a collab-capable Codex CLI. Collab tool calls are recorded in `manifest.collab_tool_calls`.
 
+Symbolic RLM runs now enable auto-deliberation by default for context management. Tune with:
+- `RLM_SYMBOLIC_DELIBERATION=1` (default)
+- `RLM_SYMBOLIC_DELIBERATION_INTERVAL=2`
+- `RLM_SYMBOLIC_DELIBERATION_MAX_RUNS=12`
+- `RLM_SYMBOLIC_DELIBERATION_MAX_SUMMARY_BYTES=2048`
+- `RLM_SYMBOLIC_DELIBERATION_INCLUDE_IN_PLANNER=1`
+
 ## 0) Register the delegation server once (required)
 
 You must register the delegation MCP server once so delegate tools are available:

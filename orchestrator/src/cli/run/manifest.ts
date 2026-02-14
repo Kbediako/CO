@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
-import { mkdir, readFile, symlink, writeFile } from 'node:fs/promises';
-import { dirname, join, relative } from 'node:path';
+import { access, lstat, mkdir, readdir, readFile, realpath, symlink, writeFile } from 'node:fs/promises';
+import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 
 import type {
   CliManifest,
@@ -20,6 +20,7 @@ import type { RunPaths } from './runPaths.js';
 import { resolveRunPaths, relativeToRepo } from './runPaths.js';
 import { ExperienceStore } from '../../persistence/ExperienceStore.js';
 import { formatExperienceInjections } from '../exec/experience.js';
+import { sanitizeRunId } from '../../persistence/sanitizeRunId.js';
 
 export interface ManifestBootstrapOptions {
   env: EnvironmentPaths;
@@ -162,9 +163,14 @@ export async function saveManifest(paths: RunPaths, manifest: CliManifest): Prom
 }
 
 export async function loadManifest(env: EnvironmentPaths, runId: string): Promise<{ manifest: CliManifest; paths: RunPaths }> {
-  const paths = resolveRunPaths(env, runId);
-  const raw = await readFile(paths.manifestPath, 'utf8');
+  const manifestPath = await resolveManifestPathForRunId(env, runId);
+  const raw = await readFile(manifestPath, 'utf8');
   const manifest = JSON.parse(raw) as CliManifest;
+  const resolvedEnv = {
+    ...env,
+    taskId: typeof manifest.task_id === 'string' && manifest.task_id.trim().length > 0 ? manifest.task_id : env.taskId
+  };
+  const paths = resolveRunPathsForManifestPath(resolvedEnv, runId, manifestPath);
   return { manifest, paths };
 }
 
@@ -427,6 +433,198 @@ async function createCompatibilityPointer(env: EnvironmentPaths, paths: RunPaths
       manifest: relativeManifest
     });
   }
+}
+
+async function resolveManifestPathForRunId(env: EnvironmentPaths, runId: string): Promise<string> {
+  const expectedPaths = resolveRunPaths(env, runId);
+  try {
+    await access(expectedPaths.manifestPath);
+    return expectedPaths.manifestPath;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+      throw error;
+    }
+  }
+
+  const safeRunId = sanitizeRunId(runId);
+  const localCompatResolved = await resolveLocalCompatManifestPath(env, safeRunId);
+  if (localCompatResolved) {
+    return localCompatResolved;
+  }
+
+  const discoveredManifestPath = await findManifestPathAcrossTasks(env.runsRoot, safeRunId);
+  if (discoveredManifestPath) {
+    return discoveredManifestPath;
+  }
+
+  return expectedPaths.manifestPath;
+}
+
+async function resolveLocalCompatManifestPath(
+  env: EnvironmentPaths,
+  safeRunId: string
+): Promise<string | null> {
+  const localCompatManifestPath = join(env.runsRoot, 'local-mcp', safeRunId, 'manifest.json');
+  try {
+    await access(localCompatManifestPath);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      return null;
+    }
+    throw error;
+  }
+
+  let stats: import('node:fs').Stats;
+  try {
+    stats = await lstat(localCompatManifestPath);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      return null;
+    }
+    throw error;
+  }
+
+  if (stats.isSymbolicLink()) {
+    try {
+      return await realpath(localCompatManifestPath);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+        return null;
+      }
+      throw error;
+    }
+  }
+
+  const redirectPath = await resolveRedirectManifestPath(env, localCompatManifestPath);
+  if (!redirectPath) {
+    return null;
+  }
+  try {
+    await access(redirectPath);
+    return redirectPath;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      return null;
+    }
+    throw error;
+  }
+}
+
+async function resolveRedirectManifestPath(
+  env: EnvironmentPaths,
+  localCompatManifestPath: string
+): Promise<string | null> {
+  let raw: string;
+  try {
+    raw = await readFile(localCompatManifestPath, 'utf8');
+  } catch {
+    return null;
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  if (!parsed || typeof parsed !== 'object') {
+    return null;
+  }
+  const data = parsed as Record<string, unknown>;
+
+  const manifestRef =
+    typeof data.manifest === 'string' && data.manifest.trim().length > 0 ? data.manifest.trim() : null;
+  if (manifestRef) {
+    return resolveManifestReference(env.repoRoot, manifestRef);
+  }
+
+  const redirectRef =
+    typeof data.redirect_to === 'string' && data.redirect_to.trim().length > 0
+      ? data.redirect_to.trim()
+      : null;
+  if (!redirectRef) {
+    return null;
+  }
+  const redirectRoot = resolveManifestReference(env.repoRoot, redirectRef);
+  if (redirectRoot.endsWith('manifest.json')) {
+    return redirectRoot;
+  }
+  return join(redirectRoot, 'manifest.json');
+}
+
+function resolveManifestReference(repoRoot: string, reference: string): string {
+  if (isAbsolute(reference)) {
+    return reference;
+  }
+  return resolve(repoRoot, reference);
+}
+
+async function findManifestPathAcrossTasks(runsRoot: string, safeRunId: string): Promise<string | null> {
+  let entries: import('node:fs').Dirent[];
+  try {
+    entries = await readdir(runsRoot, { withFileTypes: true, encoding: 'utf8' });
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      return null;
+    }
+    throw error;
+  }
+
+  for (const entry of entries) {
+    if (!entry.isDirectory()) {
+      continue;
+    }
+    if (entry.name === 'local-mcp') {
+      continue;
+    }
+    const taskRoot = join(runsRoot, entry.name);
+    const cliManifestPath = join(taskRoot, 'cli', safeRunId, 'manifest.json');
+    try {
+      await access(cliManifestPath);
+      return cliManifestPath;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+        throw error;
+      }
+    }
+
+    const legacyManifestPath = join(taskRoot, safeRunId, 'manifest.json');
+    try {
+      await access(legacyManifestPath);
+      return legacyManifestPath;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+        throw error;
+      }
+    }
+  }
+
+  return null;
+}
+
+function resolveRunPathsForManifestPath(env: EnvironmentPaths, runId: string, manifestPath: string): RunPaths {
+  const resolved = resolveRunPaths(env, runId);
+  if (resolved.manifestPath === manifestPath) {
+    return resolved;
+  }
+  const runDir = dirname(manifestPath);
+  return {
+    ...resolved,
+    runDir,
+    manifestPath,
+    heartbeatPath: join(runDir, '.heartbeat'),
+    resumeTokenPath: join(runDir, '.resume-token'),
+    logPath: join(runDir, 'runner.ndjson'),
+    eventsPath: join(runDir, 'events.jsonl'),
+    controlPath: join(runDir, 'control.json'),
+    controlAuthPath: join(runDir, 'control_auth.json'),
+    controlEndpointPath: join(runDir, 'control_endpoint.json'),
+    confirmationsPath: join(runDir, 'confirmations.json'),
+    questionsPath: join(runDir, 'questions.json'),
+    delegationTokensPath: join(runDir, 'delegation_tokens.json'),
+    commandsDir: join(runDir, 'commands'),
+    errorsDir: join(runDir, 'errors')
+  };
 }
 
 function buildCommandEntries(pipeline: PipelineDefinition): CliManifestCommand[] {

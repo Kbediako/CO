@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { basename, join } from 'node:path';
 import process from 'node:process';
@@ -381,6 +382,10 @@ async function handleRlm(orchestrator: CodexOrchestrator, rawArgs: string[]): Pr
 
 async function handleResume(orchestrator: CodexOrchestrator, rawArgs: string[]): Promise<void> {
   const { positionals, flags } = parseArgs(rawArgs);
+  if (isHelpRequest(positionals, flags)) {
+    printResumeHelp();
+    return;
+  }
   const runId = (flags['run'] ?? positionals[0]) as string | undefined;
   if (!runId) {
     throw new Error('resume requires --run <run-id>.');
@@ -401,6 +406,10 @@ async function handleResume(orchestrator: CodexOrchestrator, rawArgs: string[]):
 
 async function handleStatus(orchestrator: CodexOrchestrator, rawArgs: string[]): Promise<void> {
   const { positionals, flags } = parseArgs(rawArgs);
+  if (isHelpRequest(positionals, flags)) {
+    printStatusHelp();
+    return;
+  }
   const runId = (flags['run'] ?? positionals[0]) as string | undefined;
   if (!runId) {
     throw new Error('status requires --run <run-id>.');
@@ -698,7 +707,11 @@ async function handleMcp(rawArgs: string[]): Promise<void> {
 }
 
 async function handleDelegationServer(rawArgs: string[]): Promise<void> {
-  const { flags } = parseArgs(rawArgs);
+  const { positionals, flags } = parseArgs(rawArgs);
+  if (isHelpRequest(positionals, flags)) {
+    printDelegationServerHelp();
+    return;
+  }
   const repoRoot = typeof flags['repo'] === 'string' ? (flags['repo'] as string) : process.cwd();
   const modeFlag = typeof flags['mode'] === 'string' ? (flags['mode'] as string) : undefined;
   const overrideFlag =
@@ -831,7 +844,7 @@ function parseExecArgs(rawArgs: string[]): ParsedExecArgs {
   }
 
   return {
-    commandTokens,
+    commandTokens: normalizeExecCommandTokens(commandTokens, cwd),
     notifyTargets,
     otelEndpoint,
     requestedMode,
@@ -839,6 +852,80 @@ function parseExecArgs(rawArgs: string[]): ParsedExecArgs {
     cwd,
     taskId
   };
+}
+
+function normalizeExecCommandTokens(commandTokens: string[], cwd?: string): string[] {
+  if (commandTokens.length !== 1) {
+    return commandTokens;
+  }
+  const token = commandTokens[0]!.trim();
+  if (token.length === 0 || !/\s/.test(token) || looksLikeExistingPath(token, cwd)) {
+    return commandTokens;
+  }
+  const parsed = splitShellLikeCommand(token);
+  return parsed.length > 0 ? parsed : commandTokens;
+}
+
+function looksLikeExistingPath(token: string, cwd?: string): boolean {
+  const probes = [token];
+  if (cwd) {
+    probes.push(join(cwd, token));
+  }
+  for (const probe of probes) {
+    if (existsSync(probe)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function splitShellLikeCommand(command: string): string[] {
+  const tokens: string[] = [];
+  let current = '';
+  let quote: '"' | "'" | null = null;
+
+  for (let i = 0; i < command.length; i += 1) {
+    const char = command[i]!;
+    if (char === '\\' && quote !== null) {
+      const next = command[i + 1];
+      if (next === quote || next === '\\') {
+        current += next;
+        i += 1;
+        continue;
+      }
+    }
+    if (char === '"' || char === "'") {
+      if (quote === char) {
+        quote = null;
+      } else if (quote === null) {
+        quote = char;
+      } else {
+        current += char;
+      }
+      continue;
+    }
+    if (quote === null && /\s/u.test(char)) {
+      if (current.length > 0) {
+        tokens.push(current);
+        current = '';
+      }
+      continue;
+    }
+    current += char;
+  }
+
+  if (current.length > 0) {
+    tokens.push(current);
+  }
+  return tokens;
+}
+
+function isHelpRequest(positionals: string[], flags: ArgMap): boolean {
+  if (flags['help'] === true) {
+    return true;
+  }
+  const first = positionals[0];
+  return first === 'help' || first === '--help' || first === '-h';
 }
 
 function printHelp(): void {
@@ -957,5 +1044,42 @@ Commands:
     --force                 Overwrite existing skill files.
     --codex-home <path>     Override the target Codex home directory.
     --format json           Emit machine-readable output.
+`);
+}
+
+function printStatusHelp(): void {
+  console.log(`Usage: codex-orchestrator status --run <id> [--watch] [--interval N] [--format json]
+
+Options:
+  --run <id>         Run id to inspect.
+  --watch            Poll until run reaches a terminal state.
+  --interval <sec>   Poll interval when --watch is enabled (default 10).
+  --format json      Emit machine-readable status output.
+`);
+}
+
+function printResumeHelp(): void {
+  console.log(`Usage: codex-orchestrator resume --run <id> [options]
+
+Options:
+  --run <id>            Run id to resume.
+  --token <resume-token>  Verify the resume token before restarting.
+  --actor <name>        Record who resumed the run.
+  --reason <text>       Record why the run was resumed.
+  --target <stage-id>   Override stage selection before resuming.
+  --format json         Emit machine-readable output.
+  --interactive | --ui  Enable read-only HUD when running in a TTY.
+  --no-interactive      Force disable HUD.
+`);
+}
+
+function printDelegationServerHelp(): void {
+  console.log(`Usage: codex-orchestrator delegate-server [options]
+
+Options:
+  --repo <path>                    Repo root for config + manifests (default cwd).
+  --mode <full|question_only>      Limit tool surface for child runs.
+  --config "<key>=<value>[;...]"   Apply config overrides.
+  --help                           Show this message.
 `);
 }

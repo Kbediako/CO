@@ -43,6 +43,9 @@ const DEFAULT_MAX_PLANNER_PROMPT_BYTES = 32768;
 const DEFAULT_SEARCH_TOP_K = 20;
 const DEFAULT_MAX_PREVIEW_BYTES = 512;
 const DEFAULT_MAX_CONCURRENCY = 4;
+const DEFAULT_SYMBOLIC_DELIBERATION_INTERVAL = 2;
+const DEFAULT_SYMBOLIC_DELIBERATION_MAX_RUNS = 12;
+const DEFAULT_SYMBOLIC_DELIBERATION_MAX_SUMMARY_BYTES = 2048;
 const UNBOUNDED_ITERATION_ALIASES = new Set(['unbounded', 'unlimited', 'infinite', 'infinity']);
 
 interface ParsedArgs {
@@ -414,7 +417,8 @@ async function runCodexJsonlCompletion(
   repoRoot: string,
   nonInteractive: boolean,
   mirrorOutput: boolean,
-  extraArgs: string[] = []
+  extraArgs: string[] = [],
+  options: { validateCollabLifecycle?: boolean } = {}
 ): Promise<string> {
   const { stdout, stderr } = await runCodexExec(
     ['exec', '--json', ...extraArgs, prompt],
@@ -424,6 +428,12 @@ async function runCodexJsonlCompletion(
     false,
     mirrorOutput
   );
+  if (options.validateCollabLifecycle) {
+    const validation = validateCollabLifecycle(stdout);
+    if (!validation.ok) {
+      throw new Error(`Collab lifecycle validation failed: ${validation.reason}`);
+    }
+  }
   const message = extractAgentMessageFromJsonl(stdout);
   if (message) {
     return message;
@@ -455,10 +465,188 @@ function extractAgentMessageFromJsonl(raw: string): string | null {
   return lastMessage;
 }
 
+interface ParsedCollabToolCall {
+  sequence: number;
+  eventType: 'item.started' | 'item.updated' | 'item.completed';
+  tool: string;
+  status: 'in_progress' | 'completed' | 'failed' | 'unknown';
+  receiverThreadIds: string[];
+}
+
+function normalizeCollabStatus(value: unknown): ParsedCollabToolCall['status'] {
+  if (value === 'in_progress' || value === 'completed' || value === 'failed') {
+    return value;
+  }
+  return 'unknown';
+}
+
+function parseCollabToolCallsFromJsonl(raw: string): ParsedCollabToolCall[] {
+  const lines = raw.split(/\r?\n/);
+  const calls: ParsedCollabToolCall[] = [];
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index]?.trim();
+    if (!line || !line.startsWith('{') || !line.includes('"collab_tool_call"')) {
+      continue;
+    }
+    try {
+      const parsed = JSON.parse(line) as {
+        type?: string;
+        item?: {
+          type?: string;
+          tool?: unknown;
+          status?: unknown;
+          receiver_thread_ids?: unknown;
+        };
+      };
+      if (
+        (parsed.type !== 'item.started' && parsed.type !== 'item.updated' && parsed.type !== 'item.completed') ||
+        parsed.item?.type !== 'collab_tool_call' ||
+        typeof parsed.item.tool !== 'string'
+      ) {
+        continue;
+      }
+      const receiverThreadIds = Array.isArray(parsed.item.receiver_thread_ids)
+        ? parsed.item.receiver_thread_ids.filter((entry): entry is string => typeof entry === 'string')
+        : [];
+      calls.push({
+        sequence: index,
+        eventType: parsed.type,
+        tool: parsed.item.tool,
+        status: normalizeCollabStatus(parsed.item.status),
+        receiverThreadIds
+      });
+    } catch {
+      continue;
+    }
+  }
+  return calls;
+}
+
+function formatLifecycleIds(ids: string[]): string {
+  return ids.slice(0, 3).join(', ');
+}
+
+function includesThreadLimit(text: string): boolean {
+  return text.toLowerCase().includes('agent thread limit reached');
+}
+
+function hasCollabSpawnThreadLimitError(raw: string): boolean {
+  const lines = raw.split('\n');
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed.startsWith('{')) {
+      continue;
+    }
+    try {
+      const parsed = JSON.parse(trimmed) as { item?: Record<string, unknown>; error?: Record<string, unknown> };
+      const item = parsed.item;
+      if (
+        !item ||
+        item.type !== 'collab_tool_call' ||
+        item.tool !== 'spawn_agent'
+      ) {
+        continue;
+      }
+      const candidates: string[] = [];
+      if (typeof item.error === 'string') {
+        candidates.push(item.error);
+      }
+      if (typeof item.message === 'string') {
+        candidates.push(item.message);
+      }
+      if (typeof item.output === 'string') {
+        candidates.push(item.output);
+      }
+      if (typeof parsed.error?.message === 'string') {
+        candidates.push(parsed.error.message);
+      }
+      if (candidates.some((entry) => includesThreadLimit(entry))) {
+        return true;
+      }
+    } catch {
+      continue;
+    }
+  }
+  return false;
+}
+
+function validateCollabLifecycle(raw: string): { ok: true } | { ok: false; reason: string } {
+  if (hasCollabSpawnThreadLimitError(raw)) {
+    return { ok: false, reason: 'collab spawn hit thread limit' };
+  }
+  const calls = parseCollabToolCallsFromJsonl(raw);
+  if (calls.length === 0) {
+    return { ok: true };
+  }
+
+  const spawnedAt = new Map<string, number>();
+  const waitedAt = new Map<string, number>();
+  const closedAt = new Map<string, number>();
+
+  for (const call of calls) {
+    const isCompleted =
+      call.status === 'completed' || (call.status === 'unknown' && call.eventType === 'item.completed');
+    if (!isCompleted) {
+      continue;
+    }
+    for (const threadId of call.receiverThreadIds) {
+      if (call.tool === 'spawn_agent' && !spawnedAt.has(threadId)) {
+        spawnedAt.set(threadId, call.sequence);
+      } else if (call.tool === 'wait') {
+        waitedAt.set(threadId, call.sequence);
+      } else if (call.tool === 'close_agent') {
+        closedAt.set(threadId, call.sequence);
+      }
+    }
+  }
+
+  const spawnedIds = Array.from(spawnedAt.keys());
+  if (spawnedIds.length === 0) {
+    return { ok: true };
+  }
+
+  const missingWait = spawnedIds.filter((threadId) => !waitedAt.has(threadId));
+  if (missingWait.length > 0) {
+    return {
+      ok: false,
+      reason: `missing wait for spawned agent(s): ${formatLifecycleIds(missingWait)}`
+    };
+  }
+
+  const missingClose = spawnedIds.filter((threadId) => !closedAt.has(threadId));
+  if (missingClose.length > 0) {
+    return {
+      ok: false,
+      reason: `missing close_agent for spawned agent(s): ${formatLifecycleIds(missingClose)}`
+    };
+  }
+
+  const invalidOrder = spawnedIds.filter((threadId) => {
+    const waitSequence = waitedAt.get(threadId);
+    const closeSequence = closedAt.get(threadId);
+    if (waitSequence === undefined || closeSequence === undefined) {
+      return false;
+    }
+    return closeSequence < waitSequence;
+  });
+  if (invalidOrder.length > 0) {
+    return {
+      ok: false,
+      reason: `close_agent before wait for agent(s): ${formatLifecycleIds(invalidOrder)}`
+    };
+  }
+
+  return { ok: true };
+}
+
 function buildCollabSubcallPrompt(prompt: string): string {
   return [
-    'Use collab tools to spawn a sub-agent with the prompt below.',
-    'Wait for the sub-agent, then close it.',
+    'Use collab tools to run the sub-agent prompt below.',
+    'For every spawned agent id, execute this lifecycle in order:',
+    '1) spawn_agent',
+    '2) wait (for that same id)',
+    '3) close_agent (for that same id)',
+    'Never leave spawned agents unclosed, including timeout or error paths.',
     'Return only the sub-agent response text and nothing else.',
     '',
     'Sub-agent prompt:',
@@ -768,6 +956,14 @@ async function main(): Promise<void> {
 
   const subagentsEnabled = envFlagEnabled(env.CODEX_SUBAGENTS) || envFlagEnabled(env.RLM_SUBAGENTS);
   const symbolicCollabEnabled = envFlagEnabled(env.RLM_SYMBOLIC_COLLAB);
+  const symbolicDeliberationEnabled =
+    env.RLM_SYMBOLIC_DELIBERATION === undefined
+      ? true
+      : envFlagEnabled(env.RLM_SYMBOLIC_DELIBERATION);
+  const symbolicDeliberationIncludeInPlanner =
+    env.RLM_SYMBOLIC_DELIBERATION_INCLUDE_IN_PLANNER === undefined
+      ? true
+      : envFlagEnabled(env.RLM_SYMBOLIC_DELIBERATION_INCLUDE_IN_PLANNER);
   const nonInteractive = shouldForceNonInteractive(env);
 
   if (mode === 'symbolic') {
@@ -794,6 +990,19 @@ async function main(): Promise<void> {
       maxPreviewBytes: parsePositiveInt(env.RLM_MAX_PREVIEW_BYTES, DEFAULT_MAX_PREVIEW_BYTES) ?? 0,
       maxConcurrency: parsePositiveInt(env.RLM_MAX_CONCURRENCY, DEFAULT_MAX_CONCURRENCY) ?? 0
     };
+    const deliberationMinIntervalIterations =
+      parsePositiveInt(
+        env.RLM_SYMBOLIC_DELIBERATION_INTERVAL,
+        DEFAULT_SYMBOLIC_DELIBERATION_INTERVAL
+      ) ?? 0;
+    const deliberationMaxRuns =
+      parsePositiveInt(env.RLM_SYMBOLIC_DELIBERATION_MAX_RUNS, DEFAULT_SYMBOLIC_DELIBERATION_MAX_RUNS) ??
+      0;
+    const deliberationMaxSummaryBytes =
+      parsePositiveInt(
+        env.RLM_SYMBOLIC_DELIBERATION_MAX_SUMMARY_BYTES,
+        DEFAULT_SYMBOLIC_DELIBERATION_MAX_SUMMARY_BYTES
+      ) ?? 0;
 
     const invalidBudget = Object.entries(budgets).find(([, value]) => !value || value <= 0);
     if (invalidBudget) {
@@ -806,6 +1015,47 @@ async function main(): Promise<void> {
         context: contextInfo,
         validator: validatorCommand ?? 'none'
       });
+      return;
+    }
+    if (deliberationMinIntervalIterations <= 0) {
+      await writeStateAndExit('invalid_config', 5, 'Invalid RLM_SYMBOLIC_DELIBERATION_INTERVAL value.', {
+        goal,
+        roles,
+        maxIterations,
+        maxMinutes: resolvedMaxMinutes,
+        mode,
+        context: contextInfo,
+        validator: validatorCommand ?? 'none'
+      });
+      return;
+    }
+    if (deliberationMaxRuns <= 0) {
+      await writeStateAndExit('invalid_config', 5, 'Invalid RLM_SYMBOLIC_DELIBERATION_MAX_RUNS value.', {
+        goal,
+        roles,
+        maxIterations,
+        maxMinutes: resolvedMaxMinutes,
+        mode,
+        context: contextInfo,
+        validator: validatorCommand ?? 'none'
+      });
+      return;
+    }
+    if (deliberationMaxSummaryBytes <= 0) {
+      await writeStateAndExit(
+        'invalid_config',
+        5,
+        'Invalid RLM_SYMBOLIC_DELIBERATION_MAX_SUMMARY_BYTES value.',
+        {
+          goal,
+          roles,
+          maxIterations,
+          maxMinutes: resolvedMaxMinutes,
+          mode,
+          context: contextInfo,
+          validator: validatorCommand ?? 'none'
+        }
+      );
       return;
     }
 
@@ -844,7 +1094,32 @@ async function main(): Promise<void> {
           'collab',
           '--sandbox',
           'read-only'
-        ]);
+        ], {
+          validateCollabLifecycle: true
+        });
+      },
+      deliberation: {
+        enabled: symbolicDeliberationEnabled,
+        strategy: symbolicCollabEnabled ? 'collab' : 'single-agent',
+        minIntervalIterations: deliberationMinIntervalIterations,
+        maxRuns: deliberationMaxRuns,
+        maxSummaryBytes: deliberationMaxSummaryBytes,
+        includeInPlannerPrompt: symbolicDeliberationIncludeInPlanner,
+        run: (prompt, _meta) => {
+          void _meta;
+          if (!symbolicCollabEnabled) {
+            return runCodexCompletion(prompt, env, repoRoot, nonInteractive, false, false);
+          }
+          const collabPrompt = buildCollabSubcallPrompt(prompt);
+          return runCodexJsonlCompletion(collabPrompt, env, repoRoot, nonInteractive, true, [
+            '--enable',
+            'collab',
+            '--sandbox',
+            'read-only'
+          ], {
+            validateCollabLifecycle: true
+          });
+        }
       },
       logger: (line) => logger.info(line)
     });
@@ -898,6 +1173,9 @@ export const __test__ = {
   parseMaxIterations,
   parsePositiveInt,
   resolveRlmMode,
+  parseCollabToolCallsFromJsonl,
+  validateCollabLifecycle,
+  buildCollabSubcallPrompt,
   DEFAULT_MAX_ITERATIONS,
   DEFAULT_MAX_MINUTES,
   DEFAULT_SYMBOLIC_MIN_BYTES

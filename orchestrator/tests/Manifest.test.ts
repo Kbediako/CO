@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { mkdtemp, readFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { appendCommandError, bootstrapManifest } from '../src/cli/run/manifest.js';
+import { appendCommandError, bootstrapManifest, loadManifest } from '../src/cli/run/manifest.js';
 import type { EnvironmentPaths } from '../src/cli/run/environment.js';
 import type { CliManifestCommand, PipelineDefinition } from '../src/cli/types.js';
 
@@ -62,5 +62,120 @@ describe('appendCommandError', () => {
     expect(stderr.endsWith('…')).toBe(true);
     expect(payload.details.stderr_truncated).toBe(true);
     expect(payload.details.stdout_truncated).toBe(true);
+  });
+});
+
+describe('loadManifest', () => {
+  it('resolves manifests by run id across task directories', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'manifest-load-'));
+    const targetTask = 'task-target';
+    const requesterTask = 'task-requester';
+    const runId = '2026-02-14T00-00-00-000Z-load-test';
+
+    const targetEnv: EnvironmentPaths = {
+      repoRoot,
+      runsRoot: join(repoRoot, '.runs'),
+      outRoot: join(repoRoot, 'out'),
+      taskId: targetTask
+    };
+    const requesterEnv: EnvironmentPaths = {
+      repoRoot,
+      runsRoot: join(repoRoot, '.runs'),
+      outRoot: join(repoRoot, 'out'),
+      taskId: requesterTask
+    };
+
+    const pipeline: PipelineDefinition = { id: 'test', title: 'Test Pipeline', stages: [] };
+    await bootstrapManifest(runId, {
+      env: targetEnv,
+      pipeline,
+      parentRunId: null,
+      taskSlug: null,
+      approvalPolicy: null
+    });
+
+    const loaded = await loadManifest(requesterEnv, runId);
+    expect(loaded.manifest.task_id).toBe(targetTask);
+    expect(loaded.paths.manifestPath).toContain(
+      join('.runs', targetTask, 'cli', runId, 'manifest.json')
+    );
+  });
+
+  it('ignores non-manifest local-mcp stubs and falls back to task cli manifests', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'manifest-load-stub-'));
+    const targetTask = 'task-target';
+    const requesterTask = 'task-requester';
+    const runId = '2026-02-14T00-00-00-000Z-load-stub';
+
+    const targetEnv: EnvironmentPaths = {
+      repoRoot,
+      runsRoot: join(repoRoot, '.runs'),
+      outRoot: join(repoRoot, 'out'),
+      taskId: targetTask
+    };
+    const requesterEnv: EnvironmentPaths = {
+      repoRoot,
+      runsRoot: join(repoRoot, '.runs'),
+      outRoot: join(repoRoot, 'out'),
+      taskId: requesterTask
+    };
+
+    const localCompatPath = join(repoRoot, '.runs', 'local-mcp', runId, 'manifest.json');
+    await mkdir(join(repoRoot, '.runs', 'local-mcp', runId), { recursive: true });
+    await writeFile(localCompatPath, JSON.stringify({ redirect_to: '.runs/invalid-path' }), 'utf8');
+
+    const pipeline: PipelineDefinition = { id: 'test', title: 'Test Pipeline', stages: [] };
+    await bootstrapManifest(runId, {
+      env: targetEnv,
+      pipeline,
+      parentRunId: null,
+      taskSlug: null,
+      approvalPolicy: null
+    });
+
+    const loaded = await loadManifest(requesterEnv, runId);
+    expect(loaded.manifest.task_id).toBe(targetTask);
+    expect(loaded.paths.manifestPath).toContain(
+      join('.runs', targetTask, 'cli', runId, 'manifest.json')
+    );
+  });
+
+  it('falls back when local-mcp symlink is dangling', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'manifest-load-dangling-'));
+    const targetTask = 'task-target';
+    const requesterTask = 'task-requester';
+    const runId = '2026-02-14T00-00-00-000Z-load-dangling';
+
+    const targetEnv: EnvironmentPaths = {
+      repoRoot,
+      runsRoot: join(repoRoot, '.runs'),
+      outRoot: join(repoRoot, 'out'),
+      taskId: targetTask
+    };
+    const requesterEnv: EnvironmentPaths = {
+      repoRoot,
+      runsRoot: join(repoRoot, '.runs'),
+      outRoot: join(repoRoot, 'out'),
+      taskId: requesterTask
+    };
+
+    const pipeline: PipelineDefinition = { id: 'test', title: 'Test Pipeline', stages: [] };
+    await bootstrapManifest(runId, {
+      env: targetEnv,
+      pipeline,
+      parentRunId: null,
+      taskSlug: null,
+      approvalPolicy: null
+    });
+
+    const localCompatPath = join(repoRoot, '.runs', 'local-mcp', runId, 'manifest.json');
+    await rm(localCompatPath, { force: true });
+    await symlink('missing-manifest.json', localCompatPath);
+
+    const loaded = await loadManifest(requesterEnv, runId);
+    expect(loaded.manifest.task_id).toBe(targetTask);
+    expect(loaded.paths.manifestPath).toContain(
+      join('.runs', targetTask, 'cli', runId, 'manifest.json')
+    );
   });
 });
