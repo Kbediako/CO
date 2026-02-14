@@ -97,11 +97,14 @@ function buildTrajectorySummary(frames: TrajectoryFrame[], fallback?: string): s
   const terminal = frames[frames.length - 1];
   if (terminal?.event.type === 'exec:end') {
     const stdout = terminal.event.payload.stdout?.trim();
-    if (stdout) {
+    if (stdout && !isLowSignalOutput(stdout)) {
       return stdout.split('\n').slice(0, 2).join(' ');
     }
   }
-  return fallback ?? 'TF-GRPO trajectory summary unavailable.';
+  if (fallback && fallback.trim()) {
+    return fallback.trim();
+  }
+  return 'TF-GRPO trajectory summary unavailable.';
 }
 
 function toToolStat(frame: TrajectoryFrame): ExperienceToolStat {
@@ -119,4 +122,20 @@ function truncateSummary(value: string, maxWords: number): string {
     return tokens.join(' ');
   }
   return tokens.slice(0, maxWords).join(' ');
+}
+
+function isLowSignalOutput(stdout: string): boolean {
+  const trimmed = stdout.trim();
+  if (!trimmed) {
+    return true;
+  }
+  if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+    return true;
+  }
+  const firstLine = trimmed.split('\n')[0] ?? '';
+  if (/^\{"type":/u.test(firstLine)) {
+    return true;
+  }
+  const words = firstLine.split(/\s+/u).filter(Boolean);
+  return words.length < 3;
 }

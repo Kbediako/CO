@@ -157,6 +157,7 @@ export async function persistExperienceRecords(params: {
   }
   try {
     const frames = framesFromToolMetrics(runMetrics.perTool, terminalEvent);
+    const reward = deriveExperienceReward(terminalEvent);
     const trajectory = summarizeTrajectory({
       runId: params.manifest.run_id,
       taskId: params.manifest.task_id,
@@ -165,7 +166,8 @@ export async function persistExperienceRecords(params: {
       domain: promptPack.domain,
       stampSignature: promptPack.stamp,
       frames,
-      baseSummary: params.manifest.summary ?? undefined
+      baseSummary: params.manifest.summary ?? undefined,
+      reward
     });
     const optimized = optimizeExperience(trajectory, params.policy);
     const manifestPath = relativeToRepo(params.env, params.paths.manifestPath);
@@ -246,4 +248,15 @@ function findTerminalEvent(events: ExecEvent[]): ExecEvent | null {
     }
   }
   return events.length > 0 ? events[events.length - 1]! : null;
+}
+
+function deriveExperienceReward(event: ExecEvent): { gtScore: number; relativeRank: number } {
+  if (event.type !== 'exec:end') {
+    return { gtScore: 0, relativeRank: 0 };
+  }
+  const succeeded = event.payload.status === 'succeeded' && event.payload.exitCode === 0;
+  return {
+    gtScore: succeeded ? 1 : 0,
+    relativeRank: 0
+  };
 }

@@ -1,6 +1,6 @@
 # Archived Document
 
-last_review: 2026-01-14
+last_review: 2026-02-14
 
 <!-- docs-archive:stub -->
 > Archived on 2026-01-14. Full content: <https://github.com/Kbediako/CO/blob/doc-archives/tasks/specs/0924-tasks-archive-policy.md>

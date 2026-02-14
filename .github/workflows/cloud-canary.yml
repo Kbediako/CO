@@ -44,6 +44,8 @@ jobs:
         env:
           CODEX_CLOUD_ENV_ID: ${{ secrets.CODEX_CLOUD_ENV_ID }}
           CODEX_CLOUD_BRANCH: main
+          CODEX_CLOUD_ENABLE_FEATURES: ${{ vars.CODEX_CLOUD_ENABLE_FEATURES }}
+          CODEX_CLOUD_DISABLE_FEATURES: ${{ vars.CODEX_CLOUD_DISABLE_FEATURES }}
           CODEX_API_KEY: ${{ secrets.CODEX_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: npm run ci:cloud-canary

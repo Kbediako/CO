@@ -37,6 +37,8 @@ export interface CloudTaskExecutorInput {
   timeoutSeconds: number;
   attempts: number;
   branch?: string | null;
+  enableFeatures?: string[];
+  disableFeatures?: string[];
   env?: NodeJS.ProcessEnv;
 }
 
@@ -169,6 +171,12 @@ export class CodexCloudTaskExecutor {
       if (input.branch && input.branch.trim()) {
         execArgs.push('--branch', input.branch.trim());
       }
+      for (const feature of normalizeFeatureList(input.enableFeatures)) {
+        execArgs.push('--enable', feature);
+      }
+      for (const feature of normalizeFeatureList(input.disableFeatures)) {
+        execArgs.push('--disable', feature);
+      }
       execArgs.push(input.prompt);
 
       const execResult = await runCloudCommand(execArgs);
@@ -292,6 +300,26 @@ export class CodexCloudTaskExecutor {
       return null;
     }
   }
+}
+
+function normalizeFeatureList(features: string[] | undefined): string[] {
+  if (!Array.isArray(features) || features.length === 0) {
+    return [];
+  }
+  const seen = new Set<string>();
+  const normalized: string[] = [];
+  for (const raw of features) {
+    if (typeof raw !== 'string') {
+      continue;
+    }
+    const feature = raw.trim();
+    if (!feature || seen.has(feature)) {
+      continue;
+    }
+    seen.add(feature);
+    normalized.push(feature);
+  }
+  return normalized;
 }
 
 export async function defaultCloudCommandRunner(request: {
