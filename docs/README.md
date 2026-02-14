@@ -55,6 +55,7 @@ Group execution (when `FEATURE_TFGRPO_GROUP=on`): repeat the Builder → Tester 
 - Override snapshot storage with `LEARNING_SNAPSHOT_DIR=/custom/dir` when needed; the default lives under `.runs/learning-snapshots/` (or `$CODEX_ORCHESTRATOR_RUNS_DIR/learning-snapshots/` when configured).
 - Successful pipeline runs also persist lightweight experience records in `out/<task-id>/experiences.jsonl` using prompt-pack domains, so future runs can inject higher-signal context without requiring learning snapshots.
 - Prompt-pack injections apply a minimum reward threshold (`TFGRPO_EXPERIENCE_MIN_REWARD`, default `0.1`) to avoid re-injecting low-signal records.
+- In cloud execution mode, the orchestrator now injects a bounded subset of relevant prompt-pack experience snippets directly into the cloud task prompt, so persisted experience data can influence execution outcomes immediately.
 
 ### How to run the learning pipeline locally
 - Seed a normal run and keep manifests grouped by task:

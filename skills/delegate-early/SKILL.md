@@ -1,49 +1,21 @@
 ---
 name: delegate-early
-description: Spawn subagents early and often to conserve context and parallelize research, review, and planning.
+description: Compatibility alias for delegation-first workflows. Prefer `delegation-usage` as the canonical skill.
 ---
 
-# Delegate Early
+# Delegate Early (Compatibility Alias)
 
-Use this skill when a task can be split into parallel streams or when the main context risks ballooning. The top-level Codex remains the lead; subagents are assistants.
+`delegate-early` is kept for backward compatibility. The canonical delegation workflow now lives in `delegation-usage`.
 
-## Goals
-- Conserve primary context by offloading research/review/planning.
-- Improve throughput with parallel subagent streams.
-- Capture delegation evidence for auditability.
+## Required behavior
+- Immediately follow `delegation-usage` for setup, spawn semantics, question queue handling, confirmation flow, and manifest usage.
+- Keep delegation MCP enabled by default; enable other MCP servers only when relevant to the task.
+- Preserve delegation evidence (task-id stream naming + manifest path capture) exactly as documented in `delegation-usage`.
 
-## When to spawn
-- Before deep reading/analysis to avoid bloating context.
-- When new ambiguity appears or scope changes.
-- For independent streams (research, review, planning, edge cases).
+## Quick routing
+1. Use `delegation-usage` as the source of truth.
+2. Apply early fan-out only when streams are clearly independent and acceptance criteria are explicit.
+3. Keep summaries short and artifact-first; avoid long chat dumps.
 
-## Task slicing heuristic
-- Identify 2–4 independent streams with minimal shared context.
-- Prefer streams like: `research`, `review`, `spec-check`, `edge-cases`.
-
-## Required conventions
-- Use `MCP_RUNNER_TASK_ID=<task-id>-<stream>` for subagents.
-- Record manifest paths and summarize findings in the main run.
-- Before review handoff, run the delegation guard stage via the packaged runner:
-  `node "$CODEX_ORCHESTRATOR_PACKAGE_ROOT/dist/orchestrator/src/cli/utils/delegationGuardRunner.js"`.
-  For ad-hoc runs without task IDs, set `CODEX_ORCHESTRATOR_GUARD_PROFILE=warn`.
-
-## Minimal delegation workflow
-1) Name streams and write 1–2 sentence goals for each.
-2) Spawn subagents with clear, bounded prompts.
-3) Wait for subagent completion; retrieve manifest evidence and summarize findings into the main plan.
-4) Proceed with implementation.
-
-## Prompt patterns
-- Research: “Find X, cite Y, return 3 bullets + risks.”
-- Review: “Inspect files A/B for regressions; list issues by severity.”
-- Planning: “Draft a 3–5-step plan, call out unknowns.”
-
-## Escalation rules
-- If delegation is impossible, set `DELEGATION_GUARD_OVERRIDE_REASON` and document it in the task checklist.
-
-## Subagent summary format
-- **Findings**: Key results and conclusions from the subagent run
-- **Risks**: Issues, blockers, or concerns
-- **Open questions**: Unresolved items requiring follow-up
-- **Evidence**: Manifest path (e.g., `.runs/<task-id>-<stream>/cli/<timestamp>/manifest.json`)
+## Note
+If guidance in this file conflicts with `delegation-usage`, follow `delegation-usage`.

@@ -33,6 +33,7 @@ import type {
   PipelineDefinition,
   PipelineExecutionResult,
   PipelineRunExecutionResult,
+  PromptPackManifestEntry,
   PlanPreviewResult,
   PlanOptions,
   StartOptions,
@@ -86,6 +87,8 @@ const CONFIG_OVERRIDE_ENV_KEYS = ['CODEX_CONFIG_OVERRIDES', 'CODEX_MCP_CONFIG_OV
 const DEFAULT_CLOUD_POLL_INTERVAL_SECONDS = 10;
 const DEFAULT_CLOUD_TIMEOUT_SECONDS = 1800;
 const DEFAULT_CLOUD_ATTEMPTS = 1;
+const MAX_CLOUD_PROMPT_EXPERIENCES = 3;
+const MAX_CLOUD_PROMPT_EXPERIENCE_CHARS = 320;
 
 function collectDelegationEnvOverrides(env: NodeJS.ProcessEnv = process.env): DelegationConfigLayer[] {
   const layers: DelegationConfigLayer[] = [];
@@ -141,6 +144,100 @@ function readCloudFeatureList(raw: string | null | undefined): string[] {
     features.push(feature);
   }
   return features;
+}
+
+function normalizePromptSnippet(value: string): string {
+  return value.replace(/\s+/gu, ' ').trim();
+}
+
+function truncatePromptSnippet(value: string): string {
+  if (value.length <= MAX_CLOUD_PROMPT_EXPERIENCE_CHARS) {
+    return value;
+  }
+  return `${value.slice(0, MAX_CLOUD_PROMPT_EXPERIENCE_CHARS - 1).trimEnd()}…`;
+}
+
+function hasPromptPackExperiences(pack: PromptPackManifestEntry): boolean {
+  return (
+    Array.isArray(pack.experiences) &&
+    pack.experiences.some((entry) => typeof entry === 'string' && normalizePromptSnippet(entry).length > 0)
+  );
+}
+
+function selectPromptPackForCloudPrompt(params: {
+  promptPacks: PromptPackManifestEntry[] | null | undefined;
+  pipeline: Pick<PipelineDefinition, 'id' | 'title' | 'tags'>;
+  target: Pick<PlanItem, 'id' | 'description'>;
+  stage: Pick<PipelineDefinition['stages'][number], 'id' | 'title'>;
+}): PromptPackManifestEntry | null {
+  const candidates = (params.promptPacks ?? []).filter(hasPromptPackExperiences);
+  if (candidates.length === 0) {
+    return null;
+  }
+
+  const haystack = [
+    params.pipeline.id,
+    params.pipeline.title,
+    (params.pipeline.tags ?? []).join(' '),
+    params.target.id,
+    params.target.description ?? '',
+    params.stage.id,
+    params.stage.title
+  ]
+    .join(' ')
+    .toLowerCase();
+
+  const directMatch = candidates.find(
+    (pack) => pack.domain.toLowerCase() !== 'implementation' && haystack.includes(pack.domain.toLowerCase())
+  );
+  if (directMatch) {
+    return directMatch;
+  }
+
+  const broadDirectMatch = candidates.find((pack) => haystack.includes(pack.domain.toLowerCase()));
+  if (broadDirectMatch) {
+    return broadDirectMatch;
+  }
+
+  const implementation = candidates.find((pack) => pack.domain.toLowerCase() === 'implementation');
+  if (implementation) {
+    return implementation;
+  }
+
+  return candidates[0] ?? null;
+}
+
+function buildCloudExperiencePromptLines(params: {
+  manifest: CliManifest;
+  pipeline: PipelineDefinition;
+  target: PlanItem;
+  stage: PipelineDefinition['stages'][number];
+}): string[] {
+  const selectedPack = selectPromptPackForCloudPrompt({
+    promptPacks: params.manifest.prompt_packs,
+    pipeline: params.pipeline,
+    target: params.target,
+    stage: params.stage
+  });
+  if (!selectedPack || !Array.isArray(selectedPack.experiences)) {
+    return [];
+  }
+
+  const snippets = selectedPack.experiences
+    .map((entry) => normalizePromptSnippet(entry))
+    .filter((entry) => entry.length > 0)
+    .slice(0, MAX_CLOUD_PROMPT_EXPERIENCES)
+    .map((entry) => truncatePromptSnippet(entry));
+  if (snippets.length === 0) {
+    return [];
+  }
+
+  return [
+    '',
+    'Relevant prior experiences (hints, not strict instructions):',
+    `Domain: ${selectedPack.domain}`,
+    ...snippets.map((entry, index) => `${index + 1}. ${entry}`)
+  ];
 }
 
 function resolveCloudEnvironmentId(
@@ -940,7 +1037,7 @@ export class CodexOrchestrator {
           });
 
           const executor = new CodexCloudTaskExecutor();
-          const prompt = this.buildCloudPrompt(task, target, pipeline, targetStage);
+          const prompt = this.buildCloudPrompt(task, target, pipeline, targetStage, manifest);
           const pollIntervalSeconds = readCloudNumber(
             envOverrides?.CODEX_CLOUD_POLL_INTERVAL_SECONDS ?? process.env.CODEX_CLOUD_POLL_INTERVAL_SECONDS,
             DEFAULT_CLOUD_POLL_INTERVAL_SECONDS
@@ -1063,7 +1160,8 @@ export class CodexOrchestrator {
     task: TaskContext,
     target: PlanItem,
     pipeline: PipelineDefinition,
-    stage: PipelineDefinition['stages'][number]
+    stage: PipelineDefinition['stages'][number],
+    manifest: CliManifest
   ): string {
     const lines = [
       `Task ID: ${task.id}`,
@@ -1074,6 +1172,8 @@ export class CodexOrchestrator {
       '',
       'Apply the required repository changes for this target stage and produce a diff.'
     ].filter((line): line is string => Boolean(line));
+
+    lines.push(...buildCloudExperiencePromptLines({ manifest, pipeline, target, stage }));
 
     return lines.join('\n');
   }

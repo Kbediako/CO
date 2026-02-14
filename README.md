@@ -144,7 +144,7 @@ Bundled skills (may vary by release):
 - `docs-first`
 - `collab-evals`
 - `collab-deliberation`
-- `delegate-early`
+- `delegate-early` (compatibility alias; use `delegation-usage`)
 
 ## DevTools readiness
 
