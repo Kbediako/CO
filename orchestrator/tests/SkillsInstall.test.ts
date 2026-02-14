@@ -22,8 +22,10 @@ describe('installSkills', () => {
       expect(canonical).toContain('@latest');
       expect(alias).toContain('Compatibility Alias');
       expect(alias).toContain('delegation-usage');
-      expect(result.written.some((path) => path.endsWith('skills/delegation-usage/SKILL.md'))).toBe(true);
-      expect(result.written.some((path) => path.endsWith('skills/delegate-early/SKILL.md'))).toBe(true);
+      const canonicalSuffix = join('skills', 'delegation-usage', 'SKILL.md');
+      const aliasSuffix = join('skills', 'delegate-early', 'SKILL.md');
+      expect(result.written.some((path) => path.endsWith(canonicalSuffix))).toBe(true);
+      expect(result.written.some((path) => path.endsWith(aliasSuffix))).toBe(true);
     } finally {
       await rm(tempHome, { recursive: true, force: true });
     }
@@ -35,10 +37,12 @@ describe('installSkills', () => {
       await installSkills({ codexHome: tempHome, force: true });
       const second = await installSkills({ codexHome: tempHome, force: false });
 
+      const canonicalSuffix = join('skills', 'delegation-usage', 'SKILL.md');
+      const aliasSuffix = join('skills', 'delegate-early', 'SKILL.md');
       expect(second.written.length).toBe(0);
       expect(second.skipped.length).toBeGreaterThan(0);
-      expect(second.skipped.some((path) => path.endsWith('skills/delegation-usage/SKILL.md'))).toBe(true);
-      expect(second.skipped.some((path) => path.endsWith('skills/delegate-early/SKILL.md'))).toBe(true);
+      expect(second.skipped.some((path) => path.endsWith(canonicalSuffix))).toBe(true);
+      expect(second.skipped.some((path) => path.endsWith(aliasSuffix))).toBe(true);
     } finally {
       await rm(tempHome, { recursive: true, force: true });
     }
