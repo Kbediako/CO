@@ -1150,6 +1150,22 @@
       },
       "created_at": "2026-02-14",
       "completed_at": null
+    },
+    {
+      "id": "0960",
+      "slug": "0960-delegation-skills-optimization-patch-release",
+      "title": "Delegation Skills Optimization + Patch Release",
+      "path": "tasks/tasks-0960-delegation-skills-optimization-patch-release.md",
+      "kind": "plan",
+      "status": "in-progress",
+      "gate": {
+        "phase": "delegation-skills-optimization-patch-release-implementation",
+        "status": "succeeded",
+        "log": ".runs/0960-delegation-skills-optimization-patch-release/cli/2026-02-14T04-24-11-249Z-38fdc882/manifest.json",
+        "run_id": "2026-02-14T04-24-11-249Z-38fdc882"
+      },
+      "created_at": "2026-02-14",
+      "completed_at": null
     }
   ],
   "specs": [
@@ -1311,6 +1327,22 @@
         "task": "tasks/tasks-0959-experience-prompt-injection-delegation-skill-harmonization.md",
         "agent_task": ".agent/task/0959-experience-prompt-injection-delegation-skill-harmonization.md",
         "docs": "docs/TECH_SPEC-experience-prompt-injection-and-delegation-skill-harmonization.md"
+      }
+    },
+    {
+      "id": "20260214-0960-delegation-skills-optimization-patch-release",
+      "title": "Delegation Skills Optimization + Patch Release",
+      "relates_to": "tasks/tasks-0960-delegation-skills-optimization-patch-release.md",
+      "risk": "low",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-02-14",
+      "paths": {
+        "spec": "tasks/specs/0960-delegation-skills-optimization-patch-release.md",
+        "task": "tasks/tasks-0960-delegation-skills-optimization-patch-release.md",
+        "agent_task": ".agent/task/0960-delegation-skills-optimization-patch-release.md",
+        "docs": "docs/TECH_SPEC-delegation-skills-optimization-patch-release.md"
       }
     }
   ]
