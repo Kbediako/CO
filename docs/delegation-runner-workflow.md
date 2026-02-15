@@ -15,13 +15,13 @@ Symbolic RLM runs now enable auto-deliberation by default for context management
 You must register the delegation MCP server once so delegate tools are available:
 
 ```bash
-codex-orchestrator delegation setup --yes --repo /path/to/repo
+codex-orchestrator delegation setup --yes
 ```
 
 Manual equivalent:
 
 ```bash
-codex mcp add delegation -- codex-orchestrator delegate-server --repo /path/to/repo
+codex mcp add delegation -- codex-orchestrator delegate-server
 ```
 
 If you skip this, `delegate.*` tools will not be available even if the MCP is enabled.
@@ -34,7 +34,7 @@ If you skip this, `delegate.*` tools will not be available even if the MCP is en
 codex mcp remove delegation
 codex mcp add delegation \
   --env 'CODEX_MCP_CONFIG_OVERRIDES=delegate.mode="full"' \
-  -- codex-orchestrator delegate-server --repo /path/to/repo
+  -- codex-orchestrator delegate-server
 ```
 
 ### 0b) Optional: raise RLM depth/time budgets
@@ -44,7 +44,7 @@ For deeper recursion and longer wall-clock budgets on delegated runs, register w
 ```bash
 codex mcp add delegation \
   --env 'CODEX_MCP_CONFIG_OVERRIDES=rlm.max_subcall_depth=8;rlm.wall_clock_timeout_ms=14400000' \
-  -- codex-orchestrator delegate-server --repo /path/to/repo
+  -- codex-orchestrator delegate-server
 ```
 
 For the `rlm` pipeline specifically, set `RLM_MAX_MINUTES=240` (4 hours).
@@ -130,7 +130,9 @@ You can still store the path in a shell variable for your own convenience, but p
 
 ## 4) Optional: repo-scoped config for delegation server
 
-If you registered without `--repo` and want delegation to respect repo config (network caps, tool allowlists, etc.), re-register with `--repo`:
+`delegate-server` defaults the repo root to its current working directory. In practice this means:
+- If you run Codex from inside the repo you care about, you do not need `--repo`.
+- If you run Codex outside the repo (or want to pin the delegation server to one repo regardless of cwd), register with `--repo`.
 
 ```bash
 codex mcp add delegation -- codex-orchestrator delegate-server --repo /path/to/repo

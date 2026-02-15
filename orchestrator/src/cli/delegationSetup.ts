@@ -1,7 +1,7 @@
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import process from 'node:process';
 import { existsSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 
 import { resolveCodexCliBin } from './utils/codexCli.js';
 import { resolveCodexHome } from './utils/codexPaths.js';
@@ -38,23 +38,31 @@ export async function runDelegationSetup(options: DelegationSetupOptions = {}): 
     codexBin,
     codexHome,
     repoRoot,
-    commandLine: `"${codexBin}" mcp add delegation -- codex-orchestrator delegate-server --repo "${repoRoot}"`
+    commandLine: `"${codexBin}" mcp add delegation -- codex-orchestrator delegate-server`
   };
 
-  const configured = isDelegationConfigured(configPath);
-  const readiness = { configured, configPath };
+  const probe = inspectDelegationReadiness({ codexBin, configPath, repoRoot, env });
+  const readiness = { configured: probe.configured, configPath };
 
   if (!options.apply) {
     return { status: 'planned', plan, readiness };
   }
 
-  if (configured) {
-    return { status: 'skipped', reason: 'Delegation MCP is already configured.', plan, readiness };
+  if (probe.configured) {
+    return { status: 'skipped', reason: probe.reason ?? 'Delegation MCP is already configured.', plan, readiness };
   }
 
-  await applyDelegationSetup({ codexBin, repoRoot }, env);
-  const configuredAfter = isDelegationConfigured(configPath);
-  return { status: 'applied', plan, readiness: { ...readiness, configured: configuredAfter } };
+  await applyDelegationSetup(
+    { codexBin, removeExisting: probe.removeExisting, envVars: probe.envVars },
+    env
+  );
+  const configuredAfter = inspectDelegationReadiness({ codexBin, configPath, repoRoot, env }).configured;
+  return {
+    status: 'applied',
+    reason: probe.reason,
+    plan,
+    readiness: { ...readiness, configured: configuredAfter }
+  };
 }
 
 export function formatDelegationSetupSummary(result: DelegationSetupResult): string[] {
@@ -72,25 +80,146 @@ export function formatDelegationSetupSummary(result: DelegationSetupResult): str
   return lines;
 }
 
-async function applyDelegationSetup(plan: { codexBin: string; repoRoot: string }, env: NodeJS.ProcessEnv): Promise<void> {
-  await new Promise<void>((resolve, reject) => {
-    const child = spawn(
-      plan.codexBin,
-      ['mcp', 'add', 'delegation', '--', 'codex-orchestrator', 'delegate-server', '--repo', plan.repoRoot],
-      { stdio: 'inherit', env }
-    );
+function inspectDelegationReadiness(options: {
+  codexBin: string;
+  configPath: string;
+  repoRoot: string;
+  env: NodeJS.ProcessEnv;
+}): { configured: boolean; removeExisting: boolean; envVars: Record<string, string>; reason?: string } {
+  const requestedRepo = resolve(options.repoRoot);
+  const existing = readDelegationMcpServer(options.codexBin, options.env);
+  if (existing) {
+    const envVars = existing.envVars;
+    const isDelegationServer = existing.args.includes('delegate-server') || existing.args.includes('delegation-server');
+    if (!isDelegationServer) {
+      return {
+        configured: false,
+        removeExisting: true,
+        envVars,
+        reason: 'Existing delegation MCP entry does not point to codex-orchestrator delegate-server; reconfiguring.'
+      };
+    }
+    if (existing.pinnedRepo) {
+      const pinnedRepo = resolve(existing.pinnedRepo);
+      if (pinnedRepo !== requestedRepo) {
+        return {
+          configured: false,
+          removeExisting: true,
+          envVars,
+          reason: `Existing delegation MCP entry is pinned to ${existing.pinnedRepo}; reconfiguring.`
+        };
+      }
+      return {
+        configured: true,
+        removeExisting: false,
+        envVars,
+        reason: `Delegation MCP is already configured (pinned to ${existing.pinnedRepo}).`
+      };
+    }
+    return {
+      configured: true,
+      removeExisting: false,
+      envVars,
+      reason: 'Delegation MCP is already configured.'
+    };
+  }
+
+  // Fall back to directly scanning config.toml when the Codex CLI probe is unavailable.
+  const configured = isDelegationConfiguredFallback(options.configPath);
+  return { configured, removeExisting: false, envVars: {} };
+}
+
+function applyDelegationSetup(
+  plan: { codexBin: string; removeExisting: boolean; envVars: Record<string, string> },
+  env: NodeJS.ProcessEnv
+): Promise<void> {
+  const envFlags: string[] = [];
+  for (const [key, value] of Object.entries(plan.envVars ?? {})) {
+    envFlags.push('--env', `${key}=${value}`);
+  }
+  return new Promise<void>((resolve, reject) => {
+    const runAdd = () => {
+      const child = spawn(
+        plan.codexBin,
+        ['mcp', 'add', 'delegation', ...envFlags, '--', 'codex-orchestrator', 'delegate-server'],
+        { stdio: 'inherit', env }
+      );
+      child.once('error', (error) => reject(error instanceof Error ? error : new Error(String(error))));
+      child.once('exit', (code) => {
+        if (code === 0) {
+          resolve();
+        } else {
+          reject(new Error(`codex mcp add exited with code ${code ?? 'unknown'}`));
+        }
+      });
+    };
+
+    if (!plan.removeExisting) {
+      runAdd();
+      return;
+    }
+
+    const child = spawn(plan.codexBin, ['mcp', 'remove', 'delegation'], { stdio: 'inherit', env });
     child.once('error', (error) => reject(error instanceof Error ? error : new Error(String(error))));
     child.once('exit', (code) => {
       if (code === 0) {
-        resolve();
+        runAdd();
       } else {
-        reject(new Error(`codex mcp add exited with code ${code ?? 'unknown'}`));
+        reject(new Error(`codex mcp remove exited with code ${code ?? 'unknown'}`));
       }
     });
   });
 }
 
-function isDelegationConfigured(configPath: string): boolean {
+function readDelegationMcpServer(
+  codexBin: string,
+  env: NodeJS.ProcessEnv
+): { args: string[]; pinnedRepo: string | null; envVars: Record<string, string> } | null {
+  const result = spawnSync(codexBin, ['mcp', 'get', 'delegation', '--json'], {
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+    timeout: 5000,
+    env
+  });
+  if (result.error || result.status !== 0) {
+    return null;
+  }
+  const stdout = String(result.stdout ?? '').trim();
+  if (!stdout) {
+    return null;
+  }
+  try {
+    const parsed = JSON.parse(stdout) as Record<string, unknown>;
+    const transport = parsed.transport as Record<string, unknown> | undefined;
+    const args = Array.isArray(transport?.args)
+      ? (transport!.args as unknown[]).filter((value) => typeof value === 'string') as string[]
+      : [];
+    const envVars: Record<string, string> = {};
+    const envRecord = transport?.env;
+    if (envRecord && typeof envRecord === 'object' && !Array.isArray(envRecord)) {
+      for (const [key, value] of Object.entries(envRecord as Record<string, unknown>)) {
+        if (typeof value === 'string') {
+          envVars[key] = value;
+        }
+      }
+    }
+    const pinnedRepo = readPinnedRepo(args);
+    return { args, pinnedRepo, envVars };
+  } catch {
+    return null;
+  }
+}
+
+function readPinnedRepo(args: string[]): string | null {
+  const index = args.indexOf('--repo');
+  if (index === -1) {
+    return null;
+  }
+  const candidate = args[index + 1];
+  return typeof candidate === 'string' && candidate.trim().length > 0 ? candidate.trim() : null;
+}
+
+function isDelegationConfiguredFallback(configPath: string): boolean {
   if (!existsSync(configPath)) {
     return false;
   }

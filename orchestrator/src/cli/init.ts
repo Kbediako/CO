@@ -84,7 +84,7 @@ export function formatInitSummary(result: InitResult, cwd: string): string[] {
     lines.push('No files written.');
   }
   lines.push('Next steps (recommended):');
-  lines.push(`  - codex-orchestrator delegation setup --yes --repo ${cwd}`);
+  lines.push('  - codex-orchestrator delegation setup --yes');
   lines.push('  - codex-orchestrator codex setup  # optional: managed/pinned Codex CLI (stock CLI works by default)');
   return lines;
 }
