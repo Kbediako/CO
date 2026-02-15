@@ -24,7 +24,7 @@ If a global `release` skill is installed, prefer that and fall back to this bund
 gh auth status -h github.com
 git status -sb
 git checkout main
-git pull
+git pull --ff-only
 ```
 
 ### 2) Version bump PR
@@ -70,7 +70,7 @@ codex-orchestrator pr watch-merge --pr "$PR_NUMBER" --auto-merge --delete-branch
 
 ```bash
 git checkout main
-git pull
+git pull --ff-only
 
 TAG="v${VERSION}"
 git tag -s "$TAG" -m "$TAG"
