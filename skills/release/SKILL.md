@@ -89,7 +89,7 @@ for i in {1..30}; do
       --workflow release.yml \
       --limit 20 \
       --json databaseId,headBranch,headSha \
-      --jq ".[] | select((.headBranch==\\\"${TAG}\\\") or (.headSha==\\\"${TAG_SHA}\\\")) | .databaseId" \
+      --jq ".[] | select((.headBranch==\"${TAG}\") or (.headSha==\"${TAG_SHA}\")) | .databaseId" \
       | head -n 1 \
       || true
   )"
