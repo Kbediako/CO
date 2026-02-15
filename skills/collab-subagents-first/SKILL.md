@@ -137,6 +137,7 @@ Do not treat wrapper handoff-only output as a completed review.
 
 - Symptoms: missing collab/delegate tool-call evidence, framing/parsing errors, or unstable collab behavior after CLI upgrades.
 - Check versions first: `codex --version` and `codex-orchestrator --version`.
+- Confirm feature readiness: `codex-orchestrator doctor` (checks collab/cloud/delegation readiness and prints enablement commands).
 - CO repo refresh path (safe default): `scripts/codex-cli-refresh.sh --repo <codex-repo> --no-push`.
 - Rebuild managed CLI only: `codex-orchestrator codex setup --source <codex-repo> --yes --force`.
 - If local codex is materially behind upstream, sync before diagnosing collab behavior differences.

@@ -25,7 +25,7 @@ Codex Orchestrator is the coordination layer that glues together Codex-driven ag
 
 ## How It Works
 - **Planner → Builder → Tester → Reviewer:** The core `TaskManager` (see `orchestrator/src/manager.ts`) wires together agent interfaces that decide *what* to run (planner), execute the selected pipeline stage (builder), verify results (tester), and give a final decision (reviewer).
-- **Execution modes:** Each plan item can flag `requires_cloud` and task metadata can set `execution.parallel`; the mode policy picks `mcp` (local MCP runtime) or `cloud` execution accordingly.
+- **Execution modes:** Each plan item can flag `requires_cloud` and task metadata can set `execution.parallel`; the mode policy picks `mcp` (local MCP runtime) or `cloud` execution accordingly. Cloud runs perform a quick preflight (env id, codex availability, optional remote branch) and fall back to `mcp` with a recorded summary when preflight fails.
 - **Event-driven persistence:** Milestones emit typed events on `EventBus`. `PersistenceCoordinator` captures run summaries in the task state store and writes manifests so nothing is lost if the process crashes.
 - **CLI lifecycle:** `CodexOrchestrator` (in `orchestrator/src/cli/orchestrator.ts`) resolves instruction sources (`AGENTS.md`, `docs/AGENTS.md`, `.agent/AGENTS.md`), loads the chosen pipeline, executes each command stage via `runCommandStage`, and keeps heartbeats plus command status current inside the manifest (approval evidence will surface once prompt wiring lands).
 - **Control-plane & scheduler integrations:** Optional validation (`control-plane/`) and scheduling (`scheduler/`) modules enrich manifests with drift checks, plan assignments, and remote run metadata.
@@ -101,7 +101,7 @@ Use `npx @kbediako/codex-orchestrator resume --run <run-id>` to continue interru
 ## Companion Package Commands
 - `codex-orchestrator mcp serve [--repo <path>] [--dry-run] [-- <extra args>]`: launch the MCP stdio server (delegates to `codex mcp-server`; stdout guard keeps protocol-only output, logs to stderr).
 - `codex-orchestrator init codex [--cwd <path>] [--force]`: copy starter templates into a repo (includes `mcp-client.json` and `AGENTS.md`; no overwrite unless `--force`).
-- `codex-orchestrator doctor [--format json]`: check optional tooling dependencies and print install commands.
+- `codex-orchestrator doctor [--format json]`: check optional tooling dependencies plus collab/cloud/delegation readiness and print enablement commands.
 - `codex-orchestrator devtools setup [--yes]`: print DevTools MCP setup instructions (`--yes` applies `codex mcp add ...`).
 - `codex-orchestrator skills install [--force] [--only <skills>] [--codex-home <path>]`: install bundled skills into `$CODEX_HOME/skills` (global skills remain the primary reference when installed).
 - `codex-orchestrator self-check --format json`: emit a safe JSON health payload for smoke tests.

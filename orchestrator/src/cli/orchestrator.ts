@@ -79,6 +79,7 @@ import { CLI_EXECUTION_MODE_PARSER, resolveRequiresCloudPolicy } from '../utils/
 import { resolveCodexCliBin } from './utils/codexCli.js';
 import { CodexCloudTaskExecutor } from '../cloud/CodexCloudTaskExecutor.js';
 import { persistPipelineExperience } from './services/pipelineExperience.js';
+import { runCloudPreflight } from './utils/cloudPreflight.js';
 
 const resolveBaseEnvironment = (): EnvironmentPaths =>
   normalizeEnvironmentPaths(resolveEnvironmentPaths());
@@ -712,6 +713,29 @@ export class CodexOrchestrator {
 
   private async executePipeline(options: ExecutePipelineOptions): Promise<PipelineRunExecutionResult> {
     if (options.mode === 'cloud') {
+      const environmentId = resolveCloudEnvironmentId(options.task, options.target, options.envOverrides);
+      const branch =
+        readCloudString(options.envOverrides?.CODEX_CLOUD_BRANCH) ??
+        readCloudString(process.env.CODEX_CLOUD_BRANCH);
+      const mergedEnv = { ...process.env, ...(options.envOverrides ?? {}) };
+      const codexBin = resolveCodexCliBin(mergedEnv);
+      const preflight = await runCloudPreflight({
+        repoRoot: options.env.repoRoot,
+        codexBin,
+        environmentId,
+        branch,
+        env: mergedEnv
+      });
+      if (!preflight.ok) {
+        const detail =
+          `Cloud preflight failed; falling back to mcp. ` +
+          preflight.issues.map((issue) => issue.message).join(' ');
+        appendSummary(options.manifest, detail);
+        logger.warn(detail);
+        const fallback = await this.executePipeline({ ...options, mode: 'mcp', executionModeOverride: 'mcp' });
+        fallback.notes.unshift(detail);
+        return fallback;
+      }
       return await this.executeCloudPipeline(options);
     }
 
@@ -1085,6 +1109,14 @@ export class CodexOrchestrator {
               readCloudString(process.env.CODEX_CLOUD_DISABLE_FEATURES)
           );
           const codexBin = resolveCodexCliBin({ ...process.env, ...(envOverrides ?? {}) });
+          const cloudEnvOverrides: NodeJS.ProcessEnv = {
+            ...(envOverrides ?? {}),
+            CODEX_NON_INTERACTIVE:
+              envOverrides?.CODEX_NON_INTERACTIVE ?? process.env.CODEX_NON_INTERACTIVE ?? '1',
+            CODEX_NO_INTERACTIVE:
+              envOverrides?.CODEX_NO_INTERACTIVE ?? process.env.CODEX_NO_INTERACTIVE ?? '1',
+            CODEX_INTERACTIVE: envOverrides?.CODEX_INTERACTIVE ?? process.env.CODEX_INTERACTIVE ?? '0'
+          };
           const cloudResult = await executor.execute({
             codexBin,
             prompt,
@@ -1097,7 +1129,7 @@ export class CodexOrchestrator {
             branch,
             enableFeatures,
             disableFeatures,
-            env: envOverrides
+            env: cloudEnvOverrides
           });
 
           success = cloudResult.success;

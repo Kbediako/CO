@@ -12,6 +12,33 @@ export class CommandTester implements TesterAgent {
     const result = this.requireResult();
     if (input.mode === 'cloud') {
       const cloudExecution = result.manifest.cloud_execution;
+      if (!cloudExecution) {
+        // Cloud mode can fall back to MCP when preflight fails; treat that as a normal guardrail run.
+        const guardrailStatus = ensureGuardrailStatus(result.manifest);
+        const reports: TestReport[] = [
+          {
+            name: 'cloud-preflight',
+            status: 'passed',
+            details:
+              result.manifest.summary?.trim() ||
+              'Cloud execution was skipped due to preflight failure; fell back to MCP mode.'
+          },
+          {
+            name: 'guardrails',
+            status: guardrailStatus.present ? 'passed' : 'failed',
+            details: guardrailStatus.present
+              ? guardrailStatus.summary
+              : guardrailStatus.recommendation ?? guardrailStatus.summary
+          }
+        ];
+
+        return {
+          subtaskId: input.build.subtaskId,
+          success: guardrailStatus.present && result.success,
+          reports,
+          runId: input.runId
+        };
+      }
       const status = cloudExecution?.status ?? 'unknown';
       const passed = status === 'ready' && result.success;
       const diagnosis = diagnoseCloudFailure({

@@ -3,7 +3,7 @@
 ## Default stance (agent-first)
 - **MCP is the default control plane** for approvals, tool routing, delegation, and audit trails.
 - **Collab is additive** for intra-run multi-agent collaboration (brainstorming, role splits, parallel subcalls).
-- If unsure, choose **MCP**. Collab is opt-in (`--enable collab` / `RLM_SYMBOLIC_COLLAB=1`).
+- If unsure, choose **MCP**. Collab is opt-in (`codex-orchestrator rlm --collab "<goal>"` or `RLM_SYMBOLIC_COLLAB=1`).
 - **Top-level Codex (lead/representative) must run via MCP.** Collab agents are subordinate assistants and do not represent the run or make final decisions.
 
 ## Decision matrix
