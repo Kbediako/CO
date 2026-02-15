@@ -35,16 +35,16 @@ codex exec \
 ```
 
 Optional (only if you need it):
-- Add `--repo /path/to/repo` to the MCP args when registering the server or when you need repo-scoped config.
+- Add `--repo /path/to/repo` only when you want to pin the server to a repo even if Codex is launched outside that repo (default uses cwd).
 - Add `-c 'features.skills=false'` for a minimal, deterministic background run.
 - Add `-c 'delegate.mode=question_only'` when the child only needs `delegate.question.*` (and optional `delegate.status`).
 - Add `-c 'delegate.mode=full'` when the child needs `delegate.spawn/pause/cancel` (nested delegation / run control).
 - If the task needs external docs or APIs, enable only the relevant MCP server for that environment.
 - If `delegate.spawn` is missing, re-register the MCP server with full mode (server config controls tool surface):
   - `codex mcp remove delegation`
-  - `codex mcp add delegation --env 'CODEX_MCP_CONFIG_OVERRIDES=delegate.mode="full"' -- codex-orchestrator delegate-server --repo /path/to/repo`
+  - `codex mcp add delegation --env 'CODEX_MCP_CONFIG_OVERRIDES=delegate.mode="full"' -- codex-orchestrator delegate-server`
 - To raise RLM budgets for delegated runs, re-register with an override (TOML-quoted):
-  - `codex mcp add delegation --env 'CODEX_MCP_CONFIG_OVERRIDES=rlm.max_subcall_depth=8;rlm.wall_clock_timeout_ms=14400000' -- codex-orchestrator delegate-server --repo /path/to/repo`
+  - `codex mcp add delegation --env 'CODEX_MCP_CONFIG_OVERRIDES=rlm.max_subcall_depth=8;rlm.wall_clock_timeout_ms=14400000' -- codex-orchestrator delegate-server`
 
 For deeper background patterns and troubleshooting, see `DELEGATION_GUIDE.md`.
 For runner + delegation coordination (short `--task` flow), see `docs/delegation-runner-workflow.md`.
@@ -64,8 +64,10 @@ For runner + delegation coordination (short `--task` flow), see `docs/delegation
 ### 0) One-time setup (register the MCP server)
 
 - Register the delegation server once:
+  - Preferred: `codex-orchestrator delegation setup --yes`
+    - This wraps `codex mcp add delegation ...` and keeps wiring discoverable via `codex-orchestrator doctor`.
   - `codex mcp add delegation -- codex-orchestrator delegate-server`
-  - Optional (recommended for repo-scoped config): append `--repo /path/to/repo` to the args.
+  - Optional: append `--repo /path/to/repo` to pin the server to one repo (not recommended if you work across repos).
   - `delegate-server` is the canonical name; `delegation-server` is supported as an alias.
 - Per-run `-c 'mcp_servers.delegation.enabled=true'` only works **after** registration.
 - If `delegate.*` tools are missing mid-task, start a new run with:

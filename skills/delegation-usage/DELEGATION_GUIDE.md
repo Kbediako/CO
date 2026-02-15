@@ -63,7 +63,7 @@ Fix by re-registering the server with a TOML-quoted override:
 codex mcp remove delegation
 codex mcp add delegation \
   --env 'CODEX_MCP_CONFIG_OVERRIDES=delegate.mode="full"' \
-  -- codex-orchestrator delegate-server --repo /path/to/repo
+  -- codex-orchestrator delegate-server
 ```
 
 ## Server mode vs child mode (don’t mix them up)
@@ -98,7 +98,7 @@ If you want deeper recursion or longer wall-clock time for delegated runs, set R
 ```bash
 codex mcp add delegation \
   --env 'CODEX_MCP_CONFIG_OVERRIDES=rlm.max_subcall_depth=8;rlm.wall_clock_timeout_ms=14400000' \
-  -- codex-orchestrator delegate-server --repo /path/to/repo
+  -- codex-orchestrator delegate-server
 ```
 
 For the `rlm` pipeline specifically, use:

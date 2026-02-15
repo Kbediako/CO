@@ -101,8 +101,9 @@ Use `npx @kbediako/codex-orchestrator resume --run <run-id>` to continue interru
 ## Companion Package Commands
 - `codex-orchestrator mcp serve [--repo <path>] [--dry-run] [-- <extra args>]`: launch the MCP stdio server (delegates to `codex mcp-server`; stdout guard keeps protocol-only output, logs to stderr).
 - `codex-orchestrator init codex [--cwd <path>] [--force]`: copy starter templates into a repo (includes `mcp-client.json` and `AGENTS.md`; no overwrite unless `--force`).
-- `codex-orchestrator doctor [--format json]`: check optional tooling dependencies plus collab/cloud/delegation readiness and print enablement commands.
+- `codex-orchestrator doctor [--format json] [--usage]`: check optional tooling dependencies plus collab/cloud/delegation readiness and print enablement commands. `--usage` appends a local usage snapshot (scans `.runs/`).
 - `codex-orchestrator devtools setup [--yes]`: print DevTools MCP setup instructions (`--yes` applies `codex mcp add ...`).
+- `codex-orchestrator delegation setup [--yes]`: configure delegation MCP wiring (`--yes` applies `codex mcp add ...`).
 - `codex-orchestrator skills install [--force] [--only <skills>] [--codex-home <path>]`: install bundled skills into `$CODEX_HOME/skills` (global skills remain the primary reference when installed).
 - `codex-orchestrator self-check --format json`: emit a safe JSON health payload for smoke tests.
 - `codex-orchestrator --version`: print the package version.

@@ -152,9 +152,14 @@ Bundled skills (may vary by release):
 
 ## DevTools readiness
 
-Check DevTools readiness (skill + MCP config):
+Check readiness (deps + capability wiring):
 ```bash
 codex-orchestrator doctor --format json
+```
+
+Usage snapshot (scans local `.runs/`):
+```bash
+codex-orchestrator doctor --usage
 ```
 
 Print DevTools MCP setup guidance:
@@ -171,6 +176,7 @@ codex-orchestrator devtools setup
 - `codex-orchestrator init codex --codex-cli --yes --codex-source <path>` — optionally provision a CO-managed Codex CLI binary (build-from-source default; set `CODEX_CLI_SOURCE` to avoid passing `--codex-source` every time).
 - `codex-orchestrator init codex --codex-cli --yes --codex-download-url <url> --codex-download-sha256 <sha>` — opt-in to a prebuilt Codex CLI download.
 - `codex-orchestrator codex setup` — plan/apply a CO-managed Codex CLI install (optional managed/pinned path; use `--download-url` + `--download-sha256` for prebuilts).
+- `codex-orchestrator delegation setup --yes` — configure delegation MCP server wiring.
 - `codex-orchestrator self-check --format json` — JSON health payload.
 - `codex-orchestrator mcp serve` — Codex MCP stdio server.
 

@@ -195,7 +195,8 @@ export function runDoctor(cwd: string = process.cwd()): DoctorResult {
       status: delegationStatus,
       config: delegationConfig,
       enablement: [
-        `Run: codex mcp add delegation -- codex-orchestrator delegate-server --repo ${cwd}`,
+        'Run: codex-orchestrator delegation setup --yes',
+        'Or manually: codex mcp add delegation -- codex-orchestrator delegate-server',
         "Enable for a run with: codex -c 'mcp_servers.delegation.enabled=true' ...",
         'See: codex-orchestrator init codex'
       ]
