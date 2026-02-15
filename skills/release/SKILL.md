@@ -81,9 +81,18 @@ git push origin "$TAG"
 ### 4) Watch the release workflow + confirm npm publish
 
 ```bash
+TAG_SHA="$(git rev-list -n 1 "$TAG")"
 RUN_ID=""
 for i in {1..30}; do
-  RUN_ID="$(gh run list --workflow release.yml --branch "$TAG" --limit 1 --json databaseId --jq '.[0].databaseId' || true)"
+  RUN_ID="$(
+    gh run list \
+      --workflow release.yml \
+      --limit 20 \
+      --json databaseId,headBranch,headSha \
+      --jq ".[] | select((.headBranch==\\\"${TAG}\\\") or (.headSha==\\\"${TAG_SHA}\\\")) | .databaseId" \
+      | head -n 1 \
+      || true
+  )"
   if [[ -n "$RUN_ID" && "$RUN_ID" != "null" ]]; then
     break
   fi
