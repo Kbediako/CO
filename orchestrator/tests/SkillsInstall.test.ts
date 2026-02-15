@@ -31,6 +31,26 @@ describe('installSkills', () => {
     }
   });
 
+  it('installs collab-subagents-first with explicit close_agent hygiene', async () => {
+    const tempHome = await mkdtemp(join(tmpdir(), 'skills-install-collab-'));
+    try {
+      const result = await installSkills({ codexHome: tempHome, force: true });
+      const skillPath = join(tempHome, 'skills', 'collab-subagents-first', 'SKILL.md');
+      const briefPath = join(tempHome, 'skills', 'collab-subagents-first', 'references', 'subagent-brief-template.md');
+      const skill = await readFile(skillPath, 'utf8');
+      const brief = await readFile(briefPath, 'utf8');
+
+      expect(result.skills).toContain('collab-subagents-first');
+      expect(skill).toContain('Collab Subagents First');
+      expect(skill).toContain('Collab lifecycle hygiene');
+      expect(skill).toContain('close_agent');
+      expect(skill).toContain('agent thread limit reached');
+      expect(brief).toContain('Subagent Brief Template');
+    } finally {
+      await rm(tempHome, { recursive: true, force: true });
+    }
+  });
+
   it('skips existing files when force is disabled', async () => {
     const tempHome = await mkdtemp(join(tmpdir(), 'skills-install-skip-'));
     try {
