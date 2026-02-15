@@ -656,19 +656,29 @@ Options:
   const repoRoot = readStringFlag(flags, 'repo') ?? process.cwd();
 
   if (!apply) {
+    const bundledSkills = await listBundledSkills();
+    const forceSkills = bundledSkills.filter((skill) => skill !== 'chrome-devtools');
+    const forceOnly = forceSkills.join(',');
+    const forceCommand = forceOnly
+      ? `codex-orchestrator skills install --force --only ${forceOnly}`
+      : 'codex-orchestrator skills install --force';
+    const devtoolsCommand = bundledSkills.includes('chrome-devtools')
+      ? 'codex-orchestrator skills install --only chrome-devtools'
+      : null;
+
     const delegation = await runDelegationSetup({ repoRoot });
     const devtools = await runDevtoolsSetup();
-	    const payload = {
-	      status: 'planned' as const,
-	      steps: {
-	        skills: {
-	          commandLine: 'codex-orchestrator skills install --force',
-	          note: 'Installs bundled skills into $CODEX_HOME/skills (setup avoids overwriting chrome-devtools when already present).'
-	        },
-	        delegation,
-	        devtools
-	      }
-	    };
+    const payload = {
+      status: 'planned' as const,
+      steps: {
+        skills: {
+          commandLines: [forceCommand, devtoolsCommand].filter((entry): entry is string => Boolean(entry)),
+          note: 'Installs bundled skills into $CODEX_HOME/skills (setup avoids overwriting chrome-devtools when already present).'
+        },
+        delegation,
+        devtools
+      }
+    };
 
     if (format === 'json') {
       console.log(JSON.stringify(payload, null, 2));
@@ -676,12 +686,15 @@ Options:
     }
 
     console.log('Setup plan:');
-    console.log(`- Skills: ${payload.steps.skills.commandLine}`);
+    console.log('- Skills:');
+    for (const commandLine of payload.steps.skills.commandLines) {
+      console.log(`  - ${commandLine}`);
+    }
     console.log('- Delegation: codex-orchestrator delegation setup --yes');
     console.log('- DevTools: codex-orchestrator devtools setup --yes');
-	  console.log('Run with --yes to apply this setup.');
-	  return;
-	}
+    console.log('Run with --yes to apply this setup.');
+    return;
+  }
 
   const bundledSkills = await listBundledSkills();
   const forceSkills = bundledSkills.filter((skill) => skill !== 'chrome-devtools');
@@ -1273,7 +1286,7 @@ Commands:
 	    --task <id>           Limit --usage scan to a specific task directory.
 	    --apply               Plan/apply quick fixes for DevTools + delegation wiring (use with --yes).
 	    --yes                 Apply fixes when --apply is set.
-	    --format json         Emit machine-readable output.
+	    --format json         Emit machine-readable output (not supported with --apply).
   codex setup
     --source <path>        Build from local Codex repo (or git URL).
     --ref <ref>            Git ref (branch/tag/sha) when building from repo.
