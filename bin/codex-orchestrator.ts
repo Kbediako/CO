@@ -655,6 +655,9 @@ Options:
 
   const repoRoot = readStringFlag(flags, 'repo') ?? process.cwd();
   const bundledSkills = await listBundledSkills();
+  if (bundledSkills.length === 0) {
+    throw new Error('No bundled skills detected; cannot run setup.');
+  }
   const forceSkills = bundledSkills.filter((skill) => skill !== 'chrome-devtools');
 
   if (!apply) {
@@ -779,9 +782,11 @@ async function handleDoctor(rawArgs: string[]): Promise<void> {
   const devtoolsPlan = await runDevtoolsSetup();
   const needsDelegation = !delegationPlan.readiness.configured;
   const needsDevtoolsSkill = devtoolsPlan.readiness.skill.status !== 'ok';
-  const needsDevtoolsConfig = devtoolsPlan.readiness.config.status !== 'ok';
+  const devtoolsConfigStatus = devtoolsPlan.readiness.config.status;
+  const needsDevtoolsConfig = devtoolsConfigStatus === 'missing';
+  const hasInvalidDevtoolsConfig = devtoolsConfigStatus === 'invalid';
 
-  if (!needsDelegation && !needsDevtoolsSkill && !needsDevtoolsConfig) {
+  if (!needsDelegation && !needsDevtoolsSkill && !needsDevtoolsConfig && !hasInvalidDevtoolsConfig) {
     console.log('Doctor apply: nothing to do.');
     return;
   }
@@ -789,6 +794,11 @@ async function handleDoctor(rawArgs: string[]): Promise<void> {
   console.log('Doctor apply plan:');
   if (needsDevtoolsSkill) {
     console.log('- Install skill: chrome-devtools (codex-orchestrator skills install --only chrome-devtools)');
+  }
+  if (hasInvalidDevtoolsConfig) {
+    console.log(
+      `- DevTools MCP config is invalid: ${devtoolsPlan.readiness.config.path} (fix config.toml then rerun doctor --apply)`
+    );
   }
   if (needsDevtoolsConfig) {
     console.log('- Configure DevTools MCP: codex-orchestrator devtools setup --yes');
@@ -814,7 +824,11 @@ async function handleDoctor(rawArgs: string[]): Promise<void> {
       console.log(line);
     }
   }
-  if (needsDevtoolsConfig) {
+  if (hasInvalidDevtoolsConfig) {
+    console.log(
+      `DevTools setup: skipped (config.toml is invalid: ${devtoolsPlan.readiness.config.path}). Fix it and rerun doctor --apply --yes.`
+    );
+  } else if (needsDevtoolsConfig) {
     const devtools = await runDevtoolsSetup({ apply: true });
     for (const line of formatDevtoolsSetupSummary(devtools)) {
       console.log(line);
