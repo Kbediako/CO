@@ -130,6 +130,11 @@ flowchart TB
 
 ## Skills (bundled)
 
+Recommended one-shot bootstrap (skills + delegation + DevTools wiring):
+```bash
+codex-orchestrator setup --yes
+```
+
 The release ships skills under `skills/` for downstream packaging. If you already have global skills installed, treat those as the primary reference and use bundled skills as the shipped fallback. Install bundled skills into `$CODEX_HOME/skills`:
 ```bash
 codex-orchestrator skills install
@@ -142,6 +147,7 @@ Options:
 
 Bundled skills (may vary by release):
 - `collab-subagents-first`
+- `chrome-devtools`
 - `delegation-usage`
 - `standalone-review`
 - `docs-first`
@@ -155,6 +161,11 @@ Bundled skills (may vary by release):
 Check readiness (deps + capability wiring):
 ```bash
 codex-orchestrator doctor --format json
+```
+
+Auto-fix wiring (delegation + DevTools):
+```bash
+codex-orchestrator doctor --apply --yes
 ```
 
 Usage snapshot (scans local `.runs/`):
@@ -173,6 +184,7 @@ codex-orchestrator devtools setup
 - `codex-orchestrator plan <pipeline>` — preview pipeline stages.
 - `codex-orchestrator exec <cmd>` — run a one-off command with the exec runtime.
 - `codex-orchestrator init codex` — install starter templates (`mcp-client.json`, `AGENTS.md`) into a repo.
+- `codex-orchestrator setup --yes` — install bundled skills and configure delegation + DevTools wiring.
 - `codex-orchestrator init codex --codex-cli --yes --codex-source <path>` — optionally provision a CO-managed Codex CLI binary (build-from-source default; set `CODEX_CLI_SOURCE` to avoid passing `--codex-source` every time).
 - `codex-orchestrator init codex --codex-cli --yes --codex-download-url <url> --codex-download-sha256 <sha>` — opt-in to a prebuilt Codex CLI download.
 - `codex-orchestrator codex setup` — plan/apply a CO-managed Codex CLI install (optional managed/pinned path; use `--download-url` + `--download-sha256` for prebuilts).

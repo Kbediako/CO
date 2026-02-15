@@ -15,6 +15,12 @@ Symbolic RLM runs now enable auto-deliberation by default for context management
 You must register the delegation MCP server once so delegate tools are available:
 
 ```bash
+codex-orchestrator setup --yes
+```
+
+Or configure only delegation:
+
+```bash
 codex-orchestrator delegation setup --yes
 ```
 

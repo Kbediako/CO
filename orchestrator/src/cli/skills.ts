@@ -55,6 +55,13 @@ export async function installSkills(options: SkillsInstallOptions = {}): Promise
   };
 }
 
+export async function listBundledSkills(): Promise<string[]> {
+  const pkgRoot = findPackageRoot();
+  const sourceRoot = join(pkgRoot, 'skills');
+  await assertDirectory(sourceRoot);
+  return await listSkillNames(sourceRoot);
+}
+
 export function formatSkillsInstallSummary(result: SkillsInstallResult, cwd: string = process.cwd()): string[] {
   const lines: string[] = [];
   lines.push(`Skills source: ${result.sourceRoot}`);
