@@ -654,14 +654,12 @@ Options:
   }
 
   const repoRoot = readStringFlag(flags, 'repo') ?? process.cwd();
+  const bundledSkills = await listBundledSkills();
+  const forceSkills = bundledSkills.filter((skill) => skill !== 'chrome-devtools');
 
   if (!apply) {
-    const bundledSkills = await listBundledSkills();
-    const forceSkills = bundledSkills.filter((skill) => skill !== 'chrome-devtools');
     const forceOnly = forceSkills.join(',');
-    const forceCommand = forceOnly
-      ? `codex-orchestrator skills install --force --only ${forceOnly}`
-      : 'codex-orchestrator skills install --force';
+    const forceCommand = forceOnly ? `codex-orchestrator skills install --force --only ${forceOnly}` : null;
     const devtoolsCommand = bundledSkills.includes('chrome-devtools')
       ? 'codex-orchestrator skills install --only chrome-devtools'
       : null;
@@ -696,14 +694,12 @@ Options:
     return;
   }
 
-  const bundledSkills = await listBundledSkills();
-  const forceSkills = bundledSkills.filter((skill) => skill !== 'chrome-devtools');
-  const primarySkills = await installSkills({ force: true, only: forceSkills });
+  const primarySkills = forceSkills.length > 0 ? await installSkills({ force: true, only: forceSkills }) : null;
   const devtoolsSkill =
     bundledSkills.includes('chrome-devtools')
       ? await installSkills({ force: false, only: ['chrome-devtools'] })
       : null;
-  const skills = devtoolsSkill
+  const skills = primarySkills && devtoolsSkill
     ? {
         sourceRoot: primarySkills.sourceRoot,
         targetRoot: primarySkills.targetRoot,
@@ -711,7 +707,10 @@ Options:
         written: [...primarySkills.written, ...devtoolsSkill.written],
         skipped: [...primarySkills.skipped, ...devtoolsSkill.skipped]
       }
-    : primarySkills;
+    : devtoolsSkill ?? primarySkills;
+  if (!skills) {
+    throw new Error('No bundled skills detected; cannot run setup.');
+  }
   const delegation = await runDelegationSetup({ apply: true, repoRoot });
   const devtools = await runDevtoolsSetup({ apply: true });
 
@@ -1268,25 +1267,25 @@ Commands:
 
   status --run <id> [--watch] [--interval N] [--format json]
 
-	  self-check [--format json]
-	  init codex [--cwd <path>] [--force]
-	    --codex-cli            Also run CO-managed Codex CLI setup (plan unless --yes).
-	    --codex-source <path>  Build from local Codex repo (or git URL).
-	    --codex-ref <ref>      Git ref (branch/tag/sha) when building from repo.
-	    --codex-download-url <url>  Download a prebuilt codex binary.
-	    --codex-download-sha256 <sha>  Expected SHA256 for the prebuilt download.
-	    --codex-force          Overwrite existing CO-managed codex binary.
-	    --yes                  Apply codex CLI setup (otherwise plan only).
-	  setup [--yes] [--format json]
-	    --yes                 Apply setup (otherwise plan only).
-	    --format json         Emit machine-readable output (dry-run only).
-	  doctor [--format json] [--usage] [--window-days <n>] [--task <id>] [--apply]
-	    --usage               Include a local usage snapshot (scans .runs/).
-	    --window-days <n>     Window for --usage (default 30).
-	    --task <id>           Limit --usage scan to a specific task directory.
-	    --apply               Plan/apply quick fixes for DevTools + delegation wiring (use with --yes).
-	    --yes                 Apply fixes when --apply is set.
-	    --format json         Emit machine-readable output (not supported with --apply).
+  self-check [--format json]
+  init codex [--cwd <path>] [--force]
+    --codex-cli            Also run CO-managed Codex CLI setup (plan unless --yes).
+    --codex-source <path>  Build from local Codex repo (or git URL).
+    --codex-ref <ref>      Git ref (branch/tag/sha) when building from repo.
+    --codex-download-url <url>  Download a prebuilt codex binary.
+    --codex-download-sha256 <sha>  Expected SHA256 for the prebuilt download.
+    --codex-force          Overwrite existing CO-managed codex binary.
+    --yes                  Apply codex CLI setup (otherwise plan only).
+  setup [--yes] [--format json]
+    --yes                 Apply setup (otherwise plan only).
+    --format json         Emit machine-readable output (dry-run only).
+  doctor [--format json] [--usage] [--window-days <n>] [--task <id>] [--apply]
+    --usage               Include a local usage snapshot (scans .runs/).
+    --window-days <n>     Window for --usage (default 30).
+    --task <id>           Limit --usage scan to a specific task directory.
+    --apply               Plan/apply quick fixes for DevTools + delegation wiring (use with --yes).
+    --yes                 Apply fixes when --apply is set.
+    --format json         Emit machine-readable output (not supported with --apply).
   codex setup
     --source <path>        Build from local Codex repo (or git URL).
     --ref <ref>            Git ref (branch/tag/sha) when building from repo.
