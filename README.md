@@ -89,7 +89,7 @@ Delegation guard profile:
 ## Delegation + RLM flow
 
 RLM (Recursive Language Model) is the long-horizon loop used by the `rlm` pipeline (`codex-orchestrator rlm "<goal>"` or `codex-orchestrator start rlm --goal "<goal>"`). Delegated runs only enter RLM when the child is launched with the `rlm` pipeline (or the rlm runner directly). In auto mode it resolves to symbolic when delegated, when `RLM_CONTEXT_PATH` is set, or when the context exceeds `RLM_SYMBOLIC_MIN_BYTES`; otherwise it stays iterative. The runner writes state to `.runs/<task-id>/cli/<run-id>/rlm/state.json` and stops when the validator passes or budgets are exhausted.
-Symbolic subcalls can optionally use collab tools. Fast path: `codex-orchestrator rlm --collab "<goal>"` (sets `RLM_SYMBOLIC_COLLAB=1` and implies symbolic mode). Collab requires `collab=true` in `codex features list`. Collab tool calls parsed from `codex exec --json --enable collab` are stored in `manifest.collab_tool_calls` (bounded by `CODEX_ORCHESTRATOR_COLLAB_MAX_EVENTS`, set to `0` to disable). `codex-orchestrator codex setup` remains available when you want a managed/pinned CLI path.
+Symbolic subcalls can optionally use collab tools. Fast path: `codex-orchestrator rlm --collab auto "<goal>"` (sets `RLM_SYMBOLIC_COLLAB=1` and implies symbolic mode). Collab requires `collab=true` in `codex features list`. Collab tool calls parsed from `codex exec --json --enable collab` are stored in `manifest.collab_tool_calls` (bounded by `CODEX_ORCHESTRATOR_COLLAB_MAX_EVENTS`, set to `0` to disable). `codex-orchestrator codex setup` remains available when you want a managed/pinned CLI path.
 
 ### Delegation flow
 ```mermaid
@@ -178,7 +178,7 @@ codex-orchestrator doctor --usage
 - Bootstrap + wire everything: `codex-orchestrator setup --yes`
 - Validate + measure adoption locally: `codex-orchestrator doctor --usage --format json`
 - Delegation: `codex-orchestrator doctor --apply --yes`, then enable for a Codex run with: `codex -c 'mcp_servers.delegation.enabled=true' ...`
-- Collab (symbolic RLM subagents): `codex-orchestrator rlm "<goal>" --collab auto` (requires collab feature enabled in Codex)
+- Collab (symbolic RLM subagents): `codex-orchestrator rlm --collab auto "<goal>"` (requires collab feature enabled in Codex)
 - Cloud: set `CODEX_CLOUD_ENV_ID` (and optional `CODEX_CLOUD_BRANCH`), then run: `codex-orchestrator start <pipeline> --cloud --target <stage-id>`
 
 Print DevTools MCP setup guidance:
