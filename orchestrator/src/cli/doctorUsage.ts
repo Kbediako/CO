@@ -152,16 +152,20 @@ export async function runDoctorUsage(options: DoctorUsageOptions = {}): Promise<
 
     if (manifest.cloud_execution) {
       cloudRuns += 1;
-      const status = (manifest.cloud_execution.status ?? 'unknown').trim() || 'unknown';
+      const cloudStatusRaw = manifest.cloud_execution.status;
+      const status = typeof cloudStatusRaw === 'string' ? cloudStatusRaw.trim() || 'unknown' : 'unknown';
       cloudByStatus[status] = (cloudByStatus[status] ?? 0) + 1;
 
-      const diffStatus = (manifest.cloud_execution.diff_status ?? 'unknown').trim() || 'unknown';
+      const cloudDiffRaw = manifest.cloud_execution.diff_status;
+      const diffStatus = typeof cloudDiffRaw === 'string' ? cloudDiffRaw.trim() || 'unknown' : 'unknown';
       cloudByDiffStatus[diffStatus] = (cloudByDiffStatus[diffStatus] ?? 0) + 1;
 
-      const applyStatus = (manifest.cloud_execution.apply_status ?? 'unknown').trim() || 'unknown';
+      const cloudApplyRaw = manifest.cloud_execution.apply_status;
+      const applyStatus = typeof cloudApplyRaw === 'string' ? cloudApplyRaw.trim() || 'unknown' : 'unknown';
       cloudByApplyStatus[applyStatus] = (cloudByApplyStatus[applyStatus] ?? 0) + 1;
 
-      const envId = typeof manifest.cloud_execution.environment_id === 'string' ? manifest.cloud_execution.environment_id : null;
+      const cloudEnvIdRaw = manifest.cloud_execution.environment_id;
+      const envId = typeof cloudEnvIdRaw === 'string' ? cloudEnvIdRaw.trim() : '';
       if (envId) {
         cloudEnvIds.set(envId, (cloudEnvIds.get(envId) ?? 0) + 1);
       }
@@ -395,6 +399,7 @@ function formatTopList(entries: { key: string; value: number }[], limit: number,
     return '';
   }
   const top = filtered
+    .sort((a, b) => b.value - a.value || a.key.localeCompare(b.key))
     .slice(0, limit)
     .map((entry) => `${entry.key}=${entry.value}`)
     .join(', ');
