@@ -9,6 +9,17 @@ Archived task snapshots live on the task-archives branch.
 - 2025: https://github.com/Kbediako/CO/blob/task-archives/docs/TASKS-archive-2025.md
 - 2026: https://github.com/Kbediako/CO/blob/task-archives/docs/TASKS-archive-2026.md
 <!-- tasks-archive-index:end -->
+# Task List Snapshot - PR Watch-Merge CLI Command (0964-pr-watch-merge-cli-ship)
+- **Update - 2026-02-14:** Task created; export `MCP_RUNNER_TASK_ID=0964-pr-watch-merge-cli-ship`; guardrails required: `node scripts/delegation-guard.mjs`, `node scripts/spec-guard.mjs --dry-run`, `npm run build`, `npm run lint`, `npm run test`, `npm run docs:check`, `npm run docs:freshness`, `node scripts/diff-budget.mjs`, `npm run review`. Checklist mirror: `tasks/tasks-0964-pr-watch-merge-cli-ship.md`, `.agent/task/0964-pr-watch-merge-cli-ship.md`.
+- [x] Foundation: task scaffolding + mirrors registered. Evidence: `docs/TASKS.md`, `tasks/index.json`, `tasks/tasks-0964-pr-watch-merge-cli-ship.md`, `.agent/task/0964-pr-watch-merge-cli-ship.md`.
+- [x] Foundation: PRD + TECH_SPEC + ACTION_PLAN drafted. Evidence: `docs/PRD-pr-watch-merge-cli-ship.md`, `tasks/specs/0964-pr-watch-merge-cli-ship.md`, `docs/ACTION_PLAN-pr-watch-merge-cli-ship.md`, `docs/TECH_SPEC-pr-watch-merge-cli-ship.md`.
+- [x] Foundation: delegation subagent run captured. Evidence: `.runs/0964-pr-watch-merge-cli-ship-scout/cli/2026-02-14T23-20-11-897Z-41c5d725/manifest.json`.
+- [x] Validation: docs-review manifest captured. Evidence: `.runs/0964-pr-watch-merge-cli-ship/cli/2026-02-14T23-22-03-328Z-b62ad55a/manifest.json`.
+- [x] Validation: standalone pre-implementation review captured. Evidence: `out/0964-pr-watch-merge-cli-ship/manual/pre-implementation-standalone-review.log`.
+- [x] Implementation: shipped `codex-orchestrator pr watch-merge` command wired and SOP updated to prefer shipped monitor path. Evidence: `bin/codex-orchestrator.ts`, `.agent/SOPs/review-loop.md`, `.agent/SOPs/agent-autonomy-defaults.md`.
+- [x] Validation: implementation-gate passed. Evidence: `.runs/0964-pr-watch-merge-cli-ship/cli/2026-02-15T00-39-27-231Z-1fc7514c/manifest.json`.
+- [x] Validation: manual E2E captured (help + dry-run monitor). Evidence: `out/0964-pr-watch-merge-cli-ship/manual/e2e-validation.log`.
+
 # Task List Snapshot - Codex CLI Alignment + Refresh E2E (0963-codex-cli-alignment-refresh-e2e)
 - **Update - 2026-02-14:** Task created; export `MCP_RUNNER_TASK_ID=0963-codex-cli-alignment-refresh-e2e`; guardrails required: `node scripts/delegation-guard.mjs`, `node scripts/spec-guard.mjs --dry-run`, `npm run build`, `npm run lint`, `npm run test`, `npm run docs:check`, `npm run docs:freshness`, `node scripts/diff-budget.mjs`, `npm run review`. Checklist mirror: `tasks/tasks-0963-codex-cli-alignment-refresh-e2e.md`, `.agent/task/0963-codex-cli-alignment-refresh-e2e.md`.
 - [x] Foundation: task scaffolding + mirrors registered. Evidence: `docs/TASKS.md`, `tasks/index.json`, `tasks/tasks-0963-codex-cli-alignment-refresh-e2e.md`, `.agent/task/0963-codex-cli-alignment-refresh-e2e.md`.

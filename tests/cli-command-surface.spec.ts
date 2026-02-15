@@ -44,6 +44,16 @@ describe('codex-orchestrator command surface', () => {
     expect(stdout).toContain('Usage: codex-orchestrator delegate-server');
   }, TEST_TIMEOUT);
 
+  it('prints pr help', async () => {
+    const { stdout } = await runCli(['pr', '--help']);
+    expect(stdout).toContain('Usage: codex-orchestrator pr <subcommand>');
+  }, TEST_TIMEOUT);
+
+  it('prints pr watch-merge help', async () => {
+    const { stdout } = await runCli(['pr', 'watch-merge', '--help']);
+    expect(stdout).toContain('Usage: codex-orchestrator pr watch-merge');
+  }, TEST_TIMEOUT);
+
   it('supports quoted exec commands passed as a single token', async () => {
     tempDir = await mkdtemp(join(tmpdir(), 'co-cli-surface-'));
     const env = {

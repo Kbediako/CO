@@ -41,7 +41,7 @@
       "path": ".agent/SOPs/agent-autonomy-defaults.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-01-19",
+      "last_review": "2026-02-14",
       "cadence_days": 90
     },
     {
@@ -118,7 +118,7 @@
       "path": ".agent/SOPs/review-loop.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-01-03",
+      "last_review": "2026-02-14",
       "cadence_days": 90
     },
     {
@@ -682,6 +682,13 @@
       "cadence_days": 90
     },
     {
+      "path": ".agent/task/0964-pr-watch-merge-cli-ship.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-14",
+      "cadence_days": 90
+    },
+    {
       "path": ".agent/task/ACTION_PLAN_TEMPLATE.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -1057,6 +1064,13 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/ACTION_PLAN-pr-watch-merge-cli-ship.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-14",
       "cadence_days": 90
     },
     {
@@ -1641,6 +1655,13 @@
       "cadence_days": 90
     },
     {
+      "path": "docs/PRD-pr-watch-merge-cli-ship.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-14",
+      "cadence_days": 90
+    },
+    {
       "path": "docs/PRD-readme-codebase-alignment.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -2142,6 +2163,13 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/TECH_SPEC-pr-watch-merge-cli-ship.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-14",
       "cadence_days": 90
     },
     {
@@ -2754,6 +2782,13 @@
       "cadence_days": 90
     },
     {
+      "path": "tasks/specs/0964-pr-watch-merge-cli-ship.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-14",
+      "cadence_days": 90
+    },
+    {
       "path": "tasks/specs/README.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -3259,6 +3294,13 @@
     },
     {
       "path": "tasks/tasks-0963-codex-cli-alignment-refresh-e2e.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-14",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/tasks-0964-pr-watch-merge-cli-ship.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-02-14",

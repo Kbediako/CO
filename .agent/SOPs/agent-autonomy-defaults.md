@@ -48,7 +48,8 @@ Applies to lead orchestrator runs in this repo and defines default decision poli
 
 ## PR Monitoring & Auto-Merge
 - Monitor PRs you open until checks complete and reviewers finish.
-- Prefer `npm run pr:watch-merge -- --pr <number> --quiet-minutes <window>` so polling, quiet-window resets, and merge gating stay consistent.
+- Prefer shipped `codex-orchestrator pr watch-merge --pr <number> --quiet-minutes <window>` so polling, quiet-window resets, and merge gating stay consistent.
+- Fallback (repo script): `npm run pr:watch-merge -- --pr <number> --quiet-minutes <window>`.
 - Start a 10–20 minute quiet window once all required checks turn green; reset the window if checks restart or new feedback arrives.
 - If checks remain green and no new feedback arrives during the window, merge via GitHub and delete the branch.
 - Do not auto-merge if the PR is draft, has a "do not merge" label, or has unresolved review feedback.

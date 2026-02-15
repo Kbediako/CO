@@ -11,6 +11,7 @@ import {
   type ExecOutputMode
 } from '../orchestrator/src/cli/exec/command.js';
 import { resolveEnvironmentPaths } from '../scripts/lib/run-manifests.js';
+import { runPrWatchMerge } from '../scripts/lib/pr-watch-merge.js';
 import { normalizeEnvironmentPaths, sanitizeTaskId } from '../orchestrator/src/cli/run/environment.js';
 import { RunEventEmitter } from '../orchestrator/src/cli/events/runEvents.js';
 import type { HudController } from '../orchestrator/src/cli/ui/controller.js';
@@ -96,6 +97,9 @@ async function main(): Promise<void> {
         break;
       case 'mcp':
         await handleMcp(args);
+        break;
+      case 'pr':
+        await handlePr(args);
         break;
       case 'delegate-server':
       case 'delegation-server':
@@ -706,6 +710,21 @@ async function handleMcp(rawArgs: string[]): Promise<void> {
   await serveMcp({ repoRoot, dryRun, extraArgs: positionals });
 }
 
+async function handlePr(rawArgs: string[]): Promise<void> {
+  if (rawArgs.length === 0 || rawArgs[0] === '--help' || rawArgs[0] === '-h' || rawArgs[0] === 'help') {
+    printPrHelp();
+    return;
+  }
+  const [subcommand, ...subcommandArgs] = rawArgs;
+  if (subcommand !== 'watch-merge') {
+    throw new Error(`Unknown pr subcommand: ${subcommand}`);
+  }
+  const exitCode = await runPrWatchMerge(subcommandArgs, { usage: 'codex-orchestrator pr watch-merge' });
+  if (exitCode !== 0) {
+    process.exitCode = exitCode;
+  }
+}
+
 async function handleDelegationServer(rawArgs: string[]): Promise<void> {
   const { positionals, flags } = parseArgs(rawArgs);
   if (isHelpRequest(positionals, flags)) {
@@ -1019,6 +1038,9 @@ Commands:
     --codex-home <path>   Override the target Codex home directory.
     --format json         Emit machine-readable output.
   mcp serve [--repo <path>] [--dry-run] [-- <extra args>]
+  pr watch-merge [options]
+    Monitor PR checks/reviews with polling and optional auto-merge after a quiet window.
+    Use \`codex-orchestrator pr watch-merge --help\` for full options.
   delegate-server         Run the delegation MCP server (stdio).
     --repo <path>         Repo root for config + manifests (default cwd).
     --mode <full|question_only>  Limit tool surface for child runs.
@@ -1081,5 +1103,18 @@ Options:
   --mode <full|question_only>      Limit tool surface for child runs.
   --config "<key>=<value>[;...]"   Apply config overrides.
   --help                           Show this message.
+`);
+}
+
+function printPrHelp(): void {
+  console.log(`Usage: codex-orchestrator pr <subcommand> [options]
+
+Subcommands:
+  watch-merge             Monitor PR checks/reviews with polling and optional auto-merge.
+                          Supports PR_MONITOR_* env vars and standard flags (see: pr watch-merge --help).
+
+Examples:
+  codex-orchestrator pr watch-merge --pr 211 --dry-run --quiet-minutes 10
+  codex-orchestrator pr watch-merge --pr 211 --auto-merge --merge-method squash
 `);
 }
