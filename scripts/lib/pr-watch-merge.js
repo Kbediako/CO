@@ -183,7 +183,9 @@ async function runGh(args, { allowFailure = false } = {}) {
     const child = spawn('gh', args, {
       env: {
         ...process.env,
-        GH_PAGER: process.env.GH_PAGER || 'cat'
+        GH_PAGER: process.env.GH_PAGER || 'cat',
+        // Harden all gh calls against interactive prompts (per `gh help environment`).
+        GH_PROMPT_DISABLED: process.env.GH_PROMPT_DISABLED || '1'
       },
       stdio: ['ignore', 'pipe', 'pipe']
     });

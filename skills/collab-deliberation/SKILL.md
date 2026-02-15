@@ -50,6 +50,7 @@ Use this skill when the user asks for brainstorming, tradeoffs, option compariso
 2) Close critical context gaps.
 - Ask up to 3 targeted questions only if answers could change the recommendation.
 - If delegation is available, prefer a subagent for context gathering before asking the user.
+ - If collab spawning fails (for example `agent thread limit reached`), proceed solo and explicitly note the limitation; do not block on spawning.
 
 3) Generate distinct options.
 - Produce 3-5 materially different options.
@@ -83,3 +84,4 @@ Use this skill when the user asks for brainstorming, tradeoffs, option compariso
 - Do not present uncertainty as certainty.
 - Keep outputs concise and action-oriented.
 - If collab subagents are used, close lifecycle loops per id (`spawn_agent` -> `wait` -> `close_agent`) before finishing.
+- If you cannot close collab agents (missing ids) and spawn keeps failing, restart the session and re-run deliberation; keep work moving by doing solo deliberation meanwhile.
