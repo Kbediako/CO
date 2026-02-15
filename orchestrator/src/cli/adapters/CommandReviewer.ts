@@ -11,6 +11,22 @@ export class CommandReviewer implements ReviewerAgent {
     const result = this.requireResult();
     if (input.mode === 'cloud') {
       const cloudExecution = result.manifest.cloud_execution;
+      if (!cloudExecution) {
+        const summaryLines = [
+          result.success
+            ? 'Cloud mode requested but preflight failed; fell back to MCP mode successfully.'
+            : 'Cloud mode requested but preflight failed; fell back to MCP mode and the run failed.',
+          `Manifest: ${result.manifestPath}`,
+          `Runner log: ${result.logPath}`
+        ];
+        return {
+          summary: summaryLines.join('\n'),
+          decision: {
+            approved: result.success,
+            feedback: result.notes.join('\n') || result.manifest.summary || undefined
+          }
+        };
+      }
       const status = cloudExecution?.status ?? 'unknown';
       const cloudTask = cloudExecution?.task_id ?? '<unknown>';
       const approved = status === 'ready' && result.success;

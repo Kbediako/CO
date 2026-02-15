@@ -76,6 +76,9 @@ export async function persistPipelineExperience(params: PersistPipelineExperienc
       maxSummaryWords: instructions.experienceMaxWords
     });
     await store.recordBatch([record], relativeToRepo(env, paths.manifestPath));
+    logger.info(
+      `[experience] Recorded pipeline experience (domain=${domain}, words=${tokenCount}) for ${pipeline.id} run ${manifest.run_id}.`
+    );
   } catch (error) {
     logger.warn(
       `Failed to persist pipeline experience for run ${manifest.run_id}: ${

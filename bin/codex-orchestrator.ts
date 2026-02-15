@@ -193,6 +193,24 @@ function applyRlmEnvOverrides(flags: ArgMap, goal?: string): void {
   if (goal) {
     process.env.RLM_GOAL = goal;
   }
+  const collabRaw = flags['collab'];
+  if (collabRaw !== undefined) {
+    const normalized =
+      typeof collabRaw === 'string' ? collabRaw.trim().toLowerCase() : collabRaw === true ? 'true' : '';
+    const enabled = collabRaw === true || normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'auto';
+    const disabled = normalized === '0' || normalized === 'false' || normalized === 'no' || normalized === 'off';
+    if (enabled) {
+      process.env.RLM_SYMBOLIC_COLLAB = '1';
+      // Collab is only used in the symbolic loop; make the flag do what users expect.
+      if (!process.env.RLM_MODE) {
+        process.env.RLM_MODE = 'symbolic';
+      }
+    } else if (disabled) {
+      process.env.RLM_SYMBOLIC_COLLAB = '0';
+    } else if (typeof collabRaw === 'string') {
+      throw new Error('Invalid --collab value. Use --collab (or: --collab auto|true|false).');
+    }
+  }
   const validator = readStringFlag(flags, 'validator');
   if (validator) {
     process.env.RLM_VALIDATOR = validator;
@@ -968,6 +986,7 @@ Commands:
     --cloud                 Shortcut for --execution-mode cloud.
     --target <stage-id>     Focus plan/build metadata on a specific stage (alias: --target-stage).
     --goal "<goal>"         When pipeline is rlm, set the RLM goal.
+    --collab [auto|true|false]  When pipeline is rlm, enable collab subagents (implies symbolic mode).
     --validator <cmd|none>  When pipeline is rlm, set the validator command.
     --max-iterations <n>    When pipeline is rlm, override max iterations.
     --max-minutes <n>       When pipeline is rlm, override max minutes.
@@ -977,6 +996,7 @@ Commands:
 
   rlm "<goal>"              Run RLM loop until validator passes.
     --task <id>             Override task identifier.
+    --collab [auto|true|false]  Enable collab subagents (implies symbolic mode).
     --validator <cmd|none>  Set validator command or disable validation.
     --max-iterations <n>    Override max iterations (0 = unlimited with validator).
     --max-minutes <n>       Optional time-based guardrail in minutes.
