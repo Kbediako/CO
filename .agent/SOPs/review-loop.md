@@ -12,7 +12,8 @@ Use this playbook whenever handing off a review (`npm run review` or an implemen
    - Small: ≤50 LOC net, ≤3 files, no pipeline/guardrail changes → 10 min.
    - Medium: 51–200 LOC or 4–10 files, touches scripts/docs/pipelines → 15–20 min.
    - Large: >200 LOC, >10 files, touches CI/guardrails/release paths or adds deps → 25–30 min.
-   - Preferred monitor command: `npm run pr:watch-merge -- --pr <number> --quiet-minutes <window>` (add `--auto-merge` when merge is approved).
+   - Preferred monitor command (shipped): `codex-orchestrator pr watch-merge --pr <number> --quiet-minutes <window>` (add `--auto-merge` when merge is approved).
+   - Fallback (repo script): `npm run pr:watch-merge -- --pr <number> --quiet-minutes <window>`.
    - Escalation path:
      - Escalate when merge attempts fail twice, required checks stay flaky for >30 minutes or >3 restarts, or any security/privacy finding appears.
      - Notify repository maintainers/owners in the PR thread first; if unresolved after one watch window, open a follow-up issue and link it from the PR.
@@ -28,7 +29,7 @@ Use this playbook whenever handing off a review (`npm run review` or an implemen
 9. For non-trivial changes, run one final elegance/minimality review pass and remove avoidable complexity before merge.
 
 ## Completion discipline (patience-first)
-- Wait/poll until terminal status for checks, review agents, and cloud/orchestrator runs before handoff. Use `npm run pr:watch-merge` for PR monitoring, so polling persists even during long waits.
+- Wait/poll until terminal status for checks, review agents, and cloud/orchestrator runs before handoff. Prefer `codex-orchestrator pr watch-merge` for PR monitoring, so polling persists even during long waits.
 - If checks restart or new comments arrive, reset the watch window.
 - Do not hand off mid-flight work unless the user explicitly asks to stop early.
 
