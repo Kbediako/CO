@@ -177,7 +177,7 @@ export function runDoctor(cwd: string = process.cwd()): DoctorResult {
       status: collabStatus,
       enabled: collabEnabled,
       enablement: [
-        'Enable collab for symbolic RLM runs with: codex-orchestrator rlm --collab "<goal>"',
+        'Enable collab for symbolic RLM runs with: codex-orchestrator rlm --collab auto "<goal>"',
         'Or set: RLM_SYMBOLIC_COLLAB=1 (implies symbolic mode when using --collab).',
         'If collab is disabled in codex features: codex features enable collab'
       ]
