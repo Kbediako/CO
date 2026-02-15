@@ -1221,7 +1221,7 @@
       "title": "PR Watch-Merge CLI Command",
       "path": "tasks/tasks-0964-pr-watch-merge-cli-ship.md",
       "kind": "plan",
-      "status": "in-progress",
+      "status": "succeeded",
       "gate": {
         "phase": "pr-watch-merge-cli-ship-implementation",
         "status": "succeeded",
@@ -1229,7 +1229,7 @@
         "run_id": "2026-02-15T00-39-27-231Z-1fc7514c"
       },
       "created_at": "2026-02-14",
-      "completed_at": null
+      "completed_at": "2026-02-15"
     }
   ],
   "specs": [

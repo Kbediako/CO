@@ -18,7 +18,8 @@ Archived task snapshots live on the task-archives branch.
 - [x] Validation: standalone pre-implementation review captured. Evidence: `out/0964-pr-watch-merge-cli-ship/manual/pre-implementation-standalone-review.log`.
 - [x] Implementation: shipped `codex-orchestrator pr watch-merge` command wired and SOP updated to prefer shipped monitor path. Evidence: `bin/codex-orchestrator.ts`, `.agent/SOPs/review-loop.md`, `.agent/SOPs/agent-autonomy-defaults.md`.
 - [x] Validation: implementation-gate passed. Evidence: `.runs/0964-pr-watch-merge-cli-ship/cli/2026-02-15T00-39-27-231Z-1fc7514c/manifest.json`.
-- [x] Validation: manual E2E captured (help + dry-run monitor). Evidence: `out/0964-pr-watch-merge-cli-ship/manual/e2e-validation.log`.
+- [x] Validation: manual E2E captured (dist + auto-merge PR #212). Evidence: `out/0964-pr-watch-merge-cli-ship/manual/e2e-validation.log`.
+- [x] Validation: standalone post-implementation elegance review completed. Evidence: `out/0964-pr-watch-merge-cli-ship/manual/post-merge-standalone-review.log`.
 
 # Task List Snapshot - Codex CLI Alignment + Refresh E2E (0963-codex-cli-alignment-refresh-e2e)
 - **Update - 2026-02-14:** Task created; export `MCP_RUNNER_TASK_ID=0963-codex-cli-alignment-refresh-e2e`; guardrails required: `node scripts/delegation-guard.mjs`, `node scripts/spec-guard.mjs --dry-run`, `npm run build`, `npm run lint`, `npm run test`, `npm run docs:check`, `npm run docs:freshness`, `node scripts/diff-budget.mjs`, `npm run review`. Checklist mirror: `tasks/tasks-0963-codex-cli-alignment-refresh-e2e.md`, `.agent/task/0963-codex-cli-alignment-refresh-e2e.md`.
