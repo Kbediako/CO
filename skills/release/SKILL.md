@@ -81,7 +81,18 @@ git push origin "$TAG"
 ### 4) Watch the release workflow + confirm npm publish
 
 ```bash
-RUN_ID="$(gh run list --workflow release.yml --limit 1 --json databaseId --jq '.[0].databaseId')"
+RUN_ID=""
+for i in {1..30}; do
+  RUN_ID="$(gh run list --workflow release.yml --branch "$TAG" --limit 1 --json databaseId --jq '.[0].databaseId' || true)"
+  if [[ -n "$RUN_ID" && "$RUN_ID" != "null" ]]; then
+    break
+  fi
+  sleep 2
+done
+if [[ -z "$RUN_ID" || "$RUN_ID" == "null" ]]; then
+  echo "::error::No release workflow run found for ${TAG}."
+  exit 1
+fi
 gh run watch "$RUN_ID" --exit-status
 
 npm view @kbediako/codex-orchestrator version
