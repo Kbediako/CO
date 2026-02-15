@@ -64,6 +64,8 @@ For runner + delegation coordination (short `--task` flow), see `docs/delegation
 ### 0) One-time setup (register the MCP server)
 
 - Register the delegation server once:
+  - Preferred: `codex-orchestrator delegation setup --yes --repo /path/to/repo`
+    - This wraps `codex mcp add delegation ...` and keeps wiring discoverable via `codex-orchestrator doctor`.
   - `codex mcp add delegation -- codex-orchestrator delegate-server`
   - Optional (recommended for repo-scoped config): append `--repo /path/to/repo` to the args.
   - `delegate-server` is the canonical name; `delegation-server` is supported as an alias.

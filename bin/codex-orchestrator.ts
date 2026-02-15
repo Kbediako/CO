@@ -19,8 +19,10 @@ import { evaluateInteractiveGate } from '../orchestrator/src/cli/utils/interacti
 import { buildSelfCheckResult } from '../orchestrator/src/cli/selfCheck.js';
 import { initCodexTemplates, formatInitSummary } from '../orchestrator/src/cli/init.js';
 import { runDoctor, formatDoctorSummary } from '../orchestrator/src/cli/doctor.js';
+import { formatDoctorUsageSummary, runDoctorUsage } from '../orchestrator/src/cli/doctorUsage.js';
 import { formatDevtoolsSetupSummary, runDevtoolsSetup } from '../orchestrator/src/cli/devtoolsSetup.js';
 import { formatCodexCliSetupSummary, runCodexCliSetup } from '../orchestrator/src/cli/codexCliSetup.js';
+import { formatDelegationSetupSummary, runDelegationSetup } from '../orchestrator/src/cli/delegationSetup.js';
 import { formatSkillsInstallSummary, installSkills } from '../orchestrator/src/cli/skills.js';
 import { loadPackageInfo } from '../orchestrator/src/cli/utils/packageInfo.js';
 import { slugify } from '../orchestrator/src/cli/utils/strings.js';
@@ -104,6 +106,9 @@ async function main(): Promise<void> {
       case 'delegate-server':
       case 'delegation-server':
         await handleDelegationServer(args);
+        break;
+      case 'delegation':
+        await handleDelegation(args);
         break;
       case 'version':
         printVersion();
@@ -366,6 +371,16 @@ async function handleRlm(orchestrator: CodexOrchestrator, rawArgs: string[]): Pr
 
   console.log(`Task: ${taskId}`);
 
+  const collabUserChoice = flags['collab'] !== undefined || process.env.RLM_SYMBOLIC_COLLAB !== undefined;
+  if (!collabUserChoice) {
+    const doctor = runDoctor();
+    if (doctor.collab.status === 'ok') {
+      console.log('Tip: collab is enabled. Try: codex-orchestrator rlm --collab auto \"<goal>\"');
+    } else if (doctor.collab.status === 'disabled') {
+      console.log('Tip: collab is available but disabled. Enable with: codex features enable collab');
+    }
+  }
+
   let startResult: { manifest: { run_id: string; status: string; artifact_root: string; log_path: string | null } } | null = null;
   await withRunUi(flags, 'text', async (runEvents) => {
     startResult = await orchestrator.start({
@@ -617,14 +632,30 @@ async function handleInit(rawArgs: string[]): Promise<void> {
 async function handleDoctor(rawArgs: string[]): Promise<void> {
   const { flags } = parseArgs(rawArgs);
   const format = (flags['format'] as string | undefined) === 'json' ? 'json' : 'text';
-  const result = runDoctor();
+  const includeUsage = Boolean(flags['usage']);
+  const windowDaysRaw = readStringFlag(flags, 'window-days');
+  const windowDays = windowDaysRaw ? Number.parseInt(windowDaysRaw, 10) : undefined;
+  const taskFilter = readStringFlag(flags, 'task') ?? null;
+
+  const doctorResult = runDoctor();
+  const usageResult = includeUsage ? await runDoctorUsage({ windowDays, taskFilter }) : null;
+
   if (format === 'json') {
-    console.log(JSON.stringify(result, null, 2));
+    if (usageResult) {
+      console.log(JSON.stringify({ ...doctorResult, usage: usageResult }, null, 2));
+      return;
+    }
+    console.log(JSON.stringify(doctorResult, null, 2));
     return;
   }
-  const summary = formatDoctorSummary(result);
-  for (const line of summary) {
+
+  for (const line of formatDoctorSummary(doctorResult)) {
     console.log(line);
+  }
+  if (usageResult) {
+    for (const line of formatDoctorUsageSummary(usageResult)) {
+      console.log(line);
+    }
   }
 }
 
@@ -649,6 +680,34 @@ async function handleDevtools(rawArgs: string[]): Promise<void> {
   }
   const summary = formatDevtoolsSetupSummary(result);
   for (const line of summary) {
+    console.log(line);
+  }
+}
+
+async function handleDelegation(rawArgs: string[]): Promise<void> {
+  const { positionals, flags } = parseArgs(rawArgs);
+  const subcommand = positionals.shift();
+  if (!subcommand) {
+    throw new Error('delegation requires a subcommand (setup).');
+  }
+  if (subcommand !== 'setup') {
+    throw new Error(`Unknown delegation subcommand: ${subcommand}`);
+  }
+
+  const format = (flags['format'] as string | undefined) === 'json' ? 'json' : 'text';
+  const apply = Boolean(flags['yes']);
+  if (format === 'json' && apply) {
+    throw new Error('delegation setup does not support --format json with --yes.');
+  }
+
+  const repoRoot = readStringFlag(flags, 'repo') ?? process.cwd();
+  const result = await runDelegationSetup({ apply, repoRoot });
+
+  if (format === 'json') {
+    console.log(JSON.stringify(result, null, 2));
+    return;
+  }
+  for (const line of formatDelegationSetupSummary(result)) {
     console.log(line);
   }
 }
@@ -1049,7 +1108,11 @@ Commands:
     --codex-download-sha256 <sha>  Expected SHA256 for the prebuilt download.
     --codex-force          Overwrite existing CO-managed codex binary.
     --yes                  Apply codex CLI setup (otherwise plan only).
-  doctor [--format json]
+  doctor [--format json] [--usage] [--window-days <n>] [--task <id>]
+    --usage               Include a local usage snapshot (scans .runs/).
+    --window-days <n>     Window for --usage (default 30).
+    --task <id>           Limit --usage scan to a specific task directory.
+    --format json         Emit machine-readable output.
   codex setup
     --source <path>        Build from local Codex repo (or git URL).
     --ref <ref>            Git ref (branch/tag/sha) when building from repo.
@@ -1059,6 +1122,10 @@ Commands:
     --yes                  Apply setup (otherwise plan only).
     --format json          Emit machine-readable output.
   devtools setup          Print DevTools MCP setup instructions.
+    --yes                 Apply setup by running "codex mcp add ...".
+    --format json         Emit machine-readable output (dry-run only).
+  delegation setup        Configure delegation MCP server wiring.
+    --repo <path>         Repo root for delegation server (default cwd).
     --yes                 Apply setup by running "codex mcp add ...".
     --format json         Emit machine-readable output (dry-run only).
   skills install          Install bundled skills into $CODEX_HOME/skills.
