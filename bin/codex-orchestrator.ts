@@ -634,7 +634,17 @@ async function handleDoctor(rawArgs: string[]): Promise<void> {
   const format = (flags['format'] as string | undefined) === 'json' ? 'json' : 'text';
   const includeUsage = Boolean(flags['usage']);
   const windowDaysRaw = readStringFlag(flags, 'window-days');
-  const windowDays = windowDaysRaw ? Number.parseInt(windowDaysRaw, 10) : undefined;
+  let windowDays: number | undefined = undefined;
+  if (windowDaysRaw) {
+    if (!/^\d+$/u.test(windowDaysRaw)) {
+      throw new Error(`Invalid --window-days value '${windowDaysRaw}'. Expected a positive integer.`);
+    }
+    const parsed = Number(windowDaysRaw);
+    if (!Number.isInteger(parsed) || parsed <= 0) {
+      throw new Error(`Invalid --window-days value '${windowDaysRaw}'. Expected a positive integer.`);
+    }
+    windowDays = parsed;
+  }
   const taskFilter = readStringFlag(flags, 'task') ?? null;
 
   const doctorResult = runDoctor();

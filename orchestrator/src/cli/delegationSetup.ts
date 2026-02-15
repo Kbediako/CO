@@ -53,7 +53,8 @@ export async function runDelegationSetup(options: DelegationSetupOptions = {}): 
   }
 
   await applyDelegationSetup({ codexBin, repoRoot }, env);
-  return { status: 'applied', plan, readiness };
+  const configuredAfter = isDelegationConfigured(configPath);
+  return { status: 'applied', plan, readiness: { ...readiness, configured: configuredAfter } };
 }
 
 export function formatDelegationSetupSummary(result: DelegationSetupResult): string[] {

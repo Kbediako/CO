@@ -196,7 +196,7 @@ export function formatDoctorUsageSummary(result: DoctorUsageResult): string[] {
   const lines: string[] = [];
   lines.push(`Usage (last ${result.window_days}d, cutoff ${result.cutoff_iso})`);
   lines.push(
-    `  - runs: ${result.runs.total} (ok=${result.runs.succeeded}, failed=${result.runs.failed}, other=${result.runs.other})`
+    `  - runs: ${result.runs.total} (ok=${result.runs.succeeded}, failed=${result.runs.failed}, cancelled=${result.runs.cancelled}, other=${result.runs.other})`
   );
   lines.push(
     `  - cloud: ${result.cloud.runs} (${formatPercent(result.cloud.runs, result.runs.total)})${formatCloudStatuses(result.cloud.by_status)}`
