@@ -654,7 +654,10 @@ Options:
     throw new Error('setup does not support --format json with --yes.');
   }
 
-  const repoRoot = readStringFlag(flags, 'repo') ?? process.cwd();
+  const repoFlag = readStringFlag(flags, 'repo');
+  const repoRoot = repoFlag ?? process.cwd();
+  const repoFlagValue = repoFlag ? (/\s/u.test(repoFlag) ? JSON.stringify(repoFlag) : repoFlag) : null;
+  const delegationRepoArg = repoFlagValue ? ` --repo ${repoFlagValue}` : '';
   const bundledSkills = await listBundledSkills();
   if (bundledSkills.length === 0) {
     throw new Error('No bundled skills detected; cannot run setup.');
@@ -692,7 +695,7 @@ Options:
     for (const commandLine of payload.steps.skills.commandLines) {
       console.log(`  - ${commandLine}`);
     }
-    console.log('- Delegation: codex-orchestrator delegation setup --yes');
+    console.log(`- Delegation: codex-orchestrator delegation setup --yes${delegationRepoArg}`);
     console.log('- DevTools: codex-orchestrator devtools setup --yes');
     console.log('Run with --yes to apply this setup.');
     return;
