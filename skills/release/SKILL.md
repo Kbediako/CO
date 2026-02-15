@@ -6,6 +6,7 @@ description: Ship a signed tag + GitHub Release + npm publish for @kbediako/code
 # Release (CO Maintainer)
 
 Use this skill when the user asks to ship a new CO version to npm/downstream users.
+If a global `release` skill is installed, prefer that and fall back to this bundled skill.
 
 ## Guardrails (required)
 
@@ -104,4 +105,3 @@ If the release included bundled skill changes, refresh local skills:
 ```bash
 codex-orchestrator skills install --force
 ```
-
