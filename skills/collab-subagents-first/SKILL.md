@@ -9,6 +9,8 @@ description: Manage non-trivial tasks via focused collab subagents to save conte
 
 Delegate as a manager, not as a pass-through. Split work into narrow streams, give each subagent a rich brief, and keep parent context lean by collecting short structured summaries plus evidence paths.
 
+Note: If a global `collab-subagents-first` skill is installed, prefer that and fall back to this bundled skill.
+
 ## Delegation gate
 
 Use subagents when any condition is true:
@@ -166,4 +168,3 @@ Do not treat wrapper handoff-only output as a completed review.
 - Parent synthesis includes concise decisions and evidence paths.
 - Parent-level review completed (standalone review or equivalent).
 - Collab lifecycle closed (`spawn_agent` -> `wait` -> `close_agent` per id) or degraded mode explicitly recorded.
-
