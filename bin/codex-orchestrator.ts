@@ -683,8 +683,14 @@ async function handleSkills(rawArgs: string[]): Promise<void> {
       const format: OutputFormat = (flags['format'] as string | undefined) === 'json' ? 'json' : 'text';
       const force = flags['force'] === true;
       const codexHome = readStringFlag(flags, 'codex-home');
-      const onlyFlag = readStringFlag(flags, 'only');
-      const only = onlyFlag ? onlyFlag.split(',').map((entry) => entry.trim()).filter(Boolean) : undefined;
+      const onlyRaw = flags['only'];
+      let only: string[] | undefined;
+      if (onlyRaw !== undefined) {
+        if (typeof onlyRaw !== 'string') {
+          throw new Error('--only requires a comma-separated list of skill names.');
+        }
+        only = onlyRaw.split(',').map((entry) => entry.trim()).filter(Boolean);
+      }
       const result = await installSkills({ force, codexHome, only });
       if (format === 'json') {
         console.log(JSON.stringify(result, null, 2));
