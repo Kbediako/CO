@@ -45,7 +45,8 @@ export async function runDevtoolsSetup(options: DevtoolsSetupOptions = {}): Prom
   }
 
   await applyDevtoolsSetup(plan, env);
-  return { status: 'applied', plan, readiness };
+  const readinessAfter = resolveDevtoolsReadiness(env);
+  return { status: 'applied', plan, readiness: readinessAfter };
 }
 
 export function formatDevtoolsSetupSummary(result: DevtoolsSetupResult): string[] {

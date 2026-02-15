@@ -23,7 +23,7 @@ import { formatDoctorUsageSummary, runDoctorUsage } from '../orchestrator/src/cl
 import { formatDevtoolsSetupSummary, runDevtoolsSetup } from '../orchestrator/src/cli/devtoolsSetup.js';
 import { formatCodexCliSetupSummary, runCodexCliSetup } from '../orchestrator/src/cli/codexCliSetup.js';
 import { formatDelegationSetupSummary, runDelegationSetup } from '../orchestrator/src/cli/delegationSetup.js';
-import { formatSkillsInstallSummary, installSkills } from '../orchestrator/src/cli/skills.js';
+import { formatSkillsInstallSummary, installSkills, listBundledSkills } from '../orchestrator/src/cli/skills.js';
 import { loadPackageInfo } from '../orchestrator/src/cli/utils/packageInfo.js';
 import { slugify } from '../orchestrator/src/cli/utils/strings.js';
 import { serveMcp } from '../orchestrator/src/cli/mcp.js';
@@ -84,6 +84,9 @@ async function main(): Promise<void> {
         break;
       case 'init':
         await handleInit(args);
+        break;
+      case 'setup':
+        await handleSetup(args);
         break;
       case 'doctor':
         await handleDoctor(args);
@@ -629,10 +632,116 @@ async function handleInit(rawArgs: string[]): Promise<void> {
   }
 }
 
+async function handleSetup(rawArgs: string[]): Promise<void> {
+  const { positionals, flags } = parseArgs(rawArgs);
+  if (isHelpRequest(positionals, flags)) {
+    console.log(`Usage: codex-orchestrator setup [--yes] [--format json]
+
+One-shot bootstrap for downstream users. Installs bundled skills and configures
+delegation + DevTools MCP wiring.
+
+Options:
+  --yes                 Apply setup (otherwise plan only).
+  --repo <path>         Repo root for delegation wiring (default cwd).
+  --format json         Emit machine-readable output (dry-run only).
+`);
+    return;
+  }
+
+  const format: OutputFormat = (flags['format'] as string | undefined) === 'json' ? 'json' : 'text';
+  const apply = Boolean(flags['yes']);
+  if (format === 'json' && apply) {
+    throw new Error('setup does not support --format json with --yes.');
+  }
+
+  const repoFlag = readStringFlag(flags, 'repo');
+  const repoRoot = repoFlag ?? process.cwd();
+  const repoFlagValue = repoFlag ? (/\s/u.test(repoFlag) ? JSON.stringify(repoFlag) : repoFlag) : null;
+  const delegationRepoArg = repoFlagValue ? ` --repo ${repoFlagValue}` : '';
+  const bundledSkills = await listBundledSkills();
+  if (bundledSkills.length === 0) {
+    throw new Error('No bundled skills detected; cannot run setup.');
+  }
+  const forceSkills = bundledSkills.filter((skill) => skill !== 'chrome-devtools');
+
+  if (!apply) {
+    const forceOnly = forceSkills.join(',');
+    const forceCommand = forceOnly ? `codex-orchestrator skills install --force --only ${forceOnly}` : null;
+    const devtoolsCommand = bundledSkills.includes('chrome-devtools')
+      ? 'codex-orchestrator skills install --only chrome-devtools'
+      : null;
+
+    const delegation = await runDelegationSetup({ repoRoot });
+    const devtools = await runDevtoolsSetup();
+    const payload = {
+      status: 'planned' as const,
+      steps: {
+        skills: {
+          commandLines: [forceCommand, devtoolsCommand].filter((entry): entry is string => Boolean(entry)),
+          note: 'Installs bundled skills into $CODEX_HOME/skills (setup avoids overwriting chrome-devtools when already present).'
+        },
+        delegation,
+        devtools
+      }
+    };
+
+    if (format === 'json') {
+      console.log(JSON.stringify(payload, null, 2));
+      return;
+    }
+
+    console.log('Setup plan:');
+    console.log('- Skills:');
+    for (const commandLine of payload.steps.skills.commandLines) {
+      console.log(`  - ${commandLine}`);
+    }
+    console.log(`- Delegation: codex-orchestrator delegation setup --yes${delegationRepoArg}`);
+    console.log('- DevTools: codex-orchestrator devtools setup --yes');
+    console.log('Run with --yes to apply this setup.');
+    return;
+  }
+
+  const primarySkills = forceSkills.length > 0 ? await installSkills({ force: true, only: forceSkills }) : null;
+  const devtoolsSkill =
+    bundledSkills.includes('chrome-devtools')
+      ? await installSkills({ force: false, only: ['chrome-devtools'] })
+      : null;
+  const skills = primarySkills && devtoolsSkill
+    ? {
+        sourceRoot: primarySkills.sourceRoot,
+        targetRoot: primarySkills.targetRoot,
+        skills: [...new Set([...primarySkills.skills, ...devtoolsSkill.skills])],
+        written: [...primarySkills.written, ...devtoolsSkill.written],
+        skipped: [...primarySkills.skipped, ...devtoolsSkill.skipped]
+      }
+    : devtoolsSkill ?? primarySkills;
+  if (!skills) {
+    throw new Error('No bundled skills detected; cannot run setup.');
+  }
+  const delegation = await runDelegationSetup({ apply: true, repoRoot });
+  const devtools = await runDevtoolsSetup({ apply: true });
+
+  for (const line of formatSkillsInstallSummary(skills)) {
+    console.log(line);
+  }
+  for (const line of formatDelegationSetupSummary(delegation)) {
+    console.log(line);
+  }
+  for (const line of formatDevtoolsSetupSummary(devtools)) {
+    console.log(line);
+  }
+  console.log('Next: codex-orchestrator doctor --usage');
+}
+
 async function handleDoctor(rawArgs: string[]): Promise<void> {
   const { flags } = parseArgs(rawArgs);
   const format = (flags['format'] as string | undefined) === 'json' ? 'json' : 'text';
   const includeUsage = Boolean(flags['usage']);
+  const wantsApply = Boolean(flags['apply']);
+  const apply = Boolean(flags['yes']);
+  if (wantsApply && format === 'json') {
+    throw new Error('doctor --apply does not support --format json.');
+  }
   const windowDaysRaw = readStringFlag(flags, 'window-days');
   let windowDays: number | undefined = undefined;
   if (windowDaysRaw) {
@@ -666,6 +775,73 @@ async function handleDoctor(rawArgs: string[]): Promise<void> {
     for (const line of formatDoctorUsageSummary(usageResult)) {
       console.log(line);
     }
+  }
+
+  if (!wantsApply) {
+    return;
+  }
+
+  const repoRoot = process.cwd();
+  const delegationPlan = await runDelegationSetup({ repoRoot });
+  const devtoolsPlan = await runDevtoolsSetup();
+  const needsDelegation = !delegationPlan.readiness.configured;
+  const needsDevtoolsSkill = devtoolsPlan.readiness.skill.status !== 'ok';
+  const devtoolsConfigStatus = devtoolsPlan.readiness.config.status;
+  const needsDevtoolsConfig = devtoolsConfigStatus === 'missing';
+  const hasInvalidDevtoolsConfig = devtoolsConfigStatus === 'invalid';
+
+  if (!needsDelegation && !needsDevtoolsSkill && !needsDevtoolsConfig && !hasInvalidDevtoolsConfig) {
+    console.log('Doctor apply: nothing to do.');
+    return;
+  }
+
+  console.log('Doctor apply plan:');
+  if (needsDevtoolsSkill) {
+    console.log('- Install skill: chrome-devtools (codex-orchestrator skills install --only chrome-devtools)');
+  }
+  if (hasInvalidDevtoolsConfig) {
+    console.log(
+      `- DevTools MCP config is invalid: ${devtoolsPlan.readiness.config.path} (fix config.toml then rerun doctor --apply)`
+    );
+  }
+  if (needsDevtoolsConfig) {
+    console.log('- Configure DevTools MCP: codex-orchestrator devtools setup --yes');
+  }
+  if (needsDelegation) {
+    console.log('- Configure delegation MCP: codex-orchestrator delegation setup --yes');
+  }
+
+  if (!apply) {
+    console.log('Run with --apply --yes to apply these fixes.');
+    return;
+  }
+
+  if (needsDevtoolsSkill) {
+    const skills = await installSkills({ only: ['chrome-devtools'] });
+    for (const line of formatSkillsInstallSummary(skills)) {
+      console.log(line);
+    }
+  }
+  if (needsDelegation) {
+    const delegation = await runDelegationSetup({ apply: true, repoRoot });
+    for (const line of formatDelegationSetupSummary(delegation)) {
+      console.log(line);
+    }
+  }
+  if (hasInvalidDevtoolsConfig) {
+    console.log(
+      `DevTools setup: skipped (config.toml is invalid: ${devtoolsPlan.readiness.config.path}). Fix it and rerun doctor --apply --yes.`
+    );
+  } else if (needsDevtoolsConfig) {
+    const devtools = await runDevtoolsSetup({ apply: true });
+    for (const line of formatDevtoolsSetupSummary(devtools)) {
+      console.log(line);
+    }
+  }
+
+  const doctorAfter = runDoctor();
+  for (const line of formatDoctorSummary(doctorAfter)) {
+    console.log(line);
   }
 }
 
@@ -1118,11 +1294,17 @@ Commands:
     --codex-download-sha256 <sha>  Expected SHA256 for the prebuilt download.
     --codex-force          Overwrite existing CO-managed codex binary.
     --yes                  Apply codex CLI setup (otherwise plan only).
-  doctor [--format json] [--usage] [--window-days <n>] [--task <id>]
+  setup [--yes] [--format json]
+    --yes                 Apply setup (otherwise plan only).
+    --repo <path>         Repo root for delegation wiring (default cwd).
+    --format json         Emit machine-readable output (dry-run only).
+  doctor [--format json] [--usage] [--window-days <n>] [--task <id>] [--apply]
     --usage               Include a local usage snapshot (scans .runs/).
     --window-days <n>     Window for --usage (default 30).
     --task <id>           Limit --usage scan to a specific task directory.
-    --format json         Emit machine-readable output.
+    --apply               Plan/apply quick fixes for DevTools + delegation wiring (use with --yes).
+    --yes                 Apply fixes when --apply is set.
+    --format json         Emit machine-readable output (not supported with --apply).
   codex setup
     --source <path>        Build from local Codex repo (or git URL).
     --ref <ref>            Git ref (branch/tag/sha) when building from repo.

@@ -61,6 +61,35 @@ describe('codex-orchestrator command surface', () => {
     expect(stdout).toContain('Usage: codex-orchestrator pr watch-merge');
   }, TEST_TIMEOUT);
 
+  it('prints setup help', async () => {
+    const { stdout } = await runCli(['setup', '--help']);
+    expect(stdout).toContain('Usage: codex-orchestrator setup');
+  }, TEST_TIMEOUT);
+
+  it('prints doctor apply plan when wiring is missing', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'co-cli-doctor-apply-'));
+    const env = {
+      ...process.env,
+      CODEX_HOME: tempDir
+    };
+    const { stdout } = await runCli(['doctor', '--apply'], env);
+    expect(stdout).toContain('Doctor apply plan:');
+    expect(stdout).toContain('chrome-devtools');
+    expect(stdout).toContain('delegation');
+  }, TEST_TIMEOUT);
+
+  it('emits setup plan JSON', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'co-cli-setup-plan-'));
+    const env = {
+      ...process.env,
+      CODEX_HOME: tempDir
+    };
+    const { stdout } = await runCli(['setup', '--format', 'json'], env);
+    const payload = JSON.parse(stdout) as { status?: string; steps?: Record<string, unknown> };
+    expect(payload.status).toBe('planned');
+    expect(payload.steps).toBeTruthy();
+  }, TEST_TIMEOUT);
+
   it('supports quoted exec commands passed as a single token', async () => {
     tempDir = await mkdtemp(join(tmpdir(), 'co-cli-surface-'));
     const env = {

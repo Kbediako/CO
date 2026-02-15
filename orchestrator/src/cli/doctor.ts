@@ -120,6 +120,7 @@ export function runDoctor(cwd: string = process.cwd()): DoctorResult {
         readiness.config.status === 'ok'
           ? undefined
           : [
+              'Quick fix: codex-orchestrator doctor --apply --yes',
               'Run: codex-orchestrator devtools setup',
               `Run: ${setupPlan.commandLine}`,
               `Config path: ${setupPlan.configPath}`,
@@ -195,6 +196,7 @@ export function runDoctor(cwd: string = process.cwd()): DoctorResult {
       status: delegationStatus,
       config: delegationConfig,
       enablement: [
+        'Quick fix: codex-orchestrator doctor --apply --yes',
         'Run: codex-orchestrator delegation setup --yes',
         'Or manually: codex mcp add delegation -- codex-orchestrator delegate-server',
         "Enable for a run with: codex -c 'mcp_servers.delegation.enabled=true' ...",
