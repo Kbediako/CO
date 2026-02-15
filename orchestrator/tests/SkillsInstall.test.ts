@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -46,6 +47,21 @@ describe('installSkills', () => {
       expect(skill).toContain('close_agent');
       expect(skill).toContain('agent thread limit reached');
       expect(brief).toContain('Subagent Brief Template');
+    } finally {
+      await rm(tempHome, { recursive: true, force: true });
+    }
+  });
+
+  it('installs only selected skills when only is provided', async () => {
+    const tempHome = await mkdtemp(join(tmpdir(), 'skills-install-only-'));
+    try {
+      const result = await installSkills({ codexHome: tempHome, force: true, only: ['collab-subagents-first'] });
+      const installedPath = join(tempHome, 'skills', 'collab-subagents-first', 'SKILL.md');
+      const skippedPath = join(tempHome, 'skills', 'delegation-usage', 'SKILL.md');
+
+      expect(result.skills).toEqual(['collab-subagents-first']);
+      expect(existsSync(installedPath)).toBe(true);
+      expect(existsSync(skippedPath)).toBe(false);
     } finally {
       await rm(tempHome, { recursive: true, force: true });
     }

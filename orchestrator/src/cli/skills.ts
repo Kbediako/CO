@@ -9,6 +9,7 @@ import { findPackageRoot } from './utils/packageInfo.js';
 export interface SkillsInstallOptions {
   force?: boolean;
   codexHome?: string;
+  only?: string[];
 }
 
 export interface SkillsInstallResult {
@@ -28,20 +29,29 @@ export async function installSkills(options: SkillsInstallOptions = {}): Promise
   const targetRoot = join(codexHome, 'skills');
   const written: string[] = [];
   const skipped: string[] = [];
-  const skillNames = await listSkillNames(sourceRoot);
+  const availableSkills = await listSkillNames(sourceRoot);
+  const selectedSkills = resolveSelectedSkills(availableSkills, options.only);
 
-  await copyDir(sourceRoot, targetRoot, {
+  const copyOptions = {
     force: options.force ?? false,
     written,
     skipped
-  });
+  };
+  if (selectedSkills.length === availableSkills.length) {
+    await copyDir(sourceRoot, targetRoot, copyOptions);
+  } else {
+    await mkdir(targetRoot, { recursive: true });
+    for (const skill of selectedSkills) {
+      await copyDir(join(sourceRoot, skill), join(targetRoot, skill), copyOptions);
+    }
+  }
 
   return {
     written,
     skipped,
     sourceRoot,
     targetRoot,
-    skills: skillNames
+    skills: selectedSkills
   };
 }
 
@@ -81,6 +91,25 @@ function resolveCodexHomePath(override?: string): string {
 async function listSkillNames(sourceRoot: string): Promise<string[]> {
   const entries = await readdir(sourceRoot, { withFileTypes: true });
   return entries.filter((entry) => entry.isDirectory()).map((entry) => entry.name);
+}
+
+function resolveSelectedSkills(availableSkills: string[], only?: string[]): string[] {
+  if (!only) {
+    return availableSkills;
+  }
+  const trimmed = only.map((entry) => entry.trim()).filter(Boolean);
+  if (trimmed.length === 0) {
+    throw new Error('No skills specified for --only.');
+  }
+  const requested = Array.from(new Set(trimmed));
+  const available = new Set(availableSkills);
+  const unknown = requested.filter((skill) => !available.has(skill));
+  if (unknown.length > 0) {
+    throw new Error(
+      `Unknown skill(s): ${unknown.join(', ')}. Available skills: ${availableSkills.join(', ')}`
+    );
+  }
+  return requested;
 }
 
 async function assertDirectory(path: string): Promise<void> {

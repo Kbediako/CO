@@ -103,7 +103,7 @@ Use `npx @kbediako/codex-orchestrator resume --run <run-id>` to continue interru
 - `codex-orchestrator init codex [--cwd <path>] [--force]`: copy starter templates into a repo (includes `mcp-client.json` and `AGENTS.md`; no overwrite unless `--force`).
 - `codex-orchestrator doctor [--format json]`: check optional tooling dependencies and print install commands.
 - `codex-orchestrator devtools setup [--yes]`: print DevTools MCP setup instructions (`--yes` applies `codex mcp add ...`).
-- `codex-orchestrator skills install [--force] [--codex-home <path>]`: install bundled skills into `$CODEX_HOME/skills` (global skills remain the primary reference when installed).
+- `codex-orchestrator skills install [--force] [--only <skills>] [--codex-home <path>]`: install bundled skills into `$CODEX_HOME/skills` (global skills remain the primary reference when installed).
 - `codex-orchestrator self-check --format json`: emit a safe JSON health payload for smoke tests.
 - `codex-orchestrator --version`: print the package version.
 

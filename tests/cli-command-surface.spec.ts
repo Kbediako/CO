@@ -34,6 +34,13 @@ describe('codex-orchestrator command surface', () => {
     expect(stdout).toContain('Usage: codex-orchestrator status --run <id>');
   }, TEST_TIMEOUT);
 
+  it('rejects skills install --only when no skill list is provided', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'co-cli-skills-only-'));
+    await expect(runCli(['skills', 'install', '--only', '--codex-home', tempDir, '--format', 'json'])).rejects.toMatchObject({
+      stderr: expect.stringContaining('--only requires a comma-separated list of skill names.')
+    });
+  }, TEST_TIMEOUT);
+
   it('prints resume help without requiring a run id', async () => {
     const { stdout } = await runCli(['resume', '--help']);
     expect(stdout).toContain('Usage: codex-orchestrator resume --run <id>');
