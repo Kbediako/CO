@@ -173,6 +173,14 @@ Usage snapshot (scans local `.runs/`):
 codex-orchestrator doctor --usage
 ```
 
+## Downstream usage cheatsheet (agent-first)
+
+- Bootstrap + wire everything: `codex-orchestrator setup --yes`
+- Validate + measure adoption locally: `codex-orchestrator doctor --usage --format json`
+- Delegation: `codex-orchestrator doctor --apply --yes`, then enable for a Codex run with: `codex -c 'mcp_servers.delegation.enabled=true' ...`
+- Collab (symbolic RLM subagents): `codex-orchestrator rlm "<goal>" --collab auto` (requires collab feature enabled in Codex)
+- Cloud: set `CODEX_CLOUD_ENV_ID` (and optional `CODEX_CLOUD_BRANCH`), then run: `codex-orchestrator start <pipeline> --cloud --target <stage-id>`
+
 Print DevTools MCP setup guidance:
 ```bash
 codex-orchestrator devtools setup
