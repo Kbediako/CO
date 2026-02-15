@@ -683,7 +683,9 @@ async function handleSkills(rawArgs: string[]): Promise<void> {
       const format: OutputFormat = (flags['format'] as string | undefined) === 'json' ? 'json' : 'text';
       const force = flags['force'] === true;
       const codexHome = readStringFlag(flags, 'codex-home');
-      const result = await installSkills({ force, codexHome });
+      const onlyFlag = readStringFlag(flags, 'only');
+      const only = onlyFlag ? onlyFlag.split(',').map((entry) => entry.trim()).filter(Boolean) : undefined;
+      const result = await installSkills({ force, codexHome, only });
       if (format === 'json') {
         console.log(JSON.stringify(result, null, 2));
       } else {
@@ -1035,6 +1037,7 @@ Commands:
     --format json         Emit machine-readable output (dry-run only).
   skills install          Install bundled skills into $CODEX_HOME/skills.
     --force               Overwrite existing skill files.
+    --only <skills>       Install only selected skills (comma-separated).
     --codex-home <path>   Override the target Codex home directory.
     --format json         Emit machine-readable output.
   mcp serve [--repo <path>] [--dry-run] [-- <extra args>]
@@ -1064,6 +1067,7 @@ function printSkillsHelp(): void {
 Commands:
   install                   Install bundled skills into $CODEX_HOME/skills.
     --force                 Overwrite existing skill files.
+    --only <skills>         Install only selected skills (comma-separated).
     --codex-home <path>     Override the target Codex home directory.
     --format json           Emit machine-readable output.
 `);

@@ -137,14 +137,17 @@ codex-orchestrator skills install
 
 Options:
 - `--force` overwrites existing files.
+- `--only <skills>` installs only selected skills (comma-separated). Combine with `--force` to overwrite only those.
 - `--codex-home <path>` targets a different Codex home directory.
 
 Bundled skills (may vary by release):
+- `collab-subagents-first`
 - `delegation-usage`
 - `standalone-review`
 - `docs-first`
 - `collab-evals`
 - `collab-deliberation`
+- `release`
 - `delegate-early` (compatibility alias; use `delegation-usage`)
 
 ## DevTools readiness

@@ -13,7 +13,9 @@ This guide defines how downstream users consume skills shipped with `@kbediako/c
    - `codex-orchestrator skills install`
 3. Force refresh existing skill files (when release notes call it out):
    - `codex-orchestrator skills install --force`
-4. Verify expected skills exist:
+4. Refresh only specific skills (avoid overwriting everything):
+   - `codex-orchestrator skills install --only collab-subagents-first --force`
+5. Verify expected skills exist:
    - `ls "$CODEX_HOME/skills"`
 
 ## Release-note requirement
