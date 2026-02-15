@@ -642,6 +642,7 @@ delegation + DevTools MCP wiring.
 
 Options:
   --yes                 Apply setup (otherwise plan only).
+  --repo <path>         Repo root for delegation wiring (default cwd).
   --format json         Emit machine-readable output (dry-run only).
 `);
     return;
@@ -1292,6 +1293,7 @@ Commands:
     --yes                  Apply codex CLI setup (otherwise plan only).
   setup [--yes] [--format json]
     --yes                 Apply setup (otherwise plan only).
+    --repo <path>         Repo root for delegation wiring (default cwd).
     --format json         Emit machine-readable output (dry-run only).
   doctor [--format json] [--usage] [--window-days <n>] [--task <id>] [--apply]
     --usage               Include a local usage snapshot (scans .runs/).
