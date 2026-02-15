@@ -38,7 +38,7 @@ export async function runDelegationSetup(options: DelegationSetupOptions = {}): 
     codexBin,
     codexHome,
     repoRoot,
-    commandLine: `${codexBin} mcp add delegation -- codex-orchestrator delegate-server --repo ${repoRoot}`
+    commandLine: `"${codexBin}" mcp add delegation -- codex-orchestrator delegate-server --repo "${repoRoot}"`
   };
 
   const configured = isDelegationConfigured(configPath);

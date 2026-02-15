@@ -9,8 +9,11 @@ import {
   parseRunIdTimestamp,
   resolveEnvironmentPaths
 } from '../../../scripts/lib/run-manifests.js';
+import { normalizeTaskKey as normalizeTaskKeyAny } from '../../../scripts/lib/docs-helpers.js';
 
 import type { CliManifest } from './types.js';
+
+const normalizeTaskKey = normalizeTaskKeyAny as (item: unknown) => string | null;
 
 export interface DoctorUsageOptions {
   windowDays?: number;
@@ -268,28 +271,6 @@ function formatCloudStatuses(byStatus: Record<string, number>): string {
     .map(([status, count]) => `${status}=${count}`)
     .join(', ');
   return ` [${top}]`;
-}
-
-function normalizeTaskKey(item: unknown): string | null {
-  if (!item || typeof item !== 'object') {
-    return null;
-  }
-  const record = item as Record<string, unknown>;
-  const id = typeof record.id === 'string' ? record.id.trim() : '';
-  const slug = typeof record.slug === 'string' ? record.slug.trim() : '';
-  if (slug && id && slug.startsWith(`${id}-`)) {
-    return slug;
-  }
-  if (id && slug) {
-    return `${id}-${slug}`;
-  }
-  if (slug) {
-    return slug;
-  }
-  if (id) {
-    return id;
-  }
-  return null;
 }
 
 function readTaskIndexKeys(repoRoot: string): Set<string> {
