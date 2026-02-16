@@ -8,6 +8,7 @@ import { promisify } from 'node:util';
 const execFileAsync = promisify(execFile);
 const runReviewScript = join(process.cwd(), 'scripts', 'run-review.ts');
 const createdSandboxes: string[] = [];
+const shellBinary = process.env.SHELL && process.env.SHELL.trim().length > 0 ? process.env.SHELL : 'bash';
 
 async function makeSandbox(): Promise<string> {
   const sandbox = await mkdtemp(join(tmpdir(), 'run-review-'));
@@ -159,7 +160,7 @@ describe('scripts/run-review regression', () => {
       `${process.execPath} --loader ts-node/esm ${runReviewScript} --manifest ${manifestPath} --non-interactive 2>/dev/null | head -n 1 >/dev/null`
     ].join('\n');
 
-    const { stdout, stderr } = await execFileAsync('zsh', ['-lc', cmd], {
+    const { stdout, stderr } = await execFileAsync(shellBinary, ['-lc', cmd], {
       cwd: process.cwd(),
       env: { ...baseEnv(sandbox, codexBin), RUN_REVIEW_MODE: 'spam' },
       maxBuffer: 16 * 1024 * 1024
