@@ -29,10 +29,13 @@ const privacyGuard = new PrivacyGuard({ mode: resolvePrivacyGuardMode() });
 const handleService = new RemoteExecHandleService({ guard: privacyGuard, now: () => new Date() });
 
 const cliExecutor: ExecCommandExecutor<CliExecSessionHandle> = async (request) => {
+  const hasExplicitArgs = Array.isArray(request.args) && request.args.length > 0;
   const child = spawn(request.command, request.args ?? [], {
     cwd: request.cwd,
     env: request.env,
-    shell: true,
+    // Use shell mode only for string-style commands. When args are provided we
+    // want argv semantics (`cmd arg1 arg2`) rather than `sh -c cmd` behavior.
+    shell: !hasExplicitArgs,
     stdio: ['ignore', 'pipe', 'pipe']
   });
 

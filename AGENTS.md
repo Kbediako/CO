@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp ca12820f4d5f054bc013fe138058213b1fc251b72d5ab6629937397dcba2f91c -->
+<!-- codex:instruction-stamp 3b98f9b5cdd1d8c83b07b2a73ba333e269d3f951e03b7b9047229ac369b10ab5 -->
 # Codex-Orchestrator Agent Handbook (Template)
 
 Use this repository as the wrapper that coordinates multiple Codex-driven projects. After cloning, replace placeholder metadata (task IDs, documents, SOPs) with values for each downstream initiative while keeping these shared guardrails in place.
@@ -47,6 +47,8 @@ Use this repository as the wrapper that coordinates multiple Codex-driven projec
 - Reserve direct shell commands for lightweight discovery or one-off checks that do not require manifest evidence.
 - Delegation is mandatory for top-level tasks once a task id exists: spawn at least one subagent run using `MCP_RUNNER_TASK_ID=<task-id>-<stream>`, capture manifest evidence, and summarize in the main run. Use `DELEGATION_GUARD_OVERRIDE_REASON` only when delegation is impossible and record the justification.
 - Once a task id exists, prefer delegation for research, review, and planning work. Use `codex exec` only for pre-task triage (no task id yet) or when delegation is genuinely unavailable (technical/blocking limitation or explicit operational block), and set `DELEGATION_GUARD_OVERRIDE_REASON` with a clear justification.
+- In shared checkouts, treat in-scope edits from active write-enabled subagent streams as expected delegated output.
+- Escalate "unexpected local edits" only when files are out of all declared stream scopes, ownership collides, or no active stream owner exists.
 - Keep delegation MCP enabled by default (only MCP on by default). Enable other MCPs only when relevant to the task.
 - Avoid hard dependencies on a specific MCP server; use whatever MCPs are available and relevant to the specific task.
 - Bundled skills under `skills/` ship to downstream users; agents should prefer global skills (if installed) and fall back to bundled skills. Example: use `$CODEX_HOME/skills/docs-first` when present, otherwise use `skills/docs-first/SKILL.md`.
@@ -65,6 +67,7 @@ Use this repository as the wrapper that coordinates multiple Codex-driven projec
 - When you need manifest-backed review evidence, run `TASK=<task-id> NOTES="Goal: ... | Summary: ... | Risks: ..." MANIFEST=<path> npm run review -- --manifest <path>`.
 - See `docs/standalone-review-guide.md` for the canonical workflow.
 - Prefer the bundled `standalone-review` skill for ad-hoc review steps.
+- Prefer the bundled `elegance-review` skill for the required post-implementation minimality pass.
 - Before merge for non-trivial changes, run one explicit elegance/minimality review pass and remove avoidable complexity.
 
 ## Completion Discipline (Patience-First)

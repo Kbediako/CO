@@ -30,6 +30,7 @@ Out of scope:
 Ownership:
 - Files/paths you may edit: <paths>
 - Files/paths you must not edit: <paths>
+- Write policy: read-only | write-enabled
 
 Acceptance criteria:
 - <bullet 1>
@@ -59,6 +60,7 @@ Keep the response concise. Put detailed notes in a file and return the path.
 
 - Include enough context so the subagent can act without back-and-forth.
 - Include explicit file ownership boundaries.
+- Include explicit write policy (`read-only` or `write-enabled`).
 - Include a concrete output format and validation expectations.
 - Include at least one "do not do" constraint to prevent drift.
 - If task is review-only, explicitly prohibit implementation edits.
@@ -87,4 +89,3 @@ Objective: validate <existing change>.
 Deliverable: failing/passing checks, defect list by severity, and minimal fix suggestions.
 No broad refactors.
 ```
-

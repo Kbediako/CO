@@ -46,6 +46,13 @@ describe('formatDoctorUsageSummary', () => {
           { id: 'docs-review', runs: 5 },
           { id: 'rlm', runs: 1 }
         ]
+      },
+      adoption: {
+        exec_runs: 6,
+        exec_share_pct: 60,
+        gate_runs: 5,
+        gate_share_pct: 50,
+        recommendations: ['Most runs are plain exec; prefer gate pipelines.']
       }
     };
 
@@ -62,6 +69,7 @@ describe('formatDoctorUsageSummary', () => {
     expect(summary).toContain('tools[');
     expect(summary).toContain('delegation: 1/2');
     expect(summary).toContain('child_runs=2');
+    expect(summary).toContain('Pipeline adoption: exec=6');
+    expect(summary).toContain('Adoption hints:');
   });
 });
-

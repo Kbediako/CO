@@ -134,6 +134,26 @@ codex exec -c 'mcp_servers.delegation.enabled=true' \
 
 You can still store the path in a shell variable for your own convenience, but pass the literal value in the prompt or tool parameters.
 
+### 3a) Optional scope guard for shared checkouts
+
+When parent + subagents share one working tree, use the helper script (if present in the repo) to avoid false "unexpected edits" stops:
+
+```bash
+node scripts/subagent-edit-guard.mjs start \
+  --stream <stream-id> \
+  --mode <read-only|write-enabled> \
+  --scopes <path1,path2>
+
+# spawn + wait for the subagent
+
+node scripts/subagent-edit-guard.mjs finish --stream <stream-id> --format json
+```
+
+- `finish` exit `0`: edits were in-scope (or none).
+- `finish` exit `1`: review only `out_of_scope_paths` / `violations` and escalate those.
+- If a delegated run triggers a generic "unexpected local edits" pause prompt, treat it as a scope-classification checkpoint: keep and continue on `finish` exit `0`; escalate only `finish` violations.
+- If the helper is not present, apply the same baseline/scope logic manually (`git status --porcelain` before/after, then classify changed paths by declared stream ownership).
+
 ## 4) Optional: repo-scoped config for delegation server
 
 `delegate-server` defaults the repo root to its current working directory. In practice this means:

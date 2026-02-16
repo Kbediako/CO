@@ -23,6 +23,12 @@ Collab multi-agent mode is separate from delegation. For symbolic RLM subcalls t
 - **Lifecycle is mandatory:** for every successful `spawn_agent`, run `wait` and then `close_agent` for that same id before task completion.
 - Keep a local list of spawned ids and run a final cleanup pass so no agent id is left unclosed on timeout/error paths.
 - If spawn fails with `agent thread limit reached`, stop spawning, close any known ids first, then surface a concise recovery note.
+- In a shared checkout, spawned subagents may produce file edits. Treat edits inside that stream's declared ownership as expected delegated output, not external interference.
+- Before spawning, capture a baseline (`git status --porcelain`). After `wait`, diff against baseline and classify file changes by stream ownership.
+- Escalate "unexpected local edits" only when changed files are outside all active stream scopes (or when no subagent was active).
+- If a generic safety prompt appears after delegation (for example "unexpected local edits"), run scope classification first; when edits are in-scope, keep them and continue without user escalation.
+- For scout/research streams, set an explicit no-write constraint and verify the post-run status matches baseline.
+- Prefer `scripts/subagent-edit-guard.mjs` for low-friction enforcement when the helper exists in the repo (`start` before spawn, `finish` after `wait`); canonical command examples live in `docs/delegation-runner-workflow.md` (section `3a`). If the helper is absent, apply the same baseline/scope checks manually.
 
 ## Quick-start workflow (canned)
 
@@ -186,3 +192,4 @@ repeat:
 - **Collab payload mismatch:** `spawn_agent` rejects calls that include both `message` and `items`.
 - **Collab UI assumptions:** agent rows/records are id-based today; use explicit stream role text in prompts/artifacts for operator clarity.
 - **Collab lifecycle leaks:** missing `close_agent` calls accumulate open threads and can trigger `agent thread limit reached`; always finish `spawn -> wait -> close_agent` per id.
+- **False "unexpected edits" stops:** when a live subagent owns the touched files, treat those edits as expected output and continue with scope-aware review.
