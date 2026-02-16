@@ -64,6 +64,7 @@ codex review "Focus on correctness, regressions, edge cases; list missing tests.
 - If you need manifest evidence, use the review wrapper:
   `TASK=<task-id> NOTES="Goal: ... | Summary: ... | Risks: ... | Questions (optional): ..." MANIFEST=<path> npm run review -- --manifest <path>`
 - In non-interactive environments, add `FORCE_CODEX_REVIEW=1` as needed.
+- In non-interactive environments, prefer the wrapper over raw `codex review`; it enforces `CODEX_REVIEW_TIMEOUT_SECONDS` and `CODEX_REVIEW_STALL_TIMEOUT_SECONDS` guardrails.
 
 ## Expected outputs
 - A prioritized list of findings.

@@ -155,6 +155,7 @@ Notes:
 - `/prompts:review-handoff` takes `TASK=<task-id> MANIFEST=<path> NOTES=<goal + summary + risks + optional questions>`, re-exports `MCP_RUNNER_TASK_ID`, and (repo-only) runs `node scripts/delegation-guard.mjs`, `node scripts/spec-guard.mjs --dry-run`, `npm run lint`, `npm run test`, optional `npm run eval:test`, plus `npm run review` (wraps `codex review` against the current diff and includes the latest run manifest path as evidence). It also reminds you to log approvals in `$MANIFEST` and mirror the evidence to the same docs/metrics/state targets.
 - In CI / `--no-interactive` pipelines (or when stdin is not a TTY, or `CODEX_REVIEW_NON_INTERACTIVE=1` / `CODEX_NON_INTERACTIVE=1` / `CODEX_NO_INTERACTIVE=1`), `npm run review` prints the review handoff prompt (including evidence paths) and exits successfully instead of invoking `codex review`. Set `FORCE_CODEX_REVIEW=1` to run `codex review` in those environments.
 - When forcing non-interactive review execution, `npm run review` enforces a timeout (`CODEX_REVIEW_TIMEOUT_SECONDS`, default `900`). Set `CODEX_REVIEW_TIMEOUT_SECONDS=0` to disable the timeout.
+- Forced non-interactive review execution also enforces a no-output stall timeout (`CODEX_REVIEW_STALL_TIMEOUT_SECONDS`, default `600`). Set `CODEX_REVIEW_STALL_TIMEOUT_SECONDS=0` to disable the stall guard.
 - Always trigger diagnostics and review workflows through these prompts whenever you run the orchestrator so contributors consistently execute the required command sequences and capture auditable manifests.
 
 ### Identifier Guardrails

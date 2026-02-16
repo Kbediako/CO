@@ -34,6 +34,7 @@ Notes:
 - In CI or when `CODEX_REVIEW_NON_INTERACTIVE=1`/`CODEX_NON_INTERACTIVE=1` (or `CODEX_NO_INTERACTIVE=1`) is set, the wrapper prints a “review handoff” prompt and exits unless `FORCE_CODEX_REVIEW=1` is set.
 - To force execution in those environments: `FORCE_CODEX_REVIEW=1 CODEX_REVIEW_NON_INTERACTIVE=1 TASK=<task-id> NOTES="..." MANIFEST=<path> npm run review -- --manifest <path>`.
 - Forced non-interactive runs enforce a timeout (`CODEX_REVIEW_TIMEOUT_SECONDS`, default `900`); set `CODEX_REVIEW_TIMEOUT_SECONDS=0` to disable.
+- Forced non-interactive runs also enforce a no-output stall timeout (`CODEX_REVIEW_STALL_TIMEOUT_SECONDS`, default `600`); set `CODEX_REVIEW_STALL_TIMEOUT_SECONDS=0` to disable.
 - `npm run review` writes artifacts under `<runDir>/review/` (`runDir` is `CODEX_ORCHESTRATOR_RUN_DIR` when set; otherwise `dirname(MANIFEST)`).
 - Prompt artifact: `<runDir>/review/prompt.txt` (always).
 - Review transcript: `<runDir>/review/output.log` (when `codex review` runs, for example with `FORCE_CODEX_REVIEW=1`).
