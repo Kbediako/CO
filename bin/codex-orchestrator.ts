@@ -1362,6 +1362,10 @@ Commands:
   version | --version
 
   help                      Show this message.
+
+Notes:
+  RLM recursion guidance: docs/guides/rlm-recursion-v2.md
+  Cloud-mode preflight/fallback guide: docs/guides/cloud-mode-preflight.md
 `);
 }
 

@@ -151,7 +151,8 @@
           "command": "npm run review",
           "env": {
             "DIFF_BUDGET_STAGE": "1",
-            "CODEX_REVIEW_NON_INTERACTIVE": "1"
+            "CODEX_REVIEW_NON_INTERACTIVE": "1",
+            "NOTES": "Goal: implementation gate review handoff | Summary: automated prompt with manifest evidence + scope hints | Risks: review output depends on local Codex CLI capabilities"
           }
         }
       ]
@@ -183,7 +184,8 @@
           "command": "npm run review",
           "env": {
             "SKIP_DIFF_BUDGET": "1",
-            "CODEX_REVIEW_NON_INTERACTIVE": "1"
+            "CODEX_REVIEW_NON_INTERACTIVE": "1",
+            "NOTES": "Goal: docs review gate review handoff | Summary: automated prompt with manifest evidence + scope hints | Risks: review output depends on local Codex CLI capabilities"
           }
         }
       ]

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generated_at": "2026-02-15",
+  "generated_at": "2026-02-16",
   "entries": [
     {
       "path": ".agent/AGENTS.md",
@@ -696,6 +696,13 @@
       "cadence_days": 90
     },
     {
+      "path": ".agent/task/0966-review-modernization-docs-canary.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-16",
+      "cadence_days": 90
+    },
+    {
       "path": ".agent/task/ACTION_PLAN_TEMPLATE.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -1120,6 +1127,13 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/ACTION_PLAN-review-modernization-docs-canary.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-16",
       "cadence_days": 90
     },
     {
@@ -1732,6 +1746,13 @@
       "cadence_days": 90
     },
     {
+      "path": "docs/PRD-review-modernization-docs-canary.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-16",
+      "cadence_days": 90
+    },
+    {
       "path": "docs/PRD-rlm-help-cloud-stdout.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -2247,6 +2268,13 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/TECH_SPEC-review-modernization-docs-canary.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-16",
       "cadence_days": 90
     },
     {
@@ -2838,6 +2866,13 @@
       "cadence_days": 90
     },
     {
+      "path": "tasks/specs/0966-review-modernization-docs-canary.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-16",
+      "cadence_days": 90
+    },
+    {
       "path": "tasks/specs/README.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -3360,6 +3395,13 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-02-15",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/tasks-0966-review-modernization-docs-canary.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-16",
       "cadence_days": 90
     },
     {

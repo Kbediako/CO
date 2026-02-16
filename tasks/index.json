@@ -1246,6 +1246,22 @@
       },
       "created_at": "2026-02-15",
       "completed_at": null
+    },
+    {
+      "id": "0966",
+      "slug": "0966-review-modernization-docs-canary",
+      "title": "Review Modernization + Docs Discoverability + RLM Canary",
+      "path": "tasks/tasks-0966-review-modernization-docs-canary.md",
+      "kind": "plan",
+      "status": "in-progress",
+      "gate": {
+        "phase": "review-modernization-docs-canary-implementation",
+        "status": "succeeded",
+        "log": ".runs/0966-review-modernization-docs-canary/cli/2026-02-16T02-07-10-231Z-2d46951c/manifest.json",
+        "run_id": "2026-02-16T02-07-10-231Z-2d46951c"
+      },
+      "created_at": "2026-02-16",
+      "completed_at": null
     }
   ],
   "specs": [
@@ -1503,6 +1519,22 @@
         "task": "tasks/tasks-0965-rlm-help-cloud-stdout.md",
         "agent_task": ".agent/task/0965-rlm-help-cloud-stdout.md",
         "docs": "docs/TECH_SPEC-rlm-help-cloud-stdout.md"
+      }
+    },
+    {
+      "id": "20260216-0966-review-modernization-docs-canary",
+      "title": "Review Modernization + Docs Discoverability + RLM Canary",
+      "relates_to": "tasks/tasks-0966-review-modernization-docs-canary.md",
+      "risk": "low",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-02-16",
+      "paths": {
+        "spec": "tasks/specs/0966-review-modernization-docs-canary.md",
+        "task": "tasks/tasks-0966-review-modernization-docs-canary.md",
+        "agent_task": ".agent/task/0966-review-modernization-docs-canary.md",
+        "docs": "docs/TECH_SPEC-review-modernization-docs-canary.md"
       }
     }
   ]

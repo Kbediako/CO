@@ -3,15 +3,17 @@
  * Helper to launch `codex review` non-interactively with the latest run manifest
  * path included as evidence for reviewers.
  *
- * Note: `codex-cli` currently rejects combining diff-scoping flags (`--uncommitted`,
- * `--base`, `--commit`) with a custom prompt. This wrapper always supplies a custom
- * prompt (to include manifest evidence), so it invokes `codex review <PROMPT>` and
- * embeds any requested scope hints (base/commit) into the prompt text instead.
+ * Note: some codex CLI versions reject combining diff-scoping flags
+ * (`--uncommitted`, `--base`, `--commit`) with a custom prompt. This wrapper
+ * always supplies a custom prompt (to include manifest evidence), so it will
+ * try real scope flags first and fall back to embedding scope hints into the
+ * prompt if the CLI rejects the flag/prompt combination.
  */
 
 import { execFile, spawn } from 'node:child_process';
 import type { ChildProcess, StdioOptions } from 'node:child_process';
-import { readFile, readdir, stat } from 'node:fs/promises';
+import { createWriteStream } from 'node:fs';
+import { mkdir, readFile, readdir, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import { promisify } from 'node:util';
@@ -24,6 +26,8 @@ import { collectManifests, resolveEnvironmentPaths } from './lib/run-manifests.j
 const execFileAsync = promisify(execFile);
 const { repoRoot, runsRoot: defaultRunsDir } = resolveEnvironmentPaths();
 const DEFAULT_NON_INTERACTIVE_REVIEW_TIMEOUT_SECONDS = 15 * 60;
+const REVIEW_ARTIFACTS_DIRNAME = 'review';
+const REVIEW_OUTPUT_PREVIEW_LIMIT = 32_768;
 
 interface CliOptions {
   manifest?: string;
@@ -211,9 +215,7 @@ async function main(): Promise<void> {
   }
   const manifestPath = await resolveManifestPath(options);
 
-  if (!(await hasReviewCommand())) {
-    throw new Error('codex CLI is missing the `review` subcommand (or is not installed).');
-  }
+  await ensureReviewCommandAvailable();
 
   const relativeManifest = path.relative(repoRoot, manifestPath);
   const taskLabel = process.env.TASK ?? process.env.MCP_RUNNER_TASK_ID ?? options.task ?? 'unknown-task';
@@ -258,8 +260,8 @@ async function main(): Promise<void> {
     promptLines.push('', `Diff budget override: ${diffBudgetOverride}`);
   }
 
-  const reviewArgs = buildReviewArgs(options, promptLines.join('\n'));
-  const { command, args } = resolveReviewCommand(reviewArgs);
+  const prompt = promptLines.join('\n');
+  const artifactPaths = await prepareReviewArtifacts(manifestPath, prompt);
   const nonInteractive = options.nonInteractive ?? shouldForceNonInteractive();
   const reviewEnv = { ...process.env };
   const stdinIsTTY = process.stdin?.isTTY === true;
@@ -280,14 +282,19 @@ async function main(): Promise<void> {
   ) {
     console.log('Codex review handoff (non-interactive):');
     console.log('---');
-    console.log(promptLines.join('\n'));
+    console.log(prompt);
     console.log('---');
+    console.log(`Review prompt saved to: ${path.relative(repoRoot, artifactPaths.promptPath)}`);
     console.log('Set FORCE_CODEX_REVIEW=1 to invoke `codex review` in this environment.');
     return;
   }
+
+  await ensureReviewCommandAvailable();
+  const scopedReviewArgs = buildReviewArgs(options, prompt, { includeScopeFlags: true });
+  const resolvedScoped = resolveReviewCommand(scopedReviewArgs);
+  console.log(`Review prompt saved to: ${path.relative(repoRoot, artifactPaths.promptPath)}`);
+  console.log(`Review output log: ${path.relative(repoRoot, artifactPaths.outputLogPath)}`);
   console.log(`Launching Codex review (evidence: ${relativeManifest})`);
-  const stdio: StdioOptions = nonInteractive ? ['ignore', 'inherit', 'inherit'] : 'inherit';
-  const child: ChildProcess = spawn(command, args, { stdio, env: reviewEnv });
   const timeoutMs = resolveReviewTimeoutMs(nonInteractive);
   if (timeoutMs !== null) {
     console.log(
@@ -295,32 +302,94 @@ async function main(): Promise<void> {
     );
   }
 
-  await waitForChildExit(child, timeoutMs);
+  try {
+    await runCodexReview({
+      command: resolvedScoped.command,
+      args: resolvedScoped.args,
+      env: reviewEnv,
+      stdio: nonInteractive ? ['ignore', 'pipe', 'pipe'] : ['inherit', 'pipe', 'pipe'],
+      timeoutMs,
+      outputLogPath: artifactPaths.outputLogPath
+    });
+    console.log(`Review output saved to: ${path.relative(repoRoot, artifactPaths.outputLogPath)}`);
+  } catch (error) {
+    if (shouldRetryWithoutScopeFlags(error)) {
+      console.log('[run-review] codex CLI rejected scope flags with a custom prompt; retrying without flags.');
+      const unscopedArgs = buildReviewArgs(options, prompt, { includeScopeFlags: false });
+      const resolvedUnscoped = resolveReviewCommand(unscopedArgs);
+      await runCodexReview({
+        command: resolvedUnscoped.command,
+        args: resolvedUnscoped.args,
+        env: reviewEnv,
+        stdio: nonInteractive ? ['ignore', 'pipe', 'pipe'] : ['inherit', 'pipe', 'pipe'],
+        timeoutMs,
+        outputLogPath: artifactPaths.outputLogPath
+      });
+      console.log(`Review output saved to: ${path.relative(repoRoot, artifactPaths.outputLogPath)}`);
+      return;
+    }
+    if (error instanceof CodexReviewError && error.timedOut) {
+      console.error(`Review output log (partial): ${path.relative(repoRoot, artifactPaths.outputLogPath)}`);
+    }
+    throw error;
+  }
 }
 
 main().catch((error) => {
   console.error('[run-review] failed:', error.message ?? error);
-  process.exitCode = 1;
+  process.exitCode = typeof error?.exitCode === 'number' ? error.exitCode : 1;
 });
 
-async function hasReviewCommand(): Promise<boolean> {
-  return new Promise((resolve) => {
-    const child = spawn('codex', ['--help'], { stdio: ['ignore', 'pipe', 'pipe'] });
+async function ensureReviewCommandAvailable(): Promise<void> {
+  const resolved = resolveCodexCommand(['--help'], process.env);
+  const hasReview = await new Promise<boolean>((resolve, reject) => {
+    const child = spawn(resolved.command, resolved.args, { stdio: ['ignore', 'pipe', 'pipe'] });
     let output = '';
     child.stdout?.on('data', (chunk) => {
       output += chunk.toString();
     });
-    child.once('error', () => resolve(false));
+    child.stderr?.on('data', (chunk) => {
+      output += chunk.toString();
+    });
+    child.once('error', (error) => reject(error instanceof Error ? error : new Error(String(error))));
     child.once('close', () => {
       resolve(output.includes(' review'));
     });
   });
+
+  if (!hasReview) {
+    throw new Error('codex CLI is missing the `review` subcommand (or is not installed).');
+  }
 }
 
-function buildReviewArgs(options: CliOptions, prompt: string): string[] {
+type ScopeFlagMode = 'uncommitted' | 'base' | 'commit';
+
+interface ReviewArgsOptions {
+  includeScopeFlags: boolean;
+}
+
+function resolveScopeFlag(options: CliOptions): { mode: ScopeFlagMode; args: string[] } | null {
+  if (options.commit) {
+    return { mode: 'commit', args: ['--commit', options.commit] };
+  }
+  if (options.base) {
+    return { mode: 'base', args: ['--base', options.base] };
+  }
+  if (options.uncommitted) {
+    return { mode: 'uncommitted', args: ['--uncommitted'] };
+  }
+  return null;
+}
+
+function buildReviewArgs(options: CliOptions, prompt: string, opts: ReviewArgsOptions): string[] {
   const args = ['review'];
   if (options.title) {
     args.push('--title', options.title);
+  }
+
+  const scopeFlag = resolveScopeFlag(options);
+  if (opts.includeScopeFlags && scopeFlag) {
+    args.push(...scopeFlag.args);
   }
 
   args.push(prompt);
@@ -369,6 +438,131 @@ async function buildScopeNotes(options: CliOptions): Promise<string[]> {
   }
 
   return lines;
+}
+
+interface ReviewArtifactPaths {
+  reviewDir: string;
+  promptPath: string;
+  outputLogPath: string;
+}
+
+function resolveReviewArtifactsDir(manifestPath: string): string {
+  const configuredRunDir = process.env.CODEX_ORCHESTRATOR_RUN_DIR?.trim();
+  const runDir = configuredRunDir && configuredRunDir.length > 0 ? configuredRunDir : path.dirname(manifestPath);
+  return path.join(runDir, REVIEW_ARTIFACTS_DIRNAME);
+}
+
+async function prepareReviewArtifacts(manifestPath: string, prompt: string): Promise<ReviewArtifactPaths> {
+  const reviewDir = resolveReviewArtifactsDir(manifestPath);
+  await mkdir(reviewDir, { recursive: true });
+
+  const promptPath = path.join(reviewDir, 'prompt.txt');
+  const outputLogPath = path.join(reviewDir, 'output.log');
+
+  await writeFile(promptPath, `${prompt}\n`, 'utf8');
+
+  return { reviewDir, promptPath, outputLogPath };
+}
+
+class CodexReviewError extends Error {
+  exitCode: number | null;
+  signal: NodeJS.Signals | null;
+  timedOut: boolean;
+  outputPreview: string;
+
+  constructor(
+    message: string,
+    options: {
+      exitCode: number | null;
+      signal: NodeJS.Signals | null;
+      timedOut: boolean;
+      outputPreview: string;
+    }
+  ) {
+    super(message);
+    this.name = 'CodexReviewError';
+    this.exitCode = options.exitCode;
+    this.signal = options.signal;
+    this.timedOut = options.timedOut;
+    this.outputPreview = options.outputPreview;
+  }
+}
+
+function shouldRetryWithoutScopeFlags(error: unknown): boolean {
+  if (!error || typeof error !== 'object') {
+    return false;
+  }
+  const preview = 'outputPreview' in error ? String((error as any).outputPreview ?? '') : '';
+  const message = 'message' in error ? String((error as any).message ?? '') : '';
+  const combined = `${message}\n${preview}`.toLowerCase();
+  return (
+    combined.includes('unknown option') ||
+    combined.includes('unknown flag') ||
+    combined.includes('unrecognized option') ||
+    combined.includes('cannot be used with') ||
+    combined.includes('cannot be combined') ||
+    combined.includes('incompatible with') ||
+    combined.includes('prompt cannot') ||
+    combined.includes('custom prompt') ||
+    combined.includes('with a prompt')
+  );
+}
+
+interface RunCodexReviewOptions {
+  command: string;
+  args: string[];
+  env: Record<string, string | undefined>;
+  stdio: StdioOptions;
+  timeoutMs: number | null;
+  outputLogPath: string;
+}
+
+async function runCodexReview(options: RunCodexReviewOptions): Promise<{ preview: string }> {
+  const child: ChildProcess = spawn(options.command, options.args, {
+    stdio: options.stdio,
+    env: options.env,
+    cwd: repoRoot
+  });
+
+  const outputStream = createWriteStream(options.outputLogPath, { flags: 'w' });
+  let preview = '';
+
+  const capture = (chunk: Buffer, target: NodeJS.WriteStream) => {
+    if (!outputStream.writableEnded && !outputStream.destroyed) {
+      outputStream.write(chunk);
+    }
+    target.write(chunk);
+    if (preview.length < REVIEW_OUTPUT_PREVIEW_LIMIT) {
+      const next = chunk.toString('utf8');
+      preview = `${preview}${next}`.slice(0, REVIEW_OUTPUT_PREVIEW_LIMIT);
+    }
+  };
+
+  const onStdout = (chunk: Buffer) => capture(chunk, process.stdout);
+  const onStderr = (chunk: Buffer) => capture(chunk, process.stderr);
+  child.stdout?.on('data', onStdout);
+  child.stderr?.on('data', onStderr);
+
+  const cleanup = () => {
+    child.stdout?.off('data', onStdout);
+    child.stderr?.off('data', onStderr);
+    try {
+      outputStream.end();
+    } catch {
+      // ignore best-effort close
+    }
+  };
+
+  try {
+    await waitForChildExit(child, options.timeoutMs, cleanup);
+    return { preview };
+  } catch (error) {
+    cleanup();
+    if (error instanceof CodexReviewError) {
+      error.outputPreview = preview || error.outputPreview;
+    }
+    throw error;
+  }
 }
 
 async function runDiffBudget(options: CliOptions): Promise<void> {
@@ -433,7 +627,11 @@ function resolveReviewTimeoutMs(nonInteractive: boolean): number | null {
   return Math.round(parsedSeconds * 1000);
 }
 
-async function waitForChildExit(child: ChildProcess, timeoutMs: number | null): Promise<void> {
+async function waitForChildExit(
+  child: ChildProcess,
+  timeoutMs: number | null,
+  onCleanup?: () => void
+): Promise<void> {
   await new Promise<void>((resolve, reject) => {
     let settled = false;
     let timeoutHandle: NodeJS.Timeout | undefined;
@@ -448,7 +646,8 @@ async function waitForChildExit(child: ChildProcess, timeoutMs: number | null): 
         clearTimeout(killHandle);
       }
       child.removeListener('error', onError);
-      child.removeListener('exit', onExit);
+      child.removeListener('close', onClose);
+      onCleanup?.();
     };
 
     const settleWithError = (error: Error) => {
@@ -464,7 +663,7 @@ async function waitForChildExit(child: ChildProcess, timeoutMs: number | null): 
       settleWithError(error instanceof Error ? error : new Error(String(error)));
     };
 
-    const onExit = (code: number | null, signal: NodeJS.Signals | null) => {
+    const onClose = (code: number | null, signal: NodeJS.Signals | null) => {
       if (settled) {
         return;
       }
@@ -475,11 +674,18 @@ async function waitForChildExit(child: ChildProcess, timeoutMs: number | null): 
         return;
       }
       const suffix = signal ? ` (signal ${signal})` : '';
-      reject(new Error(`codex review exited with code ${code}${suffix}`));
+      reject(
+        new CodexReviewError(`codex review exited with code ${code}${suffix}`, {
+          exitCode: code,
+          signal,
+          timedOut: false,
+          outputPreview: ''
+        })
+      );
     };
 
     child.once('error', onError);
-    child.once('exit', onExit);
+    child.once('close', onClose);
 
     if (timeoutMs !== null) {
       timeoutHandle = setTimeout(() => {
@@ -498,7 +704,15 @@ async function waitForChildExit(child: ChildProcess, timeoutMs: number | null): 
         killHandle.unref();
 
         settleWithError(
-          new Error(`codex review timed out after ${Math.round(timeoutMs / 1000)}s (set CODEX_REVIEW_TIMEOUT_SECONDS=0 to disable).`)
+          new CodexReviewError(
+            `codex review timed out after ${Math.round(timeoutMs / 1000)}s (set CODEX_REVIEW_TIMEOUT_SECONDS=0 to disable).`,
+            {
+              exitCode: 1,
+              signal: null,
+              timedOut: true,
+              outputPreview: ''
+            }
+          )
         );
       }, timeoutMs);
       timeoutHandle.unref();

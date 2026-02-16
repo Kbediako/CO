@@ -6,7 +6,7 @@ This guide is the canonical reference for ad-hoc reviews outside pipelines. Use 
 - Uncommitted diff: `codex review --uncommitted`
 - Base branch: `codex review --base <branch>`
 - Commit: `codex review --commit <sha>`
-- Custom focus: `codex review "<custom instructions>"` (cannot be combined with `--uncommitted/--base/--commit`)
+- Custom focus: `codex review "<custom instructions>"` (newer Codex versions can combine this with `--uncommitted/--base/--commit`; if yours rejects it, drop the scope flag or use the wrapper below which falls back automatically)
 
 ## Use during implementation (recommended)
 - Run a quick standalone review after each meaningful chunk of work to catch issues early.
@@ -34,6 +34,9 @@ Notes:
 - In CI or when `CODEX_REVIEW_NON_INTERACTIVE=1`/`CODEX_NON_INTERACTIVE=1` (or `CODEX_NO_INTERACTIVE=1`) is set, the wrapper prints a “review handoff” prompt and exits unless `FORCE_CODEX_REVIEW=1` is set.
 - To force execution in those environments: `FORCE_CODEX_REVIEW=1 CODEX_REVIEW_NON_INTERACTIVE=1 TASK=<task-id> NOTES="..." MANIFEST=<path> npm run review -- --manifest <path>`.
 - Forced non-interactive runs enforce a timeout (`CODEX_REVIEW_TIMEOUT_SECONDS`, default `900`); set `CODEX_REVIEW_TIMEOUT_SECONDS=0` to disable.
+- `npm run review` writes artifacts under `<runDir>/review/` (`runDir` is `CODEX_ORCHESTRATOR_RUN_DIR` when set; otherwise `dirname(MANIFEST)`).
+- Prompt artifact: `<runDir>/review/prompt.txt` (always).
+- Review transcript: `<runDir>/review/output.log` (when `codex review` runs, for example with `FORCE_CODEX_REVIEW=1`).
 
 ## Expected outputs
 - `codex review`: prioritized findings; no working tree edits.
