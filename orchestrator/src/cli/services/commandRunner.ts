@@ -223,7 +223,6 @@ export async function runCommandStage(
     try {
       result = await runner.run({
         command: stage.command,
-        args: [],
         cwd: stage.cwd ?? env.repoRoot,
         env: execEnv,
         sessionId: sessionId ?? undefined,

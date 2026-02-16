@@ -52,6 +52,19 @@ Skip subagents when all conditions are true:
 - Include objective, scope, constraints, acceptance criteria, and expected output format.
 - Require concise summaries and evidence paths; avoid long logs in chat.
 
+4a) Declare write policy and track ownership against git status
+- Capture a baseline before spawning: `git status --porcelain`.
+- Declare each stream as either:
+  - `read-only` (research/scout/review), or
+  - `write-enabled` (implementation/tests).
+- For `read-only` streams, include an explicit "no file edits" constraint.
+- After each `wait`, compare status against baseline and map changed files to stream ownership.
+- Treat in-scope edits from active write-enabled streams as expected delegated output.
+- Escalate only for out-of-scope changes, overlapping ownership collisions, or edits appearing without an active stream owner.
+- If the agent surfaces a generic "unexpected local edits" pause prompt, treat it as a classification step: keep and continue when edits are in-scope; escalate only violations.
+- Prefer the built-in helper when available (`node scripts/subagent-edit-guard.mjs ...`); canonical command examples live in `docs/delegation-runner-workflow.md` (section `3a`). If the helper is not present in the current repo, use the same baseline/scope logic manually.
+- If `finish` exits non-zero, escalate only the reported `out_of_scope_paths` / `violations`.
+
 5) Run streams in parallel when independent
 - Spawn multiple subagents for independent streams.
 - Wait for all subagents to finish before final synthesis.
@@ -159,6 +172,7 @@ Do not treat wrapper handoff-only output as a completed review.
 - Do not skip delegation solely because there is only one implementation stream; single-stream delegation is valid for context offload.
 - Do not rely on human-readable agent names in TUI labels for control flow; use stream ownership and evidence paths as source of truth.
 - Do not end the parent work with unclosed collab agent ids.
+- Do not treat every delegated edit as "unexpected"; first verify whether the edit belongs to an active stream owner.
 
 ## Completion checklist
 

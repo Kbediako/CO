@@ -63,6 +63,13 @@ export interface DoctorUsageResult {
     total: number;
     top: { id: string; runs: number }[];
   };
+  adoption: {
+    exec_runs: number;
+    exec_share_pct: number;
+    gate_runs: number;
+    gate_share_pct: number;
+    recommendations: string[];
+  };
 }
 
 export async function runDoctorUsage(options: DoctorUsageOptions = {}): Promise<DoctorUsageResult> {
@@ -207,6 +214,19 @@ export async function runDoctorUsage(options: DoctorUsageOptions = {}): Promise<
     .slice(0, 10)
     .map(([id, runs]) => ({ id, runs }));
 
+  const execRuns = pipelines.get('exec') ?? 0;
+  const gateRuns = (pipelines.get('docs-review') ?? 0) + (pipelines.get('implementation-gate') ?? 0);
+  const execSharePct = statusCounts.total > 0 ? Math.round((execRuns / statusCounts.total) * 1000) / 10 : 0;
+  const gateSharePct = statusCounts.total > 0 ? Math.round((gateRuns / statusCounts.total) * 1000) / 10 : 0;
+  const adoptionRecommendations = buildAdoptionRecommendations({
+    totalRuns: statusCounts.total,
+    execRuns,
+    gateRuns,
+    rlmRuns,
+    cloudRuns,
+    collabRunsWithToolCalls
+  });
+
   const delegationErrors: string[] = [];
   let activeWithSubagents = 0;
   let totalSubagentManifests = 0;
@@ -272,6 +292,13 @@ export async function runDoctorUsage(options: DoctorUsageOptions = {}): Promise<
     pipelines: {
       total: pipelines.size,
       top: pipelineTop
+    },
+    adoption: {
+      exec_runs: execRuns,
+      exec_share_pct: execSharePct,
+      gate_runs: gateRuns,
+      gate_share_pct: gateSharePct,
+      recommendations: adoptionRecommendations
     }
   };
 }
@@ -333,6 +360,17 @@ export function formatDoctorUsageSummary(result: DoctorUsageResult): string[] {
     }
   }
 
+  lines.push(
+    `Pipeline adoption: exec=${result.adoption.exec_runs} (${result.adoption.exec_share_pct}%), ` +
+      `docs-review+implementation-gate=${result.adoption.gate_runs} (${result.adoption.gate_share_pct}%)`
+  );
+  if (result.adoption.recommendations.length > 0) {
+    lines.push('Adoption hints:');
+    for (const recommendation of result.adoption.recommendations) {
+      lines.push(`  - ${recommendation}`);
+    }
+  }
+
   if (result.delegation.errors.length > 0) {
     lines.push('Delegation scan warnings:');
     for (const warning of result.delegation.errors.slice(0, 3)) {
@@ -340,6 +378,45 @@ export function formatDoctorUsageSummary(result: DoctorUsageResult): string[] {
     }
   }
   return lines;
+}
+
+function buildAdoptionRecommendations(params: {
+  totalRuns: number;
+  execRuns: number;
+  gateRuns: number;
+  rlmRuns: number;
+  cloudRuns: number;
+  collabRunsWithToolCalls: number;
+}): string[] {
+  if (params.totalRuns <= 0) {
+    return [];
+  }
+  const hints: string[] = [];
+  const execShare = params.execRuns / params.totalRuns;
+  if (execShare >= 0.6) {
+    hints.push(
+      'Most runs are plain exec; prefer `codex-orchestrator start docs-review` or `start implementation-gate` for manifest-backed guardrails.'
+    );
+  }
+  if (params.gateRuns === 0) {
+    hints.push(
+      'No gate pipelines detected; use docs-review before implementation and implementation-gate before handoff.'
+    );
+  }
+  if (params.rlmRuns === 0) {
+    hints.push(
+      'No RLM runs detected; try `codex-orchestrator rlm --collab auto "<goal>"` for long-horizon or ambiguous tasks.'
+    );
+  }
+  if (params.cloudRuns === 0) {
+    hints.push(
+      'No cloud runs detected; configure CODEX_CLOUD_ENV_ID and run `codex-orchestrator start <pipeline> --cloud --target <stage-id>` for long-running stages.'
+    );
+  }
+  if (params.rlmRuns > 0 && params.collabRunsWithToolCalls === 0) {
+    hints.push('RLM is used without collab activity; ensure collab is enabled (`codex features enable collab`).');
+  }
+  return hints.slice(0, 3);
 }
 
 function extractRunIdFromManifestPath(manifestPath: string): string | null {

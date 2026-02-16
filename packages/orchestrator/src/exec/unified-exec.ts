@@ -26,7 +26,7 @@ export interface ExecCommandExecutionResult {
 
 export interface ExecCommandRequest<THandle extends ExecSessionHandle> {
   command: string;
-  args: string[];
+  args?: string[];
   cwd?: string;
   env: Record<string, string>;
   attempt: number;
@@ -130,7 +130,8 @@ export class UnifiedExecRunner<THandle extends ExecSessionHandle> {
   }
 
   async run(options: UnifiedExecRunOptions): Promise<UnifiedExecRunResult> {
-    const args = options.args ?? [];
+    const args = options.args;
+    const resolvedArgs = args ?? [];
     const invocationId = options.invocationId ?? this.idGenerator();
     const correlationId = this.idGenerator();
     const issuedHandle = this.handleService ? this.handleService.issueHandle(correlationId) : undefined;
@@ -154,7 +155,7 @@ export class UnifiedExecRunner<THandle extends ExecSessionHandle> {
     const metadata = {
       ...options.metadata,
       command: options.command,
-      args,
+      args: resolvedArgs,
       cwd: options.cwd,
       sessionId: lease.id,
       correlationId,
@@ -189,7 +190,7 @@ export class UnifiedExecRunner<THandle extends ExecSessionHandle> {
             attempt,
             correlationId,
             command: options.command,
-            args,
+            args: resolvedArgs,
             cwd: options.cwd,
             sandboxState,
             sessionId: lease.id,
@@ -593,7 +594,7 @@ function getErrorMessage(error: unknown): string {
 }
 
 const defaultExecutor: ExecCommandExecutor<ExecSessionHandle> = async (request) => {
-  const child = spawn(request.command, request.args, {
+  const child = spawn(request.command, request.args ?? [], {
     cwd: request.cwd,
     env: request.env,
     stdio: ['ignore', 'pipe', 'pipe']
