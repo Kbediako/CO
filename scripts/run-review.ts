@@ -587,6 +587,34 @@ interface RunCodexReviewOptions {
   outputLogPath: string;
 }
 
+function installSignalForwarders(child: ChildProcess, detached: boolean): () => void {
+  const signals: NodeJS.Signals[] = ['SIGINT', 'SIGTERM', 'SIGHUP'];
+  const handlers = new Map<NodeJS.Signals, () => void>();
+
+  const uninstall = () => {
+    for (const [signal, handler] of handlers.entries()) {
+      process.removeListener(signal, handler);
+    }
+    handlers.clear();
+  };
+
+  for (const signal of signals) {
+    const handler = () => {
+      signalChildProcess(child, signal, detached);
+      uninstall();
+      try {
+        process.kill(process.pid, signal);
+      } catch {
+        process.exitCode = signal === 'SIGINT' ? 130 : 143;
+      }
+    };
+    handlers.set(signal, handler);
+    process.once(signal, handler);
+  }
+
+  return uninstall;
+}
+
 function writeToStreamSafely(target: NodeJS.WriteStream, chunk: Buffer): void {
   if (target.destroyed || target.writableEnded) {
     return;
@@ -622,6 +650,7 @@ async function runCodexReview(options: RunCodexReviewOptions): Promise<{ preview
   });
 
   const outputStream = createWriteStream(options.outputLogPath, { flags: 'w' });
+  const uninstallSignalForwarders = installSignalForwarders(child, detached);
   let preview = '';
   let lastOutputAtMs = Date.now();
 
@@ -643,6 +672,7 @@ async function runCodexReview(options: RunCodexReviewOptions): Promise<{ preview
   child.stderr?.on('data', onStderr);
 
   const cleanup = () => {
+    uninstallSignalForwarders();
     child.stdout?.off('data', onStdout);
     child.stderr?.off('data', onStderr);
     try {
