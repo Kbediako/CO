@@ -1037,6 +1037,95 @@ describe('symbolic rlm loop', () => {
     expect(plannerPrompts[1]).toContain('output_var=summary');
   });
 
+  it('canary: reads a pointer and resolves final_var output', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'rlm-symbolic-'));
+    const repoRoot = tempDir;
+    const runDir = join(repoRoot, 'rlm');
+    const contextObject = await buildContextObject({
+      source: { type: 'text', value: 'alpha beta gamma delta epsilon' },
+      targetDir: join(runDir, 'context'),
+      chunking: { targetBytes: 32, overlapBytes: 0, strategy: 'byte' }
+    });
+
+    const baseState: RlmState = {
+      version: 1,
+      mode: 'symbolic',
+      context: {
+        object_id: contextObject.index.object_id,
+        index_path: relative(repoRoot, contextObject.indexPath),
+        chunk_count: contextObject.index.chunks.length
+      },
+      symbolic_iterations: [],
+      goal: 'Pointer canary',
+      validator: 'none',
+      roles: 'single',
+      maxIterations: 2,
+      maxMinutes: null,
+      iterations: []
+    };
+
+    const budgets: SymbolicBudgets = {
+      maxSubcallsPerIteration: 1,
+      maxSearchesPerIteration: 0,
+      maxChunkReadsPerIteration: 1,
+      maxBytesPerChunkRead: 64,
+      maxSnippetsPerSubcall: 1,
+      maxBytesPerSnippet: 64,
+      maxSubcallInputBytes: 512,
+      maxPlannerPromptBytes: 4096,
+      searchTopK: 5,
+      maxPreviewBytes: 32,
+      maxConcurrency: 1
+    };
+
+    const pointer = `ctx:${contextObject.index.object_id}#chunk:${contextObject.index.chunks[0].id}`;
+    const plans = [
+      JSON.stringify({
+        schema_version: 1,
+        intent: 'continue',
+        reads: [{ pointer, offset: 0, bytes: 8, reason: 'pointer-canary' }],
+        subcalls: [
+          {
+            purpose: 'summarize',
+            snippets: [{ pointer, offset: 0, bytes: 8 }],
+            output_var: 'summary',
+            max_input_bytes: 256
+          }
+        ]
+      }),
+      JSON.stringify({ schema_version: 1, intent: 'final', final_var: 'summary' })
+    ];
+    let planIndex = 0;
+
+    const result = await runSymbolicLoop({
+      goal: baseState.goal,
+      baseState,
+      maxIterations: 2,
+      maxMinutes: null,
+      repoRoot,
+      runDir,
+      contextStore: new ContextStore(contextObject),
+      budgets,
+      runPlanner: async () => plans[planIndex++] ?? plans[plans.length - 1],
+      runSubcall: async () => 'pointer summary output'
+    });
+
+    expect(result.exitCode).toBe(0);
+    expect(result.state.final?.final_answer).toBe('pointer summary output');
+    const firstIteration = result.state.symbolic_iterations[0];
+    expect(firstIteration.reads[0]).toEqual(
+      expect.objectContaining({ pointer, bytes: 8, reason: 'pointer-canary' })
+    );
+    expect(firstIteration.subcalls[0]?.output_var).toBe('summary');
+    expect(firstIteration.variable_bindings?.[0]).toEqual(
+      expect.objectContaining({
+        name: 'summary',
+        pointer: 'subcall:1:sc0001',
+        subcall_id: 'sc0001'
+      })
+    );
+  });
+
   it('retries then fails when final_var is unbound', async () => {
     tempDir = await mkdtemp(join(tmpdir(), 'rlm-symbolic-'));
     const repoRoot = tempDir;

@@ -213,6 +213,8 @@ Repo internals, development workflows, and deeper architecture notes (contributo
 - `docs/README.md`
 - `docs/diagnostics-prompt-guide.md` (first-run diagnostics prompt + expected outputs)
 - `docs/guides/collab-vs-mcp.md` (agent-first decision guide)
+- `docs/guides/rlm-recursion-v2.md` (RLM recursion reference)
+- `docs/guides/cloud-mode-preflight.md` (cloud-mode preflight + fallback guidance)
 
 ## RLM benchmark graphs
 
