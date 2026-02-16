@@ -40,6 +40,7 @@ interface RunOutputPayload {
   artifact_root: string;
   manifest: string;
   log_path: string | null;
+  summary: string | null;
 }
 
 async function main(): Promise<void> {
@@ -361,6 +362,10 @@ async function handlePlan(orchestrator: CodexOrchestrator, rawArgs: string[]): P
 
 async function handleRlm(orchestrator: CodexOrchestrator, rawArgs: string[]): Promise<void> {
   const { positionals, flags } = parseArgs(rawArgs);
+  if (isHelpRequest(positionals, flags)) {
+    printRlmHelp();
+    return;
+  }
   const goalFromArgs = positionals.length > 0 ? positionals.join(' ') : undefined;
   const goal = goalFromArgs ?? readStringFlag(flags, 'goal') ?? process.env.RLM_GOAL?.trim();
   if (!goal) {
@@ -512,13 +517,26 @@ async function withRunUi(
   }
 }
 
-function emitRunOutput(result: { manifest: { run_id: string; status: string; artifact_root: string; log_path: string | null } }, format: OutputFormat, label: string): void {
+function emitRunOutput(
+  result: {
+    manifest: {
+      run_id: string;
+      status: string;
+      artifact_root: string;
+      log_path: string | null;
+      summary?: string | null;
+    };
+  },
+  format: OutputFormat,
+  label: string
+): void {
   const payload: RunOutputPayload = {
     run_id: result.manifest.run_id,
     status: result.manifest.status,
     artifact_root: result.manifest.artifact_root,
     manifest: `${result.manifest.artifact_root}/manifest.json`,
-    log_path: result.manifest.log_path
+    log_path: result.manifest.log_path,
+    summary: result.manifest.summary ?? null
   };
   if (format === 'json') {
     console.log(JSON.stringify(payload, null, 2));
@@ -528,6 +546,12 @@ function emitRunOutput(result: { manifest: { run_id: string; status: string; art
   console.log(`Status: ${payload.status}`);
   console.log(`Manifest: ${payload.manifest}`);
   console.log(`Log: ${payload.log_path}`);
+  if (payload.summary) {
+    console.log('Summary:');
+    for (const line of payload.summary.split(/\r?\n/u)) {
+      console.log(`  ${line}`);
+    }
+  }
 }
 
 interface ParsedExecArgs {
@@ -1211,7 +1235,9 @@ function splitShellLikeCommand(command: string): string[] {
 }
 
 function isHelpRequest(positionals: string[], flags: ArgMap): boolean {
-  if (flags['help'] === true) {
+  // Treat any `--help` presence as a help request, even if a user accidentally
+  // supplies a value (our minimal argv parser would otherwise treat it as `--help <value>`).
+  if (flags['help'] !== undefined) {
     return true;
   }
   const first = positionals[0];
@@ -1405,5 +1431,24 @@ Subcommands:
 Examples:
   codex-orchestrator pr watch-merge --pr 211 --dry-run --quiet-minutes 10
   codex-orchestrator pr watch-merge --pr 211 --auto-merge --merge-method squash
+`);
+}
+
+function printRlmHelp(): void {
+  console.log(`Usage: codex-orchestrator rlm "<goal>" [options]
+
+Options:
+  --goal "<goal>"         Alternate way to set the goal (positional is preferred).
+  --task <id>             Override task identifier (defaults to MCP_RUNNER_TASK_ID).
+  --collab [auto|true|false]  Enable collab subagents (implies symbolic mode).
+  --validator <cmd|none>  Set validator command or disable validation.
+  --max-iterations <n>    Override max iterations (0 = unlimited with validator).
+  --max-minutes <n>       Optional time-based guardrail in minutes.
+  --roles <single|triad>  Choose single or triad role split.
+  --parent-run <id>       Link run to parent run id.
+  --approval-policy <p>   Record approval policy metadata.
+  --interactive | --ui    Enable read-only HUD when running in a TTY.
+  --no-interactive        Force disable HUD.
+  --help                  Show this message.
 `);
 }

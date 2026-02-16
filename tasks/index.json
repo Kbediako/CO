@@ -1230,6 +1230,22 @@
       },
       "created_at": "2026-02-14",
       "completed_at": "2026-02-15"
+    },
+    {
+      "id": "0965",
+      "slug": "0965-rlm-help-cloud-stdout",
+      "title": "RLM Help + Cloud Fallback Stdout",
+      "path": "tasks/tasks-0965-rlm-help-cloud-stdout.md",
+      "kind": "plan",
+      "status": "in-progress",
+      "gate": {
+        "phase": "rlm-help-cloud-stdout-implementation",
+        "status": "succeeded",
+        "log": ".runs/0965-rlm-help-cloud-stdout/cli/2026-02-16T00-29-52-337Z-458760fe/manifest.json",
+        "run_id": "2026-02-16T00-29-52-337Z-458760fe"
+      },
+      "created_at": "2026-02-15",
+      "completed_at": null
     }
   ],
   "specs": [
@@ -1471,6 +1487,22 @@
         "task": "tasks/tasks-0964-pr-watch-merge-cli-ship.md",
         "agent_task": ".agent/task/0964-pr-watch-merge-cli-ship.md",
         "docs": "docs/TECH_SPEC-pr-watch-merge-cli-ship.md"
+      }
+    },
+    {
+      "id": "20260215-0965-rlm-help-cloud-stdout",
+      "title": "RLM Help + Cloud Fallback Stdout",
+      "relates_to": "tasks/tasks-0965-rlm-help-cloud-stdout.md",
+      "risk": "low",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-02-15",
+      "paths": {
+        "spec": "tasks/specs/0965-rlm-help-cloud-stdout.md",
+        "task": "tasks/tasks-0965-rlm-help-cloud-stdout.md",
+        "agent_task": ".agent/task/0965-rlm-help-cloud-stdout.md",
+        "docs": "docs/TECH_SPEC-rlm-help-cloud-stdout.md"
       }
     }
   ]

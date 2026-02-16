@@ -373,3 +373,14 @@ Mirror status with `tasks/tasks-0914-npm-companion-package.md` and `.agent/task/
 - [x] Validation: required quality gates passed (delegation/spec guards, build, lint, full test suite, docs gates, diff-budget override, review handoff). Evidence: `.runs/0962-release-cloud-rlm-hardening/cli/2026-02-14T12-47-55-237Z-d45ad3bb/manifest.json`.
 - [x] Validation: implementation-gate manifest captured. Evidence: `.runs/0962-release-cloud-rlm-hardening/cli/2026-02-14T12-47-55-237Z-d45ad3bb/manifest.json`.
 - [x] Validation: standalone post-implementation review completed and findings resolved. Evidence: `out/0962-release-cloud-rlm-hardening/manual/post-implementation-standalone-review.log`.
+
+# Task List Snapshot — RLM Help + Cloud Fallback Stdout (0965)
+- **Update - 2026-02-15:** Task created; export `MCP_RUNNER_TASK_ID=0965-rlm-help-cloud-stdout`; guardrails required: `node scripts/delegation-guard.mjs`, `node scripts/spec-guard.mjs --dry-run`, `npm run build`, `npm run lint`, `npm run test`, `npm run docs:check`, `npm run docs:freshness`, `node scripts/diff-budget.mjs`, `npm run review`. Checklist mirror: `tasks/tasks-0965-rlm-help-cloud-stdout.md`, `.agent/task/0965-rlm-help-cloud-stdout.md`.
+- **Update - 2026-02-16:** Scout + docs-review + implementation-gate evidence captured. Evidence: `.runs/0965-rlm-help-cloud-stdout-scout/cli/2026-02-16T00-03-00-324Z-eada8d96/manifest.json`, `.runs/0965-rlm-help-cloud-stdout/cli/2026-02-16T00-32-57-606Z-2f80fb71/manifest.json`, `.runs/0965-rlm-help-cloud-stdout/cli/2026-02-16T00-29-52-337Z-458760fe/manifest.json`.
+- [x] Foundation: task scaffolding + mirrors registered. Evidence: `docs/TASKS.md`, `tasks/index.json`, `tasks/tasks-0965-rlm-help-cloud-stdout.md`, `.agent/task/0965-rlm-help-cloud-stdout.md`.
+- [x] Foundation: PRD + TECH_SPEC + ACTION_PLAN drafted. Evidence: `docs/PRD-rlm-help-cloud-stdout.md`, `tasks/specs/0965-rlm-help-cloud-stdout.md`, `docs/ACTION_PLAN-rlm-help-cloud-stdout.md`, `docs/TECH_SPEC-rlm-help-cloud-stdout.md`.
+- [x] Implementation: `rlm --help` UX fixed (never starts a run) and cloud fallback reason surfaced in `start` output. Evidence: `bin/codex-orchestrator.ts`, `tests/cli-command-surface.spec.ts`.
+- [x] Implementation: support docs added for initiatives 1–3 (RLM recursion v2 + cloud preflight). Evidence: `docs/guides/rlm-recursion-v2.md`, `docs/guides/cloud-mode-preflight.md`.
+- [x] Validation: required quality gates passed (delegation/spec guards, build, lint, test, docs gates, diff-budget, review handoff). Evidence: `.runs/0965-rlm-help-cloud-stdout/cli/2026-02-16T00-29-52-337Z-458760fe/manifest.json`.
+- [x] Validation: manual E2E validation captured. Evidence: `out/0965-rlm-help-cloud-stdout/manual/e2e-validation.log`.
+- [x] Validation: standalone post-implementation elegance review completed. Evidence: `out/0965-rlm-help-cloud-stdout/manual/post-implementation-standalone-review.log`.

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generated_at": "2026-02-14",
+  "generated_at": "2026-02-15",
   "entries": [
     {
       "path": ".agent/AGENTS.md",
@@ -689,6 +689,13 @@
       "cadence_days": 90
     },
     {
+      "path": ".agent/task/0965-rlm-help-cloud-stdout.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-15",
+      "cadence_days": 90
+    },
+    {
       "path": ".agent/task/ACTION_PLAN_TEMPLATE.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -1116,6 +1123,13 @@
       "cadence_days": 90
     },
     {
+      "path": "docs/ACTION_PLAN-rlm-help-cloud-stdout.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-15",
+      "cadence_days": 90
+    },
+    {
       "path": "docs/ACTION_PLAN-rlm-orchestrator-validation.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -1312,6 +1326,13 @@
       "cadence_days": 90
     },
     {
+      "path": "docs/guides/cloud-mode-preflight.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-15",
+      "cadence_days": 90
+    },
+    {
       "path": "docs/guides/collab-vs-mcp.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -1337,6 +1358,13 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/guides/rlm-recursion-v2.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-15",
       "cadence_days": 90
     },
     {
@@ -1701,6 +1729,13 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/PRD-rlm-help-cloud-stdout.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-15",
       "cadence_days": 90
     },
     {
@@ -2212,6 +2247,13 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/TECH_SPEC-rlm-help-cloud-stdout.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-15",
       "cadence_days": 90
     },
     {
@@ -2789,6 +2831,13 @@
       "cadence_days": 90
     },
     {
+      "path": "tasks/specs/0965-rlm-help-cloud-stdout.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-15",
+      "cadence_days": 90
+    },
+    {
       "path": "tasks/specs/README.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -3304,6 +3353,13 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-02-14",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/tasks-0965-rlm-help-cloud-stdout.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-15",
       "cadence_days": 90
     },
     {

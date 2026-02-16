@@ -66,6 +66,24 @@ describe('codex-orchestrator command surface', () => {
     expect(stdout).toContain('Usage: codex-orchestrator setup');
   }, TEST_TIMEOUT);
 
+  it('prints rlm help without running when help flag is passed before goal', async () => {
+    const { stdout } = await runCli(['rlm', '--help']);
+    expect(stdout).toContain('Usage: codex-orchestrator rlm');
+    expect(stdout).not.toContain('Task:');
+  }, TEST_TIMEOUT);
+
+  it('prints rlm help without running when help flag is accidentally given a value', async () => {
+    const { stdout } = await runCli(['rlm', '--help', 'write tests']);
+    expect(stdout).toContain('Usage: codex-orchestrator rlm');
+    expect(stdout).not.toContain('Task:');
+  }, TEST_TIMEOUT);
+
+  it('prints rlm help without running when help flag follows the goal', async () => {
+    const { stdout } = await runCli(['rlm', 'write tests', '--help']);
+    expect(stdout).toContain('Usage: codex-orchestrator rlm');
+    expect(stdout).not.toContain('Task:');
+  }, TEST_TIMEOUT);
+
   it('prints doctor apply plan when wiring is missing', async () => {
     tempDir = await mkdtemp(join(tmpdir(), 'co-cli-doctor-apply-'));
     const env = {
