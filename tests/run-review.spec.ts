@@ -8,7 +8,7 @@ import { promisify } from 'node:util';
 const execFileAsync = promisify(execFile);
 const runReviewScript = join(process.cwd(), 'scripts', 'run-review.ts');
 const createdSandboxes: string[] = [];
-const shellBinary = process.env.SHELL && process.env.SHELL.trim().length > 0 ? process.env.SHELL : 'bash';
+const shellBinary = 'bash';
 
 function shellQuote(value: string): string {
   return `'${value.replace(/'/g, `'\\''`)}'`;
@@ -62,7 +62,7 @@ exit 2
 }
 
 function baseEnv(sandbox: string, codexBin: string): Record<string, string | undefined> {
-  return {
+  const env: Record<string, string | undefined> = {
     ...process.env,
     NODE_NO_WARNINGS: '1',
     SKIP_DIFF_BUDGET: '1',
@@ -72,6 +72,9 @@ function baseEnv(sandbox: string, codexBin: string): Record<string, string | und
     CODEX_CLI_BIN: codexBin,
     CODEX_ORCHESTRATOR_ROOT: sandbox
   };
+  delete env.CODEX_REVIEW_STALL_TIMEOUT_SECONDS;
+  delete env.CODEX_REVIEW_TIMEOUT_SECONDS;
+  return env;
 }
 
 async function runReviewCommand(
@@ -82,12 +85,12 @@ async function runReviewCommand(
     const { stdout, stderr } = await execFileAsync(
       process.execPath,
       ['--loader', 'ts-node/esm', runReviewScript, '--manifest', manifestPath, '--non-interactive'],
-      { cwd: process.cwd(), env, maxBuffer: 16 * 1024 * 1024 }
+      { cwd: process.cwd(), env, maxBuffer: 16 * 1024 * 1024, timeout: 30_000 }
     );
     return { exitCode: 0, stdout: String(stdout ?? ''), stderr: String(stderr ?? '') };
   } catch (error) {
     const err = error as NodeJS.ErrnoException & {
-      code?: number;
+      code?: number | string;
       stdout?: string | Buffer;
       stderr?: string | Buffer;
     };
@@ -103,7 +106,8 @@ async function runReviewCommand(
         : Buffer.isBuffer(err.stderr)
         ? err.stderr.toString('utf8')
         : '';
-    return { exitCode: Number(err.code ?? 1), stdout, stderr };
+    const exitCode = typeof err.code === 'number' && Number.isFinite(err.code) ? err.code : 1;
+    return { exitCode, stdout, stderr };
   }
 }
 
