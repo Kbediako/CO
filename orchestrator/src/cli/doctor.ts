@@ -189,7 +189,8 @@ export function runDoctor(cwd: string = process.cwd()): DoctorResult {
       enablement: [
         'Set CODEX_CLOUD_ENV_ID to a valid Codex Cloud environment id.',
         'Optional: set CODEX_CLOUD_BRANCH (must exist on origin).',
-        'Then run a pipeline stage in cloud mode with: codex-orchestrator start <pipeline> --cloud --target <stage-id>'
+        'Then run a pipeline stage in cloud mode with: codex-orchestrator start <pipeline> --cloud --target <stage-id>',
+        'If cloud preflight fails, CO falls back to mcp and records the reason in manifest.summary (surfaced in start output).'
       ]
     },
     delegation: {
