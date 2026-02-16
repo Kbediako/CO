@@ -12,6 +12,9 @@ const DEFAULT_MERGE_METHOD = 'squash';
 const CHECKRUN_PASS_CONCLUSIONS = new Set(['SUCCESS', 'SKIPPED', 'NEUTRAL']);
 const STATUS_CONTEXT_PASS_STATES = new Set(['SUCCESS']);
 const STATUS_CONTEXT_PENDING_STATES = new Set(['EXPECTED', 'PENDING']);
+const REQUIRED_BUCKET_PASS = new Set(['pass']);
+const REQUIRED_BUCKET_PENDING = new Set(['pending']);
+const REQUIRED_BUCKET_FAILED = new Set(['fail', 'cancel', 'skipping']);
 const MERGEABLE_STATES = new Set(['CLEAN', 'HAS_HOOKS', 'UNSTABLE']);
 const BLOCKED_REVIEW_DECISIONS = new Set(['CHANGES_REQUESTED', 'REVIEW_REQUIRED']);
 const DO_NOT_MERGE_LABEL = /do[\s_-]*not[\s_-]*merge/i;
@@ -71,6 +74,10 @@ query($owner:String!, $repo:String!, $number:Int!) {
 
 function normalizeEnum(value) {
   return typeof value === 'string' ? value.trim().toUpperCase() : '';
+}
+
+function normalizeBucket(value) {
+  return typeof value === 'string' ? value.trim().toLowerCase() : '';
 }
 
 function formatDuration(ms) {
@@ -326,7 +333,64 @@ function summarizeChecks(nodes) {
   return summary;
 }
 
-function buildStatusSnapshot(response) {
+export function summarizeRequiredChecks(entries) {
+  const summary = {
+    total: 0,
+    successCount: 0,
+    pending: [],
+    failed: []
+  };
+
+  if (!Array.isArray(entries)) {
+    return summary;
+  }
+
+  for (const entry of entries) {
+    if (!entry || typeof entry !== 'object') {
+      continue;
+    }
+    summary.total += 1;
+    const name = typeof entry.name === 'string' && entry.name.trim() ? entry.name.trim() : 'required-check';
+    const bucket = normalizeBucket(entry.bucket);
+    const state = normalizeEnum(entry.state);
+    const detailsUrl = typeof entry.link === 'string' ? entry.link : null;
+
+    if (REQUIRED_BUCKET_PASS.has(bucket)) {
+      summary.successCount += 1;
+      continue;
+    }
+    if (REQUIRED_BUCKET_PENDING.has(bucket)) {
+      summary.pending.push(name);
+      continue;
+    }
+    if (REQUIRED_BUCKET_FAILED.has(bucket)) {
+      summary.failed.push({
+        name,
+        state: state || bucket.toUpperCase() || 'UNKNOWN',
+        detailsUrl
+      });
+      continue;
+    }
+
+    if (STATUS_CONTEXT_PENDING_STATES.has(state)) {
+      summary.pending.push(name);
+      continue;
+    }
+    if (STATUS_CONTEXT_PASS_STATES.has(state)) {
+      summary.successCount += 1;
+      continue;
+    }
+    summary.failed.push({
+      name,
+      state: state || 'UNKNOWN',
+      detailsUrl
+    });
+  }
+
+  return summary;
+}
+
+export function buildStatusSnapshot(response, requiredChecks = null) {
   const pr = response?.data?.repository?.pullRequest;
   if (!pr) {
     throw new Error('GraphQL response missing pullRequest payload.');
@@ -345,6 +409,10 @@ function buildStatusSnapshot(response) {
   const contexts = pr.commits?.nodes?.[0]?.commit?.statusCheckRollup?.contexts?.nodes;
   const checkNodes = Array.isArray(contexts) ? contexts : [];
   const checks = summarizeChecks(checkNodes);
+  const requiredCheckSummary =
+    requiredChecks && typeof requiredChecks === 'object' && requiredChecks.total > 0 ? requiredChecks : null;
+  const gateChecks = requiredCheckSummary ?? checks;
+  const gateChecksSource = requiredCheckSummary ? 'required' : 'rollup';
 
   const reviewDecision = normalizeEnum(pr.reviewDecision);
   const mergeStateStatus = normalizeEnum(pr.mergeStateStatus);
@@ -361,8 +429,12 @@ function buildStatusSnapshot(response) {
   if (hasDoNotMergeLabel) {
     gateReasons.push('label:do-not-merge');
   }
-  if (checks.pending.length > 0) {
-    gateReasons.push(`checks_pending=${checks.pending.length}`);
+  if (gateChecks.pending.length > 0) {
+    gateReasons.push(
+      gateChecksSource === 'required'
+        ? `required_checks_pending=${gateChecks.pending.length}`
+        : `checks_pending=${gateChecks.pending.length}`
+    );
   }
   if (!MERGEABLE_STATES.has(mergeStateStatus)) {
     gateReasons.push(`merge_state=${mergeStateStatus || 'UNKNOWN'}`);
@@ -387,6 +459,8 @@ function buildStatusSnapshot(response) {
     hasDoNotMergeLabel,
     unresolvedThreadCount,
     checks,
+    requiredChecks: requiredCheckSummary,
+    gateChecksSource,
     gateReasons,
     readyToMerge: gateReasons.length === 0,
     headOid: pr.commits?.nodes?.[0]?.commit?.oid || null
@@ -394,23 +468,57 @@ function buildStatusSnapshot(response) {
 }
 
 function formatStatusLine(snapshot, quietRemainingMs) {
+  const requiredChecks = snapshot.requiredChecks;
   const failedNames = snapshot.checks.failed.map((item) => `${item.name}:${item.state}`).join(', ') || '-';
   const pendingNames = snapshot.checks.pending.join(', ') || '-';
+  const requiredFailedNames = requiredChecks
+    ? requiredChecks.failed.map((item) => `${item.name}:${item.state}`).join(', ') || '-'
+    : '-';
+  const requiredPendingNames = requiredChecks ? requiredChecks.pending.join(', ') || '-' : '-';
   const reasons = snapshot.gateReasons.join(', ') || 'none';
   return [
     `PR #${snapshot.number}`,
     `state=${snapshot.state}`,
     `merge_state=${snapshot.mergeStateStatus}`,
     `review=${snapshot.reviewDecision}`,
+    `gate_checks=${snapshot.gateChecksSource}`,
     `checks_ok=${snapshot.checks.successCount}/${snapshot.checks.total}`,
     `checks_pending=${snapshot.checks.pending.length}`,
     `checks_failed=${snapshot.checks.failed.length}`,
+    `required_checks_ok=${requiredChecks ? `${requiredChecks.successCount}/${requiredChecks.total}` : 'n/a'}`,
+    `required_checks_pending=${requiredChecks ? requiredChecks.pending.length : 'n/a'}`,
+    `required_checks_failed=${requiredChecks ? requiredChecks.failed.length : 'n/a'}`,
     `unresolved_threads=${snapshot.unresolvedThreadCount}`,
     `quiet_remaining=${formatDuration(quietRemainingMs)}`,
     `blocked_by=${reasons}`,
     `pending=[${pendingNames}]`,
-    `failed=[${failedNames}]`
+    `failed=[${failedNames}]`,
+    `required_pending=[${requiredPendingNames}]`,
+    `required_failed=[${requiredFailedNames}]`
   ].join(' | ');
+}
+
+async function fetchRequiredChecks(owner, repo, prNumber) {
+  try {
+    const result = await runGhJson([
+      'pr',
+      'checks',
+      String(prNumber),
+      '--required',
+      '--json',
+      'name,state,link,bucket',
+      '--repo',
+      `${owner}/${repo}`
+    ]);
+    const entries = Array.isArray(result) ? result : [];
+    const summary = summarizeRequiredChecks(entries);
+    if (summary.total === 0) {
+      return null;
+    }
+    return summary;
+  } catch {
+    return null;
+  }
 }
 
 async function fetchSnapshot(owner, repo, prNumber) {
@@ -426,7 +534,8 @@ async function fetchSnapshot(owner, repo, prNumber) {
     '-F',
     `number=${prNumber}`
   ]);
-  return buildStatusSnapshot(response);
+  const requiredChecks = await fetchRequiredChecks(owner, repo, prNumber);
+  return buildStatusSnapshot(response, requiredChecks);
 }
 
 async function attemptMerge({ prNumber, mergeMethod, deleteBranch, headOid }) {

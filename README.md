@@ -215,6 +215,7 @@ Repo internals, development workflows, and deeper architecture notes (contributo
 - `docs/guides/collab-vs-mcp.md` (agent-first decision guide)
 - `docs/guides/rlm-recursion-v2.md` (RLM recursion reference)
 - `docs/guides/cloud-mode-preflight.md` (cloud-mode preflight + fallback guidance)
+- `docs/guides/review-artifacts.md` (where `npm run review` writes prompt/output artifacts)
 
 ## RLM benchmark graphs
 

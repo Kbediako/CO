@@ -9,6 +9,17 @@ Archived task snapshots live on the task-archives branch.
 - 2025: https://github.com/Kbediako/CO/blob/task-archives/docs/TASKS-archive-2025.md
 - 2026: https://github.com/Kbediako/CO/blob/task-archives/docs/TASKS-archive-2026.md
 <!-- tasks-archive-index:end -->
+# Task List Snapshot - PR Watch Required-Checks Gate + Review Artifacts Guide (0967-pr-watch-required-checks-review-artifacts)
+- **Update - 2026-02-16:** Task created; export `MCP_RUNNER_TASK_ID=0967-pr-watch-required-checks-review-artifacts`; guardrails required: `node scripts/delegation-guard.mjs`, `node scripts/spec-guard.mjs --dry-run`, `npm run build`, `npm run lint`, `npm run test`, `npm run docs:check`, `npm run docs:freshness`, `node scripts/diff-budget.mjs`, `npm run review`. Checklist mirror: `tasks/tasks-0967-pr-watch-required-checks-review-artifacts.md`, `.agent/task/0967-pr-watch-required-checks-review-artifacts.md`.
+- [x] Foundation: task scaffolding + mirrors registered. Evidence: `docs/TASKS.md`, `tasks/index.json`, `tasks/tasks-0967-pr-watch-required-checks-review-artifacts.md`, `.agent/task/0967-pr-watch-required-checks-review-artifacts.md`.
+- [x] Foundation: PRD + TECH_SPEC + ACTION_PLAN drafted. Evidence: `docs/PRD-pr-watch-required-checks-review-artifacts.md`, `tasks/specs/0967-pr-watch-required-checks-review-artifacts.md`, `docs/ACTION_PLAN-pr-watch-required-checks-review-artifacts.md`, `docs/TECH_SPEC-pr-watch-required-checks-review-artifacts.md`.
+- [x] Foundation: delegation subagent run captured. Evidence: `.runs/0967-pr-watch-required-checks-review-artifacts-scout/cli/2026-02-16T03-02-47-094Z-aeacffc3/manifest.json`.
+- [x] Validation: docs-review manifest captured. Evidence: `.runs/0967-pr-watch-required-checks-review-artifacts/cli/2026-02-16T03-10-17-556Z-b70aa5e9/manifest.json`.
+- [x] Implementation: `pr watch-merge` now gates on required checks when available and keeps optional checks informational. Evidence: `scripts/lib/pr-watch-merge.js`, `tests/pr-watch-merge.spec.ts`, `out/0967-pr-watch-required-checks-review-artifacts/manual/e2e-validation.log`.
+- [x] Implementation: review artifacts guide is discoverable from shipped help/docs surfaces. Evidence: `docs/guides/review-artifacts.md`, `README.md`, `bin/codex-orchestrator.ts`, `tests/cli-command-surface.spec.ts`.
+- [x] Validation: implementation-gate passed. Evidence: `.runs/0967-pr-watch-required-checks-review-artifacts/cli/2026-02-16T03-21-12-925Z-f5d7f183/manifest.json`.
+- [x] Validation: standalone post-implementation elegance review completed. Evidence: `out/0967-pr-watch-required-checks-review-artifacts/manual/post-implementation-standalone-review.log`.
+
 # Task List Snapshot - PR Watch-Merge CLI Command (0964-pr-watch-merge-cli-ship)
 - **Update - 2026-02-14:** Task created; export `MCP_RUNNER_TASK_ID=0964-pr-watch-merge-cli-ship`; guardrails required: `node scripts/delegation-guard.mjs`, `node scripts/spec-guard.mjs --dry-run`, `npm run build`, `npm run lint`, `npm run test`, `npm run docs:check`, `npm run docs:freshness`, `node scripts/diff-budget.mjs`, `npm run review`. Checklist mirror: `tasks/tasks-0964-pr-watch-merge-cli-ship.md`, `.agent/task/0964-pr-watch-merge-cli-ship.md`.
 - [x] Foundation: task scaffolding + mirrors registered. Evidence: `docs/TASKS.md`, `tasks/index.json`, `tasks/tasks-0964-pr-watch-merge-cli-ship.md`, `.agent/task/0964-pr-watch-merge-cli-ship.md`.

@@ -1262,6 +1262,22 @@
       },
       "created_at": "2026-02-16",
       "completed_at": null
+    },
+    {
+      "id": "0967",
+      "slug": "0967-pr-watch-required-checks-review-artifacts",
+      "title": "PR Watch Required-Checks Gate + Review Artifacts Guide",
+      "path": "tasks/tasks-0967-pr-watch-required-checks-review-artifacts.md",
+      "kind": "plan",
+      "status": "completed",
+      "gate": {
+        "phase": "pr-watch-required-checks-review-artifacts-implementation",
+        "status": "succeeded",
+        "log": ".runs/0967-pr-watch-required-checks-review-artifacts/cli/2026-02-16T03-21-12-925Z-f5d7f183/manifest.json",
+        "run_id": "2026-02-16T03-21-12-925Z-f5d7f183"
+      },
+      "created_at": "2026-02-16",
+      "completed_at": "2026-02-16"
     }
   ],
   "specs": [
@@ -1535,6 +1551,22 @@
         "task": "tasks/tasks-0966-review-modernization-docs-canary.md",
         "agent_task": ".agent/task/0966-review-modernization-docs-canary.md",
         "docs": "docs/TECH_SPEC-review-modernization-docs-canary.md"
+      }
+    },
+    {
+      "id": "20260216-0967-pr-watch-required-checks-review-artifacts",
+      "title": "PR Watch Required-Checks Gate + Review Artifacts Guide",
+      "relates_to": "tasks/tasks-0967-pr-watch-required-checks-review-artifacts.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-02-16",
+      "paths": {
+        "spec": "tasks/specs/0967-pr-watch-required-checks-review-artifacts.md",
+        "task": "tasks/tasks-0967-pr-watch-required-checks-review-artifacts.md",
+        "agent_task": ".agent/task/0967-pr-watch-required-checks-review-artifacts.md",
+        "docs": "docs/TECH_SPEC-pr-watch-required-checks-review-artifacts.md"
       }
     }
   ]
