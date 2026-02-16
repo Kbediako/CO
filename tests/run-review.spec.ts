@@ -10,6 +10,10 @@ const runReviewScript = join(process.cwd(), 'scripts', 'run-review.ts');
 const createdSandboxes: string[] = [];
 const shellBinary = process.env.SHELL && process.env.SHELL.trim().length > 0 ? process.env.SHELL : 'bash';
 
+function shellQuote(value: string): string {
+  return `'${value.replace(/'/g, `'\\''`)}'`;
+}
+
 async function makeSandbox(): Promise<string> {
   const sandbox = await mkdtemp(join(tmpdir(), 'run-review-'));
   createdSandboxes.push(sandbox);
@@ -157,7 +161,7 @@ describe('scripts/run-review regression', () => {
     const codexBin = await makeFakeCodex(sandbox);
     const cmd = [
       'set -o pipefail',
-      `${process.execPath} --loader ts-node/esm ${runReviewScript} --manifest ${manifestPath} --non-interactive 2>/dev/null | head -n 1 >/dev/null`
+      `${shellQuote(process.execPath)} --loader ts-node/esm ${shellQuote(runReviewScript)} --manifest ${shellQuote(manifestPath)} --non-interactive 2>/dev/null | head -n 1 >/dev/null`
     ].join('\n');
 
     const { stdout, stderr } = await execFileAsync(shellBinary, ['-lc', cmd], {
