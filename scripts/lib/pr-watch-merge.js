@@ -404,6 +404,17 @@ export function resolveRequiredChecksSummary(freshSummary, previousSummary, fetc
   return null;
 }
 
+export function resolveCachedRequiredChecksSummary(previousCache, currentHeadOid) {
+  if (!previousCache || typeof previousCache !== 'object') {
+    return null;
+  }
+  const cachedHeadOid = typeof previousCache.headOid === 'string' ? previousCache.headOid : null;
+  if (!cachedHeadOid || !currentHeadOid || cachedHeadOid !== currentHeadOid) {
+    return null;
+  }
+  return hasRequiredChecksSummary(previousCache.summary) ? previousCache.summary : null;
+}
+
 export function buildStatusSnapshot(response, requiredChecks = null) {
   const pr = response?.data?.repository?.pullRequest;
   if (!pr) {
@@ -538,7 +549,7 @@ async function fetchRequiredChecks(owner, repo, prNumber) {
   }
 }
 
-async function fetchSnapshot(owner, repo, prNumber, previousRequiredChecks = null) {
+async function fetchSnapshot(owner, repo, prNumber, previousRequiredChecksCache = null) {
   const response = await runGhJson([
     'api',
     'graphql',
@@ -551,6 +562,8 @@ async function fetchSnapshot(owner, repo, prNumber, previousRequiredChecks = nul
     '-F',
     `number=${prNumber}`
   ]);
+  const currentHeadOid = response?.data?.repository?.pullRequest?.commits?.nodes?.[0]?.commit?.oid || null;
+  const previousRequiredChecks = resolveCachedRequiredChecksSummary(previousRequiredChecksCache, currentHeadOid);
   const requiredChecksResult = await fetchRequiredChecks(owner, repo, prNumber);
   const requiredChecks = resolveRequiredChecksSummary(
     requiredChecksResult.summary,
@@ -560,6 +573,11 @@ async function fetchSnapshot(owner, repo, prNumber, previousRequiredChecks = nul
   return {
     snapshot: buildStatusSnapshot(response, requiredChecks),
     requiredChecksForNextPoll: requiredChecks
+      ? {
+          headOid: currentHeadOid,
+          summary: requiredChecks
+        }
+      : null
   };
 }
 
@@ -671,14 +689,14 @@ async function runPrWatchMergeOrThrow(argv, options) {
   let quietWindowAnchorUpdatedAt = null;
   let quietWindowAnchorHeadOid = null;
   let lastMergeAttemptHeadOid = null;
-  let requiredChecksForNextPoll = null;
+  let requiredChecksForNextPollCache = null;
 
   while (Date.now() <= deadline) {
     let snapshot;
     try {
-      const fetched = await fetchSnapshot(owner, repo, prNumber, requiredChecksForNextPoll);
+      const fetched = await fetchSnapshot(owner, repo, prNumber, requiredChecksForNextPollCache);
       snapshot = fetched.snapshot;
-      requiredChecksForNextPoll = fetched.requiredChecksForNextPoll;
+      requiredChecksForNextPollCache = fetched.requiredChecksForNextPoll;
     } catch (error) {
       log(`Polling error: ${error instanceof Error ? error.message : String(error)} (retrying).`);
       await sleep(intervalMs);

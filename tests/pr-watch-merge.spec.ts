@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   buildStatusSnapshot,
+  resolveCachedRequiredChecksSummary,
   resolveRequiredChecksSummary,
   summarizeRequiredChecks
 } from '../scripts/lib/pr-watch-merge.js';
@@ -129,6 +130,36 @@ describe('resolveRequiredChecksSummary', () => {
     ]);
 
     const resolved = resolveRequiredChecksSummary(null, previous, false);
+    expect(resolved).toBeNull();
+  });
+});
+
+describe('resolveCachedRequiredChecksSummary', () => {
+  it('returns cached required checks when cache head matches current head', () => {
+    const summary = summarizeRequiredChecks([
+      { name: 'corelane', state: 'SUCCESS', bucket: 'pass', link: 'https://example.com/corelane' }
+    ]);
+    const resolved = resolveCachedRequiredChecksSummary(
+      {
+        headOid: 'abc123',
+        summary
+      },
+      'abc123'
+    );
+    expect(resolved).toEqual(summary);
+  });
+
+  it('invalidates cached required checks when head changes', () => {
+    const summary = summarizeRequiredChecks([
+      { name: 'corelane', state: 'SUCCESS', bucket: 'pass', link: 'https://example.com/corelane' }
+    ]);
+    const resolved = resolveCachedRequiredChecksSummary(
+      {
+        headOid: 'abc123',
+        summary
+      },
+      'def456'
+    );
     expect(resolved).toBeNull();
   });
 });
