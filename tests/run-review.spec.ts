@@ -86,18 +86,22 @@ async function runReviewCommand(
     );
     return { exitCode: 0, stdout: String(stdout ?? ''), stderr: String(stderr ?? '') };
   } catch (error) {
-    const err = error as NodeJS.ErrnoException & { code?: number; stdout?: unknown; stderr?: unknown };
+    const err = error as NodeJS.ErrnoException & {
+      code?: number;
+      stdout?: string | Buffer;
+      stderr?: string | Buffer;
+    };
     const stdout =
       typeof err.stdout === 'string'
         ? err.stdout
-        : err.stdout
-        ? Buffer.from(err.stdout as never).toString('utf8')
+        : Buffer.isBuffer(err.stdout)
+        ? err.stdout.toString('utf8')
         : '';
     const stderr =
       typeof err.stderr === 'string'
         ? err.stderr
-        : err.stderr
-        ? Buffer.from(err.stderr as never).toString('utf8')
+        : Buffer.isBuffer(err.stderr)
+        ? err.stderr.toString('utf8')
         : '';
     return { exitCode: Number(err.code ?? 1), stdout, stderr };
   }
