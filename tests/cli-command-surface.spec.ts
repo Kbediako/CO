@@ -54,6 +54,7 @@ describe('codex-orchestrator command surface', () => {
   it('prints pr help', async () => {
     const { stdout } = await runCli(['pr', '--help']);
     expect(stdout).toContain('Usage: codex-orchestrator pr <subcommand>');
+    expect(stdout).toContain('docs/guides/review-artifacts.md');
   }, TEST_TIMEOUT);
 
   it('prints pr watch-merge help', async () => {

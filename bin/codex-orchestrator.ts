@@ -1366,6 +1366,7 @@ Commands:
 Notes:
   RLM recursion guidance: docs/guides/rlm-recursion-v2.md
   Cloud-mode preflight/fallback guide: docs/guides/cloud-mode-preflight.md
+  Review artifacts guide: docs/guides/review-artifacts.md
 `);
 }
 
@@ -1435,6 +1436,9 @@ Subcommands:
 Examples:
   codex-orchestrator pr watch-merge --pr 211 --dry-run --quiet-minutes 10
   codex-orchestrator pr watch-merge --pr 211 --auto-merge --merge-method squash
+
+Guide:
+  Review artifacts (prompt + output log paths): docs/guides/review-artifacts.md
 `);
 }
 
