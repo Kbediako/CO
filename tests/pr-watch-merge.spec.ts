@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildStatusSnapshot, summarizeRequiredChecks } from '../scripts/lib/pr-watch-merge.js';
+import {
+  buildStatusSnapshot,
+  resolveRequiredChecksSummary,
+  summarizeRequiredChecks
+} from '../scripts/lib/pr-watch-merge.js';
 
 function makeResponse(checkNodes: unknown[]) {
   return {
@@ -94,5 +98,37 @@ describe('summarizeRequiredChecks', () => {
     expect(summary.successCount).toBe(1);
     expect(summary.pending).toEqual(['tests']);
     expect(summary.failed.map((item) => item.name)).toEqual(['release', 'security', 'docs']);
+  });
+});
+
+describe('resolveRequiredChecksSummary', () => {
+  it('prefers fresh required-check data when available', () => {
+    const fresh = summarizeRequiredChecks([
+      { name: 'corelane', state: 'SUCCESS', bucket: 'pass', link: 'https://example.com/corelane' }
+    ]);
+    const previous = summarizeRequiredChecks([
+      { name: 'legacy', state: 'SUCCESS', bucket: 'pass', link: 'https://example.com/legacy' }
+    ]);
+
+    const resolved = resolveRequiredChecksSummary(fresh, previous, true);
+    expect(resolved).toEqual(fresh);
+  });
+
+  it('reuses the previous required-check summary on transient fetch errors', () => {
+    const previous = summarizeRequiredChecks([
+      { name: 'corelane', state: 'SUCCESS', bucket: 'pass', link: 'https://example.com/corelane' }
+    ]);
+
+    const resolved = resolveRequiredChecksSummary(null, previous, true);
+    expect(resolved).toEqual(previous);
+  });
+
+  it('falls back to rollup when no required-check data is available and no fetch error occurred', () => {
+    const previous = summarizeRequiredChecks([
+      { name: 'corelane', state: 'SUCCESS', bucket: 'pass', link: 'https://example.com/corelane' }
+    ]);
+
+    const resolved = resolveRequiredChecksSummary(null, previous, false);
+    expect(resolved).toBeNull();
   });
 });

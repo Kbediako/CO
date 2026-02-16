@@ -18,10 +18,10 @@
 
 ### Implementation
 - [x] `pr watch-merge` uses required checks for merge gating when available. - Evidence: `scripts/lib/pr-watch-merge.js`, `tests/pr-watch-merge.spec.ts`.
-- [x] Optional pending checks no longer block merge readiness by default. - Evidence: `scripts/lib/pr-watch-merge.js`, `out/0967-pr-watch-required-checks-review-artifacts/manual/e2e-validation.log`, `tests/pr-watch-merge.spec.ts`.
+- [x] Optional pending checks no longer block merge readiness by default. - Evidence: `scripts/lib/pr-watch-merge.js`, `out/0967-pr-watch-required-checks-review-artifacts/manual/e2e-validation.log`, `out/0967-pr-watch-required-checks-review-artifacts/manual/live-pr-watch-validation.log`, `tests/pr-watch-merge.spec.ts`.
 - [x] Review artifacts guide added and discoverable. - Evidence: `docs/guides/review-artifacts.md`, `README.md`, `bin/codex-orchestrator.ts`, `tests/cli-command-surface.spec.ts`.
 
 ### Validation and handoff
-- [x] Required quality gates passed (build/lint/test/docs/review + diff budget). - Evidence: `.runs/0967-pr-watch-required-checks-review-artifacts/cli/2026-02-16T03-21-12-925Z-f5d7f183/manifest.json`, `out/0967-pr-watch-required-checks-review-artifacts/manual/e2e-validation.log`.
+- [x] Required quality gates passed (build/lint/test/docs/review + diff budget). - Evidence: `.runs/0967-pr-watch-required-checks-review-artifacts/cli/2026-02-16T03-21-12-925Z-f5d7f183/manifest.json`, `out/0967-pr-watch-required-checks-review-artifacts/manual/e2e-validation.log`, `out/0967-pr-watch-required-checks-review-artifacts/manual/live-pr-watch-validation.log`.
 - [x] Implementation-gate manifest captured. - Evidence: `.runs/0967-pr-watch-required-checks-review-artifacts/cli/2026-02-16T03-21-12-925Z-f5d7f183/manifest.json`.
 - [x] Standalone post-implementation elegance review completed. - Evidence: `out/0967-pr-watch-required-checks-review-artifacts/manual/post-implementation-standalone-review.log`.

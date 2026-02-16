@@ -10,6 +10,7 @@
 - Add a required-check snapshot fetch using `gh pr checks <pr> --required --json name,state,link,bucket`.
 - Derive a `requiredChecks` summary (`successCount`, `pending`, `failed`, `total`) from `bucket` values.
 - Use `requiredChecks` as the primary merge gate for check status when available.
+- Preserve the last successful `requiredChecks` snapshot across transient `gh` fetch failures so optional pending checks do not briefly re-block readiness.
 - Preserve current gates:
   - PR open + non-draft
   - no `do-not-merge` label

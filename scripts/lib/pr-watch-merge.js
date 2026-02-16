@@ -390,6 +390,20 @@ export function summarizeRequiredChecks(entries) {
   return summary;
 }
 
+function hasRequiredChecksSummary(summary) {
+  return Boolean(summary && typeof summary === 'object' && summary.total > 0);
+}
+
+export function resolveRequiredChecksSummary(freshSummary, previousSummary, fetchError = false) {
+  if (hasRequiredChecksSummary(freshSummary)) {
+    return freshSummary;
+  }
+  if (fetchError && hasRequiredChecksSummary(previousSummary)) {
+    return previousSummary;
+  }
+  return null;
+}
+
 export function buildStatusSnapshot(response, requiredChecks = null) {
   const pr = response?.data?.repository?.pullRequest;
   if (!pr) {
@@ -512,16 +526,19 @@ async function fetchRequiredChecks(owner, repo, prNumber) {
     ]);
     const entries = Array.isArray(result) ? result : [];
     const summary = summarizeRequiredChecks(entries);
-    if (summary.total === 0) {
-      return null;
-    }
-    return summary;
+    return {
+      summary: summary.total > 0 ? summary : null,
+      fetchError: false
+    };
   } catch {
-    return null;
+    return {
+      summary: null,
+      fetchError: true
+    };
   }
 }
 
-async function fetchSnapshot(owner, repo, prNumber) {
+async function fetchSnapshot(owner, repo, prNumber, previousRequiredChecks = null) {
   const response = await runGhJson([
     'api',
     'graphql',
@@ -534,8 +551,16 @@ async function fetchSnapshot(owner, repo, prNumber) {
     '-F',
     `number=${prNumber}`
   ]);
-  const requiredChecks = await fetchRequiredChecks(owner, repo, prNumber);
-  return buildStatusSnapshot(response, requiredChecks);
+  const requiredChecksResult = await fetchRequiredChecks(owner, repo, prNumber);
+  const requiredChecks = resolveRequiredChecksSummary(
+    requiredChecksResult.summary,
+    previousRequiredChecks,
+    requiredChecksResult.fetchError
+  );
+  return {
+    snapshot: buildStatusSnapshot(response, requiredChecks),
+    requiredChecksForNextPoll: requiredChecks
+  };
 }
 
 async function attemptMerge({ prNumber, mergeMethod, deleteBranch, headOid }) {
@@ -646,11 +671,14 @@ async function runPrWatchMergeOrThrow(argv, options) {
   let quietWindowAnchorUpdatedAt = null;
   let quietWindowAnchorHeadOid = null;
   let lastMergeAttemptHeadOid = null;
+  let requiredChecksForNextPoll = null;
 
   while (Date.now() <= deadline) {
     let snapshot;
     try {
-      snapshot = await fetchSnapshot(owner, repo, prNumber);
+      const fetched = await fetchSnapshot(owner, repo, prNumber, requiredChecksForNextPoll);
+      snapshot = fetched.snapshot;
+      requiredChecksForNextPoll = fetched.requiredChecksForNextPoll;
     } catch (error) {
       log(`Polling error: ${error instanceof Error ? error.message : String(error)} (retrying).`);
       await sleep(intervalMs);

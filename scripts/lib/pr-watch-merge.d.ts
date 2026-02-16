@@ -39,6 +39,12 @@ export function printPrWatchMergeHelp(options?: PrWatchMergeOptions): void;
 
 export function summarizeRequiredChecks(entries: unknown): PrWatchMergeCheckSummary;
 
+export function resolveRequiredChecksSummary(
+  freshSummary: PrWatchMergeCheckSummary | null,
+  previousSummary: PrWatchMergeCheckSummary | null,
+  fetchError?: boolean
+): PrWatchMergeCheckSummary | null;
+
 export function buildStatusSnapshot(
   response: unknown,
   requiredChecks?: PrWatchMergeCheckSummary | null
