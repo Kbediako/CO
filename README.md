@@ -176,6 +176,7 @@ codex-orchestrator doctor --usage
 ## Downstream usage cheatsheet (agent-first)
 
 - Bootstrap + wire everything: `codex-orchestrator setup --yes`
+- Low-friction docs->implementation guardrails: `codex-orchestrator flow --task <task-id>`
 - Validate + measure adoption locally: `codex-orchestrator doctor --usage --format json`
 - Delegation: `codex-orchestrator doctor --apply --yes`, then enable for a Codex run with: `codex -c 'mcp_servers.delegation.enabled=true' ...`
 - Collab (symbolic RLM subagents): `codex-orchestrator rlm --collab auto "<goal>"` (requires collab feature enabled in Codex)
@@ -189,6 +190,7 @@ codex-orchestrator devtools setup
 ## Common commands
 
 - `codex-orchestrator start <pipeline>` — run a pipeline.
+- `codex-orchestrator flow --task <task-id>` — run `docs-review` then `implementation-gate` in sequence.
 - `codex-orchestrator plan <pipeline>` — preview pipeline stages.
 - `codex-orchestrator exec <cmd>` — run a one-off command with the exec runtime.
 - `codex-orchestrator init codex` — install starter templates (`mcp-client.json`, `AGENTS.md`) into a repo.

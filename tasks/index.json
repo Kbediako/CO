@@ -1278,6 +1278,22 @@
       },
       "created_at": "2026-02-16",
       "completed_at": "2026-02-16"
+    },
+    {
+      "id": "0968",
+      "slug": "0968-downstream-usage-adoption-flow-guidance",
+      "title": "Downstream Usage Adoption + Guardrail Flow + Setup Guidance",
+      "path": "tasks/tasks-0968-downstream-usage-adoption-flow-guidance.md",
+      "kind": "plan",
+      "status": "completed",
+      "gate": {
+        "phase": "downstream-usage-adoption-flow-guidance-implementation",
+        "status": "succeeded",
+        "log": ".runs/0968-downstream-usage-adoption-flow-guidance/cli/2026-02-16T23-19-01-131Z-ec3b6038/manifest.json",
+        "run_id": "2026-02-16T23-19-01-131Z-ec3b6038"
+      },
+      "created_at": "2026-02-16",
+      "completed_at": "2026-02-16"
     }
   ],
   "specs": [
@@ -1567,6 +1583,22 @@
         "task": "tasks/tasks-0967-pr-watch-required-checks-review-artifacts.md",
         "agent_task": ".agent/task/0967-pr-watch-required-checks-review-artifacts.md",
         "docs": "docs/TECH_SPEC-pr-watch-required-checks-review-artifacts.md"
+      }
+    },
+    {
+      "id": "20260216-0968-downstream-usage-adoption-flow-guidance",
+      "title": "Downstream Usage Adoption + Guardrail Flow + Setup Guidance",
+      "relates_to": "tasks/tasks-0968-downstream-usage-adoption-flow-guidance.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-02-16",
+      "paths": {
+        "spec": "tasks/specs/0968-downstream-usage-adoption-flow-guidance.md",
+        "task": "tasks/tasks-0968-downstream-usage-adoption-flow-guidance.md",
+        "agent_task": ".agent/task/0968-downstream-usage-adoption-flow-guidance.md",
+        "docs": "docs/TECH_SPEC-downstream-usage-adoption-flow-guidance.md"
       }
     }
   ]
