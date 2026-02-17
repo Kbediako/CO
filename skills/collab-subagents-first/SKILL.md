@@ -156,6 +156,12 @@ Do not treat wrapper handoff-only output as a completed review.
 - If local codex is materially behind upstream, sync before diagnosing collab behavior differences.
 - If compatibility remains unstable, continue with non-collab execution path and document the degraded mode.
 
+## High-output guardrail (Playwright/browser tools)
+
+- Route Playwright-heavy work to a dedicated subagent stream so the parent thread does not absorb large browser logs/snapshots.
+- Keep raw Playwright output in artifacts and return only concise summary + evidence paths to the parent.
+- For these streams, explicitly close lifecycle loops (`spawn_agent` -> `wait` -> `close_agent`) before synthesis.
+
 ## Depth-limit guardrail
 
 - Collab spawn depth is bounded. At max depth, `spawn_agent` will fail and the branch must execute directly.

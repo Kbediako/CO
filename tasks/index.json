@@ -1294,6 +1294,22 @@
       },
       "created_at": "2026-02-16",
       "completed_at": "2026-02-16"
+    },
+    {
+      "id": "0969",
+      "slug": "0969-playwright-context-subagent-guardrails",
+      "title": "Playwright Context Control + Subagent Guardrails",
+      "path": "tasks/tasks-0969-playwright-context-subagent-guardrails.md",
+      "kind": "plan",
+      "status": "in-progress",
+      "gate": {
+        "phase": "playwright-context-subagent-guardrails-implementation",
+        "status": "succeeded",
+        "log": ".runs/0969-playwright-context-subagent-guardrails/cli/2026-02-17T08-17-00-403Z-7d994ee6/manifest.json",
+        "run_id": "2026-02-17T08-17-00-403Z-7d994ee6"
+      },
+      "created_at": "2026-02-17",
+      "completed_at": null
     }
   ],
   "specs": [
@@ -1599,6 +1615,22 @@
         "task": "tasks/tasks-0968-downstream-usage-adoption-flow-guidance.md",
         "agent_task": ".agent/task/0968-downstream-usage-adoption-flow-guidance.md",
         "docs": "docs/TECH_SPEC-downstream-usage-adoption-flow-guidance.md"
+      }
+    },
+    {
+      "id": "20260217-0969-playwright-context-subagent-guardrails",
+      "title": "Playwright Context Control + Subagent Guardrails",
+      "relates_to": "tasks/tasks-0969-playwright-context-subagent-guardrails.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-02-17",
+      "paths": {
+        "spec": "tasks/specs/0969-playwright-context-subagent-guardrails.md",
+        "task": "tasks/tasks-0969-playwright-context-subagent-guardrails.md",
+        "agent_task": ".agent/task/0969-playwright-context-subagent-guardrails.md",
+        "docs": "docs/TECH_SPEC-playwright-context-subagent-guardrails.md"
       }
     }
   ]

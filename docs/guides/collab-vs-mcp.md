@@ -23,6 +23,7 @@
 ## Notes
 - Do not use collab as a replacement for MCP when you need approvals, sandbox enforcement, or manifest-grade auditability.
 - Collab can be enabled per-run and should remain off by default unless explicitly required.
+- For Playwright-heavy flows, run browser steps in a dedicated subagent stream, keep Playwright MCP off outside that stream, and return artifact paths plus a terse summary instead of raw dumps.
 
 ## Cloud Mode (When Relevant)
 - Prefer cloud mode for long-running, highly parallel, or locally constrained work.
