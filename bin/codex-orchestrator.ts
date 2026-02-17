@@ -199,45 +199,75 @@ interface FlowPlanPreview {
   };
 }
 
-function normalizeFlowTargetToken(candidate: string): string {
+interface NormalizedFlowTargetToken {
+  literal: string;
+  literalLower: string;
+  stageTokenLower: string;
+  scoped: boolean;
+}
+
+function normalizeFlowTargetToken(candidate: string): NormalizedFlowTargetToken | null {
   const trimmed = candidate.trim();
   if (!trimmed) {
-    return '';
+    return null;
   }
-  const suffix = trimmed.includes(':') ? trimmed.split(':').pop() ?? trimmed : trimmed;
-  return suffix.toLowerCase();
+  const scoped = trimmed.includes(':');
+  const suffix = scoped ? trimmed.split(':').pop() ?? trimmed : trimmed;
+  if (!suffix.trim()) {
+    return null;
+  }
+  return {
+    literal: trimmed,
+    literalLower: trimmed.toLowerCase(),
+    stageTokenLower: suffix.toLowerCase(),
+    scoped
+  };
 }
 
 function flowPlanItemMatchesTarget(item: FlowPlanItem, candidate: string): boolean {
-  const trimmed = candidate.trim();
-  if (!trimmed) {
-    return false;
-  }
-  if (item.id === trimmed || item.id.toLowerCase() === trimmed.toLowerCase()) {
-    return true;
-  }
-
-  const normalized = normalizeFlowTargetToken(trimmed);
+  const normalized = normalizeFlowTargetToken(candidate);
   if (!normalized) {
     return false;
   }
-
-  if (item.id.toLowerCase().endsWith(`:${normalized}`)) {
+  if (item.id.toLowerCase() === normalized.literalLower) {
     return true;
   }
 
   const metadataStageId =
     item.metadata && typeof item.metadata['stageId'] === 'string'
-      ? (item.metadata['stageId'] as string)
+      ? (item.metadata['stageId'] as string).toLowerCase()
       : null;
-  if (metadataStageId && metadataStageId.toLowerCase() === normalized) {
-    return true;
-  }
 
   const aliases = Array.isArray(item.metadata?.['aliases'])
     ? (item.metadata?.['aliases'] as unknown[])
     : [];
-  return aliases.some((alias) => typeof alias === 'string' && alias.toLowerCase() === normalized);
+  const aliasTokens = aliases.filter((alias): alias is string => typeof alias === 'string')
+    .map((alias) => alias.toLowerCase());
+
+  if (normalized.scoped) {
+    if (metadataStageId && metadataStageId === normalized.literalLower) {
+      return true;
+    }
+    return aliasTokens.some((alias) => alias === normalized.literalLower);
+  }
+
+  if (item.id.toLowerCase().endsWith(`:${normalized.stageTokenLower}`)) {
+    return true;
+  }
+
+  if (
+    metadataStageId
+    && (
+      metadataStageId === normalized.stageTokenLower
+      || metadataStageId.endsWith(`:${normalized.stageTokenLower}`)
+    )
+  ) {
+    return true;
+  }
+
+  return aliasTokens.some(
+    (alias) => alias === normalized.stageTokenLower || alias.endsWith(`:${normalized.stageTokenLower}`)
+  );
 }
 
 function planIncludesStageId(
