@@ -48,6 +48,41 @@ function createManifest(runId: string, pipeline: PipelineDefinition): CliManifes
 }
 
 describe('ControlPlaneValidator', () => {
+  it('omits undefined optional task fields from run requests', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'control-plane-optional-task-'));
+    const env: EnvironmentPaths = {
+      repoRoot,
+      runsRoot: join(repoRoot, '.runs'),
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'autonomy-upgrade'
+    };
+
+    const pipeline: PipelineDefinition = {
+      id: 'pipeline-optional-task-fields',
+      title: 'Optional Task Fields',
+      stages: [{ kind: 'command', id: 'build', title: 'Build', command: 'echo build' }],
+      tags: ['general']
+    };
+
+    const manifest = createManifest('run-optional-task-fields', pipeline);
+    const task: TaskContext = {
+      id: 'autonomy-upgrade',
+      title: 'Autonomy Upgrade'
+    };
+
+    const request = buildRunRequestV2({
+      runId: manifest.run_id,
+      task,
+      pipeline,
+      manifest,
+      env
+    });
+
+    expect(Object.prototype.hasOwnProperty.call(request.task, 'description')).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(request.task, 'metadata')).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(request.task, 'slug')).toBe(false);
+  });
+
   it('validates requests and records drift in shadow mode', async () => {
     const repoRoot = await mkdtemp(join(tmpdir(), 'control-plane-shadow-'));
     const env: EnvironmentPaths = {

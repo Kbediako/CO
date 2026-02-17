@@ -2,7 +2,13 @@ import { describe, expect, it } from 'vitest';
 import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { appendCommandError, bootstrapManifest, loadManifest } from '../src/cli/run/manifest.js';
+import {
+  appendCommandError,
+  bootstrapManifest,
+  buildGuardrailSummary,
+  ensureGuardrailStatus,
+  loadManifest
+} from '../src/cli/run/manifest.js';
 import type { EnvironmentPaths } from '../src/cli/run/environment.js';
 import type { CliManifestCommand, PipelineDefinition } from '../src/cli/types.js';
 
@@ -177,5 +183,46 @@ describe('loadManifest', () => {
     expect(loaded.paths.manifestPath).toContain(
       join('.runs', targetTask, 'cli', runId, 'manifest.json')
     );
+  });
+});
+
+describe('buildGuardrailSummary', () => {
+  it('treats explicit spec-guard skip summaries as skipped', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'manifest-guardrail-skip-'));
+    const env: EnvironmentPaths = {
+      repoRoot,
+      runsRoot: join(repoRoot, '.runs'),
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'guardrail-task'
+    };
+
+    const pipeline: PipelineDefinition = {
+      id: 'guardrail-pipeline',
+      title: 'Guardrail Pipeline',
+      stages: [{ kind: 'command', id: 'spec-guard', title: 'Spec guard', command: 'echo skip' }]
+    };
+
+    const { manifest } = await bootstrapManifest('run-guardrail-skip', {
+      env,
+      pipeline,
+      parentRunId: null,
+      taskSlug: null,
+      approvalPolicy: null
+    });
+
+    const command = manifest.commands[0];
+    if (!command) {
+      throw new Error('Expected spec-guard command in manifest.');
+    }
+    command.status = 'succeeded';
+    command.summary = '[spec-guard] skipped: no guard script found';
+
+    const summary = buildGuardrailSummary(manifest);
+    expect(summary).toBe('Guardrails: spec-guard skipped (all 1 skipped).');
+
+    const snapshot = ensureGuardrailStatus(manifest);
+    expect(snapshot.counts.skipped).toBe(1);
+    expect(snapshot.counts.succeeded).toBe(0);
+    expect(snapshot.present).toBe(false);
   });
 });

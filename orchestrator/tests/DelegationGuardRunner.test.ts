@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest';
+import { join } from 'node:path';
 
 import {
+  buildDelegationGuardScriptCandidates,
   buildDelegationGuardEnv,
   hasRepoStrictMarkers,
   parseGuardProfile,
+  resolveDelegationGuardScriptPath,
   resolveEffectiveGuardProfile
 } from '../src/cli/utils/delegationGuardRunner.js';
 
@@ -63,5 +66,32 @@ describe('delegation guard env shaping', () => {
     expect(withTask.DELEGATION_GUARD_OVERRIDE_REASON).toBeUndefined();
     expect(strict.DELEGATION_GUARD_OVERRIDE_REASON).toBeUndefined();
     expect(existing.DELEGATION_GUARD_OVERRIDE_REASON).toBe('manual override');
+  });
+});
+
+describe('delegation guard script resolution', () => {
+  it('prefers repo-local script over package-local fallback', () => {
+    const repoRoot = '/repo';
+    const packageRoot = '/package';
+    const repoScript = join(repoRoot, 'scripts', 'delegation-guard.mjs');
+    const packageScript = join(packageRoot, 'scripts', 'delegation-guard.mjs');
+    const exists = (path: string) => path === repoScript || path === packageScript;
+
+    expect(resolveDelegationGuardScriptPath(repoRoot, packageRoot, exists)).toBe(repoScript);
+  });
+
+  it('falls back to package-local script when repo-local script is missing', () => {
+    const repoRoot = '/repo';
+    const packageRoot = '/package';
+    const packageScript = join(packageRoot, 'scripts', 'delegation-guard.mjs');
+    const exists = (path: string) => path === packageScript;
+
+    expect(resolveDelegationGuardScriptPath(repoRoot, packageRoot, exists)).toBe(packageScript);
+  });
+
+  it('deduplicates candidate paths when repoRoot and packageRoot are the same', () => {
+    const root = '/shared';
+    const candidates = buildDelegationGuardScriptCandidates(root, root);
+    expect(candidates).toEqual([join(root, 'scripts', 'delegation-guard.mjs')]);
   });
 });
