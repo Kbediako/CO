@@ -61,6 +61,7 @@ For runner + delegation coordination (short `--task` flow), see `docs/delegation
 - Delegate when the work spans >1 domain, touches more than ~2 files, needs verification/research, or is likely to run >10 minutes.
 - Spawn one delegate per workstream with narrow scope and acceptance criteria.
 - Keep delegation MCP enabled by default; enable other MCPs only when relevant to the task.
+- For Playwright-heavy browser flows, use a dedicated child stream and keep parent context lean: artifact-first evidence, short summary in chat, no raw log dumps.
 - Use `delegate.mode=question_only` unless the child truly needs full tool access.
 - Ask delegates for short, structured summaries and to write details into files/artifacts instead of long chat dumps.
 - Use `codex exec` only for pre-task triage (no task id yet) or when delegation is unavailable; copy outcomes into the spec once it exists.

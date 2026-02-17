@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp 564e7e9e915ccaa163ad8198458c7d96385b437f7bf4343a5e1538d3c455294e -->
+<!-- codex:instruction-stamp 626aef368c41875b943cb49b4a916511b979de96e2c2a49177297697899898f8 -->
 # Repository Agent Guidance
 
 ## Project 0303 — Codex Orchestrator Autonomy Enhancements
@@ -42,6 +42,7 @@
 - Delegation is mandatory for top-level tasks once a task id exists: spawn at least one subagent run using `MCP_RUNNER_TASK_ID=<task-id>-<stream>`, capture manifest evidence, and summarize in the main run. Use `DELEGATION_GUARD_OVERRIDE_REASON` only when delegation is impossible and record the justification.
 - Once a task id exists, prefer delegation for research, review, and planning work. Use `codex exec` only for pre-task triage (no task id yet) or when delegation is genuinely unavailable (technical/blocking limitation or explicit operational block), and set `DELEGATION_GUARD_OVERRIDE_REASON` with a clear justification.
 - Keep delegation MCP enabled by default (only MCP on by default). Enable other MCPs only when relevant to the task.
+- For Playwright-heavy browser work, use a dedicated subagent stream and keep parent context compact: store raw browser output in artifacts and return only a short summary plus evidence paths.
 - Avoid hard dependencies on a specific MCP server; use whatever MCPs are available and relevant to the specific task.
 - Follow `.agent/SOPs/oracle-usage.md` for Oracle runs (tool cap: 11 attachments; unique basenames; attachments-first workflow).
 

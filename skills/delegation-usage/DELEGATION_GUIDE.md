@@ -91,6 +91,12 @@ When using collab tools (`spawn_agent` / `wait` / `close_agent`):
 - On timeout/error paths, still close known ids before reporting failure.
 - If you see `agent thread limit reached`, stop spawning immediately, close known ids, and retry only after cleanup.
 
+## Playwright stream hygiene
+
+- Run Playwright-heavy steps in a dedicated child stream; keep browser output out of parent chat.
+- Prefer artifact-first reporting (paths/manifests/screenshots) and a short synthesis instead of raw logs.
+- Keep lifecycle strict for browser streams too: `spawn_agent` -> `wait` -> `close_agent`.
+
 ## RLM budget overrides (recommended defaults)
 
 If you want deeper recursion or longer wall-clock time for delegated runs, set RLM budgets on the delegation server:
