@@ -13,6 +13,7 @@ Use this playbook whenever handing off a review (`npm run review` or an implemen
    - Medium: 51–200 LOC or 4–10 files, touches scripts/docs/pipelines → 15–20 min.
    - Large: >200 LOC, >10 files, touches CI/guardrails/release paths or adds deps → 25–30 min.
    - Preferred monitor command (shipped): `codex-orchestrator pr watch-merge --pr <number> --quiet-minutes <window>` (add `--auto-merge` when merge is approved).
+     - The shipped monitor now blocks merge readiness when head-commit bot inline feedback has no human in-thread reply.
    - Fallback (repo script): `npm run pr:watch-merge -- --pr <number> --quiet-minutes <window>`.
    - Escalation path:
      - Escalate when merge attempts fail twice, required checks stay flaky for >30 minutes or >3 restarts, or any security/privacy finding appears.

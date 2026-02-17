@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   buildStatusSnapshot,
+  isHumanReviewActor,
   resolveCachedRequiredChecksSummary,
   resolveRequiredChecksSummary,
   summarizeRequiredChecks
@@ -82,6 +83,37 @@ describe('pr watch-merge required-check gating', () => {
     expect(snapshot.gateChecksSource).toBe('rollup');
     expect(snapshot.readyToMerge).toBe(false);
     expect(snapshot.gateReasons).toContain('checks_pending=1');
+    expect(snapshot.botFeedbackFetchError).toBe(false);
+  });
+
+  it('blocks merge readiness when unacknowledged bot inline feedback exists', () => {
+    const response = makeResponse([]);
+    const requiredChecks = summarizeRequiredChecks([
+      { name: 'corelane', state: 'SUCCESS', bucket: 'pass', link: 'https://example.com/corelane' }
+    ]);
+
+    const snapshot = buildStatusSnapshot(response, requiredChecks, {
+      fetchError: false,
+      unacknowledgedCount: 1
+    });
+
+    expect(snapshot.readyToMerge).toBe(false);
+    expect(snapshot.gateReasons).toContain('unacknowledged_bot_feedback=1');
+  });
+
+  it('fails closed when bot inline feedback cannot be fetched', () => {
+    const response = makeResponse([]);
+    const requiredChecks = summarizeRequiredChecks([
+      { name: 'corelane', state: 'SUCCESS', bucket: 'pass', link: 'https://example.com/corelane' }
+    ]);
+
+    const snapshot = buildStatusSnapshot(response, requiredChecks, {
+      fetchError: true,
+      unacknowledgedCount: 0
+    });
+
+    expect(snapshot.readyToMerge).toBe(false);
+    expect(snapshot.gateReasons).toContain('bot_feedback=unknown');
   });
 });
 
@@ -161,5 +193,33 @@ describe('resolveCachedRequiredChecksSummary', () => {
       'def456'
     );
     expect(resolved).toBeNull();
+  });
+});
+
+describe('isHumanReviewActor', () => {
+  it('requires non-bot actors before clearing feedback gates', () => {
+    expect(
+      isHumanReviewActor({
+        login: 'chatgpt-codex-connector[bot]',
+        type: 'Bot'
+      })
+    ).toBe(false);
+    expect(
+      isHumanReviewActor({
+        login: 'some-other-bot[bot]'
+      })
+    ).toBe(false);
+    expect(
+      isHumanReviewActor({
+        login: 'some-other-bot',
+        type: 'Bot'
+      })
+    ).toBe(false);
+    expect(
+      isHumanReviewActor({
+        login: 'maintainer',
+        type: 'User'
+      })
+    ).toBe(true);
   });
 });

@@ -27,6 +27,8 @@ export interface PrWatchMergeSnapshot {
   labels: string[];
   hasDoNotMergeLabel: boolean;
   unresolvedThreadCount: number;
+  unacknowledgedBotFeedbackCount: number;
+  botFeedbackFetchError: boolean;
   checks: PrWatchMergeCheckSummary;
   requiredChecks: PrWatchMergeCheckSummary | null;
   gateChecksSource: 'required' | 'rollup';
@@ -41,6 +43,16 @@ export interface PrWatchMergeRequiredChecksCache {
 }
 
 export function printPrWatchMergeHelp(options?: PrWatchMergeOptions): void;
+
+export function isHumanReviewActor(
+  user:
+    | {
+        login?: string | null;
+        type?: string | null;
+      }
+    | null
+    | undefined
+): boolean;
 
 export function summarizeRequiredChecks(entries: unknown): PrWatchMergeCheckSummary;
 
@@ -57,7 +69,11 @@ export function resolveCachedRequiredChecksSummary(
 
 export function buildStatusSnapshot(
   response: unknown,
-  requiredChecks?: PrWatchMergeCheckSummary | null
+  requiredChecks?: PrWatchMergeCheckSummary | null,
+  inlineBotFeedback?: {
+    fetchError: boolean;
+    unacknowledgedCount: number;
+  } | null
 ): PrWatchMergeSnapshot;
 
 export function runPrWatchMerge(argv: string[], options?: PrWatchMergeOptions): Promise<number>;

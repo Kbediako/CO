@@ -21,6 +21,8 @@
 - [x] Post-`exec` usage recommendation nudge is emitted in text mode when guidance applies. - Evidence: `bin/codex-orchestrator.ts`, `tests/cli-command-surface.spec.ts`.
 - [x] `flow` command runs `docs-review` then `implementation-gate` with existing run UI/output contracts. - Evidence: `bin/codex-orchestrator.ts`, `tests/cli-command-surface.spec.ts`, `README.md`, `docs/README.md`.
 - [x] Setup summary includes policy/skills guidance references for downstream users. - Evidence: `bin/codex-orchestrator.ts`, `tests/cli-command-surface.spec.ts`.
+- [x] Follow-up: scoped flow targets now accept scoped aliases without cross-pipeline matches. - Evidence: `bin/codex-orchestrator.ts`, `tests/cli-command-surface.spec.ts`.
+- [x] Follow-up: PR monitor blocks auto-merge when head-commit bot inline feedback is unacknowledged. - Evidence: `scripts/lib/pr-watch-merge.js`, `tests/pr-watch-merge.spec.ts`, `.agent/SOPs/review-loop.md`.
 
 ### Validation and handoff
 - [x] Required quality gates passed (build/lint/test/docs/review + diff budget). - Evidence: `.runs/0968-downstream-usage-adoption-flow-guidance/cli/2026-02-16T23-19-01-131Z-ec3b6038/manifest.json`.
