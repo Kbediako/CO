@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { existsSync } from 'node:fs';
-import { readFile } from 'node:fs/promises';
+import { readFile, readdir } from 'node:fs/promises';
 import { basename, join } from 'node:path';
 import process from 'node:process';
 
@@ -188,25 +188,66 @@ interface FlowTargetStageSelection {
   implementationGateTargetStageId?: string;
 }
 
-function planIncludesStageId(
+interface FlowPlanItem {
+  id: string;
+  metadata?: Record<string, unknown>;
+}
+
+interface FlowPlanPreview {
   plan: {
-    plan: {
-      items: Array<{ id: string; metadata?: Record<string, unknown> }>;
-    };
-  },
-  stageId: string
-): boolean {
-  const normalized = stageId.trim();
+    items: FlowPlanItem[];
+  };
+}
+
+function normalizeFlowTargetToken(candidate: string): string {
+  const trimmed = candidate.trim();
+  if (!trimmed) {
+    return '';
+  }
+  const suffix = trimmed.includes(':') ? trimmed.split(':').pop() ?? trimmed : trimmed;
+  return suffix.toLowerCase();
+}
+
+function flowPlanItemMatchesTarget(item: FlowPlanItem, candidate: string): boolean {
+  const trimmed = candidate.trim();
+  if (!trimmed) {
+    return false;
+  }
+  if (item.id === trimmed || item.id.toLowerCase() === trimmed.toLowerCase()) {
+    return true;
+  }
+
+  const normalized = normalizeFlowTargetToken(trimmed);
   if (!normalized) {
     return false;
   }
-  return plan.plan.items.some((item) => {
-    const metadataStageId =
-      item.metadata && typeof item.metadata['stageId'] === 'string'
-        ? (item.metadata['stageId'] as string)
-        : null;
-    return metadataStageId === normalized || item.id === normalized || item.id.endsWith(`:${normalized}`);
-  });
+
+  if (item.id.toLowerCase().endsWith(`:${normalized}`)) {
+    return true;
+  }
+
+  const metadataStageId =
+    item.metadata && typeof item.metadata['stageId'] === 'string'
+      ? (item.metadata['stageId'] as string)
+      : null;
+  if (metadataStageId && metadataStageId.toLowerCase() === normalized) {
+    return true;
+  }
+
+  const aliases = Array.isArray(item.metadata?.['aliases'])
+    ? (item.metadata?.['aliases'] as unknown[])
+    : [];
+  return aliases.some((alias) => typeof alias === 'string' && alias.toLowerCase() === normalized);
+}
+
+function planIncludesStageId(
+  plan: FlowPlanPreview,
+  stageId: string
+): boolean {
+  if (!stageId.trim()) {
+    return false;
+  }
+  return plan.plan.items.some((item) => flowPlanItemMatchesTarget(item, stageId));
 }
 
 async function resolveFlowTargetStageSelection(
@@ -218,10 +259,10 @@ async function resolveFlowTargetStageSelection(
     return {};
   }
 
-  const [docsPlan, implementationPlan] = await Promise.all([
+  const [docsPlan, implementationPlan] = (await Promise.all([
     orchestrator.plan({ pipelineId: 'docs-review', taskId }),
     orchestrator.plan({ pipelineId: 'implementation-gate', taskId })
-  ]);
+  ])) as [FlowPlanPreview, FlowPlanPreview];
 
   const docsReviewTargetStageId = planIncludesStageId(docsPlan, requestedTargetStageId)
     ? requestedTargetStageId
@@ -774,13 +815,31 @@ async function handleExec(rawArgs: string[]): Promise<void> {
   }
 
   if (outputMode === 'interactive') {
-    await maybeEmitExecAdoptionHint();
+    await maybeEmitExecAdoptionHint(env.taskId);
   }
 }
 
-async function maybeEmitExecAdoptionHint(): Promise<void> {
+async function shouldScanExecAdoptionHint(taskFilter: string | undefined): Promise<boolean> {
+  if (!taskFilter) {
+    return false;
+  }
+  const env = resolveEnvironmentPaths();
+  const taskCliRunsRoot = join(env.runsRoot, taskFilter, 'cli');
   try {
-    const usage = await runDoctorUsage({ windowDays: 7 });
+    const entries = await readdir(taskCliRunsRoot, { withFileTypes: true });
+    const runCount = entries.filter((entry) => entry.isDirectory()).length;
+    return runCount <= 150;
+  } catch {
+    return false;
+  }
+}
+
+async function maybeEmitExecAdoptionHint(taskFilter: string | undefined): Promise<void> {
+  try {
+    if (!(await shouldScanExecAdoptionHint(taskFilter))) {
+      return;
+    }
+    const usage = await runDoctorUsage({ windowDays: 7, taskFilter });
     const recommendation = usage.adoption.recommendations[0];
     if (!recommendation) {
       return;
