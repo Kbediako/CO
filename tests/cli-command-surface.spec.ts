@@ -142,6 +142,18 @@ describe('codex-orchestrator command surface', () => {
         'Target stage "docs-review:impl-alias" is not defined in docs-review or implementation-gate.'
       )
     });
+
+    await expect(
+      runCli(
+        ['flow', '--format', 'json', '--task', 'flow-target', '--target', ':impl-alias'],
+        env,
+        FLOW_TARGET_TEST_TIMEOUT
+      )
+    ).rejects.toMatchObject({
+      stderr: expect.stringContaining(
+        'Target stage ":impl-alias" is not defined in docs-review or implementation-gate.'
+      )
+    });
   }, FLOW_TARGET_TEST_TIMEOUT);
 
   it('prints rlm help without running when help flag is passed before goal', async () => {

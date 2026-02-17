@@ -215,6 +215,9 @@ function normalizeFlowTargetToken(candidate: string): NormalizedFlowTargetToken 
   const tokens = trimmed.split(':');
   const scoped = tokens.length > 1;
   const scopeToken = scoped ? (tokens[0] ?? '').trim().toLowerCase() : '';
+  if (scoped && !scopeToken) {
+    return null;
+  }
   const suffixToken = scoped ? (tokens[tokens.length - 1] ?? '').trim() : trimmed;
   if (!suffixToken) {
     return null;
