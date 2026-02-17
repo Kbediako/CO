@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { existsSync } from 'node:fs';
-import { readFile, readdir } from 'node:fs/promises';
+import { opendir, readFile } from 'node:fs/promises';
 import { basename, join } from 'node:path';
 import process from 'node:process';
 
@@ -855,12 +855,26 @@ async function shouldScanExecAdoptionHint(taskFilter: string | undefined): Promi
   }
   const env = resolveEnvironmentPaths();
   const taskCliRunsRoot = join(env.runsRoot, taskFilter, 'cli');
+  let handle: Awaited<ReturnType<typeof opendir>> | null = null;
   try {
-    const entries = await readdir(taskCliRunsRoot, { withFileTypes: true });
-    const runCount = entries.filter((entry) => entry.isDirectory()).length;
-    return runCount <= 150;
+    handle = await opendir(taskCliRunsRoot);
+    let runCount = 0;
+    for await (const entry of handle) {
+      if (!entry.isDirectory()) {
+        continue;
+      }
+      runCount += 1;
+      if (runCount > 150) {
+        return false;
+      }
+    }
+    return true;
   } catch {
     return false;
+  } finally {
+    if (handle) {
+      await handle.close().catch(() => undefined);
+    }
   }
 }
 
