@@ -97,18 +97,20 @@ export function buildRunRequestV2(options: BuildRunRequestOptions): RunRequestV2
     metadata.tfgrpo = tfgrpoMetadata;
   }
 
+  const taskPayload: RunRequestV2['task'] = {
+    id: task.id,
+    title: task.title,
+    tags: capabilities,
+    ...(task.metadata?.slug ? { slug: String(task.metadata.slug) } : {}),
+    ...(typeof task.description === 'string' ? { description: task.description } : {}),
+    ...(task.metadata ? { metadata: task.metadata } : {})
+  };
+
   return {
     schema: CONTROL_PLANE_RUN_REQUEST_SCHEMA,
     version: CONTROL_PLANE_RUN_REQUEST_VERSION,
     requestId: runId,
-    task: {
-      id: task.id,
-      slug: task.metadata?.slug ? String(task.metadata.slug) : undefined,
-      title: task.title,
-      description: task.description,
-      metadata: task.metadata,
-      tags: capabilities
-    },
+    task: taskPayload,
     pipeline: {
       id: pipeline.id,
       version: '1.0.0',

@@ -303,15 +303,20 @@ function computeGuardrailStatus(manifest: CliManifest): GuardrailStatusSnapshot 
   };
 
   for (const entry of guardrailCommands) {
-    if (entry.status === 'succeeded') {
+    const status = classifyGuardrailCommand(entry);
+    if (status === 'succeeded') {
       counts.succeeded += 1;
-    } else if (entry.status === 'failed') {
-      counts.failed += 1;
-    } else if (entry.status === 'skipped') {
-      counts.skipped += 1;
-    } else {
-      counts.other += 1;
+      continue;
     }
+    if (status === 'failed') {
+      counts.failed += 1;
+      continue;
+    }
+    if (status === 'skipped') {
+      counts.skipped += 1;
+      continue;
+    }
+    counts.other += 1;
   }
 
   const present = counts.succeeded > 0;
@@ -344,6 +349,33 @@ function selectGuardrailCommands(manifest: CliManifest): CliManifestCommand[] {
     const haystack = `${id} ${title} ${command}`;
     return haystack.includes('spec-guard') || haystack.includes('specguardrunner');
   });
+}
+
+function classifyGuardrailCommand(
+  entry: CliManifestCommand
+): 'succeeded' | 'failed' | 'skipped' | 'other' {
+  if (entry.status === 'failed') {
+    return 'failed';
+  }
+  if (entry.status === 'skipped') {
+    return 'skipped';
+  }
+  if (entry.status === 'succeeded') {
+    return isExplicitGuardrailSkip(entry.summary) ? 'skipped' : 'succeeded';
+  }
+  return 'other';
+}
+
+function isExplicitGuardrailSkip(summary: string | null | undefined): boolean {
+  const normalized = summary?.toLowerCase() ?? '';
+  if (!normalized) {
+    return false;
+  }
+  return (
+    normalized.includes('[spec-guard] skipped') ||
+    normalized.includes('spec-guard skipped') ||
+    normalized.includes('spec guard skipped')
+  );
 }
 
 function formatGuardrailSummary(counts: GuardrailCounts): string {

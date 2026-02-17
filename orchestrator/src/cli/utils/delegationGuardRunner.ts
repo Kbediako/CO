@@ -6,12 +6,31 @@ import { pathToFileURL } from 'node:url';
 
 import { logger } from '../../logger.js';
 import { resolveEnvironmentPaths } from '../../../../scripts/lib/run-manifests.js';
+import { findPackageRoot } from './packageInfo.js';
 
 export type GuardProfile = 'strict' | 'warn' | 'auto';
 export type EffectiveGuardProfile = 'strict' | 'warn';
 
 const DEFAULT_PROFILE: GuardProfile = 'auto';
 const REPO_STRICT_MARKERS = ['AGENTS.md', join('tasks', 'index.json'), join('docs', 'TASKS.md')];
+const DELEGATION_GUARD_RELATIVE_PATH = join('scripts', 'delegation-guard.mjs');
+
+function normalizePath(value: string | undefined | null): string | null {
+  const normalized = value?.trim();
+  return normalized ? normalized : null;
+}
+
+function resolvePackageRoot(env: NodeJS.ProcessEnv = process.env): string {
+  const configured = normalizePath(env.CODEX_ORCHESTRATOR_PACKAGE_ROOT);
+  if (configured) {
+    return configured;
+  }
+  try {
+    return findPackageRoot();
+  } catch {
+    return process.cwd();
+  }
+}
 
 export function parseGuardProfile(raw: string | undefined | null): GuardProfile {
   const normalized = String(raw ?? '').trim().toLowerCase();
@@ -58,18 +77,57 @@ export function buildDelegationGuardEnv(
   };
 }
 
+export function buildDelegationGuardScriptCandidates(
+  repoRoot: string,
+  packageRoot: string
+): string[] {
+  const deduped: string[] = [];
+  const seen = new Set<string>();
+  for (const candidate of [
+    join(repoRoot, DELEGATION_GUARD_RELATIVE_PATH),
+    join(packageRoot, DELEGATION_GUARD_RELATIVE_PATH)
+  ]) {
+    if (seen.has(candidate)) {
+      continue;
+    }
+    seen.add(candidate);
+    deduped.push(candidate);
+  }
+  return deduped;
+}
+
+export function resolveDelegationGuardScriptPath(
+  repoRoot: string,
+  packageRoot: string,
+  fileExists: (path: string) => boolean = existsSync
+): string | null {
+  const candidates = buildDelegationGuardScriptCandidates(repoRoot, packageRoot);
+  for (const candidate of candidates) {
+    if (fileExists(candidate)) {
+      return candidate;
+    }
+  }
+  return null;
+}
+
 export async function runDelegationGuardRunner(argv: string[] = process.argv.slice(2)): Promise<void> {
   const { repoRoot } = resolveEnvironmentPaths();
-  const guardPath = join(repoRoot, 'scripts', 'delegation-guard.mjs');
+  const packageRoot = resolvePackageRoot(process.env);
+  const candidates = buildDelegationGuardScriptCandidates(repoRoot, packageRoot);
+  const guardPath = resolveDelegationGuardScriptPath(repoRoot, packageRoot);
   const profile = resolveEffectiveGuardProfile(repoRoot);
 
-  if (!existsSync(guardPath)) {
+  if (!guardPath) {
     if (profile === 'strict') {
-      logger.error(`[delegation-guard] failed: ${guardPath} not found (strict profile)`);
+      logger.error(
+        `[delegation-guard] failed: no guard script found (${candidates.join(', ')}) (strict profile)`
+      );
       process.exit(1);
       return;
     }
-    logger.warn(`[delegation-guard] skipped: ${guardPath} not found (warn profile)`);
+    logger.warn(
+      `[delegation-guard] skipped: no guard script found (${candidates.join(', ')}) (warn profile)`
+    );
     process.exit(0);
     return;
   }

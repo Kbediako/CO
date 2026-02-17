@@ -1310,6 +1310,22 @@
       },
       "created_at": "2026-02-17",
       "completed_at": null
+    },
+    {
+      "id": "0970",
+      "slug": "0970-control-plane-guardrail-runner-hardening",
+      "title": "Control-Plane + Guardrail Runner Hardening",
+      "path": "tasks/tasks-0970-control-plane-guardrail-runner-hardening.md",
+      "kind": "plan",
+      "status": "completed",
+      "gate": {
+        "phase": "control-plane-guardrail-runner-hardening-implementation",
+        "status": "succeeded",
+        "log": ".runs/0970-control-plane-guardrail-runner-hardening/cli/2026-02-17T10-20-29-821Z-f3f8bd5d/manifest.json",
+        "run_id": "2026-02-17T10-20-29-821Z-f3f8bd5d"
+      },
+      "created_at": "2026-02-17",
+      "completed_at": "2026-02-17"
     }
   ],
   "specs": [
@@ -1631,6 +1647,22 @@
         "task": "tasks/tasks-0969-playwright-context-subagent-guardrails.md",
         "agent_task": ".agent/task/0969-playwright-context-subagent-guardrails.md",
         "docs": "docs/TECH_SPEC-playwright-context-subagent-guardrails.md"
+      }
+    },
+    {
+      "id": "20260217-0970-control-plane-guardrail-runner-hardening",
+      "title": "Control-Plane + Guardrail Runner Hardening",
+      "relates_to": "tasks/tasks-0970-control-plane-guardrail-runner-hardening.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-02-17",
+      "paths": {
+        "spec": "tasks/specs/0970-control-plane-guardrail-runner-hardening.md",
+        "task": "tasks/tasks-0970-control-plane-guardrail-runner-hardening.md",
+        "agent_task": ".agent/task/0970-control-plane-guardrail-runner-hardening.md",
+        "docs": "docs/TECH_SPEC-control-plane-guardrail-runner-hardening.md"
       }
     }
   ]
