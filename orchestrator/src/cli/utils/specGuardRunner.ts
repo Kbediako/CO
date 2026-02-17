@@ -60,7 +60,7 @@ export function resolveSpecGuardScriptPath(
   return null;
 }
 
-export async function runSpecGuardRunner(argv: string[] = process.argv.slice(2)): Promise<void> {
+export function runSpecGuardRunner(argv: string[] = process.argv.slice(2)): void {
   const { repoRoot } = resolveEnvironmentPaths();
   const packageRoot = resolvePackageRoot(process.env);
   const candidates = buildSpecGuardScriptCandidates(repoRoot, packageRoot);
