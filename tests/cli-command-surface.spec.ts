@@ -10,7 +10,7 @@ const execFileAsync = promisify(execFile);
 const CLI_ENTRY = join(process.cwd(), 'bin', 'codex-orchestrator.ts');
 const TEST_TIMEOUT = 15000;
 const CLI_EXEC_TIMEOUT_MS = TEST_TIMEOUT;
-const FLOW_TARGET_TEST_TIMEOUT = 45000;
+const FLOW_TARGET_TEST_TIMEOUT = 70000;
 
 let tempDir: string | null = null;
 
@@ -108,7 +108,7 @@ describe('codex-orchestrator command surface', () => {
               id: 'impl-ok',
               title: 'impl ok',
               command: 'node -e "console.log(\'impl ok\')"',
-              plan: { aliases: ['impl-alias'] }
+              plan: { aliases: ['impl-alias', 'impl:quick'] }
             }
           ]
         }
@@ -130,6 +130,13 @@ describe('codex-orchestrator command surface', () => {
       FLOW_TARGET_TEST_TIMEOUT
     );
     expect(stdout).toContain('"status": "succeeded"');
+
+    const { stdout: unscopedColonStdout } = await runCli(
+      ['flow', '--format', 'json', '--task', 'flow-target', '--target', 'impl:quick'],
+      env,
+      FLOW_TARGET_TEST_TIMEOUT
+    );
+    expect(unscopedColonStdout).toContain('"status": "succeeded"');
 
     await expect(
       runCli(

@@ -207,18 +207,34 @@ interface NormalizedFlowTargetToken {
   scoped: boolean;
 }
 
+const FLOW_TARGET_PIPELINE_SCOPES = new Set(['docs-review', 'implementation-gate']);
+
+function isFlowTargetPipelineScope(scope: string): boolean {
+  return FLOW_TARGET_PIPELINE_SCOPES.has(scope);
+}
+
 function normalizeFlowTargetToken(candidate: string): NormalizedFlowTargetToken | null {
   const trimmed = candidate.trim();
   if (!trimmed) {
     return null;
   }
   const tokens = trimmed.split(':');
-  const scoped = tokens.length > 1;
-  const scopeToken = scoped ? (tokens[0] ?? '').trim().toLowerCase() : '';
-  if (scoped && !scopeToken) {
+  if (tokens.length > 1 && !(tokens[0] ?? '').trim()) {
     return null;
   }
-  const suffixToken = scoped ? (tokens[tokens.length - 1] ?? '').trim() : trimmed;
+
+  let scoped = false;
+  let scopeToken: string | null = null;
+  let suffixToken = trimmed;
+  if (tokens.length > 1) {
+    const candidateScope = (tokens[0] ?? '').trim().toLowerCase();
+    if (isFlowTargetPipelineScope(candidateScope)) {
+      scoped = true;
+      scopeToken = candidateScope;
+      suffixToken = (tokens[tokens.length - 1] ?? '').trim();
+    }
+  }
+
   if (!suffixToken) {
     return null;
   }
@@ -226,7 +242,7 @@ function normalizeFlowTargetToken(candidate: string): NormalizedFlowTargetToken 
     literal: trimmed,
     literalLower: trimmed.toLowerCase(),
     stageTokenLower: suffixToken.toLowerCase(),
-    scopeLower: scopeToken || null,
+    scopeLower: scopeToken,
     scoped
   };
 }
@@ -320,7 +336,10 @@ function resolveFlowTargetScope(stageId: string): string | null {
     return null;
   }
   const scope = stageId.slice(0, delimiterIndex).trim().toLowerCase();
-  return scope || null;
+  if (!isFlowTargetPipelineScope(scope)) {
+    return null;
+  }
+  return scope;
 }
 
 async function resolveFlowTargetStageSelection(
