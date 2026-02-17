@@ -203,6 +203,7 @@ interface NormalizedFlowTargetToken {
   literal: string;
   literalLower: string;
   stageTokenLower: string;
+  scopeLower: string | null;
   scoped: boolean;
 }
 
@@ -211,17 +212,35 @@ function normalizeFlowTargetToken(candidate: string): NormalizedFlowTargetToken 
   if (!trimmed) {
     return null;
   }
-  const scoped = trimmed.includes(':');
-  const suffix = scoped ? trimmed.split(':').pop() ?? trimmed : trimmed;
-  if (!suffix.trim()) {
+  const tokens = trimmed.split(':');
+  const scoped = tokens.length > 1;
+  const scopeToken = scoped ? (tokens[0] ?? '').trim().toLowerCase() : '';
+  const suffixToken = scoped ? (tokens[tokens.length - 1] ?? '').trim() : trimmed;
+  if (!suffixToken) {
     return null;
   }
   return {
     literal: trimmed,
     literalLower: trimmed.toLowerCase(),
-    stageTokenLower: suffix.toLowerCase(),
+    stageTokenLower: suffixToken.toLowerCase(),
+    scopeLower: scopeToken || null,
     scoped
   };
+}
+
+function flowPlanItemPipelineId(item: FlowPlanItem): string | null {
+  const metadataPipelineId =
+    item.metadata && typeof item.metadata['pipelineId'] === 'string'
+      ? (item.metadata['pipelineId'] as string).trim().toLowerCase()
+      : '';
+  if (metadataPipelineId) {
+    return metadataPipelineId;
+  }
+  const delimiterIndex = item.id.indexOf(':');
+  if (delimiterIndex <= 0) {
+    return null;
+  }
+  return item.id.slice(0, delimiterIndex).trim().toLowerCase() || null;
 }
 
 function flowPlanItemMatchesTarget(item: FlowPlanItem, candidate: string): boolean {
@@ -231,6 +250,13 @@ function flowPlanItemMatchesTarget(item: FlowPlanItem, candidate: string): boole
   }
   if (item.id.toLowerCase() === normalized.literalLower) {
     return true;
+  }
+
+  if (normalized.scoped && normalized.scopeLower) {
+    const itemPipelineId = flowPlanItemPipelineId(item);
+    if (itemPipelineId && itemPipelineId !== normalized.scopeLower) {
+      return false;
+    }
   }
 
   const metadataStageId =
@@ -245,10 +271,15 @@ function flowPlanItemMatchesTarget(item: FlowPlanItem, candidate: string): boole
     .map((alias) => alias.toLowerCase());
 
   if (normalized.scoped) {
-    if (metadataStageId && metadataStageId === normalized.literalLower) {
+    if (
+      metadataStageId
+      && (metadataStageId === normalized.literalLower || metadataStageId === normalized.stageTokenLower)
+    ) {
       return true;
     }
-    return aliasTokens.some((alias) => alias === normalized.literalLower);
+    return aliasTokens.some(
+      (alias) => alias === normalized.literalLower || alias === normalized.stageTokenLower
+    );
   }
 
   if (item.id.toLowerCase().endsWith(`:${normalized.stageTokenLower}`)) {
@@ -280,6 +311,15 @@ function planIncludesStageId(
   return plan.plan.items.some((item) => flowPlanItemMatchesTarget(item, stageId));
 }
 
+function resolveFlowTargetScope(stageId: string): string | null {
+  const delimiterIndex = stageId.indexOf(':');
+  if (delimiterIndex <= 0) {
+    return null;
+  }
+  const scope = stageId.slice(0, delimiterIndex).trim().toLowerCase();
+  return scope || null;
+}
+
 async function resolveFlowTargetStageSelection(
   orchestrator: CodexOrchestrator,
   taskId: string | undefined,
@@ -294,10 +334,15 @@ async function resolveFlowTargetStageSelection(
     orchestrator.plan({ pipelineId: 'implementation-gate', taskId })
   ])) as [FlowPlanPreview, FlowPlanPreview];
 
-  const docsReviewTargetStageId = planIncludesStageId(docsPlan, requestedTargetStageId)
+  const requestedScope = resolveFlowTargetScope(requestedTargetStageId);
+  const docsScopeMatch = !requestedScope || requestedScope === 'docs-review';
+  const implementationScopeMatch = !requestedScope || requestedScope === 'implementation-gate';
+
+  const docsReviewTargetStageId = docsScopeMatch && planIncludesStageId(docsPlan, requestedTargetStageId)
     ? requestedTargetStageId
     : undefined;
-  const implementationGateTargetStageId = planIncludesStageId(implementationPlan, requestedTargetStageId)
+  const implementationGateTargetStageId =
+    implementationScopeMatch && planIncludesStageId(implementationPlan, requestedTargetStageId)
     ? requestedTargetStageId
     : undefined;
 

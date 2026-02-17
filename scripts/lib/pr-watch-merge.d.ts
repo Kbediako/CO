@@ -27,6 +27,8 @@ export interface PrWatchMergeSnapshot {
   labels: string[];
   hasDoNotMergeLabel: boolean;
   unresolvedThreadCount: number;
+  unacknowledgedBotFeedbackCount: number;
+  botFeedbackFetchError: boolean;
   checks: PrWatchMergeCheckSummary;
   requiredChecks: PrWatchMergeCheckSummary | null;
   gateChecksSource: 'required' | 'rollup';
@@ -57,7 +59,11 @@ export function resolveCachedRequiredChecksSummary(
 
 export function buildStatusSnapshot(
   response: unknown,
-  requiredChecks?: PrWatchMergeCheckSummary | null
+  requiredChecks?: PrWatchMergeCheckSummary | null,
+  inlineBotFeedback?: {
+    fetchError: boolean;
+    unacknowledgedCount: number;
+  } | null
 ): PrWatchMergeSnapshot;
 
 export function runPrWatchMerge(argv: string[], options?: PrWatchMergeOptions): Promise<number>;

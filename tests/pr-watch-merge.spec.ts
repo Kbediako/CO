@@ -83,6 +83,36 @@ describe('pr watch-merge required-check gating', () => {
     expect(snapshot.readyToMerge).toBe(false);
     expect(snapshot.gateReasons).toContain('checks_pending=1');
   });
+
+  it('blocks merge readiness when unacknowledged bot inline feedback exists', () => {
+    const response = makeResponse([]);
+    const requiredChecks = summarizeRequiredChecks([
+      { name: 'corelane', state: 'SUCCESS', bucket: 'pass', link: 'https://example.com/corelane' }
+    ]);
+
+    const snapshot = buildStatusSnapshot(response, requiredChecks, {
+      fetchError: false,
+      unacknowledgedCount: 1
+    });
+
+    expect(snapshot.readyToMerge).toBe(false);
+    expect(snapshot.gateReasons).toContain('unacknowledged_bot_feedback=1');
+  });
+
+  it('fails closed when bot inline feedback cannot be fetched', () => {
+    const response = makeResponse([]);
+    const requiredChecks = summarizeRequiredChecks([
+      { name: 'corelane', state: 'SUCCESS', bucket: 'pass', link: 'https://example.com/corelane' }
+    ]);
+
+    const snapshot = buildStatusSnapshot(response, requiredChecks, {
+      fetchError: true,
+      unacknowledgedCount: 0
+    });
+
+    expect(snapshot.readyToMerge).toBe(false);
+    expect(snapshot.gateReasons).toContain('bot_feedback=unknown');
+  });
 });
 
 describe('summarizeRequiredChecks', () => {

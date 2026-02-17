@@ -18,6 +18,12 @@ const REQUIRED_BUCKET_FAILED = new Set(['fail', 'cancel', 'skipping']);
 const MERGEABLE_STATES = new Set(['CLEAN', 'HAS_HOOKS', 'UNSTABLE']);
 const BLOCKED_REVIEW_DECISIONS = new Set(['CHANGES_REQUESTED', 'REVIEW_REQUIRED']);
 const DO_NOT_MERGE_LABEL = /do[\s_-]*not[\s_-]*merge/i;
+const ACTIONABLE_BOT_LOGINS = new Set([
+  'chatgpt-codex-connector',
+  'chatgpt-codex-connector[bot]',
+  'coderabbitai',
+  'coderabbitai[bot]'
+]);
 
 const PR_QUERY = `
 query($owner:String!, $repo:String!, $number:Int!) {
@@ -78,6 +84,14 @@ function normalizeEnum(value) {
 
 function normalizeBucket(value) {
   return typeof value === 'string' ? value.trim().toLowerCase() : '';
+}
+
+function normalizeLogin(value) {
+  return typeof value === 'string' ? value.trim().toLowerCase() : '';
+}
+
+function isActionableBot(login) {
+  return ACTIONABLE_BOT_LOGINS.has(normalizeLogin(login));
 }
 
 function formatDuration(ms) {
@@ -235,6 +249,19 @@ async function runGhJson(args) {
   } catch (error) {
     throw new Error(
       `Failed to parse JSON from gh ${args.join(' ')}: ${
+        error instanceof Error ? error.message : String(error)
+      }`
+    );
+  }
+}
+
+async function runGhJsonSlurped(args) {
+  const result = await runGh([...args, '--paginate', '--slurp']);
+  try {
+    return JSON.parse(result.stdout);
+  } catch (error) {
+    throw new Error(
+      `Failed to parse paginated JSON from gh ${args.join(' ')}: ${
         error instanceof Error ? error.message : String(error)
       }`
     );
@@ -415,7 +442,7 @@ export function resolveCachedRequiredChecksSummary(previousCache, currentHeadOid
   return hasRequiredChecksSummary(previousCache.summary) ? previousCache.summary : null;
 }
 
-export function buildStatusSnapshot(response, requiredChecks = null) {
+export function buildStatusSnapshot(response, requiredChecks = null, inlineBotFeedback = null) {
   const pr = response?.data?.repository?.pullRequest;
   if (!pr) {
     throw new Error('GraphQL response missing pullRequest payload.');
@@ -430,12 +457,19 @@ export function buildStatusSnapshot(response, requiredChecks = null) {
 
   const threads = Array.isArray(pr.reviewThreads?.nodes) ? pr.reviewThreads.nodes : [];
   const unresolvedThreadCount = threads.filter((thread) => thread && !thread.isResolved && !thread.isOutdated).length;
+  const hasUnresolvedThread = unresolvedThreadCount > 0;
 
   const contexts = pr.commits?.nodes?.[0]?.commit?.statusCheckRollup?.contexts?.nodes;
   const checkNodes = Array.isArray(contexts) ? contexts : [];
   const checks = summarizeChecks(checkNodes);
   const requiredCheckSummary =
     requiredChecks && typeof requiredChecks === 'object' && requiredChecks.total > 0 ? requiredChecks : null;
+  const unacknowledgedBotFeedbackCount =
+    inlineBotFeedback && typeof inlineBotFeedback.unacknowledgedCount === 'number'
+      ? inlineBotFeedback.unacknowledgedCount
+      : 0;
+  const botFeedbackFetchError =
+    inlineBotFeedback && inlineBotFeedback.fetchError === true;
   const gateChecks = requiredCheckSummary ?? checks;
   const gateChecksSource = requiredCheckSummary ? 'required' : 'rollup';
 
@@ -467,8 +501,13 @@ export function buildStatusSnapshot(response, requiredChecks = null) {
   if (BLOCKED_REVIEW_DECISIONS.has(reviewDecision)) {
     gateReasons.push(`review=${reviewDecision}`);
   }
-  if (unresolvedThreadCount > 0) {
+  if (hasUnresolvedThread) {
     gateReasons.push(`unresolved_threads=${unresolvedThreadCount}`);
+  }
+  if (botFeedbackFetchError) {
+    gateReasons.push('bot_feedback=unknown');
+  } else if (unacknowledgedBotFeedbackCount > 0) {
+    gateReasons.push(`unacknowledged_bot_feedback=${unacknowledgedBotFeedbackCount}`);
   }
 
   return {
@@ -483,6 +522,8 @@ export function buildStatusSnapshot(response, requiredChecks = null) {
     labels,
     hasDoNotMergeLabel,
     unresolvedThreadCount,
+    unacknowledgedBotFeedbackCount,
+    botFeedbackFetchError,
     checks,
     requiredChecks: requiredCheckSummary,
     gateChecksSource,
@@ -514,6 +555,8 @@ function formatStatusLine(snapshot, quietRemainingMs) {
     `required_checks_pending=${requiredChecks ? requiredChecks.pending.length : 'n/a'}`,
     `required_checks_failed=${requiredChecks ? requiredChecks.failed.length : 'n/a'}`,
     `unresolved_threads=${snapshot.unresolvedThreadCount}`,
+    `unack_bot_feedback=${snapshot.unacknowledgedBotFeedbackCount}`,
+    `bot_feedback_fetch_error=${snapshot.botFeedbackFetchError ? 'yes' : 'no'}`,
     `quiet_remaining=${formatDuration(quietRemainingMs)}`,
     `blocked_by=${reasons}`,
     `pending=[${pendingNames}]`,
@@ -549,6 +592,85 @@ async function fetchRequiredChecks(owner, repo, prNumber) {
   }
 }
 
+function flattenReviewCommentPages(pagesPayload) {
+  if (!Array.isArray(pagesPayload)) {
+    return [];
+  }
+  const comments = [];
+  for (const page of pagesPayload) {
+    if (Array.isArray(page)) {
+      comments.push(...page);
+      continue;
+    }
+    if (page && typeof page === 'object') {
+      comments.push(page);
+    }
+  }
+  return comments;
+}
+
+async function fetchInlineBotFeedback(owner, repo, prNumber, headOid) {
+  if (!headOid) {
+    return { fetchError: false, unacknowledgedCount: 0 };
+  }
+
+  try {
+    const pagedPayload = await runGhJsonSlurped([
+      'api',
+      `repos/${owner}/${repo}/pulls/${prNumber}/comments`
+    ]);
+    const comments = flattenReviewCommentPages(pagedPayload);
+    const repliesByParentId = new Map();
+
+    for (const comment of comments) {
+      if (!comment || typeof comment !== 'object') {
+        continue;
+      }
+      const parentId = Number(comment.in_reply_to_id);
+      if (!Number.isInteger(parentId) || parentId <= 0) {
+        continue;
+      }
+      const bucket = repliesByParentId.get(parentId) ?? [];
+      bucket.push(comment);
+      repliesByParentId.set(parentId, bucket);
+    }
+
+    let unacknowledgedCount = 0;
+    for (const comment of comments) {
+      if (!comment || typeof comment !== 'object') {
+        continue;
+      }
+
+      const commentId = Number(comment.id);
+      if (!Number.isInteger(commentId) || commentId <= 0) {
+        continue;
+      }
+      if (comment.in_reply_to_id !== null && comment.in_reply_to_id !== undefined) {
+        continue;
+      }
+      if (!isActionableBot(comment.user?.login)) {
+        continue;
+      }
+
+      const commitId = typeof comment.commit_id === 'string' ? comment.commit_id : null;
+      const originalCommitId = typeof comment.original_commit_id === 'string' ? comment.original_commit_id : null;
+      if (commitId !== headOid && originalCommitId !== headOid) {
+        continue;
+      }
+
+      const replies = repliesByParentId.get(commentId) ?? [];
+      const hasHumanReply = replies.some((reply) => !isActionableBot(reply?.user?.login));
+      if (!hasHumanReply) {
+        unacknowledgedCount += 1;
+      }
+    }
+
+    return { fetchError: false, unacknowledgedCount };
+  } catch {
+    return { fetchError: true, unacknowledgedCount: 0 };
+  }
+}
+
 async function fetchSnapshot(owner, repo, prNumber, previousRequiredChecksCache = null) {
   const response = await runGhJson([
     'api',
@@ -570,8 +692,9 @@ async function fetchSnapshot(owner, repo, prNumber, previousRequiredChecksCache 
     previousRequiredChecks,
     requiredChecksResult.fetchError
   );
+  const inlineBotFeedback = await fetchInlineBotFeedback(owner, repo, prNumber, currentHeadOid);
   return {
-    snapshot: buildStatusSnapshot(response, requiredChecks),
+    snapshot: buildStatusSnapshot(response, requiredChecks, inlineBotFeedback),
     requiredChecksForNextPoll: requiredChecks
       ? {
           headOid: currentHeadOid,

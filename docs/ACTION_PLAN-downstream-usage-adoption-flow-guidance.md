@@ -15,3 +15,8 @@
 1. Run full guardrail chain (delegation/spec guard, build/lint/test/docs, diff-budget, review).
 2. Run standalone review + explicit elegance/minimality pass and apply follow-up reductions.
 3. Capture manual E2E in CO and downstream (`tower-defence`) and update checklist evidence.
+
+## Phase 4 - Post-merge hardening follow-up (2026-02-17)
+1. Fix scoped flow target matching so `pipeline:<alias>` resolves aliases only inside that pipeline.
+2. Harden `pr watch-merge` to block auto-merge when head-commit bot inline comments are not acknowledged in-thread.
+3. Add regression tests for flow target matching and PR watch merge gating.

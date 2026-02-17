@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
@@ -72,6 +72,69 @@ describe('codex-orchestrator command surface', () => {
     expect(stdout).toContain('Usage: codex-orchestrator flow');
     expect(stdout).toContain('docs-review');
     expect(stdout).toContain('implementation-gate');
+  }, TEST_TIMEOUT);
+
+  it('accepts scoped aliases for the matching flow pipeline and rejects scope-mismatched aliases', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'co-cli-flow-target-'));
+    const config = {
+      defaultPipeline: 'docs-review',
+      pipelines: [
+        {
+          id: 'docs-review',
+          title: 'Docs',
+          guardrailsRequired: false,
+          stages: [
+            {
+              kind: 'command',
+              id: 'docs-default',
+              title: 'docs default',
+              command: 'node -e "console.log(\'docs default\')"',
+              plan: { aliases: ['docs-alias'] }
+            }
+          ]
+        },
+        {
+          id: 'implementation-gate',
+          title: 'Impl',
+          guardrailsRequired: false,
+          stages: [
+            {
+              kind: 'command',
+              id: 'impl-ok',
+              title: 'impl ok',
+              command: 'node -e "console.log(\'impl ok\')"',
+              plan: { aliases: ['impl-alias'] }
+            }
+          ]
+        }
+      ]
+    };
+    await writeFile(join(tempDir, 'codex.orchestrator.json'), `${JSON.stringify(config, null, 2)}\n`);
+
+    const env = {
+      ...process.env,
+      CODEX_ORCHESTRATOR_ROOT: tempDir,
+      CODEX_ORCHESTRATOR_RUNS_DIR: join(tempDir, '.runs'),
+      CODEX_ORCHESTRATOR_OUT_DIR: join(tempDir, 'out'),
+      MCP_RUNNER_TASK_ID: 'flow-target'
+    };
+
+    const { stdout } = await runCli(
+      ['flow', '--format', 'json', '--task', 'flow-target', '--target', 'implementation-gate:impl-alias'],
+      env
+    );
+    expect(stdout).toContain('"status": "succeeded"');
+
+    await expect(
+      runCli(
+        ['flow', '--format', 'json', '--task', 'flow-target', '--target', 'docs-review:impl-alias'],
+        env
+      )
+    ).rejects.toMatchObject({
+      stderr: expect.stringContaining(
+        'Target stage "docs-review:impl-alias" is not defined in docs-review or implementation-gate.'
+      )
+    });
   }, TEST_TIMEOUT);
 
   it('prints rlm help without running when help flag is passed before goal', async () => {
