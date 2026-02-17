@@ -710,6 +710,13 @@
       "cadence_days": 90
     },
     {
+      "path": ".agent/task/0968-downstream-usage-adoption-flow-guidance.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-16",
+      "cadence_days": 90
+    },
+    {
       "path": ".agent/task/ACTION_PLAN_TEMPLATE.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -959,6 +966,13 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/ACTION_PLAN-downstream-usage-adoption-flow-guidance.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-16",
       "cadence_days": 90
     },
     {
@@ -1578,6 +1592,13 @@
       "cadence_days": 90
     },
     {
+      "path": "docs/PRD-downstream-usage-adoption-flow-guidance.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-16",
+      "cadence_days": 90
+    },
+    {
       "path": "docs/PRD-evaluation-diff-match.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -1868,7 +1889,7 @@
       "path": "docs/README.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-01-19",
+      "last_review": "2026-02-16",
       "cadence_days": 90
     },
     {
@@ -1945,7 +1966,7 @@
       "path": "docs/TASKS.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-02-14",
+      "last_review": "2026-02-16",
       "cadence_days": 90
     },
     {
@@ -2107,6 +2128,13 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/TECH_SPEC-downstream-usage-adoption-flow-guidance.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-16",
       "cadence_days": 90
     },
     {
@@ -2407,7 +2435,7 @@
       "path": "README.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-02-14",
+      "last_review": "2026-02-16",
       "cadence_days": 90
     },
     {
@@ -2909,6 +2937,13 @@
     },
     {
       "path": "tasks/specs/0967-pr-watch-required-checks-review-artifacts.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-16",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/specs/0968-downstream-usage-adoption-flow-guidance.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-02-16",
@@ -3448,6 +3483,13 @@
     },
     {
       "path": "tasks/tasks-0967-pr-watch-required-checks-review-artifacts.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-16",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/tasks-0968-downstream-usage-adoption-flow-guidance.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-02-16",

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { existsSync } from 'node:fs';
-import { readFile } from 'node:fs/promises';
+import { opendir, readFile } from 'node:fs/promises';
 import { basename, join } from 'node:path';
 import process from 'node:process';
 
@@ -43,6 +43,19 @@ interface RunOutputPayload {
   summary: string | null;
 }
 
+interface FlowOutputPayload {
+  status: string;
+  failed_stage: 'docs-review' | 'implementation-gate' | null;
+  docs_review: RunOutputPayload;
+  implementation_gate: RunOutputPayload | null;
+}
+
+interface SetupGuidancePayload {
+  note: string;
+  references: string[];
+  recommended_commands: string[];
+}
+
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
   const command = args.shift();
@@ -64,6 +77,9 @@ async function main(): Promise<void> {
         break;
       case 'frontend-test':
         await handleFrontendTest(orchestrator, args);
+        break;
+      case 'flow':
+        await handleFlow(orchestrator, args);
         break;
       case 'plan':
         await handlePlan(orchestrator, args);
@@ -165,6 +181,133 @@ function resolveTargetStageId(flags: ArgMap): string | undefined {
     return alias.trim();
   }
   return undefined;
+}
+
+interface FlowTargetStageSelection {
+  docsReviewTargetStageId?: string;
+  implementationGateTargetStageId?: string;
+}
+
+interface FlowPlanItem {
+  id: string;
+  metadata?: Record<string, unknown>;
+}
+
+interface FlowPlanPreview {
+  plan: {
+    items: FlowPlanItem[];
+  };
+}
+
+interface NormalizedFlowTargetToken {
+  literal: string;
+  literalLower: string;
+  stageTokenLower: string;
+  scoped: boolean;
+}
+
+function normalizeFlowTargetToken(candidate: string): NormalizedFlowTargetToken | null {
+  const trimmed = candidate.trim();
+  if (!trimmed) {
+    return null;
+  }
+  const scoped = trimmed.includes(':');
+  const suffix = scoped ? trimmed.split(':').pop() ?? trimmed : trimmed;
+  if (!suffix.trim()) {
+    return null;
+  }
+  return {
+    literal: trimmed,
+    literalLower: trimmed.toLowerCase(),
+    stageTokenLower: suffix.toLowerCase(),
+    scoped
+  };
+}
+
+function flowPlanItemMatchesTarget(item: FlowPlanItem, candidate: string): boolean {
+  const normalized = normalizeFlowTargetToken(candidate);
+  if (!normalized) {
+    return false;
+  }
+  if (item.id.toLowerCase() === normalized.literalLower) {
+    return true;
+  }
+
+  const metadataStageId =
+    item.metadata && typeof item.metadata['stageId'] === 'string'
+      ? (item.metadata['stageId'] as string).toLowerCase()
+      : null;
+
+  const aliases = Array.isArray(item.metadata?.['aliases'])
+    ? (item.metadata?.['aliases'] as unknown[])
+    : [];
+  const aliasTokens = aliases.filter((alias): alias is string => typeof alias === 'string')
+    .map((alias) => alias.toLowerCase());
+
+  if (normalized.scoped) {
+    if (metadataStageId && metadataStageId === normalized.literalLower) {
+      return true;
+    }
+    return aliasTokens.some((alias) => alias === normalized.literalLower);
+  }
+
+  if (item.id.toLowerCase().endsWith(`:${normalized.stageTokenLower}`)) {
+    return true;
+  }
+
+  if (
+    metadataStageId
+    && (
+      metadataStageId === normalized.stageTokenLower
+      || metadataStageId.endsWith(`:${normalized.stageTokenLower}`)
+    )
+  ) {
+    return true;
+  }
+
+  return aliasTokens.some(
+    (alias) => alias === normalized.stageTokenLower || alias.endsWith(`:${normalized.stageTokenLower}`)
+  );
+}
+
+function planIncludesStageId(
+  plan: FlowPlanPreview,
+  stageId: string
+): boolean {
+  if (!stageId.trim()) {
+    return false;
+  }
+  return plan.plan.items.some((item) => flowPlanItemMatchesTarget(item, stageId));
+}
+
+async function resolveFlowTargetStageSelection(
+  orchestrator: CodexOrchestrator,
+  taskId: string | undefined,
+  requestedTargetStageId: string | undefined
+): Promise<FlowTargetStageSelection> {
+  if (!requestedTargetStageId) {
+    return {};
+  }
+
+  const [docsPlan, implementationPlan] = (await Promise.all([
+    orchestrator.plan({ pipelineId: 'docs-review', taskId }),
+    orchestrator.plan({ pipelineId: 'implementation-gate', taskId })
+  ])) as [FlowPlanPreview, FlowPlanPreview];
+
+  const docsReviewTargetStageId = planIncludesStageId(docsPlan, requestedTargetStageId)
+    ? requestedTargetStageId
+    : undefined;
+  const implementationGateTargetStageId = planIncludesStageId(implementationPlan, requestedTargetStageId)
+    ? requestedTargetStageId
+    : undefined;
+
+  if (!docsReviewTargetStageId && !implementationGateTargetStageId) {
+    throw new Error(
+      `Target stage "${requestedTargetStageId}" is not defined in docs-review or implementation-gate.`
+    );
+  }
+
+  return { docsReviewTargetStageId, implementationGateTargetStageId };
 }
 
 function readStringFlag(flags: ArgMap, key: string): string | undefined {
@@ -342,6 +485,91 @@ async function handleFrontendTest(orchestrator: CodexOrchestrator, rawArgs: stri
       }
     }
   }
+}
+
+async function handleFlow(orchestrator: CodexOrchestrator, rawArgs: string[]): Promise<void> {
+  const { positionals, flags } = parseArgs(rawArgs);
+  if (isHelpRequest(positionals, flags)) {
+    printFlowHelp();
+    return;
+  }
+  if (positionals.length > 0) {
+    throw new Error(`flow does not accept positional arguments: ${positionals.join(' ')}`);
+  }
+
+  const format: OutputFormat = (flags['format'] as string | undefined) === 'json' ? 'json' : 'text';
+  const executionMode = resolveExecutionModeFlag(flags);
+  const taskId = typeof flags['task'] === 'string' ? (flags['task'] as string) : undefined;
+  const parentRunId = typeof flags['parent-run'] === 'string' ? (flags['parent-run'] as string) : undefined;
+  const approvalPolicy = typeof flags['approval-policy'] === 'string' ? (flags['approval-policy'] as string) : undefined;
+  const targetStageId = resolveTargetStageId(flags);
+  const { docsReviewTargetStageId, implementationGateTargetStageId } =
+    await resolveFlowTargetStageSelection(orchestrator, taskId, targetStageId);
+
+  await withRunUi(flags, format, async (runEvents) => {
+    const docsReviewResult = await orchestrator.start({
+      pipelineId: 'docs-review',
+      taskId,
+      parentRunId,
+      approvalPolicy,
+      targetStageId: docsReviewTargetStageId,
+      executionMode,
+      runEvents
+    });
+    const docsPayload = toRunOutputPayload(docsReviewResult);
+    if (format === 'text') {
+      emitRunOutput(docsReviewResult, format, 'Docs-review run');
+    }
+
+    if (docsReviewResult.manifest.status !== 'succeeded') {
+      process.exitCode = 1;
+      if (format === 'json') {
+        const payload: FlowOutputPayload = {
+          status: docsReviewResult.manifest.status,
+          failed_stage: 'docs-review',
+          docs_review: docsPayload,
+          implementation_gate: null
+        };
+        console.log(JSON.stringify(payload, null, 2));
+      } else {
+        console.log('Flow halted: docs-review failed.');
+      }
+      return;
+    }
+
+    const implementationGateResult = await orchestrator.start({
+      pipelineId: 'implementation-gate',
+      taskId,
+      parentRunId: docsReviewResult.manifest.run_id,
+      approvalPolicy,
+      targetStageId: implementationGateTargetStageId,
+      executionMode,
+      runEvents
+    });
+    const implementationPayload = toRunOutputPayload(implementationGateResult);
+
+    if (format === 'json') {
+      const payload: FlowOutputPayload = {
+        status: implementationGateResult.manifest.status,
+        failed_stage: implementationGateResult.manifest.status === 'succeeded' ? null : 'implementation-gate',
+        docs_review: docsPayload,
+        implementation_gate: implementationPayload
+      };
+      console.log(JSON.stringify(payload, null, 2));
+      if (implementationGateResult.manifest.status !== 'succeeded') {
+        process.exitCode = 1;
+      }
+      return;
+    }
+
+    emitRunOutput(implementationGateResult, format, 'Implementation-gate run');
+    if (implementationGateResult.manifest.status !== 'succeeded') {
+      process.exitCode = 1;
+      console.log('Flow halted: implementation-gate failed.');
+      return;
+    }
+    console.log('Flow complete: docs-review -> implementation-gate.');
+  });
 }
 
 async function handlePlan(orchestrator: CodexOrchestrator, rawArgs: string[]): Promise<void> {
@@ -530,14 +758,7 @@ function emitRunOutput(
   format: OutputFormat,
   label: string
 ): void {
-  const payload: RunOutputPayload = {
-    run_id: result.manifest.run_id,
-    status: result.manifest.status,
-    artifact_root: result.manifest.artifact_root,
-    manifest: `${result.manifest.artifact_root}/manifest.json`,
-    log_path: result.manifest.log_path,
-    summary: result.manifest.summary ?? null
-  };
+  const payload = toRunOutputPayload(result);
   if (format === 'json') {
     console.log(JSON.stringify(payload, null, 2));
     return;
@@ -552,6 +773,27 @@ function emitRunOutput(
       console.log(`  ${line}`);
     }
   }
+}
+
+function toRunOutputPayload(
+  result: {
+    manifest: {
+      run_id: string;
+      status: string;
+      artifact_root: string;
+      log_path: string | null;
+      summary?: string | null;
+    };
+  }
+): RunOutputPayload {
+  return {
+    run_id: result.manifest.run_id,
+    status: result.manifest.status,
+    artifact_root: result.manifest.artifact_root,
+    manifest: `${result.manifest.artifact_root}/manifest.json`,
+    log_path: result.manifest.log_path,
+    summary: result.manifest.summary ?? null
+  };
 }
 
 interface ParsedExecArgs {
@@ -600,6 +842,55 @@ async function handleExec(rawArgs: string[]): Promise<void> {
     process.exitCode = result.exitCode;
   } else if (result.status !== 'succeeded') {
     process.exitCode = 1;
+  }
+
+  if (outputMode === 'interactive') {
+    await maybeEmitExecAdoptionHint(env.taskId);
+  }
+}
+
+async function shouldScanExecAdoptionHint(taskFilter: string | undefined): Promise<boolean> {
+  if (!taskFilter) {
+    return false;
+  }
+  const env = resolveEnvironmentPaths();
+  const taskCliRunsRoot = join(env.runsRoot, taskFilter, 'cli');
+  let handle: Awaited<ReturnType<typeof opendir>> | null = null;
+  try {
+    handle = await opendir(taskCliRunsRoot);
+    let runCount = 0;
+    for await (const entry of handle) {
+      if (!entry.isDirectory()) {
+        continue;
+      }
+      runCount += 1;
+      if (runCount > 150) {
+        return false;
+      }
+    }
+    return true;
+  } catch {
+    return false;
+  } finally {
+    if (handle) {
+      await handle.close().catch(() => undefined);
+    }
+  }
+}
+
+async function maybeEmitExecAdoptionHint(taskFilter: string | undefined): Promise<void> {
+  try {
+    if (!(await shouldScanExecAdoptionHint(taskFilter))) {
+      return;
+    }
+    const usage = await runDoctorUsage({ windowDays: 7, taskFilter });
+    const recommendation = usage.adoption.recommendations[0];
+    if (!recommendation) {
+      return;
+    }
+    console.log(`Adoption hint: ${recommendation}`);
+  } catch {
+    // Exec command behavior should not fail when usage telemetry cannot be read.
   }
 }
 
@@ -687,6 +978,7 @@ Options:
     throw new Error('No bundled skills detected; cannot run setup.');
   }
   const forceSkills = bundledSkills.filter((skill) => skill !== 'chrome-devtools');
+  const guidance = buildSetupGuidance();
 
   if (!apply) {
     const forceOnly = forceSkills.join(',');
@@ -705,7 +997,8 @@ Options:
           note: 'Installs bundled skills into $CODEX_HOME/skills (setup avoids overwriting chrome-devtools when already present).'
         },
         delegation,
-        devtools
+        devtools,
+        guidance
       }
     };
 
@@ -721,6 +1014,9 @@ Options:
     }
     console.log(`- Delegation: codex-orchestrator delegation setup --yes${delegationRepoArg}`);
     console.log('- DevTools: codex-orchestrator devtools setup --yes');
+    for (const line of formatSetupGuidanceSummary(guidance)) {
+      console.log(line);
+    }
     console.log('Run with --yes to apply this setup.');
     return;
   }
@@ -754,7 +1050,42 @@ Options:
   for (const line of formatDevtoolsSetupSummary(devtools)) {
     console.log(line);
   }
+  for (const line of formatSetupGuidanceSummary(guidance)) {
+    console.log(line);
+  }
   console.log('Next: codex-orchestrator doctor --usage');
+}
+
+function buildSetupGuidance(): SetupGuidancePayload {
+  return {
+    note: 'Agent-first default: run docs-review before implementation and implementation-gate before handoff.',
+    references: [
+      'https://github.com/Kbediako/CO#downstream-usage-cheatsheet-agent-first',
+      'https://github.com/Kbediako/CO/blob/main/docs/AGENTS.md',
+      'https://github.com/Kbediako/CO/blob/main/docs/guides/collab-vs-mcp.md'
+    ],
+    recommended_commands: [
+      'codex-orchestrator flow --task <task-id>',
+      'codex-orchestrator doctor --usage'
+    ]
+  };
+}
+
+function formatSetupGuidanceSummary(guidance: SetupGuidancePayload): string[] {
+  const lines: string[] = ['Setup guidance:', `- ${guidance.note}`];
+  if (guidance.recommended_commands.length > 0) {
+    lines.push('- Recommended commands:');
+    for (const command of guidance.recommended_commands) {
+      lines.push(`  - ${command}`);
+    }
+  }
+  if (guidance.references.length > 0) {
+    lines.push('- References:');
+    for (const reference of guidance.references) {
+      lines.push(`  - ${reference}`);
+    }
+  }
+  return lines;
 }
 
 async function handleDoctor(rawArgs: string[]): Promise<void> {
@@ -1287,6 +1618,17 @@ Commands:
     --interactive | --ui    Enable read-only HUD when running in a TTY.
     --no-interactive        Force disable HUD (default is off unless requested).
 
+  flow                      Run docs-review then implementation-gate sequentially.
+    --task <id>             Override task identifier (defaults to MCP_RUNNER_TASK_ID).
+    --parent-run <id>       Link docs-review run to parent run id.
+    --approval-policy <p>   Record approval policy metadata.
+    --format json           Emit machine-readable output summary for both runs.
+    --execution-mode <mcp|cloud>  Force execution mode for both runs.
+    --cloud                 Shortcut for --execution-mode cloud.
+    --target <stage-id>     Focus plan/build metadata on a specific stage (alias: --target-stage).
+    --interactive | --ui    Enable read-only HUD when running in a TTY.
+    --no-interactive        Force disable HUD (default is off unless requested).
+
   plan [pipeline]           Preview pipeline stages without executing.
     --task <id>             Override task identifier.
     --format json           Emit machine-readable output.
@@ -1458,5 +1800,23 @@ Options:
   --interactive | --ui    Enable read-only HUD when running in a TTY.
   --no-interactive        Force disable HUD.
   --help                  Show this message.
+`);
+}
+
+function printFlowHelp(): void {
+  console.log(`Usage: codex-orchestrator flow [options]
+
+Runs docs-review first, then implementation-gate. Stops on the first failure.
+
+Options:
+  --task <id>               Override task identifier.
+  --parent-run <id>         Link docs-review run to parent run id.
+  --approval-policy <p>     Record approval policy metadata.
+  --format json             Emit machine-readable output for both runs.
+  --execution-mode <mcp|cloud>  Force execution mode for both runs.
+  --cloud                   Shortcut for --execution-mode cloud.
+  --target <stage-id>       Focus plan/build metadata (applies where the stage exists).
+  --interactive | --ui      Enable read-only HUD when running in a TTY.
+  --no-interactive          Force disable HUD.
 `);
 }

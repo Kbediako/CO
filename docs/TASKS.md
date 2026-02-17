@@ -9,6 +9,20 @@ Archived task snapshots live on the task-archives branch.
 - 2025: https://github.com/Kbediako/CO/blob/task-archives/docs/TASKS-archive-2025.md
 - 2026: https://github.com/Kbediako/CO/blob/task-archives/docs/TASKS-archive-2026.md
 <!-- tasks-archive-index:end -->
+# Task List Snapshot - Downstream Usage Adoption + Guardrail Flow + Setup Guidance (0968-downstream-usage-adoption-flow-guidance)
+- **Update - 2026-02-16:** Task created; export `MCP_RUNNER_TASK_ID=0968-downstream-usage-adoption-flow-guidance`; guardrails required: `node scripts/delegation-guard.mjs`, `node scripts/spec-guard.mjs --dry-run`, `npm run build`, `npm run lint`, `npm run test`, `npm run docs:check`, `npm run docs:freshness`, `node scripts/diff-budget.mjs`, `npm run review`. Checklist mirror: `tasks/tasks-0968-downstream-usage-adoption-flow-guidance.md`, `.agent/task/0968-downstream-usage-adoption-flow-guidance.md`.
+- [x] Foundation: task scaffolding + mirrors registered. Evidence: `docs/TASKS.md`, `tasks/index.json`, `tasks/tasks-0968-downstream-usage-adoption-flow-guidance.md`, `.agent/task/0968-downstream-usage-adoption-flow-guidance.md`.
+- [x] Foundation: PRD + TECH_SPEC + ACTION_PLAN drafted. Evidence: `docs/PRD-downstream-usage-adoption-flow-guidance.md`, `tasks/specs/0968-downstream-usage-adoption-flow-guidance.md`, `docs/ACTION_PLAN-downstream-usage-adoption-flow-guidance.md`, `docs/TECH_SPEC-downstream-usage-adoption-flow-guidance.md`.
+- [x] Foundation: delegation subagent run captured. Evidence: `.runs/0968-downstream-usage-adoption-flow-guidance-scout/cli/2026-02-16T22-21-15-558Z-d70de1a6/manifest.json`.
+- [x] Validation: docs-review manifest captured. Evidence: `.runs/0968-downstream-usage-adoption-flow-guidance/cli/2026-02-16T22-22-31-075Z-594dfd65/manifest.json`.
+- [x] Validation: standalone pre-implementation review captured. Evidence: `out/0968-downstream-usage-adoption-flow-guidance/manual/pre-implementation-standalone-review.log`.
+- [x] Implementation: post-`exec` usage recommendation nudge shipped. Evidence: `bin/codex-orchestrator.ts`, `tests/cli-command-surface.spec.ts`.
+- [x] Implementation: `flow` command ships docs-review -> implementation-gate shortcut with help/docs coverage. Evidence: `bin/codex-orchestrator.ts`, `tests/cli-command-surface.spec.ts`, `README.md`, `docs/README.md`.
+- [x] Implementation: setup guidance now includes canonical policy references + recommended commands. Evidence: `bin/codex-orchestrator.ts`, `tests/cli-command-surface.spec.ts`.
+- [x] Validation: implementation-gate passed. Evidence: `.runs/0968-downstream-usage-adoption-flow-guidance/cli/2026-02-16T23-19-01-131Z-ec3b6038/manifest.json`.
+- [x] Validation: standalone post-implementation elegance review completed. Evidence: `out/0968-downstream-usage-adoption-flow-guidance/manual/post-implementation-standalone-review.log`.
+- [x] Validation: manual E2E in CO + downstream usage snapshot updated. Evidence: `out/0968-downstream-usage-adoption-flow-guidance/manual/e2e-validation.log`, `out/0968-downstream-usage-adoption-flow-guidance/manual/downstream-usage-validation.log`, `out/0968-downstream-usage-adoption-flow-guidance/manual/exec-interactive.log`.
+
 # Task List Snapshot - PR Watch Required-Checks Gate + Review Artifacts Guide (0967-pr-watch-required-checks-review-artifacts)
 - **Update - 2026-02-16:** Task created; export `MCP_RUNNER_TASK_ID=0967-pr-watch-required-checks-review-artifacts`; guardrails required: `node scripts/delegation-guard.mjs`, `node scripts/spec-guard.mjs --dry-run`, `npm run build`, `npm run lint`, `npm run test`, `npm run docs:check`, `npm run docs:freshness`, `node scripts/diff-budget.mjs`, `npm run review`. Checklist mirror: `tasks/tasks-0967-pr-watch-required-checks-review-artifacts.md`, `.agent/task/0967-pr-watch-required-checks-review-artifacts.md`.
 - [x] Foundation: task scaffolding + mirrors registered. Evidence: `docs/TASKS.md`, `tasks/index.json`, `tasks/tasks-0967-pr-watch-required-checks-review-artifacts.md`, `.agent/task/0967-pr-watch-required-checks-review-artifacts.md`.

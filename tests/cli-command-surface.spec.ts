@@ -67,6 +67,13 @@ describe('codex-orchestrator command surface', () => {
     expect(stdout).toContain('Usage: codex-orchestrator setup');
   }, TEST_TIMEOUT);
 
+  it('prints flow help', async () => {
+    const { stdout } = await runCli(['flow', '--help']);
+    expect(stdout).toContain('Usage: codex-orchestrator flow');
+    expect(stdout).toContain('docs-review');
+    expect(stdout).toContain('implementation-gate');
+  }, TEST_TIMEOUT);
+
   it('prints rlm help without running when help flag is passed before goal', async () => {
     const { stdout } = await runCli(['rlm', '--help']);
     expect(stdout).toContain('Usage: codex-orchestrator rlm');
@@ -104,9 +111,25 @@ describe('codex-orchestrator command surface', () => {
       CODEX_HOME: tempDir
     };
     const { stdout } = await runCli(['setup', '--format', 'json'], env);
-    const payload = JSON.parse(stdout) as { status?: string; steps?: Record<string, unknown> };
+    const payload = JSON.parse(stdout) as {
+      status?: string;
+      steps?: {
+        guidance?: {
+          note?: string;
+          references?: string[];
+          recommended_commands?: string[];
+        };
+      } & Record<string, unknown>;
+    };
     expect(payload.status).toBe('planned');
     expect(payload.steps).toBeTruthy();
+    expect(payload.steps?.guidance?.note).toContain('Agent-first default');
+    expect(payload.steps?.guidance?.references).toContain(
+      'https://github.com/Kbediako/CO/blob/main/docs/AGENTS.md'
+    );
+    expect(payload.steps?.guidance?.recommended_commands).toContain(
+      'codex-orchestrator flow --task <task-id>'
+    );
   }, TEST_TIMEOUT);
 
   it('supports quoted exec commands passed as a single token', async () => {
