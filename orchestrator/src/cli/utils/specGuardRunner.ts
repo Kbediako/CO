@@ -73,7 +73,8 @@ export async function runSpecGuardRunner(argv: string[] = process.argv.slice(2))
   }
 
   const child = spawn(process.execPath, [specGuardPath, ...argv], {
-    stdio: 'inherit'
+    stdio: 'inherit',
+    cwd: repoRoot
   });
 
   child.on('error', (error) => {
