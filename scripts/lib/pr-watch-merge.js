@@ -486,8 +486,7 @@ export function buildStatusSnapshot(response, requiredChecks = null, inlineBotFe
     inlineBotFeedback && typeof inlineBotFeedback.unacknowledgedCount === 'number'
       ? inlineBotFeedback.unacknowledgedCount
       : 0;
-  const botFeedbackFetchError =
-    inlineBotFeedback && inlineBotFeedback.fetchError === true;
+  const botFeedbackFetchError = inlineBotFeedback?.fetchError === true;
   const gateChecks = requiredCheckSummary ?? checks;
   const gateChecksSource = requiredCheckSummary ? 'required' : 'rollup';
 

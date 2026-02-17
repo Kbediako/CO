@@ -83,6 +83,7 @@ describe('pr watch-merge required-check gating', () => {
     expect(snapshot.gateChecksSource).toBe('rollup');
     expect(snapshot.readyToMerge).toBe(false);
     expect(snapshot.gateReasons).toContain('checks_pending=1');
+    expect(snapshot.botFeedbackFetchError).toBe(false);
   });
 
   it('blocks merge readiness when unacknowledged bot inline feedback exists', () => {
