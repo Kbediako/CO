@@ -94,6 +94,24 @@ function isActionableBot(login) {
   return ACTIONABLE_BOT_LOGINS.has(normalizeLogin(login));
 }
 
+export function isHumanReviewActor(user) {
+  if (!user || typeof user !== 'object') {
+    return false;
+  }
+  const login = normalizeLogin(user.login);
+  if (!login) {
+    return false;
+  }
+  if (isActionableBot(login)) {
+    return false;
+  }
+  const accountType = typeof user.type === 'string' ? user.type.trim().toUpperCase() : '';
+  if (accountType) {
+    return accountType === 'USER';
+  }
+  return !login.endsWith('[bot]');
+}
+
 function formatDuration(ms) {
   if (ms <= 0) {
     return '0s';
@@ -659,7 +677,7 @@ async function fetchInlineBotFeedback(owner, repo, prNumber, headOid) {
       }
 
       const replies = repliesByParentId.get(commentId) ?? [];
-      const hasHumanReply = replies.some((reply) => !isActionableBot(reply?.user?.login));
+      const hasHumanReply = replies.some((reply) => isHumanReviewActor(reply?.user));
       if (!hasHumanReply) {
         unacknowledgedCount += 1;
       }

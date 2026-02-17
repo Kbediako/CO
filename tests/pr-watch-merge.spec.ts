@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   buildStatusSnapshot,
+  isHumanReviewActor,
   resolveCachedRequiredChecksSummary,
   resolveRequiredChecksSummary,
   summarizeRequiredChecks
@@ -191,5 +192,33 @@ describe('resolveCachedRequiredChecksSummary', () => {
       'def456'
     );
     expect(resolved).toBeNull();
+  });
+});
+
+describe('isHumanReviewActor', () => {
+  it('requires non-bot actors before clearing feedback gates', () => {
+    expect(
+      isHumanReviewActor({
+        login: 'chatgpt-codex-connector[bot]',
+        type: 'Bot'
+      })
+    ).toBe(false);
+    expect(
+      isHumanReviewActor({
+        login: 'some-other-bot[bot]'
+      })
+    ).toBe(false);
+    expect(
+      isHumanReviewActor({
+        login: 'some-other-bot',
+        type: 'Bot'
+      })
+    ).toBe(false);
+    expect(
+      isHumanReviewActor({
+        login: 'maintainer',
+        type: 'User'
+      })
+    ).toBe(true);
   });
 });

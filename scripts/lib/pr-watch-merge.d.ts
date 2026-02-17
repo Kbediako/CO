@@ -44,6 +44,16 @@ export interface PrWatchMergeRequiredChecksCache {
 
 export function printPrWatchMergeHelp(options?: PrWatchMergeOptions): void;
 
+export function isHumanReviewActor(
+  user:
+    | {
+        login?: string | null;
+        type?: string | null;
+      }
+    | null
+    | undefined
+): boolean;
+
 export function summarizeRequiredChecks(entries: unknown): PrWatchMergeCheckSummary;
 
 export function resolveRequiredChecksSummary(
