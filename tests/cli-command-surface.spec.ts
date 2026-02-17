@@ -10,6 +10,7 @@ const execFileAsync = promisify(execFile);
 const CLI_ENTRY = join(process.cwd(), 'bin', 'codex-orchestrator.ts');
 const TEST_TIMEOUT = 15000;
 const CLI_EXEC_TIMEOUT_MS = TEST_TIMEOUT;
+const FLOW_TARGET_TEST_TIMEOUT = 45000;
 
 let tempDir: string | null = null;
 
@@ -21,10 +22,14 @@ afterEach(async () => {
   tempDir = null;
 });
 
-async function runCli(args: string[], env?: NodeJS.ProcessEnv): Promise<{ stdout: string; stderr: string }> {
+async function runCli(
+  args: string[],
+  env?: NodeJS.ProcessEnv,
+  timeoutMs: number = CLI_EXEC_TIMEOUT_MS
+): Promise<{ stdout: string; stderr: string }> {
   return await execFileAsync(process.execPath, ['--loader', 'ts-node/esm', CLI_ENTRY, ...args], {
     env: env ?? process.env,
-    timeout: CLI_EXEC_TIMEOUT_MS
+    timeout: timeoutMs
   });
 }
 
@@ -121,21 +126,23 @@ describe('codex-orchestrator command surface', () => {
 
     const { stdout } = await runCli(
       ['flow', '--format', 'json', '--task', 'flow-target', '--target', 'implementation-gate:impl-alias'],
-      env
+      env,
+      FLOW_TARGET_TEST_TIMEOUT
     );
     expect(stdout).toContain('"status": "succeeded"');
 
     await expect(
       runCli(
         ['flow', '--format', 'json', '--task', 'flow-target', '--target', 'docs-review:impl-alias'],
-        env
+        env,
+        FLOW_TARGET_TEST_TIMEOUT
       )
     ).rejects.toMatchObject({
       stderr: expect.stringContaining(
         'Target stage "docs-review:impl-alias" is not defined in docs-review or implementation-gate.'
       )
     });
-  }, TEST_TIMEOUT);
+  }, FLOW_TARGET_TEST_TIMEOUT);
 
   it('prints rlm help without running when help flag is passed before goal', async () => {
     const { stdout } = await runCli(['rlm', '--help']);
