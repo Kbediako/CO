@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp f4bbf765774ba526f94224462c07de5054c1f92aa5d94dd36d39ffae6ae61393 -->
+<!-- codex:instruction-stamp 4f9803271a8209cf58746c0a71d87421952a402c884cc0262a8765fa5c456128 -->
 # Agent Instructions (Template)
 
 ## Orchestrator-first workflow
@@ -28,6 +28,7 @@
 
 ## Deliberation Default (agent-first)
 - Keep MCP as the lead control plane. Use collab/delegated subagents for deliberation when ambiguity or impact is high.
+- Terminology: `collab` is the workflow/tooling name, while Codex CLI feature gating uses `features.multi_agent=true` (legacy alias/names like `RLM_SYMBOLIC_COLLAB` and `manifest.collab_tool_calls` still use `collab`).
 - Run full deliberation on any hard-stop trigger:
   - Irreversible/destructive changes with unclear rollback.
   - Auth/secrets/PII boundary changes.
@@ -49,6 +50,8 @@
 
 ## Agent role baseline
 - Built-in roles are `default`, `explorer`, and `worker`; `researcher` is user-defined.
+- `spawn_agent` defaults to `default` when `agent_type` is omitted; always set `agent_type` explicitly.
+- For symbolic collab runs, prefix spawned prompts with `[agent_type:<role>]` on line one so role intent is auditable from JSONL/manifests.
 - Keep top-level defaults on latest codex by setting `model = "gpt-5.3-codex"` in `~/.codex/config.toml`.
 - Define a user `agents.explorer` role without `config_file` so built-in explorer inherits top-level model defaults.
 - Spark caveat: `gpt-5.3-codex-spark` is text-only.

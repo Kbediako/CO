@@ -3,8 +3,9 @@
 ## Default stance (agent-first)
 - **MCP is the default control plane** for approvals, tool routing, delegation, and audit trails.
 - **Collab is additive** for intra-run multi-agent collaboration (brainstorming, role splits, parallel subcalls).
-- If unsure, choose **MCP**. Collab is opt-in (`codex-orchestrator rlm --collab auto "<goal>"` or `RLM_SYMBOLIC_COLLAB=1`) and requires Codex `features.multi_agent=true` (`collab` is a legacy alias).
+- If unsure, choose **MCP**. Collab is opt-in (`codex-orchestrator rlm --multi-agent auto "<goal>"` or `RLM_SYMBOLIC_MULTI_AGENT=1`; legacy aliases: `--collab auto`, `RLM_SYMBOLIC_COLLAB=1`) and requires Codex `features.multi_agent=true` (`collab` is a legacy alias).
 - **Top-level Codex (lead/representative) must run via MCP.** Collab agents are subordinate assistants and do not represent the run or make final decisions.
+- For collab `spawn_agent`, always set explicit `agent_type` (omission defaults to `default`) and tag spawned prompts with `[agent_type:<role>]`.
 
 ## Decision matrix
 
@@ -24,6 +25,20 @@
 - Do not use collab as a replacement for MCP when you need approvals, sandbox enforcement, or manifest-grade auditability.
 - Collab can be enabled per-run and should remain off by default unless explicitly required.
 - For Playwright-heavy flows, run browser steps in a dedicated subagent stream, keep Playwright MCP off outside that stream, and return artifact paths plus a terse summary instead of raw dumps.
+- Current Codex CLI behavior is id-centric for collab UI/events: `agent_type` may not be visibly surfaced in the TUI and may be absent from emitted `collab_tool_call` payloads. Keep explicit prompt role tags (`[agent_type:<role>]`) and watch upstream CLI updates for direct `agent_type` exposure.
+
+## Legacy-Collab Removal Playbook
+- Trigger: upstream Codex removes or hard-fails `collab` legacy aliases.
+- Immediate CO behavior:
+  - Continue accepting `--collab` and `RLM_SYMBOLIC_COLLAB` as local compatibility aliases mapped to canonical `--multi-agent` and `RLM_SYMBOLIC_MULTI_AGENT`.
+  - Keep non-blocking warnings on legacy alias usage.
+- Hard-cutover gate (before removing local aliases):
+  - Shipped/global skills and AGENTS templates are canonical-first (`multi_agent`).
+  - README/doctor/help examples are canonical-first.
+  - Manual smoke checks pass for both canonical toggles and legacy alias compatibility.
+- Removal policy:
+  - Remove local `--collab` / `RLM_SYMBOLIC_COLLAB` aliases only in a dedicated follow-up task with release-note migration callouts.
+  - Keep `manifest.collab_tool_calls` stable until a schema-versioned manifest migration is approved.
 
 ## Cloud Mode (When Relevant)
 - Prefer cloud mode for long-running, highly parallel, or locally constrained work.
@@ -69,7 +84,8 @@ On soft cap, stop branching and execute the best current plan. On hard cap, disa
   - `RLM_SYMBOLIC_DELIBERATION_MAX_SUMMARY_BYTES=2048` (bounded planner context injection)
   - `RLM_SYMBOLIC_DELIBERATION_INCLUDE_IN_PLANNER=1` (inject latest brief into planner prompt)
   - `RLM_SYMBOLIC_DELIBERATION_LOG=0` (default; set `1` to persist deliberation prompt/output/meta artifacts)
-- When `RLM_SYMBOLIC_COLLAB=1`, deliberation runs through collab lifecycle (`spawn_agent` → `wait` → `close_agent`) with read-only sandboxing.
+- When `RLM_SYMBOLIC_MULTI_AGENT=1` (legacy alias: `RLM_SYMBOLIC_COLLAB=1`), deliberation runs through collab lifecycle (`spawn_agent` → `wait` → `close_agent`) with read-only sandboxing.
+- Symbolic collab lifecycle validation enforces prompt-role evidence by default and validates `agent_type` when present. Override only when intentionally needed: `RLM_SYMBOLIC_MULTI_AGENT_ROLE_POLICY=warn|off` (legacy alias: `RLM_COLLAB_ROLE_POLICY`) or `RLM_SYMBOLIC_MULTI_AGENT_ALLOW_DEFAULT_ROLE=1` (legacy alias: `RLM_COLLAB_ALLOW_DEFAULT_ROLE`).
 
 ### Review signal policy
 - `P0` critical findings are hard-stop.

@@ -199,9 +199,9 @@ export function runDoctor(cwd: string = process.cwd()): DoctorResult {
       enabled: collabEnabled,
       feature_key: collabFeatureKey,
       enablement: [
-        'Enable collab for symbolic RLM runs with: codex-orchestrator rlm --collab auto "<goal>"',
-        'Or set: RLM_SYMBOLIC_COLLAB=1 (implies symbolic mode when using --collab).',
-        'If collab is disabled in codex features: codex features enable multi_agent (legacy alias: collab)'
+        'Enable collab for symbolic RLM runs with: codex-orchestrator rlm --multi-agent auto "<goal>" (legacy: --collab auto).',
+        'Or set: RLM_SYMBOLIC_MULTI_AGENT=1 (legacy alias: RLM_SYMBOLIC_COLLAB=1).',
+        'If multi-agent is disabled in codex features: codex features enable multi_agent (legacy alias: collab)'
       ]
     },
     cloud: {

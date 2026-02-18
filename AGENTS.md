@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp 98c2eb751bb2af9914278809b1e7ed555bb59171027356f3ad9b9264fa982669 -->
+<!-- codex:instruction-stamp aa3ef43827a2169afeb6c77c39a0298dd0607fa5f639fd73faf84d91db49437d -->
 # Codex-Orchestrator Agent Handbook (Template)
 
 Use this repository as the wrapper that coordinates multiple Codex-driven projects. After cloning, replace placeholder metadata (task IDs, documents, SOPs) with values for each downstream initiative while keeping these shared guardrails in place.
@@ -16,11 +16,14 @@ Use this repository as the wrapper that coordinates multiple Codex-driven projec
 ## MCP vs Collab (Decision Rule)
 - Default to MCP for approvals, tool routing, delegation, external integrations, and audit trails.
 - Use collab only for intra-run brainstorming, role-split planning, or parallel subcalls.
-- Collab means auxiliary assistant agents inside a run; enable it via `RLM_SYMBOLIC_COLLAB=1` (see `docs/guides/collab-vs-mcp.md`).
+- Collab means auxiliary assistant agents inside a run; enable it via `RLM_SYMBOLIC_MULTI_AGENT=1` (legacy alias: `RLM_SYMBOLIC_COLLAB=1`; see `docs/guides/collab-vs-mcp.md`).
+- Terminology: `collab` is the workflow/tooling name, while Codex CLI feature gating uses `features.multi_agent=true` (legacy alias/names like `RLM_SYMBOLIC_COLLAB` and `manifest.collab_tool_calls` still use `collab`).
 - The “top-level Codex” is the MCP-run agent the user is interacting with; collab agents are assistants and do not represent the run.
 
 ## Agent Role Baseline
 - Built-in roles are `default`, `explorer`, and `worker`; `researcher` is user-defined.
+- `spawn_agent` defaults to `default` when `agent_type` is omitted; always set `agent_type` explicitly.
+- For symbolic collab runs, prefix spawned prompts with `[agent_type:<role>]` on line one so role intent is auditable from JSONL/manifests.
 - Keep top-level defaults on latest codex by setting `model = "gpt-5.3-codex"` in `~/.codex/config.toml`.
 - Define a user `agents.explorer` role without `config_file` so built-in explorer inherits your top-level model defaults instead of older built-in profiles.
 - Caveat: spark models are text-only; use non-spark roles when image inputs are required.

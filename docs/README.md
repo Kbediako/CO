@@ -187,7 +187,7 @@ Notes:
 - `TaskStateStore` writes per-task snapshots with bounded lock retries; failures degrade gracefully while still writing the main manifest.
 - `RunManifestWriter` generates the canonical manifest JSON for each run (mirrored under `.runs/`), while metrics appenders and summary writers keep `out/` up to date.
 - `run-summary.json` now carries `usageKpi` run-level signals (cloud/collab/delegation/rlm indicators) and `cloudFallback` details when a cloud request is downgraded to MCP.
-- `collab_tool_calls` in the manifest captures collab tool call JSONL lines extracted from command stdout (bounded by `CODEX_ORCHESTRATOR_COLLAB_MAX_EVENTS`, default 200; set 0 to disable capture).
+- `collab_tool_calls` in the manifest captures collab tool call JSONL lines extracted from command stdout (bounded by `CODEX_ORCHESTRATOR_COLLAB_MAX_EVENTS`, default 200; set 0 to disable capture). For `spawn_agent` calls, keep prompt-role intent explicit (first-line `[agent_type:<role>]`) and set `agent_type` when supported so routing remains auditable even when event payloads omit `agent_type`.
 - Heartbeat files and timestamps guard against stalled runs. `orchestrator/src/cli/metrics/metricsRecorder.ts` aggregates command durations, exit codes, and guardrail stats for later review.
 - Optional caps: `CODEX_ORCHESTRATOR_EXEC_EVENT_MAX_CHUNKS` limits captured exec chunk events per command (defaults to 500; set 0 for no cap), `CODEX_ORCHESTRATOR_TELEMETRY_MAX_EVENTS` caps in-memory telemetry events queued before flush (defaults to 1000; set 0 for no cap), and `CODEX_METRICS_PRIVACY_EVENTS_MAX` limits privacy decision events stored in `metrics.json` (-1 = no cap; `privacy_event_count` still reflects total).
 

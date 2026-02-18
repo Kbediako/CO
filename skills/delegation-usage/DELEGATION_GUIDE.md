@@ -9,7 +9,7 @@ Use this guide for deeper context on delegation behavior, tool surfaces, and tro
 - It does **not** provide general tools itself; it only exposes `delegate.*` + optional `github.*` tools.
 - Child runs get tools based on `delegate.mode` + `delegate.tool_profile` + repo caps.
 - Delegation MCP stays enabled by default (only MCP on by default); disable it only when required by safety constraints.
-- Collab multi-agent mode is separate from delegation; for symbolic RLM subcalls, set `RLM_SYMBOLIC_COLLAB=1` and ensure your Codex CLI has `features.multi_agent=true` (`collab` is a legacy alias). Collab tool calls are recorded in `manifest.collab_tool_calls`. If collab tools are unavailable in your CLI build, skip collab steps; delegation still works independently.
+- Multi-agent (collab tools) mode is separate from delegation; for symbolic RLM subcalls, set `RLM_SYMBOLIC_MULTI_AGENT=1` (legacy alias: `RLM_SYMBOLIC_COLLAB=1`) and ensure your Codex CLI has `features.multi_agent=true` (`collab` is a legacy alias/name in some keys). Collab tool calls are recorded in `manifest.collab_tool_calls`. If collab tools are unavailable in your CLI build, skip collab steps; delegation still works independently.
 
 ## Background-run pattern (preferred)
 
@@ -81,11 +81,13 @@ delegate.spawn({
 })
 ```
 
-## Collab lifecycle hygiene (required)
+## Multi-agent (collab tools) lifecycle hygiene (required)
 
 When using collab tools (`spawn_agent` / `wait` / `close_agent`):
 
 - Treat each spawned `agent_id` as a resource that must be closed.
+- `spawn_agent` falls back to `default` when `agent_type` is omitted; always set `agent_type` explicitly.
+- Prefix spawned prompts with `[agent_type:<role>]` on line one for auditable role routing.
 - For every successful spawn, run `wait` then `close_agent` for the same id.
 - Keep a local list of spawned ids and run a final cleanup pass before returning.
 - On timeout/error paths, still close known ids before reporting failure.
@@ -138,6 +140,8 @@ Delegation MCP expects JSONL. Keep `codex-orchestrator` aligned with the current
 ## Agent role guard (recommended)
 
 - Built-in agent roles are `default`, `explorer`, `worker`; `researcher` is user-defined.
+- `spawn_agent` omission defaults to `default`; require explicit `agent_type` for every spawn.
+- For symbolic collab runs, include a first-line role tag in spawned prompts: `[agent_type:<role>]`.
 - Built-in `explorer` may map to an older model profile unless overridden in `~/.codex/config.toml`.
 - Recommended baseline:
   - `model = "gpt-5.3-codex"`
@@ -155,5 +159,6 @@ Delegation MCP expects JSONL. Keep `codex-orchestrator` aligned with the current
 - **Missing control files**: delegate tools rely on `control_endpoint.json` in the run directory.
 - **Run identifiers**: status/pause/cancel require `manifest_path`; question queue requires `parent_manifest_path`.
 - **Collab payload mismatch**: `spawn_agent` calls fail if they include both `message` and `items`.
+- **Collab role routing drift**: if symbolic collab lifecycle validation reports missing/disallowed spawn roles, set explicit `agent_type` and add first-line `[agent_type:<role>]` tags.
 - **Collab depth limits**: recursive collab fan-out can fail near max depth; prefer shallow parent fan-out.
 - **Collab lifecycle leaks**: missing `close_agent` calls can exhaust thread slots and block future spawns (`agent thread limit reached`).

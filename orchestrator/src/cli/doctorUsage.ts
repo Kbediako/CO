@@ -449,7 +449,7 @@ function buildAdoptionRecommendations(params: {
   }
   if (params.rlmRuns === 0) {
     hints.push(
-      'No RLM runs detected; try `codex-orchestrator rlm --collab auto "<goal>"` for long-horizon or ambiguous tasks.'
+      'No RLM runs detected; try `codex-orchestrator rlm --multi-agent auto "<goal>"` (legacy: `--collab auto`) for long-horizon or ambiguous tasks.'
     );
   }
   if (params.cloudRuns === 0) {
@@ -459,7 +459,7 @@ function buildAdoptionRecommendations(params: {
   }
   if (params.rlmRuns > 0 && params.collabRunsWithToolCalls === 0) {
     hints.push(
-      'RLM is used without collab activity; ensure collab is enabled (`codex features enable multi_agent`, legacy alias: `collab`).'
+      'RLM is used without collab activity; ensure multi-agent is enabled (`codex features enable multi_agent`, legacy alias: `collab`).'
     );
   }
   return hints.slice(0, 3);

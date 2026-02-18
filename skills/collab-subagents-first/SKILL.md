@@ -11,6 +11,12 @@ Delegate as a manager, not as a pass-through. Split work into narrow streams, gi
 
 Note: If a global `collab-subagents-first` skill is installed, prefer that and fall back to this bundled skill.
 
+## Terminology + feature gate
+
+- Use "collab" as the workflow/tooling term for subagent calls (`spawn_agent` / `wait` / `close_agent`).
+- Codex CLI enablement is `features.multi_agent=true`; `collab` remains as legacy naming in fields like `RLM_SYMBOLIC_COLLAB` and `manifest.collab_tool_calls`.
+- Keep existing env/artifact key names as-is unless upstream explicitly changes those interfaces.
+
 ## Delegation gate
 
 Use subagents when any condition is true:
@@ -89,6 +95,8 @@ Skip subagents when all conditions are true:
   - `message` (plain text), or
   - `items` (structured input).
 - Do not send both `message` and `items` in one spawn call.
+- `spawn_agent` falls back to `default` when `agent_type` is omitted; always set `agent_type` explicitly.
+- Prefix spawned prompts with `[agent_type:<role>]` on line one so role intent is auditable from collab JSONL/manifests.
 - Use `items` when you need explicit structured context (for example `mention` paths like `app://...` or selected `skill` entries) instead of flattening everything into one long string.
 - Spawn returns an `agent_id` (thread id). Collab event rendering/picker labels are id-based today; do not depend on custom visible agent names.
 - To keep operator readability high despite id labels, encode the role clearly in your stream labels and first-line task brief (for example `review`, `tests`, `research`).
@@ -179,6 +187,7 @@ Do not treat wrapper handoff-only output as a completed review.
 - Do not keep long single-agent execution in parent when a focused subagent can own it.
 - Do not skip delegation solely because there is only one implementation stream; single-stream delegation is valid for context offload.
 - Do not rely on human-readable agent names in TUI labels for control flow; use stream ownership and evidence paths as source of truth.
+- Do not omit `agent_type` on `spawn_agent`; omission silently routes to `default`.
 - Do not end the parent work with unclosed collab agent ids.
 - Do not treat every delegated edit as "unexpected"; first verify whether the edit belongs to an active stream owner.
 

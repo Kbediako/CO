@@ -9,7 +9,12 @@ Symbolic (no collab):
 RLM_MODE=symbolic codex-orchestrator rlm "<goal>"
 ```
 
-Symbolic + collab subagents (requires `collab` enabled in Codex):
+Symbolic + collab subagents (requires Codex `features.multi_agent=true`; `collab` remains a legacy alias):
+```bash
+codex-orchestrator rlm --multi-agent auto "<goal>"
+```
+
+Legacy equivalent:
 ```bash
 codex-orchestrator rlm --collab auto "<goal>"
 ```
