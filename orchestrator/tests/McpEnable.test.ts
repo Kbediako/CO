@@ -214,4 +214,20 @@ describe('runMcpEnable', () => {
     );
     expect(runner).toHaveBeenCalledTimes(1);
   });
+
+  it('throws when codex mcp list returns invalid JSON payload', async () => {
+    const runner = buildRunner([{ exitCode: 0, stdout: '{not json', stderr: '' }]);
+    await expect(runMcpEnable(baseOptions({ commandRunner: runner }))).rejects.toThrow(
+      'codex mcp list --json returned invalid output: invalid JSON payload.'
+    );
+    expect(runner).toHaveBeenCalledTimes(1);
+  });
+
+  it('throws when codex mcp list returns non-array JSON payload', async () => {
+    const runner = buildRunner([{ exitCode: 0, stdout: JSON.stringify({ name: 'delegation' }), stderr: '' }]);
+    await expect(runMcpEnable(baseOptions({ commandRunner: runner }))).rejects.toThrow(
+      'codex mcp list --json returned invalid output: expected top-level JSON array.'
+    );
+    expect(runner).toHaveBeenCalledTimes(1);
+  });
 });

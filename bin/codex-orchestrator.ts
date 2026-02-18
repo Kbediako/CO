@@ -1521,12 +1521,16 @@ async function handleMcp(rawArgs: string[]): Promise<void> {
           .filter((entry) => entry.length > 0)
       : undefined;
     const result = await runMcpEnable({ apply, serverNames });
+    const hasApplyFailures = apply && result.actions.some((action) => action.status === 'failed');
     if (format === 'json') {
       console.log(JSON.stringify(result, null, 2));
-      return;
+    } else {
+      for (const line of formatMcpEnableSummary(result)) {
+        console.log(line);
+      }
     }
-    for (const line of formatMcpEnableSummary(result)) {
-      console.log(line);
+    if (hasApplyFailures) {
+      process.exitCode = 1;
     }
     return;
   }

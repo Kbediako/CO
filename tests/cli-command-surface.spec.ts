@@ -59,6 +59,10 @@ async function writeFakeCodexBinary(dir: string): Promise<string> {
       '  exit 0',
       'fi',
       'if [ "$1" = "mcp" ] && [ "$2" = "add" ]; then',
+      '  if [ -n "$CODEX_TEST_MCP_ADD_FAIL" ]; then',
+      '    echo "${CODEX_TEST_MCP_ADD_FAIL_MESSAGE:-simulated mcp add failure}" 1>&2',
+      '    exit 1',
+      '  fi',
       '  exit 0',
       'fi',
       'exit 0'
@@ -339,6 +343,37 @@ describe('codex-orchestrator command surface', () => {
         status: 'planned'
       })
     ]);
+  }, TEST_TIMEOUT);
+
+  it('returns non-zero when mcp enable --yes has failed actions', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'co-cli-mcp-enable-fail-'));
+    const fakeCodex = await writeFakeCodexBinary(tempDir);
+    const env = {
+      ...process.env,
+      CODEX_CLI_BIN: fakeCodex,
+      CODEX_TEST_MCP_ADD_FAIL: '1',
+      CODEX_TEST_MCP_ADD_FAIL_MESSAGE: 'simulated add failure',
+      CODEX_TEST_MCP_LIST_JSON: JSON.stringify([
+        {
+          name: 'delegation',
+          enabled: false,
+          transport: {
+            type: 'stdio',
+            command: 'node',
+            args: ['scripts/delegation-server.mjs']
+          }
+        }
+      ])
+    };
+
+    try {
+      await runCli(['mcp', 'enable', '--yes'], env);
+      throw new Error('expected mcp enable --yes to fail');
+    } catch (error) {
+      const stdout = (error as { stdout?: string }).stdout ?? '';
+      expect(stdout).toContain('delegation: failed');
+      expect(stdout).toContain('simulated add failure');
+    }
   }, TEST_TIMEOUT);
 
   it('emits setup plan JSON', async () => {

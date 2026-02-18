@@ -64,6 +64,14 @@ interface McpServerRecord {
   };
 }
 
+type ParsedMcpServer = {
+  name: string;
+  enabled: boolean;
+  startupTimeoutSec: number | null;
+  toolTimeoutSec: number | null;
+  transport: McpServerRecord['transport'];
+};
+
 export async function runMcpEnable(options: McpEnableOptions = {}): Promise<McpEnableResult> {
   const env = options.env ?? process.env;
   const codexBin = resolveCodexCliBin(env);
@@ -78,7 +86,13 @@ export async function runMcpEnable(options: McpEnableOptions = {}): Promise<McpE
     throw new Error(`codex mcp list failed: ${compactError(listResult.stderr, listResult.stdout)}`);
   }
 
-  const servers = parseMcpServerList(listResult.stdout);
+  let servers: ParsedMcpServer[];
+  try {
+    servers = parseMcpServerList(listResult.stdout);
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    throw new Error(`codex mcp list --json returned invalid output: ${reason}`);
+  }
   const requestedNames = dedupeNames(options.serverNames ?? []);
   const targetNames =
     requestedNames.length > 0
@@ -177,29 +191,17 @@ export function formatMcpEnableSummary(result: McpEnableResult): string[] {
   return lines;
 }
 
-function parseMcpServerList(raw: string): Array<{
-  name: string;
-  enabled: boolean;
-  startupTimeoutSec: number | null;
-  toolTimeoutSec: number | null;
-  transport: McpServerRecord['transport'];
-}> {
+function parseMcpServerList(raw: string): ParsedMcpServer[] {
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
   } catch {
-    return [];
+    throw new Error('invalid JSON payload.');
   }
   if (!Array.isArray(parsed)) {
-    return [];
+    throw new Error('expected top-level JSON array.');
   }
-  const servers: Array<{
-    name: string;
-    enabled: boolean;
-    startupTimeoutSec: number | null;
-    toolTimeoutSec: number | null;
-    transport: McpServerRecord['transport'];
-  }> = [];
+  const servers: ParsedMcpServer[] = [];
   for (const item of parsed) {
     if (!item || typeof item !== 'object') {
       continue;
