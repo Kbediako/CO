@@ -248,9 +248,11 @@ export async function runDoctorCloudPreflight(options: {
   branch?: string | null;
   taskId?: string | null;
 } = {}): Promise<DoctorCloudPreflightResult> {
-  const cwd = options.cwd ?? process.cwd();
-  const repoRoot = resolveDoctorRepoRoot(cwd);
   const env = options.env ?? process.env;
+  const cwd = options.cwd ?? process.cwd();
+  const configuredRoot = normalizeOptionalString(env.CODEX_ORCHESTRATOR_ROOT);
+  const rootHint = configuredRoot ? resolve(cwd, configuredRoot) : cwd;
+  const repoRoot = resolveDoctorRepoRoot(rootHint);
   const codexBin = resolveCodexCliBin(env);
   const taskId =
     normalizeOptionalString(options.taskId)

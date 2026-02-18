@@ -136,7 +136,14 @@ describe('runDoctor', () => {
     try {
       const result = await runDoctorCloudPreflight({
         cwd: process.cwd(),
-        env: { ...process.env, CODEX_CLOUD_ENV_ID: '', CODEX_CLOUD_BRANCH: '' }
+        env: {
+          ...process.env,
+          CODEX_CLOUD_ENV_ID: '',
+          CODEX_CLOUD_BRANCH: '',
+          MCP_RUNNER_TASK_ID: '',
+          TASK: '',
+          CODEX_ORCHESTRATOR_TASK_ID: ''
+        }
       });
       expect(result.ok).toBe(false);
       expect(result.issues).toEqual(expect.arrayContaining([expect.objectContaining({ code: 'missing_environment' })]));
