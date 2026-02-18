@@ -370,7 +370,11 @@ describe('codex-orchestrator command surface', () => {
     expect(payload.steps?.guidance?.recommended_commands).toContain(
       'codex-orchestrator flow --task <task-id>'
     );
-    expect((payload.steps?.skills?.commandLines ?? []).every((entry) => !entry.includes('--force'))).toBe(true);
+    const commands = payload.steps?.skills?.commandLines ?? [];
+    expect(commands).toHaveLength(1);
+    expect(commands[0]).toContain('--only');
+    expect(commands[0]).toContain('chrome-devtools');
+    expect(commands.every((entry) => !entry.includes('--force'))).toBe(true);
   }, TEST_TIMEOUT);
 
   it('emits setup plan JSON with refresh-skills overwrite commands', async () => {
@@ -390,7 +394,7 @@ describe('codex-orchestrator command surface', () => {
     };
     expect(payload.status).toBe('planned');
     const commands = payload.steps?.skills?.commandLines ?? [];
-    expect(commands.length).toBeGreaterThan(0);
+    expect(commands).toHaveLength(1);
     expect(commands.every((entry) => entry.includes('--force'))).toBe(true);
   }, TEST_TIMEOUT);
 

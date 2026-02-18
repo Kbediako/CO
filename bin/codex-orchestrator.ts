@@ -1142,17 +1142,10 @@ Options:
   if (bundledSkills.length === 0) {
     throw new Error('No bundled skills detected; cannot run setup.');
   }
-  const primarySkillNames = bundledSkills.filter((skill) => skill !== 'chrome-devtools');
   const guidance = buildSetupGuidance();
 
   if (!apply) {
-    const primaryOnly = primarySkillNames.join(',');
-    const primaryCommand = primaryOnly
-      ? `codex-orchestrator skills install ${refreshSkills ? '--force ' : ''}--only ${primaryOnly}`
-      : null;
-    const devtoolsCommand = bundledSkills.includes('chrome-devtools')
-      ? `codex-orchestrator skills install ${refreshSkills ? '--force ' : ''}--only chrome-devtools`
-      : null;
+    const installCommand = `codex-orchestrator skills install ${refreshSkills ? '--force ' : ''}--only ${bundledSkills.join(',')}`;
 
     const delegation = await runDelegationSetup({ repoRoot });
     const devtools = await runDevtoolsSetup();
@@ -1160,7 +1153,7 @@ Options:
       status: 'planned' as const,
       steps: {
         skills: {
-          commandLines: [primaryCommand, devtoolsCommand].filter((entry): entry is string => Boolean(entry)),
+          commandLines: [installCommand],
           note:
             'Installs bundled skills into $CODEX_HOME/skills without overwriting existing files by default. Add --refresh-skills to force overwrite.'
         },
@@ -1189,26 +1182,7 @@ Options:
     return;
   }
 
-  const primarySkills =
-    primarySkillNames.length > 0
-      ? await installSkills({ force: refreshSkills, only: primarySkillNames })
-      : null;
-  const devtoolsSkill =
-    bundledSkills.includes('chrome-devtools')
-      ? await installSkills({ force: refreshSkills, only: ['chrome-devtools'] })
-      : null;
-  const skills = primarySkills && devtoolsSkill
-    ? {
-        sourceRoot: primarySkills.sourceRoot,
-        targetRoot: primarySkills.targetRoot,
-        skills: [...new Set([...primarySkills.skills, ...devtoolsSkill.skills])],
-        written: [...primarySkills.written, ...devtoolsSkill.written],
-        skipped: [...primarySkills.skipped, ...devtoolsSkill.skipped]
-      }
-    : devtoolsSkill ?? primarySkills;
-  if (!skills) {
-    throw new Error('No bundled skills detected; cannot run setup.');
-  }
+  const skills = await installSkills({ force: refreshSkills, only: bundledSkills });
   const delegation = await runDelegationSetup({ apply: true, repoRoot });
   const devtools = await runDevtoolsSetup({ apply: true });
 
