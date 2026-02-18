@@ -12,6 +12,7 @@
 ## Validation
 - `npm run test -- orchestrator/tests/Doctor.test.ts orchestrator/tests/RlmRunnerMode.test.ts`
 - `npm run docs:check`
+- `npm run docs:freshness`
 - `npm run lint`
 - `npm run build`
 

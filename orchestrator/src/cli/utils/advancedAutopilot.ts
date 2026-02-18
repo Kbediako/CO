@@ -150,6 +150,7 @@ export function buildAutoScoutEvidence(params: {
   targetId: string;
   targetDescription: string;
   executionMode: 'mcp' | 'cloud';
+  cloudRequested?: boolean;
   advanced: AdvancedAutopilotDecision;
   cloudEnvironmentId: string | null;
   cloudBranch: string | null;
@@ -168,7 +169,7 @@ export function buildAutoScoutEvidence(params: {
     advanced_mode_enabled: params.advanced.enabled,
     advanced_mode_reason: params.advanced.reason,
     cloud: {
-      requested: params.executionMode === 'cloud',
+      requested: params.cloudRequested ?? params.executionMode === 'cloud',
       environment_id: params.cloudEnvironmentId,
       branch: readCloudString(params.cloudBranch)
     },
@@ -177,4 +178,3 @@ export function buildAutoScoutEvidence(params: {
     }
   };
 }
-

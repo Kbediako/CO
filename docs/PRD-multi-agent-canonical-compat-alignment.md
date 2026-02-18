@@ -48,7 +48,7 @@
   - Downstream npm user relying on shipped docs/skills.
 - User Journeys:
   - User reads setup/usage docs and sees one canonical flag (`multi_agent`) plus clear legacy caveats.
-  - User on older environments still succeeds due fallback behavior.
+  - User on older environments still succeeds due to fallback behavior.
 
 ## Technical Considerations
 - Architectural Notes:

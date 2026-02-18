@@ -63,5 +63,23 @@ describe('auto scout evidence', () => {
     expect(evidence.cloud.branch).toBe('main');
     expect(evidence.rlm.context_path_configured).toBe(true);
   });
-});
 
+  it('records cloud requested intent when execution mode already fell back to mcp', () => {
+    const decision = resolveAdvancedAutopilotDecision({ pipelineId: 'docs-review' });
+    const evidence = buildAutoScoutEvidence({
+      taskId: 'task-1',
+      pipelineId: 'docs-review',
+      targetId: 'docs-review:review',
+      targetDescription: 'Review docs',
+      executionMode: 'mcp',
+      cloudRequested: true,
+      advanced: decision,
+      cloudEnvironmentId: 'env-123',
+      cloudBranch: 'main',
+      generatedAt: '2026-02-17T00:00:00.000Z'
+    });
+
+    expect(evidence.cloud.requested).toBe(true);
+    expect(evidence.cloud.environment_id).toBe('env-123');
+  });
+});

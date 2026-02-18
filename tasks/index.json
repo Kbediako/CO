@@ -1337,8 +1337,8 @@
       "gate": {
         "phase": "advanced-capability-autopilot-implementation",
         "status": "in-progress",
-        "log": null,
-        "run_id": null
+        "log": ".runs/0971-advanced-capability-autopilot/cli/2026-02-17T14-24-29-462Z-9cad68be/manifest.json",
+        "run_id": "2026-02-17T14-24-29-462Z-9cad68be"
       },
       "created_at": "2026-02-17",
       "completed_at": null

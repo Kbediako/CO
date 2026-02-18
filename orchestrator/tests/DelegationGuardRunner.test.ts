@@ -60,6 +60,8 @@ describe('delegation guard env shaping', () => {
     const withTask = buildDelegationGuardEnv({ MCP_RUNNER_TASK_ID: 'task-1' }, 'warn');
     const withTaskFallback = buildDelegationGuardEnv({ TASK: 'task-2' }, 'warn');
     const withOrchestratorFallback = buildDelegationGuardEnv({ CODEX_ORCHESTRATOR_TASK_ID: 'task-3' }, 'warn');
+    const withTaskArg = buildDelegationGuardEnv({}, 'warn', ['--task', 'task-4']);
+    const withTaskInlineArg = buildDelegationGuardEnv({}, 'warn', ['--task=task-5']);
     const strict = buildDelegationGuardEnv({}, 'strict');
     const existing = buildDelegationGuardEnv(
       { DELEGATION_GUARD_OVERRIDE_REASON: 'manual override' },
@@ -68,6 +70,8 @@ describe('delegation guard env shaping', () => {
     expect(withTask.DELEGATION_GUARD_OVERRIDE_REASON).toBeUndefined();
     expect(withTaskFallback.DELEGATION_GUARD_OVERRIDE_REASON).toBeUndefined();
     expect(withOrchestratorFallback.DELEGATION_GUARD_OVERRIDE_REASON).toBeUndefined();
+    expect(withTaskArg.DELEGATION_GUARD_OVERRIDE_REASON).toBeUndefined();
+    expect(withTaskInlineArg.DELEGATION_GUARD_OVERRIDE_REASON).toBeUndefined();
     expect(strict.DELEGATION_GUARD_OVERRIDE_REASON).toBeUndefined();
     expect(existing.DELEGATION_GUARD_OVERRIDE_REASON).toBe('manual override');
   });

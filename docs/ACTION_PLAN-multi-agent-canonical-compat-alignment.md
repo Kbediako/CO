@@ -21,6 +21,7 @@
 - Checks / tests:
   - `npm run test -- orchestrator/tests/Doctor.test.ts orchestrator/tests/DoctorUsage.test.ts orchestrator/tests/RlmRunnerMode.test.ts tests/cli-command-surface.spec.ts`
   - `npm run docs:check`
+  - `npm run docs:freshness`
   - `npm run lint`
   - `npm run build`
 - Manual smoke:

@@ -1351,6 +1351,8 @@ export class CodexOrchestrator {
       const cloudBranch =
         readCloudString(params.envOverrides?.CODEX_CLOUD_BRANCH) ??
         readCloudString(process.env.CODEX_CLOUD_BRANCH);
+      const cloudRequested =
+        params.mode === 'cloud' || params.manifest.cloud_fallback?.mode_requested === 'cloud';
 
       const evidence = buildAutoScoutEvidence({
         taskId: params.manifest.task_id,
@@ -1358,6 +1360,7 @@ export class CodexOrchestrator {
         targetId: params.target.id,
         targetDescription: params.target.description,
         executionMode: params.mode,
+        cloudRequested,
         advanced: params.advancedDecision,
         cloudEnvironmentId,
         cloudBranch,
@@ -1380,10 +1383,11 @@ export class CodexOrchestrator {
         }, timeoutMs);
         timeoutHandle.unref?.();
       });
-      const result = await Promise.race([
-        work(),
-        timeoutPromise
-      ]);
+      const workPromise = work().catch((error): AutoScoutOutcome => ({
+        status: 'error',
+        message: (error as Error)?.message ?? String(error)
+      }));
+      const result = await Promise.race([workPromise, timeoutPromise]);
       if (timeoutHandle) {
         clearTimeout(timeoutHandle);
       }
