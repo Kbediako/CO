@@ -53,17 +53,21 @@ describe('repo marker detection', () => {
 describe('delegation guard env shaping', () => {
   it('injects an override reason for warn profile when task id is missing', () => {
     const env = buildDelegationGuardEnv({}, 'warn');
-    expect(env.DELEGATION_GUARD_OVERRIDE_REASON).toContain('No MCP_RUNNER_TASK_ID provided');
+    expect(env.DELEGATION_GUARD_OVERRIDE_REASON).toContain('No task id provided');
   });
 
   it('does not override existing reasons or strict mode', () => {
     const withTask = buildDelegationGuardEnv({ MCP_RUNNER_TASK_ID: 'task-1' }, 'warn');
+    const withTaskFallback = buildDelegationGuardEnv({ TASK: 'task-2' }, 'warn');
+    const withOrchestratorFallback = buildDelegationGuardEnv({ CODEX_ORCHESTRATOR_TASK_ID: 'task-3' }, 'warn');
     const strict = buildDelegationGuardEnv({}, 'strict');
     const existing = buildDelegationGuardEnv(
       { DELEGATION_GUARD_OVERRIDE_REASON: 'manual override' },
       'warn'
     );
     expect(withTask.DELEGATION_GUARD_OVERRIDE_REASON).toBeUndefined();
+    expect(withTaskFallback.DELEGATION_GUARD_OVERRIDE_REASON).toBeUndefined();
+    expect(withOrchestratorFallback.DELEGATION_GUARD_OVERRIDE_REASON).toBeUndefined();
     expect(strict.DELEGATION_GUARD_OVERRIDE_REASON).toBeUndefined();
     expect(existing.DELEGATION_GUARD_OVERRIDE_REASON).toBe('manual override');
   });

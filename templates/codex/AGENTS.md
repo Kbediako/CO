@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp 2408396e5cc9b25d5522b7064010a36a43007508072f3e0f051ab042370928a1 -->
+<!-- codex:instruction-stamp f4bbf765774ba526f94224462c07de5054c1f92aa5d94dd36d39ffae6ae61393 -->
 # Agent Instructions (Template)
 
 ## Orchestrator-first workflow
@@ -46,6 +46,14 @@
   - `P0` critical findings are hard-stop.
   - `P1` high findings are hard-stop only when high-signal (clear evidence or corroboration).
   - `P2/P3` findings are tracked follow-ups.
+
+## Agent role baseline
+- Built-in roles are `default`, `explorer`, and `worker`; `researcher` is user-defined.
+- Keep top-level defaults on latest codex by setting `model = "gpt-5.3-codex"` in `~/.codex/config.toml`.
+- Define a user `agents.explorer` role without `config_file` so built-in explorer inherits top-level model defaults.
+- Spark caveat: `gpt-5.3-codex-spark` is text-only.
+- Use `[agents] max_threads = 8` as the default baseline; raise to `12` only after proving stable tool/runtime behavior.
+- Add an explicit `worker_complex` role (`gpt-5.3-codex`, `xhigh`) for high-risk implementation streams.
 
 ## Completion discipline (patience-first)
 - Wait/poll for terminal state on long-running operations (CI checks, reviews, cloud jobs, orchestrator runs) before reporting completion.

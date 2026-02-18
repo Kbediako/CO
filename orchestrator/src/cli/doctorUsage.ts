@@ -70,6 +70,14 @@ export interface DoctorUsageResult {
     gate_share_pct: number;
     recommendations: string[];
   };
+  kpis: {
+    advanced_runs: number;
+    advanced_share_pct: number;
+    cloud_share_pct: number;
+    rlm_share_pct: number;
+    collab_share_pct: number;
+    delegation_task_coverage_pct: number;
+  };
 }
 
 export async function runDoctorUsage(options: DoctorUsageOptions = {}): Promise<DoctorUsageResult> {
@@ -92,6 +100,7 @@ export async function runDoctorUsage(options: DoctorUsageOptions = {}): Promise<
   let cloudRuns = 0;
   let rlmRuns = 0;
   const rlmTasks = new Set<string>();
+  let advancedRuns = 0;
   let collabRunsWithToolCalls = 0;
   let collabTotalToolCalls = 0;
   const collabTasks = new Set<string>();
@@ -150,8 +159,10 @@ export async function runDoctorUsage(options: DoctorUsageOptions = {}): Promise<
 
     const pipelineId = typeof manifest.pipeline_id === 'string' && manifest.pipeline_id ? manifest.pipeline_id : 'unknown';
     pipelines.set(pipelineId, (pipelines.get(pipelineId) ?? 0) + 1);
+    let advancedUsed = false;
     if (pipelineId === 'rlm') {
       rlmRuns += 1;
+      advancedUsed = true;
       if (typeof manifest.task_id === 'string' && manifest.task_id) {
         rlmTasks.add(manifest.task_id);
       }
@@ -159,6 +170,7 @@ export async function runDoctorUsage(options: DoctorUsageOptions = {}): Promise<
 
     if (manifest.cloud_execution) {
       cloudRuns += 1;
+      advancedUsed = true;
       const cloudStatusRaw = manifest.cloud_execution.status;
       const status = typeof cloudStatusRaw === 'string' ? cloudStatusRaw.trim() || 'unknown' : 'unknown';
       cloudByStatus[status] = (cloudByStatus[status] ?? 0) + 1;
@@ -181,9 +193,14 @@ export async function runDoctorUsage(options: DoctorUsageOptions = {}): Promise<
       }
     }
 
+    if (manifest.cloud_fallback) {
+      advancedUsed = true;
+    }
+
     if (Array.isArray(manifest.collab_tool_calls) && manifest.collab_tool_calls.length > 0) {
       collabRunsWithToolCalls += 1;
       collabTotalToolCalls += manifest.collab_tool_calls.length;
+      advancedUsed = true;
       if (typeof manifest.task_id === 'string' && manifest.task_id) {
         collabTasks.add(manifest.task_id);
       }
@@ -203,9 +220,13 @@ export async function runDoctorUsage(options: DoctorUsageOptions = {}): Promise<
 
     if (Array.isArray(manifest.child_runs) && manifest.child_runs.length > 0) {
       totalChildRuns += manifest.child_runs.length;
+      advancedUsed = true;
       if (typeof manifest.task_id === 'string' && manifest.task_id) {
         tasksWithChildRuns.add(manifest.task_id);
       }
+    }
+    if (advancedUsed) {
+      advancedRuns += 1;
     }
   }
 
@@ -246,6 +267,16 @@ export async function runDoctorUsage(options: DoctorUsageOptions = {}): Promise<
       activeWithSubagents += 1;
     }
   }
+  const delegationTaskCoveragePct =
+    activeTasks.length > 0 ? Math.round((activeWithSubagents / activeTasks.length) * 1000) / 10 : 0;
+  const advancedSharePct =
+    statusCounts.total > 0 ? Math.round((advancedRuns / statusCounts.total) * 1000) / 10 : 0;
+  const cloudSharePct =
+    statusCounts.total > 0 ? Math.round((cloudRuns / statusCounts.total) * 1000) / 10 : 0;
+  const rlmSharePct =
+    statusCounts.total > 0 ? Math.round((rlmRuns / statusCounts.total) * 1000) / 10 : 0;
+  const collabSharePct =
+    statusCounts.total > 0 ? Math.round((collabRunsWithToolCalls / statusCounts.total) * 1000) / 10 : 0;
 
   const cloudTopEnvIds = [...cloudEnvIds.entries()]
     .sort((a, b) => b[1] - a[1])
@@ -299,6 +330,14 @@ export async function runDoctorUsage(options: DoctorUsageOptions = {}): Promise<
       gate_runs: gateRuns,
       gate_share_pct: gateSharePct,
       recommendations: adoptionRecommendations
+    },
+    kpis: {
+      advanced_runs: advancedRuns,
+      advanced_share_pct: advancedSharePct,
+      cloud_share_pct: cloudSharePct,
+      rlm_share_pct: rlmSharePct,
+      collab_share_pct: collabSharePct,
+      delegation_task_coverage_pct: delegationTaskCoveragePct
     }
   };
 }
@@ -364,6 +403,11 @@ export function formatDoctorUsageSummary(result: DoctorUsageResult): string[] {
     `Pipeline adoption: exec=${result.adoption.exec_runs} (${result.adoption.exec_share_pct}%), ` +
       `docs-review+implementation-gate=${result.adoption.gate_runs} (${result.adoption.gate_share_pct}%)`
   );
+  lines.push(
+    `KPIs: advanced=${result.kpis.advanced_runs} (${result.kpis.advanced_share_pct}%), ` +
+      `cloud=${result.kpis.cloud_share_pct}%, rlm=${result.kpis.rlm_share_pct}%, ` +
+      `collab=${result.kpis.collab_share_pct}%, delegation-task-coverage=${result.kpis.delegation_task_coverage_pct}%`
+  );
   if (result.adoption.recommendations.length > 0) {
     lines.push('Adoption hints:');
     for (const recommendation of result.adoption.recommendations) {
@@ -414,7 +458,9 @@ function buildAdoptionRecommendations(params: {
     );
   }
   if (params.rlmRuns > 0 && params.collabRunsWithToolCalls === 0) {
-    hints.push('RLM is used without collab activity; ensure collab is enabled (`codex features enable collab`).');
+    hints.push(
+      'RLM is used without collab activity; ensure collab is enabled (`codex features enable multi_agent`, legacy alias: `collab`).'
+    );
   }
   return hints.slice(0, 3);
 }

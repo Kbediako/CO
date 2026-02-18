@@ -9,7 +9,7 @@ Use this guide for deeper context on delegation behavior, tool surfaces, and tro
 - It does **not** provide general tools itself; it only exposes `delegate.*` + optional `github.*` tools.
 - Child runs get tools based on `delegate.mode` + `delegate.tool_profile` + repo caps.
 - Delegation MCP stays enabled by default (only MCP on by default); disable it only when required by safety constraints.
-- Collab multi-agent mode is separate from delegation; for symbolic RLM subcalls, set `RLM_SYMBOLIC_COLLAB=1` and ensure a collab-capable Codex CLI. Collab tool calls are recorded in `manifest.collab_tool_calls`. If collab tools are unavailable in your CLI build, skip collab steps; delegation still works independently.
+- Collab multi-agent mode is separate from delegation; for symbolic RLM subcalls, set `RLM_SYMBOLIC_COLLAB=1` and ensure your Codex CLI has `features.multi_agent=true` (`collab` is a legacy alias). Collab tool calls are recorded in `manifest.collab_tool_calls`. If collab tools are unavailable in your CLI build, skip collab steps; delegation still works independently.
 
 ## Background-run pattern (preferred)
 
@@ -131,8 +131,21 @@ Delegation MCP expects JSONL. Keep `codex-orchestrator` aligned with the current
 - Stock `codex` is the default path. If using a custom Codex fork, fast-forward from `upstream/main` regularly.
 - CO repo checkout only (helper is not shipped in npm): `scripts/codex-cli-refresh.sh --repo /path/to/codex --align-only`
 - CO repo checkout only (managed rebuild helper): `scripts/codex-cli-refresh.sh --repo /path/to/codex --force-rebuild`
+- Managed routing is opt-in: `export CODEX_CLI_USE_MANAGED=1` (without this, stock/global `codex` remains active).
 - Add `--no-push` only when you intentionally want local-only alignment without updating `origin/main`.
 - npm-safe alternative (no repo helper): `codex-orchestrator codex setup --source /path/to/codex --yes --force`
+
+## Agent role guard (recommended)
+
+- Built-in agent roles are `default`, `explorer`, `worker`; `researcher` is user-defined.
+- Built-in `explorer` may map to an older model profile unless overridden in `~/.codex/config.toml`.
+- Recommended baseline:
+  - `model = "gpt-5.3-codex"`
+  - `model_reasoning_effort = "xhigh"`
+  - `[agents] max_threads = 8` (consider 12 only after stability checks)
+  - Set `[agents.explorer]` with no `config_file` so explorer inherits top-level `gpt-5.3-codex`.
+  - Add optional `[agents.explorer_fast]` for `gpt-5.3-codex-spark` (text-only caveat).
+  - Add `[agents.worker_complex]` for high-risk edits (`gpt-5.3-codex`, `xhigh`).
 
 ## Common failures
 

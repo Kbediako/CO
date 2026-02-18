@@ -60,6 +60,45 @@ export function applyCloudExecutionToRunSummary(runSummary: RunSummary, manifest
   };
 }
 
+export function applyCloudFallbackToRunSummary(runSummary: RunSummary, manifest: CliManifest): void {
+  if (!manifest.cloud_fallback) {
+    return;
+  }
+  runSummary.cloudFallback = {
+    modeRequested: manifest.cloud_fallback.mode_requested,
+    modeUsed: manifest.cloud_fallback.mode_used,
+    reason: manifest.cloud_fallback.reason,
+    issues: manifest.cloud_fallback.issues.map((issue) => ({
+      code: issue.code,
+      message: issue.message
+    })),
+    checkedAt: manifest.cloud_fallback.checked_at
+  };
+}
+
+export function applyUsageKpiToRunSummary(runSummary: RunSummary, manifest: CliManifest): void {
+  const collabToolCalls = manifest.collab_tool_calls?.length ?? 0;
+  const childRuns = manifest.child_runs?.length ?? 0;
+  const advancedSignals = {
+    cloudExecution: Boolean(manifest.cloud_execution),
+    cloudFallback: Boolean(manifest.cloud_fallback),
+    collabToolCalls,
+    childRuns,
+    rlmPipeline: manifest.pipeline_id === 'rlm'
+  };
+  const advancedSignalsUsed =
+    Number(advancedSignals.cloudExecution) +
+    Number(advancedSignals.cloudFallback) +
+    Number(collabToolCalls > 0) +
+    Number(childRuns > 0) +
+    Number(advancedSignals.rlmPipeline);
+
+  runSummary.usageKpi = {
+    advancedSignalsUsed,
+    advancedSignals
+  };
+}
+
 export async function persistRunSummary(
   env: EnvironmentPaths,
   paths: RunPaths,

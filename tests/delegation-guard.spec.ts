@@ -40,7 +40,7 @@ async function initRepo(): Promise<string> {
 }
 
 describe('delegation-guard script', () => {
-  it('reports missing MCP_RUNNER_TASK_ID with export example', async () => {
+  it('reports missing task id with export example', async () => {
     tempDir = await initRepo();
 
     const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
@@ -48,8 +48,42 @@ describe('delegation-guard script', () => {
       env: { ...process.env, MCP_RUNNER_TASK_ID: '', CODEX_ORCHESTRATOR_ROOT: tempDir }
     });
 
-    expect(stdout).toContain('MCP_RUNNER_TASK_ID is required');
+    expect(stdout).toContain('Task id is required');
     expect(stdout).toContain('export MCP_RUNNER_TASK_ID=0951-delegation-rlm-quick-wins');
+  });
+
+  it('accepts TASK env var as task-id fallback', async () => {
+    tempDir = await initRepo();
+    const taskId = '0951-delegation-rlm-quick-wins';
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
+      cwd: tempDir,
+      env: {
+        ...process.env,
+        TASK: taskId,
+        MCP_RUNNER_TASK_ID: '',
+        CODEX_ORCHESTRATOR_ROOT: tempDir
+      }
+    });
+
+    expect(stdout).not.toContain('Task id is required');
+    expect(stdout).toContain('No subagent manifests found');
+  });
+
+  it('accepts --task flag as highest-priority task id source', async () => {
+    tempDir = await initRepo();
+    const taskId = '0951-delegation-rlm-quick-wins';
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run', '--task', taskId], {
+      cwd: tempDir,
+      env: {
+        ...process.env,
+        TASK: 'should-not-be-used',
+        MCP_RUNNER_TASK_ID: '',
+        CODEX_ORCHESTRATOR_ROOT: tempDir
+      }
+    });
+
+    expect(stdout).not.toContain('Task id is required');
+    expect(stdout).toContain(`No subagent manifests found for '${taskId}'`);
   });
 
   it('lists candidate manifests and expected paths when none found', async () => {

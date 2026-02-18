@@ -44,7 +44,7 @@
 
 ## Recommendation: MCP vs Collab
 - Keep MCP as the orchestration backbone for cross-tool routing, approvals, external integrations, and long-running delegated runs with manifest evidence.
-- Treat collab as additive for intra-run multi-agent collaboration (planning splits, RLM symbolic subcalls, subagent brainstorms) and enable it explicitly (`--enable collab` / `RLM_SYMBOLIC_COLLAB=1`).
+- Treat collab as additive for intra-run multi-agent collaboration (planning splits, RLM symbolic subcalls, subagent brainstorms) and enable it explicitly (`--enable multi_agent` / `RLM_SYMBOLIC_COLLAB=1`; `--enable collab` remains a legacy alias).
 - Do not deprecate MCP until collab offers equivalent lifecycle control, audit trails, and sandbox/approval hooks; prefer CO-managed CLI installs to add collab JSONL without modifying the official CLI.
 
 ## Open Questions

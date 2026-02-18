@@ -102,6 +102,7 @@ export async function bootstrapManifest(runId: string, options: ManifestBootstra
     prompt_packs: [],
     guardrails_required: pipeline.guardrailsRequired !== false,
     cloud_execution: null,
+    cloud_fallback: null,
     learning: {
       validation: {
         mode: 'per-task',
@@ -258,6 +259,7 @@ export function resetForResume(manifest: CliManifest): void {
   manifest.status_detail = 'resuming';
   manifest.guardrail_status = undefined;
   manifest.cloud_execution = null;
+  manifest.cloud_fallback = null;
 }
 
 export function recordResumeEvent(

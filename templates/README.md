@@ -13,4 +13,4 @@ repository and will not overwrite files unless you pass --force.
 
 Next steps (recommended):
   codex mcp add delegation -- codex-orchestrator delegate-server --repo /path/to/repo
-  codex-orchestrator codex setup   # optional: CO-managed Codex CLI for collab JSONL
+  codex-orchestrator codex setup   # optional: CO-managed Codex CLI (activate only when needed via CODEX_CLI_USE_MANAGED=1)

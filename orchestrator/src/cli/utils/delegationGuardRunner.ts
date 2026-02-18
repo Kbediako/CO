@@ -65,7 +65,7 @@ export function buildDelegationGuardEnv(
   env: NodeJS.ProcessEnv,
   profile: EffectiveGuardProfile
 ): NodeJS.ProcessEnv {
-  const taskId = (env.MCP_RUNNER_TASK_ID ?? '').trim();
+  const taskId = resolveDelegationTaskId(env);
   const existingOverride = (env.DELEGATION_GUARD_OVERRIDE_REASON ?? '').trim();
   if (profile !== 'warn' || taskId || existingOverride) {
     return { ...env };
@@ -73,8 +73,19 @@ export function buildDelegationGuardEnv(
   return {
     ...env,
     DELEGATION_GUARD_OVERRIDE_REASON:
-      'No MCP_RUNNER_TASK_ID provided (warn profile): delegation evidence check bypassed.'
+      'No task id provided (warn profile): delegation evidence check bypassed.'
   };
+}
+
+function resolveDelegationTaskId(env: NodeJS.ProcessEnv): string {
+  const candidates = [env.MCP_RUNNER_TASK_ID, env.TASK, env.CODEX_ORCHESTRATOR_TASK_ID];
+  for (const candidate of candidates) {
+    const value = normalizePath(candidate);
+    if (value) {
+      return value;
+    }
+  }
+  return '';
 }
 
 export function buildDelegationGuardScriptCandidates(

@@ -58,6 +58,8 @@ import {
   applyHandlesToRunSummary,
   applyPrivacyToRunSummary,
   applyCloudExecutionToRunSummary,
+  applyCloudFallbackToRunSummary,
+  applyUsageKpiToRunSummary,
   persistRunSummary
 } from './services/runSummaryWriter.js';
 import {
@@ -81,6 +83,12 @@ import { resolveCodexCliBin } from './utils/codexCli.js';
 import { CodexCloudTaskExecutor } from '../cloud/CodexCloudTaskExecutor.js';
 import { persistPipelineExperience } from './services/pipelineExperience.js';
 import { runCloudPreflight } from './utils/cloudPreflight.js';
+import { writeJsonAtomic } from './utils/fs.js';
+import {
+  buildAutoScoutEvidence,
+  resolveAdvancedAutopilotDecision,
+  type AdvancedAutopilotDecision
+} from './utils/advancedAutopilot.js';
 
 const resolveBaseEnvironment = (): EnvironmentPaths =>
   normalizeEnvironmentPaths(resolveEnvironmentPaths());
@@ -89,6 +97,7 @@ const CONFIG_OVERRIDE_ENV_KEYS = ['CODEX_CONFIG_OVERRIDES', 'CODEX_MCP_CONFIG_OV
 const DEFAULT_CLOUD_POLL_INTERVAL_SECONDS = 10;
 const DEFAULT_CLOUD_TIMEOUT_SECONDS = 1800;
 const DEFAULT_CLOUD_ATTEMPTS = 1;
+const DEFAULT_AUTO_SCOUT_TIMEOUT_MS = 4000;
 const MAX_CLOUD_PROMPT_EXPERIENCES = 3;
 const MAX_CLOUD_PROMPT_EXPERIENCE_CHARS = 320;
 
@@ -129,6 +138,12 @@ function readCloudNumber(raw: string | undefined, fallback: number): number {
     return fallback;
   }
   return parsed;
+}
+
+function normalizeCloudFallbackIssues(
+  issues: { code: string; message: string }[]
+): Array<{ code: string; message: string }> {
+  return issues.map((issue) => ({ code: issue.code, message: issue.message }));
 }
 
 function readCloudFeatureList(raw: string | null | undefined): string[] {
@@ -321,6 +336,10 @@ interface RunLifecycleContext {
   envOverrides: NodeJS.ProcessEnv;
   executionModeOverride?: ExecutionMode;
 }
+
+type AutoScoutOutcome =
+  | { status: 'recorded'; path: string }
+  | { status: 'timeout' | 'error'; message: string };
 
 export class CodexOrchestrator {
   private readonly controlPlane = new ControlPlaneService();
@@ -732,6 +751,13 @@ export class CodexOrchestrator {
         const detail =
           `Cloud preflight failed; falling back to mcp. ` +
           preflight.issues.map((issue) => issue.message).join(' ');
+        options.manifest.cloud_fallback = {
+          mode_requested: 'cloud',
+          mode_used: 'mcp',
+          reason: detail,
+          issues: normalizeCloudFallbackIssues(preflight.issues),
+          checked_at: isoTimestamp()
+        };
         appendSummary(options.manifest, detail);
         logger.warn(detail);
         const fallback = await this.executePipeline({ ...options, mode: 'mcp', executionModeOverride: 'mcp' });
@@ -745,6 +771,19 @@ export class CodexOrchestrator {
     const notes: string[] = [];
     let success = true;
     manifest.guardrail_status = undefined;
+
+    const advancedDecision = resolveAdvancedAutopilotDecision({
+      pipelineId: pipeline.id,
+      targetMetadata: (options.target.metadata ?? null) as Record<string, unknown> | null,
+      taskMetadata: (options.task.metadata ?? null) as Record<string, unknown> | null,
+      env: { ...process.env, ...(envOverrides ?? {}) }
+    });
+    if (advancedDecision.enabled || advancedDecision.source !== 'default') {
+      const advancedSummary =
+        `Advanced mode (${advancedDecision.mode}) ${advancedDecision.enabled ? 'enabled' : 'disabled'}: ${advancedDecision.reason}.`;
+      appendSummary(manifest, advancedSummary);
+      notes.push(advancedSummary);
+    }
 
     const persister =
       options.persister ??
@@ -774,6 +813,27 @@ export class CodexOrchestrator {
     updateHeartbeat(manifest);
     await schedulePersist({ manifest: true, heartbeat: true, force: true });
     runEvents?.runStarted(snapshotStages(manifest, pipeline), manifest.status);
+
+    if (advancedDecision.autoScout) {
+      const scoutOutcome = await this.runAutoScout({
+        env,
+        paths,
+        manifest,
+        mode: options.mode,
+        pipeline,
+        target: options.target,
+        task: options.task,
+        envOverrides,
+        advancedDecision
+      });
+      const scoutMessage =
+        scoutOutcome.status === 'recorded'
+          ? `Auto scout: evidence recorded at ${scoutOutcome.path}.`
+          : `Auto scout: ${scoutOutcome.message} (non-blocking).`;
+      appendSummary(manifest, scoutMessage);
+      notes.push(scoutMessage);
+      await schedulePersist({ manifest: true, force: true });
+    }
 
     const heartbeatInterval = setInterval(() => {
       void pushHeartbeat(false).catch((error) => {
@@ -997,6 +1057,40 @@ export class CodexOrchestrator {
     updateHeartbeat(manifest);
     await schedulePersist({ manifest: true, heartbeat: true, force: true });
     runEvents?.runStarted(snapshotStages(manifest, pipeline), manifest.status);
+
+    const advancedDecision = resolveAdvancedAutopilotDecision({
+      pipelineId: pipeline.id,
+      targetMetadata: (target.metadata ?? null) as Record<string, unknown> | null,
+      taskMetadata: (task.metadata ?? null) as Record<string, unknown> | null,
+      env: { ...process.env, ...(envOverrides ?? {}) }
+    });
+    if (advancedDecision.enabled || advancedDecision.source !== 'default') {
+      const advancedSummary =
+        `Advanced mode (${advancedDecision.mode}) ${advancedDecision.enabled ? 'enabled' : 'disabled'}: ${advancedDecision.reason}.`;
+      appendSummary(manifest, advancedSummary);
+      notes.push(advancedSummary);
+      await schedulePersist({ manifest: true, force: true });
+    }
+    if (advancedDecision.autoScout) {
+      const scoutOutcome = await this.runAutoScout({
+        env,
+        paths,
+        manifest,
+        mode: options.mode,
+        pipeline,
+        target,
+        task,
+        envOverrides,
+        advancedDecision
+      });
+      const scoutMessage =
+        scoutOutcome.status === 'recorded'
+          ? `Auto scout: evidence recorded at ${scoutOutcome.path}.`
+          : `Auto scout: ${scoutOutcome.message} (non-blocking).`;
+      appendSummary(manifest, scoutMessage);
+      notes.push(scoutMessage);
+      await schedulePersist({ manifest: true, force: true });
+    }
 
     const heartbeatInterval = setInterval(() => {
       void pushHeartbeat(false).catch((error) => {
@@ -1235,6 +1329,73 @@ export class CodexOrchestrator {
     return lines.join('\n');
   }
 
+  private async runAutoScout(params: {
+    env: EnvironmentPaths;
+    paths: RunPaths;
+    manifest: CliManifest;
+    mode: ExecutionMode;
+    pipeline: PipelineDefinition;
+    target: PlanItem;
+    task: TaskContext;
+    envOverrides?: NodeJS.ProcessEnv;
+    advancedDecision: AdvancedAutopilotDecision;
+  }): Promise<AutoScoutOutcome> {
+    const mergedEnv = { ...process.env, ...(params.envOverrides ?? {}) };
+    const timeoutMs = readCloudNumber(
+      mergedEnv.CODEX_ORCHESTRATOR_AUTO_SCOUT_TIMEOUT_MS,
+      DEFAULT_AUTO_SCOUT_TIMEOUT_MS
+    );
+
+    const work = async (): Promise<AutoScoutOutcome> => {
+      const cloudEnvironmentId = resolveCloudEnvironmentId(params.task, params.target, params.envOverrides);
+      const cloudBranch =
+        readCloudString(params.envOverrides?.CODEX_CLOUD_BRANCH) ??
+        readCloudString(process.env.CODEX_CLOUD_BRANCH);
+
+      const evidence = buildAutoScoutEvidence({
+        taskId: params.manifest.task_id,
+        pipelineId: params.pipeline.id,
+        targetId: params.target.id,
+        targetDescription: params.target.description,
+        executionMode: params.mode,
+        advanced: params.advancedDecision,
+        cloudEnvironmentId,
+        cloudBranch,
+        env: mergedEnv,
+        generatedAt: isoTimestamp()
+      });
+      const evidencePath = join(params.paths.runDir, 'auto-scout.json');
+      await writeJsonAtomic(evidencePath, evidence);
+      return { status: 'recorded', path: relativeToRepo(params.env, evidencePath) };
+    };
+
+    try {
+      let timeoutHandle: NodeJS.Timeout | null = null;
+      const timeoutPromise = new Promise<AutoScoutOutcome>((resolve) => {
+        timeoutHandle = setTimeout(() => {
+          resolve({
+            status: 'timeout',
+            message: `timed out after ${Math.round(timeoutMs / 1000)}s`
+          });
+        }, timeoutMs);
+        timeoutHandle.unref?.();
+      });
+      const result = await Promise.race([
+        work(),
+        timeoutPromise
+      ]);
+      if (timeoutHandle) {
+        clearTimeout(timeoutHandle);
+      }
+      return result;
+    } catch (error) {
+      return {
+        status: 'error',
+        message: (error as Error)?.message ?? String(error)
+      };
+    }
+  }
+
   private async performRunLifecycle(context: RunLifecycleContext): Promise<PipelineExecutionResult> {
     const {
       env,
@@ -1334,6 +1495,8 @@ export class CodexOrchestrator {
     applyHandlesToRunSummary(runSummary, manifest);
     applyPrivacyToRunSummary(runSummary, manifest);
     applyCloudExecutionToRunSummary(runSummary, manifest);
+    applyCloudFallbackToRunSummary(runSummary, manifest);
+    applyUsageKpiToRunSummary(runSummary, manifest);
     this.controlPlane.applyControlPlaneToRunSummary(runSummary, controlPlaneResult);
 
     await persistRunSummary(env, paths, manifest, runSummary, persister);
@@ -1402,7 +1565,8 @@ export class CodexOrchestrator {
       activity,
       commands: manifest.commands,
       child_runs: manifest.child_runs,
-      cloud_execution: manifest.cloud_execution ?? null
+      cloud_execution: manifest.cloud_execution ?? null,
+      cloud_fallback: manifest.cloud_fallback ?? null
     };
   }
 

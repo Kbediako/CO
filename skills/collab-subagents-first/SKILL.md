@@ -151,9 +151,11 @@ Do not treat wrapper handoff-only output as a completed review.
 - Symptoms: missing collab/delegate tool-call evidence, framing/parsing errors, or unstable collab behavior after CLI upgrades.
 - Check versions first: `codex --version` and `codex-orchestrator --version`.
 - Confirm feature readiness: `codex-orchestrator doctor` (checks collab/cloud/delegation readiness and prints enablement commands).
-- CO repo refresh path (safe default): `scripts/codex-cli-refresh.sh --repo <codex-repo> --no-push`.
-- Rebuild managed CLI only: `codex-orchestrator codex setup --source <codex-repo> --yes --force`.
+- CO repo refresh path (safe default): `scripts/codex-cli-refresh.sh --repo <codex-repo> --align-only`.
+- Rebuild managed CLI only (optional): `codex-orchestrator codex setup --source <codex-repo> --yes --force`.
+- Managed routing is explicit opt-in: `export CODEX_CLI_USE_MANAGED=1` (stock/global `codex` remains default otherwise).
 - If local codex is materially behind upstream, sync before diagnosing collab behavior differences.
+- Built-in `explorer` may map to an older model profile; set `[agents.explorer]` without `config_file` so it inherits top-level `gpt-5.3-codex`, and reserve spark for optional `[agents.explorer_fast]` (text-only caveat).
 - If compatibility remains unstable, continue with non-collab execution path and document the degraded mode.
 
 ## High-output guardrail (Playwright/browser tools)

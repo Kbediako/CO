@@ -11,7 +11,7 @@ Use this skill to operate delegation MCP tools with delegation enabled by defaul
 
 `delegation-usage` is the canonical delegation workflow skill. If `delegate-early` is present, treat it as a compatibility alias that should redirect to this skill.
 
-Collab multi-agent mode is separate from delegation. For symbolic RLM subcalls that use collab tools, set `RLM_SYMBOLIC_COLLAB=1` and ensure a collab-capable Codex CLI; collab tool calls are recorded in `manifest.collab_tool_calls`. If collab tools are unavailable in your CLI build, skip collab steps; delegation still works independently.
+Collab multi-agent mode is separate from delegation. For symbolic RLM subcalls that use collab tools, set `RLM_SYMBOLIC_COLLAB=1` and ensure your Codex CLI has `features.multi_agent=true` (`collab` is a legacy alias); collab tool calls are recorded in `manifest.collab_tool_calls`. If collab tools are unavailable in your CLI build, skip collab steps; delegation still works independently.
 
 ## Collab realities in delegated runs (current behavior)
 
@@ -95,8 +95,21 @@ For runner + delegation coordination (short `--task` flow), see `docs/delegation
 - Stock `codex` is the default path. If you use a custom Codex fork, fast-forward it regularly from `upstream/main`.
 - CO repo checkout only (helper is not shipped in npm): `scripts/codex-cli-refresh.sh --repo /path/to/codex --align-only`
 - CO repo checkout only (managed rebuild helper): `scripts/codex-cli-refresh.sh --repo /path/to/codex --force-rebuild`
+- Managed routing is explicit opt-in: `export CODEX_CLI_USE_MANAGED=1` (without this, stock/global `codex` stays active).
 - Add `--no-push` only when you intentionally want local-only alignment without updating `origin/main`.
 - npm-safe alternative (no repo helper): `codex-orchestrator codex setup --source /path/to/codex --yes --force`
+
+### 0a.1) Agent role guard (avoid stale built-in defaults)
+
+- Built-in roles are `default`, `explorer`, and `worker`. `researcher` is user-defined.
+- Built-in `explorer` can map to an older model profile unless overridden; pin your own role config to keep latest-codex behavior.
+- Recommended baseline in `~/.codex/config.toml`:
+  - `model = "gpt-5.3-codex"`
+  - `model_reasoning_effort = "xhigh"`
+  - `[agents] max_threads = 8` (raise to 12 only after proving stability on your machine)
+  - `[agents.explorer]` with no `config_file` so built-in explorer inherits top-level `gpt-5.3-codex`
+  - Optional `[agents.explorer_fast]` -> `~/.codex/agents/explorer-fast.toml` (`gpt-5.3-codex-spark`, text-only)
+  - `[agents.worker_complex]` -> `~/.codex/agents/worker-complex.toml` (`gpt-5.3-codex`, `xhigh`)
 
 ### 0b) Background terminal bootstrap (required when MCP is disabled)
 

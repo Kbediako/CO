@@ -47,6 +47,10 @@ const DEFAULT_SYMBOLIC_DELIBERATION_INTERVAL = 2;
 const DEFAULT_SYMBOLIC_DELIBERATION_MAX_RUNS = 12;
 const DEFAULT_SYMBOLIC_DELIBERATION_MAX_SUMMARY_BYTES = 2048;
 const UNBOUNDED_ITERATION_ALIASES = new Set(['unbounded', 'unlimited', 'infinite', 'infinity']);
+const COLLAB_FEATURE_CANONICAL = 'multi_agent';
+const COLLAB_FEATURE_LEGACY = 'collab';
+
+type CollabFeatureKey = typeof COLLAB_FEATURE_CANONICAL | typeof COLLAB_FEATURE_LEGACY;
 
 interface ParsedArgs {
   goal?: string;
@@ -243,11 +247,9 @@ function resolveRlmMode(
   if (normalized !== 'auto') {
     return null;
   }
-  if (
-    options.delegated ||
-    options.hasContextPath ||
-    options.contextBytes >= options.symbolicMinBytes
-  ) {
+  const largeContext = options.contextBytes >= options.symbolicMinBytes;
+  const explicitContextSignal = options.hasContextPath || options.delegated;
+  if (largeContext && explicitContextSignal) {
     return 'symbolic';
   }
   return 'iterative';
@@ -439,6 +441,66 @@ async function runCodexJsonlCompletion(
     return message;
   }
   return [stdout.trim(), stderr.trim()].filter(Boolean).join('\n');
+}
+
+function parseFeatureFlagsFromText(raw: string): Record<string, boolean> {
+  const flags: Record<string, boolean> = {};
+  for (const line of raw.split(/\r?\n/u)) {
+    const trimmed = line.trim();
+    if (!trimmed) {
+      continue;
+    }
+    const tokens = trimmed.split(/\s+/u);
+    if (tokens.length < 2) {
+      continue;
+    }
+    const name = tokens[0] ?? '';
+    const enabledToken = tokens[tokens.length - 1] ?? '';
+    if (!name) {
+      continue;
+    }
+    if (enabledToken === 'true') {
+      flags[name] = true;
+    } else if (enabledToken === 'false') {
+      flags[name] = false;
+    }
+  }
+  return flags;
+}
+
+function resolveCollabFeatureKeyFromFlags(flags: Record<string, boolean>): CollabFeatureKey {
+  if (Object.prototype.hasOwnProperty.call(flags, COLLAB_FEATURE_CANONICAL)) {
+    return COLLAB_FEATURE_CANONICAL;
+  }
+  if (Object.prototype.hasOwnProperty.call(flags, COLLAB_FEATURE_LEGACY)) {
+    return COLLAB_FEATURE_LEGACY;
+  }
+  return COLLAB_FEATURE_LEGACY;
+}
+
+async function resolveCollabFeatureKey(
+  env: NodeJS.ProcessEnv,
+  repoRoot: string,
+  nonInteractive: boolean
+): Promise<CollabFeatureKey> {
+  try {
+    const { stdout } = await runCodexExec(
+      ['features', 'list'],
+      env,
+      repoRoot,
+      nonInteractive,
+      false,
+      false
+    );
+    return resolveCollabFeatureKeyFromFlags(parseFeatureFlagsFromText(stdout));
+  } catch (error) {
+    logger.debug(
+      `Unable to resolve Codex collab feature key via \`codex features list\`: ${
+        error instanceof Error ? error.message : String(error)
+      }`
+    );
+    return COLLAB_FEATURE_LEGACY;
+  }
 }
 
 function extractAgentMessageFromJsonl(raw: string): string | null {
@@ -968,6 +1030,12 @@ async function main(): Promise<void> {
   const nonInteractive = shouldForceNonInteractive(env);
 
   if (mode === 'symbolic') {
+    const collabFeatureKey = symbolicCollabEnabled
+      ? await resolveCollabFeatureKey(env, repoRoot, nonInteractive)
+      : COLLAB_FEATURE_LEGACY;
+    if (symbolicCollabEnabled) {
+      logger.info(`Symbolic collab feature key: ${collabFeatureKey}`);
+    }
     const budgets: SymbolicBudgets = {
       maxSubcallsPerIteration:
         parsePositiveInt(env.RLM_MAX_SUBCALLS_PER_ITERATION, DEFAULT_MAX_SUBCALLS_PER_ITERATION) ??
@@ -1092,7 +1160,7 @@ async function main(): Promise<void> {
         const collabPrompt = buildCollabSubcallPrompt(prompt);
         return runCodexJsonlCompletion(collabPrompt, env, repoRoot, nonInteractive, true, [
           '--enable',
-          'collab',
+          collabFeatureKey,
           '--sandbox',
           'read-only'
         ], {
@@ -1115,7 +1183,7 @@ async function main(): Promise<void> {
           const collabPrompt = buildCollabSubcallPrompt(prompt);
           return runCodexJsonlCompletion(collabPrompt, env, repoRoot, nonInteractive, true, [
             '--enable',
-            'collab',
+            collabFeatureKey,
             '--sandbox',
             'read-only'
           ], {
@@ -1174,10 +1242,14 @@ if (entry && entry === self) {
 export const __test__ = {
   parseMaxIterations,
   parsePositiveInt,
+  parseFeatureFlagsFromText,
+  resolveCollabFeatureKeyFromFlags,
   resolveRlmMode,
   parseCollabToolCallsFromJsonl,
   validateCollabLifecycle,
   buildCollabSubcallPrompt,
+  COLLAB_FEATURE_CANONICAL,
+  COLLAB_FEATURE_LEGACY,
   DEFAULT_MAX_ITERATIONS,
   DEFAULT_MAX_MINUTES,
   DEFAULT_SYMBOLIC_MIN_BYTES

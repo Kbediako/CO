@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp 3b98f9b5cdd1d8c83b07b2a73ba333e269d3f951e03b7b9047229ac369b10ab5 -->
+<!-- codex:instruction-stamp 98c2eb751bb2af9914278809b1e7ed555bb59171027356f3ad9b9264fa982669 -->
 # Codex-Orchestrator Agent Handbook (Template)
 
 Use this repository as the wrapper that coordinates multiple Codex-driven projects. After cloning, replace placeholder metadata (task IDs, documents, SOPs) with values for each downstream initiative while keeping these shared guardrails in place.
@@ -18,6 +18,14 @@ Use this repository as the wrapper that coordinates multiple Codex-driven projec
 - Use collab only for intra-run brainstorming, role-split planning, or parallel subcalls.
 - Collab means auxiliary assistant agents inside a run; enable it via `RLM_SYMBOLIC_COLLAB=1` (see `docs/guides/collab-vs-mcp.md`).
 - The “top-level Codex” is the MCP-run agent the user is interacting with; collab agents are assistants and do not represent the run.
+
+## Agent Role Baseline
+- Built-in roles are `default`, `explorer`, and `worker`; `researcher` is user-defined.
+- Keep top-level defaults on latest codex by setting `model = "gpt-5.3-codex"` in `~/.codex/config.toml`.
+- Define a user `agents.explorer` role without `config_file` so built-in explorer inherits your top-level model defaults instead of older built-in profiles.
+- Caveat: spark models are text-only; use non-spark roles when image inputs are required.
+- Set `[agents] max_threads = 8` as the standard baseline; only move to `12` after validating stability under your MCP/tool workload.
+- Use an explicit `worker_complex` role (for example `gpt-5.3-codex`, `xhigh`) for high-risk implementation streams.
 
 ## Deliberation Default (Agent-First)
 - Deliberation is the default for high-ambiguity or high-impact work. Keep MCP as the top-level control plane and use collab/delegated subagents to explore options.

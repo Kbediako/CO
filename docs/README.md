@@ -25,7 +25,7 @@ Codex Orchestrator is the coordination layer that glues together Codex-driven ag
 
 ## How It Works
 - **Planner → Builder → Tester → Reviewer:** The core `TaskManager` (see `orchestrator/src/manager.ts`) wires together agent interfaces that decide *what* to run (planner), execute the selected pipeline stage (builder), verify results (tester), and give a final decision (reviewer).
-- **Execution modes:** Each plan item can flag `requires_cloud` and task metadata can set `execution.parallel`; the mode policy picks `mcp` (local MCP runtime) or `cloud` execution accordingly. Cloud runs perform a quick preflight (env id, codex availability, optional remote branch) and fall back to `mcp` with a recorded summary when preflight fails.
+- **Execution modes:** Each plan item can flag `requires_cloud` and task metadata can set `execution.parallel`; the mode policy picks `mcp` (local MCP runtime) or `cloud` execution accordingly. Cloud runs perform a quick preflight (env id, codex availability, optional remote branch) and fall back to `mcp` with both summary text and a structured `cloud_fallback` manifest block when preflight fails.
 - **Event-driven persistence:** Milestones emit typed events on `EventBus`. `PersistenceCoordinator` captures run summaries in the task state store and writes manifests so nothing is lost if the process crashes.
 - **CLI lifecycle:** `CodexOrchestrator` (in `orchestrator/src/cli/orchestrator.ts`) resolves instruction sources (`AGENTS.md`, `docs/AGENTS.md`, `.agent/AGENTS.md`), loads the chosen pipeline, executes each command stage via `runCommandStage`, and keeps heartbeats plus command status current inside the manifest (approval evidence will surface once prompt wiring lands).
 - **Control-plane & scheduler integrations:** Optional validation (`control-plane/`) and scheduling (`scheduler/`) modules enrich manifests with drift checks, plan assignments, and remote run metadata.
@@ -103,7 +103,7 @@ Use `npx @kbediako/codex-orchestrator resume --run <run-id>` to continue interru
 - `codex-orchestrator init codex [--cwd <path>] [--force]`: copy starter templates into a repo (includes `mcp-client.json` and `AGENTS.md`; no overwrite unless `--force`).
 - `codex-orchestrator setup [--yes]`: one-shot bootstrap for downstream users (installs bundled skills, configures delegation + DevTools wiring, and prints policy/usage guidance).
 - `codex-orchestrator flow [--task <task-id>]`: runs `docs-review` then `implementation-gate` in sequence; stops on the first failure.
-- `codex-orchestrator doctor [--format json] [--usage] [--apply]`: check optional tooling dependencies plus collab/cloud/delegation readiness and print enablement commands. `--usage` appends a local usage snapshot (scans `.runs/`). `--apply` plans/applies quick fixes (use with `--yes`).
+- `codex-orchestrator doctor [--format json] [--usage] [--apply]`: check optional tooling dependencies plus collab/cloud/delegation readiness and print enablement commands. `--usage` appends a local usage snapshot (scans `.runs/`) with adoption KPIs. `--apply` plans/applies quick fixes (use with `--yes`).
 - `codex-orchestrator devtools setup [--yes]`: print DevTools MCP setup instructions (`--yes` applies `codex mcp add ...`).
 - `codex-orchestrator delegation setup [--yes]`: configure delegation MCP wiring (`--yes` applies `codex mcp add ...`).
 - `codex-orchestrator skills install [--force] [--only <skills>] [--codex-home <path>]`: install bundled skills into `$CODEX_HOME/skills` (global skills remain the primary reference when installed).
@@ -186,6 +186,7 @@ Notes:
 ## Persistence & Observability
 - `TaskStateStore` writes per-task snapshots with bounded lock retries; failures degrade gracefully while still writing the main manifest.
 - `RunManifestWriter` generates the canonical manifest JSON for each run (mirrored under `.runs/`), while metrics appenders and summary writers keep `out/` up to date.
+- `run-summary.json` now carries `usageKpi` run-level signals (cloud/collab/delegation/rlm indicators) and `cloudFallback` details when a cloud request is downgraded to MCP.
 - `collab_tool_calls` in the manifest captures collab tool call JSONL lines extracted from command stdout (bounded by `CODEX_ORCHESTRATOR_COLLAB_MAX_EVENTS`, default 200; set 0 to disable capture).
 - Heartbeat files and timestamps guard against stalled runs. `orchestrator/src/cli/metrics/metricsRecorder.ts` aggregates command durations, exit codes, and guardrail stats for later review.
 - Optional caps: `CODEX_ORCHESTRATOR_EXEC_EVENT_MAX_CHUNKS` limits captured exec chunk events per command (defaults to 500; set 0 for no cap), `CODEX_ORCHESTRATOR_TELEMETRY_MAX_EVENTS` caps in-memory telemetry events queued before flush (defaults to 1000; set 0 for no cap), and `CODEX_METRICS_PRIVACY_EVENTS_MAX` limits privacy decision events stored in `metrics.json` (-1 = no cap; `privacy_event_count` still reflects total).

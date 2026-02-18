@@ -1,9 +1,30 @@
-import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
+import { chmod, mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import { formatDoctorSummary, runDoctor } from '../src/cli/doctor.js';
+
+async function writeFakeCodexBinary(dir: string, featureLine: string): Promise<string> {
+  const binPath = join(dir, 'codex');
+  await writeFile(
+    binPath,
+    [
+      '#!/bin/sh',
+      'if [ "$1" = "features" ] && [ "$2" = "list" ]; then',
+      `  echo "${featureLine}"`,
+      '  exit 0',
+      'fi',
+      'if [ "$1" = "cloud" ] && [ "$2" = "--help" ]; then',
+      '  exit 0',
+      'fi',
+      'exit 0'
+    ].join('\n'),
+    'utf8'
+  );
+  await chmod(binPath, 0o755);
+  return binPath;
+}
 
 describe('runDoctor', () => {
   it('reports missing devtools config and skill when absent', async () => {
@@ -63,6 +84,43 @@ describe('runDoctor', () => {
         process.env.CODEX_HOME = originalCodexHome;
       }
       await rm(tempHome, { recursive: true, force: true });
+    }
+  });
+
+  it('prefers multi_agent feature key when reported by codex features list', async () => {
+    const previousCodexBin = process.env.CODEX_CLI_BIN;
+    const tempDir = await mkdtemp(join(tmpdir(), 'doctor-codex-bin-'));
+    process.env.CODEX_CLI_BIN = await writeFakeCodexBinary(tempDir, 'multi_agent experimental true');
+    try {
+      const result = runDoctor(process.cwd());
+      expect(result.collab.enabled).toBe(true);
+      expect(result.collab.feature_key).toBe('multi_agent');
+      expect(formatDoctorSummary(result).join('\n')).toContain('feature key: multi_agent');
+    } finally {
+      if (previousCodexBin === undefined) {
+        delete process.env.CODEX_CLI_BIN;
+      } else {
+        process.env.CODEX_CLI_BIN = previousCodexBin;
+      }
+      await rm(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it('falls back to legacy collab feature key when canonical key is absent', async () => {
+    const previousCodexBin = process.env.CODEX_CLI_BIN;
+    const tempDir = await mkdtemp(join(tmpdir(), 'doctor-codex-bin-'));
+    process.env.CODEX_CLI_BIN = await writeFakeCodexBinary(tempDir, 'collab experimental true');
+    try {
+      const result = runDoctor(process.cwd());
+      expect(result.collab.enabled).toBe(true);
+      expect(result.collab.feature_key).toBe('collab');
+    } finally {
+      if (previousCodexBin === undefined) {
+        delete process.env.CODEX_CLI_BIN;
+      } else {
+        process.env.CODEX_CLI_BIN = previousCodexBin;
+      }
+      await rm(tempDir, { recursive: true, force: true });
     }
   });
 });

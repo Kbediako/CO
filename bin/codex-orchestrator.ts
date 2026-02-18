@@ -41,6 +41,7 @@ interface RunOutputPayload {
   manifest: string;
   log_path: string | null;
   summary: string | null;
+  cloud_fallback_reason: string | null;
 }
 
 interface FlowOutputPayload {
@@ -680,7 +681,9 @@ async function handleRlm(orchestrator: CodexOrchestrator, rawArgs: string[]): Pr
     if (doctor.collab.status === 'ok') {
       console.log('Tip: collab is enabled. Try: codex-orchestrator rlm --collab auto \"<goal>\"');
     } else if (doctor.collab.status === 'disabled') {
-      console.log('Tip: collab is available but disabled. Enable with: codex features enable collab');
+      console.log(
+        'Tip: collab is available but disabled. Enable with: codex features enable multi_agent (legacy alias: collab).'
+      );
     }
   }
 
@@ -820,6 +823,7 @@ function emitRunOutput(
       artifact_root: string;
       log_path: string | null;
       summary?: string | null;
+      cloud_fallback?: { reason: string } | null;
     };
   },
   format: OutputFormat,
@@ -834,6 +838,9 @@ function emitRunOutput(
   console.log(`Status: ${payload.status}`);
   console.log(`Manifest: ${payload.manifest}`);
   console.log(`Log: ${payload.log_path}`);
+  if (payload.cloud_fallback_reason) {
+    console.log(`Cloud fallback: ${payload.cloud_fallback_reason}`);
+  }
   if (payload.summary) {
     console.log('Summary:');
     for (const line of payload.summary.split(/\r?\n/u)) {
@@ -850,6 +857,7 @@ function toRunOutputPayload(
       artifact_root: string;
       log_path: string | null;
       summary?: string | null;
+      cloud_fallback?: { reason: string } | null;
     };
   }
 ): RunOutputPayload {
@@ -859,7 +867,8 @@ function toRunOutputPayload(
     artifact_root: result.manifest.artifact_root,
     manifest: `${result.manifest.artifact_root}/manifest.json`,
     log_path: result.manifest.log_path,
-    summary: result.manifest.summary ?? null
+    summary: result.manifest.summary ?? null,
+    cloud_fallback_reason: result.manifest.cloud_fallback?.reason ?? null
   };
 }
 
@@ -1722,7 +1731,7 @@ Commands:
 
   self-check [--format json]
   init codex [--cwd <path>] [--force]
-    --codex-cli            Also run CO-managed Codex CLI setup (plan unless --yes).
+    --codex-cli            Also run CO-managed Codex CLI setup (plan unless --yes; activate with CODEX_CLI_USE_MANAGED=1).
     --codex-source <path>  Build from local Codex repo (or git URL).
     --codex-ref <ref>      Git ref (branch/tag/sha) when building from repo.
     --codex-download-url <url>  Download a prebuilt codex binary.
@@ -1746,7 +1755,7 @@ Commands:
     --download-url <url>   Download a prebuilt codex binary.
     --download-sha256 <sha>  Expected SHA256 for the prebuilt download.
     --force                Overwrite existing CO-managed codex binary.
-    --yes                  Apply setup (otherwise plan only).
+    --yes                  Apply setup (otherwise plan only; stock codex remains default until CODEX_CLI_USE_MANAGED=1).
     --format json          Emit machine-readable output.
   devtools setup          Print DevTools MCP setup instructions.
     --yes                 Apply setup by running "codex mcp add ...".

@@ -8,12 +8,12 @@ import { normalizeTaskKey } from './lib/docs-helpers.js';
 import { findSubagentManifests, resolveEnvironmentPaths } from './lib/run-manifests.js';
 
 function showUsage() {
-  console.log(`Usage: node scripts/delegation-guard.mjs [--dry-run]
+  console.log(`Usage: node scripts/delegation-guard.mjs [--task <id>] [--dry-run]
 
 Ensures top-level tasks include at least one subagent run with manifest evidence.
 
 Requirements:
-  - MCP_RUNNER_TASK_ID must be set for top-level runs
+  - A task id must be set (prefer MCP_RUNNER_TASK_ID; --task/TASK also supported)
   - tasks/index.json must include the top-level task
   - Subagent runs must be prefixed with <task-id>- and have .runs/<task-id>-*/cli/<run-id>/manifest.json
 
@@ -21,6 +21,7 @@ Escape hatch:
   Set DELEGATION_GUARD_OVERRIDE_REASON="<why delegation is not possible>" to bypass.
 
 Options:
+  --task <id> Resolve task id directly (fallbacks: MCP_RUNNER_TASK_ID, TASK, CODEX_ORCHESTRATOR_TASK_ID)
   --dry-run   Report failures without exiting non-zero
   -h, --help  Show this help message`);
 }
@@ -98,11 +99,16 @@ async function main() {
     showUsage();
     process.exit(0);
   }
-  const knownFlags = new Set(['dry-run', 'h', 'help']);
+  const knownFlags = new Set(['task', 'dry-run', 'h', 'help']);
   const unknown = Object.keys(args).filter((key) => !knownFlags.has(key));
   if (unknown.length > 0 || positionals.length > 0) {
     const label = unknown[0] ? `--${unknown[0]}` : positionals[0];
     console.error(`Unknown option: ${label}`);
+    showUsage();
+    process.exit(2);
+  }
+  if (args.task === true) {
+    console.error('Missing value for --task');
     showUsage();
     process.exit(2);
   }
@@ -115,7 +121,7 @@ async function main() {
     return;
   }
 
-  const taskId = (process.env.MCP_RUNNER_TASK_ID || '').trim();
+  const taskId = resolveTaskId(args, process.env);
   const failures = [];
   let candidateManifests = [];
   const { repoRoot, runsRoot: runsDir } = resolveEnvironmentPaths();
@@ -137,7 +143,9 @@ async function main() {
   }
 
   if (!taskId) {
-    failures.push(`MCP_RUNNER_TASK_ID is required for delegation guard (example: export MCP_RUNNER_TASK_ID=${exampleTaskId})`);
+    failures.push(
+      `Task id is required for delegation guard (set --task, MCP_RUNNER_TASK_ID, TASK, or CODEX_ORCHESTRATOR_TASK_ID; example: export MCP_RUNNER_TASK_ID=${exampleTaskId})`
+    );
   }
 
   if (taskId && taskKeys.length > 0) {
@@ -148,7 +156,7 @@ async function main() {
 
     if (!parentKey) {
       failures.push(
-        `MCP_RUNNER_TASK_ID '${taskId}' is not registered in tasks/index.json (add it or use a parent task prefix)`
+        `Task id '${taskId}' is not registered in tasks/index.json (add it or use a parent task prefix)`
       );
     } else if (parentKey !== taskId) {
       console.log(`Delegation guard: '${taskId}' treated as subagent run for '${parentKey}'.`);
@@ -171,7 +179,7 @@ async function main() {
     }
   } else if (taskId && taskIndexReadable) {
     failures.push(
-      `MCP_RUNNER_TASK_ID '${taskId}' is not registered in tasks/index.json (add it or use a parent task prefix)`
+      `Task id '${taskId}' is not registered in tasks/index.json (add it or use a parent task prefix)`
     );
   }
 
@@ -194,6 +202,7 @@ async function main() {
     console.log('Fix guidance:');
     if (!taskId) {
       console.log(` - export MCP_RUNNER_TASK_ID=${exampleTaskId}`);
+      console.log(` - or run: node scripts/delegation-guard.mjs --task ${exampleTaskId}`);
     } else {
       console.log(` - Use MCP_RUNNER_TASK_ID="${taskId}-<stream>" for subagent runs.`);
       console.log(
@@ -209,6 +218,22 @@ async function main() {
   }
 
   console.log('Delegation guard: OK');
+}
+
+function resolveTaskId(args, env) {
+  const candidates = [
+    typeof args.task === 'string' ? args.task : '',
+    env.MCP_RUNNER_TASK_ID,
+    env.TASK,
+    env.CODEX_ORCHESTRATOR_TASK_ID
+  ];
+  for (const candidate of candidates) {
+    const value = (candidate || '').trim();
+    if (value) {
+      return value;
+    }
+  }
+  return '';
 }
 
 main().catch((error) => {
