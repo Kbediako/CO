@@ -1,7 +1,7 @@
 import process from 'node:process';
 import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 
 import {
   buildDevtoolsSetupPlan,
@@ -249,6 +249,7 @@ export async function runDoctorCloudPreflight(options: {
   taskId?: string | null;
 } = {}): Promise<DoctorCloudPreflightResult> {
   const cwd = options.cwd ?? process.cwd();
+  const repoRoot = resolveDoctorRepoRoot(cwd);
   const env = options.env ?? process.env;
   const codexBin = resolveCodexCliBin(env);
   const taskId =
@@ -259,11 +260,11 @@ export async function runDoctorCloudPreflight(options: {
   const environmentId =
     normalizeOptionalString(options.environmentId)
     ?? normalizeOptionalString(env.CODEX_CLOUD_ENV_ID)
-    ?? resolveTaskMetadataCloudEnvironmentId(cwd, taskId);
+    ?? resolveTaskMetadataCloudEnvironmentId(repoRoot, taskId);
   const branch = normalizeOptionalBranch(options.branch) ?? normalizeOptionalBranch(env.CODEX_CLOUD_BRANCH);
 
   const preflight = await runCloudPreflight({
-    repoRoot: cwd,
+    repoRoot,
     codexBin,
     environmentId,
     branch,
@@ -281,6 +282,22 @@ export async function runDoctorCloudPreflight(options: {
     issues: preflight.issues,
     guidance
   };
+}
+
+function resolveDoctorRepoRoot(cwd: string): string {
+  const fallback = resolve(cwd);
+  let current: string | null = fallback;
+  while (current) {
+    if (existsSync(join(current, 'tasks', 'index.json'))) {
+      return current;
+    }
+    const parent = dirname(current);
+    if (parent === current) {
+      break;
+    }
+    current = parent;
+  }
+  return fallback;
 }
 
 export function formatDoctorCloudPreflightSummary(result: DoctorCloudPreflightResult): string[] {

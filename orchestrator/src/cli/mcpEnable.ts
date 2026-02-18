@@ -463,17 +463,23 @@ function redactArgsForDisplay(args: string[]): string[] {
   for (let index = 0; index < redacted.length; index += 1) {
     const token = redacted[index] ?? '';
     const longWithEquals = token.match(/^--([^=\s]+)=(.+)$/u);
-    if (longWithEquals && looksSensitiveFlag(longWithEquals[1] ?? '')) {
+    if (
+      longWithEquals
+      && (looksSensitiveFlag(longWithEquals[1] ?? '') || looksSensitiveValue(longWithEquals[2] ?? ''))
+    ) {
       redacted[index] = `--${longWithEquals[1]}=<redacted>`;
       continue;
     }
 
     const longFlag = token.match(/^--([A-Za-z0-9_.-]+)$/u);
-    if (!longFlag || !looksSensitiveFlag(longFlag[1] ?? '')) {
+    if (!longFlag) {
       continue;
     }
     const next = redacted[index + 1];
     if (!next || next.startsWith('-')) {
+      continue;
+    }
+    if (!looksSensitiveFlag(longFlag[1] ?? '') && !looksSensitiveValue(next)) {
       continue;
     }
     redacted[index + 1] = '<redacted>';

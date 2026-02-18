@@ -214,6 +214,49 @@ describe('runDoctor', () => {
     }
   });
 
+  it('resolves task metadata cloud env id when doctor runs from a subdirectory', async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), 'doctor-cloud-preflight-task-metadata-subdir-'));
+    const subdir = join(tempDir, 'packages', 'app');
+    await mkdir(join(tempDir, 'tasks'), { recursive: true });
+    await mkdir(subdir, { recursive: true });
+    await writeFile(
+      join(tempDir, 'tasks', 'index.json'),
+      JSON.stringify({
+        items: [
+          {
+            id: '0974-cloud-adoption-preflight-reliability',
+            slug: '0974-cloud-adoption-preflight-reliability',
+            title: 'Cloud preflight task',
+            metadata: {
+              cloud: {
+                envId: 'env_task_meta_subdir'
+              }
+            }
+          }
+        ]
+      }),
+      'utf8'
+    );
+    const fakeCodexBin = await writeFakeCodexBinary(tempDir, 'multi_agent experimental true');
+    try {
+      const result = await runDoctorCloudPreflight({
+        cwd: subdir,
+        taskId: '0974-cloud-adoption-preflight-reliability',
+        env: {
+          ...process.env,
+          CODEX_CLI_BIN: fakeCodexBin,
+          CODEX_CLOUD_ENV_ID: '',
+          CODEX_CLOUD_BRANCH: ''
+        }
+      });
+      expect(result.ok).toBe(true);
+      expect(result.details.environment_id).toBe('env_task_meta_subdir');
+      expect(result.issues).toHaveLength(0);
+    } finally {
+      await rm(tempDir, { recursive: true, force: true });
+    }
+  });
+
   it('uses parent task metadata cloud env id for delegated task IDs', async () => {
     const tempDir = await mkdtemp(join(tmpdir(), 'doctor-cloud-preflight-task-metadata-delegated-'));
     await mkdir(join(tempDir, 'tasks'), { recursive: true });

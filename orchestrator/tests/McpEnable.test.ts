@@ -181,6 +181,31 @@ describe('runMcpEnable', () => {
     expect(commandLine).not.toContain('ctx7-secret');
   });
 
+  it('redacts basic-auth credentials embedded in --url values', async () => {
+    const runner = buildRunner([
+      {
+        exitCode: 0,
+        stdout: JSON.stringify([
+          {
+            name: 'secure-http',
+            enabled: false,
+            transport: {
+              type: 'streamable_http',
+              url: 'https://user:pass@mcp.example.com/private'
+            }
+          }
+        ]),
+        stderr: ''
+      }
+    ]);
+
+    const result = await runMcpEnable(baseOptions({ commandRunner: runner }));
+    const commandLine = result.actions[0]?.command_line ?? '';
+    expect(commandLine).toContain('--url');
+    expect(commandLine).toContain('<redacted>');
+    expect(commandLine).not.toContain('user:pass@');
+  });
+
   it('marks streamable_http header-based configs as unsupported', async () => {
     const runner = buildRunner([
       {
