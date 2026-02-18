@@ -6,7 +6,8 @@ This guide is the canonical reference for ad-hoc reviews outside pipelines. Use 
 - Uncommitted diff: `codex review --uncommitted`
 - Base branch: `codex review --base <branch>`
 - Commit: `codex review --commit <sha>`
-- Custom focus: `codex review "<custom instructions>"` (newer Codex versions can combine this with `--uncommitted/--base/--commit`; if yours rejects it, drop the scope flag or use the wrapper below which falls back automatically)
+- Custom focus (prompt-only): `codex review "<custom instructions>"`
+- Compatibility guard: do not combine prompt arguments with `--uncommitted`, `--base`, or `--commit` (current Codex CLI rejects that combination).
 
 ## Use during implementation (recommended)
 - Run a quick standalone review after each meaningful chunk of work to catch issues early.
@@ -15,8 +16,13 @@ This guide is the canonical reference for ad-hoc reviews outside pipelines. Use 
   - run when 2+ files changed since the previous review, or
   - run when about 40+ changed lines accumulate, or
   - run immediately for any workflow/security/release file touch.
+- Also run at implementation checkpoints: after finishing a coding burst/sub-goal, after addressing a feedback batch, and before switching streams or handoff.
 - Prefer a custom focus prompt for targeted checks, for example:
   `codex review "Focus on correctness, regressions, and edge cases in the files I just touched; ignore style; list missing tests."`
+- WIP two-step pattern when you want both scope and focus:
+  1. `codex review --uncommitted` (or `--base/--commit`)
+  2. `codex review "<targeted focus prompt>"` (prompt-only)
+- For non-trivial diffs (about 2+ files or 40+ changed lines), run an elegance/minimality pass in the same cycle before handoff/merge.
 - Capture key findings in the PRD/TECH_SPEC or task notes so context survives compaction.
 - Before implementation begins, run a standalone review of the task/spec against the user’s intent and record the approval (or issues) in the spec/task notes.
 

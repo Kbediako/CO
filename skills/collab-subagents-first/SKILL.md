@@ -131,7 +131,7 @@ Reject and rerun when responses are:
 - Keep privileged/high-risk operations in the parent thread when interactive approval is required.
 - Subagents inherit core execution context (for example cwd/sandbox constraints), so include environment assumptions explicitly in each brief.
 
-## Review loop (standalone-review pairing)
+## Review loop (standalone + elegance pairing)
 
 Use a two-layer review loop:
 
@@ -145,6 +145,7 @@ Use a two-layer review loop:
 2) Parent independent review (required)
 - After integrating subagent work, run a standalone review from the parent.
 - Prefer the global `standalone-review` skill workflow for consistent checks.
+- For non-trivial diffs (about 2+ files or 40+ changed lines), run `elegance-review` in the same cycle before handoff/merge.
 
 Do not treat wrapper handoff-only output as a completed review.
 

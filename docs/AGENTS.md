@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp 11c4a39edc0a8fb07873bd4e9d2ea53cb19c50a1046784be836fe37889e1ad3d -->
+<!-- codex:instruction-stamp 5a0a6c7986282b4266ed236ec141cea1b77e13cf1a4b5e2f35fc4251d162f2a8 -->
 # Repository Agent Guidance
 
 ## Project 0303 — Codex Orchestrator Autonomy Enhancements
@@ -53,12 +53,13 @@
 - The “top-level Codex” is the MCP-run agent the user is interacting with; collab agents are assistants and do not represent the run.
 
 ## Standalone Reviews (Ad-hoc)
-- Use `codex review` for fast checks during implementation; prefer a targeted prompt.
+- Use `codex review` for fast checks during implementation.
+- Current Codex CLI behavior: do not combine prompt arguments with `--uncommitted`, `--base`, or `--commit`; use either diff-scoped review (no prompt) or prompt-only review.
 - Capture the standalone review approval (even if “no issues”) in the spec/task notes before implementation begins.
 - For manifest-backed review evidence, run `TASK=<task-id> NOTES="Goal: ... | Summary: ... | Risks: ..." MANIFEST=<path> npm run review -- --manifest <path>`.
 - See `docs/standalone-review-guide.md` for the canonical workflow.
 - Prefer the global `standalone-review` skill when installed; bundled skills ship for downstream release packaging.
-- Before merge for non-trivial changes, run one explicit elegance/minimality review pass and simplify avoidable complexity.
+- During active non-trivial implementation, run standalone review at implementation checkpoints (after coding bursts/sub-goals/feedback batches) and pair with an elegance pass before handoff/merge.
 
 ## PR Lifecycle (Top-Level Agents)
 - Open PRs for code/config changes and keep the scope tied to the active task.

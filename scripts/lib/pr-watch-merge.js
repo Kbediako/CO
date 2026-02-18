@@ -24,6 +24,16 @@ const ACTIONABLE_BOT_LOGINS = new Set([
   'coderabbitai',
   'coderabbitai[bot]'
 ]);
+const BOT_KIND_LABELS = {
+  codex: 'codex',
+  coderabbit: 'coderabbitai'
+};
+const BOT_MENTION_PATTERNS = {
+  codex: /@(?:chatgpt-codex-connector|codex)(?![\w-])/iu,
+  coderabbit: /@coderabbitai(?![\w-])/iu
+};
+const BOT_IN_PROGRESS_REACTION_CONTENT = new Set(['eyes']);
+const BOT_COMPLETE_REACTION_CONTENT = new Set(['+1', 'hooray', 'heart', 'rocket', 'laugh', 'confused']);
 
 const PR_QUERY = `
 query($owner:String!, $repo:String!, $number:Int!) {
@@ -90,6 +100,10 @@ function normalizeLogin(value) {
   return typeof value === 'string' ? value.trim().toLowerCase() : '';
 }
 
+function normalizeReactionContent(value) {
+  return typeof value === 'string' ? value.trim().toLowerCase() : '';
+}
+
 function isActionableBot(login) {
   return ACTIONABLE_BOT_LOGINS.has(normalizeLogin(login));
 }
@@ -130,6 +144,63 @@ function formatDuration(ms) {
 
 function log(message) {
   console.log(`[${new Date().toISOString()}] ${message}`);
+}
+
+function parseTimestampMs(value) {
+  if (typeof value !== 'string' || value.trim().length === 0) {
+    return null;
+  }
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function maxTimestamp(values) {
+  let max = null;
+  for (const value of values) {
+    if (typeof value !== 'number' || !Number.isFinite(value)) {
+      continue;
+    }
+    if (max === null || value > max) {
+      max = value;
+    }
+  }
+  return max;
+}
+
+function resolveBotKindFromLogin(login) {
+  const normalized = normalizeLogin(login);
+  if (!normalized) {
+    return null;
+  }
+  if (normalized === 'chatgpt-codex-connector' || normalized === 'chatgpt-codex-connector[bot]') {
+    return 'codex';
+  }
+  if (normalized === 'coderabbitai' || normalized === 'coderabbitai[bot]') {
+    return 'coderabbit';
+  }
+  return null;
+}
+
+function extractMentionedBotKinds(body) {
+  if (typeof body !== 'string' || body.trim().length === 0) {
+    return [];
+  }
+  const mentionedKinds = [];
+  for (const [kind, pattern] of Object.entries(BOT_MENTION_PATTERNS)) {
+    if (pattern.test(body)) {
+      mentionedKinds.push(kind);
+    }
+  }
+  return mentionedKinds;
+}
+
+function withCommentSource(comments, source) {
+  if (!Array.isArray(comments)) {
+    return [];
+  }
+  return comments
+    .filter((comment) => comment && typeof comment === 'object')
+    .map((comment) => ({ ...comment, __source: source }));
 }
 
 function parseNumber(name, rawValue, fallback) {
@@ -487,6 +558,16 @@ export function buildStatusSnapshot(response, requiredChecks = null, inlineBotFe
       ? inlineBotFeedback.unacknowledgedCount
       : 0;
   const botFeedbackFetchError = inlineBotFeedback?.fetchError === true;
+  const botRereview = inlineBotFeedback?.rereview && typeof inlineBotFeedback.rereview === 'object'
+    ? inlineBotFeedback.rereview
+    : null;
+  const botRereviewFetchError = botRereview?.fetchError === true;
+  const botRereviewPending = Array.isArray(botRereview?.pendingBots) ? botRereview.pendingBots : [];
+  const botRereviewInProgress = Array.isArray(botRereview?.inProgressBots) ? botRereview.inProgressBots : [];
+  const coderabbitReviewMeta =
+    botRereview?.coderabbit && typeof botRereview.coderabbit === 'object'
+      ? botRereview.coderabbit
+      : { actionableCount: 0, outsideDiffCount: 0, nitpickCount: 0 };
   const gateChecks = requiredCheckSummary ?? checks;
   const gateChecksSource = requiredCheckSummary ? 'required' : 'rollup';
 
@@ -526,6 +607,11 @@ export function buildStatusSnapshot(response, requiredChecks = null, inlineBotFe
   } else if (unacknowledgedBotFeedbackCount > 0) {
     gateReasons.push(`unacknowledged_bot_feedback=${unacknowledgedBotFeedbackCount}`);
   }
+  if (botRereviewFetchError) {
+    gateReasons.push('bot_rereview=unknown');
+  } else if (botRereviewPending.length > 0) {
+    gateReasons.push(`bot_rereview_pending=${botRereviewPending.join(',')}`);
+  }
 
   return {
     number: Number(pr.number),
@@ -541,6 +627,10 @@ export function buildStatusSnapshot(response, requiredChecks = null, inlineBotFe
     unresolvedThreadCount,
     unacknowledgedBotFeedbackCount,
     botFeedbackFetchError,
+    botRereviewFetchError,
+    botRereviewPending,
+    botRereviewInProgress,
+    coderabbitReviewMeta,
     checks,
     requiredChecks: requiredCheckSummary,
     gateChecksSource,
@@ -574,6 +664,12 @@ function formatStatusLine(snapshot, quietRemainingMs) {
     `unresolved_threads=${snapshot.unresolvedThreadCount}`,
     `unack_bot_feedback=${snapshot.unacknowledgedBotFeedbackCount}`,
     `bot_feedback_fetch_error=${snapshot.botFeedbackFetchError ? 'yes' : 'no'}`,
+    `bot_rereview_fetch_error=${snapshot.botRereviewFetchError ? 'yes' : 'no'}`,
+    `bot_rereview_pending=[${snapshot.botRereviewPending.join(', ') || '-'}]`,
+    `bot_rereview_in_progress=[${snapshot.botRereviewInProgress.join(', ') || '-'}]`,
+    `coderabbit_actionable=${snapshot.coderabbitReviewMeta.actionableCount}`,
+    `coderabbit_out_of_diff=${snapshot.coderabbitReviewMeta.outsideDiffCount}`,
+    `coderabbit_nitpick=${snapshot.coderabbitReviewMeta.nitpickCount}`,
     `quiet_remaining=${formatDuration(quietRemainingMs)}`,
     `blocked_by=${reasons}`,
     `pending=[${pendingNames}]`,
@@ -624,6 +720,303 @@ function flattenReviewCommentPages(pagesPayload) {
     }
   }
   return comments;
+}
+
+function parseReviewSummaryCounters(body) {
+  const text = typeof body === 'string' ? body : '';
+  const actionableMatch = text.match(/Actionable comments posted:\s*(\d+)/iu);
+  const outsideDiffMatch = text.match(/Outside diff range comments\s*\((\d+)\)/iu);
+  const nitpickMatch = text.match(/Nitpick comments\s*\((\d+)\)/iu);
+  return {
+    actionableCount: actionableMatch ? Number.parseInt(actionableMatch[1], 10) : 0,
+    outsideDiffCount: outsideDiffMatch ? Number.parseInt(outsideDiffMatch[1], 10) : 0,
+    nitpickCount: nitpickMatch ? Number.parseInt(nitpickMatch[1], 10) : 0
+  };
+}
+
+function summarizeCoderabbitReviewMeta(reviews, headOid) {
+  const summary = {
+    actionableCount: 0,
+    outsideDiffCount: 0,
+    nitpickCount: 0
+  };
+  if (!Array.isArray(reviews)) {
+    return summary;
+  }
+  for (const review of reviews) {
+    if (!review || typeof review !== 'object') {
+      continue;
+    }
+    if (resolveBotKindFromLogin(review.user?.login) !== 'coderabbit') {
+      continue;
+    }
+    const reviewCommitId = typeof review.commit_id === 'string' ? review.commit_id : null;
+    if (headOid && reviewCommitId && reviewCommitId !== headOid) {
+      continue;
+    }
+    const counters = parseReviewSummaryCounters(review.body);
+    summary.actionableCount = Math.max(summary.actionableCount, counters.actionableCount);
+    summary.outsideDiffCount = Math.max(summary.outsideDiffCount, counters.outsideDiffCount);
+    summary.nitpickCount = Math.max(summary.nitpickCount, counters.nitpickCount);
+  }
+  return summary;
+}
+
+export function resolveLatestBotRereviewRequests(comments) {
+  if (!Array.isArray(comments)) {
+    return {};
+  }
+  const latestByKind = {};
+  for (const comment of comments) {
+    if (!comment || typeof comment !== 'object') {
+      continue;
+    }
+    if (!isHumanReviewActor(comment.user)) {
+      continue;
+    }
+    const requestedKinds = extractMentionedBotKinds(comment.body);
+    if (requestedKinds.length === 0) {
+      continue;
+    }
+    const createdAtMs = parseTimestampMs(comment.created_at);
+    if (createdAtMs === null) {
+      continue;
+    }
+    const commentId = Number(comment.id);
+    const source =
+      comment.__source === 'pull' ? 'pull' : comment.__source === 'review' ? 'review' : 'issue';
+    const request = {
+      commentId: Number.isInteger(commentId) && commentId > 0 ? commentId : null,
+      createdAtMs,
+      source
+    };
+    for (const kind of requestedKinds) {
+      const previous = latestByKind[kind];
+      if (!previous || request.createdAtMs > previous.createdAtMs) {
+        latestByKind[kind] = request;
+      }
+    }
+  }
+  return latestByKind;
+}
+
+function maxReactionTimestampForKind(reactions, kind, contentSet, requestAtMs) {
+  if (!Array.isArray(reactions)) {
+    return null;
+  }
+  const timestamps = [];
+  for (const reaction of reactions) {
+    if (!reaction || typeof reaction !== 'object') {
+      continue;
+    }
+    if (resolveBotKindFromLogin(reaction.user?.login) !== kind) {
+      continue;
+    }
+    const content = normalizeReactionContent(reaction.content);
+    if (!contentSet.has(content)) {
+      continue;
+    }
+    const createdAtMs = parseTimestampMs(reaction.created_at);
+    if (createdAtMs === null || createdAtMs <= requestAtMs) {
+      continue;
+    }
+    timestamps.push(createdAtMs);
+  }
+  return maxTimestamp(timestamps);
+}
+
+function maxCommentTimestampForKind(issueComments, kind, requestAtMs, headOid) {
+  if (!Array.isArray(issueComments)) {
+    return null;
+  }
+  const timestamps = [];
+  for (const comment of issueComments) {
+    if (!comment || typeof comment !== 'object') {
+      continue;
+    }
+    if (resolveBotKindFromLogin(comment.user?.login) !== kind) {
+      continue;
+    }
+    if (comment.__source !== 'pull') {
+      continue;
+    }
+    const commentCommitId = typeof comment.commit_id === 'string' ? comment.commit_id : null;
+    if (headOid && commentCommitId && commentCommitId !== headOid) {
+      continue;
+    }
+    const createdAtMs = parseTimestampMs(comment.created_at);
+    if (createdAtMs === null || createdAtMs <= requestAtMs) {
+      continue;
+    }
+    timestamps.push(createdAtMs);
+  }
+  return maxTimestamp(timestamps);
+}
+
+function maxReviewTimestampForKind(reviews, kind, requestAtMs, headOid) {
+  if (!Array.isArray(reviews)) {
+    return null;
+  }
+  const timestamps = [];
+  for (const review of reviews) {
+    if (!review || typeof review !== 'object') {
+      continue;
+    }
+    if (resolveBotKindFromLogin(review.user?.login) !== kind) {
+      continue;
+    }
+    const reviewCommitId = typeof review.commit_id === 'string' ? review.commit_id : null;
+    if (headOid && reviewCommitId && reviewCommitId !== headOid) {
+      continue;
+    }
+    const submittedAtMs = parseTimestampMs(review.submitted_at);
+    if (submittedAtMs === null || submittedAtMs <= requestAtMs) {
+      continue;
+    }
+    timestamps.push(submittedAtMs);
+  }
+  return maxTimestamp(timestamps);
+}
+
+export function resolveBotRereviewTimingForKind(params) {
+  const { kind, requestAtMs, issueComments, reviews, issueReactions, requestCommentReactions, headOid } = params;
+  const useReactionSignals = kind === 'codex';
+  const commentCompleteAtMs =
+    kind === 'codex' ? null : maxCommentTimestampForKind(issueComments, kind, requestAtMs, headOid);
+  const completeAtMs = maxTimestamp([
+    commentCompleteAtMs,
+    maxReviewTimestampForKind(reviews, kind, requestAtMs, headOid),
+    useReactionSignals
+      ? maxReactionTimestampForKind(issueReactions, kind, BOT_COMPLETE_REACTION_CONTENT, requestAtMs)
+      : null,
+    useReactionSignals
+      ? maxReactionTimestampForKind(
+          requestCommentReactions,
+          kind,
+          BOT_COMPLETE_REACTION_CONTENT,
+          requestAtMs
+        )
+      : null
+  ]);
+  const inProgressAtMs = useReactionSignals
+    ? maxTimestamp([
+        maxReactionTimestampForKind(issueReactions, kind, BOT_IN_PROGRESS_REACTION_CONTENT, requestAtMs),
+        maxReactionTimestampForKind(
+          requestCommentReactions,
+          kind,
+          BOT_IN_PROGRESS_REACTION_CONTENT,
+          requestAtMs
+        )
+      ])
+    : null;
+  return {
+    completeAtMs,
+    inProgressAtMs
+  };
+}
+
+async function fetchCommentReactionsBySource(owner, repo, source, commentId) {
+  const commentEndpoint =
+    source === 'pull'
+      ? `repos/${owner}/${repo}/pulls/comments/${commentId}/reactions`
+      : `repos/${owner}/${repo}/issues/comments/${commentId}/reactions`;
+  const payload = await runGhJsonSlurped(['api', commentEndpoint]);
+  return flattenReviewCommentPages(payload);
+}
+
+async function fetchBotRereviewSignals(owner, repo, prNumber, headOid) {
+  try {
+    const [issueCommentsPayload, pullCommentsPayload, reviewsPayload, issueReactionsPayload] = await Promise.all([
+      runGhJsonSlurped(['api', `repos/${owner}/${repo}/issues/${prNumber}/comments`]),
+      runGhJsonSlurped(['api', `repos/${owner}/${repo}/pulls/${prNumber}/comments`]),
+      runGhJsonSlurped(['api', `repos/${owner}/${repo}/pulls/${prNumber}/reviews`]),
+      runGhJsonSlurped(['api', `repos/${owner}/${repo}/issues/${prNumber}/reactions`])
+    ]);
+    const issueComments = withCommentSource(flattenReviewCommentPages(issueCommentsPayload), 'issue');
+    const pullComments = withCommentSource(flattenReviewCommentPages(pullCommentsPayload), 'pull');
+    const allComments = [...issueComments, ...pullComments];
+    const reviews = flattenReviewCommentPages(reviewsPayload);
+    const reviewRequestCandidates = reviews.map((review) => ({
+      id: review?.id ?? null,
+      body: review?.body ?? '',
+      created_at: review?.submitted_at ?? null,
+      user: review?.user ?? null,
+      __source: 'review'
+    }));
+    const issueReactions = flattenReviewCommentPages(issueReactionsPayload);
+    const coderabbit = summarizeCoderabbitReviewMeta(reviews, headOid);
+
+    const rereviewRequests = resolveLatestBotRereviewRequests([...allComments, ...reviewRequestCandidates]);
+    const requestedKinds = Object.keys(rereviewRequests);
+    if (requestedKinds.length === 0) {
+      return {
+        fetchError: false,
+        pendingBots: [],
+        inProgressBots: [],
+        coderabbit
+      };
+    }
+
+    const pendingBots = [];
+    const inProgressBots = [];
+    let hadSignalFetchError = false;
+    for (const kind of requestedKinds) {
+      const request = rereviewRequests[kind];
+      if (!request) {
+        continue;
+      }
+      let requestCommentReactions = [];
+      if (kind === 'codex' && request.commentId && (request.source === 'issue' || request.source === 'pull')) {
+        try {
+          requestCommentReactions = await fetchCommentReactionsBySource(
+            owner,
+            repo,
+            request.source,
+            request.commentId
+          );
+        } catch {
+          hadSignalFetchError = true;
+          requestCommentReactions = [];
+        }
+      }
+      const { completeAtMs, inProgressAtMs } = resolveBotRereviewTimingForKind({
+        kind,
+        requestAtMs: request.createdAtMs,
+        issueComments: allComments,
+        reviews,
+        issueReactions,
+        requestCommentReactions,
+        headOid
+      });
+      const hasActiveInProgress =
+        inProgressAtMs !== null && (completeAtMs === null || inProgressAtMs > completeAtMs);
+      const label = BOT_KIND_LABELS[kind] ?? kind;
+      if (hasActiveInProgress) {
+        inProgressBots.push(label);
+      }
+      if (completeAtMs === null || hasActiveInProgress) {
+        pendingBots.push(label);
+      }
+    }
+
+    return {
+      fetchError: hadSignalFetchError,
+      pendingBots,
+      inProgressBots,
+      coderabbit
+    };
+  } catch {
+    return {
+      fetchError: true,
+      pendingBots: [],
+      inProgressBots: [],
+      coderabbit: {
+        actionableCount: 0,
+        outsideDiffCount: 0,
+        nitpickCount: 0
+      }
+    };
+  }
 }
 
 async function fetchInlineBotFeedback(owner, repo, prNumber, headOid) {
@@ -703,15 +1096,21 @@ async function fetchSnapshot(owner, repo, prNumber, previousRequiredChecksCache 
   ]);
   const currentHeadOid = response?.data?.repository?.pullRequest?.commits?.nodes?.[0]?.commit?.oid || null;
   const previousRequiredChecks = resolveCachedRequiredChecksSummary(previousRequiredChecksCache, currentHeadOid);
-  const requiredChecksResult = await fetchRequiredChecks(owner, repo, prNumber);
+  const [requiredChecksResult, inlineBotFeedback, botRereviewSignals] = await Promise.all([
+    fetchRequiredChecks(owner, repo, prNumber),
+    fetchInlineBotFeedback(owner, repo, prNumber, currentHeadOid),
+    fetchBotRereviewSignals(owner, repo, prNumber, currentHeadOid)
+  ]);
   const requiredChecks = resolveRequiredChecksSummary(
     requiredChecksResult.summary,
     previousRequiredChecks,
     requiredChecksResult.fetchError
   );
-  const inlineBotFeedback = await fetchInlineBotFeedback(owner, repo, prNumber, currentHeadOid);
   return {
-    snapshot: buildStatusSnapshot(response, requiredChecks, inlineBotFeedback),
+    snapshot: buildStatusSnapshot(response, requiredChecks, {
+      ...inlineBotFeedback,
+      rereview: botRereviewSignals
+    }),
     requiredChecksForNextPoll: requiredChecks
       ? {
           headOid: currentHeadOid,
