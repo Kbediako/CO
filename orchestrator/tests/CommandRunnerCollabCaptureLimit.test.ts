@@ -128,7 +128,6 @@ const ORIGINAL_ENV = {
   out: process.env.CODEX_ORCHESTRATOR_OUT_DIR,
   task: process.env.MCP_RUNNER_TASK_ID
 };
-
 let workspaceRoot: string;
 
 beforeEach(async () => {
@@ -138,12 +137,16 @@ beforeEach(async () => {
   process.env.CODEX_ORCHESTRATOR_OUT_DIR = join(workspaceRoot, 'out');
   process.env.MCP_RUNNER_TASK_ID = 'task-collab-cap';
 });
-
 afterEach(async () => {
-  process.env.CODEX_ORCHESTRATOR_ROOT = ORIGINAL_ENV.root;
-  process.env.CODEX_ORCHESTRATOR_RUNS_DIR = ORIGINAL_ENV.runs;
-  process.env.CODEX_ORCHESTRATOR_OUT_DIR = ORIGINAL_ENV.out;
-  process.env.MCP_RUNNER_TASK_ID = ORIGINAL_ENV.task;
+  for (const [key, value] of [
+    ['CODEX_ORCHESTRATOR_ROOT', ORIGINAL_ENV.root],
+    ['CODEX_ORCHESTRATOR_RUNS_DIR', ORIGINAL_ENV.runs],
+    ['CODEX_ORCHESTRATOR_OUT_DIR', ORIGINAL_ENV.out],
+    ['MCP_RUNNER_TASK_ID', ORIGINAL_ENV.task]
+  ] as const) {
+    if (value === undefined) delete process.env[key];
+    else process.env[key] = value;
+  }
   await rm(workspaceRoot, { recursive: true, force: true });
 });
 

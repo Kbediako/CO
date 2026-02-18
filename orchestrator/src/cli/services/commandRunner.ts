@@ -100,10 +100,10 @@ export async function runCommandStage(
   let collabCount = manifest.collab_tool_calls?.length ?? 0;
   const manifestCaptureLimit =
     typeof manifest.collab_tool_calls_max_events === 'number'
-      ? Math.trunc(manifest.collab_tool_calls_max_events)
+      ? Math.max(0, Math.trunc(manifest.collab_tool_calls_max_events))
       : null;
   const hasLegacyUnknownCaptureHistory = manifestCaptureLimit === null && collabCount > 0;
-  const runCollabCaptureLimit = manifestCaptureLimit ?? MAX_COLLAB_TOOL_CALLS;
+  const runCollabCaptureLimit = manifestCaptureLimit ?? Math.max(0, MAX_COLLAB_TOOL_CALLS);
   if (!hasLegacyUnknownCaptureHistory) {
     manifest.collab_tool_calls_max_events = runCollabCaptureLimit;
   }
