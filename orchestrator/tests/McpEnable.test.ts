@@ -212,6 +212,69 @@ describe('runMcpEnable', () => {
     expect(runner).toHaveBeenCalledTimes(1);
   });
 
+  it('marks stdio object env_vars configs as unsupported', async () => {
+    const runner = buildRunner([
+      {
+        exitCode: 0,
+        stdout: JSON.stringify([
+          {
+            name: 'custom-stdio',
+            enabled: false,
+            transport: {
+              type: 'stdio',
+              command: 'node',
+              args: ['scripts/custom.mjs'],
+              env_vars: { API_KEY: 'CTX7_API_KEY' }
+            }
+          }
+        ]),
+        stderr: ''
+      }
+    ]);
+
+    const result = await runMcpEnable(baseOptions({ commandRunner: runner }));
+
+    expect(result.actions).toEqual([
+      expect.objectContaining({
+        name: 'custom-stdio',
+        status: 'unsupported',
+        reason: expect.stringContaining('env_vars/cwd')
+      })
+    ]);
+    expect(runner).toHaveBeenCalledTimes(1);
+  });
+
+  it('marks streamable_http array-based headers as unsupported', async () => {
+    const runner = buildRunner([
+      {
+        exitCode: 0,
+        stdout: JSON.stringify([
+          {
+            name: 'custom-http-array',
+            enabled: false,
+            transport: {
+              type: 'streamable_http',
+              url: 'https://mcp.example.com/custom-array',
+              http_headers: ['Authorization: bearer token']
+            }
+          }
+        ]),
+        stderr: ''
+      }
+    ]);
+
+    const result = await runMcpEnable(baseOptions({ commandRunner: runner }));
+
+    expect(result.actions).toEqual([
+      expect.objectContaining({
+        name: 'custom-http-array',
+        status: 'unsupported',
+        reason: expect.stringContaining('headers/env_http_headers')
+      })
+    ]);
+    expect(runner).toHaveBeenCalledTimes(1);
+  });
+
   it('marks servers with timeout metadata as unsupported to avoid dropping fields', async () => {
     const runner = buildRunner([
       {

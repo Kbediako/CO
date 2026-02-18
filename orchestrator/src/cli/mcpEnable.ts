@@ -253,6 +253,7 @@ function buildEnablePlan(server: {
     }
     const hasUnsupportedStdioFields =
       Array.isArray(transport.env_vars) && transport.env_vars.length > 0
+      || hasRecordEntries(transport.env_vars)
       || (typeof transport.cwd === 'string' && transport.cwd.trim().length > 0);
     if (hasUnsupportedStdioFields) {
       return {
@@ -281,7 +282,10 @@ function buildEnablePlan(server: {
       args.push('--bearer-token-env-var', bearerTokenEnvVar);
     }
     const hasUnsupportedHeaders =
-      hasRecordEntries(transport.http_headers) || hasRecordEntries(transport.env_http_headers);
+      hasRecordEntries(transport.http_headers)
+      || hasRecordEntries(transport.env_http_headers)
+      || (Array.isArray(transport.http_headers) && transport.http_headers.length > 0)
+      || (Array.isArray(transport.env_http_headers) && transport.env_http_headers.length > 0);
     if (hasUnsupportedHeaders) {
       return {
         ok: false,
