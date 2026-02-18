@@ -15,6 +15,7 @@
   - Keep behavior additive and backward-compatible where practical.
   - Keep scout bounded and non-blocking.
   - Preserve explicit operator override paths.
+  - Collab lifecycle diagnostics should be inferred conservatively from existing collab event schema (no fragile log scraping assumptions).
 
 ## Design
 
@@ -46,6 +47,25 @@
 - Extend formatted usage output with key adoption metrics and ratios.
 - Write core KPI snapshot into run-summary output to support quick trend monitoring.
 - Keep JSON output machine-friendly.
+
+### 6) Collab lifecycle hygiene diagnostics (follow-up)
+- Extend `doctor --usage` collab aggregation with additive lifecycle indicators:
+  - runs containing likely unclosed spawned agents.
+  - total likely unclosed spawned agents.
+  - runs containing likely failed spawn attempts (`spawn_agent` status `failed`).
+  - total likely failed spawn attempts.
+- Maintain backward compatibility:
+  - additive fields only.
+  - existing counters and summary line semantics remain intact.
+- Summary formatting:
+  - append lifecycle indicators to the collab line in concise form.
+  - keep wording explicit that thread-limit classification is likely/inferred.
+
+### 7) Shipped skill close-sweep pattern (follow-up)
+- Update shipped skills to require explicit lifecycle ledgering:
+  - track open agent ids from successful spawns.
+  - close-sweep all open ids before handoff and on thread-limit errors.
+- Keep instructions minimal and deterministic to reduce agent friction.
 
 ## Validation
 - Automated:

@@ -50,6 +50,12 @@ export interface DoctorUsageResult {
     by_event_type: Record<string, number>;
     top_tools: { tool: string; calls: number }[];
     capture_disabled: boolean;
+    runs_with_unclosed_spawn_agents: number;
+    unclosed_spawn_agents: number;
+    runs_with_spawn_thread_limit_failures: number;
+    spawn_thread_limit_failures: number;
+    runs_with_potentially_truncated_tool_calls: number;
+    runs_with_unknown_capture_limit: number;
   };
   delegation: {
     active_top_level_tasks: number;
@@ -108,6 +114,12 @@ export async function runDoctorUsage(options: DoctorUsageOptions = {}): Promise<
   const collabByEventType: Record<string, number> = {};
   const collabTools = new Map<string, number>();
   const collabCaptureDisabled = String(process.env.CODEX_ORCHESTRATOR_COLLAB_MAX_EVENTS ?? '').trim() === '0';
+  let collabRunsWithUnclosedSpawnAgents = 0;
+  let collabUnclosedSpawnAgents = 0;
+  let collabRunsWithSpawnThreadLimitFailures = 0;
+  let collabSpawnThreadLimitFailures = 0;
+  let collabRunsWithPotentiallyTruncatedToolCalls = 0;
+  let collabRunsWithUnknownCaptureLimit = 0;
 
   const activeIndexTasks = new Set<string>();
   const taskKeys = readTaskIndexKeys(env.repoRoot);
@@ -201,16 +213,91 @@ export async function runDoctorUsage(options: DoctorUsageOptions = {}): Promise<
       collabRunsWithToolCalls += 1;
       collabTotalToolCalls += manifest.collab_tool_calls.length;
       advancedUsed = true;
+      const collabCaptureLimit = resolveManifestCollabCaptureLimit(manifest);
+      const collabCaptureLimitKnown = collabCaptureLimit !== null;
+      if (!collabCaptureLimitKnown) {
+        collabRunsWithUnknownCaptureLimit += 1;
+      }
+      const collabEventsPossiblyTruncated =
+        collabCaptureLimitKnown
+        && collabCaptureLimit > 0
+        && manifest.collab_tool_calls.length >= collabCaptureLimit;
+      if (collabEventsPossiblyTruncated) {
+        collabRunsWithPotentiallyTruncatedToolCalls += 1;
+      }
+      const spawnedAgents = new Set<string>();
+      const closedAgents = new Set<string>();
+      const failedSpawnIds = new Set<string>();
+      let failedSpawnCalls = 0;
       if (typeof manifest.task_id === 'string' && manifest.task_id) {
         collabTasks.add(manifest.task_id);
       }
-      for (const entry of manifest.collab_tool_calls) {
+      for (const [entryIndex, entry] of manifest.collab_tool_calls.entries()) {
         const tool = typeof entry?.tool === 'string' && entry.tool ? entry.tool : 'unknown';
         const status = typeof entry?.status === 'string' && entry.status ? entry.status : 'unknown';
         const eventType = typeof entry?.event_type === 'string' && entry.event_type ? entry.event_type : 'unknown';
+        const receiverThreadIds = Array.isArray(entry?.receiver_thread_ids)
+          ? entry.receiver_thread_ids
+              .map((id) => (typeof id === 'string' ? id.trim() : ''))
+              .filter((id) => id.length > 0)
+          : [];
+        const completedEventWithoutStatus = eventType === 'item.completed' && status !== 'failed';
+        const isCompleted = status === 'completed' || completedEventWithoutStatus;
+        const isFailed = status === 'failed';
+        const isTerminalEvent = isCompleted || isFailed;
+
         collabByStatus[status] = (collabByStatus[status] ?? 0) + 1;
         collabByEventType[eventType] = (collabByEventType[eventType] ?? 0) + 1;
         collabTools.set(tool, (collabTools.get(tool) ?? 0) + 1);
+
+        if (!isTerminalEvent) {
+          continue;
+        }
+
+        if (tool === 'spawn_agent') {
+          if (isFailed) {
+            const rawFailedSpawnId = typeof entry?.item_id === 'string' ? entry.item_id.trim() : '';
+            const failedSpawnId =
+              rawFailedSpawnId.length > 0 && rawFailedSpawnId !== 'unknown'
+                ? `${entry?.stage_id ?? 'unknown-stage'}:${entry?.command_index ?? 'unknown-command'}:${rawFailedSpawnId}`
+                : `spawn-failed@${entryIndex}`;
+            if (!failedSpawnIds.has(failedSpawnId)) {
+              failedSpawnIds.add(failedSpawnId);
+              failedSpawnCalls += 1;
+            }
+            continue;
+          }
+          if (!isCompleted) {
+            continue;
+          }
+          if (receiverThreadIds.length > 0) {
+            for (const id of receiverThreadIds) {
+              spawnedAgents.add(id);
+            }
+          } else {
+            const fallbackId = `spawn@${entry?.item_id ?? entryIndex}`;
+            spawnedAgents.add(fallbackId);
+          }
+          continue;
+        }
+
+        if (tool === 'close_agent' && isCompleted) {
+          for (const id of receiverThreadIds) {
+            closedAgents.add(id);
+          }
+        }
+      }
+
+      if (collabCaptureLimitKnown && !collabEventsPossiblyTruncated) {
+        const unclosedSpawnAgents = [...spawnedAgents].filter((id) => !closedAgents.has(id));
+        if (unclosedSpawnAgents.length > 0) {
+          collabRunsWithUnclosedSpawnAgents += 1;
+          collabUnclosedSpawnAgents += unclosedSpawnAgents.length;
+        }
+        if (failedSpawnCalls > 0) {
+          collabRunsWithSpawnThreadLimitFailures += 1;
+          collabSpawnThreadLimitFailures += failedSpawnCalls;
+        }
       }
     }
 
@@ -310,7 +397,13 @@ export async function runDoctorUsage(options: DoctorUsageOptions = {}): Promise<
       by_status: collabByStatus,
       by_event_type: collabByEventType,
       top_tools: collabTopTools,
-      capture_disabled: collabCaptureDisabled
+      capture_disabled: collabCaptureDisabled,
+      runs_with_unclosed_spawn_agents: collabRunsWithUnclosedSpawnAgents,
+      unclosed_spawn_agents: collabUnclosedSpawnAgents,
+      runs_with_spawn_thread_limit_failures: collabRunsWithSpawnThreadLimitFailures,
+      spawn_thread_limit_failures: collabSpawnThreadLimitFailures,
+      runs_with_potentially_truncated_tool_calls: collabRunsWithPotentiallyTruncatedToolCalls,
+      runs_with_unknown_capture_limit: collabRunsWithUnknownCaptureLimit
     },
     delegation: {
       active_top_level_tasks: activeTasks.length,
@@ -379,10 +472,20 @@ export function formatDoctorUsageSummary(result: DoctorUsageResult): string[] {
       : '';
   const collabOk = result.collab.by_status.completed ?? 0;
   const collabFailed = result.collab.by_status.failed ?? 0;
+  const collabLeakSignal =
+    `, leaks=${result.collab.unclosed_spawn_agents} over ${result.collab.runs_with_unclosed_spawn_agents} run(s)`;
+  const collabThreadLimitSignal =
+    `, likely_thread_limit_spawns=${result.collab.spawn_thread_limit_failures} over ${result.collab.runs_with_spawn_thread_limit_failures} run(s)`;
+  const collabLifecycleUnknownRuns =
+    result.collab.runs_with_potentially_truncated_tool_calls + result.collab.runs_with_unknown_capture_limit;
+  const collabLifecycleUnknownSignal =
+    collabLifecycleUnknownRuns > 0
+      ? `, lifecycle_unknown_runs=${collabLifecycleUnknownRuns}`
+      : '';
   const collabToolList = formatTopList(result.collab.top_tools.map((entry) => ({ key: entry.tool, value: entry.calls })), 3, 'tools');
   lines.push(
     `  - collab: ${result.collab.runs_with_tool_calls} (${formatPercent(result.collab.runs_with_tool_calls, result.runs.total)})${collabSuffix}`
-      + `${collabTaskSuffix}, events=${result.collab.total_tool_calls}${collabAvg} (ok=${collabOk}, failed=${collabFailed})${collabToolList}`
+      + `${collabTaskSuffix}, events=${result.collab.total_tool_calls}${collabAvg} (ok=${collabOk}, failed=${collabFailed}${collabLeakSignal}${collabThreadLimitSignal}${collabLifecycleUnknownSignal})${collabToolList}`
   );
   if (result.delegation.active_top_level_tasks > 0) {
     lines.push(
@@ -472,6 +575,14 @@ function extractRunIdFromManifestPath(manifestPath: string): string | null {
   // .../<run-id>/manifest.json
   const dir = manifestPath.endsWith('manifest.json') ? basename(dirname(manifestPath)) : null;
   return dir && dir !== '..' ? dir : null;
+}
+
+function resolveManifestCollabCaptureLimit(manifest: CliManifest): number | null {
+  const value = manifest.collab_tool_calls_max_events;
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return null;
+  }
+  return Math.trunc(value);
 }
 
 function clampInt(value: number, min: number, max: number): number {

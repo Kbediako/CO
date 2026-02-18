@@ -29,3 +29,8 @@
 - [x] Required quality gates passed (build/lint/test/docs/review + diff budget). - Evidence: `.runs/0971-advanced-capability-autopilot/cli/2026-02-17T15-05-09-688Z-fd231b23/manifest.json`, `out/0971-advanced-capability-autopilot/manual/post-implementation-standalone-review.log`.
 - [x] Implementation-gate manifest captured. - Evidence: `.runs/0971-advanced-capability-autopilot/cli/2026-02-17T15-05-09-688Z-fd231b23/manifest.json`.
 - [x] Standalone post-implementation elegance review completed. - Evidence: `out/0971-advanced-capability-autopilot/manual/post-implementation-standalone-review.log`, `out/0971-advanced-capability-autopilot/manual/post-implementation-elegance-review.log`.
+
+### Follow-up lifecycle hardening (2026-02-18)
+- [x] `doctor --usage` collab metrics include lifecycle leak + likely thread-limit spawn diagnostics. - Evidence: `orchestrator/src/cli/doctorUsage.ts`, `orchestrator/src/cli/services/commandRunner.ts`, `orchestrator/tests/DoctorUsage.test.ts`, `orchestrator/tests/CommandRunnerCollabCaptureLimit.test.ts`, `schemas/manifest.json`, `packages/shared/manifest/types.ts`.
+- [x] Shipped skills include deterministic close-sweep lifecycle recovery guidance. - Evidence: `skills/collab-subagents-first/SKILL.md`, `skills/delegation-usage/SKILL.md`, `skills/delegation-usage/DELEGATION_GUIDE.md`.
+- [x] Validation rerun + standalone/elegance reviews captured for follow-up changes. - Evidence: `out/0971-advanced-capability-autopilot/manual/follow-up-validation-20260218-081205.log`, `out/0971-advanced-capability-autopilot/manual/follow-up-standalone-review-20260218.log`, `out/0971-advanced-capability-autopilot/manual/follow-up-elegance-review-20260218.log`.

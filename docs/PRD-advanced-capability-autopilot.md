@@ -12,6 +12,8 @@
   - Cloud fallback uses structured manifest/output fields so users see why fallback happened without parsing free text.
   - RLM `auto` switches to symbolic only for true large-context inputs (with explicit context-source signal), reducing noisy symbolic activation.
   - Adoption KPIs are visible in `doctor --usage` and `run-summary` so usage gains and regressions are measurable.
+  - `doctor --usage` reports collab lifecycle hygiene signals (likely unclosed spawned agents + likely spawn thread-limit events).
+  - Shipped skills include a deterministic close-sweep recovery pattern for `spawn_agent`/`wait`/`close_agent`.
 
 ## Goals
 - Increase practical usage of advanced capabilities through stronger defaults and clearer routing feedback.

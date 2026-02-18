@@ -38,7 +38,13 @@ describe('formatDoctorUsageSummary', () => {
           { tool: 'spawn_agent', calls: 6 },
           { tool: 'exec_command', calls: 4 }
         ],
-        capture_disabled: false
+        capture_disabled: false,
+        runs_with_unclosed_spawn_agents: 1,
+        unclosed_spawn_agents: 2,
+        runs_with_spawn_thread_limit_failures: 1,
+        spawn_thread_limit_failures: 1,
+        runs_with_potentially_truncated_tool_calls: 1,
+        runs_with_unknown_capture_limit: 0
       },
       delegation: {
         active_top_level_tasks: 2,
@@ -82,6 +88,9 @@ describe('formatDoctorUsageSummary', () => {
     expect(summary).toContain('- collab: 2');
     expect(summary).toContain('events=10');
     expect(summary).toContain('ok=9, failed=1');
+    expect(summary).toContain('leaks=2 over 1 run(s)');
+    expect(summary).toContain('likely_thread_limit_spawns=1 over 1 run(s)');
+    expect(summary).toContain('lifecycle_unknown_runs=1');
     expect(summary).toContain('tools[');
     expect(summary).toContain('delegation: 1/2');
     expect(summary).toContain('child_runs=2');
@@ -97,7 +106,8 @@ describe('runDoctorUsage', () => {
       root: process.env.CODEX_ORCHESTRATOR_ROOT,
       runsDir: process.env.CODEX_ORCHESTRATOR_RUNS_DIR,
       outDir: process.env.CODEX_ORCHESTRATOR_OUT_DIR,
-      taskId: process.env.MCP_RUNNER_TASK_ID
+      taskId: process.env.MCP_RUNNER_TASK_ID,
+      collabMaxEvents: process.env.CODEX_ORCHESTRATOR_COLLAB_MAX_EVENTS
     };
     const repoRoot = await mkdtemp(join(tmpdir(), 'doctor-usage-'));
     const taskId = 'task-fallback';
@@ -139,6 +149,7 @@ describe('runDoctorUsage', () => {
       delete process.env.CODEX_ORCHESTRATOR_RUNS_DIR;
       delete process.env.CODEX_ORCHESTRATOR_OUT_DIR;
       process.env.MCP_RUNNER_TASK_ID = taskId;
+      delete process.env.CODEX_ORCHESTRATOR_COLLAB_MAX_EVENTS;
 
       const result = await runDoctorUsage({ windowDays: 3650, taskFilter: taskId });
       expect(result.runs.total).toBe(1);
@@ -146,6 +157,355 @@ describe('runDoctorUsage', () => {
       expect(result.kpis.advanced_share_pct).toBe(100);
       expect(result.cloud.runs).toBe(0);
       expect(result.kpis.cloud_share_pct).toBe(0);
+    } finally {
+      if (previousEnv.root === undefined) {
+        delete process.env.CODEX_ORCHESTRATOR_ROOT;
+      } else {
+        process.env.CODEX_ORCHESTRATOR_ROOT = previousEnv.root;
+      }
+      if (previousEnv.runsDir === undefined) {
+        delete process.env.CODEX_ORCHESTRATOR_RUNS_DIR;
+      } else {
+        process.env.CODEX_ORCHESTRATOR_RUNS_DIR = previousEnv.runsDir;
+      }
+      if (previousEnv.outDir === undefined) {
+        delete process.env.CODEX_ORCHESTRATOR_OUT_DIR;
+      } else {
+        process.env.CODEX_ORCHESTRATOR_OUT_DIR = previousEnv.outDir;
+      }
+      if (previousEnv.taskId === undefined) {
+        delete process.env.MCP_RUNNER_TASK_ID;
+      } else {
+        process.env.MCP_RUNNER_TASK_ID = previousEnv.taskId;
+      }
+      if (previousEnv.collabMaxEvents === undefined) {
+        delete process.env.CODEX_ORCHESTRATOR_COLLAB_MAX_EVENTS;
+      } else {
+        process.env.CODEX_ORCHESTRATOR_COLLAB_MAX_EVENTS = previousEnv.collabMaxEvents;
+      }
+      await rm(repoRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('surfaces collab lifecycle leak and likely thread-limit diagnostics', async () => {
+    const previousEnv = {
+      root: process.env.CODEX_ORCHESTRATOR_ROOT,
+      runsDir: process.env.CODEX_ORCHESTRATOR_RUNS_DIR,
+      outDir: process.env.CODEX_ORCHESTRATOR_OUT_DIR,
+      taskId: process.env.MCP_RUNNER_TASK_ID,
+      collabMaxEvents: process.env.CODEX_ORCHESTRATOR_COLLAB_MAX_EVENTS
+    };
+    const repoRoot = await mkdtemp(join(tmpdir(), 'doctor-collab-lifecycle-'));
+    const taskId = 'task-collab-lifecycle';
+    const runId = '2026-02-18T00-00-00-000Z-deadbeef';
+    try {
+      await mkdir(join(repoRoot, 'tasks'), { recursive: true });
+      await writeFile(
+        join(repoRoot, 'tasks', 'index.json'),
+        `${JSON.stringify({ items: [{ slug: taskId }] }, null, 2)}\n`,
+        'utf8'
+      );
+
+      const runDir = join(repoRoot, '.runs', taskId, 'cli', runId);
+      await mkdir(runDir, { recursive: true });
+      await writeFile(
+        join(runDir, 'manifest.json'),
+        `${JSON.stringify(
+          {
+            run_id: runId,
+            task_id: taskId,
+            pipeline_id: 'implementation-gate',
+            status: 'succeeded',
+            started_at: '2026-02-18T00:00:00.000Z',
+            collab_tool_calls_max_events: 200,
+            collab_tool_calls: [
+              {
+                observed_at: '2026-02-18T00:00:10.000Z',
+                stage_id: 'stage-1',
+                command_index: 0,
+                event_type: 'item.completed',
+                item_id: 'spawn-a',
+                tool: 'spawn_agent',
+                status: 'completed',
+                sender_thread_id: 'parent',
+                receiver_thread_ids: ['agent-a']
+              },
+              {
+                observed_at: '2026-02-18T00:00:11.000Z',
+                stage_id: 'stage-1',
+                command_index: 0,
+                event_type: 'item.completed',
+                item_id: 'wait-a',
+                tool: 'wait',
+                status: 'completed',
+                sender_thread_id: 'parent',
+                receiver_thread_ids: ['agent-a']
+              },
+              {
+                observed_at: '2026-02-18T00:00:12.000Z',
+                stage_id: 'stage-1',
+                command_index: 0,
+                event_type: 'item.completed',
+                item_id: 'close-a',
+                tool: 'close_agent',
+                sender_thread_id: 'parent',
+                receiver_thread_ids: ['agent-a']
+              },
+              {
+                observed_at: '2026-02-18T00:00:13.000Z',
+                stage_id: 'stage-1',
+                command_index: 0,
+                event_type: 'item.completed',
+                item_id: 'spawn-b',
+                tool: 'spawn_agent',
+                status: 'completed',
+                sender_thread_id: 'parent',
+                receiver_thread_ids: ['agent-b']
+              },
+              {
+                observed_at: '2026-02-18T00:00:14.000Z',
+                stage_id: 'stage-1',
+                command_index: 0,
+                event_type: 'item.updated',
+                item_id: 'spawn-failed',
+                tool: 'spawn_agent',
+                status: 'failed',
+                sender_thread_id: 'parent',
+                receiver_thread_ids: []
+              },
+              {
+                observed_at: '2026-02-18T00:00:14.500Z',
+                stage_id: 'stage-1',
+                command_index: 0,
+                event_type: 'item.completed',
+                item_id: 'spawn-failed',
+                tool: 'spawn_agent',
+                status: 'failed',
+                sender_thread_id: 'parent',
+                receiver_thread_ids: []
+              }
+            ]
+          },
+          null,
+          2
+        )}\n`,
+        'utf8'
+      );
+
+      process.env.CODEX_ORCHESTRATOR_ROOT = repoRoot;
+      delete process.env.CODEX_ORCHESTRATOR_RUNS_DIR;
+      delete process.env.CODEX_ORCHESTRATOR_OUT_DIR;
+      process.env.MCP_RUNNER_TASK_ID = taskId;
+      delete process.env.CODEX_ORCHESTRATOR_COLLAB_MAX_EVENTS;
+
+      const result = await runDoctorUsage({ windowDays: 3650, taskFilter: taskId });
+      expect(result.runs.total).toBe(1);
+      expect(result.collab.runs_with_tool_calls).toBe(1);
+      expect(result.collab.runs_with_unclosed_spawn_agents).toBe(1);
+      expect(result.collab.unclosed_spawn_agents).toBe(1);
+      expect(result.collab.runs_with_spawn_thread_limit_failures).toBe(1);
+      expect(result.collab.spawn_thread_limit_failures).toBe(1);
+      expect(result.collab.runs_with_potentially_truncated_tool_calls).toBe(0);
+      expect(result.collab.runs_with_unknown_capture_limit).toBe(0);
+    } finally {
+      if (previousEnv.root === undefined) {
+        delete process.env.CODEX_ORCHESTRATOR_ROOT;
+      } else {
+        process.env.CODEX_ORCHESTRATOR_ROOT = previousEnv.root;
+      }
+      if (previousEnv.runsDir === undefined) {
+        delete process.env.CODEX_ORCHESTRATOR_RUNS_DIR;
+      } else {
+        process.env.CODEX_ORCHESTRATOR_RUNS_DIR = previousEnv.runsDir;
+      }
+      if (previousEnv.outDir === undefined) {
+        delete process.env.CODEX_ORCHESTRATOR_OUT_DIR;
+      } else {
+        process.env.CODEX_ORCHESTRATOR_OUT_DIR = previousEnv.outDir;
+      }
+      if (previousEnv.taskId === undefined) {
+        delete process.env.MCP_RUNNER_TASK_ID;
+      } else {
+        process.env.MCP_RUNNER_TASK_ID = previousEnv.taskId;
+      }
+      if (previousEnv.collabMaxEvents === undefined) {
+        delete process.env.CODEX_ORCHESTRATOR_COLLAB_MAX_EVENTS;
+      } else {
+        process.env.CODEX_ORCHESTRATOR_COLLAB_MAX_EVENTS = previousEnv.collabMaxEvents;
+      }
+      await rm(repoRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('suppresses lifecycle leak diagnostics when collab events may be truncated', async () => {
+    const previousEnv = {
+      root: process.env.CODEX_ORCHESTRATOR_ROOT,
+      runsDir: process.env.CODEX_ORCHESTRATOR_RUNS_DIR,
+      outDir: process.env.CODEX_ORCHESTRATOR_OUT_DIR,
+      taskId: process.env.MCP_RUNNER_TASK_ID,
+      collabMaxEvents: process.env.CODEX_ORCHESTRATOR_COLLAB_MAX_EVENTS
+    };
+    const repoRoot = await mkdtemp(join(tmpdir(), 'doctor-collab-truncated-'));
+    const taskId = 'task-collab-truncated';
+    const runId = '2026-02-18T00-00-00-000Z-feedface';
+    try {
+      await mkdir(join(repoRoot, 'tasks'), { recursive: true });
+      await writeFile(
+        join(repoRoot, 'tasks', 'index.json'),
+        `${JSON.stringify({ items: [{ slug: taskId }] }, null, 2)}\n`,
+        'utf8'
+      );
+
+      const runDir = join(repoRoot, '.runs', taskId, 'cli', runId);
+      await mkdir(runDir, { recursive: true });
+      await writeFile(
+        join(runDir, 'manifest.json'),
+        `${JSON.stringify(
+          {
+            run_id: runId,
+            task_id: taskId,
+            pipeline_id: 'implementation-gate',
+            status: 'succeeded',
+            started_at: '2026-02-18T00:00:00.000Z',
+            collab_tool_calls_max_events: 2,
+            collab_tool_calls: [
+              {
+                observed_at: '2026-02-18T00:00:10.000Z',
+                stage_id: 'stage-1',
+                command_index: 0,
+                event_type: 'item.completed',
+                item_id: 'spawn-a',
+                tool: 'spawn_agent',
+                status: 'completed',
+                sender_thread_id: 'parent',
+                receiver_thread_ids: ['agent-a']
+              },
+              {
+                observed_at: '2026-02-18T00:00:11.000Z',
+                stage_id: 'stage-1',
+                command_index: 0,
+                event_type: 'item.completed',
+                item_id: 'spawn-b',
+                tool: 'spawn_agent',
+                status: 'completed',
+                sender_thread_id: 'parent',
+                receiver_thread_ids: ['agent-b']
+              }
+            ]
+          },
+          null,
+          2
+        )}\n`,
+        'utf8'
+      );
+
+      process.env.CODEX_ORCHESTRATOR_ROOT = repoRoot;
+      delete process.env.CODEX_ORCHESTRATOR_RUNS_DIR;
+      delete process.env.CODEX_ORCHESTRATOR_OUT_DIR;
+      process.env.MCP_RUNNER_TASK_ID = taskId;
+      process.env.CODEX_ORCHESTRATOR_COLLAB_MAX_EVENTS = '2';
+
+      const result = await runDoctorUsage({ windowDays: 3650, taskFilter: taskId });
+      expect(result.runs.total).toBe(1);
+      expect(result.collab.runs_with_tool_calls).toBe(1);
+      expect(result.collab.runs_with_potentially_truncated_tool_calls).toBe(1);
+      expect(result.collab.runs_with_unknown_capture_limit).toBe(0);
+      expect(result.collab.runs_with_unclosed_spawn_agents).toBe(0);
+      expect(result.collab.unclosed_spawn_agents).toBe(0);
+      expect(result.collab.runs_with_spawn_thread_limit_failures).toBe(0);
+      expect(result.collab.spawn_thread_limit_failures).toBe(0);
+    } finally {
+      if (previousEnv.root === undefined) {
+        delete process.env.CODEX_ORCHESTRATOR_ROOT;
+      } else {
+        process.env.CODEX_ORCHESTRATOR_ROOT = previousEnv.root;
+      }
+      if (previousEnv.runsDir === undefined) {
+        delete process.env.CODEX_ORCHESTRATOR_RUNS_DIR;
+      } else {
+        process.env.CODEX_ORCHESTRATOR_RUNS_DIR = previousEnv.runsDir;
+      }
+      if (previousEnv.outDir === undefined) {
+        delete process.env.CODEX_ORCHESTRATOR_OUT_DIR;
+      } else {
+        process.env.CODEX_ORCHESTRATOR_OUT_DIR = previousEnv.outDir;
+      }
+      if (previousEnv.taskId === undefined) {
+        delete process.env.MCP_RUNNER_TASK_ID;
+      } else {
+        process.env.MCP_RUNNER_TASK_ID = previousEnv.taskId;
+      }
+      if (previousEnv.collabMaxEvents === undefined) {
+        delete process.env.CODEX_ORCHESTRATOR_COLLAB_MAX_EVENTS;
+      } else {
+        process.env.CODEX_ORCHESTRATOR_COLLAB_MAX_EVENTS = previousEnv.collabMaxEvents;
+      }
+      await rm(repoRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('suppresses lifecycle leak diagnostics when collab capture limit is unknown', async () => {
+    const previousEnv = {
+      root: process.env.CODEX_ORCHESTRATOR_ROOT,
+      runsDir: process.env.CODEX_ORCHESTRATOR_RUNS_DIR,
+      outDir: process.env.CODEX_ORCHESTRATOR_OUT_DIR,
+      taskId: process.env.MCP_RUNNER_TASK_ID
+    };
+    const repoRoot = await mkdtemp(join(tmpdir(), 'doctor-collab-unknown-cap-'));
+    const taskId = 'task-collab-unknown-cap';
+    const runId = '2026-02-18T00-00-00-000Z-cafebabe';
+    try {
+      await mkdir(join(repoRoot, 'tasks'), { recursive: true });
+      await writeFile(
+        join(repoRoot, 'tasks', 'index.json'),
+        `${JSON.stringify({ items: [{ slug: taskId }] }, null, 2)}\n`,
+        'utf8'
+      );
+
+      const runDir = join(repoRoot, '.runs', taskId, 'cli', runId);
+      await mkdir(runDir, { recursive: true });
+      await writeFile(
+        join(runDir, 'manifest.json'),
+        `${JSON.stringify(
+          {
+            run_id: runId,
+            task_id: taskId,
+            pipeline_id: 'implementation-gate',
+            status: 'succeeded',
+            started_at: '2026-02-18T00:00:00.000Z',
+            collab_tool_calls: [
+              {
+                observed_at: '2026-02-18T00:00:10.000Z',
+                stage_id: 'stage-1',
+                command_index: 0,
+                event_type: 'item.completed',
+                item_id: 'spawn-a',
+                tool: 'spawn_agent',
+                status: 'completed',
+                sender_thread_id: 'parent',
+                receiver_thread_ids: ['agent-a']
+              }
+            ]
+          },
+          null,
+          2
+        )}\n`,
+        'utf8'
+      );
+
+      process.env.CODEX_ORCHESTRATOR_ROOT = repoRoot;
+      delete process.env.CODEX_ORCHESTRATOR_RUNS_DIR;
+      delete process.env.CODEX_ORCHESTRATOR_OUT_DIR;
+      process.env.MCP_RUNNER_TASK_ID = taskId;
+
+      const result = await runDoctorUsage({ windowDays: 3650, taskFilter: taskId });
+      expect(result.runs.total).toBe(1);
+      expect(result.collab.runs_with_tool_calls).toBe(1);
+      expect(result.collab.runs_with_unknown_capture_limit).toBe(1);
+      expect(result.collab.runs_with_unclosed_spawn_agents).toBe(0);
+      expect(result.collab.unclosed_spawn_agents).toBe(0);
+      expect(result.collab.runs_with_spawn_thread_limit_failures).toBe(0);
+      expect(result.collab.spawn_thread_limit_failures).toBe(0);
     } finally {
       if (previousEnv.root === undefined) {
         delete process.env.CODEX_ORCHESTRATOR_ROOT;

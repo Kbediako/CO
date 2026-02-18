@@ -23,8 +23,11 @@ Multi-agent (collab tools) mode is separate from delegation. For symbolic RLM su
 - Subagents spawned through collab run with approval effectively set to `never`; design child tasks to avoid approval/escalation requirements.
 - Collab spawn depth is bounded. Near/at max depth, recursive delegation can fail or collab can be disabled in children; prefer shallow parent fan-out.
 - **Lifecycle is mandatory:** for every successful `spawn_agent`, run `wait` and then `close_agent` for that same id before task completion.
-- Keep a local list of spawned ids and run a final cleanup pass so no agent id is left unclosed on timeout/error paths.
-- If spawn fails with `agent thread limit reached`, stop spawning, close any known ids first, then surface a concise recovery note.
+- Keep an `open_agent_ids` ledger and append ids immediately after each successful spawn.
+- Remove ids from `open_agent_ids` only after successful `close_agent`.
+- Run a final close-sweep before handoff: close every id still in `open_agent_ids`, then clear the ledger.
+- On timeout/error paths, execute the same close-sweep before returning.
+- If spawn fails with `agent thread limit reached`, stop spawning, run close-sweep for known ids, retry once, and if still blocked surface a concise degraded-mode recovery note.
 - In a shared checkout, spawned subagents may produce file edits. Treat edits inside that stream's declared ownership as expected delegated output, not external interference.
 - Before spawning, capture a baseline (`git status --porcelain`). After `wait`, diff against baseline and classify file changes by stream ownership.
 - Escalate "unexpected local edits" only when changed files are outside all active stream scopes (or when no subagent was active).

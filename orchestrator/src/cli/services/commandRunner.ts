@@ -98,12 +98,21 @@ export async function runCommandStage(
   let stderrTruncated = false;
   let collabBuffer = '';
   let collabCount = manifest.collab_tool_calls?.length ?? 0;
+  const manifestCaptureLimit =
+    typeof manifest.collab_tool_calls_max_events === 'number'
+      ? Math.max(0, Math.trunc(manifest.collab_tool_calls_max_events))
+      : null;
+  const hasLegacyUnknownCaptureHistory = manifestCaptureLimit === null && collabCount > 0;
+  const runCollabCaptureLimit = manifestCaptureLimit ?? Math.max(0, MAX_COLLAB_TOOL_CALLS);
+  if (!hasLegacyUnknownCaptureHistory) {
+    manifest.collab_tool_calls_max_events = runCollabCaptureLimit;
+  }
 
   const recordCollabToolCall = (record: CollabToolCallRecord) => {
-    if (MAX_COLLAB_TOOL_CALLS <= 0) {
+    if (runCollabCaptureLimit <= 0) {
       return;
     }
-    if (collabCount >= MAX_COLLAB_TOOL_CALLS) {
+    if (collabCount >= runCollabCaptureLimit) {
       return;
     }
     if (!manifest.collab_tool_calls) {

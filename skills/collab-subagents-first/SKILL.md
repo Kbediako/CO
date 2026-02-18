@@ -104,10 +104,13 @@ Skip subagents when all conditions are true:
 ## Collab lifecycle hygiene (required)
 
 When you use collab tools (`spawn_agent` / `wait` / `close_agent`):
-- Keep a local list of every returned `agent_id`.
-- For every successful `spawn_agent`, run `wait` and then `close_agent` for that same id.
-- Always close agents on error/timeout paths; do a final cleanup pass before finishing so no id is left unclosed.
-- If spawn fails with `agent thread limit reached`, stop spawning immediately, close any known ids, then retry once. If you still cannot spawn, proceed without collab (solo or via delegation) and explicitly note the degraded mode.
+- Keep an `open_agent_ids` ledger for the current turn/stage.
+- On successful `spawn_agent`, append the returned `agent_id` to `open_agent_ids` immediately.
+- For every successful spawn, run `wait` and then `close_agent` for that same id.
+- After each successful close, remove that id from `open_agent_ids`.
+- On timeout/error paths, close any id still in `open_agent_ids` before returning control.
+- Run a final close-sweep before handoff: iterate all remaining ids in `open_agent_ids`, call `close_agent`, then clear the list.
+- If spawn fails with `agent thread limit reached`, stop spawning immediately, run a close-sweep for all known ids, retry one time, and if it still fails proceed without collab (solo or delegation) while explicitly noting degraded mode.
 
 ## Required subagent contract
 

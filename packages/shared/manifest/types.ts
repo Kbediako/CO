@@ -70,6 +70,7 @@ export interface CodexOrchestratorCLIManifest {
     sub_run_id: string | null;
   }[];
   collab_tool_calls?: CollabToolCall[] | null;
+  collab_tool_calls_max_events?: number | null;
   child_runs: {
     run_id: string;
     pipeline_id: string;
