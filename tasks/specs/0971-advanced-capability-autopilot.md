@@ -36,8 +36,8 @@ last_review: 2026-02-18
   - cloud fallback reason appears in structured output and summary.
   - RLM auto does not switch symbolic on small contexts.
   - KPI output remains parseable and deterministic.
-  - Collab lifecycle diagnostic counters are additive and do not break existing usage output parsing.
-  - Summary output surfaces lifecycle leak/thread-limit hints with stable wording.
+  - Collab lifecycle diagnostic counters are additive and do not break existing usage output parsing (`out/0971-advanced-capability-autopilot/manual/follow-up-validation-20260218-201823.log`).
+  - Summary output surfaces lifecycle leak/thread-limit hints with stable wording (`out/0971-advanced-capability-autopilot/manual/follow-up-validation-20260218-201823.log`).
 
 ## Open Questions
 - None blocking.

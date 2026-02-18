@@ -19,3 +19,4 @@
 2. Run standalone post-implementation review + explicit elegance pass.
 3. Update checklist evidence and handoff summary.
 4. Verify `doctor --usage` summary line now surfaces lifecycle leak/thread-limit signals with deterministic wording.
+   - Evidence: `out/0971-advanced-capability-autopilot/manual/follow-up-validation-20260218-201823.log`.

@@ -159,7 +159,8 @@
       "items": { "$ref": "#/definitions/collabToolCall" }
     },
     "collab_tool_calls_max_events": {
-      "type": ["integer", "null"]
+      "type": ["integer", "null"],
+      "minimum": 0
     },
     "child_runs": {
       "type": "array",

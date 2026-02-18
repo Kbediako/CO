@@ -227,6 +227,7 @@ export async function runDoctorUsage(options: DoctorUsageOptions = {}): Promise<
       }
       const spawnedAgents = new Set<string>();
       const closedAgents = new Set<string>();
+      const failedSpawnIds = new Set<string>();
       let failedSpawnCalls = 0;
       if (typeof manifest.task_id === 'string' && manifest.task_id) {
         collabTasks.add(manifest.task_id);
@@ -255,7 +256,15 @@ export async function runDoctorUsage(options: DoctorUsageOptions = {}): Promise<
 
         if (tool === 'spawn_agent') {
           if (isFailed) {
-            failedSpawnCalls += 1;
+            const rawFailedSpawnId = typeof entry?.item_id === 'string' ? entry.item_id.trim() : '';
+            const failedSpawnId =
+              rawFailedSpawnId.length > 0 && rawFailedSpawnId !== 'unknown'
+                ? `${entry?.stage_id ?? 'unknown-stage'}:${entry?.command_index ?? 'unknown-command'}:${rawFailedSpawnId}`
+                : `spawn-failed@${entryIndex}`;
+            if (!failedSpawnIds.has(failedSpawnId)) {
+              failedSpawnIds.add(failedSpawnId);
+              failedSpawnCalls += 1;
+            }
             continue;
           }
           if (!isCompleted) {

@@ -179,4 +179,47 @@ describe('runCommandStage collab capture limit persistence', () => {
     expect(manifest.collab_tool_calls).toHaveLength(1);
     expect(manifest.collab_tool_calls?.[0]?.tool).toBe('spawn_agent');
   });
+  it('keeps legacy unknown capture limits unset when resuming runs with existing collab history', async () => {
+    const env = normalizeEnvironmentPaths(resolveEnvironmentPaths());
+    const pipeline: PipelineDefinition = {
+      id: 'pipeline-collab-cap-legacy',
+      title: 'Collab Cap Legacy',
+      stages: [
+        {
+          kind: 'command',
+          id: 'stage-collab-cap-legacy',
+          title: 'Emit collab lines',
+          command: 'echo collab'
+        }
+      ]
+    };
+
+    const { manifest, paths } = await bootstrapManifest('run-collab-cap-legacy', {
+      env,
+      pipeline,
+      parentRunId: null,
+      taskSlug: env.taskId,
+      approvalPolicy: null
+    });
+    manifest.collab_tool_calls = [
+      {
+        observed_at: '2026-02-18T00:00:00.000Z',
+        stage_id: 'legacy-stage',
+        command_index: 0,
+        event_type: 'item.completed',
+        item_id: 'legacy-spawn',
+        tool: 'spawn_agent',
+        status: 'completed',
+        sender_thread_id: 'parent',
+        receiver_thread_ids: ['legacy-agent']
+      }
+    ];
+    delete manifest.collab_tool_calls_max_events;
+
+    const stage = pipeline.stages[0] as CommandStage;
+    await runCommandStage({ env, paths, manifest, stage, index: 1 });
+
+    expect(manifest.collab_tool_calls_max_events).toBeUndefined();
+    expect(manifest.collab_tool_calls).toHaveLength(3);
+  });
 });

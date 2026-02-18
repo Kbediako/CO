@@ -266,6 +266,17 @@ describe('runDoctorUsage', () => {
                 observed_at: '2026-02-18T00:00:14.000Z',
                 stage_id: 'stage-1',
                 command_index: 0,
+                event_type: 'item.updated',
+                item_id: 'spawn-failed',
+                tool: 'spawn_agent',
+                status: 'failed',
+                sender_thread_id: 'parent',
+                receiver_thread_ids: []
+              },
+              {
+                observed_at: '2026-02-18T00:00:14.500Z',
+                stage_id: 'stage-1',
+                command_index: 0,
                 event_type: 'item.completed',
                 item_id: 'spawn-failed',
                 tool: 'spawn_agent',
