@@ -11,8 +11,11 @@
 3. Tighten RLM auto symbolic activation to large-context-only default.
 4. Extend doctor usage + run-summary KPI surfacing.
 5. Add/refresh tests for all touched behaviors.
+6. Follow-up (2026-02-18): add collab lifecycle hygiene diagnostics (`doctor --usage`) for likely unclosed spawned-agent threads + likely spawn thread-limit failures.
+7. Follow-up (2026-02-18): harden shipped collab/delegation skills with explicit close-sweep recovery pattern.
 
 ## Phase 3 - Validation and handoff
 1. Run full guardrail command chain.
 2. Run standalone post-implementation review + explicit elegance pass.
 3. Update checklist evidence and handoff summary.
+4. Verify `doctor --usage` summary line now surfaces lifecycle leak/thread-limit signals with deterministic wording.

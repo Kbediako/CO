@@ -3,6 +3,7 @@
 ## Summary
 - Problem Statement: downstream runs (including tower-defence) still underuse advanced capability paths (collab/delegation/cloud/large-context RLM) because routing signals are either implicit, missing, or not surfaced clearly enough for automated agent decisions.
 - Desired Outcome: make advanced behavior more automatic and observable with low-friction defaults, while preserving safety and backwards-compatible fallbacks.
+- Follow-up (2026-02-18): add explicit collab lifecycle leak visibility and close-sweep guidance so spawned-agent thread leaks are surfaced quickly and agents can recover before hitting thread limits.
 
 ## User Request Translation (Context Anchor)
 - User intent / needs (in your own words): implement the approved 5-point plan end-to-end, deliberate deeply on each point and open questions, and optimize for least friction, autonomy, and accuracy for shipped/npm users.
@@ -12,6 +13,8 @@
   - Cloud fallback uses structured manifest/output fields so users see why fallback happened without parsing free text.
   - RLM `auto` switches to symbolic only for true large-context inputs (with explicit context-source signal), reducing noisy symbolic activation.
   - Adoption KPIs are visible in `doctor --usage` and `run-summary` so usage gains and regressions are measurable.
+  - `doctor --usage` reports collab lifecycle hygiene signals (likely unclosed spawned agents + likely spawn thread-limit events).
+  - Shipped skills include a deterministic close-sweep recovery pattern for `spawn_agent`/`wait`/`close_agent`.
 
 ## Goals
 - Increase practical usage of advanced capabilities through stronger defaults and clearer routing feedback.
@@ -50,11 +53,13 @@
   - Additive manifest fields preferred over replacing existing summary text.
 - Dependencies / Integrations:
   - Existing manifest schema/types, doctor usage aggregators, run-summary writer, pipeline experience instrumentation.
+  - Shipped skills/docs (`skills/collab-subagents-first`, `skills/delegation-usage`, `skills/delegation-usage/DELEGATION_GUIDE.md`).
 
 ## Open Questions
 - Deliberation decision: structured cloud fallback field should be additive (not replacing summary) for compatibility.
 - Deliberation decision: auto scout remains advisory/non-blocking with explicit warning output on timeout/failure.
 - Deliberation decision: RLM auto remains overrideable by explicit symbolic mode/env even after tighter large-context gating.
+- Deliberation decision (2026-02-18): classify thread-limit inference as "likely" from collab status-only events to avoid over-claiming root cause.
 
 ## Approvals
 - Product: user

@@ -89,9 +89,11 @@ When using collab tools (`spawn_agent` / `wait` / `close_agent`):
 - `spawn_agent` falls back to `default` when `agent_type` is omitted; always set `agent_type` explicitly.
 - Prefix spawned prompts with `[agent_type:<role>]` on line one for auditable role routing.
 - For every successful spawn, run `wait` then `close_agent` for the same id.
-- Keep a local list of spawned ids and run a final cleanup pass before returning.
-- On timeout/error paths, still close known ids before reporting failure.
-- If you see `agent thread limit reached`, stop spawning immediately, close known ids, and retry only after cleanup.
+- Keep an `open_agent_ids` ledger and append each successful spawn id immediately.
+- Remove ids from `open_agent_ids` only after successful `close_agent`.
+- Run a final close-sweep before returning: close every id still in `open_agent_ids`, then clear it.
+- On timeout/error paths, run the same close-sweep before reporting failure.
+- If you see `agent thread limit reached`, stop spawning immediately, run close-sweep, retry once, and if still blocked continue in degraded mode (no further collab spawns).
 
 ## Playwright stream hygiene
 
