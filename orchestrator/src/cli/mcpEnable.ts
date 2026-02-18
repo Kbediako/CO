@@ -475,10 +475,35 @@ function redactArgsForDisplay(args: string[]): string[] {
     redacted[index + 1] = '<redacted>';
   }
 
+  // Command payload after "--" can contain arbitrary user args. Keep only the
+  // command token + first argument for operator context, redact the rest.
+  const separatorIndex = redacted.indexOf('--');
+  if (separatorIndex >= 0) {
+    const commandIndex = separatorIndex + 1;
+    const firstArgIndex = separatorIndex + 2;
+    if (commandIndex < redacted.length && looksSensitiveValue(redacted[commandIndex] ?? '')) {
+      redacted[commandIndex] = '<redacted>';
+    }
+    if (firstArgIndex < redacted.length && looksSensitiveValue(redacted[firstArgIndex] ?? '')) {
+      redacted[firstArgIndex] = '<redacted>';
+    }
+    for (let index = separatorIndex + 3; index < redacted.length; index += 1) {
+      redacted[index] = '<redacted>';
+    }
+  }
+
   return redacted;
 }
 
 function looksSensitiveFlag(flagName: string): boolean {
   const normalized = flagName.toLowerCase();
   return /(api[-_]?key|token|secret|password|passwd|bearer|auth|cookie|credential)/u.test(normalized);
+}
+
+function looksSensitiveValue(value: string): boolean {
+  const normalized = value.toLowerCase();
+  if (/(api[-_]?key|token|secret|password|passwd|bearer|auth|cookie|credential)/u.test(normalized)) {
+    return true;
+  }
+  return /^[a-z][a-z0-9+.-]*:\/\/[^/\s:@]+:[^@\s]+@/iu.test(value);
 }

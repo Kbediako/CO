@@ -1528,7 +1528,8 @@ async function handleMcp(rawArgs: string[]): Promise<void> {
       }
     }
     const result = await runMcpEnable({ apply, serverNames });
-    const hasApplyFailures = apply && result.actions.some((action) => action.status === 'failed');
+    const hasApplyFailures = apply
+      && result.actions.some((action) => action.status !== 'enabled' && action.status !== 'already_enabled');
     if (format === 'json') {
       console.log(JSON.stringify(result, null, 2));
     } else {

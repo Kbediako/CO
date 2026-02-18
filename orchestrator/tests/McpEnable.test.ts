@@ -139,8 +139,43 @@ describe('runMcpEnable', () => {
 
     const result = await runMcpEnable(baseOptions({ commandRunner: runner }));
     const commandLine = result.actions[0]?.command_line ?? '';
-    expect(commandLine).toContain('--api-key');
     expect(commandLine).toContain('<redacted>');
+    expect(commandLine).not.toContain('--api-key');
+    expect(commandLine).not.toContain('ctx7-secret');
+  });
+
+  it('redacts command payload arguments after -- in displayed command lines', async () => {
+    const runner = buildRunner([
+      {
+        exitCode: 0,
+        stdout: JSON.stringify([
+          {
+            name: 'proxy',
+            enabled: false,
+            transport: {
+              type: 'stdio',
+              command: 'node',
+              args: [
+                'scripts/proxy.mjs',
+                '-p',
+                'super-secret-password',
+                'https://user:pass@example.com/private',
+                '--api-key',
+                'ctx7-secret'
+              ]
+            }
+          }
+        ]),
+        stderr: ''
+      }
+    ]);
+
+    const result = await runMcpEnable(baseOptions({ commandRunner: runner }));
+    const commandLine = result.actions[0]?.command_line ?? '';
+    expect(commandLine).toContain('scripts/proxy.mjs');
+    expect(commandLine).toContain('<redacted>');
+    expect(commandLine).not.toContain('super-secret-password');
+    expect(commandLine).not.toContain('user:pass@example.com');
     expect(commandLine).not.toContain('ctx7-secret');
   });
 

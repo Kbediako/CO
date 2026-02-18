@@ -376,6 +376,55 @@ describe('codex-orchestrator command surface', () => {
     }
   }, TEST_TIMEOUT);
 
+  it('returns non-zero when mcp enable --yes reports missing targets', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'co-cli-mcp-enable-missing-'));
+    const fakeCodex = await writeFakeCodexBinary(tempDir);
+    const env = {
+      ...process.env,
+      CODEX_CLI_BIN: fakeCodex,
+      CODEX_TEST_MCP_LIST_JSON: JSON.stringify([
+        {
+          name: 'delegation',
+          enabled: false,
+          transport: {
+            type: 'stdio',
+            command: 'node',
+            args: ['scripts/delegation-server.mjs']
+          }
+        }
+      ])
+    };
+
+    await expect(runCli(['mcp', 'enable', '--yes', '--servers', 'unknown'], env)).rejects.toMatchObject({
+      stdout: expect.stringContaining('unknown: missing')
+    });
+  }, TEST_TIMEOUT);
+
+  it('returns non-zero when mcp enable --yes reports unsupported targets', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'co-cli-mcp-enable-unsupported-'));
+    const fakeCodex = await writeFakeCodexBinary(tempDir);
+    const env = {
+      ...process.env,
+      CODEX_CLI_BIN: fakeCodex,
+      CODEX_TEST_MCP_LIST_JSON: JSON.stringify([
+        {
+          name: 'delegation',
+          enabled: false,
+          startup_timeout_sec: 30,
+          transport: {
+            type: 'stdio',
+            command: 'node',
+            args: ['scripts/delegation-server.mjs']
+          }
+        }
+      ])
+    };
+
+    await expect(runCli(['mcp', 'enable', '--yes', '--servers', 'delegation'], env)).rejects.toMatchObject({
+      stdout: expect.stringContaining('delegation: unsupported')
+    });
+  }, TEST_TIMEOUT);
+
   it('rejects mcp enable --servers without a value', async () => {
     tempDir = await mkdtemp(join(tmpdir(), 'co-cli-mcp-enable-servers-'));
     const fakeCodex = await writeFakeCodexBinary(tempDir);
