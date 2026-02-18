@@ -57,7 +57,9 @@ describe('runMcpEnable', () => {
       })
     ]);
     expect(result.actions[0]?.command_line).toContain('mcp add delegation');
-    expect(result.actions[0]?.command_line).toContain('scripts/delegation-server.mjs');
+    expect(result.actions[0]?.command_line).toContain('-- node');
+    expect(result.actions[0]?.command_line).toContain('<redacted>');
+    expect(result.actions[0]?.command_line).not.toContain('scripts/delegation-server.mjs');
     expect(result.actions[0]?.command_line).toContain('DELEGATION_MODE=<redacted>');
     expect(result.actions[0]?.command_line).not.toContain('DELEGATION_MODE=full');
 
@@ -172,8 +174,8 @@ describe('runMcpEnable', () => {
 
     const result = await runMcpEnable(baseOptions({ commandRunner: runner }));
     const commandLine = result.actions[0]?.command_line ?? '';
-    expect(commandLine).toContain('scripts/proxy.mjs');
     expect(commandLine).toContain('<redacted>');
+    expect(commandLine).not.toContain('scripts/proxy.mjs');
     expect(commandLine).not.toContain('super-secret-password');
     expect(commandLine).not.toContain('user:pass@example.com');
     expect(commandLine).not.toContain('ctx7-secret');

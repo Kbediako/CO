@@ -480,14 +480,10 @@ function redactArgsForDisplay(args: string[]): string[] {
   const separatorIndex = redacted.indexOf('--');
   if (separatorIndex >= 0) {
     const commandIndex = separatorIndex + 1;
-    const firstArgIndex = separatorIndex + 2;
     if (commandIndex < redacted.length && looksSensitiveValue(redacted[commandIndex] ?? '')) {
       redacted[commandIndex] = '<redacted>';
     }
-    if (firstArgIndex < redacted.length && looksSensitiveValue(redacted[firstArgIndex] ?? '')) {
-      redacted[firstArgIndex] = '<redacted>';
-    }
-    for (let index = separatorIndex + 3; index < redacted.length; index += 1) {
+    for (let index = separatorIndex + 2; index < redacted.length; index += 1) {
       redacted[index] = '<redacted>';
     }
   }
