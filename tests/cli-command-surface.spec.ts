@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { chmod, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { isAbsolute, join } from 'node:path';
 import { promisify } from 'node:util';
@@ -106,6 +106,7 @@ describe('codex-orchestrator command surface', () => {
   it('prints setup help', async () => {
     const { stdout } = await runCli(['setup', '--help']);
     expect(stdout).toContain('Usage: codex-orchestrator setup');
+    expect(stdout).toContain('--refresh-skills');
   }, TEST_TIMEOUT);
 
   it('prints flow help', async () => {
@@ -350,6 +351,9 @@ describe('codex-orchestrator command surface', () => {
     const payload = JSON.parse(stdout) as {
       status?: string;
       steps?: {
+        skills?: {
+          commandLines?: string[];
+        };
         guidance?: {
           note?: string;
           references?: string[];
@@ -366,7 +370,63 @@ describe('codex-orchestrator command surface', () => {
     expect(payload.steps?.guidance?.recommended_commands).toContain(
       'codex-orchestrator flow --task <task-id>'
     );
+    expect((payload.steps?.skills?.commandLines ?? []).every((entry) => !entry.includes('--force'))).toBe(true);
   }, TEST_TIMEOUT);
+
+  it('emits setup plan JSON with refresh-skills overwrite commands', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'co-cli-setup-plan-refresh-'));
+    const env = {
+      ...process.env,
+      CODEX_HOME: tempDir
+    };
+    const { stdout } = await runCli(['setup', '--format', 'json', '--refresh-skills'], env);
+    const payload = JSON.parse(stdout) as {
+      status?: string;
+      steps?: {
+        skills?: {
+          commandLines?: string[];
+        };
+      };
+    };
+    expect(payload.status).toBe('planned');
+    const commands = payload.steps?.skills?.commandLines ?? [];
+    expect(commands.length).toBeGreaterThan(0);
+    expect(commands.every((entry) => entry.includes('--force'))).toBe(true);
+  }, TEST_TIMEOUT);
+
+  it('setup --yes keeps existing skill files by default', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'co-cli-setup-apply-'));
+    const fakeCodex = await writeFakeCodexBinary(tempDir);
+    const skillPath = join(tempDir, 'skills', 'docs-first', 'SKILL.md');
+    await mkdir(join(tempDir, 'skills', 'docs-first'), { recursive: true });
+    await writeFile(skillPath, 'MARKER\n', 'utf8');
+
+    const env = {
+      ...process.env,
+      CODEX_HOME: tempDir,
+      CODEX_CLI_BIN: fakeCodex
+    };
+    await runCli(['setup', '--yes'], env, FLOW_TARGET_TEST_TIMEOUT);
+    expect(await readFile(skillPath, 'utf8')).toBe('MARKER\n');
+  }, FLOW_TARGET_TEST_TIMEOUT);
+
+  it('setup --yes --refresh-skills overwrites existing skill files', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'co-cli-setup-refresh-'));
+    const fakeCodex = await writeFakeCodexBinary(tempDir);
+    const skillPath = join(tempDir, 'skills', 'docs-first', 'SKILL.md');
+    await mkdir(join(tempDir, 'skills', 'docs-first'), { recursive: true });
+    await writeFile(skillPath, 'MARKER\n', 'utf8');
+
+    const env = {
+      ...process.env,
+      CODEX_HOME: tempDir,
+      CODEX_CLI_BIN: fakeCodex
+    };
+    await runCli(['setup', '--yes', '--refresh-skills'], env, FLOW_TARGET_TEST_TIMEOUT);
+    const content = await readFile(skillPath, 'utf8');
+    expect(content).not.toBe('MARKER\n');
+    expect(content).toContain('docs-first');
+  }, FLOW_TARGET_TEST_TIMEOUT);
 
   it('supports quoted exec commands passed as a single token', async () => {
     tempDir = await mkdtemp(join(tmpdir(), 'co-cli-surface-'));

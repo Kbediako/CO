@@ -189,6 +189,8 @@ flowchart TB
 Recommended one-shot bootstrap (skills + delegation + DevTools wiring):
 ```bash
 codex-orchestrator setup --yes
+# Optional: overwrite existing bundled skills in $CODEX_HOME/skills
+# codex-orchestrator setup --yes --refresh-skills
 ```
 
 The release ships skills under `skills/` for downstream packaging. If you already have global skills installed, treat those as the primary reference and use bundled skills as the shipped fallback. Install bundled skills into `$CODEX_HOME/skills`:
@@ -237,7 +239,7 @@ codex-orchestrator doctor --cloud-preflight
 
 ## Downstream usage cheatsheet (agent-first)
 
-- Bootstrap + wire everything: `codex-orchestrator setup --yes`
+- Bootstrap + wire everything: `codex-orchestrator setup --yes` (non-destructive for existing skills by default; add `--refresh-skills` to overwrite)
 - Enable disabled MCP servers in one shot: `codex-orchestrator mcp enable --yes` (plan with `--format json`; env/secret values are redacted in displayed command lines)
 - Low-friction docs->implementation guardrails: `codex-orchestrator flow --task <task-id>`
 - Validate + measure adoption locally: `codex-orchestrator doctor --usage --format json`
@@ -259,7 +261,7 @@ codex-orchestrator devtools setup
 - `codex-orchestrator plan <pipeline>` — preview pipeline stages.
 - `codex-orchestrator exec <cmd>` — run a one-off command with the exec runtime.
 - `codex-orchestrator init codex` — install starter templates (`mcp-client.json`, `AGENTS.md`) into a repo.
-- `codex-orchestrator setup --yes` — install bundled skills and configure delegation + DevTools wiring.
+- `codex-orchestrator setup --yes` — install bundled skills and configure delegation + DevTools wiring (add `--refresh-skills` to overwrite existing skills in `$CODEX_HOME/skills`).
 - `codex-orchestrator init codex --codex-cli --yes --codex-source <path>` — optionally provision a CO-managed Codex CLI binary (build-from-source default; set `CODEX_CLI_SOURCE` to avoid passing `--codex-source` every time, and `CODEX_CLI_USE_MANAGED=1` to route runs to it).
 - `codex-orchestrator init codex --codex-cli --yes --codex-download-url <url> --codex-download-sha256 <sha>` — opt-in to a prebuilt Codex CLI download.
 - `codex-orchestrator codex setup` — plan/apply a CO-managed Codex CLI install (optional managed/pinned path; use `--download-url` + `--download-sha256` for prebuilts; activate with `CODEX_CLI_USE_MANAGED=1`).

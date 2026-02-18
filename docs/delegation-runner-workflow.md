@@ -18,6 +18,8 @@ You must register the delegation MCP server once so delegate tools are available
 codex-orchestrator setup --yes
 ```
 
+`setup --yes` keeps existing skill files by default. Add `--refresh-skills` when you intentionally want to overwrite bundled skills in `$CODEX_HOME/skills`.
+
 Optional low-friction enablement for already-configured-but-disabled MCP servers:
 
 ```bash

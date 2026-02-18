@@ -101,7 +101,7 @@ Use `npx @kbediako/codex-orchestrator resume --run <run-id>` to continue interru
 ## Companion Package Commands
 - `codex-orchestrator mcp serve [--repo <path>] [--dry-run] [-- <extra args>]`: launch the MCP stdio server (delegates to `codex mcp-server`; stdout guard keeps protocol-only output, logs to stderr).
 - `codex-orchestrator init codex [--cwd <path>] [--force]`: copy starter templates into a repo (includes `mcp-client.json` and `AGENTS.md`; no overwrite unless `--force`).
-- `codex-orchestrator setup [--yes]`: one-shot bootstrap for downstream users (installs bundled skills, configures delegation + DevTools wiring, and prints policy/usage guidance).
+- `codex-orchestrator setup [--yes] [--refresh-skills]`: one-shot bootstrap for downstream users (installs bundled skills, configures delegation + DevTools wiring, and prints policy/usage guidance). By default setup does not overwrite existing skills; add `--refresh-skills` when you want to replace existing bundled skill files.
 - `codex-orchestrator flow [--task <task-id>]`: runs `docs-review` then `implementation-gate` in sequence; stops on the first failure.
 - `codex-orchestrator doctor [--format json] [--usage] [--apply]`: check optional tooling dependencies plus collab/cloud/delegation readiness and print enablement commands. `--usage` appends a local usage snapshot (scans `.runs/`) with adoption KPIs. `--apply` plans/applies quick fixes (use with `--yes`).
 - `codex-orchestrator devtools setup [--yes]`: print DevTools MCP setup instructions (`--yes` applies `codex mcp add ...`).

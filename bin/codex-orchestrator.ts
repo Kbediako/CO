@@ -1113,13 +1113,14 @@ async function handleInit(rawArgs: string[]): Promise<void> {
 async function handleSetup(rawArgs: string[]): Promise<void> {
   const { positionals, flags } = parseArgs(rawArgs);
   if (isHelpRequest(positionals, flags)) {
-    console.log(`Usage: codex-orchestrator setup [--yes] [--format json]
+    console.log(`Usage: codex-orchestrator setup [--yes] [--refresh-skills] [--format json]
 
 One-shot bootstrap for downstream users. Installs bundled skills and configures
 delegation + DevTools MCP wiring.
 
 Options:
   --yes                 Apply setup (otherwise plan only).
+  --refresh-skills      Overwrite bundled skills in $CODEX_HOME/skills during setup.
   --repo <path>         Repo root for delegation wiring (default cwd).
   --format json         Emit machine-readable output (dry-run only).
 `);
@@ -1128,6 +1129,7 @@ Options:
 
   const format: OutputFormat = (flags['format'] as string | undefined) === 'json' ? 'json' : 'text';
   const apply = Boolean(flags['yes']);
+  const refreshSkills = Boolean(flags['refresh-skills']);
   if (format === 'json' && apply) {
     throw new Error('setup does not support --format json with --yes.');
   }
@@ -1140,14 +1142,16 @@ Options:
   if (bundledSkills.length === 0) {
     throw new Error('No bundled skills detected; cannot run setup.');
   }
-  const forceSkills = bundledSkills.filter((skill) => skill !== 'chrome-devtools');
+  const primarySkillNames = bundledSkills.filter((skill) => skill !== 'chrome-devtools');
   const guidance = buildSetupGuidance();
 
   if (!apply) {
-    const forceOnly = forceSkills.join(',');
-    const forceCommand = forceOnly ? `codex-orchestrator skills install --force --only ${forceOnly}` : null;
+    const primaryOnly = primarySkillNames.join(',');
+    const primaryCommand = primaryOnly
+      ? `codex-orchestrator skills install ${refreshSkills ? '--force ' : ''}--only ${primaryOnly}`
+      : null;
     const devtoolsCommand = bundledSkills.includes('chrome-devtools')
-      ? 'codex-orchestrator skills install --only chrome-devtools'
+      ? `codex-orchestrator skills install ${refreshSkills ? '--force ' : ''}--only chrome-devtools`
       : null;
 
     const delegation = await runDelegationSetup({ repoRoot });
@@ -1156,8 +1160,9 @@ Options:
       status: 'planned' as const,
       steps: {
         skills: {
-          commandLines: [forceCommand, devtoolsCommand].filter((entry): entry is string => Boolean(entry)),
-          note: 'Installs bundled skills into $CODEX_HOME/skills (setup avoids overwriting chrome-devtools when already present).'
+          commandLines: [primaryCommand, devtoolsCommand].filter((entry): entry is string => Boolean(entry)),
+          note:
+            'Installs bundled skills into $CODEX_HOME/skills without overwriting existing files by default. Add --refresh-skills to force overwrite.'
         },
         delegation,
         devtools,
@@ -1184,10 +1189,13 @@ Options:
     return;
   }
 
-  const primarySkills = forceSkills.length > 0 ? await installSkills({ force: true, only: forceSkills }) : null;
+  const primarySkills =
+    primarySkillNames.length > 0
+      ? await installSkills({ force: refreshSkills, only: primarySkillNames })
+      : null;
   const devtoolsSkill =
     bundledSkills.includes('chrome-devtools')
-      ? await installSkills({ force: false, only: ['chrome-devtools'] })
+      ? await installSkills({ force: refreshSkills, only: ['chrome-devtools'] })
       : null;
   const skills = primarySkills && devtoolsSkill
     ? {
@@ -1877,8 +1885,9 @@ Commands:
     --codex-download-sha256 <sha>  Expected SHA256 for the prebuilt download.
     --codex-force          Overwrite existing CO-managed codex binary.
     --yes                  Apply codex CLI setup (otherwise plan only).
-  setup [--yes] [--format json]
+  setup [--yes] [--refresh-skills] [--format json]
     --yes                 Apply setup (otherwise plan only).
+    --refresh-skills      Overwrite bundled skills in $CODEX_HOME/skills during setup.
     --repo <path>         Repo root for delegation wiring (default cwd).
     --format json         Emit machine-readable output (dry-run only).
   doctor [--format json] [--usage] [--window-days <n>] [--task <id>] [--cloud-preflight] [--apply]
