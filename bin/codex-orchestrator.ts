@@ -1216,7 +1216,7 @@ function buildSetupGuidance(): SetupGuidancePayload {
       'codex-orchestrator flow --task <task-id>',
       'codex-orchestrator doctor --usage',
       'codex-orchestrator rlm --multi-agent auto "<goal>"',
-      'codex-orchestrator mcp enable --yes'
+      'codex-orchestrator mcp enable --servers delegation --yes'
     ]
   };
 }
@@ -1513,13 +1513,20 @@ async function handleMcp(rawArgs: string[]): Promise<void> {
   if (subcommand === 'enable') {
     const apply = Boolean(flags['yes']);
     const format = (flags['format'] as string | undefined) === 'json' ? 'json' : 'text';
-    const serversRaw = readStringFlag(flags, 'servers');
-    const serverNames = serversRaw
-      ? serversRaw
-          .split(',')
-          .map((entry) => entry.trim())
-          .filter((entry) => entry.length > 0)
-      : undefined;
+    const serversFlag = flags['servers'];
+    let serverNames: string[] | undefined;
+    if (serversFlag !== undefined) {
+      if (typeof serversFlag !== 'string') {
+        throw new Error('--servers must include a comma-separated list of MCP server names.');
+      }
+      serverNames = serversFlag
+        .split(',')
+        .map((entry) => entry.trim())
+        .filter((entry) => entry.length > 0);
+      if (serverNames.length === 0) {
+        throw new Error('--servers must include a comma-separated list of MCP server names.');
+      }
+    }
     const result = await runMcpEnable({ apply, serverNames });
     const hasApplyFailures = apply && result.actions.some((action) => action.status === 'failed');
     if (format === 'json') {

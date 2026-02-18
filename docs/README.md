@@ -106,7 +106,7 @@ Use `npx @kbediako/codex-orchestrator resume --run <run-id>` to continue interru
 - `codex-orchestrator doctor [--format json] [--usage] [--apply]`: check optional tooling dependencies plus collab/cloud/delegation readiness and print enablement commands. `--usage` appends a local usage snapshot (scans `.runs/`) with adoption KPIs. `--apply` plans/applies quick fixes (use with `--yes`).
 - `codex-orchestrator devtools setup [--yes]`: print DevTools MCP setup instructions (`--yes` applies `codex mcp add ...`).
 - `codex-orchestrator delegation setup [--yes]`: configure delegation MCP wiring (`--yes` applies `codex mcp add ...`).
-- `codex-orchestrator skills install [--force] [--only <skills>] [--codex-home <path>]`: install bundled skills into `$CODEX_HOME/skills` (global skills remain the primary reference when installed).
+- `codex-orchestrator skills install [--force] [--only <skills>] [--codex-home <path>]`: install bundled skills into `$CODEX_HOME/skills` (prefer global skills when installed; fall back to bundled skills, for example use `$CODEX_HOME/skills/docs-first` when present, otherwise `skills/docs-first/SKILL.md`).
 - `codex-orchestrator self-check --format json`: emit a safe JSON health payload for smoke tests.
 - `codex-orchestrator --version`: print the package version.
 

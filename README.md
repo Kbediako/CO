@@ -240,7 +240,7 @@ codex-orchestrator doctor --cloud-preflight
 ## Downstream usage cheatsheet (agent-first)
 
 - Bootstrap + wire everything: `codex-orchestrator setup --yes` (non-destructive for existing skills by default; add `--refresh-skills` to overwrite)
-- Enable disabled MCP servers in one shot: `codex-orchestrator mcp enable --yes` (plan with `--format json`; env/secret values are redacted in displayed command lines)
+- Enable required MCP servers with least privilege: `codex-orchestrator mcp enable --servers delegation --yes` (plan with `--format json`; omit `--servers` only when you intentionally want all disabled servers enabled; env/secret values are redacted in displayed command lines)
 - Low-friction docs->implementation guardrails: `codex-orchestrator flow --task <task-id>`
 - Validate + measure adoption locally: `codex-orchestrator doctor --usage --format json`
 - Delegation: `codex-orchestrator doctor --apply --yes`, then enable for a Codex run with: `codex -c 'mcp_servers.delegation.enabled=true' ...`
@@ -266,7 +266,7 @@ codex-orchestrator devtools setup
 - `codex-orchestrator init codex --codex-cli --yes --codex-download-url <url> --codex-download-sha256 <sha>` — opt-in to a prebuilt Codex CLI download.
 - `codex-orchestrator codex setup` — plan/apply a CO-managed Codex CLI install (optional managed/pinned path; use `--download-url` + `--download-sha256` for prebuilts; activate with `CODEX_CLI_USE_MANAGED=1`).
 - `codex-orchestrator delegation setup --yes` — configure delegation MCP server wiring.
-- `codex-orchestrator mcp enable --yes` — enable disabled MCP servers from existing Codex config entries.
+- `codex-orchestrator mcp enable --servers <csv> --yes` — enable specific disabled MCP servers from existing Codex config entries.
 - `codex-orchestrator self-check --format json` — JSON health payload.
 - `codex-orchestrator mcp serve` — Codex MCP stdio server.
 

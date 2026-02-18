@@ -376,6 +376,32 @@ describe('codex-orchestrator command surface', () => {
     }
   }, TEST_TIMEOUT);
 
+  it('rejects mcp enable --servers without a value', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'co-cli-mcp-enable-servers-'));
+    const fakeCodex = await writeFakeCodexBinary(tempDir);
+    const env = {
+      ...process.env,
+      CODEX_CLI_BIN: fakeCodex
+    };
+
+    await expect(runCli(['mcp', 'enable', '--servers'], env)).rejects.toMatchObject({
+      stderr: expect.stringContaining('--servers must include a comma-separated list of MCP server names.')
+    });
+  }, TEST_TIMEOUT);
+
+  it('rejects mcp enable --servers when the csv has no names', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'co-cli-mcp-enable-empty-csv-'));
+    const fakeCodex = await writeFakeCodexBinary(tempDir);
+    const env = {
+      ...process.env,
+      CODEX_CLI_BIN: fakeCodex
+    };
+
+    await expect(runCli(['mcp', 'enable', '--servers', ','], env)).rejects.toMatchObject({
+      stderr: expect.stringContaining('--servers must include a comma-separated list of MCP server names.')
+    });
+  }, TEST_TIMEOUT);
+
   it('emits setup plan JSON', async () => {
     tempDir = await mkdtemp(join(tmpdir(), 'co-cli-setup-plan-'));
     const env = {
@@ -405,6 +431,9 @@ describe('codex-orchestrator command surface', () => {
     );
     expect(payload.steps?.guidance?.recommended_commands).toContain(
       'codex-orchestrator flow --task <task-id>'
+    );
+    expect(payload.steps?.guidance?.recommended_commands).toContain(
+      'codex-orchestrator mcp enable --servers delegation --yes'
     );
     const commands = payload.steps?.skills?.commandLines ?? [];
     expect(commands).toHaveLength(1);
