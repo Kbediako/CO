@@ -1,7 +1,7 @@
 import { execFile } from 'node:child_process';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { chmod, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { isAbsolute, join } from 'node:path';
 import { promisify } from 'node:util';
 
 import { afterEach, describe, expect, it } from 'vitest';
@@ -31,6 +31,42 @@ async function runCli(
     env: env ?? process.env,
     timeout: timeoutMs
   });
+}
+
+async function writeFakeCodexBinary(dir: string): Promise<string> {
+  const binPath = join(dir, 'codex');
+  await writeFile(
+    binPath,
+    [
+      '#!/bin/sh',
+      'if [ "$1" = "--version" ]; then',
+      '  echo "codex 0.0.0-test"',
+      '  exit 0',
+      'fi',
+      'if [ "$1" = "features" ] && [ "$2" = "list" ]; then',
+      '  echo "multi_agent experimental true"',
+      '  exit 0',
+      'fi',
+      'if [ "$1" = "cloud" ] && [ "$2" = "--help" ]; then',
+      '  exit 0',
+      'fi',
+      'if [ "$1" = "mcp" ] && [ "$2" = "list" ] && [ "$3" = "--json" ]; then',
+      '  if [ -n "$CODEX_TEST_MCP_LIST_JSON" ]; then',
+      '    echo "$CODEX_TEST_MCP_LIST_JSON"',
+      '  else',
+      '    echo "[]"',
+      '  fi',
+      '  exit 0',
+      'fi',
+      'if [ "$1" = "mcp" ] && [ "$2" = "add" ]; then',
+      '  exit 0',
+      'fi',
+      'exit 0'
+    ].join('\n'),
+    'utf8'
+  );
+  await chmod(binPath, 0o755);
+  return binPath;
 }
 
 describe('codex-orchestrator command surface', () => {
@@ -201,6 +237,107 @@ describe('codex-orchestrator command surface', () => {
     expect(stdout).toContain('Doctor apply plan:');
     expect(stdout).toContain('chrome-devtools');
     expect(stdout).toContain('delegation');
+  }, TEST_TIMEOUT);
+
+  it('emits doctor cloud preflight payload in JSON output', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'co-cli-doctor-cloud-preflight-'));
+    const fakeCodex = await writeFakeCodexBinary(tempDir);
+    const env = {
+      ...process.env,
+      CODEX_CLI_BIN: fakeCodex,
+      CODEX_CLOUD_ENV_ID: '',
+      CODEX_CLOUD_BRANCH: ''
+    };
+    const { stdout } = await runCli(['doctor', '--format', 'json', '--cloud-preflight'], env);
+    const payload = JSON.parse(stdout) as {
+      cloud_preflight?: {
+        ok?: boolean;
+        details?: { codex_bin?: string };
+        issues?: Array<{ code?: string }>;
+        guidance?: string[];
+      };
+    };
+    expect(payload.cloud_preflight).toBeTruthy();
+    expect(payload.cloud_preflight?.ok).toBe(false);
+    expect(payload.cloud_preflight?.details?.codex_bin).toBe(fakeCodex);
+    expect(payload.cloud_preflight?.issues).toEqual(
+      expect.arrayContaining([expect.objectContaining({ code: 'missing_environment' })])
+    );
+    expect(payload.cloud_preflight?.guidance?.join('\n')).toContain('CODEX_CLOUD_ENV_ID');
+  }, TEST_TIMEOUT);
+
+  it('returns terminal failed status when strict cloud preflight fails', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'co-cli-cloud-preflight-deny-'));
+    const fakeCodex = await writeFakeCodexBinary(tempDir);
+    const env = {
+      ...process.env,
+      CODEX_CLI_BIN: fakeCodex,
+      CODEX_ORCHESTRATOR_ROOT: tempDir,
+      CODEX_ORCHESTRATOR_RUNS_DIR: join(tempDir, '.runs'),
+      CODEX_ORCHESTRATOR_OUT_DIR: join(tempDir, 'out'),
+      MCP_RUNNER_TASK_ID: 'cloud-preflight-deny',
+      CODEX_ORCHESTRATOR_CLOUD_FALLBACK: 'deny',
+      CODEX_CLOUD_ENV_ID: '',
+      CODEX_CLOUD_BRANCH: ''
+    };
+    const { stdout } = await runCli(
+      ['start', 'docs-review', '--execution-mode', 'cloud', '--target', 'review', '--format', 'json', '--task', 'cloud-preflight-deny'],
+      env,
+      FLOW_TARGET_TEST_TIMEOUT
+    );
+    const jsonStart = stdout.indexOf('{');
+    const payload = JSON.parse(jsonStart >= 0 ? stdout.slice(jsonStart) : stdout) as {
+      status?: string;
+      summary?: string | null;
+      manifest?: string;
+    };
+    expect(payload.status).toBe('failed');
+    expect(payload.summary).toContain('cloud fallback is disabled');
+    const manifestPath = isAbsolute(payload.manifest ?? '')
+      ? (payload.manifest as string)
+      : join(tempDir, payload.manifest ?? '');
+    const manifest = JSON.parse(await readFile(manifestPath, 'utf8')) as {
+      status?: string;
+      status_detail?: string | null;
+      completed_at?: string | null;
+    };
+    expect(manifest.status).toBe('failed');
+    expect(manifest.status_detail).toBe('cloud-preflight-failed');
+    expect(manifest.completed_at).toBeTruthy();
+  }, FLOW_TARGET_TEST_TIMEOUT);
+
+  it('emits MCP enable plan payload in JSON output', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'co-cli-mcp-enable-'));
+    const fakeCodex = await writeFakeCodexBinary(tempDir);
+    const env = {
+      ...process.env,
+      CODEX_CLI_BIN: fakeCodex,
+      CODEX_TEST_MCP_LIST_JSON: JSON.stringify([
+        {
+          name: 'delegation',
+          enabled: false,
+          transport: {
+            type: 'stdio',
+            command: 'node',
+            args: ['scripts/delegation-server.mjs']
+          }
+        }
+      ])
+    };
+    const { stdout } = await runCli(['mcp', 'enable', '--format', 'json'], env);
+    const payload = JSON.parse(stdout) as {
+      status?: string;
+      targets?: string[];
+      actions?: Array<{ name?: string; status?: string }>;
+    };
+    expect(payload.status).toBe('planned');
+    expect(payload.targets).toEqual(['delegation']);
+    expect(payload.actions).toEqual([
+      expect.objectContaining({
+        name: 'delegation',
+        status: 'planned'
+      })
+    ]);
   }, TEST_TIMEOUT);
 
   it('emits setup plan JSON', async () => {

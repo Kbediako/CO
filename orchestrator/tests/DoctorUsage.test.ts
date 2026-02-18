@@ -18,6 +18,7 @@ describe('formatDoctorUsageSummary', () => {
       runs: { total: 10, succeeded: 8, failed: 1, cancelled: 1, other: 0 },
       cloud: {
         runs: 3,
+        fallback_runs: 1,
         unique_tasks: 2,
         by_status: { ready: 2, error: 1 },
         by_diff_status: { available: 2, pending: 1 },
@@ -81,6 +82,7 @@ describe('formatDoctorUsageSummary', () => {
     const summary = formatDoctorUsageSummary(sample).join('\n');
     expect(summary).toContain('Usage (last 7d');
     expect(summary).toContain('- cloud: 3 over 2 tasks');
+    expect(summary).toContain('fallback=1');
     expect(summary).toContain('diff[');
     expect(summary).toContain('apply[');
     expect(summary).toContain('env[');
@@ -156,7 +158,11 @@ describe('runDoctorUsage', () => {
       expect(result.kpis.advanced_runs).toBe(1);
       expect(result.kpis.advanced_share_pct).toBe(100);
       expect(result.cloud.runs).toBe(0);
+      expect(result.cloud.fallback_runs).toBe(1);
       expect(result.kpis.cloud_share_pct).toBe(0);
+      expect(result.adoption.recommendations).toEqual(
+        expect.arrayContaining([expect.stringContaining('Cloud fallback triggered in 1 run(s)')])
+      );
     } finally {
       if (previousEnv.root === undefined) {
         delete process.env.CODEX_ORCHESTRATOR_ROOT;
@@ -526,6 +532,99 @@ describe('runDoctorUsage', () => {
         delete process.env.MCP_RUNNER_TASK_ID;
       } else {
         process.env.MCP_RUNNER_TASK_ID = previousEnv.taskId;
+      }
+      await rm(repoRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('emits low-adoption hints when cloud is configured but cloud/RLM usage remain low', async () => {
+    const previousEnv = {
+      root: process.env.CODEX_ORCHESTRATOR_ROOT,
+      runsDir: process.env.CODEX_ORCHESTRATOR_RUNS_DIR,
+      outDir: process.env.CODEX_ORCHESTRATOR_OUT_DIR,
+      taskId: process.env.MCP_RUNNER_TASK_ID,
+      cloudEnvId: process.env.CODEX_CLOUD_ENV_ID,
+      collabMaxEvents: process.env.CODEX_ORCHESTRATOR_COLLAB_MAX_EVENTS
+    };
+    const repoRoot = await mkdtemp(join(tmpdir(), 'doctor-usage-adoption-hints-'));
+    const taskId = 'task-adoption-hints';
+    try {
+      await mkdir(join(repoRoot, 'tasks'), { recursive: true });
+      await writeFile(
+        join(repoRoot, 'tasks', 'index.json'),
+        `${JSON.stringify({ items: [{ slug: taskId }] }, null, 2)}\n`,
+        'utf8'
+      );
+
+      for (let i = 0; i < 12; i += 1) {
+        const runId = `2026-02-18T00-00-${String(i).padStart(2, '0')}-000Z-${String(i).padStart(8, '0')}`;
+        const runDir = join(repoRoot, '.runs', taskId, 'cli', runId);
+        await mkdir(runDir, { recursive: true });
+        const manifest: Record<string, unknown> = {
+          run_id: runId,
+          task_id: taskId,
+          pipeline_id: i === 1 ? 'rlm' : 'docs-review',
+          status: 'succeeded',
+          started_at: `2026-02-18T00:00:${String(i).padStart(2, '0')}.000Z`
+        };
+        if (i === 0) {
+          manifest.cloud_execution = {
+            status: 'ready',
+            diff_status: 'available',
+            apply_status: 'succeeded',
+            environment_id: 'env_123'
+          };
+        }
+        await writeFile(join(runDir, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`, 'utf8');
+      }
+
+      process.env.CODEX_ORCHESTRATOR_ROOT = repoRoot;
+      delete process.env.CODEX_ORCHESTRATOR_RUNS_DIR;
+      delete process.env.CODEX_ORCHESTRATOR_OUT_DIR;
+      process.env.MCP_RUNNER_TASK_ID = taskId;
+      process.env.CODEX_CLOUD_ENV_ID = 'env_123';
+      delete process.env.CODEX_ORCHESTRATOR_COLLAB_MAX_EVENTS;
+
+      const result = await runDoctorUsage({ windowDays: 3650, taskFilter: taskId });
+      expect(result.runs.total).toBe(12);
+      expect(result.cloud.runs).toBe(1);
+      expect(result.rlm.runs).toBe(1);
+      expect(result.adoption.recommendations).toEqual(
+        expect.arrayContaining([
+          expect.stringContaining('Cloud is configured but adoption is low'),
+          expect.stringContaining('RLM usage is low')
+        ])
+      );
+    } finally {
+      if (previousEnv.root === undefined) {
+        delete process.env.CODEX_ORCHESTRATOR_ROOT;
+      } else {
+        process.env.CODEX_ORCHESTRATOR_ROOT = previousEnv.root;
+      }
+      if (previousEnv.runsDir === undefined) {
+        delete process.env.CODEX_ORCHESTRATOR_RUNS_DIR;
+      } else {
+        process.env.CODEX_ORCHESTRATOR_RUNS_DIR = previousEnv.runsDir;
+      }
+      if (previousEnv.outDir === undefined) {
+        delete process.env.CODEX_ORCHESTRATOR_OUT_DIR;
+      } else {
+        process.env.CODEX_ORCHESTRATOR_OUT_DIR = previousEnv.outDir;
+      }
+      if (previousEnv.taskId === undefined) {
+        delete process.env.MCP_RUNNER_TASK_ID;
+      } else {
+        process.env.MCP_RUNNER_TASK_ID = previousEnv.taskId;
+      }
+      if (previousEnv.cloudEnvId === undefined) {
+        delete process.env.CODEX_CLOUD_ENV_ID;
+      } else {
+        process.env.CODEX_CLOUD_ENV_ID = previousEnv.cloudEnvId;
+      }
+      if (previousEnv.collabMaxEvents === undefined) {
+        delete process.env.CODEX_ORCHESTRATOR_COLLAB_MAX_EVENTS;
+      } else {
+        process.env.CODEX_ORCHESTRATOR_COLLAB_MAX_EVENTS = previousEnv.collabMaxEvents;
       }
       await rm(repoRoot, { recursive: true, force: true });
     }

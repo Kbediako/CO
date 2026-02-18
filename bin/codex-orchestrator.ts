@@ -18,7 +18,12 @@ import type { HudController } from '../orchestrator/src/cli/ui/controller.js';
 import { evaluateInteractiveGate } from '../orchestrator/src/cli/utils/interactive.js';
 import { buildSelfCheckResult } from '../orchestrator/src/cli/selfCheck.js';
 import { initCodexTemplates, formatInitSummary } from '../orchestrator/src/cli/init.js';
-import { runDoctor, formatDoctorSummary } from '../orchestrator/src/cli/doctor.js';
+import {
+  runDoctor,
+  runDoctorCloudPreflight,
+  formatDoctorSummary,
+  formatDoctorCloudPreflightSummary
+} from '../orchestrator/src/cli/doctor.js';
 import { formatDoctorUsageSummary, runDoctorUsage } from '../orchestrator/src/cli/doctorUsage.js';
 import { formatDevtoolsSetupSummary, runDevtoolsSetup } from '../orchestrator/src/cli/devtoolsSetup.js';
 import { formatCodexCliSetupSummary, runCodexCliSetup } from '../orchestrator/src/cli/codexCliSetup.js';
@@ -27,6 +32,7 @@ import { formatSkillsInstallSummary, installSkills, listBundledSkills } from '..
 import { loadPackageInfo } from '../orchestrator/src/cli/utils/packageInfo.js';
 import { slugify } from '../orchestrator/src/cli/utils/strings.js';
 import { serveMcp } from '../orchestrator/src/cli/mcp.js';
+import { formatMcpEnableSummary, runMcpEnable } from '../orchestrator/src/cli/mcpEnable.js';
 import { startDelegationServer } from '../orchestrator/src/cli/delegationServer.js';
 import { splitDelegationConfigOverrides } from '../orchestrator/src/cli/config/delegationConfig.js';
 
@@ -1219,11 +1225,14 @@ function buildSetupGuidance(): SetupGuidancePayload {
     references: [
       'https://github.com/Kbediako/CO#downstream-usage-cheatsheet-agent-first',
       'https://github.com/Kbediako/CO/blob/main/docs/AGENTS.md',
-      'https://github.com/Kbediako/CO/blob/main/docs/guides/collab-vs-mcp.md'
+      'https://github.com/Kbediako/CO/blob/main/docs/guides/collab-vs-mcp.md',
+      'https://github.com/Kbediako/CO/blob/main/docs/guides/rlm-recursion-v2.md'
     ],
     recommended_commands: [
       'codex-orchestrator flow --task <task-id>',
-      'codex-orchestrator doctor --usage'
+      'codex-orchestrator doctor --usage',
+      'codex-orchestrator rlm --multi-agent auto "<goal>"',
+      'codex-orchestrator mcp enable --yes'
     ]
   };
 }
@@ -1249,6 +1258,12 @@ async function handleDoctor(rawArgs: string[]): Promise<void> {
   const { flags } = parseArgs(rawArgs);
   const format = (flags['format'] as string | undefined) === 'json' ? 'json' : 'text';
   const includeUsage = Boolean(flags['usage']);
+  const includeCloudPreflight = Boolean(flags['cloud-preflight']);
+  const cloudEnvIdOverride = readStringFlag(flags, 'cloud-env-id');
+  const cloudBranchOverride = readStringFlag(flags, 'cloud-branch');
+  if (!includeCloudPreflight && (cloudEnvIdOverride || cloudBranchOverride)) {
+    throw new Error('--cloud-env-id/--cloud-branch require --cloud-preflight.');
+  }
   const wantsApply = Boolean(flags['apply']);
   const apply = Boolean(flags['yes']);
   if (wantsApply && format === 'json') {
@@ -1270,13 +1285,24 @@ async function handleDoctor(rawArgs: string[]): Promise<void> {
 
   const doctorResult = runDoctor();
   const usageResult = includeUsage ? await runDoctorUsage({ windowDays, taskFilter }) : null;
+  const cloudPreflightResult = includeCloudPreflight
+    ? await runDoctorCloudPreflight({
+        cwd: process.cwd(),
+        environmentId: cloudEnvIdOverride,
+        branch: cloudBranchOverride,
+        taskId: taskFilter
+      })
+    : null;
 
   if (format === 'json') {
+    const payload: Record<string, unknown> = { ...doctorResult };
     if (usageResult) {
-      console.log(JSON.stringify({ ...doctorResult, usage: usageResult }, null, 2));
-      return;
+      payload.usage = usageResult;
     }
-    console.log(JSON.stringify(doctorResult, null, 2));
+    if (cloudPreflightResult) {
+      payload.cloud_preflight = cloudPreflightResult;
+    }
+    console.log(JSON.stringify(payload, null, 2));
     return;
   }
 
@@ -1285,6 +1311,11 @@ async function handleDoctor(rawArgs: string[]): Promise<void> {
   }
   if (usageResult) {
     for (const line of formatDoctorUsageSummary(usageResult)) {
+      console.log(line);
+    }
+  }
+  if (cloudPreflightResult) {
+    for (const line of formatDoctorCloudPreflightSummary(cloudPreflightResult)) {
       console.log(line);
     }
   }
@@ -1481,16 +1512,41 @@ async function handleSkills(rawArgs: string[]): Promise<void> {
 
 async function handleMcp(rawArgs: string[]): Promise<void> {
   const { positionals, flags } = parseArgs(rawArgs);
+  if (isHelpRequest(positionals, flags)) {
+    printMcpHelp();
+    return;
+  }
   const subcommand = positionals.shift();
   if (!subcommand) {
-    throw new Error('mcp requires a subcommand (serve).');
+    throw new Error('mcp requires a subcommand (serve|enable).');
   }
-  if (subcommand !== 'serve') {
-    throw new Error(`Unknown mcp subcommand: ${subcommand}`);
+  if (subcommand === 'serve') {
+    const repoRoot = typeof flags['repo'] === 'string' ? (flags['repo'] as string) : undefined;
+    const dryRun = Boolean(flags['dry-run']);
+    await serveMcp({ repoRoot, dryRun, extraArgs: positionals });
+    return;
   }
-  const repoRoot = typeof flags['repo'] === 'string' ? (flags['repo'] as string) : undefined;
-  const dryRun = Boolean(flags['dry-run']);
-  await serveMcp({ repoRoot, dryRun, extraArgs: positionals });
+  if (subcommand === 'enable') {
+    const apply = Boolean(flags['yes']);
+    const format = (flags['format'] as string | undefined) === 'json' ? 'json' : 'text';
+    const serversRaw = readStringFlag(flags, 'servers');
+    const serverNames = serversRaw
+      ? serversRaw
+          .split(',')
+          .map((entry) => entry.trim())
+          .filter((entry) => entry.length > 0)
+      : undefined;
+    const result = await runMcpEnable({ apply, serverNames });
+    if (format === 'json') {
+      console.log(JSON.stringify(result, null, 2));
+      return;
+    }
+    for (const line of formatMcpEnableSummary(result)) {
+      console.log(line);
+    }
+    return;
+  }
+  throw new Error(`Unknown mcp subcommand: ${subcommand}`);
 }
 
 async function handlePr(rawArgs: string[]): Promise<void> {
@@ -1825,10 +1881,13 @@ Commands:
     --yes                 Apply setup (otherwise plan only).
     --repo <path>         Repo root for delegation wiring (default cwd).
     --format json         Emit machine-readable output (dry-run only).
-  doctor [--format json] [--usage] [--window-days <n>] [--task <id>] [--apply]
+  doctor [--format json] [--usage] [--window-days <n>] [--task <id>] [--cloud-preflight] [--apply]
     --usage               Include a local usage snapshot (scans .runs/).
     --window-days <n>     Window for --usage (default 30).
     --task <id>           Limit --usage scan to a specific task directory.
+    --cloud-preflight     Run cloud readiness preflight checks (env/codex/git/branch).
+    --cloud-env-id <id>   Override env id for --cloud-preflight (default: CODEX_CLOUD_ENV_ID).
+    --cloud-branch <name> Override branch for --cloud-preflight (default: CODEX_CLOUD_BRANCH).
     --apply               Plan/apply quick fixes for DevTools + delegation wiring (use with --yes).
     --yes                 Apply fixes when --apply is set.
     --format json         Emit machine-readable output (not supported with --apply).
@@ -1853,6 +1912,10 @@ Commands:
     --codex-home <path>   Override the target Codex home directory.
     --format json         Emit machine-readable output.
   mcp serve [--repo <path>] [--dry-run] [-- <extra args>]
+  mcp enable [--servers <csv>] [--yes] [--format json]
+    --servers <csv>       Comma-separated MCP server names to enable (default: all disabled).
+    --yes                 Apply changes (default is plan mode).
+    --format json         Emit machine-readable output.
   pr watch-merge [options]
     Monitor PR checks/reviews with polling and optional auto-merge after a quiet window.
     Use \`codex-orchestrator pr watch-merge --help\` for full options.
@@ -1927,6 +1990,21 @@ Options:
 `);
 }
 
+function printMcpHelp(): void {
+  console.log(`Usage: codex-orchestrator mcp <subcommand> [options]
+
+Subcommands:
+  serve [--repo <path>] [--dry-run] [-- <extra args>]
+    Proxy Codex MCP server mode through the selected Codex binary.
+
+  enable [--servers <csv>] [--yes] [--format json]
+    Enable disabled MCP servers using the existing Codex MCP definitions.
+    --servers <csv>    Comma-separated server names (default: all disabled servers).
+    --yes              Apply changes (default: plan only).
+    --format json      Emit machine-readable output.
+`);
+}
+
 function printPrHelp(): void {
   console.log(`Usage: codex-orchestrator pr <subcommand> [options]
 
@@ -1960,6 +2038,14 @@ Options:
   --interactive | --ui    Enable read-only HUD when running in a TTY.
   --no-interactive        Force disable HUD.
   --help                  Show this message.
+
+Examples:
+  codex-orchestrator rlm "stabilize failing test lane"
+  codex-orchestrator rlm --multi-agent auto "resolve conflicting product requirements"
+
+Tips:
+  - Use --multi-agent auto for ambiguous/long-horizon work.
+  - Ensure multi-agent is enabled in Codex: codex features enable multi_agent (legacy alias: collab).
 `);
 }
 

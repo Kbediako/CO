@@ -3,7 +3,12 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-import { formatDoctorSummary, runDoctor } from '../src/cli/doctor.js';
+import {
+  formatDoctorCloudPreflightSummary,
+  formatDoctorSummary,
+  runDoctor,
+  runDoctorCloudPreflight
+} from '../src/cli/doctor.js';
 
 async function writeFakeCodexBinary(dir: string, featureLine: string): Promise<string> {
   const binPath = join(dir, 'codex');
@@ -120,6 +125,132 @@ describe('runDoctor', () => {
       } else {
         process.env.CODEX_CLI_BIN = previousCodexBin;
       }
+      await rm(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it('reports missing cloud env id in doctor cloud preflight output', async () => {
+    const previousCodexBin = process.env.CODEX_CLI_BIN;
+    const tempDir = await mkdtemp(join(tmpdir(), 'doctor-cloud-preflight-'));
+    process.env.CODEX_CLI_BIN = await writeFakeCodexBinary(tempDir, 'multi_agent experimental true');
+    try {
+      const result = await runDoctorCloudPreflight({
+        cwd: process.cwd(),
+        env: { ...process.env, CODEX_CLOUD_ENV_ID: '', CODEX_CLOUD_BRANCH: '' }
+      });
+      expect(result.ok).toBe(false);
+      expect(result.issues).toEqual(expect.arrayContaining([expect.objectContaining({ code: 'missing_environment' })]));
+      expect(formatDoctorCloudPreflightSummary(result).join('\n')).toContain('Cloud preflight: failed');
+    } finally {
+      if (previousCodexBin === undefined) {
+        delete process.env.CODEX_CLI_BIN;
+      } else {
+        process.env.CODEX_CLI_BIN = previousCodexBin;
+      }
+      await rm(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it('passes doctor cloud preflight when env id is provided', async () => {
+    const previousCodexBin = process.env.CODEX_CLI_BIN;
+    const tempDir = await mkdtemp(join(tmpdir(), 'doctor-cloud-preflight-'));
+    process.env.CODEX_CLI_BIN = await writeFakeCodexBinary(tempDir, 'multi_agent experimental true');
+    try {
+      const result = await runDoctorCloudPreflight({
+        cwd: process.cwd(),
+        env: { ...process.env, CODEX_CLOUD_ENV_ID: 'env_123', CODEX_CLOUD_BRANCH: '' }
+      });
+      expect(result.ok).toBe(true);
+      expect(result.issues).toHaveLength(0);
+      expect(formatDoctorCloudPreflightSummary(result).join('\n')).toContain('Cloud preflight: ok');
+    } finally {
+      if (previousCodexBin === undefined) {
+        delete process.env.CODEX_CLI_BIN;
+      } else {
+        process.env.CODEX_CLI_BIN = previousCodexBin;
+      }
+      await rm(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it('uses task metadata cloud env id for doctor cloud preflight when env var is unset', async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), 'doctor-cloud-preflight-task-metadata-'));
+    await mkdir(join(tempDir, 'tasks'), { recursive: true });
+    await writeFile(
+      join(tempDir, 'tasks', 'index.json'),
+      JSON.stringify({
+        items: [
+          {
+            id: '0974-cloud-adoption-preflight-reliability',
+            slug: '0974-cloud-adoption-preflight-reliability',
+            title: 'Cloud preflight task',
+            metadata: {
+              cloud: {
+                envId: 'env_task_meta'
+              }
+            }
+          }
+        ]
+      }),
+      'utf8'
+    );
+    const fakeCodexBin = await writeFakeCodexBinary(tempDir, 'multi_agent experimental true');
+    try {
+      const result = await runDoctorCloudPreflight({
+        cwd: tempDir,
+        taskId: '0974-cloud-adoption-preflight-reliability',
+        env: {
+          ...process.env,
+          CODEX_CLI_BIN: fakeCodexBin,
+          CODEX_CLOUD_ENV_ID: '',
+          CODEX_CLOUD_BRANCH: ''
+        }
+      });
+      expect(result.ok).toBe(true);
+      expect(result.details.environment_id).toBe('env_task_meta');
+      expect(result.issues).toHaveLength(0);
+    } finally {
+      await rm(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it('uses parent task metadata cloud env id for delegated task IDs', async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), 'doctor-cloud-preflight-task-metadata-delegated-'));
+    await mkdir(join(tempDir, 'tasks'), { recursive: true });
+    await writeFile(
+      join(tempDir, 'tasks', 'index.json'),
+      JSON.stringify({
+        items: [
+          {
+            id: '0974-cloud-adoption-preflight-reliability',
+            slug: '0974-cloud-adoption-preflight-reliability',
+            title: 'Cloud preflight task',
+            metadata: {
+              cloud: {
+                envId: 'env_task_meta'
+              }
+            }
+          }
+        ]
+      }),
+      'utf8'
+    );
+    const fakeCodexBin = await writeFakeCodexBinary(tempDir, 'multi_agent experimental true');
+    try {
+      const result = await runDoctorCloudPreflight({
+        cwd: tempDir,
+        taskId: '0974-cloud-adoption-preflight-reliability-scout',
+        env: {
+          ...process.env,
+          CODEX_CLI_BIN: fakeCodexBin,
+          CODEX_CLOUD_ENV_ID: '',
+          CODEX_CLOUD_BRANCH: ''
+        }
+      });
+      expect(result.ok).toBe(true);
+      expect(result.details.environment_id).toBe('env_task_meta');
+      expect(result.issues).toHaveLength(0);
+    } finally {
       await rm(tempDir, { recursive: true, force: true });
     }
   });

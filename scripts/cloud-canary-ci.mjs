@@ -249,13 +249,14 @@ async function main() {
   const repoRoot = process.cwd();
   const taskId = process.env.CLOUD_CANARY_TASK_ID?.trim() || process.env.MCP_RUNNER_TASK_ID?.trim() || DEFAULT_TASK_ID;
   const required = envFlagEnabled(process.env.CODEX_CLOUD_CANARY_REQUIRED);
+  const expectFallback = envFlagEnabled(process.env.CLOUD_CANARY_EXPECT_FALLBACK);
   const notes = process.env.CLOUD_CANARY_NOTES?.trim() || DEFAULT_NOTES;
   const cloudBranchRaw = process.env.CLOUD_CANARY_BRANCH?.trim() || process.env.CODEX_CLOUD_BRANCH?.trim() || 'main';
   const cloudBranch = normalizeCloudBranch(cloudBranchRaw);
   const preflightIssues = [];
   const orchestratorBinPath = join(repoRoot, 'dist', 'bin', 'codex-orchestrator.js');
 
-  if (!process.env.CODEX_CLOUD_ENV_ID) {
+  if (!expectFallback && !process.env.CODEX_CLOUD_ENV_ID) {
     preflightIssues.push('Missing CODEX_CLOUD_ENV_ID.');
   }
   if (!existsSync(orchestratorBinPath)) {
@@ -286,13 +287,14 @@ async function main() {
       '',
       ...preflightIssues.map((issue) => `- ${issue}`),
       '',
+      `Expected contract: ${expectFallback ? 'fallback' : 'cloud execution'}`,
       `Cloud branch: ${cloudBranch || '<unset>'}`,
       '',
       `Required mode: ${required ? 'yes' : 'no'}`
     ];
     console.log(summaryLines.join('\n'));
     await appendStepSummary(summaryLines);
-    if (required) {
+    if (required || expectFallback) {
       process.exitCode = 1;
     }
     return;
@@ -303,6 +305,7 @@ async function main() {
     MCP_RUNNER_TASK_ID: taskId,
     TASK: taskId,
     NOTES: notes,
+    CODEX_CLOUD_ENV_ID: expectFallback ? '' : process.env.CODEX_CLOUD_ENV_ID,
     CODEX_CLOUD_BRANCH: cloudBranch,
     CODEX_NON_INTERACTIVE: process.env.CODEX_NON_INTERACTIVE ?? '1',
     CODEX_NO_INTERACTIVE: process.env.CODEX_NO_INTERACTIVE ?? '1',
@@ -335,6 +338,7 @@ async function main() {
   const manifest = manifestPath ? await waitForManifest(manifestPath) : null;
   const hasManifest = Boolean(manifest);
   const cloudExecution = manifest?.cloud_execution ?? null;
+  const cloudFallback = manifest?.cloud_fallback ?? null;
   const runSummaryPath = resolveRepoPath(repoRoot, manifest?.run_summary_path ?? null);
   const runSummary = await waitForRunSummary(runSummaryPath);
   const hasRunSummary = Boolean(runSummary);
@@ -353,38 +357,75 @@ async function main() {
   if (manifest) {
     assert(TERMINAL_STATUSES.has(String(manifest.status ?? '')), `Manifest did not reach terminal state; received ${manifest.status}.`);
   }
-  assert(Boolean(cloudExecution), 'manifest.cloud_execution is missing.');
-  if (cloudExecution) {
-    assert(typeof cloudExecution.task_id === 'string' && cloudExecution.task_id.trim().length > 0, 'cloud_execution.task_id is missing.');
-    assert(
-      TERMINAL_CLOUD_STATUSES.has(String(cloudExecution.status ?? '')),
-      `Cloud task did not reach terminal status; received ${cloudExecution.status}.`
-    );
-    assert(typeof cloudExecution.submitted_at === 'string' && cloudExecution.submitted_at.length > 0, 'cloud_execution.submitted_at is missing.');
-    assert(typeof cloudExecution.completed_at === 'string' && cloudExecution.completed_at.length > 0, 'cloud_execution.completed_at is missing.');
-    assert(typeof cloudExecution.poll_count === 'number' && cloudExecution.poll_count > 0, 'cloud_execution.poll_count should be greater than zero.');
-    assert(typeof cloudExecution.log_path === 'string' && cloudExecution.log_path.length > 0, 'cloud_execution.log_path is missing.');
-    const cloudLogPath = resolveRepoPath(repoRoot, cloudExecution.log_path);
-    assert(Boolean(cloudLogPath && existsSync(cloudLogPath)), `Cloud command log missing at ${cloudExecution.log_path}.`);
-    if (cloudExecution.diff_status === 'available') {
-      assert(typeof cloudExecution.diff_path === 'string' && cloudExecution.diff_path.length > 0, 'cloud_execution.diff_path missing while diff_status=available.');
-      const diffPath = resolveRepoPath(repoRoot, cloudExecution.diff_path);
-      assert(Boolean(diffPath && existsSync(diffPath)), `Cloud diff artifact missing at ${cloudExecution.diff_path}.`);
-    }
-    assert(cloudExecution.status === 'ready', `Cloud task reached terminal non-ready status: ${cloudExecution.status}.`);
-  }
-
   assert(Boolean(runSummaryPath && hasRunSummary), 'Run summary file missing.');
-  const summaryCloud = runSummary?.cloudExecution ?? runSummary?.build?.cloudExecution ?? null;
-  assert(Boolean(summaryCloud), 'run-summary.cloudExecution is missing.');
-  if (summaryCloud && cloudExecution) {
-    assert(summaryCloud.taskId === cloudExecution.task_id, 'run-summary.cloudExecution.taskId does not match manifest.cloud_execution.task_id.');
-    assert(summaryCloud.status === cloudExecution.status, 'run-summary.cloudExecution.status does not match manifest.cloud_execution.status.');
-    assert(summaryCloud.diffStatus === cloudExecution.diff_status, 'run-summary.cloudExecution.diffStatus does not match manifest.cloud_execution.diff_status.');
-    assert(summaryCloud.logPath === cloudExecution.log_path, 'run-summary.cloudExecution.logPath does not match manifest.cloud_execution.log_path.');
+
+  if (expectFallback) {
+    assert(manifest?.status === 'succeeded', `Fallback canary run should succeed; received manifest.status=${manifest?.status ?? '<unknown>'}.`);
+    assert(!cloudExecution, 'manifest.cloud_execution should be absent when fallback contract is expected.');
+    assert(Boolean(cloudFallback), 'manifest.cloud_fallback is missing.');
+    if (cloudFallback) {
+      assert(cloudFallback.mode_requested === 'cloud', 'cloud_fallback.mode_requested should be "cloud".');
+      assert(cloudFallback.mode_used === 'mcp', 'cloud_fallback.mode_used should be "mcp".');
+      assert(typeof cloudFallback.reason === 'string' && cloudFallback.reason.trim().length > 0, 'cloud_fallback.reason is missing.');
+      assert(Array.isArray(cloudFallback.issues) && cloudFallback.issues.length > 0, 'cloud_fallback.issues should include at least one preflight issue.');
+      if (Array.isArray(cloudFallback.issues)) {
+        assert(
+          cloudFallback.issues.some((issue) => issue?.code === 'missing_environment'),
+          'cloud_fallback.issues should include missing_environment for fallback canary mode.'
+        );
+      }
+    }
+
+    const summaryFallback = runSummary?.cloudFallback ?? runSummary?.build?.cloudFallback ?? null;
+    assert(Boolean(summaryFallback), 'run-summary.cloudFallback is missing.');
+    if (summaryFallback && cloudFallback) {
+      assert(
+        summaryFallback.modeRequested === cloudFallback.mode_requested,
+        'run-summary.cloudFallback.modeRequested does not match manifest.cloud_fallback.mode_requested.'
+      );
+      assert(
+        summaryFallback.modeUsed === cloudFallback.mode_used,
+        'run-summary.cloudFallback.modeUsed does not match manifest.cloud_fallback.mode_used.'
+      );
+      assert(
+        summaryFallback.reason === cloudFallback.reason,
+        'run-summary.cloudFallback.reason does not match manifest.cloud_fallback.reason.'
+      );
+    }
+  } else {
+    assert(Boolean(cloudExecution), 'manifest.cloud_execution is missing.');
+    if (cloudExecution) {
+      assert(typeof cloudExecution.task_id === 'string' && cloudExecution.task_id.trim().length > 0, 'cloud_execution.task_id is missing.');
+      assert(
+        TERMINAL_CLOUD_STATUSES.has(String(cloudExecution.status ?? '')),
+        `Cloud task did not reach terminal status; received ${cloudExecution.status}.`
+      );
+      assert(typeof cloudExecution.submitted_at === 'string' && cloudExecution.submitted_at.length > 0, 'cloud_execution.submitted_at is missing.');
+      assert(typeof cloudExecution.completed_at === 'string' && cloudExecution.completed_at.length > 0, 'cloud_execution.completed_at is missing.');
+      assert(typeof cloudExecution.poll_count === 'number' && cloudExecution.poll_count > 0, 'cloud_execution.poll_count should be greater than zero.');
+      assert(typeof cloudExecution.log_path === 'string' && cloudExecution.log_path.length > 0, 'cloud_execution.log_path is missing.');
+      const cloudLogPath = resolveRepoPath(repoRoot, cloudExecution.log_path);
+      assert(Boolean(cloudLogPath && existsSync(cloudLogPath)), `Cloud command log missing at ${cloudExecution.log_path}.`);
+      if (cloudExecution.diff_status === 'available') {
+        assert(typeof cloudExecution.diff_path === 'string' && cloudExecution.diff_path.length > 0, 'cloud_execution.diff_path missing while diff_status=available.');
+        const diffPath = resolveRepoPath(repoRoot, cloudExecution.diff_path);
+        assert(Boolean(diffPath && existsSync(diffPath)), `Cloud diff artifact missing at ${cloudExecution.diff_path}.`);
+      }
+      assert(cloudExecution.status === 'ready', `Cloud task reached terminal non-ready status: ${cloudExecution.status}.`);
+    }
+
+    const summaryCloud = runSummary?.cloudExecution ?? runSummary?.build?.cloudExecution ?? null;
+    assert(Boolean(summaryCloud), 'run-summary.cloudExecution is missing.');
+    if (summaryCloud && cloudExecution) {
+      assert(summaryCloud.taskId === cloudExecution.task_id, 'run-summary.cloudExecution.taskId does not match manifest.cloud_execution.task_id.');
+      assert(summaryCloud.status === cloudExecution.status, 'run-summary.cloudExecution.status does not match manifest.cloud_execution.status.');
+      assert(summaryCloud.diffStatus === cloudExecution.diff_status, 'run-summary.cloudExecution.diffStatus does not match manifest.cloud_execution.diff_status.');
+      assert(summaryCloud.logPath === cloudExecution.log_path, 'run-summary.cloudExecution.logPath does not match manifest.cloud_execution.log_path.');
+    }
   }
 
   const failureSignal = [
+    expectFallback ? '' : cloudFallback?.reason ?? '',
     cloudExecution?.error ?? '',
     manifest?.status_detail ?? '',
     execution.stderr ?? '',
@@ -393,23 +434,35 @@ async function main() {
     .filter((value) => value.trim().length > 0)
     .join('\n');
   const diagnosis = classifyFailure(failureSignal);
-  const fatalCategory = diagnosis.category === 'configuration' || diagnosis.category === 'credentials' || diagnosis.category === 'connectivity';
-  const skipEligible = !required && SKIPPABLE_FAILURE_CATEGORIES.has(diagnosis.category);
+  const fallbackContractFailure = expectFallback
+    && assertionFailures.some((failure) => failure.includes('cloud_fallback') || failure.includes('cloudFallback'));
+  const fatalCategory =
+    required &&
+    (diagnosis.category === 'configuration' || diagnosis.category === 'credentials' || diagnosis.category === 'connectivity');
+  const skipEligible = !required && !fallbackContractFailure && SKIPPABLE_FAILURE_CATEGORIES.has(diagnosis.category);
   if (fatalCategory) {
     assertionFailures.push(`Failure class ${diagnosis.category} indicates infrastructure/credential issues.`);
   }
 
   if (assertionFailures.length === 0) {
-    const successHeader = warnings.length > 0 ? '## Cloud Canary (Passed with Warnings)' : '## Cloud Canary (Passed)';
+    const successHeader = expectFallback
+      ? warnings.length > 0
+        ? '## Cloud Canary Fallback Contract (Passed with Warnings)'
+        : '## Cloud Canary Fallback Contract (Passed)'
+      : warnings.length > 0
+        ? '## Cloud Canary (Passed with Warnings)'
+        : '## Cloud Canary (Passed)';
     const successLines = [
       successHeader,
       '',
       `- Task ID: ${taskId}`,
       `- Manifest: ${manifestPath}`,
       `- Run summary: ${runSummaryPath}`,
+      `- Expected contract: ${expectFallback ? 'fallback' : 'cloud execution'}`,
       `- Cloud branch: ${cloudBranch}`,
-      `- Cloud task: ${cloudExecution?.task_id ?? '<unknown>'}`,
-      `- Cloud status URL: ${cloudExecution?.status_url ?? '<none>'}`
+      `- Cloud task: ${cloudExecution?.task_id ?? '<none>'}`,
+      `- Cloud status URL: ${cloudExecution?.status_url ?? '<none>'}`,
+      `- Fallback reason: ${cloudFallback?.reason ?? '<none>'}`
     ];
     if (warnings.length > 0) {
       successLines.push('', ...warnings.map((warning) => `- Warning: ${warning}`));
@@ -419,7 +472,13 @@ async function main() {
     return;
   }
 
-  const header = skipEligible ? '## Cloud Canary (Credential-Gated Skip)' : '## Cloud Canary (Failed)';
+  const header = skipEligible
+    ? expectFallback
+      ? '## Cloud Canary Fallback Contract (Credential-Gated Skip)'
+      : '## Cloud Canary (Credential-Gated Skip)'
+    : expectFallback
+      ? '## Cloud Canary Fallback Contract (Failed)'
+      : '## Cloud Canary (Failed)';
   const redactedStderr = redactSecrets(tail(execution.stderr, 80), [
     process.env.CODEX_API_KEY,
     process.env.OPENAI_API_KEY,

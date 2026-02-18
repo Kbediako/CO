@@ -47,6 +47,7 @@
   - Setup commands are non-interactive.
   - Required cloud secrets/variables are available.
 - If cloud preflight fails (for example, repo has no cloud env setup yet), run in local `mcp` mode and record the fallback reason in checklist/manifests.
+- For cloud-focused lanes where fallback should never be the normal path, set `CODEX_ORCHESTRATOR_CLOUD_FALLBACK=deny` so preflight failures fail fast.
 
 ## Deliberation Default v1
 - Deliberation is auto-triggered for high-impact or high-ambiguity work.

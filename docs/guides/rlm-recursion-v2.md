@@ -70,3 +70,13 @@ Symbolic budgets are controlled via env vars (defaults are intentionally conserv
 - `RLM_MAX_CONCURRENCY`
 
 If you want strict “small slice” behavior (for example, keeping subcalls around ~2k characters), lower `RLM_MAX_BYTES_PER_SNIPPET` and/or `RLM_MAX_SUBCALL_INPUT_BYTES`.
+
+## Upstream Capability Watch (Codex CLI)
+
+As of 2026-02-18, these upstream details are relevant for CO planning:
+
+- Built-in `explorer` still ships with a pinned profile (`gpt-5.1-codex-mini`, `medium` reasoning), so keep explicit role overrides in `~/.codex/config.toml` when you want latest-codex defaults.
+- `agents.max_threads` default remains `6`; CO keeps `8` as the tested baseline and recommends `12` only after local stability validation.
+- `features.multi_agent` is canonical; `collab` is a legacy alias.
+- `features.sqlite` and `features.memory_tool` are still experimental and should be enabled only for scoped evals.
+- Upstream app-server now emits `model/rerouted` notifications; CO should keep this on the watchlist for future run-summary/diagnostic enrichment.
