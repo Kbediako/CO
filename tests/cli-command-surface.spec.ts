@@ -451,6 +451,19 @@ describe('codex-orchestrator command surface', () => {
     });
   }, TEST_TIMEOUT);
 
+  it('rejects positional arguments for mcp enable to prevent unintended bulk enable', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'co-cli-mcp-enable-positional-'));
+    const fakeCodex = await writeFakeCodexBinary(tempDir);
+    const env = {
+      ...process.env,
+      CODEX_CLI_BIN: fakeCodex
+    };
+
+    await expect(runCli(['mcp', 'enable', 'delegation', '--yes'], env)).rejects.toMatchObject({
+      stderr: expect.stringContaining('mcp enable does not accept positional arguments')
+    });
+  }, TEST_TIMEOUT);
+
   it('emits setup plan JSON', async () => {
     tempDir = await mkdtemp(join(tmpdir(), 'co-cli-setup-plan-'));
     const env = {

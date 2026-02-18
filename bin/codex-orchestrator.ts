@@ -1511,6 +1511,9 @@ async function handleMcp(rawArgs: string[]): Promise<void> {
     return;
   }
   if (subcommand === 'enable') {
+    if (positionals.length > 0) {
+      throw new Error(`mcp enable does not accept positional arguments: ${positionals.join(' ')}`);
+    }
     const apply = Boolean(flags['yes']);
     const format = (flags['format'] as string | undefined) === 'json' ? 'json' : 'text';
     const serversFlag = flags['servers'];

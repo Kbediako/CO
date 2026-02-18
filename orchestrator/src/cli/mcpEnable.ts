@@ -211,9 +211,12 @@ function parseMcpServerList(raw: string): ParsedMcpServer[] {
     if (!name) {
       continue;
     }
+    if (typeof record.enabled !== 'boolean') {
+      throw new Error(`expected boolean "enabled" for server "${name}".`);
+    }
     servers.push({
       name,
-      enabled: Boolean(record.enabled),
+      enabled: record.enabled,
       startupTimeoutSec:
         typeof record.startup_timeout_sec === 'number' && Number.isFinite(record.startup_timeout_sec)
           ? record.startup_timeout_sec

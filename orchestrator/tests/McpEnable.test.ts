@@ -355,4 +355,24 @@ describe('runMcpEnable', () => {
     );
     expect(runner).toHaveBeenCalledTimes(1);
   });
+
+  it('throws when codex mcp list returns non-boolean enabled field', async () => {
+    const runner = buildRunner([
+      {
+        exitCode: 0,
+        stdout: JSON.stringify([
+          {
+            name: 'delegation',
+            enabled: 'false',
+            transport: { type: 'stdio', command: 'node', args: ['scripts/delegation-server.mjs'] }
+          }
+        ]),
+        stderr: ''
+      }
+    ]);
+    await expect(runMcpEnable(baseOptions({ commandRunner: runner }))).rejects.toThrow(
+      'codex mcp list --json returned invalid output: expected boolean "enabled" for server "delegation".'
+    );
+    expect(runner).toHaveBeenCalledTimes(1);
+  });
 });
