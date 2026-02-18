@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp aa3ef43827a2169afeb6c77c39a0298dd0607fa5f639fd73faf84d91db49437d -->
+<!-- codex:instruction-stamp 78e1d5154a2c9b57e4c3c9880e84be362af23b86eb6718638f30c9042df7138c -->
 # Codex-Orchestrator Agent Handbook (Template)
 
 Use this repository as the wrapper that coordinates multiple Codex-driven projects. After cloning, replace placeholder metadata (task IDs, documents, SOPs) with values for each downstream initiative while keeping these shared guardrails in place.
@@ -74,12 +74,13 @@ Use this repository as the wrapper that coordinates multiple Codex-driven projec
 - For low-risk tiny changes, use the bounded micro-task path in `docs/micro-task-path.md` (still requires task/spec evidence).
 
 ## Standalone Reviews (Ad-hoc)
-- Use `codex review` for quick reviews during implementation; prefer a targeted prompt.
+- Use `codex review` for quick reviews during implementation.
+- Current Codex CLI behavior: do not combine prompt arguments with `--uncommitted`, `--base`, or `--commit`; use either diff-scoped review (no prompt) or prompt-only review.
 - When you need manifest-backed review evidence, run `TASK=<task-id> NOTES="Goal: ... | Summary: ... | Risks: ..." MANIFEST=<path> npm run review -- --manifest <path>`.
 - See `docs/standalone-review-guide.md` for the canonical workflow.
 - Prefer the bundled `standalone-review` skill for ad-hoc review steps.
 - Prefer the bundled `elegance-review` skill for the required post-implementation minimality pass.
-- Before merge for non-trivial changes, run one explicit elegance/minimality review pass and remove avoidable complexity.
+- During active non-trivial implementation, run standalone review at implementation checkpoints (after coding bursts/sub-goals/feedback batches) and pair with an elegance pass before handoff/merge.
 
 ## Completion Discipline (Patience-First)
 - For CI checks, review agents, cloud jobs, and orchestrator runs, wait/poll until terminal state before reporting completion.

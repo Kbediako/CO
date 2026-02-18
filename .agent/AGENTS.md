@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp feadf632c44243f7bd6d324c9a57a13930ba9b36d1bd54557b8ea72e5bde3e2c -->
+<!-- codex:instruction-stamp 0ac1701a5a17ac610fa7aa9aea31df44f96ff721db8814cafb3f3c4e4368ddd4 -->
 # Agent Enablement
 
 ## Added by Bootstrap 2025-10-16
@@ -51,7 +51,9 @@
 - Keep the prompt files `~/.codex/prompts/diagnostics.md` and `~/.codex/prompts/review-handoff.md` on every workstation (they are not checked into the repo). Each prompt wires `/prompts:<name>` to the required orchestrator commands so contributors do not have to remember the sequences manually.
 - `/prompts:diagnostics TASK=<task-id> MANIFEST=<path> [NOTES=<free text>]` exports `MCP_RUNNER_TASK_ID=$TASK`, runs `npx @kbediako/codex-orchestrator start diagnostics --format json`, tails `.runs/$TASK/cli/<run-id>/manifest.json` (or `npx @kbediako/codex-orchestrator status --run <run-id> --watch --interval 10`), and reminds you to mirror evidence + `$MANIFEST` references into `/tasks`, `docs/TASKS.md`, `.agent/task/...`, `.runs/$TASK/metrics.json`, and `out/$TASK/state.json`.
 - `/prompts:review-handoff TASK=<task-id> MANIFEST=<path> NOTES=<goal + summary + risks + optional questions>` re-validates guardrails via `node scripts/delegation-guard.mjs`, `node scripts/spec-guard.mjs --dry-run`, executes `npm run lint`, `npm run test`, optional `npm run eval:test`, runs `node scripts/diff-budget.mjs`, then runs `npm run review`, and ensures approvals/escalations are logged in `$MANIFEST` before checklists flip.
-- Standalone review (outside pipelines): use `codex review` (non-interactive) and run it often during implementation; prefer a custom prompt for WIP checks. See `docs/standalone-review-guide.md`. For manifest evidence, run `TASK=<task-id> NOTES="..." MANIFEST=<path> npm run review -- --manifest <path>` (or ensure `MCP_RUNNER_TASK_ID` is already set); in non-interactive/CI (`CODEX_REVIEW_NON_INTERACTIVE=1`, `CODEX_NON_INTERACTIVE=1`, or `CODEX_NO_INTERACTIVE=1`) it prints the handoff prompt unless `FORCE_CODEX_REVIEW=1` is set.
+- Standalone review (outside pipelines): use `codex review` (non-interactive) and run it often during implementation; for non-trivial work, run at implementation checkpoints (after coding bursts/sub-goals/feedback batches) and pair with an elegance pass before handoff/merge.
+- Prompt compatibility: do not combine prompt arguments with `--uncommitted`, `--base`, or `--commit`; use either diff-scoped review (no prompt) or prompt-only review. See `docs/standalone-review-guide.md`.
+- For manifest evidence, run `TASK=<task-id> NOTES="..." MANIFEST=<path> npm run review -- --manifest <path>` (or ensure `MCP_RUNNER_TASK_ID` is already set); in non-interactive/CI (`CODEX_REVIEW_NON_INTERACTIVE=1`, `CODEX_NON_INTERACTIVE=1`, or `CODEX_NO_INTERACTIVE=1`) it prints the handoff prompt unless `FORCE_CODEX_REVIEW=1` is set.
 - Always use these prompts before running diagnostics or prepping a review; they are the canonical way to drive the orchestrator so manifests, approvals, and docs stay in sync across machines.
 
 ### Frontend Testing Pipeline (Core)

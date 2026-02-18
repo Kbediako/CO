@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest';
 import {
   buildStatusSnapshot,
   isHumanReviewActor,
+  resolveLatestBotRereviewRequests,
+  resolveBotRereviewTimingForKind,
   resolveCachedRequiredChecksSummary,
   resolveRequiredChecksSummary,
   summarizeRequiredChecks
@@ -115,6 +117,34 @@ describe('pr watch-merge required-check gating', () => {
     expect(snapshot.readyToMerge).toBe(false);
     expect(snapshot.gateReasons).toContain('bot_feedback=unknown');
   });
+
+  it('blocks merge readiness when requested bot re-review has not completed', () => {
+    const response = makeResponse([]);
+    const requiredChecks = summarizeRequiredChecks([
+      { name: 'corelane', state: 'SUCCESS', bucket: 'pass', link: 'https://example.com/corelane' }
+    ]);
+
+    const snapshot = buildStatusSnapshot(response, requiredChecks, {
+      fetchError: false,
+      unacknowledgedCount: 0,
+      rereview: {
+        fetchError: false,
+        pendingBots: ['codex'],
+        inProgressBots: ['codex'],
+        coderabbit: {
+          actionableCount: 2,
+          outsideDiffCount: 1,
+          nitpickCount: 3
+        }
+      }
+    });
+
+    expect(snapshot.readyToMerge).toBe(false);
+    expect(snapshot.gateReasons).toContain('bot_rereview_pending=codex');
+    expect(snapshot.botRereviewInProgress).toEqual(['codex']);
+    expect(snapshot.coderabbitReviewMeta.outsideDiffCount).toBe(1);
+    expect(snapshot.coderabbitReviewMeta.nitpickCount).toBe(3);
+  });
 });
 
 describe('summarizeRequiredChecks', () => {
@@ -221,5 +251,196 @@ describe('isHumanReviewActor', () => {
         type: 'User'
       })
     ).toBe(true);
+  });
+});
+
+describe('resolveBotRereviewTimingForKind', () => {
+  const requestAtMs = Date.parse('2026-02-18T04:43:14Z');
+
+  it('uses reaction signals for codex', () => {
+    const result = resolveBotRereviewTimingForKind({
+      kind: 'codex',
+      requestAtMs,
+      issueComments: [],
+      reviews: [],
+      issueReactions: [
+        {
+          user: { login: 'chatgpt-codex-connector[bot]' },
+          content: 'eyes',
+          created_at: '2026-02-18T04:43:51Z'
+        },
+        {
+          user: { login: 'chatgpt-codex-connector[bot]' },
+          content: '+1',
+          created_at: '2026-02-18T04:50:22Z'
+        }
+      ],
+      requestCommentReactions: [],
+      headOid: 'abc123'
+    });
+
+    expect(result.inProgressAtMs).toBe(Date.parse('2026-02-18T04:43:51Z'));
+    expect(result.completeAtMs).toBe(Date.parse('2026-02-18T04:50:22Z'));
+  });
+
+  it('does not treat codex comments as completion signals', () => {
+    const result = resolveBotRereviewTimingForKind({
+      kind: 'codex',
+      requestAtMs,
+      issueComments: [
+        {
+          user: { login: 'chatgpt-codex-connector[bot]' },
+          created_at: '2026-02-18T04:45:00Z',
+          __source: 'pull',
+          commit_id: 'abc123'
+        }
+      ],
+      reviews: [],
+      issueReactions: [],
+      requestCommentReactions: [],
+      headOid: 'abc123'
+    });
+
+    expect(result.inProgressAtMs).toBeNull();
+    expect(result.completeAtMs).toBeNull();
+  });
+
+  it('ignores reaction signals for coderabbit', () => {
+    const result = resolveBotRereviewTimingForKind({
+      kind: 'coderabbit',
+      requestAtMs,
+      issueComments: [],
+      reviews: [],
+      issueReactions: [
+        {
+          user: { login: 'coderabbitai[bot]' },
+          content: 'eyes',
+          created_at: '2026-02-18T04:43:51Z'
+        },
+        {
+          user: { login: 'coderabbitai[bot]' },
+          content: '+1',
+          created_at: '2026-02-18T04:50:22Z'
+        }
+      ],
+      requestCommentReactions: [
+        {
+          user: { login: 'coderabbitai[bot]' },
+          content: 'eyes',
+          created_at: '2026-02-18T04:44:00Z'
+        }
+      ],
+      headOid: 'abc123'
+    });
+
+    expect(result.inProgressAtMs).toBeNull();
+    expect(result.completeAtMs).toBeNull();
+  });
+
+  it('only treats current-head pull comments as coderabbit completion signals', () => {
+    const result = resolveBotRereviewTimingForKind({
+      kind: 'coderabbit',
+      requestAtMs,
+      issueComments: [
+        {
+          user: { login: 'coderabbitai[bot]' },
+          created_at: '2026-02-18T04:44:00Z',
+          __source: 'issue'
+        },
+        {
+          user: { login: 'coderabbitai[bot]' },
+          created_at: '2026-02-18T04:45:00Z',
+          __source: 'pull',
+          commit_id: 'old-head'
+        },
+        {
+          user: { login: 'coderabbitai[bot]' },
+          created_at: '2026-02-18T04:46:00Z',
+          __source: 'pull',
+          commit_id: 'abc123'
+        }
+      ],
+      reviews: [],
+      issueReactions: [],
+      requestCommentReactions: [],
+      headOid: 'abc123'
+    });
+
+    expect(result.inProgressAtMs).toBeNull();
+    expect(result.completeAtMs).toBe(Date.parse('2026-02-18T04:46:00Z'));
+  });
+});
+
+describe('resolveLatestBotRereviewRequests', () => {
+  it('tracks the newest request per bot across issue, pull, and review-body comments', () => {
+    const requests = resolveLatestBotRereviewRequests([
+      {
+        id: 10,
+        body: '@coderabbitai please re-review',
+        created_at: '2026-02-18T04:40:00Z',
+        user: { login: 'maintainer', type: 'User' },
+        __source: 'issue'
+      },
+      {
+        id: 11,
+        body: '@codex please re-review',
+        created_at: '2026-02-18T04:41:00Z',
+        user: { login: 'maintainer', type: 'User' },
+        __source: 'pull'
+      },
+      {
+        id: 12,
+        body: '@coderabbitai follow-up',
+        created_at: '2026-02-18T04:42:00Z',
+        user: { login: 'maintainer', type: 'User' },
+        __source: 'pull'
+      },
+      {
+        id: 13,
+        body: '@coderabbitai please re-review this iteration',
+        created_at: '2026-02-18T04:43:00Z',
+        user: { login: 'maintainer', type: 'User' },
+        __source: 'review'
+      }
+    ]);
+
+    expect(requests.codex.commentId).toBe(11);
+    expect(requests.codex.source).toBe('pull');
+    expect(requests.coderabbit.commentId).toBe(13);
+    expect(requests.coderabbit.source).toBe('review');
+  });
+
+  it('ignores bot-authored mentions when deriving re-review requests', () => {
+    const requests = resolveLatestBotRereviewRequests([
+      {
+        id: 20,
+        body: '@codex',
+        created_at: '2026-02-18T04:40:00Z',
+        user: { login: 'chatgpt-codex-connector[bot]', type: 'Bot' },
+        __source: 'issue'
+      }
+    ]);
+    expect(Object.keys(requests)).toEqual([]);
+  });
+
+  it('ignores scoped aliases like @codex-team and @coderabbitai-internal', () => {
+    const requests = resolveLatestBotRereviewRequests([
+      {
+        id: 30,
+        body: '@codex-team please check this',
+        created_at: '2026-02-18T04:40:00Z',
+        user: { login: 'maintainer', type: 'User' },
+        __source: 'issue'
+      },
+      {
+        id: 31,
+        body: '@coderabbitai-internal please check this',
+        created_at: '2026-02-18T04:41:00Z',
+        user: { login: 'maintainer', type: 'User' },
+        __source: 'pull'
+      }
+    ]);
+
+    expect(Object.keys(requests)).toEqual([]);
   });
 });

@@ -15,13 +15,18 @@ Before implementation, use it to review the task/spec against the user’s inten
 Run this skill automatically whenever any condition is true:
 - You made code/config/script/test edits since the last standalone review.
 - You finished a meaningful chunk of work (default: behavior change or about 2+ files touched).
+- You finished a coding burst for a sub-goal and are about to validate, summarize, or switch streams.
 - You are about to report completion, propose merge, or answer "what's next?" with recommendations.
 - You addressed external feedback (PR reviews, bot comments, or CI-fix patches).
-- 45 minutes of active implementation elapsed without a standalone review.
+- A non-trivial open diff (about 2+ files or 40+ changed lines) has not had an elegance pass in the current cycle.
 
 If review execution is blocked, record why in task notes, then do manual diff review plus targeted tests before proceeding.
 
 ## Quick start
+
+Compatibility guard (current Codex CLI behavior):
+- Do not combine `--uncommitted`, `--base`, or `--commit` with a custom prompt argument.
+- Use diff-scoped review without prompt, or prompt-only review without scope flags.
 
 Uncommitted diff:
 ```
@@ -52,7 +57,8 @@ codex review "Focus on correctness, regressions, edge cases; list missing tests.
 2) Run the review often
 - Follow the auto-trigger policy above (not optional).
 - Run after each meaningful chunk of work.
-- Prefer targeted focus prompts for WIP reviews.
+- Prefer targeted focus prompts for WIP reviews (prompt-only invocation).
+- For non-trivial diffs, pair this with `elegance-review` in the same cycle before handoff/merge.
 
 3) Capture actionable output
 - Prioritize correctness, regressions, and missing tests.

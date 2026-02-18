@@ -14,20 +14,31 @@ Use this skill after non-trivial edits to verify the implementation is minimal, 
 Run this skill whenever any condition is true:
 - You changed behavior across about 2+ files.
 - You added a new helper/module/pathway and could possibly collapse it.
+- You finished writing code for a non-trivial sub-goal and are about to lock the checkpoint.
 - You finished addressing review feedback and are preparing to hand off.
 - You are about to recommend merge/release.
 - The user explicitly asks for elegance/minimality/overengineering checks.
+- A standalone review just completed for a non-trivial diff.
 
 ## Quick start
 
-Focused uncommitted review:
+Compatibility guard (current Codex CLI behavior):
+- Do not combine `--uncommitted`, `--base`, or `--commit` with a custom prompt argument.
+- Use diff-scoped review without prompt, or prompt-only review without scope flags.
+
+Uncommitted diff:
 ```bash
-codex review --uncommitted "Find avoidable complexity, duplicate abstractions, and unnecessary indirection. Prioritize simplifications that preserve behavior."
+codex review --uncommitted
 ```
 
 Diff-vs-base review:
 ```bash
-codex review --base <branch> "Focus on smallest viable design and maintenance cost."
+codex review --base <branch>
+```
+
+Prompt-only pass (no diff flags):
+```bash
+codex review "Find avoidable complexity, duplicate abstractions, and unnecessary indirection. Prioritize simplifications that preserve behavior."
 ```
 
 ## Workflow
