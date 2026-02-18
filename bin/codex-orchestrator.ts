@@ -169,6 +169,10 @@ function parseArgs(raw: string[]): { positionals: string[]; flags: ArgMap } {
       continue;
     }
     const key = token.slice(2);
+    if (key.includes('=')) {
+      flags[key] = true;
+      continue;
+    }
     if (queue[0] && !queue[0]!.startsWith('--')) {
       flags[key] = queue.shift() as string;
     } else {
@@ -1516,7 +1520,16 @@ async function handleMcp(rawArgs: string[]): Promise<void> {
     }
     const apply = Boolean(flags['yes']);
     const format = (flags['format'] as string | undefined) === 'json' ? 'json' : 'text';
-    const serversFlag = flags['servers'];
+    const explicitServersFlag = flags['servers'];
+    const equalsStyleServersFlags = Object.keys(flags).filter((key) => key.startsWith('servers='));
+    if (explicitServersFlag !== undefined && equalsStyleServersFlags.length > 0) {
+      throw new Error('Use either --servers <csv> or --servers=<csv>, not both.');
+    }
+    if (equalsStyleServersFlags.length > 1) {
+      throw new Error('Use at most one --servers=<csv> flag.');
+    }
+    const serversFlag =
+      explicitServersFlag ?? (equalsStyleServersFlags.length === 1 ? equalsStyleServersFlags[0]!.slice('servers='.length) : undefined);
     let serverNames: string[] | undefined;
     if (serversFlag !== undefined) {
       if (typeof serversFlag !== 'string') {
