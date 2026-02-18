@@ -434,6 +434,32 @@ describe('codex-orchestrator command surface', () => {
     });
   }, TEST_TIMEOUT);
 
+  it('rejects unknown mcp enable flags to avoid unintended bulk enable fallback', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'co-cli-mcp-enable-unknown-flag-'));
+    const fakeCodex = await writeFakeCodexBinary(tempDir);
+    const env = {
+      ...process.env,
+      CODEX_CLI_BIN: fakeCodex
+    };
+
+    await expect(runCli(['mcp', 'enable', '--server', 'delegation', '--yes'], env)).rejects.toMatchObject({
+      stderr: expect.stringContaining('Unknown mcp enable flag: --server')
+    });
+  }, TEST_TIMEOUT);
+
+  it('rejects unknown equals-style mcp enable flags', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'co-cli-mcp-enable-unknown-flag-equals-'));
+    const fakeCodex = await writeFakeCodexBinary(tempDir);
+    const env = {
+      ...process.env,
+      CODEX_CLI_BIN: fakeCodex
+    };
+
+    await expect(runCli(['mcp', 'enable', '--server=delegation', '--yes'], env)).rejects.toMatchObject({
+      stderr: expect.stringContaining('Unknown mcp enable flag: --server')
+    });
+  }, TEST_TIMEOUT);
+
   it('returns non-zero when mcp enable --yes has failed actions', async () => {
     tempDir = await mkdtemp(join(tmpdir(), 'co-cli-mcp-enable-fail-'));
     const fakeCodex = await writeFakeCodexBinary(tempDir);

@@ -1518,18 +1518,76 @@ async function handleMcp(rawArgs: string[]): Promise<void> {
     if (positionals.length > 0) {
       throw new Error(`mcp enable does not accept positional arguments: ${positionals.join(' ')}`);
     }
-    const apply = Boolean(flags['yes']);
-    const format = (flags['format'] as string | undefined) === 'json' ? 'json' : 'text';
-    const explicitServersFlag = flags['servers'];
-    const equalsStyleServersFlags = Object.keys(flags).filter((key) => key.startsWith('servers='));
-    if (explicitServersFlag !== undefined && equalsStyleServersFlags.length > 0) {
-      throw new Error('Use either --servers <csv> or --servers=<csv>, not both.');
+    const allowedEnableFlags = new Set(['yes', 'format', 'servers']);
+    let yesFlag: string | boolean | undefined;
+    let formatFlag: string | boolean | undefined;
+    let serversFlag: string | boolean | undefined;
+
+    for (const [rawKey, value] of Object.entries(flags)) {
+      let key = rawKey;
+      let inlineValue: string | undefined;
+      const separatorIndex = rawKey.indexOf('=');
+      if (separatorIndex !== -1) {
+        key = rawKey.slice(0, separatorIndex);
+        inlineValue = rawKey.slice(separatorIndex + 1);
+      }
+      if (!allowedEnableFlags.has(key)) {
+        throw new Error(`Unknown mcp enable flag: --${key}`);
+      }
+      const resolvedValue = inlineValue ?? value;
+      if (key === 'yes') {
+        if (yesFlag !== undefined) {
+          throw new Error('--yes specified multiple times.');
+        }
+        yesFlag = resolvedValue;
+        continue;
+      }
+      if (key === 'format') {
+        if (formatFlag !== undefined) {
+          throw new Error('--format specified multiple times.');
+        }
+        formatFlag = resolvedValue;
+        continue;
+      }
+      if (serversFlag !== undefined) {
+        throw new Error('--servers specified multiple times.');
+      }
+      serversFlag = resolvedValue;
     }
-    if (equalsStyleServersFlags.length > 1) {
-      throw new Error('Use at most one --servers=<csv> flag.');
+
+    let apply = false;
+    if (yesFlag === true) {
+      apply = true;
+    } else if (typeof yesFlag === 'string') {
+      const normalizedYes = yesFlag.trim().toLowerCase();
+      if (normalizedYes === 'true' || normalizedYes === '1' || normalizedYes === 'yes' || normalizedYes === 'on') {
+        apply = true;
+      } else if (
+        normalizedYes === 'false'
+        || normalizedYes === '0'
+        || normalizedYes === 'no'
+        || normalizedYes === 'off'
+      ) {
+        apply = false;
+      } else {
+        throw new Error('--yes expects true/false when provided as --yes=<value>.');
+      }
     }
-    const serversFlag =
-      explicitServersFlag ?? (equalsStyleServersFlags.length === 1 ? equalsStyleServersFlags[0]!.slice('servers='.length) : undefined);
+
+    let format: OutputFormat = 'text';
+    if (formatFlag !== undefined) {
+      if (formatFlag === true) {
+        throw new Error('--format requires a value of "text" or "json".');
+      }
+      if (formatFlag === 'json') {
+        format = 'json';
+      } else if (formatFlag === 'text') {
+        format = 'text';
+      } else {
+        throw new Error('--format must be "text" or "json".');
+      }
+    }
+
     let serverNames: string[] | undefined;
     if (serversFlag !== undefined) {
       if (typeof serversFlag !== 'string') {
