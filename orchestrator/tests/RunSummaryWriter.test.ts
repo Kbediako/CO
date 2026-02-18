@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { applyCloudExecutionToRunSummary } from '../src/cli/services/runSummaryWriter.js';
+import {
+  applyCloudExecutionToRunSummary,
+  applyCloudFallbackToRunSummary,
+  applyUsageKpiToRunSummary
+} from '../src/cli/services/runSummaryWriter.js';
 import type { CliManifest } from '../src/cli/types.js';
 import type { RunSummary } from '../src/types.js';
 
@@ -49,6 +53,59 @@ describe('runSummaryWriter cloud execution projection', () => {
       applyStatus: manifest.cloud_execution?.apply_status ?? null,
       logPath: manifest.cloud_execution?.log_path ?? null,
       error: manifest.cloud_execution?.error ?? null
+    });
+  });
+
+  it('maps manifest.cloud_fallback into runSummary.cloudFallback', () => {
+    const runSummary = {} as RunSummary;
+    const manifest = {
+      cloud_fallback: {
+        mode_requested: 'cloud',
+        mode_used: 'mcp',
+        reason: 'Cloud preflight failed; falling back to mcp.',
+        issues: [{ code: 'missing_environment', message: 'Missing CODEX_CLOUD_ENV_ID.' }],
+        checked_at: '2026-02-17T00:00:00.000Z'
+      }
+    } as CliManifest;
+
+    applyCloudFallbackToRunSummary(runSummary, manifest);
+
+    expect(runSummary.cloudFallback).toEqual({
+      modeRequested: 'cloud',
+      modeUsed: 'mcp',
+      reason: 'Cloud preflight failed; falling back to mcp.',
+      issues: [{ code: 'missing_environment', message: 'Missing CODEX_CLOUD_ENV_ID.' }],
+      checkedAt: '2026-02-17T00:00:00.000Z'
+    });
+  });
+
+  it('maps per-run usage KPI signals into run summary', () => {
+    const runSummary = {} as RunSummary;
+    const manifest = {
+      pipeline_id: 'docs-review',
+      cloud_execution: null,
+      cloud_fallback: {
+        mode_requested: 'cloud',
+        mode_used: 'mcp',
+        reason: 'fallback',
+        issues: [],
+        checked_at: '2026-02-17T00:00:00.000Z'
+      },
+      collab_tool_calls: [{ tool: 'spawn_agent' }, { tool: 'exec_command' }],
+      child_runs: [{ run_id: 'child-1' }]
+    } as unknown as CliManifest;
+
+    applyUsageKpiToRunSummary(runSummary, manifest);
+
+    expect(runSummary.usageKpi).toEqual({
+      advancedSignalsUsed: 3,
+      advancedSignals: {
+        cloudExecution: false,
+        cloudFallback: true,
+        collabToolCalls: 2,
+        childRuns: 1,
+        rlmPipeline: false
+      }
     });
   });
 

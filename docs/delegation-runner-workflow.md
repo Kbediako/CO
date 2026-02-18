@@ -1,6 +1,6 @@
 # Delegation + Runner Workflow
 
-Use this workflow with delegation MCP enabled by default (the only MCP on by default). Disable it only when required by safety constraints. If older PRDs mention “disabled by default,” treat this guide and `AGENTS.md` as the current policy. Collab multi-agent mode is separate from delegation; for symbolic RLM subcalls that use collab tools, set `RLM_SYMBOLIC_COLLAB=1` and ensure a collab-capable Codex CLI. Collab tool calls are recorded in `manifest.collab_tool_calls`.
+Use this workflow with delegation MCP enabled by default (the only MCP on by default). Disable it only when required by safety constraints. If older PRDs mention “disabled by default,” treat this guide and `AGENTS.md` as the current policy. Collab multi-agent mode is separate from delegation; for symbolic RLM subcalls that use collab tools, set `RLM_SYMBOLIC_MULTI_AGENT=1` (legacy alias: `RLM_SYMBOLIC_COLLAB=1`) and ensure your Codex CLI has `features.multi_agent=true` (`collab` is a legacy alias). Collab tool calls are recorded in `manifest.collab_tool_calls`. For collab `spawn_agent`, always set explicit `agent_type` (omission defaults to `default`) and prefix spawned prompts with `[agent_type:<role>]` on line one for auditable role routing.
 
 Symbolic RLM runs now enable auto-deliberation by default for context management. Tune with:
 - `RLM_SYMBOLIC_DELIBERATION=1` (default)

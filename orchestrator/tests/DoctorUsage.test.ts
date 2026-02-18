@@ -1,6 +1,14 @@
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
 import { describe, expect, it } from 'vitest';
 
-import { formatDoctorUsageSummary, type DoctorUsageResult } from '../src/cli/doctorUsage.js';
+import {
+  formatDoctorUsageSummary,
+  runDoctorUsage,
+  type DoctorUsageResult
+} from '../src/cli/doctorUsage.js';
 
 describe('formatDoctorUsageSummary', () => {
   it('includes capability breakdowns when present', () => {
@@ -53,6 +61,14 @@ describe('formatDoctorUsageSummary', () => {
         gate_runs: 5,
         gate_share_pct: 50,
         recommendations: ['Most runs are plain exec; prefer gate pipelines.']
+      },
+      kpis: {
+        advanced_runs: 4,
+        advanced_share_pct: 40,
+        cloud_share_pct: 30,
+        rlm_share_pct: 10,
+        collab_share_pct: 20,
+        delegation_task_coverage_pct: 50
       }
     };
 
@@ -70,6 +86,88 @@ describe('formatDoctorUsageSummary', () => {
     expect(summary).toContain('delegation: 1/2');
     expect(summary).toContain('child_runs=2');
     expect(summary).toContain('Pipeline adoption: exec=6');
+    expect(summary).toContain('KPIs: advanced=4 (40%)');
     expect(summary).toContain('Adoption hints:');
+  });
+});
+
+describe('runDoctorUsage', () => {
+  it('counts fallback-only runs as advanced usage', async () => {
+    const previousEnv = {
+      root: process.env.CODEX_ORCHESTRATOR_ROOT,
+      runsDir: process.env.CODEX_ORCHESTRATOR_RUNS_DIR,
+      outDir: process.env.CODEX_ORCHESTRATOR_OUT_DIR,
+      taskId: process.env.MCP_RUNNER_TASK_ID
+    };
+    const repoRoot = await mkdtemp(join(tmpdir(), 'doctor-usage-'));
+    const taskId = 'task-fallback';
+    const runId = '2026-02-17T00-00-00-000Z-a1b2c3d4';
+    try {
+      await mkdir(join(repoRoot, 'tasks'), { recursive: true });
+      await writeFile(
+        join(repoRoot, 'tasks', 'index.json'),
+        `${JSON.stringify({ items: [{ slug: taskId }] }, null, 2)}\n`,
+        'utf8'
+      );
+
+      const runDir = join(repoRoot, '.runs', taskId, 'cli', runId);
+      await mkdir(runDir, { recursive: true });
+      await writeFile(
+        join(runDir, 'manifest.json'),
+        `${JSON.stringify(
+          {
+            run_id: runId,
+            task_id: taskId,
+            pipeline_id: 'docs-review',
+            status: 'succeeded',
+            started_at: '2026-02-17T00:00:00.000Z',
+            cloud_fallback: {
+              mode_requested: 'cloud',
+              mode_used: 'mcp',
+              reason: 'Cloud preflight failed.',
+              issues: [{ code: 'missing_environment', message: 'CODEX_CLOUD_ENV_ID is not configured.' }],
+              checked_at: '2026-02-17T00:00:01.000Z'
+            }
+          },
+          null,
+          2
+        )}\n`,
+        'utf8'
+      );
+
+      process.env.CODEX_ORCHESTRATOR_ROOT = repoRoot;
+      delete process.env.CODEX_ORCHESTRATOR_RUNS_DIR;
+      delete process.env.CODEX_ORCHESTRATOR_OUT_DIR;
+      process.env.MCP_RUNNER_TASK_ID = taskId;
+
+      const result = await runDoctorUsage({ windowDays: 3650, taskFilter: taskId });
+      expect(result.runs.total).toBe(1);
+      expect(result.kpis.advanced_runs).toBe(1);
+      expect(result.kpis.advanced_share_pct).toBe(100);
+      expect(result.cloud.runs).toBe(0);
+      expect(result.kpis.cloud_share_pct).toBe(0);
+    } finally {
+      if (previousEnv.root === undefined) {
+        delete process.env.CODEX_ORCHESTRATOR_ROOT;
+      } else {
+        process.env.CODEX_ORCHESTRATOR_ROOT = previousEnv.root;
+      }
+      if (previousEnv.runsDir === undefined) {
+        delete process.env.CODEX_ORCHESTRATOR_RUNS_DIR;
+      } else {
+        process.env.CODEX_ORCHESTRATOR_RUNS_DIR = previousEnv.runsDir;
+      }
+      if (previousEnv.outDir === undefined) {
+        delete process.env.CODEX_ORCHESTRATOR_OUT_DIR;
+      } else {
+        process.env.CODEX_ORCHESTRATOR_OUT_DIR = previousEnv.outDir;
+      }
+      if (previousEnv.taskId === undefined) {
+        delete process.env.MCP_RUNNER_TASK_ID;
+      } else {
+        process.env.MCP_RUNNER_TASK_ID = previousEnv.taskId;
+      }
+      await rm(repoRoot, { recursive: true, force: true });
+    }
   });
 });

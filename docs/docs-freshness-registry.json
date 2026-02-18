@@ -717,6 +717,27 @@
       "cadence_days": 90
     },
     {
+      "path": ".agent/task/0969-playwright-context-subagent-guardrails.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-17",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/task/0970-control-plane-guardrail-runner-hardening.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-17",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/task/0971-advanced-capability-autopilot.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-17",
+      "cadence_days": 90
+    },
+    {
       "path": ".agent/task/ACTION_PLAN_TEMPLATE.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -836,6 +857,13 @@
       "cadence_days": 90
     },
     {
+      "path": "docs/ACTION_PLAN-advanced-capability-autopilot.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-17",
+      "cadence_days": 90
+    },
+    {
       "path": "docs/ACTION_PLAN-agentic-coding-readiness.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -882,6 +910,13 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-01-22",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/ACTION_PLAN-control-plane-guardrail-runner-hardening.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-17",
       "cadence_days": 90
     },
     {
@@ -1099,6 +1134,13 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/ACTION_PLAN-playwright-context-subagent-guardrails.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-17",
       "cadence_days": 90
     },
     {
@@ -1445,6 +1487,13 @@
       "cadence_days": 90
     },
     {
+      "path": "docs/PRD-advanced-capability-autopilot.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-17",
+      "cadence_days": 90
+    },
+    {
       "path": "docs/PRD-agentic-coding-readiness.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -1498,6 +1547,13 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-01-22",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/PRD-control-plane-guardrail-runner-hardening.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-17",
       "cadence_days": 90
     },
     {
@@ -1736,6 +1792,13 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/PRD-playwright-context-subagent-guardrails.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-17",
       "cadence_days": 90
     },
     {
@@ -1984,6 +2047,13 @@
       "cadence_days": 90
     },
     {
+      "path": "docs/TECH_SPEC-advanced-capability-autopilot.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-17",
+      "cadence_days": 90
+    },
+    {
       "path": "docs/TECH_SPEC-agentic-coding-readiness.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -2037,6 +2107,13 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/TECH_SPEC-control-plane-guardrail-runner-hardening.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-17",
       "cadence_days": 90
     },
     {
@@ -2275,6 +2352,13 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/TECH_SPEC-playwright-context-subagent-guardrails.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-17",
       "cadence_days": 90
     },
     {
@@ -2950,6 +3034,27 @@
       "cadence_days": 90
     },
     {
+      "path": "tasks/specs/0969-playwright-context-subagent-guardrails.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-17",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/specs/0970-control-plane-guardrail-runner-hardening.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-17",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/specs/0971-advanced-capability-autopilot.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-17",
+      "cadence_days": 90
+    },
+    {
       "path": "tasks/specs/README.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -3496,84 +3601,7 @@
       "cadence_days": 90
     },
     {
-      "path": "templates/codex/AGENTS.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-01-19",
-      "cadence_days": 90
-    },
-    {
-      "path": ".agent/task/0969-playwright-context-subagent-guardrails.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-02-17",
-      "cadence_days": 90
-    },
-    {
-      "path": "docs/ACTION_PLAN-playwright-context-subagent-guardrails.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-02-17",
-      "cadence_days": 90
-    },
-    {
-      "path": "docs/PRD-playwright-context-subagent-guardrails.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-02-17",
-      "cadence_days": 90
-    },
-    {
-      "path": "docs/TECH_SPEC-playwright-context-subagent-guardrails.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-02-17",
-      "cadence_days": 90
-    },
-    {
-      "path": "tasks/specs/0969-playwright-context-subagent-guardrails.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-02-17",
-      "cadence_days": 90
-    },
-    {
       "path": "tasks/tasks-0969-playwright-context-subagent-guardrails.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-02-17",
-      "cadence_days": 90
-    },
-    {
-      "path": ".agent/task/0970-control-plane-guardrail-runner-hardening.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-02-17",
-      "cadence_days": 90
-    },
-    {
-      "path": "docs/ACTION_PLAN-control-plane-guardrail-runner-hardening.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-02-17",
-      "cadence_days": 90
-    },
-    {
-      "path": "docs/PRD-control-plane-guardrail-runner-hardening.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-02-17",
-      "cadence_days": 90
-    },
-    {
-      "path": "docs/TECH_SPEC-control-plane-guardrail-runner-hardening.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-02-17",
-      "cadence_days": 90
-    },
-    {
-      "path": "tasks/specs/0970-control-plane-guardrail-runner-hardening.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-02-17",
@@ -3584,6 +3612,62 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-02-17",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/tasks-0971-advanced-capability-autopilot.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-17",
+      "cadence_days": 90
+    },
+    {
+      "path": "templates/codex/AGENTS.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-19",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/task/0972-multi-agent-canonical-compat-alignment.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-18",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/ACTION_PLAN-multi-agent-canonical-compat-alignment.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-18",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/PRD-multi-agent-canonical-compat-alignment.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-18",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/TECH_SPEC-multi-agent-canonical-compat-alignment.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-18",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/specs/0972-multi-agent-canonical-compat-alignment.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-18",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/tasks-0972-multi-agent-canonical-compat-alignment.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-18",
       "cadence_days": 90
     }
   ]

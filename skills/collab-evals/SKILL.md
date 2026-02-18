@@ -9,6 +9,10 @@ Use this skill to run repeatable collab evaluation scenarios and record evidence
 
 ## Quick start
 
+0) Confirm feature readiness:
+- Run `codex features list` and verify `multi_agent` is enabled.
+- In this skill, "collab" refers to the same multi-agent tooling path; `collab` naming remains in legacy keys like `RLM_SYMBOLIC_COLLAB` and `manifest.collab_tool_calls`.
+
 1) Pick the scenario(s):
 - Large-context symbolic RLM with collab subcalls.
 - Multi-hour refactor with checkpoints.

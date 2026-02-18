@@ -134,6 +134,7 @@ export function formatCodexCliSetupSummary(result: CodexCliSetupResult): string[
     lines.push(`- Installed SHA256: ${result.install.sha256}`);
   }
   lines.push(`- Command: ${result.plan.commandLine}`);
+  lines.push('- Selection: stock `codex` stays default. Set CODEX_CLI_USE_MANAGED=1 to use this managed binary.');
 
   if (result.status === 'planned') {
     lines.push('Run with --yes to apply this setup.');

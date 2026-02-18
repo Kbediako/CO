@@ -9,7 +9,12 @@ import {
   resolveDevtoolsReadiness,
   type DevtoolsReadiness
 } from './utils/devtools.js';
-import { resolveCodexCliBin, resolveCodexCliReadiness, type CodexCliReadiness } from './utils/codexCli.js';
+import {
+  isManagedCodexCliEnabled,
+  resolveCodexCliBin,
+  resolveCodexCliReadiness,
+  type CodexCliReadiness
+} from './utils/codexCli.js';
 import { resolveCodexHome } from './utils/codexPaths.js';
 import { resolveOptionalDependency, type OptionalResolutionSource } from './utils/optionalDeps.js';
 
@@ -56,12 +61,14 @@ export interface DoctorResult {
   codex_cli: {
     active: {
       command: string;
+      managed_opt_in: boolean;
     };
     managed: CodexCliReadiness;
   };
   collab: {
     status: 'ok' | 'disabled' | 'unavailable';
     enabled: boolean | null;
+    feature_key: 'multi_agent' | 'collab' | null;
     enablement: string[];
   };
   cloud: {
@@ -143,10 +150,24 @@ export function runDoctor(cwd: string = process.cwd()): DoctorResult {
   }
 
   const codexBin = resolveCodexCliBin(process.env);
+  const managedOptIn = isManagedCodexCliEnabled(process.env);
   const managedCodex = resolveCodexCliReadiness(process.env);
 
   const features = readCodexFeatureFlags(codexBin);
-  const collabEnabled = features?.collab ?? null;
+  const collabFeatureKey: DoctorResult['collab']['feature_key'] =
+    features === null
+      ? null
+      : Object.prototype.hasOwnProperty.call(features, 'multi_agent')
+        ? 'multi_agent'
+        : Object.prototype.hasOwnProperty.call(features, 'collab')
+          ? 'collab'
+          : null;
+  const collabEnabled =
+    collabFeatureKey === 'multi_agent'
+      ? features?.multi_agent ?? null
+      : collabFeatureKey === 'collab'
+        ? features?.collab ?? null
+        : null;
   const collabStatus: DoctorResult['collab']['status'] =
     features === null ? 'unavailable' : collabEnabled ? 'ok' : 'disabled';
 
@@ -170,16 +191,17 @@ export function runDoctor(cwd: string = process.cwd()): DoctorResult {
     dependencies,
     devtools,
     codex_cli: {
-      active: { command: codexBin },
+      active: { command: codexBin, managed_opt_in: managedOptIn },
       managed: managedCodex
     },
     collab: {
       status: collabStatus,
       enabled: collabEnabled,
+      feature_key: collabFeatureKey,
       enablement: [
-        'Enable collab for symbolic RLM runs with: codex-orchestrator rlm --collab auto "<goal>"',
-        'Or set: RLM_SYMBOLIC_COLLAB=1 (implies symbolic mode when using --collab).',
-        'If collab is disabled in codex features: codex features enable collab'
+        'Enable collab for symbolic RLM runs with: codex-orchestrator rlm --multi-agent auto "<goal>" (legacy: --collab auto).',
+        'Or set: RLM_SYMBOLIC_MULTI_AGENT=1 (legacy alias: RLM_SYMBOLIC_COLLAB=1).',
+        'If multi-agent is disabled in codex features: codex features enable multi_agent (legacy alias: collab)'
       ]
     },
     cloud: {
@@ -255,12 +277,18 @@ export function formatDoctorSummary(result: DoctorResult): string[] {
   }
 
   lines.push(`Codex CLI: ${result.codex_cli.active.command}`);
+  lines.push(
+    `  - managed opt-in: ${result.codex_cli.active.managed_opt_in ? 'enabled' : 'disabled'} (set CODEX_CLI_USE_MANAGED=1)`
+  );
   lines.push(`  - managed: ${result.codex_cli.managed.status} (${result.codex_cli.managed.config.path})`);
   if (result.codex_cli.managed.status === 'invalid' && result.codex_cli.managed.config.error) {
     lines.push(`    error: ${result.codex_cli.managed.config.error}`);
   }
   if (result.codex_cli.managed.status === 'ok') {
     lines.push(`  - binary: ${result.codex_cli.managed.binary.status} (${result.codex_cli.managed.binary.path})`);
+    if (!result.codex_cli.active.managed_opt_in) {
+      lines.push('  - note: managed binary is installed but inactive; stock codex is currently selected.');
+    }
     if (result.codex_cli.managed.install?.version) {
       lines.push(`  - version: ${result.codex_cli.managed.install.version}`);
     }
@@ -269,6 +297,9 @@ export function formatDoctorSummary(result: DoctorResult): string[] {
   lines.push(`Collab: ${result.collab.status}`);
   if (result.collab.enabled !== null) {
     lines.push(`  - enabled: ${result.collab.enabled}`);
+  }
+  if (result.collab.feature_key) {
+    lines.push(`  - feature key: ${result.collab.feature_key}`);
   }
   for (const line of result.collab.enablement) {
     lines.push(`  - ${line}`);

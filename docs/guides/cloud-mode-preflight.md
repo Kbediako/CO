@@ -31,8 +31,9 @@ Preflight validates:
 
 If preflight fails, CO:
 1. Records a warning in `manifest.summary`
-2. Falls back to `mcp` for the requested work
-3. Surfaces the reason in `start` stdout under `Summary:` (and in `--format json` via `summary`)
+2. Writes a structured fallback block at `manifest.cloud_fallback` (reason + issue codes/messages + timestamp)
+3. Falls back to `mcp` for the requested work
+4. Surfaces the reason in `start` stdout as `Cloud fallback: ...` (and in `--format json` via `cloud_fallback_reason`)
 
 This means repos without cloud setup can still run the same pipelines without extra configuration; cloud is a best-effort acceleration path.
 
@@ -43,5 +44,4 @@ This means repos without cloud setup can still run the same pipelines without ex
 - Missing branch:
   - Push the branch to origin, or set `CODEX_CLOUD_BRANCH` to an existing remote branch.
 - Codex CLI unavailable:
-  - Install Codex CLI, or use CO’s managed/pinned Codex CLI setup (`codex-orchestrator codex setup`).
-
+  - Install Codex CLI, or use CO’s managed/pinned Codex CLI setup (`codex-orchestrator codex setup` + `CODEX_CLI_USE_MANAGED=1`).

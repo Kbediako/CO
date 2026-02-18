@@ -166,6 +166,8 @@ describe('codex-orchestrator command surface', () => {
   it('prints rlm help without running when help flag is passed before goal', async () => {
     const { stdout } = await runCli(['rlm', '--help']);
     expect(stdout).toContain('Usage: codex-orchestrator rlm');
+    expect(stdout).toContain('--multi-agent [auto|true|false]');
+    expect(stdout).toContain('--collab [auto|true|false]  Legacy alias for --multi-agent.');
     expect(stdout).not.toContain('Task:');
   }, TEST_TIMEOUT);
 
@@ -179,6 +181,14 @@ describe('codex-orchestrator command surface', () => {
     const { stdout } = await runCli(['rlm', 'write tests', '--help']);
     expect(stdout).toContain('Usage: codex-orchestrator rlm');
     expect(stdout).not.toContain('Task:');
+  }, TEST_TIMEOUT);
+
+  it('rejects conflicting multi-agent and collab flag values', async () => {
+    await expect(
+      runCli(['rlm', 'write tests', '--multi-agent', 'true', '--collab', 'false'])
+    ).rejects.toMatchObject({
+      stderr: expect.stringContaining('Conflicting --multi-agent and --collab values.')
+    });
   }, TEST_TIMEOUT);
 
   it('prints doctor apply plan when wiring is missing', async () => {

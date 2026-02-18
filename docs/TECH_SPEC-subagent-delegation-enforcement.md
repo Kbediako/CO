@@ -22,7 +22,7 @@ Source of truth for requirements: `tasks/0918-prd-subagent-delegation-enforcemen
 ### Proposed Changes
 #### Delegation guard script
 - Add `scripts/delegation-guard.mjs` with the following behavior:
-  - Requires `MCP_RUNNER_TASK_ID` to be set.
+  - Resolves task id from `--task`, `MCP_RUNNER_TASK_ID`, `TASK`, or `CODEX_ORCHESTRATOR_TASK_ID` (preferred: `MCP_RUNNER_TASK_ID`).
   - Reads `tasks/index.json` to resolve canonical top-level task IDs.
   - If the current `MCP_RUNNER_TASK_ID` matches a top-level task ID, require at least one subagent manifest under `.runs/<task-id>-*/cli/<run-id>/manifest.json`.
   - If the current task ID is a subagent ID (starts with a known top-level task ID + `-`), skip enforcement.
@@ -46,7 +46,7 @@ Source of truth for requirements: `tasks/0918-prd-subagent-delegation-enforcemen
 
 ## Operational Considerations
 - Failure Modes:
-  - `MCP_RUNNER_TASK_ID` unset when guard runs.
+  - Task id unset when guard runs.
   - Top-level task not registered in `tasks/index.json`.
   - Subagent run exists but has no manifest (incomplete run).
 - Observability & Telemetry:

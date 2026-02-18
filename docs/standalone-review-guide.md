@@ -10,6 +10,7 @@ This guide is the canonical reference for ad-hoc reviews outside pipelines. Use 
 
 ## Use during implementation (recommended)
 - Run a quick standalone review after each meaningful chunk of work to catch issues early.
+- After each review run, append a short progress checkpoint in the active task checklist (what changed, evidence, next step).
 - Use this default trigger heuristic so reviews stay useful (not noisy):
   - run when 2+ files changed since the previous review, or
   - run when about 40+ changed lines accumulate, or

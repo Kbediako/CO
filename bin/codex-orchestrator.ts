@@ -41,6 +41,7 @@ interface RunOutputPayload {
   manifest: string;
   log_path: string | null;
   summary: string | null;
+  cloud_fallback_reason: string | null;
 }
 
 interface FlowOutputPayload {
@@ -408,26 +409,93 @@ function resolveExecutionModeFlag(flags: ArgMap): ExecutionModeOption | undefine
   return normalized;
 }
 
+type RlmMultiAgentFlagSource = 'multi-agent' | 'collab';
+
+interface RlmMultiAgentFlagSelection {
+  source: RlmMultiAgentFlagSource;
+  raw: string | boolean;
+}
+
+function normalizeRlmMultiAgentValue(raw: string | boolean): 'enabled' | 'disabled' | 'invalid' {
+  if (raw === true) {
+    return 'enabled';
+  }
+  if (typeof raw !== 'string') {
+    return 'invalid';
+  }
+  const normalized = raw.trim().toLowerCase();
+  if (normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'auto') {
+    return 'enabled';
+  }
+  if (normalized === '0' || normalized === 'false' || normalized === 'no' || normalized === 'off') {
+    return 'disabled';
+  }
+  return 'invalid';
+}
+
+function resolveRlmMultiAgentFlag(flags: ArgMap): RlmMultiAgentFlagSelection | null {
+  const canonicalRaw = flags['multi-agent'];
+  const legacyRaw = flags['collab'];
+  if (canonicalRaw === undefined && legacyRaw === undefined) {
+    return null;
+  }
+
+  if (canonicalRaw !== undefined && legacyRaw !== undefined) {
+    const canonicalState = normalizeRlmMultiAgentValue(canonicalRaw);
+    const legacyState = normalizeRlmMultiAgentValue(legacyRaw);
+    if (canonicalState === 'invalid' || legacyState === 'invalid') {
+      throw new Error(
+        'Invalid --multi-agent/--collab value. Use --multi-agent (or legacy --collab) with auto|true|false.'
+      );
+    }
+    if (canonicalState !== legacyState) {
+      throw new Error(
+        'Conflicting --multi-agent and --collab values. Use a single flag or provide matching values.'
+      );
+    }
+    return { source: 'multi-agent', raw: canonicalRaw };
+  }
+
+  if (canonicalRaw !== undefined) {
+    return { source: 'multi-agent', raw: canonicalRaw };
+  }
+
+  return { source: 'collab', raw: legacyRaw as string | boolean };
+}
+
+function shouldWarnLegacyMultiAgentEnv(flags: ArgMap, env: NodeJS.ProcessEnv): boolean {
+  const explicitFlagUsed = flags['multi-agent'] !== undefined || flags['collab'] !== undefined;
+  if (explicitFlagUsed) {
+    return false;
+  }
+  return env.RLM_SYMBOLIC_MULTI_AGENT === undefined && env.RLM_SYMBOLIC_COLLAB !== undefined;
+}
+
 function applyRlmEnvOverrides(flags: ArgMap, goal?: string): void {
   if (goal) {
     process.env.RLM_GOAL = goal;
   }
-  const collabRaw = flags['collab'];
-  if (collabRaw !== undefined) {
-    const normalized =
-      typeof collabRaw === 'string' ? collabRaw.trim().toLowerCase() : collabRaw === true ? 'true' : '';
-    const enabled = collabRaw === true || normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'auto';
-    const disabled = normalized === '0' || normalized === 'false' || normalized === 'no' || normalized === 'off';
-    if (enabled) {
+  const multiAgentFlag = resolveRlmMultiAgentFlag(flags);
+  if (multiAgentFlag) {
+    const state = normalizeRlmMultiAgentValue(multiAgentFlag.raw);
+    if (state === 'enabled') {
+      // Keep canonical and legacy env keys in sync during the migration window.
+      process.env.RLM_SYMBOLIC_MULTI_AGENT = '1';
       process.env.RLM_SYMBOLIC_COLLAB = '1';
-      // Collab is only used in the symbolic loop; make the flag do what users expect.
+      // Multi-agent subcalls are only used in the symbolic loop.
       if (!process.env.RLM_MODE) {
         process.env.RLM_MODE = 'symbolic';
       }
-    } else if (disabled) {
+    } else if (state === 'disabled') {
+      process.env.RLM_SYMBOLIC_MULTI_AGENT = '0';
       process.env.RLM_SYMBOLIC_COLLAB = '0';
-    } else if (typeof collabRaw === 'string') {
-      throw new Error('Invalid --collab value. Use --collab (or: --collab auto|true|false).');
+    } else {
+      throw new Error(
+        'Invalid --multi-agent/--collab value. Use --multi-agent (or legacy --collab) with auto|true|false.'
+      );
+    }
+    if (multiAgentFlag.source === 'collab') {
+      console.warn('Warning: --collab is a legacy alias; prefer --multi-agent.');
     }
   }
   const validator = readStringFlag(flags, 'validator');
@@ -494,7 +562,11 @@ async function handleStart(orchestrator: CodexOrchestrator, rawArgs: string[]): 
   const executionMode = resolveExecutionModeFlag(flags);
   if (pipelineId === 'rlm') {
     const goal = readStringFlag(flags, 'goal');
+    const warnLegacyEnvAlias = shouldWarnLegacyMultiAgentEnv(flags, process.env);
     applyRlmEnvOverrides(flags, goal);
+    if (warnLegacyEnvAlias) {
+      console.warn('Warning: RLM_SYMBOLIC_COLLAB is a legacy alias; prefer RLM_SYMBOLIC_MULTI_AGENT.');
+    }
   }
   await withRunUi(flags, format, async (runEvents) => {
     let taskIdOverride = typeof flags['task'] === 'string' ? (flags['task'] as string) : undefined;
@@ -670,17 +742,29 @@ async function handleRlm(orchestrator: CodexOrchestrator, rawArgs: string[]): Pr
   const taskFlag = typeof flags['task'] === 'string' ? (flags['task'] as string) : undefined;
   const taskId = resolveRlmTaskId(taskFlag);
   process.env.MCP_RUNNER_TASK_ID = taskId;
+  const warnLegacyEnvAlias = shouldWarnLegacyMultiAgentEnv(flags, process.env);
   applyRlmEnvOverrides(flags, goal);
+  if (warnLegacyEnvAlias) {
+    console.warn('Warning: RLM_SYMBOLIC_COLLAB is a legacy alias; prefer RLM_SYMBOLIC_MULTI_AGENT.');
+  }
 
   console.log(`Task: ${taskId}`);
 
-  const collabUserChoice = flags['collab'] !== undefined || process.env.RLM_SYMBOLIC_COLLAB !== undefined;
+  const collabUserChoice =
+    flags['collab'] !== undefined ||
+    flags['multi-agent'] !== undefined ||
+    process.env.RLM_SYMBOLIC_COLLAB !== undefined ||
+    process.env.RLM_SYMBOLIC_MULTI_AGENT !== undefined;
   if (!collabUserChoice) {
     const doctor = runDoctor();
     if (doctor.collab.status === 'ok') {
-      console.log('Tip: collab is enabled. Try: codex-orchestrator rlm --collab auto \"<goal>\"');
+      console.log(
+        'Tip: multi-agent collab is enabled. Try: codex-orchestrator rlm --multi-agent auto \"<goal>\" (legacy: --collab auto).'
+      );
     } else if (doctor.collab.status === 'disabled') {
-      console.log('Tip: collab is available but disabled. Enable with: codex features enable collab');
+      console.log(
+        'Tip: multi-agent collab is available but disabled. Enable with: codex features enable multi_agent (legacy alias: collab).'
+      );
     }
   }
 
@@ -820,6 +904,7 @@ function emitRunOutput(
       artifact_root: string;
       log_path: string | null;
       summary?: string | null;
+      cloud_fallback?: { reason: string } | null;
     };
   },
   format: OutputFormat,
@@ -834,6 +919,9 @@ function emitRunOutput(
   console.log(`Status: ${payload.status}`);
   console.log(`Manifest: ${payload.manifest}`);
   console.log(`Log: ${payload.log_path}`);
+  if (payload.cloud_fallback_reason) {
+    console.log(`Cloud fallback: ${payload.cloud_fallback_reason}`);
+  }
   if (payload.summary) {
     console.log('Summary:');
     for (const line of payload.summary.split(/\r?\n/u)) {
@@ -850,6 +938,7 @@ function toRunOutputPayload(
       artifact_root: string;
       log_path: string | null;
       summary?: string | null;
+      cloud_fallback?: { reason: string } | null;
     };
   }
 ): RunOutputPayload {
@@ -859,7 +948,8 @@ function toRunOutputPayload(
     artifact_root: result.manifest.artifact_root,
     manifest: `${result.manifest.artifact_root}/manifest.json`,
     log_path: result.manifest.log_path,
-    summary: result.manifest.summary ?? null
+    summary: result.manifest.summary ?? null,
+    cloud_fallback_reason: result.manifest.cloud_fallback?.reason ?? null
   };
 }
 
@@ -1655,7 +1745,8 @@ Commands:
     --cloud                 Shortcut for --execution-mode cloud.
     --target <stage-id>     Focus plan/build metadata on a specific stage (alias: --target-stage).
     --goal "<goal>"         When pipeline is rlm, set the RLM goal.
-    --collab [auto|true|false]  When pipeline is rlm, enable collab subagents (implies symbolic mode).
+    --multi-agent [auto|true|false]  Preferred alias for multi-agent collab subagents (implies symbolic mode).
+    --collab [auto|true|false]  Legacy alias for --multi-agent.
     --validator <cmd|none>  When pipeline is rlm, set the validator command.
     --max-iterations <n>    When pipeline is rlm, override max iterations.
     --max-minutes <n>       When pipeline is rlm, override max minutes.
@@ -1665,7 +1756,8 @@ Commands:
 
   rlm "<goal>"              Run RLM loop until validator passes.
     --task <id>             Override task identifier.
-    --collab [auto|true|false]  Enable collab subagents (implies symbolic mode).
+    --multi-agent [auto|true|false]  Preferred alias for multi-agent collab subagents (implies symbolic mode).
+    --collab [auto|true|false]  Legacy alias for --multi-agent.
     --validator <cmd|none>  Set validator command or disable validation.
     --max-iterations <n>    Override max iterations (0 = unlimited with validator).
     --max-minutes <n>       Optional time-based guardrail in minutes.
@@ -1722,7 +1814,7 @@ Commands:
 
   self-check [--format json]
   init codex [--cwd <path>] [--force]
-    --codex-cli            Also run CO-managed Codex CLI setup (plan unless --yes).
+    --codex-cli            Also run CO-managed Codex CLI setup (plan unless --yes; activate with CODEX_CLI_USE_MANAGED=1).
     --codex-source <path>  Build from local Codex repo (or git URL).
     --codex-ref <ref>      Git ref (branch/tag/sha) when building from repo.
     --codex-download-url <url>  Download a prebuilt codex binary.
@@ -1746,7 +1838,7 @@ Commands:
     --download-url <url>   Download a prebuilt codex binary.
     --download-sha256 <sha>  Expected SHA256 for the prebuilt download.
     --force                Overwrite existing CO-managed codex binary.
-    --yes                  Apply setup (otherwise plan only).
+    --yes                  Apply setup (otherwise plan only; stock codex remains default until CODEX_CLI_USE_MANAGED=1).
     --format json          Emit machine-readable output.
   devtools setup          Print DevTools MCP setup instructions.
     --yes                 Apply setup by running "codex mcp add ...".
@@ -1857,7 +1949,8 @@ function printRlmHelp(): void {
 Options:
   --goal "<goal>"         Alternate way to set the goal (positional is preferred).
   --task <id>             Override task identifier (defaults to MCP_RUNNER_TASK_ID).
-  --collab [auto|true|false]  Enable collab subagents (implies symbolic mode).
+  --multi-agent [auto|true|false]  Preferred alias for multi-agent collab subagents (implies symbolic mode).
+  --collab [auto|true|false]  Legacy alias for --multi-agent.
   --validator <cmd|none>  Set validator command or disable validation.
   --max-iterations <n>    Override max iterations (0 = unlimited with validator).
   --max-minutes <n>       Optional time-based guardrail in minutes.

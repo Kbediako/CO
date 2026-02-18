@@ -1326,6 +1326,38 @@
       },
       "created_at": "2026-02-17",
       "completed_at": "2026-02-17"
+    },
+    {
+      "id": "0971",
+      "slug": "0971-advanced-capability-autopilot",
+      "title": "Advanced Capability Autopilot + Usage Signal Hardening",
+      "path": "tasks/tasks-0971-advanced-capability-autopilot.md",
+      "kind": "plan",
+      "status": "in-progress",
+      "gate": {
+        "phase": "advanced-capability-autopilot-implementation",
+        "status": "in-progress",
+        "log": ".runs/0971-advanced-capability-autopilot/cli/2026-02-17T14-24-29-462Z-9cad68be/manifest.json",
+        "run_id": "2026-02-17T14-24-29-462Z-9cad68be"
+      },
+      "created_at": "2026-02-17",
+      "completed_at": null
+    },
+    {
+      "id": "0972",
+      "slug": "0972-multi-agent-canonical-compat-alignment",
+      "title": "Multi-Agent Canonical Terminology + Compatibility Alignment",
+      "path": "tasks/tasks-0972-multi-agent-canonical-compat-alignment.md",
+      "kind": "run",
+      "status": "in-progress",
+      "gate": {
+        "phase": "multi-agent-canonical-compat-alignment-planning",
+        "status": "succeeded",
+        "log": ".runs/0972-multi-agent-canonical-compat-alignment/cli/2026-02-18T01-29-00-289Z-19f648b1/manifest.json",
+        "run_id": "2026-02-18T01-29-00-289Z-19f648b1"
+      },
+      "created_at": "2026-02-18",
+      "completed_at": null
     }
   ],
   "specs": [
@@ -1663,6 +1695,38 @@
         "task": "tasks/tasks-0970-control-plane-guardrail-runner-hardening.md",
         "agent_task": ".agent/task/0970-control-plane-guardrail-runner-hardening.md",
         "docs": "docs/TECH_SPEC-control-plane-guardrail-runner-hardening.md"
+      }
+    },
+    {
+      "id": "20260217-0971-advanced-capability-autopilot",
+      "title": "Advanced Capability Autopilot + Usage Signal Hardening",
+      "relates_to": "tasks/tasks-0971-advanced-capability-autopilot.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-02-17",
+      "paths": {
+        "spec": "tasks/specs/0971-advanced-capability-autopilot.md",
+        "task": "tasks/tasks-0971-advanced-capability-autopilot.md",
+        "agent_task": ".agent/task/0971-advanced-capability-autopilot.md",
+        "docs": "docs/TECH_SPEC-advanced-capability-autopilot.md"
+      }
+    },
+    {
+      "id": "20260218-0972-multi-agent-canonical-compat-alignment",
+      "title": "Multi-Agent Canonical Terminology + Compatibility Alignment",
+      "relates_to": "tasks/tasks-0972-multi-agent-canonical-compat-alignment.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-02-18",
+      "paths": {
+        "spec": "tasks/specs/0972-multi-agent-canonical-compat-alignment.md",
+        "task": "tasks/tasks-0972-multi-agent-canonical-compat-alignment.md",
+        "agent_task": ".agent/task/0972-multi-agent-canonical-compat-alignment.md",
+        "docs": "docs/TECH_SPEC-multi-agent-canonical-compat-alignment.md"
       }
     }
   ]

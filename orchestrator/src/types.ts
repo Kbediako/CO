@@ -121,6 +121,8 @@ export interface RunSummary {
   scheduler?: SchedulerRunSummary;
   handles?: RunHandleSummary[];
   privacy?: PrivacyRunSummary;
+  cloudFallback?: CloudFallbackSummary | null;
+  usageKpi?: RunUsageKpiSummary | null;
   designArtifacts?: DesignArtifactRecord[];
   designArtifactsSummary?: DesignArtifactsSummary;
   designConfigSnapshot?: Record<string, unknown> | null;
@@ -145,6 +147,25 @@ export interface CloudExecutionSummary {
   applyStatus: 'not_requested' | 'succeeded' | 'failed';
   logPath: string | null;
   error: string | null;
+}
+
+export interface CloudFallbackSummary {
+  modeRequested: 'cloud';
+  modeUsed: 'mcp';
+  reason: string;
+  issues: Array<{ code: string; message: string }>;
+  checkedAt: string;
+}
+
+export interface RunUsageKpiSummary {
+  advancedSignalsUsed: number;
+  advancedSignals: {
+    cloudExecution: boolean;
+    cloudFallback: boolean;
+    collabToolCalls: number;
+    childRuns: number;
+    rlmPipeline: boolean;
+  };
 }
 
 export interface RunHandleSummary {

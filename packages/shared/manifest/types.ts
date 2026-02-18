@@ -161,6 +161,16 @@ export interface CodexOrchestratorCLIManifest {
     log_path: string | null;
     error: string | null;
   } | null;
+  cloud_fallback?: {
+    mode_requested: "cloud";
+    mode_used: "mcp";
+    reason: string;
+    issues: {
+      code: string;
+      message: string;
+    }[];
+    checked_at: string;
+  } | null;
   privacy?: {
     mode: "shadow" | "enforce";
     decisions: {

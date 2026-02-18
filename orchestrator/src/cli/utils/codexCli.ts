@@ -30,6 +30,7 @@ export interface CodexCliReadiness {
 }
 
 const CONFIG_FILENAME = 'codex-cli.json';
+const USE_MANAGED_ENV = 'CODEX_CLI_USE_MANAGED';
 
 export function resolveCodexCliRoot(env: NodeJS.ProcessEnv = process.env): string {
   return join(resolveCodexOrchestratorHome(env), 'codex-cli');
@@ -48,11 +49,18 @@ export function resolveCodexCliBin(env: NodeJS.ProcessEnv = process.env): string
   if (override) {
     return override;
   }
+  if (!isManagedCodexCliEnabled(env)) {
+    return 'codex';
+  }
   const { config } = readCodexCliConfig(env);
   if (config?.binary_path) {
     return config.binary_path;
   }
   return 'codex';
+}
+
+export function isManagedCodexCliEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+  return isTrueFlag(env[USE_MANAGED_ENV]);
 }
 
 export function resolveCodexCliReadiness(env: NodeJS.ProcessEnv = process.env): CodexCliReadiness {
@@ -123,6 +131,21 @@ export function readCodexCliConfig(
 
 function codexBinaryName(): string {
   return process.platform === 'win32' ? 'codex.exe' : 'codex';
+}
+
+function isTrueFlag(value: string | undefined): boolean {
+  if (!value) {
+    return false;
+  }
+  switch (value.trim().toLowerCase()) {
+    case '1':
+    case 'true':
+    case 'yes':
+    case 'on':
+      return true;
+    default:
+      return false;
+  }
 }
 
 function sha256FileSync(path: string): string {

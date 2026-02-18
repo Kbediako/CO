@@ -9,7 +9,12 @@ Symbolic (no collab):
 RLM_MODE=symbolic codex-orchestrator rlm "<goal>"
 ```
 
-Symbolic + collab subagents (requires `collab` enabled in Codex):
+Symbolic + collab subagents (requires Codex `features.multi_agent=true`; `collab` remains a legacy alias):
+```bash
+codex-orchestrator rlm --multi-agent auto "<goal>"
+```
+
+Legacy equivalent:
 ```bash
 codex-orchestrator rlm --collab auto "<goal>"
 ```
@@ -18,6 +23,14 @@ Safe exploration:
 ```bash
 codex-orchestrator rlm --help
 ```
+
+## Auto Mode (Large-Context Default)
+
+`RLM_MODE=auto` now stays iterative unless both conditions are true:
+- Context size reaches `RLM_SYMBOLIC_MIN_BYTES` (large-context threshold)
+- An explicit context signal is present (delegated run or `RLM_CONTEXT_PATH`)
+
+This keeps routine/small-context runs in iterative mode while still auto-switching to symbolic for true large-context workflows.
 
 ## Core Concepts
 
@@ -57,4 +70,3 @@ Symbolic budgets are controlled via env vars (defaults are intentionally conserv
 - `RLM_MAX_CONCURRENCY`
 
 If you want strict “small slice” behavior (for example, keeping subcalls around ~2k characters), lower `RLM_MAX_BYTES_PER_SNIPPET` and/or `RLM_MAX_SUBCALL_INPUT_BYTES`.
-

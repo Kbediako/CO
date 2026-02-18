@@ -17,6 +17,11 @@
 - [ ] Docs-review manifest captured (pre-implementation) - Evidence: `.runs/<task-id>/cli/<run-id>/manifest.json`.
 - [ ] Implementation review manifest captured (post-implementation) - Evidence: `.runs/<task-id>/cli/<run-id>/manifest.json`.
 
+### Progress Log (continuity)
+- After each meaningful chunk, append 1-3 bullets in this file capturing: what changed, evidence path/command, and next handoff TODO.
+- Keep entries concise so another agent can resume quickly after compaction or handoff.
+- Optional scratch mirror: `out/<task-id>/progress.md` (task checklist remains the source of truth).
+
 ## Parent Tasks
 1. Parent Task Title
    - Subtask 1: Description

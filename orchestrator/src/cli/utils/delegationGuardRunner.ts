@@ -63,9 +63,10 @@ export function resolveEffectiveGuardProfile(
 
 export function buildDelegationGuardEnv(
   env: NodeJS.ProcessEnv,
-  profile: EffectiveGuardProfile
+  profile: EffectiveGuardProfile,
+  argv: string[] = []
 ): NodeJS.ProcessEnv {
-  const taskId = (env.MCP_RUNNER_TASK_ID ?? '').trim();
+  const taskId = resolveDelegationTaskId(env, argv);
   const existingOverride = (env.DELEGATION_GUARD_OVERRIDE_REASON ?? '').trim();
   if (profile !== 'warn' || taskId || existingOverride) {
     return { ...env };
@@ -73,8 +74,43 @@ export function buildDelegationGuardEnv(
   return {
     ...env,
     DELEGATION_GUARD_OVERRIDE_REASON:
-      'No MCP_RUNNER_TASK_ID provided (warn profile): delegation evidence check bypassed.'
+      'No task id provided (warn profile): delegation evidence check bypassed.'
   };
+}
+
+function resolveTaskIdFromArgv(argv: string[]): string {
+  for (let index = 0; index < argv.length; index += 1) {
+    const arg = argv[index]?.trim();
+    if (!arg) {
+      continue;
+    }
+    if (arg === '--task') {
+      const next = normalizePath(argv[index + 1]);
+      if (next) {
+        return next;
+      }
+      continue;
+    }
+    if (arg.startsWith('--task=')) {
+      const value = normalizePath(arg.slice('--task='.length));
+      if (value) {
+        return value;
+      }
+      continue;
+    }
+  }
+  return '';
+}
+
+function resolveDelegationTaskId(env: NodeJS.ProcessEnv, argv: string[] = []): string {
+  const candidates = [env.MCP_RUNNER_TASK_ID, env.TASK, env.CODEX_ORCHESTRATOR_TASK_ID];
+  for (const candidate of candidates) {
+    const value = normalizePath(candidate);
+    if (value) {
+      return value;
+    }
+  }
+  return resolveTaskIdFromArgv(argv);
 }
 
 export function buildDelegationGuardScriptCandidates(
@@ -134,7 +170,7 @@ export async function runDelegationGuardRunner(argv: string[] = process.argv.sli
 
   const child = spawn(process.execPath, [guardPath, ...argv], {
     stdio: 'inherit',
-    env: buildDelegationGuardEnv(process.env, profile)
+    env: buildDelegationGuardEnv(process.env, profile, argv)
   });
 
   child.on('error', (error) => {

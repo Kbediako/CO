@@ -7,6 +7,11 @@ description: Structure multi-agent brainstorming and deliberation (options, trad
 
 Use this skill when the user asks for brainstorming, tradeoffs, option comparison, or decision support before implementation. This skill is for ideas and decisions, not coding.
 
+## Terminology + feature gate (required)
+- In this skill, "collab" means multi-agent tool usage (`spawn_agent` / `wait` / `close_agent`).
+- Codex CLI feature gating is `features.multi_agent=true`; treat `collab` as legacy naming in some env/artifact keys.
+- For symbolic orchestration, existing key names remain `RLM_SYMBOLIC_COLLAB` and `manifest.collab_tool_calls`.
+
 ## Deliberation Default v1 (required)
 - Keep MCP as the lead control plane. Use collab/delegated subagents to generate and challenge options.
 - Run full deliberation when any hard-stop trigger is true:
@@ -84,4 +89,5 @@ Use this skill when the user asks for brainstorming, tradeoffs, option compariso
 - Do not present uncertainty as certainty.
 - Keep outputs concise and action-oriented.
 - If collab subagents are used, close lifecycle loops per id (`spawn_agent` -> `wait` -> `close_agent`) before finishing.
+- If collab subagents are used, always set explicit `agent_type` (omission defaults to `default`) and prefix spawned prompts with `[agent_type:<role>]`.
 - If you cannot close collab agents (missing ids) and spawn keeps failing, restart the session and re-run deliberation; keep work moving by doing solo deliberation meanwhile.

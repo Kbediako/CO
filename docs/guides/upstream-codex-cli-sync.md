@@ -37,5 +37,8 @@
   - `scripts/codex-cli-refresh.sh --repo /path/to/codex --align-only`
 - Managed/pinned path (optional): align and rebuild CO-managed CLI:
   - `scripts/codex-cli-refresh.sh --repo /path/to/codex --force-rebuild`
+- Managed routing is opt-in even after rebuild:
+  - `export CODEX_CLI_USE_MANAGED=1`
 - Add `--no-push` only when you intentionally want local-only alignment without updating `origin/main`.
-- Use managed/pinned CLI when you need a custom fork behavior or reproducible binary control. For routine usage, stock `codex` is sufficient when required features are enabled (`codex features list`).
+- Use managed/pinned CLI when you need custom fork behavior or reproducible binary control. Verify rebuild SHA/features before switching and after each refresh.
+- For routine usage, keep stock `codex` as default when required features are enabled (`codex features list`).

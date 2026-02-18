@@ -8,7 +8,8 @@ Use this playbook whenever handing off a review (`npm run review` or an implemen
    - Default: `implementation-gate` for general reviews.
    - Enable DevTools by setting `CODEX_REVIEW_DEVTOOLS=1` only when Chrome DevTools capabilities are required.
 3. Record the manifest path in the relevant checklists (`tasks/`, `docs/`, `.agent/task/`).
-4. Monitor checks and reviewer feedback for at least 10 minutes after checks go green. Scale the watch window based on PR complexity because the Codex connector can lag:
+4. Append a short progress checkpoint (what changed, evidence path, next action) in the active task checklist before entering long monitor loops.
+5. Monitor checks and reviewer feedback for at least 10 minutes after checks go green. Scale the watch window based on PR complexity because the Codex connector can lag:
    - Small: ≤50 LOC net, ≤3 files, no pipeline/guardrail changes → 10 min.
    - Medium: 51–200 LOC or 4–10 files, touches scripts/docs/pipelines → 15–20 min.
    - Large: >200 LOC, >10 files, touches CI/guardrails/release paths or adds deps → 25–30 min.
@@ -23,11 +24,11 @@ Use this playbook whenever handing off a review (`npm run review` or an implemen
      - CI evidence: failing/passing GitHub Actions job logs and artifacts linked from the PR checks tab.
      - Runtime evidence: orchestrator manifests/logs under `.runs/<task-id>/cli/<run-id>/` and any monitor log capture (for example `/tmp/pr-watch.log`).
      - Record evidence links in the PR thread (or run manifest notes), use UTC timestamps + PR number in filenames, and carry the same links into any follow-up issue.
-5. Check inline review comments/threads (not just review summaries). Use `gh pr view <number> --comments` or `gh api repos/<owner>/<repo>/pulls/<number>/comments` and ensure no unresolved items remain.
-6. For GitHub agent review comments (CodeRabbit, Copilot, Codex connector), respond in-thread, react with 👍 once addressed, and resolve the review thread.
-7. If the reviewer finds issues, fix them, update `NOTES` with follow-up questions (when needed), and rerun the same gate.
-8. Repeat until the reviewer reports no findings.
-9. For non-trivial changes, run one final elegance/minimality review pass and remove avoidable complexity before merge.
+6. Check inline review comments/threads (not just review summaries). Use `gh pr view <number> --comments` or `gh api repos/<owner>/<repo>/pulls/<number>/comments` and ensure no unresolved items remain.
+7. For GitHub agent review comments (CodeRabbit, Copilot, Codex connector), respond in-thread, react with 👍 once addressed, and resolve the review thread.
+8. If the reviewer finds issues, fix them, update `NOTES` with follow-up questions (when needed), and rerun the same gate.
+9. Repeat until the reviewer reports no findings.
+10. For non-trivial changes, run one final elegance/minimality review pass and remove avoidable complexity before merge.
 
 ## Completion discipline (patience-first)
 - Wait/poll until terminal status for checks, review agents, and cloud/orchestrator runs before handoff. Prefer `codex-orchestrator pr watch-merge` for PR monitoring, so polling persists even during long waits.
