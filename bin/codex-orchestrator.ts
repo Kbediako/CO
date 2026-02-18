@@ -1146,6 +1146,9 @@ Options:
 
   if (!apply) {
     const installCommand = `codex-orchestrator skills install ${refreshSkills ? '--force ' : ''}--only ${bundledSkills.join(',')}`;
+    const skillsNote = refreshSkills
+      ? 'Installs bundled skills into $CODEX_HOME/skills with overwrite enabled via --refresh-skills.'
+      : 'Installs bundled skills into $CODEX_HOME/skills without overwriting existing files by default. Add --refresh-skills to force overwrite.';
 
     const delegation = await runDelegationSetup({ repoRoot });
     const devtools = await runDevtoolsSetup();
@@ -1154,8 +1157,7 @@ Options:
       steps: {
         skills: {
           commandLines: [installCommand],
-          note:
-            'Installs bundled skills into $CODEX_HOME/skills without overwriting existing files by default. Add --refresh-skills to force overwrite.'
+          note: skillsNote
         },
         delegation,
         devtools,

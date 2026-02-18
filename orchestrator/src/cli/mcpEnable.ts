@@ -40,7 +40,10 @@ type McpCommandRunner = (request: {
   command: string;
   args: string[];
   env: NodeJS.ProcessEnv;
+  timeoutMs?: number;
 }) => Promise<McpCommandResult>;
+
+const DEFAULT_MCP_COMMAND_TIMEOUT_MS = 30_000;
 
 interface McpServerRecord {
   name?: string;
@@ -358,14 +361,42 @@ async function defaultMcpCommandRunner(request: {
   command: string;
   args: string[];
   env: NodeJS.ProcessEnv;
+  timeoutMs?: number;
 }): Promise<McpCommandResult> {
   return await new Promise<McpCommandResult>((resolve) => {
     const child = spawn(request.command, request.args, {
       env: request.env,
       stdio: ['ignore', 'pipe', 'pipe']
     });
+    const timeoutMs = Math.max(1, request.timeoutMs ?? DEFAULT_MCP_COMMAND_TIMEOUT_MS);
     let stdout = '';
     let stderr = '';
+    let settled = false;
+
+    const finalize = (result: McpCommandResult): void => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      clearTimeout(timeoutHandle);
+      resolve(result);
+    };
+
+    const timeoutHandle = setTimeout(() => {
+      child.kill('SIGTERM');
+      setTimeout(() => {
+        if (!settled) {
+          child.kill('SIGKILL');
+        }
+      }, 2_000).unref();
+      finalize({
+        exitCode: 124,
+        stdout,
+        stderr: `${stderr}\ncommand timed out after ${timeoutMs}ms`.trim()
+      });
+    }, timeoutMs);
+    timeoutHandle.unref();
+
     child.stdout?.on('data', (chunk: Buffer | string) => {
       stdout += chunk.toString();
     });
@@ -373,14 +404,14 @@ async function defaultMcpCommandRunner(request: {
       stderr += chunk.toString();
     });
     child.once('error', (error) => {
-      resolve({
+      finalize({
         exitCode: 1,
         stdout,
         stderr: `${stderr}\n${error.message}`.trim()
       });
     });
     child.once('close', (code) => {
-      resolve({
+      finalize({
         exitCode: typeof code === 'number' ? code : 1,
         stdout,
         stderr

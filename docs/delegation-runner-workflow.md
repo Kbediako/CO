@@ -19,6 +19,7 @@ codex-orchestrator setup --yes
 ```
 
 `setup --yes` keeps existing skill files by default. Add `--refresh-skills` when you intentionally want to overwrite bundled skills in `$CODEX_HOME/skills`.
+When both are present, prefer global skills in `$CODEX_HOME/skills` (for example `$CODEX_HOME/skills/docs-first`) and use bundled paths (for example `skills/docs-first/SKILL.md`) as fallback only.
 
 Optional low-friction enablement for already-configured-but-disabled MCP servers:
 

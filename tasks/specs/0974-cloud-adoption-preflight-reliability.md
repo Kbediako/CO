@@ -53,3 +53,6 @@ last_review: 2026-02-18
 - Reviewer: user
 - Date: 2026-02-18
 - Standalone pre-implementation review: approved (`out/0974-cloud-adoption-preflight-reliability/manual/pre-implementation-standalone-review.log`)
+- Docs-review manifest: `.runs/0974-cloud-adoption-preflight-reliability/cli/2026-02-18T10-37-33-980Z-72b397bb/manifest.json`
+- Delegation scout manifest: `.runs/0974-cloud-adoption-preflight-reliability-scout/cli/2026-02-18T10-34-24-363Z-10dbacbb/manifest.json`
+- Validation evidence: `.runs/0974-cloud-adoption-preflight-reliability-fallback-canary-postfix/cli/2026-02-18T12-48-42-597Z-1981cfb3/manifest.json`, `out/0974-cloud-adoption-preflight-reliability/manual/manual-cloud-canary-fallback.log`, `out/0974-cloud-adoption-preflight-reliability/manual/manual-doctor-cloud-preflight.json`

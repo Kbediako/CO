@@ -31,6 +31,12 @@
   - `codex-orchestrator mcp enable --format json`
   - `codex-orchestrator doctor --usage --format json`
   - `CLOUD_CANARY_EXPECT_FALLBACK=1 npm run ci:cloud-canary` (with task-scoped local env)
+  - Evidence:
+    - preflight logs: `out/0974-cloud-adoption-preflight-reliability/manual/manual-doctor-cloud-preflight.txt`, `out/0974-cloud-adoption-preflight-reliability/manual/manual-doctor-cloud-preflight.json`, `out/0974-cloud-adoption-preflight-reliability/manual/manual-doctor-cloud-preflight-overrides.json`
+    - fallback canary log: `out/0974-cloud-adoption-preflight-reliability/manual/manual-cloud-canary-fallback.log`
+    - docs-review manifest: `.runs/0974-cloud-adoption-preflight-reliability/cli/2026-02-18T10-37-33-980Z-72b397bb/manifest.json`
+    - delegation scout manifest: `.runs/0974-cloud-adoption-preflight-reliability-scout/cli/2026-02-18T10-34-24-363Z-10dbacbb/manifest.json`
+    - fallback-canary manifest: `.runs/0974-cloud-adoption-preflight-reliability-fallback-canary-postfix/cli/2026-02-18T12-48-42-597Z-1981cfb3/manifest.json`
 - Rollback plan:
   - Revert new doctor flag and canary fallback mode if regressions are detected.
   - Keep prior cloud execution/fallback defaults intact.

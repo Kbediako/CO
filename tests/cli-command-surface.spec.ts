@@ -353,6 +353,7 @@ describe('codex-orchestrator command surface', () => {
       steps?: {
         skills?: {
           commandLines?: string[];
+          note?: string;
         };
         guidance?: {
           note?: string;
@@ -375,6 +376,7 @@ describe('codex-orchestrator command surface', () => {
     expect(commands[0]).toContain('--only');
     expect(commands[0]).toContain('chrome-devtools');
     expect(commands.every((entry) => !entry.includes('--force'))).toBe(true);
+    expect(payload.steps?.skills?.note).toContain('without overwriting existing files by default');
   }, TEST_TIMEOUT);
 
   it('emits setup plan JSON with refresh-skills overwrite commands', async () => {
@@ -389,6 +391,7 @@ describe('codex-orchestrator command surface', () => {
       steps?: {
         skills?: {
           commandLines?: string[];
+          note?: string;
         };
       };
     };
@@ -396,6 +399,7 @@ describe('codex-orchestrator command surface', () => {
     const commands = payload.steps?.skills?.commandLines ?? [];
     expect(commands).toHaveLength(1);
     expect(commands.every((entry) => entry.includes('--force'))).toBe(true);
+    expect(payload.steps?.skills?.note).toContain('overwrite enabled via --refresh-skills');
   }, TEST_TIMEOUT);
 
   it('setup --yes keeps existing skill files by default', async () => {

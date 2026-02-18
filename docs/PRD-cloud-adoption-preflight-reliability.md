@@ -1,7 +1,7 @@
 # PRD - Cloud + RLM Adoption Reliability + Fallback Contract Hardening (0974)
 
 ## Summary
-- Problem Statement: cloud and RLM usage were materially under-adopted, and prior runs showed avoidable failures/skips due preflight friction, low-signal diagnostics, and missing low-friction MCP enablement.
+- Problem Statement: cloud and RLM usage were materially under-adopted, and prior runs showed avoidable failures/skips due to preflight friction, low-signal diagnostics, and missing low-friction MCP enablement.
 - Desired Outcome: keep cloud optional but make advanced paths reliable and auditable by shipping first-class doctor preflight + adoption hints, configurable cloud status resilience, explicit CI fallback-contract checks, and a safe `mcp enable` path for disabled MCP servers.
 
 ## User Request Translation (Context Anchor)
