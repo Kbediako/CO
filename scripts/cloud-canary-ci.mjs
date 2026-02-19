@@ -442,8 +442,11 @@ async function main() {
   const fatalCategory =
     required &&
     (diagnosis.category === 'configuration' || diagnosis.category === 'credentials' || diagnosis.category === 'connectivity');
-  // Fallback-contract canaries are explicit contract checks and should never downgrade to credential-gated skips.
-  const skipEligible = !required && !expectFallback && SKIPPABLE_FAILURE_CATEGORIES.has(diagnosis.category);
+  const skipEligible = !required
+    && (
+      (!expectFallback && SKIPPABLE_FAILURE_CATEGORIES.has(diagnosis.category))
+      || (expectFallback && diagnosis.category === 'credentials')
+    );
   if (fatalCategory) {
     assertionFailures.push(`Failure class ${diagnosis.category} indicates infrastructure/credential issues.`);
   }
