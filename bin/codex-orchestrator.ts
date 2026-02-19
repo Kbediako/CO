@@ -155,6 +155,43 @@ function parseArgs(raw: string[]): { positionals: string[]; flags: ArgMap } {
   const positionals: string[] = [];
   const flags: ArgMap = {};
   const queue = [...raw];
+  const booleanFlagKeys = new Set([
+    'apply',
+    'cloud',
+    'cloud-preflight',
+    'codex-cli',
+    'codex-force',
+    'collab',
+    'devtools',
+    'dry-run',
+    'force',
+    'help',
+    'interactive',
+    'multi-agent',
+    'no-interactive',
+    'refresh-skills',
+    'ui',
+    'usage',
+    'watch',
+    'yes'
+  ]);
+  const parseBooleanLiteral = (value: string): boolean | undefined => {
+    const normalized = value.trim().toLowerCase();
+    if (['1', 'true', 'yes', 'on'].includes(normalized)) {
+      return true;
+    }
+    if (['0', 'false', 'no', 'off'].includes(normalized)) {
+      return false;
+    }
+    return undefined;
+  };
+  const coerceFlagValue = (key: string, value: string): string | boolean => {
+    if (!booleanFlagKeys.has(key)) {
+      return value;
+    }
+    const parsed = parseBooleanLiteral(value);
+    return parsed === undefined ? value : parsed;
+  };
   while (queue.length > 0) {
     const token = queue.shift();
     if (!token) {
@@ -173,11 +210,11 @@ function parseArgs(raw: string[]): { positionals: string[]; flags: ArgMap } {
       const separatorIndex = key.indexOf('=');
       const flagKey = key.slice(0, separatorIndex);
       const inlineValue = key.slice(separatorIndex + 1);
-      flags[flagKey] = inlineValue;
+      flags[flagKey] = coerceFlagValue(flagKey, inlineValue);
       continue;
     }
     if (queue[0] && !queue[0]!.startsWith('--')) {
-      flags[key] = queue.shift() as string;
+      flags[key] = coerceFlagValue(key, queue.shift() as string);
     } else {
       flags[key] = true;
     }
@@ -432,6 +469,9 @@ interface RlmMultiAgentFlagSelection {
 function normalizeRlmMultiAgentValue(raw: string | boolean): 'enabled' | 'disabled' | 'invalid' {
   if (raw === true) {
     return 'enabled';
+  }
+  if (raw === false) {
+    return 'disabled';
   }
   if (typeof raw !== 'string') {
     return 'invalid';

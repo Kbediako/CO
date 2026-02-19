@@ -667,6 +667,25 @@ describe('codex-orchestrator command surface', () => {
     expect(payload.steps?.guidance?.note).toContain('Agent-first default');
   }, TEST_TIMEOUT);
 
+  it('treats setup --yes=false as plan mode', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'co-cli-setup-yes-false-'));
+    const env = {
+      ...process.env,
+      CODEX_HOME: tempDir
+    };
+    const { stdout } = await runCli(['setup', '--yes=false', '--format', 'json'], env);
+    const payload = JSON.parse(stdout) as {
+      status?: string;
+      steps?: {
+        skills?: {
+          commandLines?: string[];
+        };
+      };
+    };
+    expect(payload.status).toBe('planned');
+    expect(payload.steps?.skills?.commandLines).toBeDefined();
+  }, TEST_TIMEOUT);
+
   it('emits setup plan JSON with refresh-skills overwrite commands', async () => {
     tempDir = await mkdtemp(join(tmpdir(), 'co-cli-setup-plan-refresh-'));
     const env = {
