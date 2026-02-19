@@ -5,7 +5,7 @@ relates_to: tasks/tasks-0940-delegation-autonomy-platform.md
 risk: high
 owners:
   - Codex
-last_review: 2026-01-19
+last_review: 2026-02-19
 ---
 
 ## Summary
