@@ -434,12 +434,11 @@ async function main() {
     .filter((value) => value.trim().length > 0)
     .join('\n');
   const diagnosis = classifyFailure(failureSignal);
-  const fallbackContractFailure = expectFallback
-    && assertionFailures.some((failure) => failure.includes('cloud_fallback') || failure.includes('cloudFallback'));
   const fatalCategory =
     required &&
     (diagnosis.category === 'configuration' || diagnosis.category === 'credentials' || diagnosis.category === 'connectivity');
-  const skipEligible = !required && !fallbackContractFailure && SKIPPABLE_FAILURE_CATEGORIES.has(diagnosis.category);
+  // Fallback-contract canaries are explicit contract checks and should never downgrade to credential-gated skips.
+  const skipEligible = !required && !expectFallback && SKIPPABLE_FAILURE_CATEGORIES.has(diagnosis.category);
   if (fatalCategory) {
     assertionFailures.push(`Failure class ${diagnosis.category} indicates infrastructure/credential issues.`);
   }
