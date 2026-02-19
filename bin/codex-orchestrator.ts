@@ -170,7 +170,10 @@ function parseArgs(raw: string[]): { positionals: string[]; flags: ArgMap } {
     }
     const key = token.slice(2);
     if (key.includes('=')) {
-      flags[key] = true;
+      const separatorIndex = key.indexOf('=');
+      const flagKey = key.slice(0, separatorIndex);
+      const inlineValue = key.slice(separatorIndex + 1);
+      flags[flagKey] = inlineValue;
       continue;
     }
     if (queue[0] && !queue[0]!.startsWith('--')) {
