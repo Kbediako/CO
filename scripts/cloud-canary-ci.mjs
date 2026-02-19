@@ -253,6 +253,10 @@ async function main() {
   const notes = process.env.CLOUD_CANARY_NOTES?.trim() || DEFAULT_NOTES;
   const cloudBranchRaw = process.env.CLOUD_CANARY_BRANCH?.trim() || process.env.CODEX_CLOUD_BRANCH?.trim() || 'main';
   const cloudBranch = normalizeCloudBranch(cloudBranchRaw);
+  const delegationGuardOverrideReason =
+    process.env.CLOUD_CANARY_DELEGATION_GUARD_OVERRIDE_REASON?.trim() ||
+    process.env.DELEGATION_GUARD_OVERRIDE_REASON?.trim() ||
+    'Cloud canary contract run validates cloud/fallback wiring; delegation evidence is intentionally out of scope.';
   const preflightIssues = [];
   const orchestratorBinPath = join(repoRoot, 'dist', 'bin', 'codex-orchestrator.js');
 
@@ -307,6 +311,7 @@ async function main() {
     NOTES: notes,
     CODEX_CLOUD_ENV_ID: expectFallback ? '' : process.env.CODEX_CLOUD_ENV_ID,
     CODEX_CLOUD_BRANCH: cloudBranch,
+    DELEGATION_GUARD_OVERRIDE_REASON: delegationGuardOverrideReason,
     CODEX_NON_INTERACTIVE: process.env.CODEX_NON_INTERACTIVE ?? '1',
     CODEX_NO_INTERACTIVE: process.env.CODEX_NO_INTERACTIVE ?? '1',
     CODEX_INTERACTIVE: process.env.CODEX_INTERACTIVE ?? '0'
