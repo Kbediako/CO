@@ -460,6 +460,34 @@ describe('codex-orchestrator command surface', () => {
     });
   }, TEST_TIMEOUT);
 
+  it('rejects duplicate --servers flags for mcp enable', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'co-cli-mcp-enable-duplicate-servers-'));
+    const fakeCodex = await writeFakeCodexBinary(tempDir);
+    const env = {
+      ...process.env,
+      CODEX_CLI_BIN: fakeCodex
+    };
+
+    await expect(
+      runCli(['mcp', 'enable', '--servers', 'delegation', '--servers', 'playwright', '--yes'], env)
+    ).rejects.toMatchObject({
+      stderr: expect.stringContaining('--servers specified multiple times.')
+    });
+  }, TEST_TIMEOUT);
+
+  it('rejects duplicate --yes flags for mcp enable', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'co-cli-mcp-enable-duplicate-yes-'));
+    const fakeCodex = await writeFakeCodexBinary(tempDir);
+    const env = {
+      ...process.env,
+      CODEX_CLI_BIN: fakeCodex
+    };
+
+    await expect(runCli(['mcp', 'enable', '--yes', 'false', '--yes'], env)).rejects.toMatchObject({
+      stderr: expect.stringContaining('--yes specified multiple times.')
+    });
+  }, TEST_TIMEOUT);
+
   it('returns non-zero when mcp enable --yes has failed actions', async () => {
     tempDir = await mkdtemp(join(tmpdir(), 'co-cli-mcp-enable-fail-'));
     const fakeCodex = await writeFakeCodexBinary(tempDir);

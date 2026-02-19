@@ -1515,26 +1515,40 @@ async function handleMcp(rawArgs: string[]): Promise<void> {
     return;
   }
   if (subcommand === 'enable') {
-    if (positionals.length > 0) {
-      throw new Error(`mcp enable does not accept positional arguments: ${positionals.join(' ')}`);
-    }
     const allowedEnableFlags = new Set(['yes', 'format', 'servers']);
     let yesFlag: string | boolean | undefined;
     let formatFlag: string | boolean | undefined;
     let serversFlag: string | boolean | undefined;
+    const unexpectedPositionals: string[] = [];
+    const enableTokens = rawArgs.slice(1);
 
-    for (const [rawKey, value] of Object.entries(flags)) {
-      let key = rawKey;
-      let inlineValue: string | undefined;
-      const separatorIndex = rawKey.indexOf('=');
-      if (separatorIndex !== -1) {
-        key = rawKey.slice(0, separatorIndex);
-        inlineValue = rawKey.slice(separatorIndex + 1);
+    for (let index = 0; index < enableTokens.length; index += 1) {
+      const token = enableTokens[index];
+      if (!token) {
+        continue;
       }
+      if (token === '--') {
+        unexpectedPositionals.push(...enableTokens.slice(index + 1));
+        break;
+      }
+      if (!token.startsWith('--')) {
+        unexpectedPositionals.push(token);
+        continue;
+      }
+      const [key, inlineValue] = token.slice(2).split('=', 2);
       if (!allowedEnableFlags.has(key)) {
         throw new Error(`Unknown mcp enable flag: --${key}`);
       }
-      const resolvedValue = inlineValue ?? value;
+      let resolvedValue: string | boolean = true;
+      if (inlineValue !== undefined) {
+        resolvedValue = inlineValue;
+      } else {
+        const nextToken = enableTokens[index + 1];
+        if (nextToken && !nextToken.startsWith('--')) {
+          resolvedValue = nextToken;
+          index += 1;
+        }
+      }
       if (key === 'yes') {
         if (yesFlag !== undefined) {
           throw new Error('--yes specified multiple times.');
@@ -1553,6 +1567,11 @@ async function handleMcp(rawArgs: string[]): Promise<void> {
         throw new Error('--servers specified multiple times.');
       }
       serversFlag = resolvedValue;
+    }
+    if (positionals.length > 0 || unexpectedPositionals.length > 0) {
+      throw new Error(
+        `mcp enable does not accept positional arguments: ${[...positionals, ...unexpectedPositionals].join(' ')}`
+      );
     }
 
     let apply = false;
