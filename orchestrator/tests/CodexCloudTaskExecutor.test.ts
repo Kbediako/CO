@@ -262,6 +262,110 @@ describe('CodexCloudTaskExecutor', () => {
       'Fix the issue'
     ]);
   });
+
+  it('respects custom status retry limit and backoff settings', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'cloud-exec-status-retry-limit-'));
+    const runner = vi
+      .fn<Parameters<CloudCommandRunner>, ReturnType<CloudCommandRunner>>()
+      .mockResolvedValueOnce({
+        exitCode: 0,
+        stdout: `Submitted: ${TASK_ID}\n`,
+        stderr: ''
+      })
+      .mockResolvedValueOnce({
+        exitCode: 0,
+        stdout: JSON.stringify({ tasks: [{ id: TASK_ID, url: `https://chatgpt.com/codex/tasks/${TASK_ID}` }] }),
+        stderr: ''
+      })
+      .mockResolvedValueOnce({
+        exitCode: 1,
+        stdout: 'transient status error',
+        stderr: 'retry'
+      })
+      .mockResolvedValueOnce({
+        exitCode: 1,
+        stdout: 'transient status error',
+        stderr: 'retry'
+      })
+      .mockResolvedValueOnce({
+        exitCode: 1,
+        stdout: 'transient status error',
+        stderr: 'retry'
+      });
+    const sleepFn = vi.fn(async () => {});
+    const executor = new CodexCloudTaskExecutor({
+      commandRunner: runner,
+      sleepFn
+    });
+
+    const result = await executor.execute({
+      codexBin: 'codex',
+      prompt: 'Fix the issue',
+      environmentId: 'env_123',
+      repoRoot: root,
+      runDir: join(root, '.runs', 'task', 'cli', 'run-1'),
+      pollIntervalSeconds: 1,
+      timeoutSeconds: 10,
+      attempts: 1,
+      statusRetryLimit: 2,
+      statusRetryBackoffMs: 5
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.cloudExecution.status).toBe('failed');
+    expect(result.cloudExecution.error).toContain('codex cloud status failed 3 times');
+    expect(sleepFn).toHaveBeenCalledTimes(2);
+    expect(sleepFn.mock.calls.map((call) => call[0])).toEqual([5, 10]);
+  });
+
+  it('caps retry sleep to the remaining timeout when backoff is oversized', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'cloud-exec-status-backoff-cap-'));
+    const runner = vi
+      .fn<Parameters<CloudCommandRunner>, ReturnType<CloudCommandRunner>>()
+      .mockResolvedValueOnce({
+        exitCode: 0,
+        stdout: `Submitted: ${TASK_ID}\n`,
+        stderr: ''
+      })
+      .mockResolvedValueOnce({
+        exitCode: 0,
+        stdout: JSON.stringify({ tasks: [{ id: TASK_ID, url: `https://chatgpt.com/codex/tasks/${TASK_ID}` }] }),
+        stderr: ''
+      })
+      .mockResolvedValueOnce({
+        exitCode: 1,
+        stdout: 'transient status error',
+        stderr: 'retry'
+      })
+      .mockResolvedValueOnce({
+        exitCode: 1,
+        stdout: 'transient status error',
+        stderr: 'retry'
+      });
+    const sleepFn = vi.fn(async () => {});
+    const executor = new CodexCloudTaskExecutor({
+      commandRunner: runner,
+      sleepFn
+    });
+
+    const result = await executor.execute({
+      codexBin: 'codex',
+      prompt: 'Fix the issue',
+      environmentId: 'env_123',
+      repoRoot: root,
+      runDir: join(root, '.runs', 'task', 'cli', 'run-1'),
+      pollIntervalSeconds: 1,
+      timeoutSeconds: 1,
+      attempts: 1,
+      statusRetryLimit: 1,
+      statusRetryBackoffMs: 60_000
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.cloudExecution.error).toContain('codex cloud status failed 2 times');
+    expect(sleepFn).toHaveBeenCalledTimes(1);
+    expect(sleepFn.mock.calls[0]?.[0]).toBeLessThanOrEqual(1_000);
+  });
 });
 
 describe('cloud task parsing helpers', () => {

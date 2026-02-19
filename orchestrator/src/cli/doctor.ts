@@ -1,7 +1,7 @@
 import process from 'node:process';
 import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 
 import {
   buildDevtoolsSetupPlan,
@@ -17,6 +17,7 @@ import {
 } from './utils/codexCli.js';
 import { resolveCodexHome } from './utils/codexPaths.js';
 import { resolveOptionalDependency, type OptionalResolutionSource } from './utils/optionalDeps.js';
+import { runCloudPreflight, type CloudPreflightIssue } from './utils/cloudPreflight.js';
 
 const OPTIONAL_DEPENDENCIES = [
   {
@@ -86,6 +87,17 @@ export interface DoctorResult {
     };
     enablement: string[];
   };
+}
+
+export interface DoctorCloudPreflightResult {
+  ok: boolean;
+  details: {
+    codex_bin: string;
+    environment_id: string | null;
+    branch: string | null;
+  };
+  issues: CloudPreflightIssue[];
+  guidance: string[];
 }
 
 export function runDoctor(cwd: string = process.cwd()): DoctorResult {
@@ -229,6 +241,91 @@ export function runDoctor(cwd: string = process.cwd()): DoctorResult {
   };
 }
 
+export async function runDoctorCloudPreflight(options: {
+  cwd?: string;
+  env?: NodeJS.ProcessEnv;
+  environmentId?: string | null;
+  branch?: string | null;
+  taskId?: string | null;
+} = {}): Promise<DoctorCloudPreflightResult> {
+  const env = options.env ?? process.env;
+  const cwd = options.cwd ?? process.cwd();
+  const configuredRoot = normalizeOptionalString(env.CODEX_ORCHESTRATOR_ROOT);
+  const rootHint = configuredRoot ? resolve(cwd, configuredRoot) : cwd;
+  const repoRoot = resolveDoctorRepoRoot(rootHint);
+  const codexBin = resolveCodexCliBin(env);
+  const taskId =
+    normalizeOptionalString(options.taskId)
+    ?? normalizeOptionalString(env.MCP_RUNNER_TASK_ID)
+    ?? normalizeOptionalString(env.TASK)
+    ?? normalizeOptionalString(env.CODEX_ORCHESTRATOR_TASK_ID);
+  const environmentId =
+    normalizeOptionalString(options.environmentId)
+    ?? normalizeOptionalString(env.CODEX_CLOUD_ENV_ID)
+    ?? resolveTaskMetadataCloudEnvironmentId(repoRoot, taskId);
+  const branch = normalizeOptionalBranch(options.branch) ?? normalizeOptionalBranch(env.CODEX_CLOUD_BRANCH);
+
+  const preflight = await runCloudPreflight({
+    repoRoot,
+    codexBin,
+    environmentId,
+    branch,
+    env
+  });
+  const guidance = buildCloudPreflightGuidance(preflight.issues);
+
+  return {
+    ok: preflight.ok,
+    details: {
+      codex_bin: preflight.details.codexBin,
+      environment_id: preflight.details.environmentId,
+      branch: preflight.details.branch
+    },
+    issues: preflight.issues,
+    guidance
+  };
+}
+
+function resolveDoctorRepoRoot(cwd: string): string {
+  const fallback = resolve(cwd);
+  let current: string | null = fallback;
+  while (current) {
+    if (existsSync(join(current, 'tasks', 'index.json'))) {
+      return current;
+    }
+    const parent = dirname(current);
+    if (parent === current) {
+      break;
+    }
+    current = parent;
+  }
+  return fallback;
+}
+
+export function formatDoctorCloudPreflightSummary(result: DoctorCloudPreflightResult): string[] {
+  const lines: string[] = [];
+  lines.push(`Cloud preflight: ${result.ok ? 'ok' : 'failed'}`);
+  lines.push(`  - codex bin: ${result.details.codex_bin}`);
+  lines.push(`  - environment id: ${result.details.environment_id ?? '<unset>'}`);
+  lines.push(`  - branch: ${result.details.branch ?? '<unset>'}`);
+
+  if (result.issues.length > 0) {
+    lines.push('  - issues:');
+    for (const issue of result.issues) {
+      lines.push(`    - [${issue.code}] ${issue.message}`);
+    }
+  }
+
+  if (result.guidance.length > 0) {
+    lines.push('  - guidance:');
+    for (const item of result.guidance) {
+      lines.push(`    - ${item}`);
+    }
+  }
+
+  return lines;
+}
+
 export function formatDoctorSummary(result: DoctorResult): string[] {
   const lines: string[] = [];
   lines.push(`Status: ${result.status}`);
@@ -326,6 +423,102 @@ export function formatDoctorSummary(result: DoctorResult): string[] {
   }
 
   return lines;
+}
+
+function normalizeOptionalString(value: string | null | undefined): string | null {
+  if (typeof value !== 'string') {
+    return null;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function normalizeOptionalBranch(value: string | null | undefined): string | null {
+  const normalized = normalizeOptionalString(value);
+  return normalized ? normalized.replace(/^refs\/heads\//u, '') : null;
+}
+
+function resolveTaskMetadataCloudEnvironmentId(repoRoot: string, taskId: string | null): string | null {
+  if (!taskId) {
+    return null;
+  }
+  const tasksPath = join(repoRoot, 'tasks', 'index.json');
+  if (!existsSync(tasksPath)) {
+    return null;
+  }
+  try {
+    const raw = readFileSync(tasksPath, 'utf8');
+    const parsed = JSON.parse(raw) as { items?: unknown };
+    const items = Array.isArray(parsed.items) ? parsed.items : [];
+    const match = items.find((item) => {
+      if (!item || typeof item !== 'object') {
+        return false;
+      }
+      const record = item as Record<string, unknown>;
+      return matchesTaskIdentifier(record.id, taskId) || matchesTaskIdentifier(record.slug, taskId);
+    });
+    if (!match || typeof match !== 'object') {
+      return null;
+    }
+    const record = match as Record<string, unknown>;
+    const metadata = (record.metadata ?? null) as Record<string, unknown> | null;
+    const cloudMetadata =
+      metadata && typeof metadata.cloud === 'object' && metadata.cloud
+        ? (metadata.cloud as Record<string, unknown>)
+        : null;
+    const candidates: Array<string | null> = [
+      normalizeOptionalString(typeof metadata?.cloudEnvId === 'string' ? metadata.cloudEnvId : null),
+      normalizeOptionalString(typeof metadata?.cloud_env_id === 'string' ? metadata.cloud_env_id : null),
+      normalizeOptionalString(typeof metadata?.envId === 'string' ? metadata.envId : null),
+      normalizeOptionalString(typeof metadata?.environmentId === 'string' ? metadata.environmentId : null),
+      normalizeOptionalString(typeof cloudMetadata?.envId === 'string' ? cloudMetadata.envId : null),
+      normalizeOptionalString(typeof cloudMetadata?.environmentId === 'string' ? cloudMetadata.environmentId : null),
+      normalizeOptionalString(typeof cloudMetadata?.cloudEnvId === 'string' ? cloudMetadata.cloudEnvId : null),
+      normalizeOptionalString(typeof cloudMetadata?.cloud_env_id === 'string' ? cloudMetadata.cloud_env_id : null)
+    ];
+    return candidates.find((value): value is string => Boolean(value)) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function matchesTaskIdentifier(value: unknown, taskId: string): boolean {
+  if (typeof value !== 'string') {
+    return false;
+  }
+  const normalized = normalizeOptionalString(value);
+  if (!normalized) {
+    return false;
+  }
+  return normalized === taskId || taskId.startsWith(`${normalized}-`);
+}
+
+function buildCloudPreflightGuidance(issues: CloudPreflightIssue[]): string[] {
+  if (issues.length === 0) {
+    return ['Cloud preflight passed. You can run cloud mode with `--cloud --target <stage-id>`.'];
+  }
+
+  const guidance: string[] = [];
+  for (const issue of issues) {
+    switch (issue.code) {
+      case 'missing_environment':
+        guidance.push('Set CODEX_CLOUD_ENV_ID or provide target metadata.cloudEnvId.');
+        break;
+      case 'branch_missing':
+        guidance.push('Push the branch to origin or set CODEX_CLOUD_BRANCH to an existing remote branch.');
+        break;
+      case 'codex_unavailable':
+        guidance.push('Install Codex CLI or set CODEX_CLI_BIN to a valid codex binary.');
+        break;
+      case 'git_unavailable':
+        guidance.push('Install git or run with CODEX_CLOUD_BRANCH unset to skip remote branch verification.');
+        break;
+      default:
+        break;
+    }
+  }
+
+  return [...new Set(guidance)];
 }
 
 function readCodexFeatureFlags(codexBin: string): Record<string, boolean> | null {

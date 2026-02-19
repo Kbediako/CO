@@ -97,6 +97,8 @@ const CONFIG_OVERRIDE_ENV_KEYS = ['CODEX_CONFIG_OVERRIDES', 'CODEX_MCP_CONFIG_OV
 const DEFAULT_CLOUD_POLL_INTERVAL_SECONDS = 10;
 const DEFAULT_CLOUD_TIMEOUT_SECONDS = 1800;
 const DEFAULT_CLOUD_ATTEMPTS = 1;
+const DEFAULT_CLOUD_STATUS_RETRY_LIMIT = 12;
+const DEFAULT_CLOUD_STATUS_RETRY_BACKOFF_MS = 1500;
 const DEFAULT_AUTO_SCOUT_TIMEOUT_MS = 4000;
 const MAX_CLOUD_PROMPT_EXPERIENCES = 3;
 const MAX_CLOUD_PROMPT_EXPERIENCE_CHARS = 320;
@@ -138,6 +140,17 @@ function readCloudNumber(raw: string | undefined, fallback: number): number {
     return fallback;
   }
   return parsed;
+}
+
+function allowCloudFallback(envOverrides?: NodeJS.ProcessEnv): boolean {
+  const raw =
+    readCloudString(envOverrides?.CODEX_ORCHESTRATOR_CLOUD_FALLBACK) ??
+    readCloudString(process.env.CODEX_ORCHESTRATOR_CLOUD_FALLBACK);
+  if (!raw) {
+    return true;
+  }
+  const normalized = raw.toLowerCase();
+  return !['0', 'false', 'off', 'deny', 'disabled', 'never', 'strict'].includes(normalized);
 }
 
 function normalizeCloudFallbackIssues(
@@ -748,6 +761,22 @@ export class CodexOrchestrator {
         env: mergedEnv
       });
       if (!preflight.ok) {
+        if (!allowCloudFallback(options.envOverrides)) {
+          const detail =
+            `Cloud preflight failed and cloud fallback is disabled. ` +
+            preflight.issues.map((issue) => issue.message).join(' ');
+          finalizeStatus(options.manifest, 'failed', 'cloud-preflight-failed');
+          appendSummary(options.manifest, detail);
+          logger.error(detail);
+          return {
+            success: false,
+            notes: [detail],
+            manifest: options.manifest,
+            manifestPath: options.paths.manifestPath,
+            logPath: options.paths.logPath
+          };
+        }
+
         const detail =
           `Cloud preflight failed; falling back to mcp. ` +
           preflight.issues.map((issue) => issue.message).join(' ');
@@ -1193,6 +1222,14 @@ export class CodexOrchestrator {
             envOverrides?.CODEX_CLOUD_EXEC_ATTEMPTS ?? process.env.CODEX_CLOUD_EXEC_ATTEMPTS,
             DEFAULT_CLOUD_ATTEMPTS
           );
+          const statusRetryLimit = readCloudNumber(
+            envOverrides?.CODEX_CLOUD_STATUS_RETRY_LIMIT ?? process.env.CODEX_CLOUD_STATUS_RETRY_LIMIT,
+            DEFAULT_CLOUD_STATUS_RETRY_LIMIT
+          );
+          const statusRetryBackoffMs = readCloudNumber(
+            envOverrides?.CODEX_CLOUD_STATUS_RETRY_BACKOFF_MS ?? process.env.CODEX_CLOUD_STATUS_RETRY_BACKOFF_MS,
+            DEFAULT_CLOUD_STATUS_RETRY_BACKOFF_MS
+          );
           const branch =
             readCloudString(envOverrides?.CODEX_CLOUD_BRANCH) ??
             readCloudString(process.env.CODEX_CLOUD_BRANCH);
@@ -1222,6 +1259,8 @@ export class CodexOrchestrator {
             pollIntervalSeconds,
             timeoutSeconds,
             attempts,
+            statusRetryLimit,
+            statusRetryBackoffMs,
             branch,
             enableFeatures,
             disableFeatures,

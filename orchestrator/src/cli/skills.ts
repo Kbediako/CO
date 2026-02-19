@@ -37,13 +37,9 @@ export async function installSkills(options: SkillsInstallOptions = {}): Promise
     written,
     skipped
   };
-  if (selectedSkills.length === availableSkills.length) {
-    await copyDir(sourceRoot, targetRoot, copyOptions);
-  } else {
-    await mkdir(targetRoot, { recursive: true });
-    for (const skill of selectedSkills) {
-      await copyDir(join(sourceRoot, skill), join(targetRoot, skill), copyOptions);
-    }
+  await mkdir(targetRoot, { recursive: true });
+  for (const skill of selectedSkills) {
+    await copyDir(join(sourceRoot, skill), join(targetRoot, skill), copyOptions);
   }
 
   return {

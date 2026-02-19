@@ -189,6 +189,8 @@ flowchart TB
 Recommended one-shot bootstrap (skills + delegation + DevTools wiring):
 ```bash
 codex-orchestrator setup --yes
+# Optional: overwrite existing bundled skills in $CODEX_HOME/skills
+# codex-orchestrator setup --yes --refresh-skills
 ```
 
 The release ships skills under `skills/` for downstream packaging. If you already have global skills installed, treat those as the primary reference and use bundled skills as the shipped fallback. Install bundled skills into `$CODEX_HOME/skills`:
@@ -230,14 +232,22 @@ codex-orchestrator doctor --usage
 ```
 `doctor --usage` prints adoption KPIs (advanced/cloud/rlm/collab/delegation coverage), and per-run `run-summary.json` now includes a `usageKpi` section plus cloud fallback metadata when preflight downgrades to MCP.
 
+Cloud preflight check (without starting a pipeline):
+```bash
+codex-orchestrator doctor --cloud-preflight
+```
+
 ## Downstream usage cheatsheet (agent-first)
 
-- Bootstrap + wire everything: `codex-orchestrator setup --yes`
+- Bootstrap + wire everything: `codex-orchestrator setup --yes` (non-destructive for existing skills by default; add `--refresh-skills` to overwrite)
+- Enable required MCP servers with least privilege: `codex-orchestrator mcp enable --servers delegation --yes` (plan with `--format json`; omit `--servers` only when you intentionally want all disabled servers enabled; env/secret values are redacted in displayed command lines)
 - Low-friction docs->implementation guardrails: `codex-orchestrator flow --task <task-id>`
 - Validate + measure adoption locally: `codex-orchestrator doctor --usage --format json`
 - Delegation: `codex-orchestrator doctor --apply --yes`, then enable for a Codex run with: `codex -c 'mcp_servers.delegation.enabled=true' ...`
 - Collab (symbolic RLM subagents): `codex-orchestrator rlm --multi-agent auto "<goal>"` (legacy alias: `--collab auto`; requires Codex `features.multi_agent=true`)
 - Cloud: set `CODEX_CLOUD_ENV_ID` (and optional `CODEX_CLOUD_BRANCH`), then run: `codex-orchestrator start <pipeline> --cloud --target <stage-id>`
+- Cloud fail-fast (avoid fallback reliance): set `CODEX_ORCHESTRATOR_CLOUD_FALLBACK=deny`
+- Cloud status retry tuning (optional): `CODEX_CLOUD_STATUS_RETRY_LIMIT`, `CODEX_CLOUD_STATUS_RETRY_BACKOFF_MS`
 
 Print DevTools MCP setup guidance:
 ```bash
@@ -251,11 +261,12 @@ codex-orchestrator devtools setup
 - `codex-orchestrator plan <pipeline>` — preview pipeline stages.
 - `codex-orchestrator exec <cmd>` — run a one-off command with the exec runtime.
 - `codex-orchestrator init codex` — install starter templates (`mcp-client.json`, `AGENTS.md`) into a repo.
-- `codex-orchestrator setup --yes` — install bundled skills and configure delegation + DevTools wiring.
+- `codex-orchestrator setup --yes` — install bundled skills and configure delegation + DevTools wiring (add `--refresh-skills` to overwrite existing skills in `$CODEX_HOME/skills`).
 - `codex-orchestrator init codex --codex-cli --yes --codex-source <path>` — optionally provision a CO-managed Codex CLI binary (build-from-source default; set `CODEX_CLI_SOURCE` to avoid passing `--codex-source` every time, and `CODEX_CLI_USE_MANAGED=1` to route runs to it).
 - `codex-orchestrator init codex --codex-cli --yes --codex-download-url <url> --codex-download-sha256 <sha>` — opt-in to a prebuilt Codex CLI download.
 - `codex-orchestrator codex setup` — plan/apply a CO-managed Codex CLI install (optional managed/pinned path; use `--download-url` + `--download-sha256` for prebuilts; activate with `CODEX_CLI_USE_MANAGED=1`).
 - `codex-orchestrator delegation setup --yes` — configure delegation MCP server wiring.
+- `codex-orchestrator mcp enable --servers <csv> --yes` — enable specific disabled MCP servers from existing Codex config entries.
 - `codex-orchestrator self-check --format json` — JSON health payload.
 - `codex-orchestrator mcp serve` — Codex MCP stdio server.
 

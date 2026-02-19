@@ -27,6 +27,12 @@ Preflight validates:
 - Codex CLI is available (`codex --version`)
 - If `CODEX_CLOUD_BRANCH` is set: `git` is available and `origin/<branch>` exists
 
+Run the same checks directly without starting a pipeline:
+```bash
+codex-orchestrator doctor --cloud-preflight
+codex-orchestrator doctor --cloud-preflight --format json
+```
+
 ## Fallback Behavior (No Cloud Wiring)
 
 If preflight fails, CO:
@@ -36,6 +42,30 @@ If preflight fails, CO:
 4. Surfaces the reason in `start` stdout as `Cloud fallback: ...` (and in `--format json` via `cloud_fallback_reason`)
 
 This means repos without cloud setup can still run the same pipelines without extra configuration; cloud is a best-effort acceleration path.
+
+## Fail-Fast Cloud Mode (No Fallback)
+
+For cloud-focused lanes, avoid relying on fallback and fail fast on preflight issues:
+
+```bash
+export CODEX_ORCHESTRATOR_CLOUD_FALLBACK=deny
+```
+
+Accepted deny values: `deny`, `strict`, `false`, `0`, `off`, `disabled`, `never`.
+When set, cloud preflight failures stop the run with `status_detail=cloud-preflight-failed`.
+
+## Status Poll Resilience Knobs
+
+Cloud task status polling keeps safe defaults and can be tuned when needed:
+- `CODEX_CLOUD_STATUS_RETRY_LIMIT` (default `12`)
+- `CODEX_CLOUD_STATUS_RETRY_BACKOFF_MS` (default `1500`)
+
+Example:
+```bash
+export CODEX_CLOUD_STATUS_RETRY_LIMIT=20
+export CODEX_CLOUD_STATUS_RETRY_BACKOFF_MS=1000
+codex-orchestrator start diagnostics --cloud --target spec-guard
+```
 
 ## Common Fixes
 

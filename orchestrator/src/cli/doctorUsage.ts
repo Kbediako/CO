@@ -32,6 +32,7 @@ export interface DoctorUsageResult {
   };
   cloud: {
     runs: number;
+    fallback_runs: number;
     unique_tasks: number;
     by_status: Record<string, number>;
     by_diff_status: Record<string, number>;
@@ -104,6 +105,7 @@ export async function runDoctorUsage(options: DoctorUsageOptions = {}): Promise<
 
   const statusCounts = { total: 0, succeeded: 0, failed: 0, cancelled: 0, other: 0 };
   let cloudRuns = 0;
+  let cloudFallbackRuns = 0;
   let rlmRuns = 0;
   const rlmTasks = new Set<string>();
   let advancedRuns = 0;
@@ -207,6 +209,7 @@ export async function runDoctorUsage(options: DoctorUsageOptions = {}): Promise<
 
     if (manifest.cloud_fallback) {
       advancedUsed = true;
+      cloudFallbackRuns += 1;
     }
 
     if (Array.isArray(manifest.collab_tool_calls) && manifest.collab_tool_calls.length > 0) {
@@ -332,7 +335,10 @@ export async function runDoctorUsage(options: DoctorUsageOptions = {}): Promise<
     gateRuns,
     rlmRuns,
     cloudRuns,
-    collabRunsWithToolCalls
+    cloudFallbackRuns,
+    collabRunsWithToolCalls,
+    cloudConfigured:
+      typeof process.env.CODEX_CLOUD_ENV_ID === 'string' && process.env.CODEX_CLOUD_ENV_ID.trim().length > 0
   });
 
   const delegationErrors: string[] = [];
@@ -380,6 +386,7 @@ export async function runDoctorUsage(options: DoctorUsageOptions = {}): Promise<
     runs: statusCounts,
     cloud: {
       runs: cloudRuns,
+      fallback_runs: cloudFallbackRuns,
       unique_tasks: cloudTasks.size,
       by_status: cloudByStatus,
       by_diff_status: cloudByDiffStatus,
@@ -451,6 +458,7 @@ export function formatDoctorUsageSummary(result: DoctorUsageResult): string[] {
   const cloudEnv = formatTopList(result.cloud.top_environment_ids.map((entry) => ({ key: entry.id, value: entry.runs })), 2, 'env');
   lines.push(
     `  - cloud: ${result.cloud.runs}${cloudSuffix} (${formatPercent(result.cloud.runs, result.runs.total)})${formatCloudStatuses(result.cloud.by_status)}${cloudDiff}${cloudApply}${cloudEnv}`
+      + `${result.cloud.fallback_runs > 0 ? ` fallback=${result.cloud.fallback_runs}` : ''}`
   );
 
   const rlmSuffix =
@@ -533,12 +541,16 @@ function buildAdoptionRecommendations(params: {
   gateRuns: number;
   rlmRuns: number;
   cloudRuns: number;
+  cloudFallbackRuns: number;
   collabRunsWithToolCalls: number;
+  cloudConfigured: boolean;
 }): string[] {
   if (params.totalRuns <= 0) {
     return [];
   }
   const hints: string[] = [];
+  const cloudShare = params.cloudRuns / params.totalRuns;
+  const rlmShare = params.rlmRuns / params.totalRuns;
   const execShare = params.execRuns / params.totalRuns;
   if (execShare >= 0.6) {
     hints.push(
@@ -550,9 +562,29 @@ function buildAdoptionRecommendations(params: {
       'No gate pipelines detected; use docs-review before implementation and implementation-gate before handoff.'
     );
   }
+  if (params.cloudFallbackRuns > 0) {
+    hints.push(
+      `Cloud fallback triggered in ${params.cloudFallbackRuns} run(s); treat fallback as a safety net and fix preflight issues. For fail-fast lanes set \`CODEX_ORCHESTRATOR_CLOUD_FALLBACK=deny\`.`
+    );
+  }
+  if (params.cloudConfigured && params.cloudRuns === 0) {
+    hints.push(
+      'CODEX_CLOUD_ENV_ID is configured but no cloud runs were observed; route one long-running stage through cloud: `codex-orchestrator start <pipeline> --cloud --target <stage-id>`.'
+    );
+  }
+  if (params.cloudConfigured && params.cloudRuns > 0 && cloudShare < 0.1) {
+    hints.push(
+      `Cloud is configured but adoption is low (${Math.round(cloudShare * 1000) / 10}%); prefer cloud for heavy stages and confirm readiness with \`codex-orchestrator doctor --cloud-preflight\`.`
+    );
+  }
   if (params.rlmRuns === 0) {
     hints.push(
       'No RLM runs detected; try `codex-orchestrator rlm --multi-agent auto "<goal>"` (legacy: `--collab auto`) for long-horizon or ambiguous tasks.'
+    );
+  }
+  if (params.rlmRuns > 0 && rlmShare < 0.1) {
+    hints.push(
+      `RLM usage is low (${Math.round(rlmShare * 1000) / 10}%); route multi-step ambiguous work through \`codex-orchestrator rlm --multi-agent auto "<goal>"\`.`
     );
   }
   if (params.cloudRuns === 0) {
@@ -565,7 +597,7 @@ function buildAdoptionRecommendations(params: {
       'RLM is used without collab activity; ensure multi-agent is enabled (`codex features enable multi_agent`, legacy alias: `collab`).'
     );
   }
-  return hints.slice(0, 3);
+  return hints.slice(0, 5);
 }
 
 function extractRunIdFromManifestPath(manifestPath: string): string | null {

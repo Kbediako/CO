@@ -18,6 +18,15 @@ You must register the delegation MCP server once so delegate tools are available
 codex-orchestrator setup --yes
 ```
 
+`setup --yes` keeps existing skill files by default. Add `--refresh-skills` when you intentionally want to overwrite bundled skills in `$CODEX_HOME/skills`.
+When both are present, prefer global skills in `$CODEX_HOME/skills` (for example `$CODEX_HOME/skills/docs-first`) and use bundled paths (for example `skills/docs-first/SKILL.md`) as fallback only.
+
+Optional low-friction enablement for already-configured-but-disabled MCP servers:
+
+```bash
+codex-orchestrator mcp enable --yes
+```
+
 Or configure only delegation:
 
 ```bash
@@ -171,3 +180,4 @@ codex mcp add delegation -- codex-orchestrator delegate-server --repo /path/to/r
 - Use `codex exec` only for pre-task triage (no task id yet) or when delegation is unavailable.
 - Pass the manifest path whenever you need `delegate.question.*` or run control APIs.
 - `delegate.status` enforcement: active runs still require a valid `control_endpoint.json`; terminal runs (`succeeded`/`failed`/`cancelled`) can be read from manifest state even when control endpoint files are gone.
+- For cloud-focused workflows, avoid fallback dependence by setting `CODEX_ORCHESTRATOR_CLOUD_FALLBACK=deny` (preflight failures fail fast).

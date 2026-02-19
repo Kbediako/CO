@@ -8,8 +8,10 @@ import { isoTimestamp } from '../cli/utils/time.js';
 
 const TASK_ID_PATTERN = /\btask_[a-z]_[a-f0-9]+\b/i;
 const MAX_LOG_CHARS = 32 * 1024;
-const STATUS_RETRY_LIMIT = 12;
-const STATUS_RETRY_BACKOFF_MS = 1500;
+const DEFAULT_STATUS_RETRY_LIMIT = 12;
+const DEFAULT_STATUS_RETRY_BACKOFF_MS = 1500;
+const MAX_STATUS_RETRY_LIMIT = 60;
+const MAX_STATUS_RETRY_BACKOFF_MS = 30_000;
 const DEFAULT_LIST_LIMIT = 20;
 
 export type CloudExecutionManifest = NonNullable<CliManifest['cloud_execution']>;
@@ -36,6 +38,8 @@ export interface CloudTaskExecutorInput {
   pollIntervalSeconds: number;
   timeoutSeconds: number;
   attempts: number;
+  statusRetryLimit?: number;
+  statusRetryBackoffMs?: number;
   branch?: string | null;
   enableFeatures?: string[];
   disableFeatures?: string[];
@@ -143,6 +147,16 @@ export class CodexCloudTaskExecutor {
       log_path: relative(input.repoRoot, commandLogPath),
       error: null
     };
+    const statusRetryLimit = normalizePositiveInt(
+      input.statusRetryLimit,
+      DEFAULT_STATUS_RETRY_LIMIT,
+      MAX_STATUS_RETRY_LIMIT
+    );
+    const statusRetryBackoffMs = normalizePositiveInt(
+      input.statusRetryBackoffMs,
+      DEFAULT_STATUS_RETRY_BACKOFF_MS,
+      MAX_STATUS_RETRY_BACKOFF_MS
+    );
 
     const runCloudCommand = async (args: string[]): Promise<CloudCommandResult> => {
       const result = await this.commandRunner({
@@ -216,12 +230,18 @@ export class CodexCloudTaskExecutor {
         // Treat non-zero as a retry only when no recognizable status token is present.
         if (statusResult.exitCode !== 0 && mapped === 'unknown') {
           statusRetries += 1;
-          if (statusRetries > STATUS_RETRY_LIMIT) {
+          if (statusRetries > statusRetryLimit) {
             throw new Error(
               `codex cloud status failed ${statusRetries} times: ${compactError(statusResult.stderr, statusResult.stdout)}`
             );
           }
-          await this.sleepFn(STATUS_RETRY_BACKOFF_MS * statusRetries);
+          const retryDelayMs = Math.min(
+            statusRetryBackoffMs * statusRetries,
+            Math.max(0, timeoutAt - Date.now())
+          );
+          if (retryDelayMs > 0) {
+            await this.sleepFn(retryDelayMs);
+          }
           continue;
         }
         if (statusResult.exitCode !== 0 && mapped !== 'unknown' && !loggedNonZeroStatus) {
@@ -282,8 +302,10 @@ export class CodexCloudTaskExecutor {
 
       return { success, summary, notes, cloudExecution };
     } catch (error) {
-      // Preserve non-queued status to reflect last known remote state at failure time.
-      cloudExecution.status = cloudExecution.status === 'queued' ? 'failed' : cloudExecution.status;
+      // Convert non-terminal states to failed when execution throws before a terminal cloud status.
+      if (cloudExecution.status === 'queued' || cloudExecution.status === 'running') {
+        cloudExecution.status = 'failed';
+      }
       cloudExecution.diff_status = 'unavailable';
       cloudExecution.error = (error as Error)?.message ?? String(error);
       cloudExecution.completed_at = this.now();
@@ -329,6 +351,17 @@ function normalizeFeatureList(features: string[] | undefined): string[] {
     normalized.push(feature);
   }
   return normalized;
+}
+
+function normalizePositiveInt(value: number | undefined, fallback: number, max: number = Number.POSITIVE_INFINITY): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return fallback;
+  }
+  const rounded = Math.trunc(value);
+  if (rounded <= 0) {
+    return fallback;
+  }
+  return Math.min(rounded, max);
 }
 
 export async function defaultCloudCommandRunner(request: {

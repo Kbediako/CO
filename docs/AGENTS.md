@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp 5a0a6c7986282b4266ed236ec141cea1b77e13cf1a4b5e2f35fc4251d162f2a8 -->
+<!-- codex:instruction-stamp 97b2e133d1d7dc072042f6588b89b0877e5210cab0932a48ff873ce969d0400a -->
 # Repository Agent Guidance
 
 ## Project 0303 — Codex Orchestrator Autonomy Enhancements
@@ -70,7 +70,8 @@
 
 ## GitHub Agent Review Replies
 - Always reply directly in the original review discussion thread (line comment), not just top-level PR comments.
-- Tag the agent explicitly (e.g., `@coderabbitai`), and mention what changed plus the commit SHA.
+- For agents that require explicit mention (for example `@coderabbitai`), tag the agent and mention what changed plus the commit SHA.
+- For Codex (`chatgpt-codex-connector`), do not tag per-thread for routine re-review because Codex automatically re-reviews on each push; tag only when a manual Codex pass is explicitly needed.
 - CLI/API example for replying to a review comment:
 ```bash
 gh api -X POST repos/<org>/<repo>/pulls/<pr>/comments \

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generated_at": "2026-02-17T08:05:00.000Z",
+  "generated_at": "2026-02-18T15:25:00.000Z",
   "entries": [
     {
       "path": ".agent/AGENTS.md",
@@ -3665,6 +3665,48 @@
     },
     {
       "path": "tasks/tasks-0972-multi-agent-canonical-compat-alignment.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-18",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/task/0974-cloud-adoption-preflight-reliability.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-18",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/ACTION_PLAN-cloud-adoption-preflight-reliability.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-18",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/PRD-cloud-adoption-preflight-reliability.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-18",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/TECH_SPEC-cloud-adoption-preflight-reliability.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-18",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/specs/0974-cloud-adoption-preflight-reliability.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-18",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/tasks-0974-cloud-adoption-preflight-reliability.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-02-18",

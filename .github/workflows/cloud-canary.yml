@@ -38,19 +38,27 @@ jobs:
         run: npm run build
 
       - name: Install Codex CLI
-        if: env.CODEX_CLOUD_CANARY_REQUIRED == '1'
         run: npm install -g @openai/codex
 
       - name: Verify Codex CLI availability
-        if: env.CODEX_CLOUD_CANARY_REQUIRED == '1'
         run: codex --version
 
-      - name: Run cloud canary
+      - name: Run cloud execution canary
         env:
           CODEX_CLOUD_ENV_ID: ${{ secrets.CODEX_CLOUD_ENV_ID }}
           CODEX_CLOUD_BRANCH: main
           CODEX_CLOUD_ENABLE_FEATURES: ${{ vars.CODEX_CLOUD_ENABLE_FEATURES }}
           CODEX_CLOUD_DISABLE_FEATURES: ${{ vars.CODEX_CLOUD_DISABLE_FEATURES }}
+          CODEX_API_KEY: ${{ secrets.CODEX_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: npm run ci:cloud-canary
+
+      - name: Run cloud fallback contract canary
+        env:
+          CLOUD_CANARY_TASK_ID: ci-cloud-fallback-${{ github.run_id }}
+          CLOUD_CANARY_EXPECT_FALLBACK: "1"
+          CODEX_CLOUD_ENV_ID: ""
+          CODEX_CLOUD_BRANCH: main
           CODEX_API_KEY: ${{ secrets.CODEX_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: npm run ci:cloud-canary
@@ -61,6 +69,8 @@ jobs:
         with:
           name: cloud-canary-${{ github.run_id }}
           path: |
-            .runs/${{ env.CLOUD_CANARY_TASK_ID }}/cli/
-            out/${{ env.CLOUD_CANARY_TASK_ID }}/
+            .runs/ci-cloud-canary-${{ github.run_id }}/cli/
+            .runs/ci-cloud-fallback-${{ github.run_id }}/cli/
+            out/ci-cloud-canary-${{ github.run_id }}/
+            out/ci-cloud-fallback-${{ github.run_id }}/
           if-no-files-found: ignore

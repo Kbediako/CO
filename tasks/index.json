@@ -1358,6 +1358,22 @@
       },
       "created_at": "2026-02-18",
       "completed_at": null
+    },
+    {
+      "id": "0974",
+      "slug": "0974-cloud-adoption-preflight-reliability",
+      "title": "Cloud + RLM Adoption Reliability + Fallback Contract Hardening",
+      "path": "tasks/tasks-0974-cloud-adoption-preflight-reliability.md",
+      "kind": "run",
+      "status": "in-progress",
+      "gate": {
+        "phase": "cloud-adoption-preflight-reliability-planning",
+        "status": "succeeded",
+        "log": ".runs/0974-cloud-adoption-preflight-reliability/cli/2026-02-18T10-37-33-980Z-72b397bb/manifest.json",
+        "run_id": "2026-02-18T10-37-33-980Z-72b397bb"
+      },
+      "created_at": "2026-02-18",
+      "completed_at": null
     }
   ],
   "specs": [
@@ -1385,7 +1401,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-01-19",
+      "last_review": "2026-02-19",
       "paths": {
         "spec": "tasks/specs/0940-delegation-autonomy-platform.md",
         "task": "tasks/tasks-0940-delegation-autonomy-platform.md",
@@ -1727,6 +1743,22 @@
         "task": "tasks/tasks-0972-multi-agent-canonical-compat-alignment.md",
         "agent_task": ".agent/task/0972-multi-agent-canonical-compat-alignment.md",
         "docs": "docs/TECH_SPEC-multi-agent-canonical-compat-alignment.md"
+      }
+    },
+    {
+      "id": "20260218-0974-cloud-adoption-preflight-reliability",
+      "title": "Cloud + RLM Adoption Reliability + Fallback Contract Hardening",
+      "relates_to": "tasks/tasks-0974-cloud-adoption-preflight-reliability.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-02-18",
+      "paths": {
+        "spec": "tasks/specs/0974-cloud-adoption-preflight-reliability.md",
+        "task": "tasks/tasks-0974-cloud-adoption-preflight-reliability.md",
+        "agent_task": ".agent/task/0974-cloud-adoption-preflight-reliability.md",
+        "docs": "docs/TECH_SPEC-cloud-adoption-preflight-reliability.md"
       }
     }
   ]

@@ -78,6 +78,8 @@ For runner + delegation coordination (short `--task` flow), see `docs/delegation
 - Register the delegation server once:
   - Preferred: `codex-orchestrator setup --yes`
     - One-shot bootstrap (installs bundled skills + configures delegation/DevTools wiring).
+  - Optional low-friction MCP enable pass: `codex-orchestrator mcp enable --yes`
+    - Enables disabled MCP servers from existing Codex config entries (plan mode redacts env/secret values in displayed command lines).
   - `codex-orchestrator delegation setup --yes`
     - Delegation-only setup (wraps `codex mcp add delegation ...` and keeps wiring discoverable via `codex-orchestrator doctor`).
   - `codex mcp add delegation -- codex-orchestrator delegate-server`
@@ -206,6 +208,7 @@ repeat:
 - **Long waits:** `wait_ms` never blocks longer than 10s per call; use polling.
 - **Long-running delegate.spawn:** Prefer `start_only=true` (default) to avoid tool-call timeouts. If you must use `start_only=false`, keep runs short or run long jobs outside delegation (no question queue).
 - **Cloud run branch mismatch:** cloud-mode orchestration against a local-only branch can fail with `couldn't find remote ref ...`; set `CODEX_CLOUD_BRANCH` to a pushed branch (typically `main`) before cloud execution.
+- **Cloud fallback dependence:** fallback should be a safety net, not the default path; for fail-fast cloud lanes, set `CODEX_ORCHESTRATOR_CLOUD_FALLBACK=deny`.
 - **Tool profile mismatch:** child tool profile must be allowed by repo policy; invalid or unsafe names are ignored.
 - **Confirmation misuse:** never pass `confirm_nonce` from model/tool input; it is runner‑injected only.
 - **Secrets exposure:** never include secrets/tokens/PII in delegate prompts or files.

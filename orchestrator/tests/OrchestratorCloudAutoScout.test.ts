@@ -99,4 +99,116 @@ describe('CodexOrchestrator cloud auto scout', () => {
     expect(autoScout.pipeline_id).toBe('docs-review');
     expect(autoScout.advanced_mode_enabled).toBe(true);
   });
+
+  it('falls back to mcp on preflight failure when fallback policy allows it', async () => {
+    const env = normalizeEnvironmentPaths(resolveEnvironmentPaths());
+    const pipeline: PipelineDefinition = {
+      id: 'docs-review',
+      title: 'Docs Review',
+      stages: [{ kind: 'command', id: 'stage-1', title: 'Stage 1', command: 'echo ok' }]
+    };
+
+    const { manifest, paths } = await bootstrapManifest('run-cloud-fallback-ok', {
+      env,
+      pipeline,
+      parentRunId: null,
+      taskSlug: env.taskId,
+      approvalPolicy: null
+    });
+    manifest.heartbeat_interval_seconds = 1;
+    manifest.heartbeat_stale_after_seconds = 2;
+
+    vi.spyOn(cloudPreflight, 'runCloudPreflight').mockResolvedValue({
+      ok: false,
+      issues: [{ code: 'missing_environment', message: 'CODEX_CLOUD_ENV_ID is not configured.' }],
+      details: {
+        codexBin: 'codex',
+        environmentId: null,
+        branch: null
+      }
+    });
+
+    const orchestrator = new CodexOrchestrator(env);
+    const result = await (
+      orchestrator as unknown as {
+        executePipeline: (options: unknown) => Promise<{ notes: string[]; success: boolean; manifest: { cloud_fallback?: { mode_used?: string } } }>;
+      }
+    ).executePipeline({
+      env,
+      pipeline,
+      manifest,
+      paths,
+      mode: 'cloud',
+      task: { id: env.taskId, title: 'Task' },
+      target: {
+        id: 'docs-review:stage-1',
+        description: 'Stage 1',
+        metadata: { stageId: 'stage-1' }
+      }
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.notes[0]).toContain('Cloud preflight failed; falling back to mcp.');
+    expect(result.manifest.cloud_fallback?.mode_used).toBe('mcp');
+  });
+
+  it('fails fast on preflight failure when cloud fallback is disabled', async () => {
+    const env = normalizeEnvironmentPaths(resolveEnvironmentPaths());
+    const pipeline: PipelineDefinition = {
+      id: 'docs-review',
+      title: 'Docs Review',
+      stages: [{ kind: 'command', id: 'stage-1', title: 'Stage 1', command: 'echo ok' }]
+    };
+
+    const { manifest, paths } = await bootstrapManifest('run-cloud-fallback-deny', {
+      env,
+      pipeline,
+      parentRunId: null,
+      taskSlug: env.taskId,
+      approvalPolicy: null
+    });
+    manifest.heartbeat_interval_seconds = 1;
+    manifest.heartbeat_stale_after_seconds = 2;
+
+    vi.spyOn(cloudPreflight, 'runCloudPreflight').mockResolvedValue({
+      ok: false,
+      issues: [{ code: 'missing_environment', message: 'CODEX_CLOUD_ENV_ID is not configured.' }],
+      details: {
+        codexBin: 'codex',
+        environmentId: null,
+        branch: null
+      }
+    });
+
+    const orchestrator = new CodexOrchestrator(env);
+    const result = await (
+      orchestrator as unknown as {
+        executePipeline: (options: unknown) => Promise<{
+          notes: string[];
+          success: boolean;
+          manifest: { status?: string; status_detail?: string; completed_at?: string | null; cloud_fallback?: unknown };
+        }>;
+      }
+    ).executePipeline({
+      env,
+      pipeline,
+      manifest,
+      paths,
+      mode: 'cloud',
+      envOverrides: { CODEX_ORCHESTRATOR_CLOUD_FALLBACK: 'deny' },
+      task: { id: env.taskId, title: 'Task' },
+      target: {
+        id: 'docs-review:stage-1',
+        description: 'Stage 1',
+        metadata: { stageId: 'stage-1' }
+      }
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.notes[0]).toContain('cloud fallback is disabled');
+    expect(result.manifest.status).toBe('failed');
+    expect(result.manifest.status_detail).toBe('cloud-preflight-failed');
+    expect(result.manifest.completed_at).toBeTruthy();
+    expect(result.manifest.cloud_fallback).toBeFalsy();
+  });
 });

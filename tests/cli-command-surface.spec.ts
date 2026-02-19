@@ -1,7 +1,7 @@
 import { execFile } from 'node:child_process';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { isAbsolute, join } from 'node:path';
 import { promisify } from 'node:util';
 
 import { afterEach, describe, expect, it } from 'vitest';
@@ -31,6 +31,46 @@ async function runCli(
     env: env ?? process.env,
     timeout: timeoutMs
   });
+}
+
+async function writeFakeCodexBinary(dir: string): Promise<string> {
+  const binPath = join(dir, 'codex');
+  await writeFile(
+    binPath,
+    [
+      '#!/bin/sh',
+      'if [ "$1" = "--version" ]; then',
+      '  echo "codex 0.0.0-test"',
+      '  exit 0',
+      'fi',
+      'if [ "$1" = "features" ] && [ "$2" = "list" ]; then',
+      '  echo "multi_agent experimental true"',
+      '  exit 0',
+      'fi',
+      'if [ "$1" = "cloud" ] && [ "$2" = "--help" ]; then',
+      '  exit 0',
+      'fi',
+      'if [ "$1" = "mcp" ] && [ "$2" = "list" ] && [ "$3" = "--json" ]; then',
+      '  if [ -n "$CODEX_TEST_MCP_LIST_JSON" ]; then',
+      '    echo "$CODEX_TEST_MCP_LIST_JSON"',
+      '  else',
+      '    echo "[]"',
+      '  fi',
+      '  exit 0',
+      'fi',
+      'if [ "$1" = "mcp" ] && [ "$2" = "add" ]; then',
+      '  if [ -n "$CODEX_TEST_MCP_ADD_FAIL" ]; then',
+      '    echo "${CODEX_TEST_MCP_ADD_FAIL_MESSAGE:-simulated mcp add failure}" 1>&2',
+      '    exit 1',
+      '  fi',
+      '  exit 0',
+      'fi',
+      'exit 0'
+    ].join('\n'),
+    'utf8'
+  );
+  await chmod(binPath, 0o755);
+  return binPath;
 }
 
 describe('codex-orchestrator command surface', () => {
@@ -70,6 +110,7 @@ describe('codex-orchestrator command surface', () => {
   it('prints setup help', async () => {
     const { stdout } = await runCli(['setup', '--help']);
     expect(stdout).toContain('Usage: codex-orchestrator setup');
+    expect(stdout).toContain('--refresh-skills');
   }, TEST_TIMEOUT);
 
   it('prints flow help', async () => {
@@ -203,6 +244,369 @@ describe('codex-orchestrator command surface', () => {
     expect(stdout).toContain('delegation');
   }, TEST_TIMEOUT);
 
+  it('emits doctor cloud preflight payload in JSON output', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'co-cli-doctor-cloud-preflight-'));
+    const fakeCodex = await writeFakeCodexBinary(tempDir);
+    const env = {
+      ...process.env,
+      CODEX_CLI_BIN: fakeCodex,
+      CODEX_CLOUD_ENV_ID: '',
+      CODEX_CLOUD_BRANCH: ''
+    };
+    const { stdout } = await runCli(['doctor', '--format', 'json', '--cloud-preflight'], env);
+    const payload = JSON.parse(stdout) as {
+      cloud_preflight?: {
+        ok?: boolean;
+        details?: { codex_bin?: string };
+        issues?: Array<{ code?: string }>;
+        guidance?: string[];
+      };
+    };
+    expect(payload.cloud_preflight).toBeTruthy();
+    expect(payload.cloud_preflight?.ok).toBe(false);
+    expect(payload.cloud_preflight?.details?.codex_bin).toBe(fakeCodex);
+    expect(payload.cloud_preflight?.issues).toEqual(
+      expect.arrayContaining([expect.objectContaining({ code: 'missing_environment' })])
+    );
+    expect(payload.cloud_preflight?.guidance?.join('\n')).toContain('CODEX_CLOUD_ENV_ID');
+  }, TEST_TIMEOUT);
+
+  it('returns terminal failed status when strict cloud preflight fails', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'co-cli-cloud-preflight-deny-'));
+    const fakeCodex = await writeFakeCodexBinary(tempDir);
+    const env = {
+      ...process.env,
+      CODEX_CLI_BIN: fakeCodex,
+      CODEX_ORCHESTRATOR_ROOT: tempDir,
+      CODEX_ORCHESTRATOR_RUNS_DIR: join(tempDir, '.runs'),
+      CODEX_ORCHESTRATOR_OUT_DIR: join(tempDir, 'out'),
+      MCP_RUNNER_TASK_ID: 'cloud-preflight-deny',
+      CODEX_ORCHESTRATOR_CLOUD_FALLBACK: 'deny',
+      CODEX_CLOUD_ENV_ID: '',
+      CODEX_CLOUD_BRANCH: ''
+    };
+    const { stdout } = await runCli(
+      ['start', 'docs-review', '--execution-mode', 'cloud', '--target', 'review', '--format', 'json', '--task', 'cloud-preflight-deny'],
+      env,
+      FLOW_TARGET_TEST_TIMEOUT
+    );
+    const jsonStart = stdout.indexOf('{');
+    const payload = JSON.parse(jsonStart >= 0 ? stdout.slice(jsonStart) : stdout) as {
+      status?: string;
+      summary?: string | null;
+      manifest?: string;
+    };
+    expect(payload.status).toBe('failed');
+    expect(payload.summary).toContain('cloud fallback is disabled');
+    const manifestPath = isAbsolute(payload.manifest ?? '')
+      ? (payload.manifest as string)
+      : join(tempDir, payload.manifest ?? '');
+    const manifest = JSON.parse(await readFile(manifestPath, 'utf8')) as {
+      status?: string;
+      status_detail?: string | null;
+      completed_at?: string | null;
+    };
+    expect(manifest.status).toBe('failed');
+    expect(manifest.status_detail).toBe('cloud-preflight-failed');
+    expect(manifest.completed_at).toBeTruthy();
+  }, FLOW_TARGET_TEST_TIMEOUT);
+
+  it('emits MCP enable plan payload in JSON output', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'co-cli-mcp-enable-'));
+    const fakeCodex = await writeFakeCodexBinary(tempDir);
+    const env = {
+      ...process.env,
+      CODEX_CLI_BIN: fakeCodex,
+      CODEX_TEST_MCP_LIST_JSON: JSON.stringify([
+        {
+          name: 'delegation',
+          enabled: false,
+          transport: {
+            type: 'stdio',
+            command: 'node',
+            args: ['scripts/delegation-server.mjs']
+          }
+        }
+      ])
+    };
+    const { stdout } = await runCli(['mcp', 'enable', '--format', 'json'], env);
+    const payload = JSON.parse(stdout) as {
+      status?: string;
+      targets?: string[];
+      actions?: Array<{ name?: string; status?: string }>;
+    };
+    expect(payload.status).toBe('planned');
+    expect(payload.targets).toEqual(['delegation']);
+    expect(payload.actions).toEqual([
+      expect.objectContaining({
+        name: 'delegation',
+        status: 'planned'
+      })
+    ]);
+  }, TEST_TIMEOUT);
+
+  it('scopes mcp enable targets when using --servers=<csv> flag style', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'co-cli-mcp-enable-equals-'));
+    const fakeCodex = await writeFakeCodexBinary(tempDir);
+    const env = {
+      ...process.env,
+      CODEX_CLI_BIN: fakeCodex,
+      CODEX_TEST_MCP_LIST_JSON: JSON.stringify([
+        {
+          name: 'delegation',
+          enabled: false,
+          transport: {
+            type: 'stdio',
+            command: 'node',
+            args: ['scripts/delegation-server.mjs']
+          }
+        },
+        {
+          name: 'playwright',
+          enabled: false,
+          transport: {
+            type: 'stdio',
+            command: 'npx',
+            args: ['@playwright/mcp@latest']
+          }
+        }
+      ])
+    };
+
+    const { stdout } = await runCli(['mcp', 'enable', '--format', 'json', '--servers=delegation'], env);
+    const payload = JSON.parse(stdout) as {
+      status?: string;
+      targets?: string[];
+      actions?: Array<{ name?: string; status?: string }>;
+    };
+    expect(payload.status).toBe('planned');
+    expect(payload.targets).toEqual(['delegation']);
+    expect(payload.actions).toEqual([
+      expect.objectContaining({
+        name: 'delegation',
+        status: 'planned'
+      })
+    ]);
+  }, TEST_TIMEOUT);
+
+  it('treats --yes=false as a non-apply plan for mcp enable', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'co-cli-mcp-enable-yes-false-'));
+    const fakeCodex = await writeFakeCodexBinary(tempDir);
+    const env = {
+      ...process.env,
+      CODEX_CLI_BIN: fakeCodex,
+      CODEX_TEST_MCP_LIST_JSON: JSON.stringify([
+        {
+          name: 'delegation',
+          enabled: false,
+          transport: {
+            type: 'stdio',
+            command: 'node',
+            args: ['scripts/delegation-server.mjs']
+          }
+        }
+      ])
+    };
+
+    const { stdout } = await runCli(['mcp', 'enable', '--format', 'json', '--yes=false'], env);
+    const payload = JSON.parse(stdout) as {
+      status?: string;
+      actions?: Array<{ status?: string }>;
+    };
+    expect(payload.status).toBe('planned');
+    expect(payload.actions).toEqual([
+      expect.objectContaining({
+        status: 'planned'
+      })
+    ]);
+  }, TEST_TIMEOUT);
+
+  it('rejects stray positional arguments when using --servers=<csv> flag style', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'co-cli-mcp-enable-equals-positional-'));
+    const fakeCodex = await writeFakeCodexBinary(tempDir);
+    const env = {
+      ...process.env,
+      CODEX_CLI_BIN: fakeCodex
+    };
+
+    await expect(runCli(['mcp', 'enable', '--servers=delegation', 'unexpected'], env)).rejects.toMatchObject({
+      stderr: expect.stringContaining('mcp enable does not accept positional arguments')
+    });
+  }, TEST_TIMEOUT);
+
+  it('rejects unknown mcp enable flags to avoid unintended bulk enable fallback', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'co-cli-mcp-enable-unknown-flag-'));
+    const fakeCodex = await writeFakeCodexBinary(tempDir);
+    const env = {
+      ...process.env,
+      CODEX_CLI_BIN: fakeCodex
+    };
+
+    await expect(runCli(['mcp', 'enable', '--server', 'delegation', '--yes'], env)).rejects.toMatchObject({
+      stderr: expect.stringContaining('Unknown mcp enable flag: --server')
+    });
+  }, TEST_TIMEOUT);
+
+  it('rejects unknown equals-style mcp enable flags', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'co-cli-mcp-enable-unknown-flag-equals-'));
+    const fakeCodex = await writeFakeCodexBinary(tempDir);
+    const env = {
+      ...process.env,
+      CODEX_CLI_BIN: fakeCodex
+    };
+
+    await expect(runCli(['mcp', 'enable', '--server=delegation', '--yes'], env)).rejects.toMatchObject({
+      stderr: expect.stringContaining('Unknown mcp enable flag: --server')
+    });
+  }, TEST_TIMEOUT);
+
+  it('rejects duplicate --servers flags for mcp enable', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'co-cli-mcp-enable-duplicate-servers-'));
+    const fakeCodex = await writeFakeCodexBinary(tempDir);
+    const env = {
+      ...process.env,
+      CODEX_CLI_BIN: fakeCodex
+    };
+
+    await expect(
+      runCli(['mcp', 'enable', '--servers', 'delegation', '--servers', 'playwright', '--yes'], env)
+    ).rejects.toMatchObject({
+      stderr: expect.stringContaining('--servers specified multiple times.')
+    });
+  }, TEST_TIMEOUT);
+
+  it('rejects duplicate --yes flags for mcp enable', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'co-cli-mcp-enable-duplicate-yes-'));
+    const fakeCodex = await writeFakeCodexBinary(tempDir);
+    const env = {
+      ...process.env,
+      CODEX_CLI_BIN: fakeCodex
+    };
+
+    await expect(runCli(['mcp', 'enable', '--yes', 'false', '--yes'], env)).rejects.toMatchObject({
+      stderr: expect.stringContaining('--yes specified multiple times.')
+    });
+  }, TEST_TIMEOUT);
+
+  it('returns non-zero when mcp enable --yes has failed actions', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'co-cli-mcp-enable-fail-'));
+    const fakeCodex = await writeFakeCodexBinary(tempDir);
+    const env = {
+      ...process.env,
+      CODEX_CLI_BIN: fakeCodex,
+      CODEX_TEST_MCP_ADD_FAIL: '1',
+      CODEX_TEST_MCP_ADD_FAIL_MESSAGE: 'simulated add failure',
+      CODEX_TEST_MCP_LIST_JSON: JSON.stringify([
+        {
+          name: 'delegation',
+          enabled: false,
+          transport: {
+            type: 'stdio',
+            command: 'node',
+            args: ['scripts/delegation-server.mjs']
+          }
+        }
+      ])
+    };
+
+    try {
+      await runCli(['mcp', 'enable', '--yes'], env);
+      throw new Error('expected mcp enable --yes to fail');
+    } catch (error) {
+      const stdout = (error as { stdout?: string }).stdout ?? '';
+      expect(stdout).toContain('delegation: failed');
+      expect(stdout).toContain('simulated add failure');
+    }
+  }, TEST_TIMEOUT);
+
+  it('returns non-zero when mcp enable --yes reports missing targets', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'co-cli-mcp-enable-missing-'));
+    const fakeCodex = await writeFakeCodexBinary(tempDir);
+    const env = {
+      ...process.env,
+      CODEX_CLI_BIN: fakeCodex,
+      CODEX_TEST_MCP_LIST_JSON: JSON.stringify([
+        {
+          name: 'delegation',
+          enabled: false,
+          transport: {
+            type: 'stdio',
+            command: 'node',
+            args: ['scripts/delegation-server.mjs']
+          }
+        }
+      ])
+    };
+
+    await expect(runCli(['mcp', 'enable', '--yes', '--servers', 'unknown'], env)).rejects.toMatchObject({
+      stdout: expect.stringContaining('unknown: missing')
+    });
+  }, TEST_TIMEOUT);
+
+  it('returns non-zero when mcp enable --yes reports unsupported targets', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'co-cli-mcp-enable-unsupported-'));
+    const fakeCodex = await writeFakeCodexBinary(tempDir);
+    const env = {
+      ...process.env,
+      CODEX_CLI_BIN: fakeCodex,
+      CODEX_TEST_MCP_LIST_JSON: JSON.stringify([
+        {
+          name: 'delegation',
+          enabled: false,
+          startup_timeout_sec: 30,
+          transport: {
+            type: 'stdio',
+            command: 'node',
+            args: ['scripts/delegation-server.mjs']
+          }
+        }
+      ])
+    };
+
+    await expect(runCli(['mcp', 'enable', '--yes', '--servers', 'delegation'], env)).rejects.toMatchObject({
+      stdout: expect.stringContaining('delegation: unsupported')
+    });
+  }, TEST_TIMEOUT);
+
+  it('rejects mcp enable --servers without a value', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'co-cli-mcp-enable-servers-'));
+    const fakeCodex = await writeFakeCodexBinary(tempDir);
+    const env = {
+      ...process.env,
+      CODEX_CLI_BIN: fakeCodex
+    };
+
+    await expect(runCli(['mcp', 'enable', '--servers'], env)).rejects.toMatchObject({
+      stderr: expect.stringContaining('--servers must include a comma-separated list of MCP server names.')
+    });
+  }, TEST_TIMEOUT);
+
+  it('rejects mcp enable --servers when the csv has no names', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'co-cli-mcp-enable-empty-csv-'));
+    const fakeCodex = await writeFakeCodexBinary(tempDir);
+    const env = {
+      ...process.env,
+      CODEX_CLI_BIN: fakeCodex
+    };
+
+    await expect(runCli(['mcp', 'enable', '--servers', ','], env)).rejects.toMatchObject({
+      stderr: expect.stringContaining('--servers must include a comma-separated list of MCP server names.')
+    });
+  }, TEST_TIMEOUT);
+
+  it('rejects positional arguments for mcp enable to prevent unintended bulk enable', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'co-cli-mcp-enable-positional-'));
+    const fakeCodex = await writeFakeCodexBinary(tempDir);
+    const env = {
+      ...process.env,
+      CODEX_CLI_BIN: fakeCodex
+    };
+
+    await expect(runCli(['mcp', 'enable', 'delegation', '--yes'], env)).rejects.toMatchObject({
+      stderr: expect.stringContaining('mcp enable does not accept positional arguments')
+    });
+  }, TEST_TIMEOUT);
+
   it('emits setup plan JSON', async () => {
     tempDir = await mkdtemp(join(tmpdir(), 'co-cli-setup-plan-'));
     const env = {
@@ -213,6 +617,10 @@ describe('codex-orchestrator command surface', () => {
     const payload = JSON.parse(stdout) as {
       status?: string;
       steps?: {
+        skills?: {
+          commandLines?: string[];
+          note?: string;
+        };
         guidance?: {
           note?: string;
           references?: string[];
@@ -229,7 +637,111 @@ describe('codex-orchestrator command surface', () => {
     expect(payload.steps?.guidance?.recommended_commands).toContain(
       'codex-orchestrator flow --task <task-id>'
     );
+    expect(payload.steps?.guidance?.recommended_commands).toContain(
+      'codex-orchestrator mcp enable --servers delegation --yes'
+    );
+    const commands = payload.steps?.skills?.commandLines ?? [];
+    expect(commands).toHaveLength(1);
+    expect(commands[0]).toContain('--only');
+    expect(commands[0]).toContain('chrome-devtools');
+    expect(commands.every((entry) => !entry.includes('--force'))).toBe(true);
+    expect(payload.steps?.skills?.note).toContain('without overwriting existing files by default');
   }, TEST_TIMEOUT);
+
+  it('supports equals-style setup --format=json', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'co-cli-setup-plan-equals-'));
+    const env = {
+      ...process.env,
+      CODEX_HOME: tempDir
+    };
+    const { stdout } = await runCli(['setup', '--format=json'], env);
+    const payload = JSON.parse(stdout) as {
+      status?: string;
+      steps?: {
+        guidance?: {
+          note?: string;
+        };
+      };
+    };
+    expect(payload.status).toBe('planned');
+    expect(payload.steps?.guidance?.note).toContain('Agent-first default');
+  }, TEST_TIMEOUT);
+
+  it('treats setup --yes=false as plan mode', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'co-cli-setup-yes-false-'));
+    const env = {
+      ...process.env,
+      CODEX_HOME: tempDir
+    };
+    const { stdout } = await runCli(['setup', '--yes=false', '--format', 'json'], env);
+    const payload = JSON.parse(stdout) as {
+      status?: string;
+      steps?: {
+        skills?: {
+          commandLines?: string[];
+        };
+      };
+    };
+    expect(payload.status).toBe('planned');
+    expect(payload.steps?.skills?.commandLines).toBeDefined();
+  }, TEST_TIMEOUT);
+
+  it('emits setup plan JSON with refresh-skills overwrite commands', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'co-cli-setup-plan-refresh-'));
+    const env = {
+      ...process.env,
+      CODEX_HOME: tempDir
+    };
+    const { stdout } = await runCli(['setup', '--format', 'json', '--refresh-skills'], env);
+    const payload = JSON.parse(stdout) as {
+      status?: string;
+      steps?: {
+        skills?: {
+          commandLines?: string[];
+          note?: string;
+        };
+      };
+    };
+    expect(payload.status).toBe('planned');
+    const commands = payload.steps?.skills?.commandLines ?? [];
+    expect(commands).toHaveLength(1);
+    expect(commands.every((entry) => entry.includes('--force'))).toBe(true);
+    expect(payload.steps?.skills?.note).toContain('overwrite enabled via --refresh-skills');
+  }, TEST_TIMEOUT);
+
+  it('setup --yes keeps existing skill files by default', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'co-cli-setup-apply-'));
+    const fakeCodex = await writeFakeCodexBinary(tempDir);
+    const skillPath = join(tempDir, 'skills', 'docs-first', 'SKILL.md');
+    await mkdir(join(tempDir, 'skills', 'docs-first'), { recursive: true });
+    await writeFile(skillPath, 'MARKER\n', 'utf8');
+
+    const env = {
+      ...process.env,
+      CODEX_HOME: tempDir,
+      CODEX_CLI_BIN: fakeCodex
+    };
+    await runCli(['setup', '--yes'], env, FLOW_TARGET_TEST_TIMEOUT);
+    expect(await readFile(skillPath, 'utf8')).toBe('MARKER\n');
+  }, FLOW_TARGET_TEST_TIMEOUT);
+
+  it('setup --yes --refresh-skills overwrites existing skill files', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'co-cli-setup-refresh-'));
+    const fakeCodex = await writeFakeCodexBinary(tempDir);
+    const skillPath = join(tempDir, 'skills', 'docs-first', 'SKILL.md');
+    await mkdir(join(tempDir, 'skills', 'docs-first'), { recursive: true });
+    await writeFile(skillPath, 'MARKER\n', 'utf8');
+
+    const env = {
+      ...process.env,
+      CODEX_HOME: tempDir,
+      CODEX_CLI_BIN: fakeCodex
+    };
+    await runCli(['setup', '--yes', '--refresh-skills'], env, FLOW_TARGET_TEST_TIMEOUT);
+    const content = await readFile(skillPath, 'utf8');
+    expect(content).not.toBe('MARKER\n');
+    expect(content).toContain('docs-first');
+  }, FLOW_TARGET_TEST_TIMEOUT);
 
   it('supports quoted exec commands passed as a single token', async () => {
     tempDir = await mkdtemp(join(tmpdir(), 'co-cli-surface-'));

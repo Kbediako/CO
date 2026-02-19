@@ -18,7 +18,12 @@ import type { HudController } from '../orchestrator/src/cli/ui/controller.js';
 import { evaluateInteractiveGate } from '../orchestrator/src/cli/utils/interactive.js';
 import { buildSelfCheckResult } from '../orchestrator/src/cli/selfCheck.js';
 import { initCodexTemplates, formatInitSummary } from '../orchestrator/src/cli/init.js';
-import { runDoctor, formatDoctorSummary } from '../orchestrator/src/cli/doctor.js';
+import {
+  runDoctor,
+  runDoctorCloudPreflight,
+  formatDoctorSummary,
+  formatDoctorCloudPreflightSummary
+} from '../orchestrator/src/cli/doctor.js';
 import { formatDoctorUsageSummary, runDoctorUsage } from '../orchestrator/src/cli/doctorUsage.js';
 import { formatDevtoolsSetupSummary, runDevtoolsSetup } from '../orchestrator/src/cli/devtoolsSetup.js';
 import { formatCodexCliSetupSummary, runCodexCliSetup } from '../orchestrator/src/cli/codexCliSetup.js';
@@ -27,6 +32,7 @@ import { formatSkillsInstallSummary, installSkills, listBundledSkills } from '..
 import { loadPackageInfo } from '../orchestrator/src/cli/utils/packageInfo.js';
 import { slugify } from '../orchestrator/src/cli/utils/strings.js';
 import { serveMcp } from '../orchestrator/src/cli/mcp.js';
+import { formatMcpEnableSummary, runMcpEnable } from '../orchestrator/src/cli/mcpEnable.js';
 import { startDelegationServer } from '../orchestrator/src/cli/delegationServer.js';
 import { splitDelegationConfigOverrides } from '../orchestrator/src/cli/config/delegationConfig.js';
 
@@ -149,6 +155,43 @@ function parseArgs(raw: string[]): { positionals: string[]; flags: ArgMap } {
   const positionals: string[] = [];
   const flags: ArgMap = {};
   const queue = [...raw];
+  const booleanFlagKeys = new Set([
+    'apply',
+    'cloud',
+    'cloud-preflight',
+    'codex-cli',
+    'codex-force',
+    'collab',
+    'devtools',
+    'dry-run',
+    'force',
+    'help',
+    'interactive',
+    'multi-agent',
+    'no-interactive',
+    'refresh-skills',
+    'ui',
+    'usage',
+    'watch',
+    'yes'
+  ]);
+  const parseBooleanLiteral = (value: string): boolean | undefined => {
+    const normalized = value.trim().toLowerCase();
+    if (['1', 'true', 'yes', 'on'].includes(normalized)) {
+      return true;
+    }
+    if (['0', 'false', 'no', 'off'].includes(normalized)) {
+      return false;
+    }
+    return undefined;
+  };
+  const coerceFlagValue = (key: string, value: string): string | boolean => {
+    if (!booleanFlagKeys.has(key)) {
+      return value;
+    }
+    const parsed = parseBooleanLiteral(value);
+    return parsed === undefined ? value : parsed;
+  };
   while (queue.length > 0) {
     const token = queue.shift();
     if (!token) {
@@ -163,8 +206,15 @@ function parseArgs(raw: string[]): { positionals: string[]; flags: ArgMap } {
       continue;
     }
     const key = token.slice(2);
+    if (key.includes('=')) {
+      const separatorIndex = key.indexOf('=');
+      const flagKey = key.slice(0, separatorIndex);
+      const inlineValue = key.slice(separatorIndex + 1);
+      flags[flagKey] = coerceFlagValue(flagKey, inlineValue);
+      continue;
+    }
     if (queue[0] && !queue[0]!.startsWith('--')) {
-      flags[key] = queue.shift() as string;
+      flags[key] = coerceFlagValue(key, queue.shift() as string);
     } else {
       flags[key] = true;
     }
@@ -419,6 +469,9 @@ interface RlmMultiAgentFlagSelection {
 function normalizeRlmMultiAgentValue(raw: string | boolean): 'enabled' | 'disabled' | 'invalid' {
   if (raw === true) {
     return 'enabled';
+  }
+  if (raw === false) {
+    return 'disabled';
   }
   if (typeof raw !== 'string') {
     return 'invalid';
@@ -1107,13 +1160,14 @@ async function handleInit(rawArgs: string[]): Promise<void> {
 async function handleSetup(rawArgs: string[]): Promise<void> {
   const { positionals, flags } = parseArgs(rawArgs);
   if (isHelpRequest(positionals, flags)) {
-    console.log(`Usage: codex-orchestrator setup [--yes] [--format json]
+    console.log(`Usage: codex-orchestrator setup [--yes] [--refresh-skills] [--format json]
 
 One-shot bootstrap for downstream users. Installs bundled skills and configures
 delegation + DevTools MCP wiring.
 
 Options:
   --yes                 Apply setup (otherwise plan only).
+  --refresh-skills      Overwrite bundled skills in $CODEX_HOME/skills during setup.
   --repo <path>         Repo root for delegation wiring (default cwd).
   --format json         Emit machine-readable output (dry-run only).
 `);
@@ -1122,6 +1176,7 @@ Options:
 
   const format: OutputFormat = (flags['format'] as string | undefined) === 'json' ? 'json' : 'text';
   const apply = Boolean(flags['yes']);
+  const refreshSkills = Boolean(flags['refresh-skills']);
   if (format === 'json' && apply) {
     throw new Error('setup does not support --format json with --yes.');
   }
@@ -1134,15 +1189,13 @@ Options:
   if (bundledSkills.length === 0) {
     throw new Error('No bundled skills detected; cannot run setup.');
   }
-  const forceSkills = bundledSkills.filter((skill) => skill !== 'chrome-devtools');
   const guidance = buildSetupGuidance();
 
   if (!apply) {
-    const forceOnly = forceSkills.join(',');
-    const forceCommand = forceOnly ? `codex-orchestrator skills install --force --only ${forceOnly}` : null;
-    const devtoolsCommand = bundledSkills.includes('chrome-devtools')
-      ? 'codex-orchestrator skills install --only chrome-devtools'
-      : null;
+    const installCommand = `codex-orchestrator skills install ${refreshSkills ? '--force ' : ''}--only ${bundledSkills.join(',')}`;
+    const skillsNote = refreshSkills
+      ? 'Installs bundled skills into $CODEX_HOME/skills with overwrite enabled via --refresh-skills.'
+      : 'Installs bundled skills into $CODEX_HOME/skills without overwriting existing files by default. Add --refresh-skills to force overwrite.';
 
     const delegation = await runDelegationSetup({ repoRoot });
     const devtools = await runDevtoolsSetup();
@@ -1150,8 +1203,8 @@ Options:
       status: 'planned' as const,
       steps: {
         skills: {
-          commandLines: [forceCommand, devtoolsCommand].filter((entry): entry is string => Boolean(entry)),
-          note: 'Installs bundled skills into $CODEX_HOME/skills (setup avoids overwriting chrome-devtools when already present).'
+          commandLines: [installCommand],
+          note: skillsNote
         },
         delegation,
         devtools,
@@ -1178,23 +1231,7 @@ Options:
     return;
   }
 
-  const primarySkills = forceSkills.length > 0 ? await installSkills({ force: true, only: forceSkills }) : null;
-  const devtoolsSkill =
-    bundledSkills.includes('chrome-devtools')
-      ? await installSkills({ force: false, only: ['chrome-devtools'] })
-      : null;
-  const skills = primarySkills && devtoolsSkill
-    ? {
-        sourceRoot: primarySkills.sourceRoot,
-        targetRoot: primarySkills.targetRoot,
-        skills: [...new Set([...primarySkills.skills, ...devtoolsSkill.skills])],
-        written: [...primarySkills.written, ...devtoolsSkill.written],
-        skipped: [...primarySkills.skipped, ...devtoolsSkill.skipped]
-      }
-    : devtoolsSkill ?? primarySkills;
-  if (!skills) {
-    throw new Error('No bundled skills detected; cannot run setup.');
-  }
+  const skills = await installSkills({ force: refreshSkills, only: bundledSkills });
   const delegation = await runDelegationSetup({ apply: true, repoRoot });
   const devtools = await runDevtoolsSetup({ apply: true });
 
@@ -1219,11 +1256,14 @@ function buildSetupGuidance(): SetupGuidancePayload {
     references: [
       'https://github.com/Kbediako/CO#downstream-usage-cheatsheet-agent-first',
       'https://github.com/Kbediako/CO/blob/main/docs/AGENTS.md',
-      'https://github.com/Kbediako/CO/blob/main/docs/guides/collab-vs-mcp.md'
+      'https://github.com/Kbediako/CO/blob/main/docs/guides/collab-vs-mcp.md',
+      'https://github.com/Kbediako/CO/blob/main/docs/guides/rlm-recursion-v2.md'
     ],
     recommended_commands: [
       'codex-orchestrator flow --task <task-id>',
-      'codex-orchestrator doctor --usage'
+      'codex-orchestrator doctor --usage',
+      'codex-orchestrator rlm --multi-agent auto "<goal>"',
+      'codex-orchestrator mcp enable --servers delegation --yes'
     ]
   };
 }
@@ -1249,6 +1289,12 @@ async function handleDoctor(rawArgs: string[]): Promise<void> {
   const { flags } = parseArgs(rawArgs);
   const format = (flags['format'] as string | undefined) === 'json' ? 'json' : 'text';
   const includeUsage = Boolean(flags['usage']);
+  const includeCloudPreflight = Boolean(flags['cloud-preflight']);
+  const cloudEnvIdOverride = readStringFlag(flags, 'cloud-env-id');
+  const cloudBranchOverride = readStringFlag(flags, 'cloud-branch');
+  if (!includeCloudPreflight && (cloudEnvIdOverride || cloudBranchOverride)) {
+    throw new Error('--cloud-env-id/--cloud-branch require --cloud-preflight.');
+  }
   const wantsApply = Boolean(flags['apply']);
   const apply = Boolean(flags['yes']);
   if (wantsApply && format === 'json') {
@@ -1270,13 +1316,24 @@ async function handleDoctor(rawArgs: string[]): Promise<void> {
 
   const doctorResult = runDoctor();
   const usageResult = includeUsage ? await runDoctorUsage({ windowDays, taskFilter }) : null;
+  const cloudPreflightResult = includeCloudPreflight
+    ? await runDoctorCloudPreflight({
+        cwd: process.cwd(),
+        environmentId: cloudEnvIdOverride,
+        branch: cloudBranchOverride,
+        taskId: taskFilter
+      })
+    : null;
 
   if (format === 'json') {
+    const payload: Record<string, unknown> = { ...doctorResult };
     if (usageResult) {
-      console.log(JSON.stringify({ ...doctorResult, usage: usageResult }, null, 2));
-      return;
+      payload.usage = usageResult;
     }
-    console.log(JSON.stringify(doctorResult, null, 2));
+    if (cloudPreflightResult) {
+      payload.cloud_preflight = cloudPreflightResult;
+    }
+    console.log(JSON.stringify(payload, null, 2));
     return;
   }
 
@@ -1285,6 +1342,11 @@ async function handleDoctor(rawArgs: string[]): Promise<void> {
   }
   if (usageResult) {
     for (const line of formatDoctorUsageSummary(usageResult)) {
+      console.log(line);
+    }
+  }
+  if (cloudPreflightResult) {
+    for (const line of formatDoctorCloudPreflightSummary(cloudPreflightResult)) {
       console.log(line);
     }
   }
@@ -1481,16 +1543,142 @@ async function handleSkills(rawArgs: string[]): Promise<void> {
 
 async function handleMcp(rawArgs: string[]): Promise<void> {
   const { positionals, flags } = parseArgs(rawArgs);
+  if (isHelpRequest(positionals, flags)) {
+    printMcpHelp();
+    return;
+  }
   const subcommand = positionals.shift();
   if (!subcommand) {
-    throw new Error('mcp requires a subcommand (serve).');
+    throw new Error('mcp requires a subcommand (serve|enable).');
   }
-  if (subcommand !== 'serve') {
-    throw new Error(`Unknown mcp subcommand: ${subcommand}`);
+  if (subcommand === 'serve') {
+    const repoRoot = typeof flags['repo'] === 'string' ? (flags['repo'] as string) : undefined;
+    const dryRun = Boolean(flags['dry-run']);
+    await serveMcp({ repoRoot, dryRun, extraArgs: positionals });
+    return;
   }
-  const repoRoot = typeof flags['repo'] === 'string' ? (flags['repo'] as string) : undefined;
-  const dryRun = Boolean(flags['dry-run']);
-  await serveMcp({ repoRoot, dryRun, extraArgs: positionals });
+  if (subcommand === 'enable') {
+    const allowedEnableFlags = new Set(['yes', 'format', 'servers']);
+    let yesFlag: string | boolean | undefined;
+    let formatFlag: string | boolean | undefined;
+    let serversFlag: string | boolean | undefined;
+    const unexpectedPositionals: string[] = [];
+    const enableTokens = rawArgs.slice(1);
+
+    for (let index = 0; index < enableTokens.length; index += 1) {
+      const token = enableTokens[index];
+      if (!token) {
+        continue;
+      }
+      if (token === '--') {
+        unexpectedPositionals.push(...enableTokens.slice(index + 1));
+        break;
+      }
+      if (!token.startsWith('--')) {
+        unexpectedPositionals.push(token);
+        continue;
+      }
+      const [key, inlineValue] = token.slice(2).split('=', 2);
+      if (!allowedEnableFlags.has(key)) {
+        throw new Error(`Unknown mcp enable flag: --${key}`);
+      }
+      let resolvedValue: string | boolean = true;
+      if (inlineValue !== undefined) {
+        resolvedValue = inlineValue;
+      } else {
+        const nextToken = enableTokens[index + 1];
+        if (nextToken && !nextToken.startsWith('--')) {
+          resolvedValue = nextToken;
+          index += 1;
+        }
+      }
+      if (key === 'yes') {
+        if (yesFlag !== undefined) {
+          throw new Error('--yes specified multiple times.');
+        }
+        yesFlag = resolvedValue;
+        continue;
+      }
+      if (key === 'format') {
+        if (formatFlag !== undefined) {
+          throw new Error('--format specified multiple times.');
+        }
+        formatFlag = resolvedValue;
+        continue;
+      }
+      if (serversFlag !== undefined) {
+        throw new Error('--servers specified multiple times.');
+      }
+      serversFlag = resolvedValue;
+    }
+    if (positionals.length > 0 || unexpectedPositionals.length > 0) {
+      throw new Error(
+        `mcp enable does not accept positional arguments: ${[...positionals, ...unexpectedPositionals].join(' ')}`
+      );
+    }
+
+    let apply = false;
+    if (yesFlag === true) {
+      apply = true;
+    } else if (typeof yesFlag === 'string') {
+      const normalizedYes = yesFlag.trim().toLowerCase();
+      if (normalizedYes === 'true' || normalizedYes === '1' || normalizedYes === 'yes' || normalizedYes === 'on') {
+        apply = true;
+      } else if (
+        normalizedYes === 'false'
+        || normalizedYes === '0'
+        || normalizedYes === 'no'
+        || normalizedYes === 'off'
+      ) {
+        apply = false;
+      } else {
+        throw new Error('--yes expects true/false when provided as --yes=<value>.');
+      }
+    }
+
+    let format: OutputFormat = 'text';
+    if (formatFlag !== undefined) {
+      if (formatFlag === true) {
+        throw new Error('--format requires a value of "text" or "json".');
+      }
+      if (formatFlag === 'json') {
+        format = 'json';
+      } else if (formatFlag === 'text') {
+        format = 'text';
+      } else {
+        throw new Error('--format must be "text" or "json".');
+      }
+    }
+
+    let serverNames: string[] | undefined;
+    if (serversFlag !== undefined) {
+      if (typeof serversFlag !== 'string') {
+        throw new Error('--servers must include a comma-separated list of MCP server names.');
+      }
+      serverNames = serversFlag
+        .split(',')
+        .map((entry) => entry.trim())
+        .filter((entry) => entry.length > 0);
+      if (serverNames.length === 0) {
+        throw new Error('--servers must include a comma-separated list of MCP server names.');
+      }
+    }
+    const result = await runMcpEnable({ apply, serverNames });
+    const hasApplyFailures = apply
+      && result.actions.some((action) => action.status !== 'enabled' && action.status !== 'already_enabled');
+    if (format === 'json') {
+      console.log(JSON.stringify(result, null, 2));
+    } else {
+      for (const line of formatMcpEnableSummary(result)) {
+        console.log(line);
+      }
+    }
+    if (hasApplyFailures) {
+      process.exitCode = 1;
+    }
+    return;
+  }
+  throw new Error(`Unknown mcp subcommand: ${subcommand}`);
 }
 
 async function handlePr(rawArgs: string[]): Promise<void> {
@@ -1821,14 +2009,18 @@ Commands:
     --codex-download-sha256 <sha>  Expected SHA256 for the prebuilt download.
     --codex-force          Overwrite existing CO-managed codex binary.
     --yes                  Apply codex CLI setup (otherwise plan only).
-  setup [--yes] [--format json]
+  setup [--yes] [--refresh-skills] [--format json]
     --yes                 Apply setup (otherwise plan only).
+    --refresh-skills      Overwrite bundled skills in $CODEX_HOME/skills during setup.
     --repo <path>         Repo root for delegation wiring (default cwd).
     --format json         Emit machine-readable output (dry-run only).
-  doctor [--format json] [--usage] [--window-days <n>] [--task <id>] [--apply]
+  doctor [--format json] [--usage] [--window-days <n>] [--task <id>] [--cloud-preflight] [--apply]
     --usage               Include a local usage snapshot (scans .runs/).
     --window-days <n>     Window for --usage (default 30).
     --task <id>           Limit --usage scan to a specific task directory.
+    --cloud-preflight     Run cloud readiness preflight checks (env/codex/git/branch).
+    --cloud-env-id <id>   Override env id for --cloud-preflight (default: CODEX_CLOUD_ENV_ID).
+    --cloud-branch <name> Override branch for --cloud-preflight (default: CODEX_CLOUD_BRANCH).
     --apply               Plan/apply quick fixes for DevTools + delegation wiring (use with --yes).
     --yes                 Apply fixes when --apply is set.
     --format json         Emit machine-readable output (not supported with --apply).
@@ -1853,6 +2045,10 @@ Commands:
     --codex-home <path>   Override the target Codex home directory.
     --format json         Emit machine-readable output.
   mcp serve [--repo <path>] [--dry-run] [-- <extra args>]
+  mcp enable [--servers <csv>] [--yes] [--format json]
+    --servers <csv>       Comma-separated MCP server names to enable (default: all disabled).
+    --yes                 Apply changes (default is plan mode).
+    --format json         Emit machine-readable output.
   pr watch-merge [options]
     Monitor PR checks/reviews with polling and optional auto-merge after a quiet window.
     Use \`codex-orchestrator pr watch-merge --help\` for full options.
@@ -1927,6 +2123,21 @@ Options:
 `);
 }
 
+function printMcpHelp(): void {
+  console.log(`Usage: codex-orchestrator mcp <subcommand> [options]
+
+Subcommands:
+  serve [--repo <path>] [--dry-run] [-- <extra args>]
+    Proxy Codex MCP server mode through the selected Codex binary.
+
+  enable [--servers <csv>] [--yes] [--format json]
+    Enable disabled MCP servers using the existing Codex MCP definitions.
+    --servers <csv>    Comma-separated server names (default: all disabled servers).
+    --yes              Apply changes (default: plan only).
+    --format json      Emit machine-readable output.
+`);
+}
+
 function printPrHelp(): void {
   console.log(`Usage: codex-orchestrator pr <subcommand> [options]
 
@@ -1960,6 +2171,14 @@ Options:
   --interactive | --ui    Enable read-only HUD when running in a TTY.
   --no-interactive        Force disable HUD.
   --help                  Show this message.
+
+Examples:
+  codex-orchestrator rlm "stabilize failing test lane"
+  codex-orchestrator rlm --multi-agent auto "resolve conflicting product requirements"
+
+Tips:
+  - Use --multi-agent auto for ambiguous/long-horizon work.
+  - Ensure multi-agent is enabled in Codex: codex features enable multi_agent (legacy alias: collab).
 `);
 }
 
