@@ -28,7 +28,19 @@ const createSummary = (): RunSummary => ({
 
 const readAuditLog = async (outDir: string, summary: RunSummary): Promise<string> => {
   const taskDir = sanitizeTaskId(summary.taskId);
-  return await readFile(join(outDir, taskDir, 'cloud-sync', 'audit.log'), 'utf-8');
+  const auditPath = join(outDir, taskDir, 'cloud-sync', 'audit.log');
+  for (let attempt = 0; attempt < 40; attempt += 1) {
+    try {
+      return await readFile(auditPath, 'utf-8');
+    } catch (error) {
+      const err = error as NodeJS.ErrnoException;
+      if (err.code !== 'ENOENT' || attempt === 39) {
+        throw error;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+  }
+  throw new Error(`unable to read audit log: ${auditPath}`);
 };
 
 describe('CloudSyncWorker', () => {
