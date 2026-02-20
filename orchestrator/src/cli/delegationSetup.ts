@@ -5,6 +5,7 @@ import { join, resolve } from 'node:path';
 
 import { resolveCodexCliBin } from './utils/codexCli.js';
 import { resolveCodexHome } from './utils/codexPaths.js';
+import { buildCommandPreview } from './utils/commandPreview.js';
 
 export interface DelegationSetupOptions {
   apply?: boolean;
@@ -29,7 +30,7 @@ export interface DelegationSetupResult {
 
 export async function runDelegationSetup(options: DelegationSetupOptions = {}): Promise<DelegationSetupResult> {
   const env = options.env ?? process.env;
-  const repoRoot = options.repoRoot ?? process.cwd();
+  const repoRoot = resolve(options.repoRoot ?? process.cwd());
   const codexBin = resolveCodexCliBin(env);
   const codexHome = resolveCodexHome(env);
   const configPath = join(codexHome, 'config.toml');
@@ -38,7 +39,16 @@ export async function runDelegationSetup(options: DelegationSetupOptions = {}): 
     codexBin,
     codexHome,
     repoRoot,
-    commandLine: `"${codexBin}" mcp add delegation -- codex-orchestrator delegate-server`
+    commandLine: buildCommandPreview(codexBin, [
+      'mcp',
+      'add',
+      'delegation',
+      '--',
+      'codex-orchestrator',
+      'delegate-server',
+      '--repo',
+      repoRoot
+    ])
   };
 
   const probe = inspectDelegationReadiness({ codexBin, configPath, repoRoot, env });
@@ -53,7 +63,7 @@ export async function runDelegationSetup(options: DelegationSetupOptions = {}): 
   }
 
   await applyDelegationSetup(
-    { codexBin, removeExisting: probe.removeExisting, envVars: probe.envVars },
+    { codexBin, repoRoot, removeExisting: probe.removeExisting, envVars: probe.envVars },
     env
   );
   const configuredAfter = inspectDelegationReadiness({ codexBin, configPath, repoRoot, env }).configured;
@@ -117,20 +127,19 @@ function inspectDelegationReadiness(options: {
       };
     }
     return {
-      configured: true,
-      removeExisting: false,
+      configured: false,
+      removeExisting: true,
       envVars,
-      reason: 'Delegation MCP is already configured.'
+      reason: `Existing delegation MCP entry is not pinned; reconfiguring to ${requestedRepo}.`
     };
   }
 
   // Fall back to directly scanning config.toml when the Codex CLI probe is unavailable.
-  const configured = isDelegationConfiguredFallback(options.configPath);
-  return { configured, removeExisting: false, envVars: {} };
+  return inspectDelegationReadinessFallback(options.configPath, requestedRepo);
 }
 
 function applyDelegationSetup(
-  plan: { codexBin: string; removeExisting: boolean; envVars: Record<string, string> },
+  plan: { codexBin: string; repoRoot: string; removeExisting: boolean; envVars: Record<string, string> },
   env: NodeJS.ProcessEnv
 ): Promise<void> {
   const envFlags: string[] = [];
@@ -141,7 +150,17 @@ function applyDelegationSetup(
     const runAdd = () => {
       const child = spawn(
         plan.codexBin,
-        ['mcp', 'add', 'delegation', ...envFlags, '--', 'codex-orchestrator', 'delegate-server'],
+        [
+          'mcp',
+          'add',
+          'delegation',
+          ...envFlags,
+          '--',
+          'codex-orchestrator',
+          'delegate-server',
+          '--repo',
+          plan.repoRoot
+        ],
         { stdio: 'inherit', env }
       );
       child.once('error', (error) => reject(error instanceof Error ? error : new Error(String(error))));
@@ -219,17 +238,106 @@ function readPinnedRepo(args: string[]): string | null {
   return typeof candidate === 'string' && candidate.trim().length > 0 ? candidate.trim() : null;
 }
 
-function isDelegationConfiguredFallback(configPath: string): boolean {
+function inspectDelegationReadinessFallback(
+  configPath: string,
+  requestedRepo: string
+): { configured: boolean; removeExisting: boolean; envVars: Record<string, string>; reason?: string } {
+  const config = readDelegationFallbackConfig(configPath);
+  if (!config) {
+    return { configured: false, removeExisting: false, envVars: {} };
+  }
+
+  const pinnedRepo = readPinnedRepo(config.args);
+  if (!pinnedRepo) {
+    return {
+      configured: false,
+      removeExisting: true,
+      envVars: config.envVars,
+      reason: `Existing delegation MCP entry is not pinned; reconfiguring to ${requestedRepo}.`
+    };
+  }
+
+  const normalizedPinned = resolve(pinnedRepo);
+  if (normalizedPinned !== requestedRepo) {
+    return {
+      configured: false,
+      removeExisting: true,
+      envVars: config.envVars,
+      reason: `Existing delegation MCP entry is pinned to ${pinnedRepo}; reconfiguring.`
+    };
+  }
+
+  return {
+    configured: true,
+    removeExisting: false,
+    envVars: config.envVars,
+    reason: `Delegation MCP is already configured (pinned to ${pinnedRepo}).`
+  };
+}
+
+function readDelegationFallbackConfig(configPath: string): { args: string[]; envVars: Record<string, string> } | null {
   if (!existsSync(configPath)) {
-    return false;
+    return null;
   }
   try {
-    // Keep parsing loose; we only need to know whether a delegation entry exists.
     const raw = readFileSync(configPath, 'utf8');
-    return hasMcpServerEntry(raw, 'delegation');
+    if (!hasMcpServerEntry(raw, 'delegation')) {
+      return null;
+    }
+    return {
+      args: readDelegationArgsFromConfig(raw),
+      envVars: readDelegationEnvVarsFromConfig(raw)
+    };
   } catch {
-    return false;
+    return null;
   }
+}
+
+function readDelegationArgsFromConfig(raw: string): string[] {
+  const sectionMatch = raw.match(/\[mcp_servers(?:\.delegation|\."delegation"|.'delegation')\]([\s\S]*?)(?=\n\[|$)/u);
+  if (!sectionMatch) {
+    return [];
+  }
+  const section = sectionMatch[1] ?? '';
+  const argsMatch = section.match(/^\s*args\s*=\s*\[([\s\S]*?)\]/mu);
+  if (!argsMatch) {
+    return [];
+  }
+  const argsRaw = argsMatch[1] ?? '';
+  const args: string[] = [];
+  const tokenPattern = /"((?:\\"|[^"])*)"|'((?:\\'|[^'])*)'/gu;
+  let token = tokenPattern.exec(argsRaw);
+  while (token) {
+    const quoted = token[1] ?? token[2] ?? '';
+    const decoded = quoted.replace(/\\"/gu, '"').replace(/\\'/gu, '\'');
+    args.push(decoded);
+    token = tokenPattern.exec(argsRaw);
+  }
+  return args;
+}
+
+function readDelegationEnvVarsFromConfig(raw: string): Record<string, string> {
+  const envVars: Record<string, string> = {};
+  const sectionMatch = raw.match(
+    /\[mcp_servers(?:\.delegation|\."delegation"|.'delegation')\.env\]([\s\S]*?)(?=\n\[|$)/u
+  );
+  if (!sectionMatch) {
+    return envVars;
+  }
+  const section = sectionMatch[1] ?? '';
+  const linePattern = /^\s*([A-Za-z0-9_.-]+)\s*=\s*("(?:\\"|[^"])*"|'(?:\\'|[^'])*')\s*$/gmu;
+  let match = linePattern.exec(section);
+  while (match) {
+    const key = match[1];
+    const rawValue = match[2] ?? '';
+    if (key) {
+      const unquoted = rawValue.slice(1, -1);
+      const decoded = unquoted.replace(/\\"/gu, '"').replace(/\\'/gu, '\'');
+      envVars[key] = decoded;
+    }
+    match = linePattern.exec(section);
+  }
+  return envVars;
 }
 
 function hasMcpServerEntry(raw: string, serverName: string): boolean {

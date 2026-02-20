@@ -17,6 +17,7 @@ export interface RunPreparationResult {
   env: EnvironmentPaths;
   pipeline: PipelineDefinition;
   pipelineSource: string | null;
+  configNotice: string | null;
   envOverrides: NodeJS.ProcessEnv;
   planner: CommandPlanner;
   plannerTargetId: string | null;
@@ -35,6 +36,7 @@ export interface PrepareRunOptions {
   resolver?: PipelineResolver;
   pipeline?: PipelineDefinition;
   pipelineSource?: string | null;
+  configNotice?: string | null;
   envOverrides?: NodeJS.ProcessEnv;
   planner?: CommandPlanner;
 }
@@ -75,6 +77,7 @@ export async function prepareRun(options: PrepareRunOptions): Promise<RunPrepara
     ? {
         pipeline: options.pipeline,
         source: options.pipelineSource ?? null,
+        configNotice: options.configNotice ?? null,
         envOverrides: options.envOverrides ?? {}
       }
     : await resolver.resolve(env, { pipelineId: options.pipelineId });
@@ -94,6 +97,7 @@ export async function prepareRun(options: PrepareRunOptions): Promise<RunPrepara
     env,
     pipeline: resolvedPipeline.pipeline,
     pipelineSource: resolvedPipeline.source ?? null,
+    configNotice: resolvedPipeline.configNotice ?? null,
     envOverrides: resolvedPipeline.envOverrides ?? {},
     planner,
     plannerTargetId: planPreview?.targetId ?? targetId,

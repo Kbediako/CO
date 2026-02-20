@@ -6,8 +6,8 @@ describe('CLI exec runtime', () => {
   it('forwards args to spawned commands', async () => {
     const runner = getCliExecRunner();
     const result = await runner.run({
-      command: 'echo',
-      args: ['foo', 'bar']
+      command: process.execPath,
+      args: ['-e', "process.stdout.write(process.argv.slice(1).join(' '))", 'foo', 'bar']
     });
 
     expect(result.stdout.trim()).toBe('foo bar');

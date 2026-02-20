@@ -1,7 +1,12 @@
 import { spawn } from 'node:child_process';
 
 export interface CloudPreflightIssue {
-  code: 'missing_environment' | 'codex_unavailable' | 'branch_missing' | 'git_unavailable';
+  code:
+    | 'missing_environment'
+    | 'codex_unavailable'
+    | 'branch_missing'
+    | 'git_unavailable'
+    | 'pipeline_resolution_failed';
   message: string;
 }
 
@@ -142,4 +147,3 @@ export async function runCloudPreflight(params: {
     }
   };
 }
-

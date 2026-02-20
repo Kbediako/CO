@@ -25,6 +25,7 @@
     "schemas/**",
     "templates/**",
     "skills/**",
+    "codex.orchestrator.json",
     "docs/assets/setup.gif",
     "README.md",
     "LICENSE"

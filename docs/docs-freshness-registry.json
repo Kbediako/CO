@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generated_at": "2026-02-18T15:25:00.000Z",
+  "generated_at": "2026-02-19T00:00:00.000Z",
   "entries": [
     {
       "path": ".agent/AGENTS.md",
@@ -3710,6 +3710,55 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-02-18",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/task/0975-codex-cli-capability-adoption-redesign.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-19",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/ACTION_PLAN-codex-cli-capability-adoption-redesign.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-19",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/PRD-codex-cli-capability-adoption-redesign.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-19",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/TECH_SPEC-codex-cli-capability-adoption-redesign.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-19",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/codex-orchestrator-issues.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-19",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/specs/0975-codex-cli-capability-adoption-redesign.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-19",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/tasks-0975-codex-cli-capability-adoption-redesign.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-19",
       "cadence_days": 90
     }
   ]

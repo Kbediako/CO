@@ -10,6 +10,7 @@ import {
 } from '../../../../packages/shared/config/index.js';
 import { logger } from '../../logger.js';
 import type { PipelineDefinition } from '../types.js';
+import { formatRepoConfigRequiredError, isRepoConfigRequired } from '../config/repoConfigPolicy.js';
 
 const DEVTOOLS_PIPELINE_ALIASES = new Map<string, string>([
   ['implementation-gate-devtools', 'implementation-gate'],
@@ -17,11 +18,29 @@ const DEVTOOLS_PIPELINE_ALIASES = new Map<string, string>([
 ]);
 
 export class PipelineResolver {
-  async loadDesignConfig(rootDir: string): Promise<DesignConfigLoadResult> {
+  private logInfo(message: string, quiet: boolean): void {
+    if (!quiet) {
+      logger.info(message);
+    }
+  }
+
+  private logWarn(message: string, quiet: boolean): void {
+    if (!quiet) {
+      logger.warn(message);
+    }
+  }
+
+  private logError(message: string, quiet: boolean): void {
+    if (!quiet) {
+      logger.error(message);
+    }
+  }
+
+  async loadDesignConfig(rootDir: string, quiet: boolean = false): Promise<DesignConfigLoadResult> {
     const designConfig = await loadDesignConfig({ rootDir });
     if (designConfig.warnings.length > 0) {
       for (const warning of designConfig.warnings) {
-        logger.warn(`[design-config] ${warning}`);
+        this.logWarn(`[design-config] ${warning}`, quiet);
       }
     }
     return designConfig;
@@ -29,31 +48,53 @@ export class PipelineResolver {
 
   async resolve(
     env: EnvironmentPaths,
-    options: { pipelineId?: string }
+    options: { pipelineId?: string; quiet?: boolean; processEnv?: NodeJS.ProcessEnv }
   ): Promise<{
     pipeline: PipelineDefinition;
     userConfig: UserConfig | null;
     designConfig: DesignConfigLoadResult;
     source: 'default' | 'user';
+    configNotice: string | null;
     envOverrides: NodeJS.ProcessEnv;
   }> {
-    logger.info(`PipelineResolver.resolve start for ${options.pipelineId ?? '<default>'}`);
-    const designConfig = await this.loadDesignConfig(env.repoRoot);
-    logger.info(`PipelineResolver.resolve loaded design config from ${designConfig.path}`);
-    const userConfig = await loadUserConfig(env);
-    logger.info(`PipelineResolver.resolve loaded user config`);
-    
+    const quiet = options.quiet === true;
+    const runtimeEnv = options.processEnv ?? process.env;
+    this.logInfo(`PipelineResolver.resolve start for ${options.pipelineId ?? '<default>'}`, quiet);
+    const designConfig = await this.loadDesignConfig(env.repoRoot, quiet);
+    if (designConfig.exists) {
+      this.logInfo(`[design-config] loaded repo file at ${designConfig.path}`, quiet);
+    } else {
+      this.logInfo(`[design-config] using defaults (missing file at ${designConfig.path})`, quiet);
+    }
+    const repoConfigRequired = isRepoConfigRequired(runtimeEnv);
+    const userConfig = await loadUserConfig(env, { allowPackageFallback: !repoConfigRequired, quiet });
+    if (repoConfigRequired && userConfig?.source !== 'repo') {
+      throw new Error(formatRepoConfigRequiredError(env.repoRoot));
+    }
+    let configNotice: string | null = null;
+    if (userConfig?.source === 'package') {
+      configNotice =
+        'Using packaged fallback codex.orchestrator.json (compatibility path). ' +
+        'Run `codex-orchestrator init codex` to pin repo-local config.';
+      this.logWarn(`[codex-config] ${configNotice}`, quiet);
+    } else if (userConfig?.source === 'repo') {
+      this.logInfo('[codex-config] Using repo-local codex.orchestrator.json.', quiet);
+    } else {
+      this.logWarn('[codex-config] No codex.orchestrator.json found in repo or package.', quiet);
+    }
+
     const pipelineCandidate =
       options.pipelineId ??
       (shouldActivateDesignPipeline(designConfig) ? designPipelineId(designConfig) : undefined);
     const resolvedAlias = this.resolvePipelineAlias(pipelineCandidate);
     const requestedPipelineId = resolvedAlias.pipelineId;
 
-    const envOverrides = this.resolveDesignEnvOverrides(designConfig, requestedPipelineId);
+    const envOverrides = this.resolveDesignEnvOverrides(designConfig, requestedPipelineId, runtimeEnv);
     if (resolvedAlias.devtoolsRequested) {
       envOverrides.CODEX_REVIEW_DEVTOOLS = '1';
-      logger.warn(
-        `[pipeline] ${resolvedAlias.aliasId} is deprecated; use ${requestedPipelineId} with CODEX_REVIEW_DEVTOOLS=1.`
+      this.logWarn(
+        `[pipeline] ${resolvedAlias.aliasId} is deprecated; use ${requestedPipelineId} with CODEX_REVIEW_DEVTOOLS=1.`,
+        quiet
       );
     }
 
@@ -62,22 +103,39 @@ export class PipelineResolver {
         pipelineId: requestedPipelineId,
         config: userConfig
       });
-      logger.info(`PipelineResolver.resolve selected pipeline ${pipeline.id}`);
-      return { pipeline, userConfig, designConfig, source, envOverrides };
+      this.logInfo(`PipelineResolver.resolve selected pipeline ${pipeline.id}`, quiet);
+      return { pipeline, userConfig, designConfig, source, configNotice, envOverrides };
     } catch (error) {
-      if (requestedPipelineId === 'rlm' && userConfig?.source === 'repo') {
-        const packageConfig = await loadPackageConfig(env);
+      if (requestedPipelineId === 'rlm' && userConfig?.source === 'repo' && repoConfigRequired) {
+        throw new Error(
+          'Repo-local codex.orchestrator.json is missing the rlm pipeline while strict repo-config mode is enabled.'
+        );
+      }
+      if (requestedPipelineId === 'rlm' && userConfig?.source === 'repo' && !repoConfigRequired) {
+        const packageConfig = await loadPackageConfig(env, { quiet });
         if (packageConfig) {
+          const fallbackNotice =
+            'Repo config is missing the rlm pipeline; using packaged fallback pipeline for compatibility. ' +
+            'Add rlm to your repo-local codex.orchestrator.json to avoid fallback.';
+          this.logWarn(`[codex-config] ${fallbackNotice}`, quiet);
           const { pipeline, source } = resolvePipeline(env, {
             pipelineId: requestedPipelineId,
             config: packageConfig
           });
-          logger.info(`PipelineResolver.resolve selected package pipeline ${pipeline.id}`);
-          return { pipeline, userConfig: packageConfig, designConfig, source, envOverrides };
+          this.logInfo(`PipelineResolver.resolve selected package pipeline ${pipeline.id}`, quiet);
+          return {
+            pipeline,
+            userConfig: packageConfig,
+            designConfig,
+            source,
+            configNotice: fallbackNotice,
+            envOverrides
+          };
         }
       }
-      logger.error(
-        `PipelineResolver.resolve failed for ${requestedPipelineId ?? '<default>'}: ${(error as Error).message}`
+      this.logError(
+        `PipelineResolver.resolve failed for ${requestedPipelineId ?? '<default>'}: ${(error as Error).message}`,
+        quiet
       );
       throw error;
     }
@@ -85,12 +143,13 @@ export class PipelineResolver {
 
   resolveDesignEnvOverrides(
     designConfig: DesignConfigLoadResult,
-    pipelineId?: string
+    pipelineId?: string,
+    runtimeEnv: NodeJS.ProcessEnv = process.env
   ): NodeJS.ProcessEnv {
     const envOverrides: NodeJS.ProcessEnv = {
       DESIGN_CONFIG_PATH: designConfig.path
     };
-    if (pipelineId === designPipelineId(designConfig) && process.env.DESIGN_PIPELINE === undefined) {
+    if (pipelineId === designPipelineId(designConfig) && runtimeEnv.DESIGN_PIPELINE === undefined) {
       envOverrides.DESIGN_PIPELINE = '1';
     }
     return envOverrides;

@@ -1,7 +1,7 @@
 import { execFile } from 'node:child_process';
 import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { isAbsolute, join } from 'node:path';
+import { isAbsolute, join, relative } from 'node:path';
 import { promisify } from 'node:util';
 
 import { afterEach, describe, expect, it } from 'vitest';
@@ -59,6 +59,9 @@ async function writeFakeCodexBinary(dir: string): Promise<string> {
       '  exit 0',
       'fi',
       'if [ "$1" = "mcp" ] && [ "$2" = "add" ]; then',
+      '  if [ -n "$CODEX_TEST_MCP_ADD_LOG" ]; then',
+      '    printf "%s\\n" "$*" >> "$CODEX_TEST_MCP_ADD_LOG"',
+      '  fi',
       '  if [ -n "$CODEX_TEST_MCP_ADD_FAIL" ]; then',
       '    echo "${CODEX_TEST_MCP_ADD_FAIL_MESSAGE:-simulated mcp add failure}" 1>&2',
       '    exit 1',
@@ -118,6 +121,29 @@ describe('codex-orchestrator command surface', () => {
     expect(stdout).toContain('Usage: codex-orchestrator flow');
     expect(stdout).toContain('docs-review');
     expect(stdout).toContain('implementation-gate');
+    expect(stdout).toContain('--auto-issue-log [true|false]');
+    expect(stdout).toContain('--repo-config-required [true|false]');
+  }, TEST_TIMEOUT);
+
+  it('prints start help without preparing a run', async () => {
+    const { stdout } = await runCli(['start', '--help']);
+    expect(stdout).toContain('Usage: codex-orchestrator start');
+    expect(stdout).toContain('Start a new run');
+    expect(stdout).toContain('--auto-issue-log [true|false]');
+    expect(stdout).toContain('--repo-config-required [true|false]');
+    expect(stdout).not.toContain('Run started:');
+  }, TEST_TIMEOUT);
+
+  it('prints plan help', async () => {
+    const { stdout } = await runCli(['plan', '--help']);
+    expect(stdout).toContain('Usage: codex-orchestrator plan');
+    expect(stdout).toContain('Preview pipeline stages without executing.');
+  }, TEST_TIMEOUT);
+
+  it('prints init help without executing init', async () => {
+    const { stdout } = await runCli(['init', '--help']);
+    expect(stdout).toContain('Usage: codex-orchestrator init codex');
+    expect(stdout).toContain('codex.orchestrator.json');
   }, TEST_TIMEOUT);
 
   it('accepts scoped aliases for the matching flow pipeline and rejects scope-mismatched aliases', async () => {
@@ -269,6 +295,432 @@ describe('codex-orchestrator command surface', () => {
       expect.arrayContaining([expect.objectContaining({ code: 'missing_environment' })])
     );
     expect(payload.cloud_preflight?.guidance?.join('\n')).toContain('CODEX_CLOUD_ENV_ID');
+  }, TEST_TIMEOUT);
+
+  it('writes doctor issue logs and bundles with downstream run context', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'co-cli-doctor-issue-log-'));
+    const fakeCodex = await writeFakeCodexBinary(tempDir);
+    const issueLogPath = join(tempDir, 'docs', 'codex-orchestrator-issues.md');
+    const config = {
+      defaultPipeline: 'diagnostics',
+      pipelines: [
+        {
+          id: 'diagnostics',
+          title: 'Diagnostics',
+          guardrailsRequired: false,
+          stages: [
+            {
+              kind: 'command',
+              id: 'smoke',
+              title: 'smoke',
+              command: 'node -e "console.log(\'scenario-ok\')"'
+            }
+          ]
+        }
+      ]
+    };
+    await writeFile(join(tempDir, 'codex.orchestrator.json'), `${JSON.stringify(config, null, 2)}\n`);
+    const env = {
+      ...process.env,
+      CODEX_CLI_BIN: fakeCodex,
+      CODEX_ORCHESTRATOR_ROOT: tempDir,
+      CODEX_ORCHESTRATOR_RUNS_DIR: join(tempDir, '.runs'),
+      CODEX_ORCHESTRATOR_OUT_DIR: join(tempDir, 'out'),
+      MCP_RUNNER_TASK_ID: 'scenario-issue-log',
+      CODEX_CLOUD_ENV_ID: '',
+      CODEX_CLOUD_BRANCH: ''
+    };
+
+    const { stdout: startStdout } = await runCli(
+      ['start', 'diagnostics', '--format', 'json', '--task', 'scenario-issue-log'],
+      env,
+      FLOW_TARGET_TEST_TIMEOUT
+    );
+    const startJsonOffset = startStdout.indexOf('{');
+    const startPayload = JSON.parse(startJsonOffset >= 0 ? startStdout.slice(startJsonOffset) : startStdout) as {
+      run_id?: string;
+    };
+    expect(startPayload.run_id).toBeTruthy();
+
+    const { stdout } = await runCli(
+      [
+        'doctor',
+        '--format',
+        'json',
+        '--issue-log',
+        '--issue-title',
+        'Scenario issue capture',
+        '--issue-notes',
+        'Simulated downstream failure reproduction.',
+        '--issue-log-path',
+        issueLogPath,
+        '--task',
+        'scenario-issue-log',
+        '--cloud-preflight'
+      ],
+      env,
+      FLOW_TARGET_TEST_TIMEOUT
+    );
+    const payload = JSON.parse(stdout) as {
+      issue_log?: {
+        issue_log_path?: string;
+        bundle_path?: string;
+        run_context?: {
+          run_id?: string;
+        } | null;
+      };
+      cloud_preflight?: {
+        ok?: boolean;
+        issues?: Array<{ code?: string }>;
+      };
+    };
+    expect(payload.issue_log).toBeTruthy();
+    expect(payload.issue_log?.run_context?.run_id).toBe(startPayload.run_id);
+    expect(payload.cloud_preflight?.ok).toBe(false);
+    expect(payload.cloud_preflight?.issues).toEqual(
+      expect.arrayContaining([expect.objectContaining({ code: 'missing_environment' })])
+    );
+
+    const issueLogOutputPath = payload.issue_log?.issue_log_path ?? issueLogPath;
+    const issueLogOutputResolved = isAbsolute(issueLogOutputPath)
+      ? issueLogOutputPath
+      : join(process.cwd(), issueLogOutputPath);
+    const issueLogContent = await readFile(issueLogOutputResolved, 'utf8');
+    expect(issueLogContent).toContain('Scenario issue capture');
+    expect(issueLogContent).toContain('missing_environment');
+    expect(issueLogContent).toContain(startPayload.run_id ?? '');
+
+    const bundleOutputPath = payload.issue_log?.bundle_path ?? '';
+    const bundleOutputResolved = isAbsolute(bundleOutputPath)
+      ? bundleOutputPath
+      : join(process.cwd(), bundleOutputPath);
+    const bundlePayload = JSON.parse(await readFile(bundleOutputResolved, 'utf8')) as {
+      run_context?: {
+        run_id?: string;
+      } | null;
+      cloud_preflight?: {
+        issues?: Array<{ code?: string }>;
+      } | null;
+    };
+    expect(bundlePayload.run_context?.run_id).toBe(startPayload.run_id);
+    expect(bundlePayload.cloud_preflight?.issues).toEqual(
+      expect.arrayContaining([expect.objectContaining({ code: 'missing_environment' })])
+    );
+  }, FLOW_TARGET_TEST_TIMEOUT);
+
+  it('auto-captures failure issue log for start when --auto-issue-log is enabled', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'co-cli-start-auto-issue-log-'));
+    const config = {
+      defaultPipeline: 'diagnostics',
+      pipelines: [
+        {
+          id: 'diagnostics',
+          title: 'Diagnostics',
+          guardrailsRequired: false,
+          stages: [
+            {
+              kind: 'command',
+              id: 'fail-stage',
+              title: 'fail-stage',
+              command: 'node -e "process.exit(3)"'
+            }
+          ]
+        }
+      ]
+    };
+    await writeFile(join(tempDir, 'codex.orchestrator.json'), `${JSON.stringify(config, null, 2)}\n`);
+    const env = {
+      ...process.env,
+      CODEX_ORCHESTRATOR_ROOT: tempDir,
+      CODEX_ORCHESTRATOR_RUNS_DIR: join(tempDir, '.runs'),
+      CODEX_ORCHESTRATOR_OUT_DIR: join(tempDir, 'out'),
+      MCP_RUNNER_TASK_ID: 'start-auto-issue-log'
+    };
+    const { stdout } = await runCli(
+      ['start', 'diagnostics', '--format', 'json', '--task', 'start-auto-issue-log', '--auto-issue-log'],
+      env,
+      FLOW_TARGET_TEST_TIMEOUT
+    );
+    const jsonStart = stdout.indexOf('{');
+    const payload = JSON.parse(jsonStart >= 0 ? stdout.slice(jsonStart) : stdout) as {
+      status?: string;
+      run_id?: string;
+      issue_log?: {
+        issue_log_path?: string;
+        bundle_path?: string;
+        run_context?: {
+          run_id?: string;
+        } | null;
+      } | null;
+      issue_log_error?: string | null;
+    };
+    expect(payload.status).toBe('failed');
+    expect(payload.issue_log_error ?? null).toBeNull();
+    expect(payload.issue_log).toBeTruthy();
+    expect(payload.issue_log?.run_context?.run_id).toBe(payload.run_id);
+
+    const issueLogOutputPath = payload.issue_log?.issue_log_path ?? '';
+    const issueLogOutputResolved = isAbsolute(issueLogOutputPath)
+      ? issueLogOutputPath
+      : join(process.cwd(), issueLogOutputPath);
+    const issueLogContent = await readFile(issueLogOutputResolved, 'utf8');
+    expect(issueLogContent).toContain('Auto issue log: start diagnostics failed');
+    expect(issueLogContent).toContain(payload.run_id ?? '');
+
+    const bundleOutputPath = payload.issue_log?.bundle_path ?? '';
+    const bundleOutputResolved = isAbsolute(bundleOutputPath)
+      ? bundleOutputPath
+      : join(process.cwd(), bundleOutputPath);
+    const bundlePayload = JSON.parse(await readFile(bundleOutputResolved, 'utf8')) as {
+      run_context?: {
+        run_id?: string;
+      } | null;
+    };
+    expect(bundlePayload.run_context?.run_id).toBe(payload.run_id);
+  }, FLOW_TARGET_TEST_TIMEOUT);
+
+  it('uses failed manifest task_id for start auto issue-log task filtering', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'co-cli-start-auto-issue-log-task-filter-'));
+    const config = {
+      defaultPipeline: 'diagnostics',
+      pipelines: [
+        {
+          id: 'diagnostics',
+          title: 'Diagnostics',
+          guardrailsRequired: false,
+          stages: [
+            {
+              kind: 'command',
+              id: 'fail-stage',
+              title: 'fail-stage',
+              command: 'node -e "process.exit(7)"'
+            }
+          ]
+        }
+      ]
+    };
+    await writeFile(join(tempDir, 'codex.orchestrator.json'), `${JSON.stringify(config, null, 2)}\n`);
+    const env = {
+      ...process.env,
+      CODEX_ORCHESTRATOR_ROOT: tempDir,
+      CODEX_ORCHESTRATOR_RUNS_DIR: join(tempDir, '.runs'),
+      CODEX_ORCHESTRATOR_OUT_DIR: join(tempDir, 'out'),
+      MCP_RUNNER_TASK_ID: 'start-auto-issue-log-actual',
+      TASK: 'stale-task-id'
+    };
+    const { stdout } = await runCli(['start', 'diagnostics', '--format', 'json', '--auto-issue-log'], env, FLOW_TARGET_TEST_TIMEOUT);
+    const jsonStart = stdout.indexOf('{');
+    const payload = JSON.parse(jsonStart >= 0 ? stdout.slice(jsonStart) : stdout) as {
+      status?: string;
+      run_id?: string;
+      issue_log?: {
+        bundle_path?: string;
+        run_context?: { run_id?: string } | null;
+      } | null;
+      issue_log_error?: string | null;
+    };
+    expect(payload.status).toBe('failed');
+    expect(payload.issue_log_error ?? null).toBeNull();
+    expect(payload.issue_log?.run_context?.run_id).toBe(payload.run_id);
+
+    const bundleOutputPath = payload.issue_log?.bundle_path ?? '';
+    const bundleOutputResolved = isAbsolute(bundleOutputPath)
+      ? bundleOutputPath
+      : join(process.cwd(), bundleOutputPath);
+    const normalizedBundlePath = bundleOutputResolved.replace(/\\/g, '/');
+    expect(normalizedBundlePath).toContain('/out/start-auto-issue-log-actual/');
+    expect(normalizedBundlePath).not.toContain('/out/stale-task-id/');
+  }, FLOW_TARGET_TEST_TIMEOUT);
+
+  it('auto-captures issue log for start failures before run manifest creation', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'co-cli-start-auto-issue-log-pre-manifest-'));
+    const fakeCodex = await writeFakeCodexBinary(tempDir);
+    const env = {
+      ...process.env,
+      CODEX_ORCHESTRATOR_ROOT: tempDir,
+      CODEX_ORCHESTRATOR_RUNS_DIR: join(tempDir, '.runs'),
+      CODEX_ORCHESTRATOR_OUT_DIR: join(tempDir, 'out'),
+      CODEX_HOME: join(tempDir, 'codex-home'),
+      CODEX_CLI_BIN: fakeCodex,
+      MCP_RUNNER_TASK_ID: 'start-pre-manifest-issue-log'
+    };
+    await expect(
+      runCli(
+        [
+          'start',
+          'diagnostics',
+          '--task',
+          'start-pre-manifest-issue-log',
+          '--repo-config-required',
+          '--auto-issue-log'
+        ],
+        env,
+        FLOW_TARGET_TEST_TIMEOUT
+      )
+    ).rejects.toMatchObject({
+      stderr: expect.stringContaining('Auto issue log: saved to')
+    });
+
+    const issueLogContent = await readFile(join(tempDir, 'docs', 'codex-orchestrator-issues.md'), 'utf8');
+    expect(issueLogContent).toContain('Auto issue log: start diagnostics failed before run manifest');
+  }, FLOW_TARGET_TEST_TIMEOUT);
+
+  it('auto-captures issue log for flow failures before run manifest creation', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'co-cli-flow-auto-issue-log-pre-manifest-'));
+    const fakeCodex = await writeFakeCodexBinary(tempDir);
+    const env = {
+      ...process.env,
+      CODEX_ORCHESTRATOR_ROOT: tempDir,
+      CODEX_ORCHESTRATOR_RUNS_DIR: join(tempDir, '.runs'),
+      CODEX_ORCHESTRATOR_OUT_DIR: join(tempDir, 'out'),
+      CODEX_HOME: join(tempDir, 'codex-home'),
+      CODEX_CLI_BIN: fakeCodex,
+      MCP_RUNNER_TASK_ID: 'flow-pre-manifest-issue-log'
+    };
+    await expect(
+      runCli(
+        [
+          'flow',
+          '--task',
+          'flow-pre-manifest-issue-log',
+          '--repo-config-required',
+          '--auto-issue-log'
+        ],
+        env,
+        FLOW_TARGET_TEST_TIMEOUT
+      )
+    ).rejects.toMatchObject({
+      stderr: expect.stringContaining('Auto issue log: saved to')
+    });
+
+    const issueLogContent = await readFile(join(tempDir, 'docs', 'codex-orchestrator-issues.md'), 'utf8');
+    expect(issueLogContent).toContain('Auto issue log: flow failed before run manifest');
+  }, FLOW_TARGET_TEST_TIMEOUT);
+
+  it('auto-captures failure issue log for flow when CODEX_ORCHESTRATOR_AUTO_ISSUE_LOG=1', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'co-cli-flow-auto-issue-log-'));
+    const config = {
+      defaultPipeline: 'docs-review',
+      pipelines: [
+        {
+          id: 'docs-review',
+          title: 'Docs Review',
+          guardrailsRequired: false,
+          stages: [
+            {
+              kind: 'command',
+              id: 'docs-fail',
+              title: 'docs-fail',
+              command: 'node -e "process.exit(5)"'
+            }
+          ]
+        },
+        {
+          id: 'implementation-gate',
+          title: 'Implementation Gate',
+          guardrailsRequired: false,
+          stages: [
+            {
+              kind: 'command',
+              id: 'impl-pass',
+              title: 'impl-pass',
+              command: 'node -e "process.exit(0)"'
+            }
+          ]
+        }
+      ]
+    };
+    await writeFile(join(tempDir, 'codex.orchestrator.json'), `${JSON.stringify(config, null, 2)}\n`);
+    const env = {
+      ...process.env,
+      CODEX_ORCHESTRATOR_ROOT: tempDir,
+      CODEX_ORCHESTRATOR_RUNS_DIR: join(tempDir, '.runs'),
+      CODEX_ORCHESTRATOR_OUT_DIR: join(tempDir, 'out'),
+      MCP_RUNNER_TASK_ID: 'flow-auto-issue-log',
+      CODEX_ORCHESTRATOR_AUTO_ISSUE_LOG: '1'
+    };
+
+    let stdout = '';
+    try {
+      await runCli(['flow', '--format', 'json', '--task', 'flow-auto-issue-log'], env, FLOW_TARGET_TEST_TIMEOUT);
+      throw new Error('expected flow to fail');
+    } catch (error) {
+      stdout = (error as { stdout?: string }).stdout ?? '';
+    }
+    const jsonStart = stdout.indexOf('{');
+    const payload = JSON.parse(jsonStart >= 0 ? stdout.slice(jsonStart) : stdout) as {
+      failed_stage?: string | null;
+      docs_review?: { run_id?: string };
+      issue_log?: {
+        issue_log_path?: string;
+        run_context?: {
+          run_id?: string;
+        } | null;
+      } | null;
+      issue_log_error?: string | null;
+    };
+    expect(payload.failed_stage).toBe('docs-review');
+    expect(payload.issue_log_error ?? null).toBeNull();
+    expect(payload.issue_log).toBeTruthy();
+    expect(payload.issue_log?.run_context?.run_id).toBe(payload.docs_review?.run_id);
+
+    const issueLogOutputPath = payload.issue_log?.issue_log_path ?? '';
+    const issueLogOutputResolved = isAbsolute(issueLogOutputPath)
+      ? issueLogOutputPath
+      : join(process.cwd(), issueLogOutputPath);
+    const issueLogContent = await readFile(issueLogOutputResolved, 'utf8');
+    expect(issueLogContent).toContain('Auto issue log: flow docs-review failed');
+    expect(issueLogContent).toContain(payload.docs_review?.run_id ?? '');
+  }, FLOW_TARGET_TEST_TIMEOUT);
+
+  it('fails fast when --repo-config-required is enabled and repo config is missing', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'co-cli-plan-strict-repo-config-'));
+    const env = {
+      ...process.env,
+      CODEX_ORCHESTRATOR_ROOT: tempDir,
+      CODEX_ORCHESTRATOR_RUNS_DIR: join(tempDir, '.runs'),
+      CODEX_ORCHESTRATOR_OUT_DIR: join(tempDir, 'out')
+    };
+    await expect(
+      runCli(['plan', 'docs-review', '--repo-config-required'], env)
+    ).rejects.toMatchObject({
+      stderr: expect.stringContaining('Repo-local codex.orchestrator.json is required')
+    });
+  }, TEST_TIMEOUT);
+
+  it('allows disabling strict repo config mode per command with --repo-config-required=false', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'co-cli-plan-strict-override-'));
+    const env = {
+      ...process.env,
+      CODEX_ORCHESTRATOR_ROOT: tempDir,
+      CODEX_ORCHESTRATOR_RUNS_DIR: join(tempDir, '.runs'),
+      CODEX_ORCHESTRATOR_OUT_DIR: join(tempDir, 'out'),
+      CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED: '1'
+    };
+    const { stdout } = await runCli(['plan', 'docs-review', '--format', 'json', '--repo-config-required=false'], env);
+    const jsonStart = stdout.indexOf('{');
+    const payload = JSON.parse(jsonStart >= 0 ? stdout.slice(jsonStart) : stdout) as {
+      pipeline?: { id?: string };
+    };
+    expect(payload.pipeline?.id).toBe('docs-review');
+  }, TEST_TIMEOUT);
+
+  it('warns when plan uses packaged fallback config', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'co-cli-plan-package-fallback-'));
+    const env = {
+      ...process.env,
+      CODEX_ORCHESTRATOR_ROOT: tempDir,
+      CODEX_ORCHESTRATOR_RUNS_DIR: join(tempDir, '.runs'),
+      CODEX_ORCHESTRATOR_OUT_DIR: join(tempDir, 'out'),
+      MCP_RUNNER_TASK_ID: 'plan-package-fallback'
+    };
+    const { stdout, stderr } = await runCli(['plan', 'docs-review', '--format', 'json'], env);
+    const jsonStart = stdout.indexOf('{');
+    const payload = JSON.parse(jsonStart >= 0 ? stdout.slice(jsonStart) : stdout) as {
+      pipeline?: { id?: string };
+    };
+    expect(payload.pipeline?.id).toBe('docs-review');
+    expect(stderr).toContain('Using packaged fallback codex.orchestrator.json');
   }, TEST_TIMEOUT);
 
   it('returns terminal failed status when strict cloud preflight fails', async () => {
@@ -648,6 +1100,18 @@ describe('codex-orchestrator command surface', () => {
     expect(payload.steps?.skills?.note).toContain('without overwriting existing files by default');
   }, TEST_TIMEOUT);
 
+  it('quotes shell-sensitive repo args in setup delegation preview output', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'co-cli-setup-plan-repo-quote-'));
+    const repoRoot = join(tempDir, 'repo;quoted');
+    await mkdir(repoRoot, { recursive: true });
+    const env = {
+      ...process.env,
+      CODEX_HOME: join(tempDir, 'codex-home')
+    };
+    const { stdout } = await runCli(['setup', '--repo', repoRoot], env);
+    expect(stdout).toContain(`- Delegation: codex-orchestrator delegation setup --yes --repo '${repoRoot}'`);
+  }, TEST_TIMEOUT);
+
   it('supports equals-style setup --format=json', async () => {
     tempDir = await mkdtemp(join(tmpdir(), 'co-cli-setup-plan-equals-'));
     const env = {
@@ -742,6 +1206,113 @@ describe('codex-orchestrator command surface', () => {
     expect(content).not.toBe('MARKER\n');
     expect(content).toContain('docs-first');
   }, FLOW_TARGET_TEST_TIMEOUT);
+
+  it('delegation setup --yes preserves explicit repo pin in mcp add command', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'co-cli-delegation-setup-repo-'));
+    const fakeCodex = await writeFakeCodexBinary(tempDir);
+    const codexHome = join(tempDir, 'codex-home');
+    const repoRoot = join(tempDir, 'repo with spaces');
+    const addLog = join(tempDir, 'mcp-add.log');
+    await mkdir(repoRoot, { recursive: true });
+
+    const env = {
+      ...process.env,
+      CODEX_HOME: codexHome,
+      CODEX_CLI_BIN: fakeCodex,
+      CODEX_TEST_MCP_ADD_LOG: addLog
+    };
+
+    await runCli(['delegation', 'setup', '--yes', '--repo', repoRoot], env, FLOW_TARGET_TEST_TIMEOUT);
+    const log = await readFile(addLog, 'utf8');
+    expect(log).toContain('mcp add delegation');
+    expect(log).toContain(`--repo ${repoRoot}`);
+  }, FLOW_TARGET_TEST_TIMEOUT);
+
+  it('delegation setup --yes reconfigures unpinned fallback entries when mcp get is unavailable', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'co-cli-delegation-setup-fallback-repin-'));
+    const fakeCodex = await writeFakeCodexBinary(tempDir);
+    const codexHome = join(tempDir, 'codex-home');
+    const repoRoot = join(tempDir, 'repo');
+    const addLog = join(tempDir, 'mcp-add.log');
+    await mkdir(repoRoot, { recursive: true });
+    await mkdir(codexHome, { recursive: true });
+    await writeFile(
+      join(codexHome, 'config.toml'),
+      [
+        '[mcp_servers.delegation]',
+        'command = "codex-orchestrator"',
+        'args = ["delegate-server"]',
+        '[mcp_servers.delegation.env]',
+        'KEEP_ME = "1"'
+      ].join('\n'),
+      'utf8'
+    );
+
+    const env = {
+      ...process.env,
+      CODEX_HOME: codexHome,
+      CODEX_CLI_BIN: fakeCodex,
+      CODEX_TEST_MCP_ADD_LOG: addLog
+    };
+
+    await runCli(['delegation', 'setup', '--yes', '--repo', repoRoot], env, FLOW_TARGET_TEST_TIMEOUT);
+    const log = await readFile(addLog, 'utf8');
+    expect(log).toContain('mcp add delegation');
+    expect(log).toContain('--env KEEP_ME=1');
+    expect(log).toContain(`--repo ${repoRoot}`);
+  }, FLOW_TARGET_TEST_TIMEOUT);
+
+  it('delegation setup plan includes explicit repo pin', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'co-cli-delegation-setup-plan-'));
+    const fakeCodex = await writeFakeCodexBinary(tempDir);
+    const repoRoot = join(tempDir, 'repo');
+    await mkdir(repoRoot, { recursive: true });
+    const env = {
+      ...process.env,
+      CODEX_HOME: join(tempDir, 'codex-home'),
+      CODEX_CLI_BIN: fakeCodex
+    };
+
+    const { stdout } = await runCli(['delegation', 'setup', '--format', 'json', '--repo', repoRoot], env);
+    const payload = JSON.parse(stdout) as { plan?: { commandLine?: string } };
+    expect(payload.plan?.commandLine).toContain('--repo');
+    expect(payload.plan?.commandLine).toContain(repoRoot);
+  }, TEST_TIMEOUT);
+
+  it('delegation setup normalizes relative repo pin to absolute path', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'co-cli-delegation-setup-relative-'));
+    const fakeCodex = await writeFakeCodexBinary(tempDir);
+    const repoRoot = join(tempDir, 'repo');
+    await mkdir(repoRoot, { recursive: true });
+    const repoArg = relative(process.cwd(), repoRoot);
+    const env = {
+      ...process.env,
+      CODEX_HOME: join(tempDir, 'codex-home'),
+      CODEX_CLI_BIN: fakeCodex
+    };
+
+    const { stdout } = await runCli(['delegation', 'setup', '--format', 'json', '--repo', repoArg], env);
+    const payload = JSON.parse(stdout) as { plan?: { commandLine?: string; repoRoot?: string } };
+    expect(payload.plan?.repoRoot).toBe(repoRoot);
+    expect(payload.plan?.commandLine).toContain(`--repo ${repoRoot}`);
+    expect(payload.plan?.commandLine).not.toContain(`--repo ${repoArg}`);
+  }, TEST_TIMEOUT);
+
+  it('delegation setup plan safely quotes shell-sensitive repo pins', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'co-cli-delegation-setup-quoted-'));
+    const fakeCodex = await writeFakeCodexBinary(tempDir);
+    const repoRoot = join(tempDir, 'repo;tmp');
+    await mkdir(repoRoot, { recursive: true });
+    const env = {
+      ...process.env,
+      CODEX_HOME: join(tempDir, 'codex-home'),
+      CODEX_CLI_BIN: fakeCodex
+    };
+
+    const { stdout } = await runCli(['delegation', 'setup', '--format', 'json', '--repo', repoRoot], env);
+    const payload = JSON.parse(stdout) as { plan?: { commandLine?: string } };
+    expect(payload.plan?.commandLine).toContain(`--repo '${repoRoot}'`);
+  }, TEST_TIMEOUT);
 
   it('supports quoted exec commands passed as a single token', async () => {
     tempDir = await mkdtemp(join(tmpdir(), 'co-cli-surface-'));

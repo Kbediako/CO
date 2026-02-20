@@ -74,6 +74,85 @@ describe('CodexCloudTaskExecutor', () => {
     expect(runner).toHaveBeenCalledTimes(5);
   });
 
+  it('emits in-progress cloud execution updates before completion', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'cloud-exec-progress-updates-'));
+    const statusUrl = `https://chatgpt.com/codex/tasks/${TASK_ID}`;
+    const runner = vi
+      .fn<Parameters<CloudCommandRunner>, ReturnType<CloudCommandRunner>>()
+      .mockResolvedValueOnce({
+        exitCode: 0,
+        stdout: `Submitted: ${TASK_ID}\n`,
+        stderr: ''
+      })
+      .mockResolvedValueOnce({
+        exitCode: 0,
+        stdout: JSON.stringify({ tasks: [{ id: TASK_ID, url: statusUrl }] }),
+        stderr: ''
+      })
+      .mockResolvedValueOnce({
+        exitCode: 0,
+        stdout: '[READY] test task\n',
+        stderr: ''
+      })
+      .mockResolvedValueOnce({
+        exitCode: 0,
+        stdout: '',
+        stderr: ''
+      });
+    const updates: Array<{
+      taskId: string | null;
+      status: string;
+      statusUrl: string | null;
+      completedAt: string | null;
+    }> = [];
+    const executor = new CodexCloudTaskExecutor({
+      commandRunner: runner,
+      now: () => '2026-02-13T00:00:00.000Z',
+      sleepFn: async () => {}
+    });
+
+    const result = await executor.execute({
+      codexBin: 'codex',
+      prompt: 'Fix the issue',
+      environmentId: 'env_123',
+      repoRoot: root,
+      runDir: join(root, '.runs', 'task', 'cli', 'run-1'),
+      pollIntervalSeconds: 1,
+      timeoutSeconds: 60,
+      attempts: 1,
+      onUpdate: async (cloudExecution) => {
+        updates.push({
+          taskId: cloudExecution.task_id,
+          status: cloudExecution.status,
+          statusUrl: cloudExecution.status_url,
+          completedAt: cloudExecution.completed_at
+        });
+      }
+    });
+
+    expect(result.success).toBe(true);
+    expect(updates[0]).toMatchObject({
+      taskId: null,
+      status: 'queued',
+      completedAt: null
+    });
+    expect(
+      updates.some(
+        (update) =>
+          update.taskId === TASK_ID &&
+          update.status === 'running' &&
+          update.statusUrl === statusUrl &&
+          update.completedAt === null
+      )
+    ).toBe(true);
+    expect(updates.at(-1)).toMatchObject({
+      taskId: TASK_ID,
+      status: 'ready',
+      statusUrl
+    });
+    expect(updates.at(-1)?.completedAt).toBe('2026-02-13T00:00:00.000Z');
+  });
+
   it('treats non-zero pending status responses as in-progress and keeps polling', async () => {
     const root = await mkdtemp(join(tmpdir(), 'cloud-exec-pending-nonzero-'));
     const runner = vi
@@ -365,6 +444,53 @@ describe('CodexCloudTaskExecutor', () => {
     expect(result.cloudExecution.error).toContain('codex cloud status failed 2 times');
     expect(sleepFn).toHaveBeenCalledTimes(1);
     expect(sleepFn.mock.calls[0]?.[0]).toBeLessThanOrEqual(1_000);
+  });
+
+  it('continues execution when onUpdate callback throws', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'cloud-exec-update-callback-failure-'));
+    const runner = vi
+      .fn<Parameters<CloudCommandRunner>, ReturnType<CloudCommandRunner>>()
+      .mockResolvedValueOnce({
+        exitCode: 0,
+        stdout: `Submitted: ${TASK_ID}\n`,
+        stderr: ''
+      })
+      .mockResolvedValueOnce({
+        exitCode: 0,
+        stdout: JSON.stringify({ tasks: [{ id: TASK_ID, url: `https://chatgpt.com/codex/tasks/${TASK_ID}` }] }),
+        stderr: ''
+      })
+      .mockResolvedValueOnce({
+        exitCode: 0,
+        stdout: '[READY] test task\n',
+        stderr: ''
+      })
+      .mockResolvedValueOnce({
+        exitCode: 0,
+        stdout: '',
+        stderr: ''
+      });
+    const executor = new CodexCloudTaskExecutor({
+      commandRunner: runner,
+      sleepFn: async () => {}
+    });
+
+    const result = await executor.execute({
+      codexBin: 'codex',
+      prompt: 'Fix the issue',
+      environmentId: 'env_123',
+      repoRoot: root,
+      runDir: join(root, '.runs', 'task', 'cli', 'run-1'),
+      pollIntervalSeconds: 1,
+      timeoutSeconds: 60,
+      attempts: 1,
+      onUpdate: async () => {
+        throw new Error('persist failed');
+      }
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.notes.some((note) => note.includes('Cloud execution update callback failed: persist failed'))).toBe(true);
   });
 });
 

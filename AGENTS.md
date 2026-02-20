@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp bbd439be415d8b218cbb78e28176375c21f7ab83c9c0866cdea439ca8c50ebfc -->
+<!-- codex:instruction-stamp dd481ef5acff55446aef3b2702473a9abb874bc18f79566c8193cf322670e5f7 -->
 # Codex-Orchestrator Agent Handbook (Template)
 
 Use this repository as the wrapper that coordinates multiple Codex-driven projects. After cloning, replace placeholder metadata (task IDs, documents, SOPs) with values for each downstream initiative while keeping these shared guardrails in place.
@@ -74,9 +74,12 @@ Use this repository as the wrapper that coordinates multiple Codex-driven projec
 - For low-risk tiny changes, use the bounded micro-task path in `docs/micro-task-path.md` (still requires task/spec evidence).
 
 ## Standalone Reviews (Ad-hoc)
-- Use `codex review` for quick reviews during implementation.
+- Prefer `npm run review` for ad-hoc reviews in this repo so task-scoped evidence is captured, delegation MCP remains available by default, and optional runtime guards can be applied when needed.
+- `npm run review` keeps runtime unbounded by default and emits patience-first monitor checkpoints while waiting; tune/disable via `CODEX_REVIEW_MONITOR_INTERVAL_SECONDS`.
+- For large uncommitted diffs, `npm run review` emits scope advisories and prompt shaping; tune thresholds via `CODEX_REVIEW_LARGE_SCOPE_FILE_THRESHOLD` / `CODEX_REVIEW_LARGE_SCOPE_LINE_THRESHOLD`.
+- Use direct `codex review` only for quick best-effort checks when manifest-backed evidence is not needed; if it hangs in delegation startup, switch to `npm run review`.
 - Current Codex CLI behavior: do not combine prompt arguments with `--uncommitted`, `--base`, or `--commit`; use either diff-scoped review (no prompt) or prompt-only review.
-- When you need manifest-backed review evidence, run `TASK=<task-id> NOTES="Goal: ... | Summary: ... | Risks: ..." MANIFEST=<path> npm run review -- --manifest <path>`.
+- When you need manifest-backed review evidence, run `TASK=<task-id> NOTES="Goal: ... | Summary: ... | Risks: ..." MANIFEST=<path> npm run review -- --manifest <path>` (optional failure capture: `--auto-issue-log` or `CODEX_REVIEW_AUTO_ISSUE_LOG=1`).
 - See `docs/standalone-review-guide.md` for the canonical workflow.
 - Prefer the bundled `standalone-review` skill for ad-hoc review steps.
 - Prefer the bundled `elegance-review` skill for the required post-implementation minimality pass.

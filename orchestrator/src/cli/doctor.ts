@@ -18,6 +18,11 @@ import {
 import { resolveCodexHome } from './utils/codexPaths.js';
 import { resolveOptionalDependency, type OptionalResolutionSource } from './utils/optionalDeps.js';
 import { runCloudPreflight, type CloudPreflightIssue } from './utils/cloudPreflight.js';
+import { CommandPlanner } from './adapters/CommandPlanner.js';
+import { PipelineResolver } from './services/pipelineResolver.js';
+import { isRepoConfigRequired } from './config/repoConfigPolicy.js';
+import type { EnvironmentPaths } from './run/environment.js';
+import type { TaskContext } from '../types.js';
 
 const OPTIONAL_DEPENDENCIES = [
   {
@@ -76,6 +81,7 @@ export interface DoctorResult {
     status: 'ok' | 'not_configured' | 'unavailable';
     env_id_configured: boolean;
     branch: string | null;
+    fallback_policy: 'allow' | 'deny';
     enablement: string[];
   };
   delegation: {
@@ -192,6 +198,7 @@ export function runDoctor(cwd: string = process.cwd()): DoctorResult {
       : null;
   const cloudStatus: DoctorResult['cloud']['status'] =
     !cloudCmdAvailable ? 'unavailable' : cloudEnvIdConfigured ? 'ok' : 'not_configured';
+  const cloudFallbackPolicy: DoctorResult['cloud']['fallback_policy'] = resolveCloudFallbackPolicy();
 
   const delegationConfig = inspectDelegationConfig();
   const delegationStatus: DoctorResult['delegation']['status'] =
@@ -220,11 +227,13 @@ export function runDoctor(cwd: string = process.cwd()): DoctorResult {
       status: cloudStatus,
       env_id_configured: cloudEnvIdConfigured,
       branch: cloudBranch,
+      fallback_policy: cloudFallbackPolicy,
       enablement: [
         'Set CODEX_CLOUD_ENV_ID to a valid Codex Cloud environment id.',
         'Optional: set CODEX_CLOUD_BRANCH (must exist on origin).',
         'Then run a pipeline stage in cloud mode with: codex-orchestrator start <pipeline> --cloud --target <stage-id>',
-        'If cloud preflight fails, CO falls back to mcp and records the reason in manifest.summary (surfaced in start output).'
+        'Cloud fallback is a compatibility safety net; prefer fail-fast lanes with CODEX_ORCHESTRATOR_CLOUD_FALLBACK=deny.',
+        'If cloud preflight fails and fallback is allowed, CO falls back to mcp and records the reason in manifest.summary (surfaced in start output).'
       ]
     },
     delegation: {
@@ -259,8 +268,26 @@ export async function runDoctorCloudPreflight(options: {
     ?? normalizeOptionalString(env.MCP_RUNNER_TASK_ID)
     ?? normalizeOptionalString(env.TASK)
     ?? normalizeOptionalString(env.CODEX_ORCHESTRATOR_TASK_ID);
+  const explicitEnvironmentId = normalizeOptionalString(options.environmentId);
+  const strictRepoConfigRequired = isRepoConfigRequired(env);
+  let planMetadataEnvironmentId: string | null = null;
+  let planMetadataIssue: CloudPreflightIssue | null = null;
+  if (!explicitEnvironmentId || strictRepoConfigRequired) {
+    try {
+      planMetadataEnvironmentId = await resolvePlanMetadataCloudEnvironmentId(repoRoot, taskId, env);
+    } catch (error) {
+      if (strictRepoConfigRequired) {
+        const detail = error instanceof Error ? error.message : String(error);
+        planMetadataIssue = {
+          code: 'pipeline_resolution_failed',
+          message: `Pipeline resolution failed during doctor cloud preflight: ${detail}`
+        };
+      }
+    }
+  }
   const environmentId =
-    normalizeOptionalString(options.environmentId)
+    explicitEnvironmentId
+    ?? planMetadataEnvironmentId
     ?? normalizeOptionalString(env.CODEX_CLOUD_ENV_ID)
     ?? resolveTaskMetadataCloudEnvironmentId(repoRoot, taskId);
   const branch = normalizeOptionalBranch(options.branch) ?? normalizeOptionalBranch(env.CODEX_CLOUD_BRANCH);
@@ -272,16 +299,17 @@ export async function runDoctorCloudPreflight(options: {
     branch,
     env
   });
-  const guidance = buildCloudPreflightGuidance(preflight.issues);
+  const issues = planMetadataIssue ? [planMetadataIssue, ...preflight.issues] : preflight.issues;
+  const guidance = buildCloudPreflightGuidance(issues);
 
   return {
-    ok: preflight.ok,
+    ok: preflight.ok && planMetadataIssue === null,
     details: {
       codex_bin: preflight.details.codexBin,
       environment_id: preflight.details.environmentId,
       branch: preflight.details.branch
     },
-    issues: preflight.issues,
+    issues,
     guidance
   };
 }
@@ -405,6 +433,7 @@ export function formatDoctorSummary(result: DoctorResult): string[] {
   lines.push(`Cloud: ${result.cloud.status}`);
   lines.push(`  - CODEX_CLOUD_ENV_ID: ${result.cloud.env_id_configured ? 'set' : 'missing'}`);
   lines.push(`  - CODEX_CLOUD_BRANCH: ${result.cloud.branch ?? '<unset>'}`);
+  lines.push(`  - fallback policy: ${result.cloud.fallback_policy}`);
   for (const line of result.cloud.enablement) {
     lines.push(`  - ${line}`);
   }
@@ -436,6 +465,61 @@ function normalizeOptionalString(value: string | null | undefined): string | nul
 function normalizeOptionalBranch(value: string | null | undefined): string | null {
   const normalized = normalizeOptionalString(value);
   return normalized ? normalized.replace(/^refs\/heads\//u, '') : null;
+}
+
+function resolveCloudFallbackPolicy(env: NodeJS.ProcessEnv = process.env): 'allow' | 'deny' {
+  const raw = normalizeOptionalString(env.CODEX_ORCHESTRATOR_CLOUD_FALLBACK);
+  if (!raw) {
+    return 'allow';
+  }
+  const normalized = raw.toLowerCase();
+  if (['0', 'false', 'off', 'deny', 'disabled', 'never', 'strict'].includes(normalized)) {
+    return 'deny';
+  }
+  return 'allow';
+}
+
+async function resolvePlanMetadataCloudEnvironmentId(
+  repoRoot: string,
+  taskId: string | null,
+  processEnv: NodeJS.ProcessEnv = process.env
+): Promise<string | null> {
+  const env: EnvironmentPaths = {
+    repoRoot,
+    runsRoot: join(repoRoot, '.runs'),
+    outRoot: join(repoRoot, 'out'),
+    taskId: taskId ?? '0101'
+  };
+  const resolver = new PipelineResolver();
+  const resolution = await resolver.resolve(env, { quiet: true, processEnv });
+  const planner = new CommandPlanner(resolution.pipeline);
+  const context: TaskContext = {
+    id: env.taskId,
+    title: env.taskId,
+    metadata: {}
+  };
+  const plan = await planner.plan(context);
+  const selected =
+    plan.items.find((item) => item.id === plan.targetId)
+    ?? plan.items[0]
+    ?? null;
+  if (!selected || !selected.metadata || typeof selected.metadata !== 'object') {
+    return null;
+  }
+  return resolveCloudEnvironmentIdFromMetadata(selected.metadata as Record<string, unknown>);
+}
+
+function resolveCloudEnvironmentIdFromMetadata(metadata: Record<string, unknown>): string | null {
+  const stagePlan = metadata.plan && typeof metadata.plan === 'object'
+    ? (metadata.plan as Record<string, unknown>)
+    : null;
+  const candidates: Array<string | null> = [
+    normalizeOptionalString(typeof stagePlan?.cloudEnvId === 'string' ? stagePlan.cloudEnvId : null),
+    normalizeOptionalString(typeof stagePlan?.cloud_env_id === 'string' ? stagePlan.cloud_env_id : null),
+    normalizeOptionalString(typeof metadata.cloudEnvId === 'string' ? metadata.cloudEnvId : null),
+    normalizeOptionalString(typeof metadata.cloud_env_id === 'string' ? metadata.cloud_env_id : null)
+  ];
+  return candidates.find((value): value is string => Boolean(value)) ?? null;
 }
 
 function resolveTaskMetadataCloudEnvironmentId(repoRoot: string, taskId: string | null): string | null {
@@ -512,6 +596,9 @@ function buildCloudPreflightGuidance(issues: CloudPreflightIssue[]): string[] {
         break;
       case 'git_unavailable':
         guidance.push('Install git or run with CODEX_CLOUD_BRANCH unset to skip remote branch verification.');
+        break;
+      case 'pipeline_resolution_failed':
+        guidance.push('Fix pipeline/config resolution errors before cloud runs (run `codex-orchestrator init codex`).');
         break;
       default:
         break;

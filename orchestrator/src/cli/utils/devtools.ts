@@ -5,6 +5,7 @@ import process from 'node:process';
 import { EnvUtils } from '../../../../packages/shared/config/env.js';
 import { resolveCodexCliBin } from './codexCli.js';
 import { resolveCodexHome } from './codexPaths.js';
+import { buildCommandPreview } from './commandPreview.js';
 
 export const DEVTOOLS_SKILL_NAME = 'chrome-devtools';
 export const DEVTOOLS_CONFIG_OVERRIDE = 'mcp_servers.chrome-devtools.enabled=true';
@@ -107,7 +108,7 @@ export function buildDevtoolsSetupPlan(env: NodeJS.ProcessEnv = process.env): De
     configPath,
     command,
     args,
-    commandLine: [command, ...args].join(' '),
+    commandLine: buildCommandPreview(command, args),
     configSnippet: DEVTOOLS_CONFIG_SNIPPET
   };
 }

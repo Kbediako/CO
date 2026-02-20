@@ -20,10 +20,13 @@ describe('initCodexTemplates', () => {
 
     const first = await initCodexTemplates({ template: 'codex', cwd: tempDir, force: false });
     expect(first.written.some((filePath) => filePath.endsWith('mcp-client.json'))).toBe(true);
+    expect(first.written.some((filePath) => filePath.endsWith('codex.orchestrator.json'))).toBe(true);
 
     const templatePath = path.join(tempDir, 'mcp-client.json');
     const contents = await readFile(templatePath, 'utf8');
     expect(contents).toContain('"templateVersion"');
+    const pipelineConfig = await readFile(path.join(tempDir, 'codex.orchestrator.json'), 'utf8');
+    expect(pipelineConfig).toContain('"pipelines"');
 
     const second = await initCodexTemplates({ template: 'codex', cwd: tempDir, force: false });
     expect(second.written).toHaveLength(0);
@@ -32,5 +35,6 @@ describe('initCodexTemplates', () => {
     const summary = formatInitSummary(first, tempDir).join('\n');
     expect(summary).toContain('Written:');
     expect(summary).toContain('mcp-client.json');
+    expect(summary).toContain('codex.orchestrator.json');
   });
 });
