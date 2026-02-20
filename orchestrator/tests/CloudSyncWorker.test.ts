@@ -34,10 +34,12 @@ const readAuditLog = async (outDir: string, summary: RunSummary): Promise<string
       return await readFile(auditPath, 'utf-8');
     } catch (error) {
       const err = error as NodeJS.ErrnoException;
-      if (err.code !== 'ENOENT' || attempt === 39) {
+      if (err.code !== 'ENOENT') {
         throw error;
       }
-      await new Promise((resolve) => setTimeout(resolve, 10));
+      if (attempt < 39) {
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
     }
   }
   throw new Error(`unable to read audit log: ${auditPath}`);
