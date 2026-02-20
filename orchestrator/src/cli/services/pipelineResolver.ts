@@ -89,7 +89,7 @@ export class PipelineResolver {
     const resolvedAlias = this.resolvePipelineAlias(pipelineCandidate);
     const requestedPipelineId = resolvedAlias.pipelineId;
 
-    const envOverrides = this.resolveDesignEnvOverrides(designConfig, requestedPipelineId);
+    const envOverrides = this.resolveDesignEnvOverrides(designConfig, requestedPipelineId, runtimeEnv);
     if (resolvedAlias.devtoolsRequested) {
       envOverrides.CODEX_REVIEW_DEVTOOLS = '1';
       this.logWarn(
@@ -143,12 +143,13 @@ export class PipelineResolver {
 
   resolveDesignEnvOverrides(
     designConfig: DesignConfigLoadResult,
-    pipelineId?: string
+    pipelineId?: string,
+    runtimeEnv: NodeJS.ProcessEnv = process.env
   ): NodeJS.ProcessEnv {
     const envOverrides: NodeJS.ProcessEnv = {
       DESIGN_CONFIG_PATH: designConfig.path
     };
-    if (pipelineId === designPipelineId(designConfig) && process.env.DESIGN_PIPELINE === undefined) {
+    if (pipelineId === designPipelineId(designConfig) && runtimeEnv.DESIGN_PIPELINE === undefined) {
       envOverrides.DESIGN_PIPELINE = '1';
     }
     return envOverrides;

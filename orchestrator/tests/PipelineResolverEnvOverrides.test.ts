@@ -79,6 +79,27 @@ describe('PipelineResolver env overrides', () => {
     expect(result.envOverrides.DESIGN_CONFIG_PATH).toBe(join(workspaceRoot, 'design.config.yaml'));
   });
 
+  it('respects caller-provided processEnv when deciding DESIGN_PIPELINE override', async () => {
+    const env: EnvironmentPaths = {
+      repoRoot: workspaceRoot,
+      runsRoot: join(workspaceRoot, '.runs'),
+      outRoot: join(workspaceRoot, 'out'),
+      taskId: 'task-design'
+    };
+
+    const resolver = new PipelineResolver();
+    const result = await resolver.resolve(env, {
+      pipelineId: 'design-reference',
+      processEnv: {
+        ...process.env,
+        DESIGN_PIPELINE: '0'
+      }
+    });
+
+    expect(result.envOverrides.DESIGN_PIPELINE).toBeUndefined();
+    expect(result.envOverrides.DESIGN_CONFIG_PATH).toBe(join(workspaceRoot, 'design.config.yaml'));
+  });
+
   it('logs design defaults usage when repo design config is missing', async () => {
     const env: EnvironmentPaths = {
       repoRoot: workspaceRoot,
