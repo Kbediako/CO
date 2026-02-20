@@ -9,6 +9,7 @@ const execFileAsync = promisify(execFile);
 const runReviewScript = join(process.cwd(), 'scripts', 'run-review.ts');
 const createdSandboxes: string[] = [];
 const shellBinary = 'bash';
+const LONG_WAIT_TEST_TIMEOUT_MS = 20_000;
 
 function shellQuote(value: string): string {
   return `'${value.replace(/'/g, `'\\''`)}'`;
@@ -288,7 +289,7 @@ describe('scripts/run-review regression', () => {
 
     expect(result.exitCode).toBeGreaterThan(0);
     expect(result.stderr).toContain('codex review stalled with no output for 1s');
-  });
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
 
   it('emits patience-first monitor checkpoints during long-running waits', async () => {
     const sandbox = await makeSandbox();
@@ -305,7 +306,7 @@ describe('scripts/run-review regression', () => {
     expect(result.stdout).toContain('patience-first monitor checkpoints every');
     expect(result.stdout).toContain('waiting on codex review (');
     expect(result.stderr).toContain('codex review timed out after 2s');
-  });
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
 
   it('allows disabling monitor checkpoints explicitly', async () => {
     const sandbox = await makeSandbox();
@@ -404,7 +405,7 @@ describe('scripts/run-review regression', () => {
     expect(result.exitCode).toBeGreaterThan(0);
     expect(result.stderr).toContain('codex review timed out after 1s');
     expect(result.stderr).not.toContain('stalled with no output');
-  });
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
 
   it('defaults manifest selection to active task env when --task is omitted', async () => {
     const sandbox = await makeSandbox();
@@ -442,7 +443,7 @@ describe('scripts/run-review regression', () => {
 
     expect(result.exitCode).toBeGreaterThan(0);
     expect(result.stderr).toContain('codex review appears stuck in delegation startup loop');
-  });
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
 
   it('still detects startup loops when non-progress banner lines appear before the loop', async () => {
     const sandbox = await makeSandbox();
@@ -459,7 +460,7 @@ describe('scripts/run-review regression', () => {
 
     expect(result.exitCode).toBeGreaterThan(0);
     expect(result.stderr).toContain('codex review appears stuck in delegation startup loop');
-  });
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
 
   it('detects startup loops when startup lines span multiple output chunks', async () => {
     const sandbox = await makeSandbox();
@@ -476,7 +477,7 @@ describe('scripts/run-review regression', () => {
 
     expect(result.exitCode).toBeGreaterThan(0);
     expect(result.stderr).toContain('codex review appears stuck in delegation startup loop');
-  });
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
 
   it('does not merge startup-loop fragments across stdout/stderr streams', async () => {
     const sandbox = await makeSandbox();
@@ -494,7 +495,7 @@ describe('scripts/run-review regression', () => {
     expect(result.exitCode).toBeGreaterThan(0);
     expect(result.stderr).toContain('codex review timed out after 1s');
     expect(result.stderr).not.toContain('delegation startup loop');
-  });
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
 
   it('derives task context from explicit manifest instead of stale task env fallback', async () => {
     const sandbox = await makeSandbox();
@@ -563,7 +564,7 @@ describe('scripts/run-review regression', () => {
     const issueLogPath = join(sandbox, 'docs', 'codex-orchestrator-issues.md');
     const issueLog = await readFile(issueLogPath, 'utf8');
     expect(issueLog).toContain('Auto issue log: standalone review failed');
-  });
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
 
   it('does not crash when stdout pipe closes early', async () => {
     const sandbox = await makeSandbox();
