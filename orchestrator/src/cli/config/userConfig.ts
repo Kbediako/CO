@@ -12,6 +12,11 @@ export interface UserConfig {
   source?: 'repo' | 'package';
 }
 
+export interface LoadUserConfigOptions {
+  allowPackageFallback?: boolean;
+  quiet?: boolean;
+}
+
 type StageSetRef = { kind: 'stage-set'; ref: string };
 type ConfigStage = PipelineStage | StageSetRef;
 type ConfigPipelineDefinition = Omit<PipelineDefinition, 'stages'> & { stages: ConfigStage[] };
@@ -23,18 +28,28 @@ interface ConfigFile {
   stageSets?: Record<string, PipelineStage[]>;
 }
 
-export async function loadRepoConfig(env: EnvironmentPaths): Promise<UserConfig | null> {
+export async function loadRepoConfig(
+  env: EnvironmentPaths,
+  options: LoadUserConfigOptions = {}
+): Promise<UserConfig | null> {
   const repoConfigPath = join(env.repoRoot, 'codex.orchestrator.json');
   const repoConfig = await readConfig(repoConfigPath);
   if (repoConfig) {
-    logger.info(`[codex-config] Loaded user config from ${repoConfigPath}`);
+    if (!options.quiet) {
+      logger.info(`[codex-config] Loaded user config from ${repoConfigPath}`);
+    }
     return normalizeUserConfig(repoConfig, 'repo');
   }
-  logger.warn(`[codex-config] Missing codex.orchestrator.json at ${repoConfigPath}`);
+  if (!options.quiet) {
+    logger.warn(`[codex-config] Missing codex.orchestrator.json at ${repoConfigPath}`);
+  }
   return null;
 }
 
-export async function loadPackageConfig(env: EnvironmentPaths): Promise<UserConfig | null> {
+export async function loadPackageConfig(
+  env: EnvironmentPaths,
+  options: LoadUserConfigOptions = {}
+): Promise<UserConfig | null> {
   const repoConfigPath = join(env.repoRoot, 'codex.orchestrator.json');
   const packageRoot = findPackageRoot();
   const packageConfigPath = join(packageRoot, 'codex.orchestrator.json');
@@ -43,19 +58,29 @@ export async function loadPackageConfig(env: EnvironmentPaths): Promise<UserConf
   }
   const packageConfig = await readConfig(packageConfigPath);
   if (packageConfig) {
-    logger.info(`[codex-config] Loaded user config from ${packageConfigPath}`);
+    if (!options.quiet) {
+      logger.info(`[codex-config] Loaded user config from ${packageConfigPath}`);
+    }
     return normalizeUserConfig(packageConfig, 'package');
   }
-  logger.warn(`[codex-config] Missing codex.orchestrator.json at ${packageConfigPath}`);
+  if (!options.quiet) {
+    logger.warn(`[codex-config] Missing package config at ${packageConfigPath}`);
+  }
   return null;
 }
 
-export async function loadUserConfig(env: EnvironmentPaths): Promise<UserConfig | null> {
-  const repoConfig = await loadRepoConfig(env);
+export async function loadUserConfig(
+  env: EnvironmentPaths,
+  options: LoadUserConfigOptions = {}
+): Promise<UserConfig | null> {
+  const repoConfig = await loadRepoConfig(env, options);
   if (repoConfig) {
     return repoConfig;
   }
-  return await loadPackageConfig(env);
+  if (options.allowPackageFallback === false) {
+    return null;
+  }
+  return await loadPackageConfig(env, options);
 }
 
 export function findPipeline(config: UserConfig | null, id: string): PipelineDefinition | null {

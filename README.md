@@ -232,6 +232,19 @@ codex-orchestrator doctor --usage
 ```
 `doctor --usage` prints adoption KPIs (advanced/cloud/rlm/collab/delegation coverage), and per-run `run-summary.json` now includes a `usageKpi` section plus cloud fallback metadata when preflight downgrades to MCP.
 
+Issue bundle logging (downstream dogfooding / repro handoff):
+```bash
+codex-orchestrator doctor --issue-log --issue-title "Observed failure" --issue-notes "what happened"
+```
+`doctor --issue-log` appends `docs/codex-orchestrator-issues.md` (override via `--issue-log-path`) and writes a JSON bundle under `out/<resolved-task>/doctor/issue-bundles/` with doctor/cloud context (latest run context is included when available).
+
+Auto-capture issue bundles when runs fail:
+```bash
+codex-orchestrator start <pipeline> --auto-issue-log
+codex-orchestrator flow --task <task-id> --auto-issue-log
+```
+This captures both post-manifest run failures and setup failures that occur before a run manifest is created (for example strict repo-config enforcement).
+
 Cloud preflight check (without starting a pipeline):
 ```bash
 codex-orchestrator doctor --cloud-preflight
@@ -243,10 +256,13 @@ codex-orchestrator doctor --cloud-preflight
 - Enable required MCP servers with least privilege: `codex-orchestrator mcp enable --servers delegation --yes` (plan with `--format json`; omit `--servers` only when you intentionally want all disabled servers enabled; env/secret values are redacted in displayed command lines)
 - Low-friction docs->implementation guardrails: `codex-orchestrator flow --task <task-id>`
 - Validate + measure adoption locally: `codex-orchestrator doctor --usage --format json`
+- Capture reproducible downstream failures: `codex-orchestrator doctor --issue-log --issue-title "<title>" --issue-notes "<notes>"`
+- Auto-capture failed run issue bundles: `codex-orchestrator start <pipeline> --auto-issue-log` or `codex-orchestrator flow --auto-issue-log`
 - Delegation: `codex-orchestrator doctor --apply --yes`, then enable for a Codex run with: `codex -c 'mcp_servers.delegation.enabled=true' ...`
 - Collab (symbolic RLM subagents): `codex-orchestrator rlm --multi-agent auto "<goal>"` (legacy alias: `--collab auto`; requires Codex `features.multi_agent=true`)
 - Cloud: set `CODEX_CLOUD_ENV_ID` (and optional `CODEX_CLOUD_BRANCH`), then run: `codex-orchestrator start <pipeline> --cloud --target <stage-id>`
 - Cloud fail-fast (avoid fallback reliance): set `CODEX_ORCHESTRATOR_CLOUD_FALLBACK=deny`
+- Repo-config fail-fast (deny packaged config fallback): set `CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED=1` or pass `--repo-config-required`
 - Cloud status retry tuning (optional): `CODEX_CLOUD_STATUS_RETRY_LIMIT`, `CODEX_CLOUD_STATUS_RETRY_BACKOFF_MS`
 
 Print DevTools MCP setup guidance:
@@ -256,11 +272,11 @@ codex-orchestrator devtools setup
 
 ## Common commands
 
-- `codex-orchestrator start <pipeline>` — run a pipeline.
-- `codex-orchestrator flow --task <task-id>` — run `docs-review` then `implementation-gate` in sequence.
+- `codex-orchestrator start <pipeline>` — run a pipeline (add `--auto-issue-log` for automatic failure bundle capture; add `--repo-config-required` for strict repo-local config mode).
+- `codex-orchestrator flow --task <task-id>` — run `docs-review` then `implementation-gate` in sequence (supports `--auto-issue-log` and `--repo-config-required`).
 - `codex-orchestrator plan <pipeline>` — preview pipeline stages.
 - `codex-orchestrator exec <cmd>` — run a one-off command with the exec runtime.
-- `codex-orchestrator init codex` — install starter templates (`mcp-client.json`, `AGENTS.md`) into a repo.
+- `codex-orchestrator init codex` — install starter templates (`mcp-client.json`, `AGENTS.md`, `codex.orchestrator.json`) into a repo.
 - `codex-orchestrator setup --yes` — install bundled skills and configure delegation + DevTools wiring (add `--refresh-skills` to overwrite existing skills in `$CODEX_HOME/skills`).
 - `codex-orchestrator init codex --codex-cli --yes --codex-source <path>` — optionally provision a CO-managed Codex CLI binary (build-from-source default; set `CODEX_CLI_SOURCE` to avoid passing `--codex-source` every time, and `CODEX_CLI_USE_MANAGED=1` to route runs to it).
 - `codex-orchestrator init codex --codex-cli --yes --codex-download-url <url> --codex-download-sha256 <sha>` — opt-in to a prebuilt Codex CLI download.

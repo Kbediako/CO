@@ -1374,6 +1374,22 @@
       },
       "created_at": "2026-02-18",
       "completed_at": null
+    },
+    {
+      "id": "0975",
+      "slug": "0975-codex-cli-capability-adoption-redesign",
+      "title": "Codex CLI Capability Adoption + Low-Friction Downstream Reliability",
+      "path": "tasks/tasks-0975-codex-cli-capability-adoption-redesign.md",
+      "kind": "run",
+      "status": "in-progress",
+      "gate": {
+        "phase": "codex-cli-capability-adoption-redesign-planning",
+        "status": "in-progress",
+        "log": null,
+        "run_id": null
+      },
+      "created_at": "2026-02-19",
+      "completed_at": null
     }
   ],
   "specs": [
@@ -1759,6 +1775,22 @@
         "task": "tasks/tasks-0974-cloud-adoption-preflight-reliability.md",
         "agent_task": ".agent/task/0974-cloud-adoption-preflight-reliability.md",
         "docs": "docs/TECH_SPEC-cloud-adoption-preflight-reliability.md"
+      }
+    },
+    {
+      "id": "20260219-0975-codex-cli-capability-adoption-redesign",
+      "title": "Codex CLI Capability Adoption + Low-Friction Downstream Reliability",
+      "relates_to": "tasks/tasks-0975-codex-cli-capability-adoption-redesign.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-02-19",
+      "paths": {
+        "spec": "tasks/specs/0975-codex-cli-capability-adoption-redesign.md",
+        "task": "tasks/tasks-0975-codex-cli-capability-adoption-redesign.md",
+        "agent_task": ".agent/task/0975-codex-cli-capability-adoption-redesign.md",
+        "docs": "docs/TECH_SPEC-codex-cli-capability-adoption-redesign.md"
       }
     }
   ]

@@ -16,6 +16,9 @@ export interface InitResult {
   templateRoot: string;
 }
 
+const CODEX_TEMPLATE = 'codex';
+const CODEX_PIPELINE_CONFIG = 'codex.orchestrator.json';
+
 export async function initCodexTemplates(options: InitOptions): Promise<InitResult> {
   const root = findPackageRoot();
   const templateRoot = join(root, 'templates', options.template);
@@ -28,6 +31,13 @@ export async function initCodexTemplates(options: InitOptions): Promise<InitResu
     written,
     skipped
   });
+  if (options.template === CODEX_TEMPLATE) {
+    await copyTemplateFile(join(root, CODEX_PIPELINE_CONFIG), join(options.cwd, CODEX_PIPELINE_CONFIG), {
+      force: options.force,
+      written,
+      skipped
+    });
+  }
 
   return { written, skipped, templateRoot };
 }
@@ -66,6 +76,24 @@ async function copyTemplateDir(
   }
 }
 
+async function copyTemplateFile(
+  sourcePath: string,
+  targetPath: string,
+  options: { force: boolean; written: string[]; skipped: string[] }
+): Promise<void> {
+  const info = await stat(sourcePath).catch(() => null);
+  if (!info || !info.isFile()) {
+    throw new Error(`Template file not found: ${sourcePath}`);
+  }
+  if (existsSync(targetPath) && !options.force) {
+    options.skipped.push(targetPath);
+    return;
+  }
+  await mkdir(dirname(targetPath), { recursive: true });
+  await copyFile(sourcePath, targetPath);
+  options.written.push(targetPath);
+}
+
 export function formatInitSummary(result: InitResult, cwd: string): string[] {
   const lines: string[] = [];
   if (result.written.length > 0) {
@@ -84,6 +112,9 @@ export function formatInitSummary(result: InitResult, cwd: string): string[] {
     lines.push('No files written.');
   }
   lines.push('Next steps (recommended):');
+  lines.push(
+    '  - Review codex.orchestrator.json and adjust pipeline commands to your repository toolchain'
+  );
   lines.push('  - codex-orchestrator setup --yes  # installs bundled skills + configures delegation/devtools wiring');
   lines.push(
     '  - codex-orchestrator codex setup  # optional managed/pinned Codex CLI (activate with CODEX_CLI_USE_MANAGED=1; stock codex is default)'

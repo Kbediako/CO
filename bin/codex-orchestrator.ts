@@ -25,6 +25,11 @@ import {
   formatDoctorCloudPreflightSummary
 } from '../orchestrator/src/cli/doctor.js';
 import { formatDoctorUsageSummary, runDoctorUsage } from '../orchestrator/src/cli/doctorUsage.js';
+import {
+  formatDoctorIssueLogSummary,
+  type DoctorIssueLogResult,
+  writeDoctorIssueLog
+} from '../orchestrator/src/cli/doctorIssueLog.js';
 import { formatDevtoolsSetupSummary, runDevtoolsSetup } from '../orchestrator/src/cli/devtoolsSetup.js';
 import { formatCodexCliSetupSummary, runCodexCliSetup } from '../orchestrator/src/cli/codexCliSetup.js';
 import { formatDelegationSetupSummary, runDelegationSetup } from '../orchestrator/src/cli/delegationSetup.js';
@@ -35,10 +40,13 @@ import { serveMcp } from '../orchestrator/src/cli/mcp.js';
 import { formatMcpEnableSummary, runMcpEnable } from '../orchestrator/src/cli/mcpEnable.js';
 import { startDelegationServer } from '../orchestrator/src/cli/delegationServer.js';
 import { splitDelegationConfigOverrides } from '../orchestrator/src/cli/config/delegationConfig.js';
+import { buildCommandPreview } from '../orchestrator/src/cli/utils/commandPreview.js';
+import { REPO_CONFIG_REQUIRED_ENV_KEY } from '../orchestrator/src/cli/config/repoConfigPolicy.js';
 
 type ArgMap = Record<string, string | boolean>;
 type OutputFormat = 'json' | 'text';
 type ExecutionModeOption = 'mcp' | 'cloud';
+const AUTO_ISSUE_LOG_ENV_KEY = 'CODEX_ORCHESTRATOR_AUTO_ISSUE_LOG';
 
 interface RunOutputPayload {
   run_id: string;
@@ -48,6 +56,8 @@ interface RunOutputPayload {
   log_path: string | null;
   summary: string | null;
   cloud_fallback_reason: string | null;
+  issue_log: DoctorIssueLogResult | null;
+  issue_log_error: string | null;
 }
 
 interface FlowOutputPayload {
@@ -55,6 +65,8 @@ interface FlowOutputPayload {
   failed_stage: 'docs-review' | 'implementation-gate' | null;
   docs_review: RunOutputPayload;
   implementation_gate: RunOutputPayload | null;
+  issue_log: DoctorIssueLogResult | null;
+  issue_log_error: string | null;
 }
 
 interface SetupGuidancePayload {
@@ -157,6 +169,7 @@ function parseArgs(raw: string[]): { positionals: string[]; flags: ArgMap } {
   const queue = [...raw];
   const booleanFlagKeys = new Set([
     'apply',
+    'auto-issue-log',
     'cloud',
     'cloud-preflight',
     'codex-cli',
@@ -167,8 +180,10 @@ function parseArgs(raw: string[]): { positionals: string[]; flags: ArgMap } {
     'force',
     'help',
     'interactive',
+    'issue-log',
     'multi-agent',
     'no-interactive',
+    'repo-config-required',
     'refresh-skills',
     'ui',
     'usage',
@@ -437,6 +452,45 @@ function readStringFlag(flags: ArgMap, key: string): string | undefined {
   return trimmed.length > 0 ? trimmed : undefined;
 }
 
+function parseBooleanSetting(raw: string | boolean, label: string): boolean {
+  if (typeof raw === 'boolean') {
+    return raw;
+  }
+  const normalized = raw.trim().toLowerCase();
+  if (['1', 'true', 'yes', 'on'].includes(normalized)) {
+    return true;
+  }
+  if (['0', 'false', 'no', 'off'].includes(normalized)) {
+    return false;
+  }
+  throw new Error(`Invalid ${label} value "${raw}". Expected true|false.`);
+}
+
+function resolveBooleanOption(flags: ArgMap, key: string, envKey?: string): boolean {
+  const fromFlag = flags[key];
+  if (fromFlag !== undefined) {
+    return parseBooleanSetting(fromFlag, `--${key}`);
+  }
+  if (!envKey) {
+    return false;
+  }
+  const fromEnv = process.env[envKey];
+  if (typeof fromEnv !== 'string' || fromEnv.trim().length === 0) {
+    return false;
+  }
+  return parseBooleanSetting(fromEnv, envKey);
+}
+
+function applyRepoConfigRequiredPolicy(flags: ArgMap): boolean {
+  const required = resolveBooleanOption(flags, 'repo-config-required', REPO_CONFIG_REQUIRED_ENV_KEY);
+  process.env[REPO_CONFIG_REQUIRED_ENV_KEY] = required ? '1' : '0';
+  return required;
+}
+
+function resolveAutoIssueLogEnabled(flags: ArgMap): boolean {
+  return resolveBooleanOption(flags, 'auto-issue-log', AUTO_ISSUE_LOG_ENV_KEY);
+}
+
 function resolveExecutionModeFlag(flags: ArgMap): ExecutionModeOption | undefined {
   const cloudShortcut = flags['cloud'] === true;
   const rawMode = readStringFlag(flags, 'execution-mode');
@@ -608,11 +662,80 @@ async function readRlmState(statePath: string): Promise<{ exitCode: number; stat
   }
 }
 
+interface AutoIssueLogCaptureResult {
+  issueLog: DoctorIssueLogResult | null;
+  issueLogError: string | null;
+}
+
+async function maybeCaptureAutoIssueLog(params: {
+  enabled: boolean;
+  issueTitle: string;
+  issueNotes: string;
+  taskFilter: string | null;
+}): Promise<AutoIssueLogCaptureResult> {
+  if (!params.enabled) {
+    return { issueLog: null, issueLogError: null };
+  }
+  try {
+    const issueLog = await writeDoctorIssueLog({
+      doctor: runDoctor(),
+      issueTitle: params.issueTitle,
+      issueNotes: params.issueNotes,
+      taskFilter: params.taskFilter
+    });
+    return { issueLog, issueLogError: null };
+  } catch (error) {
+    const issueLogError = (error as Error)?.message ?? String(error);
+    return { issueLog: null, issueLogError };
+  }
+}
+
+function withAutoIssueLogContext(error: unknown, capture: AutoIssueLogCaptureResult): Error {
+  const baseMessage = (error as Error)?.message ?? String(error);
+  const lines = [baseMessage];
+  if (capture.issueLog) {
+    lines.push(
+      `Auto issue log: saved to ${capture.issueLog.issue_log_path} (bundle: ${capture.issueLog.bundle_path}).`
+    );
+  }
+  if (capture.issueLogError) {
+    lines.push(`Auto issue log: failed (${capture.issueLogError})`);
+  }
+  return new Error(lines.join('\n'));
+}
+
+function resolveTaskFilter(preferredTaskId?: string, taskIdOverride?: string): string | null {
+  const preferred = preferredTaskId?.trim();
+  if (preferred) {
+    return preferred;
+  }
+  const taskOverride = taskIdOverride?.trim();
+  if (taskOverride) {
+    return taskOverride;
+  }
+  const mcpTask = process.env.MCP_RUNNER_TASK_ID?.trim();
+  if (mcpTask) {
+    return mcpTask;
+  }
+  const taskEnv = process.env.TASK?.trim();
+  if (taskEnv) {
+    return taskEnv;
+  }
+  const codexTask = process.env.CODEX_ORCHESTRATOR_TASK_ID?.trim();
+  return codexTask && codexTask.length > 0 ? codexTask : null;
+}
+
 async function handleStart(orchestrator: CodexOrchestrator, rawArgs: string[]): Promise<void> {
   const { positionals, flags } = parseArgs(rawArgs);
+  if (isHelpRequest(positionals, flags)) {
+    printStartHelp();
+    return;
+  }
   const pipelineId = positionals[0];
   const format: OutputFormat = (flags['format'] as string | undefined) === 'json' ? 'json' : 'text';
   const executionMode = resolveExecutionModeFlag(flags);
+  applyRepoConfigRequiredPolicy(flags);
+  const autoIssueLogEnabled = resolveAutoIssueLogEnabled(flags);
   if (pipelineId === 'rlm') {
     const goal = readStringFlag(flags, 'goal');
     const warnLegacyEnvAlias = shouldWarnLegacyMultiAgentEnv(flags, process.env);
@@ -621,32 +744,52 @@ async function handleStart(orchestrator: CodexOrchestrator, rawArgs: string[]): 
       console.warn('Warning: RLM_SYMBOLIC_COLLAB is a legacy alias; prefer RLM_SYMBOLIC_MULTI_AGENT.');
     }
   }
-  await withRunUi(flags, format, async (runEvents) => {
-    let taskIdOverride = typeof flags['task'] === 'string' ? (flags['task'] as string) : undefined;
-    if (pipelineId === 'rlm') {
-      taskIdOverride = resolveRlmTaskId(taskIdOverride);
-      process.env.MCP_RUNNER_TASK_ID = taskIdOverride;
-      if (format !== 'json') {
-        console.log(`Task: ${taskIdOverride}`);
+  let taskIdOverride = typeof flags['task'] === 'string' ? (flags['task'] as string) : undefined;
+  try {
+    await withRunUi(flags, format, async (runEvents) => {
+      if (pipelineId === 'rlm') {
+        taskIdOverride = resolveRlmTaskId(taskIdOverride);
+        process.env.MCP_RUNNER_TASK_ID = taskIdOverride;
+        if (format !== 'json') {
+          console.log(`Task: ${taskIdOverride}`);
+        }
       }
-    }
-    const result = await orchestrator.start({
-      pipelineId,
-      taskId: taskIdOverride,
-      parentRunId: typeof flags['parent-run'] === 'string' ? (flags['parent-run'] as string) : undefined,
-      approvalPolicy: typeof flags['approval-policy'] === 'string' ? (flags['approval-policy'] as string) : undefined,
-      targetStageId: resolveTargetStageId(flags),
-      executionMode,
-      runEvents
+      const result = await orchestrator.start({
+        pipelineId,
+        taskId: taskIdOverride,
+        parentRunId: typeof flags['parent-run'] === 'string' ? (flags['parent-run'] as string) : undefined,
+        approvalPolicy: typeof flags['approval-policy'] === 'string' ? (flags['approval-policy'] as string) : undefined,
+        targetStageId: resolveTargetStageId(flags),
+        executionMode,
+        runEvents
+      });
+      const issueLogCapture =
+        result.manifest.status !== 'succeeded'
+          ? await maybeCaptureAutoIssueLog({
+              enabled: autoIssueLogEnabled,
+              issueTitle: `Auto issue log: start ${pipelineId ?? 'diagnostics'} failed`,
+              issueNotes: `Automatic failure capture for run ${result.manifest.run_id} (${result.manifest.status}).`,
+              taskFilter: resolveTaskFilter(result.manifest.task_id, taskIdOverride)
+            })
+          : { issueLog: null, issueLogError: null };
+      emitRunOutput(result, format, 'Run started', issueLogCapture);
     });
-    emitRunOutput(result, format, 'Run started');
-  });
+  } catch (error) {
+    const issueLogCapture = await maybeCaptureAutoIssueLog({
+      enabled: autoIssueLogEnabled,
+      issueTitle: `Auto issue log: start ${pipelineId ?? 'diagnostics'} failed before run manifest`,
+      issueNotes: 'Automatic failure capture for start setup failure before run manifest creation.',
+      taskFilter: resolveTaskFilter(undefined, taskIdOverride)
+    });
+    throw withAutoIssueLogContext(error, issueLogCapture);
+  }
 }
 
 async function handleFrontendTest(orchestrator: CodexOrchestrator, rawArgs: string[]): Promise<void> {
   const { positionals, flags } = parseArgs(rawArgs);
   const format: OutputFormat = (flags['format'] as string | undefined) === 'json' ? 'json' : 'text';
   const devtools = Boolean(flags['devtools']);
+  applyRepoConfigRequiredPolicy(flags);
   if (positionals.length > 0) {
     console.error(`[frontend-test] ignoring extra arguments: ${positionals.join(' ')}`);
   }
@@ -691,81 +834,133 @@ async function handleFlow(orchestrator: CodexOrchestrator, rawArgs: string[]): P
 
   const format: OutputFormat = (flags['format'] as string | undefined) === 'json' ? 'json' : 'text';
   const executionMode = resolveExecutionModeFlag(flags);
+  applyRepoConfigRequiredPolicy(flags);
+  const autoIssueLogEnabled = resolveAutoIssueLogEnabled(flags);
   const taskId = typeof flags['task'] === 'string' ? (flags['task'] as string) : undefined;
   const parentRunId = typeof flags['parent-run'] === 'string' ? (flags['parent-run'] as string) : undefined;
   const approvalPolicy = typeof flags['approval-policy'] === 'string' ? (flags['approval-policy'] as string) : undefined;
   const targetStageId = resolveTargetStageId(flags);
-  const { docsReviewTargetStageId, implementationGateTargetStageId } =
-    await resolveFlowTargetStageSelection(orchestrator, taskId, targetStageId);
+  try {
+    const { docsReviewTargetStageId, implementationGateTargetStageId } =
+      await resolveFlowTargetStageSelection(orchestrator, taskId, targetStageId);
 
-  await withRunUi(flags, format, async (runEvents) => {
-    const docsReviewResult = await orchestrator.start({
-      pipelineId: 'docs-review',
-      taskId,
-      parentRunId,
-      approvalPolicy,
-      targetStageId: docsReviewTargetStageId,
-      executionMode,
-      runEvents
-    });
-    const docsPayload = toRunOutputPayload(docsReviewResult);
-    if (format === 'text') {
-      emitRunOutput(docsReviewResult, format, 'Docs-review run');
-    }
+    await withRunUi(flags, format, async (runEvents) => {
+      const docsReviewResult = await orchestrator.start({
+        pipelineId: 'docs-review',
+        taskId,
+        parentRunId,
+        approvalPolicy,
+        targetStageId: docsReviewTargetStageId,
+        executionMode,
+        runEvents
+      });
+      const docsPayload = toRunOutputPayload(docsReviewResult);
+      if (format === 'text') {
+        emitRunOutput(docsReviewResult, format, 'Docs-review run');
+      }
 
-    if (docsReviewResult.manifest.status !== 'succeeded') {
-      process.exitCode = 1;
+      if (docsReviewResult.manifest.status !== 'succeeded') {
+        const issueLogCapture = await maybeCaptureAutoIssueLog({
+          enabled: autoIssueLogEnabled,
+          issueTitle: 'Auto issue log: flow docs-review failed',
+          issueNotes: `Automatic failure capture for docs-review run ${docsReviewResult.manifest.run_id} (${docsReviewResult.manifest.status}).`,
+          taskFilter: resolveTaskFilter(docsReviewResult.manifest.task_id, taskId)
+        });
+        process.exitCode = 1;
+        if (format === 'json') {
+          const payload: FlowOutputPayload = {
+            status: docsReviewResult.manifest.status,
+            failed_stage: 'docs-review',
+            docs_review: docsPayload,
+            implementation_gate: null,
+            issue_log: issueLogCapture.issueLog,
+            issue_log_error: issueLogCapture.issueLogError
+          };
+          console.log(JSON.stringify(payload, null, 2));
+        } else {
+          console.log('Flow halted: docs-review failed.');
+          if (issueLogCapture.issueLog) {
+            for (const line of formatDoctorIssueLogSummary(issueLogCapture.issueLog)) {
+              console.log(line);
+            }
+          }
+          if (issueLogCapture.issueLogError) {
+            console.log(`Auto issue log: failed (${issueLogCapture.issueLogError})`);
+          }
+        }
+        return;
+      }
+
+      const implementationGateResult = await orchestrator.start({
+        pipelineId: 'implementation-gate',
+        taskId,
+        parentRunId: docsReviewResult.manifest.run_id,
+        approvalPolicy,
+        targetStageId: implementationGateTargetStageId,
+        executionMode,
+        runEvents
+      });
+      const implementationPayload = toRunOutputPayload(implementationGateResult);
+      const issueLogCapture =
+        implementationGateResult.manifest.status !== 'succeeded'
+          ? await maybeCaptureAutoIssueLog({
+              enabled: autoIssueLogEnabled,
+              issueTitle: 'Auto issue log: flow implementation-gate failed',
+              issueNotes: `Automatic failure capture for implementation-gate run ${implementationGateResult.manifest.run_id} (${implementationGateResult.manifest.status}).`,
+              taskFilter: resolveTaskFilter(implementationGateResult.manifest.task_id, taskId)
+            })
+          : { issueLog: null, issueLogError: null };
+
       if (format === 'json') {
         const payload: FlowOutputPayload = {
-          status: docsReviewResult.manifest.status,
-          failed_stage: 'docs-review',
+          status: implementationGateResult.manifest.status,
+          failed_stage: implementationGateResult.manifest.status === 'succeeded' ? null : 'implementation-gate',
           docs_review: docsPayload,
-          implementation_gate: null
+          implementation_gate: implementationPayload,
+          issue_log: issueLogCapture.issueLog,
+          issue_log_error: issueLogCapture.issueLogError
         };
         console.log(JSON.stringify(payload, null, 2));
-      } else {
-        console.log('Flow halted: docs-review failed.');
+        if (implementationGateResult.manifest.status !== 'succeeded') {
+          process.exitCode = 1;
+        }
+        return;
       }
-      return;
-    }
 
-    const implementationGateResult = await orchestrator.start({
-      pipelineId: 'implementation-gate',
-      taskId,
-      parentRunId: docsReviewResult.manifest.run_id,
-      approvalPolicy,
-      targetStageId: implementationGateTargetStageId,
-      executionMode,
-      runEvents
-    });
-    const implementationPayload = toRunOutputPayload(implementationGateResult);
-
-    if (format === 'json') {
-      const payload: FlowOutputPayload = {
-        status: implementationGateResult.manifest.status,
-        failed_stage: implementationGateResult.manifest.status === 'succeeded' ? null : 'implementation-gate',
-        docs_review: docsPayload,
-        implementation_gate: implementationPayload
-      };
-      console.log(JSON.stringify(payload, null, 2));
+      emitRunOutput(implementationGateResult, format, 'Implementation-gate run');
       if (implementationGateResult.manifest.status !== 'succeeded') {
         process.exitCode = 1;
+        console.log('Flow halted: implementation-gate failed.');
+        if (issueLogCapture.issueLog) {
+          for (const line of formatDoctorIssueLogSummary(issueLogCapture.issueLog)) {
+            console.log(line);
+          }
+        }
+        if (issueLogCapture.issueLogError) {
+          console.log(`Auto issue log: failed (${issueLogCapture.issueLogError})`);
+        }
+        return;
       }
-      return;
-    }
-
-    emitRunOutput(implementationGateResult, format, 'Implementation-gate run');
-    if (implementationGateResult.manifest.status !== 'succeeded') {
-      process.exitCode = 1;
-      console.log('Flow halted: implementation-gate failed.');
-      return;
-    }
-    console.log('Flow complete: docs-review -> implementation-gate.');
-  });
+      console.log('Flow complete: docs-review -> implementation-gate.');
+    });
+  } catch (error) {
+    const issueLogCapture = await maybeCaptureAutoIssueLog({
+      enabled: autoIssueLogEnabled,
+      issueTitle: 'Auto issue log: flow failed before run manifest',
+      issueNotes: 'Automatic failure capture for flow setup failure before run manifest creation.',
+      taskFilter: resolveTaskFilter(undefined, taskId)
+    });
+    throw withAutoIssueLogContext(error, issueLogCapture);
+  }
 }
 
 async function handlePlan(orchestrator: CodexOrchestrator, rawArgs: string[]): Promise<void> {
   const { positionals, flags } = parseArgs(rawArgs);
+  if (isHelpRequest(positionals, flags)) {
+    printPlanHelp();
+    return;
+  }
+  applyRepoConfigRequiredPolicy(flags);
   const pipelineId = positionals[0];
   const format = (flags['format'] as string | undefined) === 'json' ? 'json' : 'text';
   const result = await orchestrator.plan({
@@ -786,6 +981,7 @@ async function handleRlm(orchestrator: CodexOrchestrator, rawArgs: string[]): Pr
     printRlmHelp();
     return;
   }
+  applyRepoConfigRequiredPolicy(flags);
   const goalFromArgs = positionals.length > 0 ? positionals.join(' ') : undefined;
   const goal = goalFromArgs ?? readStringFlag(flags, 'goal') ?? process.env.RLM_GOAL?.trim();
   if (!goal) {
@@ -863,6 +1059,7 @@ async function handleResume(orchestrator: CodexOrchestrator, rawArgs: string[]):
     printResumeHelp();
     return;
   }
+  applyRepoConfigRequiredPolicy(flags);
   const runId = (flags['run'] ?? positionals[0]) as string | undefined;
   if (!runId) {
     throw new Error('resume requires --run <run-id>.');
@@ -961,9 +1158,10 @@ function emitRunOutput(
     };
   },
   format: OutputFormat,
-  label: string
+  label: string,
+  issueLogCapture: AutoIssueLogCaptureResult = { issueLog: null, issueLogError: null }
 ): void {
-  const payload = toRunOutputPayload(result);
+  const payload = toRunOutputPayload(result, issueLogCapture);
   if (format === 'json') {
     console.log(JSON.stringify(payload, null, 2));
     return;
@@ -981,6 +1179,14 @@ function emitRunOutput(
       console.log(`  ${line}`);
     }
   }
+  if (payload.issue_log) {
+    for (const line of formatDoctorIssueLogSummary(payload.issue_log)) {
+      console.log(line);
+    }
+  }
+  if (payload.issue_log_error) {
+    console.log(`Auto issue log: failed (${payload.issue_log_error})`);
+  }
 }
 
 function toRunOutputPayload(
@@ -993,7 +1199,8 @@ function toRunOutputPayload(
       summary?: string | null;
       cloud_fallback?: { reason: string } | null;
     };
-  }
+  },
+  issueLogCapture: AutoIssueLogCaptureResult = { issueLog: null, issueLogError: null }
 ): RunOutputPayload {
   return {
     run_id: result.manifest.run_id,
@@ -1002,7 +1209,9 @@ function toRunOutputPayload(
     manifest: `${result.manifest.artifact_root}/manifest.json`,
     log_path: result.manifest.log_path,
     summary: result.manifest.summary ?? null,
-    cloud_fallback_reason: result.manifest.cloud_fallback?.reason ?? null
+    cloud_fallback_reason: result.manifest.cloud_fallback?.reason ?? null,
+    issue_log: issueLogCapture.issueLog,
+    issue_log_error: issueLogCapture.issueLogError
   };
 }
 
@@ -1121,6 +1330,10 @@ async function handleSelfCheck(rawArgs: string[]): Promise<void> {
 
 async function handleInit(rawArgs: string[]): Promise<void> {
   const { positionals, flags } = parseArgs(rawArgs);
+  if (isHelpRequest(positionals, flags)) {
+    printInitHelp();
+    return;
+  }
   const template = positionals[0];
   if (!template) {
     throw new Error('init requires a template name (e.g. init codex).');
@@ -1183,8 +1396,9 @@ Options:
 
   const repoFlag = readStringFlag(flags, 'repo');
   const repoRoot = repoFlag ?? process.cwd();
-  const repoFlagValue = repoFlag ? (/\s/u.test(repoFlag) ? JSON.stringify(repoFlag) : repoFlag) : null;
-  const delegationRepoArg = repoFlagValue ? ` --repo ${repoFlagValue}` : '';
+  const delegationCommandPreview = repoFlag
+    ? buildCommandPreview('codex-orchestrator', ['delegation', 'setup', '--yes', '--repo', repoFlag])
+    : 'codex-orchestrator delegation setup --yes';
   const bundledSkills = await listBundledSkills();
   if (bundledSkills.length === 0) {
     throw new Error('No bundled skills detected; cannot run setup.');
@@ -1222,7 +1436,7 @@ Options:
     for (const commandLine of payload.steps.skills.commandLines) {
       console.log(`  - ${commandLine}`);
     }
-    console.log(`- Delegation: codex-orchestrator delegation setup --yes${delegationRepoArg}`);
+    console.log(`- Delegation: ${delegationCommandPreview}`);
     console.log('- DevTools: codex-orchestrator devtools setup --yes');
     for (const line of formatSetupGuidanceSummary(guidance)) {
       console.log(line);
@@ -1290,10 +1504,17 @@ async function handleDoctor(rawArgs: string[]): Promise<void> {
   const format = (flags['format'] as string | undefined) === 'json' ? 'json' : 'text';
   const includeUsage = Boolean(flags['usage']);
   const includeCloudPreflight = Boolean(flags['cloud-preflight']);
+  const includeIssueLog = Boolean(flags['issue-log']);
   const cloudEnvIdOverride = readStringFlag(flags, 'cloud-env-id');
   const cloudBranchOverride = readStringFlag(flags, 'cloud-branch');
+  const issueTitle = readStringFlag(flags, 'issue-title');
+  const issueNotes = readStringFlag(flags, 'issue-notes');
+  const issueLogPath = readStringFlag(flags, 'issue-log-path');
   if (!includeCloudPreflight && (cloudEnvIdOverride || cloudBranchOverride)) {
     throw new Error('--cloud-env-id/--cloud-branch require --cloud-preflight.');
+  }
+  if (!includeIssueLog && (issueTitle || issueNotes || issueLogPath)) {
+    throw new Error('--issue-title/--issue-notes/--issue-log-path require --issue-log.');
   }
   const wantsApply = Boolean(flags['apply']);
   const apply = Boolean(flags['yes']);
@@ -1324,6 +1545,17 @@ async function handleDoctor(rawArgs: string[]): Promise<void> {
         taskId: taskFilter
       })
     : null;
+  const issueLogResult = includeIssueLog
+    ? await writeDoctorIssueLog({
+        doctor: doctorResult,
+        usage: usageResult,
+        cloudPreflight: cloudPreflightResult,
+        issueTitle,
+        issueNotes,
+        issueLogPath,
+        taskFilter
+      })
+    : null;
 
   if (format === 'json') {
     const payload: Record<string, unknown> = { ...doctorResult };
@@ -1332,6 +1564,9 @@ async function handleDoctor(rawArgs: string[]): Promise<void> {
     }
     if (cloudPreflightResult) {
       payload.cloud_preflight = cloudPreflightResult;
+    }
+    if (issueLogResult) {
+      payload.issue_log = issueLogResult;
     }
     console.log(JSON.stringify(payload, null, 2));
     return;
@@ -1347,6 +1582,11 @@ async function handleDoctor(rawArgs: string[]): Promise<void> {
   }
   if (cloudPreflightResult) {
     for (const line of formatDoctorCloudPreflightSummary(cloudPreflightResult)) {
+      console.log(line);
+    }
+  }
+  if (issueLogResult) {
+    for (const line of formatDoctorIssueLogSummary(issueLogResult)) {
       console.log(line);
     }
   }
@@ -1932,6 +2172,8 @@ Commands:
     --execution-mode <mcp|cloud>  Force execution mode for this run and child subpipelines.
     --cloud                 Shortcut for --execution-mode cloud.
     --target <stage-id>     Focus plan/build metadata on a specific stage (alias: --target-stage).
+    --auto-issue-log [true|false]  On failure, auto-write doctor issue bundle/log entry.
+    --repo-config-required [true|false]  Require repo-local codex.orchestrator.json (no package fallback).
     --goal "<goal>"         When pipeline is rlm, set the RLM goal.
     --multi-agent [auto|true|false]  Preferred alias for multi-agent collab subagents (implies symbolic mode).
     --collab [auto|true|false]  Legacy alias for --multi-agent.
@@ -1944,6 +2186,7 @@ Commands:
 
   rlm "<goal>"              Run RLM loop until validator passes.
     --task <id>             Override task identifier.
+    --repo-config-required [true|false]  Require repo-local codex.orchestrator.json (no package fallback).
     --multi-agent [auto|true|false]  Preferred alias for multi-agent collab subagents (implies symbolic mode).
     --collab [auto|true|false]  Legacy alias for --multi-agent.
     --validator <cmd|none>  Set validator command or disable validation.
@@ -1958,6 +2201,7 @@ Commands:
   frontend-test             Run frontend testing pipeline.
     --devtools             Enable Chrome DevTools MCP for this run.
     --task <id>             Override task identifier (defaults to MCP_RUNNER_TASK_ID).
+    --repo-config-required [true|false]  Require repo-local codex.orchestrator.json (no package fallback).
     --parent-run <id>       Link run to parent run id.
     --approval-policy <p>   Record approval policy metadata.
     --format json           Emit machine-readable output.
@@ -1973,6 +2217,8 @@ Commands:
     --execution-mode <mcp|cloud>  Force execution mode for both runs.
     --cloud                 Shortcut for --execution-mode cloud.
     --target <stage-id>     Focus plan/build metadata on a specific stage (alias: --target-stage).
+    --auto-issue-log [true|false]  On failure, auto-write doctor issue bundle/log entry.
+    --repo-config-required [true|false]  Require repo-local codex.orchestrator.json (no package fallback).
     --interactive | --ui    Enable read-only HUD when running in a TTY.
     --no-interactive        Force disable HUD (default is off unless requested).
 
@@ -1980,6 +2226,7 @@ Commands:
     --task <id>             Override task identifier.
     --format json           Emit machine-readable output.
     --target <stage-id>     Highlight the stage chosen for orchestration (alias: --target-stage).
+    --repo-config-required [true|false]  Require repo-local codex.orchestrator.json (no package fallback).
 
   exec [command]            Run a one-off command with unified exec runtime.
     --json [compact]        Emit final JSON summary (optional compact mode).
@@ -1994,6 +2241,7 @@ Commands:
     --actor <name>          Record who resumed the run.
     --reason <text>         Record why the run was resumed.
     --target <stage-id>     Override stage selection before resuming (alias: --target-stage).
+    --repo-config-required [true|false]  Require repo-local codex.orchestrator.json (no package fallback).
     --format json           Emit machine-readable output.
     --interactive | --ui    Enable read-only HUD when running in a TTY.
     --no-interactive        Force disable HUD (default is off unless requested).
@@ -2002,6 +2250,7 @@ Commands:
 
   self-check [--format json]
   init codex [--cwd <path>] [--force]
+    Installs AGENTS.md, mcp-client.json, and codex.orchestrator.json.
     --codex-cli            Also run CO-managed Codex CLI setup (plan unless --yes; activate with CODEX_CLI_USE_MANAGED=1).
     --codex-source <path>  Build from local Codex repo (or git URL).
     --codex-ref <ref>      Git ref (branch/tag/sha) when building from repo.
@@ -2021,6 +2270,10 @@ Commands:
     --cloud-preflight     Run cloud readiness preflight checks (env/codex/git/branch).
     --cloud-env-id <id>   Override env id for --cloud-preflight (default: CODEX_CLOUD_ENV_ID).
     --cloud-branch <name> Override branch for --cloud-preflight (default: CODEX_CLOUD_BRANCH).
+    --issue-log           Append markdown issue entry + JSON bundle for downstream triage.
+    --issue-title <text>  Optional title for --issue-log entries.
+    --issue-notes <text>  Optional notes for --issue-log entries.
+    --issue-log-path <p>  Output markdown path (default: docs/codex-orchestrator-issues.md).
     --apply               Plan/apply quick fixes for DevTools + delegation wiring (use with --yes).
     --yes                 Apply fixes when --apply is set.
     --format json         Emit machine-readable output (not supported with --apply).
@@ -2106,6 +2359,7 @@ Options:
   --actor <name>        Record who resumed the run.
   --reason <text>       Record why the run was resumed.
   --target <stage-id>   Override stage selection before resuming.
+  --repo-config-required [true|false]  Require repo-local codex.orchestrator.json (no package fallback).
   --format json         Emit machine-readable output.
   --interactive | --ui  Enable read-only HUD when running in a TTY.
   --no-interactive      Force disable HUD.
@@ -2160,6 +2414,7 @@ function printRlmHelp(): void {
 Options:
   --goal "<goal>"         Alternate way to set the goal (positional is preferred).
   --task <id>             Override task identifier (defaults to MCP_RUNNER_TASK_ID).
+  --repo-config-required [true|false]  Require repo-local codex.orchestrator.json (no package fallback).
   --multi-agent [auto|true|false]  Preferred alias for multi-agent collab subagents (implies symbolic mode).
   --collab [auto|true|false]  Legacy alias for --multi-agent.
   --validator <cmd|none>  Set validator command or disable validation.
@@ -2195,7 +2450,70 @@ Options:
   --execution-mode <mcp|cloud>  Force execution mode for both runs.
   --cloud                   Shortcut for --execution-mode cloud.
   --target <stage-id>       Focus plan/build metadata (applies where the stage exists).
+  --auto-issue-log [true|false]  On failure, auto-write doctor issue bundle/log entry.
+  --repo-config-required [true|false]  Require repo-local codex.orchestrator.json (no package fallback).
   --interactive | --ui      Enable read-only HUD when running in a TTY.
   --no-interactive          Force disable HUD.
+`);
+}
+
+function printStartHelp(): void {
+  console.log(`Usage: codex-orchestrator start [pipeline] [options]
+
+Start a new run. If no pipeline is provided, diagnostics is used.
+
+Options:
+  --task <id>               Override task identifier.
+  --parent-run <id>         Link run to parent run id.
+  --approval-policy <p>     Record approval policy metadata.
+  --format json             Emit machine-readable output.
+  --execution-mode <mcp|cloud>  Force execution mode for this run.
+  --cloud                   Shortcut for --execution-mode cloud.
+  --target <stage-id>       Focus plan/build metadata on a specific stage.
+  --auto-issue-log [true|false]  On failure, auto-write doctor issue bundle/log entry.
+  --repo-config-required [true|false]  Require repo-local codex.orchestrator.json (no package fallback).
+  --goal "<goal>"           When pipeline is rlm, set the RLM goal.
+  --multi-agent [auto|true|false]  Preferred alias for multi-agent collab subagents.
+  --collab [auto|true|false]  Legacy alias for --multi-agent.
+  --validator <cmd|none>    When pipeline is rlm, set validator command.
+  --max-iterations <n>      When pipeline is rlm, override max iterations.
+  --max-minutes <n>         When pipeline is rlm, override max minutes.
+  --roles <single|triad>    When pipeline is rlm, set role split.
+  --interactive | --ui      Enable read-only HUD when running in a TTY.
+  --no-interactive          Force disable HUD.
+`);
+}
+
+function printPlanHelp(): void {
+  console.log(`Usage: codex-orchestrator plan [pipeline] [options]
+
+Preview pipeline stages without executing.
+
+Options:
+  --task <id>               Override task identifier.
+  --format json             Emit machine-readable output.
+  --target <stage-id>       Highlight the stage chosen for orchestration.
+  --repo-config-required [true|false]  Require repo-local codex.orchestrator.json (no package fallback).
+`);
+}
+
+function printInitHelp(): void {
+  console.log(`Usage: codex-orchestrator init codex [options]
+
+Install starter templates into the target repository:
+- AGENTS.md
+- mcp-client.json
+- codex.orchestrator.json
+
+Options:
+  --cwd <path>              Target directory (default current directory).
+  --force                   Overwrite existing template files.
+  --codex-cli               Also run CO-managed Codex CLI setup (plan unless --yes).
+  --codex-source <path>     Build managed Codex CLI from local repo (or git URL).
+  --codex-ref <ref>         Git ref for --codex-source.
+  --codex-download-url <url>  Download managed Codex CLI prebuilt binary.
+  --codex-download-sha256 <sha>  Expected SHA256 for the prebuilt download.
+  --codex-force             Overwrite existing managed Codex CLI binary.
+  --yes                     Apply managed Codex CLI setup.
 `);
 }

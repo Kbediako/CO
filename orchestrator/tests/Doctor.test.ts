@@ -180,6 +180,681 @@ describe('runDoctor', () => {
     }
   });
 
+  it('uses repo pipeline stage cloudEnvId for doctor cloud preflight when env var is unset', async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), 'doctor-cloud-preflight-stage-metadata-'));
+    await writeFile(
+      join(tempDir, 'codex.orchestrator.json'),
+      JSON.stringify(
+        {
+          defaultPipeline: 'diagnostics',
+          pipelines: [
+            {
+              id: 'diagnostics',
+              title: 'Diagnostics',
+              guardrailsRequired: false,
+              stages: [
+                {
+                  kind: 'command',
+                  id: 'review',
+                  title: 'Review',
+                  command: 'echo review',
+                  plan: { cloudEnvId: 'env_stage_meta' }
+                }
+              ]
+            }
+          ]
+        },
+        null,
+        2
+      ),
+      'utf8'
+    );
+    const fakeCodexBin = await writeFakeCodexBinary(tempDir, 'multi_agent experimental true');
+    try {
+      const result = await runDoctorCloudPreflight({
+        cwd: tempDir,
+        env: {
+          ...process.env,
+          CODEX_CLI_BIN: fakeCodexBin,
+          CODEX_CLOUD_ENV_ID: '',
+          CODEX_CLOUD_BRANCH: ''
+        }
+      });
+      expect(result.ok).toBe(true);
+      expect(result.details.environment_id).toBe('env_stage_meta');
+      expect(result.issues).toHaveLength(0);
+    } finally {
+      await rm(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it('ignores unsupported stage envId aliases in doctor cloud preflight', async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), 'doctor-cloud-preflight-stage-envid-alias-'));
+    await writeFile(
+      join(tempDir, 'codex.orchestrator.json'),
+      JSON.stringify(
+        {
+          defaultPipeline: 'diagnostics',
+          pipelines: [
+            {
+              id: 'diagnostics',
+              title: 'Diagnostics',
+              guardrailsRequired: false,
+              stages: [
+                {
+                  kind: 'command',
+                  id: 'review',
+                  title: 'Review',
+                  command: 'echo review',
+                  plan: { envId: 'env_alias_only' }
+                }
+              ]
+            }
+          ]
+        },
+        null,
+        2
+      ),
+      'utf8'
+    );
+    const fakeCodexBin = await writeFakeCodexBinary(tempDir, 'multi_agent experimental true');
+    try {
+      const result = await runDoctorCloudPreflight({
+        cwd: tempDir,
+        env: {
+          ...process.env,
+          CODEX_CLI_BIN: fakeCodexBin,
+          CODEX_CLOUD_ENV_ID: '',
+          CODEX_CLOUD_BRANCH: ''
+        }
+      });
+      expect(result.ok).toBe(false);
+      expect(result.details.environment_id).toBeNull();
+      expect(result.issues.map((issue) => issue.code)).toContain('missing_environment');
+    } finally {
+      await rm(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it('uses runtime-selected pipeline metadata for doctor cloud preflight', async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), 'doctor-cloud-preflight-runtime-pipeline-'));
+    await writeFile(
+      join(tempDir, 'codex.orchestrator.json'),
+      JSON.stringify(
+        {
+          defaultPipeline: 'diagnostics',
+          pipelines: [
+            {
+              id: 'diagnostics',
+              title: 'Diagnostics',
+              guardrailsRequired: false,
+              stages: [
+                {
+                  kind: 'command',
+                  id: 'diag',
+                  title: 'Diagnostics stage',
+                  command: 'echo diagnostics',
+                  plan: { cloudEnvId: 'env_diag' }
+                }
+              ]
+            },
+            {
+              id: 'design-reference',
+              title: 'Design reference',
+              guardrailsRequired: false,
+              stages: [
+                {
+                  kind: 'command',
+                  id: 'design',
+                  title: 'Design stage',
+                  command: 'echo design'
+                }
+              ]
+            }
+          ]
+        },
+        null,
+        2
+      ),
+      'utf8'
+    );
+    await writeFile(
+      join(tempDir, 'design.config.yaml'),
+      ['metadata:', '  design:', '    enabled: true'].join('\n'),
+      'utf8'
+    );
+    const fakeCodexBin = await writeFakeCodexBinary(tempDir, 'multi_agent experimental true');
+    try {
+      const result = await runDoctorCloudPreflight({
+        cwd: tempDir,
+        env: {
+          ...process.env,
+          CODEX_CLI_BIN: fakeCodexBin,
+          CODEX_CLOUD_ENV_ID: '',
+          CODEX_CLOUD_BRANCH: ''
+        }
+      });
+      expect(result.ok).toBe(false);
+      expect(result.details.environment_id).toBeNull();
+      expect(result.issues.map((issue) => issue.code)).toContain('missing_environment');
+    } finally {
+      await rm(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it('falls back to diagnostics pipeline when defaultPipeline is unset in doctor cloud preflight', async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), 'doctor-cloud-preflight-diagnostics-fallback-'));
+    await writeFile(
+      join(tempDir, 'codex.orchestrator.json'),
+      JSON.stringify(
+        {
+          pipelines: [
+            {
+              id: 'alpha',
+              title: 'Alpha',
+              guardrailsRequired: false,
+              stages: [
+                {
+                  kind: 'command',
+                  id: 'alpha-stage',
+                  title: 'Alpha stage',
+                  command: 'echo alpha',
+                  plan: { cloudEnvId: 'env_alpha' }
+                }
+              ]
+            },
+            {
+              id: 'diagnostics',
+              title: 'Diagnostics',
+              guardrailsRequired: false,
+              stages: [
+                {
+                  kind: 'command',
+                  id: 'review',
+                  title: 'Review',
+                  command: 'echo review',
+                  plan: { cloudEnvId: 'env_diagnostics' }
+                }
+              ]
+            }
+          ]
+        },
+        null,
+        2
+      ),
+      'utf8'
+    );
+    const fakeCodexBin = await writeFakeCodexBinary(tempDir, 'multi_agent experimental true');
+    try {
+      const result = await runDoctorCloudPreflight({
+        cwd: tempDir,
+        env: {
+          ...process.env,
+          CODEX_CLI_BIN: fakeCodexBin,
+          CODEX_CLOUD_ENV_ID: '',
+          CODEX_CLOUD_BRANCH: ''
+        }
+      });
+      expect(result.ok).toBe(true);
+      expect(result.details.environment_id).toBe('env_diagnostics');
+      expect(result.issues).toHaveLength(0);
+    } finally {
+      await rm(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it('falls back to CODEX_CLOUD_ENV_ID when defaultPipeline is invalid in doctor cloud preflight', async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), 'doctor-cloud-preflight-invalid-default-'));
+    await writeFile(
+      join(tempDir, 'codex.orchestrator.json'),
+      JSON.stringify(
+        {
+          defaultPipeline: 'missing-default',
+          pipelines: [
+            {
+              id: 'alpha',
+              title: 'Alpha',
+              guardrailsRequired: false,
+              stages: [
+                {
+                  kind: 'command',
+                  id: 'alpha-stage',
+                  title: 'Alpha stage',
+                  command: 'echo alpha',
+                  plan: { cloudEnvId: 'env_alpha' }
+                }
+              ]
+            },
+            {
+              id: 'diagnostics',
+              title: 'Diagnostics',
+              guardrailsRequired: false,
+              stages: [
+                {
+                  kind: 'command',
+                  id: 'review',
+                  title: 'Review',
+                  command: 'echo review',
+                  plan: { cloudEnvId: 'env_diagnostics' }
+                }
+              ]
+            }
+          ]
+        },
+        null,
+        2
+      ),
+      'utf8'
+    );
+    const fakeCodexBin = await writeFakeCodexBinary(tempDir, 'multi_agent experimental true');
+    try {
+      const result = await runDoctorCloudPreflight({
+        cwd: tempDir,
+        env: {
+          ...process.env,
+          CODEX_CLI_BIN: fakeCodexBin,
+          CODEX_CLOUD_ENV_ID: 'env_from_env',
+          CODEX_CLOUD_BRANCH: ''
+        }
+      });
+      expect(result.ok).toBe(true);
+      expect(result.details.environment_id).toBe('env_from_env');
+      expect(result.issues).toHaveLength(0);
+    } finally {
+      await rm(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it('fails doctor cloud preflight when strict repo-config mode blocks pipeline resolution', async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), 'doctor-cloud-preflight-strict-repo-config-'));
+    const fakeCodexBin = await writeFakeCodexBinary(tempDir, 'multi_agent experimental true');
+    try {
+      const result = await runDoctorCloudPreflight({
+        cwd: tempDir,
+        environmentId: 'env_override',
+        env: {
+          ...process.env,
+          CODEX_CLI_BIN: fakeCodexBin,
+          CODEX_CLOUD_ENV_ID: '',
+          CODEX_CLOUD_BRANCH: '',
+          CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED: '1'
+        }
+      });
+      expect(result.ok).toBe(false);
+      expect(result.details.environment_id).toBe('env_override');
+      expect(result.issues.map((issue) => issue.code)).toContain('pipeline_resolution_failed');
+      expect(
+        result.issues.find((issue) => issue.code === 'pipeline_resolution_failed')?.message
+      ).toContain('Repo-local codex.orchestrator.json is required');
+    } finally {
+      await rm(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it('uses the first runnable stage for doctor cloud preflight when no default target is declared', async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), 'doctor-cloud-preflight-runnable-target-'));
+    await writeFile(
+      join(tempDir, 'codex.orchestrator.json'),
+      JSON.stringify(
+        {
+          defaultPipeline: 'diagnostics',
+          pipelines: [
+            {
+              id: 'diagnostics',
+              title: 'Diagnostics',
+              guardrailsRequired: false,
+              stages: [
+                {
+                  kind: 'command',
+                  id: 'bootstrap',
+                  title: 'Bootstrap',
+                  command: 'echo bootstrap',
+                  plan: { runnable: false }
+                },
+                {
+                  kind: 'command',
+                  id: 'review',
+                  title: 'Review',
+                  command: 'echo review',
+                  plan: { cloudEnvId: 'env_runnable' }
+                }
+              ]
+            }
+          ]
+        },
+        null,
+        2
+      ),
+      'utf8'
+    );
+    const fakeCodexBin = await writeFakeCodexBinary(tempDir, 'multi_agent experimental true');
+    try {
+      const result = await runDoctorCloudPreflight({
+        cwd: tempDir,
+        env: {
+          ...process.env,
+          CODEX_CLI_BIN: fakeCodexBin,
+          CODEX_CLOUD_ENV_ID: '',
+          CODEX_CLOUD_BRANCH: ''
+        }
+      });
+      expect(result.ok).toBe(true);
+      expect(result.details.environment_id).toBe('env_runnable');
+      expect(result.issues).toHaveLength(0);
+    } finally {
+      await rm(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it('matches runtime target selection when earlier runnable stages have no cloud metadata', async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), 'doctor-cloud-preflight-metadata-target-'));
+    await writeFile(
+      join(tempDir, 'codex.orchestrator.json'),
+      JSON.stringify(
+        {
+          defaultPipeline: 'diagnostics',
+          pipelines: [
+            {
+              id: 'diagnostics',
+              title: 'Diagnostics',
+              guardrailsRequired: false,
+              stages: [
+                {
+                  kind: 'command',
+                  id: 'bootstrap',
+                  title: 'Bootstrap',
+                  command: 'echo bootstrap'
+                },
+                {
+                  kind: 'command',
+                  id: 'review',
+                  title: 'Review',
+                  command: 'echo review',
+                  plan: { cloudEnvId: 'env_second_stage' }
+                }
+              ]
+            }
+          ]
+        },
+        null,
+        2
+      ),
+      'utf8'
+    );
+    const fakeCodexBin = await writeFakeCodexBinary(tempDir, 'multi_agent experimental true');
+    try {
+      const result = await runDoctorCloudPreflight({
+        cwd: tempDir,
+        env: {
+          ...process.env,
+          CODEX_CLI_BIN: fakeCodexBin,
+          CODEX_CLOUD_ENV_ID: '',
+          CODEX_CLOUD_BRANCH: ''
+        }
+      });
+      expect(result.ok).toBe(false);
+      expect(result.details.environment_id).toBeNull();
+      expect(result.issues.map((issue) => issue.code)).toContain('missing_environment');
+    } finally {
+      await rm(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it('prefers repo stage metadata over CODEX_CLOUD_ENV_ID in doctor cloud preflight', async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), 'doctor-cloud-preflight-stage-metadata-priority-'));
+    await writeFile(
+      join(tempDir, 'codex.orchestrator.json'),
+      JSON.stringify(
+        {
+          defaultPipeline: 'diagnostics',
+          pipelines: [
+            {
+              id: 'diagnostics',
+              title: 'Diagnostics',
+              guardrailsRequired: false,
+              stages: [
+                {
+                  kind: 'command',
+                  id: 'review',
+                  title: 'Review',
+                  command: 'echo review',
+                  plan: { cloudEnvId: 'env_stage_meta' }
+                }
+              ]
+            }
+          ]
+        },
+        null,
+        2
+      ),
+      'utf8'
+    );
+    const fakeCodexBin = await writeFakeCodexBinary(tempDir, 'multi_agent experimental true');
+    try {
+      const result = await runDoctorCloudPreflight({
+        cwd: tempDir,
+        env: {
+          ...process.env,
+          CODEX_CLI_BIN: fakeCodexBin,
+          CODEX_CLOUD_ENV_ID: 'env_from_env',
+          CODEX_CLOUD_BRANCH: ''
+        }
+      });
+      expect(result.ok).toBe(true);
+      expect(result.details.environment_id).toBe('env_stage_meta');
+      expect(result.issues).toHaveLength(0);
+    } finally {
+      await rm(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it('resolves cloud env id from stageSets references in doctor cloud preflight', async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), 'doctor-cloud-preflight-stage-set-'));
+    await writeFile(
+      join(tempDir, 'codex.orchestrator.json'),
+      JSON.stringify(
+        {
+          defaultPipeline: 'diagnostics',
+          stageSets: {
+            sharedCloud: [
+              {
+                kind: 'command',
+                id: 'review',
+                title: 'Review',
+                command: 'echo review',
+                plan: { cloudEnvId: 'env_stage_set' }
+              }
+            ]
+          },
+          pipelines: [
+            {
+              id: 'diagnostics',
+              title: 'Diagnostics',
+              guardrailsRequired: false,
+              stages: [{ kind: 'stage-set', ref: 'sharedCloud' }]
+            }
+          ]
+        },
+        null,
+        2
+      ),
+      'utf8'
+    );
+    const fakeCodexBin = await writeFakeCodexBinary(tempDir, 'multi_agent experimental true');
+    try {
+      const result = await runDoctorCloudPreflight({
+        cwd: tempDir,
+        env: {
+          ...process.env,
+          CODEX_CLI_BIN: fakeCodexBin,
+          CODEX_CLOUD_ENV_ID: '',
+          CODEX_CLOUD_BRANCH: ''
+        }
+      });
+      expect(result.ok).toBe(true);
+      expect(result.details.environment_id).toBe('env_stage_set');
+      expect(result.issues).toHaveLength(0);
+    } finally {
+      await rm(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it('resolves default target from expanded stageSets in doctor cloud preflight', async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), 'doctor-cloud-preflight-stage-set-default-target-'));
+    await writeFile(
+      join(tempDir, 'codex.orchestrator.json'),
+      JSON.stringify(
+        {
+          defaultPipeline: 'diagnostics',
+          stageSets: {
+            sharedCloud: [
+              {
+                kind: 'command',
+                id: 'bootstrap',
+                title: 'Bootstrap',
+                command: 'echo bootstrap',
+                plan: { cloudEnvId: 'env_first' }
+              },
+              {
+                kind: 'command',
+                id: 'review',
+                title: 'Review',
+                command: 'echo review',
+                plan: { cloudEnvId: 'env_default', defaultTarget: true }
+              }
+            ]
+          },
+          pipelines: [
+            {
+              id: 'diagnostics',
+              title: 'Diagnostics',
+              guardrailsRequired: false,
+              stages: [{ kind: 'stage-set', ref: 'sharedCloud' }]
+            }
+          ]
+        },
+        null,
+        2
+      ),
+      'utf8'
+    );
+    const fakeCodexBin = await writeFakeCodexBinary(tempDir, 'multi_agent experimental true');
+    try {
+      const result = await runDoctorCloudPreflight({
+        cwd: tempDir,
+        env: {
+          ...process.env,
+          CODEX_CLI_BIN: fakeCodexBin,
+          CODEX_CLOUD_ENV_ID: '',
+          CODEX_CLOUD_BRANCH: ''
+        }
+      });
+      expect(result.ok).toBe(true);
+      expect(result.details.environment_id).toBe('env_default');
+      expect(result.issues).toHaveLength(0);
+    } finally {
+      await rm(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it('falls back to CODEX_CLOUD_ENV_ID when stage-set references are invalid in doctor preflight', async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), 'doctor-cloud-preflight-stage-set-invalid-'));
+    await writeFile(
+      join(tempDir, 'codex.orchestrator.json'),
+      JSON.stringify(
+        {
+          defaultPipeline: 'diagnostics',
+          pipelines: [
+            {
+              id: 'diagnostics',
+              title: 'Diagnostics',
+              guardrailsRequired: false,
+              stages: [
+                { kind: 'stage-set', ref: 'missingSharedSet' },
+                {
+                  kind: 'command',
+                  id: 'review',
+                  title: 'Review',
+                  command: 'echo review',
+                  plan: { cloudEnvId: 'env_stage_meta' }
+                }
+              ]
+            }
+          ]
+        },
+        null,
+        2
+      ),
+      'utf8'
+    );
+    const fakeCodexBin = await writeFakeCodexBinary(tempDir, 'multi_agent experimental true');
+    try {
+      const result = await runDoctorCloudPreflight({
+        cwd: tempDir,
+        env: {
+          ...process.env,
+          CODEX_CLI_BIN: fakeCodexBin,
+          CODEX_CLOUD_ENV_ID: 'env_from_env',
+          CODEX_CLOUD_BRANCH: ''
+        }
+      });
+      expect(result.ok).toBe(true);
+      expect(result.details.environment_id).toBe('env_from_env');
+      expect(result.issues).toHaveLength(0);
+    } finally {
+      await rm(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it('prefers explicit cloud env id override over repo stage metadata in doctor preflight', async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), 'doctor-cloud-preflight-stage-override-'));
+    await writeFile(
+      join(tempDir, 'codex.orchestrator.json'),
+      JSON.stringify(
+        {
+          defaultPipeline: 'diagnostics',
+          pipelines: [
+            {
+              id: 'diagnostics',
+              title: 'Diagnostics',
+              guardrailsRequired: false,
+              stages: [
+                {
+                  kind: 'command',
+                  id: 'review',
+                  title: 'Review',
+                  command: 'echo review',
+                  plan: { cloudEnvId: 'env_stage_meta' }
+                }
+              ]
+            }
+          ]
+        },
+        null,
+        2
+      ),
+      'utf8'
+    );
+    const fakeCodexBin = await writeFakeCodexBinary(tempDir, 'multi_agent experimental true');
+    try {
+      const result = await runDoctorCloudPreflight({
+        cwd: tempDir,
+        environmentId: 'env_override',
+        env: {
+          ...process.env,
+          CODEX_CLI_BIN: fakeCodexBin,
+          CODEX_CLOUD_ENV_ID: '',
+          CODEX_CLOUD_BRANCH: ''
+        }
+      });
+      expect(result.ok).toBe(true);
+      expect(result.details.environment_id).toBe('env_override');
+      expect(result.issues).toHaveLength(0);
+    } finally {
+      await rm(tempDir, { recursive: true, force: true });
+    }
+  });
+
   it('uses task metadata cloud env id for doctor cloud preflight when env var is unset', async () => {
     const tempDir = await mkdtemp(join(tmpdir(), 'doctor-cloud-preflight-task-metadata-'));
     await mkdir(join(tempDir, 'tasks'), { recursive: true });

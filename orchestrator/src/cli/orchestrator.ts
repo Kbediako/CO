@@ -68,6 +68,7 @@ import {
   overrideTaskEnvironment
 } from './services/runPreparation.js';
 import { loadPackageConfig, loadUserConfig } from './config/userConfig.js';
+import { formatRepoConfigRequiredError, isRepoConfigRequired } from './config/repoConfigPolicy.js';
 import {
   loadDelegationConfigFiles,
   computeEffectiveDelegationConfig,
@@ -377,6 +378,9 @@ export class CodexOrchestrator {
       approvalPolicy: options.approvalPolicy ?? null,
       planTargetId: preparation.planPreview?.targetId ?? preparation.plannerTargetId ?? null
     });
+    if (preparation.configNotice) {
+      appendSummary(manifest, preparation.configNotice);
+    }
     const persister = new ManifestPersister({
       manifest,
       paths,
@@ -478,9 +482,13 @@ export class CodexOrchestrator {
     const resolver = new PipelineResolver();
     const designConfig = await resolver.loadDesignConfig(actualEnv.repoRoot);
 
-    const userConfig = await loadUserConfig(actualEnv);
+    const repoConfigRequired = isRepoConfigRequired(process.env);
+    const userConfig = await loadUserConfig(actualEnv, { allowPackageFallback: !repoConfigRequired });
+    if (repoConfigRequired && userConfig?.source !== 'repo') {
+      throw new Error(formatRepoConfigRequiredError(actualEnv.repoRoot));
+    }
     const fallbackConfig =
-      manifest.pipeline_id === 'rlm' && userConfig?.source === 'repo'
+      !repoConfigRequired && manifest.pipeline_id === 'rlm' && userConfig?.source === 'repo'
         ? await loadPackageConfig(actualEnv)
         : null;
     const pipeline = resolvePipelineForResume(actualEnv, manifest, userConfig, fallbackConfig);
@@ -502,6 +510,9 @@ export class CodexOrchestrator {
       planTargetFallback: manifest.plan_target_id ?? null,
       envOverrides
     });
+    if (preparation.configNotice && !(manifest.summary ?? '').includes(preparation.configNotice)) {
+      appendSummary(manifest, preparation.configNotice);
+    }
     manifest.plan_target_id = preparation.planPreview?.targetId ?? preparation.plannerTargetId ?? null;
     const persister = new ManifestPersister({
       manifest,
@@ -1264,7 +1275,12 @@ export class CodexOrchestrator {
             branch,
             enableFeatures,
             disableFeatures,
-            env: cloudEnvOverrides
+            env: cloudEnvOverrides,
+            onUpdate: async (cloudExecution) => {
+              manifest.cloud_execution = cloudExecution;
+              targetEntry.log_path = cloudExecution.log_path;
+              await schedulePersist({ manifest: true, force: true });
+            }
           });
 
           success = cloudResult.success;

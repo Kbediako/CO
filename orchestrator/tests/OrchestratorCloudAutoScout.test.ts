@@ -8,6 +8,7 @@ import { CodexOrchestrator } from '../src/cli/orchestrator.js';
 import { normalizeEnvironmentPaths } from '../src/cli/run/environment.js';
 import { bootstrapManifest } from '../src/cli/run/manifest.js';
 import type { PipelineDefinition } from '../src/cli/types.js';
+import { CodexCloudTaskExecutor } from '../src/cloud/CodexCloudTaskExecutor.js';
 import { resolveEnvironmentPaths } from '../../scripts/lib/run-manifests.js';
 import * as cloudPreflight from '../src/cli/utils/cloudPreflight.js';
 
@@ -98,6 +99,107 @@ describe('CodexOrchestrator cloud auto scout', () => {
     expect(autoScout.execution_mode).toBe('cloud');
     expect(autoScout.pipeline_id).toBe('docs-review');
     expect(autoScout.advanced_mode_enabled).toBe(true);
+  });
+
+  it('persists cloud execution metadata during in-progress cloud runs', async () => {
+    const env = normalizeEnvironmentPaths(resolveEnvironmentPaths());
+    const pipeline: PipelineDefinition = {
+      id: 'docs-review',
+      title: 'Docs Review',
+      stages: [{ kind: 'command', id: 'stage-1', title: 'Stage 1', command: 'echo ok' }]
+    };
+    const statusUrl = 'https://chatgpt.com/codex/tasks/task_e_1234567890abcdef1234567890abcdef';
+
+    const { manifest, paths } = await bootstrapManifest('run-cloud-progress-manifest', {
+      env,
+      pipeline,
+      parentRunId: null,
+      taskSlug: env.taskId,
+      approvalPolicy: null
+    });
+    manifest.heartbeat_interval_seconds = 1;
+    manifest.heartbeat_stale_after_seconds = 2;
+
+    vi.spyOn(cloudPreflight, 'runCloudPreflight').mockResolvedValue({
+      ok: true,
+      issues: [],
+      details: {
+        codexBin: 'codex',
+        environmentId: 'env-123',
+        branch: null
+      }
+    });
+
+    let persistedDuringExecution: Record<string, unknown> | null = null;
+    vi.spyOn(CodexCloudTaskExecutor.prototype, 'execute').mockImplementationOnce(async (input) => {
+      const inProgressCloudExecution = {
+        task_id: 'task_e_1234567890abcdef1234567890abcdef',
+        environment_id: 'env-123',
+        status: 'running' as const,
+        status_url: statusUrl,
+        submitted_at: '2026-02-19T00:00:00.000Z',
+        completed_at: null,
+        last_polled_at: '2026-02-19T00:00:05.000Z',
+        poll_count: 1,
+        poll_interval_seconds: 5,
+        timeout_seconds: 120,
+        attempts: 1,
+        diff_path: null,
+        diff_url: null,
+        diff_status: 'pending' as const,
+        apply_status: 'not_requested' as const,
+        log_path: '.runs/task-cloud-scout/cli/run-cloud-progress-manifest/cloud/commands.ndjson',
+        error: null
+      };
+      await input.onUpdate?.(inProgressCloudExecution);
+      const persistedRaw = await readFile(paths.manifestPath, 'utf8');
+      persistedDuringExecution = (JSON.parse(persistedRaw) as { cloud_execution?: Record<string, unknown> })
+        .cloud_execution ?? null;
+
+      return {
+        success: true,
+        summary: 'Cloud task completed.',
+        notes: [],
+        cloudExecution: {
+          ...inProgressCloudExecution,
+          status: 'ready',
+          completed_at: '2026-02-19T00:00:10.000Z',
+          diff_status: 'unavailable'
+        }
+      };
+    });
+
+    const orchestrator = new CodexOrchestrator(env);
+    const result = await (
+      orchestrator as unknown as {
+        executePipeline: (options: unknown) => Promise<{
+          notes: string[];
+          success: boolean;
+          manifest: { cloud_execution?: { status?: string; completed_at?: string | null } | null };
+        }>;
+      }
+    ).executePipeline({
+      env,
+      pipeline,
+      manifest,
+      paths,
+      mode: 'cloud',
+      task: { id: env.taskId, title: 'Task' },
+      target: {
+        id: 'docs-review:stage-1',
+        description: 'Stage 1',
+        metadata: { stageId: 'stage-1', cloudEnvId: 'env-123' }
+      }
+    });
+
+    expect(result.success).toBe(true);
+    expect(persistedDuringExecution).toBeTruthy();
+    expect(persistedDuringExecution?.task_id).toBe('task_e_1234567890abcdef1234567890abcdef');
+    expect(persistedDuringExecution?.status).toBe('running');
+    expect(persistedDuringExecution?.status_url).toBe(statusUrl);
+    expect(persistedDuringExecution?.completed_at).toBeNull();
+    expect(result.manifest.cloud_execution?.status).toBe('ready');
+    expect(result.manifest.cloud_execution?.completed_at).toBe('2026-02-19T00:00:10.000Z');
   });
 
   it('falls back to mcp on preflight failure when fallback policy allows it', async () => {

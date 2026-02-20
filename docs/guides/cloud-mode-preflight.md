@@ -40,6 +40,7 @@ If preflight fails, CO:
 2. Writes a structured fallback block at `manifest.cloud_fallback` (reason + issue codes/messages + timestamp)
 3. Falls back to `mcp` for the requested work
 4. Surfaces the reason in `start` stdout as `Cloud fallback: ...` (and in `--format json` via `cloud_fallback_reason`)
+5. Surfaces current fallback policy in `doctor` output (`fallback policy: allow|deny`)
 
 This means repos without cloud setup can still run the same pipelines without extra configuration; cloud is a best-effort acceleration path.
 
@@ -53,6 +54,14 @@ export CODEX_ORCHESTRATOR_CLOUD_FALLBACK=deny
 
 Accepted deny values: `deny`, `strict`, `false`, `0`, `off`, `disabled`, `never`.
 When set, cloud preflight failures stop the run with `status_detail=cloud-preflight-failed`.
+
+## Observability + Issue Logging
+
+- During cloud execution, `manifest.cloud_execution` is populated incrementally (task id/status/status URL) while runs are still in progress.
+- `codex-orchestrator status --run <run-id> --format json` returns `cloud_execution` and `cloud_fallback` blocks for live monitoring.
+- For reproducible downstream bug reports, run:
+  - `codex-orchestrator doctor --issue-log --issue-title "<title>" --issue-notes "<notes>"`
+  - This appends `docs/codex-orchestrator-issues.md` and writes a JSON bundle under `out/<resolved-task>/doctor/issue-bundles/` (latest run context included when available).
 
 ## Status Poll Resilience Knobs
 

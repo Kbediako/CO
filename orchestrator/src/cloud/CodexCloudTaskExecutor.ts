@@ -44,6 +44,7 @@ export interface CloudTaskExecutorInput {
   enableFeatures?: string[];
   disableFeatures?: string[];
   env?: NodeJS.ProcessEnv;
+  onUpdate?: (cloudExecution: CloudExecutionManifest) => void | Promise<void>;
 }
 
 export interface CloudTaskExecutionResult {
@@ -147,6 +148,17 @@ export class CodexCloudTaskExecutor {
       log_path: relative(input.repoRoot, commandLogPath),
       error: null
     };
+    const reportCloudExecution = async (): Promise<void> => {
+      if (!input.onUpdate) {
+        return;
+      }
+      try {
+        await input.onUpdate({ ...cloudExecution });
+      } catch (error) {
+        notes.push(`Cloud execution update callback failed: ${(error as Error)?.message ?? String(error)}`);
+      }
+    };
+    await reportCloudExecution();
     const statusRetryLimit = normalizePositiveInt(
       input.statusRetryLimit,
       DEFAULT_STATUS_RETRY_LIMIT,
@@ -209,11 +221,13 @@ export class CodexCloudTaskExecutor {
       cloudExecution.status = 'running';
       cloudExecution.submitted_at = this.now();
       notes.push(`Cloud task submitted: ${taskId}`);
+      await reportCloudExecution();
 
       const metadata = await this.lookupTaskMetadata(taskId, runCloudCommand);
       if (metadata?.url) {
         cloudExecution.status_url = metadata.url;
       }
+      await reportCloudExecution();
 
       const timeoutAt = Date.now() + cloudExecution.timeout_seconds * 1000;
       let statusRetries = 0;
@@ -235,6 +249,7 @@ export class CodexCloudTaskExecutor {
               `codex cloud status failed ${statusRetries} times: ${compactError(statusResult.stderr, statusResult.stdout)}`
             );
           }
+          await reportCloudExecution();
           const retryDelayMs = Math.min(
             statusRetryBackoffMs * statusRetries,
             Math.max(0, timeoutAt - Date.now())
@@ -258,19 +273,23 @@ export class CodexCloudTaskExecutor {
         }
 
         if (mapped === 'ready') {
+          await reportCloudExecution();
           notes.push(`Cloud task completed: ${taskId}`);
           break;
         }
         if (mapped === 'error' || mapped === 'failed' || mapped === 'cancelled') {
           cloudExecution.error = `Cloud task ended with status ${mapped}.`;
+          await reportCloudExecution();
           break;
         }
+        await reportCloudExecution();
         await this.sleepFn(cloudExecution.poll_interval_seconds * 1000);
       }
 
       if (cloudExecution.status === 'running' || cloudExecution.status === 'queued') {
         cloudExecution.status = 'failed';
         cloudExecution.error = `Timed out waiting for cloud task completion after ${cloudExecution.timeout_seconds}s (last remote status: ${lastKnownStatus}, polls: ${cloudExecution.poll_count}).`;
+        await reportCloudExecution();
       }
 
       if (cloudExecution.status === 'ready') {
@@ -295,6 +314,7 @@ export class CodexCloudTaskExecutor {
       }
 
       cloudExecution.completed_at = this.now();
+      await reportCloudExecution();
       const success = cloudExecution.status === 'ready';
       const summary = success
         ? `Cloud task ${cloudExecution.task_id} completed successfully.`
@@ -309,6 +329,7 @@ export class CodexCloudTaskExecutor {
       cloudExecution.diff_status = 'unavailable';
       cloudExecution.error = (error as Error)?.message ?? String(error);
       cloudExecution.completed_at = this.now();
+      await reportCloudExecution();
       const summary = `Cloud execution failed: ${cloudExecution.error}`;
       notes.push(summary);
       return { success: false, summary, notes, cloudExecution };

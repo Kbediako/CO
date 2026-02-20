@@ -100,10 +100,11 @@ Use `npx @kbediako/codex-orchestrator resume --run <run-id>` to continue interru
 
 ## Companion Package Commands
 - `codex-orchestrator mcp serve [--repo <path>] [--dry-run] [-- <extra args>]`: launch the MCP stdio server (delegates to `codex mcp-server`; stdout guard keeps protocol-only output, logs to stderr).
-- `codex-orchestrator init codex [--cwd <path>] [--force]`: copy starter templates into a repo (includes `mcp-client.json` and `AGENTS.md`; no overwrite unless `--force`).
+- `codex-orchestrator init codex [--cwd <path>] [--force]`: copy starter templates into a repo (includes `mcp-client.json`, `AGENTS.md`, and `codex.orchestrator.json`; no overwrite unless `--force`).
 - `codex-orchestrator setup [--yes] [--refresh-skills]`: one-shot bootstrap for downstream users (installs bundled skills, configures delegation + DevTools wiring, and prints policy/usage guidance). By default, setup does not overwrite existing skills; add `--refresh-skills` when you want to replace existing bundled skill files.
-- `codex-orchestrator flow [--task <task-id>]`: runs `docs-review` then `implementation-gate` in sequence; stops on the first failure.
-- `codex-orchestrator doctor [--format json] [--usage] [--apply]`: check optional tooling dependencies plus collab/cloud/delegation readiness and print enablement commands. `--usage` appends a local usage snapshot (scans `.runs/`) with adoption KPIs. `--apply` plans/applies quick fixes (use with `--yes`).
+- `codex-orchestrator start [pipeline] [--auto-issue-log] [--repo-config-required]`: starts a pipeline run. `--auto-issue-log` writes failure bundles automatically (including setup failures before manifest creation); `--repo-config-required` disables packaged config fallback.
+- `codex-orchestrator flow [--task <task-id>] [--auto-issue-log] [--repo-config-required]`: runs `docs-review` then `implementation-gate` in sequence; stops on the first failure. `--auto-issue-log` writes failure bundles automatically (including setup failures before manifest creation); `--repo-config-required` disables packaged config fallback.
+- `codex-orchestrator doctor [--format json] [--usage] [--cloud-preflight] [--issue-log] [--apply]`: check optional tooling dependencies plus collab/cloud/delegation readiness and print enablement commands. `--usage` appends a local usage snapshot (scans `.runs/`) with adoption KPIs. `--issue-log` appends/creates `docs/codex-orchestrator-issues.md` (or `--issue-log-path`) and writes a JSON bundle under `out/<resolved-task>/doctor/issue-bundles/` with doctor context plus latest run context when available. `--apply` plans/applies quick fixes (use with `--yes`).
 - `codex-orchestrator devtools setup [--yes]`: print DevTools MCP setup instructions (`--yes` applies `codex mcp add ...`).
 - `codex-orchestrator delegation setup [--yes]`: configure delegation MCP wiring (`--yes` applies `codex mcp add ...`).
 - `codex-orchestrator skills install [--force] [--only <skills>] [--codex-home <path>]`: install bundled skills into `$CODEX_HOME/skills` (prefer global skills when installed; fall back to bundled skills, for example use `$CODEX_HOME/skills/docs-first` when present, otherwise `skills/docs-first/SKILL.md`).
@@ -149,14 +150,18 @@ Notes:
 - Note: prompt installers and guardrail scripts live under `scripts/` and are repo-only (not included in the npm package).
 - The custom prompts live outside the repo at `~/.codex/prompts/diagnostics.md` and `~/.codex/prompts/review-handoff.md`. Recreate those files on every fresh machine so `/prompts:diagnostics` and `/prompts:review-handoff` are available in the Codex CLI palette.
 - Canonical diagnostics prompt + output expectations: `docs/diagnostics-prompt-guide.md` (keep in sync with `scripts/setup-codex-prompts.sh`).
-- Standalone review guidance (Codex CLI `codex review`): `docs/standalone-review-guide.md`.
+- Standalone review guidance (wrapper-first with `npm run review`, plus direct `codex review` quick mode): `docs/standalone-review-guide.md`.
 - These prompts are consumed by the Codex CLI UI only; the orchestrator does not read them. Keep updates synced across machines during onboarding.
 - To install or refresh the prompts (repo-only), run `scripts/setup-codex-prompts.sh` (use `--force` to overwrite existing files).
 - `/prompts:diagnostics` takes `TASK=<task-id> MANIFEST=<path> [NOTES=<free text>]`, exports `MCP_RUNNER_TASK_ID=$TASK`, runs `npx @kbediako/codex-orchestrator start diagnostics --format json`, tails `.runs/$TASK/cli/<run-id>/manifest.json` (or `npx @kbediako/codex-orchestrator status --run <run-id> --watch --interval 10`), and records evidence to `/tasks`, `docs/TASKS.md`, `.agent/task/...`, `.runs/$TASK/metrics.json`, and `out/$TASK/state.json` using `$MANIFEST`.
 - `/prompts:review-handoff` takes `TASK=<task-id> MANIFEST=<path> NOTES=<goal + summary + risks + optional questions>`, re-exports `MCP_RUNNER_TASK_ID`, and (repo-only) runs `node scripts/delegation-guard.mjs`, `node scripts/spec-guard.mjs --dry-run`, `npm run lint`, `npm run test`, optional `npm run eval:test`, plus `npm run review` (wraps `codex review` against the current diff and includes the latest run manifest path as evidence). It also reminds you to log approvals in `$MANIFEST` and mirror the evidence to the same docs/metrics/state targets.
 - In CI / `--no-interactive` pipelines (or when stdin is not a TTY, or `CODEX_REVIEW_NON_INTERACTIVE=1` / `CODEX_NON_INTERACTIVE=1` / `CODEX_NO_INTERACTIVE=1`), `npm run review` prints the review handoff prompt (including evidence paths) and exits successfully instead of invoking `codex review`. Set `FORCE_CODEX_REVIEW=1` to run `codex review` in those environments.
-- When forcing non-interactive review execution, `npm run review` enforces a timeout (`CODEX_REVIEW_TIMEOUT_SECONDS`, default `900`). Set `CODEX_REVIEW_TIMEOUT_SECONDS=0` to disable the timeout.
-- Forced non-interactive review execution also enforces a no-output stall timeout (`CODEX_REVIEW_STALL_TIMEOUT_SECONDS`, default `600`). Set `CODEX_REVIEW_STALL_TIMEOUT_SECONDS=0` to disable the stall guard.
+- `npm run review` keeps delegation MCP enabled by default; disable for troubleshooting with `CODEX_REVIEW_DISABLE_DELEGATION_MCP=1` (or `--disable-delegation-mcp`). Legacy disable control (`CODEX_REVIEW_ENABLE_DELEGATION_MCP=0`) remains supported.
+- `npm run review` allows unbounded runtime by default; set `CODEX_REVIEW_TIMEOUT_SECONDS`, `CODEX_REVIEW_STALL_TIMEOUT_SECONDS`, and/or `CODEX_REVIEW_STARTUP_LOOP_TIMEOUT_SECONDS` to opt into explicit guards (`0` disables each guard when set).
+- `CODEX_REVIEW_STARTUP_LOOP_MIN_EVENTS` defaults to `8` when startup-loop timeout detection is enabled.
+- `npm run review` emits patience-first monitor checkpoints every 60 seconds by default; set `CODEX_REVIEW_MONITOR_INTERVAL_SECONDS=<seconds>` to tune cadence (`0` disables checkpoints).
+- `npm run review` detects large uncommitted scopes and injects a high-signal scope advisory into the review prompt; tune detection via `CODEX_REVIEW_LARGE_SCOPE_FILE_THRESHOLD` (default `25`) and `CODEX_REVIEW_LARGE_SCOPE_LINE_THRESHOLD` (default `1200`).
+- Optional failure issue-bundle capture: set `CODEX_REVIEW_AUTO_ISSUE_LOG=1` (or pass `--auto-issue-log` to `npm run review -- ...`).
 - Always trigger diagnostics and review workflows through these prompts whenever you run the orchestrator so contributors consistently execute the required command sequences and capture auditable manifests.
 
 ### Identifier Guardrails
@@ -211,7 +216,7 @@ Note: the commands below assume a source checkout; `scripts/` helpers are not in
 | `node scripts/delegation-guard.mjs` | Enforces subagent delegation evidence before review (repo-only). |
 | `node scripts/spec-guard.mjs --dry-run` | Validates spec freshness; required before review (repo-only). |
 | `node scripts/diff-budget.mjs` | Guards against oversized diffs before review (repo-only; defaults: 25 files / 800 lines; supports explicit overrides). |
-| `npm run review` | Runs `codex review` with the latest run manifest path as evidence (repo-only; CI disables stdin; set `CODEX_REVIEW_NON_INTERACTIVE=1` to enforce locally). |
+| `npm run review` | Runs `codex review` with task-scoped manifest evidence; delegation MCP is enabled by default (explicit disable available via `CODEX_REVIEW_DISABLE_DELEGATION_MCP=1` / `--disable-delegation-mcp`), runtime guards are opt-in via `CODEX_REVIEW_*` env vars, and patience-first checkpoints log by default (`CODEX_REVIEW_MONITOR_INTERVAL_SECONDS` tunes/disables). Large uncommitted scopes get an automatic prompt advisory (`CODEX_REVIEW_LARGE_SCOPE_FILE_THRESHOLD` / `CODEX_REVIEW_LARGE_SCOPE_LINE_THRESHOLD`). Optional auto failure issue logging via `CODEX_REVIEW_AUTO_ISSUE_LOG=1` or `--auto-issue-log`. |
 
 Run `npm run build` to compile TypeScript before packaging or invoking the CLI directly from `dist/`.
 

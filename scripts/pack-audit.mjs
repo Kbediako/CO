@@ -13,7 +13,12 @@ const REQUIRED_FILES = [
 ];
 
 const ALLOWED_PREFIXES = ['dist/', 'schemas/', 'templates/', 'skills/'];
-const ALLOWED_ROOT_FILES = new Set(['README.md', 'LICENSE', 'package.json']);
+const ALLOWED_ROOT_FILES = new Set([
+  'README.md',
+  'LICENSE',
+  'package.json',
+  'codex.orchestrator.json'
+]);
 const DIST_ALLOWED_PREFIXES = [
   'dist/bin/',
   'dist/orchestrator/',
