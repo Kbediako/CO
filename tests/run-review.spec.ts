@@ -212,7 +212,7 @@ afterEach(async () => {
   }
 });
 
-describe('scripts/run-review regression', () => {
+describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }, () => {
   it('does not enforce default timeout/stall/startup-loop guards', async () => {
     const sandbox = await makeSandbox();
     const manifestPath = await makeManifest(sandbox);
