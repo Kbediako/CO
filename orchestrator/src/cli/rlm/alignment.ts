@@ -1291,30 +1291,46 @@ export class AlignmentChecker {
       ledger: this.ledger.summary()
     };
 
-    await this.appendLedgerEvent({
-      thread_id: this.threadId,
-      task_id: this.taskId,
-      run_id: this.runId,
-      agent_id: this.agentId,
-      event_type: 'final_summary',
-      intent_version: this.intentVersion.label,
-      payload: { ...summary },
-      score_metadata: {
-        action: 'final_summary',
-        score: null,
-        confidence: null,
-        requires_confirmation: false,
-        risk_level: null
-      },
-      provenance: {
-        source: 'alignment_checker',
-        route_strategy: 'sentinel',
-        route_model: this.policy.route.sentinel_model
-      },
-      idempotency_key: `${await this.ensureIngestionRunKey()}:final`
-    });
+    const sessionKey = await this.ensureIngestionRunKey();
+    let appendError: unknown;
+    try {
+      await this.appendLedgerEvent({
+        thread_id: this.threadId,
+        task_id: this.taskId,
+        run_id: this.runId,
+        agent_id: this.agentId,
+        event_type: 'final_summary',
+        intent_version: this.intentVersion.label,
+        payload: { ...summary },
+        score_metadata: {
+          action: 'final_summary',
+          score: null,
+          confidence: null,
+          requires_confirmation: false,
+          risk_level: null
+        },
+        provenance: {
+          source: 'alignment_checker',
+          route_strategy: 'sentinel',
+          route_model: this.policy.route.sentinel_model
+        },
+        idempotency_key: `${sessionKey}:final`
+      });
+    } catch (error) {
+      appendError = error;
+    }
 
-    await this.markIngestionSessionCompleted();
+    try {
+      await this.markIngestionSessionCompleted();
+    } catch (markError) {
+      if (!appendError) {
+        throw markError;
+      }
+    }
+
+    if (appendError) {
+      throw appendError;
+    }
 
     return {
       ...summary,

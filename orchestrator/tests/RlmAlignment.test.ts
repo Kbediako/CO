@@ -270,6 +270,40 @@ describe('alignment checker fallback policy', () => {
     expect(evaluation?.enforce_block).toBe(true);
   });
 
+  it('marks ingestion session complete even when final summary append fails', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'rlm-alignment-checker-'));
+    const checker = new AlignmentChecker({
+      enabled: true,
+      enforce: false,
+      repo_root: tempDir,
+      run_dir: join(tempDir, 'rlm'),
+      task_id: 'task-finalize',
+      run_id: 'run-finalize',
+      thread_id: 'thread-finalize',
+      agent_id: 'agent-finalize',
+      goal: 'verify ingestion session closeout'
+    });
+
+    const checkerInternals = checker as unknown as {
+      appendLedgerEvent: (event: Record<string, unknown>) => Promise<void>;
+    };
+    const originalAppend = checkerInternals.appendLedgerEvent.bind(checkerInternals);
+    checkerInternals.appendLedgerEvent = async (event: Record<string, unknown>) => {
+      if (event.event_type === 'final_summary') {
+        throw new Error('simulated final summary failure');
+      }
+      await originalAppend(event);
+    };
+
+    await expect(checker.finalize()).rejects.toThrow('simulated final summary failure');
+
+    const ingestionStatePath = join(tempDir, 'rlm', 'alignment', 'ingestion-session.json');
+    const ingestionState = JSON.parse(await readFile(ingestionStatePath, 'utf8')) as {
+      completed: boolean;
+    };
+    expect(ingestionState.completed).toBe(true);
+  });
+
   it('triggers deep audit on the turn that reaches the override streak threshold', async () => {
     tempDir = await mkdtemp(join(tmpdir(), 'rlm-alignment-checker-'));
     const checker = new AlignmentChecker({
