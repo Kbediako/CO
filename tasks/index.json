@@ -1390,6 +1390,22 @@
       },
       "created_at": "2026-02-19",
       "completed_at": null
+    },
+    {
+      "id": "0976",
+      "slug": "0976-context-alignment-checker-option2",
+      "title": "Context Alignment Checker (Option 2) - Docs-First + Simulation-Gated Implementation",
+      "path": "tasks/tasks-0976-context-alignment-checker-option2.md",
+      "kind": "run",
+      "status": "in-progress",
+      "gate": {
+        "phase": "context-alignment-checker-option2-planning",
+        "status": "succeeded",
+        "log": ".runs/0976-context-alignment-checker-option2/cli/2026-02-20T16-56-41-145Z-0c12d285/manifest.json",
+        "run_id": "2026-02-20T16-56-41-145Z-0c12d285"
+      },
+      "created_at": "2026-02-20",
+      "completed_at": null
     }
   ],
   "specs": [
@@ -1791,6 +1807,22 @@
         "task": "tasks/tasks-0975-codex-cli-capability-adoption-redesign.md",
         "agent_task": ".agent/task/0975-codex-cli-capability-adoption-redesign.md",
         "docs": "docs/TECH_SPEC-codex-cli-capability-adoption-redesign.md"
+      }
+    },
+    {
+      "id": "20260220-0976-context-alignment-checker-option2",
+      "title": "Context Alignment Checker (Option 2) - Docs-First + Simulation-Gated Implementation",
+      "relates_to": "tasks/tasks-0976-context-alignment-checker-option2.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-02-20",
+      "paths": {
+        "spec": "tasks/specs/0976-context-alignment-checker-option2.md",
+        "task": "tasks/tasks-0976-context-alignment-checker-option2.md",
+        "agent_task": ".agent/task/0976-context-alignment-checker-option2.md",
+        "docs": "docs/TECH_SPEC-context-alignment-checker-option2.md"
       }
     }
   ]
