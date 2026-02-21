@@ -11,6 +11,13 @@ Delegate as a manager, not as a pass-through. Split work into narrow streams, gi
 
 Note: If a global `collab-subagents-first` skill is installed, prefer that and fall back to this bundled skill.
 
+## Global Adoption Defaults
+
+For shipped CO usage, default to this command path unless task constraints say otherwise:
+- `codex-orchestrator flow --task <task-id>`
+- `codex-orchestrator doctor --usage --window-days 30 --task <task-id>`
+- `codex-orchestrator rlm --multi-agent auto "<goal>"`
+
 ## Terminology + feature gate
 
 - Use "collab" as the workflow/tooling term for subagent calls (`spawn_agent` / `wait` / `close_agent`).

@@ -77,6 +77,21 @@ async function writeFakeCodexBinary(dir: string): Promise<string> {
 }
 
 describe('codex-orchestrator command surface', () => {
+  it('prints root help with quickstart guidance', async () => {
+    const { stdout } = await runCli(['--help']);
+    expect(stdout).toContain('Usage: codex-orchestrator <command> [options]');
+    expect(stdout).toContain('Quickstart (agent-first):');
+    expect(stdout).toContain('codex-orchestrator flow --task <task-id>');
+    expect(stdout).toContain('codex-orchestrator doctor --usage --window-days 30');
+  }, TEST_TIMEOUT);
+
+  it('prints usage for unknown commands and exits non-zero', async () => {
+    await expect(runCli(['unknown-command'])).rejects.toMatchObject({
+      stderr: expect.stringContaining('Unknown command: unknown-command'),
+      stdout: expect.stringContaining('Usage: codex-orchestrator <command> [options]')
+    });
+  }, TEST_TIMEOUT);
+
   it('prints status help without requiring a run id', async () => {
     const { stdout } = await runCli(['status', '--help']);
     expect(stdout).toContain('Usage: codex-orchestrator status --run <id>');
@@ -123,6 +138,9 @@ describe('codex-orchestrator command surface', () => {
     expect(stdout).toContain('implementation-gate');
     expect(stdout).toContain('--auto-issue-log [true|false]');
     expect(stdout).toContain('--repo-config-required [true|false]');
+    expect(stdout).toContain('Examples:');
+    expect(stdout).toContain('codex-orchestrator flow --task <task-id>');
+    expect(stdout).toContain('Post-run check:');
   }, TEST_TIMEOUT);
 
   it('prints start help without preparing a run', async () => {
@@ -131,8 +149,363 @@ describe('codex-orchestrator command surface', () => {
     expect(stdout).toContain('Start a new run');
     expect(stdout).toContain('--auto-issue-log [true|false]');
     expect(stdout).toContain('--repo-config-required [true|false]');
+    expect(stdout).toContain('Examples:');
+    expect(stdout).toContain('codex-orchestrator start docs-review --task <task-id>');
+    expect(stdout).toContain('Post-run check:');
     expect(stdout).not.toContain('Run started:');
   }, TEST_TIMEOUT);
+
+  it('emits an adoption hint after successful start runs in text mode', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'co-cli-start-adoption-hint-'));
+    const config = {
+      defaultPipeline: 'diagnostics',
+      pipelines: [
+        {
+          id: 'diagnostics',
+          title: 'Diagnostics',
+          guardrailsRequired: false,
+          stages: [
+            {
+              kind: 'command',
+              id: 'ok',
+              title: 'ok',
+              command: 'node -e "process.exit(0)"'
+            }
+          ]
+        }
+      ]
+    };
+    await writeFile(join(tempDir, 'codex.orchestrator.json'), `${JSON.stringify(config, null, 2)}\n`);
+    const env = {
+      ...process.env,
+      CODEX_ORCHESTRATOR_ROOT: tempDir,
+      CODEX_ORCHESTRATOR_RUNS_DIR: join(tempDir, '.runs'),
+      CODEX_ORCHESTRATOR_OUT_DIR: join(tempDir, 'out'),
+      CODEX_CLOUD_ENV_ID: '',
+      MCP_RUNNER_TASK_ID: 'start-adoption-hint'
+    };
+
+    const { stdout } = await runCli(['start', 'diagnostics', '--task', 'start-adoption-hint'], env, FLOW_TARGET_TEST_TIMEOUT);
+    expect(stdout).toContain('Run started:');
+    expect(stdout).toContain('Adoption hint: ');
+  }, FLOW_TARGET_TEST_TIMEOUT);
+
+  it('does not emit an adoption hint when start run fails', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'co-cli-start-adoption-fail-'));
+    const config = {
+      defaultPipeline: 'diagnostics',
+      pipelines: [
+        {
+          id: 'diagnostics',
+          title: 'Diagnostics',
+          guardrailsRequired: false,
+          stages: [
+            {
+              kind: 'command',
+              id: 'fail',
+              title: 'fail',
+              command: 'node -e "process.exit(3)"'
+            }
+          ]
+        }
+      ]
+    };
+    await writeFile(join(tempDir, 'codex.orchestrator.json'), `${JSON.stringify(config, null, 2)}\n`);
+    const env = {
+      ...process.env,
+      CODEX_ORCHESTRATOR_ROOT: tempDir,
+      CODEX_ORCHESTRATOR_RUNS_DIR: join(tempDir, '.runs'),
+      CODEX_ORCHESTRATOR_OUT_DIR: join(tempDir, 'out'),
+      CODEX_CLOUD_ENV_ID: '',
+      MCP_RUNNER_TASK_ID: 'start-adoption-fail'
+    };
+
+    const { stdout } = await runCli(['start', 'diagnostics', '--task', 'start-adoption-fail'], env, FLOW_TARGET_TEST_TIMEOUT);
+    expect(stdout).toContain('Status: failed');
+    expect(stdout).not.toContain('Adoption hint: ');
+  }, FLOW_TARGET_TEST_TIMEOUT);
+
+  it('does not emit an adoption hint when default start pipeline resolves to rlm', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'co-cli-start-default-rlm-hint-'));
+    const config = {
+      defaultPipeline: 'rlm',
+      pipelines: [
+        {
+          id: 'rlm',
+          title: 'RLM',
+          guardrailsRequired: false,
+          stages: [
+            {
+              kind: 'command',
+              id: 'ok',
+              title: 'ok',
+              command: 'node -e "process.exit(0)"'
+            }
+          ]
+        }
+      ]
+    };
+    await writeFile(join(tempDir, 'codex.orchestrator.json'), `${JSON.stringify(config, null, 2)}\n`);
+    const env = {
+      ...process.env,
+      CODEX_ORCHESTRATOR_ROOT: tempDir,
+      CODEX_ORCHESTRATOR_RUNS_DIR: join(tempDir, '.runs'),
+      CODEX_ORCHESTRATOR_OUT_DIR: join(tempDir, 'out'),
+      CODEX_CLOUD_ENV_ID: '',
+      MCP_RUNNER_TASK_ID: 'start-default-rlm-hint'
+    };
+
+    const { stdout } = await runCli(['start', '--task', 'start-default-rlm-hint'], env, FLOW_TARGET_TEST_TIMEOUT);
+    expect(stdout).toContain('Run started:');
+    expect(stdout).not.toContain('Adoption hint: ');
+  }, FLOW_TARGET_TEST_TIMEOUT);
+
+  it('keeps start --format json output free of adoption hint text', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'co-cli-start-adoption-json-'));
+    const config = {
+      defaultPipeline: 'diagnostics',
+      pipelines: [
+        {
+          id: 'diagnostics',
+          title: 'Diagnostics',
+          guardrailsRequired: false,
+          stages: [
+            {
+              kind: 'command',
+              id: 'ok',
+              title: 'ok',
+              command: 'node -e "process.exit(0)"'
+            }
+          ]
+        }
+      ]
+    };
+    await writeFile(join(tempDir, 'codex.orchestrator.json'), `${JSON.stringify(config, null, 2)}\n`);
+    const env = {
+      ...process.env,
+      CODEX_ORCHESTRATOR_ROOT: tempDir,
+      CODEX_ORCHESTRATOR_RUNS_DIR: join(tempDir, '.runs'),
+      CODEX_ORCHESTRATOR_OUT_DIR: join(tempDir, 'out'),
+      CODEX_CLOUD_ENV_ID: '',
+      MCP_RUNNER_TASK_ID: 'start-adoption-json'
+    };
+
+    const { stdout } = await runCli(
+      ['start', 'diagnostics', '--format', 'json', '--task', 'start-adoption-json'],
+      env,
+      FLOW_TARGET_TEST_TIMEOUT
+    );
+    expect(stdout).not.toContain('Adoption hint: ');
+    const jsonStart = stdout.indexOf('{');
+    const payload = JSON.parse(jsonStart >= 0 ? stdout.slice(jsonStart) : stdout) as { status?: string };
+    expect(payload.status).toBe('succeeded');
+  }, FLOW_TARGET_TEST_TIMEOUT);
+
+  it('emits an adoption hint at the end of successful flow runs in text mode', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'co-cli-flow-adoption-hint-'));
+    const config = {
+      defaultPipeline: 'docs-review',
+      pipelines: [
+        {
+          id: 'docs-review',
+          title: 'Docs Review',
+          guardrailsRequired: false,
+          stages: [
+            {
+              kind: 'command',
+              id: 'docs-ok',
+              title: 'docs-ok',
+              command: 'node -e "process.exit(0)"'
+            }
+          ]
+        },
+        {
+          id: 'implementation-gate',
+          title: 'Implementation Gate',
+          guardrailsRequired: false,
+          stages: [
+            {
+              kind: 'command',
+              id: 'impl-ok',
+              title: 'impl-ok',
+              command: 'node -e "process.exit(0)"'
+            }
+          ]
+        }
+      ]
+    };
+    await writeFile(join(tempDir, 'codex.orchestrator.json'), `${JSON.stringify(config, null, 2)}\n`);
+    const env = {
+      ...process.env,
+      CODEX_ORCHESTRATOR_ROOT: tempDir,
+      CODEX_ORCHESTRATOR_RUNS_DIR: join(tempDir, '.runs'),
+      CODEX_ORCHESTRATOR_OUT_DIR: join(tempDir, 'out'),
+      CODEX_CLOUD_ENV_ID: '',
+      MCP_RUNNER_TASK_ID: 'flow-adoption-hint'
+    };
+
+    const { stdout } = await runCli(['flow', '--task', 'flow-adoption-hint'], env, FLOW_TARGET_TEST_TIMEOUT);
+    expect(stdout).toContain('Flow complete: docs-review -> implementation-gate.');
+    expect(stdout).toContain('Adoption hint: ');
+  }, FLOW_TARGET_TEST_TIMEOUT);
+
+  it('does not emit an adoption hint when flow stops at docs-review failure', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'co-cli-flow-adoption-docs-fail-'));
+    const config = {
+      defaultPipeline: 'docs-review',
+      pipelines: [
+        {
+          id: 'docs-review',
+          title: 'Docs Review',
+          guardrailsRequired: false,
+          stages: [
+            {
+              kind: 'command',
+              id: 'docs-fail',
+              title: 'docs-fail',
+              command: 'node -e "process.exit(4)"'
+            }
+          ]
+        },
+        {
+          id: 'implementation-gate',
+          title: 'Implementation Gate',
+          guardrailsRequired: false,
+          stages: [
+            {
+              kind: 'command',
+              id: 'impl-ok',
+              title: 'impl-ok',
+              command: 'node -e "process.exit(0)"'
+            }
+          ]
+        }
+      ]
+    };
+    await writeFile(join(tempDir, 'codex.orchestrator.json'), `${JSON.stringify(config, null, 2)}\n`);
+    const env = {
+      ...process.env,
+      CODEX_ORCHESTRATOR_ROOT: tempDir,
+      CODEX_ORCHESTRATOR_RUNS_DIR: join(tempDir, '.runs'),
+      CODEX_ORCHESTRATOR_OUT_DIR: join(tempDir, 'out'),
+      CODEX_CLOUD_ENV_ID: '',
+      MCP_RUNNER_TASK_ID: 'flow-adoption-docs-fail'
+    };
+
+    let stdout = '';
+    try {
+      await runCli(['flow', '--task', 'flow-adoption-docs-fail'], env, FLOW_TARGET_TEST_TIMEOUT);
+      throw new Error('expected flow to fail at docs-review');
+    } catch (error) {
+      stdout = (error as { stdout?: string }).stdout ?? '';
+    }
+    expect(stdout).toContain('Flow halted: docs-review failed.');
+    expect(stdout).not.toContain('Adoption hint: ');
+  }, FLOW_TARGET_TEST_TIMEOUT);
+
+  it('does not emit an adoption hint when flow stops at implementation-gate failure', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'co-cli-flow-adoption-impl-fail-'));
+    const config = {
+      defaultPipeline: 'docs-review',
+      pipelines: [
+        {
+          id: 'docs-review',
+          title: 'Docs Review',
+          guardrailsRequired: false,
+          stages: [
+            {
+              kind: 'command',
+              id: 'docs-ok',
+              title: 'docs-ok',
+              command: 'node -e "process.exit(0)"'
+            }
+          ]
+        },
+        {
+          id: 'implementation-gate',
+          title: 'Implementation Gate',
+          guardrailsRequired: false,
+          stages: [
+            {
+              kind: 'command',
+              id: 'impl-fail',
+              title: 'impl-fail',
+              command: 'node -e "process.exit(5)"'
+            }
+          ]
+        }
+      ]
+    };
+    await writeFile(join(tempDir, 'codex.orchestrator.json'), `${JSON.stringify(config, null, 2)}\n`);
+    const env = {
+      ...process.env,
+      CODEX_ORCHESTRATOR_ROOT: tempDir,
+      CODEX_ORCHESTRATOR_RUNS_DIR: join(tempDir, '.runs'),
+      CODEX_ORCHESTRATOR_OUT_DIR: join(tempDir, 'out'),
+      CODEX_CLOUD_ENV_ID: '',
+      MCP_RUNNER_TASK_ID: 'flow-adoption-impl-fail'
+    };
+
+    let stdout = '';
+    try {
+      await runCli(['flow', '--task', 'flow-adoption-impl-fail'], env, FLOW_TARGET_TEST_TIMEOUT);
+      throw new Error('expected flow to fail at implementation-gate');
+    } catch (error) {
+      stdout = (error as { stdout?: string }).stdout ?? '';
+    }
+    expect(stdout).toContain('Flow halted: implementation-gate failed.');
+    expect(stdout).not.toContain('Adoption hint: ');
+  }, FLOW_TARGET_TEST_TIMEOUT);
+
+  it('keeps flow --format json output free of adoption hint text', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'co-cli-flow-adoption-json-'));
+    const config = {
+      defaultPipeline: 'docs-review',
+      pipelines: [
+        {
+          id: 'docs-review',
+          title: 'Docs Review',
+          guardrailsRequired: false,
+          stages: [
+            {
+              kind: 'command',
+              id: 'docs-ok',
+              title: 'docs-ok',
+              command: 'node -e "process.exit(0)"'
+            }
+          ]
+        },
+        {
+          id: 'implementation-gate',
+          title: 'Implementation Gate',
+          guardrailsRequired: false,
+          stages: [
+            {
+              kind: 'command',
+              id: 'impl-ok',
+              title: 'impl-ok',
+              command: 'node -e "process.exit(0)"'
+            }
+          ]
+        }
+      ]
+    };
+    await writeFile(join(tempDir, 'codex.orchestrator.json'), `${JSON.stringify(config, null, 2)}\n`);
+    const env = {
+      ...process.env,
+      CODEX_ORCHESTRATOR_ROOT: tempDir,
+      CODEX_ORCHESTRATOR_RUNS_DIR: join(tempDir, '.runs'),
+      CODEX_ORCHESTRATOR_OUT_DIR: join(tempDir, 'out'),
+      CODEX_CLOUD_ENV_ID: '',
+      MCP_RUNNER_TASK_ID: 'flow-adoption-json'
+    };
+
+    const { stdout } = await runCli(['flow', '--format', 'json', '--task', 'flow-adoption-json'], env, FLOW_TARGET_TEST_TIMEOUT);
+    expect(stdout).not.toContain('Adoption hint: ');
+    const jsonStart = stdout.indexOf('{');
+    const payload = JSON.parse(jsonStart >= 0 ? stdout.slice(jsonStart) : stdout) as { status?: string };
+    expect(payload.status).toBe('succeeded');
+  }, FLOW_TARGET_TEST_TIMEOUT);
 
   it('prints plan help', async () => {
     const { stdout } = await runCli(['plan', '--help']);

@@ -1406,6 +1406,22 @@
       },
       "created_at": "2026-02-20",
       "completed_at": null
+    },
+    {
+      "id": "0977",
+      "slug": "0977-shipped-feature-adoption-guidance",
+      "title": "Shipped Feature Adoption Guidance Hardening",
+      "path": "tasks/tasks-0977-shipped-feature-adoption-guidance.md",
+      "kind": "run",
+      "status": "in-progress",
+      "gate": {
+        "phase": "shipped-feature-adoption-guidance-planning",
+        "status": "succeeded",
+        "log": ".runs/0977-shipped-feature-adoption-guidance/cli/2026-02-21T03-51-42-317Z-f42bf666/manifest.json",
+        "run_id": "2026-02-21T03-51-42-317Z-f42bf666"
+      },
+      "created_at": "2026-02-21",
+      "completed_at": null
     }
   ],
   "specs": [
@@ -1823,6 +1839,22 @@
         "task": "tasks/tasks-0976-context-alignment-checker-option2.md",
         "agent_task": ".agent/task/0976-context-alignment-checker-option2.md",
         "docs": "docs/TECH_SPEC-context-alignment-checker-option2.md"
+      }
+    },
+    {
+      "id": "20260221-0977-shipped-feature-adoption-guidance",
+      "title": "Shipped Feature Adoption Guidance Hardening",
+      "relates_to": "tasks/tasks-0977-shipped-feature-adoption-guidance.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-02-21",
+      "paths": {
+        "spec": "tasks/specs/0977-shipped-feature-adoption-guidance.md",
+        "task": "tasks/tasks-0977-shipped-feature-adoption-guidance.md",
+        "agent_task": ".agent/task/0977-shipped-feature-adoption-guidance.md",
+        "docs": "docs/TECH_SPEC-shipped-feature-adoption-guidance.md"
       }
     }
   ]

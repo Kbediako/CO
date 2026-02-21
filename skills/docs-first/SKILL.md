@@ -9,6 +9,13 @@ description: "Use when a task requires a spec-driven workflow: draft/refresh PRD
 
 Use this skill when a task needs a spec-driven workflow. The objective is to create or refresh PRD + TECH_SPEC + ACTION_PLAN + the task checklist before editing code or docs, capture a brief translation of the user’s request in the PRD for context retention, and keep task mirrors and review evidence in sync as understanding evolves.
 
+## Global Adoption Defaults
+
+For shipped CO usage, default to this command path unless task constraints say otherwise:
+- `codex-orchestrator flow --task <task-id>`
+- `codex-orchestrator doctor --usage --window-days 30 --task <task-id>`
+- `codex-orchestrator rlm --multi-agent auto "<goal>"`
+
 ## Workflow
 
 1) Draft or refresh PRD + TECH_SPEC + ACTION_PLAN
