@@ -33,7 +33,7 @@
 ## Scope
 - In Scope (Option 2 now):
   - Versioned intent object with major/minor/patch semantics.
-  - Sentinel check each task/turn boundary.
+  - Sentinel checks each task/turn boundary.
   - Deep audit on risk triggers.
   - 0-100 weighted rubric and policy bands.
   - 20-turn confirmation and confidence/consensus gating.
