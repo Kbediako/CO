@@ -21,9 +21,10 @@ last_review: 2026-02-20
 - Gate order (hard):
   1. Research synthesis complete.
   2. Docs-first artifacts complete + docs guards pass.
-  3. Simulation-first mock validation shows stable metrics.
-  4. Minimal Option 2 implementation + tests.
-  5. Full verification/review/elegance pass.
+  3. Standalone pre-implementation review approval recorded (`docs/REVIEW-0976-context-alignment-checker-option2-pre-implementation.md`).
+  4. Simulation-first mock validation shows stable metrics.
+  5. Minimal Option 2 implementation + tests.
+  6. Full verification/review/elegance pass.
 
 ## Technical Requirements
 - Functional requirements:

@@ -19,6 +19,7 @@
 ### Docs-first artifacts and gates (pre-implementation)
 - [x] Task scaffolding + mirrors + registries registered. - Evidence: `tasks/tasks-0976-context-alignment-checker-option2.md`, `.agent/task/0976-context-alignment-checker-option2.md`, `tasks/index.json`, `docs/TASKS.md`, `docs/docs-freshness-registry.json`.
 - [x] PRD + TECH_SPEC + ACTION_PLAN + research findings drafted. - Evidence: `docs/PRD-context-alignment-checker-option2.md`, `tasks/specs/0976-context-alignment-checker-option2.md`, `docs/ACTION_PLAN-context-alignment-checker-option2.md`, `docs/findings/0976-context-alignment-research.md`.
+- [x] Standalone review approval captured (pre-implementation). - Evidence: `docs/REVIEW-0976-context-alignment-checker-option2-pre-implementation.md`.
 - [x] Docs-review manifest captured before implementation edits. - Evidence: `.runs/0976-context-alignment-checker-option2/cli/2026-02-20T16-56-41-145Z-0c12d285/manifest.json`.
 - [x] Docs guards pass. - Evidence: `out/0976-context-alignment-checker-option2/manual/docs-guards-2026-02-20.log`.
 

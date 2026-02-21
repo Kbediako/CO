@@ -2075,6 +2075,20 @@
       "cadence_days": 90
     },
     {
+      "path": "docs/REVIEW-0976-context-alignment-checker-option2-pre-implementation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-21",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/REVIEW-0977-shipped-feature-adoption-guidance-pre-implementation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-21",
+      "cadence_days": 90
+    },
+    {
       "path": "docs/README.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",

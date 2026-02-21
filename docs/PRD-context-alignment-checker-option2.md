@@ -15,6 +15,7 @@
 
 ## Bootstrap Decision (2026-02-20)
 - Decision statement: implement Option 2 only, anchored in existing RLM symbolic-loop seams, with fail-open rollout defaults, explicit feature flags, and strict confirmation/conservative fallback when confidence gates fail.
+- Pre-implementation standalone review evidence: `docs/REVIEW-0976-context-alignment-checker-option2-pre-implementation.md`.
 - Assumptions:
   - Existing RLM loop iteration boundaries are valid "turn" boundaries for v1 gating logic.
   - Existing run artifacts (`rlm/state.json`, `events.jsonl`, manifest summary) can carry canonical checker evidence without schema-breaking manifest changes.

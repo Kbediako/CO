@@ -1141,7 +1141,15 @@ export async function runSymbolicLoop(options: SymbolicLoopOptions): Promise<Rlm
 
   const finalize = async (status: RlmState['final']): Promise<RlmLoopResult> => {
     if (alignmentChecker && finalizedAlignmentSummary === undefined) {
-      finalizedAlignmentSummary = await alignmentChecker.finalize();
+      try {
+        finalizedAlignmentSummary = await alignmentChecker.finalize();
+      } catch (error) {
+        log(
+          `Alignment finalize failed (continuing without summary): ${
+            error instanceof Error ? error.message : String(error)
+          }`
+        );
+      }
     }
     state.final = status ?? { status: 'error', exitCode: 10 };
     if (state.final && finalizedAlignmentSummary) {
@@ -1320,6 +1328,12 @@ export async function runSymbolicLoop(options: SymbolicLoopOptions): Promise<Rlm
         ...validation.reads.slice(0, 2).map((entry) =>
           entry.pointer ?? `start_byte:${entry.start_byte ?? 0}`
         ),
+        ...validation.searches.slice(0, 2).map((entry) => `search:${entry.query}`),
+        ...validation.subcalls.slice(0, 2).flatMap((entry) =>
+          entry.snippets.slice(0, 1).map((snippet) =>
+            snippet.pointer ?? `start_byte:${snippet.start_byte ?? 0}`
+          )
+        ),
         ...priorSubcalls.slice(0, 2).map((entry) => entry.pointer)
       ];
       const alignmentEvaluation = alignmentChecker
@@ -1339,9 +1353,7 @@ export async function runSymbolicLoop(options: SymbolicLoopOptions): Promise<Rlm
 
       if (alignmentEvaluation?.enforce_block) {
         log(
-          `Alignment gate blocked iteration ${iteration}: ${
-            alignmentEvaluation.enforce_reason ?? 'confirmation_required'
-          }`
+          `Alignment gate blocked iteration ${iteration}: ${alignmentEvaluation.enforce_reason ?? 'policy_block'}`
         );
         state.symbolic_iterations.push({
           iteration,

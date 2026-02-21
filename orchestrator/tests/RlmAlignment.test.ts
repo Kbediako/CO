@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -161,10 +161,45 @@ describe('alignment persistence', () => {
     expect(lines.length).toBe(2);
     expect(projectionRaw).toContain('"events": 2');
   });
+
+  it('ignores malformed ledger lines when rebuilding projections', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'rlm-alignment-'));
+    const runDir = join(tempDir, 'rlm');
+    const alignmentDir = join(runDir, 'alignment');
+    await mkdir(alignmentDir, { recursive: true });
+    const ledgerPath = join(alignmentDir, 'ledger.jsonl');
+    await writeFile(
+      ledgerPath,
+      `${JSON.stringify({ idempotency_key: 'bad:1', hash: 'hash-only' })}\n`,
+      'utf8'
+    );
+
+    const writer = new AlignmentLedgerWriter({
+      repoRoot: tempDir,
+      runDir
+    });
+
+    await expect(
+      writer.append({
+        thread_id: 't1',
+        task_id: 'task',
+        run_id: 'run',
+        agent_id: 'agent',
+        event_type: 'sentinel',
+        intent_version: '1.0.1',
+        payload: { turn: 1 },
+        score_metadata: { action: 'pass', score: 90, confidence: 0.9 },
+        provenance: { source: 'test', route_strategy: 'sentinel', route_model: 'gpt-5.3-spark' },
+        idempotency_key: 'event:valid'
+      })
+    ).resolves.toBeTruthy();
+
+    expect(writer.summary().events).toBe(1);
+  });
 });
 
 describe('alignment checker fallback policy', () => {
-  it('requires confirmation and blocks in enforce mode when high reasoning is unavailable', async () => {
+  it('requires confirmation without hard-blocking when high reasoning is unavailable', async () => {
     tempDir = await mkdtemp(join(tmpdir(), 'rlm-alignment-checker-'));
     const checker = new AlignmentChecker({
       enabled: true,
@@ -197,11 +232,42 @@ describe('alignment checker fallback policy', () => {
 
     expect(evaluation).toBeTruthy();
     expect(evaluation?.decision.requires_confirmation).toBe(true);
-    expect(evaluation?.enforce_block).toBe(true);
+    expect(evaluation?.enforce_block).toBe(false);
 
     const finalSummary = await checker.finalize();
     expect(finalSummary?.enabled).toBe(true);
     expect(finalSummary?.requires_confirmation_count).toBe(1);
+  });
+
+  it('hard-blocks in enforce mode on explicit block_escalate decisions', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'rlm-alignment-checker-'));
+    const checker = new AlignmentChecker({
+      enabled: true,
+      enforce: true,
+      repo_root: tempDir,
+      run_dir: join(tempDir, 'rlm'),
+      task_id: 'task-block',
+      run_id: 'run-block',
+      thread_id: 'thread-block',
+      agent_id: 'agent-block',
+      goal: 'verify block behavior'
+    });
+
+    const evaluation = await checker.evaluateTurn({
+      turn: 1,
+      intent: 'fail',
+      planner_prompt_bytes: 3200,
+      planner_errors: ['e1', 'e2', 'e3', 'e4'],
+      read_count: 0,
+      search_count: 0,
+      subcall_count: 0,
+      risk_level: 'high',
+      evidence_refs: []
+    });
+
+    expect(evaluation).toBeTruthy();
+    expect(evaluation?.decision.action).toBe('block_escalate');
+    expect(evaluation?.enforce_block).toBe(true);
   });
 
   it('triggers deep audit on the turn that reaches the override streak threshold', async () => {

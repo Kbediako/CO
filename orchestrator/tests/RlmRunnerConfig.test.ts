@@ -46,6 +46,7 @@ describe('rlmRunner config parsing', () => {
   it('parses probability ranges for alignment thresholds', () => {
     expect(parseProbability(undefined, 0.7)).toBe(0.7);
     expect(parseProbability('0.15', 0.7)).toBe(0.15);
+    expect(parseProbability('0', 0.7)).toBe(0);
     expect(parseProbability('1', 0.7)).toBe(1);
     expect(parseProbability('-0.1', 0.7)).toBeNull();
     expect(parseProbability('1.1', 0.7)).toBeNull();

@@ -17,6 +17,13 @@ import type {
 const ALIGNMENT_SCHEMA_VERSION = 1;
 const ALIGNMENT_HASH_GENESIS = 'GENESIS';
 const ACTION_ORDER: RlmAlignmentAction[] = ['pass', 'nudge', 'replan', 'block_escalate'];
+const ALIGNMENT_EVENT_TYPES = new Set<AlignmentLedgerEvent['event_type']>([
+  'intent_update',
+  'sentinel',
+  'deep_audit',
+  'consensus_snapshot',
+  'final_summary'
+]);
 
 export interface AlignmentWeights {
   goal_alignment: number;
@@ -613,14 +620,32 @@ function parseLedgerLine(line: string): AlignmentLedgerEvent | null {
     return null;
   }
   try {
-    const parsed = JSON.parse(trimmed) as AlignmentLedgerEvent;
+    const parsed = JSON.parse(trimmed) as Record<string, unknown>;
     if (!parsed || typeof parsed !== 'object') {
       return null;
     }
     if (typeof parsed.idempotency_key !== 'string' || typeof parsed.hash !== 'string') {
       return null;
     }
-    return parsed;
+    if (
+      typeof parsed.event_type !== 'string' ||
+      !ALIGNMENT_EVENT_TYPES.has(parsed.event_type as AlignmentLedgerEvent['event_type'])
+    ) {
+      return null;
+    }
+    if (
+      parsed.score_metadata !== undefined &&
+      (parsed.score_metadata === null || typeof parsed.score_metadata !== 'object')
+    ) {
+      return null;
+    }
+    if (
+      parsed.payload !== undefined &&
+      (parsed.payload === null || typeof parsed.payload !== 'object')
+    ) {
+      return null;
+    }
+    return parsed as unknown as AlignmentLedgerEvent;
   } catch {
     return null;
   }
@@ -638,26 +663,35 @@ function buildProjection(events: AlignmentLedgerEvent[], now: string): Record<st
   let consensusSnapshots = 0;
 
   for (const event of events) {
-    const decisionEvent = event.event_type === 'sentinel' || event.event_type === 'deep_audit';
+    const eventType = typeof event.event_type === 'string' ? event.event_type : null;
+    const scoreMetadata =
+      event.score_metadata && typeof event.score_metadata === 'object'
+        ? (event.score_metadata as Record<string, unknown>)
+        : null;
+    const decisionEvent = eventType === 'sentinel' || eventType === 'deep_audit';
     if (decisionEvent) {
-      const scoreAction = event.score_metadata.action;
+      const scoreAction = scoreMetadata?.action;
       if (typeof scoreAction === 'string' && Object.hasOwn(actionCounts, scoreAction)) {
         const typed = scoreAction as RlmAlignmentAction;
         actionCounts[typed] += 1;
       }
-      if (event.score_metadata.requires_confirmation === true) {
+      if (scoreMetadata?.requires_confirmation === true) {
         confirmations += 1;
       }
     }
-    if (event.event_type === 'deep_audit') {
+    if (eventType === 'deep_audit') {
       deepAudits += 1;
     }
-    if (event.event_type === 'consensus_snapshot') {
+    if (eventType === 'consensus_snapshot') {
       consensusSnapshots += 1;
     }
   }
 
   const tail = events.length > 0 ? events[events.length - 1] : null;
+  const tailMetadata =
+    tail?.score_metadata && typeof tail.score_metadata === 'object'
+      ? (tail.score_metadata as Record<string, unknown>)
+      : null;
   return {
     schema_version: ALIGNMENT_SCHEMA_VERSION,
     derived_from: 'alignment-ledger',
@@ -674,9 +708,9 @@ function buildProjection(events: AlignmentLedgerEvent[], now: string): Record<st
           event_id: tail.event_id,
           event_type: tail.event_type,
           intent_version: tail.intent_version,
-          action: tail.score_metadata.action ?? null,
-          score: tail.score_metadata.score ?? null,
-          confidence: tail.score_metadata.confidence ?? null
+          action: tailMetadata?.action ?? null,
+          score: tailMetadata?.score ?? null,
+          confidence: tailMetadata?.confidence ?? null
         }
       : null,
     hash_tail: tail?.hash ?? ALIGNMENT_HASH_GENESIS
@@ -1109,8 +1143,12 @@ export class AlignmentChecker {
       contradictions
     });
 
-    const enforceReason = gate.requires_confirmation ? 'confirmation_required' : undefined;
-    const enforceBlock = this.enforce && Boolean(enforceReason);
+    const enforceBlock = this.enforce && stabilizedAction === 'block_escalate';
+    const enforceReason = enforceBlock
+      ? gate.requires_confirmation
+        ? 'block_and_confirmation_required'
+        : 'block_escalate'
+      : undefined;
 
     const decision: RlmAlignmentDecision = {
       turn: input.turn,

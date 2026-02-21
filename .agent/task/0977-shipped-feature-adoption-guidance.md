@@ -19,6 +19,7 @@
 ### Docs-first artifacts and gates (pre-implementation)
 - [x] Task scaffolding + mirrors + registries registered. - Evidence: `tasks/tasks-0977-shipped-feature-adoption-guidance.md`, `.agent/task/0977-shipped-feature-adoption-guidance.md`, `tasks/index.json`, `docs/TASKS.md`, `docs/docs-freshness-registry.json`.
 - [x] PRD + TECH_SPEC + ACTION_PLAN + findings drafted. - Evidence: `docs/PRD-shipped-feature-adoption-guidance.md`, `tasks/specs/0977-shipped-feature-adoption-guidance.md`, `docs/ACTION_PLAN-shipped-feature-adoption-guidance.md`, `docs/findings/0977-shipped-feature-adoption-guidance-research.md`.
+- [x] Standalone review approval captured (pre-implementation). - Evidence: `docs/REVIEW-0977-shipped-feature-adoption-guidance-pre-implementation.md`.
 - [x] Delegation scout manifest captured (`<task-id>-<stream>`). - Evidence: `.runs/0977-shipped-feature-adoption-guidance-scout/cli/2026-02-21T03-48-42-821Z-ba2762ec/manifest.json`.
 - [x] Docs-review manifest captured before implementation edits. - Evidence: `.runs/0977-shipped-feature-adoption-guidance/cli/2026-02-21T03-51-42-317Z-f42bf666/manifest.json`.
 - [x] Docs guards pass. - Evidence: `out/0977-shipped-feature-adoption-guidance/manual/docs-guards-2026-02-21.log`.
