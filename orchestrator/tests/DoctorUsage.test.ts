@@ -629,4 +629,167 @@ describe('runDoctorUsage', () => {
       await rm(repoRoot, { recursive: true, force: true });
     }
   });
+
+  it('does not claim cloud is configured when CODEX_CLOUD_ENV_ID is unset', async () => {
+    const previousEnv = {
+      root: process.env.CODEX_ORCHESTRATOR_ROOT,
+      runsDir: process.env.CODEX_ORCHESTRATOR_RUNS_DIR,
+      outDir: process.env.CODEX_ORCHESTRATOR_OUT_DIR,
+      taskId: process.env.MCP_RUNNER_TASK_ID,
+      cloudEnvId: process.env.CODEX_CLOUD_ENV_ID
+    };
+    const repoRoot = await mkdtemp(join(tmpdir(), 'doctor-usage-cloud-config-wording-'));
+    const taskId = 'task-cloud-config-wording';
+    try {
+      await mkdir(join(repoRoot, 'tasks'), { recursive: true });
+      await writeFile(
+        join(repoRoot, 'tasks', 'index.json'),
+        `${JSON.stringify({ items: [{ slug: taskId }] }, null, 2)}\n`,
+        'utf8'
+      );
+
+      for (let i = 0; i < 20; i += 1) {
+        const runId = `2026-02-20T00-00-${String(i).padStart(2, '0')}-000Z-${String(i).padStart(8, '0')}`;
+        const runDir = join(repoRoot, '.runs', taskId, 'cli', runId);
+        await mkdir(runDir, { recursive: true });
+        const manifest: Record<string, unknown> = {
+          run_id: runId,
+          task_id: taskId,
+          pipeline_id: 'docs-review',
+          status: 'succeeded',
+          started_at: `2026-02-20T00:00:${String(i).padStart(2, '0')}.000Z`
+        };
+        if (i === 0) {
+          manifest.cloud_execution = {
+            status: 'ready',
+            diff_status: 'available',
+            apply_status: 'succeeded',
+            environment_id: 'env_historical'
+          };
+        }
+        await writeFile(join(runDir, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`, 'utf8');
+      }
+
+      process.env.CODEX_ORCHESTRATOR_ROOT = repoRoot;
+      delete process.env.CODEX_ORCHESTRATOR_RUNS_DIR;
+      delete process.env.CODEX_ORCHESTRATOR_OUT_DIR;
+      process.env.MCP_RUNNER_TASK_ID = taskId;
+      delete process.env.CODEX_CLOUD_ENV_ID;
+
+      const result = await runDoctorUsage({ windowDays: 3650, taskFilter: taskId });
+      expect(result.cloud.runs).toBe(1);
+      expect(result.adoption.recommendations).not.toEqual(
+        expect.arrayContaining([expect.stringContaining('Cloud is configured but adoption is low')])
+      );
+    } finally {
+      if (previousEnv.root === undefined) {
+        delete process.env.CODEX_ORCHESTRATOR_ROOT;
+      } else {
+        process.env.CODEX_ORCHESTRATOR_ROOT = previousEnv.root;
+      }
+      if (previousEnv.runsDir === undefined) {
+        delete process.env.CODEX_ORCHESTRATOR_RUNS_DIR;
+      } else {
+        process.env.CODEX_ORCHESTRATOR_RUNS_DIR = previousEnv.runsDir;
+      }
+      if (previousEnv.outDir === undefined) {
+        delete process.env.CODEX_ORCHESTRATOR_OUT_DIR;
+      } else {
+        process.env.CODEX_ORCHESTRATOR_OUT_DIR = previousEnv.outDir;
+      }
+      if (previousEnv.taskId === undefined) {
+        delete process.env.MCP_RUNNER_TASK_ID;
+      } else {
+        process.env.MCP_RUNNER_TASK_ID = previousEnv.taskId;
+      }
+      if (previousEnv.cloudEnvId === undefined) {
+        delete process.env.CODEX_CLOUD_ENV_ID;
+      } else {
+        process.env.CODEX_CLOUD_ENV_ID = previousEnv.cloudEnvId;
+      }
+      await rm(repoRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('deduplicates no-cloud recommendations when CODEX_CLOUD_ENV_ID is configured', async () => {
+    const previousEnv = {
+      root: process.env.CODEX_ORCHESTRATOR_ROOT,
+      runsDir: process.env.CODEX_ORCHESTRATOR_RUNS_DIR,
+      outDir: process.env.CODEX_ORCHESTRATOR_OUT_DIR,
+      taskId: process.env.MCP_RUNNER_TASK_ID,
+      cloudEnvId: process.env.CODEX_CLOUD_ENV_ID
+    };
+    const repoRoot = await mkdtemp(join(tmpdir(), 'doctor-usage-cloud-dedupe-'));
+    const taskId = 'task-cloud-dedupe';
+    const runId = '2026-02-19T00-00-00-000Z-clouddedupe';
+    try {
+      await mkdir(join(repoRoot, 'tasks'), { recursive: true });
+      await writeFile(
+        join(repoRoot, 'tasks', 'index.json'),
+        `${JSON.stringify({ items: [{ slug: taskId }] }, null, 2)}\n`,
+        'utf8'
+      );
+
+      const runDir = join(repoRoot, '.runs', taskId, 'cli', runId);
+      await mkdir(runDir, { recursive: true });
+      await writeFile(
+        join(runDir, 'manifest.json'),
+        `${JSON.stringify(
+          {
+            run_id: runId,
+            task_id: taskId,
+            pipeline_id: 'docs-review',
+            status: 'succeeded',
+            started_at: '2026-02-19T00:00:00.000Z'
+          },
+          null,
+          2
+        )}\n`,
+        'utf8'
+      );
+
+      process.env.CODEX_ORCHESTRATOR_ROOT = repoRoot;
+      delete process.env.CODEX_ORCHESTRATOR_RUNS_DIR;
+      delete process.env.CODEX_ORCHESTRATOR_OUT_DIR;
+      process.env.MCP_RUNNER_TASK_ID = taskId;
+      process.env.CODEX_CLOUD_ENV_ID = 'env_dedupe';
+
+      const result = await runDoctorUsage({ windowDays: 3650, taskFilter: taskId });
+      const cloudZeroHints = result.adoption.recommendations.filter(
+        (recommendation) => recommendation.includes('no cloud runs were observed') || recommendation.includes('No cloud runs detected')
+      );
+      expect(cloudZeroHints).toHaveLength(1);
+      expect(cloudZeroHints[0]).toContain('CODEX_CLOUD_ENV_ID is configured but no cloud runs were observed');
+      expect(result.adoption.recommendations).not.toEqual(
+        expect.arrayContaining([expect.stringContaining('No cloud runs detected; configure CODEX_CLOUD_ENV_ID')])
+      );
+    } finally {
+      if (previousEnv.root === undefined) {
+        delete process.env.CODEX_ORCHESTRATOR_ROOT;
+      } else {
+        process.env.CODEX_ORCHESTRATOR_ROOT = previousEnv.root;
+      }
+      if (previousEnv.runsDir === undefined) {
+        delete process.env.CODEX_ORCHESTRATOR_RUNS_DIR;
+      } else {
+        process.env.CODEX_ORCHESTRATOR_RUNS_DIR = previousEnv.runsDir;
+      }
+      if (previousEnv.outDir === undefined) {
+        delete process.env.CODEX_ORCHESTRATOR_OUT_DIR;
+      } else {
+        process.env.CODEX_ORCHESTRATOR_OUT_DIR = previousEnv.outDir;
+      }
+      if (previousEnv.taskId === undefined) {
+        delete process.env.MCP_RUNNER_TASK_ID;
+      } else {
+        process.env.MCP_RUNNER_TASK_ID = previousEnv.taskId;
+      }
+      if (previousEnv.cloudEnvId === undefined) {
+        delete process.env.CODEX_CLOUD_ENV_ID;
+      } else {
+        process.env.CODEX_CLOUD_ENV_ID = previousEnv.cloudEnvId;
+      }
+      await rm(repoRoot, { recursive: true, force: true });
+    }
+  });
 });

@@ -14,6 +14,7 @@ import { buildRlmPrompt } from './rlm/prompt.js';
 import { runRlmLoop } from './rlm/runner.js';
 import { buildContextObject, ContextStore, type ContextSource } from './rlm/context.js';
 import { runSymbolicLoop, type SymbolicBudgets } from './rlm/symbolic.js';
+import type { AlignmentPolicy } from './rlm/alignment.js';
 import type {
   RlmAgentInput,
   RlmAgentResult,
@@ -46,6 +47,20 @@ const DEFAULT_MAX_CONCURRENCY = 4;
 const DEFAULT_SYMBOLIC_DELIBERATION_INTERVAL = 2;
 const DEFAULT_SYMBOLIC_DELIBERATION_MAX_RUNS = 12;
 const DEFAULT_SYMBOLIC_DELIBERATION_MAX_SUMMARY_BYTES = 2048;
+const DEFAULT_ALIGNMENT_CHECKER_ENABLED = true;
+const DEFAULT_ALIGNMENT_CHECKER_ENFORCE = false;
+const DEFAULT_ALIGNMENT_DEEP_AUDIT_MIN_CONTRADICTIONS = 2;
+const DEFAULT_ALIGNMENT_DEEP_AUDIT_OVERRIDE_STREAK = 2;
+const DEFAULT_ALIGNMENT_VERBOSITY_FREE_TOKENS = 420;
+const DEFAULT_ALIGNMENT_MAX_PENALTY = 0.35;
+const DEFAULT_ALIGNMENT_COOLDOWN_TURNS = 2;
+const DEFAULT_ALIGNMENT_CONSENSUS_TOP_SCORE_MIN = 0.7;
+const DEFAULT_ALIGNMENT_CONSENSUS_MARGIN_MIN = 0.15;
+const DEFAULT_ALIGNMENT_CONSENSUS_REQUIRED_VOTES = 2;
+const DEFAULT_ALIGNMENT_SENTINEL_MODEL = 'gpt-5.3-spark';
+const DEFAULT_ALIGNMENT_HIGH_REASONING_MODEL = 'gpt-5.3-codex';
+const DEFAULT_ALIGNMENT_ARBITRATION_MODEL = 'gpt-5.3-codex';
+const DEFAULT_ALIGNMENT_HIGH_REASONING_AVAILABLE = true;
 const DEFAULT_COLLAB_ROLE_POLICY = 'enforce';
 const COLLAB_ROLE_POLICY_ENV_CANONICAL = 'RLM_SYMBOLIC_MULTI_AGENT_ROLE_POLICY';
 const COLLAB_ROLE_POLICY_ENV_LEGACY = 'RLM_COLLAB_ROLE_POLICY';
@@ -224,6 +239,17 @@ function parsePositiveInt(value: string | undefined, fallback: number): number |
   return parsed;
 }
 
+function parseProbability(value: string | undefined, fallback: number): number | null {
+  if (!value) {
+    return fallback;
+  }
+  const parsed = Number.parseFloat(value);
+  if (!Number.isFinite(parsed) || parsed < 0 || parsed > 1) {
+    return null;
+  }
+  return parsed;
+}
+
 function parseMaxIterations(value: string | undefined, fallback: number): number | null {
   if (!value) {
     return fallback;
@@ -233,6 +259,20 @@ function parseMaxIterations(value: string | undefined, fallback: number): number
     return 0;
   }
   return parsePositiveInt(value, fallback);
+}
+
+function resolveAlignmentCheckerEnabled(env: NodeJS.ProcessEnv): boolean {
+  if (env.RLM_ALIGNMENT_CHECKER === undefined) {
+    return DEFAULT_ALIGNMENT_CHECKER_ENABLED;
+  }
+  return envFlagEnabled(env.RLM_ALIGNMENT_CHECKER);
+}
+
+function resolveAlignmentCheckerEnforce(env: NodeJS.ProcessEnv): boolean {
+  if (env.RLM_ALIGNMENT_CHECKER_ENFORCE === undefined) {
+    return DEFAULT_ALIGNMENT_CHECKER_ENFORCE;
+  }
+  return envFlagEnabled(env.RLM_ALIGNMENT_CHECKER_ENFORCE);
 }
 
 function parseRoles(value: string | undefined, fallback: RlmRoles): RlmRoles | null {
@@ -998,6 +1038,7 @@ async function runValidatorCommand(command: string, repoRoot: string): Promise<R
 async function main(): Promise<void> {
   const env = process.env;
   const repoRoot = resolveRepoRoot(env);
+  const runIds = resolveRunIds(env);
   const runDir = resolveRunDir(env, repoRoot);
 
   const parsedArgs = parseArgs(process.argv.slice(2));
@@ -1338,6 +1379,59 @@ async function main(): Promise<void> {
         env.RLM_SYMBOLIC_DELIBERATION_MAX_SUMMARY_BYTES,
         DEFAULT_SYMBOLIC_DELIBERATION_MAX_SUMMARY_BYTES
       ) ?? 0;
+    const alignmentCheckerEnabled = resolveAlignmentCheckerEnabled(env);
+    const alignmentCheckerEnforce = resolveAlignmentCheckerEnforce(env);
+    const alignmentSentinelModel =
+      env.RLM_ALIGNMENT_SENTINEL_MODEL?.trim() || DEFAULT_ALIGNMENT_SENTINEL_MODEL;
+    const alignmentHighReasoningModel =
+      env.RLM_ALIGNMENT_HIGH_REASONING_MODEL?.trim() || DEFAULT_ALIGNMENT_HIGH_REASONING_MODEL;
+    const alignmentArbitrationModel =
+      env.RLM_ALIGNMENT_ARBITRATION_MODEL?.trim() || DEFAULT_ALIGNMENT_ARBITRATION_MODEL;
+    const alignmentHighReasoningAvailable =
+      env.RLM_ALIGNMENT_HIGH_REASONING_AVAILABLE === undefined
+        ? DEFAULT_ALIGNMENT_HIGH_REASONING_AVAILABLE
+        : envFlagEnabled(env.RLM_ALIGNMENT_HIGH_REASONING_AVAILABLE);
+    const alignmentConsensusTopScoreMin = parseProbability(
+      env.RLM_ALIGNMENT_CONSENSUS_TOP_SCORE_MIN,
+      DEFAULT_ALIGNMENT_CONSENSUS_TOP_SCORE_MIN
+    );
+    const alignmentConsensusMarginMin = parseProbability(
+      env.RLM_ALIGNMENT_CONSENSUS_MARGIN_MIN,
+      DEFAULT_ALIGNMENT_CONSENSUS_MARGIN_MIN
+    );
+    const alignmentConsensusRequiredVotes =
+      parsePositiveInt(
+        env.RLM_ALIGNMENT_CONSENSUS_REQUIRED_VOTES,
+        DEFAULT_ALIGNMENT_CONSENSUS_REQUIRED_VOTES
+      ) ?? 0;
+    const alignmentDeepAuditMinContradictions =
+      parsePositiveInt(
+        env.RLM_ALIGNMENT_DEEP_AUDIT_MIN_CONTRADICTIONS,
+        DEFAULT_ALIGNMENT_DEEP_AUDIT_MIN_CONTRADICTIONS
+      ) ?? 0;
+    const alignmentDeepAuditOverrideStreak =
+      parsePositiveInt(
+        env.RLM_ALIGNMENT_DEEP_AUDIT_OVERRIDE_STREAK,
+        DEFAULT_ALIGNMENT_DEEP_AUDIT_OVERRIDE_STREAK
+      ) ?? 0;
+    const alignmentVerbosityFreeTokens =
+      parsePositiveInt(
+        env.RLM_ALIGNMENT_VERBOSITY_FREE_TOKENS,
+        DEFAULT_ALIGNMENT_VERBOSITY_FREE_TOKENS
+      ) ?? 0;
+    const alignmentCooldownTurns = parsePositiveInt(
+      env.RLM_ALIGNMENT_COOLDOWN_TURNS,
+      DEFAULT_ALIGNMENT_COOLDOWN_TURNS
+    );
+    if (alignmentCheckerEnabled) {
+      logger.info(
+        `Alignment checker: enabled=1 enforce=${alignmentCheckerEnforce ? '1' : '0'} ` +
+          `sentinel_model=${alignmentSentinelModel} high_reasoning_model=${alignmentHighReasoningModel} ` +
+          `high_reasoning_available=${alignmentHighReasoningAvailable ? '1' : '0'}`
+      );
+    } else {
+      logger.info('Alignment checker: enabled=0');
+    }
 
     const invalidBudget = Object.entries(budgets).find(([, value]) => !value || value <= 0);
     if (invalidBudget) {
@@ -1393,6 +1487,81 @@ async function main(): Promise<void> {
       );
       return;
     }
+    if (alignmentCheckerEnabled) {
+      if (!alignmentSentinelModel || !alignmentHighReasoningModel || !alignmentArbitrationModel) {
+        await writeStateAndExit('invalid_config', 5, 'Invalid alignment model route configuration.', {
+          goal,
+          roles,
+          maxIterations,
+          maxMinutes: resolvedMaxMinutes,
+          mode,
+          context: contextInfo,
+          validator: validatorCommand ?? 'none'
+        });
+        return;
+      }
+      if (
+        alignmentConsensusTopScoreMin === null ||
+        alignmentConsensusMarginMin === null ||
+        alignmentConsensusRequiredVotes <= 0 ||
+        alignmentConsensusRequiredVotes > 3
+      ) {
+        await writeStateAndExit('invalid_config', 5, 'Invalid alignment consensus threshold configuration.', {
+          goal,
+          roles,
+          maxIterations,
+          maxMinutes: resolvedMaxMinutes,
+          mode,
+          context: contextInfo,
+          validator: validatorCommand ?? 'none'
+        });
+        return;
+      }
+      if (
+        alignmentDeepAuditMinContradictions <= 0 ||
+        alignmentDeepAuditOverrideStreak <= 0 ||
+        alignmentVerbosityFreeTokens <= 0 ||
+        alignmentCooldownTurns === null ||
+        alignmentCooldownTurns < 0
+      ) {
+        await writeStateAndExit('invalid_config', 5, 'Invalid alignment checker policy configuration.', {
+          goal,
+          roles,
+          maxIterations,
+          maxMinutes: resolvedMaxMinutes,
+          mode,
+          context: contextInfo,
+          validator: validatorCommand ?? 'none'
+        });
+        return;
+      }
+    }
+
+    const alignmentPolicy: Partial<AlignmentPolicy> = {
+      route: {
+        sentinel_model: alignmentSentinelModel,
+        high_reasoning_model: alignmentHighReasoningModel,
+        arbitration_model: alignmentArbitrationModel,
+        high_reasoning_available: alignmentHighReasoningAvailable
+      },
+      deep_audit: {
+        min_contradictions: alignmentDeepAuditMinContradictions,
+        override_streak_trigger: alignmentDeepAuditOverrideStreak,
+        on_high_risk: true
+      },
+      anti_gaming: {
+        verbosity_free_tokens: alignmentVerbosityFreeTokens,
+        max_penalty: DEFAULT_ALIGNMENT_MAX_PENALTY
+      },
+      anti_oscillation: {
+        cooldown_turns: alignmentCooldownTurns ?? DEFAULT_ALIGNMENT_COOLDOWN_TURNS
+      },
+      consensus: {
+        top_score_min: alignmentConsensusTopScoreMin ?? DEFAULT_ALIGNMENT_CONSENSUS_TOP_SCORE_MIN,
+        margin_min: alignmentConsensusMarginMin ?? DEFAULT_ALIGNMENT_CONSENSUS_MARGIN_MIN,
+        required_votes: alignmentConsensusRequiredVotes
+      }
+    };
 
     const baseState = buildBaseState({
       goal,
@@ -1414,6 +1583,19 @@ async function main(): Promise<void> {
       runDir: rlmRoot,
       contextStore,
       budgets,
+      alignment: alignmentCheckerEnabled
+        ? {
+            enabled: true,
+            enforce: alignmentCheckerEnforce,
+            task_id: runIds.taskId,
+            run_id: runIds.runId,
+            thread_id:
+              env.RLM_ALIGNMENT_THREAD_ID?.trim() ||
+              `${runIds.taskId}:${runIds.runId}`,
+            agent_id: env.RLM_ALIGNMENT_AGENT_ID?.trim() || 'top-level',
+            policy: alignmentPolicy
+          }
+        : undefined,
       runPlanner: (prompt, _attempt) => {
         void _attempt;
         return runCodexJsonlCompletion(prompt, env, repoRoot, nonInteractive, false);
@@ -1512,6 +1694,9 @@ if (entry && entry === self) {
 export const __test__ = {
   parseMaxIterations,
   parsePositiveInt,
+  parseProbability,
+  resolveAlignmentCheckerEnabled,
+  resolveAlignmentCheckerEnforce,
   resolveSymbolicMultiAgentConfig,
   resolveSymbolicMultiAgentRolePolicyConfig,
   resolveSymbolicMultiAgentAllowDefaultRoleConfig,
@@ -1527,5 +1712,7 @@ export const __test__ = {
   COLLAB_FEATURE_LEGACY,
   DEFAULT_MAX_ITERATIONS,
   DEFAULT_MAX_MINUTES,
-  DEFAULT_SYMBOLIC_MIN_BYTES
+  DEFAULT_SYMBOLIC_MIN_BYTES,
+  DEFAULT_ALIGNMENT_CHECKER_ENABLED,
+  DEFAULT_ALIGNMENT_CHECKER_ENFORCE
 };

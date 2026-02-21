@@ -773,6 +773,12 @@ async function handleStart(orchestrator: CodexOrchestrator, rawArgs: string[]): 
             })
           : { issueLog: null, issueLogError: null };
       emitRunOutput(result, format, 'Run started', issueLogCapture);
+      if (result.manifest.status === 'succeeded' && result.manifest.pipeline_id !== 'rlm') {
+        await maybeEmitRunAdoptionHint({
+          format,
+          taskFilter: resolveTaskFilter(result.manifest.task_id, taskIdOverride)
+        });
+      }
     });
   } catch (error) {
     const issueLogCapture = await maybeCaptureAutoIssueLog({
@@ -942,6 +948,10 @@ async function handleFlow(orchestrator: CodexOrchestrator, rawArgs: string[]): P
         return;
       }
       console.log('Flow complete: docs-review -> implementation-gate.');
+      await maybeEmitRunAdoptionHint({
+        format,
+        taskFilter: resolveTaskFilter(implementationGateResult.manifest.task_id, taskId)
+      });
     });
   } catch (error) {
     const issueLogCapture = await maybeCaptureAutoIssueLog({
@@ -1268,7 +1278,7 @@ async function handleExec(rawArgs: string[]): Promise<void> {
   }
 }
 
-async function shouldScanExecAdoptionHint(taskFilter: string | undefined): Promise<boolean> {
+async function shouldScanAdoptionHint(taskFilter: string | null | undefined): Promise<boolean> {
   if (!taskFilter) {
     return false;
   }
@@ -1297,9 +1307,9 @@ async function shouldScanExecAdoptionHint(taskFilter: string | undefined): Promi
   }
 }
 
-async function maybeEmitExecAdoptionHint(taskFilter: string | undefined): Promise<void> {
+async function maybeEmitAdoptionHint(taskFilter: string | null | undefined): Promise<void> {
   try {
-    if (!(await shouldScanExecAdoptionHint(taskFilter))) {
+    if (!(await shouldScanAdoptionHint(taskFilter))) {
       return;
     }
     const usage = await runDoctorUsage({ windowDays: 7, taskFilter });
@@ -1311,6 +1321,17 @@ async function maybeEmitExecAdoptionHint(taskFilter: string | undefined): Promis
   } catch {
     // Exec command behavior should not fail when usage telemetry cannot be read.
   }
+}
+
+async function maybeEmitRunAdoptionHint(params: { format: OutputFormat; taskFilter: string | null | undefined }): Promise<void> {
+  if (params.format !== 'text') {
+    return;
+  }
+  await maybeEmitAdoptionHint(params.taskFilter);
+}
+
+async function maybeEmitExecAdoptionHint(taskFilter: string | null | undefined): Promise<void> {
+  await maybeEmitAdoptionHint(taskFilter);
 }
 
 async function handleSelfCheck(rawArgs: string[]): Promise<void> {
@@ -2313,6 +2334,12 @@ Commands:
 
   help                      Show this message.
 
+Quickstart (agent-first):
+  codex-orchestrator flow --task <task-id>
+  codex-orchestrator doctor --usage --window-days 30
+  codex-orchestrator rlm --multi-agent auto "<goal>"
+  codex-orchestrator start implementation-gate --cloud --target <stage-id>
+
 Notes:
   RLM recursion guidance: docs/guides/rlm-recursion-v2.md
   Cloud-mode preflight/fallback guide: docs/guides/cloud-mode-preflight.md
@@ -2454,6 +2481,13 @@ Options:
   --repo-config-required [true|false]  Require repo-local codex.orchestrator.json (no package fallback).
   --interactive | --ui      Enable read-only HUD when running in a TTY.
   --no-interactive          Force disable HUD.
+
+Examples:
+  codex-orchestrator flow --task <task-id>
+  codex-orchestrator flow --task <task-id> --cloud --target implementation-gate:review
+
+Post-run check:
+  codex-orchestrator doctor --usage --window-days 30 --task <task-id>
 `);
 }
 
@@ -2481,6 +2515,13 @@ Options:
   --roles <single|triad>    When pipeline is rlm, set role split.
   --interactive | --ui      Enable read-only HUD when running in a TTY.
   --no-interactive          Force disable HUD.
+
+Examples:
+  codex-orchestrator start docs-review --task <task-id>
+  codex-orchestrator start implementation-gate --task <task-id> --cloud --target review
+
+Post-run check:
+  codex-orchestrator doctor --usage --window-days 30 --task <task-id>
 `);
 }
 

@@ -9,6 +9,13 @@ description: Use when operating the Codex delegation MCP server and tools (deleg
 
 Use this skill to operate delegation MCP tools with delegation enabled by default (the only MCP on by default). Disable it only when required by safety constraints, and keep other MCPs off unless they are relevant to the task.
 
+## Global Adoption Defaults
+
+For shipped CO usage, default to this command path unless task constraints say otherwise:
+- `codex-orchestrator flow --task <task-id>`
+- `codex-orchestrator doctor --usage --window-days 30 --task <task-id>`
+- `codex-orchestrator rlm --multi-agent auto "<goal>"`
+
 `delegation-usage` is the canonical delegation workflow skill. If `delegate-early` is present, treat it as a compatibility alias that should redirect to this skill.
 
 Multi-agent (collab tools) mode is separate from delegation. For symbolic RLM subcalls that use collab tools, set `RLM_SYMBOLIC_MULTI_AGENT=1` (legacy alias: `RLM_SYMBOLIC_COLLAB=1`) and ensure your Codex CLI has `features.multi_agent=true` (`collab` is a legacy alias/name in some keys); collab tool calls are recorded in `manifest.collab_tool_calls`. If collab tools are unavailable in your CLI build, skip collab steps; delegation still works independently.

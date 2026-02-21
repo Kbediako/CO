@@ -571,8 +571,11 @@ function buildAdoptionRecommendations(params: {
     hints.push(
       'CODEX_CLOUD_ENV_ID is configured but no cloud runs were observed; route one long-running stage through cloud: `codex-orchestrator start <pipeline> --cloud --target <stage-id>`.'
     );
-  }
-  if (params.cloudConfigured && params.cloudRuns > 0 && cloudShare < 0.1) {
+  } else if (params.cloudRuns === 0) {
+    hints.push(
+      'No cloud runs detected; configure CODEX_CLOUD_ENV_ID and run `codex-orchestrator start <pipeline> --cloud --target <stage-id>` for long-running stages.'
+    );
+  } else if (params.cloudConfigured && cloudShare < 0.1) {
     hints.push(
       `Cloud is configured but adoption is low (${Math.round(cloudShare * 1000) / 10}%); prefer cloud for heavy stages and confirm readiness with \`codex-orchestrator doctor --cloud-preflight\`.`
     );
@@ -585,11 +588,6 @@ function buildAdoptionRecommendations(params: {
   if (params.rlmRuns > 0 && rlmShare < 0.1) {
     hints.push(
       `RLM usage is low (${Math.round(rlmShare * 1000) / 10}%); route multi-step ambiguous work through \`codex-orchestrator rlm --multi-agent auto "<goal>"\`.`
-    );
-  }
-  if (params.cloudRuns === 0) {
-    hints.push(
-      'No cloud runs detected; configure CODEX_CLOUD_ENV_ID and run `codex-orchestrator start <pipeline> --cloud --target <stage-id>` for long-running stages.'
     );
   }
   if (params.rlmRuns > 0 && params.collabRunsWithToolCalls === 0) {

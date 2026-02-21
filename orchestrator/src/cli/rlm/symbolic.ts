@@ -2,6 +2,8 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join, relative } from 'node:path';
 
 import type {
+  RlmAlignmentRiskLevel,
+  RlmAlignmentFinalSummary,
   RlmLoopResult,
   RlmState,
   RlmSymbolicDeliberation,
@@ -15,6 +17,7 @@ import type {
   RlmSymbolicVariableBinding
 } from './types.js';
 import { ContextStore } from './context.js';
+import { AlignmentChecker, type AlignmentCheckerConfig } from './alignment.js';
 
 const DEFAULT_ALLOWED_PURPOSES = new Set(['summarize', 'extract', 'classify', 'verify']);
 
@@ -52,6 +55,15 @@ export interface SymbolicLoopOptions {
     includeInPlannerPrompt: boolean;
     logArtifacts?: boolean;
     run: (prompt: string, meta: { iteration: number; reason: string }) => Promise<string>;
+  };
+  alignment?: {
+    enabled: boolean;
+    enforce: boolean;
+    task_id: string;
+    run_id: string;
+    thread_id: string;
+    agent_id: string;
+    policy?: AlignmentCheckerConfig['policy'];
   };
   now?: () => string;
   logger?: (line: string) => void;
@@ -233,6 +245,26 @@ function toNumber(value: unknown): number | null {
     }
   }
   return null;
+}
+
+function deriveAlignmentRiskLevel(params: {
+  intent: PlannerPlan['intent'];
+  plannerErrors: string[];
+  readCount: number;
+  searchCount: number;
+  subcallCount: number;
+}): RlmAlignmentRiskLevel {
+  if (params.intent === 'final' || params.intent === 'fail') {
+    return 'high';
+  }
+  if (params.intent === 'pause') {
+    return 'medium';
+  }
+  if (params.plannerErrors.length > 0) {
+    return 'medium';
+  }
+  const evidenceCount = params.readCount + params.searchCount + params.subcallCount;
+  return evidenceCount === 0 ? 'medium' : 'low';
 }
 
 function extractJsonCandidates(raw: string): string[] {
@@ -1067,6 +1099,23 @@ export async function runSymbolicLoop(options: SymbolicLoopOptions): Promise<Rlm
 
   await mkdir(runDir, { recursive: true });
 
+  const alignmentChecker =
+    options.alignment?.enabled
+      ? new AlignmentChecker({
+          enabled: options.alignment.enabled,
+          enforce: options.alignment.enforce,
+          repo_root: options.repoRoot,
+          run_dir: runDir,
+          task_id: options.alignment.task_id,
+          run_id: options.alignment.run_id,
+          thread_id: options.alignment.thread_id,
+          agent_id: options.alignment.agent_id,
+          goal: options.goal,
+          policy: options.alignment.policy,
+          now: options.now
+        })
+      : null;
+
   const maxIterations = options.maxIterations;
   const maxMinutes = options.maxMinutes ?? null;
   const startTime = Date.now();
@@ -1088,9 +1137,27 @@ export async function runSymbolicLoop(options: SymbolicLoopOptions): Promise<Rlm
   let lastDeliberationIteration = 0;
   let deliberationRuns = 0;
   let latestDeliberationBrief: string | null = null;
+  let finalizedAlignmentSummary: RlmAlignmentFinalSummary | undefined;
 
   const finalize = async (status: RlmState['final']): Promise<RlmLoopResult> => {
+    if (alignmentChecker && finalizedAlignmentSummary === undefined) {
+      try {
+        finalizedAlignmentSummary = await alignmentChecker.finalize();
+      } catch (error) {
+        log(
+          `Alignment finalize failed (continuing without summary): ${
+            error instanceof Error ? error.message : String(error)
+          }`
+        );
+      }
+    }
     state.final = status ?? { status: 'error', exitCode: 10 };
+    if (state.final && finalizedAlignmentSummary) {
+      state.final = {
+        ...state.final,
+        alignment: finalizedAlignmentSummary
+      };
+    }
     await writeState(statePath, state);
     return { state, exitCode: state.final.exitCode };
   };
@@ -1250,6 +1317,65 @@ export async function runSymbolicLoop(options: SymbolicLoopOptions): Promise<Rlm
       const subcalls: RlmSymbolicSubcall[] = [];
       const searches: RlmSymbolicSearch[] = [];
       const iterationVariableBindings: RlmSymbolicVariableBinding[] = [];
+      const alignmentRiskLevel = deriveAlignmentRiskLevel({
+        intent: plan.intent,
+        plannerErrors,
+        readCount: validation.reads.length,
+        searchCount: validation.searches.length,
+        subcallCount: validation.subcalls.length
+      });
+      const evidenceRefs = [
+        ...validation.reads.slice(0, 2).map((entry) =>
+          entry.pointer ?? `start_byte:${entry.start_byte ?? 0}`
+        ),
+        ...validation.searches.slice(0, 2).map((entry) => `search:${entry.query}`),
+        ...validation.subcalls.slice(0, 2).flatMap((entry) =>
+          entry.snippets.slice(0, 1).map((snippet) =>
+            snippet.pointer ?? `start_byte:${snippet.start_byte ?? 0}`
+          )
+        ),
+        ...priorSubcalls.slice(0, 2).map((entry) => entry.pointer)
+      ];
+      const alignmentEvaluation = alignmentChecker
+        ? await alignmentChecker.evaluateTurn({
+            turn: iteration,
+            intent: plan.intent,
+            planner_prompt_bytes: plannerPromptBytes,
+            planner_errors: plannerErrors,
+            read_count: validation.reads.length,
+            search_count: validation.searches.length,
+            subcall_count: validation.subcalls.length,
+            risk_level: alignmentRiskLevel,
+            evidence_refs: evidenceRefs
+          })
+        : null;
+      const alignmentDecision = alignmentEvaluation?.decision;
+
+      if (alignmentEvaluation?.enforce_block) {
+        log(
+          `Alignment gate blocked iteration ${iteration}: ${alignmentEvaluation.enforce_reason ?? 'policy_block'}`
+        );
+        state.symbolic_iterations.push({
+          iteration,
+          planner_prompt_bytes: plannerPromptBytes,
+          reads,
+          subcalls,
+          variable_bindings:
+            iterationVariableBindings.length > 0 ? iterationVariableBindings : undefined,
+          deliberation,
+          alignment: alignmentDecision,
+          searches,
+          planner_errors: plannerErrors.length > 0 ? plannerErrors : undefined,
+          clamped: {
+            reads: validation.clamped.reads,
+            searches: validation.clamped.searches,
+            subcalls: validation.clamped.subcalls
+          },
+          truncation: promptResult.truncation
+        });
+        await writeState(statePath, state);
+        return await finalize({ status: 'invalid_config', exitCode: 5 });
+      }
 
       if (plan.intent === 'final') {
         let finalAnswer = plan.final_answer;
@@ -1270,6 +1396,7 @@ export async function runSymbolicLoop(options: SymbolicLoopOptions): Promise<Rlm
           reads,
           subcalls,
           deliberation,
+          alignment: alignmentDecision,
           searches,
           planner_errors: plannerErrors.length > 0 ? plannerErrors : undefined,
           clamped: {
@@ -1290,6 +1417,7 @@ export async function runSymbolicLoop(options: SymbolicLoopOptions): Promise<Rlm
           reads,
           subcalls,
           deliberation,
+          alignment: alignmentDecision,
           searches,
           planner_errors: plannerErrors.length > 0 ? plannerErrors : undefined,
           clamped: {
@@ -1528,6 +1656,7 @@ export async function runSymbolicLoop(options: SymbolicLoopOptions): Promise<Rlm
         variable_bindings:
           iterationVariableBindings.length > 0 ? iterationVariableBindings : undefined,
         deliberation,
+        alignment: alignmentDecision,
         searches,
         planner_errors: plannerErrors.length > 0 ? plannerErrors : undefined,
         clamped: {

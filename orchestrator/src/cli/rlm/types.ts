@@ -117,6 +117,92 @@ export interface RlmSymbolicDeliberation {
   error?: string;
 }
 
+export type RlmAlignmentRiskLevel = 'low' | 'medium' | 'high';
+export type RlmAlignmentAction = 'pass' | 'nudge' | 'replan' | 'block_escalate';
+export type RlmIntentChangeLevel = 'major' | 'minor' | 'patch';
+
+export interface RlmIntentVersion {
+  major: number;
+  minor: number;
+  patch: number;
+  label: string;
+}
+
+export interface RlmIntentSnapshot {
+  goals: string[];
+  constraints: string[];
+  priorities: string[];
+  style_preferences: string[];
+  evidence_refs: string[];
+  confidence: {
+    overall: number;
+    notes?: string;
+  };
+}
+
+export interface RlmAlignmentDimensionScores {
+  goal_alignment: number;
+  constraint_compliance: number;
+  action_evidence_coherence: number;
+  completeness: number;
+  context_continuity: number;
+  efficiency_discipline: number;
+}
+
+export interface RlmAlignmentConsensusSnapshot {
+  turn: number;
+  accepted: boolean;
+  top_action: RlmAlignmentAction;
+  top_votes: number;
+  top_confidence: number;
+  margin: number;
+  veto: boolean;
+  reasons?: string[];
+}
+
+export interface RlmAlignmentDecision {
+  turn: number;
+  action: RlmAlignmentAction;
+  score: number;
+  confidence: number;
+  risk_level: RlmAlignmentRiskLevel;
+  policy_band: 'pass' | 'nudge' | 'replan' | 'block_escalate';
+  route_model: string;
+  route_strategy: 'sentinel' | 'deep_audit' | 'arbitration';
+  deep_audit: boolean;
+  deep_audit_reasons?: string[];
+  requires_confirmation: boolean;
+  confidence_gate_passed: boolean;
+  intent_version: RlmIntentVersion;
+  intent_change: RlmIntentChangeLevel;
+  dimensions: RlmAlignmentDimensionScores;
+  consensus_snapshot?: RlmAlignmentConsensusSnapshot;
+  enforcement_blocked?: boolean;
+  enforcement_reason?: string;
+}
+
+export interface RlmAlignmentLedgerSummary {
+  ledger_path: string;
+  projection_path: string;
+  events: number;
+  last_hash: string;
+}
+
+export interface RlmAlignmentFinalSummary {
+  enabled: boolean;
+  enforce: boolean;
+  turns_evaluated: number;
+  deep_audit_count: number;
+  requires_confirmation_count: number;
+  override_rate: number;
+  consensus_acceptance_rate: number;
+  action_counts: Record<RlmAlignmentAction, number>;
+  route_counts: Record<'sentinel' | 'deep_audit' | 'arbitration', number>;
+  intent_version: RlmIntentVersion;
+  rollback_recommended: boolean;
+  ledger: RlmAlignmentLedgerSummary;
+}
+
 export interface RlmSymbolicIteration {
   iteration: number;
   planner_prompt_bytes: number;
@@ -124,6 +210,7 @@ export interface RlmSymbolicIteration {
   subcalls: RlmSymbolicSubcall[];
   variable_bindings?: RlmSymbolicVariableBinding[];
   deliberation?: RlmSymbolicDeliberation;
+  alignment?: RlmAlignmentDecision;
   searches?: RlmSymbolicSearch[];
   planner_errors?: string[];
   clamped?: {
@@ -164,6 +251,7 @@ export interface RlmState {
     status: RlmFinalStatus;
     exitCode: number;
     final_answer?: string;
+    alignment?: RlmAlignmentFinalSummary;
   };
 }
 

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generated_at": "2026-02-19T00:00:00.000Z",
+  "generated_at": "2026-02-21T00:00:00.000Z",
   "entries": [
     {
       "path": ".agent/AGENTS.md",
@@ -738,6 +738,41 @@
       "cadence_days": 90
     },
     {
+      "path": ".agent/task/0972-multi-agent-canonical-compat-alignment.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-18",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/task/0974-cloud-adoption-preflight-reliability.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-18",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/task/0975-codex-cli-capability-adoption-redesign.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-19",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/task/0976-context-alignment-checker-option2.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-20",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/task/0977-shipped-feature-adoption-guidance.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-21",
+      "cadence_days": 90
+    },
+    {
       "path": ".agent/task/ACTION_PLAN_TEMPLATE.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -871,6 +906,13 @@
       "cadence_days": 90
     },
     {
+      "path": "docs/ACTION_PLAN-cloud-adoption-preflight-reliability.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-18",
+      "cadence_days": 90
+    },
+    {
       "path": "docs/ACTION_PLAN-cloud-canary-ci.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -882,6 +924,13 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-02-14",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/ACTION_PLAN-codex-cli-capability-adoption-redesign.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-19",
       "cadence_days": 90
     },
     {
@@ -910,6 +959,13 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-01-22",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/ACTION_PLAN-context-alignment-checker-option2.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-20",
       "cadence_days": 90
     },
     {
@@ -1074,6 +1130,13 @@
       "cadence_days": 90
     },
     {
+      "path": "docs/ACTION_PLAN-multi-agent-canonical-compat-alignment.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-18",
+      "cadence_days": 90
+    },
+    {
       "path": "docs/ACTION_PLAN-npm-companion-package-publishability.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -1228,6 +1291,13 @@
       "cadence_days": 90
     },
     {
+      "path": "docs/ACTION_PLAN-shipped-feature-adoption-guidance.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-21",
+      "cadence_days": 90
+    },
+    {
       "path": "docs/ACTION_PLAN-slimdown-cycle-2.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -1298,6 +1368,13 @@
       "cadence_days": 90
     },
     {
+      "path": "docs/codex-orchestrator-issues.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-19",
+      "cadence_days": 30
+    },
+    {
       "path": "docs/delegation-runner-workflow.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -1365,6 +1442,20 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-01-22",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/findings/0976-context-alignment-research.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-20",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/findings/0977-shipped-feature-adoption-guidance-research.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-21",
       "cadence_days": 90
     },
     {
@@ -1501,6 +1592,13 @@
       "cadence_days": 90
     },
     {
+      "path": "docs/PRD-cloud-adoption-preflight-reliability.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-18",
+      "cadence_days": 90
+    },
+    {
       "path": "docs/PRD-cloud-canary-ci.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -1512,6 +1610,13 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-02-14",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/PRD-codex-cli-capability-adoption-redesign.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-19",
       "cadence_days": 90
     },
     {
@@ -1547,6 +1652,13 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-01-22",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/PRD-context-alignment-checker-option2.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-20",
       "cadence_days": 90
     },
     {
@@ -1718,6 +1830,13 @@
       "cadence_days": 90
     },
     {
+      "path": "docs/PRD-multi-agent-canonical-compat-alignment.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-18",
+      "cadence_days": 90
+    },
+    {
       "path": "docs/PRD-npm-companion-package-publishability.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -1886,6 +2005,13 @@
       "cadence_days": 90
     },
     {
+      "path": "docs/PRD-shipped-feature-adoption-guidance.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-21",
+      "cadence_days": 90
+    },
+    {
       "path": "docs/PRD-slimdown-cycle-2.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -1946,6 +2072,20 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-01-19",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/REVIEW-0976-context-alignment-checker-option2-pre-implementation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-21",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/REVIEW-0977-shipped-feature-adoption-guidance-pre-implementation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-21",
       "cadence_days": 90
     },
     {
@@ -2029,7 +2169,7 @@
       "path": "docs/TASKS.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-02-16",
+      "last_review": "2026-02-20",
       "cadence_days": 90
     },
     {
@@ -2061,6 +2201,13 @@
       "cadence_days": 90
     },
     {
+      "path": "docs/TECH_SPEC-cloud-adoption-preflight-reliability.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-18",
+      "cadence_days": 90
+    },
+    {
       "path": "docs/TECH_SPEC-cloud-canary-ci.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -2072,6 +2219,13 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-02-14",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/TECH_SPEC-codex-cli-capability-adoption-redesign.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-19",
       "cadence_days": 90
     },
     {
@@ -2100,6 +2254,13 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-01-22",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/TECH_SPEC-context-alignment-checker-option2.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-20",
       "cadence_days": 90
     },
     {
@@ -2278,6 +2439,13 @@
       "cadence_days": 90
     },
     {
+      "path": "docs/TECH_SPEC-multi-agent-canonical-compat-alignment.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-18",
+      "cadence_days": 90
+    },
+    {
       "path": "docs/TECH_SPEC-npm-companion-package-publishability.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -2443,6 +2611,13 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-01-18",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/TECH_SPEC-shipped-feature-adoption-guidance.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-21",
       "cadence_days": 90
     },
     {
@@ -3055,6 +3230,41 @@
       "cadence_days": 90
     },
     {
+      "path": "tasks/specs/0972-multi-agent-canonical-compat-alignment.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-18",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/specs/0974-cloud-adoption-preflight-reliability.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-18",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/specs/0975-codex-cli-capability-adoption-redesign.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-19",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/specs/0976-context-alignment-checker-option2.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-20",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/specs/0977-shipped-feature-adoption-guidance.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-21",
+      "cadence_days": 90
+    },
+    {
       "path": "tasks/specs/README.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -3622,84 +3832,7 @@
       "cadence_days": 90
     },
     {
-      "path": "templates/codex/AGENTS.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-01-19",
-      "cadence_days": 90
-    },
-    {
-      "path": ".agent/task/0972-multi-agent-canonical-compat-alignment.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-02-18",
-      "cadence_days": 90
-    },
-    {
-      "path": "docs/ACTION_PLAN-multi-agent-canonical-compat-alignment.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-02-18",
-      "cadence_days": 90
-    },
-    {
-      "path": "docs/PRD-multi-agent-canonical-compat-alignment.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-02-18",
-      "cadence_days": 90
-    },
-    {
-      "path": "docs/TECH_SPEC-multi-agent-canonical-compat-alignment.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-02-18",
-      "cadence_days": 90
-    },
-    {
-      "path": "tasks/specs/0972-multi-agent-canonical-compat-alignment.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-02-18",
-      "cadence_days": 90
-    },
-    {
       "path": "tasks/tasks-0972-multi-agent-canonical-compat-alignment.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-02-18",
-      "cadence_days": 90
-    },
-    {
-      "path": ".agent/task/0974-cloud-adoption-preflight-reliability.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-02-18",
-      "cadence_days": 90
-    },
-    {
-      "path": "docs/ACTION_PLAN-cloud-adoption-preflight-reliability.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-02-18",
-      "cadence_days": 90
-    },
-    {
-      "path": "docs/PRD-cloud-adoption-preflight-reliability.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-02-18",
-      "cadence_days": 90
-    },
-    {
-      "path": "docs/TECH_SPEC-cloud-adoption-preflight-reliability.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-02-18",
-      "cadence_days": 90
-    },
-    {
-      "path": "tasks/specs/0974-cloud-adoption-preflight-reliability.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-02-18",
@@ -3713,52 +3846,31 @@
       "cadence_days": 90
     },
     {
-      "path": ".agent/task/0975-codex-cli-capability-adoption-redesign.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-02-19",
-      "cadence_days": 90
-    },
-    {
-      "path": "docs/ACTION_PLAN-codex-cli-capability-adoption-redesign.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-02-19",
-      "cadence_days": 90
-    },
-    {
-      "path": "docs/PRD-codex-cli-capability-adoption-redesign.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-02-19",
-      "cadence_days": 90
-    },
-    {
-      "path": "docs/TECH_SPEC-codex-cli-capability-adoption-redesign.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-02-19",
-      "cadence_days": 90
-    },
-    {
-      "path": "docs/codex-orchestrator-issues.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-02-19",
-      "cadence_days": 30
-    },
-    {
-      "path": "tasks/specs/0975-codex-cli-capability-adoption-redesign.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-02-19",
-      "cadence_days": 90
-    },
-    {
       "path": "tasks/tasks-0975-codex-cli-capability-adoption-redesign.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-02-19",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/tasks-0976-context-alignment-checker-option2.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-20",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/tasks-0977-shipped-feature-adoption-guidance.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-21",
+      "cadence_days": 90
+    },
+    {
+      "path": "templates/codex/AGENTS.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-01-19",
       "cadence_days": 90
     }
   ]
