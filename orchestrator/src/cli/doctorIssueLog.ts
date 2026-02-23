@@ -72,9 +72,20 @@ interface ManifestSnapshot {
 export async function writeDoctorIssueLog(options: DoctorIssueLogOptions): Promise<DoctorIssueLogResult> {
   const cwd = resolve(options.cwd ?? process.cwd());
   const env = options.env ?? process.env;
-  const repoRoot = resolveIssueLogRepoRoot(cwd, env);
-  const runsRoot = resolveIssueLogRootPath(repoRoot, env.CODEX_ORCHESTRATOR_RUNS_DIR, '.runs');
-  const outRoot = resolveIssueLogRootPath(repoRoot, env.CODEX_ORCHESTRATOR_OUT_DIR, 'out');
+  const explicitCwd = options.cwd !== undefined;
+  const repoRoot = resolveIssueLogRepoRoot(cwd, env, explicitCwd);
+  const runsRoot = resolveIssueLogRootPath(
+    repoRoot,
+    env.CODEX_ORCHESTRATOR_RUNS_DIR,
+    '.runs',
+    explicitCwd
+  );
+  const outRoot = resolveIssueLogRootPath(
+    repoRoot,
+    env.CODEX_ORCHESTRATOR_OUT_DIR,
+    'out',
+    explicitCwd
+  );
   const defaultTaskId = normalizeIssueLogTaskId(env);
   const capturedAt = new Date().toISOString();
   const issueId = formatIssueId(capturedAt);
@@ -164,24 +175,47 @@ function resolveIssueLogPath(repoRoot: string, rawPath: string | null | undefine
   return resolve(repoRoot, normalized);
 }
 
-function resolveIssueLogRepoRoot(cwd: string, env: NodeJS.ProcessEnv): string {
+function resolveIssueLogRepoRoot(cwd: string, env: NodeJS.ProcessEnv, explicitCwd: boolean): string {
+  const cwdResolution = resolveRepoRootFromHint(cwd);
   const configuredRoot = normalizeText(env.CODEX_ORCHESTRATOR_ROOT);
-  const rootHint =
-    configuredRoot === null
-      ? cwd
-      : isAbsolute(configuredRoot)
-        ? configuredRoot
-        : resolve(cwd, configuredRoot);
-  return resolveRepoRootFromHint(rootHint);
+  if (configuredRoot === null) {
+    return cwdResolution.root;
+  }
+
+  const configuredHint = isAbsolute(configuredRoot) ? configuredRoot : resolve(cwd, configuredRoot);
+  const configuredResolution = resolveRepoRootFromHint(configuredHint);
+  if (!explicitCwd) {
+    return configuredResolution.root;
+  }
+
+  // Keep explicit override behavior when cwd is inside the configured workspace.
+  if (isPathWithin(cwd, configuredResolution.root)) {
+    // If cwd sits under a nested workspace boundary, prefer that more local workspace.
+    if (cwdResolution.source !== 'hint' && cwdResolution.root !== configuredResolution.root) {
+      return cwdResolution.root;
+    }
+    return configuredResolution.root;
+  }
+
+  // If cwd clearly belongs to another workspace (tasks index or git boundary), prefer cwd.
+  if (cwdResolution.source !== 'hint') {
+    return cwdResolution.root;
+  }
+
+  // Fallback to configured root when cwd has no strong workspace signals.
+  return configuredResolution.root;
 }
 
-function resolveRepoRootFromHint(rootHint: string): string {
+function resolveRepoRootFromHint(rootHint: string): {
+  root: string;
+  source: 'tasks-index' | 'git-boundary' | 'hint';
+} {
   const normalizedHint = resolve(rootHint);
   const gitBoundary = findNearestGitBoundary(normalizedHint);
   let current: string | null = normalizedHint;
   while (current) {
     if (existsSync(join(current, 'tasks', 'index.json'))) {
-      return current;
+      return { root: current, source: 'tasks-index' };
     }
     if (gitBoundary && current === gitBoundary) {
       break;
@@ -192,7 +226,10 @@ function resolveRepoRootFromHint(rootHint: string): string {
     }
     current = parent;
   }
-  return gitBoundary ?? normalizedHint;
+  if (gitBoundary) {
+    return { root: gitBoundary, source: 'git-boundary' };
+  }
+  return { root: normalizedHint, source: 'hint' };
 }
 
 function findNearestGitBoundary(start: string): string | null {
@@ -210,15 +247,26 @@ function findNearestGitBoundary(start: string): string | null {
   return null;
 }
 
-function resolveIssueLogRootPath(repoRoot: string, configuredPath: string | undefined, fallback: string): string {
+function resolveIssueLogRootPath(
+  repoRoot: string,
+  configuredPath: string | undefined,
+  fallback: string,
+  enforceRepoBoundary: boolean
+): string {
   const normalized = normalizeText(configuredPath);
   if (!normalized) {
     return resolve(repoRoot, fallback);
   }
-  if (isAbsolute(normalized)) {
-    return normalized;
+  const resolvedPath = isAbsolute(normalized) ? normalized : resolve(repoRoot, normalized);
+  if (enforceRepoBoundary && !isPathWithin(resolvedPath, repoRoot)) {
+    return resolve(repoRoot, fallback);
   }
-  return resolve(repoRoot, normalized);
+  return resolvedPath;
+}
+
+function isPathWithin(candidatePath: string, rootPath: string): boolean {
+  const rel = relative(rootPath, candidatePath);
+  return rel === '' || (!rel.startsWith('..') && !isAbsolute(rel));
 }
 
 function normalizeIssueLogTaskId(env: NodeJS.ProcessEnv): string {

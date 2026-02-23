@@ -5,7 +5,7 @@ relates_to: tasks/tasks-0956-subagents-skill-codex-cli-refresh.md
 risk: low
 owners:
   - Codex
-last_review: 2026-01-23
+last_review: 2026-02-23
 ---
 
 ## Summary
@@ -51,4 +51,4 @@ last_review: 2026-01-23
 
 ## Approvals
 - Reviewer: Codex (self)
-- Date: 2026-01-23
+- Date: 2026-02-23
