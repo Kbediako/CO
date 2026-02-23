@@ -73,6 +73,7 @@ describe('repro', () => {
   it('resolves repo-level runs/out paths when issue logging from nested cwd', async () => {
     const root = await mkdtemp(join(tmpdir(), 'issue-log-subdir-root-'));
     const nestedCwd = join(root, 'packages', 'app');
+    const foreignRoot = await mkdtemp(join(tmpdir(), 'issue-log-foreign-root-'));
     await mkdir(join(root, 'tasks'), { recursive: true });
     await mkdir(join(root, '.runs', 'task-a', 'cli', 'run-a'), { recursive: true });
     await mkdir(join(root, 'out'), { recursive: true });
@@ -93,6 +94,20 @@ describe('repro', () => {
       }),
       'utf8'
     );
+    await mkdir(join(foreignRoot, 'tasks'), { recursive: true });
+    await mkdir(join(foreignRoot, '.runs', 'foreign-task', 'cli', 'run-foreign'), { recursive: true });
+    await writeFile(join(foreignRoot, 'tasks', 'index.json'), JSON.stringify({ items: [] }), 'utf8');
+    await writeFile(
+      join(foreignRoot, '.runs', 'foreign-task', 'cli', 'run-foreign', 'manifest.json'),
+      JSON.stringify({
+        task_id: 'foreign-task',
+        run_id: '2026-02-19T05-00-00-000Z-foreign',
+        pipeline_id: 'diagnostics',
+        status: 'succeeded',
+        started_at: '2026-02-19T05:00:00.000Z'
+      }),
+      'utf8'
+    );
 
     const result = await writeDoctorIssueLog({
       doctor,
@@ -100,6 +115,7 @@ describe('repro', () => {
       issueTitle: 'nested',
       env: {
         ...process.env,
+        CODEX_ORCHESTRATOR_ROOT: foreignRoot,
         MCP_RUNNER_TASK_ID: 'task-a'
       }
     });
@@ -109,10 +125,72 @@ describe('repro', () => {
     await access(issueLogAbsolute);
     await access(bundleAbsolute);
     await rm(root, { recursive: true, force: true });
+    await rm(foreignRoot, { recursive: true, force: true });
 
     expect(result.run_context?.task_id).toBe('task-a');
     expect(issueLogAbsolute).toBe(join(root, 'docs', 'codex-orchestrator-issues.md'));
     expect(bundleAbsolute).toContain(join(root, 'out', 'task-a', 'doctor', 'issue-bundles'));
+  });
+
+  it('ignores foreign absolute runs/out env paths when explicit cwd resolves to local workspace', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'issue-log-local-root-'));
+    const nestedCwd = join(root, 'packages', 'app');
+    const foreignRoot = await mkdtemp(join(tmpdir(), 'issue-log-foreign-config-'));
+    await mkdir(join(root, 'tasks'), { recursive: true });
+    await mkdir(join(root, '.runs', 'task-local', 'cli', 'run-local'), { recursive: true });
+    await mkdir(join(root, 'out'), { recursive: true });
+    await mkdir(nestedCwd, { recursive: true });
+    await writeFile(join(root, 'tasks', 'index.json'), JSON.stringify({ items: [] }), 'utf8');
+    await writeFile(
+      join(root, '.runs', 'task-local', 'cli', 'run-local', 'manifest.json'),
+      JSON.stringify({
+        task_id: 'task-local',
+        run_id: '2026-02-19T00-00-00-000Z-local',
+        pipeline_id: 'diagnostics',
+        status: 'succeeded',
+        started_at: '2026-02-19T00:00:00.000Z'
+      }),
+      'utf8'
+    );
+    await mkdir(join(foreignRoot, 'tasks'), { recursive: true });
+    await mkdir(join(foreignRoot, '.runs', 'task-foreign', 'cli', 'run-foreign'), { recursive: true });
+    await mkdir(join(foreignRoot, 'out'), { recursive: true });
+    await writeFile(join(foreignRoot, 'tasks', 'index.json'), JSON.stringify({ items: [] }), 'utf8');
+    await writeFile(
+      join(foreignRoot, '.runs', 'task-foreign', 'cli', 'run-foreign', 'manifest.json'),
+      JSON.stringify({
+        task_id: 'task-foreign',
+        run_id: '2026-02-19T05-00-00-000Z-foreign',
+        pipeline_id: 'diagnostics',
+        status: 'succeeded',
+        started_at: '2026-02-19T05:00:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const result = await writeDoctorIssueLog({
+      doctor,
+      cwd: nestedCwd,
+      issueTitle: 'runs-out-boundary',
+      env: {
+        ...process.env,
+        CODEX_ORCHESTRATOR_ROOT: foreignRoot,
+        CODEX_ORCHESTRATOR_RUNS_DIR: join(foreignRoot, '.runs'),
+        CODEX_ORCHESTRATOR_OUT_DIR: join(foreignRoot, 'out'),
+        MCP_RUNNER_TASK_ID: 'task-local'
+      }
+    });
+
+    const issueLogAbsolute = resolvePath(nestedCwd, result.issue_log_path);
+    const bundleAbsolute = resolvePath(nestedCwd, result.bundle_path);
+    await access(issueLogAbsolute);
+    await access(bundleAbsolute);
+    await rm(root, { recursive: true, force: true });
+    await rm(foreignRoot, { recursive: true, force: true });
+
+    expect(result.run_context?.task_id).toBe('task-local');
+    expect(issueLogAbsolute).toBe(join(root, 'docs', 'codex-orchestrator-issues.md'));
+    expect(bundleAbsolute).toContain(join(root, 'out', 'task-local', 'doctor', 'issue-bundles'));
   });
 
   it('does not escape to parent workspaces when nested repo has its own git boundary', async () => {
@@ -156,6 +234,7 @@ describe('repro', () => {
       issueTitle: 'git-boundary',
       env: {
         ...process.env,
+        CODEX_ORCHESTRATOR_ROOT: parent,
         MCP_RUNNER_TASK_ID: 'child-task'
       }
     });
@@ -169,5 +248,45 @@ describe('repro', () => {
     expect(result.run_context?.task_id).toBe('child-task');
     expect(issueLogAbsolute).toBe(join(childRepo, 'docs', 'codex-orchestrator-issues.md'));
     expect(bundleAbsolute).toContain(join(childRepo, 'out', 'child-task', 'doctor', 'issue-bundles'));
+  });
+
+  it('uses explicit CODEX_ORCHESTRATOR_ROOT when cwd has no workspace signals', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'issue-log-configured-root-'));
+    const plainCwd = await mkdtemp(join(tmpdir(), 'issue-log-plain-cwd-'));
+    await mkdir(join(root, 'tasks'), { recursive: true });
+    await mkdir(join(root, '.runs', 'configured-task', 'cli', 'run-configured'), { recursive: true });
+    await writeFile(join(root, 'tasks', 'index.json'), JSON.stringify({ items: [] }), 'utf8');
+    await writeFile(
+      join(root, '.runs', 'configured-task', 'cli', 'run-configured', 'manifest.json'),
+      JSON.stringify({
+        task_id: 'configured-task',
+        run_id: '2026-02-19T06-00-00-000Z-configured',
+        pipeline_id: 'diagnostics',
+        status: 'succeeded',
+        started_at: '2026-02-19T06:00:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const result = await writeDoctorIssueLog({
+      doctor,
+      cwd: plainCwd,
+      issueTitle: 'configured-root',
+      env: {
+        ...process.env,
+        CODEX_ORCHESTRATOR_ROOT: root
+      }
+    });
+
+    const issueLogAbsolute = resolvePath(plainCwd, result.issue_log_path);
+    const bundleAbsolute = resolvePath(plainCwd, result.bundle_path);
+    await access(issueLogAbsolute);
+    await access(bundleAbsolute);
+    await rm(root, { recursive: true, force: true });
+    await rm(plainCwd, { recursive: true, force: true });
+
+    expect(result.run_context?.task_id).toBe('configured-task');
+    expect(issueLogAbsolute).toBe(join(root, 'docs', 'codex-orchestrator-issues.md'));
+    expect(bundleAbsolute).toContain(join(root, 'out', 'configured-task', 'doctor', 'issue-bundles'));
   });
 });
