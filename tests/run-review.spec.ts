@@ -121,6 +121,55 @@ fi
         sleep 0.05
       done
     fi
+    if [[ "$mode" == "heavy-hang" ]]; then
+      echo "thinking"
+      echo "exec"
+      echo "/bin/zsh -lc 'npm -C /tmp/run-review-heavy run test -- run-review' in /tmp/run-review-heavy"
+      while true; do
+        sleep 1
+      done
+    fi
+    if [[ "$mode" == "heavy-hang-cross-stream-warning" ]]; then
+      echo "thinking"
+      echo "exec"
+      echo "warning" >&2
+      echo "/bin/zsh -lc 'npm -C /tmp/run-review-heavy run test -- run-review' in /tmp/run-review-heavy"
+      while true; do
+        sleep 1
+      done
+    fi
+    if [[ "$mode" == "heavy-hang-same-stream-warning" ]]; then
+      echo "thinking"
+      echo "exec"
+      echo "warning: noisy line before command"
+      echo "/bin/zsh -lc 'npm -C /tmp/run-review-heavy run test -- run-review' in /tmp/run-review-heavy"
+      while true; do
+        sleep 1
+      done
+    fi
+    if [[ "$mode" == "heavy-hang-long-noise" ]]; then
+      echo "thinking"
+      echo "exec"
+      for i in $(seq 1 8); do
+        echo "warning-$i: noisy line before command"
+      done
+      echo "/bin/zsh -lc 'npm -C /tmp/run-review-heavy run test -- run-review' in /tmp/run-review-heavy"
+      while true; do
+        sleep 1
+      done
+    fi
+    if [[ "$mode" == "heavy-fast-exit" ]]; then
+      echo "thinking"
+      echo "exec"
+      echo "/bin/zsh -lc 'npm -C /tmp/run-review-heavy run test -- run-review' in /tmp/run-review-heavy"
+      exit 0
+    fi
+    if [[ "$mode" == "heavy-fast-cross-stream-command" ]]; then
+      echo "thinking"
+      echo "exec"
+      echo "/bin/zsh -lc 'npm -C /tmp/run-review-heavy run test -- run-review' in /tmp/run-review-heavy" >&2
+      exit 0
+    fi
     if [[ "$mode" == "spam" ]]; then
       for i in $(seq 1 200); do
         echo "stdout-$i"
@@ -144,7 +193,6 @@ function baseEnv(sandbox: string, codexBin: string): Record<string, string | und
   const env: Record<string, string | undefined> = {
     ...process.env,
     NODE_NO_WARNINGS: '1',
-    SKIP_DIFF_BUDGET: '1',
     NOTES: 'Goal: run-review regression tests | Summary: verify timeout/stall handling | Risks: none',
     FORCE_CODEX_REVIEW: '1',
     CODEX_REVIEW_NON_INTERACTIVE: '1',
@@ -158,8 +206,14 @@ function baseEnv(sandbox: string, codexBin: string): Record<string, string | und
   delete env.CODEX_REVIEW_MONITOR_INTERVAL_SECONDS;
   delete env.CODEX_REVIEW_ENABLE_DELEGATION_MCP;
   delete env.CODEX_REVIEW_DISABLE_DELEGATION_MCP;
+  delete env.CODEX_REVIEW_ALLOW_HEAVY_COMMANDS;
+  delete env.CODEX_REVIEW_ENFORCE_BOUNDED_MODE;
+  delete env.CODEX_REVIEW_DEBUG_TELEMETRY;
   delete env.CODEX_REVIEW_LARGE_SCOPE_FILE_THRESHOLD;
   delete env.CODEX_REVIEW_LARGE_SCOPE_LINE_THRESHOLD;
+  delete env.SKIP_DIFF_BUDGET;
+  delete env.DIFF_BUDGET_STAGE;
+  delete env.DIFF_BUDGET_OVERRIDE_REASON;
   return env;
 }
 
@@ -220,11 +274,64 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     const result = await runReviewCommand(manifestPath, baseEnv(sandbox, codexBin));
 
     expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain('skipping diff budget (missing scripts/diff-budget.mjs');
     expect(result.stdout).not.toContain('enforcing codex review timeout');
     expect(result.stdout).not.toContain('enforcing codex review stall timeout');
     expect(result.stdout).not.toContain('enforcing delegation-startup loop timeout');
     expect(result.stdout).toContain('delegation MCP enabled for this review (default');
     expect(result.stdout).toContain('Review output saved to:');
+  });
+
+  it('keeps explicit pipeline diff-budget skips when SKIP_DIFF_BUDGET=1', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      SKIP_DIFF_BUDGET: '1'
+    });
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain('skipping diff budget (already executed by pipeline).');
+  });
+
+  it('does not require codex availability for non-interactive handoff mode', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, '/missing/codex'),
+      FORCE_CODEX_REVIEW: '0'
+    });
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain('Codex review handoff (non-interactive):');
+    expect(result.stdout).toContain('Set FORCE_CODEX_REVIEW=1 to invoke `codex review` in this environment.');
+  });
+
+  it('adds bounded review constraints by default and allows heavy-command override', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    const boundedResult = await runReviewCommand(manifestPath, baseEnv(sandbox, codexBin));
+
+    expect(boundedResult.exitCode).toBe(0);
+    expect(boundedResult.stdout).toContain('bounded review guidance enabled by default');
+    const boundedPromptPath = join(dirname(manifestPath), 'review', 'prompt.txt');
+    const boundedPrompt = await readFile(boundedPromptPath, 'utf8');
+    expect(boundedPrompt).toContain('Execution constraints (bounded review mode):');
+    expect(boundedPrompt).toContain('Avoid full validation suites');
+
+    const heavyManifestPath = await makeManifestForTask(sandbox, 'sample-task', 'sample-run-heavy-commands');
+    const heavyResult = await runReviewCommand(heavyManifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      CODEX_REVIEW_ALLOW_HEAVY_COMMANDS: '1'
+    });
+
+    expect(heavyResult.exitCode).toBe(0);
+    expect(heavyResult.stdout).toContain('heavy review commands allowed');
+    const heavyPromptPath = join(dirname(heavyManifestPath), 'review', 'prompt.txt');
+    const heavyPrompt = await readFile(heavyPromptPath, 'utf8');
+    expect(heavyPrompt).not.toContain('Execution constraints (bounded review mode):');
   });
 
   it('keeps delegation MCP enabled by default for wrapper review runs', async () => {
@@ -289,6 +396,281 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
 
     expect(result.exitCode).toBeGreaterThan(0);
     expect(result.stderr).toContain('codex review stalled with no output for 1s');
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('persists timeout telemetry summaries for faster failure triage', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'heavy-hang',
+      CODEX_REVIEW_ALLOW_HEAVY_COMMANDS: '1',
+      CODEX_REVIEW_TIMEOUT_SECONDS: '1',
+      CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0'
+    });
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).toContain('codex review timed out after 1s');
+    expect(result.stderr).toContain('[run-review] review telemetry:');
+    expect(result.stderr).toContain('heavy command start(s)');
+    expect(result.stderr).toContain('last command started: [redacted]');
+    expect(result.stderr).toContain('output tail captured:');
+
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      error: string | null;
+      summary: { commandStarts: string[]; heavyCommandStarts: string[] };
+    };
+    expect(telemetry.status).toBe('failed');
+    expect(telemetry.error).toContain('[redacted error');
+    expect(telemetry.summary.commandStarts.length).toBeGreaterThan(0);
+    expect(telemetry.summary.heavyCommandStarts.length).toBeGreaterThan(0);
+    expect(telemetry.summary.heavyCommandStarts[0]).toContain('[redacted heavy-command');
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('prints raw telemetry command/tail details only when debug telemetry env is enabled', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'heavy-hang',
+      CODEX_REVIEW_ALLOW_HEAVY_COMMANDS: '1',
+      CODEX_REVIEW_DEBUG_TELEMETRY: '1',
+      CODEX_REVIEW_TIMEOUT_SECONDS: '1',
+      CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0'
+    });
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).toContain('last command started: /bin/zsh -lc');
+    expect(result.stderr).toContain('heavy commands detected: /bin/zsh -lc');
+    expect(result.stderr).toContain('output tail:');
+
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      error: string | null;
+      summary: { commandStarts: string[]; heavyCommandStarts: string[]; lastLines: string[] };
+    };
+    expect(telemetry.status).toBe('failed');
+    expect(telemetry.error).toBeTruthy();
+    expect(telemetry.error).not.toContain('[redacted error');
+    expect(telemetry.summary.commandStarts[0]).toContain('/bin/zsh -lc');
+    expect(telemetry.summary.heavyCommandStarts[0]).toContain('run test');
+    expect(telemetry.summary.lastLines.length).toBeGreaterThan(0);
+    expect(telemetry.summary.lastLines[0]).not.toContain('[redacted');
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('keeps bounded guidance advisory by default for heavy command starts', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'heavy-hang',
+      CODEX_REVIEW_TIMEOUT_SECONDS: '1',
+      CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0'
+    });
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).toContain('codex review timed out after 1s');
+    expect(result.stderr).not.toContain('attempted heavy command in bounded mode');
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('fails fast when bounded enforcement is enabled and heavy command starts are detected', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'heavy-hang',
+      CODEX_REVIEW_ENFORCE_BOUNDED_MODE: '1',
+      CODEX_REVIEW_TIMEOUT_SECONDS: '60',
+      CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0'
+    });
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).toContain('codex review attempted heavy command in bounded mode');
+    expect(result.stderr).toContain('CODEX_REVIEW_ALLOW_HEAVY_COMMANDS=1');
+    expect(result.stderr).not.toContain('/tmp/run-review-heavy');
+
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      summary: { heavyCommandStarts: string[] };
+    };
+    expect(telemetry.status).toBe('failed');
+    expect(telemetry.summary.heavyCommandStarts.length).toBeGreaterThan(0);
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('includes raw blocked command text in bounded failures only when debug telemetry is enabled', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+
+    const redactedResult = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'heavy-fast-exit',
+      CODEX_REVIEW_ENFORCE_BOUNDED_MODE: '1',
+      CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0'
+    });
+    expect(redactedResult.exitCode).toBeGreaterThan(0);
+    expect(redactedResult.stderr).toContain('codex review attempted heavy command in bounded mode');
+    expect(redactedResult.stderr).not.toContain('/tmp/run-review-heavy');
+
+    const debugResult = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'heavy-fast-exit',
+      CODEX_REVIEW_ENFORCE_BOUNDED_MODE: '1',
+      CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0',
+      CODEX_REVIEW_DEBUG_TELEMETRY: '1'
+    });
+    expect(debugResult.exitCode).toBeGreaterThan(0);
+    expect(debugResult.stderr).toContain('/tmp/run-review-heavy');
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('fails bounded enforcement even after long noisy preamble lines between exec and command', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'heavy-hang-long-noise',
+      CODEX_REVIEW_ENFORCE_BOUNDED_MODE: '1',
+      CODEX_REVIEW_TIMEOUT_SECONDS: '3',
+      CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0'
+    });
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).toContain('codex review attempted heavy command in bounded mode');
+    expect(result.stderr).toContain('CODEX_REVIEW_ALLOW_HEAVY_COMMANDS=1');
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('captures heavy telemetry even when command follows long noisy preamble lines', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'heavy-hang-long-noise',
+      CODEX_REVIEW_ALLOW_HEAVY_COMMANDS: '1',
+      CODEX_REVIEW_TIMEOUT_SECONDS: '1',
+      CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0'
+    });
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      summary: { commandStarts: string[]; heavyCommandStarts: string[] };
+    };
+    expect(telemetry.status).toBe('failed');
+    expect(telemetry.summary.commandStarts.length).toBeGreaterThan(0);
+    expect(telemetry.summary.heavyCommandStarts.length).toBeGreaterThan(0);
+    expect(telemetry.summary.heavyCommandStarts[0]).toContain('[redacted heavy-command');
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('detects heavy commands when stderr noise appears between exec and command line', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'heavy-hang-cross-stream-warning',
+      CODEX_REVIEW_ENFORCE_BOUNDED_MODE: '1',
+      CODEX_REVIEW_TIMEOUT_SECONDS: '60',
+      CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0'
+    });
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).toContain('codex review attempted heavy command in bounded mode');
+    expect(result.stderr).toContain('CODEX_REVIEW_ALLOW_HEAVY_COMMANDS=1');
+
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      summary: { heavyCommandStarts: string[] };
+    };
+    expect(telemetry.status).toBe('failed');
+    expect(telemetry.summary.heavyCommandStarts.length).toBeGreaterThan(0);
+    expect(telemetry.summary.heavyCommandStarts[0]).toContain('[redacted heavy-command');
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('detects heavy commands when stdout noise appears between exec and command line', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'heavy-hang-same-stream-warning',
+      CODEX_REVIEW_ENFORCE_BOUNDED_MODE: '1',
+      CODEX_REVIEW_TIMEOUT_SECONDS: '60',
+      CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0'
+    });
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).toContain('codex review attempted heavy command in bounded mode');
+    expect(result.stderr).toContain('CODEX_REVIEW_ALLOW_HEAVY_COMMANDS=1');
+
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      summary: { heavyCommandStarts: string[] };
+    };
+    expect(telemetry.status).toBe('failed');
+    expect(telemetry.summary.heavyCommandStarts.length).toBeGreaterThan(0);
+    expect(telemetry.summary.heavyCommandStarts[0]).toContain('[redacted heavy-command');
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('fails bounded enforcement even when heavy commands exit quickly', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'heavy-fast-exit',
+      CODEX_REVIEW_ENFORCE_BOUNDED_MODE: '1',
+      CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0'
+    });
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).toContain('codex review attempted heavy command in bounded mode');
+    expect(result.stderr).toContain('CODEX_REVIEW_ALLOW_HEAVY_COMMANDS=1');
+
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      summary: { heavyCommandStarts: string[] };
+    };
+    expect(telemetry.status).toBe('failed');
+    expect(telemetry.summary.heavyCommandStarts.length).toBeGreaterThan(0);
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('fails bounded enforcement when command lines land on stderr after stdout exec markers', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'heavy-fast-cross-stream-command',
+      CODEX_REVIEW_ENFORCE_BOUNDED_MODE: '1',
+      CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0',
+      CODEX_REVIEW_MONITOR_INTERVAL_SECONDS: '0'
+    });
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).toContain('codex review attempted heavy command in bounded mode');
+    expect(result.stderr).toContain('CODEX_REVIEW_ALLOW_HEAVY_COMMANDS=1');
+
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      summary: { heavyCommandStarts: string[] };
+    };
+    expect(telemetry.status).toBe('failed');
+    expect(telemetry.summary.heavyCommandStarts.length).toBeGreaterThan(0);
   }, LONG_WAIT_TEST_TIMEOUT_MS);
 
   it('emits patience-first monitor checkpoints during long-running waits', async () => {

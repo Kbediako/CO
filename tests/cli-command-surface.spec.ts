@@ -80,8 +80,10 @@ describe('codex-orchestrator command surface', () => {
   it('prints root help with quickstart guidance', async () => {
     const { stdout } = await runCli(['--help']);
     expect(stdout).toContain('Usage: codex-orchestrator <command> [options]');
+    expect(stdout).toContain('review [options]');
     expect(stdout).toContain('Quickstart (agent-first):');
     expect(stdout).toContain('codex-orchestrator flow --task <task-id>');
+    expect(stdout).toContain('NOTES="Goal: ... | Summary: ... | Risks: ..." codex-orchestrator review --task <task-id>');
     expect(stdout).toContain('codex-orchestrator doctor --usage --window-days 30');
   }, TEST_TIMEOUT);
 
@@ -141,6 +143,14 @@ describe('codex-orchestrator command surface', () => {
     expect(stdout).toContain('Examples:');
     expect(stdout).toContain('codex-orchestrator flow --task <task-id>');
     expect(stdout).toContain('Post-run check:');
+  }, TEST_TIMEOUT);
+
+  it('prints review help without invoking run-review', async () => {
+    const { stdout } = await runCli(['review', '--help']);
+    expect(stdout).toContain('Usage: codex-orchestrator review');
+    expect(stdout).toContain('Runs the standalone review wrapper');
+    expect(stdout).toContain('--manifest <path>');
+    expect(stdout).toContain('CODEX_REVIEW_ALLOW_HEAVY_COMMANDS=1');
   }, TEST_TIMEOUT);
 
   it('prints start help without preparing a run', async () => {

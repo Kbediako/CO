@@ -12,6 +12,7 @@
     "packages/control-plane-schemas/src/**/*.ts",
     "packages/sdk-node/src/**/*.ts",
     "packages/shared/**/*.ts",
+    "scripts/run-review.ts",
     "scripts/design/pipeline/**/*.ts",
     "scripts/design/pipeline/**/*.js",
     "scripts/lib/**/*.js",

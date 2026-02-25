@@ -7,7 +7,9 @@ import { runPack } from './lib/npm-pack.js';
 
 const REQUIRED_FILES = [
   'dist/bin/codex-orchestrator.js',
+  'dist/scripts/run-review.js',
   'schemas/manifest.json',
+  'skills/long-poll-wait/SKILL.md',
   'README.md',
   'LICENSE'
 ];
@@ -23,6 +25,7 @@ const DIST_ALLOWED_PREFIXES = [
   'dist/bin/',
   'dist/orchestrator/',
   'dist/packages/',
+  'dist/scripts/run-review.js',
   'dist/scripts/design/pipeline/',
   'dist/scripts/lib/',
   'dist/types/'

@@ -25,3 +25,8 @@ This guide defines how downstream users consume skills shipped with `@kbediako/c
 ## Validation
 - Run `npm run pack:audit` and `npm run pack:smoke` before release tags.
 - Ensure `skills/**` changes appear in the generated tarball contents.
+- `npm run pack:smoke` is the standard downstream simulation gate:
+  - installs the packed tarball into a temp mock repo,
+  - validates `codex-orchestrator review` artifact behavior in non-interactive + forced execution modes,
+  - validates `codex-orchestrator skills install --only long-poll-wait` installs expected patience-first guidance.
+- CI standard: core-lane runs `npm run pack:smoke` automatically when downstream-facing paths change (CLI/package/skills/review-wrapper/docs wiring).

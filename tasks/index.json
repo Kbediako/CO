@@ -1422,6 +1422,38 @@
       },
       "created_at": "2026-02-21",
       "completed_at": null
+    },
+    {
+      "id": "0978",
+      "slug": "0978-agent-first-adoption-steering-skill",
+      "title": "Agent-First Adoption Steering Skill",
+      "path": "tasks/tasks-0978-agent-first-adoption-steering-skill.md",
+      "kind": "run",
+      "status": "in-progress",
+      "gate": {
+        "phase": "agent-first-adoption-steering-skill-planning",
+        "status": "succeeded",
+        "log": ".runs/0978-agent-first-adoption-steering-skill/cli/2026-02-25T03-48-09-988Z-0e0cd9c1/manifest.json",
+        "run_id": "2026-02-25T03-48-09-988Z-0e0cd9c1"
+      },
+      "created_at": "2026-02-25",
+      "completed_at": null
+    },
+    {
+      "id": "0979",
+      "slug": "0979-standalone-review-runtime-telemetry",
+      "title": "Standalone Review Runtime Bounding + Telemetry",
+      "path": "tasks/tasks-0979-standalone-review-runtime-telemetry.md",
+      "kind": "run",
+      "status": "in-progress",
+      "gate": {
+        "phase": "standalone-review-runtime-telemetry-planning",
+        "status": "succeeded",
+        "log": ".runs/0979-standalone-review-runtime-telemetry/cli/2026-02-25T04-08-45-193Z-9f6bc5da/manifest.json",
+        "run_id": "2026-02-25T04-08-45-193Z-9f6bc5da"
+      },
+      "created_at": "2026-02-25",
+      "completed_at": null
     }
   ],
   "specs": [
@@ -1855,6 +1887,38 @@
         "task": "tasks/tasks-0977-shipped-feature-adoption-guidance.md",
         "agent_task": ".agent/task/0977-shipped-feature-adoption-guidance.md",
         "docs": "docs/TECH_SPEC-shipped-feature-adoption-guidance.md"
+      }
+    },
+    {
+      "id": "20260225-0978-agent-first-adoption-steering-skill",
+      "title": "Agent-First Adoption Steering Skill",
+      "relates_to": "tasks/tasks-0978-agent-first-adoption-steering-skill.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-02-25",
+      "paths": {
+        "spec": "tasks/specs/0978-agent-first-adoption-steering-skill.md",
+        "task": "tasks/tasks-0978-agent-first-adoption-steering-skill.md",
+        "agent_task": ".agent/task/0978-agent-first-adoption-steering-skill.md",
+        "docs": "docs/TECH_SPEC-agent-first-adoption-steering-skill.md"
+      }
+    },
+    {
+      "id": "20260225-0979-standalone-review-runtime-telemetry",
+      "title": "Standalone Review Runtime Bounding + Telemetry",
+      "relates_to": "tasks/tasks-0979-standalone-review-runtime-telemetry.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-02-25",
+      "paths": {
+        "spec": "tasks/specs/0979-standalone-review-runtime-telemetry.md",
+        "task": "tasks/tasks-0979-standalone-review-runtime-telemetry.md",
+        "agent_task": ".agent/task/0979-standalone-review-runtime-telemetry.md",
+        "docs": "docs/TECH_SPEC-standalone-review-runtime-telemetry.md"
       }
     }
   ]

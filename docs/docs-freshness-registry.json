@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generated_at": "2026-02-21T00:00:00.000Z",
+  "generated_at": "2026-02-25T00:00:00.000Z",
   "entries": [
     {
       "path": ".agent/AGENTS.md",
@@ -773,6 +773,20 @@
       "cadence_days": 90
     },
     {
+      "path": ".agent/task/0978-agent-first-adoption-steering-skill.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-25",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/task/0979-standalone-review-runtime-telemetry.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-25",
+      "cadence_days": 90
+    },
+    {
       "path": ".agent/task/ACTION_PLAN_TEMPLATE.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -896,6 +910,13 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-02-17",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/ACTION_PLAN-agent-first-adoption-steering-skill.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-25",
       "cadence_days": 90
     },
     {
@@ -1319,6 +1340,13 @@
       "cadence_days": 90
     },
     {
+      "path": "docs/ACTION_PLAN-standalone-review-runtime-telemetry.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-25",
+      "cadence_days": 90
+    },
+    {
       "path": "docs/ACTION_PLAN-subagent-delegation-enforcement.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -1582,6 +1610,13 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-02-17",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/PRD-agent-first-adoption-steering-skill.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-25",
       "cadence_days": 90
     },
     {
@@ -2033,6 +2068,13 @@
       "cadence_days": 90
     },
     {
+      "path": "docs/PRD-standalone-review-runtime-telemetry.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-25",
+      "cadence_days": 90
+    },
+    {
       "path": "docs/PRD-subagent-delegation-enforcement.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -2072,20 +2114,6 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-01-19",
-      "cadence_days": 90
-    },
-    {
-      "path": "docs/REVIEW-0976-context-alignment-checker-option2-pre-implementation.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-02-21",
-      "cadence_days": 90
-    },
-    {
-      "path": "docs/REVIEW-0977-shipped-feature-adoption-guidance-pre-implementation.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-02-21",
       "cadence_days": 90
     },
     {
@@ -2138,6 +2166,20 @@
       "cadence_days": 90
     },
     {
+      "path": "docs/REVIEW-0976-context-alignment-checker-option2-pre-implementation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-21",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/REVIEW-0977-shipped-feature-adoption-guidance-pre-implementation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-21",
+      "cadence_days": 90
+    },
+    {
       "path": "docs/skills-release.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -2155,7 +2197,7 @@
       "path": "docs/standalone-review-guide.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-01-19",
+      "last_review": "2026-02-25",
       "cadence_days": 90
     },
     {
@@ -2169,7 +2211,7 @@
       "path": "docs/TASKS.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-02-20",
+      "last_review": "2026-02-25",
       "cadence_days": 90
     },
     {
@@ -2191,6 +2233,13 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-02-17",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/TECH_SPEC-agent-first-adoption-steering-skill.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-25",
       "cadence_days": 90
     },
     {
@@ -2642,6 +2691,13 @@
       "cadence_days": 90
     },
     {
+      "path": "docs/TECH_SPEC-standalone-review-runtime-telemetry.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-25",
+      "cadence_days": 90
+    },
+    {
       "path": "docs/TECH_SPEC-subagent-delegation-enforcement.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -2694,7 +2750,14 @@
       "path": "README.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-02-16",
+      "last_review": "2026-02-25",
+      "cadence_days": 90
+    },
+    {
+      "path": "skills/agent-first-adoption-steering/SKILL.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-25",
       "cadence_days": 90
     },
     {
@@ -2877,6 +2940,13 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/index.json",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-25",
       "cadence_days": 90
     },
     {
@@ -3262,6 +3332,20 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-02-21",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/specs/0978-agent-first-adoption-steering-skill.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-25",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/specs/0979-standalone-review-runtime-telemetry.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-25",
       "cadence_days": 90
     },
     {
@@ -3864,6 +3948,20 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-02-21",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/tasks-0978-agent-first-adoption-steering-skill.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-25",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/tasks-0979-standalone-review-runtime-telemetry.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-25",
       "cadence_days": 90
     },
     {

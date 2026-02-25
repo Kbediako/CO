@@ -212,7 +212,9 @@ Bundled skills (may vary by release):
 - `docs-first`
 - `collab-evals`
 - `collab-deliberation`
+- `long-poll-wait`
 - `release`
+- `agent-first-adoption-steering`
 - `delegate-early` (compatibility alias; use `delegation-usage`)
 
 ## DevTools readiness
@@ -259,6 +261,8 @@ codex-orchestrator doctor --cloud-preflight
 - Validate + measure adoption locally: `codex-orchestrator doctor --usage --format json`
 - Capture reproducible downstream failures: `codex-orchestrator doctor --issue-log --issue-title "<title>" --issue-notes "<notes>"`
 - Auto-capture failed run issue bundles: `codex-orchestrator start <pipeline> --auto-issue-log` or `codex-orchestrator flow --auto-issue-log`
+- Review checkpoints (npm-only safe): `NOTES="Goal: ... | Summary: ... | Risks: ..." codex-orchestrator review --task <task-id>` for manifest-backed standalone review wrapper behavior (auto-skips repo-only diff-budget script when unavailable in downstream installs); use `codex review "<focus>"` for quick prompt-only checks; use `codex-orchestrator start implementation-gate --task <task-id> --format json` when you want a full gate run.
+- Downstream simulation before shipping wrapper/skill changes: `npm run pack:smoke` (packaged CLI in temp mock repo; validates `review` artifacts and `long-poll-wait` install path).
 - Delegation: `codex-orchestrator doctor --apply --yes`, then enable for a Codex run with: `codex -c 'mcp_servers.delegation.enabled=true' ...`
 - Collab (symbolic RLM subagents): `codex-orchestrator rlm --multi-agent auto "<goal>"` (legacy alias: `--collab auto`; requires Codex `features.multi_agent=true`)
 - Cloud: set `CODEX_CLOUD_ENV_ID` (and optional `CODEX_CLOUD_BRANCH`), then run: `codex-orchestrator start <pipeline> --cloud --target <stage-id>`
@@ -275,6 +279,7 @@ codex-orchestrator devtools setup
 
 - `codex-orchestrator start <pipeline>` — run a pipeline (add `--auto-issue-log` for automatic failure bundle capture; add `--repo-config-required` for strict repo-local config mode).
 - `codex-orchestrator flow --task <task-id>` — run `docs-review` then `implementation-gate` in sequence (supports `--auto-issue-log` and `--repo-config-required`).
+- `NOTES="Goal: ... | Summary: ... | Risks: ..." codex-orchestrator review --task <task-id>` — run standalone review wrapper with manifest-backed evidence (supports run-review flags/env).
 - `codex-orchestrator plan <pipeline>` — preview pipeline stages.
 - `codex-orchestrator exec <cmd>` — run a one-off command with the exec runtime.
 - `codex-orchestrator init codex` — install starter templates (`mcp-client.json`, `AGENTS.md`, `codex.orchestrator.json`) into a repo.
@@ -286,6 +291,7 @@ codex-orchestrator devtools setup
 - `codex-orchestrator mcp enable --servers <csv> --yes` — enable specific disabled MCP servers from existing Codex config entries.
 - `codex-orchestrator self-check --format json` — JSON health payload.
 - `codex-orchestrator mcp serve` — Codex MCP stdio server.
+- `npm run pack:smoke` — maintainer smoke gate for packaged downstream behavior (tarball install + review/skill checks).
 
 ## What ships in the npm release
 
@@ -302,7 +308,8 @@ Repo internals, development workflows, and deeper architecture notes (contributo
 - `docs/guides/collab-vs-mcp.md` (agent-first decision guide)
 - `docs/guides/rlm-recursion-v2.md` (RLM recursion reference)
 - `docs/guides/cloud-mode-preflight.md` (cloud-mode preflight + fallback guidance)
-- `docs/guides/review-artifacts.md` (where `npm run review` writes prompt/output artifacts)
+- `docs/guides/review-artifacts.md` (where `codex-orchestrator review` / `npm run review` write prompt/output artifacts)
+- `docs/standalone-review-guide.md` (repo-local wrapper behavior + downstream-safe review alternatives)
 
 ## RLM benchmark graphs
 

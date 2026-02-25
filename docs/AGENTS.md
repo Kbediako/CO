@@ -1,11 +1,11 @@
-<!-- codex:instruction-stamp 97b2e133d1d7dc072042f6588b89b0877e5210cab0932a48ff873ce969d0400a -->
+<!-- codex:instruction-stamp 157c0d239cf9e99e15fe4a8ffd8661449a709357729c28807775de22e8426bc4 -->
 # Repository Agent Guidance
 
 ## Project 0303 — Codex Orchestrator Autonomy Enhancements
 - Export `MCP_RUNNER_TASK_ID=0303-orchestrator-autonomy` so diagnostics land in `.runs/0303-orchestrator-autonomy/cli/` and mirrors sync across `/tasks`, `docs/`, and `.agent/`.
 - Store evidence under `.runs/0303-orchestrator-autonomy/cli/<run-id>/manifest.json`, metrics in `.runs/0303-orchestrator-autonomy/metrics.json`, and summaries in `out/0303-orchestrator-autonomy/state.json`.
 - Record any approval escalations in the manifest `approvals` array and cross-link when flipping checklist items.
-- Run `node scripts/delegation-guard.mjs`, `node scripts/spec-guard.mjs --dry-run`, `npm run lint`, `npm run test`, `npm run eval:test` (if fixtures exist), and `node scripts/diff-budget.mjs` before reviewer hand-off; attach the manifest path documenting these runs.
+- Run `node scripts/delegation-guard.mjs`, `node scripts/spec-guard.mjs --dry-run`, `npm run lint`, `npm run test`, `npm run eval:test` (if fixtures exist), and `node scripts/diff-budget.mjs` before reviewer hand-off; add `npm run pack:smoke` when touching CLI/package/skills/review-wrapper paths for downstream npm users; attach the manifest path documenting these runs.
 
 ## Project 0202 — Codex Orchestrator Resilience Hardening
 - Existing manifests remain in `.runs/0202-orchestrator-hardening/cli/`; keep metrics/state snapshots in `.runs/0202-orchestrator-hardening/metrics.json` and `out/0202-orchestrator-hardening/state.json`.
@@ -56,7 +56,8 @@
 - Use `codex review` for fast checks during implementation.
 - Current Codex CLI behavior: do not combine prompt arguments with `--uncommitted`, `--base`, or `--commit`; use either diff-scoped review (no prompt) or prompt-only review.
 - Capture the standalone review approval (even if “no issues”) in the spec/task notes before implementation begins.
-- For manifest-backed review evidence, run `TASK=<task-id> NOTES="Goal: ... | Summary: ... | Risks: ..." MANIFEST=<path> npm run review -- --manifest <path>`.
+- For manifest-backed review evidence, run `TASK=<task-id> NOTES="Goal: ... | Summary: ... | Risks: ..." codex-orchestrator review --manifest <path>` (repo alias: `npm run review -- --manifest <path>`).
+- For downstream simulation of review-wrapper or bundled-skill changes, run `npm run pack:smoke` (packaged CLI in a temp mock repo, review artifacts, and `long-poll-wait` install assertion).
 - See `docs/standalone-review-guide.md` for the canonical workflow.
 - Prefer the global `standalone-review` skill when installed; bundled skills ship for downstream release packaging.
 - During active non-trivial implementation, run standalone review at implementation checkpoints (after coding bursts/sub-goals/feedback batches) and pair with an elegance pass before handoff/merge.
