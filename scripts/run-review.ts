@@ -61,7 +61,17 @@ const REVIEW_HEAVY_SCRIPT_TARGETS = new Set([
   'docs:check',
   'docs:freshness'
 ]);
-const REVIEW_SHELL_COMMANDS = new Set(['bash', 'sh', 'zsh', 'ksh', 'fish', 'pwsh', 'powershell', 'cmd']);
+const REVIEW_SHELL_COMMANDS = new Set([
+  'bash',
+  'sh',
+  'zsh',
+  'ksh',
+  'fish',
+  'pwsh',
+  'powershell',
+  'cmd',
+  'cmd.exe'
+]);
 const REVIEW_OUTPUT_SUMMARY_TAIL_LINE_LIMIT = 20;
 const REVIEW_OUTPUT_SUMMARY_HEAVY_COMMAND_LIMIT = 8;
 const REVIEW_OUTPUT_SUMMARY_COMMAND_LIMIT = 64;
