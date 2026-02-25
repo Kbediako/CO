@@ -1120,15 +1120,20 @@ async function fetchSnapshot(owner, repo, prNumber, previousRequiredChecksCache 
   };
 }
 
-async function attemptMerge({ prNumber, mergeMethod, deleteBranch, headOid }) {
+export function buildPrMergeArgs({ owner, repo, prNumber, mergeMethod, deleteBranch, headOid }) {
   // gh pr merge has no --yes flag; rely on non-interactive stdio + explicit merge method.
-  const args = ['pr', 'merge', String(prNumber), `--${mergeMethod}`];
+  const args = ['pr', 'merge', String(prNumber), `--${mergeMethod}`, '--repo', `${owner}/${repo}`];
   if (deleteBranch) {
     args.push('--delete-branch');
   }
   if (headOid) {
     args.push('--match-head-commit', headOid);
   }
+  return args;
+}
+
+async function attemptMerge({ owner, repo, prNumber, mergeMethod, deleteBranch, headOid }) {
+  const args = buildPrMergeArgs({ owner, repo, prNumber, mergeMethod, deleteBranch, headOid });
   return await runGh(args, { allowFailure: true });
 }
 
@@ -1300,6 +1305,8 @@ async function runPrWatchMergeOrThrow(argv, options) {
         lastMergeAttemptHeadOid = snapshot.headOid;
         log(`Attempting merge via gh pr merge --${mergeMethod}${deleteBranch ? ' --delete-branch' : ''}.`);
         const mergeResult = await attemptMerge({
+          owner,
+          repo,
           prNumber,
           mergeMethod,
           deleteBranch,

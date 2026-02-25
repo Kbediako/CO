@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  buildPrMergeArgs,
   buildStatusSnapshot,
   isHumanReviewActor,
   resolveLatestBotRereviewRequests,
@@ -44,6 +45,24 @@ function makeResponse(checkNodes: unknown[]) {
     }
   };
 }
+
+describe('buildPrMergeArgs', () => {
+  it('includes explicit repo context for gh pr merge', () => {
+    const args = buildPrMergeArgs({
+      owner: 'Kbediako',
+      repo: 'CO',
+      prNumber: 253,
+      mergeMethod: 'squash',
+      deleteBranch: true,
+      headOid: 'abc123'
+    });
+
+    expect(args).toContain('--repo');
+    expect(args).toContain('Kbediako/CO');
+    expect(args).toContain('--match-head-commit');
+    expect(args).toContain('abc123');
+  });
+});
 
 describe('pr watch-merge required-check gating', () => {
   it('uses required checks for gate decisions when available', () => {
