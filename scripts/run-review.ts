@@ -61,7 +61,7 @@ const REVIEW_HEAVY_SCRIPT_TARGETS = new Set([
   'docs:check',
   'docs:freshness'
 ]);
-const REVIEW_SHELL_COMMANDS = new Set(['bash', 'sh', 'zsh', 'ksh', 'fish', 'pwsh', 'powershell']);
+const REVIEW_SHELL_COMMANDS = new Set(['bash', 'sh', 'zsh', 'ksh', 'fish', 'pwsh', 'powershell', 'cmd']);
 const REVIEW_OUTPUT_SUMMARY_TAIL_LINE_LIMIT = 20;
 const REVIEW_OUTPUT_SUMMARY_HEAVY_COMMAND_LIMIT = 8;
 const REVIEW_OUTPUT_SUMMARY_COMMAND_LIMIT = 64;
@@ -1356,6 +1356,10 @@ function extractShellCommandPayload(tokens: string[]): string | null {
   for (let index = 1; index < tokens.length; index += 1) {
     if (!isShellCommandFlagWithPayload(tokens[index] ?? '')) {
       continue;
+    }
+    if (command === 'cmd') {
+      const payload = tokens.slice(index + 1).join(' ').trim();
+      return payload.length > 0 ? payload : null;
     }
     const payload = tokens[index + 1];
     return payload ? payload.trim() : null;
