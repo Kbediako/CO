@@ -70,7 +70,7 @@ async function writeMockCodexBin(tempDir) {
       '  exit /b 0',
       ')',
       'echo codex mock unsupported args: %*',
-      'exit /b 0',
+      'exit /b 2',
       ''
     ].join('\r\n');
     await writeFile(mockPath, script, 'utf8');
@@ -93,8 +93,8 @@ if [ "$cmd" = "review" ]; then
   printf '%s\n' "thinking" "codex review mock ok"
   exit 0
 fi
-printf '%s\n' "codex mock unsupported args: $*"
-exit 0
+printf '%s\n' "codex mock unsupported args: $*" >&2
+exit 2
 `;
   await writeFile(mockPath, script, 'utf8');
   await chmod(mockPath, 0o755);

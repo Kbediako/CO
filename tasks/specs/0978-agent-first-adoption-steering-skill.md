@@ -80,5 +80,7 @@ last_review: 2026-02-25
 - None blocking.
 
 ## Approvals
+- Pre-implementation standalone review: approved (no blocking issues).
+- Standalone review evidence: `out/0978-agent-first-adoption-steering-skill/manual/pre-implementation-standalone-review.log`.
 - Reviewer: user
 - Date: 2026-02-25

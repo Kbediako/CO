@@ -1854,7 +1854,7 @@ async function waitForChildExit(
     child.once('error', onError);
     child.once('close', onClose);
 
-    const requestTermination = (message: string) => {
+    const requestTermination = (message: string, timedOut = true) => {
       if (settled) {
         return;
       }
@@ -1872,7 +1872,7 @@ async function waitForChildExit(
         new CodexReviewError(message, {
           exitCode: 1,
           signal: null,
-          timedOut: true,
+          timedOut,
           outputPreview: ''
         })
       );
@@ -1929,7 +1929,7 @@ async function waitForChildExit(
         if (!blockedCommand) {
           return;
         }
-        requestTermination(formatBoundedHeavyCommandFailure(blockedCommand));
+        requestTermination(formatBoundedHeavyCommandFailure(blockedCommand), false);
       }, 250);
       heavyCommandHandle.unref();
     }

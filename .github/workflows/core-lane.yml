@@ -48,7 +48,7 @@ jobs:
           echo "Changed files:"
           printf '%s\n' "${CHANGED}"
 
-          if printf '%s\n' "${CHANGED}" | grep -Eq '^(bin/|scripts/(pack-smoke\.mjs|pack-audit\.mjs|run-review\.ts|lib/)|skills/|orchestrator/src/cli/|package\.json|tsconfig\.build\.json|README\.md|docs/README\.md|docs/AGENTS\.md|docs/standalone-review-guide\.md|docs/skills-release\.md|docs/guides/review-artifacts\.md)'; then
+          if printf '%s\n' "${CHANGED}" | grep -Eq '^(bin/|dist/scripts/run-review\.js|scripts/(pack-smoke\.mjs|pack-audit\.mjs|run-review\.ts|lib/)|skills/|orchestrator/src/cli/|package\.json|tsconfig\.build\.json|README\.md|docs/README\.md|docs/AGENTS\.md|docs/standalone-review-guide\.md|docs/skills-release\.md|docs/guides/review-artifacts\.md)'; then
             echo "required=true" >> "$GITHUB_OUTPUT"
             echo "Downstream simulation smoke: required"
           else

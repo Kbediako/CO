@@ -495,6 +495,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(result.stderr).toContain('codex review attempted heavy command in bounded mode');
     expect(result.stderr).toContain('CODEX_REVIEW_ALLOW_HEAVY_COMMANDS=1');
     expect(result.stderr).not.toContain('/tmp/run-review-heavy');
+    expect(result.stderr).not.toContain('timed out');
 
     const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
     const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
@@ -519,6 +520,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(redactedResult.exitCode).toBeGreaterThan(0);
     expect(redactedResult.stderr).toContain('codex review attempted heavy command in bounded mode');
     expect(redactedResult.stderr).not.toContain('/tmp/run-review-heavy');
+    expect(redactedResult.stderr).not.toContain('timed out');
 
     const debugResult = await runReviewCommand(manifestPath, {
       ...baseEnv(sandbox, codexBin),

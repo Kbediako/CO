@@ -17,6 +17,7 @@
 ### Docs-first artifacts and gates
 - [x] Task scaffolding + mirrors + registries registered. - Evidence: `tasks/tasks-0978-agent-first-adoption-steering-skill.md`, `.agent/task/0978-agent-first-adoption-steering-skill.md`, `tasks/index.json`, `docs/TASKS.md`, `docs/docs-freshness-registry.json`.
 - [x] PRD + TECH_SPEC + ACTION_PLAN drafted. - Evidence: `docs/PRD-agent-first-adoption-steering-skill.md`, `tasks/specs/0978-agent-first-adoption-steering-skill.md`, `docs/ACTION_PLAN-agent-first-adoption-steering-skill.md`, `docs/TECH_SPEC-agent-first-adoption-steering-skill.md`.
+- [x] Standalone review approval captured (pre-implementation). - Evidence: `out/0978-agent-first-adoption-steering-skill/manual/pre-implementation-standalone-review.log`.
 - [x] Docs-review manifest captured (pre-implementation). - Evidence: `.runs/0978-agent-first-adoption-steering-skill/cli/2026-02-25T03-48-09-988Z-0e0cd9c1/manifest.json`.
 
 ### Skill drafting and validation
