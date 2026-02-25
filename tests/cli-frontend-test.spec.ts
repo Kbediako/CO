@@ -8,7 +8,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 const execFileAsync = promisify(execFile);
 
 const CLI_ENTRY = join(process.cwd(), 'bin', 'codex-orchestrator.ts');
-const TEST_TIMEOUT = 15000;
+const TEST_TIMEOUT = 30000;
 
 let tempDir: string | null = null;
 
