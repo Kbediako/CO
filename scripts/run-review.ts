@@ -1321,12 +1321,62 @@ function resolvePackageScriptTarget(args: string[]): string | null {
   return null;
 }
 
+function unwrapEnvCommandTokens(tokens: string[]): string[] {
+  if (tokens.length === 0 || normalizeCommandToken(tokens[0] ?? '') !== 'env') {
+    return tokens;
+  }
+
+  let index = 1;
+  while (index < tokens.length) {
+    const token = tokens[index] ?? '';
+    const normalized = token.toLowerCase();
+
+    if (token === '--') {
+      index += 1;
+      break;
+    }
+
+    if (/^[A-Za-z_][A-Za-z0-9_]*=.*/u.test(token)) {
+      index += 1;
+      continue;
+    }
+
+    if (normalized === '-u' || normalized === '--unset') {
+      index += 2;
+      continue;
+    }
+
+    if (normalized.startsWith('--unset=')) {
+      index += 1;
+      continue;
+    }
+
+    if (token.startsWith('-')) {
+      index += 1;
+      continue;
+    }
+
+    break;
+  }
+
+  return tokens.slice(index);
+}
+
 function hasHeavyCommandTokens(tokens: string[]): boolean {
   if (tokens.length === 0) {
     return false;
   }
-  const command = normalizeCommandToken(tokens[0] ?? '');
-  const args = tokens.slice(1);
+  const unwrappedTokens = unwrapEnvCommandTokens(tokens);
+  if (unwrappedTokens.length === 0) {
+    return false;
+  }
+
+  if (unwrappedTokens.length !== tokens.length) {
+    return hasHeavyCommandTokens(unwrappedTokens);
+  }
+
+  const command = normalizeCommandToken(unwrappedTokens[0] ?? '');
+  const args = unwrappedTokens.slice(1);
 
   if (command === 'npm' || command === 'pnpm' || command === 'yarn' || command === 'bun') {
     const scriptTarget = resolvePackageScriptTarget(args);
