@@ -137,7 +137,7 @@ model_reasoning_effort = "xhigh"
 Caveats:
 - `gpt-5.3-codex-spark` is text-only (no image inputs). Keep it for fast search/synthesis.
 - `max_threads = 12` is CO's recommended default for active multi-agent workloads; drop to `8` on constrained machines or when tool contention appears.
-- Keep `max_depth = 2` for normal work. Use `max_depth = 1` for deterministic low-risk lanes and raise only for deliberate recursive fan-out.
+- Keep `max_depth = 2` for normal work. Use `max_depth = 1` for constrained or deterministic high-risk fallback lanes, and raise only for deliberate recursive fan-out.
 - `codex review` delegates with collab tools disabled in review threads; keep review expectations single-agent even when multi-agent is enabled elsewhere.
 
 Delegation guard profile:

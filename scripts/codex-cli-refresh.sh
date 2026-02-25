@@ -114,8 +114,17 @@ fi
 
 if [[ "$PUSH" -eq 1 ]]; then
   if git remote get-url origin >/dev/null 2>&1; then
-    ORIGIN_BEHIND=$(git rev-list --left-right --count origin/main...HEAD | awk '{print $1}')
-    ORIGIN_AHEAD=$(git rev-list --left-right --count origin/main...HEAD | awk '{print $2}')
+    echo "[codex-cli-refresh] Fetching origin refs for delta check..."
+    git fetch origin --prune --no-tags >/dev/null 2>&1 || true
+    if git show-ref --verify --quiet refs/remotes/origin/main; then
+      read -r ORIGIN_BEHIND ORIGIN_AHEAD < <(
+        git rev-list --left-right --count origin/main...HEAD
+      )
+    else
+      ORIGIN_BEHIND=0
+      ORIGIN_AHEAD=0
+      echo "[codex-cli-refresh] origin/main missing after fetch; skipping delta-based push."
+    fi
     echo "[codex-cli-refresh] Delta vs origin/main: ahead=${ORIGIN_AHEAD} behind=${ORIGIN_BEHIND}"
     if [[ "$ORIGIN_AHEAD" -gt 0 ]]; then
       echo "[codex-cli-refresh] Pushing to origin/main..."

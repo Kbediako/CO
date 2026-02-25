@@ -64,7 +64,7 @@
 - Mitigation: keep fallback profile (`8/1`) documented and treat deeper settings as deliberate overrides.
 
 ### Alternatives rejected
-- Keep `8` as universal default: rejected due lower throughput for common CO multi-stream workloads.
+- Keep `8` as universal default: rejected due to lower throughput for common CO multi-stream workloads.
 - Raise threads to `12` but keep depth at `1`: rejected because it blocks useful bounded recursion patterns.
 - Aggressive depth (`>=3`) as default: rejected due elevated blast radius and debugging complexity.
 
@@ -106,7 +106,7 @@
 
 ### 5.4 Should CO rely more on default Codex CLI spawning vs custom RLM flow?
 - Yes for bounded independent work: prefer native spawning (`spawn_agent`, `spawn_agents_on_csv`) when tasks are clearly partitionable.
-- No as a full replacement for RLM orchestration: default spawning does not replace CO’s planning contracts, guardrail choreography, and manifest-backed “slice/delegate/stitch” conventions.
+- No, as a full replacement for RLM orchestration: default spawning does not replace CO’s planning contracts, guardrail choreography, and manifest-backed “slice/delegate/stitch” conventions.
 - Practical rule: default spawning for execution fan-out; RLM for recursive planning/coordination and evidence-heavy orchestration flows.
 
 ### 5.5 Can spawned agents run multi-turn interactions?
@@ -122,3 +122,10 @@
 - Fallback is a safety valve, not the default operating mode.
 - Primary default remains `12/2`; fallback `8/1` is for constrained hosts, deterministic high-risk edits, or observed contention.
 - Current policy intent is not “rely on fallbacks,” but “avoid hard failure when local conditions cannot sustain default parallelism.”
+
+### 5.8 Stability evidence for `max_threads = 12`
+- Scope note: this adoption did not include a dedicated synthetic MCP saturation harness run in this task.
+- Evidence used for this decision:
+  - Full CO validation chain and packaging smoke lane passed on this branch after the `12/2` updates (`build`, `lint`, `test`, `docs:check`, `docs:freshness`, `diff-budget`, `review`, `pack:smoke`).
+  - Repeated `npm run review` loops completed clean after remediations, and no thread-exhaustion/tool-routing failures surfaced in this task’s runs.
+- Acceptance basis: adopt `12/2` as the operating default now, with documented fallback profile (`8/1`) and explicit rollback triggers for constrained/high-risk environments.

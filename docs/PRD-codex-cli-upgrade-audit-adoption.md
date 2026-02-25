@@ -54,8 +54,9 @@
 - Architectural Notes: keep implementation mostly in docs/skills/config guidance, plus minimal helper/script updates when they materially improve upgrade operations.
 - Dependencies / Integrations: GitHub release metadata, local `codex` fork state, existing CO validation chain.
 
-## Open Questions
-- Should CO set `12` as the universal max-thread baseline now, or keep workload-dependent defaults with `12` as selected profile?
+## Decision Log
+- Decision (2026-02-25): set `[agents] max_threads = 12` and `[agents] max_depth = 2` as CO defaults, with fallback profile `max_threads = 8` and `max_depth = 1` for constrained or deterministic high-risk lanes.
+- Rationale: CO workloads regularly benefit from higher parallel throughput than upstream defaults, while the documented fallback profile preserves predictable operation under tighter host/tool conditions.
 
 ## Approvals
 - Product: self-approved (task owner)
