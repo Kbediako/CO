@@ -148,7 +148,7 @@ Delegation MCP expects JSONL. Keep `codex-orchestrator` aligned with the current
 - Recommended baseline:
   - `model = "gpt-5.3-codex"`
   - `model_reasoning_effort = "xhigh"`
-  - `[agents] max_threads = 8` (consider 12 only after stability checks)
+  - `[agents] max_threads = 12` with `max_depth = 2` (fall back to `8` or `max_depth = 1` for constrained/high-risk lanes)
   - Set `[agents.explorer]` with no `config_file` so explorer inherits top-level `gpt-5.3-codex`.
   - Add optional `[agents.explorer_fast]` for `gpt-5.3-codex-spark` (text-only caveat).
   - Add `[agents.worker_complex]` for high-risk edits (`gpt-5.3-codex`, `xhigh`).

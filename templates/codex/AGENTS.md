@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp 4f9803271a8209cf58746c0a71d87421952a402c884cc0262a8765fa5c456128 -->
+<!-- codex:instruction-stamp 006ea6b3c62cc2b5aed744a7b20fd2e38d5de73e5fc481ac4b6ecafb0e533fb1 -->
 # Agent Instructions (Template)
 
 ## Orchestrator-first workflow
@@ -55,7 +55,7 @@
 - Keep top-level defaults on latest codex by setting `model = "gpt-5.3-codex"` in `~/.codex/config.toml`.
 - Define a user `agents.explorer` role without `config_file` so built-in explorer inherits top-level model defaults.
 - Spark caveat: `gpt-5.3-codex-spark` is text-only.
-- Use `[agents] max_threads = 8` as the default baseline; raise to `12` only after proving stable tool/runtime behavior.
+- Use `[agents] max_threads = 12` with `max_depth = 2` as the default multi-agent baseline; fall back to `8` or `max_depth = 1` for constrained/high-risk lanes.
 - Add an explicit `worker_complex` role (`gpt-5.3-codex`, `xhigh`) for high-risk implementation streams.
 
 ## Completion discipline (patience-first)

@@ -94,6 +94,10 @@ BEFORE=$(git rev-parse HEAD)
 echo "[codex-cli-refresh] Fetching upstream..."
 git fetch upstream --prune
 
+AHEAD_BEFORE=$(git rev-list --count upstream/main..main)
+BEHIND_BEFORE=$(git rev-list --count main..upstream/main)
+echo "[codex-cli-refresh] Delta vs upstream before sync: ahead=${AHEAD_BEFORE} behind=${BEHIND_BEFORE}"
+
 echo "[codex-cli-refresh] Fast-forwarding to upstream/main..."
 if ! git merge --ff-only upstream/main; then
   echo "Failed to fast-forward. Resolve manually." >&2
@@ -110,8 +114,10 @@ fi
 
 if [[ "$PUSH" -eq 1 ]]; then
   if git remote get-url origin >/dev/null 2>&1; then
-    AHEAD=$(git rev-list --left-right --count origin/main...HEAD | awk '{print $2}')
-    if [[ "$AHEAD" -gt 0 ]]; then
+    ORIGIN_BEHIND=$(git rev-list --left-right --count origin/main...HEAD | awk '{print $1}')
+    ORIGIN_AHEAD=$(git rev-list --left-right --count origin/main...HEAD | awk '{print $2}')
+    echo "[codex-cli-refresh] Delta vs origin/main: ahead=${ORIGIN_AHEAD} behind=${ORIGIN_BEHIND}"
+    if [[ "$ORIGIN_AHEAD" -gt 0 ]]; then
       echo "[codex-cli-refresh] Pushing to origin/main..."
       git push origin main
     else

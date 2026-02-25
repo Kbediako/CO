@@ -122,7 +122,7 @@ For runner + delegation coordination (short `--task` flow), see `docs/delegation
 - Recommended baseline in `~/.codex/config.toml`:
   - `model = "gpt-5.3-codex"`
   - `model_reasoning_effort = "xhigh"`
-  - `[agents] max_threads = 8` (raise to 12 only after proving stability on your machine)
+  - `[agents] max_threads = 12` with `max_depth = 2` (fall back to `8` or `max_depth = 1` for constrained/high-risk lanes)
   - `[agents.explorer]` with no `config_file` so built-in explorer inherits top-level `gpt-5.3-codex`
   - Optional `[agents.explorer_fast]` -> `~/.codex/agents/explorer-fast.toml` (`gpt-5.3-codex-spark`, text-only)
   - `[agents.worker_complex]` -> `~/.codex/agents/worker-complex.toml` (`gpt-5.3-codex`, `xhigh`)
