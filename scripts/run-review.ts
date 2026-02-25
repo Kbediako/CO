@@ -1257,7 +1257,7 @@ function tokenizeShellSegment(segment: string): string[] {
 function normalizeCommandToken(token: string): string {
   const normalized = token.trim().replace(/\\/gu, '/');
   const basename = normalized.split('/').pop() ?? normalized;
-  return basename.replace(/\.exe$/i, '').toLowerCase();
+  return basename.replace(/\.(?:exe|cmd|bat)$/i, '').toLowerCase();
 }
 
 function stripLeadingEnvAssignments(tokens: string[]): string[] {
@@ -1366,10 +1366,11 @@ function hasHeavyCommandTokens(tokens: string[]): boolean {
 }
 
 function isShellCommandFlagWithPayload(flag: string): boolean {
-  if (flag === '/c' || flag === '-c') {
+  const normalized = flag.toLowerCase();
+  if (normalized === '/c' || normalized === '-c') {
     return true;
   }
-  return /^-[^-]*c[^-]*$/u.test(flag);
+  return /^-[^-]*c[^-]*$/u.test(normalized);
 }
 
 function extractShellCommandPayload(tokens: string[]): string | null {
