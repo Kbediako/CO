@@ -194,6 +194,14 @@ fi
         sleep 1
       done
     fi
+    if [[ "$mode" == "heavy-hang-python-module" ]]; then
+      echo "thinking"
+      echo "exec"
+      echo "python -m pytest"
+      while true; do
+        sleep 1
+      done
+    fi
     if [[ "$mode" == "spam" ]]; then
       for i in $(seq 1 200); do
         echo "stdout-$i"
@@ -748,6 +756,23 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     const result = await runReviewCommand(manifestPath, {
       ...baseEnv(sandbox, codexBin),
       RUN_REVIEW_MODE: 'heavy-hang-cmd-wrapper',
+      CODEX_REVIEW_ENFORCE_BOUNDED_MODE: '1',
+      CODEX_REVIEW_TIMEOUT_SECONDS: '60',
+      CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0'
+    });
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).toContain('codex review attempted heavy command in bounded mode');
+    expect(result.stderr).toContain('CODEX_REVIEW_ALLOW_HEAVY_COMMANDS=1');
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('detects heavy commands executed as python -m pytest', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'heavy-hang-python-module',
       CODEX_REVIEW_ENFORCE_BOUNDED_MODE: '1',
       CODEX_REVIEW_TIMEOUT_SECONDS: '60',
       CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0'

@@ -1321,6 +1321,17 @@ function hasHeavyCommandTokens(tokens: string[]): boolean {
     return true;
   }
 
+  if (command === 'python' || command === 'python3' || command === 'py') {
+    for (let index = 0; index < args.length - 1; index += 1) {
+      if ((args[index] ?? '').toLowerCase() !== '-m') {
+        continue;
+      }
+      if (normalizeCommandToken(args[index + 1] ?? '') === 'pytest') {
+        return true;
+      }
+    }
+  }
+
   const firstArg = normalizeCommandToken(args[0] ?? '');
   if (command === 'go' && firstArg === 'test') {
     return true;
