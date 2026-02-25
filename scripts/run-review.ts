@@ -52,8 +52,16 @@ const REVIEW_TELEMETRY_DEBUG_ENV_KEY = 'CODEX_REVIEW_DEBUG_TELEMETRY';
 const REVIEW_DISABLE_DELEGATION_CONFIG_OVERRIDE = 'mcp_servers.delegation.enabled=false';
 const REVIEW_DELEGATION_STARTUP_LINE_RE = /\bmcp:\s*delegation\s+(starting|ready)\b/i;
 const REVIEW_PROGRESS_SIGNAL_LINE_RE = /^(thinking|exec|codex)\b/i;
-const REVIEW_HEAVY_COMMAND_RE =
-  /\b(?:npm|pnpm|yarn|bun)\b(?:\s+[^\s'"`]+)*\s+(?:run\s+)?(?:test|lint|build|typecheck|check|docs:check|docs:freshness)\b|\b(?:pytest|go\s+test|cargo\s+test|mvn\s+test|gradle(?:w)?\s+test)\b/i;
+const REVIEW_HEAVY_SCRIPT_TARGETS = new Set([
+  'test',
+  'lint',
+  'build',
+  'typecheck',
+  'check',
+  'docs:check',
+  'docs:freshness'
+]);
+const REVIEW_SHELL_COMMANDS = new Set(['bash', 'sh', 'zsh', 'ksh', 'fish', 'pwsh', 'powershell']);
 const REVIEW_OUTPUT_SUMMARY_TAIL_LINE_LIMIT = 20;
 const REVIEW_OUTPUT_SUMMARY_HEAVY_COMMAND_LIMIT = 8;
 const REVIEW_OUTPUT_SUMMARY_COMMAND_LIMIT = 64;
@@ -1102,11 +1110,297 @@ function normalizeReviewCommandLine(line: string): string {
   return trimmed;
 }
 
+function splitShellControlSegments(command: string): string[] {
+  if (!command.trim()) {
+    return [];
+  }
+  const segments: string[] = [];
+  let current = '';
+  let quote: '"' | "'" | '`' | null = null;
+  let escaped = false;
+
+  const pushCurrent = () => {
+    const trimmed = current.trim();
+    if (trimmed.length > 0) {
+      segments.push(trimmed);
+    }
+    current = '';
+  };
+
+  for (let index = 0; index < command.length; index += 1) {
+    const char = command[index] ?? '';
+    const next = command[index + 1] ?? '';
+
+    if (escaped) {
+      current += char;
+      escaped = false;
+      continue;
+    }
+
+    if (char === '\\' && quote !== "'") {
+      current += char;
+      escaped = true;
+      continue;
+    }
+
+    if (quote) {
+      if (char === quote) {
+        quote = null;
+      }
+      current += char;
+      continue;
+    }
+
+    if (char === '"' || char === "'" || char === '`') {
+      quote = char;
+      current += char;
+      continue;
+    }
+
+    if (char === ';' || char === '\n') {
+      pushCurrent();
+      continue;
+    }
+
+    if (char === '&') {
+      if (next === '&') {
+        pushCurrent();
+        index += 1;
+        continue;
+      }
+      pushCurrent();
+      continue;
+    }
+
+    if (char === '|') {
+      if (next === '|') {
+        pushCurrent();
+        index += 1;
+        continue;
+      }
+      pushCurrent();
+      continue;
+    }
+
+    current += char;
+  }
+
+  pushCurrent();
+  return segments;
+}
+
+function tokenizeShellSegment(segment: string): string[] {
+  const tokens: string[] = [];
+  let current = '';
+  let quote: '"' | "'" | '`' | null = null;
+  let escaped = false;
+
+  const pushCurrent = () => {
+    if (current.length > 0) {
+      tokens.push(current);
+      current = '';
+    }
+  };
+
+  for (let index = 0; index < segment.length; index += 1) {
+    const char = segment[index] ?? '';
+
+    if (escaped) {
+      current += char;
+      escaped = false;
+      continue;
+    }
+
+    if (char === '\\' && quote !== "'") {
+      escaped = true;
+      continue;
+    }
+
+    if (quote) {
+      if (char === quote) {
+        quote = null;
+        continue;
+      }
+      current += char;
+      continue;
+    }
+
+    if (char === '"' || char === "'" || char === '`') {
+      quote = char;
+      continue;
+    }
+
+    if (/\s/u.test(char)) {
+      pushCurrent();
+      continue;
+    }
+
+    current += char;
+  }
+
+  pushCurrent();
+  return tokens;
+}
+
+function normalizeCommandToken(token: string): string {
+  const normalized = token.trim().replace(/\\/gu, '/');
+  const basename = normalized.split('/').pop() ?? normalized;
+  return basename.replace(/\.exe$/i, '').toLowerCase();
+}
+
+function stripLeadingEnvAssignments(tokens: string[]): string[] {
+  let index = 0;
+  while (index < tokens.length && /^[A-Za-z_][A-Za-z0-9_]*=.*/u.test(tokens[index] ?? '')) {
+    index += 1;
+  }
+  return tokens.slice(index);
+}
+
+function packageOptionConsumesValue(option: string): boolean {
+  if (/^--(?:prefix|workspace|workspaces|filter|cwd)$/iu.test(option)) {
+    return true;
+  }
+  if (/^-(?:C|w)$/iu.test(option)) {
+    return true;
+  }
+  return false;
+}
+
+function resolvePackageScriptTarget(args: string[]): string | null {
+  let index = 0;
+  while (index < args.length) {
+    const token = args[index] ?? '';
+    const normalized = token.toLowerCase();
+
+    if (normalized === '--') {
+      const fallback = args[index + 1];
+      return fallback ? fallback.toLowerCase() : null;
+    }
+
+    if (normalized === 'run') {
+      index += 1;
+      while (index < args.length) {
+        const candidate = args[index] ?? '';
+        const candidateNormalized = candidate.toLowerCase();
+        if (candidateNormalized === '--') {
+          index += 1;
+          continue;
+        }
+        if (candidate.startsWith('-')) {
+          index += packageOptionConsumesValue(candidate) ? 2 : 1;
+          continue;
+        }
+        return candidateNormalized;
+      }
+      return null;
+    }
+
+    if (token.startsWith('-')) {
+      index += packageOptionConsumesValue(token) ? 2 : 1;
+      continue;
+    }
+
+    return normalized;
+  }
+  return null;
+}
+
+function hasHeavyCommandTokens(tokens: string[]): boolean {
+  if (tokens.length === 0) {
+    return false;
+  }
+  const command = normalizeCommandToken(tokens[0] ?? '');
+  const args = tokens.slice(1);
+
+  if (command === 'npm' || command === 'pnpm' || command === 'yarn' || command === 'bun') {
+    const scriptTarget = resolvePackageScriptTarget(args);
+    return scriptTarget !== null && REVIEW_HEAVY_SCRIPT_TARGETS.has(scriptTarget);
+  }
+
+  if (command === 'pytest') {
+    return true;
+  }
+
+  const firstArg = normalizeCommandToken(args[0] ?? '');
+  if (command === 'go' && firstArg === 'test') {
+    return true;
+  }
+  if (command === 'cargo' && firstArg === 'test') {
+    return true;
+  }
+  if (command === 'mvn' || command === 'mvnw' || command === 'gradle' || command === 'gradlew') {
+    return args.some((arg) => {
+      const normalized = normalizeCommandToken(arg);
+      return normalized === 'test' || normalized.endsWith(':test');
+    });
+  }
+
+  return false;
+}
+
+function isShellCommandFlagWithPayload(flag: string): boolean {
+  if (flag === '/c' || flag === '-c') {
+    return true;
+  }
+  return /^-[^-]*c[^-]*$/u.test(flag);
+}
+
+function extractShellCommandPayload(tokens: string[]): string | null {
+  if (tokens.length < 2) {
+    return null;
+  }
+  const command = normalizeCommandToken(tokens[0] ?? '');
+  if (!REVIEW_SHELL_COMMANDS.has(command)) {
+    return null;
+  }
+  for (let index = 1; index < tokens.length; index += 1) {
+    if (!isShellCommandFlagWithPayload(tokens[index] ?? '')) {
+      continue;
+    }
+    const payload = tokens[index + 1];
+    return payload ? payload.trim() : null;
+  }
+  return null;
+}
+
+function detectHeavyReviewCommandFromSegment(segment: string, depth = 0): string | null {
+  const tokens = stripLeadingEnvAssignments(tokenizeShellSegment(segment));
+  if (tokens.length === 0) {
+    return null;
+  }
+
+  if (depth < 3) {
+    const payload = extractShellCommandPayload(tokens);
+    if (payload) {
+      const nestedSegments = splitShellControlSegments(payload);
+      for (const nestedSegment of nestedSegments) {
+        const nestedHeavyCommand = detectHeavyReviewCommandFromSegment(nestedSegment, depth + 1);
+        if (nestedHeavyCommand) {
+          return nestedHeavyCommand;
+        }
+      }
+    }
+  }
+
+  return hasHeavyCommandTokens(tokens) ? segment.trim() : null;
+}
+
+function detectHeavyReviewCommand(line: string): string | null {
+  const segments = splitShellControlSegments(line);
+  for (const segment of segments) {
+    const heavyCommand = detectHeavyReviewCommandFromSegment(segment);
+    if (heavyCommand) {
+      return heavyCommand;
+    }
+  }
+  return null;
+}
+
 function isLikelyReviewCommandLine(line: string): boolean {
   if (!line) {
     return false;
   }
-  if (REVIEW_HEAVY_COMMAND_RE.test(line)) {
+  if (detectHeavyReviewCommand(line)) {
     return true;
   }
   if (/^(?:npm|pnpm|yarn|bun|node|npx|git|bash|sh|zsh|python|pytest|go|cargo|mvn|gradle(?:w)?)\b/i.test(line)) {
@@ -1168,7 +1462,7 @@ async function summarizeReviewOutputLog(outputLogPath: string): Promise<ReviewOu
           commandStarts.shift();
         }
         commandStarts.push(commandLine);
-        if (REVIEW_HEAVY_COMMAND_RE.test(commandLine)) {
+        if (detectHeavyReviewCommand(commandLine)) {
           if (heavyCommandStarts.length < REVIEW_OUTPUT_SUMMARY_HEAVY_COMMAND_LIMIT) {
             heavyCommandStarts.push(commandLine);
           }
@@ -1430,7 +1724,7 @@ function trackReviewCommandSignals(
       continue;
     }
     state.awaitingCommandLine = false;
-    if (blockHeavyCommands && REVIEW_HEAVY_COMMAND_RE.test(commandLine) && !state.blockedHeavyCommand) {
+    if (blockHeavyCommands && detectHeavyReviewCommand(commandLine) && !state.blockedHeavyCommand) {
       state.blockedHeavyCommand = commandLine;
     }
   }

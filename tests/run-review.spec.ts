@@ -129,6 +129,14 @@ fi
         sleep 1
       done
     fi
+    if [[ "$mode" == "heavy-hang-quoted-text" ]]; then
+      echo "thinking"
+      echo "exec"
+      echo "/bin/zsh -lc 'echo npm run test && sleep 120' in /tmp/run-review-heavy"
+      while true; do
+        sleep 1
+      done
+    fi
     if [[ "$mode" == "heavy-hang-cross-stream-warning" ]]; then
       echo "thinking"
       echo "exec"
@@ -648,6 +656,31 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     };
     expect(telemetry.status).toBe('failed');
     expect(telemetry.summary.heavyCommandStarts.length).toBeGreaterThan(0);
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('does not treat quoted heavy-command text as a bounded heavy command', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'heavy-hang-quoted-text',
+      CODEX_REVIEW_ENFORCE_BOUNDED_MODE: '1',
+      CODEX_REVIEW_TIMEOUT_SECONDS: '1',
+      CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0'
+    });
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).toContain('codex review timed out after 1s');
+    expect(result.stderr).not.toContain('attempted heavy command in bounded mode');
+
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      summary: { heavyCommandStarts: string[] };
+    };
+    expect(telemetry.status).toBe('failed');
+    expect(telemetry.summary.heavyCommandStarts.length).toBe(0);
   }, LONG_WAIT_TEST_TIMEOUT_MS);
 
   it('fails bounded enforcement when command lines land on stderr after stdout exec markers', async () => {
