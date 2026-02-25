@@ -243,6 +243,7 @@ function baseEnv(sandbox: string, codexBin: string): Record<string, string | und
   delete env.CODEX_REVIEW_DEBUG_TELEMETRY;
   delete env.CODEX_REVIEW_LARGE_SCOPE_FILE_THRESHOLD;
   delete env.CODEX_REVIEW_LARGE_SCOPE_LINE_THRESHOLD;
+  delete env.CODEX_ORCHESTRATOR_RUN_DIR;
   delete env.SKIP_DIFF_BUDGET;
   delete env.DIFF_BUDGET_STAGE;
   delete env.DIFF_BUDGET_OVERRIDE_REASON;

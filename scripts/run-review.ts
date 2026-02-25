@@ -1891,7 +1891,7 @@ async function runCodexReview(options: RunCodexReviewOptions): Promise<{ preview
 
 async function runDiffBudget(options: CliOptions): Promise<void> {
   const scriptPath = path.join(repoRoot, 'scripts', 'diff-budget.mjs');
-  const relativeScriptPath = path.relative(repoRoot, scriptPath) || scriptPath;
+  const relativeScriptPath = path.relative(repoRoot, scriptPath);
   if (!(await pathExists(scriptPath))) {
     console.log(
       `[run-review] skipping diff budget (missing ${relativeScriptPath}; downstream npm environment detected).`
