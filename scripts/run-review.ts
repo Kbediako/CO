@@ -1257,7 +1257,7 @@ function tokenizeShellSegment(segment: string): string[] {
 function normalizeCommandToken(token: string): string {
   const normalized = token.trim().replace(/\\/gu, '/');
   const basename = normalized.split('/').pop() ?? normalized;
-  return basename.replace(/\.(?:exe|cmd|bat)$/i, '').toLowerCase();
+  return basename.replace(/\.(?:exe|cmd|bat|ps1)$/i, '').toLowerCase();
 }
 
 function stripLeadingEnvAssignments(tokens: string[]): string[] {
