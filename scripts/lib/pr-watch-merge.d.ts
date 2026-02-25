@@ -59,6 +59,15 @@ export interface PrWatchMergeRequiredChecksCache {
   summary: PrWatchMergeCheckSummary;
 }
 
+export interface PrWatchMergeArgsOptions {
+  owner: string;
+  repo: string;
+  prNumber: number;
+  mergeMethod: 'merge' | 'squash' | 'rebase' | string;
+  deleteBranch: boolean;
+  headOid?: string | null;
+}
+
 export function printPrWatchMergeHelp(options?: PrWatchMergeOptions): void;
 
 export function isHumanReviewActor(
@@ -143,5 +152,7 @@ export function resolveBotRereviewTimingForKind(params: {
   completeAtMs: number | null;
   inProgressAtMs: number | null;
 };
+
+export function buildPrMergeArgs(options: PrWatchMergeArgsOptions): string[];
 
 export function runPrWatchMerge(argv: string[], options?: PrWatchMergeOptions): Promise<number>;
