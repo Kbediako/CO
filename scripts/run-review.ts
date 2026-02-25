@@ -1257,7 +1257,7 @@ function stripLeadingEnvAssignments(tokens: string[]): string[] {
 }
 
 function packageOptionConsumesValue(option: string): boolean {
-  if (/^--(?:prefix|workspace|workspaces|filter|cwd)$/iu.test(option)) {
+  if (/^--(?:prefix|workspace|filter|cwd)$/iu.test(option)) {
     return true;
   }
   if (/^-(?:C|w)$/iu.test(option)) {
