@@ -61,6 +61,8 @@ const REVIEW_HEAVY_SCRIPT_TARGETS = new Set([
   'docs:check',
   'docs:freshness'
 ]);
+const REVIEW_PACKAGE_RUN_SUBCOMMAND_ALIASES = new Set(['run', 'run-script', 'rum', 'urn']);
+const REVIEW_PACKAGE_TEST_SUBCOMMAND_ALIASES = new Set(['test', 't', 'tst']);
 const REVIEW_SHELL_COMMANDS = new Set([
   'bash',
   'sh',
@@ -1287,7 +1289,11 @@ function resolvePackageScriptTarget(args: string[]): string | null {
       return fallback ? fallback.toLowerCase() : null;
     }
 
-    if (normalized === 'run') {
+    if (REVIEW_PACKAGE_TEST_SUBCOMMAND_ALIASES.has(normalized)) {
+      return 'test';
+    }
+
+    if (REVIEW_PACKAGE_RUN_SUBCOMMAND_ALIASES.has(normalized)) {
       index += 1;
       while (index < args.length) {
         const candidate = args[index] ?? '';
