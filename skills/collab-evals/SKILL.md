@@ -34,3 +34,8 @@ Use this skill to run repeatable collab evaluation scenarios and record evidence
 - Collab is additive; keep MCP as the control plane for approvals and audit trails.
 - Cap collab event capture with `CODEX_ORCHESTRATOR_COLLAB_MAX_EVENTS` when needed.
 - If pause/resume is required, use control endpoints or `codex-orchestrator resume` with manifest evidence.
+
+## Related skills
+- `collab-subagents-first`: for production stream ownership patterns mirrored in eval scenarios.
+- `delegation-usage`: for delegation MCP setup and lifecycle semantics.
+- `long-poll-wait`: for multi-hour/multi-day eval monitoring with durable checkpoints.

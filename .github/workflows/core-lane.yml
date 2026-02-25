@@ -27,6 +27,35 @@ jobs:
         if: ${{ github.event_name == 'pull_request' }}
         run: echo "BASE_SHA=${{ github.event.pull_request.base.sha }}" >> "$GITHUB_ENV"
 
+      - name: Detect downstream simulation scope
+        id: downstream-smoke
+        shell: bash
+        run: |
+          set -euo pipefail
+          RANGE=""
+          if [[ "${{ github.event_name }}" == "pull_request" ]] && [[ -n "${BASE_SHA:-}" ]]; then
+            RANGE="${BASE_SHA}...HEAD"
+          elif [[ "${{ github.event.before }}" != "" ]] && [[ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]]; then
+            RANGE="${{ github.event.before }}...HEAD"
+          fi
+
+          if [[ -n "${RANGE}" ]]; then
+            CHANGED="$(git diff --name-only "${RANGE}")"
+          else
+            CHANGED="$(git show --name-only --pretty='' HEAD)"
+          fi
+
+          echo "Changed files:"
+          printf '%s\n' "${CHANGED}"
+
+          if printf '%s\n' "${CHANGED}" | grep -Eq '^(bin/|dist/scripts/run-review\.js|scripts/(pack-smoke\.mjs|pack-audit\.mjs|run-review\.ts|lib/)|skills/|orchestrator/src/cli/|package\.json|tsconfig\.build\.json|README\.md|docs/README\.md|docs/AGENTS\.md|docs/standalone-review-guide\.md|docs/skills-release\.md|docs/guides/review-artifacts\.md)'; then
+            echo "required=true" >> "$GITHUB_OUTPUT"
+            echo "Downstream simulation smoke: required"
+          else
+            echo "required=false" >> "$GITHUB_OUTPUT"
+            echo "Downstream simulation smoke: skipped"
+          fi
+
       - name: Resolve diff-budget override (label + reason)
         if: ${{ github.event_name == 'pull_request' }}
         env:
@@ -106,6 +135,10 @@ jobs:
 
       - name: Test
         run: npm run test
+
+      - name: Downstream simulation smoke
+        if: ${{ steps.downstream-smoke.outputs.required == 'true' }}
+        run: npm run pack:smoke
 
       - name: Docs hygiene
         run: npm run docs:check

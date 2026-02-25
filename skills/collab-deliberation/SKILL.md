@@ -91,3 +91,9 @@ Use this skill when the user asks for brainstorming, tradeoffs, option compariso
 - If collab subagents are used, close lifecycle loops per id (`spawn_agent` -> `wait` -> `close_agent`) before finishing.
 - If collab subagents are used, always set explicit `agent_type` (omission defaults to `default`) and prefix spawned prompts with `[agent_type:<role>]`.
 - If you cannot close collab agents (missing ids) and spawn keeps failing, restart the session and re-run deliberation; keep work moving by doing solo deliberation meanwhile.
+
+## Related skills
+- `collab-subagents-first`: for implementation-phase stream ownership and lifecycle after deliberation.
+- `delegation-usage`: for delegation MCP orchestration when decisions require delegated execution.
+- `docs-first`: for turning chosen option into PRD/TECH_SPEC/ACTION_PLAN before edits.
+- `agent-first-adoption-steering`: for non-coercive option framing and advanced-feature nudges.

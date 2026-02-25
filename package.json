@@ -19,6 +19,7 @@
     "dist/bin/**",
     "dist/orchestrator/**",
     "dist/packages/**",
+    "dist/scripts/run-review.js",
     "dist/scripts/design/pipeline/**",
     "dist/scripts/lib/**",
     "dist/types/**",

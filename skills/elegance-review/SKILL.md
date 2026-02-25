@@ -71,3 +71,7 @@ codex review "Find avoidable complexity, duplicate abstractions, and unnecessary
 - Do not broaden scope into unrelated refactors.
 - Do not trade readability for cleverness.
 - If `codex review` is unavailable, run a manual checklist using the same criteria and note that fallback.
+
+## Related skills
+- `standalone-review`: run first to surface correctness/risk findings before simplification.
+- `docs-first`: update specs/notes if simplification changes implementation approach.

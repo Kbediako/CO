@@ -16,6 +16,7 @@ import { createReadStream, createWriteStream } from 'node:fs';
 import { mkdir, readFile, readdir, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
+import { createInterface } from 'node:readline';
 import { promisify } from 'node:util';
 
 import { resolveCodexCommand } from '../orchestrator/src/cli/utils/devtools.js';
@@ -45,9 +46,37 @@ const REVIEW_DISABLE_DELEGATION_MCP_ENV_KEY = 'CODEX_REVIEW_DISABLE_DELEGATION_M
 const REVIEW_MONITOR_INTERVAL_ENV_KEY = 'CODEX_REVIEW_MONITOR_INTERVAL_SECONDS';
 const REVIEW_LARGE_SCOPE_FILE_THRESHOLD_ENV_KEY = 'CODEX_REVIEW_LARGE_SCOPE_FILE_THRESHOLD';
 const REVIEW_LARGE_SCOPE_LINE_THRESHOLD_ENV_KEY = 'CODEX_REVIEW_LARGE_SCOPE_LINE_THRESHOLD';
+const REVIEW_ALLOW_HEAVY_COMMANDS_ENV_KEY = 'CODEX_REVIEW_ALLOW_HEAVY_COMMANDS';
+const REVIEW_ENFORCE_BOUNDED_MODE_ENV_KEY = 'CODEX_REVIEW_ENFORCE_BOUNDED_MODE';
+const REVIEW_TELEMETRY_DEBUG_ENV_KEY = 'CODEX_REVIEW_DEBUG_TELEMETRY';
 const REVIEW_DISABLE_DELEGATION_CONFIG_OVERRIDE = 'mcp_servers.delegation.enabled=false';
 const REVIEW_DELEGATION_STARTUP_LINE_RE = /\bmcp:\s*delegation\s+(starting|ready)\b/i;
 const REVIEW_PROGRESS_SIGNAL_LINE_RE = /^(thinking|exec|codex)\b/i;
+const REVIEW_HEAVY_SCRIPT_TARGETS = new Set([
+  'test',
+  'lint',
+  'build',
+  'typecheck',
+  'check',
+  'docs:check',
+  'docs:freshness'
+]);
+const REVIEW_PACKAGE_RUN_SUBCOMMAND_ALIASES = new Set(['run', 'run-script', 'rum', 'urn']);
+const REVIEW_PACKAGE_TEST_SUBCOMMAND_ALIASES = new Set(['test', 't', 'tst']);
+const REVIEW_SHELL_COMMANDS = new Set([
+  'bash',
+  'sh',
+  'zsh',
+  'ksh',
+  'fish',
+  'pwsh',
+  'powershell',
+  'cmd',
+  'cmd.exe'
+]);
+const REVIEW_OUTPUT_SUMMARY_TAIL_LINE_LIMIT = 20;
+const REVIEW_OUTPUT_SUMMARY_HEAVY_COMMAND_LIMIT = 8;
+const REVIEW_OUTPUT_SUMMARY_COMMAND_LIMIT = 64;
 
 interface CliOptions {
   manifest?: string;
@@ -344,8 +373,6 @@ async function main(): Promise<void> {
   }
   const manifestPath = await resolveManifestPath(options);
 
-  await ensureReviewCommandAvailable();
-
   const relativeManifest = path.relative(repoRoot, manifestPath);
   const taskLabel = options.task ?? process.env.MCP_RUNNER_TASK_ID ?? process.env.TASK ?? 'unknown-task';
   const notes = process.env.NOTES?.trim();
@@ -379,6 +406,29 @@ async function main(): Promise<void> {
     '',
     'Call out any remaining documentation/code mismatches or guardrail violations.'
   );
+  const allowHeavyCommands = allowHeavyReviewCommands();
+  const enforceBoundedMode = !allowHeavyCommands && enforceBoundedReviewMode();
+  if (allowHeavyCommands) {
+    console.log(
+      `[run-review] heavy review commands allowed (${REVIEW_ALLOW_HEAVY_COMMANDS_ENV_KEY}=1).`
+    );
+  } else {
+    console.log(
+      `[run-review] bounded review guidance enabled by default (set ${REVIEW_ALLOW_HEAVY_COMMANDS_ENV_KEY}=1 to opt into unrestricted heavy-command execution).`
+    );
+    if (enforceBoundedMode) {
+      console.log(
+        `[run-review] bounded enforcement enabled (${REVIEW_ENFORCE_BOUNDED_MODE_ENV_KEY}=1); heavy command starts will terminate the review.`
+      );
+    }
+    promptLines.push(
+      '',
+      'Execution constraints (bounded review mode):',
+      '- Keep this review focused on changed files and nearby dependencies.',
+      '- Avoid full validation suites (for example `npm run test`, `npm run lint`, `npm run build`) during this pass.',
+      '- If broader validation would improve confidence, list follow-up commands instead of executing them.'
+    );
+  }
 
   const scopeNotes = await buildScopeNotes(options);
   if (scopeNotes.length > 0) {
@@ -506,6 +556,7 @@ async function main(): Promise<void> {
       args: resolved.args,
       env: reviewEnv,
       stdio: nonInteractive ? ['ignore', 'pipe', 'pipe'] : ['inherit', 'pipe', 'pipe'],
+      blockHeavyCommands: enforceBoundedMode,
       timeoutMs,
       stallTimeoutMs,
       startupLoopTimeoutMs,
@@ -513,10 +564,35 @@ async function main(): Promise<void> {
       monitorIntervalMs,
       outputLogPath: artifactPaths.outputLogPath
     });
+  const writeTelemetry = async (
+    status: 'succeeded' | 'failed',
+    errorMessage?: string | null
+  ): Promise<ReviewOutputSummary | null> => {
+    try {
+      return await persistReviewTelemetry({
+        telemetryPath: artifactPaths.telemetryPath,
+        outputLogPath: artifactPaths.outputLogPath,
+        status,
+        error: errorMessage ?? null
+      });
+    } catch (telemetryError) {
+      const telemetryMessage = telemetryError instanceof Error ? telemetryError.message : String(telemetryError);
+      console.error(`[run-review] failed to persist review telemetry: ${telemetryMessage}`);
+      return null;
+    }
+  };
 
   try {
     await runReview(resolvedScoped);
+    const telemetrySummary = await writeTelemetry('succeeded');
     console.log(`Review output saved to: ${path.relative(repoRoot, artifactPaths.outputLogPath)}`);
+    if (telemetrySummary) {
+      console.log(`Review telemetry saved to: ${path.relative(repoRoot, artifactPaths.telemetryPath)}`);
+    } else {
+      console.warn(
+        `[run-review] review telemetry unavailable (persistence failed); see earlier telemetry error logs.`
+      );
+    }
   } catch (error) {
     if (shouldRetryWithoutScopeFlags(error)) {
       console.log('[run-review] codex CLI rejected scope flags with a custom prompt; retrying without flags.');
@@ -527,7 +603,15 @@ async function main(): Promise<void> {
       const resolvedUnscoped = resolveReviewCommand(unscopedArgs);
       try {
         await runReview(resolvedUnscoped);
+        const telemetrySummary = await writeTelemetry('succeeded');
         console.log(`Review output saved to: ${path.relative(repoRoot, artifactPaths.outputLogPath)}`);
+        if (telemetrySummary) {
+          console.log(`Review telemetry saved to: ${path.relative(repoRoot, artifactPaths.telemetryPath)}`);
+        } else {
+          console.warn(
+            `[run-review] review telemetry unavailable (persistence failed); see earlier telemetry error logs.`
+          );
+        }
         return;
       } catch (retryError) {
         await maybeCaptureReviewFailureIssueLog({
@@ -537,6 +621,11 @@ async function main(): Promise<void> {
           manifestPath,
           outputLogPath: artifactPaths.outputLogPath
         });
+        const retryMessage = retryError instanceof Error ? retryError.message : String(retryError);
+        const telemetrySummary = await writeTelemetry('failed', retryMessage);
+        if (telemetrySummary) {
+          logReviewTelemetrySummary(telemetrySummary, artifactPaths.telemetryPath);
+        }
         if (retryError instanceof CodexReviewError && retryError.timedOut) {
           console.error(`Review output log (partial): ${path.relative(repoRoot, artifactPaths.outputLogPath)}`);
         }
@@ -550,6 +639,11 @@ async function main(): Promise<void> {
       manifestPath,
       outputLogPath: artifactPaths.outputLogPath
     });
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const telemetrySummary = await writeTelemetry('failed', errorMessage);
+    if (telemetrySummary) {
+      logReviewTelemetrySummary(telemetrySummary, artifactPaths.telemetryPath);
+    }
     if (error instanceof CodexReviewError && error.timedOut) {
       console.error(`Review output log (partial): ${path.relative(repoRoot, artifactPaths.outputLogPath)}`);
     }
@@ -931,6 +1025,7 @@ interface ReviewArtifactPaths {
   reviewDir: string;
   promptPath: string;
   outputLogPath: string;
+  telemetryPath: string;
 }
 
 function resolveReviewArtifactsDir(manifestPath: string): string {
@@ -945,10 +1040,11 @@ async function prepareReviewArtifacts(manifestPath: string, prompt: string): Pro
 
   const promptPath = path.join(reviewDir, 'prompt.txt');
   const outputLogPath = path.join(reviewDir, 'output.log');
+  const telemetryPath = path.join(reviewDir, 'telemetry.json');
 
   await writeFile(promptPath, `${prompt}\n`, 'utf8');
 
-  return { reviewDir, promptPath, outputLogPath };
+  return { reviewDir, promptPath, outputLogPath, telemetryPath };
 }
 
 interface ReviewFailureIssueLogOptions {
@@ -991,6 +1087,577 @@ async function maybeCaptureReviewFailureIssueLog(
     console.error(`[run-review] failed to capture review issue log: ${message}`);
     return null;
   }
+}
+
+interface ReviewOutputSummary {
+  lineCount: number;
+  commandStarts: string[];
+  completionCount: number;
+  startupEvents: number;
+  reviewProgressSignals: number;
+  heavyCommandStarts: string[];
+  lastLines: string[];
+}
+
+interface PersistReviewTelemetryOptions {
+  telemetryPath: string;
+  outputLogPath: string;
+  status: 'succeeded' | 'failed';
+  error?: string | null;
+}
+
+function normalizeReviewCommandLine(line: string): string {
+  const trimmed = line.trim();
+  if (!trimmed) {
+    return '';
+  }
+  const succeededIndex = trimmed.indexOf(' succeeded in ');
+  if (succeededIndex >= 0) {
+    return trimmed.slice(0, succeededIndex).trimEnd();
+  }
+  const exitedIndex = trimmed.indexOf(' exited ');
+  if (exitedIndex >= 0) {
+    return trimmed.slice(0, exitedIndex).trimEnd();
+  }
+  return trimmed;
+}
+
+function splitShellControlSegments(command: string): string[] {
+  if (!command.trim()) {
+    return [];
+  }
+  const segments: string[] = [];
+  let current = '';
+  let quote: '"' | "'" | '`' | null = null;
+  let escaped = false;
+
+  const pushCurrent = () => {
+    const trimmed = current.trim();
+    if (trimmed.length > 0) {
+      segments.push(trimmed);
+    }
+    current = '';
+  };
+
+  for (let index = 0; index < command.length; index += 1) {
+    const char = command[index] ?? '';
+    const next = command[index + 1] ?? '';
+
+    if (escaped) {
+      current += char;
+      escaped = false;
+      continue;
+    }
+
+    if (char === '\\' && quote !== "'") {
+      current += char;
+      escaped = true;
+      continue;
+    }
+
+    if (quote) {
+      if (char === quote) {
+        quote = null;
+      }
+      current += char;
+      continue;
+    }
+
+    if (char === '"' || char === "'" || char === '`') {
+      quote = char;
+      current += char;
+      continue;
+    }
+
+    if (char === ';' || char === '\n') {
+      pushCurrent();
+      continue;
+    }
+
+    if (char === '&') {
+      if (next === '&') {
+        pushCurrent();
+        index += 1;
+        continue;
+      }
+      pushCurrent();
+      continue;
+    }
+
+    if (char === '|') {
+      if (next === '|') {
+        pushCurrent();
+        index += 1;
+        continue;
+      }
+      pushCurrent();
+      continue;
+    }
+
+    current += char;
+  }
+
+  pushCurrent();
+  return segments;
+}
+
+function tokenizeShellSegment(segment: string): string[] {
+  const tokens: string[] = [];
+  let current = '';
+  let quote: '"' | "'" | '`' | null = null;
+  let escaped = false;
+
+  const pushCurrent = () => {
+    if (current.length > 0) {
+      tokens.push(current);
+      current = '';
+    }
+  };
+
+  for (let index = 0; index < segment.length; index += 1) {
+    const char = segment[index] ?? '';
+
+    if (escaped) {
+      current += char;
+      escaped = false;
+      continue;
+    }
+
+    if (char === '\\' && quote !== "'") {
+      escaped = true;
+      continue;
+    }
+
+    if (quote) {
+      if (char === quote) {
+        quote = null;
+        continue;
+      }
+      current += char;
+      continue;
+    }
+
+    if (char === '"' || char === "'" || char === '`') {
+      quote = char;
+      continue;
+    }
+
+    if (/\s/u.test(char)) {
+      pushCurrent();
+      continue;
+    }
+
+    current += char;
+  }
+
+  pushCurrent();
+  return tokens;
+}
+
+function normalizeCommandToken(token: string): string {
+  const normalized = token.trim().replace(/\\/gu, '/');
+  const basename = normalized.split('/').pop() ?? normalized;
+  return basename.replace(/\.(?:exe|cmd|bat|ps1)$/i, '').toLowerCase();
+}
+
+function stripLeadingEnvAssignments(tokens: string[]): string[] {
+  let index = 0;
+  while (index < tokens.length && /^[A-Za-z_][A-Za-z0-9_]*=.*/u.test(tokens[index] ?? '')) {
+    index += 1;
+  }
+  return tokens.slice(index);
+}
+
+function packageOptionConsumesValue(option: string): boolean {
+  if (/^--(?:prefix|workspace|filter|cwd)$/iu.test(option)) {
+    return true;
+  }
+  if (/^-(?:C|w)$/iu.test(option)) {
+    return true;
+  }
+  return false;
+}
+
+function resolvePackageScriptTarget(args: string[]): string | null {
+  let index = 0;
+  while (index < args.length) {
+    const token = args[index] ?? '';
+    const normalized = token.toLowerCase();
+
+    if (normalized === '--') {
+      const fallback = args[index + 1];
+      return fallback ? fallback.toLowerCase() : null;
+    }
+
+    if (REVIEW_PACKAGE_TEST_SUBCOMMAND_ALIASES.has(normalized)) {
+      return 'test';
+    }
+
+    if (REVIEW_PACKAGE_RUN_SUBCOMMAND_ALIASES.has(normalized)) {
+      index += 1;
+      while (index < args.length) {
+        const candidate = args[index] ?? '';
+        const candidateNormalized = candidate.toLowerCase();
+        if (candidateNormalized === '--') {
+          index += 1;
+          continue;
+        }
+        if (candidate.startsWith('-')) {
+          index += packageOptionConsumesValue(candidate) ? 2 : 1;
+          continue;
+        }
+        return candidateNormalized;
+      }
+      return null;
+    }
+
+    if (token.startsWith('-')) {
+      index += packageOptionConsumesValue(token) ? 2 : 1;
+      continue;
+    }
+
+    return normalized;
+  }
+  return null;
+}
+
+function unwrapEnvCommandTokens(tokens: string[]): string[] {
+  if (tokens.length === 0 || normalizeCommandToken(tokens[0] ?? '') !== 'env') {
+    return tokens;
+  }
+
+  let index = 1;
+  while (index < tokens.length) {
+    const token = tokens[index] ?? '';
+    const normalized = token.toLowerCase();
+
+    if (token === '--') {
+      index += 1;
+      break;
+    }
+
+    if (/^[A-Za-z_][A-Za-z0-9_]*=.*/u.test(token)) {
+      index += 1;
+      continue;
+    }
+
+    if (normalized === '-u' || normalized === '--unset') {
+      index += 2;
+      continue;
+    }
+
+    if (normalized.startsWith('--unset=')) {
+      index += 1;
+      continue;
+    }
+
+    if (token.startsWith('-')) {
+      index += 1;
+      continue;
+    }
+
+    break;
+  }
+
+  return tokens.slice(index);
+}
+
+function hasHeavyCommandTokens(tokens: string[]): boolean {
+  if (tokens.length === 0) {
+    return false;
+  }
+  const unwrappedTokens = unwrapEnvCommandTokens(tokens);
+  if (unwrappedTokens.length === 0) {
+    return false;
+  }
+
+  if (unwrappedTokens.length !== tokens.length) {
+    return hasHeavyCommandTokens(unwrappedTokens);
+  }
+
+  const command = normalizeCommandToken(unwrappedTokens[0] ?? '');
+  const args = unwrappedTokens.slice(1);
+
+  if (command === 'npm' || command === 'pnpm' || command === 'yarn' || command === 'bun') {
+    const scriptTarget = resolvePackageScriptTarget(args);
+    return scriptTarget !== null && REVIEW_HEAVY_SCRIPT_TARGETS.has(scriptTarget);
+  }
+
+  if (command === 'pytest') {
+    return true;
+  }
+
+  if (command === 'python' || command === 'python3' || command === 'py') {
+    for (let index = 0; index < args.length - 1; index += 1) {
+      if ((args[index] ?? '').toLowerCase() !== '-m') {
+        continue;
+      }
+      if (normalizeCommandToken(args[index + 1] ?? '') === 'pytest') {
+        return true;
+      }
+    }
+  }
+
+  const firstArg = normalizeCommandToken(args[0] ?? '');
+  if (command === 'go' && firstArg === 'test') {
+    return true;
+  }
+  if (command === 'cargo' && firstArg === 'test') {
+    return true;
+  }
+  if (command === 'mvn' || command === 'mvnw' || command === 'gradle' || command === 'gradlew') {
+    return args.some((arg) => {
+      const normalized = normalizeCommandToken(arg);
+      return normalized === 'test' || normalized.endsWith(':test');
+    });
+  }
+
+  return false;
+}
+
+function isShellCommandFlagWithPayload(flag: string): boolean {
+  const normalized = flag.toLowerCase();
+  if (normalized === '/c' || normalized === '-c') {
+    return true;
+  }
+  return /^-[^-]*c[^-]*$/u.test(normalized);
+}
+
+function extractShellCommandPayload(tokens: string[]): string | null {
+  if (tokens.length < 2) {
+    return null;
+  }
+  const command = normalizeCommandToken(tokens[0] ?? '');
+  if (!REVIEW_SHELL_COMMANDS.has(command)) {
+    return null;
+  }
+  for (let index = 1; index < tokens.length; index += 1) {
+    if (!isShellCommandFlagWithPayload(tokens[index] ?? '')) {
+      continue;
+    }
+    if (command === 'cmd') {
+      const payload = tokens.slice(index + 1).join(' ').trim();
+      return payload.length > 0 ? payload : null;
+    }
+    const payload = tokens[index + 1];
+    return payload ? payload.trim() : null;
+  }
+  return null;
+}
+
+function detectHeavyReviewCommandFromSegment(segment: string, depth = 0): string | null {
+  const tokens = stripLeadingEnvAssignments(tokenizeShellSegment(segment));
+  if (tokens.length === 0) {
+    return null;
+  }
+
+  if (depth < 3) {
+    const payload = extractShellCommandPayload(tokens);
+    if (payload) {
+      const nestedSegments = splitShellControlSegments(payload);
+      for (const nestedSegment of nestedSegments) {
+        const nestedHeavyCommand = detectHeavyReviewCommandFromSegment(nestedSegment, depth + 1);
+        if (nestedHeavyCommand) {
+          return nestedHeavyCommand;
+        }
+      }
+    }
+  }
+
+  return hasHeavyCommandTokens(tokens) ? segment.trim() : null;
+}
+
+function detectHeavyReviewCommand(line: string): string | null {
+  const segments = splitShellControlSegments(line);
+  for (const segment of segments) {
+    const heavyCommand = detectHeavyReviewCommandFromSegment(segment);
+    if (heavyCommand) {
+      return heavyCommand;
+    }
+  }
+  return null;
+}
+
+function isLikelyReviewCommandLine(line: string): boolean {
+  if (!line) {
+    return false;
+  }
+  if (detectHeavyReviewCommand(line)) {
+    return true;
+  }
+  if (/^(?:npm|pnpm|yarn|bun|node|npx|git|bash|sh|zsh|python|pytest|go|cargo|mvn|gradle(?:w)?)\b/i.test(line)) {
+    return true;
+  }
+  if (line.includes(' in ') && /\s-\w+\s+/u.test(line)) {
+    return true;
+  }
+  return false;
+}
+
+async function summarizeReviewOutputLog(outputLogPath: string): Promise<ReviewOutputSummary | null> {
+  if (!(await pathExists(outputLogPath))) {
+    return null;
+  }
+
+  const lineReader = createInterface({
+    input: createReadStream(outputLogPath, { encoding: 'utf8' }),
+    crlfDelay: Infinity
+  });
+
+  const commandStarts: string[] = [];
+  const heavyCommandStarts: string[] = [];
+  const lastLines: string[] = [];
+  let lineCount = 0;
+  let completionCount = 0;
+  let startupEvents = 0;
+  let reviewProgressSignals = 0;
+  let awaitingCommandLine = false;
+
+  for await (const rawLine of lineReader) {
+    lineCount += 1;
+    const line = String(rawLine ?? '').trimEnd();
+    const trimmed = line.trim();
+
+    if (trimmed.length > 0) {
+      lastLines.push(trimmed);
+      if (lastLines.length > REVIEW_OUTPUT_SUMMARY_TAIL_LINE_LIMIT) {
+        lastLines.shift();
+      }
+    }
+
+    if (REVIEW_DELEGATION_STARTUP_LINE_RE.test(trimmed)) {
+      startupEvents += 1;
+    }
+    if (REVIEW_PROGRESS_SIGNAL_LINE_RE.test(trimmed)) {
+      reviewProgressSignals += 1;
+    }
+
+    if (trimmed === 'exec') {
+      awaitingCommandLine = true;
+      continue;
+    }
+
+    if (awaitingCommandLine && trimmed.length > 0) {
+      const commandLine = normalizeReviewCommandLine(trimmed);
+      if (isLikelyReviewCommandLine(commandLine)) {
+        if (commandStarts.length >= REVIEW_OUTPUT_SUMMARY_COMMAND_LIMIT) {
+          commandStarts.shift();
+        }
+        commandStarts.push(commandLine);
+        if (detectHeavyReviewCommand(commandLine)) {
+          if (heavyCommandStarts.length < REVIEW_OUTPUT_SUMMARY_HEAVY_COMMAND_LIMIT) {
+            heavyCommandStarts.push(commandLine);
+          }
+        }
+        awaitingCommandLine = false;
+      } else if (REVIEW_PROGRESS_SIGNAL_LINE_RE.test(trimmed) || /\bsucceeded in\b|\bexited\b/i.test(trimmed)) {
+        awaitingCommandLine = false;
+      }
+    }
+
+    if (/\bsucceeded in\b|\bexited\b/i.test(trimmed)) {
+      completionCount += 1;
+    }
+  }
+
+  return {
+    lineCount,
+    commandStarts,
+    completionCount,
+    startupEvents,
+    reviewProgressSignals,
+    heavyCommandStarts,
+    lastLines
+  };
+}
+
+async function persistReviewTelemetry(options: PersistReviewTelemetryOptions): Promise<ReviewOutputSummary | null> {
+  const summary = await summarizeReviewOutputLog(options.outputLogPath);
+  const includeRawTelemetry = envFlagEnabled(process.env[REVIEW_TELEMETRY_DEBUG_ENV_KEY]);
+  const persistedSummary = sanitizeTelemetrySummaryForPersistence(
+    summary,
+    includeRawTelemetry
+  );
+  const payload = {
+    version: 1,
+    generated_at: new Date().toISOString(),
+    status: options.status,
+    error: sanitizeTelemetryErrorForPersistence(options.error ?? null, includeRawTelemetry),
+    output_log_path: path.relative(repoRoot, options.outputLogPath),
+    summary: persistedSummary
+  };
+  await writeFile(options.telemetryPath, `${JSON.stringify(payload, null, 2)}\n`, 'utf8');
+  return summary;
+}
+
+function sanitizeTelemetrySummaryForPersistence(
+  summary: ReviewOutputSummary | null,
+  includeRawTelemetry: boolean
+): ReviewOutputSummary | null {
+  if (!summary || includeRawTelemetry) {
+    return summary;
+  }
+  return {
+    ...summary,
+    commandStarts: redactTelemetryLines(summary.commandStarts, 'command'),
+    heavyCommandStarts: redactTelemetryLines(summary.heavyCommandStarts, 'heavy-command'),
+    lastLines: redactTelemetryLines(summary.lastLines, 'output-line')
+  };
+}
+
+function redactTelemetryLines(lines: string[], label: string): string[] {
+  return lines.map(
+    (_line, index) =>
+      `[redacted ${label} ${index + 1}; set ${REVIEW_TELEMETRY_DEBUG_ENV_KEY}=1 to persist raw values]`
+  );
+}
+
+function sanitizeTelemetryErrorForPersistence(error: string | null, includeRawTelemetry: boolean): string | null {
+  if (!error || includeRawTelemetry) {
+    return error;
+  }
+  return `[redacted error; set ${REVIEW_TELEMETRY_DEBUG_ENV_KEY}=1 to persist raw values]`;
+}
+
+function logReviewTelemetrySummary(summary: ReviewOutputSummary, telemetryPath: string): void {
+  const debugTelemetry = envFlagEnabled(process.env[REVIEW_TELEMETRY_DEBUG_ENV_KEY]);
+  console.error(
+    `[run-review] review telemetry: ${summary.commandStarts.length} command start(s), ${summary.heavyCommandStarts.length} heavy command start(s), ${summary.startupEvents} delegation startup event(s), ${summary.reviewProgressSignals} review progress signal(s).`
+  );
+  const lastCommand = summary.commandStarts.at(-1);
+  if (lastCommand) {
+    if (debugTelemetry) {
+      console.error(`[run-review] last command started: ${lastCommand}`);
+    } else {
+      console.error(
+        `[run-review] last command started: [redacted] (set ${REVIEW_TELEMETRY_DEBUG_ENV_KEY}=1 to print raw command text).`
+      );
+    }
+  }
+  if (summary.completionCount < summary.commandStarts.length) {
+    console.error(
+      `[run-review] command completions observed: ${summary.completionCount}; possible in-flight command at termination.`
+    );
+  }
+  if (summary.heavyCommandStarts.length > 0) {
+    if (debugTelemetry) {
+      console.error(`[run-review] heavy commands detected: ${summary.heavyCommandStarts.join(' | ')}`);
+    } else {
+      console.error(
+        `[run-review] heavy commands detected: ${summary.heavyCommandStarts.length} sample(s) captured (set ${REVIEW_TELEMETRY_DEBUG_ENV_KEY}=1 to print raw command text).`
+      );
+    }
+  }
+  if (summary.lastLines.length > 0) {
+    if (debugTelemetry) {
+      console.error(`[run-review] output tail: ${summary.lastLines.join(' || ')}`);
+    } else {
+      console.error(
+        `[run-review] output tail captured: ${summary.lastLines.length} line(s) hidden by default (set ${REVIEW_TELEMETRY_DEBUG_ENV_KEY}=1 to print raw tail).`
+      );
+    }
+  }
+  console.error(`[run-review] review telemetry saved to: ${path.relative(repoRoot, telemetryPath)}`);
 }
 
 class CodexReviewError extends Error {
@@ -1042,6 +1709,7 @@ interface RunCodexReviewOptions {
   args: string[];
   env: Record<string, string | undefined>;
   stdio: StdioOptions;
+  blockHeavyCommands: boolean;
   timeoutMs: number | null;
   stallTimeoutMs: number | null;
   startupLoopTimeoutMs: number | null;
@@ -1055,6 +1723,13 @@ interface ReviewStartupLoopState {
   reviewProgressObserved: boolean;
   pendingStdoutFragment: string;
   pendingStderrFragment: string;
+}
+
+interface ReviewCommandSignalState {
+  awaitingCommandLine: boolean;
+  pendingStdoutFragment: string;
+  pendingStderrFragment: string;
+  blockedHeavyCommand: string | null;
 }
 
 function trackReviewStartupLoopSignals(
@@ -1089,6 +1764,50 @@ function trackReviewStartupLoopSignals(
     if (REVIEW_PROGRESS_SIGNAL_LINE_RE.test(trimmed)) {
       state.reviewProgressObserved = true;
       return;
+    }
+  }
+}
+
+function trackReviewCommandSignals(
+  chunk: string,
+  state: ReviewCommandSignalState,
+  stream: 'stdout' | 'stderr',
+  blockHeavyCommands: boolean
+): void {
+  const pendingFragment = stream === 'stdout'
+    ? state.pendingStdoutFragment
+    : state.pendingStderrFragment;
+  const combined = `${pendingFragment}${chunk}`;
+  const lines = combined.split(/\r?\n/u);
+  const nextPendingFragment = lines.pop() ?? '';
+  if (stream === 'stdout') {
+    state.pendingStdoutFragment = nextPendingFragment;
+  } else {
+    state.pendingStderrFragment = nextPendingFragment;
+  }
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) {
+      continue;
+    }
+    if (trimmed === 'exec') {
+      state.awaitingCommandLine = true;
+      continue;
+    }
+    if (!state.awaitingCommandLine) {
+      continue;
+    }
+    const commandLine = normalizeReviewCommandLine(trimmed);
+    if (!isLikelyReviewCommandLine(commandLine)) {
+      if (REVIEW_PROGRESS_SIGNAL_LINE_RE.test(trimmed) || /\bsucceeded in\b|\bexited\b/i.test(trimmed)) {
+        state.awaitingCommandLine = false;
+      }
+      continue;
+    }
+    state.awaitingCommandLine = false;
+    if (blockHeavyCommands && detectHeavyReviewCommand(commandLine) && !state.blockedHeavyCommand) {
+      state.blockedHeavyCommand = commandLine;
     }
   }
 }
@@ -1156,6 +1875,10 @@ async function runCodexReview(options: RunCodexReviewOptions): Promise<{ preview
   });
 
   const outputStream = createWriteStream(options.outputLogPath, { flags: 'w' });
+  const outputClosed = new Promise<void>((resolve) => {
+    outputStream.once('close', () => resolve());
+    outputStream.once('error', () => resolve());
+  });
   const uninstallSignalForwarders = installSignalForwarders(child, detached);
   let preview = '';
   let lastOutputAtMs = Date.now();
@@ -1164,6 +1887,12 @@ async function runCodexReview(options: RunCodexReviewOptions): Promise<{ preview
     reviewProgressObserved: false,
     pendingStdoutFragment: '',
     pendingStderrFragment: ''
+  };
+  const commandSignalState: ReviewCommandSignalState = {
+    awaitingCommandLine: false,
+    pendingStdoutFragment: '',
+    pendingStderrFragment: '',
+    blockedHeavyCommand: null
   };
 
   const capture = (chunk: Buffer, target: NodeJS.WriteStream, stream: 'stdout' | 'stderr') => {
@@ -1174,6 +1903,7 @@ async function runCodexReview(options: RunCodexReviewOptions): Promise<{ preview
     writeToStreamSafely(target, chunk);
     const next = chunk.toString('utf8');
     trackReviewStartupLoopSignals(next, startupLoopState, stream);
+    trackReviewCommandSignals(next, commandSignalState, stream, options.blockHeavyCommands);
     if (preview.length < REVIEW_OUTPUT_PREVIEW_LIMIT) {
       preview = `${preview}${next}`.slice(0, REVIEW_OUTPUT_PREVIEW_LIMIT);
     }
@@ -1184,7 +1914,12 @@ async function runCodexReview(options: RunCodexReviewOptions): Promise<{ preview
   child.stdout?.on('data', onStdout);
   child.stderr?.on('data', onStderr);
 
+  let cleanedUp = false;
   const cleanup = () => {
+    if (cleanedUp) {
+      return;
+    }
+    cleanedUp = true;
     uninstallSignalForwarders();
     child.stdout?.off('data', onStdout);
     child.stderr?.off('data', onStderr);
@@ -1202,14 +1937,18 @@ async function runCodexReview(options: RunCodexReviewOptions): Promise<{ preview
       startupLoopTimeoutMs: options.startupLoopTimeoutMs,
       startupLoopMinEvents: options.startupLoopMinEvents,
       monitorIntervalMs: options.monitorIntervalMs,
+      blockHeavyCommands: options.blockHeavyCommands,
       getLastOutputAtMs: () => lastOutputAtMs,
       getStartupLoopState: () => startupLoopState,
+      getBlockedHeavyCommand: () => commandSignalState.blockedHeavyCommand,
       detached,
       onCleanup: cleanup
     });
+    await outputClosed;
     return { preview };
   } catch (error) {
     cleanup();
+    await outputClosed;
     if (error instanceof CodexReviewError) {
       error.outputPreview = preview || error.outputPreview;
     }
@@ -1218,7 +1957,15 @@ async function runCodexReview(options: RunCodexReviewOptions): Promise<{ preview
 }
 
 async function runDiffBudget(options: CliOptions): Promise<void> {
-  const args = ['scripts/diff-budget.mjs'];
+  const scriptPath = path.join(repoRoot, 'scripts', 'diff-budget.mjs');
+  const relativeScriptPath = path.relative(repoRoot, scriptPath);
+  if (!(await pathExists(scriptPath))) {
+    console.log(
+      `[run-review] skipping diff budget (missing ${relativeScriptPath}; downstream npm environment detected).`
+    );
+    return;
+  }
+  const args = [scriptPath];
 
   if (options.commit) {
     args.push('--commit', options.commit);
@@ -1249,6 +1996,22 @@ function envFlagEnabled(value: string | undefined): boolean {
   }
   const normalized = value.trim().toLowerCase();
   return normalized === '1' || normalized === 'true' || normalized === 'yes';
+}
+
+function formatBoundedHeavyCommandFailure(blockedCommand: string): string {
+  const guidance = `Set ${REVIEW_ALLOW_HEAVY_COMMANDS_ENV_KEY}=1 to allow full validation commands.`;
+  if (!envFlagEnabled(process.env[REVIEW_TELEMETRY_DEBUG_ENV_KEY])) {
+    return `codex review attempted heavy command in bounded mode. ${guidance}`;
+  }
+  return `codex review attempted heavy command in bounded mode: ${blockedCommand}. ${guidance}`;
+}
+
+function allowHeavyReviewCommands(): boolean {
+  return envFlagEnabled(process.env[REVIEW_ALLOW_HEAVY_COMMANDS_ENV_KEY]);
+}
+
+function enforceBoundedReviewMode(): boolean {
+  return envFlagEnabled(process.env[REVIEW_ENFORCE_BOUNDED_MODE_ENV_KEY]);
 }
 
 function shouldForceNonInteractive(): boolean {
@@ -1368,8 +2131,10 @@ interface WaitForChildExitOptions {
   startupLoopTimeoutMs: number | null;
   startupLoopMinEvents: number;
   monitorIntervalMs: number | null;
+  blockHeavyCommands: boolean;
   getLastOutputAtMs: () => number;
   getStartupLoopState: () => ReviewStartupLoopState;
+  getBlockedHeavyCommand: () => string | null;
   detached: boolean;
   onCleanup?: () => void;
 }
@@ -1384,6 +2149,7 @@ async function waitForChildExit(
     let stallHandle: NodeJS.Timeout | undefined;
     let startupLoopHandle: NodeJS.Timeout | undefined;
     let monitorHandle: NodeJS.Timeout | undefined;
+    let heavyCommandHandle: NodeJS.Timeout | undefined;
     let killHandle: NodeJS.Timeout | undefined;
     let hardKillArmed = false;
     const startMs = Date.now();
@@ -1400,6 +2166,9 @@ async function waitForChildExit(
       }
       if (monitorHandle) {
         clearInterval(monitorHandle);
+      }
+      if (heavyCommandHandle) {
+        clearInterval(heavyCommandHandle);
       }
       if (killHandle && !hardKillArmed) {
         clearTimeout(killHandle);
@@ -1428,6 +2197,21 @@ async function waitForChildExit(
       }
       settled = true;
       cleanup();
+      const blockedCommand = options.getBlockedHeavyCommand();
+      if (code === 0 && options.blockHeavyCommands && blockedCommand) {
+        reject(
+          new CodexReviewError(
+            formatBoundedHeavyCommandFailure(blockedCommand),
+            {
+              exitCode: 1,
+              signal: null,
+              timedOut: false,
+              outputPreview: ''
+            }
+          )
+        );
+        return;
+      }
       if (code === 0) {
         resolve();
         return;
@@ -1446,7 +2230,7 @@ async function waitForChildExit(
     child.once('error', onError);
     child.once('close', onClose);
 
-    const requestTermination = (message: string) => {
+    const requestTermination = (message: string, timedOut = true) => {
       if (settled) {
         return;
       }
@@ -1464,7 +2248,7 @@ async function waitForChildExit(
         new CodexReviewError(message, {
           exitCode: 1,
           signal: null,
-          timedOut: true,
+          timedOut,
           outputPreview: ''
         })
       );
@@ -1513,6 +2297,17 @@ async function waitForChildExit(
         );
       }, loopCheckIntervalMs);
       startupLoopHandle.unref();
+    }
+
+    if (options.blockHeavyCommands) {
+      heavyCommandHandle = setInterval(() => {
+        const blockedCommand = options.getBlockedHeavyCommand();
+        if (!blockedCommand) {
+          return;
+        }
+        requestTermination(formatBoundedHeavyCommandFailure(blockedCommand), false);
+      }, 250);
+      heavyCommandHandle.unref();
     }
 
     const monitorIntervalMs = options.monitorIntervalMs;

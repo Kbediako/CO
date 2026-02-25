@@ -225,3 +225,9 @@ repeat:
 - **Collab UI assumptions:** agent rows/records are id-based today; use explicit stream role text in prompts/artifacts for operator clarity.
 - **Collab lifecycle leaks:** missing `close_agent` calls accumulate open threads and can trigger `agent thread limit reached`; always finish `spawn -> wait -> close_agent` per id.
 - **False "unexpected edits" stops:** when a live subagent owns the touched files, treat those edits as expected output and continue with scope-aware review.
+
+## Related skills
+- `collab-subagents-first`: for stream decomposition and parent/subagent ownership discipline.
+- `collab-deliberation`: for option generation before implementation when decisions are ambiguous/high-impact.
+- `standalone-review`: for checkpoint reviews after delegated implementation streams.
+- `long-poll-wait`: for patience-first monitoring of long-running delegated/cloud jobs.

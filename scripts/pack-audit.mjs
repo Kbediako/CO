@@ -7,7 +7,9 @@ import { runPack } from './lib/npm-pack.js';
 
 const REQUIRED_FILES = [
   'dist/bin/codex-orchestrator.js',
+  'dist/scripts/run-review.js',
   'schemas/manifest.json',
+  'skills/long-poll-wait/SKILL.md',
   'README.md',
   'LICENSE'
 ];
@@ -27,6 +29,7 @@ const DIST_ALLOWED_PREFIXES = [
   'dist/scripts/lib/',
   'dist/types/'
 ];
+const DIST_ALLOWED_EXACT_FILES = new Set(['dist/scripts/run-review.js']);
 const EXPLICIT_ALLOWED_FILES = new Set(['docs/assets/setup.gif', 'docs/README.md']);
 
 const FORBIDDEN_PREFIXES = [
@@ -69,6 +72,9 @@ function isAllowedPath(filePath) {
 
 function isAllowedDistPath(filePath) {
   if (!filePath.startsWith('dist/')) {
+    return true;
+  }
+  if (DIST_ALLOWED_EXACT_FILES.has(filePath)) {
     return true;
   }
   return DIST_ALLOWED_PREFIXES.some((prefix) => filePath.startsWith(prefix));

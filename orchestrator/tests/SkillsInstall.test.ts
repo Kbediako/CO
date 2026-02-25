@@ -52,6 +52,22 @@ describe('installSkills', () => {
     }
   });
 
+  it('installs long-poll-wait with patience-first terminal-state guidance', async () => {
+    const tempHome = await mkdtemp(join(tmpdir(), 'skills-install-long-poll-'));
+    try {
+      const result = await installSkills({ codexHome: tempHome, force: true, only: ['long-poll-wait'] });
+      const skillPath = join(tempHome, 'skills', 'long-poll-wait', 'SKILL.md');
+      const skill = await readFile(skillPath, 'utf8');
+
+      expect(result.skills).toEqual(['long-poll-wait']);
+      expect(skill).toContain('Long Poll Wait');
+      expect(skill).toContain('24/7 Patience-First Contract');
+      expect(skill).toContain('Poll until terminal state');
+    } finally {
+      await rm(tempHome, { recursive: true, force: true });
+    }
+  });
+
   it('installs only selected skills when only is provided', async () => {
     const tempHome = await mkdtemp(join(tmpdir(), 'skills-install-only-'));
     try {

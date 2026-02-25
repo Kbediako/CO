@@ -212,3 +212,9 @@ Do not treat wrapper handoff-only output as a completed review.
 - Parent synthesis includes concise decisions and evidence paths.
 - Parent-level review completed (standalone review or equivalent).
 - Collab lifecycle closed (`spawn_agent` -> `wait` -> `close_agent` per id) or degraded mode explicitly recorded.
+
+## Related skills
+- `delegation-usage`: for delegation MCP setup/mode/tool-profile policy.
+- `standalone-review`: for parent checkpoint review after stream integration.
+- `elegance-review`: for post-integration minimality pass.
+- `long-poll-wait`: for multi-hour child run monitoring with checkpointed status updates.

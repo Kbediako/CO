@@ -1,8 +1,10 @@
 #!/usr/bin/env node
+import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { opendir, readFile } from 'node:fs/promises';
 import { basename, join } from 'node:path';
 import process from 'node:process';
+import { fileURLToPath } from 'node:url';
 
 import { CodexOrchestrator } from '../orchestrator/src/cli/orchestrator.js';
 import { formatPlanPreview } from '../orchestrator/src/cli/utils/planFormatter.js';
@@ -34,7 +36,7 @@ import { formatDevtoolsSetupSummary, runDevtoolsSetup } from '../orchestrator/sr
 import { formatCodexCliSetupSummary, runCodexCliSetup } from '../orchestrator/src/cli/codexCliSetup.js';
 import { formatDelegationSetupSummary, runDelegationSetup } from '../orchestrator/src/cli/delegationSetup.js';
 import { formatSkillsInstallSummary, installSkills, listBundledSkills } from '../orchestrator/src/cli/skills.js';
-import { loadPackageInfo } from '../orchestrator/src/cli/utils/packageInfo.js';
+import { findPackageRoot, loadPackageInfo } from '../orchestrator/src/cli/utils/packageInfo.js';
 import { slugify } from '../orchestrator/src/cli/utils/strings.js';
 import { serveMcp } from '../orchestrator/src/cli/mcp.js';
 import { formatMcpEnableSummary, runMcpEnable } from '../orchestrator/src/cli/mcpEnable.js';
@@ -99,6 +101,9 @@ async function main(): Promise<void> {
         break;
       case 'flow':
         await handleFlow(orchestrator, args);
+        break;
+      case 'review':
+        await handleReview(args);
         break;
       case 'plan':
         await handlePlan(orchestrator, args);
@@ -961,6 +966,85 @@ async function handleFlow(orchestrator: CodexOrchestrator, rawArgs: string[]): P
       taskFilter: resolveTaskFilter(undefined, taskId)
     });
     throw withAutoIssueLogContext(error, issueLogCapture);
+  }
+}
+
+interface ExternalReviewRunner {
+  command: string;
+  args: string[];
+}
+
+function runningFromSourceRuntime(): boolean {
+  return fileURLToPath(import.meta.url).endsWith('.ts');
+}
+
+function resolveReviewRunner(): ExternalReviewRunner {
+  const packageRoot = findPackageRoot(import.meta.url);
+  const sourceRunner = join(packageRoot, 'scripts', 'run-review.ts');
+  const distRunner = join(packageRoot, 'dist', 'scripts', 'run-review.js');
+
+  if (runningFromSourceRuntime() && existsSync(sourceRunner)) {
+    return {
+      command: process.execPath,
+      args: ['--loader', 'ts-node/esm', sourceRunner]
+    };
+  }
+
+  if (existsSync(distRunner)) {
+    return {
+      command: process.execPath,
+      args: [distRunner]
+    };
+  }
+
+  if (existsSync(sourceRunner)) {
+    return {
+      command: process.execPath,
+      args: ['--loader', 'ts-node/esm', sourceRunner]
+    };
+  }
+
+  throw new Error(
+    'Unable to locate review runner. Expected dist/scripts/run-review.js (npm) or scripts/run-review.ts (source checkout).'
+  );
+}
+
+async function runPassthroughCommand(
+  command: string,
+  args: string[],
+  options: { env?: NodeJS.ProcessEnv; cwd?: string } = {}
+): Promise<number> {
+  return await new Promise<number>((resolve, reject) => {
+    const child = spawn(command, args, {
+      env: options.env ?? process.env,
+      cwd: options.cwd ?? process.cwd(),
+      stdio: 'inherit'
+    });
+    child.once('error', (error) => reject(error instanceof Error ? error : new Error(String(error))));
+    child.once('close', (code, signal) => {
+      if (signal) {
+        resolve(1);
+        return;
+      }
+      resolve(typeof code === 'number' ? code : 1);
+    });
+  });
+}
+
+async function handleReview(rawArgs: string[]): Promise<void> {
+  const { positionals, flags } = parseArgs(rawArgs);
+  if (isHelpRequest(positionals, flags)) {
+    printReviewHelp();
+    return;
+  }
+
+  const runner = resolveReviewRunner();
+  const exitCode = await runPassthroughCommand(runner.command, [...runner.args, ...rawArgs], {
+    cwd: process.cwd(),
+    env: process.env
+  });
+  if (exitCode !== 0) {
+    process.exitCode = exitCode;
   }
 }
 
@@ -2243,6 +2327,18 @@ Commands:
     --interactive | --ui    Enable read-only HUD when running in a TTY.
     --no-interactive        Force disable HUD (default is off unless requested).
 
+  review [options]          Run manifest-backed standalone review wrapper.
+    Forwards flags/env to scripts/run-review (source) or dist/scripts/run-review.js (npm).
+    Common flags:
+      --manifest <path>     Explicit manifest path for review evidence.
+      --task <id>           Task id used for prompt context.
+      --uncommitted         Review uncommitted diff scope.
+      --base <branch>       Review against base branch.
+      --commit <sha>        Review specific commit.
+      --non-interactive     Force non-interactive review behavior.
+      --auto-issue-log [true|false]  Auto-capture issue bundle on review failure.
+      --disable-delegation-mcp [true|false]  Disable delegation MCP for this review.
+
   plan [pipeline]           Preview pipeline stages without executing.
     --task <id>             Override task identifier.
     --format json           Emit machine-readable output.
@@ -2336,6 +2432,7 @@ Commands:
 
 Quickstart (agent-first):
   codex-orchestrator flow --task <task-id>
+  NOTES="Goal: ... | Summary: ... | Risks: ..." codex-orchestrator review --task <task-id>
   codex-orchestrator doctor --usage --window-days 30
   codex-orchestrator rlm --multi-agent auto "<goal>"
   codex-orchestrator start implementation-gate --cloud --target <stage-id>
@@ -2488,6 +2585,39 @@ Examples:
 
 Post-run check:
   codex-orchestrator doctor --usage --window-days 30 --task <task-id>
+`);
+}
+
+function printReviewHelp(): void {
+  console.log(`Usage: codex-orchestrator review [options]
+
+Runs the standalone review wrapper with manifest-backed evidence.
+This command forwards arguments/environment to run-review and preserves its behavior.
+
+Common options:
+  --manifest <path>                Explicit manifest path for review evidence.
+  --runs-dir <path>                Root runs directory when auto-resolving manifest.
+  --task <id>                      Task id used for prompt context.
+  --uncommitted                    Review uncommitted diff scope.
+  --base <branch>                  Review against a base branch.
+  --commit <sha>                   Review a specific commit.
+  --title "<text>"                 Optional review title in the prompt.
+  --non-interactive                Force non-interactive behavior.
+  --auto-issue-log [true|false]    Auto-capture issue bundle on review failure.
+  --disable-delegation-mcp [true|false]  Disable delegation MCP for this review.
+  --enable-delegation-mcp [true|false]   Legacy delegation MCP toggle (disable via false).
+
+Environment controls (selected):
+  NOTES                            Required review notes ("Goal | Summary | Risks ...").
+  CODEX_REVIEW_ALLOW_HEAVY_COMMANDS=1      Allow unrestricted heavy commands.
+  CODEX_REVIEW_ENFORCE_BOUNDED_MODE=1      Enforce bounded mode (hard-stop heavy commands).
+  CODEX_REVIEW_TIMEOUT_SECONDS             Optional overall timeout (0 disables when set).
+  CODEX_REVIEW_STALL_TIMEOUT_SECONDS       Optional stall timeout (0 disables when set).
+  CODEX_REVIEW_MONITOR_INTERVAL_SECONDS    Patience checkpoint cadence (0 disables).
+
+Examples:
+  TASK=<task-id> NOTES="Goal: ... | Summary: ... | Risks: ..." codex-orchestrator review
+  TASK=<task-id> NOTES="Goal: ... | Summary: ... | Risks: ..." codex-orchestrator review --manifest .runs/<task-id>/cli/<run-id>/manifest.json
 `);
 }
 

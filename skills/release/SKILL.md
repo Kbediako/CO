@@ -125,3 +125,7 @@ If the release included bundled skill changes, refresh local skills:
 ```bash
 codex-orchestrator skills install --force
 ```
+
+## Related skills
+- `long-poll-wait`: for patience-first monitoring of release workflow/check runs until terminal state.
+- `standalone-review`: for final targeted review checks before tag/publish.

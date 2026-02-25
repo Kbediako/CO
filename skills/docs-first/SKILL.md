@@ -49,3 +49,9 @@ For shipped CO usage, default to this command path unless task constraints say o
 ## Related docs
 - `docs/AGENTS.md`
 - `docs/guides/instructions.md`
+
+## Related skills
+- `delegation-usage`: for task-scoped delegated research/review streams after docs scaffolding.
+- `standalone-review`: for pre-implementation approval and implementation checkpoints.
+- `elegance-review`: for post-implementation minimality pass before handoff.
+- `agent-first-adoption-steering`: for non-blocking advanced-feature steering and option framing.

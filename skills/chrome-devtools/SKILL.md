@@ -32,3 +32,9 @@ Use this skill when you need browser-grounded evidence (UI screenshots, console 
   - `list_console_messages`
   - `list_network_requests` (and fetch details for failures)
 
+## Related skills
+
+- `standalone-review`: route ad-hoc review checks through a manifest-backed review loop when findings need auditability.
+- `collab-subagents-first`: isolate heavy browser exploration in a dedicated subagent stream to protect parent context.
+- `frontend-design-review`: use when the task emphasis is structured UI/UX critique with evidence-backed recommendations.
+- `long-poll-wait`: monitor long-running browser-driven checks or CI replay loops to terminal state.

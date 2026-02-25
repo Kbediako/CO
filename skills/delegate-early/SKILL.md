@@ -19,3 +19,9 @@ description: Compatibility alias for delegation-first workflows. Prefer `delegat
 
 ## Note
 If guidance in this file conflicts with `delegation-usage`, follow `delegation-usage`.
+
+## Related skills
+
+- `delegation-usage`: canonical delegation control-plane workflow and source of truth.
+- `collab-subagents-first`: role-split stream planning for bounded parallel execution.
+- `long-poll-wait`: patience-first monitoring for delegated long-running streams.
