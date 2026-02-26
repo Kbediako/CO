@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp ed98936c8a92cd2c2f6b0b832a243dafc58c9aafac828b300a4f84a0ec32afd2 -->
+<!-- codex:instruction-stamp 02752c08cbd04027a52d182c370221efdb83f4210f443a36b993aefc39f2567e -->
 # Codex-Orchestrator Agent Handbook (Template)
 
 Use this repository as the wrapper that coordinates multiple Codex-driven projects. After cloning, replace placeholder metadata (task IDs, documents, SOPs) with values for each downstream initiative while keeping these shared guardrails in place.
@@ -21,13 +21,15 @@ Use this repository as the wrapper that coordinates multiple Codex-driven projec
 - The “top-level Codex” is the MCP-run agent the user is interacting with; collab agents are assistants and do not represent the run.
 
 ## Agent Role Baseline
-- Built-in roles are `default`, `explorer`, and `worker`; `researcher` is user-defined.
+- Built-in roles are `default`, `explorer`, `worker`, and `awaiter`; `researcher` is user-defined.
 - `spawn_agent` defaults to `default` when `agent_type` is omitted; always set `agent_type` explicitly.
 - For symbolic collab runs, prefix spawned prompts with `[agent_type:<role>]` on line one so role intent is auditable from JSONL/manifests.
 - Keep top-level defaults on latest codex by setting `model = "gpt-5.3-codex"` in `~/.codex/config.toml`.
-- Define a user `agents.explorer` role without `config_file` so built-in explorer inherits your top-level model defaults instead of older built-in profiles.
+- Set `model_reasoning_effort` to at least `high` (CO default: `xhigh`) so spawned agents inherit high-reasoning behavior unless role overrides change it.
+- Built-in `explorer` now inherits top-level model defaults unless you attach a custom `config_file`; keep an explicit `agents.explorer` entry only when you want a custom description/override.
 - Caveat: spark models are text-only; use non-spark roles when image inputs are required.
-- Set `[agents] max_threads = 12` with `max_depth = 2` as the standard multi-agent baseline; fall back to `8` or `max_depth = 1` for constrained/high-risk lanes.
+- Set `[agents] max_threads = 12` with `max_depth = 4` and `max_spawn_depth = 4` as the standard multi-agent baseline.
+- Fallback policy is contingency-only (not routine): use `max_threads = 8`, `max_depth = 2`, `max_spawn_depth = 2` for constrained/high-risk lanes; use `6/1/1` only as a break-glass profile under severe host/tool contention.
 - Use an explicit `worker_complex` role (for example `gpt-5.3-codex`, `xhigh`) for high-risk implementation streams.
 
 ## Deliberation Default (Agent-First)

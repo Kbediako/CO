@@ -100,7 +100,7 @@ Use `npx @kbediako/codex-orchestrator resume --run <run-id>` to continue interru
 
 ## Companion Package Commands
 - `codex-orchestrator mcp serve [--repo <path>] [--dry-run] [-- <extra args>]`: launch the MCP stdio server (delegates to `codex mcp-server`; stdout guard keeps protocol-only output, logs to stderr).
-- `codex-orchestrator init codex [--cwd <path>] [--force]`: copy starter templates into a repo (includes `mcp-client.json`, `AGENTS.md`, and `codex.orchestrator.json`; no overwrite unless `--force`).
+- `codex-orchestrator init codex [--cwd <path>] [--force]`: copy starter templates into a repo (includes `mcp-client.json`, `AGENTS.md`, downstream .codex/config.toml + .codex/agents/* role files sourced from `templates/codex/.codex/*`, and `codex.orchestrator.json`; no overwrite unless `--force`).
 - `codex-orchestrator setup [--yes] [--refresh-skills]`: one-shot bootstrap for downstream users (installs bundled skills, configures delegation + DevTools wiring, and prints policy/usage guidance). By default, setup does not overwrite existing skills; add `--refresh-skills` when you want to replace existing bundled skill files.
 - `codex-orchestrator start [pipeline] [--auto-issue-log] [--repo-config-required]`: starts a pipeline run. `--auto-issue-log` writes failure bundles automatically (including setup failures before manifest creation); `--repo-config-required` disables packaged config fallback.
 - `codex-orchestrator flow [--task <task-id>] [--auto-issue-log] [--repo-config-required]`: runs `docs-review` then `implementation-gate` in sequence; stops on the first failure. `--auto-issue-log` writes failure bundles automatically (including setup failures before manifest creation); `--repo-config-required` disables packaged config fallback.

@@ -141,17 +141,20 @@ Delegation MCP expects JSONL. Keep `codex-orchestrator` aligned with the current
 
 ## Agent role guard (recommended)
 
-- Built-in agent roles are `default`, `explorer`, `worker`; `researcher` is user-defined.
+- Built-in agent roles are `default`, `explorer`, `worker`, and `awaiter`; `researcher` is user-defined.
 - `spawn_agent` omission defaults to `default`; require explicit `agent_type` for every spawn.
 - For symbolic collab runs, include a first-line role tag in spawned prompts: `[agent_type:<role>]`.
-- Built-in `explorer` may map to an older model profile unless overridden in `~/.codex/config.toml`.
+- Multi-turn subagent loops are supported (`spawn_agent` -> `send_input` -> `wait`/`resume_agent` -> `close_agent`).
+- In Codex CLI `0.105.0`, built-in `explorer` inherits top-level defaults unless overridden in `~/.codex/config.toml`.
 - Recommended baseline:
   - `model = "gpt-5.3-codex"`
   - `model_reasoning_effort = "xhigh"`
-  - `[agents] max_threads = 12` with `max_depth = 2` (fall back to `8` or `max_depth = 1` for constrained/high-risk lanes)
-  - Set `[agents.explorer]` with no `config_file` so explorer inherits top-level `gpt-5.3-codex`.
+  - `[agents] max_threads = 12` with `max_depth = 4` and `max_spawn_depth = 4`
+  - Leave `[agents.explorer]` undefined unless you intentionally want to override built-in explorer behavior.
   - Add optional `[agents.explorer_fast]` for `gpt-5.3-codex-spark` (text-only caveat).
+  - Add optional `[agents.awaiter]` override for `gpt-5.3-codex` + `high` while preserving awaiter instructions.
   - Add `[agents.worker_complex]` for high-risk edits (`gpt-5.3-codex`, `xhigh`).
+  - Fallback posture is contingency-only: `8/2/2` (constrained/high-risk), `6/1/1` break-glass.
 
 ## Common failures
 

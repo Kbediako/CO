@@ -115,18 +115,21 @@ For runner + delegation coordination (short `--task` flow), see `docs/delegation
 
 ### 0a.1) Agent role guard (avoid stale built-in defaults)
 
-- Built-in roles are `default`, `explorer`, and `worker`. `researcher` is user-defined.
+- Built-in roles are `default`, `explorer`, `worker`, and `awaiter`. `researcher` is user-defined.
 - `spawn_agent` omission defaults to `default`; require explicit `agent_type` for every spawn.
 - For symbolic collab runs, include a first-line role tag in spawned prompts: `[agent_type:<role>]`.
-- Built-in `explorer` can map to an older model profile unless overridden; pin your own role config to keep latest-codex behavior.
+- Multi-turn subagent loops are supported (`spawn_agent` -> `send_input` -> `wait`/`resume_agent` -> `close_agent`).
+- In Codex CLI `0.105.0`, built-in `explorer` inherits top-level model defaults unless a role `config_file` overrides it.
 - Recommended baseline in `~/.codex/config.toml`:
   - `model = "gpt-5.3-codex"`
   - `model_reasoning_effort = "xhigh"`
-  - `[agents] max_threads = 12` with `max_depth = 2` (fallback profile for constrained/high-risk lanes: `max_threads = 8`, `max_depth = 1`)
-  - `[agents.explorer]` with no `config_file` so built-in explorer inherits top-level `gpt-5.3-codex`
+  - `[agents] max_threads = 12` with `max_depth = 4` and `max_spawn_depth = 4`
+  - Leave `[agents.explorer]` undefined unless you intentionally want to override built-in explorer behavior
   - Optional `[agents.explorer_fast]` -> `~/.codex/agents/explorer-fast.toml` (`gpt-5.3-codex-spark`, text-only)
+  - Optional `[agents.awaiter]` override -> `~/.codex/agents/awaiter-high.toml` when you want awaiter at `gpt-5.3-codex` + `high` while preserving awaiter instructions
   - `[agents.worker_complex]` -> `~/.codex/agents/worker-complex.toml` (`gpt-5.3-codex`, `xhigh`)
-- Stability note (2026-02-25): this baseline was adopted without a separate synthetic thread-saturation harness in task `0980`; decision evidence, validation commands, and explicit fallback/rollback triggers are recorded in `docs/findings/0980-codex-cli-upgrade-audit-2026-02-25.md` ("5.8 Stability evidence for `max_threads = 12`").
+- Fallback posture is contingency-only: `8/2/2` for constrained/high-risk lanes, `6/1/1` as break-glass under severe contention.
+- Downstream users can get this baseline via `codex-orchestrator init codex` (ships `.codex/config.toml` + role files).
 
 ### 0b) Background terminal bootstrap (required when MCP is disabled)
 

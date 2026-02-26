@@ -1,0 +1,19 @@
+model = "gpt-5.3-codex"
+model_reasoning_effort = "xhigh"
+
+[agents]
+max_threads = 12
+max_depth = 4
+max_spawn_depth = 4
+
+[agents.explorer_fast]
+description = "Fast explorer (spark text-only)."
+config_file = "./agents/explorer-fast.toml"
+
+[agents.worker_complex]
+description = "Complex implementation role."
+config_file = "./agents/worker-complex.toml"
+
+[agents.awaiter]
+description = "Awaiter override (keeps awaiter behavior with latest codex/high reasoning)."
+config_file = "./agents/awaiter-high.toml"
