@@ -174,7 +174,7 @@ Do not treat wrapper handoff-only output as a completed review.
 - Rebuild managed CLI only (optional): `codex-orchestrator codex setup --source <codex-repo> --yes --force`.
 - Managed routing is explicit opt-in: `export CODEX_CLI_USE_MANAGED=1` (stock/global `codex` remains default otherwise).
 - If local codex is materially behind upstream, sync before diagnosing collab behavior differences.
-- Built-in `explorer` may map to an older model profile; set `[agents.explorer]` without `config_file` so it inherits top-level `gpt-5.3-codex`, and reserve spark for optional `[agents.explorer_fast]` (text-only caveat).
+- In Codex CLI `0.105.0`, built-in `explorer` inherits top-level model defaults unless you attach a role `config_file`; reserve spark for optional `[agents.explorer_fast]` (text-only caveat).
 - For cloud-heavy streams, treat fallback as a safety net only; set `CODEX_ORCHESTRATOR_CLOUD_FALLBACK=deny` in fail-fast lanes.
 - If compatibility remains unstable, continue with non-collab execution path and document the degraded mode.
 

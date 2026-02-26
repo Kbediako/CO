@@ -2367,7 +2367,7 @@ Commands:
 
   self-check [--format json]
   init codex [--cwd <path>] [--force]
-    Installs AGENTS.md, mcp-client.json, and codex.orchestrator.json.
+    Installs AGENTS.md, mcp-client.json, .codex/config.toml (+ role files), and codex.orchestrator.json.
     --codex-cli            Also run CO-managed Codex CLI setup (plan unless --yes; activate with CODEX_CLI_USE_MANAGED=1).
     --codex-source <path>  Build from local Codex repo (or git URL).
     --codex-ref <ref>      Git ref (branch/tag/sha) when building from repo.
@@ -2674,6 +2674,7 @@ function printInitHelp(): void {
 Install starter templates into the target repository:
 - AGENTS.md
 - mcp-client.json
+- .codex/config.toml (+ .codex/agents/* role files)
 - codex.orchestrator.json
 
 Options:

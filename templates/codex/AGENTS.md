@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp 006ea6b3c62cc2b5aed744a7b20fd2e38d5de73e5fc481ac4b6ecafb0e533fb1 -->
+<!-- codex:instruction-stamp 7e73683178d84f43eaafbadcfbc39460eff6e683a6213b9cfdd417a07776da73 -->
 # Agent Instructions (Template)
 
 ## Orchestrator-first workflow
@@ -49,13 +49,15 @@
   - `P2/P3` findings are tracked follow-ups.
 
 ## Agent role baseline
-- Built-in roles are `default`, `explorer`, and `worker`; `researcher` is user-defined.
+- Built-in roles are `default`, `explorer`, `worker`, and `awaiter`; `researcher` is user-defined.
 - `spawn_agent` defaults to `default` when `agent_type` is omitted; always set `agent_type` explicitly.
 - For symbolic collab runs, prefix spawned prompts with `[agent_type:<role>]` on line one so role intent is auditable from JSONL/manifests.
 - Keep top-level defaults on latest codex by setting `model = "gpt-5.3-codex"` in `~/.codex/config.toml`.
-- Define a user `agents.explorer` role without `config_file` so built-in explorer inherits top-level model defaults.
+- Set `model_reasoning_effort` to at least `high` (CO default: `xhigh`) so spawned agents inherit high reasoning unless role overrides change it.
+- Built-in `explorer` inherits top-level model defaults unless you attach a `config_file`.
 - Spark caveat: `gpt-5.3-codex-spark` is text-only.
-- Use `[agents] max_threads = 12` with `max_depth = 2` as the default multi-agent baseline; fall back to `8` or `max_depth = 1` for constrained/high-risk lanes.
+- Use `[agents] max_threads = 12` with `max_depth = 4` and `max_spawn_depth = 4` as the default multi-agent baseline.
+- Keep fallback usage explicit and rare: `8/2/2` for constrained/high-risk lanes, `6/1/1` only as break-glass.
 - Add an explicit `worker_complex` role (`gpt-5.3-codex`, `xhigh`) for high-risk implementation streams.
 
 ## Completion discipline (patience-first)

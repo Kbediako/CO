@@ -55,8 +55,8 @@
 - Dependencies / Integrations: GitHub release metadata, local `codex` fork state, existing CO validation chain.
 
 ## Decision Log
-- Decision (2026-02-25): set `[agents] max_threads = 12` and `[agents] max_depth = 2` as CO defaults, with fallback profile `max_threads = 8` and `max_depth = 1` for constrained or deterministic high-risk lanes.
-- Rationale: CO workloads regularly benefit from higher parallel throughput than upstream defaults, while the documented fallback profile preserves predictable operation under tighter host/tool conditions.
+- Decision (2026-02-26): set `[agents] max_threads = 12`, `[agents] max_depth = 4`, and `[agents] max_spawn_depth = 4` as CO defaults, with contingency-only fallback profiles `8/2/2` (constrained/high-risk) and `6/1/1` (break-glass severe contention).
+- Rationale: CO workloads benefit from deeper bounded recursion and higher parallel throughput, and contingency fallback remains available without becoming the routine operating posture.
 
 ## Approvals
 - Product: self-approved (task owner)

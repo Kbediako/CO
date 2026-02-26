@@ -1,131 +1,158 @@
-# Codex CLI Upgrade Audit - 0980 (2026-02-25)
+# Codex CLI Upgrade Audit - 0980 (2026-02-25, addendum 2026-02-26)
 
 ## 1) What changed in Codex CLI and why it matters for CO
 
 ### Release facts (verified)
 - Installed local CLI: `codex-cli 0.105.0` (`which codex` -> `/opt/homebrew/bin/codex`).
-- Latest stable upstream release: `0.105.0` published `2026-02-25T17:21:45Z`.
-- Latest published prerelease: `0.106.0-alpha.3` published `2026-02-25T19:47:33Z`.
+- Latest stable upstream release: `rust-v0.105.0` published `2026-02-25T17:21:45Z`.
+- Latest published prerelease at audit time: `rust-v0.106.0-alpha.3` published `2026-02-25T19:47:33Z`.
 - Command evidence:
-  - `gh release list --repo openai/codex --limit 10`
-  - `gh release view rust-v0.105.0 --repo openai/codex --json name,tagName,isPrerelease,publishedAt,url`
-  - `gh release view rust-v0.106.0-alpha.3 --repo openai/codex --json name,tagName,isPrerelease,publishedAt,url,body`
+  - `codex --version`
+  - `gh release view rust-v0.105.0 --repo openai/codex --json tagName,isPrerelease,publishedAt,url`
+  - `gh release view rust-v0.106.0-alpha.3 --repo openai/codex --json tagName,isPrerelease,publishedAt,url`
 
 ### Relevant capability/behavior deltas
-- Multi-agent expansion in stable line includes native `spawn_agents_on_csv` fan-out support and improved multi-agent UX signals.
-  - CO impact: use native CSV fan-out for high-volume parallel jobs before building custom wrappers.
-- Review-mode delegation explicitly disables collab tools and web search.
-  - CO impact: review pipelines must assume single-agent reviewer behavior; no review-thread collab assumptions.
-- Canonical naming direction remains `multi_agent` (legacy `collab` aliases still present).
-  - CO impact: keep canonical-first wording with compatibility notes.
-- Approval controls and related behaviors continue evolving (including granular reject controls and approval handling updates).
-  - CO impact: keep approval guidance explicit and avoid stale assumptions.
-- Config/runtime defaults remain important drift points (`agents.max_threads` default 6 upstream, `allow_login_shell` default true, project-root marker handling updates).
-  - CO impact: CO should pin/communicate explicit operational defaults instead of relying on upstream defaults.
+- Built-in agent inventory now includes `awaiter` alongside `default`, `explorer`, `worker`.
+  - CO impact: docs/skills must stop assuming only three built-ins.
+- Built-in `explorer` no longer carries a pinned model profile (`explorer.toml` is currently empty in 0.105.0).
+  - CO impact: top-level model/reasoning defaults propagate more naturally unless a role `config_file` overrides them.
+- Built-in `awaiter` ships explicit wait-loop behavior with `model_reasoning_effort = "low"`.
+  - CO impact: “stuck” perception is usually a long-running wait loop, not deadlock.
+- Multi-turn collab lifecycle is first-class: `spawn_agent`, `send_input`, `wait`, `resume_agent`, `close_agent`.
+  - CO impact: parent-child reviewer/worker loops can be iterative, not one-shot.
+- Spawned agents inherit parent model/reasoning/session config first, then role overrides apply.
+  - CO impact: setting top-level `model = "gpt-5.3-codex"` and high reasoning is the highest-leverage default knob.
+- Runtime defaults remain conservative upstream (`max_threads=6`, `max_spawn_depth=2`, `max_depth=1`).
+  - CO impact: CO must keep explicit operating defaults; cannot rely on upstream defaults for throughput.
 
 ## 2) Local fork vs upstream delta summary
 - Local fork repo: `/Users/kbediako/Code/codex`.
 - Remotes: `origin=https://github.com/Kbediako/codex.git`, `upstream=https://github.com/openai/codex.git`.
-- Divergence at audit time:
-  - `main...upstream/main` => `0 ahead / 32 behind`.
-  - `origin/main...upstream/main` => `0 ahead / 32 behind`.
-- Key upstream-only commits include:
-  - `c1851be1e` only use preambles for realtime
-  - `21f7032db` app-server thread/unsubscribe API
-  - `d45ffd583` model visibility updates
-  - `01f25a7b9` unify max depth parameter
-- Key local-only feature-branch commits include structured output/signal fixes (not on local `main`):
-  - `841f217d0`, `1aaa8b945`, `fe165b008`, `caccbfbe9`, `f29988db3`
+- Divergence at addendum check time (`2026-02-26`):
+  - `main...upstream/main` => `0 ahead / 44 behind`
+  - `origin/main...upstream/main` => `0 ahead / 44 behind`
 - Command evidence:
   - `git -C /Users/kbediako/Code/codex fetch --all --prune`
   - `git -C /Users/kbediako/Code/codex rev-list --left-right --count main...upstream/main`
-  - `git -C /Users/kbediako/Code/codex log --oneline --no-merges main..upstream/main -n 20`
-  - `git -C /Users/kbediako/Code/codex log --oneline --no-merges --branches --not upstream/main -n 20`
+  - `git -C /Users/kbediako/Code/codex rev-list --left-right --count origin/main...upstream/main`
 
 ## 3) Decision log: depth/thread defaults
 
-### Final recommendation (adopted)
-- CO default multi-agent profile:
+### Final recommendation (adopted in CO docs/templates)
+- CO baseline profile:
   - `[agents] max_threads = 12`
-  - `[agents] max_depth = 2`
-- Workload profiles:
-  - Deterministic/high-risk implementation or constrained host: `max_threads = 8`, `max_depth = 1`
-  - Standard multi-agent implementation/research: `max_threads = 12`, `max_depth = 2`
-  - High fan-out batch work (for example CSV jobs): start `12/2`, prefer `spawn_agents_on_csv`, raise only with explicit evidence.
+  - `[agents] max_depth = 4`
+  - `[agents] max_spawn_depth = 4`
+- Fallback posture (contingency-only):
+  - constrained/high-risk lanes: `8/2/2`
+  - severe contention break-glass: `6/1/1`
 
 ### Rationale
-- Upstream default (`6`) is conservative for broad compatibility.
-- CO workloads regularly use parallel analysis/review/planning streams; `12/2` increases throughput while avoiding uncontrolled recursion.
-- `max_depth = 2` keeps one recursive layer available without opening deep fan-out by default.
+- User requirement for this follow-up explicitly set max depth to `4`.
+- CO workloads frequently need recursive planning + multi-stream execution in the same run.
+- Upstream now supports richer multi-turn subagent loops; deeper but bounded recursion is more operationally useful than in earlier snapshots.
+- Guardrails were tightened so depth increase is not paired with routine fallback reliance.
 
 ### Risks and tradeoffs
-- Higher thread counts can increase local CPU/memory contention and make logs noisier.
-- Higher depth can amplify coordination overhead if prompt/ownership discipline is weak.
-- Mitigation: keep fallback profile (`8/1`) documented and treat deeper settings as deliberate overrides.
+- `12/4/4` increases fan-out blast radius, log volume, and debugging complexity versus `12/2/2`.
+- Tool contention risk is higher on constrained hosts.
+- Mitigation:
+  - enforce explicit stream ownership,
+  - require lifecycle close-sweep (`spawn -> wait -> close`),
+  - downgrade to `8/2/2` or `6/1/1` only when evidence shows instability.
 
-### Alternatives rejected
-- Keep `8` as universal default: rejected due to lower throughput for common CO multi-stream workloads.
-- Raise threads to `12` but keep depth at `1`: rejected because it blocks useful bounded recursion patterns.
-- Aggressive depth (`>=3`) as default: rejected due elevated blast radius and debugging complexity.
+### Alternatives considered and rejected
+- `12/2` as default: safer operationally and recommended by conservative stream analysis, but rejected for this cycle due explicit user direction to adopt depth `4`.
+- `8/1` as universal default: rejected due throughput loss for standard CO multi-agent tasks.
+- `>=5` depth default: rejected due excessive complexity/trace burden for daily workloads.
 
-## 4) Additional upgrades prioritized (beyond depth/thread)
+## 4) Deliberations requested in follow-up
+
+### 4.1 What caused "awaiter" to look stuck?
+- Root cause: expected behavior, not a deadlock.
+- Evidence:
+  - Built-in awaiter instructions require polling until terminal state and prefer long timeouts.
+  - `wait` timeout clamps are `min 10s / default 30s / max 1h`; sparse updates can look idle.
+  - `close_agent` returns a snapshot and can be misread as live status.
+- Operational change: CO guidance now treats awaiter as a long-poll role and recommends patience-first monitoring windows.
+
+### 4.2 What new/shipped agents exist?
+- Built-ins in current Codex source: `default`, `explorer`, `worker`, `awaiter`.
+- CO user-defined roles retained/added for specialization:
+  - `explorer_fast` (`gpt-5.3-codex-spark`, text-only)
+  - `worker_complex` (`gpt-5.3-codex`, `xhigh`)
+  - `researcher` (user-defined when needed)
+
+### 4.3 Should CO rely more on default built-ins now?
+- Yes, with a built-ins-first posture.
+- Decision:
+  - use built-ins by default,
+  - add only a minimal custom layer for clear win roles (`explorer_fast`, `worker_complex`),
+  - avoid role sprawl.
+- Reason: less maintenance drift and better upstream compatibility.
+
+### 4.4 Should CO create more custom agents generally?
+- Not broadly.
+- Create custom roles only when one of these is true:
+  - repeated workload class with measurable quality/latency gain,
+  - stable ownership boundaries,
+  - clear validation and rollback path.
+
+### 4.5 Spark-role strategy (fast but text-only)
+- Keep spark usage targeted:
+  - best for rapid search/synthesis/scoping streams,
+  - avoid for image-required or high-stakes final decision streams.
+- Current CO action: preserve optional `explorer_fast` rather than expanding many spark roles.
+
+### 4.6 Can spawned agents communicate multi-turn?
+- Yes.
+- Supported lifecycle: `spawn_agent` -> repeated `send_input` -> `wait`/`resume_agent` -> `close_agent`.
+- Additional parent-child escalation path exists via delegation queue:
+  - `delegate.question.enqueue` / `delegate.question.poll`.
+- New capability unlocked: iterative reviewer-worker loops with explicit stop criteria.
+
+### 4.7 High-reasoning defaults for subagents (confirmed)
+- Confirmed behavior:
+  - spawn config inherits parent `model` and `model_reasoning_effort` first,
+  - role `config_file` can override afterward.
+- CO action:
+  - top-level baseline remains `gpt-5.3-codex` + `xhigh`,
+  - `init codex` now ships downstream .codex/config.toml + role files (from `templates/codex/.codex/*`),
+  - template includes `awaiter-high.toml` to keep awaiter semantics while meeting high-reasoning baseline.
+
+### 4.8 Why fallback profiles still matter (without over-reliance)
+- Fallbacks are still required as safety valves for constrained/high-risk environments.
+- Policy tightened in this follow-up:
+  - baseline: `12/4/4`
+  - contingency only: `8/2/2`
+  - break-glass only: `6/1/1`
+- This addresses “fallback overuse” by making fallback explicit exception handling, not routine guidance.
+
+## 5) Additional CO upgrades enabled by current CLI behavior
 
 ### High impact / low-medium effort
-1. Add routine release-drift check to operator playbooks (`gh release list` + fork divergence commands).
-2. Keep canonical `multi_agent` wording everywhere while preserving explicit legacy-alias compatibility notes.
-3. Bake review-mode collab limitation into guidance to avoid false assumptions in review flows.
+1. Ship downstream default Codex config via `init codex` (now implemented).
+2. Normalize docs/skills to built-ins-first inventory including `awaiter` (implemented).
+3. Standardize multi-turn lifecycle guidance in skills (`spawn/send/wait/resume/close`) (implemented in primary delegation docs).
 
 ### Medium impact / medium effort
-1. Add `doctor`-level surfaced warning when local fork is significantly behind upstream.
-2. Add optional capability probes in diagnostics for `spawn_agents_on_csv` and review-mode tool restrictions.
+1. Add `doctor` surface checks for role drift (for example detect missing `templates/codex/.codex/config.toml` payloads or stale role files).
+2. Add explicit awaiter monitor checkpoint hints in review/PR-watch wrappers.
 
 ### Medium impact / higher effort
-1. Add automated upstream release ingest + CO compatibility report artifact generation.
+1. Automate upstream role-config drift detection (compare built-in role files vs CO template overrides).
 
-## 5) Follow-up deliberations (added during execution)
-
-### 5.1 Additional CO upgrades to better leverage new CLI behavior
-1. Add a lightweight capability probe command in CO diagnostics (`codex --version`, `codex features list`, `spawn_agents_on_csv` availability) and emit a task-scoped artifact.
-2. Add a pre-review docs budget guard (`docs/TASKS.md` line budget) before running `npm run review` to prevent avoidable review-loop churn.
-3. Prefer native `spawn_agents_on_csv` for independent row/batch workloads in SOP examples before custom orchestration wrappers.
-
-### 5.2 Max threads = 12 globally in CO docs/skills guidance
-- Adopted: CO guidance is now standardized on `max_threads = 12` for active multi-agent lanes across:
-  - `README.md`
-  - `AGENTS.md`
-  - `templates/codex/AGENTS.md`
-  - `skills/delegation-usage/SKILL.md`
-  - `skills/delegation-usage/DELEGATION_GUIDE.md`
-  - supporting guidance in `docs/guides/rlm-recursion-v2.md`
-
-### 5.3 Why `max_depth = 2` is currently the best default
-- `max_depth = 1` blocks bounded recursive decomposition patterns that are useful in CO (plan -> subplan -> execute).
-- `max_depth = 2` allows one recursive layer while still keeping fan-out and debugging complexity controlled.
-- `max_depth >= 3` materially increases blast radius, coordination overhead, and trace complexity without strong evidence of net gain for normal CO workloads.
-- Decision: keep `2` as default, and require explicit task-level justification for deeper recursion.
-
-### 5.4 Should CO rely more on default Codex CLI spawning vs custom RLM flow?
-- Yes for bounded independent work: prefer native spawning (`spawn_agent`, `spawn_agents_on_csv`) when tasks are clearly partitionable.
-- No, as a full replacement for RLM orchestration: default spawning does not replace CO’s planning contracts, guardrail choreography, and manifest-backed “slice/delegate/stitch” conventions.
-- Practical rule: default spawning for execution fan-out; RLM for recursive planning/coordination and evidence-heavy orchestration flows.
-
-### 5.5 Can spawned agents run multi-turn interactions?
-- Yes. The collab tool lifecycle supports iterative interactions (`spawn_agent` -> repeated `send_input` -> `wait`/`resume_agent` -> `close_agent`) rather than one-shot-only behavior.
-- This is suitable for reviewer/worker loops when bounded ownership and stop conditions are explicit.
-
-### 5.6 `npm run review` failure investigation and fix
-- The wrapper itself ran; repeated failures came from review findings and one guardrail break, not from an unrecoverable wrapper crash.
-- Root cause found during loop: `docs/TASKS.md` exceeded policy budget (`451 > 450`), which caused `npm run docs:check` to fail.
-- Fix applied: reduced `docs/TASKS.md` line count back under policy (`449`) and revalidated with `npm run docs:check`.
-
-### 5.7 Why fallback profiles still matter (and whether CO is overusing them)
-- Fallback is a safety valve, not the default operating mode.
-- Primary default remains `12/2`; fallback `8/1` is for constrained hosts, deterministic high-risk edits, or observed contention.
-- Current policy intent is not “rely on fallbacks,” but “avoid hard failure when local conditions cannot sustain default parallelism.”
-
-### 5.8 Stability evidence for `max_threads = 12`
-- Scope note: this adoption did not include a dedicated synthetic MCP saturation harness run in this task.
-- Evidence used for this decision:
-  - Full CO validation chain and packaging smoke lane passed on this branch after the `12/2` updates (`build`, `lint`, `test`, `docs:check`, `docs:freshness`, `diff-budget`, `review`, `pack:smoke`).
-  - Repeated `npm run review` loops completed clean after remediations, and no thread-exhaustion/tool-routing failures surfaced in this task’s runs.
-- Acceptance basis: adopt `12/2` as the operating default now, with documented fallback profile (`8/1`) and explicit rollback triggers for constrained/high-risk environments.
+## 6) Evidence commands used in this addendum
+- `codex --version`
+- `gh release view rust-v0.105.0 --repo openai/codex --json tagName,isPrerelease,publishedAt,url`
+- `gh release view rust-v0.106.0-alpha.3 --repo openai/codex --json tagName,isPrerelease,publishedAt,url`
+- `git -C /Users/kbediako/Code/codex fetch --all --prune`
+- `git -C /Users/kbediako/Code/codex rev-list --left-right --count main...upstream/main`
+- `git -C /Users/kbediako/Code/codex rev-list --left-right --count origin/main...upstream/main`
+- `rg -n "DEFAULT_AGENT_MAX_THREADS|DEFAULT_AGENT_MAX_SPAWN_DEPTH|DEFAULT_AGENT_MAX_DEPTH" /Users/kbediako/Code/codex/codex-rs/core/src/config/mod.rs`
+- `nl -ba /Users/kbediako/Code/codex/codex-rs/core/src/agent/role.rs | sed -n '146,230p'`
+- `sed -n '1,12p' /Users/kbediako/Code/codex/codex-rs/core/src/agent/builtins/awaiter.toml`
+- `sed -n '1,12p' /Users/kbediako/Code/codex/codex-rs/core/src/agent/builtins/explorer.toml`
+- `nl -ba /Users/kbediako/Code/codex/codex-rs/core/src/tools/spec.rs | sed -n '740,980p'`
+- `nl -ba /Users/kbediako/Code/codex/codex-rs/core/src/tools/handlers/multi_agents.rs | sed -n '1,120p'`
+- `nl -ba /Users/kbediako/Code/codex/codex-rs/core/src/tools/handlers/multi_agents.rs | sed -n '898,960p'`

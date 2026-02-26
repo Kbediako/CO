@@ -51,6 +51,7 @@ Use this when you want Codex to drive work inside another repo with the CO defau
    ```bash
    codex-orchestrator init codex --codex-cli --yes
    ```
+   This seeds `AGENTS.md`, `mcp-client.json`, and downstream .codex/config.toml + .codex/agents/* role files (sourced from `templates/codex/.codex/*`), plus `codex.orchestrator.json`.
 2. Register the delegation MCP server (one-time per machine):
    ```bash
    codex mcp add delegation -- codex-orchestrator delegate-server --repo /path/to/repo
@@ -87,10 +88,12 @@ codex -c 'mcp_servers.delegation.enabled=true' ...
 
 ## Agent role defaults (recommended)
 
-Codex built-ins are `default`, `explorer`, and `worker`. `researcher` is user-defined.
-- `spawn_agent` defaults to `default` when `agent_type` is omitted, so always set `agent_type` explicitly when using collab subagents.
+Codex built-ins are `default`, `explorer`, `worker`, and `awaiter`. `researcher` is user-defined.
+- `spawn_agent` defaults to `default` when `agent_type` is omitted, so always set `agent_type` explicitly.
+- Multi-turn loops are supported (`spawn_agent` -> `send_input` -> `wait`/`resume_agent` -> `close_agent`), so subagents can iterate before parent synthesis.
 
-Built-in `explorer` in Codex currently uses `gpt-5.1-codex-mini` with `medium` reasoning unless you override it. If you want latest-codex defaults end-to-end, add role overrides in `~/.codex/config.toml`:
+In Codex CLI `0.105.0`, built-in `explorer` no longer pins an older model profile; it inherits top-level defaults unless you attach a role `config_file`.
+CO now ships this downstream starter config via `init codex` (source template: `templates/codex/.codex/config.toml`; installed as .codex/config.toml in target repos):
 
 ```toml
 model = "gpt-5.3-codex"
@@ -98,46 +101,41 @@ model_reasoning_effort = "xhigh"
 
 [agents]
 max_threads = 12
-max_depth = 2
-
-[agents.explorer]
-description = "Explorer role override (no config_file): keep built-in explorer on top-level model defaults."
+max_depth = 4
+max_spawn_depth = 4
 
 [agents.explorer_fast]
 description = "Fast explorer (spark text-only)."
-config_file = "/absolute/path/to/.codex/agents/explorer-fast.toml"
-
-[agents.explorer_detailed]
-description = "Detailed explorer."
-config_file = "/absolute/path/to/.codex/agents/explorer-detailed.toml"
+config_file = "./agents/explorer-fast.toml"
 
 [agents.worker_complex]
 description = "Complex worker role."
-config_file = "/absolute/path/to/.codex/agents/worker-complex.toml"
+config_file = "./agents/worker-complex.toml"
+
+[agents.awaiter]
+description = "Awaiter override (keeps awaiter behavior with latest codex/high reasoning)."
+config_file = "./agents/awaiter-high.toml"
 ```
 
 ```toml
-# ~/.codex/agents/explorer-fast.toml
+# .codex/agents/explorer-fast.toml
 model = "gpt-5.3-codex-spark"
 model_reasoning_effort = "xhigh"
 ```
 
 ```toml
-# ~/.codex/agents/explorer-detailed.toml
-model = "gpt-5.3-codex"
-model_reasoning_effort = "high"
-```
-
-```toml
-# ~/.codex/agents/worker-complex.toml
+# .codex/agents/worker-complex.toml
 model = "gpt-5.3-codex"
 model_reasoning_effort = "xhigh"
 ```
 
+`init codex` also writes downstream .codex/agents/awaiter-high.toml from `templates/codex/.codex/agents/awaiter-high.toml` so CO users can keep awaiter semantics while meeting a high-reasoning minimum.
+
 Caveats:
 - `gpt-5.3-codex-spark` is text-only (no image inputs). Keep it for fast search/synthesis.
-- `max_threads = 12` is CO's recommended default for active multi-agent workloads; drop to `8` on constrained machines or when tool contention appears.
-- Keep `max_depth = 2` for normal work. Use `max_depth = 1` for constrained or deterministic high-risk fallback lanes, and raise only for deliberate recursive fan-out.
+- Leave `agents.explorer` undefined unless you intentionally want to override built-in explorer behavior.
+- `max_threads = 12`, `max_depth = 4`, and `max_spawn_depth = 4` are CO's standard multi-agent baseline.
+- Fallbacks are contingency-only: use `8/2/2` on constrained hosts or deterministic high-risk lanes; use `6/1/1` only as break-glass under severe contention.
 - `codex review` delegates with collab tools disabled in review threads; keep review expectations single-agent even when multi-agent is enabled elsewhere.
 
 Delegation guard profile:
@@ -286,7 +284,7 @@ codex-orchestrator devtools setup
 - `NOTES="Goal: ... | Summary: ... | Risks: ..." codex-orchestrator review --task <task-id>` — run standalone review wrapper with manifest-backed evidence (supports run-review flags/env).
 - `codex-orchestrator plan <pipeline>` — preview pipeline stages.
 - `codex-orchestrator exec <cmd>` — run a one-off command with the exec runtime.
-- `codex-orchestrator init codex` — install starter templates (`mcp-client.json`, `AGENTS.md`, `codex.orchestrator.json`) into a repo.
+- `codex-orchestrator init codex` — install starter templates (`mcp-client.json`, `AGENTS.md`, downstream .codex/config.toml + .codex/agents/* role files sourced from `templates/codex/.codex/*`, `codex.orchestrator.json`) into a repo.
 - `codex-orchestrator setup --yes` — install bundled skills and configure delegation + DevTools wiring (add `--refresh-skills` to overwrite existing skills in `$CODEX_HOME/skills`).
 - `codex-orchestrator init codex --codex-cli --yes --codex-source <path>` — optionally provision a CO-managed Codex CLI binary (build-from-source default; set `CODEX_CLI_SOURCE` to avoid passing `--codex-source` every time, and `CODEX_CLI_USE_MANAGED=1` to route runs to it).
 - `codex-orchestrator init codex --codex-cli --yes --codex-download-url <url> --codex-download-sha256 <sha>` — opt-in to a prebuilt Codex CLI download.

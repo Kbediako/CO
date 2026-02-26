@@ -22,6 +22,6 @@ Use this hash to audit runs and detect instruction drift over time. For example,
 - Use `docs/AGENTS.md` for project-level additions such as coding conventions or dependency policies.
 - Place sprint- or task-specific guidance in `.agent/AGENTS.md`; this file lives alongside `.agent/task/**` mirrors.
 - When you add or edit any `AGENTS.md`, refresh the instruction stamp (in this repo: `node scripts/update-instruction-stamp.mjs`).
-- For new repos, `codex-orchestrator init codex` installs the starter `mcp-client.json` plus the `AGENTS.md` template.
+- For new repos, `codex-orchestrator init codex` installs starter `mcp-client.json`, `AGENTS.md`, and downstream .codex/config.toml + .codex/agents/* role files (sourced from `templates/codex/.codex/*`).
 
 All files are treated as Markdown and concatenated verbatim, so standard headings and bullet lists render correctly in downstream tools.

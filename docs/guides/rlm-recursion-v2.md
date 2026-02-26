@@ -75,8 +75,8 @@ If you want strict “small slice” behavior (for example, keeping subcalls aro
 
 As of 2026-02-25, these upstream details are relevant for CO planning:
 
-- Built-in `explorer` still ships with a pinned profile (`gpt-5.1-codex-mini`, `medium` reasoning), so keep explicit role overrides in `~/.codex/config.toml` when you want latest-codex defaults.
-- `agents.max_threads` default remains `6`; CO now recommends `12` with `max_depth = 2` for active multi-agent lanes, with fallback profiles (`8` / `max_depth = 1`) for constrained or high-risk deterministic work.
+- Built-in `explorer` no longer pins an older profile in `0.105.0`; it inherits top-level model/reasoning unless role `config_file` overrides it.
+- `agents.max_threads` default remains `6`; CO now recommends `12` with `max_depth = 4` and `max_spawn_depth = 4` for active multi-agent lanes, with contingency-only fallback profiles (`8/2/2`, `6/1/1` break-glass) for constrained/high-risk work.
 - `features.multi_agent` is canonical; `collab` is a legacy alias.
 - `features.sqlite` and `features.memory_tool` are still experimental and should be enabled only for scoped evals.
 - Upstream app-server now emits `model/rerouted` notifications; CO should keep this on the watchlist for future run-summary/diagnostic enrichment.
