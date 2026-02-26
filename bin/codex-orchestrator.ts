@@ -1822,7 +1822,7 @@ async function handleDelegation(rawArgs: string[]): Promise<void> {
 async function handleCodex(rawArgs: string[]): Promise<void> {
   const { positionals, flags } = parseArgs(rawArgs);
   const subcommand = positionals.shift();
-  if (!subcommand || subcommand === 'help' || subcommand === '--help' || subcommand === '-h') {
+  if (flags['help'] === true || flags['--help'] === true || flags['-h'] === true || !subcommand || subcommand === 'help' || subcommand === '--help' || subcommand === '-h') {
     printCodexHelp();
     return;
   }

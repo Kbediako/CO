@@ -12,7 +12,7 @@
   - Local fork delta summary includes ahead/behind counts and key commit-level differences.
   - Explicit decision log for depth-by-workload defaults and thread limit decision is documented.
   - CO updates are implemented and consistent across AGENTS/README/docs/skills/templates.
-  - Follow-up decisions are explicit for: raw built-ins + `>= high` reasoning baseline, additive config updates, scenario/mock/simulation ownership, RLM default-capability posture, docs relevance governance, and fallback rationale.
+  - Follow-up decisions are explicit for raw built-ins + `>= high` reasoning baseline, additive config updates, scenario/mock/simulation ownership, RLM default-capability posture, docs relevance governance, and fallback rationale.
   - Required validation chain passes and evidence is captured.
   - PR is opened, feedback handled, checks monitored through quiet window, and merged.
 - Constraints / non-goals:

@@ -42,7 +42,7 @@ Use this skill to run repeatable collab evaluation scenarios and record evidence
 - For non-trivial eval runs, include at least one delegated research/review stream and summarize evidence in parent output.
 
 ## Skill split policy
-- Keep scenario/mock/simulation coverage in this skill while scope stays focused on collab/multi-agent behavior.
+- Keep scenario/mock/simulation coverage in this skill, while scope stays focused on collab/multi-agent behavior.
 - Propose a dedicated simulation skill only when repeated non-collab simulation workflows make this skill too broad.
 
 ## Related skills

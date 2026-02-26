@@ -2390,6 +2390,7 @@ Options:
   --uncommitted                  Review uncommitted diff scope.
   --base <ref>                   Review diff from base ref.
   --commit <sha>                 Review a single commit.
+  --title <title>                Set a custom review title.
   --non-interactive              Force non-interactive Codex review mode.
   --auto-issue-log[=true|false]  Capture issue bundle on failure.
   --enable-delegation-mcp[=true|false]   Enable delegation MCP for this review run.

@@ -76,7 +76,7 @@ last_review: 2026-02-26
 
 ## Open Questions
 - Should a future follow-up add an automated Codex release-drift checker to `doctor` (network-dependent)?
-- At what measured false-positive threshold should docs relevance checks graduate from agent-first advisory to deterministic gate?
+- At what measured false-positive threshold should docs-relevance checks graduate from agent-first advisory to a deterministic gate?
 
 ## Approvals
 - Reviewer: self-approved (task owner)
