@@ -356,6 +356,34 @@ describe('resolveActionRequiredReasons', () => {
     expect(snapshot.requiredChecks).toBeNull();
     expect(resolveActionRequiredReasons(snapshot)).toContain('checks_failed=1');
   });
+
+  it('does not classify rollup failures as action-required while rollup checks are pending', () => {
+    const response = makeResponse([
+      {
+        __typename: 'CheckRun',
+        name: 'corelane',
+        status: 'IN_PROGRESS',
+        conclusion: null,
+        detailsUrl: 'https://example.com/corelane'
+      },
+      {
+        __typename: 'CheckRun',
+        name: 'optional-check',
+        status: 'COMPLETED',
+        conclusion: 'FAILURE',
+        detailsUrl: 'https://example.com/optional-check'
+      }
+    ], {
+      mergeStateStatus: 'BLOCKED'
+    });
+    const snapshot = buildStatusSnapshot(response, null, {
+      fetchError: false,
+      unacknowledgedCount: 0
+    });
+
+    expect(snapshot.requiredChecks).toBeNull();
+    expect(resolveActionRequiredReasons(snapshot)).toEqual([]);
+  });
 });
 
 describe('summarizeRequiredChecks', () => {

@@ -778,7 +778,8 @@ export function resolveActionRequiredReasons(snapshot) {
     reasons.push(`required_checks_failed=${requiredFailedCount}`);
   } else {
     const rollupFailedCount = Array.isArray(snapshot.checks?.failed) ? snapshot.checks.failed.length : 0;
-    if (!requiredChecks && !MERGEABLE_STATES.has(mergeStateStatus) && rollupFailedCount > 0) {
+    const rollupPendingCount = Array.isArray(snapshot.checks?.pending) ? snapshot.checks.pending.length : 0;
+    if (!requiredChecks && !MERGEABLE_STATES.has(mergeStateStatus) && rollupPendingCount === 0 && rollupFailedCount > 0) {
       reasons.push(`checks_failed=${rollupFailedCount}`);
     }
   }
