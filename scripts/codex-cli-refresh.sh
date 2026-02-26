@@ -115,15 +115,17 @@ fi
 if [[ "$PUSH" -eq 1 ]]; then
   if git remote get-url origin >/dev/null 2>&1; then
     echo "[codex-cli-refresh] Fetching origin refs for delta check..."
-    git fetch origin --prune --no-tags >/dev/null 2>&1 || true
+    if ! git fetch origin --prune --no-tags >/dev/null 2>&1; then
+      echo "[codex-cli-refresh] Warning: failed to refresh origin refs; proceeding with local ref state."
+    fi
     if git show-ref --verify --quiet refs/remotes/origin/main; then
       read -r ORIGIN_BEHIND ORIGIN_AHEAD < <(
         git rev-list --left-right --count origin/main...HEAD
       )
     else
       ORIGIN_BEHIND=0
-      ORIGIN_AHEAD=0
-      echo "[codex-cli-refresh] origin/main missing after fetch; skipping delta-based push."
+      ORIGIN_AHEAD=$(git rev-list --count HEAD)
+      echo "[codex-cli-refresh] origin/main missing after fetch; bootstrapping origin/main from current HEAD."
     fi
     echo "[codex-cli-refresh] Delta vs origin/main: ahead=${ORIGIN_AHEAD} behind=${ORIGIN_BEHIND}"
     if [[ "$ORIGIN_AHEAD" -gt 0 ]]; then
