@@ -219,39 +219,25 @@
 ## 10) Follow-up implementation updates landed (2026-02-26c)
 
 ### 10.1 Problem and root cause confirmation
-- "Awaiter stuck" incidents in PR loops were primarily operator-loop ambiguity, not awaiter deadlock:
-  - passive monitor loops kept waiting even after actionable review feedback arrived.
-  - this looked idle because no explicit terminal "needs action" state was surfaced.
+- [x] Confirmed "awaiter stuck" incidents in PR loops were primarily operator-loop ambiguity, not awaiter deadlock. Evidence: `.runs/0980-codex-cli-upgrade-audit-adoption/cli/2026-02-26T11-05-27-918Z-5f6d4aac/manifest.json`.
+- [x] Confirmed passive monitor loops can keep waiting after actionable feedback when no explicit action-required terminal state is surfaced. Evidence: `.runs/0980-codex-cli-upgrade-audit-adoption/cli/2026-02-26T11-05-27-918Z-5f6d4aac/manifest.json`.
 
 ### 10.2 Shipped watch-resolve-merge posture
-1. Added shipped `codex-orchestrator pr resolve-merge` subcommand as a thin mode over `pr watch-merge`.
-2. Reused existing required-check/bot-feedback/thread/review gating logic; no new orchestration subsystem.
-3. Enabled `exit-on-action-required` by default in resolve mode, so loops stop early when author intervention is required.
-4. Added explicit action-required classification for:
-   - `review=CHANGES_REQUESTED|REVIEW_REQUIRED`
-   - `merge_state=BEHIND` (branch update required before merge)
-   - unresolved review threads
-   - unacknowledged head-commit bot inline feedback
-   - failing gate checks (required checks when available, otherwise rollup failed checks)
-   - draft / do-not-merge label
-5. Added fallback script entrypoint for repo workflows: `npm run pr:resolve-merge`.
-6. Hardened repo inference for PR monitor commands to prefer `git remote origin` parsing before `gh repo view` fallback, preventing incorrect global-default repo resolution in multi-repo environments.
+- [x] Added shipped `codex-orchestrator pr resolve-merge` as a thin mode over `pr watch-merge`. Evidence: `.runs/0980-codex-cli-upgrade-audit-adoption/cli/2026-02-26T11-05-27-918Z-5f6d4aac/manifest.json`, `bin/codex-orchestrator.ts`, `scripts/pr-resolve-merge.mjs`.
+- [x] Reused existing required-check/bot-feedback/thread/review gating logic rather than introducing a new orchestration subsystem. Evidence: `.runs/0980-codex-cli-upgrade-audit-adoption/cli/2026-02-26T11-05-27-918Z-5f6d4aac/manifest.json`, `scripts/lib/pr-watch-merge.js`.
+- [x] Enabled `exit-on-action-required` by default in resolve mode, so loops stop early when author intervention is required. Evidence: `.runs/0980-codex-cli-upgrade-audit-adoption/cli/2026-02-26T11-05-27-918Z-5f6d4aac/manifest.json`, `scripts/pr-resolve-merge.mjs`.
+- [x] Added explicit action-required classification for review blockers, merge-state blockers (`BEHIND`/`DIRTY`), unresolved threads, unacknowledged bot feedback, and failed gate checks (required checks first, bounded rollup fallback). Evidence: `.runs/0980-codex-cli-upgrade-audit-adoption/cli/2026-02-26T11-05-27-918Z-5f6d4aac/manifest.json`, `scripts/lib/pr-watch-merge.js`, `tests/pr-watch-merge.spec.ts`.
+- [x] Added fallback script entrypoint for repo workflows: `npm run pr:resolve-merge`. Evidence: `.runs/0980-codex-cli-upgrade-audit-adoption/cli/2026-02-26T11-05-27-918Z-5f6d4aac/manifest.json`, `package.json`.
+- [x] Hardened repo inference to prefer `git remote origin` parsing, then `gh repo view` fallback, and scoped PR-number inference to the resolved repository. Evidence: `.runs/0980-codex-cli-upgrade-audit-adoption/cli/2026-02-26T11-05-27-918Z-5f6d4aac/manifest.json`, `scripts/lib/pr-watch-merge.js`, `tests/pr-watch-merge.spec.ts`.
 
 ### 10.3 UX and exit semantics
-- `pr resolve-merge` now cleanly distinguishes:
-  - waitable states (pending checks/re-review still in progress),
-  - action-required states (exit code `2`),
-  - timeout (`3`),
-  - generic failure (`1`),
-  - success (`0`).
-- This keeps patience-first behavior while preventing silent long waits when reviewer action is required.
+- [x] `pr resolve-merge` now distinguishes waitable states, action-required states (`2`), timeout (`3`), generic failure (`1`), and success (`0`). Evidence: `.runs/0980-codex-cli-upgrade-audit-adoption/cli/2026-02-26T11-05-27-918Z-5f6d4aac/manifest.json`, `scripts/lib/pr-watch-merge.js`, `tests/pr-watch-merge.spec.ts`.
+- [x] This preserves patience-first waiting while preventing silent long waits when reviewer action is required. Evidence: `.runs/0980-codex-cli-upgrade-audit-adoption/cli/2026-02-26T11-05-27-918Z-5f6d4aac/manifest.json`.
 
 ### 10.4 Docs/skills/SOP updates
-- Updated operator guidance to prefer `pr resolve-merge` for active PR ownership loops.
-- Retained `pr watch-merge` for passive monitor-only loops.
-- Updated release skill examples to use resolve-merge for release PR watch/merge steps.
+- [x] Updated operator guidance to prefer `pr resolve-merge` for active PR ownership loops. Evidence: `.runs/0980-codex-cli-upgrade-audit-adoption/cli/2026-02-26T11-05-27-918Z-5f6d4aac/manifest.json`, `README.md`, `.agent/SOPs/review-loop.md`, `.agent/SOPs/agent-autonomy-defaults.md`.
+- [x] Retained `pr watch-merge` for passive monitor-only loops. Evidence: `.runs/0980-codex-cli-upgrade-audit-adoption/cli/2026-02-26T11-05-27-918Z-5f6d4aac/manifest.json`, `README.md`, `.agent/SOPs/review-loop.md`.
+- [x] Updated release skill examples to use resolve-merge for release PR watch/merge steps. Evidence: `.runs/0980-codex-cli-upgrade-audit-adoption/cli/2026-02-26T11-05-27-918Z-5f6d4aac/manifest.json`, `skills/release/SKILL.md`.
 
 ### 10.5 Delegated design evidence
-- Subagent `019c9978-a4e8-72f0-b9de-e99e3bbe6f98` (researcher) completed a bounded design review:
-  - recommended thin-mode reuse over new subsystem,
-  - recommended explicit action-required terminal state and command-surface tests.
+- [x] Subagent `019c9978-a4e8-72f0-b9de-e99e3bbe6f98` (researcher) completed a bounded design review that recommended thin-mode reuse over a new subsystem and explicit action-required terminal-state + command-surface test coverage. Evidence: `.runs/0980-codex-cli-upgrade-audit-adoption/cli/2026-02-26T11-05-27-918Z-5f6d4aac/manifest.json`, `tests/pr-watch-merge.spec.ts`.

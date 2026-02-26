@@ -443,7 +443,12 @@ export function parseGitHubRepoFromRemoteUrl(rawUrl) {
 }
 
 async function resolveRepoFromGitRemote() {
-  const result = await runGit(['remote', 'get-url', 'origin'], { allowFailure: true });
+  let result;
+  try {
+    result = await runGit(['remote', 'get-url', 'origin'], { allowFailure: true });
+  } catch {
+    return null;
+  }
   if (result.exitCode !== 0 || !result.stdout) {
     return null;
   }

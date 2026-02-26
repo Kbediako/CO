@@ -230,6 +230,32 @@ describe('resolveActionRequiredReasons', () => {
     expect(reasons).toContain('unacknowledged_bot_feedback=2');
   });
 
+  it('classifies draft PRs as action-required', () => {
+    const response = makeResponse([], {
+      isDraft: true
+    });
+    const snapshot = buildStatusSnapshot(response, null, {
+      fetchError: false,
+      unacknowledgedCount: 0
+    });
+
+    expect(resolveActionRequiredReasons(snapshot)).toContain('draft');
+  });
+
+  it('classifies do-not-merge labels as action-required', () => {
+    const response = makeResponse([], {
+      labels: {
+        nodes: [{ name: 'do-not-merge' }]
+      }
+    });
+    const snapshot = buildStatusSnapshot(response, null, {
+      fetchError: false,
+      unacknowledgedCount: 0
+    });
+
+    expect(resolveActionRequiredReasons(snapshot)).toContain('label:do-not-merge');
+  });
+
   it('does not classify pending checks as action-required by itself', () => {
     const response = makeResponse([
       {
