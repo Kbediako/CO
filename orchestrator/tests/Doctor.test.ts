@@ -41,6 +41,8 @@ describe('runDoctor', () => {
       expect(result.devtools.status).toBe('missing-both');
       expect(result.devtools.skill.name).toBe('chrome-devtools');
       expect(result.devtools.config.status).toBe('missing');
+      expect(result.codex_defaults.status).toBe('advisory');
+      expect(result.codex_defaults.config.status).toBe('missing');
       expect(result.missing).toContain('chrome-devtools');
       expect(result.missing).toContain('chrome-devtools-config');
     } finally {
@@ -64,6 +66,14 @@ describe('runDoctor', () => {
       await writeFile(
         join(tempHome, 'config.toml'),
         [
+          'model = "gpt-5.3-codex"',
+          'model_reasoning_effort = "xhigh"',
+          '',
+          '[agents]',
+          'max_threads = 12',
+          'max_depth = 4',
+          'max_spawn_depth = 4',
+          '',
           '[mcp_servers.chrome-devtools]',
           'command = "npx"',
           'args = ["-y", "chrome-devtools-mcp@latest"]'
@@ -76,12 +86,19 @@ describe('runDoctor', () => {
       expect(names).toEqual(['playwright', 'pngjs', 'pixelmatch', 'cheerio']);
       expect(result.devtools.status).toBe('ok');
       expect(result.devtools.config.status).toBe('ok');
+      expect(result.codex_defaults.status).toBe('ok');
+      expect(result.codex_defaults.checks.model.status).toBe('ok');
+      expect(result.codex_defaults.checks.model_reasoning_effort.status).toBe('ok');
+      expect(result.codex_defaults.checks.max_threads.status).toBe('ok');
+      expect(result.codex_defaults.checks.max_depth.status).toBe('ok');
+      expect(result.codex_defaults.checks.max_spawn_depth.status).toBe('ok');
 
       const summary = formatDoctorSummary(result).join('\n');
       for (const name of names) {
         expect(summary).toContain(name);
       }
       expect(summary).toContain('DevTools: ok');
+      expect(summary).toContain('Codex defaults advisory: ok');
     } finally {
       if (originalCodexHome === undefined) {
         delete process.env.CODEX_HOME;

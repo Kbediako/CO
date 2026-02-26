@@ -1096,6 +1096,22 @@ describe('codex-orchestrator command surface', () => {
     expect(payload.pipeline?.id).toBe('docs-review');
   }, TEST_TIMEOUT);
 
+  it('plans docs-relevance-advisory pipeline from packaged fallback config', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'co-cli-plan-docs-relevance-advisory-'));
+    const env = {
+      ...process.env,
+      CODEX_ORCHESTRATOR_ROOT: tempDir,
+      CODEX_ORCHESTRATOR_RUNS_DIR: join(tempDir, '.runs'),
+      CODEX_ORCHESTRATOR_OUT_DIR: join(tempDir, 'out')
+    };
+    const { stdout } = await runCli(['plan', 'docs-relevance-advisory', '--format', 'json'], env);
+    const jsonStart = stdout.indexOf('{');
+    const payload = JSON.parse(jsonStart >= 0 ? stdout.slice(jsonStart) : stdout) as {
+      pipeline?: { id?: string };
+    };
+    expect(payload.pipeline?.id).toBe('docs-relevance-advisory');
+  }, TEST_TIMEOUT);
+
   it('warns when plan uses packaged fallback config', async () => {
     tempDir = await mkdtemp(join(tmpdir(), 'co-cli-plan-package-fallback-'));
     const env = {

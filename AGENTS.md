@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp 02752c08cbd04027a52d182c370221efdb83f4210f443a36b993aefc39f2567e -->
+<!-- codex:instruction-stamp dd961c9a7f6432b0470d006417dae2acc6a6255492233952d83663d39e89c0e7 -->
 # Codex-Orchestrator Agent Handbook (Template)
 
 Use this repository as the wrapper that coordinates multiple Codex-driven projects. After cloning, replace placeholder metadata (task IDs, documents, SOPs) with values for each downstream initiative while keeping these shared guardrails in place.
@@ -28,9 +28,11 @@ Use this repository as the wrapper that coordinates multiple Codex-driven projec
 - Set `model_reasoning_effort` to at least `high` (CO default: `xhigh`) so spawned agents inherit high-reasoning behavior unless role overrides change it.
 - Built-in `explorer` now inherits top-level model defaults unless you attach a custom `config_file`; keep an explicit `agents.explorer` entry only when you want a custom description/override.
 - Caveat: spark models are text-only; use non-spark roles when image inputs are required.
+- Prefer built-ins-first for RLM/collab flows; add custom specialist roles only with a measured benefit, explicit owner, and validation evidence.
 - Set `[agents] max_threads = 12` with `max_depth = 4` and `max_spawn_depth = 4` as the standard multi-agent baseline.
 - Fallback policy is contingency-only (not routine): use `max_threads = 8`, `max_depth = 2`, `max_spawn_depth = 2` for constrained/high-risk lanes; use `6/1/1` only as a break-glass profile under severe host/tool contention.
 - Use an explicit `worker_complex` role (for example `gpt-5.3-codex`, `xhigh`) for high-risk implementation streams.
+- Use `codex-orchestrator doctor` as an advisory drift check for Codex defaults (model/reasoning/agent baseline); remediation is additive via `codex-orchestrator codex defaults --yes`.
 
 ## Deliberation Default (Agent-First)
 - Deliberation is the default for high-ambiguity or high-impact work. Keep MCP as the top-level control plane and use collab/delegated subagents to explore options.
@@ -56,6 +58,7 @@ Use this repository as the wrapper that coordinates multiple Codex-driven projec
 ## Orchestrator-First Workflow
 - Use `codex-orchestrator` pipelines for planning, implementation, validation, and review work that touches the repo.
 - Default to `docs-review` before implementation and `implementation-gate` after code changes (set `CODEX_REVIEW_DEVTOOLS=1` when DevTools are required).
+- Use `docs-relevance-advisory` as a non-blocking semantic docs lane when you need relevance drift signal without deterministic gating.
 - Before implementation, run a standalone review of the task/spec against the user’s intent and record the approval in the spec + checklist notes. If anything is vague, infer with a subagent and self-approve or offer options; only ask the user when truly blocked.
 - Reserve direct shell commands for lightweight discovery or one-off checks that do not require manifest evidence.
 - Delegation is mandatory for top-level tasks once a task id exists: spawn at least one subagent run using `MCP_RUNNER_TASK_ID=<task-id>-<stream>`, capture manifest evidence, and summarize in the main run. Use `DELEGATION_GUARD_OVERRIDE_REASON` only when delegation is impossible and record the justification.
@@ -91,6 +94,7 @@ Use this repository as the wrapper that coordinates multiple Codex-driven projec
 - For CI checks, review agents, cloud jobs, and orchestrator runs, wait/poll until terminal state before reporting completion.
 - Keep polling windows active after green checks and reset the window if checks restart or new feedback arrives.
 - Do not hand off an in-progress workflow unless the user explicitly asks to stop early.
+- Awaiter triage: treat long waits as normal until objective evidence shows a stall (no status/heartbeat/progress movement across multiple polling windows); increase wait timeouts before intervening.
 
 ## Oracle (External Assistant)
 - Oracle bundles a prompt plus the right files so another AI (GPT 5 Pro + more) can answer. Use when stuck/bugs/reviewing.

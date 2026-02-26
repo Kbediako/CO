@@ -175,3 +175,43 @@
 2. Fixed `npm run review` UX failure path: `--help` now exits cleanly and missing `NOTES` auto-falls back with warning.
 3. Expanded `skills/collab-evals` scenarios for additive config, built-ins-first RLM behavior, and docs relevance checks.
 4. Kept RLM runtime posture as built-ins-first overlays; no major runtime rewrite in this cycle.
+
+## 9) Follow-up implementation updates landed (2026-02-26b)
+
+### 9.1 Shipped changes
+1. Added doctor codex-defaults drift advisory (model/reasoning/agent minimums) with additive remediation guidance via `codex-orchestrator codex defaults --yes`.
+2. Shipped non-blocking `docs-relevance-advisory` pipeline lane (`docs:freshness -- --warn` + advisory `npm run review`, both `allowFailure`).
+3. Tightened built-ins-first policy language in shipped docs/templates and kept RLM posture as built-ins-first overlays.
+4. Added explicit awaiter long-wait vs stuck triage guidance across AGENTS/README surfaces.
+
+### 9.2 Validation evidence (repo)
+- Required lane rerun passed end-to-end:
+  - `out/0980-codex-cli-upgrade-audit-adoption/manual/followup-20260226b/01-delegation-guard.log`
+  - `out/0980-codex-cli-upgrade-audit-adoption/manual/followup-20260226b/02-spec-guard.log`
+  - `out/0980-codex-cli-upgrade-audit-adoption/manual/followup-20260226b/03-build.log`
+  - `out/0980-codex-cli-upgrade-audit-adoption/manual/followup-20260226b/04-lint.log`
+  - `out/0980-codex-cli-upgrade-audit-adoption/manual/followup-20260226b/05-test.log`
+  - `out/0980-codex-cli-upgrade-audit-adoption/manual/followup-20260226b/06-docs-check.log`
+  - `out/0980-codex-cli-upgrade-audit-adoption/manual/followup-20260226b/07-docs-freshness.log`
+  - `out/0980-codex-cli-upgrade-audit-adoption/manual/followup-20260226b/08-diff-budget.log`
+  - `out/0980-codex-cli-upgrade-audit-adoption/manual/followup-20260226b/09-review.log`
+  - `out/0980-codex-cli-upgrade-audit-adoption/manual/followup-20260226b/10-pack-smoke.log`
+
+### 9.3 Throwaway mock/dummy/simulated tests (downstream package path)
+- Tarball install + downstream bootstrap:
+  - `out/0980-codex-cli-upgrade-audit-adoption/manual/throwaway-sim-20260226b-01-setup.log`
+- Additive defaults merge simulation (preserve unrelated keys + preserve existing role file without `--force`):
+  - `out/0980-codex-cli-upgrade-audit-adoption/manual/throwaway-sim-20260226b-02-defaults-additive.log`
+  - `out/0980-codex-cli-upgrade-audit-adoption/manual/throwaway-sim-20260226b-02-defaults-additive-assert.log`
+- Doctor advisory before/after remediation:
+  - `out/0980-codex-cli-upgrade-audit-adoption/manual/throwaway-sim-20260226b-03-doctor-before.json`
+  - `out/0980-codex-cli-upgrade-audit-adoption/manual/throwaway-sim-20260226b-03-doctor-before-assert.log`
+  - `out/0980-codex-cli-upgrade-audit-adoption/manual/throwaway-sim-20260226b-03-defaults-remediate.log`
+  - `out/0980-codex-cli-upgrade-audit-adoption/manual/throwaway-sim-20260226b-03-doctor-after.json`
+  - `out/0980-codex-cli-upgrade-audit-adoption/manual/throwaway-sim-20260226b-03-doctor-after-assert.log`
+- `init codex` baseline payload + docs-relevance advisory lane simulation:
+  - `out/0980-codex-cli-upgrade-audit-adoption/manual/throwaway-sim-20260226b-04-init-codex.log`
+  - `out/0980-codex-cli-upgrade-audit-adoption/manual/throwaway-sim-20260226b-04-init-assert.log`
+  - `out/0980-codex-cli-upgrade-audit-adoption/manual/throwaway-sim-20260226b-04-docs-relevance.json`
+  - `out/0980-codex-cli-upgrade-audit-adoption/manual/throwaway-sim-20260226b-04-docs-relevance-assert.log`
+  - `out/0980-codex-cli-upgrade-audit-adoption/manual/throwaway-sim-20260226b-04-docs-relevance.stderr.log`

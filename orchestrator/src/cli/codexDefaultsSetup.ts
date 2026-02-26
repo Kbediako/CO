@@ -15,9 +15,10 @@ const toml = require('@iarna/toml') as {
 };
 const canonicalize = require('canonicalize') as (value: unknown) => string | undefined;
 
-const BASELINE_MODEL = 'gpt-5.3-codex';
-const BASELINE_REASONING = 'xhigh';
-const BASELINE_AGENTS = {
+export const BASELINE_MODEL = 'gpt-5.3-codex';
+export const BASELINE_REASONING = 'xhigh';
+export const BASELINE_REASONING_MINIMUM = 'high';
+export const BASELINE_AGENTS = {
   max_threads: 12,
   max_depth: 4,
   max_spawn_depth: 4

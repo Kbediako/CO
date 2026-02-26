@@ -1,6 +1,7 @@
 import process from 'node:process';
 import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { dirname, join, resolve } from 'node:path';
 
 import {
@@ -18,11 +19,21 @@ import {
 import { resolveCodexHome } from './utils/codexPaths.js';
 import { resolveOptionalDependency, type OptionalResolutionSource } from './utils/optionalDeps.js';
 import { runCloudPreflight, type CloudPreflightIssue } from './utils/cloudPreflight.js';
+import {
+  BASELINE_AGENTS,
+  BASELINE_MODEL,
+  BASELINE_REASONING_MINIMUM
+} from './codexDefaultsSetup.js';
 import { CommandPlanner } from './adapters/CommandPlanner.js';
 import { PipelineResolver } from './services/pipelineResolver.js';
 import { isRepoConfigRequired } from './config/repoConfigPolicy.js';
 import type { EnvironmentPaths } from './run/environment.js';
 import type { TaskContext } from '../types.js';
+
+const require = createRequire(import.meta.url);
+const toml = require('@iarna/toml') as {
+  parse: (source: string) => unknown;
+};
 
 const OPTIONAL_DEPENDENCIES = [
   {
@@ -59,6 +70,43 @@ export interface DoctorDevtoolsStatus {
   enablement: string[];
 }
 
+export interface DoctorCodexDefaultsAdvisory {
+  status: 'ok' | 'advisory';
+  config: {
+    path: string;
+    status: 'ok' | 'missing' | 'invalid';
+    detail?: string;
+  };
+  checks: {
+    model: {
+      status: 'ok' | 'advisory';
+      expected: string;
+      actual: string | null;
+    };
+    model_reasoning_effort: {
+      status: 'ok' | 'advisory';
+      expected_minimum: string;
+      actual: string | null;
+    };
+    max_threads: {
+      status: 'ok' | 'advisory';
+      expected_minimum: number;
+      actual: number | null;
+    };
+    max_depth: {
+      status: 'ok' | 'advisory';
+      expected_minimum: number;
+      actual: number | null;
+    };
+    max_spawn_depth: {
+      status: 'ok' | 'advisory';
+      expected_minimum: number;
+      actual: number | null;
+    };
+  };
+  guidance: string[];
+}
+
 export interface DoctorResult {
   status: 'ok' | 'warning';
   missing: string[];
@@ -71,6 +119,7 @@ export interface DoctorResult {
     };
     managed: CodexCliReadiness;
   };
+  codex_defaults: DoctorCodexDefaultsAdvisory;
   collab: {
     status: 'ok' | 'disabled' | 'unavailable';
     enabled: boolean | null;
@@ -166,6 +215,7 @@ export function runDoctor(cwd: string = process.cwd()): DoctorResult {
   if (readiness.config.status !== 'ok') {
     missing.push(`${DEVTOOLS_SKILL_NAME}-config`);
   }
+  const codexDefaults = inspectCodexDefaultsAdvisory(process.env);
 
   const codexBin = resolveCodexCliBin(process.env);
   const managedOptIn = isManagedCodexCliEnabled(process.env);
@@ -205,7 +255,7 @@ export function runDoctor(cwd: string = process.cwd()): DoctorResult {
     delegationConfig.status === 'ok' ? 'ok' : 'missing-config';
 
   return {
-    status: missing.length === 0 ? 'ok' : 'warning',
+    status: missing.length === 0 && codexDefaults.status === 'ok' ? 'ok' : 'warning',
     missing,
     dependencies,
     devtools,
@@ -213,6 +263,7 @@ export function runDoctor(cwd: string = process.cwd()): DoctorResult {
       active: { command: codexBin, managed_opt_in: managedOptIn },
       managed: managedCodex
     },
+    codex_defaults: codexDefaults,
     collab: {
       status: collabStatus,
       enabled: collabEnabled,
@@ -419,6 +470,30 @@ export function formatDoctorSummary(result: DoctorResult): string[] {
     }
   }
 
+  lines.push(`Codex defaults advisory: ${result.codex_defaults.status}`);
+  lines.push(`  - config.toml: ${result.codex_defaults.config.status} (${result.codex_defaults.config.path})`);
+  if (result.codex_defaults.config.detail) {
+    lines.push(`    detail: ${result.codex_defaults.config.detail}`);
+  }
+  lines.push(
+    `  - model: ${result.codex_defaults.checks.model.status} (actual: ${result.codex_defaults.checks.model.actual ?? '<unset>'}, expected: ${result.codex_defaults.checks.model.expected})`
+  );
+  lines.push(
+    `  - model_reasoning_effort: ${result.codex_defaults.checks.model_reasoning_effort.status} (actual: ${result.codex_defaults.checks.model_reasoning_effort.actual ?? '<unset>'}, expected >= ${result.codex_defaults.checks.model_reasoning_effort.expected_minimum})`
+  );
+  lines.push(
+    `  - agents.max_threads: ${result.codex_defaults.checks.max_threads.status} (actual: ${result.codex_defaults.checks.max_threads.actual ?? '<unset>'}, expected >= ${result.codex_defaults.checks.max_threads.expected_minimum})`
+  );
+  lines.push(
+    `  - agents.max_depth: ${result.codex_defaults.checks.max_depth.status} (actual: ${result.codex_defaults.checks.max_depth.actual ?? '<unset>'}, expected >= ${result.codex_defaults.checks.max_depth.expected_minimum})`
+  );
+  lines.push(
+    `  - agents.max_spawn_depth: ${result.codex_defaults.checks.max_spawn_depth.status} (actual: ${result.codex_defaults.checks.max_spawn_depth.actual ?? '<unset>'}, expected >= ${result.codex_defaults.checks.max_spawn_depth.expected_minimum})`
+  );
+  for (const line of result.codex_defaults.guidance) {
+    lines.push(`  - ${line}`);
+  }
+
   lines.push(`Collab: ${result.collab.status}`);
   if (result.collab.enabled !== null) {
     lines.push(`  - enabled: ${result.collab.enabled}`);
@@ -452,6 +527,127 @@ export function formatDoctorSummary(result: DoctorResult): string[] {
   }
 
   return lines;
+}
+
+function inspectCodexDefaultsAdvisory(env: NodeJS.ProcessEnv = process.env): DoctorCodexDefaultsAdvisory {
+  const configPath = join(resolveCodexHome(env), 'config.toml');
+  const checks: DoctorCodexDefaultsAdvisory['checks'] = {
+    model: { status: 'advisory', expected: BASELINE_MODEL, actual: null },
+    model_reasoning_effort: { status: 'advisory', expected_minimum: BASELINE_REASONING_MINIMUM, actual: null },
+    max_threads: { status: 'advisory', expected_minimum: BASELINE_AGENTS.max_threads, actual: null },
+    max_depth: { status: 'advisory', expected_minimum: BASELINE_AGENTS.max_depth, actual: null },
+    max_spawn_depth: { status: 'advisory', expected_minimum: BASELINE_AGENTS.max_spawn_depth, actual: null }
+  };
+  const guidance: string[] = [
+    'Run `codex-orchestrator codex defaults --yes` to apply additive baseline defaults.',
+    'Additive policy: unrelated config keys are preserved; existing role files stay untouched unless `--force` is set.'
+  ];
+
+  if (!existsSync(configPath)) {
+    return {
+      status: 'advisory',
+      config: { path: configPath, status: 'missing', detail: 'config.toml not found' },
+      checks,
+      guidance
+    };
+  }
+
+  let parsed: Record<string, unknown>;
+  try {
+    const raw = readFileSync(configPath, 'utf8');
+    const value = toml.parse(raw);
+    if (!isRecord(value)) {
+      throw new Error('top-level TOML document must be a table.');
+    }
+    parsed = value;
+  } catch (error) {
+    return {
+      status: 'advisory',
+      config: {
+        path: configPath,
+        status: 'invalid',
+        detail: error instanceof Error ? error.message : String(error)
+      },
+      checks,
+      guidance
+    };
+  }
+
+  const model = normalizeOptionalString(readStringValue(parsed.model));
+  checks.model.actual = model;
+  checks.model.status = model === BASELINE_MODEL ? 'ok' : 'advisory';
+
+  const reasoning = normalizeOptionalString(readStringValue(parsed.model_reasoning_effort));
+  checks.model_reasoning_effort.actual = reasoning;
+  checks.model_reasoning_effort.status = isReasoningAtLeastMinimum(reasoning, BASELINE_REASONING_MINIMUM)
+    ? 'ok'
+    : 'advisory';
+
+  const agents = isRecord(parsed.agents) ? parsed.agents : {};
+  const maxThreads = readNumberValue(agents.max_threads);
+  const maxDepth = readNumberValue(agents.max_depth);
+  const maxSpawnDepth = readNumberValue(agents.max_spawn_depth);
+
+  checks.max_threads.actual = maxThreads;
+  checks.max_threads.status =
+    typeof maxThreads === 'number' && maxThreads >= BASELINE_AGENTS.max_threads ? 'ok' : 'advisory';
+  checks.max_depth.actual = maxDepth;
+  checks.max_depth.status = typeof maxDepth === 'number' && maxDepth >= BASELINE_AGENTS.max_depth ? 'ok' : 'advisory';
+  checks.max_spawn_depth.actual = maxSpawnDepth;
+  checks.max_spawn_depth.status =
+    typeof maxSpawnDepth === 'number' && maxSpawnDepth >= BASELINE_AGENTS.max_spawn_depth ? 'ok' : 'advisory';
+
+  const allChecksOk = Object.values(checks).every((check) => check.status === 'ok');
+  return {
+    status: allChecksOk ? 'ok' : 'advisory',
+    config: { path: configPath, status: 'ok' },
+    checks,
+    guidance
+  };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function readStringValue(value: unknown): string | null {
+  return typeof value === 'string' ? value : null;
+}
+
+function readNumberValue(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+function isReasoningAtLeastMinimum(value: string | null, minimum: string): boolean {
+  const rank = resolveReasoningRank(value);
+  const minimumRank = resolveReasoningRank(minimum);
+  if (rank === null || minimumRank === null) {
+    return false;
+  }
+  return rank >= minimumRank;
+}
+
+function resolveReasoningRank(value: string | null): number | null {
+  if (!value) {
+    return null;
+  }
+  const normalized = value.trim().toLowerCase();
+  switch (normalized) {
+    case 'minimal':
+      return 0;
+    case 'low':
+      return 1;
+    case 'medium':
+      return 2;
+    case 'high':
+      return 3;
+    case 'xhigh':
+      return 4;
+    case 'maximum':
+      return 5;
+    default:
+      return null;
+  }
 }
 
 function normalizeOptionalString(value: string | null | undefined): string | null {

@@ -4,6 +4,7 @@
 - Goal: align CO with latest Codex CLI capabilities and defaults via a focused, evidence-backed upgrade pass.
 - Scope: audit/reporting, decision log, targeted implementation, full validation, and merged PR lifecycle.
 - Assumptions: local `codex` fork and `gh` auth are available; latest stable release remains `0.105.0` during execution.
+- Follow-up scope (2026-02-26b): implement doctor defaults-drift advisory, docs-relevance advisory lane, built-ins-first RLM guidance tightening, and awaiter triage documentation.
 
 ## Milestones & Sequencing
 1) Evidence and docs-first
@@ -15,6 +16,11 @@
 3) Validation + release
 - Run required check chain and pack smoke.
 - Open PR, resolve feedback/checks, monitor quiet window, merge, and clean branch.
+4) Follow-up hardening (2026-02-26b)
+- Add doctor codex-defaults drift advisory output + remediation guidance (`codex defaults --yes`).
+- Add a non-blocking docs-relevance advisory lane (agent/delegation friendly).
+- Update built-ins-first + awaiter-triage guidance in AGENTS/README/findings.
+- Validate in-repo + throwaway-repo simulated runs.
 
 ## Dependencies
 - `gh` release metadata + local fork git refs.
@@ -32,6 +38,7 @@
   - `node scripts/diff-budget.mjs`
   - `npm run review`
   - `npm run pack:smoke`
+  - throwaway repo simulation runs covering: `doctor` drift advisory, docs-relevance advisory lane, and awaiter triage guidance discoverability.
 - Rollback plan:
   - Revert this task’s commit range from the feature branch if validation/regression issues emerge.
 

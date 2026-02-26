@@ -140,8 +140,10 @@ model_reasoning_effort = "xhigh"
 Caveats:
 - `gpt-5.3-codex-spark` is text-only (no image inputs). Keep it for fast search/synthesis.
 - Leave `agents.explorer` undefined unless you intentionally want to override built-in explorer behavior.
+- Keep RLM/collab built-ins-first by default; add specialist custom roles only when a measured benefit justifies ongoing maintenance.
 - `max_threads = 12`, `max_depth = 4`, and `max_spawn_depth = 4` are CO's standard multi-agent baseline.
 - Fallbacks are contingency-only: use `8/2/2` on constrained hosts or deterministic high-risk lanes; use `6/1/1` only as break-glass under severe contention.
+- Awaiter triage: long waits are expected for long-running jobs; treat it as stuck only after multiple polling windows with no status/progress movement.
 - `codex review` delegates with collab tools disabled in review threads; keep review expectations single-agent even when multi-agent is enabled elsewhere.
 
 Delegation guard profile:
@@ -242,6 +244,7 @@ Usage snapshot (scans local `.runs/`):
 codex-orchestrator doctor --usage
 ```
 `doctor --usage` prints adoption KPIs (advanced/cloud/rlm/collab/delegation coverage), and per-run `run-summary.json` now includes a `usageKpi` section plus cloud fallback metadata when preflight downgrades to MCP.
+`doctor` also includes a codex-defaults advisory section (model/reasoning/agent baseline drift) and points to additive remediation via `codex-orchestrator codex defaults --yes`.
 
 Issue bundle logging (downstream dogfooding / repro handoff):
 ```bash
@@ -267,6 +270,7 @@ codex-orchestrator doctor --cloud-preflight
 - Enable required MCP servers with least privilege: `codex-orchestrator mcp enable --servers delegation --yes` (plan with `--format json`; omit `--servers` only when you intentionally want all disabled servers enabled; env/secret values are redacted in displayed command lines)
 - Low-friction docs->implementation guardrails: `codex-orchestrator flow --task <task-id>`
 - Validate + measure adoption locally: `codex-orchestrator doctor --usage --format json`
+- Run docs relevance as an advisory lane (non-blocking): `codex-orchestrator start docs-relevance-advisory --task <task-id>`
 - Capture reproducible downstream failures: `codex-orchestrator doctor --issue-log --issue-title "<title>" --issue-notes "<notes>"`
 - Auto-capture failed run issue bundles: `codex-orchestrator start <pipeline> --auto-issue-log` or `codex-orchestrator flow --auto-issue-log`
 - Review checkpoints (npm-only safe): `NOTES="Goal: ... | Summary: ... | Risks: ..." codex-orchestrator review --task <task-id>` for manifest-backed standalone review wrapper behavior (auto-skips repo-only diff-budget script when unavailable in downstream installs); use `codex review "<focus>"` for quick prompt-only checks; use `codex-orchestrator start implementation-gate --task <task-id> --format json` when you want a full gate run.
@@ -287,6 +291,7 @@ codex-orchestrator devtools setup
 
 - `codex-orchestrator start <pipeline>` — run a pipeline (add `--auto-issue-log` for automatic failure bundle capture; add `--repo-config-required` for strict repo-local config mode).
 - `codex-orchestrator flow --task <task-id>` — run `docs-review` then `implementation-gate` in sequence (supports `--auto-issue-log` and `--repo-config-required`).
+- `codex-orchestrator start docs-relevance-advisory --task <task-id>` — run non-blocking docs relevance signals (warn-mode freshness + advisory review lane).
 - `NOTES="Goal: ... | Summary: ... | Risks: ..." codex-orchestrator review --task <task-id>` — run standalone review wrapper with manifest-backed evidence (supports run-review flags/env).
 - `codex-orchestrator plan <pipeline>` — preview pipeline stages.
 - `codex-orchestrator exec <cmd>` — run a one-off command with the exec runtime.
