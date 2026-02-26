@@ -261,6 +261,25 @@ describe('resolveActionRequiredReasons', () => {
 
     expect(resolveActionRequiredReasons(snapshot)).toContain('required_checks_failed=1');
   });
+
+  it('does not classify rollup-only failing checks as action-required', () => {
+    const response = makeResponse([
+      {
+        __typename: 'CheckRun',
+        name: 'optional-check',
+        status: 'COMPLETED',
+        conclusion: 'FAILURE',
+        detailsUrl: 'https://example.com/optional-check'
+      }
+    ]);
+    const snapshot = buildStatusSnapshot(response, null, {
+      fetchError: false,
+      unacknowledgedCount: 0
+    });
+
+    expect(snapshot.requiredChecks).toBeNull();
+    expect(resolveActionRequiredReasons(snapshot)).toEqual([]);
+  });
 });
 
 describe('summarizeRequiredChecks', () => {

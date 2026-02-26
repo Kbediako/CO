@@ -757,12 +757,11 @@ export function resolveActionRequiredReasons(snapshot) {
   ) {
     reasons.push(`unacknowledged_bot_feedback=${snapshot.unacknowledgedBotFeedbackCount}`);
   }
-  const gateChecks = snapshot.requiredChecks && typeof snapshot.requiredChecks === 'object'
-    ? snapshot.requiredChecks
-    : snapshot.checks;
-  const failedCount = Array.isArray(gateChecks?.failed) ? gateChecks.failed.length : 0;
+  const requiredChecks =
+    snapshot.requiredChecks && typeof snapshot.requiredChecks === 'object' ? snapshot.requiredChecks : null;
+  const failedCount = Array.isArray(requiredChecks?.failed) ? requiredChecks.failed.length : 0;
   if (failedCount > 0) {
-    reasons.push(`${snapshot.requiredChecks ? 'required_checks_failed' : 'checks_failed'}=${failedCount}`);
+    reasons.push(`required_checks_failed=${failedCount}`);
   }
   return reasons;
 }
