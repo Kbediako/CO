@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  buildPrNumberViewArgs,
   buildPrMergeArgs,
   buildStatusSnapshot,
   isHumanReviewActor,
@@ -64,6 +65,19 @@ describe('buildPrMergeArgs', () => {
     expect(args).toContain('Kbediako/CO');
     expect(args).toContain('--match-head-commit');
     expect(args).toContain('abc123');
+  });
+});
+
+describe('buildPrNumberViewArgs', () => {
+  it('scopes PR number inference to an explicit repository', () => {
+    expect(buildPrNumberViewArgs('Kbediako', 'CO')).toEqual([
+      'pr',
+      'view',
+      '--json',
+      'number',
+      '--repo',
+      'Kbediako/CO'
+    ]);
   });
 });
 
@@ -249,6 +263,21 @@ describe('resolveActionRequiredReasons', () => {
     expect(resolveActionRequiredReasons(snapshot)).toContain('merge_state=BEHIND');
   });
 
+  it('classifies dirty merge state as action-required', () => {
+    const response = makeResponse([], {
+      mergeStateStatus: 'DIRTY'
+    });
+    const requiredChecks = summarizeRequiredChecks([
+      { name: 'corelane', state: 'SUCCESS', bucket: 'pass', link: 'https://example.com/corelane' }
+    ]);
+    const snapshot = buildStatusSnapshot(response, requiredChecks, {
+      fetchError: false,
+      unacknowledgedCount: 0
+    });
+
+    expect(resolveActionRequiredReasons(snapshot)).toContain('merge_state=DIRTY');
+  });
+
   it('classifies failing required checks as action-required', () => {
     const response = makeResponse([]);
     const requiredChecks = summarizeRequiredChecks([
@@ -279,6 +308,27 @@ describe('resolveActionRequiredReasons', () => {
 
     expect(snapshot.requiredChecks).toBeNull();
     expect(resolveActionRequiredReasons(snapshot)).toEqual([]);
+  });
+
+  it('classifies rollup failures as action-required when merge state is non-mergeable', () => {
+    const response = makeResponse([
+      {
+        __typename: 'CheckRun',
+        name: 'corelane',
+        status: 'COMPLETED',
+        conclusion: 'FAILURE',
+        detailsUrl: 'https://example.com/corelane'
+      }
+    ], {
+      mergeStateStatus: 'BLOCKED'
+    });
+    const snapshot = buildStatusSnapshot(response, null, {
+      fetchError: false,
+      unacknowledgedCount: 0
+    });
+
+    expect(snapshot.requiredChecks).toBeNull();
+    expect(resolveActionRequiredReasons(snapshot)).toContain('checks_failed=1');
   });
 });
 

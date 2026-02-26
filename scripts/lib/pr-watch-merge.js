@@ -16,6 +16,7 @@ const REQUIRED_BUCKET_PASS = new Set(['pass']);
 const REQUIRED_BUCKET_PENDING = new Set(['pending']);
 const REQUIRED_BUCKET_FAILED = new Set(['fail', 'cancel', 'skipping']);
 const MERGEABLE_STATES = new Set(['CLEAN', 'HAS_HOOKS', 'UNSTABLE']);
+const ACTION_REQUIRED_MERGE_STATES = new Set(['BEHIND', 'DIRTY']);
 const BLOCKED_REVIEW_DECISIONS = new Set(['CHANGES_REQUESTED', 'REVIEW_REQUIRED']);
 const DO_NOT_MERGE_LABEL = /do[\s_-]*not[\s_-]*merge/i;
 const ACTIONABLE_BOT_LOGINS = new Set([
@@ -469,11 +470,19 @@ async function resolveRepo(ownerArg, repoArg) {
   return { owner, repo };
 }
 
-async function resolvePrNumber(prArg) {
+export function buildPrNumberViewArgs(owner, repo) {
+  const args = ['pr', 'view', '--json', 'number'];
+  if (typeof owner === 'string' && owner.trim().length > 0 && typeof repo === 'string' && repo.trim().length > 0) {
+    args.push('--repo', `${owner.trim()}/${repo.trim()}`);
+  }
+  return args;
+}
+
+async function resolvePrNumber(prArg, owner, repo) {
   if (prArg !== undefined) {
     return parseInteger('pr', prArg, null);
   }
-  const response = await runGhJson(['pr', 'view', '--json', 'number']);
+  const response = await runGhJson(buildPrNumberViewArgs(owner, repo));
   const number = response?.number;
   if (!Number.isInteger(number) || number <= 0) {
     throw new Error('Unable to infer PR number from current branch.');
@@ -745,7 +754,7 @@ export function resolveActionRequiredReasons(snapshot) {
   if (BLOCKED_REVIEW_DECISIONS.has(reviewDecision)) {
     reasons.push(`review=${reviewDecision}`);
   }
-  if (mergeStateStatus === 'BEHIND') {
+  if (ACTION_REQUIRED_MERGE_STATES.has(mergeStateStatus)) {
     reasons.push(`merge_state=${mergeStateStatus}`);
   }
   if (typeof snapshot.unresolvedThreadCount === 'number' && snapshot.unresolvedThreadCount > 0) {
@@ -759,9 +768,14 @@ export function resolveActionRequiredReasons(snapshot) {
   }
   const requiredChecks =
     snapshot.requiredChecks && typeof snapshot.requiredChecks === 'object' ? snapshot.requiredChecks : null;
-  const failedCount = Array.isArray(requiredChecks?.failed) ? requiredChecks.failed.length : 0;
-  if (failedCount > 0) {
-    reasons.push(`required_checks_failed=${failedCount}`);
+  const requiredFailedCount = Array.isArray(requiredChecks?.failed) ? requiredChecks.failed.length : 0;
+  if (requiredFailedCount > 0) {
+    reasons.push(`required_checks_failed=${requiredFailedCount}`);
+  } else {
+    const rollupFailedCount = Array.isArray(snapshot.checks?.failed) ? snapshot.checks.failed.length : 0;
+    if (!requiredChecks && !MERGEABLE_STATES.has(mergeStateStatus) && rollupFailedCount > 0) {
+      reasons.push(`checks_failed=${rollupFailedCount}`);
+    }
   }
   return reasons;
 }
@@ -1352,7 +1366,7 @@ async function runPrWatchMergeOrThrow(argv, options) {
     typeof args.owner === 'string' ? args.owner : undefined,
     typeof args.repo === 'string' ? args.repo : undefined
   );
-  const prNumber = await resolvePrNumber(args.pr);
+  const prNumber = await resolvePrNumber(args.pr, owner, repo);
 
   const intervalMs = Math.round(intervalSeconds * 1000);
   const quietMs = Math.round(quietMinutes * 60 * 1000);

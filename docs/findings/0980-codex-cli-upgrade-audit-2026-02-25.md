@@ -226,7 +226,7 @@
 ### 10.2 Shipped watch-resolve-merge posture
 1. Added shipped `codex-orchestrator pr resolve-merge` subcommand as a thin mode over `pr watch-merge`.
 2. Reused existing required-check/bot-feedback/thread/review gating logic; no new orchestration subsystem.
-3. Enabled `exit-on-action-required` by default in resolve mode so loops stop early when author intervention is required.
+3. Enabled `exit-on-action-required` by default in resolve mode, so loops stop early when author intervention is required.
 4. Added explicit action-required classification for:
    - `review=CHANGES_REQUESTED|REVIEW_REQUIRED`
    - `merge_state=BEHIND` (branch update required before merge)

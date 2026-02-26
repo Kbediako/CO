@@ -83,6 +83,7 @@ export function isHumanReviewActor(
 ): boolean;
 
 export function parseGitHubRepoFromRemoteUrl(rawUrl: string): { owner: string; repo: string } | null;
+export function buildPrNumberViewArgs(owner?: string, repo?: string): string[];
 
 export function summarizeRequiredChecks(entries: unknown): PrWatchMergeCheckSummary;
 
