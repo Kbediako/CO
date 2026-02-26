@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  buildPrNumberViewArgs,
   buildPrMergeArgs,
   buildStatusSnapshot,
   isHumanReviewActor,
+  parseGitHubRepoFromRemoteUrl,
+  resolveActionRequiredReasons,
   resolveLatestBotRereviewRequests,
   resolveBotRereviewTimingForKind,
   resolveCachedRequiredChecksSummary,
@@ -11,7 +14,7 @@ import {
   summarizeRequiredChecks
 } from '../scripts/lib/pr-watch-merge.js';
 
-function makeResponse(checkNodes: unknown[]) {
+function makeResponse(checkNodes: unknown[], overrides: Record<string, unknown> = {}) {
   return {
     data: {
       repository: {
@@ -39,7 +42,8 @@ function makeResponse(checkNodes: unknown[]) {
                 }
               }
             ]
-          }
+          },
+          ...overrides
         }
       }
     }
@@ -61,6 +65,39 @@ describe('buildPrMergeArgs', () => {
     expect(args).toContain('Kbediako/CO');
     expect(args).toContain('--match-head-commit');
     expect(args).toContain('abc123');
+  });
+});
+
+describe('buildPrNumberViewArgs', () => {
+  it('scopes PR number inference to an explicit repository', () => {
+    expect(buildPrNumberViewArgs('Kbediako', 'CO')).toEqual([
+      'pr',
+      'view',
+      '--json',
+      'number',
+      '--repo',
+      'Kbediako/CO'
+    ]);
+  });
+});
+
+describe('parseGitHubRepoFromRemoteUrl', () => {
+  it('parses https remotes', () => {
+    expect(parseGitHubRepoFromRemoteUrl('https://github.com/Kbediako/CO.git')).toEqual({
+      owner: 'Kbediako',
+      repo: 'CO'
+    });
+  });
+
+  it('parses ssh remotes', () => {
+    expect(parseGitHubRepoFromRemoteUrl('git@github.com:Kbediako/CO.git')).toEqual({
+      owner: 'Kbediako',
+      repo: 'CO'
+    });
+  });
+
+  it('returns null for non-github remotes', () => {
+    expect(parseGitHubRepoFromRemoteUrl('https://gitlab.com/org/repo.git')).toBeNull();
   });
 });
 
@@ -163,6 +200,205 @@ describe('pr watch-merge required-check gating', () => {
     expect(snapshot.botRereviewInProgress).toEqual(['codex']);
     expect(snapshot.coderabbitReviewMeta.outsideDiffCount).toBe(1);
     expect(snapshot.coderabbitReviewMeta.nitpickCount).toBe(3);
+  });
+});
+
+describe('resolveActionRequiredReasons', () => {
+  it('classifies review and thread feedback blockers as action-required', () => {
+    const response = makeResponse([], {
+      reviewDecision: 'CHANGES_REQUESTED',
+      reviewThreads: {
+        nodes: [
+          {
+            isResolved: false,
+            isOutdated: false
+          }
+        ]
+      }
+    });
+    const requiredChecks = summarizeRequiredChecks([
+      { name: 'corelane', state: 'SUCCESS', bucket: 'pass', link: 'https://example.com/corelane' }
+    ]);
+    const snapshot = buildStatusSnapshot(response, requiredChecks, {
+      fetchError: false,
+      unacknowledgedCount: 2
+    });
+
+    const reasons = resolveActionRequiredReasons(snapshot);
+    expect(reasons).toContain('review=CHANGES_REQUESTED');
+    expect(reasons).toContain('unresolved_threads=1');
+    expect(reasons).toContain('unacknowledged_bot_feedback=2');
+  });
+
+  it('classifies draft PRs as action-required', () => {
+    const response = makeResponse([], {
+      isDraft: true
+    });
+    const snapshot = buildStatusSnapshot(response, null, {
+      fetchError: false,
+      unacknowledgedCount: 0
+    });
+
+    expect(resolveActionRequiredReasons(snapshot)).toContain('draft');
+  });
+
+  it('classifies do-not-merge labels as action-required', () => {
+    const response = makeResponse([], {
+      labels: {
+        nodes: [{ name: 'do-not-merge' }]
+      }
+    });
+    const snapshot = buildStatusSnapshot(response, null, {
+      fetchError: false,
+      unacknowledgedCount: 0
+    });
+
+    expect(resolveActionRequiredReasons(snapshot)).toContain('label:do-not-merge');
+  });
+
+  it('does not classify pending checks as action-required by itself', () => {
+    const response = makeResponse([
+      {
+        __typename: 'CheckRun',
+        name: 'corelane',
+        status: 'IN_PROGRESS',
+        conclusion: null,
+        detailsUrl: 'https://example.com/corelane'
+      }
+    ]);
+    const snapshot = buildStatusSnapshot(response, null, {
+      fetchError: false,
+      unacknowledgedCount: 0
+    });
+
+    expect(resolveActionRequiredReasons(snapshot)).toEqual([]);
+  });
+
+  it('classifies behind merge state as action-required', () => {
+    const response = makeResponse([], {
+      mergeStateStatus: 'BEHIND'
+    });
+    const requiredChecks = summarizeRequiredChecks([
+      { name: 'corelane', state: 'SUCCESS', bucket: 'pass', link: 'https://example.com/corelane' }
+    ]);
+    const snapshot = buildStatusSnapshot(response, requiredChecks, {
+      fetchError: false,
+      unacknowledgedCount: 0
+    });
+
+    expect(resolveActionRequiredReasons(snapshot)).toContain('merge_state=BEHIND');
+  });
+
+  it('classifies dirty merge state as action-required', () => {
+    const response = makeResponse([], {
+      mergeStateStatus: 'DIRTY'
+    });
+    const requiredChecks = summarizeRequiredChecks([
+      { name: 'corelane', state: 'SUCCESS', bucket: 'pass', link: 'https://example.com/corelane' }
+    ]);
+    const snapshot = buildStatusSnapshot(response, requiredChecks, {
+      fetchError: false,
+      unacknowledgedCount: 0
+    });
+
+    expect(resolveActionRequiredReasons(snapshot)).toContain('merge_state=DIRTY');
+  });
+
+  it('classifies failing required checks as action-required', () => {
+    const response = makeResponse([], {
+      mergeStateStatus: 'BLOCKED'
+    });
+    const requiredChecks = summarizeRequiredChecks([
+      { name: 'corelane', state: 'FAILURE', bucket: 'fail', link: 'https://example.com/corelane' }
+    ]);
+    const snapshot = buildStatusSnapshot(response, requiredChecks, {
+      fetchError: false,
+      unacknowledgedCount: 0
+    });
+
+    expect(resolveActionRequiredReasons(snapshot)).toContain('required_checks_failed=1');
+  });
+
+  it('ignores required-check failures when snapshot is ready to merge', () => {
+    const response = makeResponse([]);
+    const requiredChecks = summarizeRequiredChecks([
+      { name: 'corelane', state: 'FAILURE', bucket: 'fail', link: 'https://example.com/corelane' }
+    ]);
+    const snapshot = buildStatusSnapshot(response, requiredChecks, {
+      fetchError: false,
+      unacknowledgedCount: 0
+    });
+
+    expect(snapshot.readyToMerge).toBe(true);
+    expect(resolveActionRequiredReasons(snapshot)).toEqual([]);
+  });
+
+  it('does not classify rollup-only failing checks as action-required', () => {
+    const response = makeResponse([
+      {
+        __typename: 'CheckRun',
+        name: 'optional-check',
+        status: 'COMPLETED',
+        conclusion: 'FAILURE',
+        detailsUrl: 'https://example.com/optional-check'
+      }
+    ]);
+    const snapshot = buildStatusSnapshot(response, null, {
+      fetchError: false,
+      unacknowledgedCount: 0
+    });
+
+    expect(snapshot.requiredChecks).toBeNull();
+    expect(resolveActionRequiredReasons(snapshot)).toEqual([]);
+  });
+
+  it('classifies rollup failures as action-required when merge state is non-mergeable', () => {
+    const response = makeResponse([
+      {
+        __typename: 'CheckRun',
+        name: 'corelane',
+        status: 'COMPLETED',
+        conclusion: 'FAILURE',
+        detailsUrl: 'https://example.com/corelane'
+      }
+    ], {
+      mergeStateStatus: 'BLOCKED'
+    });
+    const snapshot = buildStatusSnapshot(response, null, {
+      fetchError: false,
+      unacknowledgedCount: 0
+    });
+
+    expect(snapshot.requiredChecks).toBeNull();
+    expect(resolveActionRequiredReasons(snapshot)).toContain('checks_failed=1');
+  });
+
+  it('does not classify rollup failures as action-required while rollup checks are pending', () => {
+    const response = makeResponse([
+      {
+        __typename: 'CheckRun',
+        name: 'corelane',
+        status: 'IN_PROGRESS',
+        conclusion: null,
+        detailsUrl: 'https://example.com/corelane'
+      },
+      {
+        __typename: 'CheckRun',
+        name: 'optional-check',
+        status: 'COMPLETED',
+        conclusion: 'FAILURE',
+        detailsUrl: 'https://example.com/optional-check'
+      }
+    ], {
+      mergeStateStatus: 'BLOCKED'
+    });
+    const snapshot = buildStatusSnapshot(response, null, {
+      fetchError: false,
+      unacknowledgedCount: 0
+    });
+
+    expect(snapshot.requiredChecks).toBeNull();
+    expect(resolveActionRequiredReasons(snapshot)).toEqual([]);
   });
 });
 

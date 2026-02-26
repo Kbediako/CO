@@ -5,6 +5,7 @@
 - Scope: audit/reporting, decision log, targeted implementation, full validation, and merged PR lifecycle.
 - Assumptions: local `codex` fork and `gh` auth are available; latest stable release remains `0.105.0` during execution.
 - Follow-up scope (2026-02-26b): implement doctor defaults-drift advisory, docs-relevance advisory lane, built-ins-first RLM guidance tightening, and awaiter triage documentation.
+- Follow-up scope (2026-02-26c): implement shipped `pr resolve-merge` behavior (action-required early exit), align SOP/skill guidance, and capture targeted validation evidence.
 
 ## Milestones & Sequencing
 1) Evidence and docs-first
@@ -21,6 +22,11 @@
 - Add a non-blocking docs-relevance advisory lane (agent/delegation friendly).
 - Update built-ins-first + awaiter-triage guidance in AGENTS/README/findings.
 - Validate in-repo + throwaway-repo simulated runs.
+5) Follow-up PR monitor hardening (2026-02-26c)
+- [x] Add `pr resolve-merge` subcommand by reusing `pr watch-merge` poll/gate behavior. - Evidence: `.runs/0980-codex-cli-upgrade-audit-adoption/cli/2026-02-26T11-05-27-918Z-5f6d4aac/manifest.json`.
+- [x] Exit early with explicit action-required signaling for review/thread/feedback/check-failure blockers. - Evidence: `.runs/0980-codex-cli-upgrade-audit-adoption/cli/2026-02-26T11-05-27-918Z-5f6d4aac/manifest.json`.
+- [x] Update SOP + release skill guidance and fallback scripts. - Evidence: `.runs/0980-codex-cli-upgrade-audit-adoption/cli/2026-02-26T11-05-27-918Z-5f6d4aac/manifest.json`.
+- [x] Run targeted CLI/unit/docs validation, plus the required quality lane when touched surfaces require it. - Evidence: `.runs/0980-codex-cli-upgrade-audit-adoption/cli/2026-02-26T11-05-27-918Z-5f6d4aac/manifest.json`.
 
 ## Dependencies
 - `gh` release metadata + local fork git refs.

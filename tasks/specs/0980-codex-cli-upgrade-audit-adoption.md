@@ -14,6 +14,7 @@ last_review: 2026-02-26
 - Constraints: minimal high-leverage changes only; no destructive git operations; preserve compatibility context where legacy aliases still matter.
 - Follow-up scope (2026-02-26): codify built-ins-first/high-reasoning baseline, additive config posture, simulation coverage ownership, docs relevance governance, RLM default-capability stance, and fallback exception policy.
 - Follow-up scope (2026-02-26b): implement doctor defaults-drift advisory, ship a docs-relevance advisory lane (non-blocking), tighten built-ins-first RLM guidance, and add explicit awaiter long-wait triage docs.
+- Additional scope (2026-02-26c): add a shipped watch-resolve-merge command mode that exits on actionable PR feedback, plus docs/skills updates clarifying watch vs resolve merge loops.
 
 ## Decision and Success Criteria
 - Decision:
@@ -26,6 +27,7 @@ last_review: 2026-02-26
   - Start docs relevance checks with delegated agent lanes; defer deterministic hard gate until false-positive baseline is measured.
   - Add doctor detection/advice for codex-defaults drift without converting it to a hard gate.
   - Keep RLM runtime built-ins-first; document criteria before any new specialized role proliferation.
+  - Add a first-class `pr resolve-merge` command posture that reuses existing poll/merge logic and exits non-zero on action-required blockers.
 - Success criteria:
   - Source-backed change report and fork delta summary published.
   - Thread/depth decision log includes rationale, risks, and rejected alternatives.
@@ -46,6 +48,7 @@ last_review: 2026-02-26
   - Have `doctor` report codex defaults drift advisories (model/reasoning/agent limits) and point to additive remediation.
   - Keep docs-relevance support advisory and non-blocking, with explicit language about false-positive tracking before gating.
   - Clarify in operator docs the awaiter “long wait” vs “stuck” diagnosis and expected polling behavior.
+  - Clarify PR monitor policy for action-required blockers vs waitable states to prevent long-loop ambiguity.
 - Non-functional requirements (performance, reliability, security):
   - No regressions to existing orchestrator commands or review wrappers.
   - Keep downstream packaging compatibility intact for touched skills/docs surfaces.

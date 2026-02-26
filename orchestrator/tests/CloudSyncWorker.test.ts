@@ -45,6 +45,17 @@ const readAuditLog = async (outDir: string, summary: RunSummary): Promise<string
   throw new Error(`unable to read audit log: ${auditPath}`);
 };
 
+const waitForCondition = async (predicate: () => boolean, timeoutMs: number = 2000): Promise<void> => {
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < timeoutMs) {
+    if (predicate()) {
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  throw new Error('timed out waiting for async condition');
+};
+
 describe('CloudSyncWorker', () => {
   it('uploads manifest and writes audit log on success', async () => {
     const root = await mkdtemp(join(tmpdir(), 'cloud-sync-worker-'));
@@ -67,7 +78,7 @@ describe('CloudSyncWorker', () => {
     worker.start();
     bus.emit({ type: 'run:completed', payload: summary });
 
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    await waitForCondition(() => upload.mock.calls.length >= 1);
 
     expect(upload).toHaveBeenCalledTimes(1);
     const expectedKey = createHash('sha256')
@@ -272,7 +283,7 @@ describe('CloudSyncWorker', () => {
     worker.start();
     bus.emit({ type: 'run:completed', payload: summary });
 
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    await waitForCondition(() => upload.mock.calls.length >= 1);
 
     expect(upload).toHaveBeenCalledTimes(1);
     expect(onError).toHaveBeenCalledWith(expect.any(CloudRunsHttpError), summary, 1);
@@ -307,7 +318,7 @@ describe('CloudSyncWorker', () => {
     worker.start();
     bus.emit({ type: 'run:completed', payload: summary });
 
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    await waitForCondition(() => fetchImpl.mock.calls.length >= 1);
 
     expect(fetchImpl).toHaveBeenCalledTimes(1);
     const audit = await readAuditLog(outDir, summary);

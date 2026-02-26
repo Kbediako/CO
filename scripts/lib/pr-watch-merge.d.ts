@@ -1,5 +1,7 @@
 export interface PrWatchMergeOptions {
   usage?: string;
+  defaultAutoMerge?: boolean;
+  defaultExitOnActionRequired?: boolean;
 }
 
 export interface PrWatchMergeCheckFailure {
@@ -80,6 +82,9 @@ export function isHumanReviewActor(
     | undefined
 ): boolean;
 
+export function parseGitHubRepoFromRemoteUrl(rawUrl: string): { owner: string; repo: string } | null;
+export function buildPrNumberViewArgs(owner?: string, repo?: string): string[];
+
 export function summarizeRequiredChecks(entries: unknown): PrWatchMergeCheckSummary;
 
 export function resolveRequiredChecksSummary(
@@ -102,6 +107,8 @@ export function buildStatusSnapshot(
     rereview?: PrWatchMergeBotRereviewSignals | null;
   } | null
 ): PrWatchMergeSnapshot;
+
+export function resolveActionRequiredReasons(snapshot: PrWatchMergeSnapshot): string[];
 
 export function resolveLatestBotRereviewRequests(
   comments: Array<{

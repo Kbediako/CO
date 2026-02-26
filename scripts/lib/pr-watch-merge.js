@@ -16,6 +16,7 @@ const REQUIRED_BUCKET_PASS = new Set(['pass']);
 const REQUIRED_BUCKET_PENDING = new Set(['pending']);
 const REQUIRED_BUCKET_FAILED = new Set(['fail', 'cancel', 'skipping']);
 const MERGEABLE_STATES = new Set(['CLEAN', 'HAS_HOOKS', 'UNSTABLE']);
+const ACTION_REQUIRED_MERGE_STATES = new Set(['BEHIND', 'DIRTY']);
 const BLOCKED_REVIEW_DECISIONS = new Set(['CHANGES_REQUESTED', 'REVIEW_REQUIRED']);
 const DO_NOT_MERGE_LABEL = /do[\s_-]*not[\s_-]*merge/i;
 const ACTIONABLE_BOT_LOGINS = new Set([
@@ -34,6 +35,14 @@ const BOT_MENTION_PATTERNS = {
 };
 const BOT_IN_PROGRESS_REACTION_CONTENT = new Set(['eyes']);
 const BOT_COMPLETE_REACTION_CONTENT = new Set(['+1', 'hooray', 'heart', 'rocket', 'laugh', 'confused']);
+
+class PrWatchMergeExitError extends Error {
+  constructor(message, exitCode = 1) {
+    super(message);
+    this.name = 'PrWatchMergeExitError';
+    this.exitCode = exitCode;
+  }
+}
 
 const PR_QUERY = `
 query($owner:String!, $repo:String!, $number:Int!) {
@@ -260,6 +269,11 @@ export function printPrWatchMergeHelp(options = {}) {
   const usageCommand = typeof options.usage === 'string' && options.usage.trim().length > 0
     ? options.usage.trim()
     : 'codex-orchestrator pr watch-merge';
+  const defaultAutoMerge =
+    typeof options.defaultAutoMerge === 'boolean'
+      ? options.defaultAutoMerge
+      : envFlagEnabled(process.env.PR_MONITOR_AUTO_MERGE, false);
+  const defaultExitOnActionRequired = Boolean(options.defaultExitOnActionRequired);
   console.log(`Usage: ${usageCommand} [options]
 
 Monitor PR checks/reviews with polling and optionally merge after a quiet window.
@@ -276,16 +290,21 @@ Options:
   --no-auto-merge           Never merge automatically (monitor only)
   --delete-branch           Delete remote branch when merging
   --no-delete-branch        Keep remote branch after merge
+  --exit-on-action-required Exit non-zero when author action is required
+  --no-exit-on-action-required Keep monitoring even when author action is required
   --dry-run                 Never call gh pr merge (report only)
   -h, --help                Show this help message
 
 Environment:
-  PR_MONITOR_AUTO_MERGE=1       Default auto-merge on
+  PR_MONITOR_AUTO_MERGE=1       Default auto-merge on (current default: ${defaultAutoMerge ? 'on' : 'off'})
   PR_MONITOR_DELETE_BRANCH=1    Default delete branch on merge
   PR_MONITOR_QUIET_MINUTES=<n>  Override quiet window default
   PR_MONITOR_INTERVAL_SECONDS=<n>
   PR_MONITOR_TIMEOUT_MINUTES=<n>
   PR_MONITOR_MERGE_METHOD=<method>`);
+  if (defaultExitOnActionRequired) {
+    console.log('  resolve-merge default: exit-on-action-required is on');
+  }
 }
 
 async function runGh(args, { allowFailure = false } = {}) {
@@ -331,6 +350,44 @@ async function runGh(args, { allowFailure = false } = {}) {
   });
 }
 
+async function runGit(args, { allowFailure = false } = {}) {
+  return await new Promise((resolve, reject) => {
+    const child = spawn('git', args, {
+      env: process.env,
+      stdio: ['ignore', 'pipe', 'pipe']
+    });
+
+    let stdout = '';
+    let stderr = '';
+
+    child.stdout?.on('data', (chunk) => {
+      stdout += chunk.toString();
+    });
+    child.stderr?.on('data', (chunk) => {
+      stderr += chunk.toString();
+    });
+
+    child.once('error', (error) => {
+      reject(new Error(`Failed to run git ${args.join(' ')}: ${error.message}`));
+    });
+
+    child.once('close', (code) => {
+      const exitCode = typeof code === 'number' ? code : 1;
+      const result = {
+        exitCode,
+        stdout: stdout.trim(),
+        stderr: stderr.trim()
+      };
+      if (exitCode === 0 || allowFailure) {
+        resolve(result);
+        return;
+      }
+      const detail = result.stderr || result.stdout || `exit code ${exitCode}`;
+      reject(new Error(`git ${args.join(' ')} failed: ${detail}`));
+    });
+  });
+}
+
 async function runGhJson(args) {
   const result = await runGh(args);
   try {
@@ -364,12 +421,50 @@ async function ensureGhAuth() {
   }
 }
 
+export function parseGitHubRepoFromRemoteUrl(rawUrl) {
+  if (typeof rawUrl !== 'string' || rawUrl.trim().length === 0) {
+    return null;
+  }
+  const normalized = rawUrl.trim();
+  const patterns = [
+    /^git@github\.com:(?<owner>[^/\s]+)\/(?<repo>[^/\s]+?)(?:\.git)?$/iu,
+    /^https?:\/\/github\.com\/(?<owner>[^/\s]+)\/(?<repo>[^/\s]+?)(?:\.git)?\/?$/iu,
+    /^ssh:\/\/git@github\.com\/(?<owner>[^/\s]+)\/(?<repo>[^/\s]+?)(?:\.git)?\/?$/iu
+  ];
+  for (const pattern of patterns) {
+    const match = normalized.match(pattern);
+    const owner = match?.groups?.owner?.trim();
+    const repo = match?.groups?.repo?.trim();
+    if (owner && repo) {
+      return { owner, repo };
+    }
+  }
+  return null;
+}
+
+async function resolveRepoFromGitRemote() {
+  let result;
+  try {
+    result = await runGit(['remote', 'get-url', 'origin'], { allowFailure: true });
+  } catch {
+    return null;
+  }
+  if (result.exitCode !== 0 || !result.stdout) {
+    return null;
+  }
+  return parseGitHubRepoFromRemoteUrl(result.stdout);
+}
+
 async function resolveRepo(ownerArg, repoArg) {
   if (ownerArg && repoArg) {
     return { owner: ownerArg, repo: repoArg };
   }
   if (ownerArg || repoArg) {
     throw new Error('Provide both --owner and --repo, or neither.');
+  }
+  const gitRemoteRepo = await resolveRepoFromGitRemote();
+  if (gitRemoteRepo) {
+    return gitRemoteRepo;
   }
   const response = await runGhJson(['repo', 'view', '--json', 'nameWithOwner']);
   const nameWithOwner = response?.nameWithOwner;
@@ -380,11 +475,19 @@ async function resolveRepo(ownerArg, repoArg) {
   return { owner, repo };
 }
 
-async function resolvePrNumber(prArg) {
+export function buildPrNumberViewArgs(owner, repo) {
+  const args = ['pr', 'view', '--json', 'number'];
+  if (typeof owner === 'string' && owner.trim().length > 0 && typeof repo === 'string' && repo.trim().length > 0) {
+    args.push('--repo', `${owner.trim()}/${repo.trim()}`);
+  }
+  return args;
+}
+
+async function resolvePrNumber(prArg, owner, repo) {
   if (prArg !== undefined) {
     return parseInteger('pr', prArg, null);
   }
-  const response = await runGhJson(['pr', 'view', '--json', 'number']);
+  const response = await runGhJson(buildPrNumberViewArgs(owner, repo));
   const number = response?.number;
   if (!Number.isInteger(number) || number <= 0) {
     throw new Error('Unable to infer PR number from current branch.');
@@ -638,6 +741,49 @@ export function buildStatusSnapshot(response, requiredChecks = null, inlineBotFe
     readyToMerge: gateReasons.length === 0,
     headOid: pr.commits?.nodes?.[0]?.commit?.oid || null
   };
+}
+
+export function resolveActionRequiredReasons(snapshot) {
+  if (!snapshot || typeof snapshot !== 'object') {
+    return ['snapshot=unknown'];
+  }
+  const reasons = [];
+  const reviewDecision = normalizeEnum(snapshot.reviewDecision);
+  const mergeStateStatus = normalizeEnum(snapshot.mergeStateStatus);
+  if (Boolean(snapshot.isDraft)) {
+    reasons.push('draft');
+  }
+  if (Boolean(snapshot.hasDoNotMergeLabel)) {
+    reasons.push('label:do-not-merge');
+  }
+  if (BLOCKED_REVIEW_DECISIONS.has(reviewDecision)) {
+    reasons.push(`review=${reviewDecision}`);
+  }
+  if (ACTION_REQUIRED_MERGE_STATES.has(mergeStateStatus)) {
+    reasons.push(`merge_state=${mergeStateStatus}`);
+  }
+  if (typeof snapshot.unresolvedThreadCount === 'number' && snapshot.unresolvedThreadCount > 0) {
+    reasons.push(`unresolved_threads=${snapshot.unresolvedThreadCount}`);
+  }
+  if (
+    typeof snapshot.unacknowledgedBotFeedbackCount === 'number'
+    && snapshot.unacknowledgedBotFeedbackCount > 0
+  ) {
+    reasons.push(`unacknowledged_bot_feedback=${snapshot.unacknowledgedBotFeedbackCount}`);
+  }
+  const requiredChecks =
+    snapshot.requiredChecks && typeof snapshot.requiredChecks === 'object' ? snapshot.requiredChecks : null;
+  const requiredFailedCount = Array.isArray(requiredChecks?.failed) ? requiredChecks.failed.length : 0;
+  if (requiredFailedCount > 0 && snapshot.readyToMerge === false) {
+    reasons.push(`required_checks_failed=${requiredFailedCount}`);
+  } else {
+    const rollupFailedCount = Array.isArray(snapshot.checks?.failed) ? snapshot.checks.failed.length : 0;
+    const rollupPendingCount = Array.isArray(snapshot.checks?.pending) ? snapshot.checks.pending.length : 0;
+    if (!requiredChecks && !MERGEABLE_STATES.has(mergeStateStatus) && rollupPendingCount === 0 && rollupFailedCount > 0) {
+      reasons.push(`checks_failed=${rollupFailedCount}`);
+    }
+  }
+  return reasons;
 }
 
 function formatStatusLine(snapshot, quietRemainingMs) {
@@ -1157,6 +1303,8 @@ async function runPrWatchMergeOrThrow(argv, options) {
     'no-auto-merge',
     'delete-branch',
     'no-delete-branch',
+    'exit-on-action-required',
+    'no-exit-on-action-required',
     'dry-run',
     'h',
     'help'
@@ -1193,7 +1341,8 @@ async function runPrWatchMergeOrThrow(argv, options) {
       ? args['merge-method']
       : process.env.PR_MONITOR_MERGE_METHOD || DEFAULT_MERGE_METHOD
   );
-  const defaultAutoMerge = envFlagEnabled(process.env.PR_MONITOR_AUTO_MERGE, false);
+  const defaultAutoMergeFallback = typeof options.defaultAutoMerge === 'boolean' ? options.defaultAutoMerge : false;
+  const defaultAutoMerge = envFlagEnabled(process.env.PR_MONITOR_AUTO_MERGE, defaultAutoMergeFallback);
   const defaultDeleteBranch = envFlagEnabled(process.env.PR_MONITOR_DELETE_BRANCH, true);
   let autoMerge = defaultAutoMerge;
   if (hasFlag(args, 'auto-merge')) {
@@ -1209,6 +1358,13 @@ async function runPrWatchMergeOrThrow(argv, options) {
   if (hasFlag(args, 'no-delete-branch')) {
     deleteBranch = false;
   }
+  let exitOnActionRequired = Boolean(options.defaultExitOnActionRequired);
+  if (hasFlag(args, 'exit-on-action-required')) {
+    exitOnActionRequired = true;
+  }
+  if (hasFlag(args, 'no-exit-on-action-required')) {
+    exitOnActionRequired = false;
+  }
   const dryRun = hasFlag(args, 'dry-run');
 
   await ensureGhAuth();
@@ -1216,7 +1372,7 @@ async function runPrWatchMergeOrThrow(argv, options) {
     typeof args.owner === 'string' ? args.owner : undefined,
     typeof args.repo === 'string' ? args.repo : undefined
   );
-  const prNumber = await resolvePrNumber(args.pr);
+  const prNumber = await resolvePrNumber(args.pr, owner, repo);
 
   const intervalMs = Math.round(intervalSeconds * 1000);
   const quietMs = Math.round(quietMinutes * 60 * 1000);
@@ -1226,7 +1382,7 @@ async function runPrWatchMergeOrThrow(argv, options) {
   log(
     `Monitoring ${owner}/${repo}#${prNumber} every ${intervalSeconds}s (quiet window ${quietMinutes}m, timeout ${timeoutMinutes}m, auto_merge=${
       autoMerge ? 'on' : 'off'
-    }, dry_run=${dryRun ? 'on' : 'off'}).`
+    }, exit_on_action_required=${exitOnActionRequired ? 'on' : 'off'}, dry_run=${dryRun ? 'on' : 'off'}).`
   );
 
   let quietWindowStartedAt = null;
@@ -1286,6 +1442,17 @@ async function runPrWatchMergeOrThrow(argv, options) {
 
     log(formatStatusLine(snapshot, quietRemainingMs));
 
+    if (exitOnActionRequired) {
+      const actionRequiredReasons = resolveActionRequiredReasons(snapshot);
+      if (actionRequiredReasons.length > 0) {
+        const details = actionRequiredReasons.join(', ');
+        throw new PrWatchMergeExitError(
+          `Action required before merge: ${details}${snapshot.url ? ` (${snapshot.url})` : ''}`,
+          2
+        );
+      }
+    }
+
     if (snapshot.readyToMerge && quietWindowStartedAt !== null && quietElapsedMs >= quietMs) {
       if (!autoMerge || dryRun) {
         log(
@@ -1328,7 +1495,10 @@ async function runPrWatchMergeOrThrow(argv, options) {
     await sleep(Math.min(intervalMs, remainingTimeMs));
   }
 
-  throw new Error(`Timed out after ${timeoutMinutes} minute(s) while monitoring PR #${prNumber}.`);
+  throw new PrWatchMergeExitError(
+    `Timed out after ${timeoutMinutes} minute(s) while monitoring PR #${prNumber}.`,
+    3
+  );
 }
 
 export async function runPrWatchMerge(argv, options = {}) {
@@ -1338,6 +1508,10 @@ export async function runPrWatchMerge(argv, options = {}) {
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error(message);
+    const exitCodeCandidate = Number(error?.exitCode);
+    if (Number.isInteger(exitCodeCandidate) && exitCodeCandidate > 0) {
+      return exitCodeCandidate;
+    }
     return 1;
   }
 }
