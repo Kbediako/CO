@@ -82,6 +82,8 @@ export function isHumanReviewActor(
     | undefined
 ): boolean;
 
+export function parseGitHubRepoFromRemoteUrl(rawUrl: string): { owner: string; repo: string } | null;
+
 export function summarizeRequiredChecks(entries: unknown): PrWatchMergeCheckSummary;
 
 export function resolveRequiredChecksSummary(

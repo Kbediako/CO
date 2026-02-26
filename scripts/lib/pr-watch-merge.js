@@ -349,6 +349,44 @@ async function runGh(args, { allowFailure = false } = {}) {
   });
 }
 
+async function runGit(args, { allowFailure = false } = {}) {
+  return await new Promise((resolve, reject) => {
+    const child = spawn('git', args, {
+      env: process.env,
+      stdio: ['ignore', 'pipe', 'pipe']
+    });
+
+    let stdout = '';
+    let stderr = '';
+
+    child.stdout?.on('data', (chunk) => {
+      stdout += chunk.toString();
+    });
+    child.stderr?.on('data', (chunk) => {
+      stderr += chunk.toString();
+    });
+
+    child.once('error', (error) => {
+      reject(new Error(`Failed to run git ${args.join(' ')}: ${error.message}`));
+    });
+
+    child.once('close', (code) => {
+      const exitCode = typeof code === 'number' ? code : 1;
+      const result = {
+        exitCode,
+        stdout: stdout.trim(),
+        stderr: stderr.trim()
+      };
+      if (exitCode === 0 || allowFailure) {
+        resolve(result);
+        return;
+      }
+      const detail = result.stderr || result.stdout || `exit code ${exitCode}`;
+      reject(new Error(`git ${args.join(' ')} failed: ${detail}`));
+    });
+  });
+}
+
 async function runGhJson(args) {
   const result = await runGh(args);
   try {
@@ -382,12 +420,45 @@ async function ensureGhAuth() {
   }
 }
 
+export function parseGitHubRepoFromRemoteUrl(rawUrl) {
+  if (typeof rawUrl !== 'string' || rawUrl.trim().length === 0) {
+    return null;
+  }
+  const normalized = rawUrl.trim();
+  const patterns = [
+    /^git@github\.com:(?<owner>[^/\s]+)\/(?<repo>[^/\s]+?)(?:\.git)?$/iu,
+    /^https?:\/\/github\.com\/(?<owner>[^/\s]+)\/(?<repo>[^/\s]+?)(?:\.git)?\/?$/iu,
+    /^ssh:\/\/git@github\.com\/(?<owner>[^/\s]+)\/(?<repo>[^/\s]+?)(?:\.git)?\/?$/iu
+  ];
+  for (const pattern of patterns) {
+    const match = normalized.match(pattern);
+    const owner = match?.groups?.owner?.trim();
+    const repo = match?.groups?.repo?.trim();
+    if (owner && repo) {
+      return { owner, repo };
+    }
+  }
+  return null;
+}
+
+async function resolveRepoFromGitRemote() {
+  const result = await runGit(['remote', 'get-url', 'origin'], { allowFailure: true });
+  if (result.exitCode !== 0 || !result.stdout) {
+    return null;
+  }
+  return parseGitHubRepoFromRemoteUrl(result.stdout);
+}
+
 async function resolveRepo(ownerArg, repoArg) {
   if (ownerArg && repoArg) {
     return { owner: ownerArg, repo: repoArg };
   }
   if (ownerArg || repoArg) {
     throw new Error('Provide both --owner and --repo, or neither.');
+  }
+  const gitRemoteRepo = await resolveRepoFromGitRemote();
+  if (gitRemoteRepo) {
+    return gitRemoteRepo;
   }
   const response = await runGhJson(['repo', 'view', '--json', 'nameWithOwner']);
   const nameWithOwner = response?.nameWithOwner;

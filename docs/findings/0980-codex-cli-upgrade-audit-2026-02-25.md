@@ -234,6 +234,7 @@
    - failing gate checks (required checks when available, otherwise rollup failed checks)
    - draft / do-not-merge label
 5. Added fallback script entrypoint for repo workflows: `npm run pr:resolve-merge`.
+6. Hardened repo inference for PR monitor commands to prefer `git remote origin` parsing before `gh repo view` fallback, preventing incorrect global-default repo resolution in multi-repo environments.
 
 ### 10.3 UX and exit semantics
 - `pr resolve-merge` now cleanly distinguishes:

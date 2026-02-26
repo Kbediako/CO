@@ -4,6 +4,7 @@ import {
   buildPrMergeArgs,
   buildStatusSnapshot,
   isHumanReviewActor,
+  parseGitHubRepoFromRemoteUrl,
   resolveActionRequiredReasons,
   resolveLatestBotRereviewRequests,
   resolveBotRereviewTimingForKind,
@@ -63,6 +64,26 @@ describe('buildPrMergeArgs', () => {
     expect(args).toContain('Kbediako/CO');
     expect(args).toContain('--match-head-commit');
     expect(args).toContain('abc123');
+  });
+});
+
+describe('parseGitHubRepoFromRemoteUrl', () => {
+  it('parses https remotes', () => {
+    expect(parseGitHubRepoFromRemoteUrl('https://github.com/Kbediako/CO.git')).toEqual({
+      owner: 'Kbediako',
+      repo: 'CO'
+    });
+  });
+
+  it('parses ssh remotes', () => {
+    expect(parseGitHubRepoFromRemoteUrl('git@github.com:Kbediako/CO.git')).toEqual({
+      owner: 'Kbediako',
+      repo: 'CO'
+    });
+  });
+
+  it('returns null for non-github remotes', () => {
+    expect(parseGitHubRepoFromRemoteUrl('https://gitlab.com/org/repo.git')).toBeNull();
   });
 });
 
