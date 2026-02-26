@@ -34,6 +34,7 @@ import {
 } from '../orchestrator/src/cli/doctorIssueLog.js';
 import { formatDevtoolsSetupSummary, runDevtoolsSetup } from '../orchestrator/src/cli/devtoolsSetup.js';
 import { formatCodexCliSetupSummary, runCodexCliSetup } from '../orchestrator/src/cli/codexCliSetup.js';
+import { formatCodexDefaultsSetupSummary, runCodexDefaultsSetup } from '../orchestrator/src/cli/codexDefaultsSetup.js';
 import { formatDelegationSetupSummary, runDelegationSetup } from '../orchestrator/src/cli/delegationSetup.js';
 import { formatSkillsInstallSummary, installSkills, listBundledSkills } from '../orchestrator/src/cli/skills.js';
 import { findPackageRoot, loadPackageInfo } from '../orchestrator/src/cli/utils/packageInfo.js';
@@ -1582,6 +1583,7 @@ function buildSetupGuidance(): SetupGuidancePayload {
       'codex-orchestrator flow --task <task-id>',
       'codex-orchestrator doctor --usage',
       'codex-orchestrator rlm --multi-agent auto "<goal>"',
+      'codex-orchestrator codex defaults --yes',
       'codex-orchestrator mcp enable --servers delegation --yes'
     ]
   };
@@ -1820,35 +1822,57 @@ async function handleDelegation(rawArgs: string[]): Promise<void> {
 async function handleCodex(rawArgs: string[]): Promise<void> {
   const { positionals, flags } = parseArgs(rawArgs);
   const subcommand = positionals.shift();
-  if (!subcommand) {
-    throw new Error('codex requires a subcommand (setup).');
-  }
-  if (subcommand !== 'setup') {
-    throw new Error(`Unknown codex subcommand: ${subcommand}`);
-  }
-  const format: OutputFormat = (flags['format'] as string | undefined) === 'json' ? 'json' : 'text';
-  const apply = Boolean(flags['yes']);
-  const source = readStringFlag(flags, 'source');
-  const ref = readStringFlag(flags, 'ref');
-  const downloadUrl = readStringFlag(flags, 'download-url');
-  const downloadSha256 = readStringFlag(flags, 'download-sha256');
-  const force = Boolean(flags['force']);
-  const result = await runCodexCliSetup({
-    apply,
-    force,
-    source,
-    ref,
-    downloadUrl,
-    downloadSha256
-  });
-  if (format === 'json') {
-    console.log(JSON.stringify(result, null, 2));
+  if (!subcommand || subcommand === 'help' || subcommand === '--help' || subcommand === '-h') {
+    printCodexHelp();
     return;
   }
-  const summary = formatCodexCliSetupSummary(result);
-  for (const line of summary) {
-    console.log(line);
+  if (subcommand === 'setup') {
+    const format: OutputFormat = (flags['format'] as string | undefined) === 'json' ? 'json' : 'text';
+    const apply = Boolean(flags['yes']);
+    const source = readStringFlag(flags, 'source');
+    const ref = readStringFlag(flags, 'ref');
+    const downloadUrl = readStringFlag(flags, 'download-url');
+    const downloadSha256 = readStringFlag(flags, 'download-sha256');
+    const force = Boolean(flags['force']);
+    const result = await runCodexCliSetup({
+      apply,
+      force,
+      source,
+      ref,
+      downloadUrl,
+      downloadSha256
+    });
+    if (format === 'json') {
+      console.log(JSON.stringify(result, null, 2));
+      return;
+    }
+    const summary = formatCodexCliSetupSummary(result);
+    for (const line of summary) {
+      console.log(line);
+    }
+    return;
   }
+
+  if (subcommand === 'defaults') {
+    const format: OutputFormat = (flags['format'] as string | undefined) === 'json' ? 'json' : 'text';
+    const apply = Boolean(flags['yes']);
+    const force = Boolean(flags['force']);
+    const result = await runCodexDefaultsSetup({
+      apply,
+      force
+    });
+    if (format === 'json') {
+      console.log(JSON.stringify(result, null, 2));
+      return;
+    }
+    const summary = formatCodexDefaultsSetupSummary(result);
+    for (const line of summary) {
+      console.log(line);
+    }
+    return;
+  }
+
+  throw new Error(`Unknown codex subcommand: ${subcommand}`);
 }
 
 async function handleSkills(rawArgs: string[]): Promise<void> {
@@ -2402,6 +2426,10 @@ Commands:
     --force                Overwrite existing CO-managed codex binary.
     --yes                  Apply setup (otherwise plan only; stock codex remains default until CODEX_CLI_USE_MANAGED=1).
     --format json          Emit machine-readable output.
+  codex defaults
+    --yes                  Apply setup (otherwise dry-run plan only).
+    --force                Allow overwriting existing role files in ~/.codex/agents.
+    --format json          Emit machine-readable output.
   devtools setup          Print DevTools MCP setup instructions.
     --yes                 Apply setup by running "codex mcp add ...".
     --format json         Emit machine-readable output (dry-run only).
@@ -2460,6 +2488,26 @@ Commands:
     --only <skills>         Install only selected skills (comma-separated).
     --codex-home <path>     Override the target Codex home directory.
     --format json           Emit machine-readable output.
+`);
+}
+
+function printCodexHelp(): void {
+  console.log(`Usage: codex-orchestrator codex <subcommand> [options]
+
+Subcommands:
+  setup                    Plan/apply CO-managed Codex CLI install.
+    --source <path>        Build from local Codex repo (or git URL).
+    --ref <ref>            Git ref (branch/tag/sha) when building from repo.
+    --download-url <url>   Download a prebuilt codex binary.
+    --download-sha256 <sha>  Expected SHA256 for the prebuilt download.
+    --force                Overwrite existing CO-managed codex binary.
+    --yes                  Apply setup (otherwise plan only).
+    --format json          Emit machine-readable output.
+
+  defaults                 Plan/apply additive global Codex defaults in ~/.codex/config.toml.
+    --yes                  Apply setup (otherwise dry-run plan only).
+    --force                Overwrite existing role files in ~/.codex/agents.
+    --format json          Emit machine-readable output.
 `);
 }
 
@@ -2608,7 +2656,7 @@ Common options:
   --enable-delegation-mcp [true|false]   Legacy delegation MCP toggle (disable via false).
 
 Environment controls (selected):
-  NOTES                            Required review notes ("Goal | Summary | Risks ...").
+  NOTES                            Recommended review notes ("Goal | Summary | Risks ..."); fallback notes are generated when omitted.
   CODEX_REVIEW_ALLOW_HEAVY_COMMANDS=1      Allow unrestricted heavy commands.
   CODEX_REVIEW_ENFORCE_BOUNDED_MODE=1      Enforce bounded mode (hard-stop heavy commands).
   CODEX_REVIEW_TIMEOUT_SECONDS             Optional overall timeout (0 disables when set).

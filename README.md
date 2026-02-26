@@ -65,7 +65,13 @@ Use this when you want Codex to drive work inside another repo with the CO defau
    ```bash
    export CODEX_CLI_USE_MANAGED=1
    ```
-4. Optional (fast refresh helper for downstream users):
+4. Optional (additive global defaults in `~/.codex/config.toml`):
+   ```bash
+   codex-orchestrator codex defaults
+   codex-orchestrator codex defaults --yes
+   ```
+   This updates only the CO baseline keys/role wiring and preserves unrelated config entries.
+5. Optional (fast refresh helper for downstream users):
    ```bash
    scripts/codex-cli-refresh.sh --repo /path/to/codex --align-only
    ```
@@ -289,6 +295,7 @@ codex-orchestrator devtools setup
 - `codex-orchestrator init codex --codex-cli --yes --codex-source <path>` — optionally provision a CO-managed Codex CLI binary (build-from-source default; set `CODEX_CLI_SOURCE` to avoid passing `--codex-source` every time, and `CODEX_CLI_USE_MANAGED=1` to route runs to it).
 - `codex-orchestrator init codex --codex-cli --yes --codex-download-url <url> --codex-download-sha256 <sha>` — opt-in to a prebuilt Codex CLI download.
 - `codex-orchestrator codex setup` — plan/apply a CO-managed Codex CLI install (optional managed/pinned path; use `--download-url` + `--download-sha256` for prebuilts; activate with `CODEX_CLI_USE_MANAGED=1`).
+- `codex-orchestrator codex defaults` — plan/apply additive global defaults in `~/.codex/config.toml` and `~/.codex/agents/*.toml` (`--yes` applies, `--force` allows role file overwrite).
 - `codex-orchestrator delegation setup --yes` — configure delegation MCP server wiring.
 - `codex-orchestrator mcp enable --servers <csv> --yes` — enable specific disabled MCP servers from existing Codex config entries.
 - `codex-orchestrator self-check --format json` — JSON health payload.

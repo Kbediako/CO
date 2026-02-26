@@ -90,6 +90,7 @@ interface CliOptions {
   autoIssueLog?: boolean;
   enableDelegationMcp?: boolean;
   disableDelegationMcp?: boolean;
+  help?: boolean;
 }
 
 function installStdioErrorGuards(): void {
@@ -247,7 +248,11 @@ function inferTaskFromManifestPath(manifestPath: string): string | null {
 
 function parseArgs(argv: string[]): CliOptions {
   const options: CliOptions = { runsDir: defaultRunsDir };
-  const { args, entries } = parseCliArgs(argv);
+  const { args, entries, positionals } = parseCliArgs(argv);
+  if (hasFlag(args, 'help') || hasFlag(args, 'h') || positionals.includes('help')) {
+    options.help = true;
+    return options;
+  }
 
   for (const entry of entries) {
     if (entry.key === 'manifest' && typeof entry.value === 'string') {
@@ -366,6 +371,10 @@ async function resolveManifestPath(options: CliOptions): Promise<string> {
 
 async function main(): Promise<void> {
   const options = parseArgs(process.argv.slice(2));
+  if (options.help) {
+    printReviewWrapperHelp();
+    return;
+  }
   if (shouldRunDiffBudget()) {
     await runDiffBudget(options);
   } else {
@@ -375,9 +384,12 @@ async function main(): Promise<void> {
 
   const relativeManifest = path.relative(repoRoot, manifestPath);
   const taskLabel = options.task ?? process.env.MCP_RUNNER_TASK_ID ?? process.env.TASK ?? 'unknown-task';
-  const notes = process.env.NOTES?.trim();
+  const notes = resolveReviewNotes({
+    notes: process.env.NOTES?.trim(),
+    taskLabel,
+    relativeManifest
+  });
   const diffBudgetOverride = process.env.DIFF_BUDGET_OVERRIDE_REASON?.trim();
-  requireReviewNotes(notes);
 
   const promptLines = [
     `Review task: ${taskLabel}`,
@@ -2347,10 +2359,48 @@ function signalChildProcess(child: ChildProcess, signal: NodeJS.Signals, detache
   }
 }
 
-function requireReviewNotes(notes: string | undefined): asserts notes is string {
-  if (!notes) {
-    throw new Error('NOTES is required for reviews. Set NOTES="<goal + summary + risks + optional questions>" before running.');
+function resolveReviewNotes(options: {
+  notes: string | undefined;
+  taskLabel: string;
+  relativeManifest: string;
+}): string {
+  if (options.notes) {
+    return options.notes;
   }
+  const fallback =
+    `Goal: standalone review handoff | ` +
+    `Summary: auto-generated NOTES fallback (task=${options.taskLabel}, manifest=${options.relativeManifest}) | ` +
+    'Risks: missing custom intent details may reduce review precision';
+  console.warn(
+    '[run-review] NOTES was not provided; using a generated fallback. ' +
+      'Set NOTES="Goal: ... | Summary: ... | Risks: ... | Questions (optional): ..." for higher-signal review context.'
+  );
+  return fallback;
+}
+
+function printReviewWrapperHelp(): void {
+  console.log(`Usage: npm run review -- [options]
+
+Standalone review wrapper for Codex review with manifest-backed context.
+
+Options:
+  --manifest <path>              Explicit run manifest path.
+  --task <task-id>               Task id used to resolve latest manifest.
+  --runs-dir <path>              Override .runs root for manifest discovery.
+  --uncommitted                  Review uncommitted diff scope.
+  --base <ref>                   Review diff from base ref.
+  --commit <sha>                 Review a single commit.
+  --non-interactive              Force non-interactive Codex review mode.
+  --auto-issue-log[=true|false]  Capture issue bundle on failure.
+  --enable-delegation-mcp[=true|false]   Enable delegation MCP for this review run.
+  --disable-delegation-mcp[=true|false]  Disable delegation MCP for this review run.
+  -h, --help                     Show this help.
+
+Environment:
+  NOTES (recommended)            Goal/summary/risks context. If omitted, wrapper generates fallback notes.
+  MANIFEST                       Alternative manifest path source.
+  MCP_RUNNER_TASK_ID / TASK      Task id fallback when --task is omitted.
+`);
 }
 
 async function tryGit(args: string[]): Promise<string | null> {

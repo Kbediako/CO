@@ -18,6 +18,9 @@ Use this skill to run repeatable collab evaluation scenarios and record evidence
 - Multi-hour refactor with checkpoints.
 - 24h pause/resume context-rot regression.
 - Multi-day initiative (48–72h) with multiple resumes.
+- Additive config simulation: verify updates merge into existing user config without destructive overwrite.
+- RLM default-capability simulation: verify built-ins-first behavior (`default`/`explorer`/`worker`/`awaiter`) before custom overlays.
+- Docs relevance simulation: delegated doc-audit stream checks stale/irrelevant guidance before hard-gating.
 
 2) Ensure task context:
 - `export MCP_RUNNER_TASK_ID=<task-id>`
@@ -34,6 +37,13 @@ Use this skill to run repeatable collab evaluation scenarios and record evidence
 - Collab is additive; keep MCP as the control plane for approvals and audit trails.
 - Cap collab event capture with `CODEX_ORCHESTRATOR_COLLAB_MAX_EVENTS` when needed.
 - If pause/resume is required, use control endpoints or `codex-orchestrator resume` with manifest evidence.
+- Keep top-level defaults on latest baseline model and `model_reasoning_effort >= high`; avoid role sprawl in eval lanes.
+- Treat fallback profiles as exception paths in scenarios and record why baseline settings were insufficient.
+- For non-trivial eval runs, include at least one delegated research/review stream and summarize evidence in parent output.
+
+## Skill split policy
+- Keep scenario/mock/simulation coverage in this skill while scope stays focused on collab/multi-agent behavior.
+- Propose a dedicated simulation skill only when repeated non-collab simulation workflows make this skill too broad.
 
 ## Related skills
 - `collab-subagents-first`: for production stream ownership patterns mirrored in eval scenarios.

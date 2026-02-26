@@ -81,6 +81,7 @@ describe('codex-orchestrator command surface', () => {
     const { stdout } = await runCli(['--help']);
     expect(stdout).toContain('Usage: codex-orchestrator <command> [options]');
     expect(stdout).toContain('review [options]');
+    expect(stdout).toContain('codex defaults');
     expect(stdout).toContain('Quickstart (agent-first):');
     expect(stdout).toContain('codex-orchestrator flow --task <task-id>');
     expect(stdout).toContain('NOTES="Goal: ... | Summary: ... | Risks: ..." codex-orchestrator review --task <task-id>');
@@ -131,6 +132,13 @@ describe('codex-orchestrator command surface', () => {
     const { stdout } = await runCli(['setup', '--help']);
     expect(stdout).toContain('Usage: codex-orchestrator setup');
     expect(stdout).toContain('--refresh-skills');
+  }, TEST_TIMEOUT);
+
+  it('prints codex subcommand help', async () => {
+    const { stdout } = await runCli(['codex', '--help']);
+    expect(stdout).toContain('Usage: codex-orchestrator codex <subcommand> [options]');
+    expect(stdout).toContain('defaults');
+    expect(stdout).toContain('--force');
   }, TEST_TIMEOUT);
 
   it('prints flow help', async () => {
@@ -1481,6 +1489,69 @@ describe('codex-orchestrator command surface', () => {
     expect(commands[0]).toContain('chrome-devtools');
     expect(commands.every((entry) => !entry.includes('--force'))).toBe(true);
     expect(payload.steps?.skills?.note).toContain('without overwriting existing files by default');
+  }, TEST_TIMEOUT);
+
+  it('emits codex defaults plan/apply JSON and preserves existing role files without --force', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'co-cli-codex-defaults-'));
+    const codexHome = join(tempDir, 'codex-home');
+    const explorerPath = join(codexHome, 'agents', 'explorer-fast.toml');
+    await mkdir(join(codexHome, 'agents'), { recursive: true });
+    await writeFile(explorerPath, 'KEEP\n', 'utf8');
+
+    const env = {
+      ...process.env,
+      CODEX_HOME: codexHome
+    };
+
+    const { stdout: planStdout } = await runCli(['codex', 'defaults', '--format', 'json'], env);
+    const planPayload = JSON.parse(planStdout) as {
+      status?: string;
+      changes?: Array<{ target?: string; name?: string; status?: string }>;
+    };
+    expect(planPayload.status).toBe('planned');
+    expect(planPayload.changes).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ target: 'config', status: 'pending' }),
+        expect.objectContaining({
+          target: 'role_file',
+          name: 'explorer_fast',
+          status: 'preserved'
+        })
+      ])
+    );
+
+    const { stdout: applyStdout } = await runCli(['codex', 'defaults', '--yes', '--format', 'json'], env);
+    const applyPayload = JSON.parse(applyStdout) as {
+      status?: string;
+      changes?: Array<{ target?: string; name?: string; status?: string }>;
+    };
+    expect(applyPayload.status).toBe('applied');
+    expect(applyPayload.changes).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ target: 'config', status: 'created' }),
+        expect.objectContaining({
+          target: 'role_file',
+          name: 'explorer_fast',
+          status: 'preserved'
+        }),
+        expect.objectContaining({
+          target: 'role_file',
+          name: 'worker_complex',
+          status: 'created'
+        }),
+        expect.objectContaining({
+          target: 'role_file',
+          name: 'awaiter',
+          status: 'created'
+        })
+      ])
+    );
+
+    const configRaw = await readFile(join(codexHome, 'config.toml'), 'utf8');
+    expect(configRaw).toContain('model = "gpt-5.3-codex"');
+    expect(configRaw).toContain('[agents.explorer_fast]');
+    expect(configRaw).toContain('config_file = "./agents/explorer-fast.toml"');
+    expect(await readFile(explorerPath, 'utf8')).toBe('KEEP\n');
   }, TEST_TIMEOUT);
 
   it('quotes shell-sensitive repo args in setup delegation preview output', async () => {

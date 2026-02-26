@@ -1945,7 +1945,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-02-25",
+      "last_review": "2026-02-26",
       "paths": {
         "spec": "tasks/specs/0980-codex-cli-upgrade-audit-adoption.md",
         "task": "tasks/tasks-0980-codex-cli-upgrade-audit-adoption.md",

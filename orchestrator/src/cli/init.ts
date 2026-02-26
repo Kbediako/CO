@@ -119,5 +119,8 @@ export function formatInitSummary(result: InitResult, cwd: string): string[] {
   lines.push(
     '  - codex-orchestrator codex setup  # optional managed/pinned Codex CLI (activate with CODEX_CLI_USE_MANAGED=1; stock codex is default)'
   );
+  lines.push(
+    '  - codex-orchestrator codex defaults --yes  # optional additive ~/.codex baseline (model/reasoning/agent defaults + role files)'
+  );
   return lines;
 }
