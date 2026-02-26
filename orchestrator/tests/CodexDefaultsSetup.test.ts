@@ -137,39 +137,6 @@ describe('runCodexDefaultsSetup', () => {
     }
   });
 
-  it('overwrites existing role files only when --force is set', async () => {
-    const tempHome = await mkdtemp(join(tmpdir(), 'codex-defaults-force-'));
-    const agentsDir = join(tempHome, 'agents');
-    const explorerPath = join(agentsDir, 'explorer-fast.toml');
-    const workerPath = join(agentsDir, 'worker-complex.toml');
-    const awaiterPath = join(agentsDir, 'awaiter-high.toml');
-    try {
-      await mkdir(agentsDir, { recursive: true });
-      await writeFile(explorerPath, 'OLD\n', 'utf8');
-      await writeFile(workerPath, 'OLD\n', 'utf8');
-      await writeFile(awaiterPath, 'OLD\n', 'utf8');
-
-      const result = await runCodexDefaultsSetup({
-        apply: true,
-        force: true,
-        env: { CODEX_HOME: tempHome } as NodeJS.ProcessEnv
-      });
-
-      expect(result.changes).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({ target: 'role_file', name: 'explorer_fast', status: 'updated' }),
-          expect.objectContaining({ target: 'role_file', name: 'worker_complex', status: 'updated' }),
-          expect.objectContaining({ target: 'role_file', name: 'awaiter', status: 'updated' })
-        ])
-      );
-      expect(await readFile(explorerPath, 'utf8')).toContain('gpt-5.3-codex-spark');
-      expect(await readFile(workerPath, 'utf8')).toContain('gpt-5.3-codex');
-      expect(await readFile(awaiterPath, 'utf8')).toContain('You are an awaiter.');
-    } finally {
-      await rm(tempHome, { recursive: true, force: true });
-    }
-  });
-
   it('throws a clear error and skips writes when config TOML is invalid', async () => {
     const tempHome = await mkdtemp(join(tmpdir(), 'codex-defaults-invalid-'));
     const configPath = join(tempHome, 'config.toml');

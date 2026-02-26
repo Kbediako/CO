@@ -13,6 +13,7 @@ const toml = require('@iarna/toml') as {
   parse: (source: string) => unknown;
   stringify: (value: unknown) => string;
 };
+const canonicalize = require('canonicalize') as (value: unknown) => string | undefined;
 
 const BASELINE_MODEL = 'gpt-5.3-codex';
 const BASELINE_REASONING = 'xhigh';
@@ -107,7 +108,7 @@ export async function runCodexDefaultsSetup(
   const roleDefinitions = await loadRoleDefinitions();
   const configState = await loadConfigState(plan.configPath);
   const nextConfig = mergeBaselineDefaults(configState.parsed, roleDefinitions);
-  const configChanged = !deepEqual(configState.parsed, nextConfig);
+  const configChanged = canonicalize(configState.parsed) !== canonicalize(nextConfig);
   const roleChanges = await planRoleChanges(plan.agentsDir, force, roleDefinitions);
 
   if (!apply) {
@@ -238,17 +239,19 @@ function mergeBaselineDefaults(
   existing: Record<string, unknown>,
   roleDefinitions: readonly LoadedRoleDefinition[]
 ): Record<string, unknown> {
-  const next = cloneRecord(existing);
+  const next = structuredClone(existing);
   next.model = BASELINE_MODEL;
   next.model_reasoning_effort = BASELINE_REASONING;
 
-  const agents = isRecord(next.agents) ? cloneRecord(next.agents as Record<string, unknown>) : {};
+  const agents = isRecord(next.agents) ? structuredClone(next.agents as Record<string, unknown>) : {};
   agents.max_threads = BASELINE_AGENTS.max_threads;
   agents.max_depth = BASELINE_AGENTS.max_depth;
   agents.max_spawn_depth = BASELINE_AGENTS.max_spawn_depth;
 
   for (const role of roleDefinitions) {
-    const existingRole = isRecord(agents[role.key]) ? cloneRecord(agents[role.key] as Record<string, unknown>) : {};
+    const existingRole = isRecord(agents[role.key])
+      ? structuredClone(agents[role.key] as Record<string, unknown>)
+      : {};
     existingRole.description = role.description;
     existingRole.config_file = role.configFile;
     agents[role.key] = existingRole;
@@ -365,60 +368,4 @@ function buildPlannedChanges(params: {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function cloneRecord(value: Record<string, unknown>): Record<string, unknown> {
-  const copy: Record<string, unknown> = {};
-  for (const [key, entry] of Object.entries(value)) {
-    if (Array.isArray(entry)) {
-      copy[key] = entry.map((item) => cloneValue(item));
-      continue;
-    }
-    copy[key] = cloneValue(entry);
-  }
-  return copy;
-}
-
-function cloneValue(value: unknown): unknown {
-  if (Array.isArray(value)) {
-    return value.map((item) => cloneValue(item));
-  }
-  if (isRecord(value)) {
-    return cloneRecord(value);
-  }
-  return value;
-}
-
-function deepEqual(left: unknown, right: unknown): boolean {
-  if (left === right) {
-    return true;
-  }
-  if (Array.isArray(left) && Array.isArray(right)) {
-    if (left.length !== right.length) {
-      return false;
-    }
-    for (let index = 0; index < left.length; index += 1) {
-      if (!deepEqual(left[index], right[index])) {
-        return false;
-      }
-    }
-    return true;
-  }
-  if (isRecord(left) && isRecord(right)) {
-    const leftKeys = Object.keys(left);
-    const rightKeys = Object.keys(right);
-    if (leftKeys.length !== rightKeys.length) {
-      return false;
-    }
-    for (const key of leftKeys) {
-      if (!(key in right)) {
-        return false;
-      }
-      if (!deepEqual(left[key], right[key])) {
-        return false;
-      }
-    }
-    return true;
-  }
-  return false;
 }

@@ -4,7 +4,6 @@
 - Goal: align CO with latest Codex CLI capabilities and defaults via a focused, evidence-backed upgrade pass.
 - Scope: audit/reporting, decision log, targeted implementation, full validation, and merged PR lifecycle.
 - Assumptions: local `codex` fork and `gh` auth are available; latest stable release remains `0.105.0` during execution.
-- Follow-up objective (2026-02-26): document and stage minimal next-step updates for built-ins-first/high-reasoning defaults, additive config policy, simulation ownership, docs relevance governance, and fallback exception handling.
 
 ## Milestones & Sequencing
 1) Evidence and docs-first
@@ -16,10 +15,6 @@
 3) Validation + release
 - Run required check chain and pack smoke.
 - Open PR, resolve feedback/checks, monitor quiet window, merge, and clean branch.
-4) Follow-up docs-first hardening
-- Refresh PRD/spec/action/checklist/index snapshot with explicit adopt-now vs defer recommendations.
-- Extend `skills/collab-evals` to cover config/RLM/docs-relevance simulation scenarios.
-- Keep new work scoped to docs/skills/task metadata only.
 
 ## Dependencies
 - `gh` release metadata + local fork git refs.
@@ -47,10 +42,6 @@
   - Mitigation: run targeted cross-reference grep and docs checks before merge.
 - Risk: upstream changes during execution drift findings.
   - Mitigation: stamp findings with concrete timestamps and stable release tags.
-- Risk: turning fallback profiles into implied routine defaults.
-  - Mitigation: keep `12/4/4` baseline prominent and require evidence for `8/2/2` and `6/1/1` usage.
-- Risk: noisy docs relevance gate if enforced too early.
-  - Mitigation: start with agent-first delegated relevance checks and promote to deterministic test only after measured signal quality.
 
 ## Approvals
 - Reviewer: self-approved (task owner)

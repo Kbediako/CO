@@ -160,41 +160,18 @@
 ## 7) Follow-up recommendation matrix (2026-02-26)
 
 ### Adopt now
-1. Baseline on raw built-ins plus top-level `gpt-5.3-codex` and `model_reasoning_effort >= high`:
-   - Keep custom roles additive and minimal (`worker_complex`, optional `explorer_fast`), not replacements for built-ins.
-   - Evidence: sections 1, 4.2, 4.3, 4.7.
-2. Enforce additive user config updates only (no destructive overwrite):
-   - Apply only targeted baseline keys/role wiring while preserving unrelated user config keys; preserve existing role files unless explicitly forced.
-   - Evidence: section 4.7 and current `init codex` downstream config posture.
-3. Keep scenario/mock/simulation testing in `skills/collab-evals` now:
-   - Add explicit scenarios for additive config merge validation, RLM default-capability behavior, and docs relevance drift checks.
-   - Evidence: section 5 plus this follow-up scope.
-4. Rework RLM guidance to default Codex capabilities first, then CO overlays:
-   - Keep `rlm --multi-agent auto` as the default path and treat custom recursion policy as an overlay, not a forked control model.
-   - Evidence: sections 1 and 4.6.
-5. Increase agent-first/full-autonomy emphasis:
-   - Require at least one delegated research/review stream in non-trivial lanes and document summary-only parent handoff.
-   - Evidence: section 4.6 and established delegation policy.
-6. Keep fallback profiles as explicit contingency:
-   - Baseline remains `12/4/4`; `8/2/2` and `6/1/1` require evidence-backed exception rationale.
-   - Evidence: sections 3 and 4.8.
+1. Built-ins-first baseline: top-level `gpt-5.3-codex` and `model_reasoning_effort >= high`; keep custom roles additive/minimal (`worker_complex`, optional `explorer_fast`). Evidence: sections 1, 4.2, 4.3, 4.7.
+2. Additive config updates only: mutate targeted baseline keys/role wiring while preserving unrelated config keys; preserve existing role files unless `--force`. Evidence: section 4.7.
+3. Keep scenario/mock/simulation ownership in `skills/collab-evals` for now (additive config merge, built-ins-first RLM behavior, docs relevance drift checks). Evidence: section 5.
+4. Keep RLM default-capability overlays and contingency-only fallback posture (`12/4/4` baseline; `8/2/2` and `6/1/1` by exception). Evidence: sections 3, 4.6, 4.8.
 
 ### Defer (track as follow-up)
-1. New dedicated simulation skill:
-   - Defer creating a new skill unless `collab-evals` simulation guidance becomes broad enough to dilute that skill's core purpose across multiple tasks.
-2. Docs relevance hard test gate:
-   - Defer a strict deterministic pass/fail test until false-positive rates and ownership boundaries are measured; run agent-first docs relevance checks first.
+1. New dedicated simulation skill: split only if `collab-evals` becomes too broad.
+2. Deterministic docs relevance hard gate: keep agent-first delegated relevance checks until false-positive rate is measured.
 
 ## 8) Follow-up implementation updates landed (2026-02-26)
 
-1. Added additive global Codex defaults command:
-   - `codex-orchestrator codex defaults` (dry-run by default, `--yes` to apply, `--force` to overwrite existing role files).
-   - Applies baseline keys (`model`, `model_reasoning_effort`, `agents.max_threads`, `agents.max_depth`, `agents.max_spawn_depth`) while preserving unrelated config keys.
-   - Writes/maintains role files under `~/.codex/agents/` for `explorer_fast`, `worker_complex`, and high-reasoning `awaiter`.
-2. Fixed standalone review wrapper UX failure path:
-   - `npm run review -- --help` now exits with usage output instead of running review flow.
-   - Missing `NOTES` no longer hard-fails; wrapper generates fallback notes and logs a warning.
-3. Expanded simulation guidance in `skills/collab-evals`:
-   - Added additive-config, built-ins-first RLM behavior, and docs-relevance simulation scenarios.
-4. Kept RLM runtime posture as overlay-first (no major runtime rewrite this cycle):
-   - Decision remains built-ins-first with CO overlays; runtime rewrite deferred pending stronger evidence.
+1. Added `codex-orchestrator codex defaults` (dry-run / `--yes` apply / `--force` role overwrite) to apply baseline model/reasoning/agent keys additively and manage role files under `~/.codex/agents/`.
+2. Fixed `npm run review` UX failure path: `--help` now exits cleanly and missing `NOTES` auto-falls back with warning.
+3. Expanded `skills/collab-evals` scenarios for additive config, built-ins-first RLM behavior, and docs relevance checks.
+4. Kept RLM runtime posture as built-ins-first overlays; no major runtime rewrite in this cycle.
