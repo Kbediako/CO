@@ -81,6 +81,7 @@ describe('codex-orchestrator command surface', () => {
     const { stdout } = await runCli(['--help']);
     expect(stdout).toContain('Usage: codex-orchestrator <command> [options]');
     expect(stdout).toContain('review [options]');
+    expect(stdout).toContain('codex defaults');
     expect(stdout).toContain('Quickstart (agent-first):');
     expect(stdout).toContain('codex-orchestrator flow --task <task-id>');
     expect(stdout).toContain('NOTES="Goal: ... | Summary: ... | Risks: ..." codex-orchestrator review --task <task-id>');
@@ -131,6 +132,13 @@ describe('codex-orchestrator command surface', () => {
     const { stdout } = await runCli(['setup', '--help']);
     expect(stdout).toContain('Usage: codex-orchestrator setup');
     expect(stdout).toContain('--refresh-skills');
+  }, TEST_TIMEOUT);
+
+  it('prints codex subcommand help', async () => {
+    const { stdout } = await runCli(['codex', '--help']);
+    expect(stdout).toContain('Usage: codex-orchestrator codex <subcommand> [options]');
+    expect(stdout).toContain('defaults');
+    expect(stdout).toContain('--force');
   }, TEST_TIMEOUT);
 
   it('prints flow help', async () => {

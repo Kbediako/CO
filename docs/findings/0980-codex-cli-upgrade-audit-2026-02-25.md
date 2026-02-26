@@ -156,3 +156,22 @@
 - `nl -ba /Users/kbediako/Code/codex/codex-rs/core/src/tools/spec.rs | sed -n '740,980p'`
 - `nl -ba /Users/kbediako/Code/codex/codex-rs/core/src/tools/handlers/multi_agents.rs | sed -n '1,120p'`
 - `nl -ba /Users/kbediako/Code/codex/codex-rs/core/src/tools/handlers/multi_agents.rs | sed -n '898,960p'`
+
+## 7) Follow-up recommendation matrix (2026-02-26)
+
+### Adopt now
+1. Built-ins-first baseline: top-level `gpt-5.3-codex` and `model_reasoning_effort >= high`; keep custom roles additive/minimal (`worker_complex`, optional `explorer_fast`). Evidence: sections 1, 4.2, 4.3, 4.7.
+2. Additive config updates only: mutate targeted baseline keys/role wiring while preserving unrelated config keys; preserve existing role files unless `--force`. Evidence: section 4.7.
+3. Keep scenario/mock/simulation ownership in `skills/collab-evals` for now (additive config merge, built-ins-first RLM behavior, docs relevance drift checks). Evidence: section 5.
+4. Keep RLM default-capability overlays and contingency-only fallback posture (`12/4/4` baseline; `8/2/2` and `6/1/1` by exception). Evidence: sections 3, 4.6, 4.8.
+
+### Defer (track as follow-up)
+1. New dedicated simulation skill: split only if `collab-evals` becomes too broad.
+2. Deterministic docs relevance hard gate: keep agent-first delegated relevance checks until false-positive rate is measured.
+
+## 8) Follow-up implementation updates landed (2026-02-26)
+
+1. Added `codex-orchestrator codex defaults` (dry-run / `--yes` apply / `--force` role overwrite) to apply baseline model/reasoning/agent keys additively and manage role files under `~/.codex/agents/`.
+2. Fixed `npm run review` UX failure path: `--help` now exits cleanly and missing `NOTES` auto-falls back with warning.
+3. Expanded `skills/collab-evals` scenarios for additive config, built-ins-first RLM behavior, and docs relevance checks.
+4. Kept RLM runtime posture as built-ins-first overlays; no major runtime rewrite in this cycle.
