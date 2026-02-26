@@ -569,7 +569,10 @@ function inspectCodexDefaultsAdvisory(env: NodeJS.ProcessEnv = process.env): Doc
         detail: error instanceof Error ? error.message : String(error)
       },
       checks,
-      guidance
+      guidance: [
+        `Fix TOML syntax in ${configPath} first, then rerun \`codex-orchestrator codex defaults --yes\`.`,
+        ...guidance
+      ]
     };
   }
 

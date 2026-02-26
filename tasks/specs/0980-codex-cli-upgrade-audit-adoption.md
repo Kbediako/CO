@@ -43,9 +43,9 @@ last_review: 2026-02-26
   - Ensure config update guidance is additive (merge/patch semantics) and explicitly avoids destructive overwrite.
   - Ensure `collab-evals` includes concrete scenario/mock/simulation steps for config merge, RLM default behavior, and docs relevance drift checks.
   - Ensure delegation guidance emphasizes agent-first autonomy in non-trivial lanes.
-  - Ensure `doctor` reports codex defaults drift advisories (model/reasoning/agent limits) and points to additive remediation.
-  - Ensure docs-relevance support is advisory and non-blocking, with explicit language about false-positive tracking before gating.
-  - Ensure operator docs clarify awaiter “long wait” vs “stuck” diagnosis and expected polling behavior.
+  - Have `doctor` report codex defaults drift advisories (model/reasoning/agent limits) and point to additive remediation.
+  - Keep docs-relevance support advisory and non-blocking, with explicit language about false-positive tracking before gating.
+  - Clarify in operator docs the awaiter “long wait” vs “stuck” diagnosis and expected polling behavior.
 - Non-functional requirements (performance, reliability, security):
   - No regressions to existing orchestrator commands or review wrappers.
   - Keep downstream packaging compatibility intact for touched skills/docs surfaces.
