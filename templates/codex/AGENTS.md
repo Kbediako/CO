@@ -1,9 +1,10 @@
-<!-- codex:instruction-stamp 7e73683178d84f43eaafbadcfbc39460eff6e683a6213b9cfdd417a07776da73 -->
+<!-- codex:instruction-stamp 3599cb54f155d730dfc088b0ee6792ebe91e701cc288930064d73eae562b829a -->
 # Agent Instructions (Template)
 
 ## Orchestrator-first workflow
 - Use `codex-orchestrator` pipelines for planning, implementation, validation, and review.
 - Default to `docs-review` before implementation and `implementation-gate` after code changes.
+- Use `docs-relevance-advisory` when you need semantic docs relevance signal without hard-gate behavior.
 - Prefer cloud mode when runs are long-running/parallel and cloud prerequisites are ready.
 - Before cloud mode, verify branch availability, non-interactive setup commands, and required secrets/variables; if missing, run in local `mcp` mode and record why.
 - Before implementation, run a standalone review of the task/spec against the user’s intent and record the approval in the spec + checklist notes.
@@ -56,14 +57,17 @@
 - Set `model_reasoning_effort` to at least `high` (CO default: `xhigh`) so spawned agents inherit high reasoning unless role overrides change it.
 - Built-in `explorer` inherits top-level model defaults unless you attach a `config_file`.
 - Spark caveat: `gpt-5.3-codex-spark` is text-only.
+- Keep RLM/collab built-ins-first by default; add custom specialist roles only when there is measured value, clear ownership, and validation evidence.
 - Use `[agents] max_threads = 12` with `max_depth = 4` and `max_spawn_depth = 4` as the default multi-agent baseline.
 - Keep fallback usage explicit and rare: `8/2/2` for constrained/high-risk lanes, `6/1/1` only as break-glass.
 - Add an explicit `worker_complex` role (`gpt-5.3-codex`, `xhigh`) for high-risk implementation streams.
+- Use `codex-orchestrator doctor` as an advisory drift check for Codex defaults; remediate additively via `codex-orchestrator codex defaults --yes`.
 
 ## Completion discipline (patience-first)
 - Wait/poll for terminal state on long-running operations (CI checks, reviews, cloud jobs, orchestrator runs) before reporting completion.
 - Reset waiting windows when checks restart or new feedback appears.
 - Do not hand off mid-flight work unless the user explicitly asks to stop.
+- Awaiter triage: treat long waits as expected unless progress is flat across multiple polling windows; increase timeouts before declaring a stall.
 
 ## Instruction stamp
 - If you edit this file, refresh the instruction stamp.

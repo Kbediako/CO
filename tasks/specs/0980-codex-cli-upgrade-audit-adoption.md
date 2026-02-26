@@ -13,6 +13,7 @@ last_review: 2026-02-26
 - Scope: release/fork evidence capture, decision logs, and targeted code/config/docs/skills updates in CO.
 - Constraints: minimal high-leverage changes only; no destructive git operations; preserve compatibility context where legacy aliases still matter.
 - Follow-up scope (2026-02-26): codify built-ins-first/high-reasoning baseline, additive config posture, simulation coverage ownership, docs relevance governance, RLM default-capability stance, and fallback exception policy.
+- Follow-up scope (2026-02-26b): implement doctor defaults-drift advisory, ship a docs-relevance advisory lane (non-blocking), tighten built-ins-first RLM guidance, and add explicit awaiter long-wait triage docs.
 
 ## Decision and Success Criteria
 - Decision:
@@ -23,6 +24,8 @@ last_review: 2026-02-26
   - Keep user config mutation additive and non-destructive.
   - Keep scenario/mock/simulation guidance in `skills/collab-evals` now and defer new skill creation unless scope expands.
   - Start docs relevance checks with delegated agent lanes; defer deterministic hard gate until false-positive baseline is measured.
+  - Add doctor detection/advice for codex-defaults drift without converting it to a hard gate.
+  - Keep RLM runtime built-ins-first; document criteria before any new specialized role proliferation.
 - Success criteria:
   - Source-backed change report and fork delta summary published.
   - Thread/depth decision log includes rationale, risks, and rejected alternatives.
@@ -40,6 +43,9 @@ last_review: 2026-02-26
   - Ensure config update guidance is additive (merge/patch semantics) and explicitly avoids destructive overwrite.
   - Ensure `collab-evals` includes concrete scenario/mock/simulation steps for config merge, RLM default behavior, and docs relevance drift checks.
   - Ensure delegation guidance emphasizes agent-first autonomy in non-trivial lanes.
+  - Have `doctor` report codex defaults drift advisories (model/reasoning/agent limits) and point to additive remediation.
+  - Keep docs-relevance support advisory and non-blocking, with explicit language about false-positive tracking before gating.
+  - Clarify in operator docs the awaiter “long wait” vs “stuck” diagnosis and expected polling behavior.
 - Non-functional requirements (performance, reliability, security):
   - No regressions to existing orchestrator commands or review wrappers.
   - Keep downstream packaging compatibility intact for touched skills/docs surfaces.
@@ -69,6 +75,10 @@ last_review: 2026-02-26
   - `npm run review`
   - `npm run pack:smoke`
   - `collab-evals` scenario evidence note captured in findings/task docs when simulation lanes are run.
+  - Throwaway repo simulations:
+    - `doctor` warns on codex-default drift and suggests `codex defaults --yes`.
+    - docs-relevance advisory lane runs without blocking the workflow.
+    - awaiter triage guidance is discoverable from shipped docs.
 - Rollout verification:
   - Verify docs/skills surfaces in packaged smoke lane.
 - Monitoring / alerts:

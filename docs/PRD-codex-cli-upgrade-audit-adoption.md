@@ -4,6 +4,7 @@
 - Problem Statement: CO currently carries mixed assumptions across docs/skills/config about Codex CLI multi-agent behavior, collab/delegation semantics, and agent thread defaults while upstream Codex CLI has introduced new capabilities and behavior shifts.
 - Desired Outcome: establish an evidence-backed latest-capability baseline and ship targeted CO upgrades that improve adoption safety, consistency, and downstream usability without unrelated refactors.
 - Follow-up extension (2026-02-26): codify built-ins-first/high-reasoning defaults, additive config update policy, simulation coverage guidance, docs relevance governance, and fallback exception posture.
+- Follow-up extension (2026-02-26b): ship doctor defaults-drift advisory, add a non-blocking docs-relevance advisory lane, tighten built-ins-first RLM guidance, and add explicit awaiter long-wait triage guidance with throwaway simulation evidence.
 
 ## User Request Translation (Context Anchor)
 - User intent / needs (in your own words): deeply audit latest Codex CLI changes, compare local fork against upstream, deliberate on depth/thread defaults (including a decision on moving to 12 threads), implement CO updates across code/config/docs/skills, validate, and merge the PR end-to-end.
@@ -13,6 +14,10 @@
   - Explicit decision log for depth-by-workload defaults and thread limit decision is documented.
   - CO updates are implemented and consistent across AGENTS/README/docs/skills/templates.
   - Follow-up decisions are explicit for raw built-ins + `>= high` reasoning baseline, additive config updates, scenario/mock/simulation ownership, RLM default-capability posture, docs relevance governance, and fallback rationale.
+  - `doctor` surfaces additive Codex-defaults drift advisories for model/reasoning/agent baseline and remediation guidance.
+  - A docs-relevance advisory lane exists and is explicitly non-blocking while false-positive rates are unknown.
+  - Awaiter operations guidance distinguishes long-running waits from truly stuck behavior.
+  - Mock/dummy/simulated tests in a throwaway repo validate the new CLI/docs behavior end-to-end.
   - Required validation chain passes and evidence is captured.
   - PR is opened, feedback handled, checks monitored through quiet window, and merged.
 - Constraints / non-goals:
@@ -69,6 +74,14 @@
 - Rationale: minimal footprint now, with clear escalation path if responsibilities exceed a single skill's focus.
 - Decision (2026-02-26): docs relevance/up-to-date checks should start as an agent-first delegated lane; defer strict deterministic gating until quality signals stabilize.
 - Rationale: semantic relevance is hard to gate deterministically without noisy failures.
+- Decision (2026-02-26b): add a `doctor` advisory (not hard gate) for codex-defaults drift from CO baseline (`gpt-5.3-codex`, `>= high` reasoning, `12/4/4` agent limits).
+- Rationale: gives downstream users a safe detection/remediation path without destructive writes or blocking workflows.
+- Decision (2026-02-26b): ship docs-relevance as an advisory lane and keep deterministic docs gates (`docs:check`, `docs:freshness`) unchanged.
+- Rationale: preserves current CI reliability while gathering signal quality on semantic relevance.
+- Decision (2026-02-26b): keep RLM built-ins-first posture; avoid runtime rework and only add specialized custom roles with measurable value.
+- Rationale: upstream built-ins are sufficient for default orchestration; minimizing custom role sprawl reduces maintenance drift.
+- Decision (2026-02-26b): codify awaiter “long-wait vs stuck” triage in operator-facing docs.
+- Rationale: prevents false stuck diagnoses and keeps patience-first monitoring behavior explicit.
 
 ## Approvals
 - Product: self-approved (task owner)

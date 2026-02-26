@@ -24,6 +24,18 @@ const doctor: DoctorResult = {
       install: undefined
     }
   },
+  codex_defaults: {
+    status: 'ok',
+    config: { path: '/tmp/config.toml', status: 'ok' },
+    checks: {
+      model: { status: 'ok', expected: 'gpt-5.3-codex', actual: 'gpt-5.3-codex' },
+      model_reasoning_effort: { status: 'ok', expected_minimum: 'high', actual: 'xhigh' },
+      max_threads: { status: 'ok', expected_minimum: 12, actual: 12 },
+      max_depth: { status: 'ok', expected_minimum: 4, actual: 4 },
+      max_spawn_depth: { status: 'ok', expected_minimum: 4, actual: 4 }
+    },
+    guidance: []
+  },
   collab: { status: 'ok', enabled: true, feature_key: 'multi_agent', enablement: [] },
   cloud: { status: 'ok', env_id_configured: true, branch: null, fallback_policy: 'allow', enablement: [] },
   delegation: { status: 'ok', config: { status: 'ok', path: '/tmp/config.toml' }, enablement: [] }

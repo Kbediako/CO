@@ -50,6 +50,29 @@
         "command": "npm run docs:freshness"
       }
     ],
+    "docs-relevance-advisory-checks": [
+      {
+        "kind": "command",
+        "id": "docs-freshness-advisory",
+        "title": "npm run docs:freshness -- --warn",
+        "command": "npm run docs:freshness -- --warn",
+        "allowFailure": true,
+        "summaryHint": "Advisory docs-freshness signal (non-blocking)"
+      },
+      {
+        "kind": "command",
+        "id": "docs-relevance-review",
+        "title": "npm run review (docs relevance advisory)",
+        "command": "npm run review",
+        "env": {
+          "SKIP_DIFF_BUDGET": "1",
+          "CODEX_REVIEW_NON_INTERACTIVE": "1",
+          "NOTES": "Goal: docs relevance advisory | Summary: semantic docs relevance review lane with manifest context | Risks: advisory-only lane; false positives/negatives possible"
+        },
+        "allowFailure": true,
+        "summaryHint": "Agent-first docs relevance advisory review"
+      }
+    ],
     "design-artifacts": [
       {
         "kind": "command",
@@ -187,6 +210,22 @@
             "CODEX_REVIEW_NON_INTERACTIVE": "1",
             "NOTES": "Goal: docs review gate review handoff | Summary: automated prompt with manifest evidence + scope hints | Risks: review output depends on local Codex CLI capabilities"
           }
+        }
+      ]
+    },
+    {
+      "id": "docs-relevance-advisory",
+      "title": "Docs Relevance Advisory",
+      "description": "Runs a non-blocking docs relevance signal lane (warn-mode freshness + advisory review).",
+      "tags": [
+        "docs",
+        "advisory"
+      ],
+      "guardrailsRequired": false,
+      "stages": [
+        {
+          "kind": "stage-set",
+          "ref": "docs-relevance-advisory-checks"
         }
       ]
     },
