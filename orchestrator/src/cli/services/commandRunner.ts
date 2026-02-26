@@ -231,6 +231,7 @@ export async function runCommandStage(
     };
     baseEnv.CODEX_ORCHESTRATOR_RUNTIME_MODE_ACTIVE =
       context.runtimeMode ?? (manifest.runtime_mode === 'appserver' ? 'appserver' : 'cli');
+    // Keep both keys during migration because downstream tools still read either name.
     baseEnv.CODEX_ORCHESTRATOR_RUNTIME_MODE = baseEnv.CODEX_ORCHESTRATOR_RUNTIME_MODE_ACTIVE;
     const execEnv: NodeJS.ProcessEnv = { ...baseEnv, ...stage.env };
     const invocationId = `cli-command:${manifest.run_id}:${stage.id}:${Date.now()}`;

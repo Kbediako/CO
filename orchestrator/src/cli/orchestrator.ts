@@ -783,7 +783,8 @@ export class CodexOrchestrator {
   }
 
   private async executePipeline(options: ExecutePipelineOptions): Promise<PipelineRunExecutionResult> {
-    const mergedEnv = { ...process.env, ...(options.envOverrides ?? {}) };
+    const baseEnvOverrides: NodeJS.ProcessEnv = { ...(options.envOverrides ?? {}) };
+    const mergedEnv = { ...process.env, ...baseEnvOverrides };
     let runtimeSelection: RuntimeSelection;
     try {
       runtimeSelection = await resolveRuntimeSelection({
@@ -808,22 +809,27 @@ export class CodexOrchestrator {
       };
     }
     this.applyRuntimeSelection(options.manifest, runtimeSelection);
+    const effectiveEnvOverrides: NodeJS.ProcessEnv = {
+      ...baseEnvOverrides,
+      ...runtimeSelection.env_overrides
+    };
+    const effectiveMergedEnv = { ...process.env, ...effectiveEnvOverrides };
 
     if (options.mode === 'cloud') {
-      const environmentId = resolveCloudEnvironmentId(options.task, options.target, options.envOverrides);
+      const environmentId = resolveCloudEnvironmentId(options.task, options.target, effectiveEnvOverrides);
       const branch =
-        readCloudString(options.envOverrides?.CODEX_CLOUD_BRANCH) ??
+        readCloudString(effectiveEnvOverrides.CODEX_CLOUD_BRANCH) ??
         readCloudString(process.env.CODEX_CLOUD_BRANCH);
-      const codexBin = resolveCodexCliBin(mergedEnv);
+      const codexBin = resolveCodexCliBin(effectiveMergedEnv);
       const preflight = await runCloudPreflight({
         repoRoot: options.env.repoRoot,
         codexBin,
         environmentId,
         branch,
-        env: mergedEnv
+        env: effectiveMergedEnv
       });
       if (!preflight.ok) {
-        if (!allowCloudFallback(options.envOverrides)) {
+        if (!allowCloudFallback(effectiveEnvOverrides)) {
           const detail =
             `Cloud preflight failed and cloud fallback is disabled. ` +
             preflight.issues.map((issue) => issue.message).join(' ');
@@ -851,14 +857,19 @@ export class CodexOrchestrator {
         };
         appendSummary(options.manifest, detail);
         logger.warn(detail);
-        const fallback = await this.executePipeline({ ...options, mode: 'mcp', executionModeOverride: 'mcp' });
+        const fallback = await this.executePipeline({
+          ...options,
+          mode: 'mcp',
+          executionModeOverride: 'mcp',
+          envOverrides: effectiveEnvOverrides
+        });
         fallback.notes.unshift(detail);
         return fallback;
       }
-      return await this.executeCloudPipeline(options);
+      return await this.executeCloudPipeline({ ...options, envOverrides: effectiveEnvOverrides });
     }
 
-    const { env, pipeline, manifest, paths, runEvents, envOverrides } = options;
+    const { env, pipeline, manifest, paths, runEvents } = options;
     const notes: string[] = [];
     let success = true;
     manifest.guardrail_status = undefined;
@@ -875,7 +886,7 @@ export class CodexOrchestrator {
       pipelineId: pipeline.id,
       targetMetadata: (options.target.metadata ?? null) as Record<string, unknown> | null,
       taskMetadata: (options.task.metadata ?? null) as Record<string, unknown> | null,
-      env: mergedEnv
+      env: effectiveMergedEnv
     });
     if (advancedDecision.enabled || advancedDecision.source !== 'default') {
       const advancedSummary =
@@ -922,7 +933,7 @@ export class CodexOrchestrator {
         pipeline,
         target: options.target,
         task: options.task,
-        envOverrides,
+        envOverrides: effectiveEnvOverrides,
         advancedDecision
       });
       const scoutMessage =
@@ -975,7 +986,7 @@ export class CodexOrchestrator {
               index: entry.index,
               events: runEvents,
               persister,
-              envOverrides: { ...(envOverrides ?? {}), ...runtimeSelection.env_overrides },
+              envOverrides: effectiveEnvOverrides,
               runtimeMode: runtimeSelection.selected_mode,
               runtimeSessionId: runtimeSelection.runtime_session_id
             });
@@ -1729,10 +1740,13 @@ export class CodexOrchestrator {
     logger.info(`Started: ${manifest.started_at}`);
     logger.info(`Completed: ${manifest.completed_at ?? 'in-progress'}`);
     logger.info(`Manifest: ${manifest.artifact_root}/manifest.json`);
-    logger.info(
-      `Runtime: ${manifest.runtime_mode}${manifest.runtime_mode_requested ? ` (requested ${manifest.runtime_mode_requested})` : ''}` +
-        (manifest.runtime_provider ? ` via ${manifest.runtime_provider}` : '')
-    );
+    if (manifest.runtime_mode || manifest.runtime_mode_requested || manifest.runtime_provider) {
+      const selectedMode = manifest.runtime_mode ?? 'unknown';
+      logger.info(
+        `Runtime: ${selectedMode}${manifest.runtime_mode_requested ? ` (requested ${manifest.runtime_mode_requested})` : ''}` +
+          (manifest.runtime_provider ? ` via ${manifest.runtime_provider}` : '')
+      );
+    }
     if (manifest.runtime_fallback?.occurred) {
       const fallbackCode = manifest.runtime_fallback.code ?? 'runtime-fallback';
       logger.info(`Runtime fallback: ${fallbackCode} — ${manifest.runtime_fallback.reason ?? 'n/a'}`);
