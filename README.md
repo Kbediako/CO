@@ -97,7 +97,8 @@ model = "gpt-5.3-codex"
 model_reasoning_effort = "xhigh"
 
 [agents]
-max_threads = 8
+max_threads = 12
+max_depth = 2
 
 [agents.explorer]
 description = "Explorer role override (no config_file): keep built-in explorer on top-level model defaults."
@@ -135,7 +136,9 @@ model_reasoning_effort = "xhigh"
 
 Caveats:
 - `gpt-5.3-codex-spark` is text-only (no image inputs). Keep it for fast search/synthesis.
-- Use `max_threads = 8` as a balanced default; only move to `12` after verifying your machine/tooling stays stable under higher concurrency.
+- `max_threads = 12` is CO's recommended default for active multi-agent workloads; drop to `8` on constrained machines or when tool contention appears.
+- Keep `max_depth = 2` for normal work. Use `max_depth = 1` for constrained or deterministic high-risk fallback lanes, and raise only for deliberate recursive fan-out.
+- `codex review` delegates with collab tools disabled in review threads; keep review expectations single-agent even when multi-agent is enabled elsewhere.
 
 Delegation guard profile:
 - `CODEX_ORCHESTRATOR_GUARD_PROFILE=auto` (default): strict in CO-style repos, warn in lightweight repos.
@@ -147,6 +150,7 @@ Delegation guard profile:
 RLM (Recursive Language Model) is the long-horizon loop used by the `rlm` pipeline (`codex-orchestrator rlm "<goal>"` or `codex-orchestrator start rlm --goal "<goal>"`). Delegated runs only enter RLM when the child is launched with the `rlm` pipeline (or the rlm runner directly). In auto mode it resolves to symbolic only when context is large (`RLM_SYMBOLIC_MIN_BYTES`) and an explicit context signal is present (`RLM_CONTEXT_PATH` or delegated run); otherwise it stays iterative. The runner writes state to `.runs/<task-id>/cli/<run-id>/rlm/state.json` and stops when the validator passes or budgets are exhausted.
 For symbolic mode, the Option 2 alignment checker is enabled by default (`RLM_ALIGNMENT_CHECKER=1`) and writes append-only alignment artifacts under `.runs/<task-id>/cli/<run-id>/rlm/alignment/` (ledger + projection). Rollback toggle: set `RLM_ALIGNMENT_CHECKER=0`. Enforcement is opt-in via `RLM_ALIGNMENT_CHECKER_ENFORCE=1`.
 Symbolic subcalls can optionally use collab tools. Fast path: `codex-orchestrator rlm --multi-agent auto "<goal>"` (legacy alias: `--collab auto`; sets `RLM_SYMBOLIC_MULTI_AGENT=1` plus legacy `RLM_SYMBOLIC_COLLAB=1` for compatibility, and implies symbolic mode). Collab requires `multi_agent=true` in `codex features list` (`collab` remains a legacy alias). Collab tool calls parsed from `codex exec --json --enable multi_agent` are stored in `manifest.collab_tool_calls` (bounded by `CODEX_ORCHESTRATOR_COLLAB_MAX_EVENTS`, set to `0` to disable). For auditable role routing, prefix spawned prompts with `[agent_type:<role>]` and set `spawn_agent.agent_type` when supported; lifecycle validation enforces prompt-role evidence and validates `agent_type` when present (`RLM_SYMBOLIC_MULTI_AGENT_ROLE_POLICY=warn|off`, legacy alias `RLM_COLLAB_ROLE_POLICY`; `RLM_SYMBOLIC_MULTI_AGENT_ALLOW_DEFAULT_ROLE=1`, legacy alias `RLM_COLLAB_ALLOW_DEFAULT_ROLE`). `codex-orchestrator codex setup` remains available when you want a managed/pinned CLI path (opt-in via `CODEX_CLI_USE_MANAGED=1`).
+For batch fan-out jobs, prefer native `spawn_agents_on_csv` before building custom orchestration wrappers.
 
 ### Delegation flow
 ```mermaid

@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp 0ac1701a5a17ac610fa7aa9aea31df44f96ff721db8814cafb3f3c4e4368ddd4 -->
+<!-- codex:instruction-stamp 296f04615fe578cc9a3b0ff46200ded1057fd654c6daf95030b3770b5b8da48b -->
 # Agent Enablement
 
 ## Added by Bootstrap 2025-10-16
@@ -21,7 +21,7 @@
 ### MCP vs Collab (Decision Rule)
 - Default to MCP for approvals, tool routing, delegation, external integrations, and audit trails.
 - Use collab only for intra-run brainstorming, role-split planning, or parallel subcalls.
-- Collab means auxiliary assistant agents inside a run; enable it via `RLM_SYMBOLIC_COLLAB=1` (see `docs/guides/collab-vs-mcp.md`).
+- Collab means auxiliary assistant agents inside a run; enable it via `RLM_SYMBOLIC_MULTI_AGENT=1` (legacy alias: `RLM_SYMBOLIC_COLLAB=1`; see `docs/guides/collab-vs-mcp.md`).
 - The “top-level Codex” is the MCP-run agent the user is interacting with; collab agents are assistants and do not represent the run.
 
 ### Meta-Orchestrator Mode (Parallel Workstreams)

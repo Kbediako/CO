@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp 491fa31c657ef11183ddd61556698c7621c01d30606d5bec288742bef833a40c -->
+<!-- codex:instruction-stamp ed98936c8a92cd2c2f6b0b832a243dafc58c9aafac828b300a4f84a0ec32afd2 -->
 # Codex-Orchestrator Agent Handbook (Template)
 
 Use this repository as the wrapper that coordinates multiple Codex-driven projects. After cloning, replace placeholder metadata (task IDs, documents, SOPs) with values for each downstream initiative while keeping these shared guardrails in place.
@@ -27,7 +27,7 @@ Use this repository as the wrapper that coordinates multiple Codex-driven projec
 - Keep top-level defaults on latest codex by setting `model = "gpt-5.3-codex"` in `~/.codex/config.toml`.
 - Define a user `agents.explorer` role without `config_file` so built-in explorer inherits your top-level model defaults instead of older built-in profiles.
 - Caveat: spark models are text-only; use non-spark roles when image inputs are required.
-- Set `[agents] max_threads = 8` as the standard baseline; only move to `12` after validating stability under your MCP/tool workload.
+- Set `[agents] max_threads = 12` with `max_depth = 2` as the standard multi-agent baseline; fall back to `8` or `max_depth = 1` for constrained/high-risk lanes.
 - Use an explicit `worker_complex` role (for example `gpt-5.3-codex`, `xhigh`) for high-risk implementation streams.
 
 ## Deliberation Default (Agent-First)

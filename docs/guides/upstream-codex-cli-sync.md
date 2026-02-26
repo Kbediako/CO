@@ -13,6 +13,21 @@
 - Frequent mirror updates (daily/weekly).
 - Scheduled integration windows to rebase/merge `co/patches` onto the latest upstream mirror.
 
+## Quick upgrade audit (operator checklist)
+- Confirm installed CLI and latest upstream release metadata:
+  - `codex --version`
+  - `gh release list --repo openai/codex --limit 10`
+  - `gh release view rust-v<version> --repo openai/codex --json tagName,isPrerelease,publishedAt,url`
+- Confirm fork divergence against upstream:
+  - `git -C /path/to/codex fetch --all --prune`
+  - `git -C /path/to/codex rev-list --left-right --count main...upstream/main`
+  - `git -C /path/to/codex log --oneline --no-merges main..upstream/main -n 20`
+  - `git -C /path/to/codex log --oneline --no-merges --branches --not upstream/main -n 20`
+- Record behavioral deltas that can affect CO:
+  - multi-agent tooling/runtime (`spawn_agents_on_csv`, role/thread behavior)
+  - review-mode restrictions (collab/web search disabled in review delegation)
+  - approvals/sandbox/config default shifts (for example `allow_login_shell`, approval policy deprecations)
+
 ## Patch discipline
 - Keep patches minimal and scoped.
 - Tag commits with `CO-PATCH:` and link any upstream issue/PR if applicable.

@@ -24,6 +24,8 @@
 ## Notes
 - Do not use collab as a replacement for MCP when you need approvals, sandbox enforcement, or manifest-grade auditability.
 - Collab can be enabled per-run and should remain off by default unless explicitly required.
+- Review-mode subthreads intentionally disable collab tools and web search; do not design review flows that depend on `spawn_agent`/`wait` inside `codex review`.
+- For high-volume independent work items, prefer native `spawn_agents_on_csv` before building custom fan-out wrappers.
 - For Playwright-heavy flows, run browser steps in a dedicated subagent stream, keep Playwright MCP off outside that stream, and return artifact paths plus a terse summary instead of raw dumps.
 - Current Codex CLI behavior is id-centric for collab UI/events: `agent_type` may not be visibly surfaced in the TUI and may be absent from emitted `collab_tool_call` payloads. Keep explicit prompt role tags (`[agent_type:<role>]`) and watch upstream CLI updates for direct `agent_type` exposure.
 
