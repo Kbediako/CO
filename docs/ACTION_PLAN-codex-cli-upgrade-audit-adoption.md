@@ -5,6 +5,7 @@
 - Scope: audit/reporting, decision log, targeted implementation, full validation, and merged PR lifecycle.
 - Assumptions: local `codex` fork and `gh` auth are available; latest stable release remains `0.105.0` during execution.
 - Follow-up scope (2026-02-26b): implement doctor defaults-drift advisory, docs-relevance advisory lane, built-ins-first RLM guidance tightening, and awaiter triage documentation.
+- Follow-up scope (2026-02-26c): implement shipped `pr resolve-merge` behavior (action-required early exit), align SOP/skill guidance, and capture targeted validation evidence.
 
 ## Milestones & Sequencing
 1) Evidence and docs-first
@@ -21,6 +22,11 @@
 - Add a non-blocking docs-relevance advisory lane (agent/delegation friendly).
 - Update built-ins-first + awaiter-triage guidance in AGENTS/README/findings.
 - Validate in-repo + throwaway-repo simulated runs.
+5) Follow-up PR monitor hardening (2026-02-26c)
+- Add `pr resolve-merge` subcommand by reusing `pr watch-merge` poll/gate behavior.
+- Exit early with explicit action-required signaling for review/thread/feedback/check-failure blockers.
+- Update SOP + release skill guidance and fallback scripts.
+- Run targeted CLI/unit/docs validation, plus the required quality lane when touched surfaces require it.
 
 ## Dependencies
 - `gh` release metadata + local fork git refs.

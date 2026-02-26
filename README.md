@@ -273,6 +273,8 @@ codex-orchestrator doctor --cloud-preflight
 - Run docs relevance as an advisory lane (non-blocking): `codex-orchestrator start docs-relevance-advisory --task <task-id>`
 - Capture reproducible downstream failures: `codex-orchestrator doctor --issue-log --issue-title "<title>" --issue-notes "<notes>"`
 - Auto-capture failed run issue bundles: `codex-orchestrator start <pipeline> --auto-issue-log` or `codex-orchestrator flow --auto-issue-log`
+- Active PR watch-resolve-merge loop: `codex-orchestrator pr resolve-merge --pr <number> --quiet-minutes <window>` (add `--auto-merge` when approved; exits early when author action is required).
+- Passive PR monitor loop: `codex-orchestrator pr watch-merge --pr <number> --quiet-minutes <window>` (monitor-only behavior; keeps waiting unless terminal/timeout).
 - Review checkpoints (npm-only safe): `NOTES="Goal: ... | Summary: ... | Risks: ..." codex-orchestrator review --task <task-id>` for manifest-backed standalone review wrapper behavior (auto-skips repo-only diff-budget script when unavailable in downstream installs); use `codex review "<focus>"` for quick prompt-only checks; use `codex-orchestrator start implementation-gate --task <task-id> --format json` when you want a full gate run.
 - Downstream simulation before shipping wrapper/skill changes: `npm run pack:smoke` (packaged CLI in temp mock repo; validates `review` artifacts and `long-poll-wait` install path).
 - Delegation: `codex-orchestrator doctor --apply --yes`, then enable for a Codex run with: `codex -c 'mcp_servers.delegation.enabled=true' ...`

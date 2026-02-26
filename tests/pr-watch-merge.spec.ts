@@ -4,6 +4,7 @@ import {
   buildPrMergeArgs,
   buildStatusSnapshot,
   isHumanReviewActor,
+  resolveActionRequiredReasons,
   resolveLatestBotRereviewRequests,
   resolveBotRereviewTimingForKind,
   resolveCachedRequiredChecksSummary,
@@ -11,7 +12,7 @@ import {
   summarizeRequiredChecks
 } from '../scripts/lib/pr-watch-merge.js';
 
-function makeResponse(checkNodes: unknown[]) {
+function makeResponse(checkNodes: unknown[], overrides: Record<string, unknown> = {}) {
   return {
     data: {
       repository: {
@@ -39,7 +40,8 @@ function makeResponse(checkNodes: unknown[]) {
                 }
               }
             ]
-          }
+          },
+          ...overrides
         }
       }
     }
@@ -163,6 +165,65 @@ describe('pr watch-merge required-check gating', () => {
     expect(snapshot.botRereviewInProgress).toEqual(['codex']);
     expect(snapshot.coderabbitReviewMeta.outsideDiffCount).toBe(1);
     expect(snapshot.coderabbitReviewMeta.nitpickCount).toBe(3);
+  });
+});
+
+describe('resolveActionRequiredReasons', () => {
+  it('classifies review and thread feedback blockers as action-required', () => {
+    const response = makeResponse([], {
+      reviewDecision: 'CHANGES_REQUESTED',
+      reviewThreads: {
+        nodes: [
+          {
+            isResolved: false,
+            isOutdated: false
+          }
+        ]
+      }
+    });
+    const requiredChecks = summarizeRequiredChecks([
+      { name: 'corelane', state: 'SUCCESS', bucket: 'pass', link: 'https://example.com/corelane' }
+    ]);
+    const snapshot = buildStatusSnapshot(response, requiredChecks, {
+      fetchError: false,
+      unacknowledgedCount: 2
+    });
+
+    const reasons = resolveActionRequiredReasons(snapshot);
+    expect(reasons).toContain('review=CHANGES_REQUESTED');
+    expect(reasons).toContain('unresolved_threads=1');
+    expect(reasons).toContain('unacknowledged_bot_feedback=2');
+  });
+
+  it('does not classify pending checks as action-required by itself', () => {
+    const response = makeResponse([
+      {
+        __typename: 'CheckRun',
+        name: 'corelane',
+        status: 'IN_PROGRESS',
+        conclusion: null,
+        detailsUrl: 'https://example.com/corelane'
+      }
+    ]);
+    const snapshot = buildStatusSnapshot(response, null, {
+      fetchError: false,
+      unacknowledgedCount: 0
+    });
+
+    expect(resolveActionRequiredReasons(snapshot)).toEqual([]);
+  });
+
+  it('classifies failing required checks as action-required', () => {
+    const response = makeResponse([]);
+    const requiredChecks = summarizeRequiredChecks([
+      { name: 'corelane', state: 'FAILURE', bucket: 'fail', link: 'https://example.com/corelane' }
+    ]);
+    const snapshot = buildStatusSnapshot(response, requiredChecks, {
+      fetchError: false,
+      unacknowledgedCount: 0
+    });
+
+    expect(resolveActionRequiredReasons(snapshot)).toContain('required_checks_failed=1');
   });
 });
 

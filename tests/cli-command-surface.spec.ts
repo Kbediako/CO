@@ -120,12 +120,19 @@ describe('codex-orchestrator command surface', () => {
   it('prints pr help', async () => {
     const { stdout } = await runCli(['pr', '--help']);
     expect(stdout).toContain('Usage: codex-orchestrator pr <subcommand>');
+    expect(stdout).toContain('resolve-merge');
     expect(stdout).toContain('docs/guides/review-artifacts.md');
   }, TEST_TIMEOUT);
 
   it('prints pr watch-merge help', async () => {
     const { stdout } = await runCli(['pr', 'watch-merge', '--help']);
     expect(stdout).toContain('Usage: codex-orchestrator pr watch-merge');
+  }, TEST_TIMEOUT);
+
+  it('prints pr resolve-merge help', async () => {
+    const { stdout } = await runCli(['pr', 'resolve-merge', '--help']);
+    expect(stdout).toContain('Usage: codex-orchestrator pr resolve-merge');
+    expect(stdout).toContain('--exit-on-action-required');
   }, TEST_TIMEOUT);
 
   it('prints setup help', async () => {

@@ -5,6 +5,7 @@
 - Desired Outcome: establish an evidence-backed latest-capability baseline and ship targeted CO upgrades that improve adoption safety, consistency, and downstream usability without unrelated refactors.
 - Follow-up extension (2026-02-26): codify built-ins-first/high-reasoning defaults, additive config update policy, simulation coverage guidance, docs relevance governance, and fallback exception posture.
 - Follow-up extension (2026-02-26b): ship doctor defaults-drift advisory, add a non-blocking docs-relevance advisory lane, tighten built-ins-first RLM guidance, and add explicit awaiter long-wait triage guidance with throwaway simulation evidence.
+- Follow-up extension (2026-02-26c): ship a watch-resolve-merge command mode that exits early on actionable PR feedback, codify PR monitoring semantics to avoid false "stuck" waits, and keep merge automation guarded/non-destructive by default.
 
 ## User Request Translation (Context Anchor)
 - User intent / needs (in your own words): deeply audit latest Codex CLI changes, compare local fork against upstream, deliberate on depth/thread defaults (including a decision on moving to 12 threads), implement CO updates across code/config/docs/skills, validate, and merge the PR end-to-end.
@@ -17,6 +18,7 @@
   - `doctor` surfaces additive Codex-defaults drift advisories for model/reasoning/agent baseline and remediation guidance.
   - A docs-relevance advisory lane exists and is explicitly non-blocking while false-positive rates are unknown.
   - Awaiter operations guidance distinguishes long-running waits from truly stuck behavior.
+  - PR monitoring can distinguish "waitable" states from "action-required" states and exits clearly when author intervention is needed.
   - Mock/dummy/simulated tests in a throwaway repo validate the new CLI/docs behavior end-to-end.
   - Required validation chain passes and evidence is captured.
   - PR is opened, feedback handled, checks monitored through quiet window, and merged.
@@ -82,6 +84,8 @@
 - Rationale: upstream built-ins are sufficient for default orchestration; minimizing custom role sprawl reduces maintenance drift.
 - Decision (2026-02-26b): codify awaiter “long-wait vs stuck” triage in operator-facing docs.
 - Rationale: prevents false stuck diagnoses and keeps patience-first monitoring behavior explicit.
+- Decision (2026-02-26c): add shipped `pr resolve-merge` mode built on existing `pr watch-merge` polling/gating logic, with exit-on-action-required enabled by default.
+- Rationale: removes ambiguity during long monitor windows by terminating early when feedback requires user action, while reusing proven merge/readiness gates.
 
 ## Approvals
 - Product: self-approved (task owner)

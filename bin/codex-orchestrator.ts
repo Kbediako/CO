@@ -2056,10 +2056,20 @@ async function handlePr(rawArgs: string[]): Promise<void> {
     return;
   }
   const [subcommand, ...subcommandArgs] = rawArgs;
-  if (subcommand !== 'watch-merge') {
+  const modeBySubcommand: Record<string, { usage: string; defaultAutoMerge?: boolean; defaultExitOnActionRequired?: boolean }> = {
+    'watch-merge': {
+      usage: 'codex-orchestrator pr watch-merge'
+    },
+    'resolve-merge': {
+      usage: 'codex-orchestrator pr resolve-merge',
+      defaultExitOnActionRequired: true
+    }
+  };
+  const mode = modeBySubcommand[subcommand];
+  if (!mode) {
     throw new Error(`Unknown pr subcommand: ${subcommand}`);
   }
-  const exitCode = await runPrWatchMerge(subcommandArgs, { usage: 'codex-orchestrator pr watch-merge' });
+  const exitCode = await runPrWatchMerge(subcommandArgs, mode);
   if (exitCode !== 0) {
     process.exitCode = exitCode;
   }
@@ -2450,6 +2460,9 @@ Commands:
   pr watch-merge [options]
     Monitor PR checks/reviews with polling and optional auto-merge after a quiet window.
     Use \`codex-orchestrator pr watch-merge --help\` for full options.
+  pr resolve-merge [options]
+    Monitor until merge-ready or actionable feedback appears; exits early when author action is required.
+    Use \`codex-orchestrator pr resolve-merge --help\` for full options.
   delegate-server         Run the delegation MCP server (stdio).
     --repo <path>         Repo root for config + manifests (default cwd).
     --mode <full|question_only>  Limit tool surface for child runs.
@@ -2570,10 +2583,14 @@ function printPrHelp(): void {
 Subcommands:
   watch-merge             Monitor PR checks/reviews with polling and optional auto-merge.
                           Supports PR_MONITOR_* env vars and standard flags (see: pr watch-merge --help).
+  resolve-merge           Watch for merge readiness but exit early on actionable feedback requiring author response.
+                          Inherits watch-merge flags; defaults exit-on-action-required to on.
 
 Examples:
   codex-orchestrator pr watch-merge --pr 211 --dry-run --quiet-minutes 10
   codex-orchestrator pr watch-merge --pr 211 --auto-merge --merge-method squash
+  codex-orchestrator pr resolve-merge --pr 211 --quiet-minutes 15
+  codex-orchestrator pr resolve-merge --pr 211 --auto-merge --quiet-minutes 10
 
 Guide:
   Review artifacts (prompt + output log paths): docs/guides/review-artifacts.md

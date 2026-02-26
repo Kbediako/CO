@@ -1,5 +1,7 @@
 export interface PrWatchMergeOptions {
   usage?: string;
+  defaultAutoMerge?: boolean;
+  defaultExitOnActionRequired?: boolean;
 }
 
 export interface PrWatchMergeCheckFailure {
@@ -102,6 +104,8 @@ export function buildStatusSnapshot(
     rereview?: PrWatchMergeBotRereviewSignals | null;
   } | null
 ): PrWatchMergeSnapshot;
+
+export function resolveActionRequiredReasons(snapshot: PrWatchMergeSnapshot): string[];
 
 export function resolveLatestBotRereviewRequests(
   comments: Array<{

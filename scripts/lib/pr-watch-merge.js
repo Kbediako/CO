@@ -35,6 +35,14 @@ const BOT_MENTION_PATTERNS = {
 const BOT_IN_PROGRESS_REACTION_CONTENT = new Set(['eyes']);
 const BOT_COMPLETE_REACTION_CONTENT = new Set(['+1', 'hooray', 'heart', 'rocket', 'laugh', 'confused']);
 
+class PrWatchMergeExitError extends Error {
+  constructor(message, exitCode = 1) {
+    super(message);
+    this.name = 'PrWatchMergeExitError';
+    this.exitCode = exitCode;
+  }
+}
+
 const PR_QUERY = `
 query($owner:String!, $repo:String!, $number:Int!) {
   repository(owner:$owner, name:$repo) {
@@ -260,6 +268,11 @@ export function printPrWatchMergeHelp(options = {}) {
   const usageCommand = typeof options.usage === 'string' && options.usage.trim().length > 0
     ? options.usage.trim()
     : 'codex-orchestrator pr watch-merge';
+  const defaultAutoMerge =
+    typeof options.defaultAutoMerge === 'boolean'
+      ? options.defaultAutoMerge
+      : envFlagEnabled(process.env.PR_MONITOR_AUTO_MERGE, false);
+  const defaultExitOnActionRequired = Boolean(options.defaultExitOnActionRequired);
   console.log(`Usage: ${usageCommand} [options]
 
 Monitor PR checks/reviews with polling and optionally merge after a quiet window.
@@ -276,16 +289,21 @@ Options:
   --no-auto-merge           Never merge automatically (monitor only)
   --delete-branch           Delete remote branch when merging
   --no-delete-branch        Keep remote branch after merge
+  --exit-on-action-required Exit non-zero when author action is required
+  --no-exit-on-action-required Keep monitoring even when author action is required
   --dry-run                 Never call gh pr merge (report only)
   -h, --help                Show this help message
 
 Environment:
-  PR_MONITOR_AUTO_MERGE=1       Default auto-merge on
+  PR_MONITOR_AUTO_MERGE=1       Default auto-merge on (current default: ${defaultAutoMerge ? 'on' : 'off'})
   PR_MONITOR_DELETE_BRANCH=1    Default delete branch on merge
   PR_MONITOR_QUIET_MINUTES=<n>  Override quiet window default
   PR_MONITOR_INTERVAL_SECONDS=<n>
   PR_MONITOR_TIMEOUT_MINUTES=<n>
   PR_MONITOR_MERGE_METHOD=<method>`);
+  if (defaultExitOnActionRequired) {
+    console.log('  resolve-merge default: exit-on-action-required is on');
+  }
 }
 
 async function runGh(args, { allowFailure = false } = {}) {
@@ -638,6 +656,40 @@ export function buildStatusSnapshot(response, requiredChecks = null, inlineBotFe
     readyToMerge: gateReasons.length === 0,
     headOid: pr.commits?.nodes?.[0]?.commit?.oid || null
   };
+}
+
+export function resolveActionRequiredReasons(snapshot) {
+  if (!snapshot || typeof snapshot !== 'object') {
+    return ['snapshot=unknown'];
+  }
+  const reasons = [];
+  const reviewDecision = normalizeEnum(snapshot.reviewDecision);
+  if (Boolean(snapshot.isDraft)) {
+    reasons.push('draft');
+  }
+  if (Boolean(snapshot.hasDoNotMergeLabel)) {
+    reasons.push('label:do-not-merge');
+  }
+  if (BLOCKED_REVIEW_DECISIONS.has(reviewDecision)) {
+    reasons.push(`review=${reviewDecision}`);
+  }
+  if (typeof snapshot.unresolvedThreadCount === 'number' && snapshot.unresolvedThreadCount > 0) {
+    reasons.push(`unresolved_threads=${snapshot.unresolvedThreadCount}`);
+  }
+  if (
+    typeof snapshot.unacknowledgedBotFeedbackCount === 'number'
+    && snapshot.unacknowledgedBotFeedbackCount > 0
+  ) {
+    reasons.push(`unacknowledged_bot_feedback=${snapshot.unacknowledgedBotFeedbackCount}`);
+  }
+  const gateChecks = snapshot.requiredChecks && typeof snapshot.requiredChecks === 'object'
+    ? snapshot.requiredChecks
+    : snapshot.checks;
+  const failedCount = Array.isArray(gateChecks?.failed) ? gateChecks.failed.length : 0;
+  if (failedCount > 0) {
+    reasons.push(`${snapshot.requiredChecks ? 'required_checks_failed' : 'checks_failed'}=${failedCount}`);
+  }
+  return reasons;
 }
 
 function formatStatusLine(snapshot, quietRemainingMs) {
@@ -1157,6 +1209,8 @@ async function runPrWatchMergeOrThrow(argv, options) {
     'no-auto-merge',
     'delete-branch',
     'no-delete-branch',
+    'exit-on-action-required',
+    'no-exit-on-action-required',
     'dry-run',
     'h',
     'help'
@@ -1193,7 +1247,8 @@ async function runPrWatchMergeOrThrow(argv, options) {
       ? args['merge-method']
       : process.env.PR_MONITOR_MERGE_METHOD || DEFAULT_MERGE_METHOD
   );
-  const defaultAutoMerge = envFlagEnabled(process.env.PR_MONITOR_AUTO_MERGE, false);
+  const defaultAutoMergeFallback = typeof options.defaultAutoMerge === 'boolean' ? options.defaultAutoMerge : false;
+  const defaultAutoMerge = envFlagEnabled(process.env.PR_MONITOR_AUTO_MERGE, defaultAutoMergeFallback);
   const defaultDeleteBranch = envFlagEnabled(process.env.PR_MONITOR_DELETE_BRANCH, true);
   let autoMerge = defaultAutoMerge;
   if (hasFlag(args, 'auto-merge')) {
@@ -1208,6 +1263,13 @@ async function runPrWatchMergeOrThrow(argv, options) {
   }
   if (hasFlag(args, 'no-delete-branch')) {
     deleteBranch = false;
+  }
+  let exitOnActionRequired = Boolean(options.defaultExitOnActionRequired);
+  if (hasFlag(args, 'exit-on-action-required')) {
+    exitOnActionRequired = true;
+  }
+  if (hasFlag(args, 'no-exit-on-action-required')) {
+    exitOnActionRequired = false;
   }
   const dryRun = hasFlag(args, 'dry-run');
 
@@ -1226,7 +1288,7 @@ async function runPrWatchMergeOrThrow(argv, options) {
   log(
     `Monitoring ${owner}/${repo}#${prNumber} every ${intervalSeconds}s (quiet window ${quietMinutes}m, timeout ${timeoutMinutes}m, auto_merge=${
       autoMerge ? 'on' : 'off'
-    }, dry_run=${dryRun ? 'on' : 'off'}).`
+    }, exit_on_action_required=${exitOnActionRequired ? 'on' : 'off'}, dry_run=${dryRun ? 'on' : 'off'}).`
   );
 
   let quietWindowStartedAt = null;
@@ -1286,6 +1348,17 @@ async function runPrWatchMergeOrThrow(argv, options) {
 
     log(formatStatusLine(snapshot, quietRemainingMs));
 
+    if (exitOnActionRequired) {
+      const actionRequiredReasons = resolveActionRequiredReasons(snapshot);
+      if (actionRequiredReasons.length > 0) {
+        const details = actionRequiredReasons.join(', ');
+        throw new PrWatchMergeExitError(
+          `Action required before merge: ${details}${snapshot.url ? ` (${snapshot.url})` : ''}`,
+          2
+        );
+      }
+    }
+
     if (snapshot.readyToMerge && quietWindowStartedAt !== null && quietElapsedMs >= quietMs) {
       if (!autoMerge || dryRun) {
         log(
@@ -1328,7 +1401,10 @@ async function runPrWatchMergeOrThrow(argv, options) {
     await sleep(Math.min(intervalMs, remainingTimeMs));
   }
 
-  throw new Error(`Timed out after ${timeoutMinutes} minute(s) while monitoring PR #${prNumber}.`);
+  throw new PrWatchMergeExitError(
+    `Timed out after ${timeoutMinutes} minute(s) while monitoring PR #${prNumber}.`,
+    3
+  );
 }
 
 export async function runPrWatchMerge(argv, options = {}) {
@@ -1338,6 +1414,10 @@ export async function runPrWatchMerge(argv, options = {}) {
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error(message);
+    const exitCodeCandidate = Number(error?.exitCode);
+    if (Number.isInteger(exitCodeCandidate) && exitCodeCandidate > 0) {
+      return exitCodeCandidate;
+    }
     return 1;
   }
 }

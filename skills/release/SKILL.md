@@ -63,7 +63,7 @@ Monitor + auto-merge once green:
 
 ```bash
 PR_NUMBER="$(gh pr view --json number --jq .number)"
-codex-orchestrator pr watch-merge --pr "$PR_NUMBER" --auto-merge --delete-branch --quiet-minutes 1 --interval-seconds 20
+codex-orchestrator pr resolve-merge --pr "$PR_NUMBER" --auto-merge --delete-branch --quiet-minutes 1 --interval-seconds 20
 ```
 
 ### 3) Create signed tag + push
@@ -117,7 +117,7 @@ codex-orchestrator --version
 TMPDIR="$(mktemp -d)"
 cd "$TMPDIR"
 npx -y @kbediako/codex-orchestrator@"${VERSION}" --version
-npx -y @kbediako/codex-orchestrator@"${VERSION}" pr watch-merge --help | head -n 10
+npx -y @kbediako/codex-orchestrator@"${VERSION}" pr resolve-merge --help | head -n 10
 ```
 
 If the release included bundled skill changes, refresh local skills:

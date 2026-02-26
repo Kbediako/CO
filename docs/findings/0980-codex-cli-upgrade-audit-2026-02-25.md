@@ -1,4 +1,4 @@
-# Codex CLI Upgrade Audit - 0980 (2026-02-25, addendum 2026-02-26)
+# Codex CLI Upgrade Audit - 0980 (2026-02-25, addenda 2026-02-26 / 2026-02-26b / 2026-02-26c)
 
 ## 1) What changed in Codex CLI and why it matters for CO
 
@@ -215,3 +215,41 @@
   - `out/0980-codex-cli-upgrade-audit-adoption/manual/throwaway-sim-20260226b-04-docs-relevance.json`
   - `out/0980-codex-cli-upgrade-audit-adoption/manual/throwaway-sim-20260226b-04-docs-relevance-assert.log`
   - `out/0980-codex-cli-upgrade-audit-adoption/manual/throwaway-sim-20260226b-04-docs-relevance.stderr.log`
+
+## 10) Follow-up implementation updates landed (2026-02-26c)
+
+### 10.1 Problem and root cause confirmation
+- "Awaiter stuck" incidents in PR loops were primarily operator-loop ambiguity, not awaiter deadlock:
+  - passive monitor loops kept waiting even after actionable review feedback arrived.
+  - this looked idle because no explicit terminal "needs action" state was surfaced.
+
+### 10.2 Shipped watch-resolve-merge posture
+1. Added shipped `codex-orchestrator pr resolve-merge` subcommand as a thin mode over `pr watch-merge`.
+2. Reused existing required-check/bot-feedback/thread/review gating logic; no new orchestration subsystem.
+3. Enabled `exit-on-action-required` by default in resolve mode so loops stop early when author intervention is required.
+4. Added explicit action-required classification for:
+   - `review=CHANGES_REQUESTED|REVIEW_REQUIRED`
+   - unresolved review threads
+   - unacknowledged head-commit bot inline feedback
+   - failing gate checks (required checks when available, otherwise rollup failed checks)
+   - draft / do-not-merge label
+5. Added fallback script entrypoint for repo workflows: `npm run pr:resolve-merge`.
+
+### 10.3 UX and exit semantics
+- `pr resolve-merge` now cleanly distinguishes:
+  - waitable states (pending checks/re-review still in progress),
+  - action-required states (exit code `2`),
+  - timeout (`3`),
+  - generic failure (`1`),
+  - success (`0`).
+- This keeps patience-first behavior while preventing silent long waits when reviewer action is required.
+
+### 10.4 Docs/skills/SOP updates
+- Updated operator guidance to prefer `pr resolve-merge` for active PR ownership loops.
+- Retained `pr watch-merge` for passive monitor-only loops.
+- Updated release skill examples to use resolve-merge for release PR watch/merge steps.
+
+### 10.5 Delegated design evidence
+- Subagent `019c9978-a4e8-72f0-b9de-e99e3bbe6f98` (researcher) completed a bounded design review:
+  - recommended thin-mode reuse over new subsystem,
+  - recommended explicit action-required terminal state and command-surface tests.
