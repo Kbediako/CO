@@ -12,7 +12,7 @@
 
 ### Foundation and docs-first
 - [x] Task scaffolding + mirrors + index/spec registration created. - Evidence: `docs/PRD-chatgpt-login-first-runtime-provider-migration.md`, `docs/TECH_SPEC-chatgpt-login-first-runtime-provider-migration.md`, `docs/ACTION_PLAN-chatgpt-login-first-runtime-provider-migration.md`, `tasks/specs/0981-chatgpt-login-first-runtime-provider-migration.md`, `tasks/tasks-0981-chatgpt-login-first-runtime-provider-migration.md`, `.agent/task/0981-chatgpt-login-first-runtime-provider-migration.md`, `tasks/index.json`, `docs/TASKS.md`.
-- [x] Delegated planning/research/validation streams recorded with evidence. - Evidence: subagents `019c9a5e-c231-7e82-bab2-e4821a24cf22`, `019c9a5e-c6a0-7100-9adf-28c6ef312044`, `019c9a5e-cb15-70c0-92b7-df9dbf171206`; delegated guard manifest `.runs/0981-chatgpt-login-first-runtime-provider-migration-guard/cli/2026-02-26T14-55-57-588Z-b56fc208/manifest.json`.
+- [x] Delegated planning/research/validation streams recorded with evidence. - Evidence: docs-review planning manifest `.runs/0981-chatgpt-login-first-runtime-provider-migration/cli/2026-02-26T15-02-39-504Z-3d88b520/manifest.json`; delegated guard manifest `.runs/0981-chatgpt-login-first-runtime-provider-migration-guard/cli/2026-02-26T14-55-57-588Z-b56fc208/manifest.json`.
 - [x] Docs-review manifest captured before runtime code edits. - Evidence: `.runs/0981-chatgpt-login-first-runtime-provider-migration/cli/2026-02-26T15-02-39-504Z-3d88b520/manifest.json`, `out/0981-chatgpt-login-first-runtime-provider-migration/manual/docs-review-pre-implementation-pass.log`.
 
 ### Runtime migration workstreams
@@ -37,8 +37,8 @@
 - [x] 10 `npm run pack:smoke` (required: CLI/review-wrapper paths touched) - Evidence: `out/0981-chatgpt-login-first-runtime-provider-migration/manual/10-pack-smoke.log`, `out/0981-chatgpt-login-first-runtime-provider-migration/manual/final-10-pack-smoke.log`.
 
 ### Review, merge, and handoff
-- [ ] PR opened with scope/decisions/risks/evidence.
+- [x] PR opened with scope/decisions/risks/evidence. - Evidence: `https://github.com/Kbediako/CO/pull/261`.
 - [ ] Review/bot feedback addressed in-thread with reruns.
 - [ ] Quiet-window monitoring complete after green checks.
 - [ ] Merge complete and branch cleaned up (if unblocked).
-- Blocker (2026-02-26): `gh pr create --base main --head task/0981-chatgpt-login-first-runtime-provider-migration` failed with `GraphQL: Kbediako does not have the correct permissions to execute CreatePullRequest (createPullRequest)`. Evidence: `out/0981-chatgpt-login-first-runtime-provider-migration/manual/pr-create-blocker.log`.
+- Note (2026-02-26): `gh pr create` GraphQL path remains permission-limited, but PR creation succeeded via REST fallback (`gh api repos/Kbediako/CO/pulls`). Evidence: `out/0981-chatgpt-login-first-runtime-provider-migration/manual/pr-create-blocker.log`.

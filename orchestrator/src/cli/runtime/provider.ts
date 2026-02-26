@@ -196,7 +196,10 @@ export async function resolveRuntimeSelection(
       source: options.source,
       provider: 'CliRuntimeProvider',
       env_overrides: {
-        CODEX_ORCHESTRATOR_RUNTIME_MODE_ACTIVE: 'cli'
+        CODEX_ORCHESTRATOR_RUNTIME_MODE_ACTIVE: 'cli',
+        CODEX_ORCHESTRATOR_RUNTIME_MODE: 'cli',
+        CODEX_RUNTIME_MODE: 'cli',
+        CODEX_ORCHESTRATOR_APPSERVER_SESSION_ID: ''
       },
       runtime_session_id: null,
       fallback: createNoFallback(now)
@@ -217,6 +220,7 @@ export async function resolveRuntimeSelection(
       provider: 'AppServerRuntimeProvider',
       env_overrides: {
         CODEX_ORCHESTRATOR_RUNTIME_MODE_ACTIVE: 'appserver',
+        CODEX_ORCHESTRATOR_RUNTIME_MODE: 'appserver',
         CODEX_ORCHESTRATOR_APPSERVER_SESSION_ID: runtimeSessionId,
         CODEX_RUNTIME_MODE: 'appserver'
       },
@@ -239,7 +243,10 @@ export async function resolveRuntimeSelection(
     source: options.source,
     provider: 'CliRuntimeProvider',
     env_overrides: {
-      CODEX_ORCHESTRATOR_RUNTIME_MODE_ACTIVE: 'cli'
+      CODEX_ORCHESTRATOR_RUNTIME_MODE_ACTIVE: 'cli',
+      CODEX_ORCHESTRATOR_RUNTIME_MODE: 'cli',
+      CODEX_RUNTIME_MODE: 'cli',
+      CODEX_ORCHESTRATOR_APPSERVER_SESSION_ID: ''
     },
     runtime_session_id: null,
     fallback: createFallback({

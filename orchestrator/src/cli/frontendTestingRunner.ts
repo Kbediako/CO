@@ -81,7 +81,11 @@ function shouldForceNonInteractive(env: NodeJS.ProcessEnv): boolean {
 
 export async function runFrontendTesting(env: NodeJS.ProcessEnv = process.env): Promise<void> {
   const prompt = await loadFrontendTestingPrompt(env);
-  const runtimeContext = await resolveFrontendTestingRuntimeContext(env);
+  const repoRoot =
+    typeof env.CODEX_ORCHESTRATOR_ROOT === 'string' && env.CODEX_ORCHESTRATOR_ROOT.trim().length > 0
+      ? env.CODEX_ORCHESTRATOR_ROOT.trim()
+      : process.cwd();
+  const runtimeContext = await resolveFrontendTestingRuntimeContext(env, repoRoot);
   logger.info(`[frontend-testing-runtime] ${formatRuntimeSelectionSummary(runtimeContext.runtime)}`);
   const { command, args } = resolveFrontendTestingCommand(prompt, runtimeContext);
   const nonInteractive = shouldForceNonInteractive(env);
@@ -93,7 +97,7 @@ export async function runFrontendTesting(env: NodeJS.ProcessEnv = process.env): 
   }
   const stdio: StdioOptions = nonInteractive ? ['ignore', 'inherit', 'inherit'] : 'inherit';
 
-  const child = spawn(command, args, { stdio, env: childEnv });
+  const child = spawn(command, args, { stdio, env: childEnv, cwd: repoRoot });
   await new Promise<void>((resolvePromise, reject) => {
     child.once('error', (error) => reject(error instanceof Error ? error : new Error(String(error))));
     child.once('exit', (code) => {
@@ -107,7 +111,8 @@ export async function runFrontendTesting(env: NodeJS.ProcessEnv = process.env): 
 }
 
 async function resolveFrontendTestingRuntimeContext(
-  env: NodeJS.ProcessEnv
+  env: NodeJS.ProcessEnv,
+  repoRoot: string
 ): Promise<RuntimeCodexCommandContext> {
   const requestedMode = parseRuntimeMode(
     env.CODEX_ORCHESTRATOR_RUNTIME_MODE_ACTIVE ?? env.CODEX_ORCHESTRATOR_RUNTIME_MODE ?? null
@@ -119,7 +124,7 @@ async function resolveFrontendTestingRuntimeContext(
   return await createRuntimeCodexCommandContext({
     requestedMode,
     executionMode: 'mcp',
-    repoRoot: process.cwd(),
+    repoRoot,
     env: { ...process.env, ...env },
     runId
   });

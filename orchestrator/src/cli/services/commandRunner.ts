@@ -207,7 +207,7 @@ export async function runCommandStage(
   const unsubscribe = runner.on(handleEvent);
   try {
     const sessionConfig = stage.session ?? {};
-    const stageSessionId = sessionConfig.id;
+    const stageSessionId = runtimeSessionIdOrNull(sessionConfig.id);
     const inheritedRuntimeSessionId = runtimeSessionIdOrNull(context.runtimeSessionId);
     const effectiveSessionId = stageSessionId ?? inheritedRuntimeSessionId;
     const usesInheritedRuntimeSession = !stageSessionId && Boolean(inheritedRuntimeSessionId);

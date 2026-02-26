@@ -35,6 +35,7 @@ export interface PrepareRunOptions {
   pipelineId?: string;
   targetStageId?: string | null;
   planTargetFallback?: string | null;
+  runtimeModeDefault?: RuntimeMode | null;
   resolver?: PipelineResolver;
   pipeline?: PipelineDefinition;
   pipelineSource?: string | null;
@@ -100,7 +101,7 @@ export async function prepareRun(options: PrepareRunOptions): Promise<RunPrepara
     env,
     pipeline: resolvedPipeline.pipeline,
     pipelineSource: resolvedPipeline.source ?? null,
-    runtimeModeDefault: resolvedPipeline.userConfig?.runtimeMode ?? null,
+    runtimeModeDefault: options.runtimeModeDefault ?? resolvedPipeline.userConfig?.runtimeMode ?? null,
     configNotice: resolvedPipeline.configNotice ?? null,
     envOverrides: resolvedPipeline.envOverrides ?? {},
     planner,

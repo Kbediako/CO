@@ -532,7 +532,13 @@ function resolveExecutionModeFlag(flags: ArgMap): ExecutionModeOption | undefine
 }
 
 function resolveRuntimeModeFlag(flags: ArgMap): RuntimeModeOption | undefined {
+  if (flags['runtime-mode'] === true) {
+    throw new Error('--runtime-mode requires a value. Expected one of: cli, appserver.');
+  }
   const rawMode = readStringFlag(flags, 'runtime-mode');
+  if (flags['runtime-mode'] !== undefined && !rawMode) {
+    throw new Error('--runtime-mode requires a non-empty value. Expected one of: cli, appserver.');
+  }
   if (!rawMode) {
     return undefined;
   }

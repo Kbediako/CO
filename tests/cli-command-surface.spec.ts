@@ -180,6 +180,12 @@ describe('codex-orchestrator command surface', () => {
     expect(stdout).not.toContain('Run started:');
   }, TEST_TIMEOUT);
 
+  it('fails fast when --runtime-mode is provided without a value', async () => {
+    await expect(runCli(['start', 'docs-review', '--runtime-mode'])).rejects.toMatchObject({
+      stderr: expect.stringContaining('--runtime-mode requires a value')
+    });
+  }, TEST_TIMEOUT);
+
   it('emits an adoption hint after successful start runs in text mode', async () => {
     tempDir = await mkdtemp(join(tmpdir(), 'co-cli-start-adoption-hint-'));
     const config = {

@@ -519,6 +519,7 @@ export class CodexOrchestrator {
     const preparation = await prepareRun({
       baseEnv: actualEnv,
       pipeline,
+      runtimeModeDefault: userConfig?.runtimeMode ?? null,
       resolver,
       taskIdOverride: manifest.task_id,
       targetStageId: options.targetStageId,
