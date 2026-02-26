@@ -774,7 +774,7 @@ export function resolveActionRequiredReasons(snapshot) {
   const requiredChecks =
     snapshot.requiredChecks && typeof snapshot.requiredChecks === 'object' ? snapshot.requiredChecks : null;
   const requiredFailedCount = Array.isArray(requiredChecks?.failed) ? requiredChecks.failed.length : 0;
-  if (requiredFailedCount > 0) {
+  if (requiredFailedCount > 0 && snapshot.readyToMerge === false) {
     reasons.push(`required_checks_failed=${requiredFailedCount}`);
   } else {
     const rollupFailedCount = Array.isArray(snapshot.checks?.failed) ? snapshot.checks.failed.length : 0;

@@ -305,7 +305,9 @@ describe('resolveActionRequiredReasons', () => {
   });
 
   it('classifies failing required checks as action-required', () => {
-    const response = makeResponse([]);
+    const response = makeResponse([], {
+      mergeStateStatus: 'BLOCKED'
+    });
     const requiredChecks = summarizeRequiredChecks([
       { name: 'corelane', state: 'FAILURE', bucket: 'fail', link: 'https://example.com/corelane' }
     ]);
@@ -315,6 +317,20 @@ describe('resolveActionRequiredReasons', () => {
     });
 
     expect(resolveActionRequiredReasons(snapshot)).toContain('required_checks_failed=1');
+  });
+
+  it('ignores required-check failures when snapshot is ready to merge', () => {
+    const response = makeResponse([]);
+    const requiredChecks = summarizeRequiredChecks([
+      { name: 'corelane', state: 'FAILURE', bucket: 'fail', link: 'https://example.com/corelane' }
+    ]);
+    const snapshot = buildStatusSnapshot(response, requiredChecks, {
+      fetchError: false,
+      unacknowledgedCount: 0
+    });
+
+    expect(snapshot.readyToMerge).toBe(true);
+    expect(resolveActionRequiredReasons(snapshot)).toEqual([]);
   });
 
   it('does not classify rollup-only failing checks as action-required', () => {
