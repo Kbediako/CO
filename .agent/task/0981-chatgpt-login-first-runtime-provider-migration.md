@@ -41,3 +41,4 @@
 - [ ] Review/bot feedback addressed in-thread with reruns.
 - [ ] Quiet-window monitoring complete after green checks.
 - [ ] Merge complete and branch cleaned up (if unblocked).
+- Blocker (2026-02-26): `gh pr create --base main --head task/0981-chatgpt-login-first-runtime-provider-migration` failed with `GraphQL: Kbediako does not have the correct permissions to execute CreatePullRequest (createPullRequest)`.
