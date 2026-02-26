@@ -735,6 +735,7 @@ export function resolveActionRequiredReasons(snapshot) {
   }
   const reasons = [];
   const reviewDecision = normalizeEnum(snapshot.reviewDecision);
+  const mergeStateStatus = normalizeEnum(snapshot.mergeStateStatus);
   if (Boolean(snapshot.isDraft)) {
     reasons.push('draft');
   }
@@ -743,6 +744,9 @@ export function resolveActionRequiredReasons(snapshot) {
   }
   if (BLOCKED_REVIEW_DECISIONS.has(reviewDecision)) {
     reasons.push(`review=${reviewDecision}`);
+  }
+  if (mergeStateStatus === 'BEHIND') {
+    reasons.push(`merge_state=${mergeStateStatus}`);
   }
   if (typeof snapshot.unresolvedThreadCount === 'number' && snapshot.unresolvedThreadCount > 0) {
     reasons.push(`unresolved_threads=${snapshot.unresolvedThreadCount}`);

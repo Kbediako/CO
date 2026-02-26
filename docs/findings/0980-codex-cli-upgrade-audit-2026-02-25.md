@@ -229,6 +229,7 @@
 3. Enabled `exit-on-action-required` by default in resolve mode so loops stop early when author intervention is required.
 4. Added explicit action-required classification for:
    - `review=CHANGES_REQUESTED|REVIEW_REQUIRED`
+   - `merge_state=BEHIND` (branch update required before merge)
    - unresolved review threads
    - unacknowledged head-commit bot inline feedback
    - failing gate checks (required checks when available, otherwise rollup failed checks)

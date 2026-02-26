@@ -14,7 +14,7 @@ last_review: 2026-02-26
 - Constraints: minimal high-leverage changes only; no destructive git operations; preserve compatibility context where legacy aliases still matter.
 - Follow-up scope (2026-02-26): codify built-ins-first/high-reasoning baseline, additive config posture, simulation coverage ownership, docs relevance governance, RLM default-capability stance, and fallback exception policy.
 - Follow-up scope (2026-02-26b): implement doctor defaults-drift advisory, ship a docs-relevance advisory lane (non-blocking), tighten built-ins-first RLM guidance, and add explicit awaiter long-wait triage docs.
-- Follow-up scope (2026-02-26c): add a shipped watch-resolve-merge command mode that exits on actionable PR feedback, plus docs/skills updates clarifying watch vs resolve merge loops.
+- Additional scope (2026-02-26c): add a shipped watch-resolve-merge command mode that exits on actionable PR feedback, plus docs/skills updates clarifying watch vs resolve merge loops.
 
 ## Decision and Success Criteria
 - Decision:

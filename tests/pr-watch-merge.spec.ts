@@ -234,6 +234,21 @@ describe('resolveActionRequiredReasons', () => {
     expect(resolveActionRequiredReasons(snapshot)).toEqual([]);
   });
 
+  it('classifies behind merge state as action-required', () => {
+    const response = makeResponse([], {
+      mergeStateStatus: 'BEHIND'
+    });
+    const requiredChecks = summarizeRequiredChecks([
+      { name: 'corelane', state: 'SUCCESS', bucket: 'pass', link: 'https://example.com/corelane' }
+    ]);
+    const snapshot = buildStatusSnapshot(response, requiredChecks, {
+      fetchError: false,
+      unacknowledgedCount: 0
+    });
+
+    expect(resolveActionRequiredReasons(snapshot)).toContain('merge_state=BEHIND');
+  });
+
   it('classifies failing required checks as action-required', () => {
     const response = makeResponse([]);
     const requiredChecks = summarizeRequiredChecks([
