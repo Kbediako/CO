@@ -49,6 +49,7 @@ import { REPO_CONFIG_REQUIRED_ENV_KEY } from '../orchestrator/src/cli/config/rep
 type ArgMap = Record<string, string | boolean>;
 type OutputFormat = 'json' | 'text';
 type ExecutionModeOption = 'mcp' | 'cloud';
+type RuntimeModeOption = 'cli' | 'appserver';
 const AUTO_ISSUE_LOG_ENV_KEY = 'CODEX_ORCHESTRATOR_AUTO_ISSUE_LOG';
 
 interface RunOutputPayload {
@@ -58,6 +59,17 @@ interface RunOutputPayload {
   manifest: string;
   log_path: string | null;
   summary: string | null;
+  runtime_mode_requested: string | null;
+  runtime_mode: string | null;
+  runtime_provider: string | null;
+  runtime_fallback: {
+    occurred: boolean;
+    code: string | null;
+    reason: string | null;
+    from_mode: string | null;
+    to_mode: string | null;
+    checked_at: string | null;
+  } | null;
   cloud_fallback_reason: string | null;
   issue_log: DoctorIssueLogResult | null;
   issue_log_error: string | null;
@@ -519,6 +531,18 @@ function resolveExecutionModeFlag(flags: ArgMap): ExecutionModeOption | undefine
   return normalized;
 }
 
+function resolveRuntimeModeFlag(flags: ArgMap): RuntimeModeOption | undefined {
+  const rawMode = readStringFlag(flags, 'runtime-mode');
+  if (!rawMode) {
+    return undefined;
+  }
+  const normalized = rawMode.toLowerCase();
+  if (normalized !== 'cli' && normalized !== 'appserver') {
+    throw new Error('Invalid --runtime-mode value. Expected one of: cli, appserver.');
+  }
+  return normalized;
+}
+
 type RlmMultiAgentFlagSource = 'multi-agent' | 'collab';
 
 interface RlmMultiAgentFlagSelection {
@@ -740,6 +764,7 @@ async function handleStart(orchestrator: CodexOrchestrator, rawArgs: string[]): 
   const pipelineId = positionals[0];
   const format: OutputFormat = (flags['format'] as string | undefined) === 'json' ? 'json' : 'text';
   const executionMode = resolveExecutionModeFlag(flags);
+  const runtimeMode = resolveRuntimeModeFlag(flags);
   applyRepoConfigRequiredPolicy(flags);
   const autoIssueLogEnabled = resolveAutoIssueLogEnabled(flags);
   if (pipelineId === 'rlm') {
@@ -767,6 +792,7 @@ async function handleStart(orchestrator: CodexOrchestrator, rawArgs: string[]): 
         approvalPolicy: typeof flags['approval-policy'] === 'string' ? (flags['approval-policy'] as string) : undefined,
         targetStageId: resolveTargetStageId(flags),
         executionMode,
+        runtimeMode,
         runEvents
       });
       const issueLogCapture =
@@ -801,6 +827,7 @@ async function handleFrontendTest(orchestrator: CodexOrchestrator, rawArgs: stri
   const { positionals, flags } = parseArgs(rawArgs);
   const format: OutputFormat = (flags['format'] as string | undefined) === 'json' ? 'json' : 'text';
   const devtools = Boolean(flags['devtools']);
+  const runtimeMode = resolveRuntimeModeFlag(flags);
   applyRepoConfigRequiredPolicy(flags);
   if (positionals.length > 0) {
     console.error(`[frontend-test] ignoring extra arguments: ${positionals.join(' ')}`);
@@ -819,6 +846,7 @@ async function handleFrontendTest(orchestrator: CodexOrchestrator, rawArgs: stri
         parentRunId: typeof flags['parent-run'] === 'string' ? (flags['parent-run'] as string) : undefined,
         approvalPolicy: typeof flags['approval-policy'] === 'string' ? (flags['approval-policy'] as string) : undefined,
         targetStageId: resolveTargetStageId(flags),
+        runtimeMode,
         runEvents
       });
       emitRunOutput(result, format, 'Run started');
@@ -846,6 +874,7 @@ async function handleFlow(orchestrator: CodexOrchestrator, rawArgs: string[]): P
 
   const format: OutputFormat = (flags['format'] as string | undefined) === 'json' ? 'json' : 'text';
   const executionMode = resolveExecutionModeFlag(flags);
+  const runtimeMode = resolveRuntimeModeFlag(flags);
   applyRepoConfigRequiredPolicy(flags);
   const autoIssueLogEnabled = resolveAutoIssueLogEnabled(flags);
   const taskId = typeof flags['task'] === 'string' ? (flags['task'] as string) : undefined;
@@ -864,6 +893,7 @@ async function handleFlow(orchestrator: CodexOrchestrator, rawArgs: string[]): P
         approvalPolicy,
         targetStageId: docsReviewTargetStageId,
         executionMode,
+        runtimeMode,
         runEvents
       });
       const docsPayload = toRunOutputPayload(docsReviewResult);
@@ -910,6 +940,7 @@ async function handleFlow(orchestrator: CodexOrchestrator, rawArgs: string[]): P
         approvalPolicy,
         targetStageId: implementationGateTargetStageId,
         executionMode,
+        runtimeMode,
         runEvents
       });
       const implementationPayload = toRunOutputPayload(implementationGateResult);
@@ -1076,6 +1107,7 @@ async function handleRlm(orchestrator: CodexOrchestrator, rawArgs: string[]): Pr
     printRlmHelp();
     return;
   }
+  const runtimeMode = resolveRuntimeModeFlag(flags);
   applyRepoConfigRequiredPolicy(flags);
   const goalFromArgs = positionals.length > 0 ? positionals.join(' ') : undefined;
   const goal = goalFromArgs ?? readStringFlag(flags, 'goal') ?? process.env.RLM_GOAL?.trim();
@@ -1119,6 +1151,7 @@ async function handleRlm(orchestrator: CodexOrchestrator, rawArgs: string[]): Pr
       taskId,
       parentRunId: typeof flags['parent-run'] === 'string' ? (flags['parent-run'] as string) : undefined,
       approvalPolicy: typeof flags['approval-policy'] === 'string' ? (flags['approval-policy'] as string) : undefined,
+      runtimeMode,
       runEvents
     });
     emitRunOutput(startResult, 'text', 'Run started');
@@ -1154,6 +1187,7 @@ async function handleResume(orchestrator: CodexOrchestrator, rawArgs: string[]):
     printResumeHelp();
     return;
   }
+  const runtimeMode = resolveRuntimeModeFlag(flags);
   applyRepoConfigRequiredPolicy(flags);
   const runId = (flags['run'] ?? positionals[0]) as string | undefined;
   if (!runId) {
@@ -1167,6 +1201,7 @@ async function handleResume(orchestrator: CodexOrchestrator, rawArgs: string[]):
       actor: typeof flags['actor'] === 'string' ? (flags['actor'] as string) : undefined,
       reason: typeof flags['reason'] === 'string' ? (flags['reason'] as string) : undefined,
       targetStageId: resolveTargetStageId(flags),
+      runtimeMode,
       runEvents
     });
     emitRunOutput(result, format, 'Run resumed');
@@ -1249,6 +1284,17 @@ function emitRunOutput(
       artifact_root: string;
       log_path: string | null;
       summary?: string | null;
+      runtime_mode_requested?: string | null;
+      runtime_mode?: string | null;
+      runtime_provider?: string | null;
+      runtime_fallback?: {
+        occurred: boolean;
+        code: string | null;
+        reason: string | null;
+        from_mode: string | null;
+        to_mode: string | null;
+        checked_at: string | null;
+      } | null;
       cloud_fallback?: { reason: string } | null;
     };
   },
@@ -1265,6 +1311,17 @@ function emitRunOutput(
   console.log(`Status: ${payload.status}`);
   console.log(`Manifest: ${payload.manifest}`);
   console.log(`Log: ${payload.log_path}`);
+  if (payload.runtime_mode) {
+    console.log(
+      `Runtime: ${payload.runtime_mode}${payload.runtime_mode_requested ? ` (requested ${payload.runtime_mode_requested})` : ''}` +
+        (payload.runtime_provider ? ` via ${payload.runtime_provider}` : '')
+    );
+    if (payload.runtime_fallback?.occurred) {
+      console.log(
+        `Runtime fallback: ${payload.runtime_fallback.code ?? 'runtime-fallback'} (${payload.runtime_fallback.reason ?? 'n/a'})`
+      );
+    }
+  }
   if (payload.cloud_fallback_reason) {
     console.log(`Cloud fallback: ${payload.cloud_fallback_reason}`);
   }
@@ -1292,6 +1349,17 @@ function toRunOutputPayload(
       artifact_root: string;
       log_path: string | null;
       summary?: string | null;
+      runtime_mode_requested?: string | null;
+      runtime_mode?: string | null;
+      runtime_provider?: string | null;
+      runtime_fallback?: {
+        occurred: boolean;
+        code: string | null;
+        reason: string | null;
+        from_mode: string | null;
+        to_mode: string | null;
+        checked_at: string | null;
+      } | null;
       cloud_fallback?: { reason: string } | null;
     };
   },
@@ -1304,6 +1372,10 @@ function toRunOutputPayload(
     manifest: `${result.manifest.artifact_root}/manifest.json`,
     log_path: result.manifest.log_path,
     summary: result.manifest.summary ?? null,
+    runtime_mode_requested: result.manifest.runtime_mode_requested ?? null,
+    runtime_mode: result.manifest.runtime_mode ?? null,
+    runtime_provider: result.manifest.runtime_provider ?? null,
+    runtime_fallback: result.manifest.runtime_fallback ?? null,
     cloud_fallback_reason: result.manifest.cloud_fallback?.reason ?? null,
     issue_log: issueLogCapture.issueLog,
     issue_log_error: issueLogCapture.issueLogError
@@ -2310,6 +2382,7 @@ Commands:
     --format json           Emit machine-readable output.
     --execution-mode <mcp|cloud>  Force execution mode for this run and child subpipelines.
     --cloud                 Shortcut for --execution-mode cloud.
+    --runtime-mode <cli|appserver>  Force runtime mode for this run and child subpipelines.
     --target <stage-id>     Focus plan/build metadata on a specific stage (alias: --target-stage).
     --auto-issue-log [true|false]  On failure, auto-write doctor issue bundle/log entry.
     --repo-config-required [true|false]  Require repo-local codex.orchestrator.json (no package fallback).
@@ -2325,6 +2398,7 @@ Commands:
 
   rlm "<goal>"              Run RLM loop until validator passes.
     --task <id>             Override task identifier.
+    --runtime-mode <cli|appserver>  Force runtime mode for this run.
     --repo-config-required [true|false]  Require repo-local codex.orchestrator.json (no package fallback).
     --multi-agent [auto|true|false]  Preferred alias for multi-agent collab subagents (implies symbolic mode).
     --collab [auto|true|false]  Legacy alias for --multi-agent.
@@ -2340,6 +2414,7 @@ Commands:
   frontend-test             Run frontend testing pipeline.
     --devtools             Enable Chrome DevTools MCP for this run.
     --task <id>             Override task identifier (defaults to MCP_RUNNER_TASK_ID).
+    --runtime-mode <cli|appserver>  Force runtime mode for this run.
     --repo-config-required [true|false]  Require repo-local codex.orchestrator.json (no package fallback).
     --parent-run <id>       Link run to parent run id.
     --approval-policy <p>   Record approval policy metadata.
@@ -2355,6 +2430,7 @@ Commands:
     --format json           Emit machine-readable output summary for both runs.
     --execution-mode <mcp|cloud>  Force execution mode for both runs.
     --cloud                 Shortcut for --execution-mode cloud.
+    --runtime-mode <cli|appserver>  Force runtime mode for both runs.
     --target <stage-id>     Focus plan/build metadata on a specific stage (alias: --target-stage).
     --auto-issue-log [true|false]  On failure, auto-write doctor issue bundle/log entry.
     --repo-config-required [true|false]  Require repo-local codex.orchestrator.json (no package fallback).
@@ -2370,6 +2446,7 @@ Commands:
       --base <branch>       Review against base branch.
       --commit <sha>        Review specific commit.
       --non-interactive     Force non-interactive review behavior.
+      --runtime-mode <cli|appserver>  Force runtime mode for the underlying codex review call.
       --auto-issue-log [true|false]  Auto-capture issue bundle on review failure.
       --disable-delegation-mcp [true|false]  Disable delegation MCP for this review.
 
@@ -2392,6 +2469,7 @@ Commands:
     --actor <name>          Record who resumed the run.
     --reason <text>         Record why the run was resumed.
     --target <stage-id>     Override stage selection before resuming (alias: --target-stage).
+    --runtime-mode <cli|appserver>  Force runtime mode before resuming.
     --repo-config-required [true|false]  Require repo-local codex.orchestrator.json (no package fallback).
     --format json           Emit machine-readable output.
     --interactive | --ui    Enable read-only HUD when running in a TTY.
@@ -2544,6 +2622,7 @@ Options:
   --actor <name>        Record who resumed the run.
   --reason <text>       Record why the run was resumed.
   --target <stage-id>   Override stage selection before resuming.
+  --runtime-mode <cli|appserver>  Force runtime mode before resuming.
   --repo-config-required [true|false]  Require repo-local codex.orchestrator.json (no package fallback).
   --format json         Emit machine-readable output.
   --interactive | --ui  Enable read-only HUD when running in a TTY.
@@ -2603,6 +2682,7 @@ function printRlmHelp(): void {
 Options:
   --goal "<goal>"         Alternate way to set the goal (positional is preferred).
   --task <id>             Override task identifier (defaults to MCP_RUNNER_TASK_ID).
+  --runtime-mode <cli|appserver>  Force runtime mode for this run.
   --repo-config-required [true|false]  Require repo-local codex.orchestrator.json (no package fallback).
   --multi-agent [auto|true|false]  Preferred alias for multi-agent collab subagents (implies symbolic mode).
   --collab [auto|true|false]  Legacy alias for --multi-agent.
@@ -2638,6 +2718,7 @@ Options:
   --format json             Emit machine-readable output for both runs.
   --execution-mode <mcp|cloud>  Force execution mode for both runs.
   --cloud                   Shortcut for --execution-mode cloud.
+  --runtime-mode <cli|appserver>  Force runtime mode for both runs.
   --target <stage-id>       Focus plan/build metadata (applies where the stage exists).
   --auto-issue-log [true|false]  On failure, auto-write doctor issue bundle/log entry.
   --repo-config-required [true|false]  Require repo-local codex.orchestrator.json (no package fallback).
@@ -2668,6 +2749,7 @@ Common options:
   --commit <sha>                   Review a specific commit.
   --title "<text>"                 Optional review title in the prompt.
   --non-interactive                Force non-interactive behavior.
+  --runtime-mode <cli|appserver>   Force runtime mode for the underlying codex review call.
   --auto-issue-log [true|false]    Auto-capture issue bundle on review failure.
   --disable-delegation-mcp [true|false]  Disable delegation MCP for this review.
   --enable-delegation-mcp [true|false]   Legacy delegation MCP toggle (disable via false).
@@ -2698,6 +2780,7 @@ Options:
   --format json             Emit machine-readable output.
   --execution-mode <mcp|cloud>  Force execution mode for this run.
   --cloud                   Shortcut for --execution-mode cloud.
+  --runtime-mode <cli|appserver>  Force runtime mode for this run.
   --target <stage-id>       Focus plan/build metadata on a specific stage.
   --auto-issue-log [true|false]  On failure, auto-write doctor issue bundle/log entry.
   --repo-config-required [true|false]  Require repo-local codex.orchestrator.json (no package fallback).

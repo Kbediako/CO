@@ -5,6 +5,7 @@ import type { ExecEvent, UnifiedExecRunResult } from '../../../../packages/orche
 import { ToolInvocationFailedError } from '../../../../packages/orchestrator/src/index.js';
 import { getCliExecRunner, getPrivacyGuard, getExecHandleService } from './execRuntime.js';
 import type { CommandStage, CliManifest, HandleRecord, PrivacyDecisionRecord } from '../types.js';
+import type { RuntimeMode } from '../runtime/types.js';
 import type { ExecHandleDescriptor } from '../../../../packages/orchestrator/src/index.js';
 import type { RunEventPublisher } from '../events/runEvents.js';
 import { logger } from '../../logger.js';
@@ -36,6 +37,8 @@ export interface CommandRunnerContext {
   events?: RunEventPublisher;
   persister?: ManifestPersister;
   envOverrides?: NodeJS.ProcessEnv;
+  runtimeMode?: RuntimeMode;
+  runtimeSessionId?: string | null;
 }
 
 export interface CommandRunHooks {
@@ -204,10 +207,13 @@ export async function runCommandStage(
   const unsubscribe = runner.on(handleEvent);
   try {
     const sessionConfig = stage.session ?? {};
-    const sessionId = sessionConfig.id;
-    const wantsPersist = Boolean(sessionConfig.persist || sessionConfig.reuse);
-    const persistSession = Boolean(sessionId && wantsPersist);
-    const reuseSession = Boolean(sessionId && (sessionConfig.reuse ?? persistSession));
+    const stageSessionId = sessionConfig.id;
+    const inheritedRuntimeSessionId = runtimeSessionIdOrNull(context.runtimeSessionId);
+    const effectiveSessionId = stageSessionId ?? inheritedRuntimeSessionId;
+    const usesInheritedRuntimeSession = !stageSessionId && Boolean(inheritedRuntimeSessionId);
+    const wantsPersist = Boolean(sessionConfig.persist || sessionConfig.reuse || usesInheritedRuntimeSession);
+    const persistSession = Boolean(effectiveSessionId && wantsPersist);
+    const reuseSession = Boolean(effectiveSessionId && (sessionConfig.reuse ?? persistSession));
 
     const baseEnv: NodeJS.ProcessEnv = {
       ...process.env,
@@ -223,6 +229,9 @@ export async function runCommandStage(
       CODEX_ORCHESTRATOR_ROOT: env.repoRoot,
       CODEX_ORCHESTRATOR_PACKAGE_ROOT: PACKAGE_ROOT
     };
+    baseEnv.CODEX_ORCHESTRATOR_RUNTIME_MODE_ACTIVE =
+      context.runtimeMode ?? (manifest.runtime_mode === 'appserver' ? 'appserver' : 'cli');
+    baseEnv.CODEX_ORCHESTRATOR_RUNTIME_MODE = baseEnv.CODEX_ORCHESTRATOR_RUNTIME_MODE_ACTIVE;
     const execEnv: NodeJS.ProcessEnv = { ...baseEnv, ...stage.env };
     const invocationId = `cli-command:${manifest.run_id}:${stage.id}:${Date.now()}`;
 
@@ -234,7 +243,7 @@ export async function runCommandStage(
         command: stage.command,
         cwd: stage.cwd ?? env.repoRoot,
         env: execEnv,
-        sessionId: sessionId ?? undefined,
+        sessionId: effectiveSessionId ?? undefined,
         persistSession,
         reuseSession,
         invocationId,
@@ -340,6 +349,14 @@ export async function runCommandStage(
     commandLog.end();
     privacyLog.end();
   }
+}
+
+function runtimeSessionIdOrNull(value: string | null | undefined): string | null {
+  if (typeof value !== 'string') {
+    return null;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
 }
 
 function recordHandle(

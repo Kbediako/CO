@@ -34,7 +34,7 @@ async function runFrontendTest(extraArgs: string[]): Promise<{ manifestPath: str
     { env }
   );
   const trimmed = stdout.trim();
-  const jsonStart = trimmed.lastIndexOf('{');
+  const jsonStart = trimmed.indexOf('{');
   const jsonEnd = trimmed.lastIndexOf('}');
   if (jsonStart < 0 || jsonEnd < 0 || jsonEnd <= jsonStart) {
     throw new Error(`Unable to locate JSON payload in stdout: ${trimmed}`);

@@ -19,7 +19,14 @@ import process from 'node:process';
 import { createInterface } from 'node:readline';
 import { promisify } from 'node:util';
 
-import { resolveCodexCommand } from '../orchestrator/src/cli/utils/devtools.js';
+import {
+  createRuntimeCodexCommandContext,
+  formatRuntimeSelectionSummary,
+  parseRuntimeMode,
+  resolveRuntimeCodexCommand,
+  type RuntimeCodexCommandContext,
+  type RuntimeMode
+} from '../orchestrator/src/cli/runtime/index.js';
 import { runDoctor } from '../orchestrator/src/cli/doctor.js';
 import {
   formatDoctorIssueLogSummary,
@@ -82,6 +89,7 @@ interface CliOptions {
   manifest?: string;
   runsDir: string;
   task?: string;
+  runtimeMode?: RuntimeMode;
   base?: string;
   commit?: string;
   title?: string;
@@ -224,6 +232,17 @@ function parseBooleanOptionValue(raw: string | boolean, label: string): boolean 
   throw new Error(`Invalid ${label} value "${raw}". Expected true|false.`);
 }
 
+function parseRuntimeModeOption(raw: string | boolean, label: string): RuntimeMode {
+  if (typeof raw !== 'string') {
+    throw new Error(`${label} requires a value. Expected one of: cli, appserver.`);
+  }
+  const parsed = parseRuntimeMode(raw);
+  if (!parsed) {
+    throw new Error(`Invalid ${label} value "${raw}". Expected one of: cli, appserver.`);
+  }
+  return parsed;
+}
+
 function inferTaskFromManifestPath(manifestPath: string): string | null {
   const segments = path.normalize(manifestPath).split(path.sep).filter((segment) => segment.length > 0);
   const fileName = segments.at(-1);
@@ -261,6 +280,8 @@ function parseArgs(argv: string[]): CliOptions {
       options.runsDir = path.resolve(repoRoot, entry.value);
     } else if (entry.key === 'task' && typeof entry.value === 'string') {
       options.task = entry.value;
+    } else if (entry.key === 'runtime-mode') {
+      options.runtimeMode = parseRuntimeModeOption(entry.value, '--runtime-mode');
     } else if (entry.key === 'base' && typeof entry.value === 'string') {
       options.base = entry.value;
     } else if (entry.key === 'commit' && typeof entry.value === 'string') {
@@ -504,7 +525,14 @@ async function main(): Promise<void> {
     return;
   }
 
-  await ensureReviewCommandAvailable();
+  const runtimeContext = await resolveReviewRuntimeContext({
+    options,
+    manifestPath,
+    env: reviewEnv
+  });
+  console.log(`[run-review] ${formatRuntimeSelectionSummary(runtimeContext.runtime)}.`);
+
+  await ensureReviewCommandAvailable(runtimeContext);
   const disableDelegationMcp =
     options.disableDelegationMcp ??
     (options.enableDelegationMcp === undefined ? false : !options.enableDelegationMcp);
@@ -521,7 +549,7 @@ async function main(): Promise<void> {
     includeScopeFlags: true,
     disableDelegationMcp
   });
-  const resolvedScoped = resolveReviewCommand(scopedReviewArgs);
+  const resolvedScoped = resolveReviewCommand(scopedReviewArgs, runtimeContext);
   console.log(`Review prompt saved to: ${path.relative(repoRoot, artifactPaths.promptPath)}`);
   console.log(`Review output log: ${path.relative(repoRoot, artifactPaths.outputLogPath)}`);
   console.log(`Launching Codex review (evidence: ${relativeManifest})`);
@@ -566,7 +594,7 @@ async function main(): Promise<void> {
     runCodexReview({
       command: resolved.command,
       args: resolved.args,
-      env: reviewEnv,
+      env: runtimeContext.env,
       stdio: nonInteractive ? ['ignore', 'pipe', 'pipe'] : ['inherit', 'pipe', 'pipe'],
       blockHeavyCommands: enforceBoundedMode,
       timeoutMs,
@@ -612,7 +640,7 @@ async function main(): Promise<void> {
         includeScopeFlags: false,
         disableDelegationMcp
       });
-      const resolvedUnscoped = resolveReviewCommand(unscopedArgs);
+      const resolvedUnscoped = resolveReviewCommand(unscopedArgs, runtimeContext);
       try {
         await runReview(resolvedUnscoped);
         const telemetrySummary = await writeTelemetry('succeeded');
@@ -668,8 +696,8 @@ main().catch((error) => {
   process.exitCode = typeof error?.exitCode === 'number' ? error.exitCode : 1;
 });
 
-async function ensureReviewCommandAvailable(): Promise<void> {
-  const resolved = resolveCodexCommand(['--help'], process.env);
+async function ensureReviewCommandAvailable(context: RuntimeCodexCommandContext): Promise<void> {
+  const resolved = resolveRuntimeCodexCommand(['--help'], context);
   const hasReview = await new Promise<boolean>((resolve, reject) => {
     const detached = process.platform !== 'win32';
     const child = spawn(resolved.command, resolved.args, { stdio: ['ignore', 'pipe', 'pipe'], detached });
@@ -726,6 +754,40 @@ async function ensureReviewCommandAvailable(): Promise<void> {
 
   if (!hasReview) {
     throw new Error('codex CLI is missing the `review` subcommand (or is not installed).');
+  }
+}
+
+async function resolveReviewRuntimeContext(params: {
+  options: CliOptions;
+  manifestPath: string;
+  env: NodeJS.ProcessEnv;
+}): Promise<RuntimeCodexCommandContext> {
+  const runId = await resolveReviewRunId(params.manifestPath);
+  const requestedMode =
+    params.options.runtimeMode ??
+    parseRuntimeMode(
+      params.env.CODEX_ORCHESTRATOR_RUNTIME_MODE_ACTIVE ??
+        params.env.CODEX_ORCHESTRATOR_RUNTIME_MODE ??
+        null
+    );
+  return await createRuntimeCodexCommandContext({
+    requestedMode,
+    executionMode: 'mcp',
+    repoRoot,
+    env: params.env,
+    runId: runId ?? `review-${Date.now()}`
+  });
+}
+
+async function resolveReviewRunId(manifestPath: string): Promise<string | null> {
+  try {
+    const raw = await readFile(manifestPath, 'utf8');
+    const parsed = JSON.parse(raw) as { run_id?: unknown };
+    return typeof parsed.run_id === 'string' && parsed.run_id.trim().length > 0
+      ? parsed.run_id.trim()
+      : null;
+  } catch {
+    return null;
   }
 }
 
@@ -787,8 +849,11 @@ function buildReviewArgs(options: CliOptions, prompt: string, opts: ReviewArgsOp
   return args;
 }
 
-function resolveReviewCommand(reviewArgs: string[]): { command: string; args: string[] } {
-  return resolveCodexCommand(reviewArgs, process.env);
+function resolveReviewCommand(
+  reviewArgs: string[],
+  context: RuntimeCodexCommandContext
+): { command: string; args: string[] } {
+  return resolveRuntimeCodexCommand(reviewArgs, context);
 }
 
 async function buildScopeNotes(options: CliOptions): Promise<string[]> {
@@ -2386,6 +2451,7 @@ Standalone review wrapper for Codex review with manifest-backed context.
 Options:
   --manifest <path>              Explicit run manifest path.
   --task <task-id>               Task id used to resolve latest manifest.
+  --runtime-mode <cli|appserver> Runtime mode for the underlying Codex review call.
   --runs-dir <path>              Override .runs root for manifest discovery.
   --uncommitted                  Review uncommitted diff scope.
   --base <ref>                   Review diff from base ref.

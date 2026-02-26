@@ -1470,6 +1470,22 @@
       },
       "created_at": "2026-02-25",
       "completed_at": null
+    },
+    {
+      "id": "0981",
+      "slug": "0981-chatgpt-login-first-runtime-provider-migration",
+      "title": "ChatGPT-Login-First Runtime Provider Migration",
+      "path": "tasks/tasks-0981-chatgpt-login-first-runtime-provider-migration.md",
+      "kind": "run",
+      "status": "in-progress",
+      "gate": {
+        "phase": "chatgpt-login-first-runtime-provider-migration-planning",
+        "status": "succeeded",
+        "log": ".runs/0981-chatgpt-login-first-runtime-provider-migration/cli/2026-02-26T15-40-34-316Z-e7a42ad2/manifest.json",
+        "run_id": "2026-02-26T15-40-34-316Z-e7a42ad2"
+      },
+      "created_at": "2026-02-26",
+      "completed_at": null
     }
   ],
   "specs": [
@@ -1951,6 +1967,22 @@
         "task": "tasks/tasks-0980-codex-cli-upgrade-audit-adoption.md",
         "agent_task": ".agent/task/0980-codex-cli-upgrade-audit-adoption.md",
         "docs": "docs/TECH_SPEC-codex-cli-upgrade-audit-adoption.md"
+      }
+    },
+    {
+      "id": "20260226-0981-chatgpt-login-first-runtime-provider-migration",
+      "title": "ChatGPT-Login-First Runtime Provider Migration",
+      "relates_to": "tasks/tasks-0981-chatgpt-login-first-runtime-provider-migration.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-02-26",
+      "paths": {
+        "spec": "tasks/specs/0981-chatgpt-login-first-runtime-provider-migration.md",
+        "task": "tasks/tasks-0981-chatgpt-login-first-runtime-provider-migration.md",
+        "agent_task": ".agent/task/0981-chatgpt-login-first-runtime-provider-migration.md",
+        "docs": "docs/TECH_SPEC-chatgpt-login-first-runtime-provider-migration.md"
       }
     }
   ]

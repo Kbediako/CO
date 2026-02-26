@@ -12,11 +12,13 @@ import type { UserConfig } from '../config/userConfig.js';
 import { findPipeline } from '../config/userConfig.js';
 import type { CliManifest } from '../types.js';
 import { logger } from '../../logger.js';
+import type { RuntimeMode } from '../runtime/types.js';
 
 export interface RunPreparationResult {
   env: EnvironmentPaths;
   pipeline: PipelineDefinition;
   pipelineSource: string | null;
+  runtimeModeDefault: RuntimeMode | null;
   configNotice: string | null;
   envOverrides: NodeJS.ProcessEnv;
   planner: CommandPlanner;
@@ -76,6 +78,7 @@ export async function prepareRun(options: PrepareRunOptions): Promise<RunPrepara
   const resolvedPipeline = options.pipeline
     ? {
         pipeline: options.pipeline,
+        userConfig: null,
         source: options.pipelineSource ?? null,
         configNotice: options.configNotice ?? null,
         envOverrides: options.envOverrides ?? {}
@@ -97,6 +100,7 @@ export async function prepareRun(options: PrepareRunOptions): Promise<RunPrepara
     env,
     pipeline: resolvedPipeline.pipeline,
     pipelineSource: resolvedPipeline.source ?? null,
+    runtimeModeDefault: resolvedPipeline.userConfig?.runtimeMode ?? null,
     configNotice: resolvedPipeline.configNotice ?? null,
     envOverrides: resolvedPipeline.envOverrides ?? {},
     planner,

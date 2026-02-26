@@ -35,6 +35,19 @@ export function applyPrivacyToRunSummary(runSummary: RunSummary, manifest: CliMa
   };
 }
 
+export function applyRuntimeToRunSummary(runSummary: RunSummary, manifest: CliManifest): void {
+  const fallback = manifest.runtime_fallback ?? null;
+  runSummary.runtime = {
+    modeRequested: manifest.runtime_mode_requested,
+    modeUsed: manifest.runtime_mode,
+    provider: manifest.runtime_provider,
+    fallbackOccurred: fallback?.occurred ?? false,
+    fallbackCode: fallback?.code ?? null,
+    fallbackReason: fallback?.reason ?? null,
+    checkedAt: fallback?.checked_at ?? null
+  };
+}
+
 export function applyCloudExecutionToRunSummary(runSummary: RunSummary, manifest: CliManifest): void {
   if (!manifest.cloud_execution) {
     return;

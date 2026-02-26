@@ -34,6 +34,10 @@
     "child_runs",
     "run_summary_path",
     "plan_target_id",
+    "runtime_mode_requested",
+    "runtime_mode",
+    "runtime_provider",
+    "runtime_fallback",
     "instructions_hash",
     "instructions_sources"
   ],
@@ -235,6 +239,22 @@
       }
     },
     "guardrails_required": { "type": ["boolean", "null"] },
+    "runtime_mode_requested": { "type": "string", "enum": ["cli", "appserver"] },
+    "runtime_mode": { "type": "string", "enum": ["cli", "appserver"] },
+    "runtime_provider": { "type": "string", "enum": ["CliRuntimeProvider", "AppServerRuntimeProvider"] },
+    "runtime_fallback": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["occurred", "code", "reason", "from_mode", "to_mode", "checked_at"],
+      "properties": {
+        "occurred": { "type": "boolean" },
+        "code": { "type": ["string", "null"] },
+        "reason": { "type": ["string", "null"] },
+        "from_mode": { "type": ["string", "null"], "enum": ["cli", "appserver", null] },
+        "to_mode": { "type": ["string", "null"], "enum": ["cli", "appserver", null] },
+        "checked_at": { "type": ["string", "null"] }
+      }
+    },
     "scheduler": {
       "type": ["object", "null"],
       "additionalProperties": false,
