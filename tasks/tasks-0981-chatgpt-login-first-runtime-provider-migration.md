@@ -38,7 +38,7 @@
 
 ### Review, merge, and handoff
 - [x] PR opened with scope/decisions/risks/evidence. - Evidence: `https://github.com/Kbediako/CO/pull/261`.
-- [ ] Review/bot feedback addressed in-thread with reruns.
-- [ ] Quiet-window monitoring complete after green checks.
-- [ ] Merge complete and branch cleaned up (if unblocked).
-- Note (2026-02-26): `gh pr create` GraphQL path remains permission-limited, but PR creation succeeded via REST fallback (`gh api repos/Kbediako/CO/pulls`). Evidence: `out/0981-chatgpt-login-first-runtime-provider-migration/manual/pr-create-blocker.log`.
+- [x] Review/bot feedback addressed in-thread with reruns. - Evidence: `https://github.com/Kbediako/CO/pull/261#issuecomment-3969960970`, `out/0981-chatgpt-login-first-runtime-provider-migration/manual/pr-fix3-09-review.log`.
+- [x] Quiet-window monitoring complete after green checks. - Evidence: `out/0981-chatgpt-login-first-runtime-provider-migration/manual/pr-261-monitor-3.log`.
+- [x] Merge complete and branch cleaned up. - Evidence: `https://github.com/Kbediako/CO/pull/261`, merge commit `7b74174b7594605b39fa35dde9d6497cf501b4c7`, `out/0981-chatgpt-login-first-runtime-provider-migration/manual/pr-261-monitor-3.log`.
+- Note (2026-02-27): `gh pr create` GraphQL path remained permission-limited, but PR lifecycle completed via REST fallback creation and standard merge flow after policy-state cleanup. Evidence: `out/0981-chatgpt-login-first-runtime-provider-migration/manual/pr-create-blocker.log`, `out/0981-chatgpt-login-first-runtime-provider-migration/manual/pr-261-monitor-3.log`.

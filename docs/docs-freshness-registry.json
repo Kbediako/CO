@@ -797,7 +797,14 @@
       "path": ".agent/task/0981-chatgpt-login-first-runtime-provider-migration.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-02-26",
+      "last_review": "2026-02-27",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/task/0982-docs-relevance-and-dummy-repo-validation-followup.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-27",
       "cadence_days": 90
     },
     {
@@ -945,6 +952,13 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-02-26",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/ACTION_PLAN-docs-relevance-and-dummy-repo-validation-followup.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-27",
       "cadence_days": 90
     },
     {
@@ -1669,6 +1683,13 @@
       "cadence_days": 90
     },
     {
+      "path": "docs/PRD-docs-relevance-and-dummy-repo-validation-followup.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-27",
+      "cadence_days": 90
+    },
+    {
       "path": "docs/PRD-cloud-adoption-preflight-reliability.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -2281,7 +2302,7 @@
       "path": "docs/TASKS.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-02-25",
+      "last_review": "2026-02-27",
       "cadence_days": 90
     },
     {
@@ -2324,6 +2345,13 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-02-26",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/TECH_SPEC-docs-relevance-and-dummy-repo-validation-followup.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-27",
       "cadence_days": 90
     },
     {
@@ -3037,7 +3065,7 @@
       "path": "tasks/index.json",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-02-25",
+      "last_review": "2026-02-27",
       "cadence_days": 90
     },
     {
@@ -3451,6 +3479,13 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-02-26",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/specs/0982-docs-relevance-and-dummy-repo-validation-followup.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-27",
       "cadence_days": 90
     },
     {
@@ -4080,7 +4115,14 @@
       "path": "tasks/tasks-0981-chatgpt-login-first-runtime-provider-migration.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-02-26",
+      "last_review": "2026-02-27",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/tasks-0982-docs-relevance-and-dummy-repo-validation-followup.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-27",
       "cadence_days": 90
     },
     {
