@@ -2,14 +2,17 @@
 
 ## Summary
 - Problem Statement: PR #263 merged with unresolved Codex review threads, and at least two findings remain valid on `main`.
-- Desired Outcome: ship a focused follow-up that fixes the missed runtime issues, documents root cause, and tightens merge/review discipline so this class of miss cannot recur.
+- Desired Outcome: ship a focused follow-up that fixes the missed runtime issues, documents root cause, and tightens merge/review discipline, so this class of miss cannot recur.
 
 ## User Request Translation (Context Anchor)
 - User intent / needs (in your own words): open a follow-up PR now, resolve missed feedback, and identify why it was missed with concrete prevention steps.
 - Success criteria / acceptance:
   - Two unresolved Codex findings from PR #263 are either fixed or conclusively disproven with evidence.
+    Evidence: `.runs/0984-pr-263-codex-feedback-followup/cli/2026-02-27T06-03-10-274Z-c519009a/manifest.json` | artifacts `out/0984-pr-263-codex-feedback-followup/manual/final-05-test-rerun6.log`, `out/0984-pr-263-codex-feedback-followup/manual/pre-pr-targeted-tests-3.log` | timestamp `2026-02-27T06:03:10Z` | owner `Codex`.
   - Root cause is documented with timeline evidence and remediation controls.
+    Evidence: `.runs/0984-pr-263-codex-feedback-followup/cli/2026-02-27T06-03-10-274Z-c519009a/manifest.json` | artifact `out/0984-pr-263-codex-feedback-followup/manual/pr-263-root-cause.md` | timestamp `2026-02-27T06:03:10Z` | owner `Codex`.
   - Review-thread handling and merge readiness policy are updated to prevent repeat misses.
+    Evidence: `.runs/0984-pr-263-codex-feedback-followup/cli/2026-02-27T06-03-10-274Z-c519009a/manifest.json` | artifacts `AGENTS.md`, `docs/AGENTS.md`, `tasks/tasks-0984-pr-263-codex-feedback-followup.md` | timestamp `2026-02-27T06:03:10Z` | owner `Codex`.
 - Constraints / non-goals:
   - Minimal, high-leverage diffs only; no unrelated refactors.
   - Preserve runtime fallback and compatibility behavior.

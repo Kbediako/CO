@@ -43,6 +43,18 @@ last_review: 2026-02-27
 - Targeted tests for runtime cloud/default behavior and canary env sanitization.
 - Ordered validation gates 1-10.
 
+## Checklist
+- [x] Cloud execution remains compatible for implicit runtime defaults while preserving appserver default.
+  - Evidence: `.runs/0984-pr-263-codex-feedback-followup/cli/2026-02-27T06-03-10-274Z-c519009a/manifest.json`, `out/0984-pr-263-codex-feedback-followup/manual/final-05-test-rerun6.log`, `out/0984-pr-263-codex-feedback-followup/manual/pre-pr-targeted-tests-3.log`.
+- [x] Explicit unsupported combo (`executionMode=cloud` + explicit `runtimeMode=appserver`) still fails fast.
+  - Evidence: `.runs/0984-pr-263-codex-feedback-followup/cli/2026-02-27T06-03-10-274Z-c519009a/manifest.json`, `out/0984-pr-263-codex-feedback-followup/manual/fix-09a-targeted-rerun.log`.
+- [x] Runtime canary baseline clears runtime override env vars.
+  - Evidence: `.runs/0984-pr-263-codex-feedback-followup/cli/2026-02-27T06-03-10-274Z-c519009a/manifest.json`, `out/0984-pr-263-codex-feedback-followup/manual/pre-pr-targeted-tests-4.log`.
+- [x] Root-cause timeline and prevention controls are documented and linked to merge discipline updates.
+  - Evidence: `.runs/0984-pr-263-codex-feedback-followup/cli/2026-02-27T06-03-10-274Z-c519009a/manifest.json`, `out/0984-pr-263-codex-feedback-followup/manual/pr-263-root-cause.md`, `AGENTS.md`, `docs/AGENTS.md`.
+- [x] Ordered validation gates 1-10 completed with fail/fix/pass evidence.
+  - Evidence: `.runs/0984-pr-263-codex-feedback-followup/cli/2026-02-27T06-03-10-274Z-c519009a/manifest.json`, `out/0984-pr-263-codex-feedback-followup/manual/final-01-delegation-guard.log`, `out/0984-pr-263-codex-feedback-followup/manual/final-10-pack-smoke.log`.
+
 ## Open Questions
 - Should a scripted PR pre-merge check assert unresolved actionable thread count is zero?
 

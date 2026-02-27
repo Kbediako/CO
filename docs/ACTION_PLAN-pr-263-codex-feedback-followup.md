@@ -28,6 +28,19 @@
 - Rollback plan:
   - Revert follow-up patch and keep `--runtime-mode cli` as immediate break-glass.
 
+## Acceptance Evidence
+- Runtime findings closure (cloud/default compatibility + canary env sanitization):
+  - `.runs/0984-pr-263-codex-feedback-followup/cli/2026-02-27T06-03-10-274Z-c519009a/manifest.json`
+  - `out/0984-pr-263-codex-feedback-followup/manual/final-05-test-rerun6.log`
+  - `out/0984-pr-263-codex-feedback-followup/manual/pre-pr-targeted-tests-3.log`
+- Root cause + prevention controls:
+  - `.runs/0984-pr-263-codex-feedback-followup/cli/2026-02-27T06-03-10-274Z-c519009a/manifest.json`
+  - `out/0984-pr-263-codex-feedback-followup/manual/pr-263-root-cause.md`
+- Merge-discipline control updates:
+  - `.runs/0984-pr-263-codex-feedback-followup/cli/2026-02-27T06-03-10-274Z-c519009a/manifest.json`
+  - `AGENTS.md`
+  - `docs/AGENTS.md`
+
 ## Risks & Mitigations
 - Risk: process changes are documented but not consistently applied.
   - Mitigation: encode merge-readiness checks explicitly in task checklist evidence requirements.
