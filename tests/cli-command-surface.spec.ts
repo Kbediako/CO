@@ -33,6 +33,24 @@ async function runCli(
   });
 }
 
+function parseCliFailure(error: unknown): { stdout: string; exitCode: number } {
+  const typed = error as NodeJS.ErrnoException & {
+    stdout?: string | Buffer;
+    stderr?: string | Buffer;
+    code?: number | string;
+  };
+  const hasCliFailureShape =
+    typed &&
+    (typed.code !== undefined || typed.stdout !== undefined || typed.stderr !== undefined);
+  if (!hasCliFailureShape) {
+    throw error;
+  }
+  return {
+    stdout: typeof typed.stdout === 'string' ? typed.stdout : typed.stdout?.toString() ?? '',
+    exitCode: typeof typed.code === 'number' ? typed.code : Number(typed.code ?? 1)
+  };
+}
+
 async function writeFakeCodexBinary(dir: string): Promise<string> {
   const binPath = join(dir, 'codex');
   await writeFile(
@@ -257,12 +275,7 @@ describe('codex-orchestrator command surface', () => {
       await runCli(['start', 'diagnostics', '--task', 'start-adoption-fail'], env, FLOW_TARGET_TEST_TIMEOUT);
       throw new Error('expected start-adoption-fail to exit non-zero');
     } catch (error) {
-      const typed = error as NodeJS.ErrnoException & {
-        stdout?: string | Buffer;
-        code?: number | string;
-      };
-      stdout = typeof typed.stdout === 'string' ? typed.stdout : typed.stdout?.toString() ?? '';
-      exitCode = typeof typed.code === 'number' ? typed.code : Number(typed.code ?? 1);
+      ({ stdout, exitCode } = parseCliFailure(error));
     }
     expect(exitCode).not.toBe(0);
     expect(stdout).toContain('Status: failed');
@@ -863,12 +876,7 @@ describe('codex-orchestrator command surface', () => {
       );
       throw new Error('expected start-auto-issue-log to exit non-zero');
     } catch (error) {
-      const typed = error as NodeJS.ErrnoException & {
-        stdout?: string | Buffer;
-        code?: number | string;
-      };
-      stdout = typeof typed.stdout === 'string' ? typed.stdout : typed.stdout?.toString() ?? '';
-      exitCode = typeof typed.code === 'number' ? typed.code : Number(typed.code ?? 1);
+      ({ stdout, exitCode } = parseCliFailure(error));
     }
     expect(exitCode).not.toBe(0);
     const jsonStart = stdout.indexOf('{');
@@ -944,12 +952,7 @@ describe('codex-orchestrator command surface', () => {
       await runCli(['start', 'diagnostics', '--format', 'json', '--auto-issue-log'], env, FLOW_TARGET_TEST_TIMEOUT);
       throw new Error('expected start-auto-issue-log-task-filter to exit non-zero');
     } catch (error) {
-      const typed = error as NodeJS.ErrnoException & {
-        stdout?: string | Buffer;
-        code?: number | string;
-      };
-      stdout = typeof typed.stdout === 'string' ? typed.stdout : typed.stdout?.toString() ?? '';
-      exitCode = typeof typed.code === 'number' ? typed.code : Number(typed.code ?? 1);
+      ({ stdout, exitCode } = parseCliFailure(error));
     }
     expect(exitCode).not.toBe(0);
     const jsonStart = stdout.indexOf('{');
@@ -1219,13 +1222,7 @@ describe('codex-orchestrator command surface', () => {
       );
       throw new Error('expected cloud-preflight-deny to exit non-zero');
     } catch (error) {
-      const typed = error as NodeJS.ErrnoException & {
-        stdout?: string | Buffer;
-        stderr?: string | Buffer;
-        code?: number | string;
-      };
-      stdout = typeof typed.stdout === 'string' ? typed.stdout : typed.stdout?.toString() ?? '';
-      exitCode = typeof typed.code === 'number' ? typed.code : Number(typed.code ?? 1);
+      ({ stdout, exitCode } = parseCliFailure(error));
     }
     expect(exitCode).not.toBe(0);
     const jsonStart = stdout.indexOf('{');

@@ -110,6 +110,49 @@ async function runCommand(command, args, options = {}) {
 }
 
 async function writeMockCodexBin(mockPath) {
+  if (process.platform === 'win32') {
+    const script = `@echo off
+setlocal
+set "cmd=%~1"
+if "%cmd%"=="--help" (
+  echo codex help
+  echo   review
+  echo   exec
+  echo   app-server
+  echo   login
+  echo   cloud
+  exit /b 0
+)
+if "%cmd%"=="--version" (
+  echo codex 0.0.0-runtime-canary
+  exit /b 0
+)
+if "%cmd%"=="app-server" if "%~2"=="--help" (
+  echo codex app-server help
+  exit /b 0
+)
+if "%cmd%"=="login" if "%~2"=="status" (
+  echo Logged in to ChatGPT as runtime-canary
+  exit /b 0
+)
+if "%cmd%"=="exec" (
+  echo runtime canary exec ok
+  exit /b 0
+)
+if "%cmd%"=="review" (
+  echo runtime canary review ok
+  exit /b 0
+)
+if "%cmd%"=="cloud" if "%~2"=="--help" (
+  echo codex cloud help
+  exit /b 0
+)
+echo runtime canary codex default success: %*
+exit /b 0
+`;
+    await writeFile(mockPath, script, 'utf8');
+    return;
+  }
   const script = `#!/usr/bin/env sh
 set -eu
 cmd="\${1:-}"

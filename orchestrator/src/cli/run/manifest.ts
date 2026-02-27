@@ -63,6 +63,10 @@ function createDefaultRuntimeFallback() {
   };
 }
 
+function runtimeProviderForMode(mode: 'cli' | 'appserver'): 'CliRuntimeProvider' | 'AppServerRuntimeProvider' {
+  return mode === 'appserver' ? 'AppServerRuntimeProvider' : 'CliRuntimeProvider';
+}
+
 export async function bootstrapManifest(runId: string, options: ManifestBootstrapOptions): Promise<{
   manifest: CliManifest;
   paths: RunPaths;
@@ -114,7 +118,7 @@ export async function bootstrapManifest(runId: string, options: ManifestBootstra
     guardrails_required: pipeline.guardrailsRequired !== false,
     runtime_mode_requested: 'appserver',
     runtime_mode: 'appserver',
-    runtime_provider: 'AppServerRuntimeProvider',
+    runtime_provider: runtimeProviderForMode('appserver'),
     runtime_fallback: createDefaultRuntimeFallback(),
     cloud_execution: null,
     cloud_fallback: null,
@@ -273,7 +277,7 @@ export function resetForResume(manifest: CliManifest): void {
   manifest.status = 'in_progress';
   manifest.status_detail = 'resuming';
   manifest.guardrail_status = undefined;
-  manifest.runtime_provider = manifest.runtime_mode === 'appserver' ? 'AppServerRuntimeProvider' : 'CliRuntimeProvider';
+  manifest.runtime_provider = runtimeProviderForMode(manifest.runtime_mode);
   manifest.runtime_fallback = createDefaultRuntimeFallback();
   manifest.cloud_execution = null;
   manifest.cloud_fallback = null;
