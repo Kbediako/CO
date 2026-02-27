@@ -46,5 +46,5 @@
 ## Completion Snapshot (2026-02-27)
 - Milestone 1: complete.
 - Milestone 2: complete (`0.1.37` released and verified).
-- Milestone 3: complete with decision GO (required cloud-lane reruns passed for both channels).
+- Milestone 3: complete with decision GO for CO-repo alpha adoption (global default remains stable pending broader repo coverage).
 - Milestone 4: complete (task mirrors + index + closeout validation logs updated).

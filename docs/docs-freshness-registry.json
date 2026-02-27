@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generated_at": "2026-02-25T00:00:00.000Z",
+  "generated_at": "2026-02-27T00:00:00.000Z",
   "entries": [
     {
       "path": ".agent/AGENTS.md",
@@ -4253,6 +4253,55 @@
     },
     {
       "path": ".agent/task/0985-co-release-0-1-37-codex-0-107-canary.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-27",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/PRD-co-codex-alpha-agent-first-policy.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-27",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/TECH_SPEC-co-codex-alpha-agent-first-policy.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-27",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/ACTION_PLAN-co-codex-alpha-agent-first-policy.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-27",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/specs/0986-co-codex-alpha-agent-first-policy.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-27",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/tasks-0986-co-codex-alpha-agent-first-policy.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-27",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/task/0986-co-codex-alpha-agent-first-policy.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-27",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/guides/codex-version-policy.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-02-27",

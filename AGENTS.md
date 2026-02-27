@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp 1584fe512ea7159b4b37ddd49efd319a2afd218f8c5701d55852555f8bd7c56d -->
+<!-- codex:instruction-stamp ace43c24308bf1dbec7dc03bb2a92a3557e6097ddab57973e94919ec4a19ca08 -->
 # Codex-Orchestrator Agent Handbook (Template)
 
 Use this repository as the wrapper that coordinates multiple Codex-driven projects. After cloning, replace placeholder metadata (task IDs, documents, SOPs) with values for each downstream initiative while keeping these shared guardrails in place.
@@ -33,6 +33,14 @@ Use this repository as the wrapper that coordinates multiple Codex-driven projec
 - Fallback policy is contingency-only (not routine): use `max_threads = 8`, `max_depth = 2`, `max_spawn_depth = 2` for constrained/high-risk lanes; use `6/1/1` only as a break-glass profile under severe host/tool contention.
 - Use an explicit `worker_complex` role (for example `gpt-5.3-codex`, `xhigh`) for high-risk implementation streams.
 - Use `codex-orchestrator doctor` as an advisory drift check for Codex defaults (model/reasoning/agent baseline); remediation is additive via `codex-orchestrator codex defaults --yes`.
+
+## Codex Version Policy (CO Scope)
+- Keep the global Codex CLI default on stable releases; do not require alpha/prerelease globally for CO work.
+- Use alpha/prerelease only in explicit, task-scoped CO lanes where evidence is captured under `.runs/<task-id>/` and `out/<task-id>/manual/`.
+- Current CO canary-approved prerelease is `0.107.0-alpha.4`; stable rollback/default pin is `0.106.0`.
+- Alpha adoption is evidence-gated: no P0/P1 regressions, runtime-mode canary pass, and required cloud canary contract pass.
+- If any required lane fails (or required cloud evidence is unavailable), hold/revert to stable and record the decision in `docs/TASKS.md`, `tasks/index.json`, and task checklists.
+- For policy details and cadence, follow `docs/guides/codex-version-policy.md`.
 
 ## Deliberation Default (Agent-First)
 - Deliberation is the default for high-ambiguity or high-impact work. Keep MCP as the top-level control plane and use collab/delegated subagents to explore options.

@@ -61,4 +61,4 @@ last_review: 2026-02-27
 ## Outcome Snapshot (2026-02-27)
 - Release outcome: succeeded (`@kbediako/codex-orchestrator@0.1.37` published).
 - Canary outcome: stable/prerelease parity across required cloud + fallback + fail-fast lanes.
-- Version-policy outcome: GO for global `0.107.0-alpha.4` default update; retain `0.106.0` as rollback pin.
+- Version-policy outcome: GO for CO-repo `0.107.0-alpha.4` adoption; retain global stable `0.106.0` as default and rollback pin.
