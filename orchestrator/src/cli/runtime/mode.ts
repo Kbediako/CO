@@ -1,7 +1,7 @@
 import type { RuntimeMode, RuntimeModeResolution } from './types.js';
 
 const RUNTIME_MODES = new Set<RuntimeMode>(['cli', 'appserver']);
-const DEFAULT_RUNTIME_MODE: RuntimeMode = 'cli';
+const DEFAULT_RUNTIME_MODE: RuntimeMode = 'appserver';
 const DEFAULT_RUNTIME_MODE_ENV_KEY = 'CODEX_ORCHESTRATOR_RUNTIME_MODE';
 
 function normalizeRuntimeMode(value: string): RuntimeMode | null {

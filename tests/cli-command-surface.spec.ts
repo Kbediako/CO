@@ -251,7 +251,20 @@ describe('codex-orchestrator command surface', () => {
       MCP_RUNNER_TASK_ID: 'start-adoption-fail'
     };
 
-    const { stdout } = await runCli(['start', 'diagnostics', '--task', 'start-adoption-fail'], env, FLOW_TARGET_TEST_TIMEOUT);
+    let stdout = '';
+    let exitCode = 0;
+    try {
+      await runCli(['start', 'diagnostics', '--task', 'start-adoption-fail'], env, FLOW_TARGET_TEST_TIMEOUT);
+      throw new Error('expected start-adoption-fail to exit non-zero');
+    } catch (error) {
+      const typed = error as NodeJS.ErrnoException & {
+        stdout?: string | Buffer;
+        code?: number | string;
+      };
+      stdout = typeof typed.stdout === 'string' ? typed.stdout : typed.stdout?.toString() ?? '';
+      exitCode = typeof typed.code === 'number' ? typed.code : Number(typed.code ?? 1);
+    }
+    expect(exitCode).not.toBe(0);
     expect(stdout).toContain('Status: failed');
     expect(stdout).not.toContain('Adoption hint: ');
   }, FLOW_TARGET_TEST_TIMEOUT);
@@ -840,11 +853,24 @@ describe('codex-orchestrator command surface', () => {
       CODEX_ORCHESTRATOR_OUT_DIR: join(tempDir, 'out'),
       MCP_RUNNER_TASK_ID: 'start-auto-issue-log'
     };
-    const { stdout } = await runCli(
-      ['start', 'diagnostics', '--format', 'json', '--task', 'start-auto-issue-log', '--auto-issue-log'],
-      env,
-      FLOW_TARGET_TEST_TIMEOUT
-    );
+    let stdout = '';
+    let exitCode = 0;
+    try {
+      await runCli(
+        ['start', 'diagnostics', '--format', 'json', '--task', 'start-auto-issue-log', '--auto-issue-log'],
+        env,
+        FLOW_TARGET_TEST_TIMEOUT
+      );
+      throw new Error('expected start-auto-issue-log to exit non-zero');
+    } catch (error) {
+      const typed = error as NodeJS.ErrnoException & {
+        stdout?: string | Buffer;
+        code?: number | string;
+      };
+      stdout = typeof typed.stdout === 'string' ? typed.stdout : typed.stdout?.toString() ?? '';
+      exitCode = typeof typed.code === 'number' ? typed.code : Number(typed.code ?? 1);
+    }
+    expect(exitCode).not.toBe(0);
     const jsonStart = stdout.indexOf('{');
     const payload = JSON.parse(jsonStart >= 0 ? stdout.slice(jsonStart) : stdout) as {
       status?: string;
@@ -912,7 +938,20 @@ describe('codex-orchestrator command surface', () => {
       MCP_RUNNER_TASK_ID: 'start-auto-issue-log-actual',
       TASK: 'stale-task-id'
     };
-    const { stdout } = await runCli(['start', 'diagnostics', '--format', 'json', '--auto-issue-log'], env, FLOW_TARGET_TEST_TIMEOUT);
+    let stdout = '';
+    let exitCode = 0;
+    try {
+      await runCli(['start', 'diagnostics', '--format', 'json', '--auto-issue-log'], env, FLOW_TARGET_TEST_TIMEOUT);
+      throw new Error('expected start-auto-issue-log-task-filter to exit non-zero');
+    } catch (error) {
+      const typed = error as NodeJS.ErrnoException & {
+        stdout?: string | Buffer;
+        code?: number | string;
+      };
+      stdout = typeof typed.stdout === 'string' ? typed.stdout : typed.stdout?.toString() ?? '';
+      exitCode = typeof typed.code === 'number' ? typed.code : Number(typed.code ?? 1);
+    }
+    expect(exitCode).not.toBe(0);
     const jsonStart = stdout.indexOf('{');
     const payload = JSON.parse(jsonStart >= 0 ? stdout.slice(jsonStart) : stdout) as {
       status?: string;
@@ -1157,11 +1196,38 @@ describe('codex-orchestrator command surface', () => {
       CODEX_CLOUD_ENV_ID: '',
       CODEX_CLOUD_BRANCH: ''
     };
-    const { stdout } = await runCli(
-      ['start', 'docs-review', '--execution-mode', 'cloud', '--target', 'review', '--format', 'json', '--task', 'cloud-preflight-deny'],
-      env,
-      FLOW_TARGET_TEST_TIMEOUT
-    );
+    let stdout = '';
+    let exitCode = 0;
+    try {
+      await runCli(
+        [
+          'start',
+          'docs-review',
+          '--execution-mode',
+          'cloud',
+          '--runtime-mode',
+          'cli',
+          '--target',
+          'review',
+          '--format',
+          'json',
+          '--task',
+          'cloud-preflight-deny'
+        ],
+        env,
+        FLOW_TARGET_TEST_TIMEOUT
+      );
+      throw new Error('expected cloud-preflight-deny to exit non-zero');
+    } catch (error) {
+      const typed = error as NodeJS.ErrnoException & {
+        stdout?: string | Buffer;
+        stderr?: string | Buffer;
+        code?: number | string;
+      };
+      stdout = typeof typed.stdout === 'string' ? typed.stdout : typed.stdout?.toString() ?? '';
+      exitCode = typeof typed.code === 'number' ? typed.code : Number(typed.code ?? 1);
+    }
+    expect(exitCode).not.toBe(0);
     const jsonStart = stdout.indexOf('{');
     const payload = JSON.parse(jsonStart >= 0 ? stdout.slice(jsonStart) : stdout) as {
       status?: string;
