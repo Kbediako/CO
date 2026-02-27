@@ -45,9 +45,15 @@ function parseCliFailure(error: unknown): { stdout: string; exitCode: number } {
   if (!hasCliFailureShape) {
     throw error;
   }
+  const parsedExitCode =
+    typeof typed.code === 'number'
+      ? typed.code
+      : typeof typed.code === 'string'
+        ? Number(typed.code)
+        : NaN;
   return {
     stdout: typeof typed.stdout === 'string' ? typed.stdout : typed.stdout?.toString() ?? '',
-    exitCode: typeof typed.code === 'number' ? typed.code : Number(typed.code ?? 1)
+    exitCode: Number.isInteger(parsedExitCode) && Number.isFinite(parsedExitCode) ? parsedExitCode : 1
   };
 }
 
