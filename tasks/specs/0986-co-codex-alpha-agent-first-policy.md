@@ -24,7 +24,7 @@ last_review: 2026-02-27
   - Must preserve global-stable default unless explicitly promoted.
 
 ## Validation Plan
-- Run ordered 1..10 quality lane and capture logs under task out dir.
+- Run ordered 1-10 quality lane and capture logs under task out dir.
 
 ## Approvals
 - Reviewer: Codex (self-approval, docs-first gate).

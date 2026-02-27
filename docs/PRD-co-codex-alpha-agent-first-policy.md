@@ -1,15 +1,15 @@
 # PRD - CO Codex Alpha Agent-First Policy
 
 ## Summary
-- Problem Statement: CO needs a durable agent-first operating policy so any agent working in this repo immediately knows how to use Codex alpha safely without forcing global alpha usage.
-- Desired Outcome: CO repository guidance explicitly defines a CO-only alpha policy, evidence gates, rollback rules, and cadence so alpha usage is controlled and auditable.
+- Problem Statement: CO needs a durable agent-first operating policy, so any agent working in this repo immediately knows how to use Codex alpha safely without forcing global alpha usage.
+- Desired Outcome: CO repository guidance explicitly defines a CO-only alpha policy, evidence gates, rollback rules, and cadence, so alpha usage is controlled and auditable.
 
 ## User Request Translation (Context Anchor)
-- User intent / needs (in your own words): Use alpha for CO work, but keep strict procedures so agents do not miss fast-moving Codex alpha changes and always know what to do.
+- User intent / needs (in your own words): Use alpha for CO work, but keep strict procedures, so agents do not miss fast-moving Codex alpha changes and always know what to do.
 - Success criteria / acceptance:
   - `AGENTS.md` and `docs/AGENTS.md` contain clear CO-specific Codex version policy.
   - A canonical repo guide documents cadence, evidence gates, and rollback path.
-  - Task mirrors/index are updated so policy state is auditable.
+  - Task mirrors/index are updated, so policy state is auditable.
 - Constraints / non-goals:
   - Keep global default stable unless explicit evidence-driven promotion is approved.
   - No unrelated refactors.

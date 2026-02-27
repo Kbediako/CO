@@ -11,6 +11,7 @@
 - [x] Docs-first artifacts created (PRD/TECH_SPEC/ACTION_PLAN/checklist mirror). - Evidence: `docs/PRD-co-codex-alpha-agent-first-policy.md`, `docs/TECH_SPEC-co-codex-alpha-agent-first-policy.md`, `docs/ACTION_PLAN-co-codex-alpha-agent-first-policy.md`, `tasks/specs/0986-co-codex-alpha-agent-first-policy.md`, `tasks/tasks-0986-co-codex-alpha-agent-first-policy.md`, `.agent/task/0986-co-codex-alpha-agent-first-policy.md`.
 - [x] `tasks/index.json` + `docs/TASKS.md` updated for task registration/status. - Evidence: `tasks/index.json`, `docs/TASKS.md`.
 - [x] Delegated scout stream captured. - Evidence: `.runs/0986-co-codex-alpha-agent-first-policy-scout/cli/2026-02-27T14-10-18-764Z-7fc87dd3/manifest.json`, `out/0986-co-codex-alpha-agent-first-policy/manual/delegated-scout.log`.
+- [x] Pre-implementation docs-review manifest captured and mirrored in task evidence. - Evidence: `.runs/0986-co-codex-alpha-agent-first-policy/cli/2026-02-27T14-17-18-253Z-a85dafe7/manifest.json`, `tasks/index.json`, `docs/TASKS.md`, `tasks/tasks-0986-co-codex-alpha-agent-first-policy.md`, `.agent/task/0986-co-codex-alpha-agent-first-policy.md`.
 
 ## Implementation
 - [x] Add CO Codex version policy section in `AGENTS.md`. - Evidence: `AGENTS.md`.
