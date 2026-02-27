@@ -38,7 +38,7 @@
 - [x] 10 `npm run pack:smoke` - Evidence: `out/0982-docs-relevance-and-dummy-repo-validation-followup/manual/final-10-pack-smoke.log`.
 
 ### Review, merge, and handoff
-- [ ] PR opened with scope/decisions/validation evidence.
-- [ ] Review/bot feedback addressed in-thread with reruns.
-- [ ] Quiet-window monitoring complete after green checks.
-- [ ] Merge complete and branch cleaned up (if unblocked).
+- [x] PR opened with scope/decisions/validation evidence. - Evidence: `https://github.com/Kbediako/CO/pull/262`, `out/0982-docs-relevance-and-dummy-repo-validation-followup/manual/pr-create-attempt.log`.
+- [x] Review/bot feedback addressed in-thread with reruns. - Evidence: inline replies at `https://github.com/Kbediako/CO/pull/262#discussion_r2862175445`, `https://github.com/Kbediako/CO/pull/262#discussion_r2862175446`, plus rerun logs `out/0982-docs-relevance-and-dummy-repo-validation-followup/manual/pr-fix-06-docs-check.log`, `out/0982-docs-relevance-and-dummy-repo-validation-followup/manual/pr-fix-07-docs-freshness.log`, `out/0982-docs-relevance-and-dummy-repo-validation-followup/manual/pr-fix-08-diff-budget.log`, `out/0982-docs-relevance-and-dummy-repo-validation-followup/manual/pr-fix-09-review.log`.
+- [x] Quiet-window monitoring complete after green checks. - Evidence: `out/0982-docs-relevance-and-dummy-repo-validation-followup/manual/pr-262-watch-merge-noexit.log`.
+- [x] Merge complete and branch cleaned up (if unblocked). - Evidence: merged PR `https://github.com/Kbediako/CO/pull/262`, merge commit `3674c2a580cfb5ac795d8525ebca8b9967714c9b`, branch deletion confirmation in `out/0982-docs-relevance-and-dummy-repo-validation-followup/manual/pr-262-watch-merge-noexit.log`.

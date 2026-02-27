@@ -1493,7 +1493,7 @@
       "title": "Docs Relevance + Dummy Repo Validation Follow-up",
       "path": "tasks/tasks-0982-docs-relevance-and-dummy-repo-validation-followup.md",
       "kind": "run",
-      "status": "in-progress",
+      "status": "succeeded",
       "gate": {
         "phase": "docs-relevance-and-dummy-repo-validation-followup-implementation",
         "status": "succeeded",
@@ -1501,7 +1501,7 @@
         "run_id": "2026-02-27T01-14-10-606Z-3a8e4855"
       },
       "created_at": "2026-02-27",
-      "completed_at": null
+      "completed_at": "2026-02-27"
     }
   ],
   "specs": [
