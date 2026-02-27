@@ -12,7 +12,7 @@ Define a stable default with evidence-gated prerelease adoption, so CO can move 
 For any prerelease promotion decision in CO:
 1. Runtime-mode canary passes (`scripts/runtime-mode-canary.mjs`).
 2. Cloud canary required contract passes (`scripts/cloud-canary-ci.mjs` with `CODEX_CLOUD_ENV_ID=<env-id> CODEX_CLOUD_CANARY_REQUIRED=1`).
-3. Cloud fallback contract behavior remains correct (`CODEX_CLOUD_ENV_ID=<env-id> CODEX_CLOUD_CANARY_REQUIRED=1 CLOUD_CANARY_EXPECT_FALLBACK=1`).
+3. Cloud fallback contract behavior remains correct (`scripts/cloud-canary-ci.mjs` with `CODEX_CLOUD_ENV_ID=<env-id> CODEX_CLOUD_CANARY_REQUIRED=1 CLOUD_CANARY_EXPECT_FALLBACK=1`).
 4. No P0/P1 regression versus stable baseline.
 
 ## Cadence
