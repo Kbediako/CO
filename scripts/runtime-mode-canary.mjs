@@ -15,6 +15,19 @@ const DEFAULT_REPOS = 5;
 const DEFAULT_ITERATIONS_PER_REPO = 4;
 const DEFAULT_APP_SUCCESS_THRESHOLD = 0.95;
 const DEFAULT_STRICT_THRESHOLD = 1;
+const RUNTIME_MODE_OVERRIDE_ENV_KEYS = [
+  'CODEX_ORCHESTRATOR_RUNTIME_MODE',
+  'CODEX_ORCHESTRATOR_RUNTIME_MODE_ACTIVE',
+  'CODEX_RUNTIME_MODE'
+];
+
+function sanitizeRuntimeModeOverrideEnv(env = process.env) {
+  const sanitized = { ...env };
+  for (const key of RUNTIME_MODE_OVERRIDE_ENV_KEYS) {
+    delete sanitized[key];
+  }
+  return sanitized;
+}
 
 function toPositiveInt(value, fallback) {
   if (value === undefined || value === null || value === '') {
@@ -412,7 +425,7 @@ Options:
       for (let iteration = 1; iteration <= iterationsPerRepo; iteration += 1) {
         const runSuffix = `r${repoIndex}-i${iteration}`;
         const baseEnv = {
-          ...process.env,
+          ...sanitizeRuntimeModeOverrideEnv(process.env),
           CODEX_CLI_BIN: mockCodexPath,
           CODEX_NON_INTERACTIVE: '1',
           CODEX_NO_INTERACTIVE: '1',
@@ -667,3 +680,5 @@ Options:
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   void main();
 }
+
+export { RUNTIME_MODE_OVERRIDE_ENV_KEYS, sanitizeRuntimeModeOverrideEnv };

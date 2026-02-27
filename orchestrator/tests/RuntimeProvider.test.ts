@@ -98,4 +98,36 @@ describe('runtime provider selection', () => {
       })
     ).rejects.toThrow(/Unsupported mode combination/);
   });
+
+  it('coerces implicit default appserver mode to cli for cloud execution', async () => {
+    const selection = await resolveRuntimeSelection({
+      requestedMode: 'appserver',
+      source: 'default',
+      executionMode: 'cloud',
+      repoRoot: process.cwd(),
+      env: {},
+      runId: 'runtime-cloud-default'
+    });
+
+    expect(selection.requested_mode).toBe('cli');
+    expect(selection.selected_mode).toBe('cli');
+    expect(selection.provider).toBe('CliRuntimeProvider');
+    expect(selection.fallback.occurred).toBe(false);
+  });
+
+  it('coerces manifest-derived appserver mode to cli for cloud execution', async () => {
+    const selection = await resolveRuntimeSelection({
+      requestedMode: 'appserver',
+      source: 'manifest',
+      executionMode: 'cloud',
+      repoRoot: process.cwd(),
+      env: {},
+      runId: 'runtime-cloud-manifest'
+    });
+
+    expect(selection.requested_mode).toBe('cli');
+    expect(selection.selected_mode).toBe('cli');
+    expect(selection.provider).toBe('CliRuntimeProvider');
+    expect(selection.fallback.occurred).toBe(false);
+  });
 });

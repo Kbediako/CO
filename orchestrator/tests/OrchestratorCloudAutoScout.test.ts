@@ -254,6 +254,76 @@ describe('CodexOrchestrator cloud auto scout', () => {
     expect(result.manifest.cloud_fallback?.mode_used).toBe('mcp');
   });
 
+  it('keeps the resolved runtime mode when cloud preflight falls back to mcp', async () => {
+    const env = normalizeEnvironmentPaths(resolveEnvironmentPaths());
+    const pipeline: PipelineDefinition = {
+      id: 'docs-review',
+      title: 'Docs Review',
+      stages: [{ kind: 'command', id: 'stage-1', title: 'Stage 1', command: 'echo ok' }]
+    };
+
+    const { manifest, paths } = await bootstrapManifest('run-cloud-fallback-runtime-mode', {
+      env,
+      pipeline,
+      parentRunId: null,
+      taskSlug: env.taskId,
+      approvalPolicy: null
+    });
+    manifest.heartbeat_interval_seconds = 1;
+    manifest.heartbeat_stale_after_seconds = 2;
+
+    vi.spyOn(cloudPreflight, 'runCloudPreflight').mockResolvedValue({
+      ok: false,
+      issues: [{ code: 'missing_environment', message: 'CODEX_CLOUD_ENV_ID is not configured.' }],
+      details: {
+        codexBin: 'codex',
+        environmentId: null,
+        branch: null
+      }
+    });
+
+    const orchestrator = new CodexOrchestrator(env);
+    const result = await (
+      orchestrator as unknown as {
+        executePipeline: (options: unknown) => Promise<{
+          notes: string[];
+          success: boolean;
+          manifest: {
+            status?: string;
+            runtime_mode?: string;
+            runtime_mode_requested?: string;
+            cloud_fallback?: { mode_used?: string };
+          };
+        }>;
+      }
+    ).executePipeline({
+      env,
+      pipeline,
+      manifest,
+      paths,
+      mode: 'cloud',
+      runtimeModeRequested: 'appserver',
+      runtimeModeSource: 'default',
+      envOverrides: {
+        CODEX_ORCHESTRATOR_RUNTIME_FALLBACK: 'deny',
+        CODEX_ORCHESTRATOR_APPSERVER_FORCE_PRECHECK_FAIL: '1'
+      },
+      task: { id: env.taskId, title: 'Task' },
+      target: {
+        id: 'docs-review:stage-1',
+        description: 'Stage 1',
+        metadata: { stageId: 'stage-1' }
+      }
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.notes[0]).toContain('Cloud preflight failed; falling back to mcp.');
+    expect(result.manifest.cloud_fallback?.mode_used).toBe('mcp');
+    expect(result.manifest.runtime_mode_requested).toBe('cli');
+    expect(result.manifest.runtime_mode).toBe('cli');
+    expect(result.manifest.status).toBe('succeeded');
+  });
+
   it('fails fast on preflight failure when cloud fallback is disabled', async () => {
     const env = normalizeEnvironmentPaths(resolveEnvironmentPaths());
     const pipeline: PipelineDefinition = {

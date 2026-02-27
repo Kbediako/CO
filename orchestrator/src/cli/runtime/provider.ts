@@ -68,6 +68,17 @@ function summarizePreflightFailures(issues: Array<{ code: string; message: strin
   return `Appserver preflight failed (${codes}). ${messages}`.trim();
 }
 
+function resolveRequestedMode(options: RuntimeSelectionOptions): RuntimeMode {
+  if (
+    options.executionMode === 'cloud' &&
+    options.requestedMode === 'appserver' &&
+    (options.source === 'default' || options.source === 'manifest')
+  ) {
+    return 'cli';
+  }
+  return options.requestedMode;
+}
+
 async function runCodexProbe(
   command: string,
   args: string[],
@@ -181,15 +192,16 @@ export async function resolveRuntimeSelection(
   options: RuntimeSelectionOptions
 ): Promise<RuntimeSelection> {
   const now = options.now ?? isoTimestamp;
+  const requestedMode = resolveRequestedMode(options);
 
-  if (options.executionMode === 'cloud' && options.requestedMode === 'appserver') {
+  if (options.executionMode === 'cloud' && requestedMode === 'appserver') {
     throw new Error(
       'Unsupported mode combination: executionMode=cloud does not support runtimeMode=appserver. ' +
         'Use --runtime-mode cli or remove the runtime override for cloud execution.'
     );
   }
 
-  if (options.requestedMode === 'cli') {
+  if (requestedMode === 'cli') {
     return {
       requested_mode: 'cli',
       selected_mode: 'cli',

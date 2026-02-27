@@ -1518,6 +1518,22 @@
       },
       "created_at": "2026-02-27",
       "completed_at": "2026-02-27"
+    },
+    {
+      "id": "0984",
+      "slug": "0984-pr-263-codex-feedback-followup",
+      "title": "PR 263 Codex Feedback Follow-up",
+      "path": "tasks/tasks-0984-pr-263-codex-feedback-followup.md",
+      "kind": "run",
+      "status": "in-progress",
+      "gate": {
+        "phase": "pr-263-codex-feedback-followup-implementation",
+        "status": "in-progress",
+        "log": ".runs/0984-pr-263-codex-feedback-followup/cli/2026-02-27T06-03-10-274Z-c519009a/manifest.json",
+        "run_id": "2026-02-27T06-03-10-274Z-c519009a"
+      },
+      "created_at": "2026-02-27",
+      "completed_at": null
     }
   ],
   "specs": [
@@ -2047,6 +2063,22 @@
         "task": "tasks/tasks-0983-runtime-default-flip-readiness-automation.md",
         "agent_task": ".agent/task/0983-runtime-default-flip-readiness-automation.md",
         "docs": "docs/TECH_SPEC-runtime-default-flip-readiness-automation.md"
+      }
+    },
+    {
+      "id": "20260227-0984-pr-263-codex-feedback-followup",
+      "title": "PR 263 Codex Feedback Follow-up",
+      "relates_to": "tasks/tasks-0984-pr-263-codex-feedback-followup.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-02-27",
+      "paths": {
+        "spec": "tasks/specs/0984-pr-263-codex-feedback-followup.md",
+        "task": "tasks/tasks-0984-pr-263-codex-feedback-followup.md",
+        "agent_task": ".agent/task/0984-pr-263-codex-feedback-followup.md",
+        "docs": "docs/TECH_SPEC-pr-263-codex-feedback-followup.md"
       }
     }
   ]

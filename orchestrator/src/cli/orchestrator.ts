@@ -861,6 +861,8 @@ export class CodexOrchestrator {
           ...options,
           mode: 'mcp',
           executionModeOverride: 'mcp',
+          runtimeModeRequested: runtimeSelection.selected_mode,
+          runtimeModeSource: runtimeSelection.source,
           envOverrides: effectiveEnvOverrides
         });
         fallback.notes.unshift(detail);

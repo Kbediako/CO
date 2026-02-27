@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp c37e3e887b204ab0bb70428fc5c26ec2c38cfc3cc9efa69b6b018ff103a4bcea -->
+<!-- codex:instruction-stamp 1584fe512ea7159b4b37ddd49efd319a2afd218f8c5701d55852555f8bd7c56d -->
 # Codex-Orchestrator Agent Handbook (Template)
 
 Use this repository as the wrapper that coordinates multiple Codex-driven projects. After cloning, replace placeholder metadata (task IDs, documents, SOPs) with values for each downstream initiative while keeping these shared guardrails in place.
@@ -147,6 +147,7 @@ Use this repository as the wrapper that coordinates multiple Codex-driven projec
 ## PR Lifecycle (Top-Level Agents)
 - Open PRs for code/config changes and keep the scope tied to the active task.
 - Monitor PR checks and review feedback for 10–20 minutes after all required checks turn green (use a background loop when possible).
+- Before merge, verify unresolved actionable review threads are zero (replying is not the same as resolving); explicitly resolve each addressed thread or record a waiver with evidence in the task checklist.
 - If checks remain green and no new feedback arrives during the window, merge via GitHub and delete the branch.
 - Reset the window if checks restart or feedback arrives; do not merge draft PRs or PRs labeled "do not merge."
 
