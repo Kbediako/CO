@@ -377,6 +377,11 @@ export class CodexOrchestrator {
       planTargetFallback: null
     });
     const runId = generateRunId();
+    const runtimeModeResolution = resolveRuntimeMode({
+      flag: options.runtimeMode,
+      env: { ...process.env, ...(preparation.envOverrides ?? {}) },
+      configDefault: preparation.runtimeModeDefault
+    });
     const { manifest, paths } = await bootstrapManifest(runId, {
       env: preparation.env,
       pipeline: preparation.pipeline,
@@ -384,11 +389,6 @@ export class CodexOrchestrator {
       taskSlug: preparation.metadata.slug,
       approvalPolicy: options.approvalPolicy ?? null,
       planTargetId: preparation.planPreview?.targetId ?? preparation.plannerTargetId ?? null
-    });
-    const runtimeModeResolution = resolveRuntimeMode({
-      flag: options.runtimeMode,
-      env: { ...process.env, ...(preparation.envOverrides ?? {}) },
-      configDefault: preparation.runtimeModeDefault
     });
     this.applyRequestedRuntimeMode(manifest, runtimeModeResolution.mode);
     if (preparation.configNotice) {
