@@ -1,7 +1,7 @@
 # Codex Version Policy (CO)
 
 ## Purpose
-Define a stable default with evidence-gated prerelease adoption so CO can move fast without forcing global risk.
+Define a stable default with evidence-gated prerelease adoption, so CO can move fast without forcing global risk.
 
 ## Policy
 - Global default stays on stable Codex CLI (`0.106.0`) unless explicit promotion is approved.
