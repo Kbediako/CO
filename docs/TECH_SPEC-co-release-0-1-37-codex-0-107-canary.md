@@ -43,4 +43,4 @@
 ## Execution Outcome (2026-02-27)
 - CO release completed: `0.1.37` published with signed tag `v0.1.37` and downstream smoke verification.
 - Canary parity observed across tested fallback/fail-fast lanes for stable `0.106.0` and prerelease `0.107.0-alpha.4`.
-- Required cloud lane remained blocked (`CODEX_CLOUD_ENV_ID` missing), so global default update to `0.107.x` is NO-GO pending required cloud-lane rerun.
+- Required cloud lane reruns passed for both channels with CO-scoped `CODEX_CLOUD_ENV_ID=Kbediako/CO`, so global default update to `0.107.0-alpha.4` is GO (with `0.106.0` rollback pin retained).

@@ -21,22 +21,22 @@
 - [x] Downstream/global smoke completed successfully. - Evidence: `out/0985-co-release-0-1-37-codex-0-107-canary/manual/release-downstream-smoke.log`.
 
 ## Workstream B - Codex 0.107 Canary (Dummy Repos)
-- [x] Canary automation matrix executed for stable `0.106.0` baseline. - Evidence: `out/0985-co-release-0-1-37-codex-0-107-canary/manual/codex-version-canary/stable/00-install.log` through `99-summary.json`.
-- [x] Canary automation matrix executed for prerelease `0.107.x`. - Evidence: `out/0985-co-release-0-1-37-codex-0-107-canary/manual/codex-version-canary/prerelease/00-install.log` through `99-summary.json`.
+- [x] Canary automation matrix executed for stable `0.106.0` baseline. - Evidence: `out/0985-co-release-0-1-37-codex-0-107-canary/manual/codex-version-canary/stable/00-install.log` through `99-summary.json`, plus required cloud rerun `out/0985-co-release-0-1-37-codex-0-107-canary/manual/codex-version-canary/stable/06-cloud-canary-required-with-env.log`.
+- [x] Canary automation matrix executed for prerelease `0.107.x`. - Evidence: `out/0985-co-release-0-1-37-codex-0-107-canary/manual/codex-version-canary/prerelease/00-install.log` through `99-summary.json`, plus required cloud rerun `out/0985-co-release-0-1-37-codex-0-107-canary/manual/codex-version-canary/prerelease/06-cloud-canary-required-with-env.log`.
 - [x] Regression comparison + fallback/error-path audit completed. - Evidence: `out/0985-co-release-0-1-37-codex-0-107-canary/manual/codex-version-canary/compare/pass-rate-summary.json`.
-- [x] Global version policy decision recorded (adopt or hold). - Evidence: `out/0985-co-release-0-1-37-codex-0-107-canary/manual/codex-version-canary/compare/decision-go-no-go.md` (decision: hold at stable `0.106.0` pending required cloud-lane evidence).
+- [x] Global version policy decision recorded (adopt or hold). - Evidence: `out/0985-co-release-0-1-37-codex-0-107-canary/manual/codex-version-canary/compare/decision-go-no-go.md` (decision: GO for global update to `0.107.0-alpha.4` with `0.106.0` rollback pin retained).
 
 ## Validation
-- [x] 01 `node scripts/delegation-guard.mjs`. - Evidence: `out/0985-co-release-0-1-37-codex-0-107-canary/manual/finalfinal-01-delegation-guard.log`.
-- [x] 02 `node scripts/spec-guard.mjs --dry-run`. - Evidence: `out/0985-co-release-0-1-37-codex-0-107-canary/manual/finalfinal-02-spec-guard.log`.
-- [x] 03 `npm run build`. - Evidence: `out/0985-co-release-0-1-37-codex-0-107-canary/manual/finalfinal-03-build.log`.
-- [x] 04 `npm run lint`. - Evidence: `out/0985-co-release-0-1-37-codex-0-107-canary/manual/finalfinal-04-lint.log`.
-- [x] 05 `npm run test`. - Evidence: `out/0985-co-release-0-1-37-codex-0-107-canary/manual/finalfinal-05-test.log`.
-- [x] 06 `npm run docs:check`. - Evidence: `out/0985-co-release-0-1-37-codex-0-107-canary/manual/finalfinal-06-docs-check.log`.
-- [x] 07 `npm run docs:freshness`. - Evidence: `out/0985-co-release-0-1-37-codex-0-107-canary/manual/finalfinal-07-docs-freshness.log`.
-- [x] 08 `node scripts/diff-budget.mjs`. - Evidence: `out/0985-co-release-0-1-37-codex-0-107-canary/manual/finalfinal-08-diff-budget.log`.
-- [x] 09 `npm run review`. - Evidence: `out/0985-co-release-0-1-37-codex-0-107-canary/manual/finalfinal-09-review.log`.
-- [x] 10 `npm run pack:smoke`. - Evidence: `out/0985-co-release-0-1-37-codex-0-107-canary/manual/finalfinal-10-pack-smoke.log`.
+- [x] 01 `node scripts/delegation-guard.mjs`. - Evidence: `out/0985-co-release-0-1-37-codex-0-107-canary/manual/cloudrerun-01-delegation-guard.log`.
+- [x] 02 `node scripts/spec-guard.mjs --dry-run`. - Evidence: `out/0985-co-release-0-1-37-codex-0-107-canary/manual/cloudrerun-02-spec-guard.log`.
+- [x] 03 `npm run build`. - Evidence: `out/0985-co-release-0-1-37-codex-0-107-canary/manual/cloudrerun-03-build.log`.
+- [x] 04 `npm run lint`. - Evidence: `out/0985-co-release-0-1-37-codex-0-107-canary/manual/cloudrerun-04-lint.log`.
+- [x] 05 `npm run test`. - Evidence: `out/0985-co-release-0-1-37-codex-0-107-canary/manual/cloudrerun-05-test.log`.
+- [x] 06 `npm run docs:check`. - Evidence: `out/0985-co-release-0-1-37-codex-0-107-canary/manual/cloudrerun-06-docs-check.log`.
+- [x] 07 `npm run docs:freshness`. - Evidence: `out/0985-co-release-0-1-37-codex-0-107-canary/manual/cloudrerun-07-docs-freshness.log`.
+- [x] 08 `node scripts/diff-budget.mjs`. - Evidence: `out/0985-co-release-0-1-37-codex-0-107-canary/manual/cloudrerun-08-diff-budget.log`.
+- [x] 09 `npm run review`. - Evidence: `out/0985-co-release-0-1-37-codex-0-107-canary/manual/cloudrerun-09-review.log`.
+- [x] 10 `npm run pack:smoke`. - Evidence: `out/0985-co-release-0-1-37-codex-0-107-canary/manual/cloudrerun-10-pack-smoke.log`.
 
 ## Closeout
 - [x] Checklist mirror synced (`tasks/`, `.agent/task/`, `docs/TASKS.md`). - Evidence: `tasks/tasks-0985-co-release-0-1-37-codex-0-107-canary.md`, `.agent/task/0985-co-release-0-1-37-codex-0-107-canary.md`, `docs/TASKS.md`.

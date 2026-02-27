@@ -63,5 +63,5 @@
 
 ## Resolution (2026-02-27)
 - Release goal met: `@kbediako/codex-orchestrator@0.1.37` shipped and verified.
-- Canary goal met with blocker note: stable/prerelease automation executed, but required cloud lane could not run due missing `CODEX_CLOUD_ENV_ID`.
-- Decision: keep global Codex pinned to stable `0.106.0` and defer default update until required cloud-lane evidence is available.
+- Canary goal fully met: stable/prerelease automation executed, including required cloud-contract reruns with CO-scoped `CODEX_CLOUD_ENV_ID=Kbediako/CO`.
+- Decision: move global Codex default to `0.107.0-alpha.4`, while keeping `0.106.0` rollback pin documented as break-glass.
