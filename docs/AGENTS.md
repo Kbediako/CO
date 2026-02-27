@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp a395ade55b82e8fe91628e933b2dbf80386468c0cf0c1a2932cf3ee8f087f541 -->
+<!-- codex:instruction-stamp 2bab8b68cc8b97d6d61c8e0c2595fc3cb25d58521b5ef7de8cea82c8fa17aa45 -->
 # Repository Agent Guidance
 
 ## Project 0303 — Codex Orchestrator Autonomy Enhancements
@@ -51,8 +51,8 @@
 - CO may run alpha/prerelease Codex in explicit task-scoped canary lanes only; do not treat prerelease as an automatic global default.
 - Required policy checks for alpha lanes:
   - `scripts/runtime-mode-canary.mjs`
-  - Required cloud contract run: `CODEX_CLOUD_CANARY_REQUIRED=1 npm run ci:cloud-canary`
-  - Required fallback contract run: `CODEX_CLOUD_CANARY_REQUIRED=1 CLOUD_CANARY_EXPECT_FALLBACK=1 npm run ci:cloud-canary`
+  - Required cloud contract run: `CODEX_CLOUD_ENV_ID=<env-id> CODEX_CLOUD_CANARY_REQUIRED=1 npm run ci:cloud-canary`
+  - Required fallback contract run: `CODEX_CLOUD_ENV_ID=<env-id> CODEX_CLOUD_CANARY_REQUIRED=1 CLOUD_CANARY_EXPECT_FALLBACK=1 npm run ci:cloud-canary`
 - If required checks fail, or required cloud evidence is missing, hold/revert to stable and update decision evidence in `docs/TASKS.md`, `tasks/index.json`, and task checklist mirrors.
 - Canonical policy/cadence guide: `docs/guides/codex-version-policy.md`.
 
