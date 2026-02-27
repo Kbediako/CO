@@ -1534,6 +1534,22 @@
       },
       "created_at": "2026-02-27",
       "completed_at": "2026-02-27"
+    },
+    {
+      "id": "0985",
+      "slug": "0985-co-release-0-1-37-codex-0-107-canary",
+      "title": "CO 0.1.37 Release + Codex 0.107 Canary",
+      "path": "tasks/tasks-0985-co-release-0-1-37-codex-0-107-canary.md",
+      "kind": "run",
+      "status": "in-progress",
+      "gate": {
+        "phase": "co-release-0-1-37-codex-0-107-canary-implementation",
+        "status": "in-progress",
+        "log": ".runs/0985-co-release-0-1-37-codex-0-107-canary/cli/<run-id>/manifest.json",
+        "run_id": "<run-id>"
+      },
+      "created_at": "2026-02-27",
+      "completed_at": null
     }
   ],
   "specs": [
@@ -2079,6 +2095,22 @@
         "task": "tasks/tasks-0984-pr-263-codex-feedback-followup.md",
         "agent_task": ".agent/task/0984-pr-263-codex-feedback-followup.md",
         "docs": "docs/TECH_SPEC-pr-263-codex-feedback-followup.md"
+      }
+    },
+    {
+      "id": "20260227-0985-co-release-0-1-37-codex-0-107-canary",
+      "title": "CO 0.1.37 Release + Codex 0.107 Canary",
+      "relates_to": "tasks/tasks-0985-co-release-0-1-37-codex-0-107-canary.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-02-27",
+      "paths": {
+        "spec": "tasks/specs/0985-co-release-0-1-37-codex-0-107-canary.md",
+        "task": "tasks/tasks-0985-co-release-0-1-37-codex-0-107-canary.md",
+        "agent_task": ".agent/task/0985-co-release-0-1-37-codex-0-107-canary.md",
+        "docs": "docs/TECH_SPEC-co-release-0-1-37-codex-0-107-canary.md"
       }
     }
   ]

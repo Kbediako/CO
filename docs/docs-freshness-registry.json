@@ -4215,6 +4215,48 @@
       "status": "active",
       "last_review": "2026-02-27",
       "cadence_days": 90
+    },
+    {
+      "path": "docs/PRD-co-release-0-1-37-codex-0-107-canary.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-27",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/TECH_SPEC-co-release-0-1-37-codex-0-107-canary.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-27",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/ACTION_PLAN-co-release-0-1-37-codex-0-107-canary.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-27",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/specs/0985-co-release-0-1-37-codex-0-107-canary.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-27",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/tasks-0985-co-release-0-1-37-codex-0-107-canary.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-27",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/task/0985-co-release-0-1-37-codex-0-107-canary.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-27",
+      "cadence_days": 90
     }
   ]
 }
