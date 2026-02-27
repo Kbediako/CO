@@ -34,4 +34,5 @@
 ## Closeout
 - [x] Checklist mirror synced (`tasks/`, `.agent/task/`, `docs/TASKS.md`). - Evidence: `tasks/tasks-0986-co-codex-alpha-agent-first-policy.md`, `.agent/task/0986-co-codex-alpha-agent-first-policy.md`, `docs/TASKS.md`.
 - [x] Final policy summary captured with evidence. - Evidence: `docs/guides/codex-version-policy.md`, `out/0986-co-codex-alpha-agent-first-policy/manual/final-09-review-rerun.log`.
+- [x] Merge gate documented: unresolved actionable review threads must be zero before merge (or waiver recorded with evidence).
 - [x] Post-edit guardrails rerun after index/date/status finalization. - Evidence: `out/0986-co-codex-alpha-agent-first-policy/manual/final-postedit-01-delegation-guard.log`, `out/0986-co-codex-alpha-agent-first-policy/manual/final-postedit-02-spec-guard.log`, `out/0986-co-codex-alpha-agent-first-policy/manual/final-postedit-06-docs-check.log`, `out/0986-co-codex-alpha-agent-first-policy/manual/final-postedit-07-docs-freshness.log`, `out/0986-co-codex-alpha-agent-first-policy/manual/final-postedit-08-diff-budget.log`.
