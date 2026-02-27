@@ -4,6 +4,7 @@ import type {
   CliManifestCommand as SharedCliManifestCommand,
   RunStatus
 } from '../../../packages/shared/manifest/types.js';
+import type { RuntimeMode } from './runtime/types.js';
 
 export type PipelineStage = CommandStage | SubPipelineStage;
 
@@ -129,6 +130,7 @@ export interface StartOptions {
   format?: 'text' | 'json';
   targetStageId?: string;
   executionMode?: 'mcp' | 'cloud';
+  runtimeMode?: RuntimeMode;
   runEvents?: import('./events/runEvents.js').RunEventEmitter;
 }
 
@@ -145,6 +147,7 @@ export interface ResumeOptions {
   reason?: string;
   format?: 'text' | 'json';
   targetStageId?: string;
+  runtimeMode?: RuntimeMode;
   runEvents?: import('./events/runEvents.js').RunEventEmitter;
 }
 

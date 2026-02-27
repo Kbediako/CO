@@ -8,7 +8,13 @@ import { createInterface } from 'node:readline/promises';
 import { fileURLToPath } from 'node:url';
 
 import { logger } from '../logger.js';
-import { resolveCodexCommand } from './utils/devtools.js';
+import {
+  createRuntimeCodexCommandContext,
+  formatRuntimeSelectionSummary,
+  parseRuntimeMode,
+  resolveRuntimeCodexCommand,
+  type RuntimeCodexCommandContext
+} from './runtime/index.js';
 import { detectValidator } from './rlm/validator.js';
 import { buildRlmPrompt } from './rlm/prompt.js';
 import { runRlmLoop } from './rlm/runner.js';
@@ -71,6 +77,8 @@ const COLLAB_FEATURE_CANONICAL = 'multi_agent';
 const COLLAB_FEATURE_LEGACY = 'collab';
 const COLLAB_ROLE_TAG_PATTERN = /^\s*\[(?:agent_type|role)\s*:\s*([a-z0-9._-]+)\]/i;
 const COLLAB_ROLE_TOKEN_PATTERN = /^[a-z0-9._-]+$/;
+let runtimeCodexContextPromise: Promise<RuntimeCodexCommandContext> | null = null;
+let runtimeCodexContextLogged = false;
 
 type CollabFeatureKey = typeof COLLAB_FEATURE_CANONICAL | typeof COLLAB_FEATURE_LEGACY;
 type CollabRolePolicy = 'enforce' | 'warn' | 'off';
@@ -443,8 +451,9 @@ async function runCodexExec(
   subagentsEnabled: boolean,
   mirrorOutput: boolean
 ): Promise<{ stdout: string; stderr: string }> {
-  const { command, args: resolvedArgs } = resolveCodexCommand(args, env);
-  const childEnv: NodeJS.ProcessEnv = { ...process.env, ...env };
+  const runtimeContext = await resolveRlmRuntimeCodexContext(env, repoRoot);
+  const { command, args: resolvedArgs } = resolveRuntimeCodexCommand(args, runtimeContext);
+  const childEnv: NodeJS.ProcessEnv = { ...process.env, ...env, ...runtimeContext.env };
 
   if (nonInteractive) {
     childEnv.CODEX_NON_INTERACTIVE = childEnv.CODEX_NON_INTERACTIVE ?? '1';
@@ -484,6 +493,35 @@ async function runCodexExec(
   });
 
   return { stdout, stderr };
+}
+
+async function resolveRlmRuntimeCodexContext(
+  env: NodeJS.ProcessEnv,
+  repoRoot: string
+): Promise<RuntimeCodexCommandContext> {
+  if (!runtimeCodexContextPromise) {
+    const requestedMode = parseRuntimeMode(
+      env.CODEX_ORCHESTRATOR_RUNTIME_MODE_ACTIVE ?? env.CODEX_ORCHESTRATOR_RUNTIME_MODE ?? null
+    );
+    const runId =
+      typeof env.CODEX_ORCHESTRATOR_RUN_ID === 'string' && env.CODEX_ORCHESTRATOR_RUN_ID.trim().length > 0
+        ? env.CODEX_ORCHESTRATOR_RUN_ID.trim()
+        : `rlm-${Date.now()}`;
+    runtimeCodexContextPromise = createRuntimeCodexCommandContext({
+      requestedMode,
+      executionMode: 'mcp',
+      repoRoot,
+      env: { ...process.env, ...env },
+      runId
+    });
+  }
+
+  const runtimeContext = await runtimeCodexContextPromise;
+  if (!runtimeCodexContextLogged) {
+    logger.info(`[rlm-runtime] ${formatRuntimeSelectionSummary(runtimeContext.runtime)}`);
+    runtimeCodexContextLogged = true;
+  }
+  return runtimeContext;
 }
 
 async function runCodexCompletion(

@@ -5,7 +5,13 @@ import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 
 import { logger } from '../logger.js';
-import { resolveCodexCommand } from './utils/devtools.js';
+import {
+  createRuntimeCodexCommandContext,
+  formatRuntimeSelectionSummary,
+  parseRuntimeMode,
+  resolveRuntimeCodexCommand,
+  type RuntimeCodexCommandContext
+} from './runtime/index.js';
 
 const DEFAULT_PROMPT = [
   'You are running frontend testing for the current project.',
@@ -47,10 +53,10 @@ export async function loadFrontendTestingPrompt(
 
 export function resolveFrontendTestingCommand(
   prompt: string,
-  env: NodeJS.ProcessEnv = process.env
+  context: RuntimeCodexCommandContext
 ): { command: string; args: string[] } {
   const args = ['exec', prompt];
-  return resolveCodexCommand(args, env);
+  return resolveRuntimeCodexCommand(args, context);
 }
 
 function envFlagEnabled(value: string | undefined): boolean {
@@ -75,9 +81,15 @@ function shouldForceNonInteractive(env: NodeJS.ProcessEnv): boolean {
 
 export async function runFrontendTesting(env: NodeJS.ProcessEnv = process.env): Promise<void> {
   const prompt = await loadFrontendTestingPrompt(env);
-  const { command, args } = resolveFrontendTestingCommand(prompt, env);
+  const repoRoot =
+    typeof env.CODEX_ORCHESTRATOR_ROOT === 'string' && env.CODEX_ORCHESTRATOR_ROOT.trim().length > 0
+      ? env.CODEX_ORCHESTRATOR_ROOT.trim()
+      : process.cwd();
+  const runtimeContext = await resolveFrontendTestingRuntimeContext(env, repoRoot);
+  logger.info(`[frontend-testing-runtime] ${formatRuntimeSelectionSummary(runtimeContext.runtime)}`);
+  const { command, args } = resolveFrontendTestingCommand(prompt, runtimeContext);
   const nonInteractive = shouldForceNonInteractive(env);
-  const childEnv: NodeJS.ProcessEnv = { ...process.env, ...env };
+  const childEnv: NodeJS.ProcessEnv = { ...process.env, ...env, ...runtimeContext.env };
   if (nonInteractive) {
     childEnv.CODEX_NON_INTERACTIVE = childEnv.CODEX_NON_INTERACTIVE ?? '1';
     childEnv.CODEX_NO_INTERACTIVE = childEnv.CODEX_NO_INTERACTIVE ?? '1';
@@ -85,7 +97,7 @@ export async function runFrontendTesting(env: NodeJS.ProcessEnv = process.env): 
   }
   const stdio: StdioOptions = nonInteractive ? ['ignore', 'inherit', 'inherit'] : 'inherit';
 
-  const child = spawn(command, args, { stdio, env: childEnv });
+  const child = spawn(command, args, { stdio, env: childEnv, cwd: repoRoot });
   await new Promise<void>((resolvePromise, reject) => {
     child.once('error', (error) => reject(error instanceof Error ? error : new Error(String(error))));
     child.once('exit', (code) => {
@@ -95,6 +107,26 @@ export async function runFrontendTesting(env: NodeJS.ProcessEnv = process.env): 
         reject(new Error(`codex exec exited with code ${code ?? 'unknown'}`));
       }
     });
+  });
+}
+
+async function resolveFrontendTestingRuntimeContext(
+  env: NodeJS.ProcessEnv,
+  repoRoot: string
+): Promise<RuntimeCodexCommandContext> {
+  const requestedMode = parseRuntimeMode(
+    env.CODEX_ORCHESTRATOR_RUNTIME_MODE_ACTIVE ?? env.CODEX_ORCHESTRATOR_RUNTIME_MODE ?? null
+  );
+  const runId =
+    typeof env.CODEX_ORCHESTRATOR_RUN_ID === 'string' && env.CODEX_ORCHESTRATOR_RUN_ID.trim().length > 0
+      ? env.CODEX_ORCHESTRATOR_RUN_ID.trim()
+      : `frontend-testing-${Date.now()}`;
+  return await createRuntimeCodexCommandContext({
+    requestedMode,
+    executionMode: 'mcp',
+    repoRoot,
+    env: { ...process.env, ...env },
+    runId
   });
 }
 

@@ -108,6 +108,17 @@ export interface CodexOrchestratorCLIManifest {
     } | null;
   } | null;
   guardrails_required?: boolean | null;
+  runtime_mode_requested: "cli" | "appserver";
+  runtime_mode: "cli" | "appserver";
+  runtime_provider: "CliRuntimeProvider" | "AppServerRuntimeProvider";
+  runtime_fallback: {
+    occurred: boolean;
+    code: string | null;
+    reason: string | null;
+    from_mode: "cli" | "appserver" | null;
+    to_mode: "cli" | "appserver" | null;
+    checked_at: string | null;
+  } | null;
   scheduler?: {
     mode: "multi-instance";
     requested_at: string;

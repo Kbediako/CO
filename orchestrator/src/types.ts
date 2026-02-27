@@ -1,3 +1,5 @@
+import type { RuntimeMode } from './cli/runtime/types.js';
+
 export type ExecutionMode = 'mcp' | 'cloud';
 
 export interface TaskMetadata {
@@ -107,6 +109,7 @@ export interface RunSummary {
   taskId: string;
   runId: string;
   mode: ExecutionMode;
+  runtime?: RuntimeSummary | null;
   plan: PlanResult;
   build: BuildResult;
   test: TestResult;
@@ -127,6 +130,16 @@ export interface RunSummary {
   designArtifactsSummary?: DesignArtifactsSummary;
   designConfigSnapshot?: Record<string, unknown> | null;
   group?: RunGroupSummary;
+}
+
+export interface RuntimeSummary {
+  modeRequested: RuntimeMode;
+  modeUsed: RuntimeMode;
+  provider: string;
+  fallbackOccurred: boolean;
+  fallbackCode: string | null;
+  fallbackReason: string | null;
+  checkedAt: string | null;
 }
 
 export interface CloudExecutionSummary {

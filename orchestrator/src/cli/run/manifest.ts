@@ -52,6 +52,17 @@ const HEARTBEAT_STALE_AFTER_SECONDS = 30;
 const MAX_ERROR_DETAIL_CHARS = 8 * 1024;
 const DEFAULT_MIN_EXPERIENCE_REWARD = 0.1;
 
+function createDefaultRuntimeFallback() {
+  return {
+    occurred: false,
+    code: null,
+    reason: null,
+    from_mode: null,
+    to_mode: null,
+    checked_at: isoTimestamp()
+  };
+}
+
 export async function bootstrapManifest(runId: string, options: ManifestBootstrapOptions): Promise<{
   manifest: CliManifest;
   paths: RunPaths;
@@ -101,6 +112,10 @@ export async function bootstrapManifest(runId: string, options: ManifestBootstra
     instructions_sources: [],
     prompt_packs: [],
     guardrails_required: pipeline.guardrailsRequired !== false,
+    runtime_mode_requested: 'cli',
+    runtime_mode: 'cli',
+    runtime_provider: 'CliRuntimeProvider',
+    runtime_fallback: createDefaultRuntimeFallback(),
     cloud_execution: null,
     cloud_fallback: null,
     learning: {
@@ -258,6 +273,8 @@ export function resetForResume(manifest: CliManifest): void {
   manifest.status = 'in_progress';
   manifest.status_detail = 'resuming';
   manifest.guardrail_status = undefined;
+  manifest.runtime_provider = manifest.runtime_mode === 'appserver' ? 'AppServerRuntimeProvider' : 'CliRuntimeProvider';
+  manifest.runtime_fallback = createDefaultRuntimeFallback();
   manifest.cloud_execution = null;
   manifest.cloud_fallback = null;
 }

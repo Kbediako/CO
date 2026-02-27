@@ -55,6 +55,7 @@ import { ControlPlaneService } from './services/controlPlaneService.js';
 import { ControlWatcher } from './control/controlWatcher.js';
 import { SchedulerService } from './services/schedulerService.js';
 import {
+  applyRuntimeToRunSummary,
   applyHandlesToRunSummary,
   applyPrivacyToRunSummary,
   applyCloudExecutionToRunSummary,
@@ -85,6 +86,8 @@ import { CodexCloudTaskExecutor } from '../cloud/CodexCloudTaskExecutor.js';
 import { persistPipelineExperience } from './services/pipelineExperience.js';
 import { runCloudPreflight } from './utils/cloudPreflight.js';
 import { writeJsonAtomic } from './utils/fs.js';
+import { resolveRuntimeMode, resolveRuntimeSelection } from './runtime/index.js';
+import type { RuntimeMode, RuntimeModeSource, RuntimeSelection } from './runtime/types.js';
 import {
   buildAutoScoutEvidence,
   resolveAdvancedAutopilotDecision,
@@ -325,6 +328,8 @@ interface ExecutePipelineOptions {
   manifest: CliManifest;
   paths: RunPaths;
   mode: ExecutionMode;
+  runtimeModeRequested: RuntimeMode;
+  runtimeModeSource: RuntimeModeSource;
   executionModeOverride?: ExecutionMode;
   target: PlanItem;
   task: TaskContext;
@@ -348,6 +353,8 @@ interface RunLifecycleContext {
   onEventEntry?: (entry: import('./events/runEventStream.js').RunEventStreamEntry) => void;
   persister: ManifestPersister;
   envOverrides: NodeJS.ProcessEnv;
+  runtimeModeRequested: RuntimeMode;
+  runtimeModeSource: RuntimeModeSource;
   executionModeOverride?: ExecutionMode;
 }
 
@@ -370,6 +377,11 @@ export class CodexOrchestrator {
       planTargetFallback: null
     });
     const runId = generateRunId();
+    const runtimeModeResolution = resolveRuntimeMode({
+      flag: options.runtimeMode,
+      env: { ...process.env, ...(preparation.envOverrides ?? {}) },
+      configDefault: preparation.runtimeModeDefault
+    });
     const { manifest, paths } = await bootstrapManifest(runId, {
       env: preparation.env,
       pipeline: preparation.pipeline,
@@ -378,6 +390,7 @@ export class CodexOrchestrator {
       approvalPolicy: options.approvalPolicy ?? null,
       planTargetId: preparation.planPreview?.targetId ?? preparation.plannerTargetId ?? null
     });
+    this.applyRequestedRuntimeMode(manifest, runtimeModeResolution.mode);
     if (preparation.configNotice) {
       appendSummary(manifest, preparation.configNotice);
     }
@@ -447,6 +460,8 @@ export class CodexOrchestrator {
         onEventEntry,
         persister,
         envOverrides: preparation.envOverrides,
+        runtimeModeRequested: runtimeModeResolution.mode,
+        runtimeModeSource: runtimeModeResolution.source,
         executionModeOverride: options.executionMode
       });
     } finally {
@@ -504,6 +519,7 @@ export class CodexOrchestrator {
     const preparation = await prepareRun({
       baseEnv: actualEnv,
       pipeline,
+      runtimeModeDefault: userConfig?.runtimeMode ?? null,
       resolver,
       taskIdOverride: manifest.task_id,
       targetStageId: options.targetStageId,
@@ -513,6 +529,14 @@ export class CodexOrchestrator {
     if (preparation.configNotice && !(manifest.summary ?? '').includes(preparation.configNotice)) {
       appendSummary(manifest, preparation.configNotice);
     }
+    const runtimeModeResolution = resolveRuntimeMode({
+      flag: options.runtimeMode,
+      env: { ...process.env, ...(preparation.envOverrides ?? {}) },
+      configDefault: preparation.runtimeModeDefault,
+      manifestMode: manifest.runtime_mode_requested ?? manifest.runtime_mode ?? null,
+      preferManifest: true
+    });
+    this.applyRequestedRuntimeMode(manifest, runtimeModeResolution.mode);
     manifest.plan_target_id = preparation.planPreview?.targetId ?? preparation.plannerTargetId ?? null;
     const persister = new ManifestPersister({
       manifest,
@@ -580,7 +604,9 @@ export class CodexOrchestrator {
         eventStream: stream,
         onEventEntry,
         persister,
-        envOverrides: preparation.envOverrides
+        envOverrides: preparation.envOverrides,
+        runtimeModeRequested: runtimeModeResolution.mode,
+        runtimeModeSource: runtimeModeResolution.source
       });
     } finally {
       if (detachStream) {
@@ -757,22 +783,53 @@ export class CodexOrchestrator {
   }
 
   private async executePipeline(options: ExecutePipelineOptions): Promise<PipelineRunExecutionResult> {
+    const baseEnvOverrides: NodeJS.ProcessEnv = { ...(options.envOverrides ?? {}) };
+    const mergedEnv = { ...process.env, ...baseEnvOverrides };
+    let runtimeSelection: RuntimeSelection;
+    try {
+      runtimeSelection = await resolveRuntimeSelection({
+        requestedMode: options.runtimeModeRequested,
+        source: options.runtimeModeSource,
+        executionMode: options.mode,
+        repoRoot: options.env.repoRoot,
+        env: mergedEnv,
+        runId: options.manifest.run_id
+      });
+    } catch (error) {
+      const detail = `Runtime selection failed: ${(error as Error)?.message ?? String(error)}`;
+      finalizeStatus(options.manifest, 'failed', 'runtime-selection-failed');
+      appendSummary(options.manifest, detail);
+      logger.error(detail);
+      return {
+        success: false,
+        notes: [detail],
+        manifest: options.manifest,
+        manifestPath: options.paths.manifestPath,
+        logPath: options.paths.logPath
+      };
+    }
+    this.applyRuntimeSelection(options.manifest, runtimeSelection);
+    const effectiveEnvOverrides: NodeJS.ProcessEnv = {
+      ...baseEnvOverrides,
+      ...runtimeSelection.env_overrides
+    };
+    const effectiveMergedEnv = { ...process.env, ...effectiveEnvOverrides };
+
     if (options.mode === 'cloud') {
-      const environmentId = resolveCloudEnvironmentId(options.task, options.target, options.envOverrides);
+      const environmentId = resolveCloudEnvironmentId(options.task, options.target, effectiveEnvOverrides);
       const branch =
-        readCloudString(options.envOverrides?.CODEX_CLOUD_BRANCH) ??
+        readCloudString(effectiveEnvOverrides.CODEX_CLOUD_BRANCH) ??
         readCloudString(process.env.CODEX_CLOUD_BRANCH);
-      const mergedEnv = { ...process.env, ...(options.envOverrides ?? {}) };
-      const codexBin = resolveCodexCliBin(mergedEnv);
+      const codexBin = resolveCodexCliBin(effectiveMergedEnv);
       const preflight = await runCloudPreflight({
         repoRoot: options.env.repoRoot,
         codexBin,
         environmentId,
         branch,
-        env: mergedEnv
+        env: effectiveMergedEnv
       });
       if (!preflight.ok) {
-        if (!allowCloudFallback(options.envOverrides)) {
+        if (!allowCloudFallback(effectiveEnvOverrides)) {
           const detail =
             `Cloud preflight failed and cloud fallback is disabled. ` +
             preflight.issues.map((issue) => issue.message).join(' ');
@@ -800,23 +857,36 @@ export class CodexOrchestrator {
         };
         appendSummary(options.manifest, detail);
         logger.warn(detail);
-        const fallback = await this.executePipeline({ ...options, mode: 'mcp', executionModeOverride: 'mcp' });
+        const fallback = await this.executePipeline({
+          ...options,
+          mode: 'mcp',
+          executionModeOverride: 'mcp',
+          envOverrides: effectiveEnvOverrides
+        });
         fallback.notes.unshift(detail);
         return fallback;
       }
-      return await this.executeCloudPipeline(options);
+      return await this.executeCloudPipeline({ ...options, envOverrides: effectiveEnvOverrides });
     }
 
-    const { env, pipeline, manifest, paths, runEvents, envOverrides } = options;
+    const { env, pipeline, manifest, paths, runEvents } = options;
     const notes: string[] = [];
     let success = true;
     manifest.guardrail_status = undefined;
+
+    if (runtimeSelection.fallback.occurred) {
+      const fallbackCode = runtimeSelection.fallback.code ?? 'runtime-fallback';
+      const fallbackReason = runtimeSelection.fallback.reason ?? 'runtime fallback occurred';
+      const fallbackSummary = `Runtime fallback (${fallbackCode}): ${fallbackReason}`;
+      appendSummary(manifest, fallbackSummary);
+      notes.push(fallbackSummary);
+    }
 
     const advancedDecision = resolveAdvancedAutopilotDecision({
       pipelineId: pipeline.id,
       targetMetadata: (options.target.metadata ?? null) as Record<string, unknown> | null,
       taskMetadata: (options.task.metadata ?? null) as Record<string, unknown> | null,
-      env: { ...process.env, ...(envOverrides ?? {}) }
+      env: effectiveMergedEnv
     });
     if (advancedDecision.enabled || advancedDecision.source !== 'default') {
       const advancedSummary =
@@ -863,7 +933,7 @@ export class CodexOrchestrator {
         pipeline,
         target: options.target,
         task: options.task,
-        envOverrides,
+        envOverrides: effectiveEnvOverrides,
         advancedDecision
       });
       const scoutMessage =
@@ -916,7 +986,9 @@ export class CodexOrchestrator {
               index: entry.index,
               events: runEvents,
               persister,
-              envOverrides
+              envOverrides: effectiveEnvOverrides,
+              runtimeMode: runtimeSelection.selected_mode,
+              runtimeSessionId: runtimeSelection.runtime_session_id
             });
             notes.push(`${stage.title}: ${result.summary}`);
             const updatedEntry = manifest.commands[i];
@@ -964,7 +1036,8 @@ export class CodexOrchestrator {
               pipelineId: stage.pipeline,
               parentRunId: manifest.run_id,
               format: 'json',
-              executionMode: options.executionModeOverride
+              executionMode: options.executionModeOverride,
+              runtimeMode: options.runtimeModeRequested
             });
             entry.completed_at = isoTimestamp();
             entry.sub_run_id = child.manifest.run_id;
@@ -1466,6 +1539,8 @@ export class CodexOrchestrator {
       runId,
       persister,
       envOverrides,
+      runtimeModeRequested,
+      runtimeModeSource,
       executionModeOverride
     } = context;
     let latestPipelineResult: PipelineRunExecutionResult | null = null;
@@ -1482,6 +1557,8 @@ export class CodexOrchestrator {
         manifest,
         paths,
         mode: input.mode,
+        runtimeModeRequested,
+        runtimeModeSource,
         executionModeOverride,
         target: input.target,
         task: taskContext,
@@ -1551,6 +1628,7 @@ export class CodexOrchestrator {
     });
 
     this.scheduler.applySchedulerToRunSummary(runSummary, schedulerPlan);
+    applyRuntimeToRunSummary(runSummary, manifest);
     applyHandlesToRunSummary(runSummary, manifest);
     applyPrivacyToRunSummary(runSummary, manifest);
     applyCloudExecutionToRunSummary(runSummary, manifest);
@@ -1591,6 +1669,27 @@ export class CodexOrchestrator {
     });
   }
 
+  private applyRequestedRuntimeMode(manifest: CliManifest, mode: RuntimeMode): void {
+    manifest.runtime_mode_requested = mode;
+    manifest.runtime_mode = mode;
+    manifest.runtime_provider = mode === 'appserver' ? 'AppServerRuntimeProvider' : 'CliRuntimeProvider';
+    manifest.runtime_fallback = {
+      occurred: false,
+      code: null,
+      reason: null,
+      from_mode: null,
+      to_mode: null,
+      checked_at: isoTimestamp()
+    };
+  }
+
+  private applyRuntimeSelection(manifest: CliManifest, selection: RuntimeSelection): void {
+    manifest.runtime_mode_requested = selection.requested_mode;
+    manifest.runtime_mode = selection.selected_mode;
+    manifest.runtime_provider = selection.provider;
+    manifest.runtime_fallback = selection.fallback;
+  }
+
   private async validateResumeToken(paths: RunPaths, manifest: CliManifest, provided: string | null): Promise<void> {
     let stored = manifest.resume_token;
     if (!stored) {
@@ -1624,6 +1723,10 @@ export class CodexOrchestrator {
       activity,
       commands: manifest.commands,
       child_runs: manifest.child_runs,
+      runtime_mode_requested: manifest.runtime_mode_requested,
+      runtime_mode: manifest.runtime_mode,
+      runtime_provider: manifest.runtime_provider,
+      runtime_fallback: manifest.runtime_fallback ?? null,
       cloud_execution: manifest.cloud_execution ?? null,
       cloud_fallback: manifest.cloud_fallback ?? null
     };
@@ -1637,6 +1740,17 @@ export class CodexOrchestrator {
     logger.info(`Started: ${manifest.started_at}`);
     logger.info(`Completed: ${manifest.completed_at ?? 'in-progress'}`);
     logger.info(`Manifest: ${manifest.artifact_root}/manifest.json`);
+    if (manifest.runtime_mode || manifest.runtime_mode_requested || manifest.runtime_provider) {
+      const selectedMode = manifest.runtime_mode ?? 'unknown';
+      logger.info(
+        `Runtime: ${selectedMode}${manifest.runtime_mode_requested ? ` (requested ${manifest.runtime_mode_requested})` : ''}` +
+          (manifest.runtime_provider ? ` via ${manifest.runtime_provider}` : '')
+      );
+    }
+    if (manifest.runtime_fallback?.occurred) {
+      const fallbackCode = manifest.runtime_fallback.code ?? 'runtime-fallback';
+      logger.info(`Runtime fallback: ${fallbackCode} — ${manifest.runtime_fallback.reason ?? 'n/a'}`);
+    }
     if (activity.observed_at) {
       const staleSuffix = activity.stale === null ? '' : activity.stale ? ' [stale]' : ' [active]';
       const sourceLabel = activity.observed_source ? ` via ${activity.observed_source}` : '';

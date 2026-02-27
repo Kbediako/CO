@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import type { PipelineDefinition, PipelineStage } from '../types.js';
+import type { RuntimeMode } from '../runtime/types.js';
 import type { EnvironmentPaths } from '../run/environment.js';
 import { logger } from '../../logger.js';
 import { findPackageRoot } from '../utils/packageInfo.js';
@@ -9,6 +10,7 @@ import { findPackageRoot } from '../utils/packageInfo.js';
 export interface UserConfig {
   pipelines?: PipelineDefinition[];
   defaultPipeline?: string;
+  runtimeMode?: RuntimeMode;
   source?: 'repo' | 'package';
 }
 
@@ -25,6 +27,7 @@ type ConfigSource = 'repo' | 'package';
 interface ConfigFile {
   pipelines?: ConfigPipelineDefinition[];
   defaultPipeline?: string;
+  runtimeMode?: string;
   stageSets?: Record<string, PipelineStage[]>;
 }
 
@@ -94,11 +97,17 @@ function normalizeUserConfig(config: ConfigFile | null, source: ConfigSource): U
   if (!config) {
     return null;
   }
+  const runtimeMode = normalizeRuntimeMode(config.runtimeMode);
   const stageSets = normalizeStageSets(config.stageSets);
   const pipelines = Array.isArray(config.pipelines)
     ? config.pipelines.map((pipeline) => expandPipelineStages(pipeline, stageSets))
     : config.pipelines;
-  return { pipelines, defaultPipeline: config.defaultPipeline, source };
+  return {
+    pipelines,
+    defaultPipeline: config.defaultPipeline,
+    runtimeMode,
+    source
+  };
 }
 
 async function readConfig(configPath: string): Promise<ConfigFile | null> {
@@ -156,4 +165,15 @@ function expandPipelineStages(
 
 function isStageSetRef(stage: ConfigStage): stage is StageSetRef {
   return stage.kind === 'stage-set';
+}
+
+function normalizeRuntimeMode(value: string | undefined): RuntimeMode | undefined {
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+  const normalized = value.trim().toLowerCase();
+  if (normalized === 'cli' || normalized === 'appserver') {
+    return normalized;
+  }
+  throw new Error(`Invalid codex.orchestrator.json runtimeMode "${value}". Expected one of: cli, appserver.`);
 }
