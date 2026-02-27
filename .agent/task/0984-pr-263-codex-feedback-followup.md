@@ -34,7 +34,8 @@
 - [x] 10 `npm run pack:smoke` - Evidence: `out/0984-pr-263-codex-feedback-followup/manual/final-10-pack-smoke.log`, `final2-10-pack-smoke.log`.
 
 ### Review, merge, and handoff
-- [ ] PR opened with scope/decisions/validation evidence. - Evidence: `<pr-url>`, `out/0984-pr-263-codex-feedback-followup/manual/pr-create.log`, `out/0984-pr-263-codex-feedback-followup/manual/pr-body.md`.
+- [x] PR opened with scope/decisions/validation evidence. - Evidence: `https://github.com/Kbediako/CO/pull/264`, `out/0984-pr-263-codex-feedback-followup/manual/pr-create.log`, `out/0984-pr-263-codex-feedback-followup/manual/pr-create-api.log`, `out/0984-pr-263-codex-feedback-followup/manual/pr-body.md`.
+- [x] PR #263 unresolved actionable threads explicitly replied-to and resolved after audit. - Evidence: reply links `https://github.com/Kbediako/CO/pull/263#discussion_r2863212606`, `https://github.com/Kbediako/CO/pull/263#discussion_r2863212601`, `https://github.com/Kbediako/CO/pull/263#discussion_r2863212602`; GraphQL resolve mutations `PRRT_kwDOQE1BPc5xGDor`, `PRRT_kwDOQE1BPc5xGDos`, `PRRT_kwDOQE1BPc5xGLCr`, `PRRT_kwDOQE1BPc5xGS-6`, `PRRT_kwDOQE1BPc5xGbNy`.
 - [ ] Review feedback addressed in-thread with reruns. - Evidence: `<discussion-links>`, rerun logs.
 - [ ] Quiet-window monitoring completed after green checks. - Evidence: `out/0984-pr-263-codex-feedback-followup/manual/pr-watch.log`.
 - [ ] Merge complete and branch cleaned up (if unblocked). - Evidence: `<merge-commit-sha>`, watch/cleanup logs.
