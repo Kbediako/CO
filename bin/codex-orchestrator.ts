@@ -811,6 +811,9 @@ async function handleStart(orchestrator: CodexOrchestrator, rawArgs: string[]): 
             })
           : { issueLog: null, issueLogError: null };
       emitRunOutput(result, format, 'Run started', issueLogCapture);
+      if (result.manifest.status === 'failed' || result.manifest.status === 'cancelled') {
+        process.exitCode = 1;
+      }
       if (result.manifest.status === 'succeeded' && result.manifest.pipeline_id !== 'rlm') {
         await maybeEmitRunAdoptionHint({
           format,
@@ -856,6 +859,9 @@ async function handleFrontendTest(orchestrator: CodexOrchestrator, rawArgs: stri
         runEvents
       });
       emitRunOutput(result, format, 'Run started');
+      if (result.manifest.status === 'failed' || result.manifest.status === 'cancelled') {
+        process.exitCode = 1;
+      }
     });
   } finally {
     if (devtools) {

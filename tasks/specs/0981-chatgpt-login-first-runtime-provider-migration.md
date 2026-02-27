@@ -16,7 +16,7 @@ last_review: 2026-02-26
 ## Decision and Success Criteria
 - Decision:
   - Introduce explicit runtime axis: `runtimeMode=cli|appserver` independent of `executionMode=mcp|cloud`.
-  - Maintain default `runtimeMode=cli` until parity/canary evidence supports default flip.
+  - Initially maintain default `runtimeMode=cli` until parity/canary evidence supports default flip; this was later resolved in task 0983 with default flipped to `runtimeMode=appserver`.
   - Use deterministic fallback metadata when appserver preflight fails and fallback policy allows CLI mode.
 - Success criteria:
   - W0-W5 code and docs changes ship with ordered validation evidence.
@@ -38,7 +38,7 @@ last_review: 2026-02-26
   - Route review/run-review first, then RLM/frontend-testing through provider APIs.
   - Reject unsupported runtime/execution combinations with actionable errors.
 - Non-functional requirements (performance, reliability, security):
-  - No regression in default path (`runtimeMode=cli`) behavior.
+  - No regression in appserver-default behavior and no regression in `runtimeMode=cli` break-glass behavior.
   - Fallback leaves no ambiguous partial run state.
   - Runtime preflight messages are deterministic and redacted for secrets.
 - Interfaces / contracts:
@@ -61,7 +61,7 @@ last_review: 2026-02-26
 1. W0 Foundation
 - Introduce provider seam/contracts.
 - Implement CLI provider adapter over current spawn logic.
-- Wire selector with default `runtimeMode=cli`.
+- Wire selector with initial default `runtimeMode=cli` (later flipped under 0983 evidence).
 
 2. W1 Runtime mode + observability
 - Add runtime mode resolution via flag/env/config.
@@ -86,7 +86,7 @@ last_review: 2026-02-26
 - Fail-fast on unsupported combinations.
 
 7. W6 Default flip + cleanup
-- Flip default to appserver only if parity evidence is satisfied.
+- Flip default to appserver only if parity evidence is satisfied (completed under 0983 evidence).
 - Preserve `runtimeMode=cli` break-glass and rollback instructions.
 - Remove only redundant runtime wrapper code.
 

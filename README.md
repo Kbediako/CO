@@ -307,7 +307,7 @@ codex-orchestrator devtools setup
 - `codex-orchestrator mcp enable --servers <csv> --yes` — enable specific disabled MCP servers from existing Codex config entries.
 - `codex-orchestrator self-check --format json` — JSON health payload.
 - `codex-orchestrator mcp serve` — Codex MCP stdio server.
-- `npm run pack:smoke` — maintainer smoke gate for packaged downstream behavior (tarball install + review/skill checks).
+- `npm run pack:smoke` — maintainer smoke gate for packaged downstream behavior (tarball install + review/skill checks). Core lane runs it on downstream-facing diffs; `.github/workflows/pack-smoke-backstop.yml` runs a weekly `main` backstop.
 
 ## What ships in the npm release
 

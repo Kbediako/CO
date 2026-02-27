@@ -3,6 +3,7 @@
 ## Summary
 - Problem Statement: CO currently orchestrates Codex primarily through CLI subprocess execution and has no independent runtime axis for app-server/login-first execution.
 - Desired Outcome: introduce a runtime-provider architecture with `runtimeMode=cli|appserver` orthogonal to `executionMode=mcp|cloud`, preserve backward-compatible behavior until parity evidence is proven, and provide deterministic fallback telemetry.
+- Status Update (2026-02-27): parity evidence from 0983 runtime canary automation justified flipping the default runtime mode to `appserver`; `runtimeMode=cli` remains documented break-glass.
 
 ## User Request Translation (Context Anchor)
 - User intent / needs (in your own words): execute the full migration plan across W0-W6 as top-level orchestrator, with docs-first discipline, delegated streams, manifest-backed evidence, and operational safety.
@@ -63,7 +64,7 @@
   - Existing run-review, RLM runner, and frontend testing runner paths.
 
 ## Open Questions
-- What canary threshold/fallback-rate cutoff must be met to flip default to `appserver`?
+- What post-flip soak window should be required before npm release/global-update rollout?
 - Which provider combinations should be permanently unsupported vs. deferred?
 
 ## Approvals

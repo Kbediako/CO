@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp 157c0d239cf9e99e15fe4a8ffd8661449a709357729c28807775de22e8426bc4 -->
+<!-- codex:instruction-stamp 054063cd23237dba95bddf4c6a72db114dc7fb4591c56f5b14023f985d03e239 -->
 # Repository Agent Guidance
 
 ## Project 0303 — Codex Orchestrator Autonomy Enhancements
@@ -57,7 +57,7 @@
 - Current Codex CLI behavior: do not combine prompt arguments with `--uncommitted`, `--base`, or `--commit`; use either diff-scoped review (no prompt) or prompt-only review.
 - Capture the standalone review approval (even if “no issues”) in the spec/task notes before implementation begins.
 - For manifest-backed review evidence, run `TASK=<task-id> NOTES="Goal: ... | Summary: ... | Risks: ..." codex-orchestrator review --manifest <path>` (repo alias: `npm run review -- --manifest <path>`).
-- For downstream simulation of review-wrapper or bundled-skill changes, run `npm run pack:smoke` (packaged CLI in a temp mock repo, review artifacts, and `long-poll-wait` install assertion).
+- For downstream simulation of review-wrapper or bundled-skill changes, run `npm run pack:smoke` (packaged CLI in a temp mock repo, review artifacts, and `long-poll-wait` install assertion). Core lane enforces this on downstream-facing diffs; `.github/workflows/pack-smoke-backstop.yml` runs a weekly `main` backstop.
 - See `docs/standalone-review-guide.md` for the canonical workflow.
 - Prefer the global `standalone-review` skill when installed; bundled skills ship for downstream release packaging.
 - During active non-trivial implementation, run standalone review at implementation checkpoints (after coding bursts/sub-goals/feedback batches) and pair with an elegance pass before handoff/merge.

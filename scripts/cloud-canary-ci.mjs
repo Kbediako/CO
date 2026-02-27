@@ -323,6 +323,8 @@ async function main() {
     'docs-review',
     '--execution-mode',
     'cloud',
+    '--runtime-mode',
+    'cli',
     '--target',
     'review',
     '--format',

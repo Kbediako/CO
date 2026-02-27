@@ -45,7 +45,7 @@ describe('runtime mode resolution', () => {
     ).toEqual({ mode: 'appserver', source: 'manifest' });
 
     expect(resolveRuntimeMode({ env: {}, configDefault: null, manifestMode: null, preferManifest: true })).toEqual({
-      mode: 'cli',
+      mode: 'appserver',
       source: 'default'
     });
   });

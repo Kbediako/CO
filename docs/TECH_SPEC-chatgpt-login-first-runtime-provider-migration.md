@@ -8,6 +8,6 @@
 
 ## Snapshot
 - Scope: add `runtimeMode=cli|appserver` provider architecture while preserving `executionMode=mcp|cloud` semantics.
-- Compatibility: `runtimeMode=cli` remains default until parity/canary evidence explicitly justifies flip.
+- Compatibility: `runtimeMode=cli` was the initial default until parity/canary evidence justified the flip; task 0983 flipped the default to `runtimeMode=appserver` while preserving `cli` break-glass.
 - Observability: manifest/status/run-summary include runtime provider selection and deterministic fallback metadata.
 - Rollout: W0-W6 sequencing from docs-first through migration and guarded default-flip decision.
