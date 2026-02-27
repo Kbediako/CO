@@ -52,8 +52,13 @@ last_review: 2026-02-27
   - Use PR watch loops and release workflow watches until terminal state.
 
 ## Open Questions
-- If prerelease canary results are mixed, should we schedule weekly re-canary until `0.107.0` stable.
+- Required cloud-lane parity for prerelease remains pending a valid `CODEX_CLOUD_ENV_ID`; rerun is required before any global `0.107.x` default update.
 
 ## Approvals
 - Reviewer: Codex (self-approval, docs-first gate).
 - Date: 2026-02-27.
+
+## Outcome Snapshot (2026-02-27)
+- Release outcome: succeeded (`@kbediako/codex-orchestrator@0.1.37` published).
+- Canary outcome: stable/prerelease parity on tested local lanes, required cloud lane blocked by environment gap.
+- Version-policy outcome: NO-GO for immediate global `0.107.x` default; hold stable `0.106.0` until required cloud rerun evidence is complete.

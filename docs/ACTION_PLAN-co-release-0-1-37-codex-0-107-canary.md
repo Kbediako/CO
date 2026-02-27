@@ -42,3 +42,9 @@
 ## Approvals
 - Reviewer: Codex (self-approval with user-approved objective).
 - Date: 2026-02-27.
+
+## Completion Snapshot (2026-02-27)
+- Milestone 1: complete.
+- Milestone 2: complete (`0.1.37` released and verified).
+- Milestone 3: complete with decision hold (NO-GO for global `0.107.x` due missing required cloud-lane evidence).
+- Milestone 4: complete (task mirrors + index + closeout validation logs updated).

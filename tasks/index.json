@@ -1541,15 +1541,15 @@
       "title": "CO 0.1.37 Release + Codex 0.107 Canary",
       "path": "tasks/tasks-0985-co-release-0-1-37-codex-0-107-canary.md",
       "kind": "run",
-      "status": "in-progress",
+      "status": "succeeded",
       "gate": {
         "phase": "co-release-0-1-37-codex-0-107-canary-implementation",
-        "status": "in-progress",
-        "log": ".runs/0985-co-release-0-1-37-codex-0-107-canary/cli/<run-id>/manifest.json",
-        "run_id": "<run-id>"
+        "status": "succeeded",
+        "log": ".runs/0985-co-release-0-1-37-codex-0-107-canary/cli/2026-02-27T12-41-11-710Z-77820f2c/manifest.json",
+        "run_id": "2026-02-27T12-41-11-710Z-77820f2c"
       },
       "created_at": "2026-02-27",
-      "completed_at": null
+      "completed_at": "2026-02-27"
     }
   ],
   "specs": [
