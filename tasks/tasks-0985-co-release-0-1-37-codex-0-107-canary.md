@@ -24,7 +24,7 @@
 - [x] Canary automation matrix executed for stable `0.106.0` baseline. - Evidence: `out/0985-co-release-0-1-37-codex-0-107-canary/manual/codex-version-canary/stable/00-install.log` through `99-summary.json`, plus required cloud rerun `out/0985-co-release-0-1-37-codex-0-107-canary/manual/codex-version-canary/stable/06-cloud-canary-required-with-env.log`.
 - [x] Canary automation matrix executed for prerelease `0.107.x`. - Evidence: `out/0985-co-release-0-1-37-codex-0-107-canary/manual/codex-version-canary/prerelease/00-install.log` through `99-summary.json`, plus required cloud rerun `out/0985-co-release-0-1-37-codex-0-107-canary/manual/codex-version-canary/prerelease/06-cloud-canary-required-with-env.log`.
 - [x] Regression comparison + fallback/error-path audit completed. - Evidence: `out/0985-co-release-0-1-37-codex-0-107-canary/manual/codex-version-canary/compare/pass-rate-summary.json`.
-- [x] Global version policy decision recorded (adopt or hold). - Evidence: `out/0985-co-release-0-1-37-codex-0-107-canary/manual/codex-version-canary/compare/decision-go-no-go.md` (decision: GO for global update to `0.107.0-alpha.4` with `0.106.0` rollback pin retained).
+- [x] Global version policy decision recorded (adopt or hold). - Evidence: `out/0985-co-release-0-1-37-codex-0-107-canary/manual/codex-version-canary/compare/decision-go-no-go.md` (decision: GO for CO-repo alpha adoption, keep global default at stable `0.106.0` until broader repo coverage justifies promotion).
 
 ## Validation
 - [x] 01 `node scripts/delegation-guard.mjs`. - Evidence: `out/0985-co-release-0-1-37-codex-0-107-canary/manual/cloudrerun-01-delegation-guard.log`.

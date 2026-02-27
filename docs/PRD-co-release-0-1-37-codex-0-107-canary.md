@@ -64,4 +64,4 @@
 ## Resolution (2026-02-27)
 - Release goal met: `@kbediako/codex-orchestrator@0.1.37` shipped and verified.
 - Canary goal fully met: stable/prerelease automation executed, including required cloud-contract reruns with CO-scoped `CODEX_CLOUD_ENV_ID=Kbediako/CO`.
-- Decision: move global Codex default to `0.107.0-alpha.4`, while keeping `0.106.0` rollback pin documented as break-glass.
+- Decision: adopt `0.107.0-alpha.4` for CO-repo workflows, while keeping global default on stable `0.106.0` and documenting rollback as break-glass.

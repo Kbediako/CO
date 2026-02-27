@@ -1550,6 +1550,22 @@
       },
       "created_at": "2026-02-27",
       "completed_at": "2026-02-27"
+    },
+    {
+      "id": "0986",
+      "slug": "0986-co-codex-alpha-agent-first-policy",
+      "title": "CO Codex Alpha Agent-First Policy",
+      "path": "tasks/tasks-0986-co-codex-alpha-agent-first-policy.md",
+      "kind": "run",
+      "status": "succeeded",
+      "gate": {
+        "phase": "co-codex-alpha-agent-first-policy-implementation",
+        "status": "succeeded",
+        "log": ".runs/0986-co-codex-alpha-agent-first-policy/cli/2026-02-27T14-17-18-253Z-a85dafe7/manifest.json",
+        "run_id": "2026-02-27T14-17-18-253Z-a85dafe7"
+      },
+      "created_at": "2026-02-27",
+      "completed_at": "2026-02-27"
     }
   ],
   "specs": [
@@ -2111,6 +2127,22 @@
         "task": "tasks/tasks-0985-co-release-0-1-37-codex-0-107-canary.md",
         "agent_task": ".agent/task/0985-co-release-0-1-37-codex-0-107-canary.md",
         "docs": "docs/TECH_SPEC-co-release-0-1-37-codex-0-107-canary.md"
+      }
+    },
+    {
+      "id": "20260227-0986-co-codex-alpha-agent-first-policy",
+      "title": "CO Codex Alpha Agent-First Policy",
+      "relates_to": "tasks/tasks-0986-co-codex-alpha-agent-first-policy.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-02-27",
+      "paths": {
+        "spec": "tasks/specs/0986-co-codex-alpha-agent-first-policy.md",
+        "task": "tasks/tasks-0986-co-codex-alpha-agent-first-policy.md",
+        "agent_task": ".agent/task/0986-co-codex-alpha-agent-first-policy.md",
+        "docs": "docs/TECH_SPEC-co-codex-alpha-agent-first-policy.md"
       }
     }
   ]

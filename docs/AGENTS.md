@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp ff1db88b9a7bc17a978cb8e2a12e4f4435d7daca5160aa6bc1b4ad1b03d1ace1 -->
+<!-- codex:instruction-stamp c23a6bd59e69af900ec71c9bc68752a5eaa6d6de55e80a7d8cd4e68d04bd5103 -->
 # Repository Agent Guidance
 
 ## Project 0303 — Codex Orchestrator Autonomy Enhancements
@@ -45,6 +45,15 @@
 - For Playwright-heavy browser work, use a dedicated subagent stream and keep parent context compact: store raw browser output in artifacts and return only a short summary plus evidence paths.
 - Avoid hard dependencies on a specific MCP server; use whatever MCPs are available and relevant to the specific task.
 - Follow `.agent/SOPs/oracle-usage.md` for Oracle runs (tool cap: 11 attachments; unique basenames; attachments-first workflow).
+
+## Codex Version Policy (Execution)
+- Default execution for this repository remains stable Codex CLI (`0.106.0`) unless task-scoped evidence explicitly promotes a newer version.
+- CO may run alpha/prerelease Codex in explicit task-scoped canary lanes only; do not treat prerelease as an automatic global default.
+- Required policy checks for alpha lanes:
+  - `scripts/runtime-mode-canary.mjs`
+  - `scripts/cloud-canary-ci.mjs` (required cloud contract + fallback contract behavior)
+- If required checks fail, or required cloud evidence is missing, hold/revert to stable and update decision evidence in `docs/TASKS.md`, `tasks/index.json`, and task checklist mirrors.
+- Canonical policy/cadence guide: `docs/guides/codex-version-policy.md`.
 
 ## MCP vs Collab (Decision Rule)
 - Default to MCP for approvals, tool routing, delegation, external integrations, and audit trails.
