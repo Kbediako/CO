@@ -4173,6 +4173,48 @@
       "status": "active",
       "last_review": "2026-02-27",
       "cadence_days": 90
+    },
+    {
+      "path": "docs/PRD-pr-263-codex-feedback-followup.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-27",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/TECH_SPEC-pr-263-codex-feedback-followup.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-27",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/ACTION_PLAN-pr-263-codex-feedback-followup.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-27",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/specs/0984-pr-263-codex-feedback-followup.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-27",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/tasks-0984-pr-263-codex-feedback-followup.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-27",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/task/0984-pr-263-codex-feedback-followup.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-02-27",
+      "cadence_days": 90
     }
   ]
 }

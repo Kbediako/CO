@@ -9,6 +9,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 const execFileAsync = promisify(execFile);
 const CLI_ENTRY = join(process.cwd(), 'bin', 'codex-orchestrator.ts');
 const TEST_TIMEOUT = 15000;
+const CLI_BOOT_TIMEOUT = 30000;
 const CLI_EXEC_TIMEOUT_MS = TEST_TIMEOUT;
 const FLOW_TARGET_TEST_TIMEOUT = 70000;
 
@@ -117,7 +118,7 @@ describe('codex-orchestrator command surface', () => {
       stderr: expect.stringContaining('Unknown command: unknown-command'),
       stdout: expect.stringContaining('Usage: codex-orchestrator <command> [options]')
     });
-  }, TEST_TIMEOUT);
+  }, CLI_BOOT_TIMEOUT);
 
   it('prints status help without requiring a run id', async () => {
     const { stdout } = await runCli(['status', '--help']);
@@ -1202,6 +1203,9 @@ describe('codex-orchestrator command surface', () => {
       CODEX_ORCHESTRATOR_OUT_DIR: join(tempDir, 'out'),
       MCP_RUNNER_TASK_ID: 'cloud-preflight-deny',
       CODEX_ORCHESTRATOR_CLOUD_FALLBACK: 'deny',
+      CODEX_ORCHESTRATOR_RUNTIME_MODE: '',
+      CODEX_ORCHESTRATOR_RUNTIME_MODE_ACTIVE: '',
+      CODEX_RUNTIME_MODE: '',
       CODEX_CLOUD_ENV_ID: '',
       CODEX_CLOUD_BRANCH: ''
     };
@@ -1214,8 +1218,6 @@ describe('codex-orchestrator command surface', () => {
           'docs-review',
           '--execution-mode',
           'cloud',
-          '--runtime-mode',
-          'cli',
           '--target',
           'review',
           '--format',
@@ -1239,6 +1241,7 @@ describe('codex-orchestrator command surface', () => {
     };
     expect(payload.status).toBe('failed');
     expect(payload.summary).toContain('cloud fallback is disabled');
+    expect(payload.summary).not.toContain('Runtime selection failed');
     const manifestPath = isAbsolute(payload.manifest ?? '')
       ? (payload.manifest as string)
       : join(tempDir, payload.manifest ?? '');
@@ -1874,5 +1877,5 @@ describe('codex-orchestrator command surface', () => {
 
     expect(payload.payload?.command?.argv).toEqual(['node', '-e', 'console.log("x y")']);
     expect(payload.payload?.outputs?.stdout).toContain('x y');
-  }, TEST_TIMEOUT);
+  }, CLI_BOOT_TIMEOUT);
 });

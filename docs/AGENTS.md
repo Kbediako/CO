@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp 054063cd23237dba95bddf4c6a72db114dc7fb4591c56f5b14023f985d03e239 -->
+<!-- codex:instruction-stamp ff1db88b9a7bc17a978cb8e2a12e4f4435d7daca5160aa6bc1b4ad1b03d1ace1 -->
 # Repository Agent Guidance
 
 ## Project 0303 — Codex Orchestrator Autonomy Enhancements
@@ -66,6 +66,7 @@
 - Open PRs for code/config changes and keep the scope tied to the active task.
 - Monitor PR checks and review feedback for 10–20 minutes after all required checks turn green.
 - Maintain polling until checks and reviews reach terminal status; reset the waiting window if checks restart or new feedback appears.
+- Before merge, verify unresolved actionable review threads are zero (replying is not the same as resolving); explicitly resolve each addressed thread or record a waiver with evidence in the task checklist.
 - If checks remain green and no new feedback arrives during the window, merge via GitHub and delete the branch.
 - Reset the window if checks restart or feedback arrives; do not merge draft PRs or PRs labeled "do not merge."
 
