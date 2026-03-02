@@ -16,11 +16,14 @@
 
 ## Validation
 - Checks / tests:
+  - `node scripts/runtime-mode-canary.mjs`
   - `node scripts/delegation-guard.mjs --task 0989-codex-0107-alpha9-canary-fallback-readiness`
   - `node scripts/spec-guard.mjs --dry-run`
   - `npm run docs:check`
   - `npm run docs:freshness`
   - `node scripts/diff-budget.mjs`
+  - `TASK=0989-codex-0107-alpha9-canary-fallback-readiness NOTES="Goal: reviewer hand-off | Summary: alpha.9 parity + hold decisions recorded | Risks: fallback gate contract mismatch remains" npm run review -- --manifest .runs/0989-codex-0107-alpha9-canary-fallback-readiness/cli/2026-03-02T04-30-54-182Z-76ea4048/manifest.json`
+- Reviewer hand-off note: `NOTES` is required and must include `<goal + summary + risks>` (optional questions may be appended).
 - Rollback plan:
   - If alpha.9 regresses required lanes, hold at stable baseline and keep fallback unchanged.
 

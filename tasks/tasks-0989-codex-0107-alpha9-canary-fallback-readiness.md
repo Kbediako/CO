@@ -25,6 +25,8 @@
 - [x] 06 `npm run docs:check`. - Evidence: `out/0989-codex-0107-alpha9-canary-fallback-readiness/manual/final-06-docs-check.log`.
 - [x] 07 `npm run docs:freshness`. - Evidence: `out/0989-codex-0107-alpha9-canary-fallback-readiness/manual/final-07-docs-freshness.log`.
 - [x] 08 `node scripts/diff-budget.mjs`. - Evidence: `out/0989-codex-0107-alpha9-canary-fallback-readiness/manual/final-08-diff-budget.log`.
+- [x] 09 `TASK=0989-codex-0107-alpha9-canary-fallback-readiness NOTES="Goal: reviewer hand-off | Summary: alpha.9 parity + hold decisions recorded | Risks: fallback gate contract mismatch remains" npm run review -- --manifest .runs/0989-codex-0107-alpha9-canary-fallback-readiness/cli/2026-03-02T04-30-54-182Z-76ea4048/manifest.json`. - Evidence: `out/0989-codex-0107-alpha9-canary-fallback-readiness/manual/final-09-review.log`.
+- Reviewer hand-off note: `NOTES` is required and should include `<goal + summary + risks>` (optional questions can be appended).
 
 ## Closeout
 - [x] Checklist mirror synced (`tasks/`, `.agent/task/`, `docs/TASKS.md`). - Evidence: `tasks/tasks-0989-codex-0107-alpha9-canary-fallback-readiness.md`, `.agent/task/0989-codex-0107-alpha9-canary-fallback-readiness.md`, `docs/TASKS.md`.

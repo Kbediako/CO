@@ -15,7 +15,8 @@ last_review: 2026-03-02
 
 ## Technical Requirements
 - Functional requirements:
-  - Execute canary lanes for both channels:
+  - Execute canary lanes for both channels (run runtime-mode canary before cloud canary commands):
+    - runtime-mode canary,
     - required cloud contract,
     - fallback cloud contract,
     - review fallback,
@@ -40,11 +41,13 @@ last_review: 2026-03-02
 
 ## Validation Plan
 - Tests / checks:
+  - `node scripts/runtime-mode-canary.mjs`
   - `node scripts/delegation-guard.mjs --task 0989-codex-0107-alpha9-canary-fallback-readiness`
   - `node scripts/spec-guard.mjs --dry-run`
   - `npm run docs:check`
   - `npm run docs:freshness`
   - `node scripts/diff-budget.mjs`
+  - `TASK=0989-codex-0107-alpha9-canary-fallback-readiness NOTES="Goal: reviewer hand-off | Summary: alpha.9 parity + hold decisions recorded | Risks: fallback gate contract mismatch remains" npm run review -- --manifest .runs/0989-codex-0107-alpha9-canary-fallback-readiness/cli/2026-03-02T04-30-54-182Z-76ea4048/manifest.json`
 - Rollout verification:
   - Compare stable/prerelease summaries and required lane exit codes.
 - Monitoring / alerts:
