@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp 78dbf6bba02bcd47ac0c495cf858b683a0317b9448b8ef7bef2ef0510b01dd59 -->
+<!-- codex:instruction-stamp 71a9a35ebc0a0472846a39cabefa4bf20d67ef0e5215d09ae541751bc6744063 -->
 # Codex-Orchestrator Agent Handbook (Template)
 
 Use this repository as the wrapper that coordinates multiple Codex-driven projects. After cloning, replace placeholder metadata (task IDs, documents, SOPs) with values for each downstream initiative while keeping these shared guardrails in place.
