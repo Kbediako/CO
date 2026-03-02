@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp 4b37aa2aa7efd9a1aa258ae362896cb5eb349f25a7a23e8cb9d05011be655e68 -->
+<!-- codex:instruction-stamp 784b8afa3ec366324c6461c8aa924236dc338f7f724322187618db2456fc6b8b -->
 # Repository Agent Guidance
 
 ## Project 0303 — Codex Orchestrator Autonomy Enhancements
@@ -38,6 +38,11 @@
 - Avoid ad-hoc command chains unless the work is a lightweight discovery step that does not require manifest evidence.
 - Use cloud mode when work is long-running/parallel and cloud prerequisites are ready; otherwise stay in local `mcp` mode.
 - Cloud preflight: confirm remote branch availability, non-interactive setup commands, and required cloud secrets/variables; if missing, record local fallback rationale in checklist/manifests.
+- Keep mode semantics explicit and orthogonal: `executionMode=mcp|cloud` and `runtimeMode=cli|appserver` are separate controls.
+- Local default runtime remains `appserver`, with `--runtime-mode cli` preserved as break-glass.
+- `executionMode=cloud` with explicit `runtimeMode=appserver` is unsupported and must fail fast with actionable errors.
+- `js_repl` is approved for task-scoped opt-in lanes (with manifest evidence) but remains off by default globally.
+- Keep `memory_tool` scoped to explicit eval lanes until promoted by evidence.
 - Before implementation, run a standalone review of the task/spec against the user’s intent and record the approval in the spec + checklist notes. If anything is vague, infer with a subagent and self-approve or offer options; only ask the user when truly blocked.
 - Delegation is mandatory for top-level tasks once a task id exists: spawn at least one subagent run using `MCP_RUNNER_TASK_ID=<task-id>-<stream>`, capture manifest evidence, and summarize in the main run. Use `DELEGATION_GUARD_OVERRIDE_REASON` only when delegation is impossible and record the justification.
 - Once a task id exists, prefer delegation for research, review, and planning work. Use `codex exec` only for pre-task triage (no task id yet) or when delegation is genuinely unavailable (technical/blocking limitation or explicit operational block), and set `DELEGATION_GUARD_OVERRIDE_REASON` with a clear justification.

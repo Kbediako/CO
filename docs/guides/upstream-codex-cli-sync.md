@@ -27,6 +27,8 @@
   - multi-agent tooling/runtime (`spawn_agents_on_csv`, role/thread behavior)
   - review-mode restrictions (collab/web search disabled in review delegation)
   - approvals/sandbox/config default shifts (for example `allow_login_shell`, approval policy deprecations)
+  - app-server/runtime capabilities (`runtimeMode` interactions, app-server v2 behavior, fallback/error contracts)
+  - advanced feature gates (`js_repl`, `memory_tool`, sqlite) and their cloud/local compatibility semantics
 
 ## Patch discipline
 - Keep patches minimal and scoped.

@@ -1598,6 +1598,22 @@
       },
       "created_at": "2026-03-02",
       "completed_at": "2026-03-02"
+    },
+    {
+      "id": "0990",
+      "slug": "0990-js-repl-cloud-usage-evidence-gate",
+      "title": "JS_REPL + Cloud Usage Evidence Gate",
+      "path": "tasks/tasks-0990-js-repl-cloud-usage-evidence-gate.md",
+      "kind": "run",
+      "status": "succeeded",
+      "gate": {
+        "phase": "js-repl-cloud-usage-evidence-gate-implementation",
+        "status": "succeeded",
+        "log": ".runs/0990-js-repl-cloud-usage-evidence-gate/cli/2026-03-02T09-11-00-955Z-5875de54/manifest.json",
+        "run_id": "2026-03-02T09-11-00-955Z-5875de54"
+      },
+      "created_at": "2026-03-02",
+      "completed_at": "2026-03-02"
     }
   ],
   "specs": [
@@ -2207,6 +2223,22 @@
         "task": "tasks/tasks-0989-codex-0107-alpha9-canary-fallback-readiness.md",
         "agent_task": ".agent/task/0989-codex-0107-alpha9-canary-fallback-readiness.md",
         "docs": "docs/TECH_SPEC-codex-0107-alpha9-canary-fallback-readiness.md"
+      }
+    },
+    {
+      "id": "20260302-0990-js-repl-cloud-usage-evidence-gate",
+      "title": "JS_REPL + Cloud Usage Evidence Gate",
+      "relates_to": "tasks/tasks-0990-js-repl-cloud-usage-evidence-gate.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-02",
+      "paths": {
+        "spec": "tasks/specs/0990-js-repl-cloud-usage-evidence-gate.md",
+        "task": "tasks/tasks-0990-js-repl-cloud-usage-evidence-gate.md",
+        "agent_task": ".agent/task/0990-js-repl-cloud-usage-evidence-gate.md",
+        "docs": "docs/TECH_SPEC-js-repl-cloud-usage-evidence-gate.md"
       }
     }
   ]
