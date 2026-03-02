@@ -11,6 +11,7 @@ import { hasFlag, parseArgs } from './lib/cli-args.js';
 const DEFAULT_LOCAL_REPOS = 5;
 const DEFAULT_LOCAL_ITERATIONS = 4;
 const DEFAULT_CLOUD_ITERATIONS = 4;
+const DEFAULT_COMMAND_TIMEOUT_MS = 30 * 60 * 1000;
 
 function toPositiveInt(value, fallback) {
   if (value === undefined || value === null || value === '') {
@@ -173,7 +174,8 @@ async function runCloudScenario({
   taskIdBase,
   repoRoot,
   outputDir,
-  baseEnv
+  baseEnv,
+  commandTimeoutMs
 }) {
   const scenarioTaskId = `${taskIdBase}-cloud-${scenario}-r${iteration}`;
   const env = {
@@ -189,7 +191,8 @@ async function runCloudScenario({
 
   const commandResult = await runCommand('npm', ['run', 'ci:cloud-canary'], {
     cwd: repoRoot,
-    env
+    env,
+    timeout: commandTimeoutMs
   });
 
   const logFile = join(outputDir, 'cloud', `${scenarioTaskId}.log`);
@@ -290,7 +293,7 @@ async function main() {
   const repoRoot = process.cwd();
   const { args } = parseArgs(process.argv.slice(2));
   if (hasFlag(args, 'help') || hasFlag(args, 'h')) {
-    console.log(`Usage: node scripts/js-repl-usage-matrix.mjs [--task-id <id>] [--output-dir <path>] [--local-repos <n>] [--local-iterations <n>] [--cloud-iterations <n>] [--skip-cloud]`);
+    console.log(`Usage: node scripts/js-repl-usage-matrix.mjs [--task-id <id>] [--output-dir <path>] [--local-repos <n>] [--local-iterations <n>] [--cloud-iterations <n>] [--command-timeout-ms <ms>] [--skip-cloud]`);
     return;
   }
 
@@ -305,6 +308,7 @@ async function main() {
   const localRepos = toPositiveInt(args['local-repos'], DEFAULT_LOCAL_REPOS);
   const localIterations = toPositiveInt(args['local-iterations'], DEFAULT_LOCAL_ITERATIONS);
   const cloudIterations = toPositiveInt(args['cloud-iterations'], DEFAULT_CLOUD_ITERATIONS);
+  const commandTimeoutMs = toPositiveInt(args['command-timeout-ms'], DEFAULT_COMMAND_TIMEOUT_MS);
   const skipCloud = asBool(args['skip-cloud']);
 
   await mkdir(outputDir, { recursive: true });
@@ -325,7 +329,7 @@ async function main() {
       '--output-dir',
       join(outputDir, 'local')
     ],
-    { cwd: repoRoot, env: process.env }
+    { cwd: repoRoot, env: process.env, timeout: commandTimeoutMs }
   );
   await writeFile(
     join(outputDir, 'local', 'runtime-mode-canary.log'),
@@ -348,7 +352,8 @@ async function main() {
 
   const packSmokeCommand = await runCommand('npm', ['run', 'pack:smoke'], {
     cwd: repoRoot,
-    env: process.env
+    env: process.env,
+    timeout: commandTimeoutMs
   });
   await writeFile(
     join(outputDir, 'local', 'pack-smoke.log'),
@@ -382,7 +387,8 @@ async function main() {
           taskIdBase,
           repoRoot,
           outputDir,
-          baseEnv
+          baseEnv,
+          commandTimeoutMs
         });
         cloudResults.push(result);
       }
@@ -397,7 +403,8 @@ async function main() {
 
   const localPassed = localCommand.exitCode === 0 && localSummaryCheck.passed;
   const packPassed = packSmokeCommand.exitCode === 0;
-  const cloudPassed = skipCloud ? true : cloudResults.every((result) => result.passed);
+  const cloudPassed = !skipCloud && cloudResults.length > 0 && cloudResults.every((result) => result.passed);
+  const readyForGuidance = localPassed && packPassed && cloudPassed;
 
   const summary = {
     generated_at: new Date().toISOString(),
@@ -406,6 +413,7 @@ async function main() {
       local_repos: localRepos,
       local_iterations: localIterations,
       cloud_iterations: cloudIterations,
+      command_timeout_ms: commandTimeoutMs,
       skip_cloud: skipCloud
     },
     local: {
@@ -428,10 +436,11 @@ async function main() {
       results: cloudResults
     },
     decision: {
-      ready_for_guidance: localPassed && packPassed && cloudPassed,
-      recommendation: localPassed && packPassed && cloudPassed ? 'candidate-for-js-repl-guidance' : 'hold-js-repl-guidance',
-      notes:
-        localPassed && packPassed && cloudPassed
+      ready_for_guidance: readyForGuidance,
+      recommendation: readyForGuidance ? 'candidate-for-js-repl-guidance' : 'hold-js-repl-guidance',
+      notes: skipCloud
+        ? 'Cloud scenarios were skipped. Keep js_repl guidance in defer/hold state.'
+        : readyForGuidance
           ? 'All required local/cloud scenarios passed.'
           : 'One or more required scenarios failed. Keep js_repl guidance in defer/hold state.'
     }
