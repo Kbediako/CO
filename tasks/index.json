@@ -1582,6 +1582,22 @@
       },
       "created_at": "2026-03-02",
       "completed_at": "2026-03-02"
+    },
+    {
+      "id": "0989",
+      "slug": "0989-codex-0107-alpha9-canary-fallback-readiness",
+      "title": "Codex 0.107.0-alpha.9 Canary + Fallback Removal Readiness",
+      "path": "tasks/tasks-0989-codex-0107-alpha9-canary-fallback-readiness.md",
+      "kind": "run",
+      "status": "succeeded",
+      "gate": {
+        "phase": "codex-0107-alpha9-canary-fallback-readiness-implementation",
+        "status": "succeeded",
+        "log": ".runs/0989-codex-0107-alpha9-canary-fallback-readiness/cli/2026-03-02T04-30-54-182Z-76ea4048/manifest.json",
+        "run_id": "2026-03-02T04-30-54-182Z-76ea4048"
+      },
+      "created_at": "2026-03-02",
+      "completed_at": "2026-03-02"
     }
   ],
   "specs": [
@@ -2175,6 +2191,22 @@
         "task": "tasks/tasks-0987-codex-review-quota-waiver-guardrails.md",
         "agent_task": ".agent/task/0987-codex-review-quota-waiver-guardrails.md",
         "docs": "docs/TECH_SPEC-codex-review-quota-waiver-guardrails.md"
+      }
+    },
+    {
+      "id": "20260302-0989-codex-0107-alpha9-canary-fallback-readiness",
+      "title": "Codex 0.107.0-alpha.9 Canary + Fallback Removal Readiness",
+      "relates_to": "tasks/tasks-0989-codex-0107-alpha9-canary-fallback-readiness.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-02",
+      "paths": {
+        "spec": "tasks/specs/0989-codex-0107-alpha9-canary-fallback-readiness.md",
+        "task": "tasks/tasks-0989-codex-0107-alpha9-canary-fallback-readiness.md",
+        "agent_task": ".agent/task/0989-codex-0107-alpha9-canary-fallback-readiness.md",
+        "docs": "docs/TECH_SPEC-codex-0107-alpha9-canary-fallback-readiness.md"
       }
     }
   ]
