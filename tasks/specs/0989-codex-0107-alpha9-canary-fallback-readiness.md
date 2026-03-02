@@ -55,7 +55,7 @@ last_review: 2026-03-02
 
 ## Outcome (2026-03-02)
 - Stable/prerelease parity held across required-cloud rerun, review fallback, and unsupported-combo fail-fast lanes.
-- Documented fallback gate command (`CODEX_CLOUD_CANARY_REQUIRED=1 CLOUD_CANARY_EXPECT_FALLBACK=1`) failed for both channels, so prerelease advancement remains `hold`.
+- Policy fallback gate command (`CODEX_CLOUD_ENV_ID=<env-id> CODEX_CLOUD_CANARY_REQUIRED=1 CLOUD_CANARY_EXPECT_FALLBACK=1`) failed for both channels in this run because the current fallback path clears `CODEX_CLOUD_ENV_ID` under `CLOUD_CANARY_EXPECT_FALLBACK=1`; prerelease advancement remains `hold`.
 - Fallback removal readiness remains `hold`; keep CLI fallback/break-glass in place.
 
 ## Open Questions
