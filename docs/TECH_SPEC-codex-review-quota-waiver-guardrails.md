@@ -10,11 +10,11 @@
 ## Requirements
 - Update `AGENTS.md`:
   - one manual `@codex` ping per PR head SHA,
-  - explicit waiver conditions when Codex review is unavailable due quota.
+  - explicit waiver conditions when Codex review is unavailable due to quota.
 - Mirror the same guidance in `docs/AGENTS.md`.
 - Update `docs/guides/codex-version-policy.md` to:
   - document quota-aware manual review requests,
-  - classify quota exhaustion as operational availability, not prerelease promotion signal.
+  - classify quota exhaustion as an operational availability event, not a prerelease promotion signal.
 - Update task/docs mirrors and index registration.
 
 ## Acceptance

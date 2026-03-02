@@ -156,7 +156,7 @@ Use this repository as the wrapper that coordinates multiple Codex-driven projec
 - Open PRs for code/config changes and keep the scope tied to the active task.
 - Monitor PR checks and review feedback for 10–20 minutes after all required checks turn green (use a background loop when possible).
 - Before merge, verify unresolved actionable review threads are zero (replying is not the same as resolving); explicitly resolve each addressed thread or record a waiver with evidence in the task checklist.
-- If Codex review is unavailable due quota, merge requires an explicit waiver: required checks are green, unresolved actionable review threads are `0`, and the task checklist records quota evidence plus the waiver decision.
+- If Codex review is unavailable due to quota, merge requires an explicit waiver: required checks are green, unresolved actionable review threads are `0`, and the task checklist records quota evidence plus the waiver decision.
 - If checks remain green and no new feedback arrives during the window, merge via GitHub and delete the branch.
 - Reset the window if checks restart or feedback arrives; do not merge draft PRs or PRs labeled "do not merge."
 

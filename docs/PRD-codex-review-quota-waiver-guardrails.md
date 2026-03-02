@@ -9,7 +9,7 @@
 - Success criteria / acceptance:
   - `AGENTS.md` and `docs/AGENTS.md` explicitly limit manual `@codex` requests to one ping per PR head SHA.
   - `AGENTS.md` and `docs/AGENTS.md` include a clear waiver rule for Codex quota exhaustion.
-  - `docs/guides/codex-version-policy.md` documents quota-aware Codex review behavior and clarifies quota exhaustion is operational availability, not promotion signal.
+  - `docs/guides/codex-version-policy.md` documents quota-aware Codex review behavior and clarifies quota exhaustion is an operational availability event, not a promotion signal.
   - Task mirrors/index are updated with evidence references.
 - Constraints / non-goals:
   - Minimal, docs-only policy changes.
@@ -18,7 +18,7 @@
 
 ## Goals
 - Prevent repeated manual Codex pings on unchanged PR heads.
-- Preserve merge discipline when Codex review is unavailable due quota.
+- Preserve merge discipline when Codex review is unavailable due to quota.
 - Keep policy language short, explicit, and auditable.
 
 ## Non-Goals
