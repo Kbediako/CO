@@ -1566,6 +1566,22 @@
       },
       "created_at": "2026-02-27",
       "completed_at": "2026-02-27"
+    },
+    {
+      "id": "0987",
+      "slug": "0987-codex-review-quota-waiver-guardrails",
+      "title": "Codex Review Quota + Merge Waiver Guardrails",
+      "path": "tasks/tasks-0987-codex-review-quota-waiver-guardrails.md",
+      "kind": "run",
+      "status": "succeeded",
+      "gate": {
+        "phase": "codex-review-quota-waiver-guardrails-implementation",
+        "status": "succeeded",
+        "log": ".runs/0987-codex-review-quota-waiver-guardrails/cli/2026-03-02T02-06-39-001Z-3af74bce/manifest.json",
+        "run_id": "2026-03-02T02-06-39-001Z-3af74bce"
+      },
+      "created_at": "2026-03-02",
+      "completed_at": "2026-03-02"
     }
   ],
   "specs": [
@@ -2143,6 +2159,22 @@
         "task": "tasks/tasks-0986-co-codex-alpha-agent-first-policy.md",
         "agent_task": ".agent/task/0986-co-codex-alpha-agent-first-policy.md",
         "docs": "docs/TECH_SPEC-co-codex-alpha-agent-first-policy.md"
+      }
+    },
+    {
+      "id": "20260302-0987-codex-review-quota-waiver-guardrails",
+      "title": "Codex Review Quota + Merge Waiver Guardrails",
+      "relates_to": "tasks/tasks-0987-codex-review-quota-waiver-guardrails.md",
+      "risk": "low",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-02",
+      "paths": {
+        "spec": "tasks/specs/0987-codex-review-quota-waiver-guardrails.md",
+        "task": "tasks/tasks-0987-codex-review-quota-waiver-guardrails.md",
+        "agent_task": ".agent/task/0987-codex-review-quota-waiver-guardrails.md",
+        "docs": "docs/TECH_SPEC-codex-review-quota-waiver-guardrails.md"
       }
     }
   ]

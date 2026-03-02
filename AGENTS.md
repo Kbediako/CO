@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp ace43c24308bf1dbec7dc03bb2a92a3557e6097ddab57973e94919ec4a19ca08 -->
+<!-- codex:instruction-stamp f4bfb33f3b1ef81892b08db60e58692edb2aa1e9a1cb184c8b7e22e3778f139b -->
 # Codex-Orchestrator Agent Handbook (Template)
 
 Use this repository as the wrapper that coordinates multiple Codex-driven projects. After cloning, replace placeholder metadata (task IDs, documents, SOPs) with values for each downstream initiative while keeping these shared guardrails in place.
@@ -156,13 +156,14 @@ Use this repository as the wrapper that coordinates multiple Codex-driven projec
 - Open PRs for code/config changes and keep the scope tied to the active task.
 - Monitor PR checks and review feedback for 10–20 minutes after all required checks turn green (use a background loop when possible).
 - Before merge, verify unresolved actionable review threads are zero (replying is not the same as resolving); explicitly resolve each addressed thread or record a waiver with evidence in the task checklist.
+- If Codex review is unavailable due quota, merge requires an explicit waiver: required checks are green, unresolved actionable review threads are `0`, and the task checklist records quota evidence plus the waiver decision.
 - If checks remain green and no new feedback arrives during the window, merge via GitHub and delete the branch.
 - Reset the window if checks restart or feedback arrives; do not merge draft PRs or PRs labeled "do not merge."
 
 ## GitHub Agent Review Replies
 - Always reply directly in the original review discussion thread (line comment), not just top-level PR comments.
 - For agents that require explicit mention (for example `@coderabbitai`), tag the agent and mention what changed plus the commit SHA.
-- For Codex (`chatgpt-codex-connector`), do not tag per-thread for routine re-review because Codex automatically re-reviews on each push; tag only when a manual Codex pass is explicitly needed.
+- For Codex (`chatgpt-codex-connector`), do not tag per-thread for routine re-review because Codex automatically re-reviews on each push; when a manual Codex pass is needed, send at most one `@codex` ping per PR head SHA and wait for a new head (new push) before pinging again.
 - CLI/API example for replying to a review comment:
 ```bash
 gh api -X POST repos/<org>/<repo>/pulls/<pr>/comments \
