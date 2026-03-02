@@ -39,6 +39,16 @@ Node.js >= 20 is required.
    > Tip: if you prefer `npx`, replace `codex-orch` with `npx @kbediako/codex-orchestrator`.
    > Tip: for multiple commands, you can also `export MCP_RUNNER_TASK_ID=<task-id>` once.
 
+## Runtime + Execution Modes
+
+- Mode semantics are orthogonal:
+  - `executionMode=mcp|cloud` controls where stages execute.
+  - `runtimeMode=cli|appserver` controls local runtime provider selection.
+- Local default runtime is `appserver`; preserve `--runtime-mode cli` as break-glass.
+- `--execution-mode cloud --runtime-mode appserver` is intentionally unsupported and fails fast with actionable errors.
+- `js_repl` is approved for task-scoped opt-in lanes (with manifest evidence), but remains off by default globally.
+- `memory_tool` remains scoped to explicit eval lanes.
+
 ## Downstream init (recommended)
 
 Use this when you want Codex to drive work inside another repo with the CO defaults.

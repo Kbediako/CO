@@ -4,7 +4,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Kbediako/CO"
+    "url": "git+https://github.com/Kbediako/CO.git"
   },
   "homepage": "https://github.com/Kbediako/CO#readme",
   "bugs": {
@@ -51,6 +51,7 @@
     "docs:freshness": "node scripts/docs-freshness.mjs --check",
     "docs:sync": "node --loader ts-node/esm scripts/docs-hygiene.ts --sync",
     "ci:cloud-canary": "node scripts/cloud-canary-ci.mjs",
+    "canary:js-repl-usage": "node scripts/js-repl-usage-matrix.mjs",
     "canary:runtime": "node scripts/runtime-mode-canary.mjs",
     "prelint": "node scripts/build-patterns-if-needed.mjs",
     "lint": "eslint orchestrator/src orchestrator/tests packages/orchestrator/src packages/orchestrator/tests packages/shared adapters evaluation/harness evaluation/tests --ext .ts,.tsx",
@@ -126,5 +127,13 @@
     "ink": "^4.4.1",
     "js-yaml": "^4.1.0",
     "react": "^18.3.1"
-  }
+  },
+  "description": "![Setup demo](docs/assets/setup.gif)",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs",
+    "test": "tests"
+  },
+  "keywords": [],
+  "author": ""
 }

@@ -9,6 +9,12 @@ Cloud mode is stage-scoped (use `--target`):
 codex-orchestrator start <pipeline> --cloud --target <stage-id>
 ```
 
+Runtime compatibility:
+- `executionMode` and `runtimeMode` are orthogonal controls.
+- Local default runtime is `appserver`; `--runtime-mode cli` remains break-glass.
+- `--execution-mode cloud --runtime-mode appserver` is unsupported and fails fast.
+- Cloud lanes should request `--runtime-mode cli` explicitly when deterministic contract testing is required.
+
 Typical wiring:
 - `CODEX_CLOUD_ENV_ID`: required for cloud execution
 - `CODEX_CLOUD_BRANCH`: optional, must exist on `origin` (remote)

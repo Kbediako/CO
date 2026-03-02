@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp d895f47967c12d5b7af003ad3ad1298959ec5d672d864e51ed0f45612b4d8394 -->
+<!-- codex:instruction-stamp 78dbf6bba02bcd47ac0c495cf858b683a0317b9448b8ef7bef2ef0510b01dd59 -->
 # Codex-Orchestrator Agent Handbook (Template)
 
 Use this repository as the wrapper that coordinates multiple Codex-driven projects. After cloning, replace placeholder metadata (task IDs, documents, SOPs) with values for each downstream initiative while keeping these shared guardrails in place.
@@ -9,6 +9,10 @@ Use this repository as the wrapper that coordinates multiple Codex-driven projec
 - Prefer cloud mode when work is long-running, highly parallel, or blocked by local resource constraints.
 - Before cloud mode, run a quick preflight: remote branch exists, setup commands are non-interactive, and required secrets/variables are available.
 - If cloud preflight fails (for example, missing cloud environment wiring), continue in local `mcp` mode and record the fallback reason in checklist/manifests.
+- Keep mode semantics explicit and orthogonal: `executionMode=mcp|cloud` and `runtimeMode=cli|appserver` are separate controls.
+- Local default runtime remains `appserver` (ChatGPT login-first / app-server path), with `--runtime-mode cli` preserved as break-glass.
+- `executionMode=cloud` with explicit `runtimeMode=appserver` is unsupported and must fail fast with actionable errors.
+- Feature posture: `js_repl` is approved for task-scoped opt-in lanes (with manifest evidence) but remains off by default globally; keep `memory_tool` scoped to explicit eval lanes.
 - Keep the safe approval profile (`read/edit/run/network`). Capture any escalation in `.runs/<task>/<timestamp>/manifest.json` under `approvals`.
 - Run `node scripts/delegation-guard.mjs` before requesting review; if delegation is not possible, set `DELEGATION_GUARD_OVERRIDE_REASON` and record the rationale in the task checklist.
 - Run `node scripts/spec-guard.mjs --dry-run` before requesting review. Update specs or refresh approvals when the guard fails.
