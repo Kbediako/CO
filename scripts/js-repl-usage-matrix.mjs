@@ -100,8 +100,26 @@ async function readJsonIfExists(filePath) {
   }
 }
 
+function resolveRunsRoot(rootDir, env = process.env) {
+  const configuredRoot = typeof env?.CODEX_ORCHESTRATOR_ROOT === 'string' && env.CODEX_ORCHESTRATOR_ROOT.trim().length > 0
+    ? env.CODEX_ORCHESTRATOR_ROOT.trim()
+    : '';
+  const repoRoot = configuredRoot
+    ? (path.isAbsolute(configuredRoot) ? configuredRoot : path.resolve(rootDir, configuredRoot))
+    : rootDir;
+  const configuredRunsDir = typeof env?.CODEX_ORCHESTRATOR_RUNS_DIR === 'string' && env.CODEX_ORCHESTRATOR_RUNS_DIR.trim().length > 0
+    ? env.CODEX_ORCHESTRATOR_RUNS_DIR.trim()
+    : '.runs';
+  if (path.isAbsolute(configuredRunsDir)) {
+    return configuredRunsDir;
+  }
+  return path.resolve(repoRoot, configuredRunsDir);
+}
+
 async function resolveLatestManifest(taskId, rootDir, options = {}) {
-  const cliRoot = join(rootDir, '.runs', taskId, 'cli');
+  const env = options.env ?? process.env;
+  const runsRoot = resolveRunsRoot(rootDir, env);
+  const cliRoot = join(runsRoot, taskId, 'cli');
   if (!existsSync(cliRoot)) {
     return null;
   }
@@ -228,7 +246,10 @@ async function runCloudScenario({
     'utf8'
   );
 
-  const latest = await resolveLatestManifest(scenarioTaskId, repoRoot, { minMtimeMs: scenarioStartedAt });
+  const latest = await resolveLatestManifest(scenarioTaskId, repoRoot, {
+    minMtimeMs: scenarioStartedAt,
+    env
+  });
   const manifest = latest ? await readJsonIfExists(latest.manifestPath) : null;
 
   const reasons = [];
