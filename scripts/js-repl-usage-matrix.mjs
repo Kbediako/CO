@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { spawn } from 'node:child_process';
-import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, readdir, stat, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import path, { join } from 'node:path';
 import process from 'node:process';
@@ -100,11 +100,12 @@ async function readJsonIfExists(filePath) {
   }
 }
 
-async function resolveLatestManifest(taskId, rootDir) {
+async function resolveLatestManifest(taskId, rootDir, options = {}) {
   const cliRoot = join(rootDir, '.runs', taskId, 'cli');
   if (!existsSync(cliRoot)) {
     return null;
   }
+  const minMtimeMs = Number(options.minMtimeMs);
   const candidates = (await readdir(cliRoot, { withFileTypes: true }))
     .filter((entry) => entry.isDirectory())
     .map((entry) => entry.name)
@@ -112,12 +113,26 @@ async function resolveLatestManifest(taskId, rootDir) {
   if (candidates.length === 0) {
     return null;
   }
-  const runId = candidates[candidates.length - 1];
-  const manifestPath = join(cliRoot, runId, 'manifest.json');
-  if (!existsSync(manifestPath)) {
-    return null;
+  for (let index = candidates.length - 1; index >= 0; index -= 1) {
+    const runId = candidates[index];
+    const manifestPath = join(cliRoot, runId, 'manifest.json');
+    if (!existsSync(manifestPath)) {
+      continue;
+    }
+    if (Number.isFinite(minMtimeMs) && minMtimeMs > 0) {
+      let manifestStats = null;
+      try {
+        manifestStats = await stat(manifestPath);
+      } catch {
+        manifestStats = null;
+      }
+      if (!manifestStats || manifestStats.mtimeMs < minMtimeMs) {
+        continue;
+      }
+    }
+    return { runId, manifestPath };
   }
-  return { runId, manifestPath };
+  return null;
 }
 
 function checkRuntimeSummary(summary) {
@@ -178,6 +193,7 @@ async function runCloudScenario({
   commandTimeoutMs
 }) {
   const scenarioTaskId = `${taskIdBase}-cloud-${scenario}-r${iteration}`;
+  const scenarioStartedAt = Date.now();
   const env = {
     ...baseEnv,
     MCP_RUNNER_TASK_ID: scenarioTaskId,
@@ -212,7 +228,7 @@ async function runCloudScenario({
     'utf8'
   );
 
-  const latest = await resolveLatestManifest(scenarioTaskId, repoRoot);
+  const latest = await resolveLatestManifest(scenarioTaskId, repoRoot, { minMtimeMs: scenarioStartedAt });
   const manifest = latest ? await readJsonIfExists(latest.manifestPath) : null;
 
   const reasons = [];
@@ -223,6 +239,11 @@ async function runCloudScenario({
     reasons.push('manifest missing');
   } else if (manifest.status !== 'succeeded') {
     reasons.push(`expected status=succeeded, received ${manifest.status ?? '<missing>'}`);
+  } else {
+    const manifestTaskId = manifest?.task?.id ?? manifest?.task_id ?? null;
+    if (manifestTaskId && manifestTaskId !== scenarioTaskId) {
+      reasons.push(`manifest task id mismatch: expected ${scenarioTaskId}, received ${manifestTaskId}`);
+    }
   }
 
   let disableFlagObserved = null;
