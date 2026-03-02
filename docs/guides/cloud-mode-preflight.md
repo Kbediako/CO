@@ -14,10 +14,14 @@ Runtime compatibility:
 - Local default runtime is `appserver`; `--runtime-mode cli` remains break-glass.
 - `--execution-mode cloud --runtime-mode appserver` is unsupported and fails fast.
 - Cloud lanes should request `--runtime-mode cli` explicitly when deterministic contract testing is required.
+- `js_repl` is enabled by default globally; for cloud edge-case testing, set explicit feature toggles (`CODEX_CLOUD_ENABLE_FEATURES=js_repl` or `CODEX_CLOUD_DISABLE_FEATURES=js_repl`) instead of relying on implicit defaults.
+- Keep enabled/disabled lanes separate (do not set the same feature in both lists for one run).
+- `codex features disable js_repl` updates persistent config; use it only for global emergency toggles and re-enable with `codex features enable js_repl` after triage.
 
 Typical wiring:
 - `CODEX_CLOUD_ENV_ID`: required for cloud execution
 - `CODEX_CLOUD_BRANCH`: optional, must exist on `origin` (remote)
+- `CODEX_CLOUD_ENABLE_FEATURES` / `CODEX_CLOUD_DISABLE_FEATURES`: optional, use for explicit cloud feature-contract lanes
 
 Example:
 ```bash

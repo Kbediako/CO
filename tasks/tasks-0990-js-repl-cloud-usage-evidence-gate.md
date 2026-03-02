@@ -38,3 +38,4 @@
 ## Closeout
 - [x] Checklist mirror synced (`tasks/`, `.agent/task/`, `docs/TASKS.md`). - Evidence: `tasks/tasks-0990-js-repl-cloud-usage-evidence-gate.md`, `.agent/task/0990-js-repl-cloud-usage-evidence-gate.md`, `docs/TASKS.md`.
 - [x] Final recommendation decision posted (adopt/defer/hold + rationale). - Evidence: `out/0990-js-repl-cloud-usage-evidence-gate/manual/js-repl-usage-recommendation.md`.
+- [x] Follow-up policy alignment applied: `js_repl` default-on globally with explicit cloud edge-case guardrails + break-glass disable guidance. - Evidence: `AGENTS.md`, `docs/AGENTS.md`, `README.md`, `docs/README.md`, `docs/guides/cloud-mode-preflight.md`, `docs/guides/rlm-recursion-v2.md`, `docs/guides/upstream-codex-cli-sync.md`, `docs/TASKS.md`.

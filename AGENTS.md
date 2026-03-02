@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp 78dbf6bba02bcd47ac0c495cf858b683a0317b9448b8ef7bef2ef0510b01dd59 -->
+<!-- codex:instruction-stamp a247787d8961b1c4a8eeabf8d9abb7aa0752f4ef63fcfdebf5e7106a3877f7a9 -->
 # Codex-Orchestrator Agent Handbook (Template)
 
 Use this repository as the wrapper that coordinates multiple Codex-driven projects. After cloning, replace placeholder metadata (task IDs, documents, SOPs) with values for each downstream initiative while keeping these shared guardrails in place.
@@ -12,7 +12,7 @@ Use this repository as the wrapper that coordinates multiple Codex-driven projec
 - Keep mode semantics explicit and orthogonal: `executionMode=mcp|cloud` and `runtimeMode=cli|appserver` are separate controls.
 - Local default runtime remains `appserver` (ChatGPT login-first / app-server path), with `--runtime-mode cli` preserved as break-glass.
 - `executionMode=cloud` with explicit `runtimeMode=appserver` is unsupported and must fail fast with actionable errors.
-- Feature posture: `js_repl` is approved for task-scoped opt-in lanes (with manifest evidence) but remains off by default globally; keep `memory_tool` scoped to explicit eval lanes.
+- Feature posture: `js_repl` is enabled by default globally (local + cloud lanes). For deterministic cloud contracts, pin explicit task-scoped feature lanes (`CODEX_CLOUD_ENABLE_FEATURES=js_repl` and separate `CODEX_CLOUD_DISABLE_FEATURES=js_repl` runs) and record manifest-backed evidence in checklist mirrors. Use `CODEX_CLOUD_DISABLE_FEATURES=js_repl` for task-scoped cloud break-glass; reserve `codex features disable js_repl` for global emergency toggles and re-enable afterward with `codex features enable js_repl`. Keep `memory_tool` scoped to explicit eval lanes.
 - Keep the safe approval profile (`read/edit/run/network`). Capture any escalation in `.runs/<task>/<timestamp>/manifest.json` under `approvals`.
 - Run `node scripts/delegation-guard.mjs` before requesting review; if delegation is not possible, set `DELEGATION_GUARD_OVERRIDE_REASON` and record the rationale in the task checklist.
 - Run `node scripts/spec-guard.mjs --dry-run` before requesting review. Update specs or refresh approvals when the guard fails.

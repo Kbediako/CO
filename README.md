@@ -46,7 +46,7 @@ Node.js >= 20 is required.
   - `runtimeMode=cli|appserver` controls local runtime provider selection.
 - Local default runtime is `appserver`; preserve `--runtime-mode cli` as break-glass.
 - `--execution-mode cloud --runtime-mode appserver` is intentionally unsupported and fails fast with actionable errors.
-- `js_repl` is approved for task-scoped opt-in lanes (with manifest evidence), but remains off by default globally.
+- `js_repl` is enabled by default globally. For deterministic cloud contracts, run explicit feature lanes (`CODEX_CLOUD_ENABLE_FEATURES=js_repl` and separate `CODEX_CLOUD_DISABLE_FEATURES=js_repl` runs). Use `CODEX_CLOUD_DISABLE_FEATURES=js_repl` for task-scoped cloud break-glass; reserve `codex features disable js_repl` for global emergency toggles and re-enable with `codex features enable js_repl`.
 - `memory_tool` remains scoped to explicit eval lanes.
 
 ## Downstream init (recommended)
