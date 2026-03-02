@@ -27,13 +27,44 @@ function asBool(value) {
 
 async function runCommand(command, args, options = {}) {
   return await new Promise((resolve) => {
+    const timeoutCandidate = Number(options.timeout);
+    const timeoutMs = Number.isFinite(timeoutCandidate) && timeoutCandidate > 0 ? timeoutCandidate : 0;
     const child = spawn(command, args, {
       cwd: options.cwd ?? process.cwd(),
       env: options.env ?? process.env,
       stdio: ['ignore', 'pipe', 'pipe']
     });
+    let settled = false;
+    let timedOut = false;
+    let killEscalationHandle = null;
     let stdout = '';
     let stderr = '';
+    const timeoutHandle = timeoutMs > 0
+      ? setTimeout(() => {
+          timedOut = true;
+          stderr = `${stderr}\ncommand timed out after ${timeoutMs}ms`.trim();
+          child.kill('SIGTERM');
+          killEscalationHandle = setTimeout(() => {
+            child.kill('SIGKILL');
+          }, 2000);
+        }, timeoutMs)
+      : null;
+    const clearTimers = () => {
+      if (timeoutHandle) {
+        clearTimeout(timeoutHandle);
+      }
+      if (killEscalationHandle) {
+        clearTimeout(killEscalationHandle);
+      }
+    };
+    const finalize = (result) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      clearTimers();
+      resolve(result);
+    };
     child.stdout?.on('data', (chunk) => {
       stdout += String(chunk);
     });
@@ -41,15 +72,15 @@ async function runCommand(command, args, options = {}) {
       stderr += String(chunk);
     });
     child.once('error', (error) => {
-      resolve({
-        exitCode: 1,
+      finalize({
+        exitCode: timedOut ? 124 : 1,
         stdout,
         stderr: `${stderr}\n${error.message}`.trim()
       });
     });
     child.once('close', (code) => {
-      resolve({
-        exitCode: typeof code === 'number' ? code : 1,
+      finalize({
+        exitCode: timedOut ? 124 : (typeof code === 'number' ? code : 1),
         stdout,
         stderr
       });
@@ -96,9 +127,14 @@ function checkRuntimeSummary(summary) {
     };
   }
   const checks = summary.threshold_checks ?? {};
-  const failing = Object.entries(checks)
+  const entries = Object.entries(checks);
+  const failing = [];
+  if (entries.length === 0) {
+    failing.push('runtime-mode-canary threshold_checks missing or empty');
+  }
+  failing.push(...entries
     .filter(([, result]) => !result?.passed)
-    .map(([name, result]) => `${name} pass_rate=${result?.pass_rate ?? '<missing>'} threshold=${result?.threshold ?? '<missing>'}`);
+    .map(([name, result]) => `${name} pass_rate=${result?.pass_rate ?? '<missing>'} threshold=${result?.threshold ?? '<missing>'}`));
   return {
     passed: failing.length === 0,
     reasons: failing

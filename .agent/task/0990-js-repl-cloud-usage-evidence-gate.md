@@ -11,7 +11,7 @@
 - [x] Docs-first artifacts created (PRD/TECH_SPEC/ACTION_PLAN/checklist mirror). - Evidence: `docs/PRD-js-repl-cloud-usage-evidence-gate.md`, `docs/TECH_SPEC-js-repl-cloud-usage-evidence-gate.md`, `docs/ACTION_PLAN-js-repl-cloud-usage-evidence-gate.md`, `tasks/specs/0990-js-repl-cloud-usage-evidence-gate.md`, `tasks/tasks-0990-js-repl-cloud-usage-evidence-gate.md`, `.agent/task/0990-js-repl-cloud-usage-evidence-gate.md`.
 - [x] `tasks/index.json` + `docs/TASKS.md` updated for task registration/status. - Evidence: `tasks/index.json`, `docs/TASKS.md`.
 - [x] Delegated planning/research streams captured with durable evidence. - Evidence: `out/0990-js-repl-cloud-usage-evidence-gate/manual/delegated-matrix-plan.md`, `out/0990-js-repl-cloud-usage-evidence-gate/manual/delegated-docs-audit.md`.
-- [x] Docs-review manifest captured before non-doc edits. - Evidence: `.runs/0990-js-repl-cloud-usage-evidence-gate/cli/2026-03-02T06-20-57-763Z-5f31688e/manifest.json`.
+- [x] Final review manifest captured post-edit. - Evidence: `.runs/0990-js-repl-cloud-usage-evidence-gate/cli/2026-03-02T09-11-00-955Z-5875de54/manifest.json`.
 
 ## Implementation
 - [x] Minimal local+cloud matrix automation implemented (no unrelated refactors). - Evidence: `scripts/js-repl-usage-matrix.mjs`, `package.json`, `out/0990-js-repl-cloud-usage-evidence-gate/manual/matrix-run.log`.
