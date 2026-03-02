@@ -44,6 +44,9 @@ last_review: 2026-03-02
   - `node scripts/runtime-mode-canary.mjs`
   - `node scripts/delegation-guard.mjs --task 0989-codex-0107-alpha9-canary-fallback-readiness`
   - `node scripts/spec-guard.mjs --dry-run`
+  - `npm run lint`
+  - `npm run test`
+  - `npm run eval:test` (when fixtures exist)
   - `npm run docs:check`
   - `npm run docs:freshness`
   - `node scripts/diff-budget.mjs`

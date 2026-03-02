@@ -5,7 +5,7 @@
 - TECH_SPEC: `tasks/specs/0989-codex-0107-alpha9-canary-fallback-readiness.md`
 - ACTION_PLAN: `docs/ACTION_PLAN-codex-0107-alpha9-canary-fallback-readiness.md`
 
-> Set `MCP_RUNNER_TASK_ID=0989-codex-0107-alpha9-canary-fallback-readiness` for orchestrator commands. Required quality lane for this docs/canary task: `node scripts/runtime-mode-canary.mjs`, `node scripts/delegation-guard.mjs --task 0989-codex-0107-alpha9-canary-fallback-readiness`, `node scripts/spec-guard.mjs --dry-run`, `npm run docs:check`, `npm run docs:freshness`, `node scripts/diff-budget.mjs`.
+> Set `MCP_RUNNER_TASK_ID=0989-codex-0107-alpha9-canary-fallback-readiness` for orchestrator commands. Required quality lane for this docs/canary task: `node scripts/runtime-mode-canary.mjs`, `node scripts/delegation-guard.mjs --task 0989-codex-0107-alpha9-canary-fallback-readiness`, `node scripts/spec-guard.mjs --dry-run`, `npm run lint`, `npm run test`, `npm run eval:test` (fixtures present), `npm run docs:check`, `npm run docs:freshness`, `node scripts/diff-budget.mjs`.
 
 ## Foundation
 - [x] Docs-first artifacts created (PRD/TECH_SPEC/ACTION_PLAN/checklist mirror). - Evidence: `docs/PRD-codex-0107-alpha9-canary-fallback-readiness.md`, `docs/TECH_SPEC-codex-0107-alpha9-canary-fallback-readiness.md`, `docs/ACTION_PLAN-codex-0107-alpha9-canary-fallback-readiness.md`, `tasks/specs/0989-codex-0107-alpha9-canary-fallback-readiness.md`, `tasks/tasks-0989-codex-0107-alpha9-canary-fallback-readiness.md`, `.agent/task/0989-codex-0107-alpha9-canary-fallback-readiness.md`.
@@ -23,6 +23,9 @@
 - [x] 00 `node scripts/runtime-mode-canary.mjs --task-id 0989-codex-0107-alpha9-canary-fallback-readiness --repos 1 --iterations 1 --output-dir out/0989-codex-0107-alpha9-canary-fallback-readiness/manual/runtime-mode-canary`. - Evidence: `out/0989-codex-0107-alpha9-canary-fallback-readiness/manual/final-00-runtime-mode-canary.log`.
 - [x] 01 `node scripts/delegation-guard.mjs --task 0989-codex-0107-alpha9-canary-fallback-readiness`. - Evidence: `out/0989-codex-0107-alpha9-canary-fallback-readiness/manual/final-01-delegation-guard.log`.
 - [x] 02 `node scripts/spec-guard.mjs --dry-run`. - Evidence: `out/0989-codex-0107-alpha9-canary-fallback-readiness/manual/final-02-spec-guard.log`.
+- [x] 04 `npm run lint`. - Evidence: `out/0989-codex-0107-alpha9-canary-fallback-readiness/manual/final-04-lint.log`.
+- [x] 05 `npm run test`. - Evidence: `out/0989-codex-0107-alpha9-canary-fallback-readiness/manual/final-05-test.log`.
+- [x] 05b `npm run eval:test` (fixtures present). - Evidence: `out/0989-codex-0107-alpha9-canary-fallback-readiness/manual/final-05b-eval-test.log`.
 - [x] 06 `npm run docs:check`. - Evidence: `out/0989-codex-0107-alpha9-canary-fallback-readiness/manual/final-06-docs-check.log`.
 - [x] 07 `npm run docs:freshness`. - Evidence: `out/0989-codex-0107-alpha9-canary-fallback-readiness/manual/final-07-docs-freshness.log`.
 - [x] 08 `node scripts/diff-budget.mjs`. - Evidence: `out/0989-codex-0107-alpha9-canary-fallback-readiness/manual/final-08-diff-budget.log`.
