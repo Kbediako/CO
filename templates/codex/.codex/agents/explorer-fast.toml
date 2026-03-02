@@ -1,2 +1,3 @@
 model = "gpt-5.3-codex-spark"
 model_reasoning_effort = "xhigh"
+model_reasoning_summary = "none"

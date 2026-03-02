@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp 2bab8b68cc8b97d6d61c8e0c2595fc3cb25d58521b5ef7de8cea82c8fa17aa45 -->
+<!-- codex:instruction-stamp 4b37aa2aa7efd9a1aa258ae362896cb5eb349f25a7a23e8cb9d05011be655e68 -->
 # Repository Agent Guidance
 
 ## Project 0303 — Codex Orchestrator Autonomy Enhancements
@@ -77,13 +77,14 @@
 - Monitor PR checks and review feedback for 10–20 minutes after all required checks turn green.
 - Maintain polling until checks and reviews reach terminal status; reset the waiting window if checks restart or new feedback appears.
 - Before merge, verify unresolved actionable review threads are zero (replying is not the same as resolving); explicitly resolve each addressed thread or record a waiver with evidence in the task checklist.
+- If Codex review is unavailable due to quota, merge requires an explicit waiver: required checks are green, unresolved actionable review threads are `0`, and the task checklist records quota evidence plus the waiver decision.
 - If checks remain green and no new feedback arrives during the window, merge via GitHub and delete the branch.
 - Reset the window if checks restart or feedback arrives; do not merge draft PRs or PRs labeled "do not merge."
 
 ## GitHub Agent Review Replies
 - Always reply directly in the original review discussion thread (line comment), not just top-level PR comments.
 - For agents that require explicit mention (for example `@coderabbitai`), tag the agent and mention what changed plus the commit SHA.
-- For Codex (`chatgpt-codex-connector`), do not tag per-thread for routine re-review because Codex automatically re-reviews on each push; tag only when a manual Codex pass is explicitly needed.
+- For Codex (`chatgpt-codex-connector`), do not tag per-thread for routine re-review because Codex automatically re-reviews on each push; when a manual Codex pass is needed, send at most one `@codex` ping per PR head SHA and wait for a new head (new push) before pinging again.
 - CLI/API example for replying to a review comment:
 ```bash
 gh api -X POST repos/<org>/<repo>/pulls/<pr>/comments \
