@@ -370,27 +370,29 @@ async function main() {
   );
 
   const cloudResults = [];
+  let cloudPreflightFailure = null;
   if (!skipCloud) {
     if (!process.env.CODEX_CLOUD_ENV_ID) {
-      throw new Error('CODEX_CLOUD_ENV_ID is required for cloud scenarios');
-    }
-    const baseEnv = {
-      ...process.env,
-      CODEX_CLOUD_BRANCH: process.env.CODEX_CLOUD_BRANCH || 'main'
-    };
-    const scenarios = ['required-enabled', 'required-disabled', 'fallback'];
-    for (const scenario of scenarios) {
-      for (let iteration = 1; iteration <= cloudIterations; iteration += 1) {
-        const result = await runCloudScenario({
-          scenario,
-          iteration,
-          taskIdBase,
-          repoRoot,
-          outputDir,
-          baseEnv,
-          commandTimeoutMs
-        });
-        cloudResults.push(result);
+      cloudPreflightFailure = 'missing CODEX_CLOUD_ENV_ID; falling back to local mcp';
+    } else {
+      const baseEnv = {
+        ...process.env,
+        CODEX_CLOUD_BRANCH: process.env.CODEX_CLOUD_BRANCH || 'main'
+      };
+      const scenarios = ['required-enabled', 'required-disabled', 'fallback'];
+      for (const scenario of scenarios) {
+        for (let iteration = 1; iteration <= cloudIterations; iteration += 1) {
+          const result = await runCloudScenario({
+            scenario,
+            iteration,
+            taskIdBase,
+            repoRoot,
+            outputDir,
+            baseEnv,
+            commandTimeoutMs
+          });
+          cloudResults.push(result);
+        }
       }
     }
   }
@@ -403,7 +405,7 @@ async function main() {
 
   const localPassed = localCommand.exitCode === 0 && localSummaryCheck.passed;
   const packPassed = packSmokeCommand.exitCode === 0;
-  const cloudPassed = !skipCloud && cloudResults.length > 0 && cloudResults.every((result) => result.passed);
+  const cloudPassed = !skipCloud && !cloudPreflightFailure && cloudResults.length > 0 && cloudResults.every((result) => result.passed);
   const readyForGuidance = localPassed && packPassed && cloudPassed;
 
   const summary = {
@@ -431,6 +433,7 @@ async function main() {
       }
     },
     cloud: {
+      preflight_failure: cloudPreflightFailure,
       total_runs: cloudResults.length,
       scenarios: cloudSummary,
       results: cloudResults
@@ -440,6 +443,8 @@ async function main() {
       recommendation: readyForGuidance ? 'candidate-for-js-repl-guidance' : 'hold-js-repl-guidance',
       notes: skipCloud
         ? 'Cloud scenarios were skipped. Keep js_repl guidance in defer/hold state.'
+        : cloudPreflightFailure
+          ? `Cloud preflight failed: ${cloudPreflightFailure}. Keep js_repl guidance in defer/hold state.`
         : readyForGuidance
           ? 'All required local/cloud scenarios passed.'
           : 'One or more required scenarios failed. Keep js_repl guidance in defer/hold state.'
