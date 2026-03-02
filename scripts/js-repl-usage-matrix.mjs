@@ -5,7 +5,6 @@ import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import path, { join } from 'node:path';
 import process from 'node:process';
-import { fileURLToPath } from 'node:url';
 
 import { hasFlag, parseArgs } from './lib/cli-args.js';
 
@@ -56,31 +55,6 @@ async function runCommand(command, args, options = {}) {
       });
     });
   });
-}
-
-function tryParseJson(text) {
-  const trimmed = String(text ?? '').trim();
-  if (!trimmed) {
-    return null;
-  }
-  try {
-    return JSON.parse(trimmed);
-  } catch {
-    // continue
-  }
-  const lines = trimmed.split(/\r?\n/);
-  for (let index = 0; index < lines.length; index += 1) {
-    const candidate = lines.slice(index).join('\n').trim();
-    if (!candidate.startsWith('{')) {
-      continue;
-    }
-    try {
-      return JSON.parse(candidate);
-    } catch {
-      // continue
-    }
-  }
-  return null;
 }
 
 async function readJsonIfExists(filePath) {
@@ -157,7 +131,6 @@ async function commandLogHasDisableJsRepl(commandLogPath) {
 }
 
 async function runCloudScenario({
-  label,
   scenario,
   iteration,
   taskIdBase,
@@ -245,35 +218,16 @@ async function runCloudScenario({
     scenario,
     iteration,
     task_id: scenarioTaskId,
-    run_id: latest?.runId ?? null,
     manifest_path: latest?.manifestPath ?? null,
     exit_code: commandResult.exitCode,
     status: manifest?.status ?? null,
-    runtime_mode: manifest?.runtime_mode ?? null,
-    runtime_mode_requested: manifest?.runtime_mode_requested ?? null,
-    runtime_provider: manifest?.runtime_provider ?? null,
-    cloud_execution: manifest?.cloud_execution
-      ? {
-          status: manifest.cloud_execution.status ?? null,
-          environment_id: manifest.cloud_execution.environment_id ?? null,
-          log_path: manifest.cloud_execution.log_path ?? null
-        }
-      : null,
-    cloud_fallback: manifest?.cloud_fallback
-      ? {
-          mode_used: manifest.cloud_fallback.mode_used ?? null,
-          reason: manifest.cloud_fallback.reason ?? null
-        }
-      : null,
+    cloud_execution_status: manifest?.cloud_execution?.status ?? null,
+    cloud_fallback_reason: manifest?.cloud_fallback?.reason ?? null,
     disable_flag_observed: disableFlagObserved,
     passed: reasons.length === 0,
     failure_reasons: reasons,
     log_path: logFile
   };
-
-  const detailsFile = join(outputDir, 'cloud', `${scenarioTaskId}.json`);
-  await writeFile(detailsFile, `${JSON.stringify(result, null, 2)}\n`, 'utf8');
-
   return result;
 }
 
@@ -297,16 +251,7 @@ async function main() {
   const repoRoot = process.cwd();
   const { args } = parseArgs(process.argv.slice(2));
   if (hasFlag(args, 'help') || hasFlag(args, 'h')) {
-    console.log(`Usage: node scripts/js-repl-usage-matrix.mjs [options]
-
-Options:
-  --task-id <id>              Base task id used for scenario run labels.
-  --output-dir <path>         Output directory for logs and summary.
-  --local-repos <n>           Dummy repos for local runtime matrix (default: ${DEFAULT_LOCAL_REPOS}).
-  --local-iterations <n>      Iterations per local dummy repo (default: ${DEFAULT_LOCAL_ITERATIONS}).
-  --cloud-iterations <n>      Iterations per cloud scenario (default: ${DEFAULT_CLOUD_ITERATIONS}).
-  --skip-cloud                Run local matrix only.
-`);
+    console.log(`Usage: node scripts/js-repl-usage-matrix.mjs [--task-id <id>] [--output-dir <path>] [--local-repos <n>] [--local-iterations <n>] [--cloud-iterations <n>] [--skip-cloud]`);
     return;
   }
 
@@ -393,7 +338,6 @@ Options:
     for (const scenario of scenarios) {
       for (let iteration = 1; iteration <= cloudIterations; iteration += 1) {
         const result = await runCloudScenario({
-          label: `${scenario}-r${iteration}`,
           scenario,
           iteration,
           taskIdBase,
@@ -463,9 +407,7 @@ Options:
   }
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  void main().catch((error) => {
-    console.error(`js-repl-usage-matrix failed: ${(error && error.message) || String(error)}`);
-    process.exit(1);
-  });
-}
+void main().catch((error) => {
+  console.error(`js-repl-usage-matrix failed: ${(error && error.message) || String(error)}`);
+  process.exit(1);
+});
