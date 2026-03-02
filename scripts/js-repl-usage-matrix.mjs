@@ -105,10 +105,11 @@ function checkRuntimeSummary(summary) {
   };
 }
 
-async function commandLogHasDisableJsRepl(commandLogPath) {
+async function commandLogHasJsReplFeatureFlag(commandLogPath, mode) {
   if (!commandLogPath || !existsSync(commandLogPath)) {
     return false;
   }
+  const expectedMode = mode === 'enable' ? 'enable' : 'disable';
   const raw = await readFile(commandLogPath, 'utf8');
   const lines = raw.split(/\r?\n/).filter(Boolean);
   for (const line of lines) {
@@ -122,7 +123,7 @@ async function commandLogHasDisableJsRepl(commandLogPath) {
       continue;
     }
     for (let index = 0; index < parsed.args.length - 1; index += 1) {
-      if (parsed.args[index] === '--disable' && parsed.args[index + 1] === 'js_repl') {
+      if (parsed.args[index] === `--${expectedMode}` && parsed.args[index + 1] === 'js_repl') {
         return true;
       }
     }
@@ -186,13 +187,15 @@ async function runCloudScenario({
   }
 
   let disableFlagObserved = null;
-  if (manifest && scenario === 'required-disabled') {
+  if (manifest && (scenario === 'required-disabled' || scenario === 'required-enabled')) {
     const commandLogPath = manifest?.cloud_execution?.log_path
       ? path.resolve(repoRoot, manifest.cloud_execution.log_path)
       : null;
-    disableFlagObserved = await commandLogHasDisableJsRepl(commandLogPath);
-    if (!disableFlagObserved) {
-      reasons.push('expected cloud commands log to include --disable js_repl');
+    const expectedMode = scenario === 'required-disabled' ? 'disable' : 'enable';
+    const featureFlagObserved = await commandLogHasJsReplFeatureFlag(commandLogPath, expectedMode);
+    disableFlagObserved = scenario === 'required-disabled' ? featureFlagObserved : null;
+    if (!featureFlagObserved) {
+      reasons.push(`expected cloud commands log to include --${expectedMode} js_repl`);
     }
   }
 
