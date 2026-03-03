@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp 07befe7937924f4a5b5437b57f60abf1b134e71fe2f84663fc5f9c518ca8471b -->
+<!-- codex:instruction-stamp 283480584690870dd9e1485db54bd4a8ee3958f96082edcd6d09fb5d4dfb0147 -->
 # Codex-Orchestrator Agent Handbook (Template)
 
 Use this repository as the wrapper that coordinates multiple Codex-driven projects. After cloning, replace placeholder metadata (task IDs, documents, SOPs) with values for each downstream initiative while keeping these shared guardrails in place.
@@ -8,7 +8,7 @@ Use this repository as the wrapper that coordinates multiple Codex-driven projec
 - Switch to cloud mode only if your task plan explicitly allows it and the reviewer records the override in the active run manifest.
 - Prefer cloud mode when work is long-running, highly parallel, or blocked by local resource constraints.
 - Before cloud mode, run a quick preflight: remote branch exists, setup commands are non-interactive, and required secrets/variables are available.
-- If cloud preflight fails (for example, missing cloud environment wiring), continue in local `mcp` mode and record the fallback reason in checklist/manifests; for strict cloud lanes set `CODEX_ORCHESTRATOR_CLOUD_FALLBACK=deny` to fail fast instead of falling back.
+- If cloud preflight fails (for example, missing cloud environment wiring), continue in local `mcp` mode and record the fallback reason in checklist/manifests; for strict cloud lanes, set `CODEX_ORCHESTRATOR_CLOUD_FALLBACK=deny` to fail fast instead of falling back.
 - Keep mode semantics explicit and orthogonal: `executionMode=mcp|cloud` and `runtimeMode=cli|appserver` are separate controls.
 - Local default runtime remains `appserver` (ChatGPT login-first / app-server path), with `--runtime-mode cli` preserved as break-glass.
 - `executionMode=cloud` with explicit `runtimeMode=appserver` is unsupported and must fail fast with actionable errors.

@@ -10,9 +10,9 @@
 - Success criteria / acceptance:
   - Docs-first artifacts and mirrors are updated before implementation edits.
   - Deep checks cover shipped skills, AGENTS/SOP/readme guidance, and release readiness.
-- New Codex CLI fork/session-context capability is evaluated with concrete usage recommendations for CO.
-- A clear decision is documented on whether `fork_context` handling should be guidance-only or programmatic in CO.
-- If any programmatic changes are made, they remain additive observability only (no behavior/default flips).
+  - New Codex CLI fork/session-context capability is evaluated with concrete usage recommendations for CO.
+  - A clear decision is documented on whether `fork_context` handling should be guidance-only or programmatic in CO.
+  - If any programmatic changes are made, they remain additive observability only (no behavior/default flips).
   - Contradictions are resolved with minimal, high-leverage changes.
   - Ordered validation lane (1-10) passes with evidence logs.
   - Release PR/tag/publish lifecycle completes and new npm version is verified.
