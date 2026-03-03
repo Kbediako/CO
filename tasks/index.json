@@ -1614,6 +1614,22 @@
       },
       "created_at": "2026-03-02",
       "completed_at": "2026-03-02"
+    },
+    {
+      "id": "0991",
+      "slug": "0991-codex-orchestrator-skill-and-memory-alignment",
+      "title": "Codex-Orchestrator Skill + Feature Canonical Alignment",
+      "path": "tasks/tasks-0991-codex-orchestrator-skill-and-memory-alignment.md",
+      "kind": "run",
+      "status": "succeeded",
+      "gate": {
+        "phase": "codex-orchestrator-skill-and-memory-alignment-implementation",
+        "status": "succeeded",
+        "log": ".runs/0991-codex-orchestrator-skill-and-memory-alignment/cli/2026-03-03T00-35-21-259Z-3759748e/manifest.json",
+        "run_id": "2026-03-03T00-35-21-259Z-3759748e"
+      },
+      "created_at": "2026-03-03",
+      "completed_at": "2026-03-03"
     }
   ],
   "specs": [
@@ -2239,6 +2255,22 @@
         "task": "tasks/tasks-0990-js-repl-cloud-usage-evidence-gate.md",
         "agent_task": ".agent/task/0990-js-repl-cloud-usage-evidence-gate.md",
         "docs": "docs/TECH_SPEC-js-repl-cloud-usage-evidence-gate.md"
+      }
+    },
+    {
+      "id": "20260303-0991-codex-orchestrator-skill-and-memory-alignment",
+      "title": "Codex-Orchestrator Skill + Feature Canonical Alignment",
+      "relates_to": "tasks/tasks-0991-codex-orchestrator-skill-and-memory-alignment.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-03",
+      "paths": {
+        "spec": "tasks/specs/0991-codex-orchestrator-skill-and-memory-alignment.md",
+        "task": "tasks/tasks-0991-codex-orchestrator-skill-and-memory-alignment.md",
+        "agent_task": ".agent/task/0991-codex-orchestrator-skill-and-memory-alignment.md",
+        "docs": "docs/TECH_SPEC-codex-orchestrator-skill-and-memory-alignment.md"
       }
     }
   ]

@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp 2e795cb9aa4d67cbde520747556b1b80c2d440125616d9a6704f415972ad9cfd -->
+<!-- codex:instruction-stamp ef4b8299ae9f185f19191a5d66f12c67a7f3b823c30cfeb71daf05f0fc5c21cb -->
 # Agent Enablement
 
 ## Added by Bootstrap 2025-10-16
@@ -15,8 +15,8 @@
 - Keep mode semantics explicit and orthogonal: `executionMode=mcp|cloud` and `runtimeMode=cli|appserver` are separate controls.
 - Local default runtime remains `appserver`, with `--runtime-mode cli` preserved as break-glass.
 - `executionMode=cloud` with explicit `runtimeMode=appserver` is unsupported and must fail fast with actionable errors.
-- `js_repl` is approved for task-scoped opt-in lanes (with manifest evidence) but remains off by default globally.
-- Keep `memory_tool` scoped to explicit eval lanes until promoted by evidence.
+- `js_repl` is enabled by default globally (local + cloud lanes); for deterministic cloud contracts, use explicit feature lanes (`CODEX_CLOUD_ENABLE_FEATURES=js_repl` and separate `CODEX_CLOUD_DISABLE_FEATURES=js_repl` runs).
+- Keep `memories` scoped to explicit eval lanes until promoted by evidence (legacy alias `memory_tool` is compatibility-only).
 - Honor the safe `read/edit/run/network` approval profile. Capture escalations in the manifest `approvals` array with reviewer justification and timestamp.
 - Run `node scripts/delegation-guard.mjs` prior to requesting review; if delegation is not possible, set `DELEGATION_GUARD_OVERRIDE_REASON` and record the justification in the checklist.
 - Run `node scripts/spec-guard.mjs --dry-run` prior to requesting review; a failing guard requires refreshing relevant specs (see `.agent/SOPs/specs-and-research.md`).

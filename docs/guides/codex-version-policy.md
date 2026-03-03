@@ -4,9 +4,9 @@
 Define a stable default with evidence-gated prerelease adoption, so CO can move fast without forcing global risk.
 
 ## Policy
-- Global default stays on stable Codex CLI (`0.106.0`) unless explicit promotion is approved.
+- Global default stays on stable Codex CLI (`0.107.0`) unless explicit promotion is approved.
 - CO-repo prerelease usage is allowed only in task-scoped lanes with captured evidence.
-- Current CO-approved prerelease candidate: `0.107.0-alpha.4`.
+- Latest evaluated prerelease lane: `0.107.0-alpha.9` (HOLD; not approved as default).
 - Manual Codex re-review requests are quota-aware: send at most one `@codex` ping per PR head SHA, then wait for a new head before re-requesting.
 - Codex review quota exhaustion is an operational availability event, not a prerelease-promotion signal; if it blocks review, use the merge-waiver path documented in `AGENTS.md` and `docs/AGENTS.md` (checks green, unresolved actionable threads = `0`, waiver evidence recorded).
 
@@ -22,7 +22,7 @@ For any prerelease promotion decision in CO:
 - Run weekly backstop canary while CO is actively using a prerelease.
 
 ## Rollback
-- Any failed required gate or regression signal triggers immediate HOLD and rollback to stable (`0.106.0`).
+- Any failed required gate or regression signal triggers immediate HOLD and rollback to stable (`0.107.0`).
 - Record rollback decision in:
   - `docs/TASKS.md`
   - `tasks/index.json`

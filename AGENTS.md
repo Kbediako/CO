@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp a247787d8961b1c4a8eeabf8d9abb7aa0752f4ef63fcfdebf5e7106a3877f7a9 -->
+<!-- codex:instruction-stamp d90a69039d1b189eb870427b2fd7c2bbca4f61141dce83e1b4b4ba450656fddc -->
 # Codex-Orchestrator Agent Handbook (Template)
 
 Use this repository as the wrapper that coordinates multiple Codex-driven projects. After cloning, replace placeholder metadata (task IDs, documents, SOPs) with values for each downstream initiative while keeping these shared guardrails in place.
@@ -12,7 +12,7 @@ Use this repository as the wrapper that coordinates multiple Codex-driven projec
 - Keep mode semantics explicit and orthogonal: `executionMode=mcp|cloud` and `runtimeMode=cli|appserver` are separate controls.
 - Local default runtime remains `appserver` (ChatGPT login-first / app-server path), with `--runtime-mode cli` preserved as break-glass.
 - `executionMode=cloud` with explicit `runtimeMode=appserver` is unsupported and must fail fast with actionable errors.
-- Feature posture: `js_repl` is enabled by default globally (local + cloud lanes). For deterministic cloud contracts, pin explicit task-scoped feature lanes (`CODEX_CLOUD_ENABLE_FEATURES=js_repl` and separate `CODEX_CLOUD_DISABLE_FEATURES=js_repl` runs) and record manifest-backed evidence in checklist mirrors. Use `CODEX_CLOUD_DISABLE_FEATURES=js_repl` for task-scoped cloud break-glass; reserve `codex features disable js_repl` for global emergency toggles and re-enable afterward with `codex features enable js_repl`. Keep `memory_tool` scoped to explicit eval lanes.
+- Feature posture: `js_repl` is enabled by default globally (local + cloud lanes). For deterministic cloud contracts, pin explicit task-scoped feature lanes (`CODEX_CLOUD_ENABLE_FEATURES=js_repl` and separate `CODEX_CLOUD_DISABLE_FEATURES=js_repl` runs) and record manifest-backed evidence in checklist mirrors. Use `CODEX_CLOUD_DISABLE_FEATURES=js_repl` for task-scoped cloud break-glass; reserve `codex features disable js_repl` for global emergency toggles and re-enable afterward with `codex features enable js_repl`. Keep `memories` scoped to explicit eval lanes (legacy alias `memory_tool` remains compatibility-only).
 - Keep the safe approval profile (`read/edit/run/network`). Capture any escalation in `.runs/<task>/<timestamp>/manifest.json` under `approvals`.
 - Run `node scripts/delegation-guard.mjs` before requesting review; if delegation is not possible, set `DELEGATION_GUARD_OVERRIDE_REASON` and record the rationale in the task checklist.
 - Run `node scripts/spec-guard.mjs --dry-run` before requesting review. Update specs or refresh approvals when the guard fails.
@@ -41,7 +41,8 @@ Use this repository as the wrapper that coordinates multiple Codex-driven projec
 ## Codex Version Policy (CO Scope)
 - Keep the global Codex CLI default on stable releases; do not require alpha/prerelease globally for CO work.
 - Use alpha/prerelease only in explicit, task-scoped CO lanes where evidence is captured under `.runs/<task-id>/` and `out/<task-id>/manual/`.
-- Current CO canary-approved prerelease is `0.107.0-alpha.4`; stable rollback/default pin is `0.106.0`.
+- Stable rollback/default pin is `0.107.0`.
+- Latest evaluated prerelease lane is `0.107.0-alpha.9` (HOLD; not approved as default).
 - Alpha adoption is evidence-gated: no P0/P1 regressions, runtime-mode canary pass, and required cloud canary contract pass.
 - If any required lane fails (or required cloud evidence is unavailable), hold/revert to stable and record the decision in `docs/TASKS.md`, `tasks/index.json`, and task checklists.
 - For policy details and cadence, follow `docs/guides/codex-version-policy.md`.

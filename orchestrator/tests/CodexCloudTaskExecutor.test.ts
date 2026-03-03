@@ -318,7 +318,7 @@ describe('CodexCloudTaskExecutor', () => {
       timeoutSeconds: 60,
       attempts: 1,
       branch: 'main',
-      enableFeatures: ['sqlite', 'memory_tool', 'sqlite'],
+      enableFeatures: ['sqlite', 'memories', 'sqlite'],
       disableFeatures: ['js_repl']
     });
 
@@ -335,7 +335,7 @@ describe('CodexCloudTaskExecutor', () => {
       '--enable',
       'sqlite',
       '--enable',
-      'memory_tool',
+      'memories',
       '--disable',
       'js_repl',
       'Fix the issue'

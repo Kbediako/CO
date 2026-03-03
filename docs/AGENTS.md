@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp ee7b956e4118a20811c93c994ab2e5364fe4bbdddc8206629a44f7bc159d7ca3 -->
+<!-- codex:instruction-stamp 42afedb12a42de353afdd0d55d8f42af337857fba8d28036cef1a54a6b5a3622 -->
 # Repository Agent Guidance
 
 ## Project 0303 — Codex Orchestrator Autonomy Enhancements
@@ -42,7 +42,7 @@
 - Local default runtime remains `appserver`, with `--runtime-mode cli` preserved as break-glass.
 - `executionMode=cloud` with explicit `runtimeMode=appserver` is unsupported and must fail fast with actionable errors.
 - `js_repl` is enabled by default globally (local + cloud lanes). For deterministic cloud contracts, pin explicit task-scoped feature lanes (`CODEX_CLOUD_ENABLE_FEATURES=js_repl` and separate `CODEX_CLOUD_DISABLE_FEATURES=js_repl` runs) and record manifest-backed evidence in checklist mirrors. Use `CODEX_CLOUD_DISABLE_FEATURES=js_repl` for task-scoped cloud break-glass; reserve `codex features disable js_repl` for global emergency toggles and re-enable with `codex features enable js_repl`.
-- Keep `memory_tool` scoped to explicit eval lanes until promoted by evidence.
+- Keep `memories` scoped to explicit eval lanes until promoted by evidence (legacy alias `memory_tool` is compatibility-only).
 - Before implementation, run a standalone review of the task/spec against the user’s intent and record the approval in the spec + checklist notes. If anything is vague, infer with a subagent and self-approve or offer options; only ask the user when truly blocked.
 - Delegation is mandatory for top-level tasks once a task id exists: spawn at least one subagent run using `MCP_RUNNER_TASK_ID=<task-id>-<stream>`, capture manifest evidence, and summarize in the main run. Use `DELEGATION_GUARD_OVERRIDE_REASON` only when delegation is impossible and record the justification.
 - Once a task id exists, prefer delegation for research, review, and planning work. Use `codex exec` only for pre-task triage (no task id yet) or when delegation is genuinely unavailable (technical/blocking limitation or explicit operational block), and set `DELEGATION_GUARD_OVERRIDE_REASON` with a clear justification.
@@ -52,7 +52,8 @@
 - Follow `.agent/SOPs/oracle-usage.md` for Oracle runs (tool cap: 11 attachments; unique basenames; attachments-first workflow).
 
 ## Codex Version Policy (Execution)
-- Default execution for this repository remains stable Codex CLI (`0.106.0`) unless task-scoped evidence explicitly promotes a newer version.
+- Default execution for this repository remains stable Codex CLI (`0.107.0`) unless task-scoped evidence explicitly promotes a newer version.
+- Latest evaluated prerelease lane is `0.107.0-alpha.9` (HOLD; not approved as default).
 - CO may run alpha/prerelease Codex in explicit task-scoped canary lanes only; do not treat prerelease as an automatic global default.
 - Required policy checks for alpha lanes:
   - `scripts/runtime-mode-canary.mjs`
