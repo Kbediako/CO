@@ -13,7 +13,8 @@ This repo’s git practices prioritize cloneability, reviewability, and evidence
 ## Branching
 - Create a branch per task using the task id: `<task-id>/<slug>` (example: `0906-docs-hygiene-automation/docs-check`).
 - Keep exploratory work in throwaway branches/worktrees; only preserve what you intend to review.
-- Top-level agents merge via GitHub once checks are green and no new feedback lands within a 10–20 minute monitoring window; never merge draft PRs or PRs labeled "do not merge."
+- Top-level agents merge via GitHub once checks are green and no new feedback lands within a 10–20 minute monitoring window; unresolved actionable review threads must be `0` before merge, and draft PRs / PRs labeled "do not merge" never merge.
+- If Codex review is unavailable due to quota, require an explicit merge waiver with evidence (checks green, unresolved actionable threads `0`, waiver rationale recorded in the task checklist).
 - For cloud-mode runs, ensure the branch exists on the remote. If your working branch is local-only, set `CODEX_CLOUD_BRANCH` to a pushed branch (typically `main`) before invoking cloud execution.
 
 ## Commits

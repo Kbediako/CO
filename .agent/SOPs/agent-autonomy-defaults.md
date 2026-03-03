@@ -20,7 +20,7 @@ Applies to lead orchestrator runs in this repo and defines default decision poli
 - Scope expansions beyond the request or missing/stale specs (see `.agent/SOPs/specs-and-research.md`).
 
 ## Subagent Collaboration
-- Delegation is mandatory for top-level tasks: spawn at least one subagent for scoped investigation, cross-cutting analysis, or specialized skills to conserve context.
+- Delegation is mandatory for top-level tasks once a task id exists: spawn at least one subagent for scoped investigation, cross-cutting analysis, or specialized skills to conserve context.
 - Use a distinct task id and prefer a separate worktree; link runs with `--parent-run <run-id>`.
 - Provide a narrow prompt, constraints, and explicit deliverables.
 - Summarize the result in the primary run with manifest paths; proceed unless it conflicts with user requirements.

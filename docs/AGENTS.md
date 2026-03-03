@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp 42afedb12a42de353afdd0d55d8f42af337857fba8d28036cef1a54a6b5a3622 -->
+<!-- codex:instruction-stamp e54375fdb70d13f092601fbb0ce8c7b0ad3b068a8e9d5d9adab54ea84f043466 -->
 # Repository Agent Guidance
 
 ## Project 0303 — Codex Orchestrator Autonomy Enhancements
@@ -38,6 +38,7 @@
 - Avoid ad-hoc command chains unless the work is a lightweight discovery step that does not require manifest evidence.
 - Use cloud mode when work is long-running/parallel and cloud prerequisites are ready; otherwise stay in local `mcp` mode.
 - Cloud preflight: confirm remote branch availability, non-interactive setup commands, and required cloud secrets/variables; if missing, record local fallback rationale in checklist/manifests.
+- For strict cloud lanes, set `CODEX_ORCHESTRATOR_CLOUD_FALLBACK=deny` so preflight failures fail fast instead of falling back.
 - Keep mode semantics explicit and orthogonal: `executionMode=mcp|cloud` and `runtimeMode=cli|appserver` are separate controls.
 - Local default runtime remains `appserver`, with `--runtime-mode cli` preserved as break-glass.
 - `executionMode=cloud` with explicit `runtimeMode=appserver` is unsupported and must fail fast with actionable errors.
@@ -66,10 +67,12 @@
 - Default to MCP for approvals, tool routing, delegation, external integrations, and audit trails.
 - Use collab only for intra-run brainstorming, role-split planning, or parallel subcalls.
 - Collab means auxiliary assistant agents inside a run; enable it via `RLM_SYMBOLIC_MULTI_AGENT=1` (legacy alias: `RLM_SYMBOLIC_COLLAB=1`; see `docs/guides/collab-vs-mcp.md`).
+- For collab `spawn_agent`, always set explicit `agent_type` (omission defaults to `default`) and prefix prompts with `[agent_type:<role>]`; use `fork_context=true` only when a stream explicitly needs prior thread history.
 - The “top-level Codex” is the MCP-run agent the user is interacting with; collab agents are assistants and do not represent the run.
 
 ## Standalone Reviews (Ad-hoc)
-- Use `codex review` for fast checks during implementation.
+- Prefer `npm run review` for ad-hoc reviews in this repo so task-scoped evidence is captured and delegation MCP remains enabled by default.
+- Use direct `codex review` only for quick best-effort checks when manifest-backed evidence is not needed.
 - Current Codex CLI behavior: do not combine prompt arguments with `--uncommitted`, `--base`, or `--commit`; use either diff-scoped review (no prompt) or prompt-only review.
 - Capture the standalone review approval (even if “no issues”) in the spec/task notes before implementation begins.
 - For manifest-backed review evidence, run `TASK=<task-id> NOTES="Goal: ... | Summary: ... | Risks: ..." codex-orchestrator review --manifest <path>` (repo alias: `npm run review -- --manifest <path>`).

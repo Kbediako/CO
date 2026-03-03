@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp d90a69039d1b189eb870427b2fd7c2bbca4f61141dce83e1b4b4ba450656fddc -->
+<!-- codex:instruction-stamp 283480584690870dd9e1485db54bd4a8ee3958f96082edcd6d09fb5d4dfb0147 -->
 # Codex-Orchestrator Agent Handbook (Template)
 
 Use this repository as the wrapper that coordinates multiple Codex-driven projects. After cloning, replace placeholder metadata (task IDs, documents, SOPs) with values for each downstream initiative while keeping these shared guardrails in place.
@@ -8,7 +8,7 @@ Use this repository as the wrapper that coordinates multiple Codex-driven projec
 - Switch to cloud mode only if your task plan explicitly allows it and the reviewer records the override in the active run manifest.
 - Prefer cloud mode when work is long-running, highly parallel, or blocked by local resource constraints.
 - Before cloud mode, run a quick preflight: remote branch exists, setup commands are non-interactive, and required secrets/variables are available.
-- If cloud preflight fails (for example, missing cloud environment wiring), continue in local `mcp` mode and record the fallback reason in checklist/manifests.
+- If cloud preflight fails (for example, missing cloud environment wiring), continue in local `mcp` mode and record the fallback reason in checklist/manifests; for strict cloud lanes, set `CODEX_ORCHESTRATOR_CLOUD_FALLBACK=deny` to fail fast instead of falling back.
 - Keep mode semantics explicit and orthogonal: `executionMode=mcp|cloud` and `runtimeMode=cli|appserver` are separate controls.
 - Local default runtime remains `appserver` (ChatGPT login-first / app-server path), with `--runtime-mode cli` preserved as break-glass.
 - `executionMode=cloud` with explicit `runtimeMode=appserver` is unsupported and must fail fast with actionable errors.
@@ -28,6 +28,7 @@ Use this repository as the wrapper that coordinates multiple Codex-driven projec
 - Built-in roles are `default`, `explorer`, `worker`, and `awaiter`; `researcher` is user-defined.
 - `spawn_agent` defaults to `default` when `agent_type` is omitted; always set `agent_type` explicitly.
 - For symbolic collab runs, prefix spawned prompts with `[agent_type:<role>]` on line one so role intent is auditable from JSONL/manifests.
+- For spawned subagents, default to bounded prompts without inherited context; use `fork_context=true` only when a stream explicitly needs prior thread history to avoid prompt bloat/redundancy.
 - Keep top-level defaults on latest codex by setting `model = "gpt-5.3-codex"` in `~/.codex/config.toml`.
 - Set `model_reasoning_effort` to at least `high` (CO default: `xhigh`) so spawned agents inherit high-reasoning behavior unless role overrides change it.
 - Built-in `explorer` now inherits top-level model defaults unless you attach a custom `config_file`; keep an explicit `agents.explorer` entry only when you want a custom description/override.

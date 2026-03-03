@@ -102,6 +102,7 @@ Skip subagents when all conditions are true:
   - `message` (plain text), or
   - `items` (structured input).
 - Do not send both `message` and `items` in one spawn call.
+- Keep `fork_context` disabled by default to preserve bounded context. Enable `fork_context=true` only when the subagent needs prior thread history that would otherwise be costly/risky to restate.
 - `spawn_agent` falls back to `default` when `agent_type` is omitted; always set `agent_type` explicitly.
 - Prefix spawned prompts with `[agent_type:<role>]` on line one so role intent is auditable from collab JSONL/manifests.
 - Use `items` when you need explicit structured context (for example `mention` paths like `app://...` or selected `skill` entries) instead of flattening everything into one long string.

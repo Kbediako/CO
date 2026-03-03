@@ -60,6 +60,7 @@ For explicit stage control:
 
 - `js_repl` is default-on globally (local + cloud lanes); use explicit cloud feature lanes for deterministic contracts.
 - `memories` stays scoped to explicit eval lanes.
+- Subagent context forking (`fork_context`) is guidance-first: keep it `false` for bounded streams, and set `true` only when the child must inherit prior thread history.
 - Compatibility note: upstream still accepts the legacy alias `memory_tool`; use `memories` in new CO guidance unless documenting legacy compatibility behavior.
 
 ## Related Docs

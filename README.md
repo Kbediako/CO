@@ -107,6 +107,7 @@ codex -c 'mcp_servers.delegation.enabled=true' ...
 Codex built-ins are `default`, `explorer`, `worker`, and `awaiter`. `researcher` is user-defined.
 - `spawn_agent` defaults to `default` when `agent_type` is omitted, so always set `agent_type` explicitly.
 - Multi-turn loops are supported (`spawn_agent` -> `send_input` -> `wait`/`resume_agent` -> `close_agent`), so subagents can iterate before parent synthesis.
+- Keep `fork_context` off by default for bounded subagent streams; set `fork_context=true` only when the subagent must inherit prior thread history.
 
 In Codex CLI `0.105.0`, built-in `explorer` no longer pins an older model profile; it inherits top-level defaults unless you attach a role `config_file`.
 CO now ships this downstream starter config via `init codex` (source template: `templates/codex/.codex/config.toml`; installed as .codex/config.toml in target repos):
@@ -165,7 +166,7 @@ Delegation guard profile:
 
 RLM (Recursive Language Model) is the long-horizon loop used by the `rlm` pipeline (`codex-orchestrator rlm "<goal>"` or `codex-orchestrator start rlm --goal "<goal>"`). Delegated runs only enter RLM when the child is launched with the `rlm` pipeline (or the rlm runner directly). In auto mode it resolves to symbolic only when context is large (`RLM_SYMBOLIC_MIN_BYTES`) and an explicit context signal is present (`RLM_CONTEXT_PATH` or delegated run); otherwise it stays iterative. The runner writes state to `.runs/<task-id>/cli/<run-id>/rlm/state.json` and stops when the validator passes or budgets are exhausted.
 For symbolic mode, the Option 2 alignment checker is enabled by default (`RLM_ALIGNMENT_CHECKER=1`) and writes append-only alignment artifacts under `.runs/<task-id>/cli/<run-id>/rlm/alignment/` (ledger + projection). Rollback toggle: set `RLM_ALIGNMENT_CHECKER=0`. Enforcement is opt-in via `RLM_ALIGNMENT_CHECKER_ENFORCE=1`.
-Symbolic subcalls can optionally use collab tools. Fast path: `codex-orchestrator rlm --multi-agent auto "<goal>"` (legacy alias: `--collab auto`; sets `RLM_SYMBOLIC_MULTI_AGENT=1` plus legacy `RLM_SYMBOLIC_COLLAB=1` for compatibility, and implies symbolic mode). Collab requires `multi_agent=true` in `codex features list` (`collab` remains a legacy alias). Collab tool calls parsed from `codex exec --json --enable multi_agent` are stored in `manifest.collab_tool_calls` (bounded by `CODEX_ORCHESTRATOR_COLLAB_MAX_EVENTS`, set to `0` to disable). For auditable role routing, prefix spawned prompts with `[agent_type:<role>]` and set `spawn_agent.agent_type` when supported; lifecycle validation enforces prompt-role evidence and validates `agent_type` when present (`RLM_SYMBOLIC_MULTI_AGENT_ROLE_POLICY=warn|off`, legacy alias `RLM_COLLAB_ROLE_POLICY`; `RLM_SYMBOLIC_MULTI_AGENT_ALLOW_DEFAULT_ROLE=1`, legacy alias `RLM_COLLAB_ALLOW_DEFAULT_ROLE`). `codex-orchestrator codex setup` remains available when you want a managed/pinned CLI path (opt-in via `CODEX_CLI_USE_MANAGED=1`).
+Symbolic subcalls can optionally use collab tools. Fast path: `codex-orchestrator rlm --multi-agent auto "<goal>"` (legacy alias: `--collab auto`; sets `RLM_SYMBOLIC_MULTI_AGENT=1` plus legacy `RLM_SYMBOLIC_COLLAB=1` for compatibility, and implies symbolic mode). Collab requires `multi_agent=true` in `codex features list` (`collab` remains a legacy alias). Collab tool calls parsed from `codex exec --json --enable multi_agent` are stored in `manifest.collab_tool_calls` (bounded by `CODEX_ORCHESTRATOR_COLLAB_MAX_EVENTS`, set to `0` to disable); when present in events, `spawn_agent.fork_context` is captured for observability and surfaced in `codex-orchestrator doctor --usage` fork-context counters. For auditable role routing, prefix spawned prompts with `[agent_type:<role>]` and set `spawn_agent.agent_type` when supported; lifecycle validation enforces prompt-role evidence and validates `agent_type` when present (`RLM_SYMBOLIC_MULTI_AGENT_ROLE_POLICY=warn|off`, legacy alias `RLM_COLLAB_ROLE_POLICY`; `RLM_SYMBOLIC_MULTI_AGENT_ALLOW_DEFAULT_ROLE=1`, legacy alias `RLM_COLLAB_ALLOW_DEFAULT_ROLE`). `codex-orchestrator codex setup` remains available when you want a managed/pinned CLI path (opt-in via `CODEX_CLI_USE_MANAGED=1`).
 For batch fan-out jobs, prefer native `spawn_agents_on_csv` before building custom orchestration wrappers.
 
 ### Delegation flow
@@ -230,6 +231,7 @@ Bundled skills (may vary by release):
 - `chrome-devtools`
 - `delegation-usage`
 - `standalone-review`
+- `elegance-review`
 - `docs-first`
 - `collab-evals`
 - `collab-deliberation`
@@ -287,7 +289,7 @@ codex-orchestrator doctor --cloud-preflight
 - Active PR watch-resolve-merge loop: `codex-orchestrator pr resolve-merge --pr <number> --quiet-minutes <window>` (add `--auto-merge` when approved; exits early when author action is required).
 - Passive PR monitor loop: `codex-orchestrator pr watch-merge --pr <number> --quiet-minutes <window>` (monitor-only behavior; keeps waiting unless terminal/timeout).
 - Review checkpoints (npm-only safe): `NOTES="Goal: ... | Summary: ... | Risks: ..." codex-orchestrator review --task <task-id>` for manifest-backed standalone review wrapper behavior (auto-skips repo-only diff-budget script when unavailable in downstream installs); use `codex review "<focus>"` for quick prompt-only checks; use `codex-orchestrator start implementation-gate --task <task-id> --format json` when you want a full gate run.
-- Downstream simulation before shipping wrapper/skill changes: `npm run pack:smoke` (packaged CLI in temp mock repo; validates `review` artifacts and `long-poll-wait` install path).
+- Downstream simulation before shipping wrapper/skill changes: `npm run pack:smoke` (packaged CLI in temp mock repo; validates `review` artifacts and `long-poll-wait` install path; spot-check gate). Use `npm run pack:audit` for full tarball inventory validation.
 - Delegation: `codex-orchestrator doctor --apply --yes`, then enable for a Codex run with: `codex -c 'mcp_servers.delegation.enabled=true' ...`
 - Collab (symbolic RLM subagents): `codex-orchestrator rlm --multi-agent auto "<goal>"` (legacy alias: `--collab auto`; requires Codex `features.multi_agent=true`)
 - Cloud: set `CODEX_CLOUD_ENV_ID` (and optional `CODEX_CLOUD_BRANCH`), then run: `codex-orchestrator start <pipeline> --cloud --target <stage-id>`

@@ -40,6 +40,9 @@ describe('formatDoctorUsageSummary', () => {
           { tool: 'exec_command', calls: 4 }
         ],
         capture_disabled: false,
+        spawn_agent_fork_context_true: 3,
+        spawn_agent_fork_context_false: 2,
+        spawn_agent_fork_context_unknown: 1,
         runs_with_unclosed_spawn_agents: 1,
         unclosed_spawn_agents: 2,
         runs_with_spawn_thread_limit_failures: 1,
@@ -93,6 +96,7 @@ describe('formatDoctorUsageSummary', () => {
     expect(summary).toContain('leaks=2 over 1 run(s)');
     expect(summary).toContain('likely_thread_limit_spawns=1 over 1 run(s)');
     expect(summary).toContain('lifecycle_unknown_runs=1');
+    expect(summary).toContain('fork_context=3/2/1');
     expect(summary).toContain('tools[');
     expect(summary).toContain('delegation: 1/2');
     expect(summary).toContain('child_runs=2');
@@ -234,7 +238,8 @@ describe('runDoctorUsage', () => {
                 tool: 'spawn_agent',
                 status: 'completed',
                 sender_thread_id: 'parent',
-                receiver_thread_ids: ['agent-a']
+                receiver_thread_ids: ['agent-a'],
+                fork_context: true
               },
               {
                 observed_at: '2026-02-18T00:00:11.000Z',
@@ -266,7 +271,8 @@ describe('runDoctorUsage', () => {
                 tool: 'spawn_agent',
                 status: 'completed',
                 sender_thread_id: 'parent',
-                receiver_thread_ids: ['agent-b']
+                receiver_thread_ids: ['agent-b'],
+                fork_context: false
               },
               {
                 observed_at: '2026-02-18T00:00:14.000Z',
@@ -311,6 +317,9 @@ describe('runDoctorUsage', () => {
       expect(result.collab.unclosed_spawn_agents).toBe(1);
       expect(result.collab.runs_with_spawn_thread_limit_failures).toBe(1);
       expect(result.collab.spawn_thread_limit_failures).toBe(1);
+      expect(result.collab.spawn_agent_fork_context_true).toBe(1);
+      expect(result.collab.spawn_agent_fork_context_false).toBe(1);
+      expect(result.collab.spawn_agent_fork_context_unknown).toBe(2);
       expect(result.collab.runs_with_potentially_truncated_tool_calls).toBe(0);
       expect(result.collab.runs_with_unknown_capture_limit).toBe(0);
     } finally {
@@ -420,6 +429,9 @@ describe('runDoctorUsage', () => {
       expect(result.collab.unclosed_spawn_agents).toBe(0);
       expect(result.collab.runs_with_spawn_thread_limit_failures).toBe(0);
       expect(result.collab.spawn_thread_limit_failures).toBe(0);
+      expect(result.collab.spawn_agent_fork_context_true).toBe(0);
+      expect(result.collab.spawn_agent_fork_context_false).toBe(0);
+      expect(result.collab.spawn_agent_fork_context_unknown).toBe(2);
     } finally {
       if (previousEnv.root === undefined) {
         delete process.env.CODEX_ORCHESTRATOR_ROOT;
@@ -489,7 +501,8 @@ describe('runDoctorUsage', () => {
                 tool: 'spawn_agent',
                 status: 'completed',
                 sender_thread_id: 'parent',
-                receiver_thread_ids: ['agent-a']
+                receiver_thread_ids: ['agent-a'],
+                fork_context: true
               }
             ]
           },
@@ -512,6 +525,9 @@ describe('runDoctorUsage', () => {
       expect(result.collab.unclosed_spawn_agents).toBe(0);
       expect(result.collab.runs_with_spawn_thread_limit_failures).toBe(0);
       expect(result.collab.spawn_thread_limit_failures).toBe(0);
+      expect(result.collab.spawn_agent_fork_context_true).toBe(1);
+      expect(result.collab.spawn_agent_fork_context_false).toBe(0);
+      expect(result.collab.spawn_agent_fork_context_unknown).toBe(0);
     } finally {
       if (previousEnv.root === undefined) {
         delete process.env.CODEX_ORCHESTRATOR_ROOT;

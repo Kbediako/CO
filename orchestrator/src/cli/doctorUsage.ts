@@ -51,6 +51,9 @@ export interface DoctorUsageResult {
     by_event_type: Record<string, number>;
     top_tools: { tool: string; calls: number }[];
     capture_disabled: boolean;
+    spawn_agent_fork_context_true: number;
+    spawn_agent_fork_context_false: number;
+    spawn_agent_fork_context_unknown: number;
     runs_with_unclosed_spawn_agents: number;
     unclosed_spawn_agents: number;
     runs_with_spawn_thread_limit_failures: number;
@@ -116,6 +119,9 @@ export async function runDoctorUsage(options: DoctorUsageOptions = {}): Promise<
   const collabByEventType: Record<string, number> = {};
   const collabTools = new Map<string, number>();
   const collabCaptureDisabled = String(process.env.CODEX_ORCHESTRATOR_COLLAB_MAX_EVENTS ?? '').trim() === '0';
+  let collabSpawnForkContextTrue = 0;
+  let collabSpawnForkContextFalse = 0;
+  let collabSpawnForkContextUnknown = 0;
   let collabRunsWithUnclosedSpawnAgents = 0;
   let collabUnclosedSpawnAgents = 0;
   let collabRunsWithSpawnThreadLimitFailures = 0;
@@ -258,6 +264,13 @@ export async function runDoctorUsage(options: DoctorUsageOptions = {}): Promise<
         }
 
         if (tool === 'spawn_agent') {
+          if (entry?.fork_context === true) {
+            collabSpawnForkContextTrue += 1;
+          } else if (entry?.fork_context === false) {
+            collabSpawnForkContextFalse += 1;
+          } else {
+            collabSpawnForkContextUnknown += 1;
+          }
           if (isFailed) {
             const rawFailedSpawnId = typeof entry?.item_id === 'string' ? entry.item_id.trim() : '';
             const failedSpawnId =
@@ -405,6 +418,9 @@ export async function runDoctorUsage(options: DoctorUsageOptions = {}): Promise<
       by_event_type: collabByEventType,
       top_tools: collabTopTools,
       capture_disabled: collabCaptureDisabled,
+      spawn_agent_fork_context_true: collabSpawnForkContextTrue,
+      spawn_agent_fork_context_false: collabSpawnForkContextFalse,
+      spawn_agent_fork_context_unknown: collabSpawnForkContextUnknown,
       runs_with_unclosed_spawn_agents: collabRunsWithUnclosedSpawnAgents,
       unclosed_spawn_agents: collabUnclosedSpawnAgents,
       runs_with_spawn_thread_limit_failures: collabRunsWithSpawnThreadLimitFailures,
@@ -490,10 +506,12 @@ export function formatDoctorUsageSummary(result: DoctorUsageResult): string[] {
     collabLifecycleUnknownRuns > 0
       ? `, lifecycle_unknown_runs=${collabLifecycleUnknownRuns}`
       : '';
+  const collabForkContextSignal =
+    `, fork_context=${result.collab.spawn_agent_fork_context_true}/${result.collab.spawn_agent_fork_context_false}/${result.collab.spawn_agent_fork_context_unknown}`;
   const collabToolList = formatTopList(result.collab.top_tools.map((entry) => ({ key: entry.tool, value: entry.calls })), 3, 'tools');
   lines.push(
     `  - collab: ${result.collab.runs_with_tool_calls} (${formatPercent(result.collab.runs_with_tool_calls, result.runs.total)})${collabSuffix}`
-      + `${collabTaskSuffix}, events=${result.collab.total_tool_calls}${collabAvg} (ok=${collabOk}, failed=${collabFailed}${collabLeakSignal}${collabThreadLimitSignal}${collabLifecycleUnknownSignal})${collabToolList}`
+      + `${collabTaskSuffix}, events=${result.collab.total_tool_calls}${collabAvg} (ok=${collabOk}, failed=${collabFailed}${collabLeakSignal}${collabThreadLimitSignal}${collabLifecycleUnknownSignal}${collabForkContextSignal})${collabToolList}`
   );
   if (result.delegation.active_top_level_tasks > 0) {
     lines.push(
