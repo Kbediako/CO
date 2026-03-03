@@ -880,6 +880,7 @@
           "items": { "type": "string", "minLength": 1 }
         },
         "prompt": { "type": ["string", "null"] },
+        "fork_context": { "type": ["boolean", "null"] },
         "agents_states": {
           "type": ["object", "null"],
           "additionalProperties": true

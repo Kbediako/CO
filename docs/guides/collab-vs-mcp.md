@@ -6,6 +6,8 @@
 - If unsure, choose **MCP**. Collab is opt-in (`codex-orchestrator rlm --multi-agent auto "<goal>"` or `RLM_SYMBOLIC_MULTI_AGENT=1`; legacy aliases: `--collab auto`, `RLM_SYMBOLIC_COLLAB=1`) and requires Codex `features.multi_agent=true` (`collab` is a legacy alias).
 - **Top-level Codex (lead/representative) must run via MCP.** Collab agents are subordinate assistants and do not represent the run or make final decisions.
 - For collab `spawn_agent`, always set explicit `agent_type` (omission defaults to `default`) and tag spawned prompts with `[agent_type:<role>]`.
+- Keep `fork_context` off by default for bounded streams; set `fork_context=true` only when inheriting prior thread history is required.
+- Inherited-context subagents are higher drift-risk on long parent threads; treat `fork_context=true` as an explicit exception and review `codex-orchestrator doctor --usage` fork-context counters to monitor real usage.
 
 ## Decision matrix
 

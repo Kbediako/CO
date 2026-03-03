@@ -375,6 +375,7 @@ export interface CollabToolCall {
   sender_thread_id: string;
   receiver_thread_ids: string[];
   prompt?: string | null;
+  fork_context?: boolean | null;
   agents_states?: {
     [k: string]: unknown;
   } | null;

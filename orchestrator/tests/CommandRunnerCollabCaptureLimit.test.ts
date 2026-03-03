@@ -37,7 +37,7 @@ vi.mock('../src/cli/services/execRuntime.js', () => {
           sequence: 1,
           bytes: 1,
           data:
-            '{"type":"item.completed","item":{"type":"collab_tool_call","id":"item_1","tool":"spawn_agent","status":"completed","sender_thread_id":"parent","receiver_thread_ids":["agent-1"]}}\n' +
+            '{"type":"item.completed","item":{"type":"collab_tool_call","id":"item_1","tool":"spawn_agent","status":"completed","sender_thread_id":"parent","receiver_thread_ids":["agent-1"],"fork_context":true}}\n' +
             '{"type":"item.completed","item":{"type":"collab_tool_call","id":"item_2","tool":"close_agent","status":"completed","sender_thread_id":"parent","receiver_thread_ids":["agent-1"]}}\n'
         }
       };
@@ -181,6 +181,7 @@ describe('runCommandStage collab capture limit persistence', () => {
     expect(manifest.collab_tool_calls_max_events).toBe(1);
     expect(manifest.collab_tool_calls).toHaveLength(1);
     expect(manifest.collab_tool_calls?.[0]?.tool).toBe('spawn_agent');
+    expect(manifest.collab_tool_calls?.[0]?.fork_context).toBe(true);
   });
   it('keeps legacy unknown capture limits unset when resuming runs with existing collab history', async () => {
     const env = normalizeEnvironmentPaths(resolveEnvironmentPaths());

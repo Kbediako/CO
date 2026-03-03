@@ -26,6 +26,7 @@ Multi-agent (collab tools) mode is separate from delegation. For symbolic RLM su
 - Do not send both `message` and `items` in the same `spawn_agent` call.
 - `spawn_agent` falls back to `default` when `agent_type` is omitted; always set `agent_type` explicitly.
 - For auditable role routing, prefix spawned prompts with `[agent_type:<role>]` on the first line and keep it aligned with `agent_type`.
+- Keep `fork_context` disabled by default for bounded streams; use `fork_context=true` only when the child must inherit prior thread context.
 - Spawn returns an `agent_id` (thread id). Current TUI collab rendering is id-based; do not depend on custom visible agent names.
 - Subagents spawned through collab run with approval effectively set to `never`; design child tasks to avoid approval/escalation requirements.
 - Collab spawn depth is bounded. Near/at max depth, recursive delegation can fail or collab can be disabled in children; prefer shallow parent fan-out.

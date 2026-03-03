@@ -12,7 +12,7 @@ Use this playbook whenever handing off a review (`npm run review` or an implemen
 5. Monitor checks and reviewer feedback for at least 10 minutes after checks go green. Scale the watch window based on PR complexity because the Codex connector can lag:
    - Small: ≤50 LOC net, ≤3 files, no pipeline/guardrail changes → 10 min.
    - Medium: 51–200 LOC or 4–10 files, touches scripts/docs/pipelines → 15–20 min.
-   - Large: >200 LOC, >10 files, touches CI/guardrails/release paths or adds deps → 25–30 min.
+   - Large: >200 LOC, >10 files, touches CI/guardrails/release paths or adds deps → 20 min.
    - Preferred active monitor command (shipped): `codex-orchestrator pr resolve-merge --pr <number> --quiet-minutes <window>` (add `--auto-merge` when merge is approved).
      - `resolve-merge` exits early when author action is required (for example `CHANGES_REQUESTED`, unresolved threads, unacknowledged head-commit bot inline feedback, or failing gate checks), so loops do not appear stuck.
    - Passive monitor alternative: `codex-orchestrator pr watch-merge --pr <number> --quiet-minutes <window>`.
@@ -50,6 +50,7 @@ Use this playbook whenever handing off a review (`npm run review` or an implemen
 ## GitHub agent review replies
 - Always reply directly in the original review discussion thread (line comment), not just top-level PR comments.
 - Tag the agent explicitly (e.g., `@coderabbitai`), and mention what changed plus the commit SHA.
+- Codex exception: do not per-thread tag Codex (`chatgpt-codex-connector`) for routine re-review because Codex auto-reruns on push; if manual re-review is needed, send at most one `@codex` ping per PR head SHA, then wait for a new head before pinging again.
 - CLI/API example for replying to a review comment:
 ```bash
 gh api -X POST repos/<org>/<repo>/pulls/<pr>/comments \

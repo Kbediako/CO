@@ -622,6 +622,7 @@ function parseCollabToolCallLine(
     sender_thread_id: typeof item.sender_thread_id === 'string' ? item.sender_thread_id : 'unknown',
     receiver_thread_ids: receiverThreadIds,
     prompt: typeof item.prompt === 'string' ? item.prompt : null,
+    fork_context: typeof item.fork_context === 'boolean' ? item.fork_context : null,
     agents_states:
       item.agents_states && typeof item.agents_states === 'object'
         ? (item.agents_states as Record<string, unknown>)

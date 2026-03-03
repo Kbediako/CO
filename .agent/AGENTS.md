@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp ef4b8299ae9f185f19191a5d66f12c67a7f3b823c30cfeb71daf05f0fc5c21cb -->
+<!-- codex:instruction-stamp c526044ab6e6995106c01699eee5a265ef976f6da1ecfa43e28fc6c50deeb237 -->
 # Agent Enablement
 
 ## Added by Bootstrap 2025-10-16
@@ -11,7 +11,9 @@
 - Deployment: coordinate through the deployment SOPs under `.agent/SOPs/` once environments are defined.
 
 ### Execution Modes & Approvals
-- Default run mode is `mcp`; switch to cloud only when the canonical task list flags `execution.parallel=true` and the reviewer records the override in the run manifest.
+- Default run mode is `mcp`; switch to cloud when the task plan justifies it and the reviewer records the override in the run manifest.
+- Before cloud mode, run preflight checks (remote branch exists, setup commands are non-interactive, required cloud variables/secrets are present). If preflight fails, continue in local `mcp` mode and record fallback reason.
+- For strict cloud lanes, set `CODEX_ORCHESTRATOR_CLOUD_FALLBACK=deny` so preflight failures fail fast instead of falling back.
 - Keep mode semantics explicit and orthogonal: `executionMode=mcp|cloud` and `runtimeMode=cli|appserver` are separate controls.
 - Local default runtime remains `appserver`, with `--runtime-mode cli` preserved as break-glass.
 - `executionMode=cloud` with explicit `runtimeMode=appserver` is unsupported and must fail fast with actionable errors.
@@ -27,6 +29,7 @@
 - Default to MCP for approvals, tool routing, delegation, external integrations, and audit trails.
 - Use collab only for intra-run brainstorming, role-split planning, or parallel subcalls.
 - Collab means auxiliary assistant agents inside a run; enable it via `RLM_SYMBOLIC_MULTI_AGENT=1` (legacy alias: `RLM_SYMBOLIC_COLLAB=1`; see `docs/guides/collab-vs-mcp.md`).
+- For collab `spawn_agent`, always set explicit `agent_type` and keep `fork_context` disabled unless the subagent explicitly needs prior thread history.
 - The “top-level Codex” is the MCP-run agent the user is interacting with; collab agents are assistants and do not represent the run.
 
 ### Meta-Orchestrator Mode (Parallel Workstreams)
@@ -56,7 +59,7 @@
 - Keep the prompt files `~/.codex/prompts/diagnostics.md` and `~/.codex/prompts/review-handoff.md` on every workstation (they are not checked into the repo). Each prompt wires `/prompts:<name>` to the required orchestrator commands so contributors do not have to remember the sequences manually.
 - `/prompts:diagnostics TASK=<task-id> MANIFEST=<path> [NOTES=<free text>]` exports `MCP_RUNNER_TASK_ID=$TASK`, runs `npx @kbediako/codex-orchestrator start diagnostics --format json`, tails `.runs/$TASK/cli/<run-id>/manifest.json` (or `npx @kbediako/codex-orchestrator status --run <run-id> --watch --interval 10`), and reminds you to mirror evidence + `$MANIFEST` references into `/tasks`, `docs/TASKS.md`, `.agent/task/...`, `.runs/$TASK/metrics.json`, and `out/$TASK/state.json`.
 - `/prompts:review-handoff TASK=<task-id> MANIFEST=<path> NOTES=<goal + summary + risks + optional questions>` re-validates guardrails via `node scripts/delegation-guard.mjs`, `node scripts/spec-guard.mjs --dry-run`, executes `npm run lint`, `npm run test`, optional `npm run eval:test`, runs `node scripts/diff-budget.mjs`, then runs `npm run review`, and ensures approvals/escalations are logged in `$MANIFEST` before checklists flip.
-- Standalone review (outside pipelines): use `codex review` (non-interactive) and run it often during implementation; for non-trivial work, run at implementation checkpoints (after coding bursts/sub-goals/feedback batches) and pair with an elegance pass before handoff/merge.
+- Standalone review (outside pipelines): prefer `npm run review` for manifest-backed evidence and delegation-aware defaults; use direct `codex review` only for quick best-effort checks when manifest evidence is not required.
 - Prompt compatibility: do not combine prompt arguments with `--uncommitted`, `--base`, or `--commit`; use either diff-scoped review (no prompt) or prompt-only review. See `docs/standalone-review-guide.md`.
 - For manifest evidence, run `TASK=<task-id> NOTES="..." MANIFEST=<path> npm run review -- --manifest <path>` (or ensure `MCP_RUNNER_TASK_ID` is already set); in non-interactive/CI (`CODEX_REVIEW_NON_INTERACTIVE=1`, `CODEX_NON_INTERACTIVE=1`, or `CODEX_NO_INTERACTIVE=1`) it prints the handoff prompt unless `FORCE_CODEX_REVIEW=1` is set.
 - Always use these prompts before running diagnostics or prepping a review; they are the canonical way to drive the orchestrator so manifests, approvals, and docs stay in sync across machines.
@@ -81,6 +84,8 @@ Note: pipelines already set `CODEX_NON_INTERACTIVE=1`; keep it for shortcut runs
 ### PR Lifecycle (Top-Level Agents)
 - Open PRs for code/config changes and keep the scope tied to the active task.
 - Monitor PR checks and review feedback for 10–20 minutes after all required checks turn green.
+- Before merge, verify unresolved actionable review threads are zero (replying is not the same as resolving); explicitly resolve each addressed thread or record a waiver with evidence in the task checklist.
+- If Codex review is unavailable due to quota, merge requires an explicit waiver: required checks are green, unresolved actionable review threads are `0`, and the task checklist records quota evidence plus the waiver decision.
 - If checks remain green and no new feedback arrives during the window, merge via GitHub and delete the branch.
 - Reset the window if checks restart or feedback arrives; do not merge draft PRs or PRs labeled "do not merge."
 
