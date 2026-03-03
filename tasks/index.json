@@ -1637,15 +1637,15 @@
       "title": "CO 0.1.38 Release + Skills/Docs Alignment",
       "path": "tasks/tasks-0992-release-0-1-38-skills-docs-alignment.md",
       "kind": "run",
-      "status": "in-progress",
+      "status": "completed",
       "gate": {
-        "phase": "release-0-1-38-skills-docs-alignment-validation",
+        "phase": "release-0-1-38-skills-docs-alignment-closeout",
         "status": "succeeded",
-        "log": "out/0992-release-0-1-38-skills-docs-alignment/manual/final-10-pack-smoke.log",
-        "run_id": null
+        "log": "out/0992-release-0-1-38-skills-docs-alignment/manual/release-closeout-summary.json",
+        "run_id": "22612201435"
       },
       "created_at": "2026-03-03",
-      "completed_at": null
+      "completed_at": "2026-03-03"
     }
   ],
   "specs": [
