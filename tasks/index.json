@@ -1637,7 +1637,7 @@
       "title": "CO 0.1.38 Release + Skills/Docs Alignment",
       "path": "tasks/tasks-0992-release-0-1-38-skills-docs-alignment.md",
       "kind": "run",
-      "status": "completed",
+      "status": "succeeded",
       "gate": {
         "phase": "release-0-1-38-skills-docs-alignment-closeout",
         "status": "succeeded",
