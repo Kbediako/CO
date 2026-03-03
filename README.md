@@ -47,7 +47,7 @@ Node.js >= 20 is required.
 - Local default runtime is `appserver`; preserve `--runtime-mode cli` as break-glass.
 - `--execution-mode cloud --runtime-mode appserver` is intentionally unsupported and fails fast with actionable errors.
 - `js_repl` is enabled by default globally. For deterministic cloud contracts, run explicit feature lanes (`CODEX_CLOUD_ENABLE_FEATURES=js_repl` and separate `CODEX_CLOUD_DISABLE_FEATURES=js_repl` runs). Use `CODEX_CLOUD_DISABLE_FEATURES=js_repl` for task-scoped cloud break-glass; reserve `codex features disable js_repl` for global emergency toggles and re-enable with `codex features enable js_repl`.
-- `memory_tool` remains scoped to explicit eval lanes.
+- `memories` remains scoped to explicit eval lanes (legacy alias `memory_tool` is compatibility-only).
 
 ## Downstream init (recommended)
 
@@ -225,6 +225,7 @@ Options:
 - `--codex-home <path>` targets a different Codex home directory.
 
 Bundled skills (may vary by release):
+- `codex-orchestrator`
 - `collab-subagents-first`
 - `chrome-devtools`
 - `delegation-usage`
