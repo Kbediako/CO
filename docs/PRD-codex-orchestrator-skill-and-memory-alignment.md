@@ -9,7 +9,7 @@
 - Success criteria / acceptance:
   - A bundled `codex-orchestrator` skill exists with clear usage routing and links to related skills.
   - Canonical feature naming for memory is aligned to `memories` in policy/guidance surfaces (while acknowledging legacy alias compatibility when needed).
-  - Version-policy references are up to date for current stable posture.
+  - Version-policy references are up-to-date for current stable posture.
   - Checklist mirrors, `tasks/index.json`, and `docs/TASKS.md` remain synchronized with evidence.
 - Constraints / non-goals:
   - Docs-first before implementation edits.

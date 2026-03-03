@@ -8,6 +8,7 @@
 > Set `MCP_RUNNER_TASK_ID=0991-codex-orchestrator-skill-and-memory-alignment` for orchestrator commands. Required quality lane: `node scripts/delegation-guard.mjs --task 0991-codex-orchestrator-skill-and-memory-alignment`, `node scripts/spec-guard.mjs --dry-run`, `npm run build`, `npm run lint`, `npm run test`, `npm run docs:check`, `npm run docs:freshness`, `node scripts/diff-budget.mjs`, `npm run review`, `npm run pack:smoke`.
 
 ## Foundation
+- [x] Standalone pre-implementation review of task/spec recorded in spec + checklist notes. - Evidence: `tasks/specs/0991-codex-orchestrator-skill-and-memory-alignment.md`.
 - [x] Docs-first artifacts created (PRD/TECH_SPEC/ACTION_PLAN/checklist mirror). - Evidence: `docs/PRD-codex-orchestrator-skill-and-memory-alignment.md`, `docs/TECH_SPEC-codex-orchestrator-skill-and-memory-alignment.md`, `docs/ACTION_PLAN-codex-orchestrator-skill-and-memory-alignment.md`, `tasks/specs/0991-codex-orchestrator-skill-and-memory-alignment.md`, `tasks/tasks-0991-codex-orchestrator-skill-and-memory-alignment.md`, `.agent/task/0991-codex-orchestrator-skill-and-memory-alignment.md`.
 - [x] `tasks/index.json` + `docs/TASKS.md` updated for task registration/status. - Evidence: `tasks/index.json`, `docs/TASKS.md`.
 - [x] Delegated bounded stream captured with durable manifest evidence. - Evidence: `.runs/0991-codex-orchestrator-skill-and-memory-alignment-scout/cli/2026-03-03T00-11-49-758Z-ca31ee02/manifest.json`, `out/0991-codex-orchestrator-skill-and-memory-alignment/manual/delegated-research-summary.md`.
@@ -18,6 +19,7 @@
 - [x] Codex stable version policy references refreshed to current baseline. - Evidence: `AGENTS.md`, `docs/AGENTS.md`, `.agent/AGENTS.md`, `docs/guides/codex-version-policy.md`.
 
 ## Validation
+- [x] docs-review manifest captured (pre-implementation). - Evidence: `.runs/0991-codex-orchestrator-skill-and-memory-alignment/cli/2026-03-03T00-35-21-259Z-3759748e/manifest.json`.
 - [x] 01 `node scripts/delegation-guard.mjs --task 0991-codex-orchestrator-skill-and-memory-alignment`. - Evidence: `out/0991-codex-orchestrator-skill-and-memory-alignment/manual/final-01-delegation-guard.log`.
 - [x] 02 `node scripts/spec-guard.mjs --dry-run`. - Evidence: `out/0991-codex-orchestrator-skill-and-memory-alignment/manual/final-02-spec-guard.log`.
 - [x] 03 `npm run build`. - Evidence: `out/0991-codex-orchestrator-skill-and-memory-alignment/manual/final-03-build.log`.
