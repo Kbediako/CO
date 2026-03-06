@@ -487,10 +487,18 @@ describe('TelegramOversightBridge', () => {
         }
       });
 
-      await waitForCondition(async () =>
-        telegram.sentMessages.some((message) => message.text.includes('CO status'))
-      );
-
+      await waitForCondition(async () => {
+        if (!telegram.sentMessages.some((message) => message.text.includes('CO status'))) {
+          return false;
+        }
+        try {
+          const stateRaw = await readFile(join(paths.runDir, 'telegram-oversight-state.json'), 'utf8');
+          const parsed = JSON.parse(stateRaw) as { next_update_id?: number };
+          return parsed.next_update_id === 202;
+        } catch {
+          return false;
+        }
+      });
       const stateRaw = await readFile(join(paths.runDir, 'telegram-oversight-state.json'), 'utf8');
       const state = JSON.parse(stateRaw) as { next_update_id?: number };
       expect(state.next_update_id).toBe(202);

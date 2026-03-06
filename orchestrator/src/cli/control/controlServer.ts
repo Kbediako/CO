@@ -31,13 +31,13 @@ import {
   resolveLiveLinearTrackedIssueById,
   type LiveLinearTrackedIssue
 } from './linearDispatchSource.js';
+import { createSelectedRunProjectionReader } from './selectedRunProjection.js';
 import {
-  buildCompatibilityIssuePayload,
-  buildSelectedRunPublicPayload,
-  buildSelectedRunQuestionSummaryPayload,
-  createSelectedRunProjectionReader,
-  type SelectedRunProjectionReader
-} from './selectedRunProjection.js';
+  buildCompatibilityErrorResponse,
+  buildCompatibilityTraceability,
+  createObservabilitySurface,
+  type ObservabilitySurfaceResponse
+} from './observabilitySurface.js';
 
 interface ControlServerOptions {
   paths: RunPaths;
@@ -56,8 +56,6 @@ const DELEGATION_RUN_HEADER = 'x-codex-delegation-run-id';
 const LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost', '::1']);
 const COMPATIBILITY_API_PREFIX = '/api/v1';
 const COMPATIBILITY_RESERVED_IDENTIFIERS = new Set(['state', 'refresh', 'dispatch']);
-const READ_ONLY_COMPAT_ACTION = 'refresh';
-const COMPATIBILITY_MUTATING_ACTIONS = new Set(['pause', 'resume', 'cancel', 'fail', 'rerun']);
 const UI_ASSET_PATHS: Record<string, string> = {
   '/ui': 'index.html',
   '/ui/': 'index.html',
@@ -451,8 +449,16 @@ async function handleRequest(context: RequestContext): Promise<void> {
     return;
   }
   const { req, res } = context;
+  const method = req.method ?? 'GET';
   const url = new URL(req.url ?? '/', 'http://localhost');
   const projection = createSelectedRunProjectionReader(context);
+  const observabilityContext = {
+    controlStore: context.controlStore,
+    linearAdvisoryState: context.linearAdvisoryState,
+    paths: context.paths,
+    projection
+  };
+  const observability = createObservabilitySurface(observabilityContext);
   if (url.pathname === '/health') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ status: 'ok', timestamp: isoTimestamp() }));
@@ -542,50 +548,31 @@ async function handleRequest(context: RequestContext): Promise<void> {
   }
 
   if (url.pathname === '/ui/data.json' && req.method === 'GET') {
-    const payload = await buildUiDataset(context, projection);
-    res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
-    res.end(JSON.stringify(payload));
+    writeObservabilityResponse(res, await observability.readUiDataset());
     return;
   }
 
   if (url.pathname === `${COMPATIBILITY_API_PREFIX}/state`) {
-    if (req.method !== 'GET') {
-      writeCompatibilityError(
-        res,
-        405,
-        'method_not_allowed',
-        'Method not allowed',
-        {
-          surface: 'api_v1',
-          allowed_method: 'GET'
-        },
-        buildCompatibilityTraceability(context, {
-          decision: 'rejected',
-          reason: 'method_not_allowed'
-        })
-      );
-      return;
-    }
-    const payload = await projection.buildCompatibilityStatePayload();
-    res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
-    res.end(JSON.stringify(payload));
+    writeObservabilityResponse(res, await observability.readCompatibilityState(method));
     return;
   }
 
   if (url.pathname === `${COMPATIBILITY_API_PREFIX}/dispatch`) {
     if (req.method !== 'GET') {
-      writeCompatibilityError(
+      writeObservabilityResponse(
         res,
-        405,
-        'method_not_allowed',
-        'Method not allowed',
-        {
-          surface: 'api_v1',
-          allowed_method: 'GET'
-        },
-        buildCompatibilityTraceability(context, {
-          decision: 'rejected',
-          reason: 'method_not_allowed'
+        buildCompatibilityErrorResponse({
+          status: 405,
+          code: 'method_not_allowed',
+          message: 'Method not allowed',
+          details: {
+            surface: 'api_v1',
+            allowed_method: 'GET'
+          },
+          traceability: buildCompatibilityTraceability(observabilityContext, {
+            decision: 'rejected',
+            reason: 'method_not_allowed'
+          })
         })
       );
       return;
@@ -598,191 +585,64 @@ async function handleRequest(context: RequestContext): Promise<void> {
       issueIdentifier: selected?.issueIdentifier ?? null
     });
 
-    const traceability = buildCompatibilityTraceability(context, {
+    const traceability = buildCompatibilityTraceability(observabilityContext, {
       decision: evaluation.failure ? 'rejected' : 'acknowledged',
       reason: evaluation.failure?.reason ?? evaluation.summary.reason,
       issueIdentifier: selected?.issueIdentifier ?? null
     });
 
     if (evaluation.failure) {
-      writeCompatibilityError(
+      writeObservabilityResponse(
         res,
-        evaluation.failure.status,
-        evaluation.failure.code,
-        'Dispatch pilot evaluation failed closed.',
-        {
-          surface: 'api_v1',
-          mode: 'read_only',
-          advisory_only: true,
-          reason: evaluation.failure.reason,
-          dispatch_pilot: evaluation.summary
-        },
-        traceability
+        buildCompatibilityErrorResponse({
+          status: evaluation.failure.status,
+          code: evaluation.failure.code,
+          message: 'Dispatch pilot evaluation failed closed.',
+          details: {
+            surface: 'api_v1',
+            mode: 'read_only',
+            advisory_only: true,
+            reason: evaluation.failure.reason,
+            dispatch_pilot: evaluation.summary
+          },
+          traceability
+        })
       );
       return;
     }
 
-    res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
-    res.end(
-      JSON.stringify({
+    writeObservabilityResponse(res, {
+      status: 200,
+      headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
+      body: {
         generated_at: isoTimestamp(),
         mode: 'read_only',
         advisory_only: true,
         dispatch_pilot: evaluation.summary,
         recommendation: evaluation.recommendation,
         traceability
-      })
-    );
+      }
+    });
     return;
   }
 
   if (url.pathname === `${COMPATIBILITY_API_PREFIX}/refresh`) {
-    if (req.method !== 'POST') {
-      writeCompatibilityError(
-        res,
-        405,
-        'method_not_allowed',
-        'Method not allowed',
-        {
-          surface: 'api_v1',
-          allowed_method: 'POST'
-        },
-        buildCompatibilityTraceability(context, {
-          decision: 'rejected',
-          reason: 'method_not_allowed'
-        })
-      );
-      return;
-    }
-
-    const body = await readJsonBody(req);
-    const rejection = resolveCompatibilityActionEnvelopeRejection(body);
-    if (rejection) {
-      writeCompatibilityError(
-        res,
-        rejection.status,
-        'read_only_action_rejected',
-        'Compatibility surface is read-only; only refresh acknowledgements are supported.',
-        {
-          surface: 'api_v1',
-          mode: 'read_only',
-          reason: rejection.reason,
-          allowed_actions: [READ_ONLY_COMPAT_ACTION],
-          allowed_tools: [],
-          requested_action: rejection.requestAction,
-          requested_tool: rejection.requestTool
-        },
-        buildCompatibilityTraceability(context, {
-          decision: 'rejected',
-          reason: rejection.reason,
-          requestAction: rejection.requestAction,
-          requestTool: rejection.requestTool
-        })
-      );
-      return;
-    }
-
-    const requestedAction = readStringValue(body, 'action');
-    const payload = {
-      status: 'accepted',
-      mode: 'read_only',
-      action: READ_ONLY_COMPAT_ACTION,
-      requested_at: isoTimestamp(),
-      traceability: buildCompatibilityTraceability(context, {
-        decision: 'acknowledged',
-        reason: 'refresh_projection_acknowledged',
-        requestAction: requestedAction ? requestedAction.toLowerCase() : READ_ONLY_COMPAT_ACTION
-      })
-    };
-    res.writeHead(202, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify(payload));
+    const body = method === 'POST' ? await readJsonBody(req) : undefined;
+    writeObservabilityResponse(res, observability.readCompatibilityRefresh(method, body));
     return;
   }
 
   const compatibilityIssueIdentifier = resolveCompatibilityIssueIdentifierFromPath(url.pathname);
   if (compatibilityIssueIdentifier !== null) {
-    if (req.method !== 'GET') {
-      writeCompatibilityError(
-        res,
-        405,
-        'method_not_allowed',
-        'Method not allowed',
-        {
-          surface: 'api_v1',
-          allowed_method: 'GET',
-          issue_identifier: compatibilityIssueIdentifier
-        },
-        buildCompatibilityTraceability(context, {
-          decision: 'rejected',
-          reason: 'method_not_allowed',
-          issueIdentifier: compatibilityIssueIdentifier
-        })
-      );
-      return;
-    }
-
-    const selectedSnapshot = await projection.readSelectedRunManifestSnapshot();
-    const matchesIssue =
-      selectedSnapshot &&
-      (selectedSnapshot.issueIdentifier === compatibilityIssueIdentifier ||
-        selectedSnapshot.taskId === compatibilityIssueIdentifier ||
-        selectedSnapshot.runId === compatibilityIssueIdentifier);
-    if (!selectedSnapshot || !matchesIssue) {
-      writeCompatibilityError(
-        res,
-        404,
-        'issue_not_found',
-        'Issue not found',
-        {
-          surface: 'api_v1',
-          issue_identifier: compatibilityIssueIdentifier
-        },
-        buildCompatibilityTraceability(context, {
-          decision: 'rejected',
-          reason: 'issue_not_found',
-          issueIdentifier: compatibilityIssueIdentifier
-        })
-      );
-      return;
-    }
-    const selected = await projection.buildSelectedRunContext(selectedSnapshot);
-    if (!selected) {
-      writeCompatibilityError(
-        res,
-        404,
-        'issue_not_found',
-        'Issue not found',
-        {
-          surface: 'api_v1',
-          issue_identifier: compatibilityIssueIdentifier
-        },
-        buildCompatibilityTraceability(context, {
-          decision: 'rejected',
-          reason: 'issue_not_found',
-          issueIdentifier: compatibilityIssueIdentifier
-        })
-      );
-      return;
-    }
-    res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
-    res.end(JSON.stringify(buildCompatibilityIssuePayload(selected)));
+    writeObservabilityResponse(
+      res,
+      await observability.readCompatibilityIssue(method, compatibilityIssueIdentifier)
+    );
     return;
   }
 
   if (url.pathname === COMPATIBILITY_API_PREFIX || url.pathname.startsWith(`${COMPATIBILITY_API_PREFIX}/`)) {
-    writeCompatibilityError(
-      res,
-      404,
-      'not_found',
-      'Route not found',
-      {
-        surface: 'api_v1'
-      },
-      buildCompatibilityTraceability(context, {
-        decision: 'rejected',
-        reason: 'route_not_found'
-      })
-    );
+    writeObservabilityResponse(res, observability.buildCompatibilityNotFound());
     return;
   }
 
@@ -1534,13 +1394,6 @@ async function handleRequest(context: RequestContext): Promise<void> {
   res.end(JSON.stringify({ error: 'not_found' }));
 }
 
-interface CompatibilityActionEnvelopeRejection {
-  status: number;
-  reason: 'malformed_action_request' | 'forbidden_mutating_action' | 'unsupported_action' | 'unsupported_tool';
-  requestAction: string | null;
-  requestTool: string | null;
-}
-
 type LinearAdvisoryDeliveryOutcome = 'accepted' | 'duplicate' | 'ignored' | 'rejected';
 
 interface LinearAdvisoryDeliveryRecord {
@@ -1592,55 +1445,6 @@ function resolveCompatibilityIssueIdentifierFromPath(pathname: string): string |
   } catch {
     return null;
   }
-}
-
-function resolveCompatibilityActionEnvelopeRejection(
-  body: Record<string, unknown>
-): CompatibilityActionEnvelopeRejection | null {
-  const hasAction = Object.prototype.hasOwnProperty.call(body, 'action');
-  const hasTool = Object.prototype.hasOwnProperty.call(body, 'tool');
-  if (!hasAction && !hasTool) {
-    return null;
-  }
-
-  const actionValue = readStringValue(body, 'action');
-  const normalizedAction = actionValue ? actionValue.toLowerCase() : null;
-  const toolValue = readStringValue(body, 'tool');
-  const normalizedTool = toolValue ? toolValue.toLowerCase() : null;
-
-  if (hasAction && !normalizedAction) {
-    return {
-      status: 400,
-      reason: 'malformed_action_request',
-      requestAction: null,
-      requestTool: normalizedTool
-    };
-  }
-  if (normalizedAction && COMPATIBILITY_MUTATING_ACTIONS.has(normalizedAction)) {
-    return {
-      status: 403,
-      reason: 'forbidden_mutating_action',
-      requestAction: normalizedAction,
-      requestTool: normalizedTool
-    };
-  }
-  if (normalizedAction && normalizedAction !== READ_ONLY_COMPAT_ACTION) {
-    return {
-      status: 400,
-      reason: 'unsupported_action',
-      requestAction: normalizedAction,
-      requestTool: normalizedTool
-    };
-  }
-  if (hasTool) {
-    return {
-      status: 403,
-      reason: 'unsupported_tool',
-      requestAction: normalizedAction,
-      requestTool: normalizedTool
-    };
-  }
-  return null;
 }
 
 async function handleLinearWebhook(context: RequestContext): Promise<void> {
@@ -2140,31 +1944,6 @@ async function emitLinearWebhookAuditEvent(
   });
 }
 
-function buildCompatibilityTraceability(
-  context: RequestContext,
-  input: {
-    decision: 'acknowledged' | 'rejected';
-    reason: string;
-    issueIdentifier?: string | null;
-    requestAction?: string | null;
-    requestTool?: string | null;
-  }
-): Record<string, unknown> {
-  const snapshot = context.controlStore.snapshot();
-  return {
-    task_id: resolveTaskIdFromManifestPath(context.paths.manifestPath),
-    run_id: snapshot.run_id,
-    manifest_path: context.paths.manifestPath,
-    surface: 'api_v1',
-    issue_identifier: input.issueIdentifier ?? null,
-    requested_action: input.requestAction ?? null,
-    requested_tool: input.requestTool ?? null,
-    decision: input.decision,
-    reason: input.reason,
-    timestamp: isoTimestamp()
-  };
-}
-
 async function emitDispatchPilotAuditEvents(
   context: RequestContext,
   input: {
@@ -2208,25 +1987,12 @@ async function emitDispatchPilotAuditEvents(
   });
 }
 
-function writeCompatibilityError(
+function writeObservabilityResponse(
   res: http.ServerResponse,
-  status: number,
-  code: string,
-  message: string,
-  details?: Record<string, unknown>,
-  traceability?: Record<string, unknown>
+  response: ObservabilitySurfaceResponse
 ): void {
-  res.writeHead(status, { 'Content-Type': 'application/json' });
-  res.end(
-    JSON.stringify({
-      error: {
-        code,
-        message,
-        ...(details ? { details } : {})
-      },
-      ...(traceability ? { traceability } : {})
-    })
-  );
+  res.writeHead(response.status, response.headers);
+  res.end(JSON.stringify(response.body));
 }
 
 function isControlAction(action: unknown): action is 'pause' | 'resume' | 'cancel' | 'fail' {
@@ -3355,114 +3121,6 @@ function realpathSafe(pathname: string): string {
 
 function normalizePath(pathname: string): string {
   return process.platform === 'win32' ? pathname.toLowerCase() : pathname;
-}
-
-async function buildUiDataset(
-  context: RequestContext,
-  projection: SelectedRunProjectionReader
-): Promise<Record<string, unknown>> {
-  const manifest = await readJsonFile<CliManifest>(context.paths.manifestPath);
-  const generatedAt = isoTimestamp();
-  if (!manifest) {
-    return { generated_at: generatedAt, tasks: [], runs: [], codebase: null, activity: [], selected: null };
-  }
-
-  const selected = await projection.buildSelectedRunContext();
-  const bucketInfo = classifyBucket(manifest.status, context.controlStore.snapshot());
-  const approvalsTotal = Array.isArray(manifest.approvals) ? manifest.approvals.length : 0;
-  const repoRoot = resolveRepoRootFromRunDir(context.paths.runDir);
-  const links = {
-    manifest: repoRoot ? relative(repoRoot, context.paths.manifestPath) : context.paths.manifestPath,
-    log: repoRoot ? relative(repoRoot, context.paths.logPath) : context.paths.logPath,
-    metrics: null,
-    state: null
-  };
-
-  const stages = Array.isArray(manifest.commands)
-    ? manifest.commands.map((command) => ({
-        id: command.id,
-        title: command.title || command.id,
-        status: command.status
-      }))
-    : [];
-
-  const runEntry = {
-    run_id: manifest.run_id,
-    task_id: manifest.task_id,
-    status: manifest.status,
-    raw_status: selected?.rawStatus ?? manifest.status,
-    display_status: selected?.displayStatus ?? manifest.status,
-    status_reason: selected?.statusReason ?? null,
-    started_at: manifest.started_at,
-    updated_at: manifest.updated_at,
-    completed_at: manifest.completed_at,
-    stages,
-    links,
-    approvals_pending: 0,
-    approvals_total: approvalsTotal,
-    heartbeat_stale: false,
-    latest_event: selected?.latestEvent
-      ? {
-          at: selected.latestEvent.at,
-          event: selected.latestEvent.event,
-          message: selected.latestEvent.message
-        }
-      : null,
-    question_summary: selected ? buildSelectedRunQuestionSummaryPayload(selected.questionSummary) : null,
-    ...(selected?.trackedPayload ? { tracked: selected.trackedPayload } : {})
-  };
-
-  const taskEntry = {
-    task_id: manifest.task_id,
-    title: manifest.pipeline_title || manifest.task_id,
-    bucket: bucketInfo.bucket,
-    bucket_reason: bucketInfo.reason,
-    status: manifest.status,
-    raw_status: selected?.rawStatus ?? manifest.status,
-    display_status: selected?.displayStatus ?? manifest.status,
-    status_reason: selected?.statusReason ?? null,
-    last_update: manifest.updated_at,
-    latest_run_id: manifest.run_id,
-    approvals_pending: 0,
-    approvals_total: approvalsTotal,
-    summary: manifest.summary ?? '',
-    question_summary: selected ? buildSelectedRunQuestionSummaryPayload(selected.questionSummary) : null,
-    ...(selected?.trackedPayload ? { tracked: selected.trackedPayload } : {})
-  };
-
-  return {
-    generated_at: generatedAt,
-    tasks: [taskEntry],
-    runs: [runEntry],
-    codebase: null,
-    activity: [],
-    selected: selected ? buildSelectedRunPublicPayload(selected) : null
-  };
-}
-
-function classifyBucket(
-  status: CliManifest['status'],
-  control: ControlState
-): { bucket: string; reason: string } {
-  if (status === 'queued') {
-    return { bucket: 'pending', reason: 'queued' };
-  }
-  if (status === 'in_progress') {
-    const latest = control.latest_action?.action ?? null;
-    if (latest === 'pause') {
-      return { bucket: 'ongoing', reason: 'paused' };
-    }
-    return { bucket: 'active', reason: 'running' };
-  }
-  if (status === 'succeeded' || status === 'failed' || status === 'cancelled') {
-    return { bucket: 'complete', reason: 'terminal' };
-  }
-  return { bucket: 'pending', reason: 'unknown' };
-}
-
-function resolveRepoRootFromRunDir(runDir: string): string | null {
-  const candidate = resolve(runDir, '..', '..', '..', '..');
-  return candidate || null;
 }
 
 function resolveUiRoot(): string | null {

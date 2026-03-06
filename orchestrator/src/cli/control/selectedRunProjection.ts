@@ -1,7 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
-import { isoTimestamp } from '../utils/time.js';
 import type { RunPaths } from '../run/runPaths.js';
 import type { CliManifest } from '../types.js';
 import type { ControlAction, ControlState } from './controlState.js';
@@ -77,7 +76,6 @@ export interface SelectedRunProjectionReader {
   readSelectedRunManifestSnapshot(): Promise<SelectedRunManifestSnapshot | null>;
   buildSelectedRunContext(snapshot?: SelectedRunManifestSnapshot | null): Promise<SelectedRunContext | null>;
   readDispatchEvaluation(selected?: SelectedRunContext | null): Promise<DispatchPilotEvaluation>;
-  buildCompatibilityStatePayload(): Promise<Record<string, unknown>>;
 }
 
 export function createSelectedRunProjectionReader(
@@ -124,160 +122,10 @@ export function createSelectedRunProjectionReader(
     return dispatchEvaluationPromise;
   };
 
-  const buildCompatibilityStatePayload = async (): Promise<Record<string, unknown>> => {
-    const selected = await buildSelectedRunContext();
-    const dispatchPilotEvaluation = await readDispatchEvaluation(selected);
-    const dispatchPilotSummary = dispatchPilotEvaluation.summary.configured ? dispatchPilotEvaluation.summary : null;
-    const tracked =
-      selected?.trackedPayload ??
-      buildTrackedLinearPayload(context.linearAdvisoryState.tracked_issue) ??
-      buildCompatibilityTrackedPayload(dispatchPilotEvaluation);
-    const generatedAt = isoTimestamp();
-    if (!selected) {
-      return {
-        generated_at: generatedAt,
-        counts: { running: 0, retrying: 0 },
-        running: [],
-        retrying: [],
-        codex_totals: null,
-        rate_limits: null,
-        selected: null,
-        ...(dispatchPilotSummary ? { dispatch_pilot: dispatchPilotSummary } : {}),
-        ...(tracked ? { tracked } : {})
-      };
-    }
-
-    const running = selected.rawStatus === 'in_progress' ? [buildCompatibilityRunningEntry(selected)] : [];
-    return {
-      generated_at: generatedAt,
-      counts: { running: running.length, retrying: 0 },
-      running,
-      retrying: [],
-      codex_totals: null,
-      rate_limits: null,
-      selected: buildSelectedRunPublicPayload(selected),
-      ...(dispatchPilotSummary ? { dispatch_pilot: dispatchPilotSummary } : {}),
-      ...(tracked ? { tracked } : {})
-    };
-  };
-
   return {
     readSelectedRunManifestSnapshot,
     buildSelectedRunContext,
-    readDispatchEvaluation,
-    buildCompatibilityStatePayload
-  };
-}
-
-export function buildCompatibilityIssuePayload(selected: SelectedRunContext): Record<string, unknown> {
-  const running = buildCompatibilityRunningEntry(selected);
-  const selectedPayload = buildSelectedRunPublicPayload(selected);
-  const latestEvent = selected.latestEvent
-    ? {
-        at: selected.latestEvent.at,
-        event: selected.latestEvent.event,
-        message: selected.latestEvent.message
-      }
-    : null;
-  const recentEvents = latestEvent ? [latestEvent] : [];
-
-  return {
-    issue_identifier: selected.issueIdentifier,
-    issue_id: selected.issueId,
-    status: selected.rawStatus,
-    raw_status: selected.rawStatus,
-    display_status: selected.displayStatus,
-    status_reason: selected.statusReason,
-    workspace: {
-      path: selected.workspacePath
-    },
-    attempts: {
-      restart_count: 0,
-      current_retry_attempt: 0
-    },
-    running,
-    retry: null,
-    logs: {
-      codex_session_logs: []
-    },
-    summary: selected.summary,
-    latest_event: latestEvent,
-    question_summary: selectedPayload.question_summary,
-    recent_events: recentEvents,
-    last_error: selected.lastError,
-    tracked: selected.trackedPayload ?? {},
-    ...(selected.dispatchPilotEvaluation.summary.configured
-      ? { dispatch_pilot: selected.dispatchPilotEvaluation.summary }
-      : {})
-  };
-}
-
-export function buildSelectedRunPublicPayload(selected: SelectedRunContext): Record<string, unknown> {
-  return {
-    issue_id: selected.issueId,
-    issue_identifier: selected.issueIdentifier,
-    task_id: selected.taskId,
-    run_id: selected.runId,
-    raw_status: selected.rawStatus,
-    display_status: selected.displayStatus,
-    status_reason: selected.statusReason,
-    started_at: selected.startedAt,
-    updated_at: selected.updatedAt,
-    completed_at: selected.completedAt,
-    summary: selected.summary,
-    last_error: selected.lastError,
-    latest_action: selected.latestAction,
-    latest_event: selected.latestEvent
-      ? {
-          at: selected.latestEvent.at,
-          event: selected.latestEvent.event,
-          message: selected.latestEvent.message,
-          requested_by: selected.latestEvent.requestedBy,
-          reason: selected.latestEvent.reason
-        }
-      : null,
-    workspace: {
-      path: selected.workspacePath
-    },
-    question_summary: buildSelectedRunQuestionSummaryPayload(selected.questionSummary),
-    ...(selected.trackedPayload ? { tracked: selected.trackedPayload } : {})
-  };
-}
-
-export function buildSelectedRunQuestionSummaryPayload(
-  summary: SelectedRunQuestionSummary
-): Record<string, unknown> {
-  return {
-    queued_count: summary.queuedCount,
-    latest_question: summary.latestQuestion
-      ? {
-          question_id: summary.latestQuestion.questionId,
-          prompt: summary.latestQuestion.prompt,
-          urgency: summary.latestQuestion.urgency,
-          queued_at: summary.latestQuestion.queuedAt
-        }
-      : null
-  };
-}
-
-function buildCompatibilityRunningEntry(selected: SelectedRunContext): Record<string, unknown> {
-  return {
-    issue_id: selected.issueId,
-    issue_identifier: selected.issueIdentifier,
-    state: selected.rawStatus,
-    display_state: selected.displayStatus,
-    status_reason: selected.statusReason,
-    session_id: selected.runId,
-    turn_count: 0,
-    last_event: selected.latestEvent?.event ?? selected.latestAction,
-    last_message: selected.latestEvent?.message ?? selected.summary,
-    started_at: selected.startedAt,
-    last_event_at: selected.latestEvent?.at ?? selected.updatedAt,
-    tokens: {
-      input_tokens: null,
-      output_tokens: null,
-      total_tokens: null
-    }
+    readDispatchEvaluation
   };
 }
 
