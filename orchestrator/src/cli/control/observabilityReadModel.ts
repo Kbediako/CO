@@ -126,6 +126,20 @@ export interface ControlRunningPayload {
   };
 }
 
+export interface ControlRetryPayload {
+  issue_id: string | null;
+  issue_identifier: string;
+  state: string;
+  display_state: string;
+  status_reason: string | null;
+  session_id: string | null;
+  attempt: number | null;
+  last_event: string | null;
+  last_message: string | null;
+  started_at: string | null;
+  last_event_at: string | null;
+}
+
 export interface ControlStatePayload {
   generated_at: string;
   counts: {
@@ -133,7 +147,7 @@ export interface ControlStatePayload {
     retrying: number;
   };
   running: ControlRunningPayload[];
-  retrying: unknown[];
+  retrying: ControlRetryPayload[];
   codex_totals: null;
   rate_limits: null;
   selected: ControlSelectedRunPayload | null;
@@ -143,6 +157,21 @@ export interface ControlStatePayload {
 
 export interface ControlSelectedRunRuntimeSnapshot {
   selected: SelectedRunContext | null;
+  dispatchPilot: ControlDispatchPilotPayload | null;
+  tracked: ControlTrackedPayload | null;
+}
+
+export interface CompatibilityProjectionIssueRecord {
+  issueIdentifier: string;
+  aliases: string[];
+  payload: ControlIssuePayload;
+}
+
+export interface ControlCompatibilityProjectionSnapshot {
+  running: ControlRunningPayload[];
+  retrying: ControlRetryPayload[];
+  issues: CompatibilityProjectionIssueRecord[];
+  selected: ControlSelectedRunPayload | null;
   dispatchPilot: ControlDispatchPilotPayload | null;
   tracked: ControlTrackedPayload | null;
 }
@@ -161,8 +190,8 @@ export interface ControlIssuePayload {
     restart_count: number;
     current_retry_attempt: number;
   };
-  running: ControlRunningPayload;
-  retry: null;
+  running: ControlRunningPayload | null;
+  retry: ControlRetryPayload | null;
   logs: {
     codex_session_logs: unknown[];
   };
@@ -295,6 +324,98 @@ export function buildCompatibilityRunningEntry(selected: SelectedRunContext): Co
   };
 }
 
+export function buildCompatibilityProjectionSnapshot(
+  snapshot: ControlSelectedRunRuntimeSnapshot
+): ControlCompatibilityProjectionSnapshot {
+  const selected = snapshot.selected;
+  if (!selected) {
+    return {
+      running: [],
+      retrying: [],
+      issues: [],
+      selected: null,
+      dispatchPilot: snapshot.dispatchPilot,
+      tracked: snapshot.tracked
+    };
+  }
+
+  const running =
+    selected.rawStatus === 'in_progress' ? [buildCompatibilityRunningEntry(selected)] : [];
+  const retrying: ControlRetryPayload[] = [];
+  const selectedPayload = buildSelectedRunPublicPayload(selected);
+
+  return {
+    running,
+    retrying,
+    issues: [
+      {
+        issueIdentifier: selected.issueIdentifier,
+        aliases: buildCompatibilityIssueAliases(selected),
+        payload: buildCompatibilityIssuePayload({
+          selected,
+          running: running[0] ?? null,
+          retry: null,
+          dispatchPilotSummary: snapshot.dispatchPilot
+        })
+      }
+    ],
+    selected: selectedPayload,
+    dispatchPilot: snapshot.dispatchPilot,
+    tracked: snapshot.tracked
+  };
+}
+
+export function findCompatibilityProjectionIssueRecord(
+  projection: ControlCompatibilityProjectionSnapshot,
+  issueIdentifier: string
+): CompatibilityProjectionIssueRecord | null {
+  for (const issue of projection.issues) {
+    if (issue.aliases.includes(issueIdentifier)) {
+      return issue;
+    }
+  }
+  return null;
+}
+
+export function buildCompatibilityIssuePayload(input: {
+  selected: SelectedRunContext;
+  running: ControlRunningPayload | null;
+  retry: ControlRetryPayload | null;
+  dispatchPilotSummary: ControlDispatchPilotPayload | null;
+}): ControlIssuePayload {
+  const selectedPayload = buildSelectedRunPublicPayload(input.selected);
+  const latestEvent = buildSelectedRunLatestEventPayload(input.selected.latestEvent);
+  const recentEvents = latestEvent ? [latestEvent] : [];
+
+  return {
+    issue_identifier: input.selected.issueIdentifier,
+    issue_id: input.selected.issueId,
+    status: input.selected.rawStatus,
+    raw_status: input.selected.rawStatus,
+    display_status: input.selected.displayStatus,
+    status_reason: input.selected.statusReason,
+    workspace: {
+      path: input.selected.workspacePath
+    },
+    attempts: {
+      restart_count: 0,
+      current_retry_attempt: 0
+    },
+    running: input.running,
+    retry: input.retry,
+    logs: {
+      codex_session_logs: []
+    },
+    summary: input.selected.summary,
+    latest_event: latestEvent,
+    question_summary: selectedPayload.question_summary,
+    recent_events: recentEvents,
+    last_error: input.selected.lastError,
+    tracked: input.selected.tracked ?? {},
+    ...(input.dispatchPilotSummary ? { dispatch_pilot: input.dispatchPilotSummary } : {})
+  };
+}
+
 export function buildUiSelectedRunSharedFields(selected: SelectedRunContext): UiSelectedRunSharedFields {
   return {
     raw_status: selected.rawStatus,
@@ -303,6 +424,16 @@ export function buildUiSelectedRunSharedFields(selected: SelectedRunContext): Ui
     question_summary: buildSelectedRunQuestionSummaryPayload(selected.questionSummary),
     ...(selected.tracked ? { tracked: selected.tracked } : {})
   };
+}
+
+function buildCompatibilityIssueAliases(selected: SelectedRunContext): string[] {
+  const aliases = new Set<string>();
+  for (const candidate of [selected.issueIdentifier, selected.taskId, selected.runId]) {
+    if (candidate) {
+      aliases.add(candidate);
+    }
+  }
+  return Array.from(aliases);
 }
 
 export function buildSelectedRunRuntimeFingerprintInput(

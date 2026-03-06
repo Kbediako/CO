@@ -518,7 +518,8 @@ async function handleRequest(context: RequestContext): Promise<void> {
   const presenterContext = {
     controlStore: context.controlStore,
     paths: context.paths,
-    readSelectedRunSnapshot: () => runtimeSnapshot.readSelectedRunSnapshot()
+    readSelectedRunSnapshot: () => runtimeSnapshot.readSelectedRunSnapshot(),
+    readCompatibilityProjection: () => runtimeSnapshot.readCompatibilityProjection()
   };
   if (url.pathname === '/health') {
     res.writeHead(200, { 'Content-Type': 'application/json' });

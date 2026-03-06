@@ -6,17 +6,15 @@ import type { RunPaths } from '../run/runPaths.js';
 import type { CliManifest } from '../types.js';
 import type { ControlState } from './controlState.js';
 import type {
-  ControlDispatchPilotPayload,
+  ControlCompatibilityProjectionSnapshot,
   ControlIssuePayload,
   ControlSelectedRunRuntimeSnapshot,
-  ControlStatePayload,
-  SelectedRunContext
+  ControlStatePayload
 } from './observabilityReadModel.js';
 import {
-  buildCompatibilityRunningEntry,
-  buildSelectedRunLatestEventPayload,
   buildSelectedRunPublicPayload,
-  buildUiSelectedRunSharedFields
+  buildUiSelectedRunSharedFields,
+  findCompatibilityProjectionIssueRecord
 } from './observabilityReadModel.js';
 import type {
   DispatchPilotEvaluation,
@@ -44,6 +42,7 @@ interface ObservabilityTraceabilityContext {
 
 export interface ObservabilityPresenterContext extends ObservabilityTraceabilityContext {
   readSelectedRunSnapshot(): Promise<ControlSelectedRunRuntimeSnapshot>;
+  readCompatibilityProjection(): Promise<ControlCompatibilityProjectionSnapshot>;
 }
 
 export interface DispatchExtensionContext {
@@ -306,95 +305,34 @@ export function buildCompatibilityTraceability(
 export async function readCompatibilityState(
   context: ObservabilityPresenterContext
 ): Promise<ControlStatePayload> {
-  const snapshot = await context.readSelectedRunSnapshot();
-  const selected = snapshot.selected;
-  const dispatchPilotSummary = snapshot.dispatchPilot;
-  const tracked = snapshot.tracked;
+  const projection = await context.readCompatibilityProjection();
   const generatedAt = isoTimestamp();
-  if (!selected) {
-    return {
-      generated_at: generatedAt,
-      counts: { running: 0, retrying: 0 },
-      running: [],
-      retrying: [],
-      codex_totals: null,
-      rate_limits: null,
-      selected: null,
-      ...(dispatchPilotSummary ? { dispatch_pilot: dispatchPilotSummary } : {}),
-      ...(tracked ? { tracked } : {})
-    };
-  }
-
-  const running = selected.rawStatus === 'in_progress' ? [buildCompatibilityRunningEntry(selected)] : [];
   return {
     generated_at: generatedAt,
-    counts: { running: running.length, retrying: 0 },
-    running,
-    retrying: [],
+    counts: { running: projection.running.length, retrying: projection.retrying.length },
+    running: projection.running,
+    retrying: projection.retrying,
     codex_totals: null,
     rate_limits: null,
-    selected: buildSelectedRunPublicPayload(selected),
-    ...(dispatchPilotSummary ? { dispatch_pilot: dispatchPilotSummary } : {}),
-    ...(tracked ? { tracked } : {})
+    selected: projection.selected,
+    ...(projection.dispatchPilot ? { dispatch_pilot: projection.dispatchPilot } : {}),
+    ...(projection.tracked ? { tracked: projection.tracked } : {})
   };
 }
 
 export async function readCompatibilityIssue(
-  context: Pick<ObservabilityPresenterContext, 'readSelectedRunSnapshot'>,
+  context: Pick<ObservabilityPresenterContext, 'readCompatibilityProjection'>,
   issueIdentifier: string
 ): Promise<CompatibilityIssueResult> {
-  const snapshot = await context.readSelectedRunSnapshot();
-  const selected = snapshot.selected;
-  const matchesIssue =
-    selected &&
-    (selected.issueIdentifier === issueIdentifier ||
-      selected.taskId === issueIdentifier ||
-      selected.runId === issueIdentifier);
-  if (!selected || !matchesIssue) {
+  const projection = await context.readCompatibilityProjection();
+  const issue = findCompatibilityProjectionIssueRecord(projection, issueIdentifier);
+  if (!issue) {
     return { kind: 'issue_not_found' };
   }
 
   return {
     kind: 'ok',
-    payload: buildCompatibilityIssuePayload(selected, snapshot.dispatchPilot)
-  };
-}
-
-function buildCompatibilityIssuePayload(
-  selected: SelectedRunContext,
-  dispatchPilotSummary: ControlDispatchPilotPayload | null
-): ControlIssuePayload {
-  const running = buildCompatibilityRunningEntry(selected);
-  const selectedPayload = buildSelectedRunPublicPayload(selected);
-  const latestEvent = buildSelectedRunLatestEventPayload(selected.latestEvent);
-  const recentEvents = latestEvent ? [latestEvent] : [];
-
-  return {
-    issue_identifier: selected.issueIdentifier,
-    issue_id: selected.issueId,
-    status: selected.rawStatus,
-    raw_status: selected.rawStatus,
-    display_status: selected.displayStatus,
-    status_reason: selected.statusReason,
-    workspace: {
-      path: selected.workspacePath
-    },
-    attempts: {
-      restart_count: 0,
-      current_retry_attempt: 0
-    },
-    running,
-    retry: null,
-    logs: {
-      codex_session_logs: []
-    },
-    summary: selected.summary,
-    latest_event: latestEvent,
-    question_summary: selectedPayload.question_summary,
-    recent_events: recentEvents,
-    last_error: selected.lastError,
-    tracked: selected.tracked ?? {},
-    ...(dispatchPilotSummary ? { dispatch_pilot: dispatchPilotSummary } : {})
+    payload: issue.payload
   };
 }
 

@@ -442,6 +442,23 @@ describe('ControlServer', () => {
       expect(issuePayload.workspace?.path).toBe(env.repoRoot);
       expect(issuePayload.running?.state).toBe('in_progress');
 
+      const runAliasRes = await fetch(new URL('/api/v1/run-1', baseUrl), {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      expect(runAliasRes.status).toBe(200);
+      const runAliasPayload = (await runAliasRes.json()) as {
+        issue_identifier?: string;
+        running?: { session_id?: string } | null;
+      };
+      expect(runAliasPayload).toMatchObject({
+        issue_identifier: 'task-0940',
+        running: {
+          session_id: 'run-1'
+        }
+      });
+
       const missingIssueRes = await fetch(new URL('/api/v1/task-missing', baseUrl), {
         headers: {
           Authorization: `Bearer ${token}`
@@ -881,13 +898,17 @@ describe('ControlServer', () => {
           display_status?: string;
           latest_event?: { event?: string };
           last_error?: string | null;
+          running?: { state?: string } | null;
+          retry?: unknown;
         };
         expect(issuePayload).toMatchObject({
           display_status: scenario.status,
           latest_event: {
             event: scenario.status
           },
-          last_error: scenario.expectedLastError
+          last_error: scenario.expectedLastError,
+          running: null,
+          retry: null
         });
 
         const uiRes = await fetch(new URL('/ui/data.json', baseUrl), {

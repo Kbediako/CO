@@ -2,7 +2,9 @@ import type { RunPaths } from '../run/runPaths.js';
 import type { ControlState } from './controlState.js';
 import type { LiveLinearTrackedIssue } from './linearDispatchSource.js';
 import {
+  buildCompatibilityProjectionSnapshot,
   buildTrackedLinearPayload,
+  type ControlCompatibilityProjectionSnapshot,
   type ControlSelectedRunRuntimeSnapshot,
 } from './observabilityReadModel.js';
 import { createLiveLinearAdvisoryRuntime } from './liveLinearAdvisoryRuntime.js';
@@ -32,6 +34,7 @@ interface ControlRuntimeContext {
 
 export interface ControlRuntimeSnapshot {
   readSelectedRunSnapshot(): Promise<ControlSelectedRunRuntimeSnapshot>;
+  readCompatibilityProjection(): Promise<ControlCompatibilityProjectionSnapshot>;
   readDispatchEvaluation(): Promise<{
     issueIdentifier: string | null;
     evaluation: DispatchPilotEvaluation;
@@ -106,6 +109,7 @@ function createControlRuntimeSnapshot(
 ): InternalControlRuntimeSnapshot {
   const projection = createSelectedRunProjectionReader(context);
   let selectedRunSnapshotPromise: Promise<ControlSelectedRunRuntimeSnapshot> | null = null;
+  let compatibilityProjectionPromise: Promise<ControlCompatibilityProjectionSnapshot> | null = null;
   let dispatchEvaluationPromise: Promise<{
     issueIdentifier: string | null;
     evaluation: DispatchPilotEvaluation;
@@ -124,6 +128,13 @@ function createControlRuntimeSnapshot(
       };
     })();
     return selectedRunSnapshotPromise;
+  }
+
+  async function readCompatibilityProjection(): Promise<ControlCompatibilityProjectionSnapshot> {
+    compatibilityProjectionPromise ??= readSelectedRunSnapshot().then((snapshot) =>
+      buildCompatibilityProjectionSnapshot(snapshot)
+    );
+    return compatibilityProjectionPromise;
   }
 
   async function readDispatchEvaluation(): Promise<{
@@ -156,6 +167,7 @@ function createControlRuntimeSnapshot(
 
   return {
     readSelectedRunSnapshot,
+    readCompatibilityProjection,
     readDispatchEvaluation,
     async prime(): Promise<void> {
       await readSelectedRunSnapshot();
