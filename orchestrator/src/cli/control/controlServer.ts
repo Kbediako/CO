@@ -39,18 +39,12 @@ import {
   resolveLiveLinearTrackedIssueById,
   type LiveLinearTrackedIssue
 } from './linearDispatchSource.js';
-import { createSelectedRunProjectionReader } from './selectedRunProjection.js';
+import { createControlRuntime, type ControlRuntime } from './controlRuntime.js';
 import {
   buildCompatibilityTraceability,
-  createObservabilitySurface,
   type CompatibilityDispatchResult,
   type CompatibilityRefreshRejectionReason
 } from './observabilitySurface.js';
-import {
-  createObservabilityUpdateNotifier,
-  type ObservabilityUpdate,
-  type ObservabilityUpdateNotifier
-} from './observabilityUpdateNotifier.js';
 
 interface ControlServerOptions {
   paths: RunPaths;
@@ -173,7 +167,7 @@ export class ControlServer {
   private readonly persist: RequestContext['persist'];
   private readonly paths: RunPaths;
   private readonly linearAdvisoryState: LinearAdvisoryState;
-  private readonly observabilityUpdateNotifier: ObservabilityUpdateNotifier;
+  private readonly controlRuntime: ControlRuntime;
   private telegramBridge: TelegramOversightBridge | null = null;
   private unsubscribeTelegramBridge: (() => void) | null = null;
   private baseUrl: string | null = null;
@@ -191,7 +185,7 @@ export class ControlServer {
     persist: RequestContext['persist'];
     paths: RunPaths;
     linearAdvisoryState: LinearAdvisoryState;
-    observabilityUpdateNotifier: ObservabilityUpdateNotifier;
+    controlRuntime: ControlRuntime;
   }) {
     this.server = options.server;
     this.controlStore = options.controlStore;
@@ -204,7 +198,7 @@ export class ControlServer {
     this.persist = options.persist;
     this.paths = options.paths;
     this.linearAdvisoryState = options.linearAdvisoryState;
-    this.observabilityUpdateNotifier = options.observabilityUpdateNotifier;
+    this.controlRuntime = options.controlRuntime;
   }
 
   static async start(options: ControlServerOptions): Promise<ControlServer> {
@@ -245,7 +239,12 @@ export class ControlServer {
     const delegationTokens = new DelegationTokenStore({ seed: delegationSeed?.tokens ?? [] });
     const sessionTokens = new SessionTokenStore(SESSION_TTL_MS);
     const linearAdvisoryState = normalizeLinearAdvisoryState(linearAdvisorySeed);
-    const observabilityUpdateNotifier = createObservabilityUpdateNotifier();
+    const controlRuntime = createControlRuntime({
+      controlStore,
+      questionQueue,
+      paths: options.paths,
+      linearAdvisoryState
+    });
 
     const clients = new Set<http.ServerResponse>();
     const persist = {
@@ -273,7 +272,7 @@ export class ControlServer {
         clients,
         paths: options.paths,
         linearAdvisoryState,
-        publishObservabilityUpdate: (input) => observabilityUpdateNotifier.publish(input)
+        runtime: controlRuntime
       }).catch((error) => {
         const status = error instanceof HttpError ? error.status : 500;
         res.writeHead(status, { 'Content-Type': 'application/json' });
@@ -293,7 +292,7 @@ export class ControlServer {
       persist,
       paths: options.paths,
       linearAdvisoryState,
-      observabilityUpdateNotifier
+      controlRuntime
     });
 
     const host = options.config.ui.bindHost;
@@ -355,7 +354,7 @@ export class ControlServer {
             controlToken: token
           });
           if (instance.telegramBridge) {
-            instance.unsubscribeTelegramBridge = observabilityUpdateNotifier.subscribe((input) =>
+            instance.unsubscribeTelegramBridge = instance.controlRuntime.subscribe((input) =>
               instance.telegramBridge?.notifyProjectionDelta(input)
             );
           }
@@ -395,7 +394,7 @@ export class ControlServer {
         }
       });
     }
-    this.observabilityUpdateNotifier.publish({
+    this.controlRuntime.publish({
       eventSeq: entry.seq,
       source: entry.event
     });
@@ -436,7 +435,7 @@ export class ControlServer {
       clients: this.clients,
       paths: this.paths,
       linearAdvisoryState: this.linearAdvisoryState,
-      publishObservabilityUpdate: this.observabilityUpdateNotifier.publish
+      runtime: this.controlRuntime
     };
   }
 
@@ -452,22 +451,17 @@ export class ControlServer {
 
     return {
       readState: async (): Promise<ControlStatePayload> => {
-        const context = buildInternalContext();
-        const { observability } = createObservabilityReadHandles(context);
-        return (await observability.readCompatibilityState()) as ControlStatePayload;
+        return (await this.controlRuntime.snapshot().readCompatibilityState()) as ControlStatePayload;
       },
 
       readIssue: async (issueIdentifier: string): Promise<ControlIssuePayload | null> => {
-        const context = buildInternalContext();
-        const { observability } = createObservabilityReadHandles(context);
-        const result = await observability.readCompatibilityIssue(issueIdentifier);
+        const result = await this.controlRuntime.snapshot().readCompatibilityIssue(issueIdentifier);
         return result.kind === 'ok' ? (result.payload as ControlIssuePayload) : null;
       },
 
       readDispatch: async (): Promise<ControlDispatchPayload> => {
         const context = buildInternalContext();
-        const { observability } = createObservabilityReadHandles(context);
-        const result = await observability.readCompatibilityDispatch();
+        const result = await this.controlRuntime.snapshot().readCompatibilityDispatch();
         await emitDispatchPilotAuditEvents(context, {
           surface: 'telegram_dispatch',
           evaluation: result.evaluation,
@@ -485,10 +479,7 @@ export class ControlServer {
       },
 
       resolveIssueIdentifier: async (): Promise<string | null> => {
-        const context = buildInternalContext();
-        const { projection } = createObservabilityReadHandles(context);
-        const snapshot = await projection.readSelectedRunManifestSnapshot();
-        return snapshot?.issueIdentifier ?? snapshot?.taskId ?? snapshot?.runId ?? null;
+        return this.controlRuntime.snapshot().resolveIssueIdentifier();
       }
     };
   }
@@ -515,7 +506,7 @@ interface RequestContext {
   clients: Set<http.ServerResponse>;
   paths: RunPaths;
   linearAdvisoryState: LinearAdvisoryState;
-  publishObservabilityUpdate: (input?: ObservabilityUpdate) => void;
+  runtime: ControlRuntime;
 }
 
 async function handleRequest(context: RequestContext): Promise<void> {
@@ -525,7 +516,7 @@ async function handleRequest(context: RequestContext): Promise<void> {
   const { req, res } = context;
   const method = req.method ?? 'GET';
   const url = new URL(req.url ?? '/', 'http://localhost');
-  const { observabilityContext, observability } = createObservabilityReadHandles(context);
+  const runtimeSnapshot = context.runtime.snapshot();
   if (url.pathname === '/health') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ status: 'ok', timestamp: isoTimestamp() }));
@@ -622,38 +613,38 @@ async function handleRequest(context: RequestContext): Promise<void> {
     writeObservabilityResponse(res, {
       status: 200,
       headers: JSON_NO_STORE_HEADERS,
-      body: await observability.readUiDataset()
+      body: await runtimeSnapshot.readUiDataset()
     });
     return;
   }
 
   if (url.pathname === `${COMPATIBILITY_API_PREFIX}/state`) {
     if (method !== 'GET') {
-      writeCompatibilityMethodNotAllowed(res, observabilityContext, 'GET');
+      writeCompatibilityMethodNotAllowed(res, context, 'GET');
       return;
     }
     writeObservabilityResponse(res, {
       status: 200,
       headers: JSON_NO_STORE_HEADERS,
-      body: await observability.readCompatibilityState()
+      body: await runtimeSnapshot.readCompatibilityState()
     });
     return;
   }
 
   if (url.pathname === `${COMPATIBILITY_API_PREFIX}/dispatch`) {
     if (req.method !== 'GET') {
-      writeCompatibilityDispatchMethodNotAllowed(res, observabilityContext);
+      writeCompatibilityDispatchMethodNotAllowed(res, context);
       return;
     }
 
-    const result = await observability.readCompatibilityDispatch();
+    const result = await runtimeSnapshot.readCompatibilityDispatch();
     await emitDispatchPilotAuditEvents(context, {
       surface: 'api_v1_dispatch',
       evaluation: result.evaluation,
       issueIdentifier: result.issueIdentifier
     });
 
-    const traceability = buildCompatibilityTraceability(observabilityContext, {
+    const traceability = buildCompatibilityTraceability(context, {
       decision: result.kind === 'fail_closed' ? 'rejected' : 'acknowledged',
       reason:
         result.kind === 'fail_closed'
@@ -689,12 +680,12 @@ async function handleRequest(context: RequestContext): Promise<void> {
 
   if (url.pathname === `${COMPATIBILITY_API_PREFIX}/refresh`) {
     if (method !== 'POST') {
-      writeCompatibilityMethodNotAllowed(res, observabilityContext, 'POST');
+      writeCompatibilityMethodNotAllowed(res, context, 'POST');
       return;
     }
-    const result = observability.readCompatibilityRefresh(await readJsonBody(req));
+    const result = await context.runtime.requestRefresh(await readJsonBody(req));
     if (result.kind === 'rejected') {
-      writeCompatibilityRefreshRejected(res, observabilityContext, result);
+      writeCompatibilityRefreshRejected(res, context, result);
       return;
     }
     writeObservabilityResponse(res, {
@@ -710,15 +701,15 @@ async function handleRequest(context: RequestContext): Promise<void> {
     if (method !== 'GET') {
       writeCompatibilityMethodNotAllowed(
         res,
-        observabilityContext,
+        context,
         'GET',
         compatibilityIssueIdentifier
       );
       return;
     }
-    const result = await observability.readCompatibilityIssue(compatibilityIssueIdentifier);
+    const result = await runtimeSnapshot.readCompatibilityIssue(compatibilityIssueIdentifier);
     if (result.kind === 'issue_not_found') {
-      writeCompatibilityIssueNotFound(res, observabilityContext, compatibilityIssueIdentifier);
+      writeCompatibilityIssueNotFound(res, context, compatibilityIssueIdentifier);
       return;
     }
     writeObservabilityResponse(res, {
@@ -730,7 +721,7 @@ async function handleRequest(context: RequestContext): Promise<void> {
   }
 
   if (url.pathname === COMPATIBILITY_API_PREFIX || url.pathname.startsWith(`${COMPATIBILITY_API_PREFIX}/`)) {
-    writeCompatibilityNotFound(res, observabilityContext);
+    writeCompatibilityNotFound(res, context);
     return;
   }
 
@@ -1021,6 +1012,9 @@ async function handleRequest(context: RequestContext): Promise<void> {
     if (transportMutation || !update.idempotentReplay) {
       await persistControlWithTransportNonce();
     }
+    if (!update.idempotentReplay) {
+      context.runtime.publish({ source: 'control.action' });
+    }
     const replayEntry = update.replayEntry ?? null;
     const auditRequestId = update.idempotentReplay
       ? replayEntry
@@ -1096,6 +1090,7 @@ async function handleRequest(context: RequestContext): Promise<void> {
           reason: 'confirmation_required'
         });
         await context.persist.control();
+        context.runtime.publish({ source: 'control.action' });
       }
     }
 
@@ -1180,6 +1175,7 @@ async function handleRequest(context: RequestContext): Promise<void> {
           requestId: requestId
         });
         await context.persist.control();
+        context.runtime.publish({ source: 'control.action' });
       } catch (error) {
         res.writeHead(409, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: (error as Error)?.message ?? 'confirmation_invalid' }));
@@ -1357,7 +1353,7 @@ async function handleRequest(context: RequestContext): Promise<void> {
         expires_in_ms: record.expires_in_ms ?? null
       }
     });
-    context.publishObservabilityUpdate({ source: 'questions.enqueue' });
+    context.runtime.publish({ source: 'questions.enqueue' });
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify(record));
     return;
@@ -1408,7 +1404,7 @@ async function handleRequest(context: RequestContext): Promise<void> {
       });
       await maybeResolveChildQuestion(context, record, record.status);
     }
-    context.publishObservabilityUpdate({ source: 'questions.answer' });
+    context.runtime.publish({ source: 'questions.answer' });
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ status: 'answered' }));
     return;
@@ -1447,7 +1443,7 @@ async function handleRequest(context: RequestContext): Promise<void> {
       });
       await maybeResolveChildQuestion(context, record, record.status);
     }
-    context.publishObservabilityUpdate({ source: 'questions.dismiss' });
+    context.runtime.publish({ source: 'questions.dismiss' });
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ status: 'dismissed' }));
     return;
@@ -1767,7 +1763,7 @@ async function handleLinearWebhook(context: RequestContext): Promise<void> {
       reason: 'linear_delivery_accepted'
     });
     writeLinearWebhookResponse(res, 200, 'accepted', 'linear_delivery_accepted');
-    context.publishObservabilityUpdate({ source: 'linear.webhook' });
+    context.runtime.publish({ source: 'linear.webhook' });
     return;
   }
 
@@ -2780,7 +2776,7 @@ async function expireQuestions(context: RequestContext): Promise<void> {
     });
     await maybeResolveChildQuestion(context, record, 'expired');
   }
-  context.publishObservabilityUpdate({ source: 'questions.expire' });
+  context.runtime.publish({ source: 'questions.expire' });
 }
 
 function resolveAuthToken(
@@ -2943,27 +2939,6 @@ async function emitControlEvent(
       }
     });
   }
-}
-
-function createObservabilityReadHandles(
-  context: Pick<RequestContext, 'controlStore' | 'questionQueue' | 'paths' | 'linearAdvisoryState'>
-): {
-  projection: ReturnType<typeof createSelectedRunProjectionReader>;
-  observabilityContext: Parameters<typeof createObservabilitySurface>[0];
-  observability: ReturnType<typeof createObservabilitySurface>;
-} {
-  const projection = createSelectedRunProjectionReader(context);
-  const observabilityContext = {
-    controlStore: context.controlStore,
-    linearAdvisoryState: context.linearAdvisoryState,
-    paths: context.paths,
-    projection
-  };
-  return {
-    projection,
-    observabilityContext,
-    observability: createObservabilitySurface(observabilityContext)
-  };
 }
 
 function buildTelegramOversightDispatchPayload(

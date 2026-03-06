@@ -917,7 +917,7 @@ describe('ControlServer', () => {
 
   it('acknowledges read-only refresh requests without mutating control state', async () => {
     const { root, env, paths } = await createRunRoot('task-0940');
-    await seedManifest(paths);
+    await seedManifest(paths, { summary: 'task is running' });
     const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
 
     const server = await ControlServer.start({
@@ -934,6 +934,25 @@ describe('ControlServer', () => {
         control_seq?: number;
         latest_action?: { action?: string | null } | null;
       };
+      const beforeStateRes = await fetch(new URL('/api/v1/state', baseUrl), {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      expect(beforeStateRes.status).toBe(200);
+      const beforeStatePayload = (await beforeStateRes.json()) as {
+        selected?: { summary?: string | null } | null;
+      };
+      expect(beforeStatePayload.selected?.summary).toBe('task is running');
+
+      await seedManifest(paths, { summary: 'task needs review' });
+
+      const staleStateRes = await fetch(new URL('/api/v1/state', baseUrl), {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      expect(staleStateRes.status).toBe(200);
+      const staleStatePayload = (await staleStateRes.json()) as {
+        selected?: { summary?: string | null } | null;
+      };
+      expect(staleStatePayload.selected?.summary).toBe('task is running');
 
       const refreshRes = await fetch(new URL('/api/v1/refresh', baseUrl), {
         method: 'POST',
@@ -963,6 +982,15 @@ describe('ControlServer', () => {
         requested_action: 'refresh'
       });
 
+      const refreshedStateRes = await fetch(new URL('/api/v1/state', baseUrl), {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      expect(refreshedStateRes.status).toBe(200);
+      const refreshedStatePayload = (await refreshedStateRes.json()) as {
+        selected?: { summary?: string | null } | null;
+      };
+      expect(refreshedStatePayload.selected?.summary).toBe('task needs review');
+
       const afterRaw = await readFile(paths.controlPath, 'utf8');
       const after = JSON.parse(afterRaw) as {
         control_seq?: number;
@@ -970,6 +998,71 @@ describe('ControlServer', () => {
       };
       expect(after.control_seq).toBe(before.control_seq);
       expect(after.latest_action ?? null).toEqual(before.latest_action ?? null);
+    } finally {
+      await server.close();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('invalidates the cached runtime after a control action mutates state', async () => {
+    const { root, env, paths } = await createRunRoot('task-0940');
+    await seedManifest(paths, { summary: 'task is running' });
+    const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
+
+    const server = await ControlServer.start({
+      paths,
+      config,
+      runId: 'run-1'
+    });
+
+    try {
+      const baseUrl = server.getBaseUrl() ?? '';
+      const token = await readToken(paths.controlAuthPath);
+      const initialStateRes = await fetch(new URL('/api/v1/state', baseUrl), {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      expect(initialStateRes.status).toBe(200);
+      const initialStatePayload = (await initialStateRes.json()) as {
+        selected?: { display_status?: string; summary?: string | null } | null;
+      };
+      expect(initialStatePayload.selected).toMatchObject({
+        display_status: 'in_progress',
+        summary: 'task is running'
+      });
+
+      const actionRes = await fetch(new URL('/control/action', baseUrl), {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'x-csrf-token': token,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          action: 'pause',
+          requested_by: 'delegate',
+          request_id: 'req-runtime-invalidate',
+          intent_id: 'intent-runtime-invalidate',
+          reason: 'manual pause'
+        })
+      });
+      expect(actionRes.status).toBe(200);
+
+      const refreshedStateRes = await fetch(new URL('/api/v1/state', baseUrl), {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      expect(refreshedStateRes.status).toBe(200);
+      const refreshedStatePayload = (await refreshedStateRes.json()) as {
+        selected?: {
+          display_status?: string;
+          status_reason?: string | null;
+          summary?: string | null;
+        } | null;
+      };
+      expect(refreshedStatePayload.selected).toMatchObject({
+        display_status: 'paused',
+        status_reason: 'control_pause',
+        summary: 'task is running'
+      });
     } finally {
       await server.close();
       await rm(root, { recursive: true, force: true });
