@@ -500,4 +500,333 @@ describe('TelegramOversightBridge', () => {
       await rm(root, { recursive: true, force: true });
     }
   });
+
+  it('sends deduped projection-driven push notifications when enabled', async () => {
+    const { root, env, paths } = await createRunRoot('task-1016-telegram-push');
+    await seedManifest(paths, {
+      summary: 'task is running',
+      updated_at: '2026-03-06T04:00:00.000Z'
+    });
+    await seedControlState(paths, {
+      control_seq: 1,
+      latest_action: {
+        action: 'pause',
+        requested_at: '2026-03-06T04:01:00.000Z',
+        requested_by: 'operator',
+        reason: 'manual_pause'
+      }
+    });
+    const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
+    const realFetch = globalThis.fetch;
+    const telegram = createTelegramHarness(realFetch);
+
+    vi.stubEnv('CO_TELEGRAM_POLLING_ENABLED', '1');
+    vi.stubEnv('CO_TELEGRAM_BOT_TOKEN', 'test-token');
+    vi.stubEnv('CO_TELEGRAM_ALLOWED_CHAT_IDS', '1234');
+    vi.stubEnv('CO_TELEGRAM_PUSH_ENABLED', '1');
+    vi.stubEnv('CO_TELEGRAM_PUSH_INTERVAL_MS', '1');
+    vi.stubEnv('CO_TELEGRAM_POLL_INTERVAL_MS', '10');
+    vi.stubGlobal('fetch', telegram.fetch);
+
+    const server = await ControlServer.start({
+      paths,
+      config,
+      runId: 'run-1'
+    });
+
+    try {
+      server.broadcast({
+        schema_version: 1,
+        seq: 1,
+        timestamp: '2026-03-06T04:02:00.000Z',
+        task_id: 'task-0940',
+        run_id: 'run-1',
+        event: 'run_updated',
+        actor: 'runner',
+        payload: { summary: 'initial broadcast' }
+      });
+
+      await waitForCondition(async () => telegram.sentMessages.length === 1);
+      expect(telegram.sentMessages[0]?.text).toContain('CO status');
+      expect(telegram.sentMessages[0]?.text).toContain('Summary: task is running');
+
+      server.broadcast({
+        schema_version: 1,
+        seq: 2,
+        timestamp: '2026-03-06T04:03:00.000Z',
+        task_id: 'task-0940',
+        run_id: 'run-1',
+        event: 'run_updated',
+        actor: 'runner',
+        payload: { summary: 'duplicate projection' }
+      });
+
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      expect(telegram.sentMessages).toHaveLength(1);
+
+      await writeFile(
+        paths.manifestPath,
+        JSON.stringify({
+          run_id: 'run-1',
+          task_id: 'task-0940',
+          status: 'in_progress',
+          started_at: '2026-03-06T04:00:00.000Z',
+          updated_at: '2026-03-06T04:04:00.000Z',
+          completed_at: null,
+          summary: 'task needs review',
+          commands: [],
+          approvals: []
+        }),
+        'utf8'
+      );
+
+      server.broadcast({
+        schema_version: 1,
+        seq: 3,
+        timestamp: '2026-03-06T04:04:30.000Z',
+        task_id: 'task-0940',
+        run_id: 'run-1',
+        event: 'run_updated',
+        actor: 'runner',
+        payload: { summary: 'projection changed' }
+      });
+
+      await waitForCondition(async () => telegram.sentMessages.length === 2);
+      expect(telegram.sentMessages[1]?.text).toContain('Summary: task needs review');
+
+      const stateRaw = await readFile(join(paths.runDir, 'telegram-oversight-state.json'), 'utf8');
+      const state = JSON.parse(stateRaw) as {
+        push?: {
+          last_sent_projection_hash?: string | null;
+          last_sent_at?: string | null;
+          last_event_seq?: number | null;
+          pending_projection_hash?: string | null;
+          pending_projection_observed_at?: string | null;
+        };
+      };
+      expect(state.push?.last_sent_projection_hash).toBeTruthy();
+      expect(state.push?.last_sent_at).toBeTruthy();
+      expect(state.push?.last_event_seq).toBe(3);
+      expect(state.push?.pending_projection_hash).toBeNull();
+      expect(state.push?.pending_projection_observed_at).toBeNull();
+    } finally {
+      await server.close();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('persists a pending projection during cooldown and flushes it on the next signal', async () => {
+    const { root, env, paths } = await createRunRoot('task-1016-telegram-push-cooldown');
+    await seedManifest(paths, {
+      summary: 'task is running',
+      updated_at: '2026-03-06T04:00:00.000Z'
+    });
+    await seedControlState(paths, {
+      control_seq: 1,
+      latest_action: {
+        action: 'pause',
+        requested_at: '2026-03-06T04:01:00.000Z',
+        requested_by: 'operator',
+        reason: 'manual_pause'
+      }
+    });
+    const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
+    const realFetch = globalThis.fetch;
+    const telegram = createTelegramHarness(realFetch);
+
+    vi.stubEnv('CO_TELEGRAM_POLLING_ENABLED', '1');
+    vi.stubEnv('CO_TELEGRAM_BOT_TOKEN', 'test-token');
+    vi.stubEnv('CO_TELEGRAM_ALLOWED_CHAT_IDS', '1234');
+    vi.stubEnv('CO_TELEGRAM_PUSH_ENABLED', '1');
+    vi.stubEnv('CO_TELEGRAM_PUSH_INTERVAL_MS', '250');
+    vi.stubEnv('CO_TELEGRAM_POLL_INTERVAL_MS', '10');
+    vi.stubGlobal('fetch', telegram.fetch);
+
+    const server = await ControlServer.start({
+      paths,
+      config,
+      runId: 'run-1'
+    });
+
+    try {
+      server.broadcast({
+        schema_version: 1,
+        seq: 1,
+        timestamp: '2026-03-06T04:02:00.000Z',
+        task_id: 'task-0940',
+        run_id: 'run-1',
+        event: 'run_updated',
+        actor: 'runner',
+        payload: { summary: 'initial broadcast' }
+      });
+
+      await waitForCondition(async () => telegram.sentMessages.length === 1);
+
+      await writeFile(
+        paths.manifestPath,
+        JSON.stringify({
+          run_id: 'run-1',
+          task_id: 'task-0940',
+          status: 'in_progress',
+          started_at: '2026-03-06T04:00:00.000Z',
+          updated_at: '2026-03-06T04:04:00.000Z',
+          completed_at: null,
+          summary: 'task needs review',
+          commands: [],
+          approvals: []
+        }),
+        'utf8'
+      );
+
+      server.broadcast({
+        schema_version: 1,
+        seq: 2,
+        timestamp: '2026-03-06T04:03:00.000Z',
+        task_id: 'task-0940',
+        run_id: 'run-1',
+        event: 'run_updated',
+        actor: 'runner',
+        payload: { summary: 'projection changed during cooldown' }
+      });
+
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      expect(telegram.sentMessages).toHaveLength(1);
+
+      const pendingStateRaw = await readFile(join(paths.runDir, 'telegram-oversight-state.json'), 'utf8');
+      const pendingState = JSON.parse(pendingStateRaw) as {
+        push?: {
+          last_sent_projection_hash?: string | null;
+          last_event_seq?: number | null;
+          pending_projection_hash?: string | null;
+          pending_projection_observed_at?: string | null;
+        };
+      };
+      expect(pendingState.push?.last_event_seq).toBe(2);
+      expect(pendingState.push?.pending_projection_hash).toBeTruthy();
+      expect(pendingState.push?.pending_projection_hash).not.toBe(pendingState.push?.last_sent_projection_hash);
+      expect(pendingState.push?.pending_projection_observed_at).toBeTruthy();
+
+      await new Promise((resolve) => setTimeout(resolve, 200));
+
+      server.broadcast({
+        schema_version: 1,
+        seq: 3,
+        timestamp: '2026-03-06T04:04:30.000Z',
+        task_id: 'task-0940',
+        run_id: 'run-1',
+        event: 'run_updated',
+        actor: 'runner',
+        payload: { summary: 'flush pending projection' }
+      });
+
+      await waitForCondition(async () => telegram.sentMessages.length === 2);
+      expect(telegram.sentMessages[1]?.text).toContain('Summary: task needs review');
+
+      const flushedStateRaw = await readFile(join(paths.runDir, 'telegram-oversight-state.json'), 'utf8');
+      const flushedState = JSON.parse(flushedStateRaw) as {
+        push?: {
+          last_event_seq?: number | null;
+          pending_projection_hash?: string | null;
+          pending_projection_observed_at?: string | null;
+        };
+      };
+      expect(flushedState.push?.last_event_seq).toBe(3);
+      expect(flushedState.push?.pending_projection_hash).toBeNull();
+      expect(flushedState.push?.pending_projection_observed_at).toBeNull();
+    } finally {
+      await server.close();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('sends projection-driven push notifications when queued questions are added and cleared', async () => {
+    const { root, env, paths } = await createRunRoot('task-1016-telegram-question-push');
+    await seedManifest(paths, {
+      summary: 'task is running',
+      updated_at: '2026-03-06T05:00:00.000Z'
+    });
+    const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
+    const realFetch = globalThis.fetch;
+    const telegram = createTelegramHarness(realFetch);
+
+    vi.stubEnv('CO_TELEGRAM_POLLING_ENABLED', '1');
+    vi.stubEnv('CO_TELEGRAM_BOT_TOKEN', 'test-token');
+    vi.stubEnv('CO_TELEGRAM_ALLOWED_CHAT_IDS', '1234');
+    vi.stubEnv('CO_TELEGRAM_PUSH_ENABLED', '1');
+    vi.stubEnv('CO_TELEGRAM_PUSH_INTERVAL_MS', '1');
+    vi.stubEnv('CO_TELEGRAM_POLL_INTERVAL_MS', '10');
+    vi.stubGlobal('fetch', telegram.fetch);
+
+    const server = await ControlServer.start({
+      paths,
+      config,
+      runId: 'run-1'
+    });
+
+    try {
+      const token = await readToken(paths.controlAuthPath);
+      const baseUrl = server.getBaseUrl() ?? '';
+
+      await fetch(new URL('/delegation/register', baseUrl), {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'x-csrf-token': token,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          token: 'delegation-token',
+          parent_run_id: 'run-1',
+          child_run_id: 'child-run'
+        })
+      });
+
+      const enqueueRes = await fetch(new URL('/questions/enqueue', baseUrl), {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'x-csrf-token': token,
+          'Content-Type': 'application/json',
+          'x-codex-delegation-token': 'delegation-token',
+          'x-codex-delegation-run-id': 'child-run'
+        },
+        body: JSON.stringify({
+          prompt: 'Need operator approval',
+          urgency: 'high',
+          auto_pause: true,
+          expiry_fallback: 'resume'
+        })
+      });
+      const enqueuePayload = (await enqueueRes.json()) as { question_id?: string };
+      const questionId = enqueuePayload.question_id ?? '';
+      expect(questionId).toMatch(/^q-/);
+
+      await waitForCondition(async () => telegram.sentMessages.length === 1);
+      expect(telegram.sentMessages[0]?.text).toContain('CO status');
+      expect(telegram.sentMessages[0]?.text).toContain('Queued questions: 1');
+      expect(telegram.sentMessages[0]?.text).toContain('latest ' + questionId);
+
+      const answerRes = await fetch(new URL('/questions/answer', baseUrl), {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'x-csrf-token': token,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          question_id: questionId,
+          answer: 'Approved',
+          answered_by: 'ui'
+        })
+      });
+      expect(answerRes.status).toBe(200);
+
+      await waitForCondition(async () => telegram.sentMessages.length === 2);
+      expect(telegram.sentMessages[1]?.text).toContain('CO status');
+      expect(telegram.sentMessages[1]?.text).not.toContain('Queued questions: 1');
+    } finally {
+      await server.close();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
 });

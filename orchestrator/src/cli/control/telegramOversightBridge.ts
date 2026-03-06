@@ -1,4 +1,4 @@
-import { randomBytes } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
@@ -8,6 +8,7 @@ import { writeJsonAtomic } from '../utils/fs.js';
 const TELEGRAM_API_ROOT = 'https://api.telegram.org';
 const DEFAULT_POLL_INTERVAL_MS = 1_000;
 const DEFAULT_POLL_TIMEOUT_SECONDS = 20;
+const DEFAULT_PUSH_COOLDOWN_MS = 30_000;
 const TELEGRAM_STATE_FILE = 'telegram-oversight-state.json';
 
 interface TelegramOversightBridgeConfig {
@@ -15,11 +16,20 @@ interface TelegramOversightBridgeConfig {
   allowedChatIds: ReadonlySet<string>;
   mutationsEnabled: boolean;
   pollIntervalMs: number;
+  pushEnabled: boolean;
+  pushCooldownMs: number;
 }
 
 interface TelegramOversightBridgeState {
   next_update_id: number;
   updated_at: string;
+  push: {
+    last_sent_projection_hash: string | null;
+    last_sent_at: string | null;
+    last_event_seq: number | null;
+    pending_projection_hash: string | null;
+    pending_projection_observed_at: string | null;
+  };
 }
 
 interface TelegramBotIdentity {
@@ -188,6 +198,10 @@ interface ControlActionResponse {
 type FetchLike = typeof fetch;
 
 export interface TelegramOversightBridge {
+  notifyProjectionDelta(input?: {
+    eventSeq?: number | null;
+    source?: string | null;
+  }): Promise<void>;
   close(): Promise<void>;
 }
 
@@ -234,9 +248,17 @@ class TelegramOversightBridgeRuntime implements TelegramOversightBridge {
   private activeController: AbortController | null = null;
   private state: TelegramOversightBridgeState = {
     next_update_id: 0,
-    updated_at: new Date(0).toISOString()
+    updated_at: new Date(0).toISOString(),
+    push: {
+      last_sent_projection_hash: null,
+      last_sent_at: null,
+      last_event_seq: null,
+      pending_projection_hash: null,
+      pending_projection_observed_at: null
+    }
   };
   private botIdentity: TelegramBotIdentity | null = null;
+  private notificationQueue: Promise<void> = Promise.resolve();
 
   constructor(options: {
     config: TelegramOversightBridgeConfig;
@@ -276,6 +298,28 @@ class TelegramOversightBridgeRuntime implements TelegramOversightBridge {
       await this.loopPromise;
       this.loopPromise = null;
     }
+    try {
+      await this.notificationQueue;
+    } catch {
+      // Ignore queued notification errors during shutdown.
+    }
+  }
+
+  async notifyProjectionDelta(
+    input: {
+      eventSeq?: number | null;
+      source?: string | null;
+    } = {}
+  ): Promise<void> {
+    if (!this.config.pushEnabled || this.closed) {
+      return;
+    }
+    this.notificationQueue = this.notificationQueue
+      .then(() => this.maybeSendProjectionDelta(input))
+      .catch((error) => {
+        logger.warn(`[telegram-oversight] push notification failed: ${(error as Error)?.message ?? String(error)}`);
+      });
+    await this.notificationQueue;
   }
 
   private async pollLoop(): Promise<void> {
@@ -342,10 +386,11 @@ class TelegramOversightBridgeRuntime implements TelegramOversightBridge {
     }
     if (nextUpdateId !== this.state.next_update_id) {
       this.state = {
+        ...this.state,
         next_update_id: nextUpdateId,
         updated_at: new Date().toISOString()
       };
-      await writeJsonAtomic(this.statePath, this.state);
+      await this.persistState();
     }
   }
 
@@ -631,6 +676,76 @@ class TelegramOversightBridgeRuntime implements TelegramOversightBridge {
   private telegramUrl(method: string): string {
     return `${TELEGRAM_API_ROOT}/bot${this.config.botToken}/${method}`;
   }
+
+  private async maybeSendProjectionDelta(input: {
+    eventSeq?: number | null;
+    source?: string | null;
+  }): Promise<void> {
+    const normalizedEventSeq =
+      typeof input.eventSeq === 'number' && Number.isFinite(input.eventSeq) ? Math.floor(input.eventSeq) : null;
+    const nextEventSeq = normalizedEventSeq ?? this.state.push.last_event_seq;
+    const now = Date.now();
+    const nowIso = new Date(now).toISOString();
+    const payload = await this.readControlJson<ControlStatePayload>('/api/v1/state');
+    const projectionHash = buildProjectionHash(payload);
+
+    if (!projectionHash || projectionHash === this.state.push.last_sent_projection_hash) {
+      this.state = {
+        ...this.state,
+        updated_at: nowIso,
+        push: {
+          ...this.state.push,
+          last_event_seq: nextEventSeq,
+          pending_projection_hash: null,
+          pending_projection_observed_at: null
+        }
+      };
+      await this.persistState();
+      return;
+    }
+
+    const lastSentAtMs = this.state.push.last_sent_at ? Date.parse(this.state.push.last_sent_at) : Number.NaN;
+    if (Number.isFinite(lastSentAtMs) && now - lastSentAtMs < this.config.pushCooldownMs) {
+      this.state = {
+        ...this.state,
+        updated_at: nowIso,
+        push: {
+          ...this.state.push,
+          last_event_seq: nextEventSeq,
+          pending_projection_hash: projectionHash,
+          pending_projection_observed_at:
+            projectionHash === this.state.push.pending_projection_hash
+              ? this.state.push.pending_projection_observed_at ?? nowIso
+              : nowIso
+        }
+      };
+      await this.persistState();
+      return;
+    }
+
+    const text = await this.renderStatus();
+    for (const chatId of this.config.allowedChatIds) {
+      await this.sendMessage(chatId, text);
+    }
+
+    const sentAt = new Date(now).toISOString();
+    this.state = {
+      ...this.state,
+      updated_at: sentAt,
+      push: {
+        last_sent_projection_hash: projectionHash,
+        last_sent_at: sentAt,
+        last_event_seq: nextEventSeq,
+        pending_projection_hash: null,
+        pending_projection_observed_at: null
+      }
+    };
+    await this.persistState();
+  }
+
+  private async persistState(): Promise<void> {
+    await writeJsonAtomic(this.statePath, this.state);
+  }
 }
 
 function resolveTelegramOversightBridgeConfig(env: NodeJS.ProcessEnv): TelegramOversightBridgeConfig | null {
@@ -649,7 +764,9 @@ function resolveTelegramOversightBridgeConfig(env: NodeJS.ProcessEnv): TelegramO
     botToken,
     allowedChatIds,
     mutationsEnabled: parseBooleanEnv(env.CO_TELEGRAM_ENABLE_MUTATIONS),
-    pollIntervalMs: parsePositiveIntegerEnv(env.CO_TELEGRAM_POLL_INTERVAL_MS, DEFAULT_POLL_INTERVAL_MS)
+    pollIntervalMs: parsePositiveIntegerEnv(env.CO_TELEGRAM_POLL_INTERVAL_MS, DEFAULT_POLL_INTERVAL_MS),
+    pushEnabled: parseBooleanEnv(env.CO_TELEGRAM_PUSH_ENABLED),
+    pushCooldownMs: parsePositiveIntegerEnv(env.CO_TELEGRAM_PUSH_INTERVAL_MS, DEFAULT_PUSH_COOLDOWN_MS)
   };
 }
 
@@ -666,12 +783,45 @@ async function readTelegramState(path: string): Promise<TelegramOversightBridgeS
       updated_at:
         typeof parsed.updated_at === 'string' && parsed.updated_at.trim().length > 0
           ? parsed.updated_at
-          : new Date(0).toISOString()
+          : new Date(0).toISOString(),
+      push: {
+        last_sent_projection_hash:
+          parsed.push && typeof parsed.push === 'object' && !Array.isArray(parsed.push)
+            ? readStringValue(parsed.push as Record<string, unknown>, 'last_sent_projection_hash') ?? null
+            : null,
+        last_sent_at:
+          parsed.push && typeof parsed.push === 'object' && !Array.isArray(parsed.push)
+            ? readStringValue(parsed.push as Record<string, unknown>, 'last_sent_at') ?? null
+            : null,
+        last_event_seq:
+          parsed.push &&
+          typeof parsed.push === 'object' &&
+          !Array.isArray(parsed.push) &&
+          typeof (parsed.push as Record<string, unknown>).last_event_seq === 'number' &&
+          Number.isInteger((parsed.push as Record<string, unknown>).last_event_seq)
+            ? ((parsed.push as Record<string, unknown>).last_event_seq as number)
+            : null,
+        pending_projection_hash:
+          parsed.push && typeof parsed.push === 'object' && !Array.isArray(parsed.push)
+            ? readStringValue(parsed.push as Record<string, unknown>, 'pending_projection_hash') ?? null
+            : null,
+        pending_projection_observed_at:
+          parsed.push && typeof parsed.push === 'object' && !Array.isArray(parsed.push)
+            ? readStringValue(parsed.push as Record<string, unknown>, 'pending_projection_observed_at') ?? null
+            : null
+      }
     };
   } catch {
     return {
       next_update_id: 0,
-      updated_at: new Date(0).toISOString()
+      updated_at: new Date(0).toISOString(),
+      push: {
+        last_sent_projection_hash: null,
+        last_sent_at: null,
+        last_event_seq: null,
+        pending_projection_hash: null,
+        pending_projection_observed_at: null
+      }
     };
   }
 }
@@ -790,6 +940,70 @@ function truncateLine(value: string, maxLength: number): string {
     return normalized;
   }
   return `${normalized.slice(0, Math.max(maxLength - 3, 1))}...`;
+}
+
+function buildProjectionHash(payload: ControlStatePayload): string | null {
+  const selected = payload.selected ?? null;
+  const running = payload.running?.[0] ?? null;
+  const dispatchPilot = payload.dispatch_pilot ?? null;
+  const trackedLinear = selected?.tracked?.linear ?? payload.tracked?.linear ?? null;
+  const questionSummary = selected?.question_summary ?? null;
+  if (!selected && !running && !trackedLinear && !dispatchPilot && !questionSummary) {
+    return null;
+  }
+  const fingerprint = {
+    selected: selected
+      ? {
+          issue_identifier: selected.issue_identifier ?? null,
+          run_id: selected.run_id ?? null,
+          raw_status: selected.raw_status ?? null,
+          display_status: selected.display_status ?? null,
+          status_reason: selected.status_reason ?? null,
+          summary: selected.summary ?? null,
+          latest_event: selected.latest_event
+            ? {
+                event: selected.latest_event.event ?? null,
+                message: selected.latest_event.message ?? null,
+                at: selected.latest_event.at ?? null
+              }
+            : null,
+          question_summary: questionSummary
+            ? {
+                queued_count: questionSummary.queued_count ?? 0,
+                latest_question_id: questionSummary.latest_question?.question_id ?? null
+              }
+            : null
+        }
+      : null,
+    running: running
+      ? {
+          issue_identifier: running.issue_identifier ?? null,
+          session_id: running.session_id ?? null,
+          state: running.state ?? null,
+          display_state: running.display_state ?? null,
+          status_reason: running.status_reason ?? null,
+          last_event: running.last_event ?? null,
+          last_message: running.last_message ?? null
+        }
+      : null,
+    dispatch_pilot: dispatchPilot
+      ? {
+          status: dispatchPilot.status ?? null,
+          source_status: dispatchPilot.source_status ?? null,
+          reason: dispatchPilot.reason ?? null
+        }
+      : null,
+    tracked_linear: trackedLinear
+      ? {
+          identifier: trackedLinear.identifier ?? null,
+          title: trackedLinear.title ?? null,
+          state: trackedLinear.state ?? null,
+          url: trackedLinear.url ?? null,
+          team_key: trackedLinear.team_key ?? null
+        }
+      : null
+  };
+  return createHash('sha256').update(JSON.stringify(fingerprint)).digest('hex');
 }
 
 function parseCsvSet(value: string | undefined): Set<string> {

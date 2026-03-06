@@ -5358,6 +5358,55 @@
       "cadence_days": 90
     },
     {
+      "path": ".agent/task/1016-coordinator-live-linear-advisory-ingress-and-telegram-delta-notifications.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-06",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/ACTION_PLAN-coordinator-live-linear-advisory-ingress-and-telegram-delta-notifications.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-06",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/findings/1016-live-linear-ingress-and-telegram-delta-deliberation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-06",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/PRD-coordinator-live-linear-advisory-ingress-and-telegram-delta-notifications.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-06",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/TECH_SPEC-coordinator-live-linear-advisory-ingress-and-telegram-delta-notifications.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-06",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/specs/1016-coordinator-live-linear-advisory-ingress-and-telegram-delta-notifications.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-06",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/tasks-1016-coordinator-live-linear-advisory-ingress-and-telegram-delta-notifications.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-06",
+      "cadence_days": 90
+    },
+    {
       "path": ".agent/task/1015-coordinator-symphony-aligned-selected-run-projection-and-advisory-context.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",

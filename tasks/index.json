@@ -1936,6 +1936,22 @@
       "completed_at": "2026-03-06"
     },
     {
+      "id": "1016",
+      "slug": "1016-coordinator-live-linear-advisory-ingress-and-telegram-delta-notifications",
+      "title": "Coordinator Live Linear Advisory Ingress + Telegram Delta Notifications",
+      "path": "tasks/tasks-1016-coordinator-live-linear-advisory-ingress-and-telegram-delta-notifications.md",
+      "kind": "run",
+      "status": "completed",
+      "gate": {
+        "phase": "coordinator-live-linear-advisory-ingress-and-telegram-delta-notifications-closeout-override",
+        "status": "succeeded",
+        "log": "out/1016-coordinator-live-linear-advisory-ingress-and-telegram-delta-notifications/manual/20260306T080830Z-closeout/00-summary.md",
+        "run_id": "20260306T080830Z-closeout"
+      },
+      "created_at": "2026-03-06",
+      "completed_at": "2026-03-06"
+    },
+    {
       "id": "1015",
       "slug": "1015-coordinator-symphony-aligned-selected-run-projection-and-advisory-context",
       "title": "Coordinator Symphony-Aligned Selected-Run Projection + Advisory Context",
@@ -2911,6 +2927,22 @@
         "task": "tasks/tasks-1001-coordinator-appserver-dynamic-tool-bridge-experimental-lane.md",
         "agent_task": ".agent/task/1001-coordinator-appserver-dynamic-tool-bridge-experimental-lane.md",
         "docs": "docs/TECH_SPEC-coordinator-appserver-dynamic-tool-bridge-experimental-lane.md"
+      }
+    },
+    {
+      "id": "20260306-1016-coordinator-live-linear-advisory-ingress-and-telegram-delta-notifications",
+      "title": "Coordinator Live Linear Advisory Ingress + Telegram Delta Notifications",
+      "relates_to": "tasks/tasks-1016-coordinator-live-linear-advisory-ingress-and-telegram-delta-notifications.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-06",
+      "paths": {
+        "spec": "tasks/specs/1016-coordinator-live-linear-advisory-ingress-and-telegram-delta-notifications.md",
+        "task": "tasks/tasks-1016-coordinator-live-linear-advisory-ingress-and-telegram-delta-notifications.md",
+        "agent_task": ".agent/task/1016-coordinator-live-linear-advisory-ingress-and-telegram-delta-notifications.md",
+        "docs": "docs/TECH_SPEC-coordinator-live-linear-advisory-ingress-and-telegram-delta-notifications.md"
       }
     },
     {

@@ -76,7 +76,7 @@
 - Dependencies / Integrations:
   - existing `ControlServer`, Telegram oversight bridge, and dispatch pilot runtime,
   - real Linear workspace/team/project and token supplied via env for validation,
-  - Symphony checkout at `/Users/kbediako/Code/symphony` as behavior reference only.
+  - real `openai/symphony` repo/checkout as a behavior reference only.
 
 ## Open Questions
 - Whether the shared builder should also own `/questions` summary shaping now, or only expose question metadata that Telegram and `/api/v1/state` can each render.

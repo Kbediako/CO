@@ -6,7 +6,7 @@
 - Scope Status: docs-first implementation stream for task `1014-coordinator-symphony-aligned-telegram-oversight-and-live-linear-advisory-adapters`; runtime implementation is in scope for this lane.
 
 ## User Request Translation
-- Continue as the top-level Orchestrator and use the local Symphony checkout in `/Users/kbediako/Code/symphony` as a behavior reference, not as an authority model.
+- Continue as the top-level Orchestrator and use the real `openai/symphony` repo/checkout as a behavior reference, not as an authority model.
 - Make Linear work like the useful parts of Symphony:
   - a single active item view,
   - recent event/status context,
@@ -31,7 +31,7 @@
   - no provider-backed ingress/egress adapters exist yet.
 
 ## Symphony Reference Policy
-- The local `/Users/kbediako/Code/symphony` checkout is a useful behavior reference for:
+- The real `openai/symphony` repo/checkout is a useful behavior reference for:
   - selected-item focus,
   - live event projection,
   - concise operator context around one active repo/agent.

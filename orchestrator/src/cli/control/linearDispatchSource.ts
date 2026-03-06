@@ -29,6 +29,13 @@ export interface LiveLinearTrackedIssue {
   recent_activity: LiveLinearTrackedActivity[];
 }
 
+interface LiveLinearFailureResolution {
+  kind: 'unavailable' | 'malformed';
+  status: number;
+  code: 'dispatch_source_unavailable' | 'dispatch_source_malformed';
+  reason: string;
+}
+
 export type LiveLinearDispatchResolution =
   | {
       kind: 'ready';
@@ -40,12 +47,15 @@ export type LiveLinearDispatchResolution =
       source_setup: DispatchPilotSourceSetup;
       tracked_issue: LiveLinearTrackedIssue;
     }
+  | LiveLinearFailureResolution;
+
+export type LiveLinearTrackedIssueResolution =
   | {
-      kind: 'unavailable' | 'malformed';
-      status: number;
-      code: 'dispatch_source_unavailable' | 'dispatch_source_malformed';
-      reason: string;
-    };
+      kind: 'ready';
+      tracked_issue: LiveLinearTrackedIssue;
+      source_setup: DispatchPilotSourceSetup;
+    }
+  | LiveLinearFailureResolution;
 
 interface LinearIssueQueryResponse {
   viewer?: {
@@ -53,6 +63,7 @@ interface LinearIssueQueryResponse {
       id?: string | null;
     } | null;
   } | null;
+  issue?: LinearIssueNode | null;
   issues?: {
     nodes?: LinearIssueNode[] | null;
   } | null;
@@ -126,44 +137,23 @@ export async function resolveLiveLinearDispatchRecommendation(input: {
   }
 
   const query = buildLinearIssueQuery(sourceSetup);
-  const abortController = new AbortController();
-  const timeout = setTimeout(() => abortController.abort(), timeoutMs);
-  const response = await fetchImpl(LINEAR_GRAPHQL_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: token
-    },
-    body: JSON.stringify({
-      query: query.query,
-      variables: query.variables
-    }),
-    signal: abortController.signal
-  })
-    .catch(() => null)
-    .finally(() => clearTimeout(timeout));
-
-  if (!response) {
-    return unavailable('dispatch_source_provider_request_failed');
+  const queryResult = await executeLinearQuery({
+    token,
+    timeoutMs,
+    fetchImpl,
+    query: query.query,
+    variables: query.variables
+  });
+  if (!queryResult.ok) {
+    return queryResult.resolution;
   }
 
-  let payload: { data?: LinearIssueQueryResponse; errors?: Array<{ message?: string }> };
-  try {
-    payload = (await response.json()) as { data?: LinearIssueQueryResponse; errors?: Array<{ message?: string }> };
-  } catch {
-    return malformed('dispatch_source_provider_response_invalid');
-  }
-
-  if (!response.ok || (Array.isArray(payload.errors) && payload.errors.length > 0)) {
-    return unavailable('dispatch_source_provider_request_failed');
-  }
-
-  const workspaceId = payload.data?.viewer?.organization?.id?.trim() ?? null;
+  const workspaceId = queryResult.payload.data?.viewer?.organization?.id?.trim() ?? null;
   if (sourceSetup.workspace_id && workspaceId && sourceSetup.workspace_id !== workspaceId) {
     return malformed('dispatch_source_workspace_mismatch');
   }
 
-  const issue = payload.data?.issues?.nodes?.[0] ?? null;
+  const issue = queryResult.payload.data?.issues?.nodes?.[0] ?? null;
   if (!issue) {
     return unavailable('dispatch_source_issue_not_found');
   }
@@ -199,6 +189,76 @@ export async function resolveLiveLinearDispatchRecommendation(input: {
       project_id: trackedIssue.project_id
     },
     tracked_issue: trackedIssue
+  };
+}
+
+export async function resolveLiveLinearTrackedIssueById(input: {
+  issueId: string;
+  sourceSetup: DispatchPilotSourceSetup;
+  env?: NodeJS.ProcessEnv;
+  fetchImpl?: typeof fetch;
+}): Promise<LiveLinearTrackedIssueResolution> {
+  const issueId = normalizeEnvValue(input.issueId);
+  if (!issueId) {
+    return malformed('dispatch_source_issue_id_missing');
+  }
+
+  const env = input.env ?? process.env;
+  const fetchImpl = input.fetchImpl ?? fetch;
+  const token = resolveLinearApiToken(env);
+  if (!token) {
+    return unavailable('dispatch_source_credentials_missing');
+  }
+  const timeoutMs = resolveLinearRequestTimeoutMs(env);
+
+  const sourceSetup = resolveSourceSetup(input.sourceSetup, env);
+  if (!sourceSetup.workspace_id && !sourceSetup.team_id && !sourceSetup.project_id) {
+    return malformed('dispatch_source_binding_missing');
+  }
+
+  const query = buildLinearIssueByIdQuery(issueId);
+  const queryResult = await executeLinearQuery({
+    token,
+    timeoutMs,
+    fetchImpl,
+    query: query.query,
+    variables: query.variables
+  });
+  if (!queryResult.ok) {
+    return queryResult.resolution;
+  }
+
+  const workspaceId = queryResult.payload.data?.viewer?.organization?.id?.trim() ?? null;
+  if (sourceSetup.workspace_id && workspaceId && sourceSetup.workspace_id !== workspaceId) {
+    return malformed('dispatch_source_workspace_mismatch');
+  }
+
+  const issue = queryResult.payload.data?.issue ?? null;
+  if (!issue) {
+    return unavailable('dispatch_source_issue_not_found');
+  }
+
+  const trackedIssue = parseTrackedIssue(issue, {
+    workspaceId: sourceSetup.workspace_id ?? workspaceId
+  });
+  if (!trackedIssue) {
+    return malformed('dispatch_source_provider_response_invalid');
+  }
+
+  const scopeMismatch = validateTrackedIssueScope(trackedIssue, sourceSetup);
+  if (scopeMismatch) {
+    return scopeMismatch;
+  }
+
+  return {
+    kind: 'ready',
+    tracked_issue: trackedIssue,
+    source_setup: {
+      provider: 'linear',
+      workspace_id: trackedIssue.workspace_id,
+      team_id: trackedIssue.team_id,
+      project_id: trackedIssue.project_id
+    }
   };
 }
 
@@ -282,6 +342,131 @@ function buildLinearIssueQuery(sourceSetup: DispatchPilotSourceSetup): {
   };
 }
 
+function buildLinearIssueByIdQuery(issueId: string): {
+  query: string;
+  variables: Record<string, string>;
+} {
+  return {
+    query: `query ResolveLiveLinearTrackedIssueById($issueId: ID!) {
+      viewer {
+        organization {
+          id
+        }
+      }
+      issue(id: $issueId) {
+        id
+        identifier
+        title
+        url
+        updatedAt
+        state {
+          name
+          type
+        }
+        team {
+          id
+          key
+          name
+        }
+        project {
+          id
+          name
+        }
+        history(first: ${LINEAR_RECENT_ACTIVITY_LIMIT}) {
+          nodes {
+            id
+            createdAt
+            actor {
+              name
+              displayName
+            }
+            fromState {
+              name
+            }
+            toState {
+              name
+            }
+            fromProject {
+              name
+            }
+            toProject {
+              name
+            }
+            fromTitle
+            toTitle
+          }
+        }
+      }
+    }`,
+    variables: {
+      issueId
+    }
+  };
+}
+
+async function executeLinearQuery(input: {
+  token: string;
+  timeoutMs: number;
+  fetchImpl: typeof fetch;
+  query: string;
+  variables: Record<string, string>;
+}): Promise<
+  | {
+      ok: true;
+      payload: { data?: LinearIssueQueryResponse; errors?: Array<{ message?: string }> };
+    }
+  | {
+      ok: false;
+      resolution: LiveLinearFailureResolution;
+    }
+> {
+  const abortController = new AbortController();
+  const timeout = setTimeout(() => abortController.abort(), input.timeoutMs);
+  const response = await input.fetchImpl(LINEAR_GRAPHQL_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: input.token
+    },
+    body: JSON.stringify({
+      query: input.query,
+      variables: input.variables
+    }),
+    signal: abortController.signal
+  })
+    .catch(() => null)
+    .finally(() => clearTimeout(timeout));
+
+  if (!response) {
+    return {
+      ok: false,
+      resolution: unavailable('dispatch_source_provider_request_failed')
+    };
+  }
+
+  let payload: { data?: LinearIssueQueryResponse; errors?: Array<{ message?: string }> };
+  try {
+    payload = (await response.json()) as { data?: LinearIssueQueryResponse; errors?: Array<{ message?: string }> };
+  } catch {
+    return {
+      ok: false,
+      resolution: malformed('dispatch_source_provider_response_invalid')
+    };
+  }
+
+  if (!response.ok || (Array.isArray(payload.errors) && payload.errors.length > 0)) {
+    return {
+      ok: false,
+      resolution: unavailable('dispatch_source_provider_request_failed')
+    };
+  }
+
+  return {
+    ok: true,
+    payload
+  };
+}
+
 function resolveSourceSetup(sourceSetup: DispatchPilotSourceSetup, env: NodeJS.ProcessEnv): DispatchPilotSourceSetup {
   return {
     provider: 'linear',
@@ -344,6 +529,22 @@ function parseTrackedIssue(
   };
 }
 
+function validateTrackedIssueScope(
+  trackedIssue: LiveLinearTrackedIssue,
+  sourceSetup: DispatchPilotSourceSetup
+): LiveLinearFailureResolution | null {
+  if (sourceSetup.workspace_id && trackedIssue.workspace_id && sourceSetup.workspace_id !== trackedIssue.workspace_id) {
+    return malformed('dispatch_source_workspace_mismatch');
+  }
+  if (sourceSetup.team_id && sourceSetup.team_id !== trackedIssue.team_id) {
+    return malformed('dispatch_source_team_mismatch');
+  }
+  if (sourceSetup.project_id && sourceSetup.project_id !== trackedIssue.project_id) {
+    return malformed('dispatch_source_project_mismatch');
+  }
+  return null;
+}
+
 function buildTrackedActivity(node: LinearIssueHistoryNode): LiveLinearTrackedActivity | null {
   const id = normalizeEnvValue(node.id);
   if (!id) {
@@ -381,7 +582,7 @@ function buildDefaultRationale(issue: LiveLinearTrackedIssue, defaultIssueIdenti
   return fragments.join(', ');
 }
 
-function unavailable(reason: string): LiveLinearDispatchResolution {
+function unavailable(reason: string): LiveLinearFailureResolution {
   return {
     kind: 'unavailable',
     status: 503,
@@ -390,7 +591,7 @@ function unavailable(reason: string): LiveLinearDispatchResolution {
   };
 }
 
-function malformed(reason: string): LiveLinearDispatchResolution {
+function malformed(reason: string): LiveLinearFailureResolution {
   return {
     kind: 'malformed',
     status: 422,

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import http from 'node:http';
+import { createHmac } from 'node:crypto';
 import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -117,6 +118,18 @@ async function seedManifest(
     }),
     'utf8'
   );
+}
+
+function signLinearWebhook(body: string, secret: string): string {
+  return createHmac('sha256', secret).update(body).digest('hex');
+}
+
+async function readTextOrNull(path: string): Promise<string | null> {
+  try {
+    return await readFile(path, 'utf8');
+  } catch {
+    return null;
+  }
 }
 
 describe('ControlServer', () => {
@@ -1501,6 +1514,403 @@ describe('ControlServer', () => {
       });
       expect(missingIssueRes.status).toBe(404);
       expect(linearFetchCount).toBe(0);
+    } finally {
+      await server.close();
+      await rm(root, { recursive: true, force: true });
+      vi.unstubAllEnvs();
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('accepts a valid signed Linear webhook without bearer auth and projects the tracked issue', async () => {
+    const { root, env, paths } = await createRunRoot('task-1016-linear-webhook-accept');
+    await seedManifest(paths);
+    await seedDispatchPilot(paths, {
+      enabled: true,
+      source: {
+        provider: 'linear',
+        live: true,
+        workspace_id: 'lin-workspace-1',
+        team_id: 'lin-team-live',
+        project_id: 'lin-project-1'
+      }
+    });
+    const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
+    const realFetch = globalThis.fetch;
+    const webhookSecret = 'linear-webhook-secret';
+
+    vi.stubEnv('CO_LINEAR_API_TOKEN', 'lin-api-token');
+    vi.stubEnv('CO_LINEAR_WEBHOOK_SECRET', webhookSecret);
+    vi.stubGlobal('fetch', async (input, init) => {
+      const rawUrl = input instanceof Request ? input.url : String(input);
+      const url = new URL(rawUrl);
+      if (url.toString() === 'https://api.linear.app/graphql') {
+        return new Response(
+          JSON.stringify({
+            data: {
+              viewer: {
+                organization: {
+                  id: 'lin-workspace-1'
+                }
+              },
+              issue: {
+                id: 'lin-issue-1',
+                identifier: 'PREPROD-101',
+                title: 'Investigate advisory routing',
+                url: 'https://linear.app/asabeko/issue/PREPROD-101',
+                updatedAt: '2026-03-06T05:00:00.000Z',
+                state: {
+                  name: 'In Progress',
+                  type: 'started'
+                },
+                team: {
+                  id: 'lin-team-live',
+                  key: 'PREPROD',
+                  name: 'PRE-PRO/PRODUCTION'
+                },
+                project: {
+                  id: 'lin-project-1',
+                  name: 'Icon Agency (Bookings)'
+                },
+                history: {
+                  nodes: [
+                    {
+                      id: 'history-1',
+                      createdAt: '2026-03-06T04:55:00.000Z',
+                      actor: {
+                        displayName: 'Operator One'
+                      },
+                      fromState: {
+                        name: 'Todo'
+                      },
+                      toState: {
+                        name: 'In Progress'
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }),
+          {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' }
+          }
+        );
+      }
+      return realFetch(input, init);
+    });
+
+    const server = await ControlServer.start({
+      paths,
+      config,
+      runId: 'run-1'
+    });
+
+    try {
+      const baseUrl = server.getBaseUrl() ?? '';
+      const token = await readToken(paths.controlAuthPath);
+      const controlBefore = JSON.parse(await readFile(paths.controlPath, 'utf8')) as { control_seq?: number };
+      const body = JSON.stringify({
+        action: 'update',
+        type: 'Issue',
+        webhookTimestamp: Date.now(),
+        data: {
+          id: 'lin-issue-1'
+        }
+      });
+
+      const response = await fetch(new URL('/integrations/linear/webhook', baseUrl), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Linear-Delivery': 'delivery-1',
+          'Linear-Event': 'Issue',
+          'Linear-Signature': signLinearWebhook(body, webhookSecret)
+        },
+        body
+      });
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toMatchObject({
+        status: 'accepted',
+        reason: 'linear_delivery_accepted'
+      });
+
+      const controlAfter = JSON.parse(await readFile(paths.controlPath, 'utf8')) as { control_seq?: number };
+      expect(controlAfter.control_seq).toBe(controlBefore.control_seq);
+
+      const advisoryStateRaw = await readFile(join(paths.runDir, 'linear-advisory-state.json'), 'utf8');
+      const advisoryState = JSON.parse(advisoryStateRaw) as {
+        latest_delivery_id?: string | null;
+        latest_result?: string | null;
+        tracked_issue?: { identifier?: string | null; team_key?: string | null } | null;
+        seen_deliveries?: Array<{ delivery_id?: string; outcome?: string }>;
+      };
+      expect(advisoryState.latest_delivery_id).toBe('delivery-1');
+      expect(advisoryState.latest_result).toBe('accepted');
+      expect(advisoryState.tracked_issue).toMatchObject({
+        identifier: 'PREPROD-101',
+        team_key: 'PREPROD'
+      });
+      expect(advisoryState.seen_deliveries).toHaveLength(1);
+
+      const stateRes = await fetch(new URL('/api/v1/state', baseUrl), {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      expect(stateRes.status).toBe(200);
+      const statePayload = (await stateRes.json()) as {
+        tracked?: {
+          linear?: {
+            identifier?: string;
+            state?: string;
+          };
+        };
+      };
+      expect(statePayload.tracked?.linear).toMatchObject({
+        identifier: 'PREPROD-101',
+        state: 'In Progress'
+      });
+
+      const issueRes = await fetch(new URL('/api/v1/task-0940', baseUrl), {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      expect(issueRes.status).toBe(200);
+      const issuePayload = (await issueRes.json()) as {
+        tracked?: {
+          linear?: {
+            identifier?: string;
+          };
+        };
+      };
+      expect(issuePayload.tracked?.linear?.identifier).toBe('PREPROD-101');
+
+      const duplicateResponse = await fetch(new URL('/integrations/linear/webhook', baseUrl), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Linear-Delivery': 'delivery-1',
+          'Linear-Event': 'Issue',
+          'Linear-Signature': signLinearWebhook(body, webhookSecret)
+        },
+        body
+      });
+      expect(duplicateResponse.status).toBe(200);
+      await expect(duplicateResponse.json()).resolves.toMatchObject({
+        status: 'duplicate',
+        reason: 'linear_delivery_duplicate'
+      });
+
+      const advisoryStateAfterDuplicate = JSON.parse(
+        await readFile(join(paths.runDir, 'linear-advisory-state.json'), 'utf8')
+      ) as {
+        latest_delivery_id?: string | null;
+        latest_result?: string | null;
+        seen_deliveries?: Array<{ delivery_id?: string; outcome?: string }>;
+      };
+      expect(advisoryStateAfterDuplicate.latest_delivery_id).toBe('delivery-1');
+      expect(advisoryStateAfterDuplicate.latest_result).toBe('duplicate');
+      expect(advisoryStateAfterDuplicate.seen_deliveries).toHaveLength(1);
+    } finally {
+      await server.close();
+      await rm(root, { recursive: true, force: true });
+      vi.unstubAllEnvs();
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('rejects a Linear webhook with an invalid signature without mutating advisory state', async () => {
+    const { root, env, paths } = await createRunRoot('task-1016-linear-webhook-signature');
+    await seedManifest(paths);
+    await seedDispatchPilot(paths, {
+      enabled: true,
+      source: {
+        provider: 'linear',
+        live: true,
+        workspace_id: 'lin-workspace-1',
+        team_id: 'lin-team-live',
+        project_id: 'lin-project-1'
+      }
+    });
+    const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
+
+    vi.stubEnv('CO_LINEAR_API_TOKEN', 'lin-api-token');
+    vi.stubEnv('CO_LINEAR_WEBHOOK_SECRET', 'linear-webhook-secret');
+
+    const server = await ControlServer.start({
+      paths,
+      config,
+      runId: 'run-1'
+    });
+
+    try {
+      const baseUrl = server.getBaseUrl() ?? '';
+      const token = await readToken(paths.controlAuthPath);
+      const body = JSON.stringify({
+        action: 'update',
+        type: 'Issue',
+        webhookTimestamp: Date.now(),
+        data: {
+          id: 'lin-issue-1'
+        }
+      });
+
+      const response = await fetch(new URL('/integrations/linear/webhook', baseUrl), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Linear-Delivery': 'delivery-invalid',
+          'Linear-Event': 'Issue',
+          'Linear-Signature': 'invalid-signature'
+        },
+        body
+      });
+      expect(response.status).toBe(401);
+
+      const advisoryStateRaw = await readTextOrNull(join(paths.runDir, 'linear-advisory-state.json'));
+      expect(advisoryStateRaw).toBeNull();
+
+      const stateRes = await fetch(new URL('/api/v1/state', baseUrl), {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      expect(stateRes.status).toBe(200);
+      const statePayload = (await stateRes.json()) as {
+        tracked?: {
+          linear?: unknown;
+        };
+      };
+      expect(statePayload.tracked?.linear ?? null).toBeNull();
+    } finally {
+      await server.close();
+      await rm(root, { recursive: true, force: true });
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it('ignores an out-of-scope signed Linear webhook without changing the projection', async () => {
+    const { root, env, paths } = await createRunRoot('task-1016-linear-webhook-out-of-scope');
+    await seedManifest(paths);
+    await seedDispatchPilot(paths, {
+      enabled: true,
+      source: {
+        provider: 'linear',
+        live: true,
+        workspace_id: 'lin-workspace-1',
+        team_id: 'lin-team-live',
+        project_id: 'lin-project-1'
+      }
+    });
+    const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
+    const realFetch = globalThis.fetch;
+    const webhookSecret = 'linear-webhook-secret';
+
+    vi.stubEnv('CO_LINEAR_API_TOKEN', 'lin-api-token');
+    vi.stubEnv('CO_LINEAR_WEBHOOK_SECRET', webhookSecret);
+    vi.stubGlobal('fetch', async (input, init) => {
+      const rawUrl = input instanceof Request ? input.url : String(input);
+      const url = new URL(rawUrl);
+      if (url.toString() === 'https://api.linear.app/graphql') {
+        return new Response(
+          JSON.stringify({
+            data: {
+              viewer: {
+                organization: {
+                  id: 'lin-workspace-1'
+                }
+              },
+              issue: {
+                id: 'lin-issue-2',
+                identifier: 'PREPROD-102',
+                title: 'Out of scope advisory',
+                url: 'https://linear.app/asabeko/issue/PREPROD-102',
+                updatedAt: '2026-03-06T05:10:00.000Z',
+                state: {
+                  name: 'Backlog',
+                  type: 'unstarted'
+                },
+                team: {
+                  id: 'lin-team-other',
+                  key: 'OTHER',
+                  name: 'Other Team'
+                },
+                project: {
+                  id: 'lin-project-1',
+                  name: 'Icon Agency (Bookings)'
+                },
+                history: {
+                  nodes: []
+                }
+              }
+            }
+          }),
+          {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' }
+          }
+        );
+      }
+      return realFetch(input, init);
+    });
+
+    const server = await ControlServer.start({
+      paths,
+      config,
+      runId: 'run-1'
+    });
+
+    try {
+      const baseUrl = server.getBaseUrl() ?? '';
+      const token = await readToken(paths.controlAuthPath);
+      const body = JSON.stringify({
+        action: 'update',
+        type: 'Issue',
+        webhookTimestamp: Date.now(),
+        data: {
+          id: 'lin-issue-2'
+        }
+      });
+
+      const response = await fetch(new URL('/integrations/linear/webhook', baseUrl), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Linear-Delivery': 'delivery-out-of-scope',
+          'Linear-Event': 'Issue',
+          'Linear-Signature': signLinearWebhook(body, webhookSecret)
+        },
+        body
+      });
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toMatchObject({
+        status: 'ignored',
+        reason: 'dispatch_source_team_mismatch'
+      });
+
+      const advisoryStateRaw = await readFile(join(paths.runDir, 'linear-advisory-state.json'), 'utf8');
+      const advisoryState = JSON.parse(advisoryStateRaw) as {
+        latest_result?: string | null;
+        tracked_issue?: unknown;
+      };
+      expect(advisoryState.latest_result).toBe('ignored');
+      expect(advisoryState.tracked_issue ?? null).toBeNull();
+
+      const stateRes = await fetch(new URL('/api/v1/state', baseUrl), {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      expect(stateRes.status).toBe(200);
+      const statePayload = (await stateRes.json()) as {
+        tracked?: {
+          linear?: unknown;
+        };
+      };
+      expect(statePayload.tracked?.linear ?? null).toBeNull();
     } finally {
       await server.close();
       await rm(root, { recursive: true, force: true });
