@@ -38,6 +38,11 @@ export interface ObservabilitySurfaceContext {
   readSelectedRunSnapshot(): Promise<ControlSelectedRunRuntimeSnapshot>;
 }
 
+export type ObservabilityPresenterContext = Pick<
+  ObservabilitySurfaceContext,
+  'controlStore' | 'paths' | 'readSelectedRunSnapshot'
+>;
+
 export type CompatibilityRefreshRejectionReason =
   | 'malformed_action_request'
   | 'forbidden_mutating_action'
@@ -81,21 +86,10 @@ interface CompatibilityActionEnvelopeRejection {
 export function createObservabilitySurface(
   context: ObservabilitySurfaceContext
 ): {
-  readUiDataset(): Promise<ObservabilityPayload>;
-  readCompatibilityState(): Promise<ControlStatePayload>;
   readCompatibilityDispatch(): Promise<CompatibilityDispatchResult>;
   readCompatibilityRefresh(body?: Record<string, unknown>): CompatibilityRefreshResult;
-  readCompatibilityIssue(issueIdentifier: string): Promise<CompatibilityIssueResult>;
 } {
   return {
-    async readUiDataset(): Promise<ObservabilityPayload> {
-      return buildUiDataset(context);
-    },
-
-    async readCompatibilityState(): Promise<ControlStatePayload> {
-      return buildCompatibilityStatePayload(context);
-    },
-
     async readCompatibilityDispatch(): Promise<CompatibilityDispatchResult> {
       const snapshot = await context.readSelectedRunSnapshot();
       const issueIdentifier = snapshot.selected?.issueIdentifier ?? null;
@@ -157,24 +151,6 @@ export function createObservabilitySurface(
           })
         }
       };
-    },
-
-    async readCompatibilityIssue(issueIdentifier: string): Promise<CompatibilityIssueResult> {
-      const snapshot = await context.readSelectedRunSnapshot();
-      const selected = snapshot.selected;
-      const matchesIssue =
-        selected &&
-        (selected.issueIdentifier === issueIdentifier ||
-          selected.taskId === issueIdentifier ||
-          selected.runId === issueIdentifier);
-      if (!selected || !matchesIssue) {
-        return { kind: 'issue_not_found' };
-      }
-
-      return {
-        kind: 'ok',
-        payload: buildCompatibilityIssuePayload(selected, snapshot.dispatchPilot)
-      };
     }
   };
 }
@@ -204,7 +180,9 @@ export function buildCompatibilityTraceability(
   };
 }
 
-async function buildCompatibilityStatePayload(context: ObservabilitySurfaceContext): Promise<ControlStatePayload> {
+export async function readCompatibilityState(
+  context: ObservabilityPresenterContext
+): Promise<ControlStatePayload> {
   const snapshot = await context.readSelectedRunSnapshot();
   const selected = snapshot.selected;
   const dispatchPilotSummary = snapshot.dispatchPilot;
@@ -235,6 +213,27 @@ async function buildCompatibilityStatePayload(context: ObservabilitySurfaceConte
     selected: buildSelectedRunPublicPayload(selected),
     ...(dispatchPilotSummary ? { dispatch_pilot: dispatchPilotSummary } : {}),
     ...(tracked ? { tracked } : {})
+  };
+}
+
+export async function readCompatibilityIssue(
+  context: Pick<ObservabilityPresenterContext, 'readSelectedRunSnapshot'>,
+  issueIdentifier: string
+): Promise<CompatibilityIssueResult> {
+  const snapshot = await context.readSelectedRunSnapshot();
+  const selected = snapshot.selected;
+  const matchesIssue =
+    selected &&
+    (selected.issueIdentifier === issueIdentifier ||
+      selected.taskId === issueIdentifier ||
+      selected.runId === issueIdentifier);
+  if (!selected || !matchesIssue) {
+    return { kind: 'issue_not_found' };
+  }
+
+  return {
+    kind: 'ok',
+    payload: buildCompatibilityIssuePayload(selected, snapshot.dispatchPilot)
   };
 }
 
@@ -276,7 +275,9 @@ function buildCompatibilityIssuePayload(
   };
 }
 
-async function buildUiDataset(context: ObservabilitySurfaceContext): Promise<Record<string, unknown>> {
+export async function readUiDataset(
+  context: ObservabilityPresenterContext
+): Promise<Record<string, unknown>> {
   const manifest = await readJsonFile<CliManifest>(context.paths.manifestPath);
   const generatedAt = isoTimestamp();
   if (!manifest) {

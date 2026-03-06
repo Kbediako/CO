@@ -40,6 +40,9 @@ import {
 import { createControlRuntime, type ControlRuntime } from './controlRuntime.js';
 import {
   buildCompatibilityTraceability,
+  readCompatibilityIssue,
+  readCompatibilityState,
+  readUiDataset,
   type CompatibilityDispatchResult,
   type CompatibilityRefreshRejectionReason
 } from './observabilitySurface.js';
@@ -504,6 +507,11 @@ async function handleRequest(context: RequestContext): Promise<void> {
   const method = req.method ?? 'GET';
   const url = new URL(req.url ?? '/', 'http://localhost');
   const runtimeSnapshot = context.runtime.snapshot();
+  const presenterContext = {
+    controlStore: context.controlStore,
+    paths: context.paths,
+    readSelectedRunSnapshot: () => runtimeSnapshot.readSelectedRunSnapshot()
+  };
   if (url.pathname === '/health') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ status: 'ok', timestamp: isoTimestamp() }));
@@ -600,7 +608,7 @@ async function handleRequest(context: RequestContext): Promise<void> {
     writeObservabilityResponse(res, {
       status: 200,
       headers: JSON_NO_STORE_HEADERS,
-      body: await runtimeSnapshot.readUiDataset()
+      body: await readUiDataset(presenterContext)
     });
     return;
   }
@@ -613,7 +621,7 @@ async function handleRequest(context: RequestContext): Promise<void> {
     writeObservabilityResponse(res, {
       status: 200,
       headers: JSON_NO_STORE_HEADERS,
-      body: await runtimeSnapshot.readCompatibilityState()
+      body: await readCompatibilityState(presenterContext)
     });
     return;
   }
@@ -694,7 +702,7 @@ async function handleRequest(context: RequestContext): Promise<void> {
       );
       return;
     }
-    const result = await runtimeSnapshot.readCompatibilityIssue(compatibilityIssueIdentifier);
+    const result = await readCompatibilityIssue(presenterContext, compatibilityIssueIdentifier);
     if (result.kind === 'issue_not_found') {
       writeCompatibilityIssueNotFound(res, context, compatibilityIssueIdentifier);
       return;

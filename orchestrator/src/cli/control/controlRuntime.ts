@@ -4,12 +4,10 @@ import type { LiveLinearTrackedIssue } from './linearDispatchSource.js';
 import {
   buildTrackedLinearPayload,
   type ControlSelectedRunRuntimeSnapshot,
-  type ControlStatePayload,
 } from './observabilityReadModel.js';
 import {
   createObservabilitySurface,
   type CompatibilityDispatchResult,
-  type CompatibilityIssueResult,
   type CompatibilityRefreshResult
 } from './observabilitySurface.js';
 import { createLiveLinearAdvisoryRuntime } from './liveLinearAdvisoryRuntime.js';
@@ -38,11 +36,8 @@ interface ControlRuntimeContext {
 
 export interface ControlRuntimeSnapshot {
   readSelectedRunSnapshot(): Promise<ControlSelectedRunRuntimeSnapshot>;
-  readUiDataset(): Promise<Record<string, unknown>>;
-  readCompatibilityState(): Promise<ControlStatePayload>;
   readCompatibilityDispatch(): Promise<CompatibilityDispatchResult>;
   readCompatibilityRefresh(body?: Record<string, unknown>): CompatibilityRefreshResult;
-  readCompatibilityIssue(issueIdentifier: string): Promise<CompatibilityIssueResult>;
 }
 
 export interface ControlRuntime {
@@ -142,11 +137,8 @@ function createControlRuntimeSnapshot(
 
   return {
     readSelectedRunSnapshot,
-    readUiDataset: () => observability.readUiDataset(),
-    readCompatibilityState: () => observability.readCompatibilityState(),
     readCompatibilityDispatch: () => observability.readCompatibilityDispatch(),
     readCompatibilityRefresh: (body = {}) => observability.readCompatibilityRefresh(body),
-    readCompatibilityIssue: (issueIdentifier) => observability.readCompatibilityIssue(issueIdentifier),
     async prime(): Promise<void> {
       await readSelectedRunSnapshot();
     }

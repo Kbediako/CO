@@ -1936,6 +1936,22 @@
       "completed_at": "2026-03-06"
     },
     {
+      "id": "1028",
+      "slug": "1028-coordinator-symphony-aligned-controller-owned-compatibility-and-ui-presenters",
+      "title": "Coordinator Symphony-Aligned Controller-Owned Compatibility + UI Presenters",
+      "path": "tasks/tasks-1028-coordinator-symphony-aligned-controller-owned-compatibility-and-ui-presenters.md",
+      "kind": "run",
+      "status": "in-progress",
+      "gate": {
+        "phase": "coordinator-symphony-aligned-controller-owned-compatibility-and-ui-presenters-planning",
+        "status": "in-progress",
+        "log": null,
+        "run_id": null
+      },
+      "created_at": "2026-03-06",
+      "completed_at": null
+    },
+    {
       "id": "1027",
       "slug": "1027-coordinator-symphony-aligned-selected-run-runtime-snapshot-presenter-split",
       "title": "Coordinator Symphony-Aligned Selected-Run Runtime Snapshot + Presenter Split",
@@ -3103,6 +3119,22 @@
         "task": "tasks/tasks-1001-coordinator-appserver-dynamic-tool-bridge-experimental-lane.md",
         "agent_task": ".agent/task/1001-coordinator-appserver-dynamic-tool-bridge-experimental-lane.md",
         "docs": "docs/TECH_SPEC-coordinator-appserver-dynamic-tool-bridge-experimental-lane.md"
+      }
+    },
+    {
+      "id": "20260306-1028-coordinator-symphony-aligned-controller-owned-compatibility-and-ui-presenters",
+      "title": "Coordinator Symphony-Aligned Controller-Owned Compatibility + UI Presenters",
+      "relates_to": "tasks/tasks-1028-coordinator-symphony-aligned-controller-owned-compatibility-and-ui-presenters.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-06",
+      "paths": {
+        "spec": "tasks/specs/1028-coordinator-symphony-aligned-controller-owned-compatibility-and-ui-presenters.md",
+        "task": "tasks/tasks-1028-coordinator-symphony-aligned-controller-owned-compatibility-and-ui-presenters.md",
+        "agent_task": ".agent/task/1028-coordinator-symphony-aligned-controller-owned-compatibility-and-ui-presenters.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-controller-owned-compatibility-and-ui-presenters.md"
       }
     },
     {
