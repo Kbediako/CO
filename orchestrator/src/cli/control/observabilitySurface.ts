@@ -11,7 +11,7 @@ import type {
   SelectedRunProjectionReader,
   SelectedRunQuestionSummary
 } from './selectedRunProjection.js';
-import type { DispatchPilotEvaluation } from './trackerDispatchPilot.js';
+import type { DispatchPilotEvaluation, DispatchPilotFailure } from './trackerDispatchPilot.js';
 
 const READ_ONLY_COMPAT_ACTION = 'refresh';
 const COMPATIBILITY_MUTATING_ACTIONS = new Set(['pause', 'resume', 'cancel', 'fail', 'rerun']);
@@ -48,6 +48,21 @@ export type CompatibilityRefreshResult =
       requestTool: string | null;
     };
 
+export type CompatibilityDispatchResult =
+  | {
+      kind: 'ok';
+      issueIdentifier: string | null;
+      evaluation: DispatchPilotEvaluation;
+      payload: ObservabilityPayload;
+    }
+  | {
+      kind: 'fail_closed';
+      issueIdentifier: string | null;
+      evaluation: DispatchPilotEvaluation;
+      failure: DispatchPilotFailure;
+      details: Record<string, unknown>;
+    };
+
 interface CompatibilityActionEnvelopeRejection {
   reason: CompatibilityRefreshRejectionReason;
   requestAction: string | null;
@@ -59,6 +74,7 @@ export function createObservabilitySurface(
 ): {
   readUiDataset(): Promise<ObservabilityPayload>;
   readCompatibilityState(): Promise<ObservabilityPayload>;
+  readCompatibilityDispatch(): Promise<CompatibilityDispatchResult>;
   readCompatibilityRefresh(body?: Record<string, unknown>): CompatibilityRefreshResult;
   readCompatibilityIssue(issueIdentifier: string): Promise<CompatibilityIssueResult>;
 } {
@@ -69,6 +85,41 @@ export function createObservabilitySurface(
 
     async readCompatibilityState(): Promise<ObservabilityPayload> {
       return buildCompatibilityStatePayload(context);
+    },
+
+    async readCompatibilityDispatch(): Promise<CompatibilityDispatchResult> {
+      const selected = await context.projection.buildSelectedRunContext();
+      const evaluation = await context.projection.readDispatchEvaluation(selected);
+      const issueIdentifier = selected?.issueIdentifier ?? null;
+
+      if (evaluation.failure) {
+        return {
+          kind: 'fail_closed',
+          issueIdentifier,
+          evaluation,
+          failure: evaluation.failure,
+          details: {
+            surface: 'api_v1',
+            mode: 'read_only',
+            advisory_only: true,
+            reason: evaluation.failure.reason,
+            dispatch_pilot: evaluation.summary
+          }
+        };
+      }
+
+      return {
+        kind: 'ok',
+        issueIdentifier,
+        evaluation,
+        payload: {
+          generated_at: isoTimestamp(),
+          mode: 'read_only',
+          advisory_only: true,
+          dispatch_pilot: evaluation.summary,
+          recommendation: evaluation.recommendation
+        }
+      };
     },
 
     readCompatibilityRefresh(body: Record<string, unknown> = {}): CompatibilityRefreshResult {

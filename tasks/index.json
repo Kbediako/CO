@@ -1936,6 +1936,22 @@
       "completed_at": "2026-03-06"
     },
     {
+      "id": "1020",
+      "slug": "1020-coordinator-symphony-aligned-dispatch-presenter-controller-extraction",
+      "title": "Coordinator Symphony-Aligned Dispatch Presenter/Controller Extraction",
+      "path": "tasks/tasks-1020-coordinator-symphony-aligned-dispatch-presenter-controller-extraction.md",
+      "kind": "run",
+      "status": "completed",
+      "gate": {
+        "phase": "coordinator-symphony-aligned-dispatch-presenter-controller-extraction-closeout-override",
+        "status": "succeeded",
+        "log": "out/1020-coordinator-symphony-aligned-dispatch-presenter-controller-extraction/manual/20260306T121624Z-closeout/00-summary.md",
+        "run_id": "20260306T121624Z-closeout"
+      },
+      "created_at": "2026-03-06",
+      "completed_at": "2026-03-06"
+    },
+    {
       "id": "1019",
       "slug": "1019-coordinator-symphony-aligned-observability-presenter-controller-split",
       "title": "Coordinator Symphony-Aligned Observability Presenter/Controller Split",
@@ -2975,6 +2991,22 @@
         "task": "tasks/tasks-1001-coordinator-appserver-dynamic-tool-bridge-experimental-lane.md",
         "agent_task": ".agent/task/1001-coordinator-appserver-dynamic-tool-bridge-experimental-lane.md",
         "docs": "docs/TECH_SPEC-coordinator-appserver-dynamic-tool-bridge-experimental-lane.md"
+      }
+    },
+    {
+      "id": "20260306-1020-coordinator-symphony-aligned-dispatch-presenter-controller-extraction",
+      "title": "Coordinator Symphony-Aligned Dispatch Presenter/Controller Extraction",
+      "relates_to": "tasks/tasks-1020-coordinator-symphony-aligned-dispatch-presenter-controller-extraction.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-06",
+      "paths": {
+        "spec": "tasks/specs/1020-coordinator-symphony-aligned-dispatch-presenter-controller-extraction.md",
+        "task": "tasks/tasks-1020-coordinator-symphony-aligned-dispatch-presenter-controller-extraction.md",
+        "agent_task": ".agent/task/1020-coordinator-symphony-aligned-dispatch-presenter-controller-extraction.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-dispatch-presenter-controller-extraction.md"
       }
     },
     {

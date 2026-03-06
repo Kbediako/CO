@@ -582,52 +582,33 @@ async function handleRequest(context: RequestContext): Promise<void> {
 
   if (url.pathname === `${COMPATIBILITY_API_PREFIX}/dispatch`) {
     if (req.method !== 'GET') {
-      writeObservabilityResponse(
-        res,
-        buildCompatibilityErrorResponse({
-          status: 405,
-          code: 'method_not_allowed',
-          message: 'Method not allowed',
-          details: {
-            surface: 'api_v1',
-            allowed_method: 'GET'
-          },
-          traceability: buildCompatibilityTraceability(observabilityContext, {
-            decision: 'rejected',
-            reason: 'method_not_allowed'
-          })
-        })
-      );
+      writeCompatibilityDispatchMethodNotAllowed(res, observabilityContext);
       return;
     }
 
-    const selected = await projection.buildSelectedRunContext();
-    const evaluation = await projection.readDispatchEvaluation(selected);
+    const result = await observability.readCompatibilityDispatch();
     await emitDispatchPilotAuditEvents(context, {
-      evaluation,
-      issueIdentifier: selected?.issueIdentifier ?? null
+      evaluation: result.evaluation,
+      issueIdentifier: result.issueIdentifier
     });
 
     const traceability = buildCompatibilityTraceability(observabilityContext, {
-      decision: evaluation.failure ? 'rejected' : 'acknowledged',
-      reason: evaluation.failure?.reason ?? evaluation.summary.reason,
-      issueIdentifier: selected?.issueIdentifier ?? null
+      decision: result.kind === 'fail_closed' ? 'rejected' : 'acknowledged',
+      reason:
+        result.kind === 'fail_closed'
+          ? result.evaluation.failure?.reason ?? result.evaluation.summary.reason
+          : result.evaluation.summary.reason,
+      issueIdentifier: result.issueIdentifier
     });
 
-    if (evaluation.failure) {
+    if (result.kind === 'fail_closed') {
       writeObservabilityResponse(
         res,
         buildCompatibilityErrorResponse({
-          status: evaluation.failure.status,
-          code: evaluation.failure.code,
+          status: result.failure.status,
+          code: result.failure.code,
           message: 'Dispatch pilot evaluation failed closed.',
-          details: {
-            surface: 'api_v1',
-            mode: 'read_only',
-            advisory_only: true,
-            reason: evaluation.failure.reason,
-            dispatch_pilot: evaluation.summary
-          },
+          details: result.details,
           traceability
         })
       );
@@ -636,13 +617,9 @@ async function handleRequest(context: RequestContext): Promise<void> {
 
     writeObservabilityResponse(res, {
       status: 200,
-      headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
+      headers: JSON_NO_STORE_HEADERS,
       body: {
-        generated_at: isoTimestamp(),
-        mode: 'read_only',
-        advisory_only: true,
-        dispatch_pilot: evaluation.summary,
-        recommendation: evaluation.recommendation,
+        ...result.payload,
         traceability
       }
     });
@@ -2132,6 +2109,28 @@ function writeCompatibilityNotFound(
       traceability: buildCompatibilityTraceability(context, {
         decision: 'rejected',
         reason: 'route_not_found'
+      })
+    })
+  );
+}
+
+function writeCompatibilityDispatchMethodNotAllowed(
+  res: http.ServerResponse,
+  context: Parameters<typeof buildCompatibilityTraceability>[0]
+): void {
+  writeObservabilityResponse(
+    res,
+    buildCompatibilityErrorResponse({
+      status: 405,
+      code: 'method_not_allowed',
+      message: 'Method not allowed',
+      details: {
+        surface: 'api_v1',
+        allowed_method: 'GET'
+      },
+      traceability: buildCompatibilityTraceability(context, {
+        decision: 'rejected',
+        reason: 'method_not_allowed'
       })
     })
   );

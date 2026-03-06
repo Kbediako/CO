@@ -459,7 +459,7 @@ describe('ControlServer', () => {
     }
   });
 
-  it('rejects unsupported methods for ui data and compatibility state issue and refresh routes', async () => {
+  it('rejects unsupported methods for ui data and compatibility state dispatch issue and refresh routes', async () => {
     const { root, env, paths } = await createRunRoot('task-0940');
     await seedManifest(paths);
     const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
@@ -487,6 +487,20 @@ describe('ControlServer', () => {
       };
       expect(statePayload.error?.code).toBe('method_not_allowed');
       expect(statePayload.error?.details?.allowed_method).toBe('GET');
+
+      const dispatchRes = await fetch(new URL('/api/v1/dispatch', baseUrl), {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'x-csrf-token': token
+        }
+      });
+      expect(dispatchRes.status).toBe(405);
+      const dispatchPayload = (await dispatchRes.json()) as {
+        error?: { code?: string; details?: { allowed_method?: string } };
+      };
+      expect(dispatchPayload.error?.code).toBe('method_not_allowed');
+      expect(dispatchPayload.error?.details?.allowed_method).toBe('GET');
 
       const uiRes = await fetch(new URL('/ui/data.json', baseUrl), {
         method: 'POST',
@@ -1114,6 +1128,7 @@ describe('ControlServer', () => {
         advisory_only?: boolean;
         dispatch_pilot?: { status?: string; source_status?: string };
         recommendation?: unknown;
+        traceability?: { decision?: string; reason?: string };
       };
       expect(dispatchPayload.advisory_only).toBe(true);
       expect(dispatchPayload.dispatch_pilot).toMatchObject({
@@ -1121,6 +1136,8 @@ describe('ControlServer', () => {
         source_status: 'disabled'
       });
       expect(dispatchPayload.recommendation).toBeNull();
+      expect(dispatchPayload.traceability?.decision).toBe('acknowledged');
+      expect(dispatchPayload.traceability?.reason).toBe('pilot_disabled_default_off');
 
       const reservedEncodedRes = await fetch(new URL('/api/v1/%64ispatch', baseUrl), {
         headers: {
@@ -1314,6 +1331,11 @@ describe('ControlServer', () => {
               };
             };
           };
+          traceability?: {
+            decision?: string;
+            reason?: string;
+            issue_identifier?: string | null;
+          };
         };
 
         if (scenario.expectedFailureCode) {
@@ -1337,6 +1359,11 @@ describe('ControlServer', () => {
             expect(dispatchPayload.recommendation).toBeNull();
           }
         }
+        expect(dispatchPayload.traceability?.decision).toBe(
+          scenario.expectedFailureCode ? 'rejected' : 'acknowledged'
+        );
+        expect(dispatchPayload.traceability?.issue_identifier).toBe('task-0940');
+        expect(typeof dispatchPayload.traceability?.reason).toBe('string');
 
         const stateRes = await fetch(new URL('/api/v1/state', baseUrl), {
           headers: {
@@ -1375,8 +1402,26 @@ describe('ControlServer', () => {
         };
         expect(after.control_seq).toBe(before.control_seq);
         expect(after.latest_action ?? null).toEqual(before.latest_action ?? null);
-        expect(events.some((entry) => entry.event === 'dispatch_pilot_evaluated')).toBe(true);
-        expect(events.some((entry) => entry.event === 'dispatch_pilot_viewed')).toBe(true);
+        const evaluatedEvent = events.find((entry) => entry.event === 'dispatch_pilot_evaluated');
+        const viewedEvent = events.find((entry) => entry.event === 'dispatch_pilot_viewed');
+        expect(evaluatedEvent).toBeDefined();
+        expect(viewedEvent).toBeDefined();
+        expect((evaluatedEvent?.payload ?? {}) as Record<string, unknown>).toMatchObject({
+          decision: scenario.expectedFailureCode
+            ? 'fail_closed'
+            : scenario.expectedDispatchStatus === 'ready'
+              ? 'ready'
+              : 'blocked'
+        });
+        expect((viewedEvent?.payload ?? {}) as Record<string, unknown>).toMatchObject({
+          http_status: scenario.expectedStatus,
+          recommendation_available: scenario.expectRecommendation,
+          decision: scenario.expectedFailureCode
+            ? 'fail_closed'
+            : scenario.expectedDispatchStatus === 'ready'
+              ? 'ready'
+              : 'blocked'
+        });
         expect(
           events.some((entry) => entry.event === 'control_action_applied' || entry.event === 'control_action_replayed')
         ).toBe(false);
