@@ -39,4 +39,4 @@
 - [x] `npm run pack:smoke` when required by touched downstream-facing paths. Evidence: `out/1027-coordinator-symphony-aligned-selected-run-runtime-snapshot-presenter-split/manual/20260306T192011Z-closeout/10-pack-smoke.log`.
 - [x] Manual simulated/mock presenter-alignment evidence captured. Evidence: `out/1027-coordinator-symphony-aligned-selected-run-runtime-snapshot-presenter-split/manual/20260306T192011Z-closeout/11-manual-presenter-alignment.json`.
 - [x] Explicit elegance review captured. Evidence: `out/1027-coordinator-symphony-aligned-selected-run-runtime-snapshot-presenter-split/manual/20260306T192011Z-closeout/12-elegance-review.md`.
-- [ ] Coherent `1027` commit recorded. Evidence: `out/1027-coordinator-symphony-aligned-selected-run-runtime-snapshot-presenter-split/manual/<pending>/00-summary.md`, git history for commit `<pending>`.
+- [x] Coherent `1027` commit recorded. Evidence: `out/1027-coordinator-symphony-aligned-selected-run-runtime-snapshot-presenter-split/manual/20260306T192011Z-closeout/00-summary.md`, git history for implementation commit `fec87cc79` and the closeout sync commit.
