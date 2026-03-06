@@ -34,4 +34,4 @@
 - [x] `npm run pack:smoke` when required by touched downstream-facing paths. Evidence: `out/1017-coordinator-symphony-aligned-projection-boundary-and-live-linear-refresh/manual/20260306T093745Z-closeout/09-pack-smoke.log`.
 - [x] Manual simulated/mock usage evidence captured for projection/read-surface coherence. Evidence: `out/1017-coordinator-symphony-aligned-projection-boundary-and-live-linear-refresh/manual/20260306T093745Z-closeout/10-manual-projection-mock.json`.
 - [x] Explicit elegance review captured. Evidence: `out/1017-coordinator-symphony-aligned-projection-boundary-and-live-linear-refresh/manual/20260306T093745Z-closeout/11-elegance-review.md`.
-- [ ] Coherent `1017` commit recorded. Evidence: pending closeout.
+- [x] Coherent `1017` commit recorded. Evidence: `git commit f32124925` (`extract selected-run projection boundary and close 1017`).

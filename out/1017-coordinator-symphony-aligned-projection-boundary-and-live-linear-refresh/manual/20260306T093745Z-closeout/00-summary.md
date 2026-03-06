@@ -18,6 +18,7 @@
   - `09-pack-smoke.log`
 - Manual mock evidence is in `10-manual-projection-mock.json`. It verifies coherent selected-run/tracked payloads across `/ui/data.json`, `/api/v1/state`, and `/api/v1/:issue`, plus a single live Linear fetch inside `/api/v1/dispatch`.
 - Delegated code review found no concrete regressions in the extraction; only low-risk future reuse/coverage gaps remain. The real-Symphony comparison confirmed the next step should be an observability-surface extraction rather than undoing `1017`.
+- Landing commit: `f32124925` (`extract selected-run projection boundary and close 1017`).
 
 ## Overrides
 - The registered docs-review lane had already failed only on the known local review-wrapper drift after deterministic docs guards passed. That override remains recorded in `../20260306T091813Z-docs-review-override/00-summary.md`.
