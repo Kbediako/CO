@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { createHmac } from 'node:crypto';
 import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -203,6 +204,10 @@ function jsonResponse(body: unknown, status = 200): Response {
     status,
     headers: { 'Content-Type': 'application/json' }
   });
+}
+
+function signLinearWebhook(body: string, secret: string): string {
+  return createHmac('sha256', secret).update(body).digest('hex');
 }
 
 afterEach(() => {
@@ -877,6 +882,125 @@ describe('TelegramOversightBridge', () => {
       await waitForCondition(async () => telegram.sentMessages.length === 2);
       expect(telegram.sentMessages[1]?.text).toContain('CO status');
       expect(telegram.sentMessages[1]?.text).not.toContain('Queued questions: 1');
+    } finally {
+      await server.close();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('sends projection-driven push notifications when an accepted live Linear advisory update changes the projection', async () => {
+    const { root, env, paths } = await createRunRoot('task-1022-telegram-linear-push');
+    await seedManifest(paths, {
+      summary: 'task is running',
+      updated_at: '2026-03-06T06:00:00.000Z'
+    });
+    await seedDispatchPilot(paths, {
+      enabled: true,
+      source: {
+        provider: 'linear',
+        live: true,
+        workspace_id: 'lin-workspace-1',
+        team_id: 'lin-team-live',
+        project_id: 'lin-project-1'
+      }
+    });
+
+    const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
+    const realFetch = globalThis.fetch;
+    const telegram = createTelegramHarness(realFetch);
+    const webhookSecret = 'linear-webhook-secret';
+
+    vi.stubEnv('CO_TELEGRAM_POLLING_ENABLED', '1');
+    vi.stubEnv('CO_TELEGRAM_BOT_TOKEN', 'test-token');
+    vi.stubEnv('CO_TELEGRAM_ALLOWED_CHAT_IDS', '1234');
+    vi.stubEnv('CO_TELEGRAM_PUSH_ENABLED', '1');
+    vi.stubEnv('CO_TELEGRAM_PUSH_INTERVAL_MS', '1');
+    vi.stubEnv('CO_TELEGRAM_POLL_INTERVAL_MS', '10');
+    vi.stubEnv('CO_LINEAR_API_TOKEN', 'lin-api-token');
+    vi.stubEnv('CO_LINEAR_WEBHOOK_SECRET', webhookSecret);
+    vi.stubGlobal('fetch', async (input, init) => {
+      const rawUrl = input instanceof Request ? input.url : String(input);
+      const url = new URL(rawUrl);
+      if (url.toString() === 'https://api.linear.app/graphql') {
+        return new Response(
+          JSON.stringify({
+            data: {
+              viewer: {
+                organization: {
+                  id: 'lin-workspace-1'
+                }
+              },
+              issue: {
+                id: 'lin-issue-1',
+                identifier: 'PREPROD-101',
+                title: 'Investigate advisory routing',
+                url: 'https://linear.app/asabeko/issue/PREPROD-101',
+                updatedAt: '2026-03-06T06:05:00.000Z',
+                state: {
+                  name: 'In Progress',
+                  type: 'started'
+                },
+                team: {
+                  id: 'lin-team-live',
+                  key: 'PREPROD',
+                  name: 'PRE-PRO/PRODUCTION'
+                },
+                project: {
+                  id: 'lin-project-1',
+                  name: 'Icon Agency (Bookings)'
+                },
+                history: {
+                  nodes: []
+                }
+              }
+            }
+          }),
+          {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' }
+          }
+        );
+      }
+      return telegram.fetch(input, init);
+    });
+
+    const server = await ControlServer.start({
+      paths,
+      config,
+      runId: 'run-1'
+    });
+
+    try {
+      const baseUrl = server.getBaseUrl() ?? '';
+      const body = JSON.stringify({
+        action: 'update',
+        type: 'Issue',
+        webhookTimestamp: Date.now(),
+        data: {
+          id: 'lin-issue-1'
+        }
+      });
+
+      const response = await realFetch(new URL('/integrations/linear/webhook', baseUrl), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Linear-Delivery': 'delivery-1',
+          'Linear-Event': 'Issue',
+          'Linear-Signature': signLinearWebhook(body, webhookSecret)
+        },
+        body
+      });
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toMatchObject({
+        status: 'accepted',
+        reason: 'linear_delivery_accepted'
+      });
+
+      await waitForCondition(async () => telegram.sentMessages.length === 1);
+      expect(telegram.sentMessages[0]?.text).toContain('CO status');
+      expect(telegram.sentMessages[0]?.text).toContain('Linear: PREPROD-101');
+      expect(telegram.sentMessages[0]?.text).toContain('Linear state: In Progress');
     } finally {
       await server.close();
       await rm(root, { recursive: true, force: true });

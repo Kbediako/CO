@@ -46,6 +46,11 @@ import {
   type CompatibilityDispatchResult,
   type CompatibilityRefreshRejectionReason
 } from './observabilitySurface.js';
+import {
+  createObservabilityUpdateNotifier,
+  type ObservabilityUpdate,
+  type ObservabilityUpdateNotifier
+} from './observabilityUpdateNotifier.js';
 
 interface ControlServerOptions {
   paths: RunPaths;
@@ -168,7 +173,9 @@ export class ControlServer {
   private readonly persist: RequestContext['persist'];
   private readonly paths: RunPaths;
   private readonly linearAdvisoryState: LinearAdvisoryState;
+  private readonly observabilityUpdateNotifier: ObservabilityUpdateNotifier;
   private telegramBridge: TelegramOversightBridge | null = null;
+  private unsubscribeTelegramBridge: (() => void) | null = null;
   private baseUrl: string | null = null;
   private expiryTimer: NodeJS.Timeout | null = null;
 
@@ -184,6 +191,7 @@ export class ControlServer {
     persist: RequestContext['persist'];
     paths: RunPaths;
     linearAdvisoryState: LinearAdvisoryState;
+    observabilityUpdateNotifier: ObservabilityUpdateNotifier;
   }) {
     this.server = options.server;
     this.controlStore = options.controlStore;
@@ -196,6 +204,7 @@ export class ControlServer {
     this.persist = options.persist;
     this.paths = options.paths;
     this.linearAdvisoryState = options.linearAdvisoryState;
+    this.observabilityUpdateNotifier = options.observabilityUpdateNotifier;
   }
 
   static async start(options: ControlServerOptions): Promise<ControlServer> {
@@ -236,6 +245,7 @@ export class ControlServer {
     const delegationTokens = new DelegationTokenStore({ seed: delegationSeed?.tokens ?? [] });
     const sessionTokens = new SessionTokenStore(SESSION_TTL_MS);
     const linearAdvisoryState = normalizeLinearAdvisoryState(linearAdvisorySeed);
+    const observabilityUpdateNotifier = createObservabilityUpdateNotifier();
 
     const clients = new Set<http.ServerResponse>();
     const persist = {
@@ -263,9 +273,7 @@ export class ControlServer {
         clients,
         paths: options.paths,
         linearAdvisoryState,
-        notifyTelegramProjectionDelta: (input) => {
-          void instance?.notifyTelegramProjectionDelta(input);
-        }
+        publishObservabilityUpdate: (input) => observabilityUpdateNotifier.publish(input)
       }).catch((error) => {
         const status = error instanceof HttpError ? error.status : 500;
         res.writeHead(status, { 'Content-Type': 'application/json' });
@@ -284,7 +292,8 @@ export class ControlServer {
       clients,
       persist,
       paths: options.paths,
-      linearAdvisoryState
+      linearAdvisoryState,
+      observabilityUpdateNotifier
     });
 
     const host = options.config.ui.bindHost;
@@ -345,10 +354,17 @@ export class ControlServer {
             baseUrl: instance.baseUrl,
             controlToken: token
           });
+          if (instance.telegramBridge) {
+            instance.unsubscribeTelegramBridge = observabilityUpdateNotifier.subscribe((input) =>
+              instance.telegramBridge?.notifyProjectionDelta(input)
+            );
+          }
         } catch (error) {
           logger.warn(
             `Failed to start Telegram oversight bridge: ${(error as Error)?.message ?? String(error)}`
           );
+          instance.unsubscribeTelegramBridge?.();
+          instance.unsubscribeTelegramBridge = null;
           instance.telegramBridge = null;
         }
       }
@@ -379,7 +395,7 @@ export class ControlServer {
         }
       });
     }
-    void this.notifyTelegramProjectionDelta({
+    this.observabilityUpdateNotifier.publish({
       eventSeq: entry.seq,
       source: entry.event
     });
@@ -390,6 +406,8 @@ export class ControlServer {
       clearInterval(this.expiryTimer);
       this.expiryTimer = null;
     }
+    this.unsubscribeTelegramBridge?.();
+    this.unsubscribeTelegramBridge = null;
     if (this.telegramBridge) {
       await this.telegramBridge.close().catch((error) => {
         logger.warn(`Failed to close Telegram oversight bridge: ${(error as Error)?.message ?? String(error)}`);
@@ -418,7 +436,7 @@ export class ControlServer {
       clients: this.clients,
       paths: this.paths,
       linearAdvisoryState: this.linearAdvisoryState,
-      notifyTelegramProjectionDelta: () => undefined
+      publishObservabilityUpdate: this.observabilityUpdateNotifier.publish
     };
   }
 
@@ -429,10 +447,7 @@ export class ControlServer {
     const buildInternalContext = (): RequestContext => ({
       req: null,
       res: null,
-      ...this.buildContext(config, token),
-      notifyTelegramProjectionDelta: (input) => {
-        void this.notifyTelegramProjectionDelta(input);
-      }
+      ...this.buildContext(config, token)
     });
 
     return {
@@ -477,19 +492,6 @@ export class ControlServer {
       }
     };
   }
-
-  private async notifyTelegramProjectionDelta(input?: {
-    eventSeq?: number | null;
-    source?: string | null;
-  }): Promise<void> {
-    try {
-      await this.telegramBridge?.notifyProjectionDelta(input);
-    } catch (error) {
-      logger.warn(
-        `Failed to send Telegram projection update: ${(error as Error)?.message ?? String(error)}`
-      );
-    }
-  }
 }
 
 interface RequestContext {
@@ -513,7 +515,7 @@ interface RequestContext {
   clients: Set<http.ServerResponse>;
   paths: RunPaths;
   linearAdvisoryState: LinearAdvisoryState;
-  notifyTelegramProjectionDelta: (input?: { eventSeq?: number | null; source?: string | null }) => void;
+  publishObservabilityUpdate: (input?: ObservabilityUpdate) => void;
 }
 
 async function handleRequest(context: RequestContext): Promise<void> {
@@ -1355,7 +1357,7 @@ async function handleRequest(context: RequestContext): Promise<void> {
         expires_in_ms: record.expires_in_ms ?? null
       }
     });
-    context.notifyTelegramProjectionDelta({ source: 'questions.enqueue' });
+    context.publishObservabilityUpdate({ source: 'questions.enqueue' });
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify(record));
     return;
@@ -1406,7 +1408,7 @@ async function handleRequest(context: RequestContext): Promise<void> {
       });
       await maybeResolveChildQuestion(context, record, record.status);
     }
-    context.notifyTelegramProjectionDelta({ source: 'questions.answer' });
+    context.publishObservabilityUpdate({ source: 'questions.answer' });
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ status: 'answered' }));
     return;
@@ -1445,7 +1447,7 @@ async function handleRequest(context: RequestContext): Promise<void> {
       });
       await maybeResolveChildQuestion(context, record, record.status);
     }
-    context.notifyTelegramProjectionDelta({ source: 'questions.dismiss' });
+    context.publishObservabilityUpdate({ source: 'questions.dismiss' });
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ status: 'dismissed' }));
     return;
@@ -1765,7 +1767,7 @@ async function handleLinearWebhook(context: RequestContext): Promise<void> {
       reason: 'linear_delivery_accepted'
     });
     writeLinearWebhookResponse(res, 200, 'accepted', 'linear_delivery_accepted');
-    context.notifyTelegramProjectionDelta({ source: 'linear.webhook' });
+    context.publishObservabilityUpdate({ source: 'linear.webhook' });
     return;
   }
 
@@ -2778,7 +2780,7 @@ async function expireQuestions(context: RequestContext): Promise<void> {
     });
     await maybeResolveChildQuestion(context, record, 'expired');
   }
-  context.notifyTelegramProjectionDelta({ source: 'questions.expire' });
+  context.publishObservabilityUpdate({ source: 'questions.expire' });
 }
 
 function resolveAuthToken(
