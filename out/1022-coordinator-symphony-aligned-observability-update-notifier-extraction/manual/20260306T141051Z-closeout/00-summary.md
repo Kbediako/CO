@@ -1,7 +1,7 @@
 # 1022 Closeout Summary
 
 - Task: `1022-coordinator-symphony-aligned-observability-update-notifier-extraction`
-- Status: implementation complete; final repo sync and commit pending
+- Status: completed repo-side in commit `137237003`
 
 ## Outcome
 - Added a tiny in-process observability update notifier at `orchestrator/src/cli/control/observabilityUpdateNotifier.ts`.
@@ -26,3 +26,6 @@
 - Docs-review: bounded override recorded after delegation/spec/docs guards passed and the wrapper drifted in low-signal review exploration. Evidence: `out/1022-coordinator-symphony-aligned-observability-update-notifier-extraction/manual/20260306T135954Z-docs-review-override/00-summary.md`
 - Full `npm run test`: explicit quiet-tail override backed by the targeted 85-test notifier/control/Telegram sweep and the partial full-suite progress already observed before the stall. Evidence: `out/1022-coordinator-symphony-aligned-observability-update-notifier-extraction/manual/20260306T141051Z-closeout/11-override-notes.md`
 - `npm run review`: explicit override after one non-interactive prompt-only pass and one forced low-signal drift run. Evidence: `out/1022-coordinator-symphony-aligned-observability-update-notifier-extraction/manual/20260306T141051Z-closeout/11-override-notes.md`
+
+## Commit
+- Implementation commit: `137237003`
