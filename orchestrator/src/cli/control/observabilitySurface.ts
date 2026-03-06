@@ -16,8 +16,7 @@ import type { DispatchPilotEvaluation } from './trackerDispatchPilot.js';
 const READ_ONLY_COMPAT_ACTION = 'refresh';
 const COMPATIBILITY_MUTATING_ACTIONS = new Set(['pause', 'resume', 'cancel', 'fail', 'rerun']);
 
-const JSON_HEADERS = { 'Content-Type': 'application/json' };
-const JSON_NO_STORE_HEADERS = { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' };
+type ObservabilityPayload = Record<string, unknown>;
 
 export interface ObservabilitySurfaceContext {
   controlStore: {
@@ -30,15 +29,27 @@ export interface ObservabilitySurfaceContext {
   projection: SelectedRunProjectionReader;
 }
 
-export interface ObservabilitySurfaceResponse {
-  status: number;
-  body: Record<string, unknown>;
-  headers: Record<string, string>;
-}
+export type CompatibilityRefreshRejectionReason =
+  | 'malformed_action_request'
+  | 'forbidden_mutating_action'
+  | 'unsupported_action'
+  | 'unsupported_tool';
+
+export type CompatibilityIssueResult =
+  | { kind: 'ok'; payload: ObservabilityPayload }
+  | { kind: 'issue_not_found' };
+
+export type CompatibilityRefreshResult =
+  | { kind: 'accepted'; payload: ObservabilityPayload }
+  | {
+      kind: 'rejected';
+      reason: CompatibilityRefreshRejectionReason;
+      requestAction: string | null;
+      requestTool: string | null;
+    };
 
 interface CompatibilityActionEnvelopeRejection {
-  status: number;
-  reason: string;
+  reason: CompatibilityRefreshRejectionReason;
   requestAction: string | null;
   requestTool: string | null;
 }
@@ -46,97 +57,35 @@ interface CompatibilityActionEnvelopeRejection {
 export function createObservabilitySurface(
   context: ObservabilitySurfaceContext
 ): {
-  readUiDataset(): Promise<ObservabilitySurfaceResponse>;
-  readCompatibilityState(method: string): Promise<ObservabilitySurfaceResponse>;
-  readCompatibilityRefresh(
-    method: string,
-    body?: Record<string, unknown>
-  ): ObservabilitySurfaceResponse;
-  readCompatibilityIssue(
-    method: string,
-    issueIdentifier: string
-  ): Promise<ObservabilitySurfaceResponse>;
-  buildCompatibilityNotFound(): ObservabilitySurfaceResponse;
+  readUiDataset(): Promise<ObservabilityPayload>;
+  readCompatibilityState(): Promise<ObservabilityPayload>;
+  readCompatibilityRefresh(body?: Record<string, unknown>): CompatibilityRefreshResult;
+  readCompatibilityIssue(issueIdentifier: string): Promise<CompatibilityIssueResult>;
 } {
   return {
-    async readUiDataset(): Promise<ObservabilitySurfaceResponse> {
-      return {
-        status: 200,
-        headers: JSON_NO_STORE_HEADERS,
-        body: await buildUiDataset(context)
-      };
+    async readUiDataset(): Promise<ObservabilityPayload> {
+      return buildUiDataset(context);
     },
 
-    async readCompatibilityState(method: string): Promise<ObservabilitySurfaceResponse> {
-      if (method !== 'GET') {
-        return buildCompatibilityErrorResponse({
-          status: 405,
-          code: 'method_not_allowed',
-          message: 'Method not allowed',
-          details: {
-            surface: 'api_v1',
-            allowed_method: 'GET'
-          },
-          traceability: buildCompatibilityTraceability(context, {
-            decision: 'rejected',
-            reason: 'method_not_allowed'
-          })
-        });
-      }
-
-      return {
-        status: 200,
-        headers: JSON_NO_STORE_HEADERS,
-        body: await buildCompatibilityStatePayload(context)
-      };
+    async readCompatibilityState(): Promise<ObservabilityPayload> {
+      return buildCompatibilityStatePayload(context);
     },
 
-    readCompatibilityRefresh(method: string, body: Record<string, unknown> = {}): ObservabilitySurfaceResponse {
-      if (method !== 'POST') {
-        return buildCompatibilityErrorResponse({
-          status: 405,
-          code: 'method_not_allowed',
-          message: 'Method not allowed',
-          details: {
-            surface: 'api_v1',
-            allowed_method: 'POST'
-          },
-          traceability: buildCompatibilityTraceability(context, {
-            decision: 'rejected',
-            reason: 'method_not_allowed'
-          })
-        });
-      }
-
+    readCompatibilityRefresh(body: Record<string, unknown> = {}): CompatibilityRefreshResult {
       const rejection = resolveCompatibilityActionEnvelopeRejection(body);
       if (rejection) {
-        return buildCompatibilityErrorResponse({
-          status: rejection.status,
-          code: 'read_only_action_rejected',
-          message: 'Compatibility surface is read-only; only refresh acknowledgements are supported.',
-          details: {
-            surface: 'api_v1',
-            mode: 'read_only',
-            reason: rejection.reason,
-            allowed_actions: [READ_ONLY_COMPAT_ACTION],
-            allowed_tools: [],
-            requested_action: rejection.requestAction,
-            requested_tool: rejection.requestTool
-          },
-          traceability: buildCompatibilityTraceability(context, {
-            decision: 'rejected',
-            reason: rejection.reason,
-            requestAction: rejection.requestAction,
-            requestTool: rejection.requestTool
-          })
-        });
+        return {
+          kind: 'rejected',
+          reason: rejection.reason,
+          requestAction: rejection.requestAction,
+          requestTool: rejection.requestTool
+        };
       }
 
       const requestedAction = readStringValue(body, 'action');
       return {
-        status: 202,
-        headers: JSON_HEADERS,
-        body: {
+        kind: 'accepted',
+        payload: {
           status: 'accepted',
           mode: 'read_only',
           action: READ_ONLY_COMPAT_ACTION,
@@ -150,28 +99,7 @@ export function createObservabilitySurface(
       };
     },
 
-    async readCompatibilityIssue(
-      method: string,
-      issueIdentifier: string
-    ): Promise<ObservabilitySurfaceResponse> {
-      if (method !== 'GET') {
-        return buildCompatibilityErrorResponse({
-          status: 405,
-          code: 'method_not_allowed',
-          message: 'Method not allowed',
-          details: {
-            surface: 'api_v1',
-            allowed_method: 'GET',
-            issue_identifier: issueIdentifier
-          },
-          traceability: buildCompatibilityTraceability(context, {
-            decision: 'rejected',
-            reason: 'method_not_allowed',
-            issueIdentifier
-          })
-        });
-      }
-
+    async readCompatibilityIssue(issueIdentifier: string): Promise<CompatibilityIssueResult> {
       const selectedSnapshot = await context.projection.readSelectedRunManifestSnapshot();
       const matchesIssue =
         selectedSnapshot &&
@@ -179,34 +107,18 @@ export function createObservabilitySurface(
           selectedSnapshot.taskId === issueIdentifier ||
           selectedSnapshot.runId === issueIdentifier);
       if (!selectedSnapshot || !matchesIssue) {
-        return buildCompatibilityIssueNotFoundResponse(context, issueIdentifier);
+        return { kind: 'issue_not_found' };
       }
 
       const selected = await context.projection.buildSelectedRunContext(selectedSnapshot);
       if (!selected) {
-        return buildCompatibilityIssueNotFoundResponse(context, issueIdentifier);
+        return { kind: 'issue_not_found' };
       }
 
       return {
-        status: 200,
-        headers: JSON_NO_STORE_HEADERS,
-        body: buildCompatibilityIssuePayload(selected)
+        kind: 'ok',
+        payload: buildCompatibilityIssuePayload(selected)
       };
-    },
-
-    buildCompatibilityNotFound(): ObservabilitySurfaceResponse {
-      return buildCompatibilityErrorResponse({
-        status: 404,
-        code: 'not_found',
-        message: 'Route not found',
-        details: {
-          surface: 'api_v1'
-        },
-        traceability: buildCompatibilityTraceability(context, {
-          decision: 'rejected',
-          reason: 'route_not_found'
-        })
-      });
     }
   };
 }
@@ -234,47 +146,6 @@ export function buildCompatibilityTraceability(
     reason: input.reason,
     timestamp: isoTimestamp()
   };
-}
-
-export function buildCompatibilityErrorResponse(input: {
-  status: number;
-  code: string;
-  message: string;
-  details?: Record<string, unknown>;
-  traceability?: Record<string, unknown>;
-}): ObservabilitySurfaceResponse {
-  return {
-    status: input.status,
-    headers: JSON_HEADERS,
-    body: {
-      error: {
-        code: input.code,
-        message: input.message,
-        ...(input.details ? { details: input.details } : {})
-      },
-      ...(input.traceability ? { traceability: input.traceability } : {})
-    }
-  };
-}
-
-function buildCompatibilityIssueNotFoundResponse(
-  context: ObservabilitySurfaceContext,
-  issueIdentifier: string
-): ObservabilitySurfaceResponse {
-  return buildCompatibilityErrorResponse({
-    status: 404,
-    code: 'issue_not_found',
-    message: 'Issue not found',
-    details: {
-      surface: 'api_v1',
-      issue_identifier: issueIdentifier
-    },
-    traceability: buildCompatibilityTraceability(context, {
-      decision: 'rejected',
-      reason: 'issue_not_found',
-      issueIdentifier
-    })
-  });
 }
 
 async function buildCompatibilityStatePayload(
@@ -526,7 +397,6 @@ function resolveCompatibilityActionEnvelopeRejection(
 
   if (hasAction && !normalizedAction) {
     return {
-      status: 400,
       reason: 'malformed_action_request',
       requestAction: null,
       requestTool: normalizedTool
@@ -534,7 +404,6 @@ function resolveCompatibilityActionEnvelopeRejection(
   }
   if (normalizedAction && COMPATIBILITY_MUTATING_ACTIONS.has(normalizedAction)) {
     return {
-      status: 403,
       reason: 'forbidden_mutating_action',
       requestAction: normalizedAction,
       requestTool: normalizedTool
@@ -542,7 +411,6 @@ function resolveCompatibilityActionEnvelopeRejection(
   }
   if (normalizedAction && normalizedAction !== READ_ONLY_COMPAT_ACTION) {
     return {
-      status: 400,
       reason: 'unsupported_action',
       requestAction: normalizedAction,
       requestTool: normalizedTool
@@ -550,7 +418,6 @@ function resolveCompatibilityActionEnvelopeRejection(
   }
   if (hasTool) {
     return {
-      status: 403,
       reason: 'unsupported_tool',
       requestAction: normalizedAction,
       requestTool: normalizedTool

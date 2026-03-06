@@ -459,6 +459,89 @@ describe('ControlServer', () => {
     }
   });
 
+  it('rejects unsupported methods for ui data and compatibility state issue and refresh routes', async () => {
+    const { root, env, paths } = await createRunRoot('task-0940');
+    await seedManifest(paths);
+    const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
+
+    const server = await ControlServer.start({
+      paths,
+      config,
+      runId: 'run-1'
+    });
+
+    try {
+      const baseUrl = server.getBaseUrl() ?? '';
+      const token = await readToken(paths.controlAuthPath);
+
+      const stateRes = await fetch(new URL('/api/v1/state', baseUrl), {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'x-csrf-token': token
+        }
+      });
+      expect(stateRes.status).toBe(405);
+      const statePayload = (await stateRes.json()) as {
+        error?: { code?: string; details?: { allowed_method?: string } };
+      };
+      expect(statePayload.error?.code).toBe('method_not_allowed');
+      expect(statePayload.error?.details?.allowed_method).toBe('GET');
+
+      const uiRes = await fetch(new URL('/ui/data.json', baseUrl), {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'x-csrf-token': token
+        }
+      });
+      expect(uiRes.status).toBe(405);
+      const uiPayload = (await uiRes.json()) as {
+        error?: {
+          code?: string;
+          details?: { allowed_method?: string; route?: string; surface?: string };
+        };
+      };
+      expect(uiPayload.error?.code).toBe('method_not_allowed');
+      expect(uiPayload.error?.details?.allowed_method).toBe('GET');
+      expect(uiPayload.error?.details?.route).toBe('/ui/data.json');
+      expect(uiPayload.error?.details?.surface).toBe('ui');
+
+      const refreshRes = await fetch(new URL('/api/v1/refresh', baseUrl), {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      expect(refreshRes.status).toBe(405);
+      const refreshPayload = (await refreshRes.json()) as {
+        error?: { code?: string; details?: { allowed_method?: string } };
+      };
+      expect(refreshPayload.error?.code).toBe('method_not_allowed');
+      expect(refreshPayload.error?.details?.allowed_method).toBe('POST');
+
+      const issueRes = await fetch(new URL('/api/v1/task-0940', baseUrl), {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'x-csrf-token': token
+        }
+      });
+      expect(issueRes.status).toBe(405);
+      const issuePayload = (await issueRes.json()) as {
+        error?: {
+          code?: string;
+          details?: { allowed_method?: string; issue_identifier?: string };
+        };
+      };
+      expect(issuePayload.error?.code).toBe('method_not_allowed');
+      expect(issuePayload.error?.details?.allowed_method).toBe('GET');
+      expect(issuePayload.error?.details?.issue_identifier).toBe('task-0940');
+    } finally {
+      await server.close();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   it('keeps selected paused runs coherent across state issue and ui projections', async () => {
     const { root, env, paths } = await createRunRoot('task-1015-paused');
     const startedAt = '2026-03-06T03:00:00.000Z';

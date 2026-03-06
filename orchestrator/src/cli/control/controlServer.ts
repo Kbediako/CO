@@ -33,10 +33,9 @@ import {
 } from './linearDispatchSource.js';
 import { createSelectedRunProjectionReader } from './selectedRunProjection.js';
 import {
-  buildCompatibilityErrorResponse,
   buildCompatibilityTraceability,
   createObservabilitySurface,
-  type ObservabilitySurfaceResponse
+  type CompatibilityRefreshRejectionReason
 } from './observabilitySurface.js';
 
 interface ControlServerOptions {
@@ -56,6 +55,8 @@ const DELEGATION_RUN_HEADER = 'x-codex-delegation-run-id';
 const LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost', '::1']);
 const COMPATIBILITY_API_PREFIX = '/api/v1';
 const COMPATIBILITY_RESERVED_IDENTIFIERS = new Set(['state', 'refresh', 'dispatch']);
+const JSON_HEADERS = { 'Content-Type': 'application/json' };
+const JSON_NO_STORE_HEADERS = { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' };
 const UI_ASSET_PATHS: Record<string, string> = {
   '/ui': 'index.html',
   '/ui/': 'index.html',
@@ -91,6 +92,12 @@ const MAX_TRANSPORT_POLICY_WINDOW_MS = 24 * 60 * 60 * 1000;
 const LINEAR_ADVISORY_STATE_FILE = 'linear-advisory-state.json';
 const LINEAR_WEBHOOK_MAX_AGE_MS = 5 * 60 * 1000;
 const LINEAR_ADVISORY_SEEN_DELIVERY_LIMIT = 100;
+
+interface ObservabilitySurfaceResponse {
+  status: number;
+  body: Record<string, unknown>;
+  headers: Record<string, string>;
+}
 
 class HttpError extends Error {
   readonly status: number;
@@ -547,13 +554,29 @@ async function handleRequest(context: RequestContext): Promise<void> {
     return;
   }
 
-  if (url.pathname === '/ui/data.json' && req.method === 'GET') {
-    writeObservabilityResponse(res, await observability.readUiDataset());
+  if (url.pathname === '/ui/data.json') {
+    if (method !== 'GET') {
+      writeUiDataMethodNotAllowed(res);
+      return;
+    }
+    writeObservabilityResponse(res, {
+      status: 200,
+      headers: JSON_NO_STORE_HEADERS,
+      body: await observability.readUiDataset()
+    });
     return;
   }
 
   if (url.pathname === `${COMPATIBILITY_API_PREFIX}/state`) {
-    writeObservabilityResponse(res, await observability.readCompatibilityState(method));
+    if (method !== 'GET') {
+      writeCompatibilityMethodNotAllowed(res, observabilityContext, 'GET');
+      return;
+    }
+    writeObservabilityResponse(res, {
+      status: 200,
+      headers: JSON_NO_STORE_HEADERS,
+      body: await observability.readCompatibilityState()
+    });
     return;
   }
 
@@ -627,22 +650,49 @@ async function handleRequest(context: RequestContext): Promise<void> {
   }
 
   if (url.pathname === `${COMPATIBILITY_API_PREFIX}/refresh`) {
-    const body = method === 'POST' ? await readJsonBody(req) : undefined;
-    writeObservabilityResponse(res, observability.readCompatibilityRefresh(method, body));
+    if (method !== 'POST') {
+      writeCompatibilityMethodNotAllowed(res, observabilityContext, 'POST');
+      return;
+    }
+    const result = observability.readCompatibilityRefresh(await readJsonBody(req));
+    if (result.kind === 'rejected') {
+      writeCompatibilityRefreshRejected(res, observabilityContext, result);
+      return;
+    }
+    writeObservabilityResponse(res, {
+      status: 202,
+      headers: JSON_HEADERS,
+      body: result.payload
+    });
     return;
   }
 
   const compatibilityIssueIdentifier = resolveCompatibilityIssueIdentifierFromPath(url.pathname);
   if (compatibilityIssueIdentifier !== null) {
-    writeObservabilityResponse(
-      res,
-      await observability.readCompatibilityIssue(method, compatibilityIssueIdentifier)
-    );
+    if (method !== 'GET') {
+      writeCompatibilityMethodNotAllowed(
+        res,
+        observabilityContext,
+        'GET',
+        compatibilityIssueIdentifier
+      );
+      return;
+    }
+    const result = await observability.readCompatibilityIssue(compatibilityIssueIdentifier);
+    if (result.kind === 'issue_not_found') {
+      writeCompatibilityIssueNotFound(res, observabilityContext, compatibilityIssueIdentifier);
+      return;
+    }
+    writeObservabilityResponse(res, {
+      status: 200,
+      headers: JSON_NO_STORE_HEADERS,
+      body: result.payload
+    });
     return;
   }
 
   if (url.pathname === COMPATIBILITY_API_PREFIX || url.pathname.startsWith(`${COMPATIBILITY_API_PREFIX}/`)) {
-    writeObservabilityResponse(res, observability.buildCompatibilityNotFound());
+    writeCompatibilityNotFound(res, observabilityContext);
     return;
   }
 
@@ -1993,6 +2043,161 @@ function writeObservabilityResponse(
 ): void {
   res.writeHead(response.status, response.headers);
   res.end(JSON.stringify(response.body));
+}
+
+function buildCompatibilityErrorResponse(input: {
+  status: number;
+  code: string;
+  message: string;
+  details?: Record<string, unknown>;
+  traceability?: Record<string, unknown>;
+}): ObservabilitySurfaceResponse {
+  return {
+    status: input.status,
+    headers: JSON_HEADERS,
+    body: {
+      error: {
+        code: input.code,
+        message: input.message,
+        ...(input.details ? { details: input.details } : {})
+      },
+      ...(input.traceability ? { traceability: input.traceability } : {})
+    }
+  };
+}
+
+function writeCompatibilityMethodNotAllowed(
+  res: http.ServerResponse,
+  context: Parameters<typeof buildCompatibilityTraceability>[0],
+  allowedMethod: 'GET' | 'POST',
+  issueIdentifier?: string
+): void {
+  writeObservabilityResponse(
+    res,
+    buildCompatibilityErrorResponse({
+      status: 405,
+      code: 'method_not_allowed',
+      message: 'Method not allowed',
+      details: {
+        surface: 'api_v1',
+        allowed_method: allowedMethod,
+        ...(issueIdentifier ? { issue_identifier: issueIdentifier } : {})
+      },
+      traceability: buildCompatibilityTraceability(context, {
+        decision: 'rejected',
+        reason: 'method_not_allowed',
+        ...(issueIdentifier ? { issueIdentifier } : {})
+      })
+    })
+  );
+}
+
+function writeCompatibilityIssueNotFound(
+  res: http.ServerResponse,
+  context: Parameters<typeof buildCompatibilityTraceability>[0],
+  issueIdentifier: string
+): void {
+  writeObservabilityResponse(
+    res,
+    buildCompatibilityErrorResponse({
+      status: 404,
+      code: 'issue_not_found',
+      message: 'Issue not found',
+      details: {
+        surface: 'api_v1',
+        issue_identifier: issueIdentifier
+      },
+      traceability: buildCompatibilityTraceability(context, {
+        decision: 'rejected',
+        reason: 'issue_not_found',
+        issueIdentifier
+      })
+    })
+  );
+}
+
+function writeCompatibilityNotFound(
+  res: http.ServerResponse,
+  context: Parameters<typeof buildCompatibilityTraceability>[0]
+): void {
+  writeObservabilityResponse(
+    res,
+    buildCompatibilityErrorResponse({
+      status: 404,
+      code: 'not_found',
+      message: 'Route not found',
+      details: {
+        surface: 'api_v1'
+      },
+      traceability: buildCompatibilityTraceability(context, {
+        decision: 'rejected',
+        reason: 'route_not_found'
+      })
+    })
+  );
+}
+
+function writeCompatibilityRefreshRejected(
+  res: http.ServerResponse,
+  context: Parameters<typeof buildCompatibilityTraceability>[0],
+  rejection: {
+    reason: CompatibilityRefreshRejectionReason;
+    requestAction: string | null;
+    requestTool: string | null;
+  }
+): void {
+  writeObservabilityResponse(
+    res,
+    buildCompatibilityErrorResponse({
+      status: resolveCompatibilityRefreshRejectionStatus(rejection.reason),
+      code: 'read_only_action_rejected',
+      message: 'Compatibility surface is read-only; only refresh acknowledgements are supported.',
+      details: {
+        surface: 'api_v1',
+        mode: 'read_only',
+        reason: rejection.reason,
+        allowed_actions: ['refresh'],
+        allowed_tools: [],
+        requested_action: rejection.requestAction,
+        requested_tool: rejection.requestTool
+      },
+      traceability: buildCompatibilityTraceability(context, {
+        decision: 'rejected',
+        reason: rejection.reason,
+        requestAction: rejection.requestAction,
+        requestTool: rejection.requestTool
+      })
+    })
+  );
+}
+
+function writeUiDataMethodNotAllowed(res: http.ServerResponse): void {
+  writeObservabilityResponse(
+    res,
+    buildCompatibilityErrorResponse({
+      status: 405,
+      code: 'method_not_allowed',
+      message: 'Method not allowed',
+      details: {
+        surface: 'ui',
+        route: '/ui/data.json',
+        allowed_method: 'GET'
+      }
+    })
+  );
+}
+
+function resolveCompatibilityRefreshRejectionStatus(
+  reason: CompatibilityRefreshRejectionReason
+): 400 | 403 {
+  switch (reason) {
+    case 'forbidden_mutating_action':
+    case 'unsupported_tool':
+      return 403;
+    case 'malformed_action_request':
+    case 'unsupported_action':
+      return 400;
+  }
 }
 
 function isControlAction(action: unknown): action is 'pause' | 'resume' | 'cancel' | 'fail' {
