@@ -36,4 +36,4 @@
 - [x] `npm run pack:smoke` when required by touched downstream-facing paths. Evidence: `out/1024-coordinator-symphony-aligned-snapshot-reads-and-live-linear-dispatch-separation/manual/20260306T160352Z-closeout/16-pack-smoke.log`.
 - [x] Manual simulated/mock usage evidence captured for snapshot-vs-dispatch semantics. Evidence: `out/1024-coordinator-symphony-aligned-snapshot-reads-and-live-linear-dispatch-separation/manual/20260306T160352Z-closeout/11-manual-snapshot-dispatch-separation.json`, `out/1024-coordinator-symphony-aligned-snapshot-reads-and-live-linear-dispatch-separation/manual/20260306T160352Z-closeout/12-manual-credential-summary-check.json`.
 - [x] Explicit elegance review captured. Evidence: `out/1024-coordinator-symphony-aligned-snapshot-reads-and-live-linear-dispatch-separation/manual/20260306T160352Z-closeout/13-elegance-review.md`.
-- [ ] Coherent `1024` commit recorded. Evidence: `<commit-sha>`.
+- [x] Coherent `1024` commit recorded. Evidence: `out/1024-coordinator-symphony-aligned-snapshot-reads-and-live-linear-dispatch-separation/manual/20260306T160352Z-closeout/00-summary.md`, git history for commit `42511494d`.
