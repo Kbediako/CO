@@ -1941,15 +1941,15 @@
       "title": "Coordinator Symphony-Aligned Collection-Backed Compatibility Projection",
       "path": "tasks/tasks-1032-coordinator-symphony-aligned-collection-backed-compatibility-projection.md",
       "kind": "run",
-      "status": "in-progress",
+      "status": "completed",
       "gate": {
-        "phase": "coordinator-symphony-aligned-collection-backed-compatibility-projection-planning",
-        "status": "in-progress",
-        "log": null,
-        "run_id": null
+        "phase": "coordinator-symphony-aligned-collection-backed-compatibility-projection-closeout",
+        "status": "succeeded",
+        "log": "out/1032-coordinator-symphony-aligned-collection-backed-compatibility-projection/manual/20260306T233750Z-closeout/00-summary.md",
+        "run_id": "20260306T233750Z-closeout"
       },
       "created_at": "2026-03-07",
-      "completed_at": null
+      "completed_at": "2026-03-06"
     },
     {
       "id": "1031",

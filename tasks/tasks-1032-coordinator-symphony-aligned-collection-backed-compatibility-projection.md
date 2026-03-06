@@ -17,18 +17,18 @@
 - [x] docs-review approval/override captured for registered `1032`. Evidence: `.runs/1032-coordinator-symphony-aligned-collection-backed-compatibility-projection/cli/2026-03-06T23-27-09-868Z-9572b1b3/manifest.json`, `out/1032-coordinator-symphony-aligned-collection-backed-compatibility-projection/manual/20260306T232904Z-preimpl-review-and-docs-review-override/00-summary.md`.
 
 ## Compatibility Projection
-- [ ] Compatibility state and issue readers consume a collection-backed projection instead of reading `snapshot.selected` directly. Evidence: `orchestrator/src/cli/control/controlRuntime.ts`, `orchestrator/src/cli/control/observabilityReadModel.ts`, `orchestrator/src/cli/control/observabilitySurface.ts`.
-- [ ] The selected-run runtime seam remains available for non-core UI/Telegram consumers while the compatibility API moves onto the new projection. Evidence: `orchestrator/src/cli/control/controlRuntime.ts`, `orchestrator/src/cli/control/telegramOversightBridge.ts`, `orchestrator/src/cli/control/observabilitySurface.ts`.
-- [ ] Regression/manual evidence keeps the compatibility route contract stable while making the read-model shape more Symphony-aligned. Evidence: `orchestrator/tests/ControlServer.test.ts`, `out/1032-coordinator-symphony-aligned-collection-backed-compatibility-projection/manual/<pending>/11-manual-compatibility-projection.json`.
+- [x] Compatibility state and issue readers consume a collection-backed projection instead of reading `snapshot.selected` directly. Evidence: `orchestrator/src/cli/control/controlRuntime.ts`, `orchestrator/src/cli/control/observabilityReadModel.ts`, `orchestrator/src/cli/control/observabilitySurface.ts`.
+- [x] The selected-run runtime seam remains available for non-core UI/Telegram consumers while the compatibility API moves onto the new projection. Evidence: `orchestrator/src/cli/control/controlRuntime.ts`, `orchestrator/src/cli/control/telegramOversightBridge.ts`, `orchestrator/src/cli/control/observabilitySurface.ts`.
+- [x] Regression/manual evidence keeps the compatibility route contract stable while making the read-model shape more Symphony-aligned. Evidence: `orchestrator/tests/ControlServer.test.ts`, `out/1032-coordinator-symphony-aligned-collection-backed-compatibility-projection/manual/20260306T233750Z-closeout/11-manual-compatibility-projection.json`.
 
 ## Validation + Closeout
-- [ ] `node scripts/delegation-guard.mjs`. Evidence: `out/1032-coordinator-symphony-aligned-collection-backed-compatibility-projection/manual/<pending>/01-delegation-guard.log`.
-- [ ] `node scripts/spec-guard.mjs --dry-run`. Evidence: `out/1032-coordinator-symphony-aligned-collection-backed-compatibility-projection/manual/<pending>/02-spec-guard.log`.
-- [ ] `npm run build`. Evidence: `out/1032-coordinator-symphony-aligned-collection-backed-compatibility-projection/manual/<pending>/03-build.log`.
-- [ ] `npm run lint`. Evidence: `out/1032-coordinator-symphony-aligned-collection-backed-compatibility-projection/manual/<pending>/04-lint.log`.
-- [ ] `npm run test`. Evidence: `out/1032-coordinator-symphony-aligned-collection-backed-compatibility-projection/manual/<pending>/05-test.log`.
-- [ ] `npm run docs:check`. Evidence: `out/1032-coordinator-symphony-aligned-collection-backed-compatibility-projection/manual/<pending>/06-docs-check.log`.
-- [ ] `npm run docs:freshness`. Evidence: `out/1032-coordinator-symphony-aligned-collection-backed-compatibility-projection/manual/<pending>/07-docs-freshness.log`.
-- [ ] `node scripts/diff-budget.mjs`. Evidence: `out/1032-coordinator-symphony-aligned-collection-backed-compatibility-projection/manual/<pending>/08-diff-budget.log`.
-- [ ] `npm run review`. Evidence: `out/1032-coordinator-symphony-aligned-collection-backed-compatibility-projection/manual/<pending>/09-review.log`.
-- [ ] `npm run pack:smoke` when required by touched downstream-facing paths. Evidence: `out/1032-coordinator-symphony-aligned-collection-backed-compatibility-projection/manual/<pending>/10-pack-smoke.log`.
+- [x] `node scripts/delegation-guard.mjs`. Evidence: `out/1032-coordinator-symphony-aligned-collection-backed-compatibility-projection/manual/20260306T233750Z-closeout/01-delegation-guard.log`.
+- [x] `node scripts/spec-guard.mjs --dry-run`. Evidence: `out/1032-coordinator-symphony-aligned-collection-backed-compatibility-projection/manual/20260306T233750Z-closeout/02-spec-guard.log`.
+- [x] `npm run build`. Evidence: `out/1032-coordinator-symphony-aligned-collection-backed-compatibility-projection/manual/20260306T233750Z-closeout/03-build.log`.
+- [x] `npm run lint`. Evidence: `out/1032-coordinator-symphony-aligned-collection-backed-compatibility-projection/manual/20260306T233750Z-closeout/04-lint.log`.
+- [x] `npm run test`. Evidence: `out/1032-coordinator-symphony-aligned-collection-backed-compatibility-projection/manual/20260306T233750Z-closeout/05-test.log`.
+- [x] `npm run docs:check`. Evidence: `out/1032-coordinator-symphony-aligned-collection-backed-compatibility-projection/manual/20260306T233750Z-closeout/06-docs-check.log`.
+- [x] `npm run docs:freshness`. Evidence: `out/1032-coordinator-symphony-aligned-collection-backed-compatibility-projection/manual/20260306T233750Z-closeout/07-docs-freshness.log`.
+- [x] `node scripts/diff-budget.mjs`. Evidence: `out/1032-coordinator-symphony-aligned-collection-backed-compatibility-projection/manual/20260306T233750Z-closeout/08-diff-budget.log`, `out/1032-coordinator-symphony-aligned-collection-backed-compatibility-projection/manual/20260306T233750Z-closeout/13-override-notes.md`.
+- [x] `npm run review`. Evidence: `out/1032-coordinator-symphony-aligned-collection-backed-compatibility-projection/manual/20260306T233750Z-closeout/09-review.log`, `out/1032-coordinator-symphony-aligned-collection-backed-compatibility-projection/manual/20260306T233750Z-closeout/13-override-notes.md`.
+- [x] `npm run pack:smoke` when required by touched downstream-facing paths. Evidence: `out/1032-coordinator-symphony-aligned-collection-backed-compatibility-projection/manual/20260306T233750Z-closeout/10-pack-smoke.log`.
