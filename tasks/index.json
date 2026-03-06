@@ -1936,6 +1936,22 @@
       "completed_at": "2026-03-06"
     },
     {
+      "id": "1017",
+      "slug": "1017-coordinator-symphony-aligned-projection-boundary-and-live-linear-refresh",
+      "title": "Coordinator Symphony-Aligned Projection Boundary + Live Linear Refresh",
+      "path": "tasks/tasks-1017-coordinator-symphony-aligned-projection-boundary-and-live-linear-refresh.md",
+      "kind": "run",
+      "status": "completed",
+      "gate": {
+        "phase": "coordinator-symphony-aligned-projection-boundary-and-live-linear-refresh-closeout-override",
+        "status": "succeeded",
+        "log": "out/1017-coordinator-symphony-aligned-projection-boundary-and-live-linear-refresh/manual/20260306T093745Z-closeout/00-summary.md",
+        "run_id": "20260306T093745Z-closeout"
+      },
+      "created_at": "2026-03-06",
+      "completed_at": "2026-03-06"
+    },
+    {
       "id": "1016",
       "slug": "1016-coordinator-live-linear-advisory-ingress-and-telegram-delta-notifications",
       "title": "Coordinator Live Linear Advisory Ingress + Telegram Delta Notifications",
@@ -2927,6 +2943,22 @@
         "task": "tasks/tasks-1001-coordinator-appserver-dynamic-tool-bridge-experimental-lane.md",
         "agent_task": ".agent/task/1001-coordinator-appserver-dynamic-tool-bridge-experimental-lane.md",
         "docs": "docs/TECH_SPEC-coordinator-appserver-dynamic-tool-bridge-experimental-lane.md"
+      }
+    },
+    {
+      "id": "20260306-1017-coordinator-symphony-aligned-projection-boundary-and-live-linear-refresh",
+      "title": "Coordinator Symphony-Aligned Projection Boundary + Live Linear Refresh",
+      "relates_to": "tasks/tasks-1017-coordinator-symphony-aligned-projection-boundary-and-live-linear-refresh.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-06",
+      "paths": {
+        "spec": "tasks/specs/1017-coordinator-symphony-aligned-projection-boundary-and-live-linear-refresh.md",
+        "task": "tasks/tasks-1017-coordinator-symphony-aligned-projection-boundary-and-live-linear-refresh.md",
+        "agent_task": ".agent/task/1017-coordinator-symphony-aligned-projection-boundary-and-live-linear-refresh.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-projection-boundary-and-live-linear-refresh.md"
       }
     },
     {

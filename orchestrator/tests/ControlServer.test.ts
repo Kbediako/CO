@@ -1319,12 +1319,14 @@ describe('ControlServer', () => {
     });
     const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
     const realFetch = globalThis.fetch;
+    let linearFetchCount = 0;
 
     vi.stubEnv('CO_LINEAR_API_TOKEN', 'lin-api-token');
     vi.stubGlobal('fetch', async (input, init) => {
       const rawUrl = input instanceof Request ? input.url : String(input);
       const url = new URL(rawUrl);
       if (url.toString() === 'https://api.linear.app/graphql') {
+        linearFetchCount += 1;
         return new Response(
           JSON.stringify({
             data: {
@@ -1415,6 +1417,7 @@ describe('ControlServer', () => {
         title: 'Investigate advisory routing',
         team_key: 'PREPROD'
       });
+      expect(linearFetchCount).toBe(1);
 
       const stateRes = await fetch(new URL('/api/v1/state', baseUrl), {
         headers: {
