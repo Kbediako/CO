@@ -34,4 +34,4 @@
 - [x] `npm run pack:smoke` when required by touched downstream-facing paths. Evidence: `out/1021-coordinator-symphony-aligned-telegram-in-process-read-model-reuse/manual/20260306T125623Z-closeout/10-pack-smoke.log`.
 - [x] Manual simulated/mock usage evidence captured for Telegram bridge coherence. Evidence: `out/1021-coordinator-symphony-aligned-telegram-in-process-read-model-reuse/manual/20260306T125623Z-closeout/11-manual-telegram-bridge-check.json`.
 - [x] Explicit elegance review captured. Evidence: `out/1021-coordinator-symphony-aligned-telegram-in-process-read-model-reuse/manual/20260306T125623Z-closeout/12-elegance-review.md`.
-- [ ] Coherent `1021` commit recorded. Evidence: `<commit-sha>`.
+- [x] Coherent `1021` commit recorded. Evidence: `f8669ccde` (`finish 1021 telegram in process read model reuse`).
