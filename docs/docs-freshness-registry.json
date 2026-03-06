@@ -5358,6 +5358,55 @@
       "cadence_days": 90
     },
     {
+      "path": ".agent/task/1030-coordinator-symphony-aligned-compatibility-route-contract-and-dispatch-extension-boundary.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-06",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-compatibility-route-contract-and-dispatch-extension-boundary.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-06",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/findings/1030-compatibility-route-contract-deliberation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-06",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/PRD-coordinator-symphony-aligned-compatibility-route-contract-and-dispatch-extension-boundary.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-06",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/TECH_SPEC-coordinator-symphony-aligned-compatibility-route-contract-and-dispatch-extension-boundary.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-06",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/specs/1030-coordinator-symphony-aligned-compatibility-route-contract-and-dispatch-extension-boundary.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-06",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/tasks-1030-coordinator-symphony-aligned-compatibility-route-contract-and-dispatch-extension-boundary.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-06",
+      "cadence_days": 90
+    },
+    {
       "path": ".agent/task/1029-coordinator-symphony-aligned-controller-owned-dispatch-and-refresh-helpers.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",

@@ -39,7 +39,7 @@ export interface ObservabilityPresenterContext extends ObservabilityTraceability
   readSelectedRunSnapshot(): Promise<ControlSelectedRunRuntimeSnapshot>;
 }
 
-export interface ObservabilityDispatchContext {
+export interface DispatchExtensionContext {
   readDispatchEvaluation(): Promise<{
     issueIdentifier: string | null;
     evaluation: DispatchPilotEvaluation;
@@ -69,7 +69,7 @@ export type CompatibilityRefreshResult =
       requestTool: string | null;
     };
 
-export type CompatibilityDispatchResult =
+export type DispatchExtensionResult =
   | {
       kind: 'ok';
       issueIdentifier: string | null;
@@ -90,9 +90,11 @@ interface CompatibilityActionEnvelopeRejection {
   requestTool: string | null;
 }
 
-export async function readCompatibilityDispatch(
-  context: ObservabilityDispatchContext
-): Promise<CompatibilityDispatchResult> {
+// `/api/v1/dispatch` is a CO-specific extension over the Symphony-aligned
+// compatibility surface, so keep the dispatch payload seam explicit.
+export async function readDispatchExtension(
+  context: DispatchExtensionContext
+): Promise<DispatchExtensionResult> {
   const { issueIdentifier, evaluation } = await context.readDispatchEvaluation();
 
   if (evaluation.failure) {

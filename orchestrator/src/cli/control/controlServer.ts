@@ -40,12 +40,12 @@ import {
 import { createControlRuntime, type ControlRuntime } from './controlRuntime.js';
 import {
   buildCompatibilityTraceability,
-  readCompatibilityDispatch,
+  readDispatchExtension,
   readCompatibilityIssue,
   readCompatibilityRefresh,
   readCompatibilityState,
   readUiDataset,
-  type CompatibilityDispatchResult,
+  type DispatchExtensionResult,
   type CompatibilityRefreshRejectionReason
 } from './observabilitySurface.js';
 
@@ -65,7 +65,11 @@ const DELEGATION_TOKEN_HEADER = 'x-codex-delegation-token';
 const DELEGATION_RUN_HEADER = 'x-codex-delegation-run-id';
 const LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost', '::1']);
 const COMPATIBILITY_API_PREFIX = '/api/v1';
-const COMPATIBILITY_RESERVED_IDENTIFIERS = new Set(['state', 'refresh', 'dispatch']);
+const COMPATIBILITY_STATE_PATH = `${COMPATIBILITY_API_PREFIX}/state`;
+const COMPATIBILITY_REFRESH_PATH = `${COMPATIBILITY_API_PREFIX}/refresh`;
+const COMPATIBILITY_DISPATCH_EXTENSION_PATH = `${COMPATIBILITY_API_PREFIX}/dispatch`;
+const SYMPHONY_COMPATIBILITY_CORE_SEGMENTS = new Set(['state', 'refresh']);
+const CO_COMPATIBILITY_EXTENSION_SEGMENTS = new Set(['dispatch']);
 const JSON_HEADERS = { 'Content-Type': 'application/json' };
 const JSON_NO_STORE_HEADERS = { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' };
 const UI_ASSET_PATHS: Record<string, string> = {
@@ -458,7 +462,7 @@ export class ControlServer {
       readDispatch: async (): Promise<ControlDispatchPayload> => {
         const context = buildInternalContext();
         const runtimeSnapshot = this.controlRuntime.snapshot();
-        const result = await readCompatibilityDispatch({
+        const result = await readDispatchExtension({
           readDispatchEvaluation: () => runtimeSnapshot.readDispatchEvaluation()
         });
         await emitDispatchPilotAuditEvents(context, {
@@ -618,7 +622,8 @@ async function handleRequest(context: RequestContext): Promise<void> {
     return;
   }
 
-  if (url.pathname === `${COMPATIBILITY_API_PREFIX}/state`) {
+  // Symphony-aligned core observability routes.
+  if (url.pathname === COMPATIBILITY_STATE_PATH) {
     if (method !== 'GET') {
       writeCompatibilityMethodNotAllowed(res, context, 'GET');
       return;
@@ -631,13 +636,14 @@ async function handleRequest(context: RequestContext): Promise<void> {
     return;
   }
 
-  if (url.pathname === `${COMPATIBILITY_API_PREFIX}/dispatch`) {
+  // CO-specific dispatch extension over the core compatibility surface.
+  if (url.pathname === COMPATIBILITY_DISPATCH_EXTENSION_PATH) {
     if (req.method !== 'GET') {
-      writeCompatibilityDispatchMethodNotAllowed(res, context);
+      writeDispatchExtensionMethodNotAllowed(res, context);
       return;
     }
 
-    const result = await readCompatibilityDispatch({
+    const result = await readDispatchExtension({
       readDispatchEvaluation: () => runtimeSnapshot.readDispatchEvaluation()
     });
     await emitDispatchPilotAuditEvents(context, {
@@ -680,7 +686,7 @@ async function handleRequest(context: RequestContext): Promise<void> {
     return;
   }
 
-  if (url.pathname === `${COMPATIBILITY_API_PREFIX}/refresh`) {
+  if (url.pathname === COMPATIBILITY_REFRESH_PATH) {
     if (method !== 'POST') {
       writeCompatibilityMethodNotAllowed(res, context, 'POST');
       return;
@@ -1531,7 +1537,13 @@ function resolveCompatibilityIssueIdentifierFromPath(pathname: string): string |
   }
   try {
     const decoded = decodeURIComponent(suffix);
-    if (!decoded || decoded.includes('/') || COMPATIBILITY_RESERVED_IDENTIFIERS.has(decoded.toLowerCase())) {
+    const normalized = decoded.toLowerCase();
+    if (
+      !decoded ||
+      decoded.includes('/') ||
+      SYMPHONY_COMPATIBILITY_CORE_SEGMENTS.has(normalized) ||
+      CO_COMPATIBILITY_EXTENSION_SEGMENTS.has(normalized)
+    ) {
       return null;
     }
     return decoded;
@@ -2181,7 +2193,7 @@ function writeCompatibilityNotFound(
   );
 }
 
-function writeCompatibilityDispatchMethodNotAllowed(
+function writeDispatchExtensionMethodNotAllowed(
   res: http.ServerResponse,
   context: Parameters<typeof buildCompatibilityTraceability>[0]
 ): void {
@@ -2951,7 +2963,7 @@ async function emitControlEvent(
 }
 
 function buildTelegramOversightDispatchPayload(
-  result: CompatibilityDispatchResult
+  result: DispatchExtensionResult
 ): ControlDispatchPayload {
   if (result.kind === 'ok') {
     return result.payload as ControlDispatchPayload;

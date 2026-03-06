@@ -459,7 +459,7 @@ describe('ControlServer', () => {
     }
   });
 
-  it('rejects unsupported methods for ui data and compatibility state dispatch issue and refresh routes', async () => {
+  it('rejects unsupported methods for ui data, Symphony-aligned compatibility routes, and the CO dispatch extension', async () => {
     const { root, env, paths } = await createRunRoot('task-0940');
     await seedManifest(paths);
     const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
@@ -1229,7 +1229,7 @@ describe('ControlServer', () => {
     }
   });
 
-  it('serves dispatch compatibility endpoint as read-only and reserves dispatch from issue matching', async () => {
+  it('serves dispatch as a read-only CO extension and reserves it from issue matching', async () => {
     const { root, env, paths } = await createRunRoot('task-0940');
     await seedManifest(paths);
     const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
