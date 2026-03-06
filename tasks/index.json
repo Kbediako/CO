@@ -1941,15 +1941,15 @@
       "title": "Coordinator Symphony-Aligned Controller-Owned Compatibility + UI Presenters",
       "path": "tasks/tasks-1028-coordinator-symphony-aligned-controller-owned-compatibility-and-ui-presenters.md",
       "kind": "run",
-      "status": "in-progress",
+      "status": "completed",
       "gate": {
-        "phase": "coordinator-symphony-aligned-controller-owned-compatibility-and-ui-presenters-planning",
-        "status": "in-progress",
-        "log": null,
-        "run_id": null
+        "phase": "coordinator-symphony-aligned-controller-owned-compatibility-and-ui-presenters-closeout-override",
+        "status": "succeeded",
+        "log": "out/1028-coordinator-symphony-aligned-controller-owned-compatibility-and-ui-presenters/manual/20260306T195956Z-closeout/00-summary.md",
+        "run_id": "20260306T195956Z-closeout"
       },
       "created_at": "2026-03-06",
-      "completed_at": null
+      "completed_at": "2026-03-06"
     },
     {
       "id": "1027",
