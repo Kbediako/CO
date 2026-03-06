@@ -4,6 +4,13 @@ import { join } from 'node:path';
 
 import { logger } from '../../logger.js';
 import { writeJsonAtomic } from '../utils/fs.js';
+import type {
+  ControlDispatchPilotPayload,
+  ControlIssuePayload,
+  ControlQuestionSummaryPayload,
+  ControlStatePayload,
+} from './observabilityReadModel.js';
+import { buildStateProjectionFingerprintInput } from './observabilityReadModel.js';
 
 const TELEGRAM_API_ROOT = 'https://api.telegram.org';
 const DEFAULT_POLL_INTERVAL_MS = 1_000;
@@ -68,89 +75,6 @@ interface TelegramMessage {
 interface TelegramUpdate {
   update_id: number;
   message?: TelegramMessage;
-}
-
-export interface ControlDispatchPilotPayload {
-  status?: string;
-  source_status?: string;
-  reason?: string;
-}
-
-export interface ControlTrackedLinearPayload {
-  identifier?: string | null;
-  title?: string | null;
-  state?: string | null;
-  url?: string | null;
-  team_key?: string | null;
-}
-
-export interface ControlQuestionSummaryPayload {
-  queued_count?: number;
-  latest_question?: {
-    question_id?: string | null;
-    prompt?: string | null;
-    urgency?: string | null;
-    queued_at?: string | null;
-  } | null;
-}
-
-export interface ControlLatestEventPayload {
-  event?: string | null;
-  message?: string | null;
-  at?: string | null;
-  requested_by?: string | null;
-  reason?: string | null;
-}
-
-export interface ControlSelectedRunPayload {
-  issue_identifier?: string | null;
-  run_id?: string | null;
-  raw_status?: string | null;
-  display_status?: string | null;
-  status_reason?: string | null;
-  summary?: string | null;
-  latest_event?: ControlLatestEventPayload | null;
-  question_summary?: ControlQuestionSummaryPayload | null;
-  tracked?: {
-    linear?: ControlTrackedLinearPayload;
-  } | null;
-}
-
-export interface ControlStatePayload {
-  counts?: {
-    running?: number;
-    retrying?: number;
-  };
-  running?: Array<{
-    issue_identifier?: string | null;
-    session_id?: string | null;
-    state?: string | null;
-    display_state?: string | null;
-    status_reason?: string | null;
-    last_event?: string | null;
-    last_message?: string | null;
-  }>;
-  selected?: ControlSelectedRunPayload | null;
-  dispatch_pilot?: ControlDispatchPilotPayload | null;
-  tracked?: {
-    linear?: ControlTrackedLinearPayload;
-  } | null;
-}
-
-export interface ControlIssuePayload {
-  issue_identifier?: string | null;
-  status?: string | null;
-  raw_status?: string | null;
-  display_status?: string | null;
-  status_reason?: string | null;
-  summary?: string | null;
-  latest_event?: ControlLatestEventPayload | null;
-  question_summary?: ControlQuestionSummaryPayload | null;
-  recent_events?: ControlLatestEventPayload[];
-  tracked?: {
-    linear?: ControlTrackedLinearPayload;
-  } | null;
-  dispatch_pilot?: ControlDispatchPilotPayload | null;
 }
 
 export interface ControlDispatchPayload {
@@ -920,66 +844,10 @@ function truncateLine(value: string, maxLength: number): string {
 }
 
 function buildProjectionHash(payload: ControlStatePayload): string | null {
-  const selected = payload.selected ?? null;
-  const running = payload.running?.[0] ?? null;
-  const dispatchPilot = payload.dispatch_pilot ?? null;
-  const trackedLinear = selected?.tracked?.linear ?? payload.tracked?.linear ?? null;
-  const questionSummary = selected?.question_summary ?? null;
-  if (!selected && !running && !trackedLinear && !dispatchPilot && !questionSummary) {
+  const fingerprint = buildStateProjectionFingerprintInput(payload);
+  if (!fingerprint) {
     return null;
   }
-  const fingerprint = {
-    selected: selected
-      ? {
-          issue_identifier: selected.issue_identifier ?? null,
-          run_id: selected.run_id ?? null,
-          raw_status: selected.raw_status ?? null,
-          display_status: selected.display_status ?? null,
-          status_reason: selected.status_reason ?? null,
-          summary: selected.summary ?? null,
-          latest_event: selected.latest_event
-            ? {
-                event: selected.latest_event.event ?? null,
-                message: selected.latest_event.message ?? null,
-                at: selected.latest_event.at ?? null
-              }
-            : null,
-          question_summary: questionSummary
-            ? {
-                queued_count: questionSummary.queued_count ?? 0,
-                latest_question_id: questionSummary.latest_question?.question_id ?? null
-              }
-            : null
-        }
-      : null,
-    running: running
-      ? {
-          issue_identifier: running.issue_identifier ?? null,
-          session_id: running.session_id ?? null,
-          state: running.state ?? null,
-          display_state: running.display_state ?? null,
-          status_reason: running.status_reason ?? null,
-          last_event: running.last_event ?? null,
-          last_message: running.last_message ?? null
-        }
-      : null,
-    dispatch_pilot: dispatchPilot
-      ? {
-          status: dispatchPilot.status ?? null,
-          source_status: dispatchPilot.source_status ?? null,
-          reason: dispatchPilot.reason ?? null
-        }
-      : null,
-    tracked_linear: trackedLinear
-      ? {
-          identifier: trackedLinear.identifier ?? null,
-          title: trackedLinear.title ?? null,
-          state: trackedLinear.state ?? null,
-          url: trackedLinear.url ?? null,
-          team_key: trackedLinear.team_key ?? null
-        }
-      : null
-  };
   return createHash('sha256').update(JSON.stringify(fingerprint)).digest('hex');
 }
 

@@ -1936,6 +1936,22 @@
       "completed_at": "2026-03-06"
     },
     {
+      "id": "1025",
+      "slug": "1025-coordinator-symphony-aligned-shared-observability-read-model-and-telegram-projection-dedupe",
+      "title": "Coordinator Symphony-Aligned Shared Observability Read Model + Telegram Projection Dedupe",
+      "path": "tasks/tasks-1025-coordinator-symphony-aligned-shared-observability-read-model-and-telegram-projection-dedupe.md",
+      "kind": "run",
+      "status": "in-progress",
+      "gate": {
+        "phase": "coordinator-symphony-aligned-shared-observability-read-model-and-telegram-projection-dedupe-planning",
+        "status": "in-progress",
+        "log": null,
+        "run_id": null
+      },
+      "created_at": "2026-03-06",
+      "completed_at": null
+    },
+    {
       "id": "1024",
       "slug": "1024-coordinator-symphony-aligned-snapshot-reads-and-live-linear-dispatch-separation",
       "title": "Coordinator Symphony-Aligned Snapshot Reads + Live Linear Dispatch Separation",
@@ -3055,6 +3071,22 @@
         "task": "tasks/tasks-1001-coordinator-appserver-dynamic-tool-bridge-experimental-lane.md",
         "agent_task": ".agent/task/1001-coordinator-appserver-dynamic-tool-bridge-experimental-lane.md",
         "docs": "docs/TECH_SPEC-coordinator-appserver-dynamic-tool-bridge-experimental-lane.md"
+      }
+    },
+    {
+      "id": "20260306-1025-coordinator-symphony-aligned-shared-observability-read-model-and-telegram-projection-dedupe",
+      "title": "Coordinator Symphony-Aligned Shared Observability Read Model + Telegram Projection Dedupe",
+      "relates_to": "tasks/tasks-1025-coordinator-symphony-aligned-shared-observability-read-model-and-telegram-projection-dedupe.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-06",
+      "paths": {
+        "spec": "tasks/specs/1025-coordinator-symphony-aligned-shared-observability-read-model-and-telegram-projection-dedupe.md",
+        "task": "tasks/tasks-1025-coordinator-symphony-aligned-shared-observability-read-model-and-telegram-projection-dedupe.md",
+        "agent_task": ".agent/task/1025-coordinator-symphony-aligned-shared-observability-read-model-and-telegram-projection-dedupe.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-shared-observability-read-model-and-telegram-projection-dedupe.md"
       }
     },
     {

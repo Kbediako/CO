@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 
 import { ControlStateStore } from '../src/cli/control/controlState.js';
 import { createControlRuntime } from '../src/cli/control/controlRuntime.js';
+import type { QuestionRecord } from '../src/cli/control/questions.js';
 import { resolveRunPaths, type RunPaths } from '../src/cli/run/runPaths.js';
 
 interface TestFixture {
@@ -18,6 +19,7 @@ interface CreateFixtureOptions {
   taskId?: string;
   featureToggles?: Record<string, unknown>;
   linearAdvisoryState?: Parameters<typeof createControlRuntime>[0]['linearAdvisoryState'];
+  questions?: QuestionRecord[];
   env?: NodeJS.ProcessEnv;
 }
 
@@ -55,7 +57,7 @@ async function createFixture(options: CreateFixtureOptions = {}): Promise<TestFi
 
   const runtime = createControlRuntime({
     controlStore,
-    questionQueue: { list: () => [] },
+    questionQueue: { list: () => options.questions ?? [] },
     paths,
     linearAdvisoryState: options.linearAdvisoryState ?? { tracked_issue: null },
     env: options.env
@@ -166,6 +168,33 @@ function buildLiveLinearGraphqlResponse(): Response {
       headers: { 'Content-Type': 'application/json' }
     }
   );
+}
+
+function buildTrackedIssue(): NonNullable<CreateFixtureOptions['linearAdvisoryState']>['tracked_issue'] {
+  return {
+    provider: 'linear',
+    id: 'lin-issue-1',
+    identifier: 'PREPROD-101',
+    title: 'Investigate advisory routing',
+    url: 'https://linear.app/asabeko/issue/PREPROD-101',
+    state: 'In Progress',
+    state_type: 'started',
+    workspace_id: 'lin-workspace-1',
+    team_id: 'lin-team-live',
+    team_key: 'PREPROD',
+    team_name: 'PRE-PRO/PRODUCTION',
+    project_id: 'lin-project-1',
+    project_name: 'Icon Agency (Bookings)',
+    updated_at: '2026-03-06T02:00:00.000Z',
+    recent_activity: [
+      {
+        id: 'history-1',
+        created_at: '2026-03-06T01:00:00.000Z',
+        actor_name: 'Operator One',
+        summary: 'Todo -> In Progress'
+      }
+    ]
+  };
 }
 
 describe('ControlRuntime', () => {
@@ -432,6 +461,96 @@ describe('ControlRuntime', () => {
     });
     expect(issuePayload.tracked?.linear ?? null).toBeNull();
     expect(uiPayload.selected?.tracked?.linear ?? null).toBeNull();
+  });
+
+  it('keeps shared selected-run snapshot fields aligned across state issue and ui payloads', async () => {
+    const fixture = await createFixture({
+      taskId: 'task-1025',
+      linearAdvisoryState: { tracked_issue: buildTrackedIssue() },
+      questions: [
+        {
+          question_id: 'q-1025',
+          parent_run_id: 'run-parent',
+          from_run_id: 'run-child',
+          prompt: 'Need operator approval for dispatch routing',
+          urgency: 'high',
+          status: 'queued',
+          queued_at: '2026-03-07T00:05:00.000Z',
+          expires_at: null,
+          expires_in_ms: null,
+          auto_pause: true,
+          expiry_fallback: null
+        }
+      ]
+    });
+    fixture.controlStore.setLatestAction({
+      action: 'pause',
+      requestedBy: 'ui',
+      reason: 'manual pause'
+    });
+
+    const snapshot = fixture.runtime.snapshot();
+    const statePayload = await snapshot.readCompatibilityState();
+    const issueResult = await snapshot.readCompatibilityIssue('task-1025');
+    const uiPayload = (await snapshot.readUiDataset()) as {
+      selected?: {
+        raw_status?: string;
+        display_status?: string;
+        status_reason?: string | null;
+        question_summary?: unknown;
+        tracked?: unknown;
+      } | null;
+      tasks?: Array<{
+        raw_status?: string;
+        display_status?: string;
+        status_reason?: string | null;
+        question_summary?: unknown;
+        tracked?: unknown;
+      }>;
+      runs?: Array<{
+        raw_status?: string;
+        display_status?: string;
+        status_reason?: string | null;
+        question_summary?: unknown;
+        tracked?: unknown;
+      }>;
+    };
+
+    expect(issueResult.kind).toBe('ok');
+    if (issueResult.kind !== 'ok') {
+      throw new Error('expected issue payload');
+    }
+
+    const stateSelected = statePayload.selected;
+    const issuePayload = issueResult.payload;
+    const uiSelected = uiPayload.selected;
+    const uiTask = uiPayload.tasks?.[0];
+    const uiRun = uiPayload.runs?.[0];
+
+    expect(stateSelected?.raw_status).toBe('in_progress');
+    expect(stateSelected?.display_status).toBe('paused');
+    expect(stateSelected?.status_reason).toBe('queued_questions');
+    expect(issuePayload.display_status).toBe(stateSelected?.display_status);
+    expect(issuePayload.status_reason).toBe(stateSelected?.status_reason);
+    expect(issuePayload.question_summary).toEqual(stateSelected?.question_summary);
+    expect(issuePayload.tracked).toEqual(stateSelected?.tracked ?? {});
+    expect(uiSelected?.raw_status).toBe(stateSelected?.raw_status);
+    expect(uiSelected?.display_status).toBe(stateSelected?.display_status);
+    expect(uiSelected?.status_reason).toBe(stateSelected?.status_reason);
+    expect(uiSelected?.question_summary).toEqual(stateSelected?.question_summary);
+    expect(uiSelected?.tracked).toEqual(stateSelected?.tracked);
+    expect(uiTask?.raw_status).toBe(stateSelected?.raw_status);
+    expect(uiTask?.display_status).toBe(stateSelected?.display_status);
+    expect(uiTask?.status_reason).toBe(stateSelected?.status_reason);
+    expect(uiTask?.question_summary).toEqual(stateSelected?.question_summary);
+    expect(uiTask?.tracked).toEqual(stateSelected?.tracked);
+    expect(uiRun?.raw_status).toBe(stateSelected?.raw_status);
+    expect(uiRun?.display_status).toBe(stateSelected?.display_status);
+    expect(uiRun?.status_reason).toBe(stateSelected?.status_reason);
+    expect(uiRun?.question_summary).toEqual(stateSelected?.question_summary);
+    expect(uiRun?.tracked).toEqual(stateSelected?.tracked);
+    expect(statePayload.running[0]?.display_state).toBe('paused');
+    expect(statePayload.running[0]?.status_reason).toBe('queued_questions');
   });
 
   it('single-flights explicit dispatch reads and invalidates the advisory cache on publish', async () => {

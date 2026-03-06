@@ -28,8 +28,6 @@ import {
 import {
   startTelegramOversightBridge,
   type ControlDispatchPayload,
-  type ControlIssuePayload,
-  type ControlStatePayload,
   type QuestionsPayload,
   type TelegramOversightBridge,
   type TelegramOversightReadAdapter
@@ -45,6 +43,7 @@ import {
   type CompatibilityDispatchResult,
   type CompatibilityRefreshRejectionReason
 } from './observabilitySurface.js';
+import type { ControlIssuePayload, ControlStatePayload } from './observabilityReadModel.js';
 
 interface ControlServerOptions {
   paths: RunPaths;
@@ -103,7 +102,7 @@ const LINEAR_ADVISORY_SEEN_DELIVERY_LIMIT = 100;
 
 interface ObservabilitySurfaceResponse {
   status: number;
-  body: Record<string, unknown>;
+  body: object;
   headers: Record<string, string>;
 }
 
@@ -450,13 +449,11 @@ export class ControlServer {
     });
 
     return {
-      readState: async (): Promise<ControlStatePayload> => {
-        return (await this.controlRuntime.snapshot().readCompatibilityState()) as ControlStatePayload;
-      },
+      readState: async (): Promise<ControlStatePayload> => this.controlRuntime.snapshot().readCompatibilityState(),
 
       readIssue: async (issueIdentifier: string): Promise<ControlIssuePayload | null> => {
         const result = await this.controlRuntime.snapshot().readCompatibilityIssue(issueIdentifier);
-        return result.kind === 'ok' ? (result.payload as ControlIssuePayload) : null;
+        return result.kind === 'ok' ? result.payload : null;
       },
 
       readDispatch: async (): Promise<ControlDispatchPayload> => {

@@ -5,6 +5,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { ControlServer } from '../src/cli/control/controlServer.js';
+import type { ControlStatePayload } from '../src/cli/control/observabilityReadModel.js';
+import { startTelegramOversightBridge } from '../src/cli/control/telegramOversightBridge.js';
 import { computeEffectiveDelegationConfig } from '../src/cli/config/delegationConfig.js';
 import { resolveRunPaths } from '../src/cli/run/runPaths.js';
 
@@ -204,6 +206,70 @@ function jsonResponse(body: unknown, status = 200): Response {
     status,
     headers: { 'Content-Type': 'application/json' }
   });
+}
+
+function buildTelegramStatePayload(input: {
+  prompt: string;
+  urgency: 'low' | 'medium' | 'high';
+}): ControlStatePayload {
+  return {
+    generated_at: '2026-03-06T07:00:00.000Z',
+    counts: {
+      running: 1,
+      retrying: 0
+    },
+    running: [
+      {
+        issue_id: 'task-1025',
+        issue_identifier: 'task-1025',
+        state: 'in_progress',
+        display_state: 'awaiting_input',
+        status_reason: 'queued_questions',
+        session_id: 'run-1',
+        turn_count: 0,
+        last_event: null,
+        last_message: 'Awaiting operator input',
+        started_at: '2026-03-06T07:00:00.000Z',
+        last_event_at: '2026-03-06T07:01:00.000Z',
+        tokens: {
+          input_tokens: null,
+          output_tokens: null,
+          total_tokens: null
+        }
+      }
+    ],
+    retrying: [],
+    codex_totals: null,
+    rate_limits: null,
+    selected: {
+      issue_id: 'task-1025',
+      issue_identifier: 'task-1025',
+      task_id: 'task-1025',
+      run_id: 'run-1',
+      raw_status: 'in_progress',
+      display_status: 'awaiting_input',
+      status_reason: 'queued_questions',
+      started_at: '2026-03-06T07:00:00.000Z',
+      updated_at: '2026-03-06T07:01:00.000Z',
+      completed_at: null,
+      summary: 'Awaiting operator input',
+      last_error: null,
+      latest_action: null,
+      latest_event: null,
+      workspace: {
+        path: '/tmp/co'
+      },
+      question_summary: {
+        queued_count: 1,
+        latest_question: {
+          question_id: 'q-1025',
+          prompt: input.prompt,
+          urgency: input.urgency,
+          queued_at: '2026-03-06T07:01:00.000Z'
+        }
+      }
+    }
+  };
 }
 
 function signLinearWebhook(body: string, secret: string): string {
@@ -884,6 +950,74 @@ describe('TelegramOversightBridge', () => {
       expect(telegram.sentMessages[1]?.text).not.toContain('Queued questions: 1');
     } finally {
       await server.close();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('sends a new projection push when prompt or urgency changes under the same latest question id', async () => {
+    const { root, paths } = await createRunRoot('task-1025-telegram-question-fingerprint');
+    const telegram = createTelegramHarness(globalThis.fetch);
+    let statePayload = buildTelegramStatePayload({
+      prompt: 'Need operator approval',
+      urgency: 'high'
+    });
+
+    vi.stubEnv('CO_TELEGRAM_POLLING_ENABLED', '1');
+    vi.stubEnv('CO_TELEGRAM_BOT_TOKEN', 'test-token');
+    vi.stubEnv('CO_TELEGRAM_ALLOWED_CHAT_IDS', '1234');
+    vi.stubEnv('CO_TELEGRAM_PUSH_ENABLED', '1');
+    vi.stubEnv('CO_TELEGRAM_PUSH_INTERVAL_MS', '1');
+    vi.stubEnv('CO_TELEGRAM_POLL_INTERVAL_MS', '10');
+
+    const bridge = await startTelegramOversightBridge({
+      runDir: paths.runDir,
+      readAdapter: {
+        readState: async () => statePayload,
+        readIssue: async () => null,
+        readDispatch: async () => ({}),
+        readQuestions: async () => ({ questions: [] }),
+        resolveIssueIdentifier: async () => statePayload.selected?.issue_identifier ?? null
+      },
+      baseUrl: 'http://127.0.0.1:1',
+      controlToken: 'control-token',
+      env: process.env,
+      fetchImpl: telegram.fetch
+    });
+
+    if (!bridge) {
+      throw new Error('expected telegram bridge');
+    }
+
+    try {
+      await bridge.notifyProjectionDelta({ eventSeq: 1 });
+      await waitForCondition(async () => telegram.sentMessages.length === 1);
+      expect(telegram.sentMessages[0]?.text).toContain('latest q-1025 [high]: Need operator approval');
+
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      statePayload = buildTelegramStatePayload({
+        prompt: 'Need operator approval before retry',
+        urgency: 'high'
+      });
+
+      await bridge.notifyProjectionDelta({ eventSeq: 2 });
+      await waitForCondition(async () => telegram.sentMessages.length === 2);
+      expect(telegram.sentMessages[1]?.text).toContain(
+        'latest q-1025 [high]: Need operator approval before retry'
+      );
+
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      statePayload = buildTelegramStatePayload({
+        prompt: 'Need operator approval before retry',
+        urgency: 'medium'
+      });
+
+      await bridge.notifyProjectionDelta({ eventSeq: 3 });
+      await waitForCondition(async () => telegram.sentMessages.length === 3);
+      expect(telegram.sentMessages[2]?.text).toContain(
+        'latest q-1025 [medium]: Need operator approval before retry'
+      );
+    } finally {
+      await bridge.close();
       await rm(root, { recursive: true, force: true });
     }
   });

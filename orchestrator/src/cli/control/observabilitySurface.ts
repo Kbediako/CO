@@ -8,10 +8,18 @@ import type { ControlState } from './controlState.js';
 import type { LiveLinearAdvisoryRuntime } from './liveLinearAdvisoryRuntime.js';
 import type { LiveLinearTrackedIssue } from './linearDispatchSource.js';
 import type {
-  SelectedRunContext,
-  SelectedRunProjectionReader,
-  SelectedRunQuestionSummary
-} from './selectedRunProjection.js';
+  ControlIssuePayload,
+  ControlStatePayload,
+  SelectedRunContext
+} from './observabilityReadModel.js';
+import {
+  buildCompatibilityRunningEntry,
+  buildSelectedRunLatestEventPayload,
+  buildSelectedRunPublicPayload,
+  buildTrackedLinearPayload,
+  buildUiSelectedRunSharedFields
+} from './observabilityReadModel.js';
+import type { SelectedRunProjectionReader } from './selectedRunProjection.js';
 import type {
   DispatchPilotEvaluation,
   DispatchPilotFailure,
@@ -42,7 +50,7 @@ export type CompatibilityRefreshRejectionReason =
   | 'unsupported_tool';
 
 export type CompatibilityIssueResult =
-  | { kind: 'ok'; payload: ObservabilityPayload }
+  | { kind: 'ok'; payload: ControlIssuePayload }
   | { kind: 'issue_not_found' };
 
 export type CompatibilityRefreshResult =
@@ -79,7 +87,7 @@ export function createObservabilitySurface(
   context: ObservabilitySurfaceContext
 ): {
   readUiDataset(): Promise<ObservabilityPayload>;
-  readCompatibilityState(): Promise<ObservabilityPayload>;
+  readCompatibilityState(): Promise<ControlStatePayload>;
   readCompatibilityDispatch(): Promise<CompatibilityDispatchResult>;
   readCompatibilityRefresh(body?: Record<string, unknown>): CompatibilityRefreshResult;
   readCompatibilityIssue(issueIdentifier: string): Promise<CompatibilityIssueResult>;
@@ -89,7 +97,7 @@ export function createObservabilitySurface(
       return buildUiDataset(context);
     },
 
-    async readCompatibilityState(): Promise<ObservabilityPayload> {
+    async readCompatibilityState(): Promise<ControlStatePayload> {
       return buildCompatibilityStatePayload(context);
     },
 
@@ -206,12 +214,10 @@ export function buildCompatibilityTraceability(
   };
 }
 
-async function buildCompatibilityStatePayload(
-  context: ObservabilitySurfaceContext
-): Promise<Record<string, unknown>> {
+async function buildCompatibilityStatePayload(context: ObservabilitySurfaceContext): Promise<ControlStatePayload> {
   const selected = await context.projection.buildSelectedRunContext();
   const dispatchPilotSummary = resolveSelectedDispatchPilotSummary(context, selected);
-  const tracked = selected?.trackedPayload ?? buildTrackedLinearPayload(context.linearAdvisoryState.tracked_issue);
+  const tracked = selected?.tracked ?? buildTrackedLinearPayload(context.linearAdvisoryState.tracked_issue);
   const generatedAt = isoTimestamp();
   if (!selected) {
     return {
@@ -244,16 +250,10 @@ async function buildCompatibilityStatePayload(
 function buildCompatibilityIssuePayload(
   selected: SelectedRunContext,
   dispatchPilotSummary: DispatchPilotSummary | null
-): Record<string, unknown> {
+): ControlIssuePayload {
   const running = buildCompatibilityRunningEntry(selected);
   const selectedPayload = buildSelectedRunPublicPayload(selected);
-  const latestEvent = selected.latestEvent
-    ? {
-        at: selected.latestEvent.at,
-        event: selected.latestEvent.event,
-        message: selected.latestEvent.message
-      }
-    : null;
+  const latestEvent = buildSelectedRunLatestEventPayload(selected.latestEvent);
   const recentEvents = latestEvent ? [latestEvent] : [];
 
   return {
@@ -280,77 +280,8 @@ function buildCompatibilityIssuePayload(
     question_summary: selectedPayload.question_summary,
     recent_events: recentEvents,
     last_error: selected.lastError,
-    tracked: selected.trackedPayload ?? {},
+    tracked: selected.tracked ?? {},
     ...(dispatchPilotSummary ? { dispatch_pilot: dispatchPilotSummary } : {})
-  };
-}
-
-function buildSelectedRunPublicPayload(selected: SelectedRunContext): Record<string, unknown> {
-  return {
-    issue_id: selected.issueId,
-    issue_identifier: selected.issueIdentifier,
-    task_id: selected.taskId,
-    run_id: selected.runId,
-    raw_status: selected.rawStatus,
-    display_status: selected.displayStatus,
-    status_reason: selected.statusReason,
-    started_at: selected.startedAt,
-    updated_at: selected.updatedAt,
-    completed_at: selected.completedAt,
-    summary: selected.summary,
-    last_error: selected.lastError,
-    latest_action: selected.latestAction,
-    latest_event: selected.latestEvent
-      ? {
-          at: selected.latestEvent.at,
-          event: selected.latestEvent.event,
-          message: selected.latestEvent.message,
-          requested_by: selected.latestEvent.requestedBy,
-          reason: selected.latestEvent.reason
-        }
-      : null,
-    workspace: {
-      path: selected.workspacePath
-    },
-    question_summary: buildSelectedRunQuestionSummaryPayload(selected.questionSummary),
-    ...(selected.trackedPayload ? { tracked: selected.trackedPayload } : {})
-  };
-}
-
-function buildSelectedRunQuestionSummaryPayload(
-  summary: SelectedRunQuestionSummary
-): Record<string, unknown> {
-  return {
-    queued_count: summary.queuedCount,
-    latest_question: summary.latestQuestion
-      ? {
-          question_id: summary.latestQuestion.questionId,
-          prompt: summary.latestQuestion.prompt,
-          urgency: summary.latestQuestion.urgency,
-          queued_at: summary.latestQuestion.queuedAt
-        }
-      : null
-  };
-}
-
-function buildCompatibilityRunningEntry(selected: SelectedRunContext): Record<string, unknown> {
-  return {
-    issue_id: selected.issueId,
-    issue_identifier: selected.issueIdentifier,
-    state: selected.rawStatus,
-    display_state: selected.displayStatus,
-    status_reason: selected.statusReason,
-    session_id: selected.runId,
-    turn_count: 0,
-    last_event: selected.latestEvent?.event ?? selected.latestAction,
-    last_message: selected.latestEvent?.message ?? selected.summary,
-    started_at: selected.startedAt,
-    last_event_at: selected.latestEvent?.at ?? selected.updatedAt,
-    tokens: {
-      input_tokens: null,
-      output_tokens: null,
-      total_tokens: null
-    }
   };
 }
 
@@ -362,6 +293,7 @@ async function buildUiDataset(context: ObservabilitySurfaceContext): Promise<Rec
   }
 
   const selected = await context.projection.buildSelectedRunContext();
+  const selectedSharedFields = selected ? buildUiSelectedRunSharedFields(selected) : null;
   const bucketInfo = classifyBucket(manifest.status, context.controlStore.snapshot());
   const approvalsTotal = Array.isArray(manifest.approvals) ? manifest.approvals.length : 0;
   const repoRoot = resolveRepoRootFromRunDir(context.paths.runDir);
@@ -402,8 +334,8 @@ async function buildUiDataset(context: ObservabilitySurfaceContext): Promise<Rec
           message: selected.latestEvent.message
         }
       : null,
-    question_summary: selected ? buildSelectedRunQuestionSummaryPayload(selected.questionSummary) : null,
-    ...(selected?.trackedPayload ? { tracked: selected.trackedPayload } : {})
+    question_summary: selectedSharedFields?.question_summary ?? null,
+    ...(selectedSharedFields?.tracked ? { tracked: selectedSharedFields.tracked } : {})
   };
 
   const taskEntry = {
@@ -420,8 +352,8 @@ async function buildUiDataset(context: ObservabilitySurfaceContext): Promise<Rec
     approvals_pending: 0,
     approvals_total: approvalsTotal,
     summary: manifest.summary ?? '',
-    question_summary: selected ? buildSelectedRunQuestionSummaryPayload(selected.questionSummary) : null,
-    ...(selected?.trackedPayload ? { tracked: selected.trackedPayload } : {})
+    question_summary: selectedSharedFields?.question_summary ?? null,
+    ...(selectedSharedFields?.tracked ? { tracked: selectedSharedFields.tracked } : {})
   };
 
   return {
@@ -477,33 +409,6 @@ function resolveCompatibilityActionEnvelopeRejection(
     };
   }
   return null;
-}
-
-function buildTrackedLinearPayload(
-  trackedIssue: LiveLinearTrackedIssue | null | undefined
-): Record<string, unknown> | null {
-  if (!trackedIssue) {
-    return null;
-  }
-  return {
-    linear: {
-      provider: trackedIssue.provider,
-      id: trackedIssue.id,
-      identifier: trackedIssue.identifier,
-      title: trackedIssue.title,
-      url: trackedIssue.url,
-      state: trackedIssue.state,
-      state_type: trackedIssue.state_type,
-      workspace_id: trackedIssue.workspace_id,
-      team_id: trackedIssue.team_id,
-      team_key: trackedIssue.team_key,
-      team_name: trackedIssue.team_name,
-      project_id: trackedIssue.project_id,
-      project_name: trackedIssue.project_name,
-      updated_at: trackedIssue.updated_at,
-      recent_activity: trackedIssue.recent_activity
-    }
-  };
 }
 
 function resolveSelectedDispatchPilotSummary(

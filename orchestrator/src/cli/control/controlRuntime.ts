@@ -1,6 +1,7 @@
 import type { RunPaths } from '../run/runPaths.js';
 import type { ControlState } from './controlState.js';
 import type { LiveLinearTrackedIssue } from './linearDispatchSource.js';
+import type { ControlStatePayload } from './observabilityReadModel.js';
 import {
   createObservabilitySurface,
   type CompatibilityDispatchResult,
@@ -33,7 +34,7 @@ interface ControlRuntimeContext {
 
 export interface ControlRuntimeSnapshot {
   readUiDataset(): Promise<Record<string, unknown>>;
-  readCompatibilityState(): Promise<Record<string, unknown>>;
+  readCompatibilityState(): Promise<ControlStatePayload>;
   readCompatibilityDispatch(): Promise<CompatibilityDispatchResult>;
   readCompatibilityRefresh(body?: Record<string, unknown>): CompatibilityRefreshResult;
   readCompatibilityIssue(issueIdentifier: string): Promise<CompatibilityIssueResult>;

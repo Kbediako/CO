@@ -4,46 +4,14 @@ import { resolve } from 'node:path';
 import type { RunPaths } from '../run/runPaths.js';
 import type { CliManifest } from '../types.js';
 import type { ControlAction, ControlState } from './controlState.js';
-import type { QuestionRecord, QuestionUrgency } from './questions.js';
+import {
+  buildTrackedLinearPayload,
+  type SelectedRunContext,
+  type SelectedRunLatestEvent,
+  type SelectedRunQuestionSummary
+} from './observabilityReadModel.js';
+import type { QuestionRecord } from './questions.js';
 import type { LiveLinearTrackedIssue } from './linearDispatchSource.js';
-
-export interface SelectedRunQuestionSummary {
-  queuedCount: number;
-  latestQuestion: {
-    questionId: string;
-    prompt: string;
-    urgency: QuestionUrgency;
-    queuedAt: string;
-  } | null;
-}
-
-export interface SelectedRunLatestEvent {
-  at: string | null;
-  event: string | null;
-  message: string | null;
-  requestedBy: string | null;
-  reason: string | null;
-}
-
-export interface SelectedRunContext {
-  issueIdentifier: string;
-  issueId: string | null;
-  taskId: string | null;
-  runId: string | null;
-  rawStatus: string;
-  displayStatus: string;
-  statusReason: string | null;
-  startedAt: string | null;
-  updatedAt: string | null;
-  completedAt: string | null;
-  summary: string | null;
-  lastError: string | null;
-  latestAction: ControlAction['action'] | null;
-  latestEvent: SelectedRunLatestEvent | null;
-  workspacePath: string;
-  questionSummary: SelectedRunQuestionSummary;
-  trackedPayload: Record<string, unknown> | null;
-}
 
 export interface SelectedRunManifestSnapshot {
   manifestRecord: Record<string, unknown>;
@@ -123,7 +91,7 @@ async function buildSelectedRunContextFromSnapshot(
     latestAction,
     questionSummary
   });
-  const trackedPayload = buildTrackedLinearPayload(context.linearAdvisoryState.tracked_issue);
+  const tracked = buildTrackedLinearPayload(context.linearAdvisoryState.tracked_issue);
   const latestEvent = buildSelectedRunLatestEvent({
     controlAction: control.latest_action ?? null,
     updatedAt,
@@ -152,7 +120,7 @@ async function buildSelectedRunContextFromSnapshot(
     latestEvent,
     workspacePath,
     questionSummary,
-    trackedPayload
+    tracked
   };
 }
 
@@ -238,33 +206,6 @@ function buildSelectedRunLatestEvent(input: {
     message: input.summary,
     requestedBy: input.controlAction?.requested_by ?? null,
     reason: input.controlAction?.reason ?? null
-  };
-}
-
-function buildTrackedLinearPayload(
-  trackedIssue: LiveLinearTrackedIssue | null | undefined
-): Record<string, unknown> | null {
-  if (!trackedIssue) {
-    return null;
-  }
-  return {
-    linear: {
-      provider: trackedIssue.provider,
-      id: trackedIssue.id,
-      identifier: trackedIssue.identifier,
-      title: trackedIssue.title,
-      url: trackedIssue.url,
-      state: trackedIssue.state,
-      state_type: trackedIssue.state_type,
-      workspace_id: trackedIssue.workspace_id,
-      team_id: trackedIssue.team_id,
-      team_key: trackedIssue.team_key,
-      team_name: trackedIssue.team_name,
-      project_id: trackedIssue.project_id,
-      project_name: trackedIssue.project_name,
-      updated_at: trackedIssue.updated_at,
-      recent_activity: trackedIssue.recent_activity
-    }
   };
 }
 
