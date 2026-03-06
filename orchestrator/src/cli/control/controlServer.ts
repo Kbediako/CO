@@ -25,7 +25,15 @@ import {
   evaluateTrackerDispatchPilot,
   type DispatchPilotEvaluation
 } from './trackerDispatchPilot.js';
-import { startTelegramOversightBridge, type TelegramOversightBridge } from './telegramOversightBridge.js';
+import {
+  startTelegramOversightBridge,
+  type ControlDispatchPayload,
+  type ControlIssuePayload,
+  type ControlStatePayload,
+  type QuestionsPayload,
+  type TelegramOversightBridge,
+  type TelegramOversightReadAdapter
+} from './telegramOversightBridge.js';
 import type { RunEventStream, RunEventStreamEntry } from '../events/runEventStream.js';
 import {
   resolveLiveLinearTrackedIssueById,
@@ -35,6 +43,7 @@ import { createSelectedRunProjectionReader } from './selectedRunProjection.js';
 import {
   buildCompatibilityTraceability,
   createObservabilitySurface,
+  type CompatibilityDispatchResult,
   type CompatibilityRefreshRejectionReason
 } from './observabilitySurface.js';
 
@@ -332,7 +341,7 @@ export class ControlServer {
         try {
           instance.telegramBridge = await startTelegramOversightBridge({
             runDir: options.paths.runDir,
-            manifestPath: options.paths.manifestPath,
+            readAdapter: instance.createTelegramOversightReadAdapter(options.config, token),
             baseUrl: instance.baseUrl,
             controlToken: token
           });
@@ -413,6 +422,62 @@ export class ControlServer {
     };
   }
 
+  private createTelegramOversightReadAdapter(
+    config: EffectiveDelegationConfig,
+    token: string
+  ): TelegramOversightReadAdapter {
+    const buildInternalContext = (): RequestContext => ({
+      req: null,
+      res: null,
+      ...this.buildContext(config, token),
+      notifyTelegramProjectionDelta: (input) => {
+        void this.notifyTelegramProjectionDelta(input);
+      }
+    });
+
+    return {
+      readState: async (): Promise<ControlStatePayload> => {
+        const context = buildInternalContext();
+        const { observability } = createObservabilityReadHandles(context);
+        return (await observability.readCompatibilityState()) as ControlStatePayload;
+      },
+
+      readIssue: async (issueIdentifier: string): Promise<ControlIssuePayload | null> => {
+        const context = buildInternalContext();
+        const { observability } = createObservabilityReadHandles(context);
+        const result = await observability.readCompatibilityIssue(issueIdentifier);
+        return result.kind === 'ok' ? (result.payload as ControlIssuePayload) : null;
+      },
+
+      readDispatch: async (): Promise<ControlDispatchPayload> => {
+        const context = buildInternalContext();
+        const { observability } = createObservabilityReadHandles(context);
+        const result = await observability.readCompatibilityDispatch();
+        await emitDispatchPilotAuditEvents(context, {
+          surface: 'telegram_dispatch',
+          evaluation: result.evaluation,
+          issueIdentifier: result.issueIdentifier
+        });
+        return buildTelegramOversightDispatchPayload(result);
+      },
+
+      readQuestions: async (): Promise<QuestionsPayload> => {
+        const context = buildInternalContext();
+        await expireQuestions(context);
+        const questions = context.questionQueue.list();
+        queueQuestionResolutions(context, questions);
+        return { questions };
+      },
+
+      resolveIssueIdentifier: async (): Promise<string | null> => {
+        const context = buildInternalContext();
+        const { projection } = createObservabilityReadHandles(context);
+        const snapshot = await projection.readSelectedRunManifestSnapshot();
+        return snapshot?.issueIdentifier ?? snapshot?.taskId ?? snapshot?.runId ?? null;
+      }
+    };
+  }
+
   private async notifyTelegramProjectionDelta(input?: {
     eventSeq?: number | null;
     source?: string | null;
@@ -458,14 +523,7 @@ async function handleRequest(context: RequestContext): Promise<void> {
   const { req, res } = context;
   const method = req.method ?? 'GET';
   const url = new URL(req.url ?? '/', 'http://localhost');
-  const projection = createSelectedRunProjectionReader(context);
-  const observabilityContext = {
-    controlStore: context.controlStore,
-    linearAdvisoryState: context.linearAdvisoryState,
-    paths: context.paths,
-    projection
-  };
-  const observability = createObservabilitySurface(observabilityContext);
+  const { observabilityContext, observability } = createObservabilityReadHandles(context);
   if (url.pathname === '/health') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ status: 'ok', timestamp: isoTimestamp() }));
@@ -588,6 +646,7 @@ async function handleRequest(context: RequestContext): Promise<void> {
 
     const result = await observability.readCompatibilityDispatch();
     await emitDispatchPilotAuditEvents(context, {
+      surface: 'api_v1_dispatch',
       evaluation: result.evaluation,
       issueIdentifier: result.issueIdentifier
     });
@@ -1974,6 +2033,7 @@ async function emitLinearWebhookAuditEvent(
 async function emitDispatchPilotAuditEvents(
   context: RequestContext,
   input: {
+    surface: 'api_v1_dispatch' | 'telegram_dispatch';
     evaluation: DispatchPilotEvaluation;
     issueIdentifier: string | null;
   }
@@ -1986,7 +2046,7 @@ async function emitDispatchPilotAuditEvents(
       : 'blocked';
   const statusCode = input.evaluation.failure?.status ?? 200;
   const eventPayload = {
-    surface: 'api_v1_dispatch',
+    surface: input.surface,
     advisory_only: true,
     issue_identifier: input.issueIdentifier,
     task_id: resolveTaskIdFromManifestPath(context.paths.manifestPath),
@@ -2881,6 +2941,48 @@ async function emitControlEvent(
       }
     });
   }
+}
+
+function createObservabilityReadHandles(
+  context: Pick<RequestContext, 'controlStore' | 'questionQueue' | 'paths' | 'linearAdvisoryState'>
+): {
+  projection: ReturnType<typeof createSelectedRunProjectionReader>;
+  observabilityContext: Parameters<typeof createObservabilitySurface>[0];
+  observability: ReturnType<typeof createObservabilitySurface>;
+} {
+  const projection = createSelectedRunProjectionReader(context);
+  const observabilityContext = {
+    controlStore: context.controlStore,
+    linearAdvisoryState: context.linearAdvisoryState,
+    paths: context.paths,
+    projection
+  };
+  return {
+    projection,
+    observabilityContext,
+    observability: createObservabilitySurface(observabilityContext)
+  };
+}
+
+function buildTelegramOversightDispatchPayload(
+  result: CompatibilityDispatchResult
+): ControlDispatchPayload {
+  if (result.kind === 'ok') {
+    return result.payload as ControlDispatchPayload;
+  }
+  const dispatchPilot =
+    result.details.dispatch_pilot && typeof result.details.dispatch_pilot === 'object'
+      ? (result.details.dispatch_pilot as NonNullable<ControlDispatchPayload['dispatch_pilot']>)
+      : result.evaluation.summary;
+  return {
+    dispatch_pilot: dispatchPilot,
+    error: {
+      code: result.failure.code,
+      details: {
+        dispatch_pilot: dispatchPilot
+      }
+    }
+  };
 }
 
 function readStringValue(record: Record<string, unknown>, ...keys: string[]): string | undefined {

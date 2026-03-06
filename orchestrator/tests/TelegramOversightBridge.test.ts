@@ -140,8 +140,12 @@ function createTelegramHarness(
   const fetchImpl: typeof fetch = async (input, init) => {
     const rawUrl = input instanceof Request ? input.url : String(input);
     const url = new URL(rawUrl);
+    const method = (init?.method ?? (input instanceof Request ? input.method : 'GET')).toUpperCase();
     if (url.origin !== 'https://api.telegram.org') {
-      return realFetch(input, init);
+      if (url.pathname === '/control/action' && method === 'POST') {
+        return realFetch(input, init);
+      }
+      throw new Error(`unexpected_non_telegram_fetch:${method}:${url.pathname}`);
     }
 
     if (url.pathname.endsWith('/getMe')) {
@@ -247,6 +251,24 @@ describe('TelegramOversightBridge', () => {
       }
     ]);
     const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
+    const events: import('../src/cli/events/runEventStream.js').RunEventStreamEntry[] = [];
+    const eventStream = {
+      append: async (entry: { event: string; actor: string; payload: Record<string, unknown> }) => {
+        const record = {
+          schema_version: 1,
+          seq: events.length + 1,
+          timestamp: new Date().toISOString(),
+          task_id: 'task-0940',
+          run_id: 'run-1',
+          event: entry.event,
+          actor: entry.actor,
+          payload: entry.payload
+        };
+        events.push(record);
+        return record;
+      },
+      close: async () => undefined
+    } as unknown as import('../src/cli/events/runEventStream.js').RunEventStream;
     const realFetch = globalThis.fetch;
     const telegram = createTelegramHarness(realFetch);
 
@@ -259,6 +281,7 @@ describe('TelegramOversightBridge', () => {
     const server = await ControlServer.start({
       paths,
       config,
+      eventStream,
       runId: 'run-1'
     });
 
@@ -309,6 +332,27 @@ describe('TelegramOversightBridge', () => {
         update_id: 102,
         message: {
           message_id: 3,
+          text: '/dispatch',
+          chat: { id: 1234, type: 'private' },
+          from: { id: 77, is_bot: false, first_name: 'Operator' }
+        }
+      });
+
+      await waitForCondition(async () =>
+        telegram.sentMessages.some((message) => message.text.includes('Dispatch advisory'))
+      );
+
+      const dispatchMessage = telegram.sentMessages.find((message) => message.text.includes('Dispatch advisory'));
+      expect(dispatchMessage?.text).toContain('Dispatch: ready/ready');
+      const dispatchEvaluatedEvent = events.find((entry) => entry.event === 'dispatch_pilot_evaluated');
+      const dispatchViewedEvent = events.find((entry) => entry.event === 'dispatch_pilot_viewed');
+      expect(dispatchEvaluatedEvent?.payload).toMatchObject({ surface: 'telegram_dispatch' });
+      expect(dispatchViewedEvent?.payload).toMatchObject({ surface: 'telegram_dispatch' });
+
+      telegram.updates.push({
+        update_id: 103,
+        message: {
+          message_id: 4,
           text: '/questions',
           chat: { id: 1234, type: 'private' },
           from: { id: 77, is_bot: false, first_name: 'Operator' }
@@ -316,7 +360,7 @@ describe('TelegramOversightBridge', () => {
       });
 
       await waitForCondition(async () =>
-        JSON.parse(await readFile(join(paths.runDir, 'telegram-oversight-state.json'), 'utf8')).next_update_id === 103
+        JSON.parse(await readFile(join(paths.runDir, 'telegram-oversight-state.json'), 'utf8')).next_update_id === 104
       );
 
       const questionsMessage = telegram.sentMessages.find((message) =>
@@ -327,7 +371,7 @@ describe('TelegramOversightBridge', () => {
 
       const stateRaw = await readFile(join(paths.runDir, 'telegram-oversight-state.json'), 'utf8');
       const bridgeState = JSON.parse(stateRaw) as { next_update_id?: number };
-      expect(bridgeState.next_update_id).toBe(103);
+      expect(bridgeState.next_update_id).toBe(104);
     } finally {
       await server.close();
       await rm(root, { recursive: true, force: true });
@@ -774,8 +818,9 @@ describe('TelegramOversightBridge', () => {
     try {
       const token = await readToken(paths.controlAuthPath);
       const baseUrl = server.getBaseUrl() ?? '';
+      const serverFetch: typeof fetch = (input, init) => realFetch(input, init);
 
-      await fetch(new URL('/delegation/register', baseUrl), {
+      await serverFetch(new URL('/delegation/register', baseUrl), {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -789,7 +834,7 @@ describe('TelegramOversightBridge', () => {
         })
       });
 
-      const enqueueRes = await fetch(new URL('/questions/enqueue', baseUrl), {
+      const enqueueRes = await serverFetch(new URL('/questions/enqueue', baseUrl), {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -814,7 +859,7 @@ describe('TelegramOversightBridge', () => {
       expect(telegram.sentMessages[0]?.text).toContain('Queued questions: 1');
       expect(telegram.sentMessages[0]?.text).toContain('latest ' + questionId);
 
-      const answerRes = await fetch(new URL('/questions/answer', baseUrl), {
+      const answerRes = await serverFetch(new URL('/questions/answer', baseUrl), {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,

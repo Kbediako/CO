@@ -70,13 +70,13 @@ interface TelegramUpdate {
   message?: TelegramMessage;
 }
 
-interface ControlDispatchPilotPayload {
+export interface ControlDispatchPilotPayload {
   status?: string;
   source_status?: string;
   reason?: string;
 }
 
-interface ControlTrackedLinearPayload {
+export interface ControlTrackedLinearPayload {
   identifier?: string | null;
   title?: string | null;
   state?: string | null;
@@ -84,7 +84,7 @@ interface ControlTrackedLinearPayload {
   team_key?: string | null;
 }
 
-interface ControlQuestionSummaryPayload {
+export interface ControlQuestionSummaryPayload {
   queued_count?: number;
   latest_question?: {
     question_id?: string | null;
@@ -94,7 +94,7 @@ interface ControlQuestionSummaryPayload {
   } | null;
 }
 
-interface ControlLatestEventPayload {
+export interface ControlLatestEventPayload {
   event?: string | null;
   message?: string | null;
   at?: string | null;
@@ -102,7 +102,7 @@ interface ControlLatestEventPayload {
   reason?: string | null;
 }
 
-interface ControlSelectedRunPayload {
+export interface ControlSelectedRunPayload {
   issue_identifier?: string | null;
   run_id?: string | null;
   raw_status?: string | null;
@@ -116,7 +116,7 @@ interface ControlSelectedRunPayload {
   } | null;
 }
 
-interface ControlStatePayload {
+export interface ControlStatePayload {
   counts?: {
     running?: number;
     retrying?: number;
@@ -137,7 +137,7 @@ interface ControlStatePayload {
   } | null;
 }
 
-interface ControlIssuePayload {
+export interface ControlIssuePayload {
   issue_identifier?: string | null;
   status?: string | null;
   raw_status?: string | null;
@@ -153,7 +153,7 @@ interface ControlIssuePayload {
   dispatch_pilot?: ControlDispatchPilotPayload | null;
 }
 
-interface ControlDispatchPayload {
+export interface ControlDispatchPayload {
   dispatch_pilot?: ControlDispatchPilotPayload | null;
   recommendation?: {
     dispatch_id?: string | null;
@@ -176,14 +176,14 @@ interface ControlDispatchPayload {
   } | null;
 }
 
-interface QuestionRecordPayload {
+export interface QuestionRecordPayload {
   question_id?: string;
   urgency?: string;
   prompt?: string;
   status?: string;
 }
 
-interface QuestionsPayload {
+export interface QuestionsPayload {
   questions?: QuestionRecordPayload[];
 }
 
@@ -205,9 +205,17 @@ export interface TelegramOversightBridge {
   close(): Promise<void>;
 }
 
+export interface TelegramOversightReadAdapter {
+  readState(): Promise<ControlStatePayload>;
+  readIssue(issueIdentifier: string): Promise<ControlIssuePayload | null>;
+  readDispatch(): Promise<ControlDispatchPayload>;
+  readQuestions(): Promise<QuestionsPayload>;
+  resolveIssueIdentifier(): Promise<string | null>;
+}
+
 interface StartTelegramOversightBridgeOptions {
   runDir: string;
-  manifestPath: string;
+  readAdapter: TelegramOversightReadAdapter;
   baseUrl: string;
   controlToken: string;
   env?: NodeJS.ProcessEnv;
@@ -225,7 +233,7 @@ export async function startTelegramOversightBridge(
   const bridge = new TelegramOversightBridgeRuntime({
     config,
     runDir: options.runDir,
-    manifestPath: options.manifestPath,
+    readAdapter: options.readAdapter,
     baseUrl: options.baseUrl,
     controlToken: options.controlToken,
     fetchImpl: options.fetchImpl ?? fetch
@@ -237,7 +245,7 @@ export async function startTelegramOversightBridge(
 class TelegramOversightBridgeRuntime implements TelegramOversightBridge {
   private readonly config: TelegramOversightBridgeConfig;
   private readonly runDir: string;
-  private readonly manifestPath: string;
+  private readonly readAdapter: TelegramOversightReadAdapter;
   private readonly baseUrl: string;
   private readonly controlToken: string;
   private readonly fetchImpl: FetchLike;
@@ -263,14 +271,14 @@ class TelegramOversightBridgeRuntime implements TelegramOversightBridge {
   constructor(options: {
     config: TelegramOversightBridgeConfig;
     runDir: string;
-    manifestPath: string;
+    readAdapter: TelegramOversightReadAdapter;
     baseUrl: string;
     controlToken: string;
     fetchImpl: FetchLike;
   }) {
     this.config = options.config;
     this.runDir = options.runDir;
-    this.manifestPath = options.manifestPath;
+    this.readAdapter = options.readAdapter;
     this.baseUrl = options.baseUrl;
     this.controlToken = options.controlToken;
     this.fetchImpl = options.fetchImpl;
@@ -449,7 +457,7 @@ class TelegramOversightBridgeRuntime implements TelegramOversightBridge {
   }
 
   private async renderStatus(): Promise<string> {
-    const payload = await this.readControlJson<ControlStatePayload>('/api/v1/state');
+    const payload = await this.readAdapter.readState();
     const selected = payload.selected ?? null;
     const running = payload.running?.[0] ?? null;
     const dispatch = payload.dispatch_pilot ?? null;
@@ -497,11 +505,14 @@ class TelegramOversightBridgeRuntime implements TelegramOversightBridge {
   }
 
   private async renderIssue(): Promise<string> {
-    const issueIdentifier = await this.resolveIssueIdentifier();
+    const issueIdentifier = await this.readAdapter.resolveIssueIdentifier();
     if (!issueIdentifier) {
       return 'No issue identifier is available for the current run.';
     }
-    const payload = await this.readControlJson<ControlIssuePayload>(`/api/v1/${encodeURIComponent(issueIdentifier)}`);
+    const payload = await this.readAdapter.readIssue(issueIdentifier);
+    if (!payload) {
+      throw new Error('not_found');
+    }
     const trackedLinear = payload.tracked?.linear ?? null;
     const latestEvent = payload.latest_event ?? payload.recent_events?.[0] ?? null;
     const displayStatus = payload.display_status ?? payload.status ?? 'unknown';
@@ -527,7 +538,7 @@ class TelegramOversightBridgeRuntime implements TelegramOversightBridge {
   }
 
   private async renderDispatch(): Promise<string> {
-    const payload = await this.readControlJson<ControlDispatchPayload>('/api/v1/dispatch');
+    const payload = await this.readAdapter.readDispatch();
     const dispatchPilot = payload.dispatch_pilot ?? payload.error?.details?.dispatch_pilot ?? null;
     const trackedIssue = payload.recommendation?.tracked_issue ?? null;
 
@@ -550,7 +561,7 @@ class TelegramOversightBridgeRuntime implements TelegramOversightBridge {
   }
 
   private async renderQuestions(): Promise<string> {
-    const payload = await this.readControlJson<QuestionsPayload>('/questions');
+    const payload = await this.readAdapter.readQuestions();
     const queued = (payload.questions ?? []).filter((question) => question.status === 'queued');
     if (queued.length === 0) {
       return 'No queued questions.';
@@ -600,15 +611,6 @@ class TelegramOversightBridgeRuntime implements TelegramOversightBridge {
     return `${capitalize(action)} requested. Control decision: ${payload.traceability?.decision ?? 'applied'}${typeof payload.control_seq === 'number' ? ` (seq ${payload.control_seq})` : ''}.`;
   }
 
-  private async readControlJson<T>(path: string): Promise<T> {
-    const response = await this.fetchImpl(new URL(path, this.baseUrl), {
-      headers: {
-        Authorization: `Bearer ${this.controlToken}`
-      }
-    });
-    return readJsonResponse<T>(response);
-  }
-
   private async writeControlJson<T>(path: string, body: Record<string, unknown>): Promise<T> {
     const response = await this.fetchImpl(new URL(path, this.baseUrl), {
       method: 'POST',
@@ -620,31 +622,6 @@ class TelegramOversightBridgeRuntime implements TelegramOversightBridge {
       body: JSON.stringify(body)
     });
     return readJsonResponse<T>(response);
-  }
-
-  private async resolveIssueIdentifier(): Promise<string | null> {
-    const state = await this.readControlJson<ControlStatePayload>('/api/v1/state');
-    const selectedIdentifier = state.selected?.issue_identifier;
-    if (typeof selectedIdentifier === 'string' && selectedIdentifier.trim().length > 0) {
-      return selectedIdentifier.trim();
-    }
-    const runningIdentifier = state.running?.[0]?.issue_identifier;
-    if (typeof runningIdentifier === 'string' && runningIdentifier.trim().length > 0) {
-      return runningIdentifier.trim();
-    }
-
-    try {
-      const raw = await readFile(this.manifestPath, 'utf8');
-      const manifest = JSON.parse(raw) as Record<string, unknown>;
-      const taskId = readStringValue(manifest, 'task_id', 'taskId');
-      if (taskId) {
-        return taskId;
-      }
-      return readStringValue(manifest, 'run_id', 'runId') ?? null;
-    } catch (error) {
-      logger.warn(`[telegram-oversight] failed to resolve issue identifier: ${(error as Error)?.message ?? error}`);
-      return null;
-    }
   }
 
   private async sendMessage(chatId: string, text: string): Promise<void> {
@@ -686,7 +663,7 @@ class TelegramOversightBridgeRuntime implements TelegramOversightBridge {
     const nextEventSeq = normalizedEventSeq ?? this.state.push.last_event_seq;
     const now = Date.now();
     const nowIso = new Date(now).toISOString();
-    const payload = await this.readControlJson<ControlStatePayload>('/api/v1/state');
+    const payload = await this.readAdapter.readState();
     const projectionHash = buildProjectionHash(payload);
 
     if (!projectionHash || projectionHash === this.state.push.last_sent_projection_hash) {
