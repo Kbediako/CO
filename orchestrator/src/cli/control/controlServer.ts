@@ -448,7 +448,7 @@ export class ControlServer {
     });
 
     return {
-      readSelectedRun: async () => this.controlRuntime.snapshot().readSelectedRunReadModel(),
+      readSelectedRun: async () => this.controlRuntime.snapshot().readSelectedRunSnapshot(),
 
       readDispatch: async (): Promise<ControlDispatchPayload> => {
         const context = buildInternalContext();

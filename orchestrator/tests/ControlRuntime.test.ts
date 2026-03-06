@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 
 import { ControlStateStore } from '../src/cli/control/controlState.js';
 import { createControlRuntime } from '../src/cli/control/controlRuntime.js';
+import { buildSelectedRunPublicPayload } from '../src/cli/control/observabilityReadModel.js';
 import type { QuestionRecord } from '../src/cli/control/questions.js';
 import { resolveRunPaths, type RunPaths } from '../src/cli/run/runPaths.js';
 
@@ -203,7 +204,7 @@ describe('ControlRuntime', () => {
     const initialSnapshot = fixture.runtime.snapshot();
 
     const initialState = await initialSnapshot.readCompatibilityState();
-    const initialSelectedRun = await initialSnapshot.readSelectedRunReadModel();
+    const initialSelectedRun = await initialSnapshot.readSelectedRunSnapshot();
     await seedManifest(fixture.paths, {
       summary: 'updated summary',
       updated_at: '2026-03-07T00:10:00.000Z'
@@ -216,7 +217,7 @@ describe('ControlRuntime', () => {
 
     const repeatedSnapshot = fixture.runtime.snapshot();
     const repeatedState = await repeatedSnapshot.readCompatibilityState();
-    const repeatedSelectedRun = await repeatedSnapshot.readSelectedRunReadModel();
+    const repeatedSelectedRun = await repeatedSnapshot.readSelectedRunSnapshot();
 
     expect(repeatedSnapshot).toBe(initialSnapshot);
     expect(readSelected(initialState).summary).toBe('initial summary');
@@ -246,7 +247,7 @@ describe('ControlRuntime', () => {
 
     const refreshedSnapshot = fixture.runtime.snapshot();
     const refreshedState = await refreshedSnapshot.readCompatibilityState();
-    const refreshedSelectedRun = await refreshedSnapshot.readSelectedRunReadModel();
+    const refreshedSelectedRun = await refreshedSnapshot.readSelectedRunSnapshot();
 
     expect(refreshedSnapshot).not.toBe(initialSnapshot);
     expect(readSelected(refreshedState).summary).toBe('published summary');
@@ -311,13 +312,13 @@ describe('ControlRuntime', () => {
 
     const result = await fixture.runtime.requestRefresh({ action: 'refresh' });
     const refreshedSnapshot = fixture.runtime.snapshot();
-    const refreshedSelectedRun = await refreshedSnapshot.readSelectedRunReadModel();
+    const refreshedSelectedRun = await refreshedSnapshot.readSelectedRunSnapshot();
     const refreshedState = await refreshedSnapshot.readCompatibilityState();
 
     expect(result.kind).toBe('accepted');
     expect(refreshedSelectedRun.selected?.summary).toBe('refreshed summary');
-    expect(refreshedSelectedRun.dispatch_pilot).toEqual(refreshedState.dispatch_pilot);
-    expect(refreshedSelectedRun.dispatch_pilot?.reason).toBe('dispatch_source_live_deferred');
+    expect(refreshedSelectedRun.dispatchPilot).toEqual(refreshedState.dispatch_pilot ?? null);
+    expect(refreshedSelectedRun.dispatchPilot?.reason).toBe('dispatch_source_live_deferred');
   });
 
   it('keeps the cached runtime unchanged when requestRefresh rejects the envelope', async () => {
@@ -537,7 +538,7 @@ describe('ControlRuntime', () => {
 
     const snapshot = fixture.runtime.snapshot();
     const statePayload = await snapshot.readCompatibilityState();
-    const selectedRunPayload = await snapshot.readSelectedRunReadModel();
+    const selectedRunPayload = await snapshot.readSelectedRunSnapshot();
     const issueResult = await snapshot.readCompatibilityIssue('task-1025');
     const uiPayload = (await snapshot.readUiDataset()) as {
       selected?: {
@@ -578,9 +579,9 @@ describe('ControlRuntime', () => {
     expect(stateSelected?.raw_status).toBe('in_progress');
     expect(stateSelected?.display_status).toBe('paused');
     expect(stateSelected?.status_reason).toBe('queued_questions');
-    expect(runtimeSelected).toEqual(stateSelected);
-    expect(selectedRunPayload.dispatch_pilot).toEqual(statePayload.dispatch_pilot);
-    expect(selectedRunPayload.tracked).toEqual(statePayload.tracked);
+    expect(runtimeSelected ? buildSelectedRunPublicPayload(runtimeSelected) : null).toEqual(stateSelected);
+    expect(selectedRunPayload.dispatchPilot).toEqual(statePayload.dispatch_pilot ?? null);
+    expect(selectedRunPayload.tracked).toEqual(statePayload.tracked ?? null);
     expect(issuePayload.display_status).toBe(stateSelected?.display_status);
     expect(issuePayload.status_reason).toBe(stateSelected?.status_reason);
     expect(issuePayload.question_summary).toEqual(stateSelected?.question_summary);

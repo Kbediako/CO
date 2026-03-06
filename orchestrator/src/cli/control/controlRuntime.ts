@@ -2,9 +2,8 @@ import type { RunPaths } from '../run/runPaths.js';
 import type { ControlState } from './controlState.js';
 import type { LiveLinearTrackedIssue } from './linearDispatchSource.js';
 import {
-  buildSelectedRunReadModel,
   buildTrackedLinearPayload,
-  type ControlSelectedRunReadModel,
+  type ControlSelectedRunRuntimeSnapshot,
   type ControlStatePayload,
 } from './observabilityReadModel.js';
 import {
@@ -38,13 +37,12 @@ interface ControlRuntimeContext {
 }
 
 export interface ControlRuntimeSnapshot {
-  readSelectedRunReadModel(): Promise<ControlSelectedRunReadModel>;
+  readSelectedRunSnapshot(): Promise<ControlSelectedRunRuntimeSnapshot>;
   readUiDataset(): Promise<Record<string, unknown>>;
   readCompatibilityState(): Promise<ControlStatePayload>;
   readCompatibilityDispatch(): Promise<CompatibilityDispatchResult>;
   readCompatibilityRefresh(body?: Record<string, unknown>): CompatibilityRefreshResult;
   readCompatibilityIssue(issueIdentifier: string): Promise<CompatibilityIssueResult>;
-  resolveIssueIdentifier(): Promise<string | null>;
 }
 
 export interface ControlRuntime {
@@ -121,41 +119,36 @@ function createControlRuntimeSnapshot(
   const projection = createSelectedRunProjectionReader(context);
   const observability = createObservabilitySurface({
     controlStore: context.controlStore,
-    linearAdvisoryState: context.linearAdvisoryState,
     paths: context.paths,
-    projection,
-    advisoryRuntime: liveLinearAdvisoryRuntime
+    advisoryRuntime: liveLinearAdvisoryRuntime,
+    readSelectedRunSnapshot
   });
-  let selectedRunReadModelPromise: Promise<ControlSelectedRunReadModel> | null = null;
+  let selectedRunSnapshotPromise: Promise<ControlSelectedRunRuntimeSnapshot> | null = null;
 
-  const readSelectedRunReadModel = async (): Promise<ControlSelectedRunReadModel> => {
-    selectedRunReadModelPromise ??= (async () => {
+  async function readSelectedRunSnapshot(): Promise<ControlSelectedRunRuntimeSnapshot> {
+    selectedRunSnapshotPromise ??= (async () => {
       const selected = await projection.buildSelectedRunContext();
       const issueIdentifier = selected?.issueIdentifier ?? selected?.taskId ?? selected?.runId ?? null;
       const dispatchPilotSummary = liveLinearAdvisoryRuntime.readSnapshotSummary(issueIdentifier);
       const tracked = selected?.tracked ?? buildTrackedLinearPayload(context.linearAdvisoryState.tracked_issue);
-      return buildSelectedRunReadModel({
+      return {
         selected,
         dispatchPilot: dispatchPilotSummary.configured ? dispatchPilotSummary : null,
         tracked
-      });
+      };
     })();
-    return selectedRunReadModelPromise;
-  };
+    return selectedRunSnapshotPromise;
+  }
 
   return {
-    readSelectedRunReadModel,
+    readSelectedRunSnapshot,
     readUiDataset: () => observability.readUiDataset(),
     readCompatibilityState: () => observability.readCompatibilityState(),
     readCompatibilityDispatch: () => observability.readCompatibilityDispatch(),
     readCompatibilityRefresh: (body = {}) => observability.readCompatibilityRefresh(body),
     readCompatibilityIssue: (issueIdentifier) => observability.readCompatibilityIssue(issueIdentifier),
-    async resolveIssueIdentifier(): Promise<string | null> {
-      const selectedRun = await readSelectedRunReadModel();
-      return selectedRun.selected?.issue_identifier ?? null;
-    },
     async prime(): Promise<void> {
-      await readSelectedRunReadModel();
+      await readSelectedRunSnapshot();
     }
   };
 }

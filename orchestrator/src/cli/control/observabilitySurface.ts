@@ -6,9 +6,10 @@ import type { RunPaths } from '../run/runPaths.js';
 import type { CliManifest } from '../types.js';
 import type { ControlState } from './controlState.js';
 import type { LiveLinearAdvisoryRuntime } from './liveLinearAdvisoryRuntime.js';
-import type { LiveLinearTrackedIssue } from './linearDispatchSource.js';
 import type {
+  ControlDispatchPilotPayload,
   ControlIssuePayload,
+  ControlSelectedRunRuntimeSnapshot,
   ControlStatePayload,
   SelectedRunContext
 } from './observabilityReadModel.js';
@@ -16,14 +17,11 @@ import {
   buildCompatibilityRunningEntry,
   buildSelectedRunLatestEventPayload,
   buildSelectedRunPublicPayload,
-  buildTrackedLinearPayload,
   buildUiSelectedRunSharedFields
 } from './observabilityReadModel.js';
-import type { SelectedRunProjectionReader } from './selectedRunProjection.js';
 import type {
   DispatchPilotEvaluation,
-  DispatchPilotFailure,
-  DispatchPilotSummary
+  DispatchPilotFailure
 } from './trackerDispatchPilot.js';
 
 const READ_ONLY_COMPAT_ACTION = 'refresh';
@@ -35,12 +33,9 @@ export interface ObservabilitySurfaceContext {
   controlStore: {
     snapshot(): ControlState;
   };
-  linearAdvisoryState: {
-    tracked_issue: LiveLinearTrackedIssue | null;
-  };
   paths: Pick<RunPaths, 'manifestPath' | 'runDir' | 'logPath'>;
-  projection: SelectedRunProjectionReader;
   advisoryRuntime: LiveLinearAdvisoryRuntime;
+  readSelectedRunSnapshot(): Promise<ControlSelectedRunRuntimeSnapshot>;
 }
 
 export type CompatibilityRefreshRejectionReason =
@@ -102,8 +97,8 @@ export function createObservabilitySurface(
     },
 
     async readCompatibilityDispatch(): Promise<CompatibilityDispatchResult> {
-      const selected = await context.projection.buildSelectedRunContext();
-      const issueIdentifier = selected?.issueIdentifier ?? null;
+      const snapshot = await context.readSelectedRunSnapshot();
+      const issueIdentifier = snapshot.selected?.issueIdentifier ?? null;
       const evaluation = await context.advisoryRuntime.readDispatchEvaluation(issueIdentifier);
 
       if (evaluation.failure) {
@@ -165,25 +160,20 @@ export function createObservabilitySurface(
     },
 
     async readCompatibilityIssue(issueIdentifier: string): Promise<CompatibilityIssueResult> {
-      const selectedSnapshot = await context.projection.readSelectedRunManifestSnapshot();
+      const snapshot = await context.readSelectedRunSnapshot();
+      const selected = snapshot.selected;
       const matchesIssue =
-        selectedSnapshot &&
-        (selectedSnapshot.issueIdentifier === issueIdentifier ||
-          selectedSnapshot.taskId === issueIdentifier ||
-          selectedSnapshot.runId === issueIdentifier);
-      if (!selectedSnapshot || !matchesIssue) {
+        selected &&
+        (selected.issueIdentifier === issueIdentifier ||
+          selected.taskId === issueIdentifier ||
+          selected.runId === issueIdentifier);
+      if (!selected || !matchesIssue) {
         return { kind: 'issue_not_found' };
       }
-
-      const selected = await context.projection.buildSelectedRunContext(selectedSnapshot);
-      if (!selected) {
-        return { kind: 'issue_not_found' };
-      }
-      const dispatchPilotSummary = resolveSelectedDispatchPilotSummary(context, selected);
 
       return {
         kind: 'ok',
-        payload: buildCompatibilityIssuePayload(selected, dispatchPilotSummary)
+        payload: buildCompatibilityIssuePayload(selected, snapshot.dispatchPilot)
       };
     }
   };
@@ -215,9 +205,10 @@ export function buildCompatibilityTraceability(
 }
 
 async function buildCompatibilityStatePayload(context: ObservabilitySurfaceContext): Promise<ControlStatePayload> {
-  const selected = await context.projection.buildSelectedRunContext();
-  const dispatchPilotSummary = resolveSelectedDispatchPilotSummary(context, selected);
-  const tracked = selected?.tracked ?? buildTrackedLinearPayload(context.linearAdvisoryState.tracked_issue);
+  const snapshot = await context.readSelectedRunSnapshot();
+  const selected = snapshot.selected;
+  const dispatchPilotSummary = snapshot.dispatchPilot;
+  const tracked = snapshot.tracked;
   const generatedAt = isoTimestamp();
   if (!selected) {
     return {
@@ -249,7 +240,7 @@ async function buildCompatibilityStatePayload(context: ObservabilitySurfaceConte
 
 function buildCompatibilityIssuePayload(
   selected: SelectedRunContext,
-  dispatchPilotSummary: DispatchPilotSummary | null
+  dispatchPilotSummary: ControlDispatchPilotPayload | null
 ): ControlIssuePayload {
   const running = buildCompatibilityRunningEntry(selected);
   const selectedPayload = buildSelectedRunPublicPayload(selected);
@@ -292,7 +283,8 @@ async function buildUiDataset(context: ObservabilitySurfaceContext): Promise<Rec
     return { generated_at: generatedAt, tasks: [], runs: [], codebase: null, activity: [], selected: null };
   }
 
-  const selected = await context.projection.buildSelectedRunContext();
+  const snapshot = await context.readSelectedRunSnapshot();
+  const selected = snapshot.selected;
   const selectedSharedFields = selected ? buildUiSelectedRunSharedFields(selected) : null;
   const bucketInfo = classifyBucket(manifest.status, context.controlStore.snapshot());
   const approvalsTotal = Array.isArray(manifest.approvals) ? manifest.approvals.length : 0;
@@ -410,16 +402,6 @@ function resolveCompatibilityActionEnvelopeRejection(
   }
   return null;
 }
-
-function resolveSelectedDispatchPilotSummary(
-  context: ObservabilitySurfaceContext,
-  selected: SelectedRunContext | null
-): DispatchPilotSummary | null {
-  const issueIdentifier = selected?.issueIdentifier ?? selected?.taskId ?? selected?.runId ?? null;
-  const summary = context.advisoryRuntime.readSnapshotSummary(issueIdentifier);
-  return summary.configured ? summary : null;
-}
-
 function classifyBucket(
   status: CliManifest['status'],
   control: ControlState

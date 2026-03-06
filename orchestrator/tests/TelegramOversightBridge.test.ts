@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { ControlServer } from '../src/cli/control/controlServer.js';
-import type { ControlSelectedRunReadModel } from '../src/cli/control/observabilityReadModel.js';
+import type { ControlSelectedRunRuntimeSnapshot } from '../src/cli/control/observabilityReadModel.js';
 import { startTelegramOversightBridge } from '../src/cli/control/telegramOversightBridge.js';
 import { computeEffectiveDelegationConfig } from '../src/cli/config/delegationConfig.js';
 import { resolveRunPaths } from '../src/cli/run/runPaths.js';
@@ -211,36 +211,37 @@ function jsonResponse(body: unknown, status = 200): Response {
 function buildTelegramStatePayload(input: {
   prompt: string;
   urgency: 'low' | 'medium' | 'high';
-}): ControlSelectedRunReadModel {
+}): ControlSelectedRunRuntimeSnapshot {
   return {
     selected: {
-      issue_id: 'task-1025',
-      issue_identifier: 'task-1025',
-      task_id: 'task-1025',
-      run_id: 'run-1',
-      raw_status: 'in_progress',
-      display_status: 'awaiting_input',
-      status_reason: 'queued_questions',
-      started_at: '2026-03-06T07:00:00.000Z',
-      updated_at: '2026-03-06T07:01:00.000Z',
-      completed_at: null,
+      issueId: 'task-1025',
+      issueIdentifier: 'task-1025',
+      taskId: 'task-1025',
+      runId: 'run-1',
+      rawStatus: 'in_progress',
+      displayStatus: 'awaiting_input',
+      statusReason: 'queued_questions',
+      startedAt: '2026-03-06T07:00:00.000Z',
+      updatedAt: '2026-03-06T07:01:00.000Z',
+      completedAt: null,
       summary: 'Awaiting operator input',
-      last_error: null,
-      latest_action: null,
-      latest_event: null,
-      workspace: {
-        path: '/tmp/co'
-      },
-      question_summary: {
-        queued_count: 1,
-        latest_question: {
-          question_id: 'q-1025',
+      lastError: null,
+      latestAction: null,
+      latestEvent: null,
+      workspacePath: '/tmp/co',
+      questionSummary: {
+        queuedCount: 1,
+        latestQuestion: {
+          questionId: 'q-1025',
           prompt: input.prompt,
           urgency: input.urgency,
-          queued_at: '2026-03-06T07:01:00.000Z'
+          queuedAt: '2026-03-06T07:01:00.000Z'
         }
-      }
-    }
+      },
+      tracked: null
+    },
+    dispatchPilot: null,
+    tracked: null
   };
 }
 
@@ -995,7 +996,7 @@ describe('TelegramOversightBridge', () => {
   it('renders no-selected status and issue fallbacks through the polling bridge', async () => {
     const { root, paths } = await createRunRoot('task-1026-telegram-no-selected');
     const telegram = createTelegramHarness(globalThis.fetch);
-    const statePayload: ControlSelectedRunReadModel = {
+    const statePayload: ControlSelectedRunRuntimeSnapshot = {
       selected: null,
       tracked: {
         linear: {
@@ -1015,7 +1016,7 @@ describe('TelegramOversightBridge', () => {
           recent_activity: []
         }
       },
-      dispatch_pilot: {
+      dispatchPilot: {
         advisory_only: true,
         configured: true,
         enabled: true,

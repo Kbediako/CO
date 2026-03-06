@@ -5358,6 +5358,55 @@
       "cadence_days": 90
     },
     {
+      "path": ".agent/task/1027-coordinator-symphony-aligned-selected-run-runtime-snapshot-presenter-split.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-06",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-selected-run-runtime-snapshot-presenter-split.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-06",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/findings/1027-selected-run-runtime-snapshot-presenter-split-deliberation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-06",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/PRD-coordinator-symphony-aligned-selected-run-runtime-snapshot-presenter-split.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-06",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/TECH_SPEC-coordinator-symphony-aligned-selected-run-runtime-snapshot-presenter-split.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-06",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/specs/1027-coordinator-symphony-aligned-selected-run-runtime-snapshot-presenter-split.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-06",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/tasks-1027-coordinator-symphony-aligned-selected-run-runtime-snapshot-presenter-split.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-06",
+      "cadence_days": 90
+    },
+    {
       "path": ".agent/task/1026-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",

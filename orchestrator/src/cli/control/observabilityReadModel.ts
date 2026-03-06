@@ -141,10 +141,10 @@ export interface ControlStatePayload {
   tracked?: ControlTrackedPayload;
 }
 
-export interface ControlSelectedRunReadModel {
-  selected: ControlSelectedRunPayload | null;
-  dispatch_pilot?: ControlDispatchPilotPayload;
-  tracked?: ControlTrackedPayload;
+export interface ControlSelectedRunRuntimeSnapshot {
+  selected: SelectedRunContext | null;
+  dispatchPilot: ControlDispatchPilotPayload | null;
+  tracked: ControlTrackedPayload | null;
 }
 
 export interface ControlIssuePayload {
@@ -305,50 +305,38 @@ export function buildUiSelectedRunSharedFields(selected: SelectedRunContext): Ui
   };
 }
 
-export function buildSelectedRunReadModel(input: {
-  selected: SelectedRunContext | null;
-  dispatchPilot: ControlDispatchPilotPayload | null;
-  tracked: ControlTrackedPayload | null;
-}): ControlSelectedRunReadModel {
-  return {
-    selected: input.selected ? buildSelectedRunPublicPayload(input.selected) : null,
-    ...(input.dispatchPilot ? { dispatch_pilot: input.dispatchPilot } : {}),
-    ...(input.tracked ? { tracked: input.tracked } : {})
-  };
-}
-
-export function buildSelectedRunReadModelFingerprintInput(
-  payload: ControlSelectedRunReadModel
+export function buildSelectedRunRuntimeFingerprintInput(
+  snapshot: ControlSelectedRunRuntimeSnapshot
 ): Record<string, unknown> | null {
-  const selected = payload.selected ?? null;
-  const dispatchPilot = payload.dispatch_pilot ?? null;
-  const trackedLinear = selected?.tracked?.linear ?? payload.tracked?.linear ?? null;
-  const questionSummary = selected?.question_summary ?? null;
+  const selected = snapshot.selected ?? null;
+  const dispatchPilot = snapshot.dispatchPilot ?? null;
+  const trackedLinear = selected?.tracked?.linear ?? snapshot.tracked?.linear ?? null;
+  const questionSummary = selected?.questionSummary ?? null;
   if (!selected && !trackedLinear && !dispatchPilot && !questionSummary) {
     return null;
   }
   return {
     selected: selected
       ? {
-          issue_identifier: selected.issue_identifier,
-          run_id: selected.run_id,
-          raw_status: selected.raw_status,
-          display_status: selected.display_status,
-          status_reason: selected.status_reason,
+          issue_identifier: selected.issueIdentifier,
+          run_id: selected.runId,
+          raw_status: selected.rawStatus,
+          display_status: selected.displayStatus,
+          status_reason: selected.statusReason,
           summary: selected.summary,
-          latest_event: selected.latest_event
+          latest_event: selected.latestEvent
             ? {
-                event: selected.latest_event.event,
-                message: selected.latest_event.message,
-                at: selected.latest_event.at
+                event: selected.latestEvent.event,
+                message: selected.latestEvent.message,
+                at: selected.latestEvent.at
               }
             : null,
           question_summary: questionSummary
             ? {
-                queued_count: questionSummary.queued_count,
-                latest_question_id: questionSummary.latest_question?.question_id ?? null,
-                latest_question_prompt: questionSummary.latest_question?.prompt ?? null,
-                latest_question_urgency: questionSummary.latest_question?.urgency ?? null
+                queued_count: questionSummary.queuedCount,
+                latest_question_id: questionSummary.latestQuestion?.questionId ?? null,
+                latest_question_prompt: questionSummary.latestQuestion?.prompt ?? null,
+                latest_question_urgency: questionSummary.latestQuestion?.urgency ?? null
               }
             : null
         }
