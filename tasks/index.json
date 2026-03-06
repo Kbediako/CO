@@ -1941,15 +1941,15 @@
       "title": "Coordinator Symphony-Aligned Control Runtime Canonical Read Model Exposure",
       "path": "tasks/tasks-1026-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure.md",
       "kind": "run",
-      "status": "in-progress",
+      "status": "completed",
       "gate": {
-        "phase": "coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure-planning",
-        "status": "in-progress",
-        "log": null,
-        "run_id": null
+        "phase": "coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure-closeout-override",
+        "status": "succeeded",
+        "log": "out/1026-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure/manual/20260306T182203Z-closeout/00-summary.md",
+        "run_id": "20260306T182203Z-closeout"
       },
       "created_at": "2026-03-06",
-      "completed_at": null
+      "completed_at": "2026-03-06"
     },
     {
       "id": "1025",

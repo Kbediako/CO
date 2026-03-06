@@ -1,0 +1,165 @@
+{
+  "generated_at": "2026-03-06T18:41:01.021Z",
+  "selected_run": {
+    "selected": {
+      "issue_id": "task-1026",
+      "issue_identifier": "task-1026",
+      "task_id": "task-1026",
+      "run_id": "run-1",
+      "raw_status": "in_progress",
+      "display_status": "paused",
+      "status_reason": "control_pause",
+      "started_at": "2026-03-07T00:00:00.000Z",
+      "updated_at": "2026-03-07T00:05:00.000Z",
+      "completed_at": null,
+      "summary": "manual runtime read model probe",
+      "last_error": null,
+      "latest_action": "pause",
+      "latest_event": {
+        "at": "2026-03-06T18:41:00.987Z",
+        "event": "pause",
+        "message": "manual runtime read model probe",
+        "requested_by": "operator",
+        "reason": "manual_probe"
+      },
+      "workspace": {
+        "path": "/var/folders/r8/ss2mqz1n5wgcph4gnh_894600000gn/T/control-runtime-manual-Gv4PJP"
+      },
+      "question_summary": {
+        "queued_count": 0,
+        "latest_question": null
+      },
+      "tracked": {
+        "linear": {
+          "provider": "linear",
+          "id": "lin-issue-1",
+          "identifier": "PREPROD-101",
+          "title": "Investigate advisory routing",
+          "url": "https://linear.app/asabeko/issue/PREPROD-101",
+          "state": "In Progress",
+          "state_type": "started",
+          "workspace_id": "lin-workspace-1",
+          "team_id": "lin-team-live",
+          "team_key": "PREPROD",
+          "team_name": "PRE-PRO/PRODUCTION",
+          "project_id": "lin-project-1",
+          "project_name": "Icon Agency (Bookings)",
+          "updated_at": "2026-03-06T02:00:00.000Z",
+          "recent_activity": []
+        }
+      }
+    },
+    "dispatch_pilot": {
+      "advisory_only": true,
+      "configured": true,
+      "enabled": true,
+      "kill_switch": false,
+      "status": "ready",
+      "source_status": "ready",
+      "reason": "dispatch_source_live_deferred",
+      "source_setup": {
+        "provider": "linear",
+        "workspace_id": "lin-workspace-1",
+        "team_id": "lin-team-live",
+        "project_id": "lin-project-1"
+      }
+    },
+    "tracked": {
+      "linear": {
+        "provider": "linear",
+        "id": "lin-issue-1",
+        "identifier": "PREPROD-101",
+        "title": "Investigate advisory routing",
+        "url": "https://linear.app/asabeko/issue/PREPROD-101",
+        "state": "In Progress",
+        "state_type": "started",
+        "workspace_id": "lin-workspace-1",
+        "team_id": "lin-team-live",
+        "team_key": "PREPROD",
+        "team_name": "PRE-PRO/PRODUCTION",
+        "project_id": "lin-project-1",
+        "project_name": "Icon Agency (Bookings)",
+        "updated_at": "2026-03-06T02:00:00.000Z",
+        "recent_activity": []
+      }
+    }
+  },
+  "compatibility_state_selected": {
+    "issue_id": "task-1026",
+    "issue_identifier": "task-1026",
+    "task_id": "task-1026",
+    "run_id": "run-1",
+    "raw_status": "in_progress",
+    "display_status": "paused",
+    "status_reason": "control_pause",
+    "started_at": "2026-03-07T00:00:00.000Z",
+    "updated_at": "2026-03-07T00:05:00.000Z",
+    "completed_at": null,
+    "summary": "manual runtime read model probe",
+    "last_error": null,
+    "latest_action": "pause",
+    "latest_event": {
+      "at": "2026-03-06T18:41:00.987Z",
+      "event": "pause",
+      "message": "manual runtime read model probe",
+      "requested_by": "operator",
+      "reason": "manual_probe"
+    },
+    "workspace": {
+      "path": "/var/folders/r8/ss2mqz1n5wgcph4gnh_894600000gn/T/control-runtime-manual-Gv4PJP"
+    },
+    "question_summary": {
+      "queued_count": 0,
+      "latest_question": null
+    },
+    "tracked": {
+      "linear": {
+        "provider": "linear",
+        "id": "lin-issue-1",
+        "identifier": "PREPROD-101",
+        "title": "Investigate advisory routing",
+        "url": "https://linear.app/asabeko/issue/PREPROD-101",
+        "state": "In Progress",
+        "state_type": "started",
+        "workspace_id": "lin-workspace-1",
+        "team_id": "lin-team-live",
+        "team_key": "PREPROD",
+        "team_name": "PRE-PRO/PRODUCTION",
+        "project_id": "lin-project-1",
+        "project_name": "Icon Agency (Bookings)",
+        "updated_at": "2026-03-06T02:00:00.000Z",
+        "recent_activity": []
+      }
+    }
+  },
+  "compatibility_state_dispatch_pilot": {
+    "advisory_only": true,
+    "configured": true,
+    "enabled": true,
+    "kill_switch": false,
+    "status": "ready",
+    "source_status": "ready",
+    "reason": "dispatch_source_live_deferred",
+    "source_setup": {
+      "provider": "linear",
+      "workspace_id": "lin-workspace-1",
+      "team_id": "lin-team-live",
+      "project_id": "lin-project-1"
+    }
+  },
+  "assertions": {
+    "selected_matches_state_selected": true,
+    "dispatch_matches_state_dispatch": true,
+    "tracked_matches_state_tracked": true
+  },
+  "telegram_messages": [
+    {
+      "chat_id": "1234",
+      "text": "CO status\nIssue: task-1026\nState: paused (raw in_progress)\nReason: control_pause\nSession: run-1\nLast event: pause\nSummary: manual runtime read model probe\nLinear: PREPROD-101 - Investigate advisory routing\nLinear state: In Progress\nDispatch: ready/ready (dispatch_source_live_deferred)"
+    },
+    {
+      "chat_id": "1234",
+      "text": "Issue task-1026\nStatus: paused (raw in_progress)\nReason: control_pause\nLinear: PREPROD-101 - Investigate advisory routing\nLinear state: In Progress\nLinear URL: https://linear.app/asabeko/issue/PREPROD-101\nLatest event: pause\nLatest summary: manual runtime read model probe\nDispatch: ready/ready (dispatch_source_live_deferred)"
+    }
+  ]
+}
