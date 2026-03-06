@@ -25,8 +25,15 @@ import type {
 
 const READ_ONLY_COMPAT_ACTION = 'refresh';
 const COMPATIBILITY_MUTATING_ACTIONS = new Set(['pause', 'resume', 'cancel', 'fail', 'rerun']);
+const JSON_HEADERS = { 'Content-Type': 'application/json' };
 
 type ObservabilityPayload = Record<string, unknown>;
+
+export interface ObservabilitySurfaceResponse {
+  status: number;
+  body: object;
+  headers: Record<string, string>;
+}
 
 interface ObservabilityTraceabilityContext {
   controlStore: {
@@ -88,6 +95,116 @@ interface CompatibilityActionEnvelopeRejection {
   reason: CompatibilityRefreshRejectionReason;
   requestAction: string | null;
   requestTool: string | null;
+}
+
+export function buildCompatibilityErrorResponse(input: {
+  status: number;
+  code: string;
+  message: string;
+  details?: Record<string, unknown>;
+  traceability?: Record<string, unknown>;
+}): ObservabilitySurfaceResponse {
+  return {
+    status: input.status,
+    headers: JSON_HEADERS,
+    body: {
+      error: {
+        code: input.code,
+        message: input.message,
+        ...(input.details ? { details: input.details } : {})
+      },
+      ...(input.traceability ? { traceability: input.traceability } : {})
+    }
+  };
+}
+
+export function buildCompatibilityMethodNotAllowedResponse(
+  context: ObservabilityTraceabilityContext,
+  allowedMethod: 'GET' | 'POST',
+  issueIdentifier?: string
+): ObservabilitySurfaceResponse {
+  return buildCompatibilityErrorResponse({
+    status: 405,
+    code: 'method_not_allowed',
+    message: 'Method not allowed',
+    details: {
+      surface: 'api_v1',
+      allowed_method: allowedMethod,
+      ...(issueIdentifier ? { issue_identifier: issueIdentifier } : {})
+    },
+    traceability: buildCompatibilityTraceability(context, {
+      decision: 'rejected',
+      reason: 'method_not_allowed',
+      ...(issueIdentifier ? { issueIdentifier } : {})
+    })
+  });
+}
+
+export function buildCompatibilityIssueNotFoundResponse(
+  context: ObservabilityTraceabilityContext,
+  issueIdentifier: string
+): ObservabilitySurfaceResponse {
+  return buildCompatibilityErrorResponse({
+    status: 404,
+    code: 'issue_not_found',
+    message: 'Issue not found',
+    details: {
+      surface: 'api_v1',
+      issue_identifier: issueIdentifier
+    },
+    traceability: buildCompatibilityTraceability(context, {
+      decision: 'rejected',
+      reason: 'issue_not_found',
+      issueIdentifier
+    })
+  });
+}
+
+export function buildCompatibilityNotFoundResponse(
+  context: ObservabilityTraceabilityContext
+): ObservabilitySurfaceResponse {
+  return buildCompatibilityErrorResponse({
+    status: 404,
+    code: 'not_found',
+    message: 'Route not found',
+    details: {
+      surface: 'api_v1'
+    },
+    traceability: buildCompatibilityTraceability(context, {
+      decision: 'rejected',
+      reason: 'route_not_found'
+    })
+  });
+}
+
+export function buildCompatibilityRefreshRejectedResponse(
+  context: ObservabilityTraceabilityContext,
+  rejection: {
+    reason: CompatibilityRefreshRejectionReason;
+    requestAction: string | null;
+    requestTool: string | null;
+  }
+): ObservabilitySurfaceResponse {
+  return buildCompatibilityErrorResponse({
+    status: resolveCompatibilityRefreshRejectionStatus(rejection.reason),
+    code: 'read_only_action_rejected',
+    message: 'Compatibility surface is read-only; only refresh acknowledgements are supported.',
+    details: {
+      surface: 'api_v1',
+      mode: 'read_only',
+      reason: rejection.reason,
+      allowed_actions: ['refresh'],
+      allowed_tools: [],
+      requested_action: rejection.requestAction,
+      requested_tool: rejection.requestTool
+    },
+    traceability: buildCompatibilityTraceability(context, {
+      decision: 'rejected',
+      reason: rejection.reason,
+      requestAction: rejection.requestAction,
+      requestTool: rejection.requestTool
+    })
+  });
 }
 
 // `/api/v1/dispatch` is a CO-specific extension over the Symphony-aligned
@@ -416,6 +533,19 @@ function resolveCompatibilityActionEnvelopeRejection(
     };
   }
   return null;
+}
+
+function resolveCompatibilityRefreshRejectionStatus(
+  reason: CompatibilityRefreshRejectionReason
+): 400 | 403 {
+  switch (reason) {
+    case 'forbidden_mutating_action':
+    case 'unsupported_tool':
+      return 403;
+    case 'malformed_action_request':
+    case 'unsupported_action':
+      return 400;
+  }
 }
 
 function isRecordLike(value: unknown): value is Record<string, unknown> {

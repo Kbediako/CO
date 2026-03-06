@@ -39,14 +39,19 @@ import {
 } from './linearDispatchSource.js';
 import { createControlRuntime, type ControlRuntime } from './controlRuntime.js';
 import {
+  buildCompatibilityErrorResponse,
+  buildCompatibilityIssueNotFoundResponse,
+  buildCompatibilityMethodNotAllowedResponse,
+  buildCompatibilityNotFoundResponse,
+  buildCompatibilityRefreshRejectedResponse,
   buildCompatibilityTraceability,
   readDispatchExtension,
   readCompatibilityIssue,
   readCompatibilityRefresh,
   readCompatibilityState,
   readUiDataset,
-  type DispatchExtensionResult,
-  type CompatibilityRefreshRejectionReason
+  type ObservabilitySurfaceResponse,
+  type DispatchExtensionResult
 } from './observabilitySurface.js';
 
 interface ControlServerOptions {
@@ -107,12 +112,6 @@ const MAX_TRANSPORT_POLICY_WINDOW_MS = 24 * 60 * 60 * 1000;
 const LINEAR_ADVISORY_STATE_FILE = 'linear-advisory-state.json';
 const LINEAR_WEBHOOK_MAX_AGE_MS = 5 * 60 * 1000;
 const LINEAR_ADVISORY_SEEN_DELIVERY_LIMIT = 100;
-
-interface ObservabilitySurfaceResponse {
-  status: number;
-  body: object;
-  headers: Record<string, string>;
-}
 
 class HttpError extends Error {
   readonly status: number;
@@ -625,7 +624,7 @@ async function handleRequest(context: RequestContext): Promise<void> {
   // Symphony-aligned core observability routes.
   if (url.pathname === COMPATIBILITY_STATE_PATH) {
     if (method !== 'GET') {
-      writeCompatibilityMethodNotAllowed(res, context, 'GET');
+      writeObservabilityResponse(res, buildCompatibilityMethodNotAllowedResponse(context, 'GET'));
       return;
     }
     writeObservabilityResponse(res, {
@@ -688,7 +687,7 @@ async function handleRequest(context: RequestContext): Promise<void> {
 
   if (url.pathname === COMPATIBILITY_REFRESH_PATH) {
     if (method !== 'POST') {
-      writeCompatibilityMethodNotAllowed(res, context, 'POST');
+      writeObservabilityResponse(res, buildCompatibilityMethodNotAllowedResponse(context, 'POST'));
       return;
     }
     const result = await readCompatibilityRefresh(
@@ -700,7 +699,7 @@ async function handleRequest(context: RequestContext): Promise<void> {
       await readJsonBody(req)
     );
     if (result.kind === 'rejected') {
-      writeCompatibilityRefreshRejected(res, context, result);
+      writeObservabilityResponse(res, buildCompatibilityRefreshRejectedResponse(context, result));
       return;
     }
     writeObservabilityResponse(res, {
@@ -714,17 +713,18 @@ async function handleRequest(context: RequestContext): Promise<void> {
   const compatibilityIssueIdentifier = resolveCompatibilityIssueIdentifierFromPath(url.pathname);
   if (compatibilityIssueIdentifier !== null) {
     if (method !== 'GET') {
-      writeCompatibilityMethodNotAllowed(
+      writeObservabilityResponse(
         res,
-        context,
-        'GET',
-        compatibilityIssueIdentifier
+        buildCompatibilityMethodNotAllowedResponse(context, 'GET', compatibilityIssueIdentifier)
       );
       return;
     }
     const result = await readCompatibilityIssue(presenterContext, compatibilityIssueIdentifier);
     if (result.kind === 'issue_not_found') {
-      writeCompatibilityIssueNotFound(res, context, compatibilityIssueIdentifier);
+      writeObservabilityResponse(
+        res,
+        buildCompatibilityIssueNotFoundResponse(context, compatibilityIssueIdentifier)
+      );
       return;
     }
     writeObservabilityResponse(res, {
@@ -736,7 +736,7 @@ async function handleRequest(context: RequestContext): Promise<void> {
   }
 
   if (url.pathname === COMPATIBILITY_API_PREFIX || url.pathname.startsWith(`${COMPATIBILITY_API_PREFIX}/`)) {
-    writeCompatibilityNotFound(res, context);
+    writeObservabilityResponse(res, buildCompatibilityNotFoundResponse(context));
     return;
   }
 
@@ -2101,98 +2101,6 @@ function writeObservabilityResponse(
   res.end(JSON.stringify(response.body));
 }
 
-function buildCompatibilityErrorResponse(input: {
-  status: number;
-  code: string;
-  message: string;
-  details?: Record<string, unknown>;
-  traceability?: Record<string, unknown>;
-}): ObservabilitySurfaceResponse {
-  return {
-    status: input.status,
-    headers: JSON_HEADERS,
-    body: {
-      error: {
-        code: input.code,
-        message: input.message,
-        ...(input.details ? { details: input.details } : {})
-      },
-      ...(input.traceability ? { traceability: input.traceability } : {})
-    }
-  };
-}
-
-function writeCompatibilityMethodNotAllowed(
-  res: http.ServerResponse,
-  context: Parameters<typeof buildCompatibilityTraceability>[0],
-  allowedMethod: 'GET' | 'POST',
-  issueIdentifier?: string
-): void {
-  writeObservabilityResponse(
-    res,
-    buildCompatibilityErrorResponse({
-      status: 405,
-      code: 'method_not_allowed',
-      message: 'Method not allowed',
-      details: {
-        surface: 'api_v1',
-        allowed_method: allowedMethod,
-        ...(issueIdentifier ? { issue_identifier: issueIdentifier } : {})
-      },
-      traceability: buildCompatibilityTraceability(context, {
-        decision: 'rejected',
-        reason: 'method_not_allowed',
-        ...(issueIdentifier ? { issueIdentifier } : {})
-      })
-    })
-  );
-}
-
-function writeCompatibilityIssueNotFound(
-  res: http.ServerResponse,
-  context: Parameters<typeof buildCompatibilityTraceability>[0],
-  issueIdentifier: string
-): void {
-  writeObservabilityResponse(
-    res,
-    buildCompatibilityErrorResponse({
-      status: 404,
-      code: 'issue_not_found',
-      message: 'Issue not found',
-      details: {
-        surface: 'api_v1',
-        issue_identifier: issueIdentifier
-      },
-      traceability: buildCompatibilityTraceability(context, {
-        decision: 'rejected',
-        reason: 'issue_not_found',
-        issueIdentifier
-      })
-    })
-  );
-}
-
-function writeCompatibilityNotFound(
-  res: http.ServerResponse,
-  context: Parameters<typeof buildCompatibilityTraceability>[0]
-): void {
-  writeObservabilityResponse(
-    res,
-    buildCompatibilityErrorResponse({
-      status: 404,
-      code: 'not_found',
-      message: 'Route not found',
-      details: {
-        surface: 'api_v1'
-      },
-      traceability: buildCompatibilityTraceability(context, {
-        decision: 'rejected',
-        reason: 'route_not_found'
-      })
-    })
-  );
-}
-
 function writeDispatchExtensionMethodNotAllowed(
   res: http.ServerResponse,
   context: Parameters<typeof buildCompatibilityTraceability>[0]
@@ -2215,40 +2123,6 @@ function writeDispatchExtensionMethodNotAllowed(
   );
 }
 
-function writeCompatibilityRefreshRejected(
-  res: http.ServerResponse,
-  context: Parameters<typeof buildCompatibilityTraceability>[0],
-  rejection: {
-    reason: CompatibilityRefreshRejectionReason;
-    requestAction: string | null;
-    requestTool: string | null;
-  }
-): void {
-  writeObservabilityResponse(
-    res,
-    buildCompatibilityErrorResponse({
-      status: resolveCompatibilityRefreshRejectionStatus(rejection.reason),
-      code: 'read_only_action_rejected',
-      message: 'Compatibility surface is read-only; only refresh acknowledgements are supported.',
-      details: {
-        surface: 'api_v1',
-        mode: 'read_only',
-        reason: rejection.reason,
-        allowed_actions: ['refresh'],
-        allowed_tools: [],
-        requested_action: rejection.requestAction,
-        requested_tool: rejection.requestTool
-      },
-      traceability: buildCompatibilityTraceability(context, {
-        decision: 'rejected',
-        reason: rejection.reason,
-        requestAction: rejection.requestAction,
-        requestTool: rejection.requestTool
-      })
-    })
-  );
-}
-
 function writeUiDataMethodNotAllowed(res: http.ServerResponse): void {
   writeObservabilityResponse(
     res,
@@ -2263,19 +2137,6 @@ function writeUiDataMethodNotAllowed(res: http.ServerResponse): void {
       }
     })
   );
-}
-
-function resolveCompatibilityRefreshRejectionStatus(
-  reason: CompatibilityRefreshRejectionReason
-): 400 | 403 {
-  switch (reason) {
-    case 'forbidden_mutating_action':
-    case 'unsupported_tool':
-      return 403;
-    case 'malformed_action_request':
-    case 'unsupported_action':
-      return 400;
-  }
 }
 
 function isControlAction(action: unknown): action is 'pause' | 'resume' | 'cancel' | 'fail' {
