@@ -34,4 +34,4 @@
 - [x] `npm run pack:smoke` when required by touched downstream-facing paths. Evidence: `out/1020-coordinator-symphony-aligned-dispatch-presenter-controller-extraction/manual/20260306T121624Z-closeout/05-pack-smoke.log`.
 - [x] Manual simulated/mock usage evidence captured for dispatch coherence. Evidence: `out/1020-coordinator-symphony-aligned-dispatch-presenter-controller-extraction/manual/20260306T121624Z-closeout/09-manual-dispatch-check.json`.
 - [x] Explicit elegance review captured. Evidence: `out/1020-coordinator-symphony-aligned-dispatch-presenter-controller-extraction/manual/20260306T121624Z-closeout/10-elegance-review.md`.
-- [ ] Coherent `1020` commit recorded. Evidence: pending closeout.
+- [x] Coherent `1020` commit recorded. Evidence: `467a424cf` (`finish 1020 dispatch presenter controller extraction`).
