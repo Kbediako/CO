@@ -536,17 +536,17 @@ async function handleRequest(context: RequestContext): Promise<void> {
       return;
     }
 
-    const projection = await buildCompatibilityProjection(context);
-    const evaluation = await evaluateCompatibilityDispatchPilot(context, projection);
+    const selected = await buildSelectedRunContext(context);
+    const evaluation = await evaluateCompatibilityDispatchPilot(context, selected);
     await emitDispatchPilotAuditEvents(context, {
       evaluation,
-      issueIdentifier: projection?.issueIdentifier ?? null
+      issueIdentifier: selected?.issueIdentifier ?? null
     });
 
     const traceability = buildCompatibilityTraceability(context, {
       decision: evaluation.failure ? 'rejected' : 'acknowledged',
       reason: evaluation.failure?.reason ?? evaluation.summary.reason,
-      issueIdentifier: projection?.issueIdentifier ?? null
+      issueIdentifier: selected?.issueIdentifier ?? null
     });
 
     if (evaluation.failure) {
@@ -666,13 +666,32 @@ async function handleRequest(context: RequestContext): Promise<void> {
       return;
     }
 
-    const projection = await buildCompatibilityProjection(context);
+    const selectedSnapshot = await readSelectedRunManifestSnapshot(context);
     const matchesIssue =
-      projection &&
-      (projection.issueIdentifier === compatibilityIssueIdentifier ||
-        projection.taskId === compatibilityIssueIdentifier ||
-        projection.runId === compatibilityIssueIdentifier);
-    if (!projection || !matchesIssue) {
+      selectedSnapshot &&
+      (selectedSnapshot.issueIdentifier === compatibilityIssueIdentifier ||
+        selectedSnapshot.taskId === compatibilityIssueIdentifier ||
+        selectedSnapshot.runId === compatibilityIssueIdentifier);
+    if (!selectedSnapshot || !matchesIssue) {
+      writeCompatibilityError(
+        res,
+        404,
+        'issue_not_found',
+        'Issue not found',
+        {
+          surface: 'api_v1',
+          issue_identifier: compatibilityIssueIdentifier
+        },
+        buildCompatibilityTraceability(context, {
+          decision: 'rejected',
+          reason: 'issue_not_found',
+          issueIdentifier: compatibilityIssueIdentifier
+        })
+      );
+      return;
+    }
+    const selected = await buildSelectedRunContext(context, selectedSnapshot);
+    if (!selected) {
       writeCompatibilityError(
         res,
         404,
@@ -691,14 +710,7 @@ async function handleRequest(context: RequestContext): Promise<void> {
       return;
     }
     res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
-    res.end(
-      JSON.stringify(
-        buildCompatibilityIssuePayload(
-          projection,
-          await evaluateCompatibilityDispatchPilot(context, projection)
-        )
-      )
-    );
+    res.end(JSON.stringify(buildCompatibilityIssuePayload(selected)));
     return;
   }
 
@@ -1464,17 +1476,43 @@ async function handleRequest(context: RequestContext): Promise<void> {
   res.end(JSON.stringify({ error: 'not_found' }));
 }
 
-interface CompatibilityProjection {
+interface SelectedRunQuestionSummary {
+  queuedCount: number;
+  latestQuestion: {
+    questionId: string;
+    prompt: string;
+    urgency: QuestionUrgency;
+    queuedAt: string;
+  } | null;
+}
+
+interface SelectedRunLatestEvent {
+  at: string | null;
+  event: string | null;
+  message: string | null;
+  requestedBy: string | null;
+  reason: string | null;
+}
+
+interface SelectedRunContext {
   issueIdentifier: string;
   issueId: string | null;
   taskId: string | null;
   runId: string | null;
-  status: string;
+  rawStatus: string;
+  displayStatus: string;
+  statusReason: string | null;
   startedAt: string | null;
   updatedAt: string | null;
+  completedAt: string | null;
   summary: string | null;
+  lastError: string | null;
   latestAction: ControlAction['action'] | null;
+  latestEvent: SelectedRunLatestEvent | null;
   workspacePath: string;
+  questionSummary: SelectedRunQuestionSummary;
+  dispatchPilotEvaluation: DispatchPilotEvaluation;
+  trackedPayload: Record<string, unknown> | null;
 }
 
 interface CompatibilityActionEnvelopeRejection {
@@ -1482,6 +1520,14 @@ interface CompatibilityActionEnvelopeRejection {
   reason: 'malformed_action_request' | 'forbidden_mutating_action' | 'unsupported_action' | 'unsupported_tool';
   requestAction: string | null;
   requestTool: string | null;
+}
+
+interface SelectedRunManifestSnapshot {
+  manifestRecord: Record<string, unknown>;
+  issueIdentifier: string;
+  issueId: string | null;
+  taskId: string | null;
+  runId: string | null;
 }
 
 function resolveCompatibilityIssueIdentifierFromPath(pathname: string): string | null {
@@ -1553,12 +1599,13 @@ function resolveCompatibilityActionEnvelopeRejection(
 }
 
 async function buildCompatibilityStatePayload(context: RequestContext): Promise<Record<string, unknown>> {
-  const projection = await buildCompatibilityProjection(context);
-  const dispatchPilotEvaluation = await evaluateCompatibilityDispatchPilot(context, projection);
+  const selected = await buildSelectedRunContext(context);
+  const dispatchPilotEvaluation =
+    selected?.dispatchPilotEvaluation ?? (await evaluateCompatibilityDispatchPilot(context, null));
   const dispatchPilotSummary = dispatchPilotEvaluation.summary.configured ? dispatchPilotEvaluation.summary : null;
-  const tracked = buildCompatibilityTrackedPayload(dispatchPilotEvaluation);
+  const tracked = selected?.trackedPayload ?? buildCompatibilityTrackedPayload(dispatchPilotEvaluation);
   const generatedAt = isoTimestamp();
-  if (!projection) {
+  if (!selected) {
     return {
       generated_at: generatedAt,
       counts: { running: 0, retrying: 0 },
@@ -1566,12 +1613,13 @@ async function buildCompatibilityStatePayload(context: RequestContext): Promise<
       retrying: [],
       codex_totals: null,
       rate_limits: null,
+      selected: null,
       ...(dispatchPilotSummary ? { dispatch_pilot: dispatchPilotSummary } : {}),
       ...(tracked ? { tracked } : {})
     };
   }
 
-  const running = projection.status === 'in_progress' ? [buildCompatibilityRunningEntry(projection)] : [];
+  const running = selected.rawStatus === 'in_progress' ? [buildCompatibilityRunningEntry(selected)] : [];
   return {
     generated_at: generatedAt,
     counts: { running: running.length, retrying: 0 },
@@ -1579,6 +1627,7 @@ async function buildCompatibilityStatePayload(context: RequestContext): Promise<
     retrying: [],
     codex_totals: null,
     rate_limits: null,
+    selected: buildSelectedRunPublicPayload(selected),
     ...(dispatchPilotSummary ? { dispatch_pilot: dispatchPilotSummary } : {}),
     ...(tracked ? { tracked } : {})
   };
@@ -1586,17 +1635,107 @@ async function buildCompatibilityStatePayload(context: RequestContext): Promise<
 
 async function evaluateCompatibilityDispatchPilot(
   context: RequestContext,
-  projection: CompatibilityProjection | null
+  selected: SelectedRunContext | null
 ): Promise<DispatchPilotEvaluation> {
   const controlSnapshot = context.controlStore.snapshot();
   return evaluateTrackerDispatchPilotAsync({
     featureToggles: controlSnapshot.feature_toggles,
-    defaultIssueIdentifier: projection?.issueIdentifier ?? projection?.taskId ?? projection?.runId ?? null,
+    defaultIssueIdentifier: selected?.issueIdentifier ?? selected?.taskId ?? selected?.runId ?? null,
     env: process.env
   });
 }
 
-async function buildCompatibilityProjection(context: RequestContext): Promise<CompatibilityProjection | null> {
+async function buildSelectedRunContext(
+  context: RequestContext,
+  snapshot: SelectedRunManifestSnapshot | null = null
+): Promise<SelectedRunContext | null> {
+  const selectedRunSnapshot = snapshot ?? (await readSelectedRunManifestSnapshot(context));
+  if (!selectedRunSnapshot) {
+    return null;
+  }
+  const { manifestRecord, issueIdentifier, issueId, taskId, runId } = selectedRunSnapshot;
+  const control = context.controlStore.snapshot();
+  const rawStatus = readStringValue(manifestRecord, 'status') ?? 'unknown';
+  const startedAt = readStringValue(manifestRecord, 'started_at', 'startedAt') ?? null;
+  const updatedAt = readStringValue(manifestRecord, 'updated_at', 'updatedAt') ?? null;
+  const completedAt = readStringValue(manifestRecord, 'completed_at', 'completedAt') ?? null;
+  const summary = readStringValue(manifestRecord, 'summary') ?? null;
+  const workspacePath = resolveRepoRootFromRunDir(context.paths.runDir) ?? context.paths.runDir;
+  const questionSummary = buildSelectedRunQuestionSummary(context.questionQueue.list());
+  const latestAction = control.latest_action?.action ?? null;
+  const { displayStatus, statusReason } = resolveSelectedRunDisplayStatus({
+    rawStatus,
+    latestAction,
+    questionSummary
+  });
+  const dispatchPilotEvaluation = await evaluateCompatibilityDispatchPilot(context, {
+    issueIdentifier,
+    issueId,
+    taskId,
+    runId,
+    rawStatus,
+    displayStatus,
+    statusReason,
+    startedAt,
+    updatedAt,
+    completedAt,
+    summary,
+    lastError: null,
+    latestAction,
+    latestEvent: null,
+    workspacePath,
+    questionSummary,
+    dispatchPilotEvaluation: {
+      summary: {
+        advisory_only: true,
+        configured: false,
+        enabled: false,
+        kill_switch: false,
+        status: 'disabled',
+        source_status: 'disabled',
+        reason: 'uninitialized',
+        source_setup: null
+      },
+      recommendation: null,
+      failure: null
+    },
+    trackedPayload: null
+  });
+  const trackedPayload = buildCompatibilityTrackedPayload(dispatchPilotEvaluation);
+  const latestEvent = buildSelectedRunLatestEvent({
+    controlAction: control.latest_action ?? null,
+    updatedAt,
+    summary,
+    fallbackEvent: rawStatus
+  });
+  const lastError =
+    rawStatus === 'failed' || latestAction === 'fail'
+      ? summary ?? control.latest_action?.reason ?? 'run_failed'
+      : null;
+
+  return {
+    issueIdentifier,
+    issueId,
+    taskId,
+    runId,
+    rawStatus,
+    displayStatus,
+    statusReason,
+    startedAt,
+    updatedAt,
+    completedAt,
+    summary,
+    lastError,
+    latestAction,
+    latestEvent,
+    workspacePath,
+    questionSummary,
+    dispatchPilotEvaluation,
+    trackedPayload
+  };
+}
+
+async function readSelectedRunManifestSnapshot(context: RequestContext): Promise<SelectedRunManifestSnapshot | null> {
   const manifest = await readJsonFile<CliManifest>(context.paths.manifestPath);
   if (!manifest) {
     return null;
@@ -1609,38 +1748,28 @@ async function buildCompatibilityProjection(context: RequestContext): Promise<Co
   if (!issueIdentifier) {
     return null;
   }
-  const issueId = taskId ?? runId ?? null;
-  const status = readStringValue(manifestRecord, 'status') ?? 'unknown';
-  const startedAt = readStringValue(manifestRecord, 'started_at', 'startedAt') ?? null;
-  const updatedAt = readStringValue(manifestRecord, 'updated_at', 'updatedAt') ?? null;
-  const summary = readStringValue(manifestRecord, 'summary') ?? null;
-  const workspacePath = resolveRepoRootFromRunDir(context.paths.runDir) ?? context.paths.runDir;
-
   return {
+    manifestRecord,
     issueIdentifier,
-    issueId,
+    issueId: taskId ?? runId ?? null,
     taskId,
-    runId,
-    status,
-    startedAt,
-    updatedAt,
-    summary,
-    latestAction: control.latest_action?.action ?? null,
-    workspacePath
+    runId
   };
 }
 
-function buildCompatibilityRunningEntry(projection: CompatibilityProjection): Record<string, unknown> {
+function buildCompatibilityRunningEntry(selected: SelectedRunContext): Record<string, unknown> {
   return {
-    issue_id: projection.issueId,
-    issue_identifier: projection.issueIdentifier,
-    state: projection.status,
-    session_id: projection.runId,
+    issue_id: selected.issueId,
+    issue_identifier: selected.issueIdentifier,
+    state: selected.rawStatus,
+    display_state: selected.displayStatus,
+    status_reason: selected.statusReason,
+    session_id: selected.runId,
     turn_count: 0,
-    last_event: projection.latestAction,
-    last_message: projection.summary,
-    started_at: projection.startedAt,
-    last_event_at: projection.updatedAt,
+    last_event: selected.latestEvent?.event ?? selected.latestAction,
+    last_message: selected.latestEvent?.message ?? selected.summary,
+    started_at: selected.startedAt,
+    last_event_at: selected.latestEvent?.at ?? selected.updatedAt,
     tokens: {
       input_tokens: null,
       output_tokens: null,
@@ -1650,27 +1779,28 @@ function buildCompatibilityRunningEntry(projection: CompatibilityProjection): Re
 }
 
 function buildCompatibilityIssuePayload(
-  projection: CompatibilityProjection,
-  dispatchPilotEvaluation?: DispatchPilotEvaluation | null
+  selected: SelectedRunContext
 ): Record<string, unknown> {
-  const running = buildCompatibilityRunningEntry(projection);
-  const recentEvents =
-    projection.updatedAt || projection.latestAction || projection.summary
-      ? [
-          {
-            at: projection.updatedAt,
-            event: projection.latestAction ?? 'status_update',
-            message: projection.summary
-          }
-        ]
-      : [];
+  const running = buildCompatibilityRunningEntry(selected);
+  const selectedPayload = buildSelectedRunPublicPayload(selected);
+  const latestEvent = selected.latestEvent
+    ? {
+        at: selected.latestEvent.at,
+        event: selected.latestEvent.event,
+        message: selected.latestEvent.message
+      }
+    : null;
+  const recentEvents = latestEvent ? [latestEvent] : [];
 
   return {
-    issue_identifier: projection.issueIdentifier,
-    issue_id: projection.issueId,
-    status: projection.status,
+    issue_identifier: selected.issueIdentifier,
+    issue_id: selected.issueId,
+    status: selected.rawStatus,
+    raw_status: selected.rawStatus,
+    display_status: selected.displayStatus,
+    status_reason: selected.statusReason,
     workspace: {
-      path: projection.workspacePath
+      path: selected.workspacePath
     },
     attempts: {
       restart_count: 0,
@@ -1681,10 +1811,121 @@ function buildCompatibilityIssuePayload(
     logs: {
       codex_session_logs: []
     },
+    summary: selected.summary,
+    latest_event: latestEvent,
+    question_summary: selectedPayload.question_summary,
     recent_events: recentEvents,
-    last_error: projection.status === 'failed' ? projection.summary ?? 'run_failed' : null,
-    tracked: buildCompatibilityTrackedPayload(dispatchPilotEvaluation) ?? {},
-    ...(dispatchPilotEvaluation?.summary.configured ? { dispatch_pilot: dispatchPilotEvaluation.summary } : {})
+    last_error: selected.lastError,
+    tracked: selected.trackedPayload ?? {},
+    ...(selected.dispatchPilotEvaluation.summary.configured
+      ? { dispatch_pilot: selected.dispatchPilotEvaluation.summary }
+      : {})
+  };
+}
+
+function buildSelectedRunPublicPayload(selected: SelectedRunContext): Record<string, unknown> {
+  return {
+    issue_id: selected.issueId,
+    issue_identifier: selected.issueIdentifier,
+    task_id: selected.taskId,
+    run_id: selected.runId,
+    raw_status: selected.rawStatus,
+    display_status: selected.displayStatus,
+    status_reason: selected.statusReason,
+    started_at: selected.startedAt,
+    updated_at: selected.updatedAt,
+    completed_at: selected.completedAt,
+    summary: selected.summary,
+    last_error: selected.lastError,
+    latest_action: selected.latestAction,
+    latest_event: selected.latestEvent
+      ? {
+          at: selected.latestEvent.at,
+          event: selected.latestEvent.event,
+          message: selected.latestEvent.message,
+          requested_by: selected.latestEvent.requestedBy,
+          reason: selected.latestEvent.reason
+        }
+      : null,
+    workspace: {
+      path: selected.workspacePath
+    },
+    question_summary: buildSelectedRunQuestionSummaryPayload(selected.questionSummary),
+    ...(selected.trackedPayload ? { tracked: selected.trackedPayload } : {})
+  };
+}
+
+function buildSelectedRunQuestionSummaryPayload(summary: SelectedRunQuestionSummary): Record<string, unknown> {
+  return {
+    queued_count: summary.queuedCount,
+    latest_question: summary.latestQuestion
+      ? {
+          question_id: summary.latestQuestion.questionId,
+          prompt: summary.latestQuestion.prompt,
+          urgency: summary.latestQuestion.urgency,
+          queued_at: summary.latestQuestion.queuedAt
+        }
+      : null
+  };
+}
+
+function buildSelectedRunQuestionSummary(records: QuestionRecord[]): SelectedRunQuestionSummary {
+  const queued = records.filter((record) => record.status === 'queued');
+  let latestQuestion: QuestionRecord | null = null;
+  for (const record of queued) {
+    if (!latestQuestion) {
+      latestQuestion = record;
+      continue;
+    }
+    if (Date.parse(record.queued_at) >= Date.parse(latestQuestion.queued_at)) {
+      latestQuestion = record;
+    }
+  }
+  return {
+    queuedCount: queued.length,
+    latestQuestion: latestQuestion
+      ? {
+          questionId: latestQuestion.question_id,
+          prompt: latestQuestion.prompt,
+          urgency: latestQuestion.urgency,
+          queuedAt: latestQuestion.queued_at
+        }
+      : null
+  };
+}
+
+function resolveSelectedRunDisplayStatus(input: {
+  rawStatus: string;
+  latestAction: ControlAction['action'] | null;
+  questionSummary: SelectedRunQuestionSummary;
+}): { displayStatus: string; statusReason: string | null } {
+  if (input.rawStatus === 'in_progress' && input.latestAction === 'pause') {
+    return {
+      displayStatus: 'paused',
+      statusReason: input.questionSummary.queuedCount > 0 ? 'queued_questions' : 'control_pause'
+    };
+  }
+  if (input.rawStatus === 'in_progress' && input.questionSummary.queuedCount > 0) {
+    return { displayStatus: 'awaiting_input', statusReason: 'queued_questions' };
+  }
+  return { displayStatus: input.rawStatus, statusReason: null };
+}
+
+function buildSelectedRunLatestEvent(input: {
+  controlAction: ControlAction | null;
+  updatedAt: string | null;
+  summary: string | null;
+  fallbackEvent: string;
+}): SelectedRunLatestEvent | null {
+  if (!input.controlAction && !input.updatedAt && !input.summary) {
+    return null;
+  }
+  return {
+    at: input.controlAction?.requested_at ?? input.updatedAt,
+    event: input.controlAction?.action ?? input.fallbackEvent,
+    message: input.summary,
+    requestedBy: input.controlAction?.requested_by ?? null,
+    reason: input.controlAction?.reason ?? null
   };
 }
 
@@ -2931,9 +3172,10 @@ async function buildUiDataset(context: RequestContext): Promise<Record<string, u
   const manifest = await readJsonFile<CliManifest>(context.paths.manifestPath);
   const generatedAt = isoTimestamp();
   if (!manifest) {
-    return { generated_at: generatedAt, tasks: [], runs: [], codebase: null, activity: [] };
+    return { generated_at: generatedAt, tasks: [], runs: [], codebase: null, activity: [], selected: null };
   }
 
+  const selected = await buildSelectedRunContext(context);
   const bucketInfo = classifyBucket(manifest.status, context.controlStore.snapshot());
   const approvalsTotal = Array.isArray(manifest.approvals) ? manifest.approvals.length : 0;
   const repoRoot = resolveRepoRootFromRunDir(context.paths.runDir);
@@ -2956,6 +3198,9 @@ async function buildUiDataset(context: RequestContext): Promise<Record<string, u
     run_id: manifest.run_id,
     task_id: manifest.task_id,
     status: manifest.status,
+    raw_status: selected?.rawStatus ?? manifest.status,
+    display_status: selected?.displayStatus ?? manifest.status,
+    status_reason: selected?.statusReason ?? null,
     started_at: manifest.started_at,
     updated_at: manifest.updated_at,
     completed_at: manifest.completed_at,
@@ -2963,7 +3208,16 @@ async function buildUiDataset(context: RequestContext): Promise<Record<string, u
     links,
     approvals_pending: 0,
     approvals_total: approvalsTotal,
-    heartbeat_stale: false
+    heartbeat_stale: false,
+    latest_event: selected?.latestEvent
+      ? {
+          at: selected.latestEvent.at,
+          event: selected.latestEvent.event,
+          message: selected.latestEvent.message
+        }
+      : null,
+    question_summary: selected ? buildSelectedRunQuestionSummaryPayload(selected.questionSummary) : null,
+    ...(selected?.trackedPayload ? { tracked: selected.trackedPayload } : {})
   };
 
   const taskEntry = {
@@ -2972,11 +3226,16 @@ async function buildUiDataset(context: RequestContext): Promise<Record<string, u
     bucket: bucketInfo.bucket,
     bucket_reason: bucketInfo.reason,
     status: manifest.status,
+    raw_status: selected?.rawStatus ?? manifest.status,
+    display_status: selected?.displayStatus ?? manifest.status,
+    status_reason: selected?.statusReason ?? null,
     last_update: manifest.updated_at,
     latest_run_id: manifest.run_id,
     approvals_pending: 0,
     approvals_total: approvalsTotal,
-    summary: manifest.summary ?? ''
+    summary: manifest.summary ?? '',
+    question_summary: selected ? buildSelectedRunQuestionSummaryPayload(selected.questionSummary) : null,
+    ...(selected?.trackedPayload ? { tracked: selected.trackedPayload } : {})
   };
 
   return {
@@ -2984,7 +3243,8 @@ async function buildUiDataset(context: RequestContext): Promise<Record<string, u
     tasks: [taskEntry],
     runs: [runEntry],
     codebase: null,
-    activity: []
+    activity: [],
+    selected: selected ? buildSelectedRunPublicPayload(selected) : null
   };
 }
 

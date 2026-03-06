@@ -61,6 +61,21 @@ async function seedDispatchPilot(
   );
 }
 
+async function seedControlState(
+  paths: ReturnType<typeof resolveRunPaths>,
+  overrides: Record<string, unknown> = {}
+): Promise<void> {
+  await writeFile(
+    paths.controlPath,
+    JSON.stringify({
+      run_id: 'run-1',
+      control_seq: 0,
+      ...overrides
+    }),
+    'utf8'
+  );
+}
+
 async function seedTransportMutatingControls(
   paths: ReturnType<typeof resolveRunPaths>,
   options: {
@@ -193,16 +208,27 @@ afterEach(() => {
 });
 
 describe('TelegramOversightBridge', () => {
-  it('renders status and queued questions through the integrated polling bridge', async () => {
+  it('renders selected-run status issue and queued questions through the integrated polling bridge', async () => {
     const { root, env, paths } = await createRunRoot('task-1014-telegram-status');
     await seedManifest(paths);
-    await seedDispatchPilot(paths, {
-      enabled: true,
-      source: {
-        provider: 'linear',
-        team_id: 'lin-team-ready',
-        summary: 'route advisory to queue',
-        reason: 'signal threshold met'
+    await seedControlState(paths, {
+      control_seq: 1,
+      latest_action: {
+        action: 'pause',
+        requested_at: '2026-03-06T03:01:00.000Z',
+        requested_by: 'operator',
+        reason: 'manual_pause'
+      },
+      feature_toggles: {
+        dispatch_pilot: {
+          enabled: true,
+          source: {
+            provider: 'linear',
+            team_id: 'lin-team-ready',
+            summary: 'route advisory to queue',
+            reason: 'signal threshold met'
+          }
+        }
       }
     });
     await seedQuestions(paths, [
@@ -254,13 +280,35 @@ describe('TelegramOversightBridge', () => {
       const statusMessage = telegram.sentMessages.find((message) => message.text.includes('CO status'));
       expect(statusMessage?.chat_id).toBe('1234');
       expect(statusMessage?.text).toContain('Issue: task-0940');
-      expect(statusMessage?.text).toContain('State: in_progress');
+      expect(statusMessage?.text).toContain('State: paused (raw in_progress)');
+      expect(statusMessage?.text).toContain('Reason: queued_questions');
+      expect(statusMessage?.text).toContain('Queued questions: 1');
       expect(statusMessage?.text).toContain('Dispatch: ready/ready');
 
       telegram.updates.push({
         update_id: 101,
         message: {
           message_id: 2,
+          text: '/issue',
+          chat: { id: 1234, type: 'private' },
+          from: { id: 77, is_bot: false, first_name: 'Operator' }
+        }
+      });
+
+      await waitForCondition(async () =>
+        telegram.sentMessages.some((message) => message.text.includes('Issue task-0940'))
+      );
+
+      const issueMessage = telegram.sentMessages.find((message) => message.text.includes('Issue task-0940'));
+      expect(issueMessage?.text).toContain('Status: paused (raw in_progress)');
+      expect(issueMessage?.text).toContain('Reason: queued_questions');
+      expect(issueMessage?.text).toContain('Latest event: pause');
+      expect(issueMessage?.text).toContain('Queued questions: 1');
+
+      telegram.updates.push({
+        update_id: 102,
+        message: {
+          message_id: 3,
           text: '/questions',
           chat: { id: 1234, type: 'private' },
           from: { id: 77, is_bot: false, first_name: 'Operator' }
@@ -268,16 +316,18 @@ describe('TelegramOversightBridge', () => {
       });
 
       await waitForCondition(async () =>
-        telegram.sentMessages.some((message) => message.text.includes('Queued questions: 1'))
+        JSON.parse(await readFile(join(paths.runDir, 'telegram-oversight-state.json'), 'utf8')).next_update_id === 103
       );
 
-      const questionsMessage = telegram.sentMessages.find((message) => message.text.includes('Queued questions: 1'));
+      const questionsMessage = telegram.sentMessages.find((message) =>
+        message.text.includes('q-0001 [high]: Should we keep polling enabled?')
+      );
       expect(questionsMessage?.text).toContain('q-0001 [high]');
       expect(questionsMessage?.text).toContain('Should we keep polling enabled?');
 
       const stateRaw = await readFile(join(paths.runDir, 'telegram-oversight-state.json'), 'utf8');
       const bridgeState = JSON.parse(stateRaw) as { next_update_id?: number };
-      expect(bridgeState.next_update_id).toBe(102);
+      expect(bridgeState.next_update_id).toBe(103);
     } finally {
       await server.close();
       await rm(root, { recursive: true, force: true });

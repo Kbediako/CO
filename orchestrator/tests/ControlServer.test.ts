@@ -74,6 +74,28 @@ async function seedDispatchPilot(
   );
 }
 
+async function seedControlState(
+  paths: ReturnType<typeof resolveRunPaths>,
+  overrides: Record<string, unknown> = {}
+): Promise<void> {
+  await writeFile(
+    paths.controlPath,
+    JSON.stringify({
+      run_id: 'run-1',
+      control_seq: 0,
+      ...overrides
+    }),
+    'utf8'
+  );
+}
+
+async function seedQuestions(
+  paths: ReturnType<typeof resolveRunPaths>,
+  questions: Array<Record<string, unknown>>
+): Promise<void> {
+  await writeFile(paths.questionsPath, JSON.stringify({ questions }), 'utf8');
+}
+
 async function seedManifest(
   paths: ReturnType<typeof resolveRunPaths>,
   overrides: Record<string, unknown> = {}
@@ -365,6 +387,11 @@ describe('ControlServer', () => {
         generated_at?: string;
         counts?: { running?: number; retrying?: number };
         running?: Array<{ issue_identifier?: string; session_id?: string; state?: string }>;
+        selected?: {
+          issue_identifier?: string;
+          raw_status?: string;
+          display_status?: string;
+        } | null;
         retrying?: unknown[];
       };
       expect(statePayload.generated_at).toBeTruthy();
@@ -373,6 +400,11 @@ describe('ControlServer', () => {
         issue_identifier: 'task-0940',
         session_id: 'run-1',
         state: 'in_progress'
+      });
+      expect(statePayload.selected).toMatchObject({
+        issue_identifier: 'task-0940',
+        raw_status: 'in_progress',
+        display_status: 'in_progress'
       });
       expect(statePayload.retrying).toEqual([]);
 
@@ -385,11 +417,15 @@ describe('ControlServer', () => {
       const issuePayload = (await issueRes.json()) as {
         issue_identifier?: string;
         status?: string;
+        raw_status?: string;
+        display_status?: string;
         workspace?: { path?: string };
         running?: { state?: string };
       };
       expect(issuePayload.issue_identifier).toBe('task-0940');
       expect(issuePayload.status).toBe('in_progress');
+      expect(issuePayload.raw_status).toBe('in_progress');
+      expect(issuePayload.display_status).toBe('in_progress');
       expect(issuePayload.workspace?.path).toBe(env.repoRoot);
       expect(issuePayload.running?.state).toBe('in_progress');
 
@@ -407,6 +443,365 @@ describe('ControlServer', () => {
     } finally {
       await server.close();
       await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('keeps selected paused runs coherent across state issue and ui projections', async () => {
+    const { root, env, paths } = await createRunRoot('task-1015-paused');
+    const startedAt = '2026-03-06T03:00:00.000Z';
+    const updatedAt = '2026-03-06T03:02:00.000Z';
+    await seedManifest(paths, {
+      status: 'in_progress',
+      started_at: startedAt,
+      updated_at: updatedAt,
+      summary: 'Waiting for operator approval'
+    });
+    await seedControlState(paths, {
+      control_seq: 1,
+      latest_action: {
+        action: 'pause',
+        requested_at: '2026-03-06T03:01:00.000Z',
+        requested_by: 'operator',
+        reason: 'manual_pause'
+      },
+      feature_toggles: {
+        dispatch_pilot: {
+          enabled: true,
+          source: {
+            provider: 'linear',
+            team_id: 'lin-team-ready',
+            summary: 'route advisory to queue',
+            reason: 'signal threshold met',
+            confidence: 0.7
+          }
+        }
+      }
+    });
+    await seedQuestions(paths, [
+      {
+        question_id: 'q-1015',
+        prompt: 'Approve the advisory handoff?',
+        urgency: 'high',
+        status: 'queued',
+        queued_at: updatedAt
+      }
+    ]);
+    const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
+
+    const server = await ControlServer.start({
+      paths,
+      config,
+      runId: 'run-1'
+    });
+
+    try {
+      const baseUrl = server.getBaseUrl() ?? '';
+      const token = await readToken(paths.controlAuthPath);
+
+      const stateRes = await fetch(new URL('/api/v1/state', baseUrl), {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      expect(stateRes.status).toBe(200);
+      const statePayload = (await stateRes.json()) as {
+        running?: Array<{ display_state?: string; status_reason?: string; last_event?: string }>;
+        selected?: {
+          issue_identifier?: string;
+          raw_status?: string;
+          display_status?: string;
+          status_reason?: string;
+          latest_event?: { event?: string; message?: string | null };
+          question_summary?: { queued_count?: number; latest_question?: { question_id?: string; prompt?: string } | null };
+        } | null;
+        dispatch_pilot?: { status?: string; source_status?: string };
+      };
+      expect(statePayload.running?.[0]).toMatchObject({
+        display_state: 'paused',
+        status_reason: 'queued_questions',
+        last_event: 'pause'
+      });
+      expect(statePayload.selected).toMatchObject({
+        issue_identifier: 'task-0940',
+        raw_status: 'in_progress',
+        display_status: 'paused',
+        status_reason: 'queued_questions',
+        latest_event: {
+          event: 'pause',
+          message: 'Waiting for operator approval'
+        },
+        question_summary: {
+          queued_count: 1,
+          latest_question: {
+            question_id: 'q-1015',
+            prompt: 'Approve the advisory handoff?'
+          }
+        }
+      });
+      expect(statePayload.dispatch_pilot).toMatchObject({
+        status: 'ready',
+        source_status: 'ready'
+      });
+
+      const issueRes = await fetch(new URL('/api/v1/task-0940', baseUrl), {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      expect(issueRes.status).toBe(200);
+      const issuePayload = (await issueRes.json()) as {
+        raw_status?: string;
+        display_status?: string;
+        status_reason?: string;
+        latest_event?: { event?: string; message?: string | null } | null;
+        question_summary?: { queued_count?: number; latest_question?: { question_id?: string } | null } | null;
+      };
+      expect(issuePayload).toMatchObject({
+        raw_status: 'in_progress',
+        display_status: 'paused',
+        status_reason: 'queued_questions',
+        latest_event: {
+          event: 'pause',
+          message: 'Waiting for operator approval'
+        },
+        question_summary: {
+          queued_count: 1,
+          latest_question: {
+            question_id: 'q-1015'
+          }
+        }
+      });
+
+      const uiRes = await fetch(new URL('/ui/data.json', baseUrl), {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      expect(uiRes.status).toBe(200);
+      const uiPayload = (await uiRes.json()) as {
+        selected?: {
+          display_status?: string;
+          question_summary?: { queued_count?: number };
+        } | null;
+        tasks?: Array<{ display_status?: string; status_reason?: string }>;
+        runs?: Array<{ display_status?: string; status_reason?: string }>;
+      };
+      expect(uiPayload.selected).toMatchObject({
+        display_status: 'paused',
+        question_summary: {
+          queued_count: 1
+        }
+      });
+      expect(uiPayload.tasks?.[0]).toMatchObject({
+        display_status: 'paused',
+        status_reason: 'queued_questions'
+      });
+      expect(uiPayload.runs?.[0]).toMatchObject({
+        display_status: 'paused',
+        status_reason: 'queued_questions'
+      });
+    } finally {
+      await server.close();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('keeps awaiting-input runs coherent across state issue and ui projections', async () => {
+    const { root, env, paths } = await createRunRoot('task-1015-awaiting-input');
+    const updatedAt = '2026-03-06T03:12:00.000Z';
+    await seedManifest(paths, {
+      status: 'in_progress',
+      updated_at: updatedAt,
+      summary: 'Waiting for question response'
+    });
+    await seedQuestions(paths, [
+      {
+        question_id: 'q-1015-awaiting',
+        prompt: 'Proceed with the next rollout?',
+        urgency: 'medium',
+        status: 'queued',
+        queued_at: updatedAt
+      }
+    ]);
+    const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
+
+    const server = await ControlServer.start({
+      paths,
+      config,
+      runId: 'run-1'
+    });
+
+    try {
+      const baseUrl = server.getBaseUrl() ?? '';
+      const token = await readToken(paths.controlAuthPath);
+
+      const stateRes = await fetch(new URL('/api/v1/state', baseUrl), {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      expect(stateRes.status).toBe(200);
+      const statePayload = (await stateRes.json()) as {
+        running?: Array<{ state?: string; display_state?: string; status_reason?: string }>;
+        selected?: {
+          display_status?: string;
+          status_reason?: string;
+          question_summary?: { queued_count?: number; latest_question?: { question_id?: string } | null };
+        } | null;
+      };
+      expect(statePayload.running?.[0]).toMatchObject({
+        state: 'in_progress',
+        display_state: 'awaiting_input',
+        status_reason: 'queued_questions'
+      });
+      expect(statePayload.selected).toMatchObject({
+        display_status: 'awaiting_input',
+        status_reason: 'queued_questions',
+        question_summary: {
+          queued_count: 1,
+          latest_question: {
+            question_id: 'q-1015-awaiting'
+          }
+        }
+      });
+
+      const issueRes = await fetch(new URL('/api/v1/task-0940', baseUrl), {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      expect(issueRes.status).toBe(200);
+      const issuePayload = (await issueRes.json()) as {
+        raw_status?: string;
+        display_status?: string;
+        status_reason?: string;
+        question_summary?: { queued_count?: number; latest_question?: { question_id?: string } | null } | null;
+      };
+      expect(issuePayload).toMatchObject({
+        raw_status: 'in_progress',
+        display_status: 'awaiting_input',
+        status_reason: 'queued_questions',
+        question_summary: {
+          queued_count: 1,
+          latest_question: {
+            question_id: 'q-1015-awaiting'
+          }
+        }
+      });
+
+      const uiRes = await fetch(new URL('/ui/data.json', baseUrl), {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      expect(uiRes.status).toBe(200);
+      const uiPayload = (await uiRes.json()) as {
+        selected?: { display_status?: string } | null;
+        tasks?: Array<{ display_status?: string }>;
+        runs?: Array<{ display_status?: string }>;
+      };
+      expect(uiPayload.selected?.display_status).toBe('awaiting_input');
+      expect(uiPayload.tasks?.[0]?.display_status).toBe('awaiting_input');
+      expect(uiPayload.runs?.[0]?.display_status).toBe('awaiting_input');
+    } finally {
+      await server.close();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('keeps terminal selected runs visible across state issue and ui projections', async () => {
+    const scenarios = [
+      {
+        status: 'succeeded',
+        summary: 'Completed successfully',
+        expectedLastError: null
+      },
+      {
+        status: 'failed',
+        summary: 'Dispatch failed closed',
+        expectedLastError: 'Dispatch failed closed'
+      }
+    ] as const;
+
+    for (const scenario of scenarios) {
+      const { root, env, paths } = await createRunRoot(`task-1015-${scenario.status}`);
+      await seedManifest(paths, {
+        status: scenario.status,
+        updated_at: '2026-03-06T03:20:00.000Z',
+        completed_at: '2026-03-06T03:21:00.000Z',
+        summary: scenario.summary
+      });
+      const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
+
+      const server = await ControlServer.start({
+        paths,
+        config,
+        runId: 'run-1'
+      });
+
+      try {
+        const baseUrl = server.getBaseUrl() ?? '';
+        const token = await readToken(paths.controlAuthPath);
+
+        const stateRes = await fetch(new URL('/api/v1/state', baseUrl), {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        });
+        expect(stateRes.status).toBe(200);
+        const statePayload = (await stateRes.json()) as {
+          counts?: { running?: number };
+          running?: unknown[];
+          selected?: { display_status?: string; last_error?: string | null } | null;
+        };
+        expect(statePayload.counts?.running).toBe(0);
+        expect(statePayload.running).toEqual([]);
+        expect(statePayload.selected).toMatchObject({
+          display_status: scenario.status,
+          last_error: scenario.expectedLastError
+        });
+
+        const issueRes = await fetch(new URL('/api/v1/task-0940', baseUrl), {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        });
+        expect(issueRes.status).toBe(200);
+        const issuePayload = (await issueRes.json()) as {
+          display_status?: string;
+          latest_event?: { event?: string };
+          last_error?: string | null;
+        };
+        expect(issuePayload).toMatchObject({
+          display_status: scenario.status,
+          latest_event: {
+            event: scenario.status
+          },
+          last_error: scenario.expectedLastError
+        });
+
+        const uiRes = await fetch(new URL('/ui/data.json', baseUrl), {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        });
+        expect(uiRes.status).toBe(200);
+        const uiPayload = (await uiRes.json()) as {
+          selected?: { display_status?: string } | null;
+          tasks?: Array<{ display_status?: string; bucket?: string; bucket_reason?: string }>;
+          runs?: Array<{ display_status?: string }>;
+        };
+        expect(uiPayload.selected?.display_status).toBe(scenario.status);
+        expect(uiPayload.tasks?.[0]).toMatchObject({
+          display_status: scenario.status,
+          bucket: 'complete',
+          bucket_reason: 'terminal'
+        });
+        expect(uiPayload.runs?.[0]?.display_status).toBe(scenario.status);
+      } finally {
+        await server.close();
+        await rm(root, { recursive: true, force: true });
+      }
     }
   });
 
@@ -1051,6 +1446,61 @@ describe('ControlServer', () => {
       });
       expect(issuePayload.tracked?.linear?.recent_activity?.[0]?.summary).toBe('State Todo -> In Progress');
       expect(issuePayload.workspace?.path).toBe(env.repoRoot);
+    } finally {
+      await server.close();
+      await rm(root, { recursive: true, force: true });
+      vi.unstubAllEnvs();
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('fails missing compatibility issues without triggering live Linear provider fetches', async () => {
+    const { root, env, paths } = await createRunRoot('task-1015-live-linear-missing');
+    await seedManifest(paths);
+    await seedDispatchPilot(paths, {
+      enabled: true,
+      source: {
+        provider: 'linear',
+        live: true,
+        workspace_id: 'lin-workspace-1',
+        team_id: 'lin-team-live',
+        project_id: 'lin-project-1'
+      }
+    });
+    const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
+    const realFetch = globalThis.fetch;
+    let linearFetchCount = 0;
+
+    vi.stubEnv('CO_LINEAR_API_TOKEN', 'lin-api-token');
+    vi.stubGlobal('fetch', async (input, init) => {
+      const rawUrl = input instanceof Request ? input.url : String(input);
+      const url = new URL(rawUrl);
+      if (url.toString() === 'https://api.linear.app/graphql') {
+        linearFetchCount += 1;
+        return new Response(JSON.stringify({ data: { viewer: null, issues: { nodes: [] } } }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+      return realFetch(input, init);
+    });
+
+    const server = await ControlServer.start({
+      paths,
+      config,
+      runId: 'run-1'
+    });
+
+    try {
+      const baseUrl = server.getBaseUrl() ?? '';
+      const token = await readToken(paths.controlAuthPath);
+      const missingIssueRes = await fetch(new URL('/api/v1/task-missing', baseUrl), {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      expect(missingIssueRes.status).toBe(404);
+      expect(linearFetchCount).toBe(0);
     } finally {
       await server.close();
       await rm(root, { recursive: true, force: true });

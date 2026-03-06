@@ -1936,6 +1936,22 @@
       "completed_at": "2026-03-06"
     },
     {
+      "id": "1015",
+      "slug": "1015-coordinator-symphony-aligned-selected-run-projection-and-advisory-context",
+      "title": "Coordinator Symphony-Aligned Selected-Run Projection + Advisory Context",
+      "path": "tasks/tasks-1015-coordinator-symphony-aligned-selected-run-projection-and-advisory-context.md",
+      "kind": "run",
+      "status": "completed",
+      "gate": {
+        "phase": "coordinator-symphony-aligned-selected-run-projection-and-advisory-context-closeout-override",
+        "status": "succeeded",
+        "log": "out/1015-coordinator-symphony-aligned-selected-run-projection-and-advisory-context/manual/20260306T061614Z-closeout/00-summary.md",
+        "run_id": "20260306T061614Z-closeout"
+      },
+      "created_at": "2026-03-06",
+      "completed_at": "2026-03-06"
+    },
+    {
       "id": "1014",
       "slug": "1014-coordinator-symphony-aligned-telegram-oversight-and-live-linear-advisory-adapters",
       "title": "Coordinator Symphony-Aligned Telegram Oversight + Live Linear Advisory Adapters",
@@ -2895,6 +2911,22 @@
         "task": "tasks/tasks-1001-coordinator-appserver-dynamic-tool-bridge-experimental-lane.md",
         "agent_task": ".agent/task/1001-coordinator-appserver-dynamic-tool-bridge-experimental-lane.md",
         "docs": "docs/TECH_SPEC-coordinator-appserver-dynamic-tool-bridge-experimental-lane.md"
+      }
+    },
+    {
+      "id": "20260306-1015-coordinator-symphony-aligned-selected-run-projection-and-advisory-context",
+      "title": "Coordinator Symphony-Aligned Selected-Run Projection + Advisory Context",
+      "relates_to": "tasks/tasks-1015-coordinator-symphony-aligned-selected-run-projection-and-advisory-context.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-06",
+      "paths": {
+        "spec": "tasks/specs/1015-coordinator-symphony-aligned-selected-run-projection-and-advisory-context.md",
+        "task": "tasks/tasks-1015-coordinator-symphony-aligned-selected-run-projection-and-advisory-context.md",
+        "agent_task": ".agent/task/1015-coordinator-symphony-aligned-selected-run-projection-and-advisory-context.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-selected-run-projection-and-advisory-context.md"
       }
     },
     {

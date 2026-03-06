@@ -60,6 +60,52 @@ interface TelegramUpdate {
   message?: TelegramMessage;
 }
 
+interface ControlDispatchPilotPayload {
+  status?: string;
+  source_status?: string;
+  reason?: string;
+}
+
+interface ControlTrackedLinearPayload {
+  identifier?: string | null;
+  title?: string | null;
+  state?: string | null;
+  url?: string | null;
+  team_key?: string | null;
+}
+
+interface ControlQuestionSummaryPayload {
+  queued_count?: number;
+  latest_question?: {
+    question_id?: string | null;
+    prompt?: string | null;
+    urgency?: string | null;
+    queued_at?: string | null;
+  } | null;
+}
+
+interface ControlLatestEventPayload {
+  event?: string | null;
+  message?: string | null;
+  at?: string | null;
+  requested_by?: string | null;
+  reason?: string | null;
+}
+
+interface ControlSelectedRunPayload {
+  issue_identifier?: string | null;
+  run_id?: string | null;
+  raw_status?: string | null;
+  display_status?: string | null;
+  status_reason?: string | null;
+  summary?: string | null;
+  latest_event?: ControlLatestEventPayload | null;
+  question_summary?: ControlQuestionSummaryPayload | null;
+  tracked?: {
+    linear?: ControlTrackedLinearPayload;
+  } | null;
+}
+
 interface ControlStatePayload {
   counts?: {
     running?: number;
@@ -69,55 +115,36 @@ interface ControlStatePayload {
     issue_identifier?: string | null;
     session_id?: string | null;
     state?: string | null;
+    display_state?: string | null;
+    status_reason?: string | null;
     last_event?: string | null;
     last_message?: string | null;
   }>;
-  dispatch_pilot?: {
-    status?: string;
-    source_status?: string;
-    reason?: string;
-  } | null;
+  selected?: ControlSelectedRunPayload | null;
+  dispatch_pilot?: ControlDispatchPilotPayload | null;
   tracked?: {
-    linear?: {
-      identifier?: string | null;
-      title?: string | null;
-      state?: string | null;
-      url?: string | null;
-      team_key?: string | null;
-    };
+    linear?: ControlTrackedLinearPayload;
   } | null;
 }
 
 interface ControlIssuePayload {
   issue_identifier?: string | null;
   status?: string | null;
-  recent_events?: Array<{
-    event?: string | null;
-    message?: string | null;
-    at?: string | null;
-  }>;
+  raw_status?: string | null;
+  display_status?: string | null;
+  status_reason?: string | null;
+  summary?: string | null;
+  latest_event?: ControlLatestEventPayload | null;
+  question_summary?: ControlQuestionSummaryPayload | null;
+  recent_events?: ControlLatestEventPayload[];
   tracked?: {
-    linear?: {
-      identifier?: string | null;
-      title?: string | null;
-      state?: string | null;
-      url?: string | null;
-      team_key?: string | null;
-    };
+    linear?: ControlTrackedLinearPayload;
   } | null;
-  dispatch_pilot?: {
-    status?: string;
-    source_status?: string;
-    reason?: string;
-  } | null;
+  dispatch_pilot?: ControlDispatchPilotPayload | null;
 }
 
 interface ControlDispatchPayload {
-  dispatch_pilot?: {
-    status?: string;
-    source_status?: string;
-    reason?: string;
-  } | null;
+  dispatch_pilot?: ControlDispatchPilotPayload | null;
   recommendation?: {
     dispatch_id?: string | null;
     summary?: string | null;
@@ -134,11 +161,7 @@ interface ControlDispatchPayload {
   error?: {
     code?: string;
     details?: {
-      dispatch_pilot?: {
-        status?: string;
-        source_status?: string;
-        reason?: string;
-      } | null;
+      dispatch_pilot?: ControlDispatchPilotPayload | null;
     };
   } | null;
 }
@@ -382,10 +405,11 @@ class TelegramOversightBridgeRuntime implements TelegramOversightBridge {
 
   private async renderStatus(): Promise<string> {
     const payload = await this.readControlJson<ControlStatePayload>('/api/v1/state');
+    const selected = payload.selected ?? null;
     const running = payload.running?.[0] ?? null;
     const dispatch = payload.dispatch_pilot ?? null;
-    const trackedLinear = payload.tracked?.linear ?? null;
-    if (!running) {
+    const trackedLinear = selected?.tracked?.linear ?? payload.tracked?.linear ?? null;
+    if (!selected && !running) {
       return [
         'CO status',
         'No active running projection.',
@@ -399,13 +423,24 @@ class TelegramOversightBridgeRuntime implements TelegramOversightBridge {
         .join('\n');
     }
 
+    const issueIdentifier = selected?.issue_identifier ?? running?.issue_identifier ?? 'n/a';
+    const sessionId = selected?.run_id ?? running?.session_id ?? null;
+    const displayStatus = selected?.display_status ?? running?.display_state ?? running?.state ?? 'unknown';
+    const rawStatus = selected?.raw_status ?? running?.state ?? null;
+    const statusReason = selected?.status_reason ?? running?.status_reason ?? null;
+    const latestEvent = selected?.latest_event ?? null;
+    const questionSummary = selected?.question_summary ?? null;
+    const summary = latestEvent?.message ?? selected?.summary ?? running?.last_message ?? null;
+
     return [
       'CO status',
-      `Issue: ${running.issue_identifier ?? 'n/a'}`,
-      `State: ${running.state ?? 'unknown'}`,
-      running.session_id ? `Session: ${running.session_id}` : null,
-      running.last_event ? `Last event: ${running.last_event}` : null,
-      running.last_message ? `Summary: ${truncateLine(running.last_message, 180)}` : null,
+      `Issue: ${issueIdentifier}`,
+      formatStateLine(displayStatus, rawStatus),
+      statusReason ? `Reason: ${statusReason}` : null,
+      sessionId ? `Session: ${sessionId}` : null,
+      latestEvent?.event ? `Last event: ${latestEvent.event}` : running?.last_event ? `Last event: ${running.last_event}` : null,
+      summary ? `Summary: ${truncateLine(summary, 180)}` : null,
+      formatQuestionSummary(questionSummary),
       trackedLinear?.identifier
         ? `Linear: ${trackedLinear.identifier}${trackedLinear.title ? ` - ${truncateLine(trackedLinear.title, 120)}` : ''}`
         : null,
@@ -423,16 +458,23 @@ class TelegramOversightBridgeRuntime implements TelegramOversightBridge {
     }
     const payload = await this.readControlJson<ControlIssuePayload>(`/api/v1/${encodeURIComponent(issueIdentifier)}`);
     const trackedLinear = payload.tracked?.linear ?? null;
-    const latestEvent = payload.recent_events?.[0] ?? null;
+    const latestEvent = payload.latest_event ?? payload.recent_events?.[0] ?? null;
+    const displayStatus = payload.display_status ?? payload.status ?? 'unknown';
 
     return [
       `Issue ${payload.issue_identifier ?? issueIdentifier}`,
-      `Status: ${payload.status ?? 'unknown'}`,
+      formatStateLine(displayStatus, payload.raw_status ?? payload.status ?? null, 'Status'),
+      payload.status_reason ? `Reason: ${payload.status_reason}` : null,
       trackedLinear?.identifier ? `Linear: ${trackedLinear.identifier}${trackedLinear.title ? ` - ${truncateLine(trackedLinear.title, 120)}` : ''}` : null,
       trackedLinear?.state ? `Linear state: ${trackedLinear.state}` : null,
       trackedLinear?.url ? `Linear URL: ${trackedLinear.url}` : null,
       latestEvent?.event ? `Latest event: ${latestEvent.event}` : null,
-      latestEvent?.message ? `Latest summary: ${truncateLine(latestEvent.message, 180)}` : null,
+      latestEvent?.message
+        ? `Latest summary: ${truncateLine(latestEvent.message, 180)}`
+        : payload.summary
+          ? `Latest summary: ${truncateLine(payload.summary, 180)}`
+          : null,
+      formatQuestionSummary(payload.question_summary),
       formatDispatchSummary(payload.dispatch_pilot ?? null)
     ]
       .filter(Boolean)
@@ -537,6 +579,10 @@ class TelegramOversightBridgeRuntime implements TelegramOversightBridge {
 
   private async resolveIssueIdentifier(): Promise<string | null> {
     const state = await this.readControlJson<ControlStatePayload>('/api/v1/state');
+    const selectedIdentifier = state.selected?.issue_identifier;
+    if (typeof selectedIdentifier === 'string' && selectedIdentifier.trim().length > 0) {
+      return selectedIdentifier.trim();
+    }
     const runningIdentifier = state.running?.[0]?.issue_identifier;
     if (typeof runningIdentifier === 'string' && runningIdentifier.trim().length > 0) {
       return runningIdentifier.trim();
@@ -697,14 +743,7 @@ function buildHelpMessage(mutationsEnabled: boolean): string {
 }
 
 function formatDispatchSummary(
-  dispatchPilot:
-    | {
-        status?: string;
-        source_status?: string;
-        reason?: string;
-      }
-    | null
-    | undefined
+  dispatchPilot: ControlDispatchPilotPayload | null | undefined
 ): string | null {
   if (!dispatchPilot) {
     return null;
@@ -713,6 +752,36 @@ function formatDispatchSummary(
   const sourceStatus = dispatchPilot.source_status ?? 'unknown';
   const reason = dispatchPilot.reason ? ` (${dispatchPilot.reason})` : '';
   return `Dispatch: ${status}/${sourceStatus}${reason}`;
+}
+
+function formatStateLine(
+  displayStatus: string | null | undefined,
+  rawStatus: string | null | undefined,
+  label = 'State'
+): string {
+  const normalizedDisplay = displayStatus && displayStatus.trim().length > 0 ? displayStatus.trim() : 'unknown';
+  const normalizedRaw = rawStatus && rawStatus.trim().length > 0 ? rawStatus.trim() : null;
+  if (!normalizedRaw || normalizedRaw === normalizedDisplay) {
+    return `${label}: ${normalizedDisplay}`;
+  }
+  return `${label}: ${normalizedDisplay} (raw ${normalizedRaw})`;
+}
+
+function formatQuestionSummary(summary: ControlQuestionSummaryPayload | null | undefined): string | null {
+  if (!summary || typeof summary.queued_count !== 'number' || summary.queued_count <= 0) {
+    return null;
+  }
+  const latestQuestion = summary.latest_question ?? null;
+  const latestPrompt =
+    latestQuestion?.prompt && latestQuestion.prompt.trim().length > 0
+      ? truncateLine(latestQuestion.prompt, 120)
+      : null;
+  const urgency =
+    latestQuestion?.urgency && latestQuestion.urgency.trim().length > 0 ? ` [${latestQuestion.urgency}]` : '';
+  if (latestQuestion?.question_id) {
+    return `Queued questions: ${summary.queued_count} (latest ${latestQuestion.question_id}${urgency}${latestPrompt ? `: ${latestPrompt}` : ''})`;
+  }
+  return `Queued questions: ${summary.queued_count}`;
 }
 
 function truncateLine(value: string, maxLength: number): string {
