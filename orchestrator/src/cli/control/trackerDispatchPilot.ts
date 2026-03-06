@@ -1,4 +1,7 @@
 import {
+  hasLinearApiCredentials,
+  hasLinearSourceBinding,
+  resolveLinearSourceSetup,
   resolveLiveLinearDispatchRecommendation,
   type LiveLinearTrackedActivity,
   type LiveLinearTrackedIssue
@@ -87,6 +90,7 @@ type DispatchPilotSourceParseResult =
 export function evaluateTrackerDispatchPilot(input: {
   featureToggles: Record<string, unknown> | null | undefined;
   defaultIssueIdentifier?: string | null;
+  env?: NodeJS.ProcessEnv;
 }): DispatchPilotEvaluation {
   const resolved = resolveDispatchPilotPolicy(input.featureToggles ?? null);
   const enabled = readBooleanValue(resolved.policy, 'enabled') ?? false;
@@ -102,13 +106,36 @@ export function evaluateTrackerDispatchPilot(input: {
   }
 
   if (source.kind === 'live_linear') {
+    const sourceSetup = resolveLinearSourceSetup(source.sourceSetup, input.env ?? process.env);
+    if (!hasLinearSourceBinding(sourceSetup)) {
+      return buildFailureEvaluation({
+        configured: resolved.configured,
+        sourceStatus: 'malformed',
+        reason: 'dispatch_source_binding_missing',
+        status: 422,
+        code: 'dispatch_source_malformed',
+        sourceSetup
+      });
+    }
+
+    if (!hasLinearApiCredentials(input.env)) {
+      return buildFailureEvaluation({
+        configured: resolved.configured,
+        sourceStatus: 'unavailable',
+        reason: 'dispatch_source_credentials_missing',
+        status: 503,
+        code: 'dispatch_source_unavailable',
+        sourceSetup
+      });
+    }
+
     return buildFailureEvaluation({
       configured: resolved.configured,
       sourceStatus: 'unavailable',
       reason: 'dispatch_source_live_requires_async_evaluation',
       status: 503,
       code: 'dispatch_source_unavailable',
-      sourceSetup: source.sourceSetup
+      sourceSetup
     });
   }
 
@@ -138,6 +165,75 @@ export function evaluateTrackerDispatchPilot(input: {
     configured: resolved.configured,
     recommendation: source.recommendation,
     sourceSetup: source.sourceSetup
+  });
+}
+
+export function summarizeTrackerDispatchPilotPolicy(input: {
+  featureToggles: Record<string, unknown> | null | undefined;
+  env?: NodeJS.ProcessEnv;
+}): DispatchPilotSummary {
+  const resolved = resolveDispatchPilotPolicy(input.featureToggles ?? null);
+  const enabled = readBooleanValue(resolved.policy, 'enabled') ?? false;
+  const killSwitch = readBooleanValue(resolved.policy, 'kill_switch', 'killSwitch') ?? false;
+  const source = parseDispatchPilotSource(resolved.policy, null);
+
+  if (!enabled) {
+    return buildDisabledSummary(resolved.configured, killSwitch);
+  }
+
+  if (killSwitch) {
+    return buildKillSwitchedSummary(resolved.configured, source);
+  }
+
+  if (source.kind === 'unavailable') {
+    return buildFailureSummary({
+      configured: resolved.configured,
+      sourceStatus: 'unavailable',
+      reason: 'dispatch_source_unavailable',
+      sourceSetup: null
+    });
+  }
+
+  if (source.kind === 'malformed') {
+    return buildFailureSummary({
+      configured: resolved.configured,
+      sourceStatus: 'malformed',
+      reason: source.reason,
+      sourceSetup: null
+    });
+  }
+
+  if (source.kind === 'live_linear') {
+    const sourceSetup = resolveLinearSourceSetup(source.sourceSetup, input.env ?? process.env);
+    if (!hasLinearSourceBinding(sourceSetup)) {
+      return buildFailureSummary({
+        configured: resolved.configured,
+        sourceStatus: 'malformed',
+        reason: 'dispatch_source_binding_missing',
+        sourceSetup
+      });
+    }
+
+    if (!hasLinearApiCredentials(input.env)) {
+      return buildFailureSummary({
+        configured: resolved.configured,
+        sourceStatus: 'unavailable',
+        reason: 'dispatch_source_credentials_missing',
+        sourceSetup
+      });
+    }
+
+    return buildReadySummary({
+      configured: resolved.configured,
+      sourceSetup,
+      reason: 'dispatch_source_live_deferred'
+    });
+  }
+
+  return buildReadySummary({
+    configured: resolved.configured,
+    sourceSetup: source.sourceSetup,
+    reason: 'recommendation_available'
   });
 }
 
@@ -227,16 +323,7 @@ export async function evaluateTrackerDispatchPilotAsync(input: {
 
 function buildDisabledEvaluation(configured: boolean, killSwitch: boolean): DispatchPilotEvaluation {
   return {
-    summary: {
-      advisory_only: true,
-      configured,
-      enabled: false,
-      kill_switch: killSwitch,
-      status: 'disabled',
-      source_status: 'disabled',
-      reason: 'pilot_disabled_default_off',
-      source_setup: null
-    },
+    summary: buildDisabledSummary(configured, killSwitch),
     recommendation: null,
     failure: null
   };
@@ -247,17 +334,7 @@ function buildKillSwitchedEvaluation(
   source: DispatchPilotSourceParseResult
 ): DispatchPilotEvaluation {
   return {
-    summary: {
-      advisory_only: true,
-      configured,
-      enabled: true,
-      kill_switch: true,
-      status: 'kill_switched',
-      source_status: 'blocked',
-      reason: 'pilot_kill_switch_enabled',
-      source_setup:
-        source.kind === 'ready' || source.kind === 'live_linear' ? source.sourceSetup : null
-    },
+    summary: buildKillSwitchedSummary(configured, source),
     recommendation: null,
     failure: null
   };
@@ -269,16 +346,11 @@ function buildReadyEvaluation(input: {
   sourceSetup: DispatchPilotSourceSetup;
 }): DispatchPilotEvaluation {
   return {
-    summary: {
-      advisory_only: true,
+    summary: buildReadySummary({
       configured: input.configured,
-      enabled: true,
-      kill_switch: false,
-      status: 'ready',
-      source_status: 'ready',
-      reason: 'recommendation_available',
-      source_setup: input.sourceSetup
-    },
+      sourceSetup: input.sourceSetup,
+      reason: 'recommendation_available'
+    }),
     recommendation: input.recommendation,
     failure: null
   };
@@ -293,22 +365,82 @@ function buildFailureEvaluation(input: {
   sourceSetup: DispatchPilotSourceSetup | null;
 }): DispatchPilotEvaluation {
   return {
-    summary: {
-      advisory_only: true,
+    summary: buildFailureSummary({
       configured: input.configured,
-      enabled: true,
-      kill_switch: false,
-      status: input.sourceStatus === 'unavailable' ? 'source_unavailable' : 'source_malformed',
-      source_status: input.sourceStatus,
+      sourceStatus: input.sourceStatus,
       reason: input.reason,
-      source_setup: input.sourceSetup
-    },
+      sourceSetup: input.sourceSetup
+    }),
     recommendation: null,
     failure: {
       status: input.status,
       code: input.code,
       reason: input.reason
     }
+  };
+}
+
+function buildDisabledSummary(configured: boolean, killSwitch: boolean): DispatchPilotSummary {
+  return {
+    advisory_only: true,
+    configured,
+    enabled: false,
+    kill_switch: killSwitch,
+    status: 'disabled',
+    source_status: 'disabled',
+    reason: 'pilot_disabled_default_off',
+    source_setup: null
+  };
+}
+
+function buildKillSwitchedSummary(
+  configured: boolean,
+  source: DispatchPilotSourceParseResult
+): DispatchPilotSummary {
+  return {
+    advisory_only: true,
+    configured,
+    enabled: true,
+    kill_switch: true,
+    status: 'kill_switched',
+    source_status: 'blocked',
+    reason: 'pilot_kill_switch_enabled',
+    source_setup: source.kind === 'ready' || source.kind === 'live_linear' ? source.sourceSetup : null
+  };
+}
+
+function buildReadySummary(input: {
+  configured: boolean;
+  sourceSetup: DispatchPilotSourceSetup;
+  reason: string;
+}): DispatchPilotSummary {
+  return {
+    advisory_only: true,
+    configured: input.configured,
+    enabled: true,
+    kill_switch: false,
+    status: 'ready',
+    source_status: 'ready',
+    reason: input.reason,
+    source_setup: input.sourceSetup
+  };
+}
+
+function buildFailureSummary(input: {
+  configured: boolean;
+  sourceStatus: 'unavailable' | 'malformed';
+  reason: string;
+  sourceSetup: DispatchPilotSourceSetup | null;
+}): DispatchPilotSummary {
+  return {
+    advisory_only: true,
+    configured: input.configured,
+    enabled: true,
+    kill_switch: false,
+    status: input.sourceStatus === 'unavailable' ? 'source_unavailable' : 'source_malformed',
+    source_status: input.sourceStatus,
+    reason: input.reason,
+    source_setup: input.sourceSetup
   };
 }
 

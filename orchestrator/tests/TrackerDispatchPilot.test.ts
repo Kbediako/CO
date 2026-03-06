@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import {
   evaluateTrackerDispatchPilot,
-  evaluateTrackerDispatchPilotAsync
+  evaluateTrackerDispatchPilotAsync,
+  summarizeTrackerDispatchPilotPolicy
 } from '../src/cli/control/trackerDispatchPilot.js';
 
 describe('TrackerDispatchPilot', () => {
@@ -81,7 +82,10 @@ describe('TrackerDispatchPilot', () => {
             team_id: 'lin-team-live'
           }
         }
-      }
+      },
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      } as NodeJS.ProcessEnv
     });
 
     expect(evaluation.summary.status).toBe('source_unavailable');
@@ -90,6 +94,60 @@ describe('TrackerDispatchPilot', () => {
       status: 503,
       code: 'dispatch_source_unavailable',
       reason: 'dispatch_source_live_requires_async_evaluation'
+    });
+  });
+
+  it('fails closed in synchronous mode when live evaluation bindings are missing', () => {
+    const evaluation = evaluateTrackerDispatchPilot({
+      featureToggles: {
+        dispatch_pilot: {
+          enabled: true,
+          source: {
+            provider: 'linear',
+            live: true
+          }
+        }
+      },
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      } as NodeJS.ProcessEnv
+    });
+
+    expect(evaluation.summary.status).toBe('source_malformed');
+    expect(evaluation.summary.reason).toBe('dispatch_source_binding_missing');
+    expect(evaluation.failure).toEqual({
+      status: 422,
+      code: 'dispatch_source_malformed',
+      reason: 'dispatch_source_binding_missing'
+    });
+  });
+
+  it('surfaces missing live Linear bindings in snapshot summaries', () => {
+    const summary = summarizeTrackerDispatchPilotPolicy({
+      featureToggles: {
+        dispatch_pilot: {
+          enabled: true,
+          source: {
+            provider: 'linear',
+            live: true
+          }
+        }
+      },
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      } as NodeJS.ProcessEnv
+    });
+
+    expect(summary).toMatchObject({
+      status: 'source_malformed',
+      source_status: 'malformed',
+      reason: 'dispatch_source_binding_missing',
+      source_setup: {
+        provider: 'linear',
+        workspace_id: null,
+        team_id: null,
+        project_id: null
+      }
     });
   });
 

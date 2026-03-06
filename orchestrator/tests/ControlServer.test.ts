@@ -1525,7 +1525,7 @@ describe('ControlServer', () => {
     }
   });
 
-  it('projects tracked live Linear advisory metadata into compatibility state and issue payloads', async () => {
+  it('keeps live Linear dispatch recommendations on dispatch and out of snapshot payloads', async () => {
     const { root, env, paths } = await createRunRoot('task-1014-live-linear');
     await seedManifest(paths);
     await seedDispatchPilot(paths, {
@@ -1655,11 +1655,8 @@ describe('ControlServer', () => {
           };
         };
       };
-      expect(statePayload.tracked?.linear).toMatchObject({
-        identifier: 'PREPROD-101',
-        title: 'Investigate advisory routing',
-        state: 'In Progress'
-      });
+      expect(statePayload.tracked?.linear ?? null).toBeNull();
+      expect(linearFetchCount).toBe(1);
 
       const issueRes = await fetch(new URL('/api/v1/task-0940', baseUrl), {
         headers: {
@@ -1678,11 +1675,25 @@ describe('ControlServer', () => {
           };
         };
       };
-      expect(issuePayload.tracked?.linear).toMatchObject({
-        identifier: 'PREPROD-101'
-      });
-      expect(issuePayload.tracked?.linear?.recent_activity?.[0]?.summary).toBe('State Todo -> In Progress');
+      expect(issuePayload.tracked?.linear ?? null).toBeNull();
       expect(issuePayload.workspace?.path).toBe(env.repoRoot);
+      expect(linearFetchCount).toBe(1);
+
+      const uiRes = await fetch(new URL('/ui/data.json', baseUrl), {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      expect(uiRes.status).toBe(200);
+      const uiPayload = (await uiRes.json()) as {
+        selected?: { tracked?: { linear?: unknown } } | null;
+        tasks?: Array<{ tracked?: { linear?: unknown } }>;
+        runs?: Array<{ tracked?: { linear?: unknown } }>;
+      };
+      expect(uiPayload.selected?.tracked?.linear ?? null).toBeNull();
+      expect(uiPayload.tasks?.[0]?.tracked?.linear ?? null).toBeNull();
+      expect(uiPayload.runs?.[0]?.tracked?.linear ?? null).toBeNull();
+      expect(linearFetchCount).toBe(1);
     } finally {
       await server.close();
       await rm(root, { recursive: true, force: true });
@@ -1762,6 +1773,7 @@ describe('ControlServer', () => {
     const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
     const realFetch = globalThis.fetch;
     const webhookSecret = 'linear-webhook-secret';
+    let linearFetchCount = 0;
 
     vi.stubEnv('CO_LINEAR_API_TOKEN', 'lin-api-token');
     vi.stubEnv('CO_LINEAR_WEBHOOK_SECRET', webhookSecret);
@@ -1769,6 +1781,7 @@ describe('ControlServer', () => {
       const rawUrl = input instanceof Request ? input.url : String(input);
       const url = new URL(rawUrl);
       if (url.toString() === 'https://api.linear.app/graphql') {
+        linearFetchCount += 1;
         return new Response(
           JSON.stringify({
             data: {
@@ -1877,6 +1890,7 @@ describe('ControlServer', () => {
         team_key: 'PREPROD'
       });
       expect(advisoryState.seen_deliveries).toHaveLength(1);
+      expect(linearFetchCount).toBe(1);
 
       const stateRes = await fetch(new URL('/api/v1/state', baseUrl), {
         headers: {
@@ -1938,6 +1952,7 @@ describe('ControlServer', () => {
       expect(advisoryStateAfterDuplicate.latest_delivery_id).toBe('delivery-1');
       expect(advisoryStateAfterDuplicate.latest_result).toBe('duplicate');
       expect(advisoryStateAfterDuplicate.seen_deliveries).toHaveLength(1);
+      expect(linearFetchCount).toBe(1);
     } finally {
       await server.close();
       await rm(root, { recursive: true, force: true });
@@ -1960,9 +1975,37 @@ describe('ControlServer', () => {
       }
     });
     const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
+    const realFetch = globalThis.fetch;
+    let linearFetchCount = 0;
 
     vi.stubEnv('CO_LINEAR_API_TOKEN', 'lin-api-token');
     vi.stubEnv('CO_LINEAR_WEBHOOK_SECRET', 'linear-webhook-secret');
+    vi.stubGlobal('fetch', async (input, init) => {
+      const rawUrl = input instanceof Request ? input.url : String(input);
+      const url = new URL(rawUrl);
+      if (url.toString() === 'https://api.linear.app/graphql') {
+        linearFetchCount += 1;
+        return new Response(
+          JSON.stringify({
+            data: {
+              viewer: {
+                organization: {
+                  id: 'lin-workspace-1'
+                }
+              },
+              issues: {
+                nodes: []
+              }
+            }
+          }),
+          {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' }
+          }
+        );
+      }
+      return realFetch(input, init);
+    });
 
     const server = await ControlServer.start({
       paths,
@@ -2009,10 +2052,42 @@ describe('ControlServer', () => {
         };
       };
       expect(statePayload.tracked?.linear ?? null).toBeNull();
+      expect(linearFetchCount).toBe(0);
+
+      const issueRes = await fetch(new URL('/api/v1/task-0940', baseUrl), {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      expect(issueRes.status).toBe(200);
+      const issuePayload = (await issueRes.json()) as {
+        tracked?: {
+          linear?: unknown;
+        };
+      };
+      expect(issuePayload.tracked?.linear ?? null).toBeNull();
+      expect(linearFetchCount).toBe(0);
+
+      const uiRes = await fetch(new URL('/ui/data.json', baseUrl), {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      expect(uiRes.status).toBe(200);
+      const uiPayload = (await uiRes.json()) as {
+        selected?: { tracked?: { linear?: unknown } } | null;
+        tasks?: Array<{ tracked?: { linear?: unknown } }>;
+        runs?: Array<{ tracked?: { linear?: unknown } }>;
+      };
+      expect(uiPayload.selected?.tracked?.linear ?? null).toBeNull();
+      expect(uiPayload.tasks?.[0]?.tracked?.linear ?? null).toBeNull();
+      expect(uiPayload.runs?.[0]?.tracked?.linear ?? null).toBeNull();
+      expect(linearFetchCount).toBe(0);
     } finally {
       await server.close();
       await rm(root, { recursive: true, force: true });
       vi.unstubAllEnvs();
+      vi.unstubAllGlobals();
     }
   });
 
@@ -2032,6 +2107,7 @@ describe('ControlServer', () => {
     const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
     const realFetch = globalThis.fetch;
     const webhookSecret = 'linear-webhook-secret';
+    let linearFetchCount = 0;
 
     vi.stubEnv('CO_LINEAR_API_TOKEN', 'lin-api-token');
     vi.stubEnv('CO_LINEAR_WEBHOOK_SECRET', webhookSecret);
@@ -2039,6 +2115,7 @@ describe('ControlServer', () => {
       const rawUrl = input instanceof Request ? input.url : String(input);
       const url = new URL(rawUrl);
       if (url.toString() === 'https://api.linear.app/graphql') {
+        linearFetchCount += 1;
         return new Response(
           JSON.stringify({
             data: {
@@ -2122,6 +2199,7 @@ describe('ControlServer', () => {
       };
       expect(advisoryState.latest_result).toBe('ignored');
       expect(advisoryState.tracked_issue ?? null).toBeNull();
+      expect(linearFetchCount).toBe(1);
 
       const stateRes = await fetch(new URL('/api/v1/state', baseUrl), {
         headers: {
@@ -2135,6 +2213,37 @@ describe('ControlServer', () => {
         };
       };
       expect(statePayload.tracked?.linear ?? null).toBeNull();
+      expect(linearFetchCount).toBe(1);
+
+      const issueRes = await fetch(new URL('/api/v1/task-0940', baseUrl), {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      expect(issueRes.status).toBe(200);
+      const issuePayload = (await issueRes.json()) as {
+        tracked?: {
+          linear?: unknown;
+        };
+      };
+      expect(issuePayload.tracked?.linear ?? null).toBeNull();
+      expect(linearFetchCount).toBe(1);
+
+      const uiRes = await fetch(new URL('/ui/data.json', baseUrl), {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      expect(uiRes.status).toBe(200);
+      const uiPayload = (await uiRes.json()) as {
+        selected?: { tracked?: { linear?: unknown } } | null;
+        tasks?: Array<{ tracked?: { linear?: unknown } }>;
+        runs?: Array<{ tracked?: { linear?: unknown } }>;
+      };
+      expect(uiPayload.selected?.tracked?.linear ?? null).toBeNull();
+      expect(uiPayload.tasks?.[0]?.tracked?.linear ?? null).toBeNull();
+      expect(uiPayload.runs?.[0]?.tracked?.linear ?? null).toBeNull();
+      expect(linearFetchCount).toBe(1);
     } finally {
       await server.close();
       await rm(root, { recursive: true, force: true });

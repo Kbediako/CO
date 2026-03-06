@@ -5,13 +5,18 @@ import { isoTimestamp } from '../utils/time.js';
 import type { RunPaths } from '../run/runPaths.js';
 import type { CliManifest } from '../types.js';
 import type { ControlState } from './controlState.js';
+import type { LiveLinearAdvisoryRuntime } from './liveLinearAdvisoryRuntime.js';
 import type { LiveLinearTrackedIssue } from './linearDispatchSource.js';
 import type {
   SelectedRunContext,
   SelectedRunProjectionReader,
   SelectedRunQuestionSummary
 } from './selectedRunProjection.js';
-import type { DispatchPilotEvaluation, DispatchPilotFailure } from './trackerDispatchPilot.js';
+import type {
+  DispatchPilotEvaluation,
+  DispatchPilotFailure,
+  DispatchPilotSummary
+} from './trackerDispatchPilot.js';
 
 const READ_ONLY_COMPAT_ACTION = 'refresh';
 const COMPATIBILITY_MUTATING_ACTIONS = new Set(['pause', 'resume', 'cancel', 'fail', 'rerun']);
@@ -27,6 +32,7 @@ export interface ObservabilitySurfaceContext {
   };
   paths: Pick<RunPaths, 'manifestPath' | 'runDir' | 'logPath'>;
   projection: SelectedRunProjectionReader;
+  advisoryRuntime: LiveLinearAdvisoryRuntime;
 }
 
 export type CompatibilityRefreshRejectionReason =
@@ -89,8 +95,8 @@ export function createObservabilitySurface(
 
     async readCompatibilityDispatch(): Promise<CompatibilityDispatchResult> {
       const selected = await context.projection.buildSelectedRunContext();
-      const evaluation = await context.projection.readDispatchEvaluation(selected);
       const issueIdentifier = selected?.issueIdentifier ?? null;
+      const evaluation = await context.advisoryRuntime.readDispatchEvaluation(issueIdentifier);
 
       if (evaluation.failure) {
         return {
@@ -165,10 +171,11 @@ export function createObservabilitySurface(
       if (!selected) {
         return { kind: 'issue_not_found' };
       }
+      const dispatchPilotSummary = resolveSelectedDispatchPilotSummary(context, selected);
 
       return {
         kind: 'ok',
-        payload: buildCompatibilityIssuePayload(selected)
+        payload: buildCompatibilityIssuePayload(selected, dispatchPilotSummary)
       };
     }
   };
@@ -203,14 +210,8 @@ async function buildCompatibilityStatePayload(
   context: ObservabilitySurfaceContext
 ): Promise<Record<string, unknown>> {
   const selected = await context.projection.buildSelectedRunContext();
-  const dispatchPilotEvaluation = await context.projection.readDispatchEvaluation(selected);
-  const dispatchPilotSummary = dispatchPilotEvaluation.summary.configured
-    ? dispatchPilotEvaluation.summary
-    : null;
-  const tracked =
-    selected?.trackedPayload ??
-    buildTrackedLinearPayload(context.linearAdvisoryState.tracked_issue) ??
-    buildCompatibilityTrackedPayload(dispatchPilotEvaluation);
+  const dispatchPilotSummary = resolveSelectedDispatchPilotSummary(context, selected);
+  const tracked = selected?.trackedPayload ?? buildTrackedLinearPayload(context.linearAdvisoryState.tracked_issue);
   const generatedAt = isoTimestamp();
   if (!selected) {
     return {
@@ -240,7 +241,10 @@ async function buildCompatibilityStatePayload(
   };
 }
 
-function buildCompatibilityIssuePayload(selected: SelectedRunContext): Record<string, unknown> {
+function buildCompatibilityIssuePayload(
+  selected: SelectedRunContext,
+  dispatchPilotSummary: DispatchPilotSummary | null
+): Record<string, unknown> {
   const running = buildCompatibilityRunningEntry(selected);
   const selectedPayload = buildSelectedRunPublicPayload(selected);
   const latestEvent = selected.latestEvent
@@ -277,9 +281,7 @@ function buildCompatibilityIssuePayload(selected: SelectedRunContext): Record<st
     recent_events: recentEvents,
     last_error: selected.lastError,
     tracked: selected.trackedPayload ?? {},
-    ...(selected.dispatchPilotEvaluation.summary.configured
-      ? { dispatch_pilot: selected.dispatchPilotEvaluation.summary }
-      : {})
+    ...(dispatchPilotSummary ? { dispatch_pilot: dispatchPilotSummary } : {})
   };
 }
 
@@ -477,16 +479,6 @@ function resolveCompatibilityActionEnvelopeRejection(
   return null;
 }
 
-function buildCompatibilityTrackedPayload(
-  evaluation: DispatchPilotEvaluation | null | undefined
-): Record<string, unknown> | null {
-  const trackedIssue = evaluation?.recommendation?.tracked_issue;
-  if (!trackedIssue) {
-    return null;
-  }
-  return buildTrackedLinearPayload(trackedIssue);
-}
-
 function buildTrackedLinearPayload(
   trackedIssue: LiveLinearTrackedIssue | null | undefined
 ): Record<string, unknown> | null {
@@ -512,6 +504,15 @@ function buildTrackedLinearPayload(
       recent_activity: trackedIssue.recent_activity
     }
   };
+}
+
+function resolveSelectedDispatchPilotSummary(
+  context: ObservabilitySurfaceContext,
+  selected: SelectedRunContext | null
+): DispatchPilotSummary | null {
+  const issueIdentifier = selected?.issueIdentifier ?? selected?.taskId ?? selected?.runId ?? null;
+  const summary = context.advisoryRuntime.readSnapshotSummary(issueIdentifier);
+  return summary.configured ? summary : null;
 }
 
 function classifyBucket(

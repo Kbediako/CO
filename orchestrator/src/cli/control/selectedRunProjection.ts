@@ -5,10 +5,6 @@ import type { RunPaths } from '../run/runPaths.js';
 import type { CliManifest } from '../types.js';
 import type { ControlAction, ControlState } from './controlState.js';
 import type { QuestionRecord, QuestionUrgency } from './questions.js';
-import {
-  evaluateTrackerDispatchPilotAsync,
-  type DispatchPilotEvaluation
-} from './trackerDispatchPilot.js';
 import type { LiveLinearTrackedIssue } from './linearDispatchSource.js';
 
 export interface SelectedRunQuestionSummary {
@@ -46,7 +42,6 @@ export interface SelectedRunContext {
   latestEvent: SelectedRunLatestEvent | null;
   workspacePath: string;
   questionSummary: SelectedRunQuestionSummary;
-  dispatchPilotEvaluation: DispatchPilotEvaluation;
   trackedPayload: Record<string, unknown> | null;
 }
 
@@ -69,13 +64,11 @@ export interface SelectedRunProjectionContext {
   linearAdvisoryState: {
     tracked_issue: LiveLinearTrackedIssue | null;
   };
-  env?: NodeJS.ProcessEnv;
 }
 
 export interface SelectedRunProjectionReader {
   readSelectedRunManifestSnapshot(): Promise<SelectedRunManifestSnapshot | null>;
   buildSelectedRunContext(snapshot?: SelectedRunManifestSnapshot | null): Promise<SelectedRunContext | null>;
-  readDispatchEvaluation(selected?: SelectedRunContext | null): Promise<DispatchPilotEvaluation>;
 }
 
 export function createSelectedRunProjectionReader(
@@ -83,7 +76,6 @@ export function createSelectedRunProjectionReader(
 ): SelectedRunProjectionReader {
   let selectedSnapshotPromise: Promise<SelectedRunManifestSnapshot | null> | null = null;
   let selectedContextPromise: Promise<SelectedRunContext | null> | null = null;
-  let dispatchEvaluationPromise: Promise<DispatchPilotEvaluation> | null = null;
 
   const readSelectedRunManifestSnapshot = async (): Promise<SelectedRunManifestSnapshot | null> => {
     selectedSnapshotPromise ??= readSelectedRunManifestSnapshotInternal(context);
@@ -103,29 +95,9 @@ export function createSelectedRunProjectionReader(
     return selectedContextPromise;
   };
 
-  const readDispatchEvaluation = async (
-    selected?: SelectedRunContext | null
-  ): Promise<DispatchPilotEvaluation> => {
-    if (selected !== undefined) {
-      if (selected) {
-        return selected.dispatchPilotEvaluation;
-      }
-      dispatchEvaluationPromise ??= evaluateCompatibilityDispatchPilotInternal(context, null);
-      return dispatchEvaluationPromise;
-    }
-
-    const selectedContext = await buildSelectedRunContext();
-    if (selectedContext) {
-      return selectedContext.dispatchPilotEvaluation;
-    }
-    dispatchEvaluationPromise ??= evaluateCompatibilityDispatchPilotInternal(context, null);
-    return dispatchEvaluationPromise;
-  };
-
   return {
     readSelectedRunManifestSnapshot,
-    buildSelectedRunContext,
-    readDispatchEvaluation
+    buildSelectedRunContext
   };
 }
 
@@ -151,42 +123,7 @@ async function buildSelectedRunContextFromSnapshot(
     latestAction,
     questionSummary
   });
-  const dispatchPilotEvaluation = await evaluateCompatibilityDispatchPilotInternal(context, {
-    issueIdentifier,
-    issueId,
-    taskId,
-    runId,
-    rawStatus,
-    displayStatus,
-    statusReason,
-    startedAt,
-    updatedAt,
-    completedAt,
-    summary,
-    lastError: null,
-    latestAction,
-    latestEvent: null,
-    workspacePath,
-    questionSummary,
-    dispatchPilotEvaluation: {
-      summary: {
-        advisory_only: true,
-        configured: false,
-        enabled: false,
-        kill_switch: false,
-        status: 'disabled',
-        source_status: 'disabled',
-        reason: 'uninitialized',
-        source_setup: null
-      },
-      recommendation: null,
-      failure: null
-    },
-    trackedPayload: null
-  });
-  const trackedPayload =
-    buildTrackedLinearPayload(context.linearAdvisoryState.tracked_issue) ??
-    buildCompatibilityTrackedPayload(dispatchPilotEvaluation);
+  const trackedPayload = buildTrackedLinearPayload(context.linearAdvisoryState.tracked_issue);
   const latestEvent = buildSelectedRunLatestEvent({
     controlAction: control.latest_action ?? null,
     updatedAt,
@@ -215,7 +152,6 @@ async function buildSelectedRunContextFromSnapshot(
     latestEvent,
     workspacePath,
     questionSummary,
-    dispatchPilotEvaluation,
     trackedPayload
   };
 }
@@ -243,18 +179,6 @@ async function readSelectedRunManifestSnapshotInternal(
     taskId,
     runId
   };
-}
-
-function evaluateCompatibilityDispatchPilotInternal(
-  context: SelectedRunProjectionContext,
-  selected: SelectedRunContext | null
-): Promise<DispatchPilotEvaluation> {
-  const controlSnapshot = context.controlStore.snapshot();
-  return evaluateTrackerDispatchPilotAsync({
-    featureToggles: controlSnapshot.feature_toggles,
-    defaultIssueIdentifier: selected?.issueIdentifier ?? selected?.taskId ?? selected?.runId ?? null,
-    env: context.env ?? process.env
-  });
 }
 
 function buildSelectedRunQuestionSummary(records: QuestionRecord[]): SelectedRunQuestionSummary {
@@ -315,16 +239,6 @@ function buildSelectedRunLatestEvent(input: {
     requestedBy: input.controlAction?.requested_by ?? null,
     reason: input.controlAction?.reason ?? null
   };
-}
-
-function buildCompatibilityTrackedPayload(
-  evaluation: DispatchPilotEvaluation | null | undefined
-): Record<string, unknown> | null {
-  const trackedIssue = evaluation?.recommendation?.tracked_issue;
-  if (!trackedIssue) {
-    return null;
-  }
-  return buildTrackedLinearPayload(trackedIssue);
 }
 
 function buildTrackedLinearPayload(

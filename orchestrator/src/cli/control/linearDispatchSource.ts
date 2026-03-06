@@ -131,7 +131,7 @@ export async function resolveLiveLinearDispatchRecommendation(input: {
   }
   const timeoutMs = resolveLinearRequestTimeoutMs(env);
 
-  const sourceSetup = resolveSourceSetup(input.sourceSetup, env);
+  const sourceSetup = resolveLinearSourceSetup(input.sourceSetup, env);
   if (!sourceSetup.workspace_id && !sourceSetup.team_id && !sourceSetup.project_id) {
     return malformed('dispatch_source_binding_missing');
   }
@@ -211,7 +211,7 @@ export async function resolveLiveLinearTrackedIssueById(input: {
   }
   const timeoutMs = resolveLinearRequestTimeoutMs(env);
 
-  const sourceSetup = resolveSourceSetup(input.sourceSetup, env);
+  const sourceSetup = resolveLinearSourceSetup(input.sourceSetup, env);
   if (!sourceSetup.workspace_id && !sourceSetup.team_id && !sourceSetup.project_id) {
     return malformed('dispatch_source_binding_missing');
   }
@@ -467,7 +467,18 @@ async function executeLinearQuery(input: {
   };
 }
 
-function resolveSourceSetup(sourceSetup: DispatchPilotSourceSetup, env: NodeJS.ProcessEnv): DispatchPilotSourceSetup {
+export function hasLinearApiCredentials(env?: NodeJS.ProcessEnv): boolean {
+  return resolveLinearApiToken(env ?? process.env) !== null;
+}
+
+export function hasLinearSourceBinding(sourceSetup: DispatchPilotSourceSetup): boolean {
+  return Boolean(sourceSetup.workspace_id || sourceSetup.team_id || sourceSetup.project_id);
+}
+
+export function resolveLinearSourceSetup(
+  sourceSetup: DispatchPilotSourceSetup,
+  env: NodeJS.ProcessEnv
+): DispatchPilotSourceSetup {
   return {
     provider: 'linear',
     workspace_id: sourceSetup.workspace_id ?? normalizeEnvValue(env.CO_LINEAR_WORKSPACE_ID),

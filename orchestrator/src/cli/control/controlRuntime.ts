@@ -7,6 +7,7 @@ import {
   type CompatibilityIssueResult,
   type CompatibilityRefreshResult
 } from './observabilitySurface.js';
+import { createLiveLinearAdvisoryRuntime } from './liveLinearAdvisoryRuntime.js';
 import {
   createObservabilityUpdateNotifier,
   type ObservabilityUpdate,
@@ -55,14 +56,18 @@ export function createControlRuntime(
   notifier: ObservabilityUpdateNotifier = createObservabilityUpdateNotifier()
 ): ControlRuntime {
   let cachedSnapshot: InternalControlRuntimeSnapshot | null = null;
+  const liveLinearAdvisoryRuntime = createLiveLinearAdvisoryRuntime({
+    controlStore: context.controlStore,
+    env: context.env
+  });
 
   const ensureSnapshot = (): InternalControlRuntimeSnapshot => {
-    cachedSnapshot ??= createControlRuntimeSnapshot(context);
+    cachedSnapshot ??= createControlRuntimeSnapshot(context, liveLinearAdvisoryRuntime);
     return cachedSnapshot;
   };
 
   const refreshSnapshot = async (): Promise<InternalControlRuntimeSnapshot> => {
-    const nextSnapshot = createControlRuntimeSnapshot(context);
+    const nextSnapshot = createControlRuntimeSnapshot(context, liveLinearAdvisoryRuntime);
     await nextSnapshot.prime();
     cachedSnapshot = nextSnapshot;
     return nextSnapshot;
@@ -79,11 +84,13 @@ export function createControlRuntime(
         return result;
       }
       await refreshSnapshot();
+      liveLinearAdvisoryRuntime.invalidate();
       return result;
     },
 
     publish(input) {
       cachedSnapshot = null;
+      liveLinearAdvisoryRuntime.invalidate();
       notifier.publish(input);
     },
 
@@ -94,14 +101,16 @@ export function createControlRuntime(
 }
 
 function createControlRuntimeSnapshot(
-  context: ControlRuntimeContext
+  context: ControlRuntimeContext,
+  liveLinearAdvisoryRuntime: ReturnType<typeof createLiveLinearAdvisoryRuntime>
 ): InternalControlRuntimeSnapshot {
   const projection = createSelectedRunProjectionReader(context);
   const observability = createObservabilitySurface({
     controlStore: context.controlStore,
     linearAdvisoryState: context.linearAdvisoryState,
     paths: context.paths,
-    projection
+    projection,
+    advisoryRuntime: liveLinearAdvisoryRuntime
   });
 
   return {
@@ -115,8 +124,7 @@ function createControlRuntimeSnapshot(
       return snapshot?.issueIdentifier ?? snapshot?.taskId ?? snapshot?.runId ?? null;
     },
     async prime(): Promise<void> {
-      const selected = await projection.buildSelectedRunContext();
-      await projection.readDispatchEvaluation(selected);
+      await projection.buildSelectedRunContext();
     }
   };
 }
