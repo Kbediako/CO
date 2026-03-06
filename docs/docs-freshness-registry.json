@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generated_at": "2026-03-02",
+  "generated_at": "2026-03-06",
   "entries": [
     {
       "path": ".agent/AGENTS.md",
@@ -871,6 +871,76 @@
       "cadence_days": 90
     },
     {
+      "path": ".agent/task/0993-coordinator-control-bridge-slice-1.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-03",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/task/0994-coordinator-control-bridge-slice-2-residual-risk-closure-and-external-transport-surface-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-03",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/task/0995-coordinator-control-bridge-slice-3-residual-risk-remediation-and-transport-policy-alignment.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-03",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/task/0996-coordinator-control-bridge-slice-4-discord-telegram-mutating-control-promotion-readiness.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-04",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/task/0997-coordinator-readonly-transport-surface-pilot.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-05",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/task/0998-coordinator-readonly-observability-surface-hardening-and-symphony-inclusion-plan.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-05",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/task/0999-workspace-symlink-hook-safety-hardening-and-windows-fail-closed-criteria.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-05",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/task/1000-coordinator-tracker-dispatch-pilot-non-authoritative.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-05",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/task/1004-codex-0110-version-policy-refresh-and-adoption-sequencing.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-05",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/task/1005-spec-guard-codepath-and-review-docs-alignment.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-05",
+      "cadence_days": 90
+    },
+    {
       "path": ".agent/task/ACTION_PLAN_TEMPLATE.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -1053,6 +1123,13 @@
       "cadence_days": 90
     },
     {
+      "path": "docs/ACTION_PLAN-codex-0110-version-policy-refresh-and-adoption-sequencing.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-05",
+      "cadence_days": 90
+    },
+    {
       "path": "docs/ACTION_PLAN-codex-cli-alignment-refresh-e2e.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -1127,6 +1204,55 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-02-17",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/ACTION_PLAN-coordinator-control-bridge-slice-1.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-03",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/ACTION_PLAN-coordinator-control-bridge-slice-2-residual-risk-closure-and-external-transport-surface-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-03",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/ACTION_PLAN-coordinator-control-bridge-slice-3-residual-risk-remediation-and-transport-policy-alignment.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-03",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/ACTION_PLAN-coordinator-control-bridge-slice-4-discord-telegram-mutating-control-promotion-readiness.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-04",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/ACTION_PLAN-coordinator-readonly-observability-surface-hardening-and-symphony-inclusion-plan.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-05",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/ACTION_PLAN-coordinator-readonly-transport-surface-pilot.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-05",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/ACTION_PLAN-coordinator-tracker-dispatch-pilot-non-authoritative.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-05",
       "cadence_days": 90
     },
     {
@@ -1501,6 +1627,13 @@
       "cadence_days": 90
     },
     {
+      "path": "docs/ACTION_PLAN-spec-guard-codepath-and-review-docs-alignment.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-05",
+      "cadence_days": 90
+    },
+    {
       "path": "docs/ACTION_PLAN-standalone-review-docs-first-ship.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -1547,6 +1680,13 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/ACTION_PLAN-workspace-symlink-hook-safety-hardening-and-windows-fail-closed-criteria.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-05",
       "cadence_days": 90
     },
     {
@@ -1659,6 +1799,48 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-02-25",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/findings/0994-codex-autorunner-extraction-and-transport-go-hold.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-03",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/findings/0995-codex-autorunner-extraction-and-transport-go-hold.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-04",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/findings/0998-openai-symphony-adoption-timing-and-slice-map.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-05",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/findings/0998-windows-feasibility-roadmap-consideration.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-05",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/findings/1004-agents-router-simplification-deliberation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-05",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/findings/1004-codex-cli-0110-upgrade-deliberation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-05",
       "cadence_days": 90
     },
     {
@@ -1851,6 +2033,13 @@
       "cadence_days": 90
     },
     {
+      "path": "docs/PRD-codex-0110-version-policy-refresh-and-adoption-sequencing.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-05",
+      "cadence_days": 90
+    },
+    {
       "path": "docs/PRD-codex-cli-alignment-refresh-e2e.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -1932,6 +2121,55 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-02-17",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/PRD-coordinator-control-bridge-slice-1.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-03",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/PRD-coordinator-control-bridge-slice-2-residual-risk-closure-and-external-transport-surface-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-03",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/PRD-coordinator-control-bridge-slice-3-residual-risk-remediation-and-transport-policy-alignment.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-03",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/PRD-coordinator-control-bridge-slice-4-discord-telegram-mutating-control-promotion-readiness.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-04",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/PRD-coordinator-readonly-observability-surface-hardening-and-symphony-inclusion-plan.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-05",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/PRD-coordinator-readonly-transport-surface-pilot.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-05",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/PRD-coordinator-tracker-dispatch-pilot-non-authoritative.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-05",
       "cadence_days": 90
     },
     {
@@ -2327,6 +2565,13 @@
       "cadence_days": 90
     },
     {
+      "path": "docs/PRD-spec-guard-codepath-and-review-docs-alignment.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-05",
+      "cadence_days": 90
+    },
+    {
       "path": "docs/PRD-standalone-review-docs-first-ship.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -2373,6 +2618,13 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/PRD-workspace-symlink-hook-safety-hardening-and-windows-fail-closed-criteria.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-05",
       "cadence_days": 90
     },
     {
@@ -2498,7 +2750,7 @@
       "path": "docs/TASKS.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-02",
+      "last_review": "2026-03-05",
       "cadence_days": 90
     },
     {
@@ -2576,6 +2828,13 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-03-02",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/TECH_SPEC-codex-0110-version-policy-refresh-and-adoption-sequencing.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-05",
       "cadence_days": 90
     },
     {
@@ -2660,6 +2919,55 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-02-17",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/TECH_SPEC-coordinator-control-bridge-slice-1.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-03",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/TECH_SPEC-coordinator-control-bridge-slice-2-residual-risk-closure-and-external-transport-surface-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-03",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/TECH_SPEC-coordinator-control-bridge-slice-3-residual-risk-remediation-and-transport-policy-alignment.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-03",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/TECH_SPEC-coordinator-control-bridge-slice-4-discord-telegram-mutating-control-promotion-readiness.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-04",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/TECH_SPEC-coordinator-readonly-observability-surface-hardening-and-symphony-inclusion-plan.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-05",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/TECH_SPEC-coordinator-readonly-transport-surface-pilot.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-05",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/TECH_SPEC-coordinator-tracker-dispatch-pilot-non-authoritative.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-05",
       "cadence_days": 90
     },
     {
@@ -3055,6 +3363,13 @@
       "cadence_days": 90
     },
     {
+      "path": "docs/TECH_SPEC-spec-guard-codepath-and-review-docs-alignment.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-05",
+      "cadence_days": 90
+    },
+    {
       "path": "docs/TECH_SPEC-standalone-review-docs-first-ship.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -3108,6 +3423,13 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2025-12-31",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/TECH_SPEC-workspace-symlink-hook-safety-hardening-and-windows-fail-closed-criteria.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-05",
       "cadence_days": 90
     },
     {
@@ -3324,7 +3646,7 @@
       "path": "tasks/index.json",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-02",
+      "last_review": "2026-03-05",
       "cadence_days": 90
     },
     {
@@ -3808,6 +4130,76 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-03-03",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/specs/0993-coordinator-control-bridge-slice-1.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-03",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/specs/0994-coordinator-control-bridge-slice-2-residual-risk-closure-and-external-transport-surface-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-03",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/specs/0995-coordinator-control-bridge-slice-3-residual-risk-remediation-and-transport-policy-alignment.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-03",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/specs/0996-coordinator-control-bridge-slice-4-discord-telegram-mutating-control-promotion-readiness.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-04",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/specs/0997-coordinator-readonly-transport-surface-pilot.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-05",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/specs/0998-coordinator-readonly-observability-surface-hardening-and-symphony-inclusion-plan.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-05",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/specs/0999-workspace-symlink-hook-safety-hardening-and-windows-fail-closed-criteria.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-05",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/specs/1000-coordinator-tracker-dispatch-pilot-non-authoritative.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-05",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/specs/1004-codex-0110-version-policy-refresh-and-adoption-sequencing.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-05",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/specs/1005-spec-guard-codepath-and-review-docs-alignment.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-05",
       "cadence_days": 90
     },
     {
@@ -4511,10 +4903,556 @@
       "cadence_days": 90
     },
     {
+      "path": "tasks/tasks-0993-coordinator-control-bridge-slice-1.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-03",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/tasks-0994-coordinator-control-bridge-slice-2-residual-risk-closure-and-external-transport-surface-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-03",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/tasks-0995-coordinator-control-bridge-slice-3-residual-risk-remediation-and-transport-policy-alignment.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-03",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/tasks-0996-coordinator-control-bridge-slice-4-discord-telegram-mutating-control-promotion-readiness.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-04",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/tasks-0997-coordinator-readonly-transport-surface-pilot.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-05",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/tasks-0998-coordinator-readonly-observability-surface-hardening-and-symphony-inclusion-plan.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-05",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/tasks-0999-workspace-symlink-hook-safety-hardening-and-windows-fail-closed-criteria.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-05",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/tasks-1000-coordinator-tracker-dispatch-pilot-non-authoritative.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-05",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/tasks-1004-codex-0110-version-policy-refresh-and-adoption-sequencing.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-05",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/tasks-1005-spec-guard-codepath-and-review-docs-alignment.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-05",
+      "cadence_days": 90
+    },
+    {
       "path": "templates/codex/AGENTS.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-01-19",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/task/1006-task-index-canonicalization-and-registry-normalization.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-05",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/ACTION_PLAN-task-index-canonicalization-and-registry-normalization.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-05",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/PRD-task-index-canonicalization-and-registry-normalization.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-05",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/TECH_SPEC-task-index-canonicalization-and-registry-normalization.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-05",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/specs/1006-task-index-canonicalization-and-registry-normalization.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-05",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/tasks-1006-task-index-canonicalization-and-registry-normalization.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-05",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/task/1007-codex-0110-post-change-audit-refresh-and-drift-closure.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-05",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/ACTION_PLAN-codex-0110-post-change-audit-refresh-and-drift-closure.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-05",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/PRD-codex-0110-post-change-audit-refresh-and-drift-closure.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-05",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/TECH_SPEC-codex-0110-post-change-audit-refresh-and-drift-closure.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-05",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/specs/1007-codex-0110-post-change-audit-refresh-and-drift-closure.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-05",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/tasks-1007-codex-0110-post-change-audit-refresh-and-drift-closure.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-05",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/task/1008-coordinator-staged-external-surfaces-onboarding-and-runbook-readiness.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-05",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/ACTION_PLAN-coordinator-staged-external-surfaces-onboarding-and-runbook-readiness.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-05",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/PRD-coordinator-staged-external-surfaces-onboarding-and-runbook-readiness.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-05",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/TECH_SPEC-coordinator-staged-external-surfaces-onboarding-and-runbook-readiness.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-05",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/findings/1008-transport-readiness-deliberation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-05",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/specs/1008-coordinator-staged-external-surfaces-onboarding-and-runbook-readiness.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-05",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/tasks-1008-coordinator-staged-external-surfaces-onboarding-and-runbook-readiness.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-05",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/task/1009-coordinator-telegram-setup-canary-and-runbook-implementation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-06",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/ACTION_PLAN-coordinator-telegram-setup-canary-and-runbook-implementation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-06",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/PRD-coordinator-telegram-setup-canary-and-runbook-implementation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-06",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/TECH_SPEC-coordinator-telegram-setup-canary-and-runbook-implementation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-06",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/findings/1009-telegram-setup-canary-deliberation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-06",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/specs/1009-coordinator-telegram-setup-canary-and-runbook-implementation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-06",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/tasks-1009-coordinator-telegram-setup-canary-and-runbook-implementation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-06",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/task/1010-coordinator-linear-advisory-setup-and-runbook-implementation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-06",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/ACTION_PLAN-coordinator-linear-advisory-setup-and-runbook-implementation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-06",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/PRD-coordinator-linear-advisory-setup-and-runbook-implementation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-06",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/TECH_SPEC-coordinator-linear-advisory-setup-and-runbook-implementation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-06",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/findings/1010-linear-advisory-setup-deliberation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-06",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/specs/1010-coordinator-linear-advisory-setup-and-runbook-implementation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-06",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/tasks-1010-coordinator-linear-advisory-setup-and-runbook-implementation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-06",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/task/1011-coordinator-discord-enablement-after-telegram-evidence.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-06",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/ACTION_PLAN-coordinator-discord-enablement-after-telegram-evidence.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-06",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/PRD-coordinator-discord-enablement-after-telegram-evidence.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-06",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/TECH_SPEC-coordinator-discord-enablement-after-telegram-evidence.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-06",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/findings/1011-discord-enablement-deliberation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-06",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/specs/1011-coordinator-discord-enablement-after-telegram-evidence.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-06",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/tasks-1011-coordinator-discord-enablement-after-telegram-evidence.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-06",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/task/1012-codex-0111-gpt-5-4-compatibility-and-adoption-realignment.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-06",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/ACTION_PLAN-codex-0111-gpt-5-4-compatibility-and-adoption-realignment.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-06",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/PRD-codex-0111-gpt-5-4-compatibility-and-adoption-realignment.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-06",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/TECH_SPEC-codex-0111-gpt-5-4-compatibility-and-adoption-realignment.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-06",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/findings/1012-codex-0111-gpt-5-4-compatibility-deliberation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-06",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/specs/1012-codex-0111-gpt-5-4-compatibility-and-adoption-realignment.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-06",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/tasks-1012-codex-0111-gpt-5-4-compatibility-and-adoption-realignment.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-06",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/task/1013-coordinator-dynamic-tool-bridge-token-attestation-live-appserver-canary-and-rollback-drill.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-06",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/ACTION_PLAN-coordinator-dynamic-tool-bridge-token-attestation-live-appserver-canary-and-rollback-drill.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-06",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/PRD-coordinator-dynamic-tool-bridge-token-attestation-live-appserver-canary-and-rollback-drill.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-06",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/TECH_SPEC-coordinator-dynamic-tool-bridge-token-attestation-live-appserver-canary-and-rollback-drill.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-06",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/findings/1013-dynamic-tool-bridge-token-attestation-deliberation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-06",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/specs/1013-coordinator-dynamic-tool-bridge-token-attestation-live-appserver-canary-and-rollback-drill.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-06",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/tasks-1013-coordinator-dynamic-tool-bridge-token-attestation-live-appserver-canary-and-rollback-drill.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-06",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/task/1014-coordinator-symphony-aligned-telegram-oversight-and-live-linear-advisory-adapters.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-06",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-telegram-oversight-and-live-linear-advisory-adapters.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-06",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/PRD-coordinator-symphony-aligned-telegram-oversight-and-live-linear-advisory-adapters.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-06",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/TECH_SPEC-coordinator-symphony-aligned-telegram-oversight-and-live-linear-advisory-adapters.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-06",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/findings/1014-symphony-aligned-telegram-linear-adapter-deliberation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-06",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/specs/1014-coordinator-symphony-aligned-telegram-oversight-and-live-linear-advisory-adapters.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-06",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/tasks-1014-coordinator-symphony-aligned-telegram-oversight-and-live-linear-advisory-adapters.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-06",
+      "cadence_days": 90
+    },
+    {
+      "path": ".agent/task/1001-coordinator-appserver-dynamic-tool-bridge-experimental-lane.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-06",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/ACTION_PLAN-coordinator-appserver-dynamic-tool-bridge-experimental-lane.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-06",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/PRD-coordinator-appserver-dynamic-tool-bridge-experimental-lane.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-06",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/TECH_SPEC-coordinator-appserver-dynamic-tool-bridge-experimental-lane.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-06",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/findings/1001-appserver-dynamic-tool-bridge-experimental-lane-deliberation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-06",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/specs/1001-coordinator-appserver-dynamic-tool-bridge-experimental-lane.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-06",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/tasks-1001-coordinator-appserver-dynamic-tool-bridge-experimental-lane.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-06",
       "cadence_days": 90
     }
   ]

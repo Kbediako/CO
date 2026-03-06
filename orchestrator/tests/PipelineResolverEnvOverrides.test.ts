@@ -216,14 +216,88 @@ describe('PipelineResolver env overrides', () => {
     expect(resolved.pipeline.id).toBe('frontend-testing');
     expect(resolved.envOverrides.CODEX_REVIEW_DEVTOOLS).toBe('1');
   });
+
+  it('scrubs inherited review control env in implementation-gate test stage', async () => {
+    const testDir = fileURLToPath(new URL('.', import.meta.url));
+    const repoRoot = resolve(testDir, '..', '..');
+    const env: EnvironmentPaths = {
+      repoRoot,
+      runsRoot: join(repoRoot, '.runs'),
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'gate-env-scrub'
+    };
+
+    const config = await loadUserConfig(env);
+    const implementationGate = config?.pipelines?.find((pipeline) => pipeline.id === 'implementation-gate');
+    const testStage = findCommandStage(implementationGate, 'test');
+    const testEnv = findCommandStageEnv(implementationGate, 'test');
+
+    expect(testStage?.command).toBe('npm run test');
+    expect(testEnv.FORCE_CODEX_REVIEW).toBe('');
+    expect(testEnv.CODEX_REVIEW_NON_INTERACTIVE).toBe('');
+    expect(testEnv.CODEX_NON_INTERACTIVE).toBe('');
+    expect(testEnv.CODEX_NO_INTERACTIVE).toBe('');
+    expect(testEnv.CODEX_NONINTERACTIVE).toBe('');
+    expect(testEnv.SKIP_DIFF_BUDGET).toBe('');
+    expect(testEnv.DIFF_BUDGET_STAGE).toBe('');
+    expect(testEnv.NOTES).toBe('');
+    expect(testEnv.MCP_RUNNER_TASK_ID).toBeUndefined();
+    expect(testEnv.TASK).toBe('');
+    expect(testEnv.CODEX_ORCHESTRATOR_TASK_ID).toBe('');
+  });
+
+  it('forces deterministic codex review execution in gate review stages', async () => {
+    const testDir = fileURLToPath(new URL('.', import.meta.url));
+    const repoRoot = resolve(testDir, '..', '..');
+    const env: EnvironmentPaths = {
+      repoRoot,
+      runsRoot: join(repoRoot, '.runs'),
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'gate-review-force'
+    };
+
+    const config = await loadUserConfig(env);
+    const implementationGate = config?.pipelines?.find((pipeline) => pipeline.id === 'implementation-gate');
+    const docsReview = config?.pipelines?.find((pipeline) => pipeline.id === 'docs-review');
+
+    const implementationReviewEnv = findCommandStageEnv(implementationGate, 'review');
+    const docsReviewEnv = findCommandStageEnv(docsReview, 'review');
+
+    expect(implementationReviewEnv.CODEX_REVIEW_NON_INTERACTIVE).toBe('1');
+    expect(implementationReviewEnv.FORCE_CODEX_REVIEW).toBe('1');
+    expect(docsReviewEnv.CODEX_REVIEW_NON_INTERACTIVE).toBe('1');
+    expect(docsReviewEnv.FORCE_CODEX_REVIEW).toBe('1');
+  });
 });
 
 function findFirstCommandEnv(pipeline?: PipelineDefinition): Record<string, string> {
+  return findCommandStageEnv(pipeline);
+}
+
+function findCommandStage(
+  pipeline?: PipelineDefinition,
+  stageId?: string
+): Extract<PipelineDefinition['stages'][number], { kind: 'command' }> | undefined {
+  if (!pipeline) {
+    return undefined;
+  }
+  for (const stage of pipeline.stages) {
+    if (stage.kind === 'command' && (stageId === undefined || stage.id === stageId)) {
+      return stage;
+    }
+  }
+  return undefined;
+}
+
+function findCommandStageEnv(
+  pipeline?: PipelineDefinition,
+  stageId?: string
+): Record<string, string> {
   if (!pipeline) {
     return {};
   }
   for (const stage of pipeline.stages) {
-    if (stage.kind === 'command') {
+    if (stage.kind === 'command' && (stageId === undefined || stage.id === stageId)) {
       return stage.env ?? {};
     }
   }

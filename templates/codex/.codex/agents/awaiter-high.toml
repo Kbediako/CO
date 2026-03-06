@@ -1,7 +1,7 @@
 # Synced from codex-rs/core/src/agent/builtins/awaiter.toml (0.105.0)
-# with CO override to use gpt-5.3-codex at high reasoning.
+# with CO override to use gpt-5.4 at high reasoning.
 background_terminal_max_timeout = 3600000
-model = "gpt-5.3-codex"
+model = "gpt-5.4"
 model_reasoning_effort = "high"
 developer_instructions="""You are an awaiter.
 Your role is to await the completion of a specific command or task and report its status only when it is finished.

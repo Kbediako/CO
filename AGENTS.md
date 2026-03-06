@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp 283480584690870dd9e1485db54bd4a8ee3958f96082edcd6d09fb5d4dfb0147 -->
+<!-- codex:instruction-stamp b4f509e66a9de11e454bdde28522708f88f9621028cee98d5fd1dde86027da88 -->
 # Codex-Orchestrator Agent Handbook (Template)
 
 Use this repository as the wrapper that coordinates multiple Codex-driven projects. After cloning, replace placeholder metadata (task IDs, documents, SOPs) with values for each downstream initiative while keeping these shared guardrails in place.
@@ -15,7 +15,7 @@ Use this repository as the wrapper that coordinates multiple Codex-driven projec
 - Feature posture: `js_repl` is enabled by default globally (local + cloud lanes). For deterministic cloud contracts, pin explicit task-scoped feature lanes (`CODEX_CLOUD_ENABLE_FEATURES=js_repl` and separate `CODEX_CLOUD_DISABLE_FEATURES=js_repl` runs) and record manifest-backed evidence in checklist mirrors. Use `CODEX_CLOUD_DISABLE_FEATURES=js_repl` for task-scoped cloud break-glass; reserve `codex features disable js_repl` for global emergency toggles and re-enable afterward with `codex features enable js_repl`. Keep `memories` scoped to explicit eval lanes (legacy alias `memory_tool` remains compatibility-only).
 - Keep the safe approval profile (`read/edit/run/network`). Capture any escalation in `.runs/<task>/<timestamp>/manifest.json` under `approvals`.
 - Run `node scripts/delegation-guard.mjs` before requesting review; if delegation is not possible, set `DELEGATION_GUARD_OVERRIDE_REASON` and record the rationale in the task checklist.
-- Run `node scripts/spec-guard.mjs --dry-run` before requesting review. Update specs or refresh approvals when the guard fails.
+- Run `node scripts/spec-guard.mjs --dry-run` before requesting review. The guard fails when tracked implementation paths change without a spec update (`tasks/specs/**`, `docs/design/specs/**`, or `tasks/index.json`) or when any spec file in those directories has `last_review` older than 30 days.
 
 ## MCP vs Collab (Decision Rule)
 - Default to MCP for approvals, tool routing, delegation, external integrations, and audit trails.
@@ -29,23 +29,24 @@ Use this repository as the wrapper that coordinates multiple Codex-driven projec
 - `spawn_agent` defaults to `default` when `agent_type` is omitted; always set `agent_type` explicitly.
 - For symbolic collab runs, prefix spawned prompts with `[agent_type:<role>]` on line one so role intent is auditable from JSONL/manifests.
 - For spawned subagents, default to bounded prompts without inherited context; use `fork_context=true` only when a stream explicitly needs prior thread history to avoid prompt bloat/redundancy.
-- Keep top-level defaults on latest codex by setting `model = "gpt-5.3-codex"` in `~/.codex/config.toml`.
+- Keep top-level defaults on the current CO target by setting `model = "gpt-5.4"` in `~/.codex/config.toml`.
+- Keep delegated subagent and review surfaces on `gpt-5.4` as well when using ChatGPT auth; `gpt-5.4-codex` is currently unsupported there.
 - Set `model_reasoning_effort` to at least `high` (CO default: `xhigh`) so spawned agents inherit high-reasoning behavior unless role overrides change it.
-- Built-in `explorer` now inherits top-level model defaults unless you attach a custom `config_file`; keep an explicit `agents.explorer` entry only when you want a custom description/override.
+- Built-in `explorer` now inherits top-level model defaults unless you attach a custom `config_file`; keep an explicit `agents.explorer` entry only when you want a custom description/override, and keep `explorer_fast` as the only explicit `gpt-5.3-codex-spark` exception.
 - Caveat: spark models are text-only; use non-spark roles when image inputs are required.
 - Prefer built-ins-first for RLM/collab flows; add custom specialist roles only with a measured benefit, explicit owner, and validation evidence.
-- Set `[agents] max_threads = 12` with `max_depth = 4` and `max_spawn_depth = 4` as the standard multi-agent baseline.
+- Set `[agents] max_threads = 12` as the seeded baseline. Keep explicit `max_depth = 4` / `max_spawn_depth = 4` only when your local Codex parser accepts them; existing constrained caps such as `8/2/2` or `6/1/1` should remain operator-controlled.
 - Fallback policy is contingency-only (not routine): use `max_threads = 8`, `max_depth = 2`, `max_spawn_depth = 2` for constrained/high-risk lanes; use `6/1/1` only as a break-glass profile under severe host/tool contention.
-- Use an explicit `worker_complex` role (for example `gpt-5.3-codex`, `xhigh`) for high-risk implementation streams.
+- Use an explicit `worker_complex` role (for example `gpt-5.4`, `xhigh`) for high-risk implementation streams.
 - Use `codex-orchestrator doctor` as an advisory drift check for Codex defaults (model/reasoning/agent baseline); remediation is additive via `codex-orchestrator codex defaults --yes`.
 
 ## Codex Version Policy (CO Scope)
-- Keep the global Codex CLI default on stable releases; do not require alpha/prerelease globally for CO work.
-- Use alpha/prerelease only in explicit, task-scoped CO lanes where evidence is captured under `.runs/<task-id>/` and `out/<task-id>/manual/`.
-- Stable rollback/default pin is `0.107.0`.
-- Latest evaluated prerelease lane is `0.107.0-alpha.9` (HOLD; not approved as default).
-- Alpha adoption is evidence-gated: no P0/P1 regressions, runtime-mode canary pass, and required cloud canary contract pass.
-- If any required lane fails (or required cloud evidence is unavailable), hold/revert to stable and record the decision in `docs/TASKS.md`, `tasks/index.json`, and task checklists.
+- Current CO compatibility/adoption target is stable Codex CLI `0.111.0`.
+- Current model posture is `gpt-5.4` for top-level, delegated subagent, and review surfaces; keep `explorer_fast` on `gpt-5.3-codex-spark`.
+- In ChatGPT-auth sessions, do not target delegated/review surfaces at `gpt-5.4-codex`; those runs currently fail immediately. Use `gpt-5.4` until provider compatibility changes.
+- Evaluate newer stable/prerelease Codex builds only in explicit, task-scoped CO lanes where evidence is captured under `.runs/<task-id>/` and `out/<task-id>/manual/`.
+- Newer-version adoption remains evidence-gated: no P0/P1 regressions, runtime-mode canary pass, and required cloud canary contract pass.
+- If any required lane fails (or provider/model compatibility regresses), hold/revert and record the decision in `docs/TASKS.md`, `tasks/index.json`, and task checklists.
 - For policy details and cadence, follow `docs/guides/codex-version-policy.md`.
 
 ## Deliberation Default (Agent-First)
@@ -85,7 +86,7 @@ Use this repository as the wrapper that coordinates multiple Codex-driven projec
 
 ## Docs-First (Spec-Driven)
 - Before any repo edits (code, scripts, config, or docs), create or refresh PRD + TECH_SPEC + ACTION_PLAN + the task checklist.
-- Link TECH_SPECs in `tasks/index.json` and update `last_review` dates as part of the docs-first step.
+- Link TECH_SPECs in `tasks/index.json` and update `last_review` dates as part of the docs-first step; task registration is canonical under `items[]` (legacy top-level `tasks[]` is non-canonical).
 - If docs are missing or stale, STOP and request approval before editing files.
 - Use `.agent/task/templates/tech-spec-template.md` for TECH_SPECs and `.agent/task/templates/action-plan-template.md` for ACTION_PLANs.
 - Prefer the bundled `docs-first` skill for consistent steps.
@@ -93,12 +94,13 @@ Use this repository as the wrapper that coordinates multiple Codex-driven projec
 - For low-risk tiny changes, use the bounded micro-task path in `docs/micro-task-path.md` (still requires task/spec evidence).
 
 ## Standalone Reviews (Ad-hoc)
-- Prefer `npm run review` for ad-hoc reviews in this repo so task-scoped evidence is captured, delegation MCP remains available by default, and optional runtime guards can be applied when needed.
-- `npm run review` keeps runtime unbounded by default and emits patience-first monitor checkpoints while waiting; tune/disable via `CODEX_REVIEW_MONITOR_INTERVAL_SECONDS`.
-- For large uncommitted diffs, `npm run review` emits scope advisories and prompt shaping; tune thresholds via `CODEX_REVIEW_LARGE_SCOPE_FILE_THRESHOLD` / `CODEX_REVIEW_LARGE_SCOPE_LINE_THRESHOLD`.
-- Use direct `codex review` only for quick best-effort checks when manifest-backed evidence is not needed; if it hangs in delegation startup, switch to `npm run review`.
+- Prefer `codex-orchestrator review` for ad-hoc reviews in this repo so task-scoped evidence is captured, delegation MCP remains available by default, and optional runtime guards can be applied when needed (`npm run review` is the repo-local alias).
+- `codex-orchestrator review` keeps runtime unbounded by default and emits patience-first monitor checkpoints while waiting; tune/disable via `CODEX_REVIEW_MONITOR_INTERVAL_SECONDS`.
+- For large uncommitted diffs, `codex-orchestrator review` emits scope advisories and prompt shaping; tune thresholds via `CODEX_REVIEW_LARGE_SCOPE_FILE_THRESHOLD` / `CODEX_REVIEW_LARGE_SCOPE_LINE_THRESHOLD`.
+- Use direct `codex review` only for quick best-effort checks when manifest-backed evidence is not needed; if it hangs in delegation startup, switch to `codex-orchestrator review`.
+- In non-interactive/CI runs (stdin is not a TTY, or `CODEX_REVIEW_NON_INTERACTIVE=1` / `CODEX_NON_INTERACTIVE=1` / `CODEX_NO_INTERACTIVE=1`), `codex-orchestrator review` prints the handoff prompt and exits unless `FORCE_CODEX_REVIEW=1` is set.
 - Current Codex CLI behavior: do not combine prompt arguments with `--uncommitted`, `--base`, or `--commit`; use either diff-scoped review (no prompt) or prompt-only review.
-- When you need manifest-backed review evidence, run `TASK=<task-id> NOTES="Goal: ... | Summary: ... | Risks: ..." MANIFEST=<path> npm run review -- --manifest <path>` (optional failure capture: `--auto-issue-log` or `CODEX_REVIEW_AUTO_ISSUE_LOG=1`).
+- When you need manifest-backed review evidence, run `TASK=<task-id> NOTES="Goal: ... | Summary: ... | Risks: ..." MANIFEST=<path> codex-orchestrator review --manifest <path>` (`npm run review -- --manifest <path>` is equivalent in this repo). `NOTES` is strongly recommended; the wrapper auto-generates fallback notes when omitted.
 - See `docs/standalone-review-guide.md` for the canonical workflow.
 - Prefer the bundled `standalone-review` skill for ad-hoc review steps.
 - Prefer the bundled `elegance-review` skill for the required post-implementation minimality pass.
@@ -189,13 +191,13 @@ Implementation work is not “complete” until you run (in order):
 6. `npm run docs:check`
 7. `npm run docs:freshness`
 8. `node scripts/diff-budget.mjs`
-9. `npm run review`
+9. `codex-orchestrator review` (or `npm run review` in this repo)
 10. `npm run pack:smoke` (required when touching CLI/package/skills/review-wrapper paths intended for downstream npm users)
 
 | Command | When to use | Notes |
 | --- | --- | --- |
 | `node scripts/delegation-guard.mjs` | Delegation enforcement | Requires at least one subagent manifest for top-level tasks; set `DELEGATION_GUARD_OVERRIDE_REASON` to bypass. |
-| `node scripts/spec-guard.mjs --dry-run` | Spec freshness validation | Blocks merges when touched specs are older than 30 days. |
+| `node scripts/spec-guard.mjs --dry-run` | Spec/codepath guard | Fails when tracked implementation paths change without a spec update, or when any spec under `tasks/specs/**` / `docs/design/specs/**` has `last_review` older than 30 days. |
 | `npm run build` | Build output | Compiles TypeScript to `dist/` (required by `docs:check`, `review`, and other wrappers). |
 | `npm run lint` | Pre-commit / review gates | Executes `npm run build:patterns` first so codemods compile. |
 | `npm run test` | Unit + integration checks | Vitest harness covering orchestrator + patterns. |
@@ -203,7 +205,7 @@ Implementation work is not “complete” until you run (in order):
 | `npm run docs:freshness` | Docs freshness gate | Validates registry coverage + review recency and emits `out/<task-id>/docs-freshness.json`. |
 | `node scripts/diff-budget.mjs` | Review scope guard | Fails when diffs exceed the configured budget unless `DIFF_BUDGET_OVERRIDE_REASON` is set. |
 | `npm run eval:test` | Evaluation harness smoke tests | Requires fixtures in `evaluation/fixtures/**`; optional, enable when evaluation scope exists. |
-| `npm run review` | Reviewer hand-off | Runs `codex review` with task/PRD context (when available) and the latest run manifest path included as evidence; `NOTES` is required and should include `<goal + summary + risks>` plus optional questions. |
+| `codex-orchestrator review` (`npm run review` alias) | Reviewer hand-off | Runs `codex review` with task/PRD context (when available) and the latest run manifest path included as evidence; in non-interactive/CI runs (stdin not TTY or `CODEX_REVIEW_NON_INTERACTIVE=1` / `CODEX_NON_INTERACTIVE=1` / `CODEX_NO_INTERACTIVE=1`) it prints the handoff prompt and exits unless `FORCE_CODEX_REVIEW=1`; `NOTES` is recommended (`<goal + summary + risks>` plus optional questions) and the wrapper auto-generates fallback notes when omitted. |
 | `npm run pack:smoke` | Downstream simulation gate | Packs + installs tarball in a temp mock repo, validates CLI behavior (`review` artifacts + delegate-server JSONL), and checks bundled skill install output. Core lane enforces it on downstream-facing diffs; `.github/workflows/pack-smoke-backstop.yml` runs a weekly main-branch backstop. |
 
 Update the table once you wire different build pipelines or tooling.

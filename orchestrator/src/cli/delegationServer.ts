@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { randomBytes } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { realpathSync } from 'node:fs';
 import { access, chmod, readFile, readdir, stat } from 'node:fs/promises';
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
@@ -14,6 +14,10 @@ import {
 } from './config/delegationConfig.js';
 import { logger } from '../logger.js';
 import { writeJsonAtomic } from './utils/fs.js';
+import {
+  evaluateDynamicToolBridgeRequest,
+  type DynamicToolBridgeAction
+} from './control/dynamicToolBridgePolicy.js';
 
 interface McpRequest {
   jsonrpc: '2.0';
@@ -32,7 +36,7 @@ interface McpResponse {
 
 interface DelegationServerOptions {
   repoRoot: string;
-  mode?: 'full' | 'question_only';
+  mode?: DelegationMode;
   configOverrides?: ConfigOverride[];
 }
 
@@ -58,6 +62,24 @@ const DELEGATION_RUN_HEADER = 'x-codex-delegation-run-id';
 const DELEGATION_TOKEN_FILE = 'delegation_token.json';
 const CSRF_HEADER = 'x-csrf-token';
 const LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost', '::1']);
+const DYNAMIC_TOOL_BRIDGE_PUBLIC_TOKEN_KEYS = [
+  'dynamic_tool_bridge_token',
+  'dynamicToolBridgeToken',
+  'bridge_token',
+  'bridgeToken'
+] as const;
+const DYNAMIC_TOOL_BRIDGE_PUBLIC_ATTESTATION_KEYS = [
+  'dynamic_tool_bridge_attestation',
+  'dynamicToolBridgeAttestation',
+  'bridge_attestation',
+  'bridgeAttestation'
+] as const;
+const DYNAMIC_TOOL_BRIDGE_PRIVATE_ATTESTATION_KEYS = [
+  'dynamic_tool_bridge_attestation',
+  'dynamicToolBridgeAttestation',
+  'bridge_attestation',
+  'bridgeAttestation'
+] as const;
 const CONFIG_OVERRIDE_ENV_KEYS = ['CODEX_CONFIG_OVERRIDES', 'CODEX_MCP_CONFIG_OVERRIDES'];
 const CONFIRMATION_ERROR_CODES = new Set([
   'confirmation_required',
@@ -78,6 +100,7 @@ interface ConfigOverride {
 }
 
 type ResponseFormat = 'framed' | 'jsonl';
+type DelegationMode = 'full' | 'question_only' | 'status_only';
 
 export async function startDelegationServer(options: DelegationServerOptions): Promise<void> {
   const repoRoot = resolve(options.repoRoot);
@@ -127,12 +150,13 @@ export async function startDelegationServer(options: DelegationServerOptions): P
 }
 
 function buildToolList(options: {
-  mode: 'full' | 'question_only';
+  mode: DelegationMode;
   githubEnabled: boolean;
   allowedGithubOps: Set<string>;
 }): Array<{ name: string; description: string; inputSchema: Record<string, unknown> }> {
   const tools: Array<{ name: string; description: string; inputSchema: Record<string, unknown> }> = [];
-  const includeFull = options.mode !== 'question_only';
+  const includeFull = options.mode === 'full';
+  const includeQuestionAndGithub = options.mode !== 'status_only';
 
   if (includeFull) {
     tools.push(toolDefinition('delegate.spawn', 'Spawn a delegated run', {
@@ -144,7 +168,7 @@ function buildToolList(options: {
         parent_run_id: { type: 'string' },
         parent_manifest_path: { type: 'string' },
         env: { type: 'object', additionalProperties: { type: 'string' } },
-        delegate_mode: { type: 'string', enum: ['full', 'question_only'] },
+        delegate_mode: { type: 'string', enum: ['full', 'question_only', 'status_only'] },
         start_only: { type: 'boolean' }
       },
       required: ['pipeline', 'repo']
@@ -153,14 +177,89 @@ function buildToolList(options: {
       type: 'object',
       properties: {
         manifest_path: { type: 'string' },
-        paused: { type: 'boolean' }
+        paused: { type: 'boolean' },
+        intent_id: { type: 'string' },
+        request_id: { type: 'string' },
+        transport: { type: 'string', enum: ['discord', 'telegram'] },
+        actor_id: { type: 'string' },
+        actor_source: { type: 'string' },
+        transport_principal: { type: 'string' },
+        transport_nonce: { type: 'string' },
+        transport_nonce_expires_at: { type: 'string' }
       },
       required: ['manifest_path', 'paused']
     }));
     tools.push(toolDefinition('delegate.cancel', 'Cancel a run (confirmation required)', {
       type: 'object',
       properties: {
-        manifest_path: { type: 'string' }
+        manifest_path: { type: 'string' },
+        intent_id: { type: 'string' },
+        request_id: { type: 'string' },
+        transport: { type: 'string', enum: ['discord', 'telegram'] },
+        actor_id: { type: 'string' },
+        actor_source: { type: 'string' },
+        transport_principal: { type: 'string' },
+        transport_nonce: { type: 'string' },
+        transport_nonce_expires_at: { type: 'string' }
+      },
+      required: ['manifest_path']
+    }));
+
+    tools.push(toolDefinition('coordinator.status', 'Experimental coordinator dynamic-tool status bridge', {
+      type: 'object',
+      properties: {
+        manifest_path: { type: 'string' },
+        intent_id: { type: 'string' },
+        request_id: { type: 'string' },
+        ...dynamicToolBridgeSourceSchemaProperties()
+      },
+      required: ['manifest_path']
+    }));
+    tools.push(toolDefinition('coordinator.pause', 'Experimental coordinator dynamic-tool pause bridge', {
+      type: 'object',
+      properties: {
+        manifest_path: { type: 'string' },
+        intent_id: { type: 'string' },
+        request_id: { type: 'string' },
+        transport: { type: 'string', enum: ['discord', 'telegram'] },
+        actor_id: { type: 'string' },
+        actor_source: { type: 'string' },
+        transport_principal: { type: 'string' },
+        transport_nonce: { type: 'string' },
+        transport_nonce_expires_at: { type: 'string' },
+        ...dynamicToolBridgeSourceSchemaProperties()
+      },
+      required: ['manifest_path']
+    }));
+    tools.push(toolDefinition('coordinator.resume', 'Experimental coordinator dynamic-tool resume bridge', {
+      type: 'object',
+      properties: {
+        manifest_path: { type: 'string' },
+        intent_id: { type: 'string' },
+        request_id: { type: 'string' },
+        transport: { type: 'string', enum: ['discord', 'telegram'] },
+        actor_id: { type: 'string' },
+        actor_source: { type: 'string' },
+        transport_principal: { type: 'string' },
+        transport_nonce: { type: 'string' },
+        transport_nonce_expires_at: { type: 'string' },
+        ...dynamicToolBridgeSourceSchemaProperties()
+      },
+      required: ['manifest_path']
+    }));
+    tools.push(toolDefinition('coordinator.cancel', 'Experimental coordinator dynamic-tool cancel bridge', {
+      type: 'object',
+      properties: {
+        manifest_path: { type: 'string' },
+        intent_id: { type: 'string' },
+        request_id: { type: 'string' },
+        transport: { type: 'string', enum: ['discord', 'telegram'] },
+        actor_id: { type: 'string' },
+        actor_source: { type: 'string' },
+        transport_principal: { type: 'string' },
+        transport_nonce: { type: 'string' },
+        transport_nonce_expires_at: { type: 'string' },
+        ...dynamicToolBridgeSourceSchemaProperties()
       },
       required: ['manifest_path']
     }));
@@ -169,36 +268,40 @@ function buildToolList(options: {
   tools.push(toolDefinition('delegate.status', 'Fetch run status', {
     type: 'object',
     properties: {
-      manifest_path: { type: 'string' }
+      manifest_path: { type: 'string' },
+      intent_id: { type: 'string' },
+      request_id: { type: 'string' }
     },
     required: ['manifest_path']
   }));
 
-  tools.push(toolDefinition('delegate.question.enqueue', 'Enqueue a question to the parent run', {
-    type: 'object',
-    properties: {
-      parent_manifest_path: { type: 'string' },
-      parent_run_id: { type: 'string' },
-      parent_task_id: { type: 'string' },
-      from_manifest_path: { type: 'string' },
-      prompt: { type: 'string' },
-      urgency: { type: 'string', enum: ['low', 'med', 'high'] },
-      expires_in_ms: { type: 'number' },
-      auto_pause: { type: 'boolean' }
-    },
-    required: ['parent_manifest_path', 'prompt']
-  }));
-  tools.push(toolDefinition('delegate.question.poll', 'Poll for a question answer', {
-    type: 'object',
-    properties: {
-      parent_manifest_path: { type: 'string' },
-      question_id: { type: 'string' },
-      wait_ms: { type: 'number' }
-    },
-    required: ['parent_manifest_path', 'question_id']
-  }));
+  if (includeQuestionAndGithub) {
+    tools.push(toolDefinition('delegate.question.enqueue', 'Enqueue a question to the parent run', {
+      type: 'object',
+      properties: {
+        parent_manifest_path: { type: 'string' },
+        parent_run_id: { type: 'string' },
+        parent_task_id: { type: 'string' },
+        from_manifest_path: { type: 'string' },
+        prompt: { type: 'string' },
+        urgency: { type: 'string', enum: ['low', 'med', 'high'] },
+        expires_in_ms: { type: 'number' },
+        auto_pause: { type: 'boolean' }
+      },
+      required: ['parent_manifest_path', 'prompt']
+    }));
+    tools.push(toolDefinition('delegate.question.poll', 'Poll for a question answer', {
+      type: 'object',
+      properties: {
+        parent_manifest_path: { type: 'string' },
+        question_id: { type: 'string' },
+        wait_ms: { type: 'number' }
+      },
+      required: ['parent_manifest_path', 'question_id']
+    }));
+  }
 
-  if (options.githubEnabled) {
+  if (includeQuestionAndGithub && options.githubEnabled) {
     if (options.allowedGithubOps.has('open_pr')) {
       tools.push(toolDefinition('github.open_pr', 'Open a pull request', {
         type: 'object',
@@ -268,11 +371,31 @@ function toolDefinition(name: string, description: string, inputSchema: Record<s
   return { name, description, inputSchema };
 }
 
+function dynamicToolBridgeSourceSchemaProperties(): Record<string, unknown> {
+  return {
+    source: {
+      type: 'object',
+      properties: {
+        id: { type: 'string' },
+        source_id: { type: 'string' },
+        sourceId: { type: 'string' },
+        bridge_source: { type: 'string' },
+        bridgeSource: { type: 'string' }
+      },
+      additionalProperties: true
+    },
+    source_id: { type: 'string' },
+    sourceId: { type: 'string' },
+    bridge_source: { type: 'string' },
+    bridgeSource: { type: 'string' }
+  };
+}
+
 async function handleToolCall(
   request: McpRequest,
   context: {
     repoRoot: string;
-    mode: 'full' | 'question_only';
+    mode: DelegationMode;
     allowNested: boolean;
     githubEnabled: boolean;
     allowedGithubOps: Set<string>;
@@ -289,14 +412,15 @@ async function handleToolCall(
   }
   const input = asRecord(params.arguments);
 
-  if (context.mode === 'question_only' && isRestrictedTool(toolName)) {
+  const delegateModeViolationMessage = getDelegateModeViolationMessage(context.mode, toolName);
+  if (delegateModeViolationMessage) {
     await reportSecurityViolation(
       'delegate_mode_violation',
-      `Tool ${toolName} blocked in question_only mode.`,
+      delegateModeViolationMessage,
       toolName,
       context.allowedHosts
     );
-    throw new Error('delegate_mode_forbidden');
+    throw new Error(context.mode === 'question_only' ? 'delegate_mode_forbidden' : delegateModeViolationMessage);
   }
 
   if (containsSecret(input, 'confirm_nonce') || containsSecret(input, 'confirmNonce')) {
@@ -351,6 +475,13 @@ async function handleToolCall(
           context.expiryFallback
         )
       );
+    case 'coordinator.status':
+    case 'coordinator.pause':
+    case 'coordinator.resume':
+    case 'coordinator.cancel':
+      return wrapResult(
+        await handleCoordinatorDynamicToolCall(toolName, input, request, context.allowedRoots, context.allowedHosts)
+      );
     case 'github.open_pr':
     case 'github.comment':
     case 'github.review':
@@ -380,18 +511,14 @@ async function handleDelegateStatus(
   allowedHosts: string[]
 ): Promise<Record<string, unknown>> {
   const manifestPath = resolveManifestPath(readStringValue(input, 'manifest_path', 'manifestPath'), allowedRoots);
-  const raw = await readFile(manifestPath, 'utf8');
-  const manifest = JSON.parse(raw) as {
-    status: string;
-    run_id: string;
-    task_id: string;
-    status_detail?: string;
-    log_path?: string | null;
-  };
+  const manifest = await loadRunManifest(manifestPath);
   const eventsPath = resolve(dirname(manifestPath), 'events.jsonl');
+  const intentId = readStringValue(input, 'intent_id', 'intentId') ?? null;
+  const requestId = readStringValue(input, 'request_id', 'requestId') ?? null;
   if (!TERMINAL_RUN_STATUSES.has(manifest.status)) {
     await assertControlEndpoint(manifestPath, allowedHosts);
   }
+  const control = await loadControlSnapshot(manifestPath);
   return {
     run_id: manifest.run_id,
     task_id: manifest.task_id,
@@ -399,7 +526,15 @@ async function handleDelegateStatus(
     status_detail: manifest.status_detail ?? null,
     manifest_path: manifestPath,
     events_path: eventsPath,
-    log_path: manifest.log_path ?? null
+    log_path: manifest.log_path ?? null,
+    control,
+    traceability: {
+      intent_id: intentId,
+      task_id: manifest.task_id ?? null,
+      run_id: manifest.run_id ?? null,
+      manifest_path: manifestPath,
+      request_id: requestId
+    }
   };
 }
 
@@ -409,17 +544,54 @@ async function handleDelegatePause(
   allowedHosts: string[]
 ): Promise<unknown> {
   const manifestPath = resolveManifestPath(readStringValue(input, 'manifest_path', 'manifestPath'), allowedRoots);
+  const manifest = await loadRunManifest(manifestPath);
   const paused = readBooleanValue(input, 'paused') ?? false;
-  return await callControlEndpoint(
+  const action = paused ? 'pause' : 'resume';
+  const intentId = readStringValue(input, 'intent_id', 'intentId') ?? null;
+  const requestId =
+    readStringValue(input, 'request_id', 'requestId') ??
+    deriveIdempotentRequestId(action, intentId, manifestPath);
+  const transportMetadata = readTransportMutationMetadata(input);
+  const result = await callControlEndpoint(
     manifestPath,
     '/control/action',
     {
-      action: paused ? 'pause' : 'resume',
-      requested_by: 'delegate'
+      action,
+      requested_by: 'delegate',
+      intent_id: intentId,
+      request_id: requestId,
+      ...(transportMetadata ?? {})
     },
     undefined,
     { allowedHosts }
   );
+  const resultRecord = asRecord(result);
+  const latestAction = asRecord(resultRecord.latest_action);
+  const resultRequestId =
+    readStringValue(resultRecord, 'request_id', 'requestId') ??
+    readStringValue(latestAction, 'request_id', 'requestId') ??
+    requestId;
+  const canonicalTraceability = readCanonicalTraceability(resultRecord);
+  return {
+    ...resultRecord,
+    traceability:
+      canonicalTraceability ??
+      ({
+        intent_id: intentId,
+        task_id: manifest.task_id ?? null,
+        run_id: manifest.run_id ?? null,
+        manifest_path: manifestPath,
+        request_id: resultRequestId,
+        ...(transportMetadata
+          ? {
+              transport: transportMetadata.transport,
+              actor_id: transportMetadata.actor_id,
+              actor_source: transportMetadata.actor_source,
+              transport_principal: transportMetadata.transport_principal
+            }
+          : {})
+      } as Record<string, unknown>)
+  };
 }
 
 async function handleDelegateCancel(
@@ -429,51 +601,458 @@ async function handleDelegateCancel(
   allowedHosts: string[]
 ): Promise<unknown> {
   const manifestPath = resolveManifestPath(readStringValue(input, 'manifest_path', 'manifestPath'), allowedRoots);
+  const manifest = await loadRunManifest(manifestPath);
+  const intentId = readStringValue(input, 'intent_id', 'intentId') ?? null;
+  const requestId =
+    readStringValue(input, 'request_id', 'requestId') ??
+    deriveIdempotentRequestId('cancel', intentId, manifestPath);
+  const transportMetadata = readTransportMutationMetadata(input);
   const privateNonce = request.codex_private?.confirm_nonce;
   if (!privateNonce) {
-    return await callControlEndpoint(
+    const confirmation = await callControlEndpoint(
       manifestPath,
       '/confirmations/create',
       {
         action: 'cancel',
         tool: 'delegate.cancel',
-        params: { manifest_path: manifestPath }
+        params: {
+          manifest_path: manifestPath,
+          intent_id: intentId,
+          request_id: requestId,
+          ...(transportMetadata
+            ? {
+                transport: transportMetadata.transport,
+                actor_id: transportMetadata.actor_id,
+                actor_source: transportMetadata.actor_source,
+                transport_principal: transportMetadata.transport_principal
+              }
+            : {})
+        }
       },
       undefined,
       { allowedHosts }
     );
+    const confirmationRequestId = readStringValue(confirmation, 'request_id', 'requestId') ?? requestId;
+    const confirmationRecord = asRecord(confirmation);
+    const canonicalTraceability = readCanonicalTraceability(confirmationRecord);
+    return {
+      ...confirmationRecord,
+      traceability:
+        canonicalTraceability ??
+        ({
+          intent_id: intentId,
+          task_id: manifest.task_id ?? null,
+          run_id: manifest.run_id ?? null,
+          manifest_path: manifestPath,
+          request_id: confirmationRequestId,
+          ...(transportMetadata
+            ? {
+                transport: transportMetadata.transport,
+                actor_id: transportMetadata.actor_id,
+                actor_source: transportMetadata.actor_source,
+                transport_principal: transportMetadata.transport_principal
+              }
+            : {})
+        } as Record<string, unknown>)
+    };
   }
 
   try {
-    return await callControlEndpoint(
+    const result = await callControlEndpoint(
       manifestPath,
       '/control/action',
       {
         action: 'cancel',
         requested_by: 'delegate',
+        intent_id: intentId,
+        request_id: requestId,
         confirm_nonce: String(privateNonce),
         tool: 'delegate.cancel',
-        params: { manifest_path: manifestPath }
+        params: {
+          manifest_path: manifestPath,
+          intent_id: intentId,
+          request_id: requestId,
+          ...(transportMetadata
+            ? {
+                transport: transportMetadata.transport,
+                actor_id: transportMetadata.actor_id,
+                actor_source: transportMetadata.actor_source,
+                transport_principal: transportMetadata.transport_principal
+              }
+            : {})
+        },
+        ...(transportMetadata ?? {})
       },
       undefined,
       { allowedHosts }
     );
+    const resultRecord = asRecord(result);
+    const latestAction = asRecord(resultRecord.latest_action);
+    const resultRequestId =
+      readStringValue(resultRecord, 'request_id', 'requestId') ??
+      readStringValue(latestAction, 'request_id', 'requestId') ??
+      requestId;
+    const canonicalTraceability = readCanonicalTraceability(resultRecord);
+    return {
+      ...resultRecord,
+      traceability:
+        canonicalTraceability ??
+        ({
+          intent_id: intentId,
+          task_id: manifest.task_id ?? null,
+          run_id: manifest.run_id ?? null,
+          manifest_path: manifestPath,
+          request_id: resultRequestId,
+          ...(transportMetadata
+            ? {
+                transport: transportMetadata.transport,
+                actor_id: transportMetadata.actor_id,
+                actor_source: transportMetadata.actor_source,
+                transport_principal: transportMetadata.transport_principal
+              }
+            : {})
+        } as Record<string, unknown>)
+    };
   } catch (error) {
     if (!isConfirmationError(error)) {
       throw error;
     }
-    return await callControlEndpoint(
+    const confirmation = await callControlEndpoint(
       manifestPath,
       '/confirmations/create',
       {
         action: 'cancel',
         tool: 'delegate.cancel',
-        params: { manifest_path: manifestPath }
+        params: {
+          manifest_path: manifestPath,
+          intent_id: intentId,
+          request_id: requestId,
+          ...(transportMetadata
+            ? {
+                transport: transportMetadata.transport,
+                actor_id: transportMetadata.actor_id,
+                actor_source: transportMetadata.actor_source,
+                transport_principal: transportMetadata.transport_principal
+              }
+            : {})
+        }
       },
       undefined,
       { allowedHosts }
     );
+    const confirmationRequestId = readStringValue(confirmation, 'request_id', 'requestId') ?? requestId;
+    const confirmationRecord = asRecord(confirmation);
+    const canonicalTraceability = readCanonicalTraceability(confirmationRecord);
+    return {
+      ...confirmationRecord,
+      traceability:
+        canonicalTraceability ??
+        ({
+          intent_id: intentId,
+          task_id: manifest.task_id ?? null,
+          run_id: manifest.run_id ?? null,
+          manifest_path: manifestPath,
+          request_id: confirmationRequestId,
+          ...(transportMetadata
+            ? {
+                transport: transportMetadata.transport,
+                actor_id: transportMetadata.actor_id,
+                actor_source: transportMetadata.actor_source,
+                transport_principal: transportMetadata.transport_principal
+              }
+            : {})
+        } as Record<string, unknown>)
+    };
   }
+}
+
+async function handleCoordinatorDynamicToolCall(
+  toolName: 'coordinator.status' | 'coordinator.pause' | 'coordinator.resume' | 'coordinator.cancel',
+  input: Record<string, unknown>,
+  request: McpRequest,
+  allowedRoots: string[],
+  allowedHosts: string[]
+): Promise<unknown> {
+  if (containsAnySecret(input, DYNAMIC_TOOL_BRIDGE_PUBLIC_TOKEN_KEYS)) {
+    await reportSecurityViolation(
+      'dynamic_tool_bridge_token_present',
+      'Model supplied dynamic tool bridge token.',
+      toolName,
+      allowedHosts
+    );
+    throw new Error('dynamic_tool_bridge_token_missing');
+  }
+  if (containsAnySecret(input, DYNAMIC_TOOL_BRIDGE_PUBLIC_ATTESTATION_KEYS)) {
+    await reportSecurityViolation(
+      'dynamic_tool_bridge_attestation_present',
+      'Model supplied dynamic tool bridge attestation.',
+      toolName,
+      allowedHosts
+    );
+    throw new Error('dynamic_tool_bridge_attestation_missing');
+  }
+
+  const manifestPath = resolveManifestPath(readStringValue(input, 'manifest_path', 'manifestPath'), allowedRoots);
+  const controlSnapshot = await loadControlSnapshot(manifestPath);
+  const featureToggles = asRecord(controlSnapshot?.feature_toggles);
+  const bridgeAction = resolveCoordinatorDynamicToolAction(toolName);
+  const bridgeEvaluation = evaluateDynamicToolBridgeRequest({
+    featureToggles,
+    action: bridgeAction,
+    args: input
+  });
+  if (!bridgeEvaluation.ok) {
+    throw new Error(bridgeEvaluation.error ?? 'dynamic_tool_bridge_disabled');
+  }
+  verifyDynamicToolBridgeAttestation(request, featureToggles, bridgeEvaluation.sourceId ?? 'appserver_dynamic_tool');
+
+  let result: unknown;
+  if (bridgeAction === 'status') {
+    result = await handleDelegateStatus(
+      {
+        ...input,
+        manifest_path: manifestPath
+      },
+      allowedRoots,
+      allowedHosts
+    );
+  } else if (bridgeAction === 'pause' || bridgeAction === 'resume') {
+    result = await handleDelegatePause(
+      {
+        ...input,
+        manifest_path: manifestPath,
+        paused: bridgeAction === 'pause'
+      },
+      allowedRoots,
+      allowedHosts
+    );
+  } else {
+    result = await handleDelegateCancel(
+      {
+        ...input,
+        manifest_path: manifestPath
+      },
+      request,
+      allowedRoots,
+      allowedHosts
+    );
+  }
+
+  return appendCoordinatorBridgeTraceability(result, {
+    action: bridgeAction,
+    sourceId: bridgeEvaluation.sourceId ?? 'appserver_dynamic_tool'
+  });
+}
+
+function resolveCoordinatorDynamicToolAction(toolName: string): DynamicToolBridgeAction {
+  switch (toolName) {
+    case 'coordinator.status':
+      return 'status';
+    case 'coordinator.pause':
+      return 'pause';
+    case 'coordinator.resume':
+      return 'resume';
+    case 'coordinator.cancel':
+      return 'cancel';
+    default:
+      throw new Error('dynamic_tool_bridge_action_not_allowed');
+  }
+}
+
+function appendCoordinatorBridgeTraceability(
+  payload: unknown,
+  input: { action: DynamicToolBridgeAction; sourceId: string }
+): Record<string, unknown> {
+  const record = asRecord(payload);
+  const traceability = asRecord(record.traceability);
+  return {
+    ...record,
+    traceability: {
+      ...traceability,
+      bridge_surface: 'coordinator_dynamic_tool',
+      bridge_action: input.action,
+      bridge_source_id: input.sourceId,
+      bridge_token_validated: true
+    }
+  };
+}
+
+interface DynamicToolBridgePrivateAttestation {
+  token: string;
+  sourceId: string;
+  principal: string;
+}
+
+interface DynamicToolBridgeExpectedAttestation {
+  tokenSha256: string;
+  sourceId: string;
+  principal: string;
+  expiresAt: string | null;
+  revoked: boolean;
+}
+
+function verifyDynamicToolBridgeAttestation(
+  request: McpRequest,
+  featureToggles: Record<string, unknown>,
+  sourceId: string
+): DynamicToolBridgePrivateAttestation {
+  const hiddenAttestation = readDynamicToolBridgePrivateAttestation(request);
+  if (!hiddenAttestation) {
+    throw new Error('dynamic_tool_bridge_attestation_missing');
+  }
+  const expectedAttestation = readDynamicToolBridgeExpectedAttestation(featureToggles);
+  if (!expectedAttestation) {
+    throw new Error('dynamic_tool_bridge_attestation_invalid');
+  }
+  if (expectedAttestation.revoked) {
+    throw new Error('dynamic_tool_bridge_attestation_revoked');
+  }
+  if (expectedAttestation.expiresAt) {
+    const expiresAtMs = Date.parse(expectedAttestation.expiresAt);
+    if (!Number.isFinite(expiresAtMs)) {
+      throw new Error('dynamic_tool_bridge_attestation_malformed');
+    }
+    if (expiresAtMs <= Date.now()) {
+      throw new Error('dynamic_tool_bridge_attestation_expired');
+    }
+  }
+  const normalizedSourceId = normalizeDynamicToolBridgeSourceId(sourceId);
+  if (
+    hiddenAttestation.sourceId !== normalizedSourceId ||
+    hiddenAttestation.sourceId !== expectedAttestation.sourceId ||
+    expectedAttestation.sourceId !== normalizedSourceId
+  ) {
+    throw new Error('dynamic_tool_bridge_attestation_source_mismatch');
+  }
+  if (hiddenAttestation.principal !== expectedAttestation.principal) {
+    throw new Error('dynamic_tool_bridge_attestation_principal_mismatch');
+  }
+  const tokenSha256 = createHash('sha256').update(hiddenAttestation.token).digest('hex');
+  if (tokenSha256 !== expectedAttestation.tokenSha256) {
+    throw new Error('dynamic_tool_bridge_attestation_invalid');
+  }
+  return hiddenAttestation;
+}
+
+function readDynamicToolBridgePrivateAttestation(request: McpRequest): DynamicToolBridgePrivateAttestation | null {
+  const privateRecord = request.codex_private;
+  if (!privateRecord) {
+    return null;
+  }
+  for (const key of DYNAMIC_TOOL_BRIDGE_PRIVATE_ATTESTATION_KEYS) {
+    if (!Object.prototype.hasOwnProperty.call(privateRecord, key)) {
+      continue;
+    }
+    const attestation = asRecord(privateRecord[key]);
+    const token = readStringValue(attestation, 'token', 'bridge_token', 'bridgeToken');
+    const sourceId = readStringValue(attestation, 'source_id', 'sourceId');
+    const principal = readStringValue(attestation, 'principal');
+    if (!token || !sourceId || !principal) {
+      throw new Error('dynamic_tool_bridge_attestation_malformed');
+    }
+    return {
+      token,
+      sourceId: normalizeDynamicToolBridgeSourceId(sourceId),
+      principal
+    };
+  }
+  return null;
+}
+
+function readDynamicToolBridgeExpectedAttestation(
+  featureToggles: Record<string, unknown>
+): DynamicToolBridgeExpectedAttestation | null {
+  const bridgePolicy = readDynamicToolBridgePolicyRecord(featureToggles);
+  const rawAttestation = bridgePolicy.attestation;
+  if (rawAttestation === undefined) {
+    return null;
+  }
+  const attestation = asRecord(rawAttestation);
+  const tokenSha256 = readStringValue(attestation, 'token_sha256', 'tokenSha256');
+  const sourceId = readStringValue(attestation, 'source_id', 'sourceId');
+  const principal = readStringValue(attestation, 'principal');
+  const expiresAt = readStringValue(attestation, 'expires_at', 'expiresAt');
+  const revoked = readBooleanValue(attestation, 'revoked') ?? false;
+  const revokedAt = readStringValue(attestation, 'revoked_at', 'revokedAt');
+  if (!tokenSha256 || !sourceId || !principal) {
+    throw new Error('dynamic_tool_bridge_attestation_malformed');
+  }
+  if (!/^[a-f0-9]{64}$/i.test(tokenSha256)) {
+    throw new Error('dynamic_tool_bridge_attestation_malformed');
+  }
+  return {
+    tokenSha256: tokenSha256.toLowerCase(),
+    sourceId: normalizeDynamicToolBridgeSourceId(sourceId),
+    principal,
+    expiresAt: expiresAt ?? null,
+    revoked: revoked || Boolean(revokedAt)
+  };
+}
+
+function readDynamicToolBridgePolicyRecord(featureToggles: Record<string, unknown>): Record<string, unknown> {
+  const coordinatorPolicy = asRecord(asRecord(featureToggles.coordinator).dynamic_tool_bridge);
+  if (Object.keys(coordinatorPolicy).length > 0) {
+    return coordinatorPolicy;
+  }
+  return asRecord(featureToggles.dynamic_tool_bridge);
+}
+
+function normalizeDynamicToolBridgeSourceId(sourceId: string): string {
+  return sourceId.trim().toLowerCase();
+}
+
+interface DelegationManifestSnapshot {
+  status: string;
+  run_id: string;
+  task_id: string;
+  status_detail?: string;
+  log_path?: string | null;
+}
+
+interface TransportMutationMetadata {
+  transport: 'discord' | 'telegram';
+  actor_id?: string;
+  actor_source?: string;
+  transport_principal?: string;
+  transport_nonce?: string;
+  transport_nonce_expires_at?: string;
+}
+
+async function loadRunManifest(manifestPath: string): Promise<DelegationManifestSnapshot> {
+  const raw = await readFile(manifestPath, 'utf8');
+  return JSON.parse(raw) as DelegationManifestSnapshot;
+}
+
+async function loadControlSnapshot(manifestPath: string): Promise<Record<string, unknown> | null> {
+  const controlPath = resolve(dirname(manifestPath), 'control.json');
+  try {
+    const raw = await readFile(controlPath, 'utf8');
+    const parsed = safeJsonParse(raw);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return null;
+    }
+    return parsed as Record<string, unknown>;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      return null;
+    }
+    return null;
+  }
+}
+
+function deriveIdempotentRequestId(
+  action: 'pause' | 'resume' | 'cancel',
+  intentId: string | null,
+  manifestPath: string
+): string | undefined {
+  if (!intentId) {
+    return undefined;
+  }
+  const digest = createHash('sha256')
+    .update(`${action}:${intentId}:${manifestPath}`)
+    .digest('hex')
+    .slice(0, 24);
+  return `intent-${digest}`;
 }
 
 async function handleDelegateSpawn(
@@ -506,7 +1085,7 @@ async function handleDelegateSpawn(
     args.push('--parent-run', parentRunId);
   }
   const requestedMode = readStringValue(input, 'delegate_mode', 'delegateMode') ?? 'question_only';
-  const childMode = allowNested && requestedMode === 'full' ? 'full' : 'question_only';
+  const childMode = resolveChildDelegateMode(requestedMode, allowNested);
 
   const envOverrides = readStringMap(input, 'env');
   const delegationToken = randomBytes(32).toString('hex');
@@ -1434,6 +2013,8 @@ function parseSpawnOutput(stdout: string): Record<string, unknown> {
 export const __test__ = {
   runJsonRpcServer,
   handleToolCall,
+  buildToolList,
+  resolveChildDelegateMode,
   parseContentLengthHeader,
   parseSpawnOutput,
   handleDelegateSpawn,
@@ -1711,6 +2292,72 @@ function asRecord(value: unknown): Record<string, unknown> {
   return value as Record<string, unknown>;
 }
 
+function readCanonicalTraceability(record: Record<string, unknown>): Record<string, unknown> | null {
+  const traceability = asRecord(record.traceability);
+  return Object.keys(traceability).length > 0 ? traceability : null;
+}
+
+const TRANSPORT_MUTATION_METADATA_KEYS = [
+  'actor_id',
+  'actorId',
+  'actor_source',
+  'actorSource',
+  'transport_principal',
+  'transportPrincipal',
+  'principal',
+  'transport_nonce',
+  'transportNonce',
+  'nonce',
+  'transport_nonce_expires_at',
+  'transportNonceExpiresAt',
+  'nonce_expires_at',
+  'nonceExpiresAt'
+] as const;
+
+function hasTransportMutationMetadata(input: Record<string, unknown>): boolean {
+  return TRANSPORT_MUTATION_METADATA_KEYS.some((key) => Object.prototype.hasOwnProperty.call(input, key));
+}
+
+function readTransportMutationMetadata(input: Record<string, unknown>): TransportMutationMetadata | null {
+  if (!Object.prototype.hasOwnProperty.call(input, 'transport')) {
+    if (hasTransportMutationMetadata(input)) {
+      throw new Error('transport_required');
+    }
+    return null;
+  }
+  const rawTransport = input.transport;
+  if (typeof rawTransport !== 'string') {
+    throw new Error('transport_invalid');
+  }
+  const normalizedTransport = rawTransport.trim();
+  if (!normalizedTransport) {
+    throw new Error('transport_invalid');
+  }
+  if (normalizedTransport !== 'discord' && normalizedTransport !== 'telegram') {
+    throw new Error('transport_unsupported');
+  }
+  const transport = normalizedTransport;
+  const actorId = readStringValue(input, 'actor_id', 'actorId');
+  const actorSource = readStringValue(input, 'actor_source', 'actorSource');
+  const principal = readStringValue(input, 'transport_principal', 'transportPrincipal', 'principal');
+  const nonce = readStringValue(input, 'transport_nonce', 'transportNonce', 'nonce');
+  const nonceExpiresAt = readStringValue(
+    input,
+    'transport_nonce_expires_at',
+    'transportNonceExpiresAt',
+    'nonce_expires_at',
+    'nonceExpiresAt'
+  );
+  return {
+    transport,
+    ...(actorId ? { actor_id: actorId } : {}),
+    ...(actorSource ? { actor_source: actorSource } : {}),
+    ...(principal ? { transport_principal: principal } : {}),
+    ...(nonce ? { transport_nonce: nonce } : {}),
+    ...(nonceExpiresAt ? { transport_nonce_expires_at: nonceExpiresAt } : {})
+  };
+}
+
 function readStringValue(record: Record<string, unknown>, ...keys: string[]): string | undefined {
   for (const key of keys) {
     const value = record[key];
@@ -1775,12 +2422,51 @@ function requireNumber(value: number | undefined, field: string): number {
   return value;
 }
 
+function getDelegateModeViolationMessage(mode: DelegationMode, toolName: string): string | null {
+  if (toolName.startsWith('coordinator.') && mode !== 'full') {
+    if (mode === 'status_only') {
+      return `Tool ${toolName} blocked in status_only mode; only delegate.status is allowed.`;
+    }
+    return `Tool ${toolName} blocked in question_only mode.`;
+  }
+  if (mode === 'question_only' && isRestrictedTool(toolName)) {
+    return `Tool ${toolName} blocked in question_only mode.`;
+  }
+  if (mode === 'status_only' && toolName !== 'delegate.status' && isDelegationOrGithubTool(toolName)) {
+    return `Tool ${toolName} blocked in status_only mode; only delegate.status is allowed.`;
+  }
+  return null;
+}
+
 function isRestrictedTool(toolName: string): boolean {
   return toolName === 'delegate.spawn' || toolName === 'delegate.pause' || toolName === 'delegate.cancel';
 }
 
+function isDelegationOrGithubTool(toolName: string): boolean {
+  return toolName.startsWith('delegate.') || toolName.startsWith('github.') || toolName.startsWith('coordinator.');
+}
+
+function resolveChildDelegateMode(requestedMode: string, allowNested: boolean): DelegationMode {
+  if (requestedMode === 'status_only') {
+    return 'status_only';
+  }
+  if (allowNested && requestedMode === 'full') {
+    return 'full';
+  }
+  return 'question_only';
+}
+
 function containsSecret(record: Record<string, unknown>, key: string): boolean {
   return Object.prototype.hasOwnProperty.call(record, key);
+}
+
+function containsAnySecret(record: Record<string, unknown>, keys: readonly string[]): boolean {
+  for (const key of keys) {
+    if (containsSecret(record, key)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 async function reportSecurityViolation(
@@ -1965,25 +2651,27 @@ export function resolveRunManifestPath(
   label = 'manifest_path'
 ): string {
   const resolved = resolve(rawPath);
-  assertRunManifestPath(resolved, label);
-  if (allowedRoots && !isPathWithinRoots(resolved, allowedRoots)) {
+  const canonicalPath = realpathSafe(resolved);
+  assertRunManifestPath(canonicalPath, label);
+  if (allowedRoots && !isPathWithinRoots(canonicalPath, allowedRoots)) {
     throw new Error(`${label} not permitted`);
   }
-  return resolved;
+  return canonicalPath;
 }
 
 function assertRunManifestPath(pathname: string, label: string): void {
-  if (basename(pathname) !== 'manifest.json') {
+  const resolvedPath = resolve(pathname);
+  if (basename(resolvedPath) !== 'manifest.json') {
     throw new Error(`${label} invalid`);
   }
-  const runDir = dirname(pathname);
+  const runDir = dirname(resolvedPath);
   const cliDir = dirname(runDir);
   if (basename(cliDir) !== 'cli') {
     throw new Error(`${label} invalid`);
   }
   const taskDir = dirname(cliDir);
   const runsDir = dirname(taskDir);
-  if (!basename(runDir) || !basename(taskDir) || !basename(runsDir)) {
+  if (!basename(runDir) || !basename(taskDir) || dirname(runsDir) === runsDir) {
     throw new Error(`${label} invalid`);
   }
 }
@@ -2028,11 +2716,7 @@ function resolveSpawnManifestPath(
   }
   const resolved = isAbsolute(manifestPath) ? manifestPath : resolve(repoRoot, manifestPath);
   try {
-    assertRunManifestPath(resolved, 'manifest_path');
-    if (allowedRoots && !isPathWithinRoots(resolved, allowedRoots)) {
-      return null;
-    }
-    return resolved;
+    return resolveRunManifestPath(resolved, allowedRoots, 'manifest_path');
   } catch {
     return null;
   }

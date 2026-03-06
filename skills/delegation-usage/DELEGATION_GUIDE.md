@@ -127,7 +127,7 @@ If you need delegation to respect a repo’s `.codex/orchestrator.toml` (e.g., s
 
 ## Version guard (JSONL handshake)
 
-Delegation MCP expects JSONL. Keep `codex-orchestrator` aligned with the current release line.
+Delegation MCP expects JSONL. Keep `codex-orchestrator` aligned with the current CO compatibility/adoption target (`codex-cli 0.111.0`) unless a task-scoped canary is explicitly evaluating something newer.
 
 - Check: `codex-orchestrator --version`
 - Update global: `npm i -g @kbediako/codex-orchestrator@latest`
@@ -145,16 +145,19 @@ Delegation MCP expects JSONL. Keep `codex-orchestrator` aligned with the current
 - `spawn_agent` omission defaults to `default`; require explicit `agent_type` for every spawn.
 - For symbolic collab runs, include a first-line role tag in spawned prompts: `[agent_type:<role>]`.
 - Multi-turn subagent loops are supported (`spawn_agent` -> `send_input` -> `wait`/`resume_agent` -> `close_agent`).
-- In Codex CLI `0.105.0`, built-in `explorer` inherits top-level defaults unless overridden in `~/.codex/config.toml`.
+- In Codex CLI `0.111.0`, built-in `explorer` continues to inherit top-level defaults unless overridden in `~/.codex/config.toml`.
 - Recommended baseline:
-  - `model = "gpt-5.3-codex"`
+  - `model = "gpt-5.4"`
+  - `review_model = "gpt-5.4"`
   - `model_reasoning_effort = "xhigh"`
-  - `[agents] max_threads = 12` with `max_depth = 4` and `max_spawn_depth = 4`
+  - `[agents] max_threads = 12` is the seeded baseline; keep explicit `max_depth = 4` / `max_spawn_depth = 4` only when your local Codex parser accepts them
   - Leave `[agents.explorer]` undefined unless you intentionally want to override built-in explorer behavior.
-  - Add optional `[agents.explorer_fast]` for `gpt-5.3-codex-spark` (text-only caveat).
-  - Add optional `[agents.awaiter]` override for `gpt-5.3-codex` + `high` while preserving awaiter instructions.
-  - Add `[agents.worker_complex]` for high-risk edits (`gpt-5.3-codex`, `xhigh`).
+  - Add optional `[agents.explorer_fast]` for `gpt-5.3-codex-spark` (text-only; the only explicit exception).
+  - Add optional `[agents.awaiter]` override for `gpt-5.4` + `high` while preserving awaiter instructions.
+  - Add `[agents.worker_complex]` for high-risk edits (`gpt-5.4`, `xhigh`).
+  - Keep delegated subagent and review surfaces on `gpt-5.4`; avoid `gpt-5.4-codex` under ChatGPT auth because those runs currently fail immediately.
   - Fallback posture is contingency-only: `8/2/2` (constrained/high-risk), `6/1/1` break-glass.
+  - If native `codex` startup fails with `invalid type: integer ... expected struct AgentRoleToml` under `[agents]`, remove only the live `max_depth` and `max_spawn_depth` keys from `~/.codex/config.toml` and leave the role subtables unchanged.
 
 ## Common failures
 

@@ -12,15 +12,15 @@ const execFileAsync = promisify(execFile);
 /**
  * Print usage information and available command-line options for the spec-guard script.
  *
- * Describes the checks the script performs (code/migration changes require a spec update in tasks/specs or tasks/index.json; TECH_SPEC last_review must be within 30 days) and documents the supported options (--dry-run, -h/--help).
+ * Describes the checks the script performs (tracked implementation/migration changes require a spec update in tasks/specs, docs/design/specs, or tasks/index.json; spec last_review dates must be within 30 days) and documents the supported options (--dry-run, -h/--help).
  */
 function showUsage() {
   console.log(`Usage: node scripts/spec-guard.mjs [--dry-run]
 
 Ensures that implementation changes adhere to Codex-Orchestrator spec guardrails.
 Checks include:
-  • Code/migration edits must accompany a spec update under tasks/specs or tasks/index.json
-  • TECH_SPEC last_review dates must be ≤30 days old
+  • Tracked implementation/migration edits must accompany a spec update under tasks/specs, docs/design/specs, or tasks/index.json
+  • Spec last_review dates under tasks/specs and docs/design/specs must be ≤30 days old
 
 Options:
   --dry-run   Report failures without exiting non-zero
@@ -78,15 +78,22 @@ async function listChangedFiles(baseRef) {
   return runGitDiff(['HEAD~1..HEAD']);
 }
 
+const CODE_PATH_PREFIXES = [
+  'src/',
+  'app/',
+  'server/',
+  'orchestrator/src/',
+  'packages/orchestrator/src/',
+  'packages/shared/',
+  'adapters/',
+  'evaluation/harness/',
+  'migrations/',
+  'db/migrations/',
+  'prisma/migrations/'
+];
+
 function isCodePath(file) {
-  return (
-    file.startsWith('src/') ||
-    file.startsWith('app/') ||
-    file.startsWith('server/') ||
-    file.startsWith('migrations/') ||
-    file.startsWith('db/migrations/') ||
-    file.startsWith('prisma/migrations/')
-  );
+  return CODE_PATH_PREFIXES.some((prefix) => file.startsWith(prefix));
 }
 
 function isSpecPath(file) {
@@ -218,7 +225,9 @@ async function main() {
   const failures = [];
 
   if (needsSpec && !specTouched) {
-    failures.push('code/migrations changed but no spec updated under tasks/specs or tasks/index.json');
+    failures.push(
+      'code/migrations changed but no spec updated under tasks/specs, docs/design/specs, or tasks/index.json'
+    );
   }
 
   const specFiles = await listSpecFiles();

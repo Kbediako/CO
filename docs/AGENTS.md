@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp e54375fdb70d13f092601fbb0ce8c7b0ad3b068a8e9d5d9adab54ea84f043466 -->
+<!-- codex:instruction-stamp e08bb54054b0855ae89412e6247a5a84f624dc5f7f1ed48945b62756fb768cb3 -->
 # Repository Agent Guidance
 
 ## Project 0303 — Codex Orchestrator Autonomy Enhancements
@@ -26,7 +26,7 @@
 
 ## Docs-First Requirement
 - Before any repo edits (code, scripts, config, or docs), create or refresh PRD + TECH_SPEC + ACTION_PLAN + the task checklist.
-- Link TECH_SPECs in `tasks/index.json` and update `last_review` dates before editing files.
+- Link TECH_SPECs in `tasks/index.json` and update `last_review` dates before editing files; task registration is canonical under `items[]` (legacy top-level `tasks[]` is non-canonical).
 - If docs are missing or stale, STOP and request approval before touching files.
 - Use `.agent/task/templates/tech-spec-template.md` for TECH_SPECs and `.agent/task/templates/action-plan-template.md` for ACTION_PLANs.
 - Prefer the global `docs-first` skill when installed; bundled skills ship for downstream release packaging.
@@ -53,14 +53,15 @@
 - Follow `.agent/SOPs/oracle-usage.md` for Oracle runs (tool cap: 11 attachments; unique basenames; attachments-first workflow).
 
 ## Codex Version Policy (Execution)
-- Default execution for this repository remains stable Codex CLI (`0.107.0`) unless task-scoped evidence explicitly promotes a newer version.
-- Latest evaluated prerelease lane is `0.107.0-alpha.9` (HOLD; not approved as default).
-- CO may run alpha/prerelease Codex in explicit task-scoped canary lanes only; do not treat prerelease as an automatic global default.
-- Required policy checks for alpha lanes:
+- Current CO compatibility/adoption target is stable Codex CLI (`0.111.0`).
+- Current model posture is `gpt-5.4` for top-level, delegated subagent, and review surfaces; keep `explorer_fast` on `gpt-5.3-codex-spark`.
+- On ChatGPT-auth sessions, do not target delegated/review surfaces at `gpt-5.4-codex`; those runs currently fail immediately. Use `gpt-5.4` until provider compatibility changes.
+- CO may run newer stable/prerelease Codex builds in explicit task-scoped canary lanes only; do not treat them as automatic global defaults.
+- Required policy checks for newer-version lanes:
   - `scripts/runtime-mode-canary.mjs`
   - Required cloud contract run: `CODEX_CLOUD_ENV_ID=<env-id> CODEX_CLOUD_CANARY_REQUIRED=1 npm run ci:cloud-canary`
   - Required fallback contract run: `CODEX_CLOUD_ENV_ID=<env-id> CODEX_CLOUD_CANARY_REQUIRED=1 CLOUD_CANARY_EXPECT_FALLBACK=1 npm run ci:cloud-canary`
-- If required checks fail, or required cloud evidence is missing, hold/revert to stable and update decision evidence in `docs/TASKS.md`, `tasks/index.json`, and task checklist mirrors.
+- If required checks fail, required cloud evidence is missing, or provider/model compatibility regresses, hold/revert and update decision evidence in `docs/TASKS.md`, `tasks/index.json`, and task checklist mirrors.
 - Canonical policy/cadence guide: `docs/guides/codex-version-policy.md`.
 
 ## MCP vs Collab (Decision Rule)
@@ -73,6 +74,7 @@
 ## Standalone Reviews (Ad-hoc)
 - Prefer `npm run review` for ad-hoc reviews in this repo so task-scoped evidence is captured and delegation MCP remains enabled by default.
 - Use direct `codex review` only for quick best-effort checks when manifest-backed evidence is not needed.
+- In non-interactive/CI runs (stdin is not a TTY, or `CODEX_REVIEW_NON_INTERACTIVE=1` / `CODEX_NON_INTERACTIVE=1` / `CODEX_NO_INTERACTIVE=1`), `codex-orchestrator review`/`npm run review` prints the handoff prompt and exits unless `FORCE_CODEX_REVIEW=1` is set.
 - Current Codex CLI behavior: do not combine prompt arguments with `--uncommitted`, `--base`, or `--commit`; use either diff-scoped review (no prompt) or prompt-only review.
 - Capture the standalone review approval (even if “no issues”) in the spec/task notes before implementation begins.
 - For manifest-backed review evidence, run `TASK=<task-id> NOTES="Goal: ... | Summary: ... | Risks: ..." codex-orchestrator review --manifest <path>` (repo alias: `npm run review -- --manifest <path>`).

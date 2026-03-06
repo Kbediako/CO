@@ -22,6 +22,7 @@ import { runCloudPreflight, type CloudPreflightIssue } from './utils/cloudPrefli
 import {
   BASELINE_AGENTS,
   BASELINE_MODEL,
+  BASELINE_REVIEW_MODEL,
   BASELINE_REASONING_MINIMUM
 } from './codexDefaultsSetup.js';
 import { CommandPlanner } from './adapters/CommandPlanner.js';
@@ -79,6 +80,11 @@ export interface DoctorCodexDefaultsAdvisory {
   };
   checks: {
     model: {
+      status: 'ok' | 'advisory';
+      expected: string;
+      actual: string | null;
+    };
+    review_model: {
       status: 'ok' | 'advisory';
       expected: string;
       actual: string | null;
@@ -479,16 +485,19 @@ export function formatDoctorSummary(result: DoctorResult): string[] {
     `  - model: ${result.codex_defaults.checks.model.status} (actual: ${result.codex_defaults.checks.model.actual ?? '<unset>'}, expected: ${result.codex_defaults.checks.model.expected})`
   );
   lines.push(
+    `  - review_model: ${result.codex_defaults.checks.review_model.status} (actual: ${result.codex_defaults.checks.review_model.actual ?? '<unset>'}, expected: ${result.codex_defaults.checks.review_model.expected})`
+  );
+  lines.push(
     `  - model_reasoning_effort: ${result.codex_defaults.checks.model_reasoning_effort.status} (actual: ${result.codex_defaults.checks.model_reasoning_effort.actual ?? '<unset>'}, expected >= ${result.codex_defaults.checks.model_reasoning_effort.expected_minimum})`
   );
   lines.push(
     `  - agents.max_threads: ${result.codex_defaults.checks.max_threads.status} (actual: ${result.codex_defaults.checks.max_threads.actual ?? '<unset>'}, expected >= ${result.codex_defaults.checks.max_threads.expected_minimum})`
   );
   lines.push(
-    `  - agents.max_depth: ${result.codex_defaults.checks.max_depth.status} (actual: ${result.codex_defaults.checks.max_depth.actual ?? '<unset>'}, expected >= ${result.codex_defaults.checks.max_depth.expected_minimum})`
+    `  - agents.max_depth: ${result.codex_defaults.checks.max_depth.status} (actual: ${result.codex_defaults.checks.max_depth.actual ?? '<unset>'}, expected >= ${result.codex_defaults.checks.max_depth.expected_minimum} when set; <unset> accepted)`
   );
   lines.push(
-    `  - agents.max_spawn_depth: ${result.codex_defaults.checks.max_spawn_depth.status} (actual: ${result.codex_defaults.checks.max_spawn_depth.actual ?? '<unset>'}, expected >= ${result.codex_defaults.checks.max_spawn_depth.expected_minimum})`
+    `  - agents.max_spawn_depth: ${result.codex_defaults.checks.max_spawn_depth.status} (actual: ${result.codex_defaults.checks.max_spawn_depth.actual ?? '<unset>'}, expected >= ${result.codex_defaults.checks.max_spawn_depth.expected_minimum} when set; <unset> accepted)`
   );
   for (const line of result.codex_defaults.guidance) {
     lines.push(`  - ${line}`);
@@ -533,6 +542,7 @@ function inspectCodexDefaultsAdvisory(env: NodeJS.ProcessEnv = process.env): Doc
   const configPath = join(resolveCodexHome(env), 'config.toml');
   const checks: DoctorCodexDefaultsAdvisory['checks'] = {
     model: { status: 'advisory', expected: BASELINE_MODEL, actual: null },
+    review_model: { status: 'advisory', expected: BASELINE_REVIEW_MODEL, actual: null },
     model_reasoning_effort: { status: 'advisory', expected_minimum: BASELINE_REASONING_MINIMUM, actual: null },
     max_threads: { status: 'advisory', expected_minimum: BASELINE_AGENTS.max_threads, actual: null },
     max_depth: { status: 'advisory', expected_minimum: BASELINE_AGENTS.max_depth, actual: null },
@@ -540,7 +550,8 @@ function inspectCodexDefaultsAdvisory(env: NodeJS.ProcessEnv = process.env): Doc
   };
   const guidance: string[] = [
     'Run `codex-orchestrator codex defaults --yes` to apply additive baseline defaults.',
-    'Additive policy: unrelated config keys are preserved; existing role files stay untouched unless `--force` is set.'
+    'Additive policy: unrelated config keys are preserved; existing role files stay untouched unless `--force` is set.',
+    'Current Codex 0.111.0 parser workaround: leaving `agents.max_depth` and `agents.max_spawn_depth` unset is accepted.'
   ];
 
   if (!existsSync(configPath)) {
@@ -580,6 +591,10 @@ function inspectCodexDefaultsAdvisory(env: NodeJS.ProcessEnv = process.env): Doc
   checks.model.actual = model;
   checks.model.status = model === BASELINE_MODEL ? 'ok' : 'advisory';
 
+  const reviewModel = normalizeOptionalString(readStringValue(parsed.review_model));
+  checks.review_model.actual = reviewModel;
+  checks.review_model.status = reviewModel === BASELINE_REVIEW_MODEL ? 'ok' : 'advisory';
+
   const reasoning = normalizeOptionalString(readStringValue(parsed.model_reasoning_effort));
   checks.model_reasoning_effort.actual = reasoning;
   checks.model_reasoning_effort.status = isReasoningAtLeastMinimum(reasoning, BASELINE_REASONING_MINIMUM)
@@ -595,10 +610,14 @@ function inspectCodexDefaultsAdvisory(env: NodeJS.ProcessEnv = process.env): Doc
   checks.max_threads.status =
     typeof maxThreads === 'number' && maxThreads >= BASELINE_AGENTS.max_threads ? 'ok' : 'advisory';
   checks.max_depth.actual = maxDepth;
-  checks.max_depth.status = typeof maxDepth === 'number' && maxDepth >= BASELINE_AGENTS.max_depth ? 'ok' : 'advisory';
+  checks.max_depth.status =
+    maxDepth === null || (typeof maxDepth === 'number' && maxDepth >= BASELINE_AGENTS.max_depth) ? 'ok' : 'advisory';
   checks.max_spawn_depth.actual = maxSpawnDepth;
   checks.max_spawn_depth.status =
-    typeof maxSpawnDepth === 'number' && maxSpawnDepth >= BASELINE_AGENTS.max_spawn_depth ? 'ok' : 'advisory';
+    maxSpawnDepth === null
+      || (typeof maxSpawnDepth === 'number' && maxSpawnDepth >= BASELINE_AGENTS.max_spawn_depth)
+      ? 'ok'
+      : 'advisory';
 
   const allChecksOk = Object.values(checks).every((check) => check.status === 'ok');
   return {

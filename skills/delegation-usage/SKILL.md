@@ -120,17 +120,20 @@ For runner + delegation coordination (short `--task` flow), see `docs/delegation
 - `spawn_agent` omission defaults to `default`; require explicit `agent_type` for every spawn.
 - For symbolic collab runs, include a first-line role tag in spawned prompts: `[agent_type:<role>]`.
 - Multi-turn subagent loops are supported (`spawn_agent` -> `send_input` -> `wait`/`resume_agent` -> `close_agent`).
-- In Codex CLI `0.105.0`, built-in `explorer` inherits top-level model defaults unless a role `config_file` overrides it.
+- In Codex CLI `0.111.0`, built-in `explorer` continues to inherit top-level model defaults unless a role `config_file` overrides it.
 - Recommended baseline in `~/.codex/config.toml`:
-  - `model = "gpt-5.3-codex"`
+  - `model = "gpt-5.4"`
+  - `review_model = "gpt-5.4"`
   - `model_reasoning_effort = "xhigh"`
-  - `[agents] max_threads = 12` with `max_depth = 4` and `max_spawn_depth = 4`
+  - `[agents] max_threads = 12` is the seeded baseline; keep explicit `max_depth = 4` / `max_spawn_depth = 4` only when your local Codex parser accepts them
   - Leave `[agents.explorer]` undefined unless you intentionally want to override built-in explorer behavior
-  - Optional `[agents.explorer_fast]` -> `~/.codex/agents/explorer-fast.toml` (`gpt-5.3-codex-spark`, text-only)
-  - Optional `[agents.awaiter]` override -> `~/.codex/agents/awaiter-high.toml` when you want awaiter at `gpt-5.3-codex` + `high` while preserving awaiter instructions
-  - `[agents.worker_complex]` -> `~/.codex/agents/worker-complex.toml` (`gpt-5.3-codex`, `xhigh`)
+  - Optional `[agents.explorer_fast]` -> `~/.codex/agents/explorer-fast.toml` (`gpt-5.3-codex-spark`, text-only, only explicit exception)
+  - Optional `[agents.awaiter]` override -> `~/.codex/agents/awaiter-high.toml` when you want awaiter at `gpt-5.4` + `high` while preserving awaiter instructions
+  - `[agents.worker_complex]` -> `~/.codex/agents/worker-complex.toml` (`gpt-5.4`, `xhigh`)
+- Keep delegated subagent and review surfaces on `gpt-5.4`; avoid `gpt-5.4-codex` under ChatGPT auth because those runs currently fail immediately.
 - Fallback posture is contingency-only: `8/2/2` for constrained/high-risk lanes, `6/1/1` as break-glass under severe contention.
-- Downstream users can get this baseline via `codex-orchestrator init codex` (ships `.codex/config.toml` + role files).
+- Downstream users should converge on this baseline via `codex-orchestrator init codex`.
+- If native `codex` startup fails with `invalid type: integer ... expected struct AgentRoleToml` under `[agents]`, remove only the live `max_depth` and `max_spawn_depth` keys from `~/.codex/config.toml` and leave the role subtables unchanged.
 
 ### 0b) Background terminal bootstrap (required when MCP is disabled)
 

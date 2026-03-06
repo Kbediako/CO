@@ -62,9 +62,12 @@ describe('runCodexDefaultsSetup', () => {
         configPath,
         [
           'model = "legacy-model"',
+          'review_model = "legacy-review-model"',
           'custom_flag = "keep"',
           '[agents]',
           'max_threads = 2',
+          'max_depth = 2',
+          'max_spawn_depth = 2',
           'extra_agent_key = "keep"',
           '[agents.awaiter]',
           'description = "keep-this-extra-value"',
@@ -107,6 +110,7 @@ describe('runCodexDefaultsSetup', () => {
 
       const parsed = toml.parse(await readFile(configPath, 'utf8')) as {
         model?: string;
+        review_model?: string;
         model_reasoning_effort?: string;
         custom_flag?: string;
         agents?: Record<string, unknown>;
@@ -117,21 +121,51 @@ describe('runCodexDefaultsSetup', () => {
         };
       };
 
-      expect(parsed.model).toBe('gpt-5.3-codex');
+      expect(parsed.model).toBe('gpt-5.4');
+      expect(parsed.review_model).toBe('gpt-5.4');
       expect(parsed.model_reasoning_effort).toBe('xhigh');
       expect(parsed.custom_flag).toBe('keep');
       expect(parsed.mcp_servers?.delegation?.enabled).toBe(true);
       expect(parsed.agents?.max_threads).toBe(12);
-      expect(parsed.agents?.max_depth).toBe(4);
-      expect(parsed.agents?.max_spawn_depth).toBe(4);
+      expect(parsed.agents?.max_depth).toBe(2);
+      expect(parsed.agents?.max_spawn_depth).toBe(2);
       expect(parsed.agents?.extra_agent_key).toBe('keep');
 
       const awaiterRole = parsed.agents?.awaiter as Record<string, unknown> | undefined;
       expect(awaiterRole?.config_file).toBe('./agents/awaiter-high.toml');
       expect(awaiterRole?.custom).toBe('still-here');
       expect(await readFile(explorerPath, 'utf8')).toBe('MARKER\n');
-      expect(await readFile(workerPath, 'utf8')).toContain('model = "gpt-5.3-codex"');
-      expect(await readFile(awaiterPath, 'utf8')).toContain('You are an awaiter.');
+      expect(await readFile(workerPath, 'utf8')).toContain('model = "gpt-5.4"');
+      expect(await readFile(awaiterPath, 'utf8')).toContain('model = "gpt-5.4"');
+    } finally {
+      await rm(tempHome, { recursive: true, force: true });
+    }
+  });
+
+  it('does not seed agent depth caps when the source config omits them', async () => {
+    const tempHome = await mkdtemp(join(tmpdir(), 'codex-defaults-no-depth-'));
+    const configPath = join(tempHome, 'config.toml');
+    try {
+      await writeFile(
+        configPath,
+        ['model = "legacy-model"', '[agents]', 'max_threads = 2', ''].join('\n'),
+        'utf8'
+      );
+
+      const result = await runCodexDefaultsSetup({
+        apply: true,
+        env: { CODEX_HOME: tempHome } as NodeJS.ProcessEnv
+      });
+
+      expect(result.status).toBe('applied');
+
+      const parsed = toml.parse(await readFile(configPath, 'utf8')) as {
+        agents?: Record<string, unknown>;
+      };
+
+      expect(parsed.agents?.max_threads).toBe(12);
+      expect(parsed.agents?.max_depth).toBeUndefined();
+      expect(parsed.agents?.max_spawn_depth).toBeUndefined();
     } finally {
       await rm(tempHome, { recursive: true, force: true });
     }

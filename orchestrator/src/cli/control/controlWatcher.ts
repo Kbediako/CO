@@ -11,6 +11,7 @@ interface ControlFile {
   control_seq?: number;
   latest_action?: {
     request_id?: string | null;
+    intent_id?: string | null;
     requested_by?: string | null;
     requested_at?: string | null;
     action?: 'pause' | 'resume' | 'cancel' | 'fail';
@@ -40,6 +41,7 @@ export class ControlWatcher {
   private lastControlSeq = 0;
   private paused = false;
   private lastPauseRequestId: string | null = null;
+  private lastPauseIntentId: string | null = null;
   private lastPauseReason: string | null = null;
   private cancelRequested = false;
   private failureRequested = false;
@@ -128,19 +130,26 @@ export class ControlWatcher {
 
   private async handlePause(snapshot: ControlFile): Promise<void> {
     const nextRequestId = snapshot.latest_action?.request_id ?? null;
+    const nextIntentId = snapshot.latest_action?.intent_id ?? null;
     const nextReason = snapshot.latest_action?.reason ?? null;
-    if (this.paused && nextRequestId === this.lastPauseRequestId && nextReason === this.lastPauseReason) {
+    if (
+      this.paused &&
+      nextRequestId === this.lastPauseRequestId &&
+      nextIntentId === this.lastPauseIntentId &&
+      nextReason === this.lastPauseReason
+    ) {
       return;
     }
     const wasPaused = this.paused;
     this.paused = true;
     this.lastPauseRequestId = nextRequestId;
+    this.lastPauseIntentId = nextIntentId;
     this.lastPauseReason = nextReason;
     const nextDetail = nextReason ?? 'paused';
     if (!wasPaused || this.manifest.status_detail !== nextDetail) {
       this.manifest.status_detail = nextDetail;
       if (!wasPaused) {
-        appendSummary(this.manifest, 'Run paused by control request.');
+        appendSummary(this.manifest, `Run paused by control request${formatTraceSummary(snapshot)}.`);
       }
       await this.persist();
     }
@@ -149,6 +158,7 @@ export class ControlWatcher {
       actor: snapshot.latest_action?.requested_by ?? 'user',
       payload: {
         request_id: snapshot.latest_action?.request_id ?? null,
+        intent_id: snapshot.latest_action?.intent_id ?? null,
         control_seq: snapshot.control_seq ?? null,
         requested_by: snapshot.latest_action?.requested_by ?? null,
         reason: snapshot.latest_action?.reason ?? null
@@ -161,6 +171,7 @@ export class ControlWatcher {
       payload: {
         reason: 'control_request',
         request_id: snapshot.latest_action?.request_id ?? null,
+        intent_id: snapshot.latest_action?.intent_id ?? null,
         control_seq: snapshot.control_seq ?? null,
         requested_reason: snapshot.latest_action?.reason ?? null
       },
@@ -174,15 +185,17 @@ export class ControlWatcher {
     }
     this.paused = false;
     this.lastPauseRequestId = null;
+    this.lastPauseIntentId = null;
     this.lastPauseReason = null;
     this.manifest.status_detail = null;
-    appendSummary(this.manifest, 'Run resumed by control request.');
+    appendSummary(this.manifest, `Run resumed by control request${formatTraceSummary(snapshot)}.`);
     await this.persist();
     await this.safeAppend({
       event: 'run_resumed',
       actor: 'runner',
       payload: {
         request_id: snapshot.latest_action?.request_id ?? null,
+        intent_id: snapshot.latest_action?.intent_id ?? null,
         control_seq: snapshot.control_seq ?? null,
         requested_by: snapshot.latest_action?.requested_by ?? null,
         requested_reason: snapshot.latest_action?.reason ?? null
@@ -196,13 +209,14 @@ export class ControlWatcher {
       return;
     }
     this.cancelRequested = true;
-    appendSummary(this.manifest, 'Run cancellation requested.');
+    appendSummary(this.manifest, `Run cancellation requested${formatTraceSummary(snapshot)}.`);
     await this.persist();
     await this.safeAppend({
       event: 'run_canceled',
       actor: 'runner',
       payload: {
         request_id: snapshot.latest_action?.request_id ?? null,
+        intent_id: snapshot.latest_action?.intent_id ?? null,
         control_seq: snapshot.control_seq ?? null,
         requested_by: snapshot.latest_action?.requested_by ?? null,
         requested_reason: snapshot.latest_action?.reason ?? null
@@ -217,7 +231,7 @@ export class ControlWatcher {
     }
     this.failureRequested = true;
     this.manifest.status_detail = snapshot.latest_action?.reason ?? 'control_failed';
-    appendSummary(this.manifest, 'Run failed by control request.');
+    appendSummary(this.manifest, `Run failed by control request${formatTraceSummary(snapshot)}.`);
     await this.persist();
     await this.safeAppend({
       event: 'run_failed',
@@ -225,6 +239,7 @@ export class ControlWatcher {
       payload: {
         reason: 'control_request',
         request_id: snapshot.latest_action?.request_id ?? null,
+        intent_id: snapshot.latest_action?.intent_id ?? null,
         control_seq: snapshot.control_seq ?? null,
         requested_by: snapshot.latest_action?.requested_by ?? null,
         requested_reason: snapshot.latest_action?.reason ?? null
@@ -262,4 +277,63 @@ async function readControlFile(pathname: string): Promise<ControlFile | null> {
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function formatTraceSummary(snapshot: ControlFile): string {
+  const intentId = encodeTraceId(snapshot.latest_action?.intent_id);
+  const requestId = encodeTraceId(snapshot.latest_action?.request_id);
+  const parts: string[] = [];
+  if (intentId) {
+    parts.push(`intent_id=${intentId}`);
+  }
+  if (requestId) {
+    parts.push(`request_id=${requestId}`);
+  }
+  if (parts.length === 0) {
+    return '';
+  }
+  return ` (${parts.join(', ')})`;
+}
+
+function encodeTraceId(value: unknown): string {
+  if (typeof value !== 'string') {
+    return '';
+  }
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return '';
+  }
+  const bounded = truncateToCodePoints(sanitizeUnpairedSurrogates(trimmed), 160);
+  return encodeURIComponent(bounded);
+}
+
+function sanitizeUnpairedSurrogates(value: string): string {
+  let sanitized = '';
+  for (let index = 0; index < value.length; index += 1) {
+    const codeUnit = value.charCodeAt(index);
+    if (codeUnit >= 0xd800 && codeUnit <= 0xdbff) {
+      const nextCodeUnit = value.charCodeAt(index + 1);
+      if (nextCodeUnit >= 0xdc00 && nextCodeUnit <= 0xdfff) {
+        sanitized += value[index] + value[index + 1];
+        index += 1;
+      } else {
+        sanitized += '\uFFFD';
+      }
+      continue;
+    }
+    if (codeUnit >= 0xdc00 && codeUnit <= 0xdfff) {
+      sanitized += '\uFFFD';
+      continue;
+    }
+    sanitized += value[index];
+  }
+  return sanitized;
+}
+
+function truncateToCodePoints(value: string, maxCodePoints: number): string {
+  const chars = Array.from(value);
+  if (chars.length <= maxCodePoints) {
+    return value;
+  }
+  return chars.slice(0, maxCodePoints).join('');
 }

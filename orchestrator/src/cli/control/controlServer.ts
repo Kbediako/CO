@@ -11,10 +11,21 @@ import { logger } from '../../logger.js';
 import type { RunPaths } from '../run/runPaths.js';
 import type { CliManifest } from '../types.js';
 import type { EffectiveDelegationConfig } from '../config/delegationConfig.js';
-import { ControlStateStore, type ControlState } from './controlState.js';
+import {
+  ControlStateStore,
+  type ControlAction,
+  type ControlState,
+  type ControlTransport,
+  type TransportIdempotencyEntry
+} from './controlState.js';
 import { ConfirmationStore, type ConfirmationRequest, type ConfirmationStoreSnapshot } from './confirmations.js';
 import { QuestionQueue, type QuestionRecord, type QuestionUrgency } from './questions.js';
 import { DelegationTokenStore, type DelegationTokenRecord } from './delegationTokens.js';
+import {
+  evaluateTrackerDispatchPilotAsync,
+  type DispatchPilotEvaluation
+} from './trackerDispatchPilot.js';
+import { startTelegramOversightBridge, type TelegramOversightBridge } from './telegramOversightBridge.js';
 import type { RunEventStream, RunEventStreamEntry } from '../events/runEventStream.js';
 
 interface ControlServerOptions {
@@ -32,6 +43,10 @@ const CSRF_HEADER = 'x-csrf-token';
 const DELEGATION_TOKEN_HEADER = 'x-codex-delegation-token';
 const DELEGATION_RUN_HEADER = 'x-codex-delegation-run-id';
 const LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost', '::1']);
+const COMPATIBILITY_API_PREFIX = '/api/v1';
+const COMPATIBILITY_RESERVED_IDENTIFIERS = new Set(['state', 'refresh', 'dispatch']);
+const READ_ONLY_COMPAT_ACTION = 'refresh';
+const COMPATIBILITY_MUTATING_ACTIONS = new Set(['pause', 'resume', 'cancel', 'fail', 'rerun']);
 const UI_ASSET_PATHS: Record<string, string> = {
   '/ui': 'index.html',
   '/ui/': 'index.html',
@@ -40,6 +55,30 @@ const UI_ASSET_PATHS: Record<string, string> = {
   '/ui/favicon.svg': 'favicon.svg'
 };
 const UI_ROOT = resolveUiRoot();
+const TRANSPORT_MUTATING_ACTIONS = new Set<ControlAction['action']>(['pause', 'resume', 'cancel']);
+const TRANSPORT_IDENTITY_PATTERN = /^[A-Za-z0-9._:@-]{1,128}$/;
+const TRANSPORT_SOURCE_PATTERN = /^[A-Za-z0-9._:-]{1,64}$/;
+const TRANSPORT_PRINCIPAL_PATTERN = /^[A-Za-z0-9._:@/=-]{1,256}$/;
+const TRANSPORT_NONCE_PATTERN = /^[A-Za-z0-9._~:/+=-]{8,256}$/;
+const TRANSPORT_METADATA_KEYS = [
+  'actor_id',
+  'actorId',
+  'actor_source',
+  'actorSource',
+  'transport_principal',
+  'transportPrincipal',
+  'principal',
+  'transport_nonce',
+  'transportNonce',
+  'transport_nonce_expires_at',
+  'transportNonceExpiresAt',
+  'nonce',
+  'nonce_expires_at',
+  'nonceExpiresAt'
+] as const;
+const DEFAULT_TRANSPORT_IDEMPOTENCY_WINDOW_MS = 10 * 60 * 1000;
+const DEFAULT_TRANSPORT_NONCE_MAX_TTL_MS = 10 * 60 * 1000;
+const MAX_TRANSPORT_POLICY_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 class HttpError extends Error {
   readonly status: number;
@@ -100,6 +139,7 @@ export class ControlServer {
   private readonly clients: Set<http.ServerResponse>;
   private readonly persist: RequestContext['persist'];
   private readonly paths: RunPaths;
+  private telegramBridge: TelegramOversightBridge | null = null;
   private baseUrl: string | null = null;
   private expiryTimer: NodeJS.Timeout | null = null;
 
@@ -140,7 +180,8 @@ export class ControlServer {
       runId: options.runId,
       controlSeq: controlSeed?.control_seq ?? 0,
       latestAction: controlSeed?.latest_action ?? null,
-      featureToggles: controlSeed?.feature_toggles ?? null
+      featureToggles: controlSeed?.feature_toggles ?? null,
+      transportMutation: controlSeed?.transport_mutation ?? null
     });
     const defaultToggles = controlSeed?.feature_toggles ?? {};
     if (!('rlm' in defaultToggles)) {
@@ -254,6 +295,22 @@ export class ControlServer {
           res: null
         }).catch(() => undefined);
       }, EXPIRY_INTERVAL_MS);
+
+      if (instance.baseUrl) {
+        try {
+          instance.telegramBridge = await startTelegramOversightBridge({
+            runDir: options.paths.runDir,
+            manifestPath: options.paths.manifestPath,
+            baseUrl: instance.baseUrl,
+            controlToken: token
+          });
+        } catch (error) {
+          logger.warn(
+            `Failed to start Telegram oversight bridge: ${(error as Error)?.message ?? String(error)}`
+          );
+          instance.telegramBridge = null;
+        }
+      }
     } catch (error) {
       if (instance.expiryTimer) {
         clearInterval(instance.expiryTimer);
@@ -287,6 +344,12 @@ export class ControlServer {
     if (this.expiryTimer) {
       clearInterval(this.expiryTimer);
       this.expiryTimer = null;
+    }
+    if (this.telegramBridge) {
+      await this.telegramBridge.close().catch((error) => {
+        logger.warn(`Failed to close Telegram oversight bridge: ${(error as Error)?.message ?? String(error)}`);
+      });
+      this.telegramBridge = null;
     }
     for (const client of this.clients) {
       client.end();
@@ -430,6 +493,232 @@ async function handleRequest(context: RequestContext): Promise<void> {
     return;
   }
 
+  if (url.pathname === `${COMPATIBILITY_API_PREFIX}/state`) {
+    if (req.method !== 'GET') {
+      writeCompatibilityError(
+        res,
+        405,
+        'method_not_allowed',
+        'Method not allowed',
+        {
+          surface: 'api_v1',
+          allowed_method: 'GET'
+        },
+        buildCompatibilityTraceability(context, {
+          decision: 'rejected',
+          reason: 'method_not_allowed'
+        })
+      );
+      return;
+    }
+    const payload = await buildCompatibilityStatePayload(context);
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+    res.end(JSON.stringify(payload));
+    return;
+  }
+
+  if (url.pathname === `${COMPATIBILITY_API_PREFIX}/dispatch`) {
+    if (req.method !== 'GET') {
+      writeCompatibilityError(
+        res,
+        405,
+        'method_not_allowed',
+        'Method not allowed',
+        {
+          surface: 'api_v1',
+          allowed_method: 'GET'
+        },
+        buildCompatibilityTraceability(context, {
+          decision: 'rejected',
+          reason: 'method_not_allowed'
+        })
+      );
+      return;
+    }
+
+    const projection = await buildCompatibilityProjection(context);
+    const evaluation = await evaluateCompatibilityDispatchPilot(context, projection);
+    await emitDispatchPilotAuditEvents(context, {
+      evaluation,
+      issueIdentifier: projection?.issueIdentifier ?? null
+    });
+
+    const traceability = buildCompatibilityTraceability(context, {
+      decision: evaluation.failure ? 'rejected' : 'acknowledged',
+      reason: evaluation.failure?.reason ?? evaluation.summary.reason,
+      issueIdentifier: projection?.issueIdentifier ?? null
+    });
+
+    if (evaluation.failure) {
+      writeCompatibilityError(
+        res,
+        evaluation.failure.status,
+        evaluation.failure.code,
+        'Dispatch pilot evaluation failed closed.',
+        {
+          surface: 'api_v1',
+          mode: 'read_only',
+          advisory_only: true,
+          reason: evaluation.failure.reason,
+          dispatch_pilot: evaluation.summary
+        },
+        traceability
+      );
+      return;
+    }
+
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+    res.end(
+      JSON.stringify({
+        generated_at: isoTimestamp(),
+        mode: 'read_only',
+        advisory_only: true,
+        dispatch_pilot: evaluation.summary,
+        recommendation: evaluation.recommendation,
+        traceability
+      })
+    );
+    return;
+  }
+
+  if (url.pathname === `${COMPATIBILITY_API_PREFIX}/refresh`) {
+    if (req.method !== 'POST') {
+      writeCompatibilityError(
+        res,
+        405,
+        'method_not_allowed',
+        'Method not allowed',
+        {
+          surface: 'api_v1',
+          allowed_method: 'POST'
+        },
+        buildCompatibilityTraceability(context, {
+          decision: 'rejected',
+          reason: 'method_not_allowed'
+        })
+      );
+      return;
+    }
+
+    const body = await readJsonBody(req);
+    const rejection = resolveCompatibilityActionEnvelopeRejection(body);
+    if (rejection) {
+      writeCompatibilityError(
+        res,
+        rejection.status,
+        'read_only_action_rejected',
+        'Compatibility surface is read-only; only refresh acknowledgements are supported.',
+        {
+          surface: 'api_v1',
+          mode: 'read_only',
+          reason: rejection.reason,
+          allowed_actions: [READ_ONLY_COMPAT_ACTION],
+          allowed_tools: [],
+          requested_action: rejection.requestAction,
+          requested_tool: rejection.requestTool
+        },
+        buildCompatibilityTraceability(context, {
+          decision: 'rejected',
+          reason: rejection.reason,
+          requestAction: rejection.requestAction,
+          requestTool: rejection.requestTool
+        })
+      );
+      return;
+    }
+
+    const requestedAction = readStringValue(body, 'action');
+    const payload = {
+      status: 'accepted',
+      mode: 'read_only',
+      action: READ_ONLY_COMPAT_ACTION,
+      requested_at: isoTimestamp(),
+      traceability: buildCompatibilityTraceability(context, {
+        decision: 'acknowledged',
+        reason: 'refresh_projection_acknowledged',
+        requestAction: requestedAction ? requestedAction.toLowerCase() : READ_ONLY_COMPAT_ACTION
+      })
+    };
+    res.writeHead(202, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(payload));
+    return;
+  }
+
+  const compatibilityIssueIdentifier = resolveCompatibilityIssueIdentifierFromPath(url.pathname);
+  if (compatibilityIssueIdentifier !== null) {
+    if (req.method !== 'GET') {
+      writeCompatibilityError(
+        res,
+        405,
+        'method_not_allowed',
+        'Method not allowed',
+        {
+          surface: 'api_v1',
+          allowed_method: 'GET',
+          issue_identifier: compatibilityIssueIdentifier
+        },
+        buildCompatibilityTraceability(context, {
+          decision: 'rejected',
+          reason: 'method_not_allowed',
+          issueIdentifier: compatibilityIssueIdentifier
+        })
+      );
+      return;
+    }
+
+    const projection = await buildCompatibilityProjection(context);
+    const matchesIssue =
+      projection &&
+      (projection.issueIdentifier === compatibilityIssueIdentifier ||
+        projection.taskId === compatibilityIssueIdentifier ||
+        projection.runId === compatibilityIssueIdentifier);
+    if (!projection || !matchesIssue) {
+      writeCompatibilityError(
+        res,
+        404,
+        'issue_not_found',
+        'Issue not found',
+        {
+          surface: 'api_v1',
+          issue_identifier: compatibilityIssueIdentifier
+        },
+        buildCompatibilityTraceability(context, {
+          decision: 'rejected',
+          reason: 'issue_not_found',
+          issueIdentifier: compatibilityIssueIdentifier
+        })
+      );
+      return;
+    }
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+    res.end(
+      JSON.stringify(
+        buildCompatibilityIssuePayload(
+          projection,
+          await evaluateCompatibilityDispatchPilot(context, projection)
+        )
+      )
+    );
+    return;
+  }
+
+  if (url.pathname === COMPATIBILITY_API_PREFIX || url.pathname.startsWith(`${COMPATIBILITY_API_PREFIX}/`)) {
+    writeCompatibilityError(
+      res,
+      404,
+      'not_found',
+      'Route not found',
+      {
+        surface: 'api_v1'
+      },
+      buildCompatibilityTraceability(context, {
+        decision: 'rejected',
+        reason: 'route_not_found'
+      })
+    );
+    return;
+  }
+
   if (url.pathname === '/control/action' && req.method === 'POST') {
     const body = await readJsonBody(req);
     const action = readStringValue(body, 'action');
@@ -443,10 +732,191 @@ async function handleRequest(context: RequestContext): Promise<void> {
       res.end(JSON.stringify({ error: 'ui_action_disallowed' }));
       return;
     }
+    if (auth.kind === 'session' && hasCoordinatorMetadata(body)) {
+      res.writeHead(403, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'ui_control_metadata_disallowed' }));
+      return;
+    }
 
     let resolvedRequestId = readStringValue(body, 'request_id', 'requestId');
+    let intentId = readStringValue(body, 'intent_id', 'intentId') ?? null;
+    const requestedBy = readStringValue(body, 'requested_by', 'requestedBy') ?? 'ui';
+    const reason = readStringValue(body, 'reason');
+    let snapshot = context.controlStore.snapshot();
+    const taskId = resolveTaskIdFromManifestPath(context.paths.manifestPath);
+    const confirmNonce = action === 'cancel' ? readStringValue(body, 'confirm_nonce', 'confirmNonce') : undefined;
+    const deferTransportResolutionToConfirmation =
+      action === 'cancel' && Boolean(confirmNonce) && !hasAnyOwnProperty(body, ['transport']);
+    const transportMutationResult: TransportMutationResolveResult = deferTransportResolutionToConfirmation
+      ? { request: null }
+      : resolveTransportMutationRequest(body, action);
+    if (transportMutationResult.error) {
+      const transportMutationStatus = transportMutationResult.status ?? 400;
+      const traceability = buildCanonicalTraceability({
+        action,
+        decision: 'rejected',
+        requestId: resolvedRequestId ?? null,
+        intentId,
+        taskId,
+        runId: snapshot.run_id,
+        manifestPath: context.paths.manifestPath,
+        transport: transportMutationResult.partial?.transport ?? null,
+        actorId: transportMutationResult.partial?.actorId ?? null,
+        actorSource: transportMutationResult.partial?.actorSource ?? null,
+        principal: transportMutationResult.partial?.principal ?? null
+      });
+      writeControlError(res, transportMutationStatus, transportMutationResult.error, traceability);
+      return;
+    }
+    let transportMutation = transportMutationResult.request;
+    let isTransportMutation = Boolean(transportMutation);
+    let transportPolicy: TransportMutatingPolicy | null = null;
+    let transportIdempotencyWindowMs: number | null = null;
+
+    const validateTransportMutationRequest = (): boolean => {
+      if (!transportMutation) {
+        transportPolicy = null;
+        transportIdempotencyWindowMs = null;
+        return true;
+      }
+      transportPolicy = resolveTransportMutatingPolicy(snapshot.feature_toggles);
+      transportIdempotencyWindowMs = null;
+      const baseTraceability = buildCanonicalTraceability({
+        action,
+        decision: 'rejected',
+        requestId: resolvedRequestId ?? null,
+        intentId,
+        taskId,
+        runId: snapshot.run_id,
+        manifestPath: context.paths.manifestPath,
+        transport: transportMutation.transport,
+        actorId: transportMutation.actorId,
+        actorSource: transportMutation.actorSource,
+        principal: transportMutation.principal
+      });
+
+      if (!transportPolicy.enabled) {
+        writeControlError(res, 403, 'transport_mutating_controls_disabled', baseTraceability);
+        return false;
+      }
+      if (transportPolicy.allowedTransports && !transportPolicy.allowedTransports.has(transportMutation.transport)) {
+        writeControlError(res, 403, 'transport_mutating_transport_not_allowed', baseTraceability);
+        return false;
+      }
+      if (!resolvedRequestId && !intentId) {
+        writeControlError(res, 400, 'transport_idempotency_key_missing', baseTraceability);
+        return false;
+      }
+      const nowMs = Date.now();
+      if (transportMutation.nonceExpiresAtMs <= nowMs) {
+        writeControlError(res, 409, 'transport_nonce_expired', baseTraceability);
+        return false;
+      }
+      if (transportMutation.nonceExpiresAtMs - nowMs > transportPolicy.nonceMaxTtlMs) {
+        writeControlError(res, 400, 'transport_nonce_expiry_out_of_range', baseTraceability);
+        return false;
+      }
+      if (context.controlStore.isTransportNonceConsumed(transportMutation.nonce)) {
+        writeControlError(res, 409, 'transport_nonce_replayed', baseTraceability);
+        return false;
+      }
+      transportIdempotencyWindowMs = transportPolicy.idempotencyWindowMs;
+      return true;
+    };
+
+    if (!validateTransportMutationRequest()) {
+      return;
+    }
+
+    const persistControlWithTransportNonce = async (): Promise<void> => {
+      if (!transportMutation) {
+        await context.persist.control();
+        return;
+      }
+      context.controlStore.consumeTransportNonce({
+        nonce: transportMutation.nonce,
+        action,
+        transport: transportMutation.transport,
+        requestId: resolvedRequestId ?? null,
+        intentId,
+        expiresAt: transportMutation.nonceExpiresAt
+      });
+      try {
+        await context.persist.control();
+      } catch (error) {
+        context.controlStore.rollbackTransportNonce(transportMutation.nonce);
+        throw error;
+      }
+    };
+
+    const replayIfIdempotent = async (): Promise<boolean> => {
+      // Nonce checks can prune expired transport replay entries; read a fresh snapshot before replay lookup.
+      snapshot = context.controlStore.snapshot();
+      const transportReplayEntry =
+        transportMutation && action === 'cancel'
+          ? findTransportIdempotencyReplayEntry({
+              snapshot,
+              action,
+              transport: transportMutation.transport,
+              requestId: resolvedRequestId ?? null,
+              intentId
+            })
+          : null;
+      const genericReplayAllowed =
+        !isTransportMutation &&
+        isIdempotentReplay(snapshot, action, resolvedRequestId ?? null, intentId) &&
+        (action !== 'cancel' || !snapshot.latest_action?.transport);
+      if (!transportReplayEntry && !genericReplayAllowed) {
+        return false;
+      }
+      await persistControlWithTransportNonce();
+      const replayRequestId = transportReplayEntry
+        ? transportReplayEntry.request_id
+        : withUndefinedFallback(snapshot.latest_action?.request_id, resolvedRequestId ?? null);
+      const replayIntentId = transportReplayEntry
+        ? transportReplayEntry.intent_id
+        : withUndefinedFallback(snapshot.latest_action?.intent_id, intentId ?? null);
+      const replayTraceability =
+        action === 'cancel'
+          ? buildCanonicalTraceability({
+              action,
+              decision: 'replayed',
+              requestId: replayRequestId,
+              intentId: replayIntentId,
+              taskId,
+              runId: snapshot.run_id,
+              manifestPath: context.paths.manifestPath,
+              transport: transportReplayEntry?.transport ?? snapshot.latest_action?.transport ?? transportMutation?.transport ?? null,
+              actorId: transportReplayEntry ? transportReplayEntry.actor_id : snapshot.latest_action?.actor_id ?? null,
+              actorSource: transportReplayEntry
+                ? transportReplayEntry.actor_source
+                : snapshot.latest_action?.actor_source ?? null,
+              principal: transportReplayEntry
+                ? transportReplayEntry.transport_principal
+                : snapshot.latest_action?.transport_principal ?? null
+            })
+          : null;
+      await emitControlActionAuditEvent(context, {
+        outcome: 'replayed',
+        action,
+        requestedBy,
+        reason: reason ?? null,
+        requestId: replayRequestId,
+        intentId: replayIntentId,
+        snapshot,
+        traceability: replayTraceability
+      });
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      const payload = { ...snapshot, idempotent_replay: true };
+      res.end(JSON.stringify(replayTraceability ? { ...payload, traceability: replayTraceability } : payload));
+      return true;
+    };
+
+    if (!deferTransportResolutionToConfirmation && (await replayIfIdempotent())) {
+      return;
+    }
+
     if (action === 'cancel') {
-      const confirmNonce = readStringValue(body, 'confirm_nonce', 'confirmNonce');
       if (!confirmNonce) {
         res.writeHead(409, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: 'confirmation_required' }));
@@ -466,7 +936,10 @@ async function handleRequest(context: RequestContext): Promise<void> {
         res.end(JSON.stringify({ error: (error as Error)?.message ?? 'confirmation_invalid' }));
         return;
       }
-      resolvedRequestId = validation.request.request_id;
+      const confirmedRequestId = readStringValue(validation.request.params, 'request_id', 'requestId');
+      const confirmedIntentId = readStringValue(validation.request.params, 'intent_id', 'intentId');
+      resolvedRequestId = confirmedRequestId ?? validation.request.request_id;
+      intentId = confirmedIntentId ?? intentId;
       await context.persist.confirmations();
       await emitControlEvent(context, {
         event: 'confirmation_resolved',
@@ -477,19 +950,101 @@ async function handleRequest(context: RequestContext): Promise<void> {
           outcome: 'approved'
         }
       });
+
+      const confirmedTransportMutationResult = resolveTransportMutationRequestFromConfirmationScope({
+        body,
+        params: validation.request.params,
+        action
+      });
+      if (confirmedTransportMutationResult.error) {
+        const confirmedTransportMutationStatus = confirmedTransportMutationResult.status ?? 400;
+        const traceability = buildCanonicalTraceability({
+          action,
+          decision: 'rejected',
+          requestId: resolvedRequestId ?? null,
+          intentId,
+          taskId,
+          runId: snapshot.run_id,
+          manifestPath: context.paths.manifestPath,
+          transport: confirmedTransportMutationResult.partial?.transport ?? null,
+          actorId: confirmedTransportMutationResult.partial?.actorId ?? null,
+          actorSource: confirmedTransportMutationResult.partial?.actorSource ?? null,
+          principal: confirmedTransportMutationResult.partial?.principal ?? null
+        });
+        writeControlError(res, confirmedTransportMutationStatus, confirmedTransportMutationResult.error, traceability);
+        return;
+      }
+      transportMutation = confirmedTransportMutationResult.request;
+      isTransportMutation = Boolean(transportMutation);
+      if (!validateTransportMutationRequest()) {
+        return;
+      }
+      if (await replayIfIdempotent()) {
+        return;
+      }
     }
 
-    const reason = readStringValue(body, 'reason');
-    context.controlStore.updateAction({
+    const update = context.controlStore.updateAction({
       action,
-      requestedBy: readStringValue(body, 'requested_by', 'requestedBy') ?? 'ui',
+      requestedBy,
       requestId: resolvedRequestId,
-      reason
+      intentId,
+      reason,
+      ...(transportMutation && transportIdempotencyWindowMs !== null
+        ? {
+            transportContext: {
+              transport: transportMutation.transport,
+              actorId: transportMutation.actorId,
+              actorSource: transportMutation.actorSource,
+              principal: transportMutation.principal,
+              idempotencyWindowMs: transportIdempotencyWindowMs
+            }
+          }
+        : {})
     });
-    await context.persist.control();
-    const snapshot = context.controlStore.snapshot();
+    snapshot = update.snapshot;
+    if (transportMutation || !update.idempotentReplay) {
+      await persistControlWithTransportNonce();
+    }
+    const replayEntry = update.replayEntry ?? null;
+    const auditRequestId = update.idempotentReplay
+      ? replayEntry
+        ? replayEntry.request_id
+        : snapshot.latest_action?.request_id ?? resolvedRequestId ?? null
+      : resolvedRequestId ?? snapshot.latest_action?.request_id ?? null;
+    const auditIntentId = update.idempotentReplay
+      ? replayEntry
+        ? replayEntry.intent_id
+        : snapshot.latest_action?.intent_id ?? intentId ?? null
+      : intentId ?? snapshot.latest_action?.intent_id ?? null;
+    const traceability = transportMutation
+      ? buildCanonicalTraceability({
+          action,
+          decision: update.idempotentReplay ? 'replayed' : 'applied',
+          requestId: auditRequestId,
+          intentId: auditIntentId,
+          taskId,
+          runId: snapshot.run_id,
+          manifestPath: context.paths.manifestPath,
+          transport: transportMutation.transport,
+          actorId: replayEntry?.actor_id ?? transportMutation.actorId,
+          actorSource: replayEntry?.actor_source ?? transportMutation.actorSource,
+          principal: replayEntry?.transport_principal ?? transportMutation.principal
+        })
+      : null;
+    await emitControlActionAuditEvent(context, {
+      outcome: update.idempotentReplay ? 'replayed' : 'applied',
+      action,
+      requestedBy,
+      reason: reason ?? null,
+      requestId: auditRequestId,
+      intentId: auditIntentId,
+      snapshot,
+      traceability
+    });
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify(snapshot));
+    const payload = update.idempotentReplay ? { ...snapshot, idempotent_replay: true } : snapshot;
+    res.end(JSON.stringify(traceability ? { ...payload, traceability } : payload));
     return;
   }
 
@@ -909,8 +1464,825 @@ async function handleRequest(context: RequestContext): Promise<void> {
   res.end(JSON.stringify({ error: 'not_found' }));
 }
 
+interface CompatibilityProjection {
+  issueIdentifier: string;
+  issueId: string | null;
+  taskId: string | null;
+  runId: string | null;
+  status: string;
+  startedAt: string | null;
+  updatedAt: string | null;
+  summary: string | null;
+  latestAction: ControlAction['action'] | null;
+  workspacePath: string;
+}
+
+interface CompatibilityActionEnvelopeRejection {
+  status: number;
+  reason: 'malformed_action_request' | 'forbidden_mutating_action' | 'unsupported_action' | 'unsupported_tool';
+  requestAction: string | null;
+  requestTool: string | null;
+}
+
+function resolveCompatibilityIssueIdentifierFromPath(pathname: string): string | null {
+  if (!pathname.startsWith(`${COMPATIBILITY_API_PREFIX}/`)) {
+    return null;
+  }
+  const suffix = pathname.slice(`${COMPATIBILITY_API_PREFIX}/`.length);
+  if (!suffix || suffix.includes('/')) {
+    return null;
+  }
+  try {
+    const decoded = decodeURIComponent(suffix);
+    if (!decoded || decoded.includes('/') || COMPATIBILITY_RESERVED_IDENTIFIERS.has(decoded.toLowerCase())) {
+      return null;
+    }
+    return decoded;
+  } catch {
+    return null;
+  }
+}
+
+function resolveCompatibilityActionEnvelopeRejection(
+  body: Record<string, unknown>
+): CompatibilityActionEnvelopeRejection | null {
+  const hasAction = Object.prototype.hasOwnProperty.call(body, 'action');
+  const hasTool = Object.prototype.hasOwnProperty.call(body, 'tool');
+  if (!hasAction && !hasTool) {
+    return null;
+  }
+
+  const actionValue = readStringValue(body, 'action');
+  const normalizedAction = actionValue ? actionValue.toLowerCase() : null;
+  const toolValue = readStringValue(body, 'tool');
+  const normalizedTool = toolValue ? toolValue.toLowerCase() : null;
+
+  if (hasAction && !normalizedAction) {
+    return {
+      status: 400,
+      reason: 'malformed_action_request',
+      requestAction: null,
+      requestTool: normalizedTool
+    };
+  }
+  if (normalizedAction && COMPATIBILITY_MUTATING_ACTIONS.has(normalizedAction)) {
+    return {
+      status: 403,
+      reason: 'forbidden_mutating_action',
+      requestAction: normalizedAction,
+      requestTool: normalizedTool
+    };
+  }
+  if (normalizedAction && normalizedAction !== READ_ONLY_COMPAT_ACTION) {
+    return {
+      status: 400,
+      reason: 'unsupported_action',
+      requestAction: normalizedAction,
+      requestTool: normalizedTool
+    };
+  }
+  if (hasTool) {
+    return {
+      status: 403,
+      reason: 'unsupported_tool',
+      requestAction: normalizedAction,
+      requestTool: normalizedTool
+    };
+  }
+  return null;
+}
+
+async function buildCompatibilityStatePayload(context: RequestContext): Promise<Record<string, unknown>> {
+  const projection = await buildCompatibilityProjection(context);
+  const dispatchPilotEvaluation = await evaluateCompatibilityDispatchPilot(context, projection);
+  const dispatchPilotSummary = dispatchPilotEvaluation.summary.configured ? dispatchPilotEvaluation.summary : null;
+  const tracked = buildCompatibilityTrackedPayload(dispatchPilotEvaluation);
+  const generatedAt = isoTimestamp();
+  if (!projection) {
+    return {
+      generated_at: generatedAt,
+      counts: { running: 0, retrying: 0 },
+      running: [],
+      retrying: [],
+      codex_totals: null,
+      rate_limits: null,
+      ...(dispatchPilotSummary ? { dispatch_pilot: dispatchPilotSummary } : {}),
+      ...(tracked ? { tracked } : {})
+    };
+  }
+
+  const running = projection.status === 'in_progress' ? [buildCompatibilityRunningEntry(projection)] : [];
+  return {
+    generated_at: generatedAt,
+    counts: { running: running.length, retrying: 0 },
+    running,
+    retrying: [],
+    codex_totals: null,
+    rate_limits: null,
+    ...(dispatchPilotSummary ? { dispatch_pilot: dispatchPilotSummary } : {}),
+    ...(tracked ? { tracked } : {})
+  };
+}
+
+async function evaluateCompatibilityDispatchPilot(
+  context: RequestContext,
+  projection: CompatibilityProjection | null
+): Promise<DispatchPilotEvaluation> {
+  const controlSnapshot = context.controlStore.snapshot();
+  return evaluateTrackerDispatchPilotAsync({
+    featureToggles: controlSnapshot.feature_toggles,
+    defaultIssueIdentifier: projection?.issueIdentifier ?? projection?.taskId ?? projection?.runId ?? null,
+    env: process.env
+  });
+}
+
+async function buildCompatibilityProjection(context: RequestContext): Promise<CompatibilityProjection | null> {
+  const manifest = await readJsonFile<CliManifest>(context.paths.manifestPath);
+  if (!manifest) {
+    return null;
+  }
+  const manifestRecord = manifest as unknown as Record<string, unknown>;
+  const control = context.controlStore.snapshot();
+  const taskId = readStringValue(manifestRecord, 'task_id', 'taskId') ?? resolveTaskIdFromManifestPath(context.paths.manifestPath);
+  const runId = readStringValue(manifestRecord, 'run_id', 'runId') ?? control.run_id ?? null;
+  const issueIdentifier = taskId ?? runId;
+  if (!issueIdentifier) {
+    return null;
+  }
+  const issueId = taskId ?? runId ?? null;
+  const status = readStringValue(manifestRecord, 'status') ?? 'unknown';
+  const startedAt = readStringValue(manifestRecord, 'started_at', 'startedAt') ?? null;
+  const updatedAt = readStringValue(manifestRecord, 'updated_at', 'updatedAt') ?? null;
+  const summary = readStringValue(manifestRecord, 'summary') ?? null;
+  const workspacePath = resolveRepoRootFromRunDir(context.paths.runDir) ?? context.paths.runDir;
+
+  return {
+    issueIdentifier,
+    issueId,
+    taskId,
+    runId,
+    status,
+    startedAt,
+    updatedAt,
+    summary,
+    latestAction: control.latest_action?.action ?? null,
+    workspacePath
+  };
+}
+
+function buildCompatibilityRunningEntry(projection: CompatibilityProjection): Record<string, unknown> {
+  return {
+    issue_id: projection.issueId,
+    issue_identifier: projection.issueIdentifier,
+    state: projection.status,
+    session_id: projection.runId,
+    turn_count: 0,
+    last_event: projection.latestAction,
+    last_message: projection.summary,
+    started_at: projection.startedAt,
+    last_event_at: projection.updatedAt,
+    tokens: {
+      input_tokens: null,
+      output_tokens: null,
+      total_tokens: null
+    }
+  };
+}
+
+function buildCompatibilityIssuePayload(
+  projection: CompatibilityProjection,
+  dispatchPilotEvaluation?: DispatchPilotEvaluation | null
+): Record<string, unknown> {
+  const running = buildCompatibilityRunningEntry(projection);
+  const recentEvents =
+    projection.updatedAt || projection.latestAction || projection.summary
+      ? [
+          {
+            at: projection.updatedAt,
+            event: projection.latestAction ?? 'status_update',
+            message: projection.summary
+          }
+        ]
+      : [];
+
+  return {
+    issue_identifier: projection.issueIdentifier,
+    issue_id: projection.issueId,
+    status: projection.status,
+    workspace: {
+      path: projection.workspacePath
+    },
+    attempts: {
+      restart_count: 0,
+      current_retry_attempt: 0
+    },
+    running,
+    retry: null,
+    logs: {
+      codex_session_logs: []
+    },
+    recent_events: recentEvents,
+    last_error: projection.status === 'failed' ? projection.summary ?? 'run_failed' : null,
+    tracked: buildCompatibilityTrackedPayload(dispatchPilotEvaluation) ?? {},
+    ...(dispatchPilotEvaluation?.summary.configured ? { dispatch_pilot: dispatchPilotEvaluation.summary } : {})
+  };
+}
+
+function buildCompatibilityTrackedPayload(
+  evaluation: DispatchPilotEvaluation | null | undefined
+): Record<string, unknown> | null {
+  const trackedIssue = evaluation?.recommendation?.tracked_issue;
+  if (!trackedIssue) {
+    return null;
+  }
+  return {
+    linear: {
+      provider: trackedIssue.provider,
+      id: trackedIssue.id,
+      identifier: trackedIssue.identifier,
+      title: trackedIssue.title,
+      url: trackedIssue.url,
+      state: trackedIssue.state,
+      state_type: trackedIssue.state_type,
+      workspace_id: trackedIssue.workspace_id,
+      team_id: trackedIssue.team_id,
+      team_key: trackedIssue.team_key,
+      team_name: trackedIssue.team_name,
+      project_id: trackedIssue.project_id,
+      project_name: trackedIssue.project_name,
+      updated_at: trackedIssue.updated_at,
+      recent_activity: trackedIssue.recent_activity
+    }
+  };
+}
+
+function buildCompatibilityTraceability(
+  context: RequestContext,
+  input: {
+    decision: 'acknowledged' | 'rejected';
+    reason: string;
+    issueIdentifier?: string | null;
+    requestAction?: string | null;
+    requestTool?: string | null;
+  }
+): Record<string, unknown> {
+  const snapshot = context.controlStore.snapshot();
+  return {
+    task_id: resolveTaskIdFromManifestPath(context.paths.manifestPath),
+    run_id: snapshot.run_id,
+    manifest_path: context.paths.manifestPath,
+    surface: 'api_v1',
+    issue_identifier: input.issueIdentifier ?? null,
+    requested_action: input.requestAction ?? null,
+    requested_tool: input.requestTool ?? null,
+    decision: input.decision,
+    reason: input.reason,
+    timestamp: isoTimestamp()
+  };
+}
+
+async function emitDispatchPilotAuditEvents(
+  context: RequestContext,
+  input: {
+    evaluation: DispatchPilotEvaluation;
+    issueIdentifier: string | null;
+  }
+): Promise<void> {
+  const snapshot = context.controlStore.snapshot();
+  const decision = input.evaluation.failure
+    ? 'fail_closed'
+    : input.evaluation.summary.status === 'ready'
+      ? 'ready'
+      : 'blocked';
+  const statusCode = input.evaluation.failure?.status ?? 200;
+  const eventPayload = {
+    surface: 'api_v1_dispatch',
+    advisory_only: true,
+    issue_identifier: input.issueIdentifier,
+    task_id: resolveTaskIdFromManifestPath(context.paths.manifestPath),
+    run_id: snapshot.run_id,
+    control_seq: snapshot.control_seq,
+    decision,
+    status: input.evaluation.summary.status,
+    source_status: input.evaluation.summary.source_status,
+    reason: input.evaluation.failure?.reason ?? input.evaluation.summary.reason
+  };
+
+  await emitControlEvent(context, {
+    event: 'dispatch_pilot_evaluated',
+    actor: 'runner',
+    payload: eventPayload
+  });
+  await emitControlEvent(context, {
+    event: 'dispatch_pilot_viewed',
+    actor: 'runner',
+    payload: {
+      ...eventPayload,
+      http_status: statusCode,
+      recommendation_available: Boolean(input.evaluation.recommendation)
+    }
+  });
+}
+
+function writeCompatibilityError(
+  res: http.ServerResponse,
+  status: number,
+  code: string,
+  message: string,
+  details?: Record<string, unknown>,
+  traceability?: Record<string, unknown>
+): void {
+  res.writeHead(status, { 'Content-Type': 'application/json' });
+  res.end(
+    JSON.stringify({
+      error: {
+        code,
+        message,
+        ...(details ? { details } : {})
+      },
+      ...(traceability ? { traceability } : {})
+    })
+  );
+}
+
 function isControlAction(action: unknown): action is 'pause' | 'resume' | 'cancel' | 'fail' {
   return action === 'pause' || action === 'resume' || action === 'cancel' || action === 'fail';
+}
+
+interface TransportMutatingPolicy {
+  enabled: boolean;
+  idempotencyWindowMs: number;
+  nonceMaxTtlMs: number;
+  allowedTransports: ReadonlySet<ControlTransport> | null;
+}
+
+interface TransportMutationRequest {
+  transport: ControlTransport;
+  actorId: string;
+  actorSource: string;
+  principal: string;
+  nonce: string;
+  nonceExpiresAt: string;
+  nonceExpiresAtMs: number;
+}
+
+interface TransportMutationResolveResult {
+  request: TransportMutationRequest | null;
+  status?: number;
+  error?: string;
+  partial?: {
+    transport: ControlTransport | null;
+    actorId?: string | null;
+    actorSource?: string | null;
+    principal?: string | null;
+  };
+}
+
+function resolveTransportMutationRequest(
+  body: Record<string, unknown>,
+  action: ControlAction['action']
+): TransportMutationResolveResult {
+  const mutatingAction = TRANSPORT_MUTATING_ACTIONS.has(action);
+  const hasTransportField = Object.prototype.hasOwnProperty.call(body, 'transport');
+  const hasTransportMetadata = TRANSPORT_METADATA_KEYS.some((key) => Object.prototype.hasOwnProperty.call(body, key));
+  if (mutatingAction && hasTransportMetadata && !hasTransportField) {
+    return { request: null, status: 400, error: 'transport_invalid', partial: { transport: null } };
+  }
+  const rawTransport = body.transport;
+  const normalizedTransport = typeof rawTransport === 'string' ? rawTransport.trim() : undefined;
+  if (hasTransportField && mutatingAction && !normalizedTransport) {
+    return { request: null, status: 400, error: 'transport_invalid', partial: { transport: null } };
+  }
+  const transport = parseTransport(normalizedTransport);
+  if (normalizedTransport && !transport) {
+    return { request: null, status: 400, error: 'transport_unsupported', partial: { transport: null } };
+  }
+  if (!transport || !mutatingAction) {
+    return { request: null };
+  }
+
+  const actorId = readStringValue(body, 'actor_id', 'actorId');
+  if (!actorId) {
+    return { request: null, status: 400, error: 'transport_actor_id_missing', partial: { transport } };
+  }
+  if (!TRANSPORT_IDENTITY_PATTERN.test(actorId)) {
+    return {
+      request: null,
+      status: 400,
+      error: 'transport_actor_id_invalid',
+      partial: { transport, actorId }
+    };
+  }
+
+  const actorSource = readStringValue(body, 'actor_source', 'actorSource');
+  if (!actorSource) {
+    return {
+      request: null,
+      status: 400,
+      error: 'transport_actor_source_missing',
+      partial: { transport, actorId }
+    };
+  }
+  if (!TRANSPORT_SOURCE_PATTERN.test(actorSource)) {
+    return {
+      request: null,
+      status: 400,
+      error: 'transport_actor_source_invalid',
+      partial: { transport, actorId, actorSource }
+    };
+  }
+  if (!actorSource.toLowerCase().startsWith(transport)) {
+    return {
+      request: null,
+      status: 400,
+      error: 'transport_actor_source_mismatch',
+      partial: { transport, actorId, actorSource }
+    };
+  }
+
+  const principal = readStringValue(body, 'transport_principal', 'transportPrincipal', 'principal');
+  if (!principal) {
+    return {
+      request: null,
+      status: 400,
+      error: 'transport_principal_missing',
+      partial: { transport, actorId, actorSource }
+    };
+  }
+  if (!TRANSPORT_PRINCIPAL_PATTERN.test(principal)) {
+    return {
+      request: null,
+      status: 400,
+      error: 'transport_principal_invalid',
+      partial: { transport, actorId, actorSource, principal }
+    };
+  }
+
+  const nonce = readStringValue(body, 'transport_nonce', 'transportNonce', 'nonce');
+  if (!nonce) {
+    return {
+      request: null,
+      status: 400,
+      error: 'transport_nonce_missing',
+      partial: { transport, actorId, actorSource, principal }
+    };
+  }
+  if (!TRANSPORT_NONCE_PATTERN.test(nonce)) {
+    return {
+      request: null,
+      status: 400,
+      error: 'transport_nonce_invalid',
+      partial: { transport, actorId, actorSource, principal }
+    };
+  }
+
+  const rawExpiry = readStringValue(
+    body,
+    'transport_nonce_expires_at',
+    'transportNonceExpiresAt',
+    'nonce_expires_at',
+    'nonceExpiresAt'
+  );
+  if (!rawExpiry) {
+    return {
+      request: null,
+      status: 400,
+      error: 'transport_nonce_expiry_missing',
+      partial: { transport, actorId, actorSource, principal }
+    };
+  }
+  const nonceExpiresAtMs = Date.parse(rawExpiry);
+  if (!Number.isFinite(nonceExpiresAtMs)) {
+    return {
+      request: null,
+      status: 400,
+      error: 'transport_nonce_expiry_invalid',
+      partial: { transport, actorId, actorSource, principal }
+    };
+  }
+
+  return {
+    request: {
+      transport,
+      actorId,
+      actorSource,
+      principal,
+      nonce,
+      nonceExpiresAt: new Date(nonceExpiresAtMs).toISOString(),
+      nonceExpiresAtMs
+    }
+  };
+}
+
+function resolveTransportMutationRequestFromConfirmationScope(input: {
+  body: Record<string, unknown>;
+  params: Record<string, unknown>;
+  action: ControlAction['action'];
+}): TransportMutationResolveResult {
+  const hasBodyTransportField = hasAnyOwnProperty(input.body, ['transport']);
+  const hasBodyTransportMetadata = hasAnyOwnProperty(input.body, TRANSPORT_METADATA_KEYS);
+  const hasConfirmedTransportField = hasAnyOwnProperty(input.params, ['transport']);
+  const hasConfirmedTransportMetadata = hasAnyOwnProperty(input.params, TRANSPORT_METADATA_KEYS);
+  const confirmedTransportRaw = readStringValue(input.params, 'transport');
+  const confirmedTransport = parseTransport(confirmedTransportRaw);
+  if (!confirmedTransport) {
+    if (hasConfirmedTransportField || hasConfirmedTransportMetadata || hasBodyTransportField || hasBodyTransportMetadata) {
+      return {
+        request: null,
+        status: 409,
+        error: 'confirmation_scope_mismatch',
+        partial: { transport: null }
+      };
+    }
+    return { request: null };
+  }
+
+  const confirmedActorId = readStringValue(input.params, 'actor_id', 'actorId');
+  const confirmedActorSource = readStringValue(input.params, 'actor_source', 'actorSource');
+  const confirmedPrincipal = readStringValue(input.params, 'transport_principal', 'transportPrincipal', 'principal');
+  const topLevelTransport = readStringValue(input.body, 'transport');
+  const topLevelActorId = readStringValue(input.body, 'actor_id', 'actorId');
+  const topLevelActorSource = readStringValue(input.body, 'actor_source', 'actorSource');
+  const topLevelPrincipal = readStringValue(input.body, 'transport_principal', 'transportPrincipal', 'principal');
+  const hasTopLevelActorId = hasAnyOwnProperty(input.body, ['actor_id', 'actorId']);
+  const hasTopLevelActorSource = hasAnyOwnProperty(input.body, ['actor_source', 'actorSource']);
+  const hasTopLevelPrincipal = hasAnyOwnProperty(input.body, ['transport_principal', 'transportPrincipal', 'principal']);
+  if (
+    (hasBodyTransportField && topLevelTransport !== confirmedTransport) ||
+    (hasTopLevelActorId && topLevelActorId !== confirmedActorId) ||
+    (hasTopLevelActorSource && topLevelActorSource !== confirmedActorSource) ||
+    (hasTopLevelPrincipal && topLevelPrincipal !== confirmedPrincipal)
+  ) {
+    return {
+      request: null,
+      status: 409,
+      error: 'confirmation_scope_mismatch',
+      partial: {
+        transport: confirmedTransport,
+        actorId: confirmedActorId ?? null,
+        actorSource: confirmedActorSource ?? null,
+        principal: confirmedPrincipal ?? null
+      }
+    };
+  }
+
+  return resolveTransportMutationRequest(
+    {
+      ...input.body,
+      transport: confirmedTransport,
+      actor_id: confirmedActorId,
+      actor_source: confirmedActorSource,
+      transport_principal: confirmedPrincipal
+    },
+    input.action
+  );
+}
+
+function parseTransport(value: string | undefined): ControlTransport | null {
+  if (!value) {
+    return null;
+  }
+  if (value === 'discord' || value === 'telegram') {
+    return value;
+  }
+  return null;
+}
+
+function resolveTransportMutatingPolicy(
+  featureToggles: Record<string, unknown> | null | undefined
+): TransportMutatingPolicy {
+  const toggles = featureToggles ?? {};
+  const direct = readRecordValue(toggles, 'transport_mutating_controls');
+  const coordinator = readRecordValue(toggles, 'coordinator');
+  const nested = coordinator ? readRecordValue(coordinator, 'transport_mutating_controls') : undefined;
+  const policy = nested ?? direct ?? {};
+  const allowedTransportValues = readStringArrayValue(policy, 'allowed_transports', 'allowedTransports');
+  return {
+    enabled: readBooleanValue(policy, 'enabled') ?? false,
+    idempotencyWindowMs: clampPolicyWindow(
+      readNumberValue(policy, 'idempotency_window_ms', 'idempotencyWindowMs'),
+      DEFAULT_TRANSPORT_IDEMPOTENCY_WINDOW_MS
+    ),
+    nonceMaxTtlMs: clampPolicyWindow(
+      readNumberValue(policy, 'nonce_max_ttl_ms', 'nonceMaxTtlMs'),
+      DEFAULT_TRANSPORT_NONCE_MAX_TTL_MS
+    ),
+    allowedTransports: resolveAllowedTransportPolicy(allowedTransportValues)
+  };
+}
+
+function resolveAllowedTransportPolicy(values: string[] | undefined): ReadonlySet<ControlTransport> | null {
+  if (!values) {
+    return null;
+  }
+  const allowed = new Set<ControlTransport>();
+  for (const value of values) {
+    const transport = parseTransport(value);
+    if (transport) {
+      allowed.add(transport);
+    }
+  }
+  return allowed;
+}
+
+function clampPolicyWindow(value: number | undefined, fallback: number): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return fallback;
+  }
+  return Math.min(Math.max(Math.floor(value), 1), MAX_TRANSPORT_POLICY_WINDOW_MS);
+}
+
+function buildCanonicalTraceability(input: {
+  action: ControlAction['action'];
+  decision: 'applied' | 'replayed' | 'rejected';
+  requestId: string | null;
+  intentId: string | null;
+  taskId: string | null;
+  runId: string | null;
+  manifestPath: string;
+  transport: ControlTransport | null;
+  actorId: string | null;
+  actorSource: string | null;
+  principal: string | null;
+  timestamp?: string;
+}): Record<string, unknown> {
+  const timestamp = input.timestamp ?? isoTimestamp();
+  return {
+    actor_id: input.actorId,
+    actor_source: input.actorSource,
+    transport: input.transport,
+    transport_principal: input.principal,
+    intent_id: input.intentId,
+    request_id: input.requestId,
+    task_id: input.taskId,
+    run_id: input.runId,
+    manifest_path: input.manifestPath,
+    action: input.action,
+    decision: input.decision,
+    timestamp
+  };
+}
+
+function writeControlError(
+  res: http.ServerResponse,
+  status: number,
+  error: string,
+  traceability?: Record<string, unknown>
+): void {
+  res.writeHead(status, { 'Content-Type': 'application/json' });
+  res.end(JSON.stringify(traceability ? { error, traceability } : { error }));
+}
+
+function hasCoordinatorMetadata(body: Record<string, unknown>): boolean {
+  const disallowedKeys = [
+    'intent_id',
+    'intentId',
+    'request_id',
+    'requestId',
+    'task_id',
+    'taskId',
+    'run_id',
+    'runId',
+    'manifest_path',
+    'manifestPath'
+  ];
+  return disallowedKeys.some((key) => Object.prototype.hasOwnProperty.call(body, key));
+}
+
+function isIdempotentReplay(
+  snapshot: ControlState,
+  action: ControlAction['action'],
+  requestId: string | null,
+  intentId: string | null
+): boolean {
+  const latest = snapshot.latest_action;
+  if (!latest || latest.action !== action) {
+    return false;
+  }
+  if (requestId && latest.request_id === requestId) {
+    return true;
+  }
+  if (intentId && latest.intent_id === intentId) {
+    return true;
+  }
+  return false;
+}
+
+function findTransportIdempotencyReplayEntry(input: {
+  snapshot: ControlState;
+  action: ControlAction['action'];
+  transport: ControlTransport;
+  requestId: string | null;
+  intentId: string | null;
+}): TransportIdempotencyEntry | null {
+  const index = input.snapshot.transport_mutation?.idempotency_index ?? [];
+  for (const entry of index) {
+    if (entry.action !== input.action || entry.transport !== input.transport) {
+      continue;
+    }
+    if (entry.key_type === 'request' && input.requestId && entry.key === input.requestId) {
+      return entry;
+    }
+    if (entry.key_type === 'intent' && input.intentId && entry.key === input.intentId) {
+      return entry;
+    }
+  }
+  return null;
+}
+
+function withUndefinedFallback<T>(value: T | undefined, fallback: T): T {
+  return value === undefined ? fallback : value;
+}
+
+async function emitControlActionAuditEvent(
+  context: RequestContext,
+  input: {
+    outcome: 'applied' | 'replayed';
+    action: ControlAction['action'];
+    requestedBy: string;
+    reason: string | null;
+    requestId: string | null;
+    intentId: string | null;
+    snapshot: ControlState;
+    traceability?: Record<string, unknown> | null;
+  }
+): Promise<void> {
+  await emitControlEvent(context, {
+    event: input.outcome === 'replayed' ? 'control_action_replayed' : 'control_action_applied',
+    actor: 'runner',
+    payload: {
+      idempotent_replay: input.outcome === 'replayed',
+      ...buildControlActionTracePayload(context, input),
+      ...(input.traceability ? { traceability: input.traceability } : {})
+    }
+  });
+}
+
+function buildControlActionTracePayload(
+  context: RequestContext,
+  input: {
+    action: ControlAction['action'];
+    requestedBy: string;
+    reason: string | null;
+    requestId: string | null;
+    intentId: string | null;
+    snapshot: ControlState;
+    traceability?: Record<string, unknown> | null;
+  }
+): Record<string, unknown> {
+  const latestAction = input.snapshot.latest_action;
+  const traceability = input.traceability ?? null;
+  const traceTransport =
+    traceability && Object.prototype.hasOwnProperty.call(traceability, 'transport')
+      ? typeof traceability.transport === 'string'
+        ? traceability.transport
+        : null
+      : undefined;
+  const traceActorId =
+    traceability && Object.prototype.hasOwnProperty.call(traceability, 'actor_id')
+      ? typeof traceability.actor_id === 'string'
+        ? traceability.actor_id
+        : null
+      : undefined;
+  const traceActorSource =
+    traceability && Object.prototype.hasOwnProperty.call(traceability, 'actor_source')
+      ? typeof traceability.actor_source === 'string'
+        ? traceability.actor_source
+        : null
+      : undefined;
+  const tracePrincipal =
+    traceability && Object.prototype.hasOwnProperty.call(traceability, 'transport_principal')
+      ? typeof traceability.transport_principal === 'string'
+        ? traceability.transport_principal
+        : null
+      : undefined;
+  return {
+    action: input.action,
+    request_id: input.requestId,
+    intent_id: input.intentId,
+    requested_by: input.requestedBy,
+    requested_reason: input.reason,
+    control_seq: input.snapshot.control_seq,
+    task_id: resolveTaskIdFromManifestPath(context.paths.manifestPath),
+    run_id: input.snapshot.run_id,
+    manifest_path: context.paths.manifestPath,
+    transport: traceTransport !== undefined ? traceTransport : latestAction?.transport ?? null,
+    actor_id: traceActorId !== undefined ? traceActorId : latestAction?.actor_id ?? null,
+    actor_source: traceActorSource !== undefined ? traceActorSource : latestAction?.actor_source ?? null,
+    transport_principal:
+      tracePrincipal !== undefined ? tracePrincipal : latestAction?.transport_principal ?? null
+  };
+}
+
+function resolveTaskIdFromManifestPath(manifestPath: string): string | null {
+  const runDir = dirname(manifestPath);
+  const cliDir = dirname(runDir);
+  if (basename(cliDir) !== 'cli') {
+    return null;
+  }
+  const taskDir = dirname(cliDir);
+  const taskId = basename(taskDir);
+  return taskId || null;
 }
 
 async function expireConfirmations(context: RequestContext): Promise<void> {
@@ -1121,6 +2493,15 @@ function readStringValue(record: Record<string, unknown>, ...keys: string[]): st
   return undefined;
 }
 
+function hasAnyOwnProperty(record: Record<string, unknown>, keys: readonly string[]): boolean {
+  for (const key of keys) {
+    if (Object.prototype.hasOwnProperty.call(record, key)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 function readNumberValue(record: Record<string, unknown>, ...keys: string[]): number | undefined {
   for (const key of keys) {
     const value = record[key];
@@ -1151,6 +2532,27 @@ function readRecordValue(record: Record<string, unknown>, key: string): Record<s
   const value = record[key];
   if (value && typeof value === 'object' && !Array.isArray(value)) {
     return value as Record<string, unknown>;
+  }
+  return undefined;
+}
+
+function readStringArrayValue(record: Record<string, unknown>, ...keys: string[]): string[] | undefined {
+  for (const key of keys) {
+    const value = record[key];
+    if (!Array.isArray(value)) {
+      continue;
+    }
+    const parsed: string[] = [];
+    for (const item of value) {
+      if (typeof item !== 'string') {
+        continue;
+      }
+      const trimmed = item.trim();
+      if (trimmed.length > 0) {
+        parsed.push(trimmed);
+      }
+    }
+    return parsed;
   }
   return undefined;
 }
@@ -1270,7 +2672,20 @@ async function maybeResolveChildQuestion(
       reason
     });
   } catch (error) {
-    logger.warn(`Failed to resolve child question: ${(error as Error)?.message ?? error}`);
+    const message = (error as Error)?.message ?? String(error);
+    logger.warn(`Failed to resolve child question: ${message}`);
+    await emitControlEvent(context, {
+      event: 'question.resolve_child_fallback',
+      actor: 'control',
+      payload: {
+        question_id: record.question_id,
+        outcome,
+        action,
+        reason,
+        non_fatal: true,
+        error: message
+      }
+    });
   }
 }
 
@@ -1280,7 +2695,20 @@ function queueQuestionResolutions(context: RequestContext, records: QuestionReco
       continue;
     }
     void maybeResolveChildQuestion(context, record, record.status).catch((error) => {
-      logger.warn(`Failed to resolve child question: ${(error as Error)?.message ?? error}`);
+      const message = (error as Error)?.message ?? String(error);
+      logger.warn(`Failed to resolve child question: ${message}`);
+      void emitControlEvent(context, {
+        event: 'question.resolve_child_fallback',
+        actor: 'control',
+        payload: {
+          question_id: record.question_id,
+          outcome: record.status,
+          action: 'unknown',
+          reason: 'resolution_enqueue_failed',
+          non_fatal: true,
+          error: message
+        }
+      });
     });
   }
 }
@@ -1295,7 +2723,10 @@ async function isChildAwaitingQuestion(context: RequestContext, manifestPath: st
       return false;
     }
     return latest.reason === 'awaiting_question_answer';
-  } catch {
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException)?.code !== 'ENOENT') {
+      logger.warn(`Failed to inspect child question state: ${(error as Error)?.message ?? error}`);
+    }
     return false;
   }
 }
@@ -1442,25 +2873,26 @@ async function readControlToken(tokenPath: string): Promise<string> {
 
 function resolveRunManifestPath(rawPath: string, allowedRoots: string[], label: string): string {
   const resolved = resolve(rawPath);
-  assertRunManifestPath(resolved, label);
-  if (!isPathWithinRoots(resolved, allowedRoots)) {
+  const canonicalPath = realpathSafe(resolved);
+  assertRunManifestPath(canonicalPath, label);
+  if (!isPathWithinRoots(canonicalPath, allowedRoots)) {
     throw new Error(`${label} not permitted`);
   }
-  return resolved;
+  return canonicalPath;
 }
 
 function assertRunManifestPath(pathname: string, label: string): void {
-  if (basename(pathname) !== 'manifest.json') {
+  const resolvedPath = resolve(pathname);
+  if (basename(resolvedPath) !== 'manifest.json') {
     throw new Error(`${label} invalid`);
   }
-  const runDir = dirname(pathname);
+  const runDir = dirname(resolvedPath);
   const cliDir = dirname(runDir);
   if (basename(cliDir) !== 'cli') {
     throw new Error(`${label} invalid`);
   }
   const taskDir = dirname(cliDir);
-  const runsDir = dirname(taskDir);
-  if (!basename(runDir) || !basename(taskDir) || !basename(runsDir)) {
+  if (!basename(runDir) || !basename(taskDir)) {
     throw new Error(`${label} invalid`);
   }
 }

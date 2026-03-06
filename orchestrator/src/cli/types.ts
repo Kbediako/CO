@@ -24,6 +24,7 @@ export interface CommandStage {
   command: string;
   cwd?: string;
   env?: Record<string, string>;
+  timeoutMs?: number;
   allowFailure?: boolean;
   summaryHint?: string;
   session?: {
@@ -49,6 +50,7 @@ export interface PlanPreviewCommandStage {
   command: string;
   cwd: string | null;
   env: Record<string, string> | null;
+  timeoutMs?: number | null;
   allowFailure: boolean;
   summaryHint: string | null;
 }

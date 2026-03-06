@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp c526044ab6e6995106c01699eee5a265ef976f6da1ecfa43e28fc6c50deeb237 -->
+<!-- codex:instruction-stamp b0dd42fa0d34284fcce28e047868ad4b83d232985b2449daae4b1d63c4fef3c6 -->
 # Agent Enablement
 
 ## Added by Bootstrap 2025-10-16
@@ -21,7 +21,7 @@
 - Keep `memories` scoped to explicit eval lanes until promoted by evidence (legacy alias `memory_tool` is compatibility-only).
 - Honor the safe `read/edit/run/network` approval profile. Capture escalations in the manifest `approvals` array with reviewer justification and timestamp.
 - Run `node scripts/delegation-guard.mjs` prior to requesting review; if delegation is not possible, set `DELEGATION_GUARD_OVERRIDE_REASON` and record the justification in the checklist.
-- Run `node scripts/spec-guard.mjs --dry-run` prior to requesting review; a failing guard requires refreshing relevant specs (see `.agent/SOPs/specs-and-research.md`).
+- Run `node scripts/spec-guard.mjs --dry-run` prior to requesting review; the guard fails when tracked implementation paths change without a spec update (`tasks/specs/**`, `docs/design/specs/**`, or `tasks/index.json`) or when any spec file in those directories has `last_review` older than 30 days.
 - Before implementation, run a standalone review of the task/spec against the user’s intent and record the approval in the spec + checklist notes.
 - Keep delegation MCP enabled by default (only MCP on by default). Enable other MCPs only when relevant to the task.
 
@@ -48,7 +48,7 @@
 - `npm run build:patterns` — Compile codemods/linters/templates; run whenever `patterns/**` changes.
 - `node --loader ts-node/esm evaluation/harness/run-all.ts --mode=mcp` — Manual sweep to generate scenario artifacts for manifests.
 - `node scripts/diff-budget.mjs` — Enforces a small-diff budget before review; set `DIFF_BUDGET_OVERRIDE_REASON` to bypass with justification.
-- `npm run review` — Launches `codex review` with a non-interactive prompt that includes the latest run manifest path as evidence (reviews “current changes” by default); in CI or when stdin is not a TTY (or `CODEX_REVIEW_NON_INTERACTIVE`/`CODEX_NON_INTERACTIVE` is set) it prints the handoff prompt and exits unless `FORCE_CODEX_REVIEW=1`; `NOTES` is required and should include goal, summary, risks, and optional questions.
+- `codex-orchestrator review` (repo alias: `npm run review`) — Launches `codex review` with a non-interactive prompt that includes the latest run manifest path as evidence (reviews “current changes” by default); in CI or when stdin is not a TTY (or `CODEX_REVIEW_NON_INTERACTIVE` / `CODEX_NON_INTERACTIVE` / `CODEX_NO_INTERACTIVE` is set) it prints the handoff prompt and exits unless `FORCE_CODEX_REVIEW=1`; `NOTES` is recommended and should include goal, summary, risks, and optional questions (wrapper fallback notes are auto-generated when omitted).
 - `codex-orchestrator plan [pipeline]` — Preview resolved pipeline stages without execution; add `--format json` for automation inputs.
 
 ### Runtime knobs (optional)
@@ -59,9 +59,9 @@
 - Keep the prompt files `~/.codex/prompts/diagnostics.md` and `~/.codex/prompts/review-handoff.md` on every workstation (they are not checked into the repo). Each prompt wires `/prompts:<name>` to the required orchestrator commands so contributors do not have to remember the sequences manually.
 - `/prompts:diagnostics TASK=<task-id> MANIFEST=<path> [NOTES=<free text>]` exports `MCP_RUNNER_TASK_ID=$TASK`, runs `npx @kbediako/codex-orchestrator start diagnostics --format json`, tails `.runs/$TASK/cli/<run-id>/manifest.json` (or `npx @kbediako/codex-orchestrator status --run <run-id> --watch --interval 10`), and reminds you to mirror evidence + `$MANIFEST` references into `/tasks`, `docs/TASKS.md`, `.agent/task/...`, `.runs/$TASK/metrics.json`, and `out/$TASK/state.json`.
 - `/prompts:review-handoff TASK=<task-id> MANIFEST=<path> NOTES=<goal + summary + risks + optional questions>` re-validates guardrails via `node scripts/delegation-guard.mjs`, `node scripts/spec-guard.mjs --dry-run`, executes `npm run lint`, `npm run test`, optional `npm run eval:test`, runs `node scripts/diff-budget.mjs`, then runs `npm run review`, and ensures approvals/escalations are logged in `$MANIFEST` before checklists flip.
-- Standalone review (outside pipelines): prefer `npm run review` for manifest-backed evidence and delegation-aware defaults; use direct `codex review` only for quick best-effort checks when manifest evidence is not required.
+- Standalone review (outside pipelines): prefer `codex-orchestrator review` for manifest-backed evidence and delegation-aware defaults (`npm run review` is a repo-local alias); use direct `codex review` only for quick best-effort checks when manifest evidence is not required.
 - Prompt compatibility: do not combine prompt arguments with `--uncommitted`, `--base`, or `--commit`; use either diff-scoped review (no prompt) or prompt-only review. See `docs/standalone-review-guide.md`.
-- For manifest evidence, run `TASK=<task-id> NOTES="..." MANIFEST=<path> npm run review -- --manifest <path>` (or ensure `MCP_RUNNER_TASK_ID` is already set); in non-interactive/CI (`CODEX_REVIEW_NON_INTERACTIVE=1`, `CODEX_NON_INTERACTIVE=1`, or `CODEX_NO_INTERACTIVE=1`) it prints the handoff prompt unless `FORCE_CODEX_REVIEW=1` is set.
+- For manifest evidence, run `TASK=<task-id> NOTES="..." MANIFEST=<path> codex-orchestrator review --manifest <path>` (or `npm run review -- --manifest <path>` in this repo; or ensure `MCP_RUNNER_TASK_ID` is already set). In non-interactive/CI (`CODEX_REVIEW_NON_INTERACTIVE=1`, `CODEX_NON_INTERACTIVE=1`, or `CODEX_NO_INTERACTIVE=1`) it prints the handoff prompt unless `FORCE_CODEX_REVIEW=1` is set.
 - Always use these prompts before running diagnostics or prepping a review; they are the canonical way to drive the orchestrator so manifests, approvals, and docs stay in sync across machines.
 
 ### Frontend Testing Pipeline (Core)
@@ -92,6 +92,7 @@ Note: pipelines already set `CODEX_NON_INTERACTIVE=1`; keep it for shortcut runs
 ### Workflow Pointers
 - Always start by reviewing the relevant PRD in `docs/PRD-<slug>.md` and the TECH_SPEC in `tasks/specs/<id>-<slug>.md`.
 - Docs-first: create or refresh PRD + TECH_SPEC + ACTION_PLAN + the task checklist before editing any files.
+- Keep `tasks/index.json` task registration canonical under `items[]`; legacy top-level `tasks[]` is non-canonical.
 - Use templates in `.agent/task/templates/` to draft PRDs, TECH_SPECs, ACTION_PLANs, task lists, and research notes.
 - Prefer the bundled `docs-first` and `standalone-review` skills when applicable.
 - Run `node scripts/delegation-guard.mjs` and `node scripts/spec-guard.mjs --dry-run` before opening reviews to ensure delegation and specs stay in sync with code changes.

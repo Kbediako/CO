@@ -97,9 +97,9 @@ export function pickLatestRunId(runIds) {
 
 export async function collectManifests(runsDir, taskFilter) {
   const results = [];
-  let taskIds = [];
+  let taskEntries = [];
   try {
-    taskIds = await readdir(runsDir);
+    taskEntries = await readdir(runsDir, { withFileTypes: true });
   } catch (error) {
     if (error?.code === 'ENOENT') {
       return results;
@@ -107,7 +107,11 @@ export async function collectManifests(runsDir, taskFilter) {
     throw error;
   }
 
-  for (const taskId of taskIds) {
+  for (const taskEntry of taskEntries) {
+    if (!taskEntry.isDirectory()) {
+      continue;
+    }
+    const taskId = taskEntry.name;
     if (taskFilter && taskFilter !== taskId) {
       continue;
     }
@@ -116,26 +120,27 @@ export async function collectManifests(runsDir, taskFilter) {
     const legacyPath = taskPath;
 
     const candidates = [];
-    try {
-      const cliRunIds = await readdir(cliPath);
+    const cliRunIds = await listDirectories(cliPath);
+    if (cliRunIds.length > 0) {
       candidates.push({ root: cliPath, runIds: cliRunIds });
-    } catch {
-      // Ignore missing CLI directory; fall back to legacy layout.
     }
 
     if (candidates.length === 0) {
-      try {
-        const legacyRunIds = await readdir(legacyPath);
+      const legacyRunIds = (await listDirectories(legacyPath)).filter((name) => name !== 'cli');
+      if (legacyRunIds.length > 0) {
         candidates.push({ root: legacyPath, runIds: legacyRunIds });
-      } catch {
-        continue;
       }
     }
 
     for (const candidate of candidates) {
       for (const runId of candidate.runIds) {
         const manifestPath = join(candidate.root, runId, 'manifest.json');
-        results.push(manifestPath);
+        try {
+          await access(manifestPath);
+          results.push(manifestPath);
+        } catch {
+          // Only return manifest paths that exist on disk.
+        }
       }
     }
   }

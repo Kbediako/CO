@@ -30,3 +30,6 @@
 - [x] Tailored standalone review completed and logged. - Evidence: `out/0979-standalone-review-runtime-telemetry/manual/post-implementation-standalone-review.log`.
 - [x] Tailored elegance review completed and logged. - Evidence: `out/0979-standalone-review-runtime-telemetry/manual/post-implementation-elegance-review.log`.
 - [x] Final evidence mirrors updated (`tasks/index.json`, `docs/TASKS.md`, `.agent/task/0979-...`). - Evidence: `tasks/index.json`, `docs/TASKS.md`, `.agent/task/0979-standalone-review-runtime-telemetry.md`.
+
+## Carry-Forward Note
+- Note (2026-03-06): policy follow-up - gate pipelines currently set `FORCE_CODEX_REVIEW=1`; decide whether to keep explicit forced execution and document it, or remove the override to preserve non-interactive handoff mode. Evidence: `codex.orchestrator.json`, `docs/standalone-review-guide.md`, `tests/run-review.spec.ts`, `out/1013-coordinator-dynamic-tool-bridge-token-attestation-live-appserver-canary-and-rollback-drill/manual/20260306T011202Z-docs-review-closeout/00-summary.md`.

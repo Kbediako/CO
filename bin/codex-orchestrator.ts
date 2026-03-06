@@ -2175,9 +2175,9 @@ async function handleDelegationServer(rawArgs: string[]): Promise<void> {
         : undefined;
   const envMode = process.env.CODEX_DELEGATE_MODE?.trim();
   const resolvedMode = modeFlag ?? envMode;
-  let mode: 'full' | 'question_only' | undefined;
+  let mode: 'full' | 'question_only' | 'status_only' | undefined;
   if (resolvedMode) {
-    if (resolvedMode === 'full' || resolvedMode === 'question_only') {
+    if (resolvedMode === 'full' || resolvedMode === 'question_only' || resolvedMode === 'status_only') {
       mode = resolvedMode;
     } else {
       console.warn(`Invalid delegate mode "${resolvedMode}". Falling back to config default.`);
@@ -2555,7 +2555,7 @@ Commands:
     Use \`codex-orchestrator pr resolve-merge --help\` for full options.
   delegate-server         Run the delegation MCP server (stdio).
     --repo <path>         Repo root for config + manifests (default cwd).
-    --mode <full|question_only>  Limit tool surface for child runs.
+    --mode <full|question_only|status_only>  Limit tool surface for child runs.
     --config "<key>=<value>[;...]"  Apply config overrides (repeat via separators).
   version | --version
 
@@ -2647,7 +2647,7 @@ function printDelegationServerHelp(): void {
 
 Options:
   --repo <path>                    Repo root for config + manifests (default cwd).
-  --mode <full|question_only>      Limit tool surface for child runs.
+  --mode <full|question_only|status_only>      Limit tool surface for child runs.
   --config "<key>=<value>[;...]"   Apply config overrides.
   --help                           Show this message.
 `);

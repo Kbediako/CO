@@ -81,6 +81,41 @@ describe('docs hygiene tooling', () => {
     expect(errors.find((error) => error.reference.includes('archives/'))).toBeUndefined();
   });
 
+  it('fails closed when tasks/index.json contains non-canonical top-level keys', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-hygiene-index-shape-'));
+    createdDirs.push(repoRoot);
+
+    await mkdir(join(repoRoot, 'tasks'), { recursive: true });
+    await mkdir(join(repoRoot, 'docs'), { recursive: true });
+
+    await writeFile(
+      join(repoRoot, 'package.json'),
+      JSON.stringify({ name: 'fixture', scripts: { lint: 'echo ok' } }, null, 2),
+      'utf8'
+    );
+    await writeFile(
+      join(repoRoot, 'codex.orchestrator.json'),
+      JSON.stringify({ pipelines: [{ id: 'diagnostics' }] }, null, 2),
+      'utf8'
+    );
+    await writeFile(
+      join(repoRoot, 'tasks', 'index.json'),
+      JSON.stringify({ items: [], tasks: [] }, null, 2),
+      'utf8'
+    );
+    await writeFile(join(repoRoot, 'docs', 'test.md'), '# Docs\n', 'utf8');
+
+    const errors = await runDocsCheck(repoRoot);
+
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'tasks/index.json',
+        rule: 'tasks-index-non-canonical',
+        reference: 'non-canonical top-level keys: tasks (allowed: items, specs)'
+      })
+    );
+  });
+
   it('syncs mirrors for an active task idempotently', async () => {
     const repoRoot = await mkdtemp(join(tmpdir(), 'docs-hygiene-sync-'));
     createdDirs.push(repoRoot);

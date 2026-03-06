@@ -1646,9 +1646,441 @@
       },
       "created_at": "2026-03-03",
       "completed_at": "2026-03-03"
+    },
+    {
+      "id": "0993",
+      "slug": "0993-coordinator-control-bridge-slice-1",
+      "title": "Coordinator Control Bridge Slice 1",
+      "path": "tasks/tasks-0993-coordinator-control-bridge-slice-1.md",
+      "kind": "run",
+      "status": "succeeded",
+      "gate": {
+        "phase": "coordinator-control-bridge-slice-1-implementation",
+        "status": "succeeded",
+        "log": "out/0993-coordinator-control-bridge-slice-1/manual/final-endstate-10-pack-smoke.log",
+        "run_id": "2026-03-03T09-39-40-168Z-996785b7"
+      },
+      "created_at": "2026-03-03",
+      "completed_at": "2026-03-03"
+    },
+    {
+      "id": "0994",
+      "slug": "0994-coordinator-control-bridge-slice-2-residual-risk-closure-and-external-transport-surface-extraction",
+      "title": "Coordinator Control Bridge Slice 2 + Residual Risk Closure + External Transport-Surface Extraction",
+      "path": "tasks/tasks-0994-coordinator-control-bridge-slice-2-residual-risk-closure-and-external-transport-surface-extraction.md",
+      "kind": "run",
+      "status": "succeeded",
+      "gate": {
+        "phase": "coordinator-control-bridge-slice-2-implementation-gate",
+        "status": "succeeded",
+        "log": ".runs/0994-coordinator-control-bridge-slice-2-residual-risk-closure-and-external-transport-surface-extraction/cli/2026-03-03T13-46-07-481Z-b0b0aab0/manifest.json",
+        "run_id": "2026-03-03T13-46-07-481Z-b0b0aab0"
+      },
+      "created_at": "2026-03-03",
+      "completed_at": "2026-03-03"
+    },
+    {
+      "id": "0995",
+      "slug": "0995-coordinator-control-bridge-slice-3-residual-risk-remediation-and-transport-policy-alignment",
+      "title": "Coordinator Control Bridge Slice 3 + Residual Risk Remediation + Transport Policy Alignment",
+      "path": "tasks/tasks-0995-coordinator-control-bridge-slice-3-residual-risk-remediation-and-transport-policy-alignment.md",
+      "kind": "run",
+      "status": "succeeded",
+      "gate": {
+        "phase": "coordinator-control-bridge-slice-3-terminal-closeout",
+        "status": "succeeded",
+        "log": ".runs/0995-coordinator-control-bridge-slice-3-residual-risk-remediation-and-transport-policy-alignment/cli/2026-03-03T17-05-06-072Z-83b547e1/manifest.json",
+        "run_id": "2026-03-03T17-05-06-072Z-83b547e1"
+      },
+      "created_at": "2026-03-03",
+      "completed_at": "2026-03-04"
+    },
+    {
+      "id": "0996",
+      "slug": "0996-coordinator-control-bridge-slice-4-discord-telegram-mutating-control-promotion-readiness",
+      "title": "Coordinator Control Bridge Slice 4 + Discord/Telegram Mutating Control Promotion Readiness",
+      "path": "tasks/tasks-0996-coordinator-control-bridge-slice-4-discord-telegram-mutating-control-promotion-readiness.md",
+      "kind": "run",
+      "status": "completed",
+      "gate": {
+        "phase": "coordinator-control-bridge-slice-4-hold-go-promotion-closeout",
+        "status": "succeeded",
+        "log": "out/0996-coordinator-control-bridge-slice-4-discord-telegram-mutating-control-promotion-readiness/manual/20260305T113200Z-hold-go-approval-closeout/00-hold-go-approval-artifact.md",
+        "run_id": "20260305T113200Z-hold-go-approval-closeout"
+      },
+      "created_at": "2026-03-04",
+      "completed_at": "2026-03-05"
+    },
+    {
+      "id": "1000",
+      "slug": "1000-coordinator-tracker-dispatch-pilot-non-authoritative",
+      "title": "Coordinator Tracker Dispatch Pilot (Non-Authoritative)",
+      "path": "tasks/tasks-1000-coordinator-tracker-dispatch-pilot-non-authoritative.md",
+      "kind": "run",
+      "status": "completed",
+      "gate": {
+        "phase": "coordinator-tracker-dispatch-pilot-non-authoritative-implementation-gate-terminal-closeout",
+        "status": "succeeded",
+        "log": ".runs/1000-coordinator-tracker-dispatch-pilot-non-authoritative/cli/2026-03-05T06-43-58-994Z-7bfd5f4d/manifest.json",
+        "run_id": "2026-03-05T06-43-58-994Z-7bfd5f4d"
+      },
+      "created_at": "2026-03-05",
+      "completed_at": "2026-03-05"
+    },
+    {
+      "id": "0999",
+      "slug": "0999-workspace-symlink-hook-safety-hardening-and-windows-fail-closed-criteria",
+      "title": "Workspace/Symlink/Hook Safety Hardening + Windows Fail-Closed Criteria",
+      "path": "tasks/tasks-0999-workspace-symlink-hook-safety-hardening-and-windows-fail-closed-criteria.md",
+      "kind": "run",
+      "status": "completed",
+      "gate": {
+        "phase": "workspace-symlink-hook-safety-hardening-and-windows-fail-closed-criteria-implementation-gate-terminal-closeout",
+        "status": "succeeded",
+        "log": ".runs/0999-workspace-symlink-hook-safety-hardening-and-windows-fail-closed-criteria/cli/2026-03-05T04-41-01-711Z-1543a2df/manifest.json",
+        "run_id": "2026-03-05T04-41-01-711Z-1543a2df"
+      },
+      "created_at": "2026-03-05",
+      "completed_at": "2026-03-05"
+    },
+    {
+      "id": "0998",
+      "slug": "0998-coordinator-readonly-observability-surface-hardening-and-symphony-inclusion-plan",
+      "title": "Coordinator Read-Only Observability Surface Hardening + Symphony Inclusion Plan",
+      "path": "tasks/tasks-0998-coordinator-readonly-observability-surface-hardening-and-symphony-inclusion-plan.md",
+      "kind": "run",
+      "status": "completed",
+      "gate": {
+        "phase": "coordinator-readonly-observability-surface-hardening-and-symphony-inclusion-plan-implementation-gate-terminal-closeout",
+        "status": "succeeded",
+        "log": ".runs/0998-coordinator-readonly-observability-surface-hardening-and-symphony-inclusion-plan/cli/2026-03-05T03-03-28-702Z-fd352d26/manifest.json",
+        "run_id": "2026-03-05T03-03-28-702Z-fd352d26"
+      },
+      "created_at": "2026-03-05",
+      "completed_at": "2026-03-05"
+    },
+    {
+      "id": "0997",
+      "slug": "0997-coordinator-readonly-transport-surface-pilot",
+      "title": "Coordinator Read-Only Transport Surface Pilot",
+      "path": "tasks/tasks-0997-coordinator-readonly-transport-surface-pilot.md",
+      "kind": "run",
+      "status": "completed",
+      "gate": {
+        "phase": "coordinator-readonly-transport-surface-pilot-implementation-gate-terminal-closeout",
+        "status": "succeeded",
+        "log": ".runs/0997-coordinator-readonly-transport-surface-pilot/cli/2026-03-05T00-44-50-509Z-75da1233/manifest.json",
+        "run_id": "2026-03-05T00-44-50-509Z-75da1233"
+      },
+      "created_at": "2026-03-05",
+      "completed_at": "2026-03-05"
+    },
+    {
+      "id": "1004",
+      "slug": "1004-codex-0110-version-policy-refresh-and-adoption-sequencing",
+      "title": "Codex 0.110 Version Policy Refresh + Adoption Sequencing",
+      "path": "tasks/tasks-1004-codex-0110-version-policy-refresh-and-adoption-sequencing.md",
+      "kind": "run",
+      "status": "completed",
+      "gate": {
+        "phase": "codex-0110-version-policy-refresh-and-adoption-sequencing-docs-first",
+        "status": "succeeded",
+        "log": ".runs/1004-codex-0110-version-policy-refresh-and-adoption-sequencing/cli/2026-03-05T08-43-25-261Z-b48d62dc/manifest.json",
+        "run_id": "2026-03-05T08-43-25-261Z-b48d62dc"
+      },
+      "created_at": "2026-03-05",
+      "completed_at": "2026-03-05"
+    },
+    {
+      "id": "1005",
+      "slug": "1005-spec-guard-codepath-and-review-docs-alignment",
+      "title": "Spec Guard Codepath + Review Docs Alignment",
+      "path": "tasks/tasks-1005-spec-guard-codepath-and-review-docs-alignment.md",
+      "kind": "run",
+      "status": "completed",
+      "gate": {
+        "phase": "spec-guard-codepath-and-review-docs-alignment-implementation-gate-terminal-closeout",
+        "status": "succeeded",
+        "log": ".runs/1005-spec-guard-codepath-and-review-docs-alignment/cli/2026-03-05T08-27-09-532Z-329a23e2/manifest.json",
+        "run_id": "2026-03-05T08-27-09-532Z-329a23e2"
+      },
+      "created_at": "2026-03-05",
+      "completed_at": "2026-03-05"
+    },
+    {
+      "id": "1006",
+      "slug": "1006-task-index-canonicalization-and-registry-normalization",
+      "title": "Task Index Canonicalization + Registry Normalization",
+      "path": "tasks/tasks-1006-task-index-canonicalization-and-registry-normalization.md",
+      "kind": "run",
+      "status": "completed",
+      "gate": {
+        "phase": "task-index-canonicalization-and-registry-normalization-terminal-closeout-validation",
+        "status": "succeeded",
+        "log": "out/1006-task-index-canonicalization-and-registry-normalization/manual/20260305T110206Z-terminal-closeout-validation/00-terminal-closeout-summary.md",
+        "run_id": "20260305T110206Z-terminal-closeout-validation"
+      },
+      "created_at": "2026-03-05",
+      "completed_at": "2026-03-05"
+    },
+    {
+      "id": "1007",
+      "slug": "1007-codex-0110-post-change-audit-refresh-and-drift-closure",
+      "title": "Codex 0.110 Post-Change Audit Refresh + Drift Closure",
+      "path": "tasks/tasks-1007-codex-0110-post-change-audit-refresh-and-drift-closure.md",
+      "kind": "run",
+      "status": "completed",
+      "gate": {
+        "phase": "codex-0110-post-change-audit-refresh-and-drift-closure-implementation-gate",
+        "status": "succeeded",
+        "log": ".runs/1007-codex-0110-post-change-audit-refresh-and-drift-closure/cli/2026-03-05T12-26-56-479Z-7acd1a28/manifest.json",
+        "run_id": "2026-03-05T12-26-56-479Z-7acd1a28"
+      },
+      "created_at": "2026-03-05",
+      "completed_at": "2026-03-05"
+    },
+    {
+      "id": "1008",
+      "slug": "1008-coordinator-staged-external-surfaces-onboarding-and-runbook-readiness",
+      "title": "Coordinator Staged External Surfaces Onboarding + Runbook Readiness",
+      "path": "tasks/tasks-1008-coordinator-staged-external-surfaces-onboarding-and-runbook-readiness.md",
+      "kind": "run",
+      "status": "completed",
+      "gate": {
+        "phase": "coordinator-staged-external-surfaces-onboarding-and-runbook-readiness-implementation-gate-post-remediation",
+        "status": "succeeded",
+        "log": ".runs/1008-coordinator-staged-external-surfaces-onboarding-and-runbook-readiness/cli/2026-03-05T13-20-53-232Z-cb1a0b34/manifest.json",
+        "run_id": "2026-03-05T13-20-53-232Z-cb1a0b34"
+      },
+      "created_at": "2026-03-05",
+      "completed_at": "2026-03-05"
+    },
+    {
+      "id": "1009",
+      "slug": "1009-coordinator-telegram-setup-canary-and-runbook-implementation",
+      "title": "Coordinator Telegram Setup + Canary + Runbook Implementation",
+      "path": "tasks/tasks-1009-coordinator-telegram-setup-canary-and-runbook-implementation.md",
+      "kind": "run",
+      "status": "completed",
+      "gate": {
+        "phase": "coordinator-telegram-setup-canary-and-runbook-implementation-implementation-gate-override",
+        "status": "succeeded",
+        "log": ".runs/1009-coordinator-telegram-setup-canary-and-runbook-implementation/cli/2026-03-05T14-10-26-672Z-dd7191f1/manifest.json",
+        "run_id": "2026-03-05T14-10-26-672Z-dd7191f1"
+      },
+      "created_at": "2026-03-05",
+      "completed_at": "2026-03-05"
+    },
+    {
+      "id": "1010",
+      "slug": "1010-coordinator-linear-advisory-setup-and-runbook-implementation",
+      "title": "Coordinator Linear Advisory Setup + Runbook Implementation",
+      "path": "tasks/tasks-1010-coordinator-linear-advisory-setup-and-runbook-implementation.md",
+      "kind": "run",
+      "status": "completed",
+      "gate": {
+        "phase": "coordinator-linear-advisory-setup-and-runbook-implementation-implementation-gate-override",
+        "status": "succeeded",
+        "log": ".runs/1010-coordinator-linear-advisory-setup-and-runbook-implementation/cli/2026-03-05T15-04-14-048Z-a24ddda9/manifest.json",
+        "run_id": "2026-03-05T15-04-14-048Z-a24ddda9"
+      },
+      "created_at": "2026-03-05",
+      "completed_at": "2026-03-05"
+    },
+    {
+      "id": "1011",
+      "slug": "1011-coordinator-discord-enablement-after-telegram-evidence",
+      "title": "Coordinator Discord Enablement After Telegram Evidence",
+      "path": "tasks/tasks-1011-coordinator-discord-enablement-after-telegram-evidence.md",
+      "kind": "run",
+      "status": "completed",
+      "gate": {
+        "phase": "coordinator-discord-enablement-after-telegram-evidence-implementation-gate-override",
+        "status": "succeeded",
+        "log": ".runs/1011-coordinator-discord-enablement-after-telegram-evidence/cli/2026-03-05T15-55-37-550Z-6c3246b0/manifest.json",
+        "run_id": "2026-03-05T15-55-37-550Z-6c3246b0"
+      },
+      "created_at": "2026-03-05",
+      "completed_at": "2026-03-05"
+    },
+    {
+      "id": "1012",
+      "slug": "1012-codex-0111-gpt-5-4-compatibility-and-adoption-realignment",
+      "title": "Codex 0.111 + GPT-5.4 Compatibility + Adoption Realignment",
+      "path": "tasks/tasks-1012-codex-0111-gpt-5-4-compatibility-and-adoption-realignment.md",
+      "kind": "run",
+      "status": "completed",
+      "gate": {
+        "phase": "codex-0111-gpt-5-4-compatibility-and-adoption-realignment-implementation-gate-terminal-closeout",
+        "status": "succeeded",
+        "log": ".runs/1012-codex-0111-gpt-5-4-compatibility-and-adoption-realignment/cli/2026-03-06T00-27-39-186Z-2b3367e1/manifest.json",
+        "run_id": "2026-03-06T00-27-39-186Z-2b3367e1"
+      },
+      "created_at": "2026-03-06",
+      "completed_at": "2026-03-06"
+    },
+    {
+      "id": "1013",
+      "slug": "1013-coordinator-dynamic-tool-bridge-token-attestation-live-appserver-canary-and-rollback-drill",
+      "title": "Coordinator Dynamic-Tool Bridge Token Attestation + Live App-Server Canary + Rollback Drill",
+      "path": "tasks/tasks-1013-coordinator-dynamic-tool-bridge-token-attestation-live-appserver-canary-and-rollback-drill.md",
+      "kind": "run",
+      "status": "completed",
+      "gate": {
+        "phase": "coordinator-dynamic-tool-bridge-token-attestation-live-appserver-canary-and-rollback-drill-terminal-closeout",
+        "status": "succeeded",
+        "log": "out/1013-coordinator-dynamic-tool-bridge-token-attestation-live-appserver-canary-and-rollback-drill/manual/20260306T024855Z-closeout/00-summary.md",
+        "run_id": "20260306T024855Z-closeout"
+      },
+      "created_at": "2026-03-06",
+      "completed_at": "2026-03-06"
+    },
+    {
+      "id": "1014",
+      "slug": "1014-coordinator-symphony-aligned-telegram-oversight-and-live-linear-advisory-adapters",
+      "title": "Coordinator Symphony-Aligned Telegram Oversight + Live Linear Advisory Adapters",
+      "path": "tasks/tasks-1014-coordinator-symphony-aligned-telegram-oversight-and-live-linear-advisory-adapters.md",
+      "kind": "run",
+      "status": "in-progress",
+      "gate": {
+        "phase": "coordinator-symphony-aligned-telegram-oversight-and-live-linear-advisory-adapters-docs-review",
+        "status": "in-progress",
+        "log": null,
+        "run_id": null
+      },
+      "created_at": "2026-03-06",
+      "completed_at": null
+    },
+    {
+      "id": "1001",
+      "slug": "1001-coordinator-appserver-dynamic-tool-bridge-experimental-lane",
+      "title": "Coordinator App-Server Dynamic-Tool Bridge Experimental Lane",
+      "path": "tasks/tasks-1001-coordinator-appserver-dynamic-tool-bridge-experimental-lane.md",
+      "kind": "run",
+      "status": "completed",
+      "gate": {
+        "phase": "coordinator-appserver-dynamic-tool-bridge-experimental-lane-implementation-gate-override",
+        "status": "succeeded",
+        "log": ".runs/1001-coordinator-appserver-dynamic-tool-bridge-experimental-lane/cli/2026-03-05T17-28-18-453Z-52498c17/manifest.json",
+        "run_id": "2026-03-05T17-28-18-453Z-52498c17"
+      },
+      "created_at": "2026-03-06",
+      "completed_at": "2026-03-05"
     }
   ],
   "specs": [
+    {
+      "id": "20260306-1011-coordinator-discord-enablement-after-telegram-evidence",
+      "title": "Coordinator Discord Enablement After Telegram Evidence",
+      "relates_to": "tasks/tasks-1011-coordinator-discord-enablement-after-telegram-evidence.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-06",
+      "paths": {
+        "spec": "tasks/specs/1011-coordinator-discord-enablement-after-telegram-evidence.md",
+        "task": "tasks/tasks-1011-coordinator-discord-enablement-after-telegram-evidence.md",
+        "agent_task": ".agent/task/1011-coordinator-discord-enablement-after-telegram-evidence.md",
+        "docs": "docs/TECH_SPEC-coordinator-discord-enablement-after-telegram-evidence.md"
+      }
+    },
+    {
+      "id": "20260306-1010-coordinator-linear-advisory-setup-and-runbook-implementation",
+      "title": "Coordinator Linear Advisory Setup + Runbook Implementation",
+      "relates_to": "tasks/tasks-1010-coordinator-linear-advisory-setup-and-runbook-implementation.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-06",
+      "paths": {
+        "spec": "tasks/specs/1010-coordinator-linear-advisory-setup-and-runbook-implementation.md",
+        "task": "tasks/tasks-1010-coordinator-linear-advisory-setup-and-runbook-implementation.md",
+        "agent_task": ".agent/task/1010-coordinator-linear-advisory-setup-and-runbook-implementation.md",
+        "docs": "docs/TECH_SPEC-coordinator-linear-advisory-setup-and-runbook-implementation.md"
+      }
+    },
+    {
+      "id": "20260306-1009-coordinator-telegram-setup-canary-and-runbook-implementation",
+      "title": "Coordinator Telegram Setup + Canary + Runbook Implementation",
+      "relates_to": "tasks/tasks-1009-coordinator-telegram-setup-canary-and-runbook-implementation.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-06",
+      "paths": {
+        "spec": "tasks/specs/1009-coordinator-telegram-setup-canary-and-runbook-implementation.md",
+        "task": "tasks/tasks-1009-coordinator-telegram-setup-canary-and-runbook-implementation.md",
+        "agent_task": ".agent/task/1009-coordinator-telegram-setup-canary-and-runbook-implementation.md",
+        "docs": "docs/TECH_SPEC-coordinator-telegram-setup-canary-and-runbook-implementation.md"
+      }
+    },
+    {
+      "id": "20260305-1008-coordinator-staged-external-surfaces-onboarding-and-runbook-readiness",
+      "title": "Coordinator Staged External Surfaces Onboarding + Runbook Readiness",
+      "relates_to": "tasks/tasks-1008-coordinator-staged-external-surfaces-onboarding-and-runbook-readiness.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-05",
+      "paths": {
+        "spec": "tasks/specs/1008-coordinator-staged-external-surfaces-onboarding-and-runbook-readiness.md",
+        "task": "tasks/tasks-1008-coordinator-staged-external-surfaces-onboarding-and-runbook-readiness.md",
+        "agent_task": ".agent/task/1008-coordinator-staged-external-surfaces-onboarding-and-runbook-readiness.md",
+        "docs": "docs/TECH_SPEC-coordinator-staged-external-surfaces-onboarding-and-runbook-readiness.md"
+      }
+    },
+    {
+      "id": "20260305-1007-codex-0110-post-change-audit-refresh-and-drift-closure",
+      "title": "Codex 0.110 Post-Change Audit Refresh + Drift Closure",
+      "relates_to": "tasks/tasks-1007-codex-0110-post-change-audit-refresh-and-drift-closure.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-05",
+      "paths": {
+        "spec": "tasks/specs/1007-codex-0110-post-change-audit-refresh-and-drift-closure.md",
+        "task": "tasks/tasks-1007-codex-0110-post-change-audit-refresh-and-drift-closure.md",
+        "agent_task": ".agent/task/1007-codex-0110-post-change-audit-refresh-and-drift-closure.md",
+        "docs": "docs/TECH_SPEC-codex-0110-post-change-audit-refresh-and-drift-closure.md"
+      }
+    },
+    {
+      "id": "20260305-1006-task-index-canonicalization-and-registry-normalization",
+      "title": "Task Index Canonicalization + Registry Normalization",
+      "relates_to": "tasks/tasks-1006-task-index-canonicalization-and-registry-normalization.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-05",
+      "paths": {
+        "spec": "tasks/specs/1006-task-index-canonicalization-and-registry-normalization.md",
+        "task": "tasks/tasks-1006-task-index-canonicalization-and-registry-normalization.md",
+        "agent_task": ".agent/task/1006-task-index-canonicalization-and-registry-normalization.md",
+        "docs": "docs/TECH_SPEC-task-index-canonicalization-and-registry-normalization.md"
+      }
+    },
+    {
+      "id": "20260305-1005-spec-guard-codepath-and-review-docs-alignment",
+      "title": "Spec Guard Codepath + Review Docs Alignment",
+      "relates_to": "tasks/tasks-1005-spec-guard-codepath-and-review-docs-alignment.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-05",
+      "paths": {
+        "spec": "tasks/specs/1005-spec-guard-codepath-and-review-docs-alignment.md",
+        "task": "tasks/tasks-1005-spec-guard-codepath-and-review-docs-alignment.md",
+        "agent_task": ".agent/task/1005-spec-guard-codepath-and-review-docs-alignment.md",
+        "docs": "docs/TECH_SPEC-spec-guard-codepath-and-review-docs-alignment.md"
+      }
+    },
     {
       "id": "20260106-0939-perf-reliability-loop-2",
       "title": "Orchestrator Performance & Reliability Loop 2",
@@ -2303,6 +2735,214 @@
         "task": "tasks/tasks-0992-release-0-1-38-skills-docs-alignment.md",
         "agent_task": ".agent/task/0992-release-0-1-38-skills-docs-alignment.md",
         "docs": "docs/TECH_SPEC-release-0-1-38-skills-docs-alignment.md"
+      }
+    },
+    {
+      "id": "20260303-0993-coordinator-control-bridge-slice-1",
+      "title": "Coordinator Control Bridge Slice 1",
+      "relates_to": "tasks/tasks-0993-coordinator-control-bridge-slice-1.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-03",
+      "paths": {
+        "spec": "tasks/specs/0993-coordinator-control-bridge-slice-1.md",
+        "task": "tasks/tasks-0993-coordinator-control-bridge-slice-1.md",
+        "agent_task": ".agent/task/0993-coordinator-control-bridge-slice-1.md",
+        "docs": "docs/TECH_SPEC-coordinator-control-bridge-slice-1.md"
+      }
+    },
+    {
+      "id": "20260303-0994-coordinator-control-bridge-slice-2-residual-risk-closure-and-external-transport-surface-extraction",
+      "title": "Coordinator Control Bridge Slice 2 + Residual Risk Closure + External Transport-Surface Extraction",
+      "relates_to": "tasks/tasks-0994-coordinator-control-bridge-slice-2-residual-risk-closure-and-external-transport-surface-extraction.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-03",
+      "paths": {
+        "spec": "tasks/specs/0994-coordinator-control-bridge-slice-2-residual-risk-closure-and-external-transport-surface-extraction.md",
+        "task": "tasks/tasks-0994-coordinator-control-bridge-slice-2-residual-risk-closure-and-external-transport-surface-extraction.md",
+        "agent_task": ".agent/task/0994-coordinator-control-bridge-slice-2-residual-risk-closure-and-external-transport-surface-extraction.md",
+        "docs": "docs/TECH_SPEC-coordinator-control-bridge-slice-2-residual-risk-closure-and-external-transport-surface-extraction.md"
+      }
+    },
+    {
+      "id": "20260303-0995-coordinator-control-bridge-slice-3-residual-risk-remediation-and-transport-policy-alignment",
+      "title": "Coordinator Control Bridge Slice 3 + Residual Risk Remediation + Transport Policy Alignment",
+      "relates_to": "tasks/tasks-0995-coordinator-control-bridge-slice-3-residual-risk-remediation-and-transport-policy-alignment.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-04",
+      "paths": {
+        "spec": "tasks/specs/0995-coordinator-control-bridge-slice-3-residual-risk-remediation-and-transport-policy-alignment.md",
+        "task": "tasks/tasks-0995-coordinator-control-bridge-slice-3-residual-risk-remediation-and-transport-policy-alignment.md",
+        "agent_task": ".agent/task/0995-coordinator-control-bridge-slice-3-residual-risk-remediation-and-transport-policy-alignment.md",
+        "docs": "docs/TECH_SPEC-coordinator-control-bridge-slice-3-residual-risk-remediation-and-transport-policy-alignment.md"
+      }
+    },
+    {
+      "id": "20260304-0996-coordinator-control-bridge-slice-4-discord-telegram-mutating-control-promotion-readiness",
+      "title": "Coordinator Control Bridge Slice 4 + Discord/Telegram Mutating Control Promotion Readiness",
+      "relates_to": "tasks/tasks-0996-coordinator-control-bridge-slice-4-discord-telegram-mutating-control-promotion-readiness.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-05",
+      "paths": {
+        "spec": "tasks/specs/0996-coordinator-control-bridge-slice-4-discord-telegram-mutating-control-promotion-readiness.md",
+        "task": "tasks/tasks-0996-coordinator-control-bridge-slice-4-discord-telegram-mutating-control-promotion-readiness.md",
+        "agent_task": ".agent/task/0996-coordinator-control-bridge-slice-4-discord-telegram-mutating-control-promotion-readiness.md",
+        "docs": "docs/TECH_SPEC-coordinator-control-bridge-slice-4-discord-telegram-mutating-control-promotion-readiness.md"
+      }
+    },
+    {
+      "id": "20260305-0998-coordinator-readonly-observability-surface-hardening-and-symphony-inclusion-plan",
+      "title": "Coordinator Read-Only Observability Surface Hardening + Symphony Inclusion Plan",
+      "relates_to": "tasks/tasks-0998-coordinator-readonly-observability-surface-hardening-and-symphony-inclusion-plan.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-05",
+      "paths": {
+        "spec": "tasks/specs/0998-coordinator-readonly-observability-surface-hardening-and-symphony-inclusion-plan.md",
+        "task": "tasks/tasks-0998-coordinator-readonly-observability-surface-hardening-and-symphony-inclusion-plan.md",
+        "agent_task": ".agent/task/0998-coordinator-readonly-observability-surface-hardening-and-symphony-inclusion-plan.md",
+        "docs": "docs/TECH_SPEC-coordinator-readonly-observability-surface-hardening-and-symphony-inclusion-plan.md"
+      }
+    },
+    {
+      "id": "20260305-1000-coordinator-tracker-dispatch-pilot-non-authoritative",
+      "title": "Coordinator Tracker Dispatch Pilot (Non-Authoritative)",
+      "relates_to": "tasks/tasks-1000-coordinator-tracker-dispatch-pilot-non-authoritative.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-05",
+      "paths": {
+        "spec": "tasks/specs/1000-coordinator-tracker-dispatch-pilot-non-authoritative.md",
+        "task": "tasks/tasks-1000-coordinator-tracker-dispatch-pilot-non-authoritative.md",
+        "agent_task": ".agent/task/1000-coordinator-tracker-dispatch-pilot-non-authoritative.md",
+        "docs": "docs/TECH_SPEC-coordinator-tracker-dispatch-pilot-non-authoritative.md"
+      }
+    },
+    {
+      "id": "20260305-0999-workspace-symlink-hook-safety-hardening-and-windows-fail-closed-criteria",
+      "title": "Workspace/Symlink/Hook Safety Hardening + Windows Fail-Closed Criteria",
+      "relates_to": "tasks/tasks-0999-workspace-symlink-hook-safety-hardening-and-windows-fail-closed-criteria.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-05",
+      "paths": {
+        "spec": "tasks/specs/0999-workspace-symlink-hook-safety-hardening-and-windows-fail-closed-criteria.md",
+        "task": "tasks/tasks-0999-workspace-symlink-hook-safety-hardening-and-windows-fail-closed-criteria.md",
+        "agent_task": ".agent/task/0999-workspace-symlink-hook-safety-hardening-and-windows-fail-closed-criteria.md",
+        "docs": "docs/TECH_SPEC-workspace-symlink-hook-safety-hardening-and-windows-fail-closed-criteria.md"
+      }
+    },
+    {
+      "id": "20260305-0997-coordinator-readonly-transport-surface-pilot",
+      "title": "Coordinator Read-Only Transport Surface Pilot",
+      "relates_to": "tasks/tasks-0997-coordinator-readonly-transport-surface-pilot.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-05",
+      "paths": {
+        "spec": "tasks/specs/0997-coordinator-readonly-transport-surface-pilot.md",
+        "task": "tasks/tasks-0997-coordinator-readonly-transport-surface-pilot.md",
+        "agent_task": ".agent/task/0997-coordinator-readonly-transport-surface-pilot.md",
+        "docs": "docs/TECH_SPEC-coordinator-readonly-transport-surface-pilot.md"
+      }
+    },
+    {
+      "id": "20260305-1004-codex-0110-version-policy-refresh-and-adoption-sequencing",
+      "title": "Codex 0.110 Version Policy Refresh + Adoption Sequencing",
+      "relates_to": "tasks/tasks-1004-codex-0110-version-policy-refresh-and-adoption-sequencing.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-05",
+      "paths": {
+        "spec": "tasks/specs/1004-codex-0110-version-policy-refresh-and-adoption-sequencing.md",
+        "task": "tasks/tasks-1004-codex-0110-version-policy-refresh-and-adoption-sequencing.md",
+        "agent_task": ".agent/task/1004-codex-0110-version-policy-refresh-and-adoption-sequencing.md",
+        "docs": "docs/TECH_SPEC-codex-0110-version-policy-refresh-and-adoption-sequencing.md"
+      }
+    },
+    {
+      "id": "20260306-1001-coordinator-appserver-dynamic-tool-bridge-experimental-lane",
+      "title": "Coordinator App-Server Dynamic-Tool Bridge Experimental Lane",
+      "relates_to": "tasks/tasks-1001-coordinator-appserver-dynamic-tool-bridge-experimental-lane.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-06",
+      "paths": {
+        "spec": "tasks/specs/1001-coordinator-appserver-dynamic-tool-bridge-experimental-lane.md",
+        "task": "tasks/tasks-1001-coordinator-appserver-dynamic-tool-bridge-experimental-lane.md",
+        "agent_task": ".agent/task/1001-coordinator-appserver-dynamic-tool-bridge-experimental-lane.md",
+        "docs": "docs/TECH_SPEC-coordinator-appserver-dynamic-tool-bridge-experimental-lane.md"
+      }
+    },
+    {
+      "id": "20260306-1014-coordinator-symphony-aligned-telegram-oversight-and-live-linear-advisory-adapters",
+      "title": "Coordinator Symphony-Aligned Telegram Oversight + Live Linear Advisory Adapters",
+      "relates_to": "tasks/tasks-1014-coordinator-symphony-aligned-telegram-oversight-and-live-linear-advisory-adapters.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-06",
+      "paths": {
+        "spec": "tasks/specs/1014-coordinator-symphony-aligned-telegram-oversight-and-live-linear-advisory-adapters.md",
+        "task": "tasks/tasks-1014-coordinator-symphony-aligned-telegram-oversight-and-live-linear-advisory-adapters.md",
+        "agent_task": ".agent/task/1014-coordinator-symphony-aligned-telegram-oversight-and-live-linear-advisory-adapters.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-telegram-oversight-and-live-linear-advisory-adapters.md"
+      }
+    },
+    {
+      "id": "20260306-1012-codex-0111-gpt-5-4-compatibility-and-adoption-realignment",
+      "title": "Codex 0.111 + GPT-5.4 Compatibility + Adoption Realignment",
+      "relates_to": "tasks/tasks-1012-codex-0111-gpt-5-4-compatibility-and-adoption-realignment.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-06",
+      "paths": {
+        "spec": "tasks/specs/1012-codex-0111-gpt-5-4-compatibility-and-adoption-realignment.md",
+        "task": "tasks/tasks-1012-codex-0111-gpt-5-4-compatibility-and-adoption-realignment.md",
+        "agent_task": ".agent/task/1012-codex-0111-gpt-5-4-compatibility-and-adoption-realignment.md",
+        "docs": "docs/TECH_SPEC-codex-0111-gpt-5-4-compatibility-and-adoption-realignment.md"
+      }
+    },
+    {
+      "id": "20260306-1013-coordinator-dynamic-tool-bridge-token-attestation-live-appserver-canary-and-rollback-drill",
+      "title": "Coordinator Dynamic-Tool Bridge Token Attestation + Live App-Server Canary + Rollback Drill",
+      "relates_to": "tasks/tasks-1013-coordinator-dynamic-tool-bridge-token-attestation-live-appserver-canary-and-rollback-drill.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-06",
+      "paths": {
+        "spec": "tasks/specs/1013-coordinator-dynamic-tool-bridge-token-attestation-live-appserver-canary-and-rollback-drill.md",
+        "task": "tasks/tasks-1013-coordinator-dynamic-tool-bridge-token-attestation-live-appserver-canary-and-rollback-drill.md",
+        "agent_task": ".agent/task/1013-coordinator-dynamic-tool-bridge-token-attestation-live-appserver-canary-and-rollback-drill.md",
+        "docs": "docs/TECH_SPEC-coordinator-dynamic-tool-bridge-token-attestation-live-appserver-canary-and-rollback-drill.md"
       }
     }
   ]

@@ -39,13 +39,23 @@ async function initRepo(): Promise<string> {
   return dir;
 }
 
+function cleanGuardOverrideEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  const sanitized = { ...env };
+  delete sanitized.DELEGATION_GUARD_OVERRIDE_REASON;
+  return sanitized;
+}
+
 describe('delegation-guard script', () => {
   it('reports missing task id with export example', async () => {
     tempDir = await initRepo();
 
     const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
       cwd: tempDir,
-      env: { ...process.env, MCP_RUNNER_TASK_ID: '', CODEX_ORCHESTRATOR_ROOT: tempDir }
+      env: cleanGuardOverrideEnv({
+        ...process.env,
+        MCP_RUNNER_TASK_ID: '',
+        CODEX_ORCHESTRATOR_ROOT: tempDir
+      })
     });
 
     expect(stdout).toContain('Task id is required');
@@ -57,12 +67,12 @@ describe('delegation-guard script', () => {
     const taskId = '0951-delegation-rlm-quick-wins';
     const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
       cwd: tempDir,
-      env: {
+      env: cleanGuardOverrideEnv({
         ...process.env,
         TASK: taskId,
         MCP_RUNNER_TASK_ID: '',
         CODEX_ORCHESTRATOR_ROOT: tempDir
-      }
+      })
     });
 
     expect(stdout).not.toContain('Task id is required');
@@ -74,12 +84,12 @@ describe('delegation-guard script', () => {
     const taskId = '0951-delegation-rlm-quick-wins';
     const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run', '--task', taskId], {
       cwd: tempDir,
-      env: {
+      env: cleanGuardOverrideEnv({
         ...process.env,
         TASK: 'should-not-be-used',
         MCP_RUNNER_TASK_ID: '',
         CODEX_ORCHESTRATOR_ROOT: tempDir
-      }
+      })
     });
 
     expect(stdout).not.toContain('Task id is required');
@@ -95,12 +105,12 @@ describe('delegation-guard script', () => {
 
     const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
       cwd: tempDir,
-      env: {
+      env: cleanGuardOverrideEnv({
         ...process.env,
         MCP_RUNNER_TASK_ID: taskId,
         CODEX_ORCHESTRATOR_ROOT: tempDir,
         CODEX_ORCHESTRATOR_RUNS_DIR: 'custom-runs'
-      }
+      })
     });
 
     expect(stdout).toContain('No subagent manifests found');

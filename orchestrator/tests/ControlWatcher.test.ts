@@ -158,6 +158,409 @@ describe('ControlWatcher', () => {
     }
   });
 
+  it('propagates intent_id in pause watcher events', async () => {
+    const { root, paths } = await createRunRoot('task-0940');
+    await writeFile(
+      paths.controlPath,
+      JSON.stringify({
+        run_id: 'run-1',
+        control_seq: 2,
+        latest_action: {
+          request_id: 'req-intent',
+          intent_id: 'intent-123',
+          requested_by: 'delegate',
+          requested_at: '2026-01-01T00:00:00Z',
+          action: 'pause',
+          reason: 'manual'
+        }
+      }),
+      'utf8'
+    );
+
+    const manifest = {
+      run_id: 'run-1',
+      task_id: 'task-0940',
+      status: 'in_progress',
+      status_detail: null,
+      started_at: '2026-01-01T00:00:00Z',
+      updated_at: '2026-01-01T00:00:00Z'
+    } as CliManifest;
+
+    const events: RunEventStreamEntry[] = [];
+    const eventStream = {
+      append: async (entry: { event: string; actor: string; payload: Record<string, unknown> }) => {
+        const record: RunEventStreamEntry = {
+          schema_version: 1,
+          seq: events.length + 1,
+          timestamp: '2026-01-01T00:00:00Z',
+          task_id: 'task-0940',
+          run_id: 'run-1',
+          event: entry.event,
+          actor: entry.actor,
+          payload: entry.payload
+        };
+        events.push(record);
+        return record;
+      },
+      close: async () => undefined
+    } as unknown as import('../src/cli/events/runEventStream.js').RunEventStream;
+
+    const watcher = new ControlWatcher({
+      paths,
+      manifest,
+      eventStream,
+      persist: async () => undefined,
+      now: () => '2026-01-01T00:00:00Z'
+    });
+
+    try {
+      await watcher.sync();
+      const pauseRequested = events.find((entry) => entry.event === 'pause_requested');
+      const runPaused = events.find((entry) => entry.event === 'run_paused');
+      expect(pauseRequested?.payload).toMatchObject({
+        request_id: 'req-intent',
+        intent_id: 'intent-123'
+      });
+      expect(runPaused?.payload).toMatchObject({
+        request_id: 'req-intent',
+        intent_id: 'intent-123'
+      });
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('requires control_seq advancement for watcher-visible pause transitions', async () => {
+    const { root, paths } = await createRunRoot('task-0940');
+    const pauseAction = {
+      request_id: 'req-confirm-pause',
+      requested_by: 'runner',
+      requested_at: '2026-01-01T00:00:00Z',
+      action: 'pause',
+      reason: 'confirmation_required'
+    };
+    await writeFile(
+      paths.controlPath,
+      JSON.stringify({
+        run_id: 'run-1',
+        control_seq: 0,
+        latest_action: pauseAction
+      }),
+      'utf8'
+    );
+
+    const manifest = {
+      run_id: 'run-1',
+      task_id: 'task-0940',
+      status: 'in_progress',
+      status_detail: null,
+      started_at: '2026-01-01T00:00:00Z',
+      updated_at: '2026-01-01T00:00:00Z'
+    } as CliManifest;
+
+    const events: RunEventStreamEntry[] = [];
+    const eventStream = {
+      append: async (entry: { event: string; actor: string; payload: Record<string, unknown> }) => {
+        const record: RunEventStreamEntry = {
+          schema_version: 1,
+          seq: events.length + 1,
+          timestamp: '2026-01-01T00:00:00Z',
+          task_id: 'task-0940',
+          run_id: 'run-1',
+          event: entry.event,
+          actor: entry.actor,
+          payload: entry.payload
+        };
+        events.push(record);
+        return record;
+      },
+      close: async () => undefined
+    } as unknown as import('../src/cli/events/runEventStream.js').RunEventStream;
+
+    const watcher = new ControlWatcher({
+      paths,
+      manifest,
+      eventStream,
+      persist: async () => undefined,
+      now: () => '2026-01-01T00:00:00Z'
+    });
+
+    try {
+      await watcher.sync();
+      expect(events).toHaveLength(0);
+
+      await writeFile(
+        paths.controlPath,
+        JSON.stringify({
+          run_id: 'run-1',
+          control_seq: 1,
+          latest_action: pauseAction
+        }),
+        'utf8'
+      );
+      await watcher.sync();
+
+      const pauseRequested = events.find((entry) => entry.event === 'pause_requested');
+      const runPaused = events.find((entry) => entry.event === 'run_paused');
+      expect(pauseRequested?.payload).toMatchObject({
+        request_id: 'req-confirm-pause',
+        control_seq: 1,
+        reason: 'confirmation_required'
+      });
+      expect(runPaused?.payload).toMatchObject({
+        request_id: 'req-confirm-pause',
+        control_seq: 1
+      });
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('treats intent_id changes as distinct pause requests during dedupe checks', async () => {
+    const { root, paths } = await createRunRoot('task-0940');
+    await writeFile(
+      paths.controlPath,
+      JSON.stringify({
+        run_id: 'run-1',
+        control_seq: 1,
+        latest_action: {
+          request_id: null,
+          intent_id: 'intent-a',
+          requested_by: 'delegate',
+          requested_at: '2026-01-01T00:00:00Z',
+          action: 'pause',
+          reason: 'manual'
+        }
+      }),
+      'utf8'
+    );
+
+    const manifest = {
+      run_id: 'run-1',
+      task_id: 'task-0940',
+      status: 'in_progress',
+      status_detail: null,
+      started_at: '2026-01-01T00:00:00Z',
+      updated_at: '2026-01-01T00:00:00Z'
+    } as CliManifest;
+
+    const events: RunEventStreamEntry[] = [];
+    const eventStream = {
+      append: async (entry: { event: string; actor: string; payload: Record<string, unknown> }) => {
+        const record: RunEventStreamEntry = {
+          schema_version: 1,
+          seq: events.length + 1,
+          timestamp: '2026-01-01T00:00:00Z',
+          task_id: 'task-0940',
+          run_id: 'run-1',
+          event: entry.event,
+          actor: entry.actor,
+          payload: entry.payload
+        };
+        events.push(record);
+        return record;
+      },
+      close: async () => undefined
+    } as unknown as import('../src/cli/events/runEventStream.js').RunEventStream;
+
+    const watcher = new ControlWatcher({
+      paths,
+      manifest,
+      eventStream,
+      persist: async () => undefined,
+      now: () => '2026-01-01T00:00:00Z'
+    });
+
+    try {
+      await watcher.sync();
+      await writeFile(
+        paths.controlPath,
+        JSON.stringify({
+          run_id: 'run-1',
+          control_seq: 2,
+          latest_action: {
+            request_id: null,
+            intent_id: 'intent-b',
+            requested_by: 'delegate',
+            requested_at: '2026-01-01T00:00:05Z',
+            action: 'pause',
+            reason: 'manual'
+          }
+        }),
+        'utf8'
+      );
+      await watcher.sync();
+
+      const pauseRequestedEvents = events.filter((entry) => entry.event === 'pause_requested');
+      const runPausedEvents = events.filter((entry) => entry.event === 'run_paused');
+      expect(pauseRequestedEvents).toHaveLength(2);
+      expect(runPausedEvents).toHaveLength(2);
+      expect(pauseRequestedEvents[0]?.payload).toMatchObject({ intent_id: 'intent-a', control_seq: 1 });
+      expect(pauseRequestedEvents[1]?.payload).toMatchObject({ intent_id: 'intent-b', control_seq: 2 });
+      expect(runPausedEvents[1]?.payload).toMatchObject({ intent_id: 'intent-b', control_seq: 2 });
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('does not throw when trace ids are non-string values', async () => {
+    const { root, paths } = await createRunRoot('task-0940');
+    await writeFile(
+      paths.controlPath,
+      JSON.stringify({
+        run_id: 'run-1',
+        control_seq: 3,
+        latest_action: {
+          request_id: 7,
+          intent_id: { value: 'intent' },
+          requested_by: 'delegate',
+          requested_at: '2026-01-01T00:00:00Z',
+          action: 'pause',
+          reason: 'manual'
+        }
+      }),
+      'utf8'
+    );
+
+    const manifest = {
+      run_id: 'run-1',
+      task_id: 'task-0940',
+      status: 'in_progress',
+      status_detail: null,
+      started_at: '2026-01-01T00:00:00Z',
+      updated_at: '2026-01-01T00:00:00Z'
+    } as CliManifest;
+
+    const events: RunEventStreamEntry[] = [];
+    const eventStream = {
+      append: async (entry: { event: string; actor: string; payload: Record<string, unknown> }) => {
+        const record: RunEventStreamEntry = {
+          schema_version: 1,
+          seq: events.length + 1,
+          timestamp: '2026-01-01T00:00:00Z',
+          task_id: 'task-0940',
+          run_id: 'run-1',
+          event: entry.event,
+          actor: entry.actor,
+          payload: entry.payload
+        };
+        events.push(record);
+        return record;
+      },
+      close: async () => undefined
+    } as unknown as import('../src/cli/events/runEventStream.js').RunEventStream;
+
+    const watcher = new ControlWatcher({
+      paths,
+      manifest,
+      eventStream,
+      persist: async () => undefined,
+      now: () => '2026-01-01T00:00:00Z'
+    });
+
+    try {
+      await expect(watcher.sync()).resolves.toBeUndefined();
+      const pauseRequested = events.find((entry) => entry.event === 'pause_requested');
+      const runPaused = events.find((entry) => entry.event === 'run_paused');
+      expect(pauseRequested).toBeTruthy();
+      expect(runPaused).toBeTruthy();
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('encodes trace ids before appending watcher summary text', async () => {
+    const { root, paths } = await createRunRoot('task-0940');
+    await writeFile(
+      paths.controlPath,
+      JSON.stringify({
+        run_id: 'run-1',
+        control_seq: 4,
+        latest_action: {
+          request_id: 'req, 1',
+          intent_id: 'intent\nline',
+          requested_by: 'delegate',
+          requested_at: '2026-01-01T00:00:00Z',
+          action: 'pause',
+          reason: 'manual'
+        }
+      }),
+      'utf8'
+    );
+
+    const manifest = {
+      run_id: 'run-1',
+      task_id: 'task-0940',
+      status: 'in_progress',
+      status_detail: null,
+      summary: null,
+      started_at: '2026-01-01T00:00:00Z',
+      updated_at: '2026-01-01T00:00:00Z'
+    } as CliManifest;
+
+    const watcher = new ControlWatcher({
+      paths,
+      manifest,
+      persist: async () => undefined,
+      now: () => '2026-01-01T00:00:00Z'
+    });
+
+    try {
+      await watcher.sync();
+      expect(manifest.summary ?? '').toContain('intent_id=intent%0Aline');
+      expect(manifest.summary ?? '').toContain('request_id=req%2C%201');
+      expect(manifest.summary ?? '').not.toContain('intent\nline');
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('does not throw when truncating a trace id near surrogate boundaries', async () => {
+    const { root, paths } = await createRunRoot('task-0940');
+    const riskyRequestId = `${'a'.repeat(159)}😀tail`;
+    await writeFile(
+      paths.controlPath,
+      JSON.stringify({
+        run_id: 'run-1',
+        control_seq: 5,
+        latest_action: {
+          request_id: riskyRequestId,
+          intent_id: 'intent-safe',
+          requested_by: 'delegate',
+          requested_at: '2026-01-01T00:00:00Z',
+          action: 'pause',
+          reason: 'manual'
+        }
+      }),
+      'utf8'
+    );
+
+    const manifest = {
+      run_id: 'run-1',
+      task_id: 'task-0940',
+      status: 'in_progress',
+      status_detail: null,
+      summary: null,
+      started_at: '2026-01-01T00:00:00Z',
+      updated_at: '2026-01-01T00:00:00Z'
+    } as CliManifest;
+
+    const watcher = new ControlWatcher({
+      paths,
+      manifest,
+      persist: async () => undefined,
+      now: () => '2026-01-01T00:00:00Z'
+    });
+
+    try {
+      await expect(watcher.sync()).resolves.toBeUndefined();
+      expect(manifest.summary ?? '').toContain('%F0%9F%98%80');
+      expect(manifest.summary ?? '').not.toContain('URI malformed');
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   it('does not throw when event stream append fails', async () => {
     const { root, paths } = await createRunRoot('task-0940');
     await writeFile(

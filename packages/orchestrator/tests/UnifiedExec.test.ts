@@ -1,4 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { UnifiedExecRunner } from '../src/exec/unified-exec.js';
 import { ExecSessionManager, type ExecSessionHandle } from '../src/exec/session-manager.js';
 import { RemoteExecHandleService } from '../src/exec/handle-service.js';
@@ -228,6 +231,98 @@ describe('UnifiedExecRunner', () => {
       }
       return true;
     });
+  });
+
+  it('marks timed out executions with deterministic metadata', async () => {
+    const sessionManager = createSessionManager();
+    const orchestrator = new ToolOrchestrator({
+      wait: async () => {},
+      now: () => new Date('2025-11-04T00:00:00.000Z')
+    });
+    const runner = new UnifiedExecRunner<TestHandle>({
+      orchestrator,
+      sessionManager,
+      now: createClock()
+    });
+
+    const result = await runner.run({
+      command: process.execPath,
+      args: ['-e', 'setTimeout(() => {}, 5000)'],
+      sessionId: 'shell',
+      timeoutMs: 50
+    });
+
+    expect(result.status).toBe('failed');
+    expect(result.timedOut).toBe(true);
+    expect(result.timeoutMs).toBe(50);
+    expect(result.record.status).toBe('failed');
+
+    const execMetadata = result.record.metadata?.exec as Record<string, unknown> | undefined;
+    expect(execMetadata?.timedOut).toBe(true);
+    expect(execMetadata?.timeoutMs).toBe(50);
+
+    const endEvent = [...result.events].reverse().find((event) => event.type === 'exec:end');
+    expect(endEvent?.type).toBe('exec:end');
+    if (endEvent?.type === 'exec:end') {
+      expect(endEvent.payload.status).toBe('failed');
+    }
+  });
+
+  it('escalates timed-out subprocesses to SIGKILL when SIGTERM is ignored', async () => {
+    if (process.platform === 'win32') {
+      return;
+    }
+
+    const sessionManager = createSessionManager();
+    const orchestrator = new ToolOrchestrator({
+      wait: async () => {},
+      now: () => new Date('2025-11-04T00:00:00.000Z')
+    });
+    const runner = new UnifiedExecRunner<TestHandle>({
+      orchestrator,
+      sessionManager,
+      now: createClock()
+    });
+
+    const workDir = await mkdtemp(join(tmpdir(), 'unified-exec-timeout-'));
+    const pidFile = join(workDir, 'child.pid');
+    let childPid: number | null = null;
+    try {
+      const result = await runner.run({
+        command: process.execPath,
+        args: [
+          '-e',
+          [
+            "const fs = require('node:fs');",
+            'const pidFile = process.argv[1];',
+            'fs.writeFileSync(pidFile, String(process.pid));',
+            "process.on('SIGTERM', () => {});",
+            'setInterval(() => {}, 1000);'
+          ].join(' '),
+          pidFile
+        ],
+        sessionId: 'shell',
+        timeoutMs: 50
+      });
+
+      expect(result.status).toBe('failed');
+      expect(result.timedOut).toBe(true);
+      const pidRaw = await readFile(pidFile, 'utf8');
+      childPid = Number.parseInt(pidRaw.trim(), 10);
+      expect(Number.isInteger(childPid)).toBe(true);
+
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      expect(() => process.kill(childPid as number, 0)).toThrow();
+    } finally {
+      if (childPid && Number.isInteger(childPid)) {
+        try {
+          process.kill(childPid, 'SIGKILL');
+        } catch {
+          // already exited
+        }
+      }
+      await rm(workDir, { recursive: true, force: true });
+    }
   });
 
   it('issues streaming handles and records frames', async () => {

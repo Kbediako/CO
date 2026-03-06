@@ -93,7 +93,8 @@ Run the delegation MCP server over stdio:
 ```bash
 codex-orchestrator delegate-server --repo /path/to/repo
 ```
-Optional: add `--mode question_only` to disable `delegate.spawn/pause/cancel`, keeping only `delegate.question.*` + `delegate.status` in the delegate namespace. GitHub tools remain available when GitHub integration is enabled.
+Optional: add `--mode question_only` to disable `delegate.spawn/pause/cancel`, keeping `delegate.question.*` + `delegate.status` in the delegate namespace. GitHub tools remain available when GitHub integration is enabled.
+For read-only operator status surfaces, set `delegate.mode = "status_only"` via `--config` (for example: `codex-orchestrator delegate-server --config 'delegate.mode = "status_only"'`): only `delegate.status` is allowed, and all other `delegate.*` / `github.*` tools are blocked.
 
 Register it with Codex once. Delegation MCP is enabled by default (the only MCP enabled by default). To override the default or re-enable after disabling:
 ```bash
@@ -109,17 +110,16 @@ Codex built-ins are `default`, `explorer`, `worker`, and `awaiter`. `researcher`
 - Multi-turn loops are supported (`spawn_agent` -> `send_input` -> `wait`/`resume_agent` -> `close_agent`), so subagents can iterate before parent synthesis.
 - Keep `fork_context` off by default for bounded subagent streams; set `fork_context=true` only when the subagent must inherit prior thread history.
 
-In Codex CLI `0.105.0`, built-in `explorer` no longer pins an older model profile; it inherits top-level defaults unless you attach a role `config_file`.
-CO now ships this downstream starter config via `init codex` (source template: `templates/codex/.codex/config.toml`; installed as .codex/config.toml in target repos):
+In Codex CLI `0.111.0`, built-in `explorer` continues to inherit top-level defaults unless you attach a role `config_file`.
+CO's current compatibility/adoption target is `gpt-5.4` across top-level, delegated subagent, and review surfaces. `explorer_fast` remains the only explicit spark exception. Use this target config:
 
 ```toml
-model = "gpt-5.3-codex"
+model = "gpt-5.4"
+review_model = "gpt-5.4"
 model_reasoning_effort = "xhigh"
 
 [agents]
 max_threads = 12
-max_depth = 4
-max_spawn_depth = 4
 
 [agents.explorer_fast]
 description = "Fast explorer (spark text-only)."
@@ -142,20 +142,21 @@ model_reasoning_effort = "xhigh"
 
 ```toml
 # .codex/agents/worker-complex.toml
-model = "gpt-5.3-codex"
+model = "gpt-5.4"
 model_reasoning_effort = "xhigh"
 ```
 
-`init codex` also writes downstream .codex/agents/awaiter-high.toml from `templates/codex/.codex/agents/awaiter-high.toml` so CO users can keep awaiter semantics while meeting a high-reasoning minimum.
+Align the downstream awaiter override seeded from `templates/codex/.codex/agents/awaiter-high.toml` and similar review/delegation-facing role files to `gpt-5.4` while keeping their role-specific reasoning settings. When authenticating through ChatGPT, do not swap those surfaces to `gpt-5.4-codex`; delegated and review runs currently reject that model. The starter template intentionally seeds only `max_threads = 12`; if native `codex` startup fails with `invalid type: integer ... expected struct AgentRoleToml` under `[agents]`, remove only the live `max_depth` and `max_spawn_depth` keys from `~/.codex/config.toml` as a temporary workaround and keep the role subtables unchanged.
 
 Caveats:
-- `gpt-5.3-codex-spark` is text-only (no image inputs). Keep it for fast search/synthesis.
+- `gpt-5.3-codex-spark` is text-only (no image inputs). Keep it only for `explorer_fast` / fast search-synthesis lanes.
+- Under ChatGPT auth, keep top-level, delegated, and review surfaces on `gpt-5.4`; avoid `gpt-5.4-codex` until provider compatibility changes.
 - Leave `agents.explorer` undefined unless you intentionally want to override built-in explorer behavior.
 - Keep RLM/collab built-ins-first by default; add specialist custom roles only when a measured benefit justifies ongoing maintenance.
-- `max_threads = 12`, `max_depth = 4`, and `max_spawn_depth = 4` are CO's standard multi-agent baseline.
+- `max_threads = 12` is the seeded baseline. Keep explicit `max_depth = 4` / `max_spawn_depth = 4` only when your local Codex parser accepts them; if you intentionally use constrained caps like `8/2/2` or `6/1/1`, `codex-orchestrator codex defaults --yes` preserves those existing values.
 - Fallbacks are contingency-only: use `8/2/2` on constrained hosts or deterministic high-risk lanes; use `6/1/1` only as break-glass under severe contention.
 - Awaiter triage: long waits are expected for long-running jobs; treat it as stuck only after multiple polling windows with no status/progress movement.
-- `codex review` delegates with collab tools disabled in review threads; keep review expectations single-agent even when multi-agent is enabled elsewhere.
+- `codex review` delegates with collab tools disabled in review threads; keep review expectations single-agent and on the same `gpt-5.4` target when running under ChatGPT auth.
 
 Delegation guard profile:
 - `CODEX_ORCHESTRATOR_GUARD_PROFILE=auto` (default): strict in CO-style repos, warn in lightweight repos.
@@ -288,7 +289,7 @@ codex-orchestrator doctor --cloud-preflight
 - Auto-capture failed run issue bundles: `codex-orchestrator start <pipeline> --auto-issue-log` or `codex-orchestrator flow --auto-issue-log`
 - Active PR watch-resolve-merge loop: `codex-orchestrator pr resolve-merge --pr <number> --quiet-minutes <window>` (add `--auto-merge` when approved; exits early when author action is required).
 - Passive PR monitor loop: `codex-orchestrator pr watch-merge --pr <number> --quiet-minutes <window>` (monitor-only behavior; keeps waiting unless terminal/timeout).
-- Review checkpoints (npm-only safe): `NOTES="Goal: ... | Summary: ... | Risks: ..." codex-orchestrator review --task <task-id>` for manifest-backed standalone review wrapper behavior (auto-skips repo-only diff-budget script when unavailable in downstream installs); use `codex review "<focus>"` for quick prompt-only checks; use `codex-orchestrator start implementation-gate --task <task-id> --format json` when you want a full gate run.
+- Review checkpoints (npm-only safe): `NOTES="Goal: ... | Summary: ... | Risks: ..." codex-orchestrator review --task <task-id>` for manifest-backed standalone review wrapper behavior (auto-skips repo-only diff-budget script when unavailable in downstream installs); in non-interactive/CI runs (stdin not TTY, or `CODEX_REVIEW_NON_INTERACTIVE=1` / `CODEX_NON_INTERACTIVE=1` / `CODEX_NO_INTERACTIVE=1`) it prints the handoff prompt and exits unless `FORCE_CODEX_REVIEW=1`; use `codex review "<focus>"` for quick prompt-only checks; use `codex-orchestrator start implementation-gate --task <task-id> --format json` when you want a full gate run.
 - Downstream simulation before shipping wrapper/skill changes: `npm run pack:smoke` (packaged CLI in temp mock repo; validates `review` artifacts and `long-poll-wait` install path; spot-check gate). Use `npm run pack:audit` for full tarball inventory validation.
 - Delegation: `codex-orchestrator doctor --apply --yes`, then enable for a Codex run with: `codex -c 'mcp_servers.delegation.enabled=true' ...`
 - Collab (symbolic RLM subagents): `codex-orchestrator rlm --multi-agent auto "<goal>"` (legacy alias: `--collab auto`; requires Codex `features.multi_agent=true`)
@@ -307,7 +308,7 @@ codex-orchestrator devtools setup
 - `codex-orchestrator start <pipeline>` — run a pipeline (add `--auto-issue-log` for automatic failure bundle capture; add `--repo-config-required` for strict repo-local config mode).
 - `codex-orchestrator flow --task <task-id>` — run `docs-review` then `implementation-gate` in sequence (supports `--auto-issue-log` and `--repo-config-required`).
 - `codex-orchestrator start docs-relevance-advisory --task <task-id>` — run non-blocking docs relevance signals (warn-mode freshness + advisory review lane).
-- `NOTES="Goal: ... | Summary: ... | Risks: ..." codex-orchestrator review --task <task-id>` — run standalone review wrapper with manifest-backed evidence (supports run-review flags/env).
+- `NOTES="Goal: ... | Summary: ... | Risks: ..." codex-orchestrator review --task <task-id>` — run standalone review wrapper with manifest-backed evidence (supports run-review flags/env); in non-interactive/CI runs it prints the handoff prompt and exits unless `FORCE_CODEX_REVIEW=1`.
 - `codex-orchestrator plan <pipeline>` — preview pipeline stages.
 - `codex-orchestrator exec <cmd>` — run a one-off command with the exec runtime.
 - `codex-orchestrator init codex` — install starter templates (`mcp-client.json`, `AGENTS.md`, downstream .codex/config.toml + .codex/agents/* role files sourced from `templates/codex/.codex/*`, `codex.orchestrator.json`) into a repo.

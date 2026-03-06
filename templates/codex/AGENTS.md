@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp 3599cb54f155d730dfc088b0ee6792ebe91e701cc288930064d73eae562b829a -->
+<!-- codex:instruction-stamp 94c865b40e35a3d952175ca24cdf4c2caec066a97ae844c4dc62c898c87668f8 -->
 # Agent Instructions (Template)
 
 ## Orchestrator-first workflow
@@ -53,14 +53,15 @@
 - Built-in roles are `default`, `explorer`, `worker`, and `awaiter`; `researcher` is user-defined.
 - `spawn_agent` defaults to `default` when `agent_type` is omitted; always set `agent_type` explicitly.
 - For symbolic collab runs, prefix spawned prompts with `[agent_type:<role>]` on line one so role intent is auditable from JSONL/manifests.
-- Keep top-level defaults on latest codex by setting `model = "gpt-5.3-codex"` in `~/.codex/config.toml`.
+- Keep top-level defaults on the current CO target by setting `model = "gpt-5.4"` in `~/.codex/config.toml`.
+- Keep delegated subagent and review surfaces on `gpt-5.4` as well when using ChatGPT auth; `gpt-5.4-codex` is currently unsupported there.
 - Set `model_reasoning_effort` to at least `high` (CO default: `xhigh`) so spawned agents inherit high reasoning unless role overrides change it.
-- Built-in `explorer` inherits top-level model defaults unless you attach a `config_file`.
+- Built-in `explorer` inherits top-level model defaults unless you attach a `config_file`; keep `explorer_fast` as the only explicit `gpt-5.3-codex-spark` exception.
 - Spark caveat: `gpt-5.3-codex-spark` is text-only.
 - Keep RLM/collab built-ins-first by default; add custom specialist roles only when there is measured value, clear ownership, and validation evidence.
-- Use `[agents] max_threads = 12` with `max_depth = 4` and `max_spawn_depth = 4` as the default multi-agent baseline.
+- Use `[agents] max_threads = 12` as the seeded baseline. Keep explicit `max_depth = 4` / `max_spawn_depth = 4` only when your local Codex parser accepts them; preserve any intentional constrained caps instead of resetting them.
 - Keep fallback usage explicit and rare: `8/2/2` for constrained/high-risk lanes, `6/1/1` only as break-glass.
-- Add an explicit `worker_complex` role (`gpt-5.3-codex`, `xhigh`) for high-risk implementation streams.
+- Add an explicit `worker_complex` role (`gpt-5.4`, `xhigh`) for high-risk implementation streams.
 - Use `codex-orchestrator doctor` as an advisory drift check for Codex defaults; remediate additively via `codex-orchestrator codex defaults --yes`.
 
 ## Completion discipline (patience-first)

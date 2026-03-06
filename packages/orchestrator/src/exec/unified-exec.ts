@@ -22,6 +22,8 @@ export interface ExecCommandExecutionResult {
   exitCode: number | null;
   signal: NodeJS.Signals | null;
   durationMs?: number;
+  timedOut?: boolean;
+  timeoutMs?: number;
 }
 
 export interface ExecCommandRequest<THandle extends ExecSessionHandle> {
@@ -32,6 +34,7 @@ export interface ExecCommandRequest<THandle extends ExecSessionHandle> {
   attempt: number;
   sandboxState: SandboxState;
   session: ExecSessionLease<THandle>;
+  timeoutMs?: number;
   onStdout(chunk: Buffer | string): void;
   onStderr(chunk: Buffer | string): void;
 }
@@ -66,6 +69,7 @@ export interface UnifiedExecRunOptions {
   sandbox?: ToolSandboxOptions;
   metadata?: Record<string, unknown>;
   eventCapture?: ExecEventCaptureOptions;
+  timeoutMs?: number;
 }
 
 export interface ExecEventCaptureOptions {
@@ -86,6 +90,8 @@ export interface ExecAttemptResult {
   status: ToolRunStatus;
   sandboxState: SandboxState;
   sessionId: string;
+  timedOut?: boolean;
+  timeoutMs?: number;
 }
 
 export interface UnifiedExecRunResult {
@@ -97,6 +103,8 @@ export interface UnifiedExecRunResult {
   durationMs: number;
   status: ToolRunStatus;
   sandboxState: SandboxState;
+  timedOut?: boolean;
+  timeoutMs?: number;
   record: ToolRunRecord;
   events: ExecEvent[];
   handle?: ExecHandleDescriptor;
@@ -132,6 +140,7 @@ export class UnifiedExecRunner<THandle extends ExecSessionHandle> {
   async run(options: UnifiedExecRunOptions): Promise<UnifiedExecRunResult> {
     const args = options.args;
     const resolvedArgs = args ?? [];
+    const timeoutMs = normalizeTimeoutMs(options.timeoutMs);
     const invocationId = options.invocationId ?? this.idGenerator();
     const correlationId = this.idGenerator();
     const issuedHandle = this.handleService ? this.handleService.issueHandle(correlationId) : undefined;
@@ -160,7 +169,8 @@ export class UnifiedExecRunner<THandle extends ExecSessionHandle> {
       sessionId: lease.id,
       correlationId,
       persisted: lease.persisted,
-      handleId
+      handleId,
+      timeoutMs
     };
 
     const toolInvocation = {
@@ -208,7 +218,9 @@ export class UnifiedExecRunner<THandle extends ExecSessionHandle> {
             durationMs: 0,
             status: 'failed',
             sandboxState,
-            sessionId: lease.id
+            sessionId: lease.id,
+            timedOut: false,
+            ...(timeoutMs !== null ? { timeoutMs } : {})
           };
 
           try {
@@ -220,6 +232,7 @@ export class UnifiedExecRunner<THandle extends ExecSessionHandle> {
               attempt,
               sandboxState,
               session: lease,
+              ...(timeoutMs !== null ? { timeoutMs } : {}),
               onStdout: (chunk) => {
                 const sequenced = this.recordChunk(tracker, 'stdout', chunk);
                 chunkSequence = sequenced.sequence;
@@ -243,7 +256,11 @@ export class UnifiedExecRunner<THandle extends ExecSessionHandle> {
             });
             attemptSummary.exitCode = outcome.exitCode ?? null;
             attemptSummary.signal = outcome.signal ?? null;
-            attemptSummary.status = outcome.exitCode === 0 ? 'succeeded' : 'failed';
+            attemptSummary.timedOut = outcome.timedOut === true;
+            if (typeof outcome.timeoutMs === 'number' && Number.isFinite(outcome.timeoutMs) && outcome.timeoutMs > 0) {
+              attemptSummary.timeoutMs = Math.trunc(outcome.timeoutMs);
+            }
+            attemptSummary.status = outcome.exitCode === 0 && !attemptSummary.timedOut ? 'succeeded' : 'failed';
             attemptSummary.durationMs = outcome.durationMs ?? 0;
           } catch (error: unknown) {
             capturedError = error;
@@ -290,6 +307,8 @@ export class UnifiedExecRunner<THandle extends ExecSessionHandle> {
         durationMs: attemptResult.durationMs,
         status: attemptResult.status,
         sandboxState: attemptResult.sandboxState,
+        ...(attemptResult.timedOut ? { timedOut: true } : {}),
+        ...(attemptResult.timeoutMs !== undefined ? { timeoutMs: attemptResult.timeoutMs } : {}),
         record: invocationRecord,
         events,
         handle: undefined
@@ -490,7 +509,9 @@ export class UnifiedExecRunner<THandle extends ExecSessionHandle> {
         correlationId,
         handleId,
         exitCode: attemptResult?.exitCode ?? null,
-        signal: attemptResult?.signal ?? null
+        signal: attemptResult?.signal ?? null,
+        timedOut: attemptResult?.timedOut ?? null,
+        timeoutMs: attemptResult?.timeoutMs ?? null
       }
     };
     record.metadata = execMetadata;
@@ -607,13 +628,44 @@ const defaultExecutor: ExecCommandExecutor<ExecSessionHandle> = async (request) 
   child.stdout.on('data', request.onStdout);
   child.stderr.on('data', request.onStderr);
 
+  const timeoutMs = normalizeTimeoutMs(request.timeoutMs);
+  const startedAt = Date.now();
+
   return await new Promise<ExecCommandExecutionResult>((resolve, reject) => {
-    const handleExit = (exitCode: number | null, signal: NodeJS.Signals | null) => {
+    let settled = false;
+    let timedOut = false;
+    let timeoutHandle: NodeJS.Timeout | null = null;
+    let forceKillHandle: NodeJS.Timeout | null = null;
+    let forcedSettleHandle: NodeJS.Timeout | null = null;
+
+    const resolveResult = (exitCode: number | null, signal: NodeJS.Signals | null) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
       cleanup();
-      resolve({ exitCode, signal });
+      const result: ExecCommandExecutionResult = {
+        exitCode,
+        signal,
+        durationMs: Math.max(0, Date.now() - startedAt)
+      };
+      if (timedOut) {
+        result.timedOut = true;
+        if (timeoutMs !== null) {
+          result.timeoutMs = timeoutMs;
+        }
+      }
+      resolve(result);
+    };
+
+    const handleExit = (exitCode: number | null, signal: NodeJS.Signals | null) => {
+      resolveResult(exitCode, signal);
     };
 
     const handleError = (error: Error) => {
+      if (timedOut) {
+        return;
+      }
       cleanup();
       reject(error);
     };
@@ -621,12 +673,64 @@ const defaultExecutor: ExecCommandExecutor<ExecSessionHandle> = async (request) 
     const cleanup = () => {
       child.off('exit', handleExit);
       child.off('error', handleError);
+      if (timeoutHandle) {
+        clearTimeout(timeoutHandle);
+        timeoutHandle = null;
+      }
+      if (forceKillHandle) {
+        clearTimeout(forceKillHandle);
+        forceKillHandle = null;
+      }
+      if (forcedSettleHandle) {
+        clearTimeout(forcedSettleHandle);
+        forcedSettleHandle = null;
+      }
     };
+
+    if (timeoutMs !== null) {
+      timeoutHandle = setTimeout(() => {
+        timedOut = true;
+        if (!child.killed) {
+          try {
+            child.kill('SIGTERM');
+          } catch {
+            // ignore kill errors and continue to forced settlement fallback
+          }
+        }
+        forceKillHandle = setTimeout(() => {
+          if (settled) {
+            return;
+          }
+          try {
+            child.kill('SIGKILL');
+          } catch {
+            // ignore kill errors and allow forced settlement to conclude
+          }
+        }, 1000);
+        forceKillHandle.unref?.();
+        forcedSettleHandle = setTimeout(() => {
+          resolveResult(null, 'SIGKILL');
+        }, 1500);
+        forcedSettleHandle.unref?.();
+      }, timeoutMs);
+      timeoutHandle.unref?.();
+    }
 
     child.once('exit', handleExit);
     child.once('error', handleError);
   });
 };
+
+function normalizeTimeoutMs(value: number | undefined): number | null {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return null;
+  }
+  const normalized = Math.trunc(value);
+  if (normalized <= 0) {
+    return null;
+  }
+  return normalized;
+}
 
 export type {
   ExecEvent,

@@ -1,5 +1,39 @@
 type IdentifierKind = 'task' | 'run';
 const WINDOWS_FORBIDDEN_CHARACTERS = new Set(['<', '>', ':', '"', '|', '?', '*']);
+const WINDOWS_RESERVED_DEVICE_NAMES = new Set([
+  'CON',
+  'PRN',
+  'AUX',
+  'NUL',
+  'COM1',
+  'COM2',
+  'COM3',
+  'COM4',
+  'COM5',
+  'COM6',
+  'COM7',
+  'COM8',
+  'COM9',
+  'LPT1',
+  'LPT2',
+  'LPT3',
+  'LPT4',
+  'LPT5',
+  'LPT6',
+  'LPT7',
+  'LPT8',
+  'LPT9',
+  'CONIN$',
+  'CONOUT$'
+]);
+
+function isWindowsReservedDeviceName(value: string): boolean {
+  const baseName = value.split('.')[0]?.trimEnd();
+  if (!baseName) {
+    return false;
+  }
+  return WINDOWS_RESERVED_DEVICE_NAMES.has(baseName.toUpperCase());
+}
 
 export function sanitizeIdentifier(kind: IdentifierKind, value: string): string {
   const label = kind === 'task' ? 'task' : 'run';
@@ -28,6 +62,16 @@ export function sanitizeIdentifier(kind: IdentifierKind, value: string): string 
 
   if (value.includes('/') || value.includes('\\')) {
     throw new Error(`Invalid ${label} ID "${value}": slashes are not allowed.`);
+  }
+
+  if (value.endsWith('.') || value.endsWith(' ')) {
+    throw new Error(`Invalid ${label} ID "${value}": trailing dots or spaces are not allowed.`);
+  }
+
+  if (isWindowsReservedDeviceName(value)) {
+    throw new Error(
+      `Invalid ${label} ID "${value}": Windows reserved device names are not allowed.`
+    );
   }
 
   return value;

@@ -9,7 +9,8 @@ export type DocsCheckRule =
   | 'npm-script-missing'
   | 'pipeline-id-missing'
   | 'backticked-path-missing'
-  | 'tasks-file-too-large';
+  | 'tasks-file-too-large'
+  | 'tasks-index-non-canonical';
 
 export interface DocsCheckError {
   file: string;
@@ -31,6 +32,7 @@ interface OrchestratorConfig {
 
 interface TasksIndex {
   items?: Array<{ id?: string; slug?: string; path?: string }>;
+  specs?: unknown[];
 }
 
 interface CliOptions {
@@ -38,18 +40,25 @@ interface CliOptions {
   task?: string;
 }
 
+const CANONICAL_TASKS_INDEX_KEYS = new Set(['items', 'specs']);
+
 export async function runDocsCheck(repoRoot: string): Promise<DocsCheckError[]> {
-  const [docFiles, npmScripts, pipelineIds, repoRootEntries, tasksSizeError] = await Promise.all([
-    collectDocFiles(repoRoot),
-    loadNpmScripts(repoRoot),
-    loadOrchestratorPipelines(repoRoot),
-    loadRepoRootEntries(repoRoot),
-    checkTasksFileSize(repoRoot)
-  ]);
+  const [docFiles, npmScripts, pipelineIds, repoRootEntries, tasksSizeError, tasksIndexShapeError] =
+    await Promise.all([
+      collectDocFiles(repoRoot),
+      loadNpmScripts(repoRoot),
+      loadOrchestratorPipelines(repoRoot),
+      loadRepoRootEntries(repoRoot),
+      checkTasksFileSize(repoRoot),
+      checkTasksIndexCanonicalShape(repoRoot)
+    ]);
 
   const errors: DocsCheckError[] = [];
   if (tasksSizeError) {
     errors.push(tasksSizeError);
+  }
+  if (tasksIndexShapeError) {
+    errors.push(tasksIndexShapeError);
   }
 
   for (const file of docFiles) {
@@ -130,6 +139,26 @@ async function checkTasksFileSize(repoRoot: string): Promise<DocsCheckError | nu
     file: 'docs/TASKS.md',
     rule: 'tasks-file-too-large',
     reference: `lines=${lineCount} max=${maxLines}`
+  };
+}
+
+async function checkTasksIndexCanonicalShape(repoRoot: string): Promise<DocsCheckError | null> {
+  const indexPath = path.join(repoRoot, 'tasks', 'index.json');
+  if (!(await pathExists(indexPath))) {
+    return null;
+  }
+
+  const raw = await readFile(indexPath, 'utf8');
+  const parsed = JSON.parse(raw) as unknown;
+  const nonCanonicalKeys = getNonCanonicalTasksIndexKeys(parsed);
+  if (nonCanonicalKeys.length === 0) {
+    return null;
+  }
+
+  return {
+    file: 'tasks/index.json',
+    rule: 'tasks-index-non-canonical',
+    reference: renderNonCanonicalTasksIndexError(nonCanonicalKeys)
   };
 }
 
@@ -346,7 +375,25 @@ async function loadOrchestratorPipelines(repoRoot: string): Promise<Set<string>>
 async function loadTasksIndex(repoRoot: string): Promise<TasksIndex> {
   const indexPath = path.join(repoRoot, 'tasks', 'index.json');
   const raw = await readFile(indexPath, 'utf8');
-  return JSON.parse(raw) as TasksIndex;
+  const parsed = JSON.parse(raw) as unknown;
+  const nonCanonicalKeys = getNonCanonicalTasksIndexKeys(parsed);
+  if (nonCanonicalKeys.length > 0) {
+    throw new Error(renderNonCanonicalTasksIndexError(nonCanonicalKeys));
+  }
+  return parsed as TasksIndex;
+}
+
+function getNonCanonicalTasksIndexKeys(value: unknown): string[] {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return ['<invalid-root>'];
+  }
+  const keys = Object.keys(value).sort();
+  return keys.filter((key) => !CANONICAL_TASKS_INDEX_KEYS.has(key));
+}
+
+function renderNonCanonicalTasksIndexError(keys: string[]): string {
+  const joined = keys.join(', ');
+  return `non-canonical top-level keys: ${joined} (allowed: items, specs)`;
 }
 
 function extractNpmRunScripts(markdown: string): string[] {

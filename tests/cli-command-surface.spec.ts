@@ -140,6 +140,7 @@ describe('codex-orchestrator command surface', () => {
   it('prints delegate-server help', async () => {
     const { stdout } = await runCli(['delegate-server', '--help']);
     expect(stdout).toContain('Usage: codex-orchestrator delegate-server');
+    expect(stdout).toContain('--mode <full|question_only|status_only>');
   }, TEST_TIMEOUT);
 
   it('prints pr help', async () => {

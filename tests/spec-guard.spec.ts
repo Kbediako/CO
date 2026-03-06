@@ -20,6 +20,7 @@ async function initRepository(): Promise<string> {
 
   await mkdir(join(dir, 'tasks/specs'), { recursive: true });
   await mkdir(join(dir, 'src'), { recursive: true });
+  await mkdir(join(dir, 'orchestrator/src'), { recursive: true });
 
   const today = new Date().toISOString().slice(0, 10);
   await writeFile(
@@ -27,6 +28,7 @@ async function initRepository(): Promise<string> {
     `last_review: ${today}\n\nInitial spec.\n`
   );
   await writeFile(join(dir, 'src/index.ts'), 'export const value = 1;\n');
+  await writeFile(join(dir, 'orchestrator/src/index.ts'), 'export const orchestratorValue = 1;\n');
 
   await execFileAsync('git', ['add', '.'], { cwd: dir });
   await execFileAsync('git', ['commit', '-m', 'initial commit'], { cwd: dir });
@@ -57,7 +59,7 @@ describe('spec-guard script', () => {
 
     expect(stdout).toContain('❌ Spec guard: issues detected');
     expect(stdout).toContain(
-      'code/migrations changed but no spec updated under tasks/specs or tasks/index.json'
+      'code/migrations changed but no spec updated under tasks/specs, docs/design/specs, or tasks/index.json'
     );
     expect(stdout).toContain('Dry run: exiting successfully despite failures.');
   });
@@ -76,6 +78,51 @@ describe('spec-guard script', () => {
       cwd: repo
     });
     await execFileAsync('git', ['commit', '-m', 'code and spec update'], { cwd: repo });
+
+    const { stdout } = await execFileAsync('node', [scriptPath], {
+      cwd: repo,
+      env: { ...process.env }
+    });
+
+    expect(stdout.trim()).toContain('✅ Spec guard: OK');
+  });
+
+  it('reports missing spec updates when orchestrator/src changes without spec touch (dry-run)', async () => {
+    const repo = await initRepository();
+
+    await writeFile(join(repo, 'orchestrator/src/index.ts'), 'export const orchestratorValue = 2;\n');
+    await execFileAsync('git', ['commit', '-am', 'update orchestrator code'], { cwd: repo });
+
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
+      cwd: repo,
+      env: { ...process.env }
+    });
+
+    expect(stdout).toContain('❌ Spec guard: issues detected');
+    expect(stdout).toContain(
+      'code/migrations changed but no spec updated under tasks/specs, docs/design/specs, or tasks/index.json'
+    );
+    expect(stdout).toContain('Dry run: exiting successfully despite failures.');
+  });
+
+  it('passes when orchestrator/src changes include a fresh spec update', async () => {
+    const repo = await initRepository();
+    const today = new Date().toISOString().slice(0, 10);
+
+    await writeFile(join(repo, 'orchestrator/src/index.ts'), 'export const orchestratorValue = 3;\n');
+    await writeFile(
+      join(repo, 'tasks/specs/0001-initial.md'),
+      `last_review: ${today}\n\nUpdated spec content for orchestrator change.\n`
+    );
+
+    await execFileAsync(
+      'git',
+      ['add', 'orchestrator/src/index.ts', 'tasks/specs/0001-initial.md'],
+      {
+        cwd: repo
+      }
+    );
+    await execFileAsync('git', ['commit', '-m', 'orchestrator and spec update'], { cwd: repo });
 
     const { stdout } = await execFileAsync('node', [scriptPath], {
       cwd: repo,
