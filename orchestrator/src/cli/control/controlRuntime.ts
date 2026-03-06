@@ -5,11 +5,6 @@ import {
   buildTrackedLinearPayload,
   type ControlSelectedRunRuntimeSnapshot,
 } from './observabilityReadModel.js';
-import {
-  createObservabilitySurface,
-  type CompatibilityDispatchResult,
-  type CompatibilityRefreshResult
-} from './observabilitySurface.js';
 import { createLiveLinearAdvisoryRuntime } from './liveLinearAdvisoryRuntime.js';
 import {
   createObservabilityUpdateNotifier,
@@ -19,6 +14,7 @@ import {
 } from './observabilityUpdateNotifier.js';
 import type { QuestionRecord } from './questions.js';
 import { createSelectedRunProjectionReader } from './selectedRunProjection.js';
+import type { DispatchPilotEvaluation } from './trackerDispatchPilot.js';
 
 interface ControlRuntimeContext {
   controlStore: {
@@ -36,13 +32,15 @@ interface ControlRuntimeContext {
 
 export interface ControlRuntimeSnapshot {
   readSelectedRunSnapshot(): Promise<ControlSelectedRunRuntimeSnapshot>;
-  readCompatibilityDispatch(): Promise<CompatibilityDispatchResult>;
-  readCompatibilityRefresh(body?: Record<string, unknown>): CompatibilityRefreshResult;
+  readDispatchEvaluation(): Promise<{
+    issueIdentifier: string | null;
+    evaluation: DispatchPilotEvaluation;
+  }>;
 }
 
 export interface ControlRuntime {
   snapshot(): ControlRuntimeSnapshot;
-  requestRefresh(body?: Record<string, unknown>): Promise<CompatibilityRefreshResult>;
+  requestRefresh(): Promise<void>;
   publish(input?: ObservabilityUpdate): void;
   subscribe(listener: ObservabilityUpdateListener): () => void;
 }
@@ -83,13 +81,8 @@ export function createControlRuntime(
       return ensureSnapshot();
     },
 
-    async requestRefresh(body: Record<string, unknown> = {}): Promise<CompatibilityRefreshResult> {
-      const result = ensureSnapshot().readCompatibilityRefresh(body);
-      if (result.kind === 'rejected') {
-        return result;
-      }
+    async requestRefresh(): Promise<void> {
       await refreshSnapshot();
-      return result;
     },
 
     publish(input) {
@@ -112,13 +105,11 @@ function createControlRuntimeSnapshot(
   liveLinearAdvisoryRuntime: ReturnType<typeof createLiveLinearAdvisoryRuntime>
 ): InternalControlRuntimeSnapshot {
   const projection = createSelectedRunProjectionReader(context);
-  const observability = createObservabilitySurface({
-    controlStore: context.controlStore,
-    paths: context.paths,
-    advisoryRuntime: liveLinearAdvisoryRuntime,
-    readSelectedRunSnapshot
-  });
   let selectedRunSnapshotPromise: Promise<ControlSelectedRunRuntimeSnapshot> | null = null;
+  let dispatchEvaluationPromise: Promise<{
+    issueIdentifier: string | null;
+    evaluation: DispatchPilotEvaluation;
+  }> | null = null;
 
   async function readSelectedRunSnapshot(): Promise<ControlSelectedRunRuntimeSnapshot> {
     selectedRunSnapshotPromise ??= (async () => {
@@ -135,10 +126,37 @@ function createControlRuntimeSnapshot(
     return selectedRunSnapshotPromise;
   }
 
+  async function readDispatchEvaluation(): Promise<{
+    issueIdentifier: string | null;
+    evaluation: DispatchPilotEvaluation;
+  }> {
+    if (dispatchEvaluationPromise) {
+      return dispatchEvaluationPromise;
+    }
+
+    const promise = (async () => {
+      const snapshot = await readSelectedRunSnapshot();
+      const issueIdentifier = snapshot.selected?.issueIdentifier ?? null;
+      return {
+        issueIdentifier,
+        evaluation: await liveLinearAdvisoryRuntime.readDispatchEvaluation(issueIdentifier)
+      };
+    })();
+
+    const wrappedPromise = promise.catch((error: unknown) => {
+      if (dispatchEvaluationPromise === wrappedPromise) {
+        dispatchEvaluationPromise = null;
+      }
+      throw error;
+    });
+    dispatchEvaluationPromise = wrappedPromise;
+
+    return dispatchEvaluationPromise;
+  }
+
   return {
     readSelectedRunSnapshot,
-    readCompatibilityDispatch: () => observability.readCompatibilityDispatch(),
-    readCompatibilityRefresh: (body = {}) => observability.readCompatibilityRefresh(body),
+    readDispatchEvaluation,
     async prime(): Promise<void> {
       await readSelectedRunSnapshot();
     }

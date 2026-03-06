@@ -1071,7 +1071,7 @@ describe('ControlServer', () => {
 
   it('fails closed with deterministic read-only action envelopes on compatibility refresh', async () => {
     const { root, env, paths } = await createRunRoot('task-0940');
-    await seedManifest(paths);
+    await seedManifest(paths, { summary: 'task is running' });
     const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
 
     const server = await ControlServer.start({
@@ -1088,9 +1088,19 @@ describe('ControlServer', () => {
         control_seq?: number;
         latest_action?: { action?: string | null } | null;
       };
+      const initialStateRes = await fetch(new URL('/api/v1/state', baseUrl), {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      expect(initialStateRes.status).toBe(200);
+      const initialStatePayload = (await initialStateRes.json()) as {
+        selected?: { summary?: string | null } | null;
+      };
+      expect(initialStatePayload.selected?.summary).toBe('task is running');
+
+      await seedManifest(paths, { summary: 'task needs review' });
 
       const cases: Array<{
-        body: Record<string, unknown>;
+        body: unknown;
         status: number;
         reason: string;
         requestedAction: string | null;
@@ -1112,6 +1122,20 @@ describe('ControlServer', () => {
         },
         {
           body: { action: 42 },
+          status: 400,
+          reason: 'malformed_action_request',
+          requestedAction: null,
+          requestedTool: null
+        },
+        {
+          body: ['refresh'],
+          status: 400,
+          reason: 'malformed_action_request',
+          requestedAction: null,
+          requestedTool: null
+        },
+        {
+          body: 'refresh',
           status: 400,
           reason: 'malformed_action_request',
           requestedAction: null,
@@ -1181,6 +1205,15 @@ describe('ControlServer', () => {
           requested_action: testCase.requestedAction,
           requested_tool: testCase.requestedTool
         });
+
+        const staleStateRes = await fetch(new URL('/api/v1/state', baseUrl), {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        expect(staleStateRes.status).toBe(200);
+        const staleStatePayload = (await staleStateRes.json()) as {
+          selected?: { summary?: string | null } | null;
+        };
+        expect(staleStatePayload.selected?.summary).toBe('task is running');
       }
 
       const afterRaw = await readFile(paths.controlPath, 'utf8');

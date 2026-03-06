@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 
 import { ControlStateStore } from '../src/cli/control/controlState.js';
 import { createControlRuntime } from '../src/cli/control/controlRuntime.js';
+import * as liveLinearAdvisoryRuntimeModule from '../src/cli/control/liveLinearAdvisoryRuntime.js';
 import type { QuestionRecord } from '../src/cli/control/questions.js';
 import { resolveRunPaths, type RunPaths } from '../src/cli/run/runPaths.js';
 
@@ -228,10 +229,9 @@ describe('ControlRuntime', () => {
       reason: 'manual pause'
     });
 
-    const result = await fixture.runtime.requestRefresh({ action: 'refresh' });
+    await fixture.runtime.requestRefresh();
     const refreshedSelectedRun = await fixture.runtime.snapshot().readSelectedRunSnapshot();
 
-    expect(result.kind).toBe('accepted');
     expect(refreshedSelectedRun.selected?.summary).toBe('refreshed summary');
     expect(refreshedSelectedRun.selected?.displayStatus).toBe('paused');
     expect(refreshedSelectedRun.selected?.statusReason).toBe('control_pause');
@@ -257,7 +257,7 @@ describe('ControlRuntime', () => {
     });
 
     const initialSnapshot = fixture.runtime.snapshot();
-    const initialDispatch = await initialSnapshot.readCompatibilityDispatch();
+    const initialDispatch = await initialSnapshot.readDispatchEvaluation();
 
     expect(initialDispatch.evaluation.summary.reason).not.toBe('dispatch_source_live_deferred');
 
@@ -266,43 +266,14 @@ describe('ControlRuntime', () => {
       updated_at: '2026-03-07T00:20:00.000Z'
     });
 
-    const result = await fixture.runtime.requestRefresh({ action: 'refresh' });
+    await fixture.runtime.requestRefresh();
     const refreshedSnapshot = fixture.runtime.snapshot();
     const refreshedSelectedRun = await refreshedSnapshot.readSelectedRunSnapshot();
+    const refreshedDispatch = await refreshedSnapshot.readDispatchEvaluation();
 
-    expect(result.kind).toBe('accepted');
     expect(refreshedSelectedRun.selected?.summary).toBe('refreshed summary');
     expect(refreshedSelectedRun.dispatchPilot?.reason).toBe('dispatch_source_live_deferred');
-  });
-
-  it('keeps the cached runtime unchanged when requestRefresh rejects the envelope', async () => {
-    const fixture = await createFixture();
-    const initialSnapshot = fixture.runtime.snapshot();
-
-    const initialSelectedRun = await initialSnapshot.readSelectedRunSnapshot();
-    await seedManifest(fixture.paths, {
-      summary: 'should stay hidden',
-      updated_at: '2026-03-07T00:25:00.000Z'
-    });
-    fixture.controlStore.setLatestAction({
-      action: 'pause',
-      requestedBy: 'ui',
-      reason: 'manual pause'
-    });
-
-    const result = await fixture.runtime.requestRefresh({ action: 'pause' });
-    const repeatedSnapshot = fixture.runtime.snapshot();
-    const repeatedSelectedRun = await repeatedSnapshot.readSelectedRunSnapshot();
-
-    expect(result).toMatchObject({
-      kind: 'rejected',
-      reason: 'forbidden_mutating_action',
-      requestAction: 'pause'
-    });
-    expect(repeatedSnapshot).toBe(initialSnapshot);
-    expect(initialSelectedRun.selected?.summary).toBe('initial summary');
-    expect(repeatedSelectedRun.selected?.summary).toBe('initial summary');
-    expect(repeatedSelectedRun.selected?.displayStatus).toBe('in_progress');
+    expect(refreshedDispatch.evaluation.summary.reason).toBe('recommendation_available');
   });
 
   it('preserves the previous cached snapshot when accepted refresh warmup fails', async () => {
@@ -354,7 +325,7 @@ describe('ControlRuntime', () => {
       updated_at: '2026-03-07T00:30:00.000Z'
     });
 
-    await expect(runtime.requestRefresh({ action: 'refresh' })).rejects.toThrow(
+    await expect(runtime.requestRefresh()).rejects.toThrow(
       'snapshot warmup failed'
     );
 
@@ -390,24 +361,102 @@ describe('ControlRuntime', () => {
 
     const snapshot = fixture.runtime.snapshot();
     const [firstDispatch, secondDispatch] = await Promise.all([
-      snapshot.readCompatibilityDispatch(),
-      snapshot.readCompatibilityDispatch()
+      snapshot.readDispatchEvaluation(),
+      snapshot.readDispatchEvaluation()
     ]);
 
-    expect(firstDispatch.kind).toBe('ok');
-    expect(secondDispatch.kind).toBe('ok');
+    expect(firstDispatch.evaluation.failure ?? null).toBeNull();
+    expect(secondDispatch.evaluation.failure ?? null).toBeNull();
     expect(linearFetchCount).toBe(1);
 
     fixture.runtime.publish({ source: 'run.updated', eventSeq: 1 });
 
     const refreshedSnapshot = fixture.runtime.snapshot();
     const [thirdDispatch, fourthDispatch] = await Promise.all([
-      refreshedSnapshot.readCompatibilityDispatch(),
-      refreshedSnapshot.readCompatibilityDispatch()
+      refreshedSnapshot.readDispatchEvaluation(),
+      refreshedSnapshot.readDispatchEvaluation()
     ]);
 
-    expect(thirdDispatch.kind).toBe('ok');
-    expect(fourthDispatch.kind).toBe('ok');
+    expect(thirdDispatch.evaluation.failure ?? null).toBeNull();
+    expect(fourthDispatch.evaluation.failure ?? null).toBeNull();
     expect(linearFetchCount).toBe(2);
+  });
+
+  it('retries explicit dispatch reads after a transient live evaluation failure on the same snapshot', async () => {
+    let dispatchReadCount = 0;
+    vi.spyOn(liveLinearAdvisoryRuntimeModule, 'createLiveLinearAdvisoryRuntime').mockImplementation(
+      () =>
+        ({
+          readSnapshotSummary: () => ({
+            advisory_only: true,
+            configured: true,
+            enabled: true,
+            kill_switch: false,
+            status: 'ready',
+            source_status: 'ready',
+            reason: 'dispatch_source_live_deferred',
+            source_setup: {
+              provider: 'linear',
+              workspace_id: 'lin-workspace-1',
+              team_id: 'lin-team-live',
+              project_id: 'lin-project-1'
+            }
+          }),
+          readDispatchEvaluation: async () => {
+            dispatchReadCount += 1;
+            if (dispatchReadCount === 1) {
+              throw new Error('transient linear failure');
+            }
+            return {
+              summary: {
+                advisory_only: true,
+                configured: true,
+                enabled: true,
+                kill_switch: false,
+                status: 'ready',
+                source_status: 'ready',
+                reason: 'recommendation_available',
+                source_setup: {
+                  provider: 'linear',
+                  workspace_id: 'lin-workspace-1',
+                  team_id: 'lin-team-live',
+                  project_id: 'lin-project-1'
+                }
+              },
+              recommendation: {
+                issue_identifier: 'task-1024-retry',
+                dispatch_id: 'dispatch-advisory',
+                summary: 'route advisory to queue',
+                rationale: 'signal threshold met',
+                confidence: 0.7,
+                generated_at: null,
+                source_setup: {
+                  provider: 'linear',
+                  workspace_id: 'lin-workspace-1',
+                  team_id: 'lin-team-live',
+                  project_id: 'lin-project-1'
+                },
+                tracked_issue: null
+              },
+              failure: null
+            };
+          },
+          invalidate: () => {}
+        }) satisfies ReturnType<typeof liveLinearAdvisoryRuntimeModule.createLiveLinearAdvisoryRuntime>
+    );
+
+    const fixture = await createFixture({
+      taskId: 'task-1024-retry'
+    });
+
+    const snapshot = fixture.runtime.snapshot();
+
+    await expect(snapshot.readDispatchEvaluation()).rejects.toThrow('transient linear failure');
+
+    const recoveredDispatch = await snapshot.readDispatchEvaluation();
+
+    expect(recoveredDispatch.evaluation.failure ?? null).toBeNull();
+    expect(recoveredDispatch.evaluation.summary.reason).toBe('recommendation_available');
+    expect(dispatchReadCount).toBe(2);
   });
 });

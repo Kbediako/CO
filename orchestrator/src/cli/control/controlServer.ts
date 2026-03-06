@@ -40,7 +40,9 @@ import {
 import { createControlRuntime, type ControlRuntime } from './controlRuntime.js';
 import {
   buildCompatibilityTraceability,
+  readCompatibilityDispatch,
   readCompatibilityIssue,
+  readCompatibilityRefresh,
   readCompatibilityState,
   readUiDataset,
   type CompatibilityDispatchResult,
@@ -455,7 +457,10 @@ export class ControlServer {
 
       readDispatch: async (): Promise<ControlDispatchPayload> => {
         const context = buildInternalContext();
-        const result = await this.controlRuntime.snapshot().readCompatibilityDispatch();
+        const runtimeSnapshot = this.controlRuntime.snapshot();
+        const result = await readCompatibilityDispatch({
+          readDispatchEvaluation: () => runtimeSnapshot.readDispatchEvaluation()
+        });
         await emitDispatchPilotAuditEvents(context, {
           surface: 'telegram_dispatch',
           evaluation: result.evaluation,
@@ -632,7 +637,9 @@ async function handleRequest(context: RequestContext): Promise<void> {
       return;
     }
 
-    const result = await runtimeSnapshot.readCompatibilityDispatch();
+    const result = await readCompatibilityDispatch({
+      readDispatchEvaluation: () => runtimeSnapshot.readDispatchEvaluation()
+    });
     await emitDispatchPilotAuditEvents(context, {
       surface: 'api_v1_dispatch',
       evaluation: result.evaluation,
@@ -678,7 +685,14 @@ async function handleRequest(context: RequestContext): Promise<void> {
       writeCompatibilityMethodNotAllowed(res, context, 'POST');
       return;
     }
-    const result = await context.runtime.requestRefresh(await readJsonBody(req));
+    const result = await readCompatibilityRefresh(
+      {
+        controlStore: context.controlStore,
+        paths: context.paths,
+        requestRefresh: () => context.runtime.requestRefresh()
+      },
+      await readJsonBody(req)
+    );
     if (result.kind === 'rejected') {
       writeCompatibilityRefreshRejected(res, context, result);
       return;

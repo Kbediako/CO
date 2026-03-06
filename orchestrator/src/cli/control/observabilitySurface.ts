@@ -5,7 +5,6 @@ import { isoTimestamp } from '../utils/time.js';
 import type { RunPaths } from '../run/runPaths.js';
 import type { CliManifest } from '../types.js';
 import type { ControlState } from './controlState.js';
-import type { LiveLinearAdvisoryRuntime } from './liveLinearAdvisoryRuntime.js';
 import type {
   ControlDispatchPilotPayload,
   ControlIssuePayload,
@@ -29,19 +28,27 @@ const COMPATIBILITY_MUTATING_ACTIONS = new Set(['pause', 'resume', 'cancel', 'fa
 
 type ObservabilityPayload = Record<string, unknown>;
 
-export interface ObservabilitySurfaceContext {
+interface ObservabilityTraceabilityContext {
   controlStore: {
     snapshot(): ControlState;
   };
   paths: Pick<RunPaths, 'manifestPath' | 'runDir' | 'logPath'>;
-  advisoryRuntime: LiveLinearAdvisoryRuntime;
+}
+
+export interface ObservabilityPresenterContext extends ObservabilityTraceabilityContext {
   readSelectedRunSnapshot(): Promise<ControlSelectedRunRuntimeSnapshot>;
 }
 
-export type ObservabilityPresenterContext = Pick<
-  ObservabilitySurfaceContext,
-  'controlStore' | 'paths' | 'readSelectedRunSnapshot'
->;
+export interface ObservabilityDispatchContext {
+  readDispatchEvaluation(): Promise<{
+    issueIdentifier: string | null;
+    evaluation: DispatchPilotEvaluation;
+  }>;
+}
+
+export interface ObservabilityRefreshContext extends ObservabilityTraceabilityContext {
+  requestRefresh(): Promise<void>;
+}
 
 export type CompatibilityRefreshRejectionReason =
   | 'malformed_action_request'
@@ -83,80 +90,77 @@ interface CompatibilityActionEnvelopeRejection {
   requestTool: string | null;
 }
 
-export function createObservabilitySurface(
-  context: ObservabilitySurfaceContext
-): {
-  readCompatibilityDispatch(): Promise<CompatibilityDispatchResult>;
-  readCompatibilityRefresh(body?: Record<string, unknown>): CompatibilityRefreshResult;
-} {
+export async function readCompatibilityDispatch(
+  context: ObservabilityDispatchContext
+): Promise<CompatibilityDispatchResult> {
+  const { issueIdentifier, evaluation } = await context.readDispatchEvaluation();
+
+  if (evaluation.failure) {
+    return {
+      kind: 'fail_closed',
+      issueIdentifier,
+      evaluation,
+      failure: evaluation.failure,
+      details: {
+        surface: 'api_v1',
+        mode: 'read_only',
+        advisory_only: true,
+        reason: evaluation.failure.reason,
+        dispatch_pilot: evaluation.summary
+      }
+    };
+  }
+
   return {
-    async readCompatibilityDispatch(): Promise<CompatibilityDispatchResult> {
-      const snapshot = await context.readSelectedRunSnapshot();
-      const issueIdentifier = snapshot.selected?.issueIdentifier ?? null;
-      const evaluation = await context.advisoryRuntime.readDispatchEvaluation(issueIdentifier);
+    kind: 'ok',
+    issueIdentifier,
+    evaluation,
+    payload: {
+      generated_at: isoTimestamp(),
+      mode: 'read_only',
+      advisory_only: true,
+      dispatch_pilot: evaluation.summary,
+      recommendation: evaluation.recommendation
+    }
+  };
+}
 
-      if (evaluation.failure) {
-        return {
-          kind: 'fail_closed',
-          issueIdentifier,
-          evaluation,
-          failure: evaluation.failure,
-          details: {
-            surface: 'api_v1',
-            mode: 'read_only',
-            advisory_only: true,
-            reason: evaluation.failure.reason,
-            dispatch_pilot: evaluation.summary
-          }
-        };
-      }
+export async function readCompatibilityRefresh(
+  context: ObservabilityRefreshContext,
+  body: unknown = {}
+): Promise<CompatibilityRefreshResult> {
+  const rejection = resolveCompatibilityActionEnvelopeRejection(body);
+  if (rejection) {
+    return {
+      kind: 'rejected',
+      reason: rejection.reason,
+      requestAction: rejection.requestAction,
+      requestTool: rejection.requestTool
+    };
+  }
 
-      return {
-        kind: 'ok',
-        issueIdentifier,
-        evaluation,
-        payload: {
-          generated_at: isoTimestamp(),
-          mode: 'read_only',
-          advisory_only: true,
-          dispatch_pilot: evaluation.summary,
-          recommendation: evaluation.recommendation
-        }
-      };
-    },
+  await context.requestRefresh();
 
-    readCompatibilityRefresh(body: Record<string, unknown> = {}): CompatibilityRefreshResult {
-      const rejection = resolveCompatibilityActionEnvelopeRejection(body);
-      if (rejection) {
-        return {
-          kind: 'rejected',
-          reason: rejection.reason,
-          requestAction: rejection.requestAction,
-          requestTool: rejection.requestTool
-        };
-      }
-
-      const requestedAction = readStringValue(body, 'action');
-      return {
-        kind: 'accepted',
-        payload: {
-          status: 'accepted',
-          mode: 'read_only',
-          action: READ_ONLY_COMPAT_ACTION,
-          requested_at: isoTimestamp(),
-          traceability: buildCompatibilityTraceability(context, {
-            decision: 'acknowledged',
-            reason: 'refresh_projection_acknowledged',
-            requestAction: requestedAction ? requestedAction.toLowerCase() : READ_ONLY_COMPAT_ACTION
-          })
-        }
-      };
+  const requestBody = isRecordLike(body) ? body : {};
+  const requestedAction = readStringValue(requestBody, 'action');
+  return {
+    kind: 'accepted',
+    payload: {
+      status: 'accepted',
+      mode: 'read_only',
+      action: READ_ONLY_COMPAT_ACTION,
+      requested_at: isoTimestamp(),
+      traceability: buildCompatibilityTraceability(context, {
+        decision: 'acknowledged',
+        reason: 'refresh_projection_acknowledged',
+        requestAction: requestedAction ? requestedAction.toLowerCase() : READ_ONLY_COMPAT_ACTION
+      })
     }
   };
 }
 
 export function buildCompatibilityTraceability(
-  context: Pick<ObservabilitySurfaceContext, 'controlStore' | 'paths'>,
+  context: ObservabilityTraceabilityContext,
   input: {
     decision: 'acknowledged' | 'rejected';
     reason: string;
@@ -360,8 +364,16 @@ export async function readUiDataset(
 }
 
 function resolveCompatibilityActionEnvelopeRejection(
-  body: Record<string, unknown>
+  body: unknown
 ): CompatibilityActionEnvelopeRejection | null {
+  if (!isRecordLike(body)) {
+    return {
+      reason: 'malformed_action_request',
+      requestAction: null,
+      requestTool: null
+    };
+  }
+
   const hasAction = Object.prototype.hasOwnProperty.call(body, 'action');
   const hasTool = Object.prototype.hasOwnProperty.call(body, 'tool');
   if (!hasAction && !hasTool) {
@@ -402,6 +414,10 @@ function resolveCompatibilityActionEnvelopeRejection(
     };
   }
   return null;
+}
+
+function isRecordLike(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 function classifyBucket(
   status: CliManifest['status'],
