@@ -43,7 +43,6 @@ import {
   type CompatibilityDispatchResult,
   type CompatibilityRefreshRejectionReason
 } from './observabilitySurface.js';
-import type { ControlIssuePayload, ControlStatePayload } from './observabilityReadModel.js';
 
 interface ControlServerOptions {
   paths: RunPaths;
@@ -449,12 +448,7 @@ export class ControlServer {
     });
 
     return {
-      readState: async (): Promise<ControlStatePayload> => this.controlRuntime.snapshot().readCompatibilityState(),
-
-      readIssue: async (issueIdentifier: string): Promise<ControlIssuePayload | null> => {
-        const result = await this.controlRuntime.snapshot().readCompatibilityIssue(issueIdentifier);
-        return result.kind === 'ok' ? result.payload : null;
-      },
+      readSelectedRun: async () => this.controlRuntime.snapshot().readSelectedRunReadModel(),
 
       readDispatch: async (): Promise<ControlDispatchPayload> => {
         const context = buildInternalContext();
@@ -473,10 +467,6 @@ export class ControlServer {
         const questions = context.questionQueue.list();
         queueQuestionResolutions(context, questions);
         return { questions };
-      },
-
-      resolveIssueIdentifier: async (): Promise<string | null> => {
-        return this.controlRuntime.snapshot().resolveIssueIdentifier();
       }
     };
   }

@@ -6,11 +6,10 @@ import { logger } from '../../logger.js';
 import { writeJsonAtomic } from '../utils/fs.js';
 import type {
   ControlDispatchPilotPayload,
-  ControlIssuePayload,
   ControlQuestionSummaryPayload,
-  ControlStatePayload,
+  ControlSelectedRunReadModel,
 } from './observabilityReadModel.js';
-import { buildStateProjectionFingerprintInput } from './observabilityReadModel.js';
+import { buildSelectedRunReadModelFingerprintInput } from './observabilityReadModel.js';
 
 const TELEGRAM_API_ROOT = 'https://api.telegram.org';
 const DEFAULT_POLL_INTERVAL_MS = 1_000;
@@ -130,11 +129,9 @@ export interface TelegramOversightBridge {
 }
 
 export interface TelegramOversightReadAdapter {
-  readState(): Promise<ControlStatePayload>;
-  readIssue(issueIdentifier: string): Promise<ControlIssuePayload | null>;
+  readSelectedRun(): Promise<ControlSelectedRunReadModel>;
   readDispatch(): Promise<ControlDispatchPayload>;
   readQuestions(): Promise<QuestionsPayload>;
-  resolveIssueIdentifier(): Promise<string | null>;
 }
 
 interface StartTelegramOversightBridgeOptions {
@@ -381,12 +378,11 @@ class TelegramOversightBridgeRuntime implements TelegramOversightBridge {
   }
 
   private async renderStatus(): Promise<string> {
-    const payload = await this.readAdapter.readState();
+    const payload = await this.readAdapter.readSelectedRun();
     const selected = payload.selected ?? null;
-    const running = payload.running?.[0] ?? null;
     const dispatch = payload.dispatch_pilot ?? null;
     const trackedLinear = selected?.tracked?.linear ?? payload.tracked?.linear ?? null;
-    if (!selected && !running) {
+    if (!selected) {
       return [
         'CO status',
         'No active running projection.',
@@ -400,14 +396,14 @@ class TelegramOversightBridgeRuntime implements TelegramOversightBridge {
         .join('\n');
     }
 
-    const issueIdentifier = selected?.issue_identifier ?? running?.issue_identifier ?? 'n/a';
-    const sessionId = selected?.run_id ?? running?.session_id ?? null;
-    const displayStatus = selected?.display_status ?? running?.display_state ?? running?.state ?? 'unknown';
-    const rawStatus = selected?.raw_status ?? running?.state ?? null;
-    const statusReason = selected?.status_reason ?? running?.status_reason ?? null;
+    const issueIdentifier = selected.issue_identifier ?? 'n/a';
+    const sessionId = selected.run_id ?? null;
+    const displayStatus = selected.display_status ?? 'unknown';
+    const rawStatus = selected.raw_status ?? null;
+    const statusReason = selected.status_reason ?? null;
     const latestEvent = selected?.latest_event ?? null;
     const questionSummary = selected?.question_summary ?? null;
-    const summary = latestEvent?.message ?? selected?.summary ?? running?.last_message ?? null;
+    const summary = latestEvent?.message ?? selected?.summary ?? null;
 
     return [
       'CO status',
@@ -415,7 +411,7 @@ class TelegramOversightBridgeRuntime implements TelegramOversightBridge {
       formatStateLine(displayStatus, rawStatus),
       statusReason ? `Reason: ${statusReason}` : null,
       sessionId ? `Session: ${sessionId}` : null,
-      latestEvent?.event ? `Last event: ${latestEvent.event}` : running?.last_event ? `Last event: ${running.last_event}` : null,
+      latestEvent?.event ? `Last event: ${latestEvent.event}` : null,
       summary ? `Summary: ${truncateLine(summary, 180)}` : null,
       formatQuestionSummary(questionSummary),
       trackedLinear?.identifier
@@ -429,32 +425,29 @@ class TelegramOversightBridgeRuntime implements TelegramOversightBridge {
   }
 
   private async renderIssue(): Promise<string> {
-    const issueIdentifier = await this.readAdapter.resolveIssueIdentifier();
-    if (!issueIdentifier) {
+    const payload = await this.readAdapter.readSelectedRun();
+    const selected = payload.selected ?? null;
+    if (!selected?.issue_identifier) {
       return 'No issue identifier is available for the current run.';
     }
-    const payload = await this.readAdapter.readIssue(issueIdentifier);
-    if (!payload) {
-      throw new Error('not_found');
-    }
-    const trackedLinear = payload.tracked?.linear ?? null;
-    const latestEvent = payload.latest_event ?? payload.recent_events?.[0] ?? null;
-    const displayStatus = payload.display_status ?? payload.status ?? 'unknown';
+    const trackedLinear = selected.tracked?.linear ?? payload.tracked?.linear ?? null;
+    const latestEvent = selected.latest_event ?? null;
+    const displayStatus = selected.display_status ?? 'unknown';
 
     return [
-      `Issue ${payload.issue_identifier ?? issueIdentifier}`,
-      formatStateLine(displayStatus, payload.raw_status ?? payload.status ?? null, 'Status'),
-      payload.status_reason ? `Reason: ${payload.status_reason}` : null,
+      `Issue ${selected.issue_identifier}`,
+      formatStateLine(displayStatus, selected.raw_status ?? null, 'Status'),
+      selected.status_reason ? `Reason: ${selected.status_reason}` : null,
       trackedLinear?.identifier ? `Linear: ${trackedLinear.identifier}${trackedLinear.title ? ` - ${truncateLine(trackedLinear.title, 120)}` : ''}` : null,
       trackedLinear?.state ? `Linear state: ${trackedLinear.state}` : null,
       trackedLinear?.url ? `Linear URL: ${trackedLinear.url}` : null,
       latestEvent?.event ? `Latest event: ${latestEvent.event}` : null,
       latestEvent?.message
         ? `Latest summary: ${truncateLine(latestEvent.message, 180)}`
-        : payload.summary
-          ? `Latest summary: ${truncateLine(payload.summary, 180)}`
+        : selected.summary
+          ? `Latest summary: ${truncateLine(selected.summary, 180)}`
           : null,
-      formatQuestionSummary(payload.question_summary),
+      formatQuestionSummary(selected.question_summary),
       formatDispatchSummary(payload.dispatch_pilot ?? null)
     ]
       .filter(Boolean)
@@ -587,7 +580,7 @@ class TelegramOversightBridgeRuntime implements TelegramOversightBridge {
     const nextEventSeq = normalizedEventSeq ?? this.state.push.last_event_seq;
     const now = Date.now();
     const nowIso = new Date(now).toISOString();
-    const payload = await this.readAdapter.readState();
+    const payload = await this.readAdapter.readSelectedRun();
     const projectionHash = buildProjectionHash(payload);
 
     if (!projectionHash || projectionHash === this.state.push.last_sent_projection_hash) {
@@ -843,8 +836,8 @@ function truncateLine(value: string, maxLength: number): string {
   return `${normalized.slice(0, Math.max(maxLength - 3, 1))}...`;
 }
 
-function buildProjectionHash(payload: ControlStatePayload): string | null {
-  const fingerprint = buildStateProjectionFingerprintInput(payload);
+function buildProjectionHash(payload: ControlSelectedRunReadModel): string | null {
+  const fingerprint = buildSelectedRunReadModelFingerprintInput(payload);
   if (!fingerprint) {
     return null;
   }

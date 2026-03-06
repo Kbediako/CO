@@ -1,7 +1,12 @@
 import type { RunPaths } from '../run/runPaths.js';
 import type { ControlState } from './controlState.js';
 import type { LiveLinearTrackedIssue } from './linearDispatchSource.js';
-import type { ControlStatePayload } from './observabilityReadModel.js';
+import {
+  buildSelectedRunReadModel,
+  buildTrackedLinearPayload,
+  type ControlSelectedRunReadModel,
+  type ControlStatePayload,
+} from './observabilityReadModel.js';
 import {
   createObservabilitySurface,
   type CompatibilityDispatchResult,
@@ -33,6 +38,7 @@ interface ControlRuntimeContext {
 }
 
 export interface ControlRuntimeSnapshot {
+  readSelectedRunReadModel(): Promise<ControlSelectedRunReadModel>;
   readUiDataset(): Promise<Record<string, unknown>>;
   readCompatibilityState(): Promise<ControlStatePayload>;
   readCompatibilityDispatch(): Promise<CompatibilityDispatchResult>;
@@ -57,7 +63,7 @@ export function createControlRuntime(
   notifier: ObservabilityUpdateNotifier = createObservabilityUpdateNotifier()
 ): ControlRuntime {
   let cachedSnapshot: InternalControlRuntimeSnapshot | null = null;
-  const liveLinearAdvisoryRuntime = createLiveLinearAdvisoryRuntime({
+  let liveLinearAdvisoryRuntime = createLiveLinearAdvisoryRuntime({
     controlStore: context.controlStore,
     env: context.env
   });
@@ -68,8 +74,13 @@ export function createControlRuntime(
   };
 
   const refreshSnapshot = async (): Promise<InternalControlRuntimeSnapshot> => {
-    const nextSnapshot = createControlRuntimeSnapshot(context, liveLinearAdvisoryRuntime);
+    const nextAdvisoryRuntime = createLiveLinearAdvisoryRuntime({
+      controlStore: context.controlStore,
+      env: context.env
+    });
+    const nextSnapshot = createControlRuntimeSnapshot(context, nextAdvisoryRuntime);
     await nextSnapshot.prime();
+    liveLinearAdvisoryRuntime = nextAdvisoryRuntime;
     cachedSnapshot = nextSnapshot;
     return nextSnapshot;
   };
@@ -85,13 +96,15 @@ export function createControlRuntime(
         return result;
       }
       await refreshSnapshot();
-      liveLinearAdvisoryRuntime.invalidate();
       return result;
     },
 
     publish(input) {
       cachedSnapshot = null;
-      liveLinearAdvisoryRuntime.invalidate();
+      liveLinearAdvisoryRuntime = createLiveLinearAdvisoryRuntime({
+        controlStore: context.controlStore,
+        env: context.env
+      });
       notifier.publish(input);
     },
 
@@ -113,19 +126,36 @@ function createControlRuntimeSnapshot(
     projection,
     advisoryRuntime: liveLinearAdvisoryRuntime
   });
+  let selectedRunReadModelPromise: Promise<ControlSelectedRunReadModel> | null = null;
+
+  const readSelectedRunReadModel = async (): Promise<ControlSelectedRunReadModel> => {
+    selectedRunReadModelPromise ??= (async () => {
+      const selected = await projection.buildSelectedRunContext();
+      const issueIdentifier = selected?.issueIdentifier ?? selected?.taskId ?? selected?.runId ?? null;
+      const dispatchPilotSummary = liveLinearAdvisoryRuntime.readSnapshotSummary(issueIdentifier);
+      const tracked = selected?.tracked ?? buildTrackedLinearPayload(context.linearAdvisoryState.tracked_issue);
+      return buildSelectedRunReadModel({
+        selected,
+        dispatchPilot: dispatchPilotSummary.configured ? dispatchPilotSummary : null,
+        tracked
+      });
+    })();
+    return selectedRunReadModelPromise;
+  };
 
   return {
+    readSelectedRunReadModel,
     readUiDataset: () => observability.readUiDataset(),
     readCompatibilityState: () => observability.readCompatibilityState(),
     readCompatibilityDispatch: () => observability.readCompatibilityDispatch(),
     readCompatibilityRefresh: (body = {}) => observability.readCompatibilityRefresh(body),
     readCompatibilityIssue: (issueIdentifier) => observability.readCompatibilityIssue(issueIdentifier),
     async resolveIssueIdentifier(): Promise<string | null> {
-      const snapshot = await projection.readSelectedRunManifestSnapshot();
-      return snapshot?.issueIdentifier ?? snapshot?.taskId ?? snapshot?.runId ?? null;
+      const selectedRun = await readSelectedRunReadModel();
+      return selectedRun.selected?.issue_identifier ?? null;
     },
     async prime(): Promise<void> {
-      await projection.buildSelectedRunContext();
+      await readSelectedRunReadModel();
     }
   };
 }

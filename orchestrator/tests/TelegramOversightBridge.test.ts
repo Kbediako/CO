@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { ControlServer } from '../src/cli/control/controlServer.js';
-import type { ControlStatePayload } from '../src/cli/control/observabilityReadModel.js';
+import type { ControlSelectedRunReadModel } from '../src/cli/control/observabilityReadModel.js';
 import { startTelegramOversightBridge } from '../src/cli/control/telegramOversightBridge.js';
 import { computeEffectiveDelegationConfig } from '../src/cli/config/delegationConfig.js';
 import { resolveRunPaths } from '../src/cli/run/runPaths.js';
@@ -211,36 +211,8 @@ function jsonResponse(body: unknown, status = 200): Response {
 function buildTelegramStatePayload(input: {
   prompt: string;
   urgency: 'low' | 'medium' | 'high';
-}): ControlStatePayload {
+}): ControlSelectedRunReadModel {
   return {
-    generated_at: '2026-03-06T07:00:00.000Z',
-    counts: {
-      running: 1,
-      retrying: 0
-    },
-    running: [
-      {
-        issue_id: 'task-1025',
-        issue_identifier: 'task-1025',
-        state: 'in_progress',
-        display_state: 'awaiting_input',
-        status_reason: 'queued_questions',
-        session_id: 'run-1',
-        turn_count: 0,
-        last_event: null,
-        last_message: 'Awaiting operator input',
-        started_at: '2026-03-06T07:00:00.000Z',
-        last_event_at: '2026-03-06T07:01:00.000Z',
-        tokens: {
-          input_tokens: null,
-          output_tokens: null,
-          total_tokens: null
-        }
-      }
-    ],
-    retrying: [],
-    codex_totals: null,
-    rate_limits: null,
     selected: {
       issue_id: 'task-1025',
       issue_identifier: 'task-1025',
@@ -972,11 +944,9 @@ describe('TelegramOversightBridge', () => {
     const bridge = await startTelegramOversightBridge({
       runDir: paths.runDir,
       readAdapter: {
-        readState: async () => statePayload,
-        readIssue: async () => null,
+        readSelectedRun: async () => statePayload,
         readDispatch: async () => ({}),
         readQuestions: async () => ({ questions: [] }),
-        resolveIssueIdentifier: async () => statePayload.selected?.issue_identifier ?? null
       },
       baseUrl: 'http://127.0.0.1:1',
       controlToken: 'control-token',
@@ -1016,6 +986,98 @@ describe('TelegramOversightBridge', () => {
       expect(telegram.sentMessages[2]?.text).toContain(
         'latest q-1025 [medium]: Need operator approval before retry'
       );
+    } finally {
+      await bridge.close();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('renders no-selected status and issue fallbacks through the polling bridge', async () => {
+    const { root, paths } = await createRunRoot('task-1026-telegram-no-selected');
+    const telegram = createTelegramHarness(globalThis.fetch);
+    const statePayload: ControlSelectedRunReadModel = {
+      selected: null,
+      tracked: {
+        linear: {
+          id: 'lin-issue-1',
+          identifier: 'PREPROD-101',
+          title: 'Investigate advisory routing',
+          url: 'https://linear.app/asabeko/issue/PREPROD-101',
+          state: 'In Progress',
+          state_type: 'started',
+          workspace_id: 'lin-workspace-1',
+          team_id: 'lin-team-live',
+          team_key: 'PREPROD',
+          team_name: 'PRE-PRO/PRODUCTION',
+          project_id: 'lin-project-1',
+          project_name: 'Icon Agency (Bookings)',
+          updated_at: '2026-03-06T07:01:00.000Z',
+          recent_activity: []
+        }
+      },
+      dispatch_pilot: {
+        advisory_only: true,
+        configured: true,
+        enabled: true,
+        kill_switch: false,
+        status: 'ready',
+        source_status: 'ready',
+        reason: 'dispatch_source_live_deferred',
+        source_setup: {
+          provider: 'linear',
+          workspace_id: 'lin-workspace-1',
+          team_id: 'lin-team-live',
+          project_id: 'lin-project-1'
+        }
+      }
+    };
+
+    vi.stubEnv('CO_TELEGRAM_POLLING_ENABLED', '1');
+    vi.stubEnv('CO_TELEGRAM_BOT_TOKEN', 'test-token');
+    vi.stubEnv('CO_TELEGRAM_ALLOWED_CHAT_IDS', '1234');
+    vi.stubEnv('CO_TELEGRAM_POLL_INTERVAL_MS', '10');
+
+    const bridge = await startTelegramOversightBridge({
+      runDir: paths.runDir,
+      readAdapter: {
+        readSelectedRun: async () => statePayload,
+        readDispatch: async () => ({}),
+        readQuestions: async () => ({ questions: [] }),
+      },
+      baseUrl: 'http://127.0.0.1:1',
+      controlToken: 'control-token',
+      env: process.env,
+      fetchImpl: telegram.fetch
+    });
+
+    if (!bridge) {
+      throw new Error('expected telegram bridge');
+    }
+
+    try {
+      telegram.updates.push({
+        update_id: 1,
+        message: {
+          message_id: 1,
+          text: '/status',
+          chat: { id: 1234, type: 'private' },
+          from: { id: 77, is_bot: false, first_name: 'Operator' }
+        }
+      });
+      telegram.updates.push({
+        update_id: 2,
+        message: {
+          message_id: 2,
+          text: '/issue',
+          chat: { id: 1234, type: 'private' },
+          from: { id: 77, is_bot: false, first_name: 'Operator' }
+        }
+      });
+
+      await waitForCondition(async () => telegram.sentMessages.length === 2);
+      expect(telegram.sentMessages[0]?.text).toContain('No active running projection.');
+      expect(telegram.sentMessages[0]?.text).toContain('Linear: PREPROD-101');
+      expect(telegram.sentMessages[1]?.text).toContain('No issue identifier is available for the current run.');
     } finally {
       await bridge.close();
       await rm(root, { recursive: true, force: true });

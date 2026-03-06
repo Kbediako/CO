@@ -203,6 +203,7 @@ describe('ControlRuntime', () => {
     const initialSnapshot = fixture.runtime.snapshot();
 
     const initialState = await initialSnapshot.readCompatibilityState();
+    const initialSelectedRun = await initialSnapshot.readSelectedRunReadModel();
     await seedManifest(fixture.paths, {
       summary: 'updated summary',
       updated_at: '2026-03-07T00:10:00.000Z'
@@ -215,10 +216,13 @@ describe('ControlRuntime', () => {
 
     const repeatedSnapshot = fixture.runtime.snapshot();
     const repeatedState = await repeatedSnapshot.readCompatibilityState();
+    const repeatedSelectedRun = await repeatedSnapshot.readSelectedRunReadModel();
 
     expect(repeatedSnapshot).toBe(initialSnapshot);
     expect(readSelected(initialState).summary).toBe('initial summary');
     expect(readSelected(repeatedState).summary).toBe('initial summary');
+    expect(initialSelectedRun.selected?.summary).toBe('initial summary');
+    expect(repeatedSelectedRun.selected?.summary).toBe('initial summary');
     expect(readSelected(repeatedState).display_status).toBe('in_progress');
     expect(readRunning(repeatedState)[0]?.display_state).toBe('in_progress');
   });
@@ -242,9 +246,11 @@ describe('ControlRuntime', () => {
 
     const refreshedSnapshot = fixture.runtime.snapshot();
     const refreshedState = await refreshedSnapshot.readCompatibilityState();
+    const refreshedSelectedRun = await refreshedSnapshot.readSelectedRunReadModel();
 
     expect(refreshedSnapshot).not.toBe(initialSnapshot);
     expect(readSelected(refreshedState).summary).toBe('published summary');
+    expect(refreshedSelectedRun.selected?.summary).toBe('published summary');
     expect(readSelected(refreshedState).display_status).toBe('paused');
     expect(readSelected(refreshedState).status_reason).toBe('control_pause');
     expect(readRunning(refreshedState)[0]?.display_state).toBe('paused');
@@ -272,6 +278,46 @@ describe('ControlRuntime', () => {
     expect(readSelected(refreshedState).display_status).toBe('paused');
     expect(readSelected(refreshedState).status_reason).toBe('control_pause');
     expect(readRunning(refreshedState)[0]?.last_message).toBe('refreshed summary');
+  });
+
+  it('keeps selected-run dispatch summaries aligned after requestRefresh invalidates live advisory caches', async () => {
+    const fixture = await createFixture({
+      taskId: 'task-1024',
+      featureToggles: buildLiveLinearDispatchPilot(),
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      }
+    });
+    const realFetch = globalThis.fetch;
+
+    vi.stubGlobal('fetch', async (input, init) => {
+      const rawUrl = input instanceof Request ? input.url : String(input);
+      const url = new URL(rawUrl);
+      if (url.toString() === 'https://api.linear.app/graphql') {
+        return buildLiveLinearGraphqlResponse();
+      }
+      return realFetch(input, init);
+    });
+
+    const initialSnapshot = fixture.runtime.snapshot();
+    const initialDispatch = await initialSnapshot.readCompatibilityDispatch();
+
+    expect(initialDispatch.evaluation.summary.reason).not.toBe('dispatch_source_live_deferred');
+
+    await seedManifest(fixture.paths, {
+      summary: 'refreshed summary',
+      updated_at: '2026-03-07T00:20:00.000Z'
+    });
+
+    const result = await fixture.runtime.requestRefresh({ action: 'refresh' });
+    const refreshedSnapshot = fixture.runtime.snapshot();
+    const refreshedSelectedRun = await refreshedSnapshot.readSelectedRunReadModel();
+    const refreshedState = await refreshedSnapshot.readCompatibilityState();
+
+    expect(result.kind).toBe('accepted');
+    expect(refreshedSelectedRun.selected?.summary).toBe('refreshed summary');
+    expect(refreshedSelectedRun.dispatch_pilot).toEqual(refreshedState.dispatch_pilot);
+    expect(refreshedSelectedRun.dispatch_pilot?.reason).toBe('dispatch_source_live_deferred');
   });
 
   it('keeps the cached runtime unchanged when requestRefresh rejects the envelope', async () => {
@@ -491,6 +537,7 @@ describe('ControlRuntime', () => {
 
     const snapshot = fixture.runtime.snapshot();
     const statePayload = await snapshot.readCompatibilityState();
+    const selectedRunPayload = await snapshot.readSelectedRunReadModel();
     const issueResult = await snapshot.readCompatibilityIssue('task-1025');
     const uiPayload = (await snapshot.readUiDataset()) as {
       selected?: {
@@ -523,6 +570,7 @@ describe('ControlRuntime', () => {
 
     const stateSelected = statePayload.selected;
     const issuePayload = issueResult.payload;
+    const runtimeSelected = selectedRunPayload.selected;
     const uiSelected = uiPayload.selected;
     const uiTask = uiPayload.tasks?.[0];
     const uiRun = uiPayload.runs?.[0];
@@ -530,6 +578,9 @@ describe('ControlRuntime', () => {
     expect(stateSelected?.raw_status).toBe('in_progress');
     expect(stateSelected?.display_status).toBe('paused');
     expect(stateSelected?.status_reason).toBe('queued_questions');
+    expect(runtimeSelected).toEqual(stateSelected);
+    expect(selectedRunPayload.dispatch_pilot).toEqual(statePayload.dispatch_pilot);
+    expect(selectedRunPayload.tracked).toEqual(statePayload.tracked);
     expect(issuePayload.display_status).toBe(stateSelected?.display_status);
     expect(issuePayload.status_reason).toBe(stateSelected?.status_reason);
     expect(issuePayload.question_summary).toEqual(stateSelected?.question_summary);

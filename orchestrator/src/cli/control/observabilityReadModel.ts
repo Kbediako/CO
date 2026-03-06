@@ -141,6 +141,12 @@ export interface ControlStatePayload {
   tracked?: ControlTrackedPayload;
 }
 
+export interface ControlSelectedRunReadModel {
+  selected: ControlSelectedRunPayload | null;
+  dispatch_pilot?: ControlDispatchPilotPayload;
+  tracked?: ControlTrackedPayload;
+}
+
 export interface ControlIssuePayload {
   issue_identifier: string;
   issue_id: string | null;
@@ -299,15 +305,26 @@ export function buildUiSelectedRunSharedFields(selected: SelectedRunContext): Ui
   };
 }
 
-export function buildStateProjectionFingerprintInput(
-  payload: ControlStatePayload
+export function buildSelectedRunReadModel(input: {
+  selected: SelectedRunContext | null;
+  dispatchPilot: ControlDispatchPilotPayload | null;
+  tracked: ControlTrackedPayload | null;
+}): ControlSelectedRunReadModel {
+  return {
+    selected: input.selected ? buildSelectedRunPublicPayload(input.selected) : null,
+    ...(input.dispatchPilot ? { dispatch_pilot: input.dispatchPilot } : {}),
+    ...(input.tracked ? { tracked: input.tracked } : {})
+  };
+}
+
+export function buildSelectedRunReadModelFingerprintInput(
+  payload: ControlSelectedRunReadModel
 ): Record<string, unknown> | null {
   const selected = payload.selected ?? null;
-  const running = payload.running[0] ?? null;
   const dispatchPilot = payload.dispatch_pilot ?? null;
   const trackedLinear = selected?.tracked?.linear ?? payload.tracked?.linear ?? null;
   const questionSummary = selected?.question_summary ?? null;
-  if (!selected && !running && !trackedLinear && !dispatchPilot && !questionSummary) {
+  if (!selected && !trackedLinear && !dispatchPilot && !questionSummary) {
     return null;
   }
   return {
@@ -334,17 +351,6 @@ export function buildStateProjectionFingerprintInput(
                 latest_question_urgency: questionSummary.latest_question?.urgency ?? null
               }
             : null
-        }
-      : null,
-    running: running
-      ? {
-          issue_identifier: running.issue_identifier,
-          session_id: running.session_id,
-          state: running.state,
-          display_state: running.display_state,
-          status_reason: running.status_reason,
-          last_event: running.last_event,
-          last_message: running.last_message
         }
       : null,
     dispatch_pilot: dispatchPilot

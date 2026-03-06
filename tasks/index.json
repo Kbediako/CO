@@ -1936,6 +1936,22 @@
       "completed_at": "2026-03-06"
     },
     {
+      "id": "1026",
+      "slug": "1026-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure",
+      "title": "Coordinator Symphony-Aligned Control Runtime Canonical Read Model Exposure",
+      "path": "tasks/tasks-1026-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure.md",
+      "kind": "run",
+      "status": "in-progress",
+      "gate": {
+        "phase": "coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure-planning",
+        "status": "in-progress",
+        "log": null,
+        "run_id": null
+      },
+      "created_at": "2026-03-06",
+      "completed_at": null
+    },
+    {
       "id": "1025",
       "slug": "1025-coordinator-symphony-aligned-shared-observability-read-model-and-telegram-projection-dedupe",
       "title": "Coordinator Symphony-Aligned Shared Observability Read Model + Telegram Projection Dedupe",
@@ -3071,6 +3087,22 @@
         "task": "tasks/tasks-1001-coordinator-appserver-dynamic-tool-bridge-experimental-lane.md",
         "agent_task": ".agent/task/1001-coordinator-appserver-dynamic-tool-bridge-experimental-lane.md",
         "docs": "docs/TECH_SPEC-coordinator-appserver-dynamic-tool-bridge-experimental-lane.md"
+      }
+    },
+    {
+      "id": "20260306-1026-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure",
+      "title": "Coordinator Symphony-Aligned Control Runtime Canonical Read Model Exposure",
+      "relates_to": "tasks/tasks-1026-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-06",
+      "paths": {
+        "spec": "tasks/specs/1026-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure.md",
+        "task": "tasks/tasks-1026-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure.md",
+        "agent_task": ".agent/task/1026-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure.md"
       }
     },
     {
