@@ -1,0 +1,16 @@
+⚠️ Diff budget exceeded (override applied) (base=origin/main)
+ - changed files 342 > 25
+ - total lines changed 38355 > 800
+Top changed files:
+  - orchestrator/tests/ControlServer.test.ts: 5280
+  - orchestrator/src/cli/control/controlServer.ts: 2142
+  - orchestrator/tests/DelegationServer.test.ts: 2115
+  - tasks/index.json: 1972
+  - docs/docs-freshness-registry.json: 1940
+  - orchestrator/tests/TelegramOversightBridge.test.ts: 1206
+  - orchestrator/src/cli/control/telegramOversightBridge.ts: 901
+  - orchestrator/src/cli/delegationServer.ts: 816
+  - orchestrator/tests/ControlRuntime.test.ts: 671
+  - orchestrator/src/cli/control/linearDispatchSource.ts: 654
+
+Override accepted via DIFF_BUDGET_OVERRIDE_REASON: 1034 stacked-branch scope on long-running main; bounded slice validated with targeted and manual evidence.

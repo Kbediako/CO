@@ -89,6 +89,63 @@ async function seedManifest(
   );
 }
 
+async function seedControlState(
+  paths: Pick<RunPaths, 'controlPath'>,
+  overrides: Record<string, unknown> = {}
+): Promise<void> {
+  await writeFile(
+    paths.controlPath,
+    JSON.stringify({
+      run_id: 'run-1',
+      control_seq: 0,
+      ...overrides
+    }),
+    'utf8'
+  );
+}
+
+async function seedQuestions(
+  paths: Pick<RunPaths, 'questionsPath'>,
+  questions: QuestionRecord[]
+): Promise<void> {
+  await writeFile(paths.questionsPath, JSON.stringify({ questions }), 'utf8');
+}
+
+async function createSiblingRun(
+  root: string,
+  taskId: string,
+  runId: string,
+  options: {
+    manifest?: Record<string, unknown>;
+    control?: Record<string, unknown>;
+    questions?: QuestionRecord[];
+  } = {}
+): Promise<RunPaths> {
+  const env = {
+    repoRoot: root,
+    runsRoot: join(root, '.runs'),
+    outRoot: join(root, 'out'),
+    taskId
+  };
+  const paths = resolveRunPaths(env, runId);
+  await mkdir(paths.runDir, { recursive: true });
+  await seedManifest(paths, {
+    run_id: runId,
+    task_id: taskId,
+    ...options.manifest
+  });
+  if (options.control) {
+    await seedControlState(paths, {
+      run_id: runId,
+      ...options.control
+    });
+  }
+  if (options.questions) {
+    await seedQuestions(paths, options.questions);
+  }
+  return paths;
+}
+
 function buildLiveLinearDispatchPilot(): Record<string, unknown> {
   return {
     dispatch_pilot: {
@@ -255,6 +312,90 @@ describe('ControlRuntime', () => {
     expect(compatibilityProjection.selected?.status_reason).toBe('queued_questions');
     expect(compatibilityProjection.selected?.question_summary.queued_count).toBe(1);
     expect(compatibilityProjection.selected?.latest_action).toBe('pause');
+  });
+
+  it('discovers sibling running and retrying compatibility entries while keeping selected-run local', async () => {
+    const fixture = await createFixture({
+      taskId: 'task-1034-current'
+    });
+
+    await createSiblingRun(fixture.root, 'task-1034-running', 'run-2', {
+      manifest: {
+        status: 'in_progress',
+        summary: 'sibling run is paused for approval',
+        updated_at: '2026-03-07T00:16:00.000Z'
+      },
+      control: {
+        latest_action: {
+          action: 'pause',
+          requested_by: 'telegram',
+          requested_at: '2026-03-07T00:16:30.000Z',
+          reason: 'awaiting operator'
+        }
+      },
+      questions: [
+        {
+          question_id: 'q-0001',
+          parent_run_id: 'run-2',
+          from_run_id: 'child-run-2',
+          from_manifest_path: null,
+          prompt: 'Approve deployment?',
+          urgency: 'high',
+          status: 'queued',
+          queued_at: '2026-03-07T00:16:40.000Z',
+          expires_at: null,
+          expires_in_ms: null,
+          auto_pause: true,
+          expiry_fallback: null
+        }
+      ]
+    });
+
+    await createSiblingRun(fixture.root, 'task-1034-retrying', 'run-3', {
+      manifest: {
+        status: 'failed',
+        completed_at: null,
+        summary: 'retryable failure pending rerun',
+        updated_at: '2026-03-07T00:17:00.000Z'
+      }
+    });
+
+    const selectedSnapshot = await fixture.runtime.snapshot().readSelectedRunSnapshot();
+    const compatibilityProjection = await fixture.runtime.snapshot().readCompatibilityProjection();
+    const issueIdentifiers = compatibilityProjection.issues.map((issue) => issue.issueIdentifier);
+    const siblingRunning = compatibilityProjection.issues.find(
+      (issue) => issue.issueIdentifier === 'task-1034-running'
+    );
+    const siblingRetry = compatibilityProjection.issues.find(
+      (issue) => issue.issueIdentifier === 'task-1034-retrying'
+    );
+
+    expect(selectedSnapshot.selected?.issueIdentifier).toBe('task-1034-current');
+    expect(selectedSnapshot.selected?.questionSummary.queuedCount).toBe(0);
+    expect(compatibilityProjection.selected?.issue_identifier).toBe('task-1034-current');
+    expect(compatibilityProjection.running.map((entry) => entry.issue_identifier)).toEqual([
+      'task-1034-current',
+      'task-1034-running'
+    ]);
+    expect(compatibilityProjection.retrying.map((entry) => entry.issue_identifier)).toEqual([
+      'task-1034-retrying'
+    ]);
+    expect(issueIdentifiers).toEqual([
+      'task-1034-current',
+      'task-1034-running',
+      'task-1034-retrying'
+    ]);
+    expect(siblingRunning?.payload.display_status).toBe('paused');
+    expect(siblingRunning?.payload.status_reason).toBe('queued_questions');
+    expect(siblingRunning?.payload.question_summary.queued_count).toBe(1);
+    expect(siblingRunning?.payload.running).toMatchObject({
+      issue_identifier: 'task-1034-running',
+      display_state: 'paused'
+    });
+    expect(siblingRetry?.payload.retry).toMatchObject({
+      issue_identifier: 'task-1034-retrying',
+      state: 'failed'
+    });
   });
 
   it('invalidates the cached snapshot on publish', async () => {

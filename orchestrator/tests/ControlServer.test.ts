@@ -120,6 +120,36 @@ async function seedManifest(
   );
 }
 
+async function createSiblingRun(
+  root: string,
+  taskId: string,
+  runId: string,
+  options: {
+    manifest?: Record<string, unknown>;
+    control?: Record<string, unknown>;
+    questions?: Array<Record<string, unknown>>;
+  } = {}
+) {
+  const env = { repoRoot: root, runsRoot: join(root, '.runs'), outRoot: join(root, 'out'), taskId };
+  const paths = resolveRunPaths(env, runId);
+  await mkdir(paths.runDir, { recursive: true });
+  await seedManifest(paths, {
+    run_id: runId,
+    task_id: taskId,
+    ...options.manifest
+  });
+  if (options.control) {
+    await seedControlState(paths, {
+      run_id: runId,
+      ...options.control
+    });
+  }
+  if (options.questions) {
+    await seedQuestions(paths, options.questions);
+  }
+  return paths;
+}
+
 function signLinearWebhook(body: string, secret: string): string {
   return createHmac('sha256', secret).update(body).digest('hex');
 }
@@ -470,6 +500,171 @@ describe('ControlServer', () => {
       };
       expect(missingPayload.error?.code).toBe('issue_not_found');
       expect(missingPayload.error?.details?.issue_identifier).toBe('task-missing');
+    } finally {
+      await server.close();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('discovers sibling runtime collections for compatibility routes while leaving ui data on the selected run', async () => {
+    const { root, env, paths } = await createRunRoot('task-1034-current');
+    await seedManifest(paths, {
+      task_id: 'task-1034-current'
+    });
+    await createSiblingRun(root, 'task-1034-running', 'run-2', {
+      manifest: {
+        status: 'in_progress',
+        summary: 'sibling run is paused for approval',
+        updated_at: '2026-03-07T00:18:00.000Z'
+      },
+      control: {
+        latest_action: {
+          action: 'pause',
+          requested_by: 'telegram',
+          requested_at: '2026-03-07T00:18:10.000Z',
+          reason: 'awaiting operator'
+        }
+      },
+      questions: [
+        {
+          question_id: 'q-0001',
+          parent_run_id: 'run-2',
+          from_run_id: 'child-run-2',
+          from_manifest_path: null,
+          prompt: 'Approve deploy?',
+          urgency: 'high',
+          status: 'queued',
+          queued_at: '2026-03-07T00:18:20.000Z',
+          expires_at: null,
+          expires_in_ms: null,
+          auto_pause: true,
+          expiry_fallback: null
+        }
+      ]
+    });
+    await createSiblingRun(root, 'task-1034-retrying', 'run-3', {
+      manifest: {
+        status: 'failed',
+        completed_at: null,
+        summary: 'retryable failure pending rerun',
+        updated_at: '2026-03-07T00:19:00.000Z'
+      }
+    });
+    const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
+
+    const server = await ControlServer.start({
+      paths,
+      config,
+      runId: 'run-1'
+    });
+
+    try {
+      const baseUrl = server.getBaseUrl() ?? '';
+      const token = await readToken(paths.controlAuthPath);
+      const stateRes = await fetch(new URL('/api/v1/state', baseUrl), {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      expect(stateRes.status).toBe(200);
+      const statePayload = (await stateRes.json()) as {
+        counts?: { running?: number; retrying?: number };
+        running?: Array<{ issue_identifier?: string; display_state?: string }>;
+        retrying?: Array<{ issue_identifier?: string; state?: string }>;
+        selected?: { issue_identifier?: string } | null;
+      };
+      expect(statePayload.counts).toEqual({ running: 2, retrying: 1 });
+      expect(statePayload.selected?.issue_identifier).toBe('task-1034-current');
+      expect(statePayload.running?.map((entry) => entry.issue_identifier)).toEqual([
+        'task-1034-current',
+        'task-1034-running'
+      ]);
+      expect(statePayload.running?.[1]).toMatchObject({
+        issue_identifier: 'task-1034-running',
+        display_state: 'paused'
+      });
+      expect(statePayload.retrying?.map((entry) => entry.issue_identifier)).toEqual([
+        'task-1034-retrying'
+      ]);
+
+      const siblingIssueRes = await fetch(new URL('/api/v1/task-1034-running', baseUrl), {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      expect(siblingIssueRes.status).toBe(200);
+      const siblingIssuePayload = (await siblingIssueRes.json()) as {
+        issue_identifier?: string;
+        display_status?: string;
+        status_reason?: string | null;
+        question_summary?: { queued_count?: number };
+        running?: { session_id?: string; display_state?: string } | null;
+      };
+      expect(siblingIssuePayload).toMatchObject({
+        issue_identifier: 'task-1034-running',
+        display_status: 'paused',
+        status_reason: 'queued_questions',
+        question_summary: {
+          queued_count: 1
+        },
+        running: {
+          session_id: 'run-2',
+          display_state: 'paused'
+        }
+      });
+
+      const siblingRunAliasRes = await fetch(new URL('/api/v1/run-2', baseUrl), {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      expect(siblingRunAliasRes.status).toBe(200);
+      const siblingRunAliasPayload = (await siblingRunAliasRes.json()) as {
+        issue_identifier?: string;
+      };
+      expect(siblingRunAliasPayload.issue_identifier).toBe('task-1034-running');
+
+      const retryIssueRes = await fetch(new URL('/api/v1/task-1034-retrying', baseUrl), {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      expect(retryIssueRes.status).toBe(200);
+      const retryIssuePayload = (await retryIssueRes.json()) as {
+        issue_identifier?: string;
+        retry?: { session_id?: string; state?: string } | null;
+      };
+      expect(retryIssuePayload).toMatchObject({
+        issue_identifier: 'task-1034-retrying',
+        retry: {
+          session_id: 'run-3',
+          state: 'failed'
+        }
+      });
+
+      const uiRes = await fetch(new URL('/ui/data.json', baseUrl), {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      expect(uiRes.status).toBe(200);
+      const uiPayload = (await uiRes.json()) as {
+        selected?: { issue_identifier?: string } | null;
+        tasks?: Array<{ task_id?: string }>;
+        runs?: Array<{ run_id?: string; task_id?: string }>;
+      };
+      expect(uiPayload.selected?.issue_identifier).toBe('task-1034-current');
+      expect(uiPayload.tasks).toEqual([
+        expect.objectContaining({
+          task_id: 'task-1034-current'
+        })
+      ]);
+      expect(uiPayload.runs).toEqual([
+        expect.objectContaining({
+          run_id: 'run-1',
+          task_id: 'task-1034-current'
+        })
+      ]);
     } finally {
       await server.close();
       await rm(root, { recursive: true, force: true });

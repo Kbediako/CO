@@ -361,35 +361,67 @@ export function buildCompatibilityProjectionSnapshot(
 ): ControlCompatibilityProjectionSnapshot {
   const running = snapshot.running.map((entry) => buildCompatibilityRunningEntry(entry));
   const retrying = snapshot.retrying.map((entry) => buildCompatibilityRetryEntry(entry));
-  const selected = snapshot.selected;
-  if (!selected) {
-    return {
-      running,
-      retrying,
-      issues: [],
-      selected: null,
-      dispatchPilot: snapshot.dispatchPilot,
-      tracked: snapshot.tracked
-    };
-  }
+  const issuesByIdentifier = new Map<
+    string,
+    {
+      source: ControlCompatibilitySourceContext;
+      running: ControlRunningPayload | null;
+      retry: ControlRetryPayload | null;
+      dispatchPilotSummary: ControlDispatchPilotPayload | null;
+    }
+  >();
 
-  const selectedPayload = buildProjectionSelectedPayload(selected);
+  const registerIssue = (
+    source: ControlCompatibilitySourceContext | null,
+    input: {
+      running?: ControlRunningPayload | null;
+      retry?: ControlRetryPayload | null;
+      dispatchPilotSummary?: ControlDispatchPilotPayload | null;
+    } = {}
+  ): void => {
+    if (!source) {
+      return;
+    }
+
+    const existing =
+      issuesByIdentifier.get(source.issueIdentifier) ??
+      {
+        source,
+        running: null,
+        retry: null,
+        dispatchPilotSummary: null
+      };
+
+    existing.running ??= input.running ?? null;
+    existing.retry ??= input.retry ?? null;
+    existing.dispatchPilotSummary ??= input.dispatchPilotSummary ?? null;
+    issuesByIdentifier.set(source.issueIdentifier, existing);
+  };
+
+  registerIssue(snapshot.selected, { dispatchPilotSummary: snapshot.dispatchPilot });
+  snapshot.running.forEach((entry, index) => {
+    registerIssue(entry, { running: running[index] ?? null });
+  });
+  snapshot.retrying.forEach((entry, index) => {
+    registerIssue(entry, { retry: retrying[index] ?? null });
+  });
+
+  const selectedPayload = snapshot.selected ? buildProjectionSelectedPayload(snapshot.selected) : null;
+  const issues = Array.from(issuesByIdentifier.values()).map((issue) => ({
+    issueIdentifier: issue.source.issueIdentifier,
+    aliases: buildCompatibilityIssueAliases(issue.source),
+    payload: buildCompatibilityIssuePayload({
+      source: issue.source,
+      running: issue.running,
+      retry: issue.retry,
+      dispatchPilotSummary: issue.dispatchPilotSummary
+    })
+  }));
 
   return {
     running,
     retrying,
-    issues: [
-      {
-        issueIdentifier: selected.issueIdentifier,
-        aliases: buildCompatibilityIssueAliases(selected),
-        payload: buildCompatibilityIssuePayload({
-          selected,
-          running: running[0] ?? null,
-          retry: retrying[0] ?? null,
-          dispatchPilotSummary: snapshot.dispatchPilot
-        })
-      }
-    ],
+    issues,
     selected: selectedPayload,
     dispatchPilot: snapshot.dispatchPilot,
     tracked: snapshot.tracked
@@ -409,24 +441,24 @@ export function findCompatibilityProjectionIssueRecord(
 }
 
 export function buildCompatibilityIssuePayload(input: {
-  selected: ControlCompatibilitySourceContext;
+  source: ControlCompatibilitySourceContext;
   running: ControlRunningPayload | null;
   retry: ControlRetryPayload | null;
   dispatchPilotSummary: ControlDispatchPilotPayload | null;
 }): ControlIssuePayload {
-  const selectedPayload = buildProjectionSelectedPayload(input.selected);
-  const latestEvent = buildSelectedRunLatestEventPayload(input.selected.latestEvent);
+  const selectedPayload = buildProjectionSelectedPayload(input.source);
+  const latestEvent = buildSelectedRunLatestEventPayload(input.source.latestEvent);
   const recentEvents = latestEvent ? [latestEvent] : [];
 
   return {
-    issue_identifier: input.selected.issueIdentifier,
-    issue_id: input.selected.issueId,
-    status: input.selected.rawStatus,
-    raw_status: input.selected.rawStatus,
-    display_status: input.selected.displayStatus,
-    status_reason: input.selected.statusReason,
+    issue_identifier: input.source.issueIdentifier,
+    issue_id: input.source.issueId,
+    status: input.source.rawStatus,
+    raw_status: input.source.rawStatus,
+    display_status: input.source.displayStatus,
+    status_reason: input.source.statusReason,
     workspace: {
-      path: input.selected.workspacePath
+      path: input.source.workspacePath
     },
     attempts: {
       restart_count: 0,
@@ -437,12 +469,12 @@ export function buildCompatibilityIssuePayload(input: {
     logs: {
       codex_session_logs: []
     },
-    summary: input.selected.summary,
+    summary: input.source.summary,
     latest_event: latestEvent,
     question_summary: selectedPayload.question_summary,
     recent_events: recentEvents,
-    last_error: input.selected.lastError,
-    tracked: input.selected.tracked ?? {},
+    last_error: input.source.lastError,
+    tracked: input.source.tracked ?? {},
     ...(input.dispatchPilotSummary ? { dispatch_pilot: input.dispatchPilotSummary } : {})
   };
 }

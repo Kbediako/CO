@@ -1,5 +1,5 @@
-import { readFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
+import { readdir, readFile } from 'node:fs/promises';
+import { join, resolve } from 'node:path';
 
 import type { RunPaths } from '../run/runPaths.js';
 import type { CliManifest } from '../types.js';
@@ -41,6 +41,22 @@ export interface SelectedRunProjectionReader {
   buildCompatibilitySourceContext(
     snapshot?: SelectedRunManifestSnapshot | null
   ): Promise<ControlCompatibilitySourceContext | null>;
+}
+
+export interface CompatibilityCollectionDiscovery {
+  running: ControlCompatibilitySourceContext[];
+  retrying: ControlCompatibilitySourceContext[];
+}
+
+interface ProjectionContextParts {
+  control: ControlState;
+  questions: QuestionRecord[];
+  runDir: string;
+  trackedIssue: LiveLinearTrackedIssue | null;
+}
+
+interface LinearAdvisoryStateSnapshot {
+  tracked_issue?: LiveLinearTrackedIssue | null;
 }
 
 export function createSelectedRunProjectionReader(
@@ -88,43 +104,79 @@ export function createSelectedRunProjectionReader(
   };
 }
 
+export async function discoverCompatibilityCollectionContexts(
+  context: SelectedRunProjectionContext
+): Promise<CompatibilityCollectionDiscovery> {
+  const runsRoot = resolveRunsRootFromRunDir(context.paths.runDir);
+  const currentTaskId = resolveTaskIdFromManifestPath(context.paths.manifestPath);
+  if (!runsRoot || !currentTaskId) {
+    return { running: [], retrying: [] };
+  }
+
+  const running: ControlCompatibilitySourceContext[] = [];
+  const retrying: ControlCompatibilitySourceContext[] = [];
+  const taskEntries = await readDirectoryNames(runsRoot);
+
+  for (const taskEntry of taskEntries.sort((left, right) => left.localeCompare(right)).reverse()) {
+    if (taskEntry === currentTaskId || taskEntry === 'local-mcp') {
+      continue;
+    }
+
+    const discovered = await readLatestSiblingCompatibilityContext(join(runsRoot, taskEntry, 'cli'));
+    if (!discovered) {
+      continue;
+    }
+
+    if (discovered.rawStatus === 'in_progress') {
+      running.push(discovered);
+      continue;
+    }
+
+    if (discovered.rawStatus === 'failed' && !discovered.completedAt) {
+      retrying.push(discovered);
+    }
+  }
+
+  return { running, retrying };
+}
+
 async function buildSelectedRunContextFromSnapshot(
   context: SelectedRunProjectionContext,
   snapshot: SelectedRunManifestSnapshot | null
 ): Promise<SelectedRunContext | null> {
-  return buildProjectionContextFromSnapshot(context, snapshot);
+  return buildProjectionContextFromParts(snapshot, resolveCurrentProjectionContextParts(context));
 }
 
 async function buildCompatibilitySourceContextFromSnapshot(
   context: SelectedRunProjectionContext,
   snapshot: SelectedRunManifestSnapshot | null
 ): Promise<ControlCompatibilitySourceContext | null> {
-  return buildProjectionContextFromSnapshot(context, snapshot);
+  return buildProjectionContextFromParts(snapshot, resolveCurrentProjectionContextParts(context));
 }
 
-async function buildProjectionContextFromSnapshot(
-  context: SelectedRunProjectionContext,
-  snapshot: SelectedRunManifestSnapshot | null
-): Promise<SelectedRunContext | null> {
+function buildProjectionContextFromParts(
+  snapshot: SelectedRunManifestSnapshot | null,
+  parts: ProjectionContextParts
+): SelectedRunContext | null {
   if (!snapshot) {
     return null;
   }
   const { manifestRecord, issueIdentifier, issueId, taskId, runId } = snapshot;
-  const control = context.controlStore.snapshot();
+  const control = parts.control;
   const rawStatus = readStringValue(manifestRecord, 'status') ?? 'unknown';
   const startedAt = readStringValue(manifestRecord, 'started_at', 'startedAt') ?? null;
   const updatedAt = readStringValue(manifestRecord, 'updated_at', 'updatedAt') ?? null;
   const completedAt = readStringValue(manifestRecord, 'completed_at', 'completedAt') ?? null;
   const summary = readStringValue(manifestRecord, 'summary') ?? null;
-  const workspacePath = resolveRepoRootFromRunDir(context.paths.runDir) ?? context.paths.runDir;
-  const questionSummary = buildSelectedRunQuestionSummary(context.questionQueue.list());
+  const workspacePath = resolveRepoRootFromRunDir(parts.runDir) ?? parts.runDir;
+  const questionSummary = buildSelectedRunQuestionSummary(parts.questions);
   const latestAction = control.latest_action?.action ?? null;
   const { displayStatus, statusReason } = resolveSelectedRunDisplayStatus({
     rawStatus,
     latestAction,
     questionSummary
   });
-  const tracked = buildTrackedLinearPayload(context.linearAdvisoryState.tracked_issue);
+  const tracked = buildTrackedLinearPayload(parts.trackedIssue);
   const latestEvent = buildSelectedRunLatestEvent({
     controlAction: control.latest_action ?? null,
     updatedAt,
@@ -164,22 +216,12 @@ async function readSelectedRunManifestSnapshotInternal(
   if (!manifest) {
     return null;
   }
-  const manifestRecord = manifest as unknown as Record<string, unknown>;
   const control = context.controlStore.snapshot();
-  const taskId =
-    readStringValue(manifestRecord, 'task_id', 'taskId') ?? resolveTaskIdFromManifestPath(context.paths.manifestPath);
-  const runId = readStringValue(manifestRecord, 'run_id', 'runId') ?? control.run_id ?? null;
-  const issueIdentifier = taskId ?? runId;
-  if (!issueIdentifier) {
-    return null;
-  }
-  return {
-    manifestRecord,
-    issueIdentifier,
-    issueId: taskId ?? runId ?? null,
-    taskId,
-    runId
-  };
+  return buildSelectedRunManifestSnapshot(
+    manifest as unknown as Record<string, unknown>,
+    context.paths.manifestPath,
+    control.run_id ?? null
+  );
 }
 
 function buildSelectedRunQuestionSummary(records: QuestionRecord[]): SelectedRunQuestionSummary {
@@ -247,10 +289,113 @@ function resolveRepoRootFromRunDir(runDir: string): string | null {
   return candidate || null;
 }
 
+function resolveRunsRootFromRunDir(runDir: string): string | null {
+  const candidate = resolve(runDir, '..', '..', '..');
+  return candidate || null;
+}
+
 function resolveTaskIdFromManifestPath(manifestPath: string): string | null {
   const normalizedPath = manifestPath.replace(/\\/g, '/');
   const match = normalizedPath.match(/\.runs\/([^/]+)\/cli\//);
   return match?.[1] ?? null;
+}
+
+function resolveRunIdFromManifestPath(manifestPath: string): string | null {
+  const normalizedPath = manifestPath.replace(/\\/g, '/');
+  const match = normalizedPath.match(/\/cli\/([^/]+)\/manifest\.json$/);
+  return match?.[1] ?? null;
+}
+
+function resolveCurrentProjectionContextParts(
+  context: SelectedRunProjectionContext
+): ProjectionContextParts {
+  return {
+    control: context.controlStore.snapshot(),
+    questions: context.questionQueue.list(),
+    runDir: context.paths.runDir,
+    trackedIssue: context.linearAdvisoryState.tracked_issue
+  };
+}
+
+function buildSelectedRunManifestSnapshot(
+  manifestRecord: Record<string, unknown>,
+  manifestPath: string,
+  fallbackRunId: string | null
+): SelectedRunManifestSnapshot | null {
+  const taskId = readStringValue(manifestRecord, 'task_id', 'taskId') ?? resolveTaskIdFromManifestPath(manifestPath);
+  const runId =
+    readStringValue(manifestRecord, 'run_id', 'runId') ??
+    fallbackRunId ??
+    resolveRunIdFromManifestPath(manifestPath);
+  const issueIdentifier = taskId ?? runId;
+  if (!issueIdentifier) {
+    return null;
+  }
+  return {
+    manifestRecord,
+    issueIdentifier,
+    issueId: taskId ?? runId ?? null,
+    taskId,
+    runId
+  };
+}
+
+function normalizeControlState(snapshot: ControlState | null, runId: string | null): ControlState {
+  return {
+    run_id: snapshot?.run_id ?? runId ?? 'unknown-run',
+    control_seq: typeof snapshot?.control_seq === 'number' ? snapshot.control_seq : 0,
+    latest_action: snapshot?.latest_action ?? null,
+    feature_toggles: snapshot?.feature_toggles ?? null,
+    transport_mutation: snapshot?.transport_mutation ?? null
+  };
+}
+
+async function readLatestSiblingCompatibilityContext(
+  cliRoot: string
+): Promise<ControlCompatibilitySourceContext | null> {
+  const runEntries = await readDirectoryNames(cliRoot);
+  for (const runEntry of runEntries.sort((left, right) => left.localeCompare(right)).reverse()) {
+    const runDir = join(cliRoot, runEntry);
+    const manifestPath = join(runDir, 'manifest.json');
+    const manifest = await readJsonFile<CliManifest>(manifestPath);
+    if (!manifest) {
+      continue;
+    }
+
+    const snapshot = buildSelectedRunManifestSnapshot(
+      manifest as unknown as Record<string, unknown>,
+      manifestPath,
+      runEntry
+    );
+    if (!snapshot) {
+      continue;
+    }
+
+    const control = normalizeControlState(
+      await readJsonFile<ControlState>(join(runDir, 'control.json')),
+      snapshot.runId
+    );
+    const questionSnapshot = await readJsonFile<{ questions?: QuestionRecord[] }>(join(runDir, 'questions.json'));
+    const advisoryState = await readJsonFile<LinearAdvisoryStateSnapshot>(join(runDir, 'linear-advisory-state.json'));
+
+    return buildProjectionContextFromParts(snapshot, {
+      control,
+      questions: Array.isArray(questionSnapshot?.questions) ? questionSnapshot.questions : [],
+      runDir,
+      trackedIssue: advisoryState?.tracked_issue ?? null
+    });
+  }
+
+  return null;
+}
+
+async function readDirectoryNames(path: string): Promise<string[]> {
+  try {
+    const entries = await readdir(path, { withFileTypes: true });
+    return entries.filter((entry) => entry.isDirectory()).map((entry) => entry.name);
+  } catch {
+    return [];
+  }
 }
 
 async function readJsonFile<T>(path: string): Promise<T | null> {

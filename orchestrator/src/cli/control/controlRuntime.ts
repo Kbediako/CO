@@ -4,6 +4,7 @@ import type { LiveLinearTrackedIssue } from './linearDispatchSource.js';
 import {
   buildCompatibilityProjectionSnapshot,
   buildTrackedLinearPayload,
+  type ControlCompatibilitySourceContext,
   type ControlCompatibilityProjectionSnapshot,
   type ControlCompatibilityRuntimeSnapshot,
   type ControlSelectedRunRuntimeSnapshot,
@@ -16,7 +17,10 @@ import {
   type ObservabilityUpdateNotifier
 } from './observabilityUpdateNotifier.js';
 import type { QuestionRecord } from './questions.js';
-import { createSelectedRunProjectionReader } from './selectedRunProjection.js';
+import {
+  createSelectedRunProjectionReader,
+  discoverCompatibilityCollectionContexts
+} from './selectedRunProjection.js';
 import type { DispatchPilotEvaluation } from './trackerDispatchPilot.js';
 
 interface ControlRuntimeContext {
@@ -137,13 +141,22 @@ function createControlRuntimeSnapshot(
     compatibilityRuntimeSnapshotPromise ??= (async () => {
       const selectedManifest = await compatibilityProjectionSource.readSelectedRunManifestSnapshot();
       const selected = await compatibilityProjectionSource.buildCompatibilitySourceContext(selectedManifest);
+      const discoveredCollections = await discoverCompatibilityCollectionContexts(context);
       const issueIdentifier = selected?.issueIdentifier ?? selected?.taskId ?? selected?.runId ?? null;
       const dispatchPilotSummary = liveLinearAdvisoryRuntime.readSnapshotSummary(issueIdentifier);
       const tracked = selected?.tracked ?? buildTrackedLinearPayload(context.linearAdvisoryState.tracked_issue);
+      const running = dedupeCompatibilitySources([
+        ...(selected?.rawStatus === 'in_progress' ? [selected] : []),
+        ...discoveredCollections.running
+      ]);
+      const retrying = dedupeCompatibilitySources([
+        ...(selected?.rawStatus === 'failed' && !selected.completedAt ? [selected] : []),
+        ...discoveredCollections.retrying
+      ]);
       return {
         selected,
-        running: selected?.rawStatus === 'in_progress' ? [selected] : [],
-        retrying: [],
+        running,
+        retrying,
         dispatchPilot: dispatchPilotSummary.configured ? dispatchPilotSummary : null,
         tracked
       };
@@ -194,4 +207,17 @@ function createControlRuntimeSnapshot(
       await readSelectedRunSnapshot();
     }
   };
+}
+
+function dedupeCompatibilitySources(
+  sources: Array<ControlCompatibilitySourceContext | null>
+): ControlCompatibilitySourceContext[] {
+  const deduped = new Map<string, ControlCompatibilitySourceContext>();
+  for (const source of sources) {
+    if (!source || deduped.has(source.issueIdentifier)) {
+      continue;
+    }
+    deduped.set(source.issueIdentifier, source);
+  }
+  return Array.from(deduped.values());
 }
