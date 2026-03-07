@@ -4,7 +4,6 @@ import type { LiveLinearTrackedIssue } from './linearDispatchSource.js';
 import {
   buildCompatibilityProjectionSnapshot,
   buildTrackedLinearPayload,
-  type ControlCompatibilitySourceContext,
   type ControlCompatibilityProjectionSnapshot,
   type ControlCompatibilityRuntimeSnapshot,
   type ControlSelectedRunRuntimeSnapshot,
@@ -145,14 +144,14 @@ function createControlRuntimeSnapshot(
       const issueIdentifier = selected?.issueIdentifier ?? selected?.taskId ?? selected?.runId ?? null;
       const dispatchPilotSummary = liveLinearAdvisoryRuntime.readSnapshotSummary(issueIdentifier);
       const tracked = selected?.tracked ?? buildTrackedLinearPayload(context.linearAdvisoryState.tracked_issue);
-      const running = dedupeCompatibilitySources([
+      const running = [
         ...(selected?.rawStatus === 'in_progress' ? [selected] : []),
         ...discoveredCollections.running
-      ]);
-      const retrying = dedupeCompatibilitySources([
+      ];
+      const retrying = [
         ...(selected?.rawStatus === 'failed' && !selected.completedAt ? [selected] : []),
         ...discoveredCollections.retrying
-      ]);
+      ];
       return {
         selected,
         running,
@@ -207,17 +206,4 @@ function createControlRuntimeSnapshot(
       await readSelectedRunSnapshot();
     }
   };
-}
-
-function dedupeCompatibilitySources(
-  sources: Array<ControlCompatibilitySourceContext | null>
-): ControlCompatibilitySourceContext[] {
-  const deduped = new Map<string, ControlCompatibilitySourceContext>();
-  for (const source of sources) {
-    if (!source || deduped.has(source.issueIdentifier)) {
-      continue;
-    }
-    deduped.set(source.issueIdentifier, source);
-  }
-  return Array.from(deduped.values());
 }

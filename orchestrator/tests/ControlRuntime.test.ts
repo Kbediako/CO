@@ -398,6 +398,118 @@ describe('ControlRuntime', () => {
     });
   });
 
+  it('collapses same-issue multi-run compatibility state while preserving run aliases', async () => {
+    const fixture = await createFixture({
+      taskId: 'task-1035-current'
+    });
+
+    await seedManifest(fixture.paths, {
+      task_id: 'task-1035-current',
+      issue_identifier: 'ISSUE-1035',
+      summary: 'selected run remains current authority',
+      updated_at: '2026-03-07T00:15:00.000Z'
+    });
+
+    await createSiblingRun(fixture.root, 'task-1035-current', 'run-2', {
+      manifest: {
+        task_id: 'task-1035-current',
+        issue_identifier: 'ISSUE-1035',
+        status: 'failed',
+        completed_at: null,
+        summary: 'retryable failure pending rerun',
+        updated_at: '2026-03-07T00:17:00.000Z'
+      }
+    });
+
+    await createSiblingRun(fixture.root, 'task-1035-current', 'run-3', {
+      manifest: {
+        task_id: 'task-1035-current',
+        issue_identifier: 'ISSUE-1035',
+        status: 'in_progress',
+        summary: 'newer run is awaiting operator input',
+        updated_at: '2026-03-07T00:18:00.000Z'
+      },
+      control: {
+        latest_action: {
+          action: 'pause',
+          requested_by: 'telegram',
+          requested_at: '2026-03-07T00:18:10.000Z',
+          reason: 'awaiting operator'
+        }
+      },
+      questions: [
+        {
+          question_id: 'q-1035-1',
+          parent_run_id: 'run-3',
+          from_run_id: 'child-run-3',
+          from_manifest_path: null,
+          prompt: 'Approve deploy?',
+          urgency: 'high',
+          status: 'queued',
+          queued_at: '2026-03-07T00:18:20.000Z',
+          expires_at: null,
+          expires_in_ms: null,
+          auto_pause: true,
+          expiry_fallback: null
+        }
+      ]
+    });
+
+    const selectedSnapshot = await fixture.runtime.snapshot().readSelectedRunSnapshot();
+    const compatibilityProjection = await fixture.runtime.snapshot().readCompatibilityProjection();
+    const sameIssueRecord = compatibilityProjection.issues.find(
+      (issue) => issue.issueIdentifier === 'ISSUE-1035'
+    );
+
+    expect(selectedSnapshot.selected).toMatchObject({
+      issueIdentifier: 'ISSUE-1035',
+      taskId: 'task-1035-current',
+      runId: 'run-1',
+      summary: 'selected run remains current authority'
+    });
+    expect(selectedSnapshot.selected?.questionSummary.queuedCount).toBe(0);
+    expect(compatibilityProjection.selected).toMatchObject({
+      issue_identifier: 'ISSUE-1035',
+      run_id: 'run-1'
+    });
+    expect(compatibilityProjection.running).toEqual([
+      expect.objectContaining({
+        issue_identifier: 'ISSUE-1035',
+        session_id: 'run-3',
+        display_state: 'paused'
+      })
+    ]);
+    expect(compatibilityProjection.retrying).toEqual([
+      expect.objectContaining({
+        issue_identifier: 'ISSUE-1035',
+        session_id: 'run-2',
+        state: 'failed'
+      })
+    ]);
+    expect(compatibilityProjection.issues.map((issue) => issue.issueIdentifier)).toEqual(['ISSUE-1035']);
+    expect(sameIssueRecord?.aliases).toEqual(
+      expect.arrayContaining(['ISSUE-1035', 'task-1035-current', 'run-1', 'run-2', 'run-3'])
+    );
+    expect(sameIssueRecord?.payload).toMatchObject({
+      issue_identifier: 'ISSUE-1035',
+      display_status: 'paused',
+      status_reason: 'queued_questions',
+      question_summary: {
+        queued_count: 1
+      },
+      running: {
+        issue_identifier: 'ISSUE-1035',
+        session_id: 'run-3',
+        display_state: 'paused'
+      },
+      retry: {
+        issue_identifier: 'ISSUE-1035',
+        session_id: 'run-2',
+        state: 'failed'
+      }
+    });
+  });
+
   it('invalidates the cached snapshot on publish', async () => {
     const fixture = await createFixture();
     const initialSnapshot = fixture.runtime.snapshot();

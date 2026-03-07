@@ -671,6 +671,216 @@ describe('ControlServer', () => {
     }
   });
 
+  it('resolves same-issue multi-run compatibility lookups while leaving ui data on the selected run', async () => {
+    const { root, env, paths } = await createRunRoot('task-1035-current');
+    await seedManifest(paths, {
+      task_id: 'task-1035-current',
+      issue_identifier: 'ISSUE-1035',
+      summary: 'selected run remains current authority',
+      updated_at: '2026-03-07T00:15:00.000Z'
+    });
+    await createSiblingRun(root, 'task-1035-current', 'run-2', {
+      manifest: {
+        task_id: 'task-1035-current',
+        issue_identifier: 'ISSUE-1035',
+        status: 'failed',
+        completed_at: null,
+        summary: 'retryable failure pending rerun',
+        updated_at: '2026-03-07T00:17:00.000Z'
+      }
+    });
+    await createSiblingRun(root, 'task-1035-current', 'run-3', {
+      manifest: {
+        task_id: 'task-1035-current',
+        issue_identifier: 'ISSUE-1035',
+        status: 'in_progress',
+        summary: 'newer run is awaiting operator input',
+        updated_at: '2026-03-07T00:18:00.000Z'
+      },
+      control: {
+        latest_action: {
+          action: 'pause',
+          requested_by: 'telegram',
+          requested_at: '2026-03-07T00:18:10.000Z',
+          reason: 'awaiting operator'
+        }
+      },
+      questions: [
+        {
+          question_id: 'q-1035-1',
+          parent_run_id: 'run-3',
+          from_run_id: 'child-run-3',
+          from_manifest_path: null,
+          prompt: 'Approve deploy?',
+          urgency: 'high',
+          status: 'queued',
+          queued_at: '2026-03-07T00:18:20.000Z',
+          expires_at: null,
+          expires_in_ms: null,
+          auto_pause: true,
+          expiry_fallback: null
+        }
+      ]
+    });
+    const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
+
+    const server = await ControlServer.start({
+      paths,
+      config,
+      runId: 'run-1'
+    });
+
+    try {
+      const baseUrl = server.getBaseUrl() ?? '';
+      const token = await readToken(paths.controlAuthPath);
+      const stateRes = await fetch(new URL('/api/v1/state', baseUrl), {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      expect(stateRes.status).toBe(200);
+      const statePayload = (await stateRes.json()) as {
+        counts?: { running?: number; retrying?: number };
+        running?: Array<{ issue_identifier?: string; session_id?: string; display_state?: string }>;
+        retrying?: Array<{ issue_identifier?: string; session_id?: string; state?: string }>;
+        selected?: { issue_identifier?: string; run_id?: string } | null;
+      };
+      expect(statePayload.counts).toEqual({ running: 1, retrying: 1 });
+      expect(statePayload.selected).toMatchObject({
+        issue_identifier: 'ISSUE-1035',
+        run_id: 'run-1'
+      });
+      expect(statePayload.running).toEqual([
+        expect.objectContaining({
+          issue_identifier: 'ISSUE-1035',
+          session_id: 'run-3',
+          display_state: 'paused'
+        })
+      ]);
+      expect(statePayload.retrying).toEqual([
+        expect.objectContaining({
+          issue_identifier: 'ISSUE-1035',
+          session_id: 'run-2',
+          state: 'failed'
+        })
+      ]);
+
+      for (const identifier of ['ISSUE-1035', 'task-1035-current', 'run-2', 'run-3']) {
+        const issueRes = await fetch(new URL(`/api/v1/${identifier}`, baseUrl), {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        });
+        expect(issueRes.status).toBe(200);
+        const issuePayload = (await issueRes.json()) as {
+          issue_identifier?: string;
+          display_status?: string;
+          running?: { session_id?: string; display_state?: string } | null;
+          retry?: { session_id?: string; state?: string } | null;
+          question_summary?: { queued_count?: number };
+        };
+        expect(issuePayload).toMatchObject({
+          issue_identifier: 'ISSUE-1035',
+          display_status: 'paused',
+          question_summary: {
+            queued_count: 1
+          },
+          running: {
+            session_id: 'run-3',
+            display_state: 'paused'
+          },
+          retry: {
+            session_id: 'run-2',
+            state: 'failed'
+          }
+        });
+      }
+
+      const uiRes = await fetch(new URL('/ui/data.json', baseUrl), {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      expect(uiRes.status).toBe(200);
+      const uiPayload = (await uiRes.json()) as {
+        selected?: { issue_identifier?: string; run_id?: string } | null;
+        tasks?: Array<{ task_id?: string }>;
+        runs?: Array<{ run_id?: string; task_id?: string }>;
+      };
+      expect(uiPayload.selected).toMatchObject({
+        issue_identifier: 'ISSUE-1035',
+        run_id: 'run-1'
+      });
+      expect(uiPayload.tasks).toEqual([
+        expect.objectContaining({
+          task_id: 'task-1035-current'
+        })
+      ]);
+      expect(uiPayload.runs).toEqual([
+        expect.objectContaining({
+          run_id: 'run-1',
+          task_id: 'task-1035-current'
+        })
+      ]);
+    } finally {
+      await server.close();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('prefers canonical compatibility issue identifiers over alias matches', async () => {
+    const { root, env, paths } = await createRunRoot('task-1035-canonical');
+    await seedManifest(paths, {
+      task_id: 'task-1035-canonical',
+      issue_identifier: 'run-2',
+      summary: 'canonical issue identifier wins',
+      updated_at: '2026-03-07T00:15:00.000Z'
+    });
+    await createSiblingRun(root, 'task-1035-other', 'run-2', {
+      manifest: {
+        task_id: 'task-1035-other',
+        issue_identifier: 'ISSUE-OTHER',
+        status: 'failed',
+        completed_at: null,
+        summary: 'other issue contributes alias collision',
+        updated_at: '2026-03-07T00:17:00.000Z'
+      }
+    });
+    const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
+
+    const server = await ControlServer.start({
+      paths,
+      config,
+      runId: 'run-1'
+    });
+
+    try {
+      const baseUrl = server.getBaseUrl() ?? '';
+      const token = await readToken(paths.controlAuthPath);
+      const issueRes = await fetch(new URL('/api/v1/run-2', baseUrl), {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      expect(issueRes.status).toBe(200);
+      const issuePayload = (await issueRes.json()) as {
+        issue_identifier?: string;
+        running?: { session_id?: string } | null;
+        retry?: { session_id?: string } | null;
+      };
+      expect(issuePayload).toMatchObject({
+        issue_identifier: 'run-2',
+        running: {
+          session_id: 'run-1'
+        }
+      });
+      expect(issuePayload.retry).toBeNull();
+    } finally {
+      await server.close();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   it('rejects unsupported methods for ui data, Symphony-aligned compatibility routes, and the CO dispatch extension', async () => {
     const { root, env, paths } = await createRunRoot('task-0940');
     await seedManifest(paths);

@@ -52,6 +52,7 @@ interface SharedSelectedProjectionFields {
   issueId: string | null;
   taskId: string | null;
   runId: string | null;
+  lookupAliases: string[];
   rawStatus: string;
   displayStatus: string;
   statusReason: string | null;
@@ -359,23 +360,25 @@ export function buildCompatibilityRetryEntry(selected: ControlCompatibilitySourc
 export function buildCompatibilityProjectionSnapshot(
   snapshot: ControlCompatibilityRuntimeSnapshot
 ): ControlCompatibilityProjectionSnapshot {
-  const running = snapshot.running.map((entry) => buildCompatibilityRunningEntry(entry));
-  const retrying = snapshot.retrying.map((entry) => buildCompatibilityRetryEntry(entry));
   const issuesByIdentifier = new Map<
     string,
     {
-      source: ControlCompatibilitySourceContext;
-      running: ControlRunningPayload | null;
-      retry: ControlRetryPayload | null;
+      issueIdentifier: string;
+      selectedSource: ControlCompatibilitySourceContext | null;
+      runningSource: ControlCompatibilitySourceContext | null;
+      retrySource: ControlCompatibilitySourceContext | null;
+      aliases: Set<string>;
       dispatchPilotSummary: ControlDispatchPilotPayload | null;
     }
   >();
+  const issueOrder: string[] = [];
+  const runningOrder: string[] = [];
+  const retryOrder: string[] = [];
 
   const registerIssue = (
     source: ControlCompatibilitySourceContext | null,
     input: {
-      running?: ControlRunningPayload | null;
-      retry?: ControlRetryPayload | null;
+      kind?: 'selected' | 'running' | 'retry';
       dispatchPilotSummary?: ControlDispatchPilotPayload | null;
     } = {}
   ): void => {
@@ -386,37 +389,89 @@ export function buildCompatibilityProjectionSnapshot(
     const existing =
       issuesByIdentifier.get(source.issueIdentifier) ??
       {
-        source,
-        running: null,
-        retry: null,
+        issueIdentifier: source.issueIdentifier,
+        selectedSource: null,
+        runningSource: null,
+        retrySource: null,
+        aliases: new Set<string>(),
         dispatchPilotSummary: null
       };
+    if (!issuesByIdentifier.has(source.issueIdentifier)) {
+      issueOrder.push(source.issueIdentifier);
+    }
 
-    existing.running ??= input.running ?? null;
-    existing.retry ??= input.retry ?? null;
+    if (input.kind === 'selected') {
+      existing.selectedSource ??= source;
+    }
+    if (input.kind === 'running') {
+      const shouldAppend = !existing.runningSource;
+      existing.runningSource = pickPreferredCompatibilitySource(existing.runningSource, source);
+      if (shouldAppend) {
+        runningOrder.push(source.issueIdentifier);
+      }
+    }
+    if (input.kind === 'retry') {
+      const shouldAppend = !existing.retrySource;
+      existing.retrySource = pickPreferredCompatibilitySource(existing.retrySource, source);
+      if (shouldAppend) {
+        retryOrder.push(source.issueIdentifier);
+      }
+    }
     existing.dispatchPilotSummary ??= input.dispatchPilotSummary ?? null;
+    for (const alias of buildCompatibilityIssueAliases(source)) {
+      existing.aliases.add(alias);
+    }
     issuesByIdentifier.set(source.issueIdentifier, existing);
   };
 
-  registerIssue(snapshot.selected, { dispatchPilotSummary: snapshot.dispatchPilot });
-  snapshot.running.forEach((entry, index) => {
-    registerIssue(entry, { running: running[index] ?? null });
+  registerIssue(snapshot.selected, {
+    kind: 'selected',
+    dispatchPilotSummary: snapshot.dispatchPilot
   });
-  snapshot.retrying.forEach((entry, index) => {
-    registerIssue(entry, { retry: retrying[index] ?? null });
+  snapshot.running.forEach((entry) => {
+    registerIssue(entry, {
+      kind: 'running'
+    });
+  });
+  snapshot.retrying.forEach((entry) => {
+    registerIssue(entry, {
+      kind: 'retry'
+    });
   });
 
+  const running = runningOrder.flatMap((issueIdentifier) => {
+    const source = issuesByIdentifier.get(issueIdentifier)?.runningSource;
+    return source ? [buildCompatibilityRunningEntry(source)] : [];
+  });
+  const retrying = retryOrder.flatMap((issueIdentifier) => {
+    const source = issuesByIdentifier.get(issueIdentifier)?.retrySource;
+    return source ? [buildCompatibilityRetryEntry(source)] : [];
+  });
+  const runningByIssue = new Map(running.map((entry) => [entry.issue_identifier, entry] as const));
+  const retryingByIssue = new Map(retrying.map((entry) => [entry.issue_identifier, entry] as const));
   const selectedPayload = snapshot.selected ? buildProjectionSelectedPayload(snapshot.selected) : null;
-  const issues = Array.from(issuesByIdentifier.values()).map((issue) => ({
-    issueIdentifier: issue.source.issueIdentifier,
-    aliases: buildCompatibilityIssueAliases(issue.source),
-    payload: buildCompatibilityIssuePayload({
-      source: issue.source,
-      running: issue.running,
-      retry: issue.retry,
-      dispatchPilotSummary: issue.dispatchPilotSummary
+  const issues = issueOrder
+    .map((issueIdentifier) => {
+      const issue = issuesByIdentifier.get(issueIdentifier);
+      if (!issue) {
+        return null;
+      }
+      const preferredSource = issue.runningSource ?? issue.retrySource ?? issue.selectedSource;
+      if (!preferredSource) {
+        return null;
+      }
+      return {
+        issueIdentifier: preferredSource.issueIdentifier,
+        aliases: Array.from(issue.aliases),
+        payload: buildCompatibilityIssuePayload({
+          source: preferredSource,
+          running: runningByIssue.get(issue.issueIdentifier) ?? null,
+          retry: retryingByIssue.get(issue.issueIdentifier) ?? null,
+          dispatchPilotSummary: issue.dispatchPilotSummary
+        })
+      };
     })
-  }));
+    .filter((issue): issue is CompatibilityProjectionIssueRecord => issue !== null);
 
   return {
     running,
@@ -432,6 +487,11 @@ export function findCompatibilityProjectionIssueRecord(
   projection: ControlCompatibilityProjectionSnapshot,
   issueIdentifier: string
 ): CompatibilityProjectionIssueRecord | null {
+  for (const issue of projection.issues) {
+    if (issue.issueIdentifier === issueIdentifier) {
+      return issue;
+    }
+  }
   for (const issue of projection.issues) {
     if (issue.aliases.includes(issueIdentifier)) {
       return issue;
@@ -491,12 +551,71 @@ export function buildUiSelectedRunSharedFields(selected: SelectedRunContext): Ui
 
 function buildCompatibilityIssueAliases(selected: ControlCompatibilitySourceContext): string[] {
   const aliases = new Set<string>();
-  for (const candidate of [selected.issueIdentifier, selected.taskId, selected.runId]) {
+  const candidates =
+    selected.lookupAliases.length > 0
+      ? selected.lookupAliases
+      : [selected.issueIdentifier, selected.issueId, selected.taskId, selected.runId];
+  for (const candidate of candidates) {
     if (candidate) {
       aliases.add(candidate);
     }
   }
   return Array.from(aliases);
+}
+
+function pickPreferredCompatibilitySource(
+  current: ControlCompatibilitySourceContext | null,
+  candidate: ControlCompatibilitySourceContext
+): ControlCompatibilitySourceContext {
+  if (!current) {
+    return candidate;
+  }
+  return compareCompatibilitySourcePriority(candidate, current) > 0 ? candidate : current;
+}
+
+function compareCompatibilitySourcePriority(
+  left: ControlCompatibilitySourceContext,
+  right: ControlCompatibilitySourceContext
+): number {
+  const timestampComparison =
+    compareIsoTimestamp(left.latestEvent?.at, right.latestEvent?.at) ||
+    compareIsoTimestamp(left.updatedAt, right.updatedAt) ||
+    compareIsoTimestamp(left.startedAt, right.startedAt) ||
+    compareIsoTimestamp(left.completedAt, right.completedAt);
+  if (timestampComparison !== 0) {
+    return timestampComparison;
+  }
+  return (
+    compareLexical(left.runId, right.runId) ||
+    compareLexical(left.taskId, right.taskId) ||
+    compareLexical(left.issueIdentifier, right.issueIdentifier)
+  );
+}
+
+function compareIsoTimestamp(left: string | null | undefined, right: string | null | undefined): number {
+  const leftValue = parseTimestamp(left);
+  const rightValue = parseTimestamp(right);
+  if (leftValue === rightValue) {
+    return 0;
+  }
+  return leftValue > rightValue ? 1 : -1;
+}
+
+function parseTimestamp(value: string | null | undefined): number {
+  if (!value) {
+    return Number.NEGATIVE_INFINITY;
+  }
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : Number.NEGATIVE_INFINITY;
+}
+
+function compareLexical(left: string | null | undefined, right: string | null | undefined): number {
+  const normalizedLeft = left ?? '';
+  const normalizedRight = right ?? '';
+  if (normalizedLeft === normalizedRight) {
+    return 0;
+  }
+  return normalizedLeft.localeCompare(normalizedRight);
 }
 
 export function buildSelectedRunRuntimeFingerprintInput(
