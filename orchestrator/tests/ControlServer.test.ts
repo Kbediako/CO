@@ -14,6 +14,7 @@ import {
 } from '../src/cli/control/controlServer.js';
 import { computeEffectiveDelegationConfig } from '../src/cli/config/delegationConfig.js';
 import { resolveRunPaths } from '../src/cli/run/runPaths.js';
+import { RunEventStream } from '../src/cli/events/runEventStream.js';
 
 const { readDelegationHeaders, callChildControlEndpoint } = controlServerTest;
 
@@ -631,6 +632,218 @@ describe('ControlServer', () => {
       const confirmationsRaw = await readFile(paths.confirmationsPath, 'utf8');
       expect(confirmationsRaw).not.toContain(consumePayload.confirm_nonce ?? '');
       expect(confirmationsRaw).not.toContain('confirm_nonce');
+    } finally {
+      await server.close();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('validates confirmation nonces through the extracted validate controller and records the resolved event', async () => {
+    const { root, env, paths } = await createRunRoot('task-0940');
+    const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
+    const eventStream = await RunEventStream.create({
+      paths,
+      taskId: env.taskId,
+      runId: 'run-1',
+      pipelineId: 'control-server-test',
+      pipelineTitle: 'Control Server Test'
+    });
+
+    const server = await ControlServer.start({
+      paths,
+      config,
+      eventStream,
+      runId: 'run-1'
+    });
+
+    try {
+      const token = await readToken(paths.controlAuthPath);
+      const baseUrl = server.getBaseUrl() ?? '';
+      const params = { manifest_path: paths.manifestPath };
+
+      const createRes = await fetch(new URL('/confirmations/create', baseUrl), {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'x-csrf-token': token,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ action: 'cancel', tool: 'delegate.cancel', params })
+      });
+      expect(createRes.status).toBe(200);
+
+      const listRes = await fetch(new URL('/confirmations', baseUrl), {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const listPayload = (await listRes.json()) as { pending?: Array<Record<string, unknown>> };
+      const requestId = (listPayload.pending?.[0]?.request_id as string | undefined) ?? '';
+      expect(requestId).toBeTruthy();
+
+      const approveRes = await fetch(new URL('/confirmations/approve', baseUrl), {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'x-csrf-token': token,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ request_id: requestId, actor: 'ui' })
+      });
+      expect(approveRes.status).toBe(200);
+
+      const issueRes = await fetch(new URL('/confirmations/issue', baseUrl), {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'x-csrf-token': token,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ request_id: requestId })
+      });
+      expect(issueRes.status).toBe(200);
+      const issuePayload = (await issueRes.json()) as { confirm_nonce?: string; nonce_id?: string };
+      const confirmNonce = issuePayload.confirm_nonce ?? '';
+      expect(confirmNonce).toBeTruthy();
+
+      const validateRes = await fetch(new URL('/confirmations/validate', baseUrl), {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'x-csrf-token': token,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ confirm_nonce: confirmNonce, tool: 'delegate.cancel', params })
+      });
+
+      expect(validateRes.status).toBe(200);
+      const validatePayload = (await validateRes.json()) as {
+        status?: string;
+        request_id?: string;
+        nonce_id?: string;
+      };
+      expect(validatePayload).toEqual({
+        status: 'valid',
+        request_id: requestId,
+        nonce_id: issuePayload.nonce_id
+      });
+
+      const stored = JSON.parse(await readFile(paths.confirmationsPath, 'utf8')) as {
+        pending?: Array<{ request_id?: string }>;
+        issued?: Array<{ request_id?: string; nonce_id?: string }>;
+        consumed_nonce_ids?: string[];
+      };
+      expect(stored.pending).toEqual([]);
+      expect(stored.issued).toEqual([]);
+      expect(stored.consumed_nonce_ids).toEqual([issuePayload.nonce_id]);
+
+      const eventsRaw = await readFile(paths.eventsPath, 'utf8');
+      const events = eventsRaw
+        .trim()
+        .split('\n')
+        .filter(Boolean)
+        .map((line) => JSON.parse(line) as { event?: string; payload?: Record<string, unknown> | null });
+      expect(events.some((entry) => entry.event === 'confirmation_required')).toBe(true);
+      expect(events).toContainEqual(
+        expect.objectContaining({
+          event: 'confirmation_resolved',
+          payload: {
+            request_id: requestId,
+            nonce_id: issuePayload.nonce_id,
+            outcome: 'approved'
+          }
+        })
+      );
+    } finally {
+      await server.close();
+      await eventStream.close();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects mismatched confirmation validate scope without consuming the issued nonce', async () => {
+    const { root, env, paths } = await createRunRoot('task-0940');
+    const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
+
+    const server = await ControlServer.start({
+      paths,
+      config,
+      runId: 'run-1'
+    });
+
+    try {
+      const token = await readToken(paths.controlAuthPath);
+      const baseUrl = server.getBaseUrl() ?? '';
+      const params = { manifest_path: paths.manifestPath };
+
+      const createRes = await fetch(new URL('/confirmations/create', baseUrl), {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'x-csrf-token': token,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ action: 'cancel', tool: 'delegate.cancel', params })
+      });
+      expect(createRes.status).toBe(200);
+
+      const listRes = await fetch(new URL('/confirmations', baseUrl), {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      expect(listRes.status).toBe(200);
+      const listPayload = (await listRes.json()) as { pending?: Array<Record<string, unknown>> };
+      const requestId = (listPayload.pending?.[0]?.request_id as string | undefined) ?? '';
+      expect(requestId).toBeTruthy();
+
+      const approveRes = await fetch(new URL('/confirmations/approve', baseUrl), {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'x-csrf-token': token,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ request_id: requestId, actor: 'ui' })
+      });
+      expect(approveRes.status).toBe(200);
+
+      const issueRes = await fetch(new URL('/confirmations/issue', baseUrl), {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'x-csrf-token': token,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ request_id: requestId })
+      });
+      expect(issueRes.status).toBe(200);
+      const issuePayload = (await issueRes.json()) as { confirm_nonce?: string; nonce_id?: string };
+
+      const validateRes = await fetch(new URL('/confirmations/validate', baseUrl), {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'x-csrf-token': token,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          confirm_nonce: issuePayload.confirm_nonce,
+          tool: 'delegate.resume',
+          params
+        })
+      });
+
+      expect(validateRes.status).toBe(409);
+      const validatePayload = (await validateRes.json()) as { error?: string };
+      expect(validatePayload.error).toBe('confirmation_scope_mismatch');
+
+      const stored = JSON.parse(await readFile(paths.confirmationsPath, 'utf8')) as {
+        pending?: Array<{ request_id?: string }>;
+        issued?: Array<{ request_id?: string; nonce_id?: string }>;
+        consumed_nonce_ids?: string[];
+      };
+      expect(stored.pending).toHaveLength(1);
+      expect(stored.pending?.[0]?.request_id).toBe(requestId);
+      expect(stored.issued).toHaveLength(1);
+      expect(stored.issued?.[0]?.nonce_id).toBe(issuePayload.nonce_id);
+      expect(stored.consumed_nonce_ids).toEqual([]);
     } finally {
       await server.close();
       await rm(root, { recursive: true, force: true });

@@ -43,6 +43,7 @@ import { handleEventsSseRequest } from './eventsSseController.js';
 import { handleQuestionQueueRequest } from './questionQueueController.js';
 import { handleDelegationRegisterRequest } from './delegationRegisterController.js';
 import { handleConfirmationIssueConsumeRequest } from './confirmationIssueConsumeController.js';
+import { handleConfirmationValidateRequest } from './confirmationValidateController.js';
 import {
   handleLinearWebhookRequest,
   normalizeLinearAdvisoryState,
@@ -1079,37 +1080,23 @@ async function handleRequest(context: RequestContext): Promise<void> {
     return;
   }
 
-  if (url.pathname === '/confirmations/validate' && req.method === 'POST') {
-    await expireConfirmations(context);
-    const body = await readJsonBody(req);
-    const confirmNonce = readStringValue(body, 'confirm_nonce', 'confirmNonce');
-    if (!confirmNonce) {
-      res.writeHead(400, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'missing_confirm_nonce' }));
-      return;
-    }
-    const tool = readStringValue(body, 'tool') ?? 'unknown';
-    const params = readRecordValue(body, 'params') ?? {};
-    let validation;
-    try {
-      validation = context.confirmationStore.validateNonce({ confirmNonce, tool, params });
-    } catch (error) {
-      res.writeHead(409, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: (error as Error)?.message ?? 'confirmation_invalid' }));
-      return;
-    }
-    await context.persist.confirmations();
-    await emitControlEvent(context, {
-      event: 'confirmation_resolved',
-      actor: 'runner',
-      payload: {
-        request_id: validation.request.request_id,
-        nonce_id: validation.nonce_id,
-        outcome: 'approved'
-      }
-    });
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ status: 'valid', request_id: validation.request.request_id, nonce_id: validation.nonce_id }));
+  if (
+    await handleConfirmationValidateRequest({
+      req,
+      res,
+      readRequestBody: () => readJsonBody(req),
+      expireConfirmations: () => expireConfirmations(context),
+      validateConfirmation: ({ confirmNonce, tool, params }) =>
+        context.confirmationStore.validateNonce({ confirmNonce, tool, params }),
+      persistConfirmations: () => context.persist.confirmations(),
+      emitConfirmationResolved: (payload) =>
+        emitControlEvent(context, {
+          event: 'confirmation_resolved',
+          actor: 'runner',
+          payload
+        })
+    })
+  ) {
     return;
   }
 
