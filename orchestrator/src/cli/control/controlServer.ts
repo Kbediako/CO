@@ -54,6 +54,10 @@ import {
   type TransportMutationRequest
 } from './controlActionPreflight.js';
 import {
+  buildPostMutationControlActionResponse,
+  buildReplayedControlActionResponse
+} from './controlActionOutcome.js';
+import {
   handleLinearWebhookRequest,
   normalizeLinearAdvisoryState,
   type LinearAdvisoryState,
@@ -680,19 +684,24 @@ async function handleRequest(context: RequestContext): Promise<void> {
         return false;
       }
       await persistControlWithTransportNonce();
+      const replayResponse = buildReplayedControlActionResponse({
+        snapshot,
+        requestId: replay.requestId,
+        intentId: replay.intentId,
+        traceability: replay.traceability
+      });
       await emitControlActionAuditEvent(context, {
-        outcome: 'replayed',
+        outcome: replayResponse.outcome,
         action,
         requestedBy,
         reason: reason ?? null,
-        requestId: replay.requestId,
-        intentId: replay.intentId,
+        requestId: replayResponse.requestId,
+        intentId: replayResponse.intentId,
         snapshot,
-        traceability: replay.traceability
+        traceability: replayResponse.traceability
       });
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      const payload = { ...snapshot, idempotent_replay: true };
-      res.end(JSON.stringify(replay.traceability ? { ...payload, traceability: replay.traceability } : payload));
+      res.writeHead(replayResponse.status, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(replayResponse.body));
       return true;
     };
 
@@ -702,8 +711,7 @@ async function handleRequest(context: RequestContext): Promise<void> {
 
     if (action === 'cancel') {
       if (!confirmNonce) {
-        res.writeHead(409, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: 'confirmation_required' }));
+        writeControlError(res, 409, 'confirmation_required');
         return;
       }
       const tool = readStringValue(body, 'tool') ?? 'delegate.cancel';
@@ -716,8 +724,7 @@ async function handleRequest(context: RequestContext): Promise<void> {
           params
         });
       } catch (error) {
-        res.writeHead(409, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: (error as Error)?.message ?? 'confirmation_invalid' }));
+        writeControlError(res, 409, (error as Error)?.message ?? 'confirmation_invalid');
         return;
       }
       const confirmedRequestId = readStringValue(validation.request.params, 'request_id', 'requestId');
@@ -794,44 +801,29 @@ async function handleRequest(context: RequestContext): Promise<void> {
       context.runtime.publish({ source: 'control.action' });
     }
     const replayEntry = update.replayEntry ?? null;
-    const auditRequestId = update.idempotentReplay
-      ? replayEntry
-        ? replayEntry.request_id
-        : snapshot.latest_action?.request_id ?? resolvedRequestId ?? null
-      : resolvedRequestId ?? snapshot.latest_action?.request_id ?? null;
-    const auditIntentId = update.idempotentReplay
-      ? replayEntry
-        ? replayEntry.intent_id
-        : snapshot.latest_action?.intent_id ?? intentId ?? null
-      : intentId ?? snapshot.latest_action?.intent_id ?? null;
-    const traceability = transportMutation
-      ? buildCanonicalTraceability({
-          action,
-          decision: update.idempotentReplay ? 'replayed' : 'applied',
-          requestId: auditRequestId,
-          intentId: auditIntentId,
-          taskId,
-          runId: snapshot.run_id,
-          manifestPath: context.paths.manifestPath,
-          transport: transportMutation.transport,
-          actorId: replayEntry?.actor_id ?? transportMutation.actorId,
-          actorSource: replayEntry?.actor_source ?? transportMutation.actorSource,
-          principal: replayEntry?.transport_principal ?? transportMutation.principal
-        })
-      : null;
+    const outcomeResponse = buildPostMutationControlActionResponse({
+      action,
+      snapshot,
+      requestId: resolvedRequestId,
+      intentId,
+      taskId,
+      manifestPath: context.paths.manifestPath,
+      transportMutation,
+      idempotentReplay: update.idempotentReplay,
+      replayEntry
+    });
     await emitControlActionAuditEvent(context, {
-      outcome: update.idempotentReplay ? 'replayed' : 'applied',
+      outcome: outcomeResponse.outcome,
       action,
       requestedBy,
       reason: reason ?? null,
-      requestId: auditRequestId,
-      intentId: auditIntentId,
+      requestId: outcomeResponse.requestId,
+      intentId: outcomeResponse.intentId,
       snapshot,
-      traceability
+      traceability: outcomeResponse.traceability
     });
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    const payload = update.idempotentReplay ? { ...snapshot, idempotent_replay: true } : snapshot;
-    res.end(JSON.stringify(traceability ? { ...payload, traceability } : payload));
+    res.writeHead(outcomeResponse.status, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(outcomeResponse.body));
     return;
   }
 

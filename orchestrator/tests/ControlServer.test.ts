@@ -6577,6 +6577,25 @@ describe('ControlServer', () => {
       });
       expect(actionRes.status).toBe(200);
 
+      const routeReuseRes = await fetch(new URL('/control/action', baseUrl), {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'x-csrf-token': token,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          action: 'cancel',
+          requested_by: 'delegate',
+          confirm_nonce: confirmNonce,
+          tool: 'delegate.cancel',
+          params
+        })
+      });
+      expect(routeReuseRes.status).toBe(409);
+      const routeReusePayload = (await routeReuseRes.json()) as { error?: string };
+      expect(routeReusePayload.error).toBe('nonce_already_consumed');
+
       const reuseRes = await fetch(new URL('/confirmations/validate', baseUrl), {
         method: 'POST',
         headers: {
