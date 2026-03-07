@@ -1,0 +1,18 @@
+
+ RUN  v1.6.1 /Users/kbediako/Code/CO
+
+ ✓ orchestrator/tests/ObservabilityApiController.test.ts  (2 tests) 2ms
+ ✓ orchestrator/tests/UiDataController.test.ts  (3 tests) 2ms
+stderr | orchestrator/tests/ControlServer.test.ts > ControlServer > responds even when event stream append fails
+[Codex-Orchestrator] Failed to append control event confirmation_required: append failed
+
+stderr | orchestrator/tests/ControlServer.test.ts > ControlServer > updates pause reason when questions expire with pause fallback
+[Codex-Orchestrator] Failed to resolve child question: fetch failed
+
+ ✓ orchestrator/tests/ControlServer.test.ts  (80 tests) 315ms
+
+ Test Files  3 passed (3)
+      Tests  85 passed (85)
+   Start at  17:07:30
+   Duration  592ms (transform 218ms, setup 0ms, collect 329ms, tests 319ms, environment 0ms, prepare 81ms)
+

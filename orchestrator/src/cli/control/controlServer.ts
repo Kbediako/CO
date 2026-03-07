@@ -39,13 +39,11 @@ import {
 } from './linearDispatchSource.js';
 import { createControlRuntime, type ControlRuntime } from './controlRuntime.js';
 import {
-  buildCompatibilityErrorResponse,
   readDispatchExtension,
-  type ObservabilitySurfaceResponse,
   type DispatchExtensionResult
 } from './observabilitySurface.js';
 import { handleObservabilityApiRequest } from './observabilityApiController.js';
-import { readUiDataset } from './selectedRunPresenter.js';
+import { handleUiDataRequest } from './uiDataController.js';
 
 interface ControlServerOptions {
   paths: RunPaths;
@@ -62,7 +60,6 @@ const CSRF_HEADER = 'x-csrf-token';
 const DELEGATION_TOKEN_HEADER = 'x-codex-delegation-token';
 const DELEGATION_RUN_HEADER = 'x-codex-delegation-run-id';
 const LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost', '::1']);
-const JSON_NO_STORE_HEADERS = { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' };
 const UI_ASSET_PATHS: Record<string, string> = {
   '/ui': 'index.html',
   '/ui/': 'index.html',
@@ -498,7 +495,6 @@ async function handleRequest(context: RequestContext): Promise<void> {
     return;
   }
   const { req, res } = context;
-  const method = req.method ?? 'GET';
   const url = new URL(req.url ?? '/', 'http://localhost');
   const runtimeSnapshot = context.runtime.snapshot();
   const presenterContext = {
@@ -595,16 +591,13 @@ async function handleRequest(context: RequestContext): Promise<void> {
     return;
   }
 
-  if (url.pathname === '/ui/data.json') {
-    if (method !== 'GET') {
-      writeUiDataMethodNotAllowed(res);
-      return;
-    }
-    writeObservabilityResponse(res, {
-      status: 200,
-      headers: JSON_NO_STORE_HEADERS,
-      body: await readUiDataset(presenterContext)
-    });
+  if (
+    await handleUiDataRequest({
+      req,
+      res,
+      presenterContext
+    })
+  ) {
     return;
   }
 
@@ -1948,30 +1941,6 @@ async function emitDispatchPilotAuditEvents(
       recommendation_available: Boolean(input.evaluation.recommendation)
     }
   });
-}
-
-function writeUiDataMethodNotAllowed(res: http.ServerResponse): void {
-  writeObservabilityResponse(
-    res,
-    buildCompatibilityErrorResponse({
-      status: 405,
-      code: 'method_not_allowed',
-      message: 'Method not allowed',
-      details: {
-        surface: 'ui',
-        route: '/ui/data.json',
-        allowed_method: 'GET'
-      }
-    })
-  );
-}
-
-function writeObservabilityResponse(
-  res: http.ServerResponse,
-  response: ObservabilitySurfaceResponse
-): void {
-  res.writeHead(response.status, response.headers);
-  res.end(JSON.stringify(response.body));
 }
 
 function isControlAction(action: unknown): action is 'pause' | 'resume' | 'cancel' | 'fail' {

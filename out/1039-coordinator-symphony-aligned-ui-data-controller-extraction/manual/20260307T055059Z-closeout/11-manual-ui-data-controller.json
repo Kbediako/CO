@@ -1,0 +1,91 @@
+{
+  "generated_at": "2026-03-07T05:50:59.000Z",
+  "manual_mock": {
+    "post_method_not_allowed": {
+      "handled": true,
+      "response": {
+        "statusCode": 405,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "error": {
+            "code": "method_not_allowed",
+            "message": "Method not allowed",
+            "details": {
+              "surface": "ui",
+              "route": "/ui/data.json",
+              "allowed_method": "GET"
+            }
+          }
+        }
+      }
+    },
+    "get_success": {
+      "handled": true,
+      "response": {
+        "statusCode": 200,
+        "headers": {
+          "Content-Type": "application/json",
+          "Cache-Control": "no-store"
+        },
+        "body": {
+          "generated_at": "2026-03-07T06:03:01.096Z",
+          "tasks": [
+            {
+              "task_id": "task-1039",
+              "title": "UI Data Controller Manual Smoke",
+              "bucket": "active",
+              "bucket_reason": "running",
+              "status": "in_progress",
+              "raw_status": "in_progress",
+              "display_status": "in_progress",
+              "status_reason": null,
+              "last_update": "2026-03-07T05:50:59.000Z",
+              "latest_run_id": "run-1",
+              "approvals_pending": 0,
+              "approvals_total": 0,
+              "summary": "manual ui controller smoke",
+              "question_summary": null
+            }
+          ],
+          "runs": [
+            {
+              "run_id": "run-1",
+              "task_id": "task-1039",
+              "status": "in_progress",
+              "raw_status": "in_progress",
+              "display_status": "in_progress",
+              "status_reason": null,
+              "started_at": "2026-03-07T05:50:59.000Z",
+              "updated_at": "2026-03-07T05:50:59.000Z",
+              "stages": [],
+              "links": {
+                "manifest": ".runs/task-1039/cli/run-1/manifest.json",
+                "log": ".runs/task-1039/cli/run-1/runner.log",
+                "metrics": null,
+                "state": null
+              },
+              "approvals_pending": 0,
+              "approvals_total": 0,
+              "heartbeat_stale": false,
+              "latest_event": null,
+              "question_summary": null
+            }
+          ],
+          "codebase": null,
+          "activity": [],
+          "selected": null
+        }
+      }
+    },
+    "passthrough_non_ui_route": {
+      "handled": false,
+      "response": {
+        "statusCode": null,
+        "headers": null,
+        "body": null
+      }
+    }
+  }
+}
