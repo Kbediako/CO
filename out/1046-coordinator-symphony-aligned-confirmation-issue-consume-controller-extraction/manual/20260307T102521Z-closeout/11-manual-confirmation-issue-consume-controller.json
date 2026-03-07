@@ -1,0 +1,80 @@
+{
+  "generated_at": "2026-03-07T10:32:08.150Z",
+  "controller": "confirmationIssueConsumeController",
+  "results": [
+    {
+      "name": "missing_request_id",
+      "handled": true,
+      "state": {
+        "statusCode": 400,
+        "headers": {},
+        "body": {
+          "error": "missing_request_id"
+        }
+      },
+      "calls": [
+        "expire",
+        "read"
+      ],
+      "issued": [],
+      "persistCalls": 0
+    },
+    {
+      "name": "camel_case_success",
+      "handled": true,
+      "state": {
+        "statusCode": 200,
+        "headers": {},
+        "body": {
+          "request_id": "req-camel",
+          "nonce_id": "nonce-req-camel",
+          "confirm_nonce": "secret-req-camel"
+        }
+      },
+      "calls": [
+        "expire",
+        "read",
+        "issue:req-camel",
+        "persist"
+      ],
+      "issued": [
+        {
+          "request_id": "req-camel",
+          "nonce_id": "nonce-req-camel",
+          "confirm_nonce": "secret-req-camel"
+        }
+      ],
+      "persistCalls": 1
+    },
+    {
+      "name": "store_conflict",
+      "handled": true,
+      "state": {
+        "statusCode": 409,
+        "headers": {},
+        "body": {
+          "error": "confirmation_already_issued"
+        }
+      },
+      "calls": [
+        "expire",
+        "read",
+        "issue:req-conflict"
+      ],
+      "issued": [],
+      "persistCalls": 0
+    },
+    {
+      "name": "fallthrough_non_post",
+      "handled": false,
+      "state": {
+        "statusCode": 200,
+        "headers": {},
+        "body": null
+      },
+      "calls": [],
+      "issued": [],
+      "persistCalls": 0
+    }
+  ]
+}
