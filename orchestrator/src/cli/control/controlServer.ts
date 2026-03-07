@@ -41,6 +41,7 @@ import { handleUiSessionRequest } from './uiSessionController.js';
 import { handleSecurityViolationRequest } from './securityViolationController.js';
 import { handleEventsSseRequest } from './eventsSseController.js';
 import { handleQuestionQueueRequest } from './questionQueueController.js';
+import { handleDelegationRegisterRequest } from './delegationRegisterController.js';
 import {
   handleLinearWebhookRequest,
   normalizeLinearAdvisoryState,
@@ -1137,20 +1138,15 @@ async function handleRequest(context: RequestContext): Promise<void> {
     return;
   }
 
-  if (url.pathname === '/delegation/register' && req.method === 'POST') {
-    const body = await readJsonBody(req);
-    const token = readStringValue(body, 'token');
-    const parentRunId = readStringValue(body, 'parent_run_id', 'parentRunId');
-    const childRunId = readStringValue(body, 'child_run_id', 'childRunId');
-    if (!token || !parentRunId || !childRunId) {
-      res.writeHead(400, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'missing_delegation_fields' }));
-      return;
-    }
-    const record = context.delegationTokens.register(token, parentRunId, childRunId);
-    await context.persist.delegationTokens();
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ status: 'registered', token_id: record.token_id }));
+  if (
+    await handleDelegationRegisterRequest({
+      req,
+      res,
+      delegationTokens: context.delegationTokens,
+      readRequestBody: () => readJsonBody(req),
+      persistDelegationTokens: () => context.persist.delegationTokens()
+    })
+  ) {
     return;
   }
 

@@ -495,6 +495,61 @@ describe('ControlServer', () => {
     }
   });
 
+  it('registers delegation tokens through the extracted controller and persists the record', async () => {
+    const { root, env, paths } = await createRunRoot('task-0940');
+    const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
+
+    const server = await ControlServer.start({
+      paths,
+      config,
+      runId: 'run-1'
+    });
+
+    try {
+      const token = await readToken(paths.controlAuthPath);
+      const baseUrl = server.getBaseUrl() ?? '';
+      const res = await fetch(new URL('/delegation/register', baseUrl), {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'x-csrf-token': token,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          token: 'delegation-token',
+          parentRunId: 'parent-run',
+          child_run_id: 'child-run'
+        })
+      });
+
+      expect(res.status).toBe(200);
+      const payload = (await res.json()) as { status?: string; token_id?: string };
+      expect(payload.status).toBe('registered');
+      expect(payload.token_id).toMatch(/^dlt-/);
+
+      const stored = JSON.parse(await readFile(paths.delegationTokensPath, 'utf8')) as {
+        tokens?: Array<{
+          token_id: string;
+          parent_run_id: string;
+          child_run_id: string;
+          token_hash: string;
+        }>;
+      };
+      expect(stored.tokens).toHaveLength(1);
+      expect(stored.tokens?.[0]).toEqual(
+        expect.objectContaining({
+          token_id: payload.token_id,
+          parent_run_id: 'parent-run',
+          child_run_id: 'child-run'
+        })
+      );
+      expect(stored.tokens?.[0]?.token_hash).toMatch(/^[a-f0-9]{64}$/);
+    } finally {
+      await server.close();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   it('serves authenticated GET /events as an SSE bootstrap stream', async () => {
     const { root, env, paths } = await createRunRoot('task-0940');
     const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
