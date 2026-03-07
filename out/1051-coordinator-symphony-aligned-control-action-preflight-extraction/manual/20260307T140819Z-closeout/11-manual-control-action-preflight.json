@@ -1,0 +1,120 @@
+{
+  "generated_at": "2026-03-07T14:20:35.910Z",
+  "scenarios": {
+    "invalid_action": {
+      "ok": false,
+      "status": 400,
+      "error": "invalid_action"
+    },
+    "session_ui_action_disallowed": {
+      "ok": false,
+      "status": 403,
+      "error": "ui_action_disallowed"
+    },
+    "session_ui_control_metadata_disallowed": {
+      "ok": false,
+      "status": 403,
+      "error": "ui_control_metadata_disallowed"
+    },
+    "metadata_without_transport": {
+      "ok": false,
+      "status": 400,
+      "error": "transport_invalid",
+      "traceability": {
+        "actor_id": null,
+        "actor_source": null,
+        "transport": null,
+        "transport_principal": null,
+        "intent_id": null,
+        "request_id": "req-metadata-only",
+        "task_id": "task-0940",
+        "run_id": "run-1",
+        "manifest_path": "/tmp/manifest.json",
+        "action": "pause",
+        "decision": "rejected",
+        "timestamp": "2026-03-07T14:20:35.909Z"
+      }
+    },
+    "transport_idempotency_key_missing": {
+      "ok": false,
+      "status": 400,
+      "error": "transport_idempotency_key_missing",
+      "traceability": {
+        "actor_id": "actor-current",
+        "actor_source": "discord.oauth",
+        "transport": "discord",
+        "transport_principal": "discord:channel:current",
+        "intent_id": null,
+        "request_id": null,
+        "task_id": "task-0940",
+        "run_id": "run-1",
+        "manifest_path": "/tmp/manifest.json",
+        "action": "pause",
+        "decision": "rejected",
+        "timestamp": "2026-03-07T14:20:35.910Z"
+      }
+    },
+    "confirmation_scope_mismatch": {
+      "request": null,
+      "status": 409,
+      "error": "confirmation_scope_mismatch",
+      "partial": {
+        "transport": "discord",
+        "actorId": "actor-confirmed",
+        "actorSource": "discord.oauth",
+        "principal": "discord:channel:confirmed"
+      }
+    },
+    "cancel_replay_request_only_null_intent": {
+      "matched": true,
+      "requestId": "req-replay",
+      "intentId": null,
+      "traceability": {
+        "actor_id": "actor-recorded",
+        "actor_source": "discord.oauth",
+        "transport": "discord",
+        "transport_principal": "discord:channel:recorded",
+        "intent_id": null,
+        "request_id": "req-replay",
+        "task_id": "task-0940",
+        "run_id": "run-1",
+        "manifest_path": "/tmp/manifest.json",
+        "action": "cancel",
+        "decision": "replayed",
+        "timestamp": "2026-03-07T14:20:35.910Z"
+      }
+    },
+    "cancel_replay_intent_only_null_request": {
+      "matched": true,
+      "requestId": null,
+      "intentId": "intent-replay",
+      "traceability": {
+        "actor_id": "actor-recorded",
+        "actor_source": "discord.oauth",
+        "transport": "discord",
+        "transport_principal": "discord:channel:recorded",
+        "intent_id": "intent-replay",
+        "request_id": null,
+        "task_id": "task-0940",
+        "run_id": "run-1",
+        "manifest_path": "/tmp/manifest.json",
+        "action": "cancel",
+        "decision": "replayed",
+        "timestamp": "2026-03-07T14:20:35.910Z"
+      }
+    },
+    "camel_case_alias_apply": {
+      "ok": true,
+      "value": {
+        "action": "cancel",
+        "requestId": "req-camel",
+        "intentId": "intent-camel",
+        "requestedBy": "delegate",
+        "reason": "manual",
+        "confirmNonce": "confirm-camel",
+        "deferTransportResolutionToConfirmation": true,
+        "transportMutation": null
+      }
+    }
+  }
+}

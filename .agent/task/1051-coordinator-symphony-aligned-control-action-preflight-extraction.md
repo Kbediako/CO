@@ -20,22 +20,22 @@
 
 ## Control Action Preflight Extraction
 
-- [ ] `/control/action` preflight handling is extracted into a dedicated helper module under `orchestrator/src/cli/control/`. Evidence: `orchestrator/src/cli/control/`, `orchestrator/src/cli/control/controlServer.ts`.
-- [ ] Request parsing, normalization, transport preflight, replay/confirmation decisions, and canonical traceability derivation move with the new helper without changing contracts. Evidence: `orchestrator/src/cli/control/`, `orchestrator/tests/`, `orchestrator/tests/ControlServer.test.ts`.
-- [ ] `/control/action` early reject, confirmation-required, replay, and confirmation-scope transport behavior remain unchanged after extraction. Evidence: `orchestrator/src/cli/control/`, `orchestrator/tests/`, `orchestrator/tests/ControlServer.test.ts`, `out/1051-coordinator-symphony-aligned-control-action-preflight-extraction/manual/<pending>/11-manual-control-action-preflight.json`.
-- [ ] Route ordering, auth/runner-only gating, final control mutation, persistence sequencing, runtime publish, and audit emission remain in `controlServer.ts`. Evidence: `orchestrator/src/cli/control/controlServer.ts`, `orchestrator/tests/ControlServer.test.ts`, `out/1051-coordinator-symphony-aligned-control-action-preflight-extraction/manual/<pending>/00-summary.md`.
+- [x] `/control/action` preflight handling is extracted into a dedicated helper module under `orchestrator/src/cli/control/`. Evidence: `orchestrator/src/cli/control/controlActionPreflight.ts`, `orchestrator/src/cli/control/controlServer.ts`.
+- [x] Request parsing, normalization, transport preflight, replay/confirmation decisions, and canonical traceability derivation move with the new helper without changing contracts. Evidence: `orchestrator/src/cli/control/controlActionPreflight.ts`, `orchestrator/tests/ControlActionPreflight.test.ts`, `orchestrator/tests/ControlServer.test.ts`.
+- [x] `/control/action` early reject, confirmation-required, replay, and confirmation-scope transport behavior remain unchanged after extraction. Evidence: `orchestrator/src/cli/control/controlActionPreflight.ts`, `orchestrator/tests/ControlActionPreflight.test.ts`, `orchestrator/tests/ControlServer.test.ts`, `out/1051-coordinator-symphony-aligned-control-action-preflight-extraction/manual/20260307T140819Z-closeout/11-manual-control-action-preflight.json`.
+- [x] Route ordering, auth/runner-only gating, final control mutation, persistence sequencing, runtime publish, and audit emission remain in `controlServer.ts`. Evidence: `orchestrator/src/cli/control/controlServer.ts`, `orchestrator/tests/ControlServer.test.ts`, `out/1051-coordinator-symphony-aligned-control-action-preflight-extraction/manual/20260307T140819Z-closeout/00-summary.md`.
 
 ## Validation + Closeout
 
-- [ ] `node scripts/delegation-guard.mjs`. Evidence: `out/1051-coordinator-symphony-aligned-control-action-preflight-extraction/manual/<pending>/01-delegation-guard.log`.
-- [ ] `node scripts/spec-guard.mjs --dry-run`. Evidence: `out/1051-coordinator-symphony-aligned-control-action-preflight-extraction/manual/<pending>/02-spec-guard.log`.
-- [ ] `npm run build`. Evidence: `out/1051-coordinator-symphony-aligned-control-action-preflight-extraction/manual/<pending>/03-build.log`.
-- [ ] `npm run lint`. Evidence: `out/1051-coordinator-symphony-aligned-control-action-preflight-extraction/manual/<pending>/04-lint.log`.
-- [ ] `npm run test`. Evidence: `out/1051-coordinator-symphony-aligned-control-action-preflight-extraction/manual/<pending>/05-test.log`, `.runs/1051-coordinator-symphony-aligned-control-action-preflight-extraction-guard/cli/<pending>/manifest.json`.
-- [ ] `npm run docs:check`. Evidence: `out/1051-coordinator-symphony-aligned-control-action-preflight-extraction/manual/<pending>/06-docs-check.log`.
-- [ ] `npm run docs:freshness`. Evidence: `out/1051-coordinator-symphony-aligned-control-action-preflight-extraction/manual/<pending>/07-docs-freshness.log`.
-- [ ] `node scripts/diff-budget.mjs`. Evidence: `out/1051-coordinator-symphony-aligned-control-action-preflight-extraction/manual/<pending>/08-diff-budget.log`, `out/1051-coordinator-symphony-aligned-control-action-preflight-extraction/manual/<pending>/13-override-notes.md`.
-- [ ] `npm run review`. Evidence: `out/1051-coordinator-symphony-aligned-control-action-preflight-extraction/manual/<pending>/09-review.log`, `out/1051-coordinator-symphony-aligned-control-action-preflight-extraction/manual/<pending>/13-override-notes.md`.
-- [ ] `npm run pack:smoke` not required because no downstream-facing CLI/package/skills/review-wrapper paths changed. Evidence: `out/1051-coordinator-symphony-aligned-control-action-preflight-extraction/manual/<pending>/13-override-notes.md`.
-- [ ] Manual mock control-action preflight artifact captured. Evidence: `out/1051-coordinator-symphony-aligned-control-action-preflight-extraction/manual/<pending>/11-manual-control-action-preflight.json`.
-- [ ] Elegance review completed. Evidence: `out/1051-coordinator-symphony-aligned-control-action-preflight-extraction/manual/<pending>/12-elegance-review.md`.
+- [x] `node scripts/delegation-guard.mjs`. Evidence: `out/1051-coordinator-symphony-aligned-control-action-preflight-extraction/manual/20260307T140819Z-closeout/01-delegation-guard.log`.
+- [x] `node scripts/spec-guard.mjs --dry-run`. Evidence: `out/1051-coordinator-symphony-aligned-control-action-preflight-extraction/manual/20260307T140819Z-closeout/02-spec-guard.log`.
+- [x] `npm run build`. Evidence: `out/1051-coordinator-symphony-aligned-control-action-preflight-extraction/manual/20260307T140819Z-closeout/03-build.log`.
+- [x] `npm run lint`. Evidence: `out/1051-coordinator-symphony-aligned-control-action-preflight-extraction/manual/20260307T140819Z-closeout/04-lint.log`.
+- [x] `npm run test`. Evidence: `out/1051-coordinator-symphony-aligned-control-action-preflight-extraction/manual/20260307T140819Z-closeout/05-test.log`, `.runs/1051-coordinator-symphony-aligned-control-action-preflight-extraction-guard/cli/2026-03-07T14-19-32-348Z-b46e1f5f/manifest.json`.
+- [x] `npm run docs:check`. Evidence: `out/1051-coordinator-symphony-aligned-control-action-preflight-extraction/manual/20260307T140819Z-closeout/06-docs-check.log`.
+- [x] `npm run docs:freshness`. Evidence: `out/1051-coordinator-symphony-aligned-control-action-preflight-extraction/manual/20260307T140819Z-closeout/07-docs-freshness.log`.
+- [x] `node scripts/diff-budget.mjs`. Evidence: `out/1051-coordinator-symphony-aligned-control-action-preflight-extraction/manual/20260307T140819Z-closeout/08-diff-budget.log`, `out/1051-coordinator-symphony-aligned-control-action-preflight-extraction/manual/20260307T140819Z-closeout/13-override-notes.md`.
+- [x] `npm run review`. Evidence: `out/1051-coordinator-symphony-aligned-control-action-preflight-extraction/manual/20260307T140819Z-closeout/09-review.log`, `out/1051-coordinator-symphony-aligned-control-action-preflight-extraction/manual/20260307T140819Z-closeout/13-override-notes.md`.
+- [x] `npm run pack:smoke` not required because no downstream-facing CLI/package/skills/review-wrapper paths changed. Evidence: `out/1051-coordinator-symphony-aligned-control-action-preflight-extraction/manual/20260307T140819Z-closeout/13-override-notes.md`.
+- [x] Manual mock control-action preflight artifact captured. Evidence: `out/1051-coordinator-symphony-aligned-control-action-preflight-extraction/manual/20260307T140819Z-closeout/11-manual-control-action-preflight.json`.
+- [x] Elegance review completed. Evidence: `out/1051-coordinator-symphony-aligned-control-action-preflight-extraction/manual/20260307T140819Z-closeout/12-elegance-review.md`.

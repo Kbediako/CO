@@ -8,8 +8,8 @@
 
 ## Phase 2 - Preflight Extraction
 
-- Extract `/control/action` request parsing, normalization, transport preflight, replay-or-confirmation early exits, and response writing into a dedicated controller/helper.
-- Keep `controlServer.ts` limited to route ordering, auth/CSRF/runner-only gating, store/runtime wiring, and final authority-bearing mutation/publish/audit steps.
+- Extract `/control/action` request parsing, normalization, transport preflight, replay-or-confirmation early exits, and canonical traceability shaping into a dedicated helper module.
+- Keep `controlServer.ts` limited to route ordering, auth/CSRF/runner-only gating, early response writes through the existing route shell, and final authority-bearing mutation/publish/audit steps.
 - Preserve existing traceability, replay, and confirmation-scope contracts exactly.
 
 ## Phase 3 - Validation / Closeout
