@@ -9,7 +9,7 @@
 ## Phase 2 - Events SSE Controller Extraction
 
 - [ ] Introduce a dedicated `/events` SSE controller helper.
-- [ ] Move method rejection, SSE response bootstrap, client registration, and disconnect cleanup into that module.
+- [ ] Move SSE response bootstrap, client registration, and disconnect cleanup into that module.
 - [ ] Keep route ordering, auth/runner-only gating, shared event fanout, `/api/v1/*`, webhook routes, and mutating control endpoints on their current seams.
 
 ## Phase 3 - Verification + Closeout

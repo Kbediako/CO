@@ -10,7 +10,7 @@ last_review: 2026-03-07
 
 ## Summary
 
-- Objective: extract the `/events` SSE controller policy into a dedicated helper without changing stream bootstrap or connected-client behavior.
+- Objective: extract the `GET /events` SSE controller policy into a dedicated helper without changing stream bootstrap or connected-client behavior.
 - Scope: events SSE controller extraction plus regression/manual evidence.
 - Constraints: keep auth ordering, runner-only gating, shared event fanout, webhook handling, `/api/v1/*`, and mutating control behavior unchanged.
 

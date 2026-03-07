@@ -2,7 +2,7 @@
 
 ## Problem
 
-After `1041`, `controlServer.ts` still owns the standalone `/events` SSE route inline. That branch mixes method gating, SSE response bootstrap, client registration, and disconnect cleanup into the main server entrypoint instead of behind a dedicated controller boundary.
+After `1041`, `controlServer.ts` still owns the standalone `GET /events` SSE route inline. That branch mixes SSE response bootstrap, client registration, and disconnect cleanup into the main server entrypoint instead of behind a dedicated controller boundary.
 
 ## Goal
 
@@ -17,7 +17,7 @@ Extract a dedicated events SSE controller helper so stream bootstrap and client 
 ## Scope
 
 - Extract the `/events` route-local handling out of `controlServer.ts`.
-- Move method rejection, SSE response bootstrap, client registration, and disconnect cleanup behind that controller boundary.
+- Move SSE response bootstrap, client registration, and disconnect cleanup behind that controller boundary.
 - Keep current SSE headers, initial keep-alive comment, and connected-client behavior unchanged.
 
 ## Non-Goals

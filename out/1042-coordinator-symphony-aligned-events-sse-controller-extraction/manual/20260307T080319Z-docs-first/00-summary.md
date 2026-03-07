@@ -27,4 +27,4 @@
 ## Notes
 
 - The docs-first package reflects the post-`1041` control-server shape and the delegated read-only boundary recommendation for `/events`.
-- `docs-review` remains intentionally pending and must be captured before runtime implementation starts on `1042`.
+- `docs-review` is captured as an explicit override in `05-docs-review-override.md` after the local pipeline failed at the delegation-guard pre-stage before actual review execution.

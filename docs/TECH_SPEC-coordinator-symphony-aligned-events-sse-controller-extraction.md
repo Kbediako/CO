@@ -2,8 +2,8 @@
 
 ## Scope
 
-- Extract the `/events` SSE controller decision path from `controlServer.ts`.
-- Preserve current method gating, SSE headers, keep-alive bootstrap comment, client registration, and disconnect cleanup.
+- Extract the `GET /events` SSE controller decision path from `controlServer.ts`.
+- Preserve current SSE headers, keep-alive bootstrap comment, client registration, and disconnect cleanup.
 - Leave UI assets, `/auth/session`, Linear webhook handling, `/api/v1/*`, and mutating control endpoints untouched.
 
 ## Files / Modules
@@ -15,10 +15,10 @@
 ## Design
 
 1. Introduce a dedicated events SSE controller module for `/events`.
-2. Move route-local method rejection, SSE response writing, initial keep-alive bootstrap, client registration, and disconnect cleanup into that module.
+2. Move route-local SSE response writing, initial keep-alive bootstrap, client registration, and disconnect cleanup into that module.
 3. Keep the controller narrowly parameterized so it receives only the request/response plus the connected-client set it needs.
 4. Keep `controlServer.ts` responsible for:
-   - route selection,
+   - route selection and GET gating,
    - UI asset serving,
    - `/auth/session`,
    - Linear webhook routing,
@@ -30,7 +30,7 @@
 
 ## Constraints
 
-- No `/events` contract regressions for status code, SSE headers, or initial bootstrap payload.
+- No `GET /events` contract regressions for status code, SSE headers, or initial bootstrap payload.
 - No auth or runner-only access-policy changes.
 - No event broadcast payload-shape or broadcast-order changes.
 - No reordering of the pre-auth routes relative to UI assets, `/auth/session`, or the Linear webhook.
@@ -38,6 +38,6 @@
 ## Validation
 
 - Targeted `ControlServer` regressions covering successful SSE connection bootstrap and cleanup on close.
-- Add one direct unit test file for the new events SSE controller covering method rejection, successful bootstrap, and disconnect cleanup.
+- Add one direct unit test file for the new events SSE controller covering successful bootstrap and disconnect cleanup.
 - Manual mock artifact confirming the extracted controller preserves the SSE response contract and client lifecycle behavior.
 - Standard validation lane before closeout, including `npm run pack:smoke` because packaged CLI paths are touched in this controller-thinning slice.

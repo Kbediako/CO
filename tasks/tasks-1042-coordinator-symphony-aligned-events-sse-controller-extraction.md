@@ -14,11 +14,11 @@
 ## Shared Registry + Review Handoff
 - [x] `tasks/index.json`, `docs/TASKS.md`, and `docs/docs-freshness-registry.json` updated. Evidence: `tasks/index.json`, `docs/TASKS.md`, `docs/docs-freshness-registry.json`.
 - [x] Delegated or local read-only review approval captured in the spec/checklist notes. Evidence: `tasks/specs/1042-coordinator-symphony-aligned-events-sse-controller-extraction.md`, `docs/findings/1042-events-sse-controller-extraction-deliberation.md`.
-- [ ] docs-review approval/override captured for registered `1042`. Evidence: `.runs/1042-coordinator-symphony-aligned-events-sse-controller-extraction/cli/<run-id>/manifest.json`, `out/1042-coordinator-symphony-aligned-events-sse-controller-extraction/manual/<timestamp>-docs-first/`.
+- [x] docs-review approval/override captured for registered `1042`. Evidence: `.runs/1042-coordinator-symphony-aligned-events-sse-controller-extraction/cli/2026-03-07T08-29-07-383Z-863412c4/manifest.json`, `out/1042-coordinator-symphony-aligned-events-sse-controller-extraction/manual/20260307T080319Z-docs-first/05-docs-review-override.md`.
 
 ## Events SSE Controller Extraction
 - [ ] `/events` route handling is extracted into a dedicated controller module. Evidence: `orchestrator/src/cli/control/`, `orchestrator/src/cli/control/controlServer.ts`.
-- [ ] SSE method rejection, response bootstrap, client registration, and disconnect cleanup move with the new controller without changing stream contracts. Evidence: `orchestrator/src/cli/control/`, `orchestrator/tests/ControlServer.test.ts`.
+- [ ] SSE response bootstrap, client registration, and disconnect cleanup move with the new controller without changing stream contracts. Evidence: `orchestrator/src/cli/control/`, `orchestrator/tests/ControlServer.test.ts`.
 - [ ] SSE headers, bootstrap payload framing, and active-client lifecycle behavior remain unchanged after extraction. Evidence: `orchestrator/src/cli/control/`, `orchestrator/tests/ControlServer.test.ts`.
 - [ ] Route ordering, auth/runner-only gating, shared event fanout, `/api/v1/*`, and mutating control endpoints remain in `controlServer.ts`. Evidence: `orchestrator/src/cli/control/controlServer.ts`, `orchestrator/tests/ControlServer.test.ts`.
 
