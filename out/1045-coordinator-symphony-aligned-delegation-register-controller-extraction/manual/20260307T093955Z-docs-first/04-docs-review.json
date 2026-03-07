@@ -1,0 +1,9 @@
+{
+  "run_id": "2026-03-07T09-42-34-235Z-1948acfd",
+  "status": "failed",
+  "artifact_root": ".runs/1045-coordinator-symphony-aligned-delegation-register-controller-extraction/cli/2026-03-07T09-42-34-235Z-1948acfd",
+  "manifest": ".runs/1045-coordinator-symphony-aligned-delegation-register-controller-extraction/cli/2026-03-07T09-42-34-235Z-1948acfd/manifest.json",
+  "summary": "Advanced mode (auto) enabled: auto enabled for non-trivial pipeline 'docs-review'.\nAuto scout: evidence recorded at .runs/1045-coordinator-symphony-aligned-delegation-register-controller-extraction/cli/2026-03-07T09-42-34-235Z-1948acfd/auto-scout.json.\nStage 'Run delegation guard' failed with exit code 1.\nGuardrails: spec-guard partial (1 pending of 1).",
+  "runtime_mode": "appserver",
+  "runtime_provider": "AppServerRuntimeProvider"
+}

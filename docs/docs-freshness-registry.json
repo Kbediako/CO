@@ -6632,6 +6632,55 @@
       "cadence_days": 30
     },
     {
+      "path": ".agent/task/1045-coordinator-symphony-aligned-delegation-register-controller-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-07",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-delegation-register-controller-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-07",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/findings/1045-delegation-register-controller-extraction-deliberation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-07",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/PRD-coordinator-symphony-aligned-delegation-register-controller-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-07",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/TECH_SPEC-coordinator-symphony-aligned-delegation-register-controller-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-07",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/specs/1045-coordinator-symphony-aligned-delegation-register-controller-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-07",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/tasks-1045-coordinator-symphony-aligned-delegation-register-controller-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-07",
+      "cadence_days": 30
+    },
+    {
       "path": ".agent/task/1044-coordinator-symphony-aligned-security-violation-controller-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",

@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260307-1045-coordinator-symphony-aligned-delegation-register-controller-extraction",
+      "title": "Coordinator Symphony-Aligned Delegation Register Controller Extraction",
+      "relates_to": "tasks/tasks-1045-coordinator-symphony-aligned-delegation-register-controller-extraction.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-07",
+      "paths": {
+        "spec": "tasks/specs/1045-coordinator-symphony-aligned-delegation-register-controller-extraction.md",
+        "task": "tasks/tasks-1045-coordinator-symphony-aligned-delegation-register-controller-extraction.md",
+        "agent_task": ".agent/task/1045-coordinator-symphony-aligned-delegation-register-controller-extraction.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-delegation-register-controller-extraction.md"
+      }
+    },
+    {
       "id": "20260307-1044-coordinator-symphony-aligned-security-violation-controller-extraction",
       "title": "Coordinator Symphony-Aligned Security Violation Controller Extraction",
       "relates_to": "tasks/tasks-1044-coordinator-symphony-aligned-security-violation-controller-extraction.md",
@@ -241,20 +257,36 @@
       "completed_at": null
     },
     {
-      "id": "1044",
-      "slug": "1044-coordinator-symphony-aligned-security-violation-controller-extraction",
-      "title": "Coordinator Symphony-Aligned Security Violation Controller Extraction",
-      "path": "tasks/tasks-1044-coordinator-symphony-aligned-security-violation-controller-extraction.md",
+      "id": "1045",
+      "slug": "1045-coordinator-symphony-aligned-delegation-register-controller-extraction",
+      "title": "Coordinator Symphony-Aligned Delegation Register Controller Extraction",
+      "path": "tasks/tasks-1045-coordinator-symphony-aligned-delegation-register-controller-extraction.md",
       "kind": "run",
       "status": "in-progress",
       "gate": {
-        "phase": "coordinator-symphony-aligned-security-violation-controller-extraction-planning",
+        "phase": "coordinator-symphony-aligned-delegation-register-controller-extraction-planning",
         "status": "in-progress",
         "log": null,
         "run_id": null
       },
       "created_at": "2026-03-07",
       "completed_at": null
+    },
+    {
+      "id": "1044",
+      "slug": "1044-coordinator-symphony-aligned-security-violation-controller-extraction",
+      "title": "Coordinator Symphony-Aligned Security Violation Controller Extraction",
+      "path": "tasks/tasks-1044-coordinator-symphony-aligned-security-violation-controller-extraction.md",
+      "kind": "run",
+      "status": "completed",
+      "gate": {
+        "phase": "coordinator-symphony-aligned-security-violation-controller-extraction-closeout",
+        "status": "succeeded",
+        "log": "out/1044-coordinator-symphony-aligned-security-violation-controller-extraction/manual/20260307T093117Z-closeout/00-summary.md",
+        "run_id": "20260307T093117Z-closeout"
+      },
+      "created_at": "2026-03-07",
+      "completed_at": "2026-03-07"
     },
     {
       "id": "1043",
