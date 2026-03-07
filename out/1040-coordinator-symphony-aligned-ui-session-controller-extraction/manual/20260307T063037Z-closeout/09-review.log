@@ -1,0 +1,825 @@
+
+> @kbediako/codex-orchestrator@0.1.38 review
+> node --loader ts-node/esm scripts/run-review.ts --manifest .runs/1040-coordinator-symphony-aligned-ui-session-controller-extraction-boundary-review/cli/2026-03-07T06-14-56-301Z-72103429/manifest.json
+
+(node:50178) ExperimentalWarning: `--experimental-loader` may be removed in the future; instead use `register()`:
+--import 'data:text/javascript,import { register } from "node:module"; import { pathToFileURL } from "node:url"; register("ts-node/esm", pathToFileURL("./"));'
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:50178) [DEP0180] DeprecationWarning: fs.Stats constructor is deprecated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+⚠️ Diff budget exceeded (override applied) (base=origin/main)
+ - changed files 394 > 25
+ - total lines changed 44057 > 800
+Top changed files:
+  - orchestrator/tests/ControlServer.test.ts: 5514
+  - docs/docs-freshness-registry.json: 4520
+  - tasks/index.json: 2296
+  - orchestrator/tests/DelegationServer.test.ts: 2115
+  - orchestrator/src/cli/control/controlServer.ts: 1824
+  - orchestrator/tests/TelegramOversightBridge.test.ts: 1206
+  - orchestrator/src/cli/control/telegramOversightBridge.ts: 901
+  - orchestrator/tests/ControlRuntime.test.ts: 835
+  - orchestrator/src/cli/delegationServer.ts: 816
+  - orchestrator/src/cli/control/linearDispatchSource.ts: 654
+
+Override accepted via DIFF_BUDGET_OVERRIDE_REASON: 1040 is a bounded follow-on on a stacked branch with prior Symphony-alignment commits already ahead of origin/main; current lane delta stays small even though branch aggregate exceeds the budget
+[run-review] bounded review guidance enabled by default (set CODEX_REVIEW_ALLOW_HEAVY_COMMANDS=1 to opt into unrestricted heavy-command execution).
+[run-review] review scope metrics: 8 files, 475 lines.
+[run-review] runtime requested=appserver selected=appserver provider=AppServerRuntimeProvider.
+[run-review] delegation MCP enabled for this review (default; set --disable-delegation-mcp or CODEX_REVIEW_DISABLE_DELEGATION_MCP=1 to disable).
+Review prompt saved to: .runs/1040-coordinator-symphony-aligned-ui-session-controller-extraction-boundary-review/cli/2026-03-07T06-14-56-301Z-72103429/review/prompt.txt
+Review output log: .runs/1040-coordinator-symphony-aligned-ui-session-controller-extraction-boundary-review/cli/2026-03-07T06-14-56-301Z-72103429/review/output.log
+Launching Codex review (evidence: .runs/1040-coordinator-symphony-aligned-ui-session-controller-extraction-boundary-review/cli/2026-03-07T06-14-56-301Z-72103429/manifest.json)
+[run-review] patience-first monitor checkpoints every 1m 0s (set CODEX_REVIEW_MONITOR_INTERVAL_SECONDS=0 to disable).
+OpenAI Codex v0.111.0 (research preview)
+--------
+workdir: /Users/kbediako/Code/CO
+model: gpt-5.4
+provider: openai
+approval: never
+sandbox: danger-full-access
+reasoning effort: xhigh
+reasoning summaries: detailed
+session id: 019cc715-332d-7901-8e7f-4732f42a7438
+--------
+user
+Review task: 1040-coordinator-symphony-aligned-ui-session-controller-extraction-boundary-review
+Evidence manifest: .runs/1040-coordinator-symphony-aligned-ui-session-controller-extraction-boundary-review/cli/2026-03-07T06-14-56-301Z-72103429/manifest.json
+
+Agent notes:
+Goal: review bounded /auth/session controller extraction | Summary: extracted uiSessionController.ts, delegated controlServer route handling, added direct and end-to-end fallthrough regressions | Risks: stacked branch diff metrics overstate task delta; confirm route ordering and auth-policy ownership stayed in controlServer.ts
+
+Please review the current changes and confirm:
+- The solution is minimal and avoids unnecessary abstraction/scope
+- README/SOP docs match the implemented behavior
+- Commands/scripts are non-interactive (no TTY prompts)
+- Evidence + checklist mirroring requirements are satisfied
+
+Call out any remaining documentation/code mismatches or guardrail violations.
+
+Execution constraints (bounded review mode):
+- Keep this review focused on changed files and nearby dependencies.
+- Avoid full validation suites (for example `npm run test`, `npm run lint`, `npm run build`) during this pass.
+- If broader validation would improve confidence, list follow-up commands instead of executing them.
+
+Review scope hint: uncommitted working tree changes (default).
+
+Git scope summary:
+```
+## main...origin/main [ahead 48]
+ M .agent/task/1040-coordinator-symphony-aligned-ui-session-controller-extraction.md
+ M docs/TASKS.md
+ M orchestrator/src/cli/control/controlServer.ts
+ M orchestrator/tests/ControlServer.test.ts
+ M tasks/index.json
+ M tasks/tasks-1040-coordinator-symphony-aligned-ui-session-controller-extraction.md
+?? orchestrator/src/cli/control/uiSessionController.ts
+?? orchestrator/tests/UiSessionController.test.ts
+```
+
+Diff budget override: 1040 is a bounded follow-on on a stacked branch with prior Symphony-alignment commits already ahead of origin/main; current lane delta stays small even though branch aggregate exceeds the budget
+mcp: openaiDeveloperDocs starting
+mcp: delegation starting
+mcp: delegation ready
+mcp: openaiDeveloperDocs ready
+mcp startup: ready: delegation, openaiDeveloperDocs
+mcp: openaiDeveloperDocs starting
+mcp: delegation starting
+mcp: delegation ready
+mcp: openaiDeveloperDocs ready
+mcp startup: ready: delegation, openaiDeveloperDocs
+
+
+
+
+
+
+
+thinking
+**Reviewing JSON Patch Findings**
+
+I need to review the patch and produce JSON findings, paying attention to any diffs and memory. This task isn't simple, as it relates to the CO repo and potentially the control-bridge plan. I should quickly search MEMORY.md for keywords like “1040 coordinator symphony UI session controller extraction.” I’m wondering if using memory is necessary. The instructions say we must use it by default when it's relevant, so I’ll ensure to pass through memory quickly for the review. The final output must strictly be JSON, with a citation block if any memory files were used.
+thinking
+**Reconciling JSON and Memory Usage**
+
+I’m considering whether to perform a quick pass through memory, but that would require adding a citation block, which conflicts with the need for strict JSON output. The instructions say I must append a citation if any relevant memory files are used, yet the final output has to be pure JSON without any extra prose. It seems like I should avoid using memory, but since the repo path is mentioned, it might contrarily indicate that I need to use it. This is a bit of a conflict to navigate!
+thinking
+**Weighing Memory and Output Format**
+
+According to the instructions, I should use memory by default when handling references to the workspace, repo, and related files, especially since this is a non-trivial task regarding the CO review. However, that creates a conflict with the requirement for strict JSON formatting, since I’d need to append a memory citation that doesn't fit the JSON schema. I’m grappling with whether I can argue against using memory in this case, but it feels like the system's instructions take priority over developer preferences. Finding an interpretation that satisfies both guidelines could be tricky!
+thinking
+**Considering task delegation**
+
+I'm pondering whether I should initiate a "review" or "general" pipeline. Do I need to inspect skills or prior work? It might be easier to use delegation with the current repo and task ID, like "1040-coordinator-symphony-aligned-ui-session-controller-extraction-boundary-review-docs." Should I check the documentation or skills first? But if delegation isn't possible, I may need to provide an override reason, if complications arise. Keeping things minimal seems like the best route to avoid complexity.
+thinking
+**Considering repository changes**
+
+I'm thinking about changing the repository. I could argue that the review is bounded and not just focused on top-level implementation. Maybe delegation isn't always required? But then again, it might be necessary. I need to inspect the differences first. Should I use `git diff` against `origin/main` to check for any uncommitted changes? I’ll start by running `git status` and then check the differences.
+thinking
+**Reviewing JSON Patch Findings**
+
+I need to review the patch and produce JSON findings, paying attention to any diffs and memory. This task isn't simple, as it relates to the CO repo and potentially the control-bridge plan. I should quickly search MEMORY.md for keywords like “1040 coordinator symphony UI session controller extraction.” I’m wondering if using memory is necessary. The instructions say we must use it by default when it's relevant, so I’ll ensure to pass through memory quickly for the review. The final output must strictly be JSON, with a citation block if any memory files were used.
+thinking
+**Reconciling JSON and Memory Usage**
+
+I’m considering whether to perform a quick pass through memory, but that would require adding a citation block, which conflicts with the need for strict JSON output. The instructions say I must append a citation if any relevant memory files are used, yet the final output has to be pure JSON without any extra prose. It seems like I should avoid using memory, but since the repo path is mentioned, it might contrarily indicate that I need to use it. This is a bit of a conflict to navigate!
+thinking
+**Weighing Memory and Output Format**
+
+According to the instructions, I should use memory by default when handling references to the workspace, repo, and related files, especially since this is a non-trivial task regarding the CO review. However, that creates a conflict with the requirement for strict JSON formatting, since I’d need to append a memory citation that doesn't fit the JSON schema. I’m grappling with whether I can argue against using memory in this case, but it feels like the system's instructions take priority over developer preferences. Finding an interpretation that satisfies both guidelines could be tricky!
+thinking
+**Considering task delegation**
+
+I'm pondering whether I should initiate a "review" or "general" pipeline. Do I need to inspect skills or prior work? It might be easier to use delegation with the current repo and task ID, like "1040-coordinator-symphony-aligned-ui-session-controller-extraction-boundary-review-docs." Should I check the documentation or skills first? But if delegation isn't possible, I may need to provide an override reason, if complications arise. Keeping things minimal seems like the best route to avoid complexity.
+thinking
+**Considering repository changes**
+
+I'm thinking about changing the repository. I could argue that the review is bounded and not just focused on top-level implementation. Maybe delegation isn't always required? But then again, it might be necessary. I need to inspect the differences first. Should I use `git diff` against `origin/main` to check for any uncommitted changes? I’ll start by running `git status` and then check the differences.
+exec
+/bin/zsh -lc "git status --short && echo '---DIFF---' && git diff --stat && echo '---FILES---' && git diff --name-only" in /Users/kbediako/Code/CO succeeded in 51ms:
+ M .agent/task/1040-coordinator-symphony-aligned-ui-session-controller-extraction.md
+ M docs/TASKS.md
+ M orchestrator/src/cli/control/controlServer.ts
+ M orchestrator/tests/ControlServer.test.ts
+ M tasks/index.json
+ M tasks/tasks-1040-coordinator-symphony-aligned-ui-session-controller-extraction.md
+?? orchestrator/src/cli/control/uiSessionController.ts
+?? orchestrator/tests/UiSessionController.test.ts
+---DIFF---
+ ...ony-aligned-ui-session-controller-extraction.md | 32 +++++-----
+ docs/TASKS.md                                      |  2 +-
+ orchestrator/src/cli/control/controlServer.ts      | 73 +++-------------------
+ orchestrator/tests/ControlServer.test.ts           | 24 +++++++
+ tasks/index.json                                   | 12 ++--
+ ...ony-aligned-ui-session-controller-extraction.md | 32 +++++-----
+ 6 files changed, 73 insertions(+), 102 deletions(-)
+---FILES---
+.agent/task/1040-coordinator-symphony-aligned-ui-session-controller-extraction.md
+docs/TASKS.md
+orchestrator/src/cli/control/controlServer.ts
+
+thinking
+**Navigating git diffs**
+
+I’m realizing that `git diff` doesn’t show untracked files by default, and I need a way to see those new files. I could use `git diff --no-index /dev/null` for each untracked file, or maybe `git diff --staged` could help, but it seems they are untracked. I need to inspect the relevant files, so I should probably consider using `git diff -- orchestrator` along with checking the status for anything untracked.
+thinking
+**Navigating git diffs**
+
+I’m realizing that `git diff` doesn’t show untracked files by default, and I need a way to see those new files. I could use `git diff --no-index /dev/null` for each untracked file, or maybe `git diff --staged` could help, but it seems they are untracked. I need to inspect the relevant files, so I should probably consider using `git diff -- orchestrator` along with checking the status for anything untracked.
+exec
+/bin/zsh -lc "sed -n '1,260p' .runs/1040-coordinator-symphony-aligned-ui-session-controller-extraction-boundary-review/cli/2026-03-07T06-14-56-301Z-72103429/manifest.json" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "sed -n '1,220p' orchestrator/src/cli/control/uiSessionController.ts && printf '\\n---TEST---\\n' && sed -n '1,260p' orchestrator/tests/UiSessionController.test.ts" in /Users/kbediako/Code/COexec
+/bin/zsh -lc 'git diff -- .agent/task/1040-coordinator-symphony-aligned-ui-session-controller-extraction.md docs/TASKS.md tasks/index.json tasks/tasks-1040-coordinator-symphony-aligned-ui-session-controller-extraction.md orchestrator/src/cli/control/controlServer.ts orchestrator/tests/ControlServer.test.ts' in /Users/kbediako/Code/CO succeeded in 51ms:
+{
+  "version": 1,
+  "task_id": "1040-coordinator-symphony-aligned-ui-session-controller-extraction-boundary-review",
+  "task_slug": "1040-coordinator-symphony-aligned-ui-session-controller-extraction-boundary-review",
+  "run_id": "2026-03-07T06-14-56-301Z-72103429",
+  "parent_run_id": null,
+  "pipeline_id": "diagnostics",
+  "pipeline_title": "Diagnostics Pipeline",
+  "runner": "codex-cli",
+  "approval_policy": null,
+  "status": "succeeded",
+  "status_detail": null,
+  "started_at": "2026-03-07T06:14:56.302Z",
+  "completed_at": "2026-03-07T06:18:56.589Z",
+  "updated_at": "2026-03-07T06:18:56.597Z",
+  "heartbeat_at": "2026-03-07T06:18:56.589Z",
+  "heartbeat_interval_seconds": 5,
+  "heartbeat_stale_after_seconds": 30,
+  "artifact_root": ".runs/1040-coordinator-symphony-aligned-ui-session-controller-extraction-boundary-review/cli/2026-03-07T06-14-56-301Z-72103429",
+  "compat_path": ".runs/1040-coordinator-symphony-aligned-ui-session-controller-extraction-boundary-review/mcp/2026-03-07T06-14-56-301Z-72103429",
+ succeeded in 51ms:
+import http from 'node:http';
+
+const UI_SESSION_PATH = '/auth/session';
+const JSON_HEADERS = { 'Content-Type': 'application/json' };
+const JSON_NO_STORE_HEADERS = { ...JSON_HEADERS, 'Cache-Control': 'no-store' };
+
+export interface UiSessionControllerContext {
+  req: Pick<http.IncomingMessage, 'method' | 'url' | 'headers' | 'socket'>;
+  res: http.ServerResponse;
+  allowedHosts: ReadonlySet<string>;
+  issueSession: () => { token: string; expiresAt: string };
+  isLoopbackAddress: (address: string | undefined | null) => boolean;
+}
+
+export function handleUiSessionRequest(context: UiSessionControllerContext): boolean {
+  const method = context.req.method ?? 'GET';
+  const pathname = new URL(context.req.url ?? '/', 'http://localhost').pathname;
+  if (pathname !== UI_SESSION_PATH || (method !== 'GET' && method !== 'POST')) {
+    return false;
+  }
+ succeeded in 51ms:
+diff --git a/.agent/task/1040-coordinator-symphony-aligned-ui-session-controller-extraction.md b/.agent/task/1040-coordinator-symphony-aligned-ui-session-controller-extraction.md
+index 6b3297479..61f59416f 100644
+--- a/.agent/task/1040-coordinator-symphony-aligned-ui-session-controller-extraction.md
++++ b/.agent/task/1040-coordinator-symphony-aligned-ui-session-controller-extraction.md
+@@ -17,21 +17,21 @@
+ - [x] docs-review approval/override captured for registered `1040`. Evidence: `.runs/1040-coordinator-symphony-aligned-ui-session-controller-extraction/cli/2026-03-07T06-16-47-065Z-8182ba1e/manifest.json`, `out/1040-coordinator-symphony-aligned-ui-session-controller-extraction/manual/20260307T061455Z-docs-first/00-summary.md`.
+ 
+ ## UI Session Controller Extraction
+-- [ ] `/auth/session` route handling is extracted into a dedicated controller module. Evidence: `orchestrator/src/cli/control/`, `orchestrator/src/cli/control/controlServer.ts`.
+-- [ ] Loopback/allowed-host/origin validation and route-local response writing move with the new controller without changing route contracts. Evidence: `orchestrator/src/cli/control/`, `orchestrator/tests/ControlServer.test.ts`.
+-- [ ] Session issuance semantics remain unchanged after extraction. Evidence: `orchestrator/src/cli/control/`, `orchestrator/tests/ControlServer.test.ts`.
+-- [ ] `/api/v1/*`, webhooks, event stream setup, auth ordering, and mutating control endpoints remain in `controlServer.ts`. Evidence: `orchestrator/src/cli/control/controlServer.ts`, `orchestrator/tests/ControlServer.test.ts`.
++- [x] `/auth/session` route handling is extracted into a dedicated controller module. Evidence: `orchestrator/src/cli/control/uiSessionController.ts`, `orchestrator/src/cli/control/controlServer.ts`.
++- [x] Loopback/allowed-host/origin validation and route-local response writing move with the new controller without changing route contracts. Evidence: `orchestrator/src/cli/control/uiSessionController.ts`, `orchestrator/tests/UiSessionController.test.ts`, `out/1040-coordinator-symphony-aligned-ui-session-controller-extraction/manual/20260307T063037Z-closeout/11-manual-ui-session-controller.json`.
++- [x] Session issuance semantics remain unchanged after extraction. Evidence: `orchestrator/src/cli/control/uiSessionController.ts`, `orchestrator/tests/ControlServer.test.ts`, `out/1040-coordinator-symphony-aligned-ui-session-controller-extraction/manual/20260307T063037Z-closeout/11-manual-ui-session-controller.json`.
++- [x] `/api/v1/*`, webhooks, event stream setup, auth ordering, and mutating control endpoints remain in `controlServer.ts`. Evidence: `orchestrator/src/cli/control/controlServer.ts`, `orchestrator/tests/ControlServer.test.ts`, `out/1040-coordinator-symphony-aligned-ui-session-controller-extraction/manual/20260307T063037Z-closeout/05b-targeted-tests.log`.
+ 
+ ## Validation + Closeout
+-- [ ] `node scripts/delegation-guard.mjs`. Evidence: `out/1040-coordinator-symphony-aligned-ui-session-controller-extraction/manual/<timestamp>-closeout/01-delegation-guard.log`.
+-- [ ] `node scripts/spec-guard.mjs --dry-run`. Evidence: `out/1040-coordinator-symphony-aligned-ui-session-controller-extraction/manual/<timestamp>-closeout/02-spec-guard.log`.
+
+thinking
+I'm considering whether I need more information from the manifest or if it's not necessary. I think I should inspect the surrounding controlServer code, especially the order of authentication. I'll also need to read the relevant sections around handleRequest and the definitions of imports. It's important to gather all the right details to ensure I'm on the right track here!
+thinking
+I'm considering whether I need more information from the manifest or if it's not necessary. I think I should inspect the surrounding controlServer code, especially the order of authentication. I'll also need to read the relevant sections around handleRequest and the definitions of imports. It's important to gather all the right details to ensure I'm on the right track here!
+exec
+/bin/zsh -lc "sed -n '1,220p' orchestrator/src/cli/control/controlServer.ts" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "sed -n '480,580p' orchestrator/src/cli/control/controlServer.ts" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "grep -n \"normalizeAllowedHosts\\|parseHostHeader\\|parseOriginHost\\|isLoopbackAddress\" -n orchestrator/src/cli/control/controlServer.ts" in /Users/kbediako/Code/CO succeeded in 51ms:
+  config: EffectiveDelegationConfig;
+  persist: {
+    control: () => Promise<void>;
+    confirmations: () => Promise<void>;
+    questions: () => Promise<void>;
+    delegationTokens: () => Promise<void>;
+    linearAdvisory: () => Promise<void>;
+  };
+  clients: Set<http.ServerResponse>;
+  paths: RunPaths;
+  linearAdvisoryState: LinearAdvisoryState;
+  runtime: ControlRuntime;
+}
+
+async function handleRequest(context: RequestContext): Promise<void> {
+  if (!context.req || !context.res) {
+    return;
+  }
+  const { req, res } = context;
+  const url = new URL(req.url ?? '/', 'http://localhost');
+ succeeded in 51ms:
+import http from 'node:http';
+import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
+import { existsSync, realpathSync } from 'node:fs';
+import { chmod, readFile } from 'node:fs/promises';
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+import { writeJsonAtomic } from '../utils/fs.js';
+import { isoTimestamp } from '../utils/time.js';
+import { logger } from '../../logger.js';
+import type { RunPaths } from '../run/runPaths.js';
+import type { CliManifest } from '../types.js';
+import type { EffectiveDelegationConfig } from '../config/delegationConfig.js';
+import {
+  ControlStateStore,
+  type ControlAction,
+  type ControlState,
+  type ControlTransport,
+  type TransportIdempotencyEntry
+} from './controlState.js';
+ succeeded in 51ms:
+530:      allowedHosts: normalizeAllowedHosts(context.config.ui.allowedBindHosts),
+532:      isLoopbackAddress
+2503:export function isLoopbackAddress(address: string | undefined | null): boolean {
+2947:  const allowed = normalizeAllowedHosts(allowedHosts);
+2954:function normalizeAllowedHosts(allowedHosts?: string[]): Set<string> {
+[run-review] waiting on codex review (1m 0s elapsed, 3s idle; review progress observed).
+
+
+
+thinking
+**Reviewing code behavior**
+
+I need to check if `allowedHosts: normalizeAllowedHosts(context.config.ui.allowedBindHosts)` is being processed before authorization or webhooks. It was previously inline with the route, so it should remain consistent. I notice a possible bug where `handleUiSessionRequest` accepts any `req.url` that starts with '/auth/session?foo=bar,' which seems odd. The `pathname` is taken from the URL, so that's okay. There's also a potential issue with the new `parseHostHeader`/`parseOriginHost` not being exported, but they might just be identical copies, affecting maintainability rather than functionality.
+thinking
+**Evaluating review issues**
+
+I'm thinking about how this manifest serves as evidence for the review lane. The build/lint/test executed, even with bounded review mode, raises the question of guardrail violations in the patch. The user wants to address any remaining evidence or checklist issues. It might help to point out any documentation mismatches or violations if the manifest has broader validations than stated. I'll need to check if there's a misstatement in the docs about standalone review overrides as well.
+thinking
+**Inspecting evidence files**
+
+I'm thinking about inspecting the relevant evidence files and possibly listing the child runs from the manifest. It seems there might not be a review run included in the manifest, which points to a boundary review rather than an implementation closeout. I need to ensure I have an actual summary for the implementation closeout. I should look closely at the summary and the override notes related to the 1040 implementation task to clarify any details.
+thinking
+**Reviewing code behavior**
+
+I need to check if `allowedHosts: normalizeAllowedHosts(context.config.ui.allowedBindHosts)` is being processed before authorization or webhooks. It was previously inline with the route, so it should remain consistent. I notice a possible bug where `handleUiSessionRequest` accepts any `req.url` that starts with '/auth/session?foo=bar,' which seems odd. The `pathname` is taken from the URL, so that's okay. There's also a potential issue with the new `parseHostHeader`/`parseOriginHost` not being exported, but they might just be identical copies, affecting maintainability rather than functionality.
+thinking
+**Evaluating review issues**
+
+I'm thinking about how this manifest serves as evidence for the review lane. The build/lint/test executed, even with bounded review mode, raises the question of guardrail violations in the patch. The user wants to address any remaining evidence or checklist issues. It might help to point out any documentation mismatches or violations if the manifest has broader validations than stated. I'll need to check if there's a misstatement in the docs about standalone review overrides as well.
+thinking
+**Inspecting evidence files**
+
+I'm thinking about inspecting the relevant evidence files and possibly listing the child runs from the manifest. It seems there might not be a review run included in the manifest, which points to a boundary review rather than an implementation closeout. I need to ensure I have an actual summary for the implementation closeout. I should look closely at the summary and the override notes related to the 1040 implementation task to clarify any details.
+exec
+/bin/zsh -lc "sed -n '1,220p' out/1040-coordinator-symphony-aligned-ui-session-controller-extraction/manual/20260307T063037Z-closeout/11-manual-ui-session-controller.json" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "sed -n '1,240p' out/1040-coordinator-symphony-aligned-ui-session-controller-extraction/manual/20260307T063037Z-closeout/13-override-notes.md" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "sed -n '1,240p' out/1040-coordinator-symphony-aligned-ui-session-controller-extraction/manual/20260307T063037Z-closeout/00-summary.md" in /Users/kbediako/Code/CO succeeded in 52ms:
+# Override Notes
+
+## Diff Budget
+
+- Command: `node scripts/diff-budget.mjs`
+- Outcome: override applied
+- Reason: `1040` is landing on a stacked branch; `origin/main` still excludes earlier approved Symphony-aligned slices, so branch-wide diff metrics overstate the task-owned delta.
+- Evidence: `08-diff-budget.log`
+
+## Docs Review
+
+- Manifest: `.runs/1040-coordinator-symphony-aligned-ui-session-controller-extraction/cli/2026-03-07T06-16-47-065Z-8182ba1e/manifest.json`
+- Outcome: explicit docs-first override
+- Reason: the wrapper reached `review` and never produced a terminal verdict. Deterministic docs guards were already green, and the delegated seam review approved the bounded `/auth/session` extraction with explicit non-goals and ownership boundaries.
+- Evidence: `out/1040-coordinator-symphony-aligned-ui-session-controller-extraction/manual/20260307T061455Z-docs-first/00-summary.md`, `out/1040-coordinator-symphony-aligned-ui-session-controller-extraction/manual/20260307T061455Z-docs-first/06-docs-review-override.md`
+
+## Standalone Review
+
+- Command: `npm run review`
+- Outcome: non-terminal forced review attempt after an actual diff-budget-overridden launch
+ succeeded in 52ms:
+{
+  "post_success": {
+    "handled": true,
+    "response": {
+      "statusCode": 200,
+      "headers": {
+        "Content-Type": "application/json",
+        "Cache-Control": "no-store"
+      },
+      "body": {
+        "token": "manual-token",
+        "expires_at": "2026-03-07T06:45:00.000Z"
+      }
+    }
+  },
+  "put_fallthrough": {
+    "handled": false,
+    "response": {
+      "statusCode": null,
+      "headers": null,
+ succeeded in 52ms:
+# 1040 Closeout Summary
+
+- Task: `1040-coordinator-symphony-aligned-ui-session-controller-extraction`
+- Outcome: completed
+
+## Delivered
+
+- Extracted the standalone `/auth/session` route handling into `orchestrator/src/cli/control/uiSessionController.ts`.
+- Narrowed `orchestrator/src/cli/control/controlServer.ts` so it delegates `/auth/session` bootstrap handling to the new controller while leaving route ordering, auth/CSRF policy, webhook handling, event streaming, `/api/v1/*`, and mutating control endpoints in place.
+- Kept shared host normalization in `controlServer.ts` and scoped the endpoint-only host/origin parsing helpers to the new controller.
+- Added direct controller coverage in `orchestrator/tests/UiSessionController.test.ts` plus an end-to-end `ControlServer` regression proving unsupported `/auth/session` methods still fall through into the normal auth pipeline.
+
+## Validation
+
+- Targeted regressions passed in `05b-targeted-tests.log` (`12 passed`, `76 skipped`).
+- Full validation passed on the final tree:
+  - `01-delegation-guard.log`
+  - `02-spec-guard.log`
+  - `03-build.log`
+  - `04-lint.log`
+
+thinking
+**Investigating potential bug**
+
+I’m noticing a possible subtle bug where parseHostHeader isn’t shared with any other route anymore. I need to evaluate whether there were other functions that used it before its removal from controlServer. I’m not sure if a search function might have depended on it either. It’s essential to look into this further to clarify if there's something I've missed. Let's dive deeper into the code to find out!
+thinking
+**Investigating potential bug**
+
+I’m noticing a possible subtle bug where parseHostHeader isn’t shared with any other route anymore. I need to evaluate whether there were other functions that used it before its removal from controlServer. I’m not sure if a search function might have depended on it either. It’s essential to look into this further to clarify if there's something I've missed. Let's dive deeper into the code to find out!
+exec
+/bin/zsh -lc 'rg -n "parseHostHeader|parseOriginHost|handleUiSessionRequest|origin_required|host_not_allowed|loopback_only" orchestrator/src orchestrator/tests' in /Users/kbediako/Code/CO succeeded in 52ms:
+orchestrator/tests/ControlServer.test.ts:295:      expect(payload.error).toBe('origin_required');
+orchestrator/tests/ControlServer.test.ts:2784:      expect(payload.error).toBe('host_not_allowed');
+orchestrator/tests/UiSessionController.test.ts:5:import { handleUiSessionRequest } from '../src/cli/control/uiSessionController.js';
+orchestrator/tests/UiSessionController.test.ts:51:    const handled = handleUiSessionRequest({
+orchestrator/tests/UiSessionController.test.ts:69:    const handled = handleUiSessionRequest({
+orchestrator/tests/UiSessionController.test.ts:85:  it('rejects non-loopback requests with loopback_only', () => {
+orchestrator/tests/UiSessionController.test.ts:87:    const handled = handleUiSessionRequest({
+orchestrator/tests/UiSessionController.test.ts:103:    expect(state.body).toMatchObject({ error: 'loopback_only' });
+orchestrator/tests/UiSessionController.test.ts:106:  it('rejects disallowed host headers with host_not_allowed', () => {
+orchestrator/tests/UiSessionController.test.ts:108:    const handled = handleUiSessionRequest({
+orchestrator/tests/UiSessionController.test.ts:123:    expect(state.body).toMatchObject({ error: 'host_not_allowed' });
+orchestrator/tests/UiSessionController.test.ts:126:  it('rejects POST without Origin with origin_required', () => {
+orchestrator/tests/UiSessionController.test.ts:128:    const handled = handleUiSessionRequest({
+orchestrator/tests/UiSessionController.test.ts:143:    expect(state.body).toMatchObject({ error: 'origin_required' });
+orchestrator/tests/UiSessionController.test.ts:148:    const handled = handleUiSessionRequest({
+orchestrator/tests/UiSessionController.test.ts:174:    const handled = handleUiSessionRequest({
+orchestrator/src/cli/control/controlServer.ts:47:import { handleUiSessionRequest } from './uiSessionController.js';
+orchestrator/src/cli/control/controlServer.ts:527:    handleUiSessionRequest({
+orchestrator/src/cli/control/uiSessionController.ts:15:export function handleUiSessionRequest(context: UiSessionControllerContext): boolean {
+orchestrator/src/cli/control/uiSessionController.ts:23:    writeJsonResponse(context.res, 403, { error: 'loopback_only' });
+
+thinking
+**Checking endpoint behavior**
+
+I’m noting that there are existing tests for ControlServer regarding origin requirements. It’s probably a good idea to inspect these tests closely to ensure that we're still covering the endpoint's behavior from end to end. Let’s open those tests and see if everything is functioning as expected and aligns with our requirements. This could help me identify any gaps that need addressing!
+thinking
+**Checking endpoint behavior**
+
+I’m noting that there are existing tests for ControlServer regarding origin requirements. It’s probably a good idea to inspect these tests closely to ensure that we're still covering the endpoint's behavior from end to end. Let’s open those tests and see if everything is functioning as expected and aligns with our requirements. This could help me identify any gaps that need addressing!
+exec
+/bin/zsh -lc "sed -n '240,340p' orchestrator/tests/ControlServer.test.ts" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "sed -n '2750,2815p' orchestrator/tests/ControlServer.test.ts" in /Users/kbediako/Code/CO succeeded in 52ms:
+      const res = await fetch(new URL('/auth/session', baseUrl), {
+        method: 'POST',
+        headers: { Origin: 'http://evil.example.com' }
+      });
+
+      expect(res.status).toBe(403);
+      const payload = (await res.json()) as { error?: string };
+      expect(payload.error).toBe('origin_not_allowed');
+    } finally {
+      await server.close();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects session bootstrap with disallowed host header', async () => {
+    const { root, env, paths } = await createRunRoot('task-0940');
+    const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
+    config.ui.allowedBindHosts = ['localhost'];
+
+    const server = await ControlServer.start({
+ succeeded in 52ms:
+    const req = {
+      headers: {
+        'x-codex-delegation-token': 'token-a, token-b',
+        'x-codex-delegation-run-id': 'child-run'
+      }
+    } as unknown as http.IncomingMessage;
+
+    const parsed = readDelegationHeaders(req);
+    expect(parsed).toBeNull();
+  });
+
+  it('issues session tokens via POST with no-store', async () => {
+    const { root, env, paths } = await createRunRoot('task-0940');
+    const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
+
+    const server = await ControlServer.start({
+      paths,
+      config,
+      runId: 'run-1'
+    });
+
+thinking
+**Looking into documentation**
+
+I don't see any obvious issues at the moment. I think I need to inspect the documentation, maybe check the README or the SOP. Perhaps searching for terms like "uiSessionController" or "controlServer" in the docs could help clarify things. That might point me in the right direction. I just want to make sure I cover all bases before moving forward!
+thinking
+**Looking into documentation**
+
+I don't see any obvious issues at the moment. I think I need to inspect the documentation, maybe check the README or the SOP. Perhaps searching for terms like "uiSessionController" or "controlServer" in the docs could help clarify things. That might point me in the right direction. I just want to make sure I cover all bases before moving forward!
+exec
+/bin/zsh -lc "rg -n \"uiSessionController|/auth/session|UI Session Controller Extraction|standalone review|non-terminal\" docs .agent tasks orchestrator/src/cli/control -g '"'!dist'"'" in /Users/kbediako/Code/CO succeeded in 52ms:
+orchestrator/src/cli/control/uiSessionController.ts:3:const UI_SESSION_PATH = '/auth/session';
+orchestrator/src/cli/control/controlServer.ts:47:import { handleUiSessionRequest } from './uiSessionController.js';
+tasks/tasks-0995-coordinator-control-bridge-slice-3-residual-risk-remediation-and-transport-policy-alignment.md:27:- [x] Elegance/minimality pass note recorded after standalone review. - Evidence: `out/0995-coordinator-control-bridge-slice-3-residual-risk-remediation-and-transport-policy-alignment/manual/terminal-closeout-20260303T170505Z-elegance-review.md`.
+tasks/tasks-0994-coordinator-control-bridge-slice-2-residual-risk-closure-and-external-transport-surface-extraction.md:49:- Elegance/minimality pass (implementation stream): kept changes config-first (`codex.orchestrator.json` + one focused regression test file) and avoided expanding into `orchestrator/src`; standalone review findings were limited to unrelated 0993-owned files in this shared checkout.
+.agent/SOPs/specs-and-research.md:42:- G1 — Pre-implementation approval must be recorded in `tasks/index.json` under the task’s `gate` metadata (phase/status/log/run_id). For standalone reviews without a manifest, set `gate.log` to the spec/task notes; for docs-review/implementation runs, set `gate.run_id` to the manifest run ID.
+tasks/tasks-0979-standalone-review-runtime-telemetry.md:7:- Summary of scope: investigate forced standalone review timeout behavior and harden wrapper runtime guidance + telemetry diagnostics.
+tasks/tasks-0979-standalone-review-runtime-telemetry.md:30:- [x] Tailored standalone review completed and logged. - Evidence: `out/0979-standalone-review-runtime-telemetry/manual/post-implementation-standalone-review.log`.
+.agent/AGENTS.md:25:- Before implementation, run a standalone review of the task/spec against the user’s intent and record the approval in the spec + checklist notes.
+tasks/tasks-0959-experience-prompt-injection-delegation-skill-harmonization.md:9:> Set `MCP_RUNNER_TASK_ID=0959-experience-prompt-injection-delegation-skill-harmonization` for orchestrator commands. Guardrails required: `node scripts/delegation-guard.mjs`, `node scripts/spec-guard.mjs --dry-run`, `npm run build`, `npm run lint`, `npm run test`, `npm run docs:check`, `npm run docs:freshness`, `node scripts/diff-budget.mjs`, `npm run review`. Mirror with `docs/TASKS.md` and `.agent/task/0959-experience-prompt-injection-delegation-skill-harmonization.md`. Flip `[ ]` to `[x]` only with evidence (manifest or log when required; standalone review approvals can cite spec/task notes).
+tasks/tasks-0997-coordinator-readonly-transport-surface-pilot.md:32:- [x] Stale guard seed manifest is retained as historical non-terminal evidence and is not authoritative for 0997 terminal status. - Evidence: `out/0997-coordinator-readonly-transport-surface-pilot/manual/20260305T010613Z-stale-manifest-disposition/01-disposition-note.md`.
+tasks/tasks-0955-collab-orchestrator-integration.md:9:> Set `MCP_RUNNER_TASK_ID=0955-collab-orchestrator-integration` for orchestrator commands. Guardrails required: `node scripts/delegation-guard.mjs`, `node scripts/spec-guard.mjs --dry-run`, `npm run build`, `npm run lint`, `npm run test`, `npm run docs:check`, `npm run docs:freshness`, `node scripts/diff-budget.mjs`, `npm run review`. Mirror with `docs/TASKS.md` and `.agent/task/0955-collab-orchestrator-integration.md`. Flip `[ ]` to `[x]` only with evidence (manifest or log when required; standalone review approvals can cite spec/task notes).
+docs/standalone-review-guide.md:30:- Run a quick standalone review after each meaningful chunk of work to catch issues early.
+docs/standalone-review-guide.md:44:- Before implementation begins, run a standalone review of the task/spec against the user’s intent and record the approval (or issues) in the spec/task notes.
+docs/ACTION_PLAN-coordinator-symphony-aligned-ui-session-controller-extraction.md:1:# ACTION_PLAN - Coordinator Symphony-Aligned UI Session Controller Extraction
+docs/ACTION_PLAN-coordinator-symphony-aligned-ui-session-controller-extraction.md:9:## Phase 2 - UI Session Controller Extraction
+docs/ACTION_PLAN-coordinator-symphony-aligned-ui-session-controller-extraction.md:11:- [ ] Introduce a dedicated `/auth/session` controller helper.
+docs/ACTION_PLAN-coordinator-symphony-aligned-ui-session-controller-extraction.md:17:- [ ] Add focused server/unit regressions that prove `/auth/session` behavior parity after extraction.
+docs/ACTION_PLAN-downstream-usage-adoption-flow-guidance.md:16:2. Run standalone review + explicit elegance/minimality pass and apply follow-up reductions.
+docs/ACTION_PLAN-standalone-review-docs-first-ship.md:4:- Goal: Ship standalone review + docs-first guidance updates with clear, consistent terminology and required artifacts.
+docs/ACTION_PLAN-standalone-review-docs-first-ship.md:11:3) Run conflict audit and standalone review; record approvals in specs/checklists.
+exec
+/bin/zsh -lc "python - <<'PY'
+import json
+from pathlib import Path
+obj=json.loads(Path('tasks/index.json').read_text())
+for item in obj['items']:
+    if item['id'] in ['1039','1040','1038','1037']:
+        print(item['id'], item['gate'])
+PY" in /Users/kbediako/Code/CO exited 127 in 52ms:
+zsh:1: command not found: python
+[run-review] waiting on codex review (2m 0s elapsed, 3s idle; review progress observed).
+exec
+/bin/zsh -lc "python3 - <<'PY'
+import json
+from pathlib import Path
+obj=json.loads(Path('tasks/index.json').read_text())
+for item in obj['items']:
+    if item['id'] in ['1039','1040','1038','1037']:
+        print(item['id'], item['gate'])
+PY" in /Users/kbediako/Code/CO succeeded in 52ms:
+1040 {'phase': 'coordinator-symphony-aligned-ui-session-controller-extraction-closeout', 'status': 'succeeded', 'log': 'out/1040-coordinator-symphony-aligned-ui-session-controller-extraction/manual/20260307T063037Z-closeout/00-summary.md', 'run_id': '20260307T063037Z-closeout'}
+1039 {'phase': 'coordinator-symphony-aligned-ui-data-controller-extraction-closeout', 'status': 'succeeded', 'log': 'out/1039-coordinator-symphony-aligned-ui-data-controller-extraction/manual/20260307T055059Z-closeout/00-summary.md', 'run_id': '20260307T055059Z-closeout'}
+1038 {'phase': 'coordinator-symphony-aligned-observability-api-controller-extraction-closeout', 'status': 'succeeded', 'log': 'out/1038-coordinator-symphony-aligned-observability-api-controller-extraction/manual/20260307T045306Z-closeout/00-summary.md', 'run_id': '20260307T045306Z-closeout'}
+1037 {'phase': 'coordinator-symphony-aligned-selected-run-presenter-extraction-closeout', 'status': 'succeeded', 'log': 'out/1037-coordinator-symphony-aligned-selected-run-presenter-extraction/manual/20260307T042627Z-closeout/00-summary.md', 'run_id': '20260307T042627Z-closeout'}
+
+thinking
+**Evaluating code location overlap**
+
+I'm considering that the manifest shows build/lint/test and how that might indicate a violation. However, the findings have to match up with the code location in the diff. I’m wondering if the location could be tasks/specs/1040 or docs/TASKS referring to the boundary review noted as "bounded read-only seam review completed with no blocking issue." It seems important to clarify that these references aren't part of the diff, and I definitely need the code location to align with it.
+thinking
+**Evaluating code location overlap**
+
+I'm considering that the manifest shows build/lint/test and how that might indicate a violation. However, the findings have to match up with the code location in the diff. I’m wondering if the location could be tasks/specs/1040 or docs/TASKS referring to the boundary review noted as "bounded read-only seam review completed with no blocking issue." It seems important to clarify that these references aren't part of the diff, and I definitely need the code location to align with it.
+exec
+/bin/zsh -lc "sed -n '2935,2965p' orchestrator/src/cli/control/controlServer.ts" in /Users/kbediako/Code/CO succeeded in 52ms:
+  let parsed: URL;
+  try {
+    parsed = new URL(raw);
+  } catch {
+    throw new Error('control base_url invalid');
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    throw new Error('control base_url invalid');
+  }
+  if (parsed.username || parsed.password) {
+    throw new Error('control base_url invalid');
+  }
+  const allowed = normalizeAllowedHosts(allowedHosts);
+  if (allowed.size > 0 && !allowed.has(parsed.hostname.toLowerCase())) {
+    throw new Error('control base_url not permitted');
+  }
+  return parsed;
+}
+
+function normalizeAllowedHosts(allowedHosts?: string[]): Set<string> {
+
+
+
+thinking
+**Considering allowed hosts issue**
+
+I’m wondering if there could be a problem with an empty set for allowed hosts. If `config.ui.allowedBindHosts` is empty, then `normalizeAllowedHosts` returns LOOPBACK_HOSTS, which might lead to maintainability challenges. Also, I noticed that `handleUiSessionRequest` uses `req` where `url` might be undefined, but that doesn't seem like a critical issue. There might be a confusion in documentation around non-interactive commands. I should inspect the deliberation file and manifest for actual review findings to clarify this situation.
+thinking
+**Evaluating request allocation and potential bugs**
+
+I’m considering whether every request should allocate a new Set now, rather than just for the session route. This change could introduce minor overhead across all endpoints, especially for frequent requests like `/events`. It’s a small detail, but if the control server is handling many requests, I wonder if it adds up. 
+
+Also, I noticed `handleUiSessionRequest` sends JSON 403 responses without the `Cache-Control: no-store`, except for successful requests. There might be additional confusion regarding unit tests, as they treat `res.writeHead` headers differently than expected. I need to check any involved documentation to see if there are updates required.
+thinking
+**Inspecting the ACTION_PLAN**
+
+I’m noticing that the `diff` didn’t update the ACTION_PLAN or the spec. I need to check the ACTION_PLAN file to see if it still has any `[ ]` items, as that could go against documentation requirements. The user specifically asked for evidence and a checklist to ensure everything matches. If there are still unchecked items in a completed task, that could indicate a bug. I should look into `docs/ACTION_PLAN-coordinator-symphony-aligned-ui-session-controller-extraction.md` for clarity.
+thinking
+**Considering allowed hosts issue**
+
+I’m wondering if there could be a problem with an empty set for allowed hosts. If `config.ui.allowedBindHosts` is empty, then `normalizeAllowedHosts` returns LOOPBACK_HOSTS, which might lead to maintainability challenges. Also, I noticed that `handleUiSessionRequest` uses `req` where `url` might be undefined, but that doesn't seem like a critical issue. There might be a confusion in documentation around non-interactive commands. I should inspect the deliberation file and manifest for actual review findings to clarify this situation.
+thinking
+**Evaluating request allocation and potential bugs**
+
+I’m considering whether every request should allocate a new Set now, rather than just for the session route. This change could introduce minor overhead across all endpoints, especially for frequent requests like `/events`. It’s a small detail, but if the control server is handling many requests, I wonder if it adds up. 
+
+Also, I noticed `handleUiSessionRequest` sends JSON 403 responses without the `Cache-Control: no-store`, except for successful requests. There might be additional confusion regarding unit tests, as they treat `res.writeHead` headers differently than expected. I need to check any involved documentation to see if there are updates required.
+thinking
+**Inspecting the ACTION_PLAN**
+
+I’m noticing that the `diff` didn’t update the ACTION_PLAN or the spec. I need to check the ACTION_PLAN file to see if it still has any `[ ]` items, as that could go against documentation requirements. The user specifically asked for evidence and a checklist to ensure everything matches. If there are still unchecked items in a completed task, that could indicate a bug. I should look into `docs/ACTION_PLAN-coordinator-symphony-aligned-ui-session-controller-extraction.md` for clarity.
+exec
+/bin/zsh -lc "sed -n '1,220p' docs/ACTION_PLAN-coordinator-symphony-aligned-ui-session-controller-extraction.md" in /Users/kbediako/Code/CO succeeded in 52ms:
+# ACTION_PLAN - Coordinator Symphony-Aligned UI Session Controller Extraction
+
+## Phase 1 - Docs + Boundary Confirmation
+
+- [ ] Register `1040` across PRD / TECH_SPEC / ACTION_PLAN / task/spec mirrors / freshness registry.
+- [ ] Confirm the UI session controller extraction boundary against the post-`1039` server shape before editing runtime code.
+- [ ] Capture docs-review approval or an explicit docs-review override before editing runtime code.
+
+## Phase 2 - UI Session Controller Extraction
+
+- [ ] Introduce a dedicated `/auth/session` controller helper.
+- [ ] Move loopback/host/origin validation and route-local response writing into that module.
+- [ ] Keep auth ordering, webhooks, event stream setup, `/api/v1/*`, and mutating control endpoints on their current seams.
+
+## Phase 3 - Verification + Closeout
+
+- [ ] Add focused server/unit regressions that prove `/auth/session` behavior parity after extraction.
+- [ ] Capture a manual mock UI-session artifact.
+- [ ] Run the standard validation lane, including `npm run pack:smoke` because packaged CLI paths are touched, and record any honest overrides.
+- [ ] Sync `tasks/index.json`, `docs/TASKS.md`, and task mirrors to the terminal status.
+
+thinking
+I'm thinking about whether there might be other documents that are mismatched, like task/spec 1040, which may not have the final closeout notes updated. I wonder what the best way to inspect this information would be. It feels essential to ensure everything is aligned correctly and up-to-date, so I'm curious if I should gather all relevant docs and cross-reference them to find any discrepancies. Being thorough here seems vital!
+thinking
+I'm thinking about whether there might be other documents that are mismatched, like task/spec 1040, which may not have the final closeout notes updated. I wonder what the best way to inspect this information would be. It feels essential to ensure everything is aligned correctly and up-to-date, so I'm curious if I should gather all relevant docs and cross-reference them to find any discrepancies. Being thorough here seems vital!
+exec
+/bin/zsh -lc "sed -n '1,220p' tasks/specs/1040-coordinator-symphony-aligned-ui-session-controller-extraction.md" in /Users/kbediako/Code/CO succeeded in 51ms:
+---
+id: 20260307-1040-coordinator-symphony-aligned-ui-session-controller-extraction
+title: Coordinator Symphony-Aligned UI Session Controller Extraction
+relates_to: docs/PRD-coordinator-symphony-aligned-ui-session-controller-extraction.md
+risk: high
+owners:
+  - Codex
+last_review: 2026-03-07
+---
+
+## Summary
+
+- Objective: extract the `/auth/session` controller policy into a dedicated helper without changing session issuance or request validation behavior.
+- Scope: UI session controller extraction plus regression/manual evidence.
+- Constraints: keep auth ordering, webhook handling, event streaming, `/api/v1/*`, and mutating control behavior unchanged.
+
+## Pre-Implementation Review Note
+
+- Decision: approved for docs-first planning as the immediate next slice after `1039`.
+- Reasoning: `1039` removed the standalone `/ui/data.json` route from `controlServer.ts`, leaving `/auth/session` as the next smallest UI-adjacent controller seam that can be extracted without widening into general auth/session or provider behavior.
+
+thinking
+**Inspecting documentation alignment**
+
+I'm thinking that the spec might not capture the final closeout, and I need to check the docs, like the PRD and TECH_SPEC. I wonder if they still reflect the current state of the project. The user asked if the README and SOP documents match the implemented behavior. As it stands, it seems like the README/SOP isn't affected, but it could be that only the docs/TASKS have changed. I’ll take a closer look at the TECH_SPEC.
+thinking
+**Inspecting documentation alignment**
+
+I'm thinking that the spec might not capture the final closeout, and I need to check the docs, like the PRD and TECH_SPEC. I wonder if they still reflect the current state of the project. The user asked if the README and SOP documents match the implemented behavior. As it stands, it seems like the README/SOP isn't affected, but it could be that only the docs/TASKS have changed. I’ll take a closer look at the TECH_SPEC.
+exec
+/bin/zsh -lc "sed -n '1,220p' docs/TECH_SPEC-coordinator-symphony-aligned-ui-session-controller-extraction.md" in /Users/kbediako/Code/CO succeeded in 52ms:
+# TECH_SPEC - Coordinator Symphony-Aligned UI Session Controller Extraction
+
+## Scope
+
+- Extract the `/auth/session` controller decision path from `controlServer.ts`.
+- Preserve current loopback, host-header, origin, and no-store token issuance behavior.
+- Leave `/api/v1/*`, webhook handling, event streaming, auth ordering, and mutating control endpoints untouched.
+
+## Files / Modules
+
+- `orchestrator/src/cli/control/controlServer.ts`
+- `orchestrator/src/cli/control/`
+- `orchestrator/tests/ControlServer.test.ts`
+
+## Design
+
+1. Introduce a dedicated UI session controller module for `/auth/session`.
+2. Move route-local loopback, allowed-host, and origin validation plus response writing into that module.
+3. Keep the controller narrowly parameterized so it receives only the request/response plus the exact config/token-issuance hooks it needs.
+4. Keep `controlServer.ts` responsible for:
+[run-review] waiting on codex review (3m 0s elapsed, 7s idle; review progress observed).
+exec
+/bin/zsh -lc 'tail -n 40 out/1040-coordinator-symphony-aligned-ui-session-controller-extraction/manual/20260307T063037Z-closeout/05-test.log' in /Users/kbediako/Code/COexec
+/bin/zsh -lc 'tail -n 80 out/1040-coordinator-symphony-aligned-ui-session-controller-extraction/manual/20260307T063037Z-closeout/09-review.log' in /Users/kbediako/Code/COexec
+/bin/zsh -lc 'tail -n 60 out/1040-coordinator-symphony-aligned-ui-session-controller-extraction/manual/20260307T063037Z-closeout/10-pack-smoke.log' in /Users/kbediako/Code/CO succeeded in 52ms:
+
+stdout | tests/cli-orchestrator.spec.ts > CodexOrchestrator CLI > previews pipeline plans in JSON and text formats
+[Codex-Orchestrator] prepareRun start for pipeline parent
+[Codex-Orchestrator] prepareRun resolving pipeline parent
+[Codex-Orchestrator] PipelineResolver.resolve start for parent
+[Codex-Orchestrator] [design-config] using defaults (missing file at /var/folders/r8/ss2mqz1n5wgcph4gnh_894600000gn/T/codex-cli-VvEvhu/design.config.yaml)
+[Codex-Orchestrator] [codex-config] Loaded user config from /var/folders/r8/ss2mqz1n5wgcph4gnh_894600000gn/T/codex-cli-VvEvhu/codex.orchestrator.json
+[Codex-Orchestrator] [codex-config] Using repo-local codex.orchestrator.json.
+[Codex-Orchestrator] PipelineResolver.resolve selected pipeline parent
+[Codex-Orchestrator] prepareRun resolved pipeline parent
+[Codex-Orchestrator] prepareRun loaded metadata for task 0101
+[Codex-Orchestrator] prepareRun running planner for pipeline parent
+[Codex-Orchestrator] prepareRun planner completed for pipeline parent
+[Codex-Orchestrator] prepareRun complete for pipeline parent
+
+stdout | tests/cli-orchestrator.spec.ts > CodexOrchestrator CLI > validates manifest structure via telemetry helper
+[Codex-Orchestrator] prepareRun start for pipeline simple
+[Codex-Orchestrator] prepareRun resolving pipeline simple
+[Codex-Orchestrator] PipelineResolver.resolve start for simple
+
+ succeeded in 52ms:
+Examples:
+  TASK=<task-id> NOTES="Goal: ... | Summary: ... | Risks: ..." codex-orchestrator review
+  TASK=<task-id> NOTES="Goal: ... | Summary: ... | Risks: ..." codex-orchestrator review --manifest .runs/<task-id>/cli/<run-id>/manifest.json
+
+{
+  "status": "ok",
+  "name": "@kbediako/codex-orchestrator",
+  "version": "0.1.38",
+  "node": "v25.2.1",
+  "timestamp": "2026-03-07T06:46:23.440Z"
+}
+[run-review] skipping diff budget (missing scripts/diff-budget.mjs; downstream npm environment detected).
+[run-review] bounded review guidance enabled by default (set CODEX_REVIEW_ALLOW_HEAVY_COMMANDS=1 to opt into unrestricted heavy-command execution).
+[run-review] review scope metrics unavailable (git scope stats could not be resolved).
+Codex review handoff (non-interactive):
+---
+Review task: pack-smoke
+Evidence manifest: .runs/pack-smoke/cli/2026-01-01T00-00-00-000Z-packsmoke/manifest.json
+
+Agent notes:
+ succeeded in 52ms:
+/bin/zsh -lc "sed -n '1,220p' docs/ACTION_PLAN-coordinator-symphony-aligned-ui-session-controller-extraction.md" in /Users/kbediako/Code/CO succeeded in 52ms:
+# ACTION_PLAN - Coordinator Symphony-Aligned UI Session Controller Extraction
+
+## Phase 1 - Docs + Boundary Confirmation
+
+- [ ] Register `1040` across PRD / TECH_SPEC / ACTION_PLAN / task/spec mirrors / freshness registry.
+- [ ] Confirm the UI session controller extraction boundary against the post-`1039` server shape before editing runtime code.
+- [ ] Capture docs-review approval or an explicit docs-review override before editing runtime code.
+
+## Phase 2 - UI Session Controller Extraction
+
+- [ ] Introduce a dedicated `/auth/session` controller helper.
+- [ ] Move loopback/host/origin validation and route-local response writing into that module.
+- [ ] Keep auth ordering, webhooks, event stream setup, `/api/v1/*`, and mutating control endpoints on their current seams.
+
+## Phase 3 - Verification + Closeout
+
+- [ ] Add focused server/unit regressions that prove `/auth/session` behavior parity after extraction.
+- [ ] Capture a manual mock UI-session artifact.
+- [ ] Run the standard validation lane, including `npm run pack:smoke` because packaged CLI paths are touched, and record any honest overrides.
+
+
+thinking
+**Evaluating command execution reporting**
+
+The repo's checklists often mark [x] with explicit notes if a command doesn't yield a clear verdict. The task is about command execution, rather than just terminal success. It could be acceptable for documentation to declare all tests passed. However, the statement about the controller might be a bit misleading; it also handles validation and session issuance. I should inspect the .agent/task and tasks mirror files to confirm they’re identical. I see a potential violation regarding gate metadata, as pre-implementation approval needs recording.
+thinking
+**Inspecting repo conventions**
+
+It seems that neighboring tasks in the repo are doing the same thing, which makes me wonder if the convention has drifted. It's tough to flag this as an introduced issue. However, if the current commit repeats the bad pattern, it might still be a bug. The guidelines mention that introduced issues are related to changes in a commit, so I need to inspect the line that changed and see if the author is aware of it. I should check the SOP for more clarity.
+thinking
+**Evaluating command execution reporting**
+
+The repo's checklists often mark [x] with explicit notes if a command doesn't yield a clear verdict. The task is about command execution, rather than just terminal success. It could be acceptable for documentation to declare all tests passed. However, the statement about the controller might be a bit misleading; it also handles validation and session issuance. I should inspect the .agent/task and tasks mirror files to confirm they’re identical. I see a potential violation regarding gate metadata, as pre-implementation approval needs recording.
+thinking
+**Inspecting repo conventions**
+
+It seems that neighboring tasks in the repo are doing the same thing, which makes me wonder if the convention has drifted. It's tough to flag this as an introduced issue. However, if the current commit repeats the bad pattern, it might still be a bug. The guidelines mention that introduced issues are related to changes in a commit, so I need to inspect the line that changed and see if the author is aware of it. I should check the SOP for more clarity.
+exec
+/bin/zsh -lc "sed -n '1,120p' .agent/SOPs/specs-and-research.md" in /Users/kbediako/Code/CO succeeded in 52ms:
+# Specs and Research SOP
+
+## Added by Bootstrap 2025-10-16
+
+### SPEC-FIRST REQUIREMENT (Always)
+- Before any repo edits (code, scripts, config, or docs), create or refresh the relevant implementation docs.
+- Required docs for every task:
+  - PRD (intent, user needs, success criteria) — `docs/PRD-<slug>.md`
+  - TECH_SPEC (technical requirements) — `tasks/specs/<id>-<slug>.md`
+  - ACTION_PLAN (sequence + milestones) — `docs/ACTION_PLAN-<slug>.md`
+  - Task checklist with validation — `tasks/tasks-<id>-<slug>.md` + mirrors
+- Capture the user request translation in the PRD so intent survives context compaction.
+- Update PRD/TECH_SPEC/ACTION_PLAN as new constraints or scope changes are discovered during implementation.
+
+### WHEN TO DEEPEN DETAIL (Docs are still required)
+- Cross-service or multi-module change.
+- Database or schema migration, backfill, or data transform.
+- Security, permissions, secrets, or PII handling update.
+- External API integration or contract change.
+- Performance or SLO risk including indexes, caching, or fan-out.
+
+thinking
+I'm considering if I need to find more information. Maybe I should search for the task documents that aren't mirrored, or if the README hasn't been updated. I might look into `docs/docs-freshness-registry.json` or check the task index to see if there's an update there. Since the user is looking for evidence and checklist mirroring requirements, I think it’s important to verify if the task index and the freshness registry entries are up-to-date. I'll inspect further.
+thinking
+I'm considering if I need to find more information. Maybe I should search for the task documents that aren't mirrored, or if the README hasn't been updated. I might look into `docs/docs-freshness-registry.json` or check the task index to see if there's an update there. Since the user is looking for evidence and checklist mirroring requirements, I think it’s important to verify if the task index and the freshness registry entries are up-to-date. I'll inspect further.
+exec
+/bin/zsh -lc 'rg -n "1040-coordinator-symphony-aligned-ui-session-controller-extraction|Coordinator Symphony-Aligned UI Session Controller Extraction" docs/docs-freshness-registry.json tasks/index.json' in /Users/kbediako/Code/CO succeeded in 52ms:
+tasks/index.json:4:      "id": "20260307-1040-coordinator-symphony-aligned-ui-session-controller-extraction",
+tasks/index.json:5:      "title": "Coordinator Symphony-Aligned UI Session Controller Extraction",
+tasks/index.json:6:      "relates_to": "tasks/tasks-1040-coordinator-symphony-aligned-ui-session-controller-extraction.md",
+tasks/index.json:13:        "spec": "tasks/specs/1040-coordinator-symphony-aligned-ui-session-controller-extraction.md",
+tasks/index.json:14:        "task": "tasks/tasks-1040-coordinator-symphony-aligned-ui-session-controller-extraction.md",
+tasks/index.json:15:        "agent_task": ".agent/task/1040-coordinator-symphony-aligned-ui-session-controller-extraction.md",
+tasks/index.json:1988:      "slug": "1040-coordinator-symphony-aligned-ui-session-controller-extraction",
+tasks/index.json:1989:      "title": "Coordinator Symphony-Aligned UI Session Controller Extraction",
+tasks/index.json:1990:      "path": "tasks/tasks-1040-coordinator-symphony-aligned-ui-session-controller-extraction.md",
+tasks/index.json:1996:        "log": "out/1040-coordinator-symphony-aligned-ui-session-controller-extraction/manual/20260307T063037Z-closeout/00-summary.md",
+docs/docs-freshness-registry.json:6635:      "path": ".agent/task/1040-coordinator-symphony-aligned-ui-session-controller-extraction.md",
+docs/docs-freshness-registry.json:6670:      "path": "tasks/specs/1040-coordinator-symphony-aligned-ui-session-controller-extraction.md",
+docs/docs-freshness-registry.json:6677:      "path": "tasks/tasks-1040-coordinator-symphony-aligned-ui-session-controller-extraction.md",
+
+thinking
+**Reviewing potential issues**
+
+I’m considering whether there might be missing tests for IPv6 host headers. The inline logic exists, but it seems direct tests weren't covering it. I’ve spotted a potential route ordering bug, since `handleUiSessionRequest` is called before the linear webhook. There might be a documentation issue too. The docs indicate that the controller handles more than just bootstrap checks, and I should also check tasks 1039 and 1038 to see if anything was overlooked. I need to inspect those action plans.
+thinking
+**Reviewing potential issues**
+
+I’m considering whether there might be missing tests for IPv6 host headers. The inline logic exists, but it seems direct tests weren't covering it. I’ve spotted a potential route ordering bug, since `handleUiSessionRequest` is called before the linear webhook. There might be a documentation issue too. The docs indicate that the controller handles more than just bootstrap checks, and I should also check tasks 1039 and 1038 to see if anything was overlooked. I need to inspect those action plans.
+exec
+/bin/zsh -lc "sed -n '1,120p' docs/ACTION_PLAN-coordinator-symphony-aligned-ui-data-controller-extraction.md" in /Users/kbediako/Code/CO succeeded in 53ms:
+# ACTION_PLAN - Coordinator Symphony-Aligned UI Data Controller Extraction
+
+## Phase 1 - Docs + Boundary Confirmation
+
+- [ ] Register `1039` across PRD / TECH_SPEC / ACTION_PLAN / task/spec mirrors / freshness registry.
+- [ ] Confirm the UI controller extraction boundary against the post-`1038` server shape before editing runtime code.
+- [ ] Capture docs-review approval or an explicit docs-review override before editing runtime code.
+
+## Phase 2 - UI Data Controller Extraction
+
+- [ ] Introduce a dedicated `/ui/data.json` controller helper.
+- [ ] Move UI-route method guards and route-local response writing into that module.
+- [ ] Keep `selectedRunPresenter.ts`, `/api/v1/*`, auth/session/webhook handling, and mutating control endpoints on their current seams.
+
+## Phase 3 - Verification + Closeout
+
+- [ ] Add focused server/unit regressions that prove `/ui/data.json` behavior parity after extraction.
+- [ ] Capture a manual mock UI-data artifact.
+- [ ] Run the standard validation lane, including `npm run pack:smoke` because packaged CLI paths are touched, and record any honest overrides.
+- [ ] Sync `tasks/index.json`, `docs/TASKS.md`, and task mirrors to the terminal status.
+
+[review-timeout] npm run review exceeded 240 seconds and was terminated.

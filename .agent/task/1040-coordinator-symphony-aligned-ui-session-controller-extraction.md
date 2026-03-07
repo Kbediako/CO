@@ -17,21 +17,21 @@
 - [x] docs-review approval/override captured for registered `1040`. Evidence: `.runs/1040-coordinator-symphony-aligned-ui-session-controller-extraction/cli/2026-03-07T06-16-47-065Z-8182ba1e/manifest.json`, `out/1040-coordinator-symphony-aligned-ui-session-controller-extraction/manual/20260307T061455Z-docs-first/00-summary.md`.
 
 ## UI Session Controller Extraction
-- [ ] `/auth/session` route handling is extracted into a dedicated controller module. Evidence: `orchestrator/src/cli/control/`, `orchestrator/src/cli/control/controlServer.ts`.
-- [ ] Loopback/allowed-host/origin validation and route-local response writing move with the new controller without changing route contracts. Evidence: `orchestrator/src/cli/control/`, `orchestrator/tests/ControlServer.test.ts`.
-- [ ] Session issuance semantics remain unchanged after extraction. Evidence: `orchestrator/src/cli/control/`, `orchestrator/tests/ControlServer.test.ts`.
-- [ ] `/api/v1/*`, webhooks, event stream setup, auth ordering, and mutating control endpoints remain in `controlServer.ts`. Evidence: `orchestrator/src/cli/control/controlServer.ts`, `orchestrator/tests/ControlServer.test.ts`.
+- [x] `/auth/session` route handling is extracted into a dedicated controller module. Evidence: `orchestrator/src/cli/control/uiSessionController.ts`, `orchestrator/src/cli/control/controlServer.ts`.
+- [x] Loopback/allowed-host/origin validation and route-local response writing move with the new controller without changing route contracts. Evidence: `orchestrator/src/cli/control/uiSessionController.ts`, `orchestrator/tests/UiSessionController.test.ts`, `out/1040-coordinator-symphony-aligned-ui-session-controller-extraction/manual/20260307T063037Z-closeout/11-manual-ui-session-controller.json`.
+- [x] Session issuance semantics remain unchanged after extraction. Evidence: `orchestrator/src/cli/control/uiSessionController.ts`, `orchestrator/tests/ControlServer.test.ts`, `out/1040-coordinator-symphony-aligned-ui-session-controller-extraction/manual/20260307T063037Z-closeout/11-manual-ui-session-controller.json`.
+- [x] `/api/v1/*`, webhooks, event stream setup, auth ordering, and mutating control endpoints remain in `controlServer.ts`. Evidence: `orchestrator/src/cli/control/controlServer.ts`, `orchestrator/tests/ControlServer.test.ts`, `out/1040-coordinator-symphony-aligned-ui-session-controller-extraction/manual/20260307T063037Z-closeout/05b-targeted-tests.log`.
 
 ## Validation + Closeout
-- [ ] `node scripts/delegation-guard.mjs`. Evidence: `out/1040-coordinator-symphony-aligned-ui-session-controller-extraction/manual/<timestamp>-closeout/01-delegation-guard.log`.
-- [ ] `node scripts/spec-guard.mjs --dry-run`. Evidence: `out/1040-coordinator-symphony-aligned-ui-session-controller-extraction/manual/<timestamp>-closeout/02-spec-guard.log`.
-- [ ] `npm run build`. Evidence: `out/1040-coordinator-symphony-aligned-ui-session-controller-extraction/manual/<timestamp>-closeout/03-build.log`.
-- [ ] `npm run lint`. Evidence: `out/1040-coordinator-symphony-aligned-ui-session-controller-extraction/manual/<timestamp>-closeout/04-lint.log`.
-- [ ] `npm run test`. Evidence: `out/1040-coordinator-symphony-aligned-ui-session-controller-extraction/manual/<timestamp>-closeout/05-test.log`.
-- [ ] `npm run docs:check`. Evidence: `out/1040-coordinator-symphony-aligned-ui-session-controller-extraction/manual/<timestamp>-closeout/06-docs-check.log`.
-- [ ] `npm run docs:freshness`. Evidence: `out/1040-coordinator-symphony-aligned-ui-session-controller-extraction/manual/<timestamp>-closeout/07-docs-freshness.log`.
-- [ ] `node scripts/diff-budget.mjs`. Evidence: `out/1040-coordinator-symphony-aligned-ui-session-controller-extraction/manual/<timestamp>-closeout/08-diff-budget.log`, `out/1040-coordinator-symphony-aligned-ui-session-controller-extraction/manual/<timestamp>-closeout/13-override-notes.md`.
-- [ ] `npm run review`. Evidence: `out/1040-coordinator-symphony-aligned-ui-session-controller-extraction/manual/<timestamp>-closeout/09-review.log`, `out/1040-coordinator-symphony-aligned-ui-session-controller-extraction/manual/<timestamp>-closeout/13-override-notes.md`.
-- [ ] `npm run pack:smoke` when required by touched downstream-facing paths. Evidence: `out/1040-coordinator-symphony-aligned-ui-session-controller-extraction/manual/<timestamp>-closeout/10-pack-smoke.log`.
-- [ ] Manual mock UI-session artifact captured. Evidence: `out/1040-coordinator-symphony-aligned-ui-session-controller-extraction/manual/<timestamp>-closeout/11-manual-ui-session-controller.json`.
-- [ ] Elegance review completed. Evidence: `out/1040-coordinator-symphony-aligned-ui-session-controller-extraction/manual/<timestamp>-closeout/12-elegance-review.md`.
+- [x] `node scripts/delegation-guard.mjs`. Evidence: `out/1040-coordinator-symphony-aligned-ui-session-controller-extraction/manual/20260307T063037Z-closeout/01-delegation-guard.log`.
+- [x] `node scripts/spec-guard.mjs --dry-run`. Evidence: `out/1040-coordinator-symphony-aligned-ui-session-controller-extraction/manual/20260307T063037Z-closeout/02-spec-guard.log`.
+- [x] `npm run build`. Evidence: `out/1040-coordinator-symphony-aligned-ui-session-controller-extraction/manual/20260307T063037Z-closeout/03-build.log`.
+- [x] `npm run lint`. Evidence: `out/1040-coordinator-symphony-aligned-ui-session-controller-extraction/manual/20260307T063037Z-closeout/04-lint.log`.
+- [x] `npm run test`. Evidence: `out/1040-coordinator-symphony-aligned-ui-session-controller-extraction/manual/20260307T063037Z-closeout/05-test.log`.
+- [x] `npm run docs:check`. Evidence: `out/1040-coordinator-symphony-aligned-ui-session-controller-extraction/manual/20260307T063037Z-closeout/06-docs-check.log`.
+- [x] `npm run docs:freshness`. Evidence: `out/1040-coordinator-symphony-aligned-ui-session-controller-extraction/manual/20260307T063037Z-closeout/07-docs-freshness.log`.
+- [x] `node scripts/diff-budget.mjs`. Evidence: `out/1040-coordinator-symphony-aligned-ui-session-controller-extraction/manual/20260307T063037Z-closeout/08-diff-budget.log`, `out/1040-coordinator-symphony-aligned-ui-session-controller-extraction/manual/20260307T063037Z-closeout/13-override-notes.md`.
+- [x] `npm run review`. Evidence: `out/1040-coordinator-symphony-aligned-ui-session-controller-extraction/manual/20260307T063037Z-closeout/09-review.log`, `out/1040-coordinator-symphony-aligned-ui-session-controller-extraction/manual/20260307T063037Z-closeout/13-override-notes.md`.
+- [x] `npm run pack:smoke` when required by touched downstream-facing paths. Evidence: `out/1040-coordinator-symphony-aligned-ui-session-controller-extraction/manual/20260307T063037Z-closeout/10-pack-smoke.log`.
+- [x] Manual mock UI-session artifact captured. Evidence: `out/1040-coordinator-symphony-aligned-ui-session-controller-extraction/manual/20260307T063037Z-closeout/11-manual-ui-session-controller.json`.
+- [x] Elegance review completed. Evidence: `out/1040-coordinator-symphony-aligned-ui-session-controller-extraction/manual/20260307T063037Z-closeout/12-elegance-review.md`.

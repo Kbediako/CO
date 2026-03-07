@@ -321,6 +321,30 @@ describe('ControlServer', () => {
     }
   });
 
+  it('falls through unsupported session methods to the auth pipeline', async () => {
+    const { root, env, paths } = await createRunRoot('task-0940');
+    const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
+
+    const server = await ControlServer.start({
+      paths,
+      config,
+      runId: 'run-1'
+    });
+
+    try {
+      const baseUrl = server.getBaseUrl() ?? '';
+      const res = await fetch(new URL('/auth/session', baseUrl), {
+        method: 'PUT'
+      });
+      expect(res.status).toBe(401);
+      const payload = (await res.json()) as { error?: string };
+      expect(payload.error).toBe('unauthorized');
+    } finally {
+      await server.close();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   it('responds even when event stream append fails', async () => {
     const { root, env, paths } = await createRunRoot('task-0940');
     const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });

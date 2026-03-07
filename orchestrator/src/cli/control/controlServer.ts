@@ -44,6 +44,7 @@ import {
 } from './observabilitySurface.js';
 import { handleObservabilityApiRequest } from './observabilityApiController.js';
 import { handleUiDataRequest } from './uiDataController.js';
+import { handleUiSessionRequest } from './uiSessionController.js';
 
 interface ControlServerOptions {
   paths: RunPaths;
@@ -522,34 +523,15 @@ async function handleRequest(context: RequestContext): Promise<void> {
     return;
   }
 
-  if (url.pathname === '/auth/session' && (req.method === 'GET' || req.method === 'POST')) {
-    if (!isLoopbackAddress(req.socket.remoteAddress)) {
-      res.writeHead(403, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'loopback_only' }));
-      return;
-    }
-    const allowedHosts = normalizeAllowedHosts(context.config.ui.allowedBindHosts);
-    const hostHeader = parseHostHeader(req.headers.host);
-    if (!hostHeader || !allowedHosts.has(hostHeader)) {
-      res.writeHead(403, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'host_not_allowed' }));
-      return;
-    }
-    const originHost = parseOriginHost(req.headers.origin);
-    if (originHost) {
-      if (!allowedHosts.has(originHost)) {
-        res.writeHead(403, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: 'origin_not_allowed' }));
-        return;
-      }
-    } else if (req.method !== 'GET') {
-      res.writeHead(403, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'origin_required' }));
-      return;
-    }
-    const session = context.sessionTokens.issue();
-    res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
-    res.end(JSON.stringify({ token: session.token, expires_at: session.expiresAt }));
+  if (
+    handleUiSessionRequest({
+      req,
+      res,
+      allowedHosts: normalizeAllowedHosts(context.config.ui.allowedBindHosts),
+      issueSession: () => context.sessionTokens.issue(),
+      isLoopbackAddress
+    })
+  ) {
     return;
   }
 
@@ -2972,41 +2954,6 @@ function validateControlBaseUrl(raw: unknown, allowedHosts?: string[]): URL {
 function normalizeAllowedHosts(allowedHosts?: string[]): Set<string> {
   const values = allowedHosts && allowedHosts.length > 0 ? allowedHosts : Array.from(LOOPBACK_HOSTS);
   return new Set(values.map((entry) => entry.toLowerCase()));
-}
-
-function parseHostHeader(value: string | undefined): string | null {
-  if (!value) {
-    return null;
-  }
-  const trimmed = value.trim();
-  if (!trimmed) {
-    return null;
-  }
-  if (trimmed.startsWith('[')) {
-    const end = trimmed.indexOf(']');
-    if (end === -1) {
-      return null;
-    }
-    return trimmed.slice(1, end).toLowerCase();
-  }
-  const parts = trimmed.split(':');
-  if (parts.length > 2) {
-    return trimmed.toLowerCase();
-  }
-  const host = parts[0]?.trim();
-  return host ? host.toLowerCase() : null;
-}
-
-function parseOriginHost(value: string | undefined): string | null {
-  if (!value) {
-    return null;
-  }
-  try {
-    const parsed = new URL(value);
-    return parsed.hostname.toLowerCase();
-  } catch {
-    return null;
-  }
 }
 
 function resolveControlTokenPath(tokenPath: unknown, runDir: string): string {
