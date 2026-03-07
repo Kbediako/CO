@@ -43,6 +43,7 @@ import { handleEventsSseRequest } from './eventsSseController.js';
 import { handleQuestionQueueRequest } from './questionQueueController.js';
 import { handleDelegationRegisterRequest } from './delegationRegisterController.js';
 import { handleConfirmationCreateRequest } from './confirmationCreateController.js';
+import { handleConfirmationApproveRequest } from './confirmationApproveController.js';
 import { handleConfirmationIssueConsumeRequest } from './confirmationIssueConsumeController.js';
 import { handleConfirmationValidateRequest } from './confirmationValidateController.js';
 import {
@@ -983,54 +984,38 @@ async function handleRequest(context: RequestContext): Promise<void> {
     return;
   }
 
-  if (url.pathname === '/confirmations/approve' && req.method === 'POST') {
-    await expireConfirmations(context);
-    const body = await readJsonBody(req);
-    const requestId = readStringValue(body, 'request_id', 'requestId');
-    if (!requestId) {
-      res.writeHead(400, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'missing_request_id' }));
-      return;
-    }
-    const actor = readStringValue(body, 'actor') ?? 'ui';
-    context.confirmationStore.approve(requestId, actor);
-    const entry = context.confirmationStore.get(requestId);
-    await context.persist.confirmations();
-
-    if (entry && entry.tool.startsWith('ui.') && entry.action === 'cancel') {
-      try {
-        const nonce = context.confirmationStore.issue(requestId);
-        const validation = context.confirmationStore.validateNonce({
-          confirmNonce: nonce.confirm_nonce,
-          tool: entry.tool,
-          params: entry.params
-        });
-        await context.persist.confirmations();
-        await emitControlEvent(context, {
+  if (
+    await handleConfirmationApproveRequest({
+      req,
+      res,
+      readRequestBody: () => readJsonBody(req),
+      expireConfirmations: () => expireConfirmations(context),
+      approveConfirmation: (requestId, actor) => context.confirmationStore.approve(requestId, actor),
+      readConfirmation: (requestId) => context.confirmationStore.get(requestId),
+      persistConfirmations: () => context.persist.confirmations(),
+      issueConfirmation: (requestId) => context.confirmationStore.issue(requestId),
+      validateConfirmation: (input) =>
+        context.confirmationStore.validateNonce({
+          confirmNonce: input.confirmNonce,
+          tool: input.tool,
+          params: input.params
+        }),
+      emitConfirmationResolved: (payload) =>
+        emitControlEvent(context, {
           event: 'confirmation_resolved',
           actor: 'runner',
-          payload: {
-            request_id: validation.request.request_id,
-            nonce_id: validation.nonce_id,
-            outcome: 'approved'
-          }
-        });
+          payload
+        }),
+      updateControlAction: (input) =>
         context.controlStore.updateAction({
-          action: 'cancel',
-          requestedBy: actor,
-          requestId: requestId
-        });
-        await context.persist.control();
-        context.runtime.publish({ source: 'control.action' });
-      } catch (error) {
-        res.writeHead(409, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: (error as Error)?.message ?? 'confirmation_invalid' }));
-        return;
-      }
-    }
-
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ status: 'approved' }));
+          action: input.action,
+          requestedBy: input.requestedBy,
+          requestId: input.requestId
+        }),
+      persistControl: () => context.persist.control(),
+      publishRuntime: () => context.runtime.publish({ source: 'control.action' })
+    })
+  ) {
     return;
   }
 
