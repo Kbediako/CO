@@ -36,6 +36,6 @@
 ## Validation
 
 - Targeted `ControlServer` regressions covering accepted, duplicate, ignored, and rejected webhook paths.
-- Add one direct unit test file for the new Linear webhook controller covering route capture, signature/timestamp rejection, duplicate handling, and accepted delivery behavior.
+- Add one direct unit test file for the new Linear webhook controller covering method rejection, signature/timestamp rejection, duplicate handling, and accepted delivery behavior.
 - Manual mock artifact confirming the extracted controller preserves route-level response behavior.
 - Standard validation lane before closeout, including `npm run pack:smoke` because the packaged CLI control surface changes in this slice.
