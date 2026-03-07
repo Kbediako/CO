@@ -1,0 +1,134 @@
+{
+  "generated_at": "2026-03-07T09:14:23.206Z",
+  "controller": "questionQueueController",
+  "results": [
+    {
+      "name": "list",
+      "handled": true,
+      "state": {
+        "statusCode": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "questions": [
+            {
+              "question_id": "q-1001",
+              "parent_run_id": "parent-run",
+              "from_run_id": "child-run",
+              "from_manifest_path": null,
+              "prompt": "Need approval",
+              "urgency": "high",
+              "status": "queued",
+              "queued_at": "2026-03-07T09:00:00.000Z",
+              "expires_at": null,
+              "expires_in_ms": null,
+              "auto_pause": true,
+              "expiry_fallback": null,
+              "answer": null,
+              "answered_by": null,
+              "answered_at": null,
+              "dismissed_by": null,
+              "closed_at": null
+            }
+          ]
+        }
+      },
+      "events": [
+        {
+          "type": "queue_resolutions",
+          "count": 1
+        }
+      ],
+      "questions": [
+        {
+          "question_id": "q-1001",
+          "parent_run_id": "parent-run",
+          "from_run_id": "child-run",
+          "from_manifest_path": null,
+          "prompt": "Need approval",
+          "urgency": "high",
+          "status": "queued",
+          "queued_at": "2026-03-07T09:00:00.000Z",
+          "expires_at": null,
+          "expires_in_ms": null,
+          "auto_pause": true,
+          "expiry_fallback": null,
+          "answer": null,
+          "answered_by": null,
+          "answered_at": null,
+          "dismissed_by": null,
+          "closed_at": null
+        }
+      ]
+    },
+    {
+      "name": "enqueue_missing_prompt",
+      "handled": true,
+      "state": {
+        "statusCode": 400,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "error": "missing_prompt"
+        }
+      },
+      "events": [],
+      "questions": []
+    },
+    {
+      "name": "answer_success",
+      "handled": true,
+      "state": {
+        "statusCode": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "status": "answered"
+        }
+      },
+      "events": [
+        {
+          "type": "persist"
+        },
+        {
+          "type": "answered",
+          "question_id": "q-2001",
+          "status": "answered"
+        },
+        {
+          "type": "resolve_child",
+          "question_id": "q-2001",
+          "outcome": "answered"
+        },
+        {
+          "type": "publish",
+          "source": "questions.answer"
+        }
+      ],
+      "questions": [
+        {
+          "question_id": "q-2001",
+          "parent_run_id": "parent-run",
+          "from_run_id": "child-run",
+          "from_manifest_path": null,
+          "prompt": "Need approval",
+          "urgency": "high",
+          "status": "answered",
+          "queued_at": "2026-03-07T09:00:00.000Z",
+          "expires_at": null,
+          "expires_in_ms": null,
+          "auto_pause": true,
+          "expiry_fallback": null,
+          "answer": "Approved",
+          "answered_by": "manual-check",
+          "answered_at": "2026-03-07T09:14:23.205Z",
+          "dismissed_by": null,
+          "closed_at": "2026-03-07T09:14:23.205Z"
+        }
+      ]
+    }
+  ]
+}
