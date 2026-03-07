@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260308-1053-coordinator-symphony-aligned-control-action-cancel-confirmation-resolution-extraction",
+      "title": "Coordinator Symphony-Aligned Control Action Cancel Confirmation Resolution Extraction",
+      "relates_to": "tasks/tasks-1053-coordinator-symphony-aligned-control-action-cancel-confirmation-resolution-extraction.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-08",
+      "paths": {
+        "spec": "tasks/specs/1053-coordinator-symphony-aligned-control-action-cancel-confirmation-resolution-extraction.md",
+        "task": "tasks/tasks-1053-coordinator-symphony-aligned-control-action-cancel-confirmation-resolution-extraction.md",
+        "agent_task": ".agent/task/1053-coordinator-symphony-aligned-control-action-cancel-confirmation-resolution-extraction.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-control-action-cancel-confirmation-resolution-extraction.md"
+      }
+    },
+    {
       "id": "20260308-1052-coordinator-symphony-aligned-control-action-outcome-shaping-extraction",
       "title": "Coordinator Symphony-Aligned Control Action Outcome Shaping Extraction",
       "relates_to": "tasks/tasks-1052-coordinator-symphony-aligned-control-action-outcome-shaping-extraction.md",
@@ -366,6 +382,22 @@
         "run_id": null
       },
       "created_at": "2025-11-27",
+      "completed_at": null
+    },
+    {
+      "id": "1053",
+      "slug": "1053-coordinator-symphony-aligned-control-action-cancel-confirmation-resolution-extraction",
+      "title": "Coordinator Symphony-Aligned Control Action Cancel Confirmation Resolution Extraction",
+      "path": "tasks/tasks-1053-coordinator-symphony-aligned-control-action-cancel-confirmation-resolution-extraction.md",
+      "kind": "run",
+      "status": "in-progress",
+      "gate": {
+        "phase": "coordinator-symphony-aligned-control-action-cancel-confirmation-resolution-extraction-docs-first",
+        "status": "in-progress",
+        "log": null,
+        "run_id": null
+      },
+      "created_at": "2026-03-08",
       "completed_at": null
     },
     {
