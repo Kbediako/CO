@@ -1,0 +1,499 @@
+
+> @kbediako/codex-orchestrator@0.1.38 review
+> node --loader ts-node/esm scripts/run-review.ts
+
+(node:28511) ExperimentalWarning: `--experimental-loader` may be removed in the future; instead use `register()`:
+--import 'data:text/javascript,import { register } from "node:module"; import { pathToFileURL } from "node:url"; register("ts-node/esm", pathToFileURL("./"));'
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:28511) [DEP0180] DeprecationWarning: fs.Stats constructor is deprecated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+⚠️ Diff budget exceeded (override applied) (base=origin/main)
+ - changed files 484 > 25
+ - total lines changed 50899 > 800
+Top changed files:
+  - orchestrator/tests/ControlServer.test.ts: 5983
+  - docs/docs-freshness-registry.json: 5076
+  - tasks/index.json: 2528
+  - orchestrator/tests/DelegationServer.test.ts: 2115
+  - orchestrator/src/cli/control/controlServer.ts: 1888
+  - orchestrator/tests/TelegramOversightBridge.test.ts: 1206
+  - orchestrator/src/cli/control/telegramOversightBridge.ts: 901
+  - orchestrator/tests/ControlRuntime.test.ts: 835
+  - orchestrator/src/cli/delegationServer.ts: 816
+  - orchestrator/src/cli/control/linearDispatchSource.ts: 654
+
+Override accepted via DIFF_BUDGET_OVERRIDE_REASON: stacked branch for ongoing symphony-aligned controller extraction slices
+[run-review] NOTES was not provided; using a generated fallback. Set NOTES="Goal: ... | Summary: ... | Risks: ... | Questions (optional): ..." for higher-signal review context.
+[run-review] bounded review guidance enabled by default (set CODEX_REVIEW_ALLOW_HEAVY_COMMANDS=1 to opt into unrestricted heavy-command execution).
+[run-review] review scope metrics: 3 files, 192 lines.
+[run-review] runtime requested=appserver selected=appserver provider=AppServerRuntimeProvider.
+[run-review] delegation MCP enabled for this review (default; set --disable-delegation-mcp or CODEX_REVIEW_DISABLE_DELEGATION_MCP=1 to disable).
+Review prompt saved to: .runs/1050-coordinator-symphony-aligned-confirmation-list-controller-extraction-guard/cli/2026-03-07T12-49-16-419Z-2ab5bdca/review/prompt.txt
+Review output log: .runs/1050-coordinator-symphony-aligned-confirmation-list-controller-extraction-guard/cli/2026-03-07T12-49-16-419Z-2ab5bdca/review/output.log
+Launching Codex review (evidence: .runs/1050-coordinator-symphony-aligned-confirmation-list-controller-extraction-guard/cli/2026-03-07T12-49-16-419Z-2ab5bdca/manifest.json)
+[run-review] patience-first monitor checkpoints every 1m 0s (set CODEX_REVIEW_MONITOR_INTERVAL_SECONDS=0 to disable).
+OpenAI Codex v0.111.0 (research preview)
+--------
+workdir: /Users/kbediako/Code/CO
+model: gpt-5.4
+provider: openai
+approval: never
+sandbox: danger-full-access
+reasoning effort: xhigh
+reasoning summaries: detailed
+session id: 019cc85d-4fb5-7ee0-8ab3-8dd09f0f3a83
+--------
+user
+Review task: unknown-task
+Evidence manifest: .runs/1050-coordinator-symphony-aligned-confirmation-list-controller-extraction-guard/cli/2026-03-07T12-49-16-419Z-2ab5bdca/manifest.json
+
+Agent notes:
+Goal: standalone review handoff | Summary: auto-generated NOTES fallback (task=unknown-task, manifest=.runs/1050-coordinator-symphony-aligned-confirmation-list-controller-extraction-guard/cli/2026-03-07T12-49-16-419Z-2ab5bdca/manifest.json) | Risks: missing custom intent details may reduce review precision
+
+Please review the current changes and confirm:
+- The solution is minimal and avoids unnecessary abstraction/scope
+- README/SOP docs match the implemented behavior
+- Commands/scripts are non-interactive (no TTY prompts)
+- Evidence + checklist mirroring requirements are satisfied
+
+Call out any remaining documentation/code mismatches or guardrail violations.
+
+Execution constraints (bounded review mode):
+- Keep this review focused on changed files and nearby dependencies.
+- Avoid full validation suites (for example `npm run test`, `npm run lint`, `npm run build`) during this pass.
+- If broader validation would improve confidence, list follow-up commands instead of executing them.
+
+Review scope hint: uncommitted working tree changes (default).
+
+Git scope summary:
+```
+## main...origin/main [ahead 73]
+ M orchestrator/src/cli/control/controlServer.ts
+?? orchestrator/src/cli/control/confirmationListController.ts
+?? orchestrator/tests/ConfirmationListController.test.ts
+```
+
+Diff budget override: stacked branch for ongoing symphony-aligned controller extraction slices
+mcp: delegation starting
+mcp: openaiDeveloperDocs starting
+mcp: delegation ready
+mcp: openaiDeveloperDocs ready
+mcp startup: ready: delegation, openaiDeveloperDocs
+mcp: delegation starting
+mcp: openaiDeveloperDocs starting
+mcp: delegation ready
+mcp: openaiDeveloperDocs ready
+mcp startup: ready: delegation, openaiDeveloperDocs
+
+
+
+thinking
+**Reviewing code changes**
+
+I need to perform a code review on the current changes in repository CO, focusing on outputting an exact JSON list of findings, even if it's empty. I’m considering inspecting the diff and checking if memory is relevant here. Since the inquiry is about repo CO, I should default to using memory and skim through MEMORY.md for the review workflow. However, I need to stick strictly to the JSON output format without extra prose, despite the citation requirements.
+thinking
+**Considering memory usage**
+
+The instructions indicate that I should use memory by default when repo CO is mentioned, but I might consider skipping that this time. I should probably do a quick pass to check, but because the final output needs to be strict JSON, I can see how using memory could create a conflict. It's best to proceed without it, focusing solely on the repo diff analysis and reviewing the current changes by inspecting the files with git diff.
+thinking
+**Planning the code review**
+
+It seems like we need a plan for the review tasks since they’re non-trivial, though I’m not sure a formal plan is necessary. I might check the manifest or task documents, and also take a look at what AGENTS have accomplished. I need to focus on minimality, ensuring documentation matches, and identify any violations from the commit. I can inspect the git diff and review the changed files, like controlServer.ts and confirmationListController.ts, to understand the context better.
+thinking
+**Reviewing code changes**
+
+I need to perform a code review on the current changes in repository CO, focusing on outputting an exact JSON list of findings, even if it's empty. I’m considering inspecting the diff and checking if memory is relevant here. Since the inquiry is about repo CO, I should default to using memory and skim through MEMORY.md for the review workflow. However, I need to stick strictly to the JSON output format without extra prose, despite the citation requirements.
+thinking
+**Considering memory usage**
+
+The instructions indicate that I should use memory by default when repo CO is mentioned, but I might consider skipping that this time. I should probably do a quick pass to check, but because the final output needs to be strict JSON, I can see how using memory could create a conflict. It's best to proceed without it, focusing solely on the repo diff analysis and reviewing the current changes by inspecting the files with git diff.
+thinking
+**Planning the code review**
+
+It seems like we need a plan for the review tasks since they’re non-trivial, though I’m not sure a formal plan is necessary. I might check the manifest or task documents, and also take a look at what AGENTS have accomplished. I need to focus on minimality, ensuring documentation matches, and identify any violations from the commit. I can inspect the git diff and review the changed files, like controlServer.ts and confirmationListController.ts, to understand the context better.
+exec
+/bin/zsh -lc 'git diff -- orchestrator/src/cli/control/controlServer.ts orchestrator/src/cli/control/confirmationListController.ts orchestrator/tests/ConfirmationListController.test.ts' in /Users/kbediako/Code/CO succeeded in 52ms:
+diff --git a/orchestrator/src/cli/control/controlServer.ts b/orchestrator/src/cli/control/controlServer.ts
+index 4680aeeb8..6e913ba2a 100644
+--- a/orchestrator/src/cli/control/controlServer.ts
++++ b/orchestrator/src/cli/control/controlServer.ts
+@@ -18,7 +18,7 @@ import {
+   type ControlTransport,
+   type TransportIdempotencyEntry
+ } from './controlState.js';
+-import { ConfirmationStore, type ConfirmationRequest, type ConfirmationStoreSnapshot } from './confirmations.js';
++import { ConfirmationStore, type ConfirmationStoreSnapshot } from './confirmations.js';
+ import { QuestionQueue, type QuestionRecord } from './questions.js';
+ import { DelegationTokenStore, type DelegationTokenRecord } from './delegationTokens.js';
+ import { type DispatchPilotEvaluation } from './trackerDispatchPilot.js';
+@@ -42,6 +42,7 @@ import { handleSecurityViolationRequest } from './securityViolationController.js
+ import { handleEventsSseRequest } from './eventsSseController.js';
+ import { handleQuestionQueueRequest } from './questionQueueController.js';
+ import { handleDelegationRegisterRequest } from './delegationRegisterController.js';
++import { handleConfirmationListRequest } from './confirmationListController.js';
+ import { handleConfirmationCreateRequest } from './confirmationCreateController.js';
+ import { handleConfirmationApproveRequest } from './confirmationApproveController.js';
+
+thinking
+**Opening a new file**
+
+I need to open a new file, which may also involve checking the existing controllers. It's important to ensure everything is set up correctly before proceeding. I'll consider how to integrate the new file with the current system and be mindful of any dependencies or impacts on functionality. So, getting this right is crucial, and I'll take my time to ensure everything flows smoothly!
+thinking
+**Opening a new file**
+
+I need to open a new file, which may also involve checking the existing controllers. It's important to ensure everything is set up correctly before proceeding. I'll consider how to integrate the new file with the current system and be mindful of any dependencies or impacts on functionality. So, getting this right is crucial, and I'll take my time to ensure everything flows smoothly!
+exec
+/bin/zsh -lc "sed -n '1,220p' orchestrator/src/cli/control/confirmationCreateController.ts" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "sed -n '1,260p' orchestrator/tests/ConfirmationListController.test.ts" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "sed -n '1,220p' orchestrator/src/cli/control/confirmationListController.ts" in /Users/kbediako/Code/CO succeeded in 52ms:
+import http from 'node:http';
+
+import type { ConfirmationRequest } from './confirmations.js';
+
+export interface ConfirmationListControllerContext {
+  req: Pick<http.IncomingMessage, 'method' | 'url'>;
+  res: http.ServerResponse;
+  expireConfirmations(): Promise<void>;
+  listPendingConfirmations(): ConfirmationRequest[];
+}
+
+export async function handleConfirmationListRequest(
+  context: ConfirmationListControllerContext
+): Promise<boolean> {
+  const method = context.req.method ?? 'GET';
+  const pathname = new URL(context.req.url ?? '/', 'http://localhost').pathname;
+  if (pathname !== '/confirmations' || method !== 'GET') {
+    return false;
+  }
+
+ succeeded in 52ms:
+import http from 'node:http';
+
+import { describe, expect, it, vi } from 'vitest';
+
+import {
+  handleConfirmationListRequest,
+  type ConfirmationListControllerContext
+} from '../src/cli/control/confirmationListController.js';
+import type { ConfirmationRequest } from '../src/cli/control/confirmations.js';
+
+function createResponseRecorder() {
+  const state: {
+    statusCode: number | null;
+    headers: Record<string, string> | null;
+    body: unknown;
+  } = {
+    statusCode: null,
+    headers: null,
+    body: null
+  };
+ succeeded in 52ms:
+import http from 'node:http';
+
+import type { ConfirmationAction, ConfirmationCreateResult } from './confirmations.js';
+
+type ConfirmationRequiredPayload = {
+  request_id: string;
+  confirm_scope: {
+    run_id: string;
+    action: ConfirmationAction;
+    action_params_digest: string;
+  };
+  action_params_digest: string;
+  digest_alg: 'sha256';
+  confirm_expires_in_ms: number;
+};
+
+export interface ConfirmationCreateControllerContext {
+  req: Pick<http.IncomingMessage, 'method' | 'url'>;
+  res: http.ServerResponse;
+  authKind: 'control' | 'session';
+exec
+/bin/zsh -lc "sed -n '1,260p' orchestrator/src/cli/control/confirmations.ts" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "ls orchestrator/src/cli/control | sed -n '1,200p'" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "rg -n \"sanitizeConfirmations|/confirmations' && req.method === 'GET'|pending:\" orchestrator/src/cli/control -g'*.ts'" in /Users/kbediako/Code/CO succeeded in 51ms:
+compatibilityIssuePresenter.ts
+confirmationApproveController.ts
+confirmationCreateController.ts
+confirmationIssueConsumeController.ts
+confirmationListController.ts
+confirmationValidateController.ts
+confirmations.ts
+controlRuntime.ts
+controlServer.ts
+controlState.ts
+controlWatcher.ts
+delegationRegisterController.ts
+delegationTokens.ts
+dynamicToolBridgePolicy.ts
+eventsSseController.ts
+linearDispatchSource.ts
+linearWebhookController.ts
+liveLinearAdvisoryRuntime.ts
+observabilityApiController.ts
+observabilityReadModel.ts
+ succeeded in 52ms:
+import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
+import canonicalize from 'canonicalize';
+
+export type ConfirmationAction = 'cancel' | 'merge' | 'other';
+
+export interface ConfirmationRequest {
+  request_id: string;
+  action: ConfirmationAction;
+  tool: string;
+  params: Record<string, unknown>;
+  action_params_digest: string;
+  digest_alg: 'sha256';
+  requested_at: string;
+  expires_at: string;
+  approved_by?: string | null;
+  approved_at?: string | null;
+}
+
+export interface ConfirmationCreateInput {
+  action: ConfirmationAction;
+ succeeded in 52ms:
+orchestrator/src/cli/control/confirmations.ts:58:  pending: ConfirmationRequest[];
+orchestrator/src/cli/control/confirmations.ts:279:      pending: this.listPending(),
+orchestrator/src/cli/control/selectedRunPresenter.ts:92:    approvals_pending: 0,
+orchestrator/src/cli/control/selectedRunPresenter.ts:117:    approvals_pending: 0,
+orchestrator/src/cli/control/confirmationListController.ts:22:  const pending = sanitizeConfirmations(context.listPendingConfirmations());
+orchestrator/src/cli/control/confirmationListController.ts:30:  body: { pending: Array<Omit<ConfirmationRequest, 'params'>> }
+orchestrator/src/cli/control/confirmationListController.ts:36:function sanitizeConfirmations(
+orchestrator/src/cli/control/controlServer.ts:228:        pending: confirmationsSeed?.pending ?? [],
+
+thinking
+**Exploring controller patterns**
+
+I need to read more about the surrounding controlServer and how it handles requests, along with other controller patterns. There seems to be some intricacies I need to understand. It's important to grasp these concepts to ensure that I'm effectively using them in the right context. I wonder what best practices are out there or if there's some deeper architecture that I should be aware of. Let’s dive into these patterns!
+thinking
+**Exploring controller patterns**
+
+I need to read more about the surrounding controlServer and how it handles requests, along with other controller patterns. There seems to be some intricacies I need to understand. It's important to grasp these concepts to ensure that I'm effectively using them in the right context. I wonder what best practices are out there or if there's some deeper architecture that I should be aware of. Let’s dive into these patterns!
+exec
+/bin/zsh -lc "sed -n '930,1025p' orchestrator/src/cli/control/controlServer.ts" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "sed -n '1,220p' orchestrator/src/cli/control/confirmationApproveController.ts" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "sed -n '1,220p' orchestrator/src/cli/control/questionQueueController.ts" in /Users/kbediako/Code/CO succeeded in 52ms:
+      reason: reason ?? null,
+      requestId: auditRequestId,
+      intentId: auditIntentId,
+      snapshot,
+      traceability
+    });
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    const payload = update.idempotentReplay ? { ...snapshot, idempotent_replay: true } : snapshot;
+    res.end(JSON.stringify(traceability ? { ...payload, traceability } : payload));
+    return;
+  }
+
+  if (
+    await handleConfirmationCreateRequest({
+      req,
+      res,
+      authKind: auth.kind,
+      readRequestBody: () => readJsonBody(req),
+      expireConfirmations: () => expireConfirmations(context),
+      createConfirmation: ({ action, tool, params }) =>
+ succeeded in 51ms:
+import http from 'node:http';
+
+import type {
+  ConfirmationNonce,
+  ConfirmationRequest,
+  ConfirmationValidationResult
+} from './confirmations.js';
+
+type ConfirmationResolvedPayload = {
+  request_id: string;
+  nonce_id: string;
+  outcome: 'approved';
+};
+
+export interface ConfirmationApproveControllerContext {
+  req: Pick<http.IncomingMessage, 'method' | 'url'>;
+  res: http.ServerResponse;
+  readRequestBody(): Promise<Record<string, unknown>>;
+  expireConfirmations(): Promise<void>;
+  approveConfirmation(requestId: string, actor: string): void;
+ succeeded in 50ms:
+import http from 'node:http';
+
+import type { CliManifest } from '../types.js';
+import type { QuestionQueue, QuestionRecord, QuestionUrgency } from './questions.js';
+
+interface DelegationAuth {
+  token: string;
+  childRunId: string;
+}
+
+type QuestionRouteSource = 'questions.enqueue' | 'questions.answer' | 'questions.dismiss';
+
+export interface QuestionQueueControllerContext {
+  req: Pick<http.IncomingMessage, 'method' | 'url' | 'headers'>;
+  res: http.ServerResponse;
+  questionQueue: Pick<QuestionQueue, 'list' | 'enqueue' | 'answer' | 'dismiss' | 'get'>;
+  readRequestBody(): Promise<Record<string, unknown>>;
+  expireQuestions(): Promise<void>;
+  queueQuestionResolutions(records: QuestionRecord[]): void;
+  readDelegationHeaders(): DelegationAuth | null;
+
+thinking
+**Evaluating documentation and changes**
+
+I'm thinking about how to handle guardrail violations when reviewing changed files and nearby dependencies. I might need to check the manifest and even run a git diff for documentation, although there aren't any document changes in the working tree. The user wants to see current changes and confirms the requirements. So, I should focus on the diff and consider any code changes that haven’t updated the documentation as potential bugs. I’ll inspect the git status and manifest to verify everything.
+thinking
+**Evaluating documentation and changes**
+
+I'm thinking about how to handle guardrail violations when reviewing changed files and nearby dependencies. I might need to check the manifest and even run a git diff for documentation, although there aren't any document changes in the working tree. The user wants to see current changes and confirms the requirements. So, I should focus on the diff and consider any code changes that haven’t updated the documentation as potential bugs. I’ll inspect the git status and manifest to verify everything.
+exec
+/bin/zsh -lc 'cat .runs/1050-coordinator-symphony-aligned-confirmation-list-controller-extraction-guard/cli/2026-03-07T12-49-16-419Z-2ab5bdca/manifest.json' in /Users/kbediako/Code/COexec
+/bin/zsh -lc "rg -n \"1050|confirmation list|confirmationListController|confirmations\" tasks docs .agent orchestrator/src/cli/control -g'*.md' -g'*.json' -g'*.ts'" in /Users/kbediako/Code/COexec
+/bin/zsh -lc 'git status --short' in /Users/kbediako/Code/CO succeeded in 50ms:
+Total output lines: 2844
+
+{
+  "version": 1,
+  "task_id": "1050-coordinator-symphony-aligned-confirmation-list-controller-extraction-guard",
+  "task_slug": "1050-coordinator-symphony-aligned-confirmation-list-controller-extraction-guard",
+  "run_id": "2026-03-07T12-49-16-419Z-2ab5bdca",
+  "parent_run_id": null,
+  "pipeline_id": "implementation-gate",
+  "pipeline_title": "Implementation Complete Gate",
+  "runner": "codex-cli",
+  "approval_policy": null,
+  "status": "failed",
+  "status_detail": "stage:diff-budget:failed",
+  "started_at": "2026-03-07T12:49:16.420Z",
+  "completed_at": "2026-03-07T12:53:46.867Z",
+  "updated_at": "2026-03-07T12:53:46.875Z",
+  "heartbeat_at": "2026-03-07T12:53:46.867Z",
+  "heartbeat_interval_seconds": 5,
+  "heartbeat_stale_after_seconds": 30,
+ succeeded in 52ms:
+Total output lines: 263
+
+orchestrator/src/cli/control/confirmationValidateController.ts:3:import type { ConfirmationValidationResult } from './confirmations.js';
+orchestrator/src/cli/control/confirmationValidateController.ts:30:  if (pathname !== '/confirmations/validate' || method !== 'POST') {
+orchestrator/src/cli/control/confirmationCreateController.ts:3:import type { ConfirmationAction, ConfirmationCreateResult } from './confirmations.js';
+orchestrator/src/cli/control/confirmationCreateController.ts:39:  if (pathname !== '/confirmations/create' || method !== 'POST') {
+orchestrator/src/cli/control/confirmationListController.ts:3:import type { ConfirmationRequest } from './confirmations.js';
+orchestrator/src/cli/control/confirmationListController.ts:17:  if (pathname !== '/confirmations' || method !== 'GET') {
+orchestrator/src/cli/control/confirmationIssueConsumeController.ts:3:import type { ConfirmationNonce } from './confirmations.js';
+orchestrator/src/cli/control/confirmationIssueConsumeController.ts:47:  return pathname === '/confirmations/issue' || pathname === '/confirmations/consume';
+orchestrator/src/cli/control/confirmationApproveController.ts:7:} from './confirmations.js';
+orchestrator/src/cli/control/confirmationApproveController.ts:44:  if (pathname !== '/confirmations/approve' || method !== 'POST') {
+orchestrator/src/cli/control/controlServer.ts:21:import { ConfirmationStore, type ConfirmationStoreSnapshot } from './confirmations.js';
+orchestrator/src/cli/control/controlServer.ts:45:import { handleConfirmationListRequest } from './confirmationListController.js';
+orchestrator/src/cli/control/controlServer.ts:203:    const confirmationsSeed = await readJsonFile<ConfirmationStoreSnapshot>(options.paths.confirmationsPath);
+orchestrator/src/cli/control/controlServer.ts:228:        pending: confirmationsSeed?.pending ?? [],
+orchestrator/src/cli/control/controlServer.ts:229:        issued: confirmationsSeed?.issued ?? [],
+orchestrator/src/cli/control/controlServer.ts:230:        consumed_nonce_ids: confirmationsSeed?.consumed_nonce_ids ?? []
+orchestrator/src/cli/control/controlServer.ts:248:      confirmations: async () => writeJsonAtomic(options.paths.confirmationsPath, confirmationStore.snapshot()),
+orchestrator/src/cli/control/controlServer.ts:489:    confirmations: () => Promise<void>;
+ succeeded in 52ms:
+ M orchestrator/src/cli/control/controlServer.ts
+?? orchestrator/src/cli/control/confirmationListController.ts
+?? orchestrator/tests/ConfirmationListController.test.ts
+
+thinking
+**Inspecting code issues**
+
+I think the manifest output is huge, so it seems likely enough. I should inspect the task documentation, maybe even look into the branch specifications, since I can potentially uncover issues in the code. I need to analyze the changed code semantics thoroughly. 
+
+I see that handleConfirmationListRequest uses a new URL on req.url, but it should match what was used in controlServer. It appears there was already a URL guard, but now it’s re-parsing req.url, which could change the behavior if the URL is invalid. I should check the exception handling in handleRequest.
+thinking
+**Inspecting code issues**
+
+I think the manifest output is huge, so it seems likely enough. I should inspect the task documentation, maybe even look into the branch specifications, since I can potentially uncover issues in the code. I need to analyze the changed code semantics thoroughly. 
+
+I see that handleConfirmationListRequest uses a new URL on req.url, but it should match what was used in controlServer. It appears there was already a URL guard, but now it’s re-parsing req.url, which could change the behavior if the URL is invalid. I should check the exception handling in handleRequest.
+exec
+/bin/zsh -lc "sed -n '700,850p' orchestrator/src/cli/control/controlServer.ts" in /Users/kbediako/Code/CO succeeded in 52ms:
+        writeControlError(res, 409, 'transport_nonce_expired', baseTraceability);
+        return false;
+      }
+      if (transportMutation.nonceExpiresAtMs - nowMs > transportPolicy.nonceMaxTtlMs) {
+        writeControlError(res, 400, 'transport_nonce_expiry_out_of_range', baseTraceability);
+        return false;
+      }
+      if (context.controlStore.isTransportNonceConsumed(transportMutation.nonce)) {
+        writeControlError(res, 409, 'transport_nonce_replayed', baseTraceability);
+        return false;
+      }
+      transportIdempotencyWindowMs = transportPolicy.idempotencyWindowMs;
+      return true;
+    };
+
+    if (!validateTransportMutationRequest()) {
+      return;
+    }
+
+    const persistControlWithTransportNonce = async (): Promise<void> => {
+exec
+/bin/zsh -lc "sed -n '850,940p' orchestrator/src/cli/control/controlServer.ts" in /Users/kbediako/Code/CO succeeded in 52ms:
+          action,
+          decision: 'rejected',
+          requestId: resolvedRequestId ?? null,
+          intentId,
+          taskId,
+          runId: snapshot.run_id,
+          manifestPath: context.paths.manifestPath,
+          transport: confirmedTransportMutationResult.partial?.transport ?? null,
+          actorId: confirmedTransportMutationResult.partial?.actorId ?? null,
+          actorSource: confirmedTransportMutationResult.partial?.actorSource ?? null,
+          principal: confirmedTransportMutationResult.partial?.principal ?? null
+        });
+        writeControlError(res, confirmedTransportMutationStatus, confirmedTransportMutationResult.error, traceability);
+        return;
+      }
+      transportMutation = confirmedTransportMutationResult.request;
+      isTransportMutation = Boolean(transportMutation);
+      if (!validateTransportMutationRequest()) {
+        return;
+      }
+[run-review] waiting on codex review (1m 0s elapsed, 3s idle; review progress observed).
+exec
+/bin/zsh -lc "sed -n '520,620p' orchestrator/src/cli/control/controlServer.ts" in /Users/kbediako/Code/CO succeeded in 52ms:
+    const search = url.search ? url.search : '';
+    res.writeHead(302, { Location: `/ui${search}` });
+    res.end();
+    return;
+  }
+
+  const uiAsset = resolveUiAssetPath(url.pathname);
+  if (uiAsset) {
+    await serveUiAsset(uiAsset, res);
+    return;
+  }
+
+  if (
+    handleUiSessionRequest({
+      req,
+      res,
+      allowedHosts: normalizeAllowedHosts(context.config.ui.allowedBindHosts),
+      issueSession: () => context.sessionTokens.issue(),
+      isLoopbackAddress
+    })
+exec
+/bin/zsh -lc "sed -n '460,520p' orchestrator/src/cli/control/controlServer.ts" in /Users/kbediako/Code/CO succeeded in 52ms:
+          issueIdentifier: result.issueIdentifier
+        });
+        return buildTelegramOversightDispatchPayload(result);
+      },
+
+      readQuestions: async (): Promise<QuestionsPayload> => {
+        const context = buildInternalContext();
+        await expireQuestions(context);
+        const questions = context.questionQueue.list();
+        queueQuestionResolutions(context, questions);
+        return { questions };
+      }
+    };
+  }
+}
+
+interface RequestContext {
+  req: http.IncomingMessage | null;
+  res: http.ServerResponse | null;
+  token: string;
