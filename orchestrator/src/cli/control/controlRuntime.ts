@@ -5,6 +5,7 @@ import {
   buildCompatibilityProjectionSnapshot,
   buildTrackedLinearPayload,
   type ControlCompatibilityProjectionSnapshot,
+  type ControlCompatibilityRuntimeSnapshot,
   type ControlSelectedRunRuntimeSnapshot,
 } from './observabilityReadModel.js';
 import { createLiveLinearAdvisoryRuntime } from './liveLinearAdvisoryRuntime.js';
@@ -107,8 +108,10 @@ function createControlRuntimeSnapshot(
   context: ControlRuntimeContext,
   liveLinearAdvisoryRuntime: ReturnType<typeof createLiveLinearAdvisoryRuntime>
 ): InternalControlRuntimeSnapshot {
-  const projection = createSelectedRunProjectionReader(context);
+  const selectedRunProjection = createSelectedRunProjectionReader(context);
+  const compatibilityProjectionSource = createSelectedRunProjectionReader(context);
   let selectedRunSnapshotPromise: Promise<ControlSelectedRunRuntimeSnapshot> | null = null;
+  let compatibilityRuntimeSnapshotPromise: Promise<ControlCompatibilityRuntimeSnapshot> | null = null;
   let compatibilityProjectionPromise: Promise<ControlCompatibilityProjectionSnapshot> | null = null;
   let dispatchEvaluationPromise: Promise<{
     issueIdentifier: string | null;
@@ -117,7 +120,7 @@ function createControlRuntimeSnapshot(
 
   async function readSelectedRunSnapshot(): Promise<ControlSelectedRunRuntimeSnapshot> {
     selectedRunSnapshotPromise ??= (async () => {
-      const selected = await projection.buildSelectedRunContext();
+      const selected = await selectedRunProjection.buildSelectedRunContext();
       const issueIdentifier = selected?.issueIdentifier ?? selected?.taskId ?? selected?.runId ?? null;
       const dispatchPilotSummary = liveLinearAdvisoryRuntime.readSnapshotSummary(issueIdentifier);
       const tracked = selected?.tracked ?? buildTrackedLinearPayload(context.linearAdvisoryState.tracked_issue);
@@ -130,8 +133,26 @@ function createControlRuntimeSnapshot(
     return selectedRunSnapshotPromise;
   }
 
+  async function readCompatibilityRuntimeSnapshot(): Promise<ControlCompatibilityRuntimeSnapshot> {
+    compatibilityRuntimeSnapshotPromise ??= (async () => {
+      const selectedManifest = await compatibilityProjectionSource.readSelectedRunManifestSnapshot();
+      const selected = await compatibilityProjectionSource.buildCompatibilitySourceContext(selectedManifest);
+      const issueIdentifier = selected?.issueIdentifier ?? selected?.taskId ?? selected?.runId ?? null;
+      const dispatchPilotSummary = liveLinearAdvisoryRuntime.readSnapshotSummary(issueIdentifier);
+      const tracked = selected?.tracked ?? buildTrackedLinearPayload(context.linearAdvisoryState.tracked_issue);
+      return {
+        selected,
+        running: selected?.rawStatus === 'in_progress' ? [selected] : [],
+        retrying: [],
+        dispatchPilot: dispatchPilotSummary.configured ? dispatchPilotSummary : null,
+        tracked
+      };
+    })();
+    return compatibilityRuntimeSnapshotPromise;
+  }
+
   async function readCompatibilityProjection(): Promise<ControlCompatibilityProjectionSnapshot> {
-    compatibilityProjectionPromise ??= readSelectedRunSnapshot().then((snapshot) =>
+    compatibilityProjectionPromise ??= readCompatibilityRuntimeSnapshot().then((snapshot) =>
       buildCompatibilityProjectionSnapshot(snapshot)
     );
     return compatibilityProjectionPromise;

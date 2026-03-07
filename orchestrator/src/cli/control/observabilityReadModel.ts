@@ -47,7 +47,7 @@ export interface ControlDispatchPilotPayload {
   reason?: string | null;
 }
 
-export interface SelectedRunContext {
+interface SharedSelectedProjectionFields {
   issueIdentifier: string;
   issueId: string | null;
   taskId: string | null;
@@ -66,6 +66,8 @@ export interface SelectedRunContext {
   questionSummary: SelectedRunQuestionSummary;
   tracked: ControlTrackedPayload | null;
 }
+
+export interface SelectedRunContext extends SharedSelectedProjectionFields {}
 
 export interface ControlQuestionSummaryPayload {
   queued_count: number;
@@ -157,6 +159,16 @@ export interface ControlStatePayload {
 
 export interface ControlSelectedRunRuntimeSnapshot {
   selected: SelectedRunContext | null;
+  dispatchPilot: ControlDispatchPilotPayload | null;
+  tracked: ControlTrackedPayload | null;
+}
+
+export interface ControlCompatibilitySourceContext extends SharedSelectedProjectionFields {}
+
+export interface ControlCompatibilityRuntimeSnapshot {
+  selected: ControlCompatibilitySourceContext | null;
+  running: ControlCompatibilitySourceContext[];
+  retrying: ControlCompatibilitySourceContext[];
   dispatchPilot: ControlDispatchPilotPayload | null;
   tracked: ControlTrackedPayload | null;
 }
@@ -278,6 +290,10 @@ export function buildSelectedRunLatestEventPayload(
 }
 
 export function buildSelectedRunPublicPayload(selected: SelectedRunContext): ControlSelectedRunPayload {
+  return buildProjectionSelectedPayload(selected);
+}
+
+function buildProjectionSelectedPayload(selected: SharedSelectedProjectionFields): ControlSelectedRunPayload {
   return {
     issue_id: selected.issueId,
     issue_identifier: selected.issueIdentifier,
@@ -303,7 +319,7 @@ export function buildSelectedRunPublicPayload(selected: SelectedRunContext): Con
   };
 }
 
-export function buildCompatibilityRunningEntry(selected: SelectedRunContext): ControlRunningPayload {
+export function buildCompatibilityRunningEntry(selected: ControlCompatibilitySourceContext): ControlRunningPayload {
   return {
     issue_id: selected.issueId,
     issue_identifier: selected.issueIdentifier,
@@ -312,7 +328,7 @@ export function buildCompatibilityRunningEntry(selected: SelectedRunContext): Co
     status_reason: selected.statusReason,
     session_id: selected.runId,
     turn_count: 0,
-    last_event: selected.latestEvent?.event ?? selected.latestAction,
+    last_event: selected.latestEvent?.event ?? selected.latestAction ?? selected.rawStatus,
     last_message: selected.latestEvent?.message ?? selected.summary,
     started_at: selected.startedAt,
     last_event_at: selected.latestEvent?.at ?? selected.updatedAt,
@@ -324,14 +340,32 @@ export function buildCompatibilityRunningEntry(selected: SelectedRunContext): Co
   };
 }
 
+export function buildCompatibilityRetryEntry(selected: ControlCompatibilitySourceContext): ControlRetryPayload {
+  return {
+    issue_id: selected.issueId,
+    issue_identifier: selected.issueIdentifier,
+    state: selected.rawStatus,
+    display_state: selected.displayStatus,
+    status_reason: selected.statusReason,
+    session_id: selected.runId,
+    attempt: 0,
+    last_event: selected.latestEvent?.event ?? selected.latestAction ?? selected.rawStatus,
+    last_message: selected.latestEvent?.message ?? selected.summary,
+    started_at: selected.startedAt,
+    last_event_at: selected.latestEvent?.at ?? selected.updatedAt
+  };
+}
+
 export function buildCompatibilityProjectionSnapshot(
-  snapshot: ControlSelectedRunRuntimeSnapshot
+  snapshot: ControlCompatibilityRuntimeSnapshot
 ): ControlCompatibilityProjectionSnapshot {
+  const running = snapshot.running.map((entry) => buildCompatibilityRunningEntry(entry));
+  const retrying = snapshot.retrying.map((entry) => buildCompatibilityRetryEntry(entry));
   const selected = snapshot.selected;
   if (!selected) {
     return {
-      running: [],
-      retrying: [],
+      running,
+      retrying,
       issues: [],
       selected: null,
       dispatchPilot: snapshot.dispatchPilot,
@@ -339,10 +373,7 @@ export function buildCompatibilityProjectionSnapshot(
     };
   }
 
-  const running =
-    selected.rawStatus === 'in_progress' ? [buildCompatibilityRunningEntry(selected)] : [];
-  const retrying: ControlRetryPayload[] = [];
-  const selectedPayload = buildSelectedRunPublicPayload(selected);
+  const selectedPayload = buildProjectionSelectedPayload(selected);
 
   return {
     running,
@@ -354,7 +385,7 @@ export function buildCompatibilityProjectionSnapshot(
         payload: buildCompatibilityIssuePayload({
           selected,
           running: running[0] ?? null,
-          retry: null,
+          retry: retrying[0] ?? null,
           dispatchPilotSummary: snapshot.dispatchPilot
         })
       }
@@ -378,12 +409,12 @@ export function findCompatibilityProjectionIssueRecord(
 }
 
 export function buildCompatibilityIssuePayload(input: {
-  selected: SelectedRunContext;
+  selected: ControlCompatibilitySourceContext;
   running: ControlRunningPayload | null;
   retry: ControlRetryPayload | null;
   dispatchPilotSummary: ControlDispatchPilotPayload | null;
 }): ControlIssuePayload {
-  const selectedPayload = buildSelectedRunPublicPayload(input.selected);
+  const selectedPayload = buildProjectionSelectedPayload(input.selected);
   const latestEvent = buildSelectedRunLatestEventPayload(input.selected.latestEvent);
   const recentEvents = latestEvent ? [latestEvent] : [];
 
@@ -426,7 +457,7 @@ export function buildUiSelectedRunSharedFields(selected: SelectedRunContext): Ui
   };
 }
 
-function buildCompatibilityIssueAliases(selected: SelectedRunContext): string[] {
+function buildCompatibilityIssueAliases(selected: ControlCompatibilitySourceContext): string[] {
   const aliases = new Set<string>();
   for (const candidate of [selected.issueIdentifier, selected.taskId, selected.runId]) {
     if (candidate) {

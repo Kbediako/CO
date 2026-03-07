@@ -6,6 +6,7 @@ import type { CliManifest } from '../types.js';
 import type { ControlAction, ControlState } from './controlState.js';
 import {
   buildTrackedLinearPayload,
+  type ControlCompatibilitySourceContext,
   type SelectedRunContext,
   type SelectedRunLatestEvent,
   type SelectedRunQuestionSummary
@@ -37,6 +38,9 @@ export interface SelectedRunProjectionContext {
 export interface SelectedRunProjectionReader {
   readSelectedRunManifestSnapshot(): Promise<SelectedRunManifestSnapshot | null>;
   buildSelectedRunContext(snapshot?: SelectedRunManifestSnapshot | null): Promise<SelectedRunContext | null>;
+  buildCompatibilitySourceContext(
+    snapshot?: SelectedRunManifestSnapshot | null
+  ): Promise<ControlCompatibilitySourceContext | null>;
 }
 
 export function createSelectedRunProjectionReader(
@@ -44,6 +48,7 @@ export function createSelectedRunProjectionReader(
 ): SelectedRunProjectionReader {
   let selectedSnapshotPromise: Promise<SelectedRunManifestSnapshot | null> | null = null;
   let selectedContextPromise: Promise<SelectedRunContext | null> | null = null;
+  let compatibilityContextPromise: Promise<ControlCompatibilitySourceContext | null> | null = null;
 
   const readSelectedRunManifestSnapshot = async (): Promise<SelectedRunManifestSnapshot | null> => {
     selectedSnapshotPromise ??= readSelectedRunManifestSnapshotInternal(context);
@@ -63,13 +68,41 @@ export function createSelectedRunProjectionReader(
     return selectedContextPromise;
   };
 
+  const buildCompatibilitySourceContext = async (
+    snapshot: SelectedRunManifestSnapshot | null = null
+  ): Promise<ControlCompatibilitySourceContext | null> => {
+    if (snapshot) {
+      return buildCompatibilitySourceContextFromSnapshot(context, snapshot);
+    }
+    compatibilityContextPromise ??= (async () => {
+      const selectedSnapshot = await readSelectedRunManifestSnapshot();
+      return buildCompatibilitySourceContextFromSnapshot(context, selectedSnapshot);
+    })();
+    return compatibilityContextPromise;
+  };
+
   return {
     readSelectedRunManifestSnapshot,
-    buildSelectedRunContext
+    buildSelectedRunContext,
+    buildCompatibilitySourceContext
   };
 }
 
 async function buildSelectedRunContextFromSnapshot(
+  context: SelectedRunProjectionContext,
+  snapshot: SelectedRunManifestSnapshot | null
+): Promise<SelectedRunContext | null> {
+  return buildProjectionContextFromSnapshot(context, snapshot);
+}
+
+async function buildCompatibilitySourceContextFromSnapshot(
+  context: SelectedRunProjectionContext,
+  snapshot: SelectedRunManifestSnapshot | null
+): Promise<ControlCompatibilitySourceContext | null> {
+  return buildProjectionContextFromSnapshot(context, snapshot);
+}
+
+async function buildProjectionContextFromSnapshot(
   context: SelectedRunProjectionContext,
   snapshot: SelectedRunManifestSnapshot | null
 ): Promise<SelectedRunContext | null> {

@@ -189,6 +189,74 @@ describe('ControlRuntime', () => {
     expect(repeatedSelectedRun.selected?.statusReason ?? null).toBeNull();
   });
 
+  it('keeps the selected-run cache independent when compatibility projection is read first', async () => {
+    const fixture = await createFixture();
+    const snapshot = fixture.runtime.snapshot();
+
+    const initialCompatibility = await snapshot.readCompatibilityProjection();
+    await seedManifest(fixture.paths, {
+      summary: 'selected summary after compatibility read',
+      updated_at: '2026-03-07T00:12:00.000Z'
+    });
+
+    const selectedRun = await snapshot.readSelectedRunSnapshot();
+
+    expect(initialCompatibility.selected?.summary).toBe('initial summary');
+    expect(selectedRun.selected?.summary).toBe('selected summary after compatibility read');
+  });
+
+  it('keeps the compatibility source cache independent when selected-run snapshot is read first', async () => {
+    const fixture = await createFixture();
+    const snapshot = fixture.runtime.snapshot();
+
+    const initialSelectedRun = await snapshot.readSelectedRunSnapshot();
+    await seedManifest(fixture.paths, {
+      summary: 'compatibility summary after selected read',
+      updated_at: '2026-03-07T00:13:00.000Z'
+    });
+
+    const compatibilityProjection = await snapshot.readCompatibilityProjection();
+
+    expect(initialSelectedRun.selected?.summary).toBe('initial summary');
+    expect(compatibilityProjection.selected?.summary).toBe('compatibility summary after selected read');
+  });
+
+  it('reads control and queued-question state independently for the compatibility source', async () => {
+    const questions: QuestionRecord[] = [];
+    const fixture = await createFixture({ questions });
+    const snapshot = fixture.runtime.snapshot();
+
+    const initialSelectedRun = await snapshot.readSelectedRunSnapshot();
+    fixture.controlStore.setLatestAction({
+      action: 'pause',
+      requestedBy: 'ui',
+      reason: 'manual pause'
+    });
+    questions.push({
+      question_id: 'question-1',
+      parent_run_id: 'run-1',
+      from_run_id: 'child-run-1',
+      from_manifest_path: fixture.paths.manifestPath,
+      prompt: 'Need approval',
+      urgency: 'high',
+      status: 'queued',
+      queued_at: '2026-03-07T00:14:00.000Z',
+      expires_at: null,
+      expires_in_ms: null,
+      auto_pause: true,
+      expiry_fallback: null
+    });
+
+    const compatibilityProjection = await snapshot.readCompatibilityProjection();
+
+    expect(initialSelectedRun.selected?.displayStatus).toBe('in_progress');
+    expect(initialSelectedRun.selected?.questionSummary.queuedCount).toBe(0);
+    expect(compatibilityProjection.selected?.display_status).toBe('paused');
+    expect(compatibilityProjection.selected?.status_reason).toBe('queued_questions');
+    expect(compatibilityProjection.selected?.question_summary.queued_count).toBe(1);
+    expect(compatibilityProjection.selected?.latest_action).toBe('pause');
+  });
+
   it('invalidates the cached snapshot on publish', async () => {
     const fixture = await createFixture();
     const initialSnapshot = fixture.runtime.snapshot();
