@@ -430,6 +430,57 @@ describe('ControlServer', () => {
     }
   });
 
+  it('serves authenticated GET /events as an SSE bootstrap stream', async () => {
+    const { root, env, paths } = await createRunRoot('task-0940');
+    const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
+
+    const server = await ControlServer.start({
+      paths,
+      config,
+      runId: 'run-1'
+    });
+
+    try {
+      const baseUrl = server.getBaseUrl() ?? '';
+      const token = await readToken(paths.controlAuthPath);
+      const response = await new Promise<{
+        statusCode: number | undefined;
+        headers: http.IncomingHttpHeaders;
+        bootstrap: string;
+      }>((resolve, reject) => {
+        const req = http.get(
+          new URL('/events', baseUrl),
+          {
+            headers: {
+              Authorization: `Bearer ${token}`
+            }
+          },
+          (res) => {
+            res.once('data', (chunk) => {
+              resolve({
+                statusCode: res.statusCode,
+                headers: res.headers,
+                bootstrap: chunk.toString('utf8')
+              });
+              res.destroy();
+            });
+            res.once('error', reject);
+          }
+        );
+        req.once('error', reject);
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.headers['content-type']).toBe('text/event-stream');
+      expect(response.headers['cache-control']).toBe('no-cache');
+      expect(response.headers.connection).toBe('keep-alive');
+      expect(response.bootstrap).toBe(': ok\n\n');
+    } finally {
+      await server.close();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   it('projects read-only compatibility state and issue payloads', async () => {
     const { root, env, paths } = await createRunRoot('task-0940');
     await seedManifest(paths);

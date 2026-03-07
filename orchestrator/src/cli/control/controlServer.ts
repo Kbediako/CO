@@ -38,6 +38,7 @@ import {
 import { handleObservabilityApiRequest } from './observabilityApiController.js';
 import { handleUiDataRequest } from './uiDataController.js';
 import { handleUiSessionRequest } from './uiSessionController.js';
+import { handleEventsSseRequest } from './eventsSseController.js';
 import {
   handleLinearWebhookRequest,
   normalizeLinearAdvisoryState,
@@ -566,15 +567,10 @@ async function handleRequest(context: RequestContext): Promise<void> {
   }
 
   if (url.pathname === '/events' && req.method === 'GET') {
-    res.writeHead(200, {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
-      Connection: 'keep-alive'
-    });
-    res.write(`: ok\n\n`);
-    context.clients.add(res);
-    req.on('close', () => {
-      context.clients.delete(res);
+    handleEventsSseRequest({
+      req,
+      res,
+      clients: context.clients
     });
     return;
   }
