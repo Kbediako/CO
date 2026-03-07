@@ -19,7 +19,7 @@ import {
   type TransportIdempotencyEntry
 } from './controlState.js';
 import { ConfirmationStore, type ConfirmationRequest, type ConfirmationStoreSnapshot } from './confirmations.js';
-import { QuestionQueue, type QuestionRecord, type QuestionUrgency } from './questions.js';
+import { QuestionQueue, type QuestionRecord } from './questions.js';
 import { DelegationTokenStore, type DelegationTokenRecord } from './delegationTokens.js';
 import { type DispatchPilotEvaluation } from './trackerDispatchPilot.js';
 import {
@@ -39,6 +39,7 @@ import { handleObservabilityApiRequest } from './observabilityApiController.js';
 import { handleUiDataRequest } from './uiDataController.js';
 import { handleUiSessionRequest } from './uiSessionController.js';
 import { handleEventsSseRequest } from './eventsSseController.js';
+import { handleQuestionQueueRequest } from './questionQueueController.js';
 import {
   handleLinearWebhookRequest,
   normalizeLinearAdvisoryState,
@@ -1154,197 +1155,76 @@ async function handleRequest(context: RequestContext): Promise<void> {
     return;
   }
 
-  if (url.pathname === '/questions' && req.method === 'GET') {
-    await expireQuestions(context);
-    const questions = context.questionQueue.list();
-    queueQuestionResolutions(context, questions);
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ questions }));
-    return;
-  }
-
-  if (url.pathname === '/questions/enqueue' && req.method === 'POST') {
-    const delegationAuth = readDelegationHeaders(req);
-    if (!delegationAuth || !validateDelegation(context, delegationAuth)) {
-      res.writeHead(403, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'delegation_token_invalid' }));
-      return;
-    }
-
-    const body = await readJsonBody(req);
-    const prompt = readStringValue(body, 'prompt');
-    if (!prompt) {
-      res.writeHead(400, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'missing_prompt' }));
-      return;
-    }
-    const autoPause = readBooleanValue(body, 'auto_pause', 'autoPause') ?? true;
-    const expiryFallback = parseExpiryFallback(readStringValue(body, 'expiry_fallback', 'expiryFallback'));
-    const parentRunId = context.controlStore.snapshot().run_id;
-    const rawFromManifest = readStringValue(body, 'from_manifest_path', 'fromManifestPath');
-    let resolvedFromManifest: string | null = null;
-    if (rawFromManifest) {
-      try {
-        resolvedFromManifest = resolveRunManifestPath(
-          rawFromManifest,
-          context.config.ui.allowedRunRoots,
-          'from_manifest_path'
-        );
-      } catch {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: 'invalid_manifest_path' }));
-        return;
-      }
-      const manifest = await readJsonFile<CliManifest>(resolvedFromManifest);
-      if (!manifest || manifest.run_id !== delegationAuth.childRunId) {
-        res.writeHead(403, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: 'delegation_run_mismatch' }));
-        return;
-      }
-    }
-    const record = context.questionQueue.enqueue({
-      parentRunId,
-      fromRunId: delegationAuth.childRunId,
-      fromManifestPath: resolvedFromManifest ?? null,
-      prompt,
-      urgency: parseUrgency(readStringValue(body, 'urgency')),
-      expiresInMs: readNumberValue(body, 'expires_in_ms', 'expiresInMs'),
-      autoPause,
-      expiryFallback
-    });
-    await context.persist.questions();
-    await emitControlEvent(context, {
-      event: 'question_queued',
-      actor: 'delegate',
-      payload: {
-        question_id: record.question_id,
-        parent_run_id: record.parent_run_id,
-        from_run_id: record.from_run_id,
-        prompt: record.prompt,
-        urgency: record.urgency,
-        queued_at: record.queued_at,
-        expires_at: record.expires_at ?? null,
-        expires_in_ms: record.expires_in_ms ?? null
-      }
-    });
-    context.runtime.publish({ source: 'questions.enqueue' });
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify(record));
-    return;
-  }
-
-  if (url.pathname === '/questions/answer' && req.method === 'POST') {
-    const body = await readJsonBody(req);
-    const questionId = readStringValue(body, 'question_id', 'questionId');
-    const answer = readStringValue(body, 'answer');
-    if (!questionId || !answer) {
-      res.writeHead(400, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'missing_question_or_answer' }));
-      return;
-    }
-    try {
-      context.questionQueue.answer(questionId, answer, readStringValue(body, 'answered_by', 'answeredBy') ?? 'user');
-    } catch (error) {
-      const message = (error as Error)?.message ?? 'question_invalid';
-      const status = message === 'question_not_found' ? 404 : 409;
-      res.writeHead(status, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: message }));
-      return;
-    }
-    await context.persist.questions();
-    const record = context.questionQueue.get(questionId);
-    if (record) {
-      await emitControlEvent(context, {
-        event: 'question_answered',
-        actor: 'user',
-        payload: {
-          question_id: record.question_id,
-          parent_run_id: record.parent_run_id,
-          answer: record.answer,
-          answered_by: record.answered_by,
-          answered_at: record.answered_at
-        }
-      });
-      await emitControlEvent(context, {
-        event: 'question_closed',
-        actor: 'runner',
-        payload: {
-          question_id: record.question_id,
-          parent_run_id: record.parent_run_id,
-          outcome: record.status,
-          closed_at: record.closed_at,
-          expires_at: record.expires_at ?? null
-        }
-      });
-      await maybeResolveChildQuestion(context, record, record.status);
-    }
-    context.runtime.publish({ source: 'questions.answer' });
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ status: 'answered' }));
-    return;
-  }
-
-  if (url.pathname === '/questions/dismiss' && req.method === 'POST') {
-    const body = await readJsonBody(req);
-    const questionId = readStringValue(body, 'question_id', 'questionId');
-    if (!questionId) {
-      res.writeHead(400, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'missing_question_id' }));
-      return;
-    }
-    try {
-      context.questionQueue.dismiss(questionId, readStringValue(body, 'dismissed_by', 'dismissedBy') ?? 'user');
-    } catch (error) {
-      const message = (error as Error)?.message ?? 'question_invalid';
-      const status = message === 'question_not_found' ? 404 : 409;
-      res.writeHead(status, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: message }));
-      return;
-    }
-    await context.persist.questions();
-    const record = context.questionQueue.get(questionId);
-    if (record) {
-      await emitControlEvent(context, {
-        event: 'question_closed',
-        actor: 'user',
-        payload: {
-          question_id: record.question_id,
-          parent_run_id: record.parent_run_id,
-          outcome: record.status,
-          closed_at: record.closed_at,
-          expires_at: record.expires_at ?? null
-        }
-      });
-      await maybeResolveChildQuestion(context, record, record.status);
-    }
-    context.runtime.publish({ source: 'questions.dismiss' });
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ status: 'dismissed' }));
-    return;
-  }
-
-  if (url.pathname.startsWith('/questions/') && req.method === 'GET') {
-    await expireQuestions(context);
-    const delegationAuth = readDelegationHeaders(req);
-    if (delegationAuth && !validateDelegation(context, delegationAuth)) {
-      res.writeHead(403, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'delegation_token_invalid' }));
-      return;
-    }
-    const questionId = url.pathname.split('/').pop();
-    const record = questionId ? context.questionQueue.get(questionId) : null;
-    if (!record) {
-      res.writeHead(404, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'not_found' }));
-      return;
-    }
-    if (delegationAuth && record.from_run_id !== delegationAuth.childRunId) {
-      res.writeHead(403, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'delegation_scope_mismatch' }));
-      return;
-    }
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify(record));
+  if (
+    await handleQuestionQueueRequest({
+      req,
+      res,
+      questionQueue: context.questionQueue,
+      readRequestBody: () => readJsonBody(req),
+      expireQuestions: () => expireQuestions(context),
+      queueQuestionResolutions: (records) => queueQuestionResolutions(context, records),
+      readDelegationHeaders: () => readDelegationHeaders(req),
+      validateDelegation: (auth) => Boolean(validateDelegation(context, auth)),
+      resolveManifestPath: (rawPath) =>
+        resolveRunManifestPath(rawPath, context.config.ui.allowedRunRoots, 'from_manifest_path'),
+      readManifest: (path) => readJsonFile<CliManifest>(path),
+      getParentRunId: () => context.controlStore.snapshot().run_id,
+      persistQuestions: () => context.persist.questions(),
+      resolveChildQuestion: (record, outcome) => maybeResolveChildQuestion(context, record, outcome),
+      emitQuestionQueued: (record) =>
+        emitControlEvent(context, {
+          event: 'question_queued',
+          actor: 'delegate',
+          payload: {
+            question_id: record.question_id,
+            parent_run_id: record.parent_run_id,
+            from_run_id: record.from_run_id,
+            prompt: record.prompt,
+            urgency: record.urgency,
+            queued_at: record.queued_at,
+            expires_at: record.expires_at ?? null,
+            expires_in_ms: record.expires_in_ms ?? null
+          }
+        }),
+      emitQuestionAnswered: async (record) => {
+        await emitControlEvent(context, {
+          event: 'question_answered',
+          actor: 'user',
+          payload: {
+            question_id: record.question_id,
+            parent_run_id: record.parent_run_id,
+            answer: record.answer,
+            answered_by: record.answered_by,
+            answered_at: record.answered_at
+          }
+        });
+        await emitControlEvent(context, {
+          event: 'question_closed',
+          actor: 'runner',
+          payload: {
+            question_id: record.question_id,
+            parent_run_id: record.parent_run_id,
+            outcome: record.status,
+            closed_at: record.closed_at,
+            expires_at: record.expires_at ?? null
+          }
+        });
+      },
+      emitQuestionDismissed: (record) =>
+        emitControlEvent(context, {
+          event: 'question_closed',
+          actor: 'user',
+          payload: {
+            question_id: record.question_id,
+            parent_run_id: record.parent_run_id,
+            outcome: record.status,
+            closed_at: record.closed_at,
+            expires_at: record.expires_at ?? null
+          }
+        }),
+      publishRuntime: (source) => context.runtime.publish({ source })
+    })
+  ) {
     return;
   }
 
@@ -2190,20 +2070,6 @@ function readStringArrayValue(record: Record<string, unknown>, ...keys: string[]
       }
     }
     return parsed;
-  }
-  return undefined;
-}
-
-function parseUrgency(value: string | undefined): QuestionUrgency {
-  if (value === 'low' || value === 'med' || value === 'high') {
-    return value;
-  }
-  return 'med';
-}
-
-function parseExpiryFallback(value: string | undefined): 'pause' | 'resume' | 'fail' | undefined {
-  if (value === 'pause' || value === 'resume' || value === 'fail') {
-    return value;
   }
   return undefined;
 }
