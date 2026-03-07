@@ -1,0 +1,34 @@
+[Codex-Orchestrator] prepareRun start for pipeline docs-review
+[Codex-Orchestrator] prepareRun resolving pipeline docs-review
+[Codex-Orchestrator] PipelineResolver.resolve start for docs-review
+[Codex-Orchestrator] [design-config] loaded repo file at /Users/kbediako/Code/CO/design.config.yaml
+[Codex-Orchestrator] [codex-config] Loaded user config from /Users/kbediako/Code/CO/codex.orchestrator.json
+[Codex-Orchestrator] [codex-config] Using repo-local codex.orchestrator.json.
+[Codex-Orchestrator] PipelineResolver.resolve selected pipeline docs-review
+[Codex-Orchestrator] prepareRun resolved pipeline docs-review
+[Codex-Orchestrator] prepareRun loaded metadata for task 1049
+[Codex-Orchestrator] prepareRun running planner for pipeline docs-review
+[Codex-Orchestrator] prepareRun planner completed for pipeline docs-review
+[Codex-Orchestrator] prepareRun complete for pipeline docs-review
+{
+  "run_id": "2026-03-07T12-20-13-297Z-b0e839fc",
+  "status": "failed",
+  "artifact_root": ".runs/1049/cli/2026-03-07T12-20-13-297Z-b0e839fc",
+  "manifest": ".runs/1049/cli/2026-03-07T12-20-13-297Z-b0e839fc/manifest.json",
+  "log_path": ".runs/1049/cli/2026-03-07T12-20-13-297Z-b0e839fc/runner.ndjson",
+  "summary": "Advanced mode (auto) enabled: auto enabled for non-trivial pipeline 'docs-review'.\nAuto scout: evidence recorded at .runs/1049/cli/2026-03-07T12-20-13-297Z-b0e839fc/auto-scout.json.\nStage 'Run delegation guard' failed with exit code 1.\nGuardrails: spec-guard partial (1 pending of 1).",
+  "runtime_mode_requested": "appserver",
+  "runtime_mode": "appserver",
+  "runtime_provider": "AppServerRuntimeProvider",
+  "runtime_fallback": {
+    "occurred": false,
+    "code": null,
+    "reason": null,
+    "from_mode": null,
+    "to_mode": null,
+    "checked_at": "2026-03-07T12:20:13.412Z"
+  },
+  "cloud_fallback_reason": null,
+  "issue_log": null,
+  "issue_log_error": null
+}

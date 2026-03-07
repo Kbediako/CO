@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260307-1049-coordinator-symphony-aligned-confirmation-approve-controller-extraction",
+      "title": "Coordinator Symphony-Aligned Confirmation Approve Controller Extraction",
+      "relates_to": "tasks/tasks-1049-coordinator-symphony-aligned-confirmation-approve-controller-extraction.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-07",
+      "paths": {
+        "spec": "tasks/specs/1049-coordinator-symphony-aligned-confirmation-approve-controller-extraction.md",
+        "task": "tasks/tasks-1049-coordinator-symphony-aligned-confirmation-approve-controller-extraction.md",
+        "agent_task": ".agent/task/1049-coordinator-symphony-aligned-confirmation-approve-controller-extraction.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-confirmation-approve-controller-extraction.md"
+      }
+    },
+    {
       "id": "20260307-1048-coordinator-symphony-aligned-confirmation-create-controller-extraction",
       "title": "Coordinator Symphony-Aligned Confirmation Create Controller Extraction",
       "relates_to": "tasks/tasks-1048-coordinator-symphony-aligned-confirmation-create-controller-extraction.md",
@@ -302,6 +318,22 @@
         "run_id": null
       },
       "created_at": "2025-11-27",
+      "completed_at": null
+    },
+    {
+      "id": "1049",
+      "slug": "1049-coordinator-symphony-aligned-confirmation-approve-controller-extraction",
+      "title": "Coordinator Symphony-Aligned Confirmation Approve Controller Extraction",
+      "path": "tasks/tasks-1049-coordinator-symphony-aligned-confirmation-approve-controller-extraction.md",
+      "kind": "run",
+      "status": "in-progress",
+      "gate": {
+        "phase": "coordinator-symphony-aligned-confirmation-approve-controller-extraction-planning",
+        "status": "in-progress",
+        "log": null,
+        "run_id": null
+      },
+      "created_at": "2026-03-07",
       "completed_at": null
     },
     {
