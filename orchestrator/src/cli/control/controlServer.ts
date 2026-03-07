@@ -18,7 +18,7 @@ import {
   type ControlTransport,
   type TransportIdempotencyEntry
 } from './controlState.js';
-import { ConfirmationStore, type ConfirmationRequest, type ConfirmationStoreSnapshot } from './confirmations.js';
+import { ConfirmationStore, type ConfirmationStoreSnapshot } from './confirmations.js';
 import { QuestionQueue, type QuestionRecord } from './questions.js';
 import { DelegationTokenStore, type DelegationTokenRecord } from './delegationTokens.js';
 import { type DispatchPilotEvaluation } from './trackerDispatchPilot.js';
@@ -42,6 +42,7 @@ import { handleSecurityViolationRequest } from './securityViolationController.js
 import { handleEventsSseRequest } from './eventsSseController.js';
 import { handleQuestionQueueRequest } from './questionQueueController.js';
 import { handleDelegationRegisterRequest } from './delegationRegisterController.js';
+import { handleConfirmationListRequest } from './confirmationListController.js';
 import { handleConfirmationCreateRequest } from './confirmationCreateController.js';
 import { handleConfirmationApproveRequest } from './confirmationApproveController.js';
 import { handleConfirmationIssueConsumeRequest } from './confirmationIssueConsumeController.js';
@@ -977,10 +978,14 @@ async function handleRequest(context: RequestContext): Promise<void> {
     return;
   }
 
-  if (url.pathname === '/confirmations' && req.method === 'GET') {
-    await expireConfirmations(context);
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ pending: sanitizeConfirmations(context.confirmationStore.listPending()) }));
+  if (
+    await handleConfirmationListRequest({
+      req,
+      res,
+      expireConfirmations: () => expireConfirmations(context),
+      listPendingConfirmations: () => context.confirmationStore.listPending()
+    })
+  ) {
     return;
   }
 
@@ -1813,16 +1818,6 @@ function safeTokenCompare(left: string, right: string): boolean {
     return false;
   }
   return timingSafeEqual(Buffer.from(left, 'utf8'), Buffer.from(right, 'utf8'));
-}
-
-function sanitizeConfirmations(
-  entries: ConfirmationRequest[]
-): Array<Omit<ConfirmationRequest, 'params'>> {
-  return entries.map((entry) => {
-    const sanitized = { ...entry } as Partial<ConfirmationRequest>;
-    delete sanitized.params;
-    return sanitized as Omit<ConfirmationRequest, 'params'>;
-  });
 }
 
 async function readRawBody(req: http.IncomingMessage): Promise<Buffer> {
