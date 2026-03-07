@@ -5689,6 +5689,14 @@ describe('ControlServer', () => {
           (entry.payload as { action?: string }).action === 'cancel'
       );
       expect(cancelActionEvent).toBeUndefined();
+      expect(
+        events.find(
+          (entry) =>
+            entry.event === 'confirmation_resolved' &&
+            (entry.payload as { request_id?: string; outcome?: string }).request_id === confirmRequestId &&
+            (entry.payload as { outcome?: string }).outcome === 'approved'
+        )
+      ).toBeDefined();
     } finally {
       await server.close();
       await rm(root, { recursive: true, force: true });

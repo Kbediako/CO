@@ -46,10 +46,8 @@ import { handleConfirmationApproveRequest } from './confirmationApproveControlle
 import { handleConfirmationIssueConsumeRequest } from './confirmationIssueConsumeController.js';
 import { handleConfirmationValidateRequest } from './confirmationValidateController.js';
 import {
-  buildCanonicalTraceability,
   normalizeControlActionRequest,
   resolveControlActionReplay,
-  resolveTransportMutationRequestFromConfirmationScope,
   validateTransportMutationPreflight,
   type TransportMutationRequest
 } from './controlActionPreflight.js';
@@ -57,6 +55,7 @@ import {
   buildPostMutationControlActionResponse,
   buildReplayedControlActionResponse
 } from './controlActionOutcome.js';
+import { resolveCancelConfirmation } from './controlActionCancelConfirmation.js';
 import {
   handleLinearWebhookRequest,
   normalizeLinearAdvisoryState,
@@ -716,56 +715,37 @@ async function handleRequest(context: RequestContext): Promise<void> {
       }
       const tool = readStringValue(body, 'tool') ?? 'delegate.cancel';
       const params = readRecordValue(body, 'params') ?? {};
-      let validation;
-      try {
-        validation = context.confirmationStore.validateNonce({
-          confirmNonce,
-          tool,
-          params
-        });
-      } catch (error) {
-        writeControlError(res, 409, (error as Error)?.message ?? 'confirmation_invalid');
-        return;
-      }
-      const confirmedRequestId = readStringValue(validation.request.params, 'request_id', 'requestId');
-      const confirmedIntentId = readStringValue(validation.request.params, 'intent_id', 'intentId');
-      resolvedRequestId = confirmedRequestId ?? validation.request.request_id;
-      intentId = confirmedIntentId ?? intentId;
-      await context.persist.confirmations();
-      await emitControlEvent(context, {
-        event: 'confirmation_resolved',
-        actor: 'runner',
-        payload: {
-          request_id: validation.request.request_id,
-          nonce_id: validation.nonce_id,
-          outcome: 'approved'
-        }
-      });
-
-      const confirmedTransportMutationResult = resolveTransportMutationRequestFromConfirmationScope({
+      const cancelResolution = await resolveCancelConfirmation({
         body,
-        params: validation.request.params,
-        action
+        tool,
+        params,
+        confirmNonce,
+        currentIntentId: intentId,
+        snapshot,
+        taskId,
+        manifestPath: context.paths.manifestPath,
+        validateNonce: (validationInput) =>
+          context.confirmationStore.validateNonce(validationInput),
+        persistConfirmations: () => context.persist.confirmations(),
+        emitConfirmationResolved: (payload) =>
+          emitControlEvent(context, {
+            event: 'confirmation_resolved',
+            actor: 'runner',
+            payload
+          })
       });
-      if (confirmedTransportMutationResult.error) {
-        const confirmedTransportMutationStatus = confirmedTransportMutationResult.status ?? 400;
-        const traceability = buildCanonicalTraceability({
-          action,
-          decision: 'rejected',
-          requestId: resolvedRequestId ?? null,
-          intentId,
-          taskId,
-          runId: snapshot.run_id,
-          manifestPath: context.paths.manifestPath,
-          transport: confirmedTransportMutationResult.partial?.transport ?? null,
-          actorId: confirmedTransportMutationResult.partial?.actorId ?? null,
-          actorSource: confirmedTransportMutationResult.partial?.actorSource ?? null,
-          principal: confirmedTransportMutationResult.partial?.principal ?? null
-        });
-        writeControlError(res, confirmedTransportMutationStatus, confirmedTransportMutationResult.error, traceability);
+      if (!cancelResolution.ok) {
+        writeControlError(
+          res,
+          cancelResolution.status,
+          cancelResolution.error,
+          cancelResolution.traceability
+        );
         return;
       }
-      transportMutation = confirmedTransportMutationResult.request;
+      resolvedRequestId = cancelResolution.requestId;
+      intentId = cancelResolution.intentId;
+      transportMutation = cancelResolution.transportMutation;
       isTransportMutation = Boolean(transportMutation);
       if (!validateTransportMutationRequest()) {
         return;
