@@ -14,21 +14,21 @@
 ## Shared Registry + Review Handoff
 - [x] `tasks/index.json`, `docs/TASKS.md`, and `docs/docs-freshness-registry.json` updated. Evidence: `tasks/index.json`, `docs/TASKS.md`, `docs/docs-freshness-registry.json`.
 - [x] Delegated or local read-only review approval captured in the spec/checklist notes. Evidence: `tasks/specs/1033-coordinator-symphony-aligned-runtime-compatibility-snapshot-source.md`, `docs/findings/1033-runtime-compatibility-snapshot-source-deliberation.md`.
-- [ ] docs-review approval/override captured for registered `1033`. Evidence: `.runs/1033-coordinator-symphony-aligned-runtime-compatibility-snapshot-source/cli/<pending>/manifest.json`, `out/1033-coordinator-symphony-aligned-runtime-compatibility-snapshot-source/manual/<pending>/00-summary.md`.
+- [x] docs-review approval/override captured for registered `1033`. Evidence: `.runs/1033-coordinator-symphony-aligned-runtime-compatibility-snapshot-source/cli/2026-03-07T00-59-27-222Z-32bc57e2/manifest.json`, `out/1033-coordinator-symphony-aligned-runtime-compatibility-snapshot-source/manual/20260307T010320Z-preimpl-review-and-docs-review-override/00-summary.md`.
 
 ## Runtime Compatibility Snapshot Source
-- [ ] The compatibility projection is fed by a dedicated runtime compatibility snapshot source rather than `readSelectedRunSnapshot()`. Evidence: `orchestrator/src/cli/control/controlRuntime.ts`, `orchestrator/src/cli/control/selectedRunProjection.ts`, `orchestrator/src/cli/control/observabilityReadModel.ts`.
-- [ ] The selected-run seam remains available for UI/Telegram consumers while the compatibility API uses the new source boundary. Evidence: `orchestrator/src/cli/control/controlRuntime.ts`, `orchestrator/src/cli/control/observabilitySurface.ts`, `orchestrator/src/cli/control/telegramOversightBridge.ts`.
-- [ ] Regression/manual evidence keeps the compatibility route contract stable while the source boundary becomes more Symphony-aligned. Evidence: `orchestrator/tests/ControlServer.test.ts`, `out/1033-coordinator-symphony-aligned-runtime-compatibility-snapshot-source/manual/<pending>/11-manual-runtime-compatibility-source.json`.
+- [x] The compatibility projection is fed by a dedicated runtime compatibility snapshot source rather than `readSelectedRunSnapshot()`. Evidence: `orchestrator/src/cli/control/controlRuntime.ts`, `orchestrator/src/cli/control/selectedRunProjection.ts`, `orchestrator/src/cli/control/observabilityReadModel.ts`.
+- [x] The selected-run seam remains available for UI/Telegram consumers while the compatibility API uses the new source boundary. Evidence: `orchestrator/src/cli/control/controlRuntime.ts`, `orchestrator/src/cli/control/observabilitySurface.ts`, `orchestrator/src/cli/control/telegramOversightBridge.ts`.
+- [x] Regression/manual evidence keeps the compatibility route contract stable while the source boundary becomes more Symphony-aligned. Evidence: `orchestrator/tests/ControlRuntime.test.ts`, `orchestrator/tests/ControlServer.test.ts`, `out/1033-coordinator-symphony-aligned-runtime-compatibility-snapshot-source/manual/20260307T010851Z-closeout/11-manual-runtime-compatibility-source.json`.
 
 ## Validation + Closeout
-- [ ] `node scripts/delegation-guard.mjs`. Evidence: `out/1033-coordinator-symphony-aligned-runtime-compatibility-snapshot-source/manual/<pending>/01-delegation-guard.log`.
-- [ ] `node scripts/spec-guard.mjs --dry-run`. Evidence: `out/1033-coordinator-symphony-aligned-runtime-compatibility-snapshot-source/manual/<pending>/02-spec-guard.log`.
-- [ ] `npm run build`. Evidence: `out/1033-coordinator-symphony-aligned-runtime-compatibility-snapshot-source/manual/<pending>/03-build.log`.
-- [ ] `npm run lint`. Evidence: `out/1033-coordinator-symphony-aligned-runtime-compatibility-snapshot-source/manual/<pending>/04-lint.log`.
-- [ ] `npm run test`. Evidence: `out/1033-coordinator-symphony-aligned-runtime-compatibility-snapshot-source/manual/<pending>/05-test.log`.
-- [ ] `npm run docs:check`. Evidence: `out/1033-coordinator-symphony-aligned-runtime-compatibility-snapshot-source/manual/<pending>/06-docs-check.log`.
-- [ ] `npm run docs:freshness`. Evidence: `out/1033-coordinator-symphony-aligned-runtime-compatibility-snapshot-source/manual/<pending>/07-docs-freshness.log`.
-- [ ] `node scripts/diff-budget.mjs`. Evidence: `out/1033-coordinator-symphony-aligned-runtime-compatibility-snapshot-source/manual/<pending>/08-diff-budget.log`.
-- [ ] `npm run review`. Evidence: `out/1033-coordinator-symphony-aligned-runtime-compatibility-snapshot-source/manual/<pending>/09-review.log`.
-- [ ] `npm run pack:smoke` when required by touched downstream-facing paths. Evidence: `out/1033-coordinator-symphony-aligned-runtime-compatibility-snapshot-source/manual/<pending>/10-pack-smoke.log`.
+- [x] `node scripts/delegation-guard.mjs`. Evidence: `out/1033-coordinator-symphony-aligned-runtime-compatibility-snapshot-source/manual/20260307T010851Z-closeout/01-delegation-guard.log`.
+- [x] `node scripts/spec-guard.mjs --dry-run`. Evidence: `out/1033-coordinator-symphony-aligned-runtime-compatibility-snapshot-source/manual/20260307T010851Z-closeout/02-spec-guard.log`.
+- [x] `npm run build`. Evidence: `out/1033-coordinator-symphony-aligned-runtime-compatibility-snapshot-source/manual/20260307T010851Z-closeout/03-build.log`.
+- [x] `npm run lint`. Evidence: `out/1033-coordinator-symphony-aligned-runtime-compatibility-snapshot-source/manual/20260307T010851Z-closeout/04-lint.log`.
+- [x] `npm run test`. Evidence: `out/1033-coordinator-symphony-aligned-runtime-compatibility-snapshot-source/manual/20260307T010851Z-closeout/05-test.log`.
+- [x] `npm run docs:check`. Evidence: `out/1033-coordinator-symphony-aligned-runtime-compatibility-snapshot-source/manual/20260307T010851Z-closeout/06-docs-check.log`.
+- [x] `npm run docs:freshness`. Evidence: `out/1033-coordinator-symphony-aligned-runtime-compatibility-snapshot-source/manual/20260307T010851Z-closeout/07-docs-freshness.log`.
+- [x] `node scripts/diff-budget.mjs`. Evidence: `out/1033-coordinator-symphony-aligned-runtime-compatibility-snapshot-source/manual/20260307T010851Z-closeout/08-diff-budget.log`, `out/1033-coordinator-symphony-aligned-runtime-compatibility-snapshot-source/manual/20260307T010851Z-closeout/13-override-notes.md`.
+- [x] `npm run review`. Evidence: `out/1033-coordinator-symphony-aligned-runtime-compatibility-snapshot-source/manual/20260307T010851Z-closeout/09-review.log`, `out/1033-coordinator-symphony-aligned-runtime-compatibility-snapshot-source/manual/20260307T010851Z-closeout/13-override-notes.md`.
+- [x] `npm run pack:smoke` when required by touched downstream-facing paths. Evidence: `out/1033-coordinator-symphony-aligned-runtime-compatibility-snapshot-source/manual/20260307T010851Z-closeout/10-pack-smoke.log`.

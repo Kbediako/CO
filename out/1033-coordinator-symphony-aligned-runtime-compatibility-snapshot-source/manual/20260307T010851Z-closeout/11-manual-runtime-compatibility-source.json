@@ -1,0 +1,301 @@
+{
+  "generated_at": "2026-03-07T01:31:05.563Z",
+  "scenarios": [
+    {
+      "scenario": "running",
+      "manifest_status": "in_progress",
+      "latest_action": null,
+      "queued_questions": 0,
+      "state": {
+        "generated_at": "2026-03-07T01:31:05.575Z",
+        "counts": {
+          "running": 1,
+          "retrying": 0
+        },
+        "running": [
+          {
+            "issue_id": "task-1033-manual",
+            "issue_identifier": "task-1033-manual",
+            "state": "in_progress",
+            "display_state": "in_progress",
+            "status_reason": null,
+            "session_id": "run-1",
+            "turn_count": 0,
+            "last_event": "in_progress",
+            "last_message": "task is running",
+            "started_at": "2026-03-07T01:31:05.564Z",
+            "last_event_at": "2026-03-07T01:31:05.564Z",
+            "tokens": {
+              "input_tokens": null,
+              "output_tokens": null,
+              "total_tokens": null
+            }
+          }
+        ],
+        "retrying": [],
+        "codex_totals": null,
+        "rate_limits": null,
+        "selected": {
+          "issue_id": "task-1033-manual",
+          "issue_identifier": "task-1033-manual",
+          "task_id": "task-1033-manual",
+          "run_id": "run-1",
+          "raw_status": "in_progress",
+          "display_status": "in_progress",
+          "status_reason": null,
+          "started_at": "2026-03-07T01:31:05.564Z",
+          "updated_at": "2026-03-07T01:31:05.564Z",
+          "completed_at": null,
+          "summary": "task is running",
+          "last_error": null,
+          "latest_action": null,
+          "latest_event": {
+            "at": "2026-03-07T01:31:05.564Z",
+            "event": "in_progress",
+            "message": "task is running",
+            "requested_by": null,
+            "reason": null
+          },
+          "workspace": {
+            "path": "/var/folders/r8/ss2mqz1n5wgcph4gnh_894600000gn/T/control-server-manual-KKZzIu"
+          },
+          "question_summary": {
+            "queued_count": 0,
+            "latest_question": null
+          }
+        }
+      },
+      "issue": {
+        "error": {
+          "code": "issue_not_found",
+          "message": "Issue not found",
+          "details": {
+            "surface": "api_v1",
+            "issue_identifier": "task-1033-running"
+          }
+        },
+        "traceability": {
+          "task_id": "task-1033-running",
+          "run_id": "run-1",
+          "manifest_path": "/var/folders/r8/ss2mqz1n5wgcph4gnh_894600000gn/T/control-server-manual-KKZzIu/.runs/task-1033-running/cli/run-1/manifest.json",
+          "surface": "api_v1",
+          "issue_identifier": "task-1033-running",
+          "requested_action": null,
+          "requested_tool": null,
+          "decision": "rejected",
+          "reason": "issue_not_found",
+          "timestamp": "2026-03-07T01:31:05.579Z"
+        }
+      },
+      "alias_issue": {
+        "issue_identifier": "task-1033-manual",
+        "issue_id": "task-1033-manual",
+        "status": "in_progress",
+        "raw_status": "in_progress",
+        "display_status": "in_progress",
+        "status_reason": null,
+        "workspace": {
+          "path": "/var/folders/r8/ss2mqz1n5wgcph4gnh_894600000gn/T/control-server-manual-KKZzIu"
+        },
+        "attempts": {
+          "restart_count": 0,
+          "current_retry_attempt": 0
+        },
+        "running": {
+          "issue_id": "task-1033-manual",
+          "issue_identifier": "task-1033-manual",
+          "state": "in_progress",
+          "display_state": "in_progress",
+          "status_reason": null,
+          "session_id": "run-1",
+          "turn_count": 0,
+          "last_event": "in_progress",
+          "last_message": "task is running",
+          "started_at": "2026-03-07T01:31:05.564Z",
+          "last_event_at": "2026-03-07T01:31:05.564Z",
+          "tokens": {
+            "input_tokens": null,
+            "output_tokens": null,
+            "total_tokens": null
+          }
+        },
+        "retry": null,
+        "logs": {
+          "codex_session_logs": []
+        },
+        "summary": "task is running",
+        "latest_event": {
+          "at": "2026-03-07T01:31:05.564Z",
+          "event": "in_progress",
+          "message": "task is running"
+        },
+        "question_summary": {
+          "queued_count": 0,
+          "latest_question": null
+        },
+        "recent_events": [
+          {
+            "at": "2026-03-07T01:31:05.564Z",
+            "event": "in_progress",
+            "message": "task is running"
+          }
+        ],
+        "last_error": null,
+        "tracked": {}
+      }
+    },
+    {
+      "scenario": "paused_queued",
+      "manifest_status": "in_progress",
+      "latest_action": "pause",
+      "queued_questions": 1,
+      "state": {
+        "generated_at": "2026-03-07T01:31:05.587Z",
+        "counts": {
+          "running": 1,
+          "retrying": 0
+        },
+        "running": [
+          {
+            "issue_id": "task-1033-manual",
+            "issue_identifier": "task-1033-manual",
+            "state": "in_progress",
+            "display_state": "paused",
+            "status_reason": "queued_questions",
+            "session_id": "run-1",
+            "turn_count": 0,
+            "last_event": "pause",
+            "last_message": "task is running",
+            "started_at": "2026-03-07T01:31:05.583Z",
+            "last_event_at": "2026-03-07T00:14:30.000Z",
+            "tokens": {
+              "input_tokens": null,
+              "output_tokens": null,
+              "total_tokens": null
+            }
+          }
+        ],
+        "retrying": [],
+        "codex_totals": null,
+        "rate_limits": null,
+        "selected": {
+          "issue_id": "task-1033-manual",
+          "issue_identifier": "task-1033-manual",
+          "task_id": "task-1033-manual",
+          "run_id": "run-1",
+          "raw_status": "in_progress",
+          "display_status": "paused",
+          "status_reason": "queued_questions",
+          "started_at": "2026-03-07T01:31:05.583Z",
+          "updated_at": "2026-03-07T01:31:05.583Z",
+          "completed_at": null,
+          "summary": "task is running",
+          "last_error": null,
+          "latest_action": "pause",
+          "latest_event": {
+            "at": "2026-03-07T00:14:30.000Z",
+            "event": "pause",
+            "message": "task is running",
+            "requested_by": "telegram",
+            "reason": "waiting_for_operator"
+          },
+          "workspace": {
+            "path": "/var/folders/r8/ss2mqz1n5wgcph4gnh_894600000gn/T/control-server-manual-dCnoFY"
+          },
+          "question_summary": {
+            "queued_count": 1,
+            "latest_question": {
+              "question_id": "q-0001",
+              "prompt": "Need approval",
+              "urgency": "high",
+              "queued_at": "2026-03-07T00:14:00.000Z"
+            }
+          }
+        }
+      },
+      "issue": {
+        "error": {
+          "code": "issue_not_found",
+          "message": "Issue not found",
+          "details": {
+            "surface": "api_v1",
+            "issue_identifier": "task-1033-paused_queued"
+          }
+        },
+        "traceability": {
+          "task_id": "task-1033-paused_queued",
+          "run_id": "run-1",
+          "manifest_path": "/var/folders/r8/ss2mqz1n5wgcph4gnh_894600000gn/T/control-server-manual-dCnoFY/.runs/task-1033-paused_queued/cli/run-1/manifest.json",
+          "surface": "api_v1",
+          "issue_identifier": "task-1033-paused_queued",
+          "requested_action": null,
+          "requested_tool": null,
+          "decision": "rejected",
+          "reason": "issue_not_found",
+          "timestamp": "2026-03-07T01:31:05.587Z"
+        }
+      },
+      "alias_issue": {
+        "issue_identifier": "task-1033-manual",
+        "issue_id": "task-1033-manual",
+        "status": "in_progress",
+        "raw_status": "in_progress",
+        "display_status": "paused",
+        "status_reason": "queued_questions",
+        "workspace": {
+          "path": "/var/folders/r8/ss2mqz1n5wgcph4gnh_894600000gn/T/control-server-manual-dCnoFY"
+        },
+        "attempts": {
+          "restart_count": 0,
+          "current_retry_attempt": 0
+        },
+        "running": {
+          "issue_id": "task-1033-manual",
+          "issue_identifier": "task-1033-manual",
+          "state": "in_progress",
+          "display_state": "paused",
+          "status_reason": "queued_questions",
+          "session_id": "run-1",
+          "turn_count": 0,
+          "last_event": "pause",
+          "last_message": "task is running",
+          "started_at": "2026-03-07T01:31:05.583Z",
+          "last_event_at": "2026-03-07T00:14:30.000Z",
+          "tokens": {
+            "input_tokens": null,
+            "output_tokens": null,
+            "total_tokens": null
+          }
+        },
+        "retry": null,
+        "logs": {
+          "codex_session_logs": []
+        },
+        "summary": "task is running",
+        "latest_event": {
+          "at": "2026-03-07T00:14:30.000Z",
+          "event": "pause",
+          "message": "task is running"
+        },
+        "question_summary": {
+          "queued_count": 1,
+          "latest_question": {
+            "question_id": "q-0001",
+            "prompt": "Need approval",
+            "urgency": "high",
+            "queued_at": "2026-03-07T00:14:00.000Z"
+          }
+        },
+        "recent_events": [
+          {
+            "at": "2026-03-07T00:14:30.000Z",
+            "event": "pause",
+            "message": "task is running"
+          }
+        ],
+        "last_error": null,
+        "tracked": {}
+      }
+    }
+  ]
+}
