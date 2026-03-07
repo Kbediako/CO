@@ -1,0 +1,52 @@
+{
+  "version": 1,
+  "generated_at": "2026-03-07T16:47:37.873Z",
+  "status": "succeeded",
+  "error": null,
+  "output_log_path": ".runs/1054-coordinator-symphony-aligned-control-action-execution-extraction/cli/2026-03-07T16-16-25-934Z-015c9198/review/output.log",
+  "summary": {
+    "lineCount": 680,
+    "commandStarts": [
+      "[redacted command 1; set CODEX_REVIEW_DEBUG_TELEMETRY=1 to persist raw values]",
+      "[redacted command 2; set CODEX_REVIEW_DEBUG_TELEMETRY=1 to persist raw values]",
+      "[redacted command 3; set CODEX_REVIEW_DEBUG_TELEMETRY=1 to persist raw values]",
+      "[redacted command 4; set CODEX_REVIEW_DEBUG_TELEMETRY=1 to persist raw values]",
+      "[redacted command 5; set CODEX_REVIEW_DEBUG_TELEMETRY=1 to persist raw values]",
+      "[redacted command 6; set CODEX_REVIEW_DEBUG_TELEMETRY=1 to persist raw values]",
+      "[redacted command 7; set CODEX_REVIEW_DEBUG_TELEMETRY=1 to persist raw values]",
+      "[redacted command 8; set CODEX_REVIEW_DEBUG_TELEMETRY=1 to persist raw values]",
+      "[redacted command 9; set CODEX_REVIEW_DEBUG_TELEMETRY=1 to persist raw values]",
+      "[redacted command 10; set CODEX_REVIEW_DEBUG_TELEMETRY=1 to persist raw values]",
+      "[redacted command 11; set CODEX_REVIEW_DEBUG_TELEMETRY=1 to persist raw values]",
+      "[redacted command 12; set CODEX_REVIEW_DEBUG_TELEMETRY=1 to persist raw values]",
+      "[redacted command 13; set CODEX_REVIEW_DEBUG_TELEMETRY=1 to persist raw values]",
+      "[redacted command 14; set CODEX_REVIEW_DEBUG_TELEMETRY=1 to persist raw values]"
+    ],
+    "completionCount": 19,
+    "startupEvents": 4,
+    "reviewProgressSignals": 61,
+    "heavyCommandStarts": [],
+    "lastLines": [
+      "[redacted output-line 1; set CODEX_REVIEW_DEBUG_TELEMETRY=1 to persist raw values]",
+      "[redacted output-line 2; set CODEX_REVIEW_DEBUG_TELEMETRY=1 to persist raw values]",
+      "[redacted output-line 3; set CODEX_REVIEW_DEBUG_TELEMETRY=1 to persist raw values]",
+      "[redacted output-line 4; set CODEX_REVIEW_DEBUG_TELEMETRY=1 to persist raw values]",
+      "[redacted output-line 5; set CODEX_REVIEW_DEBUG_TELEMETRY=1 to persist raw values]",
+      "[redacted output-line 6; set CODEX_REVIEW_DEBUG_TELEMETRY=1 to persist raw values]",
+      "[redacted output-line 7; set CODEX_REVIEW_DEBUG_TELEMETRY=1 to persist raw values]",
+      "[redacted output-line 8; set CODEX_REVIEW_DEBUG_TELEMETRY=1 to persist raw values]",
+      "[redacted output-line 9; set CODEX_REVIEW_DEBUG_TELEMETRY=1 to persist raw values]",
+      "[redacted output-line 10; set CODEX_REVIEW_DEBUG_TELEMETRY=1 to persist raw values]",
+      "[redacted output-line 11; set CODEX_REVIEW_DEBUG_TELEMETRY=1 to persist raw values]",
+      "[redacted output-line 12; set CODEX_REVIEW_DEBUG_TELEMETRY=1 to persist raw values]",
+      "[redacted output-line 13; set CODEX_REVIEW_DEBUG_TELEMETRY=1 to persist raw values]",
+      "[redacted output-line 14; set CODEX_REVIEW_DEBUG_TELEMETRY=1 to persist raw values]",
+      "[redacted output-line 15; set CODEX_REVIEW_DEBUG_TELEMETRY=1 to persist raw values]",
+      "[redacted output-line 16; set CODEX_REVIEW_DEBUG_TELEMETRY=1 to persist raw values]",
+      "[redacted output-line 17; set CODEX_REVIEW_DEBUG_TELEMETRY=1 to persist raw values]",
+      "[redacted output-line 18; set CODEX_REVIEW_DEBUG_TELEMETRY=1 to persist raw values]",
+      "[redacted output-line 19; set CODEX_REVIEW_DEBUG_TELEMETRY=1 to persist raw values]",
+      "[redacted output-line 20; set CODEX_REVIEW_DEBUG_TELEMETRY=1 to persist raw values]"
+    ]
+  }
+}
