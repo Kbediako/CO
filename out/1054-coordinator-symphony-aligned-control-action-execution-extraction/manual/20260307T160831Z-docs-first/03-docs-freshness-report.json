@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "generated_at": "2026-03-07T16:20:52.912Z",
+  "task_id": "1054-coordinator-symphony-aligned-control-action-execution-extraction",
+  "registry_path": "docs/docs-freshness-registry.json",
+  "totals": {
+    "docs_scanned": 1049,
+    "registry_entries": 1059,
+    "missing_in_registry": 0,
+    "missing_on_disk": 0,
+    "invalid_entries": 0,
+    "stale_entries": 0
+  },
+  "missing_in_registry": [],
+  "missing_on_disk": [],
+  "invalid_entries": [],
+  "stale_entries": []
+}
