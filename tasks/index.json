@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260307-1041-coordinator-symphony-aligned-linear-webhook-controller-extraction",
+      "title": "Coordinator Symphony-Aligned Linear Webhook Controller Extraction",
+      "relates_to": "tasks/tasks-1041-coordinator-symphony-aligned-linear-webhook-controller-extraction.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-07",
+      "paths": {
+        "spec": "tasks/specs/1041-coordinator-symphony-aligned-linear-webhook-controller-extraction.md",
+        "task": "tasks/tasks-1041-coordinator-symphony-aligned-linear-webhook-controller-extraction.md",
+        "agent_task": ".agent/task/1041-coordinator-symphony-aligned-linear-webhook-controller-extraction.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-linear-webhook-controller-extraction.md"
+      }
+    },
+    {
       "id": "20260307-1040-coordinator-symphony-aligned-ui-session-controller-extraction",
       "title": "Coordinator Symphony-Aligned UI Session Controller Extraction",
       "relates_to": "tasks/tasks-1040-coordinator-symphony-aligned-ui-session-controller-extraction.md",
@@ -1982,6 +1998,22 @@
       },
       "created_at": "2026-03-06",
       "completed_at": "2026-03-06"
+    },
+    {
+      "id": "1041",
+      "slug": "1041-coordinator-symphony-aligned-linear-webhook-controller-extraction",
+      "title": "Coordinator Symphony-Aligned Linear Webhook Controller Extraction",
+      "path": "tasks/tasks-1041-coordinator-symphony-aligned-linear-webhook-controller-extraction.md",
+      "kind": "run",
+      "status": "in-progress",
+      "gate": {
+        "phase": "coordinator-symphony-aligned-linear-webhook-controller-extraction-planning",
+        "status": "in-progress",
+        "log": null,
+        "run_id": null
+      },
+      "created_at": "2026-03-07",
+      "completed_at": null
     },
     {
       "id": "1040",
