@@ -42,6 +42,7 @@ import { handleSecurityViolationRequest } from './securityViolationController.js
 import { handleEventsSseRequest } from './eventsSseController.js';
 import { handleQuestionQueueRequest } from './questionQueueController.js';
 import { handleDelegationRegisterRequest } from './delegationRegisterController.js';
+import { handleConfirmationCreateRequest } from './confirmationCreateController.js';
 import { handleConfirmationIssueConsumeRequest } from './confirmationIssueConsumeController.js';
 import { handleConfirmationValidateRequest } from './confirmationValidateController.js';
 import {
@@ -936,76 +937,42 @@ async function handleRequest(context: RequestContext): Promise<void> {
     return;
   }
 
-  if (url.pathname === '/confirmations/create' && req.method === 'POST') {
-    await expireConfirmations(context);
-    const body = await readJsonBody(req);
-    const rawAction = readStringValue(body, 'action');
-    const action = rawAction === 'cancel' || rawAction === 'merge' ? rawAction : 'other';
-    let tool = readStringValue(body, 'tool') ?? 'unknown';
-    let params = readRecordValue(body, 'params') ?? {};
-    if (auth.kind === 'session') {
-      if (rawAction !== 'cancel' || tool !== 'ui.cancel') {
-        res.writeHead(403, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: 'ui_confirmation_disallowed' }));
-        return;
-      }
-      tool = 'ui.cancel';
-      params = {};
-    }
-    const { confirmation, wasCreated } = context.confirmationStore.create({
-      action,
-      tool,
-      params
-    });
-    await context.persist.confirmations();
-
-    if (wasCreated && context.config.confirm.autoPause) {
-      const latestAction = context.controlStore.snapshot().latest_action?.action ?? null;
-      if (latestAction !== 'pause') {
+  if (
+    await handleConfirmationCreateRequest({
+      req,
+      res,
+      authKind: auth.kind,
+      readRequestBody: () => readJsonBody(req),
+      expireConfirmations: () => expireConfirmations(context),
+      createConfirmation: ({ action, tool, params }) =>
+        context.confirmationStore.create({ action, tool, params }),
+      persistConfirmations: () => context.persist.confirmations(),
+      maybeAutoPause: async (requestId) => {
+        if (!context.config.confirm.autoPause) {
+          return;
+        }
+        const latestAction = context.controlStore.snapshot().latest_action?.action ?? null;
+        if (latestAction === 'pause') {
+          return;
+        }
         context.controlStore.updateAction({
           action: 'pause',
           requestedBy: 'runner',
-          requestId: confirmation.request_id,
+          requestId,
           reason: 'confirmation_required'
         });
         await context.persist.control();
         context.runtime.publish({ source: 'control.action' });
-      }
-    }
-
-    const runId = context.controlStore.snapshot().run_id;
-    if (wasCreated) {
-      await emitControlEvent(context, {
-        event: 'confirmation_required',
-        actor: 'runner',
-        payload: {
-          request_id: confirmation.request_id,
-          confirm_scope: {
-            run_id: runId,
-            action: confirmation.action,
-            action_params_digest: confirmation.action_params_digest
-          },
-          action_params_digest: confirmation.action_params_digest,
-          digest_alg: confirmation.digest_alg,
-          confirm_expires_in_ms: Date.parse(confirmation.expires_at) - Date.parse(confirmation.requested_at)
-        }
-      });
-    }
-
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(
-      JSON.stringify({
-        request_id: confirmation.request_id,
-        confirm_scope: {
-          run_id: runId,
-          action: confirmation.action,
-          action_params_digest: confirmation.action_params_digest
-        },
-        action_params_digest: confirmation.action_params_digest,
-        digest_alg: confirmation.digest_alg,
-        confirm_expires_in_ms: Date.parse(confirmation.expires_at) - Date.parse(confirmation.requested_at)
-      })
-    );
+      },
+      readRunId: () => context.controlStore.snapshot().run_id,
+      emitConfirmationRequired: (payload) =>
+        emitControlEvent(context, {
+          event: 'confirmation_required',
+          actor: 'runner',
+          payload
+        })
+    })
+  ) {
     return;
   }
 
