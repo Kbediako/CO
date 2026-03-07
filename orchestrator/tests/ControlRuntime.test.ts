@@ -510,6 +510,58 @@ describe('ControlRuntime', () => {
     });
   });
 
+  it('uses run id as the final same-issue representative tiebreak when timestamps collide', async () => {
+    const fixture = await createFixture({
+      taskId: 'task-1036-current'
+    });
+
+    await seedManifest(fixture.paths, {
+      task_id: 'task-1036-current',
+      issue_identifier: 'ISSUE-1036',
+      summary: 'selected run remains current authority',
+      started_at: '2026-03-07T00:15:00.000Z',
+      updated_at: '2026-03-07T00:15:00.000Z'
+    });
+
+    await createSiblingRun(fixture.root, 'task-1036-current', 'run-2', {
+      manifest: {
+        task_id: 'task-1036-current',
+        issue_identifier: 'ISSUE-1036',
+        status: 'in_progress',
+        started_at: '2026-03-07T00:20:00.000Z',
+        updated_at: '2026-03-07T00:20:00.000Z',
+        summary: 'older lexical run id'
+      }
+    });
+
+    await createSiblingRun(fixture.root, 'task-1036-current', 'run-3', {
+      manifest: {
+        task_id: 'task-1036-current',
+        issue_identifier: 'ISSUE-1036',
+        status: 'in_progress',
+        started_at: '2026-03-07T00:20:00.000Z',
+        updated_at: '2026-03-07T00:20:00.000Z',
+        summary: 'newer lexical run id'
+      }
+    });
+
+    const compatibilityProjection = await fixture.runtime.snapshot().readCompatibilityProjection();
+    const sameIssueRecord = compatibilityProjection.issues.find(
+      (issue) => issue.issueIdentifier === 'ISSUE-1036'
+    );
+
+    expect(compatibilityProjection.running).toEqual([
+      expect.objectContaining({
+        issue_identifier: 'ISSUE-1036',
+        session_id: 'run-3'
+      })
+    ]);
+    expect(sameIssueRecord?.payload.running).toMatchObject({
+      issue_identifier: 'ISSUE-1036',
+      session_id: 'run-3'
+    });
+  });
+
   it('invalidates the cached snapshot on publish', async () => {
     const fixture = await createFixture();
     const initialSnapshot = fixture.runtime.snapshot();

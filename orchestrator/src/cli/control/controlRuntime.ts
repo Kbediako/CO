@@ -2,12 +2,12 @@ import type { RunPaths } from '../run/runPaths.js';
 import type { ControlState } from './controlState.js';
 import type { LiveLinearTrackedIssue } from './linearDispatchSource.js';
 import {
-  buildCompatibilityProjectionSnapshot,
   buildTrackedLinearPayload,
   type ControlCompatibilityProjectionSnapshot,
   type ControlCompatibilityRuntimeSnapshot,
   type ControlSelectedRunRuntimeSnapshot,
 } from './observabilityReadModel.js';
+import { buildCompatibilityProjectionSnapshot } from './compatibilityIssuePresenter.js';
 import { createLiveLinearAdvisoryRuntime } from './liveLinearAdvisoryRuntime.js';
 import {
   createObservabilityUpdateNotifier,

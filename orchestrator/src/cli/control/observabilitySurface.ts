@@ -13,9 +13,9 @@ import type {
 } from './observabilityReadModel.js';
 import {
   buildSelectedRunPublicPayload,
-  buildUiSelectedRunSharedFields,
-  findCompatibilityProjectionIssueRecord
+  buildUiSelectedRunSharedFields
 } from './observabilityReadModel.js';
+import { findCompatibilityProjectionIssueRecord } from './compatibilityIssuePresenter.js';
 import type {
   DispatchPilotEvaluation,
   DispatchPilotFailure
