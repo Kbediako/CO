@@ -9,6 +9,8 @@ import { parseRunIdTimestamp, resolveEnvironmentPaths } from './lib/run-manifest
 
 const DEFAULT_POLICY_PATH = 'docs/tasks-archive-policy.json';
 const TASKS_PATH = 'docs/TASKS.md';
+const SNAPSHOT_HEADER_PREFIX = '# Task List Snapshot';
+const SNAPSHOT_HEADER_SPLIT_PATTERN = /(?=# Task List Snapshot(?: —|-)\s+)/g;
 
 function showUsage() {
   console.log(`Usage: node scripts/tasks-archive.mjs [--policy <path>] [--out <path>] [--dry-run]
@@ -63,6 +65,39 @@ function extractSnapshotKey(line) {
   return match[1].trim();
 }
 
+function lineStartsWithSnapshotHeader(line) {
+  return typeof line === 'string' && line.startsWith(SNAPSHOT_HEADER_PREFIX);
+}
+
+function normalizeInlineSnapshotHeaders(content) {
+  if (typeof content !== 'string' || content.length === 0) {
+    return '';
+  }
+
+  const normalizedLines = [];
+  for (const line of content.split('\n')) {
+    const segments = line.split(SNAPSHOT_HEADER_SPLIT_PATTERN);
+    if (segments.length === 1) {
+      normalizedLines.push(line);
+      continue;
+    }
+
+    const [prefix, ...snapshotSegments] = segments;
+    if (prefix.trim().length > 0) {
+      normalizedLines.push(prefix.trimEnd());
+    }
+
+    for (const segment of snapshotSegments) {
+      const trimmed = segment.trimStart();
+      if (trimmed.length > 0) {
+        normalizedLines.push(trimmed);
+      }
+    }
+  }
+
+  return normalizedLines.join('\n');
+}
+
 function headerMatchesTask(headerKey, taskKey) {
   if (!headerKey || !taskKey) {
     return false;
@@ -84,7 +119,7 @@ function parseHeaderSections(lines) {
 
   for (let index = 0; index < lines.length; index += 1) {
     const line = lines[index];
-    if (!line.startsWith('# Task List Snapshot')) {
+    if (!lineStartsWithSnapshotHeader(line)) {
       continue;
     }
     if (startIndex !== null && taskKey) {
@@ -128,7 +163,7 @@ function parseTaskSections(lines) {
     let startIndex = index;
     let headerLine = null;
     for (let cursor = index; cursor >= 0; cursor -= 1) {
-      if (lines[cursor].startsWith('# Task List Snapshot')) {
+      if (lineStartsWithSnapshotHeader(lines[cursor])) {
         headerLine = lines[cursor];
         if (headerMatchesTask(extractSnapshotKey(headerLine), taskKey)) {
           startIndex = cursor;
@@ -213,20 +248,19 @@ function extractArchiveYears(existingContent) {
   return years;
 }
 
-function buildArchiveIndex({ years, policy }) {
+function buildArchiveIndexText({ years, policy }) {
   const sortedYears = [...years].sort();
-  const lines = ['## Archive index'];
-  lines.push(`Archived task snapshots live on the ${policy.archiveBranch} branch.`);
   if (sortedYears.length === 0) {
-    lines.push('No archives recorded yet.');
-  } else {
-    for (const year of sortedYears) {
-      const archivePath = policy.archivePattern.replace('YYYY', year);
-      const url = `${policy.repoUrl}/blob/${policy.archiveBranch}/${archivePath}`;
-      lines.push(`- ${year}: ${url}`);
-    }
+    return `## Archive index - archived task snapshots live on the ${policy.archiveBranch} branch. No archives recorded yet.`;
   }
-  return lines;
+
+  const archiveEntries = sortedYears.map((year) => {
+    const archivePath = policy.archivePattern.replace('YYYY', year);
+    const url = `${policy.repoUrl}/blob/${policy.archiveBranch}/${archivePath}`;
+    return `${year}: ${url}`;
+  });
+
+  return `## Archive index - archived task snapshots live on the ${policy.archiveBranch} branch. ${archiveEntries.join('; ')}`;
 }
 
 function updateArchiveIndex(content, policy, years) {
@@ -238,8 +272,7 @@ function updateArchiveIndex(content, policy, years) {
   for (const year of years) {
     existingYears.add(year);
   }
-  const blockLines = [begin, ...buildArchiveIndex({ years: existingYears, policy }), end];
-  const block = blockLines.join('\n');
+  const block = `${begin} ${buildArchiveIndexText({ years: existingYears, policy })} ${end}`;
 
   const beginIndex = content.indexOf(begin);
   const endIndex = content.indexOf(end);
@@ -250,7 +283,7 @@ function updateArchiveIndex(content, policy, years) {
   const lines = content.split('\n');
   const headerIndices = [];
   for (let index = 0; index < lines.length; index += 1) {
-    if (lines[index].startsWith('# Task List Snapshot — ')) {
+    if (lineStartsWithSnapshotHeader(lines[index])) {
       headerIndices.push(index);
     }
   }
@@ -304,7 +337,7 @@ async function main() {
   ]);
 
   const policy = parsePolicy(policyRaw, policyPath);
-  const lines = tasksRaw.split('\n');
+  const lines = normalizeInlineSnapshotHeaders(tasksRaw).split('\n');
   const totalLines = lines.length;
 
   if (totalLines <= policy.maxLines) {
@@ -379,6 +412,13 @@ async function main() {
   const updatedLines = lines.filter((_, index) => !removeMask[index]);
   let updatedContent = updatedLines.join('\n');
   updatedContent = updateArchiveIndex(updatedContent, policy, archivedYears);
+  const updatedLineCount = updatedContent.split('\n').length;
+
+  if (updatedLineCount > policy.maxLines) {
+    throw new Error(
+      `Archive output still exceeds max_lines ${policy.maxLines}; ${updatedLineCount} lines remain after archiving.`
+    );
+  }
 
   const taskId = process.env.MCP_RUNNER_TASK_ID || 'local';
   const archiveFileName = path.basename(policy.archivePattern);
@@ -431,7 +471,7 @@ async function main() {
   }
 
   console.log(`Archived ${toArchive.length} task(s).`);
-  console.log(`docs/TASKS.md lines: ${totalLines} -> ${remainingLines} (limit ${policy.maxLines}).`);
+  console.log(`docs/TASKS.md lines: ${totalLines} -> ${updatedLineCount} (limit ${policy.maxLines}).`);
   console.log(`Archive branch: ${policy.archiveBranch}`);
 
   if (options.dryRun) {

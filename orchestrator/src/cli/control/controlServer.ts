@@ -40,18 +40,11 @@ import {
 import { createControlRuntime, type ControlRuntime } from './controlRuntime.js';
 import {
   buildCompatibilityErrorResponse,
-  buildCompatibilityIssueNotFoundResponse,
-  buildCompatibilityMethodNotAllowedResponse,
-  buildCompatibilityNotFoundResponse,
-  buildCompatibilityRefreshRejectedResponse,
-  buildCompatibilityTraceability,
   readDispatchExtension,
-  readCompatibilityIssue,
-  readCompatibilityRefresh,
-  readCompatibilityState,
   type ObservabilitySurfaceResponse,
   type DispatchExtensionResult
 } from './observabilitySurface.js';
+import { handleObservabilityApiRequest } from './observabilityApiController.js';
 import { readUiDataset } from './selectedRunPresenter.js';
 
 interface ControlServerOptions {
@@ -69,13 +62,6 @@ const CSRF_HEADER = 'x-csrf-token';
 const DELEGATION_TOKEN_HEADER = 'x-codex-delegation-token';
 const DELEGATION_RUN_HEADER = 'x-codex-delegation-run-id';
 const LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost', '::1']);
-const COMPATIBILITY_API_PREFIX = '/api/v1';
-const COMPATIBILITY_STATE_PATH = `${COMPATIBILITY_API_PREFIX}/state`;
-const COMPATIBILITY_REFRESH_PATH = `${COMPATIBILITY_API_PREFIX}/refresh`;
-const COMPATIBILITY_DISPATCH_EXTENSION_PATH = `${COMPATIBILITY_API_PREFIX}/dispatch`;
-const SYMPHONY_COMPATIBILITY_CORE_SEGMENTS = new Set(['state', 'refresh']);
-const CO_COMPATIBILITY_EXTENSION_SEGMENTS = new Set(['dispatch']);
-const JSON_HEADERS = { 'Content-Type': 'application/json' };
 const JSON_NO_STORE_HEADERS = { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' };
 const UI_ASSET_PATHS: Record<string, string> = {
   '/ui': 'index.html',
@@ -622,122 +608,17 @@ async function handleRequest(context: RequestContext): Promise<void> {
     return;
   }
 
-  // Symphony-aligned core observability routes.
-  if (url.pathname === COMPATIBILITY_STATE_PATH) {
-    if (method !== 'GET') {
-      writeObservabilityResponse(res, buildCompatibilityMethodNotAllowedResponse(context, 'GET'));
-      return;
-    }
-    writeObservabilityResponse(res, {
-      status: 200,
-      headers: JSON_NO_STORE_HEADERS,
-      body: await readCompatibilityState(presenterContext)
-    });
-    return;
-  }
-
-  // CO-specific dispatch extension over the core compatibility surface.
-  if (url.pathname === COMPATIBILITY_DISPATCH_EXTENSION_PATH) {
-    if (req.method !== 'GET') {
-      writeDispatchExtensionMethodNotAllowed(res, context);
-      return;
-    }
-
-    const result = await readDispatchExtension({
-      readDispatchEvaluation: () => runtimeSnapshot.readDispatchEvaluation()
-    });
-    await emitDispatchPilotAuditEvents(context, {
-      surface: 'api_v1_dispatch',
-      evaluation: result.evaluation,
-      issueIdentifier: result.issueIdentifier
-    });
-
-    const traceability = buildCompatibilityTraceability(context, {
-      decision: result.kind === 'fail_closed' ? 'rejected' : 'acknowledged',
-      reason:
-        result.kind === 'fail_closed'
-          ? result.evaluation.failure?.reason ?? result.evaluation.summary.reason
-          : result.evaluation.summary.reason,
-      issueIdentifier: result.issueIdentifier
-    });
-
-    if (result.kind === 'fail_closed') {
-      writeObservabilityResponse(
-        res,
-        buildCompatibilityErrorResponse({
-          status: result.failure.status,
-          code: result.failure.code,
-          message: 'Dispatch pilot evaluation failed closed.',
-          details: result.details,
-          traceability
-        })
-      );
-      return;
-    }
-
-    writeObservabilityResponse(res, {
-      status: 200,
-      headers: JSON_NO_STORE_HEADERS,
-      body: {
-        ...result.payload,
-        traceability
-      }
-    });
-    return;
-  }
-
-  if (url.pathname === COMPATIBILITY_REFRESH_PATH) {
-    if (method !== 'POST') {
-      writeObservabilityResponse(res, buildCompatibilityMethodNotAllowedResponse(context, 'POST'));
-      return;
-    }
-    const result = await readCompatibilityRefresh(
-      {
-        controlStore: context.controlStore,
-        paths: context.paths,
-        requestRefresh: () => context.runtime.requestRefresh()
-      },
-      await readJsonBody(req)
-    );
-    if (result.kind === 'rejected') {
-      writeObservabilityResponse(res, buildCompatibilityRefreshRejectedResponse(context, result));
-      return;
-    }
-    writeObservabilityResponse(res, {
-      status: 202,
-      headers: JSON_HEADERS,
-      body: result.payload
-    });
-    return;
-  }
-
-  const compatibilityIssueIdentifier = resolveCompatibilityIssueIdentifierFromPath(url.pathname);
-  if (compatibilityIssueIdentifier !== null) {
-    if (method !== 'GET') {
-      writeObservabilityResponse(
-        res,
-        buildCompatibilityMethodNotAllowedResponse(context, 'GET', compatibilityIssueIdentifier)
-      );
-      return;
-    }
-    const result = await readCompatibilityIssue(presenterContext, compatibilityIssueIdentifier);
-    if (result.kind === 'issue_not_found') {
-      writeObservabilityResponse(
-        res,
-        buildCompatibilityIssueNotFoundResponse(context, compatibilityIssueIdentifier)
-      );
-      return;
-    }
-    writeObservabilityResponse(res, {
-      status: 200,
-      headers: JSON_NO_STORE_HEADERS,
-      body: result.payload
-    });
-    return;
-  }
-
-  if (url.pathname === COMPATIBILITY_API_PREFIX || url.pathname.startsWith(`${COMPATIBILITY_API_PREFIX}/`)) {
-    writeObservabilityResponse(res, buildCompatibilityNotFoundResponse(context));
+  if (
+    await handleObservabilityApiRequest({
+      req,
+      res,
+      presenterContext,
+      readRequestBody: () => readJsonBody(req),
+      requestRefresh: () => context.runtime.requestRefresh(),
+      readDispatchEvaluation: () => runtimeSnapshot.readDispatchEvaluation(),
+      onDispatchEvaluated: (record) => emitDispatchPilotAuditEvents(context, record)
+    })
+  ) {
     return;
   }
 
@@ -1528,31 +1409,6 @@ interface LinearAdvisoryState {
   seen_deliveries: LinearAdvisoryDeliveryRecord[];
 }
 
-function resolveCompatibilityIssueIdentifierFromPath(pathname: string): string | null {
-  if (!pathname.startsWith(`${COMPATIBILITY_API_PREFIX}/`)) {
-    return null;
-  }
-  const suffix = pathname.slice(`${COMPATIBILITY_API_PREFIX}/`.length);
-  if (!suffix || suffix.includes('/')) {
-    return null;
-  }
-  try {
-    const decoded = decodeURIComponent(suffix);
-    const normalized = decoded.toLowerCase();
-    if (
-      !decoded ||
-      decoded.includes('/') ||
-      SYMPHONY_COMPATIBILITY_CORE_SEGMENTS.has(normalized) ||
-      CO_COMPATIBILITY_EXTENSION_SEGMENTS.has(normalized)
-    ) {
-      return null;
-    }
-    return decoded;
-  } catch {
-    return null;
-  }
-}
-
 async function handleLinearWebhook(context: RequestContext): Promise<void> {
   if (!context.req || !context.res) {
     return;
@@ -2094,36 +1950,6 @@ async function emitDispatchPilotAuditEvents(
   });
 }
 
-function writeObservabilityResponse(
-  res: http.ServerResponse,
-  response: ObservabilitySurfaceResponse
-): void {
-  res.writeHead(response.status, response.headers);
-  res.end(JSON.stringify(response.body));
-}
-
-function writeDispatchExtensionMethodNotAllowed(
-  res: http.ServerResponse,
-  context: Parameters<typeof buildCompatibilityTraceability>[0]
-): void {
-  writeObservabilityResponse(
-    res,
-    buildCompatibilityErrorResponse({
-      status: 405,
-      code: 'method_not_allowed',
-      message: 'Method not allowed',
-      details: {
-        surface: 'api_v1',
-        allowed_method: 'GET'
-      },
-      traceability: buildCompatibilityTraceability(context, {
-        decision: 'rejected',
-        reason: 'method_not_allowed'
-      })
-    })
-  );
-}
-
 function writeUiDataMethodNotAllowed(res: http.ServerResponse): void {
   writeObservabilityResponse(
     res,
@@ -2138,6 +1964,14 @@ function writeUiDataMethodNotAllowed(res: http.ServerResponse): void {
       }
     })
   );
+}
+
+function writeObservabilityResponse(
+  res: http.ServerResponse,
+  response: ObservabilitySurfaceResponse
+): void {
+  res.writeHead(response.status, response.headers);
+  res.end(JSON.stringify(response.body));
 }
 
 function isControlAction(action: unknown): action is 'pause' | 'resume' | 'cancel' | 'fail' {

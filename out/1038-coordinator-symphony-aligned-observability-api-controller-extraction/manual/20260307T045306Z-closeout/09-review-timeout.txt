@@ -1,0 +1,6 @@
+Standalone review rerun exceeded the 180s wrapper budget after reaching Codex inspection with the explicit stacked-branch diff-budget override.
+
+No concrete `1038` defect was surfaced before timeout. The final logged activity re-validated:
+- `node scripts/tasks-archive.mjs --dry-run` (`docs/TASKS.md is within limit (447/450)`),
+- `npx vitest run orchestrator/tests/ObservabilityApiController.test.ts -t "ObservabilityApiController"`,
+- `npx vitest run orchestrator/tests/ControlServer.test.ts -t "rejects unsupported methods for ui data, Symphony-aligned compatibility routes, and the CO dispatch extension|acknowledges read-only refresh requests without mutating control state|projects read-only compatibility state and issue payloads"`.

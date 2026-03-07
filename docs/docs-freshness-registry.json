@@ -6581,6 +6581,55 @@
       "status": "active",
       "last_review": "2026-01-19",
       "cadence_days": 90
+    },
+    {
+      "path": ".agent/task/1038-coordinator-symphony-aligned-observability-api-controller-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-07",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-observability-api-controller-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-07",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/findings/1038-observability-api-controller-extraction-deliberation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-07",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/PRD-coordinator-symphony-aligned-observability-api-controller-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-07",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/TECH_SPEC-coordinator-symphony-aligned-observability-api-controller-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-07",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/specs/1038-coordinator-symphony-aligned-observability-api-controller-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-07",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/tasks-1038-coordinator-symphony-aligned-observability-api-controller-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-07",
+      "cadence_days": 30
     }
   ]
 }

@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260307-1038-coordinator-symphony-aligned-observability-api-controller-extraction",
+      "title": "Coordinator Symphony-Aligned Observability API Controller Extraction",
+      "relates_to": "tasks/tasks-1038-coordinator-symphony-aligned-observability-api-controller-extraction.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-07",
+      "paths": {
+        "spec": "tasks/specs/1038-coordinator-symphony-aligned-observability-api-controller-extraction.md",
+        "task": "tasks/tasks-1038-coordinator-symphony-aligned-observability-api-controller-extraction.md",
+        "agent_task": ".agent/task/1038-coordinator-symphony-aligned-observability-api-controller-extraction.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-observability-api-controller-extraction.md"
+      }
+    },
+    {
       "id": "0101",
       "slug": "0101-slimdown-audit",
       "title": "Slimdown Audit (Documentation)",
@@ -1934,6 +1950,22 @@
       },
       "created_at": "2026-03-06",
       "completed_at": "2026-03-06"
+    },
+    {
+      "id": "1038",
+      "slug": "1038-coordinator-symphony-aligned-observability-api-controller-extraction",
+      "title": "Coordinator Symphony-Aligned Observability API Controller Extraction",
+      "path": "tasks/tasks-1038-coordinator-symphony-aligned-observability-api-controller-extraction.md",
+      "kind": "run",
+      "status": "completed",
+      "gate": {
+        "phase": "coordinator-symphony-aligned-observability-api-controller-extraction-closeout",
+        "status": "succeeded",
+        "log": "out/1038-coordinator-symphony-aligned-observability-api-controller-extraction/manual/20260307T045306Z-closeout/00-summary.md",
+        "run_id": "20260307T045306Z-closeout"
+      },
+      "created_at": "2026-03-07",
+      "completed_at": "2026-03-07"
     },
     {
       "id": "1037",

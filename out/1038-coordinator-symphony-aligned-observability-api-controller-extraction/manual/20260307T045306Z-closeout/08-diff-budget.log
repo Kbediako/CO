@@ -1,0 +1,16 @@
+⚠️ Diff budget exceeded (override applied) (base=origin/main)
+ - changed files 376 > 25
+ - total lines changed 41117 > 800
+Top changed files:
+  - orchestrator/tests/ControlServer.test.ts: 5490
+  - docs/docs-freshness-registry.json: 2638
+  - tasks/index.json: 2242
+  - orchestrator/tests/DelegationServer.test.ts: 2115
+  - orchestrator/src/cli/control/controlServer.ts: 1782
+  - orchestrator/tests/TelegramOversightBridge.test.ts: 1206
+  - orchestrator/src/cli/control/telegramOversightBridge.ts: 901
+  - orchestrator/tests/ControlRuntime.test.ts: 835
+  - orchestrator/src/cli/delegationServer.ts: 816
+  - orchestrator/src/cli/control/linearDispatchSource.ts: 654
+
+Override accepted via DIFF_BUDGET_OVERRIDE_REASON: stacked branch contains previously validated Symphony-alignment slices; 1038-owned delta is the bounded /api/v1 observability API controller extraction plus archive-parser/docs sync cleanup
