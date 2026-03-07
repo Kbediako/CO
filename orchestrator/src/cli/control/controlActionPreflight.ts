@@ -1,10 +1,5 @@
 import { isoTimestamp } from '../utils/time.js';
-import type {
-  ControlAction,
-  ControlState,
-  ControlTransport,
-  TransportIdempotencyEntry
-} from './controlState.js';
+import type { ControlAction, ControlState, ControlTransport } from './controlState.js';
 
 const TRANSPORT_MUTATING_ACTIONS = new Set<ControlAction['action']>(['pause', 'resume', 'cancel']);
 const TRANSPORT_IDENTITY_PATTERN = /^[A-Za-z0-9._:@-]{1,128}$/;
@@ -95,17 +90,6 @@ export type TransportMutationPreflightResult =
       status: number;
       error: string;
       traceability: Record<string, unknown>;
-    };
-
-export type ControlActionReplayResult =
-  | {
-      matched: false;
-    }
-  | {
-      matched: true;
-      requestId: string | null;
-      intentId: string | null;
-      traceability: Record<string, unknown> | null;
     };
 
 export function normalizeControlActionRequest(input: {
@@ -257,81 +241,6 @@ export function validateTransportMutationPreflight(input: {
   return {
     ok: true,
     idempotencyWindowMs: transportPolicy.idempotencyWindowMs
-  };
-}
-
-export function resolveControlActionReplay(input: {
-  snapshot: ControlState;
-  action: ControlAction['action'];
-  requestId: string | null;
-  intentId: string | null;
-  taskId: string | null;
-  manifestPath: string;
-  transportMutation: TransportMutationRequest | null;
-  isTransportMutation: boolean;
-}): ControlActionReplayResult {
-  const transportReplayEntry =
-    input.transportMutation && input.action === 'cancel'
-      ? findTransportIdempotencyReplayEntry({
-          snapshot: input.snapshot,
-          action: input.action,
-          transport: input.transportMutation.transport,
-          requestId: input.requestId,
-          intentId: input.intentId
-        })
-      : null;
-  const genericReplayAllowed =
-    !input.isTransportMutation &&
-    isIdempotentReplay(input.snapshot, input.action, input.requestId, input.intentId) &&
-    (input.action !== 'cancel' || !input.snapshot.latest_action?.transport);
-  if (!transportReplayEntry && !genericReplayAllowed) {
-    return { matched: false };
-  }
-
-  const replayRequestId = transportReplayEntry
-    ? transportReplayEntry.request_id
-    : withUndefinedFallback(input.snapshot.latest_action?.request_id, input.requestId);
-  const replayIntentId = transportReplayEntry
-    ? transportReplayEntry.intent_id
-    : withUndefinedFallback(input.snapshot.latest_action?.intent_id, input.intentId);
-  const traceability =
-    input.action === 'cancel'
-      ? buildCanonicalTraceability({
-          action: input.action,
-          decision: 'replayed',
-          requestId: replayRequestId,
-          intentId: replayIntentId,
-          taskId: input.taskId,
-          runId: input.snapshot.run_id,
-          manifestPath: input.manifestPath,
-          transport:
-            transportReplayEntry?.transport ??
-            input.snapshot.latest_action?.transport ??
-            input.transportMutation?.transport ??
-            null,
-          actorId:
-            transportReplayEntry?.actor_id ??
-            input.snapshot.latest_action?.actor_id ??
-            input.transportMutation?.actorId ??
-            null,
-          actorSource:
-            transportReplayEntry?.actor_source ??
-            input.snapshot.latest_action?.actor_source ??
-            input.transportMutation?.actorSource ??
-            null,
-          principal:
-            transportReplayEntry?.transport_principal ??
-            input.snapshot.latest_action?.transport_principal ??
-            input.transportMutation?.principal ??
-            null
-        })
-      : null;
-
-  return {
-    matched: true,
-    requestId: replayRequestId,
-    intentId: replayIntentId,
-    traceability
   };
 }
 
@@ -659,51 +568,6 @@ function hasCoordinatorMetadata(body: Record<string, unknown>): boolean {
     'manifestPath'
   ];
   return disallowedKeys.some((key) => Object.prototype.hasOwnProperty.call(body, key));
-}
-
-function isIdempotentReplay(
-  snapshot: ControlState,
-  action: ControlAction['action'],
-  requestId: string | null,
-  intentId: string | null
-): boolean {
-  const latest = snapshot.latest_action;
-  if (!latest || latest.action !== action) {
-    return false;
-  }
-  if (requestId && latest.request_id === requestId) {
-    return true;
-  }
-  if (intentId && latest.intent_id === intentId) {
-    return true;
-  }
-  return false;
-}
-
-function findTransportIdempotencyReplayEntry(input: {
-  snapshot: ControlState;
-  action: ControlAction['action'];
-  transport: ControlTransport;
-  requestId: string | null;
-  intentId: string | null;
-}): TransportIdempotencyEntry | null {
-  const index = input.snapshot.transport_mutation?.idempotency_index ?? [];
-  for (const entry of index) {
-    if (entry.action !== input.action || entry.transport !== input.transport) {
-      continue;
-    }
-    if (entry.key_type === 'request' && input.requestId && entry.key === input.requestId) {
-      return entry;
-    }
-    if (entry.key_type === 'intent' && input.intentId && entry.key === input.intentId) {
-      return entry;
-    }
-  }
-  return null;
-}
-
-function withUndefinedFallback<T>(value: T | undefined, fallback: T): T {
-  return value === undefined ? fallback : value;
 }
 
 function readStringValue(record: Record<string, unknown>, ...keys: string[]): string | undefined {

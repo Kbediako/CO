@@ -47,10 +47,10 @@ import { handleConfirmationIssueConsumeRequest } from './confirmationIssueConsum
 import { handleConfirmationValidateRequest } from './confirmationValidateController.js';
 import {
   normalizeControlActionRequest,
-  resolveControlActionReplay,
   validateTransportMutationPreflight,
   type TransportMutationRequest
 } from './controlActionPreflight.js';
+import { executeControlAction, resolveControlActionReplay } from './controlActionExecution.js';
 import {
   buildPostMutationControlActionResponse,
   buildReplayedControlActionResponse
@@ -666,28 +666,22 @@ async function handleRequest(context: RequestContext): Promise<void> {
       }
     };
 
-    const replayIfIdempotent = async (): Promise<boolean> => {
-      // Nonce checks can prune expired transport replay entries; read a fresh snapshot before replay lookup.
-      snapshot = context.controlStore.snapshot();
-      const replay = resolveControlActionReplay({
-        snapshot,
-        action,
-        requestId: resolvedRequestId,
-        intentId,
-        taskId,
-        manifestPath: context.paths.manifestPath,
-        transportMutation,
-        isTransportMutation
-      });
-      if (!replay.matched) {
-        return false;
+    const finalizeReplay = async (input: {
+      snapshot: ControlState;
+      requestId: string | null;
+      intentId: string | null;
+      traceability: Record<string, unknown> | null;
+      persistRequired: boolean;
+    }): Promise<void> => {
+      snapshot = input.snapshot;
+      if (input.persistRequired) {
+        await persistControlWithTransportNonce();
       }
-      await persistControlWithTransportNonce();
       const replayResponse = buildReplayedControlActionResponse({
         snapshot,
-        requestId: replay.requestId,
-        intentId: replay.intentId,
-        traceability: replay.traceability
+        requestId: input.requestId,
+        intentId: input.intentId,
+        traceability: input.traceability
       });
       await emitControlActionAuditEvent(context, {
         outcome: replayResponse.outcome,
@@ -701,14 +695,100 @@ async function handleRequest(context: RequestContext): Promise<void> {
       });
       res.writeHead(replayResponse.status, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify(replayResponse.body));
+    };
+
+    const replayIfIdempotent = async (): Promise<boolean> => {
+      // Nonce checks can prune expired transport replay entries; read a fresh snapshot before replay lookup.
+      const replaySnapshot = context.controlStore.snapshot();
+      const replay = resolveControlActionReplay({
+        snapshot: replaySnapshot,
+        action,
+        requestId: resolvedRequestId,
+        intentId,
+        taskId,
+        manifestPath: context.paths.manifestPath,
+        transportMutation,
+        isTransportMutation
+      });
+      if (!replay.matched) {
+        return false;
+      }
+      await finalizeReplay({
+        snapshot: replaySnapshot,
+        requestId: replay.requestId,
+        intentId: replay.intentId,
+        traceability: replay.traceability,
+        persistRequired: true
+      });
       return true;
     };
 
-    if (!deferTransportResolutionToConfirmation && (await replayIfIdempotent())) {
+    const finalizeExecution = async (): Promise<void> => {
+      const execution = executeControlAction({
+        action,
+        requestedBy,
+        requestId: resolvedRequestId,
+        intentId,
+        reason: reason ?? null,
+        taskId,
+        manifestPath: context.paths.manifestPath,
+        transportMutation,
+        isTransportMutation,
+        transportIdempotencyWindowMs,
+        readSnapshot: () => context.controlStore.snapshot(),
+        updateAction: (updateInput) => context.controlStore.updateAction(updateInput)
+      });
+      if (execution.kind === 'replay') {
+        await finalizeReplay({
+          snapshot: execution.snapshot,
+          requestId: execution.requestId,
+          intentId: execution.intentId,
+          traceability: execution.traceability,
+          persistRequired: execution.persistRequired
+        });
+        return;
+      }
+      if (execution.persistRequired) {
+        await persistControlWithTransportNonce();
+      }
+      snapshot = execution.snapshot;
+      if (execution.publishRequired) {
+        context.runtime.publish({ source: 'control.action' });
+      }
+      const outcomeResponse = buildPostMutationControlActionResponse({
+        action,
+        snapshot,
+        requestId: resolvedRequestId,
+        intentId,
+        taskId,
+        manifestPath: context.paths.manifestPath,
+        transportMutation,
+        idempotentReplay: execution.idempotentReplay,
+        replayEntry: execution.replayEntry
+      });
+      await emitControlActionAuditEvent(context, {
+        outcome: outcomeResponse.outcome,
+        action,
+        requestedBy,
+        reason: reason ?? null,
+        requestId: outcomeResponse.requestId,
+        intentId: outcomeResponse.intentId,
+        snapshot,
+        traceability: outcomeResponse.traceability
+      });
+      res.writeHead(outcomeResponse.status, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(outcomeResponse.body));
+    };
+
+    if (action !== 'cancel') {
+      await finalizeExecution();
       return;
     }
 
     if (action === 'cancel') {
+      if (!deferTransportResolutionToConfirmation && (await replayIfIdempotent())) {
+        return;
+      }
       if (!confirmNonce) {
         writeControlError(res, 409, 'confirmation_required');
         return;
@@ -733,7 +813,7 @@ async function handleRequest(context: RequestContext): Promise<void> {
             actor: 'runner',
             payload
           })
-      });
+        });
       if (!cancelResolution.ok) {
         writeControlError(
           res,
@@ -750,61 +830,9 @@ async function handleRequest(context: RequestContext): Promise<void> {
       if (!validateTransportMutationRequest()) {
         return;
       }
-      if (await replayIfIdempotent()) {
-        return;
-      }
+      await finalizeExecution();
+      return;
     }
-
-    const update = context.controlStore.updateAction({
-      action,
-      requestedBy,
-      requestId: resolvedRequestId,
-      intentId,
-      reason,
-      ...(transportMutation && transportIdempotencyWindowMs !== null
-        ? {
-            transportContext: {
-              transport: transportMutation.transport,
-              actorId: transportMutation.actorId,
-              actorSource: transportMutation.actorSource,
-              principal: transportMutation.principal,
-              idempotencyWindowMs: transportIdempotencyWindowMs
-            }
-          }
-        : {})
-    });
-    snapshot = update.snapshot;
-    if (transportMutation || !update.idempotentReplay) {
-      await persistControlWithTransportNonce();
-    }
-    if (!update.idempotentReplay) {
-      context.runtime.publish({ source: 'control.action' });
-    }
-    const replayEntry = update.replayEntry ?? null;
-    const outcomeResponse = buildPostMutationControlActionResponse({
-      action,
-      snapshot,
-      requestId: resolvedRequestId,
-      intentId,
-      taskId,
-      manifestPath: context.paths.manifestPath,
-      transportMutation,
-      idempotentReplay: update.idempotentReplay,
-      replayEntry
-    });
-    await emitControlActionAuditEvent(context, {
-      outcome: outcomeResponse.outcome,
-      action,
-      requestedBy,
-      reason: reason ?? null,
-      requestId: outcomeResponse.requestId,
-      intentId: outcomeResponse.intentId,
-      snapshot,
-      traceability: outcomeResponse.traceability
-    });
-    res.writeHead(outcomeResponse.status, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify(outcomeResponse.body));
-    return;
   }
 
   if (
