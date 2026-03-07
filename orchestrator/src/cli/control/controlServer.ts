@@ -49,10 +49,10 @@ import {
   readCompatibilityIssue,
   readCompatibilityRefresh,
   readCompatibilityState,
-  readUiDataset,
   type ObservabilitySurfaceResponse,
   type DispatchExtensionResult
 } from './observabilitySurface.js';
+import { readUiDataset } from './selectedRunPresenter.js';
 
 interface ControlServerOptions {
   paths: RunPaths;

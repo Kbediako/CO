@@ -1158,6 +1158,13 @@
       "cadence_days": 90
     },
     {
+      "path": ".agent/task/1037-coordinator-symphony-aligned-selected-run-presenter-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-07",
+      "cadence_days": 90
+    },
+    {
       "path": ".agent/task/1036-coordinator-symphony-aligned-compatibility-issue-index-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -1537,6 +1544,13 @@
     },
     {
       "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-compatibility-issue-identity-and-multi-run-policy.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-07",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-selected-run-presenter-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-03-07",
@@ -2495,6 +2509,13 @@
       "cadence_days": 90
     },
     {
+      "path": "docs/findings/1037-selected-run-presenter-extraction-deliberation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-07",
+      "cadence_days": 90
+    },
+    {
       "path": "docs/findings/1036-compatibility-issue-index-extraction-deliberation.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -2888,6 +2909,13 @@
     },
     {
       "path": "docs/PRD-coordinator-symphony-aligned-compatibility-issue-identity-and-multi-run-policy.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-07",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/PRD-coordinator-symphony-aligned-selected-run-presenter-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-03-07",
@@ -3910,6 +3938,13 @@
     },
     {
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-compatibility-issue-identity-and-multi-run-policy.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-07",
+      "cadence_days": 90
+    },
+    {
+      "path": "docs/TECH_SPEC-coordinator-symphony-aligned-selected-run-presenter-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-03-07",
@@ -5526,6 +5561,13 @@
       "cadence_days": 90
     },
     {
+      "path": "tasks/specs/1037-coordinator-symphony-aligned-selected-run-presenter-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-07",
+      "cadence_days": 90
+    },
+    {
       "path": "tasks/specs/1036-coordinator-symphony-aligned-compatibility-issue-index-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -6514,6 +6556,13 @@
     },
     {
       "path": "tasks/tasks-1035-coordinator-symphony-aligned-compatibility-issue-identity-and-multi-run-policy.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-07",
+      "cadence_days": 90
+    },
+    {
+      "path": "tasks/tasks-1037-coordinator-symphony-aligned-selected-run-presenter-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-03-07",

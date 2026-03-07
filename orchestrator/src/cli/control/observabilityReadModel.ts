@@ -217,14 +217,6 @@ export interface ControlIssuePayload {
   dispatch_pilot?: ControlDispatchPilotPayload;
 }
 
-export interface UiSelectedRunSharedFields {
-  raw_status: string;
-  display_status: string;
-  status_reason: string | null;
-  question_summary: ControlQuestionSummaryPayload;
-  tracked?: ControlTrackedPayload;
-}
-
 export function buildTrackedLinearPayload(
   trackedIssue: LiveLinearTrackedIssue | null | undefined
 ): ControlTrackedPayload | null {
@@ -290,10 +282,6 @@ export function buildSelectedRunLatestEventPayload(
   };
 }
 
-export function buildSelectedRunPublicPayload(selected: SelectedRunContext): ControlSelectedRunPayload {
-  return buildProjectionSelectedPayload(selected);
-}
-
 export function buildProjectionSelectedPayload(
   selected: SelectedRunContext | ControlCompatibilitySourceContext
 ): ControlSelectedRunPayload {
@@ -317,16 +305,6 @@ export function buildProjectionSelectedPayload(
     workspace: {
       path: selected.workspacePath
     },
-    question_summary: buildSelectedRunQuestionSummaryPayload(selected.questionSummary),
-    ...(selected.tracked ? { tracked: selected.tracked } : {})
-  };
-}
-
-export function buildUiSelectedRunSharedFields(selected: SelectedRunContext): UiSelectedRunSharedFields {
-  return {
-    raw_status: selected.rawStatus,
-    display_status: selected.displayStatus,
-    status_reason: selected.statusReason,
     question_summary: buildSelectedRunQuestionSummaryPayload(selected.questionSummary),
     ...(selected.tracked ? { tracked: selected.tracked } : {})
   };

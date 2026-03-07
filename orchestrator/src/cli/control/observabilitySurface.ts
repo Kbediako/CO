@@ -1,19 +1,10 @@
-import { readFile } from 'node:fs/promises';
-import { relative, resolve } from 'node:path';
-
 import { isoTimestamp } from '../utils/time.js';
 import type { RunPaths } from '../run/runPaths.js';
-import type { CliManifest } from '../types.js';
 import type { ControlState } from './controlState.js';
 import type {
   ControlCompatibilityProjectionSnapshot,
   ControlIssuePayload,
-  ControlSelectedRunRuntimeSnapshot,
   ControlStatePayload
-} from './observabilityReadModel.js';
-import {
-  buildSelectedRunPublicPayload,
-  buildUiSelectedRunSharedFields
 } from './observabilityReadModel.js';
 import { findCompatibilityProjectionIssueRecord } from './compatibilityIssuePresenter.js';
 import type {
@@ -41,7 +32,6 @@ interface ObservabilityTraceabilityContext {
 }
 
 export interface ObservabilityPresenterContext extends ObservabilityTraceabilityContext {
-  readSelectedRunSnapshot(): Promise<ControlSelectedRunRuntimeSnapshot>;
   readCompatibilityProjection(): Promise<ControlCompatibilityProjectionSnapshot>;
 }
 
@@ -336,90 +326,6 @@ export async function readCompatibilityIssue(
   };
 }
 
-export async function readUiDataset(
-  context: ObservabilityPresenterContext
-): Promise<Record<string, unknown>> {
-  const manifest = await readJsonFile<CliManifest>(context.paths.manifestPath);
-  const generatedAt = isoTimestamp();
-  if (!manifest) {
-    return { generated_at: generatedAt, tasks: [], runs: [], codebase: null, activity: [], selected: null };
-  }
-
-  const snapshot = await context.readSelectedRunSnapshot();
-  const selected = snapshot.selected;
-  const selectedSharedFields = selected ? buildUiSelectedRunSharedFields(selected) : null;
-  const bucketInfo = classifyBucket(manifest.status, context.controlStore.snapshot());
-  const approvalsTotal = Array.isArray(manifest.approvals) ? manifest.approvals.length : 0;
-  const repoRoot = resolveRepoRootFromRunDir(context.paths.runDir);
-  const links = {
-    manifest: repoRoot ? relative(repoRoot, context.paths.manifestPath) : context.paths.manifestPath,
-    log: repoRoot ? relative(repoRoot, context.paths.logPath) : context.paths.logPath,
-    metrics: null,
-    state: null
-  };
-
-  const stages = Array.isArray(manifest.commands)
-    ? manifest.commands.map((command) => ({
-        id: command.id,
-        title: command.title || command.id,
-        status: command.status
-      }))
-    : [];
-
-  const runEntry = {
-    run_id: manifest.run_id,
-    task_id: manifest.task_id,
-    status: manifest.status,
-    raw_status: selected?.rawStatus ?? manifest.status,
-    display_status: selected?.displayStatus ?? manifest.status,
-    status_reason: selected?.statusReason ?? null,
-    started_at: manifest.started_at,
-    updated_at: manifest.updated_at,
-    completed_at: manifest.completed_at,
-    stages,
-    links,
-    approvals_pending: 0,
-    approvals_total: approvalsTotal,
-    heartbeat_stale: false,
-    latest_event: selected?.latestEvent
-      ? {
-          at: selected.latestEvent.at,
-          event: selected.latestEvent.event,
-          message: selected.latestEvent.message
-        }
-      : null,
-    question_summary: selectedSharedFields?.question_summary ?? null,
-    ...(selectedSharedFields?.tracked ? { tracked: selectedSharedFields.tracked } : {})
-  };
-
-  const taskEntry = {
-    task_id: manifest.task_id,
-    title: manifest.pipeline_title || manifest.task_id,
-    bucket: bucketInfo.bucket,
-    bucket_reason: bucketInfo.reason,
-    status: manifest.status,
-    raw_status: selected?.rawStatus ?? manifest.status,
-    display_status: selected?.displayStatus ?? manifest.status,
-    status_reason: selected?.statusReason ?? null,
-    last_update: manifest.updated_at,
-    latest_run_id: manifest.run_id,
-    approvals_pending: 0,
-    approvals_total: approvalsTotal,
-    summary: manifest.summary ?? '',
-    question_summary: selectedSharedFields?.question_summary ?? null,
-    ...(selectedSharedFields?.tracked ? { tracked: selectedSharedFields.tracked } : {})
-  };
-
-  return {
-    generated_at: generatedAt,
-    tasks: [taskEntry],
-    runs: [runEntry],
-    codebase: null,
-    activity: [],
-    selected: selected ? buildSelectedRunPublicPayload(selected) : null
-  };
-}
-
 function resolveCompatibilityActionEnvelopeRejection(
   body: unknown
 ): CompatibilityActionEnvelopeRejection | null {
@@ -489,44 +395,11 @@ function resolveCompatibilityRefreshRejectionStatus(
 function isRecordLike(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
-function classifyBucket(
-  status: CliManifest['status'],
-  control: ControlState
-): { bucket: string; reason: string } {
-  if (status === 'queued') {
-    return { bucket: 'pending', reason: 'queued' };
-  }
-  if (status === 'in_progress') {
-    const latest = control.latest_action?.action ?? null;
-    if (latest === 'pause') {
-      return { bucket: 'ongoing', reason: 'paused' };
-    }
-    return { bucket: 'active', reason: 'running' };
-  }
-  if (status === 'succeeded' || status === 'failed' || status === 'cancelled') {
-    return { bucket: 'complete', reason: 'terminal' };
-  }
-  return { bucket: 'pending', reason: 'unknown' };
-}
-
-function resolveRepoRootFromRunDir(runDir: string): string | null {
-  const candidate = resolve(runDir, '..', '..', '..', '..');
-  return candidate || null;
-}
 
 function resolveTaskIdFromManifestPath(manifestPath: string): string | null {
   const normalizedPath = manifestPath.replace(/\\/g, '/');
   const match = normalizedPath.match(/\.runs\/([^/]+)\/cli\//);
   return match?.[1] ?? null;
-}
-
-async function readJsonFile<T>(path: string): Promise<T | null> {
-  try {
-    const raw = await readFile(path, 'utf8');
-    return JSON.parse(raw) as T;
-  } catch {
-    return null;
-  }
 }
 
 function readStringValue(record: Record<string, unknown>, ...keys: string[]): string | undefined {
