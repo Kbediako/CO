@@ -3335,6 +3335,70 @@ describe('ControlServer', () => {
     }
   });
 
+  it('accepts camelCase control action aliases and persists canonical ids', async () => {
+    const { root, env, paths } = await createRunRoot('task-0940');
+    const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
+
+    const server = await ControlServer.start({
+      paths,
+      config,
+      runId: 'run-1'
+    });
+
+    try {
+      const token = await readToken(paths.controlAuthPath);
+      const baseUrl = server.getBaseUrl() ?? '';
+      const res = await fetch(new URL('/control/action', baseUrl), {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'x-csrf-token': token,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          action: 'pause',
+          requestedBy: 'delegate',
+          requestId: 'req-camel-action',
+          intentId: 'intent-camel-action',
+          reason: 'manual'
+        })
+      });
+
+      expect(res.status).toBe(200);
+      const payload = (await res.json()) as {
+        control_seq?: number;
+        latest_action?: {
+          request_id?: string | null;
+          intent_id?: string | null;
+          requested_by?: string | null;
+        };
+      };
+      expect(payload.control_seq).toBe(1);
+      expect(payload.latest_action).toMatchObject({
+        request_id: 'req-camel-action',
+        intent_id: 'intent-camel-action',
+        requested_by: 'delegate'
+      });
+
+      const controlRaw = await readFile(paths.controlPath, 'utf8');
+      const control = JSON.parse(controlRaw) as {
+        latest_action?: {
+          request_id?: string | null;
+          intent_id?: string | null;
+          requested_by?: string | null;
+        };
+      };
+      expect(control.latest_action).toMatchObject({
+        request_id: 'req-camel-action',
+        intent_id: 'intent-camel-action',
+        requested_by: 'delegate'
+      });
+    } finally {
+      await server.close();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   it('replays duplicate control actions by request_id/intent_id without bumping control_seq', async () => {
     const { root, env, paths } = await createRunRoot('task-0940');
     const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
