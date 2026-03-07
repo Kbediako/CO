@@ -1,0 +1,5 @@
+
+> @kbediako/codex-orchestrator@0.1.38 docs:check
+> node --loader ts-node/esm scripts/docs-hygiene.ts --check
+
+✅ docs:check: OK

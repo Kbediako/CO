@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260307-1043-coordinator-symphony-aligned-question-queue-controller-extraction",
+      "title": "Coordinator Symphony-Aligned Question Queue Controller Extraction",
+      "relates_to": "tasks/tasks-1043-coordinator-symphony-aligned-question-queue-controller-extraction.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-07",
+      "paths": {
+        "spec": "tasks/specs/1043-coordinator-symphony-aligned-question-queue-controller-extraction.md",
+        "task": "tasks/tasks-1043-coordinator-symphony-aligned-question-queue-controller-extraction.md",
+        "agent_task": ".agent/task/1043-coordinator-symphony-aligned-question-queue-controller-extraction.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-question-queue-controller-extraction.md"
+      }
+    },
+    {
       "id": "20260307-1042-coordinator-symphony-aligned-events-sse-controller-extraction",
       "title": "Coordinator Symphony-Aligned Events SSE Controller Extraction",
       "relates_to": "tasks/tasks-1042-coordinator-symphony-aligned-events-sse-controller-extraction.md",
@@ -206,6 +222,22 @@
         "run_id": null
       },
       "created_at": "2025-11-27",
+      "completed_at": null
+    },
+    {
+      "id": "1043",
+      "slug": "1043-coordinator-symphony-aligned-question-queue-controller-extraction",
+      "title": "Coordinator Symphony-Aligned Question Queue Controller Extraction",
+      "path": "tasks/tasks-1043-coordinator-symphony-aligned-question-queue-controller-extraction.md",
+      "kind": "run",
+      "status": "in-progress",
+      "gate": {
+        "phase": "coordinator-symphony-aligned-question-queue-controller-extraction-planning",
+        "status": "in-progress",
+        "log": null,
+        "run_id": null
+      },
+      "created_at": "2026-03-07",
       "completed_at": null
     },
     {
