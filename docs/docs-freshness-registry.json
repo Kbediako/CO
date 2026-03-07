@@ -6632,6 +6632,55 @@
       "cadence_days": 30
     },
   {
+    "path": ".agent/task/1052-coordinator-symphony-aligned-control-action-outcome-shaping-extraction.md",
+    "owner": "Codex (top-level agent), Review agent",
+    "status": "active",
+    "last_review": "2026-03-08",
+    "cadence_days": 30
+  },
+  {
+    "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-control-action-outcome-shaping-extraction.md",
+    "owner": "Codex (top-level agent), Review agent",
+    "status": "active",
+    "last_review": "2026-03-08",
+    "cadence_days": 30
+  },
+  {
+    "path": "docs/PRD-coordinator-symphony-aligned-control-action-outcome-shaping-extraction.md",
+    "owner": "Codex (top-level agent), Review agent",
+    "status": "active",
+    "last_review": "2026-03-08",
+    "cadence_days": 30
+  },
+  {
+    "path": "docs/TECH_SPEC-coordinator-symphony-aligned-control-action-outcome-shaping-extraction.md",
+    "owner": "Codex (top-level agent), Review agent",
+    "status": "active",
+    "last_review": "2026-03-08",
+    "cadence_days": 30
+  },
+  {
+    "path": "docs/findings/1052-control-action-outcome-shaping-deliberation.md",
+    "owner": "Codex (top-level agent), Review agent",
+    "status": "active",
+    "last_review": "2026-03-08",
+    "cadence_days": 30
+  },
+  {
+    "path": "tasks/specs/1052-coordinator-symphony-aligned-control-action-outcome-shaping-extraction.md",
+    "owner": "Codex (top-level agent), Review agent",
+    "status": "active",
+    "last_review": "2026-03-08",
+    "cadence_days": 30
+  },
+  {
+    "path": "tasks/tasks-1052-coordinator-symphony-aligned-control-action-outcome-shaping-extraction.md",
+    "owner": "Codex (top-level agent), Review agent",
+    "status": "active",
+    "last_review": "2026-03-08",
+    "cadence_days": 30
+  },
+  {
     "path": ".agent/task/1051-coordinator-symphony-aligned-control-action-preflight-extraction.md",
     "owner": "Codex (top-level agent), Review agent",
     "status": "active",

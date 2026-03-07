@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260308-1052-coordinator-symphony-aligned-control-action-outcome-shaping-extraction",
+      "title": "Coordinator Symphony-Aligned Control Action Outcome Shaping Extraction",
+      "relates_to": "tasks/tasks-1052-coordinator-symphony-aligned-control-action-outcome-shaping-extraction.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-08",
+      "paths": {
+        "spec": "tasks/specs/1052-coordinator-symphony-aligned-control-action-outcome-shaping-extraction.md",
+        "task": "tasks/tasks-1052-coordinator-symphony-aligned-control-action-outcome-shaping-extraction.md",
+        "agent_task": ".agent/task/1052-coordinator-symphony-aligned-control-action-outcome-shaping-extraction.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-control-action-outcome-shaping-extraction.md"
+      }
+    },
+    {
       "id": "20260308-1051-coordinator-symphony-aligned-control-action-preflight-extraction",
       "title": "Coordinator Symphony-Aligned Control Action Preflight Extraction",
       "relates_to": "tasks/tasks-1051-coordinator-symphony-aligned-control-action-preflight-extraction.md",
@@ -350,6 +366,22 @@
         "run_id": null
       },
       "created_at": "2025-11-27",
+      "completed_at": null
+    },
+    {
+      "id": "1052",
+      "slug": "1052-coordinator-symphony-aligned-control-action-outcome-shaping-extraction",
+      "title": "Coordinator Symphony-Aligned Control Action Outcome Shaping Extraction",
+      "path": "tasks/tasks-1052-coordinator-symphony-aligned-control-action-outcome-shaping-extraction.md",
+      "kind": "run",
+      "status": "in-progress",
+      "gate": {
+        "phase": "coordinator-symphony-aligned-control-action-outcome-shaping-extraction-docs-first",
+        "status": "succeeded",
+        "log": "out/1052-coordinator-symphony-aligned-control-action-outcome-shaping-extraction/manual/20260307T143831Z-docs-first/00-summary.md",
+        "run_id": "20260307T143831Z-docs-first"
+      },
+      "created_at": "2026-03-08",
       "completed_at": null
     },
     {
