@@ -38,6 +38,7 @@ import {
 import { handleObservabilityApiRequest } from './observabilityApiController.js';
 import { handleUiDataRequest } from './uiDataController.js';
 import { handleUiSessionRequest } from './uiSessionController.js';
+import { handleSecurityViolationRequest } from './securityViolationController.js';
 import { handleEventsSseRequest } from './eventsSseController.js';
 import { handleQuestionQueueRequest } from './questionQueueController.js';
 import {
@@ -1120,21 +1121,19 @@ async function handleRequest(context: RequestContext): Promise<void> {
     return;
   }
 
-  if (url.pathname === '/security/violation' && req.method === 'POST') {
-    const body = await readJsonBody(req);
-    await emitControlEvent(context, {
-      event: 'security_violation',
-      actor: 'runner',
-      payload: {
-        kind: readStringValue(body, 'kind') ?? 'unknown',
-        summary: readStringValue(body, 'summary') ?? 'security_violation',
-        severity: readStringValue(body, 'severity') ?? 'high',
-        related_request_id: readStringValue(body, 'related_request_id', 'relatedRequestId') ?? null,
-        details_redacted: true
-      }
-    });
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ status: 'recorded' }));
+  if (
+    await handleSecurityViolationRequest({
+      req,
+      res,
+      readRequestBody: () => readJsonBody(req),
+      emitSecurityViolation: (payload) =>
+        emitControlEvent(context, {
+          event: 'security_violation',
+          actor: 'runner',
+          payload
+        })
+    })
+  ) {
     return;
   }
 

@@ -430,6 +430,71 @@ describe('ControlServer', () => {
     }
   });
 
+  it('records redacted security_violation events through the extracted controller', async () => {
+    const { root, env, paths } = await createRunRoot('task-0940');
+    const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
+    const events: import('../src/cli/events/runEventStream.js').RunEventStreamEntry[] = [];
+    const eventStream = {
+      append: async (entry: { event: string; actor: string; payload: Record<string, unknown> }) => {
+        const record = {
+          schema_version: 1,
+          seq: events.length + 1,
+          timestamp: new Date().toISOString(),
+          task_id: 'task-0940',
+          run_id: 'run-1',
+          event: entry.event,
+          actor: entry.actor,
+          payload: entry.payload
+        };
+        events.push(record);
+        return record;
+      },
+      close: async () => undefined
+    } as unknown as import('../src/cli/events/runEventStream.js').RunEventStream;
+
+    const server = await ControlServer.start({
+      paths,
+      config,
+      eventStream,
+      runId: 'run-1'
+    });
+
+    try {
+      const token = await readToken(paths.controlAuthPath);
+      const baseUrl = server.getBaseUrl() ?? '';
+      const res = await fetch(new URL('/security/violation', baseUrl), {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'x-csrf-token': token,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          kind: 'sandbox_escape',
+          relatedRequestId: 'req-7',
+          details: 'do-not-leak'
+        })
+      });
+
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({ status: 'recorded' });
+
+      const securityEvent = events.find((entry) => entry.event === 'security_violation');
+      expect(securityEvent).toBeTruthy();
+      expect(securityEvent?.payload).toEqual({
+        kind: 'sandbox_escape',
+        summary: 'security_violation',
+        severity: 'high',
+        related_request_id: 'req-7',
+        details_redacted: true
+      });
+      expect(JSON.stringify(securityEvent?.payload)).not.toContain('do-not-leak');
+    } finally {
+      await server.close();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   it('serves authenticated GET /events as an SSE bootstrap stream', async () => {
     const { root, env, paths } = await createRunRoot('task-0940');
     const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
