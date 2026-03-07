@@ -20,22 +20,22 @@
 
 ## Confirmation Create Controller Extraction
 
-- [ ] `/confirmations/create` route handling is extracted into a dedicated controller module. Evidence: `orchestrator/src/cli/control/`, `orchestrator/src/cli/control/controlServer.ts`.
-- [ ] Confirmation expiry, request parsing, action/tool/params normalization, session restriction logic, create invocation, persistence, optional auto-pause behavior, `confirmation_required` event emission, and response shaping move with the new controller without changing contracts. Evidence: `orchestrator/src/cli/control/`, `orchestrator/tests/ControlServer.test.ts`.
-- [ ] Confirmation create behavior and response contract remain unchanged after extraction. Evidence: `orchestrator/src/cli/control/`, `orchestrator/tests/ControlServer.test.ts`.
-- [ ] Route ordering, auth/runner-only gating, shared runtime/event hooks, `/confirmations/approve`, and non-confirmation routes remain in `controlServer.ts`. Evidence: `orchestrator/src/cli/control/controlServer.ts`, `orchestrator/tests/ControlServer.test.ts`.
+- [x] `/confirmations/create` route handling is extracted into a dedicated controller module. Evidence: `orchestrator/src/cli/control/confirmationCreateController.ts`, `orchestrator/src/cli/control/controlServer.ts`.
+- [x] Confirmation expiry, request parsing, action/tool/params normalization, session restriction logic, create invocation, persistence, optional auto-pause behavior, `confirmation_required` event emission, and response shaping move with the new controller without changing contracts. Evidence: `orchestrator/src/cli/control/confirmationCreateController.ts`, `orchestrator/tests/ConfirmationCreateController.test.ts`, `orchestrator/tests/ControlServer.test.ts`.
+- [x] Confirmation create behavior and response contract remain unchanged after extraction. Evidence: `orchestrator/src/cli/control/confirmationCreateController.ts`, `orchestrator/tests/ConfirmationCreateController.test.ts`, `orchestrator/tests/ControlServer.test.ts`, `out/1048-coordinator-symphony-aligned-confirmation-create-controller-extraction/manual/20260307T115629Z-closeout/11-manual-confirmation-create-controller.json`.
+- [x] Route ordering, auth/runner-only gating, shared runtime/event hooks, `/confirmations/approve`, and non-confirmation routes remain in `controlServer.ts`. Evidence: `orchestrator/src/cli/control/controlServer.ts`, `orchestrator/tests/ControlServer.test.ts`, `out/1048-coordinator-symphony-aligned-confirmation-create-controller-extraction/manual/20260307T115629Z-closeout/00-summary.md`.
 
 ## Validation + Closeout
 
-- [ ] `node scripts/delegation-guard.mjs`. Evidence: `out/1048-coordinator-symphony-aligned-confirmation-create-controller-extraction/manual/<timestamp>-closeout/01-delegation-guard.log`.
-- [ ] `node scripts/spec-guard.mjs --dry-run`. Evidence: `out/1048-coordinator-symphony-aligned-confirmation-create-controller-extraction/manual/<timestamp>-closeout/02-spec-guard.log`.
-- [ ] `npm run build`. Evidence: `out/1048-coordinator-symphony-aligned-confirmation-create-controller-extraction/manual/<timestamp>-closeout/03-build.log`.
-- [ ] `npm run lint`. Evidence: `out/1048-coordinator-symphony-aligned-confirmation-create-controller-extraction/manual/<timestamp>-closeout/04-lint.log`.
-- [ ] `npm run test`. Evidence: `out/1048-coordinator-symphony-aligned-confirmation-create-controller-extraction/manual/<timestamp>-closeout/05-test.log`.
-- [ ] `npm run docs:check`. Evidence: `out/1048-coordinator-symphony-aligned-confirmation-create-controller-extraction/manual/<timestamp>-closeout/06-docs-check.log`.
-- [ ] `npm run docs:freshness`. Evidence: `out/1048-coordinator-symphony-aligned-confirmation-create-controller-extraction/manual/<timestamp>-closeout/07-docs-freshness.log`.
-- [ ] `node scripts/diff-budget.mjs`. Evidence: `out/1048-coordinator-symphony-aligned-confirmation-create-controller-extraction/manual/<timestamp>-closeout/08-diff-budget.log`, `out/1048-coordinator-symphony-aligned-confirmation-create-controller-extraction/manual/<timestamp>-closeout/13-override-notes.md`.
-- [ ] `npm run review`. Evidence: `out/1048-coordinator-symphony-aligned-confirmation-create-controller-extraction/manual/<timestamp>-closeout/09-review.log`, `out/1048-coordinator-symphony-aligned-confirmation-create-controller-extraction/manual/<timestamp>-closeout/13-override-notes.md`.
-- [ ] `npm run pack:smoke` when required by touched downstream-facing paths. Evidence: `out/1048-coordinator-symphony-aligned-confirmation-create-controller-extraction/manual/<timestamp>-closeout/10-pack-smoke.log`.
-- [ ] Manual mock confirmation-create controller artifact captured. Evidence: `out/1048-coordinator-symphony-aligned-confirmation-create-controller-extraction/manual/<timestamp>-closeout/11-manual-confirmation-create-controller.json`.
-- [ ] Elegance review completed. Evidence: `out/1048-coordinator-symphony-aligned-confirmation-create-controller-extraction/manual/<timestamp>-closeout/12-elegance-review.md`.
+- [x] `node scripts/delegation-guard.mjs`. Evidence: `out/1048-coordinator-symphony-aligned-confirmation-create-controller-extraction/manual/20260307T115629Z-closeout/01-delegation-guard.log`.
+- [x] `node scripts/spec-guard.mjs --dry-run`. Evidence: `out/1048-coordinator-symphony-aligned-confirmation-create-controller-extraction/manual/20260307T115629Z-closeout/02-spec-guard.log`.
+- [x] `npm run build`. Evidence: `out/1048-coordinator-symphony-aligned-confirmation-create-controller-extraction/manual/20260307T115629Z-closeout/03-build.log`.
+- [x] `npm run lint`. Evidence: `out/1048-coordinator-symphony-aligned-confirmation-create-controller-extraction/manual/20260307T115629Z-closeout/04-lint.log`.
+- [x] `npm run test`. Evidence: `out/1048-coordinator-symphony-aligned-confirmation-create-controller-extraction/manual/20260307T115629Z-closeout/05-test.log`, `.runs/1048-coordinator-symphony-aligned-confirmation-create-controller-extraction-guard/cli/2026-03-07T11-58-18-694Z-e86a24f4/manifest.json`.
+- [x] `npm run docs:check`. Evidence: `out/1048-coordinator-symphony-aligned-confirmation-create-controller-extraction/manual/20260307T115629Z-closeout/06-docs-check.log`.
+- [x] `npm run docs:freshness`. Evidence: `out/1048-coordinator-symphony-aligned-confirmation-create-controller-extraction/manual/20260307T115629Z-closeout/07-docs-freshness.log`.
+- [x] `node scripts/diff-budget.mjs`. Evidence: `out/1048-coordinator-symphony-aligned-confirmation-create-controller-extraction/manual/20260307T115629Z-closeout/08-diff-budget.log`, `out/1048-coordinator-symphony-aligned-confirmation-create-controller-extraction/manual/20260307T115629Z-closeout/13-override-notes.md`.
+- [x] `npm run review`. Evidence: `out/1048-coordinator-symphony-aligned-confirmation-create-controller-extraction/manual/20260307T115629Z-closeout/09-review.log`, `out/1048-coordinator-symphony-aligned-confirmation-create-controller-extraction/manual/20260307T115629Z-closeout/13-override-notes.md`.
+- [x] `npm run pack:smoke` not required because no downstream-facing CLI/package/skills/review-wrapper paths changed. Evidence: `out/1048-coordinator-symphony-aligned-confirmation-create-controller-extraction/manual/20260307T115629Z-closeout/13-override-notes.md`.
+- [x] Manual mock confirmation-create controller artifact captured. Evidence: `out/1048-coordinator-symphony-aligned-confirmation-create-controller-extraction/manual/20260307T115629Z-closeout/11-manual-confirmation-create-controller.json`.
+- [x] Elegance review completed. Evidence: `out/1048-coordinator-symphony-aligned-confirmation-create-controller-extraction/manual/20260307T115629Z-closeout/12-elegance-review.md`.
