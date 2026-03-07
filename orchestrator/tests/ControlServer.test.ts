@@ -550,6 +550,93 @@ describe('ControlServer', () => {
     }
   });
 
+  it('issues confirmation nonces through the extracted consume controller and persists only the record', async () => {
+    const { root, env, paths } = await createRunRoot('task-0940');
+    const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
+
+    const server = await ControlServer.start({
+      paths,
+      config,
+      runId: 'run-1'
+    });
+
+    try {
+      const token = await readToken(paths.controlAuthPath);
+      const baseUrl = server.getBaseUrl() ?? '';
+
+      const createRes = await fetch(new URL('/confirmations/create', baseUrl), {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'x-csrf-token': token,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          action: 'cancel',
+          tool: 'delegate.cancel',
+          params: { manifest_path: paths.manifestPath, request_id: 'req-confirmation-consume' }
+        })
+      });
+      expect(createRes.status).toBe(200);
+      const createPayload = (await createRes.json()) as { request_id?: string };
+      const requestId = createPayload.request_id ?? '';
+      expect(requestId).toBeTruthy();
+
+      const approveRes = await fetch(new URL('/confirmations/approve', baseUrl), {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'x-csrf-token': token,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ request_id: requestId, actor: 'ui' })
+      });
+      expect(approveRes.status).toBe(200);
+
+      const consumeRes = await fetch(new URL('/confirmations/consume', baseUrl), {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'x-csrf-token': token,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ requestId: requestId })
+      });
+
+      expect(consumeRes.status).toBe(200);
+      const consumePayload = (await consumeRes.json()) as {
+        request_id?: string;
+        nonce_id?: string;
+        confirm_nonce?: string;
+      };
+      expect(consumePayload.request_id).toBe(requestId);
+      expect(consumePayload.nonce_id).toMatch(/^nonce-/);
+      expect(consumePayload.confirm_nonce).toBeTruthy();
+
+      const stored = JSON.parse(await readFile(paths.confirmationsPath, 'utf8')) as {
+        pending?: Array<{ request_id?: string }>;
+        issued?: Array<{ request_id?: string; nonce_id?: string }>;
+        consumed_nonce_ids?: string[];
+      };
+      expect(stored.pending).toHaveLength(1);
+      expect(stored.issued).toHaveLength(1);
+      expect(stored.issued?.[0]).toEqual(
+        expect.objectContaining({
+          request_id: requestId,
+          nonce_id: consumePayload.nonce_id
+        })
+      );
+      expect(stored.consumed_nonce_ids).toEqual([]);
+
+      const confirmationsRaw = await readFile(paths.confirmationsPath, 'utf8');
+      expect(confirmationsRaw).not.toContain(consumePayload.confirm_nonce ?? '');
+      expect(confirmationsRaw).not.toContain('confirm_nonce');
+    } finally {
+      await server.close();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   it('serves authenticated GET /events as an SSE bootstrap stream', async () => {
     const { root, env, paths } = await createRunRoot('task-0940');
     const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });

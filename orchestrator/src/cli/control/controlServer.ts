@@ -42,6 +42,7 @@ import { handleSecurityViolationRequest } from './securityViolationController.js
 import { handleEventsSseRequest } from './eventsSseController.js';
 import { handleQuestionQueueRequest } from './questionQueueController.js';
 import { handleDelegationRegisterRequest } from './delegationRegisterController.js';
+import { handleConfirmationIssueConsumeRequest } from './confirmationIssueConsumeController.js';
 import {
   handleLinearWebhookRequest,
   normalizeLinearAdvisoryState,
@@ -1065,26 +1066,16 @@ async function handleRequest(context: RequestContext): Promise<void> {
     return;
   }
 
-  if ((url.pathname === '/confirmations/issue' || url.pathname === '/confirmations/consume') && req.method === 'POST') {
-    await expireConfirmations(context);
-    const body = await readJsonBody(req);
-    const requestId = readStringValue(body, 'request_id', 'requestId');
-    if (!requestId) {
-      res.writeHead(400, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'missing_request_id' }));
-      return;
-    }
-    let nonce;
-    try {
-      nonce = context.confirmationStore.issue(requestId);
-    } catch (error) {
-      res.writeHead(409, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: (error as Error)?.message ?? 'confirmation_invalid' }));
-      return;
-    }
-    await context.persist.confirmations();
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify(nonce));
+  if (
+    await handleConfirmationIssueConsumeRequest({
+      req,
+      res,
+      readRequestBody: () => readJsonBody(req),
+      expireConfirmations: () => expireConfirmations(context),
+      issueConfirmation: (requestId) => context.confirmationStore.issue(requestId),
+      persistConfirmations: () => context.persist.confirmations()
+    })
+  ) {
     return;
   }
 
