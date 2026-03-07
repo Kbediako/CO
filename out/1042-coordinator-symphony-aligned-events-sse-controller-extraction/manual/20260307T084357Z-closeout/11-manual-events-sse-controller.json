@@ -1,0 +1,12 @@
+{
+  "route": "GET /events",
+  "statusCode": 200,
+  "headers": {
+    "Content-Type": "text/event-stream",
+    "Cache-Control": "no-cache",
+    "Connection": "keep-alive"
+  },
+  "bootstrap": ": ok\n\n",
+  "clientsBeforeClose": 1,
+  "clientsAfterClose": 0
+}

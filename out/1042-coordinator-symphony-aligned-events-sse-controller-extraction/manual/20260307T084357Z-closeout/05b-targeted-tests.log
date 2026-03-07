@@ -1,0 +1,19 @@
+
+> @kbediako/codex-orchestrator@0.1.38 test
+> npm run test:orchestrator orchestrator/tests/EventsSseController.test.ts orchestrator/tests/ControlServer.test.ts
+
+
+> @kbediako/codex-orchestrator@0.1.38 test:orchestrator
+> vitest run --config vitest.config.core.ts orchestrator/tests/EventsSseController.test.ts orchestrator/tests/ControlServer.test.ts
+
+
+ RUN  v1.6.1 /Users/kbediako/Code/CO
+
+ ✓ orchestrator/tests/EventsSseController.test.ts  (2 tests) 1ms
+ ✓ orchestrator/tests/ControlServer.test.ts  (82 tests) 327ms
+
+ Test Files  2 passed (2)
+      Tests  84 passed (84)
+   Start at  19:48:25
+   Duration  601ms (transform 145ms, setup 0ms, collect 181ms, tests 328ms, environment 0ms, prepare 53ms)
+

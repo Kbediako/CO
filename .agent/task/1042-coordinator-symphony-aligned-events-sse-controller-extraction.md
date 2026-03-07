@@ -17,21 +17,21 @@
 - [x] docs-review approval/override captured for registered `1042`. Evidence: `.runs/1042-coordinator-symphony-aligned-events-sse-controller-extraction/cli/2026-03-07T08-29-07-383Z-863412c4/manifest.json`, `out/1042-coordinator-symphony-aligned-events-sse-controller-extraction/manual/20260307T080319Z-docs-first/05-docs-review-override.md`.
 
 ## Events SSE Controller Extraction
-- [ ] `/events` route handling is extracted into a dedicated controller module. Evidence: `orchestrator/src/cli/control/`, `orchestrator/src/cli/control/controlServer.ts`.
-- [ ] SSE response bootstrap, client registration, and disconnect cleanup move with the new controller without changing stream contracts. Evidence: `orchestrator/src/cli/control/`, `orchestrator/tests/ControlServer.test.ts`.
-- [ ] SSE headers, bootstrap payload framing, and active-client lifecycle behavior remain unchanged after extraction. Evidence: `orchestrator/src/cli/control/`, `orchestrator/tests/ControlServer.test.ts`.
-- [ ] Route ordering, auth/runner-only gating, shared event fanout, `/api/v1/*`, and mutating control endpoints remain in `controlServer.ts`. Evidence: `orchestrator/src/cli/control/controlServer.ts`, `orchestrator/tests/ControlServer.test.ts`.
+- [x] `/events` route handling is extracted into a dedicated controller module. Evidence: `orchestrator/src/cli/control/eventsSseController.ts`, `orchestrator/src/cli/control/controlServer.ts`.
+- [x] SSE response bootstrap, client registration, and disconnect cleanup move with the new controller without changing stream contracts. Evidence: `orchestrator/src/cli/control/eventsSseController.ts`, `orchestrator/tests/EventsSseController.test.ts`, `orchestrator/tests/ControlServer.test.ts`.
+- [x] SSE headers, bootstrap payload framing, and active-client lifecycle behavior remain unchanged after extraction. Evidence: `orchestrator/src/cli/control/eventsSseController.ts`, `orchestrator/tests/EventsSseController.test.ts`, `orchestrator/tests/ControlServer.test.ts`, `out/1042-coordinator-symphony-aligned-events-sse-controller-extraction/manual/20260307T084357Z-closeout/11-manual-events-sse-controller.json`.
+- [x] Route ordering, auth/runner-only gating, shared event fanout, `/api/v1/*`, and mutating control endpoints remain in `controlServer.ts`. Evidence: `orchestrator/src/cli/control/controlServer.ts`, `orchestrator/tests/ControlServer.test.ts`, `out/1042-coordinator-symphony-aligned-events-sse-controller-extraction/manual/20260307T084357Z-closeout/09-review.log`.
 
 ## Validation + Closeout
-- [ ] `node scripts/delegation-guard.mjs`. Evidence: `out/1042-coordinator-symphony-aligned-events-sse-controller-extraction/manual/<timestamp>-closeout/01-delegation-guard.log`.
-- [ ] `node scripts/spec-guard.mjs --dry-run`. Evidence: `out/1042-coordinator-symphony-aligned-events-sse-controller-extraction/manual/<timestamp>-closeout/02-spec-guard.log`.
-- [ ] `npm run build`. Evidence: `out/1042-coordinator-symphony-aligned-events-sse-controller-extraction/manual/<timestamp>-closeout/03-build.log`.
-- [ ] `npm run lint`. Evidence: `out/1042-coordinator-symphony-aligned-events-sse-controller-extraction/manual/<timestamp>-closeout/04-lint.log`.
-- [ ] `npm run test`. Evidence: `out/1042-coordinator-symphony-aligned-events-sse-controller-extraction/manual/<timestamp>-closeout/05-test.log`.
-- [ ] `npm run docs:check`. Evidence: `out/1042-coordinator-symphony-aligned-events-sse-controller-extraction/manual/<timestamp>-closeout/06-docs-check.log`.
-- [ ] `npm run docs:freshness`. Evidence: `out/1042-coordinator-symphony-aligned-events-sse-controller-extraction/manual/<timestamp>-closeout/07-docs-freshness.log`.
-- [ ] `node scripts/diff-budget.mjs`. Evidence: `out/1042-coordinator-symphony-aligned-events-sse-controller-extraction/manual/<timestamp>-closeout/08-diff-budget.log`, `out/1042-coordinator-symphony-aligned-events-sse-controller-extraction/manual/<timestamp>-closeout/13-override-notes.md`.
-- [ ] `npm run review`. Evidence: `out/1042-coordinator-symphony-aligned-events-sse-controller-extraction/manual/<timestamp>-closeout/09-review.log`, `out/1042-coordinator-symphony-aligned-events-sse-controller-extraction/manual/<timestamp>-closeout/13-override-notes.md`.
-- [ ] `npm run pack:smoke` when required by touched downstream-facing paths. Evidence: `out/1042-coordinator-symphony-aligned-events-sse-controller-extraction/manual/<timestamp>-closeout/10-pack-smoke.log`.
-- [ ] Manual mock events SSE controller artifact captured. Evidence: `out/1042-coordinator-symphony-aligned-events-sse-controller-extraction/manual/<timestamp>-closeout/11-manual-events-sse-controller.json`.
-- [ ] Elegance review completed. Evidence: `out/1042-coordinator-symphony-aligned-events-sse-controller-extraction/manual/<timestamp>-closeout/12-elegance-review.md`.
+- [x] `node scripts/delegation-guard.mjs`. Evidence: `out/1042-coordinator-symphony-aligned-events-sse-controller-extraction/manual/20260307T084357Z-closeout/01-delegation-guard.log`.
+- [x] `node scripts/spec-guard.mjs --dry-run`. Evidence: `out/1042-coordinator-symphony-aligned-events-sse-controller-extraction/manual/20260307T084357Z-closeout/02-spec-guard.log`.
+- [x] `npm run build`. Evidence: `out/1042-coordinator-symphony-aligned-events-sse-controller-extraction/manual/20260307T084357Z-closeout/03-build.log`.
+- [x] `npm run lint`. Evidence: `out/1042-coordinator-symphony-aligned-events-sse-controller-extraction/manual/20260307T084357Z-closeout/04-lint.log`.
+- [x] `npm run test`. Evidence: `out/1042-coordinator-symphony-aligned-events-sse-controller-extraction/manual/20260307T084357Z-closeout/05-test.log`, `out/1042-coordinator-symphony-aligned-events-sse-controller-extraction/manual/20260307T084357Z-closeout/05b-targeted-tests.log`, `out/1042-coordinator-symphony-aligned-events-sse-controller-extraction/manual/20260307T084357Z-closeout/13-override-notes.md`.
+- [x] `npm run docs:check`. Evidence: `out/1042-coordinator-symphony-aligned-events-sse-controller-extraction/manual/20260307T084357Z-closeout/06-docs-check.log`.
+- [x] `npm run docs:freshness`. Evidence: `out/1042-coordinator-symphony-aligned-events-sse-controller-extraction/manual/20260307T084357Z-closeout/07-docs-freshness.log`.
+- [x] `node scripts/diff-budget.mjs`. Evidence: `out/1042-coordinator-symphony-aligned-events-sse-controller-extraction/manual/20260307T084357Z-closeout/08-diff-budget.log`, `out/1042-coordinator-symphony-aligned-events-sse-controller-extraction/manual/20260307T084357Z-closeout/13-override-notes.md`.
+- [x] `npm run review`. Evidence: `out/1042-coordinator-symphony-aligned-events-sse-controller-extraction/manual/20260307T084357Z-closeout/09-review.log`.
+- [x] `npm run pack:smoke` when required by touched downstream-facing paths. Evidence: `out/1042-coordinator-symphony-aligned-events-sse-controller-extraction/manual/20260307T084357Z-closeout/10-pack-smoke.log`.
+- [x] Manual mock events SSE controller artifact captured. Evidence: `out/1042-coordinator-symphony-aligned-events-sse-controller-extraction/manual/20260307T084357Z-closeout/11-manual-events-sse-controller.json`.
+- [x] Elegance review completed. Evidence: `out/1042-coordinator-symphony-aligned-events-sse-controller-extraction/manual/20260307T084357Z-closeout/12-elegance-review.md`.

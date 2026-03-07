@@ -1,0 +1,31 @@
+
+> @kbediako/codex-orchestrator@0.1.38 review
+> node --loader ts-node/esm scripts/run-review.ts
+
+⚠️ Diff budget exceeded (override applied) (base=origin/main)
+ - changed files 412 > 25
+ - total lines changed 45233 > 800
+Top changed files:
+  - orchestrator/tests/ControlServer.test.ts: 5565
+  - docs/docs-freshness-registry.json: 4594
+  - tasks/index.json: 2346
+  - orchestrator/tests/DelegationServer.test.ts: 2115
+  - orchestrator/src/cli/control/controlServer.ts: 1330
+  - orchestrator/tests/TelegramOversightBridge.test.ts: 1206
+  - orchestrator/src/cli/control/telegramOversightBridge.ts: 901
+  - orchestrator/tests/ControlRuntime.test.ts: 835
+  - orchestrator/src/cli/delegationServer.ts: 816
+  - orchestrator/src/cli/control/linearDispatchSource.ts: 654
+
+Override accepted via DIFF_BUDGET_OVERRIDE_REASON: 1042 is being closed on a stacked Symphony-alignment branch; the local slice is bounded even though the cumulative branch diff exceeds the repo baseline against origin/main.
+[run-review] bounded review guidance enabled by default (set CODEX_REVIEW_ALLOW_HEAVY_COMMANDS=1 to opt into unrestricted heavy-command execution).
+[run-review] review scope metrics: 4 files, 163 lines.
+[run-review] runtime requested=appserver selected=appserver provider=AppServerRuntimeProvider.
+[run-review] delegation MCP enabled for this review (default; set --disable-delegation-mcp or CODEX_REVIEW_DISABLE_DELEGATION_MCP=1 to disable).
+Review prompt saved to: .runs/1042-coordinator-symphony-aligned-events-sse-controller-extraction/cli/2026-03-07T08-29-07-383Z-863412c4/review/prompt.txt
+Review output log: .runs/1042-coordinator-symphony-aligned-events-sse-controller-extraction/cli/2026-03-07T08-29-07-383Z-863412c4/review/output.log
+Launching Codex review (evidence: .runs/1042-coordinator-symphony-aligned-events-sse-controller-extraction/cli/2026-03-07T08-29-07-383Z-863412c4/manifest.json)
+[run-review] patience-first monitor checkpoints every 1m 0s (set CODEX_REVIEW_MONITOR_INTERVAL_SECONDS=0 to disable).
+[run-review] waiting on codex review (1m 0s elapsed, 4s idle; review progress observed).
+Review output saved to: .runs/1042-coordinator-symphony-aligned-events-sse-controller-extraction/cli/2026-03-07T08-29-07-383Z-863412c4/review/output.log
+Review telemetry saved to: .runs/1042-coordinator-symphony-aligned-events-sse-controller-extraction/cli/2026-03-07T08-29-07-383Z-863412c4/review/telemetry.json
