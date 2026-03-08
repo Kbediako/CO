@@ -62,6 +62,7 @@ const REVIEW_LARGE_SCOPE_LINE_THRESHOLD_ENV_KEY = 'CODEX_REVIEW_LARGE_SCOPE_LINE
 const REVIEW_ALLOW_HEAVY_COMMANDS_ENV_KEY = 'CODEX_REVIEW_ALLOW_HEAVY_COMMANDS';
 const REVIEW_ENFORCE_BOUNDED_MODE_ENV_KEY = 'CODEX_REVIEW_ENFORCE_BOUNDED_MODE';
 const REVIEW_LOW_SIGNAL_TIMEOUT_ENV_KEY = 'CODEX_REVIEW_LOW_SIGNAL_TIMEOUT_SECONDS';
+const REVIEW_META_SURFACE_TIMEOUT_ENV_KEY = 'CODEX_REVIEW_META_SURFACE_TIMEOUT_SECONDS';
 const REVIEW_TELEMETRY_DEBUG_ENV_KEY = 'CODEX_REVIEW_DEBUG_TELEMETRY';
 const REVIEW_DISABLE_DELEGATION_CONFIG_OVERRIDE = 'mcp_servers.delegation.enabled=false';
 
@@ -569,6 +570,7 @@ async function main(): Promise<void> {
     );
   }
   const lowSignalTimeoutMs = !allowHeavyCommands ? resolveReviewLowSignalTimeoutMs() : null;
+  const metaSurfaceTimeoutMs = !allowHeavyCommands ? resolveReviewMetaSurfaceTimeoutMs() : null;
   if (!allowHeavyCommands) {
     if (lowSignalTimeoutMs === null) {
       console.log(
@@ -579,6 +581,17 @@ async function main(): Promise<void> {
         `[run-review] low-signal drift guard enabled after ${formatDurationMs(
           lowSignalTimeoutMs
         )} of repetitive bounded activity (set ${REVIEW_LOW_SIGNAL_TIMEOUT_ENV_KEY}=0 to disable).`
+      );
+    }
+    if (metaSurfaceTimeoutMs === null) {
+      console.log(
+        `[run-review] meta-surface expansion guard disabled (${REVIEW_META_SURFACE_TIMEOUT_ENV_KEY}=0).`
+      );
+    } else {
+      console.log(
+        `[run-review] meta-surface expansion guard enabled after ${formatDurationMs(
+          metaSurfaceTimeoutMs
+        )} of sustained off-task meta activity (set ${REVIEW_META_SURFACE_TIMEOUT_ENV_KEY}=0 to disable).`
       );
     }
   }
@@ -597,6 +610,7 @@ async function main(): Promise<void> {
       startupLoopMinEvents,
       monitorIntervalMs,
       lowSignalTimeoutMs,
+      metaSurfaceTimeoutMs,
       outputLogPath: artifactPaths.outputLogPath
     });
   const writeTelemetry = async (
@@ -1255,6 +1269,7 @@ interface RunCodexReviewOptions {
   startupLoopMinEvents: number;
   monitorIntervalMs: number | null;
   lowSignalTimeoutMs: number | null;
+  metaSurfaceTimeoutMs: number | null;
   outputLogPath: string;
 }
 
@@ -1330,7 +1345,8 @@ async function runCodexReview(
   const uninstallSignalForwarders = installSignalForwarders(child, detached);
   const executionState = new ReviewExecutionState({
     blockHeavyCommands: options.blockHeavyCommands,
-    lowSignalTimeoutMs: options.lowSignalTimeoutMs
+    lowSignalTimeoutMs: options.lowSignalTimeoutMs,
+    metaSurfaceTimeoutMs: options.metaSurfaceTimeoutMs
   });
 
   const capture = (chunk: Buffer, target: NodeJS.WriteStream, stream: 'stdout' | 'stderr') => {
@@ -1370,11 +1386,13 @@ async function runCodexReview(
       startupLoopMinEvents: options.startupLoopMinEvents,
       monitorIntervalMs: options.monitorIntervalMs,
       lowSignalTimeoutMs: options.lowSignalTimeoutMs,
+      metaSurfaceTimeoutMs: options.metaSurfaceTimeoutMs,
       blockHeavyCommands: options.blockHeavyCommands,
       getLastOutputAtMs: () => executionState.getLastOutputAtMs(),
       getStartupLoopState: () => executionState.getStartupLoopState(),
       getBlockedHeavyCommand: () => executionState.getBlockedHeavyCommand(),
       getLowSignalDriftReason: () => executionState.getLowSignalDriftState().reason,
+      getMetaSurfaceExpansionReason: () => executionState.getMetaSurfaceExpansionState().reason,
       formatCheckpoint: () => executionState.formatCheckpoint(),
       detached,
       onCleanup: cleanup
@@ -1573,6 +1591,21 @@ function resolveReviewLowSignalTimeoutMs(): number | null {
   return Math.round(parsedSeconds * 1000);
 }
 
+function resolveReviewMetaSurfaceTimeoutMs(): number | null {
+  const configured = process.env[REVIEW_META_SURFACE_TIMEOUT_ENV_KEY]?.trim();
+  if (!configured) {
+    return 180_000;
+  }
+  const parsedSeconds = Number(configured);
+  if (!Number.isFinite(parsedSeconds)) {
+    throw new Error(`${REVIEW_META_SURFACE_TIMEOUT_ENV_KEY} must be a finite number.`);
+  }
+  if (parsedSeconds <= 0) {
+    return null;
+  }
+  return Math.round(parsedSeconds * 1000);
+}
+
 interface WaitForChildExitOptions {
   timeoutMs: number | null;
   stallTimeoutMs: number | null;
@@ -1580,11 +1613,13 @@ interface WaitForChildExitOptions {
   startupLoopMinEvents: number;
   monitorIntervalMs: number | null;
   lowSignalTimeoutMs: number | null;
+  metaSurfaceTimeoutMs: number | null;
   blockHeavyCommands: boolean;
   getLastOutputAtMs: () => number;
   getStartupLoopState: () => ReviewStartupLoopState;
   getBlockedHeavyCommand: () => string | null;
   getLowSignalDriftReason: () => string | null;
+  getMetaSurfaceExpansionReason: () => string | null;
   formatCheckpoint: () => string;
   detached: boolean;
   onCleanup?: () => void;
@@ -1601,6 +1636,7 @@ async function waitForChildExit(
     let startupLoopHandle: NodeJS.Timeout | undefined;
     let monitorHandle: NodeJS.Timeout | undefined;
     let lowSignalHandle: NodeJS.Timeout | undefined;
+    let metaSurfaceHandle: NodeJS.Timeout | undefined;
     let heavyCommandHandle: NodeJS.Timeout | undefined;
     let killHandle: NodeJS.Timeout | undefined;
     let hardKillArmed = false;
@@ -1621,6 +1657,9 @@ async function waitForChildExit(
       }
       if (lowSignalHandle) {
         clearInterval(lowSignalHandle);
+      }
+      if (metaSurfaceHandle) {
+        clearInterval(metaSurfaceHandle);
       }
       if (heavyCommandHandle) {
         clearInterval(heavyCommandHandle);
@@ -1777,6 +1816,20 @@ async function waitForChildExit(
         );
       }, 1000);
       lowSignalHandle.unref();
+    }
+
+    if (options.metaSurfaceTimeoutMs !== null) {
+      metaSurfaceHandle = setInterval(() => {
+        const metaSurfaceReason = options.getMetaSurfaceExpansionReason();
+        if (!metaSurfaceReason) {
+          return;
+        }
+        requestTermination(
+          `${metaSurfaceReason} (set ${REVIEW_META_SURFACE_TIMEOUT_ENV_KEY}=0 to disable).`,
+          false
+        );
+      }, 1000);
+      metaSurfaceHandle.unref();
     }
 
     const monitorIntervalMs = options.monitorIntervalMs;

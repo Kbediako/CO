@@ -242,6 +242,126 @@ describe('ReviewExecutionState', () => {
     expect(state.getLowSignalDriftState(nowMs).triggered).toBe(false);
   });
 
+  it('classifies bounded meta-surface expansion from sustained off-task review surfaces', () => {
+    const state = new ReviewExecutionState({
+      startedAtMs: 0,
+      blockHeavyCommands: false,
+      metaSurfaceTimeoutMs: 1_000
+    });
+
+    let nowMs = 100;
+    const commands = [
+      "/bin/zsh -lc 'sed -n 1,120p /Users/kbediako/.codex/memories/MEMORY.md'",
+      "/bin/zsh -lc 'sed -n 1,120p /Users/kbediako/.codex/skills/delegation-usage/SKILL.md'",
+      "/bin/zsh -lc 'sed -n 1,80p .runs/sample-task/cli/sample-run/manifest.json'",
+      "/bin/zsh -lc 'tail -n 80 .runs/sample-task/cli/sample-run/runner.ndjson'",
+      "/bin/zsh -lc 'codex-orchestrator review --manifest .runs/sample-task/cli/sample-run/manifest.json'"
+    ];
+    for (let index = 0; index < 8; index += 1) {
+      state.observeChunk('thinking\nexec\n', 'stdout', nowMs);
+      state.observeChunk(`${commands[index % commands.length]}\n`, 'stdout', nowMs + 10);
+      if (index % 2 === 1) {
+        state.observeChunk('tool delegation.delegate.spawn({"pipeline":"docs-review"})\n', 'stdout', nowMs + 20);
+      }
+      nowMs += 100;
+    }
+
+    const expansion = state.getMetaSurfaceExpansionState(2_000);
+    expect(expansion.triggered).toBe(true);
+    expect(expansion.reason).toContain('meta-surface expansion detected');
+    expect(expansion.metaSurfaceSignals).toBeGreaterThanOrEqual(4);
+    expect(expansion.distinctMetaSurfaces).toBeGreaterThanOrEqual(3);
+  });
+
+  it('does not classify incidental meta-surface lookups as sustained expansion', () => {
+    const state = new ReviewExecutionState({
+      startedAtMs: 0,
+      blockHeavyCommands: false,
+      metaSurfaceTimeoutMs: 1_000
+    });
+
+    state.observeChunk('thinking\nexec\n', 'stdout', 100);
+    state.observeChunk("/bin/zsh -lc 'sed -n 1,120p scripts/run-review.ts'\n", 'stdout', 110);
+    state.observeChunk('thinking\nexec\n', 'stdout', 200);
+    state.observeChunk("/bin/zsh -lc 'sed -n 1,120p /Users/kbediako/.codex/memories/MEMORY.md'\n", 'stdout', 210);
+    state.observeChunk('thinking\nexec\n', 'stdout', 300);
+    state.observeChunk("/bin/zsh -lc 'sed -n 1,120p scripts/lib/review-execution-state.ts'\n", 'stdout', 310);
+    state.observeChunk('thinking\nexec\n', 'stdout', 400);
+    state.observeChunk("/bin/zsh -lc 'sed -n 1,120p tests/run-review.spec.ts'\n", 'stdout', 410);
+
+    expect(state.getMetaSurfaceExpansionState(2_000).triggered).toBe(false);
+  });
+
+  it('ignores rg patterns that only mention run manifests while searching in-scope docs files', () => {
+    const state = new ReviewExecutionState({
+      startedAtMs: 0,
+      blockHeavyCommands: false,
+      metaSurfaceTimeoutMs: 1_000
+    });
+
+    state.observeChunk('thinking\nexec\n', 'stdout', 100);
+    state.observeChunk(
+      `/bin/zsh -lc 'rg --glob=*.md -n ".runs/sample-task/cli/sample-run/manifest.json" README.md docs/standalone-review-guide.md'\n`,
+      'stdout',
+      110
+    );
+
+    const expansion = state.getMetaSurfaceExpansionState(2_000);
+    expect(expansion.triggered).toBe(false);
+    expect(expansion.metaSurfaceSignals).toBe(0);
+  });
+
+  it('classifies variable-indirected manifest reads as meta-surface activity', () => {
+    const state = new ReviewExecutionState({
+      startedAtMs: 0,
+      blockHeavyCommands: false,
+      metaSurfaceTimeoutMs: 1_000
+    });
+
+    state.observeChunk('thinking\nexec\n', 'stdout', 100);
+    state.observeChunk(
+      `/bin/zsh -lc 'MANIFEST=.runs/sample-task/cli/sample-run/manifest.json; cat "$MANIFEST"'\n`,
+      'stdout',
+      110
+    );
+
+    const expansion = state.getMetaSurfaceExpansionState(2_000);
+    expect(expansion.triggered).toBe(false);
+    expect(expansion.metaSurfaceSignals).toBe(1);
+    expect(expansion.distinctMetaSurfaces).toBe(1);
+  });
+
+  it('evicts early meta-surface bursts once later normal commands dominate the recent window', () => {
+    const state = new ReviewExecutionState({
+      startedAtMs: 0,
+      blockHeavyCommands: false,
+      metaSurfaceTimeoutMs: 1_000
+    });
+
+    let nowMs = 100;
+    const metaCommands = [
+      "/bin/zsh -lc 'sed -n 1,120p /Users/kbediako/.codex/memories/MEMORY.md'",
+      "/bin/zsh -lc 'sed -n 1,120p /Users/kbediako/.codex/skills/delegation-usage/SKILL.md'",
+      "/bin/zsh -lc 'codex-orchestrator review --manifest .runs/sample-task/cli/sample-run/manifest.json'"
+    ];
+    for (let index = 0; index < 6; index += 1) {
+      state.observeChunk('thinking\nexec\n', 'stdout', nowMs);
+      state.observeChunk(`${metaCommands[index % metaCommands.length]}\n`, 'stdout', nowMs + 10);
+      nowMs += 100;
+    }
+    expect(state.getMetaSurfaceExpansionState(nowMs + 50).metaSurfaceSignals).toBeGreaterThan(0);
+
+    for (let index = 0; index < 8; index += 1) {
+      state.observeChunk('thinking\nexec\n', 'stdout', nowMs);
+      state.observeChunk(`/bin/zsh -lc 'sed -n 1,120p scripts/run-review.ts chunk-${index}.md'\n`, 'stdout', nowMs + 10);
+      nowMs += 100;
+    }
+
+    const expansion = state.getMetaSurfaceExpansionState(nowMs + 1_500);
+    expect(expansion.triggered).toBe(false);
+    expect(expansion.metaSurfaceSignals).toBe(0);
+  });
+
   it('does not classify low-signal drift when the guard is disabled', () => {
     const state = new ReviewExecutionState({
       startedAtMs: 0,

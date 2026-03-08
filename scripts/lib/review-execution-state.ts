@@ -30,14 +30,22 @@ const DEFAULT_REVIEW_OUTPUT_SUMMARY_TAIL_LINE_LIMIT = 20;
 const DEFAULT_REVIEW_OUTPUT_SUMMARY_HEAVY_COMMAND_LIMIT = 8;
 const DEFAULT_REVIEW_OUTPUT_SUMMARY_COMMAND_LIMIT = 64;
 const DEFAULT_LOW_SIGNAL_TIMEOUT_MS = 180_000;
+const DEFAULT_META_SURFACE_TIMEOUT_MS = 180_000;
 const LOW_SIGNAL_MIN_THINKING_BLOCKS = 10;
 const LOW_SIGNAL_MIN_COMMAND_STARTS = 10;
 const LOW_SIGNAL_MAX_DISTINCT_TARGETS = 4;
 const LOW_SIGNAL_MIN_REPEAT_TARGET_HITS = 3;
 const LOW_SIGNAL_MIN_REPEAT_SIGNATURE_HITS = 4;
 const LOW_SIGNAL_RECENT_COMMAND_WINDOW = LOW_SIGNAL_MIN_COMMAND_STARTS;
+const META_SURFACE_MIN_COMMAND_STARTS = 6;
+const META_SURFACE_MIN_SIGNALS = 4;
+const META_SURFACE_MIN_DISTINCT_SURFACES = 3;
+const META_SURFACE_MIN_REPEAT_HITS = 2;
+const META_SURFACE_RECENT_SIGNAL_WINDOW = 8;
 const REVIEW_INSPECTION_TARGET_RE =
   /([A-Za-z0-9_./-]+\.(?:[cm]?js|[jt]sx?|json|md|ya?ml|toml))/gu;
+const REVIEW_META_SURFACE_DELEGATION_TOOL_LINE_RE =
+  /^tool\s+delegation\.delegate\.(?:spawn|status|pause|cancel)\(/iu;
 
 export interface ReviewOutputSummary {
   lineCount: number;
@@ -51,6 +59,10 @@ export interface ReviewOutputSummary {
   maxInspectionTargetHits: number;
   distinctInspectionSignatures: number;
   maxInspectionSignatureHits: number;
+  metaSurfaceSignals: number;
+  distinctMetaSurfaces: number;
+  maxMetaSurfaceHits: number;
+  metaSurfaceKinds: string[];
   lastLines: string[];
 }
 
@@ -81,6 +93,16 @@ export interface ReviewLowSignalDriftState {
   timeoutMs: number | null;
 }
 
+export interface ReviewMetaSurfaceExpansionState {
+  triggered: boolean;
+  reason: string | null;
+  commandStarts: number;
+  metaSurfaceSignals: number;
+  distinctMetaSurfaces: number;
+  maxMetaSurfaceHits: number;
+  timeoutMs: number | null;
+}
+
 export interface ReviewExecutionStateOptions {
   blockHeavyCommands?: boolean;
   startedAtMs?: number;
@@ -89,6 +111,7 @@ export interface ReviewExecutionStateOptions {
   heavyCommandLimit?: number;
   commandLimit?: number;
   lowSignalTimeoutMs?: number | null;
+  metaSurfaceTimeoutMs?: number | null;
 }
 
 interface ReviewExecutionTelemetryPayloadOptions {
@@ -134,6 +157,7 @@ export class ReviewExecutionState {
   private readonly heavyCommandLimit: number;
   private readonly commandLimit: number;
   private readonly lowSignalTimeoutMs: number | null;
+  private readonly metaSurfaceTimeoutMs: number | null;
 
   private lastOutputAtMs: number;
   private preview = '';
@@ -146,10 +170,12 @@ export class ReviewExecutionState {
   private awaitingCommandLine = false;
   private blockedHeavyCommand: string | null = null;
   private lowSignalCandidateSinceMs: number | null = null;
+  private metaSurfaceCandidateSinceMs: number | null = null;
   private readonly commandStarts: string[] = [];
   private readonly heavyCommandStarts: string[] = [];
   private readonly recentInspectionTargetSamples: string[][] = [];
   private readonly recentInspectionSignatures: string[] = [];
+  private readonly recentMetaSurfaceSamples: Array<string | null> = [];
   private readonly lastLines: string[] = [];
   private readonly pendingFragmentsByStream: PendingFragmentsByStream = {
     stdout: '',
@@ -172,6 +198,13 @@ export class ReviewExecutionState {
         : configuredLowSignalTimeoutMs === null || configuredLowSignalTimeoutMs <= 0
         ? null
         : configuredLowSignalTimeoutMs;
+    const configuredMetaSurfaceTimeoutMs = options.metaSurfaceTimeoutMs;
+    this.metaSurfaceTimeoutMs =
+      configuredMetaSurfaceTimeoutMs === undefined
+        ? DEFAULT_META_SURFACE_TIMEOUT_MS
+        : configuredMetaSurfaceTimeoutMs === null || configuredMetaSurfaceTimeoutMs <= 0
+        ? null
+        : configuredMetaSurfaceTimeoutMs;
   }
 
   observeChunk(chunk: Buffer | string, stream: ReviewExecutionStream, nowMs = Date.now()): void {
@@ -222,6 +255,10 @@ export class ReviewExecutionState {
       maxInspectionTargetHits: inspectionTargetSummary.maxHits,
       distinctInspectionSignatures: inspectionTargetSummary.distinctSignatures,
       maxInspectionSignatureHits: inspectionTargetSummary.maxSignatureHits,
+      metaSurfaceSignals: inspectionTargetSummary.metaSurfaceSignals,
+      distinctMetaSurfaces: inspectionTargetSummary.distinctMetaSurfaces,
+      maxMetaSurfaceHits: inspectionTargetSummary.maxMetaSurfaceHits,
+      metaSurfaceKinds: inspectionTargetSummary.metaSurfaceKinds,
       lastLines: [...this.lastLines]
     };
   }
@@ -246,6 +283,27 @@ export class ReviewExecutionState {
       distinctInspectionSignatures: summary.distinctInspectionSignatures,
       maxInspectionSignatureHits: summary.maxInspectionSignatureHits,
       timeoutMs: this.lowSignalTimeoutMs
+    };
+  }
+
+  getMetaSurfaceExpansionState(nowMs = Date.now()): ReviewMetaSurfaceExpansionState {
+    const summary = this.buildOutputSummary();
+    const triggered =
+      this.metaSurfaceTimeoutMs !== null &&
+      this.metaSurfaceCandidateSinceMs !== null &&
+      Math.max(0, nowMs - this.metaSurfaceCandidateSinceMs) >= this.metaSurfaceTimeoutMs;
+    return {
+      triggered,
+      reason: triggered
+        ? `bounded review meta-surface expansion detected after ${formatDurationMs(
+            Math.max(0, nowMs - this.startedAtMs)
+          )}: ${this.commandStarts.length} command starts, ${summary.metaSurfaceSignals} meta-surface signals, ${summary.distinctMetaSurfaces} distinct meta-surfaces [${summary.metaSurfaceKinds.join(', ')}] (max hit count ${summary.maxMetaSurfaceHits}), sustained for ${formatDurationMs(Math.max(0, nowMs - this.metaSurfaceCandidateSinceMs!))}.`
+        : null,
+      commandStarts: this.commandStarts.length,
+      metaSurfaceSignals: summary.metaSurfaceSignals,
+      distinctMetaSurfaces: summary.distinctMetaSurfaces,
+      maxMetaSurfaceHits: summary.maxMetaSurfaceHits,
+      timeoutMs: this.metaSurfaceTimeoutMs
     };
   }
 
@@ -317,6 +375,10 @@ export class ReviewExecutionState {
       this.reviewProgressSignals += 1;
       this.reviewProgressObserved = true;
     }
+    const metaSurfaceToolSample = classifyMetaSurfaceToolLine(trimmed);
+    if (metaSurfaceToolSample) {
+      this.recordMetaSurfaceToolSample(metaSurfaceToolSample);
+    }
 
     if (trimmed === 'exec') {
       this.awaitingCommandLine = true;
@@ -331,6 +393,8 @@ export class ReviewExecutionState {
         }
         this.commandStarts.push(commandLine);
         this.recordInspectionTargets(commandLine);
+        const metaSurfaceSample = classifyMetaSurfaceCommandLine(commandLine);
+        this.recordMetaSurfaceCommandSample(metaSurfaceSample);
         const heavyCommand = detectHeavyReviewCommand(commandLine);
         if (heavyCommand) {
           if (this.heavyCommandStarts.length < this.heavyCommandLimit) {
@@ -354,6 +418,7 @@ export class ReviewExecutionState {
     }
 
     this.updateLowSignalCandidate(nowMs);
+    this.updateMetaSurfaceCandidate(nowMs);
   }
 
   private recordInspectionTargets(commandLine: string): void {
@@ -400,11 +465,51 @@ export class ReviewExecutionState {
     }
   }
 
+  private recordMetaSurfaceCommandSample(sample: string | null): void {
+    this.recordMetaSurfaceSample(sample);
+  }
+
+  private recordMetaSurfaceToolSample(sample: string): void {
+    this.recordMetaSurfaceSample(sample);
+  }
+
+  private recordMetaSurfaceSample(sample: string | null): void {
+    this.recentMetaSurfaceSamples.push(sample);
+    while (this.recentMetaSurfaceSamples.length > META_SURFACE_RECENT_SIGNAL_WINDOW) {
+      this.recentMetaSurfaceSamples.shift();
+    }
+  }
+
+  private updateMetaSurfaceCandidate(nowMs: number): void {
+    if (this.metaSurfaceTimeoutMs === null) {
+      this.metaSurfaceCandidateSinceMs = null;
+      return;
+    }
+    const summary = this.buildOutputSummary();
+    const expansionShaped =
+      this.reviewProgressObserved &&
+      this.commandStarts.length >= META_SURFACE_MIN_COMMAND_STARTS &&
+      summary.metaSurfaceSignals >= META_SURFACE_MIN_SIGNALS &&
+      (summary.distinctMetaSurfaces >= META_SURFACE_MIN_DISTINCT_SURFACES ||
+        summary.maxMetaSurfaceHits >= META_SURFACE_MIN_REPEAT_HITS);
+    if (!expansionShaped) {
+      this.metaSurfaceCandidateSinceMs = null;
+      return;
+    }
+    if (this.metaSurfaceCandidateSinceMs === null) {
+      this.metaSurfaceCandidateSinceMs = nowMs;
+    }
+  }
+
   private buildInspectionTargetSummary(): {
     distinctTargets: number;
     maxHits: number;
     distinctSignatures: number;
     maxSignatureHits: number;
+    metaSurfaceSignals: number;
+    distinctMetaSurfaces: number;
+    maxMetaSurfaceHits: number;
+    metaSurfaceKinds: string[];
   } {
     const recentTargetHits = new Map<string, number>();
     for (const targets of this.recentInspectionTargetSamples) {
@@ -428,11 +533,28 @@ export class ReviewExecutionState {
         maxSignatureHits = hits;
       }
     }
+    const recentMetaSurfaceHits = new Map<string, number>();
+    for (const sample of this.recentMetaSurfaceSamples) {
+      if (!sample) {
+        continue;
+      }
+      recentMetaSurfaceHits.set(sample, (recentMetaSurfaceHits.get(sample) ?? 0) + 1);
+    }
+    let maxMetaSurfaceHits = 0;
+    for (const hits of recentMetaSurfaceHits.values()) {
+      if (hits > maxMetaSurfaceHits) {
+        maxMetaSurfaceHits = hits;
+      }
+    }
     return {
       distinctTargets: recentTargetHits.size,
       maxHits,
       distinctSignatures: recentSignatureHits.size,
-      maxSignatureHits
+      maxSignatureHits,
+      metaSurfaceSignals: [...recentMetaSurfaceHits.values()].reduce((sum, hits) => sum + hits, 0),
+      distinctMetaSurfaces: recentMetaSurfaceHits.size,
+      maxMetaSurfaceHits,
+      metaSurfaceKinds: [...recentMetaSurfaceHits.keys()].sort()
     };
   }
 }
@@ -478,6 +600,11 @@ export function logReviewTelemetrySummary(
         `[run-review] heavy commands detected: ${summary.heavyCommandStarts.length} sample(s) captured (set ${options.telemetryDebugEnvKey}=1 to print raw command text).`
       );
     }
+  }
+  if (summary.metaSurfaceSignals > 0) {
+    console.error(
+      `[run-review] meta-surface signals detected: ${summary.metaSurfaceSignals} sample(s) across ${summary.distinctMetaSurfaces} surface kind(s) [${summary.metaSurfaceKinds.join(', ')}]; max repeated surface hits ${summary.maxMetaSurfaceHits}.`
+    );
   }
   if (summary.lastLines.length > 0) {
     if (options.debugTelemetry) {
@@ -927,6 +1054,213 @@ function extractInspectionCommandSignature(commandLine: string, targets: string[
     return null;
   }
   return normalizeReviewCommandLine(commandLine);
+}
+
+function classifyMetaSurfaceToolLine(line: string): string | null {
+  if (REVIEW_META_SURFACE_DELEGATION_TOOL_LINE_RE.test(line)) {
+    return 'delegation-control';
+  }
+  return null;
+}
+
+function classifyMetaSurfaceCommandLine(commandLine: string): string | null {
+  const normalized = normalizeReviewCommandLine(commandLine).replace(/\\/gu, '/');
+  const segments = splitShellControlSegments(normalized);
+  for (const segment of segments) {
+    const kind = classifyMetaSurfaceSegment(segment);
+    if (kind) {
+      return kind;
+    }
+  }
+  return null;
+}
+
+function classifyMetaSurfaceSegment(segment: string, depth = 0): string | null {
+  const strippedTokens = stripLeadingEnvAssignments(tokenizeShellSegment(segment));
+  if (strippedTokens.length === 0) {
+    return null;
+  }
+
+  const tokens = unwrapEnvCommandTokens(strippedTokens);
+  if (tokens.length === 0) {
+    return null;
+  }
+
+  if (depth < 3) {
+    const payload = extractShellCommandPayload(tokens);
+    if (payload) {
+      const nestedSegments = splitShellControlSegments(payload);
+      for (const nestedSegment of nestedSegments) {
+        const nestedKind = classifyMetaSurfaceSegment(nestedSegment, depth + 1);
+        if (nestedKind) {
+          return nestedKind;
+        }
+      }
+    }
+  }
+
+  const command = normalizeCommandToken(tokens[0] ?? '');
+  const args = tokens.slice(1);
+  if (isReviewOrchestrationCommand(command, args)) {
+    return 'review-orchestration';
+  }
+
+  for (const operand of extractMetaSurfaceOperands(command, args)) {
+    const operandKind = classifyMetaSurfaceOperand(operand);
+    if (operandKind) {
+      return operandKind;
+    }
+  }
+
+  return null;
+}
+
+function isReviewOrchestrationCommand(command: string, args: string[]): boolean {
+  if (command === 'npm' || command === 'pnpm' || command === 'yarn' || command === 'bun') {
+    return resolvePackageScriptTarget(args) === 'review';
+  }
+
+  const firstArg = normalizeCommandToken(args[0] ?? '');
+  const secondArg = normalizeCommandToken(args[1] ?? '');
+  if (command === 'codex-orchestrator') {
+    return (
+      firstArg === 'review' ||
+      (firstArg === 'start' &&
+        (secondArg === 'docs-review' ||
+          secondArg === 'implementation-gate' ||
+          secondArg === 'diagnostics'))
+    );
+  }
+  if (command === 'codex') {
+    return firstArg === 'review';
+  }
+  if (command === 'node') {
+    return args.some(
+      (arg) =>
+        normalizeCommandToken(arg) === 'run-review.ts' ||
+        normalizeCommandToken(arg) === 'run-review.js'
+    );
+  }
+  return false;
+}
+
+function extractMetaSurfaceOperands(command: string, args: string[]): string[] {
+  const operands: string[] = [];
+  let positionalIndex = 0;
+
+  for (let index = 0; index < args.length; index += 1) {
+    const token = args[index] ?? '';
+    if (!token) {
+      continue;
+    }
+
+    if (token === '--') {
+      for (const tail of args.slice(index + 1)) {
+        if (shouldCollectMetaSurfacePositional(command, positionalIndex)) {
+          operands.push(tail);
+        }
+        positionalIndex += 1;
+      }
+      break;
+    }
+
+    if (token.startsWith('--manifest=')) {
+      operands.push(token.slice('--manifest='.length));
+      continue;
+    }
+
+    if (token.startsWith('-')) {
+      if (token === '--manifest') {
+        const manifestValue = args[index + 1];
+        if (manifestValue) {
+          operands.push(manifestValue);
+          index += 1;
+        }
+        continue;
+      }
+      if (metaSurfaceOptionConsumesValue(command, token)) {
+        if (!token.includes('=')) {
+          index += 1;
+        }
+      }
+      continue;
+    }
+
+    if (shouldCollectMetaSurfacePositional(command, positionalIndex)) {
+      operands.push(token);
+    }
+    positionalIndex += 1;
+  }
+
+  return operands;
+}
+
+function metaSurfaceOptionConsumesValue(command: string, option: string): boolean {
+  const normalized = option.toLowerCase();
+  if (command === 'rg') {
+    return (
+      normalized === '-g' ||
+      normalized === '--glob' ||
+      normalized.startsWith('--glob=') ||
+      normalized === '--iglob' ||
+      normalized.startsWith('--iglob=') ||
+      normalized === '-e' ||
+      normalized === '--regexp' ||
+      normalized.startsWith('--regexp=') ||
+      normalized === '-f' ||
+      normalized === '--file' ||
+      normalized.startsWith('--file=') ||
+      normalized === '--pre' ||
+      normalized.startsWith('--pre=') ||
+      normalized === '--pre-glob' ||
+      normalized.startsWith('--pre-glob=') ||
+      normalized === '-r' ||
+      normalized === '--replace' ||
+      normalized.startsWith('--replace=') ||
+      normalized === '-t' ||
+      normalized === '--type' ||
+      normalized.startsWith('--type=') ||
+      normalized === '--type-not' ||
+      normalized.startsWith('--type-not=')
+    );
+  }
+  if (command === 'grep' || command === 'ggrep') {
+    return normalized === '-e' || normalized === '-f';
+  }
+  return false;
+}
+
+function shouldCollectMetaSurfacePositional(command: string, positionalIndex: number): boolean {
+  if (command === 'rg' || command === 'grep' || command === 'ggrep') {
+    return positionalIndex >= 1;
+  }
+  return true;
+}
+
+function classifyMetaSurfaceOperand(operand: string): string | null {
+  const normalized = operand.trim().replace(/\\/gu, '/');
+  if (!normalized) {
+    return null;
+  }
+  if (/^\$(?:\{)?MANIFEST(?:\})?$/iu.test(normalized)) {
+    return 'run-manifest';
+  }
+  if (/^\$(?:\{)?(?:RUNNER_LOG|RUN_LOG)(?:\})?$/iu.test(normalized)) {
+    return 'run-runner-log';
+  }
+  if (normalized.includes('.codex/memories/')) {
+    return 'codex-memories';
+  }
+  if (normalized.includes('.codex/skills/')) {
+    return 'codex-skills';
+  }
+  if (normalized.includes('.runs/') && normalized.endsWith('/manifest.json')) {
+    return 'run-manifest';
+  }
+  if (normalized.includes('.runs/') && normalized.endsWith('/runner.ndjson')) {
+    return 'run-runner-log';
+  }
+  return null;
 }
 
 function sanitizeTelemetrySummaryForPersistence(
