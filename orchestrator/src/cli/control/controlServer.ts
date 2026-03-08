@@ -47,6 +47,7 @@ import { handleConfirmationIssueConsumeRequest } from './confirmationIssueConsum
 import { handleConfirmationValidateRequest } from './confirmationValidateController.js';
 import { handleControlActionRequest } from './controlActionController.js';
 import { admitAuthenticatedControlRoute } from './authenticatedControlRouteGate.js';
+import { handleAuthenticatedRouteDispatcher } from './authenticatedRouteDispatcher.js';
 import {
   handleLinearWebhookRequest,
   normalizeLinearAdvisoryState,
@@ -542,306 +543,270 @@ async function handleRequest(context: RequestContext): Promise<void> {
     return;
   }
 
-  if (url.pathname === '/events' && req.method === 'GET') {
-    handleEventsSseRequest({
-      req,
-      res,
-      clients: context.clients
-    });
-    return;
-  }
-
-  if (
-    await handleUiDataRequest({
-      req,
-      res,
-      presenterContext
-    })
-  ) {
-    return;
-  }
-
-  if (
-    await handleObservabilityApiRequest({
-      req,
-      res,
-      presenterContext,
-      readRequestBody: () => readJsonBody(req),
-      requestRefresh: () => context.runtime.requestRefresh(),
-      readDispatchEvaluation: () => runtimeSnapshot.readDispatchEvaluation(),
-      onDispatchEvaluated: (record) => emitDispatchPilotAuditEvents(context, record)
-    })
-  ) {
-    return;
-  }
-
-  if (url.pathname === '/control/action' && req.method === 'POST') {
-    await handleControlActionRequest({
-      authKind: auth.kind,
-      taskId: resolveTaskIdFromManifestPath(context.paths.manifestPath),
-      manifestPath: context.paths.manifestPath,
-      readRequestBody: () => readJsonBody(req),
-      readInitialSnapshot: () => context.controlStore.snapshot(),
-      isTransportNonceConsumed: (nonce) => context.controlStore.isTransportNonceConsumed(nonce),
-      validateConfirmation: (validationInput) =>
-        context.confirmationStore.validateNonce(validationInput),
-      persistConfirmations: () => context.persist.confirmations(),
-      emitConfirmationResolved: (payload) =>
-        emitControlEvent(context, {
-          event: 'confirmation_resolved',
-          actor: 'runner',
-          payload
-        }),
-      readSnapshot: () => context.controlStore.snapshot(),
-      updateAction: (updateInput) => context.controlStore.updateAction(updateInput),
-      persistControlAction: async (input) => {
-        if (!input.transportMutation) {
+  const handled = await handleAuthenticatedRouteDispatcher({
+    pathname: url.pathname,
+    method: req.method,
+    authKind: auth.kind,
+    handleEventsSse: () =>
+      handleEventsSseRequest({
+        req,
+        res,
+        clients: context.clients
+      }),
+    handleUiData: () =>
+      handleUiDataRequest({
+        req,
+        res,
+        presenterContext
+      }),
+    handleObservabilityApi: () =>
+      handleObservabilityApiRequest({
+        req,
+        res,
+        presenterContext,
+        readRequestBody: () => readJsonBody(req),
+        requestRefresh: () => context.runtime.requestRefresh(),
+        readDispatchEvaluation: () => runtimeSnapshot.readDispatchEvaluation(),
+        onDispatchEvaluated: (record) => emitDispatchPilotAuditEvents(context, record)
+      }),
+    handleControlAction: (authKind) =>
+      handleControlActionRequest({
+        authKind,
+        taskId: resolveTaskIdFromManifestPath(context.paths.manifestPath),
+        manifestPath: context.paths.manifestPath,
+        readRequestBody: () => readJsonBody(req),
+        readInitialSnapshot: () => context.controlStore.snapshot(),
+        isTransportNonceConsumed: (nonce) => context.controlStore.isTransportNonceConsumed(nonce),
+        validateConfirmation: (validationInput) =>
+          context.confirmationStore.validateNonce(validationInput),
+        persistConfirmations: () => context.persist.confirmations(),
+        emitConfirmationResolved: (payload) =>
+          emitControlEvent(context, {
+            event: 'confirmation_resolved',
+            actor: 'runner',
+            payload
+          }),
+        readSnapshot: () => context.controlStore.snapshot(),
+        updateAction: (updateInput) => context.controlStore.updateAction(updateInput),
+        persistControlAction: async (input) => {
+          if (!input.transportMutation) {
+            await context.persist.control();
+            return;
+          }
+          context.controlStore.consumeTransportNonce({
+            nonce: input.transportMutation.nonce,
+            action: input.action,
+            transport: input.transportMutation.transport,
+            requestId: input.requestId ?? null,
+            intentId: input.intentId,
+            expiresAt: input.transportMutation.nonceExpiresAt
+          });
+          try {
+            await context.persist.control();
+          } catch (error) {
+            context.controlStore.rollbackTransportNonce(input.transportMutation.nonce);
+            throw error;
+          }
+        },
+        publishRuntime: (source) => context.runtime.publish({ source }),
+        emitControlActionAuditEvent: (input) => emitControlActionAuditEvent(context, input),
+        writeControlError: (status, error, traceability) =>
+          writeControlError(res, status, error, traceability),
+        writeControlResponse: (response) => {
+          res.writeHead(response.status, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify(response.body));
+        }
+      }),
+    handleConfirmationCreate: () =>
+      handleConfirmationCreateRequest({
+        req,
+        res,
+        authKind: auth.kind,
+        readRequestBody: () => readJsonBody(req),
+        expireConfirmations: () => expireConfirmations(context),
+        createConfirmation: ({ action, tool, params }) =>
+          context.confirmationStore.create({ action, tool, params }),
+        persistConfirmations: () => context.persist.confirmations(),
+        maybeAutoPause: async (requestId) => {
+          if (!context.config.confirm.autoPause) {
+            return;
+          }
+          const latestAction = context.controlStore.snapshot().latest_action?.action ?? null;
+          if (latestAction === 'pause') {
+            return;
+          }
+          context.controlStore.updateAction({
+            action: 'pause',
+            requestedBy: 'runner',
+            requestId,
+            reason: 'confirmation_required'
+          });
           await context.persist.control();
-          return;
-        }
-        context.controlStore.consumeTransportNonce({
-          nonce: input.transportMutation.nonce,
-          action: input.action,
-          transport: input.transportMutation.transport,
-          requestId: input.requestId ?? null,
-          intentId: input.intentId,
-          expiresAt: input.transportMutation.nonceExpiresAt
-        });
-        try {
-          await context.persist.control();
-        } catch (error) {
-          context.controlStore.rollbackTransportNonce(input.transportMutation.nonce);
-          throw error;
-        }
-      },
-      publishRuntime: (source) => context.runtime.publish({ source }),
-      emitControlActionAuditEvent: (input) => emitControlActionAuditEvent(context, input),
-      writeControlError: (status, error, traceability) =>
-        writeControlError(res, status, error, traceability),
-      writeControlResponse: (response) => {
-        res.writeHead(response.status, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify(response.body));
-      }
-    });
-    return;
-  }
+          context.runtime.publish({ source: 'control.action' });
+        },
+        readRunId: () => context.controlStore.snapshot().run_id,
+        emitConfirmationRequired: (payload) =>
+          emitControlEvent(context, {
+            event: 'confirmation_required',
+            actor: 'runner',
+            payload
+          })
+      }),
+    handleConfirmationList: () =>
+      handleConfirmationListRequest({
+        req,
+        res,
+        expireConfirmations: () => expireConfirmations(context),
+        listPendingConfirmations: () => context.confirmationStore.listPending()
+      }),
+    handleConfirmationApprove: () =>
+      handleConfirmationApproveRequest({
+        req,
+        res,
+        readRequestBody: () => readJsonBody(req),
+        expireConfirmations: () => expireConfirmations(context),
+        approveConfirmation: (requestId, actor) => context.confirmationStore.approve(requestId, actor),
+        readConfirmation: (requestId) => context.confirmationStore.get(requestId),
+        persistConfirmations: () => context.persist.confirmations(),
+        issueConfirmation: (requestId) => context.confirmationStore.issue(requestId),
+        validateConfirmation: (input) =>
+          context.confirmationStore.validateNonce({
+            confirmNonce: input.confirmNonce,
+            tool: input.tool,
+            params: input.params
+          }),
+        emitConfirmationResolved: (payload) =>
+          emitControlEvent(context, {
+            event: 'confirmation_resolved',
+            actor: 'runner',
+            payload
+          }),
+        updateControlAction: (input) =>
+          context.controlStore.updateAction({
+            action: input.action,
+            requestedBy: input.requestedBy,
+            requestId: input.requestId
+          }),
+        persistControl: () => context.persist.control(),
+        publishRuntime: () => context.runtime.publish({ source: 'control.action' })
+      }),
+    handleConfirmationIssueConsume: () =>
+      handleConfirmationIssueConsumeRequest({
+        req,
+        res,
+        readRequestBody: () => readJsonBody(req),
+        expireConfirmations: () => expireConfirmations(context),
+        issueConfirmation: (requestId) => context.confirmationStore.issue(requestId),
+        persistConfirmations: () => context.persist.confirmations()
+      }),
+    handleConfirmationValidate: () =>
+      handleConfirmationValidateRequest({
+        req,
+        res,
+        readRequestBody: () => readJsonBody(req),
+        expireConfirmations: () => expireConfirmations(context),
+        validateConfirmation: ({ confirmNonce, tool, params }) =>
+          context.confirmationStore.validateNonce({ confirmNonce, tool, params }),
+        persistConfirmations: () => context.persist.confirmations(),
+        emitConfirmationResolved: (payload) =>
+          emitControlEvent(context, {
+            event: 'confirmation_resolved',
+            actor: 'runner',
+            payload
+          })
+      }),
+    handleSecurityViolation: () =>
+      handleSecurityViolationRequest({
+        req,
+        res,
+        readRequestBody: () => readJsonBody(req),
+        emitSecurityViolation: (payload) =>
+          emitControlEvent(context, {
+            event: 'security_violation',
+            actor: 'runner',
+            payload
+          })
+      }),
+    handleDelegationRegister: () =>
+      handleDelegationRegisterRequest({
+        req,
+        res,
+        delegationTokens: context.delegationTokens,
+        readRequestBody: () => readJsonBody(req),
+        persistDelegationTokens: () => context.persist.delegationTokens()
+      }),
+    handleQuestionQueue: () =>
+      handleQuestionQueueRequest({
+        req,
+        res,
+        questionQueue: context.questionQueue,
+        readRequestBody: () => readJsonBody(req),
+        expireQuestions: () => expireQuestions(context),
+        queueQuestionResolutions: (records) => queueQuestionResolutions(context, records),
+        readDelegationHeaders: () => readDelegationHeaders(req),
+        validateDelegation: (auth) => Boolean(validateDelegation(context, auth)),
+        resolveManifestPath: (rawPath) =>
+          resolveRunManifestPath(rawPath, context.config.ui.allowedRunRoots, 'from_manifest_path'),
+        readManifest: (path) => readJsonFile<CliManifest>(path),
+        getParentRunId: () => context.controlStore.snapshot().run_id,
+        persistQuestions: () => context.persist.questions(),
+        resolveChildQuestion: (record, outcome) => maybeResolveChildQuestion(context, record, outcome),
+        emitQuestionQueued: (record) =>
+          emitControlEvent(context, {
+            event: 'question_queued',
+            actor: 'delegate',
+            payload: {
+              question_id: record.question_id,
+              parent_run_id: record.parent_run_id,
+              from_run_id: record.from_run_id,
+              prompt: record.prompt,
+              urgency: record.urgency,
+              queued_at: record.queued_at,
+              expires_at: record.expires_at ?? null,
+              expires_in_ms: record.expires_in_ms ?? null
+            }
+          }),
+        emitQuestionAnswered: async (record) => {
+          await emitControlEvent(context, {
+            event: 'question_answered',
+            actor: 'user',
+            payload: {
+              question_id: record.question_id,
+              parent_run_id: record.parent_run_id,
+              answer: record.answer,
+              answered_by: record.answered_by,
+              answered_at: record.answered_at
+            }
+          });
+          await emitControlEvent(context, {
+            event: 'question_closed',
+            actor: 'runner',
+            payload: {
+              question_id: record.question_id,
+              parent_run_id: record.parent_run_id,
+              outcome: record.status,
+              closed_at: record.closed_at,
+              expires_at: record.expires_at ?? null
+            }
+          });
+        },
+        emitQuestionDismissed: (record) =>
+          emitControlEvent(context, {
+            event: 'question_closed',
+            actor: 'user',
+            payload: {
+              question_id: record.question_id,
+              parent_run_id: record.parent_run_id,
+              outcome: record.status,
+              closed_at: record.closed_at,
+              expires_at: record.expires_at ?? null
+            }
+          }),
+        publishRuntime: (source) => context.runtime.publish({ source })
+      })
+  });
 
-  if (
-    await handleConfirmationCreateRequest({
-      req,
-      res,
-      authKind: auth.kind,
-      readRequestBody: () => readJsonBody(req),
-      expireConfirmations: () => expireConfirmations(context),
-      createConfirmation: ({ action, tool, params }) =>
-        context.confirmationStore.create({ action, tool, params }),
-      persistConfirmations: () => context.persist.confirmations(),
-      maybeAutoPause: async (requestId) => {
-        if (!context.config.confirm.autoPause) {
-          return;
-        }
-        const latestAction = context.controlStore.snapshot().latest_action?.action ?? null;
-        if (latestAction === 'pause') {
-          return;
-        }
-        context.controlStore.updateAction({
-          action: 'pause',
-          requestedBy: 'runner',
-          requestId,
-          reason: 'confirmation_required'
-        });
-        await context.persist.control();
-        context.runtime.publish({ source: 'control.action' });
-      },
-      readRunId: () => context.controlStore.snapshot().run_id,
-      emitConfirmationRequired: (payload) =>
-        emitControlEvent(context, {
-          event: 'confirmation_required',
-          actor: 'runner',
-          payload
-        })
-    })
-  ) {
-    return;
-  }
-
-  if (
-    await handleConfirmationListRequest({
-      req,
-      res,
-      expireConfirmations: () => expireConfirmations(context),
-      listPendingConfirmations: () => context.confirmationStore.listPending()
-    })
-  ) {
-    return;
-  }
-
-  if (
-    await handleConfirmationApproveRequest({
-      req,
-      res,
-      readRequestBody: () => readJsonBody(req),
-      expireConfirmations: () => expireConfirmations(context),
-      approveConfirmation: (requestId, actor) => context.confirmationStore.approve(requestId, actor),
-      readConfirmation: (requestId) => context.confirmationStore.get(requestId),
-      persistConfirmations: () => context.persist.confirmations(),
-      issueConfirmation: (requestId) => context.confirmationStore.issue(requestId),
-      validateConfirmation: (input) =>
-        context.confirmationStore.validateNonce({
-          confirmNonce: input.confirmNonce,
-          tool: input.tool,
-          params: input.params
-        }),
-      emitConfirmationResolved: (payload) =>
-        emitControlEvent(context, {
-          event: 'confirmation_resolved',
-          actor: 'runner',
-          payload
-        }),
-      updateControlAction: (input) =>
-        context.controlStore.updateAction({
-          action: input.action,
-          requestedBy: input.requestedBy,
-          requestId: input.requestId
-        }),
-      persistControl: () => context.persist.control(),
-      publishRuntime: () => context.runtime.publish({ source: 'control.action' })
-    })
-  ) {
-    return;
-  }
-
-  if (
-    await handleConfirmationIssueConsumeRequest({
-      req,
-      res,
-      readRequestBody: () => readJsonBody(req),
-      expireConfirmations: () => expireConfirmations(context),
-      issueConfirmation: (requestId) => context.confirmationStore.issue(requestId),
-      persistConfirmations: () => context.persist.confirmations()
-    })
-  ) {
-    return;
-  }
-
-  if (
-    await handleConfirmationValidateRequest({
-      req,
-      res,
-      readRequestBody: () => readJsonBody(req),
-      expireConfirmations: () => expireConfirmations(context),
-      validateConfirmation: ({ confirmNonce, tool, params }) =>
-        context.confirmationStore.validateNonce({ confirmNonce, tool, params }),
-      persistConfirmations: () => context.persist.confirmations(),
-      emitConfirmationResolved: (payload) =>
-        emitControlEvent(context, {
-          event: 'confirmation_resolved',
-          actor: 'runner',
-          payload
-        })
-    })
-  ) {
-    return;
-  }
-
-  if (
-    await handleSecurityViolationRequest({
-      req,
-      res,
-      readRequestBody: () => readJsonBody(req),
-      emitSecurityViolation: (payload) =>
-        emitControlEvent(context, {
-          event: 'security_violation',
-          actor: 'runner',
-          payload
-        })
-    })
-  ) {
-    return;
-  }
-
-  if (
-    await handleDelegationRegisterRequest({
-      req,
-      res,
-      delegationTokens: context.delegationTokens,
-      readRequestBody: () => readJsonBody(req),
-      persistDelegationTokens: () => context.persist.delegationTokens()
-    })
-  ) {
-    return;
-  }
-
-  if (
-    await handleQuestionQueueRequest({
-      req,
-      res,
-      questionQueue: context.questionQueue,
-      readRequestBody: () => readJsonBody(req),
-      expireQuestions: () => expireQuestions(context),
-      queueQuestionResolutions: (records) => queueQuestionResolutions(context, records),
-      readDelegationHeaders: () => readDelegationHeaders(req),
-      validateDelegation: (auth) => Boolean(validateDelegation(context, auth)),
-      resolveManifestPath: (rawPath) =>
-        resolveRunManifestPath(rawPath, context.config.ui.allowedRunRoots, 'from_manifest_path'),
-      readManifest: (path) => readJsonFile<CliManifest>(path),
-      getParentRunId: () => context.controlStore.snapshot().run_id,
-      persistQuestions: () => context.persist.questions(),
-      resolveChildQuestion: (record, outcome) => maybeResolveChildQuestion(context, record, outcome),
-      emitQuestionQueued: (record) =>
-        emitControlEvent(context, {
-          event: 'question_queued',
-          actor: 'delegate',
-          payload: {
-            question_id: record.question_id,
-            parent_run_id: record.parent_run_id,
-            from_run_id: record.from_run_id,
-            prompt: record.prompt,
-            urgency: record.urgency,
-            queued_at: record.queued_at,
-            expires_at: record.expires_at ?? null,
-            expires_in_ms: record.expires_in_ms ?? null
-          }
-        }),
-      emitQuestionAnswered: async (record) => {
-        await emitControlEvent(context, {
-          event: 'question_answered',
-          actor: 'user',
-          payload: {
-            question_id: record.question_id,
-            parent_run_id: record.parent_run_id,
-            answer: record.answer,
-            answered_by: record.answered_by,
-            answered_at: record.answered_at
-          }
-        });
-        await emitControlEvent(context, {
-          event: 'question_closed',
-          actor: 'runner',
-          payload: {
-            question_id: record.question_id,
-            parent_run_id: record.parent_run_id,
-            outcome: record.status,
-            closed_at: record.closed_at,
-            expires_at: record.expires_at ?? null
-          }
-        });
-      },
-      emitQuestionDismissed: (record) =>
-        emitControlEvent(context, {
-          event: 'question_closed',
-          actor: 'user',
-          payload: {
-            question_id: record.question_id,
-            parent_run_id: record.parent_run_id,
-            outcome: record.status,
-            closed_at: record.closed_at,
-            expires_at: record.expires_at ?? null
-          }
-        }),
-      publishRuntime: (source) => context.runtime.publish({ source })
-    })
-  ) {
+  if (handled) {
     return;
   }
 

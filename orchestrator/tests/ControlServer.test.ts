@@ -3368,6 +3368,35 @@ describe('ControlServer', () => {
     }
   });
 
+  it('preserves protected not_found fallback after dispatcher extraction', async () => {
+    const { root, env, paths } = await createRunRoot('task-0940');
+    const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
+
+    const server = await ControlServer.start({
+      paths,
+      config,
+      runId: 'run-1'
+    });
+
+    try {
+      const token = await readToken(paths.controlAuthPath);
+      const baseUrl = server.getBaseUrl() ?? '';
+
+      const res = await fetch(new URL('/protected/not-here', baseUrl), {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+
+      expect(res.status).toBe(404);
+      const payload = (await res.json()) as { error?: string };
+      expect(payload.error).toBe('not_found');
+    } finally {
+      await server.close();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   it('rejects coordinator metadata on session control actions', async () => {
     const { root, env, paths } = await createRunRoot('task-0940');
     const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
