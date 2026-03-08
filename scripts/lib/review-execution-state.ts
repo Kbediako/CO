@@ -12,6 +12,12 @@ const REVIEW_HEAVY_SCRIPT_TARGETS = new Set([
   'docs:check',
   'docs:freshness'
 ]);
+const REVIEW_NON_BOUNDARY_HEAVY_SCRIPT_TARGETS = new Set(['typecheck', 'check']);
+const REVIEW_VALIDATION_SUITE_SCRIPT_TARGETS = new Set(
+  [...REVIEW_HEAVY_SCRIPT_TARGETS].filter(
+    (target) => !REVIEW_NON_BOUNDARY_HEAVY_SCRIPT_TARGETS.has(target)
+  )
+);
 const REVIEW_PACKAGE_RUN_SUBCOMMAND_ALIASES = new Set(['run', 'run-script', 'rum', 'urn']);
 const REVIEW_PACKAGE_TEST_SUBCOMMAND_ALIASES = new Set(['test', 't', 'tst']);
 const REVIEW_SHELL_COMMANDS = new Set([
@@ -52,6 +58,7 @@ const REVIEW_DIRECT_VALIDATION_RUNNERS = new Set(['vitest', 'jest']);
 const REVIEW_COMMAND_INTENT_VIOLATION_SAMPLE_LIMIT = 8;
 
 export type ReviewCommandIntentViolationKind =
+  | 'validation-suite'
   | 'validation-runner'
   | 'review-orchestration'
   | 'delegation-control';
@@ -1200,6 +1207,16 @@ function classifyCommandIntentSegment(
     };
   }
 
+  if (
+    !options.allowValidationCommandIntents &&
+    isPackageManagerValidationSuiteCommand(command, args)
+  ) {
+    return {
+      kind: 'validation-suite',
+      sample: segment.trim()
+    };
+  }
+
   if (!options.allowValidationCommandIntents && isDirectValidationRunnerCommand(command, args)) {
     return {
       kind: 'validation-runner',
@@ -1298,6 +1315,14 @@ function isDirectValidationRunnerCommand(command: string, args: string[]): boole
 
   const launcherTarget = resolveValidationLauncherTarget(command, args);
   return launcherTarget !== null && REVIEW_DIRECT_VALIDATION_RUNNERS.has(launcherTarget);
+}
+
+function isPackageManagerValidationSuiteCommand(command: string, args: string[]): boolean {
+  if (command !== 'npm' && command !== 'pnpm' && command !== 'yarn' && command !== 'bun') {
+    return false;
+  }
+  const scriptTarget = resolvePackageScriptTarget(args);
+  return scriptTarget !== null && REVIEW_VALIDATION_SUITE_SCRIPT_TARGETS.has(scriptTarget);
 }
 
 function resolveValidationLauncherTarget(command: string, args: string[]): string | null {

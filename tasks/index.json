@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260308-1066-coordinator-symphony-aligned-standalone-review-validation-suite-boundary-guard",
+      "title": "Coordinator Symphony-Aligned Standalone Review Validation-Suite Boundary Guard",
+      "relates_to": "tasks/tasks-1066-coordinator-symphony-aligned-standalone-review-validation-suite-boundary-guard.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-08",
+      "paths": {
+        "spec": "tasks/specs/1066-coordinator-symphony-aligned-standalone-review-validation-suite-boundary-guard.md",
+        "task": "tasks/tasks-1066-coordinator-symphony-aligned-standalone-review-validation-suite-boundary-guard.md",
+        "agent_task": ".agent/task/1066-coordinator-symphony-aligned-standalone-review-validation-suite-boundary-guard.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-standalone-review-validation-suite-boundary-guard.md"
+      }
+    },
+    {
       "id": "20260308-1065-coordinator-symphony-aligned-authenticated-route-controller-extraction",
       "title": "Coordinator Symphony-Aligned Authenticated Route Controller Extraction",
       "relates_to": "tasks/tasks-1065-coordinator-symphony-aligned-authenticated-route-controller-extraction.md",

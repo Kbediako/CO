@@ -440,7 +440,7 @@ async function main(): Promise<void> {
       '',
       'Execution constraints (bounded review mode):',
       '- Keep this review focused on changed files and nearby dependencies.',
-      '- Avoid full validation suites (for example `npm run test`, `npm run lint`, `npm run build`) during this pass.',
+      '- Avoid full validation suites (for example `npm run test`, `npm run lint`, `npm run build`, `npm run docs:check`, `npm run docs:freshness`) during this pass.',
       '- Do not launch direct validation runners (for example `npx vitest`, `npm exec jest`) or nested review/pipeline/delegation flows during this pass.',
       '- If broader validation would improve confidence, list follow-up commands instead of executing them.'
     );
@@ -1522,12 +1522,14 @@ function formatBoundedHeavyCommandFailure(blockedCommand: string): string {
 
 function formatCommandIntentBoundaryFailure(boundaryState: ReviewCommandIntentBoundaryState): string {
   const guidance =
-    'Bounded review should inspect and report, not launch direct validation runners, nested review flows, or mutating delegation control.';
+    'Bounded review should inspect and report, not launch explicit validation suites, direct validation runners, nested review flows, or mutating delegation control.';
   if (!boundaryState.violationKind) {
     return `codex review crossed the bounded command-intent boundary. ${guidance}`;
   }
   const kindLabel =
-    boundaryState.violationKind === 'validation-runner'
+    boundaryState.violationKind === 'validation-suite'
+      ? 'validation suite launch'
+      : boundaryState.violationKind === 'validation-runner'
       ? 'direct validation runner launch'
       : boundaryState.violationKind === 'review-orchestration'
       ? 'nested review or pipeline launch'

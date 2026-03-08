@@ -396,6 +396,35 @@ describe('ReviewExecutionState', () => {
     expect(boundary.violationCount).toBe(0);
   });
 
+  it('classifies package-manager validation suites as command-intent boundary violations by default', () => {
+    const state = new ReviewExecutionState({ startedAtMs: 0 });
+
+    state.observeChunk('thinking\nexec\n', 'stdout', 100);
+    state.observeChunk(`/bin/zsh -lc 'npm run test -- run-review'\n`, 'stdout', 110);
+    state.observeChunk('thinking\nexec\n', 'stdout', 120);
+    state.observeChunk(`/bin/zsh -lc 'pnpm run docs:freshness'\n`, 'stdout', 130);
+
+    const boundary = state.getCommandIntentBoundaryState(2_000);
+    expect(boundary.triggered).toBe(true);
+    expect(boundary.violationKind).toBe('validation-suite');
+    expect(boundary.violationCount).toBe(2);
+    expect(boundary.violationKinds).toEqual(['validation-suite']);
+  });
+
+  it('allows package-manager validation suites when heavy review commands are explicitly allowed', () => {
+    const state = new ReviewExecutionState({
+      startedAtMs: 0,
+      allowValidationCommandIntents: true
+    });
+
+    state.observeChunk('thinking\nexec\n', 'stdout', 100);
+    state.observeChunk(`/bin/zsh -lc 'npm run test -- run-review'\n`, 'stdout', 110);
+
+    const boundary = state.getCommandIntentBoundaryState(2_000);
+    expect(boundary.triggered).toBe(false);
+    expect(boundary.violationCount).toBe(0);
+  });
+
   it('classifies package-manager shorthand validation launches as command-intent violations', () => {
     const state = new ReviewExecutionState({ startedAtMs: 0 });
 
