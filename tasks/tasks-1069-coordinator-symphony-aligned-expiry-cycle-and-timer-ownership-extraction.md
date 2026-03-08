@@ -20,21 +20,21 @@
 
 ## Expiry Cycle Extraction
 
-- [ ] Raw timer plus question/confirmation expiry sweep logic moved out of `controlServer.ts` into a dedicated lifecycle owner under `orchestrator/src/cli/control/`. Evidence: `orchestrator/src/cli/control/controlServer.ts`, `orchestrator/src/cli/control/`.
-- [ ] The extracted lifecycle owner exposes a narrow explicit seam and prevents overlapping sweeps. Evidence: `orchestrator/src/cli/control/controlServer.ts`, `orchestrator/tests/ControlServer.test.ts`.
-- [ ] Expiry-triggered event emission, question child-resolution reuse, and runtime publish behavior remain intact after extraction. Evidence: `orchestrator/src/cli/control/`, `orchestrator/tests/ControlServer.test.ts`.
+- [x] Raw timer plus question/confirmation expiry sweep logic moved out of `controlServer.ts` into a dedicated lifecycle owner under `orchestrator/src/cli/control/`. Evidence: `orchestrator/src/cli/control/controlExpiryLifecycle.ts`, `orchestrator/src/cli/control/controlServer.ts`, `out/1069-coordinator-symphony-aligned-expiry-cycle-and-timer-ownership-extraction/manual/20260308T141237Z-closeout/00-summary.md`.
+- [x] The extracted lifecycle owner exposes a narrow explicit seam and prevents overlapping sweeps. Evidence: `orchestrator/src/cli/control/controlExpiryLifecycle.ts`, `orchestrator/tests/ControlExpiryLifecycle.test.ts`, `out/1069-coordinator-symphony-aligned-expiry-cycle-and-timer-ownership-extraction/manual/20260308T141237Z-closeout/05b-targeted-tests.log`.
+- [x] Expiry-triggered event emission, question child-resolution reuse, and runtime publish behavior remain intact after extraction. Evidence: `orchestrator/src/cli/control/controlExpiryLifecycle.ts`, `orchestrator/tests/ControlServer.test.ts`, `out/1069-coordinator-symphony-aligned-expiry-cycle-and-timer-ownership-extraction/manual/20260308T141237Z-closeout/11-manual-expiry-cycle-check.json`.
 
 ## Validation + Closeout
 
-- [ ] `node scripts/delegation-guard.mjs`. Evidence: `out/1069-coordinator-symphony-aligned-expiry-cycle-and-timer-ownership-extraction/manual/<timestamp>-closeout/01-delegation-guard.log`.
-- [ ] `node scripts/spec-guard.mjs --dry-run`. Evidence: `out/1069-coordinator-symphony-aligned-expiry-cycle-and-timer-ownership-extraction/manual/<timestamp>-closeout/02-spec-guard.log`.
-- [ ] `npm run build`. Evidence: `out/1069-coordinator-symphony-aligned-expiry-cycle-and-timer-ownership-extraction/manual/<timestamp>-closeout/03-build.log`.
-- [ ] `npm run lint`. Evidence: `out/1069-coordinator-symphony-aligned-expiry-cycle-and-timer-ownership-extraction/manual/<timestamp>-closeout/04-lint.log`.
-- [ ] `npm run test`. Evidence: `out/1069-coordinator-symphony-aligned-expiry-cycle-and-timer-ownership-extraction/manual/<timestamp>-closeout/05-test.log`.
-- [ ] `npm run docs:check`. Evidence: `out/1069-coordinator-symphony-aligned-expiry-cycle-and-timer-ownership-extraction/manual/<timestamp>-closeout/06-docs-check.log`.
-- [ ] `npm run docs:freshness`. Evidence: `out/1069-coordinator-symphony-aligned-expiry-cycle-and-timer-ownership-extraction/manual/<timestamp>-closeout/07-docs-freshness.log`.
-- [ ] `node scripts/diff-budget.mjs`. Evidence: `out/1069-coordinator-symphony-aligned-expiry-cycle-and-timer-ownership-extraction/manual/<timestamp>-closeout/08-diff-budget.log`.
-- [ ] `npm run review`. Evidence: `out/1069-coordinator-symphony-aligned-expiry-cycle-and-timer-ownership-extraction/manual/<timestamp>-closeout/09-review.log`.
-- [ ] `npm run pack:smoke`. Evidence: `out/1069-coordinator-symphony-aligned-expiry-cycle-and-timer-ownership-extraction/manual/<timestamp>-closeout/10-pack-smoke.log`.
-- [ ] Manual/mock expiry-cycle runtime evidence captured. Evidence: `out/1069-coordinator-symphony-aligned-expiry-cycle-and-timer-ownership-extraction/manual/<timestamp>-closeout/11-manual-expiry-cycle-check.json`.
-- [ ] Elegance review completed. Evidence: `out/1069-coordinator-symphony-aligned-expiry-cycle-and-timer-ownership-extraction/manual/<timestamp>-closeout/12-elegance-review.md`.
+- [x] `node scripts/delegation-guard.mjs`. Evidence: `out/1069-coordinator-symphony-aligned-expiry-cycle-and-timer-ownership-extraction/manual/20260308T141237Z-closeout/01-delegation-guard.log`, `out/1069-coordinator-symphony-aligned-expiry-cycle-and-timer-ownership-extraction/manual/20260308T141237Z-closeout/13-override-notes.md`.
+- [x] `node scripts/spec-guard.mjs --dry-run`. Evidence: `out/1069-coordinator-symphony-aligned-expiry-cycle-and-timer-ownership-extraction/manual/20260308T141237Z-closeout/02-spec-guard.log`.
+- [x] `npm run build`. Evidence: `out/1069-coordinator-symphony-aligned-expiry-cycle-and-timer-ownership-extraction/manual/20260308T141237Z-closeout/03-build.log`.
+- [x] `npm run lint`. Evidence: `out/1069-coordinator-symphony-aligned-expiry-cycle-and-timer-ownership-extraction/manual/20260308T141237Z-closeout/04-lint.log`.
+- [x] `npm run test`. Evidence: `out/1069-coordinator-symphony-aligned-expiry-cycle-and-timer-ownership-extraction/manual/20260308T141237Z-closeout/05-test.log`, `out/1069-coordinator-symphony-aligned-expiry-cycle-and-timer-ownership-extraction/manual/20260308T141237Z-closeout/05b-targeted-tests.log`, `out/1069-coordinator-symphony-aligned-expiry-cycle-and-timer-ownership-extraction/manual/20260308T141237Z-closeout/13-override-notes.md`.
+- [x] `npm run docs:check`. Evidence: `out/1069-coordinator-symphony-aligned-expiry-cycle-and-timer-ownership-extraction/manual/20260308T141237Z-closeout/06-docs-check.log`.
+- [x] `npm run docs:freshness`. Evidence: `out/1069-coordinator-symphony-aligned-expiry-cycle-and-timer-ownership-extraction/manual/20260308T141237Z-closeout/07-docs-freshness.log`.
+- [x] `node scripts/diff-budget.mjs`. Evidence: `out/1069-coordinator-symphony-aligned-expiry-cycle-and-timer-ownership-extraction/manual/20260308T141237Z-closeout/08-diff-budget.log`, `out/1069-coordinator-symphony-aligned-expiry-cycle-and-timer-ownership-extraction/manual/20260308T141237Z-closeout/13-override-notes.md`.
+- [x] `npm run review`. Evidence: `out/1069-coordinator-symphony-aligned-expiry-cycle-and-timer-ownership-extraction/manual/20260308T141237Z-closeout/09-review.log`, `out/1069-coordinator-symphony-aligned-expiry-cycle-and-timer-ownership-extraction/manual/20260308T141237Z-closeout/13-override-notes.md`.
+- [x] `npm run pack:smoke`. Evidence: `out/1069-coordinator-symphony-aligned-expiry-cycle-and-timer-ownership-extraction/manual/20260308T141237Z-closeout/10-pack-smoke.log`.
+- [x] Manual/mock expiry-cycle runtime evidence captured. Evidence: `out/1069-coordinator-symphony-aligned-expiry-cycle-and-timer-ownership-extraction/manual/20260308T141237Z-closeout/11-manual-expiry-cycle-check.json`.
+- [x] Elegance review completed. Evidence: `out/1069-coordinator-symphony-aligned-expiry-cycle-and-timer-ownership-extraction/manual/20260308T141237Z-closeout/12-elegance-review.md`.

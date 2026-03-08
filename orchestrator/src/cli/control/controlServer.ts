@@ -45,6 +45,10 @@ import {
   createQuestionChildResolutionAdapter,
   type QuestionChildResolutionFallbackEvent
 } from './questionChildResolutionAdapter.js';
+import {
+  createControlExpiryLifecycle,
+  type ControlExpiryLifecycle
+} from './controlExpiryLifecycle.js';
 
 interface ControlServerOptions {
   paths: RunPaths;
@@ -131,7 +135,7 @@ export class ControlServer {
   private telegramBridge: TelegramOversightBridge | null = null;
   private unsubscribeTelegramBridge: (() => void) | null = null;
   private baseUrl: string | null = null;
-  private expiryTimer: NodeJS.Timeout | null = null;
+  private expiryLifecycle: ControlExpiryLifecycle | null = null;
 
   private constructor(options: {
     server: http.Server;
@@ -232,7 +236,8 @@ export class ControlServer {
         clients,
         paths: options.paths,
         linearAdvisoryState,
-        runtime: controlRuntime
+        runtime: controlRuntime,
+        expiryLifecycle: instance?.expiryLifecycle ?? null
       }).catch((error) => {
         const status = error instanceof HttpError ? error.status : 500;
         res.writeHead(status, { 'Content-Type': 'application/json' });
@@ -253,6 +258,20 @@ export class ControlServer {
       paths: options.paths,
       linearAdvisoryState,
       controlRuntime
+    });
+    instance.expiryLifecycle = createControlExpiryLifecycle({
+      intervalMs: EXPIRY_INTERVAL_MS,
+      confirmationStore,
+      questionQueue,
+      persist: {
+        confirmations: persist.confirmations,
+        questions: persist.questions
+      },
+      runtime: controlRuntime,
+      emitControlEvent: (input) =>
+        emitControlEvent(instance.buildInternalContext(options.config, token), input),
+      createQuestionChildResolutionAdapter: () =>
+        createRequestQuestionChildResolutionAdapter(instance.buildInternalContext(options.config, token))
     });
 
     const host = options.config.ui.bindHost;
@@ -292,18 +311,7 @@ export class ControlServer {
       await chmod(options.paths.controlEndpointPath, 0o600).catch(() => undefined);
       await writeJsonAtomic(options.paths.controlPath, controlStore.snapshot());
 
-      instance.expiryTimer = setInterval(() => {
-        expireConfirmations({
-          ...instance.buildContext(options.config, token),
-          req: null,
-          res: null
-        }).catch(() => undefined);
-        expireQuestions({
-          ...instance.buildContext(options.config, token),
-          req: null,
-          res: null
-        }).catch(() => undefined);
-      }, EXPIRY_INTERVAL_MS);
+      instance.expiryLifecycle.start();
 
       if (instance.baseUrl) {
         try {
@@ -328,10 +336,7 @@ export class ControlServer {
         }
       }
     } catch (error) {
-      if (instance.expiryTimer) {
-        clearInterval(instance.expiryTimer);
-        instance.expiryTimer = null;
-      }
+      instance.expiryLifecycle?.close();
       await new Promise<void>((resolve) => {
         server.close(() => resolve());
       });
@@ -361,10 +366,8 @@ export class ControlServer {
   }
 
   async close(): Promise<void> {
-    if (this.expiryTimer) {
-      clearInterval(this.expiryTimer);
-      this.expiryTimer = null;
-    }
+    this.expiryLifecycle?.close();
+    this.expiryLifecycle = null;
     this.unsubscribeTelegramBridge?.();
     this.unsubscribeTelegramBridge = null;
     if (this.telegramBridge) {
@@ -381,7 +384,10 @@ export class ControlServer {
     });
   }
 
-  private buildContext(config: EffectiveDelegationConfig, token: string): Omit<RequestContext, 'req' | 'res'> {
+  private buildContext(
+    config: EffectiveDelegationConfig,
+    token: string
+  ): Omit<RequestContext, 'req' | 'res' | 'expiryLifecycle'> {
     return {
       token,
       controlStore: this.controlStore,
@@ -399,21 +405,24 @@ export class ControlServer {
     };
   }
 
+  private buildInternalContext(config: EffectiveDelegationConfig, token: string): RequestContext {
+    return {
+      req: null,
+      res: null,
+      ...this.buildContext(config, token),
+      expiryLifecycle: this.expiryLifecycle
+    };
+  }
+
   private createTelegramOversightReadAdapter(
     config: EffectiveDelegationConfig,
     token: string
   ): TelegramOversightReadAdapter {
-    const buildInternalContext = (): RequestContext => ({
-      req: null,
-      res: null,
-      ...this.buildContext(config, token)
-    });
-
     return {
       readSelectedRun: async () => this.controlRuntime.snapshot().readSelectedRunSnapshot(),
 
       readDispatch: async (): Promise<ControlDispatchPayload> => {
-        const context = buildInternalContext();
+        const context = this.buildInternalContext(config, token);
         const runtimeSnapshot = this.controlRuntime.snapshot();
         const result = await readDispatchExtension({
           readDispatchEvaluation: () => runtimeSnapshot.readDispatchEvaluation()
@@ -427,9 +436,9 @@ export class ControlServer {
       },
 
       readQuestions: async (): Promise<QuestionsPayload> => {
-        const context = buildInternalContext();
+        const context = this.buildInternalContext(config, token);
         const questionChildResolutionAdapter = createRequestQuestionChildResolutionAdapter(context);
-        await expireQuestions(context, questionChildResolutionAdapter);
+        await (this.expiryLifecycle?.expireQuestions(questionChildResolutionAdapter) ?? Promise.resolve());
         const questions = context.questionQueue.list();
         questionChildResolutionAdapter.queueQuestionResolutions(questions);
         return { questions };
@@ -460,6 +469,7 @@ interface RequestContext {
   paths: RunPaths;
   linearAdvisoryState: LinearAdvisoryState;
   runtime: ControlRuntime;
+  expiryLifecycle: ControlExpiryLifecycle | null;
 }
 
 async function handleRequest(context: RequestContext): Promise<void> {
@@ -556,8 +566,9 @@ async function handleRequest(context: RequestContext): Promise<void> {
     emitControlActionAuditEvent: (input) => emitControlActionAuditEvent(context, input),
     writeControlError: (status, error, traceability) =>
       writeControlError(res, status, error, traceability),
-    expireConfirmations: () => expireConfirmations(context),
-    expireQuestions: () => expireQuestions(context, questionChildResolutionAdapter),
+    expireConfirmations: () => context.expiryLifecycle?.expireConfirmations() ?? Promise.resolve(),
+    expireQuestions: () =>
+      context.expiryLifecycle?.expireQuestions(questionChildResolutionAdapter) ?? Promise.resolve(),
     queueQuestionResolutions: (records) => questionChildResolutionAdapter.queueQuestionResolutions(records),
     readDelegationHeaders: () => questionChildResolutionAdapter.readDelegationHeaders(req),
     validateDelegation: (delegationAuth) => questionChildResolutionAdapter.validateDelegation(delegationAuth),
@@ -737,51 +748,6 @@ function resolveTaskIdFromManifestPath(manifestPath: string): string | null {
   const taskDir = dirname(cliDir);
   const taskId = basename(taskDir);
   return taskId || null;
-}
-
-async function expireConfirmations(context: RequestContext): Promise<void> {
-  const expired = context.confirmationStore.expire();
-  if (expired.length === 0) {
-    return;
-  }
-  await context.persist.confirmations();
-  for (const entry of expired) {
-    await emitControlEvent(context, {
-      event: 'confirmation_resolved',
-      actor: 'runner',
-      payload: {
-        request_id: entry.request.request_id,
-        nonce_id: entry.nonce_id,
-        outcome: 'expired'
-      }
-    });
-  }
-}
-
-async function expireQuestions(
-  context: RequestContext,
-  questionChildResolutionAdapter = createRequestQuestionChildResolutionAdapter(context)
-): Promise<void> {
-  const expired = context.questionQueue.expire();
-  if (expired.length === 0) {
-    return;
-  }
-  await context.persist.questions();
-  for (const record of expired) {
-    await emitControlEvent(context, {
-      event: 'question_closed',
-      actor: 'runner',
-      payload: {
-        question_id: record.question_id,
-        parent_run_id: record.parent_run_id,
-        outcome: 'expired',
-        closed_at: record.closed_at ?? null,
-        expires_at: record.expires_at ?? null
-      }
-    });
-    await questionChildResolutionAdapter.resolveChildQuestion(record, 'expired');
-  }
-  context.runtime.publish({ source: 'questions.expire' });
 }
 
 export function formatHostForUrl(host: string): string {

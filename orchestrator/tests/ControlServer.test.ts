@@ -7033,6 +7033,24 @@ describe('ControlServer', () => {
   it('updates pause reason when questions expire with pause fallback', async () => {
     const { root, env, paths } = await createRunRoot('parent-task');
     const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
+    const events: import('../src/cli/events/runEventStream.js').RunEventStreamEntry[] = [];
+    const eventStream = {
+      append: async (entry: { event: string; actor: string; payload: Record<string, unknown> }) => {
+        const record = {
+          schema_version: 1,
+          seq: events.length + 1,
+          timestamp: new Date().toISOString(),
+          task_id: 'parent-task',
+          run_id: 'parent-run',
+          event: entry.event,
+          actor: entry.actor,
+          payload: entry.payload
+        };
+        events.push(record);
+        return record;
+      },
+      close: async () => undefined
+    } as unknown as import('../src/cli/events/runEventStream.js').RunEventStream;
 
     const childRoot = root;
     const childRunDir = join(childRoot, '.runs', 'child-task', 'cli', 'child-run');
@@ -7114,6 +7132,7 @@ describe('ControlServer', () => {
     const parentServer = await ControlServer.start({
       paths,
       config,
+      eventStream,
       runId: 'parent-run'
     });
 
@@ -7130,6 +7149,14 @@ describe('ControlServer', () => {
 
       expect((receivedAction as { action?: string } | null)?.action).toBe('pause');
       expect((receivedAction as { reason?: string } | null)?.reason).toBe('question_expired');
+      expect(
+        events.find(
+          (entry) =>
+            entry.event === 'question_closed' &&
+            (entry.payload as { question_id?: string; outcome?: string }).question_id === 'q-0001' &&
+            (entry.payload as { outcome?: string }).outcome === 'expired'
+        )
+      ).toBeDefined();
     } finally {
       await new Promise<void>((resolve) => childServer.close(() => resolve()));
       await parentServer.close();
