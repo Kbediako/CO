@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260308-1056-coordinator-symphony-aligned-control-action-controller-sequencing-extraction",
+      "title": "Coordinator Symphony-Aligned Control Action Controller Sequencing Extraction",
+      "relates_to": "tasks/tasks-1056-coordinator-symphony-aligned-control-action-controller-sequencing-extraction.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-08",
+      "paths": {
+        "spec": "tasks/specs/1056-coordinator-symphony-aligned-control-action-controller-sequencing-extraction.md",
+        "task": "tasks/tasks-1056-coordinator-symphony-aligned-control-action-controller-sequencing-extraction.md",
+        "agent_task": ".agent/task/1056-coordinator-symphony-aligned-control-action-controller-sequencing-extraction.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-control-action-controller-sequencing-extraction.md"
+      }
+    },
+    {
       "id": "20260308-1055-coordinator-symphony-aligned-control-action-finalization-extraction",
       "title": "Coordinator Symphony-Aligned Control Action Finalization Extraction",
       "relates_to": "tasks/tasks-1055-coordinator-symphony-aligned-control-action-finalization-extraction.md",
