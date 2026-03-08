@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260308-1072-coordinator-symphony-aligned-control-request-context-assembly-extraction",
+      "title": "Coordinator Symphony-Aligned Control Request Context Assembly Extraction",
+      "relates_to": "tasks/tasks-1072-coordinator-symphony-aligned-control-request-context-assembly-extraction.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-08",
+      "paths": {
+        "spec": "tasks/specs/1072-coordinator-symphony-aligned-control-request-context-assembly-extraction.md",
+        "task": "tasks/tasks-1072-coordinator-symphony-aligned-control-request-context-assembly-extraction.md",
+        "agent_task": ".agent/task/1072-coordinator-symphony-aligned-control-request-context-assembly-extraction.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-control-request-context-assembly-extraction.md"
+      }
+    },
+    {
       "id": "20260308-1071-coordinator-symphony-aligned-control-event-transport-extraction",
       "title": "Coordinator Symphony-Aligned Control Event Transport Extraction",
       "relates_to": "tasks/tasks-1071-coordinator-symphony-aligned-control-event-transport-extraction.md",
