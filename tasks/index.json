@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260308-1065-coordinator-symphony-aligned-authenticated-route-controller-extraction",
+      "title": "Coordinator Symphony-Aligned Authenticated Route Controller Extraction",
+      "relates_to": "tasks/tasks-1065-coordinator-symphony-aligned-authenticated-route-controller-extraction.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-08",
+      "paths": {
+        "spec": "tasks/specs/1065-coordinator-symphony-aligned-authenticated-route-controller-extraction.md",
+        "task": "tasks/tasks-1065-coordinator-symphony-aligned-authenticated-route-controller-extraction.md",
+        "agent_task": ".agent/task/1065-coordinator-symphony-aligned-authenticated-route-controller-extraction.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-authenticated-route-controller-extraction.md"
+      }
+    },
+    {
       "id": "20260308-1064-coordinator-symphony-aligned-authenticated-route-controller-context-extraction",
       "title": "Coordinator Symphony-Aligned Authenticated Route Controller Context Extraction",
       "relates_to": "tasks/tasks-1064-coordinator-symphony-aligned-authenticated-route-controller-context-extraction.md",
