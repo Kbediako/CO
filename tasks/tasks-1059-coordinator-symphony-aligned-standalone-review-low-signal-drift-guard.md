@@ -16,25 +16,25 @@
 
 - [x] `tasks/index.json`, `docs/TASKS.md`, and `docs/docs-freshness-registry.json` updated. Evidence: `tasks/index.json`, `docs/TASKS.md`, `docs/docs-freshness-registry.json`.
 - [x] Delegated or local read-only review approval captured in the spec/checklist notes. Evidence: `tasks/specs/1059-coordinator-symphony-aligned-standalone-review-low-signal-drift-guard.md`, `docs/findings/1059-standalone-review-low-signal-drift-guard-deliberation.md`.
-- [ ] docs-review approval/override captured for registered `1059`. Evidence: `<pending>`.
+- [x] docs-review approval/override captured for registered `1059`. Evidence: `out/1059-coordinator-symphony-aligned-standalone-review-low-signal-drift-guard/manual/20260308T033329Z-docs-first/05-docs-review-override.md`.
 
 ## Standalone Review Low-Signal Drift Guard
 
-- [ ] `ReviewExecutionState` exposes bounded low-signal drift classification from live runtime facts. Evidence: `<pending>`.
-- [ ] `scripts/run-review.ts` fails closed on that drift classification with artifact-first failure output. Evidence: `<pending>`.
-- [ ] Targeted review-wrapper coverage proves repetitive low-signal drift now terminates deterministically. Evidence: `<pending>`.
+- [x] `ReviewExecutionState` exposes bounded low-signal drift classification from live runtime facts. Evidence: `scripts/lib/review-execution-state.ts`, `tests/review-execution-state.spec.ts`.
+- [x] `scripts/run-review.ts` fails closed on that drift classification with artifact-first failure output. Evidence: `scripts/run-review.ts`, `tests/run-review.spec.ts`.
+- [x] Targeted review-wrapper coverage proves repetitive low-signal drift now terminates deterministically. Evidence: `out/1059-coordinator-symphony-aligned-standalone-review-low-signal-drift-guard/manual/20260308T035206Z-closeout/05-targeted-tests.log`.
 
 ## Validation + Closeout
 
-- [ ] `node scripts/delegation-guard.mjs`. Evidence: `<pending>`.
-- [ ] `node scripts/spec-guard.mjs --dry-run`. Evidence: `<pending>`.
-- [ ] `npm run build`. Evidence: `<pending>`.
-- [ ] `npm run lint`. Evidence: `<pending>`.
-- [ ] `npm run test`. Evidence: `<pending>`.
-- [ ] `npm run docs:check`. Evidence: `<pending>`.
-- [ ] `npm run docs:freshness`. Evidence: `<pending>`.
-- [ ] `node scripts/diff-budget.mjs`. Evidence: `<pending>`.
-- [ ] `npm run review`. Evidence: `<pending>`.
-- [ ] `npm run pack:smoke`. Evidence: `<pending>`.
-- [ ] Manual review-wrapper/runtime artifact captured. Evidence: `<pending>`.
-- [ ] Elegance review completed. Evidence: `<pending>`.
+- [x] `node scripts/delegation-guard.mjs`. Evidence: `out/1059-coordinator-symphony-aligned-standalone-review-low-signal-drift-guard/manual/20260308T035206Z-closeout/01-delegation-guard.log`.
+- [x] `node scripts/spec-guard.mjs --dry-run`. Evidence: `out/1059-coordinator-symphony-aligned-standalone-review-low-signal-drift-guard/manual/20260308T035206Z-closeout/02-spec-guard.log`.
+- [x] `npm run build`. Evidence: `out/1059-coordinator-symphony-aligned-standalone-review-low-signal-drift-guard/manual/20260308T035206Z-closeout/03-build.log`.
+- [x] `npm run lint`. Evidence: `out/1059-coordinator-symphony-aligned-standalone-review-low-signal-drift-guard/manual/20260308T035206Z-closeout/04-lint.log`.
+- [x] `npm run test`. Evidence: `out/1059-coordinator-symphony-aligned-standalone-review-low-signal-drift-guard/manual/20260308T035206Z-closeout/05-test.log`.
+- [x] `npm run docs:check`. Evidence: `out/1059-coordinator-symphony-aligned-standalone-review-low-signal-drift-guard/manual/20260308T035206Z-closeout/06-docs-check.log`.
+- [x] `npm run docs:freshness`. Evidence: `out/1059-coordinator-symphony-aligned-standalone-review-low-signal-drift-guard/manual/20260308T035206Z-closeout/07-docs-freshness.log`.
+- [x] `node scripts/diff-budget.mjs`. Evidence: `out/1059-coordinator-symphony-aligned-standalone-review-low-signal-drift-guard/manual/20260308T035206Z-closeout/08-diff-budget.log`.
+- [x] `npm run review`. Evidence: `out/1059-coordinator-symphony-aligned-standalone-review-low-signal-drift-guard/manual/20260308T035206Z-closeout/09-review.log`, `out/1059-coordinator-symphony-aligned-standalone-review-low-signal-drift-guard/manual/20260308T035206Z-closeout/13-override-notes.md`.
+- [x] `npm run pack:smoke`. Evidence: `out/1059-coordinator-symphony-aligned-standalone-review-low-signal-drift-guard/manual/20260308T035206Z-closeout/09-pack-smoke.log`.
+- [x] Manual review-wrapper/runtime artifact captured. Evidence: `out/1059-coordinator-symphony-aligned-standalone-review-low-signal-drift-guard/manual/20260308T035206Z-closeout/11-manual-review-runtime-check.md`.
+- [x] Elegance review completed. Evidence: `out/1059-coordinator-symphony-aligned-standalone-review-low-signal-drift-guard/manual/20260308T035206Z-closeout/12-elegance-review.md`.

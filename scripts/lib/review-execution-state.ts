@@ -29,6 +29,15 @@ const DEFAULT_REVIEW_OUTPUT_PREVIEW_LIMIT = 32_768;
 const DEFAULT_REVIEW_OUTPUT_SUMMARY_TAIL_LINE_LIMIT = 20;
 const DEFAULT_REVIEW_OUTPUT_SUMMARY_HEAVY_COMMAND_LIMIT = 8;
 const DEFAULT_REVIEW_OUTPUT_SUMMARY_COMMAND_LIMIT = 64;
+const DEFAULT_LOW_SIGNAL_TIMEOUT_MS = 180_000;
+const LOW_SIGNAL_MIN_THINKING_BLOCKS = 10;
+const LOW_SIGNAL_MIN_COMMAND_STARTS = 10;
+const LOW_SIGNAL_MAX_DISTINCT_TARGETS = 4;
+const LOW_SIGNAL_MIN_REPEAT_TARGET_HITS = 3;
+const LOW_SIGNAL_MIN_REPEAT_SIGNATURE_HITS = 4;
+const LOW_SIGNAL_RECENT_COMMAND_WINDOW = LOW_SIGNAL_MIN_COMMAND_STARTS;
+const REVIEW_INSPECTION_TARGET_RE =
+  /([A-Za-z0-9_./-]+\.(?:[cm]?js|[jt]sx?|json|md|ya?ml|toml))/gu;
 
 export interface ReviewOutputSummary {
   lineCount: number;
@@ -36,7 +45,12 @@ export interface ReviewOutputSummary {
   completionCount: number;
   startupEvents: number;
   reviewProgressSignals: number;
+  thinkingBlocks: number;
   heavyCommandStarts: string[];
+  distinctInspectionTargets: number;
+  maxInspectionTargetHits: number;
+  distinctInspectionSignatures: number;
+  maxInspectionSignatureHits: number;
   lastLines: string[];
 }
 
@@ -55,6 +69,18 @@ export interface ReviewExecutionSnapshot extends ReviewStartupLoopState {
   summary: ReviewOutputSummary;
 }
 
+export interface ReviewLowSignalDriftState {
+  triggered: boolean;
+  reason: string | null;
+  thinkingBlocks: number;
+  commandStarts: number;
+  distinctInspectionTargets: number;
+  maxInspectionTargetHits: number;
+  distinctInspectionSignatures: number;
+  maxInspectionSignatureHits: number;
+  timeoutMs: number | null;
+}
+
 export interface ReviewExecutionStateOptions {
   blockHeavyCommands?: boolean;
   startedAtMs?: number;
@@ -62,6 +88,7 @@ export interface ReviewExecutionStateOptions {
   tailLineLimit?: number;
   heavyCommandLimit?: number;
   commandLimit?: number;
+  lowSignalTimeoutMs?: number | null;
 }
 
 interface ReviewExecutionTelemetryPayloadOptions {
@@ -106,6 +133,7 @@ export class ReviewExecutionState {
   private readonly tailLineLimit: number;
   private readonly heavyCommandLimit: number;
   private readonly commandLimit: number;
+  private readonly lowSignalTimeoutMs: number | null;
 
   private lastOutputAtMs: number;
   private preview = '';
@@ -113,11 +141,15 @@ export class ReviewExecutionState {
   private completionCount = 0;
   private startupEvents = 0;
   private reviewProgressSignals = 0;
+  private thinkingBlocks = 0;
   private reviewProgressObserved = false;
   private awaitingCommandLine = false;
   private blockedHeavyCommand: string | null = null;
+  private lowSignalCandidateSinceMs: number | null = null;
   private readonly commandStarts: string[] = [];
   private readonly heavyCommandStarts: string[] = [];
+  private readonly recentInspectionTargetSamples: string[][] = [];
+  private readonly recentInspectionSignatures: string[] = [];
   private readonly lastLines: string[] = [];
   private readonly pendingFragmentsByStream: PendingFragmentsByStream = {
     stdout: '',
@@ -133,6 +165,13 @@ export class ReviewExecutionState {
     this.heavyCommandLimit =
       options.heavyCommandLimit ?? DEFAULT_REVIEW_OUTPUT_SUMMARY_HEAVY_COMMAND_LIMIT;
     this.commandLimit = options.commandLimit ?? DEFAULT_REVIEW_OUTPUT_SUMMARY_COMMAND_LIMIT;
+    const configuredLowSignalTimeoutMs = options.lowSignalTimeoutMs;
+    this.lowSignalTimeoutMs =
+      configuredLowSignalTimeoutMs === undefined
+        ? DEFAULT_LOW_SIGNAL_TIMEOUT_MS
+        : configuredLowSignalTimeoutMs === null || configuredLowSignalTimeoutMs <= 0
+        ? null
+        : configuredLowSignalTimeoutMs;
   }
 
   observeChunk(chunk: Buffer | string, stream: ReviewExecutionStream, nowMs = Date.now()): void {
@@ -146,7 +185,7 @@ export class ReviewExecutionState {
     const lines = combined.split(/\r?\n/u);
     this.pendingFragmentsByStream[stream] = lines.pop() ?? '';
     for (const line of lines) {
-      this.processLine(line);
+      this.processLine(line, nowMs);
     }
   }
 
@@ -170,14 +209,43 @@ export class ReviewExecutionState {
   }
 
   buildOutputSummary(): ReviewOutputSummary {
+    const inspectionTargetSummary = this.buildInspectionTargetSummary();
     return {
       lineCount: this.lineCount,
       commandStarts: [...this.commandStarts],
       completionCount: this.completionCount,
       startupEvents: this.startupEvents,
       reviewProgressSignals: this.reviewProgressSignals,
+      thinkingBlocks: this.thinkingBlocks,
       heavyCommandStarts: [...this.heavyCommandStarts],
+      distinctInspectionTargets: inspectionTargetSummary.distinctTargets,
+      maxInspectionTargetHits: inspectionTargetSummary.maxHits,
+      distinctInspectionSignatures: inspectionTargetSummary.distinctSignatures,
+      maxInspectionSignatureHits: inspectionTargetSummary.maxSignatureHits,
       lastLines: [...this.lastLines]
+    };
+  }
+
+  getLowSignalDriftState(nowMs = Date.now()): ReviewLowSignalDriftState {
+    const summary = this.buildOutputSummary();
+    const triggered =
+      this.lowSignalTimeoutMs !== null &&
+      this.lowSignalCandidateSinceMs !== null &&
+      Math.max(0, nowMs - this.lowSignalCandidateSinceMs) >= this.lowSignalTimeoutMs;
+    return {
+      triggered,
+      reason: triggered
+        ? `low-signal review drift detected after ${formatDurationMs(
+            Math.max(0, nowMs - this.startedAtMs)
+          )}: ${this.thinkingBlocks} thinking blocks, ${this.commandStarts.length} command starts, ${summary.distinctInspectionTargets} repeated inspection targets (max hit count ${summary.maxInspectionTargetHits}), ${summary.distinctInspectionSignatures} repeated inspection signatures (max hit count ${summary.maxInspectionSignatureHits}), sustained for ${formatDurationMs(Math.max(0, nowMs - this.lowSignalCandidateSinceMs!))}.`
+        : null,
+      thinkingBlocks: this.thinkingBlocks,
+      commandStarts: this.commandStarts.length,
+      distinctInspectionTargets: summary.distinctInspectionTargets,
+      maxInspectionTargetHits: summary.maxInspectionTargetHits,
+      distinctInspectionSignatures: summary.distinctInspectionSignatures,
+      maxInspectionSignatureHits: summary.maxInspectionSignatureHits,
+      timeoutMs: this.lowSignalTimeoutMs
     };
   }
 
@@ -228,7 +296,7 @@ export class ReviewExecutionState {
     };
   }
 
-  private processLine(line: string): void {
+  private processLine(line: string, nowMs: number): void {
     this.lineCount += 1;
     const trimmed = line.trim();
 
@@ -241,6 +309,9 @@ export class ReviewExecutionState {
 
     if (REVIEW_DELEGATION_STARTUP_LINE_RE.test(trimmed)) {
       this.startupEvents += 1;
+    }
+    if (trimmed === 'thinking') {
+      this.thinkingBlocks += 1;
     }
     if (REVIEW_PROGRESS_SIGNAL_LINE_RE.test(trimmed)) {
       this.reviewProgressSignals += 1;
@@ -259,6 +330,7 @@ export class ReviewExecutionState {
           this.commandStarts.shift();
         }
         this.commandStarts.push(commandLine);
+        this.recordInspectionTargets(commandLine);
         const heavyCommand = detectHeavyReviewCommand(commandLine);
         if (heavyCommand) {
           if (this.heavyCommandStarts.length < this.heavyCommandLimit) {
@@ -280,6 +352,88 @@ export class ReviewExecutionState {
     if (/\bsucceeded in\b|\bexited\b/i.test(trimmed)) {
       this.completionCount += 1;
     }
+
+    this.updateLowSignalCandidate(nowMs);
+  }
+
+  private recordInspectionTargets(commandLine: string): void {
+    const targets = extractInspectionTargets(commandLine);
+    if (targets.length === 0) {
+      return;
+    }
+    this.recentInspectionTargetSamples.push(targets);
+    while (this.recentInspectionTargetSamples.length > LOW_SIGNAL_RECENT_COMMAND_WINDOW) {
+      this.recentInspectionTargetSamples.shift();
+    }
+    const signature = extractInspectionCommandSignature(commandLine, targets);
+    if (!signature) {
+      return;
+    }
+    this.recentInspectionSignatures.push(signature);
+    while (this.recentInspectionSignatures.length > LOW_SIGNAL_RECENT_COMMAND_WINDOW) {
+      this.recentInspectionSignatures.shift();
+    }
+  }
+
+  private updateLowSignalCandidate(nowMs: number): void {
+    if (this.lowSignalTimeoutMs === null) {
+      this.lowSignalCandidateSinceMs = null;
+      return;
+    }
+    const summary = this.buildOutputSummary();
+    const driftShaped =
+      this.reviewProgressObserved &&
+      this.thinkingBlocks >= LOW_SIGNAL_MIN_THINKING_BLOCKS &&
+      this.commandStarts.length >= LOW_SIGNAL_MIN_COMMAND_STARTS &&
+      summary.distinctInspectionTargets > 0 &&
+      summary.distinctInspectionTargets <= LOW_SIGNAL_MAX_DISTINCT_TARGETS &&
+      summary.maxInspectionTargetHits >= LOW_SIGNAL_MIN_REPEAT_TARGET_HITS &&
+      summary.distinctInspectionSignatures > 0 &&
+      summary.distinctInspectionSignatures <= LOW_SIGNAL_MAX_DISTINCT_TARGETS &&
+      summary.maxInspectionSignatureHits >= LOW_SIGNAL_MIN_REPEAT_SIGNATURE_HITS;
+    if (!driftShaped) {
+      this.lowSignalCandidateSinceMs = null;
+      return;
+    }
+    if (this.lowSignalCandidateSinceMs === null) {
+      this.lowSignalCandidateSinceMs = nowMs;
+    }
+  }
+
+  private buildInspectionTargetSummary(): {
+    distinctTargets: number;
+    maxHits: number;
+    distinctSignatures: number;
+    maxSignatureHits: number;
+  } {
+    const recentTargetHits = new Map<string, number>();
+    for (const targets of this.recentInspectionTargetSamples) {
+      for (const target of targets) {
+        recentTargetHits.set(target, (recentTargetHits.get(target) ?? 0) + 1);
+      }
+    }
+    let maxHits = 0;
+    for (const hits of recentTargetHits.values()) {
+      if (hits > maxHits) {
+        maxHits = hits;
+      }
+    }
+    const recentSignatureHits = new Map<string, number>();
+    for (const signature of this.recentInspectionSignatures) {
+      recentSignatureHits.set(signature, (recentSignatureHits.get(signature) ?? 0) + 1);
+    }
+    let maxSignatureHits = 0;
+    for (const hits of recentSignatureHits.values()) {
+      if (hits > maxSignatureHits) {
+        maxSignatureHits = hits;
+      }
+    }
+    return {
+      distinctTargets: recentTargetHits.size,
+      maxHits,
+      distinctSignatures: recentSignatureHits.size,
+      maxSignatureHits
+    };
   }
 }
 
@@ -738,6 +892,10 @@ function isLikelyReviewCommandLine(line: string): boolean {
   if (detectHeavyReviewCommand(line)) {
     return true;
   }
+  const shellTokens = stripLeadingEnvAssignments(tokenizeShellSegment(line));
+  if (extractShellCommandPayload(shellTokens)) {
+    return true;
+  }
   if (
     /^(?:npm|pnpm|yarn|bun|node|npx|git|bash|sh|zsh|python|pytest|go|cargo|mvn|gradle(?:w)?)\b/i.test(
       line
@@ -749,6 +907,26 @@ function isLikelyReviewCommandLine(line: string): boolean {
     return true;
   }
   return false;
+}
+
+function extractInspectionTargets(commandLine: string): string[] {
+  const normalized = commandLine.replace(/\\/gu, '/');
+  const targets = new Set<string>();
+  for (const match of normalized.matchAll(REVIEW_INSPECTION_TARGET_RE)) {
+    const target = match[1]?.trim();
+    if (!target) {
+      continue;
+    }
+    targets.add(target.replace(/^\.\/+/u, ''));
+  }
+  return [...targets];
+}
+
+function extractInspectionCommandSignature(commandLine: string, targets: string[]): string | null {
+  if (targets.length === 0) {
+    return null;
+  }
+  return normalizeReviewCommandLine(commandLine);
 }
 
 function sanitizeTelemetrySummaryForPersistence(

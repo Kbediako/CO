@@ -124,6 +124,20 @@ fi
         sleep 0.05
       done
     fi
+    if [[ "$mode" == "low-signal-drift" ]]; then
+      while true; do
+        echo "thinking"
+        echo "exec"
+        echo "/bin/zsh -lc 'sed -n 1,120p scripts/run-review.ts' in /Users/kbediako/Code/CO"
+        echo "thinking"
+        echo "exec"
+        echo "/bin/zsh -lc 'sed -n 1,120p scripts/lib/review-execution-state.ts' in /Users/kbediako/Code/CO"
+        echo "thinking"
+        echo "exec"
+        echo "/bin/zsh -lc 'sed -n 1,120p tasks/tasks-1059-coordinator-symphony-aligned-standalone-review-low-signal-drift-guard.md' in /Users/kbediako/Code/CO"
+        sleep 0.05
+      done
+    fi
     if [[ "$mode" == "heavy-hang" ]]; then
       echo "thinking"
       echo "exec"
@@ -299,6 +313,7 @@ function baseEnv(sandbox: string, codexBin: string): Record<string, string | und
   delete env.CODEX_REVIEW_DISABLE_DELEGATION_MCP;
   delete env.CODEX_REVIEW_ALLOW_HEAVY_COMMANDS;
   delete env.CODEX_REVIEW_ENFORCE_BOUNDED_MODE;
+  delete env.CODEX_REVIEW_LOW_SIGNAL_TIMEOUT_SECONDS;
   delete env.CODEX_REVIEW_DEBUG_TELEMETRY;
   delete env.CODEX_REVIEW_LARGE_SCOPE_FILE_THRESHOLD;
   delete env.CODEX_REVIEW_LARGE_SCOPE_LINE_THRESHOLD;
@@ -1192,6 +1207,38 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(result.exitCode).toBeGreaterThan(0);
     expect(result.stderr).toContain('codex review timed out after 1s');
     expect(result.stderr).not.toContain('delegation startup loop');
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('fails bounded review when repetitive low-signal inspection persists', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'low-signal-drift',
+      CODEX_REVIEW_LOW_SIGNAL_TIMEOUT_SECONDS: '1',
+      CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0',
+      CODEX_REVIEW_TIMEOUT_SECONDS: '60'
+    });
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).toContain('low-signal review drift detected');
+
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      summary: {
+        commandStarts: string[];
+        heavyCommandStarts: string[];
+        thinkingBlocks: number;
+        distinctInspectionTargets: number;
+      };
+    };
+    expect(telemetry.status).toBe('failed');
+    expect(telemetry.summary.commandStarts.length).toBeGreaterThan(0);
+    expect(telemetry.summary.heavyCommandStarts).toEqual([]);
+    expect(telemetry.summary.thinkingBlocks).toBeGreaterThan(0);
+    expect(telemetry.summary.distinctInspectionTargets).toBeLessThanOrEqual(4);
   }, LONG_WAIT_TEST_TIMEOUT_MS);
 
   it('derives task context from explicit manifest instead of stale task env fallback', async () => {

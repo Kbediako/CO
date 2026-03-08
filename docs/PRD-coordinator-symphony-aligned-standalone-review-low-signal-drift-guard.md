@@ -26,5 +26,5 @@ After `1058`, standalone review has one runtime state owner, but the real `npm r
 
 ## User-Facing Outcome
 
-- `npm run review` still allows bounded local inspection, but it now terminates with a precise low-signal drift reason when the reviewer only repeats shallow exploration.
+- `npm run review` still allows bounded local inspection in the default non-heavy path, but it now terminates with a precise low-signal drift reason when the reviewer only repeats shallow nearby-file exploration.
 - Failure artifacts explain why the review was stopped and what evidence was observed.

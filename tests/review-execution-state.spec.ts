@@ -89,4 +89,171 @@ describe('ReviewExecutionState', () => {
     expect(raw.summary.commandStarts[0]).toContain('/bin/zsh -lc');
     expect(raw.summary.heavyCommandStarts[0]).toContain('npm run test');
   });
+
+  it('classifies bounded low-signal drift from repeated inspection targets', () => {
+    const state = new ReviewExecutionState({
+      startedAtMs: 0,
+      blockHeavyCommands: true,
+      lowSignalTimeoutMs: 1_000
+    });
+
+    for (let index = 0; index < 4; index += 1) {
+      state.observeChunk('thinking\nexec\n', 'stdout', 100 + index * 100);
+      state.observeChunk("/bin/zsh -lc 'sed -n 1,120p scripts/run-review.ts'\n", 'stdout', 110 + index * 100);
+      state.observeChunk('thinking\nexec\n', 'stdout', 120 + index * 100);
+      state.observeChunk("/bin/zsh -lc 'sed -n 1,120p scripts/lib/review-execution-state.ts'\n", 'stdout', 130 + index * 100);
+      state.observeChunk('thinking\nexec\n', 'stdout', 140 + index * 100);
+      state.observeChunk(
+        "/bin/zsh -lc 'sed -n 1,120p tasks/tasks-1059-coordinator-symphony-aligned-standalone-review-low-signal-drift-guard.md'\n",
+        'stdout',
+        150 + index * 100
+      );
+    }
+
+    const drift = state.getLowSignalDriftState(2_000);
+    expect(drift.triggered).toBe(true);
+    expect(drift.reason).toContain('low-signal review drift detected');
+    expect(drift.distinctInspectionTargets).toBeLessThanOrEqual(4);
+    expect(drift.maxInspectionTargetHits).toBeGreaterThanOrEqual(3);
+  });
+
+  it('classifies nearby drift from the recent inspection window even after broader exploration', () => {
+    const state = new ReviewExecutionState({
+      startedAtMs: 0,
+      blockHeavyCommands: false,
+      lowSignalTimeoutMs: 1_000
+    });
+
+    const broadTargets = [
+      'scripts/run-review.ts',
+      'scripts/lib/review-execution-state.ts',
+      'tasks/tasks-1059-coordinator-symphony-aligned-standalone-review-low-signal-drift-guard.md',
+      'docs/TECH_SPEC-coordinator-symphony-aligned-standalone-review-low-signal-drift-guard.md',
+      'docs/PRD-coordinator-symphony-aligned-standalone-review-low-signal-drift-guard.md'
+    ];
+    let nowMs = 100;
+    for (const target of broadTargets) {
+      state.observeChunk('thinking\nexec\n', 'stdout', nowMs);
+      state.observeChunk(`/bin/zsh -lc 'sed -n 1,120p ${target}'\n`, 'stdout', nowMs + 10);
+      nowMs += 100;
+    }
+
+    for (let index = 0; index < 10; index += 1) {
+      state.observeChunk('thinking\nexec\n', 'stdout', nowMs);
+      state.observeChunk("/bin/zsh -lc 'sed -n 1,120p scripts/run-review.ts'\n", 'stdout', nowMs + 10);
+      nowMs += 100;
+    }
+
+    const drift = state.getLowSignalDriftState(2_500);
+    expect(drift.triggered).toBe(true);
+    expect(drift.distinctInspectionTargets).toBeLessThanOrEqual(4);
+    expect(drift.maxInspectionTargetHits).toBeGreaterThanOrEqual(3);
+  });
+
+  it('tracks the recent inspection window by command sample, not raw target count', () => {
+    const state = new ReviewExecutionState({
+      startedAtMs: 0,
+      blockHeavyCommands: false,
+      lowSignalTimeoutMs: 1_000
+    });
+
+    let nowMs = 100;
+    for (let index = 0; index < 10; index += 1) {
+      state.observeChunk('thinking\nexec\n', 'stdout', nowMs);
+      state.observeChunk(
+        `/bin/zsh -lc 'git diff -- scripts/run-review.ts scripts/lib/review-execution-state.ts docs/TECH_SPEC-coordinator-symphony-aligned-standalone-review-low-signal-drift-guard.md batch-${index}.md'\n`,
+        'stdout',
+        nowMs + 10
+      );
+      nowMs += 100;
+    }
+
+    const drift = state.getLowSignalDriftState(2_000);
+    expect(drift.triggered).toBe(false);
+    expect(drift.distinctInspectionTargets).toBeGreaterThan(4);
+  });
+
+  it('does not classify focused recent review when inspection signatures keep changing', () => {
+    const state = new ReviewExecutionState({
+      startedAtMs: 0,
+      blockHeavyCommands: false,
+      lowSignalTimeoutMs: 1_000
+    });
+
+    const commands = [
+      "/bin/zsh -lc 'sed -n 1,120p scripts/run-review.ts scripts/lib/review-execution-state.ts'",
+      "/bin/zsh -lc 'rg -n low-signal scripts/run-review.ts scripts/lib/review-execution-state.ts'",
+      "/bin/zsh -lc 'git diff -- scripts/run-review.ts scripts/lib/review-execution-state.ts'",
+      "/bin/zsh -lc 'nl -ba scripts/run-review.ts scripts/lib/review-execution-state.ts'"
+    ];
+    for (let index = 0; index < 12; index += 1) {
+      state.observeChunk('thinking\nexec\n', 'stdout', 100 + index * 100);
+      state.observeChunk(`${commands[index % commands.length]}\n`, 'stdout', 110 + index * 100);
+    }
+
+    const drift = state.getLowSignalDriftState(2_000);
+    expect(drift.triggered).toBe(false);
+    expect(drift.distinctInspectionTargets).toBeLessThanOrEqual(4);
+    expect(drift.distinctInspectionSignatures).toBeGreaterThan(1);
+  });
+
+  it('does not classify same-file review when the inspection signature keeps moving forward', () => {
+    const state = new ReviewExecutionState({
+      startedAtMs: 0,
+      blockHeavyCommands: false,
+      lowSignalTimeoutMs: 1_000
+    });
+
+    let nowMs = 100;
+    for (let index = 0; index < 10; index += 1) {
+      state.observeChunk('thinking\nexec\n', 'stdout', nowMs);
+      const start = 1 + index * 120;
+      const end = start + 119;
+      state.observeChunk(
+        `/bin/zsh -lc 'sed -n ${start},${end}p scripts/run-review.ts'\n`,
+        'stdout',
+        nowMs + 10
+      );
+      nowMs += 100;
+    }
+
+    expect(state.getLowSignalDriftState(2_000).triggered).toBe(false);
+  });
+
+  it('requires the drift shape to persist for the timeout window', () => {
+    const state = new ReviewExecutionState({
+      startedAtMs: 0,
+      blockHeavyCommands: false,
+      lowSignalTimeoutMs: 1_000
+    });
+
+    let nowMs = 100;
+    for (const target of ['a.md', 'b.md', 'c.md', 'd.md', 'e.md', 'f.md']) {
+      state.observeChunk('thinking\nexec\n', 'stdout', nowMs);
+      state.observeChunk(`/bin/zsh -lc 'sed -n 1,20p ${target}'\n`, 'stdout', nowMs + 10);
+      nowMs += 250;
+    }
+    for (let index = 0; index < 10; index += 1) {
+      state.observeChunk('thinking\nexec\n', 'stdout', nowMs);
+      state.observeChunk("/bin/zsh -lc 'sed -n 1,20p scripts/run-review.ts'\n", 'stdout', nowMs + 10);
+      nowMs += 50;
+    }
+
+    expect(state.getLowSignalDriftState(nowMs).triggered).toBe(false);
+  });
+
+  it('does not classify low-signal drift when the guard is disabled', () => {
+    const state = new ReviewExecutionState({
+      startedAtMs: 0,
+      blockHeavyCommands: false,
+      lowSignalTimeoutMs: null
+    });
+
+    for (let index = 0; index < 12; index += 1) {
+      state.observeChunk('thinking\nexec\n', 'stdout', 100 + index * 100);
+      state.observeChunk("/bin/zsh -lc 'sed -n 1,120p scripts/run-review.ts'\n", 'stdout', 110 + index * 100);
+    }
+
+    expect(state.getLowSignalDriftState(2_000).triggered).toBe(false);
+  });
 });

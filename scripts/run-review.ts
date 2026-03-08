@@ -61,6 +61,7 @@ const REVIEW_LARGE_SCOPE_FILE_THRESHOLD_ENV_KEY = 'CODEX_REVIEW_LARGE_SCOPE_FILE
 const REVIEW_LARGE_SCOPE_LINE_THRESHOLD_ENV_KEY = 'CODEX_REVIEW_LARGE_SCOPE_LINE_THRESHOLD';
 const REVIEW_ALLOW_HEAVY_COMMANDS_ENV_KEY = 'CODEX_REVIEW_ALLOW_HEAVY_COMMANDS';
 const REVIEW_ENFORCE_BOUNDED_MODE_ENV_KEY = 'CODEX_REVIEW_ENFORCE_BOUNDED_MODE';
+const REVIEW_LOW_SIGNAL_TIMEOUT_ENV_KEY = 'CODEX_REVIEW_LOW_SIGNAL_TIMEOUT_SECONDS';
 const REVIEW_TELEMETRY_DEBUG_ENV_KEY = 'CODEX_REVIEW_DEBUG_TELEMETRY';
 const REVIEW_DISABLE_DELEGATION_CONFIG_OVERRIDE = 'mcp_servers.delegation.enabled=false';
 
@@ -567,6 +568,20 @@ async function main(): Promise<void> {
       )} (set CODEX_REVIEW_MONITOR_INTERVAL_SECONDS=0 to disable).`
     );
   }
+  const lowSignalTimeoutMs = !allowHeavyCommands ? resolveReviewLowSignalTimeoutMs() : null;
+  if (!allowHeavyCommands) {
+    if (lowSignalTimeoutMs === null) {
+      console.log(
+        `[run-review] low-signal drift guard disabled (${REVIEW_LOW_SIGNAL_TIMEOUT_ENV_KEY}=0).`
+      );
+    } else {
+      console.log(
+        `[run-review] low-signal drift guard enabled after ${formatDurationMs(
+          lowSignalTimeoutMs
+        )} of repetitive bounded activity (set ${REVIEW_LOW_SIGNAL_TIMEOUT_ENV_KEY}=0 to disable).`
+      );
+    }
+  }
   const autoIssueLogEnabled = options.autoIssueLog ?? false;
 
   const runReview = async (resolved: { command: string; args: string[] }) =>
@@ -581,6 +596,7 @@ async function main(): Promise<void> {
       startupLoopTimeoutMs,
       startupLoopMinEvents,
       monitorIntervalMs,
+      lowSignalTimeoutMs,
       outputLogPath: artifactPaths.outputLogPath
     });
   const writeTelemetry = async (
@@ -1238,6 +1254,7 @@ interface RunCodexReviewOptions {
   startupLoopTimeoutMs: number | null;
   startupLoopMinEvents: number;
   monitorIntervalMs: number | null;
+  lowSignalTimeoutMs: number | null;
   outputLogPath: string;
 }
 
@@ -1312,7 +1329,8 @@ async function runCodexReview(
   });
   const uninstallSignalForwarders = installSignalForwarders(child, detached);
   const executionState = new ReviewExecutionState({
-    blockHeavyCommands: options.blockHeavyCommands
+    blockHeavyCommands: options.blockHeavyCommands,
+    lowSignalTimeoutMs: options.lowSignalTimeoutMs
   });
 
   const capture = (chunk: Buffer, target: NodeJS.WriteStream, stream: 'stdout' | 'stderr') => {
@@ -1351,10 +1369,12 @@ async function runCodexReview(
       startupLoopTimeoutMs: options.startupLoopTimeoutMs,
       startupLoopMinEvents: options.startupLoopMinEvents,
       monitorIntervalMs: options.monitorIntervalMs,
+      lowSignalTimeoutMs: options.lowSignalTimeoutMs,
       blockHeavyCommands: options.blockHeavyCommands,
       getLastOutputAtMs: () => executionState.getLastOutputAtMs(),
       getStartupLoopState: () => executionState.getStartupLoopState(),
       getBlockedHeavyCommand: () => executionState.getBlockedHeavyCommand(),
+      getLowSignalDriftReason: () => executionState.getLowSignalDriftState().reason,
       formatCheckpoint: () => executionState.formatCheckpoint(),
       detached,
       onCleanup: cleanup
@@ -1538,16 +1558,33 @@ function resolveReviewMonitorIntervalMs(): number | null {
   return Math.round(parsedSeconds * 1000);
 }
 
+function resolveReviewLowSignalTimeoutMs(): number | null {
+  const configured = process.env[REVIEW_LOW_SIGNAL_TIMEOUT_ENV_KEY]?.trim();
+  if (!configured) {
+    return 180_000;
+  }
+  const parsedSeconds = Number(configured);
+  if (!Number.isFinite(parsedSeconds)) {
+    throw new Error(`${REVIEW_LOW_SIGNAL_TIMEOUT_ENV_KEY} must be a finite number.`);
+  }
+  if (parsedSeconds <= 0) {
+    return null;
+  }
+  return Math.round(parsedSeconds * 1000);
+}
+
 interface WaitForChildExitOptions {
   timeoutMs: number | null;
   stallTimeoutMs: number | null;
   startupLoopTimeoutMs: number | null;
   startupLoopMinEvents: number;
   monitorIntervalMs: number | null;
+  lowSignalTimeoutMs: number | null;
   blockHeavyCommands: boolean;
   getLastOutputAtMs: () => number;
   getStartupLoopState: () => ReviewStartupLoopState;
   getBlockedHeavyCommand: () => string | null;
+  getLowSignalDriftReason: () => string | null;
   formatCheckpoint: () => string;
   detached: boolean;
   onCleanup?: () => void;
@@ -1563,6 +1600,7 @@ async function waitForChildExit(
     let stallHandle: NodeJS.Timeout | undefined;
     let startupLoopHandle: NodeJS.Timeout | undefined;
     let monitorHandle: NodeJS.Timeout | undefined;
+    let lowSignalHandle: NodeJS.Timeout | undefined;
     let heavyCommandHandle: NodeJS.Timeout | undefined;
     let killHandle: NodeJS.Timeout | undefined;
     let hardKillArmed = false;
@@ -1580,6 +1618,9 @@ async function waitForChildExit(
       }
       if (monitorHandle) {
         clearInterval(monitorHandle);
+      }
+      if (lowSignalHandle) {
+        clearInterval(lowSignalHandle);
       }
       if (heavyCommandHandle) {
         clearInterval(heavyCommandHandle);
@@ -1722,6 +1763,20 @@ async function waitForChildExit(
         requestTermination(formatBoundedHeavyCommandFailure(blockedCommand), false);
       }, 250);
       heavyCommandHandle.unref();
+    }
+
+    if (options.lowSignalTimeoutMs !== null) {
+      lowSignalHandle = setInterval(() => {
+        const lowSignalReason = options.getLowSignalDriftReason();
+        if (!lowSignalReason) {
+          return;
+        }
+        requestTermination(
+          `${lowSignalReason} (set ${REVIEW_LOW_SIGNAL_TIMEOUT_ENV_KEY}=0 to disable).`,
+          false
+        );
+      }, 1000);
+      lowSignalHandle.unref();
     }
 
     const monitorIntervalMs = options.monitorIntervalMs;

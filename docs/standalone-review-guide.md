@@ -54,7 +54,8 @@ Use `codex-orchestrator review` as the default path so runs inherit CO guardrail
 - To force execution in those environments: `FORCE_CODEX_REVIEW=1 CODEX_REVIEW_NON_INTERACTIVE=1 TASK=<task-id> NOTES="..." MANIFEST=<path> codex-orchestrator review --manifest <path>`.
 - `codex-orchestrator review` keeps delegation MCP enabled by default; disable when needed with `CODEX_REVIEW_DISABLE_DELEGATION_MCP=1` or `--disable-delegation-mcp` (legacy control remains supported: `CODEX_REVIEW_ENABLE_DELEGATION_MCP=0` or `--enable-delegation-mcp=false`).
 - `codex-orchestrator review` does not enforce runtime limits by default (reviews can run as long as needed).
-- `codex-orchestrator review` uses bounded review guidance by default (focus on changed files, avoid full-suite validation commands) but remains advisory-only for agent autonomy/performance.
+- `codex-orchestrator review` uses bounded review guidance by default (focus on changed files, avoid full-suite validation commands).
+- In that default non-heavy path, a low-signal drift guard can fail closed when the review stays on repetitive nearby inspection for too long; disable it with `CODEX_REVIEW_LOW_SIGNAL_TIMEOUT_SECONDS=0` or shorten/extend it with an explicit seconds value.
 - Heavy-command policy toggles:
   - Allow unrestricted heavy command execution: `CODEX_REVIEW_ALLOW_HEAVY_COMMANDS=1`
   - Enforce bounded mode (hard-stop on heavy command starts): `CODEX_REVIEW_ENFORCE_BOUNDED_MODE=1`
@@ -64,6 +65,7 @@ Use `codex-orchestrator review` as the default path so runs inherit CO guardrail
   - `CODEX_REVIEW_TIMEOUT_SECONDS=<seconds>` (`0` disables when set)
   - `CODEX_REVIEW_STALL_TIMEOUT_SECONDS=<seconds>` (`0` disables when set)
   - `CODEX_REVIEW_STARTUP_LOOP_TIMEOUT_SECONDS=<seconds>` with optional `CODEX_REVIEW_STARTUP_LOOP_MIN_EVENTS` (default `8` when startup-loop timeout is set)
+  - `CODEX_REVIEW_LOW_SIGNAL_TIMEOUT_SECONDS=<seconds>` (`0` disables the bounded low-signal drift guard; default `180`)
 - Optional monitor tuning:
   - `CODEX_REVIEW_MONITOR_INTERVAL_SECONDS=<seconds>` (`0` disables checkpoints)
 - Optional large-scope thresholds:
