@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260308-1069-coordinator-symphony-aligned-expiry-cycle-and-timer-ownership-extraction",
+      "title": "Coordinator Symphony-Aligned Expiry Cycle and Timer Ownership Extraction",
+      "relates_to": "tasks/tasks-1069-coordinator-symphony-aligned-expiry-cycle-and-timer-ownership-extraction.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-08",
+      "paths": {
+        "spec": "tasks/specs/1069-coordinator-symphony-aligned-expiry-cycle-and-timer-ownership-extraction.md",
+        "task": "tasks/tasks-1069-coordinator-symphony-aligned-expiry-cycle-and-timer-ownership-extraction.md",
+        "agent_task": ".agent/task/1069-coordinator-symphony-aligned-expiry-cycle-and-timer-ownership-extraction.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-expiry-cycle-and-timer-ownership-extraction.md"
+      }
+    },
+    {
       "id": "20260308-1068-coordinator-symphony-aligned-question-queue-child-resolution-adapter-extraction",
       "title": "Coordinator Symphony-Aligned Question Queue Child-Resolution Adapter Extraction",
       "relates_to": "tasks/tasks-1068-coordinator-symphony-aligned-question-queue-child-resolution-adapter-extraction.md",
