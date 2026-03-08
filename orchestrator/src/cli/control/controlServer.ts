@@ -35,8 +35,7 @@ import {
 } from './observabilitySurface.js';
 import { handleUiSessionRequest } from './uiSessionController.js';
 import { admitAuthenticatedControlRoute } from './authenticatedControlRouteGate.js';
-import { handleAuthenticatedRouteDispatcher } from './authenticatedRouteDispatcher.js';
-import { createAuthenticatedRouteDispatcherContext } from './authenticatedRouteComposition.js';
+import { handleAuthenticatedRouteRequest } from './authenticatedRouteController.js';
 import {
   handleLinearWebhookRequest,
   normalizeLinearAdvisoryState,
@@ -532,42 +531,40 @@ async function handleRequest(context: RequestContext): Promise<void> {
     return;
   }
 
-  const handled = await handleAuthenticatedRouteDispatcher(
-    createAuthenticatedRouteDispatcherContext({
-      pathname: url.pathname,
-      method: req.method,
-      authKind: auth.kind,
-      req,
-      res,
-      clients: context.clients,
-      presenterContext,
-      confirmAutoPause: context.config.confirm.autoPause,
-      taskId: resolveTaskIdFromManifestPath(context.paths.manifestPath),
-      manifestPath: context.paths.manifestPath,
-      controlStore: context.controlStore,
-      confirmationStore: context.confirmationStore,
-      questionQueue: context.questionQueue,
-      delegationTokens: context.delegationTokens,
-      persist: context.persist,
-      runtime: context.runtime,
-      readRequestBody: () => readJsonBody(req),
-      readDispatchEvaluation: () => runtimeSnapshot.readDispatchEvaluation(),
-      onDispatchEvaluated: (record) => emitDispatchPilotAuditEvents(context, record),
-      emitControlEvent: (input) => emitControlEvent(context, input),
-      emitControlActionAuditEvent: (input) => emitControlActionAuditEvent(context, input),
-      writeControlError: (status, error, traceability) =>
-        writeControlError(res, status, error, traceability),
-      expireConfirmations: () => expireConfirmations(context),
-      expireQuestions: () => expireQuestions(context),
-      queueQuestionResolutions: (records) => queueQuestionResolutions(context, records),
-      readDelegationHeaders: () => readDelegationHeaders(req),
-      validateDelegation: (delegationAuth) => Boolean(validateDelegation(context, delegationAuth)),
-      resolveManifestPath: (rawPath) =>
-        resolveRunManifestPath(rawPath, context.config.ui.allowedRunRoots, 'from_manifest_path'),
-      readManifest: (path) => readJsonFile<CliManifest>(path),
-      resolveChildQuestion: (record, outcome) => maybeResolveChildQuestion(context, record, outcome)
-    })
-  );
+  const handled = await handleAuthenticatedRouteRequest({
+    pathname: url.pathname,
+    method: req.method,
+    authKind: auth.kind,
+    req,
+    res,
+    clients: context.clients,
+    presenterContext,
+    confirmAutoPause: context.config.confirm.autoPause,
+    taskId: resolveTaskIdFromManifestPath(context.paths.manifestPath),
+    manifestPath: context.paths.manifestPath,
+    controlStore: context.controlStore,
+    confirmationStore: context.confirmationStore,
+    questionQueue: context.questionQueue,
+    delegationTokens: context.delegationTokens,
+    persist: context.persist,
+    runtime: context.runtime,
+    readRequestBody: () => readJsonBody(req),
+    readDispatchEvaluation: () => runtimeSnapshot.readDispatchEvaluation(),
+    onDispatchEvaluated: (record) => emitDispatchPilotAuditEvents(context, record),
+    emitControlEvent: (input) => emitControlEvent(context, input),
+    emitControlActionAuditEvent: (input) => emitControlActionAuditEvent(context, input),
+    writeControlError: (status, error, traceability) =>
+      writeControlError(res, status, error, traceability),
+    expireConfirmations: () => expireConfirmations(context),
+    expireQuestions: () => expireQuestions(context),
+    queueQuestionResolutions: (records) => queueQuestionResolutions(context, records),
+    readDelegationHeaders: () => readDelegationHeaders(req),
+    validateDelegation: (delegationAuth) => Boolean(validateDelegation(context, delegationAuth)),
+    resolveManifestPath: (rawPath) =>
+      resolveRunManifestPath(rawPath, context.config.ui.allowedRunRoots, 'from_manifest_path'),
+    readManifest: (path) => readJsonFile<CliManifest>(path),
+    resolveChildQuestion: (record, outcome) => maybeResolveChildQuestion(context, record, outcome)
+  });
 
   if (handled) {
     return;

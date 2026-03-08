@@ -3397,6 +3397,42 @@ describe('ControlServer', () => {
     }
   });
 
+  it('preserves session-authenticated state reads after authenticated route controller extraction', async () => {
+    const { root, env, paths } = await createRunRoot('task-0940');
+    await seedManifest(paths);
+    const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
+
+    const server = await ControlServer.start({
+      paths,
+      config,
+      runId: 'run-1'
+    });
+
+    try {
+      const baseUrl = server.getBaseUrl() ?? '';
+      const sessionRes = await fetch(new URL('/auth/session', baseUrl), {
+        method: 'POST',
+        headers: { Origin: baseUrl }
+      });
+      expect(sessionRes.status).toBe(200);
+      const sessionPayload = (await sessionRes.json()) as { token?: string };
+      const sessionToken = sessionPayload.token ?? '';
+
+      const stateRes = await fetch(new URL('/api/v1/state', baseUrl), {
+        headers: {
+          Authorization: `Bearer ${sessionToken}`
+        }
+      });
+
+      expect(stateRes.status).toBe(200);
+      const statePayload = (await stateRes.json()) as { generated_at?: string };
+      expect(statePayload.generated_at).toBeTruthy();
+    } finally {
+      await server.close();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   it('rejects coordinator metadata on session control actions', async () => {
     const { root, env, paths } = await createRunRoot('task-0940');
     const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
