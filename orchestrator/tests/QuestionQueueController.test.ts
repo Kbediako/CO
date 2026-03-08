@@ -202,6 +202,31 @@ describe('QuestionQueueController', () => {
     expect(context.persistQuestions).not.toHaveBeenCalled();
   });
 
+  it('dismisses a queued question and resolves the child run with dismissed status', async () => {
+    const queue = new QuestionQueue({
+      seed: [createRecord({ question_id: 'q-0001', status: 'queued' })]
+    });
+    const { context, state } = createContext({
+      queue,
+      req: { method: 'POST', url: '/questions/dismiss', headers: {} } as http.IncomingMessage,
+      readRequestBody: vi.fn(async () => ({
+        question_id: 'q-0001',
+        dismissed_by: 'ui'
+      }))
+    });
+
+    await expect(handleQuestionQueueRequest(context)).resolves.toBe(true);
+
+    const record = queue.get('q-0001');
+    expect(record?.status).toBe('dismissed');
+    expect(context.persistQuestions).toHaveBeenCalledTimes(1);
+    expect(context.emitQuestionDismissed).toHaveBeenCalledWith(record);
+    expect(context.resolveChildQuestion).toHaveBeenCalledWith(record, 'dismissed');
+    expect(context.publishRuntime).toHaveBeenCalledWith('questions.dismiss');
+    expect(state.statusCode).toBe(200);
+    expect(state.body).toEqual({ status: 'dismissed' });
+  });
+
   it('rejects item reads outside the delegated child-run scope', async () => {
     const queue = new QuestionQueue({
       seed: [createRecord({ question_id: 'q-0001', from_run_id: 'child-run-a' })]

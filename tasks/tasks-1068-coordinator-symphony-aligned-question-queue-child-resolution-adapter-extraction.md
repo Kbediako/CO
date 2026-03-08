@@ -20,21 +20,21 @@
 
 ## Question Child-Resolution Extraction
 
-- [ ] Question/delegation child-resolution helper ownership moved out of `controlServer.ts` into a dedicated adapter module under `orchestrator/src/cli/control/`. Evidence: `orchestrator/src/cli/control/controlServer.ts`, `orchestrator/src/cli/control/`.
-- [ ] Question route/composition callback contracts remain explicit and behavior-preserving. Evidence: `orchestrator/src/cli/control/questionQueueController.ts`, `orchestrator/src/cli/control/authenticatedRouteComposition.ts`, `orchestrator/tests/AuthenticatedRouteComposition.test.ts`.
-- [ ] Child manifest/control-endpoint safety and fallback semantics remain intact after extraction. Evidence: `orchestrator/src/cli/control/`, `orchestrator/tests/ControlServer.test.ts`.
+- [x] Question/delegation child-resolution helper ownership moved out of `controlServer.ts` into a dedicated adapter module under `orchestrator/src/cli/control/`. Evidence: `orchestrator/src/cli/control/questionChildResolutionAdapter.ts`, `orchestrator/src/cli/control/controlServer.ts`, `orchestrator/tests/QuestionChildResolutionAdapter.test.ts`, `out/1068-coordinator-symphony-aligned-question-queue-child-resolution-adapter-extraction/manual/20260308T132355Z-closeout/00-summary.md`.
+- [x] Question route/composition callback contracts remain explicit and behavior-preserving. Evidence: `orchestrator/src/cli/control/questionQueueController.ts`, `orchestrator/src/cli/control/authenticatedRouteComposition.ts`, `orchestrator/tests/QuestionQueueController.test.ts`, `out/1068-coordinator-symphony-aligned-question-queue-child-resolution-adapter-extraction/manual/20260308T132355Z-closeout/11-manual-question-child-resolution-check.json`.
+- [x] Child manifest/control-endpoint safety and fallback semantics remain intact after extraction. Evidence: `orchestrator/src/cli/control/questionChildResolutionAdapter.ts`, `orchestrator/tests/ControlServer.test.ts`, `out/1068-coordinator-symphony-aligned-question-queue-child-resolution-adapter-extraction/manual/20260308T132355Z-closeout/11-manual-question-child-resolution-check.json`, `.runs/1068-coordinator-symphony-aligned-question-queue-child-resolution-adapter-extraction-symphony-check/cli/2026-03-08T13-22-30-087Z-0c8307a8/manifest.json`.
 
 ## Validation + Closeout
 
-- [ ] `node scripts/delegation-guard.mjs`. Evidence: `out/1068-coordinator-symphony-aligned-question-queue-child-resolution-adapter-extraction/manual/<timestamp>-closeout/01-delegation-guard.log`.
-- [ ] `node scripts/spec-guard.mjs --dry-run`. Evidence: `out/1068-coordinator-symphony-aligned-question-queue-child-resolution-adapter-extraction/manual/<timestamp>-closeout/02-spec-guard.log`.
-- [ ] `npm run build`. Evidence: `out/1068-coordinator-symphony-aligned-question-queue-child-resolution-adapter-extraction/manual/<timestamp>-closeout/03-build.log`.
-- [ ] `npm run lint`. Evidence: `out/1068-coordinator-symphony-aligned-question-queue-child-resolution-adapter-extraction/manual/<timestamp>-closeout/04-lint.log`.
-- [ ] `npm run test`. Evidence: `out/1068-coordinator-symphony-aligned-question-queue-child-resolution-adapter-extraction/manual/<timestamp>-closeout/05-test.log`.
-- [ ] `npm run docs:check`. Evidence: `out/1068-coordinator-symphony-aligned-question-queue-child-resolution-adapter-extraction/manual/<timestamp>-closeout/06-docs-check.log`.
-- [ ] `npm run docs:freshness`. Evidence: `out/1068-coordinator-symphony-aligned-question-queue-child-resolution-adapter-extraction/manual/<timestamp>-closeout/07-docs-freshness.log`.
-- [ ] `node scripts/diff-budget.mjs`. Evidence: `out/1068-coordinator-symphony-aligned-question-queue-child-resolution-adapter-extraction/manual/<timestamp>-closeout/08-diff-budget.log`.
-- [ ] `npm run review`. Evidence: `out/1068-coordinator-symphony-aligned-question-queue-child-resolution-adapter-extraction/manual/<timestamp>-closeout/09-review.log`.
-- [ ] `npm run pack:smoke`. Evidence: `out/1068-coordinator-symphony-aligned-question-queue-child-resolution-adapter-extraction/manual/<timestamp>-closeout/10-pack-smoke.log`.
-- [ ] Manual/mock child-resolution runtime evidence captured. Evidence: `out/1068-coordinator-symphony-aligned-question-queue-child-resolution-adapter-extraction/manual/<timestamp>-closeout/11-manual-question-child-resolution-check.json`.
-- [ ] Elegance review completed. Evidence: `out/1068-coordinator-symphony-aligned-question-queue-child-resolution-adapter-extraction/manual/<timestamp>-closeout/12-elegance-review.md`.
+- [x] `node scripts/delegation-guard.mjs`. Evidence: `out/1068-coordinator-symphony-aligned-question-queue-child-resolution-adapter-extraction/manual/20260308T132355Z-closeout/01-delegation-guard.log`.
+- [x] `node scripts/spec-guard.mjs --dry-run`. Evidence: `out/1068-coordinator-symphony-aligned-question-queue-child-resolution-adapter-extraction/manual/20260308T132355Z-closeout/02-spec-guard.log`.
+- [x] `npm run build`. Evidence: `out/1068-coordinator-symphony-aligned-question-queue-child-resolution-adapter-extraction/manual/20260308T132355Z-closeout/03-build.log`.
+- [x] `npm run lint`. Evidence: `out/1068-coordinator-symphony-aligned-question-queue-child-resolution-adapter-extraction/manual/20260308T132355Z-closeout/04-lint.log`.
+- [x] `npm run test`. Evidence: `out/1068-coordinator-symphony-aligned-question-queue-child-resolution-adapter-extraction/manual/20260308T132355Z-closeout/05-test.log`.
+- [x] `npm run docs:check`. Evidence: `out/1068-coordinator-symphony-aligned-question-queue-child-resolution-adapter-extraction/manual/20260308T132355Z-closeout/06-docs-check.log`.
+- [x] `npm run docs:freshness`. Evidence: `out/1068-coordinator-symphony-aligned-question-queue-child-resolution-adapter-extraction/manual/20260308T132355Z-closeout/07-docs-freshness.log`.
+- [x] `node scripts/diff-budget.mjs`. Evidence: `out/1068-coordinator-symphony-aligned-question-queue-child-resolution-adapter-extraction/manual/20260308T132355Z-closeout/08-diff-budget.log`, `out/1068-coordinator-symphony-aligned-question-queue-child-resolution-adapter-extraction/manual/20260308T132355Z-closeout/13-override-notes.md`.
+- [x] `npm run review`. Evidence: `out/1068-coordinator-symphony-aligned-question-queue-child-resolution-adapter-extraction/manual/20260308T132355Z-closeout/09-review.log`, `out/1068-coordinator-symphony-aligned-question-queue-child-resolution-adapter-extraction/manual/20260308T132355Z-closeout/13-override-notes.md`.
+- [x] `npm run pack:smoke`. Evidence: `out/1068-coordinator-symphony-aligned-question-queue-child-resolution-adapter-extraction/manual/20260308T132355Z-closeout/10-pack-smoke.log`.
+- [x] Manual/mock child-resolution runtime evidence captured. Evidence: `out/1068-coordinator-symphony-aligned-question-queue-child-resolution-adapter-extraction/manual/20260308T132355Z-closeout/11-manual-question-child-resolution-check.json`.
+- [x] Elegance review completed. Evidence: `out/1068-coordinator-symphony-aligned-question-queue-child-resolution-adapter-extraction/manual/20260308T132355Z-closeout/12-elegance-review.md`.

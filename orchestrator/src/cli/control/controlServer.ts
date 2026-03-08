@@ -1,15 +1,14 @@
 import http from 'node:http';
 import { randomBytes } from 'node:crypto';
-import { existsSync, realpathSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import { chmod, readFile } from 'node:fs/promises';
-import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { writeJsonAtomic } from '../utils/fs.js';
 import { isoTimestamp } from '../utils/time.js';
 import { logger } from '../../logger.js';
 import type { RunPaths } from '../run/runPaths.js';
-import type { CliManifest } from '../types.js';
 import type { EffectiveDelegationConfig } from '../config/delegationConfig.js';
 import {
   ControlStateStore,
@@ -42,6 +41,10 @@ import {
   type LinearAdvisoryState,
   type LinearWebhookAuditEventInput
 } from './linearWebhookController.js';
+import {
+  createQuestionChildResolutionAdapter,
+  type QuestionChildResolutionFallbackEvent
+} from './questionChildResolutionAdapter.js';
 
 interface ControlServerOptions {
   paths: RunPaths;
@@ -53,10 +56,6 @@ interface ControlServerOptions {
 const MAX_BODY_BYTES = 1024 * 1024;
 const EXPIRY_INTERVAL_MS = 15_000;
 const SESSION_TTL_MS = 15 * 60 * 1000;
-const CHILD_CONTROL_TIMEOUT_MS = 15_000;
-const CSRF_HEADER = 'x-csrf-token';
-const DELEGATION_TOKEN_HEADER = 'x-codex-delegation-token';
-const DELEGATION_RUN_HEADER = 'x-codex-delegation-run-id';
 const LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost', '::1']);
 const UI_ASSET_PATHS: Record<string, string> = {
   '/ui': 'index.html',
@@ -429,9 +428,10 @@ export class ControlServer {
 
       readQuestions: async (): Promise<QuestionsPayload> => {
         const context = buildInternalContext();
-        await expireQuestions(context);
+        const questionChildResolutionAdapter = createRequestQuestionChildResolutionAdapter(context);
+        await expireQuestions(context, questionChildResolutionAdapter);
         const questions = context.questionQueue.list();
-        queueQuestionResolutions(context, questions);
+        questionChildResolutionAdapter.queueQuestionResolutions(questions);
         return { questions };
       }
     };
@@ -531,6 +531,7 @@ async function handleRequest(context: RequestContext): Promise<void> {
     return;
   }
 
+  const questionChildResolutionAdapter = createRequestQuestionChildResolutionAdapter(context);
   const handled = await handleAuthenticatedRouteRequest({
     pathname: url.pathname,
     method: req.method,
@@ -556,14 +557,14 @@ async function handleRequest(context: RequestContext): Promise<void> {
     writeControlError: (status, error, traceability) =>
       writeControlError(res, status, error, traceability),
     expireConfirmations: () => expireConfirmations(context),
-    expireQuestions: () => expireQuestions(context),
-    queueQuestionResolutions: (records) => queueQuestionResolutions(context, records),
-    readDelegationHeaders: () => readDelegationHeaders(req),
-    validateDelegation: (delegationAuth) => Boolean(validateDelegation(context, delegationAuth)),
-    resolveManifestPath: (rawPath) =>
-      resolveRunManifestPath(rawPath, context.config.ui.allowedRunRoots, 'from_manifest_path'),
-    readManifest: (path) => readJsonFile<CliManifest>(path),
-    resolveChildQuestion: (record, outcome) => maybeResolveChildQuestion(context, record, outcome)
+    expireQuestions: () => expireQuestions(context, questionChildResolutionAdapter),
+    queueQuestionResolutions: (records) => questionChildResolutionAdapter.queueQuestionResolutions(records),
+    readDelegationHeaders: () => questionChildResolutionAdapter.readDelegationHeaders(req),
+    validateDelegation: (delegationAuth) => questionChildResolutionAdapter.validateDelegation(delegationAuth),
+    resolveManifestPath: (rawPath) => questionChildResolutionAdapter.resolveManifestPath(rawPath),
+    readManifest: (path) => questionChildResolutionAdapter.readManifest(path),
+    resolveChildQuestion: (record, outcome) =>
+      questionChildResolutionAdapter.resolveChildQuestion(record, outcome)
   });
 
   if (handled) {
@@ -757,7 +758,10 @@ async function expireConfirmations(context: RequestContext): Promise<void> {
   }
 }
 
-async function expireQuestions(context: RequestContext): Promise<void> {
+async function expireQuestions(
+  context: RequestContext,
+  questionChildResolutionAdapter = createRequestQuestionChildResolutionAdapter(context)
+): Promise<void> {
   const expired = context.questionQueue.expire();
   if (expired.length === 0) {
     return;
@@ -775,7 +779,7 @@ async function expireQuestions(context: RequestContext): Promise<void> {
         expires_at: record.expires_at ?? null
       }
     });
-    await maybeResolveChildQuestion(context, record, 'expired');
+    await questionChildResolutionAdapter.resolveChildQuestion(record, 'expired');
   }
   context.runtime.publish({ source: 'questions.expire' });
 }
@@ -843,14 +847,6 @@ async function readJsonFile<T>(path: string): Promise<T | null> {
   }
 }
 
-function safeJsonParse(text: string): unknown | null {
-  try {
-    return JSON.parse(text);
-  } catch {
-    return null;
-  }
-}
-
 async function emitControlEvent(
   context: RequestContext,
   input: { event: string; actor: string; payload: Record<string, unknown> }
@@ -900,325 +896,9 @@ function buildTelegramOversightDispatchPayload(
   };
 }
 
-function readDelegationHeaders(req: http.IncomingMessage): { token: string; childRunId: string } | null {
-  const token = readHeaderValue(req.headers[DELEGATION_TOKEN_HEADER]);
-  const childRunId = readHeaderValue(req.headers[DELEGATION_RUN_HEADER]);
-  if (!token || !childRunId) {
-    return null;
-  }
-  return { token, childRunId };
-}
-
-function readHeaderValue(value: string | string[] | undefined): string | null {
-  if (Array.isArray(value)) {
-    const values: string[] = [];
-    for (const entry of value) {
-      if (typeof entry !== 'string') {
-        continue;
-      }
-      const parts = entry.split(',');
-      for (const part of parts) {
-        const trimmed = part.trim();
-        if (trimmed) {
-          values.push(trimmed);
-        }
-      }
-    }
-    return readUniqueHeaderValue(values);
-  }
-  if (typeof value === 'string') {
-    const parts = value.split(',');
-    const values: string[] = [];
-    for (const part of parts) {
-      const trimmed = part.trim();
-      if (trimmed) {
-        values.push(trimmed);
-      }
-    }
-    return readUniqueHeaderValue(values);
-  }
-  return null;
-}
-
-function readUniqueHeaderValue(values: string[]): string | null {
-  if (values.length === 0) {
-    return null;
-  }
-  const unique = new Set(values);
-  if (unique.size > 1) {
-    return null;
-  }
-  return values[0];
-}
-
-function validateDelegation(
-  context: RequestContext,
-  auth: { token: string; childRunId: string }
-): DelegationTokenRecord | null {
-  const parentRunId = context.controlStore.snapshot().run_id;
-  return context.delegationTokens.validate(auth.token, parentRunId, auth.childRunId);
-}
-
-async function maybeResolveChildQuestion(
-  context: RequestContext,
-  record: QuestionRecord,
-  outcome: QuestionRecord['status'] | 'expired'
-): Promise<void> {
-  const autoPause = record.auto_pause ?? true;
-  if (!autoPause || !record.from_manifest_path) {
-    return;
-  }
-
-  let action: 'resume' | 'fail' | 'pause' | null = null;
-  let reason = 'question_answered';
-  if (outcome === 'expired') {
-    const fallback = record.expiry_fallback ?? context.config.delegate.expiryFallback ?? 'pause';
-    if (fallback === 'pause') {
-      action = 'pause';
-      reason = 'question_expired';
-    } else {
-      action = fallback === 'resume' ? 'resume' : 'fail';
-      reason = 'question_expired';
-    }
-  } else {
-    action = 'resume';
-    reason = outcome === 'dismissed' ? 'question_dismissed' : 'question_answered';
-  }
-
-  if (!action) {
-    return;
-  }
-
-  const shouldResolve = await isChildAwaitingQuestion(context, record.from_manifest_path);
-  if (!shouldResolve) {
-    return;
-  }
-
-  try {
-    await callChildControlEndpoint(context, record.from_manifest_path, {
-      action,
-      requested_by: 'parent',
-      reason
-    });
-  } catch (error) {
-    const message = (error as Error)?.message ?? String(error);
-    logger.warn(`Failed to resolve child question: ${message}`);
-    await emitControlEvent(context, {
-      event: 'question.resolve_child_fallback',
-      actor: 'control',
-      payload: {
-        question_id: record.question_id,
-        outcome,
-        action,
-        reason,
-        non_fatal: true,
-        error: message
-      }
-    });
-  }
-}
-
-function queueQuestionResolutions(context: RequestContext, records: QuestionRecord[]): void {
-  for (const record of records) {
-    if (record.status === 'queued') {
-      continue;
-    }
-    void maybeResolveChildQuestion(context, record, record.status).catch((error) => {
-      const message = (error as Error)?.message ?? String(error);
-      logger.warn(`Failed to resolve child question: ${message}`);
-      void emitControlEvent(context, {
-        event: 'question.resolve_child_fallback',
-        actor: 'control',
-        payload: {
-          question_id: record.question_id,
-          outcome: record.status,
-          action: 'unknown',
-          reason: 'resolution_enqueue_failed',
-          non_fatal: true,
-          error: message
-        }
-      });
-    });
-  }
-}
-
-async function isChildAwaitingQuestion(context: RequestContext, manifestPath: string): Promise<boolean> {
-  try {
-    const resolvedManifest = resolveRunManifestPath(manifestPath, context.config.ui.allowedRunRoots, 'from_manifest_path');
-    const controlPath = resolve(dirname(resolvedManifest), 'control.json');
-    const snapshot = await readJsonFile<ControlState>(controlPath);
-    const latest = snapshot?.latest_action;
-    if (!latest || latest.action !== 'pause') {
-      return false;
-    }
-    return latest.reason === 'awaiting_question_answer';
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException)?.code !== 'ENOENT') {
-      logger.warn(`Failed to inspect child question state: ${(error as Error)?.message ?? error}`);
-    }
-    return false;
-  }
-}
-
-async function callChildControlEndpoint(
-  context: RequestContext,
-  manifestPath: string,
-  payload: Record<string, unknown>
-): Promise<void> {
-  const { baseUrl, token } = await loadControlEndpoint(manifestPath, context);
-  const url = new URL('/control/action', baseUrl);
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), CHILD_CONTROL_TIMEOUT_MS);
-  let res: Awaited<ReturnType<typeof fetch>>;
-  try {
-    res = await fetch(url.toString(), {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-        [CSRF_HEADER]: token
-      },
-      body: JSON.stringify(payload),
-      signal: controller.signal
-    });
-  } catch (error) {
-    if ((error as Error)?.name === 'AbortError') {
-      throw new Error('child control request timeout');
-    }
-    throw error;
-  } finally {
-    clearTimeout(timer);
-  }
-  if (!res.ok) {
-    const message = await res.text();
-    throw new Error(`child control error: ${res.status} ${message}`);
-  }
-}
-
-async function loadControlEndpoint(
-  manifestPath: string,
-  context: RequestContext
-): Promise<{ baseUrl: URL; token: string }> {
-  const resolvedManifest = resolveRunManifestPath(manifestPath, context.config.ui.allowedRunRoots, 'from_manifest_path');
-  const runDir = dirname(resolvedManifest);
-  const endpointPath = resolve(runDir, 'control_endpoint.json');
-  const raw = await readFile(endpointPath, 'utf8');
-  const endpointInfo = JSON.parse(raw) as { base_url?: string; token_path?: string };
-  const baseUrl = validateControlBaseUrl(endpointInfo.base_url, context.config.ui.allowedBindHosts);
-  const tokenPath = resolveControlTokenPath(endpointInfo.token_path, runDir);
-  const token = await readControlToken(tokenPath);
-  return { baseUrl, token };
-}
-
-function validateControlBaseUrl(raw: unknown, allowedHosts?: string[]): URL {
-  if (typeof raw !== 'string' || raw.trim().length === 0) {
-    throw new Error('control base_url missing');
-  }
-  let parsed: URL;
-  try {
-    parsed = new URL(raw);
-  } catch {
-    throw new Error('control base_url invalid');
-  }
-  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-    throw new Error('control base_url invalid');
-  }
-  if (parsed.username || parsed.password) {
-    throw new Error('control base_url invalid');
-  }
-  const allowed = normalizeAllowedHosts(allowedHosts);
-  if (allowed.size > 0 && !allowed.has(parsed.hostname.toLowerCase())) {
-    throw new Error('control base_url not permitted');
-  }
-  return parsed;
-}
-
 function normalizeAllowedHosts(allowedHosts?: string[]): Set<string> {
   const values = allowedHosts && allowedHosts.length > 0 ? allowedHosts : Array.from(LOOPBACK_HOSTS);
   return new Set(values.map((entry) => entry.toLowerCase()));
-}
-
-function resolveControlTokenPath(tokenPath: unknown, runDir: string): string {
-  const fallback = resolve(runDir, 'control_auth.json');
-  const raw = typeof tokenPath === 'string' ? tokenPath.trim() : '';
-  const resolved = raw ? resolve(runDir, raw) : fallback;
-  if (!isPathWithinRoots(resolved, [runDir])) {
-    throw new Error('control auth path invalid');
-  }
-  return resolved;
-}
-
-async function readControlToken(tokenPath: string): Promise<string> {
-  const tokenRaw = await readFile(tokenPath, 'utf8');
-  const parsedToken = safeJsonParse(tokenRaw);
-  const tokenValue =
-    parsedToken && typeof parsedToken === 'object' && !Array.isArray(parsedToken)
-      ? (parsedToken as Record<string, unknown>).token
-      : null;
-  const token =
-    typeof tokenValue === 'string' && tokenValue.trim().length > 0
-      ? tokenValue.trim()
-      : tokenRaw.trim();
-  if (!token) {
-    throw new Error('control auth token missing');
-  }
-  return token;
-}
-
-function resolveRunManifestPath(rawPath: string, allowedRoots: string[], label: string): string {
-  const resolved = resolve(rawPath);
-  const canonicalPath = realpathSafe(resolved);
-  assertRunManifestPath(canonicalPath, label);
-  if (!isPathWithinRoots(canonicalPath, allowedRoots)) {
-    throw new Error(`${label} not permitted`);
-  }
-  return canonicalPath;
-}
-
-function assertRunManifestPath(pathname: string, label: string): void {
-  const resolvedPath = resolve(pathname);
-  if (basename(resolvedPath) !== 'manifest.json') {
-    throw new Error(`${label} invalid`);
-  }
-  const runDir = dirname(resolvedPath);
-  const cliDir = dirname(runDir);
-  if (basename(cliDir) !== 'cli') {
-    throw new Error(`${label} invalid`);
-  }
-  const taskDir = dirname(cliDir);
-  if (!basename(runDir) || !basename(taskDir)) {
-    throw new Error(`${label} invalid`);
-  }
-}
-
-function isPathWithinRoots(pathname: string, roots: string[]): boolean {
-  const resolved = normalizePath(realpathSafe(pathname));
-  return roots.some((root) => {
-    const resolvedRoot = normalizePath(realpathSafe(root));
-    if (resolvedRoot === resolved) {
-      return true;
-    }
-    const relativePath = relative(resolvedRoot, resolved);
-    if (!relativePath) {
-      return true;
-    }
-    if (isAbsolute(relativePath)) {
-      return false;
-    }
-    return !relativePath.startsWith(`..${sep}`) && relativePath !== '..';
-  });
-}
-
-function realpathSafe(pathname: string): string {
-  try {
-    return realpathSync(pathname);
-  } catch {
-    return resolve(pathname);
-  }
-}
-
-function normalizePath(pathname: string): string {
-  return process.platform === 'win32' ? pathname.toLowerCase() : pathname;
 }
 
 function resolveUiRoot(): string | null {
@@ -1278,7 +958,25 @@ function resolveUiContentType(assetPath: string): string {
   return 'application/octet-stream';
 }
 
-export const __test__ = {
-  readDelegationHeaders,
-  callChildControlEndpoint
-};
+function createRequestQuestionChildResolutionAdapter(context: RequestContext) {
+  return createQuestionChildResolutionAdapter({
+    allowedRunRoots: context.config.ui.allowedRunRoots,
+    allowedBindHosts: context.config.ui.allowedBindHosts,
+    expiryFallback: context.config.delegate.expiryFallback,
+    readParentRunId: () => context.controlStore.snapshot().run_id,
+    validateDelegationToken: (token, parentRunId, childRunId) =>
+      Boolean(context.delegationTokens.validate(token, parentRunId, childRunId)),
+    emitResolutionFallback: (payload) => emitQuestionChildResolutionFallbackEvent(context, payload)
+  });
+}
+
+async function emitQuestionChildResolutionFallbackEvent(
+  context: RequestContext,
+  payload: QuestionChildResolutionFallbackEvent
+): Promise<void> {
+  await emitControlEvent(context, {
+    event: 'question.resolve_child_fallback',
+    actor: 'control',
+    payload: payload as unknown as Record<string, unknown>
+  });
+}
