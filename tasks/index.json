@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260308-1058-coordinator-symphony-aligned-standalone-review-execution-state-extraction",
+      "title": "Coordinator Symphony-Aligned Standalone Review Execution State Extraction",
+      "relates_to": "tasks/tasks-1058-coordinator-symphony-aligned-standalone-review-execution-state-extraction.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-08",
+      "paths": {
+        "spec": "tasks/specs/1058-coordinator-symphony-aligned-standalone-review-execution-state-extraction.md",
+        "task": "tasks/tasks-1058-coordinator-symphony-aligned-standalone-review-execution-state-extraction.md",
+        "agent_task": ".agent/task/1058-coordinator-symphony-aligned-standalone-review-execution-state-extraction.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-standalone-review-execution-state-extraction.md"
+      }
+    },
+    {
       "id": "20260308-1057-coordinator-symphony-aligned-control-action-controller-extraction",
       "title": "Coordinator Symphony-Aligned Control Action Controller Extraction",
       "relates_to": "tasks/tasks-1057-coordinator-symphony-aligned-control-action-controller-extraction.md",
