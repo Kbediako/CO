@@ -7521,7 +7521,21 @@
       "cadence_days": 30
     },
     {
+      "path": ".agent/task/1061-coordinator-symphony-aligned-standalone-review-command-intent-boundary-guard.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-08",
+      "cadence_days": 30
+    },
+    {
       "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-standalone-review-meta-surface-expansion-guard.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-08",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-standalone-review-command-intent-boundary-guard.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-03-08",
@@ -7535,7 +7549,21 @@
       "cadence_days": 30
     },
     {
+      "path": "docs/PRD-coordinator-symphony-aligned-standalone-review-command-intent-boundary-guard.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-08",
+      "cadence_days": 30
+    },
+    {
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-standalone-review-meta-surface-expansion-guard.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-08",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/TECH_SPEC-coordinator-symphony-aligned-standalone-review-command-intent-boundary-guard.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-03-08",
@@ -7549,6 +7577,13 @@
       "cadence_days": 30
     },
     {
+      "path": "docs/findings/1061-standalone-review-command-intent-boundary-guard-deliberation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-08",
+      "cadence_days": 30
+    },
+    {
       "path": "tasks/specs/1060-coordinator-symphony-aligned-standalone-review-meta-surface-expansion-guard.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -7556,7 +7591,21 @@
       "cadence_days": 30
     },
     {
+      "path": "tasks/specs/1061-coordinator-symphony-aligned-standalone-review-command-intent-boundary-guard.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-08",
+      "cadence_days": 30
+    },
+    {
       "path": "tasks/tasks-1060-coordinator-symphony-aligned-standalone-review-meta-surface-expansion-guard.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-08",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/tasks-1061-coordinator-symphony-aligned-standalone-review-command-intent-boundary-guard.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-03-08",

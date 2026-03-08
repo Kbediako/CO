@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260308-1061-coordinator-symphony-aligned-standalone-review-command-intent-boundary-guard",
+      "title": "Coordinator Symphony-Aligned Standalone Review Command-Intent Boundary Guard",
+      "relates_to": "tasks/tasks-1061-coordinator-symphony-aligned-standalone-review-command-intent-boundary-guard.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-08",
+      "paths": {
+        "spec": "tasks/specs/1061-coordinator-symphony-aligned-standalone-review-command-intent-boundary-guard.md",
+        "task": "tasks/tasks-1061-coordinator-symphony-aligned-standalone-review-command-intent-boundary-guard.md",
+        "agent_task": ".agent/task/1061-coordinator-symphony-aligned-standalone-review-command-intent-boundary-guard.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-standalone-review-command-intent-boundary-guard.md"
+      }
+    },
+    {
       "id": "20260308-1060-coordinator-symphony-aligned-standalone-review-meta-surface-expansion-guard",
       "title": "Coordinator Symphony-Aligned Standalone Review Meta-Surface Expansion Guard",
       "relates_to": "tasks/tasks-1060-coordinator-symphony-aligned-standalone-review-meta-surface-expansion-guard.md",
