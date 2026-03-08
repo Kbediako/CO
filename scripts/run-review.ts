@@ -16,7 +16,6 @@ import { createReadStream, createWriteStream } from 'node:fs';
 import { mkdir, readFile, readdir, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
-import { createInterface } from 'node:readline';
 import { promisify } from 'node:util';
 
 import {
@@ -35,6 +34,14 @@ import {
 } from '../orchestrator/src/cli/doctorIssueLog.js';
 import { parseArgs as parseCliArgs, hasFlag } from './lib/cli-args.js';
 import { pathExists } from './lib/docs-helpers.js';
+import {
+  formatDurationMs,
+  logReviewTelemetrySummary as logReviewExecutionTelemetrySummary,
+  persistReviewTelemetry as persistReviewExecutionTelemetry,
+  ReviewExecutionState,
+  type ReviewOutputSummary,
+  type ReviewStartupLoopState
+} from './lib/review-execution-state.js';
 import { collectManifests, resolveEnvironmentPaths } from './lib/run-manifests.js';
 
 const execFileAsync = promisify(execFile);
@@ -45,7 +52,6 @@ const DEFAULT_LARGE_SCOPE_FILE_THRESHOLD = 25;
 const DEFAULT_LARGE_SCOPE_LINE_THRESHOLD = 1200;
 const REVIEW_COMMAND_CHECK_TIMEOUT_MS = 30_000;
 const REVIEW_ARTIFACTS_DIRNAME = 'review';
-const REVIEW_OUTPUT_PREVIEW_LIMIT = 32_768;
 const BENIGN_STDIO_ERROR_CODES = new Set(['EPIPE', 'ERR_STREAM_DESTROYED']);
 const REVIEW_AUTO_ISSUE_LOG_ENV_KEY = 'CODEX_REVIEW_AUTO_ISSUE_LOG';
 const REVIEW_ENABLE_DELEGATION_MCP_ENV_KEY = 'CODEX_REVIEW_ENABLE_DELEGATION_MCP';
@@ -57,33 +63,6 @@ const REVIEW_ALLOW_HEAVY_COMMANDS_ENV_KEY = 'CODEX_REVIEW_ALLOW_HEAVY_COMMANDS';
 const REVIEW_ENFORCE_BOUNDED_MODE_ENV_KEY = 'CODEX_REVIEW_ENFORCE_BOUNDED_MODE';
 const REVIEW_TELEMETRY_DEBUG_ENV_KEY = 'CODEX_REVIEW_DEBUG_TELEMETRY';
 const REVIEW_DISABLE_DELEGATION_CONFIG_OVERRIDE = 'mcp_servers.delegation.enabled=false';
-const REVIEW_DELEGATION_STARTUP_LINE_RE = /\bmcp:\s*delegation\s+(starting|ready)\b/i;
-const REVIEW_PROGRESS_SIGNAL_LINE_RE = /^(thinking|exec|codex)\b/i;
-const REVIEW_HEAVY_SCRIPT_TARGETS = new Set([
-  'test',
-  'lint',
-  'build',
-  'typecheck',
-  'check',
-  'docs:check',
-  'docs:freshness'
-]);
-const REVIEW_PACKAGE_RUN_SUBCOMMAND_ALIASES = new Set(['run', 'run-script', 'rum', 'urn']);
-const REVIEW_PACKAGE_TEST_SUBCOMMAND_ALIASES = new Set(['test', 't', 'tst']);
-const REVIEW_SHELL_COMMANDS = new Set([
-  'bash',
-  'sh',
-  'zsh',
-  'ksh',
-  'fish',
-  'pwsh',
-  'powershell',
-  'cmd',
-  'cmd.exe'
-]);
-const REVIEW_OUTPUT_SUMMARY_TAIL_LINE_LIMIT = 20;
-const REVIEW_OUTPUT_SUMMARY_HEAVY_COMMAND_LIMIT = 8;
-const REVIEW_OUTPUT_SUMMARY_COMMAND_LIMIT = 64;
 
 interface CliOptions {
   manifest?: string;
@@ -605,15 +584,20 @@ async function main(): Promise<void> {
       outputLogPath: artifactPaths.outputLogPath
     });
   const writeTelemetry = async (
+    state: ReviewExecutionState,
     status: 'succeeded' | 'failed',
     errorMessage?: string | null
   ): Promise<ReviewOutputSummary | null> => {
     try {
-      return await persistReviewTelemetry({
+      return await persistReviewExecutionTelemetry({
+        state,
         telemetryPath: artifactPaths.telemetryPath,
         outputLogPath: artifactPaths.outputLogPath,
+        repoRoot,
         status,
-        error: errorMessage ?? null
+        error: errorMessage ?? null,
+        includeRawTelemetry: envFlagEnabled(process.env[REVIEW_TELEMETRY_DEBUG_ENV_KEY]),
+        telemetryDebugEnvKey: REVIEW_TELEMETRY_DEBUG_ENV_KEY
       });
     } catch (telemetryError) {
       const telemetryMessage = telemetryError instanceof Error ? telemetryError.message : String(telemetryError);
@@ -623,8 +607,8 @@ async function main(): Promise<void> {
   };
 
   try {
-    await runReview(resolvedScoped);
-    const telemetrySummary = await writeTelemetry('succeeded');
+    const execution = await runReview(resolvedScoped);
+    const telemetrySummary = await writeTelemetry(execution.state, 'succeeded');
     console.log(`Review output saved to: ${path.relative(repoRoot, artifactPaths.outputLogPath)}`);
     if (telemetrySummary) {
       console.log(`Review telemetry saved to: ${path.relative(repoRoot, artifactPaths.telemetryPath)}`);
@@ -642,8 +626,8 @@ async function main(): Promise<void> {
       });
       const resolvedUnscoped = resolveReviewCommand(unscopedArgs, runtimeContext);
       try {
-        await runReview(resolvedUnscoped);
-        const telemetrySummary = await writeTelemetry('succeeded');
+        const retryExecution = await runReview(resolvedUnscoped);
+        const telemetrySummary = await writeTelemetry(retryExecution.state, 'succeeded');
         console.log(`Review output saved to: ${path.relative(repoRoot, artifactPaths.outputLogPath)}`);
         if (telemetrySummary) {
           console.log(`Review telemetry saved to: ${path.relative(repoRoot, artifactPaths.telemetryPath)}`);
@@ -662,9 +646,24 @@ async function main(): Promise<void> {
           outputLogPath: artifactPaths.outputLogPath
         });
         const retryMessage = retryError instanceof Error ? retryError.message : String(retryError);
-        const telemetrySummary = await writeTelemetry('failed', retryMessage);
+        const retryState =
+          retryError instanceof CodexReviewError &&
+          'reviewState' in retryError &&
+          retryError.reviewState instanceof ReviewExecutionState
+            ? retryError.reviewState
+            : null;
+        const telemetrySummary = retryState
+          ? await writeTelemetry(retryState, 'failed', retryMessage)
+          : null;
         if (telemetrySummary) {
-          logReviewTelemetrySummary(telemetrySummary, artifactPaths.telemetryPath);
+          logReviewExecutionTelemetrySummary(
+            telemetrySummary,
+            path.relative(repoRoot, artifactPaths.telemetryPath),
+            {
+              debugTelemetry: envFlagEnabled(process.env[REVIEW_TELEMETRY_DEBUG_ENV_KEY]),
+              telemetryDebugEnvKey: REVIEW_TELEMETRY_DEBUG_ENV_KEY
+            }
+          );
         }
         if (retryError instanceof CodexReviewError && retryError.timedOut) {
           console.error(`Review output log (partial): ${path.relative(repoRoot, artifactPaths.outputLogPath)}`);
@@ -680,9 +679,24 @@ async function main(): Promise<void> {
       outputLogPath: artifactPaths.outputLogPath
     });
     const errorMessage = error instanceof Error ? error.message : String(error);
-    const telemetrySummary = await writeTelemetry('failed', errorMessage);
+    const failureState =
+      error instanceof CodexReviewError &&
+      'reviewState' in error &&
+      error.reviewState instanceof ReviewExecutionState
+        ? error.reviewState
+        : null;
+    const telemetrySummary = failureState
+      ? await writeTelemetry(failureState, 'failed', errorMessage)
+      : null;
     if (telemetrySummary) {
-      logReviewTelemetrySummary(telemetrySummary, artifactPaths.telemetryPath);
+      logReviewExecutionTelemetrySummary(
+        telemetrySummary,
+        path.relative(repoRoot, artifactPaths.telemetryPath),
+        {
+          debugTelemetry: envFlagEnabled(process.env[REVIEW_TELEMETRY_DEBUG_ENV_KEY]),
+          telemetryDebugEnvKey: REVIEW_TELEMETRY_DEBUG_ENV_KEY
+        }
+      );
     }
     if (error instanceof CodexReviewError && error.timedOut) {
       console.error(`Review output log (partial): ${path.relative(repoRoot, artifactPaths.outputLogPath)}`);
@@ -1166,582 +1180,12 @@ async function maybeCaptureReviewFailureIssueLog(
   }
 }
 
-interface ReviewOutputSummary {
-  lineCount: number;
-  commandStarts: string[];
-  completionCount: number;
-  startupEvents: number;
-  reviewProgressSignals: number;
-  heavyCommandStarts: string[];
-  lastLines: string[];
-}
-
-interface PersistReviewTelemetryOptions {
-  telemetryPath: string;
-  outputLogPath: string;
-  status: 'succeeded' | 'failed';
-  error?: string | null;
-}
-
-function normalizeReviewCommandLine(line: string): string {
-  const trimmed = line.trim();
-  if (!trimmed) {
-    return '';
-  }
-  const succeededIndex = trimmed.indexOf(' succeeded in ');
-  if (succeededIndex >= 0) {
-    return trimmed.slice(0, succeededIndex).trimEnd();
-  }
-  const exitedIndex = trimmed.indexOf(' exited ');
-  if (exitedIndex >= 0) {
-    return trimmed.slice(0, exitedIndex).trimEnd();
-  }
-  return trimmed;
-}
-
-function splitShellControlSegments(command: string): string[] {
-  if (!command.trim()) {
-    return [];
-  }
-  const segments: string[] = [];
-  let current = '';
-  let quote: '"' | "'" | '`' | null = null;
-  let escaped = false;
-
-  const pushCurrent = () => {
-    const trimmed = current.trim();
-    if (trimmed.length > 0) {
-      segments.push(trimmed);
-    }
-    current = '';
-  };
-
-  for (let index = 0; index < command.length; index += 1) {
-    const char = command[index] ?? '';
-    const next = command[index + 1] ?? '';
-
-    if (escaped) {
-      current += char;
-      escaped = false;
-      continue;
-    }
-
-    if (char === '\\' && quote !== "'") {
-      current += char;
-      escaped = true;
-      continue;
-    }
-
-    if (quote) {
-      if (char === quote) {
-        quote = null;
-      }
-      current += char;
-      continue;
-    }
-
-    if (char === '"' || char === "'" || char === '`') {
-      quote = char;
-      current += char;
-      continue;
-    }
-
-    if (char === ';' || char === '\n') {
-      pushCurrent();
-      continue;
-    }
-
-    if (char === '&') {
-      if (next === '&') {
-        pushCurrent();
-        index += 1;
-        continue;
-      }
-      pushCurrent();
-      continue;
-    }
-
-    if (char === '|') {
-      if (next === '|') {
-        pushCurrent();
-        index += 1;
-        continue;
-      }
-      pushCurrent();
-      continue;
-    }
-
-    current += char;
-  }
-
-  pushCurrent();
-  return segments;
-}
-
-function tokenizeShellSegment(segment: string): string[] {
-  const tokens: string[] = [];
-  let current = '';
-  let quote: '"' | "'" | '`' | null = null;
-  let escaped = false;
-
-  const pushCurrent = () => {
-    if (current.length > 0) {
-      tokens.push(current);
-      current = '';
-    }
-  };
-
-  for (let index = 0; index < segment.length; index += 1) {
-    const char = segment[index] ?? '';
-
-    if (escaped) {
-      current += char;
-      escaped = false;
-      continue;
-    }
-
-    if (char === '\\' && quote !== "'") {
-      escaped = true;
-      continue;
-    }
-
-    if (quote) {
-      if (char === quote) {
-        quote = null;
-        continue;
-      }
-      current += char;
-      continue;
-    }
-
-    if (char === '"' || char === "'" || char === '`') {
-      quote = char;
-      continue;
-    }
-
-    if (/\s/u.test(char)) {
-      pushCurrent();
-      continue;
-    }
-
-    current += char;
-  }
-
-  pushCurrent();
-  return tokens;
-}
-
-function normalizeCommandToken(token: string): string {
-  const normalized = token.trim().replace(/\\/gu, '/');
-  const basename = normalized.split('/').pop() ?? normalized;
-  return basename.replace(/\.(?:exe|cmd|bat|ps1)$/i, '').toLowerCase();
-}
-
-function stripLeadingEnvAssignments(tokens: string[]): string[] {
-  let index = 0;
-  while (index < tokens.length && /^[A-Za-z_][A-Za-z0-9_]*=.*/u.test(tokens[index] ?? '')) {
-    index += 1;
-  }
-  return tokens.slice(index);
-}
-
-function packageOptionConsumesValue(option: string): boolean {
-  if (/^--(?:prefix|workspace|filter|cwd)$/iu.test(option)) {
-    return true;
-  }
-  if (/^-(?:C|w)$/iu.test(option)) {
-    return true;
-  }
-  return false;
-}
-
-function resolvePackageScriptTarget(args: string[]): string | null {
-  let index = 0;
-  while (index < args.length) {
-    const token = args[index] ?? '';
-    const normalized = token.toLowerCase();
-
-    if (normalized === '--') {
-      const fallback = args[index + 1];
-      return fallback ? fallback.toLowerCase() : null;
-    }
-
-    if (REVIEW_PACKAGE_TEST_SUBCOMMAND_ALIASES.has(normalized)) {
-      return 'test';
-    }
-
-    if (REVIEW_PACKAGE_RUN_SUBCOMMAND_ALIASES.has(normalized)) {
-      index += 1;
-      while (index < args.length) {
-        const candidate = args[index] ?? '';
-        const candidateNormalized = candidate.toLowerCase();
-        if (candidateNormalized === '--') {
-          index += 1;
-          continue;
-        }
-        if (candidate.startsWith('-')) {
-          index += packageOptionConsumesValue(candidate) ? 2 : 1;
-          continue;
-        }
-        return candidateNormalized;
-      }
-      return null;
-    }
-
-    if (token.startsWith('-')) {
-      index += packageOptionConsumesValue(token) ? 2 : 1;
-      continue;
-    }
-
-    return normalized;
-  }
-  return null;
-}
-
-function unwrapEnvCommandTokens(tokens: string[]): string[] {
-  if (tokens.length === 0 || normalizeCommandToken(tokens[0] ?? '') !== 'env') {
-    return tokens;
-  }
-
-  let index = 1;
-  while (index < tokens.length) {
-    const token = tokens[index] ?? '';
-    const normalized = token.toLowerCase();
-
-    if (token === '--') {
-      index += 1;
-      break;
-    }
-
-    if (/^[A-Za-z_][A-Za-z0-9_]*=.*/u.test(token)) {
-      index += 1;
-      continue;
-    }
-
-    if (normalized === '-u' || normalized === '--unset') {
-      index += 2;
-      continue;
-    }
-
-    if (normalized.startsWith('--unset=')) {
-      index += 1;
-      continue;
-    }
-
-    if (token.startsWith('-')) {
-      index += 1;
-      continue;
-    }
-
-    break;
-  }
-
-  return tokens.slice(index);
-}
-
-function hasHeavyCommandTokens(tokens: string[]): boolean {
-  if (tokens.length === 0) {
-    return false;
-  }
-  const unwrappedTokens = unwrapEnvCommandTokens(tokens);
-  if (unwrappedTokens.length === 0) {
-    return false;
-  }
-
-  if (unwrappedTokens.length !== tokens.length) {
-    return hasHeavyCommandTokens(unwrappedTokens);
-  }
-
-  const command = normalizeCommandToken(unwrappedTokens[0] ?? '');
-  const args = unwrappedTokens.slice(1);
-
-  if (command === 'npm' || command === 'pnpm' || command === 'yarn' || command === 'bun') {
-    const scriptTarget = resolvePackageScriptTarget(args);
-    return scriptTarget !== null && REVIEW_HEAVY_SCRIPT_TARGETS.has(scriptTarget);
-  }
-
-  if (command === 'pytest') {
-    return true;
-  }
-
-  if (command === 'python' || command === 'python3' || command === 'py') {
-    for (let index = 0; index < args.length - 1; index += 1) {
-      if ((args[index] ?? '').toLowerCase() !== '-m') {
-        continue;
-      }
-      if (normalizeCommandToken(args[index + 1] ?? '') === 'pytest') {
-        return true;
-      }
-    }
-  }
-
-  const firstArg = normalizeCommandToken(args[0] ?? '');
-  if (command === 'go' && firstArg === 'test') {
-    return true;
-  }
-  if (command === 'cargo' && firstArg === 'test') {
-    return true;
-  }
-  if (command === 'mvn' || command === 'mvnw' || command === 'gradle' || command === 'gradlew') {
-    return args.some((arg) => {
-      const normalized = normalizeCommandToken(arg);
-      return normalized === 'test' || normalized.endsWith(':test');
-    });
-  }
-
-  return false;
-}
-
-function isShellCommandFlagWithPayload(flag: string): boolean {
-  const normalized = flag.toLowerCase();
-  if (normalized === '/c' || normalized === '-c') {
-    return true;
-  }
-  return /^-[^-]*c[^-]*$/u.test(normalized);
-}
-
-function extractShellCommandPayload(tokens: string[]): string | null {
-  if (tokens.length < 2) {
-    return null;
-  }
-  const command = normalizeCommandToken(tokens[0] ?? '');
-  if (!REVIEW_SHELL_COMMANDS.has(command)) {
-    return null;
-  }
-  for (let index = 1; index < tokens.length; index += 1) {
-    if (!isShellCommandFlagWithPayload(tokens[index] ?? '')) {
-      continue;
-    }
-    if (command === 'cmd') {
-      const payload = tokens.slice(index + 1).join(' ').trim();
-      return payload.length > 0 ? payload : null;
-    }
-    const payload = tokens[index + 1];
-    return payload ? payload.trim() : null;
-  }
-  return null;
-}
-
-function detectHeavyReviewCommandFromSegment(segment: string, depth = 0): string | null {
-  const tokens = stripLeadingEnvAssignments(tokenizeShellSegment(segment));
-  if (tokens.length === 0) {
-    return null;
-  }
-
-  if (depth < 3) {
-    const payload = extractShellCommandPayload(tokens);
-    if (payload) {
-      const nestedSegments = splitShellControlSegments(payload);
-      for (const nestedSegment of nestedSegments) {
-        const nestedHeavyCommand = detectHeavyReviewCommandFromSegment(nestedSegment, depth + 1);
-        if (nestedHeavyCommand) {
-          return nestedHeavyCommand;
-        }
-      }
-    }
-  }
-
-  return hasHeavyCommandTokens(tokens) ? segment.trim() : null;
-}
-
-function detectHeavyReviewCommand(line: string): string | null {
-  const segments = splitShellControlSegments(line);
-  for (const segment of segments) {
-    const heavyCommand = detectHeavyReviewCommandFromSegment(segment);
-    if (heavyCommand) {
-      return heavyCommand;
-    }
-  }
-  return null;
-}
-
-function isLikelyReviewCommandLine(line: string): boolean {
-  if (!line) {
-    return false;
-  }
-  if (detectHeavyReviewCommand(line)) {
-    return true;
-  }
-  if (/^(?:npm|pnpm|yarn|bun|node|npx|git|bash|sh|zsh|python|pytest|go|cargo|mvn|gradle(?:w)?)\b/i.test(line)) {
-    return true;
-  }
-  if (line.includes(' in ') && /\s-\w+\s+/u.test(line)) {
-    return true;
-  }
-  return false;
-}
-
-async function summarizeReviewOutputLog(outputLogPath: string): Promise<ReviewOutputSummary | null> {
-  if (!(await pathExists(outputLogPath))) {
-    return null;
-  }
-
-  const lineReader = createInterface({
-    input: createReadStream(outputLogPath, { encoding: 'utf8' }),
-    crlfDelay: Infinity
-  });
-
-  const commandStarts: string[] = [];
-  const heavyCommandStarts: string[] = [];
-  const lastLines: string[] = [];
-  let lineCount = 0;
-  let completionCount = 0;
-  let startupEvents = 0;
-  let reviewProgressSignals = 0;
-  let awaitingCommandLine = false;
-
-  for await (const rawLine of lineReader) {
-    lineCount += 1;
-    const line = String(rawLine ?? '').trimEnd();
-    const trimmed = line.trim();
-
-    if (trimmed.length > 0) {
-      lastLines.push(trimmed);
-      if (lastLines.length > REVIEW_OUTPUT_SUMMARY_TAIL_LINE_LIMIT) {
-        lastLines.shift();
-      }
-    }
-
-    if (REVIEW_DELEGATION_STARTUP_LINE_RE.test(trimmed)) {
-      startupEvents += 1;
-    }
-    if (REVIEW_PROGRESS_SIGNAL_LINE_RE.test(trimmed)) {
-      reviewProgressSignals += 1;
-    }
-
-    if (trimmed === 'exec') {
-      awaitingCommandLine = true;
-      continue;
-    }
-
-    if (awaitingCommandLine && trimmed.length > 0) {
-      const commandLine = normalizeReviewCommandLine(trimmed);
-      if (isLikelyReviewCommandLine(commandLine)) {
-        if (commandStarts.length >= REVIEW_OUTPUT_SUMMARY_COMMAND_LIMIT) {
-          commandStarts.shift();
-        }
-        commandStarts.push(commandLine);
-        if (detectHeavyReviewCommand(commandLine)) {
-          if (heavyCommandStarts.length < REVIEW_OUTPUT_SUMMARY_HEAVY_COMMAND_LIMIT) {
-            heavyCommandStarts.push(commandLine);
-          }
-        }
-        awaitingCommandLine = false;
-      } else if (REVIEW_PROGRESS_SIGNAL_LINE_RE.test(trimmed) || /\bsucceeded in\b|\bexited\b/i.test(trimmed)) {
-        awaitingCommandLine = false;
-      }
-    }
-
-    if (/\bsucceeded in\b|\bexited\b/i.test(trimmed)) {
-      completionCount += 1;
-    }
-  }
-
-  return {
-    lineCount,
-    commandStarts,
-    completionCount,
-    startupEvents,
-    reviewProgressSignals,
-    heavyCommandStarts,
-    lastLines
-  };
-}
-
-async function persistReviewTelemetry(options: PersistReviewTelemetryOptions): Promise<ReviewOutputSummary | null> {
-  const summary = await summarizeReviewOutputLog(options.outputLogPath);
-  const includeRawTelemetry = envFlagEnabled(process.env[REVIEW_TELEMETRY_DEBUG_ENV_KEY]);
-  const persistedSummary = sanitizeTelemetrySummaryForPersistence(
-    summary,
-    includeRawTelemetry
-  );
-  const payload = {
-    version: 1,
-    generated_at: new Date().toISOString(),
-    status: options.status,
-    error: sanitizeTelemetryErrorForPersistence(options.error ?? null, includeRawTelemetry),
-    output_log_path: path.relative(repoRoot, options.outputLogPath),
-    summary: persistedSummary
-  };
-  await writeFile(options.telemetryPath, `${JSON.stringify(payload, null, 2)}\n`, 'utf8');
-  return summary;
-}
-
-function sanitizeTelemetrySummaryForPersistence(
-  summary: ReviewOutputSummary | null,
-  includeRawTelemetry: boolean
-): ReviewOutputSummary | null {
-  if (!summary || includeRawTelemetry) {
-    return summary;
-  }
-  return {
-    ...summary,
-    commandStarts: redactTelemetryLines(summary.commandStarts, 'command'),
-    heavyCommandStarts: redactTelemetryLines(summary.heavyCommandStarts, 'heavy-command'),
-    lastLines: redactTelemetryLines(summary.lastLines, 'output-line')
-  };
-}
-
-function redactTelemetryLines(lines: string[], label: string): string[] {
-  return lines.map(
-    (_line, index) =>
-      `[redacted ${label} ${index + 1}; set ${REVIEW_TELEMETRY_DEBUG_ENV_KEY}=1 to persist raw values]`
-  );
-}
-
-function sanitizeTelemetryErrorForPersistence(error: string | null, includeRawTelemetry: boolean): string | null {
-  if (!error || includeRawTelemetry) {
-    return error;
-  }
-  return `[redacted error; set ${REVIEW_TELEMETRY_DEBUG_ENV_KEY}=1 to persist raw values]`;
-}
-
-function logReviewTelemetrySummary(summary: ReviewOutputSummary, telemetryPath: string): void {
-  const debugTelemetry = envFlagEnabled(process.env[REVIEW_TELEMETRY_DEBUG_ENV_KEY]);
-  console.error(
-    `[run-review] review telemetry: ${summary.commandStarts.length} command start(s), ${summary.heavyCommandStarts.length} heavy command start(s), ${summary.startupEvents} delegation startup event(s), ${summary.reviewProgressSignals} review progress signal(s).`
-  );
-  const lastCommand = summary.commandStarts.at(-1);
-  if (lastCommand) {
-    if (debugTelemetry) {
-      console.error(`[run-review] last command started: ${lastCommand}`);
-    } else {
-      console.error(
-        `[run-review] last command started: [redacted] (set ${REVIEW_TELEMETRY_DEBUG_ENV_KEY}=1 to print raw command text).`
-      );
-    }
-  }
-  if (summary.completionCount < summary.commandStarts.length) {
-    console.error(
-      `[run-review] command completions observed: ${summary.completionCount}; possible in-flight command at termination.`
-    );
-  }
-  if (summary.heavyCommandStarts.length > 0) {
-    if (debugTelemetry) {
-      console.error(`[run-review] heavy commands detected: ${summary.heavyCommandStarts.join(' | ')}`);
-    } else {
-      console.error(
-        `[run-review] heavy commands detected: ${summary.heavyCommandStarts.length} sample(s) captured (set ${REVIEW_TELEMETRY_DEBUG_ENV_KEY}=1 to print raw command text).`
-      );
-    }
-  }
-  if (summary.lastLines.length > 0) {
-    if (debugTelemetry) {
-      console.error(`[run-review] output tail: ${summary.lastLines.join(' || ')}`);
-    } else {
-      console.error(
-        `[run-review] output tail captured: ${summary.lastLines.length} line(s) hidden by default (set ${REVIEW_TELEMETRY_DEBUG_ENV_KEY}=1 to print raw tail).`
-      );
-    }
-  }
-  console.error(`[run-review] review telemetry saved to: ${path.relative(repoRoot, telemetryPath)}`);
-}
-
 class CodexReviewError extends Error {
   exitCode: number | null;
   signal: NodeJS.Signals | null;
   timedOut: boolean;
   outputPreview: string;
+  reviewState: ReviewExecutionState | null;
 
   constructor(
     message: string,
@@ -1750,6 +1194,7 @@ class CodexReviewError extends Error {
       signal: NodeJS.Signals | null;
       timedOut: boolean;
       outputPreview: string;
+      reviewState?: ReviewExecutionState | null;
     }
   ) {
     super(message);
@@ -1758,6 +1203,7 @@ class CodexReviewError extends Error {
     this.signal = options.signal;
     this.timedOut = options.timedOut;
     this.outputPreview = options.outputPreview;
+    this.reviewState = options.reviewState ?? null;
   }
 }
 
@@ -1793,100 +1239,6 @@ interface RunCodexReviewOptions {
   startupLoopMinEvents: number;
   monitorIntervalMs: number | null;
   outputLogPath: string;
-}
-
-interface ReviewStartupLoopState {
-  startupEvents: number;
-  reviewProgressObserved: boolean;
-  pendingStdoutFragment: string;
-  pendingStderrFragment: string;
-}
-
-interface ReviewCommandSignalState {
-  awaitingCommandLine: boolean;
-  pendingStdoutFragment: string;
-  pendingStderrFragment: string;
-  blockedHeavyCommand: string | null;
-}
-
-function trackReviewStartupLoopSignals(
-  chunk: string,
-  state: ReviewStartupLoopState,
-  stream: 'stdout' | 'stderr'
-): void {
-  if (state.reviewProgressObserved) {
-    return;
-  }
-
-  const pendingFragment = stream === 'stdout'
-    ? state.pendingStdoutFragment
-    : state.pendingStderrFragment;
-  const combined = `${pendingFragment}${chunk}`;
-  const lines = combined.split(/\r?\n/u);
-  const nextPendingFragment = lines.pop() ?? '';
-  if (stream === 'stdout') {
-    state.pendingStdoutFragment = nextPendingFragment;
-  } else {
-    state.pendingStderrFragment = nextPendingFragment;
-  }
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (!trimmed) {
-      continue;
-    }
-    if (REVIEW_DELEGATION_STARTUP_LINE_RE.test(trimmed)) {
-      state.startupEvents += 1;
-      continue;
-    }
-    if (REVIEW_PROGRESS_SIGNAL_LINE_RE.test(trimmed)) {
-      state.reviewProgressObserved = true;
-      return;
-    }
-  }
-}
-
-function trackReviewCommandSignals(
-  chunk: string,
-  state: ReviewCommandSignalState,
-  stream: 'stdout' | 'stderr',
-  blockHeavyCommands: boolean
-): void {
-  const pendingFragment = stream === 'stdout'
-    ? state.pendingStdoutFragment
-    : state.pendingStderrFragment;
-  const combined = `${pendingFragment}${chunk}`;
-  const lines = combined.split(/\r?\n/u);
-  const nextPendingFragment = lines.pop() ?? '';
-  if (stream === 'stdout') {
-    state.pendingStdoutFragment = nextPendingFragment;
-  } else {
-    state.pendingStderrFragment = nextPendingFragment;
-  }
-
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (!trimmed) {
-      continue;
-    }
-    if (trimmed === 'exec') {
-      state.awaitingCommandLine = true;
-      continue;
-    }
-    if (!state.awaitingCommandLine) {
-      continue;
-    }
-    const commandLine = normalizeReviewCommandLine(trimmed);
-    if (!isLikelyReviewCommandLine(commandLine)) {
-      if (REVIEW_PROGRESS_SIGNAL_LINE_RE.test(trimmed) || /\bsucceeded in\b|\bexited\b/i.test(trimmed)) {
-        state.awaitingCommandLine = false;
-      }
-      continue;
-    }
-    state.awaitingCommandLine = false;
-    if (blockHeavyCommands && detectHeavyReviewCommand(commandLine) && !state.blockedHeavyCommand) {
-      state.blockedHeavyCommand = commandLine;
-    }
-  }
 }
 
 function installSignalForwarders(child: ChildProcess, detached: boolean): () => void {
@@ -1942,7 +1294,9 @@ function writeToStreamSafely(target: NodeJS.WriteStream, chunk: Buffer): void {
   }
 }
 
-async function runCodexReview(options: RunCodexReviewOptions): Promise<{ preview: string }> {
+async function runCodexReview(
+  options: RunCodexReviewOptions
+): Promise<{ preview: string; state: ReviewExecutionState }> {
   const detached = process.platform !== 'win32';
   const child: ChildProcess = spawn(options.command, options.args, {
     stdio: options.stdio,
@@ -1957,33 +1311,16 @@ async function runCodexReview(options: RunCodexReviewOptions): Promise<{ preview
     outputStream.once('error', () => resolve());
   });
   const uninstallSignalForwarders = installSignalForwarders(child, detached);
-  let preview = '';
-  let lastOutputAtMs = Date.now();
-  const startupLoopState: ReviewStartupLoopState = {
-    startupEvents: 0,
-    reviewProgressObserved: false,
-    pendingStdoutFragment: '',
-    pendingStderrFragment: ''
-  };
-  const commandSignalState: ReviewCommandSignalState = {
-    awaitingCommandLine: false,
-    pendingStdoutFragment: '',
-    pendingStderrFragment: '',
-    blockedHeavyCommand: null
-  };
+  const executionState = new ReviewExecutionState({
+    blockHeavyCommands: options.blockHeavyCommands
+  });
 
   const capture = (chunk: Buffer, target: NodeJS.WriteStream, stream: 'stdout' | 'stderr') => {
-    lastOutputAtMs = Date.now();
     if (!outputStream.writableEnded && !outputStream.destroyed) {
       outputStream.write(chunk);
     }
     writeToStreamSafely(target, chunk);
-    const next = chunk.toString('utf8');
-    trackReviewStartupLoopSignals(next, startupLoopState, stream);
-    trackReviewCommandSignals(next, commandSignalState, stream, options.blockHeavyCommands);
-    if (preview.length < REVIEW_OUTPUT_PREVIEW_LIMIT) {
-      preview = `${preview}${next}`.slice(0, REVIEW_OUTPUT_PREVIEW_LIMIT);
-    }
+    executionState.observeChunk(chunk, stream);
   };
 
   const onStdout = (chunk: Buffer) => capture(chunk, process.stdout, 'stdout');
@@ -2015,21 +1352,42 @@ async function runCodexReview(options: RunCodexReviewOptions): Promise<{ preview
       startupLoopMinEvents: options.startupLoopMinEvents,
       monitorIntervalMs: options.monitorIntervalMs,
       blockHeavyCommands: options.blockHeavyCommands,
-      getLastOutputAtMs: () => lastOutputAtMs,
-      getStartupLoopState: () => startupLoopState,
-      getBlockedHeavyCommand: () => commandSignalState.blockedHeavyCommand,
+      getLastOutputAtMs: () => executionState.getLastOutputAtMs(),
+      getStartupLoopState: () => executionState.getStartupLoopState(),
+      getBlockedHeavyCommand: () => executionState.getBlockedHeavyCommand(),
+      formatCheckpoint: () => executionState.formatCheckpoint(),
       detached,
       onCleanup: cleanup
     });
     await outputClosed;
-    return { preview };
+    return { preview: executionState.getPreview(), state: executionState };
   } catch (error) {
     cleanup();
     await outputClosed;
     if (error instanceof CodexReviewError) {
-      error.outputPreview = preview || error.outputPreview;
+      error.outputPreview = executionState.getPreview() || error.outputPreview;
+      error.reviewState = executionState;
+      throw error;
     }
-    throw error;
+    const wrappedError = new CodexReviewError(
+      error instanceof Error ? error.message : String(error),
+      {
+        exitCode: null,
+        signal: null,
+        timedOut: false,
+        outputPreview: executionState.getPreview(),
+        reviewState: executionState
+      }
+    );
+    if (error instanceof Error && 'cause' in Error.prototype) {
+      Object.defineProperty(wrappedError, 'cause', {
+        value: error,
+        configurable: true,
+        enumerable: false,
+        writable: true
+      });
+    }
+    throw wrappedError;
   }
 }
 
@@ -2180,28 +1538,6 @@ function resolveReviewMonitorIntervalMs(): number | null {
   return Math.round(parsedSeconds * 1000);
 }
 
-function formatDurationMs(durationMs: number): string {
-  const roundedMs = Math.max(0, Math.round(durationMs));
-  if (roundedMs < 1000) {
-    return `${roundedMs}ms`;
-  }
-
-  const totalSeconds = Math.max(0, Math.floor(durationMs / 1000));
-  if (totalSeconds < 60) {
-    return `${totalSeconds}s`;
-  }
-
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  if (minutes < 60) {
-    return `${minutes}m ${seconds}s`;
-  }
-
-  const hours = Math.floor(minutes / 60);
-  const remainingMinutes = minutes % 60;
-  return `${hours}h ${remainingMinutes}m ${seconds}s`;
-}
-
 interface WaitForChildExitOptions {
   timeoutMs: number | null;
   stallTimeoutMs: number | null;
@@ -2212,6 +1548,7 @@ interface WaitForChildExitOptions {
   getLastOutputAtMs: () => number;
   getStartupLoopState: () => ReviewStartupLoopState;
   getBlockedHeavyCommand: () => string | null;
+  formatCheckpoint: () => string;
   detached: boolean;
   onCleanup?: () => void;
 }
@@ -2391,17 +1728,7 @@ async function waitForChildExit(
     if (monitorIntervalMs !== null) {
       const checkpointIntervalMs = Math.max(1000, monitorIntervalMs);
       monitorHandle = setInterval(() => {
-        const elapsedMs = Date.now() - startMs;
-        const idleMs = Date.now() - options.getLastOutputAtMs();
-        const state = options.getStartupLoopState();
-        const startupStatus = state.reviewProgressObserved
-          ? 'review progress observed'
-          : `${state.startupEvents} delegation startup events, no review progress yet`;
-        console.log(
-          `[run-review] waiting on codex review (${formatDurationMs(
-            elapsedMs
-          )} elapsed, ${formatDurationMs(idleMs)} idle; ${startupStatus}).`
-        );
+        console.log(options.formatCheckpoint());
       }, checkpointIntervalMs);
       monitorHandle.unref();
     }

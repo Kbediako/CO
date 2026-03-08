@@ -80,6 +80,9 @@ if [[ -n "\${RUN_REVIEW_ARGS_LOG:-}" ]]; then
   } > "\${RUN_REVIEW_ARGS_LOG}"
 fi
 if [[ "\${1:-}" == "--help" ]]; then
+  if [[ "\${RUN_REVIEW_MODE:-ok}" == "delete-after-help" ]]; then
+    rm -f "$0"
+  fi
   echo "OpenAI Codex CLI"
   echo "  review   Review changes"
   exit 0
@@ -518,6 +521,32 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(telemetry.summary.heavyCommandStarts.length).toBeGreaterThan(0);
     expect(telemetry.summary.heavyCommandStarts[0]).toContain('[redacted heavy-command');
   }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('persists telemetry when review launch fails after the command probe', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'delete-after-help'
+    });
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).toContain('ENOENT');
+    expect(result.stderr).toContain('[run-review] review telemetry:');
+
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      error: string | null;
+      summary: { commandStarts: string[]; heavyCommandStarts: string[]; reviewProgressSignals: number };
+    };
+    expect(telemetry.status).toBe('failed');
+    expect(telemetry.error).toContain('[redacted error');
+    expect(telemetry.summary.commandStarts).toEqual([]);
+    expect(telemetry.summary.heavyCommandStarts).toEqual([]);
+    expect(telemetry.summary.reviewProgressSignals).toBe(0);
+  });
 
   it('prints raw telemetry command/tail details only when debug telemetry env is enabled', async () => {
     const sandbox = await makeSandbox();

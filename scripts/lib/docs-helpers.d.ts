@@ -9,6 +9,8 @@ export function normalizeTaskKey(
     | {
         id?: string;
         slug?: string;
+        path?: string;
+        relates_to?: string;
       }
     | null
     | undefined
