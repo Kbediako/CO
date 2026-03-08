@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260308-1055-coordinator-symphony-aligned-control-action-finalization-extraction",
+      "title": "Coordinator Symphony-Aligned Control Action Finalization Extraction",
+      "relates_to": "tasks/tasks-1055-coordinator-symphony-aligned-control-action-finalization-extraction.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-08",
+      "paths": {
+        "spec": "tasks/specs/1055-coordinator-symphony-aligned-control-action-finalization-extraction.md",
+        "task": "tasks/tasks-1055-coordinator-symphony-aligned-control-action-finalization-extraction.md",
+        "agent_task": ".agent/task/1055-coordinator-symphony-aligned-control-action-finalization-extraction.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-control-action-finalization-extraction.md"
+      }
+    },
+    {
       "id": "20260308-1054-coordinator-symphony-aligned-control-action-execution-extraction",
       "title": "Coordinator Symphony-Aligned Control Action Execution Extraction",
       "relates_to": "tasks/tasks-1054-coordinator-symphony-aligned-control-action-execution-extraction.md",
