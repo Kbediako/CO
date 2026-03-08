@@ -47,16 +47,12 @@ import { handleConfirmationIssueConsumeRequest } from './confirmationIssueConsum
 import { handleConfirmationValidateRequest } from './confirmationValidateController.js';
 import {
   normalizeControlActionRequest,
-  validateTransportMutationPreflight,
   type TransportMutationRequest
 } from './controlActionPreflight.js';
-import { executeControlAction, resolveControlActionReplay } from './controlActionExecution.js';
 import {
-  buildExecutionControlActionFinalizationPlan,
-  buildReplayControlActionFinalizationPlan,
   type ControlActionFinalizationPlan
 } from './controlActionFinalization.js';
-import { resolveCancelConfirmation } from './controlActionCancelConfirmation.js';
+import { resolveControlActionControllerSequencing } from './controlActionControllerSequencing.js';
 import {
   handleLinearWebhookRequest,
   normalizeLinearAdvisoryState,
@@ -595,7 +591,7 @@ async function handleRequest(context: RequestContext): Promise<void> {
 
   if (url.pathname === '/control/action' && req.method === 'POST') {
     const body = await readJsonBody(req);
-    let snapshot = context.controlStore.snapshot();
+    const snapshot = context.controlStore.snapshot();
     const taskId = resolveTaskIdFromManifestPath(context.paths.manifestPath);
     const normalized = normalizeControlActionRequest({
       body,
@@ -608,214 +604,92 @@ async function handleRequest(context: RequestContext): Promise<void> {
       writeControlError(res, normalized.status, normalized.error, normalized.traceability);
       return;
     }
-    const {
-      action,
-      requestId,
-      intentId: initialIntentId,
-      requestedBy,
-      reason,
-      confirmNonce,
-      deferTransportResolutionToConfirmation
-    } = normalized.value;
-    let resolvedRequestId = requestId;
-    let intentId = initialIntentId;
-    let transportMutation: TransportMutationRequest | null = normalized.value.transportMutation;
-    let isTransportMutation = Boolean(transportMutation);
-    let transportIdempotencyWindowMs: number | null = null;
+    const { action, requestedBy, reason } = normalized.value;
+    const tool = readStringValue(body, 'tool') ?? 'delegate.cancel';
+    const params = readRecordValue(body, 'params') ?? {};
 
-    const validateTransportMutationRequest = (): boolean => {
-      const validation = validateTransportMutationPreflight({
-        action,
-        requestId: resolvedRequestId,
-        intentId,
-        taskId,
-        snapshot,
-        manifestPath: context.paths.manifestPath,
-        transportMutation,
-        isTransportNonceConsumed: (nonce) => context.controlStore.isTransportNonceConsumed(nonce)
-      });
-      if (!validation.ok) {
-        writeControlError(res, validation.status, validation.error, validation.traceability);
-        return false;
-      }
-      transportIdempotencyWindowMs = validation.idempotencyWindowMs;
-      return true;
-    };
-
-    if (!validateTransportMutationRequest()) {
-      return;
-    }
-
-    const persistControlWithTransportNonce = async (): Promise<void> => {
-      if (!transportMutation) {
+    const persistControlWithTransportNonce = async (input: {
+      requestId: string | null;
+      intentId: string | null;
+      transportMutation: TransportMutationRequest | null;
+    }): Promise<void> => {
+      if (!input.transportMutation) {
         await context.persist.control();
         return;
       }
       context.controlStore.consumeTransportNonce({
-        nonce: transportMutation.nonce,
+        nonce: input.transportMutation.nonce,
         action,
-        transport: transportMutation.transport,
-        requestId: resolvedRequestId ?? null,
-        intentId,
-        expiresAt: transportMutation.nonceExpiresAt
+        transport: input.transportMutation.transport,
+        requestId: input.requestId ?? null,
+        intentId: input.intentId,
+        expiresAt: input.transportMutation.nonceExpiresAt
       });
       try {
         await context.persist.control();
       } catch (error) {
-        context.controlStore.rollbackTransportNonce(transportMutation.nonce);
+        context.controlStore.rollbackTransportNonce(input.transportMutation.nonce);
         throw error;
       }
     };
 
-    const applyFinalizationPlan = async (
-      plan: ControlActionFinalizationPlan
-    ): Promise<void> => {
-      snapshot = plan.snapshot;
-      if (plan.persistRequired) {
-        await persistControlWithTransportNonce();
+    const applyFinalizationPlan = async (input: {
+      requestId: string | null;
+      intentId: string | null;
+      transportMutation: TransportMutationRequest | null;
+      plan: ControlActionFinalizationPlan;
+    }): Promise<void> => {
+      if (input.plan.persistRequired) {
+        await persistControlWithTransportNonce({
+          requestId: input.requestId,
+          intentId: input.intentId,
+          transportMutation: input.transportMutation
+        });
       }
-      if (plan.publishRequired) {
+      if (input.plan.publishRequired) {
         context.runtime.publish({ source: 'control.action' });
       }
       await emitControlActionAuditEvent(context, {
-        outcome: plan.response.outcome,
+        outcome: input.plan.response.outcome,
         action,
         requestedBy,
         reason: reason ?? null,
-        requestId: plan.response.requestId,
-        intentId: plan.response.intentId,
-        snapshot: plan.snapshot,
-        traceability: plan.response.traceability
+        requestId: input.plan.response.requestId,
+        intentId: input.plan.response.intentId,
+        snapshot: input.plan.snapshot,
+        traceability: input.plan.response.traceability
       });
-      res.writeHead(plan.response.status, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify(plan.response.body));
+      res.writeHead(input.plan.response.status, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(input.plan.response.body));
     };
 
-    const finalizeReplay = async (input: {
-      snapshot: ControlState;
-      requestId: string | null;
-      intentId: string | null;
-      traceability: Record<string, unknown> | null;
-      persistRequired: boolean;
-    }): Promise<void> => {
-      await applyFinalizationPlan(
-        buildReplayControlActionFinalizationPlan({
-          snapshot: input.snapshot,
-          requestId: input.requestId,
-          intentId: input.intentId,
-          traceability: input.traceability,
-          persistRequired: input.persistRequired
-        })
-      );
-    };
-
-    const replayIfIdempotent = async (): Promise<boolean> => {
-      // Nonce checks can prune expired transport replay entries; read a fresh snapshot before replay lookup.
-      const replaySnapshot = context.controlStore.snapshot();
-      const replay = resolveControlActionReplay({
-        snapshot: replaySnapshot,
-        action,
-        requestId: resolvedRequestId,
-        intentId,
-        taskId,
-        manifestPath: context.paths.manifestPath,
-        transportMutation,
-        isTransportMutation
-      });
-      if (!replay.matched) {
-        return false;
-      }
-      await finalizeReplay({
-        snapshot: replaySnapshot,
-        requestId: replay.requestId,
-        intentId: replay.intentId,
-        traceability: replay.traceability,
-        persistRequired: true
-      });
-      return true;
-    };
-
-    const finalizeExecution = async (): Promise<void> => {
-      const execution = executeControlAction({
-        action,
-        requestedBy,
-        requestId: resolvedRequestId,
-        intentId,
-        reason: reason ?? null,
-        taskId,
-        manifestPath: context.paths.manifestPath,
-        transportMutation,
-        isTransportMutation,
-        transportIdempotencyWindowMs,
-        readSnapshot: () => context.controlStore.snapshot(),
-        updateAction: (updateInput) => context.controlStore.updateAction(updateInput)
-      });
-      await applyFinalizationPlan(
-        buildExecutionControlActionFinalizationPlan({
-          action,
-          execution,
-          requestId: resolvedRequestId,
-          intentId,
-          taskId,
-          manifestPath: context.paths.manifestPath,
-          transportMutation
-        })
-      );
-    };
-
-    if (action !== 'cancel') {
-      await finalizeExecution();
+    const sequencing = await resolveControlActionControllerSequencing({
+      body,
+      tool,
+      params,
+      snapshot,
+      taskId,
+      manifestPath: context.paths.manifestPath,
+      normalized: normalized.value,
+      isTransportNonceConsumed: (nonce) => context.controlStore.isTransportNonceConsumed(nonce),
+      validateConfirmation: (validationInput) =>
+        context.confirmationStore.validateNonce(validationInput),
+      persistConfirmations: () => context.persist.confirmations(),
+      emitConfirmationResolved: (payload) =>
+        emitControlEvent(context, {
+          event: 'confirmation_resolved',
+          actor: 'runner',
+          payload
+        }),
+      readSnapshot: () => context.controlStore.snapshot(),
+      updateAction: (updateInput) => context.controlStore.updateAction(updateInput)
+    });
+    if (sequencing.kind === 'error') {
+      writeControlError(res, sequencing.status, sequencing.error, sequencing.traceability);
       return;
     }
-
-    if (action === 'cancel') {
-      if (!deferTransportResolutionToConfirmation && (await replayIfIdempotent())) {
-        return;
-      }
-      if (!confirmNonce) {
-        writeControlError(res, 409, 'confirmation_required');
-        return;
-      }
-      const tool = readStringValue(body, 'tool') ?? 'delegate.cancel';
-      const params = readRecordValue(body, 'params') ?? {};
-      const cancelResolution = await resolveCancelConfirmation({
-        body,
-        tool,
-        params,
-        confirmNonce,
-        currentIntentId: intentId,
-        snapshot,
-        taskId,
-        manifestPath: context.paths.manifestPath,
-        validateNonce: (validationInput) =>
-          context.confirmationStore.validateNonce(validationInput),
-        persistConfirmations: () => context.persist.confirmations(),
-        emitConfirmationResolved: (payload) =>
-          emitControlEvent(context, {
-            event: 'confirmation_resolved',
-            actor: 'runner',
-            payload
-          })
-        });
-      if (!cancelResolution.ok) {
-        writeControlError(
-          res,
-          cancelResolution.status,
-          cancelResolution.error,
-          cancelResolution.traceability
-        );
-        return;
-      }
-      resolvedRequestId = cancelResolution.requestId;
-      intentId = cancelResolution.intentId;
-      transportMutation = cancelResolution.transportMutation;
-      isTransportMutation = Boolean(transportMutation);
-      if (!validateTransportMutationRequest()) {
-        return;
-      }
-      await finalizeExecution();
-      return;
-    }
+    await applyFinalizationPlan(sequencing);
+    return;
   }
 
   if (
