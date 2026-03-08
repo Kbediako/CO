@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260308-1073-coordinator-symphony-aligned-question-child-resolution-adapter-extraction",
+      "title": "Coordinator Symphony-Aligned Question Child-Resolution Adapter Extraction",
+      "relates_to": "tasks/tasks-1073-coordinator-symphony-aligned-question-child-resolution-adapter-extraction.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-08",
+      "paths": {
+        "spec": "tasks/specs/1073-coordinator-symphony-aligned-question-child-resolution-adapter-extraction.md",
+        "task": "tasks/tasks-1073-coordinator-symphony-aligned-question-child-resolution-adapter-extraction.md",
+        "agent_task": ".agent/task/1073-coordinator-symphony-aligned-question-child-resolution-adapter-extraction.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-question-child-resolution-adapter-extraction.md"
+      }
+    },
+    {
       "id": "20260308-1072-coordinator-symphony-aligned-control-request-context-assembly-extraction",
       "title": "Coordinator Symphony-Aligned Control Request Context Assembly Extraction",
       "relates_to": "tasks/tasks-1072-coordinator-symphony-aligned-control-request-context-assembly-extraction.md",
