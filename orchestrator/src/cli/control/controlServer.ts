@@ -45,14 +45,7 @@ import { handleConfirmationCreateRequest } from './confirmationCreateController.
 import { handleConfirmationApproveRequest } from './confirmationApproveController.js';
 import { handleConfirmationIssueConsumeRequest } from './confirmationIssueConsumeController.js';
 import { handleConfirmationValidateRequest } from './confirmationValidateController.js';
-import {
-  normalizeControlActionRequest,
-  type TransportMutationRequest
-} from './controlActionPreflight.js';
-import {
-  type ControlActionFinalizationPlan
-} from './controlActionFinalization.js';
-import { resolveControlActionControllerSequencing } from './controlActionControllerSequencing.js';
+import { handleControlActionRequest } from './controlActionController.js';
 import {
   handleLinearWebhookRequest,
   normalizeLinearAdvisoryState,
@@ -590,87 +583,12 @@ async function handleRequest(context: RequestContext): Promise<void> {
   }
 
   if (url.pathname === '/control/action' && req.method === 'POST') {
-    const body = await readJsonBody(req);
-    const snapshot = context.controlStore.snapshot();
-    const taskId = resolveTaskIdFromManifestPath(context.paths.manifestPath);
-    const normalized = normalizeControlActionRequest({
-      body,
+    await handleControlActionRequest({
       authKind: auth.kind,
-      snapshot,
-      taskId,
-      manifestPath: context.paths.manifestPath
-    });
-    if (!normalized.ok) {
-      writeControlError(res, normalized.status, normalized.error, normalized.traceability);
-      return;
-    }
-    const { action, requestedBy, reason } = normalized.value;
-    const tool = readStringValue(body, 'tool') ?? 'delegate.cancel';
-    const params = readRecordValue(body, 'params') ?? {};
-
-    const persistControlWithTransportNonce = async (input: {
-      requestId: string | null;
-      intentId: string | null;
-      transportMutation: TransportMutationRequest | null;
-    }): Promise<void> => {
-      if (!input.transportMutation) {
-        await context.persist.control();
-        return;
-      }
-      context.controlStore.consumeTransportNonce({
-        nonce: input.transportMutation.nonce,
-        action,
-        transport: input.transportMutation.transport,
-        requestId: input.requestId ?? null,
-        intentId: input.intentId,
-        expiresAt: input.transportMutation.nonceExpiresAt
-      });
-      try {
-        await context.persist.control();
-      } catch (error) {
-        context.controlStore.rollbackTransportNonce(input.transportMutation.nonce);
-        throw error;
-      }
-    };
-
-    const applyFinalizationPlan = async (input: {
-      requestId: string | null;
-      intentId: string | null;
-      transportMutation: TransportMutationRequest | null;
-      plan: ControlActionFinalizationPlan;
-    }): Promise<void> => {
-      if (input.plan.persistRequired) {
-        await persistControlWithTransportNonce({
-          requestId: input.requestId,
-          intentId: input.intentId,
-          transportMutation: input.transportMutation
-        });
-      }
-      if (input.plan.publishRequired) {
-        context.runtime.publish({ source: 'control.action' });
-      }
-      await emitControlActionAuditEvent(context, {
-        outcome: input.plan.response.outcome,
-        action,
-        requestedBy,
-        reason: reason ?? null,
-        requestId: input.plan.response.requestId,
-        intentId: input.plan.response.intentId,
-        snapshot: input.plan.snapshot,
-        traceability: input.plan.response.traceability
-      });
-      res.writeHead(input.plan.response.status, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify(input.plan.response.body));
-    };
-
-    const sequencing = await resolveControlActionControllerSequencing({
-      body,
-      tool,
-      params,
-      snapshot,
-      taskId,
+      taskId: resolveTaskIdFromManifestPath(context.paths.manifestPath),
       manifestPath: context.paths.manifestPath,
-      normalized: normalized.value,
+      readRequestBody: () => readJsonBody(req),
+      readInitialSnapshot: () => context.controlStore.snapshot(),
       isTransportNonceConsumed: (nonce) => context.controlStore.isTransportNonceConsumed(nonce),
       validateConfirmation: (validationInput) =>
         context.confirmationStore.validateNonce(validationInput),
@@ -682,13 +600,36 @@ async function handleRequest(context: RequestContext): Promise<void> {
           payload
         }),
       readSnapshot: () => context.controlStore.snapshot(),
-      updateAction: (updateInput) => context.controlStore.updateAction(updateInput)
+      updateAction: (updateInput) => context.controlStore.updateAction(updateInput),
+      persistControlAction: async (input) => {
+        if (!input.transportMutation) {
+          await context.persist.control();
+          return;
+        }
+        context.controlStore.consumeTransportNonce({
+          nonce: input.transportMutation.nonce,
+          action: input.action,
+          transport: input.transportMutation.transport,
+          requestId: input.requestId ?? null,
+          intentId: input.intentId,
+          expiresAt: input.transportMutation.nonceExpiresAt
+        });
+        try {
+          await context.persist.control();
+        } catch (error) {
+          context.controlStore.rollbackTransportNonce(input.transportMutation.nonce);
+          throw error;
+        }
+      },
+      publishRuntime: (source) => context.runtime.publish({ source }),
+      emitControlActionAuditEvent: (input) => emitControlActionAuditEvent(context, input),
+      writeControlError: (status, error, traceability) =>
+        writeControlError(res, status, error, traceability),
+      writeControlResponse: (response) => {
+        res.writeHead(response.status, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(response.body));
+      }
     });
-    if (sequencing.kind === 'error') {
-      writeControlError(res, sequencing.status, sequencing.error, sequencing.traceability);
-      return;
-    }
-    await applyFinalizationPlan(sequencing);
     return;
   }
 
@@ -1292,24 +1233,6 @@ function buildTelegramOversightDispatchPayload(
       }
     }
   };
-}
-
-function readStringValue(record: Record<string, unknown>, ...keys: string[]): string | undefined {
-  for (const key of keys) {
-    const value = record[key];
-    if (typeof value === 'string' && value.trim().length > 0) {
-      return value.trim();
-    }
-  }
-  return undefined;
-}
-
-function readRecordValue(record: Record<string, unknown>, key: string): Record<string, unknown> | undefined {
-  const value = record[key];
-  if (value && typeof value === 'object' && !Array.isArray(value)) {
-    return value as Record<string, unknown>;
-  }
-  return undefined;
 }
 
 function readDelegationHeaders(req: http.IncomingMessage): { token: string; childRunId: string } | null {

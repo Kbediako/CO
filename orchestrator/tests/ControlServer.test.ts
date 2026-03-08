@@ -3297,6 +3297,45 @@ describe('ControlServer', () => {
     }
   });
 
+  it('preserves invalid_action envelopes on /control/action after controller extraction', async () => {
+    const { root, env, paths } = await createRunRoot('task-0940');
+    const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
+
+    const server = await ControlServer.start({
+      paths,
+      config,
+      runId: 'run-1'
+    });
+
+    try {
+      const baseUrl = server.getBaseUrl() ?? '';
+      const sessionRes = await fetch(new URL('/auth/session', baseUrl), {
+        method: 'POST',
+        headers: { Origin: baseUrl }
+      });
+      const sessionPayload = (await sessionRes.json()) as { token?: string };
+      const sessionToken = sessionPayload.token ?? '';
+
+      const res = await fetch(new URL('/control/action', baseUrl), {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${sessionToken}`,
+          'x-csrf-token': sessionToken,
+          'Content-Type': 'application/json',
+          Origin: baseUrl
+        },
+        body: JSON.stringify({ action: 'explode' })
+      });
+
+      expect(res.status).toBe(400);
+      const payload = (await res.json()) as { error?: string };
+      expect(payload.error).toBe('invalid_action');
+    } finally {
+      await server.close();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   it('rejects coordinator metadata on session control actions', async () => {
     const { root, env, paths } = await createRunRoot('task-0940');
     const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
