@@ -1,7 +1,7 @@
 import http from 'node:http';
 import { randomBytes } from 'node:crypto';
 import { existsSync } from 'node:fs';
-import { chmod, readFile } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -20,10 +20,8 @@ import { QuestionQueue, type QuestionRecord } from './questions.js';
 import { DelegationTokenStore, type DelegationTokenRecord } from './delegationTokens.js';
 import { type DispatchPilotEvaluation } from './trackerDispatchPilot.js';
 import {
-  startTelegramOversightBridge,
   type ControlDispatchPayload,
   type QuestionsPayload,
-  type TelegramOversightBridge,
   type TelegramOversightReadAdapter
 } from './telegramOversightBridge.js';
 import type { RunEventStream, RunEventStreamEntry } from '../events/runEventStream.js';
@@ -49,6 +47,10 @@ import {
   createControlExpiryLifecycle,
   type ControlExpiryLifecycle
 } from './controlExpiryLifecycle.js';
+import {
+  createControlServerBootstrapLifecycle,
+  type ControlServerBootstrapLifecycle
+} from './controlServerBootstrapLifecycle.js';
 
 interface ControlServerOptions {
   paths: RunPaths;
@@ -132,8 +134,7 @@ export class ControlServer {
   private readonly paths: RunPaths;
   private readonly linearAdvisoryState: LinearAdvisoryState;
   private readonly controlRuntime: ControlRuntime;
-  private telegramBridge: TelegramOversightBridge | null = null;
-  private unsubscribeTelegramBridge: (() => void) | null = null;
+  private bootstrapLifecycle: ControlServerBootstrapLifecycle | null = null;
   private baseUrl: string | null = null;
   private expiryLifecycle: ControlExpiryLifecycle | null = null;
 
@@ -273,6 +274,13 @@ export class ControlServer {
       createQuestionChildResolutionAdapter: () =>
         createRequestQuestionChildResolutionAdapter(instance.buildInternalContext(options.config, token))
     });
+    instance.bootstrapLifecycle = createControlServerBootstrapLifecycle({
+      paths: options.paths,
+      persistControl: persist.control,
+      startExpiryLifecycle: () => instance.expiryLifecycle?.start(),
+      controlRuntime,
+      createTelegramReadAdapter: () => instance.createTelegramOversightReadAdapter(options.config, token)
+    });
 
     const host = options.config.ui.bindHost;
     await new Promise<void>((resolve, reject) => {
@@ -299,47 +307,15 @@ export class ControlServer {
     });
 
     try {
-      await writeJsonAtomic(options.paths.controlAuthPath, {
-        token,
-        created_at: isoTimestamp()
-      });
-      await chmod(options.paths.controlAuthPath, 0o600).catch(() => undefined);
-      await writeJsonAtomic(options.paths.controlEndpointPath, {
-        base_url: instance.baseUrl,
-        token_path: options.paths.controlAuthPath
-      });
-      await chmod(options.paths.controlEndpointPath, 0o600).catch(() => undefined);
-      await writeJsonAtomic(options.paths.controlPath, controlStore.snapshot());
-
-      instance.expiryLifecycle.start();
-
-      if (instance.baseUrl) {
-        try {
-          instance.telegramBridge = await startTelegramOversightBridge({
-            runDir: options.paths.runDir,
-            readAdapter: instance.createTelegramOversightReadAdapter(options.config, token),
-            baseUrl: instance.baseUrl,
-            controlToken: token
-          });
-          if (instance.telegramBridge) {
-            instance.unsubscribeTelegramBridge = instance.controlRuntime.subscribe((input) =>
-              instance.telegramBridge?.notifyProjectionDelta(input)
-            );
-          }
-        } catch (error) {
-          logger.warn(
-            `Failed to start Telegram oversight bridge: ${(error as Error)?.message ?? String(error)}`
-          );
-          instance.unsubscribeTelegramBridge?.();
-          instance.unsubscribeTelegramBridge = null;
-          instance.telegramBridge = null;
-        }
+      if (!instance.baseUrl) {
+        throw new Error('control_server_base_url_unavailable');
       }
-    } catch (error) {
-      instance.expiryLifecycle?.close();
-      await new Promise<void>((resolve) => {
-        server.close(() => resolve());
+      await instance.bootstrapLifecycle.start({
+        baseUrl: instance.baseUrl,
+        controlToken: token
       });
+    } catch (error) {
+      await instance.close();
       throw error;
     }
 
@@ -368,14 +344,8 @@ export class ControlServer {
   async close(): Promise<void> {
     this.expiryLifecycle?.close();
     this.expiryLifecycle = null;
-    this.unsubscribeTelegramBridge?.();
-    this.unsubscribeTelegramBridge = null;
-    if (this.telegramBridge) {
-      await this.telegramBridge.close().catch((error) => {
-        logger.warn(`Failed to close Telegram oversight bridge: ${(error as Error)?.message ?? String(error)}`);
-      });
-      this.telegramBridge = null;
-    }
+    await this.bootstrapLifecycle?.close();
+    this.bootstrapLifecycle = null;
     for (const client of this.clients) {
       client.end();
     }
