@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260308-1071-coordinator-symphony-aligned-control-event-transport-extraction",
+      "title": "Coordinator Symphony-Aligned Control Event Transport Extraction",
+      "relates_to": "tasks/tasks-1071-coordinator-symphony-aligned-control-event-transport-extraction.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-08",
+      "paths": {
+        "spec": "tasks/specs/1071-coordinator-symphony-aligned-control-event-transport-extraction.md",
+        "task": "tasks/tasks-1071-coordinator-symphony-aligned-control-event-transport-extraction.md",
+        "agent_task": ".agent/task/1071-coordinator-symphony-aligned-control-event-transport-extraction.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-control-event-transport-extraction.md"
+      }
+    },
+    {
       "id": "20260308-1070-coordinator-symphony-aligned-control-server-bootstrap-and-telegram-bridge-lifecycle-extraction",
       "title": "Coordinator Symphony-Aligned Control Server Bootstrap and Telegram Bridge Lifecycle Extraction",
       "relates_to": "tasks/tasks-1070-coordinator-symphony-aligned-control-server-bootstrap-and-telegram-bridge-lifecycle-extraction.md",
