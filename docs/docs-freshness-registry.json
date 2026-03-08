@@ -7514,6 +7514,55 @@
       "cadence_days": 30
     },
     {
+      "path": ".agent/task/1059-coordinator-symphony-aligned-standalone-review-low-signal-drift-guard.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-08",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-standalone-review-low-signal-drift-guard.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-08",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/PRD-coordinator-symphony-aligned-standalone-review-low-signal-drift-guard.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-08",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/TECH_SPEC-coordinator-symphony-aligned-standalone-review-low-signal-drift-guard.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-08",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/findings/1059-standalone-review-low-signal-drift-guard-deliberation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-08",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/specs/1059-coordinator-symphony-aligned-standalone-review-low-signal-drift-guard.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-08",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/tasks-1059-coordinator-symphony-aligned-standalone-review-low-signal-drift-guard.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-08",
+      "cadence_days": 30
+    },
+    {
       "path": ".agent/task/1058-coordinator-symphony-aligned-standalone-review-execution-state-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
