@@ -12,7 +12,7 @@ This slice extracts that event-transport ownership into a dedicated control-loca
   - `emitControlEvent(...)`,
   - `broadcast(...)`,
   - SSE client fan-out and dead-client pruning,
-  - runtime publish fan-out on emitted entries.
+  - runtime publish fan-out on broadcast entries.
 - That leaves the remaining server shell coupled to transport concerns even after the earlier controller, expiry, and post-bind lifecycle extractions.
 - The transport behavior is cohesive enough to extract without reopening controller or provider work.
 
@@ -36,7 +36,7 @@ Extract the bounded control-event transport seam from `controlServer.ts` into a 
   - event stream append behavior,
   - SSE payload shape,
   - dead-client pruning semantics,
-  - runtime publish semantics,
+  - runtime publish-on-broadcast semantics,
   - existing call sites and route behavior.
 - Keep the seam explicit and bounded rather than creating a generic event framework.
 - Add focused regressions for the extracted event-transport behavior.

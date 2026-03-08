@@ -51,6 +51,10 @@ import {
   createControlServerBootstrapLifecycle,
   type ControlServerBootstrapLifecycle
 } from './controlServerBootstrapLifecycle.js';
+import {
+  createControlEventTransport,
+  type ControlEventTransport
+} from './controlEventTransport.js';
 
 interface ControlServerOptions {
   paths: RunPaths;
@@ -128,8 +132,8 @@ export class ControlServer {
   private readonly questionQueue: QuestionQueue;
   private readonly delegationTokens: DelegationTokenStore;
   private readonly sessionTokens: SessionTokenStore;
-  private readonly eventStream?: RunEventStream;
   private readonly clients: Set<http.ServerResponse>;
+  private readonly eventTransport: ControlEventTransport;
   private readonly persist: RequestContext['persist'];
   private readonly paths: RunPaths;
   private readonly linearAdvisoryState: LinearAdvisoryState;
@@ -145,8 +149,8 @@ export class ControlServer {
     questionQueue: QuestionQueue;
     delegationTokens: DelegationTokenStore;
     sessionTokens: SessionTokenStore;
-    eventStream?: RunEventStream;
     clients: Set<http.ServerResponse>;
+    eventTransport: ControlEventTransport;
     persist: RequestContext['persist'];
     paths: RunPaths;
     linearAdvisoryState: LinearAdvisoryState;
@@ -158,8 +162,8 @@ export class ControlServer {
     this.questionQueue = options.questionQueue;
     this.delegationTokens = options.delegationTokens;
     this.sessionTokens = options.sessionTokens;
-    this.eventStream = options.eventStream;
     this.clients = options.clients;
+    this.eventTransport = options.eventTransport;
     this.persist = options.persist;
     this.paths = options.paths;
     this.linearAdvisoryState = options.linearAdvisoryState;
@@ -212,6 +216,11 @@ export class ControlServer {
     });
 
     const clients = new Set<http.ServerResponse>();
+    const eventTransport = createControlEventTransport({
+      eventStream: options.eventStream,
+      clients,
+      runtime: controlRuntime
+    });
     const persist = {
       control: async () => writeJsonAtomic(options.paths.controlPath, controlStore.snapshot()),
       confirmations: async () => writeJsonAtomic(options.paths.confirmationsPath, confirmationStore.snapshot()),
@@ -231,10 +240,10 @@ export class ControlServer {
         questionQueue,
         delegationTokens,
         sessionTokens,
-        eventStream: options.eventStream,
         config: options.config,
         persist,
         clients,
+        eventTransport,
         paths: options.paths,
         linearAdvisoryState,
         runtime: controlRuntime,
@@ -253,8 +262,8 @@ export class ControlServer {
       questionQueue,
       delegationTokens,
       sessionTokens,
-      eventStream: options.eventStream,
       clients,
+      eventTransport,
       persist,
       paths: options.paths,
       linearAdvisoryState,
@@ -269,8 +278,7 @@ export class ControlServer {
         questions: persist.questions
       },
       runtime: controlRuntime,
-      emitControlEvent: (input) =>
-        emitControlEvent(instance.buildInternalContext(options.config, token), input),
+      emitControlEvent: (input) => instance.eventTransport.emitControlEvent(input),
       createQuestionChildResolutionAdapter: () =>
         createRequestQuestionChildResolutionAdapter(instance.buildInternalContext(options.config, token))
     });
@@ -327,18 +335,7 @@ export class ControlServer {
   }
 
   broadcast(entry: RunEventStreamEntry): void {
-    const payload = `data: ${JSON.stringify(entry)}\n\n`;
-    for (const client of this.clients) {
-      client.write(payload, (error) => {
-        if (error) {
-          this.clients.delete(client);
-        }
-      });
-    }
-    this.controlRuntime.publish({
-      eventSeq: entry.seq,
-      source: entry.event
-    });
+    this.eventTransport.broadcast(entry);
   }
 
   async close(): Promise<void> {
@@ -365,10 +362,10 @@ export class ControlServer {
       questionQueue: this.questionQueue,
       delegationTokens: this.delegationTokens,
       sessionTokens: this.sessionTokens,
-      eventStream: this.eventStream,
       config,
       persist: this.persist,
       clients: this.clients,
+      eventTransport: this.eventTransport,
       paths: this.paths,
       linearAdvisoryState: this.linearAdvisoryState,
       runtime: this.controlRuntime
@@ -426,7 +423,6 @@ interface RequestContext {
   questionQueue: QuestionQueue;
   delegationTokens: DelegationTokenStore;
   sessionTokens: SessionTokenStore;
-  eventStream?: RunEventStream;
   config: EffectiveDelegationConfig;
   persist: {
     control: () => Promise<void>;
@@ -436,6 +432,7 @@ interface RequestContext {
     linearAdvisory: () => Promise<void>;
   };
   clients: Set<http.ServerResponse>;
+  eventTransport: ControlEventTransport;
   paths: RunPaths;
   linearAdvisoryState: LinearAdvisoryState;
   runtime: ControlRuntime;
@@ -532,7 +529,7 @@ async function handleRequest(context: RequestContext): Promise<void> {
     readRequestBody: () => readJsonBody(req),
     readDispatchEvaluation: () => runtimeSnapshot.readDispatchEvaluation(),
     onDispatchEvaluated: (record) => emitDispatchPilotAuditEvents(context, record),
-    emitControlEvent: (input) => emitControlEvent(context, input),
+    emitControlEvent: (input) => context.eventTransport.emitControlEvent(input),
     emitControlActionAuditEvent: (input) => emitControlActionAuditEvent(context, input),
     writeControlError: (status, error, traceability) =>
       writeControlError(res, status, error, traceability),
@@ -560,7 +557,7 @@ async function emitLinearWebhookAuditEvent(
   context: RequestContext,
   input: LinearWebhookAuditEventInput
 ): Promise<void> {
-  await emitControlEvent(context, {
+  await context.eventTransport.emitControlEvent({
     event: 'linear_advisory_webhook_processed',
     actor: 'runner',
     payload: {
@@ -603,12 +600,12 @@ async function emitDispatchPilotAuditEvents(
     reason: input.evaluation.failure?.reason ?? input.evaluation.summary.reason
   };
 
-  await emitControlEvent(context, {
+  await context.eventTransport.emitControlEvent({
     event: 'dispatch_pilot_evaluated',
     actor: 'runner',
     payload: eventPayload
   });
-  await emitControlEvent(context, {
+  await context.eventTransport.emitControlEvent({
     event: 'dispatch_pilot_viewed',
     actor: 'runner',
     payload: {
@@ -642,7 +639,7 @@ async function emitControlActionAuditEvent(
     traceability?: Record<string, unknown> | null;
   }
 ): Promise<void> {
-  await emitControlEvent(context, {
+  await context.eventTransport.emitControlEvent({
     event: input.outcome === 'replayed' ? 'control_action_replayed' : 'control_action_applied',
     actor: 'runner',
     payload: {
@@ -783,34 +780,6 @@ async function readJsonFile<T>(path: string): Promise<T | null> {
   }
 }
 
-async function emitControlEvent(
-  context: RequestContext,
-  input: { event: string; actor: string; payload: Record<string, unknown> }
-): Promise<void> {
-  if (!context.eventStream) {
-    return;
-  }
-  let entry: RunEventStreamEntry;
-  try {
-    entry = await context.eventStream.append({
-      event: input.event,
-      actor: input.actor,
-      payload: input.payload
-    });
-  } catch (error) {
-    logger.warn(`Failed to append control event ${input.event}: ${(error as Error)?.message ?? error}`);
-    return;
-  }
-  const payload = `data: ${JSON.stringify(entry)}\n\n`;
-  for (const client of context.clients) {
-    client.write(payload, (error) => {
-      if (error) {
-        context.clients.delete(client);
-      }
-    });
-  }
-}
-
 function buildTelegramOversightDispatchPayload(
   result: DispatchExtensionResult
 ): ControlDispatchPayload {
@@ -910,7 +879,7 @@ async function emitQuestionChildResolutionFallbackEvent(
   context: RequestContext,
   payload: QuestionChildResolutionFallbackEvent
 ): Promise<void> {
-  await emitControlEvent(context, {
+  await context.eventTransport.emitControlEvent({
     event: 'question.resolve_child_fallback',
     actor: 'control',
     payload: payload as unknown as Record<string, unknown>

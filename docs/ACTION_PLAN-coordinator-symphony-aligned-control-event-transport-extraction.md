@@ -9,7 +9,7 @@
 ## Phase 2 - Bounded extraction
 
 - Add a dedicated control event transport owner under `orchestrator/src/cli/control/`.
-- Move control-event append plus SSE/runtime fan-out out of `controlServer.ts`.
+- Move control-event append plus shared SSE/runtime fan-out out of `controlServer.ts`, keeping runtime publish tied to `broadcast(...)`.
 - Keep `controlServer.ts` explicit as the outer server shell, request-context owner, and route dispatcher.
 
 ## Phase 3 - Validation and closeout

@@ -18,8 +18,8 @@ last_review: 2026-03-08
 ## Summary
 
 - Extract the remaining control-event transport cluster out of `controlServer.ts`.
-- Move event append plus SSE/runtime fan-out behind a dedicated transport seam.
-- Preserve event append semantics, SSE framing, dead-client pruning, and runtime publish behavior.
+- Move event append plus shared SSE/runtime fan-out behind a dedicated transport seam.
+- Preserve event append semantics, SSE framing, dead-client pruning, and runtime publish-on-broadcast behavior.
 
 ## Review Approval
 

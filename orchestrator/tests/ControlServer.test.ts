@@ -826,6 +826,73 @@ describe('ControlServer', () => {
     }
   });
 
+  it('fans out broadcast entries to authenticated SSE clients', async () => {
+    const { root, env, paths } = await createRunRoot('task-0940');
+    const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
+
+    const server = await ControlServer.start({
+      paths,
+      config,
+      runId: 'run-1'
+    });
+
+    try {
+      const baseUrl = server.getBaseUrl() ?? '';
+      const token = await readToken(paths.controlAuthPath);
+      const entry = {
+        seq: 4,
+        event: 'question_closed',
+        actor: 'runner',
+        payload: {
+          question_id: 'q-0001',
+          outcome: 'expired'
+        },
+        ts: '2026-03-08T16:00:00.000Z'
+      };
+      const response = await new Promise<{
+        statusCode: number | undefined;
+        stream: string;
+      }>((resolve, reject) => {
+        const req = http.get(
+          new URL('/events', baseUrl),
+          {
+            headers: {
+              Authorization: `Bearer ${token}`
+            }
+          },
+          (res) => {
+            let stream = '';
+            let broadcasted = false;
+            res.setEncoding('utf8');
+            res.on('data', (chunk) => {
+              stream += chunk;
+              if (!broadcasted && stream.includes(': ok\n\n')) {
+                broadcasted = true;
+                server.broadcast(entry);
+              }
+              if (broadcasted && stream.includes(`data: ${JSON.stringify(entry)}\n\n`)) {
+                resolve({
+                  statusCode: res.statusCode,
+                  stream
+                });
+                res.destroy();
+              }
+            });
+            res.once('error', reject);
+          }
+        );
+        req.once('error', reject);
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.stream).toContain(': ok\n\n');
+      expect(response.stream).toContain(`data: ${JSON.stringify(entry)}\n\n`);
+    } finally {
+      await server.close();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   it('projects read-only compatibility state and issue payloads', async () => {
     const { root, env, paths } = await createRunRoot('task-0940');
     await seedManifest(paths);

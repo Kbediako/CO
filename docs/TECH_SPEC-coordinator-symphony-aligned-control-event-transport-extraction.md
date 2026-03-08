@@ -16,12 +16,12 @@ related_tasks:
 
 ## Summary
 
-Extract the remaining control-event transport ownership cluster from `controlServer.ts` into a dedicated module. The extracted owner should handle event stream append plus SSE/runtime fan-out, while `controlServer.ts` keeps HTTP admission, route dispatch, and request-context assembly explicit.
+Extract the remaining control-event transport ownership cluster from `controlServer.ts` into a dedicated module. The extracted owner should handle event stream append, shared SSE fan-out, and runtime publish on broadcast, while `controlServer.ts` keeps HTTP admission, route dispatch, and request-context assembly explicit.
 
 ## Scope
 
 - Add a control-local event transport module under `orchestrator/src/cli/control/`.
-- Move `emitControlEvent(...)`, `broadcast(...)`, and the associated SSE/runtime fan-out logic out of `controlServer.ts`.
+- Move `emitControlEvent(...)`, `broadcast(...)`, and the associated shared SSE/runtime fan-out logic out of `controlServer.ts`.
 - Add focused event-transport regressions.
 
 ## Out of Scope
@@ -42,7 +42,7 @@ Create a new control-local module, likely something like `controlEventTransport.
 - SSE payload serialization,
 - SSE client fan-out,
 - dead-client pruning,
-- runtime publish fan-out for emitted entries.
+- runtime publish fan-out for `broadcast(...)`.
 
 The target interface should stay small and explicit, for example:
 

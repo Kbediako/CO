@@ -2,7 +2,7 @@
 
 ## Decision
 
-Queue the next bounded Symphony-aligned slice on the remaining control-event transport cluster in `controlServer.ts`: event append, SSE fan-out, dead-client pruning, and runtime publish fan-out.
+Queue the next bounded Symphony-aligned slice on the remaining control-event transport cluster in `controlServer.ts`: event append, shared SSE fan-out, dead-client pruning, and runtime publish on `broadcast(...)`.
 
 ## Why this seam next
 
@@ -11,7 +11,7 @@ Queue the next bounded Symphony-aligned slice on the remaining control-event tra
   - `emitControlEvent(...)`,
   - `broadcast(...)`,
   - SSE client fan-out,
-  - runtime publish fan-out.
+  - runtime publish fan-out for `broadcast(...)`.
 - That seam is large enough to extract cleanly without widening into request-context composition or route logic.
 
 ## Boundaries to keep
