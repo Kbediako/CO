@@ -46,6 +46,15 @@ const REVIEW_INSPECTION_TARGET_RE =
   /([A-Za-z0-9_./-]+\.(?:[cm]?js|[jt]sx?|json|md|ya?ml|toml))/gu;
 const REVIEW_META_SURFACE_DELEGATION_TOOL_LINE_RE =
   /^tool\s+delegation\.delegate\.(?:spawn|status|pause|cancel)\(/iu;
+const REVIEW_COMMAND_INTENT_DELEGATION_TOOL_LINE_RE =
+  /^tool\s+delegation\.delegate\.(?:spawn|pause|cancel)\(/iu;
+const REVIEW_DIRECT_VALIDATION_RUNNERS = new Set(['vitest', 'jest']);
+const REVIEW_COMMAND_INTENT_VIOLATION_SAMPLE_LIMIT = 8;
+
+export type ReviewCommandIntentViolationKind =
+  | 'validation-runner'
+  | 'review-orchestration'
+  | 'delegation-control';
 
 export interface ReviewOutputSummary {
   lineCount: number;
@@ -63,6 +72,9 @@ export interface ReviewOutputSummary {
   distinctMetaSurfaces: number;
   maxMetaSurfaceHits: number;
   metaSurfaceKinds: string[];
+  commandIntentViolationCount: number;
+  commandIntentViolationKinds: ReviewCommandIntentViolationKind[];
+  commandIntentViolationSamples: string[];
   lastLines: string[];
 }
 
@@ -103,8 +115,18 @@ export interface ReviewMetaSurfaceExpansionState {
   timeoutMs: number | null;
 }
 
+export interface ReviewCommandIntentBoundaryState {
+  triggered: boolean;
+  reason: string | null;
+  violationKind: ReviewCommandIntentViolationKind | null;
+  violationSample: string | null;
+  violationCount: number;
+  violationKinds: ReviewCommandIntentViolationKind[];
+}
+
 export interface ReviewExecutionStateOptions {
   blockHeavyCommands?: boolean;
+  allowValidationCommandIntents?: boolean;
   startedAtMs?: number;
   previewLimit?: number;
   tailLineLimit?: number;
@@ -149,9 +171,15 @@ interface PendingFragmentsByStream {
   stderr: string;
 }
 
+interface ReviewCommandIntentViolation {
+  kind: ReviewCommandIntentViolationKind;
+  sample: string;
+}
+
 export class ReviewExecutionState {
   private readonly startedAtMs: number;
   private readonly blockHeavyCommands: boolean;
+  private readonly allowValidationCommandIntents: boolean;
   private readonly previewLimit: number;
   private readonly tailLineLimit: number;
   private readonly heavyCommandLimit: number;
@@ -176,16 +204,19 @@ export class ReviewExecutionState {
   private readonly recentInspectionTargetSamples: string[][] = [];
   private readonly recentInspectionSignatures: string[] = [];
   private readonly recentMetaSurfaceSamples: Array<string | null> = [];
+  private readonly commandIntentViolationSamples: ReviewCommandIntentViolation[] = [];
   private readonly lastLines: string[] = [];
   private readonly pendingFragmentsByStream: PendingFragmentsByStream = {
     stdout: '',
     stderr: ''
   };
+  private commandIntentViolation: ReviewCommandIntentViolation | null = null;
 
   constructor(options: ReviewExecutionStateOptions = {}) {
     this.startedAtMs = options.startedAtMs ?? Date.now();
     this.lastOutputAtMs = this.startedAtMs;
     this.blockHeavyCommands = options.blockHeavyCommands ?? false;
+    this.allowValidationCommandIntents = options.allowValidationCommandIntents ?? false;
     this.previewLimit = options.previewLimit ?? DEFAULT_REVIEW_OUTPUT_PREVIEW_LIMIT;
     this.tailLineLimit = options.tailLineLimit ?? DEFAULT_REVIEW_OUTPUT_SUMMARY_TAIL_LINE_LIMIT;
     this.heavyCommandLimit =
@@ -259,6 +290,13 @@ export class ReviewExecutionState {
       distinctMetaSurfaces: inspectionTargetSummary.distinctMetaSurfaces,
       maxMetaSurfaceHits: inspectionTargetSummary.maxMetaSurfaceHits,
       metaSurfaceKinds: inspectionTargetSummary.metaSurfaceKinds,
+      commandIntentViolationCount: this.commandIntentViolationSamples.length,
+      commandIntentViolationKinds: [
+        ...new Set(this.commandIntentViolationSamples.map((sample) => sample.kind))
+      ].sort(),
+      commandIntentViolationSamples: this.commandIntentViolationSamples.map(
+        (sample) => `[${sample.kind}] ${sample.sample}`
+      ),
       lastLines: [...this.lastLines]
     };
   }
@@ -304,6 +342,23 @@ export class ReviewExecutionState {
       distinctMetaSurfaces: summary.distinctMetaSurfaces,
       maxMetaSurfaceHits: summary.maxMetaSurfaceHits,
       timeoutMs: this.metaSurfaceTimeoutMs
+    };
+  }
+
+  getCommandIntentBoundaryState(nowMs = Date.now()): ReviewCommandIntentBoundaryState {
+    const summary = this.buildOutputSummary();
+    const violation = this.commandIntentViolation;
+    return {
+      triggered: violation !== null,
+      reason: violation
+        ? `bounded review command-intent boundary violated after ${formatDurationMs(
+            Math.max(0, nowMs - this.startedAtMs)
+          )}: ${formatCommandIntentViolationLabel(violation.kind)} via ${violation.sample}.`
+        : null,
+      violationKind: violation?.kind ?? null,
+      violationSample: violation?.sample ?? null,
+      violationCount: summary.commandIntentViolationCount,
+      violationKinds: summary.commandIntentViolationKinds
     };
   }
 
@@ -379,6 +434,10 @@ export class ReviewExecutionState {
     if (metaSurfaceToolSample) {
       this.recordMetaSurfaceToolSample(metaSurfaceToolSample);
     }
+    const commandIntentToolViolation = classifyCommandIntentToolLine(trimmed);
+    if (commandIntentToolViolation) {
+      this.recordCommandIntentViolation(commandIntentToolViolation);
+    }
 
     if (trimmed === 'exec') {
       this.awaitingCommandLine = true;
@@ -395,6 +454,12 @@ export class ReviewExecutionState {
         this.recordInspectionTargets(commandLine);
         const metaSurfaceSample = classifyMetaSurfaceCommandLine(commandLine);
         this.recordMetaSurfaceCommandSample(metaSurfaceSample);
+        const commandIntentViolation = classifyCommandIntentCommandLine(commandLine, {
+          allowValidationCommandIntents: this.allowValidationCommandIntents
+        });
+        if (commandIntentViolation) {
+          this.recordCommandIntentViolation(commandIntentViolation);
+        }
         const heavyCommand = detectHeavyReviewCommand(commandLine);
         if (heavyCommand) {
           if (this.heavyCommandStarts.length < this.heavyCommandLimit) {
@@ -471,6 +536,16 @@ export class ReviewExecutionState {
 
   private recordMetaSurfaceToolSample(sample: string): void {
     this.recordMetaSurfaceSample(sample);
+  }
+
+  private recordCommandIntentViolation(violation: ReviewCommandIntentViolation): void {
+    if (!this.commandIntentViolation) {
+      this.commandIntentViolation = violation;
+    }
+    this.commandIntentViolationSamples.push(violation);
+    while (this.commandIntentViolationSamples.length > REVIEW_COMMAND_INTENT_VIOLATION_SAMPLE_LIMIT) {
+      this.commandIntentViolationSamples.shift();
+    }
   }
 
   private recordMetaSurfaceSample(sample: string | null): void {
@@ -1063,6 +1138,78 @@ function classifyMetaSurfaceToolLine(line: string): string | null {
   return null;
 }
 
+function classifyCommandIntentToolLine(line: string): ReviewCommandIntentViolation | null {
+  if (REVIEW_COMMAND_INTENT_DELEGATION_TOOL_LINE_RE.test(line)) {
+    return {
+      kind: 'delegation-control',
+      sample: line.trim()
+    };
+  }
+  return null;
+}
+
+function classifyCommandIntentCommandLine(
+  commandLine: string,
+  options: { allowValidationCommandIntents: boolean }
+): ReviewCommandIntentViolation | null {
+  const normalized = normalizeReviewCommandLine(commandLine).replace(/\\/gu, '/');
+  const segments = splitShellControlSegments(normalized);
+  for (const segment of segments) {
+    const violation = classifyCommandIntentSegment(segment, options, 0);
+    if (violation) {
+      return violation;
+    }
+  }
+  return null;
+}
+
+function classifyCommandIntentSegment(
+  segment: string,
+  options: { allowValidationCommandIntents: boolean },
+  depth: number
+): ReviewCommandIntentViolation | null {
+  const strippedTokens = stripLeadingEnvAssignments(tokenizeShellSegment(segment));
+  if (strippedTokens.length === 0) {
+    return null;
+  }
+
+  const tokens = unwrapEnvCommandTokens(strippedTokens);
+  if (tokens.length === 0) {
+    return null;
+  }
+
+  if (depth < 3) {
+    const payload = extractShellCommandPayload(tokens);
+    if (payload) {
+      const nestedSegments = splitShellControlSegments(payload);
+      for (const nestedSegment of nestedSegments) {
+        const nestedViolation = classifyCommandIntentSegment(nestedSegment, options, depth + 1);
+        if (nestedViolation) {
+          return nestedViolation;
+        }
+      }
+    }
+  }
+
+  const command = normalizeCommandToken(tokens[0] ?? '');
+  const args = tokens.slice(1);
+  if (isReviewOrchestrationCommand(command, args)) {
+    return {
+      kind: 'review-orchestration',
+      sample: segment.trim()
+    };
+  }
+
+  if (!options.allowValidationCommandIntents && isDirectValidationRunnerCommand(command, args)) {
+    return {
+      kind: 'validation-runner',
+      sample: segment.trim()
+    };
+  }
+
+  return null;
+}
+
 function classifyMetaSurfaceCommandLine(commandLine: string): string | null {
   const normalized = normalizeReviewCommandLine(commandLine).replace(/\\/gu, '/');
   const segments = splitShellControlSegments(normalized);
@@ -1142,6 +1289,135 @@ function isReviewOrchestrationCommand(command: string, args: string[]): boolean 
     );
   }
   return false;
+}
+
+function isDirectValidationRunnerCommand(command: string, args: string[]): boolean {
+  if (REVIEW_DIRECT_VALIDATION_RUNNERS.has(command)) {
+    return true;
+  }
+
+  const launcherTarget = resolveValidationLauncherTarget(command, args);
+  return launcherTarget !== null && REVIEW_DIRECT_VALIDATION_RUNNERS.has(launcherTarget);
+}
+
+function resolveValidationLauncherTarget(command: string, args: string[]): string | null {
+  if (command === 'npx' || command === 'bunx') {
+    return resolveFirstBinaryLauncherTarget(args);
+  }
+
+  const firstArg = normalizeCommandToken(args[0] ?? '');
+  if (command === 'npm' && firstArg === 'exec') {
+    return resolveFirstBinaryLauncherTarget(args.slice(1), { skipDlx: false });
+  }
+  if (command === 'npm' && firstArg === 'run') {
+    return resolvePackageScriptInvocationTarget(args.slice(1));
+  }
+  if (command === 'pnpm' && (firstArg === 'dlx' || firstArg === 'exec')) {
+    return resolveFirstBinaryLauncherTarget(args.slice(1), { skipDlx: false });
+  }
+  if (command === 'pnpm' && firstArg === 'run') {
+    return resolvePackageScriptInvocationTarget(args.slice(1));
+  }
+  if (command === 'pnpm' && firstArg && !firstArg.startsWith('-')) {
+    return firstArg;
+  }
+  if (command === 'yarn' && (firstArg === 'dlx' || firstArg === 'exec')) {
+    return resolveFirstBinaryLauncherTarget(args.slice(1), { skipDlx: false });
+  }
+  if (command === 'yarn' && firstArg === 'run') {
+    return resolvePackageScriptInvocationTarget(args.slice(1));
+  }
+  if (command === 'yarn' && firstArg && !firstArg.startsWith('-')) {
+    return firstArg;
+  }
+  if (command === 'bun' && firstArg === 'x') {
+    return resolveFirstBinaryLauncherTarget(args.slice(1), { skipDlx: false });
+  }
+  if (command === 'bun' && firstArg === 'run') {
+    return resolvePackageScriptInvocationTarget(args.slice(1));
+  }
+  if (command === 'bun' && firstArg && !firstArg.startsWith('-')) {
+    return firstArg;
+  }
+
+  return null;
+}
+
+function resolvePackageScriptInvocationTarget(args: string[]): string | null {
+  let index = 0;
+  while (index < args.length) {
+    const token = args[index] ?? '';
+    const normalized = token.toLowerCase();
+    if (normalized === '--') {
+      const target = args[index + 1];
+      return target ? normalizeCommandToken(target) : null;
+    }
+    if (token.startsWith('-')) {
+      index += packageScriptOptionConsumesValue(token) && !token.includes('=') ? 2 : 1;
+      continue;
+    }
+    return normalizeCommandToken(token);
+  }
+  return null;
+}
+
+function resolveFirstBinaryLauncherTarget(
+  args: string[],
+  options: { skipDlx?: boolean } = {}
+): string | null {
+  let index = 0;
+  while (index < args.length) {
+    const token = args[index] ?? '';
+    const normalized = token.toLowerCase();
+    if (normalized === '--') {
+      const target = args[index + 1];
+      return target ? normalizeCommandToken(target) : null;
+    }
+    if (
+      options.skipDlx !== false &&
+      (normalized === 'dlx' || normalized === 'exec')
+    ) {
+      index += 1;
+      continue;
+    }
+    if (token.startsWith('-')) {
+      index += binaryLauncherOptionConsumesValue(token) && !token.includes('=') ? 2 : 1;
+      continue;
+    }
+    return normalizeCommandToken(token);
+  }
+  return null;
+}
+
+function binaryLauncherOptionConsumesValue(option: string): boolean {
+  const normalized = option.toLowerCase();
+  return (
+    normalized === '-p' ||
+    normalized === '--package' ||
+    normalized.startsWith('--package=') ||
+    normalized === '-c' ||
+    normalized === '--call' ||
+    normalized.startsWith('--call=') ||
+    normalized === '--node-options' ||
+    normalized.startsWith('--node-options=')
+  );
+}
+
+function packageScriptOptionConsumesValue(option: string): boolean {
+  const normalized = option.toLowerCase();
+  return (
+    normalized === '-c' ||
+    normalized === '--cwd' ||
+    normalized.startsWith('--cwd=') ||
+    normalized === '--filter' ||
+    normalized.startsWith('--filter=') ||
+    normalized === '--workspace' ||
+    normalized.startsWith('--workspace=') ||
+    normalized === '--workspaces' ||
+    normalized === '--top-level' ||
+    normalized === '--since' ||
+    normalized.startsWith('--since=')
+  );
 }
 
 function extractMetaSurfaceOperands(command: string, args: string[]): string[] {
@@ -1263,6 +1539,16 @@ function classifyMetaSurfaceOperand(operand: string): string | null {
   return null;
 }
 
+function formatCommandIntentViolationLabel(kind: ReviewCommandIntentViolationKind): string {
+  if (kind === 'validation-runner') {
+    return 'direct validation runner launch';
+  }
+  if (kind === 'review-orchestration') {
+    return 'nested review or pipeline launch';
+  }
+  return 'delegation control activity';
+}
+
 function sanitizeTelemetrySummaryForPersistence(
   summary: ReviewOutputSummary,
   includeRawTelemetry: boolean,
@@ -1277,6 +1563,11 @@ function sanitizeTelemetrySummaryForPersistence(
     heavyCommandStarts: redactTelemetryLines(
       summary.heavyCommandStarts,
       'heavy-command',
+      telemetryDebugEnvKey
+    ),
+    commandIntentViolationSamples: redactTelemetryLines(
+      summary.commandIntentViolationSamples,
+      'command-intent',
       telemetryDebugEnvKey
     ),
     lastLines: redactTelemetryLines(summary.lastLines, 'output-line', telemetryDebugEnvKey)

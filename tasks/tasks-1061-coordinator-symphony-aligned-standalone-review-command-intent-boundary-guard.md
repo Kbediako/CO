@@ -20,21 +20,21 @@
 
 ## Standalone Review Command-Intent Boundary Guard
 
-- [ ] `ReviewExecutionState` exposes explicit command-intent boundary classification from live runtime facts. Evidence: `<pending>`.
-- [ ] `scripts/run-review.ts` fails closed on bounded-policy-violating command launches. Evidence: `<pending>`.
-- [ ] Targeted review-wrapper coverage proves policy-violating command intents now terminate deterministically. Evidence: `<pending>`.
+- [x] `ReviewExecutionState` exposes explicit command-intent boundary classification from live runtime facts. Evidence: `out/1061-coordinator-symphony-aligned-standalone-review-command-intent-boundary-guard/manual/20260308T072548Z-closeout/00-summary.md`, `out/1061-coordinator-symphony-aligned-standalone-review-command-intent-boundary-guard/manual/20260308T072548Z-closeout/11-manual-review-runtime-check.json`.
+- [x] `scripts/run-review.ts` fails closed on bounded-policy-violating command launches. Evidence: `out/1061-coordinator-symphony-aligned-standalone-review-command-intent-boundary-guard/manual/20260308T072548Z-closeout/00-summary.md`, `out/1061-coordinator-symphony-aligned-standalone-review-command-intent-boundary-guard/manual/20260308T072548Z-closeout/11-manual-review-runtime-check.json`.
+- [x] Targeted review-wrapper coverage proves policy-violating command intents now terminate deterministically. Evidence: `out/1061-coordinator-symphony-aligned-standalone-review-command-intent-boundary-guard/manual/20260308T072548Z-closeout/05-targeted-tests.log`.
 
 ## Validation + Closeout
 
-- [ ] `node scripts/delegation-guard.mjs`. Evidence: `<pending>`.
-- [ ] `node scripts/spec-guard.mjs --dry-run`. Evidence: `<pending>`.
-- [ ] `npm run build`. Evidence: `<pending>`.
-- [ ] `npm run lint`. Evidence: `<pending>`.
-- [ ] `npm run test`. Evidence: `<pending>`.
-- [ ] `npm run docs:check`. Evidence: `<pending>`.
-- [ ] `npm run docs:freshness`. Evidence: `<pending>`.
-- [ ] `node scripts/diff-budget.mjs`. Evidence: `<pending>`.
-- [ ] `npm run review`. Evidence: `<pending>`.
-- [ ] `npm run pack:smoke`. Evidence: `<pending>`.
-- [ ] Manual review-wrapper/runtime artifact captured. Evidence: `<pending>`.
-- [ ] Elegance review completed. Evidence: `<pending>`.
+- [x] `node scripts/delegation-guard.mjs`. Evidence: `out/1061-coordinator-symphony-aligned-standalone-review-command-intent-boundary-guard/manual/20260308T072548Z-closeout/01-delegation-guard.log`.
+- [x] `node scripts/spec-guard.mjs --dry-run`. Evidence: `out/1061-coordinator-symphony-aligned-standalone-review-command-intent-boundary-guard/manual/20260308T072548Z-closeout/02-spec-guard.log`.
+- [x] `npm run build`. Evidence: `out/1061-coordinator-symphony-aligned-standalone-review-command-intent-boundary-guard/manual/20260308T072548Z-closeout/03-build.log`.
+- [x] `npm run lint`. Evidence: `out/1061-coordinator-symphony-aligned-standalone-review-command-intent-boundary-guard/manual/20260308T072548Z-closeout/04-lint.log`.
+- [x] `npm run test`. Evidence: `out/1061-coordinator-symphony-aligned-standalone-review-command-intent-boundary-guard/manual/20260308T072548Z-closeout/05-targeted-tests.log`, `out/1061-coordinator-symphony-aligned-standalone-review-command-intent-boundary-guard/manual/20260308T072548Z-closeout/05b-test.log`.
+- [x] `npm run docs:check`. Evidence: `out/1061-coordinator-symphony-aligned-standalone-review-command-intent-boundary-guard/manual/20260308T072548Z-closeout/06-docs-check.log`.
+- [x] `npm run docs:freshness`. Evidence: `out/1061-coordinator-symphony-aligned-standalone-review-command-intent-boundary-guard/manual/20260308T072548Z-closeout/07-docs-freshness.log`.
+- [x] `node scripts/diff-budget.mjs`. Evidence: `out/1061-coordinator-symphony-aligned-standalone-review-command-intent-boundary-guard/manual/20260308T072548Z-closeout/08-diff-budget.log`.
+- [x] `npm run review`. Evidence: `out/1061-coordinator-symphony-aligned-standalone-review-command-intent-boundary-guard/manual/20260308T072548Z-closeout/09-review.log`, `out/1061-coordinator-symphony-aligned-standalone-review-command-intent-boundary-guard/manual/20260308T072548Z-closeout/13-override-notes.md`.
+- [x] `npm run pack:smoke`. Evidence: `out/1061-coordinator-symphony-aligned-standalone-review-command-intent-boundary-guard/manual/20260308T072548Z-closeout/10-pack-smoke.log`.
+- [x] Manual review-wrapper/runtime artifact captured. Evidence: `out/1061-coordinator-symphony-aligned-standalone-review-command-intent-boundary-guard/manual/20260308T072548Z-closeout/11-manual-review-runtime-check.json`.
+- [x] Elegance review completed. Evidence: `out/1061-coordinator-symphony-aligned-standalone-review-command-intent-boundary-guard/manual/20260308T072548Z-closeout/12-elegance-review.md`.

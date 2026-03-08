@@ -147,7 +147,7 @@ fi
         echo "exec"
         echo "/bin/zsh -lc 'sed -n 1,120p /Users/kbediako/.codex/skills/delegation-usage/SKILL.md' in /Users/kbediako/Code/CO"
         echo "thinking"
-        echo "tool delegation.delegate.spawn({\"pipeline\":\"docs-review\"})"
+        echo "tool delegation.delegate.status({\"pipeline\":\"docs-review\"})"
         echo "thinking"
         echo "exec"
         echo "/bin/zsh -lc 'sed -n 1,80p .runs/sample-task/cli/sample-run/manifest.json' in /Users/kbediako/Code/CO"
@@ -156,7 +156,52 @@ fi
         echo "/bin/zsh -lc 'tail -n 80 .runs/sample-task/cli/sample-run/runner.ndjson' in /Users/kbediako/Code/CO"
         echo "thinking"
         echo "exec"
-        echo "/bin/zsh -lc 'codex-orchestrator review --manifest .runs/sample-task/cli/sample-run/manifest.json' in /Users/kbediako/Code/CO"
+        echo "/bin/zsh -lc 'cat .runs/sample-task/cli/sample-run/manifest.json' in /Users/kbediako/Code/CO"
+        sleep 0.05
+      done
+    fi
+    if [[ "$mode" == "command-intent-validation" ]]; then
+      while true; do
+        echo "thinking"
+        echo "exec"
+        echo "/bin/zsh -lc 'npx vitest run --config vitest.config.core.ts tests/run-review.spec.ts' in /Users/kbediako/Code/CO"
+        sleep 0.05
+      done
+    fi
+    if [[ "$mode" == "command-intent-validation-fast-exit" ]]; then
+      echo "thinking"
+      echo "exec"
+      echo "/bin/zsh -lc 'npx vitest run --config vitest.config.core.ts tests/run-review.spec.ts' in /Users/kbediako/Code/CO"
+      sleep 0.05
+      exit 0
+    fi
+    if [[ "$mode" == "command-intent-validation-fast-exit-nonzero" ]]; then
+      echo "thinking"
+      echo "exec"
+      echo "/bin/zsh -lc 'npx vitest run --config vitest.config.core.ts tests/run-review.spec.ts' in /Users/kbediako/Code/CO"
+      sleep 0.05
+      exit 2
+    fi
+    if [[ "$mode" == "command-intent-validation-shorthand" ]]; then
+      while true; do
+        echo "thinking"
+        echo "exec"
+        echo "/bin/zsh -lc 'pnpm vitest run tests/run-review.spec.ts' in /Users/kbediako/Code/CO"
+        sleep 0.05
+      done
+    fi
+    if [[ "$mode" == "command-intent-review-orchestration" ]]; then
+      while true; do
+        echo "thinking"
+        echo "exec"
+        echo "/bin/zsh -lc 'codex-orchestrator start docs-review --task sample-task' in /Users/kbediako/Code/CO"
+        sleep 0.05
+      done
+    fi
+    if [[ "$mode" == "command-intent-delegation-control" ]]; then
+      while true; do
+        echo "tool delegation.delegate.status({\"pipeline\":\"docs-review\"})"
+        echo "tool delegation.delegate.spawn({\"pipeline\":\"docs-review\"})"
         sleep 0.05
       done
     fi
@@ -1294,6 +1339,145 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(telemetry.summary.metaSurfaceSignals).toBeGreaterThanOrEqual(4);
     expect(telemetry.summary.distinctMetaSurfaces).toBeGreaterThanOrEqual(3);
     expect(telemetry.summary.maxMetaSurfaceHits).toBeGreaterThanOrEqual(1);
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('fails bounded review when it launches a direct validation runner', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'command-intent-validation',
+      CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0',
+      CODEX_REVIEW_TIMEOUT_SECONDS: '60'
+    });
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).toContain('bounded command-intent boundary (direct validation runner launch)');
+
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      summary: {
+        commandIntentViolationCount: number;
+        commandIntentViolationKinds: string[];
+        commandIntentViolationSamples: string[];
+      };
+    };
+    expect(telemetry.status).toBe('failed');
+    expect(telemetry.summary.commandIntentViolationCount).toBeGreaterThanOrEqual(1);
+    expect(telemetry.summary.commandIntentViolationKinds).toContain('validation-runner');
+    expect(telemetry.summary.commandIntentViolationSamples[0]).toContain('[redacted command-intent');
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('fails bounded review even when a forbidden validation runner exits before the interval tick', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'command-intent-validation-fast-exit'
+    });
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).toContain('bounded command-intent boundary (direct validation runner launch)');
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('fails bounded review when a forbidden validation runner exits non-zero before the interval tick', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'command-intent-validation-fast-exit-nonzero'
+    });
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).toContain('bounded command-intent boundary (direct validation runner launch)');
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('fails bounded review on package-manager shorthand validation launches', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'command-intent-validation-shorthand',
+      CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0',
+      CODEX_REVIEW_TIMEOUT_SECONDS: '60'
+    });
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).toContain('bounded command-intent boundary (direct validation runner launch)');
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('allows direct validation runners when heavy review commands are explicitly enabled', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'command-intent-validation',
+      CODEX_REVIEW_ALLOW_HEAVY_COMMANDS: '1',
+      CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0',
+      CODEX_REVIEW_TIMEOUT_SECONDS: '1'
+    });
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).toContain('codex review timed out after 1s');
+    expect(result.stderr).not.toContain('bounded command-intent boundary');
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('fails bounded review on nested review or pipeline launches', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'command-intent-review-orchestration',
+      CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0',
+      CODEX_REVIEW_TIMEOUT_SECONDS: '60'
+    });
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).toContain('bounded command-intent boundary (nested review or pipeline launch)');
+
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      summary: {
+        commandIntentViolationKinds: string[];
+      };
+    };
+    expect(telemetry.status).toBe('failed');
+    expect(telemetry.summary.commandIntentViolationKinds).toContain('review-orchestration');
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('fails bounded review on mutating delegation control but not read-only status checks', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'command-intent-delegation-control',
+      CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0',
+      CODEX_REVIEW_TIMEOUT_SECONDS: '60'
+    });
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).toContain('bounded command-intent boundary (delegation control activity)');
+
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      summary: {
+        commandIntentViolationCount: number;
+        commandIntentViolationKinds: string[];
+      };
+    };
+    expect(telemetry.status).toBe('failed');
+    expect(telemetry.summary.commandIntentViolationCount).toBeGreaterThanOrEqual(1);
+    expect(telemetry.summary.commandIntentViolationKinds).toEqual(['delegation-control']);
   }, LONG_WAIT_TEST_TIMEOUT_MS);
 
   it('derives task context from explicit manifest instead of stale task env fallback', async () => {

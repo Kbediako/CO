@@ -39,6 +39,7 @@ import {
   logReviewTelemetrySummary as logReviewExecutionTelemetrySummary,
   persistReviewTelemetry as persistReviewExecutionTelemetry,
   ReviewExecutionState,
+  type ReviewCommandIntentBoundaryState,
   type ReviewOutputSummary,
   type ReviewStartupLoopState
 } from './lib/review-execution-state.js';
@@ -440,6 +441,7 @@ async function main(): Promise<void> {
       'Execution constraints (bounded review mode):',
       '- Keep this review focused on changed files and nearby dependencies.',
       '- Avoid full validation suites (for example `npm run test`, `npm run lint`, `npm run build`) during this pass.',
+      '- Do not launch direct validation runners (for example `npx vitest`, `npm exec jest`) or nested review/pipeline/delegation flows during this pass.',
       '- If broader validation would improve confidence, list follow-up commands instead of executing them.'
     );
   }
@@ -604,6 +606,7 @@ async function main(): Promise<void> {
       env: runtimeContext.env,
       stdio: nonInteractive ? ['ignore', 'pipe', 'pipe'] : ['inherit', 'pipe', 'pipe'],
       blockHeavyCommands: enforceBoundedMode,
+      allowValidationCommandIntents: allowHeavyCommands,
       timeoutMs,
       stallTimeoutMs,
       startupLoopTimeoutMs,
@@ -1263,6 +1266,7 @@ interface RunCodexReviewOptions {
   env: Record<string, string | undefined>;
   stdio: StdioOptions;
   blockHeavyCommands: boolean;
+  allowValidationCommandIntents: boolean;
   timeoutMs: number | null;
   stallTimeoutMs: number | null;
   startupLoopTimeoutMs: number | null;
@@ -1345,6 +1349,7 @@ async function runCodexReview(
   const uninstallSignalForwarders = installSignalForwarders(child, detached);
   const executionState = new ReviewExecutionState({
     blockHeavyCommands: options.blockHeavyCommands,
+    allowValidationCommandIntents: options.allowValidationCommandIntents,
     lowSignalTimeoutMs: options.lowSignalTimeoutMs,
     metaSurfaceTimeoutMs: options.metaSurfaceTimeoutMs
   });
@@ -1361,6 +1366,10 @@ async function runCodexReview(
   const onStderr = (chunk: Buffer) => capture(chunk, process.stderr, 'stderr');
   child.stdout?.on('data', onStdout);
   child.stderr?.on('data', onStderr);
+  const outputDrainPromise = Promise.all([
+    waitForReadableClosure(child.stdout),
+    waitForReadableClosure(child.stderr)
+  ]).then(() => undefined);
 
   let cleanedUp = false;
   const cleanup = () => {
@@ -1393,6 +1402,8 @@ async function runCodexReview(
       getBlockedHeavyCommand: () => executionState.getBlockedHeavyCommand(),
       getLowSignalDriftReason: () => executionState.getLowSignalDriftState().reason,
       getMetaSurfaceExpansionReason: () => executionState.getMetaSurfaceExpansionState().reason,
+      getCommandIntentBoundaryState: () => executionState.getCommandIntentBoundaryState(),
+      waitForOutputDrain: () => outputDrainPromise,
       formatCheckpoint: () => executionState.formatCheckpoint(),
       detached,
       onCleanup: cleanup
@@ -1427,6 +1438,36 @@ async function runCodexReview(
     }
     throw wrappedError;
   }
+}
+
+function waitForReadableClosure(stream: NodeJS.ReadableStream | null | undefined): Promise<void> {
+  if (!stream) {
+    return Promise.resolve();
+  }
+
+  const readable = stream as NodeJS.ReadableStream & {
+    readableEnded?: boolean;
+    destroyed?: boolean;
+  };
+  if (readable.readableEnded || readable.destroyed) {
+    return Promise.resolve();
+  }
+
+  return new Promise<void>((resolve) => {
+    const finish = () => {
+      readable.off('end', finish);
+      readable.off('close', finish);
+      readable.off('error', finish);
+      resolve();
+    };
+    readable.once('end', finish);
+    readable.once('close', finish);
+    readable.once('error', finish);
+  });
+}
+
+async function waitForOutputSettlement(): Promise<void> {
+  await new Promise<void>((resolve) => setTimeout(resolve, 25));
 }
 
 async function runDiffBudget(options: CliOptions): Promise<void> {
@@ -1477,6 +1518,27 @@ function formatBoundedHeavyCommandFailure(blockedCommand: string): string {
     return `codex review attempted heavy command in bounded mode. ${guidance}`;
   }
   return `codex review attempted heavy command in bounded mode: ${blockedCommand}. ${guidance}`;
+}
+
+function formatCommandIntentBoundaryFailure(boundaryState: ReviewCommandIntentBoundaryState): string {
+  const guidance =
+    'Bounded review should inspect and report, not launch direct validation runners, nested review flows, or mutating delegation control.';
+  if (!boundaryState.violationKind) {
+    return `codex review crossed the bounded command-intent boundary. ${guidance}`;
+  }
+  const kindLabel =
+    boundaryState.violationKind === 'validation-runner'
+      ? 'direct validation runner launch'
+      : boundaryState.violationKind === 'review-orchestration'
+      ? 'nested review or pipeline launch'
+      : 'delegation control activity';
+  if (
+    !envFlagEnabled(process.env[REVIEW_TELEMETRY_DEBUG_ENV_KEY]) ||
+    !boundaryState.violationSample
+  ) {
+    return `codex review crossed the bounded command-intent boundary (${kindLabel}). ${guidance}`;
+  }
+  return `codex review crossed the bounded command-intent boundary (${kindLabel}): ${boundaryState.violationSample}. ${guidance}`;
 }
 
 function allowHeavyReviewCommands(): boolean {
@@ -1620,6 +1682,8 @@ interface WaitForChildExitOptions {
   getBlockedHeavyCommand: () => string | null;
   getLowSignalDriftReason: () => string | null;
   getMetaSurfaceExpansionReason: () => string | null;
+  getCommandIntentBoundaryState: () => ReviewCommandIntentBoundaryState;
+  waitForOutputDrain: () => Promise<void>;
   formatCheckpoint: () => string;
   detached: boolean;
   onCleanup?: () => void;
@@ -1631,18 +1695,25 @@ async function waitForChildExit(
 ): Promise<void> {
   await new Promise<void>((resolve, reject) => {
     let settled = false;
+    let handlesCleared = false;
+    let cleanupCompleted = false;
     let timeoutHandle: NodeJS.Timeout | undefined;
     let stallHandle: NodeJS.Timeout | undefined;
     let startupLoopHandle: NodeJS.Timeout | undefined;
     let monitorHandle: NodeJS.Timeout | undefined;
     let lowSignalHandle: NodeJS.Timeout | undefined;
     let metaSurfaceHandle: NodeJS.Timeout | undefined;
+    let commandIntentHandle: NodeJS.Timeout | undefined;
     let heavyCommandHandle: NodeJS.Timeout | undefined;
     let killHandle: NodeJS.Timeout | undefined;
     let hardKillArmed = false;
     const startMs = Date.now();
 
-    const cleanup = () => {
+    const clearHandles = () => {
+      if (handlesCleared) {
+        return;
+      }
+      handlesCleared = true;
       if (timeoutHandle) {
         clearTimeout(timeoutHandle);
       }
@@ -1661,6 +1732,9 @@ async function waitForChildExit(
       if (metaSurfaceHandle) {
         clearInterval(metaSurfaceHandle);
       }
+      if (commandIntentHandle) {
+        clearInterval(commandIntentHandle);
+      }
       if (heavyCommandHandle) {
         clearInterval(heavyCommandHandle);
       }
@@ -1669,6 +1743,14 @@ async function waitForChildExit(
       }
       child.removeListener('error', onError);
       child.removeListener('close', onClose);
+    };
+
+    const cleanup = () => {
+      if (cleanupCompleted) {
+        return;
+      }
+      cleanupCompleted = true;
+      clearHandles();
       options.onCleanup?.();
     };
 
@@ -1690,35 +1772,56 @@ async function waitForChildExit(
         return;
       }
       settled = true;
-      cleanup();
-      const blockedCommand = options.getBlockedHeavyCommand();
-      if (code === 0 && options.blockHeavyCommands && blockedCommand) {
-        reject(
-          new CodexReviewError(
-            formatBoundedHeavyCommandFailure(blockedCommand),
-            {
-              exitCode: 1,
-              signal: null,
+      clearHandles();
+      void (async () => {
+        try {
+          await options.waitForOutputDrain();
+        } catch {
+          // Best-effort drain only; fall through to current runtime state.
+        }
+        await waitForOutputSettlement();
+        cleanup();
+        const commandIntentBoundaryState = options.getCommandIntentBoundaryState();
+        if (commandIntentBoundaryState.triggered) {
+          reject(
+            new CodexReviewError(formatCommandIntentBoundaryFailure(commandIntentBoundaryState), {
+              exitCode: typeof code === 'number' && code > 0 ? code : 1,
+              signal,
               timedOut: false,
               outputPreview: ''
-            }
-          )
+            })
+          );
+          return;
+        }
+        const blockedCommand = options.getBlockedHeavyCommand();
+        if (code === 0 && options.blockHeavyCommands && blockedCommand) {
+          reject(
+            new CodexReviewError(
+              formatBoundedHeavyCommandFailure(blockedCommand),
+              {
+                exitCode: 1,
+                signal: null,
+                timedOut: false,
+                outputPreview: ''
+              }
+            )
+          );
+          return;
+        }
+        if (code === 0) {
+          resolve();
+          return;
+        }
+        const suffix = signal ? ` (signal ${signal})` : '';
+        reject(
+          new CodexReviewError(`codex review exited with code ${code}${suffix}`, {
+            exitCode: code,
+            signal,
+            timedOut: false,
+            outputPreview: ''
+          })
         );
-        return;
-      }
-      if (code === 0) {
-        resolve();
-        return;
-      }
-      const suffix = signal ? ` (signal ${signal})` : '';
-      reject(
-        new CodexReviewError(`codex review exited with code ${code}${suffix}`, {
-          exitCode: code,
-          signal,
-          timedOut: false,
-          outputPreview: ''
-        })
-      );
+      })();
     };
 
     child.once('error', onError);
@@ -1831,6 +1934,15 @@ async function waitForChildExit(
       }, 1000);
       metaSurfaceHandle.unref();
     }
+
+    commandIntentHandle = setInterval(() => {
+      const boundaryState = options.getCommandIntentBoundaryState();
+      if (!boundaryState.triggered) {
+        return;
+      }
+      requestTermination(formatCommandIntentBoundaryFailure(boundaryState), false);
+    }, 250);
+    commandIntentHandle.unref();
 
     const monitorIntervalMs = options.monitorIntervalMs;
     if (monitorIntervalMs !== null) {

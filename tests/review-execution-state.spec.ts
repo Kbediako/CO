@@ -362,6 +362,75 @@ describe('ReviewExecutionState', () => {
     expect(expansion.metaSurfaceSignals).toBe(0);
   });
 
+  it('classifies direct validation runners as command-intent boundary violations by default', () => {
+    const state = new ReviewExecutionState({ startedAtMs: 0 });
+
+    state.observeChunk('thinking\nexec\n', 'stdout', 100);
+    state.observeChunk(
+      `/bin/zsh -lc 'npx vitest run --config vitest.config.core.ts tests/run-review.spec.ts'\n`,
+      'stdout',
+      110
+    );
+
+    const boundary = state.getCommandIntentBoundaryState(2_000);
+    expect(boundary.triggered).toBe(true);
+    expect(boundary.violationKind).toBe('validation-runner');
+    expect(boundary.violationSample).toContain('npx vitest run');
+  });
+
+  it('allows direct validation runners when heavy review commands are explicitly allowed', () => {
+    const state = new ReviewExecutionState({
+      startedAtMs: 0,
+      allowValidationCommandIntents: true
+    });
+
+    state.observeChunk('thinking\nexec\n', 'stdout', 100);
+    state.observeChunk(
+      `/bin/zsh -lc 'pnpm dlx vitest run tests/review-execution-state.spec.ts'\n`,
+      'stdout',
+      110
+    );
+
+    const boundary = state.getCommandIntentBoundaryState(2_000);
+    expect(boundary.triggered).toBe(false);
+    expect(boundary.violationCount).toBe(0);
+  });
+
+  it('classifies package-manager shorthand validation launches as command-intent violations', () => {
+    const state = new ReviewExecutionState({ startedAtMs: 0 });
+
+    state.observeChunk('thinking\nexec\n', 'stdout', 100);
+    state.observeChunk(`/bin/zsh -lc 'pnpm vitest run tests/run-review.spec.ts'\n`, 'stdout', 110);
+    state.observeChunk('thinking\nexec\n', 'stdout', 120);
+    state.observeChunk(`/bin/zsh -lc 'yarn jest tests/run-review.spec.ts'\n`, 'stdout', 130);
+    state.observeChunk('thinking\nexec\n', 'stdout', 140);
+    state.observeChunk(`/bin/zsh -lc 'bun vitest run tests/run-review.spec.ts'\n`, 'stdout', 150);
+
+    const boundary = state.getCommandIntentBoundaryState(2_000);
+    expect(boundary.triggered).toBe(true);
+    expect(boundary.violationKind).toBe('validation-runner');
+    expect(boundary.violationCount).toBe(3);
+  });
+
+  it('classifies nested review and mutating delegation control as command-intent violations but keeps status read-only', () => {
+    const state = new ReviewExecutionState({ startedAtMs: 0 });
+
+    state.observeChunk('tool delegation.delegate.status({"pipeline":"docs-review"})\n', 'stdout', 50);
+    state.observeChunk('thinking\nexec\n', 'stdout', 100);
+    state.observeChunk(
+      `/bin/zsh -lc 'codex-orchestrator start docs-review --task sample-task'\n`,
+      'stdout',
+      110
+    );
+    state.observeChunk('tool delegation.delegate.spawn({"pipeline":"docs-review"})\n', 'stdout', 120);
+
+    const boundary = state.getCommandIntentBoundaryState(2_000);
+    expect(boundary.triggered).toBe(true);
+    expect(boundary.violationKind).toBe('review-orchestration');
+    expect(boundary.violationCount).toBe(2);
+    expect(boundary.violationKinds).toEqual(['delegation-control', 'review-orchestration']);
+  });
+
   it('does not classify low-signal drift when the guard is disabled', () => {
     const state = new ReviewExecutionState({
       startedAtMs: 0,
