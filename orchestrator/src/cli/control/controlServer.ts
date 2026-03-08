@@ -1,5 +1,5 @@
 import http from 'node:http';
-import { randomBytes, timingSafeEqual } from 'node:crypto';
+import { randomBytes } from 'node:crypto';
 import { existsSync, realpathSync } from 'node:fs';
 import { chmod, readFile } from 'node:fs/promises';
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
@@ -46,6 +46,7 @@ import { handleConfirmationApproveRequest } from './confirmationApproveControlle
 import { handleConfirmationIssueConsumeRequest } from './confirmationIssueConsumeController.js';
 import { handleConfirmationValidateRequest } from './confirmationValidateController.js';
 import { handleControlActionRequest } from './controlActionController.js';
+import { admitAuthenticatedControlRoute } from './authenticatedControlRouteGate.js';
 import {
   handleLinearWebhookRequest,
   normalizeLinearAdvisoryState,
@@ -530,22 +531,14 @@ async function handleRequest(context: RequestContext): Promise<void> {
     return;
   }
 
-  const auth = resolveAuthToken(req, context);
+  const auth = admitAuthenticatedControlRoute({
+    req,
+    res,
+    pathname: url.pathname,
+    controlToken: context.token,
+    isSessionTokenValid: (token) => context.sessionTokens.validate(token)
+  });
   if (!auth) {
-    res.writeHead(401, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'unauthorized' }));
-    return;
-  }
-
-  if (requiresCsrf(req) && !isCsrfValid(req, auth.token)) {
-    res.writeHead(403, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'csrf_invalid' }));
-    return;
-  }
-
-  if (isRunnerOnlyEndpoint(url.pathname, req.method) && auth.kind !== 'control') {
-    res.writeHead(403, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'runner_only' }));
     return;
   }
 
@@ -1062,52 +1055,6 @@ async function expireQuestions(context: RequestContext): Promise<void> {
   context.runtime.publish({ source: 'questions.expire' });
 }
 
-function resolveAuthToken(
-  req: http.IncomingMessage,
-  context: RequestContext
-): { token: string; kind: 'control' | 'session' } | null {
-  const header = req.headers.authorization;
-  if (!header || !header.startsWith('Bearer ')) {
-    return null;
-  }
-  const token = header.slice('Bearer '.length);
-  if (safeTokenCompare(token, context.token)) {
-    return { token, kind: 'control' };
-  }
-  if (context.sessionTokens.validate(token)) {
-    return { token, kind: 'session' };
-  }
-  return null;
-}
-
-function isCsrfValid(req: http.IncomingMessage, token: string): boolean {
-  const header = req.headers[CSRF_HEADER] as string | undefined;
-  if (!header) {
-    return false;
-  }
-  return safeTokenCompare(header, token);
-}
-
-function requiresCsrf(req: http.IncomingMessage): boolean {
-  const method = (req.method ?? 'GET').toUpperCase();
-  return method !== 'GET' && method !== 'HEAD';
-}
-
-function isRunnerOnlyEndpoint(pathname: string, method?: string): boolean {
-  if ((method ?? 'GET').toUpperCase() !== 'POST') {
-    return false;
-  }
-  const normalized = pathname.endsWith('/') && pathname !== '/' ? pathname.slice(0, -1) : pathname;
-  return (
-    normalized === '/confirmations/issue' ||
-    normalized === '/confirmations/consume' ||
-    normalized === '/confirmations/validate' ||
-    normalized === '/delegation/register' ||
-    normalized === '/questions/enqueue' ||
-    normalized === '/security/violation'
-  );
-}
-
 export function formatHostForUrl(host: string): string {
   if (host.includes(':') && !host.startsWith('[')) {
     return `[${host}]`;
@@ -1126,13 +1073,6 @@ export function isLoopbackAddress(address: string | undefined | null): boolean {
     return address.slice(7) === '127.0.0.1';
   }
   return false;
-}
-
-function safeTokenCompare(left: string, right: string): boolean {
-  if (left.length !== right.length) {
-    return false;
-  }
-  return timingSafeEqual(Buffer.from(left, 'utf8'), Buffer.from(right, 'utf8'));
 }
 
 async function readRawBody(req: http.IncomingMessage): Promise<Buffer> {
