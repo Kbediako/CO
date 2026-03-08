@@ -55,6 +55,14 @@ import {
   createControlEventTransport,
   type ControlEventTransport
 } from './controlEventTransport.js';
+import {
+  buildControlInternalContext,
+  buildControlPresenterRuntimeContext,
+  buildControlRequestContext,
+  type ControlRequestContext,
+  type ControlRequestPersist,
+  type ControlRequestSharedContext
+} from './controlRequestContext.js';
 
 interface ControlServerOptions {
   paths: RunPaths;
@@ -134,7 +142,8 @@ export class ControlServer {
   private readonly sessionTokens: SessionTokenStore;
   private readonly clients: Set<http.ServerResponse>;
   private readonly eventTransport: ControlEventTransport;
-  private readonly persist: RequestContext['persist'];
+  private readonly persist: ControlRequestPersist;
+  private readonly requestContextShared: ControlRequestSharedContext;
   private readonly paths: RunPaths;
   private readonly linearAdvisoryState: LinearAdvisoryState;
   private readonly controlRuntime: ControlRuntime;
@@ -151,7 +160,8 @@ export class ControlServer {
     sessionTokens: SessionTokenStore;
     clients: Set<http.ServerResponse>;
     eventTransport: ControlEventTransport;
-    persist: RequestContext['persist'];
+    persist: ControlRequestPersist;
+    requestContextShared: ControlRequestSharedContext;
     paths: RunPaths;
     linearAdvisoryState: LinearAdvisoryState;
     controlRuntime: ControlRuntime;
@@ -165,6 +175,7 @@ export class ControlServer {
     this.clients = options.clients;
     this.eventTransport = options.eventTransport;
     this.persist = options.persist;
+    this.requestContextShared = options.requestContextShared;
     this.paths = options.paths;
     this.linearAdvisoryState = options.linearAdvisoryState;
     this.controlRuntime = options.controlRuntime;
@@ -227,28 +238,38 @@ export class ControlServer {
       questions: async () => writeJsonAtomic(options.paths.questionsPath, { questions: questionQueue.list() }),
       delegationTokens: async () => writeJsonAtomic(options.paths.delegationTokensPath, { tokens: delegationTokens.list() }),
       linearAdvisory: async () => writeJsonAtomic(linearAdvisoryStatePath, linearAdvisoryState)
-    };
+    } satisfies ControlRequestPersist;
+    const requestContextShared = {
+      token,
+      controlStore,
+      confirmationStore,
+      questionQueue,
+      delegationTokens,
+      sessionTokens,
+      config: options.config,
+      persist,
+      clients,
+      eventTransport,
+      paths: options.paths,
+      linearAdvisoryState,
+      runtime: controlRuntime
+    } satisfies ControlRequestSharedContext;
 
     let instance: ControlServer | null = null;
     const server = http.createServer((req, res) => {
-      handleRequest({
-        req,
-        res,
-        token,
-        controlStore,
-        confirmationStore,
-        questionQueue,
-        delegationTokens,
-        sessionTokens,
-        config: options.config,
-        persist,
-        clients,
-        eventTransport,
-        paths: options.paths,
-        linearAdvisoryState,
-        runtime: controlRuntime,
-        expiryLifecycle: instance?.expiryLifecycle ?? null
-      }).catch((error) => {
+      if (!instance) {
+        res.writeHead(503, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'control_server_unavailable' }));
+        return;
+      }
+      handleRequest(
+        buildControlRequestContext({
+          ...instance.requestContextShared,
+          req,
+          res,
+          expiryLifecycle: instance.expiryLifecycle
+        })
+      ).catch((error) => {
         const status = error instanceof HttpError ? error.status : 500;
         res.writeHead(status, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: (error as Error)?.message ?? String(error) }));
@@ -265,6 +286,7 @@ export class ControlServer {
       clients,
       eventTransport,
       persist,
+      requestContextShared,
       paths: options.paths,
       linearAdvisoryState,
       controlRuntime
@@ -280,14 +302,19 @@ export class ControlServer {
       runtime: controlRuntime,
       emitControlEvent: (input) => instance.eventTransport.emitControlEvent(input),
       createQuestionChildResolutionAdapter: () =>
-        createRequestQuestionChildResolutionAdapter(instance.buildInternalContext(options.config, token))
+        createRequestQuestionChildResolutionAdapter(
+          buildControlInternalContext({
+            ...instance.requestContextShared,
+            expiryLifecycle: instance.expiryLifecycle
+          })
+        )
     });
     instance.bootstrapLifecycle = createControlServerBootstrapLifecycle({
       paths: options.paths,
       persistControl: persist.control,
       startExpiryLifecycle: () => instance.expiryLifecycle?.start(),
       controlRuntime,
-      createTelegramReadAdapter: () => instance.createTelegramOversightReadAdapter(options.config, token)
+      createTelegramReadAdapter: () => instance.createTelegramOversightReadAdapter()
     });
 
     const host = options.config.ui.bindHost;
@@ -351,46 +378,16 @@ export class ControlServer {
     });
   }
 
-  private buildContext(
-    config: EffectiveDelegationConfig,
-    token: string
-  ): Omit<RequestContext, 'req' | 'res' | 'expiryLifecycle'> {
-    return {
-      token,
-      controlStore: this.controlStore,
-      confirmationStore: this.confirmationStore,
-      questionQueue: this.questionQueue,
-      delegationTokens: this.delegationTokens,
-      sessionTokens: this.sessionTokens,
-      config,
-      persist: this.persist,
-      clients: this.clients,
-      eventTransport: this.eventTransport,
-      paths: this.paths,
-      linearAdvisoryState: this.linearAdvisoryState,
-      runtime: this.controlRuntime
-    };
-  }
-
-  private buildInternalContext(config: EffectiveDelegationConfig, token: string): RequestContext {
-    return {
-      req: null,
-      res: null,
-      ...this.buildContext(config, token),
-      expiryLifecycle: this.expiryLifecycle
-    };
-  }
-
-  private createTelegramOversightReadAdapter(
-    config: EffectiveDelegationConfig,
-    token: string
-  ): TelegramOversightReadAdapter {
+  private createTelegramOversightReadAdapter(): TelegramOversightReadAdapter {
     return {
       readSelectedRun: async () => this.controlRuntime.snapshot().readSelectedRunSnapshot(),
 
       readDispatch: async (): Promise<ControlDispatchPayload> => {
-        const context = this.buildInternalContext(config, token);
-        const runtimeSnapshot = this.controlRuntime.snapshot();
+        const context = buildControlInternalContext({
+          ...this.requestContextShared,
+          expiryLifecycle: this.expiryLifecycle
+        });
+        const runtimeSnapshot = context.runtime.snapshot();
         const result = await readDispatchExtension({
           readDispatchEvaluation: () => runtimeSnapshot.readDispatchEvaluation()
         });
@@ -403,7 +400,10 @@ export class ControlServer {
       },
 
       readQuestions: async (): Promise<QuestionsPayload> => {
-        const context = this.buildInternalContext(config, token);
+        const context = buildControlInternalContext({
+          ...this.requestContextShared,
+          expiryLifecycle: this.expiryLifecycle
+        });
         const questionChildResolutionAdapter = createRequestQuestionChildResolutionAdapter(context);
         await (this.expiryLifecycle?.expireQuestions(questionChildResolutionAdapter) ?? Promise.resolve());
         const questions = context.questionQueue.list();
@@ -414,44 +414,13 @@ export class ControlServer {
   }
 }
 
-interface RequestContext {
-  req: http.IncomingMessage | null;
-  res: http.ServerResponse | null;
-  token: string;
-  controlStore: ControlStateStore;
-  confirmationStore: ConfirmationStore;
-  questionQueue: QuestionQueue;
-  delegationTokens: DelegationTokenStore;
-  sessionTokens: SessionTokenStore;
-  config: EffectiveDelegationConfig;
-  persist: {
-    control: () => Promise<void>;
-    confirmations: () => Promise<void>;
-    questions: () => Promise<void>;
-    delegationTokens: () => Promise<void>;
-    linearAdvisory: () => Promise<void>;
-  };
-  clients: Set<http.ServerResponse>;
-  eventTransport: ControlEventTransport;
-  paths: RunPaths;
-  linearAdvisoryState: LinearAdvisoryState;
-  runtime: ControlRuntime;
-  expiryLifecycle: ControlExpiryLifecycle | null;
-}
-
-async function handleRequest(context: RequestContext): Promise<void> {
+async function handleRequest(context: ControlRequestContext): Promise<void> {
   if (!context.req || !context.res) {
     return;
   }
   const { req, res } = context;
   const url = new URL(req.url ?? '/', 'http://localhost');
-  const runtimeSnapshot = context.runtime.snapshot();
-  const presenterContext = {
-    controlStore: context.controlStore,
-    paths: context.paths,
-    readSelectedRunSnapshot: () => runtimeSnapshot.readSelectedRunSnapshot(),
-    readCompatibilityProjection: () => runtimeSnapshot.readCompatibilityProjection()
-  };
+  const { runtimeSnapshot, presenterContext } = buildControlPresenterRuntimeContext(context);
   if (url.pathname === '/health') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ status: 'ok', timestamp: isoTimestamp() }));
@@ -554,7 +523,7 @@ async function handleRequest(context: RequestContext): Promise<void> {
 }
 
 async function emitLinearWebhookAuditEvent(
-  context: RequestContext,
+  context: ControlRequestContext,
   input: LinearWebhookAuditEventInput
 ): Promise<void> {
   await context.eventTransport.emitControlEvent({
@@ -573,7 +542,7 @@ async function emitLinearWebhookAuditEvent(
 }
 
 async function emitDispatchPilotAuditEvents(
-  context: RequestContext,
+  context: ControlRequestContext,
   input: {
     surface: 'api_v1_dispatch' | 'telegram_dispatch';
     evaluation: DispatchPilotEvaluation;
@@ -627,7 +596,7 @@ function writeControlError(
 }
 
 async function emitControlActionAuditEvent(
-  context: RequestContext,
+  context: ControlRequestContext,
   input: {
     outcome: 'applied' | 'replayed';
     action: ControlAction['action'];
@@ -651,7 +620,7 @@ async function emitControlActionAuditEvent(
 }
 
 function buildControlActionTracePayload(
-  context: RequestContext,
+  context: ControlRequestContext,
   input: {
     action: ControlAction['action'];
     requestedBy: string;
@@ -863,7 +832,7 @@ function resolveUiContentType(assetPath: string): string {
   return 'application/octet-stream';
 }
 
-function createRequestQuestionChildResolutionAdapter(context: RequestContext) {
+function createRequestQuestionChildResolutionAdapter(context: ControlRequestContext) {
   return createQuestionChildResolutionAdapter({
     allowedRunRoots: context.config.ui.allowedRunRoots,
     allowedBindHosts: context.config.ui.allowedBindHosts,
@@ -876,7 +845,7 @@ function createRequestQuestionChildResolutionAdapter(context: RequestContext) {
 }
 
 async function emitQuestionChildResolutionFallbackEvent(
-  context: RequestContext,
+  context: ControlRequestContext,
   payload: QuestionChildResolutionFallbackEvent
 ): Promise<void> {
   await context.eventTransport.emitControlEvent({

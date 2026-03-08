@@ -16,25 +16,25 @@
 
 - [x] `tasks/index.json`, `docs/TASKS.md`, and `docs/docs-freshness-registry.json` updated. Evidence: `tasks/index.json`, `docs/TASKS.md`, `docs/docs-freshness-registry.json`.
 - [x] Local read-only review approval captured in the spec/checklist notes. Evidence: `tasks/specs/1072-coordinator-symphony-aligned-control-request-context-assembly-extraction.md`, `docs/findings/1072-control-request-context-assembly-extraction-deliberation.md`, `out/1071-coordinator-symphony-aligned-control-event-transport-extraction/manual/20260308T152650Z-closeout/14-next-slice-note.md`.
-- [ ] docs-review approval/override captured for registered `1072`. Evidence: `out/1072-coordinator-symphony-aligned-control-request-context-assembly-extraction/manual/<timestamp>-docs-first/00-summary.md`.
+- [x] docs-review approval/override captured for registered `1072`. Evidence: `out/1072-coordinator-symphony-aligned-control-request-context-assembly-extraction/manual/20260308T154641Z-docs-first/05-docs-review-override.md`.
 
 ## Control Request Context Assembly Extraction
 
-- [ ] Shared request-context and internal-context assembly ownership moved out of `controlServer.ts` into a dedicated builder under `orchestrator/src/cli/control/`. Evidence: `orchestrator/src/cli/control/controlServer.ts`, `orchestrator/src/cli/control/`.
-- [ ] The extracted builder preserves request/helper call patterns, internal-context behavior, and presenter/runtime snapshot composition. Evidence: `orchestrator/src/cli/control/`, `orchestrator/tests/ControlServer.test.ts`.
-- [ ] Request/route behavior remains intact after the context-builder extraction. Evidence: `orchestrator/src/cli/control/controlServer.ts`, `orchestrator/tests/ControlServer.test.ts`.
+- [x] Shared request-context and internal-context assembly ownership moved out of `controlServer.ts` into a dedicated builder under `orchestrator/src/cli/control/`. Evidence: `orchestrator/src/cli/control/controlServer.ts`, `orchestrator/src/cli/control/controlRequestContext.ts`.
+- [x] The extracted builder preserves request/helper call patterns, internal-context behavior, and presenter/runtime snapshot composition. Evidence: `orchestrator/src/cli/control/controlRequestContext.ts`, `orchestrator/tests/ControlRequestContext.test.ts`, `out/1072-coordinator-symphony-aligned-control-request-context-assembly-extraction/manual/20260308T220352Z-closeout/11-manual-control-request-context-check.json`.
+- [x] Request/route behavior remains intact after the context-builder extraction. Evidence: `orchestrator/src/cli/control/controlServer.ts`, `orchestrator/tests/ControlServer.test.ts`, `out/1072-coordinator-symphony-aligned-control-request-context-assembly-extraction/manual/20260308T220352Z-closeout/05b-targeted-tests.log`.
 
 ## Validation + Closeout
 
-- [ ] `node scripts/delegation-guard.mjs`. Evidence: `out/1072-coordinator-symphony-aligned-control-request-context-assembly-extraction/manual/<timestamp>-closeout/01-delegation-guard.log`.
-- [ ] `node scripts/spec-guard.mjs --dry-run`. Evidence: `out/1072-coordinator-symphony-aligned-control-request-context-assembly-extraction/manual/<timestamp>-closeout/02-spec-guard.log`.
-- [ ] `npm run build`. Evidence: `out/1072-coordinator-symphony-aligned-control-request-context-assembly-extraction/manual/<timestamp>-closeout/03-build.log`.
-- [ ] `npm run lint`. Evidence: `out/1072-coordinator-symphony-aligned-control-request-context-assembly-extraction/manual/<timestamp>-closeout/04-lint.log`.
-- [ ] `npm run test`. Evidence: `out/1072-coordinator-symphony-aligned-control-request-context-assembly-extraction/manual/<timestamp>-closeout/05-test.log`.
-- [ ] `npm run docs:check`. Evidence: `out/1072-coordinator-symphony-aligned-control-request-context-assembly-extraction/manual/<timestamp>-closeout/06-docs-check.log`.
-- [ ] `npm run docs:freshness`. Evidence: `out/1072-coordinator-symphony-aligned-control-request-context-assembly-extraction/manual/<timestamp>-closeout/07-docs-freshness.log`.
-- [ ] `node scripts/diff-budget.mjs`. Evidence: `out/1072-coordinator-symphony-aligned-control-request-context-assembly-extraction/manual/<timestamp>-closeout/08-diff-budget.log`.
-- [ ] `npm run review`. Evidence: `out/1072-coordinator-symphony-aligned-control-request-context-assembly-extraction/manual/<timestamp>-closeout/09-review.log`.
-- [ ] `npm run pack:smoke`. Evidence: `out/1072-coordinator-symphony-aligned-control-request-context-assembly-extraction/manual/<timestamp>-closeout/10-pack-smoke.log`.
-- [ ] Manual/mock request-context builder evidence captured. Evidence: `out/1072-coordinator-symphony-aligned-control-request-context-assembly-extraction/manual/<timestamp>-closeout/11-manual-control-request-context-check.json`.
-- [ ] Elegance review completed. Evidence: `out/1072-coordinator-symphony-aligned-control-request-context-assembly-extraction/manual/<timestamp>-closeout/12-elegance-review.md`.
+- [x] `node scripts/delegation-guard.mjs`. Evidence: `out/1072-coordinator-symphony-aligned-control-request-context-assembly-extraction/manual/20260308T220352Z-closeout/01-delegation-guard.log`.
+- [x] `node scripts/spec-guard.mjs --dry-run`. Evidence: `out/1072-coordinator-symphony-aligned-control-request-context-assembly-extraction/manual/20260308T220352Z-closeout/02-spec-guard.log`.
+- [x] `npm run build`. Evidence: `out/1072-coordinator-symphony-aligned-control-request-context-assembly-extraction/manual/20260308T220352Z-closeout/03-build.log`.
+- [x] `npm run lint`. Evidence: `out/1072-coordinator-symphony-aligned-control-request-context-assembly-extraction/manual/20260308T220352Z-closeout/04-lint.log`.
+- [x] `npm run test`. Evidence: `out/1072-coordinator-symphony-aligned-control-request-context-assembly-extraction/manual/20260308T220352Z-closeout/05-test.log`, `out/1072-coordinator-symphony-aligned-control-request-context-assembly-extraction/manual/20260308T220352Z-closeout/05b-targeted-tests.log`, `out/1072-coordinator-symphony-aligned-control-request-context-assembly-extraction/manual/20260308T220352Z-closeout/13-override-notes.md`.
+- [x] `npm run docs:check`. Evidence: `out/1072-coordinator-symphony-aligned-control-request-context-assembly-extraction/manual/20260308T220352Z-closeout/06-docs-check.log`.
+- [x] `npm run docs:freshness`. Evidence: `out/1072-coordinator-symphony-aligned-control-request-context-assembly-extraction/manual/20260308T220352Z-closeout/07-docs-freshness.log`.
+- [x] `node scripts/diff-budget.mjs`. Evidence: `out/1072-coordinator-symphony-aligned-control-request-context-assembly-extraction/manual/20260308T220352Z-closeout/08-diff-budget.log`, `out/1072-coordinator-symphony-aligned-control-request-context-assembly-extraction/manual/20260308T220352Z-closeout/13-override-notes.md`.
+- [x] `npm run review`. Evidence: `out/1072-coordinator-symphony-aligned-control-request-context-assembly-extraction/manual/20260308T220352Z-closeout/09-review.log`, `out/1072-coordinator-symphony-aligned-control-request-context-assembly-extraction/manual/20260308T220352Z-closeout/13-override-notes.md`.
+- [x] `npm run pack:smoke`. Evidence: `out/1072-coordinator-symphony-aligned-control-request-context-assembly-extraction/manual/20260308T220352Z-closeout/10-pack-smoke.log`.
+- [x] Manual/mock request-context builder evidence captured. Evidence: `out/1072-coordinator-symphony-aligned-control-request-context-assembly-extraction/manual/20260308T220352Z-closeout/11-manual-control-request-context-check.json`.
+- [x] Elegance review completed. Evidence: `out/1072-coordinator-symphony-aligned-control-request-context-assembly-extraction/manual/20260308T220352Z-closeout/12-elegance-review.md`.
