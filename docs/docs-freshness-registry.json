@@ -7808,6 +7808,55 @@
       "cadence_days": 30
     },
     {
+      "path": ".agent/task/1070-coordinator-symphony-aligned-control-server-bootstrap-and-telegram-bridge-lifecycle-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-08",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-control-server-bootstrap-and-telegram-bridge-lifecycle-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-08",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/PRD-coordinator-symphony-aligned-control-server-bootstrap-and-telegram-bridge-lifecycle-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-08",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/TECH_SPEC-coordinator-symphony-aligned-control-server-bootstrap-and-telegram-bridge-lifecycle-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-08",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/findings/1070-control-server-bootstrap-and-telegram-bridge-lifecycle-extraction-deliberation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-08",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/specs/1070-coordinator-symphony-aligned-control-server-bootstrap-and-telegram-bridge-lifecycle-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-08",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/tasks-1070-coordinator-symphony-aligned-control-server-bootstrap-and-telegram-bridge-lifecycle-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-08",
+      "cadence_days": 30
+    },
+    {
       "path": ".agent/task/1069-coordinator-symphony-aligned-expiry-cycle-and-timer-ownership-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
