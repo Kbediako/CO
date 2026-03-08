@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260308-1067-coordinator-symphony-aligned-standalone-review-manifest-affinity-and-termination-closure",
+      "title": "Coordinator Symphony-Aligned Standalone Review Manifest Affinity and Termination Closure",
+      "relates_to": "tasks/tasks-1067-coordinator-symphony-aligned-standalone-review-manifest-affinity-and-termination-closure.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-08",
+      "paths": {
+        "spec": "tasks/specs/1067-coordinator-symphony-aligned-standalone-review-manifest-affinity-and-termination-closure.md",
+        "task": "tasks/tasks-1067-coordinator-symphony-aligned-standalone-review-manifest-affinity-and-termination-closure.md",
+        "agent_task": ".agent/task/1067-coordinator-symphony-aligned-standalone-review-manifest-affinity-and-termination-closure.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-standalone-review-manifest-affinity-and-termination-closure.md"
+      }
+    },
+    {
       "id": "20260308-1066-coordinator-symphony-aligned-standalone-review-validation-suite-boundary-guard",
       "title": "Coordinator Symphony-Aligned Standalone Review Validation-Suite Boundary Guard",
       "relates_to": "tasks/tasks-1066-coordinator-symphony-aligned-standalone-review-validation-suite-boundary-guard.md",

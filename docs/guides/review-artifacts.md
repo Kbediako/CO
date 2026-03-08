@@ -8,14 +8,14 @@
 - The CLI output (stdout+stderr) streams to `review/output.log` as soon as `codex review` starts running.
 - Runtime telemetry writes to `review/telemetry.json` (best-effort command/startup summary + tail, with bounded command samples to keep artifacts compact).
 - The script echoes both relative paths before invoking the CLI (e.g., `Review prompt saved to: .runs/0303-orchestrator-autonomy/cli/2025.../review/prompt.txt`), so you can paste them straight into a terminal or a PR comment.
-- The run directory housing `review/` comes from `scripts/run-review.ts` via `resolveReviewArtifactsDir()`: it uses the manifest directory (`path.dirname(manifest.json)`) unless `CODEX_ORCHESTRATOR_RUN_DIR` is set, so overrides land in custom folders if needed.
+- The run directory housing `review/` comes from `scripts/run-review.ts` via `resolveReviewArtifactsDir()`: it follows the resolved manifest lineage, using `CODEX_ORCHESTRATOR_RUN_DIR` only when that directory contains the resolved manifest; otherwise it falls back to the manifest directory (`path.dirname(manifest.json)`).
 - This artifact contract is exercised in downstream simulation by `npm run pack:smoke` (temp mock repo + packaged CLI), not only source-checkout tests.
 
 ## Locating the run directory from a manifest
 
 1. Find the manifest that fed the review. The wrapper prints it (and the CLI summary does too) as something like `.runs/0101/cli/<run-id>/manifest.json`.
 2. The run directory is the manifest’s parent directory. For example, if the manifest is `.runs/0101/cli/2026-01-02T03-04-05-678Z/manifest.json`, then the run directory is `.runs/0101/cli/2026-01-02T03-04-05-678Z`.
-3. If your workflow sets `CODEX_ORCHESTRATOR_RUN_DIR`, that value replaces the manifest’s parent directory and the `review/` subdirectory lives under it instead.
+3. If your workflow sets `CODEX_ORCHESTRATOR_RUN_DIR` and it matches the resolved manifest lineage, the `review/` subdirectory lives under that directory; otherwise the wrapper falls back to the resolved manifest’s parent directory so artifacts and evidence stay aligned.
 4. Inside that run directory you will always find `review/prompt.txt`; when review executes you also get `review/output.log` and `review/telemetry.json`.
 
 ## Quick commands

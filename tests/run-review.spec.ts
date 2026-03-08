@@ -92,6 +92,13 @@ fi
     if [[ "$mode" == "hang" ]]; then
       while true; do sleep 1; done
     fi
+    if [[ "$mode" == "term-graceful-timeout" ]]; then
+      trap 'echo "term-sentinel"; exit 0' TERM
+      echo "thinking"
+      echo "exec"
+      echo "/bin/zsh -lc 'sed -n 1,40p scripts/run-review.ts' in /Users/kbediako/Code/CO"
+      while true; do sleep 1; done
+    fi
     if [[ "$mode" == "delegation-loop" ]]; then
       while true; do
         echo "mcp: delegation starting"
@@ -434,7 +441,9 @@ function baseEnv(sandbox: string, codexBin: string): Record<string, string | und
   delete env.CODEX_REVIEW_DEBUG_TELEMETRY;
   delete env.CODEX_REVIEW_LARGE_SCOPE_FILE_THRESHOLD;
   delete env.CODEX_REVIEW_LARGE_SCOPE_LINE_THRESHOLD;
+  delete env.CODEX_ORCHESTRATOR_MANIFEST_PATH;
   delete env.CODEX_ORCHESTRATOR_RUN_DIR;
+  delete env.MANIFEST;
   delete env.SKIP_DIFF_BUDGET;
   delete env.DIFF_BUDGET_STAGE;
   delete env.DIFF_BUDGET_OVERRIDE_REASON;
@@ -1248,6 +1257,81 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(result.stdout).not.toContain('evidence: .runs/0101/');
   });
 
+  it('prefers CODEX_ORCHESTRATOR_MANIFEST_PATH over stale MANIFEST and keeps artifacts on the active run dir', async () => {
+    const sandbox = await makeSandbox();
+    const staleManifestPath = await makeManifestForTask(sandbox, 'sample-task', 'docs-review-old');
+    const activeManifestPath = await makeManifestForTask(sandbox, 'sample-task', 'implementation-gate-active');
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(null, {
+      ...baseEnv(sandbox, codexBin),
+      MCP_RUNNER_TASK_ID: 'sample-task',
+      MANIFEST: staleManifestPath,
+      CODEX_ORCHESTRATOR_MANIFEST_PATH: activeManifestPath,
+      CODEX_ORCHESTRATOR_RUN_DIR: dirname(activeManifestPath)
+    });
+
+    expect(result.exitCode).toBe(0);
+    const activePromptPath = join(dirname(activeManifestPath), 'review', 'prompt.txt');
+    const activePrompt = await readFile(activePromptPath, 'utf8');
+    expect(activePrompt).toContain(
+      'Evidence manifest: .runs/sample-task/cli/implementation-gate-active/manifest.json'
+    );
+    expect(activePrompt).not.toContain('docs-review-old');
+  });
+
+  it('falls back to MANIFEST when CODEX_ORCHESTRATOR_MANIFEST_PATH is absent', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifestForTask(sandbox, 'sample-task', 'legacy-manifest-env');
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(null, {
+      ...baseEnv(sandbox, codexBin),
+      MCP_RUNNER_TASK_ID: 'sample-task',
+      MANIFEST: manifestPath
+    });
+
+    expect(result.exitCode).toBe(0);
+    const promptPath = join(dirname(manifestPath), 'review', 'prompt.txt');
+    const prompt = await readFile(promptPath, 'utf8');
+    expect(prompt).toContain('Evidence manifest: .runs/sample-task/cli/legacy-manifest-env/manifest.json');
+  });
+
+  it('falls back to the run-dir manifest when explicit manifest envs are absent', async () => {
+    const sandbox = await makeSandbox();
+    await makeManifestForTask(sandbox, 'sample-task', 'docs-review-old');
+    const activeManifestPath = await makeManifestForTask(sandbox, 'sample-task', 'run-dir-active');
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(null, {
+      ...baseEnv(sandbox, codexBin),
+      MCP_RUNNER_TASK_ID: 'sample-task',
+      CODEX_ORCHESTRATOR_RUN_DIR: dirname(activeManifestPath)
+    });
+
+    expect(result.exitCode).toBe(0);
+    const promptPath = join(dirname(activeManifestPath), 'review', 'prompt.txt');
+    const prompt = await readFile(promptPath, 'utf8');
+    expect(prompt).toContain('Evidence manifest: .runs/sample-task/cli/run-dir-active/manifest.json');
+  });
+
+  it('keeps review artifacts aligned with the resolved manifest when CODEX_ORCHESTRATOR_RUN_DIR is stale', async () => {
+    const sandbox = await makeSandbox();
+    const staleRunManifestPath = await makeManifestForTask(sandbox, 'sample-task', 'stale-run-dir');
+    const activeManifestPath = await makeManifestForTask(sandbox, 'sample-task', 'active-manifest');
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(null, {
+      ...baseEnv(sandbox, codexBin),
+      MCP_RUNNER_TASK_ID: 'sample-task',
+      CODEX_ORCHESTRATOR_MANIFEST_PATH: activeManifestPath,
+      CODEX_ORCHESTRATOR_RUN_DIR: dirname(staleRunManifestPath)
+    });
+
+    expect(result.exitCode).toBe(0);
+    const activePromptPath = join(dirname(activeManifestPath), 'review', 'prompt.txt');
+    const stalePromptPath = join(dirname(staleRunManifestPath), 'review', 'prompt.txt');
+    const activePrompt = await readFile(activePromptPath, 'utf8');
+    expect(activePrompt).toContain('Evidence manifest: .runs/sample-task/cli/active-manifest/manifest.json');
+    await expect(readFile(stalePromptPath, 'utf8')).rejects.toMatchObject({ code: 'ENOENT' });
+  });
+
   it('fails fast when delegation startup loops without review progress', async () => {
     const sandbox = await makeSandbox();
     const manifestPath = await makeManifest(sandbox);
@@ -1469,6 +1553,29 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(telemetry.summary.commandIntentViolationCount).toBeGreaterThanOrEqual(1);
     expect(telemetry.summary.commandIntentViolationKinds).toContain('validation-runner');
     expect(telemetry.summary.commandIntentViolationSamples[0]).toContain('[redacted command-intent');
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('waits for graceful child termination before surfacing timeout failure', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'term-graceful-timeout',
+      CODEX_REVIEW_TIMEOUT_SECONDS: '1',
+      CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0'
+    });
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).toContain('codex review timed out after 1s');
+    const outputLogPath = join(dirname(manifestPath), 'review', 'output.log');
+    const outputLog = await readFile(outputLogPath, 'utf8');
+    expect(outputLog).toContain('term-sentinel');
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+    };
+    expect(telemetry.status).toBe('failed');
   }, LONG_WAIT_TEST_TIMEOUT_MS);
 
   it('fails bounded review even when a forbidden validation runner exits before the interval tick', async () => {

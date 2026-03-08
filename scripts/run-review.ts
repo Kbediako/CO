@@ -300,7 +300,7 @@ function parseArgs(argv: string[]): CliOptions {
   }
 
   if (!options.manifest) {
-    const envManifest = process.env.MANIFEST ?? process.env.CODEX_ORCHESTRATOR_MANIFEST_PATH;
+    const envManifest = process.env.CODEX_ORCHESTRATOR_MANIFEST_PATH ?? process.env.MANIFEST;
     if (envManifest && envManifest.trim().length > 0) {
       options.manifest = path.resolve(repoRoot, envManifest.trim());
     }
@@ -352,6 +352,11 @@ async function resolveManifestPath(options: CliOptions): Promise<string> {
     return options.manifest;
   }
 
+  const runDirManifest = await resolveManifestPathFromRunDir();
+  if (runDirManifest) {
+    return runDirManifest;
+  }
+
   const manifests = await collectManifests(options.runsDir, options.task);
   if (manifests.length === 0) {
     throw new Error('No run manifests found. Provide --manifest or execute the orchestrator first.');
@@ -370,6 +375,16 @@ async function resolveManifestPath(options: CliOptions): Promise<string> {
 
   scored.sort((a, b) => b.mtimeMs - a.mtimeMs);
   return scored[0]?.manifestPath ?? manifests[0];
+}
+
+async function resolveManifestPathFromRunDir(): Promise<string | null> {
+  const configuredRunDir = process.env.CODEX_ORCHESTRATOR_RUN_DIR?.trim();
+  if (!configuredRunDir) {
+    return null;
+  }
+
+  const manifestPath = path.join(path.resolve(repoRoot, configuredRunDir), 'manifest.json');
+  return (await pathExists(manifestPath)) ? manifestPath : null;
 }
 
 async function main(): Promise<void> {
@@ -1154,8 +1169,14 @@ interface ReviewArtifactPaths {
 
 function resolveReviewArtifactsDir(manifestPath: string): string {
   const configuredRunDir = process.env.CODEX_ORCHESTRATOR_RUN_DIR?.trim();
-  const runDir = configuredRunDir && configuredRunDir.length > 0 ? configuredRunDir : path.dirname(manifestPath);
-  return path.join(runDir, REVIEW_ARTIFACTS_DIRNAME);
+  if (configuredRunDir && configuredRunDir.length > 0) {
+    const resolvedRunDir = path.resolve(repoRoot, configuredRunDir);
+    const configuredManifestPath = path.join(resolvedRunDir, 'manifest.json');
+    if (configuredManifestPath === path.resolve(manifestPath)) {
+      return path.join(resolvedRunDir, REVIEW_ARTIFACTS_DIRNAME);
+    }
+  }
+  return path.join(path.dirname(manifestPath), REVIEW_ARTIFACTS_DIRNAME);
 }
 
 async function prepareReviewArtifacts(manifestPath: string, prompt: string): Promise<ReviewArtifactPaths> {
@@ -1699,6 +1720,7 @@ async function waitForChildExit(
     let settled = false;
     let handlesCleared = false;
     let cleanupCompleted = false;
+    let pendingTermination: CodexReviewError | null = null;
     let timeoutHandle: NodeJS.Timeout | undefined;
     let stallHandle: NodeJS.Timeout | undefined;
     let startupLoopHandle: NodeJS.Timeout | undefined;
@@ -1783,6 +1805,10 @@ async function waitForChildExit(
         }
         await waitForOutputSettlement();
         cleanup();
+        if (pendingTermination) {
+          reject(pendingTermination);
+          return;
+        }
         const commandIntentBoundaryState = options.getCommandIntentBoundaryState();
         if (commandIntentBoundaryState.triggered) {
           reject(
@@ -1830,10 +1856,16 @@ async function waitForChildExit(
     child.once('close', onClose);
 
     const requestTermination = (message: string, timedOut = true) => {
-      if (settled) {
+      if (settled || pendingTermination || child.exitCode !== null) {
         return;
       }
 
+      pendingTermination = new CodexReviewError(message, {
+        exitCode: 1,
+        signal: null,
+        timedOut,
+        outputPreview: ''
+      });
       signalChildProcess(child, 'SIGTERM', options.detached);
       hardKillArmed = true;
       killHandle = setTimeout(() => {
@@ -1842,15 +1874,6 @@ async function waitForChildExit(
         }
       }, 5000);
       killHandle.unref();
-
-      settleWithError(
-        new CodexReviewError(message, {
-          exitCode: 1,
-          signal: null,
-          timedOut,
-          outputPreview: ''
-        })
-      );
     };
 
     const timeoutMs = options.timeoutMs;
