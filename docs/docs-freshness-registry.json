@@ -3,6 +3,55 @@
   "generated_at": "2026-03-10",
   "entries": [
     {
+      "path": ".agent/task/1099-coordinator-symphony-aligned-standalone-review-structured-scope-path-rendering-boundary.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-10",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-standalone-review-structured-scope-path-rendering-boundary.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-10",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/PRD-coordinator-symphony-aligned-standalone-review-structured-scope-path-rendering-boundary.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-10",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/TECH_SPEC-coordinator-symphony-aligned-standalone-review-structured-scope-path-rendering-boundary.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-10",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/findings/1099-standalone-review-structured-scope-path-rendering-boundary-deliberation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-10",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/specs/1099-coordinator-symphony-aligned-standalone-review-structured-scope-path-rendering-boundary.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-10",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/tasks-1099-coordinator-symphony-aligned-standalone-review-structured-scope-path-rendering-boundary.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-10",
+      "cadence_days": 30
+    },
+    {
       "path": ".agent/task/1098-coordinator-symphony-aligned-standalone-review-canonical-scope-summary-boundary.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
