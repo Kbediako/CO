@@ -4,16 +4,15 @@ import {
   createControlServerBootstrapLifecycle,
   type ControlServerBootstrapLifecycle
 } from './controlServerBootstrapLifecycle.js';
+import { createControlTelegramBridgeLifecycle } from './controlTelegramBridgeLifecycle.js';
 import { createControlTelegramReadAdapter } from './controlTelegramReadAdapter.js';
 import type { ControlRequestContext, ControlRequestSharedContext } from './controlRequestContext.js';
-import type { ControlRuntime } from './controlRuntime.js';
 import type { DispatchPilotEvaluation } from './trackerDispatchPilot.js';
 
 export interface ControlTelegramBridgeBootstrapLifecycleContext {
   paths: Pick<RunPaths, 'runDir' | 'controlAuthPath' | 'controlEndpointPath'>;
   persistControl: () => Promise<void>;
   startExpiryLifecycle: () => Promise<void> | void;
-  controlRuntime: Pick<ControlRuntime, 'subscribe'>;
   requestContextShared: ControlRequestSharedContext;
   getExpiryLifecycle(): ControlExpiryLifecycle | null;
   emitDispatchPilotAuditEvents(
@@ -29,16 +28,23 @@ export interface ControlTelegramBridgeBootstrapLifecycleContext {
 export function createControlTelegramBridgeBootstrapLifecycle(
   context: ControlTelegramBridgeBootstrapLifecycleContext
 ): ControlServerBootstrapLifecycle {
-  return createControlServerBootstrapLifecycle({
-    paths: context.paths,
-    persistControl: context.persistControl,
-    startExpiryLifecycle: context.startExpiryLifecycle,
-    controlRuntime: context.controlRuntime,
+  const telegramBridgeLifecycle = createControlTelegramBridgeLifecycle({
+    runDir: context.paths.runDir,
+    controlRuntime: context.requestContextShared.runtime,
     createTelegramReadAdapter: () =>
       createControlTelegramReadAdapter({
         ...context.requestContextShared,
         expiryLifecycle: context.getExpiryLifecycle(),
         emitDispatchPilotAuditEvents: context.emitDispatchPilotAuditEvents
       })
+  });
+  return createControlServerBootstrapLifecycle({
+    paths: {
+      controlAuthPath: context.paths.controlAuthPath,
+      controlEndpointPath: context.paths.controlEndpointPath
+    },
+    persistControl: context.persistControl,
+    startExpiryLifecycle: context.startExpiryLifecycle,
+    telegramBridgeLifecycle
   });
 }

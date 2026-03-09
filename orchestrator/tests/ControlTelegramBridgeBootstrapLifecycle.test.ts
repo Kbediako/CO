@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   createControlTelegramBridgeBootstrapLifecycle
 } from '../src/cli/control/controlTelegramBridgeBootstrapLifecycle.js';
+import { createControlTelegramBridgeLifecycle } from '../src/cli/control/controlTelegramBridgeLifecycle.js';
 import {
   createControlServerBootstrapLifecycle
 } from '../src/cli/control/controlServerBootstrapLifecycle.js';
@@ -10,6 +11,10 @@ import { createControlTelegramReadAdapter } from '../src/cli/control/controlTele
 
 vi.mock('../src/cli/control/controlServerBootstrapLifecycle.js', () => ({
   createControlServerBootstrapLifecycle: vi.fn()
+}));
+
+vi.mock('../src/cli/control/controlTelegramBridgeLifecycle.js', () => ({
+  createControlTelegramBridgeLifecycle: vi.fn()
 }));
 
 vi.mock('../src/cli/control/controlTelegramReadAdapter.js', () => ({
@@ -23,7 +28,9 @@ describe('ControlTelegramBridgeBootstrapLifecycle', () => {
 
   it('builds the generic bootstrap lifecycle with a lazy Telegram read-adapter closure', () => {
     const lifecycle = { start: vi.fn(), close: vi.fn() };
+    const telegramBridgeLifecycle = { start: vi.fn(), close: vi.fn() };
     vi.mocked(createControlServerBootstrapLifecycle).mockReturnValue(lifecycle as never);
+    vi.mocked(createControlTelegramBridgeLifecycle).mockReturnValue(telegramBridgeLifecycle as never);
     vi.mocked(createControlTelegramReadAdapter).mockReturnValue({
       readSelectedRun: vi.fn(),
       readDispatch: vi.fn(),
@@ -56,7 +63,6 @@ describe('ControlTelegramBridgeBootstrapLifecycle', () => {
       },
       persistControl: async () => undefined,
       startExpiryLifecycle: () => undefined,
-      controlRuntime: { subscribe: vi.fn() } as never,
       requestContextShared: requestContextShared as never,
       getExpiryLifecycle: () => expiryLifecycle,
       emitDispatchPilotAuditEvents
@@ -67,12 +73,16 @@ describe('ControlTelegramBridgeBootstrapLifecycle', () => {
 
     const input = vi.mocked(createControlServerBootstrapLifecycle).mock.calls[0]?.[0];
     expect(input?.paths).toEqual({
-      runDir: '/tmp/run',
       controlAuthPath: '/tmp/run/control-auth.json',
       controlEndpointPath: '/tmp/run/control-endpoint.json'
     });
+    expect(input?.telegramBridgeLifecycle).toBe(telegramBridgeLifecycle);
 
-    input?.createTelegramReadAdapter();
+    const bridgeLifecycleInput = vi.mocked(createControlTelegramBridgeLifecycle).mock.calls[0]?.[0];
+    expect(bridgeLifecycleInput?.runDir).toBe('/tmp/run');
+    expect(bridgeLifecycleInput?.controlRuntime).toBe(requestContextShared.runtime);
+
+    bridgeLifecycleInput?.createTelegramReadAdapter();
     expect(createControlTelegramReadAdapter).toHaveBeenCalledWith({
       ...requestContextShared,
       expiryLifecycle,
@@ -80,7 +90,7 @@ describe('ControlTelegramBridgeBootstrapLifecycle', () => {
     });
 
     expiryLifecycle = null as never;
-    input?.createTelegramReadAdapter();
+    bridgeLifecycleInput?.createTelegramReadAdapter();
     expect(createControlTelegramReadAdapter).toHaveBeenLastCalledWith({
       ...requestContextShared,
       expiryLifecycle: null,

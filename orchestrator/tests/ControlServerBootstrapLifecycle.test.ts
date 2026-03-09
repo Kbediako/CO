@@ -21,25 +21,14 @@ async function createLifecycleRoot() {
   };
 }
 
-function createReadAdapter() {
-  return {
-    readSelectedRun: vi.fn(async () => ({
-      selected: null,
-      dispatchPilot: null,
-      tracked: null
-    })),
-    readDispatch: vi.fn(async () => ({})),
-    readQuestions: vi.fn(async () => ({ questions: [] }))
-  };
-}
-
 describe('createControlServerBootstrapLifecycle', () => {
   it('persists metadata before the bridge starts', async () => {
     const { root, runDir, paths } = await createLifecycleRoot();
     const controlPath = join(runDir, 'control.json');
     const order: string[] = [];
-    const startTelegramBridgeImpl = vi.fn(async () => {
-      order.push('startBridge');
+    const telegramBridgeLifecycle = {
+      start: vi.fn(async () => {
+        order.push('startBridge');
       const authPayload = JSON.parse(await readFile(paths.controlAuthPath, 'utf8')) as {
         token?: string;
         created_at?: string;
@@ -63,7 +52,9 @@ describe('createControlServerBootstrapLifecycle', () => {
       }
       expect(controlPayload.control_seq).toBe(0);
       return null;
-    });
+      }),
+      close: vi.fn(async () => undefined)
+    };
 
     const lifecycle = createControlServerBootstrapLifecycle({
       paths,
@@ -74,11 +65,7 @@ describe('createControlServerBootstrapLifecycle', () => {
       startExpiryLifecycle: () => {
         order.push('startExpiryLifecycle');
       },
-      controlRuntime: {
-        subscribe: vi.fn(() => () => undefined)
-      },
-      createTelegramReadAdapter: createReadAdapter,
-      startTelegramBridgeImpl
+      telegramBridgeLifecycle
     });
 
     try {
@@ -88,70 +75,31 @@ describe('createControlServerBootstrapLifecycle', () => {
       });
 
       expect(order).toEqual(['persistControl', 'startExpiryLifecycle', 'startBridge']);
-      expect(startTelegramBridgeImpl).toHaveBeenCalledOnce();
+      expect(telegramBridgeLifecycle.start).toHaveBeenCalledOnce();
     } finally {
       await lifecycle.close();
       await rm(root, { recursive: true, force: true });
     }
   });
 
-  it('treats telegram bridge startup failure as non-fatal', async () => {
-    const { root, runDir, paths } = await createLifecycleRoot();
-    const controlPath = join(runDir, 'control.json');
-    const subscribe = vi.fn(() => () => undefined);
-    const lifecycle = createControlServerBootstrapLifecycle({
-      paths,
-      persistControl: async () => {
-        await writeFile(controlPath, JSON.stringify({ control_seq: 1 }), 'utf8');
-      },
-      controlRuntime: { subscribe },
-      createTelegramReadAdapter: createReadAdapter,
-      startTelegramBridgeImpl: vi.fn(async () => {
-        throw new Error('bridge-boom');
-      })
-    });
-
-    try {
-      await expect(
-        lifecycle.start({
-          baseUrl: 'http://127.0.0.1:4321',
-          controlToken: 'token-1'
-        })
-      ).resolves.toBeUndefined();
-
-      expect(subscribe).not.toHaveBeenCalled();
-      expect(JSON.parse(await readFile(controlPath, 'utf8'))).toEqual({ control_seq: 1 });
-    } finally {
-      await lifecycle.close();
-      await rm(root, { recursive: true, force: true });
-    }
-  });
-
-  it('unsubscribes before closing the telegram bridge', async () => {
+  it('delegates lifecycle close to the telegram bridge lifecycle', async () => {
     const { root, runDir, paths } = await createLifecycleRoot();
     const controlPath = join(runDir, 'control.json');
     const order: string[] = [];
-    const bridge = {
-      notifyProjectionDelta: vi.fn(async () => undefined),
+    const telegramBridgeLifecycle = {
+      start: vi.fn(async () => {
+        order.push('startBridge');
+      }),
       close: vi.fn(async () => {
-        order.push('close');
+        order.push('closeBridge');
       })
     };
     const lifecycle = createControlServerBootstrapLifecycle({
       paths,
       persistControl: async () => {
-        await writeFile(controlPath, JSON.stringify({ control_seq: 2 }), 'utf8');
+        await writeFile(controlPath, JSON.stringify({ control_seq: 1 }), 'utf8');
       },
-      controlRuntime: {
-        subscribe: vi.fn(() => {
-          order.push('subscribe');
-          return () => {
-            order.push('unsubscribe');
-          };
-        })
-      },
-      createTelegramReadAdapter: createReadAdapter,
-      startTelegramBridgeImpl: vi.fn(async () => bridge)
+      telegramBridgeLifecycle
     });
 
     try {
@@ -161,32 +109,28 @@ describe('createControlServerBootstrapLifecycle', () => {
       });
       await lifecycle.close();
 
-      expect(order).toEqual(['subscribe', 'unsubscribe', 'close']);
-      expect(bridge.close).toHaveBeenCalledOnce();
+      expect(order).toEqual(['startBridge', 'closeBridge']);
+      expect(telegramBridgeLifecycle.close).toHaveBeenCalledOnce();
     } finally {
       await rm(root, { recursive: true, force: true });
     }
   });
 
-  it('treats subscription wiring failure as non-fatal and closes the bridge', async () => {
+  it('treats telegram bridge lifecycle startup failure as non-fatal', async () => {
     const { root, runDir, paths } = await createLifecycleRoot();
     const controlPath = join(runDir, 'control.json');
-    const bridge = {
-      notifyProjectionDelta: vi.fn(async () => undefined),
+    const telegramBridgeLifecycle = {
+      start: vi.fn(async () => {
+        throw new Error('bridge-boom');
+      }),
       close: vi.fn(async () => undefined)
     };
     const lifecycle = createControlServerBootstrapLifecycle({
       paths,
       persistControl: async () => {
-        await writeFile(controlPath, JSON.stringify({ control_seq: 3 }), 'utf8');
+        await writeFile(controlPath, JSON.stringify({ control_seq: 2 }), 'utf8');
       },
-      controlRuntime: {
-        subscribe: vi.fn(() => {
-          throw new Error('subscribe-boom');
-        })
-      },
-      createTelegramReadAdapter: createReadAdapter,
-      startTelegramBridgeImpl: vi.fn(async () => bridge)
+      telegramBridgeLifecycle
     });
 
     try {
@@ -197,7 +141,8 @@ describe('createControlServerBootstrapLifecycle', () => {
         })
       ).resolves.toBeUndefined();
 
-      expect(bridge.close).toHaveBeenCalledOnce();
+      expect(telegramBridgeLifecycle.start).toHaveBeenCalledOnce();
+      expect(JSON.parse(await readFile(controlPath, 'utf8'))).toEqual({ control_seq: 2 });
     } finally {
       await lifecycle.close();
       await rm(root, { recursive: true, force: true });

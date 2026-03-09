@@ -299,7 +299,6 @@ export class ControlServer {
       paths: options.paths,
       persistControl: persist.control,
       startExpiryLifecycle: () => instance.expiryLifecycle?.start(),
-      controlRuntime,
       requestContextShared: instance.requestContextShared,
       getExpiryLifecycle: () => instance.expiryLifecycle,
       emitDispatchPilotAuditEvents

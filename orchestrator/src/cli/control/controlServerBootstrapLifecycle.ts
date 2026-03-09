@@ -1,20 +1,13 @@
 import { logger } from '../../logger.js';
 import type { RunPaths } from '../run/runPaths.js';
-import type { ControlRuntime } from './controlRuntime.js';
 import { persistControlBootstrapMetadata } from './controlBootstrapMetadataPersistence.js';
-import {
-  startTelegramOversightBridge,
-  type TelegramOversightBridge,
-  type TelegramOversightReadAdapter
-} from './telegramOversightBridge.js';
+import type { ControlTelegramBridgeLifecycle } from './controlTelegramBridgeLifecycle.js';
 
 interface ControlServerBootstrapLifecycleOptions {
-  paths: Pick<RunPaths, 'runDir' | 'controlAuthPath' | 'controlEndpointPath'>;
+  paths: Pick<RunPaths, 'controlAuthPath' | 'controlEndpointPath'>;
   persistControl: () => Promise<void>;
   startExpiryLifecycle?: () => Promise<void> | void;
-  controlRuntime: Pick<ControlRuntime, 'subscribe'>;
-  createTelegramReadAdapter: () => TelegramOversightReadAdapter;
-  startTelegramBridgeImpl?: typeof startTelegramOversightBridge;
+  telegramBridgeLifecycle?: ControlTelegramBridgeLifecycle | null;
 }
 
 interface ControlServerBootstrapLifecycleStartOptions {
@@ -34,23 +27,16 @@ export function createControlServerBootstrapLifecycle(
 }
 
 class ControlServerBootstrapLifecycleRuntime implements ControlServerBootstrapLifecycle {
-  private readonly paths: Pick<RunPaths, 'runDir' | 'controlAuthPath' | 'controlEndpointPath'>;
+  private readonly paths: Pick<RunPaths, 'controlAuthPath' | 'controlEndpointPath'>;
   private readonly persistControl: () => Promise<void>;
   private readonly startExpiryLifecycle: () => Promise<void> | void;
-  private readonly controlRuntime: Pick<ControlRuntime, 'subscribe'>;
-  private readonly createTelegramReadAdapter: () => TelegramOversightReadAdapter;
-  private readonly startTelegramBridgeImpl: typeof startTelegramOversightBridge;
-
-  private telegramBridge: TelegramOversightBridge | null = null;
-  private unsubscribeTelegramBridge: (() => void) | null = null;
+  private readonly telegramBridgeLifecycle: ControlTelegramBridgeLifecycle | null;
 
   constructor(options: ControlServerBootstrapLifecycleOptions) {
     this.paths = options.paths;
     this.persistControl = options.persistControl;
     this.startExpiryLifecycle = options.startExpiryLifecycle ?? (() => undefined);
-    this.controlRuntime = options.controlRuntime;
-    this.createTelegramReadAdapter = options.createTelegramReadAdapter;
-    this.startTelegramBridgeImpl = options.startTelegramBridgeImpl ?? startTelegramOversightBridge;
+    this.telegramBridgeLifecycle = options.telegramBridgeLifecycle ?? null;
   }
 
   async start(options: ControlServerBootstrapLifecycleStartOptions): Promise<void> {
@@ -65,53 +51,17 @@ class ControlServerBootstrapLifecycleRuntime implements ControlServerBootstrapLi
       }
     );
     await this.startExpiryLifecycle();
-    await this.startTelegramBridge(options.baseUrl, options.controlToken);
-  }
-
-  async close(): Promise<void> {
-    this.unsubscribeTelegramBridge?.();
-    this.unsubscribeTelegramBridge = null;
-    if (this.telegramBridge) {
-      await this.telegramBridge.close().catch((error) => {
-        logger.warn(`Failed to close Telegram oversight bridge: ${(error as Error)?.message ?? String(error)}`);
-      });
-      this.telegramBridge = null;
-    }
-  }
-
-  private async startTelegramBridge(
-    baseUrl: string,
-    controlToken: string
-  ): Promise<void> {
     try {
-      const bridge = await this.startTelegramBridgeImpl({
-        runDir: this.paths.runDir,
-        readAdapter: this.createTelegramReadAdapter(),
-        baseUrl,
-        controlToken
+      await this.telegramBridgeLifecycle?.start({
+        baseUrl: options.baseUrl,
+        controlToken: options.controlToken
       });
-      if (!bridge) {
-        return;
-      }
-      await this.attachTelegramBridge(bridge);
     } catch (error) {
       logger.warn(`Failed to start Telegram oversight bridge: ${(error as Error)?.message ?? String(error)}`);
     }
   }
 
-  private async attachTelegramBridge(bridge: TelegramOversightBridge): Promise<void> {
-    try {
-      this.unsubscribeTelegramBridge = this.controlRuntime.subscribe((input) =>
-        bridge.notifyProjectionDelta(input)
-      );
-      this.telegramBridge = bridge;
-    } catch (error) {
-      await bridge.close().catch((closeError) => {
-        logger.warn(
-          `Failed to close Telegram oversight bridge: ${(closeError as Error)?.message ?? String(closeError)}`
-        );
-      });
-      throw error;
-    }
+  async close(): Promise<void> {
+    await this.telegramBridgeLifecycle?.close();
   }
 }
