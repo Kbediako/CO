@@ -1,7 +1,7 @@
 ---
 id: 20260309-1089-coordinator-symphony-aligned-control-server-request-body-helper-extraction
 title: Coordinator Symphony-Aligned Control Server Request Body Helper Extraction
-status: active
+status: completed
 owners:
   - Codex
 created: 2026-03-09
@@ -35,3 +35,4 @@ Extract the shared request-body helper cluster from `controlServer.ts` into one 
 ## Notes
 
 - 2026-03-09: Approved for docs-first registration as the next bounded Symphony-aligned slice after `1088`. Evidence: `out/1088-coordinator-symphony-aligned-control-server-audit-and-error-helper-extraction/manual/20260309T125736Z-closeout/12-elegance-review.md`, `out/1088-coordinator-symphony-aligned-control-server-audit-and-error-helper-extraction/manual/20260309T125736Z-closeout/14-next-slice-note.md`, `docs/findings/1089-control-server-request-body-helper-extraction-deliberation.md`.
+- 2026-03-09: Completed. `controlServer.ts` now delegates raw-body / JSON-body parsing through `controlServerRequestBodyHelpers.ts`, focused helper regressions passed `2/2` files with `6/6` selected tests, the full local suite passed `181/181` files with `1217/1217` tests, and the delegated scout also completed a clean full-suite pass. The explicit non-green item is the forced standalone review wrapper drift override captured in `out/1089-coordinator-symphony-aligned-control-server-request-body-helper-extraction/manual/20260309T132458Z-closeout/13-override-notes.md`.
