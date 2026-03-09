@@ -60,7 +60,14 @@ describe('ControlTelegramDispatchRead', () => {
         issueIdentifier: 'task-1077',
         evaluation,
         payload: {
-          dispatch_pilot: evaluation.summary
+          generated_at: '2026-03-09T05:00:00.000Z',
+          dispatch_pilot: evaluation.summary,
+          recommendation: {
+            dispatch_id: 'dispatch-1077',
+            summary: 'Proceed',
+            rationale: 'All gates green',
+            confidence: 0.91
+          }
         }
       } as never;
     });
@@ -84,7 +91,13 @@ describe('ControlTelegramDispatchRead', () => {
     };
 
     await expect(readControlTelegramDispatch(sharedContext as never)).resolves.toEqual({
-      dispatch_pilot: evaluation.summary
+      dispatch_pilot: evaluation.summary,
+      recommendation: {
+        dispatch_id: 'dispatch-1077',
+        summary: 'Proceed',
+        rationale: 'All gates green',
+        confidence: 0.91
+      }
     });
 
     expect(buildControlInternalContext).toHaveBeenCalledWith(sharedContext);
@@ -172,6 +185,84 @@ describe('ControlTelegramDispatchRead', () => {
       surface: 'telegram_dispatch',
       evaluation,
       issueIdentifier: 'task-1077'
+    });
+  });
+
+  it('falls back to evaluation.summary when fail-closed details lack a valid dispatch pilot', async () => {
+    const evaluation = {
+      summary: {
+        advisory_only: true,
+        configured: true,
+        enabled: true,
+        kill_switch: false,
+        status: 'source_unavailable',
+        source_status: 'unavailable',
+        reason: 'dispatch_source_issue_not_found',
+        source_setup: {
+          provider: 'linear',
+          workspace_id: 'lin-workspace',
+          team_id: 'lin-team',
+          project_id: 'lin-project'
+        }
+      },
+      recommendation: null,
+      failure: {
+        status: 404,
+        code: 'dispatch_source_issue_not_found',
+        reason: 'dispatch_source_issue_not_found'
+      }
+    } as never;
+    const internalContext = {
+      runtime: {
+        snapshot: vi.fn(() => ({
+          readDispatchEvaluation: vi.fn()
+        }))
+      }
+    };
+    const emitDispatchPilotAuditEvents = vi.fn(async () => undefined);
+    vi.mocked(buildControlInternalContext).mockReturnValue(internalContext as never);
+    vi.mocked(readDispatchExtension).mockResolvedValue({
+      kind: 'fail_closed',
+      issueIdentifier: 'task-1078',
+      evaluation,
+      failure: evaluation.failure,
+      details: {
+        dispatch_pilot: 'invalid'
+      }
+    } as never);
+
+    await expect(
+      readControlTelegramDispatch({
+        token: 'token',
+        controlStore: {} as never,
+        confirmationStore: {} as never,
+        questionQueue: {} as never,
+        delegationTokens: {} as never,
+        sessionTokens: {} as never,
+        config: {} as never,
+        persist: {} as never,
+        clients: new Set(),
+        eventTransport: {} as never,
+        paths: {} as never,
+        linearAdvisoryState: {} as never,
+        runtime: {} as never,
+        expiryLifecycle: null,
+        emitDispatchPilotAuditEvents
+      } as never)
+    ).resolves.toEqual({
+      dispatch_pilot: evaluation.summary,
+      error: {
+        code: 'dispatch_source_issue_not_found',
+        details: {
+          dispatch_pilot: evaluation.summary
+        }
+      }
+    });
+
+    expect(emitDispatchPilotAuditEvents).toHaveBeenCalledWith(internalContext, {
+      surface: 'telegram_dispatch',
+      evaluation,
+      issueIdentifier: 'task-1078'
     });
   });
 });

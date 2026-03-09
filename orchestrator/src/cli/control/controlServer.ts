@@ -20,8 +20,6 @@ import { QuestionQueue, type QuestionRecord } from './questions.js';
 import { DelegationTokenStore, type DelegationTokenRecord } from './delegationTokens.js';
 import { type DispatchPilotEvaluation } from './trackerDispatchPilot.js';
 import {
-  type ControlDispatchPayload,
-  type QuestionsPayload,
   type TelegramOversightReadAdapter
 } from './telegramOversightBridge.js';
 import type { RunEventStream, RunEventStreamEntry } from '../events/runEventStream.js';
@@ -55,9 +53,8 @@ import {
   type ControlRequestPersist,
   type ControlRequestSharedContext
 } from './controlRequestContext.js';
-import { readControlTelegramDispatch } from './controlTelegramDispatchRead.js';
 import { createControlQuestionChildResolutionAdapter } from './controlQuestionChildResolution.js';
-import { readControlTelegramQuestions } from './controlTelegramQuestionRead.js';
+import { createControlTelegramReadAdapter } from './controlTelegramReadAdapter.js';
 
 interface ControlServerOptions {
   paths: RunPaths;
@@ -374,23 +371,11 @@ export class ControlServer {
   }
 
   private createTelegramOversightReadAdapter(): TelegramOversightReadAdapter {
-    return {
-      readSelectedRun: async () => this.controlRuntime.snapshot().readSelectedRunSnapshot(),
-
-      readDispatch: async (): Promise<ControlDispatchPayload> =>
-        readControlTelegramDispatch({
-          ...this.requestContextShared,
-          expiryLifecycle: this.expiryLifecycle,
-          emitDispatchPilotAuditEvents
-        }),
-
-      readQuestions: async (): Promise<QuestionsPayload> => {
-        return readControlTelegramQuestions({
-          ...this.requestContextShared,
-          expiryLifecycle: this.expiryLifecycle
-        });
-      }
-    };
+    return createControlTelegramReadAdapter({
+      ...this.requestContextShared,
+      expiryLifecycle: this.expiryLifecycle,
+      emitDispatchPilotAuditEvents
+    });
   }
 }
 

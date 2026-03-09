@@ -43,7 +43,17 @@ function buildTelegramOversightDispatchPayload(
   result: DispatchExtensionResult
 ): ControlDispatchPayload {
   if (result.kind === 'ok') {
-    return result.payload as ControlDispatchPayload;
+    const payload = result.payload;
+    return {
+      dispatch_pilot:
+        payload.dispatch_pilot && typeof payload.dispatch_pilot === 'object'
+          ? (payload.dispatch_pilot as NonNullable<ControlDispatchPayload['dispatch_pilot']>)
+          : result.evaluation.summary,
+      recommendation:
+        payload.recommendation && typeof payload.recommendation === 'object'
+          ? (payload.recommendation as NonNullable<ControlDispatchPayload['recommendation']>)
+          : null
+    };
   }
   const dispatchPilot =
     result.details.dispatch_pilot && typeof result.details.dispatch_pilot === 'object'

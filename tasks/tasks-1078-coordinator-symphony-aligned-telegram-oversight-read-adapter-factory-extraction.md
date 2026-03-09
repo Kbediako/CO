@@ -20,21 +20,21 @@
 
 ## Telegram Read-Adapter Factory
 
-- [ ] Telegram oversight read-adapter factory extracted behind one bounded helper. Evidence: extracted control-local Telegram read-adapter helper, `orchestrator/tests/TelegramOversightBridge.test.ts`.
-- [ ] `controlServer.ts` delegates `createTelegramOversightReadAdapter()` to the extracted helper while preserving existing lifecycle and transport ownership. Evidence: `orchestrator/src/cli/control/controlServer.ts`, `out/1078-coordinator-symphony-aligned-telegram-oversight-read-adapter-factory-extraction/manual/<timestamp>-closeout/11-manual-telegram-read-adapter-check.json`.
-- [ ] Existing Telegram selected-run, `/dispatch`, and `/questions` behavior remain intact under focused regressions. Evidence: `orchestrator/tests/TelegramOversightBridge.test.ts`, `out/1078-coordinator-symphony-aligned-telegram-oversight-read-adapter-factory-extraction/manual/<timestamp>-closeout/05b-targeted-tests.log`.
+- [x] Telegram oversight read-adapter factory extracted behind one bounded helper. Evidence: `orchestrator/src/cli/control/controlTelegramReadAdapter.ts`, `orchestrator/tests/ControlTelegramReadAdapter.test.ts`.
+- [x] `controlServer.ts` delegates `createTelegramOversightReadAdapter()` to the extracted helper while preserving existing lifecycle and transport ownership. Evidence: `orchestrator/src/cli/control/controlServer.ts`, `out/1078-coordinator-symphony-aligned-telegram-oversight-read-adapter-factory-extraction/manual/20260309T051949Z-closeout/11-manual-telegram-read-adapter-check.json`.
+- [x] Existing Telegram selected-run, `/dispatch`, and `/questions` behavior remain intact under focused regressions. Evidence: `orchestrator/tests/TelegramOversightBridge.test.ts`, `orchestrator/tests/ControlTelegramDispatchRead.test.ts`, `orchestrator/tests/ControlTelegramQuestionRead.test.ts`, `out/1078-coordinator-symphony-aligned-telegram-oversight-read-adapter-factory-extraction/manual/20260309T051949Z-closeout/05b-targeted-tests.log`.
 
 ## Validation + Closeout
 
-- [ ] `node scripts/delegation-guard.mjs`. Evidence: `out/1078-coordinator-symphony-aligned-telegram-oversight-read-adapter-factory-extraction/manual/<timestamp>-closeout/01-delegation-guard.log`, `.runs/1078-coordinator-symphony-aligned-telegram-oversight-read-adapter-factory-extraction-guard/cli/<timestamp>/manifest.json`.
-- [ ] `node scripts/spec-guard.mjs --dry-run`. Evidence: `out/1078-coordinator-symphony-aligned-telegram-oversight-read-adapter-factory-extraction/manual/<timestamp>-closeout/02-spec-guard.log`.
-- [ ] `npm run build`. Evidence: `out/1078-coordinator-symphony-aligned-telegram-oversight-read-adapter-factory-extraction/manual/<timestamp>-closeout/03-build.log`.
-- [ ] `npm run lint`. Evidence: `out/1078-coordinator-symphony-aligned-telegram-oversight-read-adapter-factory-extraction/manual/<timestamp>-closeout/04-lint.log`.
-- [ ] `npm run test`. Evidence: `out/1078-coordinator-symphony-aligned-telegram-oversight-read-adapter-factory-extraction/manual/<timestamp>-closeout/05-test.log`, `out/1078-coordinator-symphony-aligned-telegram-oversight-read-adapter-factory-extraction/manual/<timestamp>-closeout/05b-targeted-tests.log`.
-- [ ] `npm run docs:check`. Evidence: `out/1078-coordinator-symphony-aligned-telegram-oversight-read-adapter-factory-extraction/manual/<timestamp>-closeout/06-docs-check.log`.
-- [ ] `npm run docs:freshness`. Evidence: `out/1078-coordinator-symphony-aligned-telegram-oversight-read-adapter-factory-extraction/manual/<timestamp>-closeout/07-docs-freshness.log`.
-- [ ] `node scripts/diff-budget.mjs`. Evidence: `out/1078-coordinator-symphony-aligned-telegram-oversight-read-adapter-factory-extraction/manual/<timestamp>-closeout/08-diff-budget.log`.
-- [ ] `npm run review`. Evidence: `out/1078-coordinator-symphony-aligned-telegram-oversight-read-adapter-factory-extraction/manual/<timestamp>-closeout/09-review.log`.
-- [ ] `npm run pack:smoke`. Evidence: `out/1078-coordinator-symphony-aligned-telegram-oversight-read-adapter-factory-extraction/manual/<timestamp>-closeout/10-pack-smoke.log`.
-- [ ] Manual/mock Telegram read-adapter evidence captured. Evidence: `out/1078-coordinator-symphony-aligned-telegram-oversight-read-adapter-factory-extraction/manual/<timestamp>-closeout/11-manual-telegram-read-adapter-check.json`.
-- [ ] Elegance review completed. Evidence: `out/1078-coordinator-symphony-aligned-telegram-oversight-read-adapter-factory-extraction/manual/<timestamp>-closeout/12-elegance-review.md`.
+- [x] `node scripts/delegation-guard.mjs`. Evidence: `out/1078-coordinator-symphony-aligned-telegram-oversight-read-adapter-factory-extraction/manual/20260309T051949Z-closeout/01-delegation-guard.log`, `.runs/1078-coordinator-symphony-aligned-telegram-oversight-read-adapter-factory-extraction-guard/cli/2026-03-09T05-20-15-401Z-d7a395b5/manifest.json`.
+- [x] `node scripts/spec-guard.mjs --dry-run`. Evidence: `out/1078-coordinator-symphony-aligned-telegram-oversight-read-adapter-factory-extraction/manual/20260309T051949Z-closeout/02-spec-guard.log`.
+- [x] `npm run build`. Evidence: `out/1078-coordinator-symphony-aligned-telegram-oversight-read-adapter-factory-extraction/manual/20260309T051949Z-closeout/03-build.log`.
+- [x] `npm run lint`. Evidence: `out/1078-coordinator-symphony-aligned-telegram-oversight-read-adapter-factory-extraction/manual/20260309T051949Z-closeout/04-lint.log`.
+- [x] `npm run test`. Evidence: `out/1078-coordinator-symphony-aligned-telegram-oversight-read-adapter-factory-extraction/manual/20260309T051949Z-closeout/05-test.log`, `out/1078-coordinator-symphony-aligned-telegram-oversight-read-adapter-factory-extraction/manual/20260309T051949Z-closeout/05b-targeted-tests.log`.
+- [x] `npm run docs:check`. Evidence: `out/1078-coordinator-symphony-aligned-telegram-oversight-read-adapter-factory-extraction/manual/20260309T051949Z-closeout/06-docs-check.log`.
+- [x] `npm run docs:freshness`. Evidence: `out/1078-coordinator-symphony-aligned-telegram-oversight-read-adapter-factory-extraction/manual/20260309T051949Z-closeout/07-docs-freshness.log`.
+- [x] `node scripts/diff-budget.mjs`. Evidence: `out/1078-coordinator-symphony-aligned-telegram-oversight-read-adapter-factory-extraction/manual/20260309T051949Z-closeout/08-diff-budget.log`, `out/1078-coordinator-symphony-aligned-telegram-oversight-read-adapter-factory-extraction/manual/20260309T051949Z-closeout/13-override-notes.md`.
+- [x] `npm run review`. Evidence: `out/1078-coordinator-symphony-aligned-telegram-oversight-read-adapter-factory-extraction/manual/20260309T051949Z-closeout/09-review.log`, `out/1078-coordinator-symphony-aligned-telegram-oversight-read-adapter-factory-extraction/manual/20260309T051949Z-closeout/13-override-notes.md`.
+- [x] `npm run pack:smoke`. Evidence: `out/1078-coordinator-symphony-aligned-telegram-oversight-read-adapter-factory-extraction/manual/20260309T051949Z-closeout/10-pack-smoke.log`.
+- [x] Manual/mock Telegram read-adapter evidence captured. Evidence: `out/1078-coordinator-symphony-aligned-telegram-oversight-read-adapter-factory-extraction/manual/20260309T051949Z-closeout/11-manual-telegram-read-adapter-check.json`.
+- [x] Elegance review completed. Evidence: `out/1078-coordinator-symphony-aligned-telegram-oversight-read-adapter-factory-extraction/manual/20260309T051949Z-closeout/12-elegance-review.md`.
