@@ -8,7 +8,7 @@ import type { ConfirmationStoreSnapshot } from './confirmations.js';
 import type { QuestionRecord } from './questions.js';
 import type { DelegationTokenRecord } from './delegationTokens.js';
 import type { LinearAdvisoryState } from './linearWebhookController.js';
-import { LINEAR_ADVISORY_STATE_FILE } from './controlServerSeededRuntimeAssembly.js';
+import { LINEAR_ADVISORY_STATE_FILE } from './controlPersistenceFiles.js';
 
 export interface ControlServerSeeds {
   controlSeed: ControlState | null;

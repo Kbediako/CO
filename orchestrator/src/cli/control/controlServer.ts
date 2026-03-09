@@ -10,22 +10,16 @@ import { isoTimestamp } from '../utils/time.js';
 import type { RunPaths } from '../run/runPaths.js';
 import type { EffectiveDelegationConfig } from '../config/delegationConfig.js';
 import {
-  ControlStateStore,
   type ControlAction,
   type ControlState
 } from './controlState.js';
-import { ConfirmationStore } from './confirmations.js';
-import { QuestionQueue } from './questions.js';
-import { DelegationTokenStore } from './delegationTokens.js';
 import { type DispatchPilotEvaluation } from './trackerDispatchPilot.js';
 import type { RunEventStream, RunEventStreamEntry } from '../events/runEventStream.js';
-import { type ControlRuntime } from './controlRuntime.js';
 import { handleUiSessionRequest } from './uiSessionController.js';
 import { admitAuthenticatedControlRoute } from './authenticatedControlRouteGate.js';
 import { handleAuthenticatedRouteRequest } from './authenticatedRouteController.js';
 import {
   handleLinearWebhookRequest,
-  type LinearAdvisoryState,
   type LinearWebhookAuditEventInput
 } from './linearWebhookController.js';
 import { type ControlExpiryLifecycle } from './controlExpiryLifecycle.js';
@@ -33,13 +27,8 @@ import { type ControlServerBootstrapLifecycle } from './controlServerBootstrapLi
 import { createControlBootstrapAssembly } from './controlBootstrapAssembly.js';
 import { startControlServerStartupSequence } from './controlServerStartupSequence.js';
 import {
-  type ControlEventTransport
-} from './controlEventTransport.js';
-import {
   buildControlPresenterRuntimeContext,
   type ControlRequestContext,
-  type ControlRequestPersist,
-  type ControlSessionTokens,
   type ControlRequestSharedContext
 } from './controlRequestContext.js';
 import { createControlQuestionChildResolutionAdapter } from './controlQuestionChildResolution.js';
@@ -78,50 +67,17 @@ class HttpError extends Error {
 
 export class ControlServer {
   private readonly server: http.Server;
-  private readonly controlStore: ControlStateStore;
-  private readonly confirmationStore: ConfirmationStore;
-  private readonly questionQueue: QuestionQueue;
-  private readonly delegationTokens: DelegationTokenStore;
-  private readonly sessionTokens: ControlSessionTokens;
-  private readonly clients: Set<http.ServerResponse>;
-  private readonly eventTransport: ControlEventTransport;
-  private readonly persist: ControlRequestPersist;
   private readonly requestContextShared: ControlRequestSharedContext;
-  private readonly paths: RunPaths;
-  private readonly linearAdvisoryState: LinearAdvisoryState;
-  private readonly controlRuntime: ControlRuntime;
   private bootstrapLifecycle: ControlServerBootstrapLifecycle | null = null;
   private baseUrl: string | null = null;
   private expiryLifecycle: ControlExpiryLifecycle | null = null;
 
   private constructor(options: {
     server: http.Server;
-    controlStore: ControlStateStore;
-    confirmationStore: ConfirmationStore;
-    questionQueue: QuestionQueue;
-    delegationTokens: DelegationTokenStore;
-    sessionTokens: ControlSessionTokens;
-    clients: Set<http.ServerResponse>;
-    eventTransport: ControlEventTransport;
-    persist: ControlRequestPersist;
     requestContextShared: ControlRequestSharedContext;
-    paths: RunPaths;
-    linearAdvisoryState: LinearAdvisoryState;
-    controlRuntime: ControlRuntime;
   }) {
     this.server = options.server;
-    this.controlStore = options.controlStore;
-    this.confirmationStore = options.confirmationStore;
-    this.questionQueue = options.questionQueue;
-    this.delegationTokens = options.delegationTokens;
-    this.sessionTokens = options.sessionTokens;
-    this.clients = options.clients;
-    this.eventTransport = options.eventTransport;
-    this.persist = options.persist;
     this.requestContextShared = options.requestContextShared;
-    this.paths = options.paths;
-    this.linearAdvisoryState = options.linearAdvisoryState;
-    this.controlRuntime = options.controlRuntime;
   }
 
   static async start(options: ControlServerOptions): Promise<ControlServer> {
@@ -134,19 +90,7 @@ export class ControlServer {
       linearAdvisorySeed
     } = await readControlServerSeeds(options.paths);
 
-    const {
-      controlStore,
-      confirmationStore,
-      questionQueue,
-      delegationTokens,
-      sessionTokens,
-      clients,
-      eventTransport,
-      persist,
-      requestContextShared,
-      linearAdvisoryState,
-      controlRuntime
-    } = createControlServerSeededRuntimeAssembly({
+    const { requestContextShared } = createControlServerSeededRuntimeAssembly({
       runId: options.runId,
       token,
       config: options.config,
@@ -174,18 +118,7 @@ export class ControlServer {
 
     instance = new ControlServer({
       server,
-      controlStore,
-      confirmationStore,
-      questionQueue,
-      delegationTokens,
-      sessionTokens,
-      clients,
-      eventTransport,
-      persist,
-      requestContextShared,
-      paths: options.paths,
-      linearAdvisoryState,
-      controlRuntime
+      requestContextShared
     });
     const bootstrapAssembly = createControlBootstrapAssembly({
       intervalMs: EXPIRY_INTERVAL_MS,
@@ -211,7 +144,7 @@ export class ControlServer {
   }
 
   broadcast(entry: RunEventStreamEntry): void {
-    this.eventTransport.broadcast(entry);
+    this.requestContextShared.eventTransport.broadcast(entry);
   }
 
   async close(): Promise<void> {
@@ -219,7 +152,7 @@ export class ControlServer {
     this.expiryLifecycle = null;
     await this.bootstrapLifecycle?.close();
     this.bootstrapLifecycle = null;
-    for (const client of this.clients) {
+    for (const client of this.requestContextShared.clients) {
       client.end();
     }
     await new Promise<void>((resolve) => {

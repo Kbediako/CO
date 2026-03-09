@@ -7,7 +7,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { logger } from '../src/logger.js';
 import { resolveRunPaths } from '../src/cli/run/runPaths.js';
 import { readControlServerSeeds } from '../src/cli/control/controlServerSeedLoading.js';
-import { LINEAR_ADVISORY_STATE_FILE } from '../src/cli/control/controlServerSeededRuntimeAssembly.js';
+import { LINEAR_ADVISORY_STATE_FILE } from '../src/cli/control/controlPersistenceFiles.js';
 import type { ControlState } from '../src/cli/control/controlState.js';
 import type { ConfirmationStoreSnapshot } from '../src/cli/control/confirmations.js';
 import type { QuestionRecord } from '../src/cli/control/questions.js';

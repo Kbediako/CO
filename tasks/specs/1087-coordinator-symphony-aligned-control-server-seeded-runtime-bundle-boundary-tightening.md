@@ -1,7 +1,7 @@
 ---
 id: 20260309-1087-coordinator-symphony-aligned-control-server-seeded-runtime-bundle-boundary-tightening
 title: Coordinator Symphony-Aligned Control Server Seeded Runtime Bundle Boundary Tightening
-status: active
+status: completed
 owners:
   - Codex
 created: 2026-03-09
@@ -35,3 +35,4 @@ Tighten the seeded-runtime assembly and `ControlServer` startup contract around 
 ## Notes
 
 - 2026-03-09: Approved for docs-first registration as the next bounded Symphony-aligned slice after `1086`. Evidence: `out/1086-coordinator-symphony-aligned-control-server-seed-loading-extraction/manual/20260309T114157Z-closeout/12-elegance-review.md`, `out/1086-coordinator-symphony-aligned-control-server-seed-loading-extraction/manual/20260309T114157Z-closeout/14-next-slice-note.md`, `docs/findings/1087-control-server-seeded-runtime-bundle-boundary-tightening-deliberation.md`.
+- 2026-03-09: Completed. `createControlServerSeededRuntimeAssembly(...)` now returns only `requestContextShared`, `ControlServer` stores only the shared bundle plus server/lifecycle fields, `LINEAR_ADVISORY_STATE_FILE` now lives in `orchestrator/src/cli/control/controlPersistenceFiles.ts`, `selectedRunProjection.ts` reuses the neutral advisory filename owner, focused runtime-bundle regressions passed `4/4` files and `8/8` tests, the full local suite passed `179/179` files and `1208/1208` tests, the manual runtime-bundle check confirmed the one-bundle contract plus shared constant ownership, and the lane-discovered Telegram bridge test race was tightened so full-suite validation stays deterministic. The delegated `1087-...-scout` diagnostics manifest remains delegation evidence only because it failed on the pre-fix tree and exposed the stale seed-loading test import that the completed lane fixed. Evidence: `out/1087-coordinator-symphony-aligned-control-server-seeded-runtime-bundle-boundary-tightening/manual/20260309T122328Z-closeout/00-summary.md`, `out/1087-coordinator-symphony-aligned-control-server-seeded-runtime-bundle-boundary-tightening/manual/20260309T122328Z-closeout/05b-targeted-tests.log`, `out/1087-coordinator-symphony-aligned-control-server-seeded-runtime-bundle-boundary-tightening/manual/20260309T122328Z-closeout/11-manual-runtime-bundle-check.json`, `out/1087-coordinator-symphony-aligned-control-server-seeded-runtime-bundle-boundary-tightening/manual/20260309T122328Z-closeout/12-elegance-review.md`, `out/1087-coordinator-symphony-aligned-control-server-seeded-runtime-bundle-boundary-tightening/manual/20260309T122328Z-closeout/13-override-notes.md`, `.runs/1087-coordinator-symphony-aligned-control-server-seeded-runtime-bundle-boundary-tightening-scout/cli/2026-03-09T12-11-11-079Z-6b81a06b/manifest.json`.

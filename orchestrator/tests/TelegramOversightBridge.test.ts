@@ -643,9 +643,18 @@ describe('TelegramOversightBridge', () => {
         }
       });
 
-      await waitForCondition(async () =>
-        telegram.sentMessages.some((message) => message.text.includes('No queued questions.'))
-      );
+      await waitForCondition(async () => {
+        if (!telegram.sentMessages.some((message) => message.text.includes('No queued questions.'))) {
+          return false;
+        }
+        try {
+          const stateRaw = await readFile(join(paths.runDir, 'telegram-oversight-state.json'), 'utf8');
+          const parsed = JSON.parse(stateRaw) as { next_update_id?: number };
+          return parsed.next_update_id === 301;
+        } catch {
+          return false;
+        }
+      });
 
       const stateRaw = await readFile(join(paths.runDir, 'telegram-oversight-state.json'), 'utf8');
       const bridgeState = JSON.parse(stateRaw) as { next_update_id?: number };

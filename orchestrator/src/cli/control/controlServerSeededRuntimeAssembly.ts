@@ -20,24 +20,21 @@ import {
   type DelegationTokenRecord
 } from './delegationTokens.js';
 import {
-  createControlRuntime,
-  type ControlRuntime
+  createControlRuntime
 } from './controlRuntime.js';
 import {
-  createControlEventTransport,
-  type ControlEventTransport
+  createControlEventTransport
 } from './controlEventTransport.js';
 import {
   normalizeLinearAdvisoryState,
   type LinearAdvisoryState
 } from './linearWebhookController.js';
+import { LINEAR_ADVISORY_STATE_FILE } from './controlPersistenceFiles.js';
 import type {
   ControlRequestPersist,
   ControlRequestSharedContext,
   ControlSessionTokens
 } from './controlRequestContext.js';
-
-export const LINEAR_ADVISORY_STATE_FILE = 'linear-advisory-state.json';
 
 interface ControlServerSeededRuntimeAssemblyOptions {
   runId: string;
@@ -54,17 +51,7 @@ interface ControlServerSeededRuntimeAssemblyOptions {
 }
 
 export interface ControlServerSeededRuntimeAssembly {
-  controlStore: ControlStateStore;
-  confirmationStore: ConfirmationStore;
-  questionQueue: QuestionQueue;
-  delegationTokens: DelegationTokenStore;
-  sessionTokens: ControlSessionTokens;
-  clients: Set<http.ServerResponse>;
-  eventTransport: ControlEventTransport;
-  persist: ControlRequestPersist;
   requestContextShared: ControlRequestSharedContext;
-  linearAdvisoryState: LinearAdvisoryState;
-  controlRuntime: ControlRuntime;
 }
 
 class SessionTokenStore implements ControlSessionTokens {
@@ -175,16 +162,6 @@ export function createControlServerSeededRuntimeAssembly(
   } satisfies ControlRequestSharedContext;
 
   return {
-    controlStore,
-    confirmationStore,
-    questionQueue,
-    delegationTokens,
-    sessionTokens,
-    clients,
-    eventTransport,
-    persist,
-    requestContextShared,
-    linearAdvisoryState,
-    controlRuntime
+    requestContextShared
   };
 }

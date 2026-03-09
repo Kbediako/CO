@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 
 import { computeEffectiveDelegationConfig } from '../src/cli/config/delegationConfig.js';
 import { resolveRunPaths } from '../src/cli/run/runPaths.js';
+import { LINEAR_ADVISORY_STATE_FILE } from '../src/cli/control/controlPersistenceFiles.js';
 import { createControlServerSeededRuntimeAssembly } from '../src/cli/control/controlServerSeededRuntimeAssembly.js';
 import type { LinearAdvisoryState } from '../src/cli/control/linearWebhookController.js';
 
@@ -40,24 +41,21 @@ describe('createControlServerSeededRuntimeAssembly', () => {
         delegationSeed: null,
         linearAdvisorySeed: null
       });
+      const context = assembly.requestContextShared;
 
-      expect(assembly.controlStore.snapshot().feature_toggles).toEqual({
+      expect(Object.keys(assembly).sort()).toEqual(['requestContextShared']);
+      expect(context.controlStore.snapshot().feature_toggles).toEqual({
         dispatch_pilot: { enabled: true },
         rlm: { policy: config.rlm.policy }
       });
-      expect(assembly.requestContextShared.token).toBe('control-token');
-      expect(assembly.requestContextShared.config).toBe(config);
-      expect(assembly.requestContextShared.controlStore).toBe(assembly.controlStore);
-      expect(assembly.requestContextShared.confirmationStore).toBe(assembly.confirmationStore);
-      expect(assembly.requestContextShared.questionQueue).toBe(assembly.questionQueue);
-      expect(assembly.requestContextShared.delegationTokens).toBe(assembly.delegationTokens);
-      expect(assembly.requestContextShared.sessionTokens).toBe(assembly.sessionTokens);
-      expect(assembly.requestContextShared.persist).toBe(assembly.persist);
-      expect(assembly.requestContextShared.clients).toBe(assembly.clients);
-      expect(assembly.requestContextShared.eventTransport).toBe(assembly.eventTransport);
-      expect(assembly.requestContextShared.paths).toBe(paths);
-      expect(assembly.requestContextShared.linearAdvisoryState).toBe(assembly.linearAdvisoryState);
-      expect(assembly.requestContextShared.runtime).toBe(assembly.controlRuntime);
+      expect(context.token).toBe('control-token');
+      expect(context.config).toBe(config);
+      expect(context.paths).toBe(paths);
+      expect(context.clients).toBeInstanceOf(Set);
+      expect(context.eventTransport).toBeDefined();
+      expect(context.persist).toBeDefined();
+      expect(context.linearAdvisoryState).toBeDefined();
+      expect(context.runtime).toBeDefined();
     } finally {
       await rm(root, { recursive: true, force: true });
     }
@@ -88,7 +86,7 @@ describe('createControlServerSeededRuntimeAssembly', () => {
         linearAdvisorySeed: null
       });
 
-      expect(assembly.controlStore.snapshot().feature_toggles).toEqual({
+      expect(assembly.requestContextShared.controlStore.snapshot().feature_toggles).toEqual({
         rlm: { policy: 'seeded-policy' },
         dispatch_pilot: { enabled: true }
       });
@@ -131,35 +129,36 @@ describe('createControlServerSeededRuntimeAssembly', () => {
         delegationSeed: null,
         linearAdvisorySeed: seededAdvisory
       });
+      const context = assembly.requestContextShared;
 
-      assembly.controlStore.updateAction({
+      context.controlStore.updateAction({
         action: 'pause',
         requestedBy: 'tester',
         reason: 'manual_check'
       });
-      assembly.controlStore.updateFeatureToggles({
+      context.controlStore.updateFeatureToggles({
         dispatch_pilot: { enabled: true }
       });
-      const confirmation = assembly.confirmationStore.create({
+      const confirmation = context.confirmationStore.create({
         action: 'cancel',
         tool: 'ui.cancel',
         params: { run: 'run-1' }
       }).confirmation;
-      assembly.confirmationStore.approve(confirmation.request_id, 'tester');
-      assembly.questionQueue.enqueue({
+      context.confirmationStore.approve(confirmation.request_id, 'tester');
+      context.questionQueue.enqueue({
         parentRunId: 'run-1',
         fromRunId: 'child-run',
         prompt: 'Need approval',
         urgency: 'high',
         autoPause: true
       });
-      const delegation = assembly.delegationTokens.register('token-1', 'run-1', 'child-run');
-      assembly.linearAdvisoryState.latest_delivery_id = 'delivery-1';
-      assembly.linearAdvisoryState.latest_result = 'accepted';
-      assembly.linearAdvisoryState.latest_reason = 'linear_delivery_accepted';
-      assembly.linearAdvisoryState.latest_accepted_at = '2026-03-09T00:01:00.000Z';
-      assembly.linearAdvisoryState.updated_at = '2026-03-09T00:01:00.000Z';
-      assembly.linearAdvisoryState.seen_deliveries.push({
+      const delegation = context.delegationTokens.register('token-1', 'run-1', 'child-run');
+      context.linearAdvisoryState.latest_delivery_id = 'delivery-1';
+      context.linearAdvisoryState.latest_result = 'accepted';
+      context.linearAdvisoryState.latest_reason = 'linear_delivery_accepted';
+      context.linearAdvisoryState.latest_accepted_at = '2026-03-09T00:01:00.000Z';
+      context.linearAdvisoryState.updated_at = '2026-03-09T00:01:00.000Z';
+      context.linearAdvisoryState.seen_deliveries.push({
         delivery_id: 'delivery-1',
         event: 'issue',
         action: 'update',
@@ -170,11 +169,11 @@ describe('createControlServerSeededRuntimeAssembly', () => {
         reason: 'linear_delivery_accepted'
       });
 
-      await assembly.persist.control();
-      await assembly.persist.confirmations();
-      await assembly.persist.questions();
-      await assembly.persist.delegationTokens();
-      await assembly.persist.linearAdvisory();
+      await context.persist.control();
+      await context.persist.confirmations();
+      await context.persist.questions();
+      await context.persist.delegationTokens();
+      await context.persist.linearAdvisory();
 
       const controlSnapshot = JSON.parse(await readFile(paths.controlPath, 'utf8')) as {
         control_seq: number;
@@ -221,7 +220,9 @@ describe('createControlServerSeededRuntimeAssembly', () => {
         child_run_id: 'child-run'
       });
 
-      const advisorySnapshot = JSON.parse(await readFile(join(paths.runDir, 'linear-advisory-state.json'), 'utf8')) as LinearAdvisoryState;
+      const advisorySnapshot = JSON.parse(
+        await readFile(join(paths.runDir, LINEAR_ADVISORY_STATE_FILE), 'utf8')
+      ) as LinearAdvisoryState;
       expect(advisorySnapshot.latest_delivery_id).toBe('delivery-1');
       expect(advisorySnapshot.latest_result).toBe('accepted');
       expect(advisorySnapshot.latest_reason).toBe('linear_delivery_accepted');

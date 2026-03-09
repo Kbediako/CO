@@ -4,6 +4,7 @@ import { join, resolve } from 'node:path';
 import type { RunPaths } from '../run/runPaths.js';
 import type { CliManifest } from '../types.js';
 import type { ControlAction, ControlState } from './controlState.js';
+import { LINEAR_ADVISORY_STATE_FILE } from './controlPersistenceFiles.js';
 import {
   buildTrackedLinearPayload,
   type ControlCompatibilitySourceContext,
@@ -394,7 +395,9 @@ async function readTaskCompatibilityContexts(
       snapshot.runId
     );
     const questionSnapshot = await readJsonFile<{ questions?: QuestionRecord[] }>(join(runDir, 'questions.json'));
-    const advisoryState = await readJsonFile<LinearAdvisoryStateSnapshot>(join(runDir, 'linear-advisory-state.json'));
+    const advisoryState = await readJsonFile<LinearAdvisoryStateSnapshot>(
+      join(runDir, LINEAR_ADVISORY_STATE_FILE)
+    );
 
     const context = buildProjectionContextFromParts(snapshot, {
       control,
