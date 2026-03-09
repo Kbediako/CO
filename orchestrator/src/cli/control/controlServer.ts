@@ -30,17 +30,14 @@ import {
   type LinearAdvisoryState,
   type LinearWebhookAuditEventInput
 } from './linearWebhookController.js';
-import {
-  createControlExpiryLifecycle,
-  type ControlExpiryLifecycle
-} from './controlExpiryLifecycle.js';
+import { type ControlExpiryLifecycle } from './controlExpiryLifecycle.js';
 import { type ControlServerBootstrapLifecycle } from './controlServerBootstrapLifecycle.js';
+import { createControlBootstrapAssembly } from './controlBootstrapAssembly.js';
 import {
   createControlEventTransport,
   type ControlEventTransport
 } from './controlEventTransport.js';
 import {
-  buildControlInternalContext,
   buildControlPresenterRuntimeContext,
   buildControlRequestContext,
   type ControlRequestContext,
@@ -48,7 +45,6 @@ import {
   type ControlRequestSharedContext
 } from './controlRequestContext.js';
 import { createControlQuestionChildResolutionAdapter } from './controlQuestionChildResolution.js';
-import { createControlTelegramBridgeBootstrapLifecycle } from './controlTelegramBridgeBootstrapLifecycle.js';
 
 interface ControlServerOptions {
   paths: RunPaths;
@@ -277,32 +273,13 @@ export class ControlServer {
       linearAdvisoryState,
       controlRuntime
     });
-    instance.expiryLifecycle = createControlExpiryLifecycle({
+    const bootstrapAssembly = createControlBootstrapAssembly({
       intervalMs: EXPIRY_INTERVAL_MS,
-      confirmationStore,
-      questionQueue,
-      persist: {
-        confirmations: persist.confirmations,
-        questions: persist.questions
-      },
-      runtime: controlRuntime,
-      emitControlEvent: (input) => instance.eventTransport.emitControlEvent(input),
-      createQuestionChildResolutionAdapter: () =>
-        createControlQuestionChildResolutionAdapter(
-          buildControlInternalContext({
-            ...instance.requestContextShared,
-            expiryLifecycle: instance.expiryLifecycle
-          })
-        )
-    });
-    instance.bootstrapLifecycle = createControlTelegramBridgeBootstrapLifecycle({
-      paths: options.paths,
-      persistControl: persist.control,
-      startExpiryLifecycle: () => instance.expiryLifecycle?.start(),
       requestContextShared: instance.requestContextShared,
-      getExpiryLifecycle: () => instance.expiryLifecycle,
       emitDispatchPilotAuditEvents
     });
+    instance.expiryLifecycle = bootstrapAssembly.expiryLifecycle;
+    instance.bootstrapLifecycle = bootstrapAssembly.bootstrapLifecycle;
 
     const host = options.config.ui.bindHost;
     await new Promise<void>((resolve, reject) => {
