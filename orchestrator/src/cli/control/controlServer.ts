@@ -26,10 +26,6 @@ import {
 } from './telegramOversightBridge.js';
 import type { RunEventStream, RunEventStreamEntry } from '../events/runEventStream.js';
 import { createControlRuntime, type ControlRuntime } from './controlRuntime.js';
-import {
-  readDispatchExtension,
-  type DispatchExtensionResult
-} from './observabilitySurface.js';
 import { handleUiSessionRequest } from './uiSessionController.js';
 import { admitAuthenticatedControlRoute } from './authenticatedControlRouteGate.js';
 import { handleAuthenticatedRouteRequest } from './authenticatedRouteController.js';
@@ -59,6 +55,7 @@ import {
   type ControlRequestPersist,
   type ControlRequestSharedContext
 } from './controlRequestContext.js';
+import { readControlTelegramDispatch } from './controlTelegramDispatchRead.js';
 import { createControlQuestionChildResolutionAdapter } from './controlQuestionChildResolution.js';
 import { readControlTelegramQuestions } from './controlTelegramQuestionRead.js';
 
@@ -380,22 +377,12 @@ export class ControlServer {
     return {
       readSelectedRun: async () => this.controlRuntime.snapshot().readSelectedRunSnapshot(),
 
-      readDispatch: async (): Promise<ControlDispatchPayload> => {
-        const context = buildControlInternalContext({
+      readDispatch: async (): Promise<ControlDispatchPayload> =>
+        readControlTelegramDispatch({
           ...this.requestContextShared,
-          expiryLifecycle: this.expiryLifecycle
-        });
-        const runtimeSnapshot = context.runtime.snapshot();
-        const result = await readDispatchExtension({
-          readDispatchEvaluation: () => runtimeSnapshot.readDispatchEvaluation()
-        });
-        await emitDispatchPilotAuditEvents(context, {
-          surface: 'telegram_dispatch',
-          evaluation: result.evaluation,
-          issueIdentifier: result.issueIdentifier
-        });
-        return buildTelegramOversightDispatchPayload(result);
-      },
+          expiryLifecycle: this.expiryLifecycle,
+          emitDispatchPilotAuditEvents
+        }),
 
       readQuestions: async (): Promise<QuestionsPayload> => {
         return readControlTelegramQuestions({
@@ -740,27 +727,6 @@ async function readJsonFile<T>(path: string): Promise<T | null> {
     logger.warn(`Failed to read JSON file ${path}: ${(error as Error)?.message ?? error}`);
     return null;
   }
-}
-
-function buildTelegramOversightDispatchPayload(
-  result: DispatchExtensionResult
-): ControlDispatchPayload {
-  if (result.kind === 'ok') {
-    return result.payload as ControlDispatchPayload;
-  }
-  const dispatchPilot =
-    result.details.dispatch_pilot && typeof result.details.dispatch_pilot === 'object'
-      ? (result.details.dispatch_pilot as NonNullable<ControlDispatchPayload['dispatch_pilot']>)
-      : result.evaluation.summary;
-  return {
-    dispatch_pilot: dispatchPilot,
-    error: {
-      code: result.failure.code,
-      details: {
-        dispatch_pilot: dispatchPilot
-      }
-    }
-  };
 }
 
 function normalizeAllowedHosts(allowedHosts?: string[]): Set<string> {
