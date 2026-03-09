@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260309-1080-coordinator-symphony-aligned-bootstrap-metadata-persistence-extraction",
+      "title": "Coordinator Symphony-Aligned Bootstrap Metadata Persistence Extraction",
+      "relates_to": "tasks/tasks-1080-coordinator-symphony-aligned-bootstrap-metadata-persistence-extraction.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-09",
+      "paths": {
+        "spec": "tasks/specs/1080-coordinator-symphony-aligned-bootstrap-metadata-persistence-extraction.md",
+        "task": "tasks/tasks-1080-coordinator-symphony-aligned-bootstrap-metadata-persistence-extraction.md",
+        "agent_task": ".agent/task/1080-coordinator-symphony-aligned-bootstrap-metadata-persistence-extraction.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-bootstrap-metadata-persistence-extraction.md"
+      }
+    },
+    {
       "id": "20260309-1079-coordinator-symphony-aligned-telegram-bridge-bootstrap-handoff-extraction",
       "title": "Coordinator Symphony-Aligned Telegram Bridge Bootstrap Handoff Extraction",
       "relates_to": "tasks/tasks-1079-coordinator-symphony-aligned-telegram-bridge-bootstrap-handoff-extraction.md",
