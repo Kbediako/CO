@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260309-1092-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction",
+      "title": "Coordinator Symphony-Aligned Authenticated Route Handoff Assembly Extraction",
+      "relates_to": "tasks/tasks-1092-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-09",
+      "paths": {
+        "spec": "tasks/specs/1092-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction.md",
+        "task": "tasks/tasks-1092-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction.md",
+        "agent_task": ".agent/task/1092-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction.md"
+      }
+    },
+    {
       "id": "20260309-1091-coordinator-symphony-aligned-control-server-ui-session-admission-helper-extraction",
       "title": "Coordinator Symphony-Aligned Control Server UI Session Admission Helper Extraction",
       "relates_to": "tasks/tasks-1091-coordinator-symphony-aligned-control-server-ui-session-admission-helper-extraction.md",
