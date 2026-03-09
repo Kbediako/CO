@@ -646,6 +646,8 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
         '',
         `- MCP Task ID: \`${taskId}\``,
         `- Primary PRD: \`docs/PRD-${taskId}.md\``,
+        `- TECH_SPEC: \`tasks/specs/${taskId}.md\``,
+        `- ACTION_PLAN: \`docs/ACTION_PLAN-${taskId}.md\``,
         ''
       ].join('\n'),
       'utf8'
@@ -668,11 +670,17 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(prompt).toContain('Review surface: audit');
     expect(prompt).toContain('Evidence manifest: .runs/sample-task/cli/sample-run/manifest.json');
     expect(prompt).toContain('Task context:');
-    expect(prompt).toContain('PRD summary (`docs/PRD-sample-task.md`):');
+    expect(prompt).toContain('- Task checklist: `tasks/tasks-sample-task.md`');
+    expect(prompt).toContain('- Primary PRD: `docs/PRD-sample-task.md`');
     expect(prompt).toContain('Evidence + checklist mirroring requirements are satisfied');
     expect(prompt).toContain(
       'Keep this review focused on the requested audit surfaces, supporting evidence, and directly related code/docs paths.'
     );
+    expect(prompt).not.toContain('PRD summary (`docs/PRD-sample-task.md`):');
+    expect(prompt).not.toContain('- audit bullet one');
+    expect(prompt).not.toContain('- audit bullet two');
+    expect(prompt).not.toContain('tasks/specs/sample-task.md');
+    expect(prompt).not.toContain('docs/ACTION_PLAN-sample-task.md');
     expect(prompt).not.toContain('Keep this review focused on changed files and nearby dependencies.');
   });
 
@@ -690,6 +698,8 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
         '',
         `- MCP Task ID: \`${taskId}\``,
         `- Primary PRD: \`docs/PRD-${taskId}.md\``,
+        `- TECH_SPEC: \`tasks/specs/${taskId}.md\``,
+        `- ACTION_PLAN: \`docs/ACTION_PLAN-${taskId}.md\``,
         ''
       ].join('\n'),
       'utf8'
@@ -712,10 +722,15 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(prompt).toContain('Review surface: audit');
     expect(prompt).toContain('Evidence manifest: .runs/sample-task/cli/sample-run/manifest.json');
     expect(prompt).toContain('Task context:');
-    expect(prompt).toContain('PRD summary (`docs/PRD-sample-task.md`):');
+    expect(prompt).toContain('- Task checklist: `tasks/tasks-sample-task.md`');
+    expect(prompt).toContain('- Primary PRD: `docs/PRD-sample-task.md`');
     expect(prompt).toContain(
       'Keep this review focused on the requested audit surfaces, supporting evidence, and directly related code/docs paths.'
     );
+    expect(prompt).not.toContain('PRD summary (`docs/PRD-sample-task.md`):');
+    expect(prompt).not.toContain('- env fallback bullet');
+    expect(prompt).not.toContain('tasks/specs/sample-task.md');
+    expect(prompt).not.toContain('docs/ACTION_PLAN-sample-task.md');
     expect(prompt).not.toContain('Keep this review focused on changed files and nearby dependencies.');
   });
 
@@ -1472,7 +1487,15 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     await mkdir(join(sandbox, 'docs'), { recursive: true });
     await writeFile(
       join(sandbox, 'tasks', 'tasks-sample-task.md'),
-      ['# Task Checklist - sample-task', '', '- MCP Task ID: `sample-task`', '- Primary PRD: `docs/PRD-sample-task.md`', ''].join('\n'),
+      [
+        '# Task Checklist - sample-task',
+        '',
+        '- MCP Task ID: `sample-task`',
+        '- Primary PRD: `docs/PRD-sample-task.md`',
+        '- TECH_SPEC: `tasks/specs/sample-task.md`',
+        '- ACTION_PLAN: `docs/ACTION_PLAN-sample-task.md`',
+        ''
+      ].join('\n'),
       'utf8'
     );
     await writeFile(
@@ -1491,7 +1514,135 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     const prompt = await readFile(promptPath, 'utf8');
     expect(prompt).toContain('Review task: sample-task');
     expect(prompt).toContain('Task context:');
-    expect(prompt).toContain('PRD summary (`docs/PRD-sample-task.md`):');
+    expect(prompt).toContain('- Task checklist: `tasks/tasks-sample-task.md`');
+    expect(prompt).toContain('- Primary PRD: `docs/PRD-sample-task.md`');
+    expect(prompt).not.toContain('PRD summary (`docs/PRD-sample-task.md`):');
+    expect(prompt).not.toContain('- run-dir context bullet');
+    expect(prompt).not.toContain('tasks/specs/sample-task.md');
+    expect(prompt).not.toContain('docs/ACTION_PLAN-sample-task.md');
+  });
+
+  it('keeps audit task context checklist-only when no primary PRD is declared', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifestForTask(sandbox, 'sample-task', 'audit-no-prd');
+    const codexBin = await makeFakeCodex(sandbox);
+    await mkdir(join(sandbox, 'tasks'), { recursive: true });
+    await writeFile(
+      join(sandbox, 'tasks', 'tasks-sample-task.md'),
+      [
+        '# Task Checklist - sample-task',
+        '',
+        '- MCP Task ID: `sample-task`',
+        '- TECH_SPEC: `tasks/specs/sample-task.md`',
+        '- ACTION_PLAN: `docs/ACTION_PLAN-sample-task.md`',
+        ''
+      ].join('\n'),
+      'utf8'
+    );
+
+    const result = await runReviewCommand(
+      manifestPath,
+      baseEnv(sandbox, codexBin),
+      ['--surface', 'audit']
+    );
+
+    expect(result.exitCode).toBe(0);
+    const promptPath = join(dirname(manifestPath), 'review', 'prompt.txt');
+    const prompt = await readFile(promptPath, 'utf8');
+    expect(prompt).toContain('Task context:');
+    expect(prompt).toContain('- Task checklist: `tasks/tasks-sample-task.md`');
+    expect(prompt).not.toContain('- Primary PRD:');
+    expect(prompt).not.toContain('tasks/specs/sample-task.md');
+    expect(prompt).not.toContain('docs/ACTION_PLAN-sample-task.md');
+  });
+
+  it('derives audit task context from the registered parent task for delegated scout manifests', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifestForTask(sandbox, '1097-sample-task-scout', 'audit-scout');
+    const codexBin = await makeFakeCodex(sandbox);
+    await mkdir(join(sandbox, 'tasks', 'custom'), { recursive: true });
+    await mkdir(join(sandbox, 'docs'), { recursive: true });
+    await writeFile(
+      join(sandbox, 'tasks', 'index.json'),
+      JSON.stringify({
+        items: [
+          {
+            id: '20260310-1097-sample-task',
+            title: 'Sample Task',
+            relates_to: 'tasks/custom/registered-parent-checklist.md'
+          }
+        ]
+      }),
+      'utf8'
+    );
+    await writeFile(
+      join(sandbox, 'tasks', 'custom', 'registered-parent-checklist.md'),
+      [
+        '# Task Checklist - 1097-sample-task',
+        '',
+        '- MCP Task ID: `1097-sample-task`',
+        '- Primary PRD: `docs/PRD-sample-task.md`',
+        ''
+      ].join('\n'),
+      'utf8'
+    );
+    await writeFile(join(sandbox, 'docs', 'PRD-sample-task.md'), '# PRD\n', 'utf8');
+
+    const result = await runReviewCommand(
+      manifestPath,
+      baseEnv(sandbox, codexBin),
+      ['--surface', 'audit']
+    );
+
+    expect(result.exitCode).toBe(0);
+    const promptPath = join(dirname(manifestPath), 'review', 'prompt.txt');
+    const prompt = await readFile(promptPath, 'utf8');
+    expect(prompt).toContain('Review task: 1097-sample-task-scout');
+    expect(prompt).toContain('Task context:');
+    expect(prompt).toContain('- Task checklist: `tasks/custom/registered-parent-checklist.md`');
+    expect(prompt).toContain('- Primary PRD: `docs/PRD-sample-task.md`');
+  });
+
+  it('ignores legacy task index path entries that are not checklist paths', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifestForTask(
+      sandbox,
+      '0202-prd-orchestrator-hardening-scout',
+      'audit-legacy-path'
+    );
+    const codexBin = await makeFakeCodex(sandbox);
+    await mkdir(join(sandbox, 'tasks'), { recursive: true });
+    await writeFile(
+      join(sandbox, 'tasks', 'index.json'),
+      JSON.stringify({
+        items: [
+          {
+            id: '0202',
+            slug: 'prd-orchestrator-hardening',
+            path: 'tasks/0202-prd-orchestrator-hardening.md'
+          }
+        ]
+      }),
+      'utf8'
+    );
+    await writeFile(
+      join(sandbox, 'tasks', '0202-prd-orchestrator-hardening.md'),
+      '# PRD Snapshot - legacy entry\n',
+      'utf8'
+    );
+
+    const result = await runReviewCommand(
+      manifestPath,
+      baseEnv(sandbox, codexBin),
+      ['--surface', 'audit']
+    );
+
+    expect(result.exitCode).toBe(0);
+    const promptPath = join(dirname(manifestPath), 'review', 'prompt.txt');
+    const prompt = await readFile(promptPath, 'utf8');
+    expect(prompt).toContain('Review task: 0202-prd-orchestrator-hardening-scout');
+    expect(prompt).not.toContain('Task context:');
+    expect(prompt).not.toContain('tasks/0202-prd-orchestrator-hardening.md');
   });
 
   it('keeps review artifacts aligned with the resolved manifest when CODEX_ORCHESTRATOR_RUN_DIR is stale', async () => {

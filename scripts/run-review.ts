@@ -33,7 +33,7 @@ import {
   writeDoctorIssueLog
 } from '../orchestrator/src/cli/doctorIssueLog.js';
 import { parseArgs as parseCliArgs, hasFlag } from './lib/cli-args.js';
-import { pathExists } from './lib/docs-helpers.js';
+import { normalizeTaskKey, pathExists } from './lib/docs-helpers.js';
 import {
   formatDurationMs,
   logReviewTelemetrySummary as logReviewExecutionTelemetrySummary,
@@ -104,6 +104,79 @@ function installStdioErrorGuards(): void {
 
 installStdioErrorGuards();
 
+interface TaskIndexEntry {
+  id?: string;
+  slug?: string;
+  path?: string;
+  relates_to?: string;
+  paths?: {
+    task?: string;
+  };
+}
+
+async function readTaskIndexEntries(): Promise<TaskIndexEntry[]> {
+  const taskIndexPath = path.join(repoRoot, 'tasks', 'index.json');
+  if (!(await pathExists(taskIndexPath))) {
+    return [];
+  }
+
+  try {
+    const raw = await readFile(taskIndexPath, 'utf8');
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed?.items) ? (parsed.items as TaskIndexEntry[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function extractTaskChecklistCandidate(item: TaskIndexEntry): string | null {
+  const directTaskPath =
+    typeof item.paths?.task === 'string'
+      ? item.paths.task.trim()
+      : typeof item.relates_to === 'string'
+      ? item.relates_to.trim()
+      : '';
+  if (directTaskPath.length > 0) {
+    return directTaskPath;
+  }
+
+  const legacyPath = typeof item.path === 'string' ? item.path.trim() : '';
+  const candidate =
+    /(?:^|\/)tasks-[0-9]{4}-[A-Za-z0-9-]+\.md$/u.test(legacyPath) ? legacyPath : '';
+  return candidate.length > 0 ? candidate : null;
+}
+
+async function resolveRegisteredTaskChecklistPath(taskKey: string): Promise<string | null> {
+  const items = await readTaskIndexEntries();
+  if (items.length === 0) {
+    return null;
+  }
+
+  const keyedItems = items
+    .map((item) => ({
+      key: normalizeTaskKey(item),
+      checklistPath: extractTaskChecklistCandidate(item)
+    }))
+    .filter(
+      (entry): entry is { key: string; checklistPath: string } =>
+        typeof entry.key === 'string' &&
+        entry.key.length > 0 &&
+        typeof entry.checklistPath === 'string' &&
+        entry.checklistPath.length > 0
+    )
+    .sort((left, right) => right.key.length - left.key.length);
+
+  const exact = keyedItems.find((entry) => entry.key === taskKey);
+  const prefix = keyedItems.find((entry) => taskKey.startsWith(`${entry.key}-`));
+  const selected = exact ?? prefix;
+  if (!selected) {
+    return null;
+  }
+
+  const absolute = path.resolve(repoRoot, selected.checklistPath);
+  return (await pathExists(absolute)) ? absolute : null;
+}
+
 async function resolveTaskChecklistPath(taskKey: string): Promise<string | null> {
   const direct = path.join(repoRoot, 'tasks', `tasks-${taskKey}.md`);
   if (await pathExists(direct)) {
@@ -148,28 +221,9 @@ function extractBacktickedPath(line: string): string | null {
   return match?.[1] ?? null;
 }
 
-function extractMarkdownSection(content: string, heading: string): string[] | null {
-  const lines = content.split('\n');
-  const headingLine = `## ${heading}`;
-  const startIndex = lines.findIndex((line) => line.trim() === headingLine);
-  if (startIndex === -1) {
-    return null;
-  }
-
-  const body: string[] = [];
-  for (let index = startIndex + 1; index < lines.length; index += 1) {
-    const line = lines[index] ?? '';
-    if (line.trim().startsWith('## ')) {
-      break;
-    }
-    body.push(line);
-  }
-
-  return body;
-}
-
 async function buildTaskContext(taskKey: string): Promise<string[]> {
-  const checklistPath = await resolveTaskChecklistPath(taskKey);
+  const checklistPath =
+    (await resolveRegisteredTaskChecklistPath(taskKey)) ?? (await resolveTaskChecklistPath(taskKey));
   if (!checklistPath) {
     return [];
   }
@@ -179,26 +233,10 @@ async function buildTaskContext(taskKey: string): Promise<string[]> {
   const headerBullets = extractTaskHeaderBulletLines(checklist);
 
   const lines: string[] = ['Task context:', `- Task checklist: \`${relativeChecklist}\``];
-  for (const bullet of headerBullets) {
-    lines.push(bullet);
-  }
-
   const prdLine = headerBullets.find((line) => line.toLowerCase().includes('primary prd:'));
   const prdPath = prdLine ? extractBacktickedPath(prdLine) : null;
   if (prdPath) {
-    const absPrdPath = path.resolve(repoRoot, prdPath);
-    if (await pathExists(absPrdPath)) {
-      const prd = await readFile(absPrdPath, 'utf8');
-      const summary = extractMarkdownSection(prd, 'Summary');
-      const summaryBullets =
-        summary
-          ?.map((line) => line.trimEnd())
-          .filter((line) => line.trim().startsWith('- '))
-          .slice(0, 6) ?? [];
-      if (summaryBullets.length > 0) {
-        lines.push('', `PRD summary (\`${prdPath}\`):`, ...summaryBullets);
-      }
-    }
+    lines.push(`- Primary PRD: \`${prdPath}\``);
   }
 
   return lines;
