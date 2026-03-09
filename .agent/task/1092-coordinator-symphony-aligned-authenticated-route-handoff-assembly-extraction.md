@@ -20,21 +20,21 @@
 
 ## Authenticated Route Handoff Assembly Extraction
 
-- [ ] Shared authenticated-route handoff assembly extracted behind one bounded controller-owned seam.
-- [ ] `controlServer.ts` delegates authenticated-route handoff construction without changing branch ordering or authority ownership.
-- [ ] Authenticated-route behavior remains unchanged after extraction.
+- [x] Shared authenticated-route handoff assembly extracted behind one bounded controller-owned seam. Evidence: `orchestrator/src/cli/control/controlAuthenticatedRouteHandoff.ts`, `out/1092-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction/manual/20260309T150731Z-closeout/12-elegance-review.md`.
+- [x] `controlServer.ts` delegates authenticated-route handoff construction without changing branch ordering or authority ownership. Evidence: `orchestrator/src/cli/control/controlServer.ts`, `out/1092-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction/manual/20260309T150731Z-closeout/11-manual-authenticated-route-handoff-check.json`.
+- [x] Authenticated-route behavior remains unchanged after extraction. Evidence: `orchestrator/tests/ControlAuthenticatedRouteHandoff.test.ts`, `orchestrator/tests/AuthenticatedRouteController.test.ts`, `orchestrator/tests/ControlServer.test.ts`, `out/1092-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction/manual/20260309T150731Z-closeout/05b-targeted-tests.log`.
 
 ## Validation + Closeout
 
-- [ ] `node scripts/delegation-guard.mjs`
-- [ ] `node scripts/spec-guard.mjs --dry-run`
-- [ ] `npm run build`
-- [ ] `npm run lint`
-- [ ] `npm run test`
-- [ ] `npm run docs:check`
-- [ ] `npm run docs:freshness`
-- [ ] `node scripts/diff-budget.mjs`
-- [ ] `npm run review`
-- [ ] `npm run pack:smoke`
-- [ ] Manual/mock authenticated-route handoff evidence captured.
-- [ ] Elegance review completed.
+- [x] `node scripts/delegation-guard.mjs` Evidence: `out/1092-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction/manual/20260309T150731Z-closeout/01-delegation-guard.log`.
+- [x] `node scripts/spec-guard.mjs --dry-run` Evidence: `out/1092-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction/manual/20260309T150731Z-closeout/02-spec-guard.log`.
+- [x] `npm run build` Evidence: `out/1092-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction/manual/20260309T150731Z-closeout/03-build.log`.
+- [x] `npm run lint` Evidence: `out/1092-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction/manual/20260309T150731Z-closeout/04-lint.log`.
+- [x] `npm run test` Evidence: `out/1092-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction/manual/20260309T150731Z-closeout/05-test.log`, `out/1092-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction/manual/20260309T150731Z-closeout/05b-targeted-tests.log`, `.runs/1092-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction-scout/cli/2026-03-09T15-06-41-086Z-e3264e35/commands/04-test.ndjson`.
+- [x] `npm run docs:check` Evidence: `out/1092-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction/manual/20260309T150731Z-closeout/06-docs-check.log`.
+- [x] `npm run docs:freshness` Evidence: `out/1092-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction/manual/20260309T150731Z-closeout/07-docs-freshness.log`.
+- [x] `node scripts/diff-budget.mjs` Evidence: `out/1092-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction/manual/20260309T150731Z-closeout/08-diff-budget.log`.
+- [x] `npm run review` Evidence: `out/1092-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction/manual/20260309T150731Z-closeout/09-review.log`.
+- [x] `npm run pack:smoke` Evidence: `out/1092-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction/manual/20260309T150731Z-closeout/10-pack-smoke.log`.
+- [x] Manual/mock authenticated-route handoff evidence captured. Evidence: `out/1092-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction/manual/20260309T150731Z-closeout/11-manual-authenticated-route-handoff-check.json`.
+- [x] Elegance review completed. Evidence: `out/1092-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction/manual/20260309T150731Z-closeout/12-elegance-review.md`.
