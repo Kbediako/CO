@@ -1,0 +1,4 @@
+
+> @kbediako/codex-orchestrator@0.1.38 build
+> tsc -p tsconfig.build.json
+

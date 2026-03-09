@@ -1,0 +1,17 @@
+{
+  "seam": "readControlServerSeeds",
+  "missing_file_behavior": {
+    "controlSeed": null,
+    "confirmationsSeed": null,
+    "questionsSeed": null,
+    "delegationSeed": null,
+    "linearAdvisorySeed": null
+  },
+  "loaded_shape_behavior": {
+    "control_seq": 7,
+    "nested_questions_count": 1,
+    "nested_tokens_count": 1,
+    "linear_seed_loaded": true,
+    "confirmations_seed_missing": true
+  }
+}

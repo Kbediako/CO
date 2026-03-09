@@ -5,8 +5,8 @@ import { readFile } from 'node:fs/promises';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { isoTimestamp } from '../utils/time.js';
 import { logger } from '../../logger.js';
+import { isoTimestamp } from '../utils/time.js';
 import type { RunPaths } from '../run/runPaths.js';
 import type { EffectiveDelegationConfig } from '../config/delegationConfig.js';
 import {
@@ -14,9 +14,9 @@ import {
   type ControlAction,
   type ControlState
 } from './controlState.js';
-import { ConfirmationStore, type ConfirmationStoreSnapshot } from './confirmations.js';
-import { QuestionQueue, type QuestionRecord } from './questions.js';
-import { DelegationTokenStore, type DelegationTokenRecord } from './delegationTokens.js';
+import { ConfirmationStore } from './confirmations.js';
+import { QuestionQueue } from './questions.js';
+import { DelegationTokenStore } from './delegationTokens.js';
 import { type DispatchPilotEvaluation } from './trackerDispatchPilot.js';
 import type { RunEventStream, RunEventStreamEntry } from '../events/runEventStream.js';
 import { type ControlRuntime } from './controlRuntime.js';
@@ -43,11 +43,9 @@ import {
   type ControlRequestSharedContext
 } from './controlRequestContext.js';
 import { createControlQuestionChildResolutionAdapter } from './controlQuestionChildResolution.js';
-import {
-  createControlServerSeededRuntimeAssembly,
-  LINEAR_ADVISORY_STATE_FILE
-} from './controlServerSeededRuntimeAssembly.js';
+import { createControlServerSeededRuntimeAssembly } from './controlServerSeededRuntimeAssembly.js';
 import { createControlServerRequestShell } from './controlServerRequestShell.js';
+import { readControlServerSeeds } from './controlServerSeedLoading.js';
 
 interface ControlServerOptions {
   paths: RunPaths;
@@ -128,15 +126,13 @@ export class ControlServer {
 
   static async start(options: ControlServerOptions): Promise<ControlServer> {
     const token = randomBytes(24).toString('hex');
-    const controlSeed = await readJsonFile<ControlState>(options.paths.controlPath);
-    const confirmationsSeed = await readJsonFile<ConfirmationStoreSnapshot>(options.paths.confirmationsPath);
-    const questionsSeed = await readJsonFile<{ questions?: QuestionRecord[] }>(options.paths.questionsPath);
-    const delegationSeed = await readJsonFile<{ tokens?: DelegationTokenRecord[] }>(
-      options.paths.delegationTokensPath
-    );
-    const linearAdvisorySeed = await readJsonFile<LinearAdvisoryState>(
-      join(options.paths.runDir, LINEAR_ADVISORY_STATE_FILE)
-    );
+    const {
+      controlSeed,
+      confirmationsSeed,
+      questionsSeed,
+      delegationSeed,
+      linearAdvisorySeed
+    } = await readControlServerSeeds(options.paths);
 
     const {
       controlStore,
@@ -546,19 +542,6 @@ async function readJsonBody(req: http.IncomingMessage): Promise<Record<string, u
     return JSON.parse(raw) as Record<string, unknown>;
   } catch {
     throw new HttpError(400, 'invalid_json');
-  }
-}
-
-async function readJsonFile<T>(path: string): Promise<T | null> {
-  try {
-    const raw = await readFile(path, 'utf8');
-    return JSON.parse(raw) as T;
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-      return null;
-    }
-    logger.warn(`Failed to read JSON file ${path}: ${(error as Error)?.message ?? error}`);
-    return null;
   }
 }
 

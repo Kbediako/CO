@@ -1,0 +1,429 @@
+
+> @kbediako/codex-orchestrator@0.1.38 review
+> node --loader ts-node/esm scripts/run-review.ts --manifest .runs/1086-coordinator-symphony-aligned-control-server-seed-loading-extraction-scout/cli/2026-03-09T11-34-54-316Z-d4918433/manifest.json
+
+(node:75420) ExperimentalWarning: `--experimental-loader` may be removed in the future; instead use `register()`:
+--import 'data:text/javascript,import { register } from "node:module"; import { pathToFileURL } from "node:url"; register("ts-node/esm", pathToFileURL("./"));'
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:75420) [DEP0180] DeprecationWarning: fs.Stats constructor is deprecated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+⚠️ Diff budget exceeded (override applied) (base=origin/main)
+ - changed files 803 > 25
+ - total lines changed 80539 > 800
+Top changed files:
+  - orchestrator/tests/ControlServer.test.ts: 7536
+  - docs/docs-freshness-registry.json: 6970
+  - tasks/index.json: 5610
+  - orchestrator/tests/DelegationServer.test.ts: 2115
+  - orchestrator/src/cli/control/controlServer.ts: 1734
+  - scripts/lib/review-execution-state.ts: 1618
+  - orchestrator/tests/TelegramOversightBridge.test.ts: 1471
+  - scripts/run-review.ts: 1172
+  - orchestrator/src/cli/control/telegramOversightBridge.ts: 901
+  - orchestrator/tests/ControlRuntime.test.ts: 835
+
+Override accepted via DIFF_BUDGET_OVERRIDE_REASON: stacked-branch bounded delta for 1086 seed loading extraction
+[run-review] bounded review guidance enabled by default (set CODEX_REVIEW_ALLOW_HEAVY_COMMANDS=1 to opt into unrestricted heavy-command execution).
+[run-review] review scope metrics: 3 files, 298 lines.
+[run-review] runtime requested=appserver selected=appserver provider=AppServerRuntimeProvider.
+[run-review] delegation MCP enabled for this review (default; set --disable-delegation-mcp or CODEX_REVIEW_DISABLE_DELEGATION_MCP=1 to disable).
+Review prompt saved to: .runs/1086-coordinator-symphony-aligned-control-server-seed-loading-extraction-scout/cli/2026-03-09T11-34-54-316Z-d4918433/review/prompt.txt
+Review output log: .runs/1086-coordinator-symphony-aligned-control-server-seed-loading-extraction-scout/cli/2026-03-09T11-34-54-316Z-d4918433/review/output.log
+Launching Codex review (evidence: .runs/1086-coordinator-symphony-aligned-control-server-seed-loading-extraction-scout/cli/2026-03-09T11-34-54-316Z-d4918433/manifest.json)
+[run-review] patience-first monitor checkpoints every 1m 0s (set CODEX_REVIEW_MONITOR_INTERVAL_SECONDS=0 to disable).
+[run-review] low-signal drift guard enabled after 3m 0s of repetitive bounded activity (set CODEX_REVIEW_LOW_SIGNAL_TIMEOUT_SECONDS=0 to disable).
+[run-review] meta-surface expansion guard enabled after 3m 0s of sustained off-task meta activity (set CODEX_REVIEW_META_SURFACE_TIMEOUT_SECONDS=0 to disable).
+OpenAI Codex v0.112.0 (research preview)
+--------
+workdir: /Users/kbediako/Code/CO
+model: gpt-5.4
+provider: openai
+approval: never
+sandbox: danger-full-access
+reasoning effort: xhigh
+reasoning summaries: detailed
+session id: 019cd270-ef0a-7d11-bb3f-afa729bbbcef
+--------
+user
+Review task: 1086-coordinator-symphony-aligned-control-server-seed-loading-extraction-scout
+Evidence manifest: .runs/1086-coordinator-symphony-aligned-control-server-seed-loading-extraction-scout/cli/2026-03-09T11-34-54-316Z-d4918433/manifest.json
+
+Agent notes:
+Goal: review the bounded 1086 control-server seed-loading extraction only. | Summary: ControlServer.start now delegates the five tolerant seed file reads to controlServerSeedLoading.ts and adds direct helper coverage for missing files, preserved payload shape, and malformed JSON tolerance. | Risks: missing-file tolerance drift, payload-shape drift for questions/tokens, linear advisory path drift. | Questions: identify any concrete correctness or minimality issue in the helper, tests, or remaining ControlServer.start boundary.
+
+Please review the current changes and confirm:
+- The solution is minimal and avoids unnecessary abstraction/scope
+- README/SOP docs match the implemented behavior
+- Commands/scripts are non-interactive (no TTY prompts)
+- Evidence + checklist mirroring requirements are satisfied
+
+Call out any remaining documentation/code mismatches or guardrail violations.
+
+Execution constraints (bounded review mode):
+- Keep this review focused on changed files and nearby dependencies.
+- Avoid full validation suites (for example `npm run test`, `npm run lint`, `npm run build`, `npm run docs:check`, `npm run docs:freshness`) during this pass.
+- Do not launch direct validation runners (for example `npx vitest`, `npm exec jest`) or nested review/pipeline/delegation flows during this pass.
+- If broader validation would improve confidence, list follow-up commands instead of executing them.
+
+Review scope hint: uncommitted working tree changes (default).
+
+Git scope summary:
+```
+## main...origin/main [ahead 143]
+ M orchestrator/src/cli/control/controlServer.ts
+?? orchestrator/src/cli/control/controlServerSeedLoading.ts
+?? orchestrator/tests/ControlServerSeedLoading.test.ts
+```
+
+Diff budget override: stacked-branch bounded delta for 1086 seed loading extraction
+mcp: openaiDeveloperDocs starting
+mcp: delegation starting
+mcp: delegation ready
+mcp: openaiDeveloperDocs ready
+mcp startup: ready: delegation, openaiDeveloperDocs
+mcp: openaiDeveloperDocs starting
+mcp: delegation starting
+mcp: delegation ready
+mcp: openaiDeveloperDocs ready
+mcp startup: ready: delegation, openaiDeveloperDocs
+
+thinking
+**Looking into code review process**
+
+I need to review code changes and ensure the output matches the exact JSON schema. I'll inspect the diffs and surrounding files. It makes sense to use memory since the user's request involves reviewing the repo context. The instruction says to use memory by default when repo paths or files are mentioned, so a quick search through MEMORY.md for relevant keywords might be necessary. I think a lightweight search is the way to go!
+thinking
+**Looking into code review process**
+
+I need to review code changes and ensure the output matches the exact JSON schema. I'll inspect the diffs and surrounding files. It makes sense to use memory since the user's request involves reviewing the repo context. The instruction says to use memory by default when repo paths or files are mentioned, so a quick search through MEMORY.md for relevant keywords might be necessary. I think a lightweight search is the way to go!
+exec
+/bin/zsh -lc 'rg -n "1086|standalone review|review loop|controlServer|docs-relevance|manifest-backed review" /Users/kbediako/.codex/memories/MEMORY.md | head -n 20' in /Users/kbediako/Code/CO succeeded in 52ms:
+29:- codex-orchestrator doctor --usage, collab_tool_calls, delegation coverage, cloud fallback, delegate-server --mode status_only, full|question_only, delegationServer.ts, controlServer.ts, controlState.ts, runtimeMode appserver, executionMode, diff-budget override
+609:- rollout_summaries/2026-02-19T05-20-49-8rXt-codex_cli_capability_adoption.md (cwd=/Users/kbediako/Code/CO, rollout_path=/Users/kbediako/.codex/sessions/2026/02/19/rollout-2026-02-19T16-20-49-019c7457-fec5-7051-9b0b-96f27460a3d3.jsonl, updated_at=2026-02-20T16:31:28+00:00, thread_id=019c7457-fec5-7051-9b0b-96f27460a3d3, docs-first adoption fixes merged after CI/review loops)
+890:- 1009, telegram canary, transport allowlist, allowed_transports, mutating controls, controlServer, shared-checkout override
+exec
+/bin/zsh -lc "sed -n '20,40p' /Users/kbediako/.codex/memories/MEMORY.md && sed -n '880,900p' /Users/kbediako/.codex/memories/MEMORY.md" in /Users/kbediako/Code/CO succeeded in 51ms:
+
+## Task 2: advanced codex-orchestrator feature maturity audit with policy gaps
+
+### rollout_summary_files
+
+- rollout_summaries/2026-03-05T05-15-56-CoRo-co_codex_orchestrator_360_2026_03_05.md (cwd=/Users/kbediako/Code/CO, rollout_path=/Users/kbediako/.codex/sessions/2026/03/05/rollout-2026-03-05T16-15-56-019cbc6c-8cde-7181-99f8-8f9756db9c3e.jsonl, updated_at=2026-03-05T05:48:02+00:00, thread_id=019cbc6c-8cde-7181-99f8-8f9756db9c3e, doctor-usage plus source/manifest cross-check)
+
+### keywords
+
+- codex-orchestrator doctor --usage, collab_tool_calls, delegation coverage, cloud fallback, delegate-server --mode status_only, full|question_only, delegationServer.ts, controlServer.ts, controlState.ts, runtimeMode appserver, executionMode, diff-budget override
+
+### learnings
+
+- `codex-orchestrator doctor --usage` is the fastest entrypoint for adoption maturity baselines (delegation strong, collab low, cloud fallback heavy), then source/manifest checks should validate whether docs and CLI behavior match.
+- Failure shield: do not trust docs-only command surfaces; verify parser/help contract in `bin/codex-orchestrator.ts` (this run found docs mention `status_only` while parser accepted `full|question_only`).
+- Guardrail maturity audits are stronger when run-summary evidence is included (selected stages, diff-budget overrides, runtime defaults, review outcomes) rather than policy prose alone.
+- Recommended follow-up pattern is non-code-first: publish SOP/workarounds for contract mismatches, track weekly adoption metrics, and require explicit checklist justification for guardrail overrides.
+
+## Task 3: collab-vs-delegation explanation for operator decisions
+
+Plan update
+Bounded review: inspect diff and nearby files, assess correctness/docs/guardrails, then emit findings JSON.
+  → Inspect the changed files and surrounding control-server logic/tests/docs references
+  • Evaluate correctness, minimality, docs/guardrail compliance, and identify actionable findings
+  • Produce structured review JSON with verdict
+exec
+/bin/zsh -lc 'git diff -- orchestrator/src/cli/control/controlServer.ts orchestrator/src/cli/control/controlServerSeedLoading.ts orchestrator/tests/ControlServerSeedLoading.test.ts' in /Users/kbediako/Code/CO succeeded in 53ms:
+diff --git a/orchestrator/src/cli/control/controlServer.ts b/orchestrator/src/cli/control/controlServer.ts
+index f470405fa..996f3378a 100644
+--- a/orchestrator/src/cli/control/controlServer.ts
++++ b/orchestrator/src/cli/control/controlServer.ts
+@@ -5,8 +5,8 @@ import { readFile } from 'node:fs/promises';
+ import { basename, dirname, join, resolve } from 'node:path';
+ import { fileURLToPath } from 'node:url';
+ 
+-import { isoTimestamp } from '../utils/time.js';
+ import { logger } from '../../logger.js';
++import { isoTimestamp } from '../utils/time.js';
+ import type { RunPaths } from '../run/runPaths.js';
+ import type { EffectiveDelegationConfig } from '../config/delegationConfig.js';
+ import {
+@@ -14,9 +14,9 @@ import {
+   type ControlAction,
+   type ControlState
+ } from './controlState.js';
+-import { ConfirmationStore, type ConfirmationStoreSnapshot } from './confirmations.js';
+-import { QuestionQueue, type QuestionRecord } from './questions.js';
+exec
+/bin/zsh -lc "sed -n '1,220p' orchestrator/src/cli/control/controlServerSeedLoading.ts && printf '\\n---TEST---\\n' && sed -n '1,260p' orchestrator/tests/ControlServerSeedLoading.test.ts && printf '\\n---SURROUNDING TS---\\n' && sed -n '1,220p' orchestrator/src/cli/control/controlServer.ts" in /Users/kbediako/Code/CO succeeded in 52ms:
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
+
+import { logger } from '../../logger.js';
+import type { RunPaths } from '../run/runPaths.js';
+import type { ControlState } from './controlState.js';
+import type { ConfirmationStoreSnapshot } from './confirmations.js';
+import type { QuestionRecord } from './questions.js';
+import type { DelegationTokenRecord } from './delegationTokens.js';
+import type { LinearAdvisoryState } from './linearWebhookController.js';
+import { LINEAR_ADVISORY_STATE_FILE } from './controlServerSeededRuntimeAssembly.js';
+
+export interface ControlServerSeeds {
+  controlSeed: ControlState | null;
+  confirmationsSeed: ConfirmationStoreSnapshot | null;
+  questionsSeed: { questions?: QuestionRecord[] } | null;
+  delegationSeed: { tokens?: DelegationTokenRecord[] } | null;
+  linearAdvisorySeed: LinearAdvisoryState | null;
+}
+
+exec
+/bin/zsh -lc "sed -n '1,260p' orchestrator/src/cli/control/controlServerSeededRuntimeAssembly.ts" in /Users/kbediako/Code/CO succeeded in 53ms:
+import http from 'node:http';
+import { randomBytes } from 'node:crypto';
+import { join } from 'node:path';
+
+import { writeJsonAtomic } from '../utils/fs.js';
+import type { RunPaths } from '../run/runPaths.js';
+import type { EffectiveDelegationConfig } from '../config/delegationConfig.js';
+import type { RunEventStream } from '../events/runEventStream.js';
+import {
+  ControlStateStore,
+  type ControlState
+} from './controlState.js';
+import {
+  ConfirmationStore,
+  type ConfirmationStoreSnapshot
+} from './confirmations.js';
+import { QuestionQueue, type QuestionRecord } from './questions.js';
+import {
+  DelegationTokenStore,
+  type DelegationTokenRecord
+
+thinking
+**Inspecting documentation and tasks**
+
+I might need to check if any documentation changes have occurred. The user is asking me to confirm that the README and SOP documents match the non-interactive behavior and commands, including providing evidence and a checklist. It seems like I should look into the task documentation and checklist too. I could search for task ID 1086. Additionally, I may need to inspect the manifests to see if any updates were made. The user mentioned guardrail violations, so I'll definitely be careful about that!
+thinking
+**Inspecting documentation and tasks**
+
+I might need to check if any documentation changes have occurred. The user is asking me to confirm that the README and SOP documents match the non-interactive behavior and commands, including providing evidence and a checklist. It seems like I should look into the task documentation and checklist too. I could search for task ID 1086. Additionally, I may need to inspect the manifests to see if any updates were made. The user mentioned guardrail violations, so I'll definitely be careful about that!
+exec
+/bin/zsh -lc "rg -n \"1086|seed loading|control-server seed|seed-loading\" tasks docs .agent orchestrator/src/cli/control -g '"'!dist'"'" in /Users/kbediako/Code/CO succeeded in 53ms:
+docs/PRD-coordinator-symphony-aligned-control-server-request-shell-extraction.md:20:- Keep `ControlServer.start()` focused on token/seed loading, seeded runtime assembly, instance construction, bootstrap assembly, startup sequencing, and ready-instance return.
+docs/ACTION_PLAN-coordinator-symphony-aligned-control-server-seed-loading-extraction.md:5:1. Register `1086` docs-first from the `1085` next-slice note plus bounded read-only seam inspection.
+.agent/task/1084-coordinator-symphony-aligned-control-server-seeded-runtime-assembly-extraction.md:8:> This lane extracts the remaining seeded runtime assembly block from `ControlServer.start()` so the server method keeps seed loading plus server/startup-shell composition while seeded store/runtime creation, persist helpers, and `requestContextShared` assembly move behind one bounded helper.
+.agent/task/1086-coordinator-symphony-aligned-control-server-seed-loading-extraction.md:1:# Task Checklist - 1086-coordinator-symphony-aligned-control-server-seed-loading-extraction
+.agent/task/1086-coordinator-symphony-aligned-control-server-seed-loading-extraction.md:3:- MCP Task ID: `1086-coordinator-symphony-aligned-control-server-seed-loading-extraction`
+.agent/task/1086-coordinator-symphony-aligned-control-server-seed-loading-extraction.md:4:- Primary PRD: `docs/PRD-coordinator-symphony-aligned-control-server-seed-loading-extraction.md`
+.agent/task/1086-coordinator-symphony-aligned-control-server-seed-loading-extraction.md:5:- TECH_SPEC: `tasks/specs/1086-coordinator-symphony-aligned-control-server-seed-loading-extraction.md`
+.agent/task/1086-coordinator-symphony-aligned-control-server-seed-loading-extraction.md:6:- ACTION_PLAN: `docs/ACTION_PLAN-coordinator-symphony-aligned-control-server-seed-loading-extraction.md`
+.agent/task/1086-coordinator-symphony-aligned-control-server-seed-loading-extraction.md:12:- [x] Docs-first artifacts created (PRD/TECH_SPEC/ACTION_PLAN/spec/checklist + `.agent` mirror). Evidence: `docs/PRD-coordinator-symphony-aligned-control-server-seed-loading-extraction.md`, `docs/TECH_SPEC-coordinator-symphony-aligned-control-server-seed-loading-extraction.md`, `docs/ACTION_PLAN-coordinator-symphony-aligned-control-server-seed-loading-extraction.md`, `tasks/specs/1086-coordinator-symphony-aligned-control-server-seed-loading-extraction.md`, `tasks/tasks-1086-coordinator-symphony-aligned-control-server-seed-loading-extraction.md`, `.agent/task/1086-coordinator-symphony-aligned-control-server-seed-loading-extraction.md`.
+.agent/task/1086-coordinator-symphony-aligned-control-server-seed-loading-extraction.md:13:- [x] Deliberation/findings captured for the queued slice. Evidence: `docs/findings/1086-control-server-seed-loading-extraction-deliberation.md`, `out/1085-coordinator-symphony-aligned-control-server-request-shell-extraction/manual/20260309T110955Z-closeout/14-next-slice-note.md`.
+.agent/task/1086-coordinator-symphony-aligned-control-server-seed-loading-extraction.md:18:- [x] Local read-only review approval captured in the spec/checklist notes. Evidence: `tasks/specs/1086-coordinator-symphony-aligned-control-server-seed-loading-extraction.md`, `docs/findings/1086-control-server-seed-loading-extraction-deliberation.md`.
+.agent/task/1086-coordinator-symphony-aligned-control-server-seed-loading-extraction.md:19:- [ ] docs-review approval/override captured for registered `1086`. Evidence: `out/1086-coordinator-symphony-aligned-control-server-seed-loading-extraction/manual/<timestamp>-docs-first/00-summary.md`, `out/1086-coordinator-symphony-aligned-control-server-seed-loading-extraction/manual/<timestamp>-docs-first/05-docs-review-override.md`.
+.agent/task/1086-coordinator-symphony-aligned-control-server-seed-loading-extraction.md:23:- [ ] Seed loading extracted behind one bounded helper. Evidence: extracted control-local helper, focused seed-loading tests.
+.agent/task/1086-coordinator-symphony-aligned-control-server-seed-loading-extraction.md:24:- [ ] `ControlServer.start()` delegates the five seed reads while preserving missing-file tolerance and payload shape. Evidence: `orchestrator/src/cli/control/controlServer.ts`, focused seed-loading evidence.
+.agent/task/1086-coordinator-symphony-aligned-control-server-seed-loading-extraction.md:25:- [ ] Seed-loading regressions prove non-fatal missing-file handling and preserved loaded seed payloads remain intact. Evidence: focused seed-loading/server tests.
+.agent/task/1086-coordinator-symphony-aligned-control-server-seed-loading-extraction.md:29:- [ ] `node scripts/delegation-guard.mjs`. Evidence: `out/1086-coordinator-symphony-aligned-control-server-seed-loading-extraction/manual/<timestamp>-closeout/01-delegation-guard.log`, `.runs/1086-coordinator-symphony-aligned-control-server-seed-loading-extraction-*/cli/<timestamp>/manifest.json`.
+.agent/task/1086-coordinator-symphony-aligned-control-server-seed-loading-extraction.md:30:- [ ] `node scripts/spec-guard.mjs --dry-run`. Evidence: `out/1086-coordinator-symphony-aligned-control-server-seed-loading-extraction/manual/<timestamp>-closeout/02-spec-guard.log`.
+.agent/task/1086-coordinator-symphony-aligned-control-server-seed-loading-extraction.md:31:- [ ] `npm run build`. Evidence: `out/1086-coordinator-symphony-aligned-control-server-seed-loading-extraction/manual/<timestamp>-closeout/03-build.log`.
+.agent/task/1086-coordinator-symphony-aligned-control-server-seed-loading-extraction.md:32:- [ ] `npm run lint`. Evidence: `out/1086-coordinator-symphony-aligned-control-server-seed-loading-extraction/manual/<timestamp>-closeout/04-lint.log`.
+.agent/task/1086-coordinator-symphony-aligned-control-server-seed-loading-extraction.md:33:- [ ] `npm run test`. Evidence: `out/1086-coordinator-symphony-aligned-control-server-seed-loading-extraction/manual/<timestamp>-closeout/05-test.log`, `out/1086-coordinator-symphony-aligned-control-server-seed-loading-extraction/manual/<timestamp>-closeout/05b-targeted-tests.log`.
+
+
+[run-review] waiting on codex review (1m 0s elapsed, 2s idle; review progress observed).
+
+
+
+
+thinking
+**Evaluating document status**
+
+I need to check if the manifest reflects the current status by reviewing the present evidence or checklist. It’s possible that the user wants me to confirm if everything is properly mirrored. I should consider if there are any untracked documents, but the scope seems limited to code and test changes. If documentation isn’t updated, it could indicate bugs from the commit. It might be actionable if the author can address it, especially if there are unchecked tasks. The user wants to review changes and confirm the situation.
+thinking
+**Assessing documentation and dependencies**
+
+If the checklist or evidence requirements aren't met, it seems like the author would probably fix that. However, the code location needs to overlap with differences in the diff. For non-code documents, it might not align since there are no document differences. I could potentially point to a new helper file, but that won’t address missing documentation. The user asked to highlight document mismatches or guardrail violations, so I could include a general explanation, although the output should typically focus on specific findings. I also need to check dependencies, especially looking into how the readJsonFile helper may have been moved or altered.
+thinking
+**Evaluating import cycles and paths**
+
+I'm considering whether there could be an import cycle here. ControlServerSeedLoading imports LINEAR_ADVISORY_STATE_FILE from controlServerSeededRuntimeAssembly.ts, which imports linearWebhookController. It looks like there’s no cycle since ControlServerSeedLoading only imports constants and not the other way around. I also need to check if readControlServerSeeds reads files sequentially, which seems fine since controlServer.start does too. I wonder if tests might leak temp directories, but that doesn't seem to be an issue. Lastly, using join(paths.runDir, LINEAR_ADVISORY_STATE_FILE) may be duplicating the path logic.
+thinking
+**Identifying documentation mismatch**
+
+I'm inspecting `ControlServer.start` to see if there's something with import sorting, but it seems irrelevant. I noticed a potential mismatch where the current README/SOP docs state that `ControlServer.start()` handles token/seed loading, but after a change, it doesn't seem to do that anymore. The old docs reference for task 1085 doesn't reflect the updates from 1086, and now that statement feels outdated. I think I need to flag this documentation mismatch.
+thinking
+**Assessing documentation impact**
+
+I should comment on the start call location since the docs still state that `start` handles token/seed loading. Landing this change without a documentation update could break the docs-first mirror. It may be acceptable if it points to the new helper call. I can reference `docs/TASKS.md` and 1085 in my comments. Since the controlServer.ts line where seed loading moved overlaps the diff, that might satisfy the review. I need to determine how severe this issue might be, possibly P2 or P3. If it impacts maintainability, should I include a comment in the code review?
+thinking
+**Clarifying documentation updates**
+
+I could say that since `ControlServer.start()` now delegates seed loading, the references in the open 1085/Task snapshot indicating that the method still keeps token/seed loading are outdated. I should ask for an update to the mirrored PRD/TASKS/checklist entries to maintain accurate docs-first guardrails. This change needs to be addressed in the commit. I'll also verify the code_location in controlServer.ts for the new helper call. I should check for any "token/seed loading" documentation in AGENTS or TECH_SPEC.
+thinking
+**Evaluating document status**
+
+I need to check if the manifest reflects the current status by reviewing the present evidence or checklist. It’s possible that the user wants me to confirm if everything is properly mirrored. I should consider if there are any untracked documents, but the scope seems limited to code and test changes. If documentation isn’t updated, it could indicate bugs from the commit. It might be actionable if the author can address it, especially if there are unchecked tasks. The user wants to review changes and confirm the situation.
+thinking
+**Assessing documentation and dependencies**
+
+If the checklist or evidence requirements aren't met, it seems like the author would probably fix that. However, the code location needs to overlap with differences in the diff. For non-code documents, it might not align since there are no document differences. I could potentially point to a new helper file, but that won’t address missing documentation. The user asked to highlight document mismatches or guardrail violations, so I could include a general explanation, although the output should typically focus on specific findings. I also need to check dependencies, especially looking into how the readJsonFile helper may have been moved or altered.
+thinking
+**Evaluating import cycles and paths**
+
+I'm considering whether there could be an import cycle here. ControlServerSeedLoading imports LINEAR_ADVISORY_STATE_FILE from controlServerSeededRuntimeAssembly.ts, which imports linearWebhookController. It looks like there’s no cycle since ControlServerSeedLoading only imports constants and not the other way around. I also need to check if readControlServerSeeds reads files sequentially, which seems fine since controlServer.start does too. I wonder if tests might leak temp directories, but that doesn't seem to be an issue. Lastly, using join(paths.runDir, LINEAR_ADVISORY_STATE_FILE) may be duplicating the path logic.
+thinking
+**Identifying documentation mismatch**
+
+I'm inspecting `ControlServer.start` to see if there's something with import sorting, but it seems irrelevant. I noticed a potential mismatch where the current README/SOP docs state that `ControlServer.start()` handles token/seed loading, but after a change, it doesn't seem to do that anymore. The old docs reference for task 1085 doesn't reflect the updates from 1086, and now that statement feels outdated. I think I need to flag this documentation mismatch.
+thinking
+**Assessing documentation impact**
+
+I should comment on the start call location since the docs still state that `start` handles token/seed loading. Landing this change without a documentation update could break the docs-first mirror. It may be acceptable if it points to the new helper call. I can reference `docs/TASKS.md` and 1085 in my comments. Since the controlServer.ts line where seed loading moved overlaps the diff, that might satisfy the review. I need to determine how severe this issue might be, possibly P2 or P3. If it impacts maintainability, should I include a comment in the code review?
+thinking
+**Clarifying documentation updates**
+
+I could say that since `ControlServer.start()` now delegates seed loading, the references in the open 1085/Task snapshot indicating that the method still keeps token/seed loading are outdated. I should ask for an update to the mirrored PRD/TASKS/checklist entries to maintain accurate docs-first guardrails. This change needs to be addressed in the commit. I'll also verify the code_location in controlServer.ts for the new helper call. I should check for any "token/seed loading" documentation in AGENTS or TECH_SPEC.
+exec
+/bin/zsh -lc 'rg -n "token/seed loading|keeps token generation, seeded runtime assembly|keeps token/seed loading|seed loading" docs tasks .agent | head -n 80' in /Users/kbediako/Code/CO succeeded in 53ms:
+docs/PRD-coordinator-symphony-aligned-control-server-request-shell-extraction.md:20:- Keep `ControlServer.start()` focused on token/seed loading, seeded runtime assembly, instance construction, bootstrap assembly, startup sequencing, and ready-instance return.
+.agent/task/1084-coordinator-symphony-aligned-control-server-seeded-runtime-assembly-extraction.md:8:> This lane extracts the remaining seeded runtime assembly block from `ControlServer.start()` so the server method keeps seed loading plus server/startup-shell composition while seeded store/runtime creation, persist helpers, and `requestContextShared` assembly move behind one bounded helper.
+.agent/task/1086-coordinator-symphony-aligned-control-server-seed-loading-extraction.md:8:> This lane extracts the remaining five JSON seed reads from `ControlServer.start()` so the server method keeps token generation, seeded runtime assembly, request shell creation, bootstrap assembly, startup sequencing, and ready-instance return while startup seed hydration moves behind one bounded helper.
+docs/ACTION_PLAN-coordinator-symphony-aligned-control-server-seeded-runtime-assembly-extraction.md:7:3. Keep token generation, JSON seed loading, server/request shell creation, bootstrap assembly, and startup sequencing in `ControlServer.start()`.
+tasks/tasks-1086-coordinator-symphony-aligned-control-server-seed-loading-extraction.md:8:> This lane extracts the remaining five JSON seed reads from `ControlServer.start()` so the server method keeps token generation, seeded runtime assembly, request shell creation, bootstrap assembly, startup sequencing, and ready-instance return while startup seed hydration moves behind one bounded helper.
+docs/PRD-coordinator-symphony-aligned-control-server-seed-loading-extraction.md:5:After `1085`, `ControlServer.start()` still owns the five JSON seed reads that hydrate the control runtime before seeded runtime assembly: `control`, `confirmations`, `questions`, `delegationTokens`, and `linearAdvisory`. This slice extracts that seed-loading cluster into one bounded helper so the server method becomes a thinner composition shell around token generation, seed loading, seeded runtime assembly, request shell creation, bootstrap assembly, startup sequencing, and ready-instance return.
+.agent/task/1085-coordinator-symphony-aligned-control-server-request-shell-extraction.md:8:> This lane extracts the remaining inline `http.createServer(...)` request shell from `ControlServer.start()` so the server method keeps token/seed loading, seeded runtime assembly, instance construction, bootstrap assembly, startup sequencing, and ready-instance return while transport-level request-shell behavior moves behind one bounded helper.
+tasks/tasks-1084-coordinator-symphony-aligned-control-server-seeded-runtime-assembly-extraction.md:8:> This lane extracts the remaining seeded runtime assembly block from `ControlServer.start()` so the server method keeps seed loading plus server/startup-shell composition while seeded store/runtime creation, persist helpers, and `requestContextShared` assembly move behind one bounded helper.
+tasks/tasks-1085-coordinator-symphony-aligned-control-server-request-shell-extraction.md:8:> This lane extracts the remaining inline `http.createServer(...)` request shell from `ControlServer.start()` so the server method keeps token/seed loading, seeded runtime assembly, instance construction, bootstrap assembly, startup sequencing, and ready-instance return while transport-level request-shell behavior moves behind one bounded helper.
+tasks/specs/1085-coordinator-symphony-aligned-control-server-request-shell-extraction.md:20:Extract the inline `http.createServer(...)` request shell from `ControlServer.start()` into one helper so the server method keeps token/seed loading, seeded runtime assembly, instance construction, bootstrap assembly, startup sequencing, and ready-instance return while pre-instance availability handling, request-context assembly, and top-level JSON error mapping move behind one bounded seam.
+tasks/specs/1084-coordinator-symphony-aligned-control-server-seeded-runtime-assembly-extraction.md:20:Extract the seeded runtime assembly block from `ControlServer.start()` into one helper so the server method keeps seed loading plus server/startup-shell composition while seeded store/runtime creation, persist helpers, and `requestContextShared` assembly move behind one bounded seam.
+tasks/specs/1084-coordinator-symphony-aligned-control-server-seeded-runtime-assembly-extraction.md:30:- JSON seed loading changes before the helper call.
+tasks/specs/1086-coordinator-symphony-aligned-control-server-seed-loading-extraction.md:20:Extract the five JSON seed reads from `ControlServer.start()` into one helper so the server method keeps token generation, seeded runtime assembly, request shell creation, bootstrap assembly, startup sequencing, and ready-instance return while seed hydration moves behind one bounded seam.
+tasks/specs/1086-coordinator-symphony-aligned-control-server-seed-loading-extraction.md:35:- Splitting seed loading into multiple helpers/files.
+docs/TECH_SPEC-coordinator-symphony-aligned-control-server-request-shell-extraction.md:5:Extract the inline `http.createServer(...)` request shell from `ControlServer.start()` into one helper so the server method keeps token/seed loading, seeded runtime assembly, instance construction, bootstrap assembly, startup sequencing, and ready-instance return while the per-request shell moves behind a bounded seam.
+docs/PRD-coordinator-symphony-aligned-control-server-seeded-runtime-assembly-extraction.md:22:- Keep `ControlServer.start()` focused on seed loading, server/request shell composition, bootstrap assembly/startup delegation, and ready-instance return.
+docs/TECH_SPEC-coordinator-symphony-aligned-control-server-seed-loading-extraction.md:5:Extract the five JSON seed reads from `ControlServer.start()` into one helper so the server method keeps token generation, seeded runtime assembly, request shell creation, bootstrap assembly, startup sequencing, and ready-instance return while seed hydration moves behind a bounded seam.
+docs/TECH_SPEC-coordinator-symphony-aligned-control-server-seed-loading-extraction.md:66:- split seed loading into multiple helpers/files.
+docs/TECH_SPEC-coordinator-symphony-aligned-control-server-seed-loading-extraction.md:70:- Add a focused helper test file for seed loading.
+docs/TECH_SPEC-coordinator-symphony-aligned-control-server-seeded-runtime-assembly-extraction.md:5:Extract the seeded runtime assembly block from `ControlServer.start()` into one helper so the server method keeps seed loading plus server/startup-shell composition while seeded store/runtime creation, persist helpers, and `requestContextShared` assembly move behind one bounded seam.
+exec
+/bin/zsh -lc "sed -n '1,220p' orchestrator/src/cli/run/runPaths.ts" in /Users/kbediako/Code/CO succeeded in 51ms:
+import { join, relative } from 'node:path';
+import { sanitizeRunId } from '../../persistence/sanitizeRunId.js';
+import type { EnvironmentPaths } from './environment.js';
+
+export interface RunPaths {
+  runDir: string;
+  manifestPath: string;
+  heartbeatPath: string;
+  resumeTokenPath: string;
+  logPath: string;
+  eventsPath: string;
+  controlPath: string;
+  controlAuthPath: string;
+  controlEndpointPath: string;
+  confirmationsPath: string;
+  questionsPath: string;
+  delegationTokensPath: string;
+  commandsDir: string;
+  errorsDir: string;
+  compatDir: string;
+
+thinking
+**Inspecting control server tests**
+
+I need to look into the tests related to the control server start seeds. It seems like there might be existing tests that need updating. I should consider searching for any old coverage regarding readJsonFile to see if it's still relevant or needs adjustment. It's important to ensure that everything is current so that it works smoothly! Let’s dive into that and see what I can find.
+thinking
+**Inspecting control server tests**
+
+I need to look into the tests related to the control server start seeds. It seems like there might be existing tests that need updating. I should consider searching for any old coverage regarding readJsonFile to see if it's still relevant or needs adjustment. It's important to ensure that everything is current so that it works smoothly! Let’s dive into that and see what I can find.
+exec
+/bin/zsh -lc "rg -n \"ControlServer.start|questionsSeed|delegationSeed|linearAdvisorySeed|readJsonFile\" orchestrator/tests orchestrator/src/cli/control | sed -n '1,200p'" in /Users/kbediako/Code/CO succeeded in 53ms:
+orchestrator/src/cli/control/controlServerSeedLoading.ts:16:  questionsSeed: { questions?: QuestionRecord[] } | null;
+orchestrator/src/cli/control/controlServerSeedLoading.ts:17:  delegationSeed: { tokens?: DelegationTokenRecord[] } | null;
+orchestrator/src/cli/control/controlServerSeedLoading.ts:18:  linearAdvisorySeed: LinearAdvisoryState | null;
+orchestrator/src/cli/control/controlServerSeedLoading.ts:23:    controlSeed: await readJsonFile<ControlState>(paths.controlPath),
+orchestrator/src/cli/control/controlServerSeedLoading.ts:24:    confirmationsSeed: await readJsonFile<ConfirmationStoreSnapshot>(paths.confirmationsPath),
+orchestrator/src/cli/control/controlServerSeedLoading.ts:25:    questionsSeed: await readJsonFile<{ questions?: QuestionRecord[] }>(paths.questionsPath),
+orchestrator/src/cli/control/controlServerSeedLoading.ts:26:    delegationSeed: await readJsonFile<{ tokens?: DelegationTokenRecord[] }>(paths.delegationTokensPath),
+orchestrator/src/cli/control/controlServerSeedLoading.ts:27:    linearAdvisorySeed: await readJsonFile<LinearAdvisoryState>(
+orchestrator/src/cli/control/controlServerSeedLoading.ts:33:async function readJsonFile<T>(path: string): Promise<T | null> {
+orchestrator/tests/ControlServer.test.ts:182:    const server = await ControlServer.start({
+orchestrator/tests/ControlServer.test.ts:205:    const server = await ControlServer.start({
+orchestrator/tests/ControlServer.test.ts:232:    const server = await ControlServer.start({
+orchestrator/tests/ControlServer.test.ts:256:    const server = await ControlServer.start({
+orchestrator/tests/ControlServer.test.ts:278:    const server = await ControlServer.start({
+orchestrator/tests/ControlServer.test.ts:308:    const server = await ControlServer.start({
+orchestrator/tests/ControlServer.test.ts:338:    const server = await ControlServer.start({
+orchestrator/tests/ControlServer.test.ts:364:    const server = await ControlServer.start({
+orchestrator/tests/ControlServer.test.ts:387:    const server = await ControlServer.start({
+orchestrator/tests/ControlServer.test.ts:454:    const server = await ControlServer.start({
+orchestrator/tests/ControlServer.test.ts:501:    const server = await ControlServer.start({
+
+thinking
+**Investigating helper usage**
+
+I'm noticing a potential issue with the helper function not being exported as `readJsonFile`, which might just be in the tests. There’s a concern about the `controlServer.ts` file still importing `readFile` from `fs/promises`, but I’m not sure it's being used anymore. Hmm, I should search through the file to see if that import is still necessary. It seems like there’s some cleanup needed there!
+thinking
+**Investigating helper usage**
+
+I'm noticing a potential issue with the helper function not being exported as `readJsonFile`, which might just be in the tests. There’s a concern about the `controlServer.ts` file still importing `readFile` from `fs/promises`, but I’m not sure it's being used anymore. Hmm, I should search through the file to see if that import is still necessary. It seems like there’s some cleanup needed there!
+exec
+/bin/zsh -lc "rg -n \"readFile\\(\" orchestrator/src/cli/control/controlServer.ts" in /Users/kbediako/Code/CO succeeded in 52ms:
+581:    const payload = await readFile(assetPath);
+
+thinking
+**Inspecting potential bug**
+
+I'm currently testing a feature, and I think there might be a bug. In my tests, I'm checking `warn.mock.calls[0]?.[0]`, which could be an issue if the first call isn’t a string. So, I should probably look more closely at the line numbers around the areas I changed. I'll use line numbers as a reference to help me figure this out. I'm curious to see where the problem might be!
+thinking
+**Inspecting potential bug**
+
+I'm currently testing a feature, and I think there might be a bug. In my tests, I'm checking `warn.mock.calls[0]?.[0]`, which could be an issue if the first call isn’t a string. So, I should probably look more closely at the line numbers around the areas I changed. I'll use line numbers as a reference to help me figure this out. I'm curious to see where the problem might be!
+exec
+/bin/zsh -lc "nl -ba orchestrator/src/cli/control/controlServer.ts | sed -n '120,145p'; printf '\\n'; nl -ba orchestrator/src/cli/control/controlServerSeedLoading.ts | sed -n '1,120p'; printf '\\n'; nl -ba orchestrator/tests/ControlServerSeedLoading.test.ts | sed -n '1,240p'" in /Users/kbediako/Code/CO succeeded in 51ms:
+   120	    this.persist = options.persist;
+   121	    this.requestContextShared = options.requestContextShared;
+   122	    this.paths = options.paths;
+   123	    this.linearAdvisoryState = options.linearAdvisoryState;
+   124	    this.controlRuntime = options.controlRuntime;
+   125	  }
+   126	
+   127	  static async start(options: ControlServerOptions): Promise<ControlServer> {
+   128	    const token = randomBytes(24).toString('hex');
+   129	    const {
+   130	      controlSeed,
+   131	      confirmationsSeed,
+   132	      questionsSeed,
+   133	      delegationSeed,
+   134	      linearAdvisorySeed
+   135	    } = await readControlServerSeeds(options.paths);
+   136	
+   137	    const {
+   138	      controlStore,
+   139	      confirmationStore,
+
+[run-review] waiting on codex review (2m 0s elapsed, 2s idle; review progress observed).
+thinking
+**Inspecting evidence manifests**
+
+I think it's important to inspect the manifests, particularly for any potential guardrail evidence. I need to ensure I’m thorough in checking these details to gather the right information. There might be key findings that could impact conclusions. I guess there’s a lot that can be learned from a careful examination of the evidence manifest, so I’ll take my time with it to get everything right. Let's make sure nothing is overlooked!
+thinking
+**Inspecting evidence manifests**
+
+I think it's important to inspect the manifests, particularly for any potential guardrail evidence. I need to ensure I’m thorough in checking these details to gather the right information. There might be key findings that could impact conclusions. I guess there’s a lot that can be learned from a careful examination of the evidence manifest, so I’ll take my time with it to get everything right. Let's make sure nothing is overlooked!
+exec
+/bin/zsh -lc "jq '{run_id, task_id, pipeline, status, approvals, checklists, selected_stages, notes, parent_run_id, execution_mode: .executionMode, runtime_mode: .runtimeMode}' .runs/1086-coordinator-symphony-aligned-control-server-seed-loading-extraction-scout/cli/2026-03-09T11-34-54-316Z-d4918433/manifest.json" in /Users/kbediako/Code/CO succeeded in 52ms:
+{
+  "run_id": "2026-03-09T11-34-54-316Z-d4918433",
+  "task_id": "1086-coordinator-symphony-aligned-control-server-seed-loading-extraction-scout",
+  "pipeline": null,
+  "status": "failed",
+  "approvals": [],
+  "checklists": null,
+  "selected_stages": null,
+  "notes": null,
+  "parent_run_id": null,
+  "execution_mode": null,
+  "runtime_mode": null
+}
+exec
+/bin/zsh -lc "rg -n \"from './controlServer|from \\\"./controlServer\" orchestrator/src/cli/control/linearWebhookController.ts orchestrator/src/cli/control/controlServerSeededRuntimeAssembly.ts orchestrator/src/cli/control/controlServerSeedLoading.ts" in /Users/kbediako/Code/CO succeeded in 53ms:
+orchestrator/src/cli/control/controlServerSeedLoading.ts:11:import { LINEAR_ADVISORY_STATE_FILE } from './controlServerSeededRuntimeAssembly.js';
+
+[manual-note] Terminated the standalone review after it read the bounded 1086 diff and then drifted into stale manifest/checklist inspection (`failed` scout manifest fields, unsynced checklist placeholders) instead of returning code-local findings. No concrete defect was surfaced in `controlServerSeedLoading.ts`, its tests, or the remaining `ControlServer.start()` boundary before termination.
