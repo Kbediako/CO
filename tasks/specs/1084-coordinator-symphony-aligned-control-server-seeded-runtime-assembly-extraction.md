@@ -1,7 +1,7 @@
 ---
 id: 20260309-1084-coordinator-symphony-aligned-control-server-seeded-runtime-assembly-extraction
 title: Coordinator Symphony-Aligned Control Server Seeded Runtime Assembly Extraction
-status: draft
+status: completed
 owners:
   - Codex
 created: 2026-03-09
@@ -37,3 +37,4 @@ Extract the seeded runtime assembly block from `ControlServer.start()` into one 
 ## Notes
 
 - 2026-03-09: Approved for docs-first registration as the next bounded Symphony-aligned slice after `1083`. Evidence: `out/1083-coordinator-symphony-aligned-control-server-startup-shell-extraction/manual/20260309T095023Z-closeout/14-next-slice-note.md`, `docs/findings/1084-control-server-seeded-runtime-assembly-extraction-deliberation.md`.
+- 2026-03-09: Completed. `ControlServer.start()` now delegates seeded store/runtime creation, live persist closure assembly, and `requestContextShared` wiring through `orchestrator/src/cli/control/controlServerSeededRuntimeAssembly.ts`; focused regressions passed `2/2` files and `8/8` tests, the full local suite passed `177/177` files and `1200/1200` tests, the manifest-backed `1084-...-scout` diagnostics sub-run succeeded, pack-smoke passed on the final tree, and the only explicit non-green item is the standalone review wrapper override after it drifted into pre-closeout checklist/evidence reinspection instead of returning a bounded code verdict. Evidence: `out/1084-coordinator-symphony-aligned-control-server-seeded-runtime-assembly-extraction/manual/20260309T102726Z-closeout/00-summary.md`, `out/1084-coordinator-symphony-aligned-control-server-seeded-runtime-assembly-extraction/manual/20260309T102726Z-closeout/11-manual-seeded-runtime-check.json`, `out/1084-coordinator-symphony-aligned-control-server-seeded-runtime-assembly-extraction/manual/20260309T102726Z-closeout/12-elegance-review.md`, `out/1084-coordinator-symphony-aligned-control-server-seeded-runtime-assembly-extraction/manual/20260309T102726Z-closeout/13-override-notes.md`, `.runs/1084-coordinator-symphony-aligned-control-server-seeded-runtime-assembly-extraction-scout/cli/2026-03-09T10-23-08-551Z-be0e7df3/manifest.json`.

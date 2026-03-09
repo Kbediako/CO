@@ -5,7 +5,6 @@ import { readFile } from 'node:fs/promises';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { writeJsonAtomic } from '../utils/fs.js';
 import { isoTimestamp } from '../utils/time.js';
 import { logger } from '../../logger.js';
 import type { RunPaths } from '../run/runPaths.js';
@@ -20,13 +19,12 @@ import { QuestionQueue, type QuestionRecord } from './questions.js';
 import { DelegationTokenStore, type DelegationTokenRecord } from './delegationTokens.js';
 import { type DispatchPilotEvaluation } from './trackerDispatchPilot.js';
 import type { RunEventStream, RunEventStreamEntry } from '../events/runEventStream.js';
-import { createControlRuntime, type ControlRuntime } from './controlRuntime.js';
+import { type ControlRuntime } from './controlRuntime.js';
 import { handleUiSessionRequest } from './uiSessionController.js';
 import { admitAuthenticatedControlRoute } from './authenticatedControlRouteGate.js';
 import { handleAuthenticatedRouteRequest } from './authenticatedRouteController.js';
 import {
   handleLinearWebhookRequest,
-  normalizeLinearAdvisoryState,
   type LinearAdvisoryState,
   type LinearWebhookAuditEventInput
 } from './linearWebhookController.js';
@@ -35,7 +33,6 @@ import { type ControlServerBootstrapLifecycle } from './controlServerBootstrapLi
 import { createControlBootstrapAssembly } from './controlBootstrapAssembly.js';
 import { startControlServerStartupSequence } from './controlServerStartupSequence.js';
 import {
-  createControlEventTransport,
   type ControlEventTransport
 } from './controlEventTransport.js';
 import {
@@ -43,9 +40,14 @@ import {
   buildControlRequestContext,
   type ControlRequestContext,
   type ControlRequestPersist,
+  type ControlSessionTokens,
   type ControlRequestSharedContext
 } from './controlRequestContext.js';
 import { createControlQuestionChildResolutionAdapter } from './controlQuestionChildResolution.js';
+import {
+  createControlServerSeededRuntimeAssembly,
+  LINEAR_ADVISORY_STATE_FILE
+} from './controlServerSeededRuntimeAssembly.js';
 
 interface ControlServerOptions {
   paths: RunPaths;
@@ -66,7 +68,6 @@ const UI_ASSET_PATHS: Record<string, string> = {
   '/ui/favicon.svg': 'favicon.svg'
 };
 const UI_ROOT = resolveUiRoot();
-const LINEAR_ADVISORY_STATE_FILE = 'linear-advisory-state.json';
 
 class HttpError extends Error {
   readonly status: number;
@@ -77,52 +78,13 @@ class HttpError extends Error {
   }
 }
 
-class SessionTokenStore {
-  private readonly ttlMs: number;
-  private readonly tokens = new Map<string, number>();
-
-  constructor(ttlMs: number) {
-    this.ttlMs = ttlMs;
-  }
-
-  issue(): { token: string; expiresAt: string } {
-    this.prune();
-    const token = randomBytes(24).toString('hex');
-    const expiresAt = Date.now() + this.ttlMs;
-    this.tokens.set(token, expiresAt);
-    return { token, expiresAt: new Date(expiresAt).toISOString() };
-  }
-
-  validate(token: string): boolean {
-    this.prune();
-    const expiresAt = this.tokens.get(token);
-    if (!expiresAt) {
-      return false;
-    }
-    if (expiresAt <= Date.now()) {
-      this.tokens.delete(token);
-      return false;
-    }
-    return true;
-  }
-
-  private prune(): void {
-    const now = Date.now();
-    for (const [token, expiresAt] of this.tokens.entries()) {
-      if (expiresAt <= now) {
-        this.tokens.delete(token);
-      }
-    }
-  }
-}
-
 export class ControlServer {
   private readonly server: http.Server;
   private readonly controlStore: ControlStateStore;
   private readonly confirmationStore: ConfirmationStore;
   private readonly questionQueue: QuestionQueue;
   private readonly delegationTokens: DelegationTokenStore;
-  private readonly sessionTokens: SessionTokenStore;
+  private readonly sessionTokens: ControlSessionTokens;
   private readonly clients: Set<http.ServerResponse>;
   private readonly eventTransport: ControlEventTransport;
   private readonly persist: ControlRequestPersist;
@@ -140,7 +102,7 @@ export class ControlServer {
     confirmationStore: ConfirmationStore;
     questionQueue: QuestionQueue;
     delegationTokens: DelegationTokenStore;
-    sessionTokens: SessionTokenStore;
+    sessionTokens: ControlSessionTokens;
     clients: Set<http.ServerResponse>;
     eventTransport: ControlEventTransport;
     persist: ControlRequestPersist;
@@ -172,71 +134,35 @@ export class ControlServer {
     const delegationSeed = await readJsonFile<{ tokens?: DelegationTokenRecord[] }>(
       options.paths.delegationTokensPath
     );
-    const linearAdvisoryStatePath = join(options.paths.runDir, LINEAR_ADVISORY_STATE_FILE);
-    const linearAdvisorySeed = await readJsonFile<LinearAdvisoryState>(linearAdvisoryStatePath);
+    const linearAdvisorySeed = await readJsonFile<LinearAdvisoryState>(
+      join(options.paths.runDir, LINEAR_ADVISORY_STATE_FILE)
+    );
 
-    const controlStore = new ControlStateStore({
-      runId: options.runId,
-      controlSeq: controlSeed?.control_seq ?? 0,
-      latestAction: controlSeed?.latest_action ?? null,
-      featureToggles: controlSeed?.feature_toggles ?? null,
-      transportMutation: controlSeed?.transport_mutation ?? null
-    });
-    const defaultToggles = controlSeed?.feature_toggles ?? {};
-    if (!('rlm' in defaultToggles)) {
-      controlStore.updateFeatureToggles({ rlm: { policy: options.config.rlm.policy } });
-    }
-
-    const confirmationStore = new ConfirmationStore({
-      runId: options.runId,
-      expiresInMs: options.config.confirm.expiresInMs,
-      maxPending: options.config.confirm.maxPending,
-      seed: {
-        pending: confirmationsSeed?.pending ?? [],
-        issued: confirmationsSeed?.issued ?? [],
-        consumed_nonce_ids: confirmationsSeed?.consumed_nonce_ids ?? []
-      }
-    });
-
-    const questionQueue = new QuestionQueue({ seed: questionsSeed?.questions ?? [] });
-    const delegationTokens = new DelegationTokenStore({ seed: delegationSeed?.tokens ?? [] });
-    const sessionTokens = new SessionTokenStore(SESSION_TTL_MS);
-    const linearAdvisoryState = normalizeLinearAdvisoryState(linearAdvisorySeed);
-    const controlRuntime = createControlRuntime({
-      controlStore,
-      questionQueue,
-      paths: options.paths,
-      linearAdvisoryState
-    });
-
-    const clients = new Set<http.ServerResponse>();
-    const eventTransport = createControlEventTransport({
-      eventStream: options.eventStream,
-      clients,
-      runtime: controlRuntime
-    });
-    const persist = {
-      control: async () => writeJsonAtomic(options.paths.controlPath, controlStore.snapshot()),
-      confirmations: async () => writeJsonAtomic(options.paths.confirmationsPath, confirmationStore.snapshot()),
-      questions: async () => writeJsonAtomic(options.paths.questionsPath, { questions: questionQueue.list() }),
-      delegationTokens: async () => writeJsonAtomic(options.paths.delegationTokensPath, { tokens: delegationTokens.list() }),
-      linearAdvisory: async () => writeJsonAtomic(linearAdvisoryStatePath, linearAdvisoryState)
-    } satisfies ControlRequestPersist;
-    const requestContextShared = {
-      token,
+    const {
       controlStore,
       confirmationStore,
       questionQueue,
       delegationTokens,
       sessionTokens,
-      config: options.config,
-      persist,
       clients,
       eventTransport,
-      paths: options.paths,
+      persist,
+      requestContextShared,
       linearAdvisoryState,
-      runtime: controlRuntime
-    } satisfies ControlRequestSharedContext;
+      controlRuntime
+    } = createControlServerSeededRuntimeAssembly({
+      runId: options.runId,
+      token,
+      config: options.config,
+      paths: options.paths,
+      eventStream: options.eventStream,
+      sessionTtlMs: SESSION_TTL_MS,
+      controlSeed,
+      confirmationsSeed,
+      questionsSeed,
+      delegationSeed,
+      linearAdvisorySeed
+    });
 
     let instance: ControlServer | null = null;
     const server = http.createServer((req, res) => {

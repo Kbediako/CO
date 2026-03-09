@@ -329,6 +329,34 @@ describe('ControlServer', () => {
     }
   });
 
+  it('injects the default rlm toggle when the control seed omits it', async () => {
+    const { root, env, paths } = await createRunRoot('task-0940');
+    const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
+    await seedControlState(paths, {
+      feature_toggles: {
+        dispatch_pilot: { enabled: true }
+      }
+    });
+
+    const server = await ControlServer.start({
+      paths,
+      config,
+      runId: 'run-1'
+    });
+
+    try {
+      const controlRaw = await readFile(paths.controlPath, 'utf8');
+      const control = JSON.parse(controlRaw) as { feature_toggles?: Record<string, unknown> | null };
+      expect(control.feature_toggles).toMatchObject({
+        dispatch_pilot: { enabled: true },
+        rlm: { policy: config.rlm.policy }
+      });
+    } finally {
+      await server.close();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   it('blocks runner-only endpoints for session tokens', async () => {
     const { root, env, paths } = await createRunRoot('task-0940');
     const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
