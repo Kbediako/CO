@@ -1,7 +1,7 @@
 ---
 id: 20260309-1088-coordinator-symphony-aligned-control-server-audit-and-error-helper-extraction
 title: Coordinator Symphony-Aligned Control Server Audit and Error Helper Extraction
-status: active
+status: completed
 owners:
   - Codex
 created: 2026-03-09
@@ -35,3 +35,4 @@ Extract the remaining control-server audit payload shaping and shared JSON error
 ## Notes
 
 - 2026-03-09: Approved for docs-first registration as the next bounded Symphony-aligned slice after `1087`. Evidence: `out/1087-coordinator-symphony-aligned-control-server-seeded-runtime-bundle-boundary-tightening/manual/20260309T122328Z-closeout/12-elegance-review.md`, `out/1087-coordinator-symphony-aligned-control-server-seeded-runtime-bundle-boundary-tightening/manual/20260309T122328Z-closeout/14-next-slice-note.md`, `docs/findings/1088-control-server-audit-and-error-helper-extraction-deliberation.md`.
+- 2026-03-09: Completed. `controlServer.ts` now delegates the bounded audit/error helper cluster through `controlServerAuditAndErrorHelpers.ts`, the post-implementation elegance pass kept `resolveTaskIdFromManifestPath(...)` local to `controlServer.ts`, focused final-tree regressions passed `9/99` selected tests, and the manifest-backed delegated scout recorded a clean full-suite pass (`180/180` files, `1213/1213` tests). Evidence: `out/1088-coordinator-symphony-aligned-control-server-audit-and-error-helper-extraction/manual/20260309T125736Z-closeout/00-summary.md`, `out/1088-coordinator-symphony-aligned-control-server-audit-and-error-helper-extraction/manual/20260309T125736Z-closeout/05b-targeted-tests.log`, `out/1088-coordinator-symphony-aligned-control-server-audit-and-error-helper-extraction/manual/20260309T125736Z-closeout/12-elegance-review.md`, `.runs/1088-coordinator-symphony-aligned-control-server-audit-and-error-helper-extraction-scout/cli/2026-03-09T12-56-05-825Z-961b27ec/manifest.json`.
