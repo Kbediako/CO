@@ -1,7 +1,7 @@
 ---
 id: 20260309-1090-coordinator-symphony-aligned-control-server-public-route-and-ui-asset-helper-extraction
 title: Coordinator Symphony-Aligned Control Server Public Route and UI Asset Helper Extraction
-status: active
+status: completed
 owners:
   - Codex
 created: 2026-03-09
@@ -35,3 +35,4 @@ Extract the public-route/UI-asset helper cluster from `controlServer.ts` into on
 ## Notes
 
 - 2026-03-09: Approved for docs-first registration as the next bounded Symphony-aligned slice after `1089` based on current-file inspection and the `1089` next-slice note. Evidence: `out/1089-coordinator-symphony-aligned-control-server-request-body-helper-extraction/manual/20260309T132458Z-closeout/12-elegance-review.md`, `out/1089-coordinator-symphony-aligned-control-server-request-body-helper-extraction/manual/20260309T132458Z-closeout/14-next-slice-note.md`, `docs/findings/1090-control-server-public-route-and-ui-asset-helper-extraction-deliberation.md`.
+- 2026-03-09: Completed. `controlServer.ts` now delegates `/health`, root redirect, UI asset resolution, and static asset serving through `controlServerPublicRouteHelpers.ts`, focused regressions passed `2/2` files with `8/8` selected tests, the full local suite passed `182/182` files with `1224/1224` tests, and the delegated scout also completed a clean full-suite pass. The explicit non-green item is the forced standalone review wrapper/process drift override captured in `out/1090-coordinator-symphony-aligned-control-server-public-route-and-ui-asset-helper-extraction/manual/20260309T135121Z-closeout/13-override-notes.md`.
