@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260309-1081-coordinator-symphony-aligned-telegram-bridge-lifecycle-ownership-extraction",
+      "title": "Coordinator Symphony-Aligned Telegram Bridge Lifecycle Ownership Extraction",
+      "relates_to": "tasks/tasks-1081-coordinator-symphony-aligned-telegram-bridge-lifecycle-ownership-extraction.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-09",
+      "paths": {
+        "spec": "tasks/specs/1081-coordinator-symphony-aligned-telegram-bridge-lifecycle-ownership-extraction.md",
+        "task": "tasks/tasks-1081-coordinator-symphony-aligned-telegram-bridge-lifecycle-ownership-extraction.md",
+        "agent_task": ".agent/task/1081-coordinator-symphony-aligned-telegram-bridge-lifecycle-ownership-extraction.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-telegram-bridge-lifecycle-ownership-extraction.md"
+      }
+    },
+    {
       "id": "20260309-1080-coordinator-symphony-aligned-bootstrap-metadata-persistence-extraction",
       "title": "Coordinator Symphony-Aligned Bootstrap Metadata Persistence Extraction",
       "relates_to": "tasks/tasks-1080-coordinator-symphony-aligned-bootstrap-metadata-persistence-extraction.md",

@@ -7857,6 +7857,55 @@
       "cadence_days": 30
     },
     {
+      "path": ".agent/task/1081-coordinator-symphony-aligned-telegram-bridge-lifecycle-ownership-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-09",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-telegram-bridge-lifecycle-ownership-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-09",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/PRD-coordinator-symphony-aligned-telegram-bridge-lifecycle-ownership-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-09",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/TECH_SPEC-coordinator-symphony-aligned-telegram-bridge-lifecycle-ownership-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-09",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/findings/1081-telegram-bridge-lifecycle-ownership-extraction-deliberation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-09",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/specs/1081-coordinator-symphony-aligned-telegram-bridge-lifecycle-ownership-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-09",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/tasks-1081-coordinator-symphony-aligned-telegram-bridge-lifecycle-ownership-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-09",
+      "cadence_days": 30
+    },
+    {
       "path": ".agent/task/1080-coordinator-symphony-aligned-bootstrap-metadata-persistence-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
