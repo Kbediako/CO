@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260309-1084-coordinator-symphony-aligned-control-server-seeded-runtime-assembly-extraction",
+      "title": "Coordinator Symphony-Aligned Control Server Seeded Runtime Assembly Extraction",
+      "relates_to": "tasks/tasks-1084-coordinator-symphony-aligned-control-server-seeded-runtime-assembly-extraction.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-09",
+      "paths": {
+        "spec": "tasks/specs/1084-coordinator-symphony-aligned-control-server-seeded-runtime-assembly-extraction.md",
+        "task": "tasks/tasks-1084-coordinator-symphony-aligned-control-server-seeded-runtime-assembly-extraction.md",
+        "agent_task": ".agent/task/1084-coordinator-symphony-aligned-control-server-seeded-runtime-assembly-extraction.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-control-server-seeded-runtime-assembly-extraction.md"
+      }
+    },
+    {
       "id": "20260309-1083-coordinator-symphony-aligned-control-server-startup-shell-extraction",
       "title": "Coordinator Symphony-Aligned Control Server Startup Shell Extraction",
       "relates_to": "tasks/tasks-1083-coordinator-symphony-aligned-control-server-startup-shell-extraction.md",
