@@ -167,6 +167,39 @@ fi
         sleep 0.05
       done
     fi
+    if [[ "$mode" == "meta-surface-expansion-audit-unrelated" ]]; then
+      for _ in $(seq 1 2); do
+        echo "thinking"
+        echo "exec"
+        echo "/bin/zsh -lc 'sed -n 1,120p /Users/kbediako/.codex/memories/MEMORY.md' in /Users/kbediako/Code/CO"
+        echo "thinking"
+        echo "exec"
+        echo "/bin/zsh -lc 'sed -n 1,120p /Users/kbediako/.codex/skills/delegation-usage/SKILL.md' in /Users/kbediako/Code/CO"
+        echo "thinking"
+        echo "exec"
+        echo "/bin/zsh -lc 'sed -n 1,120p docs/guides/review-artifacts.md' in /Users/kbediako/Code/CO"
+        echo "thinking"
+        echo "exec"
+        echo "/bin/zsh -lc 'sed -n 1,80p .runs/sample-task/cli/sample-run/manifest.json' in /Users/kbediako/Code/CO"
+        echo "thinking"
+        echo "exec"
+        echo "/bin/zsh -lc 'tail -n 80 .runs/sample-task/cli/sample-run/runner.ndjson' in /Users/kbediako/Code/CO"
+        sleep 0.05
+      done
+      sleep 5
+    fi
+    if [[ "$mode" == "meta-surface-audit-evidence-only" ]]; then
+      for _ in $(seq 1 24); do
+        echo "thinking"
+        echo "exec"
+        echo "/bin/zsh -lc 'sed -n 1,80p .runs/sample-task/cli/sample-run/manifest.json' in /Users/kbediako/Code/CO"
+        echo "thinking"
+        echo "exec"
+        echo "/bin/zsh -lc 'tail -n 80 .runs/sample-task/cli/sample-run/runner.ndjson' in /Users/kbediako/Code/CO"
+        sleep 0.05
+      done
+      exit 0
+    fi
     if [[ "$mode" == "review-self-containment-drift" ]]; then
       while true; do
         echo "thinking"
@@ -629,7 +662,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     );
 
     expect(result.exitCode).toBe(0);
-    expect(result.stdout).toContain('allowed audit meta surfaces: run-manifest');
+    expect(result.stdout).toContain('allowed audit meta surfaces: run-manifest, run-runner-log');
     const promptPath = join(dirname(manifestPath), 'review', 'prompt.txt');
     const prompt = await readFile(promptPath, 'utf8');
     expect(prompt).toContain('Review surface: audit');
@@ -673,7 +706,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     });
 
     expect(result.exitCode).toBe(0);
-    expect(result.stdout).toContain('allowed audit meta surfaces: run-manifest');
+    expect(result.stdout).toContain('allowed audit meta surfaces: run-manifest, run-runner-log');
     const promptPath = join(dirname(manifestPath), 'review', 'prompt.txt');
     const prompt = await readFile(promptPath, 'utf8');
     expect(prompt).toContain('Review surface: audit');
@@ -748,7 +781,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
 
     expect(result.exitCode).toBeGreaterThan(0);
     expect(result.stderr).toContain('codex review stalled with no output for 1s');
-  }, LONG_WAIT_TEST_TIMEOUT_MS);
+  }, LONG_WAIT_TEST_TIMEOUT_MS * 2);
 
   it('persists timeout telemetry summaries for faster failure triage', async () => {
     const sandbox = await makeSandbox();
@@ -1588,7 +1621,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     const codexBin = await makeFakeCodex(sandbox);
     const result = await runReviewCommand(manifestPath, {
       ...baseEnv(sandbox, codexBin),
-      RUN_REVIEW_MODE: 'meta-surface-expansion',
+      RUN_REVIEW_MODE: 'meta-surface-expansion-audit-unrelated',
       CODEX_REVIEW_META_SURFACE_TIMEOUT_SECONDS: '1',
       CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0',
       CODEX_REVIEW_TIMEOUT_SECONDS: '60'
@@ -1652,7 +1685,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     const codexBin = await makeFakeCodex(sandbox);
     const result = await runReviewCommand(manifestPath, {
       ...baseEnv(sandbox, codexBin),
-      RUN_REVIEW_MODE: 'meta-surface-expansion',
+      RUN_REVIEW_MODE: 'meta-surface-expansion-audit-unrelated',
       CODEX_REVIEW_META_SURFACE_TIMEOUT_SECONDS: '1',
       CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0',
       CODEX_REVIEW_TIMEOUT_SECONDS: '60'
@@ -1675,7 +1708,46 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(telemetry.summary.distinctMetaSurfaces).toBeGreaterThanOrEqual(3);
     expect(telemetry.summary.metaSurfaceKinds).toContain('codex-memories');
     expect(telemetry.summary.metaSurfaceKinds).toContain('codex-skills');
+    expect(telemetry.summary.metaSurfaceKinds).toContain('review-docs');
     expect(telemetry.summary.metaSurfaceKinds).not.toContain('run-manifest');
+    expect(telemetry.summary.metaSurfaceKinds).not.toContain('run-runner-log');
+  }, LONG_WAIT_TEST_TIMEOUT_MS * 2);
+
+  it('allows audit mode to inspect manifest and runner-log evidence without tripping the meta-surface guard', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    const runnerLogPath = join(dirname(manifestPath), 'runner.ndjson');
+    await writeFile(runnerLogPath, '{"event":"sample"}\n', 'utf8');
+
+    const result = await runReviewCommand(
+      manifestPath,
+      {
+        ...baseEnv(sandbox, codexBin),
+        RUN_REVIEW_MODE: 'meta-surface-audit-evidence-only',
+        CODEX_REVIEW_META_SURFACE_TIMEOUT_SECONDS: '1',
+        CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0',
+        CODEX_REVIEW_TIMEOUT_SECONDS: '60'
+      },
+      ['--surface', 'audit']
+    );
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain('allowed audit meta surfaces: run-manifest, run-runner-log');
+
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      summary: {
+        metaSurfaceSignals: number;
+        distinctMetaSurfaces: number;
+        metaSurfaceKinds: string[];
+      };
+    };
+    expect(telemetry.status).toBe('succeeded');
+    expect(telemetry.summary.metaSurfaceSignals).toBe(0);
+    expect(telemetry.summary.distinctMetaSurfaces).toBe(0);
+    expect(telemetry.summary.metaSurfaceKinds).toEqual([]);
   }, LONG_WAIT_TEST_TIMEOUT_MS);
 
   it('fails bounded review when it launches a package-manager validation suite', async () => {

@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260310-1095-coordinator-symphony-aligned-standalone-review-audit-supporting-evidence-parity",
+      "title": "Coordinator Symphony-Aligned Standalone Review Audit Supporting-Evidence Parity",
+      "relates_to": "tasks/tasks-1095-coordinator-symphony-aligned-standalone-review-audit-supporting-evidence-parity.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-10",
+      "paths": {
+        "spec": "tasks/specs/1095-coordinator-symphony-aligned-standalone-review-audit-supporting-evidence-parity.md",
+        "task": "tasks/tasks-1095-coordinator-symphony-aligned-standalone-review-audit-supporting-evidence-parity.md",
+        "agent_task": ".agent/task/1095-coordinator-symphony-aligned-standalone-review-audit-supporting-evidence-parity.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-standalone-review-audit-supporting-evidence-parity.md"
+      }
+    },
+    {
       "id": "20260310-1094-coordinator-symphony-aligned-standalone-review-self-containment-boundary",
       "title": "Coordinator Symphony-Aligned Standalone Review Self-Containment Boundary",
       "relates_to": "tasks/tasks-1094-coordinator-symphony-aligned-standalone-review-self-containment-boundary.md",

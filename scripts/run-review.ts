@@ -631,7 +631,9 @@ async function main(): Promise<void> {
   const lowSignalTimeoutMs = !allowHeavyCommands ? resolveReviewLowSignalTimeoutMs() : null;
   const metaSurfaceTimeoutMs = !allowHeavyCommands ? resolveReviewMetaSurfaceTimeoutMs() : null;
   const allowedMetaSurfaceKinds =
-    reviewSurface === 'audit' ? (['run-manifest'] as const) : ([] as const);
+    reviewSurface === 'audit'
+      ? (['run-manifest', 'run-runner-log'] as const)
+      : ([] as const);
   const touchedPaths = await collectReviewScopePaths(options);
   if (!allowHeavyCommands) {
     if (lowSignalTimeoutMs === null) {

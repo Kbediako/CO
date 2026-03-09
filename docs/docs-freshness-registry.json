@@ -3,6 +3,55 @@
   "generated_at": "2026-03-10",
   "entries": [
     {
+      "path": ".agent/task/1095-coordinator-symphony-aligned-standalone-review-audit-supporting-evidence-parity.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-10",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-standalone-review-audit-supporting-evidence-parity.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-10",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/PRD-coordinator-symphony-aligned-standalone-review-audit-supporting-evidence-parity.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-10",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/TECH_SPEC-coordinator-symphony-aligned-standalone-review-audit-supporting-evidence-parity.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-10",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/findings/1095-standalone-review-audit-supporting-evidence-parity-deliberation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-10",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/specs/1095-coordinator-symphony-aligned-standalone-review-audit-supporting-evidence-parity.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-10",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/tasks-1095-coordinator-symphony-aligned-standalone-review-audit-supporting-evidence-parity.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-10",
+      "cadence_days": 30
+    },
+    {
       "path": ".agent/task/1094-coordinator-symphony-aligned-standalone-review-self-containment-boundary.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
