@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260310-1094-coordinator-symphony-aligned-standalone-review-self-containment-boundary",
+      "title": "Coordinator Symphony-Aligned Standalone Review Self-Containment Boundary",
+      "relates_to": "tasks/tasks-1094-coordinator-symphony-aligned-standalone-review-self-containment-boundary.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-10",
+      "paths": {
+        "spec": "tasks/specs/1094-coordinator-symphony-aligned-standalone-review-self-containment-boundary.md",
+        "task": "tasks/tasks-1094-coordinator-symphony-aligned-standalone-review-self-containment-boundary.md",
+        "agent_task": ".agent/task/1094-coordinator-symphony-aligned-standalone-review-self-containment-boundary.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-standalone-review-self-containment-boundary.md"
+      }
+    },
+    {
       "id": "20260310-1093-coordinator-symphony-aligned-standalone-review-diff-audit-surface-split",
       "title": "Coordinator Symphony-Aligned Standalone Review Diff/Audit Surface Split",
       "relates_to": "tasks/tasks-1093-coordinator-symphony-aligned-standalone-review-diff-audit-surface-split.md",
