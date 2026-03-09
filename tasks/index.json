@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260309-1091-coordinator-symphony-aligned-control-server-ui-session-admission-helper-extraction",
+      "title": "Coordinator Symphony-Aligned Control Server UI Session Admission Helper Extraction",
+      "relates_to": "tasks/tasks-1091-coordinator-symphony-aligned-control-server-ui-session-admission-helper-extraction.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-09",
+      "paths": {
+        "spec": "tasks/specs/1091-coordinator-symphony-aligned-control-server-ui-session-admission-helper-extraction.md",
+        "task": "tasks/tasks-1091-coordinator-symphony-aligned-control-server-ui-session-admission-helper-extraction.md",
+        "agent_task": ".agent/task/1091-coordinator-symphony-aligned-control-server-ui-session-admission-helper-extraction.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-control-server-ui-session-admission-helper-extraction.md"
+      }
+    },
+    {
       "id": "20260309-1090-coordinator-symphony-aligned-control-server-public-route-and-ui-asset-helper-extraction",
       "title": "Coordinator Symphony-Aligned Control Server Public Route and UI Asset Helper Extraction",
       "relates_to": "tasks/tasks-1090-coordinator-symphony-aligned-control-server-public-route-and-ui-asset-helper-extraction.md",
