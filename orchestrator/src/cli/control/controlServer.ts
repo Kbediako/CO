@@ -1,12 +1,7 @@
 import http from 'node:http';
 import { randomBytes } from 'node:crypto';
-import { existsSync } from 'node:fs';
-import { readFile } from 'node:fs/promises';
-import { basename, dirname, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { basename, dirname } from 'node:path';
 
-import { logger } from '../../logger.js';
-import { isoTimestamp } from '../utils/time.js';
 import type { RunPaths } from '../run/runPaths.js';
 import type { EffectiveDelegationConfig } from '../config/delegationConfig.js';
 import type { RunEventStream, RunEventStreamEntry } from '../events/runEventStream.js';
@@ -33,6 +28,7 @@ import {
   emitLinearWebhookAuditEvent,
   writeControlError
 } from './controlServerAuditAndErrorHelpers.js';
+import { handlePublicControlRoute } from './controlServerPublicRouteHelpers.js';
 import { readJsonBody, readRawBody } from './controlServerRequestBodyHelpers.js';
 
 interface ControlServerOptions {
@@ -45,14 +41,6 @@ interface ControlServerOptions {
 const EXPIRY_INTERVAL_MS = 15_000;
 const SESSION_TTL_MS = 15 * 60 * 1000;
 const LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost', '::1']);
-const UI_ASSET_PATHS: Record<string, string> = {
-  '/ui': 'index.html',
-  '/ui/': 'index.html',
-  '/ui/app.js': 'app.js',
-  '/ui/styles.css': 'styles.css',
-  '/ui/favicon.svg': 'favicon.svg'
-};
-const UI_ROOT = resolveUiRoot();
 
 export class ControlServer {
   private readonly server: http.Server;
@@ -157,22 +145,13 @@ async function handleRequest(context: ControlRequestContext): Promise<void> {
   const { req, res } = context;
   const url = new URL(req.url ?? '/', 'http://localhost');
   const { runtimeSnapshot, presenterContext } = buildControlPresenterRuntimeContext(context);
-  if (url.pathname === '/health') {
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ status: 'ok', timestamp: isoTimestamp() }));
-    return;
-  }
-
-  if (url.pathname === '/' || url.pathname === '') {
-    const search = url.search ? url.search : '';
-    res.writeHead(302, { Location: `/ui${search}` });
-    res.end();
-    return;
-  }
-
-  const uiAsset = resolveUiAssetPath(url.pathname);
-  if (uiAsset) {
-    await serveUiAsset(uiAsset, res);
+  if (
+    await handlePublicControlRoute({
+      pathname: url.pathname,
+      search: url.search ? url.search : '',
+      res
+    })
+  ) {
     return;
   }
 
@@ -287,61 +266,4 @@ export { formatHostForUrl } from './controlServerStartupSequence.js';
 function normalizeAllowedHosts(allowedHosts?: string[]): Set<string> {
   const values = allowedHosts && allowedHosts.length > 0 ? allowedHosts : Array.from(LOOPBACK_HOSTS);
   return new Set(values.map((entry) => entry.toLowerCase()));
-}
-
-function resolveUiRoot(): string | null {
-  const candidates = [
-    resolve(process.cwd(), 'packages', 'orchestrator-status-ui'),
-    resolve(process.cwd(), '..', 'packages', 'orchestrator-status-ui'),
-    resolve(process.cwd(), '..', '..', 'packages', 'orchestrator-status-ui'),
-    resolve(fileURLToPath(new URL('../../../../packages/orchestrator-status-ui', import.meta.url)))
-  ];
-  for (const candidate of candidates) {
-    if (existsSync(join(candidate, 'index.html'))) {
-      return candidate;
-    }
-  }
-  return null;
-}
-
-function resolveUiAssetPath(pathname: string): string | null {
-  if (!UI_ROOT) {
-    return null;
-  }
-  const asset = UI_ASSET_PATHS[pathname];
-  if (!asset) {
-    return null;
-  }
-  return resolve(UI_ROOT, asset);
-}
-
-async function serveUiAsset(assetPath: string, res: http.ServerResponse): Promise<void> {
-  try {
-    const payload = await readFile(assetPath);
-    res.writeHead(200, {
-      'Content-Type': resolveUiContentType(assetPath),
-      'Cache-Control': 'no-store'
-    });
-    res.end(payload);
-  } catch (error) {
-    logger.warn(`Failed to serve UI asset ${assetPath}: ${(error as Error)?.message ?? error}`);
-    res.writeHead(404, { 'Content-Type': 'text/plain' });
-    res.end('Not found');
-  }
-}
-
-function resolveUiContentType(assetPath: string): string {
-  if (assetPath.endsWith('.html')) {
-    return 'text/html; charset=utf-8';
-  }
-  if (assetPath.endsWith('.css')) {
-    return 'text/css; charset=utf-8';
-  }
-  if (assetPath.endsWith('.js')) {
-    return 'application/javascript; charset=utf-8';
-  }
-  if (assetPath.endsWith('.svg')) {
-    return 'image/svg+xml';
-  }
-  return 'application/octet-stream';
 }

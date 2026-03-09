@@ -198,6 +198,52 @@ describe('ControlServer', () => {
     }
   });
 
+  it('redirects / to /ui preserving search params', async () => {
+    const { root, env, paths } = await createRunRoot('task-1090');
+    const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
+
+    const server = await ControlServer.start({
+      paths,
+      config,
+      runId: 'run-1'
+    });
+
+    try {
+      const baseUrl = server.getBaseUrl() ?? '';
+      const res = await fetch(new URL('/?view=compact', baseUrl), {
+        redirect: 'manual'
+      });
+      expect(res.status).toBe(302);
+      expect(res.headers.get('location')).toBe('/ui?view=compact');
+    } finally {
+      await server.close();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('serves /ui/app.js through the control-server request shell', async () => {
+    const { root, env, paths } = await createRunRoot('task-1090');
+    const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
+
+    const server = await ControlServer.start({
+      paths,
+      config,
+      runId: 'run-1'
+    });
+
+    try {
+      const baseUrl = server.getBaseUrl() ?? '';
+      const res = await fetch(new URL('/ui/app.js', baseUrl));
+      expect(res.status).toBe(200);
+      expect(res.headers.get('content-type')).toBe('application/javascript; charset=utf-8');
+      expect(res.headers.get('cache-control')).toBe('no-store');
+      await expect(res.text()).resolves.toContain('fetch');
+    } finally {
+      await server.close();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   it('issues session tokens via POST with no-store', async () => {
     const { root, env, paths } = await createRunRoot('task-0940');
     const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
