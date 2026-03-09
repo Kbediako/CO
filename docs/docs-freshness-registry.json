@@ -3,6 +3,55 @@
   "generated_at": "2026-03-09",
   "entries": [
     {
+      "path": ".agent/task/1085-coordinator-symphony-aligned-control-server-request-shell-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-09",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-control-server-request-shell-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-09",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/PRD-coordinator-symphony-aligned-control-server-request-shell-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-09",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/TECH_SPEC-coordinator-symphony-aligned-control-server-request-shell-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-09",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/findings/1085-control-server-request-shell-extraction-deliberation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-09",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/specs/1085-coordinator-symphony-aligned-control-server-request-shell-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-09",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/tasks-1085-coordinator-symphony-aligned-control-server-request-shell-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-09",
+      "cadence_days": 30
+    },
+    {
       "path": ".agent/AGENTS.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -6631,402 +6680,402 @@
       "last_review": "2026-03-07",
       "cadence_days": 30
     },
-  {
-    "path": ".agent/task/1052-coordinator-symphony-aligned-control-action-outcome-shaping-extraction.md",
-    "owner": "Codex (top-level agent), Review agent",
-    "status": "active",
-    "last_review": "2026-03-08",
-    "cadence_days": 30
-  },
-  {
-    "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-control-action-outcome-shaping-extraction.md",
-    "owner": "Codex (top-level agent), Review agent",
-    "status": "active",
-    "last_review": "2026-03-08",
-    "cadence_days": 30
-  },
-  {
-    "path": "docs/PRD-coordinator-symphony-aligned-control-action-outcome-shaping-extraction.md",
-    "owner": "Codex (top-level agent), Review agent",
-    "status": "active",
-    "last_review": "2026-03-08",
-    "cadence_days": 30
-  },
-  {
-    "path": "docs/TECH_SPEC-coordinator-symphony-aligned-control-action-outcome-shaping-extraction.md",
-    "owner": "Codex (top-level agent), Review agent",
-    "status": "active",
-    "last_review": "2026-03-08",
-    "cadence_days": 30
-  },
-  {
-    "path": "docs/findings/1052-control-action-outcome-shaping-deliberation.md",
-    "owner": "Codex (top-level agent), Review agent",
-    "status": "active",
-    "last_review": "2026-03-08",
-    "cadence_days": 30
-  },
-  {
-    "path": "tasks/specs/1052-coordinator-symphony-aligned-control-action-outcome-shaping-extraction.md",
-    "owner": "Codex (top-level agent), Review agent",
-    "status": "active",
-    "last_review": "2026-03-08",
-    "cadence_days": 30
-  },
-  {
-    "path": "tasks/tasks-1052-coordinator-symphony-aligned-control-action-outcome-shaping-extraction.md",
-    "owner": "Codex (top-level agent), Review agent",
-    "status": "active",
-    "last_review": "2026-03-08",
-    "cadence_days": 30
-  },
-  {
-    "path": ".agent/task/1056-coordinator-symphony-aligned-control-action-controller-sequencing-extraction.md",
-    "owner": "Codex (top-level agent), Review agent",
-    "status": "active",
-    "last_review": "2026-03-08",
-    "cadence_days": 30
-  },
-  {
-    "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-control-action-controller-sequencing-extraction.md",
-    "owner": "Codex (top-level agent), Review agent",
-    "status": "active",
-    "last_review": "2026-03-08",
-    "cadence_days": 30
-  },
-  {
-    "path": "docs/PRD-coordinator-symphony-aligned-control-action-controller-sequencing-extraction.md",
-    "owner": "Codex (top-level agent), Review agent",
-    "status": "active",
-    "last_review": "2026-03-08",
-    "cadence_days": 30
-  },
-  {
-    "path": "docs/TECH_SPEC-coordinator-symphony-aligned-control-action-controller-sequencing-extraction.md",
-    "owner": "Codex (top-level agent), Review agent",
-    "status": "active",
-    "last_review": "2026-03-08",
-    "cadence_days": 30
-  },
-  {
-    "path": "docs/findings/1056-control-action-controller-sequencing-deliberation.md",
-    "owner": "Codex (top-level agent), Review agent",
-    "status": "active",
-    "last_review": "2026-03-08",
-    "cadence_days": 30
-  },
-  {
-    "path": "tasks/specs/1056-coordinator-symphony-aligned-control-action-controller-sequencing-extraction.md",
-    "owner": "Codex (top-level agent), Review agent",
-    "status": "active",
-    "last_review": "2026-03-08",
-    "cadence_days": 30
-  },
-  {
-    "path": "tasks/tasks-1056-coordinator-symphony-aligned-control-action-controller-sequencing-extraction.md",
-    "owner": "Codex (top-level agent), Review agent",
-    "status": "active",
-    "last_review": "2026-03-08",
-    "cadence_days": 30
-  },
-  {
-    "path": ".agent/task/1055-coordinator-symphony-aligned-control-action-finalization-extraction.md",
-    "owner": "Codex (top-level agent), Review agent",
-    "status": "active",
-    "last_review": "2026-03-08",
-    "cadence_days": 30
-  },
-  {
-    "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-control-action-finalization-extraction.md",
-    "owner": "Codex (top-level agent), Review agent",
-    "status": "active",
-    "last_review": "2026-03-08",
-    "cadence_days": 30
-  },
-  {
-    "path": "docs/PRD-coordinator-symphony-aligned-control-action-finalization-extraction.md",
-    "owner": "Codex (top-level agent), Review agent",
-    "status": "active",
-    "last_review": "2026-03-08",
-    "cadence_days": 30
-  },
-  {
-    "path": "docs/TECH_SPEC-coordinator-symphony-aligned-control-action-finalization-extraction.md",
-    "owner": "Codex (top-level agent), Review agent",
-    "status": "active",
-    "last_review": "2026-03-08",
-    "cadence_days": 30
-  },
-  {
-    "path": "docs/findings/1055-control-action-finalization-deliberation.md",
-    "owner": "Codex (top-level agent), Review agent",
-    "status": "active",
-    "last_review": "2026-03-08",
-    "cadence_days": 30
-  },
-  {
-    "path": "tasks/specs/1055-coordinator-symphony-aligned-control-action-finalization-extraction.md",
-    "owner": "Codex (top-level agent), Review agent",
-    "status": "active",
-    "last_review": "2026-03-08",
-    "cadence_days": 30
-  },
-  {
-    "path": "tasks/tasks-1055-coordinator-symphony-aligned-control-action-finalization-extraction.md",
-    "owner": "Codex (top-level agent), Review agent",
-    "status": "active",
-    "last_review": "2026-03-08",
-    "cadence_days": 30
-  },
-  {
-    "path": ".agent/task/1054-coordinator-symphony-aligned-control-action-execution-extraction.md",
-    "owner": "Codex (top-level agent), Review agent",
-    "status": "active",
-    "last_review": "2026-03-08",
-    "cadence_days": 30
-  },
-  {
-    "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-control-action-execution-extraction.md",
-    "owner": "Codex (top-level agent), Review agent",
-    "status": "active",
-    "last_review": "2026-03-08",
-    "cadence_days": 30
-  },
-  {
-    "path": "docs/PRD-coordinator-symphony-aligned-control-action-execution-extraction.md",
-    "owner": "Codex (top-level agent), Review agent",
-    "status": "active",
-    "last_review": "2026-03-08",
-    "cadence_days": 30
-  },
-  {
-    "path": "docs/TECH_SPEC-coordinator-symphony-aligned-control-action-execution-extraction.md",
-    "owner": "Codex (top-level agent), Review agent",
-    "status": "active",
-    "last_review": "2026-03-08",
-    "cadence_days": 30
-  },
-  {
-    "path": "docs/findings/1054-control-action-execution-deliberation.md",
-    "owner": "Codex (top-level agent), Review agent",
-    "status": "active",
-    "last_review": "2026-03-08",
-    "cadence_days": 30
-  },
-  {
-    "path": "tasks/specs/1054-coordinator-symphony-aligned-control-action-execution-extraction.md",
-    "owner": "Codex (top-level agent), Review agent",
-    "status": "active",
-    "last_review": "2026-03-08",
-    "cadence_days": 30
-  },
-  {
-    "path": "tasks/tasks-1054-coordinator-symphony-aligned-control-action-execution-extraction.md",
-    "owner": "Codex (top-level agent), Review agent",
-    "status": "active",
-    "last_review": "2026-03-08",
-    "cadence_days": 30
-  },
-  {
-    "path": ".agent/task/1053-coordinator-symphony-aligned-control-action-cancel-confirmation-resolution-extraction.md",
-    "owner": "Codex (top-level agent), Review agent",
-    "status": "active",
-    "last_review": "2026-03-08",
-    "cadence_days": 30
-  },
-  {
-    "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-control-action-cancel-confirmation-resolution-extraction.md",
-    "owner": "Codex (top-level agent), Review agent",
-    "status": "active",
-    "last_review": "2026-03-08",
-    "cadence_days": 30
-  },
-  {
-    "path": "docs/PRD-coordinator-symphony-aligned-control-action-cancel-confirmation-resolution-extraction.md",
-    "owner": "Codex (top-level agent), Review agent",
-    "status": "active",
-    "last_review": "2026-03-08",
-    "cadence_days": 30
-  },
-  {
-    "path": "docs/TECH_SPEC-coordinator-symphony-aligned-control-action-cancel-confirmation-resolution-extraction.md",
-    "owner": "Codex (top-level agent), Review agent",
-    "status": "active",
-    "last_review": "2026-03-08",
-    "cadence_days": 30
-  },
-  {
-    "path": "docs/findings/1053-control-action-cancel-confirmation-resolution-deliberation.md",
-    "owner": "Codex (top-level agent), Review agent",
-    "status": "active",
-    "last_review": "2026-03-08",
-    "cadence_days": 30
-  },
-  {
-    "path": "tasks/specs/1053-coordinator-symphony-aligned-control-action-cancel-confirmation-resolution-extraction.md",
-    "owner": "Codex (top-level agent), Review agent",
-    "status": "active",
-    "last_review": "2026-03-08",
-    "cadence_days": 30
-  },
-  {
-    "path": "tasks/tasks-1053-coordinator-symphony-aligned-control-action-cancel-confirmation-resolution-extraction.md",
-    "owner": "Codex (top-level agent), Review agent",
-    "status": "active",
-    "last_review": "2026-03-08",
-    "cadence_days": 30
-  },
-  {
-    "path": ".agent/task/1051-coordinator-symphony-aligned-control-action-preflight-extraction.md",
-    "owner": "Codex (top-level agent), Review agent",
-    "status": "active",
-    "last_review": "2026-03-08",
-    "cadence_days": 30
-  },
-  {
-    "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-control-action-preflight-extraction.md",
-    "owner": "Codex (top-level agent), Review agent",
-    "status": "active",
-    "last_review": "2026-03-08",
-    "cadence_days": 30
-  },
-  {
-    "path": "docs/PRD-coordinator-symphony-aligned-control-action-preflight-extraction.md",
-    "owner": "Codex (top-level agent), Review agent",
-    "status": "active",
-    "last_review": "2026-03-08",
-    "cadence_days": 30
-  },
-  {
-    "path": "docs/TECH_SPEC-coordinator-symphony-aligned-control-action-preflight-extraction.md",
-    "owner": "Codex (top-level agent), Review agent",
-    "status": "active",
-    "last_review": "2026-03-08",
-    "cadence_days": 30
-  },
-  {
-    "path": "docs/findings/1051-control-action-preflight-extraction-deliberation.md",
-    "owner": "Codex (top-level agent), Review agent",
-    "status": "active",
-    "last_review": "2026-03-08",
-    "cadence_days": 30
-  },
-  {
-    "path": "tasks/specs/1051-coordinator-symphony-aligned-control-action-preflight-extraction.md",
-    "owner": "Codex (top-level agent), Review agent",
-    "status": "active",
-    "last_review": "2026-03-08",
-    "cadence_days": 30
-  },
-  {
-    "path": "tasks/tasks-1051-coordinator-symphony-aligned-control-action-preflight-extraction.md",
-    "owner": "Codex (top-level agent), Review agent",
-    "status": "active",
-    "last_review": "2026-03-08",
-    "cadence_days": 30
-  },
-  {
-    "path": ".agent/task/1050-coordinator-symphony-aligned-confirmation-list-controller-extraction.md",
-    "owner": "Codex (top-level agent), Review agent",
-    "status": "active",
-    "last_review": "2026-03-07",
-    "cadence_days": 30
-  },
-  {
-    "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-confirmation-list-controller-extraction.md",
-    "owner": "Codex (top-level agent), Review agent",
-    "status": "active",
-    "last_review": "2026-03-07",
-    "cadence_days": 30
-  },
-  {
-    "path": "docs/PRD-coordinator-symphony-aligned-confirmation-list-controller-extraction.md",
-    "owner": "Codex (top-level agent), Review agent",
-    "status": "active",
-    "last_review": "2026-03-07",
-    "cadence_days": 30
-  },
-  {
-    "path": "docs/TECH_SPEC-coordinator-symphony-aligned-confirmation-list-controller-extraction.md",
-    "owner": "Codex (top-level agent), Review agent",
-    "status": "active",
-    "last_review": "2026-03-07",
-    "cadence_days": 30
-  },
-  {
-    "path": "docs/findings/1050-confirmation-list-controller-extraction-deliberation.md",
-    "owner": "Codex (top-level agent), Review agent",
-    "status": "active",
-    "last_review": "2026-03-07",
-    "cadence_days": 30
-  },
-  {
-    "path": "tasks/specs/1050-coordinator-symphony-aligned-confirmation-list-controller-extraction.md",
-    "owner": "Codex (top-level agent), Review agent",
-    "status": "active",
-    "last_review": "2026-03-07",
-    "cadence_days": 30
-  },
-  {
-    "path": "tasks/tasks-1050-coordinator-symphony-aligned-confirmation-list-controller-extraction.md",
-    "owner": "Codex (top-level agent), Review agent",
-    "status": "active",
-    "last_review": "2026-03-07",
-    "cadence_days": 30
-  },
-  {
-    "path": ".agent/task/1049-coordinator-symphony-aligned-confirmation-approve-controller-extraction.md",
-    "owner": "Codex (top-level agent), Review agent",
-    "status": "active",
-    "last_review": "2026-03-07",
-    "cadence_days": 30
-  },
-  {
-    "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-confirmation-approve-controller-extraction.md",
-    "owner": "Codex (top-level agent), Review agent",
-    "status": "active",
-    "last_review": "2026-03-07",
-    "cadence_days": 30
-  },
-  {
-    "path": "docs/PRD-coordinator-symphony-aligned-confirmation-approve-controller-extraction.md",
-    "owner": "Codex (top-level agent), Review agent",
-    "status": "active",
-    "last_review": "2026-03-07",
-    "cadence_days": 30
-  },
-  {
-    "path": "docs/TECH_SPEC-coordinator-symphony-aligned-confirmation-approve-controller-extraction.md",
-    "owner": "Codex (top-level agent), Review agent",
-    "status": "active",
-    "last_review": "2026-03-07",
-    "cadence_days": 30
-  },
-  {
-    "path": "docs/findings/1049-confirmation-approve-controller-extraction-deliberation.md",
-    "owner": "Codex (top-level agent), Review agent",
-    "status": "active",
-    "last_review": "2026-03-07",
-    "cadence_days": 30
-  },
-  {
-    "path": "tasks/specs/1049-coordinator-symphony-aligned-confirmation-approve-controller-extraction.md",
-    "owner": "Codex (top-level agent), Review agent",
-    "status": "active",
-    "last_review": "2026-03-07",
-    "cadence_days": 30
-  },
-  {
-    "path": "tasks/tasks-1049-coordinator-symphony-aligned-confirmation-approve-controller-extraction.md",
-    "owner": "Codex (top-level agent), Review agent",
-    "status": "active",
-    "last_review": "2026-03-07",
-    "cadence_days": 30
-  },
-  {
-    "path": ".agent/task/1048-coordinator-symphony-aligned-confirmation-create-controller-extraction.md",
-    "owner": "Codex (top-level agent), Review agent",
-    "status": "active",
+    {
+      "path": ".agent/task/1052-coordinator-symphony-aligned-control-action-outcome-shaping-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-08",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-control-action-outcome-shaping-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-08",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/PRD-coordinator-symphony-aligned-control-action-outcome-shaping-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-08",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/TECH_SPEC-coordinator-symphony-aligned-control-action-outcome-shaping-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-08",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/findings/1052-control-action-outcome-shaping-deliberation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-08",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/specs/1052-coordinator-symphony-aligned-control-action-outcome-shaping-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-08",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/tasks-1052-coordinator-symphony-aligned-control-action-outcome-shaping-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-08",
+      "cadence_days": 30
+    },
+    {
+      "path": ".agent/task/1056-coordinator-symphony-aligned-control-action-controller-sequencing-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-08",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-control-action-controller-sequencing-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-08",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/PRD-coordinator-symphony-aligned-control-action-controller-sequencing-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-08",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/TECH_SPEC-coordinator-symphony-aligned-control-action-controller-sequencing-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-08",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/findings/1056-control-action-controller-sequencing-deliberation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-08",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/specs/1056-coordinator-symphony-aligned-control-action-controller-sequencing-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-08",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/tasks-1056-coordinator-symphony-aligned-control-action-controller-sequencing-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-08",
+      "cadence_days": 30
+    },
+    {
+      "path": ".agent/task/1055-coordinator-symphony-aligned-control-action-finalization-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-08",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-control-action-finalization-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-08",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/PRD-coordinator-symphony-aligned-control-action-finalization-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-08",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/TECH_SPEC-coordinator-symphony-aligned-control-action-finalization-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-08",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/findings/1055-control-action-finalization-deliberation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-08",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/specs/1055-coordinator-symphony-aligned-control-action-finalization-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-08",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/tasks-1055-coordinator-symphony-aligned-control-action-finalization-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-08",
+      "cadence_days": 30
+    },
+    {
+      "path": ".agent/task/1054-coordinator-symphony-aligned-control-action-execution-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-08",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-control-action-execution-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-08",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/PRD-coordinator-symphony-aligned-control-action-execution-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-08",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/TECH_SPEC-coordinator-symphony-aligned-control-action-execution-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-08",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/findings/1054-control-action-execution-deliberation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-08",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/specs/1054-coordinator-symphony-aligned-control-action-execution-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-08",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/tasks-1054-coordinator-symphony-aligned-control-action-execution-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-08",
+      "cadence_days": 30
+    },
+    {
+      "path": ".agent/task/1053-coordinator-symphony-aligned-control-action-cancel-confirmation-resolution-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-08",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-control-action-cancel-confirmation-resolution-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-08",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/PRD-coordinator-symphony-aligned-control-action-cancel-confirmation-resolution-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-08",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/TECH_SPEC-coordinator-symphony-aligned-control-action-cancel-confirmation-resolution-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-08",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/findings/1053-control-action-cancel-confirmation-resolution-deliberation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-08",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/specs/1053-coordinator-symphony-aligned-control-action-cancel-confirmation-resolution-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-08",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/tasks-1053-coordinator-symphony-aligned-control-action-cancel-confirmation-resolution-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-08",
+      "cadence_days": 30
+    },
+    {
+      "path": ".agent/task/1051-coordinator-symphony-aligned-control-action-preflight-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-08",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-control-action-preflight-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-08",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/PRD-coordinator-symphony-aligned-control-action-preflight-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-08",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/TECH_SPEC-coordinator-symphony-aligned-control-action-preflight-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-08",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/findings/1051-control-action-preflight-extraction-deliberation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-08",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/specs/1051-coordinator-symphony-aligned-control-action-preflight-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-08",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/tasks-1051-coordinator-symphony-aligned-control-action-preflight-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-08",
+      "cadence_days": 30
+    },
+    {
+      "path": ".agent/task/1050-coordinator-symphony-aligned-confirmation-list-controller-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-07",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-confirmation-list-controller-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-07",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/PRD-coordinator-symphony-aligned-confirmation-list-controller-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-07",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/TECH_SPEC-coordinator-symphony-aligned-confirmation-list-controller-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-07",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/findings/1050-confirmation-list-controller-extraction-deliberation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-07",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/specs/1050-coordinator-symphony-aligned-confirmation-list-controller-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-07",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/tasks-1050-coordinator-symphony-aligned-confirmation-list-controller-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-07",
+      "cadence_days": 30
+    },
+    {
+      "path": ".agent/task/1049-coordinator-symphony-aligned-confirmation-approve-controller-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-07",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-confirmation-approve-controller-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-07",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/PRD-coordinator-symphony-aligned-confirmation-approve-controller-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-07",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/TECH_SPEC-coordinator-symphony-aligned-confirmation-approve-controller-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-07",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/findings/1049-confirmation-approve-controller-extraction-deliberation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-07",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/specs/1049-coordinator-symphony-aligned-confirmation-approve-controller-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-07",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/tasks-1049-coordinator-symphony-aligned-confirmation-approve-controller-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-07",
+      "cadence_days": 30
+    },
+    {
+      "path": ".agent/task/1048-coordinator-symphony-aligned-confirmation-create-controller-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
       "last_review": "2026-03-07",
       "cadence_days": 30
     },
