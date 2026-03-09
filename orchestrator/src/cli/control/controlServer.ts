@@ -60,7 +60,7 @@ import {
   type ControlRequestSharedContext
 } from './controlRequestContext.js';
 import { createControlQuestionChildResolutionAdapter } from './controlQuestionChildResolution.js';
-import { runQuestionReadSequence } from './questionReadSequence.js';
+import { readControlTelegramQuestions } from './controlTelegramQuestionRead.js';
 
 interface ControlServerOptions {
   paths: RunPaths;
@@ -398,18 +398,10 @@ export class ControlServer {
       },
 
       readQuestions: async (): Promise<QuestionsPayload> => {
-        const context = buildControlInternalContext({
+        return readControlTelegramQuestions({
           ...this.requestContextShared,
           expiryLifecycle: this.expiryLifecycle
         });
-        const questionChildResolutionAdapter = createControlQuestionChildResolutionAdapter(context);
-        const result = await runQuestionReadSequence({
-          listQuestions: () => context.questionQueue.list(),
-          expireQuestions: () =>
-            this.expiryLifecycle?.expireQuestions(questionChildResolutionAdapter) ?? Promise.resolve()
-        });
-        questionChildResolutionAdapter.queueQuestionResolutions(result.retryCandidates);
-        return { questions: result.questions };
       }
     };
   }
