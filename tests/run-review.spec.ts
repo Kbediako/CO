@@ -167,6 +167,29 @@ fi
         sleep 0.05
       done
     fi
+    if [[ "$mode" == "review-self-containment-drift" ]]; then
+      while true; do
+        echo "thinking"
+        echo "exec"
+        echo "/bin/zsh -lc 'sed -n 1,120p docs/standalone-review-guide.md' in /Users/kbediako/Code/CO"
+        echo "thinking"
+        echo "exec"
+        echo "/bin/zsh -lc 'sed -n 1,120p docs/guides/review-artifacts.md' in /Users/kbediako/Code/CO"
+        echo "thinking"
+        echo "exec"
+        echo "/bin/zsh -lc 'sed -n 1,120p scripts/pack-smoke.mjs' in /Users/kbediako/Code/CO"
+        echo "thinking"
+        echo "exec"
+        echo "/bin/zsh -lc 'sed -n 1,120p scripts/lib/run-manifests.js' in /Users/kbediako/Code/CO"
+        echo "thinking"
+        echo "exec"
+        echo "/bin/zsh -lc 'sed -n 1,120p .runs/sample-task/cli/sample-run/review/prompt.txt' in /Users/kbediako/Code/CO"
+        echo "thinking"
+        echo "exec"
+        echo "/bin/zsh -lc 'sed -n 1,120p .runs/sample-task/cli/sample-run/review/output.log' in /Users/kbediako/Code/CO"
+        sleep 0.05
+      done
+    fi
     if [[ "$mode" == "command-intent-validation" ]]; then
       while true; do
         echo "thinking"
@@ -444,6 +467,9 @@ function baseEnv(sandbox: string, codexBin: string): Record<string, string | und
   delete env.CODEX_REVIEW_LARGE_SCOPE_LINE_THRESHOLD;
   delete env.CODEX_ORCHESTRATOR_MANIFEST_PATH;
   delete env.CODEX_ORCHESTRATOR_RUN_DIR;
+  delete env.MCP_RUNNER_TASK_ID;
+  delete env.TASK;
+  delete env.CODEX_ORCHESTRATOR_TASK_ID;
   delete env.MANIFEST;
   delete env.SKIP_DIFF_BUDGET;
   delete env.DIFF_BUDGET_STAGE;
@@ -1586,6 +1612,38 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(telemetry.summary.metaSurfaceSignals).toBeGreaterThanOrEqual(4);
     expect(telemetry.summary.distinctMetaSurfaces).toBeGreaterThanOrEqual(3);
     expect(telemetry.summary.maxMetaSurfaceHits).toBeGreaterThanOrEqual(1);
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('fails bounded diff review when adjacent review-system surfaces persist', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'review-self-containment-drift',
+      CODEX_REVIEW_META_SURFACE_TIMEOUT_SECONDS: '1',
+      CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0',
+      CODEX_REVIEW_TIMEOUT_SECONDS: '60'
+    });
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).toContain('meta-surface expansion detected');
+
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      summary: {
+        metaSurfaceSignals: number;
+        distinctMetaSurfaces: number;
+        metaSurfaceKinds: string[];
+      };
+    };
+    expect(telemetry.status).toBe('failed');
+    expect(telemetry.summary.metaSurfaceSignals).toBeGreaterThanOrEqual(4);
+    expect(telemetry.summary.distinctMetaSurfaces).toBeGreaterThanOrEqual(3);
+    expect(telemetry.summary.metaSurfaceKinds).toEqual(
+      expect.arrayContaining(['review-artifacts', 'review-docs', 'review-support'])
+    );
   }, LONG_WAIT_TEST_TIMEOUT_MS);
 
   it('keeps the meta-surface guard active for audit mode when unrelated meta surfaces persist', async () => {

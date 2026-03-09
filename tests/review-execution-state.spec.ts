@@ -292,7 +292,7 @@ describe('ReviewExecutionState', () => {
     expect(state.getMetaSurfaceExpansionState(2_000).triggered).toBe(false);
   });
 
-  it('ignores rg patterns that only mention run manifests while searching in-scope docs files', () => {
+  it('ignores rg patterns that only mention run manifests while searching non-meta docs files', () => {
     const state = new ReviewExecutionState({
       startedAtMs: 0,
       blockHeavyCommands: false,
@@ -301,7 +301,7 @@ describe('ReviewExecutionState', () => {
 
     state.observeChunk('thinking\nexec\n', 'stdout', 100);
     state.observeChunk(
-      `/bin/zsh -lc 'rg --glob=*.md -n ".runs/sample-task/cli/sample-run/manifest.json" README.md docs/standalone-review-guide.md'\n`,
+      `/bin/zsh -lc 'rg --glob=*.md -n ".runs/sample-task/cli/sample-run/manifest.json" README.md docs/TASKS.md'\n`,
       'stdout',
       110
     );
@@ -331,6 +331,27 @@ describe('ReviewExecutionState', () => {
     expect(expansion.distinctMetaSurfaces).toBe(1);
   });
 
+  it('classifies adjacent review-support test files as meta-surface activity', () => {
+    const state = new ReviewExecutionState({
+      startedAtMs: 0,
+      blockHeavyCommands: false,
+      metaSurfaceTimeoutMs: 1_000
+    });
+
+    state.observeChunk('thinking\nexec\n', 'stdout', 100);
+    state.observeChunk(
+      `/bin/zsh -lc 'sed -n 1,120p tests/review-execution-state.spec.ts'\n`,
+      'stdout',
+      110
+    );
+
+    const expansion = state.getMetaSurfaceExpansionState(2_000);
+    const summary = state.buildOutputSummary();
+    expect(expansion.triggered).toBe(false);
+    expect(summary.metaSurfaceSignals).toBe(1);
+    expect(summary.metaSurfaceKinds).toEqual(['review-support']);
+  });
+
   it('evicts early meta-surface bursts once later normal commands dominate the recent window', () => {
     const state = new ReviewExecutionState({
       startedAtMs: 0,
@@ -353,11 +374,72 @@ describe('ReviewExecutionState', () => {
 
     for (let index = 0; index < 8; index += 1) {
       state.observeChunk('thinking\nexec\n', 'stdout', nowMs);
-      state.observeChunk(`/bin/zsh -lc 'sed -n 1,120p scripts/run-review.ts chunk-${index}.md'\n`, 'stdout', nowMs + 10);
+      state.observeChunk(
+        `/bin/zsh -lc 'sed -n 1,120p orchestrator/src/cli/control/controlServer.ts chunk-${index}.md'\n`,
+        'stdout',
+        nowMs + 10
+      );
       nowMs += 100;
     }
 
     const expansion = state.getMetaSurfaceExpansionState(nowMs + 1_500);
+    expect(expansion.triggered).toBe(false);
+    expect(expansion.metaSurfaceSignals).toBe(0);
+  });
+
+  it('classifies sustained adjacent review-system surfaces as meta-surface expansion', () => {
+    const state = new ReviewExecutionState({
+      startedAtMs: 0,
+      blockHeavyCommands: false,
+      metaSurfaceTimeoutMs: 1_000
+    });
+
+    let nowMs = 100;
+    const commands = [
+      "/bin/zsh -lc 'sed -n 1,120p docs/standalone-review-guide.md'",
+      "/bin/zsh -lc 'sed -n 1,120p docs/guides/review-artifacts.md'",
+      "/bin/zsh -lc 'sed -n 1,120p scripts/pack-smoke.mjs'",
+      "/bin/zsh -lc 'sed -n 1,120p scripts/lib/run-manifests.js'",
+      "/bin/zsh -lc 'sed -n 1,120p .runs/sample-task/cli/sample-run/review/prompt.txt'",
+      "/bin/zsh -lc 'sed -n 1,120p .runs/sample-task/cli/sample-run/review/output.log'"
+    ];
+    for (let index = 0; index < 8; index += 1) {
+      state.observeChunk('thinking\nexec\n', 'stdout', nowMs);
+      state.observeChunk(`${commands[index % commands.length]}\n`, 'stdout', nowMs + 10);
+      nowMs += 100;
+    }
+
+    const expansion = state.getMetaSurfaceExpansionState(2_000);
+    const summary = state.buildOutputSummary();
+    expect(expansion.triggered).toBe(true);
+    expect(summary.metaSurfaceKinds).toEqual(
+      expect.arrayContaining(['review-artifacts', 'review-docs', 'review-support'])
+    );
+  });
+
+  it('ignores review-system surfaces that are part of the touched diff scope', () => {
+    const state = new ReviewExecutionState({
+      startedAtMs: 0,
+      blockHeavyCommands: false,
+      metaSurfaceTimeoutMs: 1_000,
+      touchedPaths: ['docs/standalone-review-guide.md', 'scripts/pack-smoke.mjs']
+    });
+
+    let nowMs = 100;
+    for (const command of [
+      "/bin/zsh -lc 'sed -n 1,120p docs/standalone-review-guide.md'",
+      "/bin/zsh -lc 'sed -n 1,120p scripts/pack-smoke.mjs'",
+      "/bin/zsh -lc 'sed -n 1,120p docs/standalone-review-guide.md'",
+      "/bin/zsh -lc 'sed -n 1,120p scripts/pack-smoke.mjs'",
+      "/bin/zsh -lc 'sed -n 1,120p docs/standalone-review-guide.md'",
+      "/bin/zsh -lc 'sed -n 1,120p scripts/pack-smoke.mjs'"
+    ]) {
+      state.observeChunk('thinking\nexec\n', 'stdout', nowMs);
+      state.observeChunk(`${command}\n`, 'stdout', nowMs + 10);
+      nowMs += 100;
+    }
+
+    const expansion = state.getMetaSurfaceExpansionState(2_000);
     expect(expansion.triggered).toBe(false);
     expect(expansion.metaSurfaceSignals).toBe(0);
   });

@@ -43,6 +43,7 @@ import {
   type ReviewOutputSummary,
   type ReviewStartupLoopState
 } from './lib/review-execution-state.js';
+import { parseNameOnlyPaths, parseStatusZPaths } from './lib/review-scope-paths.js';
 import { collectManifests, resolveEnvironmentPaths } from './lib/run-manifests.js';
 
 const execFileAsync = promisify(execFile);
@@ -631,6 +632,7 @@ async function main(): Promise<void> {
   const metaSurfaceTimeoutMs = !allowHeavyCommands ? resolveReviewMetaSurfaceTimeoutMs() : null;
   const allowedMetaSurfaceKinds =
     reviewSurface === 'audit' ? (['run-manifest'] as const) : ([] as const);
+  const touchedPaths = await collectReviewScopePaths(options);
   if (!allowHeavyCommands) {
     if (lowSignalTimeoutMs === null) {
       console.log(
@@ -681,6 +683,7 @@ async function main(): Promise<void> {
       lowSignalTimeoutMs,
       metaSurfaceTimeoutMs,
       allowedMetaSurfaceKinds: [...allowedMetaSurfaceKinds],
+      touchedPaths,
       outputLogPath: artifactPaths.outputLogPath
     });
   const writeTelemetry = async (
@@ -921,6 +924,19 @@ interface ReviewScopeAssessment {
   lineThreshold: number;
 }
 
+async function collectReviewScopePaths(options: CliOptions): Promise<string[]> {
+  if (options.commit) {
+    const summary = await tryGit(['show', '--no-color', '--name-only', '--format=', options.commit]);
+    return summary ? parseNameOnlyPaths(summary) : [];
+  }
+  if (options.base) {
+    const diff = await tryGit(['diff', '--no-color', '--name-only', `${options.base}...HEAD`]);
+    return diff ? parseNameOnlyPaths(diff) : [];
+  }
+  const status = await tryGit(['status', '--porcelain=v1', '-z', '--untracked-files=all']);
+  return status ? parseStatusZPaths(status) : [];
+}
+
 function resolveScopeFlag(options: CliOptions): { mode: ScopeFlagMode; args: string[] } | null {
   if (options.commit) {
     return { mode: 'commit', args: ['--commit', options.commit] };
@@ -1034,30 +1050,6 @@ function resolveLargeScopeLineThreshold(): number {
   return parsed;
 }
 
-function parseStatusPathCount(statusOutput: string): number {
-  const paths = new Set<string>();
-  for (const rawLine of statusOutput.split(/\r?\n/u)) {
-    const line = rawLine.trimEnd();
-    if (!line) {
-      continue;
-    }
-    if (line.startsWith('## ')) {
-      continue;
-    }
-    const pathPortion = line.slice(3).trim();
-    if (!pathPortion) {
-      continue;
-    }
-    const currentPath = pathPortion.includes(' -> ')
-      ? pathPortion.split(' -> ').at(-1)?.trim() ?? pathPortion
-      : pathPortion;
-    if (currentPath) {
-      paths.add(currentPath);
-    }
-  }
-  return paths.size;
-}
-
 function parseNumstatLineDelta(numstatOutput: string): number {
   let total = 0;
   for (const rawLine of numstatOutput.split(/\r?\n/u)) {
@@ -1163,14 +1155,14 @@ async function assessReviewScope(options: CliOptions): Promise<ReviewScopeAssess
     };
   }
 
-  const status = await tryGit(['status', '--porcelain=v1']);
+  const status = await tryGit(['status', '--porcelain=v1', '-z', '--untracked-files=all']);
   const diff = await tryGit(['diff', '--numstat']);
   const cachedDiff = await tryGit(['diff', '--cached', '--numstat']);
   const untracked = await tryGit(['ls-files', '--others', '--exclude-standard', '-z']);
   const untrackedPaths = untracked ? parseNullDelimitedPaths(untracked) : [];
   const untrackedLines = untrackedPaths.length > 0 ? await countWorkingTreeLines(untrackedPaths) : null;
 
-  const changedFiles = status ? parseStatusPathCount(status) : null;
+  const changedFiles = status ? parseStatusZPaths(status).length : null;
   let changedLines: number | null = null;
   if (diff || cachedDiff || untrackedLines !== null) {
     changedLines = 0;
@@ -1348,6 +1340,7 @@ interface RunCodexReviewOptions {
   lowSignalTimeoutMs: number | null;
   metaSurfaceTimeoutMs: number | null;
   allowedMetaSurfaceKinds: string[];
+  touchedPaths: string[];
   outputLogPath: string;
 }
 
@@ -1426,7 +1419,8 @@ async function runCodexReview(
     allowValidationCommandIntents: options.allowValidationCommandIntents,
     lowSignalTimeoutMs: options.lowSignalTimeoutMs,
     metaSurfaceTimeoutMs: options.metaSurfaceTimeoutMs,
-    allowedMetaSurfaceKinds: options.allowedMetaSurfaceKinds
+    allowedMetaSurfaceKinds: options.allowedMetaSurfaceKinds,
+    touchedPaths: options.touchedPaths
   });
 
   const capture = (chunk: Buffer, target: NodeJS.WriteStream, stream: 'stdout' | 'stderr') => {

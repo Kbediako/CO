@@ -142,6 +142,7 @@ export interface ReviewExecutionStateOptions {
   lowSignalTimeoutMs?: number | null;
   metaSurfaceTimeoutMs?: number | null;
   allowedMetaSurfaceKinds?: string[];
+  touchedPaths?: string[];
 }
 
 interface ReviewExecutionTelemetryPayloadOptions {
@@ -195,6 +196,7 @@ export class ReviewExecutionState {
   private readonly lowSignalTimeoutMs: number | null;
   private readonly metaSurfaceTimeoutMs: number | null;
   private readonly allowedMetaSurfaceKinds: Set<string>;
+  private readonly touchedPaths: Set<string>;
 
   private lastOutputAtMs: number;
   private preview = '';
@@ -246,6 +248,9 @@ export class ReviewExecutionState {
         ? null
         : configuredMetaSurfaceTimeoutMs;
     this.allowedMetaSurfaceKinds = new Set(options.allowedMetaSurfaceKinds ?? []);
+    this.touchedPaths = new Set(
+      (options.touchedPaths ?? []).map((entry) => normalizeScopePath(entry)).filter(Boolean)
+    );
   }
 
   observeChunk(chunk: Buffer | string, stream: ReviewExecutionStream, nowMs = Date.now()): void {
@@ -462,7 +467,7 @@ export class ReviewExecutionState {
         }
         this.commandStarts.push(commandLine);
         this.recordInspectionTargets(commandLine);
-        const metaSurfaceSample = classifyMetaSurfaceCommandLine(commandLine);
+        const metaSurfaceSample = classifyMetaSurfaceCommandLine(commandLine, this.touchedPaths);
         this.recordMetaSurfaceCommandSample(metaSurfaceSample);
         const commandIntentViolation = classifyCommandIntentCommandLine(commandLine, {
           allowValidationCommandIntents: this.allowValidationCommandIntents
@@ -1232,11 +1237,14 @@ function classifyCommandIntentSegment(
   return null;
 }
 
-function classifyMetaSurfaceCommandLine(commandLine: string): string | null {
+function classifyMetaSurfaceCommandLine(
+  commandLine: string,
+  touchedPaths: ReadonlySet<string>
+): string | null {
   const normalized = normalizeReviewCommandLine(commandLine).replace(/\\/gu, '/');
   const segments = splitShellControlSegments(normalized);
   for (const segment of segments) {
-    const kind = classifyMetaSurfaceSegment(segment);
+    const kind = classifyMetaSurfaceSegment(segment, touchedPaths);
     if (kind) {
       return kind;
     }
@@ -1244,7 +1252,11 @@ function classifyMetaSurfaceCommandLine(commandLine: string): string | null {
   return null;
 }
 
-function classifyMetaSurfaceSegment(segment: string, depth = 0): string | null {
+function classifyMetaSurfaceSegment(
+  segment: string,
+  touchedPaths: ReadonlySet<string>,
+  depth = 0
+): string | null {
   const strippedTokens = stripLeadingEnvAssignments(tokenizeShellSegment(segment));
   if (strippedTokens.length === 0) {
     return null;
@@ -1260,7 +1272,7 @@ function classifyMetaSurfaceSegment(segment: string, depth = 0): string | null {
     if (payload) {
       const nestedSegments = splitShellControlSegments(payload);
       for (const nestedSegment of nestedSegments) {
-        const nestedKind = classifyMetaSurfaceSegment(nestedSegment, depth + 1);
+        const nestedKind = classifyMetaSurfaceSegment(nestedSegment, touchedPaths, depth + 1);
         if (nestedKind) {
           return nestedKind;
         }
@@ -1275,7 +1287,7 @@ function classifyMetaSurfaceSegment(segment: string, depth = 0): string | null {
   }
 
   for (const operand of extractMetaSurfaceOperands(command, args)) {
-    const operandKind = classifyMetaSurfaceOperand(operand);
+    const operandKind = classifyMetaSurfaceOperand(operand, touchedPaths);
     if (operandKind) {
       return operandKind;
     }
@@ -1543,9 +1555,15 @@ function shouldCollectMetaSurfacePositional(command: string, positionalIndex: nu
   return true;
 }
 
-function classifyMetaSurfaceOperand(operand: string): string | null {
+function classifyMetaSurfaceOperand(
+  operand: string,
+  touchedPaths: ReadonlySet<string>
+): string | null {
   const normalized = operand.trim().replace(/\\/gu, '/');
   if (!normalized) {
+    return null;
+  }
+  if (isTouchedScopePath(normalized, touchedPaths)) {
     return null;
   }
   if (/^\$(?:\{)?MANIFEST(?:\})?$/iu.test(normalized)) {
@@ -1566,7 +1584,55 @@ function classifyMetaSurfaceOperand(operand: string): string | null {
   if (normalized.includes('.runs/') && normalized.endsWith('/runner.ndjson')) {
     return 'run-runner-log';
   }
+  if (
+    normalized.includes('/review/') &&
+    /\/(?:prompt\.txt|output\.log|telemetry\.json)$/iu.test(normalized)
+  ) {
+    return 'review-artifacts';
+  }
+  if (
+    matchesPathSuffix(normalized, 'scripts/pack-smoke.mjs') ||
+    matchesPathSuffix(normalized, 'scripts/pack-smoke.js') ||
+    matchesPathSuffix(normalized, 'scripts/lib/run-manifests.js') ||
+    matchesPathSuffix(normalized, 'scripts/lib/run-manifests.d.ts') ||
+    matchesPathSuffix(normalized, 'scripts/run-review.ts') ||
+    matchesPathSuffix(normalized, 'scripts/run-review.js') ||
+    matchesPathSuffix(normalized, 'scripts/lib/review-execution-state.ts') ||
+    matchesPathSuffix(normalized, 'tests/run-review.spec.ts') ||
+    matchesPathSuffix(normalized, 'tests/run-review.spec.js') ||
+    matchesPathSuffix(normalized, 'tests/review-execution-state.spec.ts') ||
+    matchesPathSuffix(normalized, 'tests/review-execution-state.spec.js')
+  ) {
+    return 'review-support';
+  }
+  if (
+    matchesPathSuffix(normalized, 'docs/standalone-review-guide.md') ||
+    matchesPathSuffix(normalized, 'docs/guides/review-artifacts.md') ||
+    /(?:^|\/)docs\/(?:PRD|TECH_SPEC|ACTION_PLAN)-.*standalone-review.*\.md$/iu.test(normalized) ||
+    /(?:^|\/)docs\/findings\/.*standalone-review.*\.md$/iu.test(normalized)
+  ) {
+    return 'review-docs';
+  }
   return null;
+}
+
+function normalizeScopePath(value: string): string {
+  return value.trim().replace(/\\/gu, '/').replace(/^\.\//u, '');
+}
+
+function matchesPathSuffix(value: string, relativePath: string): boolean {
+  const normalizedRelativePath = normalizeScopePath(relativePath);
+  return value === normalizedRelativePath || value.endsWith(`/${normalizedRelativePath}`);
+}
+
+function isTouchedScopePath(operand: string, touchedPaths: ReadonlySet<string>): boolean {
+  const normalizedOperand = normalizeScopePath(operand);
+  for (const touchedPath of touchedPaths) {
+    if (matchesPathSuffix(normalizedOperand, touchedPath)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 function formatCommandIntentViolationLabel(kind: ReviewCommandIntentViolationKind): string {
