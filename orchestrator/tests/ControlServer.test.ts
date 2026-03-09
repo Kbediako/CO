@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
 import * as fsUtils from '../src/cli/utils/fs.js';
+import * as controlBootstrapAssemblyModule from '../src/cli/control/controlBootstrapAssembly.js';
 import {
   ControlServer,
   formatHostForUrl,
@@ -301,6 +302,27 @@ describe('ControlServer', () => {
       });
 
       expect(res.status).toBe(200);
+    } finally {
+      await server.close();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('persists control endpoint metadata using the bound base url', async () => {
+    const { root, env, paths } = await createRunRoot('task-0940');
+    const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
+
+    const server = await ControlServer.start({
+      paths,
+      config,
+      runId: 'run-1'
+    });
+
+    try {
+      const endpointRaw = await readFile(paths.controlEndpointPath, 'utf8');
+      const endpoint = JSON.parse(endpointRaw) as { base_url?: string; token_path?: string };
+      expect(endpoint.base_url).toBe(server.getBaseUrl());
+      expect(endpoint.token_path).toBe(paths.controlAuthPath);
     } finally {
       await server.close();
       await rm(root, { recursive: true, force: true });
@@ -6416,6 +6438,21 @@ describe('ControlServer', () => {
   it('fails when server listen emits an error', async () => {
     const { root, env, paths } = await createRunRoot('task-0940');
     const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
+    const bootstrapStart = vi.fn(async () => undefined);
+    const bootstrapAssemblySpy = vi
+      .spyOn(controlBootstrapAssemblyModule, 'createControlBootstrapAssembly')
+      .mockReturnValue({
+        expiryLifecycle: {
+          start: vi.fn(),
+          close: vi.fn(),
+          expireConfirmations: vi.fn(async () => undefined),
+          expireQuestions: vi.fn(async () => undefined)
+        },
+        bootstrapLifecycle: {
+          start: bootstrapStart,
+          close: vi.fn(async () => undefined)
+        }
+      });
     const originalCreateServer = http.createServer;
     let createdServer: http.Server | null = null;
     const createServerSpy = vi.spyOn(http, 'createServer').mockImplementation((...args) => {
@@ -6441,7 +6478,60 @@ describe('ControlServer', () => {
       ).rejects.toThrow('listen-failed');
       expect(createdServer).toBeTruthy();
       expect((createdServer as http.Server | null)?.listening).toBe(false);
+      expect(bootstrapStart).not.toHaveBeenCalled();
     } finally {
+      bootstrapAssemblySpy.mockRestore();
+      createServerSpy.mockRestore();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('closes the server when bootstrap lifecycle startup fails after bind', async () => {
+    const { root, env, paths } = await createRunRoot('task-0940');
+    const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
+    const expiryClose = vi.fn();
+    const bootstrapClose = vi.fn(async () => undefined);
+    const bootstrapStart = vi.fn(async () => {
+      throw new Error('bootstrap-failed');
+    });
+    const bootstrapAssemblySpy = vi
+      .spyOn(controlBootstrapAssemblyModule, 'createControlBootstrapAssembly')
+      .mockReturnValue({
+        expiryLifecycle: {
+          start: vi.fn(),
+          close: expiryClose,
+          expireConfirmations: vi.fn(async () => undefined),
+          expireQuestions: vi.fn(async () => undefined)
+        },
+        bootstrapLifecycle: {
+          start: bootstrapStart,
+          close: bootstrapClose
+        }
+      });
+    const originalCreateServer = http.createServer;
+    let createdServer: http.Server | null = null;
+    const createServerSpy = vi.spyOn(http, 'createServer').mockImplementation((...args) => {
+      const server = originalCreateServer(...(args as Parameters<typeof originalCreateServer>));
+      createdServer = server;
+      return server;
+    });
+
+    try {
+      await expect(
+        ControlServer.start({
+          paths,
+          config,
+          runId: 'run-1'
+        })
+      ).rejects.toThrow('bootstrap-failed');
+
+      expect(bootstrapStart).toHaveBeenCalledOnce();
+      expect(bootstrapClose).toHaveBeenCalledOnce();
+      expect(expiryClose).toHaveBeenCalledOnce();
+      expect(createdServer).toBeTruthy();
+      expect((createdServer as http.Server | null)?.listening).toBe(false);
+    } finally {
+      bootstrapAssemblySpy.mockRestore();
       createServerSpy.mockRestore();
       await rm(root, { recursive: true, force: true });
     }

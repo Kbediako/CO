@@ -33,6 +33,7 @@ import {
 import { type ControlExpiryLifecycle } from './controlExpiryLifecycle.js';
 import { type ControlServerBootstrapLifecycle } from './controlServerBootstrapLifecycle.js';
 import { createControlBootstrapAssembly } from './controlBootstrapAssembly.js';
+import { startControlServerStartupSequence } from './controlServerStartupSequence.js';
 import {
   createControlEventTransport,
   type ControlEventTransport
@@ -281,42 +282,13 @@ export class ControlServer {
     instance.expiryLifecycle = bootstrapAssembly.expiryLifecycle;
     instance.bootstrapLifecycle = bootstrapAssembly.bootstrapLifecycle;
 
-    const host = options.config.ui.bindHost;
-    await new Promise<void>((resolve, reject) => {
-      const onError = (error: Error) => {
-        server.off('error', onError);
-        try {
-          server.close(() => undefined);
-        } catch {
-          // Ignore close errors on a server that failed to bind.
-        }
-        reject(error);
-      };
-      server.once('error', onError);
-      server.listen(0, host, () => {
-        server.off('error', onError);
-        resolve();
-      });
+    instance.baseUrl = await startControlServerStartupSequence({
+      server,
+      host: options.config.ui.bindHost,
+      bootstrapLifecycle: instance.bootstrapLifecycle,
+      controlToken: token,
+      closeOnFailure: () => instance!.close()
     });
-    const address = server.address();
-    const port = typeof address === 'string' || !address ? 0 : address.port;
-    instance.baseUrl = `http://${formatHostForUrl(host)}:${port}`;
-    server.on('error', (error) => {
-      logger.error(`Control server error: ${(error as Error)?.message ?? String(error)}`);
-    });
-
-    try {
-      if (!instance.baseUrl) {
-        throw new Error('control_server_base_url_unavailable');
-      }
-      await instance.bootstrapLifecycle.start({
-        baseUrl: instance.baseUrl,
-        controlToken: token
-      });
-    } catch (error) {
-      await instance.close();
-      throw error;
-    }
 
     return instance;
   }
@@ -615,13 +587,6 @@ function resolveTaskIdFromManifestPath(manifestPath: string): string | null {
   return taskId || null;
 }
 
-export function formatHostForUrl(host: string): string {
-  if (host.includes(':') && !host.startsWith('[')) {
-    return `[${host}]`;
-  }
-  return host;
-}
-
 export function isLoopbackAddress(address: string | undefined | null): boolean {
   if (!address) {
     return false;
@@ -634,6 +599,8 @@ export function isLoopbackAddress(address: string | undefined | null): boolean {
   }
   return false;
 }
+
+export { formatHostForUrl } from './controlServerStartupSequence.js';
 
 async function readRawBody(req: http.IncomingMessage): Promise<Buffer> {
   const chunks: Buffer[] = [];

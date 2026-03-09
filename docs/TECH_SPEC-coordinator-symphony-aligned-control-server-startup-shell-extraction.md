@@ -37,7 +37,7 @@ Extract the remaining startup shell out of `ControlServer.start()` into one cont
 
 ### 1. Startup-shell helper
 
-Introduce one helper that receives the constructed `ControlServer` instance plus the already-created `server`, `host`, `token`, and `bootstrapLifecycle`, then owns:
+Introduce one helper that receives the already-created `server`, `host`, `controlToken`, `bootstrapLifecycle`, and a `closeOnFailure` callback, then owns:
 - bind/listen error handling,
 - base URL derivation,
 - server error-handler registration,
