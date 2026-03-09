@@ -1,6 +1,5 @@
 import http from 'node:http';
 import { randomBytes } from 'node:crypto';
-import { basename, dirname } from 'node:path';
 
 import type { RunPaths } from '../run/runPaths.js';
 import type { EffectiveDelegationConfig } from '../config/delegationConfig.js';
@@ -18,18 +17,16 @@ import {
   type ControlRequestContext,
   type ControlRequestSharedContext
 } from './controlRequestContext.js';
-import { createControlQuestionChildResolutionAdapter } from './controlQuestionChildResolution.js';
+import { createControlAuthenticatedRouteContext } from './controlAuthenticatedRouteHandoff.js';
 import { createControlServerSeededRuntimeAssembly } from './controlServerSeededRuntimeAssembly.js';
 import { createControlServerRequestShell } from './controlServerRequestShell.js';
 import { readControlServerSeeds } from './controlServerSeedLoading.js';
 import {
-  emitControlActionAuditEvent,
   emitDispatchPilotAuditEvents,
   emitLinearWebhookAuditEvent,
-  writeControlError
 } from './controlServerAuditAndErrorHelpers.js';
 import { handlePublicControlRoute } from './controlServerPublicRouteHelpers.js';
-import { readJsonBody, readRawBody } from './controlServerRequestBodyHelpers.js';
+import { readRawBody } from './controlServerRequestBodyHelpers.js';
 
 interface ControlServerOptions {
   paths: RunPaths;
@@ -190,42 +187,17 @@ async function handleRequest(context: ControlRequestContext): Promise<void> {
     return;
   }
 
-  const questionChildResolutionAdapter = createControlQuestionChildResolutionAdapter(context);
-  const handled = await handleAuthenticatedRouteRequest({
-    pathname: url.pathname,
-    method: req.method,
-    authKind: auth.kind,
-    req,
-    res,
-    clients: context.clients,
-    presenterContext,
-    confirmAutoPause: context.config.confirm.autoPause,
-    taskId: resolveTaskIdFromManifestPath(context.paths.manifestPath),
-    manifestPath: context.paths.manifestPath,
-    controlStore: context.controlStore,
-    confirmationStore: context.confirmationStore,
-    questionQueue: context.questionQueue,
-    delegationTokens: context.delegationTokens,
-    persist: context.persist,
-    runtime: context.runtime,
-    readRequestBody: () => readJsonBody(req),
-    readDispatchEvaluation: () => runtimeSnapshot.readDispatchEvaluation(),
-    onDispatchEvaluated: (record) => emitDispatchPilotAuditEvents(context, record),
-    emitControlEvent: (input) => context.eventTransport.emitControlEvent(input),
-    emitControlActionAuditEvent: (input) => emitControlActionAuditEvent(context, input),
-    writeControlError: (status, error, traceability) =>
-      writeControlError(res, status, error, traceability),
-    expireConfirmations: () => context.expiryLifecycle?.expireConfirmations() ?? Promise.resolve(),
-    expireQuestions: () =>
-      context.expiryLifecycle?.expireQuestions(questionChildResolutionAdapter) ?? Promise.resolve(),
-    queueQuestionResolutions: (records) => questionChildResolutionAdapter.queueQuestionResolutions(records),
-    readDelegationHeaders: () => questionChildResolutionAdapter.readDelegationHeaders(req),
-    validateDelegation: (delegationAuth) => questionChildResolutionAdapter.validateDelegation(delegationAuth),
-    resolveManifestPath: (rawPath) => questionChildResolutionAdapter.resolveManifestPath(rawPath),
-    readManifest: (path) => questionChildResolutionAdapter.readManifest(path),
-    resolveChildQuestion: (record, outcome) =>
-      questionChildResolutionAdapter.resolveChildQuestion(record, outcome)
-  });
+  const handled = await handleAuthenticatedRouteRequest(
+    createControlAuthenticatedRouteContext({
+      pathname: url.pathname,
+      authKind: auth.kind,
+      req,
+      res,
+      context,
+      runtimeSnapshot,
+      presenterContext
+    })
+  );
 
   if (handled) {
     return;
@@ -233,17 +205,6 @@ async function handleRequest(context: ControlRequestContext): Promise<void> {
 
   res.writeHead(404, { 'Content-Type': 'application/json' });
   res.end(JSON.stringify({ error: 'not_found' }));
-}
-
-function resolveTaskIdFromManifestPath(manifestPath: string): string | null {
-  const runDir = dirname(manifestPath);
-  const cliDir = dirname(runDir);
-  if (basename(cliDir) !== 'cli') {
-    return null;
-  }
-  const taskDir = dirname(cliDir);
-  const taskId = basename(taskDir);
-  return taskId || null;
 }
 
 export { isLoopbackAddress } from './uiSessionController.js';
