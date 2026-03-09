@@ -5,7 +5,7 @@ import { basename, dirname } from 'node:path';
 import type { RunPaths } from '../run/runPaths.js';
 import type { EffectiveDelegationConfig } from '../config/delegationConfig.js';
 import type { RunEventStream, RunEventStreamEntry } from '../events/runEventStream.js';
-import { handleUiSessionRequest } from './uiSessionController.js';
+import { handleControlUiSessionAdmission } from './uiSessionController.js';
 import { admitAuthenticatedControlRoute } from './authenticatedControlRouteGate.js';
 import { handleAuthenticatedRouteRequest } from './authenticatedRouteController.js';
 import { handleLinearWebhookRequest } from './linearWebhookController.js';
@@ -40,7 +40,6 @@ interface ControlServerOptions {
 
 const EXPIRY_INTERVAL_MS = 15_000;
 const SESSION_TTL_MS = 15 * 60 * 1000;
-const LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost', '::1']);
 
 export class ControlServer {
   private readonly server: http.Server;
@@ -156,12 +155,11 @@ async function handleRequest(context: ControlRequestContext): Promise<void> {
   }
 
   if (
-    handleUiSessionRequest({
+    handleControlUiSessionAdmission({
       req,
       res,
-      allowedHosts: normalizeAllowedHosts(context.config.ui.allowedBindHosts),
-      issueSession: () => context.sessionTokens.issue(),
-      isLoopbackAddress
+      allowedBindHosts: context.config.ui.allowedBindHosts,
+      issueSession: () => context.sessionTokens.issue()
     })
   ) {
     return;
@@ -248,22 +246,5 @@ function resolveTaskIdFromManifestPath(manifestPath: string): string | null {
   return taskId || null;
 }
 
-export function isLoopbackAddress(address: string | undefined | null): boolean {
-  if (!address) {
-    return false;
-  }
-  if (LOOPBACK_HOSTS.has(address)) {
-    return true;
-  }
-  if (address.startsWith('::ffff:')) {
-    return address.slice(7) === '127.0.0.1';
-  }
-  return false;
-}
-
+export { isLoopbackAddress } from './uiSessionController.js';
 export { formatHostForUrl } from './controlServerStartupSequence.js';
-
-function normalizeAllowedHosts(allowedHosts?: string[]): Set<string> {
-  const values = allowedHosts && allowedHosts.length > 0 ? allowedHosts : Array.from(LOOPBACK_HOSTS);
-  return new Set(values.map((entry) => entry.toLowerCase()));
-}

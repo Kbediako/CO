@@ -3,6 +3,7 @@ import http from 'node:http';
 const UI_SESSION_PATH = '/auth/session';
 const JSON_HEADERS = { 'Content-Type': 'application/json' };
 const JSON_NO_STORE_HEADERS = { ...JSON_HEADERS, 'Cache-Control': 'no-store' };
+const LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost', '::1']);
 
 export interface UiSessionControllerContext {
   req: Pick<http.IncomingMessage, 'method' | 'url' | 'headers' | 'socket'>;
@@ -10,6 +11,25 @@ export interface UiSessionControllerContext {
   allowedHosts: ReadonlySet<string>;
   issueSession: () => { token: string; expiresAt: string };
   isLoopbackAddress: (address: string | undefined | null) => boolean;
+}
+
+export interface ControlUiSessionAdmissionContext {
+  req: Pick<http.IncomingMessage, 'method' | 'url' | 'headers' | 'socket'>;
+  res: http.ServerResponse;
+  allowedBindHosts?: string[];
+  issueSession: () => { token: string; expiresAt: string };
+}
+
+export function handleControlUiSessionAdmission(
+  context: ControlUiSessionAdmissionContext
+): boolean {
+  return handleUiSessionRequest({
+    req: context.req,
+    res: context.res,
+    allowedHosts: normalizeAllowedHosts(context.allowedBindHosts),
+    issueSession: context.issueSession,
+    isLoopbackAddress
+  });
 }
 
 export function handleUiSessionRequest(context: UiSessionControllerContext): boolean {
@@ -52,6 +72,19 @@ export function handleUiSessionRequest(context: UiSessionControllerContext): boo
     JSON_NO_STORE_HEADERS
   );
   return true;
+}
+
+export function isLoopbackAddress(address: string | undefined | null): boolean {
+  if (!address) {
+    return false;
+  }
+  if (LOOPBACK_HOSTS.has(address)) {
+    return true;
+  }
+  if (address.startsWith('::ffff:')) {
+    return address.slice(7) === '127.0.0.1';
+  }
+  return false;
 }
 
 function writeJsonResponse(
@@ -97,4 +130,9 @@ function parseOriginHost(value: string | undefined): string | null {
   } catch {
     return null;
   }
+}
+
+function normalizeAllowedHosts(allowedHosts?: string[]): Set<string> {
+  const values = allowedHosts && allowedHosts.length > 0 ? allowedHosts : Array.from(LOOPBACK_HOSTS);
+  return new Set(values.map((entry) => entry.toLowerCase()));
 }

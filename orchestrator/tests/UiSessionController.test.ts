@@ -2,7 +2,10 @@ import http from 'node:http';
 
 import { describe, expect, it, vi } from 'vitest';
 
-import { handleUiSessionRequest } from '../src/cli/control/uiSessionController.js';
+import {
+  handleControlUiSessionAdmission,
+  handleUiSessionRequest
+} from '../src/cli/control/uiSessionController.js';
 
 function createResponseRecorder() {
   const state: {
@@ -196,5 +199,55 @@ describe('UiSessionController', () => {
       token: 'session-token',
       expires_at: '2026-03-07T06:30:00.000Z'
     });
+  });
+
+  it('uses normalized default loopback hosts when allowedBindHosts is omitted', () => {
+    const { res, state } = createResponseRecorder();
+    const issueSession = vi.fn(() => ({
+      token: 'session-token',
+      expiresAt: '2026-03-09T14:11:00.000Z'
+    }));
+
+    const handled = handleControlUiSessionAdmission({
+      req: createRequest({
+        headers: {
+          host: 'LOCALHOST:4318'
+        }
+      }),
+      res,
+      issueSession
+    });
+
+    expect(handled).toBe(true);
+    expect(issueSession).toHaveBeenCalledTimes(1);
+    expect(state.statusCode).toBe(200);
+    expect(state.body).toMatchObject({
+      token: 'session-token',
+      expires_at: '2026-03-09T14:11:00.000Z'
+    });
+  });
+
+  it('accepts ipv4-mapped loopback addresses when the host is explicitly allowed', () => {
+    const { res, state } = createResponseRecorder();
+    const issueSession = vi.fn(() => ({
+      token: 'session-token',
+      expiresAt: '2026-03-09T14:11:00.000Z'
+    }));
+
+    const handled = handleControlUiSessionAdmission({
+      req: createRequest({
+        headers: {
+          host: '127.0.0.1:4318'
+        },
+        remoteAddress: '::ffff:127.0.0.1'
+      }),
+      res,
+      allowedBindHosts: ['127.0.0.1'],
+      issueSession
+    });
+
+    expect(handled).toBe(true);
+    expect(issueSession).toHaveBeenCalledTimes(1);
+    expect(state.statusCode).toBe(200);
   });
 });
