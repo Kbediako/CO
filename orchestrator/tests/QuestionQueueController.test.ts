@@ -105,17 +105,35 @@ describe('QuestionQueueController', () => {
           answered_by: 'ui',
           answered_at: '2026-03-07T09:01:00.000Z',
           closed_at: '2026-03-07T09:01:00.000Z'
+        }),
+        createRecord({
+          question_id: 'q-0003',
+          status: 'expired',
+          closed_at: '2026-03-07T09:02:00.000Z'
         })
       ]
     });
-    const { context, state } = createContext({ queue });
+    const { context, state } = createContext({
+      queue,
+      expireQuestions: vi.fn(async () => {
+        const record = queue.get('q-0001');
+        if (record) {
+          record.status = 'expired';
+          record.closed_at = '2026-03-07T09:03:00.000Z';
+        }
+      })
+    });
 
     await expect(handleQuestionQueueRequest(context)).resolves.toBe(true);
 
     expect(context.expireQuestions).toHaveBeenCalledTimes(1);
-    expect(context.queueQuestionResolutions).toHaveBeenCalledWith(queue.list());
+    expect(context.queueQuestionResolutions).toHaveBeenCalledWith([
+      queue.get('q-0002'),
+      queue.get('q-0003')
+    ]);
     expect(state.statusCode).toBe(200);
     expect(state.body).toEqual({ questions: queue.list() });
+    expect(queue.get('q-0001')?.status).toBe('expired');
   });
 
   it('rejects enqueue without a prompt after delegation validation', async () => {

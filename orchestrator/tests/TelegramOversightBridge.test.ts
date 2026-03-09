@@ -1,3 +1,4 @@
+import http from 'node:http';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createHmac } from 'node:crypto';
 import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
@@ -523,6 +524,138 @@ describe('TelegramOversightBridge', () => {
       ).toBe(true);
     } finally {
       await server.close();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('does not immediately retry freshly expired child questions during Telegram /questions reads', async () => {
+    const { root, env, paths } = await createRunRoot('task-1074-telegram-question-read-dedupe');
+    await seedManifest(paths, { task_id: 'task-1074' });
+    const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
+    const events: import('../src/cli/events/runEventStream.js').RunEventStreamEntry[] = [];
+    const eventStream = {
+      append: async (entry: { event: string; actor: string; payload: Record<string, unknown> }) => {
+        const record = {
+          schema_version: 1,
+          seq: events.length + 1,
+          timestamp: new Date().toISOString(),
+          task_id: 'task-1074',
+          run_id: 'parent-run',
+          event: entry.event,
+          actor: entry.actor,
+          payload: entry.payload
+        };
+        events.push(record);
+        return record;
+      },
+      close: async () => undefined
+    } as unknown as import('../src/cli/events/runEventStream.js').RunEventStream;
+
+    const childRunDir = join(root, '.runs', 'child-task', 'cli', 'child-run');
+    await mkdir(childRunDir, { recursive: true });
+    const childManifestPath = join(childRunDir, 'manifest.json');
+    await writeFile(childManifestPath, JSON.stringify({ run_id: 'child-run' }), 'utf8');
+    const childTokenPath = join(childRunDir, 'control_auth.json');
+    await writeFile(childTokenPath, JSON.stringify({ token: 'child-token' }), 'utf8');
+    await writeFile(
+      join(childRunDir, 'control.json'),
+      JSON.stringify({
+        run_id: 'child-run',
+        control_seq: 1,
+        latest_action: {
+          request_id: null,
+          requested_by: 'delegate',
+          requested_at: new Date().toISOString(),
+          action: 'pause',
+          reason: 'awaiting_question_answer'
+        },
+        feature_toggles: {}
+      }),
+      'utf8'
+    );
+
+    let childControlAttempts = 0;
+    const childServer = http.createServer((req, res) => {
+      if (req.url === '/control/action' && req.method === 'POST') {
+        childControlAttempts += 1;
+        res.writeHead(500, { 'Content-Type': 'text/plain' });
+        res.end('nope');
+        return;
+      }
+      res.writeHead(404);
+      res.end();
+    });
+    await new Promise<void>((resolve) => childServer.listen(0, '127.0.0.1', resolve));
+    const childAddress = childServer.address();
+    const childPort = typeof childAddress === 'string' || !childAddress ? 0 : childAddress.port;
+    await writeFile(
+      join(childRunDir, 'control_endpoint.json'),
+      JSON.stringify({
+        base_url: `http://127.0.0.1:${childPort}`,
+        token_path: childTokenPath
+      }),
+      'utf8'
+    );
+
+    const expiredAt = new Date(Date.now() - 60_000).toISOString();
+    const queuedAt = new Date(Date.now() - 120_000).toISOString();
+    await seedQuestions(paths, [
+      {
+        question_id: 'q-0001',
+        parent_run_id: 'parent-run',
+        from_run_id: 'child-run',
+        from_manifest_path: childManifestPath,
+        prompt: 'Approval needed',
+        urgency: 'high',
+        status: 'queued',
+        queued_at: queuedAt,
+        expires_at: expiredAt,
+        expires_in_ms: 1000,
+        auto_pause: true,
+        expiry_fallback: 'pause'
+      }
+    ]);
+
+    const realFetch = globalThis.fetch;
+    const telegram = createTelegramHarness(realFetch);
+
+    vi.stubEnv('CO_TELEGRAM_POLLING_ENABLED', '1');
+    vi.stubEnv('CO_TELEGRAM_BOT_TOKEN', 'test-token');
+    vi.stubEnv('CO_TELEGRAM_ALLOWED_CHAT_IDS', '1234');
+    vi.stubEnv('CO_TELEGRAM_POLL_INTERVAL_MS', '10');
+    vi.stubGlobal('fetch', telegram.fetch);
+
+    const server = await ControlServer.start({
+      paths,
+      config,
+      eventStream,
+      runId: 'parent-run'
+    });
+
+    try {
+      telegram.updates.push({
+        update_id: 300,
+        message: {
+          message_id: 1,
+          text: '/questions',
+          chat: { id: 1234, type: 'private' },
+          from: { id: 77, is_bot: false, first_name: 'Operator' }
+        }
+      });
+
+      await waitForCondition(async () =>
+        telegram.sentMessages.some((message) => message.text.includes('No queued questions.'))
+      );
+
+      const stateRaw = await readFile(join(paths.runDir, 'telegram-oversight-state.json'), 'utf8');
+      const bridgeState = JSON.parse(stateRaw) as { next_update_id?: number };
+      expect(bridgeState.next_update_id).toBe(301);
+      expect(childControlAttempts).toBe(1);
+      expect(events.filter((entry) => entry.event === 'question.resolve_child_fallback')).toHaveLength(1);
+      expect(telegram.sentMessages.some((message) => message.text.includes('No queued questions.'))).toBe(true);
+    } finally {
+      await server.close();
+      await new Promise<void>((resolve) => childServer.close(() => resolve()));
       await rm(root, { recursive: true, force: true });
     }
   });

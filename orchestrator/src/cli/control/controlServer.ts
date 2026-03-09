@@ -60,6 +60,7 @@ import {
   type ControlRequestSharedContext
 } from './controlRequestContext.js';
 import { createControlQuestionChildResolutionAdapter } from './controlQuestionChildResolution.js';
+import { createQuestionReadRetrySelector } from './questionReadRetryDeduplication.js';
 
 interface ControlServerOptions {
   paths: RunPaths;
@@ -402,9 +403,10 @@ export class ControlServer {
           expiryLifecycle: this.expiryLifecycle
         });
         const questionChildResolutionAdapter = createControlQuestionChildResolutionAdapter(context);
+        const selectRetryCandidates = createQuestionReadRetrySelector(context.questionQueue.list());
         await (this.expiryLifecycle?.expireQuestions(questionChildResolutionAdapter) ?? Promise.resolve());
         const questions = context.questionQueue.list();
-        questionChildResolutionAdapter.queueQuestionResolutions(questions);
+        questionChildResolutionAdapter.queueQuestionResolutions(selectRetryCandidates(questions));
         return { questions };
       }
     };

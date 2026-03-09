@@ -1,6 +1,7 @@
 import http from 'node:http';
 
 import type { CliManifest } from '../types.js';
+import { createQuestionReadRetrySelector } from './questionReadRetryDeduplication.js';
 import type { QuestionQueue, QuestionRecord, QuestionUrgency } from './questions.js';
 
 interface DelegationAuth {
@@ -37,9 +38,10 @@ export async function handleQuestionQueueRequest(
   const pathname = new URL(context.req.url ?? '/', 'http://localhost').pathname;
 
   if (pathname === '/questions' && method === 'GET') {
+    const selectRetryCandidates = createQuestionReadRetrySelector(context.questionQueue.list());
     await context.expireQuestions();
     const questions = context.questionQueue.list();
-    context.queueQuestionResolutions(questions);
+    context.queueQuestionResolutions(selectRetryCandidates(questions));
     writeQuestionResponse(context.res, 200, { questions });
     return true;
   }

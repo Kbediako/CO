@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260309-1074-coordinator-symphony-aligned-question-read-retry-deduplication",
+      "title": "Coordinator Symphony-Aligned Question-Read Retry Deduplication",
+      "relates_to": "tasks/tasks-1074-coordinator-symphony-aligned-question-read-retry-deduplication.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-09",
+      "paths": {
+        "spec": "tasks/specs/1074-coordinator-symphony-aligned-question-read-retry-deduplication.md",
+        "task": "tasks/tasks-1074-coordinator-symphony-aligned-question-read-retry-deduplication.md",
+        "agent_task": ".agent/task/1074-coordinator-symphony-aligned-question-read-retry-deduplication.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-question-read-retry-deduplication.md"
+      }
+    },
+    {
       "id": "20260308-1073-coordinator-symphony-aligned-question-child-resolution-adapter-extraction",
       "title": "Coordinator Symphony-Aligned Question Child-Resolution Adapter Extraction",
       "relates_to": "tasks/tasks-1073-coordinator-symphony-aligned-question-child-resolution-adapter-extraction.md",

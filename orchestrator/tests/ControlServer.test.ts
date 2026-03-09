@@ -7269,6 +7269,7 @@ describe('ControlServer', () => {
             (entry.payload as { outcome?: string }).outcome === 'expired'
         )
       ).toBeDefined();
+      expect(events.filter((entry) => entry.event === 'question.resolve_child_fallback')).toHaveLength(1);
     } finally {
       await new Promise<void>((resolve) => childServer.close(() => resolve()));
       await parentServer.close();
