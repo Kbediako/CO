@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260310-1097-coordinator-symphony-aligned-standalone-review-audit-task-context-boundary",
+      "title": "Coordinator Symphony-Aligned Standalone Review Audit Task-Context Boundary",
+      "relates_to": "tasks/tasks-1097-coordinator-symphony-aligned-standalone-review-audit-task-context-boundary.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-10",
+      "paths": {
+        "spec": "tasks/specs/1097-coordinator-symphony-aligned-standalone-review-audit-task-context-boundary.md",
+        "task": "tasks/tasks-1097-coordinator-symphony-aligned-standalone-review-audit-task-context-boundary.md",
+        "agent_task": ".agent/task/1097-coordinator-symphony-aligned-standalone-review-audit-task-context-boundary.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-standalone-review-audit-task-context-boundary.md"
+      }
+    },
+    {
       "id": "20260310-1096-coordinator-symphony-aligned-authenticated-route-branch-shell-extraction",
       "title": "Coordinator Symphony-Aligned Authenticated Route Branch Shell Extraction",
       "relates_to": "tasks/tasks-1096-coordinator-symphony-aligned-authenticated-route-branch-shell-extraction.md",
