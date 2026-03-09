@@ -5,8 +5,6 @@ import type { RunPaths } from '../run/runPaths.js';
 import type { EffectiveDelegationConfig } from '../config/delegationConfig.js';
 import type { RunEventStream, RunEventStreamEntry } from '../events/runEventStream.js';
 import { handleControlUiSessionAdmission } from './uiSessionController.js';
-import { admitAuthenticatedControlRoute } from './authenticatedControlRouteGate.js';
-import { handleAuthenticatedRouteRequest } from './authenticatedRouteController.js';
 import { handleLinearWebhookRequest } from './linearWebhookController.js';
 import { type ControlExpiryLifecycle } from './controlExpiryLifecycle.js';
 import { type ControlServerBootstrapLifecycle } from './controlServerBootstrapLifecycle.js';
@@ -17,10 +15,10 @@ import {
   type ControlRequestContext,
   type ControlRequestSharedContext
 } from './controlRequestContext.js';
-import { createControlAuthenticatedRouteContext } from './controlAuthenticatedRouteHandoff.js';
 import { createControlServerSeededRuntimeAssembly } from './controlServerSeededRuntimeAssembly.js';
 import { createControlServerRequestShell } from './controlServerRequestShell.js';
 import { readControlServerSeeds } from './controlServerSeedLoading.js';
+import { handleControlAuthenticatedRouteBranch } from './controlServerAuthenticatedRouteBranch.js';
 import {
   emitDispatchPilotAuditEvents,
   emitLinearWebhookAuditEvent,
@@ -176,35 +174,14 @@ async function handleRequest(context: ControlRequestContext): Promise<void> {
     return;
   }
 
-  const auth = admitAuthenticatedControlRoute({
+  await handleControlAuthenticatedRouteBranch({
+    pathname: url.pathname,
     req,
     res,
-    pathname: url.pathname,
-    controlToken: context.token,
-    isSessionTokenValid: (token) => context.sessionTokens.validate(token)
+    context,
+    runtimeSnapshot,
+    presenterContext
   });
-  if (!auth) {
-    return;
-  }
-
-  const handled = await handleAuthenticatedRouteRequest(
-    createControlAuthenticatedRouteContext({
-      pathname: url.pathname,
-      authKind: auth.kind,
-      req,
-      res,
-      context,
-      runtimeSnapshot,
-      presenterContext
-    })
-  );
-
-  if (handled) {
-    return;
-  }
-
-  res.writeHead(404, { 'Content-Type': 'application/json' });
-  res.end(JSON.stringify({ error: 'not_found' }));
 }
 
 export { isLoopbackAddress } from './uiSessionController.js';
