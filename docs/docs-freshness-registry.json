@@ -3,6 +3,55 @@
   "generated_at": "2026-03-09",
   "entries": [
     {
+      "path": ".agent/task/1093-coordinator-symphony-aligned-standalone-review-diff-audit-surface-split.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-10",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-standalone-review-diff-audit-surface-split.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-10",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/PRD-coordinator-symphony-aligned-standalone-review-diff-audit-surface-split.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-10",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/TECH_SPEC-coordinator-symphony-aligned-standalone-review-diff-audit-surface-split.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-10",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/findings/1093-standalone-review-diff-audit-surface-split-deliberation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-10",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/specs/1093-coordinator-symphony-aligned-standalone-review-diff-audit-surface-split.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-10",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/tasks-1093-coordinator-symphony-aligned-standalone-review-diff-audit-surface-split.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-10",
+      "cadence_days": 30
+    },
+    {
       "path": ".agent/task/1092-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",

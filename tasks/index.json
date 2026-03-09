@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260310-1093-coordinator-symphony-aligned-standalone-review-diff-audit-surface-split",
+      "title": "Coordinator Symphony-Aligned Standalone Review Diff/Audit Surface Split",
+      "relates_to": "tasks/tasks-1093-coordinator-symphony-aligned-standalone-review-diff-audit-surface-split.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-10",
+      "paths": {
+        "spec": "tasks/specs/1093-coordinator-symphony-aligned-standalone-review-diff-audit-surface-split.md",
+        "task": "tasks/tasks-1093-coordinator-symphony-aligned-standalone-review-diff-audit-surface-split.md",
+        "agent_task": ".agent/task/1093-coordinator-symphony-aligned-standalone-review-diff-audit-surface-split.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-standalone-review-diff-audit-surface-split.md"
+      }
+    },
+    {
       "id": "20260309-1092-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction",
       "title": "Coordinator Symphony-Aligned Authenticated Route Handoff Assembly Extraction",
       "relates_to": "tasks/tasks-1092-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction.md",
