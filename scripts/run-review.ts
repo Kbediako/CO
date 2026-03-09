@@ -43,7 +43,7 @@ import {
   type ReviewOutputSummary,
   type ReviewStartupLoopState
 } from './lib/review-execution-state.js';
-import { parseNameOnlyPaths, parseStatusZPaths } from './lib/review-scope-paths.js';
+import { parseNameStatusPaths, parseStatusZPaths } from './lib/review-scope-paths.js';
 import { collectManifests, resolveEnvironmentPaths } from './lib/run-manifests.js';
 
 const execFileAsync = promisify(execFile);
@@ -966,12 +966,12 @@ interface ReviewScopeAssessment {
 
 async function collectReviewScopePaths(options: CliOptions): Promise<string[]> {
   if (options.commit) {
-    const summary = await tryGit(['show', '--no-color', '--name-only', '--format=', options.commit]);
-    return summary ? parseNameOnlyPaths(summary) : [];
+    const summary = await tryGit(['show', '--no-color', '--name-status', '--format=', options.commit]);
+    return summary ? parseNameStatusPaths(summary) : [];
   }
   if (options.base) {
-    const diff = await tryGit(['diff', '--no-color', '--name-only', `${options.base}...HEAD`]);
-    return diff ? parseNameOnlyPaths(diff) : [];
+    const diff = await tryGit(['diff', '--no-color', '--name-status', `${options.base}...HEAD`]);
+    return diff ? parseNameStatusPaths(diff) : [];
   }
   const status = await tryGit(['status', '--porcelain=v1', '-z', '--untracked-files=all']);
   return status ? parseStatusZPaths(status) : [];
@@ -1028,39 +1028,20 @@ function resolveReviewCommand(
 
 async function buildScopeNotes(options: CliOptions): Promise<string[]> {
   const lines: string[] = [];
-  const details: string[] = [];
+  const scopePaths = [...new Set(await collectReviewScopePaths(options))].sort();
 
   if (options.commit) {
     lines.push(`Review scope hint: commit \`${options.commit}\``);
-    const summary = await tryGit([
-      'show',
-      '--no-color',
-      '--name-status',
-      '--no-patch',
-      '--format=medium',
-      options.commit
-    ]);
-    if (summary) {
-      details.push(summary);
-    }
   } else if (options.base) {
     lines.push(`Review scope hint: diff vs base \`${options.base}\``);
-    const diff = await tryGit(['diff', '--no-color', '--name-status', `${options.base}...HEAD`]);
-    if (diff) {
-      details.push(diff);
-    }
   } else {
     lines.push('Review scope hint: uncommitted working tree changes (default).');
-    const status = await tryGit(['status', '--porcelain=v1', '-b']);
-    if (status) {
-      details.push(status);
-    }
   }
 
-  if (details.length > 0) {
-    lines.push('', 'Git scope summary:', '```', ...details, '```');
+  if (scopePaths.length > 0) {
+    lines.push('', `Review scope paths (${scopePaths.length}):`, '```', ...scopePaths, '```');
   } else {
-    lines.push('', 'Git scope summary: unavailable (git command failed).');
+    lines.push('', 'Review scope paths: unavailable or empty.');
   }
 
   return lines;

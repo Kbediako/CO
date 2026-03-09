@@ -1347,6 +1347,91 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(prompt).toContain('Prioritize highest-risk findings first');
   });
 
+  it('uses path-only uncommitted scope notes in prompts', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    const { files } = await initGitRepoWithCommittedFiles(sandbox, 1);
+    const modifiedFile = files[0] ?? 'file-1.txt';
+    await writeFile(join(sandbox, modifiedFile), 'updated\n', 'utf8');
+    await writeFile(join(sandbox, 'notes.txt'), 'draft\n', 'utf8');
+
+    const result = await runReviewCommand(manifestPath, baseEnv(sandbox, codexBin));
+
+    expect(result.exitCode).toBe(0);
+    const promptPath = join(dirname(manifestPath), 'review', 'prompt.txt');
+    const prompt = await readFile(promptPath, 'utf8');
+    expect(prompt).toContain('Review scope hint: uncommitted working tree changes (default).');
+    expect(prompt).toContain('Review scope paths (2):');
+    expect(prompt).toContain(modifiedFile);
+    expect(prompt).toContain('notes.txt');
+    expect(prompt).not.toContain('Git scope summary:');
+    expect(prompt).not.toContain('## ');
+    expect(prompt).not.toContain('?? notes.txt');
+  });
+
+  it('uses path-only commit scope notes in prompts', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    const { files } = await initGitRepoWithCommittedFiles(sandbox, 1);
+    const modifiedFile = files[0] ?? 'file-1.txt';
+    await writeFile(join(sandbox, modifiedFile), 'second pass\n', 'utf8');
+    await runGit(['commit', '-am', 'scope-only second'], sandbox);
+    const { stdout: commitStdout } = await execFileAsync('git', ['rev-parse', 'HEAD'], {
+      cwd: sandbox
+    });
+    const commitSha = commitStdout.trim();
+
+    const result = await runReviewCommand(manifestPath, baseEnv(sandbox, codexBin), [
+      '--commit',
+      commitSha
+    ]);
+
+    expect(result.exitCode).toBe(0);
+    const promptPath = join(dirname(manifestPath), 'review', 'prompt.txt');
+    const prompt = await readFile(promptPath, 'utf8');
+    expect(prompt).toContain(`Review scope hint: commit \`${commitSha}\``);
+    expect(prompt).toContain('Review scope paths (1):');
+    expect(prompt).toContain(modifiedFile);
+    expect(prompt).not.toContain('Git scope summary:');
+    expect(prompt).not.toContain('Author:');
+    expect(prompt).not.toContain('Date:');
+    expect(prompt).not.toContain('scope-only second');
+  });
+
+  it('uses path-only base scope notes in prompts while preserving rename identity', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    const { files } = await initGitRepoWithCommittedFiles(sandbox, 1);
+    const originalFile = files[0] ?? 'file-1.txt';
+    const { stdout: baseStdout } = await execFileAsync('git', ['rev-parse', 'HEAD'], {
+      cwd: sandbox
+    });
+    const baseRef = baseStdout.trim();
+
+    const renamedFile = 'renamed-from-base.txt';
+    await runGit(['mv', originalFile, renamedFile], sandbox);
+    await runGit(['commit', '-m', 'scope-only base rename'], sandbox);
+
+    const result = await runReviewCommand(manifestPath, baseEnv(sandbox, codexBin), [
+      '--base',
+      baseRef
+    ]);
+
+    expect(result.exitCode).toBe(0);
+    const promptPath = join(dirname(manifestPath), 'review', 'prompt.txt');
+    const prompt = await readFile(promptPath, 'utf8');
+    expect(prompt).toContain(`Review scope hint: diff vs base \`${baseRef}\``);
+    expect(prompt).toContain('Review scope paths (2):');
+    expect(prompt).toContain(originalFile);
+    expect(prompt).toContain(renamedFile);
+    expect(prompt).not.toContain('Git scope summary:');
+    expect(prompt).not.toContain('scope-only base rename');
+    expect(prompt).not.toContain('R100\t');
+  });
+
   it('counts untracked file lines when evaluating large uncommitted scope', async () => {
     const sandbox = await makeSandbox();
     const manifestPath = await makeManifest(sandbox);
