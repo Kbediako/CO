@@ -1,0 +1,28 @@
+{
+  "task_id": "1079-coordinator-symphony-aligned-telegram-bridge-bootstrap-handoff-extraction",
+  "checked_at": "2026-03-09T05:47:59Z",
+  "surface": "telegram.bootstrap_handoff",
+  "helper_path": "orchestrator/src/cli/control/controlTelegramBridgeBootstrapLifecycle.ts",
+  "delegating_shell": "orchestrator/src/cli/control/controlServer.ts",
+  "manual_check": {
+    "type": "mock_and_targeted_regression_review",
+    "assertions": [
+      "ControlServer delegates Telegram bridge bootstrap assembly through one extracted helper.",
+      "The extracted helper preserves lazy Telegram read-adapter binding through getExpiryLifecycle().",
+      "The generic bootstrap lifecycle still owns metadata persistence, expiry startup ordering, and bridge subscription wiring.",
+      "Telegram bridge startup failures remain non-fatal and subscription failures still close the bridge."
+    ],
+    "evidence": [
+      "orchestrator/src/cli/control/controlServer.ts",
+      "orchestrator/src/cli/control/controlTelegramBridgeBootstrapLifecycle.ts",
+      "orchestrator/tests/ControlTelegramBridgeBootstrapLifecycle.test.ts",
+      "orchestrator/tests/ControlServerBootstrapLifecycle.test.ts",
+      "out/1079-coordinator-symphony-aligned-telegram-bridge-bootstrap-handoff-extraction/manual/20260309T054759Z-closeout/05b-targeted-tests.log"
+    ]
+  },
+  "result": {
+    "targeted_test_files_passed": 2,
+    "targeted_tests_passed": 5,
+    "status": "passed"
+  }
+}

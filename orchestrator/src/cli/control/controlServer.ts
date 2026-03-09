@@ -19,9 +19,6 @@ import { ConfirmationStore, type ConfirmationStoreSnapshot } from './confirmatio
 import { QuestionQueue, type QuestionRecord } from './questions.js';
 import { DelegationTokenStore, type DelegationTokenRecord } from './delegationTokens.js';
 import { type DispatchPilotEvaluation } from './trackerDispatchPilot.js';
-import {
-  type TelegramOversightReadAdapter
-} from './telegramOversightBridge.js';
 import type { RunEventStream, RunEventStreamEntry } from '../events/runEventStream.js';
 import { createControlRuntime, type ControlRuntime } from './controlRuntime.js';
 import { handleUiSessionRequest } from './uiSessionController.js';
@@ -37,10 +34,7 @@ import {
   createControlExpiryLifecycle,
   type ControlExpiryLifecycle
 } from './controlExpiryLifecycle.js';
-import {
-  createControlServerBootstrapLifecycle,
-  type ControlServerBootstrapLifecycle
-} from './controlServerBootstrapLifecycle.js';
+import { type ControlServerBootstrapLifecycle } from './controlServerBootstrapLifecycle.js';
 import {
   createControlEventTransport,
   type ControlEventTransport
@@ -54,7 +48,7 @@ import {
   type ControlRequestSharedContext
 } from './controlRequestContext.js';
 import { createControlQuestionChildResolutionAdapter } from './controlQuestionChildResolution.js';
-import { createControlTelegramReadAdapter } from './controlTelegramReadAdapter.js';
+import { createControlTelegramBridgeBootstrapLifecycle } from './controlTelegramBridgeBootstrapLifecycle.js';
 
 interface ControlServerOptions {
   paths: RunPaths;
@@ -301,12 +295,14 @@ export class ControlServer {
           })
         )
     });
-    instance.bootstrapLifecycle = createControlServerBootstrapLifecycle({
+    instance.bootstrapLifecycle = createControlTelegramBridgeBootstrapLifecycle({
       paths: options.paths,
       persistControl: persist.control,
       startExpiryLifecycle: () => instance.expiryLifecycle?.start(),
       controlRuntime,
-      createTelegramReadAdapter: () => instance.createTelegramOversightReadAdapter()
+      requestContextShared: instance.requestContextShared,
+      getExpiryLifecycle: () => instance.expiryLifecycle,
+      emitDispatchPilotAuditEvents
     });
 
     const host = options.config.ui.bindHost;
@@ -367,14 +363,6 @@ export class ControlServer {
     }
     await new Promise<void>((resolve) => {
       this.server.close(() => resolve());
-    });
-  }
-
-  private createTelegramOversightReadAdapter(): TelegramOversightReadAdapter {
-    return createControlTelegramReadAdapter({
-      ...this.requestContextShared,
-      expiryLifecycle: this.expiryLifecycle,
-      emitDispatchPilotAuditEvents
     });
   }
 }

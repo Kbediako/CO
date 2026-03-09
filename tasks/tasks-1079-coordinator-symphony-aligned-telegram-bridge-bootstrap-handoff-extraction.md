@@ -20,21 +20,21 @@
 
 ## Telegram Bootstrap Handoff
 
-- [ ] Telegram bridge bootstrap handoff extracted behind one bounded helper. Evidence: extracted control-local bootstrap helper, `orchestrator/tests/ControlServerBootstrapLifecycle.test.ts`.
-- [ ] `controlServer.ts` delegates Telegram bootstrap handoff assembly to the extracted helper while preserving top-level server startup ownership. Evidence: `orchestrator/src/cli/control/controlServer.ts`, `out/1079-coordinator-symphony-aligned-telegram-bridge-bootstrap-handoff-extraction/manual/<timestamp>-closeout/11-manual-bootstrap-handoff-check.json`.
-- [ ] Existing bootstrap metadata persistence, expiry startup ordering, and Telegram bridge subscription behavior remain intact under focused regressions. Evidence: `orchestrator/tests/ControlServerBootstrapLifecycle.test.ts`, `out/1079-coordinator-symphony-aligned-telegram-bridge-bootstrap-handoff-extraction/manual/<timestamp>-closeout/05b-targeted-tests.log`.
+- [x] Telegram bridge bootstrap handoff extracted behind one bounded helper. Evidence: `orchestrator/src/cli/control/controlTelegramBridgeBootstrapLifecycle.ts`, `orchestrator/tests/ControlTelegramBridgeBootstrapLifecycle.test.ts`, `out/1079-coordinator-symphony-aligned-telegram-bridge-bootstrap-handoff-extraction/manual/20260309T054759Z-closeout/00-summary.md`.
+- [x] `controlServer.ts` delegates Telegram bootstrap handoff assembly to the extracted helper while preserving top-level server startup ownership. Evidence: `orchestrator/src/cli/control/controlServer.ts`, `out/1079-coordinator-symphony-aligned-telegram-bridge-bootstrap-handoff-extraction/manual/20260309T054759Z-closeout/11-manual-bootstrap-handoff-check.json`.
+- [x] Existing bootstrap metadata persistence, expiry startup ordering, and Telegram bridge subscription behavior remain intact under focused regressions. Evidence: `orchestrator/tests/ControlServerBootstrapLifecycle.test.ts`, `out/1079-coordinator-symphony-aligned-telegram-bridge-bootstrap-handoff-extraction/manual/20260309T054759Z-closeout/05b-targeted-tests.log`.
 
 ## Validation + Closeout
 
-- [ ] `node scripts/delegation-guard.mjs`. Evidence: `out/1079-coordinator-symphony-aligned-telegram-bridge-bootstrap-handoff-extraction/manual/<timestamp>-closeout/01-delegation-guard.log`, `.runs/1079-coordinator-symphony-aligned-telegram-bridge-bootstrap-handoff-extraction-guard/cli/<timestamp>/manifest.json`.
-- [ ] `node scripts/spec-guard.mjs --dry-run`. Evidence: `out/1079-coordinator-symphony-aligned-telegram-bridge-bootstrap-handoff-extraction/manual/<timestamp>-closeout/02-spec-guard.log`.
-- [ ] `npm run build`. Evidence: `out/1079-coordinator-symphony-aligned-telegram-bridge-bootstrap-handoff-extraction/manual/<timestamp>-closeout/03-build.log`.
-- [ ] `npm run lint`. Evidence: `out/1079-coordinator-symphony-aligned-telegram-bridge-bootstrap-handoff-extraction/manual/<timestamp>-closeout/04-lint.log`.
-- [ ] `npm run test`. Evidence: `out/1079-coordinator-symphony-aligned-telegram-bridge-bootstrap-handoff-extraction/manual/<timestamp>-closeout/05-test.log`, `out/1079-coordinator-symphony-aligned-telegram-bridge-bootstrap-handoff-extraction/manual/<timestamp>-closeout/05b-targeted-tests.log`.
-- [ ] `npm run docs:check`. Evidence: `out/1079-coordinator-symphony-aligned-telegram-bridge-bootstrap-handoff-extraction/manual/<timestamp>-closeout/06-docs-check.log`.
-- [ ] `npm run docs:freshness`. Evidence: `out/1079-coordinator-symphony-aligned-telegram-bridge-bootstrap-handoff-extraction/manual/<timestamp>-closeout/07-docs-freshness.log`.
-- [ ] `node scripts/diff-budget.mjs`. Evidence: `out/1079-coordinator-symphony-aligned-telegram-bridge-bootstrap-handoff-extraction/manual/<timestamp>-closeout/08-diff-budget.log`.
-- [ ] `npm run review`. Evidence: `out/1079-coordinator-symphony-aligned-telegram-bridge-bootstrap-handoff-extraction/manual/<timestamp>-closeout/09-review.log`.
-- [ ] `npm run pack:smoke`. Evidence: `out/1079-coordinator-symphony-aligned-telegram-bridge-bootstrap-handoff-extraction/manual/<timestamp>-closeout/10-pack-smoke.log`.
-- [ ] Manual/mock bootstrap handoff evidence captured. Evidence: `out/1079-coordinator-symphony-aligned-telegram-bridge-bootstrap-handoff-extraction/manual/<timestamp>-closeout/11-manual-bootstrap-handoff-check.json`.
-- [ ] Elegance review completed. Evidence: `out/1079-coordinator-symphony-aligned-telegram-bridge-bootstrap-handoff-extraction/manual/<timestamp>-closeout/12-elegance-review.md`.
+- [x] `node scripts/delegation-guard.mjs`. Evidence: `out/1079-coordinator-symphony-aligned-telegram-bridge-bootstrap-handoff-extraction/manual/20260309T054759Z-closeout/01-delegation-guard.log`, `.runs/1079-coordinator-symphony-aligned-telegram-bridge-bootstrap-handoff-extraction-guard/cli/2026-03-09T05-49-00-142Z-5cb4b07c/manifest.json`.
+- [x] `node scripts/spec-guard.mjs --dry-run`. Evidence: `out/1079-coordinator-symphony-aligned-telegram-bridge-bootstrap-handoff-extraction/manual/20260309T054759Z-closeout/02-spec-guard.log`.
+- [x] `npm run build`. Evidence: `out/1079-coordinator-symphony-aligned-telegram-bridge-bootstrap-handoff-extraction/manual/20260309T054759Z-closeout/03-build.log`.
+- [x] `npm run lint`. Evidence: `out/1079-coordinator-symphony-aligned-telegram-bridge-bootstrap-handoff-extraction/manual/20260309T054759Z-closeout/04-lint.log`.
+- [x] `npm run test`. Evidence: `out/1079-coordinator-symphony-aligned-telegram-bridge-bootstrap-handoff-extraction/manual/20260309T054759Z-closeout/05-test.log`, `out/1079-coordinator-symphony-aligned-telegram-bridge-bootstrap-handoff-extraction/manual/20260309T054759Z-closeout/05b-targeted-tests.log`.
+- [x] `npm run docs:check`. Evidence: `out/1079-coordinator-symphony-aligned-telegram-bridge-bootstrap-handoff-extraction/manual/20260309T054759Z-closeout/06-docs-check.log`.
+- [x] `npm run docs:freshness`. Evidence: `out/1079-coordinator-symphony-aligned-telegram-bridge-bootstrap-handoff-extraction/manual/20260309T054759Z-closeout/07-docs-freshness.log`.
+- [x] `node scripts/diff-budget.mjs`. Evidence: `out/1079-coordinator-symphony-aligned-telegram-bridge-bootstrap-handoff-extraction/manual/20260309T054759Z-closeout/08-diff-budget.log`.
+- [x] `npm run review`. Evidence: `out/1079-coordinator-symphony-aligned-telegram-bridge-bootstrap-handoff-extraction/manual/20260309T054759Z-closeout/09-review.log`, `out/1079-coordinator-symphony-aligned-telegram-bridge-bootstrap-handoff-extraction/manual/20260309T054759Z-closeout/13-override-notes.md`.
+- [x] `npm run pack:smoke`. Evidence: `out/1079-coordinator-symphony-aligned-telegram-bridge-bootstrap-handoff-extraction/manual/20260309T054759Z-closeout/10-pack-smoke.log`.
+- [x] Manual/mock bootstrap handoff evidence captured. Evidence: `out/1079-coordinator-symphony-aligned-telegram-bridge-bootstrap-handoff-extraction/manual/20260309T054759Z-closeout/11-manual-bootstrap-handoff-check.json`.
+- [x] Elegance review completed. Evidence: `out/1079-coordinator-symphony-aligned-telegram-bridge-bootstrap-handoff-extraction/manual/20260309T054759Z-closeout/12-elegance-review.md`.
