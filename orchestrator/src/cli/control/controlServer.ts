@@ -37,7 +37,6 @@ import {
 } from './controlEventTransport.js';
 import {
   buildControlPresenterRuntimeContext,
-  buildControlRequestContext,
   type ControlRequestContext,
   type ControlRequestPersist,
   type ControlSessionTokens,
@@ -48,6 +47,7 @@ import {
   createControlServerSeededRuntimeAssembly,
   LINEAR_ADVISORY_STATE_FILE
 } from './controlServerSeededRuntimeAssembly.js';
+import { createControlServerRequestShell } from './controlServerRequestShell.js';
 
 interface ControlServerOptions {
   paths: RunPaths;
@@ -165,24 +165,15 @@ export class ControlServer {
     });
 
     let instance: ControlServer | null = null;
-    const server = http.createServer((req, res) => {
-      if (!instance) {
-        res.writeHead(503, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: 'control_server_unavailable' }));
-        return;
-      }
-      handleRequest(
-        buildControlRequestContext({
-          ...instance.requestContextShared,
-          req,
-          res,
-          expiryLifecycle: instance.expiryLifecycle
-        })
-      ).catch((error) => {
-        const status = error instanceof HttpError ? error.status : 500;
-        res.writeHead(status, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: (error as Error)?.message ?? String(error) }));
-      });
+    const server = createControlServerRequestShell({
+      readRuntime: () =>
+        instance
+          ? {
+              requestContextShared: instance.requestContextShared,
+              expiryLifecycle: instance.expiryLifecycle
+            }
+          : null,
+      handleRequest
     });
 
     instance = new ControlServer({

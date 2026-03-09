@@ -1,7 +1,7 @@
 ---
 id: 20260309-1085-coordinator-symphony-aligned-control-server-request-shell-extraction
 title: Coordinator Symphony-Aligned Control Server Request Shell Extraction
-status: active
+status: completed
 owners:
   - Codex
 created: 2026-03-09
@@ -37,3 +37,4 @@ Extract the inline `http.createServer(...)` request shell from `ControlServer.st
 ## Notes
 
 - 2026-03-09: Approved for docs-first registration as the next bounded Symphony-aligned slice after `1084`. Evidence: `out/1084-coordinator-symphony-aligned-control-server-seeded-runtime-assembly-extraction/manual/20260309T102726Z-closeout/14-next-slice-note.md`, `docs/findings/1085-control-server-request-shell-extraction-deliberation.md`.
+- 2026-03-09: Completed. `ControlServer.start()` now delegates HTTP server creation, pre-instance `503` handling, live request-context assembly, and top-level request error mapping through `orchestrator/src/cli/control/controlServerRequestShell.ts`; focused request-shell regressions passed `2/2` files and `6/6` tests, the full local suite passed `178/178` files and `1205/1205` tests, the manifest-backed `1085-...-scout` diagnostics sub-run succeeded, pack-smoke passed on the final tree, and the only explicit non-green item is the standalone review wrapper override after it re-inspected incomplete closeout mirrors instead of returning a bounded code verdict. Evidence: `out/1085-coordinator-symphony-aligned-control-server-request-shell-extraction/manual/20260309T110955Z-closeout/00-summary.md`, `out/1085-coordinator-symphony-aligned-control-server-request-shell-extraction/manual/20260309T110955Z-closeout/05b-targeted-tests.log`, `out/1085-coordinator-symphony-aligned-control-server-request-shell-extraction/manual/20260309T110955Z-closeout/11-manual-request-shell-check.json`, `out/1085-coordinator-symphony-aligned-control-server-request-shell-extraction/manual/20260309T110955Z-closeout/12-elegance-review.md`, `out/1085-coordinator-symphony-aligned-control-server-request-shell-extraction/manual/20260309T110955Z-closeout/13-override-notes.md`, `.runs/1085-coordinator-symphony-aligned-control-server-request-shell-extraction-scout/cli/2026-03-09T11-13-15-122Z-5932cd9d/manifest.json`.

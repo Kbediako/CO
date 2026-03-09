@@ -175,6 +175,29 @@ describe('ControlServer', () => {
     expect(isLoopbackAddress('192.168.0.1')).toBe(false);
   });
 
+  it('serves /health through the control-server request shell', async () => {
+    const { root, env, paths } = await createRunRoot('task-1085');
+    const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
+
+    const server = await ControlServer.start({
+      paths,
+      config,
+      runId: 'run-1'
+    });
+
+    try {
+      const baseUrl = server.getBaseUrl() ?? '';
+      const res = await fetch(new URL('/health', baseUrl));
+      expect(res.status).toBe(200);
+      const payload = (await res.json()) as { status?: string; timestamp?: string };
+      expect(payload.status).toBe('ok');
+      expect(payload.timestamp).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+    } finally {
+      await server.close();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   it('issues session tokens via POST with no-store', async () => {
     const { root, env, paths } = await createRunRoot('task-0940');
     const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
@@ -2026,6 +2049,37 @@ describe('ControlServer', () => {
         status_reason: 'control_pause',
         summary: 'task is running'
       });
+    } finally {
+      await server.close();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('preserves invalid_json 400 responses through the control-server request shell', async () => {
+    const { root, env, paths } = await createRunRoot('task-1085');
+    const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
+
+    const server = await ControlServer.start({
+      paths,
+      config,
+      runId: 'run-1'
+    });
+
+    try {
+      const baseUrl = server.getBaseUrl() ?? '';
+      const token = await readToken(paths.controlAuthPath);
+      const res = await fetch(new URL('/control/action', baseUrl), {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'x-csrf-token': token,
+          'Content-Type': 'application/json'
+        },
+        body: '{"action":'
+      });
+      expect(res.status).toBe(400);
+      const payload = (await res.json()) as { error?: string };
+      expect(payload.error).toBe('invalid_json');
     } finally {
       await server.close();
       await rm(root, { recursive: true, force: true });
