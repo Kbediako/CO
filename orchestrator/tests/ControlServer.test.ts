@@ -6979,6 +6979,303 @@ describe('ControlServer', () => {
     }
   });
 
+  it('emits a fallback audit event when child resolution fails for answered questions', async () => {
+    const { root, env, paths } = await createRunRoot('parent-task');
+    const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
+    const events: import('../src/cli/events/runEventStream.js').RunEventStreamEntry[] = [];
+    let resolveFallbackEvent:
+      | ((value: import('../src/cli/events/runEventStream.js').RunEventStreamEntry) => void)
+      | null = null;
+    const fallbackEventPromise = new Promise<
+      import('../src/cli/events/runEventStream.js').RunEventStreamEntry
+    >((resolve) => {
+      resolveFallbackEvent = resolve;
+    });
+    const eventStream = {
+      append: async (entry: { event: string; actor: string; payload: Record<string, unknown> }) => {
+        const record = {
+          schema_version: 1,
+          seq: events.length + 1,
+          timestamp: new Date().toISOString(),
+          task_id: 'parent-task',
+          run_id: 'parent-run',
+          event: entry.event,
+          actor: entry.actor,
+          payload: entry.payload
+        };
+        events.push(record);
+        if (record.event === 'question.resolve_child_fallback') {
+          resolveFallbackEvent?.(record);
+        }
+        return record;
+      },
+      close: async () => undefined
+    } as unknown as import('../src/cli/events/runEventStream.js').RunEventStream;
+
+    const childRunDir = join(root, '.runs', 'child-task', 'cli', 'child-run');
+    await mkdir(childRunDir, { recursive: true });
+    const childManifestPath = join(childRunDir, 'manifest.json');
+    await writeFile(childManifestPath, JSON.stringify({ run_id: 'child-run' }), 'utf8');
+    const childTokenPath = join(childRunDir, 'control_auth.json');
+    await writeFile(childTokenPath, JSON.stringify({ token: 'child-token' }), 'utf8');
+    await writeFile(
+      join(childRunDir, 'control.json'),
+      JSON.stringify({
+        run_id: 'child-run',
+        control_seq: 1,
+        latest_action: {
+          request_id: null,
+          requested_by: 'delegate',
+          requested_at: new Date().toISOString(),
+          action: 'pause',
+          reason: 'awaiting_question_answer'
+        },
+        feature_toggles: {}
+      }),
+      'utf8'
+    );
+
+    const childServer = http.createServer((req, res) => {
+      if (req.url === '/control/action' && req.method === 'POST') {
+        res.writeHead(500, { 'Content-Type': 'text/plain' });
+        res.end('nope');
+        return;
+      }
+      res.writeHead(404);
+      res.end();
+    });
+    await new Promise<void>((resolve) => childServer.listen(0, '127.0.0.1', resolve));
+    const childAddress = childServer.address();
+    const childPort = typeof childAddress === 'string' || !childAddress ? 0 : childAddress.port;
+    const childBaseUrl = `http://127.0.0.1:${childPort}`;
+    await writeFile(
+      join(childRunDir, 'control_endpoint.json'),
+      JSON.stringify({
+        base_url: childBaseUrl,
+        token_path: childTokenPath
+      }),
+      'utf8'
+    );
+
+    const queuedAt = new Date(Date.now() - 120_000).toISOString();
+    const answeredAt = new Date(Date.now() - 60_000).toISOString();
+    await writeFile(
+      paths.questionsPath,
+      JSON.stringify({
+        questions: [
+          {
+            question_id: 'q-0001',
+            parent_run_id: 'parent-run',
+            from_run_id: 'child-run',
+            from_manifest_path: childManifestPath,
+            prompt: 'Need approval',
+            urgency: 'high',
+            status: 'answered',
+            queued_at: queuedAt,
+            answer: 'Approved',
+            answered_by: 'ui',
+            answered_at: answeredAt,
+            closed_at: answeredAt,
+            auto_pause: true
+          }
+        ]
+      }),
+      'utf8'
+    );
+
+    const parentServer = await ControlServer.start({
+      paths,
+      config,
+      eventStream,
+      runId: 'parent-run'
+    });
+
+    try {
+      const parentToken = await readToken(paths.controlAuthPath);
+      const baseUrl = parentServer.getBaseUrl() ?? '';
+
+      await fetch(new URL('/questions', baseUrl), {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${parentToken}`
+        }
+      });
+
+      const fallbackEvent = await Promise.race([
+        fallbackEventPromise,
+        new Promise<import('../src/cli/events/runEventStream.js').RunEventStreamEntry>(
+          (_, reject) => setTimeout(() => reject(new Error('timed out waiting for fallback event')), 2000)
+        )
+      ]);
+
+      expect(fallbackEvent.actor).toBe('control');
+      expect(fallbackEvent.payload).toEqual({
+        question_id: 'q-0001',
+        outcome: 'answered',
+        action: 'resume',
+        reason: 'question_answered',
+        non_fatal: true,
+        error: 'child control error: 500 nope'
+      });
+    } finally {
+      await new Promise<void>((resolve) => childServer.close(() => resolve()));
+      await parentServer.close();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('emits a fallback audit event when child resolution fails for expired questions', async () => {
+    const { root, env, paths } = await createRunRoot('parent-task');
+    const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
+    const events: import('../src/cli/events/runEventStream.js').RunEventStreamEntry[] = [];
+    let resolveFallbackEvent:
+      | ((value: import('../src/cli/events/runEventStream.js').RunEventStreamEntry) => void)
+      | null = null;
+    const fallbackEventPromise = new Promise<
+      import('../src/cli/events/runEventStream.js').RunEventStreamEntry
+    >((resolve) => {
+      resolveFallbackEvent = resolve;
+    });
+    const eventStream = {
+      append: async (entry: { event: string; actor: string; payload: Record<string, unknown> }) => {
+        const record = {
+          schema_version: 1,
+          seq: events.length + 1,
+          timestamp: new Date().toISOString(),
+          task_id: 'parent-task',
+          run_id: 'parent-run',
+          event: entry.event,
+          actor: entry.actor,
+          payload: entry.payload
+        };
+        events.push(record);
+        if (record.event === 'question.resolve_child_fallback') {
+          resolveFallbackEvent?.(record);
+        }
+        return record;
+      },
+      close: async () => undefined
+    } as unknown as import('../src/cli/events/runEventStream.js').RunEventStream;
+
+    const childRunDir = join(root, '.runs', 'child-task', 'cli', 'child-run');
+    await mkdir(childRunDir, { recursive: true });
+    const childManifestPath = join(childRunDir, 'manifest.json');
+    await writeFile(childManifestPath, JSON.stringify({ run_id: 'child-run' }), 'utf8');
+    const childTokenPath = join(childRunDir, 'control_auth.json');
+    await writeFile(childTokenPath, JSON.stringify({ token: 'child-token' }), 'utf8');
+    await writeFile(
+      join(childRunDir, 'control.json'),
+      JSON.stringify({
+        run_id: 'child-run',
+        control_seq: 1,
+        latest_action: {
+          request_id: null,
+          requested_by: 'delegate',
+          requested_at: new Date().toISOString(),
+          action: 'pause',
+          reason: 'awaiting_question_answer'
+        },
+        feature_toggles: {}
+      }),
+      'utf8'
+    );
+
+    const childServer = http.createServer((req, res) => {
+      if (req.url === '/control/action' && req.method === 'POST') {
+        res.writeHead(500, { 'Content-Type': 'text/plain' });
+        res.end('nope');
+        return;
+      }
+      res.writeHead(404);
+      res.end();
+    });
+    await new Promise<void>((resolve) => childServer.listen(0, '127.0.0.1', resolve));
+    const childAddress = childServer.address();
+    const childPort = typeof childAddress === 'string' || !childAddress ? 0 : childAddress.port;
+    const childBaseUrl = `http://127.0.0.1:${childPort}`;
+    await writeFile(
+      join(childRunDir, 'control_endpoint.json'),
+      JSON.stringify({
+        base_url: childBaseUrl,
+        token_path: childTokenPath
+      }),
+      'utf8'
+    );
+
+    const expiredAt = new Date(Date.now() - 60_000).toISOString();
+    const queuedAt = new Date(Date.now() - 120_000).toISOString();
+    await writeFile(
+      paths.questionsPath,
+      JSON.stringify({
+        questions: [
+          {
+            question_id: 'q-0001',
+            parent_run_id: 'parent-run',
+            from_run_id: 'child-run',
+            from_manifest_path: childManifestPath,
+            prompt: 'Approval needed',
+            urgency: 'high',
+            status: 'queued',
+            queued_at: queuedAt,
+            expires_at: expiredAt,
+            expires_in_ms: 1000,
+            auto_pause: true,
+            expiry_fallback: 'pause'
+          }
+        ]
+      }),
+      'utf8'
+    );
+
+    const parentServer = await ControlServer.start({
+      paths,
+      config,
+      eventStream,
+      runId: 'parent-run'
+    });
+
+    try {
+      const parentToken = await readToken(paths.controlAuthPath);
+      const baseUrl = parentServer.getBaseUrl() ?? '';
+
+      await fetch(new URL('/questions', baseUrl), {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${parentToken}`
+        }
+      });
+
+      const fallbackEvent = await Promise.race([
+        fallbackEventPromise,
+        new Promise<import('../src/cli/events/runEventStream.js').RunEventStreamEntry>(
+          (_, reject) => setTimeout(() => reject(new Error('timed out waiting for fallback event')), 2000)
+        )
+      ]);
+
+      expect(fallbackEvent.actor).toBe('control');
+      expect(fallbackEvent.payload).toEqual({
+        question_id: 'q-0001',
+        outcome: 'expired',
+        action: 'pause',
+        reason: 'question_expired',
+        non_fatal: true,
+        error: 'child control error: 500 nope'
+      });
+      expect(
+        events.find(
+          (entry) =>
+            entry.event === 'question_closed' &&
+            (entry.payload as { question_id?: string; outcome?: string }).question_id === 'q-0001' &&
+            (entry.payload as { outcome?: string }).outcome === 'expired'
+        )
+      ).toBeDefined();
+    } finally {
+      await new Promise<void>((resolve) => childServer.close(() => resolve()));
+      await parentServer.close();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   it('does not resume child runs when pause reason is unrelated', async () => {
     const { root, env, paths } = await createRunRoot('parent-task');
     const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });

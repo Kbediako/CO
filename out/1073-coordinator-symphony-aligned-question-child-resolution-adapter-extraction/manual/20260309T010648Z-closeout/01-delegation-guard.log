@@ -1,0 +1,2 @@
+Delegation guard override active.
+Reason: 1073 used bounded gpt-5.4 native subagent seam reviews outside manifest-backed codex-orchestrator child-run artifacts to keep the lane local and preserve review signal.

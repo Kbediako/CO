@@ -1,0 +1,15 @@
+{
+  "task_id": "1073-coordinator-symphony-aligned-question-child-resolution-adapter-extraction",
+  "checked_at": "2026-03-09T01:06:48Z",
+  "control_server_direct_calls_extracted_adapter": true,
+  "control_local_module_created": true,
+  "fallback_event_transport_owned_by_extracted_seam": true,
+  "answered_fallback_route_coverage": true,
+  "expired_fallback_route_coverage": true,
+  "targeted_regressions": {
+    "files": 3,
+    "tests": 98,
+    "log": "out/1073-coordinator-symphony-aligned-question-child-resolution-adapter-extraction/manual/20260309T010648Z-closeout/05b-targeted-tests.log"
+  },
+  "review_result": "no_diff_local_findings"
+}

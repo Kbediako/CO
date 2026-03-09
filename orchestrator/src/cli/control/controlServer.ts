@@ -40,10 +40,6 @@ import {
   type LinearWebhookAuditEventInput
 } from './linearWebhookController.js';
 import {
-  createQuestionChildResolutionAdapter,
-  type QuestionChildResolutionFallbackEvent
-} from './questionChildResolutionAdapter.js';
-import {
   createControlExpiryLifecycle,
   type ControlExpiryLifecycle
 } from './controlExpiryLifecycle.js';
@@ -63,6 +59,7 @@ import {
   type ControlRequestPersist,
   type ControlRequestSharedContext
 } from './controlRequestContext.js';
+import { createControlQuestionChildResolutionAdapter } from './controlQuestionChildResolution.js';
 
 interface ControlServerOptions {
   paths: RunPaths;
@@ -302,7 +299,7 @@ export class ControlServer {
       runtime: controlRuntime,
       emitControlEvent: (input) => instance.eventTransport.emitControlEvent(input),
       createQuestionChildResolutionAdapter: () =>
-        createRequestQuestionChildResolutionAdapter(
+        createControlQuestionChildResolutionAdapter(
           buildControlInternalContext({
             ...instance.requestContextShared,
             expiryLifecycle: instance.expiryLifecycle
@@ -404,7 +401,7 @@ export class ControlServer {
           ...this.requestContextShared,
           expiryLifecycle: this.expiryLifecycle
         });
-        const questionChildResolutionAdapter = createRequestQuestionChildResolutionAdapter(context);
+        const questionChildResolutionAdapter = createControlQuestionChildResolutionAdapter(context);
         await (this.expiryLifecycle?.expireQuestions(questionChildResolutionAdapter) ?? Promise.resolve());
         const questions = context.questionQueue.list();
         questionChildResolutionAdapter.queueQuestionResolutions(questions);
@@ -477,7 +474,7 @@ async function handleRequest(context: ControlRequestContext): Promise<void> {
     return;
   }
 
-  const questionChildResolutionAdapter = createRequestQuestionChildResolutionAdapter(context);
+  const questionChildResolutionAdapter = createControlQuestionChildResolutionAdapter(context);
   const handled = await handleAuthenticatedRouteRequest({
     pathname: url.pathname,
     method: req.method,
@@ -830,27 +827,4 @@ function resolveUiContentType(assetPath: string): string {
     return 'image/svg+xml';
   }
   return 'application/octet-stream';
-}
-
-function createRequestQuestionChildResolutionAdapter(context: ControlRequestContext) {
-  return createQuestionChildResolutionAdapter({
-    allowedRunRoots: context.config.ui.allowedRunRoots,
-    allowedBindHosts: context.config.ui.allowedBindHosts,
-    expiryFallback: context.config.delegate.expiryFallback,
-    readParentRunId: () => context.controlStore.snapshot().run_id,
-    validateDelegationToken: (token, parentRunId, childRunId) =>
-      Boolean(context.delegationTokens.validate(token, parentRunId, childRunId)),
-    emitResolutionFallback: (payload) => emitQuestionChildResolutionFallbackEvent(context, payload)
-  });
-}
-
-async function emitQuestionChildResolutionFallbackEvent(
-  context: ControlRequestContext,
-  payload: QuestionChildResolutionFallbackEvent
-): Promise<void> {
-  await context.eventTransport.emitControlEvent({
-    event: 'question.resolve_child_fallback',
-    actor: 'control',
-    payload: payload as unknown as Record<string, unknown>
-  });
 }
