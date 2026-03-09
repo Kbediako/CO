@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260309-1075-coordinator-symphony-aligned-shared-question-read-sequencing-extraction",
+      "title": "Coordinator Symphony-Aligned Shared Question-Read Sequencing Extraction",
+      "relates_to": "tasks/tasks-1075-coordinator-symphony-aligned-shared-question-read-sequencing-extraction.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-09",
+      "paths": {
+        "spec": "tasks/specs/1075-coordinator-symphony-aligned-shared-question-read-sequencing-extraction.md",
+        "task": "tasks/tasks-1075-coordinator-symphony-aligned-shared-question-read-sequencing-extraction.md",
+        "agent_task": ".agent/task/1075-coordinator-symphony-aligned-shared-question-read-sequencing-extraction.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-shared-question-read-sequencing-extraction.md"
+      }
+    },
+    {
       "id": "20260309-1074-coordinator-symphony-aligned-question-read-retry-deduplication",
       "title": "Coordinator Symphony-Aligned Question-Read Retry Deduplication",
       "relates_to": "tasks/tasks-1074-coordinator-symphony-aligned-question-read-retry-deduplication.md",
