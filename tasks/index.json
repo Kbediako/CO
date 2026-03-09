@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260309-1082-coordinator-symphony-aligned-control-bootstrap-assembly-extraction",
+      "title": "Coordinator Symphony-Aligned Control Bootstrap Assembly Extraction",
+      "relates_to": "tasks/tasks-1082-coordinator-symphony-aligned-control-bootstrap-assembly-extraction.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-09",
+      "paths": {
+        "spec": "tasks/specs/1082-coordinator-symphony-aligned-control-bootstrap-assembly-extraction.md",
+        "task": "tasks/tasks-1082-coordinator-symphony-aligned-control-bootstrap-assembly-extraction.md",
+        "agent_task": ".agent/task/1082-coordinator-symphony-aligned-control-bootstrap-assembly-extraction.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-control-bootstrap-assembly-extraction.md"
+      }
+    },
+    {
       "id": "20260309-1081-coordinator-symphony-aligned-telegram-bridge-lifecycle-ownership-extraction",
       "title": "Coordinator Symphony-Aligned Telegram Bridge Lifecycle Ownership Extraction",
       "relates_to": "tasks/tasks-1081-coordinator-symphony-aligned-telegram-bridge-lifecycle-ownership-extraction.md",
