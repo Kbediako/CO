@@ -16,25 +16,25 @@
 
 - [x] `tasks/index.json`, `docs/TASKS.md`, and `docs/docs-freshness-registry.json` updated. Evidence: `tasks/index.json`, `docs/TASKS.md`, `docs/docs-freshness-registry.json`.
 - [x] Local read-only review approval captured in the spec/checklist notes. Evidence: `tasks/specs/1080-coordinator-symphony-aligned-bootstrap-metadata-persistence-extraction.md`, `docs/findings/1080-bootstrap-metadata-persistence-extraction-deliberation.md`.
-- [ ] docs-review approval/override captured for registered `1080`. Evidence: `out/1080-coordinator-symphony-aligned-bootstrap-metadata-persistence-extraction/manual/<timestamp>-docs-first/00-summary.md`, `out/1080-coordinator-symphony-aligned-bootstrap-metadata-persistence-extraction/manual/<timestamp>-docs-first/05-docs-review-override.md`.
+- [x] docs-review approval/override captured for registered `1080`. Evidence: `out/1080-coordinator-symphony-aligned-bootstrap-metadata-persistence-extraction/manual/20260309T060941Z-docs-first/00-summary.md`, `out/1080-coordinator-symphony-aligned-bootstrap-metadata-persistence-extraction/manual/20260309T060941Z-docs-first/05-docs-review-override.md`.
 
 ## Bootstrap Metadata Persistence
 
-- [ ] Bootstrap metadata persistence extracted behind one bounded helper. Evidence: extracted control-local persistence helper, `orchestrator/tests/ControlServerBootstrapLifecycle.test.ts`.
-- [ ] `controlServerBootstrapLifecycle.ts` delegates the metadata persistence phase to the extracted helper while preserving lifecycle startup ownership. Evidence: `orchestrator/src/cli/control/controlServerBootstrapLifecycle.ts`, `out/1080-coordinator-symphony-aligned-bootstrap-metadata-persistence-extraction/manual/<timestamp>-closeout/11-manual-bootstrap-persistence-check.json`.
-- [ ] Persisted payloads, chmod hardening, and `persist -> expiry -> bridge` ordering remain intact under focused regressions. Evidence: `orchestrator/tests/ControlServerBootstrapLifecycle.test.ts`, `out/1080-coordinator-symphony-aligned-bootstrap-metadata-persistence-extraction/manual/<timestamp>-closeout/05b-targeted-tests.log`.
+- [x] Bootstrap metadata persistence extracted behind one bounded helper. Evidence: `orchestrator/src/cli/control/controlBootstrapMetadataPersistence.ts`, `orchestrator/tests/ControlServerBootstrapLifecycle.test.ts`.
+- [x] `controlServerBootstrapLifecycle.ts` delegates the metadata persistence phase to the extracted helper while preserving lifecycle startup ownership. Evidence: `orchestrator/src/cli/control/controlServerBootstrapLifecycle.ts`, `out/1080-coordinator-symphony-aligned-bootstrap-metadata-persistence-extraction/manual/20260309T061702Z-closeout/11-manual-bootstrap-persistence-check.json`.
+- [x] Persisted payloads, chmod hardening, and `persist -> expiry -> bridge` ordering remain intact under focused regressions. Evidence: `orchestrator/tests/ControlServerBootstrapLifecycle.test.ts`, `out/1080-coordinator-symphony-aligned-bootstrap-metadata-persistence-extraction/manual/20260309T061702Z-closeout/05b-targeted-tests.log`.
 
 ## Validation + Closeout
 
-- [ ] `node scripts/delegation-guard.mjs`. Evidence: `out/1080-coordinator-symphony-aligned-bootstrap-metadata-persistence-extraction/manual/<timestamp>-closeout/01-delegation-guard.log`, `.runs/1080-coordinator-symphony-aligned-bootstrap-metadata-persistence-extraction-guard/cli/<timestamp>/manifest.json`.
-- [ ] `node scripts/spec-guard.mjs --dry-run`. Evidence: `out/1080-coordinator-symphony-aligned-bootstrap-metadata-persistence-extraction/manual/<timestamp>-closeout/02-spec-guard.log`.
-- [ ] `npm run build`. Evidence: `out/1080-coordinator-symphony-aligned-bootstrap-metadata-persistence-extraction/manual/<timestamp>-closeout/03-build.log`.
-- [ ] `npm run lint`. Evidence: `out/1080-coordinator-symphony-aligned-bootstrap-metadata-persistence-extraction/manual/<timestamp>-closeout/04-lint.log`.
-- [ ] `npm run test`. Evidence: `out/1080-coordinator-symphony-aligned-bootstrap-metadata-persistence-extraction/manual/<timestamp>-closeout/05-test.log`, `out/1080-coordinator-symphony-aligned-bootstrap-metadata-persistence-extraction/manual/<timestamp>-closeout/05b-targeted-tests.log`.
-- [ ] `npm run docs:check`. Evidence: `out/1080-coordinator-symphony-aligned-bootstrap-metadata-persistence-extraction/manual/<timestamp>-closeout/06-docs-check.log`.
-- [ ] `npm run docs:freshness`. Evidence: `out/1080-coordinator-symphony-aligned-bootstrap-metadata-persistence-extraction/manual/<timestamp>-closeout/07-docs-freshness.log`.
-- [ ] `node scripts/diff-budget.mjs`. Evidence: `out/1080-coordinator-symphony-aligned-bootstrap-metadata-persistence-extraction/manual/<timestamp>-closeout/08-diff-budget.log`.
-- [ ] `npm run review`. Evidence: `out/1080-coordinator-symphony-aligned-bootstrap-metadata-persistence-extraction/manual/<timestamp>-closeout/09-review.log`.
-- [ ] `npm run pack:smoke`. Evidence: `out/1080-coordinator-symphony-aligned-bootstrap-metadata-persistence-extraction/manual/<timestamp>-closeout/10-pack-smoke.log`.
-- [ ] Manual/mock bootstrap persistence evidence captured. Evidence: `out/1080-coordinator-symphony-aligned-bootstrap-metadata-persistence-extraction/manual/<timestamp>-closeout/11-manual-bootstrap-persistence-check.json`.
-- [ ] Elegance review completed. Evidence: `out/1080-coordinator-symphony-aligned-bootstrap-metadata-persistence-extraction/manual/<timestamp>-closeout/12-elegance-review.md`.
+- [x] `node scripts/delegation-guard.mjs`. Evidence: `out/1080-coordinator-symphony-aligned-bootstrap-metadata-persistence-extraction/manual/20260309T061702Z-closeout/01-delegation-guard.log`, `.runs/1080-coordinator-symphony-aligned-bootstrap-metadata-persistence-extraction-guard/cli/2026-03-09T06-17-18-100Z-f0eaa64a/manifest.json`.
+- [x] `node scripts/spec-guard.mjs --dry-run`. Evidence: `out/1080-coordinator-symphony-aligned-bootstrap-metadata-persistence-extraction/manual/20260309T061702Z-closeout/02-spec-guard.log`.
+- [x] `npm run build`. Evidence: `out/1080-coordinator-symphony-aligned-bootstrap-metadata-persistence-extraction/manual/20260309T061702Z-closeout/03-build.log`.
+- [x] `npm run lint`. Evidence: `out/1080-coordinator-symphony-aligned-bootstrap-metadata-persistence-extraction/manual/20260309T061702Z-closeout/04-lint.log`.
+- [x] `npm run test`. Evidence: `out/1080-coordinator-symphony-aligned-bootstrap-metadata-persistence-extraction/manual/20260309T061702Z-closeout/05-test.log`, `out/1080-coordinator-symphony-aligned-bootstrap-metadata-persistence-extraction/manual/20260309T061702Z-closeout/05b-targeted-tests.log`, `out/1080-coordinator-symphony-aligned-bootstrap-metadata-persistence-extraction/manual/20260309T061702Z-closeout/13-override-notes.md`.
+- [x] `npm run docs:check`. Evidence: `out/1080-coordinator-symphony-aligned-bootstrap-metadata-persistence-extraction/manual/20260309T061702Z-closeout/06-docs-check.log`.
+- [x] `npm run docs:freshness`. Evidence: `out/1080-coordinator-symphony-aligned-bootstrap-metadata-persistence-extraction/manual/20260309T061702Z-closeout/07-docs-freshness.log`.
+- [x] `node scripts/diff-budget.mjs`. Evidence: `out/1080-coordinator-symphony-aligned-bootstrap-metadata-persistence-extraction/manual/20260309T061702Z-closeout/08-diff-budget.log`, `out/1080-coordinator-symphony-aligned-bootstrap-metadata-persistence-extraction/manual/20260309T061702Z-closeout/13-override-notes.md`.
+- [x] `npm run review`. Evidence: `out/1080-coordinator-symphony-aligned-bootstrap-metadata-persistence-extraction/manual/20260309T061702Z-closeout/09-review.log`.
+- [x] `npm run pack:smoke`. Evidence: `out/1080-coordinator-symphony-aligned-bootstrap-metadata-persistence-extraction/manual/20260309T061702Z-closeout/10-pack-smoke.log`.
+- [x] Manual/mock bootstrap persistence evidence captured. Evidence: `out/1080-coordinator-symphony-aligned-bootstrap-metadata-persistence-extraction/manual/20260309T061702Z-closeout/11-manual-bootstrap-persistence-check.json`.
+- [x] Elegance review completed. Evidence: `out/1080-coordinator-symphony-aligned-bootstrap-metadata-persistence-extraction/manual/20260309T061702Z-closeout/12-elegance-review.md`.

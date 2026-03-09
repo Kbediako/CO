@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -40,17 +40,27 @@ describe('createControlServerBootstrapLifecycle', () => {
     const order: string[] = [];
     const startTelegramBridgeImpl = vi.fn(async () => {
       order.push('startBridge');
-      const authPayload = JSON.parse(await readFile(paths.controlAuthPath, 'utf8')) as { token?: string };
+      const authPayload = JSON.parse(await readFile(paths.controlAuthPath, 'utf8')) as {
+        token?: string;
+        created_at?: string;
+      };
       const endpointPayload = JSON.parse(await readFile(paths.controlEndpointPath, 'utf8')) as {
         base_url?: string;
         token_path?: string;
       };
       const controlPayload = JSON.parse(await readFile(controlPath, 'utf8')) as { control_seq?: number };
       expect(authPayload.token).toBe('token-1');
+      expect(typeof authPayload.created_at).toBe('string');
       expect(endpointPayload).toEqual({
         base_url: 'http://127.0.0.1:4321',
         token_path: paths.controlAuthPath
       });
+      if (process.platform !== 'win32') {
+        const authStats = await stat(paths.controlAuthPath);
+        const endpointStats = await stat(paths.controlEndpointPath);
+        expect(authStats.mode & 0o777).toBe(0o600);
+        expect(endpointStats.mode & 0o777).toBe(0o600);
+      }
       expect(controlPayload.control_seq).toBe(0);
       return null;
     });

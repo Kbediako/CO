@@ -1,7 +1,7 @@
 ---
 id: 20260309-1080-coordinator-symphony-aligned-bootstrap-metadata-persistence-extraction
 title: Coordinator Symphony-Aligned Bootstrap Metadata Persistence Extraction
-status: draft
+status: completed
 owners:
   - Codex
 created: 2026-03-09
@@ -35,3 +35,4 @@ Extract the bootstrap metadata persistence phase from `controlServerBootstrapLif
 ## Notes
 
 - 2026-03-09: Approved for docs-first registration as the next bounded Symphony-aligned slice after `1079`. Evidence: `out/1079-coordinator-symphony-aligned-telegram-bridge-bootstrap-handoff-extraction/manual/20260309T054759Z-closeout/14-next-slice-note.md`, `docs/findings/1080-bootstrap-metadata-persistence-extraction-deliberation.md`.
+- 2026-03-09: Completed. `controlBootstrapMetadataPersistence.ts` now owns bootstrap auth/endpoint persistence plus best-effort chmod hardening and the initial control snapshot flush, while `controlServerBootstrapLifecycle.ts` remains a thin ordered coordinator. Bounded review returned no diff-local correctness findings; explicit overrides remain limited to the stacked-branch diff budget, an unrelated delegated Telegram oversight temp-state `ENOENT`, and the existing full-suite Vitest quiet-tail after the final test-only Windows-safe follow-up. Evidence: `out/1080-coordinator-symphony-aligned-bootstrap-metadata-persistence-extraction/manual/20260309T061702Z-closeout/00-summary.md`, `out/1080-coordinator-symphony-aligned-bootstrap-metadata-persistence-extraction/manual/20260309T061702Z-closeout/09-review.log`, `out/1080-coordinator-symphony-aligned-bootstrap-metadata-persistence-extraction/manual/20260309T061702Z-closeout/13-override-notes.md`.

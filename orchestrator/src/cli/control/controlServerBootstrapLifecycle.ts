@@ -1,10 +1,7 @@
-import { chmod } from 'node:fs/promises';
-
 import { logger } from '../../logger.js';
 import type { RunPaths } from '../run/runPaths.js';
-import { writeJsonAtomic } from '../utils/fs.js';
-import { isoTimestamp } from '../utils/time.js';
 import type { ControlRuntime } from './controlRuntime.js';
+import { persistControlBootstrapMetadata } from './controlBootstrapMetadataPersistence.js';
 import {
   startTelegramOversightBridge,
   type TelegramOversightBridge,
@@ -57,7 +54,16 @@ class ControlServerBootstrapLifecycleRuntime implements ControlServerBootstrapLi
   }
 
   async start(options: ControlServerBootstrapLifecycleStartOptions): Promise<void> {
-    await this.persistBootstrapMetadata(options.baseUrl, options.controlToken);
+    await persistControlBootstrapMetadata(
+      {
+        paths: this.paths,
+        persistControl: this.persistControl
+      },
+      {
+        baseUrl: options.baseUrl,
+        controlToken: options.controlToken
+      }
+    );
     await this.startExpiryLifecycle();
     await this.startTelegramBridge(options.baseUrl, options.controlToken);
   }
@@ -71,20 +77,6 @@ class ControlServerBootstrapLifecycleRuntime implements ControlServerBootstrapLi
       });
       this.telegramBridge = null;
     }
-  }
-
-  private async persistBootstrapMetadata(baseUrl: string, controlToken: string): Promise<void> {
-    await writeJsonAtomic(this.paths.controlAuthPath, {
-      token: controlToken,
-      created_at: isoTimestamp()
-    });
-    await chmod(this.paths.controlAuthPath, 0o600).catch(() => undefined);
-    await writeJsonAtomic(this.paths.controlEndpointPath, {
-      base_url: baseUrl,
-      token_path: this.paths.controlAuthPath
-    });
-    await chmod(this.paths.controlEndpointPath, 0o600).catch(() => undefined);
-    await this.persistControl();
   }
 
   private async startTelegramBridge(
