@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260309-1089-coordinator-symphony-aligned-control-server-request-body-helper-extraction",
+      "title": "Coordinator Symphony-Aligned Control Server Request Body Helper Extraction",
+      "relates_to": "tasks/tasks-1089-coordinator-symphony-aligned-control-server-request-body-helper-extraction.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-09",
+      "paths": {
+        "spec": "tasks/specs/1089-coordinator-symphony-aligned-control-server-request-body-helper-extraction.md",
+        "task": "tasks/tasks-1089-coordinator-symphony-aligned-control-server-request-body-helper-extraction.md",
+        "agent_task": ".agent/task/1089-coordinator-symphony-aligned-control-server-request-body-helper-extraction.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-control-server-request-body-helper-extraction.md"
+      }
+    },
+    {
       "id": "20260309-1088-coordinator-symphony-aligned-control-server-audit-and-error-helper-extraction",
       "title": "Coordinator Symphony-Aligned Control Server Audit and Error Helper Extraction",
       "relates_to": "tasks/tasks-1088-coordinator-symphony-aligned-control-server-audit-and-error-helper-extraction.md",
