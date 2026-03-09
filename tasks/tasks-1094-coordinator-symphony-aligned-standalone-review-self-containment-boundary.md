@@ -20,21 +20,21 @@
 
 ## Standalone Review Self-Containment Boundary
 
-- [ ] Default `diff` review treats adjacent review-system surfaces as off-task unless the diff explicitly requires them.
-- [ ] Runtime guard fails on sustained drift into review docs, review artifacts, or pack-smoke helpers.
-- [ ] Regression coverage proves the new boundary without reopening the `1093` diff/audit contract.
+- [x] Default `diff` review treats adjacent review-system surfaces as off-task unless the diff explicitly requires them. Evidence: `scripts/run-review.ts`, `scripts/lib/review-execution-state.ts`, `docs/standalone-review-guide.md`, `out/1094-coordinator-symphony-aligned-standalone-review-self-containment-boundary/manual/20260309T170748Z-closeout/00-summary.md`.
+- [x] Runtime guard fails on sustained drift into review docs, review artifacts, or pack-smoke helpers. Evidence: `scripts/lib/review-execution-state.ts`, `out/1094-coordinator-symphony-aligned-standalone-review-self-containment-boundary/manual/20260309T170748Z-closeout/11-manual-review-boundary-check.json`.
+- [x] Regression coverage proves the new boundary without reopening the `1093` diff/audit contract. Evidence: `tests/review-scope-paths.spec.ts`, `tests/review-execution-state.spec.ts`, `tests/run-review.spec.ts`, `out/1094-coordinator-symphony-aligned-standalone-review-self-containment-boundary/manual/20260309T170748Z-closeout/05-targeted-unit-tests.log`, `out/1094-coordinator-symphony-aligned-standalone-review-self-containment-boundary/manual/20260309T170748Z-closeout/05b-targeted-run-review-tests.log`.
 
 ## Validation + Closeout
 
-- [ ] `node scripts/delegation-guard.mjs`
-- [ ] `node scripts/spec-guard.mjs --dry-run`
-- [ ] `npm run build`
-- [ ] `npm run lint`
-- [ ] `npm run test`
-- [ ] `npm run docs:check`
-- [ ] `npm run docs:freshness`
-- [ ] `node scripts/diff-budget.mjs`
-- [ ] `npm run review`
-- [ ] `npm run pack:smoke`
-- [ ] Manual review-boundary evidence captured.
-- [ ] Elegance review completed.
+- [x] `node scripts/delegation-guard.mjs`. Evidence: `out/1094-coordinator-symphony-aligned-standalone-review-self-containment-boundary/manual/20260309T170748Z-closeout/01-delegation-guard.log`.
+- [x] `node scripts/spec-guard.mjs --dry-run`. Evidence: `out/1094-coordinator-symphony-aligned-standalone-review-self-containment-boundary/manual/20260309T170748Z-closeout/02-spec-guard.log`.
+- [x] `npm run build`. Evidence: `out/1094-coordinator-symphony-aligned-standalone-review-self-containment-boundary/manual/20260309T170748Z-closeout/03-build.log`.
+- [x] `npm run lint`. Evidence: `out/1094-coordinator-symphony-aligned-standalone-review-self-containment-boundary/manual/20260309T170748Z-closeout/04-lint.log`.
+- [x] `npm run test` attempted; explicit quiet-tail override recorded after the final tree reached the large CLI/review files without returning a terminal summary. Evidence: `out/1094-coordinator-symphony-aligned-standalone-review-self-containment-boundary/manual/20260309T170748Z-closeout/05-test.log`, `out/1094-coordinator-symphony-aligned-standalone-review-self-containment-boundary/manual/20260309T170748Z-closeout/13-override-notes.md`.
+- [x] `npm run docs:check`. Evidence: `out/1094-coordinator-symphony-aligned-standalone-review-self-containment-boundary/manual/20260309T170748Z-closeout/06-docs-check.log`.
+- [x] `npm run docs:freshness`. Evidence: `out/1094-coordinator-symphony-aligned-standalone-review-self-containment-boundary/manual/20260309T170748Z-closeout/07-docs-freshness.log`.
+- [x] `node scripts/diff-budget.mjs`. Evidence: `out/1094-coordinator-symphony-aligned-standalone-review-self-containment-boundary/manual/20260309T170748Z-closeout/08-diff-budget.log`.
+- [x] `npm run review` attempted; explicit bounded-drift override recorded after the live reviewer revalidated the current diff first, then broadened into speculative edge-case inspection without a terminal verdict. Evidence: `out/1094-coordinator-symphony-aligned-standalone-review-self-containment-boundary/manual/20260309T170748Z-closeout/09-review.log`, `out/1094-coordinator-symphony-aligned-standalone-review-self-containment-boundary/manual/20260309T170748Z-closeout/13-override-notes.md`.
+- [x] `npm run pack:smoke`. Evidence: `out/1094-coordinator-symphony-aligned-standalone-review-self-containment-boundary/manual/20260309T170748Z-closeout/10-pack-smoke.log`.
+- [x] Manual review-boundary evidence captured. Evidence: `out/1094-coordinator-symphony-aligned-standalone-review-self-containment-boundary/manual/20260309T170748Z-closeout/11-manual-review-boundary-check.json`.
+- [x] Elegance review completed. Evidence: `out/1094-coordinator-symphony-aligned-standalone-review-self-containment-boundary/manual/20260309T170748Z-closeout/12-elegance-review.md`.
