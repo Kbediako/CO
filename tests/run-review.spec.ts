@@ -439,6 +439,7 @@ function baseEnv(sandbox: string, codexBin: string): Record<string, string | und
   delete env.CODEX_REVIEW_LOW_SIGNAL_TIMEOUT_SECONDS;
   delete env.CODEX_REVIEW_META_SURFACE_TIMEOUT_SECONDS;
   delete env.CODEX_REVIEW_DEBUG_TELEMETRY;
+  delete env.CODEX_REVIEW_SURFACE;
   delete env.CODEX_REVIEW_LARGE_SCOPE_FILE_THRESHOLD;
   delete env.CODEX_REVIEW_LARGE_SCOPE_LINE_THRESHOLD;
   delete env.CODEX_ORCHESTRATOR_MANIFEST_PATH;
@@ -551,8 +552,13 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(boundedResult.stdout).toContain('bounded review guidance enabled by default');
     const boundedPromptPath = join(dirname(manifestPath), 'review', 'prompt.txt');
     const boundedPrompt = await readFile(boundedPromptPath, 'utf8');
+    expect(boundedPrompt).toContain('Review surface: diff');
+    expect(boundedPrompt).not.toContain('Evidence manifest:');
+    expect(boundedPrompt).not.toContain('Task context:');
+    expect(boundedPrompt).not.toContain('Evidence + checklist mirroring requirements are satisfied');
     expect(boundedPrompt).toContain('Execution constraints (bounded review mode):');
     expect(boundedPrompt).toContain('Avoid full validation suites');
+    expect(boundedPrompt).toContain('Keep this pass diff-focused.');
 
     const heavyManifestPath = await makeManifestForTask(sandbox, 'sample-task', 'sample-run-heavy-commands');
     const heavyResult = await runReviewCommand(heavyManifestPath, {
@@ -565,6 +571,93 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     const heavyPromptPath = join(dirname(heavyManifestPath), 'review', 'prompt.txt');
     const heavyPrompt = await readFile(heavyPromptPath, 'utf8');
     expect(heavyPrompt).not.toContain('Execution constraints (bounded review mode):');
+  });
+
+  it('includes checklist and manifest context only on the explicit audit surface', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    const taskId = 'sample-task';
+    await mkdir(join(sandbox, 'tasks'), { recursive: true });
+    await mkdir(join(sandbox, 'docs'), { recursive: true });
+    await writeFile(
+      join(sandbox, 'tasks', `tasks-${taskId}.md`),
+      [
+        `# Task Checklist - ${taskId}`,
+        '',
+        `- MCP Task ID: \`${taskId}\``,
+        `- Primary PRD: \`docs/PRD-${taskId}.md\``,
+        ''
+      ].join('\n'),
+      'utf8'
+    );
+    await writeFile(
+      join(sandbox, 'docs', `PRD-${taskId}.md`),
+      ['# PRD', '', '## Summary', '', '- audit bullet one', '- audit bullet two', ''].join('\n'),
+      'utf8'
+    );
+    const result = await runReviewCommand(
+      manifestPath,
+      baseEnv(sandbox, codexBin),
+      ['--task', taskId, '--surface', 'audit']
+    );
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain('allowed audit meta surfaces: run-manifest');
+    const promptPath = join(dirname(manifestPath), 'review', 'prompt.txt');
+    const prompt = await readFile(promptPath, 'utf8');
+    expect(prompt).toContain('Review surface: audit');
+    expect(prompt).toContain('Evidence manifest: .runs/sample-task/cli/sample-run/manifest.json');
+    expect(prompt).toContain('Task context:');
+    expect(prompt).toContain('PRD summary (`docs/PRD-sample-task.md`):');
+    expect(prompt).toContain('Evidence + checklist mirroring requirements are satisfied');
+    expect(prompt).toContain(
+      'Keep this review focused on the requested audit surfaces, supporting evidence, and directly related code/docs paths.'
+    );
+    expect(prompt).not.toContain('Keep this review focused on changed files and nearby dependencies.');
+  });
+
+  it('supports CODEX_REVIEW_SURFACE env fallback for audit mode', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    const taskId = 'sample-task';
+    await mkdir(join(sandbox, 'tasks'), { recursive: true });
+    await mkdir(join(sandbox, 'docs'), { recursive: true });
+    await writeFile(
+      join(sandbox, 'tasks', `tasks-${taskId}.md`),
+      [
+        `# Task Checklist - ${taskId}`,
+        '',
+        `- MCP Task ID: \`${taskId}\``,
+        `- Primary PRD: \`docs/PRD-${taskId}.md\``,
+        ''
+      ].join('\n'),
+      'utf8'
+    );
+    await writeFile(
+      join(sandbox, 'docs', `PRD-${taskId}.md`),
+      ['# PRD', '', '## Summary', '', '- env fallback bullet', ''].join('\n'),
+      'utf8'
+    );
+
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      CODEX_REVIEW_SURFACE: 'audit'
+    });
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain('allowed audit meta surfaces: run-manifest');
+    const promptPath = join(dirname(manifestPath), 'review', 'prompt.txt');
+    const prompt = await readFile(promptPath, 'utf8');
+    expect(prompt).toContain('Review surface: audit');
+    expect(prompt).toContain('Evidence manifest: .runs/sample-task/cli/sample-run/manifest.json');
+    expect(prompt).toContain('Task context:');
+    expect(prompt).toContain('PRD summary (`docs/PRD-sample-task.md`):');
+    expect(prompt).toContain(
+      'Keep this review focused on the requested audit surfaces, supporting evidence, and directly related code/docs paths.'
+    );
+    expect(prompt).not.toContain('Keep this review focused on changed files and nearby dependencies.');
   });
 
   it('keeps delegation MCP enabled by default for wrapper review runs', async () => {
@@ -1268,7 +1361,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
       MANIFEST: staleManifestPath,
       CODEX_ORCHESTRATOR_MANIFEST_PATH: activeManifestPath,
       CODEX_ORCHESTRATOR_RUN_DIR: dirname(activeManifestPath)
-    });
+    }, ['--surface', 'audit']);
 
     expect(result.exitCode).toBe(0);
     const activePromptPath = join(dirname(activeManifestPath), 'review', 'prompt.txt');
@@ -1287,7 +1380,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
       ...baseEnv(sandbox, codexBin),
       MCP_RUNNER_TASK_ID: 'sample-task',
       MANIFEST: manifestPath
-    });
+    }, ['--surface', 'audit']);
 
     expect(result.exitCode).toBe(0);
     const promptPath = join(dirname(manifestPath), 'review', 'prompt.txt');
@@ -1304,12 +1397,42 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
       ...baseEnv(sandbox, codexBin),
       MCP_RUNNER_TASK_ID: 'sample-task',
       CODEX_ORCHESTRATOR_RUN_DIR: dirname(activeManifestPath)
-    });
+    }, ['--surface', 'audit']);
 
     expect(result.exitCode).toBe(0);
     const promptPath = join(dirname(activeManifestPath), 'review', 'prompt.txt');
     const prompt = await readFile(promptPath, 'utf8');
     expect(prompt).toContain('Evidence manifest: .runs/sample-task/cli/run-dir-active/manifest.json');
+  });
+
+  it('derives audit task context from the resolved run-dir manifest when task env is absent', async () => {
+    const sandbox = await makeSandbox();
+    const activeManifestPath = await makeManifestForTask(sandbox, 'sample-task', 'run-dir-active');
+    const codexBin = await makeFakeCodex(sandbox);
+    await mkdir(join(sandbox, 'tasks'), { recursive: true });
+    await mkdir(join(sandbox, 'docs'), { recursive: true });
+    await writeFile(
+      join(sandbox, 'tasks', 'tasks-sample-task.md'),
+      ['# Task Checklist - sample-task', '', '- MCP Task ID: `sample-task`', '- Primary PRD: `docs/PRD-sample-task.md`', ''].join('\n'),
+      'utf8'
+    );
+    await writeFile(
+      join(sandbox, 'docs', 'PRD-sample-task.md'),
+      ['# PRD', '', '## Summary', '', '- run-dir context bullet', ''].join('\n'),
+      'utf8'
+    );
+
+    const result = await runReviewCommand(null, {
+      ...baseEnv(sandbox, codexBin),
+      CODEX_ORCHESTRATOR_RUN_DIR: dirname(activeManifestPath)
+    }, ['--surface', 'audit']);
+
+    expect(result.exitCode).toBe(0);
+    const promptPath = join(dirname(activeManifestPath), 'review', 'prompt.txt');
+    const prompt = await readFile(promptPath, 'utf8');
+    expect(prompt).toContain('Review task: sample-task');
+    expect(prompt).toContain('Task context:');
+    expect(prompt).toContain('PRD summary (`docs/PRD-sample-task.md`):');
   });
 
   it('keeps review artifacts aligned with the resolved manifest when CODEX_ORCHESTRATOR_RUN_DIR is stale', async () => {
@@ -1322,7 +1445,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
       MCP_RUNNER_TASK_ID: 'sample-task',
       CODEX_ORCHESTRATOR_MANIFEST_PATH: activeManifestPath,
       CODEX_ORCHESTRATOR_RUN_DIR: dirname(staleRunManifestPath)
-    });
+    }, ['--surface', 'audit']);
 
     expect(result.exitCode).toBe(0);
     const activePromptPath = join(dirname(activeManifestPath), 'review', 'prompt.txt');
@@ -1463,6 +1586,38 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(telemetry.summary.metaSurfaceSignals).toBeGreaterThanOrEqual(4);
     expect(telemetry.summary.distinctMetaSurfaces).toBeGreaterThanOrEqual(3);
     expect(telemetry.summary.maxMetaSurfaceHits).toBeGreaterThanOrEqual(1);
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('keeps the meta-surface guard active for audit mode when unrelated meta surfaces persist', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'meta-surface-expansion',
+      CODEX_REVIEW_META_SURFACE_TIMEOUT_SECONDS: '1',
+      CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0',
+      CODEX_REVIEW_TIMEOUT_SECONDS: '60'
+    }, ['--surface', 'audit']);
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).toContain('meta-surface expansion detected');
+
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      summary: {
+        metaSurfaceSignals: number;
+        distinctMetaSurfaces: number;
+        metaSurfaceKinds: string[];
+      };
+    };
+    expect(telemetry.status).toBe('failed');
+    expect(telemetry.summary.metaSurfaceSignals).toBeGreaterThanOrEqual(4);
+    expect(telemetry.summary.distinctMetaSurfaces).toBeGreaterThanOrEqual(3);
+    expect(telemetry.summary.metaSurfaceKinds).toContain('codex-memories');
+    expect(telemetry.summary.metaSurfaceKinds).toContain('codex-skills');
+    expect(telemetry.summary.metaSurfaceKinds).not.toContain('run-manifest');
   }, LONG_WAIT_TEST_TIMEOUT_MS);
 
   it('fails bounded review when it launches a package-manager validation suite', async () => {

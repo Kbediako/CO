@@ -141,6 +141,7 @@ export interface ReviewExecutionStateOptions {
   commandLimit?: number;
   lowSignalTimeoutMs?: number | null;
   metaSurfaceTimeoutMs?: number | null;
+  allowedMetaSurfaceKinds?: string[];
 }
 
 interface ReviewExecutionTelemetryPayloadOptions {
@@ -193,6 +194,7 @@ export class ReviewExecutionState {
   private readonly commandLimit: number;
   private readonly lowSignalTimeoutMs: number | null;
   private readonly metaSurfaceTimeoutMs: number | null;
+  private readonly allowedMetaSurfaceKinds: Set<string>;
 
   private lastOutputAtMs: number;
   private preview = '';
@@ -243,6 +245,7 @@ export class ReviewExecutionState {
         : configuredMetaSurfaceTimeoutMs === null || configuredMetaSurfaceTimeoutMs <= 0
         ? null
         : configuredMetaSurfaceTimeoutMs;
+    this.allowedMetaSurfaceKinds = new Set(options.allowedMetaSurfaceKinds ?? []);
   }
 
   observeChunk(chunk: Buffer | string, stream: ReviewExecutionStream, nowMs = Date.now()): void {
@@ -556,7 +559,9 @@ export class ReviewExecutionState {
   }
 
   private recordMetaSurfaceSample(sample: string | null): void {
-    this.recentMetaSurfaceSamples.push(sample);
+    const nextSample =
+      sample && this.allowedMetaSurfaceKinds.has(sample) ? null : sample;
+    this.recentMetaSurfaceSamples.push(nextSample);
     while (this.recentMetaSurfaceSamples.length > META_SURFACE_RECENT_SIGNAL_WINDOW) {
       this.recentMetaSurfaceSamples.shift();
     }

@@ -65,7 +65,9 @@ const REVIEW_ENFORCE_BOUNDED_MODE_ENV_KEY = 'CODEX_REVIEW_ENFORCE_BOUNDED_MODE';
 const REVIEW_LOW_SIGNAL_TIMEOUT_ENV_KEY = 'CODEX_REVIEW_LOW_SIGNAL_TIMEOUT_SECONDS';
 const REVIEW_META_SURFACE_TIMEOUT_ENV_KEY = 'CODEX_REVIEW_META_SURFACE_TIMEOUT_SECONDS';
 const REVIEW_TELEMETRY_DEBUG_ENV_KEY = 'CODEX_REVIEW_DEBUG_TELEMETRY';
+const REVIEW_SURFACE_ENV_KEY = 'CODEX_REVIEW_SURFACE';
 const REVIEW_DISABLE_DELEGATION_CONFIG_OVERRIDE = 'mcp_servers.delegation.enabled=false';
+type ReviewSurface = 'diff' | 'audit';
 
 interface CliOptions {
   manifest?: string;
@@ -80,6 +82,7 @@ interface CliOptions {
   autoIssueLog?: boolean;
   enableDelegationMcp?: boolean;
   disableDelegationMcp?: boolean;
+  surface?: ReviewSurface;
   help?: boolean;
 }
 
@@ -225,6 +228,17 @@ function parseRuntimeModeOption(raw: string | boolean, label: string): RuntimeMo
   return parsed;
 }
 
+function parseReviewSurfaceOption(raw: string | boolean, label: string): ReviewSurface {
+  if (typeof raw !== 'string') {
+    throw new Error(`${label} requires a value. Expected one of: diff, audit.`);
+  }
+  const normalized = raw.trim().toLowerCase();
+  if (normalized === 'diff' || normalized === 'audit') {
+    return normalized;
+  }
+  throw new Error(`Invalid ${label} value "${raw}". Expected one of: diff, audit.`);
+}
+
 function inferTaskFromManifestPath(manifestPath: string): string | null {
   const segments = path.normalize(manifestPath).split(path.sep).filter((segment) => segment.length > 0);
   const fileName = segments.at(-1);
@@ -280,6 +294,8 @@ function parseArgs(argv: string[]): CliOptions {
       options.enableDelegationMcp = parseBooleanOptionValue(entry.value, '--enable-delegation-mcp');
     } else if (entry.key === 'disable-delegation-mcp') {
       options.disableDelegationMcp = parseBooleanOptionValue(entry.value, '--disable-delegation-mcp');
+    } else if (entry.key === 'surface') {
+      options.surface = parseReviewSurfaceOption(entry.value, '--surface');
     }
   }
 
@@ -317,6 +333,13 @@ function parseArgs(argv: string[]): CliOptions {
     const taskFromEnv = process.env.MCP_RUNNER_TASK_ID?.trim() || process.env.TASK?.trim();
     if (taskFromEnv) {
       options.task = taskFromEnv;
+    }
+  }
+
+  if (options.surface === undefined) {
+    const fromEnv = process.env[REVIEW_SURFACE_ENV_KEY];
+    if (typeof fromEnv === 'string' && fromEnv.trim().length > 0) {
+      options.surface = parseReviewSurfaceOption(fromEnv, REVIEW_SURFACE_ENV_KEY);
     }
   }
 
@@ -401,21 +424,24 @@ async function main(): Promise<void> {
   const manifestPath = await resolveManifestPath(options);
 
   const relativeManifest = path.relative(repoRoot, manifestPath);
-  const taskLabel = options.task ?? process.env.MCP_RUNNER_TASK_ID ?? process.env.TASK ?? 'unknown-task';
+  const manifestTask = inferTaskFromManifestPath(manifestPath);
+  const envTask = process.env.MCP_RUNNER_TASK_ID ?? process.env.TASK;
+  const taskKey = options.task ?? envTask ?? manifestTask;
+  const taskLabel = taskKey ?? 'unknown-task';
+  const reviewSurface = options.surface ?? 'diff';
   const notes = resolveReviewNotes({
     notes: process.env.NOTES?.trim(),
     taskLabel,
-    relativeManifest
+    surface: reviewSurface
   });
   const diffBudgetOverride = process.env.DIFF_BUDGET_OVERRIDE_REASON?.trim();
+  const promptLines = [`Review task: ${taskLabel}`, `Review surface: ${reviewSurface}`];
 
-  const promptLines = [
-    `Review task: ${taskLabel}`,
-    `Evidence manifest: ${relativeManifest}`,
-  ];
+  if (reviewSurface === 'audit') {
+    promptLines.push(`Evidence manifest: ${relativeManifest}`);
+  }
 
-  const taskKey = options.task ?? process.env.MCP_RUNNER_TASK_ID ?? process.env.TASK;
-  if (taskKey) {
+  if (reviewSurface === 'audit' && taskKey) {
     const contextLines = await buildTaskContext(taskKey);
     if (contextLines.length > 0) {
       promptLines.push('', ...contextLines);
@@ -429,13 +455,24 @@ async function main(): Promise<void> {
   promptLines.push(
     '',
     'Please review the current changes and confirm:',
-    '- The solution is minimal and avoids unnecessary abstraction/scope',
-    '- README/SOP docs match the implemented behavior',
-    '- Commands/scripts are non-interactive (no TTY prompts)',
-    '- Evidence + checklist mirroring requirements are satisfied',
-    '',
-    'Call out any remaining documentation/code mismatches or guardrail violations.'
+    '- The solution is minimal and avoids unnecessary abstraction/scope'
   );
+  if (reviewSurface === 'audit') {
+    promptLines.push(
+      '- README/SOP docs match the implemented behavior',
+      '- Commands/scripts are non-interactive (no TTY prompts)',
+      '- Evidence + checklist mirroring requirements are satisfied',
+      '',
+      'Call out any remaining documentation/code mismatches or guardrail violations.'
+    );
+  } else {
+    promptLines.push(
+      '- Behavior remains correct for changed files and nearby dependencies',
+      '- Call out concrete regressions, risky edge cases, or missing tests in the changed area',
+      '',
+      'Keep this pass diff-focused. Do not audit checklist/docs/evidence surfaces unless they are directly required to assess code correctness.'
+    );
+  }
   const allowHeavyCommands = allowHeavyReviewCommands();
   const enforceBoundedMode = !allowHeavyCommands && enforceBoundedReviewMode();
   if (allowHeavyCommands) {
@@ -451,10 +488,14 @@ async function main(): Promise<void> {
         `[run-review] bounded enforcement enabled (${REVIEW_ENFORCE_BOUNDED_MODE_ENV_KEY}=1); heavy command starts will terminate the review.`
       );
     }
+    const boundedFocusLine =
+      reviewSurface === 'audit'
+        ? '- Keep this review focused on the requested audit surfaces, supporting evidence, and directly related code/docs paths.'
+        : '- Keep this review focused on changed files and nearby dependencies.';
     promptLines.push(
       '',
       'Execution constraints (bounded review mode):',
-      '- Keep this review focused on changed files and nearby dependencies.',
+      boundedFocusLine,
       '- Avoid full validation suites (for example `npm run test`, `npm run lint`, `npm run build`, `npm run docs:check`, `npm run docs:freshness`) during this pass.',
       '- Do not launch direct validation runners (for example `npx vitest`, `npm exec jest`) or nested review/pipeline/delegation flows during this pass.',
       '- If broader validation would improve confidence, list follow-up commands instead of executing them.'
@@ -490,7 +531,7 @@ async function main(): Promise<void> {
     }
   }
 
-  if (diffBudgetOverride) {
+  if (reviewSurface === 'audit' && diffBudgetOverride) {
     promptLines.push('', `Diff budget override: ${diffBudgetOverride}`);
   }
 
@@ -588,6 +629,8 @@ async function main(): Promise<void> {
   }
   const lowSignalTimeoutMs = !allowHeavyCommands ? resolveReviewLowSignalTimeoutMs() : null;
   const metaSurfaceTimeoutMs = !allowHeavyCommands ? resolveReviewMetaSurfaceTimeoutMs() : null;
+  const allowedMetaSurfaceKinds =
+    reviewSurface === 'audit' ? (['run-manifest'] as const) : ([] as const);
   if (!allowHeavyCommands) {
     if (lowSignalTimeoutMs === null) {
       console.log(
@@ -603,6 +646,14 @@ async function main(): Promise<void> {
     if (metaSurfaceTimeoutMs === null) {
       console.log(
         `[run-review] meta-surface expansion guard disabled (${REVIEW_META_SURFACE_TIMEOUT_ENV_KEY}=0).`
+      );
+    } else if (allowedMetaSurfaceKinds.length > 0) {
+      console.log(
+        `[run-review] meta-surface expansion guard enabled after ${formatDurationMs(
+          metaSurfaceTimeoutMs
+        )} of sustained off-task meta activity; allowed audit meta surfaces: ${allowedMetaSurfaceKinds.join(
+          ', '
+        )} (set ${REVIEW_META_SURFACE_TIMEOUT_ENV_KEY}=0 to disable).`
       );
     } else {
       console.log(
@@ -629,6 +680,7 @@ async function main(): Promise<void> {
       monitorIntervalMs,
       lowSignalTimeoutMs,
       metaSurfaceTimeoutMs,
+      allowedMetaSurfaceKinds: [...allowedMetaSurfaceKinds],
       outputLogPath: artifactPaths.outputLogPath
     });
   const writeTelemetry = async (
@@ -1295,6 +1347,7 @@ interface RunCodexReviewOptions {
   monitorIntervalMs: number | null;
   lowSignalTimeoutMs: number | null;
   metaSurfaceTimeoutMs: number | null;
+  allowedMetaSurfaceKinds: string[];
   outputLogPath: string;
 }
 
@@ -1372,7 +1425,8 @@ async function runCodexReview(
     blockHeavyCommands: options.blockHeavyCommands,
     allowValidationCommandIntents: options.allowValidationCommandIntents,
     lowSignalTimeoutMs: options.lowSignalTimeoutMs,
-    metaSurfaceTimeoutMs: options.metaSurfaceTimeoutMs
+    metaSurfaceTimeoutMs: options.metaSurfaceTimeoutMs,
+    allowedMetaSurfaceKinds: options.allowedMetaSurfaceKinds
   });
 
   const capture = (chunk: Buffer, target: NodeJS.WriteStream, stream: 'stdout' | 'stderr') => {
@@ -1999,14 +2053,14 @@ function signalChildProcess(child: ChildProcess, signal: NodeJS.Signals, detache
 function resolveReviewNotes(options: {
   notes: string | undefined;
   taskLabel: string;
-  relativeManifest: string;
+  surface: ReviewSurface;
 }): string {
   if (options.notes) {
     return options.notes;
   }
   const fallback =
     `Goal: standalone review handoff | ` +
-    `Summary: auto-generated NOTES fallback (task=${options.taskLabel}, manifest=${options.relativeManifest}) | ` +
+    `Summary: auto-generated NOTES fallback (task=${options.taskLabel}, surface=${options.surface}) | ` +
     'Risks: missing custom intent details may reduce review precision';
   console.warn(
     '[run-review] NOTES was not provided; using a generated fallback. ' +
@@ -2029,6 +2083,7 @@ Options:
   --base <ref>                   Review diff from base ref.
   --commit <sha>                 Review a single commit.
   --title <title>                Set a custom review title.
+  --surface <diff|audit>         Review surface (default: diff).
   --non-interactive              Force non-interactive Codex review mode.
   --auto-issue-log[=true|false]  Capture issue bundle on failure.
   --enable-delegation-mcp[=true|false]   Enable delegation MCP for this review run.
@@ -2039,6 +2094,7 @@ Environment:
   NOTES (recommended)            Goal/summary/risks context. If omitted, wrapper generates fallback notes.
   MANIFEST                       Alternative manifest path source.
   MCP_RUNNER_TASK_ID / TASK      Task id fallback when --task is omitted.
+  ${REVIEW_SURFACE_ENV_KEY}      Review surface fallback when --surface is omitted.
 `);
 }
 
