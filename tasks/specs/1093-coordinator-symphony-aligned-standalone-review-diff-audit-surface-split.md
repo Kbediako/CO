@@ -1,7 +1,7 @@
 ---
 id: 20260310-1093-coordinator-symphony-aligned-standalone-review-diff-audit-surface-split
 title: Coordinator Symphony-Aligned Standalone Review Diff/Audit Surface Split
-status: active
+status: completed
 owners:
   - Codex
 created: 2026-03-10
@@ -35,3 +35,4 @@ Split standalone review into a default diff-only review surface and an explicit 
 ## Notes
 
 - 2026-03-10: Approved for docs-first registration based on current-file inspection of `scripts/run-review.ts`, `scripts/lib/review-execution-state.ts`, and `tests/run-review.spec.ts`, repeated drift evidence in the `1060`, `1085`, and `1091` closeouts, plus real Symphony reference inspection showing orchestration/control and observability/audit should remain separate surfaces. Evidence: `docs/findings/1093-standalone-review-diff-audit-surface-split-deliberation.md`.
+- 2026-03-10: Completed with final-tree validation (`68/68` targeted, `183/183` files and `1233/1233` tests full suite, docs gates, pack-smoke, and manual prompt-surface captures). The live wrapper pass fixed two concrete audit-surface defects during the lane, but the final rerun still broadened into adjacent review-artifact/run-manifest helper surfaces, so `npm run review` closed with an explicit override. Evidence: `out/1093-coordinator-symphony-aligned-standalone-review-diff-audit-surface-split/manual/20260309T154039Z-closeout/00-summary.md`.
