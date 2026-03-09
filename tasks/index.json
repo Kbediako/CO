@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260309-1076-coordinator-symphony-aligned-telegram-question-read-adapter-assembly-extraction",
+      "title": "Coordinator Symphony-Aligned Telegram Question-Read Adapter Assembly Extraction",
+      "relates_to": "tasks/tasks-1076-coordinator-symphony-aligned-telegram-question-read-adapter-assembly-extraction.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-09",
+      "paths": {
+        "spec": "tasks/specs/1076-coordinator-symphony-aligned-telegram-question-read-adapter-assembly-extraction.md",
+        "task": "tasks/tasks-1076-coordinator-symphony-aligned-telegram-question-read-adapter-assembly-extraction.md",
+        "agent_task": ".agent/task/1076-coordinator-symphony-aligned-telegram-question-read-adapter-assembly-extraction.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-telegram-question-read-adapter-assembly-extraction.md"
+      }
+    },
+    {
       "id": "20260309-1075-coordinator-symphony-aligned-shared-question-read-sequencing-extraction",
       "title": "Coordinator Symphony-Aligned Shared Question-Read Sequencing Extraction",
       "relates_to": "tasks/tasks-1075-coordinator-symphony-aligned-shared-question-read-sequencing-extraction.md",
