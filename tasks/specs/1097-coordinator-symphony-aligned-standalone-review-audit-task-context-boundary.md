@@ -1,7 +1,7 @@
 ---
 id: 20260310-1097-coordinator-symphony-aligned-standalone-review-audit-task-context-boundary
 title: Coordinator Symphony-Aligned Standalone Review Audit Task-Context Boundary
-status: active
+status: completed
 owners:
   - Codex
 created: 2026-03-10
@@ -36,3 +36,4 @@ Narrow audit-mode standalone review task context so the wrapper preserves task i
 ## Notes
 
 - 2026-03-10: Approved for docs-first registration based on the live `1095` audit drift evidence, the clean `1096` closeout, and a bounded `gpt-5.4` scout recommending audit task-context slimming before the next product seam. Evidence: `docs/findings/1097-standalone-review-audit-task-context-boundary-deliberation.md`, `out/1096-coordinator-symphony-aligned-authenticated-route-branch-shell-extraction/manual/20260309T182942Z-closeout/14-next-slice-note.md`.
+- 2026-03-10: Completed. Audit-mode task context now stays on canonical task-doc identity only, delegated scout manifests resolve through registered checklist paths, legacy non-checklist task index paths are ignored, focused regressions passed `8/8`, the full suite passed `185/185` files and `1247/1247` tests, and the remaining live-review broadening is recorded explicitly as follow-on reliability work rather than an untracked defect. Evidence: `out/1097-coordinator-symphony-aligned-standalone-review-audit-task-context-boundary/manual/20260309T185559Z-closeout/00-summary.md`, `out/1097-coordinator-symphony-aligned-standalone-review-audit-task-context-boundary/manual/20260309T185559Z-closeout/05-targeted-tests.log`, `out/1097-coordinator-symphony-aligned-standalone-review-audit-task-context-boundary/manual/20260309T185559Z-closeout/05-test.log`, `out/1097-coordinator-symphony-aligned-standalone-review-audit-task-context-boundary/manual/20260309T185559Z-closeout/13-override-notes.md`.
