@@ -25,3 +25,4 @@ relates_to: docs/PRD-coordinator-symphony-aligned-shared-question-read-sequencin
 ## Notes
 
 - 2026-03-09: Approved for docs-first registration as the next bounded Symphony-aligned slice after `1074`. Evidence: `out/1074-coordinator-symphony-aligned-question-read-retry-deduplication/manual/20260309T015848Z-closeout/14-next-slice-note.md`, `docs/findings/1075-shared-question-read-sequencing-extraction-deliberation.md`.
+- 2026-03-09: Completed with shared question-read sequencing extracted into `questionReadSequence.ts`, both `/questions` surfaces wired to the same helper, and closeout evidence in `out/1075-coordinator-symphony-aligned-shared-question-read-sequencing-extraction/manual/20260309T023946Z-closeout/`.

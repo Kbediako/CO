@@ -660,6 +660,138 @@ describe('TelegramOversightBridge', () => {
     }
   });
 
+  it('retries answered child questions during Telegram /questions reads', async () => {
+    const { root, env, paths } = await createRunRoot('task-1075-telegram-question-read-sequence');
+    await seedManifest(paths, { task_id: 'task-1075' });
+    const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
+
+    const childRunDir = join(root, '.runs', 'child-task', 'cli', 'child-run');
+    await mkdir(childRunDir, { recursive: true });
+    const childManifestPath = join(childRunDir, 'manifest.json');
+    await writeFile(childManifestPath, JSON.stringify({ run_id: 'child-run' }), 'utf8');
+    const childTokenPath = join(childRunDir, 'control_auth.json');
+    await writeFile(childTokenPath, JSON.stringify({ token: 'child-token' }), 'utf8');
+    await writeFile(
+      join(childRunDir, 'control.json'),
+      JSON.stringify({
+        run_id: 'child-run',
+        control_seq: 1,
+        latest_action: {
+          request_id: null,
+          requested_by: 'delegate',
+          requested_at: new Date().toISOString(),
+          action: 'pause',
+          reason: 'awaiting_question_answer'
+        },
+        feature_toggles: {}
+      }),
+      'utf8'
+    );
+
+    let childAction: Record<string, unknown> | null = null;
+    let resolveChildAction: ((payload: Record<string, unknown>) => void) | null = null;
+    const childActionPromise = new Promise<Record<string, unknown>>((resolve) => {
+      resolveChildAction = resolve;
+    });
+    const childServer = http.createServer(async (req, res) => {
+      if (req.url === '/control/action' && req.method === 'POST') {
+        let body = '';
+        for await (const chunk of req) {
+          body += chunk.toString();
+        }
+        childAction = JSON.parse(body || '{}') as Record<string, unknown>;
+        resolveChildAction?.(childAction);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ status: 'ok' }));
+        return;
+      }
+      res.writeHead(404);
+      res.end();
+    });
+    await new Promise<void>((resolve) => childServer.listen(0, '127.0.0.1', resolve));
+    const childAddress = childServer.address();
+    const childPort = typeof childAddress === 'string' || !childAddress ? 0 : childAddress.port;
+    await writeFile(
+      join(childRunDir, 'control_endpoint.json'),
+      JSON.stringify({
+        base_url: `http://127.0.0.1:${childPort}`,
+        token_path: childTokenPath
+      }),
+      'utf8'
+    );
+
+    const queuedAt = new Date(Date.now() - 120_000).toISOString();
+    const answeredAt = new Date(Date.now() - 60_000).toISOString();
+    await seedQuestions(paths, [
+      {
+        question_id: 'q-0001',
+        parent_run_id: 'parent-run',
+        from_run_id: 'child-run',
+        from_manifest_path: childManifestPath,
+        prompt: 'Approval needed',
+        urgency: 'high',
+        status: 'answered',
+        queued_at: queuedAt,
+        answer: 'Approved',
+        answered_by: 'ui',
+        answered_at: answeredAt,
+        closed_at: answeredAt,
+        auto_pause: true
+      }
+    ]);
+
+    const realFetch = globalThis.fetch;
+    const telegram = createTelegramHarness(realFetch);
+
+    vi.stubEnv('CO_TELEGRAM_POLLING_ENABLED', '1');
+    vi.stubEnv('CO_TELEGRAM_BOT_TOKEN', 'test-token');
+    vi.stubEnv('CO_TELEGRAM_ALLOWED_CHAT_IDS', '1234');
+    vi.stubEnv('CO_TELEGRAM_POLL_INTERVAL_MS', '10');
+    vi.stubGlobal('fetch', telegram.fetch);
+
+    const server = await ControlServer.start({
+      paths,
+      config,
+      runId: 'parent-run'
+    });
+
+    try {
+      telegram.updates.push({
+        update_id: 300,
+        message: {
+          message_id: 1,
+          text: '/questions',
+          chat: { id: 1234, type: 'private' },
+          from: { id: 77, is_bot: false, first_name: 'Operator' }
+        }
+      });
+
+      await waitForCondition(async () =>
+        telegram.sentMessages.some((message) => message.text.includes('No queued questions.'))
+      );
+
+      const action = await Promise.race([
+        childActionPromise,
+        new Promise<Record<string, unknown>>((_, reject) =>
+          setTimeout(() => reject(new Error('timed out waiting for child action')), 2000)
+        )
+      ]);
+      expect(action).toMatchObject({
+        action: 'resume',
+        reason: 'question_answered'
+      });
+      expect(childAction).toMatchObject({
+        action: 'resume',
+        reason: 'question_answered'
+      });
+      expect(telegram.sentMessages.some((message) => message.text.includes('No queued questions.'))).toBe(true);
+    } finally {
+      await server.close();
+      await new Promise<void>((resolve) => childServer.close(() => resolve()));
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   it('continues polling after one update fails and advances the Telegram offset', async () => {
     const { root, env, paths } = await createRunRoot('task-1014-telegram-recovery');
     await seedManifest(paths);
