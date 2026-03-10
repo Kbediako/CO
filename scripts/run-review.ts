@@ -35,9 +35,11 @@ import {
 import { parseArgs as parseCliArgs, hasFlag } from './lib/cli-args.js';
 import { normalizeTaskKey, pathExists } from './lib/docs-helpers.js';
 import {
+  AUDIT_ALLOWED_META_SURFACE_KINDS,
   formatDurationMs,
   logReviewTelemetrySummary as logReviewExecutionTelemetrySummary,
   persistReviewTelemetry as persistReviewExecutionTelemetry,
+  type ReviewStartupAnchorMode,
   type ReviewStartupAnchorBoundaryState,
   ReviewExecutionState,
   type ReviewCommandIntentBoundaryState,
@@ -469,6 +471,9 @@ async function main(): Promise<void> {
   const manifestPath = await resolveManifestPath(options);
 
   const relativeManifest = path.relative(repoRoot, manifestPath);
+  const runnerLogPath = path.join(path.dirname(manifestPath), 'runner.ndjson');
+  const runnerLogExists = await pathExists(runnerLogPath);
+  const relativeRunnerLog = path.relative(repoRoot, runnerLogPath);
   const manifestTask = inferTaskFromManifestPath(manifestPath);
   const envTask = process.env.MCP_RUNNER_TASK_ID ?? process.env.TASK;
   const taskKey = options.task ?? envTask ?? manifestTask;
@@ -485,6 +490,9 @@ async function main(): Promise<void> {
 
   if (reviewSurface === 'audit') {
     promptLines.push(`Evidence manifest: ${relativeManifest}`);
+    if (runnerLogExists) {
+      promptLines.push(`Evidence runner log: ${relativeRunnerLog}`);
+    }
   }
 
   if (reviewSurface === 'audit' && taskKey) {
@@ -508,6 +516,7 @@ async function main(): Promise<void> {
       '- README/SOP docs match the implemented behavior',
       '- Commands/scripts are non-interactive (no TTY prompts)',
       '- Evidence + checklist mirroring requirements are satisfied',
+      '- Start with the manifest or runner log before consulting memory, skills, or review docs',
       '',
       'Call out any remaining documentation/code mismatches or guardrail violations.'
     );
@@ -591,6 +600,14 @@ async function main(): Promise<void> {
   const artifactPaths = await prepareReviewArtifacts(manifestPath, prompt);
   const nonInteractive = options.nonInteractive ?? shouldForceNonInteractive();
   const reviewEnv = { ...process.env };
+  reviewEnv.MANIFEST = manifestPath;
+  if (runnerLogExists) {
+    reviewEnv.RUNNER_LOG = runnerLogPath;
+    reviewEnv.RUN_LOG = runnerLogPath;
+  } else {
+    delete reviewEnv.RUNNER_LOG;
+    delete reviewEnv.RUN_LOG;
+  }
   const stdinIsTTY = process.stdin?.isTTY === true;
   if (nonInteractive) {
     reviewEnv.CODEX_NON_INTERACTIVE = reviewEnv.CODEX_NON_INTERACTIVE ?? '1';
@@ -683,11 +700,17 @@ async function main(): Promise<void> {
   const metaSurfaceTimeoutMs = !allowHeavyCommands ? resolveReviewMetaSurfaceTimeoutMs() : null;
   const allowedMetaSurfaceKinds =
     reviewSurface === 'audit'
-      ? (['run-manifest', 'run-runner-log'] as const)
+      ? AUDIT_ALLOWED_META_SURFACE_KINDS
       : ([] as const);
   const touchedPaths = scopePathCollection.paths;
-  const enforceStartupAnchorBoundary =
-    !allowHeavyCommands && reviewSurface === 'diff' && touchedPaths.length > 0;
+  const startupAnchorMode: ReviewStartupAnchorMode | null = !allowHeavyCommands
+    ? reviewSurface === 'audit'
+      ? 'audit'
+      : reviewSurface === 'diff' && touchedPaths.length > 0
+        ? 'diff'
+        : null
+    : null;
+  const enforceStartupAnchorBoundary = startupAnchorMode !== null;
   if (!allowHeavyCommands) {
     if (lowSignalTimeoutMs === null) {
       console.log(
@@ -719,9 +742,13 @@ async function main(): Promise<void> {
         )} of sustained off-task meta activity (set ${REVIEW_META_SURFACE_TIMEOUT_ENV_KEY}=0 to disable).`
       );
     }
-    if (enforceStartupAnchorBoundary) {
+    if (startupAnchorMode === 'diff') {
       console.log(
         '[run-review] startup-anchor boundary enabled for diff mode; repeated memory/skills/review-docs/manifest/review-artifact reads before the first startup anchor will terminate the review.'
+      );
+    } else if (startupAnchorMode === 'audit') {
+      console.log(
+        '[run-review] startup-anchor boundary enabled for audit mode; repeated memory/skills/review-doc reads before the first manifest/runner-log startup anchor will terminate the review.'
       );
     }
   }
@@ -745,6 +772,33 @@ async function main(): Promise<void> {
       enforceStartupAnchorBoundary,
       allowedMetaSurfaceKinds: [...allowedMetaSurfaceKinds],
       scopeMode,
+      startupAnchorMode,
+      auditStartupAnchorPaths:
+        reviewSurface === 'audit'
+          ? [manifestPath, ...(runnerLogExists ? [runnerLogPath] : [])]
+          : [],
+      allowedMetaSurfacePaths:
+        reviewSurface === 'audit'
+          ? [manifestPath, ...(runnerLogExists ? [runnerLogPath] : [])]
+          : [],
+      allowedMetaSurfaceEnvVars:
+        reviewSurface === 'audit'
+          ? ['MANIFEST', ...(runnerLogExists ? ['RUNNER_LOG', 'RUN_LOG'] : [])]
+          : [],
+      auditStartupAnchorEnvVarPaths:
+        reviewSurface === 'audit'
+          ? {
+              MANIFEST: manifestPath,
+              ...(runnerLogExists ? { RUNNER_LOG: runnerLogPath, RUN_LOG: runnerLogPath } : {})
+            }
+          : {},
+      allowedMetaSurfaceEnvVarPaths:
+        reviewSurface === 'audit'
+          ? {
+              MANIFEST: manifestPath,
+              ...(runnerLogExists ? { RUNNER_LOG: runnerLogPath, RUN_LOG: runnerLogPath } : {})
+            }
+          : {},
       repoRoot,
       touchedPaths,
       outputLogPath: artifactPaths.outputLogPath
@@ -1387,6 +1441,12 @@ interface RunCodexReviewOptions {
   enforceStartupAnchorBoundary: boolean;
   allowedMetaSurfaceKinds: string[];
   scopeMode: ScopeFlagMode;
+  startupAnchorMode: ReviewStartupAnchorMode | null;
+  auditStartupAnchorPaths: string[];
+  allowedMetaSurfacePaths: string[];
+  allowedMetaSurfaceEnvVars: string[];
+  auditStartupAnchorEnvVarPaths: Record<string, string>;
+  allowedMetaSurfaceEnvVarPaths: Record<string, string>;
   repoRoot: string;
   touchedPaths: string[];
   outputLogPath: string;
@@ -1470,6 +1530,12 @@ async function runCodexReview(
     enforceStartupAnchorBoundary: options.enforceStartupAnchorBoundary,
     allowedMetaSurfaceKinds: options.allowedMetaSurfaceKinds,
     scopeMode: options.scopeMode,
+    startupAnchorMode: options.startupAnchorMode,
+    auditStartupAnchorPaths: options.auditStartupAnchorPaths,
+    allowedMetaSurfacePaths: options.allowedMetaSurfacePaths,
+    allowedMetaSurfaceEnvVars: options.allowedMetaSurfaceEnvVars,
+    auditStartupAnchorEnvVarPaths: options.auditStartupAnchorEnvVarPaths,
+    allowedMetaSurfaceEnvVarPaths: options.allowedMetaSurfaceEnvVarPaths,
     repoRoot: options.repoRoot,
     touchedPaths: options.touchedPaths
   });

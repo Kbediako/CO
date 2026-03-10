@@ -30,6 +30,16 @@ async function makeManifestForTask(sandbox: string, taskId: string, runId: strin
   await mkdir(runDir, { recursive: true });
   const manifestPath = join(runDir, 'manifest.json');
   await writeFile(manifestPath, JSON.stringify({ run: 'sample' }), 'utf8');
+  await writeFile(join(runDir, 'runner.ndjson'), '{"event":"sample"}\n', 'utf8');
+  return manifestPath;
+}
+
+async function makeDetachedManifest(sandbox: string): Promise<string> {
+  const runDir = join(sandbox, 'detached-review-run');
+  await mkdir(runDir, { recursive: true });
+  const manifestPath = join(runDir, 'manifest.json');
+  await writeFile(manifestPath, JSON.stringify({ run: 'detached' }), 'utf8');
+  await writeFile(join(runDir, 'runner.ndjson'), '{"event":"detached"}\n', 'utf8');
   return manifestPath;
 }
 
@@ -171,6 +181,12 @@ fi
       for _ in $(seq 1 2); do
         echo "thinking"
         echo "exec"
+        echo "/bin/zsh -lc 'sed -n 1,80p .runs/sample-task/cli/sample-run/manifest.json' in /Users/kbediako/Code/CO"
+        echo "thinking"
+        echo "exec"
+        echo "/bin/zsh -lc 'tail -n 80 .runs/sample-task/cli/sample-run/runner.ndjson' in /Users/kbediako/Code/CO"
+        echo "thinking"
+        echo "exec"
         echo "/bin/zsh -lc 'sed -n 1,120p /Users/kbediako/.codex/memories/MEMORY.md' in /Users/kbediako/Code/CO"
         echo "thinking"
         echo "exec"
@@ -178,12 +194,6 @@ fi
         echo "thinking"
         echo "exec"
         echo "/bin/zsh -lc 'sed -n 1,120p docs/guides/review-artifacts.md' in /Users/kbediako/Code/CO"
-        echo "thinking"
-        echo "exec"
-        echo "/bin/zsh -lc 'sed -n 1,80p .runs/sample-task/cli/sample-run/manifest.json' in /Users/kbediako/Code/CO"
-        echo "thinking"
-        echo "exec"
-        echo "/bin/zsh -lc 'tail -n 80 .runs/sample-task/cli/sample-run/runner.ndjson' in /Users/kbediako/Code/CO"
         sleep 0.05
       done
       sleep 5
@@ -210,6 +220,15 @@ fi
         echo "/bin/zsh -lc 'sed -n 1,120p /Users/kbediako/.codex/skills/delegation-usage/SKILL.md' in /Users/kbediako/Code/CO"
         sleep 0.05
       done
+    fi
+    if [[ "$mode" == "audit-explicit-manifest-anchor" ]]; then
+      echo "thinking"
+      echo "exec"
+      echo "/bin/zsh -lc 'sed -n 1,80p \${MANIFEST}' in /Users/kbediako/Code/CO"
+      echo "thinking"
+      echo "exec"
+      echo "/bin/zsh -lc 'sed -n 1,120p /Users/kbediako/.codex/memories/MEMORY.md' in /Users/kbediako/Code/CO"
+      exit 0
     fi
     if [[ "$mode" == "review-self-containment-drift" ]]; then
       while true; do
@@ -680,10 +699,14 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     const prompt = await readFile(promptPath, 'utf8');
     expect(prompt).toContain('Review surface: audit');
     expect(prompt).toContain('Evidence manifest: .runs/sample-task/cli/sample-run/manifest.json');
+    expect(prompt).toContain('Evidence runner log: .runs/sample-task/cli/sample-run/runner.ndjson');
     expect(prompt).toContain('Task context:');
     expect(prompt).toContain('- Task checklist: `tasks/tasks-sample-task.md`');
     expect(prompt).toContain('- Primary PRD: `docs/PRD-sample-task.md`');
     expect(prompt).toContain('Evidence + checklist mirroring requirements are satisfied');
+    expect(prompt).toContain(
+      'Start with the manifest or runner log before consulting memory, skills, or review docs'
+    );
     expect(prompt).toContain(
       'Keep this review focused on the requested audit surfaces, supporting evidence, and directly related code/docs paths.'
     );
@@ -732,9 +755,13 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     const prompt = await readFile(promptPath, 'utf8');
     expect(prompt).toContain('Review surface: audit');
     expect(prompt).toContain('Evidence manifest: .runs/sample-task/cli/sample-run/manifest.json');
+    expect(prompt).toContain('Evidence runner log: .runs/sample-task/cli/sample-run/runner.ndjson');
     expect(prompt).toContain('Task context:');
     expect(prompt).toContain('- Task checklist: `tasks/tasks-sample-task.md`');
     expect(prompt).toContain('- Primary PRD: `docs/PRD-sample-task.md`');
+    expect(prompt).toContain(
+      'Start with the manifest or runner log before consulting memory, skills, or review docs'
+    );
     expect(prompt).toContain(
       'Keep this review focused on the requested audit surfaces, supporting evidence, and directly related code/docs paths.'
     );
@@ -1954,6 +1981,40 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(result.stderr).toContain('before the first startup anchor');
   }, LONG_WAIT_TEST_TIMEOUT_MS);
 
+  it('fails bounded audit review when repeated off-surface reads happen before the first audit startup anchor', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'startup-anchor-drift',
+      CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0',
+      CODEX_REVIEW_TIMEOUT_SECONDS: '60'
+    }, ['--surface', 'audit']);
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stdout).toContain('startup-anchor boundary enabled for audit mode');
+    expect(result.stderr).toContain('startup-anchor boundary violated');
+
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      summary: {
+        startupAnchorObserved: boolean;
+        preAnchorMetaSurfaceSignals: number;
+        preAnchorMetaSurfaceKinds: string[];
+      };
+    };
+    expect(telemetry.status).toBe('failed');
+    expect(telemetry.summary.startupAnchorObserved).toBe(false);
+    expect(telemetry.summary.preAnchorMetaSurfaceSignals).toBeGreaterThanOrEqual(2);
+    expect(telemetry.summary.preAnchorMetaSurfaceKinds).toEqual([
+      'codex-memories',
+      'codex-skills'
+    ]);
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
   it('fails bounded diff review when adjacent review-system surfaces persist', async () => {
     const sandbox = await makeSandbox();
     const manifestPath = await makeManifest(sandbox);
@@ -2024,8 +2085,6 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     const sandbox = await makeSandbox();
     const manifestPath = await makeManifest(sandbox);
     const codexBin = await makeFakeCodex(sandbox);
-    const runnerLogPath = join(dirname(manifestPath), 'runner.ndjson');
-    await writeFile(runnerLogPath, '{"event":"sample"}\n', 'utf8');
 
     const result = await runReviewCommand(
       manifestPath,
@@ -2041,20 +2100,57 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
 
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toContain('allowed audit meta surfaces: run-manifest, run-runner-log');
+    expect(result.stdout).toContain('startup-anchor boundary enabled for audit mode');
 
     const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
     const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
       status: string;
       summary: {
+        startupAnchorObserved: boolean;
+        preAnchorMetaSurfaceSignals: number;
         metaSurfaceSignals: number;
         distinctMetaSurfaces: number;
         metaSurfaceKinds: string[];
       };
     };
     expect(telemetry.status).toBe('succeeded');
+    expect(telemetry.summary.startupAnchorObserved).toBe(true);
+    expect(telemetry.summary.preAnchorMetaSurfaceSignals).toBe(0);
     expect(telemetry.summary.metaSurfaceSignals).toBe(0);
     expect(telemetry.summary.distinctMetaSurfaces).toBe(0);
     expect(telemetry.summary.metaSurfaceKinds).toEqual([]);
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('treats explicit audit manifest paths outside .runs as valid startup anchors', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeDetachedManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+
+    const result = await runReviewCommand(
+      manifestPath,
+      {
+        ...baseEnv(sandbox, codexBin),
+        RUN_REVIEW_MODE: 'audit-explicit-manifest-anchor',
+        CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0',
+        CODEX_REVIEW_TIMEOUT_SECONDS: '60',
+        TASK: 'sample-task'
+      },
+      ['--surface', 'audit']
+    );
+
+    expect(result.exitCode).toBe(0);
+
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      summary: {
+        startupAnchorObserved: boolean;
+        preAnchorMetaSurfaceSignals: number;
+      };
+    };
+    expect(telemetry.status).toBe('succeeded');
+    expect(telemetry.summary.startupAnchorObserved).toBe(true);
+    expect(telemetry.summary.preAnchorMetaSurfaceSignals).toBe(0);
   }, LONG_WAIT_TEST_TIMEOUT_MS);
 
   it('fails bounded review when it launches a package-manager validation suite', async () => {

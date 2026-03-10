@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260310-1108-coordinator-symphony-aligned-standalone-review-audit-startup-surface-boundary",
+      "title": "Coordinator Symphony-Aligned Standalone Review Audit Startup-Surface Boundary",
+      "relates_to": "tasks/tasks-1108-coordinator-symphony-aligned-standalone-review-audit-startup-surface-boundary.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-10",
+      "paths": {
+        "spec": "tasks/specs/1108-coordinator-symphony-aligned-standalone-review-audit-startup-surface-boundary.md",
+        "task": "tasks/tasks-1108-coordinator-symphony-aligned-standalone-review-audit-startup-surface-boundary.md",
+        "agent_task": ".agent/task/1108-coordinator-symphony-aligned-standalone-review-audit-startup-surface-boundary.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-standalone-review-audit-startup-surface-boundary.md"
+      }
+    },
+    {
       "id": "20260310-1107-coordinator-symphony-aligned-standalone-review-startup-anchor-boundary",
       "title": "Coordinator Symphony-Aligned Standalone Review Startup-Anchor Boundary",
       "relates_to": "tasks/tasks-1107-coordinator-symphony-aligned-standalone-review-startup-anchor-boundary.md",

@@ -39,6 +39,8 @@ const DEFAULT_LOW_SIGNAL_TIMEOUT_MS = 180_000;
 const DEFAULT_META_SURFACE_TIMEOUT_MS = 180_000;
 const STARTUP_ANCHOR_META_SURFACE_SIGNAL_BUDGET = 1;
 const STARTUP_ANCHOR_ALLOWED_META_SURFACE_KINDS = new Set(['review-support']);
+export const AUDIT_ALLOWED_META_SURFACE_KINDS = ['run-manifest', 'run-runner-log'] as const;
+const AUDIT_ALLOWED_META_SURFACE_KIND_SET = new Set<string>(AUDIT_ALLOWED_META_SURFACE_KINDS);
 const LOW_SIGNAL_MIN_THINKING_BLOCKS = 10;
 const LOW_SIGNAL_MIN_COMMAND_STARTS = 10;
 const LOW_SIGNAL_MAX_DISTINCT_TARGETS = 4;
@@ -66,6 +68,7 @@ export type ReviewCommandIntentViolationKind =
   | 'delegation-control';
 
 export type ReviewScopeMode = 'uncommitted' | 'base' | 'commit';
+export type ReviewStartupAnchorMode = 'diff' | 'audit';
 
 export interface ReviewOutputSummary {
   lineCount: number;
@@ -164,7 +167,13 @@ export interface ReviewExecutionStateOptions {
   touchedPaths?: string[];
   enforceStartupAnchorBoundary?: boolean;
   scopeMode?: ReviewScopeMode;
+  startupAnchorMode?: ReviewStartupAnchorMode | null;
   repoRoot?: string;
+  auditStartupAnchorPaths?: string[];
+  allowedMetaSurfacePaths?: string[];
+  allowedMetaSurfaceEnvVars?: string[];
+  auditStartupAnchorEnvVarPaths?: Record<string, string>;
+  allowedMetaSurfaceEnvVarPaths?: Record<string, string>;
 }
 
 interface ReviewExecutionTelemetryPayloadOptions {
@@ -221,7 +230,13 @@ export class ReviewExecutionState {
   private readonly touchedPaths: Set<string>;
   private readonly enforceStartupAnchorBoundary: boolean;
   private readonly startupAnchorScopeMode: ReviewScopeMode;
+  private readonly startupAnchorMode: ReviewStartupAnchorMode | null;
   private readonly repoRoot: string | null;
+  private readonly auditStartupAnchorPaths: Set<string>;
+  private readonly auditStartupAnchorEnvVarPaths: ReadonlyMap<string, string>;
+  private readonly allowedMetaSurfacePaths: Set<string>;
+  private readonly allowedMetaSurfaceEnvVars: Set<string>;
+  private readonly allowedMetaSurfaceEnvVarPaths: ReadonlyMap<string, string>;
 
   private lastOutputAtMs: number;
   private preview = '';
@@ -277,13 +292,38 @@ export class ReviewExecutionState {
         ? null
         : configuredMetaSurfaceTimeoutMs;
     this.allowedMetaSurfaceKinds = new Set(options.allowedMetaSurfaceKinds ?? []);
+    this.repoRoot = normalizeScopeRoot(options.repoRoot);
     this.touchedPaths = new Set(
       (options.touchedPaths ?? []).map((entry) => normalizeScopePath(entry)).filter(Boolean)
     );
+    this.startupAnchorMode = options.startupAnchorMode ?? null;
+    this.auditStartupAnchorPaths = new Set(
+      (options.auditStartupAnchorPaths ?? [])
+        .map((entry) => normalizeAuditStartupAnchorPath(entry, this.repoRoot))
+        .filter((entry): entry is string => Boolean(entry))
+    );
+    this.auditStartupAnchorEnvVarPaths = normalizeAuditMetaSurfaceEnvVarPathMap(
+      options.auditStartupAnchorEnvVarPaths,
+      this.repoRoot
+    );
+    this.allowedMetaSurfacePaths = new Set(
+      (options.allowedMetaSurfacePaths ?? [])
+        .map((entry) => normalizeAuditStartupAnchorPath(entry, this.repoRoot))
+        .filter((entry): entry is string => Boolean(entry))
+    );
+    this.allowedMetaSurfaceEnvVars = new Set(
+      (options.allowedMetaSurfaceEnvVars ?? [])
+        .map((entry) => entry.trim().replace(/^\$/u, '').replace(/[{}]/gu, '').toUpperCase())
+        .filter((entry) => entry.length > 0)
+    );
+    this.allowedMetaSurfaceEnvVarPaths = normalizeAuditMetaSurfaceEnvVarPathMap(
+      options.allowedMetaSurfaceEnvVarPaths,
+      this.repoRoot
+    );
     this.enforceStartupAnchorBoundary =
-      (options.enforceStartupAnchorBoundary ?? false) && this.touchedPaths.size > 0;
+      (options.enforceStartupAnchorBoundary ?? false) &&
+      (this.startupAnchorMode === 'audit' || this.touchedPaths.size > 0);
     this.startupAnchorScopeMode = options.scopeMode ?? 'uncommitted';
-    this.repoRoot = normalizeScopeRoot(options.repoRoot);
   }
 
   observeChunk(chunk: Buffer | string, stream: ReviewExecutionStream, nowMs = Date.now()): void {
@@ -526,7 +566,12 @@ export class ReviewExecutionState {
         const metaSurfaceSample = classifyMetaSurfaceCommandLine(
           commandLine,
           this.touchedPaths,
-          this.repoRoot
+          this.repoRoot,
+          {
+            allowedMetaSurfacePaths: this.allowedMetaSurfacePaths,
+            allowedMetaSurfaceEnvVars: this.allowedMetaSurfaceEnvVars,
+            allowedMetaSurfaceEnvVarPaths: this.allowedMetaSurfaceEnvVarPaths
+          }
         );
         this.recordMetaSurfaceCommandSample(metaSurfaceSample, nowMs);
         this.recordInspectionTargets(commandLine);
@@ -590,7 +635,11 @@ export class ReviewExecutionState {
     const startupBoundaryProgress = analyzeStartupAnchorBoundaryProgress(commandLine, {
       repoRoot: this.repoRoot,
       touchedPaths: this.touchedPaths,
-      scopeMode: this.startupAnchorScopeMode
+      scopeMode: this.startupAnchorScopeMode,
+      startupAnchorMode: this.startupAnchorMode,
+      auditStartupAnchorPaths: this.auditStartupAnchorPaths,
+      auditStartupAnchorEnvVars: this.allowedMetaSurfaceEnvVars,
+      auditStartupAnchorEnvVarPaths: this.auditStartupAnchorEnvVarPaths
     });
     for (const preAnchorMetaSurfaceSample of startupBoundaryProgress.preAnchorMetaSurfaceSamples) {
       this.recordPreAnchorMetaSurfaceSample(preAnchorMetaSurfaceSample, nowMs);
@@ -628,7 +677,10 @@ export class ReviewExecutionState {
   }
 
   private recordMetaSurfaceCommandSample(sample: string | null, nowMs: number): void {
-    this.recordMetaSurfaceSample(sample, nowMs);
+    this.recentMetaSurfaceSamples.push(sample);
+    while (this.recentMetaSurfaceSamples.length > META_SURFACE_RECENT_SIGNAL_WINDOW) {
+      this.recentMetaSurfaceSamples.shift();
+    }
   }
 
   private recordMetaSurfaceToolSample(sample: string, nowMs: number): void {
@@ -1351,12 +1403,23 @@ function classifyCommandIntentSegment(
 function classifyMetaSurfaceCommandLine(
   commandLine: string,
   touchedPaths: ReadonlySet<string>,
-  repoRoot: string | null
+  repoRoot: string | null,
+  allowedAuditMetaSurfaces: {
+    allowedMetaSurfacePaths: ReadonlySet<string>;
+    allowedMetaSurfaceEnvVars: ReadonlySet<string>;
+    allowedMetaSurfaceEnvVarPaths: ReadonlyMap<string, string>;
+  }
 ): string | null {
   const normalized = normalizeReviewCommandLine(commandLine).replace(/\\/gu, '/');
   const segments = splitShellControlSegments(normalized);
   for (const segment of segments) {
-    const kind = classifyMetaSurfaceSegment(segment, touchedPaths, repoRoot);
+    const kind = classifyMetaSurfaceSegment(
+      segment,
+      touchedPaths,
+      repoRoot,
+      allowedAuditMetaSurfaces,
+      new Map()
+    );
     if (kind) {
       return kind;
     }
@@ -1370,6 +1433,10 @@ function analyzeStartupAnchorBoundaryProgress(
     repoRoot: string | null;
     touchedPaths: ReadonlySet<string>;
     scopeMode: ReviewScopeMode;
+    startupAnchorMode: ReviewStartupAnchorMode | null;
+    auditStartupAnchorPaths: ReadonlySet<string>;
+    auditStartupAnchorEnvVars: ReadonlySet<string>;
+    auditStartupAnchorEnvVarPaths: ReadonlyMap<string, string>;
   }
 ): { anchorObserved: boolean; preAnchorMetaSurfaceSamples: string[] } {
   const normalized = normalizeReviewCommandLine(commandLine).replace(/\\/gu, '/');
@@ -1386,6 +1453,10 @@ function analyzeStartupAnchorBoundaryProgress(
       segment,
       options.touchedPaths,
       options.scopeMode,
+      options.startupAnchorMode,
+      options.auditStartupAnchorPaths,
+      options.auditStartupAnchorEnvVars,
+      options.auditStartupAnchorEnvVarPaths,
       options.repoRoot,
       progress
     );
@@ -1397,9 +1468,20 @@ function classifyMetaSurfaceSegment(
   segment: string,
   touchedPaths: ReadonlySet<string>,
   repoRoot: string | null,
+  allowedAuditMetaSurfaces: {
+    allowedMetaSurfacePaths: ReadonlySet<string>;
+    allowedMetaSurfaceEnvVars: ReadonlySet<string>;
+    allowedMetaSurfaceEnvVarPaths: ReadonlyMap<string, string>;
+  },
+  inheritedEnvAssignments: ReadonlyMap<string, string>,
   depth = 0
 ): string | null {
-  const strippedTokens = stripLeadingEnvAssignments(tokenizeShellSegment(segment));
+  const rawTokens = tokenizeShellSegment(segment);
+  const envAssignments = mergeEnvAssignments(
+    inheritedEnvAssignments,
+    collectInlineEnvAssignments(rawTokens)
+  );
+  const strippedTokens = stripLeadingEnvAssignments(rawTokens);
   if (strippedTokens.length === 0) {
     return null;
   }
@@ -1418,18 +1500,45 @@ function classifyMetaSurfaceSegment(
           nestedSegment,
           touchedPaths,
           repoRoot,
+          allowedAuditMetaSurfaces,
+          envAssignments,
           depth + 1
         );
         if (nestedKind) {
           return nestedKind;
         }
       }
+      const rebindingKind = detectAuditEnvRebindingMetaSurface(
+        payload,
+        envAssignments,
+        allowedAuditMetaSurfaces.allowedMetaSurfaceEnvVarPaths
+      );
+      if (rebindingKind) {
+        return rebindingKind;
+      }
+      return null;
     }
   }
 
   const command = normalizeCommandToken(tokens[0] ?? '');
   const args = tokens.slice(1);
-  return classifyMetaSurfaceDirect(command, args, touchedPaths, repoRoot)[0] ?? null;
+  if (isReviewOrchestrationCommand(command, args)) {
+    return 'review-orchestration';
+  }
+  const metaSurfaceSamples = classifyMetaSurfaceDirectDetailed(
+    command,
+    args,
+    touchedPaths,
+    repoRoot,
+    envAssignments,
+    allowedAuditMetaSurfaces.allowedMetaSurfaceEnvVarPaths
+  );
+  for (const sample of metaSurfaceSamples) {
+    if (!isAllowedAuditMetaSurfaceSample(sample, allowedAuditMetaSurfaces, repoRoot)) {
+      return sample.kind;
+    }
+  }
+  return null;
 }
 
 function isDiffScopeAnchorCommand(
@@ -1488,17 +1597,136 @@ function extractGitDiffPathspecs(args: string[]): string[] {
     .filter((arg) => arg.length > 0);
 }
 
-function expandTouchedScopeOperandCandidates(
+function expandMetaSurfaceOperandCandidates(
   command: string,
   args: string[],
-  operand: string
+  operand: string,
+  envAssignments: ReadonlyMap<string, string> = new Map(),
+  auditStartupAnchorEnvVarPaths: ReadonlyMap<string, string> = new Map(),
+  repoRoot: string | null = null
 ): string[] {
-  const candidates = [operand];
+  const candidates: string[] = [];
+  const resolvedEnvPath = resolveAuditMetaSurfaceEnvOperandPath(
+    operand,
+    envAssignments,
+    auditStartupAnchorEnvVarPaths,
+    repoRoot
+  );
+  if (resolvedEnvPath) {
+    candidates.push(resolvedEnvPath);
+  }
+  candidates.push(operand);
   const gitRevisionPathCandidate = extractGitRevisionPathCandidate(command, args, operand);
   if (gitRevisionPathCandidate) {
     candidates.push(gitRevisionPathCandidate);
   }
   return candidates;
+}
+
+function collectInlineEnvAssignments(tokens: string[]): Map<string, string> {
+  const assignments = new Map<string, string>();
+  let index = 0;
+  while (index < tokens.length && /^[A-Za-z_][A-Za-z0-9_]*=.*/u.test(tokens[index] ?? '')) {
+    recordInlineEnvAssignment(assignments, tokens[index] ?? '');
+    index += 1;
+  }
+
+  if (normalizeCommandToken(tokens[index] ?? '') !== 'env') {
+    return assignments;
+  }
+
+  index += 1;
+  while (index < tokens.length) {
+    const token = tokens[index] ?? '';
+    const normalized = token.toLowerCase();
+    if (token === '--') {
+      index += 1;
+      break;
+    }
+    if (/^[A-Za-z_][A-Za-z0-9_]*=.*/u.test(token)) {
+      recordInlineEnvAssignment(assignments, token);
+      index += 1;
+      continue;
+    }
+    if (normalized === '-u' || normalized === '--unset') {
+      index += 2;
+      continue;
+    }
+    if (normalized.startsWith('--unset=')) {
+      index += 1;
+      continue;
+    }
+    if (token.startsWith('-')) {
+      index += 1;
+      continue;
+    }
+    break;
+  }
+  return assignments;
+}
+
+function recordInlineEnvAssignment(assignments: Map<string, string>, token: string): void {
+  const separatorIndex = token.indexOf('=');
+  if (separatorIndex <= 0) {
+    return;
+  }
+  const key = token.slice(0, separatorIndex).trim().toUpperCase();
+  const value = token.slice(separatorIndex + 1).trim();
+  if (!key || !value) {
+    return;
+  }
+  assignments.set(key, value);
+}
+
+function resolveAuditMetaSurfaceEnvOperandPath(
+  operand: string,
+  envAssignments: ReadonlyMap<string, string>,
+  auditStartupAnchorEnvVarPaths: ReadonlyMap<string, string>,
+  repoRoot: string | null
+): string | null {
+  const normalizedEnvVar = normalizeAuditMetaSurfaceEnvVar(operand);
+  if (!normalizedEnvVar) {
+    return null;
+  }
+  const inlineValue = envAssignments.get(normalizedEnvVar);
+  if (inlineValue) {
+    return normalizeAuditStartupAnchorPath(inlineValue, repoRoot);
+  }
+  return auditStartupAnchorEnvVarPaths.get(normalizedEnvVar) ?? null;
+}
+
+function mergeEnvAssignments(
+  inheritedEnvAssignments: ReadonlyMap<string, string>,
+  nextEnvAssignments: ReadonlyMap<string, string>
+): Map<string, string> {
+  const merged = new Map(inheritedEnvAssignments);
+  for (const [key, value] of nextEnvAssignments.entries()) {
+    merged.set(key, value);
+  }
+  return merged;
+}
+
+function detectAuditEnvRebindingMetaSurface(
+  payload: string,
+  envAssignments: ReadonlyMap<string, string>,
+  auditStartupAnchorEnvVarPaths: ReadonlyMap<string, string>
+): 'run-manifest' | 'run-runner-log' | null {
+  for (const [envVar, activePath] of auditStartupAnchorEnvVarPaths.entries()) {
+    const reboundPath = envAssignments.get(envVar);
+    if (!reboundPath || reboundPath === activePath) {
+      continue;
+    }
+    if (!new RegExp(`\\$(?:\\{)?${envVar}(?:\\})?\\b`, 'u').test(payload)) {
+      continue;
+    }
+    if (envVar === 'MANIFEST') {
+      return 'run-manifest';
+    }
+    if (envVar === 'RUNNER_LOG' || envVar === 'RUN_LOG') {
+      return 'run-runner-log';
+    }
+  }
+  return null;
 }
 
 function extractGitRevisionPathCandidate(
@@ -1572,11 +1800,21 @@ function analyzeStartupAnchorBoundarySegment(
   segment: string,
   touchedPaths: ReadonlySet<string>,
   scopeMode: ReviewScopeMode,
+  startupAnchorMode: ReviewStartupAnchorMode | null,
+  auditStartupAnchorPaths: ReadonlySet<string>,
+  auditStartupAnchorEnvVars: ReadonlySet<string>,
+  auditStartupAnchorEnvVarPaths: ReadonlyMap<string, string>,
   repoRoot: string | null,
   progress: { anchorObserved: boolean; preAnchorMetaSurfaceSamples: string[] },
+  inheritedEnvAssignments: ReadonlyMap<string, string> = new Map(),
   depth = 0
 ): void {
-  const strippedTokens = stripLeadingEnvAssignments(tokenizeShellSegment(segment));
+  const rawTokens = tokenizeShellSegment(segment);
+  const envAssignments = mergeEnvAssignments(
+    inheritedEnvAssignments,
+    collectInlineEnvAssignments(rawTokens)
+  );
+  const strippedTokens = stripLeadingEnvAssignments(rawTokens);
   if (strippedTokens.length === 0) {
     return;
   }
@@ -1598,10 +1836,23 @@ function analyzeStartupAnchorBoundarySegment(
           nestedSegment,
           touchedPaths,
           scopeMode,
+          startupAnchorMode,
+          auditStartupAnchorPaths,
+          auditStartupAnchorEnvVars,
+          auditStartupAnchorEnvVarPaths,
           repoRoot,
           progress,
+          envAssignments,
           depth + 1
         );
+      }
+      const rebindingKind = detectAuditEnvRebindingMetaSurface(
+        payload,
+        envAssignments,
+        auditStartupAnchorEnvVarPaths
+      );
+      if (rebindingKind && !progress.anchorObserved) {
+        progress.preAnchorMetaSurfaceSamples.push(rebindingKind);
       }
       return;
     }
@@ -1609,16 +1860,101 @@ function analyzeStartupAnchorBoundarySegment(
 
   const command = normalizeCommandToken(tokens[0] ?? '');
   const args = tokens.slice(1);
-  const metaSurfaceSamples = classifyMetaSurfaceDirect(command, args, touchedPaths, repoRoot);
+  const metaSurfaceSamples = classifyMetaSurfaceDirectDetailed(
+    command,
+    args,
+    touchedPaths,
+    repoRoot,
+    envAssignments,
+    auditStartupAnchorEnvVarPaths
+  );
+  const auditStartupAnchorObserved =
+    startupAnchorMode === 'audit' &&
+    segmentMatchesAuditStartupAnchorPath(
+      command,
+      args,
+      envAssignments,
+      auditStartupAnchorPaths,
+      auditStartupAnchorEnvVarPaths,
+      repoRoot
+    );
   if (!progress.anchorObserved) {
-    progress.preAnchorMetaSurfaceSamples.push(...metaSurfaceSamples);
+    const preAnchorSamples = metaSurfaceSamples
+      .filter(
+        (sample) =>
+          !(
+            startupAnchorMode === 'audit' &&
+            isAllowedAuditMetaSurfaceSample(
+              sample,
+              {
+                allowedMetaSurfacePaths: auditStartupAnchorPaths,
+                allowedMetaSurfaceEnvVars: auditStartupAnchorEnvVars,
+                allowedMetaSurfaceEnvVarPaths: auditStartupAnchorEnvVarPaths
+              },
+              repoRoot
+            )
+          )
+      )
+      .map((sample) => sample.kind);
+    progress.preAnchorMetaSurfaceSamples.push(...preAnchorSamples);
   }
-  if (
-    segmentDirectHasTouchedPathAnchor(command, args, touchedPaths, repoRoot) ||
-    isDiffScopeAnchorCommand(command, args, scopeMode, touchedPaths, repoRoot)
-  ) {
+  const startupAnchorObserved =
+    startupAnchorMode === 'audit'
+      ? auditStartupAnchorObserved
+      : segmentDirectHasTouchedPathAnchor(command, args, touchedPaths, repoRoot) ||
+        isDiffScopeAnchorCommand(command, args, scopeMode, touchedPaths, repoRoot);
+  if (startupAnchorObserved) {
     progress.anchorObserved = true;
   }
+}
+
+function segmentMatchesAuditStartupAnchorPath(
+  command: string,
+  args: string[],
+  envAssignments: ReadonlyMap<string, string>,
+  auditStartupAnchorPaths: ReadonlySet<string>,
+  auditStartupAnchorEnvVarPaths: ReadonlyMap<string, string>,
+  repoRoot: string | null
+): boolean {
+  if (auditStartupAnchorPaths.size === 0) {
+    return false;
+  }
+  for (const operand of extractMetaSurfaceOperands(command, args)) {
+    for (const candidate of expandMetaSurfaceOperandCandidates(
+      command,
+      args,
+      operand,
+      envAssignments,
+      auditStartupAnchorEnvVarPaths,
+      repoRoot
+    )) {
+      const normalizedOperand = normalizeAuditStartupAnchorPath(candidate, repoRoot);
+      if (normalizedOperand && auditStartupAnchorPaths.has(normalizedOperand)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+function normalizeAuditStartupAnchorPath(candidate: string, repoRoot: string | null): string | null {
+  const normalized = candidate.trim().replace(/\\/gu, '/');
+  if (!normalized) {
+    return null;
+  }
+  if (normalized.startsWith('$')) {
+    return null;
+  }
+  if (normalized.startsWith('/')) {
+    return normalizeScopePath(normalized);
+  }
+  if (/^[A-Za-z]:\//u.test(normalized)) {
+    return normalizeScopePath(normalized);
+  }
+  if (!repoRoot) {
+    return normalizeScopePath(normalized);
+  }
+  return normalizeScopePath(path.resolve(repoRoot, normalized));
 }
 
 function segmentDirectHasTouchedPathAnchor(
@@ -1628,7 +1964,7 @@ function segmentDirectHasTouchedPathAnchor(
   repoRoot: string | null
 ): boolean {
   for (const operand of extractMetaSurfaceOperands(command, args)) {
-    for (const candidate of expandTouchedScopeOperandCandidates(command, args, operand)) {
+    for (const candidate of expandMetaSurfaceOperandCandidates(command, args, operand)) {
       if (isTouchedScopePath(candidate, touchedPaths, repoRoot)) {
         return true;
       }
@@ -1643,22 +1979,78 @@ function classifyMetaSurfaceDirect(
   touchedPaths: ReadonlySet<string>,
   repoRoot: string | null
 ): string[] {
-  if (isReviewOrchestrationCommand(command, args)) {
-    return ['review-orchestration'];
-  }
+  return classifyMetaSurfaceDirectDetailed(command, args, touchedPaths, repoRoot).map((sample) => sample.kind);
+}
 
-  const metaSurfaceKinds: string[] = [];
+function classifyMetaSurfaceDirectDetailed(
+  command: string,
+  args: string[],
+  touchedPaths: ReadonlySet<string>,
+  repoRoot: string | null,
+  envAssignments: ReadonlyMap<string, string> = new Map(),
+  auditStartupAnchorEnvVarPaths: ReadonlyMap<string, string> = new Map()
+): Array<{ kind: string; candidate: string; operand: string }> {
+  const detailedSamples: Array<{ kind: string; candidate: string; operand: string }> = [];
   for (const operand of extractMetaSurfaceOperands(command, args)) {
-    for (const candidate of expandTouchedScopeOperandCandidates(command, args, operand)) {
+    for (const candidate of expandMetaSurfaceOperandCandidates(
+      command,
+      args,
+      operand,
+      envAssignments,
+      auditStartupAnchorEnvVarPaths,
+      repoRoot
+    )) {
       const operandKind = classifyMetaSurfaceOperand(candidate, touchedPaths, repoRoot);
       if (operandKind) {
-        metaSurfaceKinds.push(operandKind);
+        detailedSamples.push({ kind: operandKind, candidate, operand });
         break;
       }
     }
   }
+  return detailedSamples;
+}
 
-  return metaSurfaceKinds;
+function isAllowedAuditMetaSurfaceSample(
+  sample: { kind: string; candidate: string; operand: string },
+  allowedAuditMetaSurfaces: {
+    allowedMetaSurfacePaths: ReadonlySet<string>;
+    allowedMetaSurfaceEnvVars: ReadonlySet<string>;
+    allowedMetaSurfaceEnvVarPaths: ReadonlyMap<string, string>;
+  },
+  repoRoot: string | null
+): boolean {
+  if (!AUDIT_ALLOWED_META_SURFACE_KIND_SET.has(sample.kind)) {
+    return false;
+  }
+  const normalizedCandidate = normalizeAuditStartupAnchorPath(sample.candidate, repoRoot);
+  return (
+    normalizedCandidate !== null &&
+    allowedAuditMetaSurfaces.allowedMetaSurfacePaths.has(normalizedCandidate)
+  );
+}
+
+function normalizeAuditMetaSurfaceEnvVar(candidate: string): string | null {
+  const trimmed = candidate.trim();
+  const match = /^\$(?:\{)?([A-Z_]+)(?:\})?$/iu.exec(trimmed);
+  return match?.[1]?.toUpperCase() ?? null;
+}
+
+function normalizeAuditMetaSurfaceEnvVarPathMap(
+  entries: Record<string, string> | undefined,
+  repoRoot: string | null
+): Map<string, string> {
+  const normalized = new Map<string, string>();
+  if (!entries) {
+    return normalized;
+  }
+  for (const [key, value] of Object.entries(entries)) {
+    const normalizedKey = key.trim().replace(/^\$/u, '').replace(/[{}]/gu, '').toUpperCase();
+    const normalizedValue = normalizeAuditStartupAnchorPath(value, repoRoot);
+    if (normalizedKey && normalizedValue) {
+      normalized.set(normalizedKey, normalizedValue);
+    }
+  }
+  return normalized;
 }
 
 function isReviewOrchestrationCommand(command: string, args: string[]): boolean {

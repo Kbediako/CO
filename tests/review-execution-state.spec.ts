@@ -363,6 +363,292 @@ describe('ReviewExecutionState', () => {
     expect(summary.preAnchorMetaSurfaceSignals).toBe(2);
   });
 
+  it('triggers the audit startup-anchor boundary when repeated off-surface reads happen before manifest or runner-log evidence', () => {
+    const state = new ReviewExecutionState({
+      startedAtMs: 0,
+      blockHeavyCommands: false,
+      enforceStartupAnchorBoundary: true,
+      startupAnchorMode: 'audit'
+    });
+
+    state.observeChunk('thinking\nexec\n', 'stdout', 100);
+    state.observeChunk(
+      `/bin/zsh -lc 'sed -n 1,120p docs/standalone-review-guide.md'\n`,
+      'stdout',
+      110
+    );
+    state.observeChunk('thinking\nexec\n', 'stdout', 200);
+    state.observeChunk(
+      `/bin/zsh -lc 'sed -n 1,120p /Users/kbediako/.codex/memories/MEMORY.md'\n`,
+      'stdout',
+      210
+    );
+
+    const boundary = state.getStartupAnchorBoundaryState(220);
+    const summary = state.buildOutputSummary();
+    expect(boundary.triggered).toBe(true);
+    expect(boundary.anchorObserved).toBe(false);
+    expect(boundary.preAnchorCommandStarts).toBe(2);
+    expect(boundary.preAnchorMetaSurfaceSignals).toBe(2);
+    expect(boundary.preAnchorMetaSurfaceKinds).toEqual(['codex-memories', 'review-docs']);
+    expect(summary.startupAnchorObserved).toBe(false);
+    expect(summary.preAnchorMetaSurfaceSignals).toBe(2);
+  });
+
+  it('treats manifest and runner-log evidence as valid audit startup anchors', () => {
+    const state = new ReviewExecutionState({
+      startedAtMs: 0,
+      blockHeavyCommands: false,
+      enforceStartupAnchorBoundary: true,
+      startupAnchorMode: 'audit',
+      repoRoot: '/Users/kbediako/Code/CO',
+      auditStartupAnchorPaths: [
+        '/Users/kbediako/Code/CO/.runs/sample-task/cli/sample-run/manifest.json',
+        '/Users/kbediako/Code/CO/.runs/sample-task/cli/sample-run/runner.ndjson'
+      ],
+      auditStartupAnchorEnvVarPaths: {
+        MANIFEST: '/Users/kbediako/Code/CO/.runs/sample-task/cli/sample-run/manifest.json',
+        RUNNER_LOG: '/Users/kbediako/Code/CO/.runs/sample-task/cli/sample-run/runner.ndjson',
+        RUN_LOG: '/Users/kbediako/Code/CO/.runs/sample-task/cli/sample-run/runner.ndjson'
+      }
+    });
+
+    state.observeChunk('thinking\nexec\n', 'stdout', 100);
+    state.observeChunk(
+      `/bin/zsh -lc 'sed -n 1,80p .runs/sample-task/cli/sample-run/manifest.json'\n`,
+      'stdout',
+      110
+    );
+    state.observeChunk('thinking\nexec\n', 'stdout', 200);
+    state.observeChunk(
+      `/bin/zsh -lc 'tail -n 80 .runs/sample-task/cli/sample-run/runner.ndjson'\n`,
+      'stdout',
+      210
+    );
+    state.observeChunk('thinking\nexec\n', 'stdout', 300);
+    state.observeChunk(
+      `/bin/zsh -lc 'sed -n 1,120p /Users/kbediako/.codex/memories/MEMORY.md'\n`,
+      'stdout',
+      310
+    );
+
+    const boundary = state.getStartupAnchorBoundaryState(320);
+    const summary = state.buildOutputSummary();
+    expect(boundary.triggered).toBe(false);
+    expect(boundary.anchorObserved).toBe(true);
+    expect(summary.startupAnchorObserved).toBe(true);
+    expect(summary.preAnchorCommandStarts).toBe(0);
+    expect(summary.preAnchorMetaSurfaceSignals).toBe(0);
+    expect(summary.preAnchorMetaSurfaceKinds).toEqual([]);
+  });
+
+  it('treats explicit audit startup anchor paths outside .runs as valid anchors', () => {
+    const state = new ReviewExecutionState({
+      startedAtMs: 0,
+      blockHeavyCommands: false,
+      enforceStartupAnchorBoundary: true,
+      startupAnchorMode: 'audit',
+      repoRoot: '/Users/kbediako/Code/CO',
+      auditStartupAnchorPaths: ['/Users/kbediako/Code/CO/manual-review/manifest.json'],
+      auditStartupAnchorEnvVarPaths: {
+        MANIFEST: '/Users/kbediako/Code/CO/manual-review/manifest.json'
+      }
+    });
+
+    state.observeChunk('thinking\nexec\n', 'stdout', 100);
+    state.observeChunk(
+      `/bin/zsh -lc 'sed -n 1,80p manual-review/manifest.json'\n`,
+      'stdout',
+      110
+    );
+    state.observeChunk('thinking\nexec\n', 'stdout', 200);
+    state.observeChunk(
+      `/bin/zsh -lc 'sed -n 1,120p /Users/kbediako/.codex/memories/MEMORY.md'\n`,
+      'stdout',
+      210
+    );
+
+    const boundary = state.getStartupAnchorBoundaryState(220);
+    const summary = state.buildOutputSummary();
+    expect(boundary.triggered).toBe(false);
+    expect(boundary.anchorObserved).toBe(true);
+    expect(summary.startupAnchorObserved).toBe(true);
+    expect(summary.preAnchorMetaSurfaceSignals).toBe(0);
+  });
+
+  it('does not treat unrelated run manifests as valid audit startup anchors', () => {
+    const state = new ReviewExecutionState({
+      startedAtMs: 0,
+      blockHeavyCommands: false,
+      enforceStartupAnchorBoundary: true,
+      startupAnchorMode: 'audit',
+      repoRoot: '/Users/kbediako/Code/CO',
+      auditStartupAnchorPaths: ['/Users/kbediako/Code/CO/.runs/sample-task/cli/sample-run/manifest.json'],
+      allowedMetaSurfaceEnvVars: ['MANIFEST'],
+      auditStartupAnchorEnvVarPaths: {
+        MANIFEST: '/Users/kbediako/Code/CO/.runs/sample-task/cli/sample-run/manifest.json'
+      }
+    });
+
+    state.observeChunk('thinking\nexec\n', 'stdout', 100);
+    state.observeChunk(
+      `/bin/zsh -lc 'sed -n 1,80p .runs/other-task/cli/other-run/manifest.json'\n`,
+      'stdout',
+      110
+    );
+    state.observeChunk('thinking\nexec\n', 'stdout', 200);
+    state.observeChunk(
+      `/bin/zsh -lc 'sed -n 1,120p /Users/kbediako/.codex/memories/MEMORY.md'\n`,
+      'stdout',
+      210
+    );
+
+    const boundary = state.getStartupAnchorBoundaryState(220);
+    expect(boundary.triggered).toBe(true);
+    expect(boundary.anchorObserved).toBe(false);
+    expect(boundary.preAnchorMetaSurfaceKinds).toEqual(['codex-memories', 'run-manifest']);
+  });
+
+  it('does not treat unavailable runner-log env vars as valid audit startup anchors', () => {
+    const state = new ReviewExecutionState({
+      startedAtMs: 0,
+      blockHeavyCommands: false,
+      enforceStartupAnchorBoundary: true,
+      startupAnchorMode: 'audit',
+      repoRoot: '/Users/kbediako/Code/CO',
+      auditStartupAnchorPaths: ['/Users/kbediako/Code/CO/.runs/sample-task/cli/sample-run/manifest.json'],
+      allowedMetaSurfaceEnvVars: ['MANIFEST'],
+      auditStartupAnchorEnvVarPaths: {
+        MANIFEST: '/Users/kbediako/Code/CO/.runs/sample-task/cli/sample-run/manifest.json'
+      }
+    });
+
+    state.observeChunk('thinking\nexec\n', 'stdout', 100);
+    state.observeChunk(`/bin/zsh -lc 'sed -n 1,80p $RUNNER_LOG'\n`, 'stdout', 110);
+    state.observeChunk('thinking\nexec\n', 'stdout', 200);
+    state.observeChunk(
+      `/bin/zsh -lc 'sed -n 1,120p /Users/kbediako/.codex/memories/MEMORY.md'\n`,
+      'stdout',
+      210
+    );
+
+    const boundary = state.getStartupAnchorBoundaryState(220);
+    expect(boundary.triggered).toBe(true);
+    expect(boundary.anchorObserved).toBe(false);
+    expect(boundary.preAnchorMetaSurfaceKinds).toEqual(['codex-memories', 'run-runner-log']);
+  });
+
+  it('keeps unrelated run manifests visible to the meta-surface guard after an active audit anchor exists', () => {
+    const state = new ReviewExecutionState({
+      startedAtMs: 0,
+      blockHeavyCommands: false,
+      allowedMetaSurfaceKinds: ['run-manifest', 'run-runner-log'],
+      repoRoot: '/Users/kbediako/Code/CO',
+      allowedMetaSurfacePaths: ['/Users/kbediako/Code/CO/.runs/sample-task/cli/sample-run/manifest.json'],
+      allowedMetaSurfaceEnvVars: ['MANIFEST'],
+      allowedMetaSurfaceEnvVarPaths: {
+        MANIFEST: '/Users/kbediako/Code/CO/.runs/sample-task/cli/sample-run/manifest.json'
+      }
+    });
+
+    state.observeChunk('thinking\nexec\n', 'stdout', 100);
+    state.observeChunk(
+      `/bin/zsh -lc 'sed -n 1,80p .runs/sample-task/cli/sample-run/manifest.json'\n`,
+      'stdout',
+      110
+    );
+    state.observeChunk('thinking\nexec\n', 'stdout', 200);
+    state.observeChunk(
+      `/bin/zsh -lc 'sed -n 1,80p .runs/other-task/cli/other-run/manifest.json'\n`,
+      'stdout',
+      210
+    );
+
+    const summary = state.buildOutputSummary();
+    expect(summary.metaSurfaceSignals).toBe(1);
+    expect(summary.metaSurfaceKinds).toEqual(['run-manifest']);
+  });
+
+  it('does not treat ordinary repo manifest.json files as run-manifest meta-surface activity', () => {
+    const state = new ReviewExecutionState({
+      startedAtMs: 0,
+      blockHeavyCommands: false,
+      metaSurfaceTimeoutMs: 1_000,
+      repoRoot: '/Users/kbediako/Code/CO'
+    });
+
+    state.observeChunk('thinking\nexec\n', 'stdout', 100);
+    state.observeChunk(`/bin/zsh -lc 'sed -n 1,80p schemas/manifest.json'\n`, 'stdout', 110);
+
+    const summary = state.buildOutputSummary();
+    expect(summary.metaSurfaceSignals).toBe(0);
+    expect(summary.metaSurfaceKinds).toEqual([]);
+  });
+
+  it('does not allow rebinding MANIFEST away from the active audit evidence path', () => {
+    const state = new ReviewExecutionState({
+      startedAtMs: 0,
+      blockHeavyCommands: false,
+      enforceStartupAnchorBoundary: true,
+      startupAnchorMode: 'audit',
+      repoRoot: '/Users/kbediako/Code/CO',
+      auditStartupAnchorPaths: ['/Users/kbediako/Code/CO/manual-review/manifest.json'],
+      auditStartupAnchorEnvVarPaths: {
+        MANIFEST: '/Users/kbediako/Code/CO/manual-review/manifest.json'
+      }
+    });
+
+    state.observeChunk('thinking\nexec\n', 'stdout', 100);
+    state.observeChunk(
+      `/bin/zsh -lc 'MANIFEST=/tmp/other.json sed -n 1,80p \"$MANIFEST\"'\n`,
+      'stdout',
+      110
+    );
+    state.observeChunk('thinking\nexec\n', 'stdout', 200);
+    state.observeChunk(
+      `/bin/zsh -lc 'sed -n 1,120p /Users/kbediako/.codex/memories/MEMORY.md'\n`,
+      'stdout',
+      210
+    );
+
+    const boundary = state.getStartupAnchorBoundaryState(220);
+    expect(boundary.triggered).toBe(true);
+    expect(boundary.anchorObserved).toBe(false);
+    expect(boundary.preAnchorMetaSurfaceKinds).toEqual(['codex-memories', 'run-manifest']);
+  });
+
+  it('preserves shell-wrapped MANIFEST rebinding when descending into nested audit payloads', () => {
+    const state = new ReviewExecutionState({
+      startedAtMs: 0,
+      blockHeavyCommands: false,
+      enforceStartupAnchorBoundary: true,
+      startupAnchorMode: 'audit',
+      repoRoot: '/Users/kbediako/Code/CO',
+      auditStartupAnchorPaths: ['/Users/kbediako/Code/CO/manual-review/manifest.json'],
+      auditStartupAnchorEnvVarPaths: {
+        MANIFEST: '/Users/kbediako/Code/CO/manual-review/manifest.json'
+      }
+    });
+
+    state.observeChunk('thinking\nexec\n', 'stdout', 100);
+    state.observeChunk(
+      `/bin/zsh -lc 'MANIFEST=/tmp/other.json /bin/zsh -lc \"sed -n 1,80p \\\"$MANIFEST\\\"\"'\n`,
+      'stdout',
+      110
+    );
+    state.observeChunk('thinking\nexec\n', 'stdout', 200);
+    state.observeChunk(
+      `/bin/zsh -lc 'sed -n 1,120p /Users/kbediako/.codex/memories/MEMORY.md'\n`,
+      'stdout',
+      210
+    );
+
+    const boundary = state.getStartupAnchorBoundaryState(220);
+    expect(boundary.triggered).toBe(true);
+    expect(boundary.anchorObserved).toBe(false);
+    expect(boundary.preAnchorMetaSurfaceKinds).toEqual(['codex-memories', 'run-manifest']);
+  });
+
   it('allows one incidental meta-surface read before a touched-path anchor', () => {
     const state = new ReviewExecutionState({
       startedAtMs: 0,
