@@ -1425,11 +1425,31 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     const prompt = await readFile(promptPath, 'utf8');
     expect(prompt).toContain(`Review scope hint: diff vs base \`${baseRef}\``);
     expect(prompt).toContain('Review scope paths (2):');
-    expect(prompt).toContain(originalFile);
-    expect(prompt).toContain(renamedFile);
+    expect(prompt).toContain(`${originalFile} -> ${renamedFile}`);
     expect(prompt).not.toContain('Git scope summary:');
     expect(prompt).not.toContain('scope-only base rename');
     expect(prompt).not.toContain('R100\t');
+  });
+
+  it('renders uncommitted rename scope notes as paired paths', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    const { files } = await initGitRepoWithCommittedFiles(sandbox, 1);
+    const originalFile = files[0] ?? 'file-1.txt';
+    const renamedFile = 'renamed-working-tree.txt';
+    await runGit(['mv', originalFile, renamedFile], sandbox);
+
+    const result = await runReviewCommand(manifestPath, baseEnv(sandbox, codexBin));
+
+    expect(result.exitCode).toBe(0);
+    const promptPath = join(dirname(manifestPath), 'review', 'prompt.txt');
+    const prompt = await readFile(promptPath, 'utf8');
+    expect(prompt).toContain('Review scope hint: uncommitted working tree changes (default).');
+    expect(prompt).toContain('Review scope paths (2):');
+    expect(prompt).toContain(`${originalFile} -> ${renamedFile}`);
+    expect(prompt).not.toContain(`\n${originalFile}\n`);
+    expect(prompt).not.toContain(`\n${renamedFile}\n`);
   });
 
   it('counts untracked file lines when evaluating large uncommitted scope', async () => {

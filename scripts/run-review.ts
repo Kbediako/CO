@@ -43,7 +43,12 @@ import {
   type ReviewOutputSummary,
   type ReviewStartupLoopState
 } from './lib/review-execution-state.js';
-import { parseNameStatusPaths, parseStatusZPaths } from './lib/review-scope-paths.js';
+import {
+  parseNameStatusPathCollection,
+  parseStatusZPathCollection,
+  parseStatusZPaths,
+  type ReviewScopePathCollection
+} from './lib/review-scope-paths.js';
 import { collectManifests, resolveEnvironmentPaths } from './lib/run-manifests.js';
 
 const execFileAsync = promisify(execFile);
@@ -541,7 +546,8 @@ async function main(): Promise<void> {
     );
   }
 
-  const scopeNotes = await buildScopeNotes(options);
+  const scopePathCollection = await collectReviewScopePaths(options);
+  const scopeNotes = buildScopeNotes(options, scopePathCollection);
   if (scopeNotes.length > 0) {
     promptLines.push('', ...scopeNotes);
   }
@@ -672,7 +678,7 @@ async function main(): Promise<void> {
     reviewSurface === 'audit'
       ? (['run-manifest', 'run-runner-log'] as const)
       : ([] as const);
-  const touchedPaths = await collectReviewScopePaths(options);
+  const touchedPaths = scopePathCollection.paths;
   if (!allowHeavyCommands) {
     if (lowSignalTimeoutMs === null) {
       console.log(
@@ -964,17 +970,17 @@ interface ReviewScopeAssessment {
   lineThreshold: number;
 }
 
-async function collectReviewScopePaths(options: CliOptions): Promise<string[]> {
+async function collectReviewScopePaths(options: CliOptions): Promise<ReviewScopePathCollection> {
   if (options.commit) {
     const summary = await tryGit(['show', '--no-color', '--name-status', '--format=', options.commit]);
-    return summary ? parseNameStatusPaths(summary) : [];
+    return summary ? parseNameStatusPathCollection(summary) : { paths: [], renderedLines: [] };
   }
   if (options.base) {
     const diff = await tryGit(['diff', '--no-color', '--name-status', `${options.base}...HEAD`]);
-    return diff ? parseNameStatusPaths(diff) : [];
+    return diff ? parseNameStatusPathCollection(diff) : { paths: [], renderedLines: [] };
   }
   const status = await tryGit(['status', '--porcelain=v1', '-z', '--untracked-files=all']);
-  return status ? parseStatusZPaths(status) : [];
+  return status ? parseStatusZPathCollection(status) : { paths: [], renderedLines: [] };
 }
 
 function resolveScopeFlag(options: CliOptions): { mode: ScopeFlagMode; args: string[] } | null {
@@ -1026,9 +1032,10 @@ function resolveReviewCommand(
   return resolveRuntimeCodexCommand(reviewArgs, context);
 }
 
-async function buildScopeNotes(options: CliOptions): Promise<string[]> {
+function buildScopeNotes(options: CliOptions, scopePathCollection: ReviewScopePathCollection): string[] {
   const lines: string[] = [];
-  const scopePaths = [...new Set(await collectReviewScopePaths(options))].sort();
+  const scopePaths = scopePathCollection.paths;
+  const renderedScopeLines = scopePathCollection.renderedLines;
 
   if (options.commit) {
     lines.push(`Review scope hint: commit \`${options.commit}\``);
@@ -1039,7 +1046,7 @@ async function buildScopeNotes(options: CliOptions): Promise<string[]> {
   }
 
   if (scopePaths.length > 0) {
-    lines.push('', `Review scope paths (${scopePaths.length}):`, '```', ...scopePaths, '```');
+    lines.push('', `Review scope paths (${scopePaths.length}):`, '```', ...renderedScopeLines, '```');
   } else {
     lines.push('', 'Review scope paths: unavailable or empty.');
   }
