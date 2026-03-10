@@ -68,43 +68,47 @@ export interface LinearWebhookControllerInput {
   now?: () => number;
 }
 
-export async function handleLinearWebhookRequest(input: LinearWebhookControllerInput): Promise<void> {
+export async function handleLinearWebhookRequest(input: LinearWebhookControllerInput): Promise<boolean> {
   const { req, res } = input;
+  const pathname = new URL(req.url ?? '/', 'http://localhost').pathname;
+  if (pathname !== '/integrations/linear/webhook') {
+    return false;
+  }
   const env = input.env ?? process.env;
   const now = input.now ?? Date.now;
   if (req.method !== 'POST') {
     writeLinearWebhookResponse(res, 405, 'rejected', 'method_not_allowed');
-    return;
+    return true;
   }
 
   const deliveryId = readHeaderValue(req.headers['linear-delivery']);
   if (!deliveryId) {
     writeLinearWebhookResponse(res, 400, 'rejected', 'linear_delivery_header_missing');
-    return;
+    return true;
   }
 
   const signature = readHeaderValue(req.headers['linear-signature']);
   if (!signature) {
     writeLinearWebhookResponse(res, 401, 'rejected', 'linear_signature_missing');
-    return;
+    return true;
   }
 
   const webhookSecret = env.CO_LINEAR_WEBHOOK_SECRET?.trim();
   if (!webhookSecret) {
     writeLinearWebhookResponse(res, 503, 'rejected', 'linear_webhook_secret_missing');
-    return;
+    return true;
   }
 
   const rawBody = await input.readRawBody(req as http.IncomingMessage);
   if (!isLinearWebhookSignatureValid(signature, rawBody, webhookSecret)) {
     writeLinearWebhookResponse(res, 401, 'rejected', 'linear_signature_invalid');
-    return;
+    return true;
   }
 
   const payload = parseJsonRecord(rawBody);
   if (!payload) {
     writeLinearWebhookResponse(res, 400, 'rejected', 'invalid_json');
-    return;
+    return true;
   }
 
   const eventName = readHeaderValue(req.headers['linear-event']) ?? readStringValue(payload, 'type') ?? null;
@@ -122,7 +126,7 @@ export async function handleLinearWebhookRequest(input: LinearWebhookControllerI
       reason: 'linear_webhook_timestamp_invalid'
     });
     writeLinearWebhookResponse(res, 401, 'rejected', 'linear_webhook_timestamp_invalid');
-    return;
+    return true;
   }
 
   if (Math.abs(now() - webhookTimestamp) > LINEAR_WEBHOOK_MAX_AGE_MS) {
@@ -136,7 +140,7 @@ export async function handleLinearWebhookRequest(input: LinearWebhookControllerI
       reason: 'linear_webhook_timestamp_expired'
     });
     writeLinearWebhookResponse(res, 401, 'rejected', 'linear_webhook_timestamp_expired');
-    return;
+    return true;
   }
 
   if (hasSeenLinearDelivery(input.linearAdvisoryState, deliveryId)) {
@@ -157,7 +161,7 @@ export async function handleLinearWebhookRequest(input: LinearWebhookControllerI
       reason: 'linear_delivery_duplicate'
     });
     writeLinearWebhookResponse(res, 200, 'duplicate', 'linear_delivery_duplicate');
-    return;
+    return true;
   }
 
   const sourceSetup = resolveLinearWebhookSourceSetup(input.readFeatureToggles(), env);
@@ -172,7 +176,7 @@ export async function handleLinearWebhookRequest(input: LinearWebhookControllerI
       reason: sourceSetup.error
     });
     writeLinearWebhookResponse(res, sourceSetup.status, 'rejected', sourceSetup.error);
-    return;
+    return true;
   }
 
   if ((eventName ?? '').toLowerCase() !== 'issue' || (readStringValue(payload, 'type') ?? '').toLowerCase() !== 'issue') {
@@ -186,7 +190,7 @@ export async function handleLinearWebhookRequest(input: LinearWebhookControllerI
       reason: 'linear_event_unsupported'
     });
     writeLinearWebhookResponse(res, 200, 'ignored', 'linear_event_unsupported');
-    return;
+    return true;
   }
 
   if (action !== 'create' && action !== 'update') {
@@ -200,7 +204,7 @@ export async function handleLinearWebhookRequest(input: LinearWebhookControllerI
       reason: 'linear_action_unsupported'
     });
     writeLinearWebhookResponse(res, 200, 'ignored', 'linear_action_unsupported');
-    return;
+    return true;
   }
 
   if (!issueId) {
@@ -214,7 +218,7 @@ export async function handleLinearWebhookRequest(input: LinearWebhookControllerI
       reason: 'linear_issue_id_missing'
     });
     writeLinearWebhookResponse(res, 400, 'rejected', 'linear_issue_id_missing');
-    return;
+    return true;
   }
 
   const resolution = await resolveLiveLinearTrackedIssueById({
@@ -236,7 +240,7 @@ export async function handleLinearWebhookRequest(input: LinearWebhookControllerI
     });
     writeLinearWebhookResponse(res, 200, 'accepted', 'linear_delivery_accepted');
     input.publishRuntime();
-    return;
+    return true;
   }
 
   if (shouldIgnoreLinearResolutionReason(resolution.reason)) {
@@ -250,7 +254,7 @@ export async function handleLinearWebhookRequest(input: LinearWebhookControllerI
       reason: resolution.reason
     });
     writeLinearWebhookResponse(res, 200, 'ignored', resolution.reason);
-    return;
+    return true;
   }
 
   await recordAndPersistLinearAdvisoryOutcome(input, {
@@ -263,7 +267,7 @@ export async function handleLinearWebhookRequest(input: LinearWebhookControllerI
     reason: resolution.reason
   });
   writeLinearWebhookResponse(res, resolution.status, 'rejected', resolution.reason);
-  return;
+  return true;
 }
 
 export function normalizeLinearAdvisoryState(input: LinearAdvisoryState | null): LinearAdvisoryState {

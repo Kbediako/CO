@@ -160,7 +160,7 @@ async function handleRequest(context: ControlRequestContext): Promise<void> {
     return;
   }
 
-  if (url.pathname === '/integrations/linear/webhook') {
+  if (
     await handleLinearWebhookRequest({
       req,
       res,
@@ -170,7 +170,8 @@ async function handleRequest(context: ControlRequestContext): Promise<void> {
       emitAuditEvent: (input) => emitLinearWebhookAuditEvent(context, input),
       readFeatureToggles: () => context.controlStore.snapshot().feature_toggles,
       publishRuntime: () => context.runtime.publish({ source: 'linear.webhook' })
-    });
+    })
+  ) {
     return;
   }
 

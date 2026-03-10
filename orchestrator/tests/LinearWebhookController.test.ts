@@ -70,6 +70,53 @@ afterEach(() => {
 });
 
 describe('LinearWebhookController', () => {
+  it('returns false for non-webhook pathnames without invoking the webhook controller path', async () => {
+    const { res, state } = createResponseRecorder();
+    const advisoryState = normalizeLinearAdvisoryState(null);
+    const readRawBody = vi.fn(async () => Buffer.from(''));
+
+    const handled = await handleLinearWebhookRequest({
+      req: createRequest({ method: 'POST', url: '/api/v1/state' }),
+      res,
+      linearAdvisoryState: advisoryState,
+      readRawBody,
+      persistLinearAdvisory: vi.fn(async () => undefined),
+      emitAuditEvent: vi.fn(async () => undefined),
+      readFeatureToggles: () => null,
+      publishRuntime: vi.fn()
+    });
+
+    expect(handled).toBe(false);
+    expect(readRawBody).not.toHaveBeenCalled();
+    expect(state.statusCode).toBeNull();
+    expect(state.body).toBeNull();
+  });
+
+  it('handles webhook pathnames through the controller-owned branch entrypoint', async () => {
+    const { res, state } = createResponseRecorder();
+    const advisoryState = normalizeLinearAdvisoryState(null);
+    const readRawBody = vi.fn(async () => Buffer.from(''));
+
+    const handled = await handleLinearWebhookRequest({
+      req: createRequest({ method: 'GET' }),
+      res,
+      linearAdvisoryState: advisoryState,
+      readRawBody,
+      persistLinearAdvisory: vi.fn(async () => undefined),
+      emitAuditEvent: vi.fn(async () => undefined),
+      readFeatureToggles: () => null,
+      publishRuntime: vi.fn()
+    });
+
+    expect(handled).toBe(true);
+    expect(readRawBody).not.toHaveBeenCalled();
+    expect(state.statusCode).toBe(405);
+    expect(state.body).toMatchObject({
+      status: 'rejected',
+      reason: 'method_not_allowed'
+    });
+  });
+
   it('returns method-not-allowed for non-POST webhook methods', async () => {
     const { res, state } = createResponseRecorder();
     const readRawBody = vi.fn(async () => Buffer.from(''));
