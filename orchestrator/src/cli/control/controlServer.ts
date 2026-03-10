@@ -9,11 +9,9 @@ import { type ControlServerBootstrapLifecycle } from './controlServerBootstrapLi
 import { createControlBootstrapAssembly } from './controlBootstrapAssembly.js';
 import { startControlServerStartupSequence } from './controlServerStartupSequence.js';
 import {
-  type ControlRequestContext,
   type ControlRequestSharedContext
 } from './controlRequestContext.js';
-import { buildControlRequestRouteDispatchInput } from './controlRequestPredispatch.js';
-import { handleControlRequestRouteDispatch } from './controlRequestRouteDispatch.js';
+import { handleControlRequest } from './controlRequestController.js';
 import { createControlServerSeededRuntimeAssembly } from './controlServerSeededRuntimeAssembly.js';
 import { createControlServerRequestShell } from './controlServerRequestShell.js';
 import { readControlServerSeeds } from './controlServerSeedLoading.js';
@@ -79,7 +77,7 @@ export class ControlServer {
               expiryLifecycle: instance.expiryLifecycle
             }
           : null,
-      handleRequest
+      handleRequest: handleControlRequest
     });
 
     instance = new ControlServer({
@@ -125,14 +123,6 @@ export class ControlServer {
       this.server.close(() => resolve());
     });
   }
-}
-
-async function handleRequest(context: ControlRequestContext): Promise<void> {
-  const dispatchInput = buildControlRequestRouteDispatchInput(context);
-  if (!dispatchInput) {
-    return;
-  }
-  await handleControlRequestRouteDispatch(dispatchInput);
 }
 
 export { isLoopbackAddress } from './uiSessionController.js';
