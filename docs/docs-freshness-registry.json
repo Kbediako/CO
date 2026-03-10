@@ -3,6 +3,55 @@
   "generated_at": "2026-03-10",
   "entries": [
     {
+      "path": ".agent/task/1100-coordinator-symphony-aligned-linear-webhook-branch-shell-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-10",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-linear-webhook-branch-shell-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-10",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/PRD-coordinator-symphony-aligned-linear-webhook-branch-shell-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-10",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/TECH_SPEC-coordinator-symphony-aligned-linear-webhook-branch-shell-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-10",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/findings/1100-linear-webhook-branch-shell-extraction-deliberation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-10",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/specs/1100-coordinator-symphony-aligned-linear-webhook-branch-shell-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-10",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/tasks-1100-coordinator-symphony-aligned-linear-webhook-branch-shell-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-10",
+      "cadence_days": 30
+    },
+    {
       "path": ".agent/task/1099-coordinator-symphony-aligned-standalone-review-structured-scope-path-rendering-boundary.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
