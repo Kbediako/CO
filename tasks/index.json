@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260310-1107-coordinator-symphony-aligned-standalone-review-startup-anchor-boundary",
+      "title": "Coordinator Symphony-Aligned Standalone Review Startup-Anchor Boundary",
+      "relates_to": "tasks/tasks-1107-coordinator-symphony-aligned-standalone-review-startup-anchor-boundary.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-10",
+      "paths": {
+        "spec": "tasks/specs/1107-coordinator-symphony-aligned-standalone-review-startup-anchor-boundary.md",
+        "task": "tasks/tasks-1107-coordinator-symphony-aligned-standalone-review-startup-anchor-boundary.md",
+        "agent_task": ".agent/task/1107-coordinator-symphony-aligned-standalone-review-startup-anchor-boundary.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-standalone-review-startup-anchor-boundary.md"
+      }
+    },
+    {
       "id": "20260310-1106-coordinator-symphony-aligned-control-server-live-instance-host-shell-extraction",
       "title": "Coordinator Symphony-Aligned Control Server Live-Instance Host Shell Extraction",
       "relates_to": "tasks/tasks-1106-coordinator-symphony-aligned-control-server-live-instance-host-shell-extraction.md",
