@@ -37,6 +37,8 @@ const DEFAULT_REVIEW_OUTPUT_SUMMARY_HEAVY_COMMAND_LIMIT = 8;
 const DEFAULT_REVIEW_OUTPUT_SUMMARY_COMMAND_LIMIT = 64;
 const DEFAULT_LOW_SIGNAL_TIMEOUT_MS = 180_000;
 const DEFAULT_META_SURFACE_TIMEOUT_MS = 180_000;
+const STARTUP_ANCHOR_META_SURFACE_SIGNAL_BUDGET = 1;
+const STARTUP_ANCHOR_ALLOWED_META_SURFACE_KINDS = new Set(['review-support']);
 const LOW_SIGNAL_MIN_THINKING_BLOCKS = 10;
 const LOW_SIGNAL_MIN_COMMAND_STARTS = 10;
 const LOW_SIGNAL_MAX_DISTINCT_TARGETS = 4;
@@ -63,6 +65,8 @@ export type ReviewCommandIntentViolationKind =
   | 'review-orchestration'
   | 'delegation-control';
 
+export type ReviewScopeMode = 'uncommitted' | 'base' | 'commit';
+
 export interface ReviewOutputSummary {
   lineCount: number;
   commandStarts: string[];
@@ -79,6 +83,11 @@ export interface ReviewOutputSummary {
   distinctMetaSurfaces: number;
   maxMetaSurfaceHits: number;
   metaSurfaceKinds: string[];
+  startupAnchorObserved: boolean;
+  preAnchorCommandStarts: number;
+  preAnchorMetaSurfaceSignals: number;
+  preAnchorDistinctMetaSurfaces: number;
+  preAnchorMetaSurfaceKinds: string[];
   commandIntentViolationCount: number;
   commandIntentViolationKinds: ReviewCommandIntentViolationKind[];
   commandIntentViolationSamples: string[];
@@ -122,6 +131,16 @@ export interface ReviewMetaSurfaceExpansionState {
   timeoutMs: number | null;
 }
 
+export interface ReviewStartupAnchorBoundaryState {
+  triggered: boolean;
+  reason: string | null;
+  anchorObserved: boolean;
+  preAnchorCommandStarts: number;
+  preAnchorMetaSurfaceSignals: number;
+  preAnchorDistinctMetaSurfaces: number;
+  preAnchorMetaSurfaceKinds: string[];
+}
+
 export interface ReviewCommandIntentBoundaryState {
   triggered: boolean;
   reason: string | null;
@@ -143,6 +162,9 @@ export interface ReviewExecutionStateOptions {
   metaSurfaceTimeoutMs?: number | null;
   allowedMetaSurfaceKinds?: string[];
   touchedPaths?: string[];
+  enforceStartupAnchorBoundary?: boolean;
+  scopeMode?: ReviewScopeMode;
+  repoRoot?: string;
 }
 
 interface ReviewExecutionTelemetryPayloadOptions {
@@ -197,6 +219,9 @@ export class ReviewExecutionState {
   private readonly metaSurfaceTimeoutMs: number | null;
   private readonly allowedMetaSurfaceKinds: Set<string>;
   private readonly touchedPaths: Set<string>;
+  private readonly enforceStartupAnchorBoundary: boolean;
+  private readonly startupAnchorScopeMode: ReviewScopeMode;
+  private readonly repoRoot: string | null;
 
   private lastOutputAtMs: number;
   private preview = '';
@@ -206,15 +231,19 @@ export class ReviewExecutionState {
   private reviewProgressSignals = 0;
   private thinkingBlocks = 0;
   private reviewProgressObserved = false;
+  private startupAnchorObserved = false;
   private awaitingCommandLine = false;
   private blockedHeavyCommand: string | null = null;
   private lowSignalCandidateSinceMs: number | null = null;
   private metaSurfaceCandidateSinceMs: number | null = null;
+  private startupAnchorViolationAtMs: number | null = null;
+  private preAnchorCommandStarts = 0;
   private readonly commandStarts: string[] = [];
   private readonly heavyCommandStarts: string[] = [];
   private readonly recentInspectionTargetSamples: string[][] = [];
   private readonly recentInspectionSignatures: string[] = [];
   private readonly recentMetaSurfaceSamples: Array<string | null> = [];
+  private readonly preAnchorMetaSurfaceSamples: string[] = [];
   private readonly commandIntentViolationSamples: ReviewCommandIntentViolation[] = [];
   private readonly lastLines: string[] = [];
   private readonly pendingFragmentsByStream: PendingFragmentsByStream = {
@@ -251,6 +280,10 @@ export class ReviewExecutionState {
     this.touchedPaths = new Set(
       (options.touchedPaths ?? []).map((entry) => normalizeScopePath(entry)).filter(Boolean)
     );
+    this.enforceStartupAnchorBoundary =
+      (options.enforceStartupAnchorBoundary ?? false) && this.touchedPaths.size > 0;
+    this.startupAnchorScopeMode = options.scopeMode ?? 'uncommitted';
+    this.repoRoot = normalizeScopeRoot(options.repoRoot);
   }
 
   observeChunk(chunk: Buffer | string, stream: ReviewExecutionStream, nowMs = Date.now()): void {
@@ -289,6 +322,7 @@ export class ReviewExecutionState {
 
   buildOutputSummary(): ReviewOutputSummary {
     const inspectionTargetSummary = this.buildInspectionTargetSummary();
+    const preAnchorMetaSurfaceSummary = this.buildPreAnchorMetaSurfaceSummary();
     return {
       lineCount: this.lineCount,
       commandStarts: [...this.commandStarts],
@@ -305,6 +339,11 @@ export class ReviewExecutionState {
       distinctMetaSurfaces: inspectionTargetSummary.distinctMetaSurfaces,
       maxMetaSurfaceHits: inspectionTargetSummary.maxMetaSurfaceHits,
       metaSurfaceKinds: inspectionTargetSummary.metaSurfaceKinds,
+      startupAnchorObserved: this.startupAnchorObserved,
+      preAnchorCommandStarts: this.preAnchorCommandStarts,
+      preAnchorMetaSurfaceSignals: preAnchorMetaSurfaceSummary.signals,
+      preAnchorDistinctMetaSurfaces: preAnchorMetaSurfaceSummary.distinctSurfaces,
+      preAnchorMetaSurfaceKinds: preAnchorMetaSurfaceSummary.kinds,
       commandIntentViolationCount: this.commandIntentViolationSamples.length,
       commandIntentViolationKinds: [
         ...new Set(this.commandIntentViolationSamples.map((sample) => sample.kind))
@@ -357,6 +396,24 @@ export class ReviewExecutionState {
       distinctMetaSurfaces: summary.distinctMetaSurfaces,
       maxMetaSurfaceHits: summary.maxMetaSurfaceHits,
       timeoutMs: this.metaSurfaceTimeoutMs
+    };
+  }
+
+  getStartupAnchorBoundaryState(nowMs = Date.now()): ReviewStartupAnchorBoundaryState {
+    const summary = this.buildOutputSummary();
+    const triggered = this.startupAnchorViolationAtMs !== null;
+    return {
+      triggered,
+      reason: triggered
+        ? `bounded review startup-anchor boundary violated after ${formatDurationMs(
+            Math.max(0, this.startupAnchorViolationAtMs! - this.startedAtMs)
+          )}: ${summary.preAnchorCommandStarts} pre-anchor command starts, ${summary.preAnchorMetaSurfaceSignals} pre-anchor meta-surface signals across ${summary.preAnchorDistinctMetaSurfaces} surface kind(s) [${summary.preAnchorMetaSurfaceKinds.join(', ')}] before the first startup anchor.`
+        : null,
+      anchorObserved: this.startupAnchorObserved,
+      preAnchorCommandStarts: summary.preAnchorCommandStarts,
+      preAnchorMetaSurfaceSignals: summary.preAnchorMetaSurfaceSignals,
+      preAnchorDistinctMetaSurfaces: summary.preAnchorDistinctMetaSurfaces,
+      preAnchorMetaSurfaceKinds: summary.preAnchorMetaSurfaceKinds
     };
   }
 
@@ -447,7 +504,7 @@ export class ReviewExecutionState {
     }
     const metaSurfaceToolSample = classifyMetaSurfaceToolLine(trimmed);
     if (metaSurfaceToolSample) {
-      this.recordMetaSurfaceToolSample(metaSurfaceToolSample);
+      this.recordMetaSurfaceToolSample(metaSurfaceToolSample, nowMs);
     }
     const commandIntentToolViolation = classifyCommandIntentToolLine(trimmed);
     if (commandIntentToolViolation) {
@@ -466,9 +523,14 @@ export class ReviewExecutionState {
           this.commandStarts.shift();
         }
         this.commandStarts.push(commandLine);
+        const metaSurfaceSample = classifyMetaSurfaceCommandLine(
+          commandLine,
+          this.touchedPaths,
+          this.repoRoot
+        );
+        this.recordMetaSurfaceCommandSample(metaSurfaceSample, nowMs);
         this.recordInspectionTargets(commandLine);
-        const metaSurfaceSample = classifyMetaSurfaceCommandLine(commandLine, this.touchedPaths);
-        this.recordMetaSurfaceCommandSample(metaSurfaceSample);
+        this.recordStartupAnchorProgress(commandLine, nowMs);
         const commandIntentViolation = classifyCommandIntentCommandLine(commandLine, {
           allowValidationCommandIntents: this.allowValidationCommandIntents
         });
@@ -501,10 +563,10 @@ export class ReviewExecutionState {
     this.updateMetaSurfaceCandidate(nowMs);
   }
 
-  private recordInspectionTargets(commandLine: string): void {
+  private recordInspectionTargets(commandLine: string): string[] {
     const targets = extractInspectionTargets(commandLine);
     if (targets.length === 0) {
-      return;
+      return targets;
     }
     this.recentInspectionTargetSamples.push(targets);
     while (this.recentInspectionTargetSamples.length > LOW_SIGNAL_RECENT_COMMAND_WINDOW) {
@@ -512,11 +574,31 @@ export class ReviewExecutionState {
     }
     const signature = extractInspectionCommandSignature(commandLine, targets);
     if (!signature) {
-      return;
+      return targets;
     }
     this.recentInspectionSignatures.push(signature);
     while (this.recentInspectionSignatures.length > LOW_SIGNAL_RECENT_COMMAND_WINDOW) {
       this.recentInspectionSignatures.shift();
+    }
+    return targets;
+  }
+
+  private recordStartupAnchorProgress(commandLine: string, nowMs: number): void {
+    if (!this.enforceStartupAnchorBoundary || this.startupAnchorObserved) {
+      return;
+    }
+    const startupBoundaryProgress = analyzeStartupAnchorBoundaryProgress(commandLine, {
+      repoRoot: this.repoRoot,
+      touchedPaths: this.touchedPaths,
+      scopeMode: this.startupAnchorScopeMode
+    });
+    for (const preAnchorMetaSurfaceSample of startupBoundaryProgress.preAnchorMetaSurfaceSamples) {
+      this.recordPreAnchorMetaSurfaceSample(preAnchorMetaSurfaceSample, nowMs);
+    }
+    if (startupBoundaryProgress.anchorObserved) {
+      this.startupAnchorObserved = true;
+    } else {
+      this.preAnchorCommandStarts += 1;
     }
   }
 
@@ -545,12 +627,12 @@ export class ReviewExecutionState {
     }
   }
 
-  private recordMetaSurfaceCommandSample(sample: string | null): void {
-    this.recordMetaSurfaceSample(sample);
+  private recordMetaSurfaceCommandSample(sample: string | null, nowMs: number): void {
+    this.recordMetaSurfaceSample(sample, nowMs);
   }
 
-  private recordMetaSurfaceToolSample(sample: string): void {
-    this.recordMetaSurfaceSample(sample);
+  private recordMetaSurfaceToolSample(sample: string, nowMs: number): void {
+    this.recordMetaSurfaceSample(sample, nowMs);
   }
 
   private recordCommandIntentViolation(violation: ReviewCommandIntentViolation): void {
@@ -563,12 +645,25 @@ export class ReviewExecutionState {
     }
   }
 
-  private recordMetaSurfaceSample(sample: string | null): void {
+  private recordMetaSurfaceSample(sample: string | null, _nowMs: number): void {
     const nextSample =
       sample && this.allowedMetaSurfaceKinds.has(sample) ? null : sample;
     this.recentMetaSurfaceSamples.push(nextSample);
     while (this.recentMetaSurfaceSamples.length > META_SURFACE_RECENT_SIGNAL_WINDOW) {
       this.recentMetaSurfaceSamples.shift();
+    }
+  }
+
+  private recordPreAnchorMetaSurfaceSample(sample: string, nowMs: number): void {
+    if (STARTUP_ANCHOR_ALLOWED_META_SURFACE_KINDS.has(sample)) {
+      return;
+    }
+    this.preAnchorMetaSurfaceSamples.push(sample);
+    if (
+      this.startupAnchorViolationAtMs === null &&
+      this.preAnchorMetaSurfaceSamples.length > STARTUP_ANCHOR_META_SURFACE_SIGNAL_BUDGET
+    ) {
+      this.startupAnchorViolationAtMs = nowMs;
     }
   }
 
@@ -647,6 +742,22 @@ export class ReviewExecutionState {
       distinctMetaSurfaces: recentMetaSurfaceHits.size,
       maxMetaSurfaceHits,
       metaSurfaceKinds: [...recentMetaSurfaceHits.keys()].sort()
+    };
+  }
+
+  private buildPreAnchorMetaSurfaceSummary(): {
+    signals: number;
+    distinctSurfaces: number;
+    kinds: string[];
+  } {
+    const preAnchorMetaSurfaceHits = new Map<string, number>();
+    for (const sample of this.preAnchorMetaSurfaceSamples) {
+      preAnchorMetaSurfaceHits.set(sample, (preAnchorMetaSurfaceHits.get(sample) ?? 0) + 1);
+    }
+    return {
+      signals: [...preAnchorMetaSurfaceHits.values()].reduce((sum, hits) => sum + hits, 0),
+      distinctSurfaces: preAnchorMetaSurfaceHits.size,
+      kinds: [...preAnchorMetaSurfaceHits.keys()].sort()
     };
   }
 }
@@ -1239,12 +1350,13 @@ function classifyCommandIntentSegment(
 
 function classifyMetaSurfaceCommandLine(
   commandLine: string,
-  touchedPaths: ReadonlySet<string>
+  touchedPaths: ReadonlySet<string>,
+  repoRoot: string | null
 ): string | null {
   const normalized = normalizeReviewCommandLine(commandLine).replace(/\\/gu, '/');
   const segments = splitShellControlSegments(normalized);
   for (const segment of segments) {
-    const kind = classifyMetaSurfaceSegment(segment, touchedPaths);
+    const kind = classifyMetaSurfaceSegment(segment, touchedPaths, repoRoot);
     if (kind) {
       return kind;
     }
@@ -1252,9 +1364,39 @@ function classifyMetaSurfaceCommandLine(
   return null;
 }
 
+function analyzeStartupAnchorBoundaryProgress(
+  commandLine: string,
+  options: {
+    repoRoot: string | null;
+    touchedPaths: ReadonlySet<string>;
+    scopeMode: ReviewScopeMode;
+  }
+): { anchorObserved: boolean; preAnchorMetaSurfaceSamples: string[] } {
+  const normalized = normalizeReviewCommandLine(commandLine).replace(/\\/gu, '/');
+  const segments = splitShellControlSegments(normalized);
+  const progress = {
+    anchorObserved: false,
+    preAnchorMetaSurfaceSamples: [] as string[]
+  };
+  for (const segment of segments) {
+    if (progress.anchorObserved) {
+      break;
+    }
+    analyzeStartupAnchorBoundarySegment(
+      segment,
+      options.touchedPaths,
+      options.scopeMode,
+      options.repoRoot,
+      progress
+    );
+  }
+  return progress;
+}
+
 function classifyMetaSurfaceSegment(
   segment: string,
   touchedPaths: ReadonlySet<string>,
+  repoRoot: string | null,
   depth = 0
 ): string | null {
   const strippedTokens = stripLeadingEnvAssignments(tokenizeShellSegment(segment));
@@ -1272,7 +1414,12 @@ function classifyMetaSurfaceSegment(
     if (payload) {
       const nestedSegments = splitShellControlSegments(payload);
       for (const nestedSegment of nestedSegments) {
-        const nestedKind = classifyMetaSurfaceSegment(nestedSegment, touchedPaths, depth + 1);
+        const nestedKind = classifyMetaSurfaceSegment(
+          nestedSegment,
+          touchedPaths,
+          repoRoot,
+          depth + 1
+        );
         if (nestedKind) {
           return nestedKind;
         }
@@ -1282,18 +1429,236 @@ function classifyMetaSurfaceSegment(
 
   const command = normalizeCommandToken(tokens[0] ?? '');
   const args = tokens.slice(1);
-  if (isReviewOrchestrationCommand(command, args)) {
-    return 'review-orchestration';
+  return classifyMetaSurfaceDirect(command, args, touchedPaths, repoRoot)[0] ?? null;
+}
+
+function isDiffScopeAnchorCommand(
+  command: string,
+  args: string[],
+  scopeMode: ReviewScopeMode,
+  touchedPaths: ReadonlySet<string>,
+  repoRoot: string | null
+): boolean {
+  if (scopeMode !== 'uncommitted') {
+    return false;
+  }
+  if (command !== 'git') {
+    return false;
   }
 
-  for (const operand of extractMetaSurfaceOperands(command, args)) {
-    const operandKind = classifyMetaSurfaceOperand(operand, touchedPaths);
-    if (operandKind) {
-      return operandKind;
+  const invocation = resolveGitInvocation(args);
+  if (invocation.subcommand !== 'diff' || !gitDiffArgsAreScopeOnly(invocation.subcommandArgs)) {
+    return false;
+  }
+
+  const pathspecs = extractGitDiffPathspecs(invocation.subcommandArgs);
+  if (pathspecs.length === 0) {
+    return true;
+  }
+
+  return pathspecs.some((pathspec) => isTouchedScopePath(pathspec, touchedPaths, repoRoot));
+}
+
+function gitDiffArgsAreScopeOnly(args: string[]): boolean {
+  let sawScopeSeparator = false;
+  for (const arg of args) {
+    if (!arg) {
+      continue;
+    }
+    if (arg === '--') {
+      sawScopeSeparator = true;
+      continue;
+    }
+    if (sawScopeSeparator || arg.startsWith('-')) {
+      continue;
+    }
+    return false;
+  }
+  return true;
+}
+
+function extractGitDiffPathspecs(args: string[]): string[] {
+  const separatorIndex = args.indexOf('--');
+  if (separatorIndex === -1 || separatorIndex === args.length - 1) {
+    return [];
+  }
+  return args
+    .slice(separatorIndex + 1)
+    .map((arg) => arg.trim())
+    .filter((arg) => arg.length > 0);
+}
+
+function expandTouchedScopeOperandCandidates(
+  command: string,
+  args: string[],
+  operand: string
+): string[] {
+  const candidates = [operand];
+  const gitRevisionPathCandidate = extractGitRevisionPathCandidate(command, args, operand);
+  if (gitRevisionPathCandidate) {
+    candidates.push(gitRevisionPathCandidate);
+  }
+  return candidates;
+}
+
+function extractGitRevisionPathCandidate(
+  command: string,
+  args: string[],
+  operand: string
+): string | null {
+  if (command !== 'git') {
+    return null;
+  }
+  const invocation = resolveGitInvocation(args);
+  if (invocation.subcommand !== 'show') {
+    return null;
+  }
+  const normalizedOperand = operand.replace(/\\/gu, '/');
+  if (normalizedOperand.startsWith(':')) {
+    return normalizedOperand.slice(1);
+  }
+  if (normalizedOperand.includes('://')) {
+    return null;
+  }
+  const separatorIndex = normalizedOperand.lastIndexOf(':');
+  if (separatorIndex <= 0 || separatorIndex === normalizedOperand.length - 1) {
+    return null;
+  }
+  return normalizedOperand.slice(separatorIndex + 1);
+}
+
+function resolveGitInvocation(args: string[]): { subcommand: string | null; subcommandArgs: string[] } {
+  let index = 0;
+  while (index < args.length) {
+    const token = args[index] ?? '';
+    const normalized = normalizeCommandToken(token);
+    if (!normalized) {
+      index += 1;
+      continue;
+    }
+    if (normalized === '--') {
+      return { subcommand: null, subcommandArgs: [] };
+    }
+    if (token.startsWith('-')) {
+      index += gitOptionConsumesValue(token) && !token.includes('=') ? 2 : 1;
+      continue;
+    }
+    return { subcommand: normalized, subcommandArgs: args.slice(index + 1) };
+  }
+  return { subcommand: null, subcommandArgs: [] };
+}
+
+function gitOptionConsumesValue(option: string): boolean {
+  const normalized = option.toLowerCase();
+  return (
+    normalized === '-c' ||
+    normalized === '-C' ||
+    normalized === '--git-dir' ||
+    normalized.startsWith('--git-dir=') ||
+    normalized === '--work-tree' ||
+    normalized.startsWith('--work-tree=') ||
+    normalized === '--namespace' ||
+    normalized.startsWith('--namespace=') ||
+    normalized === '--exec-path' ||
+    normalized.startsWith('--exec-path=') ||
+    normalized === '--config-env' ||
+    normalized.startsWith('--config-env=') ||
+    normalized === '--super-prefix' ||
+    normalized.startsWith('--super-prefix=')
+  );
+}
+
+function analyzeStartupAnchorBoundarySegment(
+  segment: string,
+  touchedPaths: ReadonlySet<string>,
+  scopeMode: ReviewScopeMode,
+  repoRoot: string | null,
+  progress: { anchorObserved: boolean; preAnchorMetaSurfaceSamples: string[] },
+  depth = 0
+): void {
+  const strippedTokens = stripLeadingEnvAssignments(tokenizeShellSegment(segment));
+  if (strippedTokens.length === 0) {
+    return;
+  }
+
+  const tokens = unwrapEnvCommandTokens(strippedTokens);
+  if (tokens.length === 0) {
+    return;
+  }
+
+  if (depth < 3) {
+    const payload = extractShellCommandPayload(tokens);
+    if (payload) {
+      const nestedSegments = splitShellControlSegments(payload);
+      for (const nestedSegment of nestedSegments) {
+        if (progress.anchorObserved) {
+          return;
+        }
+        analyzeStartupAnchorBoundarySegment(
+          nestedSegment,
+          touchedPaths,
+          scopeMode,
+          repoRoot,
+          progress,
+          depth + 1
+        );
+      }
+      return;
     }
   }
 
-  return null;
+  const command = normalizeCommandToken(tokens[0] ?? '');
+  const args = tokens.slice(1);
+  const metaSurfaceSamples = classifyMetaSurfaceDirect(command, args, touchedPaths, repoRoot);
+  if (!progress.anchorObserved) {
+    progress.preAnchorMetaSurfaceSamples.push(...metaSurfaceSamples);
+  }
+  if (
+    segmentDirectHasTouchedPathAnchor(command, args, touchedPaths, repoRoot) ||
+    isDiffScopeAnchorCommand(command, args, scopeMode, touchedPaths, repoRoot)
+  ) {
+    progress.anchorObserved = true;
+  }
+}
+
+function segmentDirectHasTouchedPathAnchor(
+  command: string,
+  args: string[],
+  touchedPaths: ReadonlySet<string>,
+  repoRoot: string | null
+): boolean {
+  for (const operand of extractMetaSurfaceOperands(command, args)) {
+    for (const candidate of expandTouchedScopeOperandCandidates(command, args, operand)) {
+      if (isTouchedScopePath(candidate, touchedPaths, repoRoot)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+function classifyMetaSurfaceDirect(
+  command: string,
+  args: string[],
+  touchedPaths: ReadonlySet<string>,
+  repoRoot: string | null
+): string[] {
+  if (isReviewOrchestrationCommand(command, args)) {
+    return ['review-orchestration'];
+  }
+
+  const metaSurfaceKinds: string[] = [];
+  for (const operand of extractMetaSurfaceOperands(command, args)) {
+    for (const candidate of expandTouchedScopeOperandCandidates(command, args, operand)) {
+      const operandKind = classifyMetaSurfaceOperand(candidate, touchedPaths, repoRoot);
+      if (operandKind) {
+        metaSurfaceKinds.push(operandKind);
+        break;
+      }
+    }
+  }
+
+  return metaSurfaceKinds;
 }
 
 function isReviewOrchestrationCommand(command: string, args: string[]): boolean {
@@ -1557,13 +1922,14 @@ function shouldCollectMetaSurfacePositional(command: string, positionalIndex: nu
 
 function classifyMetaSurfaceOperand(
   operand: string,
-  touchedPaths: ReadonlySet<string>
+  touchedPaths: ReadonlySet<string>,
+  repoRoot: string | null
 ): string | null {
   const normalized = operand.trim().replace(/\\/gu, '/');
   if (!normalized) {
     return null;
   }
-  if (isTouchedScopePath(normalized, touchedPaths)) {
+  if (isTouchedScopePath(normalized, touchedPaths, repoRoot)) {
     return null;
   }
   if (/^\$(?:\{)?MANIFEST(?:\})?$/iu.test(normalized)) {
@@ -1620,15 +1986,44 @@ function normalizeScopePath(value: string): string {
   return value.trim().replace(/\\/gu, '/').replace(/^\.\//u, '');
 }
 
+function normalizeScopeRoot(value: string | undefined): string | null {
+  if (!value) {
+    return null;
+  }
+  const normalized = normalizeScopePath(value).replace(/\/+$/u, '');
+  return normalized.length > 0 ? normalized : null;
+}
+
 function matchesPathSuffix(value: string, relativePath: string): boolean {
   const normalizedRelativePath = normalizeScopePath(relativePath);
   return value === normalizedRelativePath || value.endsWith(`/${normalizedRelativePath}`);
 }
 
-function isTouchedScopePath(operand: string, touchedPaths: ReadonlySet<string>): boolean {
+function relativizeOperandToRepoRoot(operand: string, repoRoot: string | null): string {
+  if (!repoRoot) {
+    return operand;
+  }
+  if (operand === repoRoot) {
+    return '';
+  }
+  if (operand.startsWith(`${repoRoot}/`)) {
+    return operand.slice(repoRoot.length + 1);
+  }
+  return operand;
+}
+
+function isTouchedScopePath(
+  operand: string,
+  touchedPaths: ReadonlySet<string>,
+  repoRoot: string | null = null
+): boolean {
   const normalizedOperand = normalizeScopePath(operand);
+  const repoRelativeOperand = relativizeOperandToRepoRoot(normalizedOperand, repoRoot);
   for (const touchedPath of touchedPaths) {
-    if (matchesPathSuffix(normalizedOperand, touchedPath)) {
+    if (
+      repoRelativeOperand === touchedPath ||
+      repoRelativeOperand === normalizeScopePath(touchedPath)
+    ) {
       return true;
     }
   }

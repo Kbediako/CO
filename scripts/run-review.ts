@@ -38,6 +38,7 @@ import {
   formatDurationMs,
   logReviewTelemetrySummary as logReviewExecutionTelemetrySummary,
   persistReviewTelemetry as persistReviewExecutionTelemetry,
+  type ReviewStartupAnchorBoundaryState,
   ReviewExecutionState,
   type ReviewCommandIntentBoundaryState,
   type ReviewOutputSummary,
@@ -479,6 +480,7 @@ async function main(): Promise<void> {
     surface: reviewSurface
   });
   const diffBudgetOverride = process.env.DIFF_BUDGET_OVERRIDE_REASON?.trim();
+  const scopeMode = resolveEffectiveScopeMode(options);
   const promptLines = [`Review task: ${taskLabel}`, `Review surface: ${reviewSurface}`];
 
   if (reviewSurface === 'audit') {
@@ -510,9 +512,14 @@ async function main(): Promise<void> {
       'Call out any remaining documentation/code mismatches or guardrail violations.'
     );
   } else {
+    const startupFocusLine =
+      scopeMode === 'uncommitted'
+        ? '- Start with touched paths, scoped diff commands, or nearby changed code before consulting memory, skills, review docs, manifests, or review artifacts'
+        : '- Start with touched paths or nearby changed code before consulting memory, skills, review docs, manifests, or review artifacts';
     promptLines.push(
       '- Behavior remains correct for changed files and nearby dependencies',
       '- Call out concrete regressions, risky edge cases, or missing tests in the changed area',
+      startupFocusLine,
       '',
       'Keep this pass diff-focused. Do not audit checklist/docs/evidence surfaces unless they are directly required to assess code correctness.'
     );
@@ -679,6 +686,8 @@ async function main(): Promise<void> {
       ? (['run-manifest', 'run-runner-log'] as const)
       : ([] as const);
   const touchedPaths = scopePathCollection.paths;
+  const enforceStartupAnchorBoundary =
+    !allowHeavyCommands && reviewSurface === 'diff' && touchedPaths.length > 0;
   if (!allowHeavyCommands) {
     if (lowSignalTimeoutMs === null) {
       console.log(
@@ -710,6 +719,11 @@ async function main(): Promise<void> {
         )} of sustained off-task meta activity (set ${REVIEW_META_SURFACE_TIMEOUT_ENV_KEY}=0 to disable).`
       );
     }
+    if (enforceStartupAnchorBoundary) {
+      console.log(
+        '[run-review] startup-anchor boundary enabled for diff mode; repeated memory/skills/review-docs/manifest/review-artifact reads before the first startup anchor will terminate the review.'
+      );
+    }
   }
   const autoIssueLogEnabled = options.autoIssueLog ?? false;
 
@@ -728,7 +742,10 @@ async function main(): Promise<void> {
       monitorIntervalMs,
       lowSignalTimeoutMs,
       metaSurfaceTimeoutMs,
+      enforceStartupAnchorBoundary,
       allowedMetaSurfaceKinds: [...allowedMetaSurfaceKinds],
+      scopeMode,
+      repoRoot,
       touchedPaths,
       outputLogPath: artifactPaths.outputLogPath
     });
@@ -1367,7 +1384,10 @@ interface RunCodexReviewOptions {
   monitorIntervalMs: number | null;
   lowSignalTimeoutMs: number | null;
   metaSurfaceTimeoutMs: number | null;
+  enforceStartupAnchorBoundary: boolean;
   allowedMetaSurfaceKinds: string[];
+  scopeMode: ScopeFlagMode;
+  repoRoot: string;
   touchedPaths: string[];
   outputLogPath: string;
 }
@@ -1447,7 +1467,10 @@ async function runCodexReview(
     allowValidationCommandIntents: options.allowValidationCommandIntents,
     lowSignalTimeoutMs: options.lowSignalTimeoutMs,
     metaSurfaceTimeoutMs: options.metaSurfaceTimeoutMs,
+    enforceStartupAnchorBoundary: options.enforceStartupAnchorBoundary,
     allowedMetaSurfaceKinds: options.allowedMetaSurfaceKinds,
+    scopeMode: options.scopeMode,
+    repoRoot: options.repoRoot,
     touchedPaths: options.touchedPaths
   });
 
@@ -1493,12 +1516,14 @@ async function runCodexReview(
       monitorIntervalMs: options.monitorIntervalMs,
       lowSignalTimeoutMs: options.lowSignalTimeoutMs,
       metaSurfaceTimeoutMs: options.metaSurfaceTimeoutMs,
+      enforceStartupAnchorBoundary: options.enforceStartupAnchorBoundary,
       blockHeavyCommands: options.blockHeavyCommands,
       getLastOutputAtMs: () => executionState.getLastOutputAtMs(),
       getStartupLoopState: () => executionState.getStartupLoopState(),
       getBlockedHeavyCommand: () => executionState.getBlockedHeavyCommand(),
       getLowSignalDriftReason: () => executionState.getLowSignalDriftState().reason,
       getMetaSurfaceExpansionReason: () => executionState.getMetaSurfaceExpansionState().reason,
+      getStartupAnchorBoundaryState: () => executionState.getStartupAnchorBoundaryState(),
       getCommandIntentBoundaryState: () => executionState.getCommandIntentBoundaryState(),
       waitForOutputDrain: () => outputDrainPromise,
       formatCheckpoint: () => executionState.formatCheckpoint(),
@@ -1775,12 +1800,14 @@ interface WaitForChildExitOptions {
   monitorIntervalMs: number | null;
   lowSignalTimeoutMs: number | null;
   metaSurfaceTimeoutMs: number | null;
+  enforceStartupAnchorBoundary: boolean;
   blockHeavyCommands: boolean;
   getLastOutputAtMs: () => number;
   getStartupLoopState: () => ReviewStartupLoopState;
   getBlockedHeavyCommand: () => string | null;
   getLowSignalDriftReason: () => string | null;
   getMetaSurfaceExpansionReason: () => string | null;
+  getStartupAnchorBoundaryState: () => ReviewStartupAnchorBoundaryState;
   getCommandIntentBoundaryState: () => ReviewCommandIntentBoundaryState;
   waitForOutputDrain: () => Promise<void>;
   formatCheckpoint: () => string;
@@ -1803,6 +1830,7 @@ async function waitForChildExit(
     let monitorHandle: NodeJS.Timeout | undefined;
     let lowSignalHandle: NodeJS.Timeout | undefined;
     let metaSurfaceHandle: NodeJS.Timeout | undefined;
+    let startupAnchorHandle: NodeJS.Timeout | undefined;
     let commandIntentHandle: NodeJS.Timeout | undefined;
     let heavyCommandHandle: NodeJS.Timeout | undefined;
     let killHandle: NodeJS.Timeout | undefined;
@@ -1831,6 +1859,9 @@ async function waitForChildExit(
       }
       if (metaSurfaceHandle) {
         clearInterval(metaSurfaceHandle);
+      }
+      if (startupAnchorHandle) {
+        clearInterval(startupAnchorHandle);
       }
       if (commandIntentHandle) {
         clearInterval(commandIntentHandle);
@@ -1889,6 +1920,18 @@ async function waitForChildExit(
         if (commandIntentBoundaryState.triggered) {
           reject(
             new CodexReviewError(formatCommandIntentBoundaryFailure(commandIntentBoundaryState), {
+              exitCode: typeof code === 'number' && code > 0 ? code : 1,
+              signal,
+              timedOut: false,
+              outputPreview: ''
+            })
+          );
+          return;
+        }
+        const startupAnchorBoundaryState = options.getStartupAnchorBoundaryState();
+        if (startupAnchorBoundaryState.triggered) {
+          reject(
+            new CodexReviewError(startupAnchorBoundaryState.reason ?? 'bounded review startup-anchor boundary violated', {
               exitCode: typeof code === 'number' && code > 0 ? code : 1,
               signal,
               timedOut: false,
@@ -2034,6 +2077,17 @@ async function waitForChildExit(
         );
       }, 1000);
       metaSurfaceHandle.unref();
+    }
+
+    if (options.enforceStartupAnchorBoundary) {
+      startupAnchorHandle = setInterval(() => {
+        const boundaryState = options.getStartupAnchorBoundaryState();
+        if (!boundaryState.triggered) {
+          return;
+        }
+        requestTermination(boundaryState.reason ?? 'bounded review startup-anchor boundary violated', false);
+      }, 250);
+      startupAnchorHandle.unref();
     }
 
     commandIntentHandle = setInterval(() => {

@@ -200,6 +200,17 @@ fi
       done
       exit 0
     fi
+    if [[ "$mode" == "startup-anchor-drift" ]]; then
+      while true; do
+        echo "thinking"
+        echo "exec"
+        echo "/bin/zsh -lc 'sed -n 1,120p /Users/kbediako/.codex/memories/MEMORY.md' in /Users/kbediako/Code/CO"
+        echo "thinking"
+        echo "exec"
+        echo "/bin/zsh -lc 'sed -n 1,120p /Users/kbediako/.codex/skills/delegation-usage/SKILL.md' in /Users/kbediako/Code/CO"
+        sleep 0.05
+      done
+    fi
     if [[ "$mode" == "review-self-containment-drift" ]]; then
       while true; do
         echo "thinking"
@@ -1365,6 +1376,9 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(prompt).toContain('Review scope paths (2):');
     expect(prompt).toContain(modifiedFile);
     expect(prompt).toContain('notes.txt');
+    expect(prompt).toContain(
+      'Start with touched paths, scoped diff commands, or nearby changed code before consulting memory, skills, review docs, manifests, or review artifacts'
+    );
     expect(prompt).not.toContain('Git scope summary:');
     expect(prompt).not.toContain('## ');
     expect(prompt).not.toContain('?? notes.txt');
@@ -1394,6 +1408,12 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(prompt).toContain(`Review scope hint: commit \`${commitSha}\``);
     expect(prompt).toContain('Review scope paths (1):');
     expect(prompt).toContain(modifiedFile);
+    expect(prompt).toContain(
+      'Start with touched paths or nearby changed code before consulting memory, skills, review docs, manifests, or review artifacts'
+    );
+    expect(prompt).not.toContain(
+      'Start with touched paths, scoped diff commands, or nearby changed code before consulting memory, skills, review docs, manifests, or review artifacts'
+    );
     expect(prompt).not.toContain('Git scope summary:');
     expect(prompt).not.toContain('Author:');
     expect(prompt).not.toContain('Date:');
@@ -1426,6 +1446,12 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(prompt).toContain(`Review scope hint: diff vs base \`${baseRef}\``);
     expect(prompt).toContain('Review scope paths (2):');
     expect(prompt).toContain(`${originalFile} -> ${renamedFile}`);
+    expect(prompt).toContain(
+      'Start with touched paths or nearby changed code before consulting memory, skills, review docs, manifests, or review artifacts'
+    );
+    expect(prompt).not.toContain(
+      'Start with touched paths, scoped diff commands, or nearby changed code before consulting memory, skills, review docs, manifests, or review artifacts'
+    );
     expect(prompt).not.toContain('Git scope summary:');
     expect(prompt).not.toContain('scope-only base rename');
     expect(prompt).not.toContain('R100\t');
@@ -1901,6 +1927,31 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(telemetry.summary.metaSurfaceSignals).toBeGreaterThanOrEqual(4);
     expect(telemetry.summary.distinctMetaSurfaces).toBeGreaterThanOrEqual(3);
     expect(telemetry.summary.maxMetaSurfaceHits).toBeGreaterThanOrEqual(1);
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('fails bounded diff review when repeated meta-surface reads happen before the first startup anchor', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    await runGit(['init', '-q'], sandbox);
+    await runGit(['config', 'user.email', 'run-review-tests@example.com'], sandbox);
+    await runGit(['config', 'user.name', 'run-review-tests'], sandbox);
+    await mkdir(join(sandbox, 'scripts'), { recursive: true });
+    await writeFile(join(sandbox, 'scripts', 'run-review.ts'), 'export const version = 1;\n', 'utf8');
+    await runGit(['add', '.'], sandbox);
+    await runGit(['commit', '-m', 'seed'], sandbox);
+    await writeFile(join(sandbox, 'scripts', 'run-review.ts'), 'export const version = 2;\n', 'utf8');
+
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'startup-anchor-drift',
+      CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0',
+      CODEX_REVIEW_TIMEOUT_SECONDS: '60'
+    });
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).toContain('startup-anchor boundary violated');
+    expect(result.stderr).toContain('before the first startup anchor');
   }, LONG_WAIT_TEST_TIMEOUT_MS);
 
   it('fails bounded diff review when adjacent review-system surfaces persist', async () => {

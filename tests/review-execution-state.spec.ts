@@ -331,6 +331,351 @@ describe('ReviewExecutionState', () => {
     expect(expansion.distinctMetaSurfaces).toBe(1);
   });
 
+  it('triggers the startup-anchor boundary when repeated meta-surface reads happen before touched-path inspection', () => {
+    const state = new ReviewExecutionState({
+      startedAtMs: 0,
+      blockHeavyCommands: false,
+      enforceStartupAnchorBoundary: true,
+      touchedPaths: ['scripts/run-review.ts']
+    });
+
+    state.observeChunk('thinking\nexec\n', 'stdout', 100);
+    state.observeChunk(
+      `/bin/zsh -lc 'sed -n 1,120p /Users/kbediako/.codex/memories/MEMORY.md'\n`,
+      'stdout',
+      110
+    );
+    state.observeChunk('thinking\nexec\n', 'stdout', 200);
+    state.observeChunk(
+      `/bin/zsh -lc 'sed -n 1,120p /Users/kbediako/.codex/skills/delegation-usage/SKILL.md'\n`,
+      'stdout',
+      210
+    );
+
+    const boundary = state.getStartupAnchorBoundaryState(220);
+    const summary = state.buildOutputSummary();
+    expect(boundary.triggered).toBe(true);
+    expect(boundary.anchorObserved).toBe(false);
+    expect(boundary.preAnchorCommandStarts).toBe(2);
+    expect(boundary.preAnchorMetaSurfaceSignals).toBe(2);
+    expect(boundary.preAnchorMetaSurfaceKinds).toEqual(['codex-memories', 'codex-skills']);
+    expect(summary.startupAnchorObserved).toBe(false);
+    expect(summary.preAnchorMetaSurfaceSignals).toBe(2);
+  });
+
+  it('allows one incidental meta-surface read before a touched-path anchor', () => {
+    const state = new ReviewExecutionState({
+      startedAtMs: 0,
+      blockHeavyCommands: false,
+      enforceStartupAnchorBoundary: true,
+      touchedPaths: ['scripts/run-review.ts']
+    });
+
+    state.observeChunk('thinking\nexec\n', 'stdout', 100);
+    state.observeChunk(
+      `/bin/zsh -lc 'sed -n 1,120p /Users/kbediako/.codex/memories/MEMORY.md'\n`,
+      'stdout',
+      110
+    );
+    state.observeChunk('thinking\nexec\n', 'stdout', 200);
+    state.observeChunk(`/bin/zsh -lc 'sed -n 1,120p scripts/run-review.ts'\n`, 'stdout', 210);
+
+    const boundary = state.getStartupAnchorBoundaryState(220);
+    const summary = state.buildOutputSummary();
+    expect(boundary.triggered).toBe(false);
+    expect(boundary.anchorObserved).toBe(true);
+    expect(summary.startupAnchorObserved).toBe(true);
+    expect(summary.preAnchorCommandStarts).toBe(1);
+    expect(summary.preAnchorMetaSurfaceSignals).toBe(1);
+    expect(summary.preAnchorMetaSurfaceKinds).toEqual(['codex-memories']);
+  });
+
+  it('does not count nearby review-support reads against the startup-anchor budget', () => {
+    const state = new ReviewExecutionState({
+      startedAtMs: 0,
+      blockHeavyCommands: false,
+      enforceStartupAnchorBoundary: true,
+      touchedPaths: ['scripts/run-review.ts']
+    });
+
+    state.observeChunk('thinking\nexec\n', 'stdout', 100);
+    state.observeChunk(
+      `/bin/zsh -lc 'sed -n 1,120p tests/review-execution-state.spec.ts'\n`,
+      'stdout',
+      110
+    );
+    state.observeChunk('thinking\nexec\n', 'stdout', 200);
+    state.observeChunk(
+      `/bin/zsh -lc 'sed -n 1,120p tests/run-review.spec.ts'\n`,
+      'stdout',
+      210
+    );
+    state.observeChunk('thinking\nexec\n', 'stdout', 300);
+    state.observeChunk(`/bin/zsh -lc 'sed -n 1,120p scripts/run-review.ts'\n`, 'stdout', 310);
+
+    const boundary = state.getStartupAnchorBoundaryState(320);
+    const summary = state.buildOutputSummary();
+    expect(boundary.triggered).toBe(false);
+    expect(boundary.anchorObserved).toBe(true);
+    expect(summary.preAnchorCommandStarts).toBe(2);
+    expect(summary.preAnchorMetaSurfaceSignals).toBe(0);
+    expect(summary.preAnchorMetaSurfaceKinds).toEqual([]);
+  });
+
+  it('treats scoped diff commands as valid startup anchors', () => {
+    const state = new ReviewExecutionState({
+      startedAtMs: 0,
+      blockHeavyCommands: false,
+      enforceStartupAnchorBoundary: true,
+      scopeMode: 'uncommitted',
+      touchedPaths: ['scripts/run-review.ts']
+    });
+
+    state.observeChunk('thinking\nexec\n', 'stdout', 100);
+    state.observeChunk(`/bin/zsh -lc 'git diff --stat'\n`, 'stdout', 110);
+    state.observeChunk('thinking\nexec\n', 'stdout', 200);
+    state.observeChunk(
+      `/bin/zsh -lc 'sed -n 1,120p /Users/kbediako/.codex/memories/MEMORY.md'\n`,
+      'stdout',
+      210
+    );
+
+    const boundary = state.getStartupAnchorBoundaryState(220);
+    const summary = state.buildOutputSummary();
+    expect(boundary.triggered).toBe(false);
+    expect(boundary.anchorObserved).toBe(true);
+    expect(summary.startupAnchorObserved).toBe(true);
+    expect(summary.preAnchorCommandStarts).toBe(0);
+    expect(summary.preAnchorMetaSurfaceSignals).toBe(0);
+    expect(summary.preAnchorMetaSurfaceKinds).toEqual([]);
+  });
+
+  it('does not treat scoped diff commands as startup anchors outside uncommitted mode', () => {
+    const state = new ReviewExecutionState({
+      startedAtMs: 0,
+      blockHeavyCommands: false,
+      enforceStartupAnchorBoundary: true,
+      scopeMode: 'commit',
+      touchedPaths: ['scripts/run-review.ts']
+    });
+
+    state.observeChunk('thinking\nexec\n', 'stdout', 100);
+    state.observeChunk(`/bin/zsh -lc 'git diff --stat'\n`, 'stdout', 110);
+    state.observeChunk('thinking\nexec\n', 'stdout', 200);
+    state.observeChunk(
+      `/bin/zsh -lc 'sed -n 1,120p /Users/kbediako/.codex/memories/MEMORY.md'\n`,
+      'stdout',
+      210
+    );
+    state.observeChunk('thinking\nexec\n', 'stdout', 300);
+    state.observeChunk(`/bin/zsh -lc 'sed -n 1,120p scripts/run-review.ts'\n`, 'stdout', 310);
+
+    const boundary = state.getStartupAnchorBoundaryState(320);
+    const summary = state.buildOutputSummary();
+    expect(boundary.triggered).toBe(false);
+    expect(boundary.anchorObserved).toBe(true);
+    expect(summary.startupAnchorObserved).toBe(true);
+    expect(summary.preAnchorCommandStarts).toBe(2);
+    expect(summary.preAnchorMetaSurfaceSignals).toBe(1);
+    expect(summary.preAnchorMetaSurfaceKinds).toEqual(['codex-memories']);
+  });
+
+  it('does not treat off-scope uncommitted diff pathspecs as startup anchors', () => {
+    const state = new ReviewExecutionState({
+      startedAtMs: 0,
+      blockHeavyCommands: false,
+      enforceStartupAnchorBoundary: true,
+      scopeMode: 'uncommitted',
+      touchedPaths: ['scripts/run-review.ts']
+    });
+
+    state.observeChunk('thinking\nexec\n', 'stdout', 100);
+    state.observeChunk(
+      `/bin/zsh -lc 'git diff --stat -- docs/standalone-review-guide.md'\n`,
+      'stdout',
+      110
+    );
+    state.observeChunk('thinking\nexec\n', 'stdout', 200);
+    state.observeChunk(
+      `/bin/zsh -lc 'sed -n 1,120p /Users/kbediako/.codex/memories/MEMORY.md'\n`,
+      'stdout',
+      210
+    );
+    state.observeChunk('thinking\nexec\n', 'stdout', 300);
+    state.observeChunk(`/bin/zsh -lc 'sed -n 1,120p scripts/run-review.ts'\n`, 'stdout', 310);
+
+    const boundary = state.getStartupAnchorBoundaryState(320);
+    const summary = state.buildOutputSummary();
+    expect(boundary.triggered).toBe(true);
+    expect(boundary.anchorObserved).toBe(true);
+    expect(summary.startupAnchorObserved).toBe(true);
+    expect(summary.preAnchorCommandStarts).toBe(2);
+    expect(summary.preAnchorMetaSurfaceSignals).toBe(2);
+    expect(summary.preAnchorMetaSurfaceKinds).toEqual(['codex-memories', 'review-docs']);
+  });
+
+  it('does not treat same-suffix paths outside the repo root as touched-path anchors', () => {
+    const state = new ReviewExecutionState({
+      startedAtMs: 0,
+      blockHeavyCommands: false,
+      enforceStartupAnchorBoundary: true,
+      repoRoot: '/Users/kbediako/Code/CO',
+      touchedPaths: ['src/current/file.ts']
+    });
+
+    state.observeChunk('thinking\nexec\n', 'stdout', 100);
+    state.observeChunk(`/bin/zsh -lc 'sed -n 1,120p /tmp/other/src/current/file.ts'\n`, 'stdout', 110);
+    state.observeChunk('thinking\nexec\n', 'stdout', 200);
+    state.observeChunk(
+      `/bin/zsh -lc 'sed -n 1,120p /Users/kbediako/.codex/memories/MEMORY.md'\n`,
+      'stdout',
+      210
+    );
+    state.observeChunk('thinking\nexec\n', 'stdout', 300);
+    state.observeChunk(`/bin/zsh -lc 'sed -n 1,120p src/current/file.ts'\n`, 'stdout', 310);
+
+    const boundary = state.getStartupAnchorBoundaryState(320);
+    const summary = state.buildOutputSummary();
+    expect(boundary.triggered).toBe(false);
+    expect(boundary.anchorObserved).toBe(true);
+    expect(summary.startupAnchorObserved).toBe(true);
+    expect(summary.preAnchorCommandStarts).toBe(2);
+    expect(summary.preAnchorMetaSurfaceSignals).toBe(1);
+    expect(summary.preAnchorMetaSurfaceKinds).toEqual(['codex-memories']);
+  });
+
+  it('does not count meta-surface reads that happen after a scoped diff anchor in the same shell line', () => {
+    const state = new ReviewExecutionState({
+      startedAtMs: 0,
+      blockHeavyCommands: false,
+      enforceStartupAnchorBoundary: true,
+      touchedPaths: ['scripts/run-review.ts']
+    });
+
+    state.observeChunk('thinking\nexec\n', 'stdout', 100);
+    state.observeChunk(
+      `/bin/zsh -lc 'git diff --stat && sed -n 1,120p /Users/kbediako/.codex/memories/MEMORY.md'\n`,
+      'stdout',
+      110
+    );
+
+    const boundary = state.getStartupAnchorBoundaryState(120);
+    const summary = state.buildOutputSummary();
+    expect(boundary.triggered).toBe(false);
+    expect(boundary.anchorObserved).toBe(true);
+    expect(summary.startupAnchorObserved).toBe(true);
+    expect(summary.preAnchorCommandStarts).toBe(0);
+    expect(summary.preAnchorMetaSurfaceSignals).toBe(0);
+    expect(summary.preAnchorMetaSurfaceKinds).toEqual([]);
+  });
+
+  it('counts every disallowed pre-anchor meta read in a chained shell command before the first anchor', () => {
+    const state = new ReviewExecutionState({
+      startedAtMs: 0,
+      blockHeavyCommands: false,
+      enforceStartupAnchorBoundary: true,
+      touchedPaths: ['scripts/run-review.ts']
+    });
+
+    state.observeChunk('thinking\nexec\n', 'stdout', 100);
+    state.observeChunk(
+      `/bin/zsh -lc 'sed -n 1,120p tests/run-review.spec.ts && sed -n 1,120p /Users/kbediako/.codex/memories/MEMORY.md && sed -n 1,120p /Users/kbediako/.codex/skills/delegation-usage/SKILL.md && sed -n 1,120p scripts/run-review.ts'\n`,
+      'stdout',
+      110
+    );
+
+    const boundary = state.getStartupAnchorBoundaryState(120);
+    const summary = state.buildOutputSummary();
+    expect(boundary.triggered).toBe(true);
+    expect(boundary.anchorObserved).toBe(true);
+    expect(summary.startupAnchorObserved).toBe(true);
+    expect(summary.preAnchorCommandStarts).toBe(0);
+    expect(summary.preAnchorMetaSurfaceSignals).toBe(2);
+    expect(summary.preAnchorMetaSurfaceKinds).toEqual(['codex-memories', 'codex-skills']);
+  });
+
+  it('treats non-regex-matched touched paths such as shell scripts as valid startup anchors', () => {
+    const state = new ReviewExecutionState({
+      startedAtMs: 0,
+      blockHeavyCommands: false,
+      enforceStartupAnchorBoundary: true,
+      touchedPaths: ['scripts/review-helper.sh']
+    });
+
+    state.observeChunk('thinking\nexec\n', 'stdout', 100);
+    state.observeChunk(
+      `/bin/zsh -lc 'sed -n 1,120p /Users/kbediako/.codex/memories/MEMORY.md'\n`,
+      'stdout',
+      110
+    );
+    state.observeChunk('thinking\nexec\n', 'stdout', 200);
+    state.observeChunk(
+      `/bin/zsh -lc 'sed -n 1,120p scripts/review-helper.sh'\n`,
+      'stdout',
+      210
+    );
+
+    const boundary = state.getStartupAnchorBoundaryState(220);
+    const summary = state.buildOutputSummary();
+    expect(boundary.triggered).toBe(false);
+    expect(boundary.anchorObserved).toBe(true);
+    expect(summary.startupAnchorObserved).toBe(true);
+    expect(summary.preAnchorCommandStarts).toBe(1);
+    expect(summary.preAnchorMetaSurfaceSignals).toBe(1);
+  });
+
+  it('treats git show rev:path reads of touched files as valid startup anchors', () => {
+    const state = new ReviewExecutionState({
+      startedAtMs: 0,
+      blockHeavyCommands: false,
+      enforceStartupAnchorBoundary: true,
+      touchedPaths: ['scripts/run-review.ts']
+    });
+
+    state.observeChunk('thinking\nexec\n', 'stdout', 100);
+    state.observeChunk(`/bin/zsh -lc 'git show HEAD:scripts/run-review.ts'\n`, 'stdout', 110);
+    state.observeChunk('thinking\nexec\n', 'stdout', 200);
+    state.observeChunk(
+      `/bin/zsh -lc 'sed -n 1,120p /Users/kbediako/.codex/memories/MEMORY.md'\n`,
+      'stdout',
+      210
+    );
+
+    const boundary = state.getStartupAnchorBoundaryState(220);
+    const summary = state.buildOutputSummary();
+    expect(boundary.triggered).toBe(false);
+    expect(boundary.anchorObserved).toBe(true);
+    expect(summary.startupAnchorObserved).toBe(true);
+    expect(summary.preAnchorCommandStarts).toBe(0);
+    expect(summary.preAnchorMetaSurfaceSignals).toBe(0);
+    expect(summary.preAnchorMetaSurfaceKinds).toEqual([]);
+  });
+
+  it('counts mixed touched-path and meta-surface commands before the startup anchor is promoted', () => {
+    const state = new ReviewExecutionState({
+      startedAtMs: 0,
+      blockHeavyCommands: false,
+      enforceStartupAnchorBoundary: true,
+      touchedPaths: ['scripts/run-review.ts']
+    });
+
+    state.observeChunk('thinking\nexec\n', 'stdout', 100);
+    state.observeChunk(
+      `/bin/zsh -lc 'sed -n 1,120p scripts/run-review.ts /Users/kbediako/.codex/memories/MEMORY.md'\n`,
+      'stdout',
+      110
+    );
+
+    const boundary = state.getStartupAnchorBoundaryState(120);
+    const summary = state.buildOutputSummary();
+    expect(boundary.triggered).toBe(false);
+    expect(boundary.anchorObserved).toBe(true);
+    expect(summary.startupAnchorObserved).toBe(true);
+    expect(summary.preAnchorCommandStarts).toBe(0);
+    expect(summary.preAnchorMetaSurfaceSignals).toBe(1);
+    expect(summary.preAnchorMetaSurfaceKinds).toEqual(['codex-memories']);
+  });
+
   it('classifies adjacent review-support test files as meta-surface activity', () => {
     const state = new ReviewExecutionState({
       startedAtMs: 0,
@@ -385,6 +730,45 @@ describe('ReviewExecutionState', () => {
     const expansion = state.getMetaSurfaceExpansionState(nowMs + 1_500);
     expect(expansion.triggered).toBe(false);
     expect(expansion.metaSurfaceSignals).toBe(0);
+  });
+
+  it('keeps startup-anchor violations visible even after later touched-path reads evict the recent meta-surface window', () => {
+    const state = new ReviewExecutionState({
+      startedAtMs: 0,
+      blockHeavyCommands: false,
+      metaSurfaceTimeoutMs: 1_000,
+      enforceStartupAnchorBoundary: true,
+      touchedPaths: ['scripts/run-review.ts', 'scripts/lib/review-execution-state.ts']
+    });
+
+    let nowMs = 100;
+    for (const command of [
+      "/bin/zsh -lc 'sed -n 1,120p /Users/kbediako/.codex/memories/MEMORY.md'",
+      "/bin/zsh -lc 'sed -n 1,120p /Users/kbediako/.codex/skills/delegation-usage/SKILL.md'",
+      "/bin/zsh -lc 'sed -n 1,120p scripts/run-review.ts'",
+      "/bin/zsh -lc 'sed -n 1,120p scripts/lib/review-execution-state.ts'",
+      "/bin/zsh -lc 'sed -n 1,120p scripts/run-review.ts'",
+      "/bin/zsh -lc 'sed -n 1,120p scripts/lib/review-execution-state.ts'",
+      "/bin/zsh -lc 'sed -n 1,120p scripts/run-review.ts'",
+      "/bin/zsh -lc 'sed -n 1,120p scripts/lib/review-execution-state.ts'",
+      "/bin/zsh -lc 'sed -n 1,120p scripts/run-review.ts'",
+      "/bin/zsh -lc 'sed -n 1,120p scripts/lib/review-execution-state.ts'"
+    ]) {
+      state.observeChunk('thinking\nexec\n', 'stdout', nowMs);
+      state.observeChunk(`${command}\n`, 'stdout', nowMs + 10);
+      nowMs += 100;
+    }
+
+    const expansion = state.getMetaSurfaceExpansionState(nowMs + 1_500);
+    const boundary = state.getStartupAnchorBoundaryState(nowMs + 1_500);
+    const summary = state.buildOutputSummary();
+    expect(expansion.triggered).toBe(false);
+    expect(expansion.metaSurfaceSignals).toBe(0);
+    expect(boundary.triggered).toBe(true);
+    expect(boundary.anchorObserved).toBe(true);
+    expect(summary.startupAnchorObserved).toBe(true);
+    expect(summary.preAnchorMetaSurfaceSignals).toBe(2);
+    expect(summary.preAnchorMetaSurfaceKinds).toEqual(['codex-memories', 'codex-skills']);
   });
 
   it('classifies sustained adjacent review-system surfaces as meta-surface expansion', () => {
