@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260310-1101-coordinator-symphony-aligned-control-request-route-dispatch-shell-extraction",
+      "title": "Coordinator Symphony-Aligned Control Request Route Dispatch Shell Extraction",
+      "relates_to": "tasks/tasks-1101-coordinator-symphony-aligned-control-request-route-dispatch-shell-extraction.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-10",
+      "paths": {
+        "spec": "tasks/specs/1101-coordinator-symphony-aligned-control-request-route-dispatch-shell-extraction.md",
+        "task": "tasks/tasks-1101-coordinator-symphony-aligned-control-request-route-dispatch-shell-extraction.md",
+        "agent_task": ".agent/task/1101-coordinator-symphony-aligned-control-request-route-dispatch-shell-extraction.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-control-request-route-dispatch-shell-extraction.md"
+      }
+    },
+    {
       "id": "20260310-1100-coordinator-symphony-aligned-linear-webhook-branch-shell-extraction",
       "title": "Coordinator Symphony-Aligned Linear Webhook Branch Shell Extraction",
       "relates_to": "tasks/tasks-1100-coordinator-symphony-aligned-linear-webhook-branch-shell-extraction.md",
