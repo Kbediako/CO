@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260310-1106-coordinator-symphony-aligned-control-server-live-instance-host-shell-extraction",
+      "title": "Coordinator Symphony-Aligned Control Server Live-Instance Host Shell Extraction",
+      "relates_to": "tasks/tasks-1106-coordinator-symphony-aligned-control-server-live-instance-host-shell-extraction.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-10",
+      "paths": {
+        "spec": "tasks/specs/1106-coordinator-symphony-aligned-control-server-live-instance-host-shell-extraction.md",
+        "task": "tasks/tasks-1106-coordinator-symphony-aligned-control-server-live-instance-host-shell-extraction.md",
+        "agent_task": ".agent/task/1106-coordinator-symphony-aligned-control-server-live-instance-host-shell-extraction.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-control-server-live-instance-host-shell-extraction.md"
+      }
+    },
+    {
       "id": "20260310-1105-coordinator-symphony-aligned-control-server-ready-instance-startup-composition-extraction",
       "title": "Coordinator Symphony-Aligned Control Server Ready-Instance Startup Composition Extraction",
       "relates_to": "tasks/tasks-1105-coordinator-symphony-aligned-control-server-ready-instance-startup-composition-extraction.md",
