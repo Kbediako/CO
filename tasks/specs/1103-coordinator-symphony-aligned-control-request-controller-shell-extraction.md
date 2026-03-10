@@ -1,7 +1,7 @@
 ---
 id: 20260310-1103-coordinator-symphony-aligned-control-request-controller-shell-extraction
 title: Coordinator Symphony-Aligned Control Request Controller Shell Extraction
-status: active
+status: completed
 owners:
   - Codex
 created: 2026-03-10
@@ -40,3 +40,4 @@ Extract the remaining inline request-controller shell from `controlServer.ts` in
 ## Notes
 
 - 2026-03-10: Approved for docs-first registration based on the `1102` closeout evidence showing the remaining `handleRequest()` work is now only the null-fallthrough plus route-dispatch handoff shell. Evidence: `docs/findings/1103-control-request-controller-shell-extraction-deliberation.md`, `out/1102-coordinator-symphony-aligned-control-request-predispatch-shell-extraction/manual/20260310T025103Z-closeout/14-next-slice-note.md`.
+- 2026-03-10: Completed. `controlServer.ts` now delegates the remaining request-controller shell to `handleControlRequest`, focused regressions passed `101/101`, the full suite passed `188/188` files and `1267/1267` tests, the bounded standalone review returned a clean verdict, and pack-smoke passed. Evidence: `out/1103-coordinator-symphony-aligned-control-request-controller-shell-extraction/manual/20260310T030712Z-closeout/00-summary.md`, `out/1103-coordinator-symphony-aligned-control-request-controller-shell-extraction/manual/20260310T030712Z-closeout/05-targeted-tests.log`, `out/1103-coordinator-symphony-aligned-control-request-controller-shell-extraction/manual/20260310T030712Z-closeout/05-test.log`, `out/1103-coordinator-symphony-aligned-control-request-controller-shell-extraction/manual/20260310T030712Z-closeout/09-review.log`, `out/1103-coordinator-symphony-aligned-control-request-controller-shell-extraction/manual/20260310T030712Z-closeout/10-pack-smoke.log`, `out/1103-coordinator-symphony-aligned-control-request-controller-shell-extraction/manual/20260310T030712Z-closeout/11-manual-request-controller-check.json`, `out/1103-coordinator-symphony-aligned-control-request-controller-shell-extraction/manual/20260310T030712Z-closeout/12-elegance-review.md`, `out/1103-coordinator-symphony-aligned-control-request-controller-shell-extraction/manual/20260310T030712Z-closeout/13-override-notes.md`.
