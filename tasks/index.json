@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260310-1105-coordinator-symphony-aligned-control-server-ready-instance-startup-composition-extraction",
+      "title": "Coordinator Symphony-Aligned Control Server Ready-Instance Startup Composition Extraction",
+      "relates_to": "tasks/tasks-1105-coordinator-symphony-aligned-control-server-ready-instance-startup-composition-extraction.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-10",
+      "paths": {
+        "spec": "tasks/specs/1105-coordinator-symphony-aligned-control-server-ready-instance-startup-composition-extraction.md",
+        "task": "tasks/tasks-1105-coordinator-symphony-aligned-control-server-ready-instance-startup-composition-extraction.md",
+        "agent_task": ".agent/task/1105-coordinator-symphony-aligned-control-server-ready-instance-startup-composition-extraction.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-control-server-ready-instance-startup-composition-extraction.md"
+      }
+    },
+    {
       "id": "20260310-1104-coordinator-symphony-aligned-control-server-request-shell-binding-extraction",
       "title": "Coordinator Symphony-Aligned Control Server Request-Shell Binding Extraction",
       "relates_to": "tasks/tasks-1104-coordinator-symphony-aligned-control-server-request-shell-binding-extraction.md",
