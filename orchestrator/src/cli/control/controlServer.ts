@@ -63,6 +63,20 @@ export class ControlServer {
       linearAdvisorySeed
     });
 
+    return ControlServer.startPendingReadyInstance({
+      requestContextShared,
+      host: options.config.ui.bindHost,
+      controlToken: token,
+      intervalMs: EXPIRY_INTERVAL_MS
+    });
+  }
+
+  private static async startPendingReadyInstance(options: {
+    requestContextShared: ControlRequestSharedContext;
+    host: string;
+    controlToken: string;
+    intervalMs: number;
+  }): Promise<ControlServer> {
     let instance: ControlServer | null = null;
     const server = createBoundControlServerRequestShell({
       readRequestContextShared: () => instance?.requestContextShared ?? null,
@@ -71,14 +85,14 @@ export class ControlServer {
 
     instance = new ControlServer({
       server,
-      requestContextShared
+      requestContextShared: options.requestContextShared
     });
     instance.baseUrl = await startControlServerReadyInstanceStartup({
       server,
       requestContextShared: instance.requestContextShared,
-      intervalMs: EXPIRY_INTERVAL_MS,
-      host: options.config.ui.bindHost,
-      controlToken: token,
+      intervalMs: options.intervalMs,
+      host: options.host,
+      controlToken: options.controlToken,
       onBootstrapAssembly: ({ expiryLifecycle, bootstrapLifecycle }) => {
         instance!.expiryLifecycle = expiryLifecycle;
         instance!.bootstrapLifecycle = bootstrapLifecycle;
