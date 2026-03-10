@@ -11,13 +11,12 @@ import { startControlServerStartupSequence } from './controlServerStartupSequenc
 import {
   type ControlRequestSharedContext
 } from './controlRequestContext.js';
-import { handleControlRequest } from './controlRequestController.js';
 import { createControlServerSeededRuntimeAssembly } from './controlServerSeededRuntimeAssembly.js';
-import { createControlServerRequestShell } from './controlServerRequestShell.js';
 import { readControlServerSeeds } from './controlServerSeedLoading.js';
 import {
   emitDispatchPilotAuditEvents,
 } from './controlServerAuditAndErrorHelpers.js';
+import { createBoundControlServerRequestShell } from './controlServerRequestShellBinding.js';
 
 interface ControlServerOptions {
   paths: RunPaths;
@@ -69,15 +68,9 @@ export class ControlServer {
     });
 
     let instance: ControlServer | null = null;
-    const server = createControlServerRequestShell({
-      readRuntime: () =>
-        instance
-          ? {
-              requestContextShared: instance.requestContextShared,
-              expiryLifecycle: instance.expiryLifecycle
-            }
-          : null,
-      handleRequest: handleControlRequest
+    const server = createBoundControlServerRequestShell({
+      readRequestContextShared: () => instance?.requestContextShared ?? null,
+      readExpiryLifecycle: () => instance?.expiryLifecycle ?? null
     });
 
     instance = new ControlServer({

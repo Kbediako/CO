@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260310-1104-coordinator-symphony-aligned-control-server-request-shell-binding-extraction",
+      "title": "Coordinator Symphony-Aligned Control Server Request-Shell Binding Extraction",
+      "relates_to": "tasks/tasks-1104-coordinator-symphony-aligned-control-server-request-shell-binding-extraction.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-10",
+      "paths": {
+        "spec": "tasks/specs/1104-coordinator-symphony-aligned-control-server-request-shell-binding-extraction.md",
+        "task": "tasks/tasks-1104-coordinator-symphony-aligned-control-server-request-shell-binding-extraction.md",
+        "agent_task": ".agent/task/1104-coordinator-symphony-aligned-control-server-request-shell-binding-extraction.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-control-server-request-shell-binding-extraction.md"
+      }
+    },
+    {
       "id": "20260310-1103-coordinator-symphony-aligned-control-request-controller-shell-extraction",
       "title": "Coordinator Symphony-Aligned Control Request Controller Shell Extraction",
       "relates_to": "tasks/tasks-1103-coordinator-symphony-aligned-control-request-controller-shell-extraction.md",
