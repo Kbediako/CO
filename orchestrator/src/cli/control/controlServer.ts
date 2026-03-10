@@ -4,8 +4,6 @@ import { randomBytes } from 'node:crypto';
 import type { RunPaths } from '../run/runPaths.js';
 import type { EffectiveDelegationConfig } from '../config/delegationConfig.js';
 import type { RunEventStream, RunEventStreamEntry } from '../events/runEventStream.js';
-import { handleControlUiSessionAdmission } from './uiSessionController.js';
-import { handleLinearWebhookRequest } from './linearWebhookController.js';
 import { type ControlExpiryLifecycle } from './controlExpiryLifecycle.js';
 import { type ControlServerBootstrapLifecycle } from './controlServerBootstrapLifecycle.js';
 import { createControlBootstrapAssembly } from './controlBootstrapAssembly.js';
@@ -15,16 +13,13 @@ import {
   type ControlRequestContext,
   type ControlRequestSharedContext
 } from './controlRequestContext.js';
+import { handleControlRequestRouteDispatch } from './controlRequestRouteDispatch.js';
 import { createControlServerSeededRuntimeAssembly } from './controlServerSeededRuntimeAssembly.js';
 import { createControlServerRequestShell } from './controlServerRequestShell.js';
 import { readControlServerSeeds } from './controlServerSeedLoading.js';
-import { handleControlAuthenticatedRouteBranch } from './controlServerAuthenticatedRouteBranch.js';
 import {
   emitDispatchPilotAuditEvents,
-  emitLinearWebhookAuditEvent,
 } from './controlServerAuditAndErrorHelpers.js';
-import { handlePublicControlRoute } from './controlServerPublicRouteHelpers.js';
-import { readRawBody } from './controlServerRequestBodyHelpers.js';
 
 interface ControlServerOptions {
   paths: RunPaths;
@@ -139,44 +134,9 @@ async function handleRequest(context: ControlRequestContext): Promise<void> {
   const { req, res } = context;
   const url = new URL(req.url ?? '/', 'http://localhost');
   const { runtimeSnapshot, presenterContext } = buildControlPresenterRuntimeContext(context);
-  if (
-    await handlePublicControlRoute({
-      pathname: url.pathname,
-      search: url.search ? url.search : '',
-      res
-    })
-  ) {
-    return;
-  }
-
-  if (
-    handleControlUiSessionAdmission({
-      req,
-      res,
-      allowedBindHosts: context.config.ui.allowedBindHosts,
-      issueSession: () => context.sessionTokens.issue()
-    })
-  ) {
-    return;
-  }
-
-  if (
-    await handleLinearWebhookRequest({
-      req,
-      res,
-      linearAdvisoryState: context.linearAdvisoryState,
-      readRawBody,
-      persistLinearAdvisory: context.persist.linearAdvisory,
-      emitAuditEvent: (input) => emitLinearWebhookAuditEvent(context, input),
-      readFeatureToggles: () => context.controlStore.snapshot().feature_toggles,
-      publishRuntime: () => context.runtime.publish({ source: 'linear.webhook' })
-    })
-  ) {
-    return;
-  }
-
-  await handleControlAuthenticatedRouteBranch({
+  await handleControlRequestRouteDispatch({
     pathname: url.pathname,
+    search: url.search ? url.search : '',
     req,
     res,
     context,
