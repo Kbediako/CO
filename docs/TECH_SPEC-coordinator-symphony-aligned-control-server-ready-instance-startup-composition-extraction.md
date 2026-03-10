@@ -16,12 +16,12 @@ related_tasks:
 
 ## Summary
 
-Extract the remaining ready-instance startup composition out of `ControlServer.start()` into one control-local helper. The helper should own `ControlServer` instance construction, bootstrap lifecycle attachment, and final startup sequencing over the already-extracted request-shell binding, bootstrap assembly, and startup sequence collaborators.
+Extract the remaining ready-instance startup composition out of `ControlServer.start()` into one control-local helper. The helper should own bootstrap lifecycle attachment plus final startup sequencing over the already-extracted request-shell binding, bootstrap assembly, and startup sequence collaborators, returning the ready startup bundle that `ControlServer.start()` assigns to the live instance.
 
 ## Scope
 
 - Add one control-local helper under `orchestrator/src/cli/control/`.
-- Move ready-instance construction plus startup composition out of `ControlServer.start()`.
+- Move ready-instance startup bundle assembly plus startup composition out of `ControlServer.start()`.
 - Preserve lifecycle attachment, startup ordering, and failure cleanup behavior.
 - Add focused regressions proving unchanged success and fail-closed startup semantics.
 
@@ -39,7 +39,7 @@ Extract the remaining ready-instance startup composition out of `ControlServer.s
 ### 1. Ready-instance startup helper
 
 Introduce one helper that receives the already-built `server`, `requestContextShared`, `host`, `controlToken`, and a `closeOnFailure` callback, then owns:
-- `ControlServer` ready-instance construction or the equivalent ready-instance startup bundle assembly,
+- ready-instance startup bundle assembly,
 - bootstrap lifecycle attachment over `createControlBootstrapAssembly(...)`,
 - final `startControlServerStartupSequence(...)`,
 - returning the ready-instance startup bundle that `ControlServer.start()` assigns or returns.

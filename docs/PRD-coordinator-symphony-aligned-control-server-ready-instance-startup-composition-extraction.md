@@ -2,12 +2,11 @@
 
 ## Summary
 
-After `1104`, `ControlServer.start()` is down to one remaining stateful startup composition block: instantiate the ready server host, attach the bootstrap lifecycles, and run the final startup sequence that binds the server to a base URL or fails closed. This slice extracts that ready-instance startup composition into one bounded helper so the top-level server method becomes a thinner composition entrypoint.
+After `1104`, `ControlServer.start()` is down to one remaining stateful startup composition block: build the ready-instance startup bundle, attach the bootstrap lifecycles, and run the final startup sequence that binds the server to a base URL or fails closed. This slice extracts that ready-instance startup composition into one bounded helper so the top-level server method becomes a thinner composition entrypoint.
 
 ## Problem
 
 `ControlServer.start()` still owns:
-- `new ControlServer(...)` host construction,
 - bootstrap lifecycle attachment over the already-extracted bootstrap assembly helper,
 - final `startControlServerStartupSequence(...)` orchestration,
 - close-on-startup-failure wiring through the live instance.
@@ -16,7 +15,7 @@ That is now the highest-cost review surface in `start()` because a reader still 
 
 ## Goals
 
-- Extract the remaining ready-instance startup composition from `ControlServer.start()` into one helper.
+- Extract the remaining ready-instance startup bundle assembly from `ControlServer.start()` into one helper.
 - Keep `ControlServer.start()` focused on token generation, seed loading, seeded runtime assembly, request-shell binding, and ready-instance return.
 - Preserve startup ordering, lifecycle attachment, and failure cleanup exactly.
 
@@ -35,6 +34,6 @@ That is now the highest-cost review surface in `start()` because a reader still 
 
 ## Acceptance Criteria
 
-- One helper owns ready-instance construction, bootstrap lifecycle attachment, and final startup sequencing over the already-extracted collaborators.
+- One helper owns ready-instance startup bundle assembly, bootstrap lifecycle attachment, and final startup sequencing over the already-extracted collaborators.
 - `ControlServer.start()` delegates that composition while preserving startup ordering and failure cleanup semantics.
 - Focused regressions prove success-path startup wiring and fail-closed startup behavior remain unchanged.

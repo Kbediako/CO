@@ -16,25 +16,25 @@
 
 - [x] `tasks/index.json`, `docs/TASKS.md`, and `docs/docs-freshness-registry.json` updated. Evidence: `tasks/index.json`, `docs/TASKS.md`, `docs/docs-freshness-registry.json`.
 - [x] Local read-only review approval captured in the spec/checklist notes. Evidence: `tasks/specs/1105-coordinator-symphony-aligned-control-server-ready-instance-startup-composition-extraction.md`, `docs/findings/1105-control-server-ready-instance-startup-composition-extraction-deliberation.md`.
-- [ ] docs-review approval/override captured for registered `1105`.
+- [x] docs-review approval/override captured for registered `1105`. Evidence: `out/1105-coordinator-symphony-aligned-control-server-ready-instance-startup-composition-extraction/manual/20260310T040500Z-docs-first/05-docs-review-override.md`.
 
 ## Control Server Ready-Instance Startup Composition
 
-- [ ] `ControlServer.start()` delegates the remaining ready-instance startup composition through one dedicated helper.
-- [ ] The helper owns only ready-instance construction, bootstrap lifecycle attachment, and final startup sequencing over the extracted collaborators.
-- [ ] Focused regression coverage proves the new startup composition seam without reopening request-shell or startup-sequence behavior.
+- [x] `ControlServer.start()` delegates the remaining ready-instance startup composition through one dedicated helper. Evidence: `orchestrator/src/cli/control/controlServer.ts`, `orchestrator/src/cli/control/controlServerReadyInstanceStartup.ts`.
+- [x] The helper owns only ready startup bundle assembly, bootstrap lifecycle attachment, and final startup sequencing over the extracted collaborators. Evidence: `orchestrator/src/cli/control/controlServerReadyInstanceStartup.ts`, `orchestrator/src/cli/control/controlBootstrapAssembly.ts`, `orchestrator/src/cli/control/controlServerStartupSequence.ts`.
+- [x] Focused regression coverage proves the new startup composition seam without reopening request-shell or startup-sequence behavior. Evidence: `orchestrator/tests/ControlServerReadyInstanceStartup.test.ts`, `orchestrator/tests/ControlServerStartupSequence.test.ts`, `out/1105-coordinator-symphony-aligned-control-server-ready-instance-startup-composition-extraction/manual/20260310T041150Z-closeout/05-targeted-tests.log`, `out/1105-coordinator-symphony-aligned-control-server-ready-instance-startup-composition-extraction/manual/20260310T041150Z-closeout/11-manual-startup-composition-check.json`.
 
 ## Validation + Closeout
 
-- [ ] `node scripts/delegation-guard.mjs`
-- [ ] `node scripts/spec-guard.mjs --dry-run`
-- [ ] `npm run build`
-- [ ] `npm run lint`
-- [ ] `npm run test`
-- [ ] `npm run docs:check`
-- [ ] `npm run docs:freshness`
-- [ ] `node scripts/diff-budget.mjs`
-- [ ] `npm run review`
-- [ ] `npm run pack:smoke`
-- [ ] Manual startup-composition evidence captured.
-- [ ] Elegance review completed.
+- [x] `node scripts/delegation-guard.mjs`. Evidence: `out/1105-coordinator-symphony-aligned-control-server-ready-instance-startup-composition-extraction/manual/20260310T041150Z-closeout/01-delegation-guard.log`.
+- [x] `node scripts/spec-guard.mjs --dry-run`. Evidence: `out/1105-coordinator-symphony-aligned-control-server-ready-instance-startup-composition-extraction/manual/20260310T041150Z-closeout/02-spec-guard.log`.
+- [x] `npm run build`. Evidence: `out/1105-coordinator-symphony-aligned-control-server-ready-instance-startup-composition-extraction/manual/20260310T041150Z-closeout/03-build.log`.
+- [x] `npm run lint`. Evidence: `out/1105-coordinator-symphony-aligned-control-server-ready-instance-startup-composition-extraction/manual/20260310T041150Z-closeout/04-lint.log`.
+- [x] `npm run test`. Evidence: `out/1105-coordinator-symphony-aligned-control-server-ready-instance-startup-composition-extraction/manual/20260310T041150Z-closeout/05-test.log`.
+- [x] `npm run docs:check`. Evidence: `out/1105-coordinator-symphony-aligned-control-server-ready-instance-startup-composition-extraction/manual/20260310T041150Z-closeout/06-docs-check.log`.
+- [x] `npm run docs:freshness`. Evidence: `out/1105-coordinator-symphony-aligned-control-server-ready-instance-startup-composition-extraction/manual/20260310T041150Z-closeout/07-docs-freshness.log`.
+- [x] `node scripts/diff-budget.mjs`. Evidence: `out/1105-coordinator-symphony-aligned-control-server-ready-instance-startup-composition-extraction/manual/20260310T041150Z-closeout/08-diff-budget.log`, `out/1105-coordinator-symphony-aligned-control-server-ready-instance-startup-composition-extraction/manual/20260310T041150Z-closeout/13-override-notes.md`.
+- [x] `npm run review`. Evidence: `out/1105-coordinator-symphony-aligned-control-server-ready-instance-startup-composition-extraction/manual/20260310T041150Z-closeout/09-review.log`.
+- [x] `npm run pack:smoke`. Evidence: `out/1105-coordinator-symphony-aligned-control-server-ready-instance-startup-composition-extraction/manual/20260310T041150Z-closeout/10-pack-smoke.log`.
+- [x] Manual startup-composition evidence captured. Evidence: `out/1105-coordinator-symphony-aligned-control-server-ready-instance-startup-composition-extraction/manual/20260310T041150Z-closeout/11-manual-startup-composition-check.json`.
+- [x] Elegance review completed. Evidence: `out/1105-coordinator-symphony-aligned-control-server-ready-instance-startup-composition-extraction/manual/20260310T041150Z-closeout/12-elegance-review.md`.

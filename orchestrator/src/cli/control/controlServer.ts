@@ -6,17 +6,13 @@ import type { EffectiveDelegationConfig } from '../config/delegationConfig.js';
 import type { RunEventStream, RunEventStreamEntry } from '../events/runEventStream.js';
 import { type ControlExpiryLifecycle } from './controlExpiryLifecycle.js';
 import { type ControlServerBootstrapLifecycle } from './controlServerBootstrapLifecycle.js';
-import { createControlBootstrapAssembly } from './controlBootstrapAssembly.js';
-import { startControlServerStartupSequence } from './controlServerStartupSequence.js';
 import {
   type ControlRequestSharedContext
 } from './controlRequestContext.js';
 import { createControlServerSeededRuntimeAssembly } from './controlServerSeededRuntimeAssembly.js';
 import { readControlServerSeeds } from './controlServerSeedLoading.js';
-import {
-  emitDispatchPilotAuditEvents,
-} from './controlServerAuditAndErrorHelpers.js';
 import { createBoundControlServerRequestShell } from './controlServerRequestShellBinding.js';
+import { startControlServerReadyInstanceStartup } from './controlServerReadyInstanceStartup.js';
 
 interface ControlServerOptions {
   paths: RunPaths;
@@ -77,19 +73,16 @@ export class ControlServer {
       server,
       requestContextShared
     });
-    const bootstrapAssembly = createControlBootstrapAssembly({
-      intervalMs: EXPIRY_INTERVAL_MS,
-      requestContextShared: instance.requestContextShared,
-      emitDispatchPilotAuditEvents
-    });
-    instance.expiryLifecycle = bootstrapAssembly.expiryLifecycle;
-    instance.bootstrapLifecycle = bootstrapAssembly.bootstrapLifecycle;
-
-    instance.baseUrl = await startControlServerStartupSequence({
+    instance.baseUrl = await startControlServerReadyInstanceStartup({
       server,
+      requestContextShared: instance.requestContextShared,
+      intervalMs: EXPIRY_INTERVAL_MS,
       host: options.config.ui.bindHost,
-      bootstrapLifecycle: instance.bootstrapLifecycle,
       controlToken: token,
+      onBootstrapAssembly: ({ expiryLifecycle, bootstrapLifecycle }) => {
+        instance!.expiryLifecycle = expiryLifecycle;
+        instance!.bootstrapLifecycle = bootstrapLifecycle;
+      },
       closeOnFailure: () => instance!.close()
     });
 
