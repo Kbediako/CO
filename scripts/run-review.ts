@@ -42,6 +42,7 @@ import {
   type ReviewStartupAnchorMode,
   type ReviewStartupAnchorBoundaryState,
   type ReviewShellProbeBoundaryState,
+  type ReviewVerdictStabilityState,
   ReviewExecutionState,
   type ReviewCommandIntentBoundaryState,
   type ReviewOutputSummary,
@@ -73,6 +74,7 @@ const REVIEW_LARGE_SCOPE_LINE_THRESHOLD_ENV_KEY = 'CODEX_REVIEW_LARGE_SCOPE_LINE
 const REVIEW_ALLOW_HEAVY_COMMANDS_ENV_KEY = 'CODEX_REVIEW_ALLOW_HEAVY_COMMANDS';
 const REVIEW_ENFORCE_BOUNDED_MODE_ENV_KEY = 'CODEX_REVIEW_ENFORCE_BOUNDED_MODE';
 const REVIEW_LOW_SIGNAL_TIMEOUT_ENV_KEY = 'CODEX_REVIEW_LOW_SIGNAL_TIMEOUT_SECONDS';
+const REVIEW_VERDICT_STABILITY_TIMEOUT_ENV_KEY = 'CODEX_REVIEW_VERDICT_STABILITY_TIMEOUT_SECONDS';
 const REVIEW_META_SURFACE_TIMEOUT_ENV_KEY = 'CODEX_REVIEW_META_SURFACE_TIMEOUT_SECONDS';
 const REVIEW_TELEMETRY_DEBUG_ENV_KEY = 'CODEX_REVIEW_DEBUG_TELEMETRY';
 const REVIEW_SURFACE_ENV_KEY = 'CODEX_REVIEW_SURFACE';
@@ -791,6 +793,9 @@ async function main(): Promise<void> {
     );
   }
   const lowSignalTimeoutMs = !allowHeavyCommands ? resolveReviewLowSignalTimeoutMs() : null;
+  const verdictStabilityTimeoutMs = !allowHeavyCommands
+    ? resolveReviewVerdictStabilityTimeoutMs()
+    : null;
   const metaSurfaceTimeoutMs = !allowHeavyCommands ? resolveReviewMetaSurfaceTimeoutMs() : null;
   const allowedMetaSurfaceKinds =
     reviewSurface === 'audit'
@@ -815,6 +820,17 @@ async function main(): Promise<void> {
         `[run-review] low-signal drift guard enabled after ${formatDurationMs(
           lowSignalTimeoutMs
         )} of repetitive bounded activity (set ${REVIEW_LOW_SIGNAL_TIMEOUT_ENV_KEY}=0 to disable).`
+      );
+    }
+    if (verdictStabilityTimeoutMs === null) {
+      console.log(
+        `[run-review] verdict-stability guard disabled (${REVIEW_VERDICT_STABILITY_TIMEOUT_ENV_KEY}=0).`
+      );
+    } else {
+      console.log(
+        `[run-review] verdict-stability guard enabled after ${formatDurationMs(
+          verdictStabilityTimeoutMs
+        )} of repeated speculative no-progress output (set ${REVIEW_VERDICT_STABILITY_TIMEOUT_ENV_KEY}=0 to disable).`
       );
     }
     if (metaSurfaceTimeoutMs === null) {
@@ -862,6 +878,7 @@ async function main(): Promise<void> {
       startupLoopMinEvents,
       monitorIntervalMs,
       lowSignalTimeoutMs,
+      verdictStabilityTimeoutMs,
       metaSurfaceTimeoutMs,
       enforceStartupAnchorBoundary,
       allowedMetaSurfaceKinds: [...allowedMetaSurfaceKinds],
@@ -1532,6 +1549,7 @@ interface RunCodexReviewOptions {
   startupLoopMinEvents: number;
   monitorIntervalMs: number | null;
   lowSignalTimeoutMs: number | null;
+  verdictStabilityTimeoutMs: number | null;
   metaSurfaceTimeoutMs: number | null;
   enforceStartupAnchorBoundary: boolean;
   allowedMetaSurfaceKinds: string[];
@@ -1622,6 +1640,7 @@ async function runCodexReview(
     allowValidationCommandIntents: options.allowValidationCommandIntents,
     activeCloseoutBundleRoots: options.activeCloseoutBundleRoots,
     lowSignalTimeoutMs: options.lowSignalTimeoutMs,
+    verdictStabilityTimeoutMs: options.verdictStabilityTimeoutMs,
     metaSurfaceTimeoutMs: options.metaSurfaceTimeoutMs,
     enforceStartupAnchorBoundary: options.enforceStartupAnchorBoundary,
     allowedMetaSurfaceKinds: options.allowedMetaSurfaceKinds,
@@ -1677,6 +1696,7 @@ async function runCodexReview(
       startupLoopMinEvents: options.startupLoopMinEvents,
       monitorIntervalMs: options.monitorIntervalMs,
       lowSignalTimeoutMs: options.lowSignalTimeoutMs,
+      verdictStabilityTimeoutMs: options.verdictStabilityTimeoutMs,
       metaSurfaceTimeoutMs: options.metaSurfaceTimeoutMs,
       enforceStartupAnchorBoundary: options.enforceStartupAnchorBoundary,
       blockHeavyCommands: options.blockHeavyCommands,
@@ -1684,6 +1704,7 @@ async function runCodexReview(
       getStartupLoopState: () => executionState.getStartupLoopState(),
       getBlockedHeavyCommand: () => executionState.getBlockedHeavyCommand(),
       getLowSignalDriftReason: () => executionState.getLowSignalDriftState().reason,
+      getVerdictStabilityState: () => executionState.getVerdictStabilityState(),
       getMetaSurfaceExpansionReason: () => executionState.getMetaSurfaceExpansionState().reason,
       getStartupAnchorBoundaryState: () => executionState.getStartupAnchorBoundaryState(),
       getCommandIntentBoundaryState: () => executionState.getCommandIntentBoundaryState(),
@@ -1940,6 +1961,21 @@ function resolveReviewLowSignalTimeoutMs(): number | null {
   return Math.round(parsedSeconds * 1000);
 }
 
+function resolveReviewVerdictStabilityTimeoutMs(): number | null {
+  const configured = process.env[REVIEW_VERDICT_STABILITY_TIMEOUT_ENV_KEY]?.trim();
+  if (!configured) {
+    return 180_000;
+  }
+  const parsedSeconds = Number(configured);
+  if (!Number.isFinite(parsedSeconds)) {
+    throw new Error(`${REVIEW_VERDICT_STABILITY_TIMEOUT_ENV_KEY} must be a finite number.`);
+  }
+  if (parsedSeconds <= 0) {
+    return null;
+  }
+  return Math.round(parsedSeconds * 1000);
+}
+
 function resolveReviewMetaSurfaceTimeoutMs(): number | null {
   const configured = process.env[REVIEW_META_SURFACE_TIMEOUT_ENV_KEY]?.trim();
   if (!configured) {
@@ -1962,6 +1998,7 @@ interface WaitForChildExitOptions {
   startupLoopMinEvents: number;
   monitorIntervalMs: number | null;
   lowSignalTimeoutMs: number | null;
+  verdictStabilityTimeoutMs: number | null;
   metaSurfaceTimeoutMs: number | null;
   enforceStartupAnchorBoundary: boolean;
   blockHeavyCommands: boolean;
@@ -1969,6 +2006,7 @@ interface WaitForChildExitOptions {
   getStartupLoopState: () => ReviewStartupLoopState;
   getBlockedHeavyCommand: () => string | null;
   getLowSignalDriftReason: () => string | null;
+  getVerdictStabilityState: () => ReviewVerdictStabilityState;
   getMetaSurfaceExpansionReason: () => string | null;
   getStartupAnchorBoundaryState: () => ReviewStartupAnchorBoundaryState;
   getCommandIntentBoundaryState: () => ReviewCommandIntentBoundaryState;
@@ -1993,6 +2031,7 @@ async function waitForChildExit(
     let startupLoopHandle: NodeJS.Timeout | undefined;
     let monitorHandle: NodeJS.Timeout | undefined;
     let lowSignalHandle: NodeJS.Timeout | undefined;
+    let verdictStabilityHandle: NodeJS.Timeout | undefined;
     let metaSurfaceHandle: NodeJS.Timeout | undefined;
     let startupAnchorHandle: NodeJS.Timeout | undefined;
     let commandIntentHandle: NodeJS.Timeout | undefined;
@@ -2021,6 +2060,9 @@ async function waitForChildExit(
       }
       if (lowSignalHandle) {
         clearInterval(lowSignalHandle);
+      }
+      if (verdictStabilityHandle) {
+        clearInterval(verdictStabilityHandle);
       }
       if (metaSurfaceHandle) {
         clearInterval(metaSurfaceHandle);
@@ -2105,6 +2147,21 @@ async function waitForChildExit(
               timedOut: false,
               outputPreview: ''
             })
+          );
+          return;
+        }
+        const verdictStabilityState = options.getVerdictStabilityState();
+        if (verdictStabilityState.triggered) {
+          reject(
+            new CodexReviewError(
+              verdictStabilityState.reason ?? 'bounded review verdict-stability drift detected',
+              {
+                exitCode: typeof code === 'number' && code > 0 ? code : 1,
+                signal,
+                timedOut: false,
+                outputPreview: ''
+              }
+            )
           );
           return;
         }
@@ -2246,6 +2303,20 @@ async function waitForChildExit(
         );
       }, 1000);
       lowSignalHandle.unref();
+    }
+
+    if (options.verdictStabilityTimeoutMs !== null) {
+      verdictStabilityHandle = setInterval(() => {
+        const verdictStabilityState = options.getVerdictStabilityState();
+        if (!verdictStabilityState.triggered) {
+          return;
+        }
+        requestTermination(
+          `${verdictStabilityState.reason ?? 'bounded review verdict-stability drift detected'} (set ${REVIEW_VERDICT_STABILITY_TIMEOUT_ENV_KEY}=0 to disable).`,
+          false
+        );
+      }, 1000);
+      verdictStabilityHandle.unref();
     }
 
     if (options.metaSurfaceTimeoutMs !== null) {

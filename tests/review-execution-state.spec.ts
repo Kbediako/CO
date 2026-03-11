@@ -409,6 +409,182 @@ describe('ReviewExecutionState', () => {
     expect(state.getLowSignalDriftState(nowMs).triggered).toBe(false);
   });
 
+  it('classifies verdict-stability drift from repeated speculative output with no new concrete progress even when commands vary', () => {
+    const state = new ReviewExecutionState({
+      startedAtMs: 0,
+      blockHeavyCommands: false,
+      verdictStabilityTimeoutMs: 1_000
+    });
+
+    const commands = [
+      "/bin/zsh -lc 'sed -n 1,120p scripts/run-review.ts'",
+      "/bin/zsh -lc 'sed -n 1,120p scripts/lib/review-execution-state.ts'",
+      "/bin/zsh -lc 'sed -n 1,120p tests/run-review.spec.ts'",
+      "/bin/zsh -lc 'sed -n 1,120p docs/standalone-review-guide.md'"
+    ];
+
+    let nowMs = 100;
+    for (let index = 0; index < 4; index += 1) {
+      state.observeChunk('thinking\n', 'stdout', nowMs);
+      state.observeChunk(
+        'I need to inspect dist/tests/review-scope-paths.spec.js to confirm whether the generated test surface still exposes the bug.\n',
+        'stdout',
+        nowMs + 10
+      );
+      state.observeChunk(
+        'I need to inspect dist/tests/review-scope-paths.spec.js to confirm whether the generated test surface still exposes the bug.\n',
+        'stdout',
+        nowMs + 20
+      );
+      state.observeChunk(
+        'I am still considering whether scripts/lib/review-scope-paths.ts requires another parity change before I can finish the review.\n',
+        'stdout',
+        nowMs + 30
+      );
+      state.observeChunk(
+        'I am still considering whether scripts/lib/review-scope-paths.ts requires another parity change before I can finish the review.\n',
+        'stdout',
+        nowMs + 40
+      );
+      state.observeChunk('exec\n', 'stdout', nowMs + 50);
+      state.observeChunk(`${commands[index]}\n`, 'stdout', nowMs + 60);
+      nowMs += 100;
+    }
+
+    const drift = state.getVerdictStabilityState(2_000);
+    const summary = state.buildOutputSummary();
+    expect(drift.triggered).toBe(true);
+    expect(drift.reason).toContain('verdict-stability drift detected');
+    expect(summary.outputInspectionSignals).toBeGreaterThanOrEqual(4);
+    expect(summary.distinctOutputInspectionTargets).toBeLessThanOrEqual(4);
+    expect(summary.maxOutputNarrativeSignatureHits).toBeGreaterThanOrEqual(2);
+  });
+
+  it('does not classify verdict-stability drift when output keeps introducing new concrete targets', () => {
+    const state = new ReviewExecutionState({
+      startedAtMs: 0,
+      blockHeavyCommands: false,
+      verdictStabilityTimeoutMs: 1_000
+    });
+
+    const commands = [
+      "/bin/zsh -lc 'sed -n 1,120p scripts/run-review.ts'",
+      "/bin/zsh -lc 'sed -n 1,120p scripts/lib/review-execution-state.ts'",
+      "/bin/zsh -lc 'sed -n 1,120p tests/run-review.spec.ts'",
+      "/bin/zsh -lc 'sed -n 1,120p docs/standalone-review-guide.md'"
+    ];
+    const narratives = [
+      'I need to inspect scripts/run-review.ts to verify the new concrete review surface before finalizing findings.',
+      'I need to inspect scripts/lib/review-execution-state.ts to verify the new concrete review surface before finalizing findings.',
+      'I need to inspect tests/run-review.spec.ts to verify the new concrete review surface before finalizing findings.',
+      'I need to inspect docs/standalone-review-guide.md to verify the new concrete review surface before finalizing findings.',
+      'I need to inspect docs/PRD-coordinator-symphony-aligned-standalone-review-verdict-stability-guard.md to verify the new concrete review surface before finalizing findings.'
+    ];
+
+    let nowMs = 100;
+    for (let index = 0; index < narratives.length; index += 1) {
+      state.observeChunk('thinking\n', 'stdout', nowMs);
+      state.observeChunk(`${narratives[index]}\n`, 'stdout', nowMs + 20);
+      state.observeChunk('exec\n', 'stdout', nowMs + 30);
+      state.observeChunk(`${commands[index % commands.length]}\n`, 'stdout', nowMs + 40);
+      nowMs += 100;
+    }
+
+    const drift = state.getVerdictStabilityState(2_000);
+    const summary = state.buildOutputSummary();
+    expect(drift.triggered).toBe(false);
+    expect(summary.distinctOutputInspectionTargets).toBeGreaterThan(4);
+  });
+
+  it('does not classify inspected fixture file contents as verdict-stability narrative drift', () => {
+    const state = new ReviewExecutionState({
+      startedAtMs: 0,
+      blockHeavyCommands: false,
+      verdictStabilityTimeoutMs: 1_000
+    });
+
+    const fixtureOutputs = [
+      [
+        'echo "I need to inspect dist/tests/review-scope-paths.spec.js to confirm whether the generated test surface still exposes the bug."',
+        'echo "I am still considering whether scripts/lib/review-scope-paths.ts requires another parity change before I can finish the review."'
+      ],
+      [
+        "'I need to inspect dist/tests/review-scope-paths.spec.js to confirm whether the generated test surface still exposes the bug.\\n',",
+        "'I am still considering whether scripts/lib/review-scope-paths.ts requires another parity change before I can finish the review.\\n',"
+      ]
+    ];
+
+    const commands = [
+      "/bin/zsh -lc 'sed -n 168,182p tests/run-review.spec.ts'",
+      "/bin/zsh -lc 'sed -n 426,446p tests/review-execution-state.spec.ts'"
+    ];
+
+    let nowMs = 100;
+    for (let index = 0; index < 4; index += 1) {
+      const fixtureOutput = fixtureOutputs[index % fixtureOutputs.length] ?? [];
+      state.observeChunk('thinking\n', 'stdout', nowMs);
+      state.observeChunk('exec\n', 'stdout', nowMs + 10);
+      state.observeChunk(`${commands[index % commands.length]}\n`, 'stdout', nowMs + 20);
+      for (const line of fixtureOutput) {
+        state.observeChunk(`${line}\n`, 'stdout', nowMs + 30);
+        nowMs += 10;
+      }
+      nowMs += 100;
+    }
+
+    const drift = state.getVerdictStabilityState(2_000);
+    const summary = state.buildOutputSummary();
+    expect(drift.triggered).toBe(false);
+    expect(summary.outputInspectionSignals).toBe(0);
+    expect(summary.distinctOutputInspectionTargets).toBe(0);
+    expect(summary.maxOutputNarrativeSignatureHits).toBe(0);
+  });
+
+  it('ages verdict-stability drift out after sustained non-speculative progress', () => {
+    const state = new ReviewExecutionState({
+      startedAtMs: 0,
+      blockHeavyCommands: false,
+      verdictStabilityTimeoutMs: 1_000
+    });
+
+    let nowMs = 100;
+    for (let index = 0; index < 4; index += 1) {
+      state.observeChunk('thinking\n', 'stdout', nowMs);
+      state.observeChunk(
+        'I need to inspect dist/tests/review-scope-paths.spec.js to confirm whether the generated test surface still exposes the bug.\n',
+        'stdout',
+        nowMs + 10
+      );
+      state.observeChunk(
+        'I am still considering whether scripts/lib/review-scope-paths.ts requires another parity change before I can finish the review.\n',
+        'stdout',
+        nowMs + 20
+      );
+      state.observeChunk('exec\n', 'stdout', nowMs + 30);
+      state.observeChunk(
+        `/bin/zsh -lc 'sed -n 1,120p scripts/run-review.ts'\n`,
+        'stdout',
+        nowMs + 40
+      );
+      nowMs += 100;
+    }
+
+    for (let index = 0; index < 40; index += 1) {
+      state.observeChunk(
+        'Concrete diff line without file target but definitely new progress.\n',
+        'stdout',
+        nowMs + index * 10
+      );
+    }
+
+    const drift = state.getVerdictStabilityState(3_000);
+    const summary = state.buildOutputSummary();
+    expect(drift.triggered).toBe(false);
+    expect(summary.outputInspectionSignals).toBe(0);
+    expect(summary.distinctOutputInspectionTargets).toBe(0);
+    expect(summary.maxOutputNarrativeSignatureHits).toBe(0);
+  });
+
   it('classifies bounded meta-surface expansion from sustained off-task review surfaces', () => {
     const state = new ReviewExecutionState({
       startedAtMs: 0,

@@ -3,6 +3,55 @@
   "generated_at": "2026-03-11",
   "entries": [
     {
+      "path": ".agent/task/1114-coordinator-symphony-aligned-standalone-review-verdict-stability-guard.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-11",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-standalone-review-verdict-stability-guard.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-11",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/PRD-coordinator-symphony-aligned-standalone-review-verdict-stability-guard.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-11",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/TECH_SPEC-coordinator-symphony-aligned-standalone-review-verdict-stability-guard.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-11",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/findings/1114-standalone-review-verdict-stability-guard-deliberation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-11",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/specs/1114-coordinator-symphony-aligned-standalone-review-verdict-stability-guard.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-11",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/tasks-1114-coordinator-symphony-aligned-standalone-review-verdict-stability-guard.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-11",
+      "cadence_days": 30
+    },
+    {
       "path": ".agent/task/1113-coordinator-symphony-aligned-standalone-review-untouched-helper-classification-parity.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",

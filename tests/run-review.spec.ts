@@ -167,6 +167,42 @@ fi
         sleep 0.05
       done
     fi
+    if [[ "$mode" == "verdict-stability-drift" ]]; then
+      targets=(
+        "scripts/run-review.ts"
+        "scripts/lib/review-execution-state.ts"
+        "tests/run-review.spec.ts"
+        "docs/standalone-review-guide.md"
+      )
+      for target in "\${targets[@]}"; do
+        echo "thinking"
+        echo "I need to inspect dist/tests/review-scope-paths.spec.js to confirm whether the generated test surface still exposes the bug."
+        echo "I need to inspect dist/tests/review-scope-paths.spec.js to confirm whether the generated test surface still exposes the bug."
+        echo "I am still considering whether scripts/lib/review-scope-paths.ts requires another parity change before I can finish the review."
+        echo "I am still considering whether scripts/lib/review-scope-paths.ts requires another parity change before I can finish the review."
+        echo "exec"
+        echo "/bin/zsh -lc 'sed -n 1,120p \${target}' in /Users/kbediako/Code/CO"
+        sleep 0.05
+      done
+      while true; do sleep 1; done
+    fi
+    if [[ "$mode" == "verdict-stability-progress" ]]; then
+      targets=(
+        "scripts/run-review.ts"
+        "scripts/lib/review-execution-state.ts"
+        "tests/run-review.spec.ts"
+        "docs/standalone-review-guide.md"
+        "docs/PRD-coordinator-symphony-aligned-standalone-review-verdict-stability-guard.md"
+      )
+      for target in "\${targets[@]}"; do
+        echo "thinking"
+        echo "I need to inspect \${target} to verify the new concrete review surface before finalizing findings."
+        echo "exec"
+        echo "/bin/zsh -lc 'sed -n 1,120p \${target}' in /Users/kbediako/Code/CO"
+        sleep 0.05
+      done
+      exit 0
+    fi
     if [[ "$mode" == "meta-surface-expansion" ]]; then
       while true; do
         echo "thinking"
@@ -2122,6 +2158,61 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(telemetry.summary.heavyCommandStarts).toEqual([]);
     expect(telemetry.summary.thinkingBlocks).toBeGreaterThan(0);
     expect(telemetry.summary.distinctInspectionTargets).toBeLessThanOrEqual(4);
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('fails bounded review when speculative output keeps repeating without new concrete progress', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'verdict-stability-drift',
+      CODEX_REVIEW_VERDICT_STABILITY_TIMEOUT_SECONDS: '1',
+      CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0',
+      CODEX_REVIEW_TIMEOUT_SECONDS: '60'
+    });
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).toContain('verdict-stability drift detected');
+
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      summary: {
+        outputInspectionSignals: number;
+        distinctOutputInspectionTargets: number;
+        maxOutputNarrativeSignatureHits: number;
+      };
+    };
+    expect(telemetry.status).toBe('failed');
+    expect(telemetry.summary.outputInspectionSignals).toBeGreaterThanOrEqual(4);
+    expect(telemetry.summary.distinctOutputInspectionTargets).toBeLessThanOrEqual(4);
+    expect(telemetry.summary.maxOutputNarrativeSignatureHits).toBeGreaterThanOrEqual(2);
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('allows bounded review to complete when speculative output keeps introducing new concrete targets', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'verdict-stability-progress',
+      CODEX_REVIEW_VERDICT_STABILITY_TIMEOUT_SECONDS: '1',
+      CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0',
+      CODEX_REVIEW_TIMEOUT_SECONDS: '60'
+    });
+
+    expect(result.exitCode).toBe(0);
+
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      summary: {
+        distinctOutputInspectionTargets: number;
+      };
+    };
+    expect(telemetry.status).toBe('succeeded');
+    expect(telemetry.summary.distinctOutputInspectionTargets).toBeGreaterThan(4);
   }, LONG_WAIT_TEST_TIMEOUT_MS);
 
   it('fails bounded review when meta-surface expansion persists', async () => {

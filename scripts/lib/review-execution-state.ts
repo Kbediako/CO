@@ -37,6 +37,7 @@ const DEFAULT_REVIEW_OUTPUT_SUMMARY_TAIL_LINE_LIMIT = 20;
 const DEFAULT_REVIEW_OUTPUT_SUMMARY_HEAVY_COMMAND_LIMIT = 8;
 const DEFAULT_REVIEW_OUTPUT_SUMMARY_COMMAND_LIMIT = 64;
 const DEFAULT_LOW_SIGNAL_TIMEOUT_MS = 180_000;
+const DEFAULT_VERDICT_STABILITY_TIMEOUT_MS = 180_000;
 const DEFAULT_META_SURFACE_TIMEOUT_MS = 180_000;
 const REVIEW_ACTIVE_CLOSEOUT_BUNDLE_KIND = 'review-closeout-bundle';
 const STARTUP_ANCHOR_META_SURFACE_SIGNAL_BUDGET = 1;
@@ -49,11 +50,22 @@ const LOW_SIGNAL_MAX_DISTINCT_TARGETS = 4;
 const LOW_SIGNAL_MIN_REPEAT_TARGET_HITS = 3;
 const LOW_SIGNAL_MIN_REPEAT_SIGNATURE_HITS = 4;
 const LOW_SIGNAL_RECENT_COMMAND_WINDOW = LOW_SIGNAL_MIN_COMMAND_STARTS;
+const VERDICT_STABILITY_MIN_THINKING_BLOCKS = 4;
+const VERDICT_STABILITY_MIN_COMMAND_STARTS = 4;
+const VERDICT_STABILITY_MIN_OUTPUT_TARGET_SIGNALS = 4;
+const VERDICT_STABILITY_MAX_DISTINCT_OUTPUT_TARGETS = 4;
+const VERDICT_STABILITY_MAX_DISTINCT_OUTPUT_SIGNATURES = 8;
+const VERDICT_STABILITY_MIN_REPEAT_OUTPUT_TARGET_HITS = 2;
+const VERDICT_STABILITY_MIN_REPEAT_OUTPUT_SIGNATURE_HITS = 2;
+const VERDICT_STABILITY_RECENT_OUTPUT_WINDOW = 16;
 const META_SURFACE_MIN_COMMAND_STARTS = 6;
 const META_SURFACE_MIN_SIGNALS = 4;
 const META_SURFACE_MIN_DISTINCT_SURFACES = 3;
 const META_SURFACE_MIN_REPEAT_HITS = 2;
 const META_SURFACE_RECENT_SIGNAL_WINDOW = 8;
+const REVIEW_NARRATIVE_INSPECTION_MIN_LINE_LENGTH = 32;
+const REVIEW_SPECULATIVE_NARRATIVE_LINE_RE =
+  /^(?:I\b|I['’]m\b|It\s+(?:might|may|seems|feels)\b|Maybe\b|Perhaps\b)/iu;
 const REVIEW_INSPECTION_TARGET_RE =
   /([A-Za-z0-9_./-]+\.(?:[cm]?js|[jt]sx?|json|md|ya?ml|toml))/gu;
 const REVIEW_META_SURFACE_DELEGATION_TOOL_LINE_RE =
@@ -85,6 +97,11 @@ export interface ReviewOutputSummary {
   maxInspectionTargetHits: number;
   distinctInspectionSignatures: number;
   maxInspectionSignatureHits: number;
+  outputInspectionSignals: number;
+  distinctOutputInspectionTargets: number;
+  maxOutputInspectionTargetHits: number;
+  distinctOutputNarrativeSignatures: number;
+  maxOutputNarrativeSignatureHits: number;
   metaSurfaceSignals: number;
   distinctMetaSurfaces: number;
   maxMetaSurfaceHits: number;
@@ -125,6 +142,19 @@ export interface ReviewLowSignalDriftState {
   maxInspectionTargetHits: number;
   distinctInspectionSignatures: number;
   maxInspectionSignatureHits: number;
+  timeoutMs: number | null;
+}
+
+export interface ReviewVerdictStabilityState {
+  triggered: boolean;
+  reason: string | null;
+  thinkingBlocks: number;
+  commandStarts: number;
+  outputInspectionSignals: number;
+  distinctOutputInspectionTargets: number;
+  maxOutputInspectionTargetHits: number;
+  distinctOutputNarrativeSignatures: number;
+  maxOutputNarrativeSignatureHits: number;
   timeoutMs: number | null;
 }
 
@@ -174,6 +204,7 @@ export interface ReviewExecutionStateOptions {
   heavyCommandLimit?: number;
   commandLimit?: number;
   lowSignalTimeoutMs?: number | null;
+  verdictStabilityTimeoutMs?: number | null;
   metaSurfaceTimeoutMs?: number | null;
   allowedMetaSurfaceKinds?: string[];
   touchedPaths?: string[];
@@ -243,6 +274,7 @@ export class ReviewExecutionState {
   private readonly heavyCommandLimit: number;
   private readonly commandLimit: number;
   private readonly lowSignalTimeoutMs: number | null;
+  private readonly verdictStabilityTimeoutMs: number | null;
   private readonly metaSurfaceTimeoutMs: number | null;
   private readonly allowedMetaSurfaceKinds: Set<string>;
   private readonly touchedPaths: Set<string>;
@@ -268,6 +300,7 @@ export class ReviewExecutionState {
   private awaitingCommandLine = false;
   private blockedHeavyCommand: string | null = null;
   private lowSignalCandidateSinceMs: number | null = null;
+  private verdictStabilityCandidateSinceMs: number | null = null;
   private metaSurfaceCandidateSinceMs: number | null = null;
   private startupAnchorViolationAtMs: number | null = null;
   private preAnchorCommandStarts = 0;
@@ -275,6 +308,8 @@ export class ReviewExecutionState {
   private readonly heavyCommandStarts: string[] = [];
   private readonly recentInspectionTargetSamples: string[][] = [];
   private readonly recentInspectionSignatures: string[] = [];
+  private readonly recentOutputInspectionTargetSamples: Array<string[] | null> = [];
+  private readonly recentOutputNarrativeSignatures: Array<string | null> = [];
   private readonly recentMetaSurfaceSamples: Array<string | null> = [];
   private readonly preAnchorMetaSurfaceSamples: string[] = [];
   private readonly commandIntentViolationSamples: ReviewCommandIntentViolation[] = [];
@@ -305,6 +340,13 @@ export class ReviewExecutionState {
         : configuredLowSignalTimeoutMs === null || configuredLowSignalTimeoutMs <= 0
         ? null
         : configuredLowSignalTimeoutMs;
+    const configuredVerdictStabilityTimeoutMs = options.verdictStabilityTimeoutMs;
+    this.verdictStabilityTimeoutMs =
+      configuredVerdictStabilityTimeoutMs === undefined
+        ? DEFAULT_VERDICT_STABILITY_TIMEOUT_MS
+        : configuredVerdictStabilityTimeoutMs === null || configuredVerdictStabilityTimeoutMs <= 0
+        ? null
+        : configuredVerdictStabilityTimeoutMs;
     const configuredMetaSurfaceTimeoutMs = options.metaSurfaceTimeoutMs;
     this.metaSurfaceTimeoutMs =
       configuredMetaSurfaceTimeoutMs === undefined
@@ -388,6 +430,7 @@ export class ReviewExecutionState {
 
   buildOutputSummary(): ReviewOutputSummary {
     const inspectionTargetSummary = this.buildInspectionTargetSummary();
+    const outputNarrativeSummary = this.buildOutputNarrativeSummary();
     const preAnchorMetaSurfaceSummary = this.buildPreAnchorMetaSurfaceSummary();
     return {
       lineCount: this.lineCount,
@@ -401,6 +444,11 @@ export class ReviewExecutionState {
       maxInspectionTargetHits: inspectionTargetSummary.maxHits,
       distinctInspectionSignatures: inspectionTargetSummary.distinctSignatures,
       maxInspectionSignatureHits: inspectionTargetSummary.maxSignatureHits,
+      outputInspectionSignals: outputNarrativeSummary.outputInspectionSignals,
+      distinctOutputInspectionTargets: outputNarrativeSummary.distinctOutputTargets,
+      maxOutputInspectionTargetHits: outputNarrativeSummary.maxOutputTargetHits,
+      distinctOutputNarrativeSignatures: outputNarrativeSummary.distinctNarrativeSignatures,
+      maxOutputNarrativeSignatureHits: outputNarrativeSummary.maxNarrativeSignatureHits,
       metaSurfaceSignals: inspectionTargetSummary.metaSurfaceSignals,
       distinctMetaSurfaces: inspectionTargetSummary.distinctMetaSurfaces,
       maxMetaSurfaceHits: inspectionTargetSummary.maxMetaSurfaceHits,
@@ -442,6 +490,31 @@ export class ReviewExecutionState {
       distinctInspectionSignatures: summary.distinctInspectionSignatures,
       maxInspectionSignatureHits: summary.maxInspectionSignatureHits,
       timeoutMs: this.lowSignalTimeoutMs
+    };
+  }
+
+  getVerdictStabilityState(nowMs = Date.now()): ReviewVerdictStabilityState {
+    const summary = this.buildOutputSummary();
+    const triggered =
+      this.verdictStabilityTimeoutMs !== null &&
+      this.verdictStabilityCandidateSinceMs !== null &&
+      Math.max(0, nowMs - this.verdictStabilityCandidateSinceMs) >=
+        this.verdictStabilityTimeoutMs;
+    return {
+      triggered,
+      reason: triggered
+        ? `bounded review verdict-stability drift detected after ${formatDurationMs(
+            Math.max(0, nowMs - this.startedAtMs)
+          )}: ${this.thinkingBlocks} thinking blocks, ${this.commandStarts.length} command starts, ${summary.outputInspectionSignals} repeated output inspection signals across ${summary.distinctOutputInspectionTargets} target(s) (max hit count ${summary.maxOutputInspectionTargetHits}), ${summary.distinctOutputNarrativeSignatures} repeated narrative signature(s) (max hit count ${summary.maxOutputNarrativeSignatureHits}), sustained for ${formatDurationMs(Math.max(0, nowMs - this.verdictStabilityCandidateSinceMs!))}.`
+        : null,
+      thinkingBlocks: this.thinkingBlocks,
+      commandStarts: this.commandStarts.length,
+      outputInspectionSignals: summary.outputInspectionSignals,
+      distinctOutputInspectionTargets: summary.distinctOutputInspectionTargets,
+      maxOutputInspectionTargetHits: summary.maxOutputInspectionTargetHits,
+      distinctOutputNarrativeSignatures: summary.distinctOutputNarrativeSignatures,
+      maxOutputNarrativeSignatureHits: summary.maxOutputNarrativeSignatureHits,
+      timeoutMs: this.verdictStabilityTimeoutMs
     };
   }
 
@@ -656,6 +729,7 @@ export class ReviewExecutionState {
       if (outputMetaSurfaceSample) {
         this.recordMetaSurfaceSample(outputMetaSurfaceSample, nowMs);
       }
+      this.recordNarrativeInspectionSignals(trimmed);
     }
 
     if (/\bsucceeded in\b|\bexited\b/i.test(trimmed)) {
@@ -663,6 +737,7 @@ export class ReviewExecutionState {
     }
 
     this.updateLowSignalCandidate(nowMs);
+    this.updateVerdictStabilityCandidate(nowMs);
     this.updateMetaSurfaceCandidate(nowMs);
   }
 
@@ -732,6 +807,38 @@ export class ReviewExecutionState {
     }
     if (this.lowSignalCandidateSinceMs === null) {
       this.lowSignalCandidateSinceMs = nowMs;
+    }
+  }
+
+  private recordNarrativeInspectionSignals(line: string): void {
+    const signature = normalizeNarrativeInspectionSignature(line);
+    if (!signature) {
+      this.recordOutputNarrativeMiss();
+      return;
+    }
+    const targets = extractInspectionTargets(signature);
+    if (targets.length === 0) {
+      this.recordOutputNarrativeMiss();
+      return;
+    }
+    this.recentOutputInspectionTargetSamples.push(targets);
+    while (this.recentOutputInspectionTargetSamples.length > VERDICT_STABILITY_RECENT_OUTPUT_WINDOW) {
+      this.recentOutputInspectionTargetSamples.shift();
+    }
+    this.recentOutputNarrativeSignatures.push(signature);
+    while (this.recentOutputNarrativeSignatures.length > VERDICT_STABILITY_RECENT_OUTPUT_WINDOW) {
+      this.recentOutputNarrativeSignatures.shift();
+    }
+  }
+
+  private recordOutputNarrativeMiss(): void {
+    this.recentOutputInspectionTargetSamples.push(null);
+    while (this.recentOutputInspectionTargetSamples.length > VERDICT_STABILITY_RECENT_OUTPUT_WINDOW) {
+      this.recentOutputInspectionTargetSamples.shift();
+    }
+    this.recentOutputNarrativeSignatures.push(null);
+    while (this.recentOutputNarrativeSignatures.length > VERDICT_STABILITY_RECENT_OUTPUT_WINDOW) {
+      this.recentOutputNarrativeSignatures.shift();
     }
   }
 
@@ -813,6 +920,34 @@ export class ReviewExecutionState {
     }
   }
 
+  private updateVerdictStabilityCandidate(nowMs: number): void {
+    if (this.verdictStabilityTimeoutMs === null) {
+      this.verdictStabilityCandidateSinceMs = null;
+      return;
+    }
+    const summary = this.buildOutputSummary();
+    const driftShaped =
+      this.reviewProgressObserved &&
+      this.thinkingBlocks >= VERDICT_STABILITY_MIN_THINKING_BLOCKS &&
+      this.commandStarts.length >= VERDICT_STABILITY_MIN_COMMAND_STARTS &&
+      summary.outputInspectionSignals >= VERDICT_STABILITY_MIN_OUTPUT_TARGET_SIGNALS &&
+      summary.distinctOutputInspectionTargets > 0 &&
+      summary.distinctOutputInspectionTargets <= VERDICT_STABILITY_MAX_DISTINCT_OUTPUT_TARGETS &&
+      summary.maxOutputInspectionTargetHits >= VERDICT_STABILITY_MIN_REPEAT_OUTPUT_TARGET_HITS &&
+      summary.distinctOutputNarrativeSignatures > 0 &&
+      summary.distinctOutputNarrativeSignatures <=
+        VERDICT_STABILITY_MAX_DISTINCT_OUTPUT_SIGNATURES &&
+      summary.maxOutputNarrativeSignatureHits >=
+        VERDICT_STABILITY_MIN_REPEAT_OUTPUT_SIGNATURE_HITS;
+    if (!driftShaped) {
+      this.verdictStabilityCandidateSinceMs = null;
+      return;
+    }
+    if (this.verdictStabilityCandidateSinceMs === null) {
+      this.verdictStabilityCandidateSinceMs = nowMs;
+    }
+  }
+
   private buildInspectionTargetSummary(): {
     distinctTargets: number;
     maxHits: number;
@@ -867,6 +1002,53 @@ export class ReviewExecutionState {
       distinctMetaSurfaces: recentMetaSurfaceHits.size,
       maxMetaSurfaceHits,
       metaSurfaceKinds: [...recentMetaSurfaceHits.keys()].sort()
+    };
+  }
+
+  private buildOutputNarrativeSummary(): {
+    outputInspectionSignals: number;
+    distinctOutputTargets: number;
+    maxOutputTargetHits: number;
+    distinctNarrativeSignatures: number;
+    maxNarrativeSignatureHits: number;
+  } {
+    const outputTargetHits = new Map<string, number>();
+    for (const targets of this.recentOutputInspectionTargetSamples) {
+      if (!targets) {
+        continue;
+      }
+      for (const target of targets) {
+        outputTargetHits.set(target, (outputTargetHits.get(target) ?? 0) + 1);
+      }
+    }
+    let maxOutputTargetHits = 0;
+    for (const hits of outputTargetHits.values()) {
+      if (hits > maxOutputTargetHits) {
+        maxOutputTargetHits = hits;
+      }
+    }
+    const outputNarrativeSignatureHits = new Map<string, number>();
+    for (const signature of this.recentOutputNarrativeSignatures) {
+      if (!signature) {
+        continue;
+      }
+      outputNarrativeSignatureHits.set(
+        signature,
+        (outputNarrativeSignatureHits.get(signature) ?? 0) + 1
+      );
+    }
+    let maxNarrativeSignatureHits = 0;
+    for (const hits of outputNarrativeSignatureHits.values()) {
+      if (hits > maxNarrativeSignatureHits) {
+        maxNarrativeSignatureHits = hits;
+      }
+    }
+    return {
+      outputInspectionSignals: [...outputTargetHits.values()].reduce((sum, hits) => sum + hits, 0),
+      distinctOutputTargets: outputTargetHits.size,
+      maxOutputTargetHits,
+      distinctNarrativeSignatures: outputNarrativeSignatureHits.size,
+      maxNarrativeSignatureHits
     };
   }
 
@@ -1567,6 +1749,28 @@ function extractInspectionTargets(commandLine: string): string[] {
     targets.add(target.replace(/^\.\/+/u, ''));
   }
   return [...targets];
+}
+
+function normalizeNarrativeInspectionSignature(line: string): string | null {
+  const normalized = line.trim().replace(/\s+/gu, ' ');
+  if (normalized.length < REVIEW_NARRATIVE_INSPECTION_MIN_LINE_LENGTH) {
+    return null;
+  }
+  if (
+    normalized === 'thinking' ||
+    normalized === 'exec' ||
+    REVIEW_PROGRESS_SIGNAL_LINE_RE.test(normalized) ||
+    isLikelyReviewCommandLine(normalized) ||
+    /^mcp:/iu.test(normalized) ||
+    /^(?:diff --git|index |--- |\+\+\+ |@@|```)/u.test(normalized) ||
+    /\bsucceeded in\b|\bexited\b/iu.test(normalized)
+  ) {
+    return null;
+  }
+  if (!REVIEW_SPECULATIVE_NARRATIVE_LINE_RE.test(normalized)) {
+    return null;
+  }
+  return normalized;
 }
 
 function extractInspectionCommandSignature(commandLine: string, targets: string[]): string | null {
