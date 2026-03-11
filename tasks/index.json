@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260312-1123-coordinator-symphony-aligned-control-server-shutdown-shell-extraction",
+      "title": "Coordinator Symphony-Aligned Control Server Shutdown Shell Extraction",
+      "relates_to": "tasks/tasks-1123-coordinator-symphony-aligned-control-server-shutdown-shell-extraction.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-12",
+      "paths": {
+        "spec": "tasks/specs/1123-coordinator-symphony-aligned-control-server-shutdown-shell-extraction.md",
+        "task": "tasks/tasks-1123-coordinator-symphony-aligned-control-server-shutdown-shell-extraction.md",
+        "agent_task": ".agent/task/1123-coordinator-symphony-aligned-control-server-shutdown-shell-extraction.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-control-server-shutdown-shell-extraction.md"
+      }
+    },
+    {
       "id": "20260312-1122-coordinator-symphony-aligned-control-server-pending-ready-instance-activation-guard",
       "title": "Coordinator Symphony-Aligned Control Server Pending Ready-Instance Activation Guard",
       "relates_to": "tasks/tasks-1122-coordinator-symphony-aligned-control-server-pending-ready-instance-activation-guard.md",
