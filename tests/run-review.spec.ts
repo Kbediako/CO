@@ -722,6 +722,11 @@ function baseEnv(sandbox: string, codexBin: string): Record<string, string | und
     CODEX_CLI_BIN: codexBin,
     CODEX_ORCHESTRATOR_ROOT: sandbox
   };
+  for (const key of Object.keys(env)) {
+    if (key.startsWith('RUN_REVIEW_')) {
+      delete env[key];
+    }
+  }
   delete env.CODEX_REVIEW_STALL_TIMEOUT_SECONDS;
   delete env.CODEX_REVIEW_TIMEOUT_SECONDS;
   delete env.CODEX_REVIEW_STARTUP_LOOP_TIMEOUT_SECONDS;
@@ -876,6 +881,27 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     const heavyPromptPath = join(dirname(heavyManifestPath), 'review', 'prompt.txt');
     const heavyPrompt = await readFile(heavyPromptPath, 'utf8');
     expect(heavyPrompt).not.toContain('Execution constraints (bounded review mode):');
+  });
+
+  it('ignores ambient fake-codex harness env in baseEnv', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    const previousMode = process.env.RUN_REVIEW_MODE;
+
+    process.env.RUN_REVIEW_MODE = 'delete-after-help';
+    try {
+      const result = await runReviewCommand(manifestPath, baseEnv(sandbox, codexBin));
+
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout).toContain('bounded review guidance enabled by default');
+    } finally {
+      if (previousMode === undefined) {
+        delete process.env.RUN_REVIEW_MODE;
+      } else {
+        process.env.RUN_REVIEW_MODE = previousMode;
+      }
+    }
   });
 
   it('surfaces active closeout provenance in the diff-mode handoff for the direct task', async () => {
