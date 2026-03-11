@@ -2409,6 +2409,24 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(telemetry.summary.distinctInspectionTargets).toBeGreaterThan(4);
   }, LONG_WAIT_TEST_TIMEOUT_MS);
 
+  it('disables the relevant reinspection dwell boundary when low-signal timeout is off', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    await initGitRepoWithTouchedPath(sandbox, 'file-1.py');
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'relevant-reinspection-dwell',
+      CODEX_REVIEW_LOW_SIGNAL_TIMEOUT_SECONDS: '0',
+      CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0',
+      CODEX_REVIEW_TIMEOUT_SECONDS: '1'
+    });
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).not.toContain('relevant-reinspection dwell boundary violated');
+    expect(result.stderr).toContain('codex review timed out after 1s');
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
   it('fails bounded review when speculative output keeps repeating without new concrete progress', async () => {
     const sandbox = await makeSandbox();
     const manifestPath = await makeManifest(sandbox);

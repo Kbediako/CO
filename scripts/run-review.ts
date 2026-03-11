@@ -816,8 +816,10 @@ async function main(): Promise<void> {
   const enforceStartupAnchorBoundary = startupAnchorMode !== null;
   const enforceActiveCloseoutBundleRereadBoundary =
     reviewSurface === 'diff' && !allowHeavyCommands && activeCloseoutBundleRoots.length > 0;
-  const enforceRelevantReinspectionDwellBoundary =
+  const announceRelevantReinspectionDwellBoundary =
     reviewSurface === 'diff' && !allowHeavyCommands && touchedPaths.length > 0;
+  const enforceRelevantReinspectionDwellBoundary =
+    announceRelevantReinspectionDwellBoundary && lowSignalTimeoutMs !== null;
   if (!allowHeavyCommands) {
     if (lowSignalTimeoutMs === null) {
       console.log(
@@ -869,7 +871,7 @@ async function main(): Promise<void> {
         '[run-review] startup-anchor boundary enabled for audit mode; repeated memory/skills/review-doc reads before the first manifest/runner-log startup anchor will terminate the review.'
       );
     }
-    if (enforceRelevantReinspectionDwellBoundary) {
+    if (announceRelevantReinspectionDwellBoundary) {
       if (lowSignalTimeoutMs === null) {
         console.log(
           `[run-review] bounded relevant reinspection dwell boundary disabled (${REVIEW_LOW_SIGNAL_TIMEOUT_ENV_KEY}=0).`
