@@ -1,7 +1,7 @@
 ---
 id: 20260312-1121-coordinator-symphony-aligned-control-server-startup-input-prep-extraction
 title: Coordinator Symphony-Aligned Control Server Startup Input Prep Extraction
-status: draft
+status: completed
 owners:
   - Codex
 created: 2026-03-12
@@ -36,3 +36,4 @@ Extract the remaining startup-input preparation from `ControlServer.start()` so 
 ## Notes
 
 - 2026-03-12: Registered after `1120` closed and the branch returned to the broader Symphony extraction track. `1106` already removed the last strong mutable host-shell block, so the truthful remaining seam is the weaker startup-input prep still living in `ControlServer.start()`. Evidence: `docs/findings/1121-control-server-startup-input-prep-extraction-deliberation.md`, `out/1106-coordinator-symphony-aligned-control-server-live-instance-host-shell-extraction/manual/20260310T041640Z-closeout/00-summary.md`, `out/1106-coordinator-symphony-aligned-control-server-live-instance-host-shell-extraction/manual/20260310T041640Z-closeout/14-next-slice-note.md`, `out/1120-coordinator-symphony-aligned-standalone-review-bounded-relevant-reinspection-dwell-boundary/manual/20260311T135537Z-closeout/14-next-slice-note.md`.
+- 2026-03-12: Completed. `ControlServer.start()` now delegates token generation, seed loading, seeded runtime assembly, and prepared ready-instance inputs into `controlServerStartupInputPreparation.ts` while leaving `startPendingReadyInstance(...)` and the downstream startup lifecycle unchanged. Focused seam coverage passed (`05-targeted-tests.log`), full suite passed (`05-test.log`), docs gates passed, `pack:smoke` passed, and the bounded standalone review rerun returned no concrete `1121` finding. Evidence: `out/1121-coordinator-symphony-aligned-control-server-startup-input-prep-extraction/manual/20260311T221050Z-closeout/00-summary.md`, `out/1121-coordinator-symphony-aligned-control-server-startup-input-prep-extraction/manual/20260311T221050Z-closeout/09-review.log`, `out/1121-coordinator-symphony-aligned-control-server-startup-input-prep-extraction/manual/20260311T221050Z-closeout/13-override-notes.md`.

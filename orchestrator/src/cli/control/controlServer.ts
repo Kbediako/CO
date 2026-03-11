@@ -1,5 +1,4 @@
 import http from 'node:http';
-import { randomBytes } from 'node:crypto';
 
 import type { RunPaths } from '../run/runPaths.js';
 import type { EffectiveDelegationConfig } from '../config/delegationConfig.js';
@@ -9,10 +8,9 @@ import { type ControlServerBootstrapLifecycle } from './controlServerBootstrapLi
 import {
   type ControlRequestSharedContext
 } from './controlRequestContext.js';
-import { createControlServerSeededRuntimeAssembly } from './controlServerSeededRuntimeAssembly.js';
-import { readControlServerSeeds } from './controlServerSeedLoading.js';
 import { createBoundControlServerRequestShell } from './controlServerRequestShellBinding.js';
 import { startControlServerReadyInstanceStartup } from './controlServerReadyInstanceStartup.js';
+import { prepareControlServerStartupInputs } from './controlServerStartupInputPreparation.js';
 
 interface ControlServerOptions {
   paths: RunPaths;
@@ -40,33 +38,18 @@ export class ControlServer {
   }
 
   static async start(options: ControlServerOptions): Promise<ControlServer> {
-    const token = randomBytes(24).toString('hex');
-    const {
-      controlSeed,
-      confirmationsSeed,
-      questionsSeed,
-      delegationSeed,
-      linearAdvisorySeed
-    } = await readControlServerSeeds(options.paths);
-
-    const { requestContextShared } = createControlServerSeededRuntimeAssembly({
-      runId: options.runId,
-      token,
-      config: options.config,
+    const startupInputs = await prepareControlServerStartupInputs({
       paths: options.paths,
+      config: options.config,
       eventStream: options.eventStream,
-      sessionTtlMs: SESSION_TTL_MS,
-      controlSeed,
-      confirmationsSeed,
-      questionsSeed,
-      delegationSeed,
-      linearAdvisorySeed
+      runId: options.runId,
+      sessionTtlMs: SESSION_TTL_MS
     });
 
     return ControlServer.startPendingReadyInstance({
-      requestContextShared,
-      host: options.config.ui.bindHost,
-      controlToken: token,
+      requestContextShared: startupInputs.requestContextShared,
+      host: startupInputs.host,
+      controlToken: startupInputs.controlToken,
       intervalMs: EXPIRY_INTERVAL_MS
     });
   }
