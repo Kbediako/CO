@@ -1,0 +1,37 @@
+{
+  "task": "1110-coordinator-symphony-aligned-standalone-review-shell-probe-stop-condition",
+  "checked_at": "2026-03-11T02:17:05Z",
+  "status": "passed",
+  "checks": [
+    {
+      "name": "single_probe_allowed",
+      "result": "passed",
+      "evidence": "05c-shell-probe-subset.log",
+      "note": "A single direct shell probe remains allowed during bounded review."
+    },
+    {
+      "name": "repeated_probe_terminates",
+      "result": "passed",
+      "evidence": "05c-shell-probe-subset.log",
+      "note": "Repeated direct shell probes terminate bounded review before further drift."
+    },
+    {
+      "name": "nested_probe_terminates",
+      "result": "passed",
+      "evidence": "05c-shell-probe-subset.log",
+      "note": "Nested shell payload probes are still counted toward the repeated-probe boundary."
+    },
+    {
+      "name": "mixed_probe_plus_read_counts",
+      "result": "passed",
+      "evidence": "05a-review-execution-state.log",
+      "note": "A mixed env-probe plus file-read command still counts as a shell probe."
+    },
+    {
+      "name": "ordinary_reads_preserved",
+      "result": "passed",
+      "evidence": "05a-review-execution-state.log",
+      "note": "Shell-wrapped touched-file reads and valid audit startup-anchor reads remain allowed."
+    }
+  ]
+}

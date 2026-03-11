@@ -41,6 +41,7 @@ import {
   persistReviewTelemetry as persistReviewExecutionTelemetry,
   type ReviewStartupAnchorMode,
   type ReviewStartupAnchorBoundaryState,
+  type ReviewShellProbeBoundaryState,
   ReviewExecutionState,
   type ReviewCommandIntentBoundaryState,
   type ReviewOutputSummary,
@@ -1591,6 +1592,7 @@ async function runCodexReview(
       getMetaSurfaceExpansionReason: () => executionState.getMetaSurfaceExpansionState().reason,
       getStartupAnchorBoundaryState: () => executionState.getStartupAnchorBoundaryState(),
       getCommandIntentBoundaryState: () => executionState.getCommandIntentBoundaryState(),
+      getShellProbeBoundaryState: () => executionState.getShellProbeBoundaryState(),
       waitForOutputDrain: () => outputDrainPromise,
       formatCheckpoint: () => executionState.formatCheckpoint(),
       detached,
@@ -1875,6 +1877,7 @@ interface WaitForChildExitOptions {
   getMetaSurfaceExpansionReason: () => string | null;
   getStartupAnchorBoundaryState: () => ReviewStartupAnchorBoundaryState;
   getCommandIntentBoundaryState: () => ReviewCommandIntentBoundaryState;
+  getShellProbeBoundaryState: () => ReviewShellProbeBoundaryState;
   waitForOutputDrain: () => Promise<void>;
   formatCheckpoint: () => string;
   detached: boolean;
@@ -1898,6 +1901,7 @@ async function waitForChildExit(
     let metaSurfaceHandle: NodeJS.Timeout | undefined;
     let startupAnchorHandle: NodeJS.Timeout | undefined;
     let commandIntentHandle: NodeJS.Timeout | undefined;
+    let shellProbeHandle: NodeJS.Timeout | undefined;
     let heavyCommandHandle: NodeJS.Timeout | undefined;
     let killHandle: NodeJS.Timeout | undefined;
     let hardKillArmed = false;
@@ -1931,6 +1935,9 @@ async function waitForChildExit(
       }
       if (commandIntentHandle) {
         clearInterval(commandIntentHandle);
+      }
+      if (shellProbeHandle) {
+        clearInterval(shellProbeHandle);
       }
       if (heavyCommandHandle) {
         clearInterval(heavyCommandHandle);
@@ -2003,6 +2010,21 @@ async function waitForChildExit(
               timedOut: false,
               outputPreview: ''
             })
+          );
+          return;
+        }
+        const shellProbeBoundaryState = options.getShellProbeBoundaryState();
+        if (shellProbeBoundaryState.triggered) {
+          reject(
+            new CodexReviewError(
+              shellProbeBoundaryState.reason ?? 'bounded review shell-probe boundary violated',
+              {
+                exitCode: typeof code === 'number' && code > 0 ? code : 1,
+                signal,
+                timedOut: false,
+                outputPreview: ''
+              }
+            )
           );
           return;
         }
@@ -2164,6 +2186,18 @@ async function waitForChildExit(
       requestTermination(formatCommandIntentBoundaryFailure(boundaryState), false);
     }, 250);
     commandIntentHandle.unref();
+
+    shellProbeHandle = setInterval(() => {
+      const boundaryState = options.getShellProbeBoundaryState();
+      if (!boundaryState.triggered) {
+        return;
+      }
+      requestTermination(
+        boundaryState.reason ?? 'bounded review shell-probe boundary violated',
+        false
+      );
+    }, 250);
+    shellProbeHandle.unref();
 
     const monitorIntervalMs = options.monitorIntervalMs;
     if (monitorIntervalMs !== null) {

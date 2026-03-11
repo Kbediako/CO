@@ -55,6 +55,173 @@ describe('ReviewExecutionState', () => {
     expect(resetState.buildOutputSummary().commandStarts).toEqual([]);
   });
 
+  it('does not treat shell-wrapped touched-file reads as shell probes', () => {
+    const state = new ReviewExecutionState({
+      startedAtMs: 0,
+      touchedPaths: ['scripts/run-review.ts']
+    });
+
+    state.observeChunk('thinking\nexec\n', 'stdout', 100);
+    state.observeChunk("/bin/zsh -lc 'sed -n 1,120p scripts/run-review.ts'\n", 'stdout', 110);
+
+    const boundary = state.getShellProbeBoundaryState(2_000);
+    expect(boundary.triggered).toBe(false);
+    expect(boundary.probeCount).toBe(0);
+  });
+
+  it('allows one direct shell probe but flags a repeated shell probe', () => {
+    const state = new ReviewExecutionState({ startedAtMs: 0 });
+
+    state.observeChunk('thinking\nexec\n', 'stdout', 100);
+    state.observeChunk(
+      `/bin/bash -lc 'MANIFEST=/tmp/other.json; export MANIFEST; printf "%s\\n" "$MANIFEST"'\n`,
+      'stdout',
+      110
+    );
+    expect(state.getShellProbeBoundaryState(120).triggered).toBe(false);
+    expect(state.getShellProbeBoundaryState(120).probeCount).toBe(1);
+
+    state.observeChunk('thinking\nexec\n', 'stdout', 200);
+    state.observeChunk(
+      `/bin/zsh -lc 'MANIFEST=/tmp/third.json; export MANIFEST; printf "%s\\n" "$MANIFEST"'\n`,
+      'stdout',
+      210
+    );
+
+    const boundary = state.getShellProbeBoundaryState(2_000);
+    expect(boundary.triggered).toBe(true);
+    expect(boundary.reason).toContain('shell-probe boundary violated');
+    expect(boundary.probeCount).toBe(2);
+    expect(boundary.violationSample).toContain('/bin/zsh -lc');
+  });
+
+  it('counts mixed probe plus touched-file reads as shell probes', () => {
+    const state = new ReviewExecutionState({
+      startedAtMs: 0,
+      touchedPaths: ['scripts/run-review.ts']
+    });
+
+    state.observeChunk('thinking\nexec\n', 'stdout', 100);
+    state.observeChunk(
+      `/bin/zsh -lc 'printf "%s\\n" "$MANIFEST"; sed -n 1,120p scripts/run-review.ts'\n`,
+      'stdout',
+      110
+    );
+
+    const boundary = state.getShellProbeBoundaryState(2_000);
+    expect(boundary.triggered).toBe(false);
+    expect(boundary.probeCount).toBe(1);
+  });
+
+  it('does not treat active audit startup-anchor reads as shell probes', () => {
+    const state = new ReviewExecutionState({
+      startedAtMs: 0,
+      enforceStartupAnchorBoundary: true,
+      startupAnchorMode: 'audit',
+      repoRoot: '/repo',
+      auditStartupAnchorPaths: ['/repo/.runs/sample-task/cli/sample-run/manifest.json'],
+      allowedMetaSurfaceEnvVars: ['MANIFEST'],
+      auditStartupAnchorEnvVarPaths: {
+        MANIFEST: '/repo/.runs/sample-task/cli/sample-run/manifest.json'
+      }
+    });
+
+    state.observeChunk('thinking\nexec\n', 'stdout', 100);
+    state.observeChunk(
+      `/bin/zsh -lc 'export MANIFEST=$MANIFEST; sed -n 1,80p "$MANIFEST"'\n`,
+      'stdout',
+      110
+    );
+
+    expect(state.getStartupAnchorBoundaryState(2_000).anchorObserved).toBe(true);
+    expect(state.getShellProbeBoundaryState(2_000).triggered).toBe(false);
+    expect(state.getShellProbeBoundaryState(2_000).probeCount).toBe(0);
+  });
+
+  it('counts mixed probe plus active audit startup-anchor reads as shell probes while preserving the anchor', () => {
+    const state = new ReviewExecutionState({
+      startedAtMs: 0,
+      enforceStartupAnchorBoundary: true,
+      startupAnchorMode: 'audit',
+      repoRoot: '/repo',
+      auditStartupAnchorPaths: ['/repo/.runs/sample-task/cli/sample-run/manifest.json'],
+      allowedMetaSurfaceEnvVars: ['MANIFEST'],
+      auditStartupAnchorEnvVarPaths: {
+        MANIFEST: '/repo/.runs/sample-task/cli/sample-run/manifest.json'
+      }
+    });
+
+    state.observeChunk('thinking\nexec\n', 'stdout', 100);
+    state.observeChunk(
+      `/bin/zsh -lc 'printf "%s\\n" "$MANIFEST"; sed -n 1,80p "$MANIFEST"'\n`,
+      'stdout',
+      110
+    );
+
+    expect(state.getStartupAnchorBoundaryState(2_000).anchorObserved).toBe(true);
+    expect(state.getShellProbeBoundaryState(2_000).triggered).toBe(false);
+    expect(state.getShellProbeBoundaryState(2_000).probeCount).toBe(1);
+  });
+
+  it('ignores literal MANIFEST_HINT echoes but counts printenv MANIFEST as shell probes', () => {
+    const echoState = new ReviewExecutionState({ startedAtMs: 0 });
+
+    echoState.observeChunk('thinking\nexec\n', 'stdout', 100);
+    echoState.observeChunk(`/bin/zsh -lc 'echo MANIFEST_HINT'\n`, 'stdout', 110);
+
+    expect(echoState.getShellProbeBoundaryState(2_000).probeCount).toBe(0);
+
+    const printenvState = new ReviewExecutionState({ startedAtMs: 0 });
+
+    printenvState.observeChunk('thinking\nexec\n', 'stdout', 100);
+    printenvState.observeChunk(`/bin/zsh -lc 'printenv MANIFEST'\n`, 'stdout', 110);
+
+    expect(printenvState.getShellProbeBoundaryState(2_000).probeCount).toBe(1);
+  });
+
+  it('does not treat grep-based code searches over files as shell probes', () => {
+    const state = new ReviewExecutionState({ startedAtMs: 0 });
+
+    state.observeChunk('thinking\nexec\n', 'stdout', 100);
+    state.observeChunk(
+      `/bin/zsh -lc 'grep -n MANIFEST tests/run-review.spec.ts docs/standalone-review-guide.md'\n`,
+      'stdout',
+      110
+    );
+
+    expect(state.getShellProbeBoundaryState(2_000).probeCount).toBe(0);
+  });
+
+  it('counts nested shell payload probes', () => {
+    const state = new ReviewExecutionState({ startedAtMs: 0 });
+
+    state.observeChunk('thinking\nexec\n', 'stdout', 100);
+    state.observeChunk(
+      `/bin/zsh -lc "/bin/bash -lc 'printenv MANIFEST'"\n`,
+      'stdout',
+      110
+    );
+
+    expect(state.getShellProbeBoundaryState(2_000).probeCount).toBe(1);
+  });
+
+  it('reports total shell probe count beyond the retained sample window', () => {
+    const state = new ReviewExecutionState({ startedAtMs: 0 });
+
+    for (let index = 0; index < 10; index += 1) {
+      state.observeChunk('thinking\nexec\n', 'stdout', 100 + index * 100);
+      state.observeChunk(
+        `/bin/zsh -lc 'printenv MANIFEST'\n`,
+        'stdout',
+        110 + index * 100
+      );
+    }
+
+    const summary = state.buildOutputSummary();
+    expect(summary.shellProbeCount).toBe(10);
+    expect(state.getShellProbeBoundaryState(2_000).probeCount).toBe(10);
+  });
+
   it('persists redacted and raw telemetry from the same live snapshot', () => {
     const state = new ReviewExecutionState({
       startedAtMs: 0,

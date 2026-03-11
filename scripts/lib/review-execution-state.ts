@@ -31,6 +31,7 @@ const REVIEW_SHELL_COMMANDS = new Set([
   'cmd',
   'cmd.exe'
 ]);
+const REVIEW_SHELL_PROBE_ENV_VARS = new Set(['MANIFEST', 'RUNNER_LOG', 'RUN_LOG']);
 const DEFAULT_REVIEW_OUTPUT_PREVIEW_LIMIT = 32_768;
 const DEFAULT_REVIEW_OUTPUT_SUMMARY_TAIL_LINE_LIMIT = 20;
 const DEFAULT_REVIEW_OUTPUT_SUMMARY_HEAVY_COMMAND_LIMIT = 8;
@@ -95,6 +96,7 @@ export interface ReviewOutputSummary {
   commandIntentViolationCount: number;
   commandIntentViolationKinds: ReviewCommandIntentViolationKind[];
   commandIntentViolationSamples: string[];
+  shellProbeCount: number;
   lastLines: string[];
 }
 
@@ -152,6 +154,13 @@ export interface ReviewCommandIntentBoundaryState {
   violationSample: string | null;
   violationCount: number;
   violationKinds: ReviewCommandIntentViolationKind[];
+}
+
+export interface ReviewShellProbeBoundaryState {
+  triggered: boolean;
+  reason: string | null;
+  probeCount: number;
+  violationSample: string | null;
 }
 
 export interface ReviewExecutionStateOptions {
@@ -217,6 +226,11 @@ interface ReviewCommandIntentViolation {
   sample: string;
 }
 
+interface ReviewShellProbeViolation {
+  sample: string;
+  detectedAtMs: number;
+}
+
 export class ReviewExecutionState {
   private readonly startedAtMs: number;
   private readonly blockHeavyCommands: boolean;
@@ -261,12 +275,15 @@ export class ReviewExecutionState {
   private readonly recentMetaSurfaceSamples: Array<string | null> = [];
   private readonly preAnchorMetaSurfaceSamples: string[] = [];
   private readonly commandIntentViolationSamples: ReviewCommandIntentViolation[] = [];
+  private readonly shellProbeSamples: string[] = [];
   private readonly lastLines: string[] = [];
   private readonly pendingFragmentsByStream: PendingFragmentsByStream = {
     stdout: '',
     stderr: ''
   };
   private commandIntentViolation: ReviewCommandIntentViolation | null = null;
+  private shellProbeViolation: ReviewShellProbeViolation | null = null;
+  private shellProbeCount = 0;
 
   constructor(options: ReviewExecutionStateOptions = {}) {
     this.startedAtMs = options.startedAtMs ?? Date.now();
@@ -392,6 +409,7 @@ export class ReviewExecutionState {
       commandIntentViolationSamples: this.commandIntentViolationSamples.map(
         (sample) => `[${sample.kind}] ${sample.sample}`
       ),
+      shellProbeCount: this.shellProbeCount,
       lastLines: [...this.lastLines]
     };
   }
@@ -472,6 +490,19 @@ export class ReviewExecutionState {
       violationSample: violation?.sample ?? null,
       violationCount: summary.commandIntentViolationCount,
       violationKinds: summary.commandIntentViolationKinds
+    };
+  }
+
+  getShellProbeBoundaryState(nowMs = Date.now()): ReviewShellProbeBoundaryState {
+    return {
+      triggered: this.shellProbeViolation !== null,
+      reason: this.shellProbeViolation
+        ? `bounded review shell-probe boundary violated after ${formatDurationMs(
+            Math.max(0, this.shellProbeViolation.detectedAtMs - this.startedAtMs)
+          )}: repeated direct shell verification via ${this.shellProbeViolation.sample}.`
+        : null,
+      probeCount: this.shellProbeCount,
+      violationSample: this.shellProbeViolation?.sample ?? null
     };
   }
 
@@ -577,6 +608,10 @@ export class ReviewExecutionState {
         this.recordMetaSurfaceCommandSample(metaSurfaceSample, nowMs);
         this.recordInspectionTargets(commandLine);
         this.recordStartupAnchorProgress(commandLine, nowMs);
+        const shellProbeSample = classifyShellProbeCommandLine(commandLine);
+        if (shellProbeSample) {
+          this.recordShellProbe(shellProbeSample, nowMs);
+        }
         const commandIntentViolation = classifyCommandIntentCommandLine(commandLine, {
           allowValidationCommandIntents: this.allowValidationCommandIntents
         });
@@ -695,6 +730,20 @@ export class ReviewExecutionState {
     this.commandIntentViolationSamples.push(violation);
     while (this.commandIntentViolationSamples.length > REVIEW_COMMAND_INTENT_VIOLATION_SAMPLE_LIMIT) {
       this.commandIntentViolationSamples.shift();
+    }
+  }
+
+  private recordShellProbe(sample: string, nowMs: number): void {
+    this.shellProbeCount += 1;
+    this.shellProbeSamples.push(sample);
+    while (this.shellProbeSamples.length > REVIEW_COMMAND_INTENT_VIOLATION_SAMPLE_LIMIT) {
+      this.shellProbeSamples.shift();
+    }
+    if (!this.shellProbeViolation && this.shellProbeCount > 1) {
+      this.shellProbeViolation = {
+        sample,
+        detectedAtMs: nowMs
+      };
     }
   }
 
@@ -1333,6 +1382,131 @@ function detectHeavyReviewCommand(line: string): string | null {
     }
   }
   return null;
+}
+
+function tokenReferencesReviewShellProbeEnvVar(token: string): boolean {
+  const normalized = token.trim().toUpperCase();
+  if (!normalized) {
+    return false;
+  }
+  for (const envVar of REVIEW_SHELL_PROBE_ENV_VARS) {
+    if (normalized === envVar) {
+      return true;
+    }
+    if (new RegExp(`\\$${envVar}(?=$|[^A-Z0-9_])`, 'u').test(normalized)) {
+      return true;
+    }
+    if (new RegExp(`\\$\\{${envVar}(?=$|[:}?+\\-/])`, 'u').test(normalized)) {
+      return true;
+    }
+    if (new RegExp(`(^|[^A-Z0-9_])${envVar}(?=$|[^A-Z0-9_])`, 'u').test(normalized)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function grepOptionConsumesValue(option: string): boolean {
+  const normalized = option.toLowerCase();
+  return (
+    normalized === '-e' ||
+    normalized === '-f' ||
+    normalized === '-m' ||
+    normalized === '--regexp' ||
+    normalized === '--file' ||
+    normalized === '--max-count' ||
+    normalized === '--after-context' ||
+    normalized === '--before-context' ||
+    normalized === '--context'
+  );
+}
+
+function grepSegmentUsesExplicitSearchTargets(args: string[]): boolean {
+  let patternConsumed = false;
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index] ?? '';
+    if (!patternConsumed) {
+      if (arg === '--') {
+        continue;
+      }
+      if (grepOptionConsumesValue(arg)) {
+        if (index + 1 < args.length) {
+          if (arg === '-e' || arg === '--regexp') {
+            patternConsumed = true;
+          }
+          index += 1;
+        }
+        continue;
+      }
+      if (arg.startsWith('-') && arg !== '-') {
+        continue;
+      }
+      patternConsumed = true;
+      continue;
+    }
+    if (arg === '--') {
+      continue;
+    }
+    if (arg.startsWith('<')) {
+      continue;
+    }
+    return true;
+  }
+  return false;
+}
+
+function segmentLooksLikeShellProbe(rawTokens: string[], depth = 0): boolean {
+  const strippedTokens = stripLeadingEnvAssignments(rawTokens);
+  if (strippedTokens.length === 0) {
+    return false;
+  }
+  const tokens = unwrapEnvCommandTokens(strippedTokens);
+  if (tokens.length === 0) {
+    return false;
+  }
+  const command = normalizeCommandToken(tokens[0] ?? '');
+  const args = tokens.slice(1);
+  if (depth < 3 && REVIEW_SHELL_COMMANDS.has(command)) {
+    const nestedPayload = extractShellCommandPayload(tokens);
+    return nestedPayload ? payloadContainsShellProbe(nestedPayload, depth + 1) : false;
+  }
+  const referencesReviewEnvVar = args.some((token) => tokenReferencesReviewShellProbeEnvVar(token));
+  if (!referencesReviewEnvVar) {
+    return false;
+  }
+  if (command === 'printf' || command === 'echo' || command === 'printenv') {
+    return true;
+  }
+  if (command === 'grep') {
+    return !grepSegmentUsesExplicitSearchTargets(args);
+  }
+  if (command === 'declare' || command === 'typeset') {
+    return args.some((arg) => arg === '-p' || arg === '-xp' || arg === '-px');
+  }
+  return false;
+}
+
+function payloadContainsShellProbe(payload: string, depth = 0): boolean {
+  const segments = splitShellControlSegmentsDetailed(payload);
+  for (const { segment } of segments) {
+    if (segmentLooksLikeShellProbe(tokenizeShellSegment(segment), depth)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function classifyShellProbeCommandLine(commandLine: string): string | null {
+  const normalized = normalizeReviewCommandLine(commandLine);
+  if (detectHeavyReviewCommand(normalized)) {
+    return null;
+  }
+  const shellTokens = stripLeadingEnvAssignments(tokenizeShellSegment(normalized));
+  const payload = extractShellCommandPayload(shellTokens);
+  if (!payload) {
+    return null;
+  }
+  return payloadContainsShellProbe(payload) ? normalized : null;
 }
 
 function isLikelyReviewCommandLine(line: string): boolean {

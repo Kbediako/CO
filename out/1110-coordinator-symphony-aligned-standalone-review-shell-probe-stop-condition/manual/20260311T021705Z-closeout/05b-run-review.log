@@ -1,0 +1,98 @@
+
+ RUN  v1.6.1 /Users/kbediako/Code/CO
+
+ ✓ tests/run-review.spec.ts > scripts/run-review regression > does not enforce default timeout/stall/startup-loop guards 1063ms
+ ✓ tests/run-review.spec.ts > scripts/run-review regression > keeps explicit pipeline diff-budget skips when SKIP_DIFF_BUDGET=1 1009ms
+ ✓ tests/run-review.spec.ts > scripts/run-review regression > does not require codex availability for non-interactive handoff mode 874ms
+ ✓ tests/run-review.spec.ts > scripts/run-review regression > adds bounded review constraints by default and allows heavy-command override 1909ms
+ ✓ tests/run-review.spec.ts > scripts/run-review regression > includes checklist and manifest context only on the explicit audit surface 1073ms
+ ✓ tests/run-review.spec.ts > scripts/run-review regression > supports CODEX_REVIEW_SURFACE env fallback for audit mode 1060ms
+ ✓ tests/run-review.spec.ts > scripts/run-review regression > keeps delegation MCP enabled by default for wrapper review runs 1122ms
+ ✓ tests/run-review.spec.ts > scripts/run-review regression > allows explicit delegation MCP disable for wrapper review runs 1017ms
+ ✓ tests/run-review.spec.ts > scripts/run-review regression > supports legacy enable env override for explicit disable 1017ms
+ ✓ tests/run-review.spec.ts > scripts/run-review regression > fails a silent review process via stall-timeout override 2039ms
+ ✓ tests/run-review.spec.ts > scripts/run-review regression > persists timeout telemetry summaries for faster failure triage 2113ms
+ ✓ tests/run-review.spec.ts > scripts/run-review regression > persists telemetry when review launch fails after the command probe 1049ms
+ ✓ tests/run-review.spec.ts > scripts/run-review regression > prints raw telemetry command/tail details only when debug telemetry env is enabled 2085ms
+ ✓ tests/run-review.spec.ts > scripts/run-review regression > keeps bounded guidance advisory by default for heavy command starts 2104ms
+ ✓ tests/run-review.spec.ts > scripts/run-review regression > fails fast when bounded enforcement is enabled and heavy command starts are detected 1347ms
+ ✓ tests/run-review.spec.ts > scripts/run-review regression > includes raw blocked command text in bounded failures only when debug telemetry is enabled 1892ms
+ ✓ tests/run-review.spec.ts > scripts/run-review regression > fails bounded enforcement even after long noisy preamble lines between exec and command 1247ms
+ ✓ tests/run-review.spec.ts > scripts/run-review regression > captures heavy telemetry even when command follows long noisy preamble lines 1974ms
+ ✓ tests/run-review.spec.ts > scripts/run-review regression > detects heavy commands when stderr noise appears between exec and command line 1295ms
+ ✓ tests/run-review.spec.ts > scripts/run-review regression > detects heavy commands when stdout noise appears between exec and command line 1237ms
+ ✓ tests/run-review.spec.ts > scripts/run-review regression > fails bounded enforcement even when heavy commands exit quickly 1002ms
+ ✓ tests/run-review.spec.ts > scripts/run-review regression > does not treat quoted heavy-command text as a bounded heavy command 2066ms
+ ✓ tests/run-review.spec.ts > scripts/run-review regression > fails bounded enforcement when command lines land on stderr after stdout exec markers 960ms
+ ✓ tests/run-review.spec.ts > scripts/run-review regression > fails bounded review on npm --workspaces validation-suite launches 1238ms
+ ✓ tests/run-review.spec.ts > scripts/run-review regression > fails bounded review on npm run-script validation-suite launches 1224ms
+ ✓ tests/run-review.spec.ts > scripts/run-review regression > fails bounded review on npm test aliases by default 1279ms
+ ✓ tests/run-review.spec.ts > scripts/run-review regression > fails bounded review on npm.cmd validation-suite launches 1237ms
+ ✓ tests/run-review.spec.ts > scripts/run-review regression > fails bounded review on npm.ps1 validation-suite launches 1233ms
+ ✓ tests/run-review.spec.ts > scripts/run-review regression > fails bounded review on cmd /c wrapped validation-suite launches 1222ms
+ ✓ tests/run-review.spec.ts > scripts/run-review regression > fails bounded review on cmd /C wrapped validation-suite launches 1335ms
+ ✓ tests/run-review.spec.ts > scripts/run-review regression > detects heavy commands executed as python -m pytest 1243ms
+ ✓ tests/run-review.spec.ts > scripts/run-review regression > fails bounded review on env-wrapped validation-suite launches 1225ms
+ ✓ tests/run-review.spec.ts > scripts/run-review regression > detects heavy commands wrapped by /usr/bin/env 1229ms
+ ✓ tests/run-review.spec.ts > scripts/run-review regression > emits patience-first monitor checkpoints during long-running waits 2974ms
+ ✓ tests/run-review.spec.ts > scripts/run-review regression > allows disabling monitor checkpoints explicitly 1973ms
+ ✓ tests/run-review.spec.ts > scripts/run-review regression > warns and injects a scope advisory when uncommitted scope is large 1061ms
+ ✓ tests/run-review.spec.ts > scripts/run-review regression > uses path-only uncommitted scope notes in prompts 1097ms
+ ✓ tests/run-review.spec.ts > scripts/run-review regression > uses path-only commit scope notes in prompts 1036ms
+ ✓ tests/run-review.spec.ts > scripts/run-review regression > uses path-only base scope notes in prompts while preserving rename identity 1036ms
+ ✓ tests/run-review.spec.ts > scripts/run-review regression > renders uncommitted rename scope notes as paired paths 1068ms
+ ✓ tests/run-review.spec.ts > scripts/run-review regression > counts untracked file lines when evaluating large uncommitted scope 1047ms
+ ✓ tests/run-review.spec.ts > scripts/run-review regression > skips non-regular untracked paths when computing scope line metrics 1056ms
+ ✓ tests/run-review.spec.ts > scripts/run-review regression > disables stall termination when CODEX_REVIEW_STALL_TIMEOUT_SECONDS=0 2011ms
+ ✓ tests/run-review.spec.ts > scripts/run-review regression > defaults manifest selection to active task env when --task is omitted 1077ms
+ ✓ tests/run-review.spec.ts > scripts/run-review regression > prefers CODEX_ORCHESTRATOR_MANIFEST_PATH over stale MANIFEST and keeps artifacts on the active run dir 1053ms
+ ✓ tests/run-review.spec.ts > scripts/run-review regression > falls back to MANIFEST when CODEX_ORCHESTRATOR_MANIFEST_PATH is absent 1037ms
+ ✓ tests/run-review.spec.ts > scripts/run-review regression > falls back to the run-dir manifest when explicit manifest envs are absent 1050ms
+ ✓ tests/run-review.spec.ts > scripts/run-review regression > derives audit task context from the resolved run-dir manifest when task env is absent 957ms
+ ✓ tests/run-review.spec.ts > scripts/run-review regression > keeps audit task context checklist-only when no primary PRD is declared 978ms
+ ✓ tests/run-review.spec.ts > scripts/run-review regression > derives audit task context from the registered parent task for delegated scout manifests 962ms
+ ✓ tests/run-review.spec.ts > scripts/run-review regression > ignores legacy task index path entries that are not checklist paths 972ms
+ ✓ tests/run-review.spec.ts > scripts/run-review regression > keeps review artifacts aligned with the resolved manifest when CODEX_ORCHESTRATOR_RUN_DIR is stale 1031ms
+ ✓ tests/run-review.spec.ts > scripts/run-review regression > fails fast when delegation startup loops without review progress 2036ms
+ ✓ tests/run-review.spec.ts > scripts/run-review regression > still detects startup loops when non-progress banner lines appear before the loop 1976ms
+ ✓ tests/run-review.spec.ts > scripts/run-review regression > detects startup loops when startup lines span multiple output chunks 2066ms
+ ✓ tests/run-review.spec.ts > scripts/run-review regression > does not merge startup-loop fragments across stdout/stderr streams 1982ms
+ ✓ tests/run-review.spec.ts > scripts/run-review regression > fails bounded review when repetitive low-signal inspection persists 2977ms
+ ✓ tests/run-review.spec.ts > scripts/run-review regression > fails bounded review when meta-surface expansion persists 3039ms
+ ✓ tests/run-review.spec.ts > scripts/run-review regression > fails bounded diff review when repeated meta-surface reads happen before the first startup anchor 1360ms
+ ✓ tests/run-review.spec.ts > scripts/run-review regression > fails bounded audit review when repeated off-surface reads happen before the first audit startup anchor 1235ms
+ ✓ tests/run-review.spec.ts > scripts/run-review regression > fails bounded diff review when adjacent review-system surfaces persist 3005ms
+ ✓ tests/run-review.spec.ts > scripts/run-review regression > keeps the meta-surface guard active for audit mode when unrelated meta surfaces persist 2990ms
+ ✓ tests/run-review.spec.ts > scripts/run-review regression > allows audit mode to inspect manifest and runner-log evidence without tripping the meta-surface guard 2426ms
+ ✓ tests/run-review.spec.ts > scripts/run-review regression > treats explicit audit manifest paths outside .runs as valid startup anchors 977ms
+ ✓ tests/run-review.spec.ts > scripts/run-review regression > treats exported audit MANIFEST reads inside the review shell payload as valid startup anchors 1077ms
+ ✓ tests/run-review.spec.ts > scripts/run-review regression > keeps zsh leading assignment plus export on the active audit MANIFEST path 994ms
+ ✓ tests/run-review.spec.ts > scripts/run-review regression > does not carry export state across pipelines when checking audit startup anchors 1053ms
+ ✓ tests/run-review.spec.ts > scripts/run-review regression > treats RUN_LOG alias reexports inside the review shell payload as valid startup anchors 1057ms
+ ✓ tests/run-review.spec.ts > scripts/run-review regression > treats env -u same-shell MANIFEST expansions as valid startup anchors 1039ms
+ ✓ tests/run-review.spec.ts > scripts/run-review regression > allows a single direct shell probe during bounded review 1060ms
+ ✓ tests/run-review.spec.ts > scripts/run-review regression > fails bounded review on repeated direct shell probes even when the child exits quickly 1098ms
+ ✓ tests/run-review.spec.ts > scripts/run-review regression > fails bounded review on repeated direct shell probes before child exit 1252ms
+ ✓ tests/run-review.spec.ts > scripts/run-review regression > fails bounded review on repeated nested shell probes 1024ms
+ ✓ tests/run-review.spec.ts > scripts/run-review regression > fails bounded review when it launches a package-manager validation suite 1276ms
+ ✓ tests/run-review.spec.ts > scripts/run-review regression > fails bounded review even when a forbidden validation suite exits before the interval tick 958ms
+ ✓ tests/run-review.spec.ts > scripts/run-review regression > allows package-manager validation suites when heavy review commands are explicitly enabled 1983ms
+ ✓ tests/run-review.spec.ts > scripts/run-review regression > fails bounded review when it launches a direct validation runner 1233ms
+ ✓ tests/run-review.spec.ts > scripts/run-review regression > waits for graceful child termination before surfacing timeout failure 2025ms
+ ✓ tests/run-review.spec.ts > scripts/run-review regression > fails bounded review even when a forbidden validation runner exits before the interval tick 1029ms
+ ✓ tests/run-review.spec.ts > scripts/run-review regression > fails bounded review when a forbidden validation runner exits non-zero before the interval tick 1024ms
+ ✓ tests/run-review.spec.ts > scripts/run-review regression > fails bounded review on package-manager shorthand validation launches 1245ms
+ ✓ tests/run-review.spec.ts > scripts/run-review regression > allows direct validation runners when heavy review commands are explicitly enabled 2062ms
+ ✓ tests/run-review.spec.ts > scripts/run-review regression > fails bounded review on nested review or pipeline launches 1236ms
+ ✓ tests/run-review.spec.ts > scripts/run-review regression > fails bounded review on mutating delegation control but not read-only status checks 1246ms
+ ✓ tests/run-review.spec.ts > scripts/run-review regression > derives task context from explicit manifest instead of stale task env fallback 827ms
+ ✓ tests/run-review.spec.ts > scripts/run-review regression > derives task context from legacy run-layout manifests 819ms
+ ✓ tests/run-review.spec.ts > scripts/run-review regression > uses the nearest run-root segment when ancestor paths contain "runs" 820ms
+ ✓ tests/run-review.spec.ts > scripts/run-review regression > captures an issue bundle on review failure when auto issue log is enabled 1995ms
+ ✓ tests/run-review.spec.ts > scripts/run-review regression > does not crash when stdout pipe closes early 964ms
+
+ Test Files  1 passed (1)
+      Tests  89 passed (89)
+   Start at  13:36:54
+   Duration  125.14s (transform 47ms, setup 0ms, collect 51ms, tests 124.96s, environment 0ms, prepare 32ms)
+

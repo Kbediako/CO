@@ -275,6 +275,41 @@ fi
       echo "/bin/zsh -lc 'sed -n 1,120p /Users/kbediako/.codex/memories/MEMORY.md' in /Users/kbediako/Code/CO"
       exit 0
     fi
+    if [[ "$mode" == "shell-probe-single" ]]; then
+      echo "thinking"
+      echo "exec"
+      echo "/bin/bash -lc 'MANIFEST=/tmp/other.json; export MANIFEST; printf \"%s\\n\" \"\$MANIFEST\"' in /Users/kbediako/Code/CO"
+      exit 0
+    fi
+    if [[ "$mode" == "shell-probe-repeat-fast-exit" ]]; then
+      echo "thinking"
+      echo "exec"
+      echo "/bin/bash -lc 'MANIFEST=/tmp/other.json; export MANIFEST; printf \"%s\\n\" \"\$MANIFEST\"' in /Users/kbediako/Code/CO"
+      echo "thinking"
+      echo "exec"
+      echo "/bin/zsh -lc 'MANIFEST=/tmp/third.json; export MANIFEST; printf \"%s\\n\" \"\$MANIFEST\"' in /Users/kbediako/Code/CO"
+      sleep 0.05
+      exit 0
+    fi
+    if [[ "$mode" == "shell-probe-repeat-hang" ]]; then
+      echo "thinking"
+      echo "exec"
+      echo "/bin/bash -lc 'MANIFEST=/tmp/other.json; export MANIFEST; printf \"%s\\n\" \"\$MANIFEST\"' in /Users/kbediako/Code/CO"
+      echo "thinking"
+      echo "exec"
+      echo "/bin/zsh -lc 'MANIFEST=/tmp/third.json; export MANIFEST; printf \"%s\\n\" \"\$MANIFEST\"' in /Users/kbediako/Code/CO"
+      while true; do sleep 1; done
+    fi
+    if [[ "$mode" == "shell-probe-repeat-nested-fast-exit" ]]; then
+      echo "thinking"
+      echo "exec"
+      echo "/bin/zsh -lc '/bin/bash -lc \\\"printenv MANIFEST\\\"' in /Users/kbediako/Code/CO"
+      echo "thinking"
+      echo "exec"
+      echo "/bin/zsh -lc '/bin/bash -lc \\\"printenv MANIFEST\\\"' in /Users/kbediako/Code/CO"
+      sleep 0.05
+      exit 0
+    fi
     if [[ "$mode" == "review-self-containment-drift" ]]; then
       while true; do
         echo "thinking"
@@ -2356,6 +2391,109 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(telemetry.status).toBe('succeeded');
     expect(telemetry.summary.startupAnchorObserved).toBe(true);
     expect(telemetry.summary.preAnchorMetaSurfaceSignals).toBe(0);
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('allows a single direct shell probe during bounded review', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'shell-probe-single',
+      CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0',
+      CODEX_REVIEW_TIMEOUT_SECONDS: '60'
+    });
+
+    expect(result.exitCode).toBe(0);
+
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      summary: {
+        shellProbeCount: number;
+      };
+    };
+    expect(telemetry.status).toBe('succeeded');
+    expect(telemetry.summary.shellProbeCount).toBe(1);
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('fails bounded review on repeated direct shell probes even when the child exits quickly', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'shell-probe-repeat-fast-exit',
+      CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0',
+      CODEX_REVIEW_TIMEOUT_SECONDS: '60'
+    });
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).toContain('bounded review shell-probe boundary violated');
+
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      summary: {
+        shellProbeCount: number;
+      };
+    };
+    expect(telemetry.status).toBe('failed');
+    expect(telemetry.summary.shellProbeCount).toBe(2);
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('fails bounded review on repeated direct shell probes before child exit', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'shell-probe-repeat-hang',
+      CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0',
+      CODEX_REVIEW_TIMEOUT_SECONDS: '60'
+    });
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).toContain('bounded review shell-probe boundary violated');
+
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      summary: {
+        shellProbeCount: number;
+      };
+    };
+    expect(telemetry.status).toBe('failed');
+    expect(telemetry.summary.shellProbeCount).toBe(2);
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('fails bounded review on repeated nested shell probes', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'shell-probe-repeat-nested-fast-exit',
+      CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0',
+      CODEX_REVIEW_TIMEOUT_SECONDS: '60'
+    });
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).toContain('bounded review shell-probe boundary violated');
+
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      summary: {
+        shellProbeCount: number;
+      };
+    };
+    expect(telemetry.status).toBe('failed');
+    expect(telemetry.summary.shellProbeCount).toBe(2);
   }, LONG_WAIT_TEST_TIMEOUT_MS);
 
   it('fails bounded review when it launches a package-manager validation suite', async () => {
