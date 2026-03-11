@@ -324,6 +324,20 @@ async function resolveActiveCloseoutBundleRoots(taskKey: string | null | undefin
   return [...roots];
 }
 
+function buildActiveCloseoutProvenanceLines(activeCloseoutBundleRoots: string[]): string[] {
+  if (activeCloseoutBundleRoots.length === 0) {
+    return [];
+  }
+
+  return [
+    'Active closeout provenance:',
+    ...activeCloseoutBundleRoots.map(
+      (root) => `- Resolved active closeout root: \`${path.relative(repoRoot, root)}\``
+    ),
+    '- These roots are already-resolved self-referential review surfaces for this task; do not re-derive or re-enumerate them unless directly necessary to assess code correctness.'
+  ];
+}
+
 function parseBooleanOptionValue(raw: string | boolean, label: string): boolean {
   if (typeof raw === 'boolean') {
     return raw;
@@ -560,6 +574,8 @@ async function main(): Promise<void> {
   });
   const diffBudgetOverride = process.env.DIFF_BUDGET_OVERRIDE_REASON?.trim();
   const scopeMode = resolveEffectiveScopeMode(options);
+  const activeCloseoutBundleRoots =
+    reviewSurface === 'diff' ? await resolveActiveCloseoutBundleRoots(taskKey) : [];
   const promptLines = [`Review task: ${taskLabel}`, `Review surface: ${reviewSurface}`];
 
   if (reviewSurface === 'audit') {
@@ -640,6 +656,10 @@ async function main(): Promise<void> {
   const scopeNotes = buildScopeNotes(options, scopePathCollection);
   if (scopeNotes.length > 0) {
     promptLines.push('', ...scopeNotes);
+  }
+  const activeCloseoutProvenanceLines = buildActiveCloseoutProvenanceLines(activeCloseoutBundleRoots);
+  if (activeCloseoutProvenanceLines.length > 0) {
+    promptLines.push('', ...activeCloseoutProvenanceLines);
   }
   const scopeAssessment = await assessReviewScope(options);
   const scopeMetrics = formatScopeMetrics(scopeAssessment);
@@ -827,9 +847,6 @@ async function main(): Promise<void> {
     }
   }
   const autoIssueLogEnabled = options.autoIssueLog ?? false;
-  const activeCloseoutBundleRoots =
-    reviewSurface === 'diff' ? await resolveActiveCloseoutBundleRoots(taskKey) : [];
-
   const runReview = async (resolved: { command: string; args: string[] }) =>
     runCodexReview({
       command: resolved.command,

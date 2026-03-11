@@ -762,6 +762,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(boundedPrompt).toContain('Review surface: diff');
     expect(boundedPrompt).not.toContain('Evidence manifest:');
     expect(boundedPrompt).not.toContain('Task context:');
+    expect(boundedPrompt).not.toContain('Active closeout provenance:');
     expect(boundedPrompt).not.toContain('Evidence + checklist mirroring requirements are satisfied');
     expect(boundedPrompt).toContain('Execution constraints (bounded review mode):');
     expect(boundedPrompt).toContain('Avoid full validation suites');
@@ -778,6 +779,72 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     const heavyPromptPath = join(dirname(heavyManifestPath), 'review', 'prompt.txt');
     const heavyPrompt = await readFile(heavyPromptPath, 'utf8');
     expect(heavyPrompt).not.toContain('Execution constraints (bounded review mode):');
+  });
+
+  it('surfaces active closeout provenance in the diff-mode handoff for the direct task', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    await makeCloseoutBundle(sandbox, 'sample-task');
+    const codexBin = await makeFakeCodex(sandbox);
+
+    const result = await runReviewCommand(manifestPath, baseEnv(sandbox, codexBin));
+
+    expect(result.exitCode).toBe(0);
+    const promptPath = join(dirname(manifestPath), 'review', 'prompt.txt');
+    const prompt = await readFile(promptPath, 'utf8');
+    expect(prompt).toContain('Active closeout provenance:');
+    expect(prompt).toContain('- Resolved active closeout root: `out/sample-task/manual/TODO-closeout`');
+    expect(prompt).toContain(
+      'do not re-derive or re-enumerate them unless directly necessary to assess code correctness'
+    );
+  });
+
+  it('surfaces parent-task active closeout provenance for delegated task ids', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifestForTask(sandbox, 'sample-task-scout', 'review-closeout-parent');
+    await makeCloseoutBundle(sandbox, 'sample-task');
+    const codexBin = await makeFakeCodex(sandbox);
+    await mkdir(join(sandbox, 'tasks'), { recursive: true });
+    await writeFile(
+      join(sandbox, 'tasks', 'index.json'),
+      JSON.stringify({
+        items: [
+          {
+            id: 'sample-task',
+            title: 'Sample Task',
+            relates_to: 'tasks/tasks-sample-task.md'
+          }
+        ]
+      }),
+      'utf8'
+    );
+
+    const result = await runReviewCommand(manifestPath, baseEnv(sandbox, codexBin));
+
+    expect(result.exitCode).toBe(0);
+    const promptPath = join(dirname(manifestPath), 'review', 'prompt.txt');
+    const prompt = await readFile(promptPath, 'utf8');
+    expect(prompt).toContain('Active closeout provenance:');
+    expect(prompt).toContain('- Resolved active closeout root: `out/sample-task/manual/TODO-closeout`');
+    expect(prompt).not.toContain('out/sample-task-scout/manual/TODO-closeout');
+  });
+
+  it('surfaces TODO and latest completed closeout provenance together in the diff-mode handoff', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    await makeCloseoutBundle(sandbox, 'sample-task');
+    await makeCloseoutBundle(sandbox, 'sample-task', '20260311T000000Z-closeout');
+    const codexBin = await makeFakeCodex(sandbox);
+
+    const result = await runReviewCommand(manifestPath, baseEnv(sandbox, codexBin));
+
+    expect(result.exitCode).toBe(0);
+    const promptPath = join(dirname(manifestPath), 'review', 'prompt.txt');
+    const prompt = await readFile(promptPath, 'utf8');
+    expect(prompt).toContain('- Resolved active closeout root: `out/sample-task/manual/TODO-closeout`');
+    expect(prompt).toContain(
+      '- Resolved active closeout root: `out/sample-task/manual/20260311T000000Z-closeout`'
+    );
   });
 
   it('includes checklist and manifest context only on the explicit audit surface', async () => {

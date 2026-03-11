@@ -1,0 +1,5 @@
+# Override Notes - 1112
+
+- `delegation-guard` override is intentional. This resumed local lane used bounded top-level `gpt-5.4` Codex subagents for scout/elegance support, but that evidence is not a manifest-backed orchestrator delegation stream, so `node scripts/delegation-guard.mjs` required `DELEGATION_GUARD_OVERRIDE_REASON`. Evidence: `01-delegation-guard.log`.
+- The task-scoped diagnostics manifest exists for review handoff continuity, but its run finished `failed` because delegation-guard was expected to fail in this resumed local lane without a manifest-backed delegation stream. Evidence: `.runs/1112-coordinator-symphony-aligned-standalone-review-active-closeout-root-provenance-hint/cli/2026-03-11T04-46-18-402Z-61286b10/manifest.json`, `01-delegation-guard.log`.
+- `diff-budget` ran with the explicit stacked-branch override reason `1112 is being landed on the existing stacked Symphony-alignment branch; branch-wide diff budget is not meaningful for this bounded prompt/handoff lane.` Evidence: `08-diff-budget.log`.

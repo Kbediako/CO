@@ -1,0 +1,37 @@
+{
+  "task": "1112-coordinator-symphony-aligned-standalone-review-active-closeout-root-provenance-hint",
+  "checked_at": "2026-03-11T04:40:21Z",
+  "status": "passed",
+  "checks": [
+    {
+      "name": "direct_task_provenance_rendered",
+      "result": "passed",
+      "evidence": "05a-targeted-tests.log",
+      "note": "The diff-mode handoff shows the resolved active closeout root for the direct task."
+    },
+    {
+      "name": "delegated_parent_task_provenance_inherited",
+      "result": "passed",
+      "evidence": "05a-targeted-tests.log",
+      "note": "Delegated task ids inherit the parent task's resolved active closeout root instead of surfacing a child-stream closeout path."
+    },
+    {
+      "name": "todo_and_latest_completed_roots_both_surface",
+      "result": "passed",
+      "evidence": "05a-targeted-tests.log",
+      "note": "When both roots exist, the handoff includes the TODO closeout and the latest completed closeout together."
+    },
+    {
+      "name": "no_provenance_block_without_roots",
+      "result": "passed",
+      "evidence": "05a-targeted-tests.log",
+      "note": "Bounded prompt cases without resolved active closeout roots do not grow a stray provenance section."
+    },
+    {
+      "name": "review_converges_with_hint_present",
+      "result": "passed",
+      "evidence": "09-review.log",
+      "note": "The final manifest-backed review returned a bounded no-findings verdict instead of reopening another closeout-root rediscovery loop."
+    }
+  ]
+}

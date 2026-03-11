@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260311-1112-coordinator-symphony-aligned-standalone-review-active-closeout-root-provenance-hint",
+      "title": "Coordinator Symphony-Aligned Standalone Review Active Closeout-Root Provenance Hint",
+      "relates_to": "tasks/tasks-1112-coordinator-symphony-aligned-standalone-review-active-closeout-root-provenance-hint.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-11",
+      "paths": {
+        "spec": "tasks/specs/1112-coordinator-symphony-aligned-standalone-review-active-closeout-root-provenance-hint.md",
+        "task": "tasks/tasks-1112-coordinator-symphony-aligned-standalone-review-active-closeout-root-provenance-hint.md",
+        "agent_task": ".agent/task/1112-coordinator-symphony-aligned-standalone-review-active-closeout-root-provenance-hint.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-standalone-review-active-closeout-root-provenance-hint.md"
+      }
+    },
+    {
       "id": "20260311-1111-coordinator-symphony-aligned-standalone-review-closeout-bundle-self-reference-boundary",
       "title": "Coordinator Symphony-Aligned Standalone Review Closeout-Bundle Self-Reference Boundary",
       "relates_to": "tasks/tasks-1111-coordinator-symphony-aligned-standalone-review-closeout-bundle-self-reference-boundary.md",
