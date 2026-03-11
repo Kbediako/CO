@@ -621,6 +621,8 @@ async function main(): Promise<void> {
       '- Behavior remains correct for changed files and nearby dependencies',
       '- Call out concrete regressions, risky edge cases, or missing tests in the changed area',
       startupFocusLine,
+      '- Concrete same-diff progress can be shown by citing touched paths with explicit locations such as `path:line`, `path:line:col`, `path#Lline`, or `path#LlineCcol`.',
+      '- If you already have that diff-local citation evidence, do not search the wider repo for other examples of the rendering.',
       '',
       'Keep this pass diff-focused. Do not audit checklist/docs/evidence surfaces unless they are directly required to assess code correctness.'
     );

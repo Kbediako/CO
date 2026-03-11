@@ -225,6 +225,24 @@ fi
       done
       exit 0
     fi
+    if [[ "$mode" == "citation-contract-local" ]]; then
+      prompt="$*"
+      if [[ "$prompt" == *"Concrete same-diff progress can be shown by citing touched paths with explicit locations"* ]]; then
+        if [[ "$prompt" == *"do not search the wider repo for other examples of the rendering"* ]]; then
+          echo "thinking"
+          echo "The diff-local citation contract is explicit, so I can stay on the touched surface."
+          echo "exec"
+          echo "/bin/zsh -lc 'sed -n 1,120p scripts/run-review.ts' in /Users/kbediako/Code/CO"
+          echo "tests/run-review.spec.ts:2250 keeps the bounded runtime citation contract covered."
+          exit 0
+        fi
+      fi
+      echo "thinking"
+      echo "I need to search the repo for citation-style examples before I can trust the concrete-progress surface."
+      echo "exec"
+      echo "/bin/zsh -lc 'rg -n \"path#L123|path:123\" docs tests scripts' in /Users/kbediako/Code/CO"
+      while true; do sleep 1; done
+    fi
     if [[ "$mode" == "meta-surface-expansion" ]]; then
       while true; do
         echo "thinking"
@@ -840,6 +858,12 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(boundedPrompt).toContain('Execution constraints (bounded review mode):');
     expect(boundedPrompt).toContain('Avoid full validation suites');
     expect(boundedPrompt).toContain('Keep this pass diff-focused.');
+    expect(boundedPrompt).toContain(
+      'Concrete same-diff progress can be shown by citing touched paths with explicit locations'
+    );
+    expect(boundedPrompt).toContain(
+      'do not search the wider repo for other examples of the rendering'
+    );
 
     const heavyManifestPath = await makeManifestForTask(sandbox, 'sample-task', 'sample-run-heavy-commands');
     const heavyResult = await runReviewCommand(heavyManifestPath, {
@@ -2267,6 +2291,30 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     };
     expect(telemetry.status).toBe('succeeded');
     expect(telemetry.summary.distinctOutputInspectionTargets).toBeGreaterThan(4);
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('allows bounded review to stay diff-local when the concrete-progress citation contract is explicit', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'citation-contract-local',
+      CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0',
+      CODEX_REVIEW_TIMEOUT_SECONDS: '10'
+    });
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stderr).not.toContain('timed out');
+
+    const promptPath = join(dirname(manifestPath), 'review', 'prompt.txt');
+    const prompt = await readFile(promptPath, 'utf8');
+    expect(prompt).toContain(
+      'Concrete same-diff progress can be shown by citing touched paths with explicit locations'
+    );
+    expect(prompt).toContain(
+      'do not search the wider repo for other examples of the rendering'
+    );
   }, LONG_WAIT_TEST_TIMEOUT_MS);
 
   it('fails bounded review when meta-surface expansion persists', async () => {
