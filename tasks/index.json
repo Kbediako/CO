@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260312-1122-coordinator-symphony-aligned-control-server-pending-ready-instance-activation-guard",
+      "title": "Coordinator Symphony-Aligned Control Server Pending Ready-Instance Activation Guard",
+      "relates_to": "tasks/tasks-1122-coordinator-symphony-aligned-control-server-pending-ready-instance-activation-guard.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-12",
+      "paths": {
+        "spec": "tasks/specs/1122-coordinator-symphony-aligned-control-server-pending-ready-instance-activation-guard.md",
+        "task": "tasks/tasks-1122-coordinator-symphony-aligned-control-server-pending-ready-instance-activation-guard.md",
+        "agent_task": ".agent/task/1122-coordinator-symphony-aligned-control-server-pending-ready-instance-activation-guard.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-control-server-pending-ready-instance-activation-guard.md"
+      }
+    },
+    {
       "id": "20260312-1121-coordinator-symphony-aligned-control-server-startup-input-prep-extraction",
       "title": "Coordinator Symphony-Aligned Control Server Startup Input Prep Extraction",
       "relates_to": "tasks/tasks-1121-coordinator-symphony-aligned-control-server-startup-input-prep-extraction.md",
