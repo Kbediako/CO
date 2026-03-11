@@ -186,6 +186,28 @@ fi
       done
       while true; do sleep 1; done
     fi
+    if [[ "$mode" == "generic-speculative-dwell" ]]; then
+      narratives=(
+        "Maybe the reviewer is still circling around ANSI stripping before reaching a final verdict."
+        "Maybe the reviewer is still circling around ANSI stripping before reaching a final verdict."
+        "I am still considering whether the small-diff revisit policy needs another tweak before I can finish the review."
+        "I am still considering whether the small-diff revisit policy needs another tweak before I can finish the review."
+      )
+      targets=(
+        "scripts/run-review.ts"
+        "scripts/lib/review-execution-state.ts"
+        "tests/run-review.spec.ts"
+        "docs/standalone-review-guide.md"
+      )
+      for index in 0 1 2 3; do
+        echo "thinking"
+        echo "\${narratives[$index]}"
+        echo "exec"
+        echo "/bin/zsh -lc 'sed -n 1,120p \${targets[$index]}' in /Users/kbediako/Code/CO"
+        sleep 0.05
+      done
+      while true; do sleep 1; done
+    fi
     if [[ "$mode" == "verdict-stability-progress" ]]; then
       targets=(
         "scripts/run-review.ts"
@@ -2187,6 +2209,38 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(telemetry.status).toBe('failed');
     expect(telemetry.summary.outputInspectionSignals).toBeGreaterThanOrEqual(4);
     expect(telemetry.summary.distinctOutputInspectionTargets).toBeLessThanOrEqual(4);
+    expect(telemetry.summary.maxOutputNarrativeSignatureHits).toBeGreaterThanOrEqual(2);
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('fails bounded review when repeated targetless speculative output persists without concrete findings', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'generic-speculative-dwell',
+      CODEX_REVIEW_VERDICT_STABILITY_TIMEOUT_SECONDS: '1',
+      CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0',
+      CODEX_REVIEW_TIMEOUT_SECONDS: '60'
+    });
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).toContain('verdict-stability drift detected');
+
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      summary: {
+        outputInspectionSignals: number;
+        outputNarrativeSignals: number;
+        distinctOutputInspectionTargets: number;
+        maxOutputNarrativeSignatureHits: number;
+      };
+    };
+    expect(telemetry.status).toBe('failed');
+    expect(telemetry.summary.outputInspectionSignals).toBe(0);
+    expect(telemetry.summary.outputNarrativeSignals).toBeGreaterThanOrEqual(4);
+    expect(telemetry.summary.distinctOutputInspectionTargets).toBe(0);
     expect(telemetry.summary.maxOutputNarrativeSignatureHits).toBeGreaterThanOrEqual(2);
   }, LONG_WAIT_TEST_TIMEOUT_MS);
 

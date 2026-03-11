@@ -53,6 +53,7 @@ const LOW_SIGNAL_RECENT_COMMAND_WINDOW = LOW_SIGNAL_MIN_COMMAND_STARTS;
 const VERDICT_STABILITY_MIN_THINKING_BLOCKS = 4;
 const VERDICT_STABILITY_MIN_COMMAND_STARTS = 4;
 const VERDICT_STABILITY_MIN_OUTPUT_TARGET_SIGNALS = 4;
+const VERDICT_STABILITY_MIN_OUTPUT_NARRATIVE_SIGNALS = 4;
 const VERDICT_STABILITY_MAX_DISTINCT_OUTPUT_TARGETS = 4;
 const VERDICT_STABILITY_MAX_DISTINCT_OUTPUT_SIGNATURES = 8;
 const VERDICT_STABILITY_MIN_REPEAT_OUTPUT_TARGET_HITS = 2;
@@ -98,6 +99,8 @@ export interface ReviewOutputSummary {
   distinctInspectionSignatures: number;
   maxInspectionSignatureHits: number;
   outputInspectionSignals: number;
+  outputNarrativeSignals: number;
+  concreteOutputSignals: number;
   distinctOutputInspectionTargets: number;
   maxOutputInspectionTargetHits: number;
   distinctOutputNarrativeSignatures: number;
@@ -151,6 +154,8 @@ export interface ReviewVerdictStabilityState {
   thinkingBlocks: number;
   commandStarts: number;
   outputInspectionSignals: number;
+  outputNarrativeSignals: number;
+  concreteOutputSignals: number;
   distinctOutputInspectionTargets: number;
   maxOutputInspectionTargetHits: number;
   distinctOutputNarrativeSignatures: number;
@@ -310,6 +315,7 @@ export class ReviewExecutionState {
   private readonly recentInspectionSignatures: string[] = [];
   private readonly recentOutputInspectionTargetSamples: Array<string[] | null> = [];
   private readonly recentOutputNarrativeSignatures: Array<string | null> = [];
+  private readonly recentConcreteOutputTargetSamples: Array<string[] | null> = [];
   private readonly recentMetaSurfaceSamples: Array<string | null> = [];
   private readonly preAnchorMetaSurfaceSamples: string[] = [];
   private readonly commandIntentViolationSamples: ReviewCommandIntentViolation[] = [];
@@ -445,6 +451,8 @@ export class ReviewExecutionState {
       distinctInspectionSignatures: inspectionTargetSummary.distinctSignatures,
       maxInspectionSignatureHits: inspectionTargetSummary.maxSignatureHits,
       outputInspectionSignals: outputNarrativeSummary.outputInspectionSignals,
+      outputNarrativeSignals: outputNarrativeSummary.outputNarrativeSignals,
+      concreteOutputSignals: outputNarrativeSummary.concreteOutputSignals,
       distinctOutputInspectionTargets: outputNarrativeSummary.distinctOutputTargets,
       maxOutputInspectionTargetHits: outputNarrativeSummary.maxOutputTargetHits,
       distinctOutputNarrativeSignatures: outputNarrativeSummary.distinctNarrativeSignatures,
@@ -503,13 +511,19 @@ export class ReviewExecutionState {
     return {
       triggered,
       reason: triggered
-        ? `bounded review verdict-stability drift detected after ${formatDurationMs(
-            Math.max(0, nowMs - this.startedAtMs)
-          )}: ${this.thinkingBlocks} thinking blocks, ${this.commandStarts.length} command starts, ${summary.outputInspectionSignals} repeated output inspection signals across ${summary.distinctOutputInspectionTargets} target(s) (max hit count ${summary.maxOutputInspectionTargetHits}), ${summary.distinctOutputNarrativeSignatures} repeated narrative signature(s) (max hit count ${summary.maxOutputNarrativeSignatureHits}), sustained for ${formatDurationMs(Math.max(0, nowMs - this.verdictStabilityCandidateSinceMs!))}.`
+        ? summary.distinctOutputInspectionTargets > 0
+          ? `bounded review verdict-stability drift detected after ${formatDurationMs(
+              Math.max(0, nowMs - this.startedAtMs)
+            )}: ${this.thinkingBlocks} thinking blocks, ${this.commandStarts.length} command starts, ${summary.outputInspectionSignals} repeated output inspection signals across ${summary.distinctOutputInspectionTargets} target(s) (max hit count ${summary.maxOutputInspectionTargetHits}), ${summary.distinctOutputNarrativeSignatures} repeated narrative signature(s) (max hit count ${summary.maxOutputNarrativeSignatureHits}), sustained for ${formatDurationMs(Math.max(0, nowMs - this.verdictStabilityCandidateSinceMs!))}.`
+          : `bounded review verdict-stability drift detected after ${formatDurationMs(
+              Math.max(0, nowMs - this.startedAtMs)
+            )}: ${this.thinkingBlocks} thinking blocks, ${this.commandStarts.length} command starts, ${summary.outputNarrativeSignals} repeated speculative narrative signal(s) with no concrete output targets, ${summary.distinctOutputNarrativeSignatures} repeated narrative signature(s) (max hit count ${summary.maxOutputNarrativeSignatureHits}), sustained for ${formatDurationMs(Math.max(0, nowMs - this.verdictStabilityCandidateSinceMs!))}.`
         : null,
       thinkingBlocks: this.thinkingBlocks,
       commandStarts: this.commandStarts.length,
       outputInspectionSignals: summary.outputInspectionSignals,
+      outputNarrativeSignals: summary.outputNarrativeSignals,
+      concreteOutputSignals: summary.concreteOutputSignals,
       distinctOutputInspectionTargets: summary.distinctOutputInspectionTargets,
       maxOutputInspectionTargetHits: summary.maxOutputInspectionTargetHits,
       distinctOutputNarrativeSignatures: summary.distinctOutputNarrativeSignatures,
@@ -729,6 +743,7 @@ export class ReviewExecutionState {
       if (outputMetaSurfaceSample) {
         this.recordMetaSurfaceSample(outputMetaSurfaceSample, nowMs);
       }
+      this.recordConcreteOutputSignals(trimmed);
       this.recordNarrativeInspectionSignals(trimmed);
     }
 
@@ -816,18 +831,23 @@ export class ReviewExecutionState {
       this.recordOutputNarrativeMiss();
       return;
     }
+    this.recentOutputNarrativeSignatures.push(signature);
+    while (this.recentOutputNarrativeSignatures.length > VERDICT_STABILITY_RECENT_OUTPUT_WINDOW) {
+      this.recentOutputNarrativeSignatures.shift();
+    }
     const targets = extractInspectionTargets(signature);
     if (targets.length === 0) {
-      this.recordOutputNarrativeMiss();
+      this.recentOutputInspectionTargetSamples.push(null);
+      while (
+        this.recentOutputInspectionTargetSamples.length > VERDICT_STABILITY_RECENT_OUTPUT_WINDOW
+      ) {
+        this.recentOutputInspectionTargetSamples.shift();
+      }
       return;
     }
     this.recentOutputInspectionTargetSamples.push(targets);
     while (this.recentOutputInspectionTargetSamples.length > VERDICT_STABILITY_RECENT_OUTPUT_WINDOW) {
       this.recentOutputInspectionTargetSamples.shift();
-    }
-    this.recentOutputNarrativeSignatures.push(signature);
-    while (this.recentOutputNarrativeSignatures.length > VERDICT_STABILITY_RECENT_OUTPUT_WINDOW) {
-      this.recentOutputNarrativeSignatures.shift();
     }
   }
 
@@ -839,6 +859,23 @@ export class ReviewExecutionState {
     this.recentOutputNarrativeSignatures.push(null);
     while (this.recentOutputNarrativeSignatures.length > VERDICT_STABILITY_RECENT_OUTPUT_WINDOW) {
       this.recentOutputNarrativeSignatures.shift();
+    }
+  }
+
+  private recordConcreteOutputSignals(line: string): void {
+    if (this.touchedPaths.size === 0) {
+      this.recentConcreteOutputTargetSamples.push(null);
+      while (
+        this.recentConcreteOutputTargetSamples.length > VERDICT_STABILITY_RECENT_OUTPUT_WINDOW
+      ) {
+        this.recentConcreteOutputTargetSamples.shift();
+      }
+      return;
+    }
+    const targets = extractConcreteOutputTargets(line, this.touchedPaths, this.repoRoot);
+    this.recentConcreteOutputTargetSamples.push(targets.length > 0 ? targets : null);
+    while (this.recentConcreteOutputTargetSamples.length > VERDICT_STABILITY_RECENT_OUTPUT_WINDOW) {
+      this.recentConcreteOutputTargetSamples.shift();
     }
   }
 
@@ -926,7 +963,7 @@ export class ReviewExecutionState {
       return;
     }
     const summary = this.buildOutputSummary();
-    const driftShaped =
+    const fileTargetDriftShaped =
       this.reviewProgressObserved &&
       this.thinkingBlocks >= VERDICT_STABILITY_MIN_THINKING_BLOCKS &&
       this.commandStarts.length >= VERDICT_STABILITY_MIN_COMMAND_STARTS &&
@@ -939,6 +976,19 @@ export class ReviewExecutionState {
         VERDICT_STABILITY_MAX_DISTINCT_OUTPUT_SIGNATURES &&
       summary.maxOutputNarrativeSignatureHits >=
         VERDICT_STABILITY_MIN_REPEAT_OUTPUT_SIGNATURE_HITS;
+    const genericNarrativeDriftShaped =
+      this.reviewProgressObserved &&
+      this.thinkingBlocks >= VERDICT_STABILITY_MIN_THINKING_BLOCKS &&
+      this.commandStarts.length >= VERDICT_STABILITY_MIN_COMMAND_STARTS &&
+      summary.outputNarrativeSignals >= VERDICT_STABILITY_MIN_OUTPUT_NARRATIVE_SIGNALS &&
+      summary.distinctOutputInspectionTargets === 0 &&
+      summary.concreteOutputSignals === 0 &&
+      summary.distinctOutputNarrativeSignatures > 0 &&
+      summary.distinctOutputNarrativeSignatures <=
+        VERDICT_STABILITY_MAX_DISTINCT_OUTPUT_SIGNATURES &&
+      summary.maxOutputNarrativeSignatureHits >=
+        VERDICT_STABILITY_MIN_REPEAT_OUTPUT_SIGNATURE_HITS;
+    const driftShaped = fileTargetDriftShaped || genericNarrativeDriftShaped;
     if (!driftShaped) {
       this.verdictStabilityCandidateSinceMs = null;
       return;
@@ -1007,6 +1057,8 @@ export class ReviewExecutionState {
 
   private buildOutputNarrativeSummary(): {
     outputInspectionSignals: number;
+    outputNarrativeSignals: number;
+    concreteOutputSignals: number;
     distinctOutputTargets: number;
     maxOutputTargetHits: number;
     distinctNarrativeSignatures: number;
@@ -1043,8 +1095,20 @@ export class ReviewExecutionState {
         maxNarrativeSignatureHits = hits;
       }
     }
+    let concreteOutputSignals = 0;
+    for (const targets of this.recentConcreteOutputTargetSamples) {
+      if (!targets) {
+        continue;
+      }
+      concreteOutputSignals += targets.length;
+    }
     return {
       outputInspectionSignals: [...outputTargetHits.values()].reduce((sum, hits) => sum + hits, 0),
+      outputNarrativeSignals: [...outputNarrativeSignatureHits.values()].reduce(
+        (sum, hits) => sum + hits,
+        0
+      ),
+      concreteOutputSignals,
       distinctOutputTargets: outputTargetHits.size,
       maxOutputTargetHits,
       distinctNarrativeSignatures: outputNarrativeSignatureHits.size,
@@ -1771,6 +1835,48 @@ function normalizeNarrativeInspectionSignature(line: string): string | null {
     return null;
   }
   return normalized;
+}
+
+function extractConcreteOutputTargets(
+  line: string,
+  touchedPaths: ReadonlySet<string>,
+  repoRoot: string | null
+): string[] {
+  const normalized = line.trim().replace(/\s+/gu, ' ');
+  if (
+    normalized.length === 0 ||
+    normalized === 'thinking' ||
+    normalized === 'exec' ||
+    REVIEW_PROGRESS_SIGNAL_LINE_RE.test(normalized) ||
+    isLikelyReviewCommandLine(normalized) ||
+    /^mcp:/iu.test(normalized) ||
+    /^(?:diff --git|index |--- |\+\+\+ |@@|```)/u.test(normalized) ||
+    /^[`"']/u.test(normalized) ||
+    /\bsucceeded in\b|\bexited\b/iu.test(normalized) ||
+    normalizeNarrativeInspectionSignature(normalized)
+  ) {
+    return [];
+  }
+  const concreteTargets = new Set<string>();
+  for (const touchedPath of touchedPaths) {
+    const normalizedTouchedPath = normalizeScopePath(touchedPath);
+    if (normalizedTouchedPath.length === 0) {
+      continue;
+    }
+    const escapedTouchedPath = escapeRegex(normalizedTouchedPath);
+    const lineMarkerRe = new RegExp(
+      `${escapedTouchedPath}(?::\\d+(?::\\d+)?)\\b|${escapedTouchedPath}#L\\d+(?:C\\d+)?\\b`,
+      'iu'
+    );
+    if (lineMarkerRe.test(normalized) && isTouchedScopePath(normalizedTouchedPath, touchedPaths, repoRoot)) {
+      concreteTargets.add(normalizedTouchedPath);
+    }
+  }
+  return [...concreteTargets];
+}
+
+function escapeRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
 }
 
 function extractInspectionCommandSignature(commandLine: string, targets: string[]): string | null {

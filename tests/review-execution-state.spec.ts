@@ -460,6 +460,46 @@ describe('ReviewExecutionState', () => {
     expect(summary.maxOutputNarrativeSignatureHits).toBeGreaterThanOrEqual(2);
   });
 
+  it('classifies verdict-stability drift from repeated targetless speculative output with no new concrete findings', () => {
+    const state = new ReviewExecutionState({
+      startedAtMs: 0,
+      blockHeavyCommands: false,
+      verdictStabilityTimeoutMs: 1_000
+    });
+
+    const commands = [
+      "/bin/zsh -lc 'sed -n 1,120p scripts/run-review.ts'",
+      "/bin/zsh -lc 'sed -n 1,120p scripts/lib/review-execution-state.ts'",
+      "/bin/zsh -lc 'sed -n 1,120p tests/run-review.spec.ts'",
+      "/bin/zsh -lc 'sed -n 1,120p docs/standalone-review-guide.md'"
+    ];
+    const narratives = [
+      'Maybe the reviewer is still circling around ANSI stripping before reaching a final verdict.',
+      'Maybe the reviewer is still circling around ANSI stripping before reaching a final verdict.',
+      'I am still considering whether the small-diff revisit policy needs another tweak before I can finish the review.',
+      'I am still considering whether the small-diff revisit policy needs another tweak before I can finish the review.'
+    ];
+
+    let nowMs = 100;
+    for (let index = 0; index < narratives.length; index += 1) {
+      state.observeChunk('thinking\n', 'stdout', nowMs);
+      state.observeChunk(`${narratives[index]}\n`, 'stdout', nowMs + 20);
+      state.observeChunk('exec\n', 'stdout', nowMs + 30);
+      state.observeChunk(`${commands[index % commands.length]}\n`, 'stdout', nowMs + 40);
+      nowMs += 100;
+    }
+
+    const drift = state.getVerdictStabilityState(2_000);
+    const summary = state.buildOutputSummary();
+    expect(drift.triggered).toBe(true);
+    expect(drift.reason).toContain('verdict-stability drift detected');
+    expect(summary.outputInspectionSignals).toBe(0);
+    expect(summary.outputNarrativeSignals).toBeGreaterThanOrEqual(4);
+    expect(summary.concreteOutputSignals).toBe(0);
+    expect(summary.distinctOutputInspectionTargets).toBe(0);
+    expect(summary.maxOutputNarrativeSignatureHits).toBeGreaterThanOrEqual(2);
+  });
+
   it('does not classify verdict-stability drift when output keeps introducing new concrete targets', () => {
     const state = new ReviewExecutionState({
       startedAtMs: 0,
@@ -494,6 +534,98 @@ describe('ReviewExecutionState', () => {
     const summary = state.buildOutputSummary();
     expect(drift.triggered).toBe(false);
     expect(summary.distinctOutputInspectionTargets).toBeGreaterThan(4);
+  });
+
+  it('does not classify generic verdict-stability drift when the same small diff keeps surfacing concrete findings', () => {
+    const state = new ReviewExecutionState({
+      startedAtMs: 0,
+      blockHeavyCommands: false,
+      verdictStabilityTimeoutMs: 1_000,
+      touchedPaths: [
+        'scripts/run-review.ts',
+        'scripts/lib/review-execution-state.ts',
+        'scripts/review-helper.sh'
+      ]
+    });
+
+    const commands = [
+      "/bin/zsh -lc 'sed -n 1,120p scripts/run-review.ts'",
+      "/bin/zsh -lc 'sed -n 1,120p scripts/lib/review-execution-state.ts'",
+      "/bin/zsh -lc 'sed -n 1,120p scripts/run-review.ts'",
+      "/bin/zsh -lc 'sed -n 1,120p scripts/lib/review-execution-state.ts'"
+    ];
+    const narratives = [
+      'Maybe the reviewer is still circling around ANSI stripping before reaching a final verdict.',
+      'Maybe the reviewer is still circling around ANSI stripping before reaching a final verdict.',
+      'I am still considering whether the small-diff revisit policy needs another tweak before I can finish the review.',
+      'I am still considering whether the small-diff revisit policy needs another tweak before I can finish the review.'
+    ];
+    const concreteFindings = [
+      '- scripts/run-review.ts:2315 still includes the bounded exit toggle text.',
+      '- scripts/lib/review-execution-state.ts:946 still resets the candidate when concrete output arrives.',
+      '- scripts/review-helper.sh:12 still counts as a touched-path concrete finding.',
+      '- scripts/lib/review-execution-state.ts#L929 still keeps the targeted file-output predicate intact.'
+    ];
+
+    let nowMs = 100;
+    for (let index = 0; index < narratives.length; index += 1) {
+      state.observeChunk('thinking\n', 'stdout', nowMs);
+      state.observeChunk(`${narratives[index]}\n`, 'stdout', nowMs + 20);
+      state.observeChunk(`${concreteFindings[index]}\n`, 'stdout', nowMs + 25);
+      state.observeChunk('exec\n', 'stdout', nowMs + 30);
+      state.observeChunk(`${commands[index]}\n`, 'stdout', nowMs + 40);
+      nowMs += 100;
+    }
+
+    const drift = state.getVerdictStabilityState(2_000);
+    const summary = state.buildOutputSummary();
+    expect(drift.triggered).toBe(false);
+    expect(summary.distinctOutputInspectionTargets).toBe(0);
+    expect(summary.outputNarrativeSignals).toBeGreaterThanOrEqual(4);
+    expect(summary.concreteOutputSignals).toBeGreaterThanOrEqual(4);
+    expect(summary.maxOutputNarrativeSignatureHits).toBeGreaterThanOrEqual(2);
+  });
+
+  it('does not treat raw touched-file content references without location markers as concrete progress', () => {
+    const state = new ReviewExecutionState({
+      startedAtMs: 0,
+      blockHeavyCommands: false,
+      verdictStabilityTimeoutMs: 1_000,
+      touchedPaths: ['scripts/run-review.ts']
+    });
+
+    const commands = [
+      "/bin/zsh -lc 'sed -n 1,120p scripts/run-review.ts'",
+      "/bin/zsh -lc 'sed -n 1,120p scripts/lib/review-execution-state.ts'",
+      "/bin/zsh -lc 'sed -n 1,120p tests/run-review.spec.ts'",
+      "/bin/zsh -lc 'sed -n 1,120p docs/standalone-review-guide.md'"
+    ];
+    const narratives = [
+      'Maybe the reviewer is still circling around ANSI stripping before reaching a final verdict.',
+      'Maybe the reviewer is still circling around ANSI stripping before reaching a final verdict.',
+      'I am still considering whether the small-diff revisit policy needs another tweak before I can finish the review.',
+      'I am still considering whether the small-diff revisit policy needs another tweak before I can finish the review.'
+    ];
+
+    let nowMs = 100;
+    for (let index = 0; index < narratives.length; index += 1) {
+      state.observeChunk('thinking\n', 'stdout', nowMs);
+      state.observeChunk(`${narratives[index]}\n`, 'stdout', nowMs + 20);
+      state.observeChunk(
+        "matchesPathSuffix(normalized, 'scripts/run-review.ts') ||\n",
+        'stdout',
+        nowMs + 25
+      );
+      state.observeChunk('exec\n', 'stdout', nowMs + 30);
+      state.observeChunk(`${commands[index % commands.length]}\n`, 'stdout', nowMs + 40);
+      nowMs += 100;
+    }
+
+    const drift = state.getVerdictStabilityState(2_000);
+    const summary = state.buildOutputSummary();
+    expect(drift.triggered).toBe(true);
+    expect(summary.concreteOutputSignals).toBe(0);
+    expect(summary.distinctOutputInspectionTargets).toBe(0);
   });
 
   it('does not classify inspected fixture file contents as verdict-stability narrative drift', () => {
