@@ -3,6 +3,55 @@
   "generated_at": "2026-03-11",
   "entries": [
     {
+      "path": ".agent/task/1119-coordinator-symphony-aligned-standalone-review-active-closeout-bundle-fast-fail-boundary.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-11",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-standalone-review-active-closeout-bundle-fast-fail-boundary.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-11",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/PRD-coordinator-symphony-aligned-standalone-review-active-closeout-bundle-fast-fail-boundary.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-11",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/TECH_SPEC-coordinator-symphony-aligned-standalone-review-active-closeout-bundle-fast-fail-boundary.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-11",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/findings/1119-standalone-review-active-closeout-bundle-fast-fail-boundary-deliberation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-11",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/specs/1119-coordinator-symphony-aligned-standalone-review-active-closeout-bundle-fast-fail-boundary.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-11",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/tasks-1119-coordinator-symphony-aligned-standalone-review-active-closeout-bundle-fast-fail-boundary.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-11",
+      "cadence_days": 30
+    },
+    {
       "path": ".agent/task/1118-coordinator-symphony-aligned-standalone-review-run-review-spec-whole-file-probe-truthfulness.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",

@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260311-1119-coordinator-symphony-aligned-standalone-review-active-closeout-bundle-fast-fail-boundary",
+      "title": "Coordinator Symphony-Aligned Standalone Review Active Closeout Bundle Fast-Fail Boundary",
+      "relates_to": "tasks/tasks-1119-coordinator-symphony-aligned-standalone-review-active-closeout-bundle-fast-fail-boundary.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-11",
+      "paths": {
+        "spec": "tasks/specs/1119-coordinator-symphony-aligned-standalone-review-active-closeout-bundle-fast-fail-boundary.md",
+        "task": "tasks/tasks-1119-coordinator-symphony-aligned-standalone-review-active-closeout-bundle-fast-fail-boundary.md",
+        "agent_task": ".agent/task/1119-coordinator-symphony-aligned-standalone-review-active-closeout-bundle-fast-fail-boundary.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-standalone-review-active-closeout-bundle-fast-fail-boundary.md"
+      }
+    },
+    {
       "id": "20260311-1118-coordinator-symphony-aligned-standalone-review-run-review-spec-whole-file-probe-truthfulness",
       "title": "Coordinator Symphony-Aligned Standalone Review Run-Review Spec Whole-File Probe Truthfulness",
       "relates_to": "tasks/tasks-1118-coordinator-symphony-aligned-standalone-review-run-review-spec-whole-file-probe-truthfulness.md",
