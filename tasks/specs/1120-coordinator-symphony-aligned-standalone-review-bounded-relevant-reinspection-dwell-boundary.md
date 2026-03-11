@@ -1,11 +1,11 @@
 ---
 id: 20260311-1120-coordinator-symphony-aligned-standalone-review-bounded-relevant-reinspection-dwell-boundary
 title: Coordinator Symphony-Aligned Standalone Review Bounded Relevant Reinspection Dwell Boundary
-status: draft
+status: completed
 owners:
   - Codex
 created: 2026-03-11
-last_review: 2026-03-11
+last_review: 2026-03-12
 review_cadence_days: 30
 related_prd: docs/PRD-coordinator-symphony-aligned-standalone-review-bounded-relevant-reinspection-dwell-boundary.md
 related_action_plan: docs/ACTION_PLAN-coordinator-symphony-aligned-standalone-review-bounded-relevant-reinspection-dwell-boundary.md
@@ -35,3 +35,4 @@ Tighten standalone review so repetitive bounded relevant reinspection of the sam
 ## Notes
 
 - 2026-03-11: Registered after `1119` closed. Current evidence shows the remaining residual review issue is repetitive bounded reinspection of the same touched files and adjacent relevant helpers/tests after startup-anchor success, not off-task meta-surface drift. Evidence: `docs/findings/1120-standalone-review-bounded-relevant-reinspection-dwell-boundary-deliberation.md`, `out/1119-coordinator-symphony-aligned-standalone-review-active-closeout-bundle-fast-fail-boundary/manual/20260311T122853Z-closeout/09-review.log`, `.runs/1119-coordinator-symphony-aligned-standalone-review-active-closeout-bundle-fast-fail-boundary-scout/cli/2026-03-11T12-13-09-171Z-7ef52029/review/telemetry.json`.
+- 2026-03-12: Completed. The final implementation moved command-line inspection target detection onto touched-path-aware operand parsing, kept the generic regex as a narrative fallback, and added focused coverage for Python-path runtime behavior, odd filenames, and search-pattern false positives. The final live review rerun stayed bounded to the touched review files and terminated via the dedicated relevant-reinspection dwell boundary after the concrete defects were fixed, while the only remaining explicit residual is the separate repo-wide `npm run test` quiet tail. Evidence: `out/1120-coordinator-symphony-aligned-standalone-review-bounded-relevant-reinspection-dwell-boundary/manual/20260311T132813Z-closeout/00-summary.md`, `out/1120-coordinator-symphony-aligned-standalone-review-bounded-relevant-reinspection-dwell-boundary/manual/20260311T132813Z-closeout/09-review.log`, `out/1120-coordinator-symphony-aligned-standalone-review-bounded-relevant-reinspection-dwell-boundary/manual/20260311T132813Z-closeout/13-override-notes.md`.
