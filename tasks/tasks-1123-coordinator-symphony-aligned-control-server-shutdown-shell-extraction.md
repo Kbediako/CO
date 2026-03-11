@@ -20,21 +20,21 @@
 
 ## Control Server Shutdown Shell
 
-- [ ] The `ControlServer.close()` shutdown shell is extracted through one bounded helper while preserving the public close contract. Evidence: `orchestrator/src/cli/control/controlServer.ts`.
-- [ ] The extracted helper owns only expiry teardown/reset, bootstrap teardown/reset, open-client termination, and the final `server.close()` promise wrapper. Evidence: `orchestrator/src/cli/control/controlServer.ts`.
-- [ ] Focused regression coverage proves teardown ordering and post-close field reset behavior remain unchanged. Evidence: `orchestrator/tests/ControlServer.test.ts`, `out/1123-coordinator-symphony-aligned-control-server-shutdown-shell-extraction/manual/20260312T000000Z-closeout/05-targeted-tests.log`.
+- [x] The `ControlServer.close()` shutdown shell is extracted through one bounded helper while preserving the public close contract. Evidence: `orchestrator/src/cli/control/controlServer.ts`, `out/1123-coordinator-symphony-aligned-control-server-shutdown-shell-extraction/manual/20260311T235001Z-closeout/00-summary.md`.
+- [x] The extracted helper owns only expiry teardown/reset, bootstrap teardown/reset, open-client termination, and the final `server.close()` promise wrapper. Evidence: `orchestrator/src/cli/control/controlServer.ts`, `out/1123-coordinator-symphony-aligned-control-server-shutdown-shell-extraction/manual/20260311T235001Z-closeout/11-manual-control-server-shutdown-shell-check.json`.
+- [x] Focused regression coverage proves teardown ordering and post-close field reset behavior remain unchanged. Evidence: `orchestrator/tests/ControlServer.test.ts`, `out/1123-coordinator-symphony-aligned-control-server-shutdown-shell-extraction/manual/20260311T235001Z-closeout/05-targeted-tests.log`.
 
 ## Validation + Closeout
 
-- [ ] `node scripts/delegation-guard.mjs`. Evidence: `out/1123-coordinator-symphony-aligned-control-server-shutdown-shell-extraction/manual/20260312T000000Z-closeout/01-delegation-guard.log`.
-- [ ] `node scripts/spec-guard.mjs --dry-run`. Evidence: `out/1123-coordinator-symphony-aligned-control-server-shutdown-shell-extraction/manual/20260312T000000Z-closeout/02-spec-guard.log`.
-- [ ] `npm run build`. Evidence: `out/1123-coordinator-symphony-aligned-control-server-shutdown-shell-extraction/manual/20260312T000000Z-closeout/03-build.log`.
-- [ ] `npm run lint`. Evidence: `out/1123-coordinator-symphony-aligned-control-server-shutdown-shell-extraction/manual/20260312T000000Z-closeout/04-lint.log`.
-- [ ] `npm run test`. Evidence: `out/1123-coordinator-symphony-aligned-control-server-shutdown-shell-extraction/manual/20260312T000000Z-closeout/05-test.log`.
-- [ ] `npm run docs:check`. Evidence: `out/1123-coordinator-symphony-aligned-control-server-shutdown-shell-extraction/manual/20260312T000000Z-closeout/06-docs-check.log`.
-- [ ] `npm run docs:freshness`. Evidence: `out/1123-coordinator-symphony-aligned-control-server-shutdown-shell-extraction/manual/20260312T000000Z-closeout/07-docs-freshness.log`.
-- [ ] `node scripts/diff-budget.mjs`. Evidence: `out/1123-coordinator-symphony-aligned-control-server-shutdown-shell-extraction/manual/20260312T000000Z-closeout/08-diff-budget.log`.
-- [ ] `npm run review`. Evidence: `out/1123-coordinator-symphony-aligned-control-server-shutdown-shell-extraction/manual/20260312T000000Z-closeout/09-review.log`.
-- [ ] `npm run pack:smoke`. Evidence: `out/1123-coordinator-symphony-aligned-control-server-shutdown-shell-extraction/manual/20260312T000000Z-closeout/10-pack-smoke.log`.
-- [ ] Manual shutdown-shell evidence captured. Evidence: `out/1123-coordinator-symphony-aligned-control-server-shutdown-shell-extraction/manual/20260312T000000Z-closeout/11-manual-control-server-shutdown-shell-check.json`.
-- [ ] Elegance review completed. Evidence: `out/1123-coordinator-symphony-aligned-control-server-shutdown-shell-extraction/manual/20260312T000000Z-closeout/12-elegance-review.md`.
+- [x] `node scripts/delegation-guard.mjs`. Evidence: `out/1123-coordinator-symphony-aligned-control-server-shutdown-shell-extraction/manual/20260311T235001Z-closeout/01-delegation-guard.log`.
+- [x] `node scripts/spec-guard.mjs --dry-run`. Evidence: `out/1123-coordinator-symphony-aligned-control-server-shutdown-shell-extraction/manual/20260311T235001Z-closeout/02-spec-guard.log`.
+- [x] `npm run build`. Evidence: `out/1123-coordinator-symphony-aligned-control-server-shutdown-shell-extraction/manual/20260311T235001Z-closeout/03-build.log`.
+- [x] `npm run lint`. Evidence: `out/1123-coordinator-symphony-aligned-control-server-shutdown-shell-extraction/manual/20260311T235001Z-closeout/04-lint.log`.
+- [x] `npm run test` executed, with the recurring quiet-tail override recorded explicitly instead of claiming a full-suite pass. Evidence: `out/1123-coordinator-symphony-aligned-control-server-shutdown-shell-extraction/manual/20260311T235001Z-closeout/05-test.log`, `out/1123-coordinator-symphony-aligned-control-server-shutdown-shell-extraction/manual/20260311T235001Z-closeout/13-override-notes.md`.
+- [x] `npm run docs:check`. Evidence: `out/1123-coordinator-symphony-aligned-control-server-shutdown-shell-extraction/manual/20260311T235001Z-closeout/06-docs-check.log`.
+- [x] `npm run docs:freshness`. Evidence: `out/1123-coordinator-symphony-aligned-control-server-shutdown-shell-extraction/manual/20260311T235001Z-closeout/07-docs-freshness.log`.
+- [x] `node scripts/diff-budget.mjs` with the explicit stacked-branch override. Evidence: `out/1123-coordinator-symphony-aligned-control-server-shutdown-shell-extraction/manual/20260311T235001Z-closeout/08-diff-budget.log`, `out/1123-coordinator-symphony-aligned-control-server-shutdown-shell-extraction/manual/20260311T235001Z-closeout/13-override-notes.md`.
+- [x] `npm run review`. Evidence: `out/1123-coordinator-symphony-aligned-control-server-shutdown-shell-extraction/manual/20260311T235001Z-closeout/09-review.log`.
+- [x] `npm run pack:smoke`. Evidence: `out/1123-coordinator-symphony-aligned-control-server-shutdown-shell-extraction/manual/20260311T235001Z-closeout/10-pack-smoke.log`.
+- [x] Manual shutdown-shell evidence captured. Evidence: `out/1123-coordinator-symphony-aligned-control-server-shutdown-shell-extraction/manual/20260311T235001Z-closeout/11-manual-control-server-shutdown-shell-check.json`.
+- [x] Elegance review completed. Evidence: `out/1123-coordinator-symphony-aligned-control-server-shutdown-shell-extraction/manual/20260311T235001Z-closeout/12-elegance-review.md`.

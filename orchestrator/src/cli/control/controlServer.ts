@@ -109,6 +109,10 @@ export class ControlServer {
   }
 
   async close(): Promise<void> {
+    return this.shutdownOwnedRuntime();
+  }
+
+  private async shutdownOwnedRuntime(): Promise<void> {
     this.expiryLifecycle?.close();
     this.expiryLifecycle = null;
     await this.bootstrapLifecycle?.close();

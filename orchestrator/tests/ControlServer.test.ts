@@ -6665,6 +6665,71 @@ describe('ControlServer', () => {
     }
   });
 
+  it('closes owned runtime state in order and resets lifecycle fields', async () => {
+    const { root, env, paths } = await createRunRoot('task-0940');
+    const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
+    const order: string[] = [];
+    const expiryClose = vi.fn(() => {
+      order.push('expiry');
+    });
+    const bootstrapClose = vi.fn(async () => {
+      order.push('bootstrap');
+    });
+    const bootstrapAssemblySpy = vi
+      .spyOn(controlBootstrapAssemblyModule, 'createControlBootstrapAssembly')
+      .mockReturnValue({
+        expiryLifecycle: {
+          start: vi.fn(),
+          close: expiryClose,
+          expireConfirmations: vi.fn(async () => undefined),
+          expireQuestions: vi.fn(async () => undefined)
+        },
+        bootstrapLifecycle: {
+          start: vi.fn(async () => undefined),
+          close: bootstrapClose
+        }
+      });
+
+    const server = await ControlServer.start({
+      paths,
+      config,
+      runId: 'run-1'
+    });
+    const runtimeServer = server as unknown as {
+      server: http.Server;
+      expiryLifecycle: { close(): void } | null;
+      bootstrapLifecycle: { close(): Promise<void> } | null;
+      requestContextShared: { clients: Set<http.ServerResponse> };
+    };
+    const clientEnd = vi.fn(() => {
+      order.push('client');
+    });
+    const client = {
+      end: clientEnd
+    } as unknown as http.ServerResponse;
+    runtimeServer.requestContextShared.clients.add(client);
+    const originalClose = runtimeServer.server.close.bind(runtimeServer.server);
+    const serverCloseSpy = vi.spyOn(runtimeServer.server, 'close').mockImplementation((callback?) => {
+      order.push('server');
+      return originalClose(callback);
+    });
+
+    try {
+      await server.close();
+
+      expect(expiryClose).toHaveBeenCalledOnce();
+      expect(bootstrapClose).toHaveBeenCalledOnce();
+      expect(clientEnd).toHaveBeenCalledOnce();
+      expect(order).toEqual(['expiry', 'bootstrap', 'client', 'server']);
+      expect(runtimeServer.expiryLifecycle).toBeNull();
+      expect(runtimeServer.bootstrapLifecycle).toBeNull();
+    } finally {
+      serverCloseSpy.mockRestore();
+      bootstrapAssemblySpy.mockRestore();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   it('allows ui.cancel approvals to issue cancel actions without nonce leakage', async () => {
     const { root, env, paths } = await createRunRoot('task-0940');
     const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
