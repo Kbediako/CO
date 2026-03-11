@@ -3,55 +3,6 @@
   "generated_at": "2026-03-11",
   "entries": [
     {
-      "path": ".agent/task/1111-coordinator-symphony-aligned-standalone-review-direct-shell-probe-detection-and-redaction-parity.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-03-11",
-      "cadence_days": 30
-    },
-    {
-      "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-standalone-review-direct-shell-probe-detection-and-redaction-parity.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-03-11",
-      "cadence_days": 30
-    },
-    {
-      "path": "docs/PRD-coordinator-symphony-aligned-standalone-review-direct-shell-probe-detection-and-redaction-parity.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-03-11",
-      "cadence_days": 30
-    },
-    {
-      "path": "docs/TECH_SPEC-coordinator-symphony-aligned-standalone-review-direct-shell-probe-detection-and-redaction-parity.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-03-11",
-      "cadence_days": 30
-    },
-    {
-      "path": "docs/findings/1111-standalone-review-direct-shell-probe-detection-and-redaction-parity-deliberation.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-03-11",
-      "cadence_days": 30
-    },
-    {
-      "path": "tasks/specs/1111-coordinator-symphony-aligned-standalone-review-direct-shell-probe-detection-and-redaction-parity.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-03-11",
-      "cadence_days": 30
-    },
-    {
-      "path": "tasks/tasks-1111-coordinator-symphony-aligned-standalone-review-direct-shell-probe-detection-and-redaction-parity.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-03-11",
-      "cadence_days": 30
-    },
-    {
       "path": ".agent/task/1110-coordinator-symphony-aligned-standalone-review-shell-probe-stop-condition.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
