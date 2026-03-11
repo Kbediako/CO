@@ -2,13 +2,13 @@
 
 ## Summary
 
-`1118` proved the old whole-file non-determinism premise was stale, but it also exposed the next real review-reliability defect: bounded review can still widen into post-anchor rereads of the active closeout bundle for the task it is reviewing, including the live `09-review.log`, and then burn its timeout budget without producing a verdict. The next truthful slice is to fail fast on that self-inspection pattern.
+`1118` proved the old whole-file non-determinism premise was stale, but it also exposed the next real review-reliability defect: bounded review can still widen into repeated direct rereads of the active closeout bundle for the task it is reviewing, including the live `09-review.log`, after earlier bounded inspection and then burn its timeout budget without producing a verdict. The next truthful slice is to fail fast on that self-inspection pattern.
 
 ## Problem
 
-- `npm run review` on the completed `1118` docs/evidence lane reached the bounded task surface, then performed post-anchor rereads of the active closeout bundle and timed out after `240s`.
+- `npm run review` on the completed `1118` docs/evidence lane reached the bounded task surface, then performed repeated direct rereads of the active closeout bundle after earlier bounded inspection and timed out after `240s`.
 - Telemetry already classified the drift as `review-closeout-bundle`, so the remaining gap is not detection; it is timely enforcement.
-- Letting review spend its full timeout budget inside post-anchor rereads of the active closeout bundle weakens operator trust and obscures whether the bounded diff itself had any issue.
+- Letting review spend its full timeout budget inside repeated direct rereads of the active closeout bundle after earlier bounded inspection weakens operator trust and obscures whether the bounded diff itself had any issue.
 
 ## Goals
 
@@ -32,7 +32,7 @@
 
 ## Acceptance Criteria
 
-- A bounded diff review that performs post-anchor rereads of the active closeout bundle fails before consuming the full generic timeout budget.
+- A bounded diff review that performs repeated direct rereads of the active closeout bundle after earlier bounded inspection fails before consuming the full generic timeout budget.
 - The failure reason and telemetry still identify `review-closeout-bundle`.
 - The provenance hint for the active closeout root remains intact.
 - Existing audit allowances for run manifests and runner logs remain intact.

@@ -16,11 +16,11 @@ related_tasks:
 
 ## Summary
 
-Make bounded standalone review fail promptly when it starts post-anchor rereads of the active closeout bundle for the task under review, instead of waiting for the generic meta-surface timeout to expire.
+Make bounded standalone review fail promptly when it starts repeated direct rereads of the active closeout bundle for the task under review after earlier bounded inspection, instead of waiting for the generic meta-surface timeout to expire.
 
 ## Scope
 
-- Tighten post-anchor active-closeout-bundle reread handling in the standalone review execution state.
+- Tighten repeated direct active-closeout-bundle reread handling in the standalone review execution state after earlier bounded inspection.
 - Keep the failure classification and telemetry anchored on `review-closeout-bundle`.
 - Add focused regression coverage for the `1118`-style self-inspection path.
 
@@ -33,9 +33,9 @@ Make bounded standalone review fail promptly when it starts post-anchor rereads 
 
 ## Proposed Design
 
-### 1. Treat post-anchor active closeout bundle rereads as a dedicated fast-fail shape
+### 1. Treat repeated direct active closeout bundle rereads after earlier bounded inspection as a dedicated fast-fail shape
 
-`review-closeout-bundle` is already classified in `review-execution-state.ts`, but today it only contributes to the generic meta-surface candidate window. The new boundary should fail sooner when the repeated meta surface is specifically post-anchor rereads of the active closeout bundle for the task under review.
+`review-closeout-bundle` is already classified in `review-execution-state.ts`, but today it only contributes to the generic meta-surface candidate window. The new boundary should fail sooner when the repeated meta surface is specifically direct rereads of the active closeout bundle for the task under review after earlier bounded inspection.
 
 ### 2. Keep the logic local to review execution state
 
@@ -43,7 +43,7 @@ The smallest seam is in `scripts/lib/review-execution-state.ts`, where meta-surf
 
 ### 3. Add targeted runtime contract coverage
 
-Add focused `tests/run-review.spec.ts` coverage that models a bounded review drifting into post-anchor rereads of the active closeout bundle after initial bounded inspection and verifies that the wrapper exits on the fast-fail path rather than only on the long generic timeout. Add targeted `tests/review-execution-state.spec.ts` coverage for the dedicated reread-shaping contract.
+Add focused `tests/run-review.spec.ts` coverage that models a bounded review drifting into repeated direct rereads of the active closeout bundle after initial bounded inspection and verifies that the wrapper exits on the fast-fail path rather than only on the long generic timeout. Add targeted `tests/review-execution-state.spec.ts` coverage for the dedicated reread-shaping contract.
 
 ## Files / Modules
 

@@ -7,7 +7,7 @@
 ## Why This Slice
 
 - `1118` proved the old whole-file determinism premise was stale, so reopening `tests/run-review.spec.ts` would be mis-scoped.
-- The current residual defect is narrower: bounded review can still perform post-anchor rereads of the active closeout bundle for the task under review and then time out without a verdict.
+- The current residual defect is narrower: bounded review can still perform repeated direct rereads of the active closeout bundle for the task under review after earlier bounded inspection and then time out without a verdict.
 - Telemetry already classifies that drift as `review-closeout-bundle`, which makes a focused reread fast-fail boundary the smallest truthful next seam.
 
 ## Evidence
@@ -21,7 +21,7 @@
 
 ## Approval Notes
 
-- Keep the seam bounded to post-anchor active closeout-bundle rereads.
+- Keep the seam bounded to repeated direct active closeout-bundle rereads after earlier bounded inspection.
 - Preserve the provenance hint; the issue is the reread boundary, not the existence of the hint itself.
 - Preserve audit-mode allowances for run manifests and runner logs.
 - Do not reopen whole-file determinism or broader native-review redesign in this slice.

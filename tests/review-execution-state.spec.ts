@@ -2389,6 +2389,106 @@ describe('ReviewExecutionState', () => {
     expect(summary.preAnchorMetaSurfaceKinds).toEqual(['review-closeout-bundle']);
   });
 
+  it('treats repeated active closeout-bundle rereads after earlier bounded inspection as a dedicated boundary', () => {
+    const state = new ReviewExecutionState({
+      startedAtMs: 0,
+      blockHeavyCommands: false,
+      enforceStartupAnchorBoundary: true,
+      startupAnchorMode: 'diff',
+      activeCloseoutBundleRoots: ['/repo/out/sample-task/manual/TODO-closeout'],
+      repoRoot: '/repo',
+      touchedPaths: ['scripts/run-review.ts']
+    });
+
+    let nowMs = 100;
+    for (const command of [
+      "/bin/zsh -lc 'sed -n 1,120p scripts/run-review.ts'",
+      "/bin/zsh -lc 'sed -n 1,120p out/sample-task/manual/TODO-closeout/09-review.log'",
+      "/bin/zsh -lc 'sed -n 1,120p /repo/out/sample-task/manual/TODO-closeout/13-override-notes.md'",
+      "/bin/zsh -lc 'sed -n 1,120p out/sample-task/manual/TODO-closeout/09-review.log'",
+      "/bin/zsh -lc 'sed -n 1,120p /repo/out/sample-task/manual/TODO-closeout/13-override-notes.md'",
+      "/bin/zsh -lc 'sed -n 1,120p out/sample-task/manual/TODO-closeout/09-review.log'"
+    ]) {
+      state.observeChunk('thinking\nexec\n', 'stdout', nowMs);
+      state.observeChunk(`${command}\n`, 'stdout', nowMs + 10);
+      nowMs += 100;
+    }
+
+    const boundary = state.getStartupAnchorBoundaryState(2_000);
+    const rereadBoundary = state.getActiveCloseoutBundleRereadBoundaryState(2_000);
+    const summary = state.buildOutputSummary();
+    expect(boundary.triggered).toBe(false);
+    expect(boundary.anchorObserved).toBe(true);
+    expect(rereadBoundary.triggered).toBe(true);
+    expect(rereadBoundary.reason).toContain('active-closeout-bundle reread boundary violated');
+    expect(rereadBoundary.anchorObserved).toBe(true);
+    expect(rereadBoundary.rereadCount).toBeGreaterThanOrEqual(2);
+    expect(summary.startupAnchorObserved).toBe(true);
+    expect(summary.metaSurfaceKinds).toContain('review-closeout-bundle');
+    expect(summary.preAnchorMetaSurfaceKinds).toEqual([]);
+  });
+
+  it('does not trigger the closeout-bundle reread boundary when bounded startup enforcement is disabled', () => {
+    const state = new ReviewExecutionState({
+      startedAtMs: 0,
+      blockHeavyCommands: false,
+      enforceStartupAnchorBoundary: false,
+      startupAnchorMode: null,
+      activeCloseoutBundleRoots: ['/repo/out/sample-task/manual/TODO-closeout'],
+      repoRoot: '/repo',
+      touchedPaths: ['scripts/run-review.ts']
+    });
+
+    let nowMs = 100;
+    for (const command of [
+      "/bin/zsh -lc 'sed -n 1,120p scripts/run-review.ts'",
+      "/bin/zsh -lc 'sed -n 1,120p out/sample-task/manual/TODO-closeout/09-review.log'",
+      "/bin/zsh -lc 'sed -n 1,120p /repo/out/sample-task/manual/TODO-closeout/13-override-notes.md'",
+      "/bin/zsh -lc 'sed -n 1,120p out/sample-task/manual/TODO-closeout/09-review.log'"
+    ]) {
+      state.observeChunk('thinking\nexec\n', 'stdout', nowMs);
+      state.observeChunk(`${command}\n`, 'stdout', nowMs + 10);
+      nowMs += 100;
+    }
+
+    const rereadBoundary = state.getActiveCloseoutBundleRereadBoundaryState(2_000);
+    const summary = state.buildOutputSummary();
+    expect(rereadBoundary.triggered).toBe(false);
+    expect(rereadBoundary.rereadCount).toBe(0);
+    expect(summary.metaSurfaceKinds).toContain('review-closeout-bundle');
+  });
+
+  it('supports the dedicated closeout-bundle reread boundary independently from startup-anchor enforcement', () => {
+    const state = new ReviewExecutionState({
+      startedAtMs: 0,
+      blockHeavyCommands: false,
+      enforceStartupAnchorBoundary: false,
+      enforceActiveCloseoutBundleRereadBoundary: true,
+      startupAnchorMode: null,
+      activeCloseoutBundleRoots: ['/repo/out/sample-task/manual/TODO-closeout'],
+      repoRoot: '/repo',
+      touchedPaths: ['scripts/run-review.ts']
+    });
+
+    let nowMs = 100;
+    for (const command of [
+      "/bin/zsh -lc 'sed -n 1,120p scripts/run-review.ts'",
+      "/bin/zsh -lc 'sed -n 1,120p out/sample-task/manual/TODO-closeout/09-review.log'",
+      "/bin/zsh -lc 'sed -n 1,120p /repo/out/sample-task/manual/TODO-closeout/13-override-notes.md'",
+      "/bin/zsh -lc 'sed -n 1,120p out/sample-task/manual/TODO-closeout/09-review.log'"
+    ]) {
+      state.observeChunk('thinking\nexec\n', 'stdout', nowMs);
+      state.observeChunk(`${command}\n`, 'stdout', nowMs + 10);
+      nowMs += 100;
+    }
+
+    const rereadBoundary = state.getActiveCloseoutBundleRereadBoundaryState(2_000);
+    expect(rereadBoundary.triggered).toBe(true);
+    expect(rereadBoundary.anchorObserved).toBe(false);
+    expect(rereadBoundary.rereadCount).toBeGreaterThanOrEqual(2);
+    expect(rereadBoundary.reason).toContain('active-closeout-bundle reread boundary violated');
+  });
+
   it('classifies repo-wide search results that surface the active closeout bundle', () => {
     const state = new ReviewExecutionState({
       startedAtMs: 0,

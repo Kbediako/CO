@@ -78,6 +78,19 @@ async function initGitRepoWithCommittedFiles(
   return { files };
 }
 
+async function initGitRepoWithTouchedPath(sandbox: string, relativePath: string): Promise<void> {
+  await runGit(['init', '-q'], sandbox);
+  await runGit(['config', 'user.email', 'run-review-tests@example.com'], sandbox);
+  await runGit(['config', 'user.name', 'run-review-tests'], sandbox);
+
+  const filePath = join(sandbox, relativePath);
+  await mkdir(dirname(filePath), { recursive: true });
+  await writeFile(filePath, 'baseline\n', 'utf8');
+  await runGit(['add', '.'], sandbox);
+  await runGit(['commit', '-m', 'seed touched path'], sandbox);
+  await writeFile(filePath, 'updated\n', 'utf8');
+}
+
 async function makeFakeCodex(sandbox: string): Promise<string> {
   const binPath = join(sandbox, 'codex-mock.sh');
   const script = `#!/usr/bin/env bash
@@ -430,6 +443,25 @@ fi
         echo "exec"
         echo "/bin/zsh -lc 'grep -R \"shellProbeCount\\|getShellProbeBoundaryState\" -n .' in /Users/kbediako/Code/CO"
         echo "out/sample-task/manual/TODO-closeout/09-review.log:278:shellProbeCount"
+        sleep 0.05
+      done
+      while true; do sleep 1; done
+    fi
+    if [[ "$mode" == "active-closeout-self-reference-reread" ]]; then
+      echo "thinking"
+      echo "exec"
+      echo "/bin/zsh -lc 'sed -n 1,120p file-1.txt' in /Users/kbediako/Code/CO"
+      closeout_targets=(
+        "out/sample-task/manual/TODO-closeout/09-review.log"
+        "$CODEX_ORCHESTRATOR_ROOT/out/sample-task/manual/TODO-closeout/13-override-notes.md"
+        "out/sample-task/manual/TODO-closeout/09-review.log"
+        "$CODEX_ORCHESTRATOR_ROOT/out/sample-task/manual/TODO-closeout/13-override-notes.md"
+        "out/sample-task/manual/TODO-closeout/09-review.log"
+      )
+      for target in "\${closeout_targets[@]}"; do
+        echo "thinking"
+        echo "exec"
+        echo "/bin/zsh -lc 'sed -n 1,120p $target' in /Users/kbediako/Code/CO"
         sleep 0.05
       done
       while true; do sleep 1; done
@@ -2497,6 +2529,71 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(telemetry.summary.metaSurfaceSignals).toBeGreaterThanOrEqual(4);
     expect(telemetry.summary.metaSurfaceKinds).toContain('review-closeout-bundle');
     expect(telemetry.summary.preAnchorMetaSurfaceKinds).toEqual([]);
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('fails bounded diff review promptly when post-anchor rereads hit the active closeout bundle', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    await makeCloseoutBundle(sandbox, 'sample-task');
+    await initGitRepoWithTouchedPath(sandbox, 'file-1.txt');
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'active-closeout-self-reference-reread',
+      CODEX_REVIEW_META_SURFACE_TIMEOUT_SECONDS: '1',
+      CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0',
+      CODEX_REVIEW_TIMEOUT_SECONDS: '60'
+    });
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).toContain('active-closeout-bundle reread boundary violated');
+    expect(result.stderr).not.toContain('codex review timed out after');
+
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      summary: {
+        startupAnchorObserved: boolean;
+        metaSurfaceSignals: number;
+        metaSurfaceKinds: string[];
+        preAnchorMetaSurfaceKinds: string[];
+      };
+    };
+    expect(telemetry.status).toBe('failed');
+    expect(telemetry.summary.startupAnchorObserved).toBe(true);
+    expect(telemetry.summary.metaSurfaceSignals).toBeGreaterThanOrEqual(4);
+    expect(telemetry.summary.metaSurfaceKinds).toContain('review-closeout-bundle');
+    expect(telemetry.summary.preAnchorMetaSurfaceKinds).toEqual([]);
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('does not apply the closeout-bundle reread boundary when heavy review commands are explicitly allowed', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    await makeCloseoutBundle(sandbox, 'sample-task');
+    await initGitRepoWithTouchedPath(sandbox, 'file-1.txt');
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'active-closeout-self-reference-reread',
+      CODEX_REVIEW_ALLOW_HEAVY_COMMANDS: '1',
+      CODEX_REVIEW_META_SURFACE_TIMEOUT_SECONDS: '1',
+      CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0',
+      CODEX_REVIEW_TIMEOUT_SECONDS: '1'
+    });
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).toContain('codex review timed out after 1s');
+    expect(result.stderr).not.toContain('active-closeout-bundle reread boundary violated');
+
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      summary: {
+        metaSurfaceKinds: string[];
+      };
+    };
+    expect(telemetry.status).toBe('failed');
+    expect(telemetry.summary.metaSurfaceKinds).toContain('review-closeout-bundle');
   }, LONG_WAIT_TEST_TIMEOUT_MS);
 
   it('inherits closeout roots from the registered parent task for delegated task ids', async () => {

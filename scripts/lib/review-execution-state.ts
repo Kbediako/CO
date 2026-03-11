@@ -199,6 +199,20 @@ export interface ReviewShellProbeBoundaryState {
   violationSample: string | null;
 }
 
+interface ReviewActiveCloseoutBundleRereadViolation {
+  sample: string;
+  detectedAtMs: number;
+  rereadCount: number;
+}
+
+export interface ReviewActiveCloseoutBundleRereadBoundaryState {
+  triggered: boolean;
+  reason: string | null;
+  rereadCount: number;
+  violationSample: string | null;
+  anchorObserved: boolean;
+}
+
 export interface ReviewExecutionStateOptions {
   blockHeavyCommands?: boolean;
   allowValidationCommandIntents?: boolean;
@@ -214,6 +228,7 @@ export interface ReviewExecutionStateOptions {
   allowedMetaSurfaceKinds?: string[];
   touchedPaths?: string[];
   enforceStartupAnchorBoundary?: boolean;
+  enforceActiveCloseoutBundleRereadBoundary?: boolean;
   scopeMode?: ReviewScopeMode;
   startupAnchorMode?: ReviewStartupAnchorMode | null;
   repoRoot?: string;
@@ -284,6 +299,7 @@ export class ReviewExecutionState {
   private readonly allowedMetaSurfaceKinds: Set<string>;
   private readonly touchedPaths: Set<string>;
   private readonly enforceStartupAnchorBoundary: boolean;
+  private readonly enforceActiveCloseoutBundleRereadBoundary: boolean;
   private readonly startupAnchorScopeMode: ReviewScopeMode;
   private readonly startupAnchorMode: ReviewStartupAnchorMode | null;
   private readonly repoRoot: string | null;
@@ -327,6 +343,8 @@ export class ReviewExecutionState {
   };
   private commandIntentViolation: ReviewCommandIntentViolation | null = null;
   private shellProbeViolation: ReviewShellProbeViolation | null = null;
+  private activeCloseoutBundleRereadViolation: ReviewActiveCloseoutBundleRereadViolation | null = null;
+  private activeCloseoutBundleRereadCount = 0;
   private shellProbeCount = 0;
 
   constructor(options: ReviewExecutionStateOptions = {}) {
@@ -397,6 +415,9 @@ export class ReviewExecutionState {
     this.enforceStartupAnchorBoundary =
       (options.enforceStartupAnchorBoundary ?? false) &&
       (this.startupAnchorMode === 'audit' || this.touchedPaths.size > 0);
+    this.enforceActiveCloseoutBundleRereadBoundary =
+      (options.enforceActiveCloseoutBundleRereadBoundary ?? this.enforceStartupAnchorBoundary) &&
+      this.activeCloseoutBundleRoots.size > 0;
     this.startupAnchorScopeMode = options.scopeMode ?? 'uncommitted';
   }
 
@@ -534,7 +555,11 @@ export class ReviewExecutionState {
 
   getMetaSurfaceExpansionState(nowMs = Date.now()): ReviewMetaSurfaceExpansionState {
     const summary = this.buildOutputSummary();
+    const activeCloseoutBundleRereadTriggered =
+      this.enforceActiveCloseoutBundleRereadBoundary &&
+      this.activeCloseoutBundleRereadViolation !== null;
     const triggered =
+      !activeCloseoutBundleRereadTriggered &&
       this.metaSurfaceTimeoutMs !== null &&
       this.metaSurfaceCandidateSinceMs !== null &&
       Math.max(0, nowMs - this.metaSurfaceCandidateSinceMs) >= this.metaSurfaceTimeoutMs;
@@ -598,6 +623,22 @@ export class ReviewExecutionState {
         : null,
       probeCount: this.shellProbeCount,
       violationSample: this.shellProbeViolation?.sample ?? null
+    };
+  }
+
+  getActiveCloseoutBundleRereadBoundaryState(
+    nowMs = Date.now()
+  ): ReviewActiveCloseoutBundleRereadBoundaryState {
+    return {
+      triggered: this.activeCloseoutBundleRereadViolation !== null,
+      reason: this.activeCloseoutBundleRereadViolation
+        ? `bounded review active-closeout-bundle reread boundary violated after ${formatDurationMs(
+            Math.max(0, this.activeCloseoutBundleRereadViolation.detectedAtMs - this.startedAtMs)
+          )}: ${this.activeCloseoutBundleRereadViolation.rereadCount} repeated direct reread command(s) into the active closeout bundle after earlier bounded inspection via ${this.activeCloseoutBundleRereadViolation.sample}.`
+        : null,
+      rereadCount: this.activeCloseoutBundleRereadCount,
+      violationSample: this.activeCloseoutBundleRereadViolation?.sample ?? null,
+      anchorObserved: this.startupAnchorObserved
     };
   }
 
@@ -702,7 +743,7 @@ export class ReviewExecutionState {
             allowedMetaSurfaceEnvVarPaths: this.allowedMetaSurfaceEnvVarPaths
           }
         );
-        this.recordMetaSurfaceCommandSample(metaSurfaceSample, nowMs);
+        this.recordMetaSurfaceCommandSample(metaSurfaceSample, commandLine, nowMs);
         this.recordInspectionTargets(commandLine);
         this.recordStartupAnchorProgress(commandLine, nowMs);
         const shellProbeSample = classifyShellProbeCommandLine(commandLine);
@@ -879,10 +920,24 @@ export class ReviewExecutionState {
     }
   }
 
-  private recordMetaSurfaceCommandSample(sample: string | null, nowMs: number): void {
+  private recordMetaSurfaceCommandSample(sample: string | null, commandLine: string, nowMs: number): void {
     this.recentMetaSurfaceSamples.push(sample);
     while (this.recentMetaSurfaceSamples.length > META_SURFACE_RECENT_SIGNAL_WINDOW) {
       this.recentMetaSurfaceSamples.shift();
+    }
+    if (
+      this.enforceActiveCloseoutBundleRereadBoundary &&
+      sample === REVIEW_ACTIVE_CLOSEOUT_BUNDLE_KIND &&
+      this.commandStarts.length > 1
+    ) {
+      this.activeCloseoutBundleRereadCount += 1;
+      if (!this.activeCloseoutBundleRereadViolation && this.activeCloseoutBundleRereadCount > 1) {
+        this.activeCloseoutBundleRereadViolation = {
+          sample: commandLine,
+          detectedAtMs: nowMs,
+          rereadCount: this.activeCloseoutBundleRereadCount
+        };
+      }
     }
   }
 
