@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260311-1120-coordinator-symphony-aligned-standalone-review-bounded-relevant-reinspection-dwell-boundary",
+      "title": "Coordinator Symphony-Aligned Standalone Review Bounded Relevant Reinspection Dwell Boundary",
+      "relates_to": "tasks/tasks-1120-coordinator-symphony-aligned-standalone-review-bounded-relevant-reinspection-dwell-boundary.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-11",
+      "paths": {
+        "spec": "tasks/specs/1120-coordinator-symphony-aligned-standalone-review-bounded-relevant-reinspection-dwell-boundary.md",
+        "task": "tasks/tasks-1120-coordinator-symphony-aligned-standalone-review-bounded-relevant-reinspection-dwell-boundary.md",
+        "agent_task": ".agent/task/1120-coordinator-symphony-aligned-standalone-review-bounded-relevant-reinspection-dwell-boundary.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-standalone-review-bounded-relevant-reinspection-dwell-boundary.md"
+      }
+    },
+    {
       "id": "20260311-1119-coordinator-symphony-aligned-standalone-review-active-closeout-bundle-fast-fail-boundary",
       "title": "Coordinator Symphony-Aligned Standalone Review Active Closeout Bundle Fast-Fail Boundary",
       "relates_to": "tasks/tasks-1119-coordinator-symphony-aligned-standalone-review-active-closeout-bundle-fast-fail-boundary.md",
