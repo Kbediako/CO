@@ -43,6 +43,18 @@ async function makeDetachedManifest(sandbox: string): Promise<string> {
   return manifestPath;
 }
 
+async function makeCloseoutBundle(
+  sandbox: string,
+  taskId: string,
+  bundleName = 'TODO-closeout'
+): Promise<string> {
+  const bundleDir = join(sandbox, 'out', taskId, 'manual', bundleName);
+  await mkdir(bundleDir, { recursive: true });
+  await writeFile(join(bundleDir, '09-review.log'), 'shellProbeCount\n', 'utf8');
+  await writeFile(join(bundleDir, '13-override-notes.md'), 'getShellProbeBoundaryState\n', 'utf8');
+  return bundleDir;
+}
+
 async function runGit(args: string[], cwd: string): Promise<void> {
   await execFileAsync('git', args, { cwd });
 }
@@ -332,6 +344,32 @@ fi
         echo "/bin/zsh -lc 'sed -n 1,120p .runs/sample-task/cli/sample-run/review/output.log' in /Users/kbediako/Code/CO"
         sleep 0.05
       done
+    fi
+    if [[ "$mode" == "active-closeout-self-reference-search" ]]; then
+      echo "thinking"
+      echo "exec"
+      echo "/bin/zsh -lc 'sed -n 1,120p scripts/run-review.ts' in /Users/kbediako/Code/CO"
+      for _ in $(seq 1 6); do
+        echo "thinking"
+        echo "exec"
+        echo "/bin/zsh -lc 'grep -R \"shellProbeCount\\|getShellProbeBoundaryState\" -n .' in /Users/kbediako/Code/CO"
+        echo "out/sample-task/manual/TODO-closeout/09-review.log:278:shellProbeCount"
+        sleep 0.05
+      done
+      while true; do sleep 1; done
+    fi
+    if [[ "$mode" == "active-completed-closeout-self-reference-search" ]]; then
+      echo "thinking"
+      echo "exec"
+      echo "/bin/zsh -lc 'sed -n 1,120p scripts/run-review.ts' in /Users/kbediako/Code/CO"
+      for _ in $(seq 1 6); do
+        echo "thinking"
+        echo "exec"
+        echo "/bin/zsh -lc 'grep -R \"shellProbeCount\\|getShellProbeBoundaryState\" -n .' in /Users/kbediako/Code/CO"
+        echo "out/sample-task/manual/20260311T000000Z-closeout/09-review.log:278:shellProbeCount"
+        sleep 0.05
+      done
+      while true; do sleep 1; done
     fi
     if [[ "$mode" == "command-intent-validation" ]]; then
       while true; do
@@ -2125,6 +2163,89 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(telemetry.summary.metaSurfaceKinds).toEqual(
       expect.arrayContaining(['review-artifacts', 'review-docs', 'review-support'])
     );
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('fails bounded diff review when repo-wide search results surface the active closeout bundle', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    await makeCloseoutBundle(sandbox, 'sample-task');
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'active-closeout-self-reference-search',
+      CODEX_REVIEW_META_SURFACE_TIMEOUT_SECONDS: '1',
+      CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0',
+      CODEX_REVIEW_TIMEOUT_SECONDS: '60'
+    });
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).toContain('meta-surface expansion detected');
+
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      summary: {
+        startupAnchorObserved: boolean;
+        metaSurfaceSignals: number;
+        metaSurfaceKinds: string[];
+        preAnchorMetaSurfaceKinds: string[];
+      };
+    };
+    expect(telemetry.status).toBe('failed');
+    expect(telemetry.summary.startupAnchorObserved).toBe(false);
+    expect(telemetry.summary.metaSurfaceSignals).toBeGreaterThanOrEqual(4);
+    expect(telemetry.summary.metaSurfaceKinds).toContain('review-closeout-bundle');
+    expect(telemetry.summary.preAnchorMetaSurfaceKinds).toEqual([]);
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('inherits closeout roots from the registered parent task for delegated task ids', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifestForTask(sandbox, 'sample-task-scout', 'review-closeout-parent');
+    await makeCloseoutBundle(sandbox, 'sample-task');
+    const codexBin = await makeFakeCodex(sandbox);
+    await mkdir(join(sandbox, 'tasks'), { recursive: true });
+    await writeFile(
+      join(sandbox, 'tasks', 'index.json'),
+      JSON.stringify({
+        items: [
+          {
+            id: 'sample-task',
+            title: 'Sample Task',
+            relates_to: 'tasks/tasks-sample-task.md'
+          }
+        ]
+      }),
+      'utf8'
+    );
+
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'active-closeout-self-reference-search',
+      CODEX_REVIEW_META_SURFACE_TIMEOUT_SECONDS: '1',
+      CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0',
+      CODEX_REVIEW_TIMEOUT_SECONDS: '60'
+    });
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).toContain('meta-surface expansion detected');
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('keeps the latest completed closeout root active even when TODO-closeout exists', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    await makeCloseoutBundle(sandbox, 'sample-task');
+    await makeCloseoutBundle(sandbox, 'sample-task', '20260311T000000Z-closeout');
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'active-completed-closeout-self-reference-search',
+      CODEX_REVIEW_META_SURFACE_TIMEOUT_SECONDS: '1',
+      CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0',
+      CODEX_REVIEW_TIMEOUT_SECONDS: '60'
+    });
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).toContain('meta-surface expansion detected');
   }, LONG_WAIT_TEST_TIMEOUT_MS);
 
   it('keeps the meta-surface guard active for audit mode when unrelated meta surfaces persist', async () => {

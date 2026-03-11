@@ -186,6 +186,26 @@ async function resolveRegisteredTaskChecklistPath(taskKey: string): Promise<stri
   return (await pathExists(absolute)) ? absolute : null;
 }
 
+async function resolveCanonicalTaskKey(taskKey: string | null | undefined): Promise<string | null> {
+  if (!taskKey) {
+    return null;
+  }
+
+  const items = await readTaskIndexEntries();
+  if (items.length === 0) {
+    return taskKey;
+  }
+
+  const keyedItems = items
+    .map((item) => ({ key: normalizeTaskKey(item) }))
+    .filter((entry): entry is { key: string } => typeof entry.key === 'string' && entry.key.length > 0)
+    .sort((left, right) => right.key.length - left.key.length);
+
+  const exact = keyedItems.find((entry) => entry.key === taskKey);
+  const prefix = keyedItems.find((entry) => taskKey.startsWith(`${entry.key}-`));
+  return exact?.key ?? prefix?.key ?? taskKey;
+}
+
 async function resolveTaskChecklistPath(taskKey: string): Promise<string | null> {
   const direct = path.join(repoRoot, 'tasks', `tasks-${taskKey}.md`);
   if (await pathExists(direct)) {
@@ -249,6 +269,59 @@ async function buildTaskContext(taskKey: string): Promise<string[]> {
   }
 
   return lines;
+}
+
+async function resolveActiveCloseoutBundleRoots(taskKey: string | null | undefined): Promise<string[]> {
+  const canonicalTaskKey = await resolveCanonicalTaskKey(taskKey);
+  if (!canonicalTaskKey) {
+    return [];
+  }
+
+  const manualDir = path.join(repoRoot, 'out', canonicalTaskKey, 'manual');
+  if (!(await pathExists(manualDir))) {
+    return [];
+  }
+
+  let entries: string[] = [];
+  try {
+    entries = await readdir(manualDir);
+  } catch {
+    return [];
+  }
+
+  const closeoutDirs: string[] = [];
+  for (const entry of entries) {
+    if (!(entry === 'TODO-closeout' || entry.endsWith('-closeout'))) {
+      continue;
+    }
+    const absolute = path.join(manualDir, entry);
+    try {
+      if ((await stat(absolute)).isDirectory()) {
+        closeoutDirs.push(absolute);
+      }
+    } catch {
+      // ignore disappearing or unreadable entries
+    }
+  }
+  closeoutDirs.sort();
+
+  if (closeoutDirs.length === 0) {
+    return [];
+  }
+
+  const roots = new Set<string>();
+  const todoCloseout = closeoutDirs.find((entry) => path.basename(entry) === 'TODO-closeout');
+  if (todoCloseout) {
+    roots.add(todoCloseout);
+  }
+  const completedCloseouts = closeoutDirs.filter(
+    (entry) => path.basename(entry) !== 'TODO-closeout'
+  );
+  const latestCompletedCloseout = completedCloseouts.at(-1);
+  if (latestCompletedCloseout) {
+    roots.add(latestCompletedCloseout);
+  }
+  return [...roots];
 }
 
 function parseBooleanOptionValue(raw: string | boolean, label: string): boolean {
@@ -754,6 +827,8 @@ async function main(): Promise<void> {
     }
   }
   const autoIssueLogEnabled = options.autoIssueLog ?? false;
+  const activeCloseoutBundleRoots =
+    reviewSurface === 'diff' ? await resolveActiveCloseoutBundleRoots(taskKey) : [];
 
   const runReview = async (resolved: { command: string; args: string[] }) =>
     runCodexReview({
@@ -761,6 +836,7 @@ async function main(): Promise<void> {
       args: resolved.args,
       env: runtimeContext.env,
       stdio: nonInteractive ? ['ignore', 'pipe', 'pipe'] : ['inherit', 'pipe', 'pipe'],
+      activeCloseoutBundleRoots,
       blockHeavyCommands: enforceBoundedMode,
       allowValidationCommandIntents: allowHeavyCommands,
       timeoutMs,
@@ -1430,6 +1506,7 @@ interface RunCodexReviewOptions {
   args: string[];
   env: Record<string, string | undefined>;
   stdio: StdioOptions;
+  activeCloseoutBundleRoots?: string[];
   blockHeavyCommands: boolean;
   allowValidationCommandIntents: boolean;
   timeoutMs: number | null;
@@ -1526,6 +1603,7 @@ async function runCodexReview(
   const executionState = new ReviewExecutionState({
     blockHeavyCommands: options.blockHeavyCommands,
     allowValidationCommandIntents: options.allowValidationCommandIntents,
+    activeCloseoutBundleRoots: options.activeCloseoutBundleRoots,
     lowSignalTimeoutMs: options.lowSignalTimeoutMs,
     metaSurfaceTimeoutMs: options.metaSurfaceTimeoutMs,
     enforceStartupAnchorBoundary: options.enforceStartupAnchorBoundary,

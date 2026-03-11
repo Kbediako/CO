@@ -1915,6 +1915,123 @@ describe('ReviewExecutionState', () => {
     );
   });
 
+  it('classifies direct active closeout-bundle rereads as self-referential meta surfaces', () => {
+    const state = new ReviewExecutionState({
+      startedAtMs: 0,
+      blockHeavyCommands: false,
+      enforceStartupAnchorBoundary: true,
+      startupAnchorMode: 'diff',
+      activeCloseoutBundleRoots: ['/repo/out/sample-task/manual/TODO-closeout'],
+      repoRoot: '/repo',
+      touchedPaths: ['scripts/run-review.ts']
+    });
+
+    state.observeChunk('thinking\nexec\n', 'stdout', 100);
+    state.observeChunk(
+      `/bin/zsh -lc 'sed -n 1,120p out/sample-task/manual/TODO-closeout/09-review.log'\n`,
+      'stdout',
+      110
+    );
+    state.observeChunk('thinking\nexec\n', 'stdout', 200);
+    state.observeChunk(
+      `/bin/zsh -lc 'sed -n 1,120p /repo/out/sample-task/manual/TODO-closeout/13-override-notes.md'\n`,
+      'stdout',
+      210
+    );
+
+    const boundary = state.getStartupAnchorBoundaryState(2_000);
+    const summary = state.buildOutputSummary();
+    expect(boundary.triggered).toBe(true);
+    expect(boundary.anchorObserved).toBe(false);
+    expect(summary.metaSurfaceKinds).toContain('review-closeout-bundle');
+    expect(summary.preAnchorMetaSurfaceKinds).toEqual(['review-closeout-bundle']);
+  });
+
+  it('classifies repo-wide search results that surface the active closeout bundle', () => {
+    const state = new ReviewExecutionState({
+      startedAtMs: 0,
+      blockHeavyCommands: false,
+      enforceStartupAnchorBoundary: true,
+      startupAnchorMode: 'diff',
+      activeCloseoutBundleRoots: ['/repo/out/sample-task/manual/TODO-closeout'],
+      repoRoot: '/repo',
+      touchedPaths: ['scripts/run-review.ts']
+    });
+
+    state.observeChunk('thinking\nexec\n', 'stdout', 100);
+    state.observeChunk(`/bin/zsh -lc 'grep -R "shellProbeCount" -n .'\n`, 'stdout', 110);
+    state.observeChunk(
+      `out/sample-task/manual/TODO-closeout/09-review.log:278:shellProbeCount\n`,
+      'stdout',
+      120
+    );
+    state.observeChunk(
+      `/repo/out/sample-task/manual/TODO-closeout/13-override-notes.md:6:getShellProbeBoundaryState\n`,
+      'stdout',
+      130
+    );
+
+    const summary = state.buildOutputSummary();
+    expect(state.getStartupAnchorBoundaryState(2_000).triggered).toBe(false);
+    expect(summary.metaSurfaceSignals).toBe(2);
+    expect(summary.metaSurfaceKinds).toContain('review-closeout-bundle');
+    expect(summary.preAnchorMetaSurfaceKinds).toEqual([]);
+  });
+
+  it('classifies Windows-style search results that surface the active closeout bundle', () => {
+    const state = new ReviewExecutionState({
+      startedAtMs: 0,
+      blockHeavyCommands: false,
+      activeCloseoutBundleRoots: ['C:/repo/out/sample-task/manual/TODO-closeout'],
+      repoRoot: 'C:/repo',
+      touchedPaths: ['scripts/run-review.ts']
+    });
+
+    state.observeChunk('thinking\nexec\n', 'stdout', 100);
+    state.observeChunk(`/bin/zsh -lc 'rg -n "shellProbeCount" .'\n`, 'stdout', 110);
+    state.observeChunk(
+      `C:/repo/out/sample-task/manual/TODO-closeout/09-review.log:278:shellProbeCount\n`,
+      'stdout',
+      120
+    );
+
+    const summary = state.buildOutputSummary();
+    expect(summary.metaSurfaceSignals).toBe(1);
+    expect(summary.metaSurfaceKinds).toContain('review-closeout-bundle');
+  });
+
+  it('ignores historical closeout bundles outside the active root set', () => {
+    const state = new ReviewExecutionState({
+      startedAtMs: 0,
+      blockHeavyCommands: false,
+      enforceStartupAnchorBoundary: true,
+      startupAnchorMode: 'diff',
+      activeCloseoutBundleRoots: ['/repo/out/sample-task/manual/TODO-closeout'],
+      repoRoot: '/repo',
+      touchedPaths: ['scripts/run-review.ts']
+    });
+
+    state.observeChunk('thinking\nexec\n', 'stdout', 100);
+    state.observeChunk(`/bin/zsh -lc 'grep -R "shellProbeCount" -n .'\n`, 'stdout', 110);
+    state.observeChunk(
+      `out/sample-task/manual/20260310T235959Z-closeout/09-review.log:278:shellProbeCount\n`,
+      'stdout',
+      120
+    );
+    state.observeChunk(
+      `/repo/out/sample-task/manual/20260310T235959Z-closeout/13-override-notes.md:6:getShellProbeBoundaryState\n`,
+      'stdout',
+      130
+    );
+
+    const boundary = state.getStartupAnchorBoundaryState(2_000);
+    const summary = state.buildOutputSummary();
+    expect(boundary.triggered).toBe(false);
+    expect(summary.metaSurfaceSignals).toBe(0);
+    expect(summary.metaSurfaceKinds).toEqual([]);
+    expect(summary.preAnchorMetaSurfaceKinds).toEqual([]);
+  });
+
   it('ignores review-system surfaces that are part of the touched diff scope', () => {
     const state = new ReviewExecutionState({
       startedAtMs: 0,

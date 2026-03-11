@@ -38,6 +38,7 @@ const DEFAULT_REVIEW_OUTPUT_SUMMARY_HEAVY_COMMAND_LIMIT = 8;
 const DEFAULT_REVIEW_OUTPUT_SUMMARY_COMMAND_LIMIT = 64;
 const DEFAULT_LOW_SIGNAL_TIMEOUT_MS = 180_000;
 const DEFAULT_META_SURFACE_TIMEOUT_MS = 180_000;
+const REVIEW_ACTIVE_CLOSEOUT_BUNDLE_KIND = 'review-closeout-bundle';
 const STARTUP_ANCHOR_META_SURFACE_SIGNAL_BUDGET = 1;
 const STARTUP_ANCHOR_ALLOWED_META_SURFACE_KINDS = new Set(['review-support']);
 export const AUDIT_ALLOWED_META_SURFACE_KINDS = ['run-manifest', 'run-runner-log'] as const;
@@ -166,6 +167,7 @@ export interface ReviewShellProbeBoundaryState {
 export interface ReviewExecutionStateOptions {
   blockHeavyCommands?: boolean;
   allowValidationCommandIntents?: boolean;
+  activeCloseoutBundleRoots?: string[];
   startedAtMs?: number;
   previewLimit?: number;
   tailLineLimit?: number;
@@ -235,6 +237,7 @@ export class ReviewExecutionState {
   private readonly startedAtMs: number;
   private readonly blockHeavyCommands: boolean;
   private readonly allowValidationCommandIntents: boolean;
+  private readonly activeCloseoutBundleRoots: Set<string>;
   private readonly previewLimit: number;
   private readonly tailLineLimit: number;
   private readonly heavyCommandLimit: number;
@@ -313,6 +316,11 @@ export class ReviewExecutionState {
     this.repoRoot = normalizeScopeRoot(options.repoRoot);
     this.touchedPaths = new Set(
       (options.touchedPaths ?? []).map((entry) => normalizeScopePath(entry)).filter(Boolean)
+    );
+    this.activeCloseoutBundleRoots = new Set(
+      (options.activeCloseoutBundleRoots ?? [])
+        .map((entry) => normalizeActiveCloseoutBundleRoot(entry, this.repoRoot))
+        .filter((entry): entry is string => Boolean(entry))
     );
     this.startupAnchorMode = options.startupAnchorMode ?? null;
     this.auditStartupAnchorPaths = new Set(
@@ -556,6 +564,7 @@ export class ReviewExecutionState {
   private processLine(line: string, nowMs: number): void {
     this.lineCount += 1;
     const trimmed = line.trim();
+    let handledAsCommandLine = false;
 
     if (trimmed.length > 0) {
       this.lastLines.push(trimmed);
@@ -599,6 +608,7 @@ export class ReviewExecutionState {
           commandLine,
           this.touchedPaths,
           this.repoRoot,
+          this.activeCloseoutBundleRoots,
           {
             allowedMetaSurfacePaths: this.allowedMetaSurfacePaths,
             allowedMetaSurfaceEnvVars: this.allowedMetaSurfaceEnvVars,
@@ -627,12 +637,24 @@ export class ReviewExecutionState {
             this.blockedHeavyCommand = commandLine;
           }
         }
+        handledAsCommandLine = true;
         this.awaitingCommandLine = false;
       } else if (
         REVIEW_PROGRESS_SIGNAL_LINE_RE.test(trimmed) ||
         /\bsucceeded in\b|\bexited\b/i.test(trimmed)
       ) {
         this.awaitingCommandLine = false;
+      }
+    }
+
+    if (!handledAsCommandLine) {
+      const outputMetaSurfaceSample = classifyMetaSurfaceOutputLine(
+        trimmed,
+        this.activeCloseoutBundleRoots,
+        this.repoRoot
+      );
+      if (outputMetaSurfaceSample) {
+        this.recordMetaSurfaceSample(outputMetaSurfaceSample, nowMs);
       }
     }
 
@@ -670,6 +692,7 @@ export class ReviewExecutionState {
     }
     const startupBoundaryProgress = analyzeStartupAnchorBoundaryProgress(commandLine, {
       repoRoot: this.repoRoot,
+      activeCloseoutBundleRoots: this.activeCloseoutBundleRoots,
       touchedPaths: this.touchedPaths,
       scopeMode: this.startupAnchorScopeMode,
       startupAnchorMode: this.startupAnchorMode,
@@ -1646,6 +1669,7 @@ function classifyMetaSurfaceCommandLine(
   commandLine: string,
   touchedPaths: ReadonlySet<string>,
   repoRoot: string | null,
+  activeCloseoutBundleRoots: ReadonlySet<string>,
   allowedAuditMetaSurfaces: {
     allowedMetaSurfacePaths: ReadonlySet<string>;
     allowedMetaSurfaceEnvVars: ReadonlySet<string>;
@@ -1665,6 +1689,7 @@ function classifyMetaSurfaceCommandLine(
       segment,
       touchedPaths,
       repoRoot,
+      activeCloseoutBundleRoots,
       allowedAuditMetaSurfaces,
       shellEnvState
     );
@@ -1680,10 +1705,25 @@ function classifyMetaSurfaceCommandLine(
   return null;
 }
 
+function classifyMetaSurfaceOutputLine(
+  line: string,
+  activeCloseoutBundleRoots: ReadonlySet<string>,
+  repoRoot: string | null
+): string | null {
+  const normalized = line.replace(/\\/gu, '/');
+  const sourceFieldMatch = /^(.*):\d+(?::\d+)?(?:[: -]|$)/u.exec(normalized);
+  if (!sourceFieldMatch) {
+    return null;
+  }
+  const sourceField = sourceFieldMatch[1]?.trim() ?? '';
+  return classifyActiveCloseoutBundleCandidate(sourceField, activeCloseoutBundleRoots, repoRoot);
+}
+
 function analyzeStartupAnchorBoundaryProgress(
   commandLine: string,
   options: {
     repoRoot: string | null;
+    activeCloseoutBundleRoots: ReadonlySet<string>;
     touchedPaths: ReadonlySet<string>;
     scopeMode: ReviewScopeMode;
     startupAnchorMode: ReviewStartupAnchorMode | null;
@@ -1715,6 +1755,7 @@ function analyzeStartupAnchorBoundaryProgress(
       options.auditStartupAnchorEnvVars,
       options.auditStartupAnchorEnvVarPaths,
       options.repoRoot,
+      options.activeCloseoutBundleRoots,
       progress,
       shellEnvState
     );
@@ -1980,6 +2021,7 @@ function classifyMetaSurfaceSegment(
   segment: string,
   touchedPaths: ReadonlySet<string>,
   repoRoot: string | null,
+  activeCloseoutBundleRoots: ReadonlySet<string>,
   allowedAuditMetaSurfaces: {
     allowedMetaSurfacePaths: ReadonlySet<string>;
     allowedMetaSurfaceEnvVars: ReadonlySet<string>;
@@ -2020,6 +2062,7 @@ function classifyMetaSurfaceSegment(
           nestedSegment,
           touchedPaths,
           repoRoot,
+          activeCloseoutBundleRoots,
           allowedAuditMetaSurfaces,
           nestedShellEnvState,
           depth + 1,
@@ -2058,6 +2101,7 @@ function classifyMetaSurfaceSegment(
     args,
     touchedPaths,
     repoRoot,
+    activeCloseoutBundleRoots,
     envAssignments,
     allowedAuditMetaSurfaces.allowedMetaSurfaceEnvVarPaths,
     shellEnvState.blockedEnvVars,
@@ -2448,6 +2492,7 @@ function analyzeStartupAnchorBoundarySegment(
   auditStartupAnchorEnvVars: ReadonlySet<string>,
   auditStartupAnchorEnvVarPaths: ReadonlyMap<string, string>,
   repoRoot: string | null,
+  activeCloseoutBundleRoots: ReadonlySet<string>,
   progress: { anchorObserved: boolean; preAnchorMetaSurfaceSamples: string[] },
   shellEnvState: ReviewShellEnvState,
   depth = 0,
@@ -2492,6 +2537,7 @@ function analyzeStartupAnchorBoundarySegment(
           auditStartupAnchorEnvVars,
           auditStartupAnchorEnvVarPaths,
           repoRoot,
+          activeCloseoutBundleRoots,
           progress,
           nestedShellEnvState,
           depth + 1,
@@ -2514,6 +2560,7 @@ function analyzeStartupAnchorBoundarySegment(
     args,
     touchedPaths,
     repoRoot,
+    activeCloseoutBundleRoots,
     envAssignments,
     auditStartupAnchorEnvVarPaths,
     shellEnvState.blockedEnvVars
@@ -2643,9 +2690,16 @@ function classifyMetaSurfaceDirect(
   command: string,
   args: string[],
   touchedPaths: ReadonlySet<string>,
-  repoRoot: string | null
+  repoRoot: string | null,
+  activeCloseoutBundleRoots: ReadonlySet<string> = new Set()
 ): string[] {
-  return classifyMetaSurfaceDirectDetailed(command, args, touchedPaths, repoRoot).map((sample) => sample.kind);
+  return classifyMetaSurfaceDirectDetailed(
+    command,
+    args,
+    touchedPaths,
+    repoRoot,
+    activeCloseoutBundleRoots
+  ).map((sample) => sample.kind);
 }
 
 function classifyMetaSurfaceDirectDetailed(
@@ -2653,6 +2707,7 @@ function classifyMetaSurfaceDirectDetailed(
   args: string[],
   touchedPaths: ReadonlySet<string>,
   repoRoot: string | null,
+  activeCloseoutBundleRoots: ReadonlySet<string> = new Set(),
   envAssignments: ReadonlyMap<string, string> = new Map(),
   auditStartupAnchorEnvVarPaths: ReadonlyMap<string, string> = new Map(),
   blockedEnvVars: ReadonlySet<string> = new Set(),
@@ -2698,7 +2753,12 @@ function classifyMetaSurfaceDirectDetailed(
             repoRoot
           );
     for (const candidate of candidates) {
-      const operandKind = classifyMetaSurfaceOperand(candidate, touchedPaths, repoRoot);
+      const operandKind = classifyMetaSurfaceOperand(
+        candidate,
+        touchedPaths,
+        repoRoot,
+        activeCloseoutBundleRoots
+      );
       if (operandKind) {
         detailedSamples.push({ kind: operandKind, candidate, operand });
         break;
@@ -3013,7 +3073,8 @@ function shouldCollectMetaSurfacePositional(command: string, positionalIndex: nu
 function classifyMetaSurfaceOperand(
   operand: string,
   touchedPaths: ReadonlySet<string>,
-  repoRoot: string | null
+  repoRoot: string | null,
+  activeCloseoutBundleRoots: ReadonlySet<string> = new Set()
 ): string | null {
   const normalized = operand.trim().replace(/\\/gu, '/');
   if (!normalized) {
@@ -3024,6 +3085,14 @@ function classifyMetaSurfaceOperand(
   }
   if (isTouchedScopePath(normalized, touchedPaths, repoRoot)) {
     return null;
+  }
+  const activeCloseoutBundleKind = classifyActiveCloseoutBundleCandidate(
+    normalized,
+    activeCloseoutBundleRoots,
+    repoRoot
+  );
+  if (activeCloseoutBundleKind) {
+    return activeCloseoutBundleKind;
   }
   if (/^\$(?:\{)?MANIFEST(?:\})?$/iu.test(normalized)) {
     return 'run-manifest';
@@ -3087,6 +3156,15 @@ function normalizeScopeRoot(value: string | undefined): string | null {
   return normalized.length > 0 ? normalized : null;
 }
 
+function normalizeActiveCloseoutBundleRoot(value: string | undefined, repoRoot: string | null): string | null {
+  if (!value) {
+    return null;
+  }
+  const normalized = normalizeAuditStartupAnchorPath(value, repoRoot);
+  const repoRelativeRoot = normalized ? relativizeOperandToRepoRoot(normalized, repoRoot) : '';
+  return repoRelativeRoot.length > 0 ? repoRelativeRoot.replace(/\/+$/u, '') : null;
+}
+
 function matchesPathSuffix(value: string, relativePath: string): boolean {
   const normalizedRelativePath = normalizeScopePath(relativePath);
   return value === normalizedRelativePath || value.endsWith(`/${normalizedRelativePath}`);
@@ -3103,6 +3181,24 @@ function relativizeOperandToRepoRoot(operand: string, repoRoot: string | null): 
     return operand.slice(repoRoot.length + 1);
   }
   return operand;
+}
+
+function classifyActiveCloseoutBundleCandidate(
+  candidate: string,
+  activeCloseoutBundleRoots: ReadonlySet<string>,
+  repoRoot: string | null
+): string | null {
+  if (activeCloseoutBundleRoots.size === 0) {
+    return null;
+  }
+  const normalized = normalizeScopePath(candidate);
+  const repoRelativeOperand = relativizeOperandToRepoRoot(normalized, repoRoot);
+  for (const root of activeCloseoutBundleRoots) {
+    if (repoRelativeOperand === root || repoRelativeOperand.startsWith(`${root}/`)) {
+      return REVIEW_ACTIVE_CLOSEOUT_BUNDLE_KIND;
+    }
+  }
+  return null;
 }
 
 function isTouchedScopePath(
