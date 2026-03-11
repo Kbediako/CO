@@ -3,6 +3,55 @@
   "generated_at": "2026-03-11",
   "entries": [
     {
+      "path": ".agent/task/1113-coordinator-symphony-aligned-standalone-review-untouched-helper-classification-parity.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-11",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-standalone-review-untouched-helper-classification-parity.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-11",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/PRD-coordinator-symphony-aligned-standalone-review-untouched-helper-classification-parity.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-11",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/TECH_SPEC-coordinator-symphony-aligned-standalone-review-untouched-helper-classification-parity.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-11",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/findings/1113-standalone-review-untouched-helper-classification-parity-deliberation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-11",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/specs/1113-coordinator-symphony-aligned-standalone-review-untouched-helper-classification-parity.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-11",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/tasks-1113-coordinator-symphony-aligned-standalone-review-untouched-helper-classification-parity.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-11",
+      "cadence_days": 30
+    },
+    {
       "path": ".agent/task/1112-coordinator-symphony-aligned-standalone-review-active-closeout-root-provenance-hint.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",

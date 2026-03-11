@@ -371,6 +371,21 @@ fi
       done
       while true; do sleep 1; done
     fi
+    if [[ "$mode" == "untouched-helper-review-support-drift" ]]; then
+      echo "thinking"
+      echo "exec"
+      echo "/bin/zsh -lc 'sed -n 1,120p scripts/run-review.ts' in /Users/kbediako/Code/CO"
+      for _ in $(seq 1 6); do
+        echo "thinking"
+        echo "exec"
+        echo "/bin/zsh -lc 'sed -n 1,120p dist/scripts/lib/review-scope-paths.js' in /Users/kbediako/Code/CO"
+        echo "thinking"
+        echo "exec"
+        echo "/bin/zsh -lc 'sed -n 1,120p tests/review-scope-paths.spec.ts' in /Users/kbediako/Code/CO"
+        sleep 0.05
+      done
+      while true; do sleep 1; done
+    fi
     if [[ "$mode" == "command-intent-validation" ]]; then
       while true; do
         echo "thinking"
@@ -2313,6 +2328,35 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
 
     expect(result.exitCode).toBeGreaterThan(0);
     expect(result.stderr).toContain('meta-surface expansion detected');
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('fails bounded diff review when untouched adjacent review-scope helpers keep expanding after the provenance hint', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    await makeCloseoutBundle(sandbox, 'sample-task');
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'untouched-helper-review-support-drift',
+      CODEX_REVIEW_META_SURFACE_TIMEOUT_SECONDS: '1',
+      CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0',
+      CODEX_REVIEW_TIMEOUT_SECONDS: '60'
+    });
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).toContain('meta-surface expansion detected');
+
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      summary: {
+        metaSurfaceSignals: number;
+        metaSurfaceKinds: string[];
+      };
+    };
+    expect(telemetry.status).toBe('failed');
+    expect(telemetry.summary.metaSurfaceSignals).toBeGreaterThanOrEqual(4);
+    expect(telemetry.summary.metaSurfaceKinds).toContain('review-support');
   }, LONG_WAIT_TEST_TIMEOUT_MS);
 
   it('keeps the meta-surface guard active for audit mode when unrelated meta surfaces persist', async () => {

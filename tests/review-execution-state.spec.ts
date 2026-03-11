@@ -1790,6 +1790,33 @@ describe('ReviewExecutionState', () => {
     expect(summary.preAnchorMetaSurfaceKinds).toEqual(['codex-memories']);
   });
 
+  it('treats review-scope sibling reads as valid startup anchors when the paired source is touched', () => {
+    const state = new ReviewExecutionState({
+      startedAtMs: 0,
+      blockHeavyCommands: false,
+      enforceStartupAnchorBoundary: true,
+      touchedPaths: ['scripts/lib/review-scope-paths.ts']
+    });
+
+    state.observeChunk('thinking\nexec\n', 'stdout', 100);
+    state.observeChunk(`/bin/zsh -lc 'sed -n 1,120p tests/review-scope-paths.spec.ts'\n`, 'stdout', 110);
+    state.observeChunk('thinking\nexec\n', 'stdout', 200);
+    state.observeChunk(
+      `/bin/zsh -lc 'sed -n 1,120p /Users/kbediako/.codex/memories/MEMORY.md'\n`,
+      'stdout',
+      210
+    );
+
+    const boundary = state.getStartupAnchorBoundaryState(220);
+    const summary = state.buildOutputSummary();
+    expect(boundary.triggered).toBe(false);
+    expect(boundary.anchorObserved).toBe(true);
+    expect(summary.startupAnchorObserved).toBe(true);
+    expect(summary.preAnchorCommandStarts).toBe(0);
+    expect(summary.preAnchorMetaSurfaceSignals).toBe(0);
+    expect(summary.preAnchorMetaSurfaceKinds).toEqual([]);
+  });
+
   it('classifies adjacent review-support test files as meta-surface activity', () => {
     const state = new ReviewExecutionState({
       startedAtMs: 0,
@@ -1809,6 +1836,113 @@ describe('ReviewExecutionState', () => {
     expect(expansion.triggered).toBe(false);
     expect(summary.metaSurfaceSignals).toBe(1);
     expect(summary.metaSurfaceKinds).toEqual(['review-support']);
+  });
+
+  it('classifies untouched adjacent review-scope helpers as meta-surface activity for standalone-review diffs', () => {
+    const state = new ReviewExecutionState({
+      startedAtMs: 0,
+      blockHeavyCommands: false,
+      metaSurfaceTimeoutMs: 1_000,
+      touchedPaths: ['scripts/run-review.ts']
+    });
+
+    state.observeChunk('thinking\nexec\n', 'stdout', 100);
+    state.observeChunk('thinking\nexec\n', 'stdout', 200);
+    state.observeChunk(
+      `/bin/zsh -lc 'sed -n 1,120p dist/scripts/lib/review-scope-paths.js'\n`,
+      'stdout',
+      210
+    );
+    state.observeChunk('thinking\nexec\n', 'stdout', 300);
+    state.observeChunk(
+      `/bin/zsh -lc 'sed -n 1,120p tests/review-scope-paths.spec.ts'\n`,
+      'stdout',
+      310
+    );
+
+    const expansion = state.getMetaSurfaceExpansionState(2_000);
+    const summary = state.buildOutputSummary();
+    expect(expansion.triggered).toBe(false);
+    expect(summary.metaSurfaceSignals).toBe(2);
+    expect(summary.metaSurfaceKinds).toEqual(['review-support']);
+  });
+
+  it('keeps shared docs-helpers reads in ordinary diff scope even for standalone-review diffs', () => {
+    const state = new ReviewExecutionState({
+      startedAtMs: 0,
+      blockHeavyCommands: false,
+      metaSurfaceTimeoutMs: 1_000,
+      touchedPaths: ['scripts/run-review.ts']
+    });
+
+    state.observeChunk('thinking\nexec\n', 'stdout', 100);
+    state.observeChunk(`/bin/zsh -lc 'sed -n 1,120p scripts/lib/docs-helpers.js'\n`, 'stdout', 110);
+    state.observeChunk('thinking\nexec\n', 'stdout', 200);
+    state.observeChunk(`/bin/zsh -lc 'sed -n 1,120p scripts/lib/docs-helpers.d.ts'\n`, 'stdout', 210);
+
+    const expansion = state.getMetaSurfaceExpansionState(2_000);
+    const summary = state.buildOutputSummary();
+    expect(expansion.triggered).toBe(false);
+    expect(summary.metaSurfaceSignals).toBe(0);
+    expect(summary.metaSurfaceKinds).toEqual([]);
+  });
+
+  it('keeps touched adjacent review-support helpers in ordinary diff scope', () => {
+    const state = new ReviewExecutionState({
+      startedAtMs: 0,
+      blockHeavyCommands: false,
+      metaSurfaceTimeoutMs: 1_000,
+      touchedPaths: ['scripts/lib/review-scope-paths.ts']
+    });
+
+    state.observeChunk('thinking\nexec\n', 'stdout', 100);
+    state.observeChunk(
+      `/bin/zsh -lc 'sed -n 1,120p dist/scripts/lib/review-scope-paths.js'\n`,
+      'stdout',
+      110
+    );
+
+    const expansion = state.getMetaSurfaceExpansionState(2_000);
+    const summary = state.buildOutputSummary();
+    expect(expansion.triggered).toBe(false);
+    expect(summary.metaSurfaceSignals).toBe(0);
+    expect(summary.metaSurfaceKinds).toEqual([]);
+  });
+
+  it('keeps review-scope helper tests in ordinary diff scope when the helper source is touched', () => {
+    const state = new ReviewExecutionState({
+      startedAtMs: 0,
+      blockHeavyCommands: false,
+      metaSurfaceTimeoutMs: 1_000,
+      touchedPaths: ['scripts/lib/review-scope-paths.ts']
+    });
+
+    state.observeChunk('thinking\nexec\n', 'stdout', 100);
+    state.observeChunk(`/bin/zsh -lc 'sed -n 1,120p tests/review-scope-paths.spec.ts'\n`, 'stdout', 110);
+
+    const expansion = state.getMetaSurfaceExpansionState(2_000);
+    const summary = state.buildOutputSummary();
+    expect(expansion.triggered).toBe(false);
+    expect(summary.metaSurfaceSignals).toBe(0);
+    expect(summary.metaSurfaceKinds).toEqual([]);
+  });
+
+  it('keeps touched review-scope helper tests and their paired source in ordinary diff scope', () => {
+    const state = new ReviewExecutionState({
+      startedAtMs: 0,
+      blockHeavyCommands: false,
+      metaSurfaceTimeoutMs: 1_000,
+      touchedPaths: ['tests/review-scope-paths.spec.ts']
+    });
+
+    state.observeChunk('thinking\nexec\n', 'stdout', 100);
+    state.observeChunk(`/bin/zsh -lc 'sed -n 1,120p dist/scripts/lib/review-scope-paths.js'\n`, 'stdout', 110);
+
+    const expansion = state.getMetaSurfaceExpansionState(2_000);
+    const summary = state.buildOutputSummary();
+    expect(expansion.triggered).toBe(false);
+    expect(summary.metaSurfaceSignals).toBe(0);
+    expect(summary.metaSurfaceKinds).toEqual([]);
   });
 
   it('evicts early meta-surface bursts once later normal commands dominate the recent window', () => {

@@ -2678,7 +2678,10 @@ function segmentDirectHasTouchedPathAnchor(
 ): boolean {
   for (const operand of extractMetaSurfaceOperands(command, args)) {
     for (const candidate of expandMetaSurfaceOperandCandidates(command, args, operand)) {
-      if (isTouchedScopePath(candidate, touchedPaths, repoRoot)) {
+      if (
+        isTouchedScopePath(candidate, touchedPaths, repoRoot) ||
+        isTouchedReviewScopePathFamilyOperand(candidate, touchedPaths, repoRoot)
+      ) {
         return true;
       }
     }
@@ -3083,7 +3086,10 @@ function classifyMetaSurfaceOperand(
   if (/^[A-Za-z_][A-Za-z0-9_]*=.*/u.test(normalized)) {
     return null;
   }
-  if (isTouchedScopePath(normalized, touchedPaths, repoRoot)) {
+  if (
+    isTouchedScopePath(normalized, touchedPaths, repoRoot) ||
+    isTouchedReviewScopePathFamilyOperand(normalized, touchedPaths, repoRoot)
+  ) {
     return null;
   }
   const activeCloseoutBundleKind = classifyActiveCloseoutBundleCandidate(
@@ -3123,9 +3129,12 @@ function classifyMetaSurfaceOperand(
     matchesPathSuffix(normalized, 'scripts/pack-smoke.js') ||
     matchesPathSuffix(normalized, 'scripts/lib/run-manifests.js') ||
     matchesPathSuffix(normalized, 'scripts/lib/run-manifests.d.ts') ||
+    matchesPathSuffix(normalized, 'scripts/lib/review-scope-paths.ts') ||
+    matchesPathSuffix(normalized, 'dist/scripts/lib/review-scope-paths.js') ||
     matchesPathSuffix(normalized, 'scripts/run-review.ts') ||
     matchesPathSuffix(normalized, 'scripts/run-review.js') ||
     matchesPathSuffix(normalized, 'scripts/lib/review-execution-state.ts') ||
+    matchesPathSuffix(normalized, 'tests/review-scope-paths.spec.ts') ||
     matchesPathSuffix(normalized, 'tests/run-review.spec.ts') ||
     matchesPathSuffix(normalized, 'tests/run-review.spec.js') ||
     matchesPathSuffix(normalized, 'tests/review-execution-state.spec.ts') ||
@@ -3208,15 +3217,31 @@ function isTouchedScopePath(
 ): boolean {
   const normalizedOperand = normalizeScopePath(operand);
   const repoRelativeOperand = relativizeOperandToRepoRoot(normalizedOperand, repoRoot);
+  const equivalentOperands = new Set<string>([repoRelativeOperand]);
   for (const touchedPath of touchedPaths) {
-    if (
-      repoRelativeOperand === touchedPath ||
-      repoRelativeOperand === normalizeScopePath(touchedPath)
-    ) {
+    if (equivalentOperands.has(normalizeScopePath(touchedPath))) {
       return true;
     }
   }
   return false;
+}
+
+function isTouchedReviewScopePathFamilyOperand(
+  operand: string,
+  touchedPaths: ReadonlySet<string>,
+  repoRoot: string | null = null
+): boolean {
+  const normalizedOperand = normalizeScopePath(operand);
+  const repoRelativeOperand = relativizeOperandToRepoRoot(normalizedOperand, repoRoot);
+  const reviewScopePathFamily = [
+    'scripts/lib/review-scope-paths.ts',
+    'dist/scripts/lib/review-scope-paths.js',
+    'tests/review-scope-paths.spec.ts'
+  ];
+  if (!reviewScopePathFamily.includes(repoRelativeOperand)) {
+    return false;
+  }
+  return reviewScopePathFamily.some((path) => isTouchedScopePath(path, touchedPaths, repoRoot));
 }
 
 function formatCommandIntentViolationLabel(kind: ReviewCommandIntentViolationKind): string {
