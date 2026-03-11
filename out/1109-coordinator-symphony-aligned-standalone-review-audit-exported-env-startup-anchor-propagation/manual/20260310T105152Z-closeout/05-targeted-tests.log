@@ -1,0 +1,10 @@
+
+ RUN  v1.6.1 /Users/kbediako/Code/CO
+
+ ✓ tests/review-execution-state.spec.ts  (68 tests) 30ms
+
+ Test Files  1 passed (1)
+      Tests  68 passed (68)
+   Start at  12:18:26
+   Duration  319ms (transform 73ms, setup 0ms, collect 73ms, tests 30ms, environment 0ms, prepare 80ms)
+

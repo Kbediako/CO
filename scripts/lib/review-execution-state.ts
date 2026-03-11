@@ -69,6 +69,7 @@ export type ReviewCommandIntentViolationKind =
 
 export type ReviewScopeMode = 'uncommitted' | 'base' | 'commit';
 export type ReviewStartupAnchorMode = 'diff' | 'audit';
+type ReviewShellDialect = 'bashlike' | 'zsh' | 'other';
 
 export interface ReviewOutputSummary {
   lineCount: number;
@@ -911,19 +912,26 @@ function normalizeReviewCommandLine(line: string): string {
   return trimmed;
 }
 
-function splitShellControlSegments(command: string): string[] {
+type ShellControlSeparator = ';' | '\n' | '&&' | '||' | '|' | '&' | null;
+
+type ShellControlSegment = {
+  segment: string;
+  separatorAfter: ShellControlSeparator;
+};
+
+function splitShellControlSegmentsDetailed(command: string): ShellControlSegment[] {
   if (!command.trim()) {
     return [];
   }
-  const segments: string[] = [];
+  const segments: ShellControlSegment[] = [];
   let current = '';
   let quote: '"' | "'" | '`' | null = null;
   let escaped = false;
 
-  const pushCurrent = () => {
+  const pushCurrent = (separatorAfter: ShellControlSeparator) => {
     const trimmed = current.trim();
     if (trimmed.length > 0) {
-      segments.push(trimmed);
+      segments.push({ segment: trimmed, separatorAfter });
     }
     current = '';
   };
@@ -959,35 +967,95 @@ function splitShellControlSegments(command: string): string[] {
     }
 
     if (char === ';' || char === '\n') {
-      pushCurrent();
+      pushCurrent(char);
       continue;
     }
 
     if (char === '&') {
       if (next === '&') {
-        pushCurrent();
+        pushCurrent('&&');
         index += 1;
         continue;
       }
-      pushCurrent();
+      pushCurrent('&');
       continue;
     }
 
     if (char === '|') {
       if (next === '|') {
-        pushCurrent();
+        pushCurrent('||');
         index += 1;
         continue;
       }
-      pushCurrent();
+      pushCurrent('|');
       continue;
     }
 
     current += char;
   }
 
-  pushCurrent();
+  pushCurrent(null);
   return segments;
+}
+
+function splitShellControlSegments(command: string): string[] {
+  return splitShellControlSegmentsDetailed(command).map((entry) => entry.segment);
+}
+
+function separatorCarriesParentShellStateForward(
+  separator: ShellControlSeparator
+): boolean {
+  return separator !== '|' && separator !== '&';
+}
+
+function inferStaticShellTruthiness(segment: string): boolean | null {
+  const rawTokens = tokenizeShellSegment(segment);
+  const strippedTokens = stripLeadingEnvAssignments(rawTokens);
+  if (strippedTokens.length === 0) {
+    return null;
+  }
+  const tokens = unwrapEnvCommandTokens(strippedTokens);
+  if (tokens.length === 0) {
+    return null;
+  }
+  const command = normalizeCommandToken(tokens[0] ?? '');
+  if (command === 'true' || command === ':' || command === 'export' || command === 'unset') {
+    return true;
+  }
+  if (command === 'false') {
+    return false;
+  }
+  return null;
+}
+
+function detectReviewShellDialect(tokens: string[]): ReviewShellDialect {
+  const command = normalizeCommandToken(tokens[0] ?? '');
+  if (command === 'zsh') {
+    return 'zsh';
+  }
+  if (command === 'bash' || command === 'sh' || command === 'ksh') {
+    return 'bashlike';
+  }
+  return 'other';
+}
+
+function segmentRunsInParentShell(
+  separatorBefore: ShellControlSeparator,
+  previousSegmentTruthiness: boolean | null
+): boolean {
+  if (separatorBefore === null || separatorBefore === ';' || separatorBefore === '\n' || separatorBefore === '&') {
+    return true;
+  }
+  if (separatorBefore === '|') {
+    return false;
+  }
+  if (separatorBefore === '&&') {
+    return previousSegmentTruthiness === true;
+  }
+  if (separatorBefore === '||') {
+    return previousSegmentTruthiness === false;
+  }
+  return false;
 }
 
 function tokenizeShellSegment(segment: string): string[] {
@@ -1411,18 +1479,29 @@ function classifyMetaSurfaceCommandLine(
   }
 ): string | null {
   const normalized = normalizeReviewCommandLine(commandLine).replace(/\\/gu, '/');
-  const segments = splitShellControlSegments(normalized);
-  for (const segment of segments) {
-    const kind = classifyMetaSurfaceSegment(
+  const segments = splitShellControlSegmentsDetailed(normalized);
+  let shellEnvState = createEmptyReviewShellEnvState(
+    allowedAuditMetaSurfaces.allowedMetaSurfaceEnvVarPaths
+  );
+  let separatorBefore: ShellControlSeparator = null;
+  let previousSegmentTruthiness: boolean | null = null;
+  for (const { segment, separatorAfter } of segments) {
+    const runsInParentShell = segmentRunsInParentShell(separatorBefore, previousSegmentTruthiness);
+    const result = classifyMetaSurfaceSegment(
       segment,
       touchedPaths,
       repoRoot,
       allowedAuditMetaSurfaces,
-      new Map()
+      shellEnvState
     );
-    if (kind) {
-      return kind;
+    if (runsInParentShell && separatorCarriesParentShellStateForward(separatorAfter)) {
+      shellEnvState = result.nextShellEnvState;
     }
+    if (result.kind) {
+      return result.kind;
+    }
+    previousSegmentTruthiness = inferStaticShellTruthiness(segment);
+    separatorBefore = separatorAfter;
   }
   return null;
 }
@@ -1440,16 +1519,20 @@ function analyzeStartupAnchorBoundaryProgress(
   }
 ): { anchorObserved: boolean; preAnchorMetaSurfaceSamples: string[] } {
   const normalized = normalizeReviewCommandLine(commandLine).replace(/\\/gu, '/');
-  const segments = splitShellControlSegments(normalized);
+  const segments = splitShellControlSegmentsDetailed(normalized);
   const progress = {
     anchorObserved: false,
     preAnchorMetaSurfaceSamples: [] as string[]
   };
-  for (const segment of segments) {
+  let shellEnvState = createEmptyReviewShellEnvState(options.auditStartupAnchorEnvVarPaths);
+  let separatorBefore: ShellControlSeparator = null;
+  let previousSegmentTruthiness: boolean | null = null;
+  for (const { segment, separatorAfter } of segments) {
     if (progress.anchorObserved) {
       break;
     }
-    analyzeStartupAnchorBoundarySegment(
+    const runsInParentShell = segmentRunsInParentShell(separatorBefore, previousSegmentTruthiness);
+    const nextShellEnvState = analyzeStartupAnchorBoundarySegment(
       segment,
       options.touchedPaths,
       options.scopeMode,
@@ -1458,10 +1541,265 @@ function analyzeStartupAnchorBoundaryProgress(
       options.auditStartupAnchorEnvVars,
       options.auditStartupAnchorEnvVarPaths,
       options.repoRoot,
-      progress
+      progress,
+      shellEnvState
     );
+    if (runsInParentShell && separatorCarriesParentShellStateForward(separatorAfter)) {
+      shellEnvState = nextShellEnvState;
+    }
+    previousSegmentTruthiness = inferStaticShellTruthiness(segment);
+    separatorBefore = separatorAfter;
   }
   return progress;
+}
+
+type ReviewShellEnvState = {
+  shellVars: Map<string, string>;
+  exportedVars: Set<string>;
+  blockedEnvVars: Set<string>;
+};
+
+function createEmptyReviewShellEnvState(
+  initialEnvVarPaths: ReadonlyMap<string, string> = new Map()
+): ReviewShellEnvState {
+  const shellVars = new Map<string, string>();
+  for (const [envVar, envPath] of initialEnvVarPaths.entries()) {
+    shellVars.set(envVar, envPath);
+  }
+  return {
+    shellVars,
+    exportedVars: new Set(shellVars.keys()),
+    blockedEnvVars: new Set()
+  };
+}
+
+function cloneReviewShellEnvState(shellEnvState: ReviewShellEnvState): ReviewShellEnvState {
+  return {
+    shellVars: new Map(shellEnvState.shellVars),
+    exportedVars: new Set(shellEnvState.exportedVars),
+    blockedEnvVars: new Set(shellEnvState.blockedEnvVars)
+  };
+}
+
+function buildBlockedEnvVarSet(
+  shellEnvState: ReviewShellEnvState,
+  rawTokens: string[]
+): Set<string> {
+  const blockedEnvVars = new Set(shellEnvState.blockedEnvVars);
+  for (const envVar of collectInlineEnvUnsetVars(rawTokens)) {
+    blockedEnvVars.add(envVar);
+  }
+  for (const envVar of collectInlineEnvAssignments(rawTokens).keys()) {
+    blockedEnvVars.delete(envVar);
+  }
+  return blockedEnvVars;
+}
+
+function collectLeadingShellAssignments(tokens: string[]): Map<string, string> {
+  const assignments = new Map<string, string>();
+  let index = 0;
+  while (index < tokens.length && /^[A-Za-z_][A-Za-z0-9_]*=.*/u.test(tokens[index] ?? '')) {
+    recordInlineEnvAssignment(assignments, tokens[index] ?? '');
+    index += 1;
+  }
+  return assignments;
+}
+
+function buildCommandEnvAssignments(
+  shellEnvState: ReviewShellEnvState,
+  rawTokens: string[]
+): Map<string, string> {
+  const envAssignments = commandUsesCleanEnvironment(rawTokens)
+    ? new Map<string, string>()
+    : mergeEnvAssignments(shellEnvState.shellVars, new Map());
+  for (const envVar of shellEnvState.blockedEnvVars) {
+    envAssignments.delete(envVar);
+  }
+  return mergeEnvAssignments(envAssignments, collectInlineEnvAssignments(rawTokens));
+}
+
+function buildNestedShellEnvState(
+  shellEnvState: ReviewShellEnvState,
+  rawTokens: string[]
+): ReviewShellEnvState {
+  const blockedEnvVars = buildBlockedEnvVarSet(shellEnvState, rawTokens);
+  const usesCleanEnvironment = commandUsesCleanEnvironment(rawTokens);
+  const shellVars = new Map<string, string>();
+  if (!usesCleanEnvironment) {
+    for (const envVar of shellEnvState.exportedVars) {
+      if (blockedEnvVars.has(envVar)) {
+        continue;
+      }
+      const value = shellEnvState.shellVars.get(envVar);
+      if (value !== undefined) {
+        shellVars.set(envVar, value);
+      }
+    }
+  }
+  for (const [key, value] of collectInlineEnvAssignments(rawTokens).entries()) {
+    shellVars.set(key, value);
+    blockedEnvVars.delete(key);
+  }
+  return {
+    shellVars,
+    exportedVars: new Set(shellVars.keys()),
+    blockedEnvVars
+  };
+}
+
+function updateReviewShellEnvStateForSegment(
+  shellEnvState: ReviewShellEnvState,
+  rawTokens: string[],
+  shellDialect: ReviewShellDialect = 'other'
+): ReviewShellEnvState {
+  const nextState = cloneReviewShellEnvState(shellEnvState);
+  const leadingAssignments = collectLeadingShellAssignments(rawTokens);
+  const strippedTokens = stripLeadingEnvAssignments(rawTokens);
+
+  if (strippedTokens.length === 0) {
+    for (const [key, value] of leadingAssignments.entries()) {
+      nextState.shellVars.set(key, value);
+      nextState.blockedEnvVars.delete(key);
+    }
+    return nextState;
+  }
+
+  const tokens = unwrapEnvCommandTokens(strippedTokens);
+  if (tokens.length === 0) {
+    return nextState;
+  }
+
+  const command = normalizeCommandToken(tokens[0] ?? '');
+  if (command === 'export') {
+    const exportTokens = tokens.slice(1);
+    const bashLikeUnexportMode = shellDialect === 'bashlike' && exportTokens.includes('-n');
+    if (shellDialect === 'bashlike' && !bashLikeUnexportMode) {
+      applyBashLikeLeadingBareExportAssignments(nextState, exportTokens, leadingAssignments);
+    }
+    applyExportTokensToReviewShellEnvState(
+      nextState,
+      exportTokens,
+      leadingAssignments,
+      shellDialect
+    );
+    return nextState;
+  }
+
+  if (command === 'unset') {
+    applyUnsetTokensToReviewShellEnvState(nextState, tokens.slice(1));
+    return nextState;
+  }
+
+  return nextState;
+}
+
+function applyBashLikeLeadingBareExportAssignments(
+  shellEnvState: ReviewShellEnvState,
+  tokens: string[],
+  leadingAssignments: ReadonlyMap<string, string>
+): void {
+  if (leadingAssignments.size === 0) {
+    return;
+  }
+
+  const bareExportTargets = new Set<string>();
+  for (const token of tokens) {
+    if (!token || token.startsWith('-') || /^[A-Za-z_][A-Za-z0-9_]*=.*/u.test(token)) {
+      continue;
+    }
+    const normalized = token.trim().replace(/^\$/u, '').replace(/[{}]/gu, '').toUpperCase();
+    if (normalized) {
+      bareExportTargets.add(normalized);
+    }
+  }
+
+  for (const [key, value] of leadingAssignments.entries()) {
+    if (!bareExportTargets.has(key)) {
+      continue;
+    }
+    shellEnvState.shellVars.set(key, value);
+    shellEnvState.exportedVars.add(key);
+    shellEnvState.blockedEnvVars.delete(key);
+  }
+}
+
+function applyExportTokensToReviewShellEnvState(
+  shellEnvState: ReviewShellEnvState,
+  tokens: string[],
+  leadingAssignments: ReadonlyMap<string, string> = new Map(),
+  shellDialect: ReviewShellDialect = 'other'
+): void {
+  let bashLikeExportMode: 'export' | 'unexport' = 'export';
+  for (const token of tokens) {
+    if (!token) {
+      continue;
+    }
+    if (shellDialect === 'bashlike' && token === '-n') {
+      bashLikeExportMode = 'unexport';
+      continue;
+    }
+    if (token === '--') {
+      continue;
+    }
+    if (/^[A-Za-z_][A-Za-z0-9_]*=.*/u.test(token)) {
+      if (bashLikeExportMode === 'unexport') {
+        continue;
+      }
+      const assignments = new Map<string, string>();
+      recordInlineEnvAssignment(assignments, token);
+      for (const [key, value] of assignments.entries()) {
+        let resolvedValue = value;
+        const normalizedInlineEnvVar = normalizeAuditMetaSurfaceEnvVar(value);
+        if (normalizedInlineEnvVar) {
+          const expansionEnv = new Map(shellEnvState.shellVars);
+          for (const [leadingKey, leadingValue] of leadingAssignments.entries()) {
+            if (leadingKey !== key) {
+              expansionEnv.set(leadingKey, leadingValue);
+            }
+          }
+          const currentValue = expansionEnv.get(normalizedInlineEnvVar);
+          resolvedValue = currentValue ?? '';
+        }
+        shellEnvState.shellVars.set(key, resolvedValue);
+        shellEnvState.exportedVars.add(key);
+        shellEnvState.blockedEnvVars.delete(key);
+      }
+      continue;
+    }
+    if (token.startsWith('-')) {
+      continue;
+    }
+    const normalized = token.trim().replace(/^\$/u, '').replace(/[{}]/gu, '').toUpperCase();
+    if (!normalized) {
+      continue;
+    }
+    if (bashLikeExportMode === 'unexport') {
+      shellEnvState.exportedVars.delete(normalized);
+      continue;
+    }
+    if (shellEnvState.shellVars.has(normalized)) {
+      shellEnvState.exportedVars.add(normalized);
+      shellEnvState.blockedEnvVars.delete(normalized);
+    }
+  }
+}
+
+function applyUnsetTokensToReviewShellEnvState(
+  shellEnvState: ReviewShellEnvState,
+  tokens: string[]
+): void {
+  for (const token of tokens) {
+    if (!token || token.startsWith('-')) {
+      continue;
+    }
+    const normalized = token.trim().replace(/^\$/u, '').replace(/[{}]/gu, '').toUpperCase();
+    if (!normalized) {
+      continue;
+    }
+    shellEnvState.shellVars.delete(normalized);
+    shellEnvState.exportedVars.delete(normalized);
+    shellEnvState.blockedEnvVars.add(normalized);
+  }
 }
 
 function classifyMetaSurfaceSegment(
@@ -1473,57 +1811,73 @@ function classifyMetaSurfaceSegment(
     allowedMetaSurfaceEnvVars: ReadonlySet<string>;
     allowedMetaSurfaceEnvVarPaths: ReadonlyMap<string, string>;
   },
-  inheritedEnvAssignments: ReadonlyMap<string, string>,
-  depth = 0
-): string | null {
+  shellEnvState: ReviewShellEnvState,
+  depth = 0,
+  shellDialect: ReviewShellDialect = 'other'
+) : { kind: string | null; nextShellEnvState: ReviewShellEnvState } {
   const rawTokens = tokenizeShellSegment(segment);
-  const envAssignments = mergeEnvAssignments(
-    inheritedEnvAssignments,
-    collectInlineEnvAssignments(rawTokens)
+  const envAssignments = buildCommandEnvAssignments(shellEnvState, rawTokens);
+  const nextShellEnvState = updateReviewShellEnvStateForSegment(
+    shellEnvState,
+    rawTokens,
+    shellDialect
   );
   const strippedTokens = stripLeadingEnvAssignments(rawTokens);
   if (strippedTokens.length === 0) {
-    return null;
+    return { kind: null, nextShellEnvState };
   }
 
   const tokens = unwrapEnvCommandTokens(strippedTokens);
   if (tokens.length === 0) {
-    return null;
+    return { kind: null, nextShellEnvState };
   }
 
   if (depth < 3) {
     const payload = extractShellCommandPayload(tokens);
     if (payload) {
-      const nestedSegments = splitShellControlSegments(payload);
-      for (const nestedSegment of nestedSegments) {
-        const nestedKind = classifyMetaSurfaceSegment(
+      const nestedShellDialect = detectReviewShellDialect(tokens);
+      const nestedSegments = splitShellControlSegmentsDetailed(payload);
+      let nestedShellEnvState = buildNestedShellEnvState(shellEnvState, rawTokens);
+      let separatorBefore: ShellControlSeparator = null;
+      let previousSegmentTruthiness: boolean | null = null;
+      for (const { segment: nestedSegment, separatorAfter } of nestedSegments) {
+        const runsInParentShell = segmentRunsInParentShell(separatorBefore, previousSegmentTruthiness);
+        const nestedResult = classifyMetaSurfaceSegment(
           nestedSegment,
           touchedPaths,
           repoRoot,
           allowedAuditMetaSurfaces,
-          envAssignments,
-          depth + 1
+          nestedShellEnvState,
+          depth + 1,
+          nestedShellDialect
         );
-        if (nestedKind) {
-          return nestedKind;
+        if (runsInParentShell && separatorCarriesParentShellStateForward(separatorAfter)) {
+          nestedShellEnvState = nestedResult.nextShellEnvState;
         }
+        if (nestedResult.kind) {
+          return { kind: nestedResult.kind, nextShellEnvState };
+        }
+        previousSegmentTruthiness = inferStaticShellTruthiness(nestedSegment);
+        separatorBefore = separatorAfter;
       }
       const rebindingKind = detectAuditEnvRebindingMetaSurface(
         payload,
-        envAssignments,
-        allowedAuditMetaSurfaces.allowedMetaSurfaceEnvVarPaths
+        nestedShellEnvState.shellVars,
+        allowedAuditMetaSurfaces.allowedMetaSurfaceEnvVarPaths,
+        repoRoot
       );
       if (rebindingKind) {
-        return rebindingKind;
+        return { kind: rebindingKind, nextShellEnvState };
       }
-      return null;
+      return { kind: null, nextShellEnvState };
     }
   }
 
   const command = normalizeCommandToken(tokens[0] ?? '');
   const args = tokens.slice(1);
+  const inlineAssignedEnvVars = new Set(collectInlineEnvAssignments(rawTokens).keys());
   if (isReviewOrchestrationCommand(command, args)) {
-    return 'review-orchestration';
+    return { kind: 'review-orchestration', nextShellEnvState };
   }
   const metaSurfaceSamples = classifyMetaSurfaceDirectDetailed(
     command,
@@ -1531,14 +1885,16 @@ function classifyMetaSurfaceSegment(
     touchedPaths,
     repoRoot,
     envAssignments,
-    allowedAuditMetaSurfaces.allowedMetaSurfaceEnvVarPaths
+    allowedAuditMetaSurfaces.allowedMetaSurfaceEnvVarPaths,
+    shellEnvState.blockedEnvVars,
+    inlineAssignedEnvVars
   );
   for (const sample of metaSurfaceSamples) {
     if (!isAllowedAuditMetaSurfaceSample(sample, allowedAuditMetaSurfaces, repoRoot)) {
-      return sample.kind;
+      return { kind: sample.kind, nextShellEnvState };
     }
   }
-  return null;
+  return { kind: null, nextShellEnvState };
 }
 
 function isDiffScopeAnchorCommand(
@@ -1603,17 +1959,23 @@ function expandMetaSurfaceOperandCandidates(
   operand: string,
   envAssignments: ReadonlyMap<string, string> = new Map(),
   auditStartupAnchorEnvVarPaths: ReadonlyMap<string, string> = new Map(),
+  blockedEnvVars: ReadonlySet<string> = new Set(),
   repoRoot: string | null = null
 ): string[] {
   const candidates: string[] = [];
+  const normalizedEnvVar = normalizeAuditMetaSurfaceEnvVar(operand);
   const resolvedEnvPath = resolveAuditMetaSurfaceEnvOperandPath(
     operand,
     envAssignments,
     auditStartupAnchorEnvVarPaths,
+    blockedEnvVars,
     repoRoot
   );
   if (resolvedEnvPath) {
     candidates.push(resolvedEnvPath);
+  }
+  if (normalizedEnvVar && blockedEnvVars.has(normalizedEnvVar)) {
+    return candidates;
   }
   candidates.push(operand);
   const gitRevisionPathCandidate = extractGitRevisionPathCandidate(command, args, operand);
@@ -1665,6 +2027,101 @@ function collectInlineEnvAssignments(tokens: string[]): Map<string, string> {
   return assignments;
 }
 
+function commandUsesCleanEnvironment(tokens: string[]): boolean {
+  let index = 0;
+  while (index < tokens.length && /^[A-Za-z_][A-Za-z0-9_]*=.*/u.test(tokens[index] ?? '')) {
+    index += 1;
+  }
+
+  if (normalizeCommandToken(tokens[index] ?? '') !== 'env') {
+    return false;
+  }
+
+  index += 1;
+  while (index < tokens.length) {
+    const token = tokens[index] ?? '';
+    const normalized = token.toLowerCase();
+    if (token === '--') {
+      return false;
+    }
+    if (/^[A-Za-z_][A-Za-z0-9_]*=.*/u.test(token)) {
+      index += 1;
+      continue;
+    }
+    if (normalized === '-i' || normalized === '--ignore-environment') {
+      return true;
+    }
+    if ((normalized === '-u' || normalized === '--unset') && index + 1 < tokens.length) {
+      index += 2;
+      continue;
+    }
+    if (normalized.startsWith('--unset=')) {
+      index += 1;
+      continue;
+    }
+    if (token.startsWith('-')) {
+      index += 1;
+      continue;
+    }
+    return false;
+  }
+
+  return false;
+}
+
+function collectInlineEnvUnsetVars(tokens: string[]): Set<string> {
+  const unsetVars = new Set<string>();
+  let index = 0;
+  while (index < tokens.length && /^[A-Za-z_][A-Za-z0-9_]*=.*/u.test(tokens[index] ?? '')) {
+    index += 1;
+  }
+
+  if (normalizeCommandToken(tokens[index] ?? '') !== 'env') {
+    return unsetVars;
+  }
+
+  index += 1;
+  while (index < tokens.length) {
+    const token = tokens[index] ?? '';
+    const normalized = token.toLowerCase();
+    if (token === '--') {
+      index += 1;
+      break;
+    }
+    if (/^[A-Za-z_][A-Za-z0-9_]*=.*/u.test(token)) {
+      index += 1;
+      continue;
+    }
+    if ((normalized === '-u' || normalized === '--unset') && index + 1 < tokens.length) {
+      const envVar = tokens[index + 1]?.trim().replace(/^\$/u, '').replace(/[{}]/gu, '').toUpperCase();
+      if (envVar) {
+        unsetVars.add(envVar);
+      }
+      index += 2;
+      continue;
+    }
+    if (normalized.startsWith('--unset=')) {
+      const envVar = normalized
+        .slice('--unset='.length)
+        .trim()
+        .replace(/^\$/u, '')
+        .replace(/[{}]/gu, '')
+        .toUpperCase();
+      if (envVar) {
+        unsetVars.add(envVar);
+      }
+      index += 1;
+      continue;
+    }
+    if (token.startsWith('-')) {
+      index += 1;
+      continue;
+    }
+    break;
+  }
+  return unsetVars;
+}
+
 function recordInlineEnvAssignment(assignments: Map<string, string>, token: string): void {
   const separatorIndex = token.indexOf('=');
   if (separatorIndex <= 0) {
@@ -1682,15 +2139,23 @@ function resolveAuditMetaSurfaceEnvOperandPath(
   operand: string,
   envAssignments: ReadonlyMap<string, string>,
   auditStartupAnchorEnvVarPaths: ReadonlyMap<string, string>,
+  blockedEnvVars: ReadonlySet<string>,
   repoRoot: string | null
 ): string | null {
   const normalizedEnvVar = normalizeAuditMetaSurfaceEnvVar(operand);
   if (!normalizedEnvVar) {
     return null;
   }
+  if (blockedEnvVars.has(normalizedEnvVar)) {
+    return null;
+  }
   const inlineValue = envAssignments.get(normalizedEnvVar);
-  if (inlineValue) {
-    return normalizeAuditStartupAnchorPath(inlineValue, repoRoot);
+  if (inlineValue !== undefined) {
+    const normalizedInlinePath = normalizeAuditStartupAnchorPath(inlineValue, repoRoot);
+    if (normalizedInlinePath) {
+      return normalizedInlinePath;
+    }
+    return null;
   }
   return auditStartupAnchorEnvVarPaths.get(normalizedEnvVar) ?? null;
 }
@@ -1709,11 +2174,15 @@ function mergeEnvAssignments(
 function detectAuditEnvRebindingMetaSurface(
   payload: string,
   envAssignments: ReadonlyMap<string, string>,
-  auditStartupAnchorEnvVarPaths: ReadonlyMap<string, string>
+  auditStartupAnchorEnvVarPaths: ReadonlyMap<string, string>,
+  repoRoot: string | null
 ): 'run-manifest' | 'run-runner-log' | null {
   for (const [envVar, activePath] of auditStartupAnchorEnvVarPaths.entries()) {
     const reboundPath = envAssignments.get(envVar);
-    if (!reboundPath || reboundPath === activePath) {
+    const normalizedReboundPath = reboundPath
+      ? normalizeAuditStartupAnchorPath(reboundPath, repoRoot)
+      : null;
+    if (!normalizedReboundPath || normalizedReboundPath === activePath) {
       continue;
     }
     if (!new RegExp(`\\$(?:\\{)?${envVar}(?:\\})?\\b`, 'u').test(payload)) {
@@ -1806,33 +2275,41 @@ function analyzeStartupAnchorBoundarySegment(
   auditStartupAnchorEnvVarPaths: ReadonlyMap<string, string>,
   repoRoot: string | null,
   progress: { anchorObserved: boolean; preAnchorMetaSurfaceSamples: string[] },
-  inheritedEnvAssignments: ReadonlyMap<string, string> = new Map(),
-  depth = 0
-): void {
+  shellEnvState: ReviewShellEnvState,
+  depth = 0,
+  shellDialect: ReviewShellDialect = 'other'
+) : ReviewShellEnvState {
   const rawTokens = tokenizeShellSegment(segment);
-  const envAssignments = mergeEnvAssignments(
-    inheritedEnvAssignments,
-    collectInlineEnvAssignments(rawTokens)
+  const envAssignments = buildCommandEnvAssignments(shellEnvState, rawTokens);
+  const nextShellEnvState = updateReviewShellEnvStateForSegment(
+    shellEnvState,
+    rawTokens,
+    shellDialect
   );
   const strippedTokens = stripLeadingEnvAssignments(rawTokens);
   if (strippedTokens.length === 0) {
-    return;
+    return nextShellEnvState;
   }
 
   const tokens = unwrapEnvCommandTokens(strippedTokens);
   if (tokens.length === 0) {
-    return;
+    return nextShellEnvState;
   }
 
   if (depth < 3) {
     const payload = extractShellCommandPayload(tokens);
     if (payload) {
-      const nestedSegments = splitShellControlSegments(payload);
-      for (const nestedSegment of nestedSegments) {
+      const nestedShellDialect = detectReviewShellDialect(tokens);
+      const nestedSegments = splitShellControlSegmentsDetailed(payload);
+      let nestedShellEnvState = buildNestedShellEnvState(shellEnvState, rawTokens);
+      let separatorBefore: ShellControlSeparator = null;
+      let previousSegmentTruthiness: boolean | null = null;
+      for (const { segment: nestedSegment, separatorAfter } of nestedSegments) {
         if (progress.anchorObserved) {
-          return;
+          return nextShellEnvState;
         }
-        analyzeStartupAnchorBoundarySegment(
+        const runsInParentShell = segmentRunsInParentShell(separatorBefore, previousSegmentTruthiness);
+        const nextNestedShellEnvState = analyzeStartupAnchorBoundarySegment(
           nestedSegment,
           touchedPaths,
           scopeMode,
@@ -1842,19 +2319,17 @@ function analyzeStartupAnchorBoundarySegment(
           auditStartupAnchorEnvVarPaths,
           repoRoot,
           progress,
-          envAssignments,
-          depth + 1
+          nestedShellEnvState,
+          depth + 1,
+          nestedShellDialect
         );
+        if (runsInParentShell && separatorCarriesParentShellStateForward(separatorAfter)) {
+          nestedShellEnvState = nextNestedShellEnvState;
+        }
+        previousSegmentTruthiness = inferStaticShellTruthiness(nestedSegment);
+        separatorBefore = separatorAfter;
       }
-      const rebindingKind = detectAuditEnvRebindingMetaSurface(
-        payload,
-        envAssignments,
-        auditStartupAnchorEnvVarPaths
-      );
-      if (rebindingKind && !progress.anchorObserved) {
-        progress.preAnchorMetaSurfaceSamples.push(rebindingKind);
-      }
-      return;
+      return nextShellEnvState;
     }
   }
 
@@ -1866,8 +2341,18 @@ function analyzeStartupAnchorBoundarySegment(
     touchedPaths,
     repoRoot,
     envAssignments,
-    auditStartupAnchorEnvVarPaths
+    auditStartupAnchorEnvVarPaths,
+    shellEnvState.blockedEnvVars
   );
+  const directRebindingKind =
+    startupAnchorMode === 'audit'
+      ? detectAuditEnvRebindingMetaSurface(
+          segment,
+          envAssignments,
+          auditStartupAnchorEnvVarPaths,
+          repoRoot
+        )
+      : null;
   const auditStartupAnchorObserved =
     startupAnchorMode === 'audit' &&
     segmentMatchesAuditStartupAnchorPath(
@@ -1876,6 +2361,7 @@ function analyzeStartupAnchorBoundarySegment(
       envAssignments,
       auditStartupAnchorPaths,
       auditStartupAnchorEnvVarPaths,
+      shellEnvState.blockedEnvVars,
       repoRoot
     );
   if (!progress.anchorObserved) {
@@ -1896,6 +2382,9 @@ function analyzeStartupAnchorBoundarySegment(
           )
       )
       .map((sample) => sample.kind);
+    if (directRebindingKind && !preAnchorSamples.includes(directRebindingKind)) {
+      preAnchorSamples.push(directRebindingKind);
+    }
     progress.preAnchorMetaSurfaceSamples.push(...preAnchorSamples);
   }
   const startupAnchorObserved =
@@ -1906,6 +2395,7 @@ function analyzeStartupAnchorBoundarySegment(
   if (startupAnchorObserved) {
     progress.anchorObserved = true;
   }
+  return nextShellEnvState;
 }
 
 function segmentMatchesAuditStartupAnchorPath(
@@ -1914,6 +2404,7 @@ function segmentMatchesAuditStartupAnchorPath(
   envAssignments: ReadonlyMap<string, string>,
   auditStartupAnchorPaths: ReadonlySet<string>,
   auditStartupAnchorEnvVarPaths: ReadonlyMap<string, string>,
+  blockedEnvVars: ReadonlySet<string>,
   repoRoot: string | null
 ): boolean {
   if (auditStartupAnchorPaths.size === 0) {
@@ -1926,6 +2417,7 @@ function segmentMatchesAuditStartupAnchorPath(
       operand,
       envAssignments,
       auditStartupAnchorEnvVarPaths,
+      blockedEnvVars,
       repoRoot
     )) {
       const normalizedOperand = normalizeAuditStartupAnchorPath(candidate, repoRoot);
@@ -1988,18 +2480,50 @@ function classifyMetaSurfaceDirectDetailed(
   touchedPaths: ReadonlySet<string>,
   repoRoot: string | null,
   envAssignments: ReadonlyMap<string, string> = new Map(),
-  auditStartupAnchorEnvVarPaths: ReadonlyMap<string, string> = new Map()
+  auditStartupAnchorEnvVarPaths: ReadonlyMap<string, string> = new Map(),
+  blockedEnvVars: ReadonlySet<string> = new Set(),
+  inlineAssignedEnvVars: ReadonlySet<string> = new Set()
 ): Array<{ kind: string; candidate: string; operand: string }> {
   const detailedSamples: Array<{ kind: string; candidate: string; operand: string }> = [];
   for (const operand of extractMetaSurfaceOperands(command, args)) {
-    for (const candidate of expandMetaSurfaceOperandCandidates(
-      command,
-      args,
+    const resolvedEnvPath = resolveAuditMetaSurfaceEnvOperandPath(
       operand,
       envAssignments,
       auditStartupAnchorEnvVarPaths,
+      blockedEnvVars,
       repoRoot
-    )) {
+    );
+    const normalizedEnvVar = normalizeAuditMetaSurfaceEnvVar(operand);
+    if (resolvedEnvPath && normalizedEnvVar) {
+      const allowedAuditEnvPath = auditStartupAnchorEnvVarPaths.get(normalizedEnvVar) ?? null;
+      if (normalizedEnvVar === 'MANIFEST') {
+        if (allowedAuditEnvPath && resolvedEnvPath === allowedAuditEnvPath) {
+          detailedSamples.push({ kind: 'run-manifest', candidate: resolvedEnvPath, operand });
+          continue;
+        }
+      }
+      if (normalizedEnvVar === 'RUNNER_LOG' || normalizedEnvVar === 'RUN_LOG') {
+        if (allowedAuditEnvPath && resolvedEnvPath === allowedAuditEnvPath) {
+          detailedSamples.push({ kind: 'run-runner-log', candidate: resolvedEnvPath, operand });
+          continue;
+        }
+      }
+    }
+    const candidates =
+      resolvedEnvPath &&
+      normalizedEnvVar &&
+      !inlineAssignedEnvVars.has(normalizedEnvVar)
+        ? [resolvedEnvPath]
+        : expandMetaSurfaceOperandCandidates(
+            command,
+            args,
+            operand,
+            envAssignments,
+            auditStartupAnchorEnvVarPaths,
+            blockedEnvVars,
+            repoRoot
+          );
+    for (const candidate of candidates) {
       const operandKind = classifyMetaSurfaceOperand(candidate, touchedPaths, repoRoot);
       if (operandKind) {
         detailedSamples.push({ kind: operandKind, candidate, operand });
@@ -2319,6 +2843,9 @@ function classifyMetaSurfaceOperand(
 ): string | null {
   const normalized = operand.trim().replace(/\\/gu, '/');
   if (!normalized) {
+    return null;
+  }
+  if (/^[A-Za-z_][A-Za-z0-9_]*=.*/u.test(normalized)) {
     return null;
   }
   if (isTouchedScopePath(normalized, touchedPaths, repoRoot)) {

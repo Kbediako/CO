@@ -230,6 +230,51 @@ fi
       echo "/bin/zsh -lc 'sed -n 1,120p /Users/kbediako/.codex/memories/MEMORY.md' in /Users/kbediako/Code/CO"
       exit 0
     fi
+    if [[ "$mode" == "audit-exported-manifest-anchor" ]]; then
+      echo "thinking"
+      echo "exec"
+      echo "/bin/zsh -lc 'export MANIFEST=\$MANIFEST; sed -n 1,80p \"\$MANIFEST\"' in /Users/kbediako/Code/CO"
+      echo "thinking"
+      echo "exec"
+      echo "/bin/zsh -lc 'sed -n 1,120p /Users/kbediako/.codex/memories/MEMORY.md' in /Users/kbediako/Code/CO"
+      exit 0
+    fi
+    if [[ "$mode" == "audit-leading-assignment-export" ]]; then
+      echo "thinking"
+      echo "exec"
+      echo "/bin/zsh -lc 'MANIFEST=/tmp/other.json export MANIFEST; sed -n 1,80p \"\$MANIFEST\"' in /Users/kbediako/Code/CO"
+      echo "thinking"
+      echo "exec"
+      echo "/bin/zsh -lc 'sed -n 1,120p /Users/kbediako/.codex/memories/MEMORY.md' in /Users/kbediako/Code/CO"
+      exit 0
+    fi
+    if [[ "$mode" == "audit-pipeline-manifest-anchor" ]]; then
+      echo "thinking"
+      echo "exec"
+      echo "/bin/zsh -lc 'export MANIFEST=/tmp/other.json | cat >/dev/null; sed -n 1,80p \"\$MANIFEST\"' in /Users/kbediako/Code/CO"
+      echo "thinking"
+      echo "exec"
+      echo "/bin/zsh -lc 'sed -n 1,120p /Users/kbediako/.codex/memories/MEMORY.md' in /Users/kbediako/Code/CO"
+      exit 0
+    fi
+    if [[ "$mode" == "audit-exported-run-log-alias-anchor" ]]; then
+      echo "thinking"
+      echo "exec"
+      echo "/bin/zsh -lc 'export RUN_LOG=\$RUNNER_LOG; tail -n 80 \"\$RUN_LOG\"' in /Users/kbediako/Code/CO"
+      echo "thinking"
+      echo "exec"
+      echo "/bin/zsh -lc 'sed -n 1,120p /Users/kbediako/.codex/memories/MEMORY.md' in /Users/kbediako/Code/CO"
+      exit 0
+    fi
+    if [[ "$mode" == "audit-env-unset-child-manifest-anchor" ]]; then
+      echo "thinking"
+      echo "exec"
+      echo "/bin/zsh -lc 'env -u MANIFEST sed -n 1,80p \"\$MANIFEST\"' in /Users/kbediako/Code/CO"
+      echo "thinking"
+      echo "exec"
+      echo "/bin/zsh -lc 'sed -n 1,120p /Users/kbediako/.codex/memories/MEMORY.md' in /Users/kbediako/Code/CO"
+      exit 0
+    fi
     if [[ "$mode" == "review-self-containment-drift" ]]; then
       while true; do
         echo "thinking"
@@ -2131,6 +2176,166 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
       {
         ...baseEnv(sandbox, codexBin),
         RUN_REVIEW_MODE: 'audit-explicit-manifest-anchor',
+        CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0',
+        CODEX_REVIEW_TIMEOUT_SECONDS: '60',
+        TASK: 'sample-task'
+      },
+      ['--surface', 'audit']
+    );
+
+    expect(result.exitCode).toBe(0);
+
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      summary: {
+        startupAnchorObserved: boolean;
+        preAnchorMetaSurfaceSignals: number;
+      };
+    };
+    expect(telemetry.status).toBe('succeeded');
+    expect(telemetry.summary.startupAnchorObserved).toBe(true);
+    expect(telemetry.summary.preAnchorMetaSurfaceSignals).toBe(0);
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('treats exported audit MANIFEST reads inside the review shell payload as valid startup anchors', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeDetachedManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+
+    const result = await runReviewCommand(
+      manifestPath,
+      {
+        ...baseEnv(sandbox, codexBin),
+        RUN_REVIEW_MODE: 'audit-exported-manifest-anchor',
+        CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0',
+        CODEX_REVIEW_TIMEOUT_SECONDS: '60',
+        TASK: 'sample-task'
+      },
+      ['--surface', 'audit']
+    );
+
+    expect(result.exitCode).toBe(0);
+
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      summary: {
+        startupAnchorObserved: boolean;
+        preAnchorMetaSurfaceSignals: number;
+      };
+    };
+    expect(telemetry.status).toBe('succeeded');
+    expect(telemetry.summary.startupAnchorObserved).toBe(true);
+    expect(telemetry.summary.preAnchorMetaSurfaceSignals).toBe(0);
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('keeps zsh leading assignment plus export on the active audit MANIFEST path', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeDetachedManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+
+    const result = await runReviewCommand(
+      manifestPath,
+      {
+        ...baseEnv(sandbox, codexBin),
+        RUN_REVIEW_MODE: 'audit-leading-assignment-export',
+        CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0',
+        CODEX_REVIEW_TIMEOUT_SECONDS: '60',
+        TASK: 'sample-task'
+      },
+      ['--surface', 'audit']
+    );
+
+    expect(result.exitCode).toBe(0);
+
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      summary: {
+        startupAnchorObserved: boolean;
+        preAnchorMetaSurfaceSignals: number;
+      };
+    };
+    expect(telemetry.status).toBe('succeeded');
+    expect(telemetry.summary.startupAnchorObserved).toBe(true);
+    expect(telemetry.summary.preAnchorMetaSurfaceSignals).toBe(0);
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('does not carry export state across pipelines when checking audit startup anchors', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeDetachedManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+
+    const result = await runReviewCommand(
+      manifestPath,
+      {
+        ...baseEnv(sandbox, codexBin),
+        RUN_REVIEW_MODE: 'audit-pipeline-manifest-anchor',
+        CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0',
+        CODEX_REVIEW_TIMEOUT_SECONDS: '60',
+        TASK: 'sample-task'
+      },
+      ['--surface', 'audit']
+    );
+
+    expect(result.exitCode).toBe(0);
+
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      summary: {
+        startupAnchorObserved: boolean;
+        preAnchorMetaSurfaceSignals: number;
+      };
+    };
+    expect(telemetry.status).toBe('succeeded');
+    expect(telemetry.summary.startupAnchorObserved).toBe(true);
+    expect(telemetry.summary.preAnchorMetaSurfaceSignals).toBe(0);
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('treats RUN_LOG alias reexports inside the review shell payload as valid startup anchors', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeDetachedManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+
+    const result = await runReviewCommand(
+      manifestPath,
+      {
+        ...baseEnv(sandbox, codexBin),
+        RUN_REVIEW_MODE: 'audit-exported-run-log-alias-anchor',
+        CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0',
+        CODEX_REVIEW_TIMEOUT_SECONDS: '60',
+        TASK: 'sample-task'
+      },
+      ['--surface', 'audit']
+    );
+
+    expect(result.exitCode).toBe(0);
+
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      summary: {
+        startupAnchorObserved: boolean;
+        preAnchorMetaSurfaceSignals: number;
+      };
+    };
+    expect(telemetry.status).toBe('succeeded');
+    expect(telemetry.summary.startupAnchorObserved).toBe(true);
+    expect(telemetry.summary.preAnchorMetaSurfaceSignals).toBe(0);
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('treats env -u same-shell MANIFEST expansions as valid startup anchors', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeDetachedManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+
+    const result = await runReviewCommand(
+      manifestPath,
+      {
+        ...baseEnv(sandbox, codexBin),
+        RUN_REVIEW_MODE: 'audit-env-unset-child-manifest-anchor',
         CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0',
         CODEX_REVIEW_TIMEOUT_SECONDS: '60',
         TASK: 'sample-task'

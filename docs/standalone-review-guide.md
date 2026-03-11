@@ -63,6 +63,7 @@ Use `codex-orchestrator review` as the default path so runs inherit CO guardrail
 - In that same default `diff` path, a meta-surface expansion guard can fail closed when the review persistently broadens into off-task review-orchestration surfaces such as global skills/memory, run manifests/logs, or adjacent review-system docs/artifacts/helpers that are not part of the touched diff; disable it with `CODEX_REVIEW_META_SURFACE_TIMEOUT_SECONDS=0` or shorten/extend it with an explicit seconds value.
 - In `audit` mode, the wrapper keeps the meta-surface expansion guard active for unrelated drift but treats the explicit audit evidence surfaces (`run-manifest` and `run-runner-log`) as in-scope.
 - In that same bounded `audit` path, a startup-anchor boundary now fails closed only when repeated memory/skills/review-doc reads happen before the review first anchors on the active evidence manifest or active runner log; it does not fail merely because no audit anchor has been observed yet.
+- That audit startup anchor can arrive either through the explicit active manifest/runner-log path itself or through an exported review-shell env var that still resolves to that same active evidence path.
 - Heavy-command policy toggles:
   - Allow unrestricted heavy command execution (including explicit validation suites and direct validation-runner launches): `CODEX_REVIEW_ALLOW_HEAVY_COMMANDS=1`
   - Enforce bounded mode (hard-stop on remaining heavy command starts outside the default command-intent boundary): `CODEX_REVIEW_ENFORCE_BOUNDED_MODE=1`

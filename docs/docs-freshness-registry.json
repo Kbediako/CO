@@ -3,6 +3,55 @@
   "generated_at": "2026-03-10",
   "entries": [
     {
+      "path": ".agent/task/1109-coordinator-symphony-aligned-standalone-review-audit-exported-env-startup-anchor-propagation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-10",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-standalone-review-audit-exported-env-startup-anchor-propagation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-10",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/PRD-coordinator-symphony-aligned-standalone-review-audit-exported-env-startup-anchor-propagation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-10",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/TECH_SPEC-coordinator-symphony-aligned-standalone-review-audit-exported-env-startup-anchor-propagation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-10",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/findings/1109-standalone-review-audit-exported-env-startup-anchor-propagation-deliberation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-10",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/specs/1109-coordinator-symphony-aligned-standalone-review-audit-exported-env-startup-anchor-propagation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-10",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/tasks-1109-coordinator-symphony-aligned-standalone-review-audit-exported-env-startup-anchor-propagation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-10",
+      "cadence_days": 30
+    },
+    {
       "path": ".agent/task/1108-coordinator-symphony-aligned-standalone-review-audit-startup-surface-boundary.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
