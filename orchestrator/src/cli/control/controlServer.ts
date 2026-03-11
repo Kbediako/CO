@@ -60,6 +60,20 @@ export class ControlServer {
     controlToken: string;
     intervalMs: number;
   }): Promise<ControlServer> {
+    return ControlServer.activatePendingReadyInstance({
+      requestContextShared: options.requestContextShared,
+      host: options.host,
+      controlToken: options.controlToken,
+      intervalMs: options.intervalMs
+    });
+  }
+
+  private static async activatePendingReadyInstance(options: {
+    requestContextShared: ControlRequestSharedContext;
+    host: string;
+    controlToken: string;
+    intervalMs: number;
+  }): Promise<ControlServer> {
     let instance: ControlServer | null = null;
     const server = createBoundControlServerRequestShell({
       readRequestContextShared: () => instance?.requestContextShared ?? null,

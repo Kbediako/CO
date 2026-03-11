@@ -61,6 +61,31 @@ describe('createBoundControlServerRequestShell', () => {
     expect(readExpiryLifecycle).toHaveBeenCalledTimes(1);
   });
 
+  it('re-reads the current runtime instead of snapshotting the initial reader values', () => {
+    let requestContextShared: ControlRequestSharedContext | null = null;
+    let expiryLifecycle: ControlExpiryLifecycle | null = null;
+
+    createBoundControlServerRequestShell({
+      readRequestContextShared: () => requestContextShared,
+      readExpiryLifecycle: () => expiryLifecycle
+    });
+
+    const [[{ readRuntime }]] = vi.mocked(createControlServerRequestShell).mock.calls;
+    expect(readRuntime()).toBeNull();
+
+    requestContextShared = {
+      kind: 'request-context-shared'
+    } as unknown as ControlRequestSharedContext;
+    expiryLifecycle = {
+      kind: 'expiry-lifecycle'
+    } as unknown as ControlExpiryLifecycle;
+
+    expect(readRuntime()).toEqual({
+      requestContextShared,
+      expiryLifecycle
+    });
+  });
+
   it('returns null runtime when the shared request context is unavailable', () => {
     const readRequestContextShared = vi.fn(() => null);
     const readExpiryLifecycle = vi.fn(() => {
