@@ -40,6 +40,9 @@ const DEFAULT_LOW_SIGNAL_TIMEOUT_MS = 180_000;
 const DEFAULT_VERDICT_STABILITY_TIMEOUT_MS = 180_000;
 const DEFAULT_META_SURFACE_TIMEOUT_MS = 180_000;
 const REVIEW_ACTIVE_CLOSEOUT_BUNDLE_KIND = 'review-closeout-bundle';
+const RELEVANT_REINSPECTION_MIN_COMMAND_STARTS = 8;
+const RELEVANT_REINSPECTION_MAX_DISTINCT_TARGETS = 4;
+const RELEVANT_REINSPECTION_MIN_REPEAT_TARGET_HITS = 3;
 const STARTUP_ANCHOR_META_SURFACE_SIGNAL_BUDGET = 1;
 const STARTUP_ANCHOR_ALLOWED_META_SURFACE_KINDS = new Set(['review-support']);
 export const AUDIT_ALLOWED_META_SURFACE_KINDS = ['run-manifest', 'run-runner-log'] as const;
@@ -67,8 +70,10 @@ const META_SURFACE_RECENT_SIGNAL_WINDOW = 8;
 const REVIEW_NARRATIVE_INSPECTION_MIN_LINE_LENGTH = 32;
 const REVIEW_SPECULATIVE_NARRATIVE_LINE_RE =
   /^(?:I\b|I['’]m\b|It\s+(?:might|may|seems|feels)\b|Maybe\b|Perhaps\b)/iu;
+const REVIEW_INSPECTION_TARGET_PATH_RE =
+  /^(?:[A-Za-z0-9_./-]+\.(?:[cm]?[jt]sx?|json|md|ya?ml|toml|py|rb|php|go|rs|java|c|cc|cpp|cxx|h|hh|hpp|cs|swift|kt|kts|scala|exs?|sh|bash|zsh|fish|ps1|sql|html?|css|scss|less))$/u;
 const REVIEW_INSPECTION_TARGET_RE =
-  /([A-Za-z0-9_./-]+\.(?:[cm]?js|[jt]sx?|json|md|ya?ml|toml))/gu;
+  /([A-Za-z0-9_./-]+\.(?:[cm]?[jt]sx?|json|md|ya?ml|toml|py|rb|php|go|rs|java|c|cc|cpp|cxx|h|hh|hpp|cs|swift|kt|kts|scala|exs?|sh|bash|zsh|fish|ps1|sql|html?|css|scss|less))/gu;
 const REVIEW_META_SURFACE_DELEGATION_TOOL_LINE_RE =
   /^tool\s+delegation\.delegate\.(?:spawn|status|pause|cancel)\(/iu;
 const REVIEW_COMMAND_INTENT_DELEGATION_TOOL_LINE_RE =
@@ -213,6 +218,26 @@ export interface ReviewActiveCloseoutBundleRereadBoundaryState {
   anchorObserved: boolean;
 }
 
+interface ReviewRelevantReinspectionDwellViolation {
+  sample: string | null;
+  detectedAtMs: number;
+  commandStarts: number;
+  distinctTargets: number;
+  maxTargetHits: number;
+}
+
+export interface ReviewRelevantReinspectionDwellBoundaryState {
+  triggered: boolean;
+  reason: string | null;
+  anchorObserved: boolean;
+  commandStarts: number;
+  distinctTargets: number;
+  maxTargetHits: number;
+  metaSurfaceSignals: number;
+  concreteOutputSignals: number;
+  violationSample: string | null;
+}
+
 export interface ReviewExecutionStateOptions {
   blockHeavyCommands?: boolean;
   allowValidationCommandIntents?: boolean;
@@ -229,6 +254,7 @@ export interface ReviewExecutionStateOptions {
   touchedPaths?: string[];
   enforceStartupAnchorBoundary?: boolean;
   enforceActiveCloseoutBundleRereadBoundary?: boolean;
+  enforceRelevantReinspectionDwellBoundary?: boolean;
   scopeMode?: ReviewScopeMode;
   startupAnchorMode?: ReviewStartupAnchorMode | null;
   repoRoot?: string;
@@ -300,6 +326,7 @@ export class ReviewExecutionState {
   private readonly touchedPaths: Set<string>;
   private readonly enforceStartupAnchorBoundary: boolean;
   private readonly enforceActiveCloseoutBundleRereadBoundary: boolean;
+  private readonly enforceRelevantReinspectionDwellBoundary: boolean;
   private readonly startupAnchorScopeMode: ReviewScopeMode;
   private readonly startupAnchorMode: ReviewStartupAnchorMode | null;
   private readonly repoRoot: string | null;
@@ -323,6 +350,7 @@ export class ReviewExecutionState {
   private lowSignalCandidateSinceMs: number | null = null;
   private verdictStabilityCandidateSinceMs: number | null = null;
   private metaSurfaceCandidateSinceMs: number | null = null;
+  private relevantReinspectionDwellCandidateSinceMs: number | null = null;
   private startupAnchorViolationAtMs: number | null = null;
   private preAnchorCommandStarts = 0;
   private readonly commandStarts: string[] = [];
@@ -344,8 +372,10 @@ export class ReviewExecutionState {
   private commandIntentViolation: ReviewCommandIntentViolation | null = null;
   private shellProbeViolation: ReviewShellProbeViolation | null = null;
   private activeCloseoutBundleRereadViolation: ReviewActiveCloseoutBundleRereadViolation | null = null;
+  private relevantReinspectionDwellViolation: ReviewRelevantReinspectionDwellViolation | null = null;
   private activeCloseoutBundleRereadCount = 0;
   private shellProbeCount = 0;
+  private lastInspectionCommandLine: string | null = null;
 
   constructor(options: ReviewExecutionStateOptions = {}) {
     this.startedAtMs = options.startedAtMs ?? Date.now();
@@ -418,6 +448,9 @@ export class ReviewExecutionState {
     this.enforceActiveCloseoutBundleRereadBoundary =
       (options.enforceActiveCloseoutBundleRereadBoundary ?? this.enforceStartupAnchorBoundary) &&
       this.activeCloseoutBundleRoots.size > 0;
+    this.enforceRelevantReinspectionDwellBoundary =
+      (options.enforceRelevantReinspectionDwellBoundary ?? this.enforceStartupAnchorBoundary) &&
+      this.touchedPaths.size > 0;
     this.startupAnchorScopeMode = options.scopeMode ?? 'uncommitted';
   }
 
@@ -642,6 +675,51 @@ export class ReviewExecutionState {
     };
   }
 
+  getRelevantReinspectionDwellBoundaryState(
+    nowMs = Date.now()
+  ): ReviewRelevantReinspectionDwellBoundaryState {
+    const summary = this.buildOutputSummary();
+    const derivedTriggered =
+      this.relevantReinspectionDwellViolation !== null ||
+      (this.enforceRelevantReinspectionDwellBoundary &&
+        this.lowSignalTimeoutMs !== null &&
+        this.relevantReinspectionDwellCandidateSinceMs !== null &&
+        Math.max(0, nowMs - this.relevantReinspectionDwellCandidateSinceMs) >=
+          this.lowSignalTimeoutMs);
+    const detectedAtMs =
+      this.relevantReinspectionDwellViolation?.detectedAtMs ??
+      (derivedTriggered && this.relevantReinspectionDwellCandidateSinceMs !== null && this.lowSignalTimeoutMs !== null
+        ? this.relevantReinspectionDwellCandidateSinceMs + this.lowSignalTimeoutMs
+        : null);
+    const violationSample =
+      this.relevantReinspectionDwellViolation?.sample ?? this.lastInspectionCommandLine;
+    const commandStarts =
+      this.relevantReinspectionDwellViolation?.commandStarts ?? this.commandStarts.length;
+    const distinctTargets =
+      this.relevantReinspectionDwellViolation?.distinctTargets ?? summary.distinctInspectionTargets;
+    const maxTargetHits =
+      this.relevantReinspectionDwellViolation?.maxTargetHits ?? summary.maxInspectionTargetHits;
+    return {
+      triggered: derivedTriggered,
+      reason: derivedTriggered && detectedAtMs !== null
+        ? `bounded review relevant-reinspection dwell boundary violated after ${formatDurationMs(
+            Math.max(0, detectedAtMs - this.startedAtMs)
+          )}: ${commandStarts} command start(s) repeatedly revisited ${distinctTargets} bounded relevant target(s) (max target hit count ${maxTargetHits}) after startup-anchor success without concrete findings or meta-surface drift${
+            violationSample
+              ? ` via ${violationSample}`
+              : ''
+          }.`
+        : null,
+      anchorObserved: this.startupAnchorObserved,
+      commandStarts: this.commandStarts.length,
+      distinctTargets: summary.distinctInspectionTargets,
+      maxTargetHits: summary.maxInspectionTargetHits,
+      metaSurfaceSignals: summary.metaSurfaceSignals,
+      concreteOutputSignals: summary.concreteOutputSignals,
+      violationSample
+    };
+  }
+
   snapshot(nowMs = Date.now()): ReviewExecutionSnapshot {
     return {
       startedAtMs: this.startedAtMs,
@@ -795,13 +873,18 @@ export class ReviewExecutionState {
     this.updateLowSignalCandidate(nowMs);
     this.updateVerdictStabilityCandidate(nowMs);
     this.updateMetaSurfaceCandidate(nowMs);
+    this.updateRelevantReinspectionDwellCandidate(nowMs);
   }
 
   private recordInspectionTargets(commandLine: string): string[] {
-    const targets = extractInspectionTargets(commandLine);
+    const targets = extractInspectionTargets(commandLine, {
+      touchedPaths: this.touchedPaths,
+      repoRoot: this.repoRoot
+    });
     if (targets.length === 0) {
       return targets;
     }
+    this.lastInspectionCommandLine = commandLine;
     this.recentInspectionTargetSamples.push(targets);
     while (this.recentInspectionTargetSamples.length > LOW_SIGNAL_RECENT_COMMAND_WINDOW) {
       this.recentInspectionTargetSamples.shift();
@@ -863,6 +946,47 @@ export class ReviewExecutionState {
     }
     if (this.lowSignalCandidateSinceMs === null) {
       this.lowSignalCandidateSinceMs = nowMs;
+    }
+  }
+
+  private updateRelevantReinspectionDwellCandidate(nowMs: number): void {
+    if (
+      !this.enforceRelevantReinspectionDwellBoundary ||
+      this.lowSignalTimeoutMs === null ||
+      this.relevantReinspectionDwellViolation
+    ) {
+      this.relevantReinspectionDwellCandidateSinceMs = null;
+      return;
+    }
+    const summary = this.buildOutputSummary();
+    const dwellShaped =
+      this.startupAnchorObserved &&
+      this.reviewProgressObserved &&
+      this.commandStarts.length >= RELEVANT_REINSPECTION_MIN_COMMAND_STARTS &&
+      summary.distinctInspectionTargets > 0 &&
+      summary.distinctInspectionTargets <= RELEVANT_REINSPECTION_MAX_DISTINCT_TARGETS &&
+      summary.maxInspectionTargetHits >= RELEVANT_REINSPECTION_MIN_REPEAT_TARGET_HITS &&
+      summary.metaSurfaceSignals === 0 &&
+      summary.concreteOutputSignals === 0;
+    if (!dwellShaped) {
+      this.relevantReinspectionDwellCandidateSinceMs = null;
+      return;
+    }
+    if (this.relevantReinspectionDwellCandidateSinceMs === null) {
+      this.relevantReinspectionDwellCandidateSinceMs = nowMs;
+      return;
+    }
+    if (
+      nowMs - this.relevantReinspectionDwellCandidateSinceMs >= this.lowSignalTimeoutMs &&
+      this.relevantReinspectionDwellViolation === null
+    ) {
+      this.relevantReinspectionDwellViolation = {
+        sample: this.lastInspectionCommandLine,
+        detectedAtMs: nowMs,
+        commandStarts: this.commandStarts.length,
+        distinctTargets: summary.distinctInspectionTargets,
+        maxTargetHits: summary.maxInspectionTargetHits
+      };
     }
   }
 
@@ -1857,8 +1981,24 @@ function isLikelyReviewCommandLine(line: string): boolean {
   return false;
 }
 
-function extractInspectionTargets(commandLine: string): string[] {
+function extractInspectionTargets(
+  commandLine: string,
+  options: {
+    touchedPaths?: ReadonlySet<string>;
+    repoRoot?: string | null;
+  } = {}
+): string[] {
   const normalized = commandLine.replace(/\\/gu, '/');
+  if (options.touchedPaths && options.touchedPaths.size > 0) {
+    const parsedTargets = extractParsedInspectionTargets(
+      normalized,
+      options.touchedPaths,
+      options.repoRoot ?? null
+    );
+    if (parsedTargets.length > 0) {
+      return parsedTargets;
+    }
+  }
   const targets = new Set<string>();
   for (const match of normalized.matchAll(REVIEW_INSPECTION_TARGET_RE)) {
     const target = match[1]?.trim();
@@ -1868,6 +2008,102 @@ function extractInspectionTargets(commandLine: string): string[] {
     targets.add(target.replace(/^\.\/+/u, ''));
   }
   return [...targets];
+}
+
+function extractParsedInspectionTargets(
+  commandLine: string,
+  touchedPaths: ReadonlySet<string>,
+  repoRoot: string | null
+): string[] {
+  const touchedTargets = new Set<string>();
+  const genericTargets = new Set<string>();
+  for (const segment of splitShellControlSegments(commandLine)) {
+    collectParsedInspectionTargetsFromSegment(
+      segment,
+      touchedPaths,
+      repoRoot,
+      touchedTargets,
+      genericTargets
+    );
+  }
+  return touchedTargets.size > 0 ? [...touchedTargets] : [...genericTargets];
+}
+
+function collectParsedInspectionTargetsFromSegment(
+  segment: string,
+  touchedPaths: ReadonlySet<string>,
+  repoRoot: string | null,
+  touchedTargets: Set<string>,
+  genericTargets: Set<string>,
+  depth = 0
+): void {
+  const strippedTokens = stripLeadingEnvAssignments(tokenizeShellSegment(segment));
+  if (strippedTokens.length === 0) {
+    return;
+  }
+  const tokens = unwrapEnvCommandTokens(strippedTokens);
+  if (tokens.length === 0) {
+    return;
+  }
+  if (depth < 3) {
+    const payload = extractShellCommandPayload(tokens);
+    if (payload) {
+      for (const nestedSegment of splitShellControlSegments(payload)) {
+        collectParsedInspectionTargetsFromSegment(
+          nestedSegment,
+          touchedPaths,
+          repoRoot,
+          touchedTargets,
+          genericTargets,
+          depth + 1
+        );
+      }
+      return;
+    }
+  }
+  const command = normalizeCommandToken(tokens[0] ?? '');
+  const args = tokens.slice(1);
+  for (const operand of extractMetaSurfaceOperands(command, args)) {
+    for (const candidate of expandMetaSurfaceOperandCandidates(
+      command,
+      args,
+      operand,
+      new Map(),
+      new Map(),
+      new Set(),
+      repoRoot
+    )) {
+      const matchedTouchedPath = resolveTouchedInspectionTarget(candidate, touchedPaths, repoRoot);
+      if (matchedTouchedPath) {
+        touchedTargets.add(matchedTouchedPath);
+        continue;
+      }
+      const normalizedCandidate = relativizeOperandToRepoRoot(candidate, repoRoot).replace(
+        /^\.\/+/u,
+        ''
+      );
+      if (REVIEW_INSPECTION_TARGET_PATH_RE.test(normalizedCandidate)) {
+        genericTargets.add(normalizedCandidate);
+      }
+    }
+  }
+}
+
+function resolveTouchedInspectionTarget(
+  candidate: string,
+  touchedPaths: ReadonlySet<string>,
+  repoRoot: string | null
+): string | null {
+  for (const touchedPath of touchedPaths) {
+    const normalizedTouchedPath = normalizeScopePath(touchedPath);
+    if (!normalizedTouchedPath) {
+      continue;
+    }
+    if (isTouchedScopePath(candidate, new Set<string>([normalizedTouchedPath]), repoRoot)) {
+      return normalizedTouchedPath;
+    }
+  }
+  return null;
 }
 
 function normalizeNarrativeInspectionSignature(line: string): string | null {

@@ -2458,6 +2458,151 @@ describe('ReviewExecutionState', () => {
     expect(summary.metaSurfaceKinds).toContain('review-closeout-bundle');
   });
 
+  it('treats repetitive bounded relevant reinspection after startup-anchor success as a dedicated dwell boundary', () => {
+    const state = new ReviewExecutionState({
+      startedAtMs: 0,
+      blockHeavyCommands: false,
+      lowSignalTimeoutMs: 1_000,
+      enforceStartupAnchorBoundary: true,
+      enforceRelevantReinspectionDwellBoundary: true,
+      startupAnchorMode: 'diff',
+      touchedPaths: [
+        'scripts/run-review.ts',
+        'scripts/lib/review-execution-state.ts',
+        'tests/run-review.spec.ts',
+        'tests/review-execution-state.spec.ts'
+      ]
+    });
+
+    let nowMs = 100;
+    for (const command of [
+      "/bin/zsh -lc 'sed -n 1,120p scripts/run-review.ts'",
+      "/bin/zsh -lc 'sed -n 121,240p scripts/run-review.ts'",
+      "/bin/zsh -lc 'sed -n 1,120p scripts/lib/review-execution-state.ts'",
+      "/bin/zsh -lc 'sed -n 121,240p scripts/lib/review-execution-state.ts'",
+      "/bin/zsh -lc 'sed -n 1,120p tests/run-review.spec.ts'",
+      "/bin/zsh -lc 'sed -n 121,240p tests/run-review.spec.ts'",
+      "/bin/zsh -lc 'sed -n 1,120p tests/review-execution-state.spec.ts'",
+      "/bin/zsh -lc 'sed -n 121,240p tests/review-execution-state.spec.ts'",
+      "/bin/zsh -lc 'sed -n 241,360p scripts/run-review.ts'",
+      "/bin/zsh -lc 'sed -n 241,360p tests/run-review.spec.ts'"
+    ]) {
+      state.observeChunk('thinking\nexec\n', 'stdout', nowMs);
+      state.observeChunk(`${command}\n`, 'stdout', nowMs + 10);
+      nowMs += 100;
+    }
+
+    const dwellBoundary = state.getRelevantReinspectionDwellBoundaryState(2_000);
+    const summary = state.buildOutputSummary();
+    expect(dwellBoundary.triggered).toBe(true);
+    expect(dwellBoundary.reason).toContain('relevant-reinspection dwell boundary violated');
+    expect(dwellBoundary.anchorObserved).toBe(true);
+    expect(dwellBoundary.distinctTargets).toBeLessThanOrEqual(4);
+    expect(dwellBoundary.maxTargetHits).toBeGreaterThanOrEqual(2);
+    expect(summary.startupAnchorObserved).toBe(true);
+    expect(summary.metaSurfaceSignals).toBe(0);
+    expect(summary.concreteOutputSignals).toBe(0);
+  });
+
+  it('does not trigger the bounded relevant reinspection dwell boundary after concrete findings appear', () => {
+    const state = new ReviewExecutionState({
+      startedAtMs: 0,
+      blockHeavyCommands: false,
+      lowSignalTimeoutMs: 1_000,
+      enforceStartupAnchorBoundary: true,
+      enforceRelevantReinspectionDwellBoundary: true,
+      startupAnchorMode: 'diff',
+      touchedPaths: ['scripts/run-review.ts', 'tests/run-review.spec.ts']
+    });
+
+    let nowMs = 100;
+    for (const command of [
+      "/bin/zsh -lc 'sed -n 1,120p scripts/run-review.ts'",
+      "/bin/zsh -lc 'sed -n 121,240p scripts/run-review.ts'",
+      "/bin/zsh -lc 'sed -n 1,120p tests/run-review.spec.ts'",
+      "/bin/zsh -lc 'sed -n 121,240p tests/run-review.spec.ts'",
+      "/bin/zsh -lc 'sed -n 241,360p scripts/run-review.ts'",
+      "/bin/zsh -lc 'sed -n 241,360p tests/run-review.spec.ts'"
+    ]) {
+      state.observeChunk('thinking\nexec\n', 'stdout', nowMs);
+      state.observeChunk(`${command}\n`, 'stdout', nowMs + 10);
+      nowMs += 100;
+    }
+    state.observeChunk('Potential finding at scripts/run-review.ts:12 needs a direct follow-up.\n', 'stdout', nowMs);
+    nowMs += 100;
+    state.observeChunk('thinking\nexec\n', 'stdout', nowMs);
+    state.observeChunk(`/bin/zsh -lc 'sed -n 361,480p scripts/run-review.ts'\n`, 'stdout', nowMs + 10);
+
+    const dwellBoundary = state.getRelevantReinspectionDwellBoundaryState(1_800);
+    const summary = state.buildOutputSummary();
+    expect(dwellBoundary.triggered).toBe(false);
+    expect(summary.startupAnchorObserved).toBe(true);
+    expect(summary.concreteOutputSignals).toBeGreaterThan(0);
+  });
+
+  it('tracks touched inspection targets that do not match the generic filename regex', () => {
+    const state = new ReviewExecutionState({
+      startedAtMs: 0,
+      blockHeavyCommands: false,
+      lowSignalTimeoutMs: 1_000,
+      enforceStartupAnchorBoundary: true,
+      enforceRelevantReinspectionDwellBoundary: true,
+      startupAnchorMode: 'diff',
+      touchedPaths: ['Dockerfile']
+    });
+
+    let nowMs = 100;
+    for (const command of [
+      "/bin/zsh -lc 'sed -n 1,20p Dockerfile'",
+      "/bin/zsh -lc 'sed -n 21,40p Dockerfile'",
+      "/bin/zsh -lc 'head -n 5 Dockerfile'",
+      "/bin/zsh -lc 'tail -n 5 Dockerfile'",
+      "/bin/zsh -lc 'grep -n \\\"FROM node:20.11\\\" Dockerfile'",
+      "/bin/zsh -lc 'grep -n \\\"\\\\.cache\\\" Dockerfile'",
+      "/bin/zsh -lc 'cat Dockerfile'",
+      "/bin/zsh -lc 'wc -l Dockerfile'"
+    ]) {
+      state.observeChunk('thinking\nexec\n', 'stdout', nowMs);
+      state.observeChunk(`${command}\n`, 'stdout', nowMs + 10);
+      nowMs += 100;
+    }
+
+    const dwellBoundary = state.getRelevantReinspectionDwellBoundaryState(2_000);
+    expect(dwellBoundary.triggered).toBe(true);
+    expect(dwellBoundary.distinctTargets).toBe(1);
+    expect(dwellBoundary.maxTargetHits).toBeGreaterThanOrEqual(3);
+  });
+
+  it('does not treat touched filenames inside search patterns as inspected targets', () => {
+    const state = new ReviewExecutionState({
+      startedAtMs: 0,
+      blockHeavyCommands: false,
+      lowSignalTimeoutMs: 1_000,
+      enforceStartupAnchorBoundary: true,
+      enforceRelevantReinspectionDwellBoundary: true,
+      startupAnchorMode: 'diff',
+      touchedPaths: ['helper.py']
+    });
+
+    let nowMs = 100;
+    for (const command of [
+      "/bin/zsh -lc 'grep -n \\\"helper.py\\\" other.py'",
+      "/bin/zsh -lc 'grep -n \\\"helper.py\\\" other.py'",
+      "/bin/zsh -lc 'grep -n \\\"helper.py\\\" other.py'",
+      "/bin/zsh -lc 'grep -n \\\"helper.py\\\" other.py'"
+    ]) {
+      state.observeChunk('thinking\nexec\n', 'stdout', nowMs);
+      state.observeChunk(`${command}\n`, 'stdout', nowMs + 10);
+      nowMs += 100;
+    }
+
+    const dwellBoundary = state.getRelevantReinspectionDwellBoundaryState(2_000);
+    const summary = state.buildOutputSummary();
+    expect(dwellBoundary.triggered).toBe(false);
+    expect(summary.distinctInspectionTargets).toBe(1);
+    expect(summary.maxInspectionTargetHits).toBe(4);
+  });
+
   it('supports the dedicated closeout-bundle reread boundary independently from startup-anchor enforcement', () => {
     const state = new ReviewExecutionState({
       startedAtMs: 0,

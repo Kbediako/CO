@@ -61,7 +61,8 @@ async function runGit(args: string[], cwd: string): Promise<void> {
 
 async function initGitRepoWithCommittedFiles(
   sandbox: string,
-  fileCount: number
+  fileCount: number,
+  extension = '.txt'
 ): Promise<{ files: string[] }> {
   await runGit(['init', '-q'], sandbox);
   await runGit(['config', 'user.email', 'run-review-tests@example.com'], sandbox);
@@ -69,7 +70,7 @@ async function initGitRepoWithCommittedFiles(
 
   const files: string[] = [];
   for (let index = 1; index <= fileCount; index += 1) {
-    const file = `file-${index}.txt`;
+    const file = `file-${index}${extension}`;
     files.push(file);
     await writeFile(join(sandbox, file), `baseline-${index}\n`, 'utf8');
   }
@@ -179,6 +180,58 @@ fi
         echo "/bin/zsh -lc 'sed -n 1,120p tasks/tasks-1059-coordinator-symphony-aligned-standalone-review-low-signal-drift-guard.md' in /Users/kbediako/Code/CO"
         sleep 0.05
       done
+    fi
+    if [[ "$mode" == "relevant-reinspection-dwell" ]]; then
+      commands=(
+        "sed -n 1,20p file-1.py"
+        "sed -n 21,40p file-1.py"
+        "head -n 5 file-1.py"
+        "tail -n 5 file-1.py"
+        "grep -n updated file-1.py"
+        "grep -n baseline file-1.py"
+        "cat file-1.py"
+        "wc -l file-1.py"
+      )
+      while true; do
+        for command in "\${commands[@]}"; do
+          echo "thinking"
+          echo "exec"
+          echo "/bin/zsh -lc '\${command}' in /Users/kbediako/Code/CO"
+          sleep 0.05
+        done
+      done
+    fi
+    if [[ "$mode" == "relevant-reinspection-concrete-output" ]]; then
+      commands=(
+        "sed -n 1,20p file-1.py"
+        "sed -n 21,40p file-1.py"
+        "head -n 5 file-1.py"
+        "tail -n 5 file-1.py"
+      )
+      for command in "\${commands[@]}"; do
+        echo "thinking"
+        echo "exec"
+        echo "/bin/zsh -lc '\${command}' in /Users/kbediako/Code/CO"
+        sleep 0.05
+      done
+      echo "Potential finding at file-1.py:1 indicates the touched diff now stays within the expected contract."
+      exit 0
+    fi
+    if [[ "$mode" == "relevant-reinspection-diverse" ]]; then
+      targets=(
+        "file-1.py"
+        "file-2.py"
+        "file-3.py"
+        "file-4.py"
+        "file-5.py"
+      )
+      for target in "\${targets[@]}"; do
+        echo "thinking"
+        echo "exec"
+        echo "/bin/zsh -lc 'sed -n 1,20p \${target}' in /Users/kbediako/Code/CO"
+        sleep 0.05
+      done
+      exit 0
     fi
     if [[ "$mode" == "verdict-stability-drift" ]]; then
       targets=(
@@ -2262,6 +2315,98 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(telemetry.summary.heavyCommandStarts).toEqual([]);
     expect(telemetry.summary.thinkingBlocks).toBeGreaterThan(0);
     expect(telemetry.summary.distinctInspectionTargets).toBeLessThanOrEqual(4);
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('fails bounded diff review when repetitive relevant reinspection persists without concrete findings', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    await initGitRepoWithTouchedPath(sandbox, 'file-1.py');
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'relevant-reinspection-dwell',
+      CODEX_REVIEW_LOW_SIGNAL_TIMEOUT_SECONDS: '1',
+      CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0',
+      CODEX_REVIEW_TIMEOUT_SECONDS: '60'
+    });
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).toContain('relevant-reinspection dwell boundary violated');
+    expect(result.stderr).not.toContain('low-signal review drift detected');
+    expect(result.stderr).not.toContain('codex review timed out after');
+
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      summary: {
+        startupAnchorObserved: boolean;
+        distinctInspectionTargets: number;
+        maxInspectionTargetHits: number;
+        metaSurfaceSignals: number;
+        concreteOutputSignals: number;
+      };
+    };
+    expect(telemetry.status).toBe('failed');
+    expect(telemetry.summary.startupAnchorObserved).toBe(true);
+    expect(telemetry.summary.distinctInspectionTargets).toBe(1);
+    expect(telemetry.summary.maxInspectionTargetHits).toBeGreaterThanOrEqual(3);
+    expect(telemetry.summary.metaSurfaceSignals).toBe(0);
+    expect(telemetry.summary.concreteOutputSignals).toBe(0);
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('allows bounded review to complete when relevant reinspection produces concrete findings', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    await initGitRepoWithTouchedPath(sandbox, 'file-1.py');
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'relevant-reinspection-concrete-output',
+      CODEX_REVIEW_LOW_SIGNAL_TIMEOUT_SECONDS: '1',
+      CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0',
+      CODEX_REVIEW_TIMEOUT_SECONDS: '60'
+    });
+
+    expect(result.exitCode).toBe(0);
+
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      summary: {
+        startupAnchorObserved: boolean;
+        concreteOutputSignals: number;
+      };
+    };
+    expect(telemetry.status).toBe('succeeded');
+    expect(telemetry.summary.startupAnchorObserved).toBe(true);
+    expect(telemetry.summary.concreteOutputSignals).toBeGreaterThan(0);
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('allows bounded review to complete when relevant inspection stays diverse across targets', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    await initGitRepoWithCommittedFiles(sandbox, 5, '.py');
+    await writeFile(join(sandbox, 'file-1.py'), 'updated\n', 'utf8');
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'relevant-reinspection-diverse',
+      CODEX_REVIEW_LOW_SIGNAL_TIMEOUT_SECONDS: '1',
+      CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0',
+      CODEX_REVIEW_TIMEOUT_SECONDS: '60'
+    });
+
+    expect(result.exitCode).toBe(0);
+
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      summary: {
+        distinctInspectionTargets: number;
+      };
+    };
+    expect(telemetry.status).toBe('succeeded');
+    expect(telemetry.summary.distinctInspectionTargets).toBeGreaterThan(4);
   }, LONG_WAIT_TEST_TIMEOUT_MS);
 
   it('fails bounded review when speculative output keeps repeating without new concrete progress', async () => {

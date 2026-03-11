@@ -42,6 +42,7 @@ import {
   type ReviewStartupAnchorMode,
   type ReviewStartupAnchorBoundaryState,
   type ReviewActiveCloseoutBundleRereadBoundaryState,
+  type ReviewRelevantReinspectionDwellBoundaryState,
   type ReviewShellProbeBoundaryState,
   type ReviewVerdictStabilityState,
   ReviewExecutionState,
@@ -815,6 +816,8 @@ async function main(): Promise<void> {
   const enforceStartupAnchorBoundary = startupAnchorMode !== null;
   const enforceActiveCloseoutBundleRereadBoundary =
     reviewSurface === 'diff' && !allowHeavyCommands && activeCloseoutBundleRoots.length > 0;
+  const enforceRelevantReinspectionDwellBoundary =
+    reviewSurface === 'diff' && !allowHeavyCommands && touchedPaths.length > 0;
   if (!allowHeavyCommands) {
     if (lowSignalTimeoutMs === null) {
       console.log(
@@ -866,6 +869,19 @@ async function main(): Promise<void> {
         '[run-review] startup-anchor boundary enabled for audit mode; repeated memory/skills/review-doc reads before the first manifest/runner-log startup anchor will terminate the review.'
       );
     }
+    if (enforceRelevantReinspectionDwellBoundary) {
+      if (lowSignalTimeoutMs === null) {
+        console.log(
+          `[run-review] bounded relevant reinspection dwell boundary disabled (${REVIEW_LOW_SIGNAL_TIMEOUT_ENV_KEY}=0).`
+        );
+      } else {
+        console.log(
+          `[run-review] bounded relevant reinspection dwell boundary enabled after ${formatDurationMs(
+            lowSignalTimeoutMs
+          )} of repetitive on-task reinspection without concrete findings (set ${REVIEW_LOW_SIGNAL_TIMEOUT_ENV_KEY}=0 to disable).`
+        );
+      }
+    }
   }
   const autoIssueLogEnabled = options.autoIssueLog ?? false;
   const runReview = async (resolved: { command: string; args: string[] }) =>
@@ -887,6 +903,7 @@ async function main(): Promise<void> {
       metaSurfaceTimeoutMs,
       enforceStartupAnchorBoundary,
       enforceActiveCloseoutBundleRereadBoundary,
+      enforceRelevantReinspectionDwellBoundary,
       allowedMetaSurfaceKinds: [...allowedMetaSurfaceKinds],
       scopeMode,
       startupAnchorMode,
@@ -1559,6 +1576,7 @@ interface RunCodexReviewOptions {
   metaSurfaceTimeoutMs: number | null;
   enforceStartupAnchorBoundary: boolean;
   enforceActiveCloseoutBundleRereadBoundary: boolean;
+  enforceRelevantReinspectionDwellBoundary: boolean;
   allowedMetaSurfaceKinds: string[];
   scopeMode: ScopeFlagMode;
   startupAnchorMode: ReviewStartupAnchorMode | null;
@@ -1651,6 +1669,7 @@ async function runCodexReview(
     metaSurfaceTimeoutMs: options.metaSurfaceTimeoutMs,
     enforceStartupAnchorBoundary: options.enforceStartupAnchorBoundary,
     enforceActiveCloseoutBundleRereadBoundary: options.enforceActiveCloseoutBundleRereadBoundary,
+    enforceRelevantReinspectionDwellBoundary: options.enforceRelevantReinspectionDwellBoundary,
     allowedMetaSurfaceKinds: options.allowedMetaSurfaceKinds,
     scopeMode: options.scopeMode,
     startupAnchorMode: options.startupAnchorMode,
@@ -1708,6 +1727,7 @@ async function runCodexReview(
       metaSurfaceTimeoutMs: options.metaSurfaceTimeoutMs,
       enforceStartupAnchorBoundary: options.enforceStartupAnchorBoundary,
       enforceActiveCloseoutBundleRereadBoundary: options.enforceActiveCloseoutBundleRereadBoundary,
+      enforceRelevantReinspectionDwellBoundary: options.enforceRelevantReinspectionDwellBoundary,
       blockHeavyCommands: options.blockHeavyCommands,
       getLastOutputAtMs: () => executionState.getLastOutputAtMs(),
       getStartupLoopState: () => executionState.getStartupLoopState(),
@@ -1718,6 +1738,8 @@ async function runCodexReview(
       getStartupAnchorBoundaryState: () => executionState.getStartupAnchorBoundaryState(),
       getActiveCloseoutBundleRereadBoundaryState: () =>
         executionState.getActiveCloseoutBundleRereadBoundaryState(),
+      getRelevantReinspectionDwellBoundaryState: () =>
+        executionState.getRelevantReinspectionDwellBoundaryState(),
       getCommandIntentBoundaryState: () => executionState.getCommandIntentBoundaryState(),
       getShellProbeBoundaryState: () => executionState.getShellProbeBoundaryState(),
       waitForOutputDrain: () => outputDrainPromise,
@@ -2013,6 +2035,7 @@ interface WaitForChildExitOptions {
   metaSurfaceTimeoutMs: number | null;
   enforceStartupAnchorBoundary: boolean;
   enforceActiveCloseoutBundleRereadBoundary: boolean;
+  enforceRelevantReinspectionDwellBoundary: boolean;
   blockHeavyCommands: boolean;
   getLastOutputAtMs: () => number;
   getStartupLoopState: () => ReviewStartupLoopState;
@@ -2022,6 +2045,7 @@ interface WaitForChildExitOptions {
   getMetaSurfaceExpansionReason: () => string | null;
   getStartupAnchorBoundaryState: () => ReviewStartupAnchorBoundaryState;
   getActiveCloseoutBundleRereadBoundaryState: () => ReviewActiveCloseoutBundleRereadBoundaryState;
+  getRelevantReinspectionDwellBoundaryState: () => ReviewRelevantReinspectionDwellBoundaryState;
   getCommandIntentBoundaryState: () => ReviewCommandIntentBoundaryState;
   getShellProbeBoundaryState: () => ReviewShellProbeBoundaryState;
   waitForOutputDrain: () => Promise<void>;
@@ -2048,6 +2072,7 @@ async function waitForChildExit(
     let metaSurfaceHandle: NodeJS.Timeout | undefined;
     let startupAnchorHandle: NodeJS.Timeout | undefined;
     let activeCloseoutBundleHandle: NodeJS.Timeout | undefined;
+    let relevantReinspectionHandle: NodeJS.Timeout | undefined;
     let commandIntentHandle: NodeJS.Timeout | undefined;
     let shellProbeHandle: NodeJS.Timeout | undefined;
     let heavyCommandHandle: NodeJS.Timeout | undefined;
@@ -2086,6 +2111,9 @@ async function waitForChildExit(
       }
       if (activeCloseoutBundleHandle) {
         clearInterval(activeCloseoutBundleHandle);
+      }
+      if (relevantReinspectionHandle) {
+        clearInterval(relevantReinspectionHandle);
       }
       if (commandIntentHandle) {
         clearInterval(commandIntentHandle);
@@ -2175,6 +2203,25 @@ async function waitForChildExit(
               new CodexReviewError(
                 activeCloseoutBundleBoundaryState.reason ??
                   'bounded review active-closeout-bundle reread boundary violated',
+                {
+                  exitCode: typeof code === 'number' && code > 0 ? code : 1,
+                  signal,
+                  timedOut: false,
+                  outputPreview: ''
+                }
+              )
+            );
+            return;
+          }
+        }
+        if (options.enforceRelevantReinspectionDwellBoundary) {
+          const relevantReinspectionBoundaryState =
+            options.getRelevantReinspectionDwellBoundaryState();
+          if (relevantReinspectionBoundaryState.triggered) {
+            reject(
+              new CodexReviewError(
+                relevantReinspectionBoundaryState.reason ??
+                  'bounded review relevant-reinspection dwell boundary violated',
                 {
                   exitCode: typeof code === 'number' && code > 0 ? code : 1,
                   signal,
@@ -2392,6 +2439,20 @@ async function waitForChildExit(
         );
       }, 250);
       activeCloseoutBundleHandle.unref();
+    }
+
+    if (options.enforceRelevantReinspectionDwellBoundary) {
+      relevantReinspectionHandle = setInterval(() => {
+        const boundaryState = options.getRelevantReinspectionDwellBoundaryState();
+        if (!boundaryState.triggered) {
+          return;
+        }
+        requestTermination(
+          `${boundaryState.reason ?? 'bounded review relevant-reinspection dwell boundary violated'} (set ${REVIEW_LOW_SIGNAL_TIMEOUT_ENV_KEY}=0 to disable).`,
+          false
+        );
+      }, 250);
+      relevantReinspectionHandle.unref();
     }
 
     commandIntentHandle = setInterval(() => {
