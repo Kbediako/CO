@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260312-1121-coordinator-symphony-aligned-control-server-startup-input-prep-extraction",
+      "title": "Coordinator Symphony-Aligned Control Server Startup Input Prep Extraction",
+      "relates_to": "tasks/tasks-1121-coordinator-symphony-aligned-control-server-startup-input-prep-extraction.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-12",
+      "paths": {
+        "spec": "tasks/specs/1121-coordinator-symphony-aligned-control-server-startup-input-prep-extraction.md",
+        "task": "tasks/tasks-1121-coordinator-symphony-aligned-control-server-startup-input-prep-extraction.md",
+        "agent_task": ".agent/task/1121-coordinator-symphony-aligned-control-server-startup-input-prep-extraction.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-control-server-startup-input-prep-extraction.md"
+      }
+    },
+    {
       "id": "20260311-1120-coordinator-symphony-aligned-standalone-review-bounded-relevant-reinspection-dwell-boundary",
       "title": "Coordinator Symphony-Aligned Standalone Review Bounded Relevant Reinspection Dwell Boundary",
       "relates_to": "tasks/tasks-1120-coordinator-symphony-aligned-standalone-review-bounded-relevant-reinspection-dwell-boundary.md",
