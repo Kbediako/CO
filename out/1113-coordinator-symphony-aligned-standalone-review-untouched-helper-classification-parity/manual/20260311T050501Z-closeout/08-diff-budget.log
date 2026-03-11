@@ -1,0 +1,16 @@
+⚠️ Diff budget exceeded (override applied) (base=origin/main)
+ - changed files 1015 > 25
+ - total lines changed 98060 > 800
+Top changed files:
+  - docs/docs-freshness-registry.json: 9631
+  - orchestrator/tests/ControlServer.test.ts: 7570
+  - tasks/index.json: 6198
+  - scripts/lib/review-execution-state.ts: 3298
+  - tests/review-execution-state.spec.ts: 2308
+  - orchestrator/tests/DelegationServer.test.ts: 2115
+  - tests/run-review.spec.ts: 1906
+  - scripts/run-review.ts: 1871
+  - orchestrator/src/cli/control/controlServer.ts: 1657
+  - orchestrator/tests/TelegramOversightBridge.test.ts: 1480
+
+Override accepted via DIFF_BUDGET_OVERRIDE_REASON: stacked branch history and docs-first/task mirror sync exceed the default review budget for 1113

@@ -1,0 +1,41 @@
+{
+  "task": "1113-coordinator-symphony-aligned-standalone-review-untouched-helper-classification-parity",
+  "status": "passed",
+  "checks": [
+    {
+      "name": "untouched_review_scope_family_reads_classify_review_support",
+      "status": "passed",
+      "evidence": "out/1113-coordinator-symphony-aligned-standalone-review-untouched-helper-classification-parity/manual/20260311T050501Z-closeout/05a-targeted-tests.log"
+    },
+    {
+      "name": "shared_docs_helpers_remain_ordinary_even_for_standalone_review_diffs",
+      "status": "passed",
+      "evidence": "out/1113-coordinator-symphony-aligned-standalone-review-untouched-helper-classification-parity/manual/20260311T050501Z-closeout/05a-targeted-tests.log"
+    },
+    {
+      "name": "touched_review_scope_source_keeps_dist_sibling_ordinary",
+      "status": "passed",
+      "evidence": "out/1113-coordinator-symphony-aligned-standalone-review-untouched-helper-classification-parity/manual/20260311T050501Z-closeout/05a-targeted-tests.log"
+    },
+    {
+      "name": "touched_review_scope_source_keeps_paired_test_ordinary",
+      "status": "passed",
+      "evidence": "out/1113-coordinator-symphony-aligned-standalone-review-untouched-helper-classification-parity/manual/20260311T050501Z-closeout/05a-targeted-tests.log"
+    },
+    {
+      "name": "touched_review_scope_test_keeps_dist_sibling_ordinary",
+      "status": "passed",
+      "evidence": "out/1113-coordinator-symphony-aligned-standalone-review-untouched-helper-classification-parity/manual/20260311T050501Z-closeout/05a-targeted-tests.log"
+    },
+    {
+      "name": "review_scope_sibling_reads_anchor_startup_boundary",
+      "status": "passed",
+      "evidence": "out/1113-coordinator-symphony-aligned-standalone-review-untouched-helper-classification-parity/manual/20260311T050501Z-closeout/05a-targeted-tests.log"
+    },
+    {
+      "name": "runtime_review_scope_helper_drift_fails_closed_after_provenance_hint",
+      "status": "passed",
+      "evidence": "out/1113-coordinator-symphony-aligned-standalone-review-untouched-helper-classification-parity/manual/20260311T050501Z-closeout/05a-targeted-tests.log"
+    }
+  ]
+}
