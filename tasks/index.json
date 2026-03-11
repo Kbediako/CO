@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260311-1111-coordinator-symphony-aligned-standalone-review-direct-shell-probe-detection-and-redaction-parity",
+      "title": "Coordinator Symphony-Aligned Standalone Review Direct Shell-Probe Detection and Redaction Parity",
+      "relates_to": "tasks/tasks-1111-coordinator-symphony-aligned-standalone-review-direct-shell-probe-detection-and-redaction-parity.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-11",
+      "paths": {
+        "spec": "tasks/specs/1111-coordinator-symphony-aligned-standalone-review-direct-shell-probe-detection-and-redaction-parity.md",
+        "task": "tasks/tasks-1111-coordinator-symphony-aligned-standalone-review-direct-shell-probe-detection-and-redaction-parity.md",
+        "agent_task": ".agent/task/1111-coordinator-symphony-aligned-standalone-review-direct-shell-probe-detection-and-redaction-parity.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-standalone-review-direct-shell-probe-detection-and-redaction-parity.md"
+      }
+    },
+    {
       "id": "20260311-1110-coordinator-symphony-aligned-standalone-review-shell-probe-stop-condition",
       "title": "Coordinator Symphony-Aligned Standalone Review Shell-Probe Stop Condition",
       "relates_to": "tasks/tasks-1110-coordinator-symphony-aligned-standalone-review-shell-probe-stop-condition.md",
