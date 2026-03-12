@@ -91,7 +91,7 @@ Use `codex-orchestrator review` as the default path so runs inherit CO guardrail
 - `codex-orchestrator review` writes artifacts under `<runDir>/review/`, where `<runDir>` tracks the resolved manifest lineage: it uses `CODEX_ORCHESTRATOR_RUN_DIR` only when that directory contains the resolved manifest, otherwise it falls back to `dirname(manifestPath)`.
 - Prompt artifact: `<runDir>/review/prompt.txt` (always).
 - Review transcript: `<runDir>/review/output.log` (when `codex review` runs, for example with `FORCE_CODEX_REVIEW=1`).
-- Runtime telemetry artifact: `<runDir>/review/telemetry.json` (best-effort summary of observed command activity, startup events, output tail, plus a first-class `termination_boundary` record when the current bounded startup-anchor, meta-surface expansion, verdict-stability, or relevant-reinspection dwell guard fires).
+- Runtime telemetry artifact: `<runDir>/review/telemetry.json` (best-effort summary of observed command activity, startup events, output tail, plus a first-class `termination_boundary` record when the current bounded command-intent, startup-anchor, meta-surface expansion, verdict-stability, or relevant-reinspection dwell guard fires).
 
 ## Expected outputs
 - `codex review`: prioritized findings; no working tree edits.

@@ -1,7 +1,7 @@
 ---
 id: 20260312-1131-coordinator-symphony-aligned-standalone-review-command-intent-termination-boundary-provenance-classification
 title: Coordinator Symphony-Aligned Standalone Review Command-Intent Termination Boundary Provenance Classification
-status: draft
+status: completed
 owners:
   - Codex
 created: 2026-03-12
@@ -35,3 +35,4 @@ Extend the first-class standalone-review `termination_boundary` contract so the 
 
 - 2026-03-12: Registered after `1130` closed. The four-family boundary contract is now stable, so the next smallest truthful gap is command-intent parity rather than more widening of the existing taxonomy. Evidence: `out/1130-coordinator-symphony-aligned-standalone-review-termination-boundary-provenance-classification/manual/20260312T061623Z-closeout/00-summary.md`, `out/1130-coordinator-symphony-aligned-standalone-review-termination-boundary-provenance-classification/manual/20260312T061623Z-closeout/14-next-slice-note.md`.
 - 2026-03-12: Pre-implementation local read-only review approved. A bounded scout confirmed command-intent is the smallest remaining contract-parity seam because the runtime already carries typed violation state for that family. Evidence: `docs/findings/1131-standalone-review-command-intent-termination-boundary-provenance-classification-deliberation.md`.
+- 2026-03-12: Completed. The final tree now persists a first-class command-intent `termination_boundary` record with provenance, carries that record through both poller and natural child-close termination paths, fixes the `validation-suite` label fallthrough, and keeps the broader unsupported families out of scope. Evidence: `out/1131-coordinator-symphony-aligned-standalone-review-command-intent-termination-boundary-provenance-classification/manual/20260312T081716Z-closeout/00-summary.md`, `out/1131-coordinator-symphony-aligned-standalone-review-command-intent-termination-boundary-provenance-classification/manual/20260312T081716Z-closeout/05b-targeted-tests.log`, `out/1131-coordinator-symphony-aligned-standalone-review-command-intent-termination-boundary-provenance-classification/manual/20260312T081716Z-closeout/12-manual-command-intent-boundary-check.md`, `out/1131-coordinator-symphony-aligned-standalone-review-command-intent-termination-boundary-provenance-classification/manual/20260312T081716Z-closeout/15-elegance-review.md`.

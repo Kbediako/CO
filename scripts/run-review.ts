@@ -46,6 +46,7 @@ import {
   type ReviewRelevantReinspectionDwellBoundaryState,
   type ReviewShellProbeBoundaryState,
   type ReviewTelemetryPayload,
+  type ReviewTerminationBoundaryKind,
   type ReviewTerminationBoundaryRecord,
   type ReviewVerdictStabilityState,
   ReviewExecutionState,
@@ -2165,13 +2166,7 @@ interface WaitForChildExitOptions {
   getRelevantReinspectionDwellBoundaryState: () => ReviewRelevantReinspectionDwellBoundaryState;
   getCommandIntentBoundaryState: () => ReviewCommandIntentBoundaryState;
   getShellProbeBoundaryState: () => ReviewShellProbeBoundaryState;
-  getTerminationBoundaryRecord: (
-    kind:
-      | 'startup-anchor'
-      | 'meta-surface-expansion'
-      | 'relevant-reinspection-dwell'
-      | 'verdict-stability'
-  ) => ReviewTerminationBoundaryRecord | null;
+  getTerminationBoundaryRecord: (kind: ReviewTerminationBoundaryKind) => ReviewTerminationBoundaryRecord | null;
   waitForOutputDrain: () => Promise<void>;
   formatCheckpoint: () => string;
   detached: boolean;
@@ -2302,7 +2297,8 @@ async function waitForChildExit(
               exitCode: typeof code === 'number' && code > 0 ? code : 1,
               signal,
               timedOut: false,
-              outputPreview: ''
+              outputPreview: '',
+              terminationBoundary: options.getTerminationBoundaryRecord('command-intent')
             })
           );
           return;
@@ -2601,7 +2597,11 @@ async function waitForChildExit(
       if (!boundaryState.triggered) {
         return;
       }
-      requestTermination(formatCommandIntentBoundaryFailure(boundaryState), false);
+      requestTermination(
+        formatCommandIntentBoundaryFailure(boundaryState),
+        false,
+        options.getTerminationBoundaryRecord('command-intent')
+      );
     }, 250);
     commandIntentHandle.unref();
 

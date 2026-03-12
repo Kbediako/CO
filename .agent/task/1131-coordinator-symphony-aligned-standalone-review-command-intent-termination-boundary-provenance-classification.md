@@ -20,21 +20,21 @@
 
 ## Output Contract
 
-- [ ] Failed telemetry persists a stable `termination_boundary` record for command-intent failures. Evidence: `REPLACE-CLOSEOUT-SUMMARY`, `REPLACE-TARGETED-TESTS`
-- [ ] Terminal failure output prints one stable command-intent boundary classification/provenance line while preserving the current human-readable failure prose. Evidence: `REPLACE-CLOSEOUT-SUMMARY`, `REPLACE-TARGETED-TESTS`, `REPLACE-REVIEW-LOG`
-- [ ] Existing `1130` supported families remain unchanged, and shell-probe / active-closeout / timeout-style families stay out of the taxonomy. Evidence: `REPLACE-CLOSEOUT-SUMMARY`, `REPLACE-TARGETED-TESTS`, `REPLACE-REVIEW-LOG`
+- [x] Failed telemetry persists a stable `termination_boundary` record for command-intent failures. Evidence: `out/1131-coordinator-symphony-aligned-standalone-review-command-intent-termination-boundary-provenance-classification/manual/20260312T081716Z-closeout/00-summary.md`, `out/1131-coordinator-symphony-aligned-standalone-review-command-intent-termination-boundary-provenance-classification/manual/20260312T081716Z-closeout/05b-targeted-tests.log`, `out/1131-coordinator-symphony-aligned-standalone-review-command-intent-termination-boundary-provenance-classification/manual/20260312T081716Z-closeout/12-manual-command-intent-boundary-check.md`
+- [x] Terminal failure output prints one stable command-intent boundary classification/provenance line while preserving the current human-readable failure prose. Evidence: `out/1131-coordinator-symphony-aligned-standalone-review-command-intent-termination-boundary-provenance-classification/manual/20260312T081716Z-closeout/00-summary.md`, `out/1131-coordinator-symphony-aligned-standalone-review-command-intent-termination-boundary-provenance-classification/manual/20260312T081716Z-closeout/05b-targeted-tests.log`, `out/1131-coordinator-symphony-aligned-standalone-review-command-intent-termination-boundary-provenance-classification/manual/20260312T081716Z-closeout/10-review.log`, `out/1131-coordinator-symphony-aligned-standalone-review-command-intent-termination-boundary-provenance-classification/manual/20260312T081716Z-closeout/12-manual-command-intent-boundary-check.md`
+- [x] Existing `1130` supported families remain unchanged, and shell-probe / active-closeout / timeout-style families stay out of the taxonomy. Evidence: `out/1131-coordinator-symphony-aligned-standalone-review-command-intent-termination-boundary-provenance-classification/manual/20260312T081716Z-closeout/00-summary.md`, `out/1131-coordinator-symphony-aligned-standalone-review-command-intent-termination-boundary-provenance-classification/manual/20260312T081716Z-closeout/05b-targeted-tests.log`, `out/1131-coordinator-symphony-aligned-standalone-review-command-intent-termination-boundary-provenance-classification/manual/20260312T081716Z-closeout/10-review.log`
 
 ## Validation + Closeout
 
-- [ ] `node scripts/delegation-guard.mjs`. Evidence: `REPLACE-DELEGATION-GUARD`
-- [ ] `node scripts/spec-guard.mjs --dry-run`. Evidence: `REPLACE-SPEC-GUARD`
-- [ ] `npm run build`. Evidence: `REPLACE-BUILD`
-- [ ] `npm run lint`. Evidence: `REPLACE-LINT`
-- [ ] `npm run test`. Evidence: `REPLACE-TEST`
-- [ ] `npm run docs:check`. Evidence: `REPLACE-DOCS-CHECK`
-- [ ] `npm run docs:freshness`. Evidence: `REPLACE-DOCS-FRESHNESS`
-- [ ] `node scripts/diff-budget.mjs`. Evidence: `REPLACE-DIFF-BUDGET`
-- [ ] `npm run review`. Evidence: `REPLACE-REVIEW`
-- [ ] `npm run pack:smoke`. Evidence: `REPLACE-PACK-SMOKE`
-- [ ] Manual/mock evidence captured for the new command-intent termination-boundary contract. Evidence: `REPLACE-MANUAL`
-- [ ] Elegance review completed. Evidence: `REPLACE-ELEGANCE`
+- [x] `node scripts/delegation-guard.mjs`. Evidence: `out/1131-coordinator-symphony-aligned-standalone-review-command-intent-termination-boundary-provenance-classification/manual/20260312T081716Z-closeout/01-delegation-guard.log`, `out/1131-coordinator-symphony-aligned-standalone-review-command-intent-termination-boundary-provenance-classification/manual/20260312T081716Z-closeout/13-override-notes.md`
+- [x] `node scripts/spec-guard.mjs --dry-run`. Evidence: `out/1131-coordinator-symphony-aligned-standalone-review-command-intent-termination-boundary-provenance-classification/manual/20260312T081716Z-closeout/02-spec-guard.log`
+- [x] `npm run build`. Evidence: `out/1131-coordinator-symphony-aligned-standalone-review-command-intent-termination-boundary-provenance-classification/manual/20260312T081716Z-closeout/03-build.log`
+- [x] `npm run lint`. Evidence: `out/1131-coordinator-symphony-aligned-standalone-review-command-intent-termination-boundary-provenance-classification/manual/20260312T081716Z-closeout/04-lint.log`
+- [x] `npm run test`. Evidence: `out/1131-coordinator-symphony-aligned-standalone-review-command-intent-termination-boundary-provenance-classification/manual/20260312T081716Z-closeout/05-test.log`, `out/1131-coordinator-symphony-aligned-standalone-review-command-intent-termination-boundary-provenance-classification/manual/20260312T081716Z-closeout/13-override-notes.md`
+- [x] `npm run docs:check`. Evidence: `out/1131-coordinator-symphony-aligned-standalone-review-command-intent-termination-boundary-provenance-classification/manual/20260312T081716Z-closeout/06-docs-check.log`
+- [x] `npm run docs:freshness`. Evidence: `out/1131-coordinator-symphony-aligned-standalone-review-command-intent-termination-boundary-provenance-classification/manual/20260312T081716Z-closeout/07-docs-freshness.log`
+- [x] `node scripts/diff-budget.mjs`. Evidence: `out/1131-coordinator-symphony-aligned-standalone-review-command-intent-termination-boundary-provenance-classification/manual/20260312T081716Z-closeout/09-diff-budget.log`, `out/1131-coordinator-symphony-aligned-standalone-review-command-intent-termination-boundary-provenance-classification/manual/20260312T081716Z-closeout/13-override-notes.md`
+- [x] `npm run review`. Evidence: `out/1131-coordinator-symphony-aligned-standalone-review-command-intent-termination-boundary-provenance-classification/manual/20260312T081716Z-closeout/10-review.log`, `out/1131-coordinator-symphony-aligned-standalone-review-command-intent-termination-boundary-provenance-classification/manual/20260312T081716Z-closeout/13-override-notes.md`
+- [x] `npm run pack:smoke`. Evidence: `out/1131-coordinator-symphony-aligned-standalone-review-command-intent-termination-boundary-provenance-classification/manual/20260312T081716Z-closeout/11-pack-smoke.log`
+- [x] Manual/mock evidence captured for the new command-intent termination-boundary contract. Evidence: `out/1131-coordinator-symphony-aligned-standalone-review-command-intent-termination-boundary-provenance-classification/manual/20260312T081716Z-closeout/12-manual-command-intent-boundary-check.md`, `out/1131-coordinator-symphony-aligned-standalone-review-command-intent-termination-boundary-provenance-classification/manual/20260312T081716Z-closeout/05b-targeted-tests.log`
+- [x] Elegance review completed. Evidence: `out/1131-coordinator-symphony-aligned-standalone-review-command-intent-termination-boundary-provenance-classification/manual/20260312T081716Z-closeout/15-elegance-review.md`

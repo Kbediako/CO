@@ -1716,6 +1716,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
 
     expect(result.exitCode).toBeGreaterThan(0);
     expect(result.stderr).toContain('bounded command-intent boundary (validation suite launch)');
+    expect(result.stderr).toContain('termination boundary: command-intent (validation-suite).');
   }, LONG_WAIT_TEST_TIMEOUT_MS);
 
   it('fails bounded review on npm run-script validation-suite launches', async () => {
@@ -3588,7 +3589,14 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
       };
     };
     expect(telemetry.status).toBe('failed');
-    expect(telemetry.termination_boundary).toBeNull();
+    expect(telemetry.termination_boundary).toEqual(
+      expect.objectContaining({
+        kind: 'command-intent',
+        provenance: 'validation-suite',
+        reason: expect.stringContaining('bounded review command-intent boundary violated')
+      })
+    );
+    expect(telemetry.termination_boundary?.sample).toContain('[redacted command-intent sample');
     expect(telemetry.summary.commandIntentViolationCount).toBeGreaterThanOrEqual(1);
     expect(telemetry.summary.commandIntentViolationKinds).toContain('validation-suite');
     expect(telemetry.summary.commandIntentViolationSamples[0]).toContain('[redacted command-intent');
@@ -3638,10 +3646,17 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
 
     expect(result.exitCode).toBeGreaterThan(0);
     expect(result.stderr).toContain('bounded command-intent boundary (direct validation runner launch)');
+    expect(result.stderr).toContain('termination boundary: command-intent (validation-runner).');
 
     const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
     const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
       status: string;
+      termination_boundary: {
+        kind: string;
+        provenance: string;
+        reason: string;
+        sample: string | null;
+      } | null;
       summary: {
         commandIntentViolationCount: number;
         commandIntentViolationKinds: string[];
@@ -3649,6 +3664,14 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
       };
     };
     expect(telemetry.status).toBe('failed');
+    expect(telemetry.termination_boundary).toEqual(
+      expect.objectContaining({
+        kind: 'command-intent',
+        provenance: 'validation-runner',
+        reason: expect.stringContaining('bounded review command-intent boundary violated')
+      })
+    );
+    expect(telemetry.termination_boundary?.sample).toContain('[redacted command-intent sample');
     expect(telemetry.summary.commandIntentViolationCount).toBeGreaterThanOrEqual(1);
     expect(telemetry.summary.commandIntentViolationKinds).toContain('validation-runner');
     expect(telemetry.summary.commandIntentViolationSamples[0]).toContain('[redacted command-intent');
@@ -3688,6 +3711,27 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
 
     expect(result.exitCode).toBeGreaterThan(0);
     expect(result.stderr).toContain('bounded command-intent boundary (direct validation runner launch)');
+    expect(result.stderr).toContain('termination boundary: command-intent (validation-runner).');
+
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      termination_boundary: {
+        kind: string;
+        provenance: string;
+        reason: string;
+        sample: string | null;
+      } | null;
+    };
+    expect(telemetry.status).toBe('failed');
+    expect(telemetry.termination_boundary).toEqual(
+      expect.objectContaining({
+        kind: 'command-intent',
+        provenance: 'validation-runner',
+        reason: expect.stringContaining('bounded review command-intent boundary violated')
+      })
+    );
+    expect(telemetry.termination_boundary?.sample).toContain('[redacted command-intent sample');
   }, LONG_WAIT_TEST_TIMEOUT_MS);
 
   it('fails bounded review when a forbidden validation runner exits non-zero before the interval tick', async () => {
@@ -3748,15 +3792,30 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
 
     expect(result.exitCode).toBeGreaterThan(0);
     expect(result.stderr).toContain('bounded command-intent boundary (nested review or pipeline launch)');
+    expect(result.stderr).toContain('termination boundary: command-intent (review-orchestration).');
 
     const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
     const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
       status: string;
+      termination_boundary: {
+        kind: string;
+        provenance: string;
+        reason: string;
+        sample: string | null;
+      } | null;
       summary: {
         commandIntentViolationKinds: string[];
       };
     };
     expect(telemetry.status).toBe('failed');
+    expect(telemetry.termination_boundary).toEqual(
+      expect.objectContaining({
+        kind: 'command-intent',
+        provenance: 'review-orchestration',
+        reason: expect.stringContaining('bounded review command-intent boundary violated')
+      })
+    );
+    expect(telemetry.termination_boundary?.sample).toContain('[redacted command-intent sample');
     expect(telemetry.summary.commandIntentViolationKinds).toContain('review-orchestration');
   }, LONG_WAIT_TEST_TIMEOUT_MS);
 
@@ -3773,16 +3832,31 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
 
     expect(result.exitCode).toBeGreaterThan(0);
     expect(result.stderr).toContain('bounded command-intent boundary (delegation control activity)');
+    expect(result.stderr).toContain('termination boundary: command-intent (delegation-control).');
 
     const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
     const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
       status: string;
+      termination_boundary: {
+        kind: string;
+        provenance: string;
+        reason: string;
+        sample: string | null;
+      } | null;
       summary: {
         commandIntentViolationCount: number;
         commandIntentViolationKinds: string[];
       };
     };
     expect(telemetry.status).toBe('failed');
+    expect(telemetry.termination_boundary).toEqual(
+      expect.objectContaining({
+        kind: 'command-intent',
+        provenance: 'delegation-control',
+        reason: expect.stringContaining('bounded review command-intent boundary violated')
+      })
+    );
+    expect(telemetry.termination_boundary?.sample).toContain('[redacted command-intent sample');
     expect(telemetry.summary.commandIntentViolationCount).toBeGreaterThanOrEqual(1);
     expect(telemetry.summary.commandIntentViolationKinds).toEqual(['delegation-control']);
   }, LONG_WAIT_TEST_TIMEOUT_MS);

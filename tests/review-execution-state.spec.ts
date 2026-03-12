@@ -350,6 +350,49 @@ describe('ReviewExecutionState', () => {
     expect(payload.termination_boundary).toBeNull();
   });
 
+  it('projects validation-suite command-intent violations into first-class termination boundary records', () => {
+    const state = new ReviewExecutionState({ startedAtMs: 0 });
+
+    state.observeChunk('thinking\nexec\n', 'stdout', 100);
+    state.observeChunk(`/bin/zsh -lc 'npm run docs:freshness'\n`, 'stdout', 110);
+
+    const boundary = state.getTerminationBoundaryRecordForKind('command-intent', 2_000);
+    expect(boundary).toEqual({
+      kind: 'command-intent',
+      provenance: 'validation-suite',
+      reason: expect.stringContaining('validation suite launch'),
+      sample: 'npm run docs:freshness'
+    });
+    expect(
+      state.getTerminationBoundaryRecord(
+        'codex review crossed the bounded command-intent boundary (validation suite launch).',
+        2_000
+      )
+    ).toEqual(
+      expect.objectContaining({
+        kind: 'command-intent',
+        provenance: 'validation-suite'
+      })
+    );
+
+    const payload = state.buildTelemetryPayload({
+      status: 'failed',
+      error: 'codex review crossed the bounded command-intent boundary (validation suite launch).',
+      terminationBoundary: boundary,
+      outputLogPath: '/repo/.runs/sample/review/output.log',
+      repoRoot: '/repo',
+      includeRawTelemetry: false,
+      telemetryDebugEnvKey: 'CODEX_REVIEW_DEBUG_TELEMETRY'
+    });
+
+    expect(payload.termination_boundary).toEqual({
+      kind: 'command-intent',
+      provenance: 'validation-suite',
+      reason: expect.stringContaining('validation suite launch'),
+      sample: '[redacted command-intent sample; set CODEX_REVIEW_DEBUG_TELEMETRY=1 to persist raw sample]'
+    });
+  });
+
   it('persists an explicit termination boundary record without reparsing the failure prose', () => {
     const state = new ReviewExecutionState({
       startedAtMs: 0,

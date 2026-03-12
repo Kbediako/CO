@@ -100,11 +100,13 @@ export type ReviewCommandIntentViolationKind =
   | 'review-orchestration'
   | 'delegation-control';
 export type ReviewTerminationBoundaryKind =
+  | 'command-intent'
   | 'startup-anchor'
   | 'meta-surface-expansion'
   | 'verdict-stability'
   | 'relevant-reinspection-dwell';
 export type ReviewTerminationBoundaryProvenance =
+  | ReviewCommandIntentViolationKind
   | 'pre-anchor-meta-surface'
   | 'meta-surface-kinds'
   | 'repeated-output-inspection'
@@ -851,6 +853,19 @@ export class ReviewExecutionState {
     kind: ReviewTerminationBoundaryKind,
     nowMs: number
   ): ReviewTerminationBoundaryRecord | null {
+    if (kind === 'command-intent') {
+      const boundary = this.getCommandIntentBoundaryState(nowMs);
+      if (!boundary.triggered || !boundary.reason || !boundary.violationKind) {
+        return null;
+      }
+      return {
+        kind,
+        provenance: boundary.violationKind,
+        reason: boundary.reason,
+        sample: normalizeTerminationBoundarySample(boundary.violationSample)
+      };
+    }
+
     if (kind === 'startup-anchor') {
       const boundary = this.getStartupAnchorBoundaryState(nowMs);
       if (!boundary.triggered || !boundary.reason) {
@@ -1553,6 +1568,9 @@ function inferTerminationBoundaryKindsFromErrorMessage(
     return [];
   }
   const kinds: ReviewTerminationBoundaryKind[] = [];
+  if (errorMessage.includes('bounded command-intent boundary')) {
+    kinds.push('command-intent');
+  }
   if (errorMessage.includes('startup-anchor boundary violated')) {
     kinds.push('startup-anchor');
   }
@@ -4092,6 +4110,9 @@ function isTouchedReviewScopePathFamilyOperand(
 }
 
 function formatCommandIntentViolationLabel(kind: ReviewCommandIntentViolationKind): string {
+  if (kind === 'validation-suite') {
+    return 'validation suite launch';
+  }
   if (kind === 'validation-runner') {
     return 'direct validation runner launch';
   }
