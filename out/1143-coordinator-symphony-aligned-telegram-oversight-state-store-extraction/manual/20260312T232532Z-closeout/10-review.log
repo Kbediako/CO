@@ -1,0 +1,700 @@
+
+> @kbediako/codex-orchestrator@0.1.38 review
+> node --loader ts-node/esm scripts/run-review.ts
+
+(node:57497) ExperimentalWarning: `--experimental-loader` may be removed in the future; instead use `register()`:
+--import 'data:text/javascript,import { register } from "node:module"; import { pathToFileURL } from "node:url"; register("ts-node/esm", pathToFileURL("./"));'
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:57497) [DEP0180] DeprecationWarning: fs.Stats constructor is deprecated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+⚠️ Diff budget exceeded (override applied) (base=origin/main)
+ - changed files 1242 > 25
+ - total lines changed 114669 > 800
+Top changed files:
+  - docs/docs-freshness-registry.json: 11035
+  - orchestrator/tests/ControlServer.test.ts: 7635
+  - tasks/index.json: 6952
+  - scripts/lib/review-execution-state.ts: 4243
+  - tests/review-execution-state.spec.ts: 3522
+  - tests/run-review.spec.ts: 3110
+  - scripts/run-review.ts: 2221
+  - orchestrator/tests/DelegationServer.test.ts: 2115
+  - orchestrator/tests/TelegramOversightBridge.test.ts: 1803
+  - orchestrator/src/cli/control/controlServer.ts: 1658
+
+Override accepted via DIFF_BUDGET_OVERRIDE_REASON: stacked branch continuity for 1143 review
+[run-review] bounded review guidance enabled by default (set CODEX_REVIEW_ALLOW_HEAVY_COMMANDS=1 to opt into unrestricted heavy-command execution).
+[run-review] review scope metrics: 6 files, 376 lines.
+[run-review] runtime requested=appserver selected=appserver provider=AppServerRuntimeProvider.
+[run-review] delegation MCP enabled for this review (default; set --disable-delegation-mcp or CODEX_REVIEW_DISABLE_DELEGATION_MCP=1 to disable).
+Review prompt saved to: .runs/1143-coordinator-symphony-aligned-telegram-oversight-state-store-extraction/cli/2026-03-12T23-17-59-356Z-d5a30cfc/review/prompt.txt
+Review output log: .runs/1143-coordinator-symphony-aligned-telegram-oversight-state-store-extraction/cli/2026-03-12T23-17-59-356Z-d5a30cfc/review/output.log
+Launching Codex review (evidence: .runs/1143-coordinator-symphony-aligned-telegram-oversight-state-store-extraction/cli/2026-03-12T23-17-59-356Z-d5a30cfc/manifest.json)
+[run-review] patience-first monitor checkpoints every 1m 0s (set CODEX_REVIEW_MONITOR_INTERVAL_SECONDS=0 to disable).
+[run-review] low-signal drift guard enabled after 3m 0s of repetitive bounded activity (set CODEX_REVIEW_LOW_SIGNAL_TIMEOUT_SECONDS=0 to disable).
+[run-review] verdict-stability guard enabled after 3m 0s of repeated speculative no-progress output (set CODEX_REVIEW_VERDICT_STABILITY_TIMEOUT_SECONDS=0 to disable).
+[run-review] meta-surface expansion guard enabled after 3m 0s of sustained off-task meta activity (set CODEX_REVIEW_META_SURFACE_TIMEOUT_SECONDS=0 to disable).
+[run-review] startup-anchor boundary enabled for diff mode; repeated memory/skills/review-docs/manifest/review-artifact reads before the first startup anchor will terminate the review.
+[run-review] bounded relevant reinspection dwell boundary enabled after 3m 0s of repetitive on-task reinspection without concrete findings (set CODEX_REVIEW_LOW_SIGNAL_TIMEOUT_SECONDS=0 to disable).
+OpenAI Codex v0.114.0 (research preview)
+--------
+workdir: /Users/kbediako/Code/CO
+model: gpt-5.4
+provider: openai
+approval: never
+sandbox: danger-full-access
+reasoning effort: xhigh
+reasoning summaries: detailed
+session id: 019ce470-c5d7-76b3-8307-30203bfdacc8
+--------
+user
+Review task: 1143-coordinator-symphony-aligned-telegram-oversight-state-store-extraction
+Review surface: diff
+
+Agent notes:
+Goal: extract the Telegram oversight persisted state store into a bridge-local helper while keeping the path-bound store limited to load/save. | Summary: moved state-file path resolution and persisted read/write into a dedicated helper file and left monotonic state reconciliation as plain helper functions in the same module, with bridge ownership retained for sequencing and controller/API lifecycle. | Risks: monotonic updated_at behavior during next_update_id-only advancement; seam drift between persistence and pure reconciliation logic.
+
+Please review the current changes and confirm:
+- The solution is minimal and avoids unnecessary abstraction/scope
+- Behavior remains correct for changed files and nearby dependencies
+- Call out concrete regressions, risky edge cases, or missing tests in the changed area
+- Start with touched paths, scoped diff commands, or nearby changed code before consulting memory, skills, review docs, manifests, or review artifacts
+- Concrete same-diff progress can be shown by citing touched paths with explicit locations such as `path:line`, `path:line:col`, `path#Lline`, or `path#LlineCcol`.
+- If you already have that diff-local citation evidence, do not search the wider repo for other examples of the rendering.
+
+Keep this pass diff-focused. Do not audit checklist/docs/evidence surfaces unless they are directly required to assess code correctness.
+
+Execution constraints (bounded review mode):
+- Keep this review focused on changed files and nearby dependencies.
+- Avoid full validation suites (for example `npm run test`, `npm run lint`, `npm run build`, `npm run docs:check`, `npm run docs:freshness`) during this pass.
+- Do not launch direct validation runners (for example `npx vitest`, `npm exec jest`) or nested review/pipeline/delegation flows during this pass.
+- If broader validation would improve confidence, list follow-up commands instead of executing them.
+
+Review scope hint: uncommitted working tree changes (default).
+
+Review scope paths (6):
+```
+orchestrator/src/cli/control/controlTelegramPushState.ts
+orchestrator/src/cli/control/telegramOversightBridge.ts
+orchestrator/tests/ControlTelegramPushState.test.ts
+orchestrator/tests/TelegramOversightBridge.test.ts
+orchestrator/src/cli/control/telegramOversightBridgeStateStore.ts
+orchestrator/tests/TelegramOversightBridgeStateStore.test.ts
+```
+
+Active closeout provenance:
+- Resolved active closeout root: `out/1143-coordinator-symphony-aligned-telegram-oversight-state-store-extraction/manual/20260312T232532Z-closeout`
+- These roots are already-resolved self-referential review surfaces for this task; do not re-derive or re-enumerate them unless directly necessary to assess code correctness.
+mcp: delegation starting
+mcp: openaiDeveloperDocs starting
+mcp: delegation ready
+mcp: openaiDeveloperDocs ready
+mcp startup: ready: delegation, openaiDeveloperDocs
+mcp: delegation starting
+mcp: openaiDeveloperDocs starting
+mcp: delegation ready
+mcp: openaiDeveloperDocs ready
+mcp startup: ready: delegation, openaiDeveloperDocs
+exec
+/bin/zsh -lc "git status --short && echo '---DIFF---' && git diff -- orchestrator/src/cli/control/controlTelegramPushState.ts orchestrator/src/cli/control/telegramOversightBridge.ts orchestrator/tests/ControlTelegramPushState.test.ts orchestrator/tests/TelegramOversightBridge.test.ts orchestrator/src/cli/control/telegramOversightBridgeStateStore.ts orchestrator/tests/TelegramOversightBridgeStateStore.test.ts" in /Users/kbediako/Code/CO succeeded in 0ms:
+ M orchestrator/src/cli/control/controlTelegramPushState.ts
+ M orchestrator/src/cli/control/telegramOversightBridge.ts
+ M orchestrator/tests/ControlTelegramPushState.test.ts
+ M orchestrator/tests/TelegramOversightBridge.test.ts
+?? orchestrator/src/cli/control/telegramOversightBridgeStateStore.ts
+?? orchestrator/tests/TelegramOversightBridgeStateStore.test.ts
+---DIFF---
+diff --git a/orchestrator/src/cli/control/controlTelegramPushState.ts b/orchestrator/src/cli/control/controlTelegramPushState.ts
+index 2eccf02c5..a33a51315 100644
+--- a/orchestrator/src/cli/control/controlTelegramPushState.ts
++++ b/orchestrator/src/cli/control/controlTelegramPushState.ts
+@@ -1,7 +1,3 @@
+-import { readFile } from 'node:fs/promises';
+-
+-import { writeJsonAtomic } from '../utils/fs.js';
+-
+ export interface TelegramOversightPushState {
+   last_sent_projection_hash: string | null;
+   last_sent_at: string | null;
+@@ -37,45 +33,6 @@ export function createDefaultTelegramOversightState(): TelegramOversightBridgeSt
+exec
+/bin/zsh -lc 'git diff -- orchestrator/src/cli/control/telegramOversightBridgeStateStore.ts orchestrator/tests/TelegramOversightBridgeStateStore.test.ts' in /Users/kbediako/Code/CO succeeded in 0ms:
+
+
+thinking
+**Inspecting file contents**
+
+I need to take a closer look at the new file's contents. It feels like an important step to understand what I'm working with before I dive into any tasks. I want to ensure that I'm equipped with the right information to proceed effectively. Let's make sure I'm thorough in this inspection and gather all relevant details. Okay, so I’ll get started on this now.
+thinking
+**Inspecting file contents**
+
+I need to take a closer look at the new file's contents. It feels like an important step to understand what I'm working with before I dive into any tasks. I want to ensure that I'm equipped with the right information to proceed effectively. Let's make sure I'm thorough in this inspection and gather all relevant details. Okay, so I’ll get started on this now.
+exec
+/bin/zsh -lc "sed -n '1,220p' orchestrator/src/cli/control/controlTelegramPushState.ts" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "sed -n '1,260p' orchestrator/src/cli/control/telegramOversightBridge.ts" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "sed -n '1,260p' orchestrator/tests/TelegramOversightBridgeStateStore.test.ts" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "sed -n '1,240p' orchestrator/src/cli/control/telegramOversightBridgeStateStore.ts" in /Users/kbediako/Code/CO succeeded in 0ms:
+export interface TelegramOversightPushState {
+  last_sent_projection_hash: string | null;
+  last_sent_at: string | null;
+  last_event_seq: number | null;
+  pending_projection_hash: string | null;
+  pending_projection_observed_at: string | null;
+}
+
+export interface TelegramOversightBridgeState {
+  next_update_id: number;
+  updated_at: string;
+  push: TelegramOversightPushState;
+}
+
+export type TelegramOversightStatePatch = Pick<TelegramOversightBridgeState, 'updated_at' | 'push'>;
+
+export interface TelegramProjectionStateTransition {
+  kind: 'skip' | 'pending' | 'send';
+  statePatch: TelegramOversightStatePatch;
+}
+ succeeded in 0ms:
+import { randomUUID } from 'node:crypto';
+import { mkdtemp } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+import { describe, expect, it } from 'vitest';
+
+import { createDefaultTelegramOversightState } from '../src/cli/control/controlTelegramPushState.js';
+import {
+  advanceTelegramOversightBridgeStateNextUpdateId,
+  applyTelegramOversightBridgeStatePatch,
+  createTelegramOversightBridgeStateStore
+} from '../src/cli/control/telegramOversightBridgeStateStore.js';
+
+async function createRunDir(): Promise<string> {
+  return mkdtemp(join(tmpdir(), `telegram-oversight-state-store-${randomUUID()}-`));
+}
+
+describe('TelegramOversightBridgeStateStore', () => {
+  it('returns the default state when persisted telegram oversight state is missing', async () => {
+ succeeded in 0ms:
+import { logger } from '../../logger.js';
+import {
+  createControlTelegramCommandController,
+  type ControlTelegramCommandController
+} from './controlTelegramCommandController.js';
+import {
+  createControlTelegramReadController,
+  type ControlTelegramReadController
+} from './controlTelegramReadController.js';
+import {
+  createControlTelegramProjectionNotificationController,
+  type ControlTelegramProjectionNotificationController
+} from './controlTelegramProjectionNotificationController.js';
+import {
+  createControlTelegramUpdateHandler,
+  type ControlTelegramUpdateHandler
+} from './controlTelegramUpdateHandler.js';
+import type {
+  ControlDispatchPilotPayload,
+  ControlSelectedRunRuntimeSnapshot
+ succeeded in 0ms:
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
+
+import { writeJsonAtomic } from '../utils/fs.js';
+import {
+  createDefaultTelegramOversightState,
+  type TelegramOversightBridgeState,
+  type TelegramOversightStatePatch
+} from './controlTelegramPushState.js';
+
+const TELEGRAM_STATE_FILE = 'telegram-oversight-state.json';
+
+export interface TelegramOversightBridgeStateStore {
+  loadState(): Promise<TelegramOversightBridgeState>;
+  saveState(state: TelegramOversightBridgeState): Promise<void>;
+}
+
+export function createTelegramOversightBridgeStateStore(runDir: string): TelegramOversightBridgeStateStore {
+  const statePath = join(runDir, TELEGRAM_STATE_FILE);
+  return {
+
+thinking
+**Inspecting bridge functions**
+
+I need to take a closer look at the lower part of the bridge, especially near the handleUpdates function. There might be other relevant functions I should check as well. It seems essential to ensure everything's functioning properly and to see if there's something that needs adjustment or improvement. I'll approach this carefully to avoid overlooking anything important. Making sure I gather all necessary information will help me address this effectively!
+thinking
+**Inspecting bridge functions**
+
+I need to take a closer look at the lower part of the bridge, especially near the handleUpdates function. There might be other relevant functions I should check as well. It seems essential to ensure everything's functioning properly and to see if there's something that needs adjustment or improvement. I'll approach this carefully to avoid overlooking anything important. Making sure I gather all necessary information will help me address this effectively!
+exec
+/bin/zsh -lc "sed -n '220,420p' orchestrator/src/cli/control/telegramOversightBridge.ts" in /Users/kbediako/Code/CO succeeded in 0ms:
+    } = {}
+  ): Promise<void> {
+    if (!this.config.pushEnabled || this.closed) {
+      return;
+    }
+    this.notificationQueue = this.notificationQueue
+      .then(() => this.maybeSendProjectionDelta(input))
+      .catch((error) => {
+        logger.warn(`[telegram-oversight] push notification failed: ${(error as Error)?.message ?? String(error)}`);
+      });
+    await this.notificationQueue;
+  }
+
+  private async pollLoop(): Promise<void> {
+    while (!this.closed) {
+      try {
+        const updates = await this.fetchUpdates();
+        if (updates.length > 0) {
+          await this.handleUpdates(updates);
+        }
+
+
+
+thinking
+**Identifying potential bugs**
+
+I need to identify any bugs introduced in the new test file, which may miss cleanup but shouldn’t be considered a bug itself. I’ll inspect the original bridge/test context for issues, especially around persistence helper extraction and the monotonic top-level updated_at. I should compare this with previous code to check if behavior remains consistent, especially for edge cases. I'll look closely at new helper functions and interactions to ensure everything works correctly. There might be some formatting issues, but they’re not necessarily bugs.
+thinking
+**Reviewing potential test bugs**
+
+I might only mention a missing test if there's a concrete regression to report. I'll need to review the semantics closely. One potential issue is that `createTelegramOversightBridgeStateStore` hardcodes the `TELEGRAM_STATE_FILE` privately; I wonder if other tests need this path too, but it’s probably okay. There’s also a concern that `advanceTelegramOversightBridgeStateNextUpdateId` updates the `updated_at` based on `state.updated_at` instead of always setting it to the current time, which might need clarification if `updated_at` is malformed. I'll inspect everything thoroughly for potential issues!
+thinking
+**Inspecting potential issues**
+
+I’m looking at the old code, specifically `createTelegramOversightBridgeStateStore(runDir)`, which uses `join` with `runDir`. I’m starting to wonder if `runDir` might be undefined, but that likely isn’t the case. I also need to check if any other modules import `readTelegramOversightState` or `writeTelegramOversightState`, as changes in exports could be causing a broken build. It might be good to search for those names in nearby dependencies using a tool like `rg`. Let’s see what I can find!
+thinking
+**Identifying potential bugs**
+
+I need to identify any bugs introduced in the new test file, which may miss cleanup but shouldn’t be considered a bug itself. I’ll inspect the original bridge/test context for issues, especially around persistence helper extraction and the monotonic top-level updated_at. I should compare this with previous code to check if behavior remains consistent, especially for edge cases. I'll look closely at new helper functions and interactions to ensure everything works correctly. There might be some formatting issues, but they’re not necessarily bugs.
+thinking
+**Reviewing potential test bugs**
+
+I might only mention a missing test if there's a concrete regression to report. I'll need to review the semantics closely. One potential issue is that `createTelegramOversightBridgeStateStore` hardcodes the `TELEGRAM_STATE_FILE` privately; I wonder if other tests need this path too, but it’s probably okay. There’s also a concern that `advanceTelegramOversightBridgeStateNextUpdateId` updates the `updated_at` based on `state.updated_at` instead of always setting it to the current time, which might need clarification if `updated_at` is malformed. I'll inspect everything thoroughly for potential issues!
+thinking
+**Inspecting potential issues**
+
+I’m looking at the old code, specifically `createTelegramOversightBridgeStateStore(runDir)`, which uses `join` with `runDir`. I’m starting to wonder if `runDir` might be undefined, but that likely isn’t the case. I also need to check if any other modules import `readTelegramOversightState` or `writeTelegramOversightState`, as changes in exports could be causing a broken build. It might be good to search for those names in nearby dependencies using a tool like `rg`. Let’s see what I can find!
+exec
+/bin/zsh -lc 'rg -n "readTelegramOversightState|writeTelegramOversightState|createTelegramOversightBridgeStateStore|advanceTelegramOversightBridgeStateNextUpdateId|applyTelegramOversightBridgeStatePatch" orchestrator/src orchestrator/tests' in /Users/kbediako/Code/CO succeeded in 0ms:
+orchestrator/tests/TelegramOversightBridgeStateStore.test.ts:10:  advanceTelegramOversightBridgeStateNextUpdateId,
+orchestrator/tests/TelegramOversightBridgeStateStore.test.ts:11:  applyTelegramOversightBridgeStatePatch,
+orchestrator/tests/TelegramOversightBridgeStateStore.test.ts:12:  createTelegramOversightBridgeStateStore
+orchestrator/tests/TelegramOversightBridgeStateStore.test.ts:22:    const state = await createTelegramOversightBridgeStateStore(runDir).loadState();
+orchestrator/tests/TelegramOversightBridgeStateStore.test.ts:40:    const nextState = applyTelegramOversightBridgeStatePatch(currentState, {
+orchestrator/tests/TelegramOversightBridgeStateStore.test.ts:60:    const nextState = advanceTelegramOversightBridgeStateNextUpdateId(
+orchestrator/src/cli/control/telegramOversightBridge.ts:34:  advanceTelegramOversightBridgeStateNextUpdateId,
+orchestrator/src/cli/control/telegramOversightBridge.ts:35:  applyTelegramOversightBridgeStatePatch,
+orchestrator/src/cli/control/telegramOversightBridge.ts:36:  createTelegramOversightBridgeStateStore,
+orchestrator/src/cli/control/telegramOversightBridge.ts:160:    this.stateStore = createTelegramOversightBridgeStateStore(options.runDir);
+orchestrator/src/cli/control/telegramOversightBridge.ts:288:      this.state = advanceTelegramOversightBridgeStateNextUpdateId(this.state, nextUpdateId, new Date().toISOString());
+orchestrator/src/cli/control/telegramOversightBridge.ts:308:    this.state = applyTelegramOversightBridgeStatePatch(this.state, result.statePatch);
+orchestrator/src/cli/control/telegramOversightBridgeStateStore.ts:18:export function createTelegramOversightBridgeStateStore(runDir: string): TelegramOversightBridgeStateStore {
+orchestrator/src/cli/control/telegramOversightBridgeStateStore.ts:21:    loadState: async () => readTelegramOversightState(statePath),
+orchestrator/src/cli/control/telegramOversightBridgeStateStore.ts:26:export function advanceTelegramOversightBridgeStateNextUpdateId(
+orchestrator/src/cli/control/telegramOversightBridgeStateStore.ts:38:export function applyTelegramOversightBridgeStatePatch(
+orchestrator/src/cli/control/telegramOversightBridgeStateStore.ts:49:async function readTelegramOversightState(path: string): Promise<TelegramOversightBridgeState> {
+
+[run-review] waiting on codex review (1m 0s elapsed, 2s idle; review progress observed).
+thinking
+**Evaluating potential bugs**
+
+I'm considering the bug introduction regarding `createTelegramOversightBridgeStateStore`. It seems like `TELEGRAM_STATE_FILE` might not be exported, which could mean bridge tests or utilities still use a hardcoded path — though I'm not sure if that's really a bug. There's also a potential issue with `last_event_seq` parsing since it accepts any integer, even negative ones. But old code handles this fine. So maybe it's okay? I'll need to dig deeper!
+thinking
+**Evaluating potential bugs**
+
+I'm considering the bug introduction regarding `createTelegramOversightBridgeStateStore`. It seems like `TELEGRAM_STATE_FILE` might not be exported, which could mean bridge tests or utilities still use a hardcoded path — though I'm not sure if that's really a bug. There's also a potential issue with `last_event_seq` parsing since it accepts any integer, even negative ones. But old code handles this fine. So maybe it's okay? I'll need to dig deeper!
+exec
+/bin/zsh -lc "rg -n \"updated_at|TelegramOversightStatePatch|last_event_seq|pending_projection\" orchestrator/src/cli/control -g'*.ts'" in /Users/kbediako/Code/CO succeeded in 0ms:
+orchestrator/src/cli/control/controlTelegramProjectionNotificationController.ts:3:  type TelegramOversightStatePatch,
+orchestrator/src/cli/control/controlTelegramProjectionNotificationController.ts:17:  statePatch: TelegramOversightStatePatch;
+orchestrator/src/cli/control/selectedRunPresenter.ts:88:    updated_at: input.manifest.updated_at,
+orchestrator/src/cli/control/selectedRunPresenter.ts:115:    last_update: input.manifest.updated_at,
+orchestrator/src/cli/control/controlTelegramPushState.ts:4:  last_event_seq: number | null;
+orchestrator/src/cli/control/controlTelegramPushState.ts:5:  pending_projection_hash: string | null;
+orchestrator/src/cli/control/controlTelegramPushState.ts:6:  pending_projection_observed_at: string | null;
+orchestrator/src/cli/control/controlTelegramPushState.ts:11:  updated_at: string;
+orchestrator/src/cli/control/controlTelegramPushState.ts:15:export type TelegramOversightStatePatch = Pick<TelegramOversightBridgeState, 'updated_at' | 'push'>;
+orchestrator/src/cli/control/controlTelegramPushState.ts:19:  statePatch: TelegramOversightStatePatch;
+orchestrator/src/cli/control/controlTelegramPushState.ts:25:    updated_at: new Date(0).toISOString(),
+orchestrator/src/cli/control/controlTelegramPushState.ts:29:      last_event_seq: null,
+orchestrator/src/cli/control/controlTelegramPushState.ts:30:      pending_projection_hash: null,
+orchestrator/src/cli/control/controlTelegramPushState.ts:31:      pending_projection_observed_at: null
+orchestrator/src/cli/control/controlTelegramPushState.ts:46:      : input.pushState.last_event_seq;
+orchestrator/src/cli/control/controlTelegramPushState.ts:53:        updated_at: nowIso,
+orchestrator/src/cli/control/controlTelegramPushState.ts:56:          last_event_seq: nextEventSeq,
+orchestrator/src/cli/control/controlTelegramPushState.ts:57:          pending_projection_hash: null,
+orchestrator/src/cli/control/controlTelegramPushState.ts:58:          pending_projection_observed_at: null
+orchestrator/src/cli/control/controlTelegramPushState.ts:69:        updated_at: nowIso,
+
+thinking
+**Inspecting controller expectations**
+
+I’m thinking about comparing the style with linearWebhookController for reading and writing state, though it might not be necessary. I should check the controlTelegramProjectionNotificationController to see what expectations exist around updated_at being monotonic or eventSeq. There could be important details there! This inspection might help clarify how to handle these elements moving forward. I’m curious to see what the current best practices are regarding these controller functionalities.
+thinking
+**Inspecting controller expectations**
+
+I’m thinking about comparing the style with linearWebhookController for reading and writing state, though it might not be necessary. I should check the controlTelegramProjectionNotificationController to see what expectations exist around updated_at being monotonic or eventSeq. There could be important details there! This inspection might help clarify how to handle these elements moving forward. I’m curious to see what the current best practices are regarding these controller functionalities.
+exec
+/bin/zsh -lc "sed -n '1,220p' orchestrator/src/cli/control/controlTelegramProjectionNotificationController.ts" in /Users/kbediako/Code/CO succeeded in 0ms:
+import {
+  computeTelegramProjectionStateTransition,
+  type TelegramOversightStatePatch,
+  type TelegramOversightPushState
+} from './controlTelegramPushState.js';
+import type { TelegramProjectionDeltaPresentation } from './controlTelegramReadController.js';
+
+export interface ControlTelegramProjectionNotificationController {
+  notifyProjectionDelta(input: {
+    pushState: TelegramOversightPushState;
+    eventSeq?: number | null;
+  }): Promise<ControlTelegramProjectionNotificationResult>;
+}
+
+export interface ControlTelegramProjectionNotificationResult {
+  delivery: 'skip' | 'pending' | 'send';
+  statePatch: TelegramOversightStatePatch;
+}
+
+export function createControlTelegramProjectionNotificationController(input: {
+
+
+
+
+thinking
+**Inspecting module issues**
+
+I need to look into the prior state file to confirm usage and check referenced paths in tests or documentation. This doesn’t seem like a bug at first glance, but I’m wondering if there could be an issue with `applyTelegramOversightBridgeStatePatch`, especially if the `updated_at` timestamp from the `statePatch` is older than what’s expected. It’s important to check if the new module fits our maintenance criteria and includes all necessary files. Running a type check could also help, but it might not be necessary right now.
+thinking
+**Reviewing potential issues**
+
+I want to inspect if there are any changes in `telegramOversightBridge.ts`, specifically around lines 284, to ensure everything is functioning correctly. I should consider concurrency issues with `maybeSendProjectionDelta` and how it updates `this.state`. Although `handleUpdates` can run concurrently, the helper functions are unchanged. There might be a concern with `start()` and `loadState()`, since calling it multiple times could be problematic. Any read errors are still swallowed by the now-private `readTelegramOversightState`, but it seems there’s no actual bug here.
+thinking
+**Inspecting test behavior**
+
+I need to check the updated tests for any new monotonic behavior that might have been missed. Is there a scenario where `next_update_id` should advance with a later `observedAt` timestamp, which in turn should update `updated_at`? The store helper test only accounts for older times, and the bridge test does as well. However, it seems like the behavior is probably correct since we’re using `pickLatestTimestamp`. So, I don’t think there’s an actual bug here.
+thinking
+**Searching for state issues**
+
+I'm wondering if there could be an issue with the default state when missing a push during loadState. It might be a good idea to check the usage of `telegram-oversight-state.json` across the repository. I need to ensure that the state path isn't exported anymore, and maybe look into tests or other code that might have hardcoded values. Alright, let's search to clear this up!
+thinking
+**Inspecting module issues**
+
+I need to look into the prior state file to confirm usage and check referenced paths in tests or documentation. This doesn’t seem like a bug at first glance, but I’m wondering if there could be an issue with `applyTelegramOversightBridgeStatePatch`, especially if the `updated_at` timestamp from the `statePatch` is older than what’s expected. It’s important to check if the new module fits our maintenance criteria and includes all necessary files. Running a type check could also help, but it might not be necessary right now.
+thinking
+**Reviewing potential issues**
+
+I want to inspect if there are any changes in `telegramOversightBridge.ts`, specifically around lines 284, to ensure everything is functioning correctly. I should consider concurrency issues with `maybeSendProjectionDelta` and how it updates `this.state`. Although `handleUpdates` can run concurrently, the helper functions are unchanged. There might be a concern with `start()` and `loadState()`, since calling it multiple times could be problematic. Any read errors are still swallowed by the now-private `readTelegramOversightState`, but it seems there’s no actual bug here.
+thinking
+**Inspecting test behavior**
+
+I need to check the updated tests for any new monotonic behavior that might have been missed. Is there a scenario where `next_update_id` should advance with a later `observedAt` timestamp, which in turn should update `updated_at`? The store helper test only accounts for older times, and the bridge test does as well. However, it seems like the behavior is probably correct since we’re using `pickLatestTimestamp`. So, I don’t think there’s an actual bug here.
+thinking
+**Searching for state issues**
+
+I'm wondering if there could be an issue with the default state when missing a push during loadState. It might be a good idea to check the usage of `telegram-oversight-state.json` across the repository. I need to ensure that the state path isn't exported anymore, and maybe look into tests or other code that might have hardcoded values. Alright, let's search to clear this up!
+exec
+/bin/zsh -lc "rg -n \"telegram-oversight-state\\.json|TELEGRAM_STATE_FILE\" orchestrator -g'*.ts'" in /Users/kbediako/Code/CO succeeded in 0ms:
+orchestrator/src/cli/control/telegramOversightBridgeStateStore.ts:11:const TELEGRAM_STATE_FILE = 'telegram-oversight-state.json';
+orchestrator/src/cli/control/telegramOversightBridgeStateStore.ts:19:  const statePath = join(runDir, TELEGRAM_STATE_FILE);
+orchestrator/tests/TelegramOversightBridge.test.ts:473:        JSON.parse(await readFile(join(paths.runDir, 'telegram-oversight-state.json'), 'utf8')).next_update_id === 104
+orchestrator/tests/TelegramOversightBridge.test.ts:482:      const stateRaw = await readFile(join(paths.runDir, 'telegram-oversight-state.json'), 'utf8');
+orchestrator/tests/TelegramOversightBridge.test.ts:716:          const stateRaw = await readFile(join(paths.runDir, 'telegram-oversight-state.json'), 'utf8');
+orchestrator/tests/TelegramOversightBridge.test.ts:724:      const stateRaw = await readFile(join(paths.runDir, 'telegram-oversight-state.json'), 'utf8');
+orchestrator/tests/TelegramOversightBridge.test.ts:922:          const stateRaw = await readFile(join(paths.runDir, 'telegram-oversight-state.json'), 'utf8');
+orchestrator/tests/TelegramOversightBridge.test.ts:929:      const stateRaw = await readFile(join(paths.runDir, 'telegram-oversight-state.json'), 'utf8');
+orchestrator/tests/TelegramOversightBridge.test.ts:955:      join(paths.runDir, 'telegram-oversight-state.json'),
+orchestrator/tests/TelegramOversightBridge.test.ts:1047:      const stateRaw = await readFile(join(paths.runDir, 'telegram-oversight-state.json'), 'utf8');
+orchestrator/tests/TelegramOversightBridge.test.ts:1086:      join(paths.runDir, 'telegram-oversight-state.json'),
+orchestrator/tests/TelegramOversightBridge.test.ts:1162:      const pendingStateRaw = await readFile(join(paths.runDir, 'telegram-oversight-state.json'), 'utf8');
+orchestrator/tests/TelegramOversightBridge.test.ts:1194:      const flushedStateRaw = await readFile(join(paths.runDir, 'telegram-oversight-state.json'), 'utf8');
+orchestrator/tests/TelegramOversightBridge.test.ts:1229:      join(paths.runDir, 'telegram-oversight-state.json'),
+orchestrator/tests/TelegramOversightBridge.test.ts:1306:        const stateRaw = await readFile(join(paths.runDir, 'telegram-oversight-state.json'), 'utf8');
+orchestrator/tests/TelegramOversightBridge.test.ts:1311:      const overlapStateRaw = await readFile(join(paths.runDir, 'telegram-oversight-state.json'), 'utf8');
+orchestrator/tests/TelegramOversightBridge.test.ts:1321:        const stateRaw = await readFile(join(paths.runDir, 'telegram-oversight-state.json'), 'utf8');
+orchestrator/tests/TelegramOversightBridge.test.ts:1329:      const finalStateRaw = await readFile(join(paths.runDir, 'telegram-oversight-state.json'), 'utf8');
+orchestrator/tests/TelegramOversightBridge.test.ts:1376:      join(paths.runDir, 'telegram-oversight-state.json'),
+orchestrator/tests/TelegramOversightBridge.test.ts:1420:        const stateRaw = await readFile(join(paths.runDir, 'telegram-oversight-state.json'), 'utf8');
+
+thinking
+**Inspecting test behavior**
+
+I noticed that the path constant isn’t exported, and it seems like the tests are hardcoding a string. I need to check the surrounding tests related to monotonic behavior and see if the treatment of `next_update_id` and `updated_at` is as expected. I’ll look into the relevant tests around lines 955, 1086, and maybe that will clarify any assumptions in the code. It’s worth a thorough inspection!
+thinking
+**Inspecting test behavior**
+
+I noticed that the path constant isn’t exported, and it seems like the tests are hardcoding a string. I need to check the surrounding tests related to monotonic behavior and see if the treatment of `next_update_id` and `updated_at` is as expected. I’ll look into the relevant tests around lines 955, 1086, and maybe that will clarify any assumptions in the code. It’s worth a thorough inspection!
+exec
+/bin/zsh -lc "sed -n '930,1110p' orchestrator/tests/TelegramOversightBridge.test.ts" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "sed -n '1160,1345p' orchestrator/tests/TelegramOversightBridge.test.ts" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "sed -n '1345,1455p' orchestrator/tests/TelegramOversightBridge.test.ts" in /Users/kbediako/Code/CO succeeded in 0ms:
+      const state = JSON.parse(stateRaw) as { next_update_id?: number };
+      expect(state.next_update_id).toBe(202);
+      expect(telegram.sentMessages.some((message) => message.text.includes('CO status'))).toBe(true);
+    } finally {
+      await server.close();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('sends deduped projection-driven push notifications when enabled', async () => {
+    const { root, env, paths } = await createRunRoot('task-1016-telegram-push');
+    await seedManifest(paths, {
+      summary: 'task is running',
+      updated_at: '2026-03-06T04:00:00.000Z'
+    });
+    await seedControlState(paths, {
+      control_seq: 1,
+      latest_action: {
+        action: 'pause',
+        requested_at: '2026-03-06T04:01:00.000Z',
+ succeeded in 0ms:
+      expect(telegram.sentMessages).toHaveLength(1);
+
+      const pendingStateRaw = await readFile(join(paths.runDir, 'telegram-oversight-state.json'), 'utf8');
+      const pendingState = JSON.parse(pendingStateRaw) as {
+        next_update_id?: number;
+        push?: {
+          last_sent_projection_hash?: string | null;
+          last_event_seq?: number | null;
+          pending_projection_hash?: string | null;
+          pending_projection_observed_at?: string | null;
+        };
+      };
+      expect(pendingState.next_update_id).toBe(52);
+      expect(pendingState.push?.last_event_seq).toBe(2);
+      expect(pendingState.push?.pending_projection_hash).toBeTruthy();
+      expect(pendingState.push?.pending_projection_hash).not.toBe(pendingState.push?.last_sent_projection_hash);
+      expect(pendingState.push?.pending_projection_observed_at).toBeTruthy();
+
+      await new Promise((resolve) => setTimeout(resolve, 200));
+
+ succeeded in 0ms:
+      expect(finalState.push?.last_sent_at).toBeTruthy();
+      expect(finalState.push?.last_event_seq).toBe(1);
+      expect(finalState.push?.pending_projection_hash).toBeNull();
+      expect(finalState.push?.pending_projection_observed_at).toBeNull();
+      expect(telegram.sentMessages).toHaveLength(2);
+      expect(telegram.sentMessages.every((message) => message.chat_id === '1234')).toBe(true);
+    } finally {
+      releaseProjectionSend?.();
+      await server.close();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('keeps top-level updated_at monotonic when update polling only advances next_update_id', async () => {
+    const { root, paths } = await createRunRoot('telegram-oversight-next-update-monotonicity');
+    const harness = createTelegramHarness(fetch);
+    const seededUpdatedAt = '2099-01-01T00:00:00.000Z';
+    harness.updates.push({
+      update_id: 100,
+      message: {
+[run-review] waiting on codex review (2m 0s elapsed, 14s idle; review progress observed).
+exec
+/bin/zsh -lc "nl -ba orchestrator/src/cli/control/controlTelegramPushState.ts | sed -n '1,130p'" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "nl -ba orchestrator/tests/TelegramOversightBridge.test.ts | sed -n '1348,1428p'" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "nl -ba orchestrator/src/cli/control/telegramOversightBridgeStateStore.ts | sed -n '1,220p'" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "nl -ba orchestrator/src/cli/control/telegramOversightBridge.ts | sed -n '270,320p'" in /Users/kbediako/Code/CO succeeded in 0ms:
+     1	export interface TelegramOversightPushState {
+     2	  last_sent_projection_hash: string | null;
+     3	  last_sent_at: string | null;
+     4	  last_event_seq: number | null;
+     5	  pending_projection_hash: string | null;
+     6	  pending_projection_observed_at: string | null;
+     7	}
+     8	
+     9	export interface TelegramOversightBridgeState {
+    10	  next_update_id: number;
+    11	  updated_at: string;
+    12	  push: TelegramOversightPushState;
+    13	}
+    14	
+    15	export type TelegramOversightStatePatch = Pick<TelegramOversightBridgeState, 'updated_at' | 'push'>;
+    16	
+    17	export interface TelegramProjectionStateTransition {
+    18	  kind: 'skip' | 'pending' | 'send';
+    19	  statePatch: TelegramOversightStatePatch;
+    20	}
+ succeeded in 0ms:
+  1348	      expect(finalState.push?.pending_projection_observed_at).toBeNull();
+  1349	      expect(telegram.sentMessages).toHaveLength(2);
+  1350	      expect(telegram.sentMessages.every((message) => message.chat_id === '1234')).toBe(true);
+  1351	    } finally {
+  1352	      releaseProjectionSend?.();
+  1353	      await server.close();
+  1354	      await rm(root, { recursive: true, force: true });
+  1355	    }
+  1356	  });
+  1357	
+  1358	  it('keeps top-level updated_at monotonic when update polling only advances next_update_id', async () => {
+  1359	    const { root, paths } = await createRunRoot('telegram-oversight-next-update-monotonicity');
+  1360	    const harness = createTelegramHarness(fetch);
+  1361	    const seededUpdatedAt = '2099-01-01T00:00:00.000Z';
+  1362	    harness.updates.push({
+  1363	      update_id: 100,
+  1364	      message: {
+  1365	        message_id: 1,
+  1366	        date: 1,
+  1367	        chat: {
+ succeeded in 0ms:
+     1	import { readFile } from 'node:fs/promises';
+     2	import { join } from 'node:path';
+     3	
+     4	import { writeJsonAtomic } from '../utils/fs.js';
+     5	import {
+     6	  createDefaultTelegramOversightState,
+     7	  type TelegramOversightBridgeState,
+     8	  type TelegramOversightStatePatch
+     9	} from './controlTelegramPushState.js';
+    10	
+    11	const TELEGRAM_STATE_FILE = 'telegram-oversight-state.json';
+    12	
+    13	export interface TelegramOversightBridgeStateStore {
+    14	  loadState(): Promise<TelegramOversightBridgeState>;
+    15	  saveState(state: TelegramOversightBridgeState): Promise<void>;
+    16	}
+    17	
+    18	export function createTelegramOversightBridgeStateStore(runDir: string): TelegramOversightBridgeStateStore {
+    19	  const statePath = join(runDir, TELEGRAM_STATE_FILE);
+    20	  return {
+ succeeded in 0ms:
+   270	    }
+   271	  }
+   272	
+   273	  private async handleUpdates(updates: TelegramUpdate[]): Promise<void> {
+   274	    let nextUpdateId = this.state.next_update_id;
+   275	    for (const update of updates) {
+   276	      nextUpdateId = Math.max(nextUpdateId, update.update_id + 1);
+   277	      try {
+   278	        await this.handleUpdate(update);
+   279	      } catch (error) {
+   280	        logger.warn(
+   281	          `[telegram-oversight] failed to handle update ${update.update_id}: ${
+   282	            (error as Error)?.message ?? String(error)
+   283	          }`
+   284	        );
+   285	      }
+   286	    }
+   287	    if (nextUpdateId !== this.state.next_update_id) {
+   288	      this.state = advanceTelegramOversightBridgeStateNextUpdateId(this.state, nextUpdateId, new Date().toISOString());
+   289	      await this.stateStore.saveState(this.state);
+
+
+
+thinking
+**Evaluating potential issues**
+
+I’m considering an issue that might not be captured. When polling, only `next_update_id` advances, while `updated_at` stays monotonic, and `push.last_event_seq` is unaffected. The user wants a review of the current changes. I could inspect `git diff --stat` or check if a new file lacks export from the barrel. There’s a potential bug scenario with the state loading if the state file exists, but fields are missing. Also, I should look into temp directory cleanup in tests. Could be a good idea to run targeted `tsc` on files instead of a full validation.
+thinking
+**Reviewing validation and tests**
+
+I’m thinking that the validation runner might not be necessary at this point, especially since a diff review should be sufficient. I should check the `package exports` or see if `index.ts` needs an update, although it's an internal module not used elsewhere. There might be an issue with `applyTelegramOversightBridgeStatePatch`, as it applies `pickLatestTimestamp` even for skip transitions. If `state.updated_at` is future-dated and `eventSeq` advances, `last_event_seq` changes, but `updated_at` remains the same. I need to review the changed tests for coverage, and I could confirm that there are no missing tests in that area.
+thinking
+**Inspecting state functions**
+
+I need to consider whether there's an issue with the `loadState` and `saveState` interface being async arrow functions that might be wrapping other functions unnecessarily. Then I think about the potential risk that `readTelegramOversightState` is private, which could prevent testing malformed-file parsing through the public API since `loadState` only interacts with the store. However, the tests already cover missing files. I wonder if the absence of a malformed JSON test could be seen as a bug, but the behavior existed before, and the code hasn’t changed, so it doesn't seem like a regression.
+thinking
+**Evaluating potential issues**
+
+I’m considering an issue that might not be captured. When polling, only `next_update_id` advances, while `updated_at` stays monotonic, and `push.last_event_seq` is unaffected. The user wants a review of the current changes. I could inspect `git diff --stat` or check if a new file lacks export from the barrel. There’s a potential bug scenario with the state loading if the state file exists, but fields are missing. Also, I should look into temp directory cleanup in tests. Could be a good idea to run targeted `tsc` on files instead of a full validation.
+thinking
+**Reviewing validation and tests**
+
+I’m thinking that the validation runner might not be necessary at this point, especially since a diff review should be sufficient. I should check the `package exports` or see if `index.ts` needs an update, although it's an internal module not used elsewhere. There might be an issue with `applyTelegramOversightBridgeStatePatch`, as it applies `pickLatestTimestamp` even for skip transitions. If `state.updated_at` is future-dated and `eventSeq` advances, `last_event_seq` changes, but `updated_at` remains the same. I need to review the changed tests for coverage, and I could confirm that there are no missing tests in that area.
+thinking
+**Inspecting state functions**
+
+I need to consider whether there's an issue with the `loadState` and `saveState` interface being async arrow functions that might be wrapping other functions unnecessarily. Then I think about the potential risk that `readTelegramOversightState` is private, which could prevent testing malformed-file parsing through the public API since `loadState` only interacts with the store. However, the tests already cover missing files. I wonder if the absence of a malformed JSON test could be seen as a bug, but the behavior existed before, and the code hasn’t changed, so it doesn't seem like a regression.
+exec
+/bin/zsh -lc 'git diff --stat -- orchestrator/src/cli/control/controlTelegramPushState.ts orchestrator/src/cli/control/telegramOversightBridge.ts orchestrator/tests/ControlTelegramPushState.test.ts orchestrator/tests/TelegramOversightBridge.test.ts orchestrator/src/cli/control/telegramOversightBridgeStateStore.ts orchestrator/tests/TelegramOversightBridgeStateStore.test.ts' in /Users/kbediako/Code/CO succeeded in 0ms:
+ .../src/cli/control/controlTelegramPushState.ts    | 57 ----------------
+ .../src/cli/control/telegramOversightBridge.ts     | 49 ++++----------
+ .../tests/ControlTelegramPushState.test.ts         | 19 +-----
+ orchestrator/tests/TelegramOversightBridge.test.ts | 77 ++++++++++++++++++++++
+ 4 files changed, 91 insertions(+), 111 deletions(-)
+
+
+
+
+
+
+
+[run-review] waiting on codex review (3m 0s elapsed, 1s idle; review progress observed).
+
+thinking
+**Reviewing git diff process**
+
+I think the issue with the diff stat is that it doesn't show new files due to untracked status. It's not included in the diff; this can be confusing. I might consider using `git diff --no-index /dev/null` to check new files, though it seems unnecessary. I need to inspect the generated code and line numbers for clarity, and ensure the new tests are adequate. Overall, I can confirm no functional regressions were found in the tests.
+thinking
+**Evaluating edge cases**
+
+Before concluding that there are no findings, I should manually analyze the edge cases. First, the loadState function captures all errors. The next_update_id helper uses pickLatestTimestamp, so if there's an invalid current date, it returns observedAt. This could turn updated_at valid if the current date is invalid, which is a change from the old direct assignment method. Applying a patch with the current invalid date returns a valid patch, which is an improvement. Overall, previous direct assignments may have resulted in invalid values, but the observedAt passed here is valid.
+thinking
+**Identifying potential issues**
+
+I'm considering a potential issue where, if the state file is missing and the runDir doesn't exist, `loadState` might catch an ENOENT error and just return the default. This could create a problem later on if `saveState` is called, as writeJsonAtomic may fail due to the missing directory. However, the runDir should exist, so it's not technically a bug. Also, I notice that the `TELEGRAM_STATE_FILE` constant was moved, but tests are still using the repeated string. I should check if the new file tests cover `saveState`, but it seems there’s no regression.
+thinking
+**Evaluating potential issues**
+
+I’m considering if there’s a bug in the new store test that uses `createDefaultTelegramOversightState()` twice, which could lead to separate objects. Then I wonder about missing imports of `rm` in the new test file, but it seems that’s not needed since there's no cleanup required. 
+
+I want to thoroughly check if any untracked files affect the package build, as they might not compile in a TypeScript project. I should inspect the `writeJsonAtomic` function, but that may not be necessary.
+thinking
+**Inspecting potential bugs**
+
+I’m wondering if there could be a bug related to the `createTelegramOversightBridgeStateStore` name, but I don't think so. Then I consider whether there's a missing round-trip persistence test for the new helper. However, the guidelines suggest missing tests are only necessary for significant regressions or risky edge cases. 
+
+Since bridge integration tests cover the persisted state file, I’ll check `ControlTelegramPushState.test.ts` and the new store tests for any potentially missing tests about malformed state files, but it doesn't seem like there's a bug.
+thinking
+**Debugging file structure**
+
+I see that the new file path is under src/cli/control, but it seems there's no accompanying `.js` extension for imports, even though it correctly imports `./telegramOversightBridgeStateStore.js` from the TypeScript file. I'm wondering if the `pickLatestTimestamp` function could have a bug regarding monotonicity when strings with time zone offsets parse as equal. The extracted state store module should probably export `readTelegramOversightState` for tests or nearby dependencies, but it's private right now. However, tests are working fine with public loadState.
+thinking
+**Evaluating PR concerns**
+
+I should check for any existing failures or concerns from the PR, but since it’s only diff-focused, I won’t do that. It's essential to ensure no unnecessary memory usage, and I won't need a final memory citation. The output needs to match the exact JSON schema, so if I find no issues, I’ll return `findings: []` and confirm the overall correctness is accurate. I’ll also include an explanation in one to three sentences and a measured overall confidence. I might mention that the review remained diff-focused, and suggest potential issues in the `advanceTelegramOversightBridgeStateNextUpdateId`.
+thinking
+**Clarifying module structure**
+
+This seems to be exactly what I wanted. I’m considering the note about the "path-bound store limited to load/save." In the new module, the `advance...` and `apply...` functions are exported from the same module as the state store. I’m wondering if this means it’s not just a "path-bound store limited to load/save," since the module also includes pure logic. However, the store object only exposes load/save methods, which is minimal enough. So, I think it's not a bug.
+thinking
+**Reviewing git diff process**
+
+I think the issue with the diff stat is that it doesn't show new files due to untracked status. It's not included in the diff; this can be confusing. I might consider using `git diff --no-index /dev/null` to check new files, though it seems unnecessary. I need to inspect the generated code and line numbers for clarity, and ensure the new tests are adequate. Overall, I can confirm no functional regressions were found in the tests.
+thinking
+**Evaluating edge cases**
+
+Before concluding that there are no findings, I should manually analyze the edge cases. First, the loadState function captures all errors. The next_update_id helper uses pickLatestTimestamp, so if there's an invalid current date, it returns observedAt. This could turn updated_at valid if the current date is invalid, which is a change from the old direct assignment method. Applying a patch with the current invalid date returns a valid patch, which is an improvement. Overall, previous direct assignments may have resulted in invalid values, but the observedAt passed here is valid.
+thinking
+**Identifying potential issues**
+
+I'm considering a potential issue where, if the state file is missing and the runDir doesn't exist, `loadState` might catch an ENOENT error and just return the default. This could create a problem later on if `saveState` is called, as writeJsonAtomic may fail due to the missing directory. However, the runDir should exist, so it's not technically a bug. Also, I notice that the `TELEGRAM_STATE_FILE` constant was moved, but tests are still using the repeated string. I should check if the new file tests cover `saveState`, but it seems there’s no regression.
+thinking
+**Evaluating potential issues**
+
+I’m considering if there’s a bug in the new store test that uses `createDefaultTelegramOversightState()` twice, which could lead to separate objects. Then I wonder about missing imports of `rm` in the new test file, but it seems that’s not needed since there's no cleanup required. 
+
+I want to thoroughly check if any untracked files affect the package build, as they might not compile in a TypeScript project. I should inspect the `writeJsonAtomic` function, but that may not be necessary.
+thinking
+**Inspecting potential bugs**
+
+I’m wondering if there could be a bug related to the `createTelegramOversightBridgeStateStore` name, but I don't think so. Then I consider whether there's a missing round-trip persistence test for the new helper. However, the guidelines suggest missing tests are only necessary for significant regressions or risky edge cases. 
+
+Since bridge integration tests cover the persisted state file, I’ll check `ControlTelegramPushState.test.ts` and the new store tests for any potentially missing tests about malformed state files, but it doesn't seem like there's a bug.
+thinking
+**Debugging file structure**
+
+I see that the new file path is under src/cli/control, but it seems there's no accompanying `.js` extension for imports, even though it correctly imports `./telegramOversightBridgeStateStore.js` from the TypeScript file. I'm wondering if the `pickLatestTimestamp` function could have a bug regarding monotonicity when strings with time zone offsets parse as equal. The extracted state store module should probably export `readTelegramOversightState` for tests or nearby dependencies, but it's private right now. However, tests are working fine with public loadState.
+thinking
+**Evaluating PR concerns**
+
+I should check for any existing failures or concerns from the PR, but since it’s only diff-focused, I won’t do that. It's essential to ensure no unnecessary memory usage, and I won't need a final memory citation. The output needs to match the exact JSON schema, so if I find no issues, I’ll return `findings: []` and confirm the overall correctness is accurate. I’ll also include an explanation in one to three sentences and a measured overall confidence. I might mention that the review remained diff-focused, and suggest potential issues in the `advanceTelegramOversightBridgeStateNextUpdateId`.
+thinking
+**Clarifying module structure**
+
+This seems to be exactly what I wanted. I’m considering the note about the "path-bound store limited to load/save." In the new module, the `advance...` and `apply...` functions are exported from the same module as the state store. I’m wondering if this means it’s not just a "path-bound store limited to load/save," since the module also includes pure logic. However, the store object only exposes load/save methods, which is minimal enough. So, I think it's not a bug.
+codex
+I did not find a discrete correctness regression in the touched paths. The extraction preserves the existing load/save parsing behavior, and the changed monotonic `updated_at` handling is now covered both at the helper level and in the bridge-level polling path.
+Review output saved to: .runs/1143-coordinator-symphony-aligned-telegram-oversight-state-store-extraction/cli/2026-03-12T23-17-59-356Z-d5a30cfc/review/output.log
+Review telemetry saved to: .runs/1143-coordinator-symphony-aligned-telegram-oversight-state-store-extraction/cli/2026-03-12T23-17-59-356Z-d5a30cfc/review/telemetry.json

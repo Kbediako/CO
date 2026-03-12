@@ -20,21 +20,21 @@
 
 ## Telegram State Store Extraction
 
-- [ ] One dedicated helper owns Telegram state-file path resolution, persisted-state reads/writes, and monotonic top-level `updated_at` reconciliation.
-- [ ] `telegramOversightBridge.ts` remains the authoritative owner of in-memory whole-state sequencing, `next_update_id`, queue lifecycle, and controller/API-client ownership.
-- [ ] Focused regressions preserve the existing interleaving guarantee and fallback/default state behavior.
+- [x] One dedicated helper owns Telegram state-file path resolution, persisted-state reads/writes, and monotonic top-level `updated_at` reconciliation. Evidence: `orchestrator/src/cli/control/telegramOversightBridgeStateStore.ts`, `out/1143-coordinator-symphony-aligned-telegram-oversight-state-store-extraction/manual/20260312T232532Z-closeout/12-manual-telegram-state-store-check.md`
+- [x] `telegramOversightBridge.ts` remains the authoritative owner of in-memory whole-state sequencing, `next_update_id`, queue lifecycle, and controller/API-client ownership. Evidence: `orchestrator/src/cli/control/telegramOversightBridge.ts`, `out/1143-coordinator-symphony-aligned-telegram-oversight-state-store-extraction/manual/20260312T232532Z-closeout/12-manual-telegram-state-store-check.md`
+- [x] Focused regressions preserve the existing interleaving guarantee and fallback/default state behavior. Evidence: `orchestrator/tests/ControlTelegramPushState.test.ts`, `orchestrator/tests/TelegramOversightBridgeStateStore.test.ts`, `orchestrator/tests/TelegramOversightBridge.test.ts`, `out/1143-coordinator-symphony-aligned-telegram-oversight-state-store-extraction/manual/20260312T232532Z-closeout/05-targeted-tests.log`
 
 ## Validation + Closeout
 
-- [ ] `node scripts/delegation-guard.mjs`
-- [ ] `node scripts/spec-guard.mjs --dry-run`
-- [ ] `npm run build`
-- [ ] `npm run lint`
-- [ ] `npm run test`
-- [ ] `npm run docs:check`
-- [ ] `npm run docs:freshness`
-- [ ] `node scripts/diff-budget.mjs`
-- [ ] `npm run review`
-- [ ] `npm run pack:smoke`
-- [ ] Manual/mock Telegram state-store evidence captured.
-- [ ] Elegance review completed.
+- [x] `node scripts/delegation-guard.mjs` Evidence: `out/1143-coordinator-symphony-aligned-telegram-oversight-state-store-extraction/manual/20260312T232532Z-closeout/01-delegation-guard.log`
+- [x] `node scripts/spec-guard.mjs --dry-run` Evidence: `out/1143-coordinator-symphony-aligned-telegram-oversight-state-store-extraction/manual/20260312T232532Z-closeout/02-spec-guard.log`
+- [x] `npm run build` Evidence: `out/1143-coordinator-symphony-aligned-telegram-oversight-state-store-extraction/manual/20260312T232532Z-closeout/03-build.log`
+- [x] `npm run lint` Evidence: `out/1143-coordinator-symphony-aligned-telegram-oversight-state-store-extraction/manual/20260312T232532Z-closeout/04-lint.log`
+- [x] `npm run test` Evidence: `out/1143-coordinator-symphony-aligned-telegram-oversight-state-store-extraction/manual/20260312T232532Z-closeout/06-test.log`
+- [x] `npm run docs:check` Evidence: `out/1143-coordinator-symphony-aligned-telegram-oversight-state-store-extraction/manual/20260312T232532Z-closeout/07-docs-check.log`
+- [x] `npm run docs:freshness` Evidence: `out/1143-coordinator-symphony-aligned-telegram-oversight-state-store-extraction/manual/20260312T232532Z-closeout/08-docs-freshness.log`
+- [x] `node scripts/diff-budget.mjs` Evidence: `out/1143-coordinator-symphony-aligned-telegram-oversight-state-store-extraction/manual/20260312T232532Z-closeout/09-diff-budget.log`, `out/1143-coordinator-symphony-aligned-telegram-oversight-state-store-extraction/manual/20260312T232532Z-closeout/14-override-notes.md`
+- [x] `npm run review` Evidence: `out/1143-coordinator-symphony-aligned-telegram-oversight-state-store-extraction/manual/20260312T232532Z-closeout/10-review.log`
+- [x] `npm run pack:smoke` Evidence: `out/1143-coordinator-symphony-aligned-telegram-oversight-state-store-extraction/manual/20260312T232532Z-closeout/11-pack-smoke.log`
+- [x] Manual/mock Telegram state-store evidence captured. Evidence: `out/1143-coordinator-symphony-aligned-telegram-oversight-state-store-extraction/manual/20260312T232532Z-closeout/12-manual-telegram-state-store-check.md`
+- [x] Elegance review completed. Evidence: `out/1143-coordinator-symphony-aligned-telegram-oversight-state-store-extraction/manual/20260312T232532Z-closeout/13-elegance-review.md`

@@ -1,7 +1,7 @@
 ---
 id: 20260313-1143-coordinator-symphony-aligned-telegram-oversight-state-store-extraction
 title: Coordinator Symphony-Aligned Telegram Oversight State Store Extraction
-status: draft
+status: completed
 owners:
   - Codex
 created: 2026-03-13
@@ -38,3 +38,4 @@ Extract the remaining bridge-local Telegram state-store shell from `telegramOver
 - 2026-03-13: Pre-implementation local read-only review approved for docs-first registration. Evidence: `docs/findings/1143-telegram-oversight-state-store-extraction-deliberation.md`.
 - 2026-03-13: Deterministic docs-first guards passed for the registered package after resolving one planned-path docs mismatch and one `docs/TASKS.md` line-budget overflow. Evidence: `out/1143-coordinator-symphony-aligned-telegram-oversight-state-store-extraction/manual/20260312T230956Z-docs-first/00-summary.md`, `out/1143-coordinator-symphony-aligned-telegram-oversight-state-store-extraction/manual/20260312T230956Z-docs-first/01-spec-guard.log`, `out/1143-coordinator-symphony-aligned-telegram-oversight-state-store-extraction/manual/20260312T230956Z-docs-first/02-docs-check.log`, `out/1143-coordinator-symphony-aligned-telegram-oversight-state-store-extraction/manual/20260312T230956Z-docs-first/03-docs-freshness.log`.
 - 2026-03-13: `docs-review` was attempted twice; the first run failed at its own delegation guard, and the rerun drifted into `scripts/tasks-archive.mjs` after the archive-policy context instead of surfacing a concrete `1143` docs defect, so this lane carries an explicit docs-review override for registration. Evidence: `out/1143-coordinator-symphony-aligned-telegram-oversight-state-store-extraction/manual/20260312T230956Z-docs-first/04-docs-review.json`, `out/1143-coordinator-symphony-aligned-telegram-oversight-state-store-extraction/manual/20260312T230956Z-docs-first/05-docs-review.json`, `out/1143-coordinator-symphony-aligned-telegram-oversight-state-store-extraction/manual/20260312T230956Z-docs-first/05-docs-review-override.md`.
+- 2026-03-13: Completed. `1143` extracted the bridge-local Telegram persisted state shell into `telegramOversightBridgeStateStore.ts`, then tightened the final seam so the path-bound store is limited to load/save while the same helper module exposes plain monotonic `updated_at` reconciliation helpers. Focused Telegram regressions passed `3/3` files and `20/20` tests, the final full suite passed `198/198` files and `1436/1436` tests, bounded review returned no discrete correctness regression, and `pack:smoke` passed. Evidence: `out/1143-coordinator-symphony-aligned-telegram-oversight-state-store-extraction/manual/20260312T232532Z-closeout/00-summary.md`.
