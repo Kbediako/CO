@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260313-1142-coordinator-symphony-aligned-telegram-projection-notification-interleaving-backstop",
+      "title": "Coordinator Symphony-Aligned Telegram Projection Notification Interleaving Backstop",
+      "relates_to": "tasks/tasks-1142-coordinator-symphony-aligned-telegram-projection-notification-interleaving-backstop.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-13",
+      "paths": {
+        "spec": "tasks/specs/1142-coordinator-symphony-aligned-telegram-projection-notification-interleaving-backstop.md",
+        "task": "tasks/tasks-1142-coordinator-symphony-aligned-telegram-projection-notification-interleaving-backstop.md",
+        "agent_task": ".agent/task/1142-coordinator-symphony-aligned-telegram-projection-notification-interleaving-backstop.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-telegram-projection-notification-interleaving-backstop.md"
+      }
+    },
+    {
       "id": "20260313-1141-coordinator-symphony-aligned-telegram-projection-notification-state-contract-narrowing",
       "title": "Coordinator Symphony-Aligned Telegram Projection Notification State Contract Narrowing",
       "relates_to": "tasks/tasks-1141-coordinator-symphony-aligned-telegram-projection-notification-state-contract-narrowing.md",
