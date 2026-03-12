@@ -20,21 +20,21 @@
 
 ## Output Contract
 
-- [ ] Startup-loop failures persist a stable first-class `termination_boundary` record. Evidence: `REPLACE-CLOSEOUT-SUMMARY`, `REPLACE-TARGETED-TESTS`
-- [ ] Terminal failure output prints one stable startup-loop classification/provenance line while preserving the existing startup-loop message. Evidence: `REPLACE-CLOSEOUT-SUMMARY`, `REPLACE-TARGETED-TESTS`, `REPLACE-REVIEW-LOG`
-- [ ] Cross-stream fragmented startup-loop text still falls back to plain timeout rather than startup-loop classification. Evidence: `REPLACE-CLOSEOUT-SUMMARY`, `REPLACE-TARGETED-TESTS`
+- [x] Startup-loop failures persist a stable first-class `termination_boundary` record. Evidence: `out/1134-coordinator-symphony-aligned-standalone-review-startup-loop-termination-boundary-classification/manual/20260312T102852Z-closeout/00-summary.md`, `out/1134-coordinator-symphony-aligned-standalone-review-startup-loop-termination-boundary-classification/manual/20260312T102852Z-closeout/05-targeted-tests.log`
+- [x] Terminal failure output prints one stable startup-loop classification/provenance line while preserving the existing startup-loop message. Evidence: `out/1134-coordinator-symphony-aligned-standalone-review-startup-loop-termination-boundary-classification/manual/20260312T102852Z-closeout/00-summary.md`, `out/1134-coordinator-symphony-aligned-standalone-review-startup-loop-termination-boundary-classification/manual/20260312T102852Z-closeout/05-targeted-tests.log`, `out/1134-coordinator-symphony-aligned-standalone-review-startup-loop-termination-boundary-classification/manual/20260312T102852Z-closeout/10-review.log`
+- [x] Cross-stream fragmented startup-loop text still falls back to plain timeout rather than startup-loop classification. Evidence: `out/1134-coordinator-symphony-aligned-standalone-review-startup-loop-termination-boundary-classification/manual/20260312T102852Z-closeout/00-summary.md`, `out/1134-coordinator-symphony-aligned-standalone-review-startup-loop-termination-boundary-classification/manual/20260312T102852Z-closeout/05-targeted-tests.log`
 
 ## Validation + Closeout
 
-- [ ] `node scripts/delegation-guard.mjs`. Evidence: `REPLACE-DELEGATION-GUARD`
-- [ ] `node scripts/spec-guard.mjs --dry-run`. Evidence: `REPLACE-SPEC-GUARD`
-- [ ] `npm run build`. Evidence: `REPLACE-BUILD`
-- [ ] `npm run lint`. Evidence: `REPLACE-LINT`
-- [ ] `npm run test`. Evidence: `REPLACE-TEST`
-- [ ] `npm run docs:check`. Evidence: `REPLACE-DOCS-CHECK`
-- [ ] `npm run docs:freshness`. Evidence: `REPLACE-DOCS-FRESHNESS`
-- [ ] `node scripts/diff-budget.mjs`. Evidence: `REPLACE-DIFF-BUDGET`
-- [ ] `npm run review`. Evidence: `REPLACE-REVIEW`
-- [ ] `npm run pack:smoke`. Evidence: `REPLACE-PACK-SMOKE`
-- [ ] Manual/mock evidence captured for startup-loop boundary classification. Evidence: `REPLACE-MANUAL`
-- [ ] Elegance review completed. Evidence: `REPLACE-ELEGANCE`
+- [x] `node scripts/delegation-guard.mjs`. Evidence: `out/1134-coordinator-symphony-aligned-standalone-review-startup-loop-termination-boundary-classification/manual/20260312T102852Z-closeout/01-delegation-guard.log`
+- [x] `node scripts/spec-guard.mjs --dry-run`. Evidence: `out/1134-coordinator-symphony-aligned-standalone-review-startup-loop-termination-boundary-classification/manual/20260312T102852Z-closeout/02-spec-guard.log`
+- [x] `npm run build`. Evidence: `out/1134-coordinator-symphony-aligned-standalone-review-startup-loop-termination-boundary-classification/manual/20260312T102852Z-closeout/03-build.log`
+- [x] `npm run lint`. Evidence: `out/1134-coordinator-symphony-aligned-standalone-review-startup-loop-termination-boundary-classification/manual/20260312T102852Z-closeout/04-lint.log`
+- [x] `npm run test`. Evidence: `out/1134-coordinator-symphony-aligned-standalone-review-startup-loop-termination-boundary-classification/manual/20260312T102852Z-closeout/06-test.log`, `out/1134-coordinator-symphony-aligned-standalone-review-startup-loop-termination-boundary-classification/manual/20260312T102852Z-closeout/14-override-notes.md`
+- [x] `npm run docs:check`. Evidence: `out/1134-coordinator-symphony-aligned-standalone-review-startup-loop-termination-boundary-classification/manual/20260312T102852Z-closeout/07-docs-check.log`
+- [x] `npm run docs:freshness`. Evidence: `out/1134-coordinator-symphony-aligned-standalone-review-startup-loop-termination-boundary-classification/manual/20260312T102852Z-closeout/08-docs-freshness.log`
+- [x] `node scripts/diff-budget.mjs`. Evidence: `out/1134-coordinator-symphony-aligned-standalone-review-startup-loop-termination-boundary-classification/manual/20260312T102852Z-closeout/09-diff-budget.log`
+- [x] `npm run review`. Evidence: `out/1134-coordinator-symphony-aligned-standalone-review-startup-loop-termination-boundary-classification/manual/20260312T102852Z-closeout/10-review.log`, `out/1134-coordinator-symphony-aligned-standalone-review-startup-loop-termination-boundary-classification/manual/20260312T102852Z-closeout/14-override-notes.md`
+- [x] `npm run pack:smoke`. Evidence: `out/1134-coordinator-symphony-aligned-standalone-review-startup-loop-termination-boundary-classification/manual/20260312T102852Z-closeout/11-pack-smoke.log`
+- [x] Manual/mock evidence captured for startup-loop boundary classification. Evidence: `out/1134-coordinator-symphony-aligned-standalone-review-startup-loop-termination-boundary-classification/manual/20260312T102852Z-closeout/12-manual-startup-loop-check.md`
+- [x] Elegance review completed. Evidence: `out/1134-coordinator-symphony-aligned-standalone-review-startup-loop-termination-boundary-classification/manual/20260312T102852Z-closeout/13-elegance-review.md`

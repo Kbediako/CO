@@ -447,6 +447,37 @@ describe('ReviewExecutionState', () => {
     });
   });
 
+  it('projects startup-loop failures into first-class termination boundary records', () => {
+    const state = new ReviewExecutionState({ startedAtMs: 0 });
+    const message =
+      'codex review appears stuck in delegation startup loop after 1s (2 startup events, no review progress). Set CODEX_REVIEW_STARTUP_LOOP_TIMEOUT_SECONDS=0 to disable.';
+
+    const boundary = state.getTerminationBoundaryRecord(message, 2_000);
+    expect(boundary).toEqual({
+      kind: 'startup-loop',
+      provenance: 'delegation-startup-loop',
+      reason: message,
+      sample: null
+    });
+
+    const payload = state.buildTelemetryPayload({
+      status: 'failed',
+      error: message,
+      terminationBoundary: boundary,
+      outputLogPath: '/repo/.runs/sample/review/output.log',
+      repoRoot: '/repo',
+      includeRawTelemetry: false,
+      telemetryDebugEnvKey: 'CODEX_REVIEW_DEBUG_TELEMETRY'
+    });
+
+    expect(payload.termination_boundary).toEqual({
+      kind: 'startup-loop',
+      provenance: 'delegation-startup-loop',
+      reason: message,
+      sample: null
+    });
+  });
+
   it('projects active closeout rereads into first-class termination boundary records', () => {
     const state = new ReviewExecutionState({
       startedAtMs: 0,

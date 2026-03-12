@@ -2390,6 +2390,27 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
 
     expect(result.exitCode).toBeGreaterThan(0);
     expect(result.stderr).toContain('codex review appears stuck in delegation startup loop');
+    expect(result.stderr).toContain('termination boundary: startup-loop (delegation-startup-loop).');
+
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      termination_boundary: {
+        kind: string;
+        provenance: string;
+        reason: string;
+        sample: string | null;
+      } | null;
+    };
+    expect(telemetry.status).toBe('failed');
+    expect(telemetry.termination_boundary).toEqual(
+      expect.objectContaining({
+        kind: 'startup-loop',
+        provenance: 'delegation-startup-loop',
+        reason: expect.stringContaining('codex review appears stuck in delegation startup loop'),
+        sample: null
+      })
+    );
   }, LONG_WAIT_TEST_TIMEOUT_MS);
 
   it('still detects startup loops when non-progress banner lines appear before the loop', async () => {
@@ -2442,6 +2463,17 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(result.exitCode).toBeGreaterThan(0);
     expect(result.stderr).toContain('codex review timed out after 1s');
     expect(result.stderr).not.toContain('delegation startup loop');
+
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      termination_boundary: {
+        kind: string;
+        provenance: string;
+        reason: string;
+        sample: string | null;
+      } | null;
+    };
+    expect(telemetry.termination_boundary).toBeNull();
   }, LONG_WAIT_TEST_TIMEOUT_MS);
 
   it('fails bounded review when repetitive low-signal inspection persists', async () => {

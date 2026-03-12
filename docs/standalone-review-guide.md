@@ -79,7 +79,7 @@ Use `codex-orchestrator review` as the default path so runs inherit CO guardrail
 - Optional timeout/stall/startup-loop guards:
   - `CODEX_REVIEW_TIMEOUT_SECONDS=<seconds>` (`0` disables when set)
   - `CODEX_REVIEW_STALL_TIMEOUT_SECONDS=<seconds>` (`0` disables when set)
-  - `CODEX_REVIEW_STARTUP_LOOP_TIMEOUT_SECONDS=<seconds>` with optional `CODEX_REVIEW_STARTUP_LOOP_MIN_EVENTS` (default `8` when startup-loop timeout is set)
+  - `CODEX_REVIEW_STARTUP_LOOP_TIMEOUT_SECONDS=<seconds>` with optional `CODEX_REVIEW_STARTUP_LOOP_MIN_EVENTS` (default `8` when startup-loop timeout is set); when this guard fires, runtime telemetry records a first-class `startup-loop` termination boundary
   - `CODEX_REVIEW_LOW_SIGNAL_TIMEOUT_SECONDS=<seconds>` (`0` disables the bounded low-signal drift guard; default `180`)
   - `CODEX_REVIEW_VERDICT_STABILITY_TIMEOUT_SECONDS=<seconds>` (`0` disables the bounded verdict-stability guard; default `180`)
   - `CODEX_REVIEW_META_SURFACE_TIMEOUT_SECONDS=<seconds>` (`0` disables the bounded meta-surface expansion guard; default `180`)
@@ -91,7 +91,7 @@ Use `codex-orchestrator review` as the default path so runs inherit CO guardrail
 - `codex-orchestrator review` writes artifacts under `<runDir>/review/`, where `<runDir>` tracks the resolved manifest lineage: it uses `CODEX_ORCHESTRATOR_RUN_DIR` only when that directory contains the resolved manifest, otherwise it falls back to `dirname(manifestPath)`.
 - Prompt artifact: `<runDir>/review/prompt.txt` (always).
 - Review transcript: `<runDir>/review/output.log` (when `codex review` runs, for example with `FORCE_CODEX_REVIEW=1`).
-- Runtime telemetry artifact: `<runDir>/review/telemetry.json` (best-effort summary of observed command activity, startup events, output tail, plus a first-class `termination_boundary` record when the current bounded command-intent, shell-probe, active-closeout-bundle-reread, startup-anchor, meta-surface expansion, verdict-stability, or relevant-reinspection dwell guard fires).
+- Runtime telemetry artifact: `<runDir>/review/telemetry.json` (best-effort summary of observed command activity, startup events, output tail, plus a first-class `termination_boundary` record when the current bounded command-intent, shell-probe, active-closeout-bundle-reread, startup-anchor, startup-loop, meta-surface expansion, verdict-stability, or relevant-reinspection dwell guard fires).
 
 ## Expected outputs
 - `codex review`: prioritized findings; no working tree edits.

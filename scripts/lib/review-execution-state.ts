@@ -102,6 +102,7 @@ export type ReviewCommandIntentViolationKind =
 export type ReviewTerminationBoundaryKind =
   | 'command-intent'
   | 'shell-probe'
+  | 'startup-loop'
   | 'active-closeout-bundle-reread'
   | 'startup-anchor'
   | 'meta-surface-expansion'
@@ -110,6 +111,7 @@ export type ReviewTerminationBoundaryKind =
 export type ReviewTerminationBoundaryProvenance =
   | ReviewCommandIntentViolationKind
   | 'direct-shell-verification'
+  | 'delegation-startup-loop'
   | 'active-closeout-self-reference-search'
   | 'pre-anchor-meta-surface'
   | 'meta-surface-kinds'
@@ -845,6 +847,14 @@ export class ReviewExecutionState {
   ): ReviewTerminationBoundaryRecord | null {
     const matchedKinds = inferTerminationBoundaryKindsFromErrorMessage(errorMessage);
     for (const kind of matchedKinds) {
+      if (kind === 'startup-loop' && errorMessage) {
+        return {
+          kind: 'startup-loop',
+          provenance: 'delegation-startup-loop',
+          reason: errorMessage,
+          sample: null
+        };
+      }
       const record = this.buildTerminationBoundaryRecord(kind, nowMs);
       if (record) {
         return record;
@@ -1605,6 +1615,9 @@ function inferTerminationBoundaryKindsFromErrorMessage(
   }
   if (errorMessage.includes('shell-probe boundary violated')) {
     kinds.push('shell-probe');
+  }
+  if (errorMessage.includes('appears stuck in delegation startup loop')) {
+    kinds.push('startup-loop');
   }
   if (errorMessage.includes('active-closeout-bundle reread boundary violated')) {
     kinds.push('active-closeout-bundle-reread');

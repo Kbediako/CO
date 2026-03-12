@@ -2485,11 +2485,15 @@ async function waitForChildExit(
         if (state.reviewProgressObserved || state.startupEvents < options.startupLoopMinEvents) {
           return;
         }
-        requestTermination(
-          `codex review appears stuck in delegation startup loop after ${Math.round(
-            startupLoopTimeoutMs / 1000
-          )}s (${state.startupEvents} startup events, no review progress). Set CODEX_REVIEW_STARTUP_LOOP_TIMEOUT_SECONDS=0 to disable.`
-        );
+        const message = `codex review appears stuck in delegation startup loop after ${Math.round(
+          startupLoopTimeoutMs / 1000
+        )}s (${state.startupEvents} startup events, no review progress). Set CODEX_REVIEW_STARTUP_LOOP_TIMEOUT_SECONDS=0 to disable.`;
+        requestTermination(message, true, {
+          kind: 'startup-loop',
+          provenance: 'delegation-startup-loop',
+          reason: message,
+          sample: null
+        });
       }, loopCheckIntervalMs);
       startupLoopHandle.unref();
     }
