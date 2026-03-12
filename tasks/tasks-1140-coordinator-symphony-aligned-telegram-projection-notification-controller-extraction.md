@@ -20,22 +20,22 @@
 
 ## Telegram Projection Notification Controller
 
-- [ ] `telegramOversightBridge.ts` delegates the outbound `maybeSendProjectionDelta(...)` shell into one bounded helper seam.
-- [ ] The extracted controller owns projection rendering, transition evaluation, skip/pending/send branching, multi-chat send fan-out, and next-state return without moving queue ownership, `next_update_id` persistence, bot identity startup, or bridge lifecycle ownership out of the bridge shell.
-- [ ] Existing `ControlTelegramReadController` and `controlTelegramPushState.ts` ownership remains unchanged.
-- [ ] Focused Telegram regressions prove the outbound projection-notification surface remains unchanged.
+- [x] `telegramOversightBridge.ts` delegates the outbound `maybeSendProjectionDelta(...)` shell into one bounded helper seam. Evidence: `orchestrator/src/cli/control/telegramOversightBridge.ts`, `orchestrator/src/cli/control/controlTelegramProjectionNotificationController.ts`, `out/1140-coordinator-symphony-aligned-telegram-projection-notification-controller-extraction/manual/20260312T211318Z-closeout/00-summary.md`
+- [x] The extracted controller owns projection rendering, transition evaluation, skip/pending/send branching, multi-chat send fan-out, and next-state return without moving queue ownership, `next_update_id` persistence, bot identity startup, or bridge lifecycle ownership out of the bridge shell. Evidence: `orchestrator/src/cli/control/controlTelegramProjectionNotificationController.ts`, `out/1140-coordinator-symphony-aligned-telegram-projection-notification-controller-extraction/manual/20260312T211318Z-closeout/12-manual-telegram-projection-notification-check.md`
+- [x] Existing `ControlTelegramReadController` and `controlTelegramPushState.ts` ownership remains unchanged. Evidence: `orchestrator/src/cli/control/controlTelegramProjectionNotificationController.ts`, `orchestrator/src/cli/control/telegramOversightBridge.ts`, `out/1140-coordinator-symphony-aligned-telegram-projection-notification-controller-extraction/manual/20260312T211318Z-closeout/12-manual-telegram-projection-notification-check.md`
+- [x] Focused Telegram regressions prove the outbound projection-notification surface remains unchanged. Evidence: `out/1140-coordinator-symphony-aligned-telegram-projection-notification-controller-extraction/manual/20260312T211318Z-closeout/05-targeted-tests.log`
 
 ## Validation + Closeout
 
-- [ ] `node scripts/delegation-guard.mjs`
-- [ ] `node scripts/spec-guard.mjs --dry-run`
-- [ ] `npm run build`
-- [ ] `npm run lint`
-- [ ] `npm run test`
-- [ ] `npm run docs:check`
-- [ ] `npm run docs:freshness`
-- [ ] `node scripts/diff-budget.mjs`
-- [ ] `npm run review`
-- [ ] `npm run pack:smoke`
-- [ ] Manual/mock Telegram projection-notification evidence captured.
-- [ ] Elegance review completed.
+- [x] `node scripts/delegation-guard.mjs` Evidence: `out/1140-coordinator-symphony-aligned-telegram-projection-notification-controller-extraction/manual/20260312T211318Z-closeout/01-delegation-guard.log`
+- [x] `node scripts/spec-guard.mjs --dry-run` Evidence: `out/1140-coordinator-symphony-aligned-telegram-projection-notification-controller-extraction/manual/20260312T211318Z-closeout/02-spec-guard.log`
+- [x] `npm run build` Evidence: `out/1140-coordinator-symphony-aligned-telegram-projection-notification-controller-extraction/manual/20260312T211318Z-closeout/03-build.log`
+- [x] `npm run lint` Evidence: `out/1140-coordinator-symphony-aligned-telegram-projection-notification-controller-extraction/manual/20260312T211318Z-closeout/04-lint.log`
+- [x] `npm run test` Evidence: `out/1140-coordinator-symphony-aligned-telegram-projection-notification-controller-extraction/manual/20260312T211318Z-closeout/06-test.log`
+- [x] `npm run docs:check` Evidence: `out/1140-coordinator-symphony-aligned-telegram-projection-notification-controller-extraction/manual/20260312T211318Z-closeout/07-docs-check.log`
+- [x] `npm run docs:freshness` Evidence: `out/1140-coordinator-symphony-aligned-telegram-projection-notification-controller-extraction/manual/20260312T211318Z-closeout/08-docs-freshness.log`
+- [x] `node scripts/diff-budget.mjs` Evidence: `out/1140-coordinator-symphony-aligned-telegram-projection-notification-controller-extraction/manual/20260312T211318Z-closeout/09-diff-budget.log`
+- [x] `npm run review` Evidence: `out/1140-coordinator-symphony-aligned-telegram-projection-notification-controller-extraction/manual/20260312T211318Z-closeout/10-review.log`
+- [x] `npm run pack:smoke` Evidence: `out/1140-coordinator-symphony-aligned-telegram-projection-notification-controller-extraction/manual/20260312T211318Z-closeout/11-pack-smoke.log`
+- [x] Manual/mock Telegram projection-notification evidence captured. Evidence: `out/1140-coordinator-symphony-aligned-telegram-projection-notification-controller-extraction/manual/20260312T211318Z-closeout/12-manual-telegram-projection-notification-check.md`
+- [x] Elegance review completed. Evidence: `out/1140-coordinator-symphony-aligned-telegram-projection-notification-controller-extraction/manual/20260312T211318Z-closeout/13-elegance-review.md`
