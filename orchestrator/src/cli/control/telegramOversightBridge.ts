@@ -10,6 +10,10 @@ import {
   type ControlTelegramReadController
 } from './controlTelegramReadController.js';
 import {
+  createControlTelegramProjectionNotificationController,
+  type ControlTelegramProjectionNotificationController
+} from './controlTelegramProjectionNotificationController.js';
+import {
   createControlTelegramUpdateHandler,
   type ControlTelegramUpdateHandler
 } from './controlTelegramUpdateHandler.js';
@@ -18,7 +22,6 @@ import type {
   ControlSelectedRunRuntimeSnapshot
 } from './observabilityReadModel.js';
 import {
-  computeTelegramProjectionStateTransition,
   createDefaultTelegramOversightState,
   readTelegramOversightState,
   type TelegramOversightBridgeState,
@@ -131,6 +134,7 @@ class TelegramOversightBridgeRuntime implements TelegramOversightBridge {
   private readonly telegramClient: TelegramOversightApiClient;
   private readonly commandController: ControlTelegramCommandController;
   private readonly updateHandler: ControlTelegramUpdateHandler;
+  private readonly projectionNotificationController: ControlTelegramProjectionNotificationController;
 
   private closed = false;
   private loopPromise: Promise<void> | null = null;
@@ -170,6 +174,12 @@ class TelegramOversightBridgeRuntime implements TelegramOversightBridge {
       allowedChatIds: options.config.allowedChatIds,
       readController: this.readController,
       commandController: this.commandController,
+      sendMessage: (chatId, text) => this.telegramClient.sendMessage(chatId, text)
+    });
+    this.projectionNotificationController = createControlTelegramProjectionNotificationController({
+      allowedChatIds: options.config.allowedChatIds,
+      pushCooldownMs: options.config.pushCooldownMs,
+      renderProjectionDeltaMessage: () => this.readController.renderProjectionDeltaMessage(),
       sendMessage: (chatId, text) => this.telegramClient.sendMessage(chatId, text)
     });
   }
@@ -294,28 +304,11 @@ class TelegramOversightBridgeRuntime implements TelegramOversightBridge {
     eventSeq?: number | null;
     source?: string | null;
   }): Promise<void> {
-    const now = Date.now();
-    const projection = await this.readController.renderProjectionDeltaMessage();
-    const transition = computeTelegramProjectionStateTransition({
+    const result = await this.projectionNotificationController.notifyProjectionDelta({
       state: this.state,
-      projectionHash: projection.projectionHash,
-      eventSeq: input.eventSeq,
-      nowMs: now,
-      pushCooldownMs: this.config.pushCooldownMs
+      eventSeq: input.eventSeq
     });
-
-    if (transition.kind === 'skip' || transition.kind === 'pending') {
-      this.state = transition.nextState;
-      await this.persistState();
-      return;
-    }
-
-    const text = projection.text;
-    for (const chatId of this.config.allowedChatIds) {
-      await this.telegramClient.sendMessage(chatId, text);
-    }
-
-    this.state = transition.nextState;
+    this.state = result.nextState;
     await this.persistState();
   }
 
