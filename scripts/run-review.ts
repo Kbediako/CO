@@ -35,6 +35,7 @@ import {
 import { parseArgs as parseCliArgs, hasFlag } from './lib/cli-args.js';
 import { normalizeTaskKey, pathExists } from './lib/docs-helpers.js';
 import {
+  ARCHITECTURE_ALLOWED_META_SURFACE_KINDS,
   AUDIT_ALLOWED_META_SURFACE_KINDS,
   formatDurationMs,
   logReviewTelemetrySummary as logReviewExecutionTelemetrySummary,
@@ -81,7 +82,7 @@ const REVIEW_META_SURFACE_TIMEOUT_ENV_KEY = 'CODEX_REVIEW_META_SURFACE_TIMEOUT_S
 const REVIEW_TELEMETRY_DEBUG_ENV_KEY = 'CODEX_REVIEW_DEBUG_TELEMETRY';
 const REVIEW_SURFACE_ENV_KEY = 'CODEX_REVIEW_SURFACE';
 const REVIEW_DISABLE_DELEGATION_CONFIG_OVERRIDE = 'mcp_servers.delegation.enabled=false';
-type ReviewSurface = 'diff' | 'audit';
+type ReviewSurface = 'diff' | 'audit' | 'architecture';
 
 interface CliOptions {
   manifest?: string;
@@ -254,25 +255,68 @@ function extractBacktickedPath(line: string): string | null {
   return match?.[1] ?? null;
 }
 
-async function buildTaskContext(taskKey: string): Promise<string[]> {
+function extractTaskHeaderDocPath(headerBullets: string[], patterns: string[]): string | null {
+  const match = headerBullets.find((line) => {
+    const normalized = line.toLowerCase();
+    return patterns.some((pattern) => normalized.includes(pattern));
+  });
+  return match ? extractBacktickedPath(match) : null;
+}
+
+interface ReviewTaskContext {
+  lines: string[];
+  architectureSurfacePaths: string[];
+}
+
+async function buildTaskContext(taskKey: string, surface: ReviewSurface): Promise<ReviewTaskContext> {
   const checklistPath =
     (await resolveRegisteredTaskChecklistPath(taskKey)) ?? (await resolveTaskChecklistPath(taskKey));
   if (!checklistPath) {
-    return [];
+    return { lines: [], architectureSurfacePaths: [] };
   }
 
   const relativeChecklist = path.relative(repoRoot, checklistPath);
   const checklist = await readFile(checklistPath, 'utf8');
   const headerBullets = extractTaskHeaderBulletLines(checklist);
 
+  const architectureSurfacePaths = surface === 'architecture' ? [checklistPath] : [];
   const lines: string[] = ['Task context:', `- Task checklist: \`${relativeChecklist}\``];
-  const prdLine = headerBullets.find((line) => line.toLowerCase().includes('primary prd:'));
-  const prdPath = prdLine ? extractBacktickedPath(prdLine) : null;
+  const prdPath = extractTaskHeaderDocPath(headerBullets, ['primary prd:']);
   if (prdPath) {
     lines.push(`- Primary PRD: \`${prdPath}\``);
+    const absolutePrdPath = path.resolve(repoRoot, prdPath);
+    if (surface === 'architecture' && (await pathExists(absolutePrdPath))) {
+      architectureSurfacePaths.push(absolutePrdPath);
+    }
+  }
+  if (surface === 'architecture') {
+    const techSpecPath = extractTaskHeaderDocPath(headerBullets, ['tech_spec:', 'tech spec:']);
+    if (techSpecPath) {
+      lines.push(`- TECH_SPEC: \`${techSpecPath}\``);
+      const absoluteTechSpecPath = path.resolve(repoRoot, techSpecPath);
+      if (await pathExists(absoluteTechSpecPath)) {
+        architectureSurfacePaths.push(absoluteTechSpecPath);
+      }
+    }
+    const actionPlanPath = extractTaskHeaderDocPath(headerBullets, [
+      'action_plan:',
+      'action plan:'
+    ]);
+    if (actionPlanPath) {
+      lines.push(`- ACTION_PLAN: \`${actionPlanPath}\``);
+      const absoluteActionPlanPath = path.resolve(repoRoot, actionPlanPath);
+      if (await pathExists(absoluteActionPlanPath)) {
+        architectureSurfacePaths.push(absoluteActionPlanPath);
+      }
+    }
+    const architecturePath = path.join(repoRoot, '.agent', 'system', 'architecture.md');
+    if (await pathExists(architecturePath)) {
+      lines.push(`- Repo architecture baseline: \`${path.relative(repoRoot, architecturePath)}\``);
+      architectureSurfacePaths.push(architecturePath);
+    }
   }
 
-  return lines;
+  return { lines, architectureSurfacePaths };
 }
 
 async function resolveActiveCloseoutBundleRoots(taskKey: string | null | undefined): Promise<string[]> {
@@ -369,13 +413,13 @@ function parseRuntimeModeOption(raw: string | boolean, label: string): RuntimeMo
 
 function parseReviewSurfaceOption(raw: string | boolean, label: string): ReviewSurface {
   if (typeof raw !== 'string') {
-    throw new Error(`${label} requires a value. Expected one of: diff, audit.`);
+    throw new Error(`${label} requires a value. Expected one of: diff, audit, architecture.`);
   }
   const normalized = raw.trim().toLowerCase();
-  if (normalized === 'diff' || normalized === 'audit') {
+  if (normalized === 'diff' || normalized === 'audit' || normalized === 'architecture') {
     return normalized;
   }
-  throw new Error(`Invalid ${label} value "${raw}". Expected one of: diff, audit.`);
+  throw new Error(`Invalid ${label} value "${raw}". Expected one of: diff, audit, architecture.`);
 }
 
 function inferTaskFromManifestPath(manifestPath: string): string | null {
@@ -581,6 +625,7 @@ async function main(): Promise<void> {
   const activeCloseoutBundleRoots =
     reviewSurface === 'diff' ? await resolveActiveCloseoutBundleRoots(taskKey) : [];
   const promptLines = [`Review task: ${taskLabel}`, `Review surface: ${reviewSurface}`];
+  let reviewTaskContext: ReviewTaskContext = { lines: [], architectureSurfacePaths: [] };
 
   if (reviewSurface === 'audit') {
     promptLines.push(`Evidence manifest: ${relativeManifest}`);
@@ -589,10 +634,10 @@ async function main(): Promise<void> {
     }
   }
 
-  if (reviewSurface === 'audit' && taskKey) {
-    const contextLines = await buildTaskContext(taskKey);
-    if (contextLines.length > 0) {
-      promptLines.push('', ...contextLines);
+  if ((reviewSurface === 'audit' || reviewSurface === 'architecture') && taskKey) {
+    reviewTaskContext = await buildTaskContext(taskKey, reviewSurface);
+    if (reviewTaskContext.lines.length > 0) {
+      promptLines.push('', ...reviewTaskContext.lines);
     }
   }
 
@@ -613,6 +658,15 @@ async function main(): Promise<void> {
       '- Start with the manifest or runner log before consulting memory, skills, or review docs',
       '',
       'Call out any remaining documentation/code mismatches or guardrail violations.'
+    );
+  } else if (reviewSurface === 'architecture') {
+    promptLines.push(
+      '- Architecture, layering, and boundaries remain coherent for the requested change',
+      '- Use the canonical architecture inputs above as the primary review context before widening further',
+      '- Call out architectural drift, abstraction mismatch, or missing design rationale that is directly relevant to this task',
+      '- Stay on the requested architecture/context surfaces and directly related implementation paths; do not switch into manifest/runner-log evidence audit unless it is explicitly required',
+      '',
+      'Keep this pass architecture-focused. Do not treat it as a generic evidence or closeout audit.'
     );
   } else {
     const startupFocusLine =
@@ -647,7 +701,9 @@ async function main(): Promise<void> {
     const boundedFocusLine =
       reviewSurface === 'audit'
         ? '- Keep this review focused on the requested audit surfaces, supporting evidence, and directly related code/docs paths.'
-        : '- Keep this review focused on changed files and nearby dependencies.';
+        : reviewSurface === 'architecture'
+          ? '- Keep this review focused on the requested architecture surfaces, canonical task docs, and directly relevant implementation paths.'
+          : '- Keep this review focused on changed files and nearby dependencies.';
     promptLines.push(
       '',
       'Execution constraints (bounded review mode):',
@@ -804,6 +860,8 @@ async function main(): Promise<void> {
   const allowedMetaSurfaceKinds =
     reviewSurface === 'audit'
       ? AUDIT_ALLOWED_META_SURFACE_KINDS
+      : reviewSurface === 'architecture'
+        ? ARCHITECTURE_ALLOWED_META_SURFACE_KINDS
       : ([] as const);
   const touchedPaths = scopePathCollection.paths;
   const startupAnchorMode: ReviewStartupAnchorMode | null = !allowHeavyCommands
@@ -848,10 +906,12 @@ async function main(): Promise<void> {
         `[run-review] meta-surface expansion guard disabled (${REVIEW_META_SURFACE_TIMEOUT_ENV_KEY}=0).`
       );
     } else if (allowedMetaSurfaceKinds.length > 0) {
+      const allowedMetaSurfaceLabel =
+        reviewSurface === 'audit' ? 'allowed audit meta surfaces' : 'allowed architecture meta surfaces';
       console.log(
         `[run-review] meta-surface expansion guard enabled after ${formatDurationMs(
           metaSurfaceTimeoutMs
-        )} of sustained off-task meta activity; allowed audit meta surfaces: ${allowedMetaSurfaceKinds.join(
+        )} of sustained off-task meta activity; ${allowedMetaSurfaceLabel}: ${allowedMetaSurfaceKinds.join(
           ', '
         )} (set ${REVIEW_META_SURFACE_TIMEOUT_ENV_KEY}=0 to disable).`
       );
@@ -916,6 +976,8 @@ async function main(): Promise<void> {
       allowedMetaSurfacePaths:
         reviewSurface === 'audit'
           ? [manifestPath, ...(runnerLogExists ? [runnerLogPath] : [])]
+          : reviewSurface === 'architecture'
+            ? reviewTaskContext.architectureSurfacePaths
           : [],
       allowedMetaSurfaceEnvVars:
         reviewSurface === 'audit'
@@ -2538,7 +2600,7 @@ Options:
   --base <ref>                   Review diff from base ref.
   --commit <sha>                 Review a single commit.
   --title <title>                Set a custom review title.
-  --surface <diff|audit>         Review surface (default: diff).
+  --surface <diff|audit|architecture>  Review surface (default: diff).
   --non-interactive              Force non-interactive Codex review mode.
   --auto-issue-log[=true|false]  Capture issue bundle on failure.
   --enable-delegation-mcp[=true|false]   Enable delegation MCP for this review run.

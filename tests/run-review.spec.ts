@@ -55,6 +55,35 @@ async function makeCloseoutBundle(
   return bundleDir;
 }
 
+async function writeTaskDocsFirstContext(
+  sandbox: string,
+  taskId: string,
+  options: { includeArchitectureBaseline?: boolean } = {}
+): Promise<void> {
+  await mkdir(join(sandbox, 'tasks', 'specs'), { recursive: true });
+  await mkdir(join(sandbox, 'docs'), { recursive: true });
+  await writeFile(
+    join(sandbox, 'tasks', `tasks-${taskId}.md`),
+    [
+      `# Task Checklist - ${taskId}`,
+      '',
+      `- MCP Task ID: \`${taskId}\``,
+      `- Primary PRD: \`docs/PRD-${taskId}.md\``,
+      `- TECH_SPEC: \`tasks/specs/${taskId}.md\``,
+      `- ACTION_PLAN: \`docs/ACTION_PLAN-${taskId}.md\``,
+      ''
+    ].join('\n'),
+    'utf8'
+  );
+  await writeFile(join(sandbox, 'docs', `PRD-${taskId}.md`), '# PRD\n', 'utf8');
+  await writeFile(join(sandbox, 'tasks', 'specs', `${taskId}.md`), '# TECH_SPEC\n', 'utf8');
+  await writeFile(join(sandbox, 'docs', `ACTION_PLAN-${taskId}.md`), '# ACTION_PLAN\n', 'utf8');
+  if (options.includeArchitectureBaseline) {
+    await mkdir(join(sandbox, '.agent', 'system'), { recursive: true });
+    await writeFile(join(sandbox, '.agent', 'system', 'architecture.md'), '# Architecture\n', 'utf8');
+  }
+}
+
 async function runGit(args: string[], cwd: string): Promise<void> {
   await execFileAsync('git', args, { cwd });
 }
@@ -1163,6 +1192,70 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(prompt).not.toContain('tasks/specs/sample-task.md');
     expect(prompt).not.toContain('docs/ACTION_PLAN-sample-task.md');
     expect(prompt).not.toContain('Keep this review focused on changed files and nearby dependencies.');
+  });
+
+  it('includes canonical docs-first context only on the explicit architecture surface', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    const taskId = 'sample-task';
+    await writeTaskDocsFirstContext(sandbox, taskId, { includeArchitectureBaseline: true });
+
+    const result = await runReviewCommand(
+      manifestPath,
+      baseEnv(sandbox, codexBin),
+      ['--task', taskId, '--surface', 'architecture']
+    );
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain('bounded review guidance enabled by default');
+    expect(result.stdout).not.toContain('allowed audit meta surfaces: run-manifest, run-runner-log');
+    expect(result.stdout).toContain(
+      'allowed architecture meta surfaces: architecture-context, review-support, review-docs'
+    );
+    const promptPath = join(dirname(manifestPath), 'review', 'prompt.txt');
+    const prompt = await readFile(promptPath, 'utf8');
+    expect(prompt).toContain('Review surface: architecture');
+    expect(prompt).toContain('Task context:');
+    expect(prompt).toContain('- Task checklist: `tasks/tasks-sample-task.md`');
+    expect(prompt).toContain('- Primary PRD: `docs/PRD-sample-task.md`');
+    expect(prompt).toContain('- TECH_SPEC: `tasks/specs/sample-task.md`');
+    expect(prompt).toContain('- ACTION_PLAN: `docs/ACTION_PLAN-sample-task.md`');
+    expect(prompt).toContain('- Repo architecture baseline: `.agent/system/architecture.md`');
+    expect(prompt).toContain(
+      'Use the canonical architecture inputs above as the primary review context before widening further'
+    );
+    expect(prompt).toContain(
+      'Keep this pass architecture-focused. Do not treat it as a generic evidence or closeout audit.'
+    );
+    expect(prompt).toContain(
+      'Keep this review focused on the requested architecture surfaces, canonical task docs, and directly relevant implementation paths.'
+    );
+    expect(prompt).not.toContain('Evidence manifest:');
+    expect(prompt).not.toContain('Evidence runner log:');
+    expect(prompt).not.toContain('Evidence + checklist mirroring requirements are satisfied');
+    expect(prompt).not.toContain('Keep this pass diff-focused.');
+  });
+
+  it('supports CODEX_REVIEW_SURFACE env fallback for architecture mode', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    const taskId = 'sample-task';
+    await writeTaskDocsFirstContext(sandbox, taskId, { includeArchitectureBaseline: true });
+
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      TASK: taskId,
+      CODEX_REVIEW_SURFACE: 'architecture'
+    });
+
+    expect(result.exitCode).toBe(0);
+    const promptPath = join(dirname(manifestPath), 'review', 'prompt.txt');
+    const prompt = await readFile(promptPath, 'utf8');
+    expect(prompt).toContain('Review surface: architecture');
+    expect(prompt).toContain('- Repo architecture baseline: `.agent/system/architecture.md`');
+    expect(prompt).not.toContain('Evidence manifest:');
   });
 
   it('keeps delegation MCP enabled by default for wrapper review runs', async () => {

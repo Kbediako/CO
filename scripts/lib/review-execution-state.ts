@@ -45,8 +45,21 @@ const RELEVANT_REINSPECTION_MAX_DISTINCT_TARGETS = 4;
 const RELEVANT_REINSPECTION_MIN_REPEAT_TARGET_HITS = 3;
 const STARTUP_ANCHOR_META_SURFACE_SIGNAL_BUDGET = 1;
 const STARTUP_ANCHOR_ALLOWED_META_SURFACE_KINDS = new Set(['review-support']);
+const ARCHITECTURE_CONTEXT_META_SURFACE_KIND = 'architecture-context';
+export const ARCHITECTURE_ALLOWED_META_SURFACE_KINDS = [
+  ARCHITECTURE_CONTEXT_META_SURFACE_KIND,
+  'review-support',
+  'review-docs'
+] as const;
 export const AUDIT_ALLOWED_META_SURFACE_KINDS = ['run-manifest', 'run-runner-log'] as const;
 const AUDIT_ALLOWED_META_SURFACE_KIND_SET = new Set<string>(AUDIT_ALLOWED_META_SURFACE_KINDS);
+const ALLOWED_META_SURFACE_KIND_SET = new Set<string>([
+  ...AUDIT_ALLOWED_META_SURFACE_KINDS,
+  ...ARCHITECTURE_ALLOWED_META_SURFACE_KINDS
+]);
+const COMMAND_LEVEL_ALLOWED_META_SURFACE_KIND_SET = new Set<string>(
+  ARCHITECTURE_ALLOWED_META_SURFACE_KINDS
+);
 const LOW_SIGNAL_MIN_THINKING_BLOCKS = 10;
 const LOW_SIGNAL_MIN_COMMAND_STARTS = 10;
 const LOW_SIGNAL_MAX_DISTINCT_TARGETS = 4;
@@ -408,7 +421,11 @@ export class ReviewExecutionState {
         : configuredMetaSurfaceTimeoutMs === null || configuredMetaSurfaceTimeoutMs <= 0
         ? null
         : configuredMetaSurfaceTimeoutMs;
-    this.allowedMetaSurfaceKinds = new Set(options.allowedMetaSurfaceKinds ?? []);
+    this.allowedMetaSurfaceKinds = new Set(
+      (options.allowedMetaSurfaceKinds ?? []).filter((kind) =>
+        ALLOWED_META_SURFACE_KIND_SET.has(kind)
+      )
+    );
     this.repoRoot = normalizeScopeRoot(options.repoRoot);
     this.touchedPaths = new Set(
       (options.touchedPaths ?? []).map((entry) => normalizeScopePath(entry)).filter(Boolean)
@@ -1045,13 +1062,19 @@ export class ReviewExecutionState {
   }
 
   private recordMetaSurfaceCommandSample(sample: string | null, commandLine: string, nowMs: number): void {
-    this.recentMetaSurfaceSamples.push(sample);
+    const nextSample =
+      sample &&
+      COMMAND_LEVEL_ALLOWED_META_SURFACE_KIND_SET.has(sample) &&
+      this.allowedMetaSurfaceKinds.has(sample)
+        ? null
+        : sample;
+    this.recentMetaSurfaceSamples.push(nextSample);
     while (this.recentMetaSurfaceSamples.length > META_SURFACE_RECENT_SIGNAL_WINDOW) {
       this.recentMetaSurfaceSamples.shift();
     }
     if (
       this.enforceActiveCloseoutBundleRereadBoundary &&
-      sample === REVIEW_ACTIVE_CLOSEOUT_BUNDLE_KIND &&
+      nextSample === REVIEW_ACTIVE_CLOSEOUT_BUNDLE_KIND &&
       this.commandStarts.length > 1
     ) {
       this.activeCloseoutBundleRereadCount += 1;
@@ -2706,7 +2729,8 @@ function classifyMetaSurfaceSegment(
     envAssignments,
     allowedAuditMetaSurfaces.allowedMetaSurfaceEnvVarPaths,
     shellEnvState.blockedEnvVars,
-    inlineAssignedEnvVars
+    inlineAssignedEnvVars,
+    allowedAuditMetaSurfaces.allowedMetaSurfacePaths
   );
   for (const sample of metaSurfaceSamples) {
     if (!isAllowedAuditMetaSurfaceSample(sample, allowedAuditMetaSurfaces, repoRoot)) {
@@ -3278,7 +3302,7 @@ function segmentDirectHasTouchedPathAnchor(
   repoRoot: string | null
 ): boolean {
   for (const operand of extractMetaSurfaceOperands(command, args)) {
-    for (const candidate of expandMetaSurfaceOperandCandidates(command, args, operand)) {
+    for (const candidate of [operand]) {
       if (
         isTouchedScopePath(candidate, touchedPaths, repoRoot) ||
         isTouchedReviewScopePathFamilyOperand(candidate, touchedPaths, repoRoot)
@@ -3295,14 +3319,20 @@ function classifyMetaSurfaceDirect(
   args: string[],
   touchedPaths: ReadonlySet<string>,
   repoRoot: string | null,
-  activeCloseoutBundleRoots: ReadonlySet<string> = new Set()
+  activeCloseoutBundleRoots: ReadonlySet<string> = new Set(),
+  allowedMetaSurfacePaths: ReadonlySet<string> = new Set()
 ): string[] {
   return classifyMetaSurfaceDirectDetailed(
     command,
     args,
     touchedPaths,
     repoRoot,
-    activeCloseoutBundleRoots
+    activeCloseoutBundleRoots,
+    new Map(),
+    new Map(),
+    new Set(),
+    new Set(),
+    allowedMetaSurfacePaths
   ).map((sample) => sample.kind);
 }
 
@@ -3315,7 +3345,8 @@ function classifyMetaSurfaceDirectDetailed(
   envAssignments: ReadonlyMap<string, string> = new Map(),
   auditStartupAnchorEnvVarPaths: ReadonlyMap<string, string> = new Map(),
   blockedEnvVars: ReadonlySet<string> = new Set(),
-  inlineAssignedEnvVars: ReadonlySet<string> = new Set()
+  inlineAssignedEnvVars: ReadonlySet<string> = new Set(),
+  allowedMetaSurfacePaths: ReadonlySet<string> = new Set()
 ): Array<{ kind: string; candidate: string; operand: string }> {
   const detailedSamples: Array<{ kind: string; candidate: string; operand: string }> = [];
   for (const operand of extractMetaSurfaceOperands(command, args)) {
@@ -3361,7 +3392,8 @@ function classifyMetaSurfaceDirectDetailed(
         candidate,
         touchedPaths,
         repoRoot,
-        activeCloseoutBundleRoots
+        activeCloseoutBundleRoots,
+        allowedMetaSurfacePaths
       );
       if (operandKind) {
         detailedSamples.push({ kind: operandKind, candidate, operand });
@@ -3678,7 +3710,8 @@ function classifyMetaSurfaceOperand(
   operand: string,
   touchedPaths: ReadonlySet<string>,
   repoRoot: string | null,
-  activeCloseoutBundleRoots: ReadonlySet<string> = new Set()
+  activeCloseoutBundleRoots: ReadonlySet<string> = new Set(),
+  allowedMetaSurfacePaths: ReadonlySet<string> = new Set()
 ): string | null {
   const normalized = operand.trim().replace(/\\/gu, '/');
   if (!normalized) {
@@ -3718,6 +3751,13 @@ function classifyMetaSurfaceOperand(
   }
   if (normalized.includes('.runs/') && normalized.endsWith('/runner.ndjson')) {
     return 'run-runner-log';
+  }
+  const normalizedAllowedMetaSurfacePath = normalizeAuditStartupAnchorPath(normalized, repoRoot);
+  if (
+    normalizedAllowedMetaSurfacePath !== null &&
+    allowedMetaSurfacePaths.has(normalizedAllowedMetaSurfacePath)
+  ) {
+    return ARCHITECTURE_CONTEXT_META_SURFACE_KIND;
   }
   if (
     normalized.includes('/review/') &&

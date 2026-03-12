@@ -1593,6 +1593,70 @@ describe('ReviewExecutionState', () => {
     expect(summary.metaSurfaceKinds).toEqual(['run-manifest']);
   });
 
+  it('allows only the narrow architecture meta-surface kinds from the generic allowlist', () => {
+    const state = new ReviewExecutionState({
+      startedAtMs: 0,
+      blockHeavyCommands: false,
+      allowedMetaSurfaceKinds: ['architecture-context', 'review-support', 'review-docs', 'codex-memories']
+    });
+
+    state.observeChunk('thinking\nexec\n', 'stdout', 100);
+    state.observeChunk(`/bin/zsh -lc 'sed -n 1,120p docs/standalone-review-guide.md'\n`, 'stdout', 110);
+    state.observeChunk('thinking\nexec\n', 'stdout', 200);
+    state.observeChunk(`/bin/zsh -lc 'sed -n 1,120p tests/review-execution-state.spec.ts'\n`, 'stdout', 210);
+    state.observeChunk('thinking\nexec\n', 'stdout', 300);
+    state.observeChunk(
+      `/bin/zsh -lc 'sed -n 1,120p /Users/kbediako/.codex/memories/MEMORY.md'\n`,
+      'stdout',
+      310
+    );
+
+    const summary = state.buildOutputSummary();
+    expect(summary.metaSurfaceSignals).toBe(1);
+    expect(summary.metaSurfaceKinds).toEqual(['codex-memories']);
+  });
+
+  it('classifies configured architecture context paths as a dedicated meta-surface family', () => {
+    const state = new ReviewExecutionState({
+      startedAtMs: 0,
+      blockHeavyCommands: false,
+      repoRoot: '/Users/kbediako/Code/CO',
+      allowedMetaSurfacePaths: ['/Users/kbediako/Code/CO/tasks/tasks-sample-task.md']
+    });
+
+    state.observeChunk('thinking\nexec\n', 'stdout', 100);
+    state.observeChunk(
+      `/bin/zsh -lc 'sed -n 1,120p /Users/kbediako/Code/CO/tasks/tasks-sample-task.md'\n`,
+      'stdout',
+      110
+    );
+
+    const summary = state.buildOutputSummary();
+    expect(summary.metaSurfaceSignals).toBe(1);
+    expect(summary.metaSurfaceKinds).toEqual(['architecture-context']);
+  });
+
+  it('suppresses configured architecture context paths when the architecture allowlist permits them', () => {
+    const state = new ReviewExecutionState({
+      startedAtMs: 0,
+      blockHeavyCommands: false,
+      repoRoot: '/Users/kbediako/Code/CO',
+      allowedMetaSurfaceKinds: ['architecture-context', 'review-support', 'review-docs'],
+      allowedMetaSurfacePaths: ['/Users/kbediako/Code/CO/tasks/tasks-sample-task.md']
+    });
+
+    state.observeChunk('thinking\nexec\n', 'stdout', 100);
+    state.observeChunk(
+      `/bin/zsh -lc 'sed -n 1,120p /Users/kbediako/Code/CO/tasks/tasks-sample-task.md'\n`,
+      'stdout',
+      110
+    );
+
+    const summary = state.buildOutputSummary();
+    expect(summary.metaSurfaceSignals).toBe(0);
+    expect(summary.metaSurfaceKinds).toEqual([]);
+  });
+
   it('does not treat ordinary repo manifest.json files as run-manifest meta-surface activity', () => {
     const state = new ReviewExecutionState({
       startedAtMs: 0,
@@ -2046,7 +2110,7 @@ describe('ReviewExecutionState', () => {
     expect(summary.preAnchorMetaSurfaceSignals).toBe(1);
   });
 
-  it('treats git show rev:path reads of touched files as valid startup anchors', () => {
+  it('does not treat git show rev:path reads of touched files as valid startup anchors', () => {
     const state = new ReviewExecutionState({
       startedAtMs: 0,
       blockHeavyCommands: false,
@@ -2062,15 +2126,17 @@ describe('ReviewExecutionState', () => {
       'stdout',
       210
     );
+    state.observeChunk('thinking\nexec\n', 'stdout', 300);
+    state.observeChunk(`/bin/zsh -lc 'sed -n 1,120p scripts/run-review.ts'\n`, 'stdout', 310);
 
-    const boundary = state.getStartupAnchorBoundaryState(220);
+    const boundary = state.getStartupAnchorBoundaryState(320);
     const summary = state.buildOutputSummary();
     expect(boundary.triggered).toBe(false);
     expect(boundary.anchorObserved).toBe(true);
     expect(summary.startupAnchorObserved).toBe(true);
-    expect(summary.preAnchorCommandStarts).toBe(0);
-    expect(summary.preAnchorMetaSurfaceSignals).toBe(0);
-    expect(summary.preAnchorMetaSurfaceKinds).toEqual([]);
+    expect(summary.preAnchorCommandStarts).toBe(2);
+    expect(summary.preAnchorMetaSurfaceSignals).toBe(1);
+    expect(summary.preAnchorMetaSurfaceKinds).toEqual(['codex-memories']);
   });
 
   it('counts mixed touched-path and meta-surface commands before the startup anchor is promoted', () => {

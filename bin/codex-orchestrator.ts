@@ -2756,6 +2756,7 @@ Common options:
   --manifest <path>                Explicit manifest path for review evidence.
   --runs-dir <path>                Root runs directory when auto-resolving manifest.
   --task <id>                      Task id used for prompt context.
+  --surface <diff|audit|architecture>  Select review surface (default: diff).
   --uncommitted                    Review uncommitted diff scope.
   --base <branch>                  Review against a base branch.
   --commit <sha>                   Review a specific commit.
