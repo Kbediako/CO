@@ -1,7 +1,10 @@
-import { randomBytes } from 'node:crypto';
 import { join } from 'node:path';
 
 import { logger } from '../../logger.js';
+import {
+  createControlTelegramCommandController,
+  type ControlTelegramCommandController
+} from './controlTelegramCommandController.js';
 import {
   createControlTelegramReadController,
   type ControlTelegramReadController
@@ -24,10 +27,7 @@ import {
   type TelegramUpdate,
   type TelegramUser
 } from './telegramOversightApiClient.js';
-import {
-  createTelegramOversightControlActionApiClient,
-  type TelegramOversightControlActionApiClient
-} from './telegramOversightControlActionApiClient.js';
+import { createTelegramOversightControlActionApiClient } from './telegramOversightControlActionApiClient.js';
 const DEFAULT_POLL_INTERVAL_MS = 1_000;
 const DEFAULT_POLL_TIMEOUT_SECONDS = 20;
 const DEFAULT_PUSH_COOLDOWN_MS = 30_000;
@@ -126,7 +126,7 @@ class TelegramOversightBridgeRuntime implements TelegramOversightBridge {
   private readonly readController: ControlTelegramReadController;
   private readonly statePath: string;
   private readonly telegramClient: TelegramOversightApiClient;
-  private readonly controlActionClient: TelegramOversightControlActionApiClient;
+  private readonly commandController: ControlTelegramCommandController;
 
   private closed = false;
   private loopPromise: Promise<void> | null = null;
@@ -153,10 +153,14 @@ class TelegramOversightBridgeRuntime implements TelegramOversightBridge {
       botToken: options.config.botToken,
       fetchImpl: options.fetchImpl
     });
-    this.controlActionClient = createTelegramOversightControlActionApiClient({
+    const controlActionClient = createTelegramOversightControlActionApiClient({
       baseUrl: options.baseUrl,
       controlToken: options.controlToken,
       fetchImpl: options.fetchImpl
+    });
+    this.commandController = createControlTelegramCommandController({
+      mutationsEnabled: options.config.mutationsEnabled,
+      controlActionClient
     });
   }
 
@@ -306,49 +310,13 @@ class TelegramOversightBridgeRuntime implements TelegramOversightBridge {
     if (readResponse !== null) {
       return readResponse;
     }
-    switch (input.command) {
-      case '/pause':
-      case '/resume':
-        return this.applyControlCommand(input.command.slice(1) as 'pause' | 'resume', input);
-      default:
-        return 'Unknown command. Use /help for commands.';
-    }
-  }
 
-  private async applyControlCommand(
-    action: 'pause' | 'resume',
-    input: {
-      updateId: number;
-      chatId: string;
-      user: TelegramUser | null;
-    }
-  ): Promise<string> {
-    if (!this.config.mutationsEnabled) {
-      return `${capitalize(action)} is disabled for this Telegram bridge.`;
+    const mutatingResponse = await this.commandController.dispatchMutatingCommand(input);
+    if (mutatingResponse !== null) {
+      return mutatingResponse;
     }
 
-    const nonce = `telegram:${input.chatId}:${input.updateId}:${action}:${randomBytes(4).toString('hex')}`;
-    const nonceExpiresAt = new Date(Date.now() + 60 * 1000).toISOString();
-    const actorId = input.user?.id ? `telegram.user.${input.user.id}` : `telegram.chat.${input.chatId}`;
-    const body = {
-      action,
-      requested_by: 'telegram',
-      request_id: `telegram-${action}-${input.updateId}`,
-      intent_id: `telegram-${action}-${input.updateId}`,
-      reason: `telegram_command_${action}`,
-      transport: 'telegram',
-      actor_id: actorId,
-      actor_source: 'telegram.bot.polling',
-      transport_principal: `telegram:chat:${input.chatId}`,
-      transport_nonce: nonce,
-      transport_nonce_expires_at: nonceExpiresAt
-    };
-
-    const payload = await this.controlActionClient.postAction(body);
-    if (payload.error) {
-      return `${capitalize(action)} failed: ${payload.error}`;
-    }
-    return `${capitalize(action)} requested. Control decision: ${payload.traceability?.decision ?? 'applied'}${typeof payload.control_seq === 'number' ? ` (seq ${payload.control_seq})` : ''}.`;
+    return 'Unknown command. Use /help for commands.';
   }
 
   private async maybeSendProjectionDelta(input: {
@@ -452,10 +420,6 @@ function parsePositiveIntegerEnv(value: string | undefined, fallback: number): n
     return fallback;
   }
   return parsed;
-}
-
-function capitalize(value: string): string {
-  return value.length === 0 ? value : `${value[0].toUpperCase()}${value.slice(1)}`;
 }
 
 function delay(ms: number): Promise<void> {

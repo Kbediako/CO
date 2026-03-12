@@ -6,18 +6,19 @@
 ## Why this slice
 
 - `1137` closed the last high-value standalone-review contract mismatch and the parallel scout recommended pausing further review micro-lanes unless a new reproducible wrapper defect appears.
-- The next higher-value Symphony-aligned seam is back on the runtime/operator surface: `telegramOversightBridge.ts` still mixes runtime lifecycle with operator command admission, routing, and reply generation.
+- The next higher-value Symphony-aligned seam is back on the runtime/operator surface: `telegramOversightBridge.ts` still mixes runtime lifecycle with the mutating `/pause` and `/resume` operator branch.
 - After `1126` and `1127`, the remaining Telegram surface is explicitly narrowed to the command cluster, which makes this a truthful bounded follow-on instead of a broader runtime rewrite.
 
 ## In Scope
 
-- The inline command cluster currently centered around `handleUpdate`, command routing, and mutating command dispatch in `telegramOversightBridge.ts`.
+- The inline mutating operator branch currently centered around `/pause`, `/resume`, and mutating reply shaping in `telegramOversightBridge.ts`.
 - A single extracted Telegram command controller/helper.
 - Focused Telegram bridge regression coverage for the preserved command behavior.
 
 ## Out of Scope
 
 - Polling lifecycle, update offset persistence, startup/shutdown, or push-state sequencing.
+- Non-mutating read routing (`/help`, `/status`, `/issue`, `/dispatch`, `/questions`).
 - Telegram Bot API transport extracted in `1126`.
 - `/control/action` transport client extracted in `1127`.
 - Linear webhook or dispatch source refactors.
@@ -26,5 +27,5 @@
 ## Recommendation
 
 - Proceed with one bounded Telegram command controller seam.
-- Keep runtime shell ownership in `telegramOversightBridge.ts`.
+- Keep runtime shell ownership, command admission, and read routing in `telegramOversightBridge.ts`.
 - Keep `/pause` and `/resume` on the existing `/control/action` transport client so authority and traceability remain unchanged.

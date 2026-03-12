@@ -2,7 +2,7 @@
 
 ## Summary
 
-After `1126` and `1127` extracted the Telegram Bot API transport and `/control/action` write client, the remaining mixed operator surface in `telegramOversightBridge.ts` is the inline command admission, routing, and reply-generation cluster.
+After `1126` and `1127` extracted the Telegram Bot API transport and `/control/action` write client, the remaining mixed operator surface in `telegramOversightBridge.ts` is the inline mutating operator branch for `/pause` and `/resume`.
 
 ## Problem
 
@@ -12,18 +12,17 @@ After `1126` and `1127` extracted the Telegram Bot API transport and `/control/a
   - update offset persistence,
   - startup/shutdown,
   - push-state transitions;
-- operator command handling:
-  - command admission,
-  - `/help`, `/status`, `/issue`, `/dispatch`, `/questions`, `/pause`, `/resume` routing,
-  - reply generation,
+- mutating operator command execution:
+  - `/pause` and `/resume` request shaping,
+  - reply generation for mutating outcomes,
   - control-action invocation for mutating commands.
 
-That leaves the bridge thicker than the current Symphony-aligned target and makes the downstream operator surface harder to evolve independently from the poll/update runtime shell.
+That leaves the bridge thicker than the current Symphony-aligned target and keeps the transport-hardened mutating operator path mixed into the polling shell instead of isolated behind a smaller controller boundary.
 
 ## Goals
 
-- Extract Telegram command admission/routing/reply generation into one bounded controller seam.
-- Keep `telegramOversightBridge.ts` focused on polling, update sequencing, persistence, and push-state lifecycle.
+- Extract the `/pause` and `/resume` execution/reply path into one bounded controller seam.
+- Keep `telegramOversightBridge.ts` focused on polling, update sequencing, persistence, push-state lifecycle, and read-command routing.
 - Preserve `/pause` and `/resume` behavior through the existing `/control/action` transport client.
 - Keep Telegram bot transport and control auth surfaces unchanged.
 
@@ -43,7 +42,8 @@ That leaves the bridge thicker than the current Symphony-aligned target and make
 
 ## Acceptance Criteria
 
-- `telegramOversightBridge.ts` no longer owns the inline command admission/routing/reply-generation cluster.
-- A dedicated control-local helper/controller owns `/help`, `/status`, `/issue`, `/dispatch`, `/questions`, `/pause`, and `/resume` command handling.
+- `telegramOversightBridge.ts` no longer owns the inline `/pause` and `/resume` request-shaping/reply-generation branch.
+- A dedicated control-local helper/controller owns only `/pause` and `/resume` handling.
+- `telegramOversightBridge.ts` continues to own command admission, slash-command normalization, and non-mutating read routing.
 - `/pause` and `/resume` still flow through the existing `/control/action` client with the same nonce, actor, transport, and traceability behavior.
 - Focused Telegram bridge regressions prove the existing operator command surface remains unchanged.
