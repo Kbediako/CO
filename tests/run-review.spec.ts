@@ -262,6 +262,32 @@ fi
       done
       exit 0
     fi
+    if [[ "$mode" == "architecture-relevant-reinspection-dwell" ]]; then
+      commands=(
+        "sed -n 1,120p tasks/tasks-sample-task.md"
+        "sed -n 1,120p docs/PRD-sample-task.md"
+        "sed -n 1,120p tasks/specs/sample-task.md"
+        "sed -n 1,120p docs/ACTION_PLAN-sample-task.md"
+        "sed -n 1,120p .agent/system/architecture.md"
+        "sed -n 1,120p file-1.py"
+        "sed -n 1,120p file-2.py"
+        "sed -n 121,240p tasks/tasks-sample-task.md"
+        "sed -n 121,240p docs/PRD-sample-task.md"
+        "sed -n 121,240p tasks/specs/sample-task.md"
+        "sed -n 121,240p docs/ACTION_PLAN-sample-task.md"
+        "sed -n 121,240p .agent/system/architecture.md"
+        "sed -n 121,240p file-1.py"
+        "sed -n 121,240p file-2.py"
+      )
+      while true; do
+        for command in "\${commands[@]}"; do
+          echo "thinking"
+          echo "exec"
+          echo "/bin/zsh -lc '\${command}' in /Users/kbediako/Code/CO"
+          sleep 0.05
+        done
+      done
+    fi
     if [[ "$mode" == "verdict-stability-drift" ]]; then
       targets=(
         "scripts/run-review.ts"
@@ -2518,6 +2544,57 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(result.exitCode).toBeGreaterThan(0);
     expect(result.stderr).not.toContain('relevant-reinspection dwell boundary violated');
     expect(result.stderr).toContain('codex review timed out after 1s');
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('fails bounded architecture review when in-bounds rereads keep revisiting canonical docs and touched files without a verdict', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    await writeTaskDocsFirstContext(sandbox, 'sample-task', { includeArchitectureBaseline: true });
+    const { files } = await initGitRepoWithCommittedFiles(sandbox, 2, '.py');
+    const architectureRelevantTargets = [
+      'tasks/tasks-sample-task.md',
+      'docs/PRD-sample-task.md',
+      'tasks/specs/sample-task.md',
+      'docs/ACTION_PLAN-sample-task.md',
+      '.agent/system/architecture.md',
+      files[0] ?? 'file-1.py',
+      files[1] ?? 'file-2.py'
+    ];
+    await writeFile(join(sandbox, files[0] ?? 'file-1.py'), 'updated-1\n', 'utf8');
+    await writeFile(join(sandbox, files[1] ?? 'file-2.py'), 'updated-2\n', 'utf8');
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(
+      manifestPath,
+      {
+        ...baseEnv(sandbox, codexBin),
+        RUN_REVIEW_MODE: 'architecture-relevant-reinspection-dwell',
+        CODEX_REVIEW_LOW_SIGNAL_TIMEOUT_SECONDS: '1',
+        CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0',
+        CODEX_REVIEW_TIMEOUT_SECONDS: '60'
+      },
+      ['--task', 'sample-task', '--surface', 'architecture']
+    );
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).toContain('relevant-reinspection dwell boundary violated');
+    expect(result.stderr).toContain('within the current bounded review surface');
+    expect(result.stderr).not.toContain('codex review timed out after');
+
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      summary: {
+        metaSurfaceSignals: number;
+        distinctInspectionTargets: number;
+        maxInspectionTargetHits: number;
+      };
+    };
+    expect(telemetry.status).toBe('failed');
+    expect(telemetry.summary.metaSurfaceSignals).toBe(0);
+    expect(telemetry.summary.distinctInspectionTargets).toBeLessThanOrEqual(
+      architectureRelevantTargets.length
+    );
+    expect(telemetry.summary.maxInspectionTargetHits).toBeGreaterThanOrEqual(2);
   }, LONG_WAIT_TEST_TIMEOUT_MS);
 
   it('fails bounded review when speculative output keeps repeating without new concrete progress', async () => {

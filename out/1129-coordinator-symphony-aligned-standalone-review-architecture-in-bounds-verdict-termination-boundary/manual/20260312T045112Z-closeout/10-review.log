@@ -1,0 +1,525 @@
+
+> @kbediako/codex-orchestrator@0.1.38 review
+> node --loader ts-node/esm scripts/run-review.ts --manifest .runs/1129-coordinator-symphony-aligned-standalone-review-architecture-in-bounds-verdict-termination-boundary/cli/manual-closeout-runtime-check/manifest.json --task 1129-coordinator-symphony-aligned-standalone-review-architecture-in-bounds-verdict-termination-boundary --surface architecture
+
+(node:47061) ExperimentalWarning: `--experimental-loader` may be removed in the future; instead use `register()`:
+--import 'data:text/javascript,import { register } from "node:module"; import { pathToFileURL } from "node:url"; register("ts-node/esm", pathToFileURL("./"));'
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:47061) [DEP0180] DeprecationWarning: fs.Stats constructor is deprecated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+⚠️ Diff budget exceeded (override applied) (base=origin/main)
+ - changed files 1136 > 25
+ - total lines changed 107202 > 800
+Top changed files:
+  - docs/docs-freshness-registry.json: 10573
+  - orchestrator/tests/ControlServer.test.ts: 7635
+  - tasks/index.json: 6556
+  - scripts/lib/review-execution-state.ts: 3968
+  - tests/review-execution-state.spec.ts: 2995
+  - tests/run-review.spec.ts: 2633
+  - orchestrator/tests/DelegationServer.test.ts: 2115
+  - scripts/run-review.ts: 2095
+  - orchestrator/src/cli/control/controlServer.ts: 1658
+  - orchestrator/tests/TelegramOversightBridge.test.ts: 1545
+
+Override accepted via DIFF_BUDGET_OVERRIDE_REASON: stacked branch; bounded 1129 diff validated with focused tests and manual runtime review
+[run-review] bounded review guidance enabled by default (set CODEX_REVIEW_ALLOW_HEAVY_COMMANDS=1 to opt into unrestricted heavy-command execution).
+[run-review] review scope metrics: 14 files, 614 lines.
+[run-review] runtime requested=appserver selected=appserver provider=AppServerRuntimeProvider.
+[run-review] delegation MCP enabled for this review (default; set --disable-delegation-mcp or CODEX_REVIEW_DISABLE_DELEGATION_MCP=1 to disable).
+Review prompt saved to: .runs/1129-coordinator-symphony-aligned-standalone-review-architecture-in-bounds-verdict-termination-boundary/cli/manual-closeout-runtime-check/review/prompt.txt
+Review output log: .runs/1129-coordinator-symphony-aligned-standalone-review-architecture-in-bounds-verdict-termination-boundary/cli/manual-closeout-runtime-check/review/output.log
+Launching Codex review (evidence: .runs/1129-coordinator-symphony-aligned-standalone-review-architecture-in-bounds-verdict-termination-boundary/cli/manual-closeout-runtime-check/manifest.json)
+[run-review] enforcing codex review timeout at 120s (configured via CODEX_REVIEW_TIMEOUT_SECONDS).
+[run-review] patience-first monitor checkpoints every 1m 0s (set CODEX_REVIEW_MONITOR_INTERVAL_SECONDS=0 to disable).
+[run-review] low-signal drift guard enabled after 1s of repetitive bounded activity (set CODEX_REVIEW_LOW_SIGNAL_TIMEOUT_SECONDS=0 to disable).
+[run-review] verdict-stability guard enabled after 1m 0s of repeated speculative no-progress output (set CODEX_REVIEW_VERDICT_STABILITY_TIMEOUT_SECONDS=0 to disable).
+[run-review] meta-surface expansion guard enabled after 2m 0s of sustained off-task meta activity; allowed architecture meta surfaces: architecture-context, review-support, review-docs (set CODEX_REVIEW_META_SURFACE_TIMEOUT_SECONDS=0 to disable).
+[run-review] bounded relevant reinspection dwell boundary enabled after 1s of repetitive on-task reinspection without concrete findings (set CODEX_REVIEW_LOW_SIGNAL_TIMEOUT_SECONDS=0 to disable).
+OpenAI Codex v0.114.0 (research preview)
+--------
+workdir: /Users/kbediako/Code/CO
+model: gpt-5.4
+provider: openai
+approval: never
+sandbox: danger-full-access
+reasoning effort: xhigh
+reasoning summaries: detailed
+session id: 019ce07b-943b-7ee2-8541-e7758ce931fb
+--------
+user
+Review task: 1129-coordinator-symphony-aligned-standalone-review-architecture-in-bounds-verdict-termination-boundary
+Review surface: architecture
+
+Task context:
+- Task checklist: `tasks/tasks-1129-coordinator-symphony-aligned-standalone-review-architecture-in-bounds-verdict-termination-boundary.md`
+- Primary PRD: `docs/PRD-coordinator-symphony-aligned-standalone-review-architecture-in-bounds-verdict-termination-boundary.md`
+- TECH_SPEC: `tasks/specs/1129-coordinator-symphony-aligned-standalone-review-architecture-in-bounds-verdict-termination-boundary.md`
+- ACTION_PLAN: `docs/ACTION_PLAN-coordinator-symphony-aligned-standalone-review-architecture-in-bounds-verdict-termination-boundary.md`
+- Repo architecture baseline: `.agent/system/architecture.md`
+
+Agent notes:
+Goal: validate architecture in-bounds verdict termination boundary | Summary: architecture review now treats the canonical docs bundle plus touched implementation paths as the bounded relevant reread surface and terminates on the dedicated dwell boundary before the global timeout | Risks: docs-only architecture review behavior should still remain truthful and non-coercive while no-verdict rereads fail closed
+
+Please review the current changes and confirm:
+- The solution is minimal and avoids unnecessary abstraction/scope
+- Architecture, layering, and boundaries remain coherent for the requested change
+- Use the canonical architecture inputs above as the primary review context before widening further
+- Call out architectural drift, abstraction mismatch, or missing design rationale that is directly relevant to this task
+- Stay on the requested architecture/context surfaces and directly related implementation paths; do not switch into manifest/runner-log evidence audit unless it is explicitly required
+
+Keep this pass architecture-focused. Do not treat it as a generic evidence or closeout audit.
+
+Execution constraints (bounded review mode):
+- Keep this review focused on the requested architecture surfaces, canonical task docs, and directly relevant implementation paths.
+- Avoid full validation suites (for example `npm run test`, `npm run lint`, `npm run build`, `npm run docs:check`, `npm run docs:freshness`) during this pass.
+- Do not launch direct validation runners (for example `npx vitest`, `npm exec jest`) or nested review/pipeline/delegation flows during this pass.
+- If broader validation would improve confidence, list follow-up commands instead of executing them.
+
+Review scope hint: uncommitted working tree changes (default).
+
+Review scope paths (14):
+```
+docs/TASKS.md
+docs/docs-freshness-registry.json
+scripts/lib/review-execution-state.ts
+scripts/run-review.ts
+tasks/index.json
+tests/review-execution-state.spec.ts
+tests/run-review.spec.ts
+.agent/task/1129-coordinator-symphony-aligned-standalone-review-architecture-in-bounds-verdict-termination-boundary.md
+docs/ACTION_PLAN-coordinator-symphony-aligned-standalone-review-architecture-in-bounds-verdict-termination-boundary.md
+docs/PRD-coordinator-symphony-aligned-standalone-review-architecture-in-bounds-verdict-termination-boundary.md
+docs/TECH_SPEC-coordinator-symphony-aligned-standalone-review-architecture-in-bounds-verdict-termination-boundary.md
+docs/findings/1129-standalone-review-architecture-in-bounds-verdict-termination-boundary-deliberation.md
+tasks/specs/1129-coordinator-symphony-aligned-standalone-review-architecture-in-bounds-verdict-termination-boundary.md
+tasks/tasks-1129-coordinator-symphony-aligned-standalone-review-architecture-in-bounds-verdict-termination-boundary.md
+```
+mcp: openaiDeveloperDocs starting
+mcp: delegation starting
+mcp: delegation ready
+mcp: openaiDeveloperDocs ready
+mcp startup: ready: delegation, openaiDeveloperDocs
+mcp: openaiDeveloperDocs starting
+mcp: delegation starting
+mcp: delegation ready
+mcp: openaiDeveloperDocs ready
+mcp startup: ready: delegation, openaiDeveloperDocs
+
+thinking
+**Searching for keywords**
+
+I’m thinking about doing a quick pass through my memory for task-specific keywords. It might be something like "standalone review architecture." I want to inspect its relevance, but I’m not sure if I need to use citations for this process. Keeping it minimal could help streamline things, so I’m focusing on finding exactly what I need without any extra fluff. Let’s see what I can uncover!
+thinking
+**Searching for keywords**
+
+I’m thinking about doing a quick pass through my memory for task-specific keywords. It might be something like "standalone review architecture." I want to inspect its relevance, but I’m not sure if I need to use citations for this process. Keeping it minimal could help streamline things, so I’m focusing on finding exactly what I need without any extra fluff. Let’s see what I can uncover!
+exec
+/bin/zsh -lc 'rg -n "standalone review|architecture review|review-execution-state|termination boundary|dwell boundary|1129" /Users/kbediako/.codex/memories/MEMORY.md' in /Users/kbediako/Code/CO exited 1 in 0ms:
+
+exec
+/bin/zsh -lc "sed -n '1,220p' docs/PRD-coordinator-symphony-aligned-standalone-review-architecture-in-bounds-verdict-termination-boundary.md" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "sed -n '1,260p' tasks/specs/1129-coordinator-symphony-aligned-standalone-review-architecture-in-bounds-verdict-termination-boundary.md" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "sed -n '1,220p' tasks/tasks-1129-coordinator-symphony-aligned-standalone-review-architecture-in-bounds-verdict-termination-boundary.md" in /Users/kbediako/Code/CO succeeded in 0ms:
+# PRD - Coordinator Symphony-Aligned Standalone Review Architecture In-Bounds Verdict Termination Boundary
+
+## Summary
+
+`1128` established an explicit `architecture` review surface and a dedicated runtime `architecture-context` family for canonical task docs. The remaining live gap is narrower: under Codex CLI `0.114.0`, an architecture-mode review can stay fully in-bounds, reread the same canonical docs plus touched implementation files, and still run until the global wrapper timeout with no verdict.
+
+## Problem
+
+The current wrapper has multiple termination boundaries:
+- meta-surface expansion,
+- heavy-command blocking,
+- startup-anchor enforcement,
+- verdict-stability,
+- relevant reinspection dwell.
+
+Those boundaries now prevent the earlier off-surface and evidence-audit drift, but they do not terminate the specific failure mode seen in the final `1128` rerun:
+- the review stayed on canonical architecture docs and the touched implementation/test files,
+- telemetry recorded repeated command starts and review progress,
+- no heavy commands or meta-surface violations occurred,
+- the review still timed out after `300s` without producing a verdict.
+ succeeded in 0ms:
+---
+id: 20260312-1129-coordinator-symphony-aligned-standalone-review-architecture-in-bounds-verdict-termination-boundary
+title: Coordinator Symphony-Aligned Standalone Review Architecture In-Bounds Verdict Termination Boundary
+status: draft
+owners:
+  - Codex
+created: 2026-03-12
+last_review: 2026-03-12
+review_cadence_days: 30
+related_prd: docs/PRD-coordinator-symphony-aligned-standalone-review-architecture-in-bounds-verdict-termination-boundary.md
+related_action_plan: docs/ACTION_PLAN-coordinator-symphony-aligned-standalone-review-architecture-in-bounds-verdict-termination-boundary.md
+related_tasks:
+  - tasks/tasks-1129-coordinator-symphony-aligned-standalone-review-architecture-in-bounds-verdict-termination-boundary.md
+---
+
+# Task Spec - Coordinator Symphony-Aligned Standalone Review Architecture In-Bounds Verdict Termination Boundary
+
+## Summary
+
+Tighten standalone-review termination so architecture-mode rereads of canonical architecture docs plus touched implementation files do not continue until the global wrapper timeout with no verdict.
+ succeeded in 0ms:
+# Task Checklist - 1129-coordinator-symphony-aligned-standalone-review-architecture-in-bounds-verdict-termination-boundary
+
+- MCP Task ID: `1129-coordinator-symphony-aligned-standalone-review-architecture-in-bounds-verdict-termination-boundary`
+- Primary PRD: `docs/PRD-coordinator-symphony-aligned-standalone-review-architecture-in-bounds-verdict-termination-boundary.md`
+- TECH_SPEC: `tasks/specs/1129-coordinator-symphony-aligned-standalone-review-architecture-in-bounds-verdict-termination-boundary.md`
+- ACTION_PLAN: `docs/ACTION_PLAN-coordinator-symphony-aligned-standalone-review-architecture-in-bounds-verdict-termination-boundary.md`
+
+> This lane tightens standalone-review so architecture-mode rereads of canonical docs plus touched implementation files terminate deterministically instead of running to the global timeout with no verdict.
+
+## Foundation
+
+- [x] Docs-first artifacts created (PRD/TECH_SPEC/ACTION_PLAN/spec/checklist + `.agent` mirror). Evidence: `docs/PRD-coordinator-symphony-aligned-standalone-review-architecture-in-bounds-verdict-termination-boundary.md`, `docs/TECH_SPEC-coordinator-symphony-aligned-standalone-review-architecture-in-bounds-verdict-termination-boundary.md`, `docs/ACTION_PLAN-coordinator-symphony-aligned-standalone-review-architecture-in-bounds-verdict-termination-boundary.md`, `tasks/specs/1129-coordinator-symphony-aligned-standalone-review-architecture-in-bounds-verdict-termination-boundary.md`, `tasks/tasks-1129-coordinator-symphony-aligned-standalone-review-architecture-in-bounds-verdict-termination-boundary.md`, `.agent/task/1129-coordinator-symphony-aligned-standalone-review-architecture-in-bounds-verdict-termination-boundary.md`, `out/1129-coordinator-symphony-aligned-standalone-review-architecture-in-bounds-verdict-termination-boundary/manual/20260312T043425Z-docs-first/00-summary.md`.
+- [x] Deliberation/findings captured for the queued slice. Evidence: `docs/findings/1129-standalone-review-architecture-in-bounds-verdict-termination-boundary-deliberation.md`, `out/1129-coordinator-symphony-aligned-standalone-review-architecture-in-bounds-verdict-termination-boundary/manual/20260312T043425Z-docs-first/00-summary.md`.
+
+## Shared Registry + Review Handoff
+
+- [x] `tasks/index.json`, `docs/TASKS.md`, and `docs/docs-freshness-registry.json` updated. Evidence: `tasks/index.json`, `docs/TASKS.md`, `docs/docs-freshness-registry.json`, `out/1129-coordinator-symphony-aligned-standalone-review-architecture-in-bounds-verdict-termination-boundary/manual/20260312T043425Z-docs-first/00-summary.md`.
+- [x] Local read-only review approval captured in the spec/checklist notes. Evidence: `tasks/specs/1129-coordinator-symphony-aligned-standalone-review-architecture-in-bounds-verdict-termination-boundary.md`, `docs/findings/1129-standalone-review-architecture-in-bounds-verdict-termination-boundary-deliberation.md`, `out/1129-coordinator-symphony-aligned-standalone-review-architecture-in-bounds-verdict-termination-boundary/manual/20260312T043425Z-docs-first/00-summary.md`, `out/1129-coordinator-symphony-aligned-standalone-review-architecture-in-bounds-verdict-termination-boundary/manual/20260312T043425Z-docs-first/01-spec-guard.log`, `out/1129-coordinator-symphony-aligned-standalone-review-architecture-in-bounds-verdict-termination-boundary/manual/20260312T043425Z-docs-first/02-docs-check.log`, `out/1129-coordinator-symphony-aligned-standalone-review-architecture-in-bounds-verdict-termination-boundary/manual/20260312T043425Z-docs-first/03-docs-freshness.log`.
+- [ ] docs-review approval or explicit override captured for registered `1129`. Evidence: `REPLACE-DOCS-REVIEW`.
+
+exec
+/bin/zsh -lc "sed -n '1,220p' docs/ACTION_PLAN-coordinator-symphony-aligned-standalone-review-architecture-in-bounds-verdict-termination-boundary.md" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "sed -n '1,220p' .agent/system/architecture.md" in /Users/kbediako/Code/CO succeeded in 0ms:
+# ACTION_PLAN - Coordinator Symphony-Aligned Standalone Review Architecture In-Bounds Verdict Termination Boundary
+
+## Summary
+- Goal: terminate repetitive in-bounds architecture review loops before the global wrapper timeout.
+- Scope: standalone-review runtime boundary tuning for architecture-mode rereads only.
+- Assumptions: the `1128` architecture surface contract remains correct; the current gap is runtime termination, not surface selection.
+
+## Milestones & Sequencing
+1. Register the `1129` docs-first package and capture the narrowed post-`1128` problem statement.
+2. Inspect the existing relevant-reinspection dwell / verdict-stability hooks and choose the smallest architecture-mode extension.
+3. Add focused runtime + wrapper regressions for the in-bounds timeout pattern.
+4. Implement the bounded termination change, rerun focused checks, then close the lane with explicit review reliability evidence.
+
+## Dependencies
+- `1128` closeout evidence, especially the final `0.114.0` patient rerun.
+- Existing review-runtime classification in `scripts/lib/review-execution-state.ts`.
+- Existing wrapper termination hooks in `scripts/run-review.ts`.
+
+## Validation
+- Checks / tests:
+ succeeded in 0ms:
+# System Architecture
+
+Codex Orchestrator is the “wrapper repo” that coordinates agentic work across multiple downstream projects. The repo is organized around a simple loop:
+
+1) Choose a task id (`<id>-<slug>`) and write scope docs in `docs/`.
+2) Execute a pipeline (usually `diagnostics`) via `codex-orchestrator`.
+3) Capture evidence in `.runs/<task-id>/cli/<run-id>/manifest.json` and mirror outcomes into checklists under `tasks/`, `docs/TASKS.md`, and `.agent/task/`.
+
+## Topology (local-first)
+- **CLI entrypoint:** `bin/codex-orchestrator.ts` (compiled to `dist/bin/codex-orchestrator.js` via `npm run build`).
+- **Pipeline definitions:** `codex.orchestrator.json` (e.g., `diagnostics`, `diagnostics-with-eval`, `tfgrpo-learning`).
+- **Orchestrator core:** `orchestrator/src/**` (manager + CLI wiring + persistence).
+- **Shared packages:** `packages/orchestrator/**` (tooling/approvals/sandbox helpers) and `packages/shared/**` (types/schemas/config helpers).
+- **Adapters / integrations:** `adapters/**` (optional connectors and supporting utilities).
+- **Patterns / codemods:** `patterns/**` and `eslint-plugin-patterns/**` (compiled via `npm run build:patterns`).
+- **Evaluation harness:** `evaluation/harness/**` and `evaluation/tests/**` (opt-in checks via `npm run eval:test`).
+- **Downstream projects:** `packages/<project>/**` (each project keeps its own code/config/assets under `packages/`).
+
+## Data flow (task → pipeline → evidence)
+1. **Task context** is identified by `MCP_RUNNER_TASK_ID=<task-id>` (and/or `--task <task-id>` in the CLI).
+exec
+/bin/zsh -lc 'git status --short' in /Users/kbediako/Code/CO succeeded in 0ms:
+ M docs/TASKS.md
+ M docs/docs-freshness-registry.json
+ M scripts/lib/review-execution-state.ts
+ M scripts/run-review.ts
+ M tasks/index.json
+ M tests/review-execution-state.spec.ts
+ M tests/run-review.spec.ts
+?? .agent/task/1129-coordinator-symphony-aligned-standalone-review-architecture-in-bounds-verdict-termination-boundary.md
+?? docs/ACTION_PLAN-coordinator-symphony-aligned-standalone-review-architecture-in-bounds-verdict-termination-boundary.md
+?? docs/PRD-coordinator-symphony-aligned-standalone-review-architecture-in-bounds-verdict-termination-boundary.md
+?? docs/TECH_SPEC-coordinator-symphony-aligned-standalone-review-architecture-in-bounds-verdict-termination-boundary.md
+?? docs/findings/1129-standalone-review-architecture-in-bounds-verdict-termination-boundary-deliberation.md
+?? tasks/specs/1129-coordinator-symphony-aligned-standalone-review-architecture-in-bounds-verdict-termination-boundary.md
+?? tasks/tasks-1129-coordinator-symphony-aligned-standalone-review-architecture-in-bounds-verdict-termination-boundary.md
+exec
+/bin/zsh -lc 'git diff --stat -- docs/TASKS.md docs/docs-freshness-registry.json scripts/lib/review-execution-state.ts scripts/run-review.ts tasks/index.json tests/review-execution-state.spec.ts tests/run-review.spec.ts .agent/task/1129-coordinator-symphony-aligned-standalone-review-architecture-in-bounds-verdict-termination-boundary.md docs/ACTION_PLAN-coordinator-symphony-aligned-standalone-review-architecture-in-bounds-verdict-termination-boundary.md docs/PRD-coordinator-symphony-aligned-standalone-review-architecture-in-bounds-verdict-termination-boundary.md docs/TECH_SPEC-coordinator-symphony-aligned-standalone-review-architecture-in-bounds-verdict-termination-boundary.md docs/findings/1129-standalone-review-architecture-in-bounds-verdict-termination-boundary-deliberation.md tasks/specs/1129-coordinator-symphony-aligned-standalone-review-architecture-in-bounds-verdict-termination-boundary.md tasks/tasks-1129-coordinator-symphony-aligned-standalone-review-architecture-in-bounds-verdict-termination-boundary.md' in /Users/kbediako/Code/CO succeeded in 0ms:
+ docs/TASKS.md                         |  1 +
+ docs/docs-freshness-registry.json     | 49 ++++++++++++++++++++++
+ scripts/lib/review-execution-state.ts | 65 +++++++++++++++++++++--------
+ scripts/run-review.ts                 | 16 +++++++-
+ tasks/index.json                      | 16 ++++++++
+ tests/review-execution-state.spec.ts  | 70 ++++++++++++++++++++++++++++++-
+ tests/run-review.spec.ts              | 77 +++++++++++++++++++++++++++++++++++
+ 7 files changed, 273 insertions(+), 21 deletions(-)
+
+thinking
+**Inspecting code diffs**
+
+I need to check the code differences. It seems the user mentioned a document called "docs/TECH_SPEC," but I noticed a diff that also added "docs/TECH_SPEC." I’m wondering if that’s similar to "tasks/spec." I’ll have to read through everything to clarify what’s going on. It's essential to ensure that I understand whether they’re actually the same or if there are critical differences I should note!
+thinking
+**Inspecting code diffs**
+
+I need to check the code differences. It seems the user mentioned a document called "docs/TECH_SPEC," but I noticed a diff that also added "docs/TECH_SPEC." I’m wondering if that’s similar to "tasks/spec." I’ll have to read through everything to clarify what’s going on. It's essential to ensure that I understand whether they’re actually the same or if there are critical differences I should note!
+exec
+/bin/zsh -lc "sed -n '1,240p' docs/TECH_SPEC-coordinator-symphony-aligned-standalone-review-architecture-in-bounds-verdict-termination-boundary.md" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "sed -n '1,240p' .agent/task/1129-coordinator-symphony-aligned-standalone-review-architecture-in-bounds-verdict-termination-boundary.md" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "sed -n '1,240p' docs/findings/1129-standalone-review-architecture-in-bounds-verdict-termination-boundary-deliberation.md" in /Users/kbediako/Code/CO succeeded in 0ms:
+# Findings - 1129 Standalone Review Architecture In-Bounds Verdict Termination Boundary
+
+## Decision
+
+Open a bounded review-reliability slice that reuses the existing in-bounds termination hooks for architecture review instead of expanding the review surface again.
+
+## Why now
+
+- `1128` already solved the surface-selection problem by shipping explicit `architecture` review and runtime `architecture-context`.
+- The final patient rerun on Codex CLI `0.114.0` did not reproduce the earlier historical-closeout drift.
+- The remaining live problem is narrower and concrete: architecture review stayed in-bounds, emitted no heavy-command or meta-surface violations, and still timed out after `300s` with no verdict.
+
+## Recommended seam
+
+- `scripts/run-review.ts`
+  - `announceRelevantReinspectionDwellBoundary`
+  - `enforceRelevantReinspectionDwellBoundary`
+  - verdict-stability / timeout wiring
+- `scripts/lib/review-execution-state.ts`
+  - `updateRelevantReinspectionDwellCandidate`
+ succeeded in 0ms:
+---
+id: 20260312-1129-coordinator-symphony-aligned-standalone-review-architecture-in-bounds-verdict-termination-boundary
+title: Coordinator Symphony-Aligned Standalone Review Architecture In-Bounds Verdict Termination Boundary
+relates_to: docs/PRD-coordinator-symphony-aligned-standalone-review-architecture-in-bounds-verdict-termination-boundary.md
+risk: medium
+owners:
+  - Codex
+last_review: 2026-03-12
+---
+
+# TECH_SPEC - Coordinator Symphony-Aligned Standalone Review Architecture In-Bounds Verdict Termination Boundary
+
+## Summary
+
+Tighten standalone-review termination so the `architecture` surface does not remain in a long in-bounds reread loop until the global timeout fires. Reuse the existing review-runtime boundary primitives instead of adding a new surface or replacing the wrapper.
+
+## Current State
+
+`1128` left the wrapper in a materially better place:
+- `architecture` is an explicit third review surface.
+ succeeded in 0ms:
+# Task Checklist - 1129-coordinator-symphony-aligned-standalone-review-architecture-in-bounds-verdict-termination-boundary
+
+- MCP Task ID: `1129-coordinator-symphony-aligned-standalone-review-architecture-in-bounds-verdict-termination-boundary`
+- Primary PRD: `docs/PRD-coordinator-symphony-aligned-standalone-review-architecture-in-bounds-verdict-termination-boundary.md`
+- TECH_SPEC: `tasks/specs/1129-coordinator-symphony-aligned-standalone-review-architecture-in-bounds-verdict-termination-boundary.md`
+- ACTION_PLAN: `docs/ACTION_PLAN-coordinator-symphony-aligned-standalone-review-architecture-in-bounds-verdict-termination-boundary.md`
+
+> This lane tightens standalone-review so architecture-mode rereads of canonical docs plus touched implementation files terminate deterministically instead of running to the global timeout with no verdict.
+
+## Foundation
+
+- [x] Docs-first artifacts created (PRD/TECH_SPEC/ACTION_PLAN/spec/checklist + `.agent` mirror). Evidence: `docs/PRD-coordinator-symphony-aligned-standalone-review-architecture-in-bounds-verdict-termination-boundary.md`, `docs/TECH_SPEC-coordinator-symphony-aligned-standalone-review-architecture-in-bounds-verdict-termination-boundary.md`, `docs/ACTION_PLAN-coordinator-symphony-aligned-standalone-review-architecture-in-bounds-verdict-termination-boundary.md`, `tasks/specs/1129-coordinator-symphony-aligned-standalone-review-architecture-in-bounds-verdict-termination-boundary.md`, `tasks/tasks-1129-coordinator-symphony-aligned-standalone-review-architecture-in-bounds-verdict-termination-boundary.md`, `.agent/task/1129-coordinator-symphony-aligned-standalone-review-architecture-in-bounds-verdict-termination-boundary.md`, `out/1129-coordinator-symphony-aligned-standalone-review-architecture-in-bounds-verdict-termination-boundary/manual/20260312T043425Z-docs-first/00-summary.md`.
+- [x] Deliberation/findings captured for the queued slice. Evidence: `docs/findings/1129-standalone-review-architecture-in-bounds-verdict-termination-boundary-deliberation.md`, `out/1129-coordinator-symphony-aligned-standalone-review-architecture-in-bounds-verdict-termination-boundary/manual/20260312T043425Z-docs-first/00-summary.md`.
+
+## Shared Registry + Review Handoff
+
+- [x] `tasks/index.json`, `docs/TASKS.md`, and `docs/docs-freshness-registry.json` updated. Evidence: `tasks/index.json`, `docs/TASKS.md`, `docs/docs-freshness-registry.json`, `out/1129-coordinator-symphony-aligned-standalone-review-architecture-in-bounds-verdict-termination-boundary/manual/20260312T043425Z-docs-first/00-summary.md`.
+- [x] Local read-only review approval captured in the spec/checklist notes. Evidence: `tasks/specs/1129-coordinator-symphony-aligned-standalone-review-architecture-in-bounds-verdict-termination-boundary.md`, `docs/findings/1129-standalone-review-architecture-in-bounds-verdict-termination-boundary-deliberation.md`, `out/1129-coordinator-symphony-aligned-standalone-review-architecture-in-bounds-verdict-termination-boundary/manual/20260312T043425Z-docs-first/00-summary.md`, `out/1129-coordinator-symphony-aligned-standalone-review-architecture-in-bounds-verdict-termination-boundary/manual/20260312T043425Z-docs-first/01-spec-guard.log`, `out/1129-coordinator-symphony-aligned-standalone-review-architecture-in-bounds-verdict-termination-boundary/manual/20260312T043425Z-docs-first/02-docs-check.log`, `out/1129-coordinator-symphony-aligned-standalone-review-architecture-in-bounds-verdict-termination-boundary/manual/20260312T043425Z-docs-first/03-docs-freshness.log`.
+- [ ] docs-review approval or explicit override captured for registered `1129`. Evidence: `REPLACE-DOCS-REVIEW`.
+
+exec
+/bin/zsh -lc 'git diff -- scripts/lib/review-execution-state.ts scripts/run-review.ts tests/review-execution-state.spec.ts tests/run-review.spec.ts docs/TASKS.md docs/docs-freshness-registry.json tasks/index.json' in /Users/kbediako/Code/CO succeeded in 0ms:
+diff --git a/docs/TASKS.md b/docs/TASKS.md
+index 9f13a24f0..fece3c86e 100644
+--- a/docs/TASKS.md
++++ b/docs/TASKS.md
+@@ -1,4 +1,5 @@
+ <!-- tasks-archive-index:begin --> ## Archive index - archived task snapshots live on the task-archives branch. 2025: https://github.com/Kbediako/CO/blob/task-archives/docs/TASKS-archive-2025.md; 2026: https://github.com/Kbediako/CO/blob/task-archives/docs/TASKS-archive-2026.md <!-- tasks-archive-index:end -->
++# Task List Snapshot - Coordinator Symphony-Aligned Standalone Review Architecture In-Bounds Verdict Termination Boundary (1129-coordinator-symphony-aligned-standalone-review-architecture-in-bounds-verdict-termination-boundary) - Update 2026-03-12: active. Registered the next bounded review-reliability slice after `1128`. The explicit `architecture` surface and runtime `architecture-context` family are already shipped; the new problem statement is narrower and based on the final `0.114.0` rerun: architecture review stayed in-bounds, emitted no heavy-command or meta-surface violations, and still timed out after a long speculative loop with no verdict. This lane is scoped to deterministic no-verdict termination for repeated rereads of canonical architecture docs plus touched implementation files. Evidence: `docs/PRD-coordinator-symphony-aligned-standalone-review-architecture-in-bounds-verdict-termination-boundary.md`, `docs/TECH_SPEC-coordinator-symphony-aligned-standalone-review-architecture-in-bounds-verdict-termination-boundary.md`, `docs/ACTION_PLAN-coordinator-symphony-aligned-standalone-review-architecture-in-bounds-verdict-termination-boundary.md`, `tasks/specs/1129-coordinator-symphony-aligned-standalone-review-architecture-in-bounds-verdict-termination-boundary.md`, `tasks/tasks-1129-coordinator-symphony-aligned-standalone-review-architecture-in-bounds-verdict-termination-boundary.md`, `.agent/task/1129-coordinator-symphony-aligned-standalone-review-architecture-in-bounds-verdict-termination-boundary.md`, `docs/findings/1129-standalone-review-architecture-in-bounds-verdict-termination-boundary-deliberation.md`, `out/1129-coordinator-symphony-aligned-standalone-review-architecture-in-bounds-verdict-termination-boundary/manual/20260312T043425Z-docs-first/00-summary.md`.
+ # Task List Snapshot - Coordinator Symphony-Aligned Standalone Review Architecture Surface Boundary (1128-coordinator-symphony-aligned-standalone-review-architecture-surface-boundary) - Update 2026-03-12: completed. Shipped an explicit `architecture` review surface in `run-review`, added canonical docs-first architecture context plus an explicit runtime `architecture-context` family, and tightened the diff startup-anchor contract so `git show <rev>:<path>` no longer counts as a default diff anchor. Focused wrapper/runtime regressions, deterministic gates, elegance review, and pack-smoke passed. Remaining reliability gap is now explicit in evidence: the patient `0.114.0` architecture review rerun stayed in-bounds after prompt-plus-scope fallback but still timed out after a long speculative loop with no verdict, and the full Vitest suite still quiet-tailed after the final CLI-heavy file. Evidence: `tasks/specs/1128-coordinator-symphony-aligned-standalone-review-architecture-surface-boundary.md`, `tasks/tasks-1128-coordinator-symphony-aligned-standalone-review-architecture-surface-boundary.md`, `.agent/task/1128-coordinator-symphony-aligned-standalone-review-architecture-surface-boundary.md`, `out/1128-coordinator-symphony-aligned-standalone-review-architecture-surface-boundary/manual/20260312T034950Z-closeout/00-summary.md`, `out/1128-coordinator-symphony-aligned-standalone-review-architecture-surface-boundary/manual/20260312T034950Z-closeout/05-targeted-tests.log`, `out/1128-coordinator-symphony-aligned-standalone-review-architecture-surface-boundary/manual/20260312T034950Z-closeout/12-manual-review-architecture-surface-check.md`, `out/1128-coordinator-symphony-aligned-standalone-review-architecture-surface-boundary/manual/20260312T034950Z-closeout/13-override-notes.md`, `out/1128-coordinator-symphony-aligned-standalone-review-architecture-surface-boundary/manual/20260312T034950Z-closeout/14-next-slice-note.md`, `out/1128-coordinator-symphony-aligned-standalone-review-architecture-surface-boundary/manual/20260312T034950Z-closeout/15-elegance-review.md`.
+ # Task List Snapshot - Coordinator Symphony-Aligned Telegram Control Action API Client Extraction (1127-coordinator-symphony-aligned-telegram-control-action-api-client-extraction) - Update 2026-03-12: completed. `telegramOversightBridge.ts` now delegates `/control/action` auth-header construction, POST dispatch, response parsing, and preserved non-2xx error translation into `telegramOversightControlActionApiClient.ts`, while the bridge shell keeps `/pause|/resume` command authority, nonce/actor shaping, and Telegram reply text. Focused final-tree Telegram regressions passed `13/13`, the final-tree full suite passed `194/194` files and `1399/1399` tests, `pack:smoke` passed, manual control transport evidence was captured, and forced bounded review converged to a no-findings verdict. Evidence: `docs/PRD-coordinator-symphony-aligned-telegram-control-action-api-client-extraction.md`, `docs/TECH_SPEC-coordinator-symphony-aligned-telegram-control-action-api-client-extraction.md`, `docs/ACTION_PLAN-coordinator-symphony-aligned-telegram-control-action-api-client-extraction.md`, `tasks/specs/1127-coordinator-symphony-aligned-telegram-control-action-api-client-extraction.md`, `tasks/tasks-1127-coordinator-symphony-aligned-telegram-control-action-api-client-extraction.md`, `.agent/task/1127-coordinator-symphony-aligned-telegram-control-action-api-client-extraction.md`, `out/1127-coordinator-symphony-aligned-telegram-control-action-api-client-extraction/manual/20260312T024917Z-closeout/00-summary.md`, `out/1127-coordinator-symphony-aligned-telegram-control-action-api-client-extraction/manual/20260312T024917Z-closeout/05-targeted-tests.log`, `out/1127-coordinator-symphony-aligned-telegram-control-action-api-client-extraction/manual/20260312T024917Z-closeout/08-test.log`, `out/1127-coordinator-symphony-aligned-telegram-control-action-api-client-extraction/manual/20260312T024917Z-closeout/10-review.log`, `out/1127-coordinator-symphony-aligned-telegram-control-action-api-client-extraction/manual/20260312T024917Z-closeout/14-override-notes.md`.
+ # Task List Snapshot - Coordinator Symphony-Aligned Telegram Bot API Client Extraction (1126-coordinator-symphony-aligned-telegram-bot-api-client-extraction) - Update 2026-03-12: completed. `telegramOversightBridge.ts` now delegates Telegram Bot API URL construction, `getMe`, `getUpdates`, and `sendMessage` request/response handling into `telegramOversightApiClient.ts`, while the bridge shell keeps startup ordering, polling/update sequencing, offset persistence, push-state policy, and `/pause|/resume` mutation authority. Focused final-tree Telegram regressions passed `16/16`, the final-tree full suite passed `194/194` files and `1397/1397` tests, `pack:smoke` passed, manual helper transport evidence was captured, and forced bounded review converged to a no-findings verdict. Evidence: `docs/PRD-coordinator-symphony-aligned-telegram-bot-api-client-extraction.md`, `docs/TECH_SPEC-coordinator-symphony-aligned-telegram-bot-api-client-extraction.md`, `docs/ACTION_PLAN-coordinator-symphony-aligned-telegram-bot-api-client-extraction.md`, `tasks/specs/1126-coordinator-symphony-aligned-telegram-bot-api-client-extraction.md`, `tasks/tasks-1126-coordinator-symphony-aligned-telegram-bot-api-client-extraction.md`, `.agent/task/1126-coordinator-symphony-aligned-telegram-bot-api-client-extraction.md`, `out/1126-coordinator-symphony-aligned-telegram-bot-api-client-extraction/manual/20260312T024700Z-closeout/00-summary.md`, `out/1126-coordinator-symphony-aligned-telegram-bot-api-client-extraction/manual/20260312T024700Z-closeout/05-test.log`, `out/1126-coordinator-symphony-aligned-telegram-bot-api-client-extraction/manual/20260312T024700Z-closeout/09-review.log`, `out/1126-coordinator-symphony-aligned-telegram-bot-api-client-extraction/manual/20260312T024700Z-closeout/13-override-notes.md`.
+diff --git a/docs/docs-freshness-registry.json b/docs/docs-freshness-registry.json
+index d7eea556a..d7bfb629e 100644
+--- a/docs/docs-freshness-registry.json
++++ b/docs/docs-freshness-registry.json
+@@ -2,6 +2,55 @@
+   "version": 1,
+   "generated_at": "2026-03-12",
+   "entries": [
++    {
++      "path": "tasks/tasks-1129-coordinator-symphony-aligned-standalone-review-architecture-in-bounds-verdict-termination-boundary.md",
+
+thinking
+**Inspecting code logic**
+
+I need to take a closer look at the current file to understand its context and identify any potential bugs. I think the architecture touchedPaths might be connected with architectureRelevantPaths, which could be influencing some boundaries. I’ll also need to review the relevant functions, specifically those regarding architectureSurfacePaths generation. It sounds like searching through the code will help me clarify how everything connects together. Let's dive into this!
+thinking
+**Inspecting code logic**
+
+I need to take a closer look at the current file to understand its context and identify any potential bugs. I think the architecture touchedPaths might be connected with architectureRelevantPaths, which could be influencing some boundaries. I’ll also need to review the relevant functions, specifically those regarding architectureSurfacePaths generation. It sounds like searching through the code will help me clarify how everything connects together. Let's dive into this!
+exec
+/bin/zsh -lc "sed -n '780,940p' scripts/run-review.ts" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "sed -n '880,1325p' scripts/lib/review-execution-state.ts" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "sed -n '1,260p' scripts/lib/review-execution-state.ts" in /Users/kbediako/Code/CO succeeded in 0ms:
+      envFlagEnabled(process.env.CODEX_NO_INTERACTIVE) ||
+      envFlagEnabled(process.env.CODEX_NONINTERACTIVE))
+  ) {
+    console.log('Codex review handoff (non-interactive):');
+    console.log('---');
+    console.log(prompt);
+    console.log('---');
+    console.log(`Review prompt saved to: ${path.relative(repoRoot, artifactPaths.promptPath)}`);
+    console.log('Set FORCE_CODEX_REVIEW=1 to invoke `codex review` in this environment.');
+    return;
+  }
+
+  const runtimeContext = await resolveReviewRuntimeContext({
+    options,
+    manifestPath,
+    env: reviewEnv
+  });
+  console.log(`[run-review] ${formatRuntimeSelectionSummary(runtimeContext.runtime)}.`);
+
+  await ensureReviewCommandAvailable(runtimeContext);
+ succeeded in 0ms:
+import { writeFile } from 'node:fs/promises';
+import path from 'node:path';
+
+const REVIEW_DELEGATION_STARTUP_LINE_RE = /\bmcp:\s*delegation\s+(starting|ready)\b/i;
+const REVIEW_PROGRESS_SIGNAL_LINE_RE = /^(thinking|exec|codex)\b/i;
+const REVIEW_HEAVY_SCRIPT_TARGETS = new Set([
+  'test',
+  'lint',
+  'build',
+  'typecheck',
+  'check',
+  'docs:check',
+  'docs:freshness'
+]);
+const REVIEW_NON_BOUNDARY_HEAVY_SCRIPT_TARGETS = new Set(['typecheck', 'check']);
+const REVIEW_VALIDATION_SUITE_SCRIPT_TARGETS = new Set(
+  [...REVIEW_HEAVY_SCRIPT_TARGETS].filter(
+    (target) => !REVIEW_NON_BOUNDARY_HEAVY_SCRIPT_TARGETS.has(target)
+  )
+);
+ succeeded in 0ms:
+
+    if (!handledAsCommandLine) {
+      const outputMetaSurfaceSample = classifyMetaSurfaceOutputLine(
+        trimmed,
+        this.activeCloseoutBundleRoots,
+        this.repoRoot
+      );
+      if (outputMetaSurfaceSample) {
+        this.recordMetaSurfaceSample(outputMetaSurfaceSample, nowMs);
+      }
+      this.recordConcreteOutputSignals(trimmed);
+      this.recordNarrativeInspectionSignals(trimmed);
+    }
+
+    if (/\bsucceeded in\b|\bexited\b/i.test(trimmed)) {
+      this.completionCount += 1;
+    }
+
+    this.updateLowSignalCandidate(nowMs);
+    this.updateVerdictStabilityCandidate(nowMs);
+exec
+/bin/zsh -lc 'rg -n "architectureSurfacePaths|announceRelevantReinspectionDwellBoundary|enforceRelevantReinspectionDwellBoundary|touchedPaths" scripts/run-review.ts scripts/lib/review-execution-state.ts' in /Users/kbediako/Code/CO succeeded in 0ms:
+scripts/run-review.ts:268:  architectureSurfacePaths: string[];
+scripts/run-review.ts:275:    return { lines: [], architectureSurfacePaths: [] };
+scripts/run-review.ts:282:  const architectureSurfacePaths = surface === 'architecture' ? [checklistPath] : [];
+scripts/run-review.ts:289:      architectureSurfacePaths.push(absolutePrdPath);
+scripts/run-review.ts:298:        architectureSurfacePaths.push(absoluteTechSpecPath);
+scripts/run-review.ts:309:        architectureSurfacePaths.push(absoluteActionPlanPath);
+scripts/run-review.ts:315:      architectureSurfacePaths.push(architecturePath);
+scripts/run-review.ts:319:  return { lines, architectureSurfacePaths };
+scripts/run-review.ts:628:  let reviewTaskContext: ReviewTaskContext = { lines: [], architectureSurfacePaths: [] };
+scripts/run-review.ts:869:      ? reviewTaskContext.architectureSurfacePaths
+scripts/run-review.ts:873:  const touchedPaths =
+scripts/run-review.ts:880:      : reviewSurface === 'diff' && touchedPaths.length > 0
+scripts/run-review.ts:887:  const announceRelevantReinspectionDwellBoundary =
+scripts/run-review.ts:890:    touchedPaths.length > 0;
+scripts/run-review.ts:891:  const enforceRelevantReinspectionDwellBoundary =
+scripts/run-review.ts:892:    announceRelevantReinspectionDwellBoundary && lowSignalTimeoutMs !== null;
+scripts/run-review.ts:946:    if (announceRelevantReinspectionDwellBoundary) {
+scripts/run-review.ts:980:      enforceRelevantReinspectionDwellBoundary,
+scripts/run-review.ts:992:            ? reviewTaskContext.architectureSurfacePaths
+scripts/run-review.ts:1013:      touchedPaths,
+
+thinking
+I'm thinking about inspecting the constructor and building an output summary to understand how they interact. There's a lot to unpack here, and I want to make sure I’m covering all angles. I wonder what elements might need special attention as I analyze this. It feels important to connect these components correctly to ensure everything functions well together. So, let's dive into the details and see what insights emerge from this exploration.
+thinking
+I'm thinking about inspecting the constructor and building an output summary to understand how they interact. There's a lot to unpack here, and I want to make sure I’m covering all angles. I wonder what elements might need special attention as I analyze this. It feels important to connect these components correctly to ensure everything functions well together. So, let's dive into the details and see what insights emerge from this exploration.
+exec
+/bin/zsh -lc "sed -n '620,760p' scripts/lib/review-execution-state.ts" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "sed -n '760,860p' scripts/lib/review-execution-state.ts" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "sed -n '400,520p' scripts/lib/review-execution-state.ts" in /Users/kbediako/Code/CO succeeded in 0ms:
+  }
+
+  formatCheckpoint(nowMs = Date.now()): string {
+    const snapshot = this.snapshot(nowMs);
+    const startupStatus = snapshot.reviewProgressObserved
+      ? 'review progress observed'
+      : `${snapshot.startupEvents} delegation startup events, no review progress yet`;
+    return `[run-review] waiting on codex review (${formatDurationMs(
+      snapshot.elapsedMs
+    )} elapsed, ${formatDurationMs(snapshot.idleMs)} idle; ${startupStatus}).`;
+  }
+
+  buildTelemetryPayload(
+    options: ReviewExecutionTelemetryPayloadOptions
+  ): RedactedReviewTelemetryPayload {
+    const summary = this.buildOutputSummary();
+    const persistedSummary = sanitizeTelemetrySummaryForPersistence(
+      summary,
+      options.includeRawTelemetry,
+      options.telemetryDebugEnvKey
+ succeeded in 0ms:
+            Math.max(0, nowMs - this.startedAtMs)
+          )}: ${this.commandStarts.length} command starts, ${summary.metaSurfaceSignals} meta-surface signals, ${summary.distinctMetaSurfaces} distinct meta-surfaces [${summary.metaSurfaceKinds.join(', ')}] (max hit count ${summary.maxMetaSurfaceHits}), sustained for ${formatDurationMs(Math.max(0, nowMs - this.metaSurfaceCandidateSinceMs!))}.`
+        : null,
+      commandStarts: this.commandStarts.length,
+      metaSurfaceSignals: summary.metaSurfaceSignals,
+      distinctMetaSurfaces: summary.distinctMetaSurfaces,
+      maxMetaSurfaceHits: summary.maxMetaSurfaceHits,
+      timeoutMs: this.metaSurfaceTimeoutMs
+    };
+  }
+
+  getStartupAnchorBoundaryState(nowMs = Date.now()): ReviewStartupAnchorBoundaryState {
+    const summary = this.buildOutputSummary();
+    const triggered = this.startupAnchorViolationAtMs !== null;
+    return {
+      triggered,
+      reason: triggered
+        ? `bounded review startup-anchor boundary violated after ${formatDurationMs(
+            Math.max(0, this.startupAnchorViolationAtMs! - this.startedAtMs)
+          )}: ${summary.preAnchorCommandStarts} pre-anchor command starts, ${summary.preAnchorMetaSurfaceSignals} pre-anchor meta-surface signals across ${summary.preAnchorDistinctMetaSurfaces} surface kind(s) [${summary.preAnchorMetaSurfaceKinds.join(', ')}] before the first startup anchor.`
+ succeeded in 0ms:
+    this.heavyCommandLimit =
+      options.heavyCommandLimit ?? DEFAULT_REVIEW_OUTPUT_SUMMARY_HEAVY_COMMAND_LIMIT;
+    this.commandLimit = options.commandLimit ?? DEFAULT_REVIEW_OUTPUT_SUMMARY_COMMAND_LIMIT;
+    const configuredLowSignalTimeoutMs = options.lowSignalTimeoutMs;
+    this.lowSignalTimeoutMs =
+      configuredLowSignalTimeoutMs === undefined
+        ? DEFAULT_LOW_SIGNAL_TIMEOUT_MS
+        : configuredLowSignalTimeoutMs === null || configuredLowSignalTimeoutMs <= 0
+        ? null
+        : configuredLowSignalTimeoutMs;
+    const configuredVerdictStabilityTimeoutMs = options.verdictStabilityTimeoutMs;
+    this.verdictStabilityTimeoutMs =
+      configuredVerdictStabilityTimeoutMs === undefined
+        ? DEFAULT_VERDICT_STABILITY_TIMEOUT_MS
+        : configuredVerdictStabilityTimeoutMs === null || configuredVerdictStabilityTimeoutMs <= 0
+        ? null
+        : configuredVerdictStabilityTimeoutMs;
+    const configuredMetaSurfaceTimeoutMs = options.metaSurfaceTimeoutMs;
+    this.metaSurfaceTimeoutMs =
+      configuredMetaSurfaceTimeoutMs === undefined
+[run-review] review telemetry: 10 command start(s), 0 heavy command start(s), 4 delegation startup event(s), 19 review progress signal(s).
+[run-review] last command started: [redacted] (set CODEX_REVIEW_DEBUG_TELEMETRY=1 to print raw command text).
+[run-review] output tail captured: 20 line(s) hidden by default (set CODEX_REVIEW_DEBUG_TELEMETRY=1 to print raw tail).
+[run-review] review telemetry saved to: .runs/1129-coordinator-symphony-aligned-standalone-review-architecture-in-bounds-verdict-termination-boundary/cli/manual-closeout-runtime-check/review/telemetry.json
+[run-review] failed: bounded review relevant-reinspection dwell boundary violated after 58s: 10 command start(s) repeatedly revisited 15 bounded relevant target(s) (max target hit count 4) within the current bounded review surface without concrete findings or meta-surface drift via /bin/zsh -lc "sed -n '620,760p' scripts/lib/review-execution-state.ts" in /Users/kbediako/Code/COexec. (set CODEX_REVIEW_LOW_SIGNAL_TIMEOUT_SECONDS=0 to disable).

@@ -41,7 +41,7 @@ const DEFAULT_VERDICT_STABILITY_TIMEOUT_MS = 180_000;
 const DEFAULT_META_SURFACE_TIMEOUT_MS = 180_000;
 const REVIEW_ACTIVE_CLOSEOUT_BUNDLE_KIND = 'review-closeout-bundle';
 const RELEVANT_REINSPECTION_MIN_COMMAND_STARTS = 8;
-const RELEVANT_REINSPECTION_MAX_DISTINCT_TARGETS = 4;
+const RELEVANT_REINSPECTION_BASE_MAX_DISTINCT_TARGETS = 4;
 const RELEVANT_REINSPECTION_MIN_REPEAT_TARGET_HITS = 3;
 const STARTUP_ANCHOR_META_SURFACE_SIGNAL_BUDGET = 1;
 const STARTUP_ANCHOR_ALLOWED_META_SURFACE_KINDS = new Set(['review-support']);
@@ -696,6 +696,9 @@ export class ReviewExecutionState {
     nowMs = Date.now()
   ): ReviewRelevantReinspectionDwellBoundaryState {
     const summary = this.buildOutputSummary();
+    const relevantInspectionSummary = this.buildInspectionTargetSummary(
+      this.getRelevantReinspectionWindowSize()
+    );
     const derivedTriggered =
       this.relevantReinspectionDwellViolation !== null ||
       (this.enforceRelevantReinspectionDwellBoundary &&
@@ -713,15 +716,20 @@ export class ReviewExecutionState {
     const commandStarts =
       this.relevantReinspectionDwellViolation?.commandStarts ?? this.commandStarts.length;
     const distinctTargets =
-      this.relevantReinspectionDwellViolation?.distinctTargets ?? summary.distinctInspectionTargets;
+      this.relevantReinspectionDwellViolation?.distinctTargets ??
+      relevantInspectionSummary.distinctTargets;
     const maxTargetHits =
-      this.relevantReinspectionDwellViolation?.maxTargetHits ?? summary.maxInspectionTargetHits;
+      this.relevantReinspectionDwellViolation?.maxTargetHits ?? relevantInspectionSummary.maxHits;
     return {
       triggered: derivedTriggered,
       reason: derivedTriggered && detectedAtMs !== null
         ? `bounded review relevant-reinspection dwell boundary violated after ${formatDurationMs(
             Math.max(0, detectedAtMs - this.startedAtMs)
-          )}: ${commandStarts} command start(s) repeatedly revisited ${distinctTargets} bounded relevant target(s) (max target hit count ${maxTargetHits}) after startup-anchor success without concrete findings or meta-surface drift${
+          )}: ${commandStarts} command start(s) repeatedly revisited ${distinctTargets} bounded relevant target(s) (max target hit count ${maxTargetHits}) ${
+            this.enforceStartupAnchorBoundary
+              ? 'after startup-anchor success'
+              : 'within the current bounded review surface'
+          } without concrete findings or meta-surface drift${
             violationSample
               ? ` via ${violationSample}`
               : ''
@@ -729,8 +737,8 @@ export class ReviewExecutionState {
         : null,
       anchorObserved: this.startupAnchorObserved,
       commandStarts: this.commandStarts.length,
-      distinctTargets: summary.distinctInspectionTargets,
-      maxTargetHits: summary.maxInspectionTargetHits,
+      distinctTargets: relevantInspectionSummary.distinctTargets,
+      maxTargetHits: relevantInspectionSummary.maxHits,
       metaSurfaceSignals: summary.metaSurfaceSignals,
       concreteOutputSignals: summary.concreteOutputSignals,
       violationSample
@@ -903,7 +911,7 @@ export class ReviewExecutionState {
     }
     this.lastInspectionCommandLine = commandLine;
     this.recentInspectionTargetSamples.push(targets);
-    while (this.recentInspectionTargetSamples.length > LOW_SIGNAL_RECENT_COMMAND_WINDOW) {
+    while (this.recentInspectionTargetSamples.length > this.getRecordedInspectionSignalWindowSize()) {
       this.recentInspectionTargetSamples.shift();
     }
     const signature = extractInspectionCommandSignature(commandLine, targets);
@@ -911,7 +919,7 @@ export class ReviewExecutionState {
       return targets;
     }
     this.recentInspectionSignatures.push(signature);
-    while (this.recentInspectionSignatures.length > LOW_SIGNAL_RECENT_COMMAND_WINDOW) {
+    while (this.recentInspectionSignatures.length > this.getRecordedInspectionSignalWindowSize()) {
       this.recentInspectionSignatures.shift();
     }
     return targets;
@@ -976,14 +984,18 @@ export class ReviewExecutionState {
       return;
     }
     const summary = this.buildOutputSummary();
+    const relevantInspectionSummary = this.buildInspectionTargetSummary(
+      this.getRelevantReinspectionWindowSize()
+    );
+    const anchorSatisfied = !this.enforceStartupAnchorBoundary || this.startupAnchorObserved;
     const dwellShaped =
-      this.startupAnchorObserved &&
+      anchorSatisfied &&
       this.reviewProgressObserved &&
       this.commandStarts.length >= RELEVANT_REINSPECTION_MIN_COMMAND_STARTS &&
-      summary.distinctInspectionTargets > 0 &&
-      summary.distinctInspectionTargets <= RELEVANT_REINSPECTION_MAX_DISTINCT_TARGETS &&
-      summary.maxInspectionTargetHits >= RELEVANT_REINSPECTION_MIN_REPEAT_TARGET_HITS &&
-      summary.metaSurfaceSignals === 0 &&
+      relevantInspectionSummary.distinctTargets > 0 &&
+      relevantInspectionSummary.distinctTargets <= this.getRelevantReinspectionMaxDistinctTargets() &&
+      relevantInspectionSummary.maxHits >= RELEVANT_REINSPECTION_MIN_REPEAT_TARGET_HITS &&
+      relevantInspectionSummary.metaSurfaceSignals === 0 &&
       summary.concreteOutputSignals === 0;
     if (!dwellShaped) {
       this.relevantReinspectionDwellCandidateSinceMs = null;
@@ -1001,8 +1013,8 @@ export class ReviewExecutionState {
         sample: this.lastInspectionCommandLine,
         detectedAtMs: nowMs,
         commandStarts: this.commandStarts.length,
-        distinctTargets: summary.distinctInspectionTargets,
-        maxTargetHits: summary.maxInspectionTargetHits
+        distinctTargets: relevantInspectionSummary.distinctTargets,
+        maxTargetHits: relevantInspectionSummary.maxHits
       };
     }
   }
@@ -1200,7 +1212,7 @@ export class ReviewExecutionState {
     }
   }
 
-  private buildInspectionTargetSummary(): {
+  private buildInspectionTargetSummary(windowSize = LOW_SIGNAL_RECENT_COMMAND_WINDOW): {
     distinctTargets: number;
     maxHits: number;
     distinctSignatures: number;
@@ -1211,7 +1223,8 @@ export class ReviewExecutionState {
     metaSurfaceKinds: string[];
   } {
     const recentTargetHits = new Map<string, number>();
-    for (const targets of this.recentInspectionTargetSamples) {
+    const relevantTargetSamples = this.recentInspectionTargetSamples.slice(-windowSize);
+    for (const targets of relevantTargetSamples) {
       for (const target of targets) {
         recentTargetHits.set(target, (recentTargetHits.get(target) ?? 0) + 1);
       }
@@ -1223,7 +1236,8 @@ export class ReviewExecutionState {
       }
     }
     const recentSignatureHits = new Map<string, number>();
-    for (const signature of this.recentInspectionSignatures) {
+    const relevantSignatures = this.recentInspectionSignatures.slice(-windowSize);
+    for (const signature of relevantSignatures) {
       recentSignatureHits.set(signature, (recentSignatureHits.get(signature) ?? 0) + 1);
     }
     let maxSignatureHits = 0;
@@ -1255,6 +1269,21 @@ export class ReviewExecutionState {
       maxMetaSurfaceHits,
       metaSurfaceKinds: [...recentMetaSurfaceHits.keys()].sort()
     };
+  }
+
+  private getRelevantReinspectionMaxDistinctTargets(): number {
+    return Math.max(RELEVANT_REINSPECTION_BASE_MAX_DISTINCT_TARGETS, this.touchedPaths.size);
+  }
+
+  private getRelevantReinspectionWindowSize(): number {
+    return Math.max(
+      LOW_SIGNAL_RECENT_COMMAND_WINDOW,
+      this.getRelevantReinspectionMaxDistinctTargets() * RELEVANT_REINSPECTION_MIN_REPEAT_TARGET_HITS
+    );
+  }
+
+  private getRecordedInspectionSignalWindowSize(): number {
+    return this.getRelevantReinspectionWindowSize();
   }
 
   private buildOutputNarrativeSummary(): {

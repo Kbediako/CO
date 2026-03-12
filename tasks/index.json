@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260312-1129-coordinator-symphony-aligned-standalone-review-architecture-in-bounds-verdict-termination-boundary",
+      "title": "Coordinator Symphony-Aligned Standalone Review Architecture In-Bounds Verdict Termination Boundary",
+      "relates_to": "tasks/tasks-1129-coordinator-symphony-aligned-standalone-review-architecture-in-bounds-verdict-termination-boundary.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-12",
+      "paths": {
+        "spec": "tasks/specs/1129-coordinator-symphony-aligned-standalone-review-architecture-in-bounds-verdict-termination-boundary.md",
+        "task": "tasks/tasks-1129-coordinator-symphony-aligned-standalone-review-architecture-in-bounds-verdict-termination-boundary.md",
+        "agent_task": ".agent/task/1129-coordinator-symphony-aligned-standalone-review-architecture-in-bounds-verdict-termination-boundary.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-standalone-review-architecture-in-bounds-verdict-termination-boundary.md"
+      }
+    },
+    {
       "id": "20260312-1128-coordinator-symphony-aligned-standalone-review-architecture-surface-boundary",
       "title": "Coordinator Symphony-Aligned Standalone Review Architecture Surface Boundary",
       "relates_to": "tasks/tasks-1128-coordinator-symphony-aligned-standalone-review-architecture-surface-boundary.md",

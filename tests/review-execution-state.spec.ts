@@ -2558,7 +2558,7 @@ describe('ReviewExecutionState', () => {
       nowMs += 100;
     }
 
-    const dwellBoundary = state.getRelevantReinspectionDwellBoundaryState(2_000);
+    const dwellBoundary = state.getRelevantReinspectionDwellBoundaryState(3_000);
     const summary = state.buildOutputSummary();
     expect(dwellBoundary.triggered).toBe(true);
     expect(dwellBoundary.reason).toContain('relevant-reinspection dwell boundary violated');
@@ -2566,6 +2566,74 @@ describe('ReviewExecutionState', () => {
     expect(dwellBoundary.distinctTargets).toBeLessThanOrEqual(4);
     expect(dwellBoundary.maxTargetHits).toBeGreaterThanOrEqual(2);
     expect(summary.startupAnchorObserved).toBe(true);
+    expect(summary.metaSurfaceSignals).toBe(0);
+    expect(summary.concreteOutputSignals).toBe(0);
+  });
+
+  it('treats repetitive in-bounds architecture rereads as a dedicated dwell boundary', () => {
+    const architectureRelevantTargets = [
+      'tasks/tasks-sample-task.md',
+      'docs/PRD-sample-task.md',
+      'tasks/specs/sample-task.md',
+      'docs/ACTION_PLAN-sample-task.md',
+      '.agent/system/architecture.md',
+      'file-1.py',
+      'file-2.py'
+    ];
+    const state = new ReviewExecutionState({
+      startedAtMs: 0,
+      blockHeavyCommands: false,
+      lowSignalTimeoutMs: 1_000,
+      enforceRelevantReinspectionDwellBoundary: true,
+      repoRoot: '/Users/kbediako/Code/CO',
+      touchedPaths: architectureRelevantTargets,
+      allowedMetaSurfaceKinds: ['architecture-context', 'review-support', 'review-docs'],
+      allowedMetaSurfacePaths: [
+        '/Users/kbediako/Code/CO/tasks/tasks-sample-task.md',
+        '/Users/kbediako/Code/CO/docs/PRD-sample-task.md',
+        '/Users/kbediako/Code/CO/tasks/specs/sample-task.md',
+        '/Users/kbediako/Code/CO/docs/ACTION_PLAN-sample-task.md',
+        '/Users/kbediako/Code/CO/.agent/system/architecture.md'
+      ]
+    });
+
+    let nowMs = 100;
+    for (const command of [
+      "/bin/zsh -lc 'sed -n 1,120p tasks/tasks-sample-task.md'",
+      "/bin/zsh -lc 'sed -n 1,120p docs/PRD-sample-task.md'",
+      "/bin/zsh -lc 'sed -n 1,120p tasks/specs/sample-task.md'",
+      "/bin/zsh -lc 'sed -n 1,120p docs/ACTION_PLAN-sample-task.md'",
+      "/bin/zsh -lc 'sed -n 1,120p .agent/system/architecture.md'",
+      "/bin/zsh -lc 'sed -n 1,120p file-1.py'",
+      "/bin/zsh -lc 'sed -n 1,120p file-2.py'",
+      "/bin/zsh -lc 'sed -n 121,240p tasks/tasks-sample-task.md'",
+      "/bin/zsh -lc 'sed -n 121,240p docs/PRD-sample-task.md'",
+      "/bin/zsh -lc 'sed -n 121,240p tasks/specs/sample-task.md'",
+      "/bin/zsh -lc 'sed -n 121,240p docs/ACTION_PLAN-sample-task.md'",
+      "/bin/zsh -lc 'sed -n 121,240p .agent/system/architecture.md'",
+      "/bin/zsh -lc 'sed -n 121,240p file-1.py'",
+      "/bin/zsh -lc 'sed -n 121,240p file-2.py'",
+      "/bin/zsh -lc 'sed -n 241,360p tasks/tasks-sample-task.md'",
+      "/bin/zsh -lc 'sed -n 241,360p docs/PRD-sample-task.md'",
+      "/bin/zsh -lc 'sed -n 241,360p tasks/specs/sample-task.md'",
+      "/bin/zsh -lc 'sed -n 241,360p docs/ACTION_PLAN-sample-task.md'",
+      "/bin/zsh -lc 'sed -n 241,360p .agent/system/architecture.md'",
+      "/bin/zsh -lc 'sed -n 241,360p file-1.py'",
+      "/bin/zsh -lc 'sed -n 241,360p file-2.py'"
+    ]) {
+      state.observeChunk('thinking\nexec\n', 'stdout', nowMs);
+      state.observeChunk(`${command}\n`, 'stdout', nowMs + 10);
+      nowMs += 100;
+    }
+
+    const dwellBoundary = state.getRelevantReinspectionDwellBoundaryState(3_000);
+    const summary = state.buildOutputSummary();
+    expect(dwellBoundary.triggered).toBe(true);
+    expect(dwellBoundary.reason).toContain('relevant-reinspection dwell boundary violated');
+    expect(dwellBoundary.reason).toContain('within the current bounded review surface');
+    expect(dwellBoundary.anchorObserved).toBe(false);
+    expect(dwellBoundary.distinctTargets).toBeLessThanOrEqual(architectureRelevantTargets.length);
+    expect(dwellBoundary.maxTargetHits).toBeGreaterThanOrEqual(2);
     expect(summary.metaSurfaceSignals).toBe(0);
     expect(summary.concreteOutputSignals).toBe(0);
   });

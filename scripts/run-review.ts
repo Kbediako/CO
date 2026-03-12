@@ -863,7 +863,17 @@ async function main(): Promise<void> {
       : reviewSurface === 'architecture'
         ? ARCHITECTURE_ALLOWED_META_SURFACE_KINDS
       : ([] as const);
-  const touchedPaths = scopePathCollection.paths;
+  const scopeTouchedPaths = scopePathCollection.paths;
+  const architectureRelevantPaths =
+    reviewSurface === 'architecture'
+      ? reviewTaskContext.architectureSurfacePaths
+          .map((entry) => path.relative(repoRoot, entry))
+          .filter((entry) => entry.length > 0)
+      : [];
+  const touchedPaths =
+    reviewSurface === 'architecture'
+      ? [...new Set([...scopeTouchedPaths, ...architectureRelevantPaths])]
+      : scopeTouchedPaths;
   const startupAnchorMode: ReviewStartupAnchorMode | null = !allowHeavyCommands
     ? reviewSurface === 'audit'
       ? 'audit'
@@ -875,7 +885,9 @@ async function main(): Promise<void> {
   const enforceActiveCloseoutBundleRereadBoundary =
     reviewSurface === 'diff' && !allowHeavyCommands && activeCloseoutBundleRoots.length > 0;
   const announceRelevantReinspectionDwellBoundary =
-    reviewSurface === 'diff' && !allowHeavyCommands && touchedPaths.length > 0;
+    (reviewSurface === 'diff' || reviewSurface === 'architecture') &&
+    !allowHeavyCommands &&
+    touchedPaths.length > 0;
   const enforceRelevantReinspectionDwellBoundary =
     announceRelevantReinspectionDwellBoundary && lowSignalTimeoutMs !== null;
   if (!allowHeavyCommands) {
