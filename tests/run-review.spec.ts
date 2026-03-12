@@ -916,6 +916,7 @@ function baseEnv(sandbox: string, codexBin: string): Record<string, string | und
   delete env.CODEX_REVIEW_ALLOW_HEAVY_COMMANDS;
   delete env.CODEX_REVIEW_ENFORCE_BOUNDED_MODE;
   delete env.CODEX_REVIEW_LOW_SIGNAL_TIMEOUT_SECONDS;
+  delete env.CODEX_REVIEW_VERDICT_STABILITY_TIMEOUT_SECONDS;
   delete env.CODEX_REVIEW_META_SURFACE_TIMEOUT_SECONDS;
   delete env.CODEX_REVIEW_DEBUG_TELEMETRY;
   delete env.CODEX_REVIEW_SURFACE;
@@ -2806,6 +2807,23 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(telemetry.summary.maxOutputNarrativeSignatureHits).toBeGreaterThanOrEqual(2);
   }, LONG_WAIT_TEST_TIMEOUT_MS);
 
+  it('clears verdict-stability timeout env from shared wrapper test setup', async () => {
+    const sandbox = await makeSandbox();
+    const codexBin = await makeFakeCodex(sandbox);
+    const previous = process.env.CODEX_REVIEW_VERDICT_STABILITY_TIMEOUT_SECONDS;
+    process.env.CODEX_REVIEW_VERDICT_STABILITY_TIMEOUT_SECONDS = '99';
+    try {
+      const env = baseEnv(sandbox, codexBin);
+      expect(env.CODEX_REVIEW_VERDICT_STABILITY_TIMEOUT_SECONDS).toBeUndefined();
+    } finally {
+      if (previous === undefined) {
+        delete process.env.CODEX_REVIEW_VERDICT_STABILITY_TIMEOUT_SECONDS;
+      } else {
+        process.env.CODEX_REVIEW_VERDICT_STABILITY_TIMEOUT_SECONDS = previous;
+      }
+    }
+  });
+
   it('fails bounded review when repeated targetless speculative output persists without concrete findings', async () => {
     const sandbox = await makeSandbox();
     const manifestPath = await makeManifest(sandbox);
@@ -2851,6 +2869,45 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(telemetry.summary.outputNarrativeSignals).toBeGreaterThanOrEqual(4);
     expect(telemetry.summary.distinctOutputInspectionTargets).toBe(0);
     expect(telemetry.summary.maxOutputNarrativeSignatureHits).toBeGreaterThanOrEqual(2);
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('disables verdict-stability termination when CODEX_REVIEW_VERDICT_STABILITY_TIMEOUT_SECONDS=0', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'verdict-stability-drift',
+      CODEX_REVIEW_VERDICT_STABILITY_TIMEOUT_SECONDS: '0',
+      CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0',
+      CODEX_REVIEW_TIMEOUT_SECONDS: '1'
+    });
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).toContain('codex review timed out after 1s');
+    expect(result.stderr).not.toContain('verdict-stability drift detected');
+    expect(result.stderr).not.toContain(
+      'termination boundary: verdict-stability (repeated-output-inspection).'
+    );
+
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      termination_boundary: {
+        kind: string;
+        provenance: string;
+        reason: string;
+        sample: string | null;
+      } | null;
+    };
+    expect(telemetry.status).toBe('failed');
+    expect(telemetry.termination_boundary).toEqual({
+      kind: 'timeout',
+      provenance: 'review-timeout',
+      reason:
+        'codex review timed out after 1s (set CODEX_REVIEW_TIMEOUT_SECONDS=0 to disable).',
+      sample: null
+    });
   }, LONG_WAIT_TEST_TIMEOUT_MS);
 
   it('allows bounded review to complete when speculative output keeps introducing new concrete targets', async () => {
