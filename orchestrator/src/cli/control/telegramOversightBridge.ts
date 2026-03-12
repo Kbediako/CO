@@ -24,6 +24,10 @@ import {
   type TelegramUpdate,
   type TelegramUser
 } from './telegramOversightApiClient.js';
+import {
+  createTelegramOversightControlActionApiClient,
+  type TelegramOversightControlActionApiClient
+} from './telegramOversightControlActionApiClient.js';
 const DEFAULT_POLL_INTERVAL_MS = 1_000;
 const DEFAULT_POLL_TIMEOUT_SECONDS = 20;
 const DEFAULT_PUSH_COOLDOWN_MS = 30_000;
@@ -70,14 +74,6 @@ export interface QuestionRecordPayload {
 
 export interface QuestionsPayload {
   questions?: QuestionRecordPayload[];
-}
-
-interface ControlActionResponse {
-  error?: string;
-  control_seq?: number;
-  traceability?: {
-    decision?: string;
-  };
 }
 
 type FetchLike = typeof fetch;
@@ -128,11 +124,9 @@ export async function startTelegramOversightBridge(
 class TelegramOversightBridgeRuntime implements TelegramOversightBridge {
   private readonly config: TelegramOversightBridgeConfig;
   private readonly readController: ControlTelegramReadController;
-  private readonly baseUrl: string;
-  private readonly controlToken: string;
-  private readonly fetchImpl: FetchLike;
   private readonly statePath: string;
   private readonly telegramClient: TelegramOversightApiClient;
+  private readonly controlActionClient: TelegramOversightControlActionApiClient;
 
   private closed = false;
   private loopPromise: Promise<void> | null = null;
@@ -154,12 +148,14 @@ class TelegramOversightBridgeRuntime implements TelegramOversightBridge {
       readAdapter: options.readAdapter,
       mutationsEnabled: options.config.mutationsEnabled
     });
-    this.baseUrl = options.baseUrl;
-    this.controlToken = options.controlToken;
-    this.fetchImpl = options.fetchImpl;
     this.statePath = join(options.runDir, TELEGRAM_STATE_FILE);
     this.telegramClient = createTelegramOversightApiClient({
       botToken: options.config.botToken,
+      fetchImpl: options.fetchImpl
+    });
+    this.controlActionClient = createTelegramOversightControlActionApiClient({
+      baseUrl: options.baseUrl,
+      controlToken: options.controlToken,
       fetchImpl: options.fetchImpl
     });
   }
@@ -348,24 +344,11 @@ class TelegramOversightBridgeRuntime implements TelegramOversightBridge {
       transport_nonce_expires_at: nonceExpiresAt
     };
 
-    const payload = await this.writeControlJson<ControlActionResponse>('/control/action', body);
+    const payload = await this.controlActionClient.postAction(body);
     if (payload.error) {
       return `${capitalize(action)} failed: ${payload.error}`;
     }
     return `${capitalize(action)} requested. Control decision: ${payload.traceability?.decision ?? 'applied'}${typeof payload.control_seq === 'number' ? ` (seq ${payload.control_seq})` : ''}.`;
-  }
-
-  private async writeControlJson<T>(path: string, body: Record<string, unknown>): Promise<T> {
-    const response = await this.fetchImpl(new URL(path, this.baseUrl), {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${this.controlToken}`,
-        'x-csrf-token': this.controlToken,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(body)
-    });
-    return readJsonResponse<T>(response);
   }
 
   private async maybeSendProjectionDelta(input: {
@@ -422,41 +405,6 @@ function resolveTelegramOversightBridgeConfig(env: NodeJS.ProcessEnv): TelegramO
     pushEnabled: parseBooleanEnv(env.CO_TELEGRAM_PUSH_ENABLED),
     pushCooldownMs: parsePositiveIntegerEnv(env.CO_TELEGRAM_PUSH_INTERVAL_MS, DEFAULT_PUSH_COOLDOWN_MS)
   };
-}
-
-async function readJsonResponse<T>(response: Response): Promise<T> {
-  const payload = (await response.json()) as T & { error?: { code?: string; message?: string } };
-  if (!response.ok) {
-    const message = resolveErrorMessage(payload);
-    throw new Error(message);
-  }
-  return payload;
-}
-
-function resolveErrorMessage(payload: unknown): string {
-  if (!payload || typeof payload !== 'object') {
-    return 'request_failed';
-  }
-  const record = payload as Record<string, unknown>;
-  if (typeof record.error === 'string' && record.error.trim().length > 0) {
-    return record.error.trim();
-  }
-  const error = record.error;
-  if (error && typeof error === 'object' && !Array.isArray(error)) {
-    const errorRecord = error as Record<string, unknown>;
-    const code = typeof errorRecord.code === 'string' ? errorRecord.code : null;
-    const message = typeof errorRecord.message === 'string' ? errorRecord.message : null;
-    if (code && message) {
-      return `${code}: ${message}`;
-    }
-    if (code) {
-      return code;
-    }
-    if (message) {
-      return message;
-    }
-  }
-  return 'request_failed';
 }
 
 function normalizeTelegramCommand(input: string, botUsername?: string): string {

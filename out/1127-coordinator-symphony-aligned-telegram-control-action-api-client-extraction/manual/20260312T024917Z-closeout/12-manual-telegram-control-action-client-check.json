@@ -1,0 +1,18 @@
+{
+  "task_id": "1127-coordinator-symphony-aligned-telegram-control-action-api-client-extraction",
+  "summary": "Mocked Telegram control transport seam verification",
+  "checks": [
+    {
+      "name": "control client posts /control/action with bearer and csrf headers",
+      "evidence": "05-targeted-tests.log"
+    },
+    {
+      "name": "control client preserves 200 payload errors and non-2xx or transport throw semantics",
+      "evidence": "05-targeted-tests.log"
+    },
+    {
+      "name": "integrated /pause and /resume Telegram mutation flow remains unchanged",
+      "evidence": "05-targeted-tests.log"
+    }
+  ]
+}

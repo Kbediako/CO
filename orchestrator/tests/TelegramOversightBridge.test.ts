@@ -8,6 +8,7 @@ import { join } from 'node:path';
 import { ControlServer } from '../src/cli/control/controlServer.js';
 import type { ControlSelectedRunRuntimeSnapshot } from '../src/cli/control/observabilityReadModel.js';
 import { startTelegramOversightBridge } from '../src/cli/control/telegramOversightBridge.js';
+import { createTelegramOversightControlActionApiClient } from '../src/cli/control/telegramOversightControlActionApiClient.js';
 import { computeEffectiveDelegationConfig } from '../src/cli/config/delegationConfig.js';
 import { resolveRunPaths } from '../src/cli/run/runPaths.js';
 
@@ -257,6 +258,70 @@ afterEach(() => {
 });
 
 describe('TelegramOversightBridge', () => {
+  it('posts /control/action with Telegram auth headers and body through the extracted client', async () => {
+    const fetchImpl = vi.fn<typeof fetch>(async (input, init) => {
+      expect(String(input)).toBe('http://127.0.0.1:4312/control/action');
+      expect(init?.method).toBe('POST');
+      expect(init?.headers).toMatchObject({
+        Authorization: 'Bearer control-token',
+        'x-csrf-token': 'control-token',
+        'Content-Type': 'application/json'
+      });
+      expect(JSON.parse(String(init?.body ?? '{}'))).toEqual({
+        action: 'pause',
+        request_id: 'telegram-pause-200'
+      });
+      return jsonResponse({
+        control_seq: 7,
+        traceability: { decision: 'applied' }
+      });
+    });
+    const client = createTelegramOversightControlActionApiClient({
+      baseUrl: 'http://127.0.0.1:4312',
+      controlToken: 'control-token',
+      fetchImpl
+    });
+
+    await expect(
+      client.postAction({
+        action: 'pause',
+        request_id: 'telegram-pause-200'
+      })
+    ).resolves.toEqual({
+      control_seq: 7,
+      traceability: { decision: 'applied' }
+    });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it('preserves /control/action payload errors and thrown transport failures through the extracted client', async () => {
+    const responseClient = createTelegramOversightControlActionApiClient({
+      baseUrl: 'http://127.0.0.1:4312',
+      controlToken: 'control-token',
+      fetchImpl: vi
+        .fn<typeof fetch>()
+        .mockResolvedValueOnce(jsonResponse({ error: 'transport_mutating_controls_disabled' }, 200))
+        .mockResolvedValueOnce(jsonResponse({ error: { code: 'csrf_invalid', message: 'bad token' } }, 403))
+        .mockResolvedValueOnce(jsonResponse('nope', 500))
+        .mockResolvedValueOnce(new Response('not-json', { status: 200 }))
+    });
+
+    await expect(responseClient.postAction({ action: 'pause' })).resolves.toEqual({
+      error: 'transport_mutating_controls_disabled'
+    });
+    await expect(responseClient.postAction({ action: 'pause' })).rejects.toThrow('csrf_invalid: bad token');
+    await expect(responseClient.postAction({ action: 'pause' })).rejects.toThrow('request_failed');
+    await expect(responseClient.postAction({ action: 'pause' })).rejects.toThrow();
+
+    const transportClient = createTelegramOversightControlActionApiClient({
+      baseUrl: 'http://127.0.0.1:4312',
+      controlToken: 'control-token',
+      fetchImpl: vi.fn<typeof fetch>().mockRejectedValue(new Error('fetch failed'))
+    });
+
+    await expect(transportClient.postAction({ action: 'pause' })).rejects.toThrow('fetch failed');
+  });
+
   it('renders selected-run status issue and queued questions through the integrated polling bridge', async () => {
     const { root, env, paths } = await createRunRoot('task-1014-telegram-status');
     await seedManifest(paths);

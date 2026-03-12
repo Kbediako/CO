@@ -1,0 +1,16 @@
+⚠️ Diff budget exceeded (override applied) (base=origin/main)
+ - changed files 1122 > 25
+ - total lines changed 105652 > 800
+Top changed files:
+  - docs/docs-freshness-registry.json: 10167
+  - orchestrator/tests/ControlServer.test.ts: 7635
+  - tasks/index.json: 6508
+  - scripts/lib/review-execution-state.ts: 3899
+  - tests/review-execution-state.spec.ts: 2861
+  - tests/run-review.spec.ts: 2509
+  - orchestrator/tests/DelegationServer.test.ts: 2115
+  - scripts/run-review.ts: 2015
+  - orchestrator/src/cli/control/controlServer.ts: 1658
+  - orchestrator/tests/TelegramOversightBridge.test.ts: 1545
+
+Override accepted via DIFF_BUDGET_OVERRIDE_REASON: Stacked main branch; 1127 is being validated through bounded review plus focused and full test evidence.
