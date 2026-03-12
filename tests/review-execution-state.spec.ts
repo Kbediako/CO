@@ -393,6 +393,60 @@ describe('ReviewExecutionState', () => {
     });
   });
 
+  it('projects repeated shell probes into first-class termination boundary records', () => {
+    const state = new ReviewExecutionState({ startedAtMs: 0 });
+
+    state.observeChunk('thinking\nexec\n', 'stdout', 100);
+    state.observeChunk(
+      `/bin/bash -lc 'MANIFEST=/tmp/other.json; export MANIFEST; printf "%s\\n" "$MANIFEST"'\n`,
+      'stdout',
+      110
+    );
+    state.observeChunk('thinking\nexec\n', 'stdout', 200);
+    state.observeChunk(
+      `/bin/zsh -lc 'MANIFEST=/tmp/third.json; export MANIFEST; printf "%s\\n" "$MANIFEST"'\n`,
+      'stdout',
+      210
+    );
+
+    const boundary = state.getTerminationBoundaryRecordForKind('shell-probe', 2_000);
+    expect(boundary).toEqual({
+      kind: 'shell-probe',
+      provenance: 'direct-shell-verification',
+      reason: expect.stringContaining('shell-probe boundary violated'),
+      sample: `/bin/zsh -lc 'MANIFEST=/tmp/third.json; export MANIFEST; printf "%s\\n" "$MANIFEST"'`
+    });
+    expect(
+      state.getTerminationBoundaryRecord(
+        'bounded review shell-probe boundary violated after 210ms: repeated direct shell verification via /bin/zsh -lc',
+        2_000
+      )
+    ).toEqual(
+      expect.objectContaining({
+        kind: 'shell-probe',
+        provenance: 'direct-shell-verification'
+      })
+    );
+
+    const payload = state.buildTelemetryPayload({
+      status: 'failed',
+      error:
+        'bounded review shell-probe boundary violated after 210ms: repeated direct shell verification via /bin/zsh -lc',
+      terminationBoundary: boundary,
+      outputLogPath: '/repo/.runs/sample/review/output.log',
+      repoRoot: '/repo',
+      includeRawTelemetry: false,
+      telemetryDebugEnvKey: 'CODEX_REVIEW_DEBUG_TELEMETRY'
+    });
+
+    expect(payload.termination_boundary).toEqual({
+      kind: 'shell-probe',
+      provenance: 'direct-shell-verification',
+      reason: expect.stringContaining('shell-probe boundary violated'),
+      sample: '[redacted shell-probe sample; set CODEX_REVIEW_DEBUG_TELEMETRY=1 to persist raw sample]'
+    });
+  });
+
   it('persists an explicit termination boundary record without reparsing the failure prose', () => {
     const state = new ReviewExecutionState({
       startedAtMs: 0,

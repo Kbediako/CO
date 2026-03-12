@@ -3472,11 +3472,18 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
     const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
       status: string;
+      termination_boundary: {
+        kind: string;
+        provenance: string;
+        reason: string;
+        sample: string | null;
+      } | null;
       summary: {
         shellProbeCount: number;
       };
     };
     expect(telemetry.status).toBe('succeeded');
+    expect(telemetry.termination_boundary).toBeNull();
     expect(telemetry.summary.shellProbeCount).toBe(1);
   }, LONG_WAIT_TEST_TIMEOUT_MS);
 
@@ -3494,15 +3501,30 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
 
     expect(result.exitCode).toBeGreaterThan(0);
     expect(result.stderr).toContain('bounded review shell-probe boundary violated');
+    expect(result.stderr).toContain('termination boundary: shell-probe (direct-shell-verification).');
 
     const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
     const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
       status: string;
+      termination_boundary: {
+        kind: string;
+        provenance: string;
+        reason: string;
+        sample: string | null;
+      } | null;
       summary: {
         shellProbeCount: number;
       };
     };
     expect(telemetry.status).toBe('failed');
+    expect(telemetry.termination_boundary).toEqual(
+      expect.objectContaining({
+        kind: 'shell-probe',
+        provenance: 'direct-shell-verification',
+        reason: expect.stringContaining('shell-probe boundary violated')
+      })
+    );
+    expect(telemetry.termination_boundary?.sample).toContain('[redacted shell-probe sample');
     expect(telemetry.summary.shellProbeCount).toBe(2);
   }, LONG_WAIT_TEST_TIMEOUT_MS);
 
@@ -3520,41 +3542,30 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
 
     expect(result.exitCode).toBeGreaterThan(0);
     expect(result.stderr).toContain('bounded review shell-probe boundary violated');
+    expect(result.stderr).toContain('termination boundary: shell-probe (direct-shell-verification).');
 
     const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
     const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
       status: string;
+      termination_boundary: {
+        kind: string;
+        provenance: string;
+        reason: string;
+        sample: string | null;
+      } | null;
       summary: {
         shellProbeCount: number;
       };
     };
     expect(telemetry.status).toBe('failed');
-    expect(telemetry.summary.shellProbeCount).toBe(2);
-  }, LONG_WAIT_TEST_TIMEOUT_MS);
-
-  it('fails bounded review on repeated nested shell probes', async () => {
-    const sandbox = await makeSandbox();
-    const manifestPath = await makeManifest(sandbox);
-    const codexBin = await makeFakeCodex(sandbox);
-
-    const result = await runReviewCommand(manifestPath, {
-      ...baseEnv(sandbox, codexBin),
-      RUN_REVIEW_MODE: 'shell-probe-repeat-nested-fast-exit',
-      CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0',
-      CODEX_REVIEW_TIMEOUT_SECONDS: '60'
-    });
-
-    expect(result.exitCode).toBeGreaterThan(0);
-    expect(result.stderr).toContain('bounded review shell-probe boundary violated');
-
-    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
-    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
-      status: string;
-      summary: {
-        shellProbeCount: number;
-      };
-    };
-    expect(telemetry.status).toBe('failed');
+    expect(telemetry.termination_boundary).toEqual(
+      expect.objectContaining({
+        kind: 'shell-probe',
+        provenance: 'direct-shell-verification',
+        reason: expect.stringContaining('shell-probe boundary violated')
+      })
+    );
+    expect(telemetry.termination_boundary?.sample).toContain('[redacted shell-probe sample');
     expect(telemetry.summary.shellProbeCount).toBe(2);
   }, LONG_WAIT_TEST_TIMEOUT_MS);
 

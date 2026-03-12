@@ -101,12 +101,14 @@ export type ReviewCommandIntentViolationKind =
   | 'delegation-control';
 export type ReviewTerminationBoundaryKind =
   | 'command-intent'
+  | 'shell-probe'
   | 'startup-anchor'
   | 'meta-surface-expansion'
   | 'verdict-stability'
   | 'relevant-reinspection-dwell';
 export type ReviewTerminationBoundaryProvenance =
   | ReviewCommandIntentViolationKind
+  | 'direct-shell-verification'
   | 'pre-anchor-meta-surface'
   | 'meta-surface-kinds'
   | 'repeated-output-inspection'
@@ -866,6 +868,19 @@ export class ReviewExecutionState {
       };
     }
 
+    if (kind === 'shell-probe') {
+      const boundary = this.getShellProbeBoundaryState(nowMs);
+      if (!boundary.triggered || !boundary.reason) {
+        return null;
+      }
+      return {
+        kind,
+        provenance: 'direct-shell-verification',
+        reason: boundary.reason,
+        sample: normalizeTerminationBoundarySample(boundary.violationSample)
+      };
+    }
+
     if (kind === 'startup-anchor') {
       const boundary = this.getStartupAnchorBoundaryState(nowMs);
       if (!boundary.triggered || !boundary.reason) {
@@ -1570,6 +1585,9 @@ function inferTerminationBoundaryKindsFromErrorMessage(
   const kinds: ReviewTerminationBoundaryKind[] = [];
   if (errorMessage.includes('bounded command-intent boundary')) {
     kinds.push('command-intent');
+  }
+  if (errorMessage.includes('shell-probe boundary violated')) {
+    kinds.push('shell-probe');
   }
   if (errorMessage.includes('startup-anchor boundary violated')) {
     kinds.push('startup-anchor');

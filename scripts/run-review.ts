@@ -2382,7 +2382,8 @@ async function waitForChildExit(
                 exitCode: typeof code === 'number' && code > 0 ? code : 1,
                 signal,
                 timedOut: false,
-                outputPreview: ''
+                outputPreview: '',
+                terminationBoundary: options.getTerminationBoundaryRecord('shell-probe')
               }
             )
           );
@@ -2612,7 +2613,8 @@ async function waitForChildExit(
       }
       requestTermination(
         boundaryState.reason ?? 'bounded review shell-probe boundary violated',
-        false
+        false,
+        options.getTerminationBoundaryRecord('shell-probe')
       );
     }, 250);
     shellProbeHandle.unref();
