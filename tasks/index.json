@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260312-1135-coordinator-symphony-aligned-standalone-review-timeout-stall-termination-boundary-taxonomy-split",
+      "title": "Coordinator Symphony-Aligned Standalone Review Timeout-Stall Termination Boundary Taxonomy Split",
+      "relates_to": "tasks/tasks-1135-coordinator-symphony-aligned-standalone-review-timeout-stall-termination-boundary-taxonomy-split.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-12",
+      "paths": {
+        "spec": "tasks/specs/1135-coordinator-symphony-aligned-standalone-review-timeout-stall-termination-boundary-taxonomy-split.md",
+        "task": "tasks/tasks-1135-coordinator-symphony-aligned-standalone-review-timeout-stall-termination-boundary-taxonomy-split.md",
+        "agent_task": ".agent/task/1135-coordinator-symphony-aligned-standalone-review-timeout-stall-termination-boundary-taxonomy-split.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-standalone-review-timeout-stall-termination-boundary-taxonomy-split.md"
+      }
+    },
+    {
       "id": "20260312-1134-coordinator-symphony-aligned-standalone-review-startup-loop-termination-boundary-classification",
       "title": "Coordinator Symphony-Aligned Standalone Review Startup-Loop Termination Boundary Classification",
       "relates_to": "tasks/tasks-1134-coordinator-symphony-aligned-standalone-review-startup-loop-termination-boundary-classification.md",
