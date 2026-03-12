@@ -3,6 +3,55 @@
   "generated_at": "2026-03-12",
   "entries": [
     {
+      "path": "tasks/tasks-1125-coordinator-symphony-aligned-telegram-oversight-bridge-push-state-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-12",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/specs/1125-coordinator-symphony-aligned-telegram-oversight-bridge-push-state-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-12",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/findings/1125-telegram-oversight-bridge-push-state-extraction-deliberation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-12",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/TECH_SPEC-coordinator-symphony-aligned-telegram-oversight-bridge-push-state-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-12",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/PRD-coordinator-symphony-aligned-telegram-oversight-bridge-push-state-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-12",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-telegram-oversight-bridge-push-state-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-12",
+      "cadence_days": 30
+    },
+    {
+      "path": ".agent/task/1125-coordinator-symphony-aligned-telegram-oversight-bridge-push-state-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-12",
+      "cadence_days": 30
+    },
+    {
       "path": ".agent/task/1124-coordinator-symphony-aligned-telegram-oversight-bridge-presenter-controller-split.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",

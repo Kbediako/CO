@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260312-1125-coordinator-symphony-aligned-telegram-oversight-bridge-push-state-extraction",
+      "title": "Coordinator Symphony-Aligned Telegram Oversight Bridge Push-State Extraction",
+      "relates_to": "tasks/tasks-1125-coordinator-symphony-aligned-telegram-oversight-bridge-push-state-extraction.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-12",
+      "paths": {
+        "spec": "tasks/specs/1125-coordinator-symphony-aligned-telegram-oversight-bridge-push-state-extraction.md",
+        "task": "tasks/tasks-1125-coordinator-symphony-aligned-telegram-oversight-bridge-push-state-extraction.md",
+        "agent_task": ".agent/task/1125-coordinator-symphony-aligned-telegram-oversight-bridge-push-state-extraction.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-telegram-oversight-bridge-push-state-extraction.md"
+      }
+    },
+    {
       "id": "20260312-1124-coordinator-symphony-aligned-telegram-oversight-bridge-presenter-controller-split",
       "title": "Coordinator Symphony-Aligned Telegram Oversight Bridge Presenter/Controller Split",
       "relates_to": "tasks/tasks-1124-coordinator-symphony-aligned-telegram-oversight-bridge-presenter-controller-split.md",
