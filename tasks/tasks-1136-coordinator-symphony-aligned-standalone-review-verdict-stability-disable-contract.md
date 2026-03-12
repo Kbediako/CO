@@ -20,21 +20,21 @@
 
 ## Disable Contract
 
-- [ ] Shared wrapper env setup clears `CODEX_REVIEW_VERDICT_STABILITY_TIMEOUT_SECONDS`. Evidence: `out/1136-coordinator-symphony-aligned-standalone-review-verdict-stability-disable-contract/manual/<timestamp>-closeout/00-summary.md`, `out/1136-coordinator-symphony-aligned-standalone-review-verdict-stability-disable-contract/manual/<timestamp>-closeout/05-targeted-tests.log`
-- [ ] An explicit wrapper regression proves `CODEX_REVIEW_VERDICT_STABILITY_TIMEOUT_SECONDS=0` disables the verdict-stability guard. Evidence: `out/1136-coordinator-symphony-aligned-standalone-review-verdict-stability-disable-contract/manual/<timestamp>-closeout/00-summary.md`, `out/1136-coordinator-symphony-aligned-standalone-review-verdict-stability-disable-contract/manual/<timestamp>-closeout/05-targeted-tests.log`
-- [ ] Disabled-path stderr and telemetry fall back to the existing non-verdict-stability transport. Evidence: `out/1136-coordinator-symphony-aligned-standalone-review-verdict-stability-disable-contract/manual/<timestamp>-closeout/00-summary.md`, `out/1136-coordinator-symphony-aligned-standalone-review-verdict-stability-disable-contract/manual/<timestamp>-closeout/05-targeted-tests.log`
+- [x] Shared wrapper env setup clears `CODEX_REVIEW_VERDICT_STABILITY_TIMEOUT_SECONDS`. Evidence: `out/1136-coordinator-symphony-aligned-standalone-review-verdict-stability-disable-contract/manual/20260312T114740Z-closeout/00-summary.md`, `out/1136-coordinator-symphony-aligned-standalone-review-verdict-stability-disable-contract/manual/20260312T114740Z-closeout/05-targeted-tests.log`
+- [x] An explicit wrapper regression proves `CODEX_REVIEW_VERDICT_STABILITY_TIMEOUT_SECONDS=0` disables the verdict-stability guard. Evidence: `out/1136-coordinator-symphony-aligned-standalone-review-verdict-stability-disable-contract/manual/20260312T114740Z-closeout/00-summary.md`, `out/1136-coordinator-symphony-aligned-standalone-review-verdict-stability-disable-contract/manual/20260312T114740Z-closeout/05-targeted-tests.log`
+- [x] Disabled-path stderr and telemetry fall back to the existing non-verdict-stability transport. Evidence: `out/1136-coordinator-symphony-aligned-standalone-review-verdict-stability-disable-contract/manual/20260312T114740Z-closeout/00-summary.md`, `out/1136-coordinator-symphony-aligned-standalone-review-verdict-stability-disable-contract/manual/20260312T114740Z-closeout/05-targeted-tests.log`
 
 ## Validation + Closeout
 
-- [ ] `node scripts/delegation-guard.mjs`
-- [ ] `node scripts/spec-guard.mjs --dry-run`
-- [ ] `npm run build`
-- [ ] `npm run lint`
-- [ ] `npm run test`
-- [ ] `npm run docs:check`
-- [ ] `npm run docs:freshness`
-- [ ] `node scripts/diff-budget.mjs`
-- [ ] `npm run review`
-- [ ] `npm run pack:smoke`
-- [ ] Manual/mock evidence captured for the verdict-stability disable contract.
-- [ ] Elegance review completed.
+- [x] `node scripts/delegation-guard.mjs`. Evidence: `out/1136-coordinator-symphony-aligned-standalone-review-verdict-stability-disable-contract/manual/20260312T114740Z-closeout/01-delegation-guard.log`
+- [x] `node scripts/spec-guard.mjs --dry-run`. Evidence: `out/1136-coordinator-symphony-aligned-standalone-review-verdict-stability-disable-contract/manual/20260312T114740Z-closeout/02-spec-guard.log`
+- [x] `npm run build`. Evidence: `out/1136-coordinator-symphony-aligned-standalone-review-verdict-stability-disable-contract/manual/20260312T114740Z-closeout/03-build.log`
+- [x] `npm run lint`. Evidence: `out/1136-coordinator-symphony-aligned-standalone-review-verdict-stability-disable-contract/manual/20260312T114740Z-closeout/04-lint.log`
+- [x] `npm run test`. Evidence: `out/1136-coordinator-symphony-aligned-standalone-review-verdict-stability-disable-contract/manual/20260312T114740Z-closeout/06-test.log`, `out/1136-coordinator-symphony-aligned-standalone-review-verdict-stability-disable-contract/manual/20260312T114740Z-closeout/13-override-notes.md`
+- [x] `npm run docs:check`. Evidence: `out/1136-coordinator-symphony-aligned-standalone-review-verdict-stability-disable-contract/manual/20260312T114740Z-closeout/07-docs-check.log`
+- [x] `npm run docs:freshness`. Evidence: `out/1136-coordinator-symphony-aligned-standalone-review-verdict-stability-disable-contract/manual/20260312T114740Z-closeout/08-docs-freshness.log`
+- [x] `node scripts/diff-budget.mjs`. Evidence: `out/1136-coordinator-symphony-aligned-standalone-review-verdict-stability-disable-contract/manual/20260312T114740Z-closeout/09-diff-budget.log`
+- [x] `npm run review`. Evidence: `out/1136-coordinator-symphony-aligned-standalone-review-verdict-stability-disable-contract/manual/20260312T114740Z-closeout/10-review.log`, `out/1136-coordinator-symphony-aligned-standalone-review-verdict-stability-disable-contract/manual/20260312T114740Z-closeout/13-override-notes.md`
+- [x] `npm run pack:smoke`. Evidence: `out/1136-coordinator-symphony-aligned-standalone-review-verdict-stability-disable-contract/manual/20260312T114740Z-closeout/11-pack-smoke.log`
+- [x] Manual/mock evidence captured for the verdict-stability disable contract. Evidence: `out/1136-coordinator-symphony-aligned-standalone-review-verdict-stability-disable-contract/manual/20260312T114740Z-closeout/12-manual-verdict-stability-disable-check.md`
+- [x] Elegance review completed. Evidence: `out/1136-coordinator-symphony-aligned-standalone-review-verdict-stability-disable-contract/manual/20260312T114740Z-closeout/15-elegance-review.md`
