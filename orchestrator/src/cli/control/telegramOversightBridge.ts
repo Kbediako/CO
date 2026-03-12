@@ -305,10 +305,14 @@ class TelegramOversightBridgeRuntime implements TelegramOversightBridge {
     source?: string | null;
   }): Promise<void> {
     const result = await this.projectionNotificationController.notifyProjectionDelta({
-      state: this.state,
+      pushState: this.state.push,
       eventSeq: input.eventSeq
     });
-    this.state = result.nextState;
+    this.state = {
+      ...this.state,
+      updated_at: pickLatestTimestamp(this.state.updated_at, result.statePatch.updated_at),
+      push: result.statePatch.push
+    };
     await this.persistState();
   }
 
@@ -371,6 +375,18 @@ function parsePositiveIntegerEnv(value: string | undefined, fallback: number): n
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function pickLatestTimestamp(currentIso: string, candidateIso: string): string {
+  const currentMs = Date.parse(currentIso);
+  const candidateMs = Date.parse(candidateIso);
+  if (!Number.isFinite(currentMs)) {
+    return candidateIso;
+  }
+  if (!Number.isFinite(candidateMs)) {
+    return currentIso;
+  }
+  return candidateMs >= currentMs ? candidateIso : currentIso;
 }
 
 function isAbortError(error: unknown): boolean {

@@ -16,9 +16,11 @@ export interface TelegramOversightBridgeState {
   push: TelegramOversightPushState;
 }
 
+export type TelegramOversightStatePatch = Pick<TelegramOversightBridgeState, 'updated_at' | 'push'>;
+
 export interface TelegramProjectionStateTransition {
   kind: 'skip' | 'pending' | 'send';
-  nextState: TelegramOversightBridgeState;
+  statePatch: TelegramOversightStatePatch;
 }
 
 export function createDefaultTelegramOversightState(): TelegramOversightBridgeState {
@@ -75,24 +77,25 @@ export async function writeTelegramOversightState(
 }
 
 export function computeTelegramProjectionStateTransition(input: {
-  state: TelegramOversightBridgeState;
+  pushState: TelegramOversightPushState;
   projectionHash: string | null;
   eventSeq?: number | null;
   nowMs: number;
   pushCooldownMs: number;
 }): TelegramProjectionStateTransition {
   const nextEventSeq =
-    typeof input.eventSeq === 'number' && Number.isFinite(input.eventSeq) ? Math.floor(input.eventSeq) : input.state.push.last_event_seq;
+    typeof input.eventSeq === 'number' && Number.isFinite(input.eventSeq)
+      ? Math.floor(input.eventSeq)
+      : input.pushState.last_event_seq;
   const nowIso = new Date(input.nowMs).toISOString();
 
-  if (!input.projectionHash || input.projectionHash === input.state.push.last_sent_projection_hash) {
+  if (!input.projectionHash || input.projectionHash === input.pushState.last_sent_projection_hash) {
     return {
       kind: 'skip',
-      nextState: {
-        ...input.state,
+      statePatch: {
         updated_at: nowIso,
         push: {
-          ...input.state.push,
+          ...input.pushState,
           last_event_seq: nextEventSeq,
           pending_projection_hash: null,
           pending_projection_observed_at: null
@@ -101,20 +104,19 @@ export function computeTelegramProjectionStateTransition(input: {
     };
   }
 
-  const lastSentAtMs = input.state.push.last_sent_at ? Date.parse(input.state.push.last_sent_at) : Number.NaN;
+  const lastSentAtMs = input.pushState.last_sent_at ? Date.parse(input.pushState.last_sent_at) : Number.NaN;
   if (Number.isFinite(lastSentAtMs) && input.nowMs - lastSentAtMs < input.pushCooldownMs) {
     return {
       kind: 'pending',
-      nextState: {
-        ...input.state,
+      statePatch: {
         updated_at: nowIso,
         push: {
-          ...input.state.push,
+          ...input.pushState,
           last_event_seq: nextEventSeq,
           pending_projection_hash: input.projectionHash,
           pending_projection_observed_at:
-            input.projectionHash === input.state.push.pending_projection_hash
-              ? input.state.push.pending_projection_observed_at ?? nowIso
+            input.projectionHash === input.pushState.pending_projection_hash
+              ? input.pushState.pending_projection_observed_at ?? nowIso
               : nowIso
         }
       }
@@ -123,8 +125,7 @@ export function computeTelegramProjectionStateTransition(input: {
 
   return {
     kind: 'send',
-    nextState: {
-      ...input.state,
+    statePatch: {
       updated_at: nowIso,
       push: {
         last_sent_projection_hash: input.projectionHash,

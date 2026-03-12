@@ -1,19 +1,20 @@
 import {
   computeTelegramProjectionStateTransition,
-  type TelegramOversightBridgeState
+  type TelegramOversightStatePatch,
+  type TelegramOversightPushState
 } from './controlTelegramPushState.js';
 import type { TelegramProjectionDeltaPresentation } from './controlTelegramReadController.js';
 
 export interface ControlTelegramProjectionNotificationController {
   notifyProjectionDelta(input: {
-    state: TelegramOversightBridgeState;
+    pushState: TelegramOversightPushState;
     eventSeq?: number | null;
   }): Promise<ControlTelegramProjectionNotificationResult>;
 }
 
 export interface ControlTelegramProjectionNotificationResult {
   delivery: 'skip' | 'pending' | 'send';
-  nextState: TelegramOversightBridgeState;
+  statePatch: TelegramOversightStatePatch;
 }
 
 export function createControlTelegramProjectionNotificationController(input: {
@@ -25,16 +26,16 @@ export function createControlTelegramProjectionNotificationController(input: {
 }): ControlTelegramProjectionNotificationController {
   return {
     async notifyProjectionDelta({
-      state,
+      pushState,
       eventSeq
     }: {
-      state: TelegramOversightBridgeState;
+      pushState: TelegramOversightPushState;
       eventSeq?: number | null;
     }): Promise<ControlTelegramProjectionNotificationResult> {
       const nowMs = input.nowMs?.() ?? Date.now();
       const projection = await input.renderProjectionDeltaMessage();
       const transition = computeTelegramProjectionStateTransition({
-        state,
+        pushState,
         projectionHash: projection.projectionHash,
         eventSeq,
         nowMs,
@@ -44,7 +45,7 @@ export function createControlTelegramProjectionNotificationController(input: {
       if (transition.kind !== 'send') {
         return {
           delivery: transition.kind,
-          nextState: transition.nextState
+          statePatch: transition.statePatch
         };
       }
 
@@ -54,7 +55,7 @@ export function createControlTelegramProjectionNotificationController(input: {
 
       return {
         delivery: 'send',
-        nextState: transition.nextState
+        statePatch: transition.statePatch
       };
     }
   };

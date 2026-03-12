@@ -951,6 +951,21 @@ describe('TelegramOversightBridge', () => {
         reason: 'manual_pause'
       }
     });
+    await writeFile(
+      join(paths.runDir, 'telegram-oversight-state.json'),
+      JSON.stringify({
+        next_update_id: 41,
+        updated_at: '2026-03-06T04:00:30.000Z',
+        push: {
+          last_sent_projection_hash: null,
+          last_sent_at: null,
+          last_event_seq: null,
+          pending_projection_hash: null,
+          pending_projection_observed_at: null
+        }
+      }),
+      'utf8'
+    );
     const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
     const realFetch = globalThis.fetch;
     const telegram = createTelegramHarness(realFetch);
@@ -1031,6 +1046,7 @@ describe('TelegramOversightBridge', () => {
 
       const stateRaw = await readFile(join(paths.runDir, 'telegram-oversight-state.json'), 'utf8');
       const state = JSON.parse(stateRaw) as {
+        next_update_id?: number;
         push?: {
           last_sent_projection_hash?: string | null;
           last_sent_at?: string | null;
@@ -1039,6 +1055,7 @@ describe('TelegramOversightBridge', () => {
           pending_projection_observed_at?: string | null;
         };
       };
+      expect(state.next_update_id).toBe(41);
       expect(state.push?.last_sent_projection_hash).toBeTruthy();
       expect(state.push?.last_sent_at).toBeTruthy();
       expect(state.push?.last_event_seq).toBe(3);
@@ -1065,6 +1082,21 @@ describe('TelegramOversightBridge', () => {
         reason: 'manual_pause'
       }
     });
+    await writeFile(
+      join(paths.runDir, 'telegram-oversight-state.json'),
+      JSON.stringify({
+        next_update_id: 52,
+        updated_at: '2026-03-06T04:00:30.000Z',
+        push: {
+          last_sent_projection_hash: null,
+          last_sent_at: null,
+          last_event_seq: null,
+          pending_projection_hash: null,
+          pending_projection_observed_at: null
+        }
+      }),
+      'utf8'
+    );
     const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
     const realFetch = globalThis.fetch;
     const telegram = createTelegramHarness(realFetch);
@@ -1129,6 +1161,7 @@ describe('TelegramOversightBridge', () => {
 
       const pendingStateRaw = await readFile(join(paths.runDir, 'telegram-oversight-state.json'), 'utf8');
       const pendingState = JSON.parse(pendingStateRaw) as {
+        next_update_id?: number;
         push?: {
           last_sent_projection_hash?: string | null;
           last_event_seq?: number | null;
@@ -1136,6 +1169,7 @@ describe('TelegramOversightBridge', () => {
           pending_projection_observed_at?: string | null;
         };
       };
+      expect(pendingState.next_update_id).toBe(52);
       expect(pendingState.push?.last_event_seq).toBe(2);
       expect(pendingState.push?.pending_projection_hash).toBeTruthy();
       expect(pendingState.push?.pending_projection_hash).not.toBe(pendingState.push?.last_sent_projection_hash);
@@ -1159,12 +1193,14 @@ describe('TelegramOversightBridge', () => {
 
       const flushedStateRaw = await readFile(join(paths.runDir, 'telegram-oversight-state.json'), 'utf8');
       const flushedState = JSON.parse(flushedStateRaw) as {
+        next_update_id?: number;
         push?: {
           last_event_seq?: number | null;
           pending_projection_hash?: string | null;
           pending_projection_observed_at?: string | null;
         };
       };
+      expect(flushedState.next_update_id).toBe(52);
       expect(flushedState.push?.last_event_seq).toBe(3);
       expect(flushedState.push?.pending_projection_hash).toBeNull();
       expect(flushedState.push?.pending_projection_observed_at).toBeNull();
