@@ -3,6 +3,55 @@
   "generated_at": "2026-03-12",
   "entries": [
     {
+      "path": "tasks/tasks-1128-coordinator-symphony-aligned-standalone-review-architecture-surface-boundary.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-12",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/specs/1128-coordinator-symphony-aligned-standalone-review-architecture-surface-boundary.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-12",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/findings/1128-standalone-review-architecture-surface-boundary-deliberation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-12",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/TECH_SPEC-coordinator-symphony-aligned-standalone-review-architecture-surface-boundary.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-12",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/PRD-coordinator-symphony-aligned-standalone-review-architecture-surface-boundary.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-12",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-standalone-review-architecture-surface-boundary.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-12",
+      "cadence_days": 30
+    },
+    {
+      "path": ".agent/task/1128-coordinator-symphony-aligned-standalone-review-architecture-surface-boundary.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-12",
+      "cadence_days": 30
+    },
+    {
       "path": "tasks/tasks-1127-coordinator-symphony-aligned-telegram-control-action-api-client-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",

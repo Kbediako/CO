@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260312-1128-coordinator-symphony-aligned-standalone-review-architecture-surface-boundary",
+      "title": "Coordinator Symphony-Aligned Standalone Review Architecture Surface Boundary",
+      "relates_to": "tasks/tasks-1128-coordinator-symphony-aligned-standalone-review-architecture-surface-boundary.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-12",
+      "paths": {
+        "spec": "tasks/specs/1128-coordinator-symphony-aligned-standalone-review-architecture-surface-boundary.md",
+        "task": "tasks/tasks-1128-coordinator-symphony-aligned-standalone-review-architecture-surface-boundary.md",
+        "agent_task": ".agent/task/1128-coordinator-symphony-aligned-standalone-review-architecture-surface-boundary.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-standalone-review-architecture-surface-boundary.md"
+      }
+    },
+    {
       "id": "20260312-1127-coordinator-symphony-aligned-telegram-control-action-api-client-extraction",
       "title": "Coordinator Symphony-Aligned Telegram Control Action API Client Extraction",
       "relates_to": "tasks/tasks-1127-coordinator-symphony-aligned-telegram-control-action-api-client-extraction.md",
