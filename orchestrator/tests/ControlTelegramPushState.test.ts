@@ -1,25 +1,8 @@
-import { randomUUID } from 'node:crypto';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-
 import { describe, expect, it } from 'vitest';
 
-import {
-  computeTelegramProjectionStateTransition,
-  readTelegramOversightState
-} from '../src/cli/control/controlTelegramPushState.js';
+import { computeTelegramProjectionStateTransition } from '../src/cli/control/controlTelegramPushState.js';
 
 describe('ControlTelegramPushState', () => {
-  it('returns the default state when persisted telegram oversight state is missing', async () => {
-    const state = await readTelegramOversightState(
-      join(tmpdir(), `telegram-oversight-state-missing-${randomUUID()}.json`)
-    );
-
-    expect(state.next_update_id).toBe(0);
-    expect(state.push.last_sent_projection_hash).toBeNull();
-    expect(state.push.pending_projection_hash).toBeNull();
-  });
-
   it('keeps a pending projection during cooldown without resetting the original observed time', () => {
     const transition = computeTelegramProjectionStateTransition({
       pushState: {

@@ -1,5 +1,3 @@
-import { join } from 'node:path';
-
 import { logger } from '../../logger.js';
 import {
   createControlTelegramCommandController,
@@ -23,9 +21,7 @@ import type {
 } from './observabilityReadModel.js';
 import {
   createDefaultTelegramOversightState,
-  readTelegramOversightState,
   type TelegramOversightBridgeState,
-  writeTelegramOversightState
 } from './controlTelegramPushState.js';
 import {
   createTelegramOversightApiClient,
@@ -34,10 +30,15 @@ import {
   type TelegramUpdate
 } from './telegramOversightApiClient.js';
 import { createTelegramOversightControlActionApiClient } from './telegramOversightControlActionApiClient.js';
+import {
+  advanceTelegramOversightBridgeStateNextUpdateId,
+  applyTelegramOversightBridgeStatePatch,
+  createTelegramOversightBridgeStateStore,
+  type TelegramOversightBridgeStateStore
+} from './telegramOversightBridgeStateStore.js';
 const DEFAULT_POLL_INTERVAL_MS = 1_000;
 const DEFAULT_POLL_TIMEOUT_SECONDS = 20;
 const DEFAULT_PUSH_COOLDOWN_MS = 30_000;
-const TELEGRAM_STATE_FILE = 'telegram-oversight-state.json';
 
 interface TelegramOversightBridgeConfig {
   botToken: string;
@@ -130,7 +131,7 @@ export async function startTelegramOversightBridge(
 class TelegramOversightBridgeRuntime implements TelegramOversightBridge {
   private readonly config: TelegramOversightBridgeConfig;
   private readonly readController: ControlTelegramReadController;
-  private readonly statePath: string;
+  private readonly stateStore: TelegramOversightBridgeStateStore;
   private readonly telegramClient: TelegramOversightApiClient;
   private readonly commandController: ControlTelegramCommandController;
   private readonly updateHandler: ControlTelegramUpdateHandler;
@@ -156,7 +157,7 @@ class TelegramOversightBridgeRuntime implements TelegramOversightBridge {
       readAdapter: options.readAdapter,
       mutationsEnabled: options.config.mutationsEnabled
     });
-    this.statePath = join(options.runDir, TELEGRAM_STATE_FILE);
+    this.stateStore = createTelegramOversightBridgeStateStore(options.runDir);
     this.telegramClient = createTelegramOversightApiClient({
       botToken: options.config.botToken,
       fetchImpl: options.fetchImpl
@@ -185,7 +186,7 @@ class TelegramOversightBridgeRuntime implements TelegramOversightBridge {
   }
 
   async start(): Promise<void> {
-    this.state = await readTelegramOversightState(this.statePath);
+    this.state = await this.stateStore.loadState();
     this.botIdentity = await this.telegramClient.getMe();
     logger.info(
       `[telegram-oversight] enabled for ${Array.from(this.config.allowedChatIds).length} chat(s) as @${
@@ -284,12 +285,8 @@ class TelegramOversightBridgeRuntime implements TelegramOversightBridge {
       }
     }
     if (nextUpdateId !== this.state.next_update_id) {
-      this.state = {
-        ...this.state,
-        next_update_id: nextUpdateId,
-        updated_at: new Date().toISOString()
-      };
-      await this.persistState();
+      this.state = advanceTelegramOversightBridgeStateNextUpdateId(this.state, nextUpdateId, new Date().toISOString());
+      await this.stateStore.saveState(this.state);
     }
   }
 
@@ -308,16 +305,8 @@ class TelegramOversightBridgeRuntime implements TelegramOversightBridge {
       pushState: this.state.push,
       eventSeq: input.eventSeq
     });
-    this.state = {
-      ...this.state,
-      updated_at: pickLatestTimestamp(this.state.updated_at, result.statePatch.updated_at),
-      push: result.statePatch.push
-    };
-    await this.persistState();
-  }
-
-  private async persistState(): Promise<void> {
-    await writeTelegramOversightState(this.statePath, this.state);
+    this.state = applyTelegramOversightBridgeStatePatch(this.state, result.statePatch);
+    await this.stateStore.saveState(this.state);
   }
 }
 
@@ -375,18 +364,6 @@ function parsePositiveIntegerEnv(value: string | undefined, fallback: number): n
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-function pickLatestTimestamp(currentIso: string, candidateIso: string): string {
-  const currentMs = Date.parse(currentIso);
-  const candidateMs = Date.parse(candidateIso);
-  if (!Number.isFinite(currentMs)) {
-    return candidateIso;
-  }
-  if (!Number.isFinite(candidateMs)) {
-    return currentIso;
-  }
-  return candidateMs >= currentMs ? candidateIso : currentIso;
 }
 
 function isAbortError(error: unknown): boolean {

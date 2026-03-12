@@ -1355,6 +1355,83 @@ describe('TelegramOversightBridge', () => {
     }
   });
 
+  it('keeps top-level updated_at monotonic when update polling only advances next_update_id', async () => {
+    const { root, paths } = await createRunRoot('telegram-oversight-next-update-monotonicity');
+    const harness = createTelegramHarness(fetch);
+    const seededUpdatedAt = '2099-01-01T00:00:00.000Z';
+    harness.updates.push({
+      update_id: 100,
+      message: {
+        message_id: 1,
+        date: 1,
+        chat: {
+          id: 1234,
+          type: 'private'
+        },
+        text: '/help'
+      }
+    });
+    await seedManifest(paths);
+    await writeFile(
+      join(paths.runDir, 'telegram-oversight-state.json'),
+      JSON.stringify({
+        next_update_id: 52,
+        updated_at: seededUpdatedAt,
+        push: {
+          last_sent_projection_hash: null,
+          last_sent_at: null,
+          last_event_seq: null,
+          pending_projection_hash: null,
+          pending_projection_observed_at: null
+        }
+      }),
+      'utf8'
+    );
+    const readAdapter = {
+      readSelectedRun: async () => buildTelegramStatePayload({
+        prompt: 'ship the monotonic timestamp fix',
+        urgency: 'medium'
+      }),
+      readDispatch: async () => ({}),
+      readQuestions: async () => ({ questions: [] })
+    };
+    const env = {
+      CO_TELEGRAM_POLLING_ENABLED: '1',
+      CO_TELEGRAM_BOT_TOKEN: 'bot-token',
+      CO_TELEGRAM_ALLOWED_CHAT_IDS: '1234',
+      CO_TELEGRAM_PUSH_ENABLED: '0',
+      CO_TELEGRAM_ENABLE_MUTATIONS: '1',
+      CO_TELEGRAM_POLL_INTERVAL_MS: '5'
+    };
+    let bridge: Awaited<ReturnType<typeof startTelegramOversightBridge>> | null = null;
+
+    try {
+      bridge = await startTelegramOversightBridge({
+        runDir: paths.runDir,
+        readAdapter,
+        baseUrl: 'http://127.0.0.1:1',
+        controlToken: 'token',
+        env,
+        fetchImpl: harness.fetch
+      });
+      expect(bridge).not.toBeNull();
+
+      await waitForCondition(async () => {
+        const stateRaw = await readFile(join(paths.runDir, 'telegram-oversight-state.json'), 'utf8');
+        const parsed = JSON.parse(stateRaw) as { next_update_id?: number };
+        return parsed.next_update_id === 101;
+      });
+
+      const stateRaw = await readFile(join(paths.runDir, 'telegram-oversight-state.json'), 'utf8');
+      const state = JSON.parse(stateRaw) as { next_update_id?: number; updated_at?: string };
+      expect(state.next_update_id).toBe(101);
+      expect(state.updated_at).toBe(seededUpdatedAt);
+    } finally {
+      await bridge?.close();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   it('sends projection-driven push notifications when queued questions are added and cleared', async () => {
     const { root, env, paths } = await createRunRoot('task-1016-telegram-question-push');
     await seedManifest(paths, {
