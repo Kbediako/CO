@@ -1385,6 +1385,26 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
 
     expect(result.exitCode).toBeGreaterThan(0);
     expect(result.stderr).toContain('codex review stalled with no output for 1s');
+    expect(result.stderr).toContain('termination boundary: stall (output-stall).');
+
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      termination_boundary: {
+        kind: string;
+        provenance: string;
+        reason: string;
+        sample: string | null;
+      } | null;
+    };
+    expect(telemetry.status).toBe('failed');
+    expect(telemetry.termination_boundary).toEqual({
+      kind: 'stall',
+      provenance: 'output-stall',
+      reason:
+        'codex review stalled with no output for 1s (set CODEX_REVIEW_STALL_TIMEOUT_SECONDS=0 to disable).',
+      sample: null
+    });
   }, LONG_WAIT_TEST_TIMEOUT_MS * 2);
 
   it('persists timeout telemetry summaries for faster failure triage', async () => {
@@ -1401,6 +1421,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
 
     expect(result.exitCode).toBeGreaterThan(0);
     expect(result.stderr).toContain('codex review timed out after 1s');
+    expect(result.stderr).toContain('termination boundary: timeout (review-timeout).');
     expect(result.stderr).toContain('[run-review] review telemetry:');
     expect(result.stderr).toContain('heavy command start(s)');
     expect(result.stderr).toContain('last command started: [redacted]');
@@ -1410,10 +1431,23 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
       status: string;
       error: string | null;
+      termination_boundary: {
+        kind: string;
+        provenance: string;
+        reason: string;
+        sample: string | null;
+      } | null;
       summary: { commandStarts: string[]; heavyCommandStarts: string[] };
     };
     expect(telemetry.status).toBe('failed');
     expect(telemetry.error).toContain('[redacted error');
+    expect(telemetry.termination_boundary).toEqual({
+      kind: 'timeout',
+      provenance: 'review-timeout',
+      reason:
+        'codex review timed out after 1s (set CODEX_REVIEW_TIMEOUT_SECONDS=0 to disable).',
+      sample: null
+    });
     expect(telemetry.summary.commandStarts.length).toBeGreaterThan(0);
     expect(telemetry.summary.heavyCommandStarts.length).toBeGreaterThan(0);
     expect(telemetry.summary.heavyCommandStarts[0]).toContain('[redacted heavy-command');
@@ -2111,6 +2145,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(result.exitCode).toBeGreaterThan(0);
     expect(result.stderr).toContain('codex review timed out after 1s');
     expect(result.stderr).not.toContain('stalled with no output');
+    expect(result.stderr).not.toContain('termination boundary: stall (output-stall).');
   }, LONG_WAIT_TEST_TIMEOUT_MS);
 
   it('defaults manifest selection to active task env when --task is omitted', async () => {

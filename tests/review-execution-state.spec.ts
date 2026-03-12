@@ -478,6 +478,61 @@ describe('ReviewExecutionState', () => {
     });
   });
 
+  it('projects timeout and stall failures into first-class termination boundary records', () => {
+    const state = new ReviewExecutionState({ startedAtMs: 0 });
+    const timeoutMessage =
+      'codex review timed out after 1s (set CODEX_REVIEW_TIMEOUT_SECONDS=0 to disable).';
+    const stallMessage =
+      'codex review stalled with no output for 1s (set CODEX_REVIEW_STALL_TIMEOUT_SECONDS=0 to disable).';
+
+    const timeoutBoundary = state.getTerminationBoundaryRecord(timeoutMessage, 2_000);
+    expect(timeoutBoundary).toEqual({
+      kind: 'timeout',
+      provenance: 'review-timeout',
+      reason: timeoutMessage,
+      sample: null
+    });
+    const stallBoundary = state.getTerminationBoundaryRecord(stallMessage, 2_000);
+    expect(stallBoundary).toEqual({
+      kind: 'stall',
+      provenance: 'output-stall',
+      reason: stallMessage,
+      sample: null
+    });
+
+    const timeoutPayload = state.buildTelemetryPayload({
+      status: 'failed',
+      error: timeoutMessage,
+      terminationBoundary: timeoutBoundary,
+      outputLogPath: '/repo/.runs/sample/review/output.log',
+      repoRoot: '/repo',
+      includeRawTelemetry: false,
+      telemetryDebugEnvKey: 'CODEX_REVIEW_DEBUG_TELEMETRY'
+    });
+    expect(timeoutPayload.termination_boundary).toEqual({
+      kind: 'timeout',
+      provenance: 'review-timeout',
+      reason: timeoutMessage,
+      sample: null
+    });
+
+    const stallPayload = state.buildTelemetryPayload({
+      status: 'failed',
+      error: stallMessage,
+      terminationBoundary: stallBoundary,
+      outputLogPath: '/repo/.runs/sample/review/output.log',
+      repoRoot: '/repo',
+      includeRawTelemetry: false,
+      telemetryDebugEnvKey: 'CODEX_REVIEW_DEBUG_TELEMETRY'
+    });
+    expect(stallPayload.termination_boundary).toEqual({
+      kind: 'stall',
+      provenance: 'output-stall',
+      reason: stallMessage,
+      sample: null
+    });
+  });
+
   it('projects active closeout rereads into first-class termination boundary records', () => {
     const state = new ReviewExecutionState({
       startedAtMs: 0,

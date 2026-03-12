@@ -100,6 +100,8 @@ export type ReviewCommandIntentViolationKind =
   | 'review-orchestration'
   | 'delegation-control';
 export type ReviewTerminationBoundaryKind =
+  | 'timeout'
+  | 'stall'
   | 'command-intent'
   | 'shell-probe'
   | 'startup-loop'
@@ -109,6 +111,8 @@ export type ReviewTerminationBoundaryKind =
   | 'verdict-stability'
   | 'relevant-reinspection-dwell';
 export type ReviewTerminationBoundaryProvenance =
+  | 'review-timeout'
+  | 'output-stall'
   | ReviewCommandIntentViolationKind
   | 'direct-shell-verification'
   | 'delegation-startup-loop'
@@ -847,6 +851,22 @@ export class ReviewExecutionState {
   ): ReviewTerminationBoundaryRecord | null {
     const matchedKinds = inferTerminationBoundaryKindsFromErrorMessage(errorMessage);
     for (const kind of matchedKinds) {
+      if (kind === 'timeout' && errorMessage) {
+        return {
+          kind: 'timeout',
+          provenance: 'review-timeout',
+          reason: errorMessage,
+          sample: null
+        };
+      }
+      if (kind === 'stall' && errorMessage) {
+        return {
+          kind: 'stall',
+          provenance: 'output-stall',
+          reason: errorMessage,
+          sample: null
+        };
+      }
       if (kind === 'startup-loop' && errorMessage) {
         return {
           kind: 'startup-loop',
@@ -1610,6 +1630,12 @@ function inferTerminationBoundaryKindsFromErrorMessage(
     return [];
   }
   const kinds: ReviewTerminationBoundaryKind[] = [];
+  if (errorMessage.includes('codex review timed out after')) {
+    kinds.push('timeout');
+  }
+  if (errorMessage.includes('codex review stalled with no output for')) {
+    kinds.push('stall');
+  }
   if (errorMessage.includes('bounded command-intent boundary')) {
     kinds.push('command-intent');
   }

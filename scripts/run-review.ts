@@ -2452,9 +2452,15 @@ async function waitForChildExit(
     const timeoutMs = options.timeoutMs;
     if (timeoutMs !== null) {
       timeoutHandle = setTimeout(() => {
-        requestTermination(
-          `codex review timed out after ${Math.round(timeoutMs / 1000)}s (set CODEX_REVIEW_TIMEOUT_SECONDS=0 to disable).`
-        );
+        const message = `codex review timed out after ${Math.round(
+          timeoutMs / 1000
+        )}s (set CODEX_REVIEW_TIMEOUT_SECONDS=0 to disable).`;
+        requestTermination(message, true, {
+          kind: 'timeout',
+          provenance: 'review-timeout',
+          reason: message,
+          sample: null
+        });
       }, timeoutMs);
       timeoutHandle.unref();
     }
@@ -2467,9 +2473,15 @@ async function waitForChildExit(
         if (idleMs < stallTimeoutMs) {
           return;
         }
-        requestTermination(
-          `codex review stalled with no output for ${Math.round(stallTimeoutMs / 1000)}s (set CODEX_REVIEW_STALL_TIMEOUT_SECONDS=0 to disable).`
-        );
+        const message = `codex review stalled with no output for ${Math.round(
+          stallTimeoutMs / 1000
+        )}s (set CODEX_REVIEW_STALL_TIMEOUT_SECONDS=0 to disable).`;
+        requestTermination(message, true, {
+          kind: 'stall',
+          provenance: 'output-stall',
+          reason: message,
+          sample: null
+        });
       }, checkIntervalMs);
       stallHandle.unref();
     }
