@@ -1210,6 +1210,151 @@ describe('TelegramOversightBridge', () => {
     }
   });
 
+  it('preserves next_update_id and monotonic updated_at when projection delivery overlaps update persistence', async () => {
+    const { root, env, paths } = await createRunRoot('task-1142-telegram-interleaving');
+    await seedManifest(paths, {
+      summary: 'task is running',
+      updated_at: '2026-03-06T04:00:00.000Z'
+    });
+    await seedControlState(paths, {
+      control_seq: 1,
+      latest_action: {
+        action: 'pause',
+        requested_at: '2026-03-06T04:01:00.000Z',
+        requested_by: 'operator',
+        reason: 'manual_pause'
+      }
+    });
+    await writeFile(
+      join(paths.runDir, 'telegram-oversight-state.json'),
+      JSON.stringify({
+        next_update_id: 73,
+        updated_at: '2026-03-06T04:00:30.000Z',
+        push: {
+          last_sent_projection_hash: null,
+          last_sent_at: null,
+          last_event_seq: null,
+          pending_projection_hash: null,
+          pending_projection_observed_at: null
+        }
+      }),
+      'utf8'
+    );
+    const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
+    const realFetch = globalThis.fetch;
+    const telegram = createTelegramHarness(realFetch);
+
+    let releaseProjectionSend: (() => void) | null = null;
+    const projectionSendBlocked = new Promise<void>((resolve) => {
+      releaseProjectionSend = resolve;
+    });
+    let projectionSendBlockedResolve: (() => void) | null = null;
+    const projectionSendStarted = new Promise<void>((resolve) => {
+      projectionSendBlockedResolve = resolve;
+    });
+    let blockNextProjectionSend = true;
+    const fetchImpl: typeof fetch = async (input, init) => {
+      const rawUrl = input instanceof Request ? input.url : String(input);
+      const url = new URL(rawUrl);
+      if (url.origin === 'https://api.telegram.org' && url.pathname.endsWith('/sendMessage') && blockNextProjectionSend) {
+        blockNextProjectionSend = false;
+        projectionSendBlockedResolve?.();
+        await projectionSendBlocked;
+      }
+      return telegram.fetch(input, init);
+    };
+
+    vi.stubEnv('CO_TELEGRAM_POLLING_ENABLED', '1');
+    vi.stubEnv('CO_TELEGRAM_BOT_TOKEN', 'test-token');
+    vi.stubEnv('CO_TELEGRAM_ALLOWED_CHAT_IDS', '1234');
+    vi.stubEnv('CO_TELEGRAM_PUSH_ENABLED', '1');
+    vi.stubEnv('CO_TELEGRAM_PUSH_INTERVAL_MS', '1');
+    vi.stubEnv('CO_TELEGRAM_POLL_INTERVAL_MS', '10');
+    vi.stubGlobal('fetch', fetchImpl);
+
+    const server = await ControlServer.start({
+      paths,
+      config,
+      runId: 'run-1'
+    });
+
+    try {
+      server.broadcast({
+        schema_version: 1,
+        seq: 1,
+        timestamp: '2026-03-06T04:02:00.000Z',
+        task_id: 'task-0940',
+        run_id: 'run-1',
+        event: 'run_updated',
+        actor: 'runner',
+        payload: { summary: 'initial broadcast' }
+      });
+
+      await projectionSendStarted;
+
+      telegram.updates.push({
+        update_id: 87,
+        message: {
+          message_id: 1,
+          text: '/help',
+          chat: { id: 1234, type: 'private' },
+          from: { id: 77, is_bot: false, first_name: 'Operator' }
+        }
+      });
+
+      await waitForCondition(async () => {
+        const stateRaw = await readFile(join(paths.runDir, 'telegram-oversight-state.json'), 'utf8');
+        const parsed = JSON.parse(stateRaw) as { next_update_id?: number };
+        return parsed.next_update_id === 88 && telegram.sentMessages.length === 1;
+      });
+
+      const overlapStateRaw = await readFile(join(paths.runDir, 'telegram-oversight-state.json'), 'utf8');
+      const overlapState = JSON.parse(overlapStateRaw) as {
+        next_update_id?: number;
+        updated_at?: string;
+      };
+      expect(overlapState.next_update_id).toBe(88);
+
+      releaseProjectionSend?.();
+
+      await waitForCondition(async () => {
+        const stateRaw = await readFile(join(paths.runDir, 'telegram-oversight-state.json'), 'utf8');
+        const parsed = JSON.parse(stateRaw) as {
+          next_update_id?: number;
+          push?: { last_event_seq?: number | null };
+        };
+        return parsed.next_update_id === 88 && parsed.push?.last_event_seq === 1 && telegram.sentMessages.length === 2;
+      });
+
+      const finalStateRaw = await readFile(join(paths.runDir, 'telegram-oversight-state.json'), 'utf8');
+      const finalState = JSON.parse(finalStateRaw) as {
+        next_update_id?: number;
+        updated_at?: string;
+        push?: {
+          last_sent_projection_hash?: string | null;
+          last_sent_at?: string | null;
+          last_event_seq?: number | null;
+          pending_projection_hash?: string | null;
+          pending_projection_observed_at?: string | null;
+        };
+      };
+      expect(finalState.next_update_id).toBe(88);
+      expect(Date.parse(finalState.updated_at ?? '')).toBeGreaterThanOrEqual(Date.parse(overlapState.updated_at ?? ''));
+      expect(Date.parse(finalState.updated_at ?? '')).toBeGreaterThan(Date.parse('2026-03-06T04:00:30.000Z'));
+      expect(finalState.push?.last_sent_projection_hash).toBeTruthy();
+      expect(finalState.push?.last_sent_at).toBeTruthy();
+      expect(finalState.push?.last_event_seq).toBe(1);
+      expect(finalState.push?.pending_projection_hash).toBeNull();
+      expect(finalState.push?.pending_projection_observed_at).toBeNull();
+      expect(telegram.sentMessages).toHaveLength(2);
+      expect(telegram.sentMessages.every((message) => message.chat_id === '1234')).toBe(true);
+    } finally {
+      releaseProjectionSend?.();
+      await server.close();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   it('sends projection-driven push notifications when queued questions are added and cleared', async () => {
     const { root, env, paths } = await createRunRoot('task-1016-telegram-question-push');
     await seedManifest(paths, {

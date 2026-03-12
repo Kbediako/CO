@@ -20,21 +20,21 @@
 
 ## Telegram Interleaving Backstop
 
-- [ ] Direct bridge-level regression proof added for preserved `next_update_id` under projection/update interleaving.
-- [ ] Direct bridge-level regression proof added for monotonic top-level `updated_at` under the same interleaving.
-- [ ] Production code stays unchanged unless the new backstop exposes a real defect.
+- [x] Direct bridge-level regression proof added for preserved `next_update_id` under projection/update interleaving. Evidence: `orchestrator/tests/TelegramOversightBridge.test.ts`, `out/1142-coordinator-symphony-aligned-telegram-projection-notification-interleaving-backstop/manual/20260312T223224Z-closeout/12-manual-telegram-interleaving-check.md`
+- [x] Direct bridge-level regression proof added for monotonic top-level `updated_at` under the same interleaving. Evidence: `orchestrator/tests/TelegramOversightBridge.test.ts`, `out/1142-coordinator-symphony-aligned-telegram-projection-notification-interleaving-backstop/manual/20260312T223224Z-closeout/12-manual-telegram-interleaving-check.md`
+- [x] Production code stays unchanged unless the new backstop exposes a real defect. Evidence: `out/1142-coordinator-symphony-aligned-telegram-projection-notification-interleaving-backstop/manual/20260312T223224Z-closeout/00-summary.md`
 
 ## Validation + Closeout
 
-- [ ] `node scripts/delegation-guard.mjs`
-- [ ] `node scripts/spec-guard.mjs --dry-run`
-- [ ] `npm run build`
-- [ ] `npm run lint`
-- [ ] `npm run test`
-- [ ] `npm run docs:check`
-- [ ] `npm run docs:freshness`
-- [ ] `node scripts/diff-budget.mjs`
-- [ ] `npm run review`
-- [ ] `npm run pack:smoke`
-- [ ] Manual/mock Telegram interleaving evidence captured.
-- [ ] Elegance review completed.
+- [x] `node scripts/delegation-guard.mjs` Evidence: `out/1142-coordinator-symphony-aligned-telegram-projection-notification-interleaving-backstop/manual/20260312T223224Z-closeout/01-delegation-guard.log`
+- [x] `node scripts/spec-guard.mjs --dry-run` Evidence: `out/1142-coordinator-symphony-aligned-telegram-projection-notification-interleaving-backstop/manual/20260312T223224Z-closeout/02-spec-guard.log`
+- [x] `npm run build` Evidence: `out/1142-coordinator-symphony-aligned-telegram-projection-notification-interleaving-backstop/manual/20260312T223224Z-closeout/03-build.log`
+- [x] `npm run lint` Evidence: `out/1142-coordinator-symphony-aligned-telegram-projection-notification-interleaving-backstop/manual/20260312T223224Z-closeout/04-lint.log`
+- [x] `npm run test` Evidence: `out/1142-coordinator-symphony-aligned-telegram-projection-notification-interleaving-backstop/manual/20260312T223224Z-closeout/06-test.log`
+- [x] `npm run docs:check` Evidence: `out/1142-coordinator-symphony-aligned-telegram-projection-notification-interleaving-backstop/manual/20260312T223224Z-closeout/07-docs-check.log`
+- [x] `npm run docs:freshness` Evidence: `out/1142-coordinator-symphony-aligned-telegram-projection-notification-interleaving-backstop/manual/20260312T223224Z-closeout/08-docs-freshness.log`
+- [x] `node scripts/diff-budget.mjs` Evidence: `out/1142-coordinator-symphony-aligned-telegram-projection-notification-interleaving-backstop/manual/20260312T223224Z-closeout/09-diff-budget.log`
+- [x] `npm run review` Evidence: `out/1142-coordinator-symphony-aligned-telegram-projection-notification-interleaving-backstop/manual/20260312T223224Z-closeout/10-review.log`, `out/1142-coordinator-symphony-aligned-telegram-projection-notification-interleaving-backstop/manual/20260312T223224Z-closeout/14-override-notes.md`
+- [x] `npm run pack:smoke` Evidence: `out/1142-coordinator-symphony-aligned-telegram-projection-notification-interleaving-backstop/manual/20260312T223224Z-closeout/11-pack-smoke.log`
+- [x] Manual/mock Telegram interleaving evidence captured. Evidence: `out/1142-coordinator-symphony-aligned-telegram-projection-notification-interleaving-backstop/manual/20260312T223224Z-closeout/12-manual-telegram-interleaving-check.md`
+- [x] Elegance review completed. Evidence: `out/1142-coordinator-symphony-aligned-telegram-projection-notification-interleaving-backstop/manual/20260312T223224Z-closeout/13-elegance-review.md`
