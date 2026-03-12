@@ -17,8 +17,13 @@ import {
   type TelegramOversightBridgeState,
   writeTelegramOversightState
 } from './controlTelegramPushState.js';
-
-const TELEGRAM_API_ROOT = 'https://api.telegram.org';
+import {
+  createTelegramOversightApiClient,
+  type TelegramBotIdentity,
+  type TelegramOversightApiClient,
+  type TelegramUpdate,
+  type TelegramUser
+} from './telegramOversightApiClient.js';
 const DEFAULT_POLL_INTERVAL_MS = 1_000;
 const DEFAULT_POLL_TIMEOUT_SECONDS = 20;
 const DEFAULT_PUSH_COOLDOWN_MS = 30_000;
@@ -31,44 +36,6 @@ interface TelegramOversightBridgeConfig {
   pollIntervalMs: number;
   pushEnabled: boolean;
   pushCooldownMs: number;
-}
-
-interface TelegramBotIdentity {
-  id: number;
-  username?: string;
-  first_name?: string;
-}
-
-interface TelegramApiEnvelope<T> {
-  ok: boolean;
-  result?: T;
-  description?: string;
-}
-
-interface TelegramChat {
-  id: number;
-  type?: string;
-  title?: string;
-  username?: string;
-}
-
-interface TelegramUser {
-  id: number;
-  is_bot?: boolean;
-  first_name?: string;
-  username?: string;
-}
-
-interface TelegramMessage {
-  message_id: number;
-  text?: string;
-  chat: TelegramChat;
-  from?: TelegramUser;
-}
-
-interface TelegramUpdate {
-  update_id: number;
-  message?: TelegramMessage;
 }
 
 export interface ControlDispatchPayload {
@@ -160,13 +127,12 @@ export async function startTelegramOversightBridge(
 
 class TelegramOversightBridgeRuntime implements TelegramOversightBridge {
   private readonly config: TelegramOversightBridgeConfig;
-  private readonly runDir: string;
-  private readonly readAdapter: TelegramOversightReadAdapter;
   private readonly readController: ControlTelegramReadController;
   private readonly baseUrl: string;
   private readonly controlToken: string;
   private readonly fetchImpl: FetchLike;
   private readonly statePath: string;
+  private readonly telegramClient: TelegramOversightApiClient;
 
   private closed = false;
   private loopPromise: Promise<void> | null = null;
@@ -184,8 +150,6 @@ class TelegramOversightBridgeRuntime implements TelegramOversightBridge {
     fetchImpl: FetchLike;
   }) {
     this.config = options.config;
-    this.runDir = options.runDir;
-    this.readAdapter = options.readAdapter;
     this.readController = createControlTelegramReadController({
       readAdapter: options.readAdapter,
       mutationsEnabled: options.config.mutationsEnabled
@@ -194,11 +158,15 @@ class TelegramOversightBridgeRuntime implements TelegramOversightBridge {
     this.controlToken = options.controlToken;
     this.fetchImpl = options.fetchImpl;
     this.statePath = join(options.runDir, TELEGRAM_STATE_FILE);
+    this.telegramClient = createTelegramOversightApiClient({
+      botToken: options.config.botToken,
+      fetchImpl: options.fetchImpl
+    });
   }
 
   async start(): Promise<void> {
     this.state = await readTelegramOversightState(this.statePath);
-    this.botIdentity = await this.callTelegram<TelegramBotIdentity>('getMe');
+    this.botIdentity = await this.telegramClient.getMe();
     logger.info(
       `[telegram-oversight] enabled for ${Array.from(this.config.allowedChatIds).length} chat(s) as @${
         this.botIdentity.username ?? 'bot'
@@ -269,19 +237,11 @@ class TelegramOversightBridgeRuntime implements TelegramOversightBridge {
         DEFAULT_POLL_TIMEOUT_SECONDS,
         Math.ceil((this.config.pollIntervalMs + 500) / 1_000)
       );
-      const query = new URLSearchParams({
-        offset: String(this.state.next_update_id),
-        timeout: String(timeout),
-        allowed_updates: JSON.stringify(['message'])
-      });
-      const response = await this.fetchImpl(this.telegramUrl(`getUpdates?${query.toString()}`), {
+      return this.telegramClient.getUpdates({
+        offset: this.state.next_update_id,
+        timeoutSeconds: timeout,
         signal: controller.signal
       });
-      const payload = (await response.json()) as TelegramApiEnvelope<TelegramUpdate[]>;
-      if (!response.ok || !payload.ok) {
-        throw new Error(payload.description ?? `telegram_get_updates_failed_${response.status}`);
-      }
-      return Array.isArray(payload.result) ? payload.result : [];
     } finally {
       if (this.activeController === controller) {
         this.activeController = null;
@@ -326,7 +286,7 @@ class TelegramOversightBridgeRuntime implements TelegramOversightBridge {
 
     const rawText = typeof message.text === 'string' ? message.text.trim() : '';
     if (!rawText.startsWith('/')) {
-      await this.sendMessage(chatId, 'Use /help for available commands.');
+      await this.telegramClient.sendMessage(chatId, 'Use /help for available commands.');
       return;
     }
 
@@ -337,7 +297,7 @@ class TelegramOversightBridgeRuntime implements TelegramOversightBridge {
       chatId,
       user: message.from ?? null
     });
-    await this.sendMessage(chatId, response);
+    await this.telegramClient.sendMessage(chatId, response);
   }
 
   private async dispatchCommand(input: {
@@ -408,36 +368,6 @@ class TelegramOversightBridgeRuntime implements TelegramOversightBridge {
     return readJsonResponse<T>(response);
   }
 
-  private async sendMessage(chatId: string, text: string): Promise<void> {
-    const response = await this.fetchImpl(this.telegramUrl('sendMessage'), {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text
-      })
-    });
-    const payload = (await response.json()) as TelegramApiEnvelope<unknown>;
-    if (!response.ok || !payload.ok) {
-      throw new Error(payload.description ?? `telegram_send_message_failed_${response.status}`);
-    }
-  }
-
-  private async callTelegram<T>(method: string): Promise<T> {
-    const response = await this.fetchImpl(this.telegramUrl(method));
-    const payload = (await response.json()) as TelegramApiEnvelope<T>;
-    if (!response.ok || !payload.ok || payload.result === undefined) {
-      throw new Error(payload.description ?? `telegram_${method}_failed_${response.status}`);
-    }
-    return payload.result;
-  }
-
-  private telegramUrl(method: string): string {
-    return `${TELEGRAM_API_ROOT}/bot${this.config.botToken}/${method}`;
-  }
-
   private async maybeSendProjectionDelta(input: {
     eventSeq?: number | null;
     source?: string | null;
@@ -460,7 +390,7 @@ class TelegramOversightBridgeRuntime implements TelegramOversightBridge {
 
     const text = projection.text;
     for (const chatId of this.config.allowedChatIds) {
-      await this.sendMessage(chatId, text);
+      await this.telegramClient.sendMessage(chatId, text);
     }
 
     this.state = transition.nextState;
