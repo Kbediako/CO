@@ -80,6 +80,7 @@ Use `codex-orchestrator review` as the default path so runs inherit CO guardrail
   - `CODEX_REVIEW_TIMEOUT_SECONDS=<seconds>` (`0` disables when set); when this guard fires, runtime telemetry records a first-class `timeout` termination boundary
   - `CODEX_REVIEW_STALL_TIMEOUT_SECONDS=<seconds>` (`0` disables when set); when this guard fires, runtime telemetry records a first-class `stall` termination boundary
   - `CODEX_REVIEW_STARTUP_LOOP_TIMEOUT_SECONDS=<seconds>` with optional `CODEX_REVIEW_STARTUP_LOOP_MIN_EVENTS` (default `8` when startup-loop timeout is set); when this guard fires, runtime telemetry records a first-class `startup-loop` termination boundary
+  - Those timeout-adjacent families continue to print `Review output log (partial)`; other first-class boundary violations do not.
   - `CODEX_REVIEW_LOW_SIGNAL_TIMEOUT_SECONDS=<seconds>` (`0` disables the bounded low-signal drift guard; default `180`)
   - `CODEX_REVIEW_VERDICT_STABILITY_TIMEOUT_SECONDS=<seconds>` (`0` disables the bounded verdict-stability guard; default `180`)
   - `CODEX_REVIEW_META_SURFACE_TIMEOUT_SECONDS=<seconds>` (`0` disables the bounded meta-surface expansion guard; default `180`)

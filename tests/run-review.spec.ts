@@ -1387,6 +1387,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(result.exitCode).toBeGreaterThan(0);
     expect(result.stderr).toContain('codex review stalled with no output for 1s');
     expect(result.stderr).toContain('termination boundary: stall (output-stall).');
+    expect(result.stderr).toContain('Review output log (partial):');
 
     const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
     const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
@@ -1423,6 +1424,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(result.exitCode).toBeGreaterThan(0);
     expect(result.stderr).toContain('codex review timed out after 1s');
     expect(result.stderr).toContain('termination boundary: timeout (review-timeout).');
+    expect(result.stderr).toContain('Review output log (partial):');
     expect(result.stderr).toContain('[run-review] review telemetry:');
     expect(result.stderr).toContain('heavy command start(s)');
     expect(result.stderr).toContain('last command started: [redacted]');
@@ -2427,6 +2429,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(result.exitCode).toBeGreaterThan(0);
     expect(result.stderr).toContain('codex review appears stuck in delegation startup loop');
     expect(result.stderr).toContain('termination boundary: startup-loop (delegation-startup-loop).');
+    expect(result.stderr).toContain('Review output log (partial):');
 
     const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
     const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
@@ -2499,6 +2502,8 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(result.exitCode).toBeGreaterThan(0);
     expect(result.stderr).toContain('codex review timed out after 1s');
     expect(result.stderr).not.toContain('delegation startup loop');
+    expect(result.stderr).toContain('termination boundary: timeout (review-timeout).');
+    expect(result.stderr).toContain('Review output log (partial):');
 
     const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
     const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
@@ -2509,7 +2514,13 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
         sample: string | null;
       } | null;
     };
-    expect(telemetry.termination_boundary).toBeNull();
+    expect(telemetry.termination_boundary).toEqual({
+      kind: 'timeout',
+      provenance: 'review-timeout',
+      reason:
+        'codex review timed out after 1s (set CODEX_REVIEW_TIMEOUT_SECONDS=0 to disable).',
+      sample: null
+    });
   }, LONG_WAIT_TEST_TIMEOUT_MS);
 
   it('fails bounded review when repetitive low-signal inspection persists', async () => {
@@ -2779,6 +2790,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(result.stderr).toContain(
       'termination boundary: verdict-stability (repeated-output-inspection).'
     );
+    expect(result.stderr).not.toContain('Review output log (partial):');
 
     const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
     const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
@@ -3790,6 +3802,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
 
     expect(result.exitCode).toBeGreaterThan(0);
     expect(result.stderr).toContain('bounded command-intent boundary (validation suite launch)');
+    expect(result.stderr).not.toContain('Review output log (partial):');
 
     const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
     const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {

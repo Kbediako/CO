@@ -85,6 +85,11 @@ const REVIEW_TELEMETRY_DEBUG_ENV_KEY = 'CODEX_REVIEW_DEBUG_TELEMETRY';
 const REVIEW_SURFACE_ENV_KEY = 'CODEX_REVIEW_SURFACE';
 const REVIEW_DISABLE_DELEGATION_CONFIG_OVERRIDE = 'mcp_servers.delegation.enabled=false';
 type ReviewSurface = 'diff' | 'audit' | 'architecture';
+const REVIEW_PARTIAL_OUTPUT_HINT_BOUNDARY_KINDS = new Set<ReviewTerminationBoundaryKind>([
+  'timeout',
+  'stall',
+  'startup-loop'
+]);
 
 interface CliOptions {
   manifest?: string;
@@ -1110,7 +1115,7 @@ async function main(): Promise<void> {
             retryTerminationBoundary ?? retryState.getTerminationBoundaryRecord(retryMessage)
           );
         }
-        if (retryError instanceof CodexReviewError && retryError.timedOut) {
+        if (shouldLogPartialReviewOutput(retryTerminationBoundary)) {
           console.error(`Review output log (partial): ${path.relative(repoRoot, artifactPaths.outputLogPath)}`);
         }
         throw retryError;
@@ -1154,7 +1159,7 @@ async function main(): Promise<void> {
         failureTerminationBoundary ?? failureState.getTerminationBoundaryRecord(errorMessage)
       );
     }
-    if (error instanceof CodexReviewError && error.timedOut) {
+    if (shouldLogPartialReviewOutput(failureTerminationBoundary)) {
       console.error(`Review output log (partial): ${path.relative(repoRoot, artifactPaths.outputLogPath)}`);
     }
     throw error;
@@ -1641,6 +1646,15 @@ class CodexReviewError extends Error {
     this.reviewState = options.reviewState ?? null;
     this.terminationBoundary = options.terminationBoundary ?? null;
   }
+}
+
+function shouldLogPartialReviewOutput(
+  terminationBoundary: ReviewTerminationBoundaryRecord | null
+): boolean {
+  return (
+    terminationBoundary !== null &&
+    REVIEW_PARTIAL_OUTPUT_HINT_BOUNDARY_KINDS.has(terminationBoundary.kind)
+  );
 }
 
 function shouldRetryWithoutScopeFlags(error: unknown): boolean {
