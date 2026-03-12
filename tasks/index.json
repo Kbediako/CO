@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260312-1133-coordinator-symphony-aligned-standalone-review-active-closeout-termination-boundary-taxonomy-split",
+      "title": "Coordinator Symphony-Aligned Standalone Review Active-Closeout Termination Boundary Taxonomy Split",
+      "relates_to": "tasks/tasks-1133-coordinator-symphony-aligned-standalone-review-active-closeout-termination-boundary-taxonomy-split.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-12",
+      "paths": {
+        "spec": "tasks/specs/1133-coordinator-symphony-aligned-standalone-review-active-closeout-termination-boundary-taxonomy-split.md",
+        "task": "tasks/tasks-1133-coordinator-symphony-aligned-standalone-review-active-closeout-termination-boundary-taxonomy-split.md",
+        "agent_task": ".agent/task/1133-coordinator-symphony-aligned-standalone-review-active-closeout-termination-boundary-taxonomy-split.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-standalone-review-active-closeout-termination-boundary-taxonomy-split.md"
+      }
+    },
+    {
       "id": "20260312-1132-coordinator-symphony-aligned-standalone-review-shell-probe-termination-boundary-provenance-classification",
       "title": "Coordinator Symphony-Aligned Standalone Review Shell-Probe Termination Boundary Provenance Classification",
       "relates_to": "tasks/tasks-1132-coordinator-symphony-aligned-standalone-review-shell-probe-termination-boundary-provenance-classification.md",

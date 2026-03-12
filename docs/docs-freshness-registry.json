@@ -3,6 +3,55 @@
   "generated_at": "2026-03-12",
   "entries": [
     {
+      "path": "tasks/tasks-1133-coordinator-symphony-aligned-standalone-review-active-closeout-termination-boundary-taxonomy-split.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-12",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/specs/1133-coordinator-symphony-aligned-standalone-review-active-closeout-termination-boundary-taxonomy-split.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-12",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/findings/1133-standalone-review-active-closeout-termination-boundary-taxonomy-split-deliberation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-12",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/TECH_SPEC-coordinator-symphony-aligned-standalone-review-active-closeout-termination-boundary-taxonomy-split.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-12",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/PRD-coordinator-symphony-aligned-standalone-review-active-closeout-termination-boundary-taxonomy-split.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-12",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-standalone-review-active-closeout-termination-boundary-taxonomy-split.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-12",
+      "cadence_days": 30
+    },
+    {
+      "path": ".agent/task/1133-coordinator-symphony-aligned-standalone-review-active-closeout-termination-boundary-taxonomy-split.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-12",
+      "cadence_days": 30
+    },
+    {
       "path": "tasks/tasks-1132-coordinator-symphony-aligned-standalone-review-shell-probe-termination-boundary-provenance-classification.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
