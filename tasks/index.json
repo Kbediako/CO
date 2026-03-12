@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260313-1141-coordinator-symphony-aligned-telegram-projection-notification-state-contract-narrowing",
+      "title": "Coordinator Symphony-Aligned Telegram Projection Notification State Contract Narrowing",
+      "relates_to": "tasks/tasks-1141-coordinator-symphony-aligned-telegram-projection-notification-state-contract-narrowing.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-13",
+      "paths": {
+        "spec": "tasks/specs/1141-coordinator-symphony-aligned-telegram-projection-notification-state-contract-narrowing.md",
+        "task": "tasks/tasks-1141-coordinator-symphony-aligned-telegram-projection-notification-state-contract-narrowing.md",
+        "agent_task": ".agent/task/1141-coordinator-symphony-aligned-telegram-projection-notification-state-contract-narrowing.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-telegram-projection-notification-state-contract-narrowing.md"
+      }
+    },
+    {
       "id": "20260313-1140-coordinator-symphony-aligned-telegram-projection-notification-controller-extraction",
       "title": "Coordinator Symphony-Aligned Telegram Projection Notification Controller Extraction",
       "relates_to": "tasks/tasks-1140-coordinator-symphony-aligned-telegram-projection-notification-controller-extraction.md",
