@@ -9,6 +9,10 @@ import {
   createControlTelegramReadController,
   type ControlTelegramReadController
 } from './controlTelegramReadController.js';
+import {
+  createControlTelegramUpdateHandler,
+  type ControlTelegramUpdateHandler
+} from './controlTelegramUpdateHandler.js';
 import type {
   ControlDispatchPilotPayload,
   ControlSelectedRunRuntimeSnapshot
@@ -24,8 +28,7 @@ import {
   createTelegramOversightApiClient,
   type TelegramBotIdentity,
   type TelegramOversightApiClient,
-  type TelegramUpdate,
-  type TelegramUser
+  type TelegramUpdate
 } from './telegramOversightApiClient.js';
 import { createTelegramOversightControlActionApiClient } from './telegramOversightControlActionApiClient.js';
 const DEFAULT_POLL_INTERVAL_MS = 1_000;
@@ -127,6 +130,7 @@ class TelegramOversightBridgeRuntime implements TelegramOversightBridge {
   private readonly statePath: string;
   private readonly telegramClient: TelegramOversightApiClient;
   private readonly commandController: ControlTelegramCommandController;
+  private readonly updateHandler: ControlTelegramUpdateHandler;
 
   private closed = false;
   private loopPromise: Promise<void> | null = null;
@@ -161,6 +165,12 @@ class TelegramOversightBridgeRuntime implements TelegramOversightBridge {
     this.commandController = createControlTelegramCommandController({
       mutationsEnabled: options.config.mutationsEnabled,
       controlActionClient
+    });
+    this.updateHandler = createControlTelegramUpdateHandler({
+      allowedChatIds: options.config.allowedChatIds,
+      readController: this.readController,
+      commandController: this.commandController,
+      sendMessage: (chatId, text) => this.telegramClient.sendMessage(chatId, text)
     });
   }
 
@@ -274,49 +284,10 @@ class TelegramOversightBridgeRuntime implements TelegramOversightBridge {
   }
 
   private async handleUpdate(update: TelegramUpdate): Promise<void> {
-    const message = update.message;
-    if (!message?.chat) {
-      return;
-    }
-    const chatId = String(message.chat.id);
-    if (!this.config.allowedChatIds.has(chatId)) {
-      logger.warn(`[telegram-oversight] ignoring unauthorized chat ${chatId}`);
-      return;
-    }
-
-    const rawText = typeof message.text === 'string' ? message.text.trim() : '';
-    if (!rawText.startsWith('/')) {
-      await this.telegramClient.sendMessage(chatId, 'Use /help for available commands.');
-      return;
-    }
-
-    const command = normalizeTelegramCommand(rawText, this.botIdentity?.username);
-    const response = await this.dispatchCommand({
-      command,
-      updateId: update.update_id,
-      chatId,
-      user: message.from ?? null
+    await this.updateHandler.handleUpdate({
+      update,
+      botUsername: this.botIdentity?.username ?? null
     });
-    await this.telegramClient.sendMessage(chatId, response);
-  }
-
-  private async dispatchCommand(input: {
-    command: string;
-    updateId: number;
-    chatId: string;
-    user: TelegramUser | null;
-  }): Promise<string> {
-    const readResponse = await this.readController.dispatchReadCommand(input.command);
-    if (readResponse !== null) {
-      return readResponse;
-    }
-
-    const mutatingResponse = await this.commandController.dispatchMutatingCommand(input);
-    if (mutatingResponse !== null) {
-      return mutatingResponse;
-    }
-
-    return 'Unknown command. Use /help for commands.';
   }
 
   private async maybeSendProjectionDelta(input: {
@@ -373,23 +344,6 @@ function resolveTelegramOversightBridgeConfig(env: NodeJS.ProcessEnv): TelegramO
     pushEnabled: parseBooleanEnv(env.CO_TELEGRAM_PUSH_ENABLED),
     pushCooldownMs: parsePositiveIntegerEnv(env.CO_TELEGRAM_PUSH_INTERVAL_MS, DEFAULT_PUSH_COOLDOWN_MS)
   };
-}
-
-function normalizeTelegramCommand(input: string, botUsername?: string): string {
-  const token = input.trim().split(/\s+/, 1)[0] ?? '';
-  const normalized = token.toLowerCase();
-  if (!normalized.startsWith('/')) {
-    return normalized;
-  }
-  const atIndex = normalized.indexOf('@');
-  if (atIndex === -1) {
-    return normalized;
-  }
-  const suffix = normalized.slice(atIndex + 1);
-  if (!botUsername || suffix === botUsername.toLowerCase()) {
-    return normalized.slice(0, atIndex);
-  }
-  return normalized;
 }
 
 function parseCsvSet(value: string | undefined): Set<string> {
