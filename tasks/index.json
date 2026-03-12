@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260313-1139-coordinator-symphony-aligned-telegram-oversight-update-handler-extraction",
+      "title": "Coordinator Symphony-Aligned Telegram Oversight Update Handler Extraction",
+      "relates_to": "tasks/tasks-1139-coordinator-symphony-aligned-telegram-oversight-update-handler-extraction.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-13",
+      "paths": {
+        "spec": "tasks/specs/1139-coordinator-symphony-aligned-telegram-oversight-update-handler-extraction.md",
+        "task": "tasks/tasks-1139-coordinator-symphony-aligned-telegram-oversight-update-handler-extraction.md",
+        "agent_task": ".agent/task/1139-coordinator-symphony-aligned-telegram-oversight-update-handler-extraction.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-telegram-oversight-update-handler-extraction.md"
+      }
+    },
+    {
       "id": "20260313-1138-coordinator-symphony-aligned-telegram-oversight-command-controller-extraction",
       "title": "Coordinator Symphony-Aligned Telegram Oversight Command Controller Extraction",
       "relates_to": "tasks/tasks-1138-coordinator-symphony-aligned-telegram-oversight-command-controller-extraction.md",
