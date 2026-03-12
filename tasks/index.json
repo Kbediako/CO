@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260313-1138-coordinator-symphony-aligned-telegram-oversight-command-controller-extraction",
+      "title": "Coordinator Symphony-Aligned Telegram Oversight Command Controller Extraction",
+      "relates_to": "tasks/tasks-1138-coordinator-symphony-aligned-telegram-oversight-command-controller-extraction.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-13",
+      "paths": {
+        "spec": "tasks/specs/1138-coordinator-symphony-aligned-telegram-oversight-command-controller-extraction.md",
+        "task": "tasks/tasks-1138-coordinator-symphony-aligned-telegram-oversight-command-controller-extraction.md",
+        "agent_task": ".agent/task/1138-coordinator-symphony-aligned-telegram-oversight-command-controller-extraction.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-telegram-oversight-command-controller-extraction.md"
+      }
+    },
+    {
       "id": "20260312-1137-coordinator-symphony-aligned-standalone-review-boundary-driven-partial-output-hints",
       "title": "Coordinator Symphony-Aligned Standalone Review Boundary-Driven Partial Output Hints",
       "relates_to": "tasks/tasks-1137-coordinator-symphony-aligned-standalone-review-boundary-driven-partial-output-hints.md",
