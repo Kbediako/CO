@@ -1,7 +1,7 @@
 ---
 id: 20260313-1139-coordinator-symphony-aligned-telegram-oversight-update-handler-extraction
 title: Coordinator Symphony-Aligned Telegram Oversight Update Handler Extraction
-status: draft
+status: completed
 owners:
   - Codex
 created: 2026-03-13
@@ -39,3 +39,4 @@ Extract the remaining Telegram update-local ingress shell from `telegramOversigh
 - 2026-03-13: Registered after `1138` closed the operator-only mutating command seam. The next truthful Symphony-aligned Telegram seam is the update-local shell still centered around `handleUpdate` / `dispatchCommand`, because it remains mixed into the bridge runtime after the transport, read, mutating-command, and push-state extractions. Evidence: `docs/findings/1139-telegram-oversight-update-handler-extraction-deliberation.md`.
 - 2026-03-13: Pre-implementation local read-only review approved. The truthful bounded seam is the update-local ingress shell, not another lifecycle or state-owning extraction. Evidence: `docs/findings/1139-telegram-oversight-update-handler-extraction-deliberation.md`.
 - 2026-03-13: Docs-first registration completed. Deterministic docs guards passed; the docs-review pipeline again failed at its own delegation guard before surfacing a concrete docs defect, so the package carries an explicit override rather than a clean docs-review pass. Evidence: `.runs/1139-coordinator-symphony-aligned-telegram-oversight-update-handler-extraction/cli/2026-03-12T20-45-52-814Z-c8d39681/manifest.json`, `out/1139-coordinator-symphony-aligned-telegram-oversight-update-handler-extraction/manual/20260312T204022Z-docs-first/00-summary.md`.
+- 2026-03-13: Completed. `telegramOversightBridge.ts` now delegates the update-local ingress shell into `controlTelegramUpdateHandler.ts` while retaining poll-loop sequencing, `next_update_id` persistence, bot identity startup, and push-state ownership in the bridge runtime. Focused regressions passed `3/3` files and `23/23` tests, the full suite passed `196/196` files and `1428/1428` tests, bounded review returned no findings, and `pack:smoke` passed. Evidence: `out/1139-coordinator-symphony-aligned-telegram-oversight-update-handler-extraction/manual/20260312T204022Z-closeout/00-summary.md`.

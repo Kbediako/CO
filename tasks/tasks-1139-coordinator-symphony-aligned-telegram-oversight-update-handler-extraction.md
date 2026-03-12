@@ -20,22 +20,22 @@
 
 ## Telegram Update Handler
 
-- [ ] `telegramOversightBridge.ts` delegates the update-local `handleUpdate` / `dispatchCommand` shell into one bounded helper seam.
-- [ ] The extracted handler owns message admission, authorized-chat filtering, slash normalization, read routing, mutating fallback routing, and reply send-path invocation without moving poll/update lifecycle, `next_update_id` persistence, bot identity startup, or push-state ownership out of the bridge shell.
-- [ ] Existing `ControlTelegramReadController` and `ControlTelegramCommandController` ownership remains unchanged.
-- [ ] Focused Telegram regressions prove the update-local operator surface remains unchanged.
+- [x] `telegramOversightBridge.ts` delegates the update-local `handleUpdate` / `dispatchCommand` shell into one bounded helper seam. Evidence: `orchestrator/src/cli/control/telegramOversightBridge.ts`, `orchestrator/src/cli/control/controlTelegramUpdateHandler.ts`, `out/1139-coordinator-symphony-aligned-telegram-oversight-update-handler-extraction/manual/20260312T204022Z-closeout/00-summary.md`
+- [x] The extracted handler owns message admission, authorized-chat filtering, slash normalization, read routing, mutating fallback routing, and reply send-path invocation without moving poll/update lifecycle, `next_update_id` persistence, bot identity startup, or push-state ownership out of the bridge shell. Evidence: `orchestrator/src/cli/control/controlTelegramUpdateHandler.ts`, `out/1139-coordinator-symphony-aligned-telegram-oversight-update-handler-extraction/manual/20260312T204022Z-closeout/12-manual-telegram-update-handler-check.md`
+- [x] Existing `ControlTelegramReadController` and `ControlTelegramCommandController` ownership remains unchanged. Evidence: `orchestrator/src/cli/control/controlTelegramUpdateHandler.ts`, `orchestrator/src/cli/control/telegramOversightBridge.ts`, `out/1139-coordinator-symphony-aligned-telegram-oversight-update-handler-extraction/manual/20260312T204022Z-closeout/12-manual-telegram-update-handler-check.md`
+- [x] Focused Telegram regressions prove the update-local operator surface remains unchanged. Evidence: `out/1139-coordinator-symphony-aligned-telegram-oversight-update-handler-extraction/manual/20260312T204022Z-closeout/05-targeted-tests.log`
 
 ## Validation + Closeout
 
-- [ ] `node scripts/delegation-guard.mjs`
-- [ ] `node scripts/spec-guard.mjs --dry-run`
-- [ ] `npm run build`
-- [ ] `npm run lint`
-- [ ] `npm run test`
-- [ ] `npm run docs:check`
-- [ ] `npm run docs:freshness`
-- [ ] `node scripts/diff-budget.mjs`
-- [ ] `npm run review`
-- [ ] `npm run pack:smoke`
-- [ ] Manual/mock Telegram update-handler evidence captured.
-- [ ] Elegance review completed.
+- [x] `node scripts/delegation-guard.mjs` Evidence: `out/1139-coordinator-symphony-aligned-telegram-oversight-update-handler-extraction/manual/20260312T204022Z-closeout/01-delegation-guard.log`
+- [x] `node scripts/spec-guard.mjs --dry-run` Evidence: `out/1139-coordinator-symphony-aligned-telegram-oversight-update-handler-extraction/manual/20260312T204022Z-closeout/02-spec-guard.log`
+- [x] `npm run build` Evidence: `out/1139-coordinator-symphony-aligned-telegram-oversight-update-handler-extraction/manual/20260312T204022Z-closeout/03-build.log`
+- [x] `npm run lint` Evidence: `out/1139-coordinator-symphony-aligned-telegram-oversight-update-handler-extraction/manual/20260312T204022Z-closeout/04-lint.log`
+- [x] `npm run test` Evidence: `out/1139-coordinator-symphony-aligned-telegram-oversight-update-handler-extraction/manual/20260312T204022Z-closeout/06-test.log`
+- [x] `npm run docs:check` Evidence: `out/1139-coordinator-symphony-aligned-telegram-oversight-update-handler-extraction/manual/20260312T204022Z-closeout/07-docs-check.log`
+- [x] `npm run docs:freshness` Evidence: `out/1139-coordinator-symphony-aligned-telegram-oversight-update-handler-extraction/manual/20260312T204022Z-closeout/08-docs-freshness.log`
+- [x] `node scripts/diff-budget.mjs` Evidence: `out/1139-coordinator-symphony-aligned-telegram-oversight-update-handler-extraction/manual/20260312T204022Z-closeout/09-diff-budget.log`
+- [x] `npm run review` Evidence: `out/1139-coordinator-symphony-aligned-telegram-oversight-update-handler-extraction/manual/20260312T204022Z-closeout/10-review.log`
+- [x] `npm run pack:smoke` Evidence: `out/1139-coordinator-symphony-aligned-telegram-oversight-update-handler-extraction/manual/20260312T204022Z-closeout/11-pack-smoke.log`
+- [x] Manual/mock Telegram update-handler evidence captured. Evidence: `out/1139-coordinator-symphony-aligned-telegram-oversight-update-handler-extraction/manual/20260312T204022Z-closeout/12-manual-telegram-update-handler-check.md`
+- [x] Elegance review completed. Evidence: `out/1139-coordinator-symphony-aligned-telegram-oversight-update-handler-extraction/manual/20260312T204022Z-closeout/13-elegance-review.md`
