@@ -20,21 +20,21 @@
 
 ## Review Surface Contract
 
-- [ ] `run-review` exposes `architecture` as an explicit review surface without weakening `diff` or `audit`. Evidence: `scripts/run-review.ts`, `out/1128-coordinator-symphony-aligned-standalone-review-architecture-surface-boundary/manual/REPLACE-CLOSEOUT/00-summary.md`.
-- [ ] The diff startup-anchor contract no longer treats `git show <rev>:<path>` as a default diff anchor. Evidence: `scripts/lib/review-execution-state.ts`, `tests/review-execution-state.spec.ts`, `out/1128-coordinator-symphony-aligned-standalone-review-architecture-surface-boundary/manual/REPLACE-CLOSEOUT/00-summary.md`.
-- [ ] Focused review-wrapper regressions cover the new surface and revised anchor behavior. Evidence: `tests/run-review.spec.ts`, `tests/review-execution-state.spec.ts`, `out/1128-coordinator-symphony-aligned-standalone-review-architecture-surface-boundary/manual/REPLACE-CLOSEOUT/05-targeted-tests.log`.
+- [x] `run-review` exposes `architecture` as an explicit review surface without weakening `diff` or `audit`. Evidence: `scripts/run-review.ts`, `docs/standalone-review-guide.md`, `bin/codex-orchestrator.ts`, `out/1128-coordinator-symphony-aligned-standalone-review-architecture-surface-boundary/manual/20260312T034950Z-closeout/00-summary.md`, `out/1128-coordinator-symphony-aligned-standalone-review-architecture-surface-boundary/manual/20260312T034950Z-closeout/12-manual-review-architecture-surface-check.md`.
+- [x] The diff startup-anchor contract no longer treats `git show <rev>:<path>` as a default diff anchor. Evidence: `scripts/lib/review-execution-state.ts`, `tests/review-execution-state.spec.ts`, `out/1128-coordinator-symphony-aligned-standalone-review-architecture-surface-boundary/manual/20260312T034950Z-closeout/00-summary.md`, `out/1128-coordinator-symphony-aligned-standalone-review-architecture-surface-boundary/manual/20260312T034950Z-closeout/05-targeted-tests.log`.
+- [x] Focused review-wrapper regressions cover the new surface and revised anchor behavior. Evidence: `tests/run-review.spec.ts`, `tests/review-execution-state.spec.ts`, `out/1128-coordinator-symphony-aligned-standalone-review-architecture-surface-boundary/manual/20260312T034950Z-closeout/05-targeted-tests.log`.
 
 ## Validation + Closeout
 
-- [ ] `node scripts/delegation-guard.mjs`. Evidence: `out/1128-coordinator-symphony-aligned-standalone-review-architecture-surface-boundary/manual/REPLACE-CLOSEOUT/01-delegation-guard.log`.
-- [ ] `node scripts/spec-guard.mjs --dry-run`. Evidence: `out/1128-coordinator-symphony-aligned-standalone-review-architecture-surface-boundary/manual/REPLACE-CLOSEOUT/02-spec-guard.log`.
-- [ ] `npm run build`. Evidence: `out/1128-coordinator-symphony-aligned-standalone-review-architecture-surface-boundary/manual/REPLACE-CLOSEOUT/03-build.log`.
-- [ ] `npm run lint`. Evidence: `out/1128-coordinator-symphony-aligned-standalone-review-architecture-surface-boundary/manual/REPLACE-CLOSEOUT/04-lint.log`.
-- [ ] `npm run test`. Evidence: `out/1128-coordinator-symphony-aligned-standalone-review-architecture-surface-boundary/manual/REPLACE-CLOSEOUT/08-test.log`.
-- [ ] `npm run docs:check`. Evidence: `out/1128-coordinator-symphony-aligned-standalone-review-architecture-surface-boundary/manual/REPLACE-CLOSEOUT/06-docs-check.log`.
-- [ ] `npm run docs:freshness`. Evidence: `out/1128-coordinator-symphony-aligned-standalone-review-architecture-surface-boundary/manual/REPLACE-CLOSEOUT/07-docs-freshness.log`.
-- [ ] `node scripts/diff-budget.mjs`. Evidence: `out/1128-coordinator-symphony-aligned-standalone-review-architecture-surface-boundary/manual/REPLACE-CLOSEOUT/09-diff-budget.log`.
-- [ ] `npm run review`. Evidence: `out/1128-coordinator-symphony-aligned-standalone-review-architecture-surface-boundary/manual/REPLACE-CLOSEOUT/10-review.log`.
-- [ ] `npm run pack:smoke`. Evidence: `out/1128-coordinator-symphony-aligned-standalone-review-architecture-surface-boundary/manual/REPLACE-CLOSEOUT/11-pack-smoke.log`.
-- [ ] Manual/mock review-surface evidence captured. Evidence: `out/1128-coordinator-symphony-aligned-standalone-review-architecture-surface-boundary/manual/REPLACE-CLOSEOUT/12-manual-review-architecture-surface-check.md`.
-- [ ] Elegance review completed. Evidence: `out/1128-coordinator-symphony-aligned-standalone-review-architecture-surface-boundary/manual/REPLACE-CLOSEOUT/13-elegance-review.md`.
+- [x] `node scripts/delegation-guard.mjs`. Evidence: `out/1128-coordinator-symphony-aligned-standalone-review-architecture-surface-boundary/manual/20260312T034950Z-closeout/01-delegation-guard.log`.
+- [x] `node scripts/spec-guard.mjs --dry-run`. Evidence: `out/1128-coordinator-symphony-aligned-standalone-review-architecture-surface-boundary/manual/20260312T034950Z-closeout/02-spec-guard.log`.
+- [x] `npm run build`. Evidence: `out/1128-coordinator-symphony-aligned-standalone-review-architecture-surface-boundary/manual/20260312T034950Z-closeout/03-build.log`.
+- [x] `npm run lint`. Evidence: `out/1128-coordinator-symphony-aligned-standalone-review-architecture-surface-boundary/manual/20260312T034950Z-closeout/04-lint.log`.
+- [x] `npm run test`. Evidence: `out/1128-coordinator-symphony-aligned-standalone-review-architecture-surface-boundary/manual/20260312T034950Z-closeout/08-test.log`, `out/1128-coordinator-symphony-aligned-standalone-review-architecture-surface-boundary/manual/20260312T034950Z-closeout/13-override-notes.md`.
+- [x] `npm run docs:check`. Evidence: `out/1128-coordinator-symphony-aligned-standalone-review-architecture-surface-boundary/manual/20260312T034950Z-closeout/06-docs-check.log`.
+- [x] `npm run docs:freshness`. Evidence: `out/1128-coordinator-symphony-aligned-standalone-review-architecture-surface-boundary/manual/20260312T034950Z-closeout/07-docs-freshness.log`.
+- [x] `node scripts/diff-budget.mjs`. Evidence: `out/1128-coordinator-symphony-aligned-standalone-review-architecture-surface-boundary/manual/20260312T034950Z-closeout/09-diff-budget.log`, `out/1128-coordinator-symphony-aligned-standalone-review-architecture-surface-boundary/manual/20260312T034950Z-closeout/13-override-notes.md`.
+- [x] `npm run review`. Evidence: `out/1128-coordinator-symphony-aligned-standalone-review-architecture-surface-boundary/manual/20260312T034950Z-closeout/10-review.log`, `out/1128-coordinator-symphony-aligned-standalone-review-architecture-surface-boundary/manual/20260312T034950Z-closeout/12-manual-review-architecture-surface-check.md`, `out/1128-coordinator-symphony-aligned-standalone-review-architecture-surface-boundary/manual/20260312T034950Z-closeout/13-override-notes.md`.
+- [x] `npm run pack:smoke`. Evidence: `out/1128-coordinator-symphony-aligned-standalone-review-architecture-surface-boundary/manual/20260312T034950Z-closeout/11-pack-smoke.log`.
+- [x] Manual/mock review-surface evidence captured. Evidence: `out/1128-coordinator-symphony-aligned-standalone-review-architecture-surface-boundary/manual/20260312T034950Z-closeout/12-manual-review-architecture-surface-check.md`.
+- [x] Elegance review completed. Evidence: `out/1128-coordinator-symphony-aligned-standalone-review-architecture-surface-boundary/manual/20260312T034950Z-closeout/15-elegance-review.md`.
