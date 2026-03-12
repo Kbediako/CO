@@ -99,6 +99,18 @@ export type ReviewCommandIntentViolationKind =
   | 'validation-runner'
   | 'review-orchestration'
   | 'delegation-control';
+export type ReviewTerminationBoundaryKind =
+  | 'startup-anchor'
+  | 'meta-surface-expansion'
+  | 'verdict-stability'
+  | 'relevant-reinspection-dwell';
+export type ReviewTerminationBoundaryProvenance =
+  | 'pre-anchor-meta-surface'
+  | 'meta-surface-kinds'
+  | 'repeated-output-inspection'
+  | 'targetless-speculative-narrative'
+  | 'post-startup-anchor'
+  | 'bounded-surface';
 
 export type ReviewScopeMode = 'uncommitted' | 'base' | 'commit';
 export type ReviewStartupAnchorMode = 'diff' | 'audit';
@@ -251,6 +263,13 @@ export interface ReviewRelevantReinspectionDwellBoundaryState {
   violationSample: string | null;
 }
 
+export interface ReviewTerminationBoundaryRecord {
+  kind: ReviewTerminationBoundaryKind;
+  provenance: ReviewTerminationBoundaryProvenance;
+  reason: string;
+  sample: string | null;
+}
+
 export interface ReviewExecutionStateOptions {
   blockHeavyCommands?: boolean;
   allowValidationCommandIntents?: boolean;
@@ -281,6 +300,7 @@ export interface ReviewExecutionStateOptions {
 interface ReviewExecutionTelemetryPayloadOptions {
   status: 'succeeded' | 'failed';
   error?: string | null;
+  terminationBoundary?: ReviewTerminationBoundaryRecord | null;
   outputLogPath: string;
   repoRoot: string;
   includeRawTelemetry: boolean;
@@ -292,12 +312,13 @@ export interface PersistReviewTelemetryOptions extends ReviewExecutionTelemetryP
   state: ReviewExecutionState;
 }
 
-interface RedactedReviewTelemetryPayload {
+export interface ReviewTelemetryPayload {
   version: number;
   generated_at: string;
   status: 'succeeded' | 'failed';
   error: string | null;
   output_log_path: string;
+  termination_boundary: ReviewTerminationBoundaryRecord | null;
   summary: ReviewOutputSummary;
 }
 
@@ -771,12 +792,16 @@ export class ReviewExecutionState {
 
   buildTelemetryPayload(
     options: ReviewExecutionTelemetryPayloadOptions
-  ): RedactedReviewTelemetryPayload {
+  ): ReviewTelemetryPayload {
     const summary = this.buildOutputSummary();
     const persistedSummary = sanitizeTelemetrySummaryForPersistence(
       summary,
       options.includeRawTelemetry,
       options.telemetryDebugEnvKey
+    );
+    const explicitTerminationBoundaryProvided = Object.prototype.hasOwnProperty.call(
+      options,
+      'terminationBoundary'
     );
     return {
       version: 1,
@@ -788,7 +813,99 @@ export class ReviewExecutionState {
         options.telemetryDebugEnvKey
       ),
       output_log_path: path.relative(options.repoRoot, options.outputLogPath),
+      termination_boundary: sanitizeTerminationBoundaryForPersistence(
+        options.status === 'failed'
+          ? explicitTerminationBoundaryProvided
+            ? options.terminationBoundary ?? null
+            : this.getTerminationBoundaryRecord(options.error ?? null)
+          : null,
+        options.includeRawTelemetry,
+        options.telemetryDebugEnvKey
+      ),
       summary: persistedSummary
+    };
+  }
+
+  getTerminationBoundaryRecordForKind(
+    kind: ReviewTerminationBoundaryKind,
+    nowMs = Date.now()
+  ): ReviewTerminationBoundaryRecord | null {
+    return this.buildTerminationBoundaryRecord(kind, nowMs);
+  }
+
+  getTerminationBoundaryRecord(
+    errorMessage: string | null = null,
+    nowMs = Date.now()
+  ): ReviewTerminationBoundaryRecord | null {
+    const matchedKinds = inferTerminationBoundaryKindsFromErrorMessage(errorMessage);
+    for (const kind of matchedKinds) {
+      const record = this.buildTerminationBoundaryRecord(kind, nowMs);
+      if (record) {
+        return record;
+      }
+    }
+    return null;
+  }
+
+  private buildTerminationBoundaryRecord(
+    kind: ReviewTerminationBoundaryKind,
+    nowMs: number
+  ): ReviewTerminationBoundaryRecord | null {
+    if (kind === 'startup-anchor') {
+      const boundary = this.getStartupAnchorBoundaryState(nowMs);
+      if (!boundary.triggered || !boundary.reason) {
+        return null;
+      }
+      return {
+        kind,
+        provenance: 'pre-anchor-meta-surface',
+        reason: boundary.reason,
+        sample: boundary.preAnchorMetaSurfaceKinds[0] ?? null
+      };
+    }
+
+    if (kind === 'meta-surface-expansion') {
+      const boundary = this.getMetaSurfaceExpansionState(nowMs);
+      if (!boundary.triggered || !boundary.reason) {
+        return null;
+      }
+      const summary = this.buildOutputSummary();
+      if (summary.metaSurfaceKinds.includes('review-closeout-bundle')) {
+        return null;
+      }
+      return {
+        kind,
+        provenance: 'meta-surface-kinds',
+        reason: boundary.reason,
+        sample: summary.metaSurfaceKinds[0] ?? null
+      };
+    }
+
+    if (kind === 'verdict-stability') {
+      const boundary = this.getVerdictStabilityState(nowMs);
+      if (!boundary.triggered || !boundary.reason) {
+        return null;
+      }
+      return {
+        kind,
+        provenance:
+          boundary.distinctOutputInspectionTargets > 0
+            ? 'repeated-output-inspection'
+            : 'targetless-speculative-narrative',
+        reason: boundary.reason,
+        sample: null
+      };
+    }
+
+    const boundary = this.getRelevantReinspectionDwellBoundaryState(nowMs);
+    if (!boundary.triggered || !boundary.reason) {
+      return null;
+    }
+    return {
+      kind,
+      provenance: boundary.anchorObserved ? 'post-startup-anchor' : 'bounded-surface',
+      reason: boundary.reason,
+      sample: normalizeTerminationBoundarySample(boundary.violationSample)
     };
   }
 
@@ -1366,20 +1483,26 @@ export class ReviewExecutionState {
 
 export async function persistReviewTelemetry(
   options: PersistReviewTelemetryOptions
-): Promise<ReviewOutputSummary> {
+): Promise<ReviewTelemetryPayload> {
   const payload = options.state.buildTelemetryPayload(options);
   await writeFile(options.telemetryPath, `${JSON.stringify(payload, null, 2)}\n`, 'utf8');
-  return payload.summary;
+  return payload;
 }
 
 export function logReviewTelemetrySummary(
-  summary: ReviewOutputSummary,
+  payload: ReviewTelemetryPayload,
   telemetryPath: string,
   options: LogReviewTelemetryOptions
 ): void {
+  const summary = payload.summary;
   console.error(
     `[run-review] review telemetry: ${summary.commandStarts.length} command start(s), ${summary.heavyCommandStarts.length} heavy command start(s), ${summary.startupEvents} delegation startup event(s), ${summary.reviewProgressSignals} review progress signal(s).`
   );
+  if (payload.termination_boundary) {
+    console.error(
+      `[run-review] termination boundary: ${payload.termination_boundary.kind} (${payload.termination_boundary.provenance}).`
+    );
+  }
   const lastCommand = summary.commandStarts.at(-1);
   if (lastCommand) {
     if (options.debugTelemetry) {
@@ -1421,6 +1544,60 @@ export function logReviewTelemetrySummary(
     }
   }
   console.error(`[run-review] review telemetry saved to: ${telemetryPath}`);
+}
+
+function inferTerminationBoundaryKindsFromErrorMessage(
+  errorMessage: string | null
+): ReviewTerminationBoundaryKind[] {
+  if (!errorMessage) {
+    return [];
+  }
+  const kinds: ReviewTerminationBoundaryKind[] = [];
+  if (errorMessage.includes('startup-anchor boundary violated')) {
+    kinds.push('startup-anchor');
+  }
+  if (errorMessage.includes('meta-surface expansion detected')) {
+    kinds.push('meta-surface-expansion');
+  }
+  if (errorMessage.includes('relevant-reinspection dwell boundary violated')) {
+    kinds.push('relevant-reinspection-dwell');
+  }
+  if (errorMessage.includes('verdict-stability drift detected')) {
+    kinds.push('verdict-stability');
+  }
+  return kinds;
+}
+
+function normalizeTerminationBoundarySample(sample: string | null): string | null {
+  if (!sample) {
+    return null;
+  }
+  const trimmed = sample.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function sanitizeTerminationBoundaryForPersistence(
+  boundary: ReviewTerminationBoundaryRecord | null,
+  includeRawTelemetry: boolean,
+  telemetryDebugEnvKey: string
+): ReviewTerminationBoundaryRecord | null {
+  if (!boundary) {
+    return null;
+  }
+  if (includeRawTelemetry) {
+    return boundary;
+  }
+  const redactedSample = boundary.sample
+    ? `[redacted ${boundary.kind} sample; set ${telemetryDebugEnvKey}=1 to persist raw sample]`
+    : null;
+  return {
+    ...boundary,
+    reason:
+      boundary.sample && redactedSample
+        ? boundary.reason.split(boundary.sample).join(redactedSample)
+        : boundary.reason,
+    sample: redactedSample
+  };
 }
 
 export function formatDurationMs(durationMs: number): string {

@@ -257,6 +257,158 @@ describe('ReviewExecutionState', () => {
     expect(raw.summary.heavyCommandStarts[0]).toContain('npm run test');
   });
 
+  it('redacts termination-boundary samples in persisted telemetry when raw telemetry is disabled', () => {
+    const state = new ReviewExecutionState({
+      startedAtMs: 0,
+      blockHeavyCommands: false,
+      lowSignalTimeoutMs: 1_000,
+      enforceRelevantReinspectionDwellBoundary: true,
+      touchedPaths: ['scripts/run-review.ts', 'tests/run-review.spec.ts']
+    });
+
+    let nowMs = 100;
+    for (const command of [
+      "/bin/zsh -lc 'sed -n 1,120p scripts/run-review.ts'",
+      "/bin/zsh -lc 'sed -n 1,120p tests/run-review.spec.ts'",
+      "/bin/zsh -lc 'sed -n 121,240p scripts/run-review.ts'",
+      "/bin/zsh -lc 'sed -n 121,240p tests/run-review.spec.ts'",
+      "/bin/zsh -lc 'sed -n 241,360p scripts/run-review.ts'",
+      "/bin/zsh -lc 'sed -n 241,360p tests/run-review.spec.ts'",
+      "/bin/zsh -lc 'sed -n 361,480p scripts/run-review.ts'",
+      "/bin/zsh -lc 'sed -n 361,480p tests/run-review.spec.ts'"
+    ]) {
+      state.observeChunk('thinking\nexec\n', 'stdout', nowMs);
+      state.observeChunk(`${command}\n`, 'stdout', nowMs + 10);
+      nowMs += 100;
+    }
+
+    const boundary = state.getRelevantReinspectionDwellBoundaryState(2_000);
+    const redacted = state.buildTelemetryPayload({
+      status: 'failed',
+      error: boundary.reason ?? 'bounded review relevant-reinspection dwell boundary violated',
+      outputLogPath: '/repo/.runs/sample/review/output.log',
+      repoRoot: '/repo',
+      includeRawTelemetry: false,
+      telemetryDebugEnvKey: 'CODEX_REVIEW_DEBUG_TELEMETRY'
+    });
+    const raw = state.buildTelemetryPayload({
+      status: 'failed',
+      error: boundary.reason ?? 'bounded review relevant-reinspection dwell boundary violated',
+      outputLogPath: '/repo/.runs/sample/review/output.log',
+      repoRoot: '/repo',
+      includeRawTelemetry: true,
+      telemetryDebugEnvKey: 'CODEX_REVIEW_DEBUG_TELEMETRY'
+    });
+
+    expect(redacted.termination_boundary?.sample).toContain('[redacted relevant-reinspection-dwell sample');
+    expect(redacted.termination_boundary?.reason).not.toContain("/bin/zsh -lc 'sed -n");
+    expect(raw.termination_boundary?.sample).toContain("/bin/zsh -lc 'sed -n");
+    expect(raw.termination_boundary?.reason).toContain("/bin/zsh -lc 'sed -n");
+  });
+
+  it('does not infer a supported termination boundary when the failure message belongs to another guard family', () => {
+    const state = new ReviewExecutionState({
+      startedAtMs: 0,
+      blockHeavyCommands: false,
+      lowSignalTimeoutMs: 1_000,
+      enforceRelevantReinspectionDwellBoundary: true,
+      touchedPaths: ['scripts/run-review.ts', 'tests/run-review.spec.ts']
+    });
+
+    let nowMs = 100;
+    for (const command of [
+      "/bin/zsh -lc 'sed -n 1,120p scripts/run-review.ts'",
+      "/bin/zsh -lc 'sed -n 1,120p tests/run-review.spec.ts'",
+      "/bin/zsh -lc 'sed -n 121,240p scripts/run-review.ts'",
+      "/bin/zsh -lc 'sed -n 121,240p tests/run-review.spec.ts'",
+      "/bin/zsh -lc 'sed -n 241,360p scripts/run-review.ts'",
+      "/bin/zsh -lc 'sed -n 241,360p tests/run-review.spec.ts'",
+      "/bin/zsh -lc 'sed -n 361,480p scripts/run-review.ts'",
+      "/bin/zsh -lc 'sed -n 361,480p tests/run-review.spec.ts'"
+    ]) {
+      state.observeChunk('thinking\nexec\n', 'stdout', nowMs);
+      state.observeChunk(`${command}\n`, 'stdout', nowMs + 10);
+      nowMs += 100;
+    }
+
+    expect(state.getRelevantReinspectionDwellBoundaryState(2_000).triggered).toBe(true);
+    expect(
+      state.getTerminationBoundaryRecord(
+        'codex review crossed the bounded command-intent boundary (validation suite launch).',
+        2_000
+      )
+    ).toBeNull();
+    const payload = state.buildTelemetryPayload({
+      status: 'failed',
+      error: 'codex review crossed the bounded command-intent boundary (validation suite launch).',
+      terminationBoundary: null,
+      outputLogPath: '/repo/.runs/sample/review/output.log',
+      repoRoot: '/repo',
+      includeRawTelemetry: false,
+      telemetryDebugEnvKey: 'CODEX_REVIEW_DEBUG_TELEMETRY'
+    });
+    expect(payload.termination_boundary).toBeNull();
+  });
+
+  it('persists an explicit termination boundary record without reparsing the failure prose', () => {
+    const state = new ReviewExecutionState({
+      startedAtMs: 0,
+      blockHeavyCommands: false,
+      lowSignalTimeoutMs: 1_000,
+      enforceRelevantReinspectionDwellBoundary: true,
+      touchedPaths: ['scripts/run-review.ts', 'tests/run-review.spec.ts']
+    });
+
+    let nowMs = 100;
+    for (const command of [
+      "/bin/zsh -lc 'sed -n 1,120p scripts/run-review.ts'",
+      "/bin/zsh -lc 'sed -n 1,120p tests/run-review.spec.ts'",
+      "/bin/zsh -lc 'sed -n 121,240p scripts/run-review.ts'",
+      "/bin/zsh -lc 'sed -n 121,240p tests/run-review.spec.ts'",
+      "/bin/zsh -lc 'sed -n 241,360p scripts/run-review.ts'",
+      "/bin/zsh -lc 'sed -n 241,360p tests/run-review.spec.ts'",
+      "/bin/zsh -lc 'sed -n 361,480p scripts/run-review.ts'",
+      "/bin/zsh -lc 'sed -n 361,480p tests/run-review.spec.ts'"
+    ]) {
+      state.observeChunk('thinking\nexec\n', 'stdout', nowMs);
+      state.observeChunk(`${command}\n`, 'stdout', nowMs + 10);
+      nowMs += 100;
+    }
+
+    const boundary = state.getTerminationBoundaryRecordForKind(
+      'relevant-reinspection-dwell',
+      2_000
+    );
+    expect(
+      state.getTerminationBoundaryRecord(
+        'review wrapper terminated after bounded telemetry flush',
+        2_000
+      )
+    ).toBeNull();
+    const payload = state.buildTelemetryPayload({
+      status: 'failed',
+      error: 'review wrapper terminated after bounded telemetry flush',
+      terminationBoundary: boundary,
+      outputLogPath: '/repo/.runs/sample/review/output.log',
+      repoRoot: '/repo',
+      includeRawTelemetry: false,
+      telemetryDebugEnvKey: 'CODEX_REVIEW_DEBUG_TELEMETRY'
+    });
+
+    expect(boundary).toEqual(
+      expect.objectContaining({
+        kind: 'relevant-reinspection-dwell',
+        provenance: 'bounded-surface'
+      })
+    );
+    expect(payload.termination_boundary).toEqual(
+      expect.objectContaining({
+        kind: 'relevant-reinspection-dwell',
+        provenance: 'bounded-surface'
+      })
+    );
+  });
+
   it('classifies bounded low-signal drift from repeated inspection targets', () => {
     const state = new ReviewExecutionState({
       startedAtMs: 0,
@@ -453,8 +605,22 @@ describe('ReviewExecutionState', () => {
 
     const drift = state.getVerdictStabilityState(2_000);
     const summary = state.buildOutputSummary();
+    const payload = state.buildTelemetryPayload({
+      status: 'failed',
+      error: drift.reason ?? 'bounded review verdict-stability drift detected',
+      outputLogPath: '/repo/review/output.log',
+      repoRoot: '/repo',
+      includeRawTelemetry: false,
+      telemetryDebugEnvKey: 'CODEX_REVIEW_TELEMETRY_DEBUG'
+    });
     expect(drift.triggered).toBe(true);
     expect(drift.reason).toContain('verdict-stability drift detected');
+    expect(payload.termination_boundary).toEqual(
+      expect.objectContaining({
+        kind: 'verdict-stability',
+        provenance: 'repeated-output-inspection'
+      })
+    );
     expect(summary.outputInspectionSignals).toBeGreaterThanOrEqual(4);
     expect(summary.distinctOutputInspectionTargets).toBeLessThanOrEqual(4);
     expect(summary.maxOutputNarrativeSignatureHits).toBeGreaterThanOrEqual(2);
@@ -491,8 +657,22 @@ describe('ReviewExecutionState', () => {
 
     const drift = state.getVerdictStabilityState(2_000);
     const summary = state.buildOutputSummary();
+    const payload = state.buildTelemetryPayload({
+      status: 'failed',
+      error: drift.reason ?? 'bounded review verdict-stability drift detected',
+      outputLogPath: '/repo/review/output.log',
+      repoRoot: '/repo',
+      includeRawTelemetry: false,
+      telemetryDebugEnvKey: 'CODEX_REVIEW_TELEMETRY_DEBUG'
+    });
     expect(drift.triggered).toBe(true);
     expect(drift.reason).toContain('verdict-stability drift detected');
+    expect(payload.termination_boundary).toEqual(
+      expect.objectContaining({
+        kind: 'verdict-stability',
+        provenance: 'targetless-speculative-narrative'
+      })
+    );
     expect(summary.outputInspectionSignals).toBe(0);
     expect(summary.outputNarrativeSignals).toBeGreaterThanOrEqual(4);
     expect(summary.concreteOutputSignals).toBe(0);
@@ -742,8 +922,22 @@ describe('ReviewExecutionState', () => {
     }
 
     const expansion = state.getMetaSurfaceExpansionState(2_000);
+    const payload = state.buildTelemetryPayload({
+      status: 'failed',
+      error: expansion.reason ?? 'bounded review meta-surface expansion detected',
+      outputLogPath: '/repo/review/output.log',
+      repoRoot: '/repo',
+      includeRawTelemetry: false,
+      telemetryDebugEnvKey: 'CODEX_REVIEW_TELEMETRY_DEBUG'
+    });
     expect(expansion.triggered).toBe(true);
     expect(expansion.reason).toContain('meta-surface expansion detected');
+    expect(payload.termination_boundary).toEqual(
+      expect.objectContaining({
+        kind: 'meta-surface-expansion',
+        provenance: 'meta-surface-kinds'
+      })
+    );
     expect(expansion.metaSurfaceSignals).toBeGreaterThanOrEqual(4);
     expect(expansion.distinctMetaSurfaces).toBeGreaterThanOrEqual(3);
   });
@@ -829,8 +1023,22 @@ describe('ReviewExecutionState', () => {
 
     const boundary = state.getStartupAnchorBoundaryState(220);
     const summary = state.buildOutputSummary();
+    const payload = state.buildTelemetryPayload({
+      status: 'failed',
+      error: boundary.reason ?? 'bounded review startup-anchor boundary violated',
+      outputLogPath: '/repo/review/output.log',
+      repoRoot: '/repo',
+      includeRawTelemetry: false,
+      telemetryDebugEnvKey: 'CODEX_REVIEW_TELEMETRY_DEBUG'
+    });
     expect(boundary.triggered).toBe(true);
     expect(boundary.anchorObserved).toBe(false);
+    expect(payload.termination_boundary).toEqual(
+      expect.objectContaining({
+        kind: 'startup-anchor',
+        provenance: 'pre-anchor-meta-surface'
+      })
+    );
     expect(boundary.preAnchorCommandStarts).toBe(2);
     expect(boundary.preAnchorMetaSurfaceSignals).toBe(2);
     expect(boundary.preAnchorMetaSurfaceKinds).toEqual(['codex-memories', 'codex-skills']);
@@ -2560,8 +2768,22 @@ describe('ReviewExecutionState', () => {
 
     const dwellBoundary = state.getRelevantReinspectionDwellBoundaryState(3_000);
     const summary = state.buildOutputSummary();
+    const payload = state.buildTelemetryPayload({
+      status: 'failed',
+      error: dwellBoundary.reason ?? 'bounded review relevant-reinspection dwell boundary violated',
+      outputLogPath: '/repo/review/output.log',
+      repoRoot: '/repo',
+      includeRawTelemetry: false,
+      telemetryDebugEnvKey: 'CODEX_REVIEW_TELEMETRY_DEBUG'
+    });
     expect(dwellBoundary.triggered).toBe(true);
     expect(dwellBoundary.reason).toContain('relevant-reinspection dwell boundary violated');
+    expect(payload.termination_boundary).toEqual(
+      expect.objectContaining({
+        kind: 'relevant-reinspection-dwell',
+        provenance: 'post-startup-anchor'
+      })
+    );
     expect(dwellBoundary.anchorObserved).toBe(true);
     expect(dwellBoundary.distinctTargets).toBeLessThanOrEqual(4);
     expect(dwellBoundary.maxTargetHits).toBeGreaterThanOrEqual(2);
@@ -2628,9 +2850,23 @@ describe('ReviewExecutionState', () => {
 
     const dwellBoundary = state.getRelevantReinspectionDwellBoundaryState(3_000);
     const summary = state.buildOutputSummary();
+    const payload = state.buildTelemetryPayload({
+      status: 'failed',
+      error: dwellBoundary.reason ?? 'bounded review relevant-reinspection dwell boundary violated',
+      outputLogPath: '/repo/review/output.log',
+      repoRoot: '/repo',
+      includeRawTelemetry: false,
+      telemetryDebugEnvKey: 'CODEX_REVIEW_TELEMETRY_DEBUG'
+    });
     expect(dwellBoundary.triggered).toBe(true);
     expect(dwellBoundary.reason).toContain('relevant-reinspection dwell boundary violated');
     expect(dwellBoundary.reason).toContain('within the current bounded review surface');
+    expect(payload.termination_boundary).toEqual(
+      expect.objectContaining({
+        kind: 'relevant-reinspection-dwell',
+        provenance: 'bounded-surface'
+      })
+    );
     expect(dwellBoundary.anchorObserved).toBe(false);
     expect(dwellBoundary.distinctTargets).toBeLessThanOrEqual(architectureRelevantTargets.length);
     expect(dwellBoundary.maxTargetHits).toBeGreaterThanOrEqual(2);

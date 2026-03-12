@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260312-1130-coordinator-symphony-aligned-standalone-review-termination-boundary-provenance-classification",
+      "title": "Coordinator Symphony-Aligned Standalone Review Termination Boundary Provenance Classification",
+      "relates_to": "tasks/tasks-1130-coordinator-symphony-aligned-standalone-review-termination-boundary-provenance-classification.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-12",
+      "paths": {
+        "spec": "tasks/specs/1130-coordinator-symphony-aligned-standalone-review-termination-boundary-provenance-classification.md",
+        "task": "tasks/tasks-1130-coordinator-symphony-aligned-standalone-review-termination-boundary-provenance-classification.md",
+        "agent_task": ".agent/task/1130-coordinator-symphony-aligned-standalone-review-termination-boundary-provenance-classification.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-standalone-review-termination-boundary-provenance-classification.md"
+      }
+    },
+    {
       "id": "20260312-1129-coordinator-symphony-aligned-standalone-review-architecture-in-bounds-verdict-termination-boundary",
       "title": "Coordinator Symphony-Aligned Standalone Review Architecture In-Bounds Verdict Termination Boundary",
       "relates_to": "tasks/tasks-1129-coordinator-symphony-aligned-standalone-review-architecture-in-bounds-verdict-termination-boundary.md",

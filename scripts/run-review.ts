@@ -45,10 +45,11 @@ import {
   type ReviewActiveCloseoutBundleRereadBoundaryState,
   type ReviewRelevantReinspectionDwellBoundaryState,
   type ReviewShellProbeBoundaryState,
+  type ReviewTelemetryPayload,
+  type ReviewTerminationBoundaryRecord,
   type ReviewVerdictStabilityState,
   ReviewExecutionState,
   type ReviewCommandIntentBoundaryState,
-  type ReviewOutputSummary,
   type ReviewStartupLoopState
 } from './lib/review-execution-state.js';
 import {
@@ -1016,8 +1017,9 @@ async function main(): Promise<void> {
   const writeTelemetry = async (
     state: ReviewExecutionState,
     status: 'succeeded' | 'failed',
-    errorMessage?: string | null
-  ): Promise<ReviewOutputSummary | null> => {
+    errorMessage?: string | null,
+    terminationBoundary?: ReviewTerminationBoundaryRecord | null
+  ): Promise<ReviewTelemetryPayload | null> => {
     try {
       return await persistReviewExecutionTelemetry({
         state,
@@ -1026,6 +1028,7 @@ async function main(): Promise<void> {
         repoRoot,
         status,
         error: errorMessage ?? null,
+        terminationBoundary: terminationBoundary ?? null,
         includeRawTelemetry: envFlagEnabled(process.env[REVIEW_TELEMETRY_DEBUG_ENV_KEY]),
         telemetryDebugEnvKey: REVIEW_TELEMETRY_DEBUG_ENV_KEY
       });
@@ -1038,9 +1041,9 @@ async function main(): Promise<void> {
 
   try {
     const execution = await runReview(resolvedScoped);
-    const telemetrySummary = await writeTelemetry(execution.state, 'succeeded');
+    const telemetryPayload = await writeTelemetry(execution.state, 'succeeded');
     console.log(`Review output saved to: ${path.relative(repoRoot, artifactPaths.outputLogPath)}`);
-    if (telemetrySummary) {
+    if (telemetryPayload) {
       console.log(`Review telemetry saved to: ${path.relative(repoRoot, artifactPaths.telemetryPath)}`);
     } else {
       console.warn(
@@ -1057,9 +1060,9 @@ async function main(): Promise<void> {
       const resolvedUnscoped = resolveReviewCommand(unscopedArgs, runtimeContext);
       try {
         const retryExecution = await runReview(resolvedUnscoped);
-        const telemetrySummary = await writeTelemetry(retryExecution.state, 'succeeded');
+        const telemetryPayload = await writeTelemetry(retryExecution.state, 'succeeded');
         console.log(`Review output saved to: ${path.relative(repoRoot, artifactPaths.outputLogPath)}`);
-        if (telemetrySummary) {
+        if (telemetryPayload) {
           console.log(`Review telemetry saved to: ${path.relative(repoRoot, artifactPaths.telemetryPath)}`);
         } else {
           console.warn(
@@ -1082,17 +1085,28 @@ async function main(): Promise<void> {
           retryError.reviewState instanceof ReviewExecutionState
             ? retryError.reviewState
             : null;
-        const telemetrySummary = retryState
-          ? await writeTelemetry(retryState, 'failed', retryMessage)
+        const retryTerminationBoundary =
+          retryError instanceof CodexReviewError ? retryError.terminationBoundary : null;
+        const telemetryPayload = retryState
+          ? await writeTelemetry(
+              retryState,
+              'failed',
+              retryMessage,
+              retryTerminationBoundary
+            )
           : null;
-        if (telemetrySummary) {
+        if (telemetryPayload) {
           logReviewExecutionTelemetrySummary(
-            telemetrySummary,
+            telemetryPayload,
             path.relative(repoRoot, artifactPaths.telemetryPath),
             {
               debugTelemetry: envFlagEnabled(process.env[REVIEW_TELEMETRY_DEBUG_ENV_KEY]),
               telemetryDebugEnvKey: REVIEW_TELEMETRY_DEBUG_ENV_KEY
             }
+          );
+        } else if (retryState) {
+          logTerminationBoundaryFallback(
+            retryTerminationBoundary ?? retryState.getTerminationBoundaryRecord(retryMessage)
           );
         }
         if (retryError instanceof CodexReviewError && retryError.timedOut) {
@@ -1115,17 +1129,28 @@ async function main(): Promise<void> {
       error.reviewState instanceof ReviewExecutionState
         ? error.reviewState
         : null;
-    const telemetrySummary = failureState
-      ? await writeTelemetry(failureState, 'failed', errorMessage)
+    const failureTerminationBoundary =
+      error instanceof CodexReviewError ? error.terminationBoundary : null;
+    const telemetryPayload = failureState
+      ? await writeTelemetry(
+          failureState,
+          'failed',
+          errorMessage,
+          failureTerminationBoundary
+        )
       : null;
-    if (telemetrySummary) {
+    if (telemetryPayload) {
       logReviewExecutionTelemetrySummary(
-        telemetrySummary,
+        telemetryPayload,
         path.relative(repoRoot, artifactPaths.telemetryPath),
         {
           debugTelemetry: envFlagEnabled(process.env[REVIEW_TELEMETRY_DEBUG_ENV_KEY]),
           telemetryDebugEnvKey: REVIEW_TELEMETRY_DEBUG_ENV_KEY
         }
+      );
+    } else if (failureState) {
+      logTerminationBoundaryFallback(
+        failureTerminationBoundary ?? failureState.getTerminationBoundaryRecord(errorMessage)
       );
     }
     if (error instanceof CodexReviewError && error.timedOut) {
@@ -1593,6 +1618,7 @@ class CodexReviewError extends Error {
   timedOut: boolean;
   outputPreview: string;
   reviewState: ReviewExecutionState | null;
+  terminationBoundary: ReviewTerminationBoundaryRecord | null;
 
   constructor(
     message: string,
@@ -1602,6 +1628,7 @@ class CodexReviewError extends Error {
       timedOut: boolean;
       outputPreview: string;
       reviewState?: ReviewExecutionState | null;
+      terminationBoundary?: ReviewTerminationBoundaryRecord | null;
     }
   ) {
     super(message);
@@ -1611,6 +1638,7 @@ class CodexReviewError extends Error {
     this.timedOut = options.timedOut;
     this.outputPreview = options.outputPreview;
     this.reviewState = options.reviewState ?? null;
+    this.terminationBoundary = options.terminationBoundary ?? null;
   }
 }
 
@@ -1818,6 +1846,8 @@ async function runCodexReview(
         executionState.getRelevantReinspectionDwellBoundaryState(),
       getCommandIntentBoundaryState: () => executionState.getCommandIntentBoundaryState(),
       getShellProbeBoundaryState: () => executionState.getShellProbeBoundaryState(),
+      getTerminationBoundaryRecord: (kind) =>
+        executionState.getTerminationBoundaryRecordForKind(kind),
       waitForOutputDrain: () => outputDrainPromise,
       formatCheckpoint: () => executionState.formatCheckpoint(),
       detached,
@@ -1917,6 +1947,17 @@ async function runDiffBudget(options: CliOptions): Promise<void> {
 
 function shouldRunDiffBudget(): boolean {
   return !(envFlagEnabled(process.env.DIFF_BUDGET_STAGE) || envFlagEnabled(process.env.SKIP_DIFF_BUDGET));
+}
+
+function logTerminationBoundaryFallback(
+  boundaryRecord: ReviewTerminationBoundaryRecord | null
+): void {
+  if (!boundaryRecord) {
+    return;
+  }
+  console.error(
+    `[run-review] termination boundary: ${boundaryRecord.kind} (${boundaryRecord.provenance}).`
+  );
 }
 
 function envFlagEnabled(value: string | undefined): boolean {
@@ -2124,6 +2165,13 @@ interface WaitForChildExitOptions {
   getRelevantReinspectionDwellBoundaryState: () => ReviewRelevantReinspectionDwellBoundaryState;
   getCommandIntentBoundaryState: () => ReviewCommandIntentBoundaryState;
   getShellProbeBoundaryState: () => ReviewShellProbeBoundaryState;
+  getTerminationBoundaryRecord: (
+    kind:
+      | 'startup-anchor'
+      | 'meta-surface-expansion'
+      | 'relevant-reinspection-dwell'
+      | 'verdict-stability'
+  ) => ReviewTerminationBoundaryRecord | null;
   waitForOutputDrain: () => Promise<void>;
   formatCheckpoint: () => string;
   detached: boolean;
@@ -2266,7 +2314,8 @@ async function waitForChildExit(
               exitCode: typeof code === 'number' && code > 0 ? code : 1,
               signal,
               timedOut: false,
-              outputPreview: ''
+              outputPreview: '',
+              terminationBoundary: options.getTerminationBoundaryRecord('startup-anchor')
             })
           );
           return;
@@ -2283,7 +2332,8 @@ async function waitForChildExit(
                   exitCode: typeof code === 'number' && code > 0 ? code : 1,
                   signal,
                   timedOut: false,
-                  outputPreview: ''
+                  outputPreview: '',
+                  terminationBoundary: null
                 }
               )
             );
@@ -2302,7 +2352,9 @@ async function waitForChildExit(
                   exitCode: typeof code === 'number' && code > 0 ? code : 1,
                   signal,
                   timedOut: false,
-                  outputPreview: ''
+                  outputPreview: '',
+                  terminationBoundary:
+                    options.getTerminationBoundaryRecord('relevant-reinspection-dwell')
                 }
               )
             );
@@ -2318,7 +2370,8 @@ async function waitForChildExit(
                 exitCode: typeof code === 'number' && code > 0 ? code : 1,
                 signal,
                 timedOut: false,
-                outputPreview: ''
+                outputPreview: '',
+                terminationBoundary: options.getTerminationBoundaryRecord('verdict-stability')
               }
             )
           );
@@ -2373,7 +2426,11 @@ async function waitForChildExit(
     child.once('error', onError);
     child.once('close', onClose);
 
-    const requestTermination = (message: string, timedOut = true) => {
+    const requestTermination = (
+      message: string,
+      timedOut = true,
+      terminationBoundary: ReviewTerminationBoundaryRecord | null = null
+    ) => {
       if (settled || pendingTermination || child.exitCode !== null) {
         return;
       }
@@ -2382,7 +2439,8 @@ async function waitForChildExit(
         exitCode: 1,
         signal: null,
         timedOut,
-        outputPreview: ''
+        outputPreview: '',
+        terminationBoundary
       });
       signalChildProcess(child, 'SIGTERM', options.detached);
       hardKillArmed = true;
@@ -2472,7 +2530,8 @@ async function waitForChildExit(
         }
         requestTermination(
           `${verdictStabilityState.reason ?? 'bounded review verdict-stability drift detected'} (set ${REVIEW_VERDICT_STABILITY_TIMEOUT_ENV_KEY}=0 to disable).`,
-          false
+          false,
+          options.getTerminationBoundaryRecord('verdict-stability')
         );
       }, 1000);
       verdictStabilityHandle.unref();
@@ -2486,7 +2545,8 @@ async function waitForChildExit(
         }
         requestTermination(
           `${metaSurfaceReason} (set ${REVIEW_META_SURFACE_TIMEOUT_ENV_KEY}=0 to disable).`,
-          false
+          false,
+          options.getTerminationBoundaryRecord('meta-surface-expansion')
         );
       }, 1000);
       metaSurfaceHandle.unref();
@@ -2498,7 +2558,11 @@ async function waitForChildExit(
         if (!boundaryState.triggered) {
           return;
         }
-        requestTermination(boundaryState.reason ?? 'bounded review startup-anchor boundary violated', false);
+        requestTermination(
+          boundaryState.reason ?? 'bounded review startup-anchor boundary violated',
+          false,
+          options.getTerminationBoundaryRecord('startup-anchor')
+        );
       }, 250);
       startupAnchorHandle.unref();
     }
@@ -2525,7 +2589,8 @@ async function waitForChildExit(
         }
         requestTermination(
           `${boundaryState.reason ?? 'bounded review relevant-reinspection dwell boundary violated'} (set ${REVIEW_LOW_SIGNAL_TIMEOUT_ENV_KEY}=0 to disable).`,
-          false
+          false,
+          options.getTerminationBoundaryRecord('relevant-reinspection-dwell')
         );
       }, 250);
       relevantReinspectionHandle.unref();

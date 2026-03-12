@@ -230,6 +230,26 @@ fi
         done
       done
     fi
+    if [[ "$mode" == "relevant-reinspection-dwell-fast-exit" ]]; then
+      commands=(
+        "sed -n 1,20p file-1.py"
+        "sed -n 21,40p file-1.py"
+        "head -n 5 file-1.py"
+        "tail -n 5 file-1.py"
+        "grep -n updated file-1.py"
+        "grep -n baseline file-1.py"
+        "cat file-1.py"
+        "wc -l file-1.py"
+      )
+      for command in "\${commands[@]}"; do
+        echo "thinking"
+        echo "exec"
+        echo "/bin/zsh -lc '\${command}' in /Users/kbediako/Code/CO"
+        sleep 0.01
+      done
+      sleep 0.15
+      exit 0
+    fi
     if [[ "$mode" == "relevant-reinspection-concrete-output" ]]; then
       commands=(
         "sed -n 1,20p file-1.py"
@@ -2473,6 +2493,44 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(telemetry.summary.concreteOutputSignals).toBe(0);
   }, LONG_WAIT_TEST_TIMEOUT_MS);
 
+  it('preserves relevant dwell termination provenance when the review exits naturally before the poller fires', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    await initGitRepoWithTouchedPath(sandbox, 'file-1.py');
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'relevant-reinspection-dwell-fast-exit',
+      CODEX_REVIEW_LOW_SIGNAL_TIMEOUT_SECONDS: '0.05',
+      CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0',
+      CODEX_REVIEW_TIMEOUT_SECONDS: '60'
+    });
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).toContain('relevant-reinspection dwell boundary violated');
+    expect(result.stderr).toContain(
+      'termination boundary: relevant-reinspection-dwell (post-startup-anchor).'
+    );
+
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      termination_boundary: {
+        kind: string;
+        provenance: string;
+        reason: string;
+        sample: string | null;
+      } | null;
+    };
+    expect(telemetry.status).toBe('failed');
+    expect(telemetry.termination_boundary).toEqual(
+      expect.objectContaining({
+        kind: 'relevant-reinspection-dwell',
+        provenance: 'post-startup-anchor'
+      })
+    );
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
   it('allows bounded review to complete when relevant reinspection produces concrete findings', async () => {
     const sandbox = await makeSandbox();
     const manifestPath = await makeManifest(sandbox);
@@ -2578,11 +2636,20 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(result.exitCode).toBeGreaterThan(0);
     expect(result.stderr).toContain('relevant-reinspection dwell boundary violated');
     expect(result.stderr).toContain('within the current bounded review surface');
+    expect(result.stderr).toContain(
+      'termination boundary: relevant-reinspection-dwell (bounded-surface).'
+    );
     expect(result.stderr).not.toContain('codex review timed out after');
 
     const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
     const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
       status: string;
+      termination_boundary: {
+        kind: string;
+        provenance: string;
+        reason: string;
+        sample: string | null;
+      } | null;
       summary: {
         metaSurfaceSignals: number;
         distinctInspectionTargets: number;
@@ -2590,6 +2657,16 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
       };
     };
     expect(telemetry.status).toBe('failed');
+    expect(telemetry.termination_boundary).toEqual(
+      expect.objectContaining({
+        kind: 'relevant-reinspection-dwell',
+        provenance: 'bounded-surface',
+        reason: expect.stringContaining('relevant-reinspection dwell boundary violated')
+      })
+    );
+    expect(telemetry.termination_boundary?.sample).toContain(
+      '[redacted relevant-reinspection-dwell sample'
+    );
     expect(telemetry.summary.metaSurfaceSignals).toBe(0);
     expect(telemetry.summary.distinctInspectionTargets).toBeLessThanOrEqual(
       architectureRelevantTargets.length
@@ -2611,10 +2688,19 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
 
     expect(result.exitCode).toBeGreaterThan(0);
     expect(result.stderr).toContain('verdict-stability drift detected');
+    expect(result.stderr).toContain(
+      'termination boundary: verdict-stability (repeated-output-inspection).'
+    );
 
     const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
     const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
       status: string;
+      termination_boundary: {
+        kind: string;
+        provenance: string;
+        reason: string;
+        sample: string | null;
+      } | null;
       summary: {
         outputInspectionSignals: number;
         distinctOutputInspectionTargets: number;
@@ -2622,6 +2708,12 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
       };
     };
     expect(telemetry.status).toBe('failed');
+    expect(telemetry.termination_boundary).toEqual({
+      kind: 'verdict-stability',
+      provenance: 'repeated-output-inspection',
+      reason: expect.stringContaining('verdict-stability drift detected'),
+      sample: null
+    });
     expect(telemetry.summary.outputInspectionSignals).toBeGreaterThanOrEqual(4);
     expect(telemetry.summary.distinctOutputInspectionTargets).toBeLessThanOrEqual(4);
     expect(telemetry.summary.maxOutputNarrativeSignatureHits).toBeGreaterThanOrEqual(2);
@@ -2641,10 +2733,19 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
 
     expect(result.exitCode).toBeGreaterThan(0);
     expect(result.stderr).toContain('verdict-stability drift detected');
+    expect(result.stderr).toContain(
+      'termination boundary: verdict-stability (targetless-speculative-narrative).'
+    );
 
     const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
     const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
       status: string;
+      termination_boundary: {
+        kind: string;
+        provenance: string;
+        reason: string;
+        sample: string | null;
+      } | null;
       summary: {
         outputInspectionSignals: number;
         outputNarrativeSignals: number;
@@ -2653,6 +2754,12 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
       };
     };
     expect(telemetry.status).toBe('failed');
+    expect(telemetry.termination_boundary).toEqual({
+      kind: 'verdict-stability',
+      provenance: 'targetless-speculative-narrative',
+      reason: expect.stringContaining('verdict-stability drift detected'),
+      sample: null
+    });
     expect(telemetry.summary.outputInspectionSignals).toBe(0);
     expect(telemetry.summary.outputNarrativeSignals).toBeGreaterThanOrEqual(4);
     expect(telemetry.summary.distinctOutputInspectionTargets).toBe(0);
@@ -2722,10 +2829,19 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
 
     expect(result.exitCode).toBeGreaterThan(0);
     expect(result.stderr).toContain('meta-surface expansion detected');
+    expect(result.stderr).toContain(
+      'termination boundary: meta-surface-expansion (meta-surface-kinds).'
+    );
 
     const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
     const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
       status: string;
+      termination_boundary: {
+        kind: string;
+        provenance: string;
+        reason: string;
+        sample: string | null;
+      } | null;
       summary: {
         commandStarts: string[];
         metaSurfaceSignals: number;
@@ -2734,6 +2850,14 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
       };
     };
     expect(telemetry.status).toBe('failed');
+    expect(telemetry.termination_boundary).toEqual(
+      expect.objectContaining({
+        kind: 'meta-surface-expansion',
+        provenance: 'meta-surface-kinds',
+        reason: expect.stringContaining('meta-surface expansion detected'),
+        sample: expect.any(String)
+      })
+    );
     expect(telemetry.summary.commandStarts.length).toBeGreaterThan(0);
     expect(telemetry.summary.metaSurfaceSignals).toBeGreaterThanOrEqual(4);
     expect(telemetry.summary.distinctMetaSurfaces).toBeGreaterThanOrEqual(3);
@@ -2763,6 +2887,29 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(result.exitCode).toBeGreaterThan(0);
     expect(result.stderr).toContain('startup-anchor boundary violated');
     expect(result.stderr).toContain('before the first startup anchor');
+    expect(result.stderr).toContain(
+      'termination boundary: startup-anchor (pre-anchor-meta-surface).'
+    );
+
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      termination_boundary: {
+        kind: string;
+        provenance: string;
+        reason: string;
+        sample: string | null;
+      } | null;
+    };
+    expect(telemetry.status).toBe('failed');
+    expect(telemetry.termination_boundary).toEqual(
+      expect.objectContaining({
+        kind: 'startup-anchor',
+        provenance: 'pre-anchor-meta-surface',
+        reason: expect.stringContaining('startup-anchor boundary violated'),
+        sample: expect.any(String)
+      })
+    );
   }, LONG_WAIT_TEST_TIMEOUT_MS);
 
   it('fails bounded audit review when repeated off-surface reads happen before the first audit startup anchor', async () => {
@@ -2780,10 +2927,19 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(result.exitCode).toBeGreaterThan(0);
     expect(result.stdout).toContain('startup-anchor boundary enabled for audit mode');
     expect(result.stderr).toContain('startup-anchor boundary violated');
+    expect(result.stderr).toContain(
+      'termination boundary: startup-anchor (pre-anchor-meta-surface).'
+    );
 
     const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
     const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
       status: string;
+      termination_boundary: {
+        kind: string;
+        provenance: string;
+        reason: string;
+        sample: string | null;
+      } | null;
       summary: {
         startupAnchorObserved: boolean;
         preAnchorMetaSurfaceSignals: number;
@@ -2791,6 +2947,14 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
       };
     };
     expect(telemetry.status).toBe('failed');
+    expect(telemetry.termination_boundary).toEqual(
+      expect.objectContaining({
+        kind: 'startup-anchor',
+        provenance: 'pre-anchor-meta-surface',
+        reason: expect.stringContaining('startup-anchor boundary violated'),
+        sample: expect.any(String)
+      })
+    );
     expect(telemetry.summary.startupAnchorObserved).toBe(false);
     expect(telemetry.summary.preAnchorMetaSurfaceSignals).toBeGreaterThanOrEqual(2);
     expect(telemetry.summary.preAnchorMetaSurfaceKinds).toEqual([
@@ -2846,10 +3010,17 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
 
     expect(result.exitCode).toBeGreaterThan(0);
     expect(result.stderr).toContain('meta-surface expansion detected');
+    expect(result.stderr).not.toContain('termination boundary:');
 
     const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
     const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
       status: string;
+      termination_boundary: {
+        kind: string;
+        provenance: string;
+        reason: string;
+        sample: string | null;
+      } | null;
       summary: {
         startupAnchorObserved: boolean;
         metaSurfaceSignals: number;
@@ -2858,6 +3029,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
       };
     };
     expect(telemetry.status).toBe('failed');
+    expect(telemetry.termination_boundary).toBeNull();
     expect(telemetry.summary.startupAnchorObserved).toBe(false);
     expect(telemetry.summary.metaSurfaceSignals).toBeGreaterThanOrEqual(4);
     expect(telemetry.summary.metaSurfaceKinds).toContain('review-closeout-bundle');
@@ -2881,10 +3053,17 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(result.exitCode).toBeGreaterThan(0);
     expect(result.stderr).toContain('active-closeout-bundle reread boundary violated');
     expect(result.stderr).not.toContain('codex review timed out after');
+    expect(result.stderr).not.toContain('termination boundary:');
 
     const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
     const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
       status: string;
+      termination_boundary: {
+        kind: string;
+        provenance: string;
+        reason: string;
+        sample: string | null;
+      } | null;
       summary: {
         startupAnchorObserved: boolean;
         metaSurfaceSignals: number;
@@ -2893,6 +3072,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
       };
     };
     expect(telemetry.status).toBe('failed');
+    expect(telemetry.termination_boundary).toBeNull();
     expect(telemetry.summary.startupAnchorObserved).toBe(true);
     expect(telemetry.summary.metaSurfaceSignals).toBeGreaterThanOrEqual(4);
     expect(telemetry.summary.metaSurfaceKinds).toContain('review-closeout-bundle');
@@ -3394,6 +3574,12 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
     const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
       status: string;
+      termination_boundary: {
+        kind: string;
+        provenance: string;
+        reason: string;
+        sample: string | null;
+      } | null;
       summary: {
         commandIntentViolationCount: number;
         commandIntentViolationKinds: string[];
@@ -3402,6 +3588,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
       };
     };
     expect(telemetry.status).toBe('failed');
+    expect(telemetry.termination_boundary).toBeNull();
     expect(telemetry.summary.commandIntentViolationCount).toBeGreaterThanOrEqual(1);
     expect(telemetry.summary.commandIntentViolationKinds).toContain('validation-suite');
     expect(telemetry.summary.commandIntentViolationSamples[0]).toContain('[redacted command-intent');
