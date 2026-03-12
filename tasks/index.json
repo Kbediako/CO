@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260312-1137-coordinator-symphony-aligned-standalone-review-boundary-driven-partial-output-hints",
+      "title": "Coordinator Symphony-Aligned Standalone Review Boundary-Driven Partial Output Hints",
+      "relates_to": "tasks/tasks-1137-coordinator-symphony-aligned-standalone-review-boundary-driven-partial-output-hints.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-12",
+      "paths": {
+        "spec": "tasks/specs/1137-coordinator-symphony-aligned-standalone-review-boundary-driven-partial-output-hints.md",
+        "task": "tasks/tasks-1137-coordinator-symphony-aligned-standalone-review-boundary-driven-partial-output-hints.md",
+        "agent_task": ".agent/task/1137-coordinator-symphony-aligned-standalone-review-boundary-driven-partial-output-hints.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-standalone-review-boundary-driven-partial-output-hints.md"
+      }
+    },
+    {
       "id": "20260312-1136-coordinator-symphony-aligned-standalone-review-verdict-stability-disable-contract",
       "title": "Coordinator Symphony-Aligned Standalone Review Verdict-Stability Disable Contract",
       "relates_to": "tasks/tasks-1136-coordinator-symphony-aligned-standalone-review-verdict-stability-disable-contract.md",
