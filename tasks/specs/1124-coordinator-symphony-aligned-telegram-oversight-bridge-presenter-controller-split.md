@@ -1,7 +1,7 @@
 ---
 id: 20260312-1124-coordinator-symphony-aligned-telegram-oversight-bridge-presenter-controller-split
 title: Coordinator Symphony-Aligned Telegram Oversight Bridge Presenter/Controller Split
-status: draft
+status: completed
 owners:
   - Codex
 created: 2026-03-12
@@ -36,3 +36,4 @@ Extract the read-side presenter/controller surface from `telegramOversightBridge
 
 - 2026-03-12: Approved for docs-first registration as the next truthful post-`1123` Symphony-aligned seam. Evidence: `out/1123-coordinator-symphony-aligned-control-server-shutdown-shell-extraction/manual/20260311T235001Z-closeout/14-next-slice-note.md`, `docs/findings/1124-telegram-oversight-bridge-presenter-controller-split-deliberation.md`.
 - 2026-03-12: Pre-implementation read-only review approved. The docs-first guard bundle passed, and `docs-review` succeeded after a manifest-backed `1124-...-guard` sub-run satisfied the delegation requirement. Evidence: `out/1124-coordinator-symphony-aligned-telegram-oversight-bridge-presenter-controller-split/manual/20260312T001520Z-docs-first/00-summary.md`, `.runs/1124-coordinator-symphony-aligned-telegram-oversight-bridge-presenter-controller-split/cli/2026-03-12T00-17-09-300Z-4df1395d/manifest.json`, `.runs/1124-coordinator-symphony-aligned-telegram-oversight-bridge-presenter-controller-split-guard/cli/2026-03-12T00-16-24-029Z-e8ac7020/manifest.json`.
+- 2026-03-12: Completed. `telegramOversightBridge.ts` now delegates read-side command routing and projection-delta shaping into `controlTelegramReadController.ts` while keeping polling transport, bridge state persistence, and pause/resume mutation authority in the bridge runtime. Focused final-tree Telegram regressions passed (`05-targeted-tests.log`), deterministic gates passed through `pack:smoke`, the standalone review returned no concrete `1124` finding, and the recurring unrelated full-suite quiet tail was recorded as an explicit override instead of being treated as green. Evidence: `out/1124-coordinator-symphony-aligned-telegram-oversight-bridge-presenter-controller-split/manual/20260312T003259Z-closeout/00-summary.md`, `out/1124-coordinator-symphony-aligned-telegram-oversight-bridge-presenter-controller-split/manual/20260312T003259Z-closeout/09-review.log`, `out/1124-coordinator-symphony-aligned-telegram-oversight-bridge-presenter-controller-split/manual/20260312T003259Z-closeout/13-override-notes.md`.
