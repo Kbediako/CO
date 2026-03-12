@@ -1,0 +1,54 @@
+
+ RUN  v1.6.1 /Users/kbediako/Code/CO
+
+ ✓ orchestrator/tests/TelegramOversightApiClient.test.ts  (5 tests) 5ms
+stdout | orchestrator/tests/TelegramOversightBridge.test.ts > TelegramOversightBridge > renders selected-run status issue and queued questions through the integrated polling bridge
+[Codex-Orchestrator] [telegram-oversight] enabled for 1 chat(s) as @co_test_advisory_bot
+
+stdout | orchestrator/tests/TelegramOversightBridge.test.ts > TelegramOversightBridge > routes pause and resume through transport-mutating control policy
+[Codex-Orchestrator] [telegram-oversight] enabled for 1 chat(s) as @co_test_advisory_bot
+
+stdout | orchestrator/tests/TelegramOversightBridge.test.ts > TelegramOversightBridge > does not immediately retry freshly expired child questions during Telegram /questions reads
+[Codex-Orchestrator] [telegram-oversight] enabled for 1 chat(s) as @co_test_advisory_bot
+
+stdout | orchestrator/tests/TelegramOversightBridge.test.ts > TelegramOversightBridge > does not immediately retry freshly expired child questions during Telegram /questions reads
+<empty line>
+stderr | orchestrator/tests/TelegramOversightBridge.test.ts > TelegramOversightBridge > does not immediately retry freshly expired child questions during Telegram /questions reads
+[Codex-Orchestrator] Failed to resolve child question: child control error: 500 nope
+
+stdout | orchestrator/tests/TelegramOversightBridge.test.ts > TelegramOversightBridge > retries answered child questions during Telegram /questions reads
+[Codex-Orchestrator] [telegram-oversight] enabled for 1 chat(s) as @co_test_advisory_bot
+
+stdout | orchestrator/tests/TelegramOversightBridge.test.ts > TelegramOversightBridge > continues polling after one update fails and advances the Telegram offset
+[Codex-Orchestrator] [telegram-oversight] enabled for 1 chat(s) as @co_test_advisory_bot
+
+stdout | orchestrator/tests/TelegramOversightBridge.test.ts > TelegramOversightBridge > continues polling after one update fails and advances the Telegram offset
+<empty line>
+stderr | orchestrator/tests/TelegramOversightBridge.test.ts > TelegramOversightBridge > continues polling after one update fails and advances the Telegram offset
+[Codex-Orchestrator] [telegram-oversight] failed to handle update 200: simulated_send_failure
+
+stdout | orchestrator/tests/TelegramOversightBridge.test.ts > TelegramOversightBridge > sends deduped projection-driven push notifications when enabled
+[Codex-Orchestrator] [telegram-oversight] enabled for 1 chat(s) as @co_test_advisory_bot
+
+stdout | orchestrator/tests/TelegramOversightBridge.test.ts > TelegramOversightBridge > persists a pending projection during cooldown and flushes it on the next signal
+[Codex-Orchestrator] [telegram-oversight] enabled for 1 chat(s) as @co_test_advisory_bot
+
+stdout | orchestrator/tests/TelegramOversightBridge.test.ts > TelegramOversightBridge > sends projection-driven push notifications when queued questions are added and cleared
+[Codex-Orchestrator] [telegram-oversight] enabled for 1 chat(s) as @co_test_advisory_bot
+
+stdout | orchestrator/tests/TelegramOversightBridge.test.ts > TelegramOversightBridge > sends a new projection push when prompt or urgency changes under the same latest question id
+[Codex-Orchestrator] [telegram-oversight] enabled for 1 chat(s) as @co_test_advisory_bot
+
+stdout | orchestrator/tests/TelegramOversightBridge.test.ts > TelegramOversightBridge > renders no-selected status and issue fallbacks through the polling bridge
+[Codex-Orchestrator] [telegram-oversight] enabled for 1 chat(s) as @co_test_advisory_bot
+
+stdout | orchestrator/tests/TelegramOversightBridge.test.ts > TelegramOversightBridge > sends projection-driven push notifications when an accepted live Linear advisory update changes the projection
+[Codex-Orchestrator] [telegram-oversight] enabled for 1 chat(s) as @co_test_advisory_bot
+
+ ✓ orchestrator/tests/TelegramOversightBridge.test.ts  (11 tests) 1033ms
+
+ Test Files  2 passed (2)
+      Tests  16 passed (16)
+   Start at  12:58:02
+   Duration  1.42s (transform 192ms, setup 0ms, collect 264ms, tests 1.04s, environment 0ms, prepare 55ms)
+

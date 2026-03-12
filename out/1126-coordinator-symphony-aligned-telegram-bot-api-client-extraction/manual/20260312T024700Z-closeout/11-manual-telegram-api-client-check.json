@@ -1,0 +1,41 @@
+{
+  "identity": {
+    "id": 1,
+    "username": "co_test_advisory_bot"
+  },
+  "updates": [
+    {
+      "update_id": 12
+    }
+  ],
+  "calls": [
+    {
+      "url": "https://api.telegram.org/bottest-token/getMe",
+      "pathname": "/bottest-token/getMe",
+      "search": {},
+      "method": "GET",
+      "body": null
+    },
+    {
+      "url": "https://api.telegram.org/bottest-token/getUpdates?offset=12&timeout=20&allowed_updates=%5B%22message%22%5D",
+      "pathname": "/bottest-token/getUpdates",
+      "search": {
+        "offset": "12",
+        "timeout": "20",
+        "allowed_updates": "[\"message\"]"
+      },
+      "method": "GET",
+      "body": null
+    },
+    {
+      "url": "https://api.telegram.org/bottest-token/sendMessage",
+      "pathname": "/bottest-token/sendMessage",
+      "search": {},
+      "method": "POST",
+      "body": {
+        "chat_id": "1234",
+        "text": "hello"
+      }
+    }
+  ]
+}

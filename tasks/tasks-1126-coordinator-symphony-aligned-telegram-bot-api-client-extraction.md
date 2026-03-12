@@ -20,21 +20,21 @@
 
 ## Telegram Bot API Client
 
-- [ ] `telegramOversightBridge.ts` delegates Telegram Bot API request/response handling into one bounded helper seam.
-- [ ] The extracted seam owns Bot API URL construction plus `getMe`, `getUpdates`, and `sendMessage` request/response handling without moving sequencing, push-state policy, or mutation authority out of the bridge.
-- [ ] Focused Telegram regressions prove query construction, send payloads, and Telegram error propagation remain unchanged.
+- [x] `telegramOversightBridge.ts` delegates Telegram Bot API request/response handling into one bounded helper seam. Evidence: `orchestrator/src/cli/control/telegramOversightBridge.ts`, `orchestrator/src/cli/control/telegramOversightApiClient.ts`, `out/1126-coordinator-symphony-aligned-telegram-bot-api-client-extraction/manual/20260312T024700Z-closeout/00-summary.md`.
+- [x] The extracted seam owns Bot API URL construction plus `getMe`, `getUpdates`, and `sendMessage` request/response handling without moving sequencing, push-state policy, or mutation authority out of the bridge. Evidence: `orchestrator/src/cli/control/telegramOversightApiClient.ts`, `out/1126-coordinator-symphony-aligned-telegram-bot-api-client-extraction/manual/20260312T024700Z-closeout/11-manual-telegram-api-client-check.json`, `out/1126-coordinator-symphony-aligned-telegram-bot-api-client-extraction/manual/20260312T024700Z-closeout/12-elegance-review.md`.
+- [x] Focused Telegram regressions prove query construction, send payloads, and Telegram error propagation remain unchanged. Evidence: `orchestrator/tests/TelegramOversightApiClient.test.ts`, `out/1126-coordinator-symphony-aligned-telegram-bot-api-client-extraction/manual/20260312T024700Z-closeout/05-targeted-tests.log`.
 
 ## Validation + Closeout
 
-- [ ] `node scripts/delegation-guard.mjs`.
-- [ ] `node scripts/spec-guard.mjs --dry-run`.
-- [ ] `npm run build`.
-- [ ] `npm run lint`.
-- [ ] `npm run test`.
-- [ ] `npm run docs:check`.
-- [ ] `npm run docs:freshness`.
-- [ ] `node scripts/diff-budget.mjs`.
-- [ ] `npm run review`.
-- [ ] `npm run pack:smoke`.
-- [ ] Manual/mock Telegram Bot API client evidence captured.
-- [ ] Elegance review completed.
+- [x] `node scripts/delegation-guard.mjs`. Evidence: `out/1126-coordinator-symphony-aligned-telegram-bot-api-client-extraction/manual/20260312T024700Z-closeout/01-delegation-guard.log`.
+- [x] `node scripts/spec-guard.mjs --dry-run`. Evidence: `out/1126-coordinator-symphony-aligned-telegram-bot-api-client-extraction/manual/20260312T024700Z-closeout/02-spec-guard.log`.
+- [x] `npm run build`. Evidence: `out/1126-coordinator-symphony-aligned-telegram-bot-api-client-extraction/manual/20260312T024700Z-closeout/03-build.log`.
+- [x] `npm run lint`. Evidence: `out/1126-coordinator-symphony-aligned-telegram-bot-api-client-extraction/manual/20260312T024700Z-closeout/04-lint.log`.
+- [x] `npm run test`. Evidence: `out/1126-coordinator-symphony-aligned-telegram-bot-api-client-extraction/manual/20260312T024700Z-closeout/05-test.log`.
+- [x] `npm run docs:check`. Evidence: `out/1126-coordinator-symphony-aligned-telegram-bot-api-client-extraction/manual/20260312T024700Z-closeout/06-docs-check.log`.
+- [x] `npm run docs:freshness`. Evidence: `out/1126-coordinator-symphony-aligned-telegram-bot-api-client-extraction/manual/20260312T024700Z-closeout/07-docs-freshness.log`.
+- [x] `node scripts/diff-budget.mjs`. Evidence: `out/1126-coordinator-symphony-aligned-telegram-bot-api-client-extraction/manual/20260312T024700Z-closeout/08-diff-budget.log`, `out/1126-coordinator-symphony-aligned-telegram-bot-api-client-extraction/manual/20260312T024700Z-closeout/13-override-notes.md`.
+- [x] `npm run review`. Evidence: `out/1126-coordinator-symphony-aligned-telegram-bot-api-client-extraction/manual/20260312T024700Z-closeout/09-review.log`.
+- [x] `npm run pack:smoke`. Evidence: `out/1126-coordinator-symphony-aligned-telegram-bot-api-client-extraction/manual/20260312T024700Z-closeout/10-pack-smoke.log`.
+- [x] Manual/mock Telegram Bot API client evidence captured. Evidence: `out/1126-coordinator-symphony-aligned-telegram-bot-api-client-extraction/manual/20260312T024700Z-closeout/11-manual-telegram-api-client-check.json`.
+- [x] Elegance review completed. Evidence: `out/1126-coordinator-symphony-aligned-telegram-bot-api-client-extraction/manual/20260312T024700Z-closeout/12-elegance-review.md`.
