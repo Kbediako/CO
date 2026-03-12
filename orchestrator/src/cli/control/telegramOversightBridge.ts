@@ -1,5 +1,4 @@
 import { randomBytes } from 'node:crypto';
-import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import { logger } from '../../logger.js';
@@ -11,7 +10,13 @@ import type {
   ControlDispatchPilotPayload,
   ControlSelectedRunRuntimeSnapshot
 } from './observabilityReadModel.js';
-import { writeJsonAtomic } from '../utils/fs.js';
+import {
+  computeTelegramProjectionStateTransition,
+  createDefaultTelegramOversightState,
+  readTelegramOversightState,
+  type TelegramOversightBridgeState,
+  writeTelegramOversightState
+} from './controlTelegramPushState.js';
 
 const TELEGRAM_API_ROOT = 'https://api.telegram.org';
 const DEFAULT_POLL_INTERVAL_MS = 1_000;
@@ -26,18 +31,6 @@ interface TelegramOversightBridgeConfig {
   pollIntervalMs: number;
   pushEnabled: boolean;
   pushCooldownMs: number;
-}
-
-interface TelegramOversightBridgeState {
-  next_update_id: number;
-  updated_at: string;
-  push: {
-    last_sent_projection_hash: string | null;
-    last_sent_at: string | null;
-    last_event_seq: number | null;
-    pending_projection_hash: string | null;
-    pending_projection_observed_at: string | null;
-  };
 }
 
 interface TelegramBotIdentity {
@@ -178,17 +171,7 @@ class TelegramOversightBridgeRuntime implements TelegramOversightBridge {
   private closed = false;
   private loopPromise: Promise<void> | null = null;
   private activeController: AbortController | null = null;
-  private state: TelegramOversightBridgeState = {
-    next_update_id: 0,
-    updated_at: new Date(0).toISOString(),
-    push: {
-      last_sent_projection_hash: null,
-      last_sent_at: null,
-      last_event_seq: null,
-      pending_projection_hash: null,
-      pending_projection_observed_at: null
-    }
-  };
+  private state: TelegramOversightBridgeState = createDefaultTelegramOversightState();
   private botIdentity: TelegramBotIdentity | null = null;
   private notificationQueue: Promise<void> = Promise.resolve();
 
@@ -214,7 +197,7 @@ class TelegramOversightBridgeRuntime implements TelegramOversightBridge {
   }
 
   async start(): Promise<void> {
-    this.state = await readTelegramState(this.statePath);
+    this.state = await readTelegramOversightState(this.statePath);
     this.botIdentity = await this.callTelegram<TelegramBotIdentity>('getMe');
     logger.info(
       `[telegram-oversight] enabled for ${Array.from(this.config.allowedChatIds).length} chat(s) as @${
@@ -459,44 +442,18 @@ class TelegramOversightBridgeRuntime implements TelegramOversightBridge {
     eventSeq?: number | null;
     source?: string | null;
   }): Promise<void> {
-    const normalizedEventSeq =
-      typeof input.eventSeq === 'number' && Number.isFinite(input.eventSeq) ? Math.floor(input.eventSeq) : null;
-    const nextEventSeq = normalizedEventSeq ?? this.state.push.last_event_seq;
     const now = Date.now();
-    const nowIso = new Date(now).toISOString();
     const projection = await this.readController.renderProjectionDeltaMessage();
-    const projectionHash = projection.projectionHash;
+    const transition = computeTelegramProjectionStateTransition({
+      state: this.state,
+      projectionHash: projection.projectionHash,
+      eventSeq: input.eventSeq,
+      nowMs: now,
+      pushCooldownMs: this.config.pushCooldownMs
+    });
 
-    if (!projectionHash || projectionHash === this.state.push.last_sent_projection_hash) {
-      this.state = {
-        ...this.state,
-        updated_at: nowIso,
-        push: {
-          ...this.state.push,
-          last_event_seq: nextEventSeq,
-          pending_projection_hash: null,
-          pending_projection_observed_at: null
-        }
-      };
-      await this.persistState();
-      return;
-    }
-
-    const lastSentAtMs = this.state.push.last_sent_at ? Date.parse(this.state.push.last_sent_at) : Number.NaN;
-    if (Number.isFinite(lastSentAtMs) && now - lastSentAtMs < this.config.pushCooldownMs) {
-      this.state = {
-        ...this.state,
-        updated_at: nowIso,
-        push: {
-          ...this.state.push,
-          last_event_seq: nextEventSeq,
-          pending_projection_hash: projectionHash,
-          pending_projection_observed_at:
-            projectionHash === this.state.push.pending_projection_hash
-              ? this.state.push.pending_projection_observed_at ?? nowIso
-              : nowIso
-        }
-      };
+    if (transition.kind === 'skip' || transition.kind === 'pending') {
+      this.state = transition.nextState;
       await this.persistState();
       return;
     }
@@ -506,23 +463,12 @@ class TelegramOversightBridgeRuntime implements TelegramOversightBridge {
       await this.sendMessage(chatId, text);
     }
 
-    const sentAt = new Date(now).toISOString();
-    this.state = {
-      ...this.state,
-      updated_at: sentAt,
-      push: {
-        last_sent_projection_hash: projectionHash,
-        last_sent_at: sentAt,
-        last_event_seq: nextEventSeq,
-        pending_projection_hash: null,
-        pending_projection_observed_at: null
-      }
-    };
+    this.state = transition.nextState;
     await this.persistState();
   }
 
   private async persistState(): Promise<void> {
-    await writeJsonAtomic(this.statePath, this.state);
+    await writeTelegramOversightState(this.statePath, this.state);
   }
 }
 
@@ -546,62 +492,6 @@ function resolveTelegramOversightBridgeConfig(env: NodeJS.ProcessEnv): TelegramO
     pushEnabled: parseBooleanEnv(env.CO_TELEGRAM_PUSH_ENABLED),
     pushCooldownMs: parsePositiveIntegerEnv(env.CO_TELEGRAM_PUSH_INTERVAL_MS, DEFAULT_PUSH_COOLDOWN_MS)
   };
-}
-
-async function readTelegramState(path: string): Promise<TelegramOversightBridgeState> {
-  try {
-    const raw = await readFile(path, 'utf8');
-    const parsed = JSON.parse(raw) as Partial<TelegramOversightBridgeState>;
-    const nextUpdateId =
-      typeof parsed.next_update_id === 'number' && Number.isInteger(parsed.next_update_id) && parsed.next_update_id >= 0
-        ? parsed.next_update_id
-        : 0;
-    return {
-      next_update_id: nextUpdateId,
-      updated_at:
-        typeof parsed.updated_at === 'string' && parsed.updated_at.trim().length > 0
-          ? parsed.updated_at
-          : new Date(0).toISOString(),
-      push: {
-        last_sent_projection_hash:
-          parsed.push && typeof parsed.push === 'object' && !Array.isArray(parsed.push)
-            ? readStringValue(parsed.push as Record<string, unknown>, 'last_sent_projection_hash') ?? null
-            : null,
-        last_sent_at:
-          parsed.push && typeof parsed.push === 'object' && !Array.isArray(parsed.push)
-            ? readStringValue(parsed.push as Record<string, unknown>, 'last_sent_at') ?? null
-            : null,
-        last_event_seq:
-          parsed.push &&
-          typeof parsed.push === 'object' &&
-          !Array.isArray(parsed.push) &&
-          typeof (parsed.push as Record<string, unknown>).last_event_seq === 'number' &&
-          Number.isInteger((parsed.push as Record<string, unknown>).last_event_seq)
-            ? ((parsed.push as Record<string, unknown>).last_event_seq as number)
-            : null,
-        pending_projection_hash:
-          parsed.push && typeof parsed.push === 'object' && !Array.isArray(parsed.push)
-            ? readStringValue(parsed.push as Record<string, unknown>, 'pending_projection_hash') ?? null
-            : null,
-        pending_projection_observed_at:
-          parsed.push && typeof parsed.push === 'object' && !Array.isArray(parsed.push)
-            ? readStringValue(parsed.push as Record<string, unknown>, 'pending_projection_observed_at') ?? null
-            : null
-      }
-    };
-  } catch {
-    return {
-      next_update_id: 0,
-      updated_at: new Date(0).toISOString(),
-      push: {
-        last_sent_projection_hash: null,
-        last_sent_at: null,
-        last_event_seq: null,
-        pending_projection_hash: null,
-        pending_projection_observed_at: null
-      }
-    };
-  }
 }
 
 async function readJsonResponse<T>(response: Response): Promise<T> {
@@ -684,16 +574,6 @@ function parsePositiveIntegerEnv(value: string | undefined, fallback: number): n
     return fallback;
   }
   return parsed;
-}
-
-function readStringValue(record: Record<string, unknown>, ...keys: string[]): string | undefined {
-  for (const key of keys) {
-    const value = record[key];
-    if (typeof value === 'string' && value.trim().length > 0) {
-      return value.trim();
-    }
-  }
-  return undefined;
 }
 
 function capitalize(value: string): string {
