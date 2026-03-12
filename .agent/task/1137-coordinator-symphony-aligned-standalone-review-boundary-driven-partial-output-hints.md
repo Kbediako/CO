@@ -20,21 +20,21 @@
 
 ## Partial Output Hint Contract
 
-- [ ] The partial-output hint no longer depends on `error.timedOut`. Evidence: `out/1137-coordinator-symphony-aligned-standalone-review-boundary-driven-partial-output-hints/manual/<timestamp>-closeout/00-summary.md`, `out/1137-coordinator-symphony-aligned-standalone-review-boundary-driven-partial-output-hints/manual/<timestamp>-closeout/05-targeted-tests.log`
-- [ ] `timeout`, `stall`, and `startup-loop` still print `Review output log (partial)`. Evidence: `out/1137-coordinator-symphony-aligned-standalone-review-boundary-driven-partial-output-hints/manual/<timestamp>-closeout/00-summary.md`, `out/1137-coordinator-symphony-aligned-standalone-review-boundary-driven-partial-output-hints/manual/<timestamp>-closeout/05-targeted-tests.log`
-- [ ] Non-timeout boundaries do not print the partial-output hint. Evidence: `out/1137-coordinator-symphony-aligned-standalone-review-boundary-driven-partial-output-hints/manual/<timestamp>-closeout/00-summary.md`, `out/1137-coordinator-symphony-aligned-standalone-review-boundary-driven-partial-output-hints/manual/<timestamp>-closeout/05-targeted-tests.log`
+- [x] The partial-output hint no longer depends on `error.timedOut`. Evidence: `out/1137-coordinator-symphony-aligned-standalone-review-boundary-driven-partial-output-hints/manual/20260312T193136Z-closeout/00-summary.md`, `out/1137-coordinator-symphony-aligned-standalone-review-boundary-driven-partial-output-hints/manual/20260312T193136Z-closeout/05-targeted-tests.log`
+- [x] `timeout`, `stall`, and `startup-loop` still print `Review output log (partial)`. Evidence: `out/1137-coordinator-symphony-aligned-standalone-review-boundary-driven-partial-output-hints/manual/20260312T193136Z-closeout/00-summary.md`, `out/1137-coordinator-symphony-aligned-standalone-review-boundary-driven-partial-output-hints/manual/20260312T193136Z-closeout/05-targeted-tests.log`, `out/1137-coordinator-symphony-aligned-standalone-review-boundary-driven-partial-output-hints/manual/20260312T193136Z-closeout/12-manual-partial-output-hint-check.md`
+- [x] Non-timeout boundaries do not print the partial-output hint. Evidence: `out/1137-coordinator-symphony-aligned-standalone-review-boundary-driven-partial-output-hints/manual/20260312T193136Z-closeout/00-summary.md`, `out/1137-coordinator-symphony-aligned-standalone-review-boundary-driven-partial-output-hints/manual/20260312T193136Z-closeout/05-targeted-tests.log`, `out/1137-coordinator-symphony-aligned-standalone-review-boundary-driven-partial-output-hints/manual/20260312T193136Z-closeout/12-manual-partial-output-hint-check.md`
 
 ## Validation + Closeout
 
-- [ ] `node scripts/delegation-guard.mjs`
-- [ ] `node scripts/spec-guard.mjs --dry-run`
-- [ ] `npm run build`
-- [ ] `npm run lint`
-- [ ] `npm run test`
-- [ ] `npm run docs:check`
-- [ ] `npm run docs:freshness`
-- [ ] `node scripts/diff-budget.mjs`
-- [ ] `npm run review`
-- [ ] `npm run pack:smoke`
-- [ ] Manual/mock evidence captured for the boundary-driven partial-output hint contract.
-- [ ] Elegance review completed.
+- [x] `node scripts/delegation-guard.mjs`. Evidence: `out/1137-coordinator-symphony-aligned-standalone-review-boundary-driven-partial-output-hints/manual/20260312T193136Z-closeout/01-delegation-guard.log`, `out/1137-coordinator-symphony-aligned-standalone-review-boundary-driven-partial-output-hints/manual/20260312T193136Z-closeout/13-override-notes.md`
+- [x] `node scripts/spec-guard.mjs --dry-run`. Evidence: `out/1137-coordinator-symphony-aligned-standalone-review-boundary-driven-partial-output-hints/manual/20260312T193136Z-closeout/02-spec-guard.log`
+- [x] `npm run build`. Evidence: `out/1137-coordinator-symphony-aligned-standalone-review-boundary-driven-partial-output-hints/manual/20260312T193136Z-closeout/03-build.log`
+- [x] `npm run lint`. Evidence: `out/1137-coordinator-symphony-aligned-standalone-review-boundary-driven-partial-output-hints/manual/20260312T193136Z-closeout/04-lint.log`
+- [x] `npm run test`. Evidence: `out/1137-coordinator-symphony-aligned-standalone-review-boundary-driven-partial-output-hints/manual/20260312T193136Z-closeout/06-test.log`
+- [x] `npm run docs:check`. Evidence: `out/1137-coordinator-symphony-aligned-standalone-review-boundary-driven-partial-output-hints/manual/20260312T193136Z-closeout/07-docs-check.log`
+- [x] `npm run docs:freshness`. Evidence: `out/1137-coordinator-symphony-aligned-standalone-review-boundary-driven-partial-output-hints/manual/20260312T193136Z-closeout/08-docs-freshness.log`
+- [x] `node scripts/diff-budget.mjs`. Evidence: `out/1137-coordinator-symphony-aligned-standalone-review-boundary-driven-partial-output-hints/manual/20260312T193136Z-closeout/09-diff-budget.log`, `out/1137-coordinator-symphony-aligned-standalone-review-boundary-driven-partial-output-hints/manual/20260312T193136Z-closeout/13-override-notes.md`
+- [x] `npm run review`. Evidence: `out/1137-coordinator-symphony-aligned-standalone-review-boundary-driven-partial-output-hints/manual/20260312T193136Z-closeout/10-review.log`
+- [x] `npm run pack:smoke`. Evidence: `out/1137-coordinator-symphony-aligned-standalone-review-boundary-driven-partial-output-hints/manual/20260312T193136Z-closeout/11-pack-smoke.log`
+- [x] Manual/mock evidence captured for the boundary-driven partial-output hint contract. Evidence: `out/1137-coordinator-symphony-aligned-standalone-review-boundary-driven-partial-output-hints/manual/20260312T193136Z-closeout/12-manual-partial-output-hint-check.md`
+- [x] Elegance review completed. Evidence: `out/1137-coordinator-symphony-aligned-standalone-review-boundary-driven-partial-output-hints/manual/20260312T193136Z-closeout/15-elegance-review.md`
