@@ -575,6 +575,25 @@ fi
       done
       while true; do sleep 1; done
     fi
+    if [[ "$mode" == "active-closeout-self-reference-search-mixed" ]]; then
+      echo "thinking"
+      echo "exec"
+      echo "/bin/zsh -lc 'sed -n 1,120p scripts/run-review.ts' in /Users/kbediako/Code/CO"
+      for _ in $(seq 1 2); do
+        echo "thinking"
+        echo "exec"
+        echo "/bin/zsh -lc 'sed -n 1,120p docs/standalone-review-guide.md' in /Users/kbediako/Code/CO"
+        echo "thinking"
+        echo "exec"
+        echo "/bin/zsh -lc 'sed -n 1,120p .runs/sample-task/cli/sample-run/review/output.log' in /Users/kbediako/Code/CO"
+        echo "thinking"
+        echo "exec"
+        echo "/bin/zsh -lc 'grep -R \"shellProbeCount\\|getShellProbeBoundaryState\" -n .' in /Users/kbediako/Code/CO"
+        echo "out/sample-task/manual/TODO-closeout/09-review.log:278:shellProbeCount"
+        sleep 0.05
+      done
+      while true; do sleep 1; done
+    fi
     if [[ "$mode" == "active-closeout-self-reference-reread" ]]; then
       echo "thinking"
       echo "exec"
@@ -3011,7 +3030,9 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
 
     expect(result.exitCode).toBeGreaterThan(0);
     expect(result.stderr).toContain('meta-surface expansion detected');
-    expect(result.stderr).not.toContain('termination boundary:');
+    expect(result.stderr).toContain(
+      'termination boundary: meta-surface-expansion (active-closeout-self-reference-search).'
+    );
 
     const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
     const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
@@ -3030,11 +3051,63 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
       };
     };
     expect(telemetry.status).toBe('failed');
-    expect(telemetry.termination_boundary).toBeNull();
+    expect(telemetry.termination_boundary).toEqual(
+      expect.objectContaining({
+        kind: 'meta-surface-expansion',
+        provenance: 'active-closeout-self-reference-search',
+        reason: expect.stringContaining('meta-surface expansion detected')
+      })
+    );
+    expect(telemetry.termination_boundary?.sample).toContain(
+      '[redacted meta-surface-expansion sample'
+    );
     expect(telemetry.summary.startupAnchorObserved).toBe(false);
     expect(telemetry.summary.metaSurfaceSignals).toBeGreaterThanOrEqual(4);
     expect(telemetry.summary.metaSurfaceKinds).toContain('review-closeout-bundle');
     expect(telemetry.summary.preAnchorMetaSurfaceKinds).toEqual([]);
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('keeps mixed active closeout search drift on generic meta-surface provenance', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    await makeCloseoutBundle(sandbox, 'sample-task');
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'active-closeout-self-reference-search-mixed',
+      CODEX_REVIEW_META_SURFACE_TIMEOUT_SECONDS: '1',
+      CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0',
+      CODEX_REVIEW_TIMEOUT_SECONDS: '60'
+    });
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).toContain('meta-surface expansion detected');
+    expect(result.stderr).toContain('termination boundary: meta-surface-expansion (meta-surface-kinds).');
+
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      termination_boundary: {
+        kind: string;
+        provenance: string;
+        reason: string;
+        sample: string | null;
+      } | null;
+      summary: {
+        metaSurfaceKinds: string[];
+      };
+    };
+    expect(telemetry.status).toBe('failed');
+    expect(telemetry.termination_boundary).toEqual(
+      expect.objectContaining({
+        kind: 'meta-surface-expansion',
+        provenance: 'meta-surface-kinds',
+        reason: expect.stringContaining('meta-surface expansion detected')
+      })
+    );
+    expect(telemetry.summary.metaSurfaceKinds).toEqual(
+      expect.arrayContaining(['review-artifacts', 'review-closeout-bundle', 'review-docs'])
+    );
   }, LONG_WAIT_TEST_TIMEOUT_MS);
 
   it('fails bounded diff review promptly when post-anchor rereads hit the active closeout bundle', async () => {
@@ -3054,7 +3127,9 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(result.exitCode).toBeGreaterThan(0);
     expect(result.stderr).toContain('active-closeout-bundle reread boundary violated');
     expect(result.stderr).not.toContain('codex review timed out after');
-    expect(result.stderr).not.toContain('termination boundary:');
+    expect(result.stderr).toContain(
+      'termination boundary: active-closeout-bundle-reread (post-startup-anchor).'
+    );
 
     const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
     const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
@@ -3073,7 +3148,16 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
       };
     };
     expect(telemetry.status).toBe('failed');
-    expect(telemetry.termination_boundary).toBeNull();
+    expect(telemetry.termination_boundary).toEqual(
+      expect.objectContaining({
+        kind: 'active-closeout-bundle-reread',
+        provenance: 'post-startup-anchor',
+        reason: expect.stringContaining('active-closeout-bundle reread boundary violated')
+      })
+    );
+    expect(telemetry.termination_boundary?.sample).toContain(
+      '[redacted active-closeout-bundle-reread sample'
+    );
     expect(telemetry.summary.startupAnchorObserved).toBe(true);
     expect(telemetry.summary.metaSurfaceSignals).toBeGreaterThanOrEqual(4);
     expect(telemetry.summary.metaSurfaceKinds).toContain('review-closeout-bundle');

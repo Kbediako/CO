@@ -2329,7 +2329,7 @@ async function waitForChildExit(
                   signal,
                   timedOut: false,
                   outputPreview: '',
-                  terminationBoundary: null
+                  terminationBoundary: options.getTerminationBoundaryRecord('active-closeout-bundle-reread')
                 }
               )
             );
@@ -2572,7 +2572,8 @@ async function waitForChildExit(
         }
         requestTermination(
           boundaryState.reason ?? 'bounded review active-closeout-bundle reread boundary violated',
-          false
+          false,
+          options.getTerminationBoundaryRecord('active-closeout-bundle-reread')
         );
       }, 250);
       activeCloseoutBundleHandle.unref();

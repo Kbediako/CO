@@ -102,6 +102,7 @@ export type ReviewCommandIntentViolationKind =
 export type ReviewTerminationBoundaryKind =
   | 'command-intent'
   | 'shell-probe'
+  | 'active-closeout-bundle-reread'
   | 'startup-anchor'
   | 'meta-surface-expansion'
   | 'verdict-stability'
@@ -109,6 +110,7 @@ export type ReviewTerminationBoundaryKind =
 export type ReviewTerminationBoundaryProvenance =
   | ReviewCommandIntentViolationKind
   | 'direct-shell-verification'
+  | 'active-closeout-self-reference-search'
   | 'pre-anchor-meta-surface'
   | 'meta-surface-kinds'
   | 'repeated-output-inspection'
@@ -881,6 +883,19 @@ export class ReviewExecutionState {
       };
     }
 
+    if (kind === 'active-closeout-bundle-reread') {
+      const boundary = this.getActiveCloseoutBundleRereadBoundaryState(nowMs);
+      if (!boundary.triggered || !boundary.reason) {
+        return null;
+      }
+      return {
+        kind,
+        provenance: boundary.anchorObserved ? 'post-startup-anchor' : 'bounded-surface',
+        reason: boundary.reason,
+        sample: normalizeTerminationBoundarySample(boundary.violationSample)
+      };
+    }
+
     if (kind === 'startup-anchor') {
       const boundary = this.getStartupAnchorBoundaryState(nowMs);
       if (!boundary.triggered || !boundary.reason) {
@@ -900,12 +915,14 @@ export class ReviewExecutionState {
         return null;
       }
       const summary = this.buildOutputSummary();
-      if (summary.metaSurfaceKinds.includes('review-closeout-bundle')) {
-        return null;
-      }
+      const isPureActiveCloseoutSearch =
+        summary.metaSurfaceKinds.length === 1 &&
+        summary.metaSurfaceKinds[0] === REVIEW_ACTIVE_CLOSEOUT_BUNDLE_KIND;
       return {
         kind,
-        provenance: 'meta-surface-kinds',
+        provenance: isPureActiveCloseoutSearch
+          ? 'active-closeout-self-reference-search'
+          : 'meta-surface-kinds',
         reason: boundary.reason,
         sample: summary.metaSurfaceKinds[0] ?? null
       };
@@ -1588,6 +1605,9 @@ function inferTerminationBoundaryKindsFromErrorMessage(
   }
   if (errorMessage.includes('shell-probe boundary violated')) {
     kinds.push('shell-probe');
+  }
+  if (errorMessage.includes('active-closeout-bundle reread boundary violated')) {
+    kinds.push('active-closeout-bundle-reread');
   }
   if (errorMessage.includes('startup-anchor boundary violated')) {
     kinds.push('startup-anchor');

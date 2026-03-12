@@ -447,6 +447,72 @@ describe('ReviewExecutionState', () => {
     });
   });
 
+  it('projects active closeout rereads into first-class termination boundary records', () => {
+    const state = new ReviewExecutionState({
+      startedAtMs: 0,
+      blockHeavyCommands: false,
+      enforceStartupAnchorBoundary: true,
+      startupAnchorMode: 'diff',
+      activeCloseoutBundleRoots: ['/repo/out/sample-task/manual/TODO-closeout'],
+      repoRoot: '/repo',
+      touchedPaths: ['scripts/run-review.ts']
+    });
+
+    let nowMs = 100;
+    for (const command of [
+      "/bin/zsh -lc 'sed -n 1,120p scripts/run-review.ts'",
+      "/bin/zsh -lc 'sed -n 1,120p out/sample-task/manual/TODO-closeout/09-review.log'",
+      "/bin/zsh -lc 'sed -n 1,120p /repo/out/sample-task/manual/TODO-closeout/13-override-notes.md'",
+      "/bin/zsh -lc 'sed -n 1,120p out/sample-task/manual/TODO-closeout/09-review.log'",
+      "/bin/zsh -lc 'sed -n 1,120p /repo/out/sample-task/manual/TODO-closeout/13-override-notes.md'",
+      "/bin/zsh -lc 'sed -n 1,120p out/sample-task/manual/TODO-closeout/09-review.log'"
+    ]) {
+      state.observeChunk('thinking\nexec\n', 'stdout', nowMs);
+      state.observeChunk(`${command}\n`, 'stdout', nowMs + 10);
+      nowMs += 100;
+    }
+
+    const boundary = state.getTerminationBoundaryRecordForKind('active-closeout-bundle-reread', 2_000);
+    expect(boundary).toEqual(
+      expect.objectContaining({
+        kind: 'active-closeout-bundle-reread',
+        provenance: 'post-startup-anchor',
+        reason: expect.stringContaining('active-closeout-bundle reread boundary violated'),
+        sample: expect.stringContaining('TODO-closeout')
+      })
+    );
+    expect(
+      state.getTerminationBoundaryRecord(
+        'bounded review active-closeout-bundle reread boundary violated after 610ms: repeated direct reread command(s) into the active closeout bundle after earlier bounded inspection via /bin/zsh -lc',
+        2_000
+      )
+    ).toEqual(
+      expect.objectContaining({
+        kind: 'active-closeout-bundle-reread',
+        provenance: 'post-startup-anchor'
+      })
+    );
+
+    const payload = state.buildTelemetryPayload({
+      status: 'failed',
+      error:
+        'bounded review active-closeout-bundle reread boundary violated after 610ms: repeated direct reread command(s) into the active closeout bundle after earlier bounded inspection via /bin/zsh -lc',
+      terminationBoundary: boundary,
+      outputLogPath: '/repo/.runs/sample/review/output.log',
+      repoRoot: '/repo',
+      includeRawTelemetry: false,
+      telemetryDebugEnvKey: 'CODEX_REVIEW_DEBUG_TELEMETRY'
+    });
+
+    expect(payload.termination_boundary).toEqual({
+      kind: 'active-closeout-bundle-reread',
+      provenance: 'post-startup-anchor',
+      reason: expect.stringContaining('active-closeout-bundle reread boundary violated'),
+      sample:
+        '[redacted active-closeout-bundle-reread sample; set CODEX_REVIEW_DEBUG_TELEMETRY=1 to persist raw sample]'
+    });
+  });
+
   it('persists an explicit termination boundary record without reparsing the failure prose', () => {
     const state = new ReviewExecutionState({
       startedAtMs: 0,
@@ -3130,6 +3196,48 @@ describe('ReviewExecutionState', () => {
     expect(summary.metaSurfaceSignals).toBe(2);
     expect(summary.metaSurfaceKinds).toContain('review-closeout-bundle');
     expect(summary.preAnchorMetaSurfaceKinds).toEqual([]);
+  });
+
+  it('keeps mixed active closeout search drift under generic meta-surface provenance', () => {
+    const state = new ReviewExecutionState({
+      startedAtMs: 0,
+      blockHeavyCommands: false,
+      metaSurfaceTimeoutMs: 1_000,
+      enforceStartupAnchorBoundary: true,
+      startupAnchorMode: 'diff',
+      activeCloseoutBundleRoots: ['/repo/out/sample-task/manual/TODO-closeout'],
+      repoRoot: '/repo',
+      touchedPaths: ['scripts/run-review.ts']
+    });
+
+    let nowMs = 100;
+    const commands = [
+      "/bin/zsh -lc 'sed -n 1,120p scripts/run-review.ts'",
+      "/bin/zsh -lc 'sed -n 1,120p docs/standalone-review-guide.md'",
+      "/bin/zsh -lc 'sed -n 1,120p .runs/sample-task/cli/sample-run/review/output.log'",
+      `/bin/zsh -lc 'grep -R "shellProbeCount" -n .'\nout/sample-task/manual/TODO-closeout/09-review.log:278:shellProbeCount`,
+      "/bin/zsh -lc 'sed -n 1,120p docs/standalone-review-guide.md'",
+      "/bin/zsh -lc 'sed -n 1,120p .runs/sample-task/cli/sample-run/review/output.log'",
+      `/bin/zsh -lc 'grep -R "shellProbeCount" -n .'\nout/sample-task/manual/TODO-closeout/09-review.log:278:shellProbeCount`
+    ];
+    for (const chunk of commands) {
+      state.observeChunk('thinking\nexec\n', 'stdout', nowMs);
+      state.observeChunk(`${chunk}\n`, 'stdout', nowMs + 10);
+      nowMs += 100;
+    }
+
+    const boundary = state.getTerminationBoundaryRecordForKind('meta-surface-expansion', 2_000);
+    const summary = state.buildOutputSummary();
+    expect(boundary).toEqual(
+      expect.objectContaining({
+        kind: 'meta-surface-expansion',
+        provenance: 'meta-surface-kinds',
+        reason: expect.stringContaining('meta-surface expansion detected')
+      })
+    );
+    expect(summary.metaSurfaceKinds).toEqual(
+      expect.arrayContaining(['review-artifacts', 'review-closeout-bundle', 'review-docs'])
+    );
   });
 
   it('classifies Windows-style search results that surface the active closeout bundle', () => {

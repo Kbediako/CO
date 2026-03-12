@@ -1,7 +1,7 @@
 ---
 id: 20260312-1133-coordinator-symphony-aligned-standalone-review-active-closeout-termination-boundary-taxonomy-split
 title: Coordinator Symphony-Aligned Standalone Review Active-Closeout Termination Boundary Taxonomy Split
-status: draft
+status: completed
 owners:
   - Codex
 created: 2026-03-12
@@ -35,3 +35,4 @@ Make the active-closeout taxonomy explicit by promoting only the dedicated activ
 
 - 2026-03-12: Registered after `1132` closed shell-probe parity. A bounded scout confirmed active-closeout is the next smallest truthful seam only if framed as a taxonomy split because search and reread behaviors are intentionally different today.
 - 2026-03-12: Pre-implementation local read-only review approved. The lane is intentionally scoped to promote only the deterministic active-closeout reread guard while preserving active-closeout search as `meta-surface-expansion`. Evidence: `docs/findings/1133-standalone-review-active-closeout-termination-boundary-taxonomy-split-deliberation.md`, `out/1133-coordinator-symphony-aligned-standalone-review-active-closeout-termination-boundary-taxonomy-split/manual/20260312T113500Z-docs-first/00-summary.md`.
+- 2026-03-12: Completed. Pure active-closeout search now keeps dedicated provenance only when it is the sole meta-surface family, mixed drift stays `meta-surface-kinds`, and direct rereads remain first-class under `active-closeout-bundle-reread`. Focused active-closeout regressions passed, build/lint/docs/pack-smoke passed, and the full-suite quiet-tail plus post-patch standalone-review drift were recorded as explicit overrides rather than false greens. Evidence: `out/1133-coordinator-symphony-aligned-standalone-review-active-closeout-termination-boundary-taxonomy-split/manual/20260312T104800Z-closeout/00-summary.md`, `out/1133-coordinator-symphony-aligned-standalone-review-active-closeout-termination-boundary-taxonomy-split/manual/20260312T104800Z-closeout/05-targeted-tests.log`, `out/1133-coordinator-symphony-aligned-standalone-review-active-closeout-termination-boundary-taxonomy-split/manual/20260312T104800Z-closeout/13-override-notes.md`.
