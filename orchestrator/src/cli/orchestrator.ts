@@ -44,7 +44,6 @@ import type {
 } from './types.js';
 import { generateRunId } from './utils/runId.js';
 import { runCommandStage } from './services/commandRunner.js';
-import { appendMetricsEntry } from './metrics/metricsRecorder.js';
 import { isoTimestamp } from './utils/time.js';
 import type { RunPaths } from './run/runPaths.js';
 import { resolveRunPaths, relativeToRepo } from './run/runPaths.js';
@@ -52,7 +51,6 @@ import { logger } from '../logger.js';
 import { getPrivacyGuard } from './services/execRuntime.js';
 import { PipelineResolver } from './services/pipelineResolver.js';
 import { ControlPlaneService } from './services/controlPlaneService.js';
-import { ControlWatcher } from './control/controlWatcher.js';
 import { SchedulerService } from './services/schedulerService.js';
 import {
   applyRuntimeToRunSummary,
@@ -70,22 +68,21 @@ import {
 } from './services/runPreparation.js';
 import { loadPackageConfig, loadUserConfig } from './config/userConfig.js';
 import { formatRepoConfigRequiredError, isRepoConfigRequired } from './config/repoConfigPolicy.js';
-import { RunEventEmitter, RunEventPublisher, snapshotStages } from './events/runEvents.js';
+import { RunEventEmitter, RunEventPublisher } from './events/runEvents.js';
 import { RunEventStream } from './events/runEventStream.js';
 import { CLI_EXECUTION_MODE_PARSER, resolveRequiresCloudPolicy } from '../utils/executionMode.js';
 import { resolveCodexCliBin } from './utils/codexCli.js';
 import { CodexCloudTaskExecutor } from '../cloud/CodexCloudTaskExecutor.js';
-import { persistPipelineExperience } from './services/pipelineExperience.js';
 import { runCloudPreflight } from './utils/cloudPreflight.js';
 import { writeJsonAtomic } from './utils/fs.js';
 import { resolveRuntimeMode, resolveRuntimeSelection } from './runtime/index.js';
 import type { RuntimeMode, RuntimeModeSource, RuntimeSelection } from './runtime/types.js';
 import {
   buildAutoScoutEvidence,
-  resolveAdvancedAutopilotDecision,
   type AdvancedAutopilotDecision
 } from './utils/advancedAutopilot.js';
 import { startOrchestratorControlPlaneLifecycle } from './services/orchestratorControlPlaneLifecycle.js';
+import { runOrchestratorExecutionLifecycle } from './services/orchestratorExecutionLifecycle.js';
 
 const resolveBaseEnvironment = (): EnvironmentPaths =>
   normalizeEnvironmentPaths(resolveEnvironmentPaths());
@@ -750,549 +747,387 @@ export class CodexOrchestrator {
     }
 
     const { env, pipeline, manifest, paths, runEvents } = options;
-    const notes: string[] = [];
-    let success = true;
-    manifest.guardrail_status = undefined;
 
-    if (runtimeSelection.fallback.occurred) {
-      const fallbackCode = runtimeSelection.fallback.code ?? 'runtime-fallback';
-      const fallbackReason = runtimeSelection.fallback.reason ?? 'runtime fallback occurred';
-      const fallbackSummary = `Runtime fallback (${fallbackCode}): ${fallbackReason}`;
-      appendSummary(manifest, fallbackSummary);
-      notes.push(fallbackSummary);
-    }
-
-    const advancedDecision = resolveAdvancedAutopilotDecision({
-      pipelineId: pipeline.id,
-      targetMetadata: (options.target.metadata ?? null) as Record<string, unknown> | null,
-      taskMetadata: (options.task.metadata ?? null) as Record<string, unknown> | null,
-      env: effectiveMergedEnv
-    });
-    if (advancedDecision.enabled || advancedDecision.source !== 'default') {
-      const advancedSummary =
-        `Advanced mode (${advancedDecision.mode}) ${advancedDecision.enabled ? 'enabled' : 'disabled'}: ${advancedDecision.reason}.`;
-      appendSummary(manifest, advancedSummary);
-      notes.push(advancedSummary);
-    }
-
-    const persister =
-      options.persister ??
-      new ManifestPersister({
-        manifest,
-        paths,
-        persistIntervalMs: Math.max(1000, manifest.heartbeat_interval_seconds * 1000)
-      });
-    const schedulePersist = (
-      options: { manifest?: boolean; heartbeat?: boolean; force?: boolean } = {}
-    ): Promise<void> => persister.schedule(options);
-
-    const pushHeartbeat = (forceManifest = false): Promise<void> => {
-      updateHeartbeat(manifest);
-      return schedulePersist({ manifest: forceManifest, heartbeat: true, force: forceManifest });
-    };
-
-    const controlWatcher = new ControlWatcher({
-      paths,
+    return runOrchestratorExecutionLifecycle({
+      env,
+      pipeline,
       manifest,
+      paths,
+      mode: options.mode,
+      target: options.target,
+      task: options.task,
+      runEvents,
       eventStream: options.eventStream,
-      onEntry: options.onEventEntry,
-      persist: () => schedulePersist({ manifest: true, force: true })
+      onEventEntry: options.onEventEntry,
+      persister: options.persister,
+      envOverrides: effectiveEnvOverrides,
+      advancedDecisionEnv: effectiveMergedEnv,
+      defaultFailureStatusDetail: 'pipeline-failed',
+      beforeStart: ({ notes }) => {
+        if (runtimeSelection.fallback.occurred) {
+          const fallbackCode = runtimeSelection.fallback.code ?? 'runtime-fallback';
+          const fallbackReason = runtimeSelection.fallback.reason ?? 'runtime fallback occurred';
+          const fallbackSummary = `Runtime fallback (${fallbackCode}): ${fallbackReason}`;
+          appendSummary(manifest, fallbackSummary);
+          notes.push(fallbackSummary);
+        }
+      },
+      runAutoScout: (autoScoutOptions) =>
+        this.runAutoScout({
+          ...autoScoutOptions,
+          envOverrides: effectiveEnvOverrides
+        }),
+      executeBody: async ({ notes, persister, controlWatcher, schedulePersist }) => {
+        let success = true;
+
+        for (let i = 0; i < pipeline.stages.length; i += 1) {
+          await controlWatcher.sync();
+          await controlWatcher.waitForResume();
+          if (controlWatcher.isCanceled()) {
+            manifest.status_detail = 'run-canceled';
+            success = false;
+            break;
+          }
+          const stage = pipeline.stages[i];
+          const entry = manifest.commands[i];
+          if (!entry) {
+            continue;
+          }
+          if (entry.status === 'succeeded' || entry.status === 'skipped') {
+            notes.push(`${stage.title}: ${entry.status}`);
+            continue;
+          }
+
+          entry.status = 'pending';
+          entry.started_at = isoTimestamp();
+          void schedulePersist({ manifest: true });
+
+          if (stage.kind === 'command') {
+            try {
+              const result = await runCommandStage({
+                env,
+                paths,
+                manifest,
+                stage,
+                index: entry.index,
+                events: runEvents,
+                persister,
+                envOverrides: effectiveEnvOverrides,
+                runtimeMode: runtimeSelection.selected_mode,
+                runtimeSessionId: runtimeSelection.runtime_session_id
+              });
+              notes.push(`${stage.title}: ${result.summary}`);
+              const updatedEntry = manifest.commands[i];
+              if (updatedEntry?.status === 'failed') {
+                manifest.status_detail = `stage:${stage.id}:failed`;
+                appendSummary(manifest, `Stage '${stage.title}' failed with exit code ${result.exitCode}.`);
+                success = false;
+                await schedulePersist({ manifest: true, force: true });
+                break;
+              }
+            } catch (error) {
+              entry.status = 'failed';
+              entry.completed_at = isoTimestamp();
+              entry.summary = `Execution error: ${(error as Error)?.message ?? String(error)}`;
+              manifest.status_detail = `stage:${stage.id}:error`;
+              appendSummary(manifest, entry.summary);
+              await schedulePersist({ manifest: true, force: true });
+              runEvents?.stageCompleted({
+                stageId: stage.id,
+                stageIndex: entry.index,
+                title: stage.title,
+                kind: 'command',
+                status: entry.status,
+                exitCode: entry.exit_code,
+                summary: entry.summary,
+                logPath: entry.log_path
+              });
+              success = false;
+              break;
+            }
+          } else {
+            entry.status = 'running';
+            await schedulePersist({ manifest: true, force: true });
+            runEvents?.stageStarted({
+              stageId: stage.id,
+              stageIndex: entry.index,
+              title: stage.title,
+              kind: 'subpipeline',
+              logPath: entry.log_path,
+              status: entry.status
+            });
+            try {
+              const child = await this.start({
+                taskId: env.taskId,
+                pipelineId: stage.pipeline,
+                parentRunId: manifest.run_id,
+                format: 'json',
+                executionMode: options.executionModeOverride,
+                runtimeMode: options.runtimeModeRequested
+              });
+              entry.completed_at = isoTimestamp();
+              entry.sub_run_id = child.manifest.run_id;
+              entry.summary = child.runSummary.review.summary ?? null;
+              entry.status =
+                child.manifest.status === 'succeeded' ? 'succeeded' : stage.optional ? 'skipped' : 'failed';
+              entry.command = null;
+              manifest.child_runs.push({
+                run_id: child.manifest.run_id,
+                pipeline_id: stage.pipeline,
+                status: child.manifest.status,
+                manifest: relativeToRepo(env, resolveRunPaths(env, child.manifest.run_id).manifestPath)
+              });
+              notes.push(`${stage.title}: ${entry.status}`);
+              await schedulePersist({ manifest: true, force: true });
+              runEvents?.stageCompleted({
+                stageId: stage.id,
+                stageIndex: entry.index,
+                title: stage.title,
+                kind: 'subpipeline',
+                status: entry.status,
+                exitCode: entry.exit_code,
+                summary: entry.summary,
+                logPath: entry.log_path,
+                subRunId: entry.sub_run_id
+              });
+              if (!stage.optional && entry.status === 'failed') {
+                manifest.status_detail = `subpipeline:${stage.pipeline}:failed`;
+                appendSummary(manifest, `Sub-pipeline '${stage.pipeline}' failed.`);
+                await schedulePersist({ manifest: true, force: true });
+                success = false;
+                break;
+              }
+            } catch (error) {
+              entry.completed_at = isoTimestamp();
+              entry.summary = `Sub-pipeline error: ${(error as Error)?.message ?? String(error)}`;
+              entry.status = stage.optional ? 'skipped' : 'failed';
+              entry.command = null;
+              manifest.status_detail = `subpipeline:${stage.pipeline}:error`;
+              appendSummary(manifest, entry.summary);
+              notes.push(`${stage.title}: ${entry.status}`);
+              await schedulePersist({ manifest: true, force: true });
+              runEvents?.stageCompleted({
+                stageId: stage.id,
+                stageIndex: entry.index,
+                title: stage.title,
+                kind: 'subpipeline',
+                status: entry.status,
+                exitCode: entry.exit_code,
+                summary: entry.summary,
+                logPath: entry.log_path,
+                subRunId: entry.sub_run_id
+              });
+              if (!stage.optional) {
+                success = false;
+                break;
+              }
+            }
+          }
+        }
+
+        return success;
+      },
+      afterFinalize: () => {
+        const guardrailStatus = ensureGuardrailStatus(manifest);
+        if (guardrailStatus.recommendation) {
+          appendSummary(manifest, guardrailStatus.recommendation);
+        }
+      }
     });
+  }
 
-    manifest.status = 'in_progress';
-    updateHeartbeat(manifest);
-    await schedulePersist({ manifest: true, heartbeat: true, force: true });
-    runEvents?.runStarted(snapshotStages(manifest, pipeline), manifest.status);
+  private async executeCloudPipeline(options: ExecutePipelineOptions): Promise<PipelineRunExecutionResult> {
+    const { env, pipeline, manifest, paths, runEvents, target, task, envOverrides } = options;
 
-    if (advancedDecision.autoScout) {
-      const scoutOutcome = await this.runAutoScout({
-        env,
-        paths,
-        manifest,
-        mode: options.mode,
-        pipeline,
-        target: options.target,
-        task: options.task,
-        envOverrides: effectiveEnvOverrides,
-        advancedDecision
-      });
-      const scoutMessage =
-        scoutOutcome.status === 'recorded'
-          ? `Auto scout: evidence recorded at ${scoutOutcome.path}.`
-          : `Auto scout: ${scoutOutcome.message} (non-blocking).`;
-      appendSummary(manifest, scoutMessage);
-      notes.push(scoutMessage);
-      await schedulePersist({ manifest: true, force: true });
-    }
+    return runOrchestratorExecutionLifecycle({
+      env,
+      pipeline,
+      manifest,
+      paths,
+      mode: options.mode,
+      target,
+      task,
+      runEvents,
+      eventStream: options.eventStream,
+      onEventEntry: options.onEventEntry,
+      persister: options.persister,
+      envOverrides,
+      advancedDecisionEnv: { ...process.env, ...(envOverrides ?? {}) },
+      defaultFailureStatusDetail: 'cloud-execution-failed',
+      runAutoScout: (autoScoutOptions) => this.runAutoScout(autoScoutOptions),
+      executeBody: async ({ notes, controlWatcher, schedulePersist }) => {
+        let success = true;
+        const targetStageId = this.resolveTargetStageId(target, pipeline);
+        const targetStage = targetStageId
+          ? pipeline.stages.find((stage) => stage.id === targetStageId)
+          : undefined;
+        const targetEntry = targetStageId
+          ? manifest.commands.find((command) => command.id === targetStageId)
+          : undefined;
 
-    const heartbeatInterval = setInterval(() => {
-      void pushHeartbeat(false).catch((error) => {
-        logger.warn(
-          `Heartbeat update failed for run ${manifest.run_id}: ${(error as Error)?.message ?? String(error)}`
-        );
-      });
-    }, manifest.heartbeat_interval_seconds * 1000);
-
-    try {
-      for (let i = 0; i < pipeline.stages.length; i += 1) {
         await controlWatcher.sync();
         await controlWatcher.waitForResume();
         if (controlWatcher.isCanceled()) {
           manifest.status_detail = 'run-canceled';
           success = false;
-          break;
-        }
-        const stage = pipeline.stages[i];
-        const entry = manifest.commands[i];
-        if (!entry) {
-          continue;
-        }
-        if (entry.status === 'succeeded' || entry.status === 'skipped') {
-          notes.push(`${stage.title}: ${entry.status}`);
-          continue;
-        }
-
-        entry.status = 'pending';
-        entry.started_at = isoTimestamp();
-        void schedulePersist({ manifest: true });
-
-        if (stage.kind === 'command') {
-          try {
-            const result = await runCommandStage({
-              env,
-              paths,
-              manifest,
-              stage,
-              index: entry.index,
-              events: runEvents,
-              persister,
-              envOverrides: effectiveEnvOverrides,
-              runtimeMode: runtimeSelection.selected_mode,
-              runtimeSessionId: runtimeSelection.runtime_session_id
-            });
-            notes.push(`${stage.title}: ${result.summary}`);
-            const updatedEntry = manifest.commands[i];
-            if (updatedEntry?.status === 'failed') {
-              manifest.status_detail = `stage:${stage.id}:failed`;
-              appendSummary(manifest, `Stage '${stage.title}' failed with exit code ${result.exitCode}.`);
-              success = false;
-              await schedulePersist({ manifest: true, force: true });
-              break;
-            }
-          } catch (error) {
-            entry.status = 'failed';
-            entry.completed_at = isoTimestamp();
-            entry.summary = `Execution error: ${(error as Error)?.message ?? String(error)}`;
-            manifest.status_detail = `stage:${stage.id}:error`;
-            appendSummary(manifest, entry.summary);
-            await schedulePersist({ manifest: true, force: true });
-            runEvents?.stageCompleted({
-              stageId: stage.id,
-              stageIndex: entry.index,
-              title: stage.title,
-              kind: 'command',
-              status: entry.status,
-              exitCode: entry.exit_code,
-              summary: entry.summary,
-              logPath: entry.log_path
-            });
-            success = false;
-            break;
-          }
-        } else {
-          entry.status = 'running';
-          await schedulePersist({ manifest: true, force: true });
-          runEvents?.stageStarted({
-            stageId: stage.id,
-            stageIndex: entry.index,
-            title: stage.title,
-            kind: 'subpipeline',
-            logPath: entry.log_path,
-            status: entry.status
-          });
-          try {
-            const child = await this.start({
-              taskId: env.taskId,
-              pipelineId: stage.pipeline,
-              parentRunId: manifest.run_id,
-              format: 'json',
-              executionMode: options.executionModeOverride,
-              runtimeMode: options.runtimeModeRequested
-            });
-            entry.completed_at = isoTimestamp();
-            entry.sub_run_id = child.manifest.run_id;
-            entry.summary = child.runSummary.review.summary ?? null;
-            entry.status = child.manifest.status === 'succeeded' ? 'succeeded' : stage.optional ? 'skipped' : 'failed';
-            entry.command = null;
-            manifest.child_runs.push({
-              run_id: child.manifest.run_id,
-              pipeline_id: stage.pipeline,
-              status: child.manifest.status,
-              manifest: relativeToRepo(env, resolveRunPaths(env, child.manifest.run_id).manifestPath)
-            });
-            notes.push(`${stage.title}: ${entry.status}`);
-            await schedulePersist({ manifest: true, force: true });
-            runEvents?.stageCompleted({
-              stageId: stage.id,
-              stageIndex: entry.index,
-              title: stage.title,
-              kind: 'subpipeline',
-              status: entry.status,
-              exitCode: entry.exit_code,
-              summary: entry.summary,
-              logPath: entry.log_path,
-              subRunId: entry.sub_run_id
-            });
-            if (!stage.optional && entry.status === 'failed') {
-              manifest.status_detail = `subpipeline:${stage.pipeline}:failed`;
-              appendSummary(manifest, `Sub-pipeline '${stage.pipeline}' failed.`);
-              await schedulePersist({ manifest: true, force: true });
-              success = false;
-              break;
-            }
-          } catch (error) {
-            entry.completed_at = isoTimestamp();
-            entry.summary = `Sub-pipeline error: ${(error as Error)?.message ?? String(error)}`;
-            entry.status = stage.optional ? 'skipped' : 'failed';
-            entry.command = null;
-            manifest.status_detail = `subpipeline:${stage.pipeline}:error`;
-            appendSummary(manifest, entry.summary);
-            notes.push(`${stage.title}: ${entry.status}`);
-            await schedulePersist({ manifest: true, force: true });
-            runEvents?.stageCompleted({
-              stageId: stage.id,
-              stageIndex: entry.index,
-              title: stage.title,
-              kind: 'subpipeline',
-              status: entry.status,
-              exitCode: entry.exit_code,
-              summary: entry.summary,
-              logPath: entry.log_path,
-              subRunId: entry.sub_run_id
-            });
-            if (!stage.optional) {
-              success = false;
-              break;
-            }
-          }
-        }
-      }
-    } finally {
-      clearInterval(heartbeatInterval);
-      await schedulePersist({ force: true });
-    }
-
-    await controlWatcher.sync();
-
-    if (controlWatcher.isCanceled()) {
-      finalizeStatus(manifest, 'cancelled', manifest.status_detail ?? 'run-canceled');
-    } else if (success) {
-      finalizeStatus(manifest, 'succeeded');
-    } else {
-      finalizeStatus(manifest, 'failed', manifest.status_detail ?? 'pipeline-failed');
-    }
-
-    const guardrailStatus = ensureGuardrailStatus(manifest);
-    if (guardrailStatus.recommendation) {
-      appendSummary(manifest, guardrailStatus.recommendation);
-    }
-
-    updateHeartbeat(manifest);
-    await schedulePersist({ manifest: true, heartbeat: true, force: true }).catch((error) => {
-      logger.warn(
-        `Heartbeat update failed for run ${manifest.run_id}: ${(error as Error)?.message ?? String(error)}`
-      );
-    });
-    await persistPipelineExperience({ env, pipeline, manifest, paths });
-    await schedulePersist({ force: true });
-    await appendMetricsEntry(env, paths, manifest, persister);
-
-    return {
-      success,
-      notes,
-      manifest,
-      manifestPath: relativeToRepo(env, paths.manifestPath),
-      logPath: relativeToRepo(env, paths.logPath)
-    };
-  }
-
-  private async executeCloudPipeline(options: ExecutePipelineOptions): Promise<PipelineRunExecutionResult> {
-    const { env, pipeline, manifest, paths, runEvents, target, task, envOverrides } = options;
-    const notes: string[] = [];
-    let success = true;
-    manifest.guardrail_status = undefined;
-
-    const persister =
-      options.persister ??
-      new ManifestPersister({
-        manifest,
-        paths,
-        persistIntervalMs: Math.max(1000, manifest.heartbeat_interval_seconds * 1000)
-      });
-    const schedulePersist = (
-      persistOptions: { manifest?: boolean; heartbeat?: boolean; force?: boolean } = {}
-    ): Promise<void> => persister.schedule(persistOptions);
-
-    const pushHeartbeat = (forceManifest = false): Promise<void> => {
-      updateHeartbeat(manifest);
-      return schedulePersist({ manifest: forceManifest, heartbeat: true, force: forceManifest });
-    };
-
-    const controlWatcher = new ControlWatcher({
-      paths,
-      manifest,
-      eventStream: options.eventStream,
-      onEntry: options.onEventEntry,
-      persist: () => schedulePersist({ manifest: true, force: true })
-    });
-
-    manifest.status = 'in_progress';
-    updateHeartbeat(manifest);
-    await schedulePersist({ manifest: true, heartbeat: true, force: true });
-    runEvents?.runStarted(snapshotStages(manifest, pipeline), manifest.status);
-
-    const advancedDecision = resolveAdvancedAutopilotDecision({
-      pipelineId: pipeline.id,
-      targetMetadata: (target.metadata ?? null) as Record<string, unknown> | null,
-      taskMetadata: (task.metadata ?? null) as Record<string, unknown> | null,
-      env: { ...process.env, ...(envOverrides ?? {}) }
-    });
-    if (advancedDecision.enabled || advancedDecision.source !== 'default') {
-      const advancedSummary =
-        `Advanced mode (${advancedDecision.mode}) ${advancedDecision.enabled ? 'enabled' : 'disabled'}: ${advancedDecision.reason}.`;
-      appendSummary(manifest, advancedSummary);
-      notes.push(advancedSummary);
-      await schedulePersist({ manifest: true, force: true });
-    }
-    if (advancedDecision.autoScout) {
-      const scoutOutcome = await this.runAutoScout({
-        env,
-        paths,
-        manifest,
-        mode: options.mode,
-        pipeline,
-        target,
-        task,
-        envOverrides,
-        advancedDecision
-      });
-      const scoutMessage =
-        scoutOutcome.status === 'recorded'
-          ? `Auto scout: evidence recorded at ${scoutOutcome.path}.`
-          : `Auto scout: ${scoutOutcome.message} (non-blocking).`;
-      appendSummary(manifest, scoutMessage);
-      notes.push(scoutMessage);
-      await schedulePersist({ manifest: true, force: true });
-    }
-
-    const heartbeatInterval = setInterval(() => {
-      void pushHeartbeat(false).catch((error) => {
-        logger.warn(
-          `Heartbeat update failed for run ${manifest.run_id}: ${(error as Error)?.message ?? String(error)}`
-        );
-      });
-    }, manifest.heartbeat_interval_seconds * 1000);
-
-    const targetStageId = this.resolveTargetStageId(target, pipeline);
-    const targetStage = targetStageId
-      ? pipeline.stages.find((stage) => stage.id === targetStageId)
-      : undefined;
-    const targetEntry = targetStageId
-      ? manifest.commands.find((command) => command.id === targetStageId)
-      : undefined;
-
-    try {
-      await controlWatcher.sync();
-      await controlWatcher.waitForResume();
-      if (controlWatcher.isCanceled()) {
-        manifest.status_detail = 'run-canceled';
-        success = false;
-      } else if (!targetStage || targetStage.kind !== 'command' || !targetEntry) {
-        success = false;
-        manifest.status_detail = 'cloud-target-missing';
-        const detail = targetStageId
-          ? `Cloud execution target "${targetStageId}" could not be resolved to a command stage.`
-          : `Cloud execution target "${target.id}" could not be resolved.`;
-        appendSummary(manifest, detail);
-        notes.push(detail);
-      } else {
-        for (let i = 0; i < manifest.commands.length; i += 1) {
-          const entry = manifest.commands[i];
-          if (!entry || entry.id === targetStageId) {
-            continue;
-          }
-          entry.status = 'skipped';
-          entry.started_at = entry.started_at ?? isoTimestamp();
-          entry.completed_at = isoTimestamp();
-          entry.summary = `Skipped in cloud mode (target stage: ${targetStageId}).`;
-        }
-
-        const environmentId = resolveCloudEnvironmentId(task, target, envOverrides);
-        if (!environmentId) {
+        } else if (!targetStage || targetStage.kind !== 'command' || !targetEntry) {
           success = false;
-          manifest.status_detail = 'cloud-env-missing';
-          const detail =
-            'Cloud execution requested but no environment id is configured. Set CODEX_CLOUD_ENV_ID or provide target metadata.cloudEnvId.';
-          manifest.cloud_execution = {
-            task_id: null,
-            environment_id: null,
-            status: 'failed',
-            status_url: null,
-            submitted_at: null,
-            completed_at: isoTimestamp(),
-            last_polled_at: null,
-            poll_count: 0,
-            poll_interval_seconds: DEFAULT_CLOUD_POLL_INTERVAL_SECONDS,
-            timeout_seconds: DEFAULT_CLOUD_TIMEOUT_SECONDS,
-            attempts: DEFAULT_CLOUD_ATTEMPTS,
-            diff_path: null,
-            diff_url: null,
-            diff_status: 'unavailable',
-            apply_status: 'not_requested',
-            log_path: null,
-            error: detail
-          };
+          manifest.status_detail = 'cloud-target-missing';
+          const detail = targetStageId
+            ? `Cloud execution target "${targetStageId}" could not be resolved to a command stage.`
+            : `Cloud execution target "${target.id}" could not be resolved.`;
           appendSummary(manifest, detail);
           notes.push(detail);
-          targetEntry.status = 'failed';
-          targetEntry.started_at = targetEntry.started_at ?? isoTimestamp();
-          targetEntry.completed_at = isoTimestamp();
-          targetEntry.exit_code = 1;
-          targetEntry.summary = detail;
         } else {
-          targetEntry.status = 'running';
-          targetEntry.started_at = isoTimestamp();
-          await schedulePersist({ manifest: true, force: true });
-          runEvents?.stageStarted({
-            stageId: targetStage.id,
-            stageIndex: targetEntry.index,
-            title: targetStage.title,
-            kind: 'command',
-            logPath: targetEntry.log_path,
-            status: targetEntry.status
-          });
-
-          const executor = new CodexCloudTaskExecutor();
-          const prompt = this.buildCloudPrompt(task, target, pipeline, targetStage, manifest);
-          const pollIntervalSeconds = readCloudNumber(
-            envOverrides?.CODEX_CLOUD_POLL_INTERVAL_SECONDS ?? process.env.CODEX_CLOUD_POLL_INTERVAL_SECONDS,
-            DEFAULT_CLOUD_POLL_INTERVAL_SECONDS
-          );
-          const timeoutSeconds = readCloudNumber(
-            envOverrides?.CODEX_CLOUD_TIMEOUT_SECONDS ?? process.env.CODEX_CLOUD_TIMEOUT_SECONDS,
-            DEFAULT_CLOUD_TIMEOUT_SECONDS
-          );
-          const attempts = readCloudNumber(
-            envOverrides?.CODEX_CLOUD_EXEC_ATTEMPTS ?? process.env.CODEX_CLOUD_EXEC_ATTEMPTS,
-            DEFAULT_CLOUD_ATTEMPTS
-          );
-          const statusRetryLimit = readCloudNumber(
-            envOverrides?.CODEX_CLOUD_STATUS_RETRY_LIMIT ?? process.env.CODEX_CLOUD_STATUS_RETRY_LIMIT,
-            DEFAULT_CLOUD_STATUS_RETRY_LIMIT
-          );
-          const statusRetryBackoffMs = readCloudNumber(
-            envOverrides?.CODEX_CLOUD_STATUS_RETRY_BACKOFF_MS ?? process.env.CODEX_CLOUD_STATUS_RETRY_BACKOFF_MS,
-            DEFAULT_CLOUD_STATUS_RETRY_BACKOFF_MS
-          );
-          const branch =
-            readCloudString(envOverrides?.CODEX_CLOUD_BRANCH) ??
-            readCloudString(process.env.CODEX_CLOUD_BRANCH);
-          const enableFeatures = readCloudFeatureList(
-            readCloudString(envOverrides?.CODEX_CLOUD_ENABLE_FEATURES) ??
-              readCloudString(process.env.CODEX_CLOUD_ENABLE_FEATURES)
-          );
-          const disableFeatures = readCloudFeatureList(
-            readCloudString(envOverrides?.CODEX_CLOUD_DISABLE_FEATURES) ??
-              readCloudString(process.env.CODEX_CLOUD_DISABLE_FEATURES)
-          );
-          const codexBin = resolveCodexCliBin({ ...process.env, ...(envOverrides ?? {}) });
-          const cloudEnvOverrides: NodeJS.ProcessEnv = {
-            ...(envOverrides ?? {}),
-            CODEX_NON_INTERACTIVE:
-              envOverrides?.CODEX_NON_INTERACTIVE ?? process.env.CODEX_NON_INTERACTIVE ?? '1',
-            CODEX_NO_INTERACTIVE:
-              envOverrides?.CODEX_NO_INTERACTIVE ?? process.env.CODEX_NO_INTERACTIVE ?? '1',
-            CODEX_INTERACTIVE: envOverrides?.CODEX_INTERACTIVE ?? process.env.CODEX_INTERACTIVE ?? '0'
-          };
-          const cloudResult = await executor.execute({
-            codexBin,
-            prompt,
-            environmentId,
-            repoRoot: env.repoRoot,
-            runDir: paths.runDir,
-            pollIntervalSeconds,
-            timeoutSeconds,
-            attempts,
-            statusRetryLimit,
-            statusRetryBackoffMs,
-            branch,
-            enableFeatures,
-            disableFeatures,
-            env: cloudEnvOverrides,
-            onUpdate: async (cloudExecution) => {
-              manifest.cloud_execution = cloudExecution;
-              targetEntry.log_path = cloudExecution.log_path;
-              await schedulePersist({ manifest: true, force: true });
+          for (let i = 0; i < manifest.commands.length; i += 1) {
+            const entry = manifest.commands[i];
+            if (!entry || entry.id === targetStageId) {
+              continue;
             }
-          });
-
-          success = cloudResult.success;
-          notes.push(...cloudResult.notes);
-          manifest.cloud_execution = cloudResult.cloudExecution;
-          targetEntry.log_path = cloudResult.cloudExecution.log_path;
-          targetEntry.completed_at = isoTimestamp();
-          targetEntry.exit_code = cloudResult.success ? 0 : 1;
-          targetEntry.status = cloudResult.success ? 'succeeded' : 'failed';
-          targetEntry.summary = cloudResult.summary;
-          if (!cloudResult.success) {
-            manifest.status_detail = `cloud:${targetStage.id}:failed`;
-            appendSummary(manifest, cloudResult.summary);
+            entry.status = 'skipped';
+            entry.started_at = entry.started_at ?? isoTimestamp();
+            entry.completed_at = isoTimestamp();
+            entry.summary = `Skipped in cloud mode (target stage: ${targetStageId}).`;
           }
-          await schedulePersist({ manifest: true, force: true });
-          runEvents?.stageCompleted({
-            stageId: targetStage.id,
-            stageIndex: targetEntry.index,
-            title: targetStage.title,
-            kind: 'command',
-            status: targetEntry.status,
-            exitCode: targetEntry.exit_code,
-            summary: targetEntry.summary,
-            logPath: targetEntry.log_path
-          });
+
+          const environmentId = resolveCloudEnvironmentId(task, target, envOverrides);
+          if (!environmentId) {
+            success = false;
+            manifest.status_detail = 'cloud-env-missing';
+            const detail =
+              'Cloud execution requested but no environment id is configured. Set CODEX_CLOUD_ENV_ID or provide target metadata.cloudEnvId.';
+            manifest.cloud_execution = {
+              task_id: null,
+              environment_id: null,
+              status: 'failed',
+              status_url: null,
+              submitted_at: null,
+              completed_at: isoTimestamp(),
+              last_polled_at: null,
+              poll_count: 0,
+              poll_interval_seconds: DEFAULT_CLOUD_POLL_INTERVAL_SECONDS,
+              timeout_seconds: DEFAULT_CLOUD_TIMEOUT_SECONDS,
+              attempts: DEFAULT_CLOUD_ATTEMPTS,
+              diff_path: null,
+              diff_url: null,
+              diff_status: 'unavailable',
+              apply_status: 'not_requested',
+              log_path: null,
+              error: detail
+            };
+            appendSummary(manifest, detail);
+            notes.push(detail);
+            targetEntry.status = 'failed';
+            targetEntry.started_at = targetEntry.started_at ?? isoTimestamp();
+            targetEntry.completed_at = isoTimestamp();
+            targetEntry.exit_code = 1;
+            targetEntry.summary = detail;
+          } else {
+            targetEntry.status = 'running';
+            targetEntry.started_at = isoTimestamp();
+            await schedulePersist({ manifest: true, force: true });
+            runEvents?.stageStarted({
+              stageId: targetStage.id,
+              stageIndex: targetEntry.index,
+              title: targetStage.title,
+              kind: 'command',
+              logPath: targetEntry.log_path,
+              status: targetEntry.status
+            });
+
+            const executor = new CodexCloudTaskExecutor();
+            const prompt = this.buildCloudPrompt(task, target, pipeline, targetStage, manifest);
+            const pollIntervalSeconds = readCloudNumber(
+              envOverrides?.CODEX_CLOUD_POLL_INTERVAL_SECONDS ?? process.env.CODEX_CLOUD_POLL_INTERVAL_SECONDS,
+              DEFAULT_CLOUD_POLL_INTERVAL_SECONDS
+            );
+            const timeoutSeconds = readCloudNumber(
+              envOverrides?.CODEX_CLOUD_TIMEOUT_SECONDS ?? process.env.CODEX_CLOUD_TIMEOUT_SECONDS,
+              DEFAULT_CLOUD_TIMEOUT_SECONDS
+            );
+            const attempts = readCloudNumber(
+              envOverrides?.CODEX_CLOUD_EXEC_ATTEMPTS ?? process.env.CODEX_CLOUD_EXEC_ATTEMPTS,
+              DEFAULT_CLOUD_ATTEMPTS
+            );
+            const statusRetryLimit = readCloudNumber(
+              envOverrides?.CODEX_CLOUD_STATUS_RETRY_LIMIT ?? process.env.CODEX_CLOUD_STATUS_RETRY_LIMIT,
+              DEFAULT_CLOUD_STATUS_RETRY_LIMIT
+            );
+            const statusRetryBackoffMs = readCloudNumber(
+              envOverrides?.CODEX_CLOUD_STATUS_RETRY_BACKOFF_MS ?? process.env.CODEX_CLOUD_STATUS_RETRY_BACKOFF_MS,
+              DEFAULT_CLOUD_STATUS_RETRY_BACKOFF_MS
+            );
+            const branch =
+              readCloudString(envOverrides?.CODEX_CLOUD_BRANCH) ??
+              readCloudString(process.env.CODEX_CLOUD_BRANCH);
+            const enableFeatures = readCloudFeatureList(
+              readCloudString(envOverrides?.CODEX_CLOUD_ENABLE_FEATURES) ??
+                readCloudString(process.env.CODEX_CLOUD_ENABLE_FEATURES)
+            );
+            const disableFeatures = readCloudFeatureList(
+              readCloudString(envOverrides?.CODEX_CLOUD_DISABLE_FEATURES) ??
+                readCloudString(process.env.CODEX_CLOUD_DISABLE_FEATURES)
+            );
+            const codexBin = resolveCodexCliBin({ ...process.env, ...(envOverrides ?? {}) });
+            const cloudEnvOverrides: NodeJS.ProcessEnv = {
+              ...(envOverrides ?? {}),
+              CODEX_NON_INTERACTIVE:
+                envOverrides?.CODEX_NON_INTERACTIVE ?? process.env.CODEX_NON_INTERACTIVE ?? '1',
+              CODEX_NO_INTERACTIVE:
+                envOverrides?.CODEX_NO_INTERACTIVE ?? process.env.CODEX_NO_INTERACTIVE ?? '1',
+              CODEX_INTERACTIVE: envOverrides?.CODEX_INTERACTIVE ?? process.env.CODEX_INTERACTIVE ?? '0'
+            };
+            const cloudResult = await executor.execute({
+              codexBin,
+              prompt,
+              environmentId,
+              repoRoot: env.repoRoot,
+              runDir: paths.runDir,
+              pollIntervalSeconds,
+              timeoutSeconds,
+              attempts,
+              statusRetryLimit,
+              statusRetryBackoffMs,
+              branch,
+              enableFeatures,
+              disableFeatures,
+              env: cloudEnvOverrides,
+              onUpdate: async (cloudExecution) => {
+                manifest.cloud_execution = cloudExecution;
+                targetEntry.log_path = cloudExecution.log_path;
+                await schedulePersist({ manifest: true, force: true });
+              }
+            });
+
+            success = cloudResult.success;
+            notes.push(...cloudResult.notes);
+            manifest.cloud_execution = cloudResult.cloudExecution;
+            targetEntry.log_path = cloudResult.cloudExecution.log_path;
+            targetEntry.completed_at = isoTimestamp();
+            targetEntry.exit_code = cloudResult.success ? 0 : 1;
+            targetEntry.status = cloudResult.success ? 'succeeded' : 'failed';
+            targetEntry.summary = cloudResult.summary;
+            if (!cloudResult.success) {
+              manifest.status_detail = `cloud:${targetStage.id}:failed`;
+              appendSummary(manifest, cloudResult.summary);
+            }
+            await schedulePersist({ manifest: true, force: true });
+            runEvents?.stageCompleted({
+              stageId: targetStage.id,
+              stageIndex: targetEntry.index,
+              title: targetStage.title,
+              kind: 'command',
+              status: targetEntry.status,
+              exitCode: targetEntry.exit_code,
+              summary: targetEntry.summary,
+              logPath: targetEntry.log_path
+            });
+          }
         }
+
+        return success;
       }
-    } finally {
-      clearInterval(heartbeatInterval);
-      await schedulePersist({ force: true });
-    }
-
-    await controlWatcher.sync();
-
-    if (controlWatcher.isCanceled()) {
-      finalizeStatus(manifest, 'cancelled', manifest.status_detail ?? 'run-canceled');
-    } else if (success) {
-      finalizeStatus(manifest, 'succeeded');
-    } else {
-      finalizeStatus(manifest, 'failed', manifest.status_detail ?? 'cloud-execution-failed');
-    }
-
-    updateHeartbeat(manifest);
-    await schedulePersist({ manifest: true, heartbeat: true, force: true }).catch((error) => {
-      logger.warn(
-        `Heartbeat update failed for run ${manifest.run_id}: ${(error as Error)?.message ?? String(error)}`
-      );
     });
-    await persistPipelineExperience({ env, pipeline, manifest, paths });
-    await schedulePersist({ force: true });
-    await appendMetricsEntry(env, paths, manifest, persister);
-
-    return {
-      success,
-      notes,
-      manifest,
-      manifestPath: relativeToRepo(env, paths.manifestPath),
-      logPath: relativeToRepo(env, paths.logPath)
-    };
   }
 
   private resolveTargetStageId(target: PlanItem, pipeline: PipelineDefinition): string | null {
