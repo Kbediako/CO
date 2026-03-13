@@ -3,6 +3,55 @@
   "generated_at": "2026-03-13",
   "entries": [
     {
+      "path": "tasks/tasks-1151-coordinator-symphony-aligned-control-telegram-bridge-bootstrap-oversight-factory-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-13",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/specs/1151-coordinator-symphony-aligned-control-telegram-bridge-bootstrap-oversight-factory-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-13",
+      "cadence_days": 30
+    },
+    {
+      "path": ".agent/task/1151-coordinator-symphony-aligned-control-telegram-bridge-bootstrap-oversight-factory-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-13",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/findings/1151-control-telegram-bridge-bootstrap-oversight-factory-extraction-deliberation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-13",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/TECH_SPEC-coordinator-symphony-aligned-control-telegram-bridge-bootstrap-oversight-factory-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-13",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/PRD-coordinator-symphony-aligned-control-telegram-bridge-bootstrap-oversight-factory-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-13",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-control-telegram-bridge-bootstrap-oversight-factory-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-13",
+      "cadence_days": 30
+    },
+    {
       "path": "tasks/tasks-1150-coordinator-symphony-aligned-control-oversight-update-contract-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
