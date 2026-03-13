@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260313-1152-coordinator-symphony-aligned-control-server-bootstrap-start-sequencing-extraction",
+      "title": "Coordinator Symphony-Aligned Control Server Bootstrap Start Sequencing Extraction",
+      "relates_to": "tasks/tasks-1152-coordinator-symphony-aligned-control-server-bootstrap-start-sequencing-extraction.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-13",
+      "paths": {
+        "spec": "tasks/specs/1152-coordinator-symphony-aligned-control-server-bootstrap-start-sequencing-extraction.md",
+        "task": "tasks/tasks-1152-coordinator-symphony-aligned-control-server-bootstrap-start-sequencing-extraction.md",
+        "agent_task": ".agent/task/1152-coordinator-symphony-aligned-control-server-bootstrap-start-sequencing-extraction.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-control-server-bootstrap-start-sequencing-extraction.md"
+      }
+    },
+    {
       "id": "20260313-1151-coordinator-symphony-aligned-control-telegram-bridge-bootstrap-oversight-factory-extraction",
       "title": "Coordinator Symphony-Aligned Control Telegram Bridge Bootstrap Oversight Factory Extraction",
       "relates_to": "tasks/tasks-1151-coordinator-symphony-aligned-control-telegram-bridge-bootstrap-oversight-factory-extraction.md",
