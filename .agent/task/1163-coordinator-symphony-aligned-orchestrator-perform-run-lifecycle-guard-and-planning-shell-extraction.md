@@ -20,21 +20,21 @@
 
 ## Guard-and-Planning Shell Extraction
 
-- [ ] One bounded helper owns the guard-and-planning shell in `performRunLifecycle(...)`.
-- [ ] `performRunLifecycle(...)` delegates that seam without changing registration, execution, completion, or public lifecycle authority.
-- [ ] Focused regressions preserve ordering, input forwarding, and guard-failure short-circuit behavior.
+- [x] One bounded helper owns the guard-and-planning shell in `performRunLifecycle(...)`. Evidence: `orchestrator/src/cli/orchestrator.ts`, `out/1163-coordinator-symphony-aligned-orchestrator-perform-run-lifecycle-guard-and-planning-shell-extraction/manual/20260313T181131Z-closeout/00-summary.md`
+- [x] `performRunLifecycle(...)` delegates that seam without changing registration, execution, completion, or public lifecycle authority. Evidence: `orchestrator/src/cli/orchestrator.ts`, `out/1163-coordinator-symphony-aligned-orchestrator-perform-run-lifecycle-guard-and-planning-shell-extraction/manual/20260313T181131Z-closeout/11-manual-guard-and-planning-check.json`
+- [x] Focused regressions preserve ordering, input forwarding, and guard-failure short-circuit behavior. Evidence: `out/1163-coordinator-symphony-aligned-orchestrator-perform-run-lifecycle-guard-and-planning-shell-extraction/manual/20260313T181131Z-closeout/05-targeted-tests.log`
 
 ## Validation + Closeout
 
-- [ ] `node scripts/delegation-guard.mjs`
-- [ ] `node scripts/spec-guard.mjs --dry-run`
-- [ ] `npm run build`
-- [ ] `npm run lint`
-- [ ] `npm run test`
-- [ ] `npm run docs:check`
-- [ ] `npm run docs:freshness`
-- [ ] `node scripts/diff-budget.mjs`
-- [ ] `npm run review`
-- [ ] `npm run pack:smoke`
-- [ ] Manual/mock guard-and-planning evidence captured.
-- [ ] Elegance review completed.
+- [x] `node scripts/delegation-guard.mjs` Evidence: `out/1163-coordinator-symphony-aligned-orchestrator-perform-run-lifecycle-guard-and-planning-shell-extraction/manual/20260313T181131Z-closeout/01-delegation-guard.log`
+- [x] `node scripts/spec-guard.mjs --dry-run` Evidence: `out/1163-coordinator-symphony-aligned-orchestrator-perform-run-lifecycle-guard-and-planning-shell-extraction/manual/20260313T181131Z-closeout/02-spec-guard.log`
+- [x] `npm run build` Evidence: `out/1163-coordinator-symphony-aligned-orchestrator-perform-run-lifecycle-guard-and-planning-shell-extraction/manual/20260313T181131Z-closeout/03-build.log`
+- [x] `npm run lint` Evidence: `out/1163-coordinator-symphony-aligned-orchestrator-perform-run-lifecycle-guard-and-planning-shell-extraction/manual/20260313T181131Z-closeout/04-lint.log`
+- [x] `npm run test` Evidence: `out/1163-coordinator-symphony-aligned-orchestrator-perform-run-lifecycle-guard-and-planning-shell-extraction/manual/20260313T181131Z-closeout/05b-test.log`
+- [x] `npm run docs:check` Evidence: `out/1163-coordinator-symphony-aligned-orchestrator-perform-run-lifecycle-guard-and-planning-shell-extraction/manual/20260313T181131Z-closeout/06-docs-check.log`
+- [x] `npm run docs:freshness` Evidence: `out/1163-coordinator-symphony-aligned-orchestrator-perform-run-lifecycle-guard-and-planning-shell-extraction/manual/20260313T181131Z-closeout/07-docs-freshness.log`
+- [x] `node scripts/diff-budget.mjs` Evidence: `out/1163-coordinator-symphony-aligned-orchestrator-perform-run-lifecycle-guard-and-planning-shell-extraction/manual/20260313T181131Z-closeout/08-diff-budget.log`
+- [x] `npm run review` Evidence: `out/1163-coordinator-symphony-aligned-orchestrator-perform-run-lifecycle-guard-and-planning-shell-extraction/manual/20260313T181131Z-closeout/09-review.log`, `out/1163-coordinator-symphony-aligned-orchestrator-perform-run-lifecycle-guard-and-planning-shell-extraction/manual/20260313T181131Z-closeout/13-override-notes.md`
+- [x] `npm run pack:smoke` Evidence: `out/1163-coordinator-symphony-aligned-orchestrator-perform-run-lifecycle-guard-and-planning-shell-extraction/manual/20260313T181131Z-closeout/10-pack-smoke.log`
+- [x] Manual/mock guard-and-planning evidence captured. Evidence: `out/1163-coordinator-symphony-aligned-orchestrator-perform-run-lifecycle-guard-and-planning-shell-extraction/manual/20260313T181131Z-closeout/11-manual-guard-and-planning-check.json`
+- [x] Elegance review completed. Evidence: `out/1163-coordinator-symphony-aligned-orchestrator-perform-run-lifecycle-guard-and-planning-shell-extraction/manual/20260313T181131Z-closeout/12-elegance-review.md`
