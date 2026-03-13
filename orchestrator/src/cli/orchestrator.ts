@@ -42,10 +42,9 @@ import type {
   RunSummary
 } from './types.js';
 import { generateRunId } from './utils/runId.js';
-import { runCommandStage } from './services/commandRunner.js';
 import { isoTimestamp } from './utils/time.js';
 import type { RunPaths } from './run/runPaths.js';
-import { resolveRunPaths, relativeToRepo } from './run/runPaths.js';
+import { relativeToRepo } from './run/runPaths.js';
 import { logger } from '../logger.js';
 import { getPrivacyGuard } from './services/execRuntime.js';
 import { PipelineResolver } from './services/pipelineResolver.js';
@@ -85,6 +84,7 @@ import {
   executeOrchestratorCloudTarget,
   resolveCloudEnvironmentId
 } from './services/orchestratorCloudTargetExecutor.js';
+import { executeOrchestratorLocalPipeline } from './services/orchestratorLocalPipelineExecutor.js';
 
 const resolveBaseEnvironment = (): EnvironmentPaths =>
   normalizeEnvironmentPaths(resolveEnvironmentPaths());
@@ -614,154 +614,30 @@ export class CodexOrchestrator {
           envOverrides: effectiveEnvOverrides
         }),
       executeBody: async ({ notes, persister, controlWatcher, schedulePersist }) => {
-        let success = true;
-
-        for (let i = 0; i < pipeline.stages.length; i += 1) {
-          await controlWatcher.sync();
-          await controlWatcher.waitForResume();
-          if (controlWatcher.isCanceled()) {
-            manifest.status_detail = 'run-canceled';
-            success = false;
-            break;
-          }
-          const stage = pipeline.stages[i];
-          const entry = manifest.commands[i];
-          if (!entry) {
-            continue;
-          }
-          if (entry.status === 'succeeded' || entry.status === 'skipped') {
-            notes.push(`${stage.title}: ${entry.status}`);
-            continue;
-          }
-
-          entry.status = 'pending';
-          entry.started_at = isoTimestamp();
-          void schedulePersist({ manifest: true });
-
-          if (stage.kind === 'command') {
-            try {
-              const result = await runCommandStage({
-                env,
-                paths,
-                manifest,
-                stage,
-                index: entry.index,
-                events: runEvents,
-                persister,
-                envOverrides: effectiveEnvOverrides,
-                runtimeMode: runtimeSelection.selected_mode,
-                runtimeSessionId: runtimeSelection.runtime_session_id
-              });
-              notes.push(`${stage.title}: ${result.summary}`);
-              const updatedEntry = manifest.commands[i];
-              if (updatedEntry?.status === 'failed') {
-                manifest.status_detail = `stage:${stage.id}:failed`;
-                appendSummary(manifest, `Stage '${stage.title}' failed with exit code ${result.exitCode}.`);
-                success = false;
-                await schedulePersist({ manifest: true, force: true });
-                break;
-              }
-            } catch (error) {
-              entry.status = 'failed';
-              entry.completed_at = isoTimestamp();
-              entry.summary = `Execution error: ${(error as Error)?.message ?? String(error)}`;
-              manifest.status_detail = `stage:${stage.id}:error`;
-              appendSummary(manifest, entry.summary);
-              await schedulePersist({ manifest: true, force: true });
-              runEvents?.stageCompleted({
-                stageId: stage.id,
-                stageIndex: entry.index,
-                title: stage.title,
-                kind: 'command',
-                status: entry.status,
-                exitCode: entry.exit_code,
-                summary: entry.summary,
-                logPath: entry.log_path
-              });
-              success = false;
-              break;
-            }
-          } else {
-            entry.status = 'running';
-            await schedulePersist({ manifest: true, force: true });
-            runEvents?.stageStarted({
-              stageId: stage.id,
-              stageIndex: entry.index,
-              title: stage.title,
-              kind: 'subpipeline',
-              logPath: entry.log_path,
-              status: entry.status
-            });
-            try {
-              const child = await this.start({
-                taskId: env.taskId,
-                pipelineId: stage.pipeline,
-                parentRunId: manifest.run_id,
-                format: 'json',
-                executionMode: options.executionModeOverride,
-                runtimeMode: options.runtimeModeRequested
-              });
-              entry.completed_at = isoTimestamp();
-              entry.sub_run_id = child.manifest.run_id;
-              entry.summary = child.runSummary.review.summary ?? null;
-              entry.status =
-                child.manifest.status === 'succeeded' ? 'succeeded' : stage.optional ? 'skipped' : 'failed';
-              entry.command = null;
-              manifest.child_runs.push({
-                run_id: child.manifest.run_id,
-                pipeline_id: stage.pipeline,
-                status: child.manifest.status,
-                manifest: relativeToRepo(env, resolveRunPaths(env, child.manifest.run_id).manifestPath)
-              });
-              notes.push(`${stage.title}: ${entry.status}`);
-              await schedulePersist({ manifest: true, force: true });
-              runEvents?.stageCompleted({
-                stageId: stage.id,
-                stageIndex: entry.index,
-                title: stage.title,
-                kind: 'subpipeline',
-                status: entry.status,
-                exitCode: entry.exit_code,
-                summary: entry.summary,
-                logPath: entry.log_path,
-                subRunId: entry.sub_run_id
-              });
-              if (!stage.optional && entry.status === 'failed') {
-                manifest.status_detail = `subpipeline:${stage.pipeline}:failed`;
-                appendSummary(manifest, `Sub-pipeline '${stage.pipeline}' failed.`);
-                await schedulePersist({ manifest: true, force: true });
-                success = false;
-                break;
-              }
-            } catch (error) {
-              entry.completed_at = isoTimestamp();
-              entry.summary = `Sub-pipeline error: ${(error as Error)?.message ?? String(error)}`;
-              entry.status = stage.optional ? 'skipped' : 'failed';
-              entry.command = null;
-              manifest.status_detail = `subpipeline:${stage.pipeline}:error`;
-              appendSummary(manifest, entry.summary);
-              notes.push(`${stage.title}: ${entry.status}`);
-              await schedulePersist({ manifest: true, force: true });
-              runEvents?.stageCompleted({
-                stageId: stage.id,
-                stageIndex: entry.index,
-                title: stage.title,
-                kind: 'subpipeline',
-                status: entry.status,
-                exitCode: entry.exit_code,
-                summary: entry.summary,
-                logPath: entry.log_path,
-                subRunId: entry.sub_run_id
-              });
-              if (!stage.optional) {
-                success = false;
-                break;
-              }
-            }
-          }
-        }
-
-        return success;
+        const localResult = await executeOrchestratorLocalPipeline({
+          env,
+          pipeline,
+          manifest,
+          paths,
+          persister,
+          envOverrides: effectiveEnvOverrides,
+          runtimeMode: runtimeSelection.selected_mode,
+          runtimeSessionId: runtimeSelection.runtime_session_id,
+          runEvents,
+          controlWatcher,
+          schedulePersist,
+          startSubpipeline: (pipelineId) =>
+            this.start({
+              taskId: env.taskId,
+              pipelineId,
+              parentRunId: manifest.run_id,
+              format: 'json',
+              executionMode: options.executionModeOverride,
+              runtimeMode: options.runtimeModeRequested
+            })
+        });
+        notes.push(...localResult.notes);
+        return localResult.success;
       },
       afterFinalize: () => {
         const guardrailStatus = ensureGuardrailStatus(manifest);
