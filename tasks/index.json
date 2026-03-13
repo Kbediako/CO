@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260313-1144-coordinator-symphony-aligned-telegram-oversight-polling-controller-extraction",
+      "title": "Coordinator Symphony-Aligned Telegram Oversight Polling Controller Extraction",
+      "relates_to": "tasks/tasks-1144-coordinator-symphony-aligned-telegram-oversight-polling-controller-extraction.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-13",
+      "paths": {
+        "spec": "tasks/specs/1144-coordinator-symphony-aligned-telegram-oversight-polling-controller-extraction.md",
+        "task": "tasks/tasks-1144-coordinator-symphony-aligned-telegram-oversight-polling-controller-extraction.md",
+        "agent_task": ".agent/task/1144-coordinator-symphony-aligned-telegram-oversight-polling-controller-extraction.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-telegram-oversight-polling-controller-extraction.md"
+      }
+    },
+    {
       "id": "20260313-1143-coordinator-symphony-aligned-telegram-oversight-state-store-extraction",
       "title": "Coordinator Symphony-Aligned Telegram Oversight State Store Extraction",
       "relates_to": "tasks/tasks-1143-coordinator-symphony-aligned-telegram-oversight-state-store-extraction.md",
