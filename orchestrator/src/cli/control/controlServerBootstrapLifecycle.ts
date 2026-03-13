@@ -1,6 +1,5 @@
-import { logger } from '../../logger.js';
 import type { RunPaths } from '../run/runPaths.js';
-import { persistControlBootstrapMetadata } from './controlBootstrapMetadataPersistence.js';
+import { runControlServerBootstrapStartSequence } from './controlServerBootstrapStartSequence.js';
 import type { ControlTelegramBridgeLifecycle } from './controlTelegramBridgeLifecycle.js';
 
 interface ControlServerBootstrapLifecycleOptions {
@@ -40,25 +39,18 @@ class ControlServerBootstrapLifecycleRuntime implements ControlServerBootstrapLi
   }
 
   async start(options: ControlServerBootstrapLifecycleStartOptions): Promise<void> {
-    await persistControlBootstrapMetadata(
+    await runControlServerBootstrapStartSequence(
       {
         paths: this.paths,
-        persistControl: this.persistControl
+        persistControl: this.persistControl,
+        startExpiryLifecycle: this.startExpiryLifecycle,
+        telegramBridgeLifecycle: this.telegramBridgeLifecycle
       },
       {
         baseUrl: options.baseUrl,
         controlToken: options.controlToken
       }
     );
-    await this.startExpiryLifecycle();
-    try {
-      await this.telegramBridgeLifecycle?.start({
-        baseUrl: options.baseUrl,
-        controlToken: options.controlToken
-      });
-    } catch (error) {
-      logger.warn(`Failed to start Telegram oversight bridge: ${(error as Error)?.message ?? String(error)}`);
-    }
   }
 
   async close(): Promise<void> {
