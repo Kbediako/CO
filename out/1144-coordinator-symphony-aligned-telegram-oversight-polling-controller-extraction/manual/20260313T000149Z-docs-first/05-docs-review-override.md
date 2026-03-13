@@ -7,7 +7,7 @@ Record an explicit docs-review override for the `1144` docs-first registration.
 ## Why
 
 1. The initial docs-review attempt stopped at its own delegation guard before any docs verdict.
-2. A task-scoped delegated scout then produced real parent-task delegation evidence through build, lint, and visible `npm run test` progress.
+2. A task-scoped delegated scout then produced real parent-task delegation evidence and completed successfully through `delegation-guard`, `build`, `lint`, `test`, and `spec-guard`.
 3. A fresh docs-review rerun cleared the deterministic docs gates (`delegation-guard`, `spec-guard`, `docs-check`, `docs-freshness`) but the live review surface re-expanded into unrelated historical standalone-review task artifacts instead of staying on the `1144` Telegram polling-controller docs boundary.
 
 ## Evidence

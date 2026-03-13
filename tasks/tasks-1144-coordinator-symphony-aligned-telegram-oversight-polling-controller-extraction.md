@@ -20,21 +20,21 @@
 
 ## Telegram Polling Controller Extraction
 
-- [ ] One dedicated controller owns the inbound polling loop, `getUpdates` offset/timeout orchestration, and per-update error isolation.
-- [ ] `telegramOversightBridge.ts` remains the authoritative owner of in-memory whole-state sequencing, queue lifecycle, bot identity lifecycle, and controller/API-client composition.
-- [ ] Focused regressions preserve `next_update_id` advancement plus the pinned monotonic `updated_at` guarantee.
+- [x] One dedicated controller owns the inbound polling loop, `getUpdates` offset/timeout orchestration, and per-update error isolation. Evidence: `orchestrator/src/cli/control/controlTelegramPollingController.ts`, `out/1144-coordinator-symphony-aligned-telegram-oversight-polling-controller-extraction/manual/20260313T002129Z-closeout/12-manual-telegram-polling-controller-check.md`
+- [x] `telegramOversightBridge.ts` remains the authoritative owner of in-memory whole-state sequencing, queue lifecycle, bot identity lifecycle, and controller/API-client composition. Evidence: `orchestrator/src/cli/control/telegramOversightBridge.ts`, `out/1144-coordinator-symphony-aligned-telegram-oversight-polling-controller-extraction/manual/20260313T002129Z-closeout/12-manual-telegram-polling-controller-check.md`, `out/1144-coordinator-symphony-aligned-telegram-oversight-polling-controller-extraction/manual/20260313T002129Z-closeout/13-elegance-review.md`
+- [x] Focused regressions preserve `next_update_id` advancement plus the pinned monotonic `updated_at` guarantee. Evidence: `orchestrator/tests/ControlTelegramPollingController.test.ts`, `orchestrator/tests/TelegramOversightBridge.test.ts`, `out/1144-coordinator-symphony-aligned-telegram-oversight-polling-controller-extraction/manual/20260313T002129Z-closeout/05-targeted-tests.log`
 
 ## Validation + Closeout
 
-- [ ] `node scripts/delegation-guard.mjs`
-- [ ] `node scripts/spec-guard.mjs --dry-run`
-- [ ] `npm run build`
-- [ ] `npm run lint`
-- [ ] `npm run test`
-- [ ] `npm run docs:check`
-- [ ] `npm run docs:freshness`
-- [ ] `node scripts/diff-budget.mjs`
-- [ ] `npm run review`
-- [ ] `npm run pack:smoke`
-- [ ] Manual/mock Telegram polling-controller evidence captured.
-- [ ] Elegance review completed.
+- [x] `node scripts/delegation-guard.mjs` Evidence: `out/1144-coordinator-symphony-aligned-telegram-oversight-polling-controller-extraction/manual/20260313T002129Z-closeout/01-delegation-guard.log`
+- [x] `node scripts/spec-guard.mjs --dry-run` Evidence: `out/1144-coordinator-symphony-aligned-telegram-oversight-polling-controller-extraction/manual/20260313T002129Z-closeout/02-spec-guard.log`
+- [x] `npm run build` Evidence: `out/1144-coordinator-symphony-aligned-telegram-oversight-polling-controller-extraction/manual/20260313T002129Z-closeout/03-build.log`
+- [x] `npm run lint` Evidence: `out/1144-coordinator-symphony-aligned-telegram-oversight-polling-controller-extraction/manual/20260313T002129Z-closeout/04-lint.log`
+- [x] `npm run test` Evidence: `out/1144-coordinator-symphony-aligned-telegram-oversight-polling-controller-extraction/manual/20260313T002129Z-closeout/05-targeted-tests.log`, `out/1144-coordinator-symphony-aligned-telegram-oversight-polling-controller-extraction/manual/20260313T002129Z-closeout/06-test.log`, `out/1144-coordinator-symphony-aligned-telegram-oversight-polling-controller-extraction/manual/20260313T002129Z-closeout/14-override-notes.md`
+- [x] `npm run docs:check` Evidence: `out/1144-coordinator-symphony-aligned-telegram-oversight-polling-controller-extraction/manual/20260313T002129Z-closeout/07-docs-check.log`
+- [x] `npm run docs:freshness` Evidence: `out/1144-coordinator-symphony-aligned-telegram-oversight-polling-controller-extraction/manual/20260313T002129Z-closeout/08-docs-freshness.log`
+- [x] `node scripts/diff-budget.mjs` Evidence: `out/1144-coordinator-symphony-aligned-telegram-oversight-polling-controller-extraction/manual/20260313T002129Z-closeout/09-diff-budget.log`, `out/1144-coordinator-symphony-aligned-telegram-oversight-polling-controller-extraction/manual/20260313T002129Z-closeout/14-override-notes.md`
+- [x] `npm run review` Evidence: `out/1144-coordinator-symphony-aligned-telegram-oversight-polling-controller-extraction/manual/20260313T002129Z-closeout/10-review.log`, `out/1144-coordinator-symphony-aligned-telegram-oversight-polling-controller-extraction/manual/20260313T002129Z-closeout/14-override-notes.md`
+- [x] `npm run pack:smoke` Evidence: `out/1144-coordinator-symphony-aligned-telegram-oversight-polling-controller-extraction/manual/20260313T002129Z-closeout/11-pack-smoke.log`
+- [x] Manual/mock Telegram polling-controller evidence captured. Evidence: `out/1144-coordinator-symphony-aligned-telegram-oversight-polling-controller-extraction/manual/20260313T002129Z-closeout/12-manual-telegram-polling-controller-check.md`
+- [x] Elegance review completed. Evidence: `out/1144-coordinator-symphony-aligned-telegram-oversight-polling-controller-extraction/manual/20260313T002129Z-closeout/13-elegance-review.md`
