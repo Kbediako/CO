@@ -22,6 +22,7 @@ import {
   loadManifest,
   updateHeartbeat,
   appendSummary,
+  finalizeStatus,
   resetForResume,
   recordResumeEvent
 } from './run/manifest.js';
@@ -121,6 +122,8 @@ type ExecutePipelineOptions = Omit<
   OrchestratorExecutionRouteOptions,
   'applyRuntimeSelection' | 'executeCloudPipeline' | 'runAutoScout' | 'startSubpipeline'
 >;
+
+const RESUME_PRE_START_FAILURE_STATUS_DETAIL = 'resume-pre-start-failed';
 
 export class CodexOrchestrator {
   private readonly controlPlane = new ControlPlaneService();
@@ -264,14 +267,28 @@ export class CodexOrchestrator {
     let controlPlaneLifecycle: Awaited<ReturnType<typeof startOrchestratorControlPlaneLifecycle>> | null = null;
 
     try {
-      controlPlaneLifecycle = await startOrchestratorControlPlaneLifecycle({
-        repoRoot: preparation.env.repoRoot,
-        paths,
-        taskId: manifest.task_id,
-        runId: manifest.run_id,
-        pipeline,
-        emitter
-      });
+      try {
+        controlPlaneLifecycle = await startOrchestratorControlPlaneLifecycle({
+          repoRoot: preparation.env.repoRoot,
+          paths,
+          taskId: manifest.task_id,
+          runId: manifest.run_id,
+          pipeline,
+          emitter
+        });
+      } catch (error) {
+        finalizeStatus(manifest, 'failed', RESUME_PRE_START_FAILURE_STATUS_DETAIL);
+        try {
+          await persistManifest(paths, manifest, persister, { force: true });
+        } catch (persistError) {
+          logger.warn(
+            `Failed to persist resume pre-start failure state: ${
+              (persistError as Error)?.message ?? String(persistError)
+            }`
+          );
+        }
+        throw error;
+      }
       const runEvents = this.createRunEventPublisher({
         runId: manifest.run_id,
         pipeline,

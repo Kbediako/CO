@@ -2,9 +2,10 @@ import fs from 'fs/promises';
 import os from 'os';
 import path from 'path';
 
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { CodexOrchestrator } from '../orchestrator/src/cli/orchestrator.js';
+import * as orchestratorControlPlaneLifecycle from '../orchestrator/src/cli/services/orchestratorControlPlaneLifecycle.js';
 import { getTelemetrySchemas, validateCliManifest } from '../orchestrator/src/cli/telemetry/schema.js';
 import { formatPlanPreview } from '../orchestrator/src/cli/utils/planFormatter.js';
 import { resolveRunPaths } from '../orchestrator/src/cli/run/runPaths.js';
@@ -94,6 +95,7 @@ describe('CodexOrchestrator CLI', () => {
   });
 
   afterEach(async () => {
+    vi.restoreAllMocks();
     delete process.env.CODEX_ORCHESTRATOR_ROOT;
     delete process.env.CODEX_ORCHESTRATOR_RUNS_DIR;
     delete process.env.CODEX_ORCHESTRATOR_OUT_DIR;
@@ -131,6 +133,29 @@ describe('CodexOrchestrator CLI', () => {
 
     const resumed = await orchestrator.resume({ runId: failed.manifest.run_id });
     expect(resumed.manifest.status).toBe('succeeded');
+  });
+
+  it('persists failed status when resume pre-start lifecycle boot fails', async () => {
+    const orchestrator = new CodexOrchestrator();
+    await fs.writeFile(path.join(tempDir, 'fail.flag'), 'fail');
+
+    const failed = await orchestrator.start({ pipelineId: 'failable' });
+    expect(failed.manifest.status).toBe('failed');
+
+    const lifecycleError = new Error('control plane failed before resume start');
+    vi
+      .spyOn(orchestratorControlPlaneLifecycle, 'startOrchestratorControlPlaneLifecycle')
+      .mockRejectedValueOnce(lifecycleError);
+
+    await expect(orchestrator.resume({ runId: failed.manifest.run_id })).rejects.toBe(lifecycleError);
+
+    const manifestPath = path.join(tempDir, failed.manifest.artifact_root, 'manifest.json');
+    const storedManifest = JSON.parse(await fs.readFile(manifestPath, 'utf8'));
+    expect(storedManifest.status).toBe('failed');
+    expect(storedManifest.status_detail).toBe('resume-pre-start-failed');
+    expect(storedManifest.completed_at).toEqual(expect.any(String));
+    expect(storedManifest.metrics_recorded).toBe(false);
+    expect(storedManifest.status).not.toBe('in_progress');
   });
 
   it('retains failure status_detail after heartbeat flush', async () => {

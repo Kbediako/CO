@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260314-1166-coordinator-symphony-aligned-orchestrator-resume-pre-start-failure-manifest-contract",
+      "title": "Coordinator Symphony-Aligned Orchestrator Resume Pre-Start Failure Manifest Contract",
+      "relates_to": "tasks/tasks-1166-coordinator-symphony-aligned-orchestrator-resume-pre-start-failure-manifest-contract.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-14",
+      "paths": {
+        "spec": "tasks/specs/1166-coordinator-symphony-aligned-orchestrator-resume-pre-start-failure-manifest-contract.md",
+        "task": "tasks/tasks-1166-coordinator-symphony-aligned-orchestrator-resume-pre-start-failure-manifest-contract.md",
+        "agent_task": ".agent/task/1166-coordinator-symphony-aligned-orchestrator-resume-pre-start-failure-manifest-contract.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-resume-pre-start-failure-manifest-contract.md"
+      }
+    },
+    {
       "id": "20260314-1165-coordinator-symphony-aligned-orchestrator-public-run-entry-bootstrap-and-handoff-reassessment",
       "title": "Coordinator Symphony-Aligned Orchestrator Public Run-Entry Bootstrap-and-Handoff Reassessment",
       "relates_to": "tasks/tasks-1165-coordinator-symphony-aligned-orchestrator-public-run-entry-bootstrap-and-handoff-reassessment.md",
