@@ -1,0 +1,14 @@
+{
+  "task": "1164-coordinator-symphony-aligned-orchestrator-perform-run-lifecycle-execution-and-run-error-shell-extraction",
+  "manual_check": "performRunLifecycle execution and run-error boundary",
+  "assertions": [
+    "The success path still returns the exact RunSummary from manager.execute via the seam-local regression.",
+    "A manager.execute rejection on the real performRunLifecycle caller path emits exactly one runError with pipelineId and stageId null.",
+    "Completion finalization is not entered when manager.execute rejects on the real caller path."
+  ],
+  "evidence": [
+    "orchestrator/src/cli/orchestrator.ts",
+    "orchestrator/tests/OrchestratorRunLifecycleExecutionAndRunError.test.ts",
+    "out/1164-coordinator-symphony-aligned-orchestrator-perform-run-lifecycle-execution-and-run-error-shell-extraction/manual/20260313T220010Z-closeout/05-targeted-tests.log"
+  ]
+}
