@@ -14,9 +14,9 @@
 
 ## Shared Registry + Review Handoff
 
-- [ ] `tasks/index.json`, `docs/TASKS.md`, and `docs/docs-freshness-registry.json` updated.
+- [x] `tasks/index.json`, `docs/TASKS.md`, and `docs/docs-freshness-registry.json` updated. Evidence: `tasks/index.json`, `docs/TASKS.md`, `docs/docs-freshness-registry.json`, `out/1144-coordinator-symphony-aligned-telegram-oversight-polling-controller-extraction/manual/20260313T000149Z-docs-first/00-summary.md`
 - [x] Local read-only review approval captured in the spec/checklist notes. Evidence: `tasks/specs/1144-coordinator-symphony-aligned-telegram-oversight-polling-controller-extraction.md`, `docs/findings/1144-telegram-oversight-polling-controller-extraction-deliberation.md`
-- [ ] docs-review approval or explicit override captured for registered `1144`.
+- [x] docs-review approval or explicit override captured for registered `1144`. Evidence: `out/1144-coordinator-symphony-aligned-telegram-oversight-polling-controller-extraction/manual/20260313T000149Z-docs-first/00-summary.md`, `out/1144-coordinator-symphony-aligned-telegram-oversight-polling-controller-extraction/manual/20260313T000149Z-docs-first/05-docs-review-override.md`
 
 ## Telegram Polling Controller Extraction
 
