@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260313-1160-coordinator-symphony-aligned-orchestrator-perform-run-lifecycle-execution-registration-shell-extraction",
+      "title": "Coordinator Symphony-Aligned Orchestrator Perform-Run-Lifecycle Execution-Registration Shell Extraction",
+      "relates_to": "tasks/tasks-1160-coordinator-symphony-aligned-orchestrator-perform-run-lifecycle-execution-registration-shell-extraction.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-13",
+      "paths": {
+        "spec": "tasks/specs/1160-coordinator-symphony-aligned-orchestrator-perform-run-lifecycle-execution-registration-shell-extraction.md",
+        "task": "tasks/tasks-1160-coordinator-symphony-aligned-orchestrator-perform-run-lifecycle-execution-registration-shell-extraction.md",
+        "agent_task": ".agent/task/1160-coordinator-symphony-aligned-orchestrator-perform-run-lifecycle-execution-registration-shell-extraction.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-perform-run-lifecycle-execution-registration-shell-extraction.md"
+      }
+    },
+    {
       "id": "20260313-1159-coordinator-symphony-aligned-orchestrator-execution-routing-shell-extraction",
       "title": "Coordinator Symphony-Aligned Orchestrator Execution-Routing Shell Extraction",
       "relates_to": "tasks/tasks-1159-coordinator-symphony-aligned-orchestrator-execution-routing-shell-extraction.md",
