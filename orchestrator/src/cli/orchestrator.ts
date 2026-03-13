@@ -554,32 +554,14 @@ export class CodexOrchestrator {
       manifest,
       paths,
       taskContext,
-      persister,
-      runId
+      persister
     } = context;
 
     const manager = this.createRunLifecycleTaskManager(context);
 
     getPrivacyGuard().reset();
 
-    const controlPlaneResult = await this.controlPlane.guard({
-      env,
-      manifest,
-      paths,
-      pipeline,
-      task: taskContext,
-      runId,
-      requestedBy: { actorId: 'codex-cli', channel: 'cli', name: 'Codex CLI' },
-      persister
-    });
-
-    const schedulerPlan = await this.scheduler.createPlanForRun({
-      env,
-      manifest,
-      paths,
-      controlPlaneResult,
-      persister
-    });
+    const { controlPlaneResult, schedulerPlan } = await this.runLifecycleGuardAndPlanning(context);
 
     let runSummary: RunSummary;
     try {
@@ -607,6 +589,34 @@ export class CodexOrchestrator {
       applyControlPlaneToRunSummary: (summary, result) =>
         this.controlPlane.applyControlPlaneToRunSummary(summary, result)
     });
+  }
+
+  private async runLifecycleGuardAndPlanning(
+    context: Pick<
+      RunLifecycleContext,
+      'env' | 'pipeline' | 'manifest' | 'paths' | 'taskContext' | 'runId' | 'persister'
+    >
+  ) {
+    const controlPlaneResult = await this.controlPlane.guard({
+      env: context.env,
+      manifest: context.manifest,
+      paths: context.paths,
+      pipeline: context.pipeline,
+      task: context.taskContext,
+      runId: context.runId,
+      requestedBy: { actorId: 'codex-cli', channel: 'cli', name: 'Codex CLI' },
+      persister: context.persister
+    });
+
+    const schedulerPlan = await this.scheduler.createPlanForRun({
+      env: context.env,
+      manifest: context.manifest,
+      paths: context.paths,
+      controlPlaneResult,
+      persister: context.persister
+    });
+
+    return { controlPlaneResult, schedulerPlan };
   }
 
   private createRunLifecycleTaskManager(context: RunLifecycleContext): TaskManager {
