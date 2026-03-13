@@ -20,21 +20,21 @@
 
 ## Control Oversight Service Boundary Extraction
 
-- [ ] One coordinator-owned oversight facade exposes the current Telegram consumer contract.
-- [ ] Telegram bootstrap/lifecycle consume the facade instead of stitching runtime/read helpers directly.
-- [ ] Focused coordinator and Telegram regressions preserve the existing consumer behavior.
+- [x] One coordinator-owned oversight facade exposes the current Telegram consumer contract. Evidence: `orchestrator/src/cli/control/controlOversightFacade.ts`, `out/1147-coordinator-symphony-aligned-control-oversight-service-boundary-extraction/manual/20260313T030819Z-closeout/11-manual-oversight-facade-check.json`
+- [x] Telegram bootstrap/lifecycle consume the facade instead of stitching runtime/read helpers directly. Evidence: `orchestrator/src/cli/control/controlTelegramBridgeLifecycle.ts`, `orchestrator/src/cli/control/controlTelegramBridgeBootstrapLifecycle.ts`, `out/1147-coordinator-symphony-aligned-control-oversight-service-boundary-extraction/manual/20260313T030819Z-closeout/11-manual-oversight-facade-check.json`
+- [x] Focused coordinator and Telegram regressions preserve the existing consumer behavior. Evidence: `orchestrator/tests/ControlOversightFacade.test.ts`, `orchestrator/tests/ControlTelegramBridgeLifecycle.test.ts`, `orchestrator/tests/ControlTelegramBridgeBootstrapLifecycle.test.ts`, `out/1147-coordinator-symphony-aligned-control-oversight-service-boundary-extraction/manual/20260313T030819Z-closeout/05b-targeted-tests.log`
 
 ## Validation + Closeout
 
-- [ ] `node scripts/delegation-guard.mjs`
-- [ ] `node scripts/spec-guard.mjs --dry-run`
-- [ ] `npm run build`
-- [ ] `npm run lint`
-- [ ] `npm run test`
-- [ ] `npm run docs:check`
-- [ ] `npm run docs:freshness`
-- [ ] `node scripts/diff-budget.mjs`
-- [ ] `npm run review`
-- [ ] `npm run pack:smoke`
-- [ ] Manual/mock oversight-facade evidence captured.
-- [ ] Elegance review completed.
+- [x] `node scripts/delegation-guard.mjs`. Evidence: `out/1147-coordinator-symphony-aligned-control-oversight-service-boundary-extraction/manual/20260313T030819Z-closeout/01-delegation-guard.log`
+- [x] `node scripts/spec-guard.mjs --dry-run`. Evidence: `out/1147-coordinator-symphony-aligned-control-oversight-service-boundary-extraction/manual/20260313T030819Z-closeout/02-spec-guard.log`
+- [x] `npm run build`. Evidence: `out/1147-coordinator-symphony-aligned-control-oversight-service-boundary-extraction/manual/20260313T030819Z-closeout/03-build.log`
+- [x] `npm run lint`. Evidence: `out/1147-coordinator-symphony-aligned-control-oversight-service-boundary-extraction/manual/20260313T030819Z-closeout/04-lint.log`
+- [x] `npm run test`. Evidence: `out/1147-coordinator-symphony-aligned-control-oversight-service-boundary-extraction/manual/20260313T030819Z-closeout/05-test.log`, `out/1147-coordinator-symphony-aligned-control-oversight-service-boundary-extraction/manual/20260313T030819Z-closeout/05b-targeted-tests.log`, `out/1147-coordinator-symphony-aligned-control-oversight-service-boundary-extraction/manual/20260313T030819Z-closeout/13-override-notes.md`
+- [x] `npm run docs:check`. Evidence: `out/1147-coordinator-symphony-aligned-control-oversight-service-boundary-extraction/manual/20260313T030819Z-closeout/06-docs-check.log`
+- [x] `npm run docs:freshness`. Evidence: `out/1147-coordinator-symphony-aligned-control-oversight-service-boundary-extraction/manual/20260313T030819Z-closeout/07-docs-freshness.log`
+- [x] `node scripts/diff-budget.mjs`. Evidence: `out/1147-coordinator-symphony-aligned-control-oversight-service-boundary-extraction/manual/20260313T030819Z-closeout/08-diff-budget.log`, `out/1147-coordinator-symphony-aligned-control-oversight-service-boundary-extraction/manual/20260313T030819Z-closeout/13-override-notes.md`
+- [x] `npm run review`. Evidence: `out/1147-coordinator-symphony-aligned-control-oversight-service-boundary-extraction/manual/20260313T030819Z-closeout/09-review.log`, `out/1147-coordinator-symphony-aligned-control-oversight-service-boundary-extraction/manual/20260313T030819Z-closeout/13-override-notes.md`
+- [x] `npm run pack:smoke`. Evidence: `out/1147-coordinator-symphony-aligned-control-oversight-service-boundary-extraction/manual/20260313T030819Z-closeout/10-pack-smoke.log`
+- [x] Manual/mock oversight-facade evidence captured. Evidence: `out/1147-coordinator-symphony-aligned-control-oversight-service-boundary-extraction/manual/20260313T030819Z-closeout/11-manual-oversight-facade-check.json`
+- [x] Elegance review completed. Evidence: `out/1147-coordinator-symphony-aligned-control-oversight-service-boundary-extraction/manual/20260313T030819Z-closeout/12-elegance-review.md`
