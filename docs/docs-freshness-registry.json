@@ -3,6 +3,55 @@
   "generated_at": "2026-03-13",
   "entries": [
     {
+      "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-orchestrator-local-pipeline-executor-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-13",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/PRD-coordinator-symphony-aligned-orchestrator-local-pipeline-executor-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-13",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-local-pipeline-executor-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-13",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/findings/1158-orchestrator-local-pipeline-executor-extraction-deliberation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-13",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/tasks-1158-coordinator-symphony-aligned-orchestrator-local-pipeline-executor-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-13",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/specs/1158-coordinator-symphony-aligned-orchestrator-local-pipeline-executor-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-13",
+      "cadence_days": 30
+    },
+    {
+      "path": ".agent/task/1158-coordinator-symphony-aligned-orchestrator-local-pipeline-executor-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-13",
+      "cadence_days": 30
+    },
+    {
       "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-orchestrator-cloud-target-executor-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",

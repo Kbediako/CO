@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260313-1158-coordinator-symphony-aligned-orchestrator-local-pipeline-executor-extraction",
+      "title": "Coordinator Symphony-Aligned Orchestrator Local-Pipeline Executor Extraction",
+      "relates_to": "tasks/tasks-1158-coordinator-symphony-aligned-orchestrator-local-pipeline-executor-extraction.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-13",
+      "paths": {
+        "spec": "tasks/specs/1158-coordinator-symphony-aligned-orchestrator-local-pipeline-executor-extraction.md",
+        "task": "tasks/tasks-1158-coordinator-symphony-aligned-orchestrator-local-pipeline-executor-extraction.md",
+        "agent_task": ".agent/task/1158-coordinator-symphony-aligned-orchestrator-local-pipeline-executor-extraction.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-local-pipeline-executor-extraction.md"
+      }
+    },
+    {
       "id": "20260313-1157-coordinator-symphony-aligned-orchestrator-cloud-target-executor-extraction",
       "title": "Coordinator Symphony-Aligned Orchestrator Cloud-Target Executor Extraction",
       "relates_to": "tasks/tasks-1157-coordinator-symphony-aligned-orchestrator-cloud-target-executor-extraction.md",
