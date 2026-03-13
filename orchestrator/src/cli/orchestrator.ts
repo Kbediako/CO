@@ -562,18 +562,12 @@ export class CodexOrchestrator {
     getPrivacyGuard().reset();
 
     const { controlPlaneResult, schedulerPlan } = await this.runLifecycleGuardAndPlanning(context);
-
-    let runSummary: RunSummary;
-    try {
-      runSummary = await manager.execute(taskContext);
-    } catch (error) {
-      context.runEvents?.runError({
-        pipelineId: pipeline.id,
-        message: (error as Error)?.message ?? String(error),
-        stageId: null
-      });
-      throw error;
-    }
+    const runSummary = await this.executeRunLifecycleTask(
+      manager,
+      taskContext,
+      pipeline.id,
+      context.runEvents
+    );
     return await completeOrchestratorRunLifecycle({
       env,
       pipeline,
@@ -589,6 +583,24 @@ export class CodexOrchestrator {
       applyControlPlaneToRunSummary: (summary, result) =>
         this.controlPlane.applyControlPlaneToRunSummary(summary, result)
     });
+  }
+
+  private async executeRunLifecycleTask(
+    manager: Pick<TaskManager, 'execute'>,
+    taskContext: TaskContext,
+    pipelineId: string,
+    runEvents?: RunEventPublisher
+  ): Promise<RunSummary> {
+    try {
+      return await manager.execute(taskContext);
+    } catch (error) {
+      runEvents?.runError({
+        pipelineId,
+        message: (error as Error)?.message ?? String(error),
+        stageId: null
+      });
+      throw error;
+    }
   }
 
   private async runLifecycleGuardAndPlanning(
