@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260314-1165-coordinator-symphony-aligned-orchestrator-public-run-entry-bootstrap-and-handoff-reassessment",
+      "title": "Coordinator Symphony-Aligned Orchestrator Public Run-Entry Bootstrap-and-Handoff Reassessment",
+      "relates_to": "tasks/tasks-1165-coordinator-symphony-aligned-orchestrator-public-run-entry-bootstrap-and-handoff-reassessment.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-14",
+      "paths": {
+        "spec": "tasks/specs/1165-coordinator-symphony-aligned-orchestrator-public-run-entry-bootstrap-and-handoff-reassessment.md",
+        "task": "tasks/tasks-1165-coordinator-symphony-aligned-orchestrator-public-run-entry-bootstrap-and-handoff-reassessment.md",
+        "agent_task": ".agent/task/1165-coordinator-symphony-aligned-orchestrator-public-run-entry-bootstrap-and-handoff-reassessment.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-public-run-entry-bootstrap-and-handoff-reassessment.md"
+      }
+    },
+    {
       "id": "20260314-1164-coordinator-symphony-aligned-orchestrator-perform-run-lifecycle-execution-and-run-error-shell-extraction",
       "title": "Coordinator Symphony-Aligned Orchestrator Perform-Run-Lifecycle Execution-and-Run-Error Shell Extraction",
       "relates_to": "tasks/tasks-1164-coordinator-symphony-aligned-orchestrator-perform-run-lifecycle-execution-and-run-error-shell-extraction.md",
