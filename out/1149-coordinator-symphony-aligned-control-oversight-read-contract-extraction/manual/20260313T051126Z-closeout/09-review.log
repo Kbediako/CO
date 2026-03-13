@@ -1,0 +1,544 @@
+
+> @kbediako/codex-orchestrator@0.1.38 review
+> node --loader ts-node/esm scripts/run-review.ts
+
+(node:58036) ExperimentalWarning: `--experimental-loader` may be removed in the future; instead use `register()`:
+--import 'data:text/javascript,import { register } from "node:module"; import { pathToFileURL } from "node:url"; register("ts-node/esm", pathToFileURL("./"));'
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:58036) [DEP0180] DeprecationWarning: fs.Stats constructor is deprecated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+⚠️ Diff budget exceeded (override applied) (base=origin/main)
+ - changed files 1293 > 25
+ - total lines changed 117569 > 800
+Top changed files:
+  - docs/docs-freshness-registry.json: 11583
+  - orchestrator/tests/ControlServer.test.ts: 7635
+  - tasks/index.json: 7050
+  - scripts/lib/review-execution-state.ts: 4243
+  - tests/review-execution-state.spec.ts: 3522
+  - tests/run-review.spec.ts: 3110
+  - scripts/run-review.ts: 2221
+  - orchestrator/tests/DelegationServer.test.ts: 2115
+  - orchestrator/tests/TelegramOversightBridge.test.ts: 1803
+  - orchestrator/src/cli/control/controlServer.ts: 1658
+
+Override accepted via DIFF_BUDGET_OVERRIDE_REASON: stacked-branch scope against origin/main obscures the bounded 1149 oversight read-contract slice
+[run-review] bounded review guidance enabled by default (set CODEX_REVIEW_ALLOW_HEAVY_COMMANDS=1 to opt into unrestricted heavy-command execution).
+[run-review] review scope metrics: 7 files, 125 lines.
+[run-review] runtime requested=appserver selected=appserver provider=AppServerRuntimeProvider.
+[run-review] delegation MCP enabled for this review (default; set --disable-delegation-mcp or CODEX_REVIEW_DISABLE_DELEGATION_MCP=1 to disable).
+Review prompt saved to: .runs/1149-coordinator-symphony-aligned-control-oversight-read-contract-extraction/cli/2026-03-13T04-19-14-058Z-afd63eff/review/prompt.txt
+Review output log: .runs/1149-coordinator-symphony-aligned-control-oversight-read-contract-extraction/cli/2026-03-13T04-19-14-058Z-afd63eff/review/output.log
+Launching Codex review (evidence: .runs/1149-coordinator-symphony-aligned-control-oversight-read-contract-extraction/cli/2026-03-13T04-19-14-058Z-afd63eff/manifest.json)
+[run-review] patience-first monitor checkpoints every 1m 0s (set CODEX_REVIEW_MONITOR_INTERVAL_SECONDS=0 to disable).
+[run-review] low-signal drift guard enabled after 3m 0s of repetitive bounded activity (set CODEX_REVIEW_LOW_SIGNAL_TIMEOUT_SECONDS=0 to disable).
+[run-review] verdict-stability guard enabled after 3m 0s of repeated speculative no-progress output (set CODEX_REVIEW_VERDICT_STABILITY_TIMEOUT_SECONDS=0 to disable).
+[run-review] meta-surface expansion guard enabled after 3m 0s of sustained off-task meta activity (set CODEX_REVIEW_META_SURFACE_TIMEOUT_SECONDS=0 to disable).
+[run-review] startup-anchor boundary enabled for diff mode; repeated memory/skills/review-docs/manifest/review-artifact reads before the first startup anchor will terminate the review.
+[run-review] bounded relevant reinspection dwell boundary enabled after 3m 0s of repetitive on-task reinspection without concrete findings (set CODEX_REVIEW_LOW_SIGNAL_TIMEOUT_SECONDS=0 to disable).
+OpenAI Codex v0.114.0 (research preview)
+--------
+workdir: /Users/kbediako/Code/CO
+model: gpt-5.4
+provider: openai
+approval: never
+sandbox: danger-full-access
+reasoning effort: xhigh
+reasoning summaries: detailed
+session id: 019ce5a1-4859-7021-9bdf-4cfa0228c558
+--------
+user
+Review task: 1149-coordinator-symphony-aligned-control-oversight-read-contract-extraction
+Review surface: diff
+
+Agent notes:
+Goal: validate the 1149 oversight read-contract extraction | Summary: moved the selected-run dispatch and questions read contract out of telegramOversightBridge.ts into a coordinator-owned contract module while preserving Telegram runtime behavior | Risks: import rewiring, payload-type ownership, unchanged read-controller behavior
+
+Please review the current changes and confirm:
+- The solution is minimal and avoids unnecessary abstraction/scope
+- Behavior remains correct for changed files and nearby dependencies
+- Call out concrete regressions, risky edge cases, or missing tests in the changed area
+- Start with touched paths, scoped diff commands, or nearby changed code before consulting memory, skills, review docs, manifests, or review artifacts
+- Concrete same-diff progress can be shown by citing touched paths with explicit locations such as `path:line`, `path:line:col`, `path#Lline`, or `path#LlineCcol`.
+- If you already have that diff-local citation evidence, do not search the wider repo for other examples of the rendering.
+
+Keep this pass diff-focused. Do not audit checklist/docs/evidence surfaces unless they are directly required to assess code correctness.
+
+Execution constraints (bounded review mode):
+- Keep this review focused on changed files and nearby dependencies.
+- Avoid full validation suites (for example `npm run test`, `npm run lint`, `npm run build`, `npm run docs:check`, `npm run docs:freshness`) during this pass.
+- Do not launch direct validation runners (for example `npx vitest`, `npm exec jest`) or nested review/pipeline/delegation flows during this pass.
+- If broader validation would improve confidence, list follow-up commands instead of executing them.
+
+Review scope hint: uncommitted working tree changes (default).
+
+Review scope paths (7):
+```
+orchestrator/src/cli/control/controlOversightFacade.ts
+orchestrator/src/cli/control/controlOversightReadService.ts
+orchestrator/src/cli/control/controlTelegramDispatchRead.ts
+orchestrator/src/cli/control/controlTelegramQuestionRead.ts
+orchestrator/src/cli/control/controlTelegramReadController.ts
+orchestrator/src/cli/control/telegramOversightBridge.ts
+orchestrator/src/cli/control/controlOversightReadContract.ts
+```
+
+Active closeout provenance:
+- Resolved active closeout root: `out/1149-coordinator-symphony-aligned-control-oversight-read-contract-extraction/manual/20260313T051126Z-closeout`
+- These roots are already-resolved self-referential review surfaces for this task; do not re-derive or re-enumerate them unless directly necessary to assess code correctness.
+mcp: openaiDeveloperDocs starting
+mcp: delegation starting
+mcp: delegation ready
+mcp: openaiDeveloperDocs ready
+mcp startup: ready: delegation, openaiDeveloperDocs
+mcp: openaiDeveloperDocs starting
+mcp: delegation starting
+mcp: delegation ready
+mcp: openaiDeveloperDocs ready
+mcp startup: ready: delegation, openaiDeveloperDocs
+
+thinking
+**Planning analysis steps**
+
+I think I can come up with a plan to inspect differences and dependencies. I want to analyze everything thoroughly. It seems like a good approach to use the exec_command to check the git status and diff for the specific files involved. It feels like this method will give me the information I need to ensure everything is correct. Let’s dive into that data and see what we can uncover!
+thinking
+**Planning analysis steps**
+
+I think I can come up with a plan to inspect differences and dependencies. I want to analyze everything thoroughly. It seems like a good approach to use the exec_command to check the git status and diff for the specific files involved. It feels like this method will give me the information I need to ensure everything is correct. Let’s dive into that data and see what we can uncover!
+Plan update
+  → Inspect scoped diff for touched control/telegram oversight files
+  • Read nearby dependency code to validate behavior and types
+  • Summarize concrete findings with diff-overlapping locations
+exec
+/bin/zsh -lc "git status --short && echo '
+--- DIFF ---' && git diff -- orchestrator/src/cli/control/controlOversightFacade.ts orchestrator/src/cli/control/controlOversightReadService.ts orchestrator/src/cli/control/controlTelegramDispatchRead.ts orchestrator/src/cli/control/controlTelegramQuestionRead.ts orchestrator/src/cli/control/controlTelegramReadController.ts orchestrator/src/cli/control/telegramOversightBridge.ts orchestrator/src/cli/control/controlOversightReadContract.ts" in /Users/kbediako/Code/CO succeeded in 0ms:
+ M orchestrator/src/cli/control/controlOversightFacade.ts
+ M orchestrator/src/cli/control/controlOversightReadService.ts
+ M orchestrator/src/cli/control/controlTelegramDispatchRead.ts
+ M orchestrator/src/cli/control/controlTelegramQuestionRead.ts
+ M orchestrator/src/cli/control/controlTelegramReadController.ts
+ M orchestrator/src/cli/control/telegramOversightBridge.ts
+?? orchestrator/src/cli/control/controlOversightReadContract.ts
+
+--- DIFF ---
+diff --git a/orchestrator/src/cli/control/controlOversightFacade.ts b/orchestrator/src/cli/control/controlOversightFacade.ts
+index 3eefb21e3..89d6342fb 100644
+--- a/orchestrator/src/cli/control/controlOversightFacade.ts
++++ b/orchestrator/src/cli/control/controlOversightFacade.ts
+@@ -1,15 +1,11 @@
+-import type { ControlSelectedRunRuntimeSnapshot } from './observabilityReadModel.js';
+ import type { ObservabilityUpdateListener } from './observabilityUpdateNotifier.js';
+ import {
+   createControlOversightReadService,
+   type ControlOversightReadServiceContext
+ } from './controlOversightReadService.js';
+
+thinking
+**Inspecting files for differences**
+
+I need to determine if a new file was omitted due to maximum output constraints. It seems crucial to check the new file alongside nearby code. I’m considering inspecting the file's content and possibly using git diff to identify changes, especially for that specific new file. I wonder what I might find that could help clarify things. Let’s see what that reveals!
+thinking
+**Inspecting files for differences**
+
+I need to determine if a new file was omitted due to maximum output constraints. It seems crucial to check the new file alongside nearby code. I’m considering inspecting the file's content and possibly using git diff to identify changes, especially for that specific new file. I wonder what I might find that could help clarify things. Let’s see what that reveals!
+exec
+/bin/zsh -lc "sed -n '1,220p' orchestrator/src/cli/control/controlOversightReadContract.ts && echo '
+--- telegram bridge ---' && sed -n '1,260p' orchestrator/src/cli/control/telegramOversightBridge.ts && echo '
+--- read service ---' && sed -n '1,220p' orchestrator/src/cli/control/controlOversightReadService.ts && echo '
+--- read controller ---' && sed -n '1,220p' orchestrator/src/cli/control/controlTelegramReadController.ts" in /Users/kbediako/Code/CO succeeded in 0ms:
+import type {
+  ControlDispatchPilotPayload,
+  ControlSelectedRunRuntimeSnapshot
+} from './observabilityReadModel.js';
+
+export interface ControlDispatchPayload {
+  dispatch_pilot?: ControlDispatchPilotPayload | null;
+  recommendation?: {
+    dispatch_id?: string | null;
+    summary?: string | null;
+    rationale?: string | null;
+    confidence?: number | null;
+    tracked_issue?: {
+      identifier?: string | null;
+      title?: string | null;
+      state?: string | null;
+      url?: string | null;
+      team_key?: string | null;
+    } | null;
+  } | null;
+
+thinking
+**Investigating potential issues**
+
+I need to inspect the rest of the code, as maybe the type usage elsewhere is causing problems. Reviewing the changed area and its nearby dependencies sounds crucial. I might think the difference could just be type extraction. However, I have to check for any compile errors or hidden cycles. There could be import cycles due to the new module imports. Inspecting for circular dependencies is key, and I should look at related files like controlOversightFacade and the read service.
+thinking
+**Investigating potential issues**
+
+I need to inspect the rest of the code, as maybe the type usage elsewhere is causing problems. Reviewing the changed area and its nearby dependencies sounds crucial. I might think the difference could just be type extraction. However, I have to check for any compile errors or hidden cycles. There could be import cycles due to the new module imports. Inspecting for circular dependencies is key, and I should look at related files like controlOversightFacade and the read service.
+exec
+/bin/zsh -lc "sed -n '1,220p' orchestrator/src/cli/control/controlOversightFacade.ts && echo '
+--- dispatch read ---' && sed -n '1,220p' orchestrator/src/cli/control/controlTelegramDispatchRead.ts && echo '
+--- question read ---' && sed -n '1,220p' orchestrator/src/cli/control/controlTelegramQuestionRead.ts" in /Users/kbediako/Code/CO succeeded in 0ms:
+import type { ObservabilityUpdateListener } from './observabilityUpdateNotifier.js';
+import {
+  createControlOversightReadService,
+  type ControlOversightReadServiceContext
+} from './controlOversightReadService.js';
+import type { ControlOversightReadContract } from './controlOversightReadContract.js';
+
+export interface ControlOversightFacade extends ControlOversightReadContract {
+  subscribe(listener: ObservabilityUpdateListener): () => void;
+}
+
+export function createControlOversightFacade(
+  context: ControlOversightReadServiceContext
+): ControlOversightFacade {
+  const readService = createControlOversightReadService(context);
+  return {
+    ...readService,
+    subscribe: (listener) => context.runtime.subscribe(listener)
+  };
+}
+
+thinking
+**Identifying possible issues**
+
+I need to identify any potential issues with type-only extraction, which might be acceptable. I'll have to check whether any re-export or public API has changed. There's also a new file called controlOversightReadContract that might not be exported from the package index, but the internal file could be fine. I'll inspect how types from telegramOversightBridge are used elsewhere and search for references to gather more information.
+thinking
+**Identifying possible issues**
+
+I need to identify any potential issues with type-only extraction, which might be acceptable. I'll have to check whether any re-export or public API has changed. There's also a new file called controlOversightReadContract that might not be exported from the package index, but the internal file could be fine. I'll inspect how types from telegramOversightBridge are used elsewhere and search for references to gather more information.
+exec
+/bin/zsh -lc "rg -n \"TelegramOversightReadAdapter|ControlDispatchPayload|QuestionsPayload|ControlOversightReadContract\" orchestrator/src/cli/control -g '"'!dist'"'" in /Users/kbediako/Code/CO succeeded in 0ms:
+orchestrator/src/cli/control/controlTelegramReadController.ts:3:import type { ControlOversightReadContract } from './controlOversightReadContract.js';
+orchestrator/src/cli/control/controlTelegramReadController.ts:25:  readAdapter: ControlOversightReadContract;
+orchestrator/src/cli/control/controlTelegramReadController.ts:58:async function renderStatus(readAdapter: ControlOversightReadContract): Promise<string> {
+orchestrator/src/cli/control/controlTelegramReadController.ts:62:async function renderIssue(readAdapter: ControlOversightReadContract): Promise<string> {
+orchestrator/src/cli/control/controlTelegramReadController.ts:95:async function renderDispatch(readAdapter: ControlOversightReadContract): Promise<string> {
+orchestrator/src/cli/control/controlTelegramReadController.ts:118:async function renderQuestions(readAdapter: ControlOversightReadContract): Promise<string> {
+orchestrator/src/cli/control/controlOversightFacade.ts:6:import type { ControlOversightReadContract } from './controlOversightReadContract.js';
+orchestrator/src/cli/control/controlOversightFacade.ts:8:export interface ControlOversightFacade extends ControlOversightReadContract {
+orchestrator/src/cli/control/telegramOversightBridge.ts:23:  ControlOversightReadContract
+orchestrator/src/cli/control/telegramOversightBridge.ts:72:  readAdapter: ControlOversightReadContract;
+orchestrator/src/cli/control/telegramOversightBridge.ts:116:    readAdapter: ControlOversightReadContract;
+orchestrator/src/cli/control/controlTelegramQuestionRead.ts:8:import type { QuestionsPayload } from './controlOversightReadContract.js';
+orchestrator/src/cli/control/controlTelegramQuestionRead.ts:16:): Promise<QuestionsPayload> {
+orchestrator/src/cli/control/controlTelegramDispatchRead.ts:12:import type { ControlDispatchPayload } from './controlOversightReadContract.js';
+orchestrator/src/cli/control/controlTelegramDispatchRead.ts:28:): Promise<ControlDispatchPayload> {
+orchestrator/src/cli/control/controlTelegramDispatchRead.ts:44:): ControlDispatchPayload {
+orchestrator/src/cli/control/controlTelegramDispatchRead.ts:50:          ? (payload.dispatch_pilot as NonNullable<ControlDispatchPayload['dispatch_pilot']>)
+orchestrator/src/cli/control/controlTelegramDispatchRead.ts:54:          ? (payload.recommendation as NonNullable<ControlDispatchPayload['recommendation']>)
+orchestrator/src/cli/control/controlTelegramDispatchRead.ts:60:      ? (result.details.dispatch_pilot as NonNullable<ControlDispatchPayload['dispatch_pilot']>)
+orchestrator/src/cli/control/controlOversightReadService.ts:5:  ControlOversightReadContract,
+
+thinking
+**Investigating module cycles**
+
+I'm noticing a potential issue with the imports in different modules. ControlOversightReadContract imports certain elements from observabilityReadModel, while telegramOversightBridge used to import them only via types but now imports directly from the contract. This makes me wonder if there's a module cycle involved, especially since controlOversightReadContract imports observabilityReadModel, which may also import telegramOversightBridge. I think it’s necessary for me to inspect the observabilityReadModel imports to confirm this. Time to search!
+thinking
+**Investigating module cycles**
+
+I'm noticing a potential issue with the imports in different modules. ControlOversightReadContract imports certain elements from observabilityReadModel, while telegramOversightBridge used to import them only via types but now imports directly from the contract. This makes me wonder if there's a module cycle involved, especially since controlOversightReadContract imports observabilityReadModel, which may also import telegramOversightBridge. I think it’s necessary for me to inspect the observabilityReadModel imports to confirm this. Time to search!
+exec
+/bin/zsh -lc "sed -n '1,260p' orchestrator/src/cli/control/observabilityReadModel.ts | head -n 80 && echo '
+--- imports referencing bridge/contract ---' && rg -n \"telegramOversightBridge|controlOversightReadContract|controlOversightFacade|controlOversightReadService\" orchestrator/src/cli/control/observabilityReadModel.ts orchestrator/src/cli/control/*.ts" in /Users/kbediako/Code/CO succeeded in 0ms:
+import type { LiveLinearTrackedIssue } from './linearDispatchSource.js';
+import type { QuestionUrgency } from './questions.js';
+
+export interface SelectedRunQuestionSummary {
+  queuedCount: number;
+  latestQuestion: {
+    questionId: string;
+    prompt: string;
+    urgency: QuestionUrgency;
+    queuedAt: string;
+  } | null;
+}
+
+export interface SelectedRunLatestEvent {
+  at: string | null;
+  event: string | null;
+  message: string | null;
+  requestedBy: string | null;
+  reason: string | null;
+}
+
+thinking
+**Inspecting dependencies**
+
+I’m trying to figure out why there’s no cycle indicated from the observabilityReadModel. I think I need to look into other nearby dependencies that might accept types like ControlOversightFacade or readAdapter. There's a possibility that I should search for something to compile, maybe? I want to ensure I'm not missing any connections or relationships within these dependencies that could clarify this issue. Let’s keep exploring!
+thinking
+**Inspecting dependencies**
+
+I’m trying to figure out why there’s no cycle indicated from the observabilityReadModel. I think I need to look into other nearby dependencies that might accept types like ControlOversightFacade or readAdapter. There's a possibility that I should search for something to compile, maybe? I want to ensure I'm not missing any connections or relationships within these dependencies that could clarify this issue. Let’s keep exploring!
+exec
+/bin/zsh -lc "sed -n '1,220p' orchestrator/src/cli/control/controlTelegramBridgeLifecycle.ts && echo '
+--- bootstrap lifecycle ---' && sed -n '1,240p' orchestrator/src/cli/control/controlTelegramBridgeBootstrapLifecycle.ts" in /Users/kbediako/Code/CO succeeded in 0ms:
+import { logger } from '../../logger.js';
+import type { RunPaths } from '../run/runPaths.js';
+import type { ControlOversightFacade } from './controlOversightFacade.js';
+import {
+  startTelegramOversightBridge,
+  type TelegramOversightBridge
+} from './telegramOversightBridge.js';
+
+interface ControlTelegramBridgeLifecycleOptions {
+  runDir: Pick<RunPaths, 'runDir'>['runDir'];
+  createOversightFacade: () => ControlOversightFacade;
+  startTelegramBridgeImpl?: typeof startTelegramOversightBridge;
+}
+
+interface ControlTelegramBridgeLifecycleStartOptions {
+  baseUrl: string;
+  controlToken: string;
+}
+
+export interface ControlTelegramBridgeLifecycle {
+
+thinking
+**Investigating export issues**
+
+I’m wondering if there might be a missing export in the barrel. I should check if the module exports have changed recently. It looks like some tests might be importing `ControlDispatchPayload` from `telegramOversightBridge`, and they could be failing because that export has been removed. I think I should search the entire repository to find out what's happening and identify the scope of the issue.
+thinking
+**Investigating export issues**
+
+I’m wondering if there might be a missing export in the barrel. I should check if the module exports have changed recently. It looks like some tests might be importing `ControlDispatchPayload` from `telegramOversightBridge`, and they could be failing because that export has been removed. I think I should search the entire repository to find out what's happening and identify the scope of the issue.
+exec
+/bin/zsh -lc "rg -n \"from './telegramOversightBridge\\.js'|from \\\"\\.\\/telegramOversightBridge\\.js\\\"|from '.*telegramOversightBridge\\.js'|from \\\".*telegramOversightBridge\\.js\\\"|ControlDispatchPayload|QuestionsPayload|QuestionRecordPayload|TelegramOversightReadAdapter\" orchestrator/src test src . -g '"'!dist'"'" in /Users/kbediako/Code/CO exited 2 in 0ms:
+rg: test: No such file or directory (os error 2)
+rg: src: No such file or directory (os error 2)
+orchestrator/src/cli/control/controlTelegramBridgeLifecycle.ts:7:} from './telegramOversightBridge.js';
+./orchestrator/src/cli/control/controlOversightReadService.ts:6:  ControlDispatchPayload,
+./orchestrator/src/cli/control/controlOversightReadService.ts:7:  QuestionsPayload
+./orchestrator/src/cli/control/controlOversightReadService.ts:30:    readDispatch: async (): Promise<ControlDispatchPayload> =>
+./orchestrator/src/cli/control/controlOversightReadService.ts:37:    readQuestions: async (): Promise<QuestionsPayload> =>
+./orchestrator/src/cli/control/controlTelegramBridgeLifecycle.ts:7:} from './telegramOversightBridge.js';
+./orchestrator/src/cli/control/controlTelegramQuestionRead.ts:8:import type { QuestionsPayload } from './controlOversightReadContract.js';
+./orchestrator/src/cli/control/controlTelegramQuestionRead.ts:16:): Promise<QuestionsPayload> {
+./orchestrator/src/cli/control/controlTelegramDispatchRead.ts:12:import type { ControlDispatchPayload } from './controlOversightReadContract.js';
+./orchestrator/src/cli/control/controlTelegramDispatchRead.ts:28:): Promise<ControlDispatchPayload> {
+./orchestrator/src/cli/control/controlTelegramDispatchRead.ts:44:): ControlDispatchPayload {
+./orchestrator/src/cli/control/controlTelegramDispatchRead.ts:50:          ? (payload.dispatch_pilot as NonNullable<ControlDispatchPayload['dispatch_pilot']>)
+./orchestrator/src/cli/control/controlTelegramDispatchRead.ts:54:          ? (payload.recommendation as NonNullable<ControlDispatchPayload['recommendation']>)
+./orchestrator/src/cli/control/controlTelegramDispatchRead.ts:60:      ? (result.details.dispatch_pilot as NonNullable<ControlDispatchPayload['dispatch_pilot']>)
+./orchestrator/src/cli/control/controlOversightReadContract.ts:6:export interface ControlDispatchPayload {
+./orchestrator/src/cli/control/controlOversightReadContract.ts:29:export interface QuestionRecordPayload {
+./orchestrator/src/cli/control/controlOversightReadContract.ts:36:export interface QuestionsPayload {
+./orchestrator/src/cli/control/controlOversightReadContract.ts:37:  questions?: QuestionRecordPayload[];
+[run-review] waiting on codex review (1m 0s elapsed, 1s idle; review progress observed).
+
+thinking
+**Investigating test errors**
+
+I’m noticing there’s an error with rg due to a nonexistent test path, but I still received output. There's a test file, TelegramOversightBridge.test.ts, that might be relevant. I think I need to inspect the nearby tests to see if they’ve been updated. The user requested that I call out any missing tests, so I’ll also search the tests for imports to ensure everything's in order. It's all about getting this right for the user!
+thinking
+**Investigating test errors**
+
+I’m noticing there’s an error with rg due to a nonexistent test path, but I still received output. There's a test file, TelegramOversightBridge.test.ts, that might be relevant. I think I need to inspect the nearby tests to see if they’ve been updated. The user requested that I call out any missing tests, so I’ll also search the tests for imports to ensure everything's in order. It's all about getting this right for the user!
+exec
+/bin/zsh -lc "sed -n '1,260p' orchestrator/tests/TelegramOversightBridge.test.ts && echo '
+--- related tests ---' && rg -n \"ControlOversightReadContract|TelegramOversightReadAdapter|startTelegramOversightBridge|createControlTelegramReadController|createControlOversightFacade\" orchestrator/tests -g '"'!dist'"'" in /Users/kbediako/Code/CO succeeded in 0ms:
+import http from 'node:http';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { createHmac } from 'node:crypto';
+import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+import { ControlServer } from '../src/cli/control/controlServer.js';
+import type { ControlSelectedRunRuntimeSnapshot } from '../src/cli/control/observabilityReadModel.js';
+import { startTelegramOversightBridge } from '../src/cli/control/telegramOversightBridge.js';
+import { createTelegramOversightControlActionApiClient } from '../src/cli/control/telegramOversightControlActionApiClient.js';
+import { computeEffectiveDelegationConfig } from '../src/cli/config/delegationConfig.js';
+import { resolveRunPaths } from '../src/cli/run/runPaths.js';
+
+async function createRunRoot(taskId: string) {
+  const root = await mkdtemp(join(tmpdir(), 'telegram-oversight-'));
+  const env = { repoRoot: root, runsRoot: join(root, '.runs'), outRoot: join(root, 'out'), taskId };
+  const paths = resolveRunPaths(env, 'run-1');
+  await mkdir(paths.runDir, { recursive: true });
+  return { root, env, paths };
+
+thinking
+**Inspecting imports for tests**
+
+I need to check the relevant tests to see if they're importing types from `telegramOversightBridge`. It’s crucial to ensure that everything compiles correctly. I think the best next step would be to search globally for those type imports to see if they’re being used properly. Checking this might help identify any issues or confirm that things are set up as they should be. Let’s get to it!
+thinking
+**Inspecting imports for tests**
+
+I need to check the relevant tests to see if they're importing types from `telegramOversightBridge`. It’s crucial to ensure that everything compiles correctly. I think the best next step would be to search globally for those type imports to see if they’re being used properly. Checking this might help identify any issues or confirm that things are set up as they should be. Let’s get to it!
+exec
+/bin/zsh -lc "rg -n \"import type \\{["'^}]*ControlDispatchPayload|import type '"\\{["'^}]*QuestionsPayload|import type '"\\{["'^}]*QuestionRecordPayload|import type '"\\{["'^}]*TelegramOversightReadAdapter|TelegramOversightReadAdapter|QuestionRecordPayload|QuestionsPayload|ControlDispatchPayload" orchestrator/tests orchestrator/src -g '"'"'!dist'"'" in /Users/kbediako/Code/CO succeeded in 0ms:
+orchestrator/src/cli/control/controlOversightReadService.ts:6:  ControlDispatchPayload,
+orchestrator/src/cli/control/controlOversightReadService.ts:7:  QuestionsPayload
+orchestrator/src/cli/control/controlOversightReadService.ts:30:    readDispatch: async (): Promise<ControlDispatchPayload> =>
+orchestrator/src/cli/control/controlOversightReadService.ts:37:    readQuestions: async (): Promise<QuestionsPayload> =>
+orchestrator/src/cli/control/controlOversightReadContract.ts:6:export interface ControlDispatchPayload {
+orchestrator/src/cli/control/controlOversightReadContract.ts:29:export interface QuestionRecordPayload {
+orchestrator/src/cli/control/controlOversightReadContract.ts:36:export interface QuestionsPayload {
+orchestrator/src/cli/control/controlOversightReadContract.ts:37:  questions?: QuestionRecordPayload[];
+orchestrator/src/cli/control/controlOversightReadContract.ts:42:  readDispatch(): Promise<ControlDispatchPayload>;
+orchestrator/src/cli/control/controlOversightReadContract.ts:43:  readQuestions(): Promise<QuestionsPayload>;
+orchestrator/src/cli/control/controlTelegramQuestionRead.ts:8:import type { QuestionsPayload } from './controlOversightReadContract.js';
+orchestrator/src/cli/control/controlTelegramQuestionRead.ts:16:): Promise<QuestionsPayload> {
+orchestrator/src/cli/control/controlTelegramDispatchRead.ts:12:import type { ControlDispatchPayload } from './controlOversightReadContract.js';
+orchestrator/src/cli/control/controlTelegramDispatchRead.ts:28:): Promise<ControlDispatchPayload> {
+orchestrator/src/cli/control/controlTelegramDispatchRead.ts:44:): ControlDispatchPayload {
+orchestrator/src/cli/control/controlTelegramDispatchRead.ts:50:          ? (payload.dispatch_pilot as NonNullable<ControlDispatchPayload['dispatch_pilot']>)
+orchestrator/src/cli/control/controlTelegramDispatchRead.ts:54:          ? (payload.recommendation as NonNullable<ControlDispatchPayload['recommendation']>)
+orchestrator/src/cli/control/controlTelegramDispatchRead.ts:60:      ? (result.details.dispatch_pilot as NonNullable<ControlDispatchPayload['dispatch_pilot']>)
+
+
+thinking
+**Evaluating test coverage and module issues**
+
+I’m considering whether there are missing tests or if the contract module needs updates. However, I need to focus on actual bugs rather than just the absence of tests unless there's something concrete. If there's no bug, I should say there are no findings. I'm thinking about inspecting the git diff to check specific files and whether a new module might be missing from exports, potentially due to how TypeScript handles internal imports and package configurations. I’ll need to check those details further!
+thinking
+**Identifying potential module issues**
+
+I'm noticing a potential issue with `telegramOversightBridge.ts`, which imports `ControlOversightReadContract` from a new module. This new module also imports `ControlDispatchPilotPayload` from another file, `controlTelegramReadController.ts`, which already imports `ControlDispatchPilotPayload` and `ControlSelectedRunRuntimeSnapshot` — but that seems fine. I’m also considering the tests and mocking; some tests might be using `vi.mock` with a limited return that only includes `startTelegramOversightBridge`, but I'm not sure if types will come into play here. I need to look into that further!
+thinking
+**Evaluating test coverage and module issues**
+
+I’m considering whether there are missing tests or if the contract module needs updates. However, I need to focus on actual bugs rather than just the absence of tests unless there's something concrete. If there's no bug, I should say there are no findings. I'm thinking about inspecting the git diff to check specific files and whether a new module might be missing from exports, potentially due to how TypeScript handles internal imports and package configurations. I’ll need to check those details further!
+thinking
+**Identifying potential module issues**
+
+I'm noticing a potential issue with `telegramOversightBridge.ts`, which imports `ControlOversightReadContract` from a new module. This new module also imports `ControlDispatchPilotPayload` from another file, `controlTelegramReadController.ts`, which already imports `ControlDispatchPilotPayload` and `ControlSelectedRunRuntimeSnapshot` — but that seems fine. I’m also considering the tests and mocking; some tests might be using `vi.mock` with a limited return that only includes `startTelegramOversightBridge`, but I'm not sure if types will come into play here. I need to look into that further!
+exec
+/bin/zsh -lc "sed -n '1,220p' /Users/kbediako/.codex/skills/standalone-review/SKILL.md" in /Users/kbediako/Code/CO succeeded in 0ms:
+---
+name: standalone-review
+description: Use for required periodic cross-check reviews during implementation and before handoff using `codex review`.
+---
+
+# Standalone Review
+
+## Overview
+
+Use this skill when you need a fast, ad-hoc review without running a pipeline or collecting a manifest. It is ideal during implementation or for quick pre-flight checks.
+Before implementation, use it to review the task/spec against the user’s intent and record the approval in the PRD/TECH_SPEC or task notes.
+
+## Auto-trigger policy (required)
+
+Run this skill automatically whenever any condition is true:
+- You made code/config/script/test edits since the last standalone review.
+- You finished a meaningful chunk of work (default: behavior change or about 2+ files touched).
+- You finished a coding burst for a sub-goal and are about to validate, summarize, or switch streams.
+- You are about to report completion, propose merge, or answer "what's next?" with recommendations.
+- You addressed external feedback (PR reviews, bot comments, or CI-fix patches).
+
+
+thinking
+I'm thinking about checking if there are any changes missed in the git diff, particularly related to a new file. It could be that `git diff` didn't show the file since it lacks a newline. I'm wondering if there's a maintainability concern since the `QuestionsPayload` status field is still a string instead of a more specific type for question status. I also want to look at `ControlOversightFacade.test.ts` to confirm if there's a test for the new contract ownership.
+thinking
+**Inspecting diff stats**
+
+I want to check the diff stats for these 7 files. It seems like there might be no hidden line numbers to worry about. So, I think I should run `git diff --stat` to get a clear overview of the changes. This command will help me understand the modifications without complicating things too much. Let’s go ahead and see what the output tells me!
+thinking
+I'm thinking about checking if there are any changes missed in the git diff, particularly related to a new file. It could be that `git diff` didn't show the file since it lacks a newline. I'm wondering if there's a maintainability concern since the `QuestionsPayload` status field is still a string instead of a more specific type for question status. I also want to look at `ControlOversightFacade.test.ts` to confirm if there's a test for the new contract ownership.
+thinking
+**Inspecting diff stats**
+
+I want to check the diff stats for these 7 files. It seems like there might be no hidden line numbers to worry about. So, I think I should run `git diff --stat` to get a clear overview of the changes. This command will help me understand the modifications without complicating things too much. Let’s go ahead and see what the output tells me!
+exec
+/bin/zsh -lc 'git diff --stat -- orchestrator/src/cli/control/controlOversightFacade.ts orchestrator/src/cli/control/controlOversightReadService.ts orchestrator/src/cli/control/controlTelegramDispatchRead.ts orchestrator/src/cli/control/controlTelegramQuestionRead.ts orchestrator/src/cli/control/controlTelegramReadController.ts orchestrator/src/cli/control/telegramOversightBridge.ts orchestrator/src/cli/control/controlOversightReadContract.ts' in /Users/kbediako/Code/CO succeeded in 0ms:
+ .../src/cli/control/controlOversightFacade.ts      |  8 +---
+ .../src/cli/control/controlOversightReadService.ts |  8 ++--
+ .../src/cli/control/controlTelegramDispatchRead.ts |  2 +-
+ .../src/cli/control/controlTelegramQuestionRead.ts |  2 +-
+ .../cli/control/controlTelegramReadController.ts   | 12 +++---
+ .../src/cli/control/telegramOversightBridge.ts     | 49 ++--------------------
+ 6 files changed, 18 insertions(+), 63 deletions(-)
+[run-review] waiting on codex review (2m 0s elapsed, 4s idle; review progress observed).
+exec
+/bin/zsh -lc 'git diff --no-index -- /dev/null orchestrator/src/cli/control/controlOversightReadContract.ts' in /Users/kbediako/Code/CO exited 1 in 0ms:
+diff --git a/orchestrator/src/cli/control/controlOversightReadContract.ts b/orchestrator/src/cli/control/controlOversightReadContract.ts
+new file mode 100644
+index 000000000..2ba9d76d9
+--- /dev/null
++++ b/orchestrator/src/cli/control/controlOversightReadContract.ts
+@@ -0,0 +1,44 @@
++import type {
++  ControlDispatchPilotPayload,
++  ControlSelectedRunRuntimeSnapshot
++} from './observabilityReadModel.js';
++
++export interface ControlDispatchPayload {
++  dispatch_pilot?: ControlDispatchPilotPayload | null;
++  recommendation?: {
++    dispatch_id?: string | null;
++    summary?: string | null;
++    rationale?: string | null;
++    confidence?: number | null;
++    tracked_issue?: {
++      identifier?: string | null;
+
+thinking
+**Considering testing approach**
+
+I need to inspect tests and how they're being compiled or used. It seems like I could run targeted TypeScript compilation or tests. The user mentioned we should avoid launching full validation runners, so I'm thinking maybe `tsc --noEmit` or using Node could be options, but that might be too broad. Ideally, I want to just inspect, so I might run `git diff -U0` with line numbers to gather the necessary information.
+thinking
+**Considering testing approach**
+
+I need to inspect tests and how they're being compiled or used. It seems like I could run targeted TypeScript compilation or tests. The user mentioned we should avoid launching full validation runners, so I'm thinking maybe `tsc --noEmit` or using Node could be options, but that might be too broad. Ideally, I want to just inspect, so I might run `git diff -U0` with line numbers to gather the necessary information.
+exec
+/bin/zsh -lc "git diff -U0 -- orchestrator/src/cli/control/controlOversightFacade.ts orchestrator/src/cli/control/controlOversightReadService.ts orchestrator/src/cli/control/controlTelegramDispatchRead.ts orchestrator/src/cli/control/controlTelegramQuestionRead.ts orchestrator/src/cli/control/controlTelegramReadController.ts orchestrator/src/cli/control/telegramOversightBridge.ts && echo '
+--- NEW FILE ---' && git diff --no-index -U0 -- /dev/null orchestrator/src/cli/control/controlOversightReadContract.ts" in /Users/kbediako/Code/CO exited 1 in 0ms:
+diff --git a/orchestrator/src/cli/control/controlOversightFacade.ts b/orchestrator/src/cli/control/controlOversightFacade.ts
+index 3eefb21e3..89d6342fb 100644
+--- a/orchestrator/src/cli/control/controlOversightFacade.ts
++++ b/orchestrator/src/cli/control/controlOversightFacade.ts
+@@ -1 +0,0 @@
+-import type { ControlSelectedRunRuntimeSnapshot } from './observabilityReadModel.js';
+@@ -7 +6 @@ import {
+-import type { ControlDispatchPayload, QuestionsPayload } from './telegramOversightBridge.js';
++import type { ControlOversightReadContract } from './controlOversightReadContract.js';
+@@ -9,4 +8 @@ import type { ControlDispatchPayload, QuestionsPayload } from './telegramOversig
+-export interface ControlOversightFacade {
+-  readSelectedRun(): Promise<ControlSelectedRunRuntimeSnapshot>;
+-  readDispatch(): Promise<ControlDispatchPayload>;
+-  readQuestions(): Promise<QuestionsPayload>;
++export interface ControlOversightFacade extends ControlOversightReadContract {
+diff --git a/orchestrator/src/cli/control/controlOversightReadService.ts b/orchestrator/src/cli/control/controlOversightReadService.ts
+index f12706023..af329a708 100644
+--- a/orchestrator/src/cli/control/controlOversightReadService.ts
++++ b/orchestrator/src/cli/control/controlOversightReadService.ts
+@@ -4,0 +5 @@ import type {
+
+
+thinking
+**Considering code review implications**
+
+In a real pull request, any untracked files would typically be included if committed. However, during a review, the default diff view of the uncommitted working tree also includes untracked files. I realize that if the new file isn't committed, the code change won't compile. But for the review, I should assess the patch as intended, including the untracked files, which might not be relevant. I'll keep that in mind!
+thinking
+**Inspecting review surface**
+
+I want to inspect the "review surface: diff" to ensure it's minimal. It seems likely that there won't be any findings. I should also mention that the overall correctness of the patch is important, and I need to have a confidence score. Before finalizing everything, I might need to update the completion plan to reflect any changes or confirmations. It feels like organizing these steps will help clarify the process!
+thinking
+**Considering code review implications**
+
+In a real pull request, any untracked files would typically be included if committed. However, during a review, the default diff view of the uncommitted working tree also includes untracked files. I realize that if the new file isn't committed, the code change won't compile. But for the review, I should assess the patch as intended, including the untracked files, which might not be relevant. I'll keep that in mind!
+thinking
+**Inspecting review surface**
+
+I want to inspect the "review surface: diff" to ensure it's minimal. It seems likely that there won't be any findings. I should also mention that the overall correctness of the patch is important, and I need to have a confidence score. Before finalizing everything, I might need to update the completion plan to reflect any changes or confirmations. It feels like organizing these steps will help clarify the process!
+Plan update
+Reviewed the touched oversight/telegram files plus nearby lifecycle/tests for type-contract rewiring and found no concrete behavioral regressions in the scoped diff.
+  ✓ Inspect scoped diff for touched control/telegram oversight files
+  ✓ Read nearby dependency code to validate behavior and types
+  ✓ Summarize concrete findings with diff-overlapping locations
+[run-review] waiting on codex review (3m 0s elapsed, 2s idle; review progress observed).
+
+thinking
+**Finalizing JSON schema**
+
+I need to finalize the exact schema for the JSON output. If there are no findings, I should keep the code location absent and leave the findings empty. The overall correctness patch is correct, and I want the overall explanation to be just 1-3 sentences long. I also need to include an overall confidence score. Since no memory citation is used, I’ll make sure to output pure JSON without any markdown formatting. I want the final JSON to be valid and clean!
+thinking
+**Finalizing JSON schema**
+
+I need to finalize the exact schema for the JSON output. If there are no findings, I should keep the code location absent and leave the findings empty. The overall correctness patch is correct, and I want the overall explanation to be just 1-3 sentences long. I also need to include an overall confidence score. Since no memory citation is used, I’ll make sure to output pure JSON without any markdown formatting. I want the final JSON to be valid and clean!
+codex
+The diff is a narrowly scoped type-contract extraction: the selected-run/dispatch/question read surface moved into `controlOversightReadContract.ts`, and the touched consumers were rewired structurally without changing the underlying read or Telegram runtime logic. I did not find a concrete regression in the changed files or their nearby dependencies.
+Review output saved to: .runs/1149-coordinator-symphony-aligned-control-oversight-read-contract-extraction/cli/2026-03-13T04-19-14-058Z-afd63eff/review/output.log
+Review telemetry saved to: .runs/1149-coordinator-symphony-aligned-control-oversight-read-contract-extraction/cli/2026-03-13T04-19-14-058Z-afd63eff/review/telemetry.json

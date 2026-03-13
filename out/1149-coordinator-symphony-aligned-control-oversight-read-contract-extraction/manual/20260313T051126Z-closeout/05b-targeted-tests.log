@@ -1,0 +1,70 @@
+
+> @kbediako/codex-orchestrator@0.1.38 test
+> npm run test:orchestrator orchestrator/tests/ControlOversightReadService.test.ts orchestrator/tests/ControlOversightFacade.test.ts orchestrator/tests/ControlTelegramReadController.test.ts orchestrator/tests/TelegramOversightBridge.test.ts
+
+
+> @kbediako/codex-orchestrator@0.1.38 test:orchestrator
+> vitest run --config vitest.config.core.ts orchestrator/tests/ControlOversightReadService.test.ts orchestrator/tests/ControlOversightFacade.test.ts orchestrator/tests/ControlTelegramReadController.test.ts orchestrator/tests/TelegramOversightBridge.test.ts
+
+
+ RUN  v1.6.1 /Users/kbediako/Code/CO
+
+ ✓ orchestrator/tests/ControlOversightReadService.test.ts  (1 test) 2ms
+ ✓ orchestrator/tests/ControlOversightFacade.test.ts  (1 test) 2ms
+ ✓ orchestrator/tests/ControlTelegramReadController.test.ts  (6 tests) 2ms
+stdout | orchestrator/tests/TelegramOversightBridge.test.ts > TelegramOversightBridge > renders selected-run status issue and queued questions through the integrated polling bridge
+[Codex-Orchestrator] [telegram-oversight] enabled for 1 chat(s) as @co_test_advisory_bot
+
+stdout | orchestrator/tests/TelegramOversightBridge.test.ts > TelegramOversightBridge > routes pause and resume through transport-mutating control policy
+[Codex-Orchestrator] [telegram-oversight] enabled for 1 chat(s) as @co_test_advisory_bot
+
+stdout | orchestrator/tests/TelegramOversightBridge.test.ts > TelegramOversightBridge > does not immediately retry freshly expired child questions during Telegram /questions reads
+[Codex-Orchestrator] [telegram-oversight] enabled for 1 chat(s) as @co_test_advisory_bot
+
+stdout | orchestrator/tests/TelegramOversightBridge.test.ts > TelegramOversightBridge > does not immediately retry freshly expired child questions during Telegram /questions reads
+<empty line>
+stderr | orchestrator/tests/TelegramOversightBridge.test.ts > TelegramOversightBridge > does not immediately retry freshly expired child questions during Telegram /questions reads
+[Codex-Orchestrator] Failed to resolve child question: child control error: 500 nope
+
+stdout | orchestrator/tests/TelegramOversightBridge.test.ts > TelegramOversightBridge > retries answered child questions during Telegram /questions reads
+[Codex-Orchestrator] [telegram-oversight] enabled for 1 chat(s) as @co_test_advisory_bot
+
+stdout | orchestrator/tests/TelegramOversightBridge.test.ts > TelegramOversightBridge > continues polling after one update fails and advances the Telegram offset
+[Codex-Orchestrator] [telegram-oversight] enabled for 1 chat(s) as @co_test_advisory_bot
+
+stdout | orchestrator/tests/TelegramOversightBridge.test.ts > TelegramOversightBridge > continues polling after one update fails and advances the Telegram offset
+<empty line>
+stderr | orchestrator/tests/TelegramOversightBridge.test.ts > TelegramOversightBridge > continues polling after one update fails and advances the Telegram offset
+[Codex-Orchestrator] [telegram-oversight] failed to handle update 200: simulated_send_failure
+
+stdout | orchestrator/tests/TelegramOversightBridge.test.ts > TelegramOversightBridge > sends deduped projection-driven push notifications when enabled
+[Codex-Orchestrator] [telegram-oversight] enabled for 1 chat(s) as @co_test_advisory_bot
+
+stdout | orchestrator/tests/TelegramOversightBridge.test.ts > TelegramOversightBridge > persists a pending projection during cooldown and flushes it on the next signal
+[Codex-Orchestrator] [telegram-oversight] enabled for 1 chat(s) as @co_test_advisory_bot
+
+stdout | orchestrator/tests/TelegramOversightBridge.test.ts > TelegramOversightBridge > preserves next_update_id and monotonic updated_at when projection delivery overlaps update persistence
+[Codex-Orchestrator] [telegram-oversight] enabled for 1 chat(s) as @co_test_advisory_bot
+
+stdout | orchestrator/tests/TelegramOversightBridge.test.ts > TelegramOversightBridge > keeps top-level updated_at monotonic when update polling only advances next_update_id
+[Codex-Orchestrator] [telegram-oversight] enabled for 1 chat(s) as @co_test_advisory_bot
+
+stdout | orchestrator/tests/TelegramOversightBridge.test.ts > TelegramOversightBridge > sends projection-driven push notifications when queued questions are added and cleared
+[Codex-Orchestrator] [telegram-oversight] enabled for 1 chat(s) as @co_test_advisory_bot
+
+stdout | orchestrator/tests/TelegramOversightBridge.test.ts > TelegramOversightBridge > sends a new projection push when prompt or urgency changes under the same latest question id
+[Codex-Orchestrator] [telegram-oversight] enabled for 1 chat(s) as @co_test_advisory_bot
+
+stdout | orchestrator/tests/TelegramOversightBridge.test.ts > TelegramOversightBridge > renders no-selected status and issue fallbacks through the polling bridge
+[Codex-Orchestrator] [telegram-oversight] enabled for 1 chat(s) as @co_test_advisory_bot
+
+stdout | orchestrator/tests/TelegramOversightBridge.test.ts > TelegramOversightBridge > sends projection-driven push notifications when an accepted live Linear advisory update changes the projection
+[Codex-Orchestrator] [telegram-oversight] enabled for 1 chat(s) as @co_test_advisory_bot
+
+ ✓ orchestrator/tests/TelegramOversightBridge.test.ts  (15 tests) 1168ms
+
+ Test Files  4 passed (4)
+      Tests  23 passed (23)
+   Start at  16:17:32
+   Duration  1.49s (transform 214ms, setup 0ms, collect 319ms, tests 1.17s, environment 0ms, prepare 143ms)
+
