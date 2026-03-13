@@ -37,6 +37,10 @@ import {
   type TelegramOversightBridgeRuntimeLifecycle
 } from './telegramOversightBridgeRuntimeLifecycle.js';
 import {
+  createTelegramOversightBridgeProjectionDeliveryQueue,
+  type TelegramOversightBridgeProjectionDeliveryQueue
+} from './telegramOversightBridgeProjectionDeliveryQueue.js';
+import {
   advanceTelegramOversightBridgeStateNextUpdateId,
   applyTelegramOversightBridgeStatePatch,
   createTelegramOversightBridgeStateStore,
@@ -143,9 +147,9 @@ class TelegramOversightBridgeRuntime implements TelegramOversightBridge {
   private readonly pollingController: ControlTelegramPollingController;
   private readonly projectionNotificationController: ControlTelegramProjectionNotificationController;
   private readonly runtimeLifecycle: TelegramOversightBridgeRuntimeLifecycle;
+  private readonly projectionDeliveryQueue: TelegramOversightBridgeProjectionDeliveryQueue;
 
   private state: TelegramOversightBridgeState = createDefaultTelegramOversightState();
-  private notificationQueue: Promise<void> = Promise.resolve();
 
   constructor(options: {
     config: TelegramOversightBridgeConfig;
@@ -191,6 +195,24 @@ class TelegramOversightBridgeRuntime implements TelegramOversightBridge {
       renderProjectionDeltaMessage: () => this.readController.renderProjectionDeltaMessage(),
       sendMessage: (chatId, text) => this.telegramClient.sendMessage(chatId, text)
     });
+    let readRuntimeClosed: (() => boolean) | null = null;
+    this.projectionDeliveryQueue = createTelegramOversightBridgeProjectionDeliveryQueue({
+      pushEnabled: this.config.pushEnabled,
+      isClosed: () => readRuntimeClosed?.() ?? false,
+      readPushState: () => this.state.push,
+      notifyProjectionDelta: ({ pushState, eventSeq }) =>
+        this.projectionNotificationController.notifyProjectionDelta({
+          pushState,
+          eventSeq
+        }),
+      applyStatePatchAndSave: async (statePatch) => {
+        this.state = applyTelegramOversightBridgeStatePatch(this.state, statePatch);
+        await this.stateStore.saveState(this.state);
+      },
+      logDeliveryFailure: (error) => {
+        logger.warn(`[telegram-oversight] push notification failed: ${(error as Error)?.message ?? String(error)}`);
+      }
+    });
     this.runtimeLifecycle = createTelegramOversightBridgeRuntimeLifecycle({
       loadState: () => this.stateStore.loadState(),
       setState: (state) => {
@@ -206,7 +228,7 @@ class TelegramOversightBridgeRuntime implements TelegramOversightBridge {
         }),
       abortPolling: () => this.pollingController.abort(),
       flushNotifications: async () => {
-        await this.notificationQueue;
+        await this.projectionDeliveryQueue.flushNotifications();
       },
       logEnabled: (botUsername) => {
         logger.info(
@@ -216,6 +238,7 @@ class TelegramOversightBridgeRuntime implements TelegramOversightBridge {
         );
       }
     });
+    readRuntimeClosed = () => this.runtimeLifecycle.isClosed();
   }
 
   async start(): Promise<void> {
@@ -232,31 +255,11 @@ class TelegramOversightBridgeRuntime implements TelegramOversightBridge {
       source?: string | null;
     } = {}
   ): Promise<void> {
-    if (!this.config.pushEnabled || this.runtimeLifecycle.isClosed()) {
-      return;
-    }
-    this.notificationQueue = this.notificationQueue
-      .then(() => this.maybeSendProjectionDelta(input))
-      .catch((error) => {
-        logger.warn(`[telegram-oversight] push notification failed: ${(error as Error)?.message ?? String(error)}`);
-      });
-    await this.notificationQueue;
+    await this.projectionDeliveryQueue.notifyProjectionDelta(input);
   }
 
   private async persistNextUpdateId(nextUpdateId: number, observedAt: string): Promise<void> {
     this.state = advanceTelegramOversightBridgeStateNextUpdateId(this.state, nextUpdateId, observedAt);
-    await this.stateStore.saveState(this.state);
-  }
-
-  private async maybeSendProjectionDelta(input: {
-    eventSeq?: number | null;
-    source?: string | null;
-  }): Promise<void> {
-    const result = await this.projectionNotificationController.notifyProjectionDelta({
-      pushState: this.state.push,
-      eventSeq: input.eventSeq
-    });
-    this.state = applyTelegramOversightBridgeStatePatch(this.state, result.statePatch);
     await this.stateStore.saveState(this.state);
   }
 }
