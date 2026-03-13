@@ -20,21 +20,21 @@
 
 ## Execution-Routing Shell Extraction
 
-- [ ] One bounded helper/service owns the remaining execution-routing shell in `orchestrator.ts`.
-- [ ] `orchestrator.ts` delegates that routing seam without changing public behavior or widening coordinator authority.
-- [ ] Focused routing regressions preserve mode policy, runtime selection/env merge, cloud preflight/fallback shaping, and local/cloud executor dispatch.
+- [x] One bounded helper/service owns the remaining execution-routing shell in `orchestrator.ts`. Evidence: `orchestrator/src/cli/services/orchestratorExecutionRouter.ts`, `out/1159-coordinator-symphony-aligned-orchestrator-execution-routing-shell-extraction/manual/20260313T145000Z-closeout/00-summary.md`
+- [x] `orchestrator.ts` delegates that routing seam without changing public behavior or widening coordinator authority. Evidence: `orchestrator/src/cli/orchestrator.ts`, `out/1159-coordinator-symphony-aligned-orchestrator-execution-routing-shell-extraction/manual/20260313T145000Z-closeout/00-summary.md`
+- [x] Focused routing regressions preserve mode policy, runtime selection/env merge, cloud preflight/fallback shaping, local/cloud executor dispatch, and fallback-adjusted child routing. Evidence: `out/1159-coordinator-symphony-aligned-orchestrator-execution-routing-shell-extraction/manual/20260313T145000Z-closeout/05b-targeted-tests.log`
 
 ## Validation + Closeout
 
-- [ ] `node scripts/delegation-guard.mjs`
-- [ ] `node scripts/spec-guard.mjs --dry-run`
-- [ ] `npm run build`
-- [ ] `npm run lint`
-- [ ] `npm run test`
-- [ ] `npm run docs:check`
-- [ ] `npm run docs:freshness`
-- [ ] `node scripts/diff-budget.mjs`
-- [ ] `npm run review`
-- [ ] `npm run pack:smoke`
-- [ ] Manual/mock execution-routing shell evidence captured.
-- [ ] Elegance review completed.
+- [x] `node scripts/delegation-guard.mjs` Evidence: `out/1159-coordinator-symphony-aligned-orchestrator-execution-routing-shell-extraction/manual/20260313T145000Z-closeout/01-delegation-guard.log`
+- [x] `node scripts/spec-guard.mjs --dry-run` Evidence: `out/1159-coordinator-symphony-aligned-orchestrator-execution-routing-shell-extraction/manual/20260313T145000Z-closeout/02-spec-guard.log`
+- [x] `npm run build` Evidence: `out/1159-coordinator-symphony-aligned-orchestrator-execution-routing-shell-extraction/manual/20260313T145000Z-closeout/03-build.log`
+- [x] `npm run lint` Evidence: `out/1159-coordinator-symphony-aligned-orchestrator-execution-routing-shell-extraction/manual/20260313T145000Z-closeout/04-lint.log`
+- [x] `npm run test` Evidence: `out/1159-coordinator-symphony-aligned-orchestrator-execution-routing-shell-extraction/manual/20260313T145000Z-closeout/05-test.log`, `out/1159-coordinator-symphony-aligned-orchestrator-execution-routing-shell-extraction/manual/20260313T145000Z-closeout/05b-targeted-tests.log`, `out/1159-coordinator-symphony-aligned-orchestrator-execution-routing-shell-extraction/manual/20260313T145000Z-closeout/13-override-notes.md`
+- [x] `npm run docs:check` Evidence: `out/1159-coordinator-symphony-aligned-orchestrator-execution-routing-shell-extraction/manual/20260313T145000Z-closeout/06-docs-check.log`
+- [x] `npm run docs:freshness` Evidence: `out/1159-coordinator-symphony-aligned-orchestrator-execution-routing-shell-extraction/manual/20260313T145000Z-closeout/07-docs-freshness.log`
+- [x] `node scripts/diff-budget.mjs` Evidence: `out/1159-coordinator-symphony-aligned-orchestrator-execution-routing-shell-extraction/manual/20260313T145000Z-closeout/08-diff-budget.log`
+- [x] `npm run review` Evidence: `out/1159-coordinator-symphony-aligned-orchestrator-execution-routing-shell-extraction/manual/20260313T145000Z-closeout/09-review.log`, `out/1159-coordinator-symphony-aligned-orchestrator-execution-routing-shell-extraction/manual/20260313T145000Z-closeout/13-override-notes.md`
+- [x] `npm run pack:smoke` Evidence: `out/1159-coordinator-symphony-aligned-orchestrator-execution-routing-shell-extraction/manual/20260313T145000Z-closeout/10-pack-smoke.log`
+- [x] Manual/mock execution-routing shell evidence captured. Evidence: `out/1159-coordinator-symphony-aligned-orchestrator-execution-routing-shell-extraction/manual/20260313T145000Z-closeout/11-manual-execution-routing-shell-check.json`
+- [x] Elegance review completed. Evidence: `out/1159-coordinator-symphony-aligned-orchestrator-execution-routing-shell-extraction/manual/20260313T145000Z-closeout/12-elegance-review.md`
