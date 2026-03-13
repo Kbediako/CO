@@ -20,21 +20,21 @@
 
 ## Local-Pipeline Executor Extraction
 
-- [ ] One bounded helper/service owns the remaining local-pipeline executor body in `orchestrator.ts`.
-- [ ] The non-cloud lifecycle branch delegates that local-only executor seam without changing public behavior or widening coordinator authority.
-- [ ] Focused local regressions preserve command-stage execution, subpipeline handling, fail/skip shaping, already-completed skip behavior, and manifest/run-event persistence.
+- [x] One bounded helper/service owns the remaining local-pipeline executor body in `orchestrator.ts`. Evidence: `orchestrator/src/cli/services/orchestratorLocalPipelineExecutor.ts`, `out/1158-coordinator-symphony-aligned-orchestrator-local-pipeline-executor-extraction/manual/20260313T134357Z-closeout/00-summary.md`
+- [x] The non-cloud lifecycle branch delegates that local-only executor seam without changing public behavior or widening coordinator authority. Evidence: `orchestrator/src/cli/orchestrator.ts`, `out/1158-coordinator-symphony-aligned-orchestrator-local-pipeline-executor-extraction/manual/20260313T134357Z-closeout/00-summary.md`
+- [x] Focused local regressions preserve command-stage execution, subpipeline handling, fail/skip shaping, already-completed skip behavior, and manifest/run-event persistence. Evidence: `out/1158-coordinator-symphony-aligned-orchestrator-local-pipeline-executor-extraction/manual/20260313T134357Z-closeout/05b-targeted-tests.log`
 
 ## Validation + Closeout
 
-- [ ] `node scripts/delegation-guard.mjs`
-- [ ] `node scripts/spec-guard.mjs --dry-run`
-- [ ] `npm run build`
-- [ ] `npm run lint`
-- [ ] `npm run test`
-- [ ] `npm run docs:check`
-- [ ] `npm run docs:freshness`
-- [ ] `node scripts/diff-budget.mjs`
-- [ ] `npm run review`
-- [ ] `npm run pack:smoke`
-- [ ] Manual/mock local-pipeline executor evidence captured.
-- [ ] Elegance review completed.
+- [x] `node scripts/delegation-guard.mjs` Evidence: `out/1158-coordinator-symphony-aligned-orchestrator-local-pipeline-executor-extraction/manual/20260313T134357Z-closeout/01-delegation-guard.log`
+- [x] `node scripts/spec-guard.mjs --dry-run` Evidence: `out/1158-coordinator-symphony-aligned-orchestrator-local-pipeline-executor-extraction/manual/20260313T134357Z-closeout/02-spec-guard.log`
+- [x] `npm run build` Evidence: `out/1158-coordinator-symphony-aligned-orchestrator-local-pipeline-executor-extraction/manual/20260313T134357Z-closeout/03-build.log`
+- [x] `npm run lint` Evidence: `out/1158-coordinator-symphony-aligned-orchestrator-local-pipeline-executor-extraction/manual/20260313T134357Z-closeout/04-lint.log`
+- [x] `npm run test` Evidence: `out/1158-coordinator-symphony-aligned-orchestrator-local-pipeline-executor-extraction/manual/20260313T134357Z-closeout/05-test.log`, `out/1158-coordinator-symphony-aligned-orchestrator-local-pipeline-executor-extraction/manual/20260313T134357Z-closeout/13-override-notes.md`
+- [x] `npm run docs:check` Evidence: `out/1158-coordinator-symphony-aligned-orchestrator-local-pipeline-executor-extraction/manual/20260313T134357Z-closeout/06-docs-check.log`
+- [x] `npm run docs:freshness` Evidence: `out/1158-coordinator-symphony-aligned-orchestrator-local-pipeline-executor-extraction/manual/20260313T134357Z-closeout/07-docs-freshness.log`
+- [x] `node scripts/diff-budget.mjs` Evidence: `out/1158-coordinator-symphony-aligned-orchestrator-local-pipeline-executor-extraction/manual/20260313T134357Z-closeout/08-diff-budget.log`
+- [x] `npm run review` Evidence: `out/1158-coordinator-symphony-aligned-orchestrator-local-pipeline-executor-extraction/manual/20260313T134357Z-closeout/09-review.log`, `out/1158-coordinator-symphony-aligned-orchestrator-local-pipeline-executor-extraction/manual/20260313T134357Z-closeout/13-override-notes.md`
+- [x] `npm run pack:smoke` Evidence: `out/1158-coordinator-symphony-aligned-orchestrator-local-pipeline-executor-extraction/manual/20260313T134357Z-closeout/10-pack-smoke.log`
+- [x] Manual/mock local-pipeline executor evidence captured. Evidence: `out/1158-coordinator-symphony-aligned-orchestrator-local-pipeline-executor-extraction/manual/20260313T134357Z-closeout/11-manual-local-pipeline-executor-check.json`
+- [x] Elegance review completed. Evidence: `out/1158-coordinator-symphony-aligned-orchestrator-local-pipeline-executor-extraction/manual/20260313T134357Z-closeout/12-elegance-review.md`
