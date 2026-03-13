@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260313-1150-coordinator-symphony-aligned-control-oversight-update-contract-extraction",
+      "title": "Coordinator Symphony-Aligned Control Oversight Update Contract Extraction",
+      "relates_to": "tasks/tasks-1150-coordinator-symphony-aligned-control-oversight-update-contract-extraction.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-13",
+      "paths": {
+        "spec": "tasks/specs/1150-coordinator-symphony-aligned-control-oversight-update-contract-extraction.md",
+        "task": "tasks/tasks-1150-coordinator-symphony-aligned-control-oversight-update-contract-extraction.md",
+        "agent_task": ".agent/task/1150-coordinator-symphony-aligned-control-oversight-update-contract-extraction.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-control-oversight-update-contract-extraction.md"
+      }
+    },
+    {
       "id": "20260313-1149-coordinator-symphony-aligned-control-oversight-read-contract-extraction",
       "title": "Coordinator Symphony-Aligned Control Oversight Read Contract Extraction",
       "relates_to": "tasks/tasks-1149-coordinator-symphony-aligned-control-oversight-read-contract-extraction.md",
