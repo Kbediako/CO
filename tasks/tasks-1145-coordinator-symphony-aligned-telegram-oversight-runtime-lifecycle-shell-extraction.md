@@ -16,7 +16,7 @@
 
 - [x] `tasks/index.json`, `docs/TASKS.md`, and `docs/docs-freshness-registry.json` updated. Evidence: `tasks/index.json`, `docs/TASKS.md`, `docs/docs-freshness-registry.json`
 - [x] Local read-only review approval captured in the spec/checklist notes. Evidence: `tasks/specs/1145-coordinator-symphony-aligned-telegram-oversight-runtime-lifecycle-shell-extraction.md`, `docs/findings/1145-telegram-oversight-runtime-lifecycle-shell-extraction-deliberation.md`
-- [x] docs-review approval or explicit override captured for registered `1145`. Evidence: `out/1145-coordinator-symphony-aligned-telegram-oversight-runtime-lifecycle-shell-extraction/manual/20260313T003943Z-docs-first/00-summary.md`, `out/1145-coordinator-symphony-aligned-telegram-oversight-runtime-lifecycle-shell-extraction/manual/20260313T003943Z-docs-first/05-docs-review-override.md`
+- [x] docs-review approval captured for registered `1145`. Evidence: `out/1145-coordinator-symphony-aligned-telegram-oversight-runtime-lifecycle-shell-extraction/manual/20260313T003943Z-docs-first/00-summary.md`, `out/1145-coordinator-symphony-aligned-telegram-oversight-runtime-lifecycle-shell-extraction/manual/20260313T003943Z-docs-first/05-docs-review.json`, `out/1145-coordinator-symphony-aligned-telegram-oversight-runtime-lifecycle-shell-extraction/manual/20260313T003943Z-docs-first/06-docs-review-rerun.json`
 
 ## Telegram Runtime Lifecycle Shell Extraction
 

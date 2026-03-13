@@ -58,7 +58,7 @@ Introduce one Telegram lifecycle helper near the existing control helpers. It sh
 - the in-memory `TelegramOversightBridgeState`,
 - `next_update_id` and the authoritative current state object,
 - notification queue ownership,
-- bot identity as bridge state,
+- bot identity as bridge-owned runtime lifecycle data kept separate from persisted bridge state,
 - command/update/push controller composition,
 - final composition of the lifecycle helper dependencies.
 

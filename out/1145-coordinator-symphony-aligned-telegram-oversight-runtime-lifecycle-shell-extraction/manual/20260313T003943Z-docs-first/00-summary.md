@@ -26,7 +26,8 @@
 
 - The initial `docs-review` attempt failed at its own delegation guard before surfacing a docs verdict. Evidence: `.runs/1145-coordinator-symphony-aligned-telegram-oversight-runtime-lifecycle-shell-extraction/cli/2026-03-13T00-51-06-852Z-886c7c2e/manifest.json`, `04-docs-review.json`
 - A task-scoped delegated scout was launched to seed clean sub-run evidence for the parent task. It completed successfully through `delegation-guard`, `build`, `lint`, `test`, and `spec-guard`. Evidence: `.runs/1145-coordinator-symphony-aligned-telegram-oversight-runtime-lifecycle-shell-extraction-scout/cli/2026-03-13T00-52-00-578Z-767cfba0/manifest.json`, `04a-delegated-scout.json`
-- A fresh `docs-review` rerun then cleared `delegation-guard`, `spec-guard`, `docs-check`, and `docs-freshness`, but the live review surface expanded into registry/example reinspection and then stalled without producing a docs-local verdict. That is recorded as an explicit docs-review override, not a docs defect. Evidence: `.runs/1145-coordinator-symphony-aligned-telegram-oversight-runtime-lifecycle-shell-extraction/cli/2026-03-13T00-55-34-215Z-751821f2/manifest.json`, `.runs/1145-coordinator-symphony-aligned-telegram-oversight-runtime-lifecycle-shell-extraction/cli/2026-03-13T00-55-34-215Z-751821f2/review/output.log`, `05-docs-review.json`, `05-docs-review-override.md`
+- The first successful `docs-review` rerun produced one valid docs finding: the TECH_SPEC briefly described bot identity as bridge state instead of bridge-owned runtime lifecycle data. Evidence: `.runs/1145-coordinator-symphony-aligned-telegram-oversight-runtime-lifecycle-shell-extraction/cli/2026-03-13T00-55-34-215Z-751821f2/manifest.json`, `.runs/1145-coordinator-symphony-aligned-telegram-oversight-runtime-lifecycle-shell-extraction/cli/2026-03-13T00-55-34-215Z-751821f2/review/output.log`, `05-docs-review.json`
+- After correcting that wording, a final `docs-review` rerun cleared `delegation-guard`, `spec-guard`, `docs-check`, `docs-freshness`, and bounded review with no findings. Evidence: `.runs/1145-coordinator-symphony-aligned-telegram-oversight-runtime-lifecycle-shell-extraction/cli/2026-03-13T01-04-26-528Z-e9c1dba6/manifest.json`, `.runs/1145-coordinator-symphony-aligned-telegram-oversight-runtime-lifecycle-shell-extraction/cli/2026-03-13T01-04-26-528Z-e9c1dba6/review/output.log`, `06-docs-review-rerun.json`
 
 ## Delegated seam confirmation
 
@@ -36,4 +37,4 @@
 
 - `1145` is registered docs-first with deterministic gates green.
 - The implementation seam remains bounded to Telegram startup/shutdown lifecycle choreography only.
-- Docs-review is explicitly overridden for wrapper/reviewer drift reasons, not because the `1145` docs package is missing or inconsistent.
+- Docs-review approval is now captured after one valid wording fix and a clean rerun.
