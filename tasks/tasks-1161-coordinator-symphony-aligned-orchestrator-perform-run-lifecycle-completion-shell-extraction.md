@@ -20,21 +20,21 @@
 
 ## Completion Shell Extraction
 
-- [ ] One bounded helper/service owns the post-execution completion cluster in `performRunLifecycle(...)`.
-- [ ] `performRunLifecycle(...)` delegates that seam without changing upstream lifecycle authority.
-- [ ] Focused completion regressions preserve finalize/apply ordering, persistence continuity, and completion payload continuity.
+- [x] One bounded helper/service owns the post-execution completion cluster in `performRunLifecycle(...)`.
+- [x] `performRunLifecycle(...)` delegates that seam without changing upstream lifecycle authority.
+- [x] Focused completion regressions preserve finalize/apply ordering, persistence continuity, and completion payload continuity.
 
 ## Validation + Closeout
 
-- [ ] `node scripts/delegation-guard.mjs`
-- [ ] `node scripts/spec-guard.mjs --dry-run`
-- [ ] `npm run build`
-- [ ] `npm run lint`
-- [ ] `npm run test`
-- [ ] `npm run docs:check`
-- [ ] `npm run docs:freshness`
-- [ ] `node scripts/diff-budget.mjs`
-- [ ] `npm run review`
-- [ ] `npm run pack:smoke`
-- [ ] Manual/mock completion evidence captured.
-- [ ] Elegance review completed.
+- [x] `node scripts/delegation-guard.mjs`
+- [x] `node scripts/spec-guard.mjs --dry-run`
+- [x] `npm run build`
+- [x] `npm run lint`
+- [x] `npm run test`
+- [x] `npm run docs:check`
+- [x] `npm run docs:freshness`
+- [x] `node scripts/diff-budget.mjs`
+- [x] `npm run review` (scoped to `orchestrator/src/cli/orchestrator.ts`, `orchestrator/src/cli/services/orchestratorRunLifecycleCompletion.ts`, `orchestrator/tests/OrchestratorRunLifecycleCompletion.test.ts`)
+- [x] `npm run pack:smoke`
+- [x] Manual/mock completion evidence captured.
+- [x] Elegance review completed.

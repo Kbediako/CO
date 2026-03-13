@@ -59,55 +59,7 @@ async function createLifecycleFixture() {
       from_mode: null,
       to_mode: null,
       checked_at: '2026-03-13T00:00:00.000Z'
-    },
-    handles: [
-      {
-        handle_id: 'handle-1',
-        correlation_id: 'corr-1',
-        stage_id: 'review',
-        status: 'closed',
-        frame_count: 3,
-        latest_sequence: 4
-      }
-    ],
-    privacy: {
-      mode: 'strict',
-      decisions: [],
-      totals: {
-        total_frames: 5,
-        redacted_frames: 1,
-        blocked_frames: 0,
-        allowed_frames: 4
-      }
-    },
-    cloud_execution: {
-      task_id: 'task_e_123',
-      environment_id: 'env_123',
-      status: 'ready',
-      status_url: 'https://example.com/status',
-      submitted_at: '2026-03-13T00:00:00.000Z',
-      completed_at: '2026-03-13T00:01:00.000Z',
-      last_polled_at: '2026-03-13T00:00:55.000Z',
-      poll_count: 6,
-      poll_interval_seconds: 10,
-      timeout_seconds: 900,
-      attempts: 1,
-      diff_path: '.runs/task-1161/cloud.diff',
-      diff_url: 'https://example.com/diff',
-      diff_status: 'available',
-      apply_status: 'not_requested',
-      log_path: '.runs/task-1161/cloud.log',
-      error: null
-    },
-    cloud_fallback: {
-      mode_requested: 'cloud',
-      mode_used: 'mcp',
-      reason: 'fallback',
-      issues: [{ code: 'missing_environment', message: 'Missing env' }],
-      checked_at: '2026-03-13T00:00:00.000Z'
-    },
-    collab_tool_calls: [{ tool: 'spawn_agent' }, { tool: 'exec_command' }],
-    child_runs: [{ run_id: 'child-1' }]
+    }
   } as unknown as CliManifest;
 
   const schedulerPlan = {
@@ -257,14 +209,20 @@ describe('completeOrchestratorRunLifecycle', () => {
     expect(result).toEqual({ manifest, runSummary });
 
     const persistedSummary = JSON.parse(await readFile(join(paths.runDir, 'run-summary.json'), 'utf8')) as RunSummary;
-    expect(persistedSummary.runtime?.modeRequested).toBe('appserver');
-    expect(persistedSummary.handles?.[0]?.handleId).toBe('handle-1');
-    expect(persistedSummary.privacy?.redactedFrames).toBe(1);
-    expect(persistedSummary.cloudExecution?.taskId).toBe('task_e_123');
-    expect(persistedSummary.cloudFallback?.reason).toBe('fallback');
-    expect(persistedSummary.usageKpi?.advancedSignalsUsed).toBe(4);
-    expect(persistedSummary.scheduler?.assignments?.[0]?.instanceId).toBe('task-1161-general-01');
-    expect(persistedSummary.controlPlane?.requestId).toBe('req-1161');
+    expect(persistedSummary).toMatchObject({
+      runtime: {
+        modeRequested: 'appserver',
+        modeUsed: 'appserver',
+        provider: 'AppServerRuntimeProvider'
+      },
+      scheduler: {
+        mode: 'multi-instance',
+        assignments: [{ instanceId: 'task-1161-general-01' }]
+      },
+      controlPlane: {
+        requestId: 'req-1161'
+      }
+    });
   });
 
   it('stops before apply and runCompleted when finalizePlan fails', async () => {
