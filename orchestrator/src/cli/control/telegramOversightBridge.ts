@@ -29,10 +29,13 @@ import {
 } from './controlTelegramPushState.js';
 import {
   createTelegramOversightApiClient,
-  type TelegramBotIdentity,
   type TelegramOversightApiClient
 } from './telegramOversightApiClient.js';
 import { createTelegramOversightControlActionApiClient } from './telegramOversightControlActionApiClient.js';
+import {
+  createTelegramOversightBridgeRuntimeLifecycle,
+  type TelegramOversightBridgeRuntimeLifecycle
+} from './telegramOversightBridgeRuntimeLifecycle.js';
 import {
   advanceTelegramOversightBridgeStateNextUpdateId,
   applyTelegramOversightBridgeStatePatch,
@@ -139,11 +142,9 @@ class TelegramOversightBridgeRuntime implements TelegramOversightBridge {
   private readonly updateHandler: ControlTelegramUpdateHandler;
   private readonly pollingController: ControlTelegramPollingController;
   private readonly projectionNotificationController: ControlTelegramProjectionNotificationController;
+  private readonly runtimeLifecycle: TelegramOversightBridgeRuntimeLifecycle;
 
-  private closed = false;
-  private loopPromise: Promise<void> | null = null;
   private state: TelegramOversightBridgeState = createDefaultTelegramOversightState();
-  private botIdentity: TelegramBotIdentity | null = null;
   private notificationQueue: Promise<void> = Promise.resolve();
 
   constructor(options: {
@@ -190,36 +191,39 @@ class TelegramOversightBridgeRuntime implements TelegramOversightBridge {
       renderProjectionDeltaMessage: () => this.readController.renderProjectionDeltaMessage(),
       sendMessage: (chatId, text) => this.telegramClient.sendMessage(chatId, text)
     });
-  }
-
-  async start(): Promise<void> {
-    this.state = await this.stateStore.loadState();
-    this.botIdentity = await this.telegramClient.getMe();
-    logger.info(
-      `[telegram-oversight] enabled for ${Array.from(this.config.allowedChatIds).length} chat(s) as @${
-        this.botIdentity.username ?? 'bot'
-      }`
-    );
-    this.loopPromise = this.pollingController.run({
-      isClosed: () => this.closed,
-      readNextUpdateId: () => this.state.next_update_id,
-      persistNextUpdateId: (nextUpdateId, observedAt) => this.persistNextUpdateId(nextUpdateId, observedAt),
-      readBotUsername: () => this.botIdentity?.username ?? null
+    this.runtimeLifecycle = createTelegramOversightBridgeRuntimeLifecycle({
+      loadState: () => this.stateStore.loadState(),
+      setState: (state) => {
+        this.state = state;
+      },
+      getBotIdentity: () => this.telegramClient.getMe(),
+      runPolling: (runtime) =>
+        this.pollingController.run({
+          isClosed: runtime.isClosed,
+          readNextUpdateId: () => this.state.next_update_id,
+          persistNextUpdateId: (nextUpdateId, observedAt) => this.persistNextUpdateId(nextUpdateId, observedAt),
+          readBotUsername: runtime.readBotUsername
+        }),
+      abortPolling: () => this.pollingController.abort(),
+      flushNotifications: async () => {
+        await this.notificationQueue;
+      },
+      logEnabled: (botUsername) => {
+        logger.info(
+          `[telegram-oversight] enabled for ${Array.from(this.config.allowedChatIds).length} chat(s) as @${
+            botUsername ?? 'bot'
+          }`
+        );
+      }
     });
   }
 
+  async start(): Promise<void> {
+    await this.runtimeLifecycle.start();
+  }
+
   async close(): Promise<void> {
-    this.closed = true;
-    this.pollingController.abort();
-    if (this.loopPromise) {
-      await this.loopPromise;
-      this.loopPromise = null;
-    }
-    try {
-      await this.notificationQueue;
-    } catch {
-      // Ignore queued notification errors during shutdown.
-    }
+    await this.runtimeLifecycle.close();
   }
 
   async notifyProjectionDelta(
@@ -228,7 +232,7 @@ class TelegramOversightBridgeRuntime implements TelegramOversightBridge {
       source?: string | null;
     } = {}
   ): Promise<void> {
-    if (!this.config.pushEnabled || this.closed) {
+    if (!this.config.pushEnabled || this.runtimeLifecycle.isClosed()) {
       return;
     }
     this.notificationQueue = this.notificationQueue
