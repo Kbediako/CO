@@ -5,7 +5,7 @@ import {
   type ControlRequestSharedContext
 } from './controlRequestContext.js';
 import { runQuestionReadSequence } from './questionReadSequence.js';
-import type { QuestionsPayload } from './telegramOversightBridge.js';
+import type { QuestionsPayload } from './controlOversightReadContract.js';
 
 export interface ControlTelegramQuestionReadContext extends ControlRequestSharedContext {
   expiryLifecycle: ControlExpiryLifecycle | null;

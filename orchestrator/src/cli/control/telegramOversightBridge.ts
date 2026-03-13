@@ -20,9 +20,8 @@ import {
   type ControlTelegramUpdateHandler
 } from './controlTelegramUpdateHandler.js';
 import type {
-  ControlDispatchPilotPayload,
-  ControlSelectedRunRuntimeSnapshot
-} from './observabilityReadModel.js';
+  ControlOversightReadContract
+} from './controlOversightReadContract.js';
 import {
   createDefaultTelegramOversightState,
   type TelegramOversightBridgeState,
@@ -58,40 +57,6 @@ interface TelegramOversightBridgeConfig {
   pushCooldownMs: number;
 }
 
-export interface ControlDispatchPayload {
-  dispatch_pilot?: ControlDispatchPilotPayload | null;
-  recommendation?: {
-    dispatch_id?: string | null;
-    summary?: string | null;
-    rationale?: string | null;
-    confidence?: number | null;
-    tracked_issue?: {
-      identifier?: string | null;
-      title?: string | null;
-      state?: string | null;
-      url?: string | null;
-      team_key?: string | null;
-    } | null;
-  } | null;
-  error?: {
-    code?: string;
-    details?: {
-      dispatch_pilot?: ControlDispatchPilotPayload | null;
-    };
-  } | null;
-}
-
-export interface QuestionRecordPayload {
-  question_id?: string;
-  urgency?: string;
-  prompt?: string;
-  status?: string;
-}
-
-export interface QuestionsPayload {
-  questions?: QuestionRecordPayload[];
-}
-
 type FetchLike = typeof fetch;
 
 export interface TelegramOversightBridge {
@@ -102,15 +67,9 @@ export interface TelegramOversightBridge {
   close(): Promise<void>;
 }
 
-export interface TelegramOversightReadAdapter {
-  readSelectedRun(): Promise<ControlSelectedRunRuntimeSnapshot>;
-  readDispatch(): Promise<ControlDispatchPayload>;
-  readQuestions(): Promise<QuestionsPayload>;
-}
-
 interface StartTelegramOversightBridgeOptions {
   runDir: string;
-  readAdapter: TelegramOversightReadAdapter;
+  readAdapter: ControlOversightReadContract;
   baseUrl: string;
   controlToken: string;
   env?: NodeJS.ProcessEnv;
@@ -154,7 +113,7 @@ class TelegramOversightBridgeRuntime implements TelegramOversightBridge {
   constructor(options: {
     config: TelegramOversightBridgeConfig;
     runDir: string;
-    readAdapter: TelegramOversightReadAdapter;
+    readAdapter: ControlOversightReadContract;
     baseUrl: string;
     controlToken: string;
     fetchImpl: FetchLike;

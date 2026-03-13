@@ -9,7 +9,7 @@ import {
   type DispatchExtensionResult
 } from './observabilitySurface.js';
 import type { DispatchPilotEvaluation } from './trackerDispatchPilot.js';
-import type { ControlDispatchPayload } from './telegramOversightBridge.js';
+import type { ControlDispatchPayload } from './controlOversightReadContract.js';
 
 export interface ControlTelegramDispatchReadContext extends ControlRequestSharedContext {
   expiryLifecycle: ControlExpiryLifecycle | null;

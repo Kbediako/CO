@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 
-import type { TelegramOversightReadAdapter } from './telegramOversightBridge.js';
+import type { ControlOversightReadContract } from './controlOversightReadContract.js';
 import type {
   ControlDispatchPilotPayload,
   ControlQuestionSummaryPayload,
@@ -22,7 +22,7 @@ export interface ControlTelegramReadController {
 }
 
 export function createControlTelegramReadController(input: {
-  readAdapter: TelegramOversightReadAdapter;
+  readAdapter: ControlOversightReadContract;
   mutationsEnabled: boolean;
 }): ControlTelegramReadController {
   return {
@@ -55,11 +55,11 @@ export function createControlTelegramReadController(input: {
   };
 }
 
-async function renderStatus(readAdapter: TelegramOversightReadAdapter): Promise<string> {
+async function renderStatus(readAdapter: ControlOversightReadContract): Promise<string> {
   return buildStatusMessage(await readAdapter.readSelectedRun());
 }
 
-async function renderIssue(readAdapter: TelegramOversightReadAdapter): Promise<string> {
+async function renderIssue(readAdapter: ControlOversightReadContract): Promise<string> {
   const snapshot = await readAdapter.readSelectedRun();
   const selected = snapshot.selected ?? null;
   if (!selected?.issueIdentifier) {
@@ -92,7 +92,7 @@ async function renderIssue(readAdapter: TelegramOversightReadAdapter): Promise<s
     .join('\n');
 }
 
-async function renderDispatch(readAdapter: TelegramOversightReadAdapter): Promise<string> {
+async function renderDispatch(readAdapter: ControlOversightReadContract): Promise<string> {
   const payload = await readAdapter.readDispatch();
   const dispatchPilot = payload.dispatch_pilot ?? payload.error?.details?.dispatch_pilot ?? null;
   const trackedIssue = payload.recommendation?.tracked_issue ?? null;
@@ -115,7 +115,7 @@ async function renderDispatch(readAdapter: TelegramOversightReadAdapter): Promis
     .join('\n');
 }
 
-async function renderQuestions(readAdapter: TelegramOversightReadAdapter): Promise<string> {
+async function renderQuestions(readAdapter: ControlOversightReadContract): Promise<string> {
   const payload = await readAdapter.readQuestions();
   const queued = (payload.questions ?? []).filter((question) => question.status === 'queued');
   if (queued.length === 0) {

@@ -2,10 +2,10 @@ import type { ControlExpiryLifecycle } from './controlExpiryLifecycle.js';
 import { readControlTelegramDispatch } from './controlTelegramDispatchRead.js';
 import { readControlTelegramQuestions } from './controlTelegramQuestionRead.js';
 import type {
+  ControlOversightReadContract,
   ControlDispatchPayload,
-  QuestionsPayload,
-  TelegramOversightReadAdapter
-} from './telegramOversightBridge.js';
+  QuestionsPayload
+} from './controlOversightReadContract.js';
 import type { DispatchPilotEvaluation } from './trackerDispatchPilot.js';
 import type { ControlRequestContext, ControlRequestSharedContext } from './controlRequestContext.js';
 
@@ -23,7 +23,7 @@ export interface ControlOversightReadServiceContext extends ControlRequestShared
 
 export function createControlOversightReadService(
   context: ControlOversightReadServiceContext
-): TelegramOversightReadAdapter {
+): ControlOversightReadContract {
   return {
     readSelectedRun: async () => context.runtime.snapshot().readSelectedRunSnapshot(),
 
