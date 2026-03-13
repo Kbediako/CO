@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260313-1162-coordinator-symphony-aligned-orchestrator-perform-run-lifecycle-task-manager-registration-shell-extraction",
+      "title": "Coordinator Symphony-Aligned Orchestrator Perform-Run-Lifecycle Task-Manager Registration Shell Extraction",
+      "relates_to": "tasks/tasks-1162-coordinator-symphony-aligned-orchestrator-perform-run-lifecycle-task-manager-registration-shell-extraction.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-13",
+      "paths": {
+        "spec": "tasks/specs/1162-coordinator-symphony-aligned-orchestrator-perform-run-lifecycle-task-manager-registration-shell-extraction.md",
+        "task": "tasks/tasks-1162-coordinator-symphony-aligned-orchestrator-perform-run-lifecycle-task-manager-registration-shell-extraction.md",
+        "agent_task": ".agent/task/1162-coordinator-symphony-aligned-orchestrator-perform-run-lifecycle-task-manager-registration-shell-extraction.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-perform-run-lifecycle-task-manager-registration-shell-extraction.md"
+      }
+    },
+    {
       "id": "20260313-1161-coordinator-symphony-aligned-orchestrator-perform-run-lifecycle-completion-shell-extraction",
       "title": "Coordinator Symphony-Aligned Orchestrator Perform-Run-Lifecycle Completion Shell Extraction",
       "relates_to": "tasks/tasks-1161-coordinator-symphony-aligned-orchestrator-perform-run-lifecycle-completion-shell-extraction.md",
