@@ -20,21 +20,21 @@
 
 ## Control Server Bootstrap Start Sequencing Extraction
 
-- [ ] One adjacent helper replaces the inline generic bootstrap start sequence in `controlServerBootstrapLifecycle.ts`.
-- [ ] `controlServerBootstrapLifecycle.ts` consumes the extracted helper without changing the generic lifecycle contract.
-- [ ] Focused bootstrap lifecycle regressions preserve ordering and non-fatal bridge-start behavior.
+- [x] One adjacent helper replaces the inline generic bootstrap start sequence in `controlServerBootstrapLifecycle.ts`. Evidence: `orchestrator/src/cli/control/controlServerBootstrapStartSequence.ts`
+- [x] `controlServerBootstrapLifecycle.ts` consumes the extracted helper without changing the generic lifecycle contract. Evidence: `orchestrator/src/cli/control/controlServerBootstrapLifecycle.ts`, `out/1152-coordinator-symphony-aligned-control-server-bootstrap-start-sequencing-extraction/manual/20260313T074736Z-closeout/11-manual-bootstrap-start-sequencing-check.json`
+- [x] Focused bootstrap lifecycle regressions preserve ordering and non-fatal bridge-start behavior. Evidence: `out/1152-coordinator-symphony-aligned-control-server-bootstrap-start-sequencing-extraction/manual/20260313T074736Z-closeout/05b-targeted-tests.log`
 
 ## Validation + Closeout
 
-- [ ] `node scripts/delegation-guard.mjs`
-- [ ] `node scripts/spec-guard.mjs --dry-run`
-- [ ] `npm run build`
-- [ ] `npm run lint`
-- [ ] `npm run test`
-- [ ] `npm run docs:check`
-- [ ] `npm run docs:freshness`
-- [ ] `node scripts/diff-budget.mjs`
-- [ ] `npm run review`
-- [ ] `npm run pack:smoke`
-- [ ] Manual/mock bootstrap start-sequencing evidence captured.
-- [ ] Elegance review completed.
+- [x] `node scripts/delegation-guard.mjs` Evidence: `out/1152-coordinator-symphony-aligned-control-server-bootstrap-start-sequencing-extraction/manual/20260313T074736Z-closeout/01-delegation-guard.log`, `.runs/1152-coordinator-symphony-aligned-control-server-bootstrap-start-sequencing-extraction-docs-guard/cli/2026-03-13T07-35-46-639Z-5dc5bfd0/manifest.json`
+- [x] `node scripts/spec-guard.mjs --dry-run` Evidence: `out/1152-coordinator-symphony-aligned-control-server-bootstrap-start-sequencing-extraction/manual/20260313T074736Z-closeout/02-spec-guard.log`
+- [x] `npm run build` Evidence: `out/1152-coordinator-symphony-aligned-control-server-bootstrap-start-sequencing-extraction/manual/20260313T074736Z-closeout/03-build.log`
+- [x] `npm run lint` Evidence: `out/1152-coordinator-symphony-aligned-control-server-bootstrap-start-sequencing-extraction/manual/20260313T074736Z-closeout/04-lint.log`
+- [x] `npm run test` Evidence: `out/1152-coordinator-symphony-aligned-control-server-bootstrap-start-sequencing-extraction/manual/20260313T074736Z-closeout/05-test.log`, `out/1152-coordinator-symphony-aligned-control-server-bootstrap-start-sequencing-extraction/manual/20260313T074736Z-closeout/13-override-notes.md`
+- [x] `npm run docs:check` Evidence: `out/1152-coordinator-symphony-aligned-control-server-bootstrap-start-sequencing-extraction/manual/20260313T074736Z-closeout/06-docs-check.log`
+- [x] `npm run docs:freshness` Evidence: `out/1152-coordinator-symphony-aligned-control-server-bootstrap-start-sequencing-extraction/manual/20260313T074736Z-closeout/07-docs-freshness.log`
+- [x] `node scripts/diff-budget.mjs` Evidence: `out/1152-coordinator-symphony-aligned-control-server-bootstrap-start-sequencing-extraction/manual/20260313T074736Z-closeout/08-diff-budget.log`, `out/1152-coordinator-symphony-aligned-control-server-bootstrap-start-sequencing-extraction/manual/20260313T074736Z-closeout/13-override-notes.md`
+- [x] `npm run review` Evidence: `out/1152-coordinator-symphony-aligned-control-server-bootstrap-start-sequencing-extraction/manual/20260313T074736Z-closeout/09-review.log`, `out/1152-coordinator-symphony-aligned-control-server-bootstrap-start-sequencing-extraction/manual/20260313T074736Z-closeout/13-override-notes.md`
+- [x] `npm run pack:smoke` Evidence: `out/1152-coordinator-symphony-aligned-control-server-bootstrap-start-sequencing-extraction/manual/20260313T074736Z-closeout/10-pack-smoke.log`
+- [x] Manual/mock bootstrap start-sequencing evidence captured. Evidence: `out/1152-coordinator-symphony-aligned-control-server-bootstrap-start-sequencing-extraction/manual/20260313T074736Z-closeout/11-manual-bootstrap-start-sequencing-check.json`
+- [x] Elegance review completed. Evidence: `out/1152-coordinator-symphony-aligned-control-server-bootstrap-start-sequencing-extraction/manual/20260313T074736Z-closeout/12-elegance-review.md`
