@@ -20,21 +20,21 @@
 
 ## Control Server Ready Instance Lifecycle Shell Extraction
 
-- [ ] One bounded lifecycle shell replaces the remaining higher-order ready-instance startup/rollback orchestration in `controlServer.ts`. Evidence: `orchestrator/src/cli/control/controlServer.ts`
-- [ ] `controlServer.ts` delegates pending-ready activation and owned shutdown orchestration without widening the public contract. Evidence: `orchestrator/src/cli/control/controlServer.ts`
-- [ ] Focused ready-instance lifecycle regressions preserve startup ordering and rollback/cleanup behavior. Evidence: `out/1153-coordinator-symphony-aligned-control-server-ready-instance-lifecycle-shell-extraction/manual/20260313T081150Z-closeout/05b-targeted-tests.log`
+- [x] One bounded lifecycle shell replaces the remaining higher-order ready-instance startup/rollback orchestration in `controlServer.ts`. Evidence: `orchestrator/src/cli/control/controlServer.ts`, `orchestrator/src/cli/control/controlServerReadyInstanceLifecycle.ts`, `out/1153-coordinator-symphony-aligned-control-server-ready-instance-lifecycle-shell-extraction/manual/20260313T084108Z-closeout/00-summary.md`
+- [x] `controlServer.ts` delegates pending-ready activation and owned shutdown orchestration without widening the public contract. Evidence: `orchestrator/src/cli/control/controlServer.ts`, `out/1153-coordinator-symphony-aligned-control-server-ready-instance-lifecycle-shell-extraction/manual/20260313T084108Z-closeout/12-elegance-review.md`
+- [x] Focused ready-instance lifecycle regressions preserve startup ordering and rollback/cleanup behavior. Evidence: `out/1153-coordinator-symphony-aligned-control-server-ready-instance-lifecycle-shell-extraction/manual/20260313T084108Z-closeout/05b-targeted-tests.log`, `out/1153-coordinator-symphony-aligned-control-server-ready-instance-lifecycle-shell-extraction/manual/20260313T084108Z-closeout/11-manual-ready-instance-lifecycle-check.json`
 
 ## Validation + Closeout
 
-- [ ] `node scripts/delegation-guard.mjs`
-- [ ] `node scripts/spec-guard.mjs --dry-run`
-- [ ] `npm run build`
-- [ ] `npm run lint`
-- [ ] `npm run test`
-- [ ] `npm run docs:check`
-- [ ] `npm run docs:freshness`
-- [ ] `node scripts/diff-budget.mjs`
-- [ ] `npm run review`
-- [ ] `npm run pack:smoke`
-- [ ] Manual/mock ready-instance lifecycle evidence captured.
-- [ ] Elegance review completed.
+- [x] `node scripts/delegation-guard.mjs`. Evidence: `out/1153-coordinator-symphony-aligned-control-server-ready-instance-lifecycle-shell-extraction/manual/20260313T084108Z-closeout/01-delegation-guard.log`
+- [x] `node scripts/spec-guard.mjs --dry-run`. Evidence: `out/1153-coordinator-symphony-aligned-control-server-ready-instance-lifecycle-shell-extraction/manual/20260313T084108Z-closeout/02-spec-guard.log`
+- [x] `npm run build`. Evidence: `out/1153-coordinator-symphony-aligned-control-server-ready-instance-lifecycle-shell-extraction/manual/20260313T084108Z-closeout/03-build.log`
+- [x] `npm run lint`. Evidence: `out/1153-coordinator-symphony-aligned-control-server-ready-instance-lifecycle-shell-extraction/manual/20260313T084108Z-closeout/04-lint.log`
+- [x] `npm run test` override recorded. Evidence: `out/1153-coordinator-symphony-aligned-control-server-ready-instance-lifecycle-shell-extraction/manual/20260313T084108Z-closeout/05-test.log`, `out/1153-coordinator-symphony-aligned-control-server-ready-instance-lifecycle-shell-extraction/manual/20260313T084108Z-closeout/13-override-notes.md`
+- [x] `npm run docs:check`. Evidence: `out/1153-coordinator-symphony-aligned-control-server-ready-instance-lifecycle-shell-extraction/manual/20260313T084108Z-closeout/06-docs-check.log`
+- [x] `npm run docs:freshness`. Evidence: `out/1153-coordinator-symphony-aligned-control-server-ready-instance-lifecycle-shell-extraction/manual/20260313T084108Z-closeout/07-docs-freshness.log`
+- [x] `node scripts/diff-budget.mjs` override recorded. Evidence: `out/1153-coordinator-symphony-aligned-control-server-ready-instance-lifecycle-shell-extraction/manual/20260313T084108Z-closeout/08-diff-budget.log`, `out/1153-coordinator-symphony-aligned-control-server-ready-instance-lifecycle-shell-extraction/manual/20260313T084108Z-closeout/13-override-notes.md`
+- [x] `npm run review` override recorded after fixing the real shared-state regression it surfaced. Evidence: `out/1153-coordinator-symphony-aligned-control-server-ready-instance-lifecycle-shell-extraction/manual/20260313T084108Z-closeout/09-review.log`, `out/1153-coordinator-symphony-aligned-control-server-ready-instance-lifecycle-shell-extraction/manual/20260313T084108Z-closeout/13-override-notes.md`
+- [x] `npm run pack:smoke`. Evidence: `out/1153-coordinator-symphony-aligned-control-server-ready-instance-lifecycle-shell-extraction/manual/20260313T084108Z-closeout/10-pack-smoke.log`
+- [x] Manual/mock ready-instance lifecycle evidence captured. Evidence: `out/1153-coordinator-symphony-aligned-control-server-ready-instance-lifecycle-shell-extraction/manual/20260313T084108Z-closeout/11-manual-ready-instance-lifecycle-check.json`
+- [x] Elegance review completed. Evidence: `out/1153-coordinator-symphony-aligned-control-server-ready-instance-lifecycle-shell-extraction/manual/20260313T084108Z-closeout/12-elegance-review.md`
