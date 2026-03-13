@@ -4,8 +4,8 @@ import {
   createControlServerBootstrapLifecycle,
   type ControlServerBootstrapLifecycle
 } from './controlServerBootstrapLifecycle.js';
-import { createControlOversightFacade } from './controlOversightFacade.js';
 import { createControlTelegramBridgeLifecycle } from './controlTelegramBridgeLifecycle.js';
+import { createControlTelegramBridgeOversightFacadeFactory } from './controlTelegramBridgeOversightFacadeFactory.js';
 import type { ControlRequestContext, ControlRequestSharedContext } from './controlRequestContext.js';
 import type { DispatchPilotEvaluation } from './trackerDispatchPilot.js';
 
@@ -30,12 +30,11 @@ export function createControlTelegramBridgeBootstrapLifecycle(
 ): ControlServerBootstrapLifecycle {
   const telegramBridgeLifecycle = createControlTelegramBridgeLifecycle({
     runDir: context.paths.runDir,
-    createOversightFacade: () =>
-      createControlOversightFacade({
-        ...context.requestContextShared,
-        expiryLifecycle: context.getExpiryLifecycle(),
-        emitDispatchPilotAuditEvents: context.emitDispatchPilotAuditEvents
-      })
+    createOversightFacade: createControlTelegramBridgeOversightFacadeFactory({
+      requestContextShared: context.requestContextShared,
+      getExpiryLifecycle: () => context.getExpiryLifecycle(),
+      emitDispatchPilotAuditEvents: context.emitDispatchPilotAuditEvents
+    })
   });
   return createControlServerBootstrapLifecycle({
     paths: {
