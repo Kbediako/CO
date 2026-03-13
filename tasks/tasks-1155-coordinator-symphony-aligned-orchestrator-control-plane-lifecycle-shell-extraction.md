@@ -20,21 +20,21 @@
 
 ## Orchestrator Control Plane Lifecycle Shell Extraction
 
-- [ ] One bounded helper owns the duplicated run-entry control-plane lifecycle shell shared by `Orchestrator.start()` and `Orchestrator.resume()`.
-- [ ] `orchestrator.ts` delegates shared control-plane setup and teardown without widening coordinator authority.
-- [ ] Focused regressions preserve startup, adapter attachment, and teardown ordering behavior.
+- [x] One bounded helper owns the duplicated run-entry control-plane lifecycle shell shared by `Orchestrator.start()` and `Orchestrator.resume()`. Evidence: `orchestrator/src/cli/services/orchestratorControlPlaneLifecycle.ts`, `orchestrator/src/cli/orchestrator.ts`
+- [x] `orchestrator.ts` delegates shared control-plane setup and teardown without widening coordinator authority. Evidence: `orchestrator/src/cli/orchestrator.ts`, `orchestrator/src/cli/services/orchestratorControlPlaneLifecycle.ts`
+- [x] Focused regressions preserve startup, control-disabled behavior, adapter attachment, and teardown ordering behavior. Evidence: `orchestrator/tests/OrchestratorControlPlaneLifecycle.test.ts`, `orchestrator/tests/OrchestratorCleanupOrder.test.ts`, `out/1155-coordinator-symphony-aligned-orchestrator-control-plane-lifecycle-shell-extraction/manual/20260313T104000Z-closeout/05b-targeted-tests.log`
 
 ## Validation + Closeout
 
-- [ ] `node scripts/delegation-guard.mjs`
-- [ ] `node scripts/spec-guard.mjs --dry-run`
-- [ ] `npm run build`
-- [ ] `npm run lint`
-- [ ] `npm run test`
-- [ ] `npm run docs:check`
-- [ ] `npm run docs:freshness`
-- [ ] `node scripts/diff-budget.mjs`
-- [ ] `npm run review`
-- [ ] `npm run pack:smoke`
-- [ ] Manual/mock orchestrator control-plane lifecycle evidence captured.
-- [ ] Elegance review completed.
+- [x] `node scripts/delegation-guard.mjs`. Evidence: `out/1155-coordinator-symphony-aligned-orchestrator-control-plane-lifecycle-shell-extraction/manual/20260313T104000Z-closeout/01-delegation-guard.log`, `out/1155-coordinator-symphony-aligned-orchestrator-control-plane-lifecycle-shell-extraction/manual/20260313T104000Z-closeout/00-delegated-guard-run.json`
+- [x] `node scripts/spec-guard.mjs --dry-run`. Evidence: `out/1155-coordinator-symphony-aligned-orchestrator-control-plane-lifecycle-shell-extraction/manual/20260313T104000Z-closeout/02-spec-guard.log`
+- [x] `npm run build`. Evidence: `out/1155-coordinator-symphony-aligned-orchestrator-control-plane-lifecycle-shell-extraction/manual/20260313T104000Z-closeout/03-build.log`
+- [x] `npm run lint`. Evidence: `out/1155-coordinator-symphony-aligned-orchestrator-control-plane-lifecycle-shell-extraction/manual/20260313T104000Z-closeout/04-lint.log`
+- [x] `npm run test`. Evidence: `out/1155-coordinator-symphony-aligned-orchestrator-control-plane-lifecycle-shell-extraction/manual/20260313T104000Z-closeout/05-test.log`, `out/1155-coordinator-symphony-aligned-orchestrator-control-plane-lifecycle-shell-extraction/manual/20260313T104000Z-closeout/05b-targeted-tests.log`
+- [x] `npm run docs:check`. Evidence: `out/1155-coordinator-symphony-aligned-orchestrator-control-plane-lifecycle-shell-extraction/manual/20260313T104000Z-closeout/06-docs-check.log`
+- [x] `npm run docs:freshness`. Evidence: `out/1155-coordinator-symphony-aligned-orchestrator-control-plane-lifecycle-shell-extraction/manual/20260313T104000Z-closeout/07-docs-freshness.log`
+- [x] `node scripts/diff-budget.mjs`. Evidence: `out/1155-coordinator-symphony-aligned-orchestrator-control-plane-lifecycle-shell-extraction/manual/20260313T104000Z-closeout/08-diff-budget.log`, `out/1155-coordinator-symphony-aligned-orchestrator-control-plane-lifecycle-shell-extraction/manual/20260313T104000Z-closeout/13-override-notes.md`
+- [x] `npm run review`. Evidence: `out/1155-coordinator-symphony-aligned-orchestrator-control-plane-lifecycle-shell-extraction/manual/20260313T104000Z-closeout/09-review.log`, `out/1155-coordinator-symphony-aligned-orchestrator-control-plane-lifecycle-shell-extraction/manual/20260313T104000Z-closeout/13-override-notes.md`
+- [x] `npm run pack:smoke`. Evidence: `out/1155-coordinator-symphony-aligned-orchestrator-control-plane-lifecycle-shell-extraction/manual/20260313T104000Z-closeout/10-pack-smoke.log`
+- [x] Manual/mock orchestrator control-plane lifecycle evidence captured. Evidence: `out/1155-coordinator-symphony-aligned-orchestrator-control-plane-lifecycle-shell-extraction/manual/20260313T104000Z-closeout/11-manual-control-plane-lifecycle-check.json`
+- [x] Elegance review completed. Evidence: `out/1155-coordinator-symphony-aligned-orchestrator-control-plane-lifecycle-shell-extraction/manual/20260313T104000Z-closeout/12-elegance-review.md`
