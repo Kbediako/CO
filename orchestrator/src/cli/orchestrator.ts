@@ -21,9 +21,7 @@ import {
   bootstrapManifest,
   loadManifest,
   updateHeartbeat,
-  finalizeStatus,
   appendSummary,
-  ensureGuardrailStatus,
   resetForResume,
   recordResumeEvent
 } from './run/manifest.js';
@@ -68,11 +66,8 @@ import { loadPackageConfig, loadUserConfig } from './config/userConfig.js';
 import { formatRepoConfigRequiredError, isRepoConfigRequired } from './config/repoConfigPolicy.js';
 import { RunEventEmitter, RunEventPublisher } from './events/runEvents.js';
 import { RunEventStream } from './events/runEventStream.js';
-import { CLI_EXECUTION_MODE_PARSER, resolveRequiresCloudPolicy } from '../utils/executionMode.js';
-import { resolveCodexCliBin } from './utils/codexCli.js';
-import { runCloudPreflight } from './utils/cloudPreflight.js';
 import { writeJsonAtomic } from './utils/fs.js';
-import { resolveRuntimeMode, resolveRuntimeSelection } from './runtime/index.js';
+import { resolveRuntimeMode } from './runtime/index.js';
 import type { RuntimeMode, RuntimeModeSource, RuntimeSelection } from './runtime/types.js';
 import {
   buildAutoScoutEvidence,
@@ -84,7 +79,12 @@ import {
   executeOrchestratorCloudTarget,
   resolveCloudEnvironmentId
 } from './services/orchestratorCloudTargetExecutor.js';
-import { executeOrchestratorLocalPipeline } from './services/orchestratorLocalPipelineExecutor.js';
+import {
+  determineOrchestratorExecutionMode,
+  routeOrchestratorExecution,
+  type OrchestratorAutoScoutOutcome,
+  type OrchestratorExecutionRouteOptions
+} from './services/orchestratorExecutionRouter.js';
 
 const resolveBaseEnvironment = (): EnvironmentPaths =>
   normalizeEnvironmentPaths(resolveEnvironmentPaths());
@@ -106,41 +106,6 @@ function readCloudNumber(raw: string | undefined, fallback: number): number {
   return parsed;
 }
 
-function allowCloudFallback(envOverrides?: NodeJS.ProcessEnv): boolean {
-  const raw =
-    readCloudString(envOverrides?.CODEX_ORCHESTRATOR_CLOUD_FALLBACK) ??
-    readCloudString(process.env.CODEX_ORCHESTRATOR_CLOUD_FALLBACK);
-  if (!raw) {
-    return true;
-  }
-  const normalized = raw.toLowerCase();
-  return !['0', 'false', 'off', 'deny', 'disabled', 'never', 'strict'].includes(normalized);
-}
-
-function normalizeCloudFallbackIssues(
-  issues: { code: string; message: string }[]
-): Array<{ code: string; message: string }> {
-  return issues.map((issue) => ({ code: issue.code, message: issue.message }));
-}
-
-interface ExecutePipelineOptions {
-  env: EnvironmentPaths;
-  pipeline: PipelineDefinition;
-  manifest: CliManifest;
-  paths: RunPaths;
-  mode: ExecutionMode;
-  runtimeModeRequested: RuntimeMode;
-  runtimeModeSource: RuntimeModeSource;
-  executionModeOverride?: ExecutionMode;
-  target: PlanItem;
-  task: TaskContext;
-  runEvents?: RunEventPublisher;
-  eventStream?: RunEventStream;
-  onEventEntry?: (entry: import('./events/runEventStream.js').RunEventStreamEntry) => void;
-  persister?: ManifestPersister;
-  envOverrides?: NodeJS.ProcessEnv;
-}
-
 interface RunLifecycleContext {
   env: EnvironmentPaths;
   pipeline: PipelineDefinition;
@@ -159,9 +124,10 @@ interface RunLifecycleContext {
   executionModeOverride?: ExecutionMode;
 }
 
-type AutoScoutOutcome =
-  | { status: 'recorded'; path: string }
-  | { status: 'timeout' | 'error'; message: string };
+type ExecutePipelineOptions = Omit<
+  OrchestratorExecutionRouteOptions,
+  'applyRuntimeSelection' | 'executeCloudPipeline' | 'runAutoScout' | 'startSubpipeline'
+>;
 
 export class CodexOrchestrator {
   private readonly controlPlane = new ControlPlaneService();
@@ -453,198 +419,29 @@ export class CodexOrchestrator {
       tester,
       reviewer,
       runIdFactory: () => runId,
-      modePolicy: (task, subtask) => this.determineMode(task, subtask, modeOverride),
+      modePolicy: (task, subtask) =>
+        determineOrchestratorExecutionMode(task, subtask, modeOverride),
       persistence: { autoStart: true, stateStore, manifestWriter }
     };
 
     return new TaskManager(options);
   }
 
-  private determineMode(
-    task: TaskContext,
-    subtask: PlanItem,
-    overrideMode?: ExecutionMode
-  ): ExecutionMode {
-    if (overrideMode) {
-      return overrideMode;
-    }
-    if (this.requiresCloudExecution(task, subtask)) {
-      return 'cloud';
-    }
-    return 'mcp';
-  }
-
-  private requiresCloudExecution(task: TaskContext, subtask: PlanItem): boolean {
-    const requiresCloudFlag = resolveRequiresCloudPolicy({
-      boolFlags: [subtask.requires_cloud, subtask.requiresCloud],
-      metadata: {
-        executionMode:
-          typeof subtask.metadata?.executionMode === 'string'
-            ? (subtask.metadata.executionMode as string)
-            : null,
-        mode: typeof subtask.metadata?.mode === 'string' ? (subtask.metadata.mode as string) : null
-      },
-      metadataOrder: ['executionMode', 'mode'],
-      parseMode: CLI_EXECUTION_MODE_PARSER
-    });
-    if (requiresCloudFlag !== null) {
-      return requiresCloudFlag;
-    }
-    return Boolean(task.metadata?.execution?.parallel);
-  }
-
   private async executePipeline(options: ExecutePipelineOptions): Promise<PipelineRunExecutionResult> {
-    const baseEnvOverrides: NodeJS.ProcessEnv = { ...(options.envOverrides ?? {}) };
-    const mergedEnv = { ...process.env, ...baseEnvOverrides };
-    let runtimeSelection: RuntimeSelection;
-    try {
-      runtimeSelection = await resolveRuntimeSelection({
-        requestedMode: options.runtimeModeRequested,
-        source: options.runtimeModeSource,
-        executionMode: options.mode,
-        repoRoot: options.env.repoRoot,
-        env: mergedEnv,
-        runId: options.manifest.run_id
-      });
-    } catch (error) {
-      const detail = `Runtime selection failed: ${(error as Error)?.message ?? String(error)}`;
-      finalizeStatus(options.manifest, 'failed', 'runtime-selection-failed');
-      appendSummary(options.manifest, detail);
-      logger.error(detail);
-      return {
-        success: false,
-        notes: [detail],
-        manifest: options.manifest,
-        manifestPath: options.paths.manifestPath,
-        logPath: options.paths.logPath
-      };
-    }
-    this.applyRuntimeSelection(options.manifest, runtimeSelection);
-    const effectiveEnvOverrides: NodeJS.ProcessEnv = {
-      ...baseEnvOverrides,
-      ...runtimeSelection.env_overrides
-    };
-    const effectiveMergedEnv = { ...process.env, ...effectiveEnvOverrides };
-
-    if (options.mode === 'cloud') {
-      const environmentId = resolveCloudEnvironmentId(options.task, options.target, effectiveEnvOverrides);
-      const branch =
-        readCloudString(effectiveEnvOverrides.CODEX_CLOUD_BRANCH) ??
-        readCloudString(process.env.CODEX_CLOUD_BRANCH);
-      const codexBin = resolveCodexCliBin(effectiveMergedEnv);
-      const preflight = await runCloudPreflight({
-        repoRoot: options.env.repoRoot,
-        codexBin,
-        environmentId,
-        branch,
-        env: effectiveMergedEnv
-      });
-      if (!preflight.ok) {
-        if (!allowCloudFallback(effectiveEnvOverrides)) {
-          const detail =
-            `Cloud preflight failed and cloud fallback is disabled. ` +
-            preflight.issues.map((issue) => issue.message).join(' ');
-          finalizeStatus(options.manifest, 'failed', 'cloud-preflight-failed');
-          appendSummary(options.manifest, detail);
-          logger.error(detail);
-          return {
-            success: false,
-            notes: [detail],
-            manifest: options.manifest,
-            manifestPath: options.paths.manifestPath,
-            logPath: options.paths.logPath
-          };
-        }
-
-        const detail =
-          `Cloud preflight failed; falling back to mcp. ` +
-          preflight.issues.map((issue) => issue.message).join(' ');
-        options.manifest.cloud_fallback = {
-          mode_requested: 'cloud',
-          mode_used: 'mcp',
-          reason: detail,
-          issues: normalizeCloudFallbackIssues(preflight.issues),
-          checked_at: isoTimestamp()
-        };
-        appendSummary(options.manifest, detail);
-        logger.warn(detail);
-        const fallback = await this.executePipeline({
-          ...options,
-          mode: 'mcp',
-          executionModeOverride: 'mcp',
-          runtimeModeRequested: runtimeSelection.selected_mode,
-          runtimeModeSource: runtimeSelection.source,
-          envOverrides: effectiveEnvOverrides
-        });
-        fallback.notes.unshift(detail);
-        return fallback;
-      }
-      return await this.executeCloudPipeline({ ...options, envOverrides: effectiveEnvOverrides });
-    }
-
-    const { env, pipeline, manifest, paths, runEvents } = options;
-
-    return runOrchestratorExecutionLifecycle({
-      env,
-      pipeline,
-      manifest,
-      paths,
-      mode: options.mode,
-      target: options.target,
-      task: options.task,
-      runEvents,
-      eventStream: options.eventStream,
-      onEventEntry: options.onEventEntry,
-      persister: options.persister,
-      envOverrides: effectiveEnvOverrides,
-      advancedDecisionEnv: effectiveMergedEnv,
-      defaultFailureStatusDetail: 'pipeline-failed',
-      beforeStart: ({ notes }) => {
-        if (runtimeSelection.fallback.occurred) {
-          const fallbackCode = runtimeSelection.fallback.code ?? 'runtime-fallback';
-          const fallbackReason = runtimeSelection.fallback.reason ?? 'runtime fallback occurred';
-          const fallbackSummary = `Runtime fallback (${fallbackCode}): ${fallbackReason}`;
-          appendSummary(manifest, fallbackSummary);
-          notes.push(fallbackSummary);
-        }
-      },
-      runAutoScout: (autoScoutOptions) =>
-        this.runAutoScout({
-          ...autoScoutOptions,
-          envOverrides: effectiveEnvOverrides
-        }),
-      executeBody: async ({ notes, persister, controlWatcher, schedulePersist }) => {
-        const localResult = await executeOrchestratorLocalPipeline({
-          env,
-          pipeline,
-          manifest,
-          paths,
-          persister,
-          envOverrides: effectiveEnvOverrides,
-          runtimeMode: runtimeSelection.selected_mode,
-          runtimeSessionId: runtimeSelection.runtime_session_id,
-          runEvents,
-          controlWatcher,
-          schedulePersist,
-          startSubpipeline: (pipelineId) =>
-            this.start({
-              taskId: env.taskId,
-              pipelineId,
-              parentRunId: manifest.run_id,
-              format: 'json',
-              executionMode: options.executionModeOverride,
-              runtimeMode: options.runtimeModeRequested
-            })
-        });
-        notes.push(...localResult.notes);
-        return localResult.success;
-      },
-      afterFinalize: () => {
-        const guardrailStatus = ensureGuardrailStatus(manifest);
-        if (guardrailStatus.recommendation) {
-          appendSummary(manifest, guardrailStatus.recommendation);
-        }
-      }
+    return routeOrchestratorExecution({
+      ...options,
+      applyRuntimeSelection: (manifest, selection) => this.applyRuntimeSelection(manifest, selection),
+      executeCloudPipeline: (cloudOptions) => this.executeCloudPipeline(cloudOptions),
+      runAutoScout: (autoScoutOptions) => this.runAutoScout(autoScoutOptions),
+      startSubpipeline: ({ pipelineId, executionModeOverride, runtimeModeRequested }) =>
+        this.start({
+          taskId: options.env.taskId,
+          pipelineId,
+          parentRunId: options.manifest.run_id,
+          format: 'json',
+          executionMode: executionModeOverride,
+          runtimeMode: runtimeModeRequested
+        })
     });
   }
 
@@ -696,14 +493,14 @@ export class CodexOrchestrator {
     task: TaskContext;
     envOverrides?: NodeJS.ProcessEnv;
     advancedDecision: AdvancedAutopilotDecision;
-  }): Promise<AutoScoutOutcome> {
+  }): Promise<OrchestratorAutoScoutOutcome> {
     const mergedEnv = { ...process.env, ...(params.envOverrides ?? {}) };
     const timeoutMs = readCloudNumber(
       mergedEnv.CODEX_ORCHESTRATOR_AUTO_SCOUT_TIMEOUT_MS,
       DEFAULT_AUTO_SCOUT_TIMEOUT_MS
     );
 
-    const work = async (): Promise<AutoScoutOutcome> => {
+    const work = async (): Promise<OrchestratorAutoScoutOutcome> => {
       const cloudEnvironmentId = resolveCloudEnvironmentId(params.task, params.target, params.envOverrides);
       const cloudBranch =
         readCloudString(params.envOverrides?.CODEX_CLOUD_BRANCH) ??
@@ -731,7 +528,7 @@ export class CodexOrchestrator {
 
     try {
       let timeoutHandle: NodeJS.Timeout | null = null;
-      const timeoutPromise = new Promise<AutoScoutOutcome>((resolve) => {
+      const timeoutPromise = new Promise<OrchestratorAutoScoutOutcome>((resolve) => {
         timeoutHandle = setTimeout(() => {
           resolve({
             status: 'timeout',
@@ -740,7 +537,7 @@ export class CodexOrchestrator {
         }, timeoutMs);
         timeoutHandle.unref?.();
       });
-      const workPromise = work().catch((error): AutoScoutOutcome => ({
+      const workPromise = work().catch((error): OrchestratorAutoScoutOutcome => ({
         status: 'error',
         message: (error as Error)?.message ?? String(error)
       }));

@@ -7,11 +7,12 @@ import {
   FunctionalReviewerAgent
 } from '../src/agents/index.js';
 import type { ExecutionMode, PlanItem, PlanResult, TaskContext } from '../src/types.js';
-import { CodexOrchestrator } from '../src/cli/orchestrator.js';
 import { CommandPlanner } from '../src/cli/adapters/CommandPlanner.js';
 import type { PipelineDefinition, PipelineStage } from '../src/cli/types.js';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import {
+  determineOrchestratorExecutionMode,
+  requiresCloudOrchestratorExecution
+} from '../src/cli/services/orchestratorExecutionRouter.js';
 
 const baseTask: TaskContext = {
   id: 'task-1',
@@ -73,22 +74,12 @@ function resolveCliRequiresCloud(
   taskMetadata: TaskContext['metadata'] | undefined,
   itemOverrides: Partial<PlanItem>
 ): boolean {
-  const root = tmpdir();
-  const orchestrator = new CodexOrchestrator({
-    repoRoot: root,
-    runsRoot: join(root, 'runs'),
-    outRoot: join(root, 'out'),
-    taskId: 'task-1'
-  });
-  const method = (orchestrator as unknown as {
-    requiresCloudExecution: (task: TaskContext, subtask: PlanItem) => boolean;
-  }).requiresCloudExecution;
   const task: TaskContext = {
     id: baseTask.id,
     title: baseTask.title,
     ...(taskMetadata !== undefined ? { metadata: taskMetadata } : {})
   };
-  return method.call(orchestrator, task, makePlanItem(itemOverrides));
+  return requiresCloudOrchestratorExecution(task, makePlanItem(itemOverrides));
 }
 
 function resolveCliModeWithOverride(
@@ -96,22 +87,12 @@ function resolveCliModeWithOverride(
   itemOverrides: Partial<PlanItem>,
   overrideMode: ExecutionMode
 ): ExecutionMode {
-  const root = tmpdir();
-  const orchestrator = new CodexOrchestrator({
-    repoRoot: root,
-    runsRoot: join(root, 'runs'),
-    outRoot: join(root, 'out'),
-    taskId: 'task-1'
-  });
-  const method = (orchestrator as unknown as {
-    determineMode: (task: TaskContext, subtask: PlanItem, mode?: ExecutionMode) => ExecutionMode;
-  }).determineMode;
   const task: TaskContext = {
     id: baseTask.id,
     title: baseTask.title,
     ...(taskMetadata !== undefined ? { metadata: taskMetadata } : {})
   };
-  return method.call(orchestrator, task, makePlanItem(itemOverrides), overrideMode);
+  return determineOrchestratorExecutionMode(task, makePlanItem(itemOverrides), overrideMode);
 }
 
 async function resolvePlannerItem(stageOverrides: Record<string, unknown>): Promise<PlanItem> {
