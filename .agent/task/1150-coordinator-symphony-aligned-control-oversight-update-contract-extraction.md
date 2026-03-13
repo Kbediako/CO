@@ -20,21 +20,21 @@
 
 ## Control Oversight Update Contract Extraction
 
-- [ ] One coordinator-owned oversight update contract replaces facade-specific ownership of the update-side `subscribe(...)` surface.
-- [ ] The Telegram bridge lifecycle consumes the extracted neutral update boundary instead of a facade-specific type.
-- [ ] Focused lifecycle/update regressions preserve the existing runtime behavior.
+- [x] One coordinator-owned oversight update contract replaces facade-specific ownership of the update-side `subscribe(...)` surface. Evidence: `orchestrator/src/cli/control/controlOversightUpdateContract.ts`, `orchestrator/src/cli/control/controlOversightFacade.ts`
+- [x] The Telegram bridge lifecycle consumes the extracted neutral update boundary instead of a facade-specific type. Evidence: `orchestrator/src/cli/control/controlTelegramBridgeLifecycle.ts`, `out/1150-coordinator-symphony-aligned-control-oversight-update-contract-extraction/manual/20260313T060724Z-closeout/11-manual-oversight-update-contract-check.json`
+- [x] Focused lifecycle/update regressions preserve the existing runtime behavior. Evidence: `out/1150-coordinator-symphony-aligned-control-oversight-update-contract-extraction/manual/20260313T060724Z-closeout/05b-targeted-tests.log`
 
 ## Validation + Closeout
 
-- [ ] `node scripts/delegation-guard.mjs`
-- [ ] `node scripts/spec-guard.mjs --dry-run`
-- [ ] `npm run build`
-- [ ] `npm run lint`
-- [ ] `npm run test`
-- [ ] `npm run docs:check`
-- [ ] `npm run docs:freshness`
-- [ ] `node scripts/diff-budget.mjs`
-- [ ] `npm run review`
-- [ ] `npm run pack:smoke`
-- [ ] Manual/mock oversight update-contract evidence captured.
-- [ ] Elegance review completed.
+- [x] `node scripts/delegation-guard.mjs` Evidence: `out/1150-coordinator-symphony-aligned-control-oversight-update-contract-extraction/manual/20260313T060724Z-closeout/01-delegation-guard.log`, `out/1150-coordinator-symphony-aligned-control-oversight-update-contract-extraction/manual/20260313T060724Z-closeout/00b-delegated-guard-run.json`
+- [x] `node scripts/spec-guard.mjs --dry-run` Evidence: `out/1150-coordinator-symphony-aligned-control-oversight-update-contract-extraction/manual/20260313T060724Z-closeout/02-spec-guard.log`
+- [x] `npm run build` Evidence: `out/1150-coordinator-symphony-aligned-control-oversight-update-contract-extraction/manual/20260313T060724Z-closeout/03-build.log`
+- [x] `npm run lint` Evidence: `out/1150-coordinator-symphony-aligned-control-oversight-update-contract-extraction/manual/20260313T060724Z-closeout/04-lint.log`
+- [x] `npm run test` Evidence: `out/1150-coordinator-symphony-aligned-control-oversight-update-contract-extraction/manual/20260313T060724Z-closeout/05-test.log`, `out/1150-coordinator-symphony-aligned-control-oversight-update-contract-extraction/manual/20260313T060724Z-closeout/13-override-notes.md`
+- [x] `npm run docs:check` Evidence: `out/1150-coordinator-symphony-aligned-control-oversight-update-contract-extraction/manual/20260313T060724Z-closeout/06-docs-check.log`
+- [x] `npm run docs:freshness` Evidence: `out/1150-coordinator-symphony-aligned-control-oversight-update-contract-extraction/manual/20260313T060724Z-closeout/07-docs-freshness.log`
+- [x] `node scripts/diff-budget.mjs` Evidence: `out/1150-coordinator-symphony-aligned-control-oversight-update-contract-extraction/manual/20260313T060724Z-closeout/08-diff-budget.log`
+- [x] `npm run review` Evidence: `out/1150-coordinator-symphony-aligned-control-oversight-update-contract-extraction/manual/20260313T060724Z-closeout/09-review.log`, `out/1150-coordinator-symphony-aligned-control-oversight-update-contract-extraction/manual/20260313T060724Z-closeout/13-override-notes.md`
+- [x] `npm run pack:smoke` Evidence: `out/1150-coordinator-symphony-aligned-control-oversight-update-contract-extraction/manual/20260313T060724Z-closeout/10-pack-smoke.log`
+- [x] Manual/mock oversight update-contract evidence captured. Evidence: `out/1150-coordinator-symphony-aligned-control-oversight-update-contract-extraction/manual/20260313T060724Z-closeout/11-manual-oversight-update-contract-check.json`
+- [x] Elegance review completed. Evidence: `out/1150-coordinator-symphony-aligned-control-oversight-update-contract-extraction/manual/20260313T060724Z-closeout/12-elegance-review.md`
