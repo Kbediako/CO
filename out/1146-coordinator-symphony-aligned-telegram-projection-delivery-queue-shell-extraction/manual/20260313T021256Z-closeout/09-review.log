@@ -1,0 +1,759 @@
+
+> @kbediako/codex-orchestrator@0.1.38 review
+> node --loader ts-node/esm scripts/run-review.ts
+
+(node:90032) ExperimentalWarning: `--experimental-loader` may be removed in the future; instead use `register()`:
+--import 'data:text/javascript,import { register } from "node:module"; import { pathToFileURL } from "node:url"; register("ts-node/esm", pathToFileURL("./"));'
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:90032) [DEP0180] DeprecationWarning: fs.Stats constructor is deprecated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+⚠️ Diff budget exceeded (override applied) (base=origin/main)
+ - changed files 1269 > 25
+ - total lines changed 116175 > 800
+Top changed files:
+  - docs/docs-freshness-registry.json: 11090
+  - orchestrator/tests/ControlServer.test.ts: 7635
+  - tasks/index.json: 7000
+  - scripts/lib/review-execution-state.ts: 4243
+  - tests/review-execution-state.spec.ts: 3522
+  - tests/run-review.spec.ts: 3110
+  - scripts/run-review.ts: 2221
+  - orchestrator/tests/DelegationServer.test.ts: 2115
+  - orchestrator/tests/TelegramOversightBridge.test.ts: 1803
+  - orchestrator/src/cli/control/controlServer.ts: 1658
+
+Override accepted via DIFF_BUDGET_OVERRIDE_REASON: 1146 final tree is bounded but branch scope exceeds diff budget on stacked main-ahead workspace
+[run-review] bounded review guidance enabled by default (set CODEX_REVIEW_ALLOW_HEAVY_COMMANDS=1 to opt into unrestricted heavy-command execution).
+[run-review] review scope metrics: 3 files, 242 lines.
+[run-review] runtime requested=appserver selected=appserver provider=AppServerRuntimeProvider.
+[run-review] delegation MCP enabled for this review (default; set --disable-delegation-mcp or CODEX_REVIEW_DISABLE_DELEGATION_MCP=1 to disable).
+Review prompt saved to: .runs/1146-coordinator-symphony-aligned-telegram-projection-delivery-queue-shell-extraction/cli/2026-03-13T01-54-09-884Z-9ecbaa78/review/prompt.txt
+Review output log: .runs/1146-coordinator-symphony-aligned-telegram-projection-delivery-queue-shell-extraction/cli/2026-03-13T01-54-09-884Z-9ecbaa78/review/output.log
+Launching Codex review (evidence: .runs/1146-coordinator-symphony-aligned-telegram-projection-delivery-queue-shell-extraction/cli/2026-03-13T01-54-09-884Z-9ecbaa78/manifest.json)
+[run-review] patience-first monitor checkpoints every 1m 0s (set CODEX_REVIEW_MONITOR_INTERVAL_SECONDS=0 to disable).
+[run-review] low-signal drift guard enabled after 3m 0s of repetitive bounded activity (set CODEX_REVIEW_LOW_SIGNAL_TIMEOUT_SECONDS=0 to disable).
+[run-review] verdict-stability guard enabled after 3m 0s of repeated speculative no-progress output (set CODEX_REVIEW_VERDICT_STABILITY_TIMEOUT_SECONDS=0 to disable).
+[run-review] meta-surface expansion guard enabled after 3m 0s of sustained off-task meta activity (set CODEX_REVIEW_META_SURFACE_TIMEOUT_SECONDS=0 to disable).
+[run-review] startup-anchor boundary enabled for diff mode; repeated memory/skills/review-docs/manifest/review-artifact reads before the first startup anchor will terminate the review.
+[run-review] bounded relevant reinspection dwell boundary enabled after 3m 0s of repetitive on-task reinspection without concrete findings (set CODEX_REVIEW_LOW_SIGNAL_TIMEOUT_SECONDS=0 to disable).
+OpenAI Codex v0.114.0 (research preview)
+--------
+workdir: /Users/kbediako/Code/CO
+model: gpt-5.4
+provider: openai
+approval: never
+sandbox: danger-full-access
+reasoning effort: xhigh
+reasoning summaries: detailed
+session id: 019ce4fd-0bae-7151-ae77-202fd000e4d9
+--------
+user
+Review task: 1146-coordinator-symphony-aligned-telegram-projection-delivery-queue-shell-extraction
+Review surface: diff
+
+Agent notes:
+Goal: extract Telegram projection delivery queue shell | Summary: moved closed/push gating, serialized projection notification queueing, controller-driven patch application, and persisted-state write-through into telegramOversightBridgeProjectionDeliveryQueue while keeping bridge state authority and next_update_id persistence in the bridge | Risks: queue serialization, shutdown flush hookup, projection delivery failure recovery
+
+Please review the current changes and confirm:
+- The solution is minimal and avoids unnecessary abstraction/scope
+- Behavior remains correct for changed files and nearby dependencies
+- Call out concrete regressions, risky edge cases, or missing tests in the changed area
+- Start with touched paths, scoped diff commands, or nearby changed code before consulting memory, skills, review docs, manifests, or review artifacts
+- Concrete same-diff progress can be shown by citing touched paths with explicit locations such as `path:line`, `path:line:col`, `path#Lline`, or `path#LlineCcol`.
+- If you already have that diff-local citation evidence, do not search the wider repo for other examples of the rendering.
+
+Keep this pass diff-focused. Do not audit checklist/docs/evidence surfaces unless they are directly required to assess code correctness.
+
+Execution constraints (bounded review mode):
+- Keep this review focused on changed files and nearby dependencies.
+- Avoid full validation suites (for example `npm run test`, `npm run lint`, `npm run build`, `npm run docs:check`, `npm run docs:freshness`) during this pass.
+- Do not launch direct validation runners (for example `npx vitest`, `npm exec jest`) or nested review/pipeline/delegation flows during this pass.
+- If broader validation would improve confidence, list follow-up commands instead of executing them.
+
+Review scope hint: uncommitted working tree changes (default).
+
+Review scope paths (3):
+```
+orchestrator/src/cli/control/telegramOversightBridge.ts
+orchestrator/src/cli/control/telegramOversightBridgeProjectionDeliveryQueue.ts
+orchestrator/tests/TelegramOversightBridgeProjectionDeliveryQueue.test.ts
+```
+
+Active closeout provenance:
+- Resolved active closeout root: `out/1146-coordinator-symphony-aligned-telegram-projection-delivery-queue-shell-extraction/manual/20260313T021256Z-closeout`
+- These roots are already-resolved self-referential review surfaces for this task; do not re-derive or re-enumerate them unless directly necessary to assess code correctness.
+mcp: delegation starting
+mcp: openaiDeveloperDocs starting
+mcp: delegation ready
+mcp: openaiDeveloperDocs ready
+mcp startup: ready: delegation, openaiDeveloperDocs
+mcp: delegation starting
+mcp: openaiDeveloperDocs starting
+mcp: delegation ready
+mcp: openaiDeveloperDocs ready
+mcp startup: ready: delegation, openaiDeveloperDocs
+
+thinking
+**Reviewing code changes**
+
+I need to review the differences and output the findings in JSON format. The user suggests starting with touched paths and scoped diff commands, avoiding memory unless absolutely necessary. I should closely inspect the current changes in the repository and likely run “git diff” for specific files. It may help to plan steps, although it might not be essential right now. I need to be a reviewer, reading the diff and checking nearby code. Let’s inspect those touched files.
+thinking
+**Reviewing code changes**
+
+I need to review the differences and output the findings in JSON format. The user suggests starting with touched paths and scoped diff commands, avoiding memory unless absolutely necessary. I should closely inspect the current changes in the repository and likely run “git diff” for specific files. It may help to plan steps, although it might not be essential right now. I need to be a reviewer, reading the diff and checking nearby code. Let’s inspect those touched files.
+Plan update
+  → Inspect diff for touched Telegram oversight bridge files and tests
+  • Analyze changed logic against nearby code for regressions or edge cases
+  • Produce JSON review findings with correctness verdict
+exec
+/bin/zsh -lc 'git diff -- orchestrator/src/cli/control/telegramOversightBridge.ts orchestrator/src/cli/control/telegramOversightBridgeProjectionDeliveryQueue.ts orchestrator/tests/TelegramOversightBridgeProjectionDeliveryQueue.test.ts' in /Users/kbediako/Code/COexec
+/bin/zsh -lc 'git status --short -- orchestrator/src/cli/control/telegramOversightBridge.ts orchestrator/src/cli/control/telegramOversightBridgeProjectionDeliveryQueue.ts orchestrator/tests/TelegramOversightBridgeProjectionDeliveryQueue.test.ts' in /Users/kbediako/Code/CO succeeded in 0ms:
+ M orchestrator/src/cli/control/telegramOversightBridge.ts
+?? orchestrator/src/cli/control/telegramOversightBridgeProjectionDeliveryQueue.ts
+?? orchestrator/tests/TelegramOversightBridgeProjectionDeliveryQueue.test.ts
+ succeeded in 0ms:
+diff --git a/orchestrator/src/cli/control/telegramOversightBridge.ts b/orchestrator/src/cli/control/telegramOversightBridge.ts
+index 3080d4690..eaae65ad8 100644
+--- a/orchestrator/src/cli/control/telegramOversightBridge.ts
++++ b/orchestrator/src/cli/control/telegramOversightBridge.ts
+@@ -36,6 +36,10 @@ import {
+   createTelegramOversightBridgeRuntimeLifecycle,
+   type TelegramOversightBridgeRuntimeLifecycle
+ } from './telegramOversightBridgeRuntimeLifecycle.js';
++import {
++  createTelegramOversightBridgeProjectionDeliveryQueue,
++  type TelegramOversightBridgeProjectionDeliveryQueue
++} from './telegramOversightBridgeProjectionDeliveryQueue.js';
+ import {
+   advanceTelegramOversightBridgeStateNextUpdateId,
+   applyTelegramOversightBridgeStatePatch,
+@@ -143,9 +147,9 @@ class TelegramOversightBridgeRuntime implements TelegramOversightBridge {
+   private readonly pollingController: ControlTelegramPollingController;
+   private readonly projectionNotificationController: ControlTelegramProjectionNotificationController;
+   private readonly runtimeLifecycle: TelegramOversightBridgeRuntimeLifecycle;
++  private readonly projectionDeliveryQueue: TelegramOversightBridgeProjectionDeliveryQueue;
+
+thinking
+**Inspecting files and tests**
+
+It looks like I need to check a new file and run some tests. I want to make sure I look through everything carefully to catch any issues and ensure everything is functioning as expected. I'll need to pay attention to details, as I'm sure there could be things I might overlook otherwise. Let’s see what this new file is all about and how I can test it effectively!
+thinking
+**Inspecting files and tests**
+
+It looks like I need to check a new file and run some tests. I want to make sure I look through everything carefully to catch any issues and ensure everything is functioning as expected. I'll need to pay attention to details, as I'm sure there could be things I might overlook otherwise. Let’s see what this new file is all about and how I can test it effectively!
+exec
+/bin/zsh -lc "sed -n '1,240p' orchestrator/src/cli/control/telegramOversightBridgeProjectionDeliveryQueue.ts" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "sed -n '1,320p' orchestrator/src/cli/control/telegramOversightBridge.ts" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "sed -n '1,260p' orchestrator/tests/TelegramOversightBridgeProjectionDeliveryQueue.test.ts" in /Users/kbediako/Code/CO succeeded in 0ms:
+import { describe, expect, it, vi } from 'vitest';
+
+import { createDefaultTelegramOversightState } from '../src/cli/control/controlTelegramPushState.js';
+import { createTelegramOversightBridgeProjectionDeliveryQueue } from '../src/cli/control/telegramOversightBridgeProjectionDeliveryQueue.js';
+
+function createDeferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+}
+
+describe('createTelegramOversightBridgeProjectionDeliveryQueue', () => {
+  it('skips projection delivery when push is disabled or the bridge is already closed', async () => {
+    const readPushState = vi.fn(() => createDefaultTelegramOversightState().push);
+    const notifyProjectionDelta = vi.fn();
+    const applyStatePatchAndSave = vi.fn();
+ succeeded in 0ms:
+import type {
+  ControlTelegramProjectionNotificationResult
+} from './controlTelegramProjectionNotificationController.js';
+import type {
+  TelegramOversightPushState,
+  TelegramOversightStatePatch
+} from './controlTelegramPushState.js';
+
+interface ProjectionDeltaInput {
+  eventSeq?: number | null;
+  source?: string | null;
+}
+
+export interface TelegramOversightBridgeProjectionDeliveryQueue {
+  notifyProjectionDelta(input?: ProjectionDeltaInput): Promise<void>;
+  flushNotifications(): Promise<void>;
+}
+
+export function createTelegramOversightBridgeProjectionDeliveryQueue(input: {
+  pushEnabled: boolean;
+ succeeded in 0ms:
+import { logger } from '../../logger.js';
+import {
+  createControlTelegramCommandController,
+  type ControlTelegramCommandController
+} from './controlTelegramCommandController.js';
+import {
+  createControlTelegramReadController,
+  type ControlTelegramReadController
+} from './controlTelegramReadController.js';
+import {
+  createControlTelegramProjectionNotificationController,
+  type ControlTelegramProjectionNotificationController
+} from './controlTelegramProjectionNotificationController.js';
+import {
+  createControlTelegramPollingController,
+  type ControlTelegramPollingController
+} from './controlTelegramPollingController.js';
+import {
+  createControlTelegramUpdateHandler,
+  type ControlTelegramUpdateHandler
+
+thinking
+**Analyzing potential bugs**
+
+I need to analyze for bugs by inspecting the nearby dependencies, especially focusing on the controllers' lifecycle to grasp the semantics. I should take a closer look at the relevant code, particularly around the projection notification controller, its lifecycle, the state store, and the push state. I might also want to check the existing tests to ensure everything is functioning as expected. This can give me better insight into any issues.
+thinking
+**Analyzing potential bugs**
+
+I need to analyze for bugs by inspecting the nearby dependencies, especially focusing on the controllers' lifecycle to grasp the semantics. I should take a closer look at the relevant code, particularly around the projection notification controller, its lifecycle, the state store, and the push state. I might also want to check the existing tests to ensure everything is functioning as expected. This can give me better insight into any issues.
+exec
+/bin/zsh -lc "sed -n '1,260p' orchestrator/src/cli/control/controlTelegramPushState.ts" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "sed -n '1,260p' orchestrator/src/cli/control/telegramOversightBridgeStateStore.ts" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "sed -n '1,260p' orchestrator/src/cli/control/telegramOversightBridgeRuntimeLifecycle.ts" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "sed -n '1,260p' orchestrator/src/cli/control/controlTelegramProjectionNotificationController.ts" in /Users/kbediako/Code/CO succeeded in 0ms:
+export interface TelegramOversightPushState {
+  last_sent_projection_hash: string | null;
+  last_sent_at: string | null;
+  last_event_seq: number | null;
+  pending_projection_hash: string | null;
+  pending_projection_observed_at: string | null;
+}
+
+export interface TelegramOversightBridgeState {
+  next_update_id: number;
+  updated_at: string;
+  push: TelegramOversightPushState;
+}
+
+export type TelegramOversightStatePatch = Pick<TelegramOversightBridgeState, 'updated_at' | 'push'>;
+
+export interface TelegramProjectionStateTransition {
+  kind: 'skip' | 'pending' | 'send';
+  statePatch: TelegramOversightStatePatch;
+}
+ succeeded in 0ms:
+import type { TelegramOversightBridgeState } from './controlTelegramPushState.js';
+import type { TelegramBotIdentity } from './telegramOversightApiClient.js';
+
+export interface TelegramOversightBridgeRuntimeLifecycle {
+  start(): Promise<void>;
+  close(): Promise<void>;
+  isClosed(): boolean;
+}
+
+export function createTelegramOversightBridgeRuntimeLifecycle(input: {
+  loadState: () => Promise<TelegramOversightBridgeState>;
+  setState: (state: TelegramOversightBridgeState) => void;
+  getBotIdentity: () => Promise<TelegramBotIdentity>;
+  runPolling: (runtime: {
+    isClosed: () => boolean;
+    readBotUsername: () => string | null;
+  }) => Promise<void>;
+  abortPolling: () => void;
+  flushNotifications: () => Promise<void>;
+  logEnabled: (botUsername: string | null) => void;
+ succeeded in 0ms:
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
+
+import { writeJsonAtomic } from '../utils/fs.js';
+import {
+  createDefaultTelegramOversightState,
+  type TelegramOversightBridgeState,
+  type TelegramOversightStatePatch
+} from './controlTelegramPushState.js';
+
+const TELEGRAM_STATE_FILE = 'telegram-oversight-state.json';
+
+export interface TelegramOversightBridgeStateStore {
+  loadState(): Promise<TelegramOversightBridgeState>;
+  saveState(state: TelegramOversightBridgeState): Promise<void>;
+}
+
+export function createTelegramOversightBridgeStateStore(runDir: string): TelegramOversightBridgeStateStore {
+  const statePath = join(runDir, TELEGRAM_STATE_FILE);
+  return {
+ succeeded in 0ms:
+import {
+  computeTelegramProjectionStateTransition,
+  type TelegramOversightStatePatch,
+  type TelegramOversightPushState
+} from './controlTelegramPushState.js';
+import type { TelegramProjectionDeltaPresentation } from './controlTelegramReadController.js';
+
+export interface ControlTelegramProjectionNotificationController {
+  notifyProjectionDelta(input: {
+    pushState: TelegramOversightPushState;
+    eventSeq?: number | null;
+  }): Promise<ControlTelegramProjectionNotificationResult>;
+}
+
+export interface ControlTelegramProjectionNotificationResult {
+  delivery: 'skip' | 'pending' | 'send';
+  statePatch: TelegramOversightStatePatch;
+}
+
+export function createControlTelegramProjectionNotificationController(input: {
+
+thinking
+I'm considering inspecting the previous version or tests related to the bridge. It seems like a good idea to search for any existing tests and review the logic behind them. I want to ensure that I’m thorough in my investigation so that I get the right information. This process will hopefully help me clarify any uncertainties I have and lead to a better understanding of the situation at hand. Let's see what I can find!
+thinking
+I'm considering inspecting the previous version or tests related to the bridge. It seems like a good idea to search for any existing tests and review the logic behind them. I want to ensure that I’m thorough in my investigation so that I get the right information. This process will hopefully help me clarify any uncertainties I have and lead to a better understanding of the situation at hand. Let's see what I can find!
+exec
+/bin/zsh -lc "git grep -n \"notifyProjectionDelta\" -- orchestrator/src/cli/control orchestrator/tests | sed -n '1,200p'" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "git grep -n \"pending_projection_hash\\|last_event_seq\\|push notification failed\" -- orchestrator/tests orchestrator/src/cli/control | sed -n '1,240p'" in /Users/kbediako/Code/CO succeeded in 0ms:
+orchestrator/src/cli/control/controlTelegramBridgeLifecycle.ts:76:        bridge.notifyProjectionDelta(input)
+orchestrator/src/cli/control/controlTelegramProjectionNotificationController.ts:9:  notifyProjectionDelta(input: {
+orchestrator/src/cli/control/controlTelegramProjectionNotificationController.ts:28:    async notifyProjectionDelta({
+orchestrator/src/cli/control/telegramOversightBridge.ts:98:  notifyProjectionDelta(input?: {
+orchestrator/src/cli/control/telegramOversightBridge.ts:203:      notifyProjectionDelta: ({ pushState, eventSeq }) =>
+orchestrator/src/cli/control/telegramOversightBridge.ts:204:        this.projectionNotificationController.notifyProjectionDelta({
+orchestrator/src/cli/control/telegramOversightBridge.ts:252:  async notifyProjectionDelta(
+orchestrator/src/cli/control/telegramOversightBridge.ts:258:    await this.projectionDeliveryQueue.notifyProjectionDelta(input);
+orchestrator/tests/ControlTelegramBridgeLifecycle.test.ts:42:      notifyProjectionDelta: vi.fn(async () => undefined),
+orchestrator/tests/ControlTelegramBridgeLifecycle.test.ts:73:      notifyProjectionDelta: vi.fn(async () => undefined),
+orchestrator/tests/ControlTelegramProjectionNotificationController.test.ts:26:    const result = await controller.notifyProjectionDelta({
+orchestrator/tests/ControlTelegramProjectionNotificationController.test.ts:55:    const result = await controller.notifyProjectionDelta({
+orchestrator/tests/ControlTelegramProjectionNotificationController.test.ts:80:    const result = await controller.notifyProjectionDelta({
+orchestrator/tests/ControlTelegramProjectionNotificationController.test.ts:111:    const first = await controller.notifyProjectionDelta({
+orchestrator/tests/ControlTelegramProjectionNotificationController.test.ts:120:    const second = await controller.notifyProjectionDelta({
+orchestrator/tests/TelegramOversightBridge.test.ts:1560:      await bridge.notifyProjectionDelta({ eventSeq: 1 });
+orchestrator/tests/TelegramOversightBridge.test.ts:1570:      await bridge.notifyProjectionDelta({ eventSeq: 2 });
+orchestrator/tests/TelegramOversightBridge.test.ts:1582:      await bridge.notifyProjectionDelta({ eventSeq: 3 });
+ succeeded in 0ms:
+orchestrator/src/cli/control/controlTelegramPushState.ts:4:  last_event_seq: number | null;
+orchestrator/src/cli/control/controlTelegramPushState.ts:5:  pending_projection_hash: string | null;
+orchestrator/src/cli/control/controlTelegramPushState.ts:29:      last_event_seq: null,
+orchestrator/src/cli/control/controlTelegramPushState.ts:30:      pending_projection_hash: null,
+orchestrator/src/cli/control/controlTelegramPushState.ts:46:      : input.pushState.last_event_seq;
+orchestrator/src/cli/control/controlTelegramPushState.ts:56:          last_event_seq: nextEventSeq,
+orchestrator/src/cli/control/controlTelegramPushState.ts:57:          pending_projection_hash: null,
+orchestrator/src/cli/control/controlTelegramPushState.ts:72:          last_event_seq: nextEventSeq,
+orchestrator/src/cli/control/controlTelegramPushState.ts:73:          pending_projection_hash: input.projectionHash,
+orchestrator/src/cli/control/controlTelegramPushState.ts:75:            input.projectionHash === input.pushState.pending_projection_hash
+orchestrator/src/cli/control/controlTelegramPushState.ts:90:        last_event_seq: nextEventSeq,
+orchestrator/src/cli/control/controlTelegramPushState.ts:91:        pending_projection_hash: null,
+orchestrator/src/cli/control/telegramOversightBridge.ts:213:        logger.warn(`[telegram-oversight] push notification failed: ${(error as Error)?.message ?? String(error)}`);
+orchestrator/src/cli/control/telegramOversightBridgeStateStore.ts:67:        last_event_seq:
+orchestrator/src/cli/control/telegramOversightBridgeStateStore.ts:68:          parsedPush && typeof parsedPush.last_event_seq === 'number' && Number.isInteger(parsedPush.last_event_seq)
+orchestrator/src/cli/control/telegramOversightBridgeStateStore.ts:69:            ? parsedPush.last_event_seq
+orchestrator/src/cli/control/telegramOversightBridgeStateStore.ts:71:        pending_projection_hash: parsedPush ? readStringValue(parsedPush, 'pending_projection_hash') ?? null : null,
+orchestrator/tests/ControlTelegramProjectionNotificationController.test.ts:34:    expect(result.statePatch.push.last_event_seq).toBe(7);
+orchestrator/tests/ControlTelegramProjectionNotificationController.test.ts:35:    expect(result.statePatch.push.pending_projection_hash).toBeNull();
+orchestrator/tests/ControlTelegramProjectionNotificationController.test.ts:63:    expect(result.statePatch.push.last_event_seq).toBe(8);
+
+thinking
+**Evaluating bridge tests**
+
+I need to inspect the existing bridge tests, possibly looking for a new file extracted from the current behavior. This involves comparing it with the current test coverage to see how they align. I should look closely at specific portions of the tests to ensure everything is covered effectively. It's essential that I get this right, as thorough testing will help prevent issues down the line! Let's dive into those sections together.
+thinking
+**Evaluating bridge tests**
+
+I need to inspect the existing bridge tests, possibly looking for a new file extracted from the current behavior. This involves comparing it with the current test coverage to see how they align. I should look closely at specific portions of the tests to ensure everything is covered effectively. It's essential that I get this right, as thorough testing will help prevent issues down the line! Let's dive into those sections together.
+exec
+/bin/zsh -lc "sed -n '1,140p' orchestrator/src/cli/control/controlTelegramBridgeLifecycle.ts" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "sed -n '1020,1225p' orchestrator/tests/TelegramOversightBridge.test.ts" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "sed -n '1300,1610p' orchestrator/tests/TelegramOversightBridge.test.ts" in /Users/kbediako/Code/CO succeeded in 0ms:
+import { logger } from '../../logger.js';
+import type { RunPaths } from '../run/runPaths.js';
+import type { ControlRuntime } from './controlRuntime.js';
+import {
+  startTelegramOversightBridge,
+  type TelegramOversightBridge,
+  type TelegramOversightReadAdapter
+} from './telegramOversightBridge.js';
+
+interface ControlTelegramBridgeLifecycleOptions {
+  runDir: Pick<RunPaths, 'runDir'>['runDir'];
+  controlRuntime: Pick<ControlRuntime, 'subscribe'>;
+  createTelegramReadAdapter: () => TelegramOversightReadAdapter;
+  startTelegramBridgeImpl?: typeof startTelegramOversightBridge;
+}
+
+interface ControlTelegramBridgeLifecycleStartOptions {
+  baseUrl: string;
+  controlToken: string;
+}
+ succeeded in 0ms:
+          run_id: 'run-1',
+          task_id: 'task-0940',
+          status: 'in_progress',
+          started_at: '2026-03-06T04:00:00.000Z',
+          updated_at: '2026-03-06T04:04:00.000Z',
+          completed_at: null,
+          summary: 'task needs review',
+          commands: [],
+          approvals: []
+        }),
+        'utf8'
+      );
+
+      server.broadcast({
+        schema_version: 1,
+        seq: 3,
+        timestamp: '2026-03-06T04:04:30.000Z',
+        task_id: 'task-0940',
+        run_id: 'run-1',
+        event: 'run_updated',
+ succeeded in 0ms:
+          chat: { id: 1234, type: 'private' },
+          from: { id: 77, is_bot: false, first_name: 'Operator' }
+        }
+      });
+
+      await waitForCondition(async () => {
+        const stateRaw = await readFile(join(paths.runDir, 'telegram-oversight-state.json'), 'utf8');
+        const parsed = JSON.parse(stateRaw) as { next_update_id?: number };
+        return parsed.next_update_id === 88 && telegram.sentMessages.length === 1;
+      });
+
+      const overlapStateRaw = await readFile(join(paths.runDir, 'telegram-oversight-state.json'), 'utf8');
+      const overlapState = JSON.parse(overlapStateRaw) as {
+        next_update_id?: number;
+        updated_at?: string;
+      };
+      expect(overlapState.next_update_id).toBe(88);
+
+      releaseProjectionSend?.();
+
+[run-review] waiting on codex review (1m 0s elapsed, 2s idle; review progress observed).
+
+
+
+
+
+thinking
+**Evaluating TypeScript issues**
+
+I'm considering testing a new file, and it seems there haven't been any changes to the integration tests. I need to check the TypeScript compilation, especially since this new file uses an interface that's not an exported type. But it looks like the file is untracked, and the diff only shows changes from the bridge. So, perhaps this file isn't referenced in the tsconfig? I’ll definitely need to investigate further.
+thinking
+**Considering maintainability issues**
+
+I’m wondering if there might be a maintainability issue rather than just a bug. It feels like there’s not enough information at the moment. I think it’s important to inspect the differing line numbers and look at the code locations where there are overlaps. Checking the new file line numbers could also help clarify if there’s something affecting maintainability here, rather than simply being a software bug.
+thinking
+**Inspecting code imports**
+
+I'm considering how the new queue directly applies patches or saves via callbacks. I wonder if type imports might be causing a cycle. The new file imports `ControlTelegramProjectionNotificationResult`, which goes through multiple files and could create a circular runtime import, but it uses `import type`, so there shouldn't be runtime issues from that.
+
+I might have a bug with an untracked new file and its associated test not being part of the git diff. I need to inspect the line numbers of the new file, and maybe also consider the catch location in the queue. If the first task fails in `maybeSendProjectionDelta`, catch logs could resolve it, but the second task may still append. Let's keep thinking this through!
+thinking
+**Analyzing queue behavior**
+
+I’m thinking about how the initial call sets the queue with `P0.then(task1).catch(log)`, and then the second call adds `task2` to that same queue. This means `task2` has to wait for the first call to finish, including any catches. 
+
+I see the same structure in the new code, which seems fine. But wait, there could be a bug: the new queue interface doesn’t expose `source` and just ignores it, while the old bridge interface still includes source. That's something to keep an eye on!
+thinking
+I’m considering whether there are tests in place for checking things that are pending or closed. It sounds like I need to dive into some inspections. I'll look up existing tests that might address this situation to ensure everything is covered. It’s always better to be thorough, especially when it comes to pending matters. I’m curious to see what I can find and make sure nothing is left out!
+thinking
+**Evaluating TypeScript issues**
+
+I'm considering testing a new file, and it seems there haven't been any changes to the integration tests. I need to check the TypeScript compilation, especially since this new file uses an interface that's not an exported type. But it looks like the file is untracked, and the diff only shows changes from the bridge. So, perhaps this file isn't referenced in the tsconfig? I’ll definitely need to investigate further.
+thinking
+**Considering maintainability issues**
+
+I’m wondering if there might be a maintainability issue rather than just a bug. It feels like there’s not enough information at the moment. I think it’s important to inspect the differing line numbers and look at the code locations where there are overlaps. Checking the new file line numbers could also help clarify if there’s something affecting maintainability here, rather than simply being a software bug.
+thinking
+**Inspecting code imports**
+
+I'm considering how the new queue directly applies patches or saves via callbacks. I wonder if type imports might be causing a cycle. The new file imports `ControlTelegramProjectionNotificationResult`, which goes through multiple files and could create a circular runtime import, but it uses `import type`, so there shouldn't be runtime issues from that.
+
+I might have a bug with an untracked new file and its associated test not being part of the git diff. I need to inspect the line numbers of the new file, and maybe also consider the catch location in the queue. If the first task fails in `maybeSendProjectionDelta`, catch logs could resolve it, but the second task may still append. Let's keep thinking this through!
+thinking
+**Analyzing queue behavior**
+
+I’m thinking about how the initial call sets the queue with `P0.then(task1).catch(log)`, and then the second call adds `task2` to that same queue. This means `task2` has to wait for the first call to finish, including any catches. 
+
+I see the same structure in the new code, which seems fine. But wait, there could be a bug: the new queue interface doesn’t expose `source` and just ignores it, while the old bridge interface still includes source. That's something to keep an eye on!
+thinking
+I’m considering whether there are tests in place for checking things that are pending or closed. It sounds like I need to dive into some inspections. I'll look up existing tests that might address this situation to ensure everything is covered. It’s always better to be thorough, especially when it comes to pending matters. I’m curious to see what I can find and make sure nothing is left out!
+exec
+/bin/zsh -lc "git grep -n \"flushNotifications\\|close().*notifyProjectionDelta\\|notifyProjectionDelta({ eventSeq\" orchestrator/tests/TelegramOversightBridge.test.ts orchestrator/tests/TelegramOversightBridgeProjectionDeliveryQueue.test.ts | sed -n '1,200p'" in /Users/kbediako/Code/CO succeeded in 0ms:
+orchestrator/tests/TelegramOversightBridge.test.ts:1560:      await bridge.notifyProjectionDelta({ eventSeq: 1 });
+orchestrator/tests/TelegramOversightBridge.test.ts:1570:      await bridge.notifyProjectionDelta({ eventSeq: 2 });
+orchestrator/tests/TelegramOversightBridge.test.ts:1582:      await bridge.notifyProjectionDelta({ eventSeq: 3 });
+exec
+/bin/zsh -lc "sed -n '1530,1605p' orchestrator/tests/TelegramOversightBridge.test.ts" in /Users/kbediako/Code/CO succeeded in 0ms:
+    let statePayload = buildTelegramStatePayload({
+      prompt: 'Need operator approval',
+      urgency: 'high'
+    });
+
+    vi.stubEnv('CO_TELEGRAM_POLLING_ENABLED', '1');
+    vi.stubEnv('CO_TELEGRAM_BOT_TOKEN', 'test-token');
+    vi.stubEnv('CO_TELEGRAM_ALLOWED_CHAT_IDS', '1234');
+    vi.stubEnv('CO_TELEGRAM_PUSH_ENABLED', '1');
+    vi.stubEnv('CO_TELEGRAM_PUSH_INTERVAL_MS', '1');
+    vi.stubEnv('CO_TELEGRAM_POLL_INTERVAL_MS', '10');
+
+    const bridge = await startTelegramOversightBridge({
+      runDir: paths.runDir,
+      readAdapter: {
+        readSelectedRun: async () => statePayload,
+        readDispatch: async () => ({}),
+        readQuestions: async () => ({ questions: [] }),
+      },
+      baseUrl: 'http://127.0.0.1:1',
+
+[run-review] waiting on codex review (2m 0s elapsed, 2s idle; review progress observed).
+
+
+thinking
+**Inspecting code for issues**
+
+I'm looking into the notifyProjectionDelta tests, and I'm thinking I might need to inspect the git diff compared to the base branch. Since there are untracked files, perhaps some commits haven't been added yet. The review should mainly focus on the diff. I wonder if I can identify any subtle bugs in the tests or surrounding code related to projection transition. It seems like a thorough check is necessary. One potential issue could be the timing of state reads and updates in the applyStatePatchAndSave function.
+thinking
+**Analyzing state mutation risks**
+
+I’m diving into the persistNextUpdateId and its interaction with this.state's mutation. If persistNextUpdateId changes this.state before the save resolves, both old and new code could save the later state instead of the patched one. So, when applyStatePatchAndSave sets this.state, it captures the reference at that moment. If persistNextUpdateId modifies it afterward, saveState will miss the patch. I should check how persistNextUpdateId and applyStatePatchAndSave might interleave due to the controller's patch application. There might be a risk with flushNotifications being tied to a queue object created at runtime.
+thinking
+**Examining shutdown semantics**
+
+I'm questioning whether the shutdown semantics are weakened. What if notifyProjectionDelta gets called before the constructor finishes? I should look at the tests for bridge interleaving to see if they're redundant or potentially broken. There's already a test, but maybe it hasn’t been updated, and we aren't running the tests currently. I’m wondering if there’s a potential gap in integration tests related to extraction since there are new unit tests. It’s something to dig into further!
+thinking
+**Inspecting code for issues**
+
+I'm looking into the notifyProjectionDelta tests, and I'm thinking I might need to inspect the git diff compared to the base branch. Since there are untracked files, perhaps some commits haven't been added yet. The review should mainly focus on the diff. I wonder if I can identify any subtle bugs in the tests or surrounding code related to projection transition. It seems like a thorough check is necessary. One potential issue could be the timing of state reads and updates in the applyStatePatchAndSave function.
+thinking
+**Analyzing state mutation risks**
+
+I’m diving into the persistNextUpdateId and its interaction with this.state's mutation. If persistNextUpdateId changes this.state before the save resolves, both old and new code could save the later state instead of the patched one. So, when applyStatePatchAndSave sets this.state, it captures the reference at that moment. If persistNextUpdateId modifies it afterward, saveState will miss the patch. I should check how persistNextUpdateId and applyStatePatchAndSave might interleave due to the controller's patch application. There might be a risk with flushNotifications being tied to a queue object created at runtime.
+thinking
+**Examining shutdown semantics**
+
+I'm questioning whether the shutdown semantics are weakened. What if notifyProjectionDelta gets called before the constructor finishes? I should look at the tests for bridge interleaving to see if they're redundant or potentially broken. There's already a test, but maybe it hasn’t been updated, and we aren't running the tests currently. I’m wondering if there’s a potential gap in integration tests related to extraction since there are new unit tests. It’s something to dig into further!
+exec
+/bin/zsh -lc "git grep -n \"flushNotifications\\|queued notification errors during shutdown\\|close\\(\\).*telegram\" orchestrator/tests | sed -n '1,200p'" in /Users/kbediako/Code/CO succeeded in 0ms:
+orchestrator/tests/ControlServerBootstrapLifecycle.test.ts:85:  it('delegates lifecycle close to the telegram bridge lifecycle', async () => {
+orchestrator/tests/TelegramOversightBridgeRuntimeLifecycle.test.ts:52:      flushNotifications: vi.fn(async () => {
+orchestrator/tests/TelegramOversightBridgeRuntimeLifecycle.test.ts:53:        order.push('flushNotifications');
+orchestrator/tests/TelegramOversightBridgeRuntimeLifecycle.test.ts:75:    const flushNotifications = vi.fn(async () => undefined);
+orchestrator/tests/TelegramOversightBridgeRuntimeLifecycle.test.ts:85:      flushNotifications,
+orchestrator/tests/TelegramOversightBridgeRuntimeLifecycle.test.ts:107:    expect(flushNotifications).toHaveBeenCalledOnce();
+orchestrator/tests/TelegramOversightBridgeRuntimeLifecycle.test.ts:119:      flushNotifications: vi.fn(() => flushDeferred.promise),
+
+thinking
+**Evaluating function behavior**
+
+I’m thinking about how call1 resolves after the first delivery and call2 after both, which is consistent with what I expected. However, I’m wondering if there could be an issue if `applyStatePatchAndSave` throws an error synchronously before returning a Promise. Fortunately, there’s a catch to handle that. I’m also concerned about the possibility of a path-level bug due to a new file not being included in the review scope; it’s untracked, which could be problematic.
+thinking
+**Evaluating function behavior**
+
+I’m thinking about how call1 resolves after the first delivery and call2 after both, which is consistent with what I expected. However, I’m wondering if there could be an issue if `applyStatePatchAndSave` throws an error synchronously before returning a Promise. Fortunately, there’s a catch to handle that. I’m also concerned about the possibility of a path-level bug due to a new file not being included in the review scope; it’s untracked, which could be problematic.
+exec
+/bin/zsh -lc "nl -ba orchestrator/src/cli/control/telegramOversightBridge.ts | sed -n '180,270p'" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "nl -ba orchestrator/src/cli/control/telegramOversightBridgeProjectionDeliveryQueue.ts | sed -n '1,220p'" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "nl -ba orchestrator/tests/TelegramOversightBridgeProjectionDeliveryQueue.test.ts | sed -n '1,220p'" in /Users/kbediako/Code/CO succeeded in 0ms:
+     1	import type {
+     2	  ControlTelegramProjectionNotificationResult
+     3	} from './controlTelegramProjectionNotificationController.js';
+     4	import type {
+     5	  TelegramOversightPushState,
+     6	  TelegramOversightStatePatch
+     7	} from './controlTelegramPushState.js';
+     8	
+     9	interface ProjectionDeltaInput {
+    10	  eventSeq?: number | null;
+    11	  source?: string | null;
+    12	}
+    13	
+    14	export interface TelegramOversightBridgeProjectionDeliveryQueue {
+    15	  notifyProjectionDelta(input?: ProjectionDeltaInput): Promise<void>;
+    16	  flushNotifications(): Promise<void>;
+    17	}
+    18	
+    19	export function createTelegramOversightBridgeProjectionDeliveryQueue(input: {
+    20	  pushEnabled: boolean;
+ succeeded in 0ms:
+   180	    });
+   181	    this.updateHandler = createControlTelegramUpdateHandler({
+   182	      allowedChatIds: options.config.allowedChatIds,
+   183	      readController: this.readController,
+   184	      commandController: this.commandController,
+   185	      sendMessage: (chatId, text) => this.telegramClient.sendMessage(chatId, text)
+   186	    });
+   187	    this.pollingController = createControlTelegramPollingController({
+   188	      pollIntervalMs: options.config.pollIntervalMs,
+   189	      telegramClient: this.telegramClient,
+   190	      updateHandler: this.updateHandler
+   191	    });
+   192	    this.projectionNotificationController = createControlTelegramProjectionNotificationController({
+   193	      allowedChatIds: options.config.allowedChatIds,
+   194	      pushCooldownMs: options.config.pushCooldownMs,
+   195	      renderProjectionDeltaMessage: () => this.readController.renderProjectionDeltaMessage(),
+   196	      sendMessage: (chatId, text) => this.telegramClient.sendMessage(chatId, text)
+   197	    });
+   198	    let readRuntimeClosed: (() => boolean) | null = null;
+   199	    this.projectionDeliveryQueue = createTelegramOversightBridgeProjectionDeliveryQueue({
+ succeeded in 0ms:
+     1	import { describe, expect, it, vi } from 'vitest';
+     2	
+     3	import { createDefaultTelegramOversightState } from '../src/cli/control/controlTelegramPushState.js';
+     4	import { createTelegramOversightBridgeProjectionDeliveryQueue } from '../src/cli/control/telegramOversightBridgeProjectionDeliveryQueue.js';
+     5	
+     6	function createDeferred<T>() {
+     7	  let resolve!: (value: T | PromiseLike<T>) => void;
+     8	  let reject!: (reason?: unknown) => void;
+     9	  const promise = new Promise<T>((res, rej) => {
+    10	    resolve = res;
+    11	    reject = rej;
+    12	  });
+    13	  return { promise, resolve, reject };
+    14	}
+    15	
+    16	describe('createTelegramOversightBridgeProjectionDeliveryQueue', () => {
+    17	  it('skips projection delivery when push is disabled or the bridge is already closed', async () => {
+    18	    const readPushState = vi.fn(() => createDefaultTelegramOversightState().push);
+    19	    const notifyProjectionDelta = vi.fn();
+    20	    const applyStatePatchAndSave = vi.fn();
+
+
+thinking
+**Inspecting test cases**
+
+I need to inspect the differences with the base commit to see if any tests were removed or cases not ported. It's possible that the queue extraction moved tests out of the bridge file. I could consider using `git diff --stat`, but I may not really need to. There might be some new unit tests, while the old bridge tests remain unchanged. I want to confirm that everything meets the requirements and behaves correctly, especially regarding any potential correctness bugs around the pending state.
+thinking
+**Investigating potential bug**
+
+I’m looking into a potential bug with the `source` property on input. The `ProjectionDeltaInput` includes `source`, but it seems it’s not being used, which means the unit tests might not cover it adequately. The old method signature also ignored `source`. I wonder if the caller might use `source` for something later on. I should search for `source:` in the control runtime subscribe to see if it pops up anywhere impactful. Let's clarify this to ensure everything is working as expected!
+thinking
+**Inspecting test cases**
+
+I need to inspect the differences with the base commit to see if any tests were removed or cases not ported. It's possible that the queue extraction moved tests out of the bridge file. I could consider using `git diff --stat`, but I may not really need to. There might be some new unit tests, while the old bridge tests remain unchanged. I want to confirm that everything meets the requirements and behaves correctly, especially regarding any potential correctness bugs around the pending state.
+thinking
+**Investigating potential bug**
+
+I’m looking into a potential bug with the `source` property on input. The `ProjectionDeltaInput` includes `source`, but it seems it’s not being used, which means the unit tests might not cover it adequately. The old method signature also ignored `source`. I wonder if the caller might use `source` for something later on. I should search for `source:` in the control runtime subscribe to see if it pops up anywhere impactful. Let's clarify this to ensure everything is working as expected!
+exec
+/bin/zsh -lc "git grep -n \"source:\" -- orchestrator/src/cli/control orchestrator/tests | sed -n '1,200p'" in /Users/kbediako/Code/CO succeeded in 0ms:
+orchestrator/src/cli/control/authenticatedRouteComposition.ts:193:          context.runtime.publish({ source: 'control.action' });
+orchestrator/src/cli/control/authenticatedRouteComposition.ts:239:        publishRuntime: () => context.runtime.publish({ source: 'control.action' })
+orchestrator/src/cli/control/compatibilityIssuePresenter.ts:83:          source: preferredSource,
+orchestrator/src/cli/control/compatibilityIssuePresenter.ts:134:    source: TSource | null,
+orchestrator/src/cli/control/compatibilityIssuePresenter.ts:271:  source: ControlCompatibilitySourceContext;
+orchestrator/src/cli/control/controlActionController.ts:53:  publishRuntime(source: 'control.action'): void;
+orchestrator/src/cli/control/controlActionPreflight.ts:323:      actor_source: confirmedActorSource,
+orchestrator/src/cli/control/controlActionPreflight.ts:485:    actor_source: input.actorSource,
+orchestrator/src/cli/control/controlEventTransport.ts:63:      source: entry.event
+orchestrator/src/cli/control/controlExpiryLifecycle.ts:113:    this.runtime.publish({ source: 'questions.expire' });
+orchestrator/src/cli/control/controlRequestRouteDispatch.ts:55:      publishRuntime: () => input.context.runtime.publish({ source: 'linear.webhook' })
+orchestrator/src/cli/control/controlServerAuditAndErrorHelpers.ts:160:    actor_source: traceActorSource !== undefined ? traceActorSource : latestAction?.actor_source ?? null,
+orchestrator/src/cli/control/controlState.ts:38:  actor_source: string | null;
+orchestrator/src/cli/control/controlState.ts:144:      actor_source: input.transportContext?.actorSource ?? null,
+orchestrator/src/cli/control/controlState.ts:315:        actor_source: input.actorSource,
+orchestrator/src/cli/control/controlState.ts:334:        actor_source: input.actorSource,
+orchestrator/src/cli/control/controlTelegramCommandController.ts:73:    actor_source: 'telegram.bot.polling',
+orchestrator/src/cli/control/linearDispatchSource.ts:120:  source: Record<string, unknown>;
+orchestrator/src/cli/control/questionQueueController.ts:31:  publishRuntime(source: QuestionRouteSource): void;
+orchestrator/src/cli/control/trackerDispatchPilot.ts:71:  source: Record<string, unknown>;
+[run-review] waiting on codex review (3m 0s elapsed, 3s idle; review progress observed).
+
+thinking
+**Inspecting bridge control lifecycle**
+
+I’m considering whether the createControlTelegramBridgeLifecycle function properly subscribes and handles notifications without awaiting notifyProjectionDelta. It looks like it passes a callback to bridge.notifyProjectionDelta with the input. If subscribe calls callbacks synchronously and doesn’t await, that could affect things. I should check the controlRuntime.subscribe API, although maybe not at this moment. I’ll need to search more into this to clarify how everything interacts.
+thinking
+**Inspecting bridge control lifecycle**
+
+I’m considering whether the createControlTelegramBridgeLifecycle function properly subscribes and handles notifications without awaiting notifyProjectionDelta. It looks like it passes a callback to bridge.notifyProjectionDelta with the input. If subscribe calls callbacks synchronously and doesn’t await, that could affect things. I should check the controlRuntime.subscribe API, although maybe not at this moment. I’ll need to search more into this to clarify how everything interacts.
+exec
+/bin/zsh -lc "git grep -n \"subscribe(.*notifyProjectionDelta\\|publish(.*eventSeq\\|class ControlRuntime\\|interface ControlRuntime\" -- orchestrator/src/cli/control | sed -n '1,260p'" in /Users/kbediako/Code/CO succeeded in 0ms:
+orchestrator/src/cli/control/controlRuntime.ts:25:interface ControlRuntimeContext {
+orchestrator/src/cli/control/controlRuntime.ts:39:export interface ControlRuntimeSnapshot {
+orchestrator/src/cli/control/controlRuntime.ts:48:export interface ControlRuntime {
+exec
+/bin/zsh -lc "sed -n '1,220p' orchestrator/src/cli/control/controlRuntime.ts" in /Users/kbediako/Code/CO succeeded in 0ms:
+import type { RunPaths } from '../run/runPaths.js';
+import type { ControlState } from './controlState.js';
+import type { LiveLinearTrackedIssue } from './linearDispatchSource.js';
+import {
+  buildTrackedLinearPayload,
+  type ControlCompatibilityProjectionSnapshot,
+  type ControlCompatibilityRuntimeSnapshot,
+  type ControlSelectedRunRuntimeSnapshot,
+} from './observabilityReadModel.js';
+import { buildCompatibilityProjectionSnapshot } from './compatibilityIssuePresenter.js';
+import { createLiveLinearAdvisoryRuntime } from './liveLinearAdvisoryRuntime.js';
+import {
+  createObservabilityUpdateNotifier,
+  type ObservabilityUpdate,
+  type ObservabilityUpdateListener,
+  type ObservabilityUpdateNotifier
+} from './observabilityUpdateNotifier.js';
+import type { QuestionRecord } from './questions.js';
+import {
+  createSelectedRunProjectionReader,
+
+thinking
+**Checking observability update**
+
+I need to look into the `ObservabilityUpdateNotifier` because it seems like it might not be awaiting the listener properly, which could lead to unhandled async errors. This could cause issues down the line, so it's essential to check how it's handling those scenarios. I want to make sure everything is working smoothly without any hiccups. I'll dive deeper into the code and see what needs fixing.
+thinking
+**Checking observability update**
+
+I need to look into the `ObservabilityUpdateNotifier` because it seems like it might not be awaiting the listener properly, which could lead to unhandled async errors. This could cause issues down the line, so it's essential to check how it's handling those scenarios. I want to make sure everything is working smoothly without any hiccups. I'll dive deeper into the code and see what needs fixing.
+exec
+/bin/zsh -lc "sed -n '1,180p' orchestrator/src/cli/control/observabilityUpdateNotifier.ts" in /Users/kbediako/Code/CO succeeded in 0ms:
+import { logger } from '../../logger.js';
+
+export interface ObservabilityUpdate {
+  eventSeq?: number | null;
+  source?: string | null;
+}
+
+export type ObservabilityUpdateListener = (
+  input?: ObservabilityUpdate
+) => void | Promise<void>;
+
+export interface ObservabilityUpdateNotifier {
+  publish(input?: ObservabilityUpdate): void;
+  subscribe(listener: ObservabilityUpdateListener): () => void;
+}
+
+export function createObservabilityUpdateNotifier(): ObservabilityUpdateNotifier {
+  const listeners = new Set<ObservabilityUpdateListener>();
+
+  return {
+exec
+/bin/zsh -lc "git grep -n \"noUnusedLocals\\|noUnusedParameters\" -- tsconfig*.json orchestrator/tsconfig*.json package.json . | sed -n '1,200p'" in /Users/kbediako/Code/CO succeeded in 0ms:
+zsh:1: no matches found: orchestrator/tsconfig*.json
+exec
+/bin/zsh -lc 'rg -n "noUnusedLocals|noUnusedParameters" tsconfig*.json orchestrator package.json .' in /Users/kbediako/Code/CO exited 1 in 0ms:
+
+[run-review] waiting on codex review (4m 0s elapsed, 9s idle; review progress observed).
+
+
+thinking
+**Evaluating code opportunities**
+
+I'm wondering if this extraction could be an opportunity to fix something. I notice a subtle difference in how closed checks are handled: the old code used `runtimeLifecycle.isClosed()`, while the new queue checks `input.isClosed()`, which may treat `readRuntimeClosed` as false if it's null at runtime. After construction, it should be fine. I’m considering if there’s a missing test for "flushNotifications" — which might not really be a bug anyway. I’ll inspect the diff of the tests to see if the new unit tests retain previous integration tests.
+thinking
+**Reviewing minimality in abstraction**
+
+I’m thinking I need to review the minimality of this new abstraction. It appears small and targeted, which is good because it avoids unnecessary complexity. However, I might want to inspect `orchestrator/src/cli/control/telegramOversightBridgeProjectionDeliveryQueue.ts` to see if the interface export and functions are potentially over-abstracted. It doesn’t seem to be a bug, and I might not find anything significant. Before finalizing my thoughts, I should probably update my plan as well.
+thinking
+**Evaluating code opportunities**
+
+I'm wondering if this extraction could be an opportunity to fix something. I notice a subtle difference in how closed checks are handled: the old code used `runtimeLifecycle.isClosed()`, while the new queue checks `input.isClosed()`, which may treat `readRuntimeClosed` as false if it's null at runtime. After construction, it should be fine. I’m considering if there’s a missing test for "flushNotifications" — which might not really be a bug anyway. I’ll inspect the diff of the tests to see if the new unit tests retain previous integration tests.
+thinking
+**Reviewing minimality in abstraction**
+
+I’m thinking I need to review the minimality of this new abstraction. It appears small and targeted, which is good because it avoids unnecessary complexity. However, I might want to inspect `orchestrator/src/cli/control/telegramOversightBridgeProjectionDeliveryQueue.ts` to see if the interface export and functions are potentially over-abstracted. It doesn’t seem to be a bug, and I might not find anything significant. Before finalizing my thoughts, I should probably update my plan as well.
+Plan update
+Reviewed the diff, nearby projection notification/lifecycle/state-store code, and existing bridge tests for interleaving/cooldown/shutdown semantics. I did not find a discrete regression introduced by this extraction.
+  ✓ Inspect diff for touched Telegram oversight bridge files and tests
+  ✓ Analyze changed logic against nearby code for regressions or edge cases
+  → Produce JSON review findings with correctness verdict
+codex
+I did not identify a discrete correctness regression in the touched Telegram bridge extraction. The new queue shell preserves the previous serialization, closed/push gating, state-patch application, and shutdown flush behavior, while the added tests cover the extracted queue's main paths.
+Review output saved to: .runs/1146-coordinator-symphony-aligned-telegram-projection-delivery-queue-shell-extraction/cli/2026-03-13T01-54-09-884Z-9ecbaa78/review/output.log
+Review telemetry saved to: .runs/1146-coordinator-symphony-aligned-telegram-projection-delivery-queue-shell-extraction/cli/2026-03-13T01-54-09-884Z-9ecbaa78/review/telemetry.json

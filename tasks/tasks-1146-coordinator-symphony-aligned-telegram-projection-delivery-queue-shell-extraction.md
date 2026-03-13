@@ -20,21 +20,21 @@
 
 ## Telegram Projection Delivery Queue Shell Extraction
 
-- [ ] One dedicated helper owns the queued projection delivery runtime shell.
-- [ ] `telegramOversightBridge.ts` remains the public composition entrypoint and bridge-local state owner.
-- [ ] Focused regressions preserve serialized projection delivery and persisted-state write-through semantics.
+- [x] One dedicated helper owns the queued projection delivery runtime shell. Evidence: `orchestrator/src/cli/control/telegramOversightBridgeProjectionDeliveryQueue.ts`, `out/1146-coordinator-symphony-aligned-telegram-projection-delivery-queue-shell-extraction/manual/20260313T021256Z-closeout/11-manual-telegram-projection-delivery-check.md`
+- [x] `telegramOversightBridge.ts` remains the public composition entrypoint and bridge-local state owner. Evidence: `orchestrator/src/cli/control/telegramOversightBridge.ts`, `out/1146-coordinator-symphony-aligned-telegram-projection-delivery-queue-shell-extraction/manual/20260313T021256Z-closeout/11-manual-telegram-projection-delivery-check.md`
+- [x] Focused regressions preserve serialized projection delivery and persisted-state write-through semantics. Evidence: `orchestrator/tests/TelegramOversightBridgeProjectionDeliveryQueue.test.ts`, `orchestrator/tests/TelegramOversightBridge.test.ts`, `out/1146-coordinator-symphony-aligned-telegram-projection-delivery-queue-shell-extraction/manual/20260313T021256Z-closeout/05b-targeted-tests.log`
 
 ## Validation + Closeout
 
-- [ ] `node scripts/delegation-guard.mjs`
-- [ ] `node scripts/spec-guard.mjs --dry-run`
-- [ ] `npm run build`
-- [ ] `npm run lint`
-- [ ] `npm run test`
-- [ ] `npm run docs:check`
-- [ ] `npm run docs:freshness`
-- [ ] `node scripts/diff-budget.mjs`
-- [ ] `npm run review`
-- [ ] `npm run pack:smoke`
-- [ ] Manual/mock Telegram projection delivery evidence captured.
-- [ ] Elegance review completed.
+- [x] `node scripts/delegation-guard.mjs`. Evidence: `out/1146-coordinator-symphony-aligned-telegram-projection-delivery-queue-shell-extraction/manual/20260313T021256Z-closeout/01-delegation-guard.log`
+- [x] `node scripts/spec-guard.mjs --dry-run`. Evidence: `out/1146-coordinator-symphony-aligned-telegram-projection-delivery-queue-shell-extraction/manual/20260313T021256Z-closeout/02-spec-guard.log`
+- [x] `npm run build`. Evidence: `out/1146-coordinator-symphony-aligned-telegram-projection-delivery-queue-shell-extraction/manual/20260313T021256Z-closeout/03-build.log`
+- [x] `npm run lint`. Evidence: `out/1146-coordinator-symphony-aligned-telegram-projection-delivery-queue-shell-extraction/manual/20260313T021256Z-closeout/04-lint.log`
+- [x] `npm run test`. Evidence: `out/1146-coordinator-symphony-aligned-telegram-projection-delivery-queue-shell-extraction/manual/20260313T021256Z-closeout/05-test.log`
+- [x] `npm run docs:check`. Evidence: `out/1146-coordinator-symphony-aligned-telegram-projection-delivery-queue-shell-extraction/manual/20260313T021256Z-closeout/06-docs-check.log`
+- [x] `npm run docs:freshness`. Evidence: `out/1146-coordinator-symphony-aligned-telegram-projection-delivery-queue-shell-extraction/manual/20260313T021256Z-closeout/07-docs-freshness.log`
+- [x] `node scripts/diff-budget.mjs`. Evidence: `out/1146-coordinator-symphony-aligned-telegram-projection-delivery-queue-shell-extraction/manual/20260313T021256Z-closeout/08-diff-budget.log`
+- [x] `npm run review`. Evidence: `out/1146-coordinator-symphony-aligned-telegram-projection-delivery-queue-shell-extraction/manual/20260313T021256Z-closeout/09-review.log`
+- [x] `npm run pack:smoke`. Evidence: `out/1146-coordinator-symphony-aligned-telegram-projection-delivery-queue-shell-extraction/manual/20260313T021256Z-closeout/10-pack-smoke.log`
+- [x] Manual/mock Telegram projection delivery evidence captured. Evidence: `out/1146-coordinator-symphony-aligned-telegram-projection-delivery-queue-shell-extraction/manual/20260313T021256Z-closeout/11-manual-telegram-projection-delivery-check.md`
+- [x] Elegance review completed. Evidence: `out/1146-coordinator-symphony-aligned-telegram-projection-delivery-queue-shell-extraction/manual/20260313T021256Z-closeout/12-elegance-review.md`
