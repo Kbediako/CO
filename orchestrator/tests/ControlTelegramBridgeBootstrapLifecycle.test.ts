@@ -3,11 +3,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   createControlTelegramBridgeBootstrapLifecycle
 } from '../src/cli/control/controlTelegramBridgeBootstrapLifecycle.js';
+import { createControlOversightFacade } from '../src/cli/control/controlOversightFacade.js';
 import { createControlTelegramBridgeLifecycle } from '../src/cli/control/controlTelegramBridgeLifecycle.js';
 import {
   createControlServerBootstrapLifecycle
 } from '../src/cli/control/controlServerBootstrapLifecycle.js';
-import { createControlTelegramReadAdapter } from '../src/cli/control/controlTelegramReadAdapter.js';
 
 vi.mock('../src/cli/control/controlServerBootstrapLifecycle.js', () => ({
   createControlServerBootstrapLifecycle: vi.fn()
@@ -17,8 +17,8 @@ vi.mock('../src/cli/control/controlTelegramBridgeLifecycle.js', () => ({
   createControlTelegramBridgeLifecycle: vi.fn()
 }));
 
-vi.mock('../src/cli/control/controlTelegramReadAdapter.js', () => ({
-  createControlTelegramReadAdapter: vi.fn()
+vi.mock('../src/cli/control/controlOversightFacade.js', () => ({
+  createControlOversightFacade: vi.fn()
 }));
 
 describe('ControlTelegramBridgeBootstrapLifecycle', () => {
@@ -26,15 +26,16 @@ describe('ControlTelegramBridgeBootstrapLifecycle', () => {
     vi.clearAllMocks();
   });
 
-  it('builds the generic bootstrap lifecycle with a lazy Telegram read-adapter closure', () => {
+  it('builds the generic bootstrap lifecycle with a lazy oversight-facade closure', () => {
     const lifecycle = { start: vi.fn(), close: vi.fn() };
     const telegramBridgeLifecycle = { start: vi.fn(), close: vi.fn() };
     vi.mocked(createControlServerBootstrapLifecycle).mockReturnValue(lifecycle as never);
     vi.mocked(createControlTelegramBridgeLifecycle).mockReturnValue(telegramBridgeLifecycle as never);
-    vi.mocked(createControlTelegramReadAdapter).mockReturnValue({
+    vi.mocked(createControlOversightFacade).mockReturnValue({
       readSelectedRun: vi.fn(),
       readDispatch: vi.fn(),
-      readQuestions: vi.fn()
+      readQuestions: vi.fn(),
+      subscribe: vi.fn()
     } as never);
 
     const emitDispatchPilotAuditEvents = vi.fn(async () => undefined);
@@ -80,18 +81,19 @@ describe('ControlTelegramBridgeBootstrapLifecycle', () => {
 
     const bridgeLifecycleInput = vi.mocked(createControlTelegramBridgeLifecycle).mock.calls[0]?.[0];
     expect(bridgeLifecycleInput?.runDir).toBe('/tmp/run');
-    expect(bridgeLifecycleInput?.controlRuntime).toBe(requestContextShared.runtime);
+    expect(bridgeLifecycleInput?.createOversightFacade).toBeTypeOf('function');
+    expect(createControlOversightFacade).not.toHaveBeenCalled();
 
-    bridgeLifecycleInput?.createTelegramReadAdapter();
-    expect(createControlTelegramReadAdapter).toHaveBeenCalledWith({
+    bridgeLifecycleInput?.createOversightFacade();
+    expect(createControlOversightFacade).toHaveBeenCalledWith({
       ...requestContextShared,
       expiryLifecycle,
       emitDispatchPilotAuditEvents
     });
 
     expiryLifecycle = null as never;
-    bridgeLifecycleInput?.createTelegramReadAdapter();
-    expect(createControlTelegramReadAdapter).toHaveBeenLastCalledWith({
+    bridgeLifecycleInput?.createOversightFacade();
+    expect(createControlOversightFacade).toHaveBeenLastCalledWith({
       ...requestContextShared,
       expiryLifecycle: null,
       emitDispatchPilotAuditEvents
