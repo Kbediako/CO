@@ -1,31 +1,21 @@
 import { describe, expect, it } from 'vitest';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import type { PlanItem, TaskContext } from '../src/types.js';
-import { CodexOrchestrator } from '../src/cli/orchestrator.js';
-import type { PipelineDefinition } from '../src/cli/types.js';
+import type { CliManifest, PipelineDefinition } from '../src/cli/types.js';
+import { buildCloudPrompt } from '../src/cli/services/orchestratorCloudTargetExecutor.js';
+
 function invokeBuildCloudPrompt(params: {
   task: TaskContext;
   target: PlanItem;
   pipeline: PipelineDefinition;
-  manifest: Record<string, unknown>;
+  manifest: Pick<CliManifest, 'prompt_packs'>;
 }): string {
-  const orchestrator = new CodexOrchestrator({
-    repoRoot: tmpdir(),
-    runsRoot: join(tmpdir(), 'runs'),
-    outRoot: join(tmpdir(), 'out'),
-    taskId: params.task.id
+  return buildCloudPrompt({
+    task: params.task,
+    target: params.target,
+    pipeline: params.pipeline,
+    stage: params.pipeline.stages[0],
+    manifest: params.manifest
   });
-  const method = (orchestrator as unknown as {
-    buildCloudPrompt: (
-      task: TaskContext,
-      target: PlanItem,
-      pipeline: PipelineDefinition,
-      stage: PipelineDefinition['stages'][number],
-      manifest: Record<string, unknown>
-    ) => string;
-  }).buildCloudPrompt;
-  return method.call(orchestrator, params.task, params.target, params.pipeline, params.pipeline.stages[0], params.manifest);
 }
 describe('buildCloudPrompt experience injection', () => {
   const task: TaskContext = {

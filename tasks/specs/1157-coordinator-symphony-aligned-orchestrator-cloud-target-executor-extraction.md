@@ -1,7 +1,7 @@
 ---
 id: 20260313-1157-coordinator-symphony-aligned-orchestrator-cloud-target-executor-extraction
 title: Coordinator Symphony-Aligned Orchestrator Cloud-Target Executor Extraction
-status: active
+status: completed
 owners:
   - Codex
 created: 2026-03-13
@@ -39,3 +39,4 @@ Extract the remaining cloud-only target executor body from `orchestrator.ts` aft
 - 2026-03-13: Registered after `1156` completed. The next truthful seam is the cloud-only target executor cluster in `orchestrator.ts`, not a prompt-only extraction or another broad lifecycle refactor. Evidence: `out/1156-coordinator-symphony-aligned-orchestrator-execution-mode-lifecycle-shell-extraction/manual/20260313T120356Z-closeout/14-next-slice-note.md`, `docs/findings/1157-orchestrator-cloud-target-executor-extraction-deliberation.md`.
 - 2026-03-13: Pre-implementation local read-only review approved for docs-first registration. Evidence: `docs/findings/1157-orchestrator-cloud-target-executor-extraction-deliberation.md`.
 - 2026-03-13: Deterministic docs-first guards are green. The manifest-backed `docs-review` reached the reviewer with delegation guard satisfied but drifted into nearby code inspection instead of completing a docs-only pass, so the lane is registered with an explicit docs-review override. Evidence: `out/1157-coordinator-symphony-aligned-orchestrator-cloud-target-executor-extraction/manual/20260313T122837Z-docs-first/00-summary.md`, `out/1157-coordinator-symphony-aligned-orchestrator-cloud-target-executor-extraction/manual/20260313T122837Z-docs-first/04-docs-review-override.md`.
+- 2026-03-13: Completed. `orchestrator.ts` now delegates the cloud-only target runner through `orchestratorCloudTargetExecutor.ts`, focused cloud regressions passed `10/10`, the full suite passed `208/208` files and `1465/1465` tests, and pack-smoke passed. The standalone review wrapper remained an explicit override after bounded diff-local drift without surfacing a concrete `1157` defect. Evidence: `out/1157-coordinator-symphony-aligned-orchestrator-cloud-target-executor-extraction/manual/20260313T124615Z-closeout/00-summary.md`, `out/1157-coordinator-symphony-aligned-orchestrator-cloud-target-executor-extraction/manual/20260313T124615Z-closeout/05b-targeted-tests.log`, `out/1157-coordinator-symphony-aligned-orchestrator-cloud-target-executor-extraction/manual/20260313T124615Z-closeout/05-test.log`, `out/1157-coordinator-symphony-aligned-orchestrator-cloud-target-executor-extraction/manual/20260313T124615Z-closeout/10-pack-smoke.log`, `out/1157-coordinator-symphony-aligned-orchestrator-cloud-target-executor-extraction/manual/20260313T124615Z-closeout/13-override-notes.md`.
