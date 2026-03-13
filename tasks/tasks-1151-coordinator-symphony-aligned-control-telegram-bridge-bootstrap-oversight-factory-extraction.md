@@ -20,21 +20,21 @@
 
 ## Control Telegram Bridge Bootstrap Oversight Factory Extraction
 
-- [ ] One adjacent helper/factory replaces the inline lazy oversight-facade assembly in `controlTelegramBridgeBootstrapLifecycle.ts`.
-- [ ] `controlTelegramBridgeBootstrapLifecycle.ts` consumes the extracted helper without changing the downstream callback contract.
-- [ ] Focused helper/bootstrap regressions preserve the existing runtime behavior.
+- [x] One adjacent helper/factory replaces the inline lazy oversight-facade assembly in `controlTelegramBridgeBootstrapLifecycle.ts`. Evidence: `orchestrator/src/cli/control/controlTelegramBridgeOversightFacadeFactory.ts`
+- [x] `controlTelegramBridgeBootstrapLifecycle.ts` consumes the extracted helper without changing the downstream callback contract. Evidence: `orchestrator/src/cli/control/controlTelegramBridgeBootstrapLifecycle.ts`, `out/1151-coordinator-symphony-aligned-control-telegram-bridge-bootstrap-oversight-factory-extraction/manual/20260313T070606Z-closeout/11-manual-bootstrap-oversight-factory-check.json`
+- [x] Focused helper/bootstrap regressions preserve the existing runtime behavior. Evidence: `out/1151-coordinator-symphony-aligned-control-telegram-bridge-bootstrap-oversight-factory-extraction/manual/20260313T070606Z-closeout/05b-targeted-tests.log`
 
 ## Validation + Closeout
 
-- [ ] `node scripts/delegation-guard.mjs`
-- [ ] `node scripts/spec-guard.mjs --dry-run`
-- [ ] `npm run build`
-- [ ] `npm run lint`
-- [ ] `npm run test`
-- [ ] `npm run docs:check`
-- [ ] `npm run docs:freshness`
-- [ ] `node scripts/diff-budget.mjs`
-- [ ] `npm run review`
-- [ ] `npm run pack:smoke`
-- [ ] Manual/mock bootstrap oversight-factory evidence captured.
-- [ ] Elegance review completed.
+- [x] `node scripts/delegation-guard.mjs` Evidence: `out/1151-coordinator-symphony-aligned-control-telegram-bridge-bootstrap-oversight-factory-extraction/manual/20260313T070606Z-closeout/01-delegation-guard.log`, `.runs/1151-coordinator-symphony-aligned-control-telegram-bridge-bootstrap-oversight-factory-extraction-docs-guard/cli/2026-03-13T06-50-03-985Z-8eea14d7/manifest.json`
+- [x] `node scripts/spec-guard.mjs --dry-run` Evidence: `out/1151-coordinator-symphony-aligned-control-telegram-bridge-bootstrap-oversight-factory-extraction/manual/20260313T070606Z-closeout/02-spec-guard.log`
+- [x] `npm run build` Evidence: `out/1151-coordinator-symphony-aligned-control-telegram-bridge-bootstrap-oversight-factory-extraction/manual/20260313T070606Z-closeout/03-build.log`
+- [x] `npm run lint` Evidence: `out/1151-coordinator-symphony-aligned-control-telegram-bridge-bootstrap-oversight-factory-extraction/manual/20260313T070606Z-closeout/04-lint.log`
+- [x] `npm run test` Evidence: `out/1151-coordinator-symphony-aligned-control-telegram-bridge-bootstrap-oversight-factory-extraction/manual/20260313T070606Z-closeout/05-test.log`
+- [x] `npm run docs:check` Evidence: `out/1151-coordinator-symphony-aligned-control-telegram-bridge-bootstrap-oversight-factory-extraction/manual/20260313T070606Z-closeout/06-docs-check.log`
+- [x] `npm run docs:freshness` Evidence: `out/1151-coordinator-symphony-aligned-control-telegram-bridge-bootstrap-oversight-factory-extraction/manual/20260313T070606Z-closeout/07-docs-freshness.log`
+- [x] `node scripts/diff-budget.mjs` Evidence: `out/1151-coordinator-symphony-aligned-control-telegram-bridge-bootstrap-oversight-factory-extraction/manual/20260313T070606Z-closeout/08-diff-budget.log`, `out/1151-coordinator-symphony-aligned-control-telegram-bridge-bootstrap-oversight-factory-extraction/manual/20260313T070606Z-closeout/13-override-notes.md`
+- [x] `npm run review` Evidence: `out/1151-coordinator-symphony-aligned-control-telegram-bridge-bootstrap-oversight-factory-extraction/manual/20260313T070606Z-closeout/09-review.log`, `out/1151-coordinator-symphony-aligned-control-telegram-bridge-bootstrap-oversight-factory-extraction/manual/20260313T070606Z-closeout/13-override-notes.md`
+- [x] `npm run pack:smoke` Evidence: `out/1151-coordinator-symphony-aligned-control-telegram-bridge-bootstrap-oversight-factory-extraction/manual/20260313T070606Z-closeout/10-pack-smoke.log`
+- [x] Manual/mock bootstrap oversight-factory evidence captured. Evidence: `out/1151-coordinator-symphony-aligned-control-telegram-bridge-bootstrap-oversight-factory-extraction/manual/20260313T070606Z-closeout/11-manual-bootstrap-oversight-factory-check.json`
+- [x] Elegance review completed. Evidence: `out/1151-coordinator-symphony-aligned-control-telegram-bridge-bootstrap-oversight-factory-extraction/manual/20260313T070606Z-closeout/12-elegance-review.md`
