@@ -85,6 +85,7 @@ import {
   type OrchestratorAutoScoutOutcome,
   type OrchestratorExecutionRouteOptions
 } from './services/orchestratorExecutionRouter.js';
+import { createOrchestratorRunLifecycleExecutionRegistration } from './services/orchestratorRunLifecycleExecutionRegistration.js';
 
 const resolveBaseEnvironment = (): EnvironmentPaths =>
   normalizeEnvironmentPaths(resolveEnvironmentPaths());
@@ -569,38 +570,23 @@ export class CodexOrchestrator {
       runtimeModeSource,
       executionModeOverride
     } = context;
-    let latestPipelineResult: PipelineRunExecutionResult | null = null;
-    const executingByKey = new Map<string, Promise<PipelineRunExecutionResult>>();
-    const executePipeline: PipelineExecutor = async (input) => {
-      const key = `${input.mode}:${input.target.id}`;
-      const existing = executingByKey.get(key);
-      if (existing) {
-        return existing;
-      }
-      const executing = this.executePipeline({
-        env,
-        pipeline,
-        manifest,
-        paths,
-        mode: input.mode,
-        runtimeModeRequested,
-        runtimeModeSource,
-        executionModeOverride,
-        target: input.target,
-        task: taskContext,
-        runEvents: context.runEvents,
-        eventStream: context.eventStream,
-        onEventEntry: context.onEventEntry,
-        persister,
-        envOverrides
-      }).then((result) => {
-        latestPipelineResult = result;
-        return result;
-      });
-      executingByKey.set(key, executing);
-      return executing;
-    };
-    const getResult = () => latestPipelineResult;
+
+    const { executePipeline, getResult } = createOrchestratorRunLifecycleExecutionRegistration({
+      env,
+      pipeline,
+      manifest,
+      paths,
+      taskContext,
+      runEvents: context.runEvents,
+      eventStream: context.eventStream,
+      onEventEntry: context.onEventEntry,
+      persister,
+      envOverrides,
+      runtimeModeRequested,
+      runtimeModeSource,
+      executionModeOverride,
+      executePipeline: (options) => this.executePipeline(options)
+    });
     const manager = this.createTaskManager(
       runId,
       pipeline,
