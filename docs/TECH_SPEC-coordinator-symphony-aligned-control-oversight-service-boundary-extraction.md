@@ -6,7 +6,7 @@ The post-`1146` Telegram path already has thinner bridge-local helpers, but Tele
 
 - runtime subscription in `controlTelegramBridgeLifecycle.ts`
 - bootstrap-side read assembly in `controlTelegramBridgeBootstrapLifecycle.ts`
-- selected-run/dispatch/question read assembly in `controlTelegramReadAdapter.ts`, `controlTelegramDispatchRead.ts`, and `controlTelegramQuestionRead.ts`
+- selected-run/dispatch/question read assembly in the current coordinator-owned `controlOversightReadService.ts` seam plus `controlTelegramDispatchRead.ts` and `controlTelegramQuestionRead.ts`
 
 That means the remaining structural seam is no longer a Telegram-only bridge helper. It is a coordinator-owned oversight boundary that packages the current Telegram consumer contract behind one facade.
 

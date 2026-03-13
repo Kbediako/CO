@@ -20,7 +20,7 @@
 
 ## Telegram Read-Adapter Factory
 
-- [x] Telegram oversight read-adapter factory extracted behind one bounded helper. Evidence: `orchestrator/src/cli/control/controlTelegramReadAdapter.ts`, `orchestrator/tests/ControlTelegramReadAdapter.test.ts`.
+- [x] Telegram oversight read-adapter factory extracted behind one bounded helper. Historical seam later renamed in `1148` to the coordinator-owned `orchestrator/src/cli/control/controlOversightReadService.ts` and `orchestrator/tests/ControlOversightReadService.test.ts`.
 - [x] `controlServer.ts` delegates `createTelegramOversightReadAdapter()` to the extracted helper while preserving existing lifecycle and transport ownership. Evidence: `orchestrator/src/cli/control/controlServer.ts`, `out/1078-coordinator-symphony-aligned-telegram-oversight-read-adapter-factory-extraction/manual/20260309T051949Z-closeout/11-manual-telegram-read-adapter-check.json`.
 - [x] Existing Telegram selected-run, `/dispatch`, and `/questions` behavior remain intact under focused regressions. Evidence: `orchestrator/tests/TelegramOversightBridge.test.ts`, `orchestrator/tests/ControlTelegramDispatchRead.test.ts`, `orchestrator/tests/ControlTelegramQuestionRead.test.ts`, `out/1078-coordinator-symphony-aligned-telegram-oversight-read-adapter-factory-extraction/manual/20260309T051949Z-closeout/05b-targeted-tests.log`.
 

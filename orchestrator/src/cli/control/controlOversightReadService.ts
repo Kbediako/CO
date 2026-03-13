@@ -9,7 +9,7 @@ import type {
 import type { DispatchPilotEvaluation } from './trackerDispatchPilot.js';
 import type { ControlRequestContext, ControlRequestSharedContext } from './controlRequestContext.js';
 
-export interface ControlTelegramReadAdapterContext extends ControlRequestSharedContext {
+export interface ControlOversightReadServiceContext extends ControlRequestSharedContext {
   expiryLifecycle: ControlExpiryLifecycle | null;
   emitDispatchPilotAuditEvents(
     context: ControlRequestContext,
@@ -21,8 +21,8 @@ export interface ControlTelegramReadAdapterContext extends ControlRequestSharedC
   ): Promise<void>;
 }
 
-export function createControlTelegramReadAdapter(
-  context: ControlTelegramReadAdapterContext
+export function createControlOversightReadService(
+  context: ControlOversightReadServiceContext
 ): TelegramOversightReadAdapter {
   return {
     readSelectedRun: async () => context.runtime.snapshot().readSelectedRunSnapshot(),

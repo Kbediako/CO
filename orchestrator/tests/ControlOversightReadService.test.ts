@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { readControlTelegramDispatch } from '../src/cli/control/controlTelegramDispatchRead.js';
 import { readControlTelegramQuestions } from '../src/cli/control/controlTelegramQuestionRead.js';
-import { createControlTelegramReadAdapter } from '../src/cli/control/controlTelegramReadAdapter.js';
+import { createControlOversightReadService } from '../src/cli/control/controlOversightReadService.js';
 
 vi.mock('../src/cli/control/controlTelegramDispatchRead.js', () => ({
   readControlTelegramDispatch: vi.fn()
@@ -12,12 +12,12 @@ vi.mock('../src/cli/control/controlTelegramQuestionRead.js', () => ({
   readControlTelegramQuestions: vi.fn()
 }));
 
-describe('ControlTelegramReadAdapter', () => {
+describe('ControlOversightReadService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('builds the Telegram read adapter from runtime selected-run reads plus the extracted helper seams', async () => {
+  it('builds the coordinator-owned oversight read service from runtime selected-run reads plus the existing helper seams', async () => {
     const selectedRun = {
       selected: { issueId: 'task-1078' },
       dispatchPilot: null,
@@ -60,17 +60,17 @@ describe('ControlTelegramReadAdapter', () => {
       emitDispatchPilotAuditEvents
     };
 
-    const adapter = createControlTelegramReadAdapter(context as never);
+    const service = createControlOversightReadService(context as never);
 
-    await expect(adapter.readSelectedRun()).resolves.toEqual(selectedRun);
-    await expect(adapter.readDispatch()).resolves.toEqual({
+    await expect(service.readSelectedRun()).resolves.toEqual(selectedRun);
+    await expect(service.readDispatch()).resolves.toEqual({
       dispatch_pilot: {
         status: 'ready',
         source_status: 'ready',
         reason: 'signal_threshold_met'
       }
     });
-    await expect(adapter.readQuestions()).resolves.toEqual({
+    await expect(service.readQuestions()).resolves.toEqual({
       questions: [{ question_id: 'q-1078', prompt: 'Continue?' }]
     });
 

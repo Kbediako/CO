@@ -1,9 +1,9 @@
 import type { ControlSelectedRunRuntimeSnapshot } from './observabilityReadModel.js';
 import type { ObservabilityUpdateListener } from './observabilityUpdateNotifier.js';
 import {
-  createControlTelegramReadAdapter,
-  type ControlTelegramReadAdapterContext
-} from './controlTelegramReadAdapter.js';
+  createControlOversightReadService,
+  type ControlOversightReadServiceContext
+} from './controlOversightReadService.js';
 import type { ControlDispatchPayload, QuestionsPayload } from './telegramOversightBridge.js';
 
 export interface ControlOversightFacade {
@@ -14,11 +14,11 @@ export interface ControlOversightFacade {
 }
 
 export function createControlOversightFacade(
-  context: ControlTelegramReadAdapterContext
+  context: ControlOversightReadServiceContext
 ): ControlOversightFacade {
-  const readAdapter = createControlTelegramReadAdapter(context);
+  const readService = createControlOversightReadService(context);
   return {
-    ...readAdapter,
+    ...readService,
     subscribe: (listener) => context.runtime.subscribe(listener)
   };
 }

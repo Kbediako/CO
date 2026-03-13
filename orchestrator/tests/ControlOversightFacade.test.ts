@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createControlOversightFacade } from '../src/cli/control/controlOversightFacade.js';
-import { createControlTelegramReadAdapter } from '../src/cli/control/controlTelegramReadAdapter.js';
+import { createControlOversightReadService } from '../src/cli/control/controlOversightReadService.js';
 
-vi.mock('../src/cli/control/controlTelegramReadAdapter.js', () => ({
-  createControlTelegramReadAdapter: vi.fn()
+vi.mock('../src/cli/control/controlOversightReadService.js', () => ({
+  createControlOversightReadService: vi.fn()
 }));
 
 describe('ControlOversightFacade', () => {
@@ -12,8 +12,8 @@ describe('ControlOversightFacade', () => {
     vi.clearAllMocks();
   });
 
-  it('composes the telegram read seam with runtime subscription', async () => {
-    const readAdapter = {
+  it('composes the coordinator-owned oversight read service with runtime subscription', async () => {
+    const readService = {
       readSelectedRun: vi
         .fn()
         .mockResolvedValueOnce({
@@ -31,7 +31,7 @@ describe('ControlOversightFacade', () => {
     };
     const unsubscribe = vi.fn();
     const subscribe = vi.fn(() => unsubscribe);
-    vi.mocked(createControlTelegramReadAdapter).mockReturnValue(readAdapter as never);
+    vi.mocked(createControlOversightReadService).mockReturnValue(readService as never);
 
     const context = {
       runtime: {
@@ -61,10 +61,10 @@ describe('ControlOversightFacade', () => {
     const listener = vi.fn();
     expect(facade.subscribe(listener)).toBe(unsubscribe);
 
-    expect(createControlTelegramReadAdapter).toHaveBeenCalledWith(context);
-    expect(readAdapter.readSelectedRun).toHaveBeenCalledTimes(2);
-    expect(readAdapter.readDispatch).toHaveBeenCalledOnce();
-    expect(readAdapter.readQuestions).toHaveBeenCalledOnce();
+    expect(createControlOversightReadService).toHaveBeenCalledWith(context);
+    expect(readService.readSelectedRun).toHaveBeenCalledTimes(2);
+    expect(readService.readDispatch).toHaveBeenCalledOnce();
+    expect(readService.readQuestions).toHaveBeenCalledOnce();
     expect(subscribe).toHaveBeenCalledWith(listener);
   });
 });
