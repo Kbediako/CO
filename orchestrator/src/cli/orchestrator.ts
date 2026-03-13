@@ -49,15 +49,6 @@ import { PipelineResolver } from './services/pipelineResolver.js';
 import { ControlPlaneService } from './services/controlPlaneService.js';
 import { SchedulerService } from './services/schedulerService.js';
 import {
-  applyRuntimeToRunSummary,
-  applyHandlesToRunSummary,
-  applyPrivacyToRunSummary,
-  applyCloudExecutionToRunSummary,
-  applyCloudFallbackToRunSummary,
-  applyUsageKpiToRunSummary,
-  persistRunSummary
-} from './services/runSummaryWriter.js';
-import {
   prepareRun,
   resolvePipelineForResume,
   overrideTaskEnvironment
@@ -86,6 +77,7 @@ import {
   type OrchestratorExecutionRouteOptions
 } from './services/orchestratorExecutionRouter.js';
 import { createOrchestratorRunLifecycleExecutionRegistration } from './services/orchestratorRunLifecycleExecutionRegistration.js';
+import { completeOrchestratorRunLifecycle } from './services/orchestratorRunLifecycleCompletion.js';
 
 const resolveBaseEnvironment = (): EnvironmentPaths =>
   normalizeEnvironmentPaths(resolveEnvironmentPaths());
@@ -630,35 +622,21 @@ export class CodexOrchestrator {
       });
       throw error;
     }
-
-
-    await this.scheduler.finalizePlan({
+    return await completeOrchestratorRunLifecycle({
+      env,
+      pipeline,
       manifest,
       paths,
-      plan: schedulerPlan,
-      persister
+      runSummary,
+      schedulerPlan,
+      controlPlaneResult,
+      runEvents: context.runEvents,
+      persister,
+      finalizePlan: (options) => this.scheduler.finalizePlan(options),
+      applySchedulerToRunSummary: (summary, plan) => this.scheduler.applySchedulerToRunSummary(summary, plan),
+      applyControlPlaneToRunSummary: (summary, result) =>
+        this.controlPlane.applyControlPlaneToRunSummary(summary, result)
     });
-
-    this.scheduler.applySchedulerToRunSummary(runSummary, schedulerPlan);
-    applyRuntimeToRunSummary(runSummary, manifest);
-    applyHandlesToRunSummary(runSummary, manifest);
-    applyPrivacyToRunSummary(runSummary, manifest);
-    applyCloudExecutionToRunSummary(runSummary, manifest);
-    applyCloudFallbackToRunSummary(runSummary, manifest);
-    applyUsageKpiToRunSummary(runSummary, manifest);
-    this.controlPlane.applyControlPlaneToRunSummary(runSummary, controlPlaneResult);
-
-    await persistRunSummary(env, paths, manifest, runSummary, persister);
-    context.runEvents?.runCompleted({
-      pipelineId: pipeline.id,
-      status: manifest.status,
-      manifestPath: paths.manifestPath,
-      runSummaryPath: manifest.run_summary_path,
-      metricsPath: join(env.runsRoot, env.taskId, 'metrics.json'),
-      summary: manifest.summary ?? null
-    });
-
-    return { manifest, runSummary };
   }
 
   private attachPlanTargetTracker(
