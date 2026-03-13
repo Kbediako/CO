@@ -1,0 +1,11 @@
+# Manual Tasks Archive Fallback
+
+`npm run docs:archive-tasks` could not auto-archive the oldest retained historical snapshot on the current tree because `scripts/tasks-archive.mjs` did not detect any eligible sections in the modern inline `docs/TASKS.md` format. To keep `docs/TASKS.md` under the line cap for the new `1164` docs-first registration, the oldest retained historical snapshot was moved out of the live snapshot file manually for this lane and preserved here.
+
+Archived snapshot:
+
+```md
+# Task List Snapshot — Manifest Persister Throughput (0935-manifest-persister-throughput)
+- **Update — 2026-01-06:** Implementation-gate complete via `.runs/0935-manifest-persister-throughput/cli/2026-01-05T23-58-37-316Z-069c2fc7/manifest.json`; docs-review via `.runs/0935-manifest-persister-throughput/cli/2026-01-06T00-38-50-402Z-120c37a4/manifest.json`; diagnostics + RLM via `.runs/0935-manifest-persister-throughput/cli/2026-01-05T23-49-32-830Z-56caf5aa/manifest.json` and `.runs/0935-manifest-persister-throughput/cli/2026-01-05T23-50-53-932Z-8c859dc0/manifest.json`. Notes: export `MCP_RUNNER_TASK_ID=0935-manifest-persister-throughput`; guardrails required: `node scripts/spec-guard.mjs --dry-run`, `npm run build`, `npm run lint`, `npm run test`, `npm run docs:check`, `npm run docs:freshness`, `node scripts/diff-budget.mjs`, `npm run review`.
+- Checklist mirror: `tasks/tasks-0935-manifest-persister-throughput.md`, `.agent/task/0935-manifest-persister-throughput.md` (keep `[ ]` until evidence). [x] Foundation: `.runs/0935-manifest-persister-throughput-scout/cli/2026-01-05T23-40-50-659Z-0f65b4b0/manifest.json`, `.runs/0935-manifest-persister-throughput/cli/2026-01-06T00-38-50-402Z-120c37a4/manifest.json`, `docs/TASKS.md`, `.agent/task/0935-manifest-persister-throughput.md`, `tasks/index.json`, `docs/docs-freshness-registry.json`. [x] Discovery: `.runs/0935-manifest-persister-throughput/cli/2026-01-05T23-49-32-830Z-56caf5aa/manifest.json`, `.runs/0935-manifest-persister-throughput/cli/2026-01-05T23-50-53-932Z-8c859dc0/manifest.json`. [x] Implementation: `.runs/0935-manifest-persister-throughput/cli/2026-01-05T23-58-37-316Z-069c2fc7/manifest.json`. [x] Validation: `.runs/0935-manifest-persister-throughput/cli/2026-01-05T23-58-37-316Z-069c2fc7/manifest.json`.
+```
