@@ -12,6 +12,10 @@ import {
   type ControlTelegramProjectionNotificationController
 } from './controlTelegramProjectionNotificationController.js';
 import {
+  createControlTelegramPollingController,
+  type ControlTelegramPollingController
+} from './controlTelegramPollingController.js';
+import {
   createControlTelegramUpdateHandler,
   type ControlTelegramUpdateHandler
 } from './controlTelegramUpdateHandler.js';
@@ -26,8 +30,7 @@ import {
 import {
   createTelegramOversightApiClient,
   type TelegramBotIdentity,
-  type TelegramOversightApiClient,
-  type TelegramUpdate
+  type TelegramOversightApiClient
 } from './telegramOversightApiClient.js';
 import { createTelegramOversightControlActionApiClient } from './telegramOversightControlActionApiClient.js';
 import {
@@ -37,7 +40,6 @@ import {
   type TelegramOversightBridgeStateStore
 } from './telegramOversightBridgeStateStore.js';
 const DEFAULT_POLL_INTERVAL_MS = 1_000;
-const DEFAULT_POLL_TIMEOUT_SECONDS = 20;
 const DEFAULT_PUSH_COOLDOWN_MS = 30_000;
 
 interface TelegramOversightBridgeConfig {
@@ -135,11 +137,11 @@ class TelegramOversightBridgeRuntime implements TelegramOversightBridge {
   private readonly telegramClient: TelegramOversightApiClient;
   private readonly commandController: ControlTelegramCommandController;
   private readonly updateHandler: ControlTelegramUpdateHandler;
+  private readonly pollingController: ControlTelegramPollingController;
   private readonly projectionNotificationController: ControlTelegramProjectionNotificationController;
 
   private closed = false;
   private loopPromise: Promise<void> | null = null;
-  private activeController: AbortController | null = null;
   private state: TelegramOversightBridgeState = createDefaultTelegramOversightState();
   private botIdentity: TelegramBotIdentity | null = null;
   private notificationQueue: Promise<void> = Promise.resolve();
@@ -177,6 +179,11 @@ class TelegramOversightBridgeRuntime implements TelegramOversightBridge {
       commandController: this.commandController,
       sendMessage: (chatId, text) => this.telegramClient.sendMessage(chatId, text)
     });
+    this.pollingController = createControlTelegramPollingController({
+      pollIntervalMs: options.config.pollIntervalMs,
+      telegramClient: this.telegramClient,
+      updateHandler: this.updateHandler
+    });
     this.projectionNotificationController = createControlTelegramProjectionNotificationController({
       allowedChatIds: options.config.allowedChatIds,
       pushCooldownMs: options.config.pushCooldownMs,
@@ -193,15 +200,17 @@ class TelegramOversightBridgeRuntime implements TelegramOversightBridge {
         this.botIdentity.username ?? 'bot'
       }`
     );
-    this.loopPromise = this.pollLoop();
+    this.loopPromise = this.pollingController.run({
+      isClosed: () => this.closed,
+      readNextUpdateId: () => this.state.next_update_id,
+      persistNextUpdateId: (nextUpdateId, observedAt) => this.persistNextUpdateId(nextUpdateId, observedAt),
+      readBotUsername: () => this.botIdentity?.username ?? null
+    });
   }
 
   async close(): Promise<void> {
     this.closed = true;
-    if (this.activeController) {
-      this.activeController.abort();
-      this.activeController = null;
-    }
+    this.pollingController.abort();
     if (this.loopPromise) {
       await this.loopPromise;
       this.loopPromise = null;
@@ -230,71 +239,9 @@ class TelegramOversightBridgeRuntime implements TelegramOversightBridge {
     await this.notificationQueue;
   }
 
-  private async pollLoop(): Promise<void> {
-    while (!this.closed) {
-      try {
-        const updates = await this.fetchUpdates();
-        if (updates.length > 0) {
-          await this.handleUpdates(updates);
-        }
-      } catch (error) {
-        if (this.closed || isAbortError(error)) {
-          break;
-        }
-        logger.warn(`[telegram-oversight] polling failed: ${(error as Error)?.message ?? String(error)}`);
-      }
-      if (this.closed) {
-        break;
-      }
-      await delay(this.config.pollIntervalMs);
-    }
-  }
-
-  private async fetchUpdates(): Promise<TelegramUpdate[]> {
-    const controller = new AbortController();
-    this.activeController = controller;
-    try {
-      const timeout = Math.max(
-        DEFAULT_POLL_TIMEOUT_SECONDS,
-        Math.ceil((this.config.pollIntervalMs + 500) / 1_000)
-      );
-      return this.telegramClient.getUpdates({
-        offset: this.state.next_update_id,
-        timeoutSeconds: timeout,
-        signal: controller.signal
-      });
-    } finally {
-      if (this.activeController === controller) {
-        this.activeController = null;
-      }
-    }
-  }
-
-  private async handleUpdates(updates: TelegramUpdate[]): Promise<void> {
-    let nextUpdateId = this.state.next_update_id;
-    for (const update of updates) {
-      nextUpdateId = Math.max(nextUpdateId, update.update_id + 1);
-      try {
-        await this.handleUpdate(update);
-      } catch (error) {
-        logger.warn(
-          `[telegram-oversight] failed to handle update ${update.update_id}: ${
-            (error as Error)?.message ?? String(error)
-          }`
-        );
-      }
-    }
-    if (nextUpdateId !== this.state.next_update_id) {
-      this.state = advanceTelegramOversightBridgeStateNextUpdateId(this.state, nextUpdateId, new Date().toISOString());
-      await this.stateStore.saveState(this.state);
-    }
-  }
-
-  private async handleUpdate(update: TelegramUpdate): Promise<void> {
-    await this.updateHandler.handleUpdate({
-      update,
-      botUsername: this.botIdentity?.username ?? null
-    });
+  private async persistNextUpdateId(nextUpdateId: number, observedAt: string): Promise<void> {
+    this.state = advanceTelegramOversightBridgeStateNextUpdateId(this.state, nextUpdateId, observedAt);
+    await this.stateStore.saveState(this.state);
   }
 
   private async maybeSendProjectionDelta(input: {
@@ -360,12 +307,4 @@ function parsePositiveIntegerEnv(value: string | undefined, fallback: number): n
     return fallback;
   }
   return parsed;
-}
-
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-function isAbortError(error: unknown): boolean {
-  return error instanceof Error && error.name === 'AbortError';
 }
