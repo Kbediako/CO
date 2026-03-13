@@ -6697,8 +6697,10 @@ describe('ControlServer', () => {
     });
     const runtimeServer = server as unknown as {
       server: http.Server;
-      expiryLifecycle: { close(): void } | null;
-      bootstrapLifecycle: { close(): Promise<void> } | null;
+      lifecycleState: {
+        expiryLifecycle: { close(): void } | null;
+        bootstrapLifecycle: { close(): Promise<void> } | null;
+      };
       requestContextShared: { clients: Set<http.ServerResponse> };
     };
     const clientEnd = vi.fn(() => {
@@ -6721,8 +6723,8 @@ describe('ControlServer', () => {
       expect(bootstrapClose).toHaveBeenCalledOnce();
       expect(clientEnd).toHaveBeenCalledOnce();
       expect(order).toEqual(['expiry', 'bootstrap', 'client', 'server']);
-      expect(runtimeServer.expiryLifecycle).toBeNull();
-      expect(runtimeServer.bootstrapLifecycle).toBeNull();
+      expect(runtimeServer.lifecycleState.expiryLifecycle).toBeNull();
+      expect(runtimeServer.lifecycleState.bootstrapLifecycle).toBeNull();
     } finally {
       serverCloseSpy.mockRestore();
       bootstrapAssemblySpy.mockRestore();
