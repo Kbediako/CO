@@ -1,14 +1,19 @@
 import { logger } from '../../logger.js';
 import type { RunPaths } from '../run/runPaths.js';
-import type { ControlOversightFacade } from './controlOversightFacade.js';
+import type { ControlOversightReadContract } from './controlOversightReadContract.js';
+import type { ControlOversightUpdateContract } from './controlOversightUpdateContract.js';
 import {
   startTelegramOversightBridge,
   type TelegramOversightBridge
 } from './telegramOversightBridge.js';
 
+type ControlTelegramBridgeOversightContract =
+  ControlOversightReadContract &
+  ControlOversightUpdateContract;
+
 interface ControlTelegramBridgeLifecycleOptions {
   runDir: Pick<RunPaths, 'runDir'>['runDir'];
-  createOversightFacade: () => ControlOversightFacade;
+  createOversightFacade: () => ControlTelegramBridgeOversightContract;
   startTelegramBridgeImpl?: typeof startTelegramOversightBridge;
 }
 
@@ -30,11 +35,12 @@ export function createControlTelegramBridgeLifecycle(
 
 class ControlTelegramBridgeLifecycleRuntime implements ControlTelegramBridgeLifecycle {
   private readonly runDir: Pick<RunPaths, 'runDir'>['runDir'];
-  private readonly createOversightFacade: () => ControlOversightFacade;
+  private readonly createOversightFacade: () => ControlTelegramBridgeOversightContract;
   private readonly startTelegramBridgeImpl: typeof startTelegramOversightBridge;
 
   private telegramBridge: TelegramOversightBridge | null = null;
   private unsubscribeTelegramBridge: (() => void) | null = null;
+  private lifecycleOperation: Promise<void> = Promise.resolve();
 
   constructor(options: ControlTelegramBridgeLifecycleOptions) {
     this.runDir = options.runDir;
@@ -43,33 +49,52 @@ class ControlTelegramBridgeLifecycleRuntime implements ControlTelegramBridgeLife
   }
 
   async start(options: ControlTelegramBridgeLifecycleStartOptions): Promise<void> {
-    const oversightFacade = this.createOversightFacade();
-    const bridge = await this.startTelegramBridgeImpl({
-      runDir: this.runDir,
-      readAdapter: oversightFacade,
-      baseUrl: options.baseUrl,
-      controlToken: options.controlToken
+    await this.enqueueLifecycleOperation(async () => {
+      await this.closeActiveBridge();
+      const oversightFacade = this.createOversightFacade();
+      const bridge = await this.startTelegramBridgeImpl({
+        runDir: this.runDir,
+        readAdapter: oversightFacade,
+        baseUrl: options.baseUrl,
+        controlToken: options.controlToken
+      });
+      if (!bridge) {
+        return;
+      }
+      await this.attachTelegramBridge(bridge, oversightFacade);
     });
-    if (!bridge) {
-      return;
-    }
-    await this.attachTelegramBridge(bridge, oversightFacade);
   }
 
   async close(): Promise<void> {
+    await this.enqueueLifecycleOperation(async () => {
+      await this.closeActiveBridge();
+    });
+  }
+
+  private enqueueLifecycleOperation(operation: () => Promise<void>): Promise<void> {
+    const nextOperation = this.lifecycleOperation.then(operation, operation);
+    this.lifecycleOperation = nextOperation.then(
+      () => undefined,
+      () => undefined
+    );
+    return nextOperation;
+  }
+
+  private async closeActiveBridge(): Promise<void> {
     this.unsubscribeTelegramBridge?.();
     this.unsubscribeTelegramBridge = null;
-    if (this.telegramBridge) {
-      await this.telegramBridge.close().catch((error) => {
+    const bridge = this.telegramBridge;
+    this.telegramBridge = null;
+    if (bridge) {
+      await bridge.close().catch((error) => {
         logger.warn(`Failed to close Telegram oversight bridge: ${(error as Error)?.message ?? String(error)}`);
       });
-      this.telegramBridge = null;
     }
   }
 
   private async attachTelegramBridge(
     bridge: TelegramOversightBridge,
-    oversightFacade: ControlOversightFacade
+    oversightFacade: ControlTelegramBridgeOversightContract
   ): Promise<void> {
     try {
       this.unsubscribeTelegramBridge = oversightFacade.subscribe((input) =>

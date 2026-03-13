@@ -1,13 +1,13 @@
-import type { ObservabilityUpdateListener } from './observabilityUpdateNotifier.js';
 import {
   createControlOversightReadService,
   type ControlOversightReadServiceContext
 } from './controlOversightReadService.js';
 import type { ControlOversightReadContract } from './controlOversightReadContract.js';
+import type { ControlOversightUpdateContract } from './controlOversightUpdateContract.js';
 
-export interface ControlOversightFacade extends ControlOversightReadContract {
-  subscribe(listener: ObservabilityUpdateListener): () => void;
-}
+export type ControlOversightFacade =
+  ControlOversightReadContract &
+  ControlOversightUpdateContract;
 
 export function createControlOversightFacade(
   context: ControlOversightReadServiceContext
