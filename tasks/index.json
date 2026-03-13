@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260313-1148-coordinator-symphony-aligned-control-oversight-read-service-boundary-extraction",
+      "title": "Coordinator Symphony-Aligned Control Oversight Read Service Boundary Extraction",
+      "relates_to": "tasks/tasks-1148-coordinator-symphony-aligned-control-oversight-read-service-boundary-extraction.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-13",
+      "paths": {
+        "spec": "tasks/specs/1148-coordinator-symphony-aligned-control-oversight-read-service-boundary-extraction.md",
+        "task": "tasks/tasks-1148-coordinator-symphony-aligned-control-oversight-read-service-boundary-extraction.md",
+        "agent_task": ".agent/task/1148-coordinator-symphony-aligned-control-oversight-read-service-boundary-extraction.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-control-oversight-read-service-boundary-extraction.md"
+      }
+    },
+    {
       "id": "20260313-1147-coordinator-symphony-aligned-control-oversight-service-boundary-extraction",
       "title": "Coordinator Symphony-Aligned Control Oversight Service Boundary Extraction",
       "relates_to": "tasks/tasks-1147-coordinator-symphony-aligned-control-oversight-service-boundary-extraction.md",
