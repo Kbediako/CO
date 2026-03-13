@@ -3,13 +3,16 @@ import http from 'node:http';
 import type { RunPaths } from '../run/runPaths.js';
 import type { EffectiveDelegationConfig } from '../config/delegationConfig.js';
 import type { RunEventStream, RunEventStreamEntry } from '../events/runEventStream.js';
-import { type ControlExpiryLifecycle } from './controlExpiryLifecycle.js';
-import { type ControlServerBootstrapLifecycle } from './controlServerBootstrapLifecycle.js';
+import type { ControlExpiryLifecycle } from './controlExpiryLifecycle.js';
+import type { ControlServerBootstrapLifecycle } from './controlServerBootstrapLifecycle.js';
 import {
   type ControlRequestSharedContext
 } from './controlRequestContext.js';
-import { createBoundControlServerRequestShell } from './controlServerRequestShellBinding.js';
-import { startControlServerReadyInstanceStartup } from './controlServerReadyInstanceStartup.js';
+import {
+  type ControlServerOwnedLifecycleState,
+  closeControlServerOwnedRuntime,
+  startControlServerReadyInstanceLifecycle
+} from './controlServerReadyInstanceLifecycle.js';
 import { prepareControlServerStartupInputs } from './controlServerStartupInputPreparation.js';
 
 interface ControlServerOptions {
@@ -25,16 +28,38 @@ const SESSION_TTL_MS = 15 * 60 * 1000;
 export class ControlServer {
   private readonly server: http.Server;
   private readonly requestContextShared: ControlRequestSharedContext;
-  private bootstrapLifecycle: ControlServerBootstrapLifecycle | null = null;
   private baseUrl: string | null = null;
-  private expiryLifecycle: ControlExpiryLifecycle | null = null;
+  private readonly lifecycleState: ControlServerOwnedLifecycleState;
+
+  private get expiryLifecycle(): ControlExpiryLifecycle | null {
+    return this.lifecycleState.expiryLifecycle;
+  }
+
+  private set expiryLifecycle(value: ControlExpiryLifecycle | null) {
+    this.lifecycleState.expiryLifecycle = value;
+  }
+
+  private get bootstrapLifecycle(): ControlServerBootstrapLifecycle | null {
+    return this.lifecycleState.bootstrapLifecycle;
+  }
+
+  private set bootstrapLifecycle(value: ControlServerBootstrapLifecycle | null) {
+    this.lifecycleState.bootstrapLifecycle = value;
+  }
 
   private constructor(options: {
     server: http.Server;
     requestContextShared: ControlRequestSharedContext;
+    baseUrl?: string | null;
+    lifecycleState?: ControlServerOwnedLifecycleState;
   }) {
     this.server = options.server;
     this.requestContextShared = options.requestContextShared;
+    this.baseUrl = options.baseUrl ?? null;
+    this.lifecycleState = options.lifecycleState ?? {
+      expiryLifecycle: null,
+      bootstrapLifecycle: null
+    };
   }
 
   static async start(options: ControlServerOptions): Promise<ControlServer> {
@@ -60,44 +85,19 @@ export class ControlServer {
     controlToken: string;
     intervalMs: number;
   }): Promise<ControlServer> {
-    return ControlServer.activatePendingReadyInstance({
+    const readyInstance = await startControlServerReadyInstanceLifecycle({
       requestContextShared: options.requestContextShared,
       host: options.host,
       controlToken: options.controlToken,
       intervalMs: options.intervalMs
     });
-  }
 
-  private static async activatePendingReadyInstance(options: {
-    requestContextShared: ControlRequestSharedContext;
-    host: string;
-    controlToken: string;
-    intervalMs: number;
-  }): Promise<ControlServer> {
-    let instance: ControlServer | null = null;
-    const server = createBoundControlServerRequestShell({
-      readRequestContextShared: () => instance?.requestContextShared ?? null,
-      readExpiryLifecycle: () => instance?.expiryLifecycle ?? null
+    return new ControlServer({
+      server: readyInstance.server,
+      requestContextShared: options.requestContextShared,
+      baseUrl: readyInstance.baseUrl,
+      lifecycleState: readyInstance.lifecycleState
     });
-
-    instance = new ControlServer({
-      server,
-      requestContextShared: options.requestContextShared
-    });
-    instance.baseUrl = await startControlServerReadyInstanceStartup({
-      server,
-      requestContextShared: instance.requestContextShared,
-      intervalMs: options.intervalMs,
-      host: options.host,
-      controlToken: options.controlToken,
-      onBootstrapAssembly: ({ expiryLifecycle, bootstrapLifecycle }) => {
-        instance!.expiryLifecycle = expiryLifecycle;
-        instance!.bootstrapLifecycle = bootstrapLifecycle;
-      },
-      closeOnFailure: () => instance!.close()
-    });
-
-    return instance;
   }
 
   getBaseUrl(): string | null {
@@ -109,19 +109,10 @@ export class ControlServer {
   }
 
   async close(): Promise<void> {
-    return this.shutdownOwnedRuntime();
-  }
-
-  private async shutdownOwnedRuntime(): Promise<void> {
-    this.expiryLifecycle?.close();
-    this.expiryLifecycle = null;
-    await this.bootstrapLifecycle?.close();
-    this.bootstrapLifecycle = null;
-    for (const client of this.requestContextShared.clients) {
-      client.end();
-    }
-    await new Promise<void>((resolve) => {
-      this.server.close(() => resolve());
+    return closeControlServerOwnedRuntime({
+      server: this.server,
+      requestContextShared: this.requestContextShared,
+      lifecycleState: this.lifecycleState
     });
   }
 }
