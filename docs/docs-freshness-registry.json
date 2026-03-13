@@ -3,6 +3,55 @@
   "generated_at": "2026-03-13",
   "entries": [
     {
+      "path": "tasks/tasks-1147-coordinator-symphony-aligned-control-oversight-service-boundary-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-13",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/specs/1147-coordinator-symphony-aligned-control-oversight-service-boundary-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-13",
+      "cadence_days": 30
+    },
+    {
+      "path": ".agent/task/1147-coordinator-symphony-aligned-control-oversight-service-boundary-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-13",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/findings/1147-control-oversight-service-boundary-extraction-deliberation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-13",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/TECH_SPEC-coordinator-symphony-aligned-control-oversight-service-boundary-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-13",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/PRD-coordinator-symphony-aligned-control-oversight-service-boundary-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-13",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-control-oversight-service-boundary-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-13",
+      "cadence_days": 30
+    },
+    {
       "path": "tasks/tasks-1146-coordinator-symphony-aligned-telegram-projection-delivery-queue-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
