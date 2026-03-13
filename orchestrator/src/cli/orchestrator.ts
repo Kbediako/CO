@@ -76,8 +76,8 @@ import {
   type OrchestratorAutoScoutOutcome,
   type OrchestratorExecutionRouteOptions
 } from './services/orchestratorExecutionRouter.js';
-import { createOrchestratorRunLifecycleExecutionRegistration } from './services/orchestratorRunLifecycleExecutionRegistration.js';
 import { completeOrchestratorRunLifecycle } from './services/orchestratorRunLifecycleCompletion.js';
+import { createOrchestratorRunLifecycleExecutionRegistration } from './services/orchestratorRunLifecycleExecutionRegistration.js';
 
 const resolveBaseEnvironment = (): EnvironmentPaths =>
   normalizeEnvironmentPaths(resolveEnvironmentPaths());
@@ -553,42 +553,12 @@ export class CodexOrchestrator {
       pipeline,
       manifest,
       paths,
-      planner,
       taskContext,
-      runId,
       persister,
-      envOverrides,
-      runtimeModeRequested,
-      runtimeModeSource,
-      executionModeOverride
+      runId
     } = context;
 
-    const { executePipeline, getResult } = createOrchestratorRunLifecycleExecutionRegistration({
-      env,
-      pipeline,
-      manifest,
-      paths,
-      taskContext,
-      runEvents: context.runEvents,
-      eventStream: context.eventStream,
-      onEventEntry: context.onEventEntry,
-      persister,
-      envOverrides,
-      runtimeModeRequested,
-      runtimeModeSource,
-      executionModeOverride,
-      executePipeline: (options) => this.executePipeline(options)
-    });
-    const manager = this.createTaskManager(
-      runId,
-      pipeline,
-      executePipeline,
-      getResult,
-      planner,
-      env,
-      executionModeOverride
-    );
-    this.attachPlanTargetTracker(manager, manifest, paths, persister);
+    const manager = this.createRunLifecycleTaskManager(context);
 
     getPrivacyGuard().reset();
 
@@ -637,6 +607,44 @@ export class CodexOrchestrator {
       applyControlPlaneToRunSummary: (summary, result) =>
         this.controlPlane.applyControlPlaneToRunSummary(summary, result)
     });
+  }
+
+  private createRunLifecycleTaskManager(context: RunLifecycleContext): TaskManager {
+    const registration = createOrchestratorRunLifecycleExecutionRegistration({
+      env: context.env,
+      pipeline: context.pipeline,
+      manifest: context.manifest,
+      paths: context.paths,
+      taskContext: context.taskContext,
+      runEvents: context.runEvents,
+      eventStream: context.eventStream,
+      onEventEntry: context.onEventEntry,
+      persister: context.persister,
+      envOverrides: context.envOverrides,
+      runtimeModeRequested: context.runtimeModeRequested,
+      runtimeModeSource: context.runtimeModeSource,
+      executionModeOverride: context.executionModeOverride,
+      executePipeline: (options) => this.executePipeline(options)
+    });
+
+    const manager = this.createTaskManager(
+      context.runId,
+      context.pipeline,
+      registration.executePipeline,
+      registration.getResult,
+      context.planner,
+      context.env,
+      context.executionModeOverride
+    );
+
+    this.attachPlanTargetTracker(
+      manager,
+      context.manifest,
+      context.paths,
+      context.persister
+    );
+
+    return manager;
   }
 
   private attachPlanTargetTracker(

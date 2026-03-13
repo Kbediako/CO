@@ -11,7 +11,7 @@
 
 ## Scope
 
-- Extract the TaskManager-registration harness from `performRunLifecycle(...)` into one bounded helper/service
+- Extract the TaskManager-registration harness from `performRunLifecycle(...)` into one bounded helper
 - Move with that extraction:
   - `createOrchestratorRunLifecycleExecutionRegistration(...)`
   - `this.createTaskManager(...)`
@@ -30,7 +30,7 @@
 
 ## Proposed Approach
 
-1. Introduce one bounded TaskManager-registration helper adjacent to `orchestrator.ts`, likely under `orchestrator/src/cli/services/`.
+1. Introduce one bounded TaskManager-registration helper adjacent to `performRunLifecycle(...)`, preferring a class-local lifecycle method unless a larger external ownership boundary becomes necessary.
 2. Move the execution-registration composition, `TaskManager` creation, and plan-target tracker attachment into that helper while keeping the resulting manager/harness as its output.
 3. Keep `performRunLifecycle(...)` as the owner of privacy reset, control-plane guard execution, scheduler plan creation, `manager.execute(...)`, error handling, and completion delegation.
 4. Add focused regressions that pin harness continuity:

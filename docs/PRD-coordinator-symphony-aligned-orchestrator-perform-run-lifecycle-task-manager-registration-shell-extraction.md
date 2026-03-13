@@ -10,7 +10,7 @@ After `1161` extracted the post-execution completion shell, the next truthful bo
 
 ## Goal
 
-Extract one bounded TaskManager-registration shell adjacent to `orchestrator.ts`, moving only the harness assembly block out of `performRunLifecycle(...)` while preserving current lifecycle authority and keeping guard/planning, execution, and completion seams where they already belong.
+Extract one bounded TaskManager-registration helper adjacent to `performRunLifecycle(...)`, moving only the harness assembly block out of the inline body while preserving current lifecycle authority and keeping guard/planning, execution, and completion seams where they already belong.
 
 ## Non-Goals
 

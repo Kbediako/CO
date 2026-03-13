@@ -8,7 +8,7 @@
 
 ## Implementation
 
-- [ ] Introduce one bounded TaskManager-registration shell adjacent to `orchestrator.ts`.
+- [ ] Introduce one bounded TaskManager-registration helper adjacent to `performRunLifecycle(...)`.
 - [ ] Rewire `performRunLifecycle(...)` to delegate execution-registration composition, `TaskManager` creation, and plan-target tracker attachment through that helper without changing lifecycle authority.
 - [ ] Keep focused manager-wiring / plan-target tracking regressions green.
 
