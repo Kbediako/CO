@@ -20,21 +20,21 @@
 
 ## Execution-Registration Shell Extraction
 
-- [ ] One bounded helper/service owns the execution-registration cluster in `performRunLifecycle(...)`.
-- [ ] `performRunLifecycle(...)` delegates that seam without changing control-plane, scheduler, or public lifecycle authority.
-- [ ] Focused lifecycle/registration regressions preserve dedupe behavior, routed executor forwarding, and latest-result continuity.
+- [x] One bounded helper/service owns the execution-registration cluster in `performRunLifecycle(...)`.
+- [x] `performRunLifecycle(...)` delegates that seam without changing control-plane, scheduler, or public lifecycle authority.
+- [x] Focused lifecycle/registration regressions preserve dedupe behavior, routed executor forwarding, and latest-result continuity.
 
 ## Validation + Closeout
 
-- [ ] `node scripts/delegation-guard.mjs`
-- [ ] `node scripts/spec-guard.mjs --dry-run`
-- [ ] `npm run build`
-- [ ] `npm run lint`
-- [ ] `npm run test`
-- [ ] `npm run docs:check`
-- [ ] `npm run docs:freshness`
-- [ ] `node scripts/diff-budget.mjs`
-- [ ] `npm run review`
-- [ ] `npm run pack:smoke`
-- [ ] Manual/mock execution-registration evidence captured.
-- [ ] Elegance review completed.
+- [x] `node scripts/delegation-guard.mjs`
+- [x] `node scripts/spec-guard.mjs --dry-run`
+- [x] `npm run build`
+- [x] `npm run lint`
+- [x] `npm run test`
+- [x] `npm run docs:check`
+- [x] `npm run docs:freshness`
+- [x] `node scripts/diff-budget.mjs`
+- [x] `npm run review` (scoped to `orchestrator/src/cli/orchestrator.ts`, `orchestrator/src/cli/services/orchestratorRunLifecycleExecutionRegistration.ts`, `orchestrator/tests/OrchestratorRunLifecycleExecutionRegistration.test.ts`)
+- [x] `npm run pack:smoke`
+- [x] Manual/mock execution-registration evidence captured.
+- [x] Elegance review completed.
