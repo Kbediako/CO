@@ -8,12 +8,12 @@
 
 ## Implementation
 
-- [ ] Extract the remaining `performRunLifecycle(...)` orchestration shell from `orchestrator.ts`.
-- [ ] Move or delegate the current `runLifecycleGuardAndPlanning(...)` and `executeRunLifecycleTask(...)` through the same shell move.
-- [ ] Keep focused regressions on privacy-guard reset, guard short-circuit behavior, run-error ordering, and completion semantics.
+- [x] Extract the remaining `performRunLifecycle(...)` orchestration shell from `orchestrator.ts`. Evidence: `orchestrator/src/cli/services/orchestratorRunLifecycleOrchestrationShell.ts`, `out/1190-coordinator-symphony-aligned-orchestrator-run-lifecycle-orchestration-shell-extraction/manual/20260314T130757Z-closeout/00-summary.md`
+- [x] Move or delegate the current `runLifecycleGuardAndPlanning(...)` and `executeRunLifecycleTask(...)` through the same shell move. Evidence: `orchestrator/src/cli/services/orchestratorRunLifecycleOrchestrationShell.ts`, `out/1190-coordinator-symphony-aligned-orchestrator-run-lifecycle-orchestration-shell-extraction/manual/20260314T130757Z-closeout/00-summary.md`
+- [x] Keep focused regressions on privacy-guard reset, guard short-circuit behavior, run-error ordering, and completion semantics. Evidence: `orchestrator/tests/OrchestratorRunLifecycleGuardAndPlanning.test.ts`, `orchestrator/tests/OrchestratorRunLifecycleExecutionAndRunError.test.ts`, `orchestrator/tests/OrchestratorRunLifecycleOrchestrationShell.test.ts`, `out/1190-coordinator-symphony-aligned-orchestrator-run-lifecycle-orchestration-shell-extraction/manual/20260314T130757Z-closeout/05b-targeted-tests.log`
 
 ## Closeout
 
-- [ ] Run the standard gate bundle and capture closeout artifacts under `out/1190-coordinator-symphony-aligned-orchestrator-run-lifecycle-orchestration-shell-extraction/manual/<timestamp>-closeout/`.
-- [ ] Run an explicit elegance review.
-- [ ] Record the next truthful seam after `1190`.
+- [x] Run the standard gate bundle and capture closeout artifacts under `out/1190-coordinator-symphony-aligned-orchestrator-run-lifecycle-orchestration-shell-extraction/manual/20260314T130757Z-closeout/`. Evidence: `out/1190-coordinator-symphony-aligned-orchestrator-run-lifecycle-orchestration-shell-extraction/manual/20260314T130757Z-closeout/00-summary.md`
+- [x] Run an explicit elegance review. Evidence: `out/1190-coordinator-symphony-aligned-orchestrator-run-lifecycle-orchestration-shell-extraction/manual/20260314T130757Z-closeout/12-elegance-review.md`
+- [x] Record the next truthful seam after `1190`. Evidence: `out/1190-coordinator-symphony-aligned-orchestrator-run-lifecycle-orchestration-shell-extraction/manual/20260314T130757Z-closeout/14-next-slice-note.md`
