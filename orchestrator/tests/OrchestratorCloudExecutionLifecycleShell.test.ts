@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { runOrchestratorCloudExecutionLifecycleShell } from '../src/cli/services/orchestratorCloudExecutionLifecycleShell.js';
+
 const mockState = vi.hoisted(() => ({
   lifecycleRunner: vi.fn(),
   cloudExecutor: vi.fn()
@@ -12,8 +14,6 @@ vi.mock('../src/cli/services/orchestratorExecutionLifecycle.js', () => ({
 vi.mock('../src/cli/services/orchestratorCloudTargetExecutor.js', () => ({
   executeOrchestratorCloudTarget: mockState.cloudExecutor
 }));
-
-import { CodexOrchestrator } from '../src/cli/orchestrator.js';
 
 function createOptions() {
   return {
@@ -54,68 +54,22 @@ function createOptions() {
     eventStream: { label: 'event-stream' } as never,
     onEventEntry: vi.fn(),
     persister: { label: 'persister' } as never,
+    runAutoScout: vi.fn(async () => ({ status: 'recorded', path: 'out/auto-scout.json' })),
     envOverrides: {
       OUTER_FLAG: '1'
     }
   };
 }
 
-type CloudExecutionLifecycleHarness = {
-  executeCloudPipeline: (
-    options: ReturnType<typeof createOptions>
-  ) => Promise<{
-    success: boolean;
-    notes: string[];
-    manifest: unknown;
-    manifestPath: string;
-    logPath: string;
-  }>;
-  runCloudExecutionLifecycleShell: (
-    options: ReturnType<typeof createOptions>
-  ) => Promise<{
-    success: boolean;
-    notes: string[];
-    manifest: unknown;
-    manifestPath: string;
-    logPath: string;
-  }>;
-};
-
-describe('CodexOrchestrator cloud execution lifecycle shell', () => {
+describe('runOrchestratorCloudExecutionLifecycleShell', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     mockState.lifecycleRunner.mockReset();
     mockState.cloudExecutor.mockReset();
   });
 
-  it('delegates executeCloudPipeline to the extracted lifecycle shell helper', async () => {
-    const options = createOptions();
-    const orchestrator = new CodexOrchestrator(options.env);
-    const harness = orchestrator as unknown as CloudExecutionLifecycleHarness;
-    const expectedResult = {
-      success: true,
-      notes: ['delegated'],
-      manifest: options.manifest,
-      manifestPath: options.paths.manifestPath,
-      logPath: options.paths.logPath
-    };
-    const shellSpy = vi
-      .spyOn(harness, 'runCloudExecutionLifecycleShell')
-      .mockResolvedValue(expectedResult);
-
-    const result = await harness.executeCloudPipeline(options);
-
-    expect(shellSpy).toHaveBeenCalledOnce();
-    expect(shellSpy).toHaveBeenCalledWith(options);
-    expect(result).toBe(expectedResult);
-    expect(mockState.lifecycleRunner).not.toHaveBeenCalled();
-    expect(mockState.cloudExecutor).not.toHaveBeenCalled();
-  });
-
   it('preserves lifecycle contract forwarding and executeBody note and success wiring', async () => {
     const options = createOptions();
-    const orchestrator = new CodexOrchestrator(options.env);
-    const harness = orchestrator as unknown as CloudExecutionLifecycleHarness;
     let capturedControlWatcher: unknown;
     let capturedSchedulePersist: unknown;
 
@@ -141,7 +95,7 @@ describe('CodexOrchestrator cloud execution lifecycle shell', () => {
       notes: ['cloud note']
     });
 
-    const result = await harness.runCloudExecutionLifecycleShell(options);
+    const result = await runOrchestratorCloudExecutionLifecycleShell(options);
 
     expect(mockState.lifecycleRunner).toHaveBeenCalledOnce();
     const lifecycleInput = mockState.lifecycleRunner.mock.calls[0]?.[0];
@@ -158,12 +112,12 @@ describe('CodexOrchestrator cloud execution lifecycle shell', () => {
       onEventEntry: options.onEventEntry,
       persister: options.persister,
       envOverrides: options.envOverrides,
-      defaultFailureStatusDetail: 'cloud-execution-failed'
+      defaultFailureStatusDetail: 'cloud-execution-failed',
+      runAutoScout: options.runAutoScout
     });
     expect(lifecycleInput.advancedDecisionEnv).toMatchObject({
       OUTER_FLAG: '1'
     });
-    expect(lifecycleInput.runAutoScout).toEqual(expect.any(Function));
 
     expect(mockState.cloudExecutor).toHaveBeenCalledOnce();
     expect(mockState.cloudExecutor).toHaveBeenCalledWith({

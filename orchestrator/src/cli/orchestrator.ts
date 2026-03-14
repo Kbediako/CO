@@ -50,12 +50,11 @@ import {
   startOrchestratorControlPlaneLifecycle,
   type OrchestratorControlPlaneLifecycle
 } from './services/orchestratorControlPlaneLifecycle.js';
-import { runOrchestratorExecutionLifecycle } from './services/orchestratorExecutionLifecycle.js';
-import { executeOrchestratorCloudTarget } from './services/orchestratorCloudTargetExecutor.js';
 import {
   type OrchestratorAutoScoutOutcome
 } from './services/orchestratorExecutionRouter.js';
 import { recordOrchestratorAutoScoutEvidence } from './services/orchestratorAutoScoutEvidenceRecorder.js';
+import { runOrchestratorCloudExecutionLifecycleShell } from './services/orchestratorCloudExecutionLifecycleShell.js';
 import {
   runOrchestratorRunLifecycle,
   type OrchestratorRunLifecycleContext
@@ -396,46 +395,9 @@ export class CodexOrchestrator {
   }
 
   private async executeCloudPipeline(options: ExecutePipelineOptions): Promise<PipelineRunExecutionResult> {
-    return this.runCloudExecutionLifecycleShell(options);
-  }
-
-  private async runCloudExecutionLifecycleShell(
-    options: ExecutePipelineOptions
-  ): Promise<PipelineRunExecutionResult> {
-    const { env, pipeline, manifest, paths, runEvents, target, task, envOverrides } = options;
-
-    return runOrchestratorExecutionLifecycle({
-      env,
-      pipeline,
-      manifest,
-      paths,
-      mode: options.mode,
-      target,
-      task,
-      runEvents,
-      eventStream: options.eventStream,
-      onEventEntry: options.onEventEntry,
-      persister: options.persister,
-      envOverrides,
-      advancedDecisionEnv: { ...process.env, ...(envOverrides ?? {}) },
-      defaultFailureStatusDetail: 'cloud-execution-failed',
+    return runOrchestratorCloudExecutionLifecycleShell({
+      ...options,
       runAutoScout: (autoScoutOptions) => this.runAutoScout(autoScoutOptions),
-      executeBody: async ({ notes, controlWatcher, schedulePersist }) => {
-        const cloudResult = await executeOrchestratorCloudTarget({
-          env,
-          pipeline,
-          manifest,
-          paths,
-          target,
-          task,
-          envOverrides,
-          runEvents,
-          controlWatcher,
-          schedulePersist
-        });
-        notes.push(...cloudResult.notes);
-        return cloudResult.success;
-      }
     });
   }
 
