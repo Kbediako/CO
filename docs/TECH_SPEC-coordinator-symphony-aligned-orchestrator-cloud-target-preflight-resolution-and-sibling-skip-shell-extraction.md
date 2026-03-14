@@ -12,7 +12,6 @@ Introduce one same-module helper in `orchestrator/src/cli/services/orchestratorC
 - `pipeline`
 - `target`
 - `controlWatcher`
-- optional `runEvents`
 
 and owns only:
 

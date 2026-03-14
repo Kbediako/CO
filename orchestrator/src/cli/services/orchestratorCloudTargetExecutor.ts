@@ -50,7 +50,6 @@ type CloudTargetPreflightFailure = {
 
 type CloudTargetPreflightSuccess = {
   success: true;
-  targetStageId: string;
   targetStage: PipelineDefinition['stages'][number];
   targetEntry: CliManifest['commands'][number];
 };
@@ -304,7 +303,6 @@ async function prepareCloudTargetPreflight(params: {
 
   return {
     success: true,
-    targetStageId,
     targetStage,
     targetEntry
   };
@@ -523,7 +521,7 @@ export async function executeOrchestratorCloudTarget(
   if (!preflight.success) {
     return preflight;
   }
-  const { targetStageId, targetStage, targetEntry } = preflight;
+  const { targetStage, targetEntry } = preflight;
 
   const environmentId = resolveCloudEnvironmentId(task, target, options.envOverrides);
   if (!environmentId) {
