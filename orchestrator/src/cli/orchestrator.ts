@@ -4,8 +4,7 @@ import { readFile } from 'node:fs/promises';
 import { TaskManager } from '../manager.js';
 import type { TaskContext, ExecutionMode, PlanItem } from '../types.js';
 import {
-  CommandPlanner,
-  type PipelineExecutor
+  CommandPlanner
 } from './adapters/index.js';
 import { resolveEnvironmentPaths } from '../../../scripts/lib/run-manifests.js';
 import { normalizeEnvironmentPaths } from './run/environment.js';
@@ -64,11 +63,9 @@ import {
   type OrchestratorAutoScoutOutcome
 } from './services/orchestratorExecutionRouter.js';
 import { completeOrchestratorRunLifecycle } from './services/orchestratorRunLifecycleCompletion.js';
-import { createOrchestratorRunLifecycleExecutionRegistration } from './services/orchestratorRunLifecycleExecutionRegistration.js';
 import { recordOrchestratorAutoScoutEvidence } from './services/orchestratorAutoScoutEvidenceRecorder.js';
-import { attachOrchestratorPlanTargetTracker } from './services/orchestratorPlanTargetTracker.js';
+import { createOrchestratorRunLifecycleTaskManager } from './services/orchestratorRunLifecycleTaskManagerShell.js';
 import {
-  createOrchestratorTaskManager,
   executeOrchestratorPipelineWithRouteAdapter,
   type ExecutePipelineOptions
 } from './services/orchestratorExecutionRouteAdapterShell.js';
@@ -403,26 +400,6 @@ export class CodexOrchestrator {
     }
   }
 
-  private createTaskManager(
-    runId: string,
-    pipeline: PipelineDefinition,
-    executePipeline: PipelineExecutor,
-    getResult: () => PipelineRunExecutionResult | null,
-    plannerInstance: CommandPlanner | undefined,
-    env: EnvironmentPaths,
-    modeOverride?: ExecutionMode
-  ): TaskManager {
-    return createOrchestratorTaskManager({
-      runId,
-      pipeline,
-      executePipeline,
-      getResult,
-      plannerInstance,
-      env,
-      modeOverride
-    });
-  }
-
   private async executePipeline(options: ExecutePipelineOptions): Promise<PipelineRunExecutionResult> {
     return executeOrchestratorPipelineWithRouteAdapter({
       options,
@@ -509,7 +486,24 @@ export class CodexOrchestrator {
       persister
     } = context;
 
-    const manager = this.createRunLifecycleTaskManager(context);
+    const manager = createOrchestratorRunLifecycleTaskManager({
+      runId: context.runId,
+      env: context.env,
+      pipeline: context.pipeline,
+      manifest: context.manifest,
+      paths: context.paths,
+      planner: context.planner,
+      taskContext: context.taskContext,
+      runEvents: context.runEvents,
+      eventStream: context.eventStream,
+      onEventEntry: context.onEventEntry,
+      persister: context.persister,
+      envOverrides: context.envOverrides,
+      runtimeModeRequested: context.runtimeModeRequested,
+      runtimeModeSource: context.runtimeModeSource,
+      executionModeOverride: context.executionModeOverride,
+      executePipeline: (options) => this.executePipeline(options)
+    });
 
     getPrivacyGuard().reset();
 
@@ -581,44 +575,6 @@ export class CodexOrchestrator {
     });
 
     return { controlPlaneResult, schedulerPlan };
-  }
-
-  private createRunLifecycleTaskManager(context: RunLifecycleContext): TaskManager {
-    const registration = createOrchestratorRunLifecycleExecutionRegistration({
-      env: context.env,
-      pipeline: context.pipeline,
-      manifest: context.manifest,
-      paths: context.paths,
-      taskContext: context.taskContext,
-      runEvents: context.runEvents,
-      eventStream: context.eventStream,
-      onEventEntry: context.onEventEntry,
-      persister: context.persister,
-      envOverrides: context.envOverrides,
-      runtimeModeRequested: context.runtimeModeRequested,
-      runtimeModeSource: context.runtimeModeSource,
-      executionModeOverride: context.executionModeOverride,
-      executePipeline: (options) => this.executePipeline(options)
-    });
-
-    const manager = this.createTaskManager(
-      context.runId,
-      context.pipeline,
-      registration.executePipeline,
-      registration.getResult,
-      context.planner,
-      context.env,
-      context.executionModeOverride
-    );
-
-    attachOrchestratorPlanTargetTracker({
-      manager,
-      manifest: context.manifest,
-      paths: context.paths,
-      persister: context.persister
-    });
-
-    return manager;
   }
 
   private applyRequestedRuntimeMode(manifest: CliManifest, mode: RuntimeMode): void {

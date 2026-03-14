@@ -8,7 +8,7 @@ import type { RunPaths } from '../run/runPaths.js';
 import type { RuntimeMode, RuntimeModeSource } from '../runtime/types.js';
 import type { CliManifest, PipelineDefinition, PipelineRunExecutionResult } from '../types.js';
 
-interface OrchestratorRunLifecycleRegisteredPipelineOptions {
+export interface OrchestratorRunLifecycleRegisteredPipelineOptions {
   env: EnvironmentPaths;
   pipeline: PipelineDefinition;
   manifest: CliManifest;
@@ -26,7 +26,7 @@ interface OrchestratorRunLifecycleRegisteredPipelineOptions {
   envOverrides: NodeJS.ProcessEnv;
 }
 
-interface OrchestratorRunLifecycleExecutionRegistrationOptions {
+export interface OrchestratorRunLifecycleExecutionRegistrationOptions {
   env: EnvironmentPaths;
   pipeline: PipelineDefinition;
   manifest: CliManifest;
