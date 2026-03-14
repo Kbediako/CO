@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260314-1177-coordinator-symphony-aligned-orchestrator-cloud-target-preflight-resolution-and-sibling-skip-shell-extraction",
+      "title": "Coordinator Symphony-Aligned Orchestrator Cloud-Target Preflight Resolution And Sibling-Skip Shell Extraction",
+      "relates_to": "tasks/tasks-1177-coordinator-symphony-aligned-orchestrator-cloud-target-preflight-resolution-and-sibling-skip-shell-extraction.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-14",
+      "paths": {
+        "spec": "tasks/specs/1177-coordinator-symphony-aligned-orchestrator-cloud-target-preflight-resolution-and-sibling-skip-shell-extraction.md",
+        "task": "tasks/tasks-1177-coordinator-symphony-aligned-orchestrator-cloud-target-preflight-resolution-and-sibling-skip-shell-extraction.md",
+        "agent_task": ".agent/task/1177-coordinator-symphony-aligned-orchestrator-cloud-target-preflight-resolution-and-sibling-skip-shell-extraction.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-cloud-target-preflight-resolution-and-sibling-skip-shell-extraction.md"
+      }
+    },
+    {
       "id": "20260314-1176-coordinator-symphony-aligned-orchestrator-cloud-target-completion-shell-extraction",
       "title": "Coordinator Symphony-Aligned Orchestrator Cloud-Target Completion Shell Extraction",
       "relates_to": "tasks/tasks-1176-coordinator-symphony-aligned-orchestrator-cloud-target-completion-shell-extraction.md",
