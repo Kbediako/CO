@@ -96,6 +96,26 @@ type OrchestratorExecutionRouteState = {
   effectiveMergedEnv: NodeJS.ProcessEnv;
 };
 
+type CloudFallbackReroute = {
+  mode: 'mcp';
+  executionModeOverride: 'mcp';
+  runtimeModeRequested: RuntimeMode;
+  runtimeModeSource: RuntimeModeSource;
+  envOverrides: NodeJS.ProcessEnv;
+};
+
+type CloudPreflightFailureContract =
+  | {
+      outcome: 'fail';
+      detail: string;
+    }
+  | {
+      outcome: 'fallback';
+      detail: string;
+      manifestFallback: NonNullable<CliManifest['cloud_fallback']>;
+      reroute: CloudFallbackReroute;
+    };
+
 export function requiresCloudOrchestratorExecution(task: TaskContext, subtask: PlanItem): boolean {
   const requiresCloudFlag = resolveRequiresCloudPolicy({
     boolFlags: [subtask.requires_cloud, subtask.requiresCloud],
@@ -169,6 +189,39 @@ async function resolveExecutionRouteState(
   return { runtimeSelection, effectiveEnvOverrides, effectiveMergedEnv };
 }
 
+function buildCloudPreflightFailureContract(
+  state: OrchestratorExecutionRouteState,
+  issues: { code: string; message: string }[]
+): CloudPreflightFailureContract {
+  const issueSummary = issues.map((issue) => issue.message).join(' ');
+  if (!allowCloudFallback(state.effectiveEnvOverrides)) {
+    return {
+      outcome: 'fail',
+      detail: `Cloud preflight failed and cloud fallback is disabled. ${issueSummary}`
+    };
+  }
+
+  const detail = `Cloud preflight failed; falling back to mcp. ${issueSummary}`;
+  return {
+    outcome: 'fallback',
+    detail,
+    manifestFallback: {
+      mode_requested: 'cloud',
+      mode_used: 'mcp',
+      reason: detail,
+      issues: normalizeCloudFallbackIssues(issues),
+      checked_at: isoTimestamp()
+    },
+    reroute: {
+      mode: 'mcp',
+      executionModeOverride: 'mcp',
+      runtimeModeRequested: state.runtimeSelection.selected_mode,
+      runtimeModeSource: state.runtimeSelection.source,
+      envOverrides: state.effectiveEnvOverrides
+    }
+  };
+}
+
 async function executeCloudRoute(
   options: OrchestratorExecutionRouteOptions,
   state: OrchestratorExecutionRouteState
@@ -187,33 +240,19 @@ async function executeCloudRoute(
   });
 
   if (!preflight.ok) {
-    if (!allowCloudFallback(state.effectiveEnvOverrides)) {
-      const detail =
-        `Cloud preflight failed and cloud fallback is disabled. ` +
-        preflight.issues.map((issue) => issue.message).join(' ');
-      return failExecutionRoute(options, 'cloud-preflight-failed', detail);
+    const contract = buildCloudPreflightFailureContract(state, preflight.issues);
+    if (contract.outcome === 'fail') {
+      return failExecutionRoute(options, 'cloud-preflight-failed', contract.detail);
     }
 
-    const detail =
-      `Cloud preflight failed; falling back to mcp. ` + preflight.issues.map((issue) => issue.message).join(' ');
-    options.manifest.cloud_fallback = {
-      mode_requested: 'cloud',
-      mode_used: 'mcp',
-      reason: detail,
-      issues: normalizeCloudFallbackIssues(preflight.issues),
-      checked_at: isoTimestamp()
-    };
-    appendSummary(options.manifest, detail);
-    logger.warn(detail);
+    options.manifest.cloud_fallback = contract.manifestFallback;
+    appendSummary(options.manifest, contract.detail);
+    logger.warn(contract.detail);
     const fallback = await routeOrchestratorExecution({
       ...options,
-      mode: 'mcp',
-      executionModeOverride: 'mcp',
-      runtimeModeRequested: state.runtimeSelection.selected_mode,
-      runtimeModeSource: state.runtimeSelection.source,
-      envOverrides: state.effectiveEnvOverrides
+      ...contract.reroute
     });
-    fallback.notes.unshift(detail);
+    fallback.notes.unshift(contract.detail);
     return fallback;
   }
 

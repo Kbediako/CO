@@ -15,18 +15,18 @@
 
 ## Implementation
 
-- [ ] Fallback manifest/error-note shaping is isolated into a smaller truthful router-local seam. Evidence: `orchestrator/src/cli/services/orchestratorExecutionRouter.ts`
-- [ ] Hard-fail versus recursive fallback outcomes remain behaviorally unchanged. Evidence: `orchestrator/tests/OrchestratorExecutionRouter.test.ts`
+- [x] Fallback manifest/error-note shaping is isolated into a smaller truthful router-local seam. Evidence: `orchestrator/src/cli/services/orchestratorExecutionRouter.ts`, `out/1170-coordinator-symphony-aligned-orchestrator-execution-routing-fallback-manifest-contract/manual/20260314T015844Z-closeout/00-summary.md`
+- [x] Hard-fail versus recursive fallback outcomes remain behaviorally unchanged. Evidence: `orchestrator/tests/OrchestratorExecutionRouter.test.ts`, `out/1170-coordinator-symphony-aligned-orchestrator-execution-routing-fallback-manifest-contract/manual/20260314T015844Z-closeout/05b-targeted-tests.log`
 
 ## Validation + Closeout
 
-- [ ] `node scripts/delegation-guard.mjs`
-- [ ] `node scripts/spec-guard.mjs --dry-run`
-- [ ] `npm run build`
-- [ ] `npm run lint`
-- [ ] `npm run test`
-- [ ] `npm run docs:check`
-- [ ] `npm run docs:freshness`
-- [ ] `node scripts/diff-budget.mjs`
-- [ ] `npm run review`
-- [ ] `npm run pack:smoke`
+- [x] `node scripts/delegation-guard.mjs`. Evidence: `out/1170-coordinator-symphony-aligned-orchestrator-execution-routing-fallback-manifest-contract/manual/20260314T015844Z-closeout/01-delegation-guard.log`
+- [x] `node scripts/spec-guard.mjs --dry-run`. Evidence: `out/1170-coordinator-symphony-aligned-orchestrator-execution-routing-fallback-manifest-contract/manual/20260314T015844Z-closeout/02-spec-guard.log`
+- [x] `npm run build`. Evidence: `out/1170-coordinator-symphony-aligned-orchestrator-execution-routing-fallback-manifest-contract/manual/20260314T015844Z-closeout/03-build.log`
+- [x] `npm run lint`. Evidence: `out/1170-coordinator-symphony-aligned-orchestrator-execution-routing-fallback-manifest-contract/manual/20260314T015844Z-closeout/04-lint.log`
+- [x] `npm run test`. Evidence: `out/1170-coordinator-symphony-aligned-orchestrator-execution-routing-fallback-manifest-contract/manual/20260314T015844Z-closeout/05-test.log`
+- [x] `npm run docs:check`. Evidence: `out/1170-coordinator-symphony-aligned-orchestrator-execution-routing-fallback-manifest-contract/manual/20260314T015844Z-closeout/06-docs-check.log`
+- [x] `npm run docs:freshness`. Evidence: `out/1170-coordinator-symphony-aligned-orchestrator-execution-routing-fallback-manifest-contract/manual/20260314T015844Z-closeout/07-docs-freshness.log`
+- [x] `node scripts/diff-budget.mjs`. Evidence: `out/1170-coordinator-symphony-aligned-orchestrator-execution-routing-fallback-manifest-contract/manual/20260314T015844Z-closeout/08-diff-budget.log`
+- [x] `npm run review`. Evidence: `out/1170-coordinator-symphony-aligned-orchestrator-execution-routing-fallback-manifest-contract/manual/20260314T015844Z-closeout/09-review.log`, `out/1170-coordinator-symphony-aligned-orchestrator-execution-routing-fallback-manifest-contract/manual/20260314T015844Z-closeout/09-review-output.log`
+- [x] `npm run pack:smoke`. Evidence: `out/1170-coordinator-symphony-aligned-orchestrator-execution-routing-fallback-manifest-contract/manual/20260314T015844Z-closeout/10-pack-smoke.log`

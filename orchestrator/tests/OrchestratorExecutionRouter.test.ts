@@ -31,6 +31,7 @@ function createManifest() {
     commands: [],
     child_runs: [],
     prompt_packs: [],
+    cloud_fallback: null,
     heartbeat_interval_seconds: 60,
     heartbeat_at: null,
     guardrail_status: undefined
@@ -135,10 +136,31 @@ describe('routeOrchestratorExecution', () => {
   });
 
   it('falls back from cloud preflight failure to the local execution route when allowed', async () => {
-    vi.spyOn(runtimeIndex, 'resolveRuntimeSelection').mockResolvedValue(createRuntimeSelection());
+    const resolveRuntimeSelectionSpy = vi
+      .spyOn(runtimeIndex, 'resolveRuntimeSelection')
+      .mockResolvedValue(
+        createRuntimeSelection({
+          requested_mode: 'appserver',
+          selected_mode: 'cli',
+          source: 'default',
+          provider: 'CliRuntimeProvider',
+          fallback: {
+            occurred: true,
+            code: 'appserver-command-unavailable',
+            reason: 'Appserver preflight failed.',
+            from_mode: 'appserver',
+            to_mode: 'cli',
+            checked_at: '2026-03-13T00:00:00.000Z'
+          },
+          env_overrides: { CODEX_FAKE_ROUTER_FLAG: '1' }
+        })
+      );
     vi.spyOn(cloudPreflight, 'runCloudPreflight').mockResolvedValue({
       ok: false,
-      issues: [{ code: 'missing_environment', message: 'CODEX_CLOUD_ENV_ID is not configured.' }],
+      issues: [
+        { code: 'missing_environment', message: 'CODEX_CLOUD_ENV_ID is not configured.' },
+        { code: 'missing_branch', message: 'CODEX_CLOUD_BRANCH is not configured.' }
+      ],
       details: {
         codexBin: 'codex',
         environmentId: null,
@@ -146,22 +168,57 @@ describe('routeOrchestratorExecution', () => {
       }
     });
 
-    const options = createOptions({ mode: 'cloud' });
+    const expectedDetail =
+      'Cloud preflight failed; falling back to mcp. ' +
+      'CODEX_CLOUD_ENV_ID is not configured. CODEX_CLOUD_BRANCH is not configured.';
+    const options = createOptions({
+      mode: 'cloud',
+      envOverrides: { OUTER_FLAG: '1' }
+    });
     const result = await routeOrchestratorExecution(options);
 
     expect(result.success).toBe(true);
-    expect(result.notes[0]).toContain('Cloud preflight failed; falling back to mcp.');
-    expect(options.manifest.cloud_fallback?.mode_used).toBe('mcp');
+    expect(result.notes[0]).toBe(expectedDetail);
+    expect(result.notes.filter((note) => note === expectedDetail)).toHaveLength(1);
+    expect(options.manifest.summary).toContain('Cloud preflight failed; falling back to mcp.');
+    expect(options.manifest.status_detail).toBeNull();
+    expect(options.manifest.cloud_fallback).toMatchObject({
+      mode_requested: 'cloud',
+      mode_used: 'mcp',
+      reason: expectedDetail,
+      issues: [
+        { code: 'missing_environment', message: 'CODEX_CLOUD_ENV_ID is not configured.' },
+        { code: 'missing_branch', message: 'CODEX_CLOUD_BRANCH is not configured.' }
+      ]
+    });
+    expect(options.manifest.cloud_fallback?.checked_at).toMatch(/^\d{4}-\d{2}-\d{2}T/);
     expect(options.executeCloudPipeline).not.toHaveBeenCalled();
     expect(mockState.lifecycleRunner).toHaveBeenCalledOnce();
     expect(mockState.lifecycleRunner.mock.calls[0]?.[0].mode).toBe('mcp');
+    expect(mockState.lifecycleRunner.mock.calls[0]?.[0].envOverrides).toMatchObject({
+      OUTER_FLAG: '1',
+      CODEX_FAKE_ROUTER_FLAG: '1'
+    });
+    expect(resolveRuntimeSelectionSpy).toHaveBeenCalledTimes(2);
+    expect(resolveRuntimeSelectionSpy.mock.calls[1]?.[0]).toMatchObject({
+      requestedMode: 'cli',
+      source: 'default',
+      executionMode: 'mcp',
+      env: expect.objectContaining({
+        OUTER_FLAG: '1',
+        CODEX_FAKE_ROUTER_FLAG: '1'
+      })
+    });
   });
 
   it('fails fast when cloud preflight fails and fallback is disabled', async () => {
     vi.spyOn(runtimeIndex, 'resolveRuntimeSelection').mockResolvedValue(createRuntimeSelection());
     vi.spyOn(cloudPreflight, 'runCloudPreflight').mockResolvedValue({
       ok: false,
-      issues: [{ code: 'missing_environment', message: 'CODEX_CLOUD_ENV_ID is not configured.' }],
+      issues: [
+        { code: 'missing_environment', message: 'CODEX_CLOUD_ENV_ID is not configured.' },
+        { code: 'missing_branch', message: 'CODEX_CLOUD_BRANCH is not configured.' }
+      ],
       details: {
         codexBin: 'codex',
         environmentId: null,
@@ -176,10 +233,14 @@ describe('routeOrchestratorExecution', () => {
     const result = await routeOrchestratorExecution(options);
 
     expect(result.success).toBe(false);
-    expect(result.notes[0]).toContain('Cloud preflight failed and cloud fallback is disabled.');
+    expect(result.notes).toEqual([
+      'Cloud preflight failed and cloud fallback is disabled. ' +
+        'CODEX_CLOUD_ENV_ID is not configured. CODEX_CLOUD_BRANCH is not configured.'
+    ]);
     expect(options.manifest.status).toBe('failed');
     expect(options.manifest.status_detail).toBe('cloud-preflight-failed');
-    expect(options.manifest.cloud_fallback).toBeUndefined();
+    expect(options.manifest.summary).toContain('Cloud preflight failed and cloud fallback is disabled.');
+    expect(options.manifest.cloud_fallback).toBeNull();
     expect(options.executeCloudPipeline).not.toHaveBeenCalled();
     expect(mockState.lifecycleRunner).not.toHaveBeenCalled();
     expect(mockState.localExecutor).not.toHaveBeenCalled();
@@ -282,7 +343,7 @@ describe('routeOrchestratorExecution', () => {
       createRuntimeSelection({
         requested_mode: 'appserver',
         selected_mode: 'cli',
-        source: 'fallback',
+        source: 'default',
         provider: 'CliRuntimeProvider',
         fallback: {
           occurred: true,
