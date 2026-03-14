@@ -2,26 +2,34 @@
 
 ## Summary
 
-After `1177` closed the remaining cloud-target preflight shell inside `orchestratorCloudTargetExecutor.ts`, the next truthful seam is the cloud-only lifecycle wrapper still shaped inline in `executeCloudPipeline()` in `orchestrator.ts`.
+After `1190` moved the run-lifecycle orchestration envelope out of `orchestrator.ts`, the next truthful seam is the remaining private cloud execution lifecycle shell around `executeCloudPipeline(...)` and `runCloudExecutionLifecycleShell(...)`.
 
 ## Problem
 
-`orchestrator/src/cli/orchestrator.ts` still owns the cloud execution wrapper around `runOrchestratorExecutionLifecycle(...)`, including the `executeBody` callback that delegates to `executeOrchestratorCloudTarget(...)`, pushes returned notes, and shapes the success/failure return path. That keeps one cloud-specific lifecycle shell inline at the top-level orchestrator boundary even though the inner cloud-target executor phases are already segmented.
+`orchestrator/src/cli/orchestrator.ts` still owns a bounded cloud execution orchestration shell:
+
+- `executeCloudPipeline(...)`
+- `runCloudExecutionLifecycleShell(...)`
+- `runOrchestratorExecutionLifecycle(...)` wiring
+- `executeOrchestratorCloudTarget(...)` execute-body assembly
+- passthrough of `runAutoScout`, event-stream wiring, and lifecycle note assembly
+
+This is now one of the last obvious orchestration bodies still embedded in the class-private surface.
 
 ## Goal
 
-Extract one bounded cloud execution lifecycle helper so `executeCloudPipeline()` becomes a thin delegator while preserving the current lifecycle contract, note propagation, and success/failure behavior.
+Extract the cloud execution lifecycle shell from `orchestrator.ts` into a bounded service helper while preserving the same behavior and keeping broader routing/public lifecycle ownership intact.
 
 ## Non-Goals
 
-- changing `runOrchestratorExecutionLifecycle(...)`
-- changing router fallback or execution-mode policy in `orchestratorExecutionRouter.ts`
-- changing `executeOrchestratorCloudTarget(...)` internals, including request shaping, missing-env handling, running-state updates, completion application, or preflight resolution
-- reopening local execution routing or shared `executePipeline()` behavior
-- broad orchestrator lifecycle refactors
+- changing route-decision or execution-mode policy behavior
+- changing public `start()` / `resume()` behavior
+- changing local execution lifecycle behavior
+- changing cloud target executor behavior itself
+- changing note ordering, failure-detail strings, or scout passthrough semantics
 
 ## Success Criteria
 
-- one bounded helper owns the cloud-only `runOrchestratorExecutionLifecycle(...)` wrapper and the `executeBody` note/success wiring
-- `executeCloudPipeline()` remains the public orchestrator boundary but delegates the lifecycle shell directly
-- focused regressions pin note propagation and success/failure shaping without reopening router policy or cloud-target executor internals
+- `executeCloudPipeline(...)` becomes a thin delegate over the extracted cloud execution lifecycle shell
+- `runAutoScout`, `advancedDecisionEnv`, note ordering, failure detail, and event/persister passthrough remain unchanged
+- focused regressions preserve cloud lifecycle orchestration behavior at the new boundary
