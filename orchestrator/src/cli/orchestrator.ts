@@ -3,7 +3,7 @@ import { resolveEnvironmentPaths } from '../../../scripts/lib/run-manifests.js';
 import { normalizeEnvironmentPaths } from './run/environment.js';
 import type { EnvironmentPaths } from './run/environment.js';
 import { finalizeStatus } from './run/manifest.js';
-import { persistManifest } from './run/manifestPersister.js';
+import { persistManifest, type ManifestPersister } from './run/manifestPersister.js';
 import type {
   CliManifest,
   PipelineDefinition,
@@ -47,6 +47,23 @@ const resolveBaseEnvironment = (): EnvironmentPaths =>
   normalizeEnvironmentPaths(resolveEnvironmentPaths());
 
 const RESUME_PRE_START_FAILURE_STATUS_DETAIL = 'resume-pre-start-failed';
+
+async function persistResumePreStartFailureState(
+  manifest: CliManifest,
+  paths: RunPaths,
+  persister?: ManifestPersister
+): Promise<void> {
+  finalizeStatus(manifest, 'failed', RESUME_PRE_START_FAILURE_STATUS_DETAIL);
+  try {
+    await persistManifest(paths, manifest, persister, { force: true });
+  } catch (persistError) {
+    logger.warn(
+      `Failed to persist resume pre-start failure state: ${
+        (persistError as Error)?.message ?? String(persistError)
+      }`
+    );
+  }
+}
 
 export class CodexOrchestrator {
   private readonly controlPlane = new ControlPlaneService();
@@ -104,18 +121,7 @@ export class CodexOrchestrator {
       pipeline: preparation.pipeline,
       manifest,
       emitter: options.runEvents,
-      onStartFailure: async () => {
-        finalizeStatus(manifest, 'failed', RESUME_PRE_START_FAILURE_STATUS_DETAIL);
-        try {
-          await persistManifest(paths, manifest, persister, { force: true });
-        } catch (persistError) {
-          logger.warn(
-            `Failed to persist resume pre-start failure state: ${
-              (persistError as Error)?.message ?? String(persistError)
-            }`
-          );
-        }
-      },
+      onStartFailure: () => persistResumePreStartFailureState(manifest, paths, persister),
       runWithLifecycle: ({ runEvents, eventStream, onEventEntry }) =>
         this.performRunLifecycle({
           env: preparation.env,
