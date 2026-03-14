@@ -1,9 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import type { PipelineDefinition, PipelineRunExecutionResult } from '../src/cli/types.js';
+import type { PipelineDefinition, PipelineExecutionResult, PipelineRunExecutionResult } from '../src/cli/types.js';
 import type { TaskContext } from '../src/types.js';
 import {
   buildOrchestratorTaskManagerOptions,
+  executeOrchestratorPipelineRouteEntryShell,
   executeOrchestratorPipelineWithRouteAdapter,
   type ExecutePipelineOptions
 } from '../src/cli/services/orchestratorExecutionRouteAdapterShell.js';
@@ -23,6 +24,13 @@ function createPipelineResult(): PipelineRunExecutionResult {
     } as never,
     manifestPath: '.runs/task-1/run-1/manifest.json',
     logPath: '.runs/task-1/run-1/runner.ndjson'
+  };
+}
+
+function createExecutionResult(): PipelineExecutionResult {
+  return {
+    manifest: createPipelineResult().manifest,
+    runSummary: { review: { summary: 'ok' } } as never
   };
 }
 
@@ -106,5 +114,58 @@ describe('orchestratorExecutionRouteAdapterShell', () => {
       startSubpipeline
     });
     expect(typeof routeExecution.mock.calls[0]?.[0].executeCloudPipeline).toBe('function');
+  });
+});
+
+describe('orchestratorPipelineRouteEntryShell', () => {
+  it('bridges cloud lifecycle and subpipeline start from the base start inputs', async () => {
+    const options = createExecutePipelineOptions();
+    const applyRuntimeSelection = vi.fn();
+    const runAutoScout = vi.fn(async () => ({ status: 'timeout' as const, message: 'noop' }));
+    const startPipeline = vi.fn(async () => createExecutionResult());
+    const cloudLifecycleResult = createPipelineResult();
+    const runCloudExecutionLifecycleShell = vi.fn(async () => cloudLifecycleResult);
+    const executePipelineWithRouteAdapter = vi.fn(async (input) => {
+      expect(input.options).toBe(options);
+      expect(input.applyRuntimeSelection).toBe(applyRuntimeSelection);
+      expect(input.runAutoScout).toBe(runAutoScout);
+
+      const cloudOptions = { ...options, envOverrides: { TEST_ENV: '2' } };
+      const cloudResult = await input.executeCloudPipeline(cloudOptions);
+      expect(cloudResult).toBe(cloudLifecycleResult);
+      expect(runCloudExecutionLifecycleShell).toHaveBeenCalledWith({
+        ...cloudOptions,
+        runAutoScout
+      });
+
+      const childResult = await input.startSubpipeline({
+        pipelineId: 'child-pipeline',
+        executionModeOverride: 'cloud',
+        runtimeModeRequested: 'cli'
+      });
+      expect(childResult).toEqual(createExecutionResult());
+      expect(startPipeline).toHaveBeenCalledWith({
+        taskId: options.env.taskId,
+        pipelineId: 'child-pipeline',
+        parentRunId: options.manifest.run_id,
+        format: 'json',
+        executionMode: 'cloud',
+        runtimeMode: 'cli'
+      });
+
+      return createPipelineResult();
+    });
+
+    const result = await executeOrchestratorPipelineRouteEntryShell({
+      options,
+      applyRuntimeSelection,
+      runAutoScout,
+      startPipeline,
+      executePipelineWithRouteAdapter,
+      runCloudExecutionLifecycleShell
+    });
+
+    expect(result.success).toBe(true);
+    expect(executePipelineWithRouteAdapter).toHaveBeenCalledOnce();
   });
 });

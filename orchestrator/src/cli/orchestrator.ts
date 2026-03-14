@@ -58,8 +58,10 @@ import {
   runOrchestratorRunLifecycle,
   type OrchestratorRunLifecycleContext
 } from './services/orchestratorRunLifecycleOrchestrationShell.js';
-import { type ExecutePipelineOptions } from './services/orchestratorExecutionRouteAdapterShell.js';
-import { runOrchestratorPipelineRouteEntryShell } from './services/orchestratorPipelineRouteEntryShell.js';
+import {
+  executeOrchestratorPipelineRouteEntryShell,
+  type ExecutePipelineOptions
+} from './services/orchestratorExecutionRouteAdapterShell.js';
 
 const resolveBaseEnvironment = (): EnvironmentPaths =>
   normalizeEnvironmentPaths(resolveEnvironmentPaths());
@@ -374,19 +376,11 @@ export class CodexOrchestrator {
   }
 
   private async executePipeline(options: ExecutePipelineOptions): Promise<PipelineRunExecutionResult> {
-    return runOrchestratorPipelineRouteEntryShell({
+    return executeOrchestratorPipelineRouteEntryShell({
       options,
-      applyRuntimeSelection: (manifest, selection) => this.applyRuntimeSelection(manifest, selection),
-      runAutoScout: (autoScoutOptions) => this.runAutoScout(autoScoutOptions),
-      startSubpipeline: ({ pipelineId, executionModeOverride, runtimeModeRequested }) =>
-        this.start({
-          taskId: options.env.taskId,
-          pipelineId,
-          parentRunId: options.manifest.run_id,
-          format: 'json',
-          executionMode: executionModeOverride,
-          runtimeMode: runtimeModeRequested
-      })
+      applyRuntimeSelection: this.applyRuntimeSelection.bind(this),
+      runAutoScout: this.runAutoScout.bind(this),
+      startPipeline: this.start.bind(this)
     });
   }
 

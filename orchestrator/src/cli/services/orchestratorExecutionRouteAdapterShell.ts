@@ -11,13 +11,20 @@ import {
   type PipelineExecutor
 } from '../adapters/index.js';
 import type { EnvironmentPaths } from '../run/environment.js';
-import type { CliManifest, PipelineDefinition, PipelineRunExecutionResult } from '../types.js';
+import type {
+  CliManifest,
+  PipelineDefinition,
+  PipelineExecutionResult,
+  PipelineRunExecutionResult,
+  StartOptions
+} from '../types.js';
 import type { RuntimeSelection } from '../runtime/types.js';
 import { determineOrchestratorExecutionMode } from './orchestratorExecutionModePolicy.js';
 import {
   routeOrchestratorExecution,
   type OrchestratorExecutionRouteOptions
 } from './orchestratorExecutionRouter.js';
+import { runOrchestratorCloudExecutionLifecycleShell } from './orchestratorCloudExecutionLifecycleShell.js';
 
 export type ExecutePipelineOptions = Omit<
   OrchestratorExecutionRouteOptions,
@@ -42,6 +49,23 @@ export interface ExecuteOrchestratorPipelineWithRouteAdapterParams {
   ) => Promise<PipelineRunExecutionResult>;
   runAutoScout: OrchestratorExecutionRouteOptions['runAutoScout'];
   startSubpipeline: OrchestratorExecutionRouteOptions['startSubpipeline'];
+  routeExecution?: typeof routeOrchestratorExecution;
+}
+
+type StartSubpipelineRun = (
+  options: Pick<
+    StartOptions,
+    'taskId' | 'pipelineId' | 'parentRunId' | 'format' | 'executionMode' | 'runtimeMode'
+  >
+) => Promise<PipelineExecutionResult>;
+
+export interface ExecuteOrchestratorPipelineRouteEntryShellParams {
+  options: ExecutePipelineOptions;
+  applyRuntimeSelection: (manifest: CliManifest, selection: RuntimeSelection) => void;
+  runAutoScout: OrchestratorExecutionRouteOptions['runAutoScout'];
+  startPipeline: StartSubpipelineRun;
+  executePipelineWithRouteAdapter?: typeof executeOrchestratorPipelineWithRouteAdapter;
+  runCloudExecutionLifecycleShell?: typeof runOrchestratorCloudExecutionLifecycleShell;
   routeExecution?: typeof routeOrchestratorExecution;
 }
 
@@ -83,5 +107,35 @@ export async function executeOrchestratorPipelineWithRouteAdapter(
     executeCloudPipeline: (options) => params.executeCloudPipeline(options),
     runAutoScout: params.runAutoScout,
     startSubpipeline: params.startSubpipeline
+  });
+}
+
+export async function executeOrchestratorPipelineRouteEntryShell(
+  params: ExecuteOrchestratorPipelineRouteEntryShellParams
+): Promise<PipelineRunExecutionResult> {
+  const executePipelineWithRouteAdapter =
+    params.executePipelineWithRouteAdapter ?? executeOrchestratorPipelineWithRouteAdapter;
+  const runCloudExecutionLifecycle =
+    params.runCloudExecutionLifecycleShell ?? runOrchestratorCloudExecutionLifecycleShell;
+
+  return executePipelineWithRouteAdapter({
+    options: params.options,
+    applyRuntimeSelection: params.applyRuntimeSelection,
+    executeCloudPipeline: (options) =>
+      runCloudExecutionLifecycle({
+        ...options,
+        runAutoScout: params.runAutoScout
+      }),
+    runAutoScout: params.runAutoScout,
+    startSubpipeline: ({ pipelineId, executionModeOverride, runtimeModeRequested }) =>
+      params.startPipeline({
+        taskId: params.options.env.taskId,
+        pipelineId,
+        parentRunId: params.options.manifest.run_id,
+        format: 'json',
+        executionMode: executionModeOverride,
+        runtimeMode: runtimeModeRequested
+      }),
+    routeExecution: params.routeExecution
   });
 }
