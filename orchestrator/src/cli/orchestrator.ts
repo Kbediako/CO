@@ -1,11 +1,7 @@
 import process from 'node:process';
 import { readFile } from 'node:fs/promises';
 
-import { TaskManager } from '../manager.js';
 import type { TaskContext, ExecutionMode, PlanItem } from '../types.js';
-import {
-  CommandPlanner
-} from './adapters/index.js';
 import { resolveEnvironmentPaths } from '../../../scripts/lib/run-manifests.js';
 import { normalizeEnvironmentPaths } from './run/environment.js';
 import type { EnvironmentPaths } from './run/environment.js';
@@ -30,14 +26,12 @@ import type {
   StartOptions,
   ResumeOptions,
   StatusOptions,
-  RunSummary
 } from './types.js';
 import { generateRunId } from './utils/runId.js';
 import { isoTimestamp } from './utils/time.js';
 import type { RunPaths } from './run/runPaths.js';
 import { relativeToRepo } from './run/runPaths.js';
 import { logger } from '../logger.js';
-import { getPrivacyGuard } from './services/execRuntime.js';
 import { PipelineResolver } from './services/pipelineResolver.js';
 import { ControlPlaneService } from './services/controlPlaneService.js';
 import { SchedulerService } from './services/schedulerService.js';
@@ -49,9 +43,8 @@ import {
 import { loadPackageConfig, loadUserConfig } from './config/userConfig.js';
 import { formatRepoConfigRequiredError, isRepoConfigRequired } from './config/repoConfigPolicy.js';
 import { RunEventEmitter, RunEventPublisher } from './events/runEvents.js';
-import { RunEventStream } from './events/runEventStream.js';
 import { resolveRuntimeMode } from './runtime/index.js';
-import type { RuntimeMode, RuntimeModeSource, RuntimeSelection } from './runtime/types.js';
+import type { RuntimeMode, RuntimeSelection } from './runtime/types.js';
 import type { AdvancedAutopilotDecision } from './utils/advancedAutopilot.js';
 import {
   startOrchestratorControlPlaneLifecycle,
@@ -62,9 +55,11 @@ import { executeOrchestratorCloudTarget } from './services/orchestratorCloudTarg
 import {
   type OrchestratorAutoScoutOutcome
 } from './services/orchestratorExecutionRouter.js';
-import { completeOrchestratorRunLifecycle } from './services/orchestratorRunLifecycleCompletion.js';
 import { recordOrchestratorAutoScoutEvidence } from './services/orchestratorAutoScoutEvidenceRecorder.js';
-import { createOrchestratorRunLifecycleTaskManager } from './services/orchestratorRunLifecycleTaskManagerShell.js';
+import {
+  runOrchestratorRunLifecycle,
+  type OrchestratorRunLifecycleContext
+} from './services/orchestratorRunLifecycleOrchestrationShell.js';
 import {
   executeOrchestratorPipelineWithRouteAdapter,
   type ExecutePipelineOptions
@@ -72,24 +67,6 @@ import {
 
 const resolveBaseEnvironment = (): EnvironmentPaths =>
   normalizeEnvironmentPaths(resolveEnvironmentPaths());
-
-interface RunLifecycleContext {
-  env: EnvironmentPaths;
-  pipeline: PipelineDefinition;
-  manifest: CliManifest;
-  paths: RunPaths;
-  planner: CommandPlanner;
-  taskContext: TaskContext;
-  runId: string;
-  runEvents?: RunEventPublisher;
-  eventStream?: RunEventStream;
-  onEventEntry?: (entry: import('./events/runEventStream.js').RunEventStreamEntry) => void;
-  persister: ManifestPersister;
-  envOverrides: NodeJS.ProcessEnv;
-  runtimeModeRequested: RuntimeMode;
-  runtimeModeSource: RuntimeModeSource;
-  executionModeOverride?: ExecutionMode;
-}
 
 interface ControlPlaneLaunchContext {
   runEvents?: RunEventPublisher;
@@ -476,105 +453,17 @@ export class CodexOrchestrator {
     return await recordOrchestratorAutoScoutEvidence(params);
   }
 
-  private async performRunLifecycle(context: RunLifecycleContext): Promise<PipelineExecutionResult> {
-    const {
-      env,
-      pipeline,
-      manifest,
-      paths,
-      taskContext,
-      persister
-    } = context;
-
-    const manager = createOrchestratorRunLifecycleTaskManager({
-      runId: context.runId,
-      env: context.env,
-      pipeline: context.pipeline,
-      manifest: context.manifest,
-      paths: context.paths,
-      planner: context.planner,
-      taskContext: context.taskContext,
-      runEvents: context.runEvents,
-      eventStream: context.eventStream,
-      onEventEntry: context.onEventEntry,
-      persister: context.persister,
-      envOverrides: context.envOverrides,
-      runtimeModeRequested: context.runtimeModeRequested,
-      runtimeModeSource: context.runtimeModeSource,
-      executionModeOverride: context.executionModeOverride,
-      executePipeline: (options) => this.executePipeline(options)
-    });
-
-    getPrivacyGuard().reset();
-
-    const { controlPlaneResult, schedulerPlan } = await this.runLifecycleGuardAndPlanning(context);
-    const runSummary = await this.executeRunLifecycleTask(
-      manager,
-      taskContext,
-      pipeline.id,
-      context.runEvents
-    );
-    return await completeOrchestratorRunLifecycle({
-      env,
-      pipeline,
-      manifest,
-      paths,
-      runSummary,
-      schedulerPlan,
-      controlPlaneResult,
-      runEvents: context.runEvents,
-      persister,
+  private async performRunLifecycle(context: OrchestratorRunLifecycleContext): Promise<PipelineExecutionResult> {
+    return await runOrchestratorRunLifecycle({
+      ...context,
+      executePipeline: (options) => this.executePipeline(options),
+      controlPlaneGuard: (options) => this.controlPlane.guard(options),
+      createSchedulerPlan: (options) => this.scheduler.createPlanForRun(options),
       finalizePlan: (options) => this.scheduler.finalizePlan(options),
       applySchedulerToRunSummary: (summary, plan) => this.scheduler.applySchedulerToRunSummary(summary, plan),
       applyControlPlaneToRunSummary: (summary, result) =>
         this.controlPlane.applyControlPlaneToRunSummary(summary, result)
     });
-  }
-
-  private async executeRunLifecycleTask(
-    manager: Pick<TaskManager, 'execute'>,
-    taskContext: TaskContext,
-    pipelineId: string,
-    runEvents?: RunEventPublisher
-  ): Promise<RunSummary> {
-    try {
-      return await manager.execute(taskContext);
-    } catch (error) {
-      runEvents?.runError({
-        pipelineId,
-        message: (error as Error)?.message ?? String(error),
-        stageId: null
-      });
-      throw error;
-    }
-  }
-
-  private async runLifecycleGuardAndPlanning(
-    context: Pick<
-      RunLifecycleContext,
-      'env' | 'pipeline' | 'manifest' | 'paths' | 'taskContext' | 'runId' | 'persister'
-    >
-  ) {
-    const controlPlaneResult = await this.controlPlane.guard({
-      env: context.env,
-      manifest: context.manifest,
-      paths: context.paths,
-      pipeline: context.pipeline,
-      task: context.taskContext,
-      runId: context.runId,
-      requestedBy: { actorId: 'codex-cli', channel: 'cli', name: 'Codex CLI' },
-      persister: context.persister
-    });
-
-    const schedulerPlan = await this.scheduler.createPlanForRun({
-      env: context.env,
-      manifest: context.manifest,
-      paths: context.paths,
-      controlPlaneResult,
-      persister: context.persister
-    });
-
-    return { controlPlaneResult, schedulerPlan };
   }
 
   private applyRequestedRuntimeMode(manifest: CliManifest, mode: RuntimeMode): void {
