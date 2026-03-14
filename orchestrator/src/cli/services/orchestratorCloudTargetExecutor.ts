@@ -349,6 +349,42 @@ function buildCloudTaskExecutorRequest(params: {
   };
 }
 
+function applyMissingCloudEnvironmentFailure(params: {
+  manifest: CliManifest;
+  notes: string[];
+  targetEntry: CliManifest['commands'][number];
+}): void {
+  const detail =
+    'Cloud execution requested but no environment id is configured. Set CODEX_CLOUD_ENV_ID or provide target metadata.cloudEnvId.';
+  params.manifest.status_detail = 'cloud-env-missing';
+  params.manifest.cloud_execution = {
+    task_id: null,
+    environment_id: null,
+    status: 'failed',
+    status_url: null,
+    submitted_at: null,
+    completed_at: isoTimestamp(),
+    last_polled_at: null,
+    poll_count: 0,
+    poll_interval_seconds: DEFAULT_CLOUD_POLL_INTERVAL_SECONDS,
+    timeout_seconds: DEFAULT_CLOUD_TIMEOUT_SECONDS,
+    attempts: DEFAULT_CLOUD_ATTEMPTS,
+    diff_path: null,
+    diff_url: null,
+    diff_status: 'unavailable',
+    apply_status: 'not_requested',
+    log_path: null,
+    error: detail
+  };
+  appendSummary(params.manifest, detail);
+  params.notes.push(detail);
+  params.targetEntry.status = 'failed';
+  params.targetEntry.started_at = params.targetEntry.started_at ?? isoTimestamp();
+  params.targetEntry.completed_at = isoTimestamp();
+  params.targetEntry.exit_code = 1;
+  params.targetEntry.summary = detail;
+}
+
 export async function executeOrchestratorCloudTarget(
   options: CloudTargetExecutorOptions
 ): Promise<{ success: boolean; notes: string[] }> {
@@ -389,35 +425,7 @@ export async function executeOrchestratorCloudTarget(
   const environmentId = resolveCloudEnvironmentId(task, target, options.envOverrides);
   if (!environmentId) {
     success = false;
-    manifest.status_detail = 'cloud-env-missing';
-    const detail =
-      'Cloud execution requested but no environment id is configured. Set CODEX_CLOUD_ENV_ID or provide target metadata.cloudEnvId.';
-    manifest.cloud_execution = {
-      task_id: null,
-      environment_id: null,
-      status: 'failed',
-      status_url: null,
-      submitted_at: null,
-      completed_at: isoTimestamp(),
-      last_polled_at: null,
-      poll_count: 0,
-      poll_interval_seconds: DEFAULT_CLOUD_POLL_INTERVAL_SECONDS,
-      timeout_seconds: DEFAULT_CLOUD_TIMEOUT_SECONDS,
-      attempts: DEFAULT_CLOUD_ATTEMPTS,
-      diff_path: null,
-      diff_url: null,
-      diff_status: 'unavailable',
-      apply_status: 'not_requested',
-      log_path: null,
-      error: detail
-    };
-    appendSummary(manifest, detail);
-    notes.push(detail);
-    targetEntry.status = 'failed';
-    targetEntry.started_at = targetEntry.started_at ?? isoTimestamp();
-    targetEntry.completed_at = isoTimestamp();
-    targetEntry.exit_code = 1;
-    targetEntry.summary = detail;
+    applyMissingCloudEnvironmentFailure({ manifest, notes, targetEntry });
     return { success, notes };
   }
 

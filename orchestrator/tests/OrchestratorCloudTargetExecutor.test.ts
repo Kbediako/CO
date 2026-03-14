@@ -14,6 +14,7 @@ import {
 
 const ORIGINAL_ENV = {
   CODEX_CLI_BIN: process.env.CODEX_CLI_BIN,
+  CODEX_CLOUD_ENV_ID: process.env.CODEX_CLOUD_ENV_ID,
   CODEX_CLOUD_POLL_INTERVAL_SECONDS: process.env.CODEX_CLOUD_POLL_INTERVAL_SECONDS,
   CODEX_CLOUD_TIMEOUT_SECONDS: process.env.CODEX_CLOUD_TIMEOUT_SECONDS,
   CODEX_CLOUD_EXEC_ATTEMPTS: process.env.CODEX_CLOUD_EXEC_ATTEMPTS,
@@ -296,5 +297,68 @@ describe('executeOrchestratorCloudTarget request shaping', () => {
     expect(captured?.env?.CODEX_NON_INTERACTIVE).toBe('0');
     expect(captured?.env?.CODEX_NO_INTERACTIVE).toBe('0');
     expect(captured?.env?.CODEX_INTERACTIVE).toBe('1');
+  });
+
+  it('applies the missing-env failure contract before executor handoff', async () => {
+    delete process.env.CODEX_CLOUD_ENV_ID;
+    const options = buildOptions({ CODEX_CLOUD_ENV_ID: ' ' });
+    options.target.metadata = { stageId: 'stage-1' };
+
+    const executeSpy = vi.spyOn(CodexCloudTaskExecutor.prototype, 'execute');
+
+    const result = await executeOrchestratorCloudTarget(options);
+
+    expect(result.success).toBe(false);
+    expect(result.notes).toEqual([
+      'Cloud execution requested but no environment id is configured. Set CODEX_CLOUD_ENV_ID or provide target metadata.cloudEnvId.'
+    ]);
+    expect(executeSpy).not.toHaveBeenCalled();
+    expect(options.schedulePersist).not.toHaveBeenCalled();
+    expect(options.manifest.status_detail).toBe('cloud-env-missing');
+    expect(options.manifest.summary).toBe(
+      'Cloud execution requested but no environment id is configured. Set CODEX_CLOUD_ENV_ID or provide target metadata.cloudEnvId.'
+    );
+    expect(options.manifest.cloud_execution).toMatchObject({
+      task_id: null,
+      environment_id: null,
+      status: 'failed',
+      status_url: null,
+      submitted_at: null,
+      last_polled_at: null,
+      poll_count: 0,
+      poll_interval_seconds: 10,
+      timeout_seconds: 1800,
+      attempts: 1,
+      diff_path: null,
+      diff_url: null,
+      diff_status: 'unavailable',
+      apply_status: 'not_requested',
+      log_path: null,
+      error:
+        'Cloud execution requested but no environment id is configured. Set CODEX_CLOUD_ENV_ID or provide target metadata.cloudEnvId.'
+    });
+    expect(options.manifest.cloud_execution?.completed_at).toBeTruthy();
+    expect(options.manifest.commands[0]).toMatchObject({
+      status: 'failed',
+      exit_code: 1,
+      summary:
+        'Cloud execution requested but no environment id is configured. Set CODEX_CLOUD_ENV_ID or provide target metadata.cloudEnvId.'
+    });
+    expect(options.manifest.commands[0]?.started_at).toBeTruthy();
+    expect(options.manifest.commands[0]?.completed_at).toBeTruthy();
+  });
+
+  it('preserves an existing target started_at when applying the missing-env failure contract', async () => {
+    delete process.env.CODEX_CLOUD_ENV_ID;
+    const options = buildOptions({ CODEX_CLOUD_ENV_ID: '' });
+    options.target.metadata = { stageId: 'stage-1' };
+    options.manifest.commands[0]!.started_at = '2026-03-14T03:00:00.000Z';
+
+    const result = await executeOrchestratorCloudTarget(options);
+
+    expect(result.success).toBe(false);
+    expect(options.manifest.commands[0]?.started_at).toBe('2026-03-14T03:00:00.000Z');
+    expect(options.manifest.commands[0]?.completed_at).toBeTruthy();
+    expect(options.manifest.commands[0]?.exit_code).toBe(1);
   });
 });
