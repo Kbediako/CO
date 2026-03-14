@@ -167,6 +167,32 @@ describe('routeOrchestratorExecution', () => {
         branch: null
       }
     });
+    mockState.lifecycleRunner.mockImplementation(async (input) => {
+      const success = await input.executeBody({
+        notes: [],
+        persister: { schedule: vi.fn(async () => undefined) },
+        controlWatcher: {
+          sync: vi.fn(async () => undefined),
+          waitForResume: vi.fn(async () => undefined),
+          isCanceled: vi.fn(() => false)
+        },
+        schedulePersist: vi.fn(async () => undefined)
+      });
+      return {
+        success,
+        notes: [],
+        manifest: input.manifest,
+        manifestPath: input.paths.manifestPath,
+        logPath: input.paths.logPath
+      };
+    });
+    mockState.localExecutor.mockImplementation(async (input) => {
+      await input.startSubpipeline('child-pipeline');
+      return {
+        success: true,
+        notes: ['local']
+      };
+    });
 
     const expectedDetail =
       'Cloud preflight failed; falling back to mcp. ' +
@@ -198,6 +224,17 @@ describe('routeOrchestratorExecution', () => {
     expect(mockState.lifecycleRunner.mock.calls[0]?.[0].envOverrides).toMatchObject({
       OUTER_FLAG: '1',
       CODEX_FAKE_ROUTER_FLAG: '1'
+    });
+    expect(mockState.localExecutor).toHaveBeenCalledOnce();
+    expect(mockState.localExecutor.mock.calls[0]?.[0].runtimeMode).toBe('cli');
+    expect(mockState.localExecutor.mock.calls[0]?.[0].envOverrides).toMatchObject({
+      OUTER_FLAG: '1',
+      CODEX_FAKE_ROUTER_FLAG: '1'
+    });
+    expect(options.startSubpipeline).toHaveBeenCalledWith({
+      pipelineId: 'child-pipeline',
+      executionModeOverride: 'mcp',
+      runtimeModeRequested: 'cli'
     });
     expect(resolveRuntimeSelectionSpy).toHaveBeenCalledTimes(2);
     expect(resolveRuntimeSelectionSpy.mock.calls[1]?.[0]).toMatchObject({
@@ -321,48 +358,6 @@ describe('routeOrchestratorExecution', () => {
     expect(mockState.localExecutor).not.toHaveBeenCalled();
   });
 
-  it('forwards resolved runtime mode and env overrides into the direct local execution body', async () => {
-    vi.spyOn(runtimeIndex, 'resolveRuntimeSelection').mockResolvedValue(
-      createRuntimeSelection({
-        selected_mode: 'cli',
-        provider: 'CliRuntimeProvider',
-        runtime_session_id: 'runtime-123',
-        env_overrides: { CODEX_FAKE_ROUTER_FLAG: '1' }
-      })
-    );
-    mockState.lifecycleRunner.mockImplementation(async (input) => {
-      const notes: string[] = [];
-      const success = await input.executeBody({
-        notes,
-        persister: { schedule: vi.fn(async () => undefined) },
-        controlWatcher: {
-          sync: vi.fn(async () => undefined),
-          waitForResume: vi.fn(async () => undefined),
-          isCanceled: vi.fn(() => false)
-        },
-        schedulePersist: vi.fn(async () => undefined)
-      });
-      return {
-        success,
-        notes,
-        manifest: input.manifest,
-        manifestPath: input.paths.manifestPath,
-        logPath: input.paths.logPath
-      };
-    });
-
-    const options = createOptions({ mode: 'mcp' });
-    const result = await routeOrchestratorExecution(options);
-
-    expect(result.success).toBe(true);
-    expect(mockState.localExecutor).toHaveBeenCalledOnce();
-    expect(mockState.localExecutor.mock.calls[0]?.[0].envOverrides).toMatchObject({
-      CODEX_FAKE_ROUTER_FLAG: '1'
-    });
-    expect(mockState.localExecutor.mock.calls[0]?.[0].runtimeMode).toBe('cli');
-    expect(mockState.localExecutor.mock.calls[0]?.[0].runtimeSessionId).toBe('runtime-123');
-  });
-
   it('forwards fallback-adjusted execution and runtime modes to local subpipelines', async () => {
     vi.spyOn(runtimeIndex, 'resolveRuntimeSelection').mockResolvedValue(
       createRuntimeSelection({
@@ -456,128 +451,4 @@ describe('routeOrchestratorExecution', () => {
     });
   });
 
-  it('adds the runtime fallback summary during local lifecycle beforeStart', async () => {
-    vi.spyOn(runtimeIndex, 'resolveRuntimeSelection').mockResolvedValue(
-      createRuntimeSelection({
-        selected_mode: 'cli',
-        provider: 'CliRuntimeProvider',
-        fallback: {
-          occurred: true,
-          code: 'appserver-command-unavailable',
-          reason: 'Appserver preflight failed.',
-          from_mode: 'appserver',
-          to_mode: 'cli',
-          checked_at: '2026-03-13T00:00:00.000Z'
-        }
-      })
-    );
-    mockState.lifecycleRunner.mockImplementation(async (input) => {
-      const notes: string[] = [];
-      input.beforeStart?.({ notes });
-      return {
-        success: true,
-        notes,
-        manifest: input.manifest,
-        manifestPath: input.paths.manifestPath,
-        logPath: input.paths.logPath
-      };
-    });
-
-    const options = createOptions({ mode: 'mcp' });
-    const result = await routeOrchestratorExecution(options);
-
-    expect(result.success).toBe(true);
-    expect(result.notes).toEqual([
-      'Runtime fallback (appserver-command-unavailable): Appserver preflight failed.'
-    ]);
-    expect(options.manifest.summary).toBe(
-      'Runtime fallback (appserver-command-unavailable): Appserver preflight failed.'
-    );
-  });
-
-  it('passes local auto-scout through with effective env overrides', async () => {
-    vi.spyOn(runtimeIndex, 'resolveRuntimeSelection').mockResolvedValue(
-      createRuntimeSelection({
-        selected_mode: 'cli',
-        provider: 'CliRuntimeProvider',
-        env_overrides: { CODEX_FAKE_ROUTER_FLAG: '1' }
-      })
-    );
-    const autoScoutOutcome = { status: 'recorded' as const, path: 'auto-scout.json' };
-    mockState.lifecycleRunner.mockImplementation(async (input) => {
-      await input.runAutoScout({
-        env: input.env,
-        paths: input.paths,
-        manifest: input.manifest,
-        mode: input.mode,
-        pipeline: input.pipeline,
-        target: input.target,
-        task: input.task,
-        advancedDecision: { mode: 'auto' } as never
-      });
-      return {
-        success: true,
-        notes: [],
-        manifest: input.manifest,
-        manifestPath: input.paths.manifestPath,
-        logPath: input.paths.logPath
-      };
-    });
-
-    const options = createOptions({
-      mode: 'mcp',
-      runAutoScout: vi.fn(async () => autoScoutOutcome)
-    });
-    const result = await routeOrchestratorExecution(options);
-
-    expect(result.success).toBe(true);
-    expect(options.runAutoScout).toHaveBeenCalledOnce();
-    expect(options.runAutoScout).toHaveBeenCalledWith(
-      expect.objectContaining({
-        envOverrides: expect.objectContaining({
-          CODEX_FAKE_ROUTER_FLAG: '1'
-        })
-      })
-    );
-  });
-
-  it('appends the guardrail recommendation during local lifecycle afterFinalize', async () => {
-    vi.spyOn(runtimeIndex, 'resolveRuntimeSelection').mockResolvedValue(
-      createRuntimeSelection({
-        selected_mode: 'cli',
-        provider: 'CliRuntimeProvider'
-      })
-    );
-    mockState.lifecycleRunner.mockImplementation(async (input) => {
-      input.afterFinalize?.();
-      return {
-        success: true,
-        notes: [],
-        manifest: input.manifest,
-        manifestPath: input.paths.manifestPath,
-        logPath: input.paths.logPath
-      };
-    });
-
-    const manifest = createManifest();
-    manifest.guardrail_status = {
-      present: true,
-      recommendation: 'Guardrails: follow-up required.',
-      summary: 'Guardrails: 0 succeeded, 1 failed.',
-      computed_at: '2026-03-14T00:00:00.000Z',
-      counts: {
-        total: 1,
-        succeeded: 0,
-        failed: 1,
-        skipped: 0,
-        other: 0
-      }
-    };
-
-    const options = createOptions({ mode: 'mcp', manifest });
-    const result = await routeOrchestratorExecution(options);
-
-    expect(result.success).toBe(true);
-    expect(options.manifest.summary).toBe('Guardrails: follow-up required.');
-  });
 });

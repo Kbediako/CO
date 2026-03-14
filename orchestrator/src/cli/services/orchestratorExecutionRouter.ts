@@ -4,7 +4,8 @@ import { CLI_EXECUTION_MODE_PARSER, resolveRequiresCloudPolicy } from '../../uti
 import type { RunEventPublisher } from '../events/runEvents.js';
 import type { RunEventStream, RunEventStreamEntry } from '../events/runEventStream.js';
 import type { EnvironmentPaths } from '../run/environment.js';
-import { appendSummary, ensureGuardrailStatus, finalizeStatus } from '../run/manifest.js';
+import { appendSummary, finalizeStatus } from '../run/manifest.js';
+import { executeOrchestratorLocalRouteShell } from './orchestratorLocalRouteShell.js';
 import type { ManifestPersister } from '../run/manifestPersister.js';
 import type { RunPaths } from '../run/runPaths.js';
 import type { RuntimeMode, RuntimeModeSource, RuntimeSelection } from '../runtime/types.js';
@@ -16,12 +17,10 @@ import type {
 } from '../types.js';
 import type { AdvancedAutopilotDecision } from '../utils/advancedAutopilot.js';
 import { executeOrchestratorCloudRouteShell } from './orchestratorCloudRouteShell.js';
-import { runOrchestratorExecutionLifecycle } from './orchestratorExecutionLifecycle.js';
 import {
   resolveOrchestratorExecutionRouteState,
   type OrchestratorExecutionRouteState
 } from './orchestratorExecutionRouteState.js';
-import { executeOrchestratorLocalPipeline } from './orchestratorLocalPipelineExecutor.js';
 
 export type OrchestratorAutoScoutOutcome =
   | { status: 'recorded'; path: string }
@@ -142,73 +141,7 @@ async function executeLocalRoute(
   options: OrchestratorExecutionRouteOptions,
   state: OrchestratorExecutionRouteState
 ): Promise<PipelineRunExecutionResult> {
-  return runLocalExecutionLifecycleShell(options, state);
-}
-
-async function runLocalExecutionLifecycleShell(
-  options: OrchestratorExecutionRouteOptions,
-  state: OrchestratorExecutionRouteState
-): Promise<PipelineRunExecutionResult> {
-  const { env, pipeline, manifest, paths, runEvents } = options;
-  return runOrchestratorExecutionLifecycle({
-    env,
-    pipeline,
-    manifest,
-    paths,
-    mode: options.mode,
-    target: options.target,
-    task: options.task,
-    runEvents,
-    eventStream: options.eventStream,
-    onEventEntry: options.onEventEntry,
-    persister: options.persister,
-    envOverrides: state.effectiveEnvOverrides,
-    advancedDecisionEnv: state.effectiveMergedEnv,
-    defaultFailureStatusDetail: 'pipeline-failed',
-    beforeStart: ({ notes }) => {
-      if (state.runtimeSelection.fallback.occurred) {
-        const fallbackCode = state.runtimeSelection.fallback.code ?? 'runtime-fallback';
-        const fallbackReason = state.runtimeSelection.fallback.reason ?? 'runtime fallback occurred';
-        const fallbackSummary = `Runtime fallback (${fallbackCode}): ${fallbackReason}`;
-        appendSummary(manifest, fallbackSummary);
-        notes.push(fallbackSummary);
-      }
-    },
-    runAutoScout: (autoScoutOptions) =>
-      options.runAutoScout({
-        ...autoScoutOptions,
-        envOverrides: state.effectiveEnvOverrides
-      }),
-    executeBody: async ({ notes, persister, controlWatcher, schedulePersist }) => {
-      const localResult = await executeOrchestratorLocalPipeline({
-        env,
-        pipeline,
-        manifest,
-        paths,
-        persister,
-        envOverrides: state.effectiveEnvOverrides,
-        runtimeMode: state.runtimeSelection.selected_mode,
-        runtimeSessionId: state.runtimeSelection.runtime_session_id,
-        runEvents,
-        controlWatcher,
-        schedulePersist,
-        startSubpipeline: (pipelineId) =>
-          options.startSubpipeline({
-            pipelineId,
-            executionModeOverride: options.executionModeOverride,
-            runtimeModeRequested: state.runtimeSelection.selected_mode
-          })
-      });
-      notes.push(...localResult.notes);
-      return localResult.success;
-    },
-    afterFinalize: () => {
-      const guardrailStatus = ensureGuardrailStatus(manifest);
-      if (guardrailStatus.recommendation) {
-        appendSummary(manifest, guardrailStatus.recommendation);
-      }
-    }
-  });
+  return executeOrchestratorLocalRouteShell({ ...options, state });
 }
 
 export async function routeOrchestratorExecution(
