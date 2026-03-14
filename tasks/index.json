@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260315-1201-coordinator-symphony-aligned-orchestrator-remaining-private-wrapper-reassessment",
+      "title": "Coordinator Symphony-Aligned Orchestrator Remaining Private Wrapper Reassessment",
+      "relates_to": "tasks/tasks-1201-coordinator-symphony-aligned-orchestrator-remaining-private-wrapper-reassessment.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-15",
+      "paths": {
+        "spec": "tasks/specs/1201-coordinator-symphony-aligned-orchestrator-remaining-private-wrapper-reassessment.md",
+        "task": "tasks/tasks-1201-coordinator-symphony-aligned-orchestrator-remaining-private-wrapper-reassessment.md",
+        "agent_task": ".agent/task/1201-coordinator-symphony-aligned-orchestrator-remaining-private-wrapper-reassessment.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-remaining-private-wrapper-reassessment.md"
+      }
+    },
+    {
       "id": "20260315-1200-coordinator-symphony-aligned-orchestrator-resume-pre-start-failure-persistence-callback-extraction",
       "title": "Coordinator Symphony-Aligned Orchestrator Resume Pre-Start Failure Persistence Callback Extraction",
       "relates_to": "tasks/tasks-1200-coordinator-symphony-aligned-orchestrator-resume-pre-start-failure-persistence-callback-extraction.md",

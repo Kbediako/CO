@@ -3,6 +3,55 @@
   "generated_at": "2026-03-15",
   "entries": [
     {
+      "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-orchestrator-remaining-private-wrapper-reassessment.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-15",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/PRD-coordinator-symphony-aligned-orchestrator-remaining-private-wrapper-reassessment.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-15",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-remaining-private-wrapper-reassessment.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-15",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/findings/1201-orchestrator-remaining-private-wrapper-reassessment-deliberation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-15",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/tasks-1201-coordinator-symphony-aligned-orchestrator-remaining-private-wrapper-reassessment.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-15",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/specs/1201-coordinator-symphony-aligned-orchestrator-remaining-private-wrapper-reassessment.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-15",
+      "cadence_days": 30
+    },
+    {
+      "path": ".agent/task/1201-coordinator-symphony-aligned-orchestrator-remaining-private-wrapper-reassessment.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-15",
+      "cadence_days": 30
+    },
+    {
       "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-orchestrator-resume-pre-start-failure-persistence-callback-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
