@@ -17,12 +17,10 @@ import type {
   ResumeOptions,
   StatusOptions,
 } from './types.js';
-import { isoTimestamp } from './utils/time.js';
 import type { RunPaths } from './run/runPaths.js';
 import { logger } from '../logger.js';
 import { ControlPlaneService } from './services/controlPlaneService.js';
 import { SchedulerService } from './services/schedulerService.js';
-import type { RuntimeMode, RuntimeSelection } from './runtime/types.js';
 import type { AdvancedAutopilotDecision } from './utils/advancedAutopilot.js';
 import {
   type OrchestratorAutoScoutOutcome
@@ -41,6 +39,10 @@ import { runOrchestratorStartPreparationShell } from './services/orchestratorSta
 import { runOrchestratorResumePreparationShell } from './services/orchestratorResumePreparationShell.js';
 import { runOrchestratorStatusShell } from './services/orchestratorStatusShell.js';
 import { runOrchestratorPlanShell } from './services/orchestratorPlanShell.js';
+import {
+  applyRequestedRuntimeModeToManifest,
+  applyRuntimeSelectionToManifest
+} from './services/orchestratorRuntimeManifestMutation.js';
 
 const resolveBaseEnvironment = (): EnvironmentPaths =>
   normalizeEnvironmentPaths(resolveEnvironmentPaths());
@@ -58,7 +60,7 @@ export class CodexOrchestrator {
       await runOrchestratorStartPreparationShell({
         baseEnv: this.baseEnv,
         options,
-        applyRequestedRuntimeMode: this.applyRequestedRuntimeMode.bind(this)
+        applyRequestedRuntimeMode: applyRequestedRuntimeModeToManifest
       });
 
     return await runOrchestratorControlPlaneLifecycleShell({
@@ -94,7 +96,7 @@ export class CodexOrchestrator {
         baseEnv: this.baseEnv,
         options,
         validateResumeToken: this.validateResumeToken.bind(this),
-        applyRequestedRuntimeMode: this.applyRequestedRuntimeMode.bind(this)
+        applyRequestedRuntimeMode: applyRequestedRuntimeModeToManifest
       });
 
     return await runOrchestratorControlPlaneLifecycleShell({
@@ -152,7 +154,7 @@ export class CodexOrchestrator {
   private async executePipeline(options: ExecutePipelineOptions): Promise<PipelineRunExecutionResult> {
     return executeOrchestratorPipelineRouteEntryShell({
       options,
-      applyRuntimeSelection: this.applyRuntimeSelection.bind(this),
+      applyRuntimeSelection: applyRuntimeSelectionToManifest,
       runAutoScout: this.runAutoScout.bind(this),
       startPipeline: this.start.bind(this)
     });
@@ -183,27 +185,6 @@ export class CodexOrchestrator {
       applyControlPlaneToRunSummary: (summary, result) =>
         this.controlPlane.applyControlPlaneToRunSummary(summary, result)
     });
-  }
-
-  private applyRequestedRuntimeMode(manifest: CliManifest, mode: RuntimeMode): void {
-    manifest.runtime_mode_requested = mode;
-    manifest.runtime_mode = mode;
-    manifest.runtime_provider = mode === 'appserver' ? 'AppServerRuntimeProvider' : 'CliRuntimeProvider';
-    manifest.runtime_fallback = {
-      occurred: false,
-      code: null,
-      reason: null,
-      from_mode: null,
-      to_mode: null,
-      checked_at: isoTimestamp()
-    };
-  }
-
-  private applyRuntimeSelection(manifest: CliManifest, selection: RuntimeSelection): void {
-    manifest.runtime_mode_requested = selection.requested_mode;
-    manifest.runtime_mode = selection.selected_mode;
-    manifest.runtime_provider = selection.provider;
-    manifest.runtime_fallback = selection.fallback;
   }
 
   private async validateResumeToken(paths: RunPaths, manifest: CliManifest, provided: string | null): Promise<void> {
