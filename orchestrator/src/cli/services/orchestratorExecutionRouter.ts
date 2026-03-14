@@ -1,5 +1,3 @@
-import process from 'node:process';
-
 import type { TaskContext, ExecutionMode, PlanItem } from '../../types.js';
 import { logger } from '../../logger.js';
 import { CLI_EXECUTION_MODE_PARSER, resolveRequiresCloudPolicy } from '../../utils/executionMode.js';
@@ -9,7 +7,6 @@ import type { EnvironmentPaths } from '../run/environment.js';
 import { appendSummary, ensureGuardrailStatus, finalizeStatus } from '../run/manifest.js';
 import type { ManifestPersister } from '../run/manifestPersister.js';
 import type { RunPaths } from '../run/runPaths.js';
-import { resolveRuntimeSelection } from '../runtime/index.js';
 import type { RuntimeMode, RuntimeModeSource, RuntimeSelection } from '../runtime/types.js';
 import type {
   CliManifest,
@@ -22,6 +19,10 @@ import type { AdvancedAutopilotDecision } from '../utils/advancedAutopilot.js';
 import { isoTimestamp } from '../utils/time.js';
 import { resolveCloudEnvironmentId } from './orchestratorCloudTargetExecutor.js';
 import { runOrchestratorExecutionLifecycle } from './orchestratorExecutionLifecycle.js';
+import {
+  resolveOrchestratorExecutionRouteState,
+  type OrchestratorExecutionRouteState
+} from './orchestratorExecutionRouteState.js';
 import { executeOrchestratorLocalPipeline } from './orchestratorLocalPipelineExecutor.js';
 
 function readCloudString(value: unknown): string | null {
@@ -88,12 +89,6 @@ export interface OrchestratorExecutionRouteOptions {
     runtimeModeRequested: RuntimeMode;
   }): Promise<PipelineExecutionResult>;
 }
-
-type OrchestratorExecutionRouteState = {
-  runtimeSelection: RuntimeSelection;
-  effectiveEnvOverrides: NodeJS.ProcessEnv;
-  effectiveMergedEnv: NodeJS.ProcessEnv;
-};
 
 type CloudFallbackReroute = {
   mode: 'mcp';
@@ -163,29 +158,6 @@ function failExecutionRoute(
     manifestPath: options.paths.manifestPath,
     logPath: options.paths.logPath
   };
-}
-
-async function resolveExecutionRouteState(
-  options: OrchestratorExecutionRouteOptions
-): Promise<OrchestratorExecutionRouteState> {
-  const baseEnvOverrides: NodeJS.ProcessEnv = { ...(options.envOverrides ?? {}) };
-  const mergedEnv = { ...process.env, ...baseEnvOverrides };
-  const runtimeSelection = await resolveRuntimeSelection({
-    requestedMode: options.runtimeModeRequested,
-    source: options.runtimeModeSource,
-    executionMode: options.mode,
-    repoRoot: options.env.repoRoot,
-    env: mergedEnv,
-    runId: options.manifest.run_id
-  });
-
-  options.applyRuntimeSelection(options.manifest, runtimeSelection);
-  const effectiveEnvOverrides: NodeJS.ProcessEnv = {
-    ...baseEnvOverrides,
-    ...runtimeSelection.env_overrides
-  };
-  const effectiveMergedEnv = { ...process.env, ...effectiveEnvOverrides };
-  return { runtimeSelection, effectiveEnvOverrides, effectiveMergedEnv };
 }
 
 function buildCloudPreflightFailureContract(
@@ -341,7 +313,15 @@ export async function routeOrchestratorExecution(
 ): Promise<PipelineRunExecutionResult> {
   let state: OrchestratorExecutionRouteState;
   try {
-    state = await resolveExecutionRouteState(options);
+    state = await resolveOrchestratorExecutionRouteState({
+      repoRoot: options.env.repoRoot,
+      manifest: options.manifest,
+      mode: options.mode,
+      runtimeModeRequested: options.runtimeModeRequested,
+      runtimeModeSource: options.runtimeModeSource,
+      envOverrides: options.envOverrides,
+      applyRuntimeSelection: options.applyRuntimeSelection
+    });
   } catch (error) {
     const detail = `Runtime selection failed: ${(error as Error)?.message ?? String(error)}`;
     return failExecutionRoute(options, 'runtime-selection-failed', detail);
