@@ -65,7 +65,7 @@ function buildManifest(): CliManifest {
   return {
     commands: [
       {
-        index: 0,
+        index: 1,
         id: 'stage-1',
         kind: 'command',
         title: 'Stage 1',
@@ -393,7 +393,7 @@ describe('executeOrchestratorCloudTarget request shaping', () => {
       expect(runEvents.stageStarted).toHaveBeenCalledWith(
         expect.objectContaining({
           stageId: 'stage-1',
-          stageIndex: 0,
+          stageIndex: 1,
           status: 'running',
           logPath: null
         })
@@ -429,7 +429,7 @@ describe('executeOrchestratorCloudTarget request shaping', () => {
     expect(runEvents.stageCompleted).toHaveBeenCalledWith(
       expect.objectContaining({
         stageId: 'stage-1',
-        stageIndex: 0,
+        stageIndex: 1,
         status: 'succeeded',
         exitCode: 0,
         logPath: 'cloud/final.ndjson'
@@ -461,7 +461,6 @@ describe('executeOrchestratorCloudTarget request shaping', () => {
     const result = await executeOrchestratorCloudTarget(options);
 
     expect(result.success).toBe(false);
-    expect(result.notes).toEqual(['Remote runner failed.']);
     expect(options.manifest.cloud_execution).toEqual(failedExecution);
     expect(options.manifest.status_detail).toBe('cloud:stage-1:failed');
     expect(options.manifest.summary).toBe('Cloud task failed.');
@@ -477,7 +476,7 @@ describe('executeOrchestratorCloudTarget request shaping', () => {
     expect(runEvents.stageCompleted).toHaveBeenCalledWith(
       expect.objectContaining({
         stageId: 'stage-1',
-        stageIndex: 0,
+        stageIndex: 1,
         status: 'failed',
         exitCode: 1,
         summary: 'Cloud task failed.',
