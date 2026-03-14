@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { CodexOrchestrator } from '../src/cli/orchestrator.js';
+import * as taskManagerShell from '../src/cli/services/orchestratorRunLifecycleTaskManagerShell.js';
 import type { TaskManager } from '../src/manager.js';
 import type { TaskContext } from '../src/types.js';
 import type { RunEventPublisher } from '../src/cli/events/runEvents.js';
@@ -47,9 +48,6 @@ type ExecutionAndRunErrorHarness = {
     runEvents?: RunEventPublisher
   ) => Promise<RunSummary>;
   performRunLifecycle: (context: ReturnType<typeof createPerformRunLifecycleOptions>) => Promise<unknown>;
-  createRunLifecycleTaskManager: (
-    context: ReturnType<typeof createPerformRunLifecycleOptions>
-  ) => Pick<TaskManager, 'execute'>;
   runLifecycleGuardAndPlanning: (
     context: ReturnType<typeof createPerformRunLifecycleOptions>
   ) => Promise<{ controlPlaneResult: unknown; schedulerPlan: unknown }>;
@@ -117,7 +115,7 @@ describe('CodexOrchestrator.executeRunLifecycleTask', () => {
       })
     };
 
-    vi.spyOn(harness, 'createRunLifecycleTaskManager').mockReturnValue(manager);
+    vi.spyOn(taskManagerShell, 'createOrchestratorRunLifecycleTaskManager').mockReturnValue(manager as never);
     vi.spyOn(harness, 'runLifecycleGuardAndPlanning').mockResolvedValue({
       controlPlaneResult: { label: 'control-plane-result' },
       schedulerPlan: { label: 'scheduler-plan' }
