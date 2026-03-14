@@ -8,12 +8,12 @@
 
 ## Implementation
 
-- [ ] Extract one bounded cloud-route shell around `executeCloudRoute(...)`.
-- [ ] Keep `routeOrchestratorExecution(...)` as the router-local failure and branch boundary while delegating cloud preflight, fallback reroute, and successful cloud dispatch.
-- [ ] Add focused regression coverage for fail-fast behavior, fallback reroute env propagation, and successful cloud delegation without reopening shared route-state or lifecycle seams.
+- [x] Extract one bounded cloud-route shell around `executeCloudRoute(...)`.
+- [x] Keep `routeOrchestratorExecution(...)` as the router-local failure and branch boundary while delegating cloud preflight, fallback reroute, and successful cloud dispatch.
+- [x] Add focused regression coverage for fail-fast behavior, fallback reroute env propagation, and successful cloud delegation without reopening shared route-state or lifecycle seams.
 
 ## Closeout
 
-- [ ] Run the standard gate bundle and capture closeout artifacts under `out/1181-coordinator-symphony-aligned-orchestrator-cloud-route-preflight-and-reroute-shell-extraction/manual/<timestamp>-closeout/`.
-- [ ] Run an explicit elegance review.
-- [ ] Record the next truthful seam after `1181`.
+- [x] Run the standard gate bundle and capture closeout artifacts under `out/1181-coordinator-symphony-aligned-orchestrator-cloud-route-preflight-and-reroute-shell-extraction/manual/20260314T071433Z-closeout/`.
+- [x] Run an explicit elegance review.
+- [x] Record the next truthful seam after `1181`.
