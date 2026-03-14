@@ -60,7 +60,10 @@ import { RunEventStream } from './events/runEventStream.js';
 import { resolveRuntimeMode } from './runtime/index.js';
 import type { RuntimeMode, RuntimeModeSource, RuntimeSelection } from './runtime/types.js';
 import type { AdvancedAutopilotDecision } from './utils/advancedAutopilot.js';
-import { startOrchestratorControlPlaneLifecycle } from './services/orchestratorControlPlaneLifecycle.js';
+import {
+  startOrchestratorControlPlaneLifecycle,
+  type OrchestratorControlPlaneLifecycle
+} from './services/orchestratorControlPlaneLifecycle.js';
 import { runOrchestratorExecutionLifecycle } from './services/orchestratorExecutionLifecycle.js';
 import { executeOrchestratorCloudTarget } from './services/orchestratorCloudTargetExecutor.js';
 import {
@@ -92,6 +95,12 @@ interface RunLifecycleContext {
   runtimeModeRequested: RuntimeMode;
   runtimeModeSource: RuntimeModeSource;
   executionModeOverride?: ExecutionMode;
+}
+
+interface ControlPlaneLaunchContext {
+  runEvents?: RunEventPublisher;
+  eventStream: OrchestratorControlPlaneLifecycle['eventStream'];
+  onEventEntry: OrchestratorControlPlaneLifecycle['onEventEntry'];
 }
 
 type ExecutePipelineOptions = Omit<
@@ -139,48 +148,33 @@ export class CodexOrchestrator {
       persistIntervalMs: Math.max(1000, manifest.heartbeat_interval_seconds * 1000)
     });
 
-    const emitter = options.runEvents ?? new RunEventEmitter();
-    let controlPlaneLifecycle: Awaited<ReturnType<typeof startOrchestratorControlPlaneLifecycle>> | null = null;
-
-    try {
-      controlPlaneLifecycle = await startOrchestratorControlPlaneLifecycle({
-        repoRoot: preparation.env.repoRoot,
-        paths,
-        taskId: manifest.task_id,
-        runId,
-        pipeline: preparation.pipeline,
-        emitter
-      });
-      const runEvents = this.createRunEventPublisher({
-        runId,
-        pipeline: preparation.pipeline,
-        manifest,
-        paths,
-        emitter
-      });
-
-      return await this.performRunLifecycle({
-        env: preparation.env,
-        pipeline: preparation.pipeline,
-        manifest,
-        paths,
-        planner: preparation.planner,
-        taskContext: preparation.taskContext,
-        runId,
-        runEvents,
-        eventStream: controlPlaneLifecycle.eventStream,
-        onEventEntry: controlPlaneLifecycle.onEventEntry,
-        persister,
-        envOverrides: preparation.envOverrides,
-        runtimeModeRequested: runtimeModeResolution.mode,
-        runtimeModeSource: runtimeModeResolution.source,
-        executionModeOverride: options.executionMode
-      });
-    } finally {
-      if (controlPlaneLifecycle) {
-        await controlPlaneLifecycle.close();
-      }
-    }
+    return await this.withControlPlaneLifecycle({
+      repoRoot: preparation.env.repoRoot,
+      paths,
+      taskId: manifest.task_id,
+      runId,
+      pipeline: preparation.pipeline,
+      manifest,
+      emitter: options.runEvents,
+      runWithLifecycle: ({ runEvents, eventStream, onEventEntry }) =>
+        this.performRunLifecycle({
+          env: preparation.env,
+          pipeline: preparation.pipeline,
+          manifest,
+          paths,
+          planner: preparation.planner,
+          taskContext: preparation.taskContext,
+          runId,
+          runEvents,
+          eventStream,
+          onEventEntry,
+          persister,
+          envOverrides: preparation.envOverrides,
+          runtimeModeRequested: runtimeModeResolution.mode,
+          runtimeModeSource: runtimeModeResolution.source,
+          executionModeOverride: options.executionMode
+        })
+    });
   }
 
   async resume(options: ResumeOptions): Promise<PipelineExecutionResult> {
@@ -239,20 +233,15 @@ export class CodexOrchestrator {
     });
     await persister.schedule({ manifest: true, heartbeat: true, force: true });
 
-    const emitter = options.runEvents ?? new RunEventEmitter();
-    let controlPlaneLifecycle: Awaited<ReturnType<typeof startOrchestratorControlPlaneLifecycle>> | null = null;
-
-    try {
-      try {
-        controlPlaneLifecycle = await startOrchestratorControlPlaneLifecycle({
-          repoRoot: preparation.env.repoRoot,
-          paths,
-          taskId: manifest.task_id,
-          runId: manifest.run_id,
-          pipeline,
-          emitter
-        });
-      } catch (error) {
+    return await this.withControlPlaneLifecycle({
+      repoRoot: preparation.env.repoRoot,
+      paths,
+      taskId: manifest.task_id,
+      runId: manifest.run_id,
+      pipeline,
+      manifest,
+      emitter: options.runEvents,
+      onStartFailure: async () => {
         finalizeStatus(manifest, 'failed', RESUME_PRE_START_FAILURE_STATUS_DETAIL);
         try {
           await persistManifest(paths, manifest, persister, { force: true });
@@ -263,37 +252,25 @@ export class CodexOrchestrator {
             }`
           );
         }
-        throw error;
-      }
-      const runEvents = this.createRunEventPublisher({
-        runId: manifest.run_id,
-        pipeline,
-        manifest,
-        paths,
-        emitter
-      });
-
-      return await this.performRunLifecycle({
-        env: preparation.env,
-        pipeline,
-        manifest,
-        paths,
-        planner: preparation.planner,
-        taskContext: preparation.taskContext,
-        runId: manifest.run_id,
-        runEvents,
-        eventStream: controlPlaneLifecycle.eventStream,
-        onEventEntry: controlPlaneLifecycle.onEventEntry,
-        persister,
-        envOverrides: preparation.envOverrides,
-        runtimeModeRequested: runtimeModeResolution.mode,
-        runtimeModeSource: runtimeModeResolution.source
-      });
-    } finally {
-      if (controlPlaneLifecycle) {
-        await controlPlaneLifecycle.close();
-      }
-    }
+      },
+      runWithLifecycle: ({ runEvents, eventStream, onEventEntry }) =>
+        this.performRunLifecycle({
+          env: preparation.env,
+          pipeline,
+          manifest,
+          paths,
+          planner: preparation.planner,
+          taskContext: preparation.taskContext,
+          runId: manifest.run_id,
+          runEvents,
+          eventStream,
+          onEventEntry,
+          persister,
+          envOverrides: preparation.envOverrides,
+          runtimeModeRequested: runtimeModeResolution.mode,
+          runtimeModeSource: runtimeModeResolution.source
+        })
+    });
   }
 
   async status(options: StatusOptions): Promise<CliManifest> {
@@ -381,6 +358,57 @@ export class CodexOrchestrator {
       manifestPath: params.paths.manifestPath,
       logPath: params.paths.logPath
     });
+  }
+
+  private async withControlPlaneLifecycle<T>(params: {
+    repoRoot: string;
+    paths: RunPaths;
+    taskId: string;
+    runId: string;
+    pipeline: PipelineDefinition;
+    manifest: CliManifest;
+    emitter?: RunEventEmitter;
+    onStartFailure?: () => Promise<void>;
+    runWithLifecycle: (context: ControlPlaneLaunchContext) => Promise<T>;
+  }): Promise<T> {
+    const emitter = params.emitter ?? new RunEventEmitter();
+    let controlPlaneLifecycle: OrchestratorControlPlaneLifecycle | null = null;
+
+    try {
+      try {
+        controlPlaneLifecycle = await startOrchestratorControlPlaneLifecycle({
+          repoRoot: params.repoRoot,
+          paths: params.paths,
+          taskId: params.taskId,
+          runId: params.runId,
+          pipeline: params.pipeline,
+          emitter
+        });
+      } catch (error) {
+        if (params.onStartFailure) {
+          await params.onStartFailure();
+        }
+        throw error;
+      }
+
+      const runEvents = this.createRunEventPublisher({
+        runId: params.runId,
+        pipeline: params.pipeline,
+        manifest: params.manifest,
+        paths: params.paths,
+        emitter
+      });
+
+      return await params.runWithLifecycle({
+        runEvents,
+        eventStream: controlPlaneLifecycle.eventStream,
+        onEventEntry: controlPlaneLifecycle.onEventEntry
+      });
+    } finally {
+      if (controlPlaneLifecycle) {
+        await controlPlaneLifecycle.close();
+      }
+    }
   }
 
   private createTaskManager(

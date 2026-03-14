@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260314-1168-coordinator-symphony-aligned-orchestrator-start-resume-control-plane-launch-shell-extraction",
+      "title": "Coordinator Symphony-Aligned Orchestrator Start-Resume Control-Plane Launch Shell Extraction",
+      "relates_to": "tasks/tasks-1168-coordinator-symphony-aligned-orchestrator-start-resume-control-plane-launch-shell-extraction.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-14",
+      "paths": {
+        "spec": "tasks/specs/1168-coordinator-symphony-aligned-orchestrator-start-resume-control-plane-launch-shell-extraction.md",
+        "task": "tasks/tasks-1168-coordinator-symphony-aligned-orchestrator-start-resume-control-plane-launch-shell-extraction.md",
+        "agent_task": ".agent/task/1168-coordinator-symphony-aligned-orchestrator-start-resume-control-plane-launch-shell-extraction.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-start-resume-control-plane-launch-shell-extraction.md"
+      }
+    },
+    {
       "id": "20260314-1167-coordinator-symphony-aligned-orchestrator-auto-scout-evidence-recorder-extraction",
       "title": "Coordinator Symphony-Aligned Orchestrator Auto-Scout Evidence Recorder Extraction",
       "relates_to": "tasks/tasks-1167-coordinator-symphony-aligned-orchestrator-auto-scout-evidence-recorder-extraction.md",
