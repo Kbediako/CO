@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260314-1169-coordinator-symphony-aligned-orchestrator-execution-routing-policy-splitting",
+      "title": "Coordinator Symphony-Aligned Orchestrator Execution-Routing Policy Splitting",
+      "relates_to": "tasks/tasks-1169-coordinator-symphony-aligned-orchestrator-execution-routing-policy-splitting.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-14",
+      "paths": {
+        "spec": "tasks/specs/1169-coordinator-symphony-aligned-orchestrator-execution-routing-policy-splitting.md",
+        "task": "tasks/tasks-1169-coordinator-symphony-aligned-orchestrator-execution-routing-policy-splitting.md",
+        "agent_task": ".agent/task/1169-coordinator-symphony-aligned-orchestrator-execution-routing-policy-splitting.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-execution-routing-policy-splitting.md"
+      }
+    },
+    {
       "id": "20260314-1168-coordinator-symphony-aligned-orchestrator-start-resume-control-plane-launch-shell-extraction",
       "title": "Coordinator Symphony-Aligned Orchestrator Start-Resume Control-Plane Launch Shell Extraction",
       "relates_to": "tasks/tasks-1168-coordinator-symphony-aligned-orchestrator-start-resume-control-plane-launch-shell-extraction.md",
