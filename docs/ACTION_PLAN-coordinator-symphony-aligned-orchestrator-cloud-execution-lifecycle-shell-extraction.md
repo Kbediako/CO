@@ -8,12 +8,12 @@
 
 ## Implementation
 
-- [ ] Extract one bounded helper for the cloud execution lifecycle wrapper around `runOrchestratorExecutionLifecycle(...)`.
-- [ ] Keep `executeCloudPipeline()` as the public orchestrator boundary while delegating the inline `executeBody` note/success wiring.
-- [ ] Add focused regression coverage for lifecycle-shell delegation and note propagation without reopening cloud-target internals.
+- [x] Extract one bounded helper for the cloud execution lifecycle wrapper around `runOrchestratorExecutionLifecycle(...)`.
+- [x] Keep `executeCloudPipeline()` as the public orchestrator boundary while delegating the inline `executeBody` note/success wiring.
+- [x] Add focused regression coverage for lifecycle-shell delegation and note propagation without reopening cloud-target internals.
 
 ## Closeout
 
-- [ ] Run the standard gate bundle and capture closeout artifacts under `out/1178-coordinator-symphony-aligned-orchestrator-cloud-execution-lifecycle-shell-extraction/manual/<timestamp>-closeout/`.
-- [ ] Run an explicit elegance review.
-- [ ] Record the next truthful seam after `1178`.
+- [x] Run the standard gate bundle and capture closeout artifacts under `out/1178-coordinator-symphony-aligned-orchestrator-cloud-execution-lifecycle-shell-extraction/manual/20260314T060306Z-closeout/`.
+- [x] Run an explicit elegance review.
+- [x] Record the next truthful seam after `1178`.
