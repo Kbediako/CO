@@ -1,0 +1,23 @@
+
+ RUN  v1.6.1 /Users/kbediako/Code/CO
+
+ ✓ orchestrator/tests/OrchestratorLocalRouteShell.test.ts  (4 tests) 3ms
+stderr | orchestrator/tests/OrchestratorExecutionRouter.test.ts > routeOrchestratorExecution > fails fast on runtime selection errors without invoking downstream execution
+[Codex-Orchestrator] Runtime selection failed: provider missing
+
+stderr | orchestrator/tests/OrchestratorExecutionRouter.test.ts > routeOrchestratorExecution > falls back from cloud preflight failure to the local execution route when allowed
+[Codex-Orchestrator] Cloud preflight failed; falling back to mcp. CODEX_CLOUD_ENV_ID is not configured. CODEX_CLOUD_BRANCH is not configured.
+
+stderr | orchestrator/tests/OrchestratorExecutionRouter.test.ts > routeOrchestratorExecution > fails fast when cloud preflight fails and fallback is disabled
+[Codex-Orchestrator] Cloud preflight failed and cloud fallback is disabled. CODEX_CLOUD_ENV_ID is not configured. CODEX_CLOUD_BRANCH is not configured.
+
+ ✓ orchestrator/tests/OrchestratorExecutionRouter.test.ts  (6 tests) 6ms
+stderr | orchestrator/tests/OrchestratorExecutionRouter.test.ts > routeOrchestratorExecution > forwards fallback-adjusted execution and runtime modes to local subpipelines
+[Codex-Orchestrator] Cloud preflight failed; falling back to mcp. CODEX_CLOUD_ENV_ID is not configured.
+
+
+ Test Files  2 passed (2)
+      Tests  10 passed (10)
+   Start at  18:59:41
+   Duration  204ms (transform 84ms, setup 0ms, collect 148ms, tests 9ms, environment 0ms, prepare 47ms)
+
