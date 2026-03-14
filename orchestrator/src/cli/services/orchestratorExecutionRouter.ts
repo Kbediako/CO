@@ -14,37 +14,14 @@ import type {
   PipelineExecutionResult,
   PipelineRunExecutionResult
 } from '../types.js';
-import { buildCloudPreflightRequest, runCloudPreflight } from '../utils/cloudPreflight.js';
 import type { AdvancedAutopilotDecision } from '../utils/advancedAutopilot.js';
-import { isoTimestamp } from '../utils/time.js';
-import { resolveCloudEnvironmentId } from './orchestratorCloudTargetExecutor.js';
+import { executeOrchestratorCloudRouteShell } from './orchestratorCloudRouteShell.js';
 import { runOrchestratorExecutionLifecycle } from './orchestratorExecutionLifecycle.js';
 import {
   resolveOrchestratorExecutionRouteState,
   type OrchestratorExecutionRouteState
 } from './orchestratorExecutionRouteState.js';
 import { executeOrchestratorLocalPipeline } from './orchestratorLocalPipelineExecutor.js';
-
-function readCloudString(value: unknown): string | null {
-  return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
-}
-
-function allowCloudFallback(envOverrides?: NodeJS.ProcessEnv): boolean {
-  const raw =
-    readCloudString(envOverrides?.CODEX_ORCHESTRATOR_CLOUD_FALLBACK) ??
-    readCloudString(process.env.CODEX_ORCHESTRATOR_CLOUD_FALLBACK);
-  if (!raw) {
-    return true;
-  }
-  const normalized = raw.toLowerCase();
-  return !['0', 'false', 'off', 'deny', 'disabled', 'never', 'strict'].includes(normalized);
-}
-
-function normalizeCloudFallbackIssues(
-  issues: { code: string; message: string }[]
-): Array<{ code: string; message: string }> {
-  return issues.map((issue) => ({ code: issue.code, message: issue.message }));
-}
 
 export type OrchestratorAutoScoutOutcome =
   | { status: 'recorded'; path: string }
@@ -89,26 +66,6 @@ export interface OrchestratorExecutionRouteOptions {
     runtimeModeRequested: RuntimeMode;
   }): Promise<PipelineExecutionResult>;
 }
-
-type CloudFallbackReroute = {
-  mode: 'mcp';
-  executionModeOverride: 'mcp';
-  runtimeModeRequested: RuntimeMode;
-  runtimeModeSource: RuntimeModeSource;
-  envOverrides: NodeJS.ProcessEnv;
-};
-
-type CloudPreflightFailureContract =
-  | {
-      outcome: 'fail';
-      detail: string;
-    }
-  | {
-      outcome: 'fallback';
-      detail: string;
-      manifestFallback: NonNullable<CliManifest['cloud_fallback']>;
-      reroute: CloudFallbackReroute;
-    };
 
 export function requiresCloudOrchestratorExecution(task: TaskContext, subtask: PlanItem): boolean {
   const requiresCloudFlag = resolveRequiresCloudPolicy({
@@ -160,79 +117,25 @@ function failExecutionRoute(
   };
 }
 
-function buildCloudPreflightFailureContract(
-  state: OrchestratorExecutionRouteState,
-  issues: { code: string; message: string }[]
-): CloudPreflightFailureContract {
-  const issueSummary = issues.map((issue) => issue.message).join(' ');
-  if (!allowCloudFallback(state.effectiveEnvOverrides)) {
-    return {
-      outcome: 'fail',
-      detail: `Cloud preflight failed and cloud fallback is disabled. ${issueSummary}`
-    };
-  }
-
-  const detail = `Cloud preflight failed; falling back to mcp. ${issueSummary}`;
-  return {
-    outcome: 'fallback',
-    detail,
-    manifestFallback: {
-      mode_requested: 'cloud',
-      mode_used: 'mcp',
-      reason: detail,
-      issues: normalizeCloudFallbackIssues(issues),
-      checked_at: isoTimestamp()
-    },
-    reroute: {
-      mode: 'mcp',
-      executionModeOverride: 'mcp',
-      runtimeModeRequested: state.runtimeSelection.selected_mode,
-      runtimeModeSource: state.runtimeSelection.source,
-      envOverrides: state.effectiveEnvOverrides
-    }
-  };
-}
-
-function buildExecutionRouteCloudPreflightRequest(
-  options: OrchestratorExecutionRouteOptions,
-  state: OrchestratorExecutionRouteState
-): Parameters<typeof runCloudPreflight>[0] {
-  const environmentId = resolveCloudEnvironmentId(options.task, options.target, state.effectiveEnvOverrides);
-  const branch =
-    readCloudString(state.effectiveEnvOverrides.CODEX_CLOUD_BRANCH) ??
-    readCloudString(process.env.CODEX_CLOUD_BRANCH);
-  return buildCloudPreflightRequest({
-    repoRoot: options.env.repoRoot,
-    environmentId,
-    branch,
-    env: state.effectiveMergedEnv
-  });
-}
-
 async function executeCloudRoute(
   options: OrchestratorExecutionRouteOptions,
   state: OrchestratorExecutionRouteState
 ): Promise<PipelineRunExecutionResult> {
-  const preflight = await runCloudPreflight(buildExecutionRouteCloudPreflightRequest(options, state));
-
-  if (!preflight.ok) {
-    const contract = buildCloudPreflightFailureContract(state, preflight.issues);
-    if (contract.outcome === 'fail') {
-      return failExecutionRoute(options, 'cloud-preflight-failed', contract.detail);
-    }
-
-    options.manifest.cloud_fallback = contract.manifestFallback;
-    appendSummary(options.manifest, contract.detail);
-    logger.warn(contract.detail);
-    const fallback = await routeOrchestratorExecution({
-      ...options,
-      ...contract.reroute
-    });
-    fallback.notes.unshift(contract.detail);
-    return fallback;
-  }
-
-  return await options.executeCloudPipeline({ ...options, envOverrides: state.effectiveEnvOverrides });
+  return await executeOrchestratorCloudRouteShell({
+    repoRoot: options.env.repoRoot,
+    task: options.task,
+    target: options.target,
+    manifest: options.manifest,
+    state,
+    executeCloudPipeline: (envOverrides) =>
+      options.executeCloudPipeline({ ...options, envOverrides }),
+    reroute: (reroute) =>
+      routeOrchestratorExecution({
+        ...options,
+        ...reroute
+      }),
+    failExecutionRoute: (statusDetail, detail) => failExecutionRoute(options, statusDetail, detail)
+  });
 }
 
 async function executeLocalRoute(
