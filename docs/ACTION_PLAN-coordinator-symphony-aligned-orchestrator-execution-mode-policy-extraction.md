@@ -8,12 +8,12 @@
 
 ## Implementation
 
-- [ ] Extract one bounded execution-mode policy helper from `orchestratorExecutionRouter.ts`.
-- [ ] Keep route decision shell behavior, route-state assembly, and cloud/local shell internals out of scope.
-- [ ] Keep focused regression coverage on unchanged execution-mode policy semantics.
+- [x] Extract one bounded execution-mode policy helper from `orchestratorExecutionRouter.ts`.
+- [x] Keep route decision shell behavior, route-state assembly, and cloud/local shell internals out of scope.
+- [x] Keep focused regression coverage on unchanged execution-mode policy semantics.
 
 ## Closeout
 
-- [ ] Run the standard gate bundle and capture closeout artifacts under `out/1185-coordinator-symphony-aligned-orchestrator-execution-mode-policy-extraction/manual/<timestamp>-closeout/`.
-- [ ] Run an explicit elegance review.
-- [ ] Record the next truthful seam after `1185`.
+- [x] Run the standard gate bundle and capture closeout artifacts under `out/1185-coordinator-symphony-aligned-orchestrator-execution-mode-policy-extraction/manual/20260314T102111Z-closeout/`.
+- [x] Run an explicit elegance review.
+- [x] Record the next truthful seam after `1185`.
