@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260314-1176-coordinator-symphony-aligned-orchestrator-cloud-target-completion-shell-extraction",
+      "title": "Coordinator Symphony-Aligned Orchestrator Cloud-Target Completion Shell Extraction",
+      "relates_to": "tasks/tasks-1176-coordinator-symphony-aligned-orchestrator-cloud-target-completion-shell-extraction.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-14",
+      "paths": {
+        "spec": "tasks/specs/1176-coordinator-symphony-aligned-orchestrator-cloud-target-completion-shell-extraction.md",
+        "task": "tasks/tasks-1176-coordinator-symphony-aligned-orchestrator-cloud-target-completion-shell-extraction.md",
+        "agent_task": ".agent/task/1176-coordinator-symphony-aligned-orchestrator-cloud-target-completion-shell-extraction.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-cloud-target-completion-shell-extraction.md"
+      }
+    },
+    {
       "id": "20260314-1175-coordinator-symphony-aligned-orchestrator-cloud-target-running-state-and-update-shell-extraction",
       "title": "Coordinator Symphony-Aligned Orchestrator Cloud-Target Running-State And Update Shell Extraction",
       "relates_to": "tasks/tasks-1175-coordinator-symphony-aligned-orchestrator-cloud-target-running-state-and-update-shell-extraction.md",
