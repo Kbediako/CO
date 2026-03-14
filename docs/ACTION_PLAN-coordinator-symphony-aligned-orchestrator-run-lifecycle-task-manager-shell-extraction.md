@@ -8,12 +8,12 @@
 
 ## Implementation
 
-- [ ] Extract the remaining `createRunLifecycleTaskManager(...)` shell from `orchestrator.ts`.
-- [ ] Remove the one-call-site local `createTaskManager(...)` forwarding wrapper as part of the same move.
-- [ ] Keep focused regressions on manager creation, attach-after-success behavior, and no-attach-on-manager-failure behavior.
+- [x] Extract the remaining `createRunLifecycleTaskManager(...)` shell from `orchestrator.ts`. Evidence: `orchestrator/src/cli/services/orchestratorRunLifecycleTaskManagerShell.ts`, `out/1189-coordinator-symphony-aligned-orchestrator-run-lifecycle-task-manager-shell-extraction/manual/20260314T124650Z-closeout/00-summary.md`
+- [x] Remove the one-call-site local `createTaskManager(...)` forwarding wrapper as part of the same move. Evidence: `orchestrator/src/cli/orchestrator.ts`, `out/1189-coordinator-symphony-aligned-orchestrator-run-lifecycle-task-manager-shell-extraction/manual/20260314T124650Z-closeout/00-summary.md`
+- [x] Keep focused regressions on manager creation, attach-after-success behavior, and no-attach-on-manager-failure behavior. Evidence: `orchestrator/tests/OrchestratorRunLifecycleTaskManagerRegistration.test.ts`, `orchestrator/tests/OrchestratorRunLifecycleExecutionAndRunError.test.ts`, `out/1189-coordinator-symphony-aligned-orchestrator-run-lifecycle-task-manager-shell-extraction/manual/20260314T124650Z-closeout/05b-targeted-tests.log`
 
 ## Closeout
 
-- [ ] Run the standard gate bundle and capture closeout artifacts under `out/1189-coordinator-symphony-aligned-orchestrator-run-lifecycle-task-manager-shell-extraction/manual/<timestamp>-closeout/`.
-- [ ] Run an explicit elegance review.
-- [ ] Record the next truthful seam after `1189`.
+- [x] Run the standard gate bundle and capture closeout artifacts under `out/1189-coordinator-symphony-aligned-orchestrator-run-lifecycle-task-manager-shell-extraction/manual/20260314T124650Z-closeout/`. Evidence: `out/1189-coordinator-symphony-aligned-orchestrator-run-lifecycle-task-manager-shell-extraction/manual/20260314T124650Z-closeout/00-summary.md`
+- [x] Run an explicit elegance review. Evidence: `out/1189-coordinator-symphony-aligned-orchestrator-run-lifecycle-task-manager-shell-extraction/manual/20260314T124650Z-closeout/12-elegance-review.md`
+- [x] Record the next truthful seam after `1189`. Evidence: `out/1189-coordinator-symphony-aligned-orchestrator-run-lifecycle-task-manager-shell-extraction/manual/20260314T124650Z-closeout/14-next-slice-note.md`

@@ -20,20 +20,20 @@
 
 ## Task-Manager Shell Extraction
 
-- [ ] `orchestrator.ts` no longer owns the local `createRunLifecycleTaskManager(...)` composition shell. Evidence: `orchestrator/src/cli/orchestrator.ts`, `out/1189-coordinator-symphony-aligned-orchestrator-run-lifecycle-task-manager-shell-extraction/manual/<timestamp>-closeout/00-summary.md`
-- [ ] The local `createTaskManager(...)` forwarding wrapper is removed as part of the same shell move. Evidence: `orchestrator/src/cli/orchestrator.ts`, `out/1189-coordinator-symphony-aligned-orchestrator-run-lifecycle-task-manager-shell-extraction/manual/<timestamp>-closeout/00-summary.md`
-- [ ] Focused regressions preserve manager creation, attach-after-success behavior, and no-attach-on-manager-failure behavior. Evidence: `orchestrator/tests/OrchestratorRunLifecycleTaskManagerRegistration.test.ts`, `out/1189-coordinator-symphony-aligned-orchestrator-run-lifecycle-task-manager-shell-extraction/manual/<timestamp>-closeout/05b-targeted-tests.log`
+- [x] `orchestrator.ts` no longer owns the local `createRunLifecycleTaskManager(...)` composition shell. Evidence: `orchestrator/src/cli/orchestrator.ts`, `out/1189-coordinator-symphony-aligned-orchestrator-run-lifecycle-task-manager-shell-extraction/manual/20260314T124650Z-closeout/00-summary.md`
+- [x] The local `createTaskManager(...)` forwarding wrapper is removed as part of the same shell move. Evidence: `orchestrator/src/cli/orchestrator.ts`, `out/1189-coordinator-symphony-aligned-orchestrator-run-lifecycle-task-manager-shell-extraction/manual/20260314T124650Z-closeout/00-summary.md`
+- [x] Focused regressions preserve manager creation, attach-after-success behavior, and no-attach-on-manager-failure behavior. Evidence: `orchestrator/tests/OrchestratorRunLifecycleTaskManagerRegistration.test.ts`, `orchestrator/tests/OrchestratorRunLifecycleExecutionAndRunError.test.ts`, `out/1189-coordinator-symphony-aligned-orchestrator-run-lifecycle-task-manager-shell-extraction/manual/20260314T124650Z-closeout/05b-targeted-tests.log`
 
 ## Validation + Closeout
 
-- [ ] `node scripts/delegation-guard.mjs`. Evidence: `out/1189-coordinator-symphony-aligned-orchestrator-run-lifecycle-task-manager-shell-extraction/manual/<timestamp>-closeout/01-delegation-guard.log`
-- [ ] `node scripts/spec-guard.mjs --dry-run`. Evidence: `out/1189-coordinator-symphony-aligned-orchestrator-run-lifecycle-task-manager-shell-extraction/manual/<timestamp>-closeout/02-spec-guard.log`
-- [ ] `npm run build`. Evidence: `out/1189-coordinator-symphony-aligned-orchestrator-run-lifecycle-task-manager-shell-extraction/manual/<timestamp>-closeout/03-build.log`
-- [ ] `npm run lint`. Evidence: `out/1189-coordinator-symphony-aligned-orchestrator-run-lifecycle-task-manager-shell-extraction/manual/<timestamp>-closeout/04-lint.log`
-- [ ] `npm run test`. Evidence: `out/1189-coordinator-symphony-aligned-orchestrator-run-lifecycle-task-manager-shell-extraction/manual/<timestamp>-closeout/05-test.log`
-- [ ] `npm run docs:check`. Evidence: `out/1189-coordinator-symphony-aligned-orchestrator-run-lifecycle-task-manager-shell-extraction/manual/<timestamp>-closeout/06-docs-check.log`
-- [ ] `npm run docs:freshness`. Evidence: `out/1189-coordinator-symphony-aligned-orchestrator-run-lifecycle-task-manager-shell-extraction/manual/<timestamp>-closeout/07-docs-freshness.log`
-- [ ] `node scripts/diff-budget.mjs`. Evidence: `out/1189-coordinator-symphony-aligned-orchestrator-run-lifecycle-task-manager-shell-extraction/manual/<timestamp>-closeout/08-diff-budget.log`
-- [ ] `npm run review`. Evidence: `out/1189-coordinator-symphony-aligned-orchestrator-run-lifecycle-task-manager-shell-extraction/manual/<timestamp>-closeout/09-review.log`
-- [ ] `npm run pack:smoke`. Evidence: `out/1189-coordinator-symphony-aligned-orchestrator-run-lifecycle-task-manager-shell-extraction/manual/<timestamp>-closeout/10-pack-smoke.log`
-- [ ] Elegance review completed. Evidence: `out/1189-coordinator-symphony-aligned-orchestrator-run-lifecycle-task-manager-shell-extraction/manual/<timestamp>-closeout/12-elegance-review.md`
+- [x] `node scripts/delegation-guard.mjs`. Evidence: `out/1189-coordinator-symphony-aligned-orchestrator-run-lifecycle-task-manager-shell-extraction/manual/20260314T124650Z-closeout/01-delegation-guard.log`
+- [x] `node scripts/spec-guard.mjs --dry-run`. Evidence: `out/1189-coordinator-symphony-aligned-orchestrator-run-lifecycle-task-manager-shell-extraction/manual/20260314T124650Z-closeout/02-spec-guard.log`
+- [x] `npm run build`. Evidence: `out/1189-coordinator-symphony-aligned-orchestrator-run-lifecycle-task-manager-shell-extraction/manual/20260314T124650Z-closeout/03-build.log`
+- [x] `npm run lint`. Evidence: `out/1189-coordinator-symphony-aligned-orchestrator-run-lifecycle-task-manager-shell-extraction/manual/20260314T124650Z-closeout/04-lint.log`
+- [x] `npm run test`. Evidence: `out/1189-coordinator-symphony-aligned-orchestrator-run-lifecycle-task-manager-shell-extraction/manual/20260314T124650Z-closeout/05-test.log`
+- [x] `npm run docs:check`. Evidence: `out/1189-coordinator-symphony-aligned-orchestrator-run-lifecycle-task-manager-shell-extraction/manual/20260314T124650Z-closeout/06-docs-check.log`
+- [x] `npm run docs:freshness`. Evidence: `out/1189-coordinator-symphony-aligned-orchestrator-run-lifecycle-task-manager-shell-extraction/manual/20260314T124650Z-closeout/07-docs-freshness.log`
+- [x] `node scripts/diff-budget.mjs`. Evidence: `out/1189-coordinator-symphony-aligned-orchestrator-run-lifecycle-task-manager-shell-extraction/manual/20260314T124650Z-closeout/08-diff-budget.log`
+- [x] `npm run review`. Evidence: `out/1189-coordinator-symphony-aligned-orchestrator-run-lifecycle-task-manager-shell-extraction/manual/20260314T124650Z-closeout/09-review.log`
+- [x] `npm run pack:smoke`. Evidence: `out/1189-coordinator-symphony-aligned-orchestrator-run-lifecycle-task-manager-shell-extraction/manual/20260314T124650Z-closeout/10-pack-smoke.log`
+- [x] Elegance review completed. Evidence: `out/1189-coordinator-symphony-aligned-orchestrator-run-lifecycle-task-manager-shell-extraction/manual/20260314T124650Z-closeout/12-elegance-review.md`
