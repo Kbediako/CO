@@ -157,6 +157,126 @@ describe('routeOrchestratorExecution', () => {
     expect(mockState.lifecycleRunner.mock.calls[0]?.[0].mode).toBe('mcp');
   });
 
+  it('fails fast when cloud preflight fails and fallback is disabled', async () => {
+    vi.spyOn(runtimeIndex, 'resolveRuntimeSelection').mockResolvedValue(createRuntimeSelection());
+    vi.spyOn(cloudPreflight, 'runCloudPreflight').mockResolvedValue({
+      ok: false,
+      issues: [{ code: 'missing_environment', message: 'CODEX_CLOUD_ENV_ID is not configured.' }],
+      details: {
+        codexBin: 'codex',
+        environmentId: null,
+        branch: null
+      }
+    });
+
+    const options = createOptions({
+      mode: 'cloud',
+      envOverrides: { CODEX_ORCHESTRATOR_CLOUD_FALLBACK: 'deny' }
+    });
+    const result = await routeOrchestratorExecution(options);
+
+    expect(result.success).toBe(false);
+    expect(result.notes[0]).toContain('Cloud preflight failed and cloud fallback is disabled.');
+    expect(options.manifest.status).toBe('failed');
+    expect(options.manifest.status_detail).toBe('cloud-preflight-failed');
+    expect(options.manifest.cloud_fallback).toBeUndefined();
+    expect(options.executeCloudPipeline).not.toHaveBeenCalled();
+    expect(mockState.lifecycleRunner).not.toHaveBeenCalled();
+    expect(mockState.localExecutor).not.toHaveBeenCalled();
+  });
+
+  it('forwards resolved env overrides to the cloud execution route after successful preflight', async () => {
+    vi.spyOn(runtimeIndex, 'resolveRuntimeSelection').mockResolvedValue(
+      createRuntimeSelection({
+        env_overrides: { CODEX_FAKE_ROUTER_FLAG: '1' }
+      })
+    );
+    vi.spyOn(cloudPreflight, 'runCloudPreflight').mockResolvedValue({
+      ok: true,
+      issues: [],
+      details: {
+        codexBin: 'codex',
+        environmentId: 'env-123',
+        branch: 'main'
+      }
+    });
+
+    const options = createOptions({ mode: 'cloud' });
+    const result = await routeOrchestratorExecution(options);
+
+    expect(result.success).toBe(true);
+    expect(options.executeCloudPipeline).toHaveBeenCalledOnce();
+    expect(options.executeCloudPipeline.mock.calls[0]?.[0].envOverrides).toMatchObject({
+      CODEX_FAKE_ROUTER_FLAG: '1'
+    });
+    expect(mockState.lifecycleRunner).not.toHaveBeenCalled();
+    expect(mockState.localExecutor).not.toHaveBeenCalled();
+  });
+
+  it('routes direct mcp execution through the local lifecycle with resolved env overrides', async () => {
+    vi.spyOn(runtimeIndex, 'resolveRuntimeSelection').mockResolvedValue(
+      createRuntimeSelection({
+        selected_mode: 'cli',
+        provider: 'CliRuntimeProvider',
+        env_overrides: { CODEX_FAKE_ROUTER_FLAG: '1' }
+      })
+    );
+
+    const options = createOptions({ mode: 'mcp' });
+    const result = await routeOrchestratorExecution(options);
+
+    expect(result.success).toBe(true);
+    expect(options.executeCloudPipeline).not.toHaveBeenCalled();
+    expect(mockState.lifecycleRunner).toHaveBeenCalledOnce();
+    expect(mockState.lifecycleRunner.mock.calls[0]?.[0].mode).toBe('mcp');
+    expect(mockState.lifecycleRunner.mock.calls[0]?.[0].envOverrides).toMatchObject({
+      CODEX_FAKE_ROUTER_FLAG: '1'
+    });
+    expect(mockState.localExecutor).not.toHaveBeenCalled();
+  });
+
+  it('forwards resolved runtime mode and env overrides into the direct local execution body', async () => {
+    vi.spyOn(runtimeIndex, 'resolveRuntimeSelection').mockResolvedValue(
+      createRuntimeSelection({
+        selected_mode: 'cli',
+        provider: 'CliRuntimeProvider',
+        runtime_session_id: 'runtime-123',
+        env_overrides: { CODEX_FAKE_ROUTER_FLAG: '1' }
+      })
+    );
+    mockState.lifecycleRunner.mockImplementation(async (input) => {
+      const notes: string[] = [];
+      const success = await input.executeBody({
+        notes,
+        persister: { schedule: vi.fn(async () => undefined) },
+        controlWatcher: {
+          sync: vi.fn(async () => undefined),
+          waitForResume: vi.fn(async () => undefined),
+          isCanceled: vi.fn(() => false)
+        },
+        schedulePersist: vi.fn(async () => undefined)
+      });
+      return {
+        success,
+        notes,
+        manifest: input.manifest,
+        manifestPath: input.paths.manifestPath,
+        logPath: input.paths.logPath
+      };
+    });
+
+    const options = createOptions({ mode: 'mcp' });
+    const result = await routeOrchestratorExecution(options);
+
+    expect(result.success).toBe(true);
+    expect(mockState.localExecutor).toHaveBeenCalledOnce();
+    expect(mockState.localExecutor.mock.calls[0]?.[0].envOverrides).toMatchObject({
+      CODEX_FAKE_ROUTER_FLAG: '1'
+    });
+    expect(mockState.localExecutor.mock.calls[0]?.[0].runtimeMode).toBe('cli');
+    expect(mockState.localExecutor.mock.calls[0]?.[0].runtimeSessionId).toBe('runtime-123');
+  });
+
   it('forwards fallback-adjusted execution and runtime modes to local subpipelines', async () => {
     vi.spyOn(runtimeIndex, 'resolveRuntimeSelection').mockResolvedValue(
       createRuntimeSelection({

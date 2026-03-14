@@ -90,6 +90,12 @@ export interface OrchestratorExecutionRouteOptions {
   }): Promise<PipelineExecutionResult>;
 }
 
+type OrchestratorExecutionRouteState = {
+  runtimeSelection: RuntimeSelection;
+  effectiveEnvOverrides: NodeJS.ProcessEnv;
+  effectiveMergedEnv: NodeJS.ProcessEnv;
+};
+
 export function requiresCloudOrchestratorExecution(task: TaskContext, subtask: PlanItem): boolean {
   const requiresCloudFlag = resolveRequiresCloudPolicy({
     boolFlags: [subtask.requires_cloud, subtask.requiresCloud],
@@ -123,34 +129,36 @@ export function determineOrchestratorExecutionMode(
   return 'mcp';
 }
 
-export async function routeOrchestratorExecution(
+function failExecutionRoute(
+  options: OrchestratorExecutionRouteOptions,
+  statusDetail: string,
+  detail: string
+): PipelineRunExecutionResult {
+  finalizeStatus(options.manifest, 'failed', statusDetail);
+  appendSummary(options.manifest, detail);
+  logger.error(detail);
+  return {
+    success: false,
+    notes: [detail],
+    manifest: options.manifest,
+    manifestPath: options.paths.manifestPath,
+    logPath: options.paths.logPath
+  };
+}
+
+async function resolveExecutionRouteState(
   options: OrchestratorExecutionRouteOptions
-): Promise<PipelineRunExecutionResult> {
+): Promise<OrchestratorExecutionRouteState> {
   const baseEnvOverrides: NodeJS.ProcessEnv = { ...(options.envOverrides ?? {}) };
   const mergedEnv = { ...process.env, ...baseEnvOverrides };
-  let runtimeSelection: RuntimeSelection;
-  try {
-    runtimeSelection = await resolveRuntimeSelection({
-      requestedMode: options.runtimeModeRequested,
-      source: options.runtimeModeSource,
-      executionMode: options.mode,
-      repoRoot: options.env.repoRoot,
-      env: mergedEnv,
-      runId: options.manifest.run_id
-    });
-  } catch (error) {
-    const detail = `Runtime selection failed: ${(error as Error)?.message ?? String(error)}`;
-    finalizeStatus(options.manifest, 'failed', 'runtime-selection-failed');
-    appendSummary(options.manifest, detail);
-    logger.error(detail);
-    return {
-      success: false,
-      notes: [detail],
-      manifest: options.manifest,
-      manifestPath: options.paths.manifestPath,
-      logPath: options.paths.logPath
-    };
-  }
+  const runtimeSelection = await resolveRuntimeSelection({
+    requestedMode: options.runtimeModeRequested,
+    source: options.runtimeModeSource,
+    executionMode: options.mode,
+    repoRoot: options.env.repoRoot,
+    env: mergedEnv,
+    runId: options.manifest.run_id
+  });
 
   options.applyRuntimeSelection(options.manifest, runtimeSelection);
   const effectiveEnvOverrides: NodeJS.ProcessEnv = {
@@ -158,63 +166,64 @@ export async function routeOrchestratorExecution(
     ...runtimeSelection.env_overrides
   };
   const effectiveMergedEnv = { ...process.env, ...effectiveEnvOverrides };
+  return { runtimeSelection, effectiveEnvOverrides, effectiveMergedEnv };
+}
 
-  if (options.mode === 'cloud') {
-    const environmentId = resolveCloudEnvironmentId(options.task, options.target, effectiveEnvOverrides);
-    const branch =
-      readCloudString(effectiveEnvOverrides.CODEX_CLOUD_BRANCH) ??
-      readCloudString(process.env.CODEX_CLOUD_BRANCH);
-    const codexBin = resolveCodexCliBin(effectiveMergedEnv);
-    const preflight = await runCloudPreflight({
-      repoRoot: options.env.repoRoot,
-      codexBin,
-      environmentId,
-      branch,
-      env: effectiveMergedEnv
-    });
-    if (!preflight.ok) {
-      if (!allowCloudFallback(effectiveEnvOverrides)) {
-        const detail =
-          `Cloud preflight failed and cloud fallback is disabled. ` +
-          preflight.issues.map((issue) => issue.message).join(' ');
-        finalizeStatus(options.manifest, 'failed', 'cloud-preflight-failed');
-        appendSummary(options.manifest, detail);
-        logger.error(detail);
-        return {
-          success: false,
-          notes: [detail],
-          manifest: options.manifest,
-          manifestPath: options.paths.manifestPath,
-          logPath: options.paths.logPath
-        };
-      }
+async function executeCloudRoute(
+  options: OrchestratorExecutionRouteOptions,
+  state: OrchestratorExecutionRouteState
+): Promise<PipelineRunExecutionResult> {
+  const environmentId = resolveCloudEnvironmentId(options.task, options.target, state.effectiveEnvOverrides);
+  const branch =
+    readCloudString(state.effectiveEnvOverrides.CODEX_CLOUD_BRANCH) ??
+    readCloudString(process.env.CODEX_CLOUD_BRANCH);
+  const codexBin = resolveCodexCliBin(state.effectiveMergedEnv);
+  const preflight = await runCloudPreflight({
+    repoRoot: options.env.repoRoot,
+    codexBin,
+    environmentId,
+    branch,
+    env: state.effectiveMergedEnv
+  });
 
+  if (!preflight.ok) {
+    if (!allowCloudFallback(state.effectiveEnvOverrides)) {
       const detail =
-        `Cloud preflight failed; falling back to mcp. ` +
+        `Cloud preflight failed and cloud fallback is disabled. ` +
         preflight.issues.map((issue) => issue.message).join(' ');
-      options.manifest.cloud_fallback = {
-        mode_requested: 'cloud',
-        mode_used: 'mcp',
-        reason: detail,
-        issues: normalizeCloudFallbackIssues(preflight.issues),
-        checked_at: isoTimestamp()
-      };
-      appendSummary(options.manifest, detail);
-      logger.warn(detail);
-      const fallback = await routeOrchestratorExecution({
-        ...options,
-        mode: 'mcp',
-        executionModeOverride: 'mcp',
-        runtimeModeRequested: runtimeSelection.selected_mode,
-        runtimeModeSource: runtimeSelection.source,
-        envOverrides: effectiveEnvOverrides
-      });
-      fallback.notes.unshift(detail);
-      return fallback;
+      return failExecutionRoute(options, 'cloud-preflight-failed', detail);
     }
-    return await options.executeCloudPipeline({ ...options, envOverrides: effectiveEnvOverrides });
+
+    const detail =
+      `Cloud preflight failed; falling back to mcp. ` + preflight.issues.map((issue) => issue.message).join(' ');
+    options.manifest.cloud_fallback = {
+      mode_requested: 'cloud',
+      mode_used: 'mcp',
+      reason: detail,
+      issues: normalizeCloudFallbackIssues(preflight.issues),
+      checked_at: isoTimestamp()
+    };
+    appendSummary(options.manifest, detail);
+    logger.warn(detail);
+    const fallback = await routeOrchestratorExecution({
+      ...options,
+      mode: 'mcp',
+      executionModeOverride: 'mcp',
+      runtimeModeRequested: state.runtimeSelection.selected_mode,
+      runtimeModeSource: state.runtimeSelection.source,
+      envOverrides: state.effectiveEnvOverrides
+    });
+    fallback.notes.unshift(detail);
+    return fallback;
   }
 
+  return await options.executeCloudPipeline({ ...options, envOverrides: state.effectiveEnvOverrides });
+}
+
+async function executeLocalRoute(
+  options: OrchestratorExecutionRouteOptions,
+  state: OrchestratorExecutionRouteState
+): Promise<PipelineRunExecutionResult> {
   const { env, pipeline, manifest, paths, runEvents } = options;
   return runOrchestratorExecutionLifecycle({
     env,
@@ -228,13 +237,13 @@ export async function routeOrchestratorExecution(
     eventStream: options.eventStream,
     onEventEntry: options.onEventEntry,
     persister: options.persister,
-    envOverrides: effectiveEnvOverrides,
-    advancedDecisionEnv: effectiveMergedEnv,
+    envOverrides: state.effectiveEnvOverrides,
+    advancedDecisionEnv: state.effectiveMergedEnv,
     defaultFailureStatusDetail: 'pipeline-failed',
     beforeStart: ({ notes }) => {
-      if (runtimeSelection.fallback.occurred) {
-        const fallbackCode = runtimeSelection.fallback.code ?? 'runtime-fallback';
-        const fallbackReason = runtimeSelection.fallback.reason ?? 'runtime fallback occurred';
+      if (state.runtimeSelection.fallback.occurred) {
+        const fallbackCode = state.runtimeSelection.fallback.code ?? 'runtime-fallback';
+        const fallbackReason = state.runtimeSelection.fallback.reason ?? 'runtime fallback occurred';
         const fallbackSummary = `Runtime fallback (${fallbackCode}): ${fallbackReason}`;
         appendSummary(manifest, fallbackSummary);
         notes.push(fallbackSummary);
@@ -243,7 +252,7 @@ export async function routeOrchestratorExecution(
     runAutoScout: (autoScoutOptions) =>
       options.runAutoScout({
         ...autoScoutOptions,
-        envOverrides: effectiveEnvOverrides
+        envOverrides: state.effectiveEnvOverrides
       }),
     executeBody: async ({ notes, persister, controlWatcher, schedulePersist }) => {
       const localResult = await executeOrchestratorLocalPipeline({
@@ -252,9 +261,9 @@ export async function routeOrchestratorExecution(
         manifest,
         paths,
         persister,
-        envOverrides: effectiveEnvOverrides,
-        runtimeMode: runtimeSelection.selected_mode,
-        runtimeSessionId: runtimeSelection.runtime_session_id,
+        envOverrides: state.effectiveEnvOverrides,
+        runtimeMode: state.runtimeSelection.selected_mode,
+        runtimeSessionId: state.runtimeSelection.runtime_session_id,
         runEvents,
         controlWatcher,
         schedulePersist,
@@ -262,7 +271,7 @@ export async function routeOrchestratorExecution(
           options.startSubpipeline({
             pipelineId,
             executionModeOverride: options.executionModeOverride,
-            runtimeModeRequested: runtimeSelection.selected_mode
+            runtimeModeRequested: state.runtimeSelection.selected_mode
           })
       });
       notes.push(...localResult.notes);
@@ -275,4 +284,21 @@ export async function routeOrchestratorExecution(
       }
     }
   });
+}
+
+export async function routeOrchestratorExecution(
+  options: OrchestratorExecutionRouteOptions
+): Promise<PipelineRunExecutionResult> {
+  let state: OrchestratorExecutionRouteState;
+  try {
+    state = await resolveExecutionRouteState(options);
+  } catch (error) {
+    const detail = `Runtime selection failed: ${(error as Error)?.message ?? String(error)}`;
+    return failExecutionRoute(options, 'runtime-selection-failed', detail);
+  }
+
+  if (options.mode === 'cloud') {
+    return await executeCloudRoute(options, state);
+  }
+  return await executeLocalRoute(options, state);
 }
