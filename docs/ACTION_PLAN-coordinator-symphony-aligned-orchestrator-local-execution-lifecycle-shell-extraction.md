@@ -8,12 +8,12 @@
 
 ## Implementation
 
-- [ ] Extract one bounded helper for the local execution lifecycle wrapper around `runOrchestratorExecutionLifecycle(...)`.
-- [ ] Keep `executeLocalRoute()` as the router-local boundary while delegating fallback-summary shaping, auto-scout pass-through, local executor wiring, and post-finalize guardrail-summary append.
-- [ ] Add focused regression coverage for the extracted local lifecycle shell without reopening runtime selection or local executor internals.
+- [x] Extract one bounded helper for the local execution lifecycle wrapper around `runOrchestratorExecutionLifecycle(...)`.
+- [x] Keep `executeLocalRoute()` as the router-local boundary while delegating fallback-summary shaping, auto-scout pass-through, local executor wiring, and post-finalize guardrail-summary append.
+- [x] Add focused regression coverage for the extracted local lifecycle shell without reopening runtime selection or local executor internals.
 
 ## Closeout
 
-- [ ] Run the standard gate bundle and capture closeout artifacts under `out/1179-coordinator-symphony-aligned-orchestrator-local-execution-lifecycle-shell-extraction/manual/<timestamp>-closeout/`.
-- [ ] Run an explicit elegance review.
-- [ ] Record the next truthful seam after `1179`.
+- [x] Run the standard gate bundle and capture closeout artifacts under `out/1179-coordinator-symphony-aligned-orchestrator-local-execution-lifecycle-shell-extraction/manual/20260314T062139Z-closeout/`.
+- [x] Run an explicit elegance review.
+- [x] Record the next truthful seam after `1179`.
