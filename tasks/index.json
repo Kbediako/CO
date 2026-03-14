@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260314-1172-coordinator-symphony-aligned-orchestrator-shared-cloud-preflight-request-contract-extraction",
+      "title": "Coordinator Symphony-Aligned Orchestrator Shared Cloud-Preflight Request Contract Extraction",
+      "relates_to": "tasks/tasks-1172-coordinator-symphony-aligned-orchestrator-shared-cloud-preflight-request-contract-extraction.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-14",
+      "paths": {
+        "spec": "tasks/specs/1172-coordinator-symphony-aligned-orchestrator-shared-cloud-preflight-request-contract-extraction.md",
+        "task": "tasks/tasks-1172-coordinator-symphony-aligned-orchestrator-shared-cloud-preflight-request-contract-extraction.md",
+        "agent_task": ".agent/task/1172-coordinator-symphony-aligned-orchestrator-shared-cloud-preflight-request-contract-extraction.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-shared-cloud-preflight-request-contract-extraction.md"
+      }
+    },
+    {
       "id": "20260314-1171-coordinator-symphony-aligned-orchestrator-cloud-preflight-request-assembly-extraction",
       "title": "Coordinator Symphony-Aligned Orchestrator Cloud-Preflight Request Assembly Extraction",
       "relates_to": "tasks/tasks-1171-coordinator-symphony-aligned-orchestrator-cloud-preflight-request-assembly-extraction.md",
