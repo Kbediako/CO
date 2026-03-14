@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260314-1183-coordinator-symphony-aligned-orchestrator-cloud-route-fallback-contract-extraction",
+      "title": "Coordinator Symphony-Aligned Orchestrator Cloud Route Fallback Contract Extraction",
+      "relates_to": "tasks/tasks-1183-coordinator-symphony-aligned-orchestrator-cloud-route-fallback-contract-extraction.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-14",
+      "paths": {
+        "spec": "tasks/specs/1183-coordinator-symphony-aligned-orchestrator-cloud-route-fallback-contract-extraction.md",
+        "task": "tasks/tasks-1183-coordinator-symphony-aligned-orchestrator-cloud-route-fallback-contract-extraction.md",
+        "agent_task": ".agent/task/1183-coordinator-symphony-aligned-orchestrator-cloud-route-fallback-contract-extraction.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-cloud-route-fallback-contract-extraction.md"
+      }
+    },
+    {
       "id": "20260314-1182-coordinator-symphony-aligned-orchestrator-local-route-shell-extraction",
       "title": "Coordinator Symphony-Aligned Orchestrator Local Route Shell Extraction",
       "relates_to": "tasks/tasks-1182-coordinator-symphony-aligned-orchestrator-local-route-shell-extraction.md",
