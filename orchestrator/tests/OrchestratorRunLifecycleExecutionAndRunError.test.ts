@@ -2,7 +2,6 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { executeOrchestratorRunLifecycleTask } from '../src/cli/services/orchestratorRunLifecycleOrchestrationShell.js';
 import type { TaskContext } from '../src/types.js';
-import type { RunEventPublisher } from '../src/cli/events/runEvents.js';
 import type { RunSummary } from '../src/cli/types.js';
 
 function createExecutionAndRunErrorOptions() {
