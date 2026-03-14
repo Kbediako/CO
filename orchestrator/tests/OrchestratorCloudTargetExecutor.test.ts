@@ -362,6 +362,82 @@ describe('executeOrchestratorCloudTarget request shaping', () => {
     expect(options.manifest.commands[0]?.exit_code).toBe(1);
   });
 
+  it('returns run-canceled before target preflight continues', async () => {
+    const options = buildOptions();
+    options.controlWatcher.isCanceled = vi.fn(() => true);
+    const executeSpy = vi.spyOn(CodexCloudTaskExecutor.prototype, 'execute');
+
+    const result = await executeOrchestratorCloudTarget(options);
+
+    expect(result).toEqual({ success: false, notes: [] });
+    expect(options.manifest.status_detail).toBe('run-canceled');
+    expect(options.manifest.commands[0]?.status).toBe('pending');
+    expect(executeSpy).not.toHaveBeenCalled();
+    expect(options.schedulePersist).not.toHaveBeenCalled();
+  });
+
+  it('fails when the cloud target cannot be resolved during preflight', async () => {
+    const options = buildOptions();
+    options.target.id = 'implementation:missing-stage';
+    options.target.metadata = {};
+    const executeSpy = vi.spyOn(CodexCloudTaskExecutor.prototype, 'execute');
+
+    const result = await executeOrchestratorCloudTarget(options);
+
+    expect(result.success).toBe(false);
+    expect(result.notes).toEqual(['Cloud execution target "implementation:missing-stage" could not be resolved.']);
+    expect(options.manifest.status_detail).toBe('cloud-target-missing');
+    expect(options.manifest.summary).toBe('Cloud execution target "implementation:missing-stage" could not be resolved.');
+    expect(options.manifest.commands[0]?.status).toBe('pending');
+    expect(executeSpy).not.toHaveBeenCalled();
+  });
+
+  it('marks non-target siblings as skipped during preflight before missing-env failure returns', async () => {
+    delete process.env.CODEX_CLOUD_ENV_ID;
+    const options = buildOptions({ CODEX_CLOUD_ENV_ID: '' });
+    options.target.metadata = { stageId: 'stage-1' };
+    options.pipeline.stages.push({
+      kind: 'command',
+      id: 'stage-2',
+      title: 'Stage 2',
+      command: 'echo second'
+    });
+    options.manifest.commands.push({
+      index: 2,
+      id: 'stage-2',
+      kind: 'command',
+      title: 'Stage 2',
+      command: 'echo second',
+      status: 'pending',
+      log_path: null,
+      summary: null,
+      started_at: null,
+      completed_at: null,
+      exit_code: null,
+      cwd: null,
+      env: null,
+      timeout_ms: null,
+      allow_failure: false,
+      optional: false,
+      child_pipeline_id: null,
+      child_run_id: null
+    });
+
+    const result = await executeOrchestratorCloudTarget(options);
+
+    expect(result.success).toBe(false);
+    expect(options.manifest.commands[0]).toMatchObject({
+      status: 'failed',
+      exit_code: 1
+    });
+    expect(options.manifest.commands[1]).toMatchObject({
+      status: 'skipped',
+      summary: 'Skipped in cloud mode (target stage: stage-1).'
+    });
+    expect(options.manifest.commands[1]?.started_at).toBeTruthy();
+    expect(options.manifest.commands[1]?.completed_at).toBeTruthy();
+  });
+
   it('enters running state before executor handoff and persists intermediate cloud updates', async () => {
     const runEvents = {
       stageStarted: vi.fn(),

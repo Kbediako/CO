@@ -43,6 +43,18 @@ interface CloudTargetExecutorOptions {
   schedulePersist(options?: PersistOptions): Promise<void>;
 }
 
+type CloudTargetPreflightFailure = {
+  success: false;
+  notes: string[];
+};
+
+type CloudTargetPreflightSuccess = {
+  success: true;
+  targetStageId: string;
+  targetStage: PipelineDefinition['stages'][number];
+  targetEntry: CliManifest['commands'][number];
+};
+
 function readCloudString(value: unknown): string | null {
   return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
 }
@@ -249,6 +261,55 @@ function resolveCloudTargetStage(params: {
   return { targetStageId, targetStage, targetEntry };
 }
 
+async function prepareCloudTargetPreflight(params: {
+  manifest: CliManifest;
+  pipeline: PipelineDefinition;
+  target: PlanItem;
+  controlWatcher: CloudTargetExecutorOptions['controlWatcher'];
+}): Promise<CloudTargetPreflightFailure | CloudTargetPreflightSuccess> {
+  const notes: string[] = [];
+  const { targetStageId, targetStage, targetEntry } = resolveCloudTargetStage({
+    target: params.target,
+    pipeline: params.pipeline,
+    manifest: params.manifest
+  });
+
+  await params.controlWatcher.sync();
+  await params.controlWatcher.waitForResume();
+  if (params.controlWatcher.isCanceled()) {
+    params.manifest.status_detail = 'run-canceled';
+    return { success: false, notes };
+  }
+
+  if (!targetStageId || !targetStage || targetStage.kind !== 'command' || !targetEntry) {
+    const detail = targetStageId
+      ? `Cloud execution target "${targetStageId}" could not be resolved to a command stage.`
+      : `Cloud execution target "${params.target.id}" could not be resolved.`;
+    params.manifest.status_detail = 'cloud-target-missing';
+    appendSummary(params.manifest, detail);
+    notes.push(detail);
+    return { success: false, notes };
+  }
+
+  for (let i = 0; i < params.manifest.commands.length; i += 1) {
+    const entry = params.manifest.commands[i];
+    if (!entry || entry.id === targetStageId) {
+      continue;
+    }
+    entry.status = 'skipped';
+    entry.started_at = entry.started_at ?? isoTimestamp();
+    entry.completed_at = isoTimestamp();
+    entry.summary = `Skipped in cloud mode (target stage: ${targetStageId}).`;
+  }
+
+  return {
+    success: true,
+    targetStageId,
+    targetStage,
+    targetEntry
+  };
+}
+
 export function buildCloudPrompt(params: {
   task: TaskContext;
   target: PlanItem;
@@ -453,36 +514,16 @@ export async function executeOrchestratorCloudTarget(
   const notes: string[] = [];
   let success = true;
   const { manifest, pipeline, target, task, runEvents, controlWatcher, schedulePersist } = options;
-  const { targetStageId, targetStage, targetEntry } = resolveCloudTargetStage({ target, pipeline, manifest });
-
-  await controlWatcher.sync();
-  await controlWatcher.waitForResume();
-  if (controlWatcher.isCanceled()) {
-    manifest.status_detail = 'run-canceled';
-    return { success: false, notes };
+  const preflight = await prepareCloudTargetPreflight({
+    manifest,
+    pipeline,
+    target,
+    controlWatcher
+  });
+  if (!preflight.success) {
+    return preflight;
   }
-
-  if (!targetStage || targetStage.kind !== 'command' || !targetEntry) {
-    success = false;
-    manifest.status_detail = 'cloud-target-missing';
-    const detail = targetStageId
-      ? `Cloud execution target "${targetStageId}" could not be resolved to a command stage.`
-      : `Cloud execution target "${target.id}" could not be resolved.`;
-    appendSummary(manifest, detail);
-    notes.push(detail);
-    return { success, notes };
-  }
-
-  for (let i = 0; i < manifest.commands.length; i += 1) {
-    const entry = manifest.commands[i];
-    if (!entry || entry.id === targetStageId) {
-      continue;
-    }
-    entry.status = 'skipped';
-    entry.started_at = entry.started_at ?? isoTimestamp();
-    entry.completed_at = isoTimestamp();
-    entry.summary = `Skipped in cloud mode (target stage: ${targetStageId}).`;
-  }
+  const { targetStageId, targetStage, targetEntry } = preflight;
 
   const environmentId = resolveCloudEnvironmentId(task, target, options.envOverrides);
   if (!environmentId) {
