@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260314-1185-coordinator-symphony-aligned-orchestrator-execution-mode-policy-extraction",
+      "title": "Coordinator Symphony-Aligned Orchestrator Execution Mode Policy Extraction",
+      "relates_to": "tasks/tasks-1185-coordinator-symphony-aligned-orchestrator-execution-mode-policy-extraction.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-14",
+      "paths": {
+        "spec": "tasks/specs/1185-coordinator-symphony-aligned-orchestrator-execution-mode-policy-extraction.md",
+        "task": "tasks/tasks-1185-coordinator-symphony-aligned-orchestrator-execution-mode-policy-extraction.md",
+        "agent_task": ".agent/task/1185-coordinator-symphony-aligned-orchestrator-execution-mode-policy-extraction.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-execution-mode-policy-extraction.md"
+      }
+    },
+    {
       "id": "20260314-1184-coordinator-symphony-aligned-orchestrator-execution-routing-decision-shell-extraction",
       "title": "Coordinator Symphony-Aligned Orchestrator Execution Routing Decision Shell Extraction",
       "relates_to": "tasks/tasks-1184-coordinator-symphony-aligned-orchestrator-execution-routing-decision-shell-extraction.md",

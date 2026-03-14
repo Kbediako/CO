@@ -3,6 +3,55 @@
   "generated_at": "2026-03-14",
   "entries": [
     {
+      "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-orchestrator-execution-mode-policy-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-14",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/PRD-coordinator-symphony-aligned-orchestrator-execution-mode-policy-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-14",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-execution-mode-policy-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-14",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/findings/1185-orchestrator-execution-mode-policy-extraction-deliberation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-14",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/tasks-1185-coordinator-symphony-aligned-orchestrator-execution-mode-policy-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-14",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/specs/1185-coordinator-symphony-aligned-orchestrator-execution-mode-policy-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-14",
+      "cadence_days": 30
+    },
+    {
+      "path": ".agent/task/1185-coordinator-symphony-aligned-orchestrator-execution-mode-policy-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-14",
+      "cadence_days": 30
+    },
+    {
       "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-orchestrator-execution-routing-decision-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
