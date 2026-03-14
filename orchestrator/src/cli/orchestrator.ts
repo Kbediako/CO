@@ -4,8 +4,8 @@ import type { TaskContext, ExecutionMode, PlanItem } from '../types.js';
 import { resolveEnvironmentPaths } from '../../../scripts/lib/run-manifests.js';
 import { normalizeEnvironmentPaths } from './run/environment.js';
 import type { EnvironmentPaths } from './run/environment.js';
-import { loadManifest, updateHeartbeat, appendSummary, finalizeStatus, resetForResume, recordResumeEvent } from './run/manifest.js';
-import { ManifestPersister, persistManifest } from './run/manifestPersister.js';
+import { loadManifest, finalizeStatus } from './run/manifest.js';
+import { persistManifest } from './run/manifestPersister.js';
 import { resolveRuntimeActivitySnapshot, type RuntimeActivitySnapshot } from './run/runtimeActivity.js';
 import type {
   CliManifest,
@@ -22,17 +22,9 @@ import { isoTimestamp } from './utils/time.js';
 import type { RunPaths } from './run/runPaths.js';
 import { relativeToRepo } from './run/runPaths.js';
 import { logger } from '../logger.js';
-import { PipelineResolver } from './services/pipelineResolver.js';
 import { ControlPlaneService } from './services/controlPlaneService.js';
 import { SchedulerService } from './services/schedulerService.js';
-import {
-  prepareRun,
-  resolvePipelineForResume,
-  overrideTaskEnvironment
-} from './services/runPreparation.js';
-import { loadPackageConfig, loadUserConfig } from './config/userConfig.js';
-import { formatRepoConfigRequiredError, isRepoConfigRequired } from './config/repoConfigPolicy.js';
-import { resolveRuntimeMode } from './runtime/index.js';
+import { prepareRun } from './services/runPreparation.js';
 import type { RuntimeMode, RuntimeSelection } from './runtime/types.js';
 import type { AdvancedAutopilotDecision } from './utils/advancedAutopilot.js';
 import {
@@ -49,6 +41,7 @@ import {
 } from './services/orchestratorExecutionRouteAdapterShell.js';
 import { runOrchestratorControlPlaneLifecycleShell } from './services/orchestratorControlPlaneLifecycleShell.js';
 import { runOrchestratorStartPreparationShell } from './services/orchestratorStartPreparationShell.js';
+import { runOrchestratorResumePreparationShell } from './services/orchestratorResumePreparationShell.js';
 
 const resolveBaseEnvironment = (): EnvironmentPaths =>
   normalizeEnvironmentPaths(resolveEnvironmentPaths());
@@ -97,65 +90,18 @@ export class CodexOrchestrator {
   }
 
   async resume(options: ResumeOptions): Promise<PipelineExecutionResult> {
-    const env = this.baseEnv;
-    const { manifest, paths } = await loadManifest(env, options.runId);
-    const actualEnv = overrideTaskEnvironment(env, manifest.task_id);
-
-    const resolver = new PipelineResolver();
-    const designConfig = await resolver.loadDesignConfig(actualEnv.repoRoot);
-
-    const repoConfigRequired = isRepoConfigRequired(process.env);
-    const userConfig = await loadUserConfig(actualEnv, { allowPackageFallback: !repoConfigRequired });
-    if (repoConfigRequired && userConfig?.source !== 'repo') {
-      throw new Error(formatRepoConfigRequiredError(actualEnv.repoRoot));
-    }
-    const fallbackConfig =
-      !repoConfigRequired && manifest.pipeline_id === 'rlm' && userConfig?.source === 'repo'
-        ? await loadPackageConfig(actualEnv)
-        : null;
-    const pipeline = resolvePipelineForResume(actualEnv, manifest, userConfig, fallbackConfig);
-    const envOverrides = resolver.resolveDesignEnvOverrides(designConfig, pipeline.id);
-    await this.validateResumeToken(paths, manifest, options.resumeToken ?? null);
-    recordResumeEvent(manifest, {
-      actor: options.actor ?? 'cli',
-      reason: options.reason ?? 'manual-resume',
-      outcome: 'accepted'
-    });
-    resetForResume(manifest);
-    updateHeartbeat(manifest);
-    const preparation = await prepareRun({
-      baseEnv: actualEnv,
-      pipeline,
-      runtimeModeDefault: userConfig?.runtimeMode ?? null,
-      resolver,
-      taskIdOverride: manifest.task_id,
-      targetStageId: options.targetStageId,
-      planTargetFallback: manifest.plan_target_id ?? null,
-      envOverrides
-    });
-    if (preparation.configNotice && !(manifest.summary ?? '').includes(preparation.configNotice)) {
-      appendSummary(manifest, preparation.configNotice);
-    }
-    const runtimeModeResolution = resolveRuntimeMode({
-      flag: options.runtimeMode,
-      env: { ...process.env, ...(preparation.envOverrides ?? {}) },
-      configDefault: preparation.runtimeModeDefault,
-      manifestMode: manifest.runtime_mode_requested ?? manifest.runtime_mode ?? null,
-      preferManifest: true
-    });
-    this.applyRequestedRuntimeMode(manifest, runtimeModeResolution.mode);
-    manifest.plan_target_id = preparation.planPreview?.targetId ?? preparation.plannerTargetId ?? null;
-    const persister = new ManifestPersister({
-      manifest,
-      paths,
-      persistIntervalMs: Math.max(1000, manifest.heartbeat_interval_seconds * 1000)
-    });
-    await persister.schedule({ manifest: true, heartbeat: true, force: true });
+    const { preparation, runtimeModeResolution, manifest, paths, persister } =
+      await runOrchestratorResumePreparationShell({
+        baseEnv: this.baseEnv,
+        options,
+        validateResumeToken: this.validateResumeToken.bind(this),
+        applyRequestedRuntimeMode: this.applyRequestedRuntimeMode.bind(this)
+      });
 
     return await runOrchestratorControlPlaneLifecycleShell({
       repoRoot: preparation.env.repoRoot,
       paths,
-      pipeline,
+      pipeline: preparation.pipeline,
       manifest,
       emitter: options.runEvents,
       onStartFailure: async () => {
@@ -173,7 +119,7 @@ export class CodexOrchestrator {
       runWithLifecycle: ({ runEvents, eventStream, onEventEntry }) =>
         this.performRunLifecycle({
           env: preparation.env,
-          pipeline,
+          pipeline: preparation.pipeline,
           manifest,
           paths,
           planner: preparation.planner,
