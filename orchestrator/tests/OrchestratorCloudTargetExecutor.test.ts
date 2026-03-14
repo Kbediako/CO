@@ -5,6 +5,7 @@ import type { PlanItem, TaskContext } from '../src/types.js';
 import type { CliManifest, PipelineDefinition } from '../src/cli/types.js';
 import type { EnvironmentPaths } from '../src/cli/run/environment.js';
 import type { RunPaths } from '../src/cli/run/runPaths.js';
+import { buildCloudPrompt } from '../src/cli/services/orchestratorCloudPromptBuilder.js';
 import { executeOrchestratorCloudTarget } from '../src/cli/services/orchestratorCloudTargetExecutor.js';
 import {
   CodexCloudTaskExecutor,
@@ -159,23 +160,23 @@ describe('executeOrchestratorCloudTarget request shaping', () => {
       };
     });
 
-    const result = await executeOrchestratorCloudTarget(
-      buildOptions({
-        CODEX_CLI_BIN: '/custom/codex',
-        CODEX_CLOUD_POLL_INTERVAL_SECONDS: '25',
-        CODEX_CLOUD_TIMEOUT_SECONDS: '600',
-        CODEX_CLOUD_EXEC_ATTEMPTS: '3',
-        CODEX_CLOUD_STATUS_RETRY_LIMIT: '9',
-        CODEX_CLOUD_STATUS_RETRY_BACKOFF_MS: '2100',
-        CODEX_CLOUD_BRANCH: ' refs/heads/feature/test ',
-        CODEX_CLOUD_ENABLE_FEATURES: 'js_repl, memories js_repl',
-        CODEX_CLOUD_DISABLE_FEATURES: 'audio, audio telemetry',
-        CODEX_NON_INTERACTIVE: '0',
-        CODEX_NO_INTERACTIVE: '0',
-        CODEX_INTERACTIVE: '1',
-        CUSTOM_ENV: 'present'
-      })
-    );
+    const options = buildOptions({
+      CODEX_CLI_BIN: '/custom/codex',
+      CODEX_CLOUD_POLL_INTERVAL_SECONDS: '25',
+      CODEX_CLOUD_TIMEOUT_SECONDS: '600',
+      CODEX_CLOUD_EXEC_ATTEMPTS: '3',
+      CODEX_CLOUD_STATUS_RETRY_LIMIT: '9',
+      CODEX_CLOUD_STATUS_RETRY_BACKOFF_MS: '2100',
+      CODEX_CLOUD_BRANCH: ' refs/heads/feature/test ',
+      CODEX_CLOUD_ENABLE_FEATURES: 'js_repl, memories js_repl',
+      CODEX_CLOUD_DISABLE_FEATURES: 'audio, audio telemetry',
+      CODEX_NON_INTERACTIVE: '0',
+      CODEX_NO_INTERACTIVE: '0',
+      CODEX_INTERACTIVE: '1',
+      CUSTOM_ENV: 'present'
+    });
+
+    const result = await executeOrchestratorCloudTarget(options);
 
     expect(result.success).toBe(true);
     expect(captured).toBeTruthy();
@@ -195,10 +196,111 @@ describe('executeOrchestratorCloudTarget request shaping', () => {
     expect(captured?.env?.CODEX_NON_INTERACTIVE).toBe('0');
     expect(captured?.env?.CODEX_NO_INTERACTIVE).toBe('0');
     expect(captured?.env?.CODEX_INTERACTIVE).toBe('1');
+    expect(captured?.prompt).toBe(
+      buildCloudPrompt({
+        task: options.task,
+        target: options.target,
+        pipeline: options.pipeline,
+        stage: options.pipeline.stages[0]!,
+        manifest: options.manifest
+      })
+    );
     expect(captured?.prompt).toContain('Task ID: task-1');
     expect(captured?.prompt).toContain('Target stage: stage-1 (Run stage 1 in cloud.)');
     expect(captured?.prompt).toContain('Relevant prior experiences');
     expect(typeof captured?.onUpdate).toBe('function');
+  });
+
+  it('builds the cloud prompt from the resolved non-first target stage', async () => {
+    let captured: CloudTaskExecutorInput | null = null;
+    vi.spyOn(CodexCloudTaskExecutor.prototype, 'execute').mockImplementationOnce(async (input) => {
+      captured = input;
+      return {
+        success: true,
+        summary: 'Cloud task completed.',
+        notes: [],
+        cloudExecution: buildCloudExecution({
+          environment_id: input.environmentId,
+          poll_interval_seconds: input.pollIntervalSeconds,
+          timeout_seconds: input.timeoutSeconds,
+          attempts: input.attempts
+        })
+      };
+    });
+
+    const options = buildOptions();
+    options.pipeline = {
+      ...options.pipeline,
+      stages: [
+        { kind: 'command', id: 'stage-1', title: 'Stage 1', command: 'echo stage-1' },
+        { kind: 'command', id: 'stage-2', title: 'Stage 2', command: 'echo stage-2' }
+      ]
+    };
+    options.manifest = {
+      ...options.manifest,
+      commands: [
+        {
+          index: 1,
+          id: 'stage-1',
+          kind: 'command',
+          title: 'Stage 1',
+          command: 'echo stage-1',
+          status: 'pending',
+          log_path: null,
+          summary: null,
+          started_at: null,
+          completed_at: null,
+          exit_code: null,
+          cwd: null,
+          env: null,
+          timeout_ms: null,
+          allow_failure: false,
+          optional: false,
+          child_pipeline_id: null,
+          child_run_id: null
+        },
+        {
+          index: 2,
+          id: 'stage-2',
+          kind: 'command',
+          title: 'Stage 2',
+          command: 'echo stage-2',
+          status: 'pending',
+          log_path: null,
+          summary: null,
+          started_at: null,
+          completed_at: null,
+          exit_code: null,
+          cwd: null,
+          env: null,
+          timeout_ms: null,
+          allow_failure: false,
+          optional: false,
+          child_pipeline_id: null,
+          child_run_id: null
+        }
+      ]
+    } as CliManifest;
+    options.target = {
+      id: 'implementation:stage-2',
+      description: 'Run stage 2 in cloud.',
+      metadata: { stageId: 'stage-2', cloudEnvId: 'env-123' }
+    };
+
+    const result = await executeOrchestratorCloudTarget(options);
+
+    expect(result.success).toBe(true);
+    expect(captured?.prompt).toBe(
+      buildCloudPrompt({
+        task: options.task,
+        target: options.target,
+        pipeline: options.pipeline,
+        stage: options.pipeline.stages[1]!,
+        manifest: options.manifest
+      })
+    );
+    expect(captured?.prompt).toContain('Target stage: stage-2 (Run stage 2 in cloud.)');
+    expect(captured?.prompt).not.toContain('Target stage: stage-1');
   });
 
   it('falls back to defaults when optional request env values are blank or invalid', async () => {

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { PlanItem, TaskContext } from '../src/types.js';
 import type { CliManifest, PipelineDefinition } from '../src/cli/types.js';
-import { buildCloudPrompt } from '../src/cli/services/orchestratorCloudTargetExecutor.js';
+import { buildCloudPrompt } from '../src/cli/services/orchestratorCloudPromptBuilder.js';
 
 function invokeBuildCloudPrompt(params: {
   task: TaskContext;
