@@ -35,7 +35,7 @@ The remaining truthful extraction seam after `1166` is the class-local `runAutoS
 
 - Focused helper test for `recorded`, `timeout`, and `error`
 - `orchestrator/tests/OrchestratorCloudAutoScout.test.ts`
-- `orchestrator/tests/OrchestratorExecutionRouter.test.ts` if the router callback contract surface changes
+- `orchestrator/tests/OrchestratorExecutionRouteDecisionShell.test.ts` if the router callback contract surface changes
 - Standard deterministic gate bundle on the final tree
 
 ## Risks

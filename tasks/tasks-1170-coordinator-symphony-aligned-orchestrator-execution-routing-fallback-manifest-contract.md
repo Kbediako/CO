@@ -23,7 +23,7 @@
 ## Implementation
 
 - [x] Fallback manifest/error-note shaping is isolated into a smaller truthful router-local seam. Evidence: `orchestrator/src/cli/services/orchestratorExecutionRouter.ts`, `out/1170-coordinator-symphony-aligned-orchestrator-execution-routing-fallback-manifest-contract/manual/20260314T015844Z-closeout/00-summary.md`
-- [x] Hard-fail versus recursive fallback outcomes remain behaviorally unchanged. Evidence: `orchestrator/tests/OrchestratorExecutionRouter.test.ts`, `out/1170-coordinator-symphony-aligned-orchestrator-execution-routing-fallback-manifest-contract/manual/20260314T015844Z-closeout/05b-targeted-tests.log`
+- [x] Hard-fail versus recursive fallback outcomes remain behaviorally unchanged. Evidence: `orchestrator/tests/OrchestratorExecutionRouteDecisionShell.test.ts`, `out/1170-coordinator-symphony-aligned-orchestrator-execution-routing-fallback-manifest-contract/manual/20260314T015844Z-closeout/05b-targeted-tests.log`
 
 ## Validation + Closeout
 

@@ -23,7 +23,7 @@
 ## Implementation
 
 - [x] `routeOrchestratorExecution(...)` delegates to smaller router-local policy helpers. Evidence: `orchestrator/src/cli/services/orchestratorExecutionRouter.ts`, `out/1169-coordinator-symphony-aligned-orchestrator-execution-routing-policy-splitting/manual/20260314T011615Z-closeout/00-summary.md`
-- [x] Cloud hard-fail, fallback, and local-routing branches preserve current behavior. Evidence: `orchestrator/tests/OrchestratorExecutionRouter.test.ts`, `out/1169-coordinator-symphony-aligned-orchestrator-execution-routing-policy-splitting/manual/20260314T011615Z-closeout/05b-targeted-tests.log`
+- [x] Cloud hard-fail, fallback, and local-routing branches preserve current behavior. Evidence: `orchestrator/tests/OrchestratorExecutionRouteDecisionShell.test.ts`, `out/1169-coordinator-symphony-aligned-orchestrator-execution-routing-policy-splitting/manual/20260314T011615Z-closeout/05b-targeted-tests.log`
 - [x] `executePipeline()` remains a thin router adapter boundary. Evidence: `orchestrator/src/cli/orchestrator.ts`, `out/1169-coordinator-symphony-aligned-orchestrator-execution-routing-policy-splitting/manual/20260314T011615Z-closeout/00-summary.md`
 
 ## Validation + Closeout

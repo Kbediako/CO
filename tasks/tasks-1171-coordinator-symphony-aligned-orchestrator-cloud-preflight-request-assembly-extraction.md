@@ -23,7 +23,7 @@
 ## Implementation
 
 - [x] Cloud-preflight request assembly is isolated into a smaller truthful router-local seam. Evidence: `orchestrator/src/cli/services/orchestratorExecutionRouter.ts`, `out/1171-coordinator-symphony-aligned-orchestrator-cloud-preflight-request-assembly-extraction/manual/20260314T023037Z-closeout/00-summary.md`
-- [x] `executeCloudRoute(...)` preserves preflight invocation plus hard-fail/fallback ownership. Evidence: `orchestrator/tests/OrchestratorExecutionRouter.test.ts`, `out/1171-coordinator-symphony-aligned-orchestrator-cloud-preflight-request-assembly-extraction/manual/20260314T023037Z-closeout/00-summary.md`
+- [x] `executeCloudRoute(...)` preserves preflight invocation plus hard-fail/fallback ownership. Evidence: `orchestrator/tests/OrchestratorExecutionRouteDecisionShell.test.ts`, `out/1171-coordinator-symphony-aligned-orchestrator-cloud-preflight-request-assembly-extraction/manual/20260314T023037Z-closeout/00-summary.md`
 
 ## Validation + Closeout
 

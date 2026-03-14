@@ -9,7 +9,7 @@
 `1170` is scoped to the router-local fallback manifest contract:
 
 - `orchestrator/src/cli/services/orchestratorExecutionRouter.ts`
-- `orchestrator/tests/OrchestratorExecutionRouter.test.ts`
+- `orchestrator/tests/OrchestratorExecutionRouteDecisionShell.test.ts`
 
 ## Why Not A Broader Router Or Orchestrator Lane
 
