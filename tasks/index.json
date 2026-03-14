@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260314-1182-coordinator-symphony-aligned-orchestrator-local-route-shell-extraction",
+      "title": "Coordinator Symphony-Aligned Orchestrator Local Route Shell Extraction",
+      "relates_to": "tasks/tasks-1182-coordinator-symphony-aligned-orchestrator-local-route-shell-extraction.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-14",
+      "paths": {
+        "spec": "tasks/specs/1182-coordinator-symphony-aligned-orchestrator-local-route-shell-extraction.md",
+        "task": "tasks/tasks-1182-coordinator-symphony-aligned-orchestrator-local-route-shell-extraction.md",
+        "agent_task": ".agent/task/1182-coordinator-symphony-aligned-orchestrator-local-route-shell-extraction.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-local-route-shell-extraction.md"
+      }
+    },
+    {
       "id": "20260314-1181-coordinator-symphony-aligned-orchestrator-cloud-route-preflight-and-reroute-shell-extraction",
       "title": "Coordinator Symphony-Aligned Orchestrator Cloud Route Preflight And Reroute Shell Extraction",
       "relates_to": "tasks/tasks-1181-coordinator-symphony-aligned-orchestrator-cloud-route-preflight-and-reroute-shell-extraction.md",
