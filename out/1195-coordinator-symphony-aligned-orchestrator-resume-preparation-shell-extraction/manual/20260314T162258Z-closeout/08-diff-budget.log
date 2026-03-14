@@ -1,0 +1,16 @@
+⚠️ Diff budget exceeded (override applied) (base=origin/main)
+ - changed files 1672 > 25
+ - total lines changed 141985 > 800
+Top changed files:
+  - docs/docs-freshness-registry.json: 13854
+  - tasks/index.json: 7776
+  - orchestrator/tests/ControlServer.test.ts: 7637
+  - scripts/lib/review-execution-state.ts: 4243
+  - tests/review-execution-state.spec.ts: 3522
+  - tests/run-review.spec.ts: 3110
+  - scripts/run-review.ts: 2221
+  - orchestrator/tests/DelegationServer.test.ts: 2115
+  - orchestrator/tests/TelegramOversightBridge.test.ts: 1803
+  - orchestrator/src/cli/orchestrator.ts: 1646
+
+Override accepted via DIFF_BUDGET_OVERRIDE_REASON: 1195 stacked-branch symphony alignment lane

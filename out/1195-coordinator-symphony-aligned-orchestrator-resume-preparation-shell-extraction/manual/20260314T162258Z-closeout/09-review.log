@@ -1,0 +1,517 @@
+
+> @kbediako/codex-orchestrator@0.1.38 review
+> node --loader ts-node/esm scripts/run-review.ts --manifest .runs/1195-coordinator-symphony-aligned-orchestrator-resume-preparation-shell-extraction/cli/2026-03-14T16-10-34-149Z-feead61b/manifest.json
+
+(node:46392) ExperimentalWarning: `--experimental-loader` may be removed in the future; instead use `register()`:
+--import 'data:text/javascript,import { register } from "node:module"; import { pathToFileURL } from "node:url"; register("ts-node/esm", pathToFileURL("./"));'
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:46392) [DEP0180] DeprecationWarning: fs.Stats constructor is deprecated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+⚠️ Diff budget exceeded (override applied) (base=origin/main)
+ - changed files 1672 > 25
+ - total lines changed 141985 > 800
+Top changed files:
+  - docs/docs-freshness-registry.json: 13854
+  - tasks/index.json: 7776
+  - orchestrator/tests/ControlServer.test.ts: 7637
+  - scripts/lib/review-execution-state.ts: 4243
+  - tests/review-execution-state.spec.ts: 3522
+  - tests/run-review.spec.ts: 3110
+  - scripts/run-review.ts: 2221
+  - orchestrator/tests/DelegationServer.test.ts: 2115
+  - orchestrator/tests/TelegramOversightBridge.test.ts: 1803
+  - orchestrator/src/cli/orchestrator.ts: 1646
+
+Override accepted via DIFF_BUDGET_OVERRIDE_REASON: 1195 stacked-branch symphony alignment lane
+[run-review] bounded review guidance enabled by default (set CODEX_REVIEW_ALLOW_HEAVY_COMMANDS=1 to opt into unrestricted heavy-command execution).
+[run-review] review scope metrics unavailable (git scope stats could not be resolved).
+[run-review] runtime requested=appserver selected=appserver provider=AppServerRuntimeProvider.
+[run-review] delegation MCP enabled for this review (default; set --disable-delegation-mcp or CODEX_REVIEW_DISABLE_DELEGATION_MCP=1 to disable).
+Review prompt saved to: .runs/1195-coordinator-symphony-aligned-orchestrator-resume-preparation-shell-extraction/cli/2026-03-14T16-10-34-149Z-feead61b/review/prompt.txt
+Review output log: .runs/1195-coordinator-symphony-aligned-orchestrator-resume-preparation-shell-extraction/cli/2026-03-14T16-10-34-149Z-feead61b/review/output.log
+Launching Codex review (evidence: .runs/1195-coordinator-symphony-aligned-orchestrator-resume-preparation-shell-extraction/cli/2026-03-14T16-10-34-149Z-feead61b/manifest.json)
+[run-review] patience-first monitor checkpoints every 1m 0s (set CODEX_REVIEW_MONITOR_INTERVAL_SECONDS=0 to disable).
+[run-review] low-signal drift guard enabled after 3m 0s of repetitive bounded activity (set CODEX_REVIEW_LOW_SIGNAL_TIMEOUT_SECONDS=0 to disable).
+[run-review] verdict-stability guard enabled after 3m 0s of repeated speculative no-progress output (set CODEX_REVIEW_VERDICT_STABILITY_TIMEOUT_SECONDS=0 to disable).
+[run-review] meta-surface expansion guard enabled after 3m 0s of sustained off-task meta activity (set CODEX_REVIEW_META_SURFACE_TIMEOUT_SECONDS=0 to disable).
+OpenAI Codex v0.114.0 (research preview)
+--------
+workdir: /Users/kbediako/Code/CO
+model: gpt-5.4
+provider: openai
+approval: never
+sandbox: danger-full-access
+reasoning effort: xhigh
+reasoning summaries: detailed
+session id: 019ced33-b148-71c2-8144-f8b3a90c8743
+--------
+user
+Review task: 1195-coordinator-symphony-aligned-orchestrator-resume-preparation-shell-extraction
+Review surface: diff
+
+Agent notes:
+Goal: extract the resume preparation shell from CodexOrchestrator.resume | Summary: delegated manifest/config/runtime-mode/run-preparation assembly into orchestratorResumePreparationShell while keeping the pre-start failure persistence contract inline | Risks: resume token validation ordering, summary dedupe, manifest-preferred runtime mode, plan_target refresh, forced initial persist
+
+Please review the current changes and confirm:
+- The solution is minimal and avoids unnecessary abstraction/scope
+- Behavior remains correct for changed files and nearby dependencies
+- Call out concrete regressions, risky edge cases, or missing tests in the changed area
+- Start with touched paths, scoped diff commands, or nearby changed code before consulting memory, skills, review docs, manifests, or review artifacts
+- Concrete same-diff progress can be shown by citing touched paths with explicit locations such as `path:line`, `path:line:col`, `path#Lline`, or `path#LlineCcol`.
+- If you already have that diff-local citation evidence, do not search the wider repo for other examples of the rendering.
+
+Keep this pass diff-focused. Do not audit checklist/docs/evidence surfaces unless they are directly required to assess code correctness.
+
+Execution constraints (bounded review mode):
+- Keep this review focused on changed files and nearby dependencies.
+- Avoid full validation suites (for example `npm run test`, `npm run lint`, `npm run build`, `npm run docs:check`, `npm run docs:freshness`) during this pass.
+- Do not launch direct validation runners (for example `npx vitest`, `npm exec jest`) or nested review/pipeline/delegation flows during this pass.
+- If broader validation would improve confidence, list follow-up commands instead of executing them.
+
+Review scope hint: uncommitted working tree changes (default).
+
+Review scope paths: unavailable or empty.
+
+Active closeout provenance:
+- Resolved active closeout root: `out/1195-coordinator-symphony-aligned-orchestrator-resume-preparation-shell-extraction/manual/20260314T162258Z-closeout`
+- These roots are already-resolved self-referential review surfaces for this task; do not re-derive or re-enumerate them unless directly necessary to assess code correctness.
+mcp: delegation starting
+mcp: openaiDeveloperDocs starting
+mcp: delegation ready
+mcp: openaiDeveloperDocs ready
+mcp startup: ready: delegation, openaiDeveloperDocs
+mcp: delegation starting
+mcp: openaiDeveloperDocs starting
+mcp: delegation ready
+mcp: openaiDeveloperDocs ready
+mcp startup: ready: delegation, openaiDeveloperDocs
+
+thinking
+**Reviewing code findings**
+
+I need to produce JSON findings based on the code review schema. First, I'll inspect the diff and touched paths according to the instructions. It seems that using memory might not be necessary since the task is contained within the repo. I'll use git diff for this purpose. While considering using an update plan for non-trivial tasks, I may find it's not needed. My focus is on analyzing the diff carefully and outputting only the findings without any additional commentary.
+thinking
+**Reviewing code findings**
+
+I need to produce JSON findings based on the code review schema. First, I'll inspect the diff and touched paths according to the instructions. It seems that using memory might not be necessary since the task is contained within the repo. I'll use git diff for this purpose. While considering using an update plan for non-trivial tasks, I may find it's not needed. My focus is on analyzing the diff carefully and outputting only the findings without any additional commentary.
+exec
+/bin/zsh -lc "git status --short && echo '---DIFF---' && git diff --stat && echo '---NAME-ONLY---' && git diff --name-only" in /Users/kbediako/Code/CO succeeded in 0ms:
+---DIFF---
+---NAME-ONLY---
+
+thinking
+**Reviewing Git Status**
+
+I'm considering if there are uncommitted changes or if the branch is clean. I might need to compare branches or check if there's a diff from the current HEAD. Checking the status could help me locate tasks that need attention. I'll use git status to get a full picture and see if the branch is ahead of the base. It's all about understanding the current state of my work!
+thinking
+**Reviewing Git Status**
+
+I'm considering if there are uncommitted changes or if the branch is clean. I might need to compare branches or check if there's a diff from the current HEAD. Checking the status could help me locate tasks that need attention. I'll use git status to get a full picture and see if the branch is ahead of the base. It's all about understanding the current state of my work!
+exec
+/bin/zsh -lc 'git status -sb && git branch --show-current && git rev-parse --abbrev-ref --symbolic-full-name @{upstream} 2>/dev/null || true && git log --oneline --decorate -n 5' in /Users/kbediako/Code/CO succeeded in 0ms:
+## main...origin/main [ahead 431]
+main
+origin/main
+d57826be9 (HEAD -> main) extract orchestrator resume preparation shell for 1195
+83b7d206c register docs-first slice 1195 resume preparation shell
+0d51b026b close task 1194 and sync status mirrors
+ebcc7657a extract orchestrator start preparation shell for 1194
+2fc2761ea register docs-first slice 1194 start preparation shell
+
+thinking
+**Reviewing git commit changes**
+
+I need to review the commit, possibly comparing the current HEAD with its parent. The diff will likely be from HEAD1 to HEAD. I might check the default "diff," but it could be uncommitted and empty. The commit message is important too. So, I’ll use a command like `git show --stat HEAD` to inspect the HEAD diff and see details about the files involved. This seems like a solid approach!
+thinking
+**Reviewing git commit changes**
+
+I need to review the commit, possibly comparing the current HEAD with its parent. The diff will likely be from HEAD1 to HEAD. I might check the default "diff," but it could be uncommitted and empty. The commit message is important too. So, I’ll use a command like `git show --stat HEAD` to inspect the HEAD diff and see details about the files involved. This seems like a solid approach!
+exec
+/bin/zsh -lc 'git show --stat --summary --decorate=short --format=fuller HEAD' in /Users/kbediako/Code/CO succeeded in 0ms:
+commit d57826be9f95e6c41d9525f16319cff23ae58273 (HEAD -> main)
+Author:     Kbediako <jasarebed@gmail.com>
+AuthorDate: Sun Mar 15 03:22:28 2026 +1100
+Commit:     Kbediako <jasarebed@gmail.com>
+CommitDate: Sun Mar 15 03:22:28 2026 +1100
+
+    extract orchestrator resume preparation shell for 1195
+
+ orchestrator/src/cli/orchestrator.ts               |  80 +----
+ .../services/orchestratorResumePreparationShell.ts | 149 +++++++++
+ .../OrchestratorResumePreparationShell.test.ts     | 352 +++++++++++++++++++++
+ 3 files changed, 514 insertions(+), 67 deletions(-)
+ create mode 100644 orchestrator/src/cli/services/orchestratorResumePreparationShell.ts
+ create mode 100644 orchestrator/tests/OrchestratorResumePreparationShell.test.ts
+exec
+/bin/zsh -lc 'git show --unified=80 --format=medium HEAD -- orchestrator/src/cli/orchestrator.ts orchestrator/src/cli/services/orchestratorResumePreparationShell.ts orchestrator/tests/OrchestratorResumePreparationShell.test.ts' in /Users/kbediako/Code/CO succeeded in 0ms:
+commit d57826be9f95e6c41d9525f16319cff23ae58273
+Author: Kbediako <jasarebed@gmail.com>
+Date:   Sun Mar 15 03:22:28 2026 +1100
+
+    extract orchestrator resume preparation shell for 1195
+
+diff --git a/orchestrator/src/cli/orchestrator.ts b/orchestrator/src/cli/orchestrator.ts
+index 04e6a4853..9de5972ef 100644
+--- a/orchestrator/src/cli/orchestrator.ts
++++ b/orchestrator/src/cli/orchestrator.ts
+@@ -1,256 +1,202 @@
+ import { readFile } from 'node:fs/promises';
+ 
+ import type { TaskContext, ExecutionMode, PlanItem } from '../types.js';
+ import { resolveEnvironmentPaths } from '../../../scripts/lib/run-manifests.js';
+ import { normalizeEnvironmentPaths } from './run/environment.js';
+ import type { EnvironmentPaths } from './run/environment.js';
+-import { loadManifest, updateHeartbeat, appendSummary, finalizeStatus, resetForResume, recordResumeEvent } from './run/manifest.js';
+-import { ManifestPersister, persistManifest } from './run/manifestPersister.js';
++import { loadManifest, finalizeStatus } from './run/manifest.js';
+
+thinking
+**Reviewing changes and dependencies**
+
+I need to review the changed files and see how they relate to nearby dependencies. It's crucial to understand the existing functions first. I think I should inspect the current source, maybe check it before the changes were made, and look at related functions. My goal is to identify any bugs that might have been introduced. I can inspect the resume in the previous commit or check for patterns in the related shell.
+thinking
+**Reviewing changes and dependencies**
+
+I need to review the changed files and see how they relate to nearby dependencies. It's crucial to understand the existing functions first. I think I should inspect the current source, maybe check it before the changes were made, and look at related functions. My goal is to identify any bugs that might have been introduced. I can inspect the resume in the previous commit or check for patterns in the related shell.
+exec
+/bin/zsh -lc "sed -n '1,260p' orchestrator/src/cli/services/orchestratorStartPreparationShell.ts" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "sed -n '1,260p' orchestrator/src/cli/services/runPreparation.ts" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "sed -n '1,260p' orchestrator/src/cli/runtime/index.ts" in /Users/kbediako/Code/CO succeeded in 0ms:
+import process from 'node:process';
+
+import { bootstrapManifest, appendSummary } from '../run/manifest.js';
+import {
+  ManifestPersister,
+  type ManifestPersisterOptions
+} from '../run/manifestPersister.js';
+import type { RunPaths } from '../run/runPaths.js';
+import { resolveRuntimeMode } from '../runtime/index.js';
+import type { RuntimeMode, RuntimeModeResolution } from '../runtime/types.js';
+import { prepareRun, type RunPreparationResult } from './runPreparation.js';
+import type { CliManifest, StartOptions } from '../types.js';
+import type { EnvironmentPaths } from '../run/environment.js';
+import { generateRunId } from '../utils/runId.js';
+
+export interface RunOrchestratorStartPreparationShellParams {
+  baseEnv: EnvironmentPaths;
+  options: StartOptions;
+  applyRequestedRuntimeMode: (manifest: CliManifest, mode: RuntimeMode) => void;
+  prepareRunImpl?: typeof prepareRun;
+ succeeded in 0ms:
+import process from 'node:process';
+
+import { CommandPlanner } from '../adapters/index.js';
+import { PipelineResolver } from './pipelineResolver.js';
+import { sanitizeTaskId } from '../run/environment.js';
+import type { EnvironmentPaths } from '../run/environment.js';
+import { loadTaskMetadata } from '../tasks/taskMetadata.js';
+import type { TaskContext, PlanResult } from '../../types.js';
+import type { PipelineDefinition } from '../types.js';
+import { resolvePipeline } from '../pipelines/index.js';
+import type { UserConfig } from '../config/userConfig.js';
+import { findPipeline } from '../config/userConfig.js';
+import type { CliManifest } from '../types.js';
+import { logger } from '../../logger.js';
+import type { RuntimeMode } from '../runtime/types.js';
+
+export interface RunPreparationResult {
+  env: EnvironmentPaths;
+  pipeline: PipelineDefinition;
+  pipelineSource: string | null;
+ succeeded in 0ms:
+export {
+  parseRuntimeMode,
+  resolveRuntimeMode,
+  DEFAULT_RUNTIME_MODE,
+  DEFAULT_RUNTIME_MODE_ENV_KEY
+} from './mode.js';
+export { resolveRuntimeSelection } from './provider.js';
+export {
+  createRuntimeCodexCommandContext,
+  resolveRuntimeCodexCommand,
+  formatRuntimeSelectionSummary,
+  type RuntimeCodexCommandContext,
+  type RuntimeCodexCommandContextOptions
+} from './codexCommand.js';
+export type {
+  RuntimeMode,
+  RuntimeModeResolution,
+  RuntimeModeSource,
+  RuntimeProviderName,
+  RuntimeFallbackMetadata,
+exec
+/bin/zsh -lc "sed -n '1,260p' orchestrator/src/cli/runtime/mode.ts" in /Users/kbediako/Code/CO succeeded in 0ms:
+import type { RuntimeMode, RuntimeModeResolution } from './types.js';
+
+const RUNTIME_MODES = new Set<RuntimeMode>(['cli', 'appserver']);
+const DEFAULT_RUNTIME_MODE: RuntimeMode = 'appserver';
+const DEFAULT_RUNTIME_MODE_ENV_KEY = 'CODEX_ORCHESTRATOR_RUNTIME_MODE';
+
+function normalizeRuntimeMode(value: string): RuntimeMode | null {
+  const normalized = value.trim().toLowerCase();
+  return RUNTIME_MODES.has(normalized as RuntimeMode) ? (normalized as RuntimeMode) : null;
+}
+
+function parseRuntimeModeFromSource(
+  value: string,
+  sourceLabel: string
+): RuntimeMode {
+  const parsed = normalizeRuntimeMode(value);
+  if (!parsed) {
+    throw new Error(
+      `Invalid runtime mode "${value}" from ${sourceLabel}. Expected one of: cli, appserver.`
+    );
+
+thinking
+**Examining runtime mode behavior**
+
+I'm noticing that the `resolveRuntimeMode` function checks the environment before the manifest, even when `preferManifest` is set to true. That seems interesting! Then, there's a mention in current tests about using the manifest-preferred runtime mode while the environment is set to none. It makes me wonder if previous code had a similar setup. I think I need to inspect the `applyRequestedRuntimeMode` function to understand better what's going on here.
+thinking
+**Examining runtime mode behavior**
+
+I'm noticing that the `resolveRuntimeMode` function checks the environment before the manifest, even when `preferManifest` is set to true. That seems interesting! Then, there's a mention in current tests about using the manifest-preferred runtime mode while the environment is set to none. It makes me wonder if previous code had a similar setup. I think I need to inspect the `applyRequestedRuntimeMode` function to understand better what's going on here.
+exec
+/bin/zsh -lc "grep -R \"applyRequestedRuntimeMode\" -n orchestrator/src/cli | head -20 && sed -n '200,340p' orchestrator/src/cli/orchestrator.ts" in /Users/kbediako/Code/CO succeeded in 0ms:
+orchestrator/src/cli/orchestrator.ts:62:        applyRequestedRuntimeMode: this.applyRequestedRuntimeMode.bind(this)
+orchestrator/src/cli/orchestrator.ts:98:        applyRequestedRuntimeMode: this.applyRequestedRuntimeMode.bind(this)
+orchestrator/src/cli/orchestrator.ts:242:  private applyRequestedRuntimeMode(manifest: CliManifest, mode: RuntimeMode): void {
+orchestrator/src/cli/services/orchestratorResumePreparationShell.ts:39:  applyRequestedRuntimeMode: (manifest: CliManifest, mode: RuntimeMode) => void;
+orchestrator/src/cli/services/orchestratorResumePreparationShell.ts:133:  params.applyRequestedRuntimeMode(manifest, runtimeModeResolution.mode);
+orchestrator/src/cli/services/orchestratorStartPreparationShell.ts:19:  applyRequestedRuntimeMode: (manifest: CliManifest, mode: RuntimeMode) => void;
+orchestrator/src/cli/services/orchestratorStartPreparationShell.ts:69:  params.applyRequestedRuntimeMode(manifest, runtimeModeResolution.mode);
+      stages,
+      plan,
+      targetId: plan.targetId ?? null
+    };
+  }
+
+  private async executePipeline(options: ExecutePipelineOptions): Promise<PipelineRunExecutionResult> {
+    return executeOrchestratorPipelineRouteEntryShell({
+      options,
+      applyRuntimeSelection: this.applyRuntimeSelection.bind(this),
+      runAutoScout: this.runAutoScout.bind(this),
+      startPipeline: this.start.bind(this)
+    });
+
+[run-review] waiting on codex review (1m 0s elapsed, 1s idle; review progress observed).
+thinking
+**Inspecting resume implementation**
+
+I need to look closely at the original resume implementation before changes to compare it with the current version. I might use a diff tool to compare it to the parent. It seems the logic has likely moved. 
+
+I should also search for tests related to the resume in case there are dependencies expecting something specific. I'll consider checking the old file orchestratorResumePreparationShell and inspect the manifest functions like resetForResume and schedule to understand everything better.
+thinking
+**Inspecting resume implementation**
+
+I need to look closely at the original resume implementation before changes to compare it with the current version. I might use a diff tool to compare it to the parent. It seems the logic has likely moved. 
+
+I should also search for tests related to the resume in case there are dependencies expecting something specific. I'll consider checking the old file orchestratorResumePreparationShell and inspect the manifest functions like resetForResume and schedule to understand everything better.
+exec
+/bin/zsh -lc "sed -n '1,260p' orchestrator/src/cli/run/manifestPersister.ts" in /Users/kbediako/Code/CO succeeded in 0ms:
+import { saveManifest, writeHeartbeatFile } from './manifest.js';
+import type { CliManifest } from '../types.js';
+import type { RunPaths } from './runPaths.js';
+
+export interface ManifestPersisterOptions {
+  manifest: CliManifest;
+  paths: RunPaths;
+  persistIntervalMs: number;
+  now?: () => number;
+  writeManifest?: (paths: RunPaths, manifest: CliManifest) => Promise<void>;
+  writeHeartbeat?: (paths: RunPaths, manifest: CliManifest) => Promise<void>;
+}
+
+export interface PersistRequest {
+  manifest?: boolean;
+  heartbeat?: boolean;
+  force?: boolean;
+}
+
+export class ManifestPersister {
+exec
+/bin/zsh -lc "grep -R \"function resetForResume\\|export function resetForResume\\|recordResumeEvent\\|appendSummary\\|updateHeartbeat\" -n orchestrator/src/cli/run/manifest.ts && sed -n '1,260p' orchestrator/src/cli/run/manifest.ts" in /Users/kbediako/Code/CO succeeded in 0ms:
+orchestrator/src/cli/run/manifest.ts:266:export function updateHeartbeat(manifest: CliManifest): void {
+orchestrator/src/cli/run/manifest.ts:273:export function resetForResume(manifest: CliManifest): void {
+orchestrator/src/cli/run/manifest.ts:285:export function recordResumeEvent(
+orchestrator/src/cli/run/manifest.ts:431:export function appendSummary(manifest: CliManifest, message: string | null | undefined): void {
+import { randomBytes } from 'node:crypto';
+import { access, lstat, mkdir, readdir, readFile, realpath, symlink, writeFile } from 'node:fs/promises';
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
+
+import type {
+  CliManifest,
+  CliManifestCommand,
+  CommandStage,
+  PipelineDefinition,
+  PipelineStage,
+  SubPipelineStage,
+  RunStatus
+} from '../types.js';
+import { writeJsonAtomic } from '../utils/fs.js';
+import { slugify } from '../utils/strings.js';
+import { isoTimestamp } from '../utils/time.js';
+exec
+/bin/zsh -lc "grep -R \"runOrchestratorResumePreparationShell\\|resume preparation\" -n orchestrator/tests orchestrator/src | head -50" in /Users/kbediako/Code/CO succeeded in 0ms:
+orchestrator/tests/OrchestratorResumePreparationShell.test.ts:5:import { runOrchestratorResumePreparationShell } from '../src/cli/services/orchestratorResumePreparationShell.js';
+orchestrator/tests/OrchestratorResumePreparationShell.test.ts:13:describe('runOrchestratorResumePreparationShell', () => {
+orchestrator/tests/OrchestratorResumePreparationShell.test.ts:83:    const result = await runOrchestratorResumePreparationShell({
+orchestrator/tests/OrchestratorResumePreparationShell.test.ts:174:      runOrchestratorResumePreparationShell({
+orchestrator/tests/OrchestratorResumePreparationShell.test.ts:254:    const result = await runOrchestratorResumePreparationShell({
+orchestrator/tests/OrchestratorResumePreparationShell.test.ts:328:    const result = await runOrchestratorResumePreparationShell({
+orchestrator/src/cli/orchestrator.ts:44:import { runOrchestratorResumePreparationShell } from './services/orchestratorResumePreparationShell.js';
+orchestrator/src/cli/orchestrator.ts:94:      await runOrchestratorResumePreparationShell({
+orchestrator/src/cli/services/orchestratorResumePreparationShell.ts:65:export async function runOrchestratorResumePreparationShell(
+
+thinking
+**Examining function reset processes**
+
+I need to take a closer look at the manifest reset functions, especially around lines 260 and beyond. It seems like there might be something worth investigating in that part of the code. I wonder what sort of issues or improvements could be addressed there, and I'm curious what led me to focus on this specific section. Let's see what I can uncover!
+thinking
+**Examining function reset processes**
+
+I need to take a closer look at the manifest reset functions, especially around lines 260 and beyond. It seems like there might be something worth investigating in that part of the code. I wonder what sort of issues or improvements could be addressed there, and I'm curious what led me to focus on this specific section. Let's see what I can uncover!
+exec
+/bin/zsh -lc "sed -n '250,470p' orchestrator/src/cli/run/manifest.ts" in /Users/kbediako/Code/CO succeeded in 0ms:
+  }
+  return sanitized;
+}
+
+function resolveExperienceMinReward(env: NodeJS.ProcessEnv = process.env): number {
+  const raw = env.TFGRPO_EXPERIENCE_MIN_REWARD;
+  if (!raw || !raw.trim()) {
+    return DEFAULT_MIN_EXPERIENCE_REWARD;
+  }
+  const parsed = Number.parseFloat(raw);
+  if (!Number.isFinite(parsed)) {
+    return DEFAULT_MIN_EXPERIENCE_REWARD;
+  }
+  return Math.max(0, parsed);
+}
+
+export function updateHeartbeat(manifest: CliManifest): void {
+  manifest.heartbeat_at = isoTimestamp();
+  if (manifest.status === 'in_progress') {
+    manifest.status_detail = null;
+
+
+
+
+thinking
+**Identifying potential bugs**
+
+I’m considering whether to return `ManifestPersister` from `createPersister`, although the persister variable is typed as `ManifestPersister`. There’s a potential bug with the `applyRequestedRuntimeMode` parameter needing `RuntimeMode`, and `resolveRuntimeModeImpl` could return an invalid mode during tests. I should check the previous diff for updates related to `new ManifestPersister` in `orchestrator.ts`. Lastly, I should assess if there are missing tests related to repo config or package config, focusing on actionable bugs.
+thinking
+**Considering test guidelines and issues**
+
+I'm checking the guidelines for any concrete regressions, risky edge cases, or missing tests. The output schema expects to find specific issues, so I might need to include missing tests if they lead to a concrete bug. I’m looking into the new shell against start shell patterns. There’s a potential issue with `params.options.targetStageId` being passed to `prepareRunImpl`, similar to the old code. Also, if the `schedule` fails due to a persister write error, it could cause `runOrchestratorResumePreparationShell` to reject, which would throw an error like the original code.
+thinking
+**Investigating possible bugs**
+
+I’m thinking there might be a bug in the tests since `applyRequestedRuntimeMode` is called before `appendSummary`, which seems similar to an old issue. I need to inspect the related resume lifecycle to confirm if the pre-start failure persistence contract is preserved. It could be that onStartFailure only persists the manifest and not the heartbeat. Hmm, that sounds like it might be the same as before. Guess I need to figure this out!
+thinking
+**Inspecting resume method**
+
+I suspect the root tests might not work because they use the `process` global. I need to take a closer look at the old resume method, specifically around lines 70-120 in the parent commit, to ensure I understand its exact equivalence. To do that, I can use the command `git show HEAD^:orchestrator/src/cli/orchestrator.ts` to inspect that section.  Let's figure this out!
+thinking
+**Identifying potential bugs**
+
+I’m considering whether to return `ManifestPersister` from `createPersister`, although the persister variable is typed as `ManifestPersister`. There’s a potential bug with the `applyRequestedRuntimeMode` parameter needing `RuntimeMode`, and `resolveRuntimeModeImpl` could return an invalid mode during tests. I should check the previous diff for updates related to `new ManifestPersister` in `orchestrator.ts`. Lastly, I should assess if there are missing tests related to repo config or package config, focusing on actionable bugs.
+thinking
+**Considering test guidelines and issues**
+
+I'm checking the guidelines for any concrete regressions, risky edge cases, or missing tests. The output schema expects to find specific issues, so I might need to include missing tests if they lead to a concrete bug. I’m looking into the new shell against start shell patterns. There’s a potential issue with `params.options.targetStageId` being passed to `prepareRunImpl`, similar to the old code. Also, if the `schedule` fails due to a persister write error, it could cause `runOrchestratorResumePreparationShell` to reject, which would throw an error like the original code.
+thinking
+**Investigating possible bugs**
+
+I’m thinking there might be a bug in the tests since `applyRequestedRuntimeMode` is called before `appendSummary`, which seems similar to an old issue. I need to inspect the related resume lifecycle to confirm if the pre-start failure persistence contract is preserved. It could be that onStartFailure only persists the manifest and not the heartbeat. Hmm, that sounds like it might be the same as before. Guess I need to figure this out!
+thinking
+**Inspecting resume method**
+
+I suspect the root tests might not work because they use the `process` global. I need to take a closer look at the old resume method, specifically around lines 70-120 in the parent commit, to ensure I understand its exact equivalence. To do that, I can use the command `git show HEAD^:orchestrator/src/cli/orchestrator.ts` to inspect that section.  Let's figure this out!
+exec
+/bin/zsh -lc 'git show HEAD''^:orchestrator/src/cli/orchestrator.ts | sed -n '"'1,170p'" in /Users/kbediako/Code/CO succeeded in 0ms:
+import { readFile } from 'node:fs/promises';
+
+import type { TaskContext, ExecutionMode, PlanItem } from '../types.js';
+import { resolveEnvironmentPaths } from '../../../scripts/lib/run-manifests.js';
+import { normalizeEnvironmentPaths } from './run/environment.js';
+import type { EnvironmentPaths } from './run/environment.js';
+import { loadManifest, updateHeartbeat, appendSummary, finalizeStatus, resetForResume, recordResumeEvent } from './run/manifest.js';
+import { ManifestPersister, persistManifest } from './run/manifestPersister.js';
+import { resolveRuntimeActivitySnapshot, type RuntimeActivitySnapshot } from './run/runtimeActivity.js';
+import type {
+  CliManifest,
+  PipelineDefinition,
+  PipelineExecutionResult,
+  PipelineRunExecutionResult,
+  PlanPreviewResult,
+  PlanOptions,
+  StartOptions,
+  ResumeOptions,
+  StatusOptions,
+} from './types.js';
+
+thinking
+**Examining potential bugs**
+
+I'm considering that maybe a bug was introduced due to reducing imports from `manifestPersister`. It seems like `persistManifest` is now only imported from `run/manifestPersister.js`, while `ManifestPersister` isn't being imported. However, the resume shell returns `persister: ManifestPersister`, and that's okay because the variable type can be inferred. So far, there aren't any compile issues, but I'm definitely keeping an eye on this potential problem!
+thinking
+**Examining potential bugs**
+
+I'm considering that maybe a bug was introduced due to reducing imports from `manifestPersister`. It seems like `persistManifest` is now only imported from `run/manifestPersister.js`, while `ManifestPersister` isn't being imported. However, the resume shell returns `persister: ManifestPersister`, and that's okay because the variable type can be inferred. So far, there aren't any compile issues, but I'm definitely keeping an eye on this potential problem!
+exec
+/bin/zsh -lc "grep -R \"resume(options\\|Resume token\\|manual-resume\\|resume-pre-start-failed\" -n orchestrator/tests | sed -n '1,200p'" in /Users/kbediako/Code/CO succeeded in 0ms:
+orchestrator/tests/OrchestratorResumePreparationShell.test.ts:89:        reason: 'manual-resume',
+[run-review] waiting on codex review (2m 0s elapsed, 6s idle; review progress observed).
+
+
+
+thinking
+**Reviewing code and tests**
+
+I’m considering if I should inspect the orchestrator tests and maybe review the extraction for minimal elements. I might run a targeted diff inspection with git show to check new shell lines, as I suspect a line order bug. It seems there's a potential issue with `prepareRunImpl` being injected, but it doesn’t seem critical. However, I notice the new extraction introduces many injected dependencies, which could be a quality concern given the request for minimal abstraction.
+thinking
+**Considering code abstraction and maintainability**
+
+I’m questioning if this level of abstraction is unnecessary. The review findings should target concrete bugs or regressions. I could mention maintainability as a concern if the author needs to fix it, but overall correctness might still hold up. The review task emphasizes confirming minimal details and identifying regressions or missing tests. I wonder if over-abstracting the dependency injection in the new shell could harm maintainability. Additionally, I should check if the tests assert the summary deduplication correctly, as it could lead to false deduplication issues.
+thinking
+**Investigating import issues in TypeScript**
+
+I'm wondering if refactoring `appendSummary` could lead to tests not catching certain issues. Is there a problem with the `type ManifestPersisterOptions` import at runtime that's causing the transpiled JavaScript to still import the type? Since the line `import { ManifestPersister, type ManifestPersisterOptions } from '../run/manifestPersister.js';` in TypeScript ESM likely only imports `ManifestPersister`, that seems fine. But I should check if the target file path uses the `.js` extension in TS imports to ensure it's all standard.
+thinking
+**Reviewing code and tests**
+
+I’m considering if I should inspect the orchestrator tests and maybe review the extraction for minimal elements. I might run a targeted diff inspection with git show to check new shell lines, as I suspect a line order bug. It seems there's a potential issue with `prepareRunImpl` being injected, but it doesn’t seem critical. However, I notice the new extraction introduces many injected dependencies, which could be a quality concern given the request for minimal abstraction.
+thinking
+**Considering code abstraction and maintainability**
+
+I’m questioning if this level of abstraction is unnecessary. The review findings should target concrete bugs or regressions. I could mention maintainability as a concern if the author needs to fix it, but overall correctness might still hold up. The review task emphasizes confirming minimal details and identifying regressions or missing tests. I wonder if over-abstracting the dependency injection in the new shell could harm maintainability. Additionally, I should check if the tests assert the summary deduplication correctly, as it could lead to false deduplication issues.
+thinking
+**Investigating import issues in TypeScript**
+
+I'm wondering if refactoring `appendSummary` could lead to tests not catching certain issues. Is there a problem with the `type ManifestPersisterOptions` import at runtime that's causing the transpiled JavaScript to still import the type? Since the line `import { ManifestPersister, type ManifestPersisterOptions } from '../run/manifestPersister.js';` in TypeScript ESM likely only imports `ManifestPersister`, that seems fine. But I should check if the target file path uses the `.js` extension in TS imports to ensure it's all standard.
+exec
+/bin/zsh -lc "sed -n '1,260p' orchestrator/tests/OrchestratorStartPreparationShell.test.ts" in /Users/kbediako/Code/CO succeeded in 0ms:
+import { afterEach, describe, expect, it, vi } from 'vitest';
+
+import type { ManifestPersister } from '../src/cli/run/manifestPersister.js';
+import { runOrchestratorStartPreparationShell } from '../src/cli/services/orchestratorStartPreparationShell.js';
+
+afterEach(() => {
+  delete process.env.CODEX_ORCHESTRATOR_START_PREP_TEST;
+  vi.restoreAllMocks();
+});
+
+describe('runOrchestratorStartPreparationShell', () => {
+  it('prepares start inputs, resolves runtime mode, bootstraps the manifest, and appends config notices', async () => {
+    process.env.CODEX_ORCHESTRATOR_START_PREP_TEST = 'ambient';
+
+    const preparation = {
+      env: {
+        repoRoot: '/tmp/repo',
+        taskId: 'task-1',
+        runsRoot: '/tmp/repo/.runs',
+        outRoot: '/tmp/repo/out'
+
+[run-review] waiting on codex review (3m 0s elapsed, 14s idle; review progress observed).
+
