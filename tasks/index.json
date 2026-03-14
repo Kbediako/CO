@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260315-1200-coordinator-symphony-aligned-orchestrator-resume-pre-start-failure-persistence-callback-extraction",
+      "title": "Coordinator Symphony-Aligned Orchestrator Resume Pre-Start Failure Persistence Callback Extraction",
+      "relates_to": "tasks/tasks-1200-coordinator-symphony-aligned-orchestrator-resume-pre-start-failure-persistence-callback-extraction.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-15",
+      "paths": {
+        "spec": "tasks/specs/1200-coordinator-symphony-aligned-orchestrator-resume-pre-start-failure-persistence-callback-extraction.md",
+        "task": "tasks/tasks-1200-coordinator-symphony-aligned-orchestrator-resume-pre-start-failure-persistence-callback-extraction.md",
+        "agent_task": ".agent/task/1200-coordinator-symphony-aligned-orchestrator-resume-pre-start-failure-persistence-callback-extraction.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-resume-pre-start-failure-persistence-callback-extraction.md"
+      }
+    },
+    {
       "id": "20260315-1199-coordinator-symphony-aligned-orchestrator-resume-token-validation-extraction",
       "title": "Coordinator Symphony-Aligned Orchestrator Resume Token Validation Extraction",
       "relates_to": "tasks/tasks-1199-coordinator-symphony-aligned-orchestrator-resume-token-validation-extraction.md",
