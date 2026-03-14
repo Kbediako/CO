@@ -350,12 +350,11 @@ export async function runDoctorCloudPreflight(options: {
     ?? planMetadataEnvironmentId
     ?? normalizeOptionalString(env.CODEX_CLOUD_ENV_ID)
     ?? resolveTaskMetadataCloudEnvironmentId(repoRoot, taskId);
-  const branch = normalizeOptionalString(options.branch);
 
   const preflight = await runCloudPreflight(buildCloudPreflightRequest({
     repoRoot,
     environmentId,
-    branch,
+    branch: options.branch,
     env
   }));
   const issues = planMetadataIssue ? [planMetadataIssue, ...preflight.issues] : preflight.issues;
