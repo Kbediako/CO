@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260314-1174-coordinator-symphony-aligned-orchestrator-cloud-target-missing-env-failure-contract-extraction",
+      "title": "Coordinator Symphony-Aligned Orchestrator Cloud-Target Missing-Env Failure Contract Extraction",
+      "relates_to": "tasks/tasks-1174-coordinator-symphony-aligned-orchestrator-cloud-target-missing-env-failure-contract-extraction.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-14",
+      "paths": {
+        "spec": "tasks/specs/1174-coordinator-symphony-aligned-orchestrator-cloud-target-missing-env-failure-contract-extraction.md",
+        "task": "tasks/tasks-1174-coordinator-symphony-aligned-orchestrator-cloud-target-missing-env-failure-contract-extraction.md",
+        "agent_task": ".agent/task/1174-coordinator-symphony-aligned-orchestrator-cloud-target-missing-env-failure-contract-extraction.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-cloud-target-missing-env-failure-contract-extraction.md"
+      }
+    },
+    {
       "id": "20260314-1173-coordinator-symphony-aligned-orchestrator-cloud-target-execution-request-contract-extraction",
       "title": "Coordinator Symphony-Aligned Orchestrator Cloud-Target Execution Request Contract Extraction",
       "relates_to": "tasks/tasks-1173-coordinator-symphony-aligned-orchestrator-cloud-target-execution-request-contract-extraction.md",
