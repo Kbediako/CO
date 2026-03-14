@@ -20,20 +20,20 @@
 
 ## Pipeline Route Entry Shell Extraction
 
-- [ ] No route-entry callback envelope remains in `orchestrator.ts`; the remaining `executePipeline(...)` callback assembly moves behind one bounded helper. Evidence: `orchestrator/src/cli/orchestrator.ts`, `out/1192-coordinator-symphony-aligned-orchestrator-pipeline-route-entry-shell-extraction/manual/<timestamp>-closeout/00-summary.md`
-- [ ] The extracted helper owns callback passthrough for runtime selection, cloud execution, auto-scout, and subpipeline restart behavior without changing contracts. Evidence: `orchestrator/src/cli/services/`, `out/1192-coordinator-symphony-aligned-orchestrator-pipeline-route-entry-shell-extraction/manual/<timestamp>-closeout/00-summary.md`
-- [ ] Focused regressions preserve callback wiring, `taskId` / `parentRunId` propagation, and nearby route-adapter behavior. Evidence: `orchestrator/tests/`, `out/1192-coordinator-symphony-aligned-orchestrator-pipeline-route-entry-shell-extraction/manual/<timestamp>-closeout/05b-targeted-tests.log`
+- [x] `executePipeline(...)` no longer assembles the route-entry callback envelope inline; it delegates to `executeOrchestratorPipelineRouteEntryShell(...)`. Evidence: `orchestrator/src/cli/orchestrator.ts`, `orchestrator/src/cli/services/orchestratorExecutionRouteAdapterShell.ts`, `out/1192-coordinator-symphony-aligned-orchestrator-pipeline-route-entry-shell-extraction/manual/20260314T142557Z-closeout/00-summary.md`
+- [x] The extracted route-entry helper owns runtime-selection, cloud lifecycle, auto-scout, and child-start callback passthrough without changing contracts. Evidence: `orchestrator/src/cli/services/orchestratorExecutionRouteAdapterShell.ts`, `out/1192-coordinator-symphony-aligned-orchestrator-pipeline-route-entry-shell-extraction/manual/20260314T142557Z-closeout/00-summary.md`
+- [x] Focused regressions preserve callback wiring, `taskId` / `parentRunId` propagation, and nearby route-adapter behavior. Evidence: `orchestrator/tests/OrchestratorExecutionRouteAdapterShell.test.ts`, `orchestrator/tests/OrchestratorCloudAutoScout.test.ts`, `orchestrator/tests/OrchestratorSubpipelineFailure.test.ts`, `out/1192-coordinator-symphony-aligned-orchestrator-pipeline-route-entry-shell-extraction/manual/20260314T142557Z-closeout/05b-targeted-tests.log`
 
 ## Validation + Closeout
 
-- [ ] `node scripts/delegation-guard.mjs`. Evidence: `out/1192-coordinator-symphony-aligned-orchestrator-pipeline-route-entry-shell-extraction/manual/<timestamp>-closeout/01-delegation-guard.log`
-- [ ] `node scripts/spec-guard.mjs --dry-run`. Evidence: `out/1192-coordinator-symphony-aligned-orchestrator-pipeline-route-entry-shell-extraction/manual/<timestamp>-closeout/02-spec-guard.log`
-- [ ] `npm run build`. Evidence: `out/1192-coordinator-symphony-aligned-orchestrator-pipeline-route-entry-shell-extraction/manual/<timestamp>-closeout/03-build.log`
-- [ ] `npm run lint`. Evidence: `out/1192-coordinator-symphony-aligned-orchestrator-pipeline-route-entry-shell-extraction/manual/<timestamp>-closeout/04-lint.log`
-- [ ] `npm run test`. Evidence: `out/1192-coordinator-symphony-aligned-orchestrator-pipeline-route-entry-shell-extraction/manual/<timestamp>-closeout/05-test.log`
-- [ ] `npm run docs:check`. Evidence: `out/1192-coordinator-symphony-aligned-orchestrator-pipeline-route-entry-shell-extraction/manual/<timestamp>-closeout/06-docs-check.log`
-- [ ] `npm run docs:freshness`. Evidence: `out/1192-coordinator-symphony-aligned-orchestrator-pipeline-route-entry-shell-extraction/manual/<timestamp>-closeout/07-docs-freshness.log`
-- [ ] `node scripts/diff-budget.mjs`. Evidence: `out/1192-coordinator-symphony-aligned-orchestrator-pipeline-route-entry-shell-extraction/manual/<timestamp>-closeout/08-diff-budget.log`
-- [ ] `npm run review`. Evidence: `out/1192-coordinator-symphony-aligned-orchestrator-pipeline-route-entry-shell-extraction/manual/<timestamp>-closeout/09-review.log`
-- [ ] `npm run pack:smoke`. Evidence: `out/1192-coordinator-symphony-aligned-orchestrator-pipeline-route-entry-shell-extraction/manual/<timestamp>-closeout/10-pack-smoke.log`
-- [ ] Elegance review completed. Evidence: `out/1192-coordinator-symphony-aligned-orchestrator-pipeline-route-entry-shell-extraction/manual/<timestamp>-closeout/12-elegance-review.md`
+- [x] `node scripts/delegation-guard.mjs --task 1192-coordinator-symphony-aligned-orchestrator-pipeline-route-entry-shell-extraction`. Evidence: `out/1192-coordinator-symphony-aligned-orchestrator-pipeline-route-entry-shell-extraction/manual/20260314T142557Z-closeout/01-delegation-guard.log`
+- [x] `node scripts/spec-guard.mjs --dry-run`. Evidence: `out/1192-coordinator-symphony-aligned-orchestrator-pipeline-route-entry-shell-extraction/manual/20260314T142557Z-closeout/02-spec-guard.log`
+- [x] `npm run build`. Evidence: `out/1192-coordinator-symphony-aligned-orchestrator-pipeline-route-entry-shell-extraction/manual/20260314T142557Z-closeout/03-build.log`
+- [x] `npm run lint`. Evidence: `out/1192-coordinator-symphony-aligned-orchestrator-pipeline-route-entry-shell-extraction/manual/20260314T142557Z-closeout/04-lint.log`
+- [x] `npm run test`. Evidence: `out/1192-coordinator-symphony-aligned-orchestrator-pipeline-route-entry-shell-extraction/manual/20260314T142557Z-closeout/05-test.log`
+- [x] `npm run docs:check`. Evidence: `out/1192-coordinator-symphony-aligned-orchestrator-pipeline-route-entry-shell-extraction/manual/20260314T142557Z-closeout/06-docs-check.log`
+- [x] `npm run docs:freshness`. Evidence: `out/1192-coordinator-symphony-aligned-orchestrator-pipeline-route-entry-shell-extraction/manual/20260314T142557Z-closeout/07-docs-freshness.log`
+- [x] `node scripts/diff-budget.mjs`. Evidence: `out/1192-coordinator-symphony-aligned-orchestrator-pipeline-route-entry-shell-extraction/manual/20260314T142557Z-closeout/08-diff-budget.log`, `out/1192-coordinator-symphony-aligned-orchestrator-pipeline-route-entry-shell-extraction/manual/20260314T142557Z-closeout/13-override-notes.md`
+- [x] `npm run review`. Evidence: `out/1192-coordinator-symphony-aligned-orchestrator-pipeline-route-entry-shell-extraction/manual/20260314T142557Z-closeout/09-review.log`
+- [x] `npm run pack:smoke`. Evidence: `out/1192-coordinator-symphony-aligned-orchestrator-pipeline-route-entry-shell-extraction/manual/20260314T142557Z-closeout/10-pack-smoke.log`
+- [x] Elegance review completed. Evidence: `out/1192-coordinator-symphony-aligned-orchestrator-pipeline-route-entry-shell-extraction/manual/20260314T142557Z-closeout/12-elegance-review.md`

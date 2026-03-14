@@ -8,12 +8,12 @@
 
 ## Implementation
 
-- [ ] Extract the remaining `executePipeline(...)` route-entry callback shell from `orchestrator.ts`.
-- [ ] Keep callback passthrough for runtime selection, cloud execution, auto-scout, and subpipeline restart behavior exact.
-- [ ] Preserve focused regressions around route-entry callback wiring and nearby route-adapter behavior in `OrchestratorExecutionRouteAdapterShell.test.ts`, `OrchestratorCloudAutoScout.test.ts`, and `OrchestratorSubpipelineFailure.test.ts`.
+- [x] Extract the remaining `executePipeline(...)` route-entry callback shell from `orchestrator.ts`. Evidence: `orchestrator/src/cli/services/orchestratorExecutionRouteAdapterShell.ts`, `out/1192-coordinator-symphony-aligned-orchestrator-pipeline-route-entry-shell-extraction/manual/20260314T142557Z-closeout/00-summary.md`
+- [x] Keep callback passthrough for runtime selection, cloud execution, auto-scout, and subpipeline restart behavior exact. Evidence: `orchestrator/src/cli/orchestrator.ts`, `orchestrator/src/cli/services/orchestratorExecutionRouteAdapterShell.ts`, `out/1192-coordinator-symphony-aligned-orchestrator-pipeline-route-entry-shell-extraction/manual/20260314T142557Z-closeout/00-summary.md`
+- [x] Preserve focused regressions around route-entry callback wiring and nearby route-adapter behavior in `OrchestratorExecutionRouteAdapterShell.test.ts`, `OrchestratorCloudAutoScout.test.ts`, and `OrchestratorSubpipelineFailure.test.ts`. Evidence: `orchestrator/tests/OrchestratorExecutionRouteAdapterShell.test.ts`, `orchestrator/tests/OrchestratorCloudAutoScout.test.ts`, `orchestrator/tests/OrchestratorSubpipelineFailure.test.ts`, `out/1192-coordinator-symphony-aligned-orchestrator-pipeline-route-entry-shell-extraction/manual/20260314T142557Z-closeout/05b-targeted-tests.log`
 
 ## Closeout
 
-- [ ] Run the standard gate bundle and capture closeout artifacts under `out/1192-coordinator-symphony-aligned-orchestrator-pipeline-route-entry-shell-extraction/manual/<timestamp>-closeout/`.
-- [ ] Run an explicit elegance review.
-- [ ] Record the next truthful seam after `1192`.
+- [x] Run the standard gate bundle and capture closeout artifacts under `out/1192-coordinator-symphony-aligned-orchestrator-pipeline-route-entry-shell-extraction/manual/20260314T142557Z-closeout/`. Evidence: `out/1192-coordinator-symphony-aligned-orchestrator-pipeline-route-entry-shell-extraction/manual/20260314T142557Z-closeout/00-summary.md`
+- [x] Run an explicit elegance review. Evidence: `out/1192-coordinator-symphony-aligned-orchestrator-pipeline-route-entry-shell-extraction/manual/20260314T142557Z-closeout/12-elegance-review.md`
+- [x] Record the next truthful seam after `1192`. Evidence: `out/1192-coordinator-symphony-aligned-orchestrator-pipeline-route-entry-shell-extraction/manual/20260314T142557Z-closeout/14-next-slice-note.md`
