@@ -54,15 +54,12 @@ import {
   type OrchestratorAutoScoutOutcome
 } from './services/orchestratorExecutionRouter.js';
 import { recordOrchestratorAutoScoutEvidence } from './services/orchestratorAutoScoutEvidenceRecorder.js';
-import { runOrchestratorCloudExecutionLifecycleShell } from './services/orchestratorCloudExecutionLifecycleShell.js';
 import {
   runOrchestratorRunLifecycle,
   type OrchestratorRunLifecycleContext
 } from './services/orchestratorRunLifecycleOrchestrationShell.js';
-import {
-  executeOrchestratorPipelineWithRouteAdapter,
-  type ExecutePipelineOptions
-} from './services/orchestratorExecutionRouteAdapterShell.js';
+import { type ExecutePipelineOptions } from './services/orchestratorExecutionRouteAdapterShell.js';
+import { runOrchestratorPipelineRouteEntryShell } from './services/orchestratorPipelineRouteEntryShell.js';
 
 const resolveBaseEnvironment = (): EnvironmentPaths =>
   normalizeEnvironmentPaths(resolveEnvironmentPaths());
@@ -377,14 +374,9 @@ export class CodexOrchestrator {
   }
 
   private async executePipeline(options: ExecutePipelineOptions): Promise<PipelineRunExecutionResult> {
-    return executeOrchestratorPipelineWithRouteAdapter({
+    return runOrchestratorPipelineRouteEntryShell({
       options,
       applyRuntimeSelection: (manifest, selection) => this.applyRuntimeSelection(manifest, selection),
-      executeCloudPipeline: (cloudOptions) =>
-        runOrchestratorCloudExecutionLifecycleShell({
-          ...cloudOptions,
-          runAutoScout: (autoScoutOptions) => this.runAutoScout(autoScoutOptions)
-        }),
       runAutoScout: (autoScoutOptions) => this.runAutoScout(autoScoutOptions),
       startSubpipeline: ({ pipelineId, executionModeOverride, runtimeModeRequested }) =>
         this.start({
