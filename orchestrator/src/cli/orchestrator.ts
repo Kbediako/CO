@@ -2,15 +2,9 @@ import process from 'node:process';
 import { readFile } from 'node:fs/promises';
 
 import { TaskManager } from '../manager.js';
-import type { ManagerOptions } from '../manager.js';
 import type { TaskContext, ExecutionMode, PlanItem } from '../types.js';
-import { RunManifestWriter } from '../persistence/RunManifestWriter.js';
-import { TaskStateStore } from '../persistence/TaskStateStore.js';
 import {
   CommandPlanner,
-  CommandBuilder,
-  CommandTester,
-  CommandReviewer,
   type PipelineExecutor
 } from './adapters/index.js';
 import { resolveEnvironmentPaths } from '../../../scripts/lib/run-manifests.js';
@@ -67,14 +61,16 @@ import {
 import { runOrchestratorExecutionLifecycle } from './services/orchestratorExecutionLifecycle.js';
 import { executeOrchestratorCloudTarget } from './services/orchestratorCloudTargetExecutor.js';
 import {
-  determineOrchestratorExecutionMode,
-  routeOrchestratorExecution,
-  type OrchestratorAutoScoutOutcome,
-  type OrchestratorExecutionRouteOptions
+  type OrchestratorAutoScoutOutcome
 } from './services/orchestratorExecutionRouter.js';
 import { completeOrchestratorRunLifecycle } from './services/orchestratorRunLifecycleCompletion.js';
 import { createOrchestratorRunLifecycleExecutionRegistration } from './services/orchestratorRunLifecycleExecutionRegistration.js';
 import { recordOrchestratorAutoScoutEvidence } from './services/orchestratorAutoScoutEvidenceRecorder.js';
+import {
+  createOrchestratorTaskManager,
+  executeOrchestratorPipelineWithRouteAdapter,
+  type ExecutePipelineOptions
+} from './services/orchestratorExecutionRouteAdapterShell.js';
 
 const resolveBaseEnvironment = (): EnvironmentPaths =>
   normalizeEnvironmentPaths(resolveEnvironmentPaths());
@@ -102,11 +98,6 @@ interface ControlPlaneLaunchContext {
   eventStream: OrchestratorControlPlaneLifecycle['eventStream'];
   onEventEntry: OrchestratorControlPlaneLifecycle['onEventEntry'];
 }
-
-type ExecutePipelineOptions = Omit<
-  OrchestratorExecutionRouteOptions,
-  'applyRuntimeSelection' | 'executeCloudPipeline' | 'runAutoScout' | 'startSubpipeline'
->;
 
 const RESUME_PRE_START_FAILURE_STATUS_DETAIL = 'resume-pre-start-failed';
 
@@ -420,30 +411,20 @@ export class CodexOrchestrator {
     env: EnvironmentPaths,
     modeOverride?: ExecutionMode
   ): TaskManager {
-    const planner = plannerInstance ?? new CommandPlanner(pipeline);
-    const builder = new CommandBuilder(executePipeline);
-    const tester = new CommandTester(getResult);
-    const reviewer = new CommandReviewer(getResult);
-    const stateStore = new TaskStateStore({ outDir: env.outRoot, runsDir: env.runsRoot });
-    const manifestWriter = new RunManifestWriter({ runsDir: env.runsRoot });
-
-    const options: ManagerOptions = {
-      planner,
-      builder,
-      tester,
-      reviewer,
-      runIdFactory: () => runId,
-      modePolicy: (task, subtask) =>
-        determineOrchestratorExecutionMode(task, subtask, modeOverride),
-      persistence: { autoStart: true, stateStore, manifestWriter }
-    };
-
-    return new TaskManager(options);
+    return createOrchestratorTaskManager({
+      runId,
+      pipeline,
+      executePipeline,
+      getResult,
+      plannerInstance,
+      env,
+      modeOverride
+    });
   }
 
   private async executePipeline(options: ExecutePipelineOptions): Promise<PipelineRunExecutionResult> {
-    return routeOrchestratorExecution({
-      ...options,
+    return executeOrchestratorPipelineWithRouteAdapter({
+      options,
       applyRuntimeSelection: (manifest, selection) => this.applyRuntimeSelection(manifest, selection),
       executeCloudPipeline: (cloudOptions) => this.executeCloudPipeline(cloudOptions),
       runAutoScout: (autoScoutOptions) => this.runAutoScout(autoScoutOptions),
