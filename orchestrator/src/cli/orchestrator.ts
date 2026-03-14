@@ -42,14 +42,9 @@ import {
 } from './services/runPreparation.js';
 import { loadPackageConfig, loadUserConfig } from './config/userConfig.js';
 import { formatRepoConfigRequiredError, isRepoConfigRequired } from './config/repoConfigPolicy.js';
-import { RunEventEmitter, RunEventPublisher } from './events/runEvents.js';
 import { resolveRuntimeMode } from './runtime/index.js';
 import type { RuntimeMode, RuntimeSelection } from './runtime/types.js';
 import type { AdvancedAutopilotDecision } from './utils/advancedAutopilot.js';
-import {
-  startOrchestratorControlPlaneLifecycle,
-  type OrchestratorControlPlaneLifecycle
-} from './services/orchestratorControlPlaneLifecycle.js';
 import {
   type OrchestratorAutoScoutOutcome
 } from './services/orchestratorExecutionRouter.js';
@@ -62,15 +57,10 @@ import {
   executeOrchestratorPipelineRouteEntryShell,
   type ExecutePipelineOptions
 } from './services/orchestratorExecutionRouteAdapterShell.js';
+import { runOrchestratorControlPlaneLifecycleShell } from './services/orchestratorControlPlaneLifecycleShell.js';
 
 const resolveBaseEnvironment = (): EnvironmentPaths =>
   normalizeEnvironmentPaths(resolveEnvironmentPaths());
-
-interface ControlPlaneLaunchContext {
-  runEvents?: RunEventPublisher;
-  eventStream: OrchestratorControlPlaneLifecycle['eventStream'];
-  onEventEntry: OrchestratorControlPlaneLifecycle['onEventEntry'];
-}
 
 const RESUME_PRE_START_FAILURE_STATUS_DETAIL = 'resume-pre-start-failed';
 
@@ -112,11 +102,9 @@ export class CodexOrchestrator {
       persistIntervalMs: Math.max(1000, manifest.heartbeat_interval_seconds * 1000)
     });
 
-    return await this.withControlPlaneLifecycle({
+    return await runOrchestratorControlPlaneLifecycleShell({
       repoRoot: preparation.env.repoRoot,
       paths,
-      taskId: manifest.task_id,
-      runId,
       pipeline: preparation.pipeline,
       manifest,
       emitter: options.runEvents,
@@ -197,11 +185,9 @@ export class CodexOrchestrator {
     });
     await persister.schedule({ manifest: true, heartbeat: true, force: true });
 
-    return await this.withControlPlaneLifecycle({
+    return await runOrchestratorControlPlaneLifecycleShell({
       repoRoot: preparation.env.repoRoot,
       paths,
-      taskId: manifest.task_id,
-      runId: manifest.run_id,
       pipeline,
       manifest,
       emitter: options.runEvents,
@@ -302,77 +288,6 @@ export class CodexOrchestrator {
       plan,
       targetId: plan.targetId ?? null
     };
-  }
-
-  private createRunEventPublisher(params: {
-    runId: string;
-    pipeline: PipelineDefinition;
-    manifest: CliManifest;
-    paths: RunPaths;
-    emitter?: RunEventEmitter;
-  }): RunEventPublisher | undefined {
-    if (!params.emitter) {
-      return undefined;
-    }
-    return new RunEventPublisher(params.emitter, {
-      taskId: params.manifest.task_id,
-      runId: params.runId,
-      pipelineId: params.pipeline.id,
-      pipelineTitle: params.pipeline.title,
-      manifestPath: params.paths.manifestPath,
-      logPath: params.paths.logPath
-    });
-  }
-
-  private async withControlPlaneLifecycle<T>(params: {
-    repoRoot: string;
-    paths: RunPaths;
-    taskId: string;
-    runId: string;
-    pipeline: PipelineDefinition;
-    manifest: CliManifest;
-    emitter?: RunEventEmitter;
-    onStartFailure?: () => Promise<void>;
-    runWithLifecycle: (context: ControlPlaneLaunchContext) => Promise<T>;
-  }): Promise<T> {
-    const emitter = params.emitter ?? new RunEventEmitter();
-    let controlPlaneLifecycle: OrchestratorControlPlaneLifecycle | null = null;
-
-    try {
-      try {
-        controlPlaneLifecycle = await startOrchestratorControlPlaneLifecycle({
-          repoRoot: params.repoRoot,
-          paths: params.paths,
-          taskId: params.taskId,
-          runId: params.runId,
-          pipeline: params.pipeline,
-          emitter
-        });
-      } catch (error) {
-        if (params.onStartFailure) {
-          await params.onStartFailure();
-        }
-        throw error;
-      }
-
-      const runEvents = this.createRunEventPublisher({
-        runId: params.runId,
-        pipeline: params.pipeline,
-        manifest: params.manifest,
-        paths: params.paths,
-        emitter
-      });
-
-      return await params.runWithLifecycle({
-        runEvents,
-        eventStream: controlPlaneLifecycle.eventStream,
-        onEventEntry: controlPlaneLifecycle.onEventEntry
-      });
-    } finally {
-      if (controlPlaneLifecycle) {
-        await controlPlaneLifecycle.close();
-      }
-    }
   }
 
   private async executePipeline(options: ExecutePipelineOptions): Promise<PipelineRunExecutionResult> {
