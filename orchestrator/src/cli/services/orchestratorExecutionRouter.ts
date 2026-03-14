@@ -222,22 +222,30 @@ function buildCloudPreflightFailureContract(
   };
 }
 
-async function executeCloudRoute(
+function buildCloudPreflightRequest(
   options: OrchestratorExecutionRouteOptions,
   state: OrchestratorExecutionRouteState
-): Promise<PipelineRunExecutionResult> {
+): Parameters<typeof runCloudPreflight>[0] {
   const environmentId = resolveCloudEnvironmentId(options.task, options.target, state.effectiveEnvOverrides);
   const branch =
     readCloudString(state.effectiveEnvOverrides.CODEX_CLOUD_BRANCH) ??
     readCloudString(process.env.CODEX_CLOUD_BRANCH);
   const codexBin = resolveCodexCliBin(state.effectiveMergedEnv);
-  const preflight = await runCloudPreflight({
+
+  return {
     repoRoot: options.env.repoRoot,
     codexBin,
     environmentId,
     branch,
     env: state.effectiveMergedEnv
-  });
+  };
+}
+
+async function executeCloudRoute(
+  options: OrchestratorExecutionRouteOptions,
+  state: OrchestratorExecutionRouteState
+): Promise<PipelineRunExecutionResult> {
+  const preflight = await runCloudPreflight(buildCloudPreflightRequest(options, state));
 
   if (!preflight.ok) {
     const contract = buildCloudPreflightFailureContract(state, preflight.issues);

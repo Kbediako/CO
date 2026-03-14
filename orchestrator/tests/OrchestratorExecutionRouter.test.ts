@@ -247,25 +247,50 @@ describe('routeOrchestratorExecution', () => {
   });
 
   it('forwards resolved env overrides to the cloud execution route after successful preflight', async () => {
-    vi.spyOn(runtimeIndex, 'resolveRuntimeSelection').mockResolvedValue(
-      createRuntimeSelection({
-        env_overrides: { CODEX_FAKE_ROUTER_FLAG: '1' }
-      })
-    );
-    vi.spyOn(cloudPreflight, 'runCloudPreflight').mockResolvedValue({
+    const runCloudPreflightSpy = vi.spyOn(cloudPreflight, 'runCloudPreflight').mockResolvedValue({
       ok: true,
       issues: [],
       details: {
-        codexBin: 'codex',
+        codexBin: '/tmp/fake-codex',
         environmentId: 'env-123',
-        branch: 'main'
+        branch: 'feature/router-preflight'
       }
     });
+    vi.spyOn(runtimeIndex, 'resolveRuntimeSelection').mockResolvedValue(
+      createRuntimeSelection({
+        env_overrides: {
+          CODEX_FAKE_ROUTER_FLAG: '1',
+          CODEX_CLI_BIN: '/tmp/fake-codex',
+          CODEX_CLOUD_BRANCH: 'refs/heads/runtime/router-preflight'
+        }
+      })
+    );
 
-    const options = createOptions({ mode: 'cloud' });
+    const options = createOptions({
+      mode: 'cloud',
+      envOverrides: {
+        CODEX_CLOUD_BRANCH: 'refs/heads/outer/router-preflight',
+        CODEX_CLOUD_ENV_ID: 'env-123'
+      }
+    });
     const result = await routeOrchestratorExecution(options);
 
     expect(result.success).toBe(true);
+    expect(runCloudPreflightSpy).toHaveBeenCalledOnce();
+    expect(runCloudPreflightSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+      repoRoot: '/tmp/repo',
+      codexBin: '/tmp/fake-codex',
+      environmentId: 'env-123',
+      branch: 'refs/heads/runtime/router-preflight',
+      env: expect.objectContaining({
+        CODEX_FAKE_ROUTER_FLAG: '1',
+        CODEX_CLI_BIN: '/tmp/fake-codex',
+        CODEX_CLOUD_BRANCH: 'refs/heads/runtime/router-preflight',
+        CODEX_CLOUD_ENV_ID: 'env-123'
+      })
+      })
+    );
     expect(options.executeCloudPipeline).toHaveBeenCalledOnce();
     expect(options.executeCloudPipeline.mock.calls[0]?.[0].envOverrides).toMatchObject({
       CODEX_FAKE_ROUTER_FLAG: '1'
