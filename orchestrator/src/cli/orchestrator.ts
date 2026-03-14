@@ -460,6 +460,12 @@ export class CodexOrchestrator {
   }
 
   private async executeCloudPipeline(options: ExecutePipelineOptions): Promise<PipelineRunExecutionResult> {
+    return this.runCloudExecutionLifecycleShell(options);
+  }
+
+  private async runCloudExecutionLifecycleShell(
+    options: ExecutePipelineOptions
+  ): Promise<PipelineRunExecutionResult> {
     const { env, pipeline, manifest, paths, runEvents, target, task, envOverrides } = options;
 
     return runOrchestratorExecutionLifecycle({
