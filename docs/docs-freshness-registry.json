@@ -1,7 +1,56 @@
 {
   "version": 1,
-  "generated_at": "2026-03-14",
+  "generated_at": "2026-03-15",
   "entries": [
+    {
+      "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-orchestrator-status-shell-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-15",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/PRD-coordinator-symphony-aligned-orchestrator-status-shell-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-15",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-status-shell-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-15",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/findings/1196-orchestrator-status-shell-extraction-deliberation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-15",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/tasks-1196-coordinator-symphony-aligned-orchestrator-status-shell-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-15",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/specs/1196-coordinator-symphony-aligned-orchestrator-status-shell-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-15",
+      "cadence_days": 30
+    },
+    {
+      "path": ".agent/task/1196-coordinator-symphony-aligned-orchestrator-status-shell-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-15",
+      "cadence_days": 30
+    },
     {
       "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-orchestrator-resume-preparation-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
