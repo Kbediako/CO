@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260314-1190-coordinator-symphony-aligned-orchestrator-run-lifecycle-orchestration-shell-extraction",
+      "title": "Coordinator Symphony-Aligned Orchestrator Run Lifecycle Orchestration Shell Extraction",
+      "relates_to": "tasks/tasks-1190-coordinator-symphony-aligned-orchestrator-run-lifecycle-orchestration-shell-extraction.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-14",
+      "paths": {
+        "spec": "tasks/specs/1190-coordinator-symphony-aligned-orchestrator-run-lifecycle-orchestration-shell-extraction.md",
+        "task": "tasks/tasks-1190-coordinator-symphony-aligned-orchestrator-run-lifecycle-orchestration-shell-extraction.md",
+        "agent_task": ".agent/task/1190-coordinator-symphony-aligned-orchestrator-run-lifecycle-orchestration-shell-extraction.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-run-lifecycle-orchestration-shell-extraction.md"
+      }
+    },
+    {
       "id": "20260314-1189-coordinator-symphony-aligned-orchestrator-run-lifecycle-task-manager-shell-extraction",
       "title": "Coordinator Symphony-Aligned Orchestrator Run Lifecycle Task Manager Shell Extraction",
       "relates_to": "tasks/tasks-1189-coordinator-symphony-aligned-orchestrator-run-lifecycle-task-manager-shell-extraction.md",
