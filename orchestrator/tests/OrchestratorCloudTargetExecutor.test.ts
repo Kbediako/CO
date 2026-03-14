@@ -361,4 +361,79 @@ describe('executeOrchestratorCloudTarget request shaping', () => {
     expect(options.manifest.commands[0]?.completed_at).toBeTruthy();
     expect(options.manifest.commands[0]?.exit_code).toBe(1);
   });
+
+  it('enters running state before executor handoff and persists intermediate cloud updates', async () => {
+    const runEvents = {
+      stageStarted: vi.fn(),
+      stageCompleted: vi.fn()
+    };
+    const options = {
+      ...buildOptions(),
+      runEvents
+    };
+    const intermediateExecution = buildCloudExecution({
+      status: 'running',
+      completed_at: null,
+      last_polled_at: '2026-03-14T03:00:05.000Z',
+      log_path: 'cloud/intermediate.ndjson'
+    });
+    const finalExecution = buildCloudExecution({
+      status: 'completed',
+      log_path: 'cloud/final.ndjson'
+    });
+
+    vi.spyOn(CodexCloudTaskExecutor.prototype, 'execute').mockImplementationOnce(async (input) => {
+      expect(options.manifest.commands[0]).toMatchObject({
+        status: 'running',
+        started_at: expect.any(String)
+      });
+      expect(options.schedulePersist).toHaveBeenCalledTimes(1);
+      expect(options.schedulePersist).toHaveBeenNthCalledWith(1, { manifest: true, force: true });
+      expect(runEvents.stageStarted).toHaveBeenCalledTimes(1);
+      expect(runEvents.stageStarted).toHaveBeenCalledWith(
+        expect.objectContaining({
+          stageId: 'stage-1',
+          stageIndex: 0,
+          status: 'running',
+          logPath: null
+        })
+      );
+
+      await input.onUpdate?.(intermediateExecution);
+
+      expect(options.manifest.cloud_execution).toEqual(intermediateExecution);
+      expect(options.manifest.commands[0]?.log_path).toBe('cloud/intermediate.ndjson');
+      expect(options.schedulePersist).toHaveBeenCalledTimes(2);
+      expect(options.schedulePersist).toHaveBeenNthCalledWith(2, { manifest: true, force: true });
+
+      return {
+        success: true,
+        summary: 'Cloud task completed.',
+        notes: [],
+        cloudExecution: finalExecution
+      };
+    });
+
+    const result = await executeOrchestratorCloudTarget(options);
+
+    expect(result.success).toBe(true);
+    expect(options.manifest.cloud_execution).toEqual(finalExecution);
+    expect(options.manifest.commands[0]).toMatchObject({
+      status: 'succeeded',
+      exit_code: 0,
+      log_path: 'cloud/final.ndjson',
+      summary: 'Cloud task completed.'
+    });
+    expect(options.schedulePersist).toHaveBeenCalledTimes(3);
+    expect(options.schedulePersist).toHaveBeenNthCalledWith(3, { manifest: true, force: true });
+    expect(runEvents.stageCompleted).toHaveBeenCalledWith(
+      expect.objectContaining({
+        stageId: 'stage-1',
+        stageIndex: 0,
+        status: 'succeeded',
+        exitCode: 0,
+        logPath: 'cloud/final.ndjson'
+      })
+    );
+  });
 });

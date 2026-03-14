@@ -8,7 +8,11 @@ import type { RunPaths } from '../run/runPaths.js';
 import type { CliManifest, PipelineDefinition, PromptPackManifestEntry } from '../types.js';
 import { isoTimestamp } from '../utils/time.js';
 import { resolveCodexCliBin } from '../utils/codexCli.js';
-import { CodexCloudTaskExecutor, type CloudTaskExecutorInput } from '../../cloud/CodexCloudTaskExecutor.js';
+import {
+  CodexCloudTaskExecutor,
+  type CloudExecutionManifest,
+  type CloudTaskExecutorInput
+} from '../../cloud/CodexCloudTaskExecutor.js';
 
 const DEFAULT_CLOUD_POLL_INTERVAL_SECONDS = 10;
 const DEFAULT_CLOUD_TIMEOUT_SECONDS = 1800;
@@ -385,6 +389,32 @@ function applyMissingCloudEnvironmentFailure(params: {
   params.targetEntry.summary = detail;
 }
 
+async function startCloudTargetAndBuildUpdateHandler(params: {
+  manifest: CliManifest;
+  targetStage: PipelineDefinition['stages'][number];
+  targetEntry: CliManifest['commands'][number];
+  schedulePersist(options?: PersistOptions): Promise<void>;
+  runEvents?: RunEventPublisher;
+}): Promise<(cloudExecution: CloudExecutionManifest) => Promise<void>> {
+  params.targetEntry.status = 'running';
+  params.targetEntry.started_at = isoTimestamp();
+  await params.schedulePersist({ manifest: true, force: true });
+  params.runEvents?.stageStarted({
+    stageId: params.targetStage.id,
+    stageIndex: params.targetEntry.index,
+    title: params.targetStage.title,
+    kind: 'command',
+    logPath: params.targetEntry.log_path,
+    status: params.targetEntry.status
+  });
+
+  return async (cloudExecution) => {
+    params.manifest.cloud_execution = cloudExecution;
+    params.targetEntry.log_path = cloudExecution.log_path;
+    await params.schedulePersist({ manifest: true, force: true });
+  };
+}
+
 export async function executeOrchestratorCloudTarget(
   options: CloudTargetExecutorOptions
 ): Promise<{ success: boolean; notes: string[] }> {
@@ -429,16 +459,12 @@ export async function executeOrchestratorCloudTarget(
     return { success, notes };
   }
 
-  targetEntry.status = 'running';
-  targetEntry.started_at = isoTimestamp();
-  await schedulePersist({ manifest: true, force: true });
-  runEvents?.stageStarted({
-    stageId: targetStage.id,
-    stageIndex: targetEntry.index,
-    title: targetStage.title,
-    kind: 'command',
-    logPath: targetEntry.log_path,
-    status: targetEntry.status
+  const onUpdate = await startCloudTargetAndBuildUpdateHandler({
+    manifest,
+    targetStage,
+    targetEntry,
+    schedulePersist,
+    runEvents
   });
   const request = buildCloudTaskExecutorRequest({
     env: options.env,
@@ -454,11 +480,7 @@ export async function executeOrchestratorCloudTarget(
   const executor = new CodexCloudTaskExecutor();
   const cloudResult = await executor.execute({
     ...request,
-    onUpdate: async (cloudExecution) => {
-      manifest.cloud_execution = cloudExecution;
-      targetEntry.log_path = cloudExecution.log_path;
-      await schedulePersist({ manifest: true, force: true });
-    }
+    onUpdate
   });
 
   success = cloudResult.success;
