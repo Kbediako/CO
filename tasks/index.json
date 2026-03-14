@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260314-1194-coordinator-symphony-aligned-orchestrator-start-preparation-shell-extraction",
+      "title": "Coordinator Symphony-Aligned Orchestrator Start Preparation Shell Extraction",
+      "relates_to": "tasks/tasks-1194-coordinator-symphony-aligned-orchestrator-start-preparation-shell-extraction.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-14",
+      "paths": {
+        "spec": "tasks/specs/1194-coordinator-symphony-aligned-orchestrator-start-preparation-shell-extraction.md",
+        "task": "tasks/tasks-1194-coordinator-symphony-aligned-orchestrator-start-preparation-shell-extraction.md",
+        "agent_task": ".agent/task/1194-coordinator-symphony-aligned-orchestrator-start-preparation-shell-extraction.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-start-preparation-shell-extraction.md"
+      }
+    },
+    {
       "id": "20260314-1193-coordinator-symphony-aligned-orchestrator-control-plane-lifecycle-shell-extraction",
       "title": "Coordinator Symphony-Aligned Orchestrator Control Plane Lifecycle Shell Extraction",
       "relates_to": "tasks/tasks-1193-coordinator-symphony-aligned-orchestrator-control-plane-lifecycle-shell-extraction.md",
