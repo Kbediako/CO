@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260314-1170-coordinator-symphony-aligned-orchestrator-execution-routing-fallback-manifest-contract",
+      "title": "Coordinator Symphony-Aligned Orchestrator Execution-Routing Fallback Manifest Contract",
+      "relates_to": "tasks/tasks-1170-coordinator-symphony-aligned-orchestrator-execution-routing-fallback-manifest-contract.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-14",
+      "paths": {
+        "spec": "tasks/specs/1170-coordinator-symphony-aligned-orchestrator-execution-routing-fallback-manifest-contract.md",
+        "task": "tasks/tasks-1170-coordinator-symphony-aligned-orchestrator-execution-routing-fallback-manifest-contract.md",
+        "agent_task": ".agent/task/1170-coordinator-symphony-aligned-orchestrator-execution-routing-fallback-manifest-contract.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-execution-routing-fallback-manifest-contract.md"
+      }
+    },
+    {
       "id": "20260314-1169-coordinator-symphony-aligned-orchestrator-execution-routing-policy-splitting",
       "title": "Coordinator Symphony-Aligned Orchestrator Execution-Routing Policy Splitting",
       "relates_to": "tasks/tasks-1169-coordinator-symphony-aligned-orchestrator-execution-routing-policy-splitting.md",
