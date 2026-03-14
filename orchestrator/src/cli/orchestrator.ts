@@ -380,7 +380,11 @@ export class CodexOrchestrator {
     return executeOrchestratorPipelineWithRouteAdapter({
       options,
       applyRuntimeSelection: (manifest, selection) => this.applyRuntimeSelection(manifest, selection),
-      executeCloudPipeline: (cloudOptions) => this.executeCloudPipeline(cloudOptions),
+      executeCloudPipeline: (cloudOptions) =>
+        runOrchestratorCloudExecutionLifecycleShell({
+          ...cloudOptions,
+          runAutoScout: (autoScoutOptions) => this.runAutoScout(autoScoutOptions)
+        }),
       runAutoScout: (autoScoutOptions) => this.runAutoScout(autoScoutOptions),
       startSubpipeline: ({ pipelineId, executionModeOverride, runtimeModeRequested }) =>
         this.start({
@@ -390,14 +394,7 @@ export class CodexOrchestrator {
           format: 'json',
           executionMode: executionModeOverride,
           runtimeMode: runtimeModeRequested
-        })
-    });
-  }
-
-  private async executeCloudPipeline(options: ExecutePipelineOptions): Promise<PipelineRunExecutionResult> {
-    return runOrchestratorCloudExecutionLifecycleShell({
-      ...options,
-      runAutoScout: (autoScoutOptions) => this.runAutoScout(autoScoutOptions),
+      })
     });
   }
 

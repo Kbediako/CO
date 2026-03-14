@@ -15,7 +15,7 @@ vi.mock('../src/cli/services/orchestratorCloudTargetExecutor.js', () => ({
   executeOrchestratorCloudTarget: mockState.cloudExecutor
 }));
 
-function createOptions() {
+function createOptions(overrides: Record<string, unknown> = {}) {
   return {
     env: { repoRoot: '/tmp/repo', taskId: 'task-1' } as never,
     pipeline: {
@@ -57,7 +57,8 @@ function createOptions() {
     runAutoScout: vi.fn(async () => ({ status: 'recorded', path: 'out/auto-scout.json' })),
     envOverrides: {
       OUTER_FLAG: '1'
-    }
+    },
+    ...overrides
   };
 }
 
@@ -68,7 +69,90 @@ describe('runOrchestratorCloudExecutionLifecycleShell', () => {
     mockState.cloudExecutor.mockReset();
   });
 
-  it('preserves lifecycle contract forwarding and executeBody note and success wiring', async () => {
+  it('forwards the lifecycle contract with merged advanced decision env state', async () => {
+    const previousProcessOnly = process.env.CLOUD_SHELL_PROCESS_ONLY;
+    const previousShared = process.env.CLOUD_SHELL_SHARED;
+    process.env.CLOUD_SHELL_PROCESS_ONLY = 'process-only';
+    process.env.CLOUD_SHELL_SHARED = 'process-value';
+
+    try {
+      const autoScoutOutcome = { status: 'recorded' as const, path: 'out/auto-scout.json' };
+      const runAutoScout = vi.fn(async () => autoScoutOutcome);
+      const options = createOptions({
+        envOverrides: {
+          OUTER_FLAG: '1',
+          CLOUD_SHELL_SHARED: 'override-value'
+        },
+        runAutoScout
+      });
+      mockState.lifecycleRunner.mockImplementation(async (input) => ({
+        success: true,
+        notes: ['lifecycle note'],
+        manifest: input.manifest,
+        manifestPath: input.paths.manifestPath,
+        logPath: input.paths.logPath
+      }));
+
+      const result = await runOrchestratorCloudExecutionLifecycleShell(options);
+
+      expect(result.success).toBe(true);
+      expect(result.notes).toEqual(['lifecycle note']);
+      expect(mockState.lifecycleRunner).toHaveBeenCalledOnce();
+      const lifecycleInput = mockState.lifecycleRunner.mock.calls[0]?.[0];
+      expect(lifecycleInput).toMatchObject({
+        env: options.env,
+        pipeline: options.pipeline,
+        manifest: options.manifest,
+        paths: options.paths,
+        mode: options.mode,
+        target: options.target,
+        task: options.task,
+        runEvents: options.runEvents,
+        eventStream: options.eventStream,
+        onEventEntry: options.onEventEntry,
+        persister: options.persister,
+        envOverrides: options.envOverrides,
+        defaultFailureStatusDetail: 'cloud-execution-failed',
+        runAutoScout
+      });
+      expect(lifecycleInput.advancedDecisionEnv).toMatchObject({
+        CLOUD_SHELL_PROCESS_ONLY: 'process-only',
+        CLOUD_SHELL_SHARED: 'override-value',
+        OUTER_FLAG: '1'
+      });
+
+      const autoScoutInput = {
+        env: options.env,
+        paths: options.paths,
+        manifest: options.manifest,
+        mode: options.mode,
+        pipeline: options.pipeline,
+        target: options.target,
+        task: options.task,
+        advancedDecision: { mode: 'auto' } as never
+      };
+      const actualAutoScoutOutcome = await lifecycleInput.runAutoScout(autoScoutInput);
+
+      expect(runAutoScout).toHaveBeenCalledOnce();
+      expect(runAutoScout).toHaveBeenCalledWith(autoScoutInput);
+      expect(actualAutoScoutOutcome).toBe(autoScoutOutcome);
+      expect(mockState.cloudExecutor).not.toHaveBeenCalled();
+    } finally {
+      if (previousProcessOnly === undefined) {
+        delete process.env.CLOUD_SHELL_PROCESS_ONLY;
+      } else {
+        process.env.CLOUD_SHELL_PROCESS_ONLY = previousProcessOnly;
+      }
+
+      if (previousShared === undefined) {
+        delete process.env.CLOUD_SHELL_SHARED;
+      } else {
+        process.env.CLOUD_SHELL_SHARED = previousShared;
+      }
+    }
+  });
+
+  it('passes the cloud executor through executeBody and appends notes after lifecycle notes', async () => {
     const options = createOptions();
     let capturedControlWatcher: unknown;
     let capturedSchedulePersist: unknown;
@@ -96,28 +180,6 @@ describe('runOrchestratorCloudExecutionLifecycleShell', () => {
     });
 
     const result = await runOrchestratorCloudExecutionLifecycleShell(options);
-
-    expect(mockState.lifecycleRunner).toHaveBeenCalledOnce();
-    const lifecycleInput = mockState.lifecycleRunner.mock.calls[0]?.[0];
-    expect(lifecycleInput).toMatchObject({
-      env: options.env,
-      pipeline: options.pipeline,
-      manifest: options.manifest,
-      paths: options.paths,
-      mode: options.mode,
-      target: options.target,
-      task: options.task,
-      runEvents: options.runEvents,
-      eventStream: options.eventStream,
-      onEventEntry: options.onEventEntry,
-      persister: options.persister,
-      envOverrides: options.envOverrides,
-      defaultFailureStatusDetail: 'cloud-execution-failed',
-      runAutoScout: options.runAutoScout
-    });
-    expect(lifecycleInput.advancedDecisionEnv).toMatchObject({
-      OUTER_FLAG: '1'
-    });
 
     expect(mockState.cloudExecutor).toHaveBeenCalledOnce();
     expect(mockState.cloudExecutor).toHaveBeenCalledWith({
