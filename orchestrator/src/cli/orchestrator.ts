@@ -22,7 +22,6 @@ import type { RunPaths } from './run/runPaths.js';
 import { logger } from '../logger.js';
 import { ControlPlaneService } from './services/controlPlaneService.js';
 import { SchedulerService } from './services/schedulerService.js';
-import { prepareRun } from './services/runPreparation.js';
 import type { RuntimeMode, RuntimeSelection } from './runtime/types.js';
 import type { AdvancedAutopilotDecision } from './utils/advancedAutopilot.js';
 import {
@@ -41,6 +40,7 @@ import { runOrchestratorControlPlaneLifecycleShell } from './services/orchestrat
 import { runOrchestratorStartPreparationShell } from './services/orchestratorStartPreparationShell.js';
 import { runOrchestratorResumePreparationShell } from './services/orchestratorResumePreparationShell.js';
 import { runOrchestratorStatusShell } from './services/orchestratorStatusShell.js';
+import { runOrchestratorPlanShell } from './services/orchestratorPlanShell.js';
 
 const resolveBaseEnvironment = (): EnvironmentPaths =>
   normalizeEnvironmentPaths(resolveEnvironmentPaths());
@@ -143,57 +143,10 @@ export class CodexOrchestrator {
   }
 
   async plan(options: PlanOptions = {}): Promise<PlanPreviewResult> {
-    const preparation = await prepareRun({
+    return await runOrchestratorPlanShell({
       baseEnv: this.baseEnv,
-      taskIdOverride: options.taskId,
-      pipelineId: options.pipelineId,
-      targetStageId: options.targetStageId,
-      planTargetFallback: null
+      options
     });
-    const plan = preparation.planPreview ?? (await preparation.planner.plan(preparation.taskContext));
-
-    const stages = preparation.pipeline.stages.map((stage: PipelineDefinition['stages'][number], index: number) => {
-      if (stage.kind === 'command') {
-        return {
-          index: index + 1,
-          id: stage.id,
-          title: stage.title,
-          kind: stage.kind,
-          command: stage.command,
-          cwd: stage.cwd ?? null,
-          env: stage.env ?? null,
-          allowFailure: Boolean(stage.allowFailure),
-          summaryHint: stage.summaryHint ?? null
-        } as const;
-      }
-      return {
-        index: index + 1,
-        id: stage.id,
-        title: stage.title,
-        kind: stage.kind,
-        pipeline: stage.pipeline,
-        optional: Boolean(stage.optional)
-      } as const;
-    });
-
-    const pipelineSource =
-      preparation.pipelineSource === 'user'
-        ? 'user'
-        : preparation.pipelineSource === 'default'
-          ? 'default'
-          : null;
-
-    return {
-      pipeline: {
-        id: preparation.pipeline.id,
-        title: preparation.pipeline.title,
-        description: preparation.pipeline.description ?? null,
-        source: pipelineSource
-      },
-      stages,
-      plan,
-      targetId: plan.targetId ?? null
-    };
   }
 
   private async executePipeline(options: ExecutePipelineOptions): Promise<PipelineRunExecutionResult> {
