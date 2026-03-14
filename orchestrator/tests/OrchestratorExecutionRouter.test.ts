@@ -455,4 +455,129 @@ describe('routeOrchestratorExecution', () => {
       runtimeModeRequested: 'cli'
     });
   });
+
+  it('adds the runtime fallback summary during local lifecycle beforeStart', async () => {
+    vi.spyOn(runtimeIndex, 'resolveRuntimeSelection').mockResolvedValue(
+      createRuntimeSelection({
+        selected_mode: 'cli',
+        provider: 'CliRuntimeProvider',
+        fallback: {
+          occurred: true,
+          code: 'appserver-command-unavailable',
+          reason: 'Appserver preflight failed.',
+          from_mode: 'appserver',
+          to_mode: 'cli',
+          checked_at: '2026-03-13T00:00:00.000Z'
+        }
+      })
+    );
+    mockState.lifecycleRunner.mockImplementation(async (input) => {
+      const notes: string[] = [];
+      input.beforeStart?.({ notes });
+      return {
+        success: true,
+        notes,
+        manifest: input.manifest,
+        manifestPath: input.paths.manifestPath,
+        logPath: input.paths.logPath
+      };
+    });
+
+    const options = createOptions({ mode: 'mcp' });
+    const result = await routeOrchestratorExecution(options);
+
+    expect(result.success).toBe(true);
+    expect(result.notes).toEqual([
+      'Runtime fallback (appserver-command-unavailable): Appserver preflight failed.'
+    ]);
+    expect(options.manifest.summary).toBe(
+      'Runtime fallback (appserver-command-unavailable): Appserver preflight failed.'
+    );
+  });
+
+  it('passes local auto-scout through with effective env overrides', async () => {
+    vi.spyOn(runtimeIndex, 'resolveRuntimeSelection').mockResolvedValue(
+      createRuntimeSelection({
+        selected_mode: 'cli',
+        provider: 'CliRuntimeProvider',
+        env_overrides: { CODEX_FAKE_ROUTER_FLAG: '1' }
+      })
+    );
+    const autoScoutOutcome = { status: 'recorded' as const, path: 'auto-scout.json' };
+    mockState.lifecycleRunner.mockImplementation(async (input) => {
+      await input.runAutoScout({
+        env: input.env,
+        paths: input.paths,
+        manifest: input.manifest,
+        mode: input.mode,
+        pipeline: input.pipeline,
+        target: input.target,
+        task: input.task,
+        advancedDecision: { mode: 'auto' } as never
+      });
+      return {
+        success: true,
+        notes: [],
+        manifest: input.manifest,
+        manifestPath: input.paths.manifestPath,
+        logPath: input.paths.logPath
+      };
+    });
+
+    const options = createOptions({
+      mode: 'mcp',
+      runAutoScout: vi.fn(async () => autoScoutOutcome)
+    });
+    const result = await routeOrchestratorExecution(options);
+
+    expect(result.success).toBe(true);
+    expect(options.runAutoScout).toHaveBeenCalledOnce();
+    expect(options.runAutoScout).toHaveBeenCalledWith(
+      expect.objectContaining({
+        envOverrides: expect.objectContaining({
+          CODEX_FAKE_ROUTER_FLAG: '1'
+        })
+      })
+    );
+  });
+
+  it('appends the guardrail recommendation during local lifecycle afterFinalize', async () => {
+    vi.spyOn(runtimeIndex, 'resolveRuntimeSelection').mockResolvedValue(
+      createRuntimeSelection({
+        selected_mode: 'cli',
+        provider: 'CliRuntimeProvider'
+      })
+    );
+    mockState.lifecycleRunner.mockImplementation(async (input) => {
+      input.afterFinalize?.();
+      return {
+        success: true,
+        notes: [],
+        manifest: input.manifest,
+        manifestPath: input.paths.manifestPath,
+        logPath: input.paths.logPath
+      };
+    });
+
+    const manifest = createManifest();
+    manifest.guardrail_status = {
+      present: true,
+      recommendation: 'Guardrails: follow-up required.',
+      summary: 'Guardrails: 0 succeeded, 1 failed.',
+      computed_at: '2026-03-14T00:00:00.000Z',
+      counts: {
+        total: 1,
+        succeeded: 0,
+        failed: 1,
+        skipped: 0,
+        other: 0
+      }
+    };
+
+    const options = createOptions({ mode: 'mcp', manifest });
+    const result = await routeOrchestratorExecution(options);
+
+    expect(result.success).toBe(true);
+    expect(options.manifest.summary).toBe('Guardrails: follow-up required.');
+  });
 });

@@ -267,6 +267,13 @@ async function executeLocalRoute(
   options: OrchestratorExecutionRouteOptions,
   state: OrchestratorExecutionRouteState
 ): Promise<PipelineRunExecutionResult> {
+  return runLocalExecutionLifecycleShell(options, state);
+}
+
+async function runLocalExecutionLifecycleShell(
+  options: OrchestratorExecutionRouteOptions,
+  state: OrchestratorExecutionRouteState
+): Promise<PipelineRunExecutionResult> {
   const { env, pipeline, manifest, paths, runEvents } = options;
   return runOrchestratorExecutionLifecycle({
     env,
