@@ -611,23 +611,14 @@ export class CodexOrchestrator {
       context.executionModeOverride
     );
 
-    this.attachPlanTargetTracker(
+    attachOrchestratorPlanTargetTracker({
       manager,
-      context.manifest,
-      context.paths,
-      context.persister
-    );
+      manifest: context.manifest,
+      paths: context.paths,
+      persister: context.persister
+    });
 
     return manager;
-  }
-
-  private attachPlanTargetTracker(
-    manager: TaskManager,
-    manifest: CliManifest,
-    paths: RunPaths,
-    persister?: ManifestPersister
-  ): void {
-    attachOrchestratorPlanTargetTracker({ manager, manifest, paths, persister });
   }
 
   private applyRequestedRuntimeMode(manifest: CliManifest, mode: RuntimeMode): void {

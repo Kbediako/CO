@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { CodexOrchestrator } from '../src/cli/orchestrator.js';
+import * as trackerService from '../src/cli/services/orchestratorPlanTargetTracker.js';
 import type { PipelineDefinition } from '../src/cli/types.js';
 import type { ExecutionMode, TaskContext } from '../src/types.js';
 
@@ -45,9 +46,7 @@ describe('CodexOrchestrator.createRunLifecycleTaskManager', () => {
       }, 'createTaskManager')
       .mockReturnValue(manager);
     const attachPlanTargetTracker = vi
-      .spyOn(orchestrator as unknown as {
-        attachPlanTargetTracker: (...args: unknown[]) => void;
-      }, 'attachPlanTargetTracker')
+      .spyOn(trackerService, 'attachOrchestratorPlanTargetTracker')
       .mockImplementation(() => undefined);
 
     const result = (
@@ -70,12 +69,12 @@ describe('CodexOrchestrator.createRunLifecycleTaskManager', () => {
     );
     const capturedGetResult = createTaskManager.mock.calls[0]?.[3] as (() => unknown) | undefined;
     expect(capturedGetResult?.()).toBeNull();
-    expect(attachPlanTargetTracker).toHaveBeenCalledWith(
+    expect(attachPlanTargetTracker).toHaveBeenCalledWith({
       manager,
-      shared.manifest,
-      shared.paths,
-      shared.persister
-    );
+      manifest: shared.manifest,
+      paths: shared.paths,
+      persister: shared.persister
+    });
   });
 
   it('does not attach the plan target tracker when task manager creation fails', () => {
@@ -88,9 +87,7 @@ describe('CodexOrchestrator.createRunLifecycleTaskManager', () => {
       throw createTaskManagerError;
     });
     const attachPlanTargetTracker = vi
-      .spyOn(orchestrator as unknown as {
-        attachPlanTargetTracker: (...args: unknown[]) => void;
-      }, 'attachPlanTargetTracker')
+      .spyOn(trackerService, 'attachOrchestratorPlanTargetTracker')
       .mockImplementation(() => undefined);
 
     expect(() =>
