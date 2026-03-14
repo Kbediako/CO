@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260314-1181-coordinator-symphony-aligned-orchestrator-cloud-route-preflight-and-reroute-shell-extraction",
+      "title": "Coordinator Symphony-Aligned Orchestrator Cloud Route Preflight And Reroute Shell Extraction",
+      "relates_to": "tasks/tasks-1181-coordinator-symphony-aligned-orchestrator-cloud-route-preflight-and-reroute-shell-extraction.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-14",
+      "paths": {
+        "spec": "tasks/specs/1181-coordinator-symphony-aligned-orchestrator-cloud-route-preflight-and-reroute-shell-extraction.md",
+        "task": "tasks/tasks-1181-coordinator-symphony-aligned-orchestrator-cloud-route-preflight-and-reroute-shell-extraction.md",
+        "agent_task": ".agent/task/1181-coordinator-symphony-aligned-orchestrator-cloud-route-preflight-and-reroute-shell-extraction.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-cloud-route-preflight-and-reroute-shell-extraction.md"
+      }
+    },
+    {
       "id": "20260314-1180-coordinator-symphony-aligned-orchestrator-execution-route-state-assembly-extraction",
       "title": "Coordinator Symphony-Aligned Orchestrator Execution Route State Assembly Extraction",
       "relates_to": "tasks/tasks-1180-coordinator-symphony-aligned-orchestrator-execution-route-state-assembly-extraction.md",
