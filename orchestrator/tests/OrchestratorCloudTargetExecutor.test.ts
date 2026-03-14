@@ -436,4 +436,53 @@ describe('executeOrchestratorCloudTarget request shaping', () => {
       })
     );
   });
+
+  it('applies the failed completion shell after executor returns', async () => {
+    const runEvents = {
+      stageStarted: vi.fn(),
+      stageCompleted: vi.fn()
+    };
+    const options = {
+      ...buildOptions(),
+      runEvents
+    };
+    const failedExecution = buildCloudExecution({
+      status: 'failed',
+      log_path: 'cloud/failed.ndjson'
+    });
+
+    vi.spyOn(CodexCloudTaskExecutor.prototype, 'execute').mockResolvedValueOnce({
+      success: false,
+      summary: 'Cloud task failed.',
+      notes: ['Remote runner failed.'],
+      cloudExecution: failedExecution
+    });
+
+    const result = await executeOrchestratorCloudTarget(options);
+
+    expect(result.success).toBe(false);
+    expect(result.notes).toEqual(['Remote runner failed.']);
+    expect(options.manifest.cloud_execution).toEqual(failedExecution);
+    expect(options.manifest.status_detail).toBe('cloud:stage-1:failed');
+    expect(options.manifest.summary).toBe('Cloud task failed.');
+    expect(options.manifest.commands[0]).toMatchObject({
+      status: 'failed',
+      exit_code: 1,
+      log_path: 'cloud/failed.ndjson',
+      summary: 'Cloud task failed.'
+    });
+    expect(options.manifest.commands[0]?.completed_at).toBeTruthy();
+    expect(options.schedulePersist).toHaveBeenCalledTimes(2);
+    expect(options.schedulePersist).toHaveBeenNthCalledWith(2, { manifest: true, force: true });
+    expect(runEvents.stageCompleted).toHaveBeenCalledWith(
+      expect.objectContaining({
+        stageId: 'stage-1',
+        stageIndex: 0,
+        status: 'failed',
+        exitCode: 1,
+        summary: 'Cloud task failed.',
+        logPath: 'cloud/failed.ndjson'
+      })
+    );
+  });
 });

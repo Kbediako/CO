@@ -11,6 +11,7 @@ import { resolveCodexCliBin } from '../utils/codexCli.js';
 import {
   CodexCloudTaskExecutor,
   type CloudExecutionManifest,
+  type CloudTaskExecutionResult,
   type CloudTaskExecutorInput
 } from '../../cloud/CodexCloudTaskExecutor.js';
 
@@ -415,6 +416,37 @@ async function startCloudTargetAndBuildUpdateHandler(params: {
   };
 }
 
+async function applyCloudTargetCompletion(params: {
+  manifest: CliManifest;
+  targetStage: PipelineDefinition['stages'][number];
+  targetEntry: CliManifest['commands'][number];
+  cloudResult: CloudTaskExecutionResult;
+  schedulePersist(options?: PersistOptions): Promise<void>;
+  runEvents?: RunEventPublisher;
+}): Promise<void> {
+  params.manifest.cloud_execution = params.cloudResult.cloudExecution;
+  params.targetEntry.log_path = params.cloudResult.cloudExecution.log_path;
+  params.targetEntry.completed_at = isoTimestamp();
+  params.targetEntry.exit_code = params.cloudResult.success ? 0 : 1;
+  params.targetEntry.status = params.cloudResult.success ? 'succeeded' : 'failed';
+  params.targetEntry.summary = params.cloudResult.summary;
+  if (!params.cloudResult.success) {
+    params.manifest.status_detail = `cloud:${params.targetStage.id}:failed`;
+    appendSummary(params.manifest, params.cloudResult.summary);
+  }
+  await params.schedulePersist({ manifest: true, force: true });
+  params.runEvents?.stageCompleted({
+    stageId: params.targetStage.id,
+    stageIndex: params.targetEntry.index,
+    title: params.targetStage.title,
+    kind: 'command',
+    status: params.targetEntry.status,
+    exitCode: params.targetEntry.exit_code,
+    summary: params.targetEntry.summary,
+    logPath: params.targetEntry.log_path
+  });
+}
+
 export async function executeOrchestratorCloudTarget(
   options: CloudTargetExecutorOptions
 ): Promise<{ success: boolean; notes: string[] }> {
@@ -485,26 +517,13 @@ export async function executeOrchestratorCloudTarget(
 
   success = cloudResult.success;
   notes.push(...cloudResult.notes);
-  manifest.cloud_execution = cloudResult.cloudExecution;
-  targetEntry.log_path = cloudResult.cloudExecution.log_path;
-  targetEntry.completed_at = isoTimestamp();
-  targetEntry.exit_code = cloudResult.success ? 0 : 1;
-  targetEntry.status = cloudResult.success ? 'succeeded' : 'failed';
-  targetEntry.summary = cloudResult.summary;
-  if (!cloudResult.success) {
-    manifest.status_detail = `cloud:${targetStage.id}:failed`;
-    appendSummary(manifest, cloudResult.summary);
-  }
-  await schedulePersist({ manifest: true, force: true });
-  runEvents?.stageCompleted({
-    stageId: targetStage.id,
-    stageIndex: targetEntry.index,
-    title: targetStage.title,
-    kind: 'command',
-    status: targetEntry.status,
-    exitCode: targetEntry.exit_code,
-    summary: targetEntry.summary,
-    logPath: targetEntry.log_path
+  await applyCloudTargetCompletion({
+    manifest,
+    targetStage,
+    targetEntry,
+    cloudResult,
+    schedulePersist,
+    runEvents
   });
 
   return { success, notes };
