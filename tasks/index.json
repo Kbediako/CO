@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260314-1188-coordinator-symphony-aligned-orchestrator-run-lifecycle-task-manager-tracker-delegation",
+      "title": "Coordinator Symphony-Aligned Orchestrator Run Lifecycle Task Manager Tracker Delegation",
+      "relates_to": "tasks/tasks-1188-coordinator-symphony-aligned-orchestrator-run-lifecycle-task-manager-tracker-delegation.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-14",
+      "paths": {
+        "spec": "tasks/specs/1188-coordinator-symphony-aligned-orchestrator-run-lifecycle-task-manager-tracker-delegation.md",
+        "task": "tasks/tasks-1188-coordinator-symphony-aligned-orchestrator-run-lifecycle-task-manager-tracker-delegation.md",
+        "agent_task": ".agent/task/1188-coordinator-symphony-aligned-orchestrator-run-lifecycle-task-manager-tracker-delegation.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-run-lifecycle-task-manager-tracker-delegation.md"
+      }
+    },
+    {
       "id": "20260314-1187-coordinator-symphony-aligned-orchestrator-plan-target-tracker-shell-extraction",
       "title": "Coordinator Symphony-Aligned Orchestrator Plan-Target Tracker Shell Extraction",
       "relates_to": "tasks/tasks-1187-coordinator-symphony-aligned-orchestrator-plan-target-tracker-shell-extraction.md",
