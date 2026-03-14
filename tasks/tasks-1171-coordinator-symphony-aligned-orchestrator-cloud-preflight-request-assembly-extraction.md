@@ -22,18 +22,18 @@
 
 ## Implementation
 
-- [ ] Cloud-preflight request assembly is isolated into a smaller truthful router-local seam. Evidence: `orchestrator/src/cli/services/orchestratorExecutionRouter.ts`
-- [ ] `executeCloudRoute(...)` preserves preflight invocation plus hard-fail/fallback ownership. Evidence: `orchestrator/tests/OrchestratorExecutionRouter.test.ts`
+- [x] Cloud-preflight request assembly is isolated into a smaller truthful router-local seam. Evidence: `orchestrator/src/cli/services/orchestratorExecutionRouter.ts`, `out/1171-coordinator-symphony-aligned-orchestrator-cloud-preflight-request-assembly-extraction/manual/20260314T023037Z-closeout/00-summary.md`
+- [x] `executeCloudRoute(...)` preserves preflight invocation plus hard-fail/fallback ownership. Evidence: `orchestrator/tests/OrchestratorExecutionRouter.test.ts`, `out/1171-coordinator-symphony-aligned-orchestrator-cloud-preflight-request-assembly-extraction/manual/20260314T023037Z-closeout/00-summary.md`
 
 ## Validation + Closeout
 
-- [ ] `node scripts/delegation-guard.mjs`
-- [ ] `node scripts/spec-guard.mjs --dry-run`
-- [ ] `npm run build`
-- [ ] `npm run lint`
-- [ ] `npm run test`
-- [ ] `npm run docs:check`
-- [ ] `npm run docs:freshness`
-- [ ] `node scripts/diff-budget.mjs`
-- [ ] `npm run review`
-- [ ] `npm run pack:smoke`
+- [x] `node scripts/delegation-guard.mjs` Evidence: `out/1171-coordinator-symphony-aligned-orchestrator-cloud-preflight-request-assembly-extraction/manual/20260314T023037Z-closeout/01-delegation-guard.log`
+- [x] `node scripts/spec-guard.mjs --dry-run` Evidence: `out/1171-coordinator-symphony-aligned-orchestrator-cloud-preflight-request-assembly-extraction/manual/20260314T023037Z-closeout/02-spec-guard.log`
+- [x] `npm run build` Evidence: `out/1171-coordinator-symphony-aligned-orchestrator-cloud-preflight-request-assembly-extraction/manual/20260314T023037Z-closeout/03-build.log`
+- [x] `npm run lint` Evidence: `out/1171-coordinator-symphony-aligned-orchestrator-cloud-preflight-request-assembly-extraction/manual/20260314T023037Z-closeout/04-lint.log`
+- [x] `npm run test` Evidence: `out/1171-coordinator-symphony-aligned-orchestrator-cloud-preflight-request-assembly-extraction/manual/20260314T023037Z-closeout/05-test.log`
+- [x] `npm run docs:check` Evidence: `out/1171-coordinator-symphony-aligned-orchestrator-cloud-preflight-request-assembly-extraction/manual/20260314T023037Z-closeout/06-docs-check.log`
+- [x] `npm run docs:freshness` Evidence: `out/1171-coordinator-symphony-aligned-orchestrator-cloud-preflight-request-assembly-extraction/manual/20260314T023037Z-closeout/07-docs-freshness.log`
+- [x] `node scripts/diff-budget.mjs` Evidence: `out/1171-coordinator-symphony-aligned-orchestrator-cloud-preflight-request-assembly-extraction/manual/20260314T023037Z-closeout/08-diff-budget.log`
+- [x] `npm run review` Evidence: `out/1171-coordinator-symphony-aligned-orchestrator-cloud-preflight-request-assembly-extraction/manual/20260314T023037Z-closeout/09-review.log`
+- [x] `npm run pack:smoke` Evidence: `out/1171-coordinator-symphony-aligned-orchestrator-cloud-preflight-request-assembly-extraction/manual/20260314T023037Z-closeout/10-pack-smoke.log`
