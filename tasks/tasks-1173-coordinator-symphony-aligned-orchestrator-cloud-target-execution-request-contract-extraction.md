@@ -20,20 +20,20 @@
 
 ## Request Contract Extraction
 
-- [ ] One bounded helper inside `orchestratorCloudTargetExecutor.ts` owns the request contract assembled before `CodexCloudTaskExecutor.execute(...)`. Evidence: `orchestrator/src/cli/services/orchestratorCloudTargetExecutor.ts`, `out/1173-coordinator-symphony-aligned-orchestrator-cloud-target-execution-request-contract-extraction/manual/<timestamp>-closeout/00-summary.md`
-- [ ] `executeOrchestratorCloudTarget(...)` retains lifecycle, persistence, and final result ownership while delegating request shaping. Evidence: `orchestrator/src/cli/services/orchestratorCloudTargetExecutor.ts`, `out/1173-coordinator-symphony-aligned-orchestrator-cloud-target-execution-request-contract-extraction/manual/<timestamp>-closeout/00-summary.md`
-- [ ] Focused cloud regressions preserve prompt construction, env/default precedence, feature parsing, and cloud execution request shaping. Evidence: `out/1173-coordinator-symphony-aligned-orchestrator-cloud-target-execution-request-contract-extraction/manual/<timestamp>-closeout/05b-targeted-tests.log`
+- [x] One bounded helper inside `orchestratorCloudTargetExecutor.ts` owns the request contract assembled before `CodexCloudTaskExecutor.execute(...)`. Evidence: `orchestrator/src/cli/services/orchestratorCloudTargetExecutor.ts`, `out/1173-coordinator-symphony-aligned-orchestrator-cloud-target-execution-request-contract-extraction/manual/20260314T034531Z-closeout/00-summary.md`
+- [x] `executeOrchestratorCloudTarget(...)` retains lifecycle, persistence, and final result ownership while delegating request shaping. Evidence: `orchestrator/src/cli/services/orchestratorCloudTargetExecutor.ts`, `out/1173-coordinator-symphony-aligned-orchestrator-cloud-target-execution-request-contract-extraction/manual/20260314T034531Z-closeout/00-summary.md`
+- [x] Focused cloud regressions preserve prompt construction, env/default precedence, feature parsing, and cloud execution request shaping. Evidence: `out/1173-coordinator-symphony-aligned-orchestrator-cloud-target-execution-request-contract-extraction/manual/20260314T034531Z-closeout/05b-targeted-tests.log`
 
 ## Validation + Closeout
 
-- [ ] `node scripts/delegation-guard.mjs`. Evidence: `out/1173-coordinator-symphony-aligned-orchestrator-cloud-target-execution-request-contract-extraction/manual/<timestamp>-closeout/01-delegation-guard.log`
-- [ ] `node scripts/spec-guard.mjs --dry-run`. Evidence: `out/1173-coordinator-symphony-aligned-orchestrator-cloud-target-execution-request-contract-extraction/manual/<timestamp>-closeout/02-spec-guard.log`
-- [ ] `npm run build`. Evidence: `out/1173-coordinator-symphony-aligned-orchestrator-cloud-target-execution-request-contract-extraction/manual/<timestamp>-closeout/03-build.log`
-- [ ] `npm run lint`. Evidence: `out/1173-coordinator-symphony-aligned-orchestrator-cloud-target-execution-request-contract-extraction/manual/<timestamp>-closeout/04-lint.log`
-- [ ] `npm run test`. Evidence: `out/1173-coordinator-symphony-aligned-orchestrator-cloud-target-execution-request-contract-extraction/manual/<timestamp>-closeout/05-test.log`
-- [ ] `npm run docs:check`. Evidence: `out/1173-coordinator-symphony-aligned-orchestrator-cloud-target-execution-request-contract-extraction/manual/<timestamp>-closeout/06-docs-check.log`
-- [ ] `npm run docs:freshness`. Evidence: `out/1173-coordinator-symphony-aligned-orchestrator-cloud-target-execution-request-contract-extraction/manual/<timestamp>-closeout/07-docs-freshness.log`
-- [ ] `node scripts/diff-budget.mjs`. Evidence: `out/1173-coordinator-symphony-aligned-orchestrator-cloud-target-execution-request-contract-extraction/manual/<timestamp>-closeout/08-diff-budget.log`
-- [ ] `npm run review`. Evidence: `out/1173-coordinator-symphony-aligned-orchestrator-cloud-target-execution-request-contract-extraction/manual/<timestamp>-closeout/09-review.log`
-- [ ] `npm run pack:smoke`. Evidence: `out/1173-coordinator-symphony-aligned-orchestrator-cloud-target-execution-request-contract-extraction/manual/<timestamp>-closeout/10-pack-smoke.log`
-- [ ] Elegance review completed. Evidence: `out/1173-coordinator-symphony-aligned-orchestrator-cloud-target-execution-request-contract-extraction/manual/<timestamp>-closeout/12-elegance-review.md`
+- [x] `node scripts/delegation-guard.mjs`. Evidence: `out/1173-coordinator-symphony-aligned-orchestrator-cloud-target-execution-request-contract-extraction/manual/20260314T034531Z-closeout/01-delegation-guard.log`, `.runs/1173-coordinator-symphony-aligned-orchestrator-cloud-target-execution-request-contract-extraction-guard/cli/2026-03-14T03-49-08-442Z-4d49a50f/manifest.json`
+- [x] `node scripts/spec-guard.mjs --dry-run`. Evidence: `out/1173-coordinator-symphony-aligned-orchestrator-cloud-target-execution-request-contract-extraction/manual/20260314T034531Z-closeout/02-spec-guard.log`
+- [x] `npm run build`. Evidence: `out/1173-coordinator-symphony-aligned-orchestrator-cloud-target-execution-request-contract-extraction/manual/20260314T034531Z-closeout/03-build.log`
+- [x] `npm run lint`. Evidence: `out/1173-coordinator-symphony-aligned-orchestrator-cloud-target-execution-request-contract-extraction/manual/20260314T034531Z-closeout/04-lint.log`
+- [x] `npm run test`. Evidence: `out/1173-coordinator-symphony-aligned-orchestrator-cloud-target-execution-request-contract-extraction/manual/20260314T034531Z-closeout/05-test.log`
+- [x] `npm run docs:check`. Evidence: `out/1173-coordinator-symphony-aligned-orchestrator-cloud-target-execution-request-contract-extraction/manual/20260314T034531Z-closeout/06-docs-check.log`
+- [x] `npm run docs:freshness`. Evidence: `out/1173-coordinator-symphony-aligned-orchestrator-cloud-target-execution-request-contract-extraction/manual/20260314T034531Z-closeout/07-docs-freshness.log`
+- [x] `node scripts/diff-budget.mjs`. Evidence: `out/1173-coordinator-symphony-aligned-orchestrator-cloud-target-execution-request-contract-extraction/manual/20260314T034531Z-closeout/08-diff-budget.log` (stacked-branch override applied)
+- [x] `npm run review`. Evidence: `out/1173-coordinator-symphony-aligned-orchestrator-cloud-target-execution-request-contract-extraction/manual/20260314T034531Z-closeout/09-review.log`
+- [x] `npm run pack:smoke`. Evidence: `out/1173-coordinator-symphony-aligned-orchestrator-cloud-target-execution-request-contract-extraction/manual/20260314T034531Z-closeout/10-pack-smoke.log`
+- [x] Elegance review completed. Evidence: `out/1173-coordinator-symphony-aligned-orchestrator-cloud-target-execution-request-contract-extraction/manual/20260314T034531Z-closeout/12-elegance-review.md`

@@ -1,7 +1,7 @@
 ---
 id: 20260314-1173-coordinator-symphony-aligned-orchestrator-cloud-target-execution-request-contract-extraction
 title: Coordinator Symphony-Aligned Orchestrator Cloud-Target Execution Request Contract Extraction
-status: draft
+status: completed
 owners:
   - Codex
 created: 2026-03-14
@@ -37,3 +37,4 @@ Extract the remaining inline request contract assembled before `CodexCloudTaskEx
 - 2026-03-14: Approved for docs-first registration immediately after `1172`. The next truthful risk is the inline request-contract assembly in `orchestratorCloudTargetExecutor.ts`, not another router/doctor preflight lane. Evidence: `docs/findings/1173-orchestrator-cloud-target-execution-request-contract-extraction-deliberation.md`.
 - 2026-03-14: The initial docs-first `docs:check` hit a real `docs/TASKS.md` line-cap breach (`451/450`). `npm run docs:archive-tasks` found no eligible archive target, so the fix was to fold the `1173` registration note into the current top snapshot line and rerun the deterministic docs guards successfully. Evidence: `out/1173-coordinator-symphony-aligned-orchestrator-cloud-target-execution-request-contract-extraction/manual/20260314T033431Z-docs-first/00-summary.md`.
 - 2026-03-14: docs-review was started manifest-backed, then terminated as an explicit override after it drifted into unrelated helper/review-wrapper files instead of staying on the bounded `1173` docs surface. Evidence: `out/1173-coordinator-symphony-aligned-orchestrator-cloud-target-execution-request-contract-extraction/manual/20260314T033431Z-docs-first/05-docs-review-override.md`.
+- 2026-03-14: Closed repo-side after extracting the same-module `buildCloudTaskExecutorRequest(...)` helper in `orchestratorCloudTargetExecutor.ts`, adding focused request-contract coverage, and validating the lane with delegation guard, spec guard, build, lint, full test (`218/218` files, `1503/1503` tests), focused regressions, docs gates, bounded review, and pack-smoke. Evidence: `out/1173-coordinator-symphony-aligned-orchestrator-cloud-target-execution-request-contract-extraction/manual/20260314T034531Z-closeout/00-summary.md`.
