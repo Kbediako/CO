@@ -20,20 +20,20 @@
 
 ## Completion Shell Extraction
 
-- [ ] One bounded helper inside `orchestratorCloudTargetExecutor.ts` owns the post-executor completion shell. Evidence: `orchestrator/src/cli/services/orchestratorCloudTargetExecutor.ts`, `out/1176-coordinator-symphony-aligned-orchestrator-cloud-target-completion-shell-extraction/manual/<timestamp>-closeout/00-summary.md`
-- [ ] `executeOrchestratorCloudTarget(...)` retains resolution, missing-env handling, request shaping, executor invocation, and return-path control flow. Evidence: `orchestrator/src/cli/services/orchestratorCloudTargetExecutor.ts`, `out/1176-coordinator-symphony-aligned-orchestrator-cloud-target-completion-shell-extraction/manual/<timestamp>-closeout/00-summary.md`
-- [ ] Focused cloud regressions preserve success/failure completion behavior without widening into the broader executor lifecycle. Evidence: `out/1176-coordinator-symphony-aligned-orchestrator-cloud-target-completion-shell-extraction/manual/<timestamp>-closeout/05b-targeted-tests.log`
+- [x] One bounded helper inside `orchestratorCloudTargetExecutor.ts` owns the post-executor completion shell. Evidence: `orchestrator/src/cli/services/orchestratorCloudTargetExecutor.ts`, `out/1176-coordinator-symphony-aligned-orchestrator-cloud-target-completion-shell-extraction/manual/20260314T050712Z-closeout/00-summary.md`
+- [x] `executeOrchestratorCloudTarget(...)` retains resolution, missing-env handling, request shaping, executor invocation, and return-path control flow. Evidence: `orchestrator/src/cli/services/orchestratorCloudTargetExecutor.ts`, `out/1176-coordinator-symphony-aligned-orchestrator-cloud-target-completion-shell-extraction/manual/20260314T050712Z-closeout/00-summary.md`
+- [x] Focused cloud regressions preserve success/failure completion behavior without widening into the broader executor lifecycle. Evidence: `out/1176-coordinator-symphony-aligned-orchestrator-cloud-target-completion-shell-extraction/manual/20260314T050712Z-closeout/05b-targeted-tests.log`
 
 ## Validation + Closeout
 
-- [ ] `node scripts/delegation-guard.mjs`. Evidence: `out/1176-coordinator-symphony-aligned-orchestrator-cloud-target-completion-shell-extraction/manual/<timestamp>-closeout/01-delegation-guard.log`
-- [ ] `node scripts/spec-guard.mjs --dry-run`. Evidence: `out/1176-coordinator-symphony-aligned-orchestrator-cloud-target-completion-shell-extraction/manual/<timestamp>-closeout/02-spec-guard.log`
-- [ ] `npm run build`. Evidence: `out/1176-coordinator-symphony-aligned-orchestrator-cloud-target-completion-shell-extraction/manual/<timestamp>-closeout/03-build.log`
-- [ ] `npm run lint`. Evidence: `out/1176-coordinator-symphony-aligned-orchestrator-cloud-target-completion-shell-extraction/manual/<timestamp>-closeout/04-lint.log`
-- [ ] `npm run test`. Evidence: `out/1176-coordinator-symphony-aligned-orchestrator-cloud-target-completion-shell-extraction/manual/<timestamp>-closeout/05-test.log`
-- [ ] `npm run docs:check`. Evidence: `out/1176-coordinator-symphony-aligned-orchestrator-cloud-target-completion-shell-extraction/manual/<timestamp>-closeout/06-docs-check.log`
-- [ ] `npm run docs:freshness`. Evidence: `out/1176-coordinator-symphony-aligned-orchestrator-cloud-target-completion-shell-extraction/manual/<timestamp>-closeout/07-docs-freshness.log`
-- [ ] `node scripts/diff-budget.mjs`. Evidence: `out/1176-coordinator-symphony-aligned-orchestrator-cloud-target-completion-shell-extraction/manual/<timestamp>-closeout/08-diff-budget.log`
-- [ ] `npm run review`. Evidence: `out/1176-coordinator-symphony-aligned-orchestrator-cloud-target-completion-shell-extraction/manual/<timestamp>-closeout/09-review.log`
-- [ ] `npm run pack:smoke`. Evidence: `out/1176-coordinator-symphony-aligned-orchestrator-cloud-target-completion-shell-extraction/manual/<timestamp>-closeout/10-pack-smoke.log`
-- [ ] Elegance review completed. Evidence: `out/1176-coordinator-symphony-aligned-orchestrator-cloud-target-completion-shell-extraction/manual/<timestamp>-closeout/12-elegance-review.md`
+- [x] `node scripts/delegation-guard.mjs`. Evidence: `out/1176-coordinator-symphony-aligned-orchestrator-cloud-target-completion-shell-extraction/manual/20260314T050712Z-closeout/01-delegation-guard.log`
+- [x] `node scripts/spec-guard.mjs --dry-run`. Evidence: `out/1176-coordinator-symphony-aligned-orchestrator-cloud-target-completion-shell-extraction/manual/20260314T050712Z-closeout/02-spec-guard.log`
+- [x] `npm run build`. Evidence: `out/1176-coordinator-symphony-aligned-orchestrator-cloud-target-completion-shell-extraction/manual/20260314T050712Z-closeout/03-build.log`
+- [x] `npm run lint`. Evidence: `out/1176-coordinator-symphony-aligned-orchestrator-cloud-target-completion-shell-extraction/manual/20260314T050712Z-closeout/04-lint.log`
+- [x] `npm run test`. Evidence: `out/1176-coordinator-symphony-aligned-orchestrator-cloud-target-completion-shell-extraction/manual/20260314T050712Z-closeout/05-test.log`
+- [x] `npm run docs:check`. Evidence: `out/1176-coordinator-symphony-aligned-orchestrator-cloud-target-completion-shell-extraction/manual/20260314T050712Z-closeout/06-docs-check.log`
+- [x] `npm run docs:freshness`. Evidence: `out/1176-coordinator-symphony-aligned-orchestrator-cloud-target-completion-shell-extraction/manual/20260314T050712Z-closeout/07-docs-freshness.log`
+- [x] `node scripts/diff-budget.mjs`. Evidence: `out/1176-coordinator-symphony-aligned-orchestrator-cloud-target-completion-shell-extraction/manual/20260314T050712Z-closeout/08-diff-budget.log`, `out/1176-coordinator-symphony-aligned-orchestrator-cloud-target-completion-shell-extraction/manual/20260314T050712Z-closeout/13-override-notes.md`
+- [x] `npm run review`. Evidence: `out/1176-coordinator-symphony-aligned-orchestrator-cloud-target-completion-shell-extraction/manual/20260314T050712Z-closeout/09-review.log`, `out/1176-coordinator-symphony-aligned-orchestrator-cloud-target-completion-shell-extraction/manual/20260314T050712Z-closeout/13-override-notes.md`
+- [x] `npm run pack:smoke`. Evidence: `out/1176-coordinator-symphony-aligned-orchestrator-cloud-target-completion-shell-extraction/manual/20260314T050712Z-closeout/10-pack-smoke.log`
+- [x] Elegance review completed. Evidence: `out/1176-coordinator-symphony-aligned-orchestrator-cloud-target-completion-shell-extraction/manual/20260314T050712Z-closeout/12-elegance-review.md`
