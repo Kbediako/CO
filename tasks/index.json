@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260314-1180-coordinator-symphony-aligned-orchestrator-execution-route-state-assembly-extraction",
+      "title": "Coordinator Symphony-Aligned Orchestrator Execution Route State Assembly Extraction",
+      "relates_to": "tasks/tasks-1180-coordinator-symphony-aligned-orchestrator-execution-route-state-assembly-extraction.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-14",
+      "paths": {
+        "spec": "tasks/specs/1180-coordinator-symphony-aligned-orchestrator-execution-route-state-assembly-extraction.md",
+        "task": "tasks/tasks-1180-coordinator-symphony-aligned-orchestrator-execution-route-state-assembly-extraction.md",
+        "agent_task": ".agent/task/1180-coordinator-symphony-aligned-orchestrator-execution-route-state-assembly-extraction.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-execution-route-state-assembly-extraction.md"
+      }
+    },
+    {
       "id": "20260314-1179-coordinator-symphony-aligned-orchestrator-local-execution-lifecycle-shell-extraction",
       "title": "Coordinator Symphony-Aligned Orchestrator Local Execution Lifecycle Shell Extraction",
       "relates_to": "tasks/tasks-1179-coordinator-symphony-aligned-orchestrator-local-execution-lifecycle-shell-extraction.md",
