@@ -18,7 +18,11 @@ import {
 } from './utils/codexCli.js';
 import { resolveCodexHome } from './utils/codexPaths.js';
 import { resolveOptionalDependency, type OptionalResolutionSource } from './utils/optionalDeps.js';
-import { runCloudPreflight, type CloudPreflightIssue } from './utils/cloudPreflight.js';
+import {
+  buildCloudPreflightRequest,
+  runCloudPreflight,
+  type CloudPreflightIssue
+} from './utils/cloudPreflight.js';
 import {
   BASELINE_AGENTS,
   BASELINE_MODEL,
@@ -319,7 +323,6 @@ export async function runDoctorCloudPreflight(options: {
   const configuredRoot = normalizeOptionalString(env.CODEX_ORCHESTRATOR_ROOT);
   const rootHint = configuredRoot ? resolve(cwd, configuredRoot) : cwd;
   const repoRoot = resolveDoctorRepoRoot(rootHint);
-  const codexBin = resolveCodexCliBin(env);
   const taskId =
     normalizeOptionalString(options.taskId)
     ?? normalizeOptionalString(env.MCP_RUNNER_TASK_ID)
@@ -347,15 +350,14 @@ export async function runDoctorCloudPreflight(options: {
     ?? planMetadataEnvironmentId
     ?? normalizeOptionalString(env.CODEX_CLOUD_ENV_ID)
     ?? resolveTaskMetadataCloudEnvironmentId(repoRoot, taskId);
-  const branch = normalizeOptionalBranch(options.branch) ?? normalizeOptionalBranch(env.CODEX_CLOUD_BRANCH);
+  const branch = normalizeOptionalString(options.branch);
 
-  const preflight = await runCloudPreflight({
+  const preflight = await runCloudPreflight(buildCloudPreflightRequest({
     repoRoot,
-    codexBin,
     environmentId,
     branch,
     env
-  });
+  }));
   const issues = planMetadataIssue ? [planMetadataIssue, ...preflight.issues] : preflight.issues;
   const guidance = buildCloudPreflightGuidance(issues);
 
@@ -678,11 +680,6 @@ function normalizeOptionalString(value: string | null | undefined): string | nul
   }
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : null;
-}
-
-function normalizeOptionalBranch(value: string | null | undefined): string | null {
-  const normalized = normalizeOptionalString(value);
-  return normalized ? normalized.replace(/^refs\/heads\//u, '') : null;
 }
 
 function resolveCloudFallbackPolicy(env: NodeJS.ProcessEnv = process.env): 'allow' | 'deny' {

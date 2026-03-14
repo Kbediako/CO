@@ -1,7 +1,7 @@
 import { chmod, mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
   formatDoctorCloudPreflightSummary,
@@ -9,6 +9,7 @@ import {
   runDoctor,
   runDoctorCloudPreflight
 } from '../src/cli/doctor.js';
+import * as cloudPreflight from '../src/cli/utils/cloudPreflight.js';
 
 async function writeFakeCodexBinary(dir: string, featureLine: string): Promise<string> {
   const binPath = join(dir, 'codex');
@@ -701,6 +702,83 @@ describe('runDoctor', () => {
       expect(result.details.environment_id).toBe('env_stage_meta');
       expect(result.issues).toHaveLength(0);
     } finally {
+      await rm(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it('passes the shared cloud-preflight request contract while preserving doctor precedence', async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), 'doctor-cloud-preflight-shared-contract-'));
+    await writeFile(
+      join(tempDir, 'codex.orchestrator.json'),
+      JSON.stringify(
+        {
+          defaultPipeline: 'diagnostics',
+          pipelines: [
+            {
+              id: 'diagnostics',
+              title: 'Diagnostics',
+              guardrailsRequired: false,
+              stages: [
+                {
+                  kind: 'command',
+                  id: 'review',
+                  title: 'Review',
+                  command: 'echo review',
+                  plan: { cloudEnvId: 'env_stage_meta' }
+                }
+              ]
+            }
+          ]
+        },
+        null,
+        2
+      ),
+      'utf8'
+    );
+    const fakeCodexBin = await writeFakeCodexBinary(tempDir, 'multi_agent experimental true');
+    const runCloudPreflightSpy = vi
+      .spyOn(cloudPreflight, 'runCloudPreflight')
+      .mockImplementation(async (request) => ({
+        ok: true,
+        issues: [],
+        details: {
+          codexBin: request.codexBin,
+          environmentId: request.environmentId,
+          branch: typeof request.branch === 'string' ? request.branch.replace(/^refs\/heads\//u, '') : null
+        }
+      }));
+
+    try {
+      const result = await runDoctorCloudPreflight({
+        cwd: tempDir,
+        branch: ' refs/heads/option-branch ',
+        env: {
+          ...process.env,
+          CODEX_CLI_BIN: fakeCodexBin,
+          CODEX_CLOUD_ENV_ID: 'env_from_env',
+          CODEX_CLOUD_BRANCH: 'refs/heads/env-branch'
+        }
+      });
+
+      expect(runCloudPreflightSpy).toHaveBeenCalledOnce();
+      const [request] = runCloudPreflightSpy.mock.calls[0] ?? [];
+      expect(request).toBeDefined();
+      expect(request?.repoRoot).toBe(tempDir);
+      expect(request?.codexBin).toBe(fakeCodexBin);
+      expect(request?.environmentId).toBe('env_stage_meta');
+      expect(request?.branch).toBe('refs/heads/option-branch');
+      expect(request?.env).toEqual(
+        expect.objectContaining({
+          CODEX_CLI_BIN: fakeCodexBin,
+          CODEX_CLOUD_ENV_ID: 'env_from_env',
+          CODEX_CLOUD_BRANCH: 'refs/heads/env-branch'
+        })
+      );
+      expect(result.ok).toBe(true);
+      expect(result.details.environment_id).toBe('env_stage_meta');
+      expect(result.details.branch).toBe('option-branch');
+    } finally {
+      runCloudPreflightSpy.mockRestore();
       await rm(tempDir, { recursive: true, force: true });
     }
   });

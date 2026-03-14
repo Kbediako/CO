@@ -17,8 +17,7 @@ import type {
   PipelineExecutionResult,
   PipelineRunExecutionResult
 } from '../types.js';
-import { resolveCodexCliBin } from '../utils/codexCli.js';
-import { runCloudPreflight } from '../utils/cloudPreflight.js';
+import { buildCloudPreflightRequest, runCloudPreflight } from '../utils/cloudPreflight.js';
 import type { AdvancedAutopilotDecision } from '../utils/advancedAutopilot.js';
 import { isoTimestamp } from '../utils/time.js';
 import { resolveCloudEnvironmentId } from './orchestratorCloudTargetExecutor.js';
@@ -222,7 +221,7 @@ function buildCloudPreflightFailureContract(
   };
 }
 
-function buildCloudPreflightRequest(
+function buildExecutionRouteCloudPreflightRequest(
   options: OrchestratorExecutionRouteOptions,
   state: OrchestratorExecutionRouteState
 ): Parameters<typeof runCloudPreflight>[0] {
@@ -230,22 +229,19 @@ function buildCloudPreflightRequest(
   const branch =
     readCloudString(state.effectiveEnvOverrides.CODEX_CLOUD_BRANCH) ??
     readCloudString(process.env.CODEX_CLOUD_BRANCH);
-  const codexBin = resolveCodexCliBin(state.effectiveMergedEnv);
-
-  return {
+  return buildCloudPreflightRequest({
     repoRoot: options.env.repoRoot,
-    codexBin,
     environmentId,
     branch,
     env: state.effectiveMergedEnv
-  };
+  });
 }
 
 async function executeCloudRoute(
   options: OrchestratorExecutionRouteOptions,
   state: OrchestratorExecutionRouteState
 ): Promise<PipelineRunExecutionResult> {
-  const preflight = await runCloudPreflight(buildCloudPreflightRequest(options, state));
+  const preflight = await runCloudPreflight(buildExecutionRouteCloudPreflightRequest(options, state));
 
   if (!preflight.ok) {
     const contract = buildCloudPreflightFailureContract(state, preflight.issues);
