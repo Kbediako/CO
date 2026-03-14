@@ -8,12 +8,12 @@
 
 ## Implementation
 
-- [ ] Extract the private cloud execution lifecycle shell from `orchestrator.ts`.
-- [ ] Keep `executeCloudPipeline(...)` as the thin delegate over the extracted helper.
-- [ ] Preserve failure-detail forwarding, env merge behavior, note ordering, and lifecycle passthrough semantics in focused regressions.
+- [x] Extract the private cloud execution lifecycle shell from `orchestrator.ts`.
+- [x] Wire the route-adapter cloud callback directly to the extracted helper and remove the interim single-use trampoline during the elegance pass.
+- [x] Preserve failure-detail forwarding, env merge behavior, note ordering, and lifecycle passthrough semantics in focused regressions.
 
 ## Closeout
 
-- [ ] Run the standard gate bundle and capture closeout artifacts under `out/1191-coordinator-symphony-aligned-orchestrator-cloud-execution-lifecycle-shell-extraction/manual/<timestamp>-closeout/`.
-- [ ] Run an explicit elegance review.
-- [ ] Record the next truthful seam after `1191`.
+- [x] Run the standard gate bundle and capture closeout artifacts under `out/1191-coordinator-symphony-aligned-orchestrator-cloud-execution-lifecycle-shell-extraction/manual/20260314T134333Z-closeout/`.
+- [x] Run an explicit elegance review.
+- [x] Record the next truthful seam after `1191`.

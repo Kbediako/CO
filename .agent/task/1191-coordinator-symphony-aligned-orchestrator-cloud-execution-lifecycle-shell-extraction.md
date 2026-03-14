@@ -20,20 +20,20 @@
 
 ## Cloud Execution Lifecycle Shell Extraction
 
-- [ ] `executeCloudPipeline(...)` no longer owns the private cloud execution lifecycle shell. Evidence: `orchestrator/src/cli/orchestrator.ts`, `out/1191-coordinator-symphony-aligned-orchestrator-cloud-execution-lifecycle-shell-extraction/manual/<timestamp>-closeout/00-summary.md`
-- [ ] `runCloudExecutionLifecycleShell(...)` moves into a bounded service helper without changing failure-detail, note-ordering, or passthrough behavior. Evidence: `orchestrator/src/cli/services/`, `out/1191-coordinator-symphony-aligned-orchestrator-cloud-execution-lifecycle-shell-extraction/manual/<timestamp>-closeout/00-summary.md`
-- [ ] Focused regressions preserve failure-detail forwarding, env merge behavior, note ordering, and lifecycle passthrough semantics. Evidence: `orchestrator/tests/OrchestratorCloudExecutionLifecycleShell.test.ts`, `out/1191-coordinator-symphony-aligned-orchestrator-cloud-execution-lifecycle-shell-extraction/manual/<timestamp>-closeout/05b-targeted-tests.log`
+- [x] No private cloud execution lifecycle shell remains in `orchestrator.ts`; `executePipeline(...)` now wires the extracted helper directly. Evidence: `orchestrator/src/cli/orchestrator.ts`, `out/1191-coordinator-symphony-aligned-orchestrator-cloud-execution-lifecycle-shell-extraction/manual/20260314T134333Z-closeout/00-summary.md`
+- [x] `runOrchestratorCloudExecutionLifecycleShell(...)` owns the bounded failure-detail, note-ordering, and passthrough contract in the new helper. Evidence: `orchestrator/src/cli/services/orchestratorCloudExecutionLifecycleShell.ts`, `out/1191-coordinator-symphony-aligned-orchestrator-cloud-execution-lifecycle-shell-extraction/manual/20260314T134333Z-closeout/00-summary.md`
+- [x] Focused regressions preserve failure-detail forwarding, env merge behavior, note ordering, and lifecycle passthrough semantics. Evidence: `orchestrator/tests/OrchestratorCloudExecutionLifecycleShell.test.ts`, `out/1191-coordinator-symphony-aligned-orchestrator-cloud-execution-lifecycle-shell-extraction/manual/20260314T134333Z-closeout/05b-targeted-tests.log`
 
 ## Validation + Closeout
 
-- [ ] `node scripts/delegation-guard.mjs`. Evidence: `out/1191-coordinator-symphony-aligned-orchestrator-cloud-execution-lifecycle-shell-extraction/manual/<timestamp>-closeout/01-delegation-guard.log`
-- [ ] `node scripts/spec-guard.mjs --dry-run`. Evidence: `out/1191-coordinator-symphony-aligned-orchestrator-cloud-execution-lifecycle-shell-extraction/manual/<timestamp>-closeout/02-spec-guard.log`
-- [ ] `npm run build`. Evidence: `out/1191-coordinator-symphony-aligned-orchestrator-cloud-execution-lifecycle-shell-extraction/manual/<timestamp>-closeout/03-build.log`
-- [ ] `npm run lint`. Evidence: `out/1191-coordinator-symphony-aligned-orchestrator-cloud-execution-lifecycle-shell-extraction/manual/<timestamp>-closeout/04-lint.log`
-- [ ] `npm run test`. Evidence: `out/1191-coordinator-symphony-aligned-orchestrator-cloud-execution-lifecycle-shell-extraction/manual/<timestamp>-closeout/05-test.log`
-- [ ] `npm run docs:check`. Evidence: `out/1191-coordinator-symphony-aligned-orchestrator-cloud-execution-lifecycle-shell-extraction/manual/<timestamp>-closeout/06-docs-check.log`
-- [ ] `npm run docs:freshness`. Evidence: `out/1191-coordinator-symphony-aligned-orchestrator-cloud-execution-lifecycle-shell-extraction/manual/<timestamp>-closeout/07-docs-freshness.log`
-- [ ] `node scripts/diff-budget.mjs`. Evidence: `out/1191-coordinator-symphony-aligned-orchestrator-cloud-execution-lifecycle-shell-extraction/manual/<timestamp>-closeout/08-diff-budget.log`
-- [ ] `npm run review`. Evidence: `out/1191-coordinator-symphony-aligned-orchestrator-cloud-execution-lifecycle-shell-extraction/manual/<timestamp>-closeout/09-review.log`
-- [ ] `npm run pack:smoke`. Evidence: `out/1191-coordinator-symphony-aligned-orchestrator-cloud-execution-lifecycle-shell-extraction/manual/<timestamp>-closeout/10-pack-smoke.log`
-- [ ] Elegance review completed. Evidence: `out/1191-coordinator-symphony-aligned-orchestrator-cloud-execution-lifecycle-shell-extraction/manual/<timestamp>-closeout/12-elegance-review.md`
+- [x] `node scripts/delegation-guard.mjs`. Evidence: `out/1191-coordinator-symphony-aligned-orchestrator-cloud-execution-lifecycle-shell-extraction/manual/20260314T134333Z-closeout/01-delegation-guard.log`
+- [x] `node scripts/spec-guard.mjs --dry-run`. Evidence: `out/1191-coordinator-symphony-aligned-orchestrator-cloud-execution-lifecycle-shell-extraction/manual/20260314T134333Z-closeout/02-spec-guard.log`
+- [x] `npm run build`. Evidence: `out/1191-coordinator-symphony-aligned-orchestrator-cloud-execution-lifecycle-shell-extraction/manual/20260314T134333Z-closeout/03-build.log`
+- [x] `npm run lint`. Evidence: `out/1191-coordinator-symphony-aligned-orchestrator-cloud-execution-lifecycle-shell-extraction/manual/20260314T134333Z-closeout/04-lint.log`
+- [x] `npm run test`. Evidence: `out/1191-coordinator-symphony-aligned-orchestrator-cloud-execution-lifecycle-shell-extraction/manual/20260314T134333Z-closeout/05-test.log`, `out/1191-coordinator-symphony-aligned-orchestrator-cloud-execution-lifecycle-shell-extraction/manual/20260314T134333Z-closeout/13-override-notes.md`
+- [x] `npm run docs:check`. Evidence: `out/1191-coordinator-symphony-aligned-orchestrator-cloud-execution-lifecycle-shell-extraction/manual/20260314T134333Z-closeout/06-docs-check.log`
+- [x] `npm run docs:freshness`. Evidence: `out/1191-coordinator-symphony-aligned-orchestrator-cloud-execution-lifecycle-shell-extraction/manual/20260314T134333Z-closeout/07-docs-freshness.log`
+- [x] `node scripts/diff-budget.mjs`. Evidence: `out/1191-coordinator-symphony-aligned-orchestrator-cloud-execution-lifecycle-shell-extraction/manual/20260314T134333Z-closeout/08-diff-budget.log`
+- [x] `npm run review`. Evidence: `out/1191-coordinator-symphony-aligned-orchestrator-cloud-execution-lifecycle-shell-extraction/manual/20260314T134333Z-closeout/09-review.log`, `out/1191-coordinator-symphony-aligned-orchestrator-cloud-execution-lifecycle-shell-extraction/manual/20260314T134333Z-closeout/13-override-notes.md`
+- [x] `npm run pack:smoke`. Evidence: `out/1191-coordinator-symphony-aligned-orchestrator-cloud-execution-lifecycle-shell-extraction/manual/20260314T134333Z-closeout/10-pack-smoke.log`
+- [x] Elegance review completed. Evidence: `out/1191-coordinator-symphony-aligned-orchestrator-cloud-execution-lifecycle-shell-extraction/manual/20260314T134333Z-closeout/12-elegance-review.md`
