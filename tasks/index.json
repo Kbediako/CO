@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260314-1187-coordinator-symphony-aligned-orchestrator-plan-target-tracker-shell-extraction",
+      "title": "Coordinator Symphony-Aligned Orchestrator Plan-Target Tracker Shell Extraction",
+      "relates_to": "tasks/tasks-1187-coordinator-symphony-aligned-orchestrator-plan-target-tracker-shell-extraction.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-14",
+      "paths": {
+        "spec": "tasks/specs/1187-coordinator-symphony-aligned-orchestrator-plan-target-tracker-shell-extraction.md",
+        "task": "tasks/tasks-1187-coordinator-symphony-aligned-orchestrator-plan-target-tracker-shell-extraction.md",
+        "agent_task": ".agent/task/1187-coordinator-symphony-aligned-orchestrator-plan-target-tracker-shell-extraction.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-plan-target-tracker-shell-extraction.md"
+      }
+    },
+    {
       "id": "20260314-1186-coordinator-symphony-aligned-orchestrator-execution-route-adapter-shell-extraction",
       "title": "Coordinator Symphony-Aligned Orchestrator Execution Route Adapter Shell Extraction",
       "relates_to": "tasks/tasks-1186-coordinator-symphony-aligned-orchestrator-execution-route-adapter-shell-extraction.md",
