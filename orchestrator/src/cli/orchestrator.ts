@@ -66,6 +66,7 @@ import {
 import { completeOrchestratorRunLifecycle } from './services/orchestratorRunLifecycleCompletion.js';
 import { createOrchestratorRunLifecycleExecutionRegistration } from './services/orchestratorRunLifecycleExecutionRegistration.js';
 import { recordOrchestratorAutoScoutEvidence } from './services/orchestratorAutoScoutEvidenceRecorder.js';
+import { attachOrchestratorPlanTargetTracker } from './services/orchestratorPlanTargetTracker.js';
 import {
   createOrchestratorTaskManager,
   executeOrchestratorPipelineWithRouteAdapter,
@@ -626,18 +627,7 @@ export class CodexOrchestrator {
     paths: RunPaths,
     persister?: ManifestPersister
   ): void {
-    manager.bus.on('plan:completed', (event) => {
-      const targetId = event.payload.plan.targetId ?? null;
-      if (manifest.plan_target_id === targetId) {
-        return;
-      }
-      manifest.plan_target_id = targetId;
-      void persistManifest(paths, manifest, persister, { force: true }).catch((error) => {
-        logger.warn(
-          `Failed to persist plan target for run ${manifest.run_id}: ${(error as Error)?.message ?? String(error)}`
-        );
-      });
-    });
+    attachOrchestratorPlanTargetTracker({ manager, manifest, paths, persister });
   }
 
   private applyRequestedRuntimeMode(manifest: CliManifest, mode: RuntimeMode): void {
