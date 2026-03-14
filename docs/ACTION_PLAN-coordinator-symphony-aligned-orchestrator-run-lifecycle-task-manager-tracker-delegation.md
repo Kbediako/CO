@@ -8,12 +8,12 @@
 
 ## Implementation
 
-- [ ] Remove the local `attachPlanTargetTracker(...)` wrapper from `orchestrator.ts`.
-- [ ] Delegate directly to `attachOrchestratorPlanTargetTracker(...)` from `createRunLifecycleTaskManager(...)`.
-- [ ] Keep focused regressions on attach-after-success and no-attach-on-manager-failure behavior.
+- [x] Remove the local `attachPlanTargetTracker(...)` wrapper from `orchestrator.ts`. Evidence: `orchestrator/src/cli/orchestrator.ts`, `out/1188-coordinator-symphony-aligned-orchestrator-run-lifecycle-task-manager-tracker-delegation/manual/20260314T122020Z-closeout/00-summary.md`
+- [x] Delegate directly to `attachOrchestratorPlanTargetTracker(...)` from `createRunLifecycleTaskManager(...)`. Evidence: `orchestrator/src/cli/orchestrator.ts`, `out/1188-coordinator-symphony-aligned-orchestrator-run-lifecycle-task-manager-tracker-delegation/manual/20260314T122020Z-closeout/00-summary.md`
+- [x] Keep focused regressions on attach-after-success and no-attach-on-manager-failure behavior. Evidence: `orchestrator/tests/OrchestratorRunLifecycleTaskManagerRegistration.test.ts`, `out/1188-coordinator-symphony-aligned-orchestrator-run-lifecycle-task-manager-tracker-delegation/manual/20260314T122020Z-closeout/05b-targeted-tests.log`
 
 ## Closeout
 
-- [ ] Run the standard gate bundle and capture closeout artifacts under `out/1188-coordinator-symphony-aligned-orchestrator-run-lifecycle-task-manager-tracker-delegation/manual/<timestamp>-closeout/`.
-- [ ] Run an explicit elegance review.
-- [ ] Record the next truthful seam after `1188`.
+- [x] Run the standard gate bundle and capture closeout artifacts under `out/1188-coordinator-symphony-aligned-orchestrator-run-lifecycle-task-manager-tracker-delegation/manual/<timestamp>-closeout/`. Evidence: `out/1188-coordinator-symphony-aligned-orchestrator-run-lifecycle-task-manager-tracker-delegation/manual/20260314T122020Z-closeout/00-summary.md`
+- [x] Run an explicit elegance review. Evidence: `out/1188-coordinator-symphony-aligned-orchestrator-run-lifecycle-task-manager-tracker-delegation/manual/20260314T122020Z-closeout/12-elegance-review.md`
+- [x] Record the next truthful seam after `1188`. Evidence: `out/1188-coordinator-symphony-aligned-orchestrator-run-lifecycle-task-manager-tracker-delegation/manual/20260314T122020Z-closeout/14-next-slice-note.md`
