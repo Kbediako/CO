@@ -8,7 +8,7 @@ import type { RunPaths } from '../run/runPaths.js';
 import type { CliManifest, PipelineDefinition, PromptPackManifestEntry } from '../types.js';
 import { isoTimestamp } from '../utils/time.js';
 import { resolveCodexCliBin } from '../utils/codexCli.js';
-import { CodexCloudTaskExecutor } from '../../cloud/CodexCloudTaskExecutor.js';
+import { CodexCloudTaskExecutor, type CloudTaskExecutorInput } from '../../cloud/CodexCloudTaskExecutor.js';
 
 const DEFAULT_CLOUD_POLL_INTERVAL_SECONDS = 10;
 const DEFAULT_CLOUD_TIMEOUT_SECONDS = 1800;
@@ -273,6 +273,82 @@ export function buildCloudPrompt(params: {
   return lines.join('\n');
 }
 
+function buildCloudTaskExecutorRequest(params: {
+  env: Pick<EnvironmentPaths, 'repoRoot'>;
+  runDir: string;
+  task: TaskContext;
+  target: PlanItem;
+  pipeline: PipelineDefinition;
+  stage: PipelineDefinition['stages'][number];
+  manifest: CloudPromptManifest;
+  environmentId: string;
+  envOverrides?: NodeJS.ProcessEnv;
+}): Omit<CloudTaskExecutorInput, 'onUpdate'> {
+  const prompt = buildCloudPrompt({
+    task: params.task,
+    target: params.target,
+    pipeline: params.pipeline,
+    stage: params.stage,
+    manifest: params.manifest
+  });
+  const pollIntervalSeconds = readCloudNumber(
+    params.envOverrides?.CODEX_CLOUD_POLL_INTERVAL_SECONDS ?? process.env.CODEX_CLOUD_POLL_INTERVAL_SECONDS,
+    DEFAULT_CLOUD_POLL_INTERVAL_SECONDS
+  );
+  const timeoutSeconds = readCloudNumber(
+    params.envOverrides?.CODEX_CLOUD_TIMEOUT_SECONDS ?? process.env.CODEX_CLOUD_TIMEOUT_SECONDS,
+    DEFAULT_CLOUD_TIMEOUT_SECONDS
+  );
+  const attempts = readCloudNumber(
+    params.envOverrides?.CODEX_CLOUD_EXEC_ATTEMPTS ?? process.env.CODEX_CLOUD_EXEC_ATTEMPTS,
+    DEFAULT_CLOUD_ATTEMPTS
+  );
+  const statusRetryLimit = readCloudNumber(
+    params.envOverrides?.CODEX_CLOUD_STATUS_RETRY_LIMIT ?? process.env.CODEX_CLOUD_STATUS_RETRY_LIMIT,
+    DEFAULT_CLOUD_STATUS_RETRY_LIMIT
+  );
+  const statusRetryBackoffMs = readCloudNumber(
+    params.envOverrides?.CODEX_CLOUD_STATUS_RETRY_BACKOFF_MS ?? process.env.CODEX_CLOUD_STATUS_RETRY_BACKOFF_MS,
+    DEFAULT_CLOUD_STATUS_RETRY_BACKOFF_MS
+  );
+  const branch =
+    readCloudString(params.envOverrides?.CODEX_CLOUD_BRANCH) ?? readCloudString(process.env.CODEX_CLOUD_BRANCH);
+  const enableFeatures = readCloudFeatureList(
+    readCloudString(params.envOverrides?.CODEX_CLOUD_ENABLE_FEATURES) ??
+      readCloudString(process.env.CODEX_CLOUD_ENABLE_FEATURES)
+  );
+  const disableFeatures = readCloudFeatureList(
+    readCloudString(params.envOverrides?.CODEX_CLOUD_DISABLE_FEATURES) ??
+      readCloudString(process.env.CODEX_CLOUD_DISABLE_FEATURES)
+  );
+  const codexBin = resolveCodexCliBin({ ...process.env, ...(params.envOverrides ?? {}) });
+  const cloudEnvOverrides: NodeJS.ProcessEnv = {
+    ...(params.envOverrides ?? {}),
+    CODEX_NON_INTERACTIVE:
+      params.envOverrides?.CODEX_NON_INTERACTIVE ?? process.env.CODEX_NON_INTERACTIVE ?? '1',
+    CODEX_NO_INTERACTIVE:
+      params.envOverrides?.CODEX_NO_INTERACTIVE ?? process.env.CODEX_NO_INTERACTIVE ?? '1',
+    CODEX_INTERACTIVE: params.envOverrides?.CODEX_INTERACTIVE ?? process.env.CODEX_INTERACTIVE ?? '0'
+  };
+
+  return {
+    codexBin,
+    prompt,
+    environmentId: params.environmentId,
+    repoRoot: params.env.repoRoot,
+    runDir: params.runDir,
+    pollIntervalSeconds,
+    timeoutSeconds,
+    attempts,
+    statusRetryLimit,
+    statusRetryBackoffMs,
+    branch,
+    enableFeatures,
+    disableFeatures,
+    env: cloudEnvOverrides
+  };
+}
+
 export async function executeOrchestratorCloudTarget(
   options: CloudTargetExecutorOptions
 ): Promise<{ success: boolean; notes: string[] }> {
@@ -356,69 +432,20 @@ export async function executeOrchestratorCloudTarget(
     logPath: targetEntry.log_path,
     status: targetEntry.status
   });
-
-  const prompt = buildCloudPrompt({
+  const request = buildCloudTaskExecutorRequest({
+    env: options.env,
+    runDir: options.paths.runDir,
     task,
     target,
     pipeline,
     stage: targetStage,
-    manifest
+    manifest,
+    environmentId,
+    envOverrides: options.envOverrides
   });
-  const pollIntervalSeconds = readCloudNumber(
-    options.envOverrides?.CODEX_CLOUD_POLL_INTERVAL_SECONDS ?? process.env.CODEX_CLOUD_POLL_INTERVAL_SECONDS,
-    DEFAULT_CLOUD_POLL_INTERVAL_SECONDS
-  );
-  const timeoutSeconds = readCloudNumber(
-    options.envOverrides?.CODEX_CLOUD_TIMEOUT_SECONDS ?? process.env.CODEX_CLOUD_TIMEOUT_SECONDS,
-    DEFAULT_CLOUD_TIMEOUT_SECONDS
-  );
-  const attempts = readCloudNumber(
-    options.envOverrides?.CODEX_CLOUD_EXEC_ATTEMPTS ?? process.env.CODEX_CLOUD_EXEC_ATTEMPTS,
-    DEFAULT_CLOUD_ATTEMPTS
-  );
-  const statusRetryLimit = readCloudNumber(
-    options.envOverrides?.CODEX_CLOUD_STATUS_RETRY_LIMIT ?? process.env.CODEX_CLOUD_STATUS_RETRY_LIMIT,
-    DEFAULT_CLOUD_STATUS_RETRY_LIMIT
-  );
-  const statusRetryBackoffMs = readCloudNumber(
-    options.envOverrides?.CODEX_CLOUD_STATUS_RETRY_BACKOFF_MS ?? process.env.CODEX_CLOUD_STATUS_RETRY_BACKOFF_MS,
-    DEFAULT_CLOUD_STATUS_RETRY_BACKOFF_MS
-  );
-  const branch =
-    readCloudString(options.envOverrides?.CODEX_CLOUD_BRANCH) ?? readCloudString(process.env.CODEX_CLOUD_BRANCH);
-  const enableFeatures = readCloudFeatureList(
-    readCloudString(options.envOverrides?.CODEX_CLOUD_ENABLE_FEATURES) ??
-      readCloudString(process.env.CODEX_CLOUD_ENABLE_FEATURES)
-  );
-  const disableFeatures = readCloudFeatureList(
-    readCloudString(options.envOverrides?.CODEX_CLOUD_DISABLE_FEATURES) ??
-      readCloudString(process.env.CODEX_CLOUD_DISABLE_FEATURES)
-  );
-  const codexBin = resolveCodexCliBin({ ...process.env, ...(options.envOverrides ?? {}) });
-  const cloudEnvOverrides: NodeJS.ProcessEnv = {
-    ...(options.envOverrides ?? {}),
-    CODEX_NON_INTERACTIVE: options.envOverrides?.CODEX_NON_INTERACTIVE ?? process.env.CODEX_NON_INTERACTIVE ?? '1',
-    CODEX_NO_INTERACTIVE:
-      options.envOverrides?.CODEX_NO_INTERACTIVE ?? process.env.CODEX_NO_INTERACTIVE ?? '1',
-    CODEX_INTERACTIVE: options.envOverrides?.CODEX_INTERACTIVE ?? process.env.CODEX_INTERACTIVE ?? '0'
-  };
-
   const executor = new CodexCloudTaskExecutor();
   const cloudResult = await executor.execute({
-    codexBin,
-    prompt,
-    environmentId,
-    repoRoot: options.env.repoRoot,
-    runDir: options.paths.runDir,
-    pollIntervalSeconds,
-    timeoutSeconds,
-    attempts,
-    statusRetryLimit,
-    statusRetryBackoffMs,
-    branch,
-    enableFeatures,
-    disableFeatures,
-    env: cloudEnvOverrides,
+    ...request,
     onUpdate: async (cloudExecution) => {
       manifest.cloud_execution = cloudExecution;
       targetEntry.log_path = cloudExecution.log_path;
