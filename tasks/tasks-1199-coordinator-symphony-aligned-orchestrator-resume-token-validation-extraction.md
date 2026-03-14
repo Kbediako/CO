@@ -20,20 +20,20 @@
 
 ## Implementation
 
-- [ ] One bounded helper owns the real resume-token validation behavior. Evidence: `orchestrator/src/cli/services/`, `out/1199-coordinator-symphony-aligned-orchestrator-resume-token-validation-extraction/manual/<timestamp>-closeout/00-summary.md`
-- [ ] `orchestrator.ts` no longer directly owns `validateResumeToken(...)`. Evidence: `orchestrator/src/cli/orchestrator.ts`, `out/1199-coordinator-symphony-aligned-orchestrator-resume-token-validation-extraction/manual/<timestamp>-closeout/00-summary.md`
-- [ ] Focused regressions preserve successful validation, missing-token rejection, and mismatch rejection semantics. Evidence: `orchestrator/tests/`, `out/1199-coordinator-symphony-aligned-orchestrator-resume-token-validation-extraction/manual/<timestamp>-closeout/05b-targeted-tests.log`
+- [x] One bounded helper owns the real resume-token validation behavior. Evidence: `orchestrator/src/cli/services/orchestratorResumeTokenValidation.ts`, `out/1199-coordinator-symphony-aligned-orchestrator-resume-token-validation-extraction/manual/20260314T221044Z-closeout/00-summary.md`
+- [x] `orchestrator.ts` no longer directly owns `validateResumeToken(...)`. Evidence: `orchestrator/src/cli/orchestrator.ts`, `out/1199-coordinator-symphony-aligned-orchestrator-resume-token-validation-extraction/manual/20260314T221044Z-closeout/00-summary.md`
+- [x] Focused regressions preserve successful validation, missing-token rejection, and mismatch rejection semantics. Evidence: `orchestrator/tests/OrchestratorResumeTokenValidation.test.ts`, `out/1199-coordinator-symphony-aligned-orchestrator-resume-token-validation-extraction/manual/20260314T221044Z-closeout/05b-targeted-tests.log`
 
 ## Validation & Closeout
 
-- [ ] `node scripts/delegation-guard.mjs`. Evidence: `out/1199-coordinator-symphony-aligned-orchestrator-resume-token-validation-extraction/manual/<timestamp>-closeout/01-delegation-guard.log`
-- [ ] `node scripts/spec-guard.mjs --dry-run`. Evidence: `out/1199-coordinator-symphony-aligned-orchestrator-resume-token-validation-extraction/manual/<timestamp>-closeout/02-spec-guard.log`
-- [ ] `npm run build`. Evidence: `out/1199-coordinator-symphony-aligned-orchestrator-resume-token-validation-extraction/manual/<timestamp>-closeout/03-build.log`
-- [ ] `npm run lint`. Evidence: `out/1199-coordinator-symphony-aligned-orchestrator-resume-token-validation-extraction/manual/<timestamp>-closeout/04-lint.log`
-- [ ] `npm run test`. Evidence: `out/1199-coordinator-symphony-aligned-orchestrator-resume-token-validation-extraction/manual/<timestamp>-closeout/05-test.log`
-- [ ] `npm run docs:check`. Evidence: `out/1199-coordinator-symphony-aligned-orchestrator-resume-token-validation-extraction/manual/<timestamp>-closeout/06-docs-check.log`
-- [ ] `npm run docs:freshness`. Evidence: `out/1199-coordinator-symphony-aligned-orchestrator-resume-token-validation-extraction/manual/<timestamp>-closeout/07-docs-freshness.log`
-- [ ] `node scripts/diff-budget.mjs`. Evidence: `out/1199-coordinator-symphony-aligned-orchestrator-resume-token-validation-extraction/manual/<timestamp>-closeout/08-diff-budget.log`
-- [ ] `npm run review`. Evidence: `out/1199-coordinator-symphony-aligned-orchestrator-resume-token-validation-extraction/manual/<timestamp>-closeout/09-review.log`
-- [ ] `npm run pack:smoke`. Evidence: `out/1199-coordinator-symphony-aligned-orchestrator-resume-token-validation-extraction/manual/<timestamp>-closeout/10-pack-smoke.log`
-- [ ] Elegance review completed. Evidence: `out/1199-coordinator-symphony-aligned-orchestrator-resume-token-validation-extraction/manual/<timestamp>-closeout/12-elegance-review.md`
+- [x] `node scripts/delegation-guard.mjs`. Evidence: `out/1199-coordinator-symphony-aligned-orchestrator-resume-token-validation-extraction/manual/20260314T221044Z-closeout/01-delegation-guard.log`
+- [x] `node scripts/spec-guard.mjs --dry-run`. Evidence: `out/1199-coordinator-symphony-aligned-orchestrator-resume-token-validation-extraction/manual/20260314T221044Z-closeout/02-spec-guard.log`
+- [x] `npm run build`. Evidence: `out/1199-coordinator-symphony-aligned-orchestrator-resume-token-validation-extraction/manual/20260314T221044Z-closeout/03-build.log`
+- [x] `npm run lint`. Evidence: `out/1199-coordinator-symphony-aligned-orchestrator-resume-token-validation-extraction/manual/20260314T221044Z-closeout/04-lint.log`
+- [x] `npm run test`. Evidence: `out/1199-coordinator-symphony-aligned-orchestrator-resume-token-validation-extraction/manual/20260314T221044Z-closeout/05-test.log`
+- [x] `npm run docs:check`. Evidence: `out/1199-coordinator-symphony-aligned-orchestrator-resume-token-validation-extraction/manual/20260314T221044Z-closeout/06-docs-check.log`
+- [x] `npm run docs:freshness`. Evidence: `out/1199-coordinator-symphony-aligned-orchestrator-resume-token-validation-extraction/manual/20260314T221044Z-closeout/07-docs-freshness.log`
+- [x] `node scripts/diff-budget.mjs`. Evidence: `out/1199-coordinator-symphony-aligned-orchestrator-resume-token-validation-extraction/manual/20260314T221044Z-closeout/08-diff-budget.log`
+- [x] `npm run review`. Evidence: `out/1199-coordinator-symphony-aligned-orchestrator-resume-token-validation-extraction/manual/20260314T221044Z-closeout/09-review.log`
+- [x] `npm run pack:smoke`. Evidence: `out/1199-coordinator-symphony-aligned-orchestrator-resume-token-validation-extraction/manual/20260314T221044Z-closeout/10-pack-smoke.log`
+- [x] Elegance review completed. Evidence: `out/1199-coordinator-symphony-aligned-orchestrator-resume-token-validation-extraction/manual/20260314T221044Z-closeout/12-elegance-review.md`
