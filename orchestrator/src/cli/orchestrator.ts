@@ -1,6 +1,5 @@
 import process from 'node:process';
 import { readFile } from 'node:fs/promises';
-import { join } from 'node:path';
 
 import { TaskManager } from '../manager.js';
 import type { ManagerOptions } from '../manager.js';
@@ -58,19 +57,12 @@ import { loadPackageConfig, loadUserConfig } from './config/userConfig.js';
 import { formatRepoConfigRequiredError, isRepoConfigRequired } from './config/repoConfigPolicy.js';
 import { RunEventEmitter, RunEventPublisher } from './events/runEvents.js';
 import { RunEventStream } from './events/runEventStream.js';
-import { writeJsonAtomic } from './utils/fs.js';
 import { resolveRuntimeMode } from './runtime/index.js';
 import type { RuntimeMode, RuntimeModeSource, RuntimeSelection } from './runtime/types.js';
-import {
-  buildAutoScoutEvidence,
-  type AdvancedAutopilotDecision
-} from './utils/advancedAutopilot.js';
+import type { AdvancedAutopilotDecision } from './utils/advancedAutopilot.js';
 import { startOrchestratorControlPlaneLifecycle } from './services/orchestratorControlPlaneLifecycle.js';
 import { runOrchestratorExecutionLifecycle } from './services/orchestratorExecutionLifecycle.js';
-import {
-  executeOrchestratorCloudTarget,
-  resolveCloudEnvironmentId
-} from './services/orchestratorCloudTargetExecutor.js';
+import { executeOrchestratorCloudTarget } from './services/orchestratorCloudTargetExecutor.js';
 import {
   determineOrchestratorExecutionMode,
   routeOrchestratorExecution,
@@ -79,26 +71,10 @@ import {
 } from './services/orchestratorExecutionRouter.js';
 import { completeOrchestratorRunLifecycle } from './services/orchestratorRunLifecycleCompletion.js';
 import { createOrchestratorRunLifecycleExecutionRegistration } from './services/orchestratorRunLifecycleExecutionRegistration.js';
+import { recordOrchestratorAutoScoutEvidence } from './services/orchestratorAutoScoutEvidenceRecorder.js';
 
 const resolveBaseEnvironment = (): EnvironmentPaths =>
   normalizeEnvironmentPaths(resolveEnvironmentPaths());
-
-const DEFAULT_AUTO_SCOUT_TIMEOUT_MS = 4000;
-
-function readCloudString(value: unknown): string | null {
-  return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
-}
-
-function readCloudNumber(raw: string | undefined, fallback: number): number {
-  if (!raw) {
-    return fallback;
-  }
-  const parsed = Number.parseInt(raw, 10);
-  if (!Number.isFinite(parsed) || parsed <= 0) {
-    return fallback;
-  }
-  return parsed;
-}
 
 interface RunLifecycleContext {
   env: EnvironmentPaths;
@@ -504,64 +480,7 @@ export class CodexOrchestrator {
     envOverrides?: NodeJS.ProcessEnv;
     advancedDecision: AdvancedAutopilotDecision;
   }): Promise<OrchestratorAutoScoutOutcome> {
-    const mergedEnv = { ...process.env, ...(params.envOverrides ?? {}) };
-    const timeoutMs = readCloudNumber(
-      mergedEnv.CODEX_ORCHESTRATOR_AUTO_SCOUT_TIMEOUT_MS,
-      DEFAULT_AUTO_SCOUT_TIMEOUT_MS
-    );
-
-    const work = async (): Promise<OrchestratorAutoScoutOutcome> => {
-      const cloudEnvironmentId = resolveCloudEnvironmentId(params.task, params.target, params.envOverrides);
-      const cloudBranch =
-        readCloudString(params.envOverrides?.CODEX_CLOUD_BRANCH) ??
-        readCloudString(process.env.CODEX_CLOUD_BRANCH);
-      const cloudRequested =
-        params.mode === 'cloud' || params.manifest.cloud_fallback?.mode_requested === 'cloud';
-
-      const evidence = buildAutoScoutEvidence({
-        taskId: params.manifest.task_id,
-        pipelineId: params.pipeline.id,
-        targetId: params.target.id,
-        targetDescription: params.target.description,
-        executionMode: params.mode,
-        cloudRequested,
-        advanced: params.advancedDecision,
-        cloudEnvironmentId,
-        cloudBranch,
-        env: mergedEnv,
-        generatedAt: isoTimestamp()
-      });
-      const evidencePath = join(params.paths.runDir, 'auto-scout.json');
-      await writeJsonAtomic(evidencePath, evidence);
-      return { status: 'recorded', path: relativeToRepo(params.env, evidencePath) };
-    };
-
-    try {
-      let timeoutHandle: NodeJS.Timeout | null = null;
-      const timeoutPromise = new Promise<OrchestratorAutoScoutOutcome>((resolve) => {
-        timeoutHandle = setTimeout(() => {
-          resolve({
-            status: 'timeout',
-            message: `timed out after ${Math.round(timeoutMs / 1000)}s`
-          });
-        }, timeoutMs);
-        timeoutHandle.unref?.();
-      });
-      const workPromise = work().catch((error): OrchestratorAutoScoutOutcome => ({
-        status: 'error',
-        message: (error as Error)?.message ?? String(error)
-      }));
-      const result = await Promise.race([workPromise, timeoutPromise]);
-      if (timeoutHandle) {
-        clearTimeout(timeoutHandle);
-      }
-      return result;
-    } catch (error) {
-      return {
-        status: 'error',
-        message: (error as Error)?.message ?? String(error)
-      };
-    }
+    return await recordOrchestratorAutoScoutEvidence(params);
   }
 
   private async performRunLifecycle(context: RunLifecycleContext): Promise<PipelineExecutionResult> {

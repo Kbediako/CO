@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260314-1167-coordinator-symphony-aligned-orchestrator-auto-scout-evidence-recorder-extraction",
+      "title": "Coordinator Symphony-Aligned Orchestrator Auto-Scout Evidence Recorder Extraction",
+      "relates_to": "tasks/tasks-1167-coordinator-symphony-aligned-orchestrator-auto-scout-evidence-recorder-extraction.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-14",
+      "paths": {
+        "spec": "tasks/specs/1167-coordinator-symphony-aligned-orchestrator-auto-scout-evidence-recorder-extraction.md",
+        "task": "tasks/tasks-1167-coordinator-symphony-aligned-orchestrator-auto-scout-evidence-recorder-extraction.md",
+        "agent_task": ".agent/task/1167-coordinator-symphony-aligned-orchestrator-auto-scout-evidence-recorder-extraction.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-auto-scout-evidence-recorder-extraction.md"
+      }
+    },
+    {
       "id": "20260314-1166-coordinator-symphony-aligned-orchestrator-resume-pre-start-failure-manifest-contract",
       "title": "Coordinator Symphony-Aligned Orchestrator Resume Pre-Start Failure Manifest Contract",
       "relates_to": "tasks/tasks-1166-coordinator-symphony-aligned-orchestrator-resume-pre-start-failure-manifest-contract.md",

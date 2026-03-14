@@ -2,7 +2,7 @@
 import { readFile, readdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { parseArgs as parseCliArgs } from './lib/cli-args.js';
-import { collectDocFiles, pathExists, toPosixPath } from './lib/docs-helpers.js';
+import { collectDocFiles, normalizeTaskKey, pathExists, toPosixPath } from './lib/docs-helpers.js';
 import { resolveEnvironmentPaths } from './lib/run-manifests.js';
 
 export type DocsCheckRule =
@@ -130,7 +130,8 @@ async function checkTasksFileSize(repoRoot: string): Promise<DocsCheckError | nu
   }
 
   const tasksRaw = await readFile(tasksPath, 'utf8');
-  const lineCount = tasksRaw.split('\n').length;
+  const tasksLines = tasksRaw.split('\n');
+  const lineCount = tasksLines.at(-1) === '' ? tasksLines.length - 1 : tasksLines.length;
   if (lineCount <= maxLines) {
     return null;
   }
@@ -328,24 +329,36 @@ async function resolveTaskIdentity(repoRoot: string, taskArg: string): Promise<{
   }
 
   const index = await loadTasksIndex(repoRoot);
-  const item = index.items?.find((entry) => entry.id === numericId);
-  if (!item || !item.slug) {
+  const providedSlug = taskArg.includes('-') ? taskArg.slice(numericId.length + 1) : null;
+  const matches = (index.items ?? [])
+    .map((entry) => ({ entry, taskKey: normalizeTaskKey(entry) }))
+    .filter(
+      (candidate): candidate is { entry: NonNullable<TasksIndex['items']>[number]; taskKey: string } =>
+        typeof candidate.taskKey === 'string' && candidate.taskKey.startsWith(`${numericId}-`)
+    );
+  const match = providedSlug
+    ? matches.find((candidate) => candidate.taskKey === `${numericId}-${providedSlug}`)
+    : matches[0];
+  if (!match) {
     throw new Error(`Task "${numericId}" not found in tasks/index.json.`);
   }
 
-  const providedSlug = taskArg.includes('-') ? taskArg.slice(numericId.length + 1) : null;
-  if (providedSlug && providedSlug !== item.slug) {
+  const slug = match.taskKey.slice(numericId.length + 1);
+  if (!slug) {
+    throw new Error(`Task "${numericId}" not found in tasks/index.json.`);
+  }
+  if (providedSlug && providedSlug !== slug) {
     throw new Error(
-      `Task "${taskArg}" slug mismatch. tasks/index.json declares "${numericId}-${item.slug}".`
+      `Task "${taskArg}" slug mismatch. tasks/index.json declares "${numericId}-${slug}".`
     );
   }
 
-  const canonicalTasksPath = path.join(repoRoot, 'tasks', `tasks-${numericId}-${item.slug}.md`);
+  const canonicalTasksPath = path.join(repoRoot, 'tasks', `tasks-${numericId}-${slug}.md`);
   if (!(await pathExists(canonicalTasksPath))) {
-    throw new Error(`Canonical source task file is missing: tasks/tasks-${numericId}-${item.slug}.md`);
+    throw new Error(`Canonical source task file is missing: tasks/tasks-${numericId}-${slug}.md`);
   }
 
-  return { id: numericId, slug: item.slug };
+  return { id: numericId, slug };
 }
 
 async function loadNpmScripts(repoRoot: string): Promise<Set<string>> {
