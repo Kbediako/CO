@@ -8,12 +8,12 @@
 
 ## Implementation
 
-- [ ] Extract one bounded route-adapter helper from `orchestrator.ts`.
-- [ ] Keep router policy helpers, cloud/local route shells, and broader run-lifecycle behavior out of scope.
-- [ ] Keep focused routing regression coverage on unchanged adapter behavior.
+- [x] Extract one bounded route-adapter helper from `orchestrator.ts`.
+- [x] Keep router policy helpers, cloud/local route shells, and broader run-lifecycle behavior out of scope.
+- [x] Keep focused routing regression coverage on unchanged adapter behavior.
 
 ## Closeout
 
-- [ ] Run the standard gate bundle and capture closeout artifacts under `out/1186-coordinator-symphony-aligned-orchestrator-execution-route-adapter-shell-extraction/manual/<timestamp>-closeout/`.
-- [ ] Run an explicit elegance review.
-- [ ] Record the next truthful seam after `1186`.
+- [x] Run the standard gate bundle and capture closeout artifacts under `out/1186-coordinator-symphony-aligned-orchestrator-execution-route-adapter-shell-extraction/manual/20260314T111633Z-closeout/`.
+- [x] Run an explicit elegance review.
+- [x] Record the next truthful seam after `1186`.
