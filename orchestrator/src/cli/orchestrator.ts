@@ -1,5 +1,3 @@
-import { readFile } from 'node:fs/promises';
-
 import type { TaskContext, ExecutionMode, PlanItem } from '../types.js';
 import { resolveEnvironmentPaths } from '../../../scripts/lib/run-manifests.js';
 import { normalizeEnvironmentPaths } from './run/environment.js';
@@ -43,6 +41,7 @@ import {
   applyRequestedRuntimeModeToManifest,
   applyRuntimeSelectionToManifest
 } from './services/orchestratorRuntimeManifestMutation.js';
+import { validateOrchestratorResumeToken } from './services/orchestratorResumeTokenValidation.js';
 
 const resolveBaseEnvironment = (): EnvironmentPaths =>
   normalizeEnvironmentPaths(resolveEnvironmentPaths());
@@ -95,7 +94,7 @@ export class CodexOrchestrator {
       await runOrchestratorResumePreparationShell({
         baseEnv: this.baseEnv,
         options,
-        validateResumeToken: this.validateResumeToken.bind(this),
+        validateResumeToken: validateOrchestratorResumeToken,
         applyRequestedRuntimeMode: applyRequestedRuntimeModeToManifest
       });
 
@@ -185,19 +184,5 @@ export class CodexOrchestrator {
       applyControlPlaneToRunSummary: (summary, result) =>
         this.controlPlane.applyControlPlaneToRunSummary(summary, result)
     });
-  }
-
-  private async validateResumeToken(paths: RunPaths, manifest: CliManifest, provided: string | null): Promise<void> {
-    let stored = manifest.resume_token;
-    if (!stored) {
-      try {
-        stored = (await readFile(paths.resumeTokenPath, 'utf8')).trim();
-      } catch (error) {
-        throw new Error(`Resume token missing for run ${manifest.run_id}: ${(error as Error)?.message ?? String(error)}`);
-      }
-    }
-    if (provided && stored !== provided) {
-      throw new Error('Resume token mismatch.');
-    }
   }
 }
