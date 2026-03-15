@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260316-1221-coordinator-symphony-aligned-standalone-review-execution-runtime-shell-extraction",
+      "title": "Coordinator Symphony-Aligned Standalone Review Execution Runtime Shell Extraction",
+      "relates_to": "tasks/tasks-1221-coordinator-symphony-aligned-standalone-review-execution-runtime-shell-extraction.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-16",
+      "paths": {
+        "spec": "tasks/specs/1221-coordinator-symphony-aligned-standalone-review-execution-runtime-shell-extraction.md",
+        "task": "tasks/tasks-1221-coordinator-symphony-aligned-standalone-review-execution-runtime-shell-extraction.md",
+        "agent_task": ".agent/task/1221-coordinator-symphony-aligned-standalone-review-execution-runtime-shell-extraction.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-standalone-review-execution-runtime-shell-extraction.md"
+      }
+    },
+    {
       "id": "20260316-1220-coordinator-symphony-aligned-standalone-review-run-review-orchestration-boundary-reassessment",
       "title": "Coordinator Symphony-Aligned Standalone Review Run-Review Orchestration Boundary Reassessment",
       "relates_to": "tasks/tasks-1220-coordinator-symphony-aligned-standalone-review-run-review-orchestration-boundary-reassessment.md",
