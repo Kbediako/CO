@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260315-1214-coordinator-symphony-aligned-standalone-review-command-probe-classification-extraction",
+      "title": "Coordinator Symphony-Aligned Standalone Review Command-Probe Classification Extraction",
+      "relates_to": "tasks/tasks-1214-coordinator-symphony-aligned-standalone-review-command-probe-classification-extraction.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-15",
+      "paths": {
+        "spec": "tasks/specs/1214-coordinator-symphony-aligned-standalone-review-command-probe-classification-extraction.md",
+        "task": "tasks/tasks-1214-coordinator-symphony-aligned-standalone-review-command-probe-classification-extraction.md",
+        "agent_task": ".agent/task/1214-coordinator-symphony-aligned-standalone-review-command-probe-classification-extraction.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-standalone-review-command-probe-classification-extraction.md"
+      }
+    },
+    {
       "id": "20260315-1213-coordinator-symphony-aligned-standalone-review-inspection-target-parsing-pipeline-extraction",
       "title": "Coordinator Symphony-Aligned Standalone Review Inspection Target Parsing Pipeline Extraction",
       "relates_to": "tasks/tasks-1213-coordinator-symphony-aligned-standalone-review-inspection-target-parsing-pipeline-extraction.md",
