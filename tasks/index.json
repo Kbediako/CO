@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260315-1212-coordinator-symphony-aligned-standalone-review-operand-path-normalization-boundary-extraction",
+      "title": "Coordinator Symphony-Aligned Standalone Review Operand Path Normalization Boundary Extraction",
+      "relates_to": "tasks/tasks-1212-coordinator-symphony-aligned-standalone-review-operand-path-normalization-boundary-extraction.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-15",
+      "paths": {
+        "spec": "tasks/specs/1212-coordinator-symphony-aligned-standalone-review-operand-path-normalization-boundary-extraction.md",
+        "task": "tasks/tasks-1212-coordinator-symphony-aligned-standalone-review-operand-path-normalization-boundary-extraction.md",
+        "agent_task": ".agent/task/1212-coordinator-symphony-aligned-standalone-review-operand-path-normalization-boundary-extraction.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-standalone-review-operand-path-normalization-boundary-extraction.md"
+      }
+    },
+    {
       "id": "20260315-1211-coordinator-symphony-aligned-standalone-review-shell-command-parser-primitives-extraction",
       "title": "Coordinator Symphony-Aligned Standalone Review Shell Command Parser Primitives Extraction",
       "relates_to": "tasks/tasks-1211-coordinator-symphony-aligned-standalone-review-shell-command-parser-primitives-extraction.md",
