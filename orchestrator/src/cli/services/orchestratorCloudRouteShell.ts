@@ -1,20 +1,15 @@
-import process from 'node:process';
-
 import { logger } from '../../logger.js';
 import type { TaskContext, PlanItem } from '../../types.js';
 import { appendSummary } from '../run/manifest.js';
 import type { CliManifest, PipelineRunExecutionResult } from '../types.js';
 import { buildCloudPreflightRequest, runCloudPreflight } from '../utils/cloudPreflight.js';
+import { resolveCloudBranch } from './orchestratorCloudBranchResolution.js';
 import { resolveCloudEnvironmentId } from './orchestratorCloudEnvironmentResolution.js';
 import {
   buildCloudPreflightFailureContract,
   type OrchestratorCloudFallbackReroute
 } from './orchestratorCloudRouteFallbackContract.js';
 import type { OrchestratorExecutionRouteState } from './orchestratorExecutionRouteState.js';
-
-function readCloudString(value: unknown): string | null {
-  return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
-}
 
 export interface OrchestratorCloudRouteShellOptions {
   repoRoot: string;
@@ -35,9 +30,7 @@ function buildExecutionRouteCloudPreflightRequest(
     options.target,
     options.state.effectiveEnvOverrides
   );
-  const branch =
-    readCloudString(options.state.effectiveEnvOverrides.CODEX_CLOUD_BRANCH) ??
-    readCloudString(process.env.CODEX_CLOUD_BRANCH);
+  const branch = resolveCloudBranch(options.state.effectiveEnvOverrides);
   return buildCloudPreflightRequest({
     repoRoot: options.repoRoot,
     environmentId,

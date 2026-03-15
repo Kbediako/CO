@@ -24,7 +24,7 @@ Cloud branch precedence is now the smallest shared cloud behavior still duplicat
 ## Requirements
 
 1. Extract only the shared cloud branch-resolution contract into one bounded helper/service.
-2. Preserve the exact branch precedence across target metadata, env overrides, and process env.
+2. Preserve the exact branch precedence across env overrides and process env.
 3. Update the cloud executor, cloud-route shell, and auto-scout evidence recorder to consume the shared helper without widening the lane into request shaping or cloud lifecycle behavior.
 4. Keep this slice separate from shared environment-id resolution, prompt assembly, and completion helpers already extracted earlier.
 

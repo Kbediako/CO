@@ -8,7 +8,7 @@ Now that `1203` extracted shared environment-id resolution, the smallest truthfu
 
 - extract shared cloud branch resolution into one bounded helper/service
 - update the cloud executor, cloud-route shell, and auto-scout evidence recorder to consume the shared branch contract
-- preserve current precedence across target metadata, env overrides, and process env
+- preserve current precedence across env overrides and process env
 
 ## Out of Scope
 

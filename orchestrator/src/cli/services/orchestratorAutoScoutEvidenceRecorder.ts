@@ -6,13 +6,10 @@ import { writeJsonAtomic } from '../utils/fs.js';
 import { buildAutoScoutEvidence } from '../utils/advancedAutopilot.js';
 import { isoTimestamp } from '../utils/time.js';
 import { relativeToRepo } from '../run/runPaths.js';
+import { resolveCloudBranch } from './orchestratorCloudBranchResolution.js';
 import { resolveCloudEnvironmentId } from './orchestratorCloudEnvironmentResolution.js';
 
 const DEFAULT_AUTO_SCOUT_TIMEOUT_MS = 4000;
-
-function readCloudString(value: unknown): string | null {
-  return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
-}
 
 function readCloudNumber(raw: string | undefined, fallback: number): number {
   if (!raw) {
@@ -36,9 +33,7 @@ export async function recordOrchestratorAutoScoutEvidence(
 
   const work = async (): Promise<OrchestratorAutoScoutOutcome> => {
     const cloudEnvironmentId = resolveCloudEnvironmentId(params.task, params.target, params.envOverrides);
-    const cloudBranch =
-      readCloudString(params.envOverrides?.CODEX_CLOUD_BRANCH) ??
-      readCloudString(process.env.CODEX_CLOUD_BRANCH);
+    const cloudBranch = resolveCloudBranch(params.envOverrides);
     const cloudRequested =
       params.mode === 'cloud' || params.manifest.cloud_fallback?.mode_requested === 'cloud';
 

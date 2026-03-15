@@ -95,10 +95,12 @@ describe('recordOrchestratorAutoScoutEvidence', () => {
       execution_mode: string;
       pipeline_id: string;
       advanced_mode_enabled: boolean;
+      cloud: { branch: string | null };
     };
     expect(autoScout.execution_mode).toBe('cloud');
     expect(autoScout.pipeline_id).toBe('docs-review');
     expect(autoScout.advanced_mode_enabled).toBe(true);
+    expect(autoScout.cloud.branch).toBe('main');
   });
 
   it('returns timeout instead of throwing when the write exceeds the configured timeout', async () => {

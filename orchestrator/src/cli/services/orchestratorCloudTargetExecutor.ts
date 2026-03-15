@@ -8,6 +8,7 @@ import type { RunPaths } from '../run/runPaths.js';
 import type { CliManifest, PipelineDefinition } from '../types.js';
 import { isoTimestamp } from '../utils/time.js';
 import { resolveCodexCliBin } from '../utils/codexCli.js';
+import { resolveCloudBranch } from './orchestratorCloudBranchResolution.js';
 import { resolveCloudEnvironmentId } from './orchestratorCloudEnvironmentResolution.js';
 import { buildCloudPrompt, type CloudPromptManifest } from './orchestratorCloudPromptBuilder.js';
 import {
@@ -203,8 +204,7 @@ function buildCloudTaskExecutorRequest(params: {
     params.envOverrides?.CODEX_CLOUD_STATUS_RETRY_BACKOFF_MS ?? process.env.CODEX_CLOUD_STATUS_RETRY_BACKOFF_MS,
     DEFAULT_CLOUD_STATUS_RETRY_BACKOFF_MS
   );
-  const branch =
-    readCloudString(params.envOverrides?.CODEX_CLOUD_BRANCH) ?? readCloudString(process.env.CODEX_CLOUD_BRANCH);
+  const branch = resolveCloudBranch(params.envOverrides);
   const enableFeatures = readCloudFeatureList(
     readCloudString(params.envOverrides?.CODEX_CLOUD_ENABLE_FEATURES) ??
       readCloudString(process.env.CODEX_CLOUD_ENABLE_FEATURES)
