@@ -20,13 +20,23 @@
 
 ## Implementation
 
-- [ ] One bounded helper/service owns shared cloud branch-resolution behavior. Evidence: `orchestrator/src/cli/services/`
-- [ ] Cloud executor, cloud-route shell, and auto-scout evidence recorder consume the shared helper without changing branch precedence. Evidence: `orchestrator/src/cli/services/orchestratorCloudTargetExecutor.ts`, `orchestrator/src/cli/services/orchestratorCloudRouteShell.ts`, `orchestrator/src/cli/services/orchestratorAutoScoutEvidenceRecorder.ts`
-- [ ] Focused regressions preserve branch precedence and adjacent caller behavior. Evidence: `orchestrator/tests/`
+- [x] One bounded helper/service owns shared cloud branch-resolution behavior. Evidence: `orchestrator/src/cli/services/orchestratorCloudBranchResolution.ts`
+- [x] Cloud executor, cloud-route shell, and auto-scout evidence recorder consume the shared helper without changing branch precedence. Evidence: `orchestrator/src/cli/services/orchestratorCloudTargetExecutor.ts`, `orchestrator/src/cli/services/orchestratorCloudRouteShell.ts`, `orchestrator/src/cli/services/orchestratorAutoScoutEvidenceRecorder.ts`
+- [x] Focused regressions preserve branch precedence and adjacent caller behavior. Evidence: `orchestrator/tests/OrchestratorCloudBranchResolution.test.ts`, `orchestrator/tests/OrchestratorCloudTargetExecutor.test.ts`, `orchestrator/tests/OrchestratorCloudRouteShell.test.ts`, `orchestrator/tests/OrchestratorAutoScoutEvidenceRecorder.test.ts`
 
 ## Validation & Closeout
 
-- [ ] `node scripts/delegation-guard.mjs --task 1204-coordinator-symphony-aligned-orchestrator-cloud-branch-resolution-boundary-extraction`. Evidence: `out/1204-coordinator-symphony-aligned-orchestrator-cloud-branch-resolution-boundary-extraction/manual/<timestamp>-closeout/01-delegation-guard.log`
+- [x] `node scripts/delegation-guard.mjs --task 1204-coordinator-symphony-aligned-orchestrator-cloud-branch-resolution-boundary-extraction`. Evidence: `out/1204-coordinator-symphony-aligned-orchestrator-cloud-branch-resolution-boundary-extraction/manual/20260315T005628Z-closeout/01-delegation-guard.log`
 - [x] `node scripts/spec-guard.mjs --dry-run`. Evidence: `out/1204-coordinator-symphony-aligned-orchestrator-cloud-branch-resolution-boundary-extraction/manual/20260315T004111Z-docs-first/02-spec-guard.log`
 - [x] `npm run docs:check`. Evidence: `out/1204-coordinator-symphony-aligned-orchestrator-cloud-branch-resolution-boundary-extraction/manual/20260315T004111Z-docs-first/03-docs-check.log`
 - [x] `npm run docs:freshness`. Evidence: `out/1204-coordinator-symphony-aligned-orchestrator-cloud-branch-resolution-boundary-extraction/manual/20260315T004111Z-docs-first/04-docs-freshness.log`
+- [x] `npm run build`. Evidence: `out/1204-coordinator-symphony-aligned-orchestrator-cloud-branch-resolution-boundary-extraction/manual/20260315T005628Z-closeout/03-build.log`
+- [x] `npm run lint`. Evidence: `out/1204-coordinator-symphony-aligned-orchestrator-cloud-branch-resolution-boundary-extraction/manual/20260315T005628Z-closeout/04-lint.log`
+- [x] Focused cloud branch-resolution regressions passed on the final tree. Evidence: `out/1204-coordinator-symphony-aligned-orchestrator-cloud-branch-resolution-boundary-extraction/manual/20260315T005628Z-closeout/05b-targeted-tests.log`
+- [x] Full `npm run test` passed on the final tree. Evidence: `out/1204-coordinator-symphony-aligned-orchestrator-cloud-branch-resolution-boundary-extraction/manual/20260315T005628Z-closeout/05-test.log`
+- [x] `npm run docs:check`. Evidence: `out/1204-coordinator-symphony-aligned-orchestrator-cloud-branch-resolution-boundary-extraction/manual/20260315T005628Z-closeout/06-docs-check.log`
+- [x] `npm run docs:freshness`. Evidence: `out/1204-coordinator-symphony-aligned-orchestrator-cloud-branch-resolution-boundary-extraction/manual/20260315T005628Z-closeout/07-docs-freshness.log`
+- [x] Diff-budget status captured with the required stacked-branch justification. Evidence: `out/1204-coordinator-symphony-aligned-orchestrator-cloud-branch-resolution-boundary-extraction/manual/20260315T005628Z-closeout/08-diff-budget.log`
+- [x] Bounded standalone review completed on the final tree. Evidence: `out/1204-coordinator-symphony-aligned-orchestrator-cloud-branch-resolution-boundary-extraction/manual/20260315T005628Z-closeout/09-review.log`
+- [x] `npm run pack:smoke`. Evidence: `out/1204-coordinator-symphony-aligned-orchestrator-cloud-branch-resolution-boundary-extraction/manual/20260315T005628Z-closeout/10-pack-smoke.log`
+- [x] Closeout summary, elegance review, override notes, and next-slice note captured. Evidence: `out/1204-coordinator-symphony-aligned-orchestrator-cloud-branch-resolution-boundary-extraction/manual/20260315T005628Z-closeout/00-summary.md`, `out/1204-coordinator-symphony-aligned-orchestrator-cloud-branch-resolution-boundary-extraction/manual/20260315T005628Z-closeout/12-elegance-review.md`, `out/1204-coordinator-symphony-aligned-orchestrator-cloud-branch-resolution-boundary-extraction/manual/20260315T005628Z-closeout/13-override-notes.md`, `out/1204-coordinator-symphony-aligned-orchestrator-cloud-branch-resolution-boundary-extraction/manual/20260315T005628Z-closeout/14-next-slice-note.md`
