@@ -3,6 +3,55 @@
   "generated_at": "2026-03-15",
   "entries": [
     {
+      "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-standalone-review-command-intent-classification-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-15",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/PRD-coordinator-symphony-aligned-standalone-review-command-intent-classification-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-15",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/TECH_SPEC-coordinator-symphony-aligned-standalone-review-command-intent-classification-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-15",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/findings/1215-standalone-review-command-intent-classification-extraction-deliberation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-15",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/tasks-1215-coordinator-symphony-aligned-standalone-review-command-intent-classification-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-15",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/specs/1215-coordinator-symphony-aligned-standalone-review-command-intent-classification-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-15",
+      "cadence_days": 30
+    },
+    {
+      "path": ".agent/task/1215-coordinator-symphony-aligned-standalone-review-command-intent-classification-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-15",
+      "cadence_days": 30
+    },
+    {
       "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-standalone-review-command-probe-classification-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
