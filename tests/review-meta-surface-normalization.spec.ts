@@ -243,6 +243,91 @@ describe('review meta-surface normalization', () => {
     ).toBe(true);
   });
 
+  it('classifies the extracted shell-command parser helper as review-support when it is inspected directly', () => {
+    expect(
+      classifyMetaSurfaceDirectDetailed(
+        'sed',
+        ['-n', '1,80p', 'scripts/lib/review-shell-command-parser.ts'],
+        new Set(),
+        '/repo'
+      )
+    ).toEqual([
+      {
+        kind: 'review-support',
+        candidate: 'scripts/lib/review-shell-command-parser.ts',
+        operand: 'scripts/lib/review-shell-command-parser.ts'
+      }
+    ]);
+  });
+
+  it('treats the extracted shell-command parser helper family as touched when the sibling source path is touched', () => {
+    expect(
+      isTouchedReviewScopePathFamilyOperand(
+        'dist/scripts/lib/review-shell-command-parser.js',
+        new Set(['scripts/lib/review-shell-command-parser.ts']),
+        '/repo'
+      )
+    ).toBe(true);
+  });
+
+  it('treats the extracted shell-command parser test host as touched when the parser source is touched', () => {
+    expect(
+      isTouchedReviewScopePathFamilyOperand(
+        'tests/review-execution-state.spec.ts',
+        new Set(['scripts/lib/review-shell-command-parser.ts']),
+        '/repo'
+      )
+    ).toBe(true);
+  });
+
+  it('treats the shell-command parser normalization-spec host as touched when the parser source is touched', () => {
+    expect(
+      isTouchedReviewScopePathFamilyOperand(
+        'tests/review-meta-surface-normalization.spec.ts',
+        new Set(['scripts/lib/review-shell-command-parser.ts']),
+        '/repo'
+      )
+    ).toBe(true);
+  });
+
+  it('treats the shell-command parser normalization source host as touched when the parser source is touched', () => {
+    expect(
+      isTouchedReviewScopePathFamilyOperand(
+        'scripts/lib/review-meta-surface-normalization.ts',
+        new Set(['scripts/lib/review-shell-command-parser.ts']),
+        '/repo'
+      )
+    ).toBe(true);
+  });
+
+  it('treats the shell-command parser direct consumer sources as touched when the parser source is touched', () => {
+    for (const operand of [
+      'scripts/lib/review-inspection-target-parsing.ts',
+      'scripts/lib/review-command-probe-classification.ts',
+      'scripts/lib/review-command-intent-classification.ts',
+      'scripts/lib/review-meta-surface-boundary-analysis.ts',
+      'scripts/lib/review-execution-state.ts'
+    ]) {
+      expect(
+        isTouchedReviewScopePathFamilyOperand(
+          operand,
+          new Set(['scripts/lib/review-shell-command-parser.ts']),
+          '/repo'
+        )
+      ).toBe(true);
+    }
+  });
+
+  it('does not treat sibling shell-command parser consumer sources as touched when a different consumer source is touched', () => {
+    expect(
+      isTouchedReviewScopePathFamilyOperand(
+        'scripts/lib/review-command-intent-classification.ts',
+        new Set(['scripts/lib/review-command-probe-classification.ts']),
+        '/repo'
+      )
+    ).toBe(false);
+  });
+
   it('classifies the extracted execution telemetry helper as review-support when it is inspected directly', () => {
     expect(
       classifyMetaSurfaceDirectDetailed(

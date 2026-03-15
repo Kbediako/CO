@@ -356,6 +356,36 @@ export function isTouchedReviewScopePathFamilyOperand(
       'scripts/lib/review-execution-state.ts',
       'tests/review-execution-state.spec.ts'
     ];
+    const reviewShellCommandParserSharedPathFamily = [
+      'scripts/lib/review-shell-command-parser.ts',
+      'dist/scripts/lib/review-shell-command-parser.js'
+    ];
+    const reviewShellCommandParserInspectionTargetParsingPathFamily = [
+      ...reviewShellCommandParserSharedPathFamily,
+      'scripts/lib/review-inspection-target-parsing.ts',
+    ];
+    const reviewShellCommandParserCommandProbeClassificationPathFamily = [
+      ...reviewShellCommandParserSharedPathFamily,
+      'scripts/lib/review-command-probe-classification.ts',
+    ];
+    const reviewShellCommandParserCommandIntentClassificationPathFamily = [
+      ...reviewShellCommandParserSharedPathFamily,
+      'scripts/lib/review-command-intent-classification.ts',
+    ];
+    const reviewShellCommandParserMetaSurfaceBoundaryAnalysisPathFamily = [
+      ...reviewShellCommandParserSharedPathFamily,
+      'scripts/lib/review-meta-surface-boundary-analysis.ts',
+    ];
+    const reviewShellCommandParserNormalizationPathFamily = [
+      ...reviewShellCommandParserSharedPathFamily,
+      'scripts/lib/review-meta-surface-normalization.ts',
+      'tests/review-meta-surface-normalization.spec.ts'
+    ];
+    const reviewShellCommandParserExecutionStatePathFamily = [
+      ...reviewShellCommandParserSharedPathFamily,
+      'scripts/lib/review-execution-state.ts',
+      'tests/review-execution-state.spec.ts'
+    ];
     const reviewExecutionTelemetryPathFamily = [
       'scripts/lib/review-execution-telemetry.ts',
       'dist/scripts/lib/review-execution-telemetry.js',
@@ -370,6 +400,12 @@ export function isTouchedReviewScopePathFamilyOperand(
       reviewCommandProbeClassificationPathFamily,
       reviewCommandIntentClassificationPathFamily,
       reviewMetaSurfaceBoundaryAnalysisPathFamily,
+      reviewShellCommandParserInspectionTargetParsingPathFamily,
+      reviewShellCommandParserCommandProbeClassificationPathFamily,
+      reviewShellCommandParserCommandIntentClassificationPathFamily,
+      reviewShellCommandParserMetaSurfaceBoundaryAnalysisPathFamily,
+      reviewShellCommandParserNormalizationPathFamily,
+      reviewShellCommandParserExecutionStatePathFamily,
       reviewExecutionTelemetryPathFamily
     ];
     return reviewSupportPathFamilies.some(
@@ -599,6 +635,8 @@ function classifyMetaSurfaceOperand(
     matchesPathSuffix(normalized, 'dist/scripts/lib/review-command-intent-classification.js') ||
     matchesPathSuffix(normalized, 'scripts/lib/review-meta-surface-boundary-analysis.ts') ||
     matchesPathSuffix(normalized, 'dist/scripts/lib/review-meta-surface-boundary-analysis.js') ||
+    matchesPathSuffix(normalized, 'scripts/lib/review-shell-command-parser.ts') ||
+    matchesPathSuffix(normalized, 'dist/scripts/lib/review-shell-command-parser.js') ||
     matchesPathSuffix(normalized, 'scripts/lib/review-execution-telemetry.ts') ||
     matchesPathSuffix(normalized, 'dist/scripts/lib/review-execution-telemetry.js') ||
     matchesPathSuffix(normalized, 'tests/review-meta-surface-boundary-analysis.spec.ts') ||
