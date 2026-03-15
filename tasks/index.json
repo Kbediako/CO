@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260315-1217-coordinator-symphony-aligned-standalone-review-execution-telemetry-surface-extraction",
+      "title": "Coordinator Symphony-Aligned Standalone Review Execution Telemetry Surface Extraction",
+      "relates_to": "tasks/tasks-1217-coordinator-symphony-aligned-standalone-review-execution-telemetry-surface-extraction.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-15",
+      "paths": {
+        "spec": "tasks/specs/1217-coordinator-symphony-aligned-standalone-review-execution-telemetry-surface-extraction.md",
+        "task": "tasks/tasks-1217-coordinator-symphony-aligned-standalone-review-execution-telemetry-surface-extraction.md",
+        "agent_task": ".agent/task/1217-coordinator-symphony-aligned-standalone-review-execution-telemetry-surface-extraction.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-standalone-review-execution-telemetry-surface-extraction.md"
+      }
+    },
+    {
       "id": "20260315-1216-coordinator-symphony-aligned-standalone-review-meta-surface-boundary-analysis-extraction",
       "title": "Coordinator Symphony-Aligned Standalone Review Meta-Surface Boundary Analysis Extraction",
       "relates_to": "tasks/tasks-1216-coordinator-symphony-aligned-standalone-review-meta-surface-boundary-analysis-extraction.md",
