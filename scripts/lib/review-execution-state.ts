@@ -39,10 +39,10 @@ import {
   normalizeAuditStartupAnchorPath,
   normalizeScopePath,
   normalizeScopeRoot,
-  relativizeOperandToRepoRoot,
   resolveGitInvocation,
   segmentMatchesAuditStartupAnchorPath
 } from './review-meta-surface-normalization.js';
+import { extractInspectionTargets } from './review-inspection-target-parsing.js';
 
 const REVIEW_DELEGATION_STARTUP_LINE_RE = /\bmcp:\s*delegation\s+(starting|ready)\b/i;
 const REVIEW_PROGRESS_SIGNAL_LINE_RE = /^(thinking|exec|codex)\b/i;
@@ -114,10 +114,6 @@ const META_SURFACE_RECENT_SIGNAL_WINDOW = 8;
 const REVIEW_NARRATIVE_INSPECTION_MIN_LINE_LENGTH = 32;
 const REVIEW_SPECULATIVE_NARRATIVE_LINE_RE =
   /^(?:I\b|I['’]m\b|It\s+(?:might|may|seems|feels)\b|Maybe\b|Perhaps\b)/iu;
-const REVIEW_INSPECTION_TARGET_PATH_RE =
-  /^(?:[A-Za-z0-9_./-]+\.(?:[cm]?[jt]sx?|json|md|ya?ml|toml|py|rb|php|go|rs|java|c|cc|cpp|cxx|h|hh|hpp|cs|swift|kt|kts|scala|exs?|sh|bash|zsh|fish|ps1|sql|html?|css|scss|less))$/u;
-const REVIEW_INSPECTION_TARGET_RE =
-  /([A-Za-z0-9_./-]+\.(?:[cm]?[jt]sx?|json|md|ya?ml|toml|py|rb|php|go|rs|java|c|cc|cpp|cxx|h|hh|hpp|cs|swift|kt|kts|scala|exs?|sh|bash|zsh|fish|ps1|sql|html?|css|scss|less))/gu;
 const REVIEW_META_SURFACE_DELEGATION_TOOL_LINE_RE =
   /^tool\s+delegation\.delegate\.(?:spawn|status|pause|cancel)\(/iu;
 const REVIEW_COMMAND_INTENT_DELEGATION_TOOL_LINE_RE =
@@ -2060,135 +2056,6 @@ function isLikelyReviewCommandLine(line: string): boolean {
     return true;
   }
   return false;
-}
-
-function extractInspectionTargets(
-  commandLine: string,
-  options: {
-    touchedPaths?: ReadonlySet<string>;
-    repoRoot?: string | null;
-  } = {}
-): string[] {
-  const normalized = commandLine.replace(/\\/gu, '/');
-  if (options.touchedPaths && options.touchedPaths.size > 0) {
-    const parsedTargets = extractParsedInspectionTargets(
-      normalized,
-      options.touchedPaths,
-      options.repoRoot ?? null
-    );
-    if (parsedTargets.length > 0) {
-      return parsedTargets;
-    }
-  }
-  const targets = new Set<string>();
-  for (const match of normalized.matchAll(REVIEW_INSPECTION_TARGET_RE)) {
-    const target = match[1]?.trim();
-    if (!target) {
-      continue;
-    }
-    targets.add(target.replace(/^\.\/+/u, ''));
-  }
-  return [...targets];
-}
-
-function extractParsedInspectionTargets(
-  commandLine: string,
-  touchedPaths: ReadonlySet<string>,
-  repoRoot: string | null
-): string[] {
-  const touchedTargets = new Set<string>();
-  const genericTargets = new Set<string>();
-  for (const segment of splitShellControlSegments(commandLine)) {
-    collectParsedInspectionTargetsFromSegment(
-      segment,
-      touchedPaths,
-      repoRoot,
-      touchedTargets,
-      genericTargets
-    );
-  }
-  return touchedTargets.size > 0 ? [...touchedTargets] : [...genericTargets];
-}
-
-function collectParsedInspectionTargetsFromSegment(
-  segment: string,
-  touchedPaths: ReadonlySet<string>,
-  repoRoot: string | null,
-  touchedTargets: Set<string>,
-  genericTargets: Set<string>,
-  depth = 0
-): void {
-  const strippedTokens = stripLeadingEnvAssignments(tokenizeShellSegment(segment));
-  if (strippedTokens.length === 0) {
-    return;
-  }
-  const tokens = unwrapEnvCommandTokens(strippedTokens);
-  if (tokens.length === 0) {
-    return;
-  }
-  if (depth < 3) {
-    const payload = extractShellCommandPayload(tokens);
-    if (payload) {
-      for (const nestedSegment of splitShellControlSegments(payload)) {
-        collectParsedInspectionTargetsFromSegment(
-          nestedSegment,
-          touchedPaths,
-          repoRoot,
-          touchedTargets,
-          genericTargets,
-          depth + 1
-        );
-      }
-      return;
-    }
-  }
-  const command = normalizeCommandToken(tokens[0] ?? '');
-  const args = tokens.slice(1);
-  for (const operand of extractMetaSurfaceOperands(command, args)) {
-    for (const candidate of expandMetaSurfaceOperandCandidates(
-      command,
-      args,
-      operand,
-      new Map(),
-      new Map(),
-      new Set(),
-      repoRoot
-    )) {
-      const matchedTouchedPath = resolveTouchedInspectionTarget(candidate, touchedPaths, repoRoot);
-      if (matchedTouchedPath) {
-        touchedTargets.add(matchedTouchedPath);
-        continue;
-      }
-      const normalizedCandidate = relativizeOperandToRepoRoot(candidate, repoRoot).replace(
-        /^\.\/+/u,
-        ''
-      );
-      if (REVIEW_INSPECTION_TARGET_PATH_RE.test(normalizedCandidate)) {
-        genericTargets.add(normalizedCandidate);
-      }
-    }
-  }
-}
-
-function resolveTouchedInspectionTarget(
-  candidate: string,
-  touchedPaths: ReadonlySet<string>,
-  repoRoot: string | null
-): string | null {
-  for (const touchedPath of touchedPaths) {
-    const normalizedTouchedPath = normalizeScopePath(touchedPath);
-    if (!normalizedTouchedPath) {
-      continue;
-    }
-    const touchedPathSet = new Set<string>([normalizedTouchedPath]);
-    if (
-      isTouchedScopePath(candidate, touchedPathSet, repoRoot) ||
-      isTouchedReviewScopePathFamilyOperand(candidate, touchedPathSet, repoRoot)
-    ) {
-      return normalizedTouchedPath;
-    }
-  }
-  return null;
 }
 
 function normalizeNarrativeInspectionSignature(line: string): string | null {

@@ -328,10 +328,22 @@ export function isTouchedReviewScopePathFamilyOperand(
       'dist/scripts/lib/review-meta-surface-normalization.js',
       'tests/review-meta-surface-normalization.spec.ts'
     ];
-    if (!reviewMetaSurfaceNormalizationPathFamily.includes(repoRelativeOperand)) {
+    if (reviewMetaSurfaceNormalizationPathFamily.includes(repoRelativeOperand)) {
+      return reviewMetaSurfaceNormalizationPathFamily.some((familyPath) =>
+        isTouchedScopePath(familyPath, touchedPaths, repoRoot)
+      );
+    }
+    const reviewInspectionTargetParsingPathFamily = [
+      'scripts/lib/review-inspection-target-parsing.ts',
+      'dist/scripts/lib/review-inspection-target-parsing.js',
+      'tests/review-inspection-target-parsing.spec.ts',
+      'scripts/lib/review-execution-state.ts',
+      'tests/review-execution-state.spec.ts'
+    ];
+    if (!reviewInspectionTargetParsingPathFamily.includes(repoRelativeOperand)) {
       return false;
     }
-    return reviewMetaSurfaceNormalizationPathFamily.some((familyPath) =>
+    return reviewInspectionTargetParsingPathFamily.some((familyPath) =>
       isTouchedScopePath(familyPath, touchedPaths, repoRoot)
     );
   }
@@ -548,11 +560,14 @@ function classifyMetaSurfaceOperand(
     matchesPathSuffix(normalized, 'dist/scripts/lib/review-scope-paths.js') ||
     matchesPathSuffix(normalized, 'scripts/lib/review-meta-surface-normalization.ts') ||
     matchesPathSuffix(normalized, 'dist/scripts/lib/review-meta-surface-normalization.js') ||
+    matchesPathSuffix(normalized, 'scripts/lib/review-inspection-target-parsing.ts') ||
+    matchesPathSuffix(normalized, 'dist/scripts/lib/review-inspection-target-parsing.js') ||
     matchesPathSuffix(normalized, 'scripts/run-review.ts') ||
     matchesPathSuffix(normalized, 'scripts/run-review.js') ||
     matchesPathSuffix(normalized, 'scripts/lib/review-execution-state.ts') ||
     matchesPathSuffix(normalized, 'tests/review-prompt-context.spec.ts') ||
     matchesPathSuffix(normalized, 'tests/review-meta-surface-normalization.spec.ts') ||
+    matchesPathSuffix(normalized, 'tests/review-inspection-target-parsing.spec.ts') ||
     matchesPathSuffix(normalized, 'tests/review-scope-paths.spec.ts') ||
     matchesPathSuffix(normalized, 'tests/run-review.spec.ts') ||
     matchesPathSuffix(normalized, 'tests/run-review.spec.js') ||
