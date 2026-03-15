@@ -13,6 +13,7 @@ related_tasks:
   - tasks/tasks-1220-coordinator-symphony-aligned-standalone-review-run-review-orchestration-boundary-reassessment.md
 review_notes:
   - 2026-03-16: Post-1219 local inspection indicates the next truthful standalone-review move, if any, is broader reassessment of the remaining `scripts/run-review.ts` orchestration shell rather than another helper-family extraction. Evidence: `docs/findings/1220-standalone-review-run-review-orchestration-boundary-reassessment-deliberation.md`, `out/1219-coordinator-symphony-aligned-standalone-review-remaining-helper-family-freeze-reassessment/manual/20260315T141218Z-closeout/14-next-slice-note.md`.
+  - 2026-03-16: Final reassessment identifies one truthful follow-on seam: the child execution and termination-monitor shell around `runCodexReview(...)` and `waitForChildExit(...)`. Prompt/task-context/runtime/handoff orchestration remains with `main()`. Evidence: `out/1220-coordinator-symphony-aligned-standalone-review-run-review-orchestration-boundary-reassessment/manual/20260315T213146Z-closeout/00-summary.md`, `out/1220-coordinator-symphony-aligned-standalone-review-run-review-orchestration-boundary-reassessment/manual/20260315T213146Z-closeout/14-next-slice-note.md`.
 ---
 
 # Technical Specification
