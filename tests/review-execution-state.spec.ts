@@ -2924,6 +2924,188 @@ describe('ReviewExecutionState', () => {
     expect(summary.metaSurfaceKinds).toEqual(['review-support']);
   });
 
+  it('keeps execution-runtime helpers in ordinary diff scope when run-review is touched', () => {
+    const state = new ReviewExecutionState({
+      startedAtMs: 0,
+      blockHeavyCommands: false,
+      metaSurfaceTimeoutMs: 1_000,
+      touchedPaths: ['scripts/run-review.ts']
+    });
+
+    state.observeChunk('thinking\nexec\n', 'stdout', 100);
+    state.observeChunk(
+      `/bin/zsh -lc 'sed -n 1,120p dist/scripts/lib/review-execution-runtime.js'\n`,
+      'stdout',
+      110
+    );
+
+    const expansion = state.getMetaSurfaceExpansionState(2_000);
+    const summary = state.buildOutputSummary();
+    expect(expansion.triggered).toBe(false);
+    expect(summary.metaSurfaceSignals).toBe(0);
+    expect(summary.metaSurfaceKinds).toEqual([]);
+  });
+
+  it('keeps the JS-host execution-runtime helper in ordinary diff scope when the JS run-review host is touched', () => {
+    const state = new ReviewExecutionState({
+      startedAtMs: 0,
+      blockHeavyCommands: false,
+      metaSurfaceTimeoutMs: 1_000,
+      touchedPaths: ['scripts/run-review.js']
+    });
+
+    state.observeChunk('thinking\nexec\n', 'stdout', 100);
+    state.observeChunk(
+      `/bin/zsh -lc 'sed -n 1,120p scripts/lib/review-execution-runtime.js'\n`,
+      'stdout',
+      110
+    );
+
+    const expansion = state.getMetaSurfaceExpansionState(2_000);
+    const summary = state.buildOutputSummary();
+    expect(expansion.triggered).toBe(false);
+    expect(summary.metaSurfaceSignals).toBe(0);
+    expect(summary.metaSurfaceKinds).toEqual([]);
+  });
+
+  it('keeps the run-review regression spec host in ordinary diff scope when the execution-runtime helper is touched', () => {
+    const state = new ReviewExecutionState({
+      startedAtMs: 0,
+      blockHeavyCommands: false,
+      metaSurfaceTimeoutMs: 1_000,
+      touchedPaths: ['scripts/lib/review-execution-runtime.ts']
+    });
+
+    state.observeChunk('thinking\nexec\n', 'stdout', 100);
+    state.observeChunk(`/bin/zsh -lc 'sed -n 998,1422p tests/run-review.spec.ts'\n`, 'stdout', 110);
+
+    const expansion = state.getMetaSurfaceExpansionState(2_000);
+    const summary = state.buildOutputSummary();
+    expect(expansion.triggered).toBe(false);
+    expect(summary.metaSurfaceSignals).toBe(0);
+    expect(summary.metaSurfaceKinds).toEqual([]);
+  });
+
+  it('keeps the execution-runtime helper in ordinary diff scope when the run-review regression spec host is touched', () => {
+    const state = new ReviewExecutionState({
+      startedAtMs: 0,
+      blockHeavyCommands: false,
+      metaSurfaceTimeoutMs: 1_000,
+      touchedPaths: ['tests/run-review.spec.ts']
+    });
+
+    state.observeChunk('thinking\nexec\n', 'stdout', 100);
+    state.observeChunk(`/bin/zsh -lc 'sed -n 1,120p scripts/lib/review-execution-runtime.ts'\n`, 'stdout', 110);
+
+    const expansion = state.getMetaSurfaceExpansionState(2_000);
+    const summary = state.buildOutputSummary();
+    expect(expansion.triggered).toBe(false);
+    expect(summary.metaSurfaceSignals).toBe(0);
+    expect(summary.metaSurfaceKinds).toEqual([]);
+  });
+
+  it('keeps execution-runtime helpers in ordinary diff scope when review-execution-state is touched', () => {
+    const state = new ReviewExecutionState({
+      startedAtMs: 0,
+      blockHeavyCommands: false,
+      metaSurfaceTimeoutMs: 1_000,
+      touchedPaths: ['scripts/lib/review-execution-state.ts']
+    });
+
+    state.observeChunk('thinking\nexec\n', 'stdout', 100);
+    state.observeChunk(
+      `/bin/zsh -lc 'sed -n 1,120p dist/scripts/lib/review-execution-runtime.js'\n`,
+      'stdout',
+      110
+    );
+
+    const expansion = state.getMetaSurfaceExpansionState(2_000);
+    const summary = state.buildOutputSummary();
+    expect(expansion.triggered).toBe(false);
+    expect(summary.metaSurfaceSignals).toBe(0);
+    expect(summary.metaSurfaceKinds).toEqual([]);
+  });
+
+  it('keeps the JS-host execution-runtime helper in ordinary diff scope when the JS review-execution-state spec host is touched', () => {
+    const state = new ReviewExecutionState({
+      startedAtMs: 0,
+      blockHeavyCommands: false,
+      metaSurfaceTimeoutMs: 1_000,
+      touchedPaths: ['tests/review-execution-state.spec.js']
+    });
+
+    state.observeChunk('thinking\nexec\n', 'stdout', 100);
+    state.observeChunk(
+      `/bin/zsh -lc 'sed -n 1,120p scripts/lib/review-execution-runtime.js'\n`,
+      'stdout',
+      110
+    );
+
+    const expansion = state.getMetaSurfaceExpansionState(2_000);
+    const summary = state.buildOutputSummary();
+    expect(expansion.triggered).toBe(false);
+    expect(summary.metaSurfaceSignals).toBe(0);
+    expect(summary.metaSurfaceKinds).toEqual([]);
+  });
+
+  it('keeps the JS run-review regression spec host in ordinary diff scope when the JS-host execution-runtime helper is touched', () => {
+    const state = new ReviewExecutionState({
+      startedAtMs: 0,
+      blockHeavyCommands: false,
+      metaSurfaceTimeoutMs: 1_000,
+      touchedPaths: ['scripts/lib/review-execution-runtime.js']
+    });
+
+    state.observeChunk('thinking\nexec\n', 'stdout', 100);
+    state.observeChunk(`/bin/zsh -lc 'sed -n 998,1422p tests/run-review.spec.js'\n`, 'stdout', 110);
+
+    const expansion = state.getMetaSurfaceExpansionState(2_000);
+    const summary = state.buildOutputSummary();
+    expect(expansion.triggered).toBe(false);
+    expect(summary.metaSurfaceSignals).toBe(0);
+    expect(summary.metaSurfaceKinds).toEqual([]);
+  });
+
+  it('keeps the JS-host execution-runtime helper in ordinary diff scope when the JS run-review regression spec host is touched', () => {
+    const state = new ReviewExecutionState({
+      startedAtMs: 0,
+      blockHeavyCommands: false,
+      metaSurfaceTimeoutMs: 1_000,
+      touchedPaths: ['tests/run-review.spec.js']
+    });
+
+    state.observeChunk('thinking\nexec\n', 'stdout', 100);
+    state.observeChunk(`/bin/zsh -lc 'sed -n 1,120p scripts/lib/review-execution-runtime.js'\n`, 'stdout', 110);
+
+    const expansion = state.getMetaSurfaceExpansionState(2_000);
+    const summary = state.buildOutputSummary();
+    expect(expansion.triggered).toBe(false);
+    expect(summary.metaSurfaceSignals).toBe(0);
+    expect(summary.metaSurfaceKinds).toEqual([]);
+  });
+
+  it('keeps the JS-host execution-runtime helper in ordinary diff scope when the source-host review-execution-state.js sibling is touched', () => {
+    const state = new ReviewExecutionState({
+      startedAtMs: 0,
+      blockHeavyCommands: false,
+      metaSurfaceTimeoutMs: 1_000,
+      touchedPaths: ['scripts/lib/review-execution-state.js']
+    });
+
+    state.observeChunk('thinking\nexec\n', 'stdout', 100);
+    state.observeChunk(
+      `/bin/zsh -lc 'sed -n 1,120p scripts/lib/review-execution-runtime.js'\n`,
+      'stdout',
+      110
+    );
+
+    const expansion = state.getMetaSurfaceExpansionState(2_000);
+    const summary = state.buildOutputSummary();
+    expect(expansion.triggered).toBe(false);
+    expect(summary.metaSurfaceSignals).toBe(0);
+    expect(summary.metaSurfaceKinds).toEqual([]);
+  });
+
   it('classifies untouched adjacent shell-command parser helpers as meta-surface activity for standalone-review diffs', () => {
     const state = new ReviewExecutionState({
       startedAtMs: 0,
@@ -3204,6 +3386,24 @@ describe('ReviewExecutionState', () => {
     expect(summary.metaSurfaceKinds).toEqual([]);
   });
 
+  it('keeps the run-review host in ordinary diff scope when the execution-runtime helper source is touched', () => {
+    const state = new ReviewExecutionState({
+      startedAtMs: 0,
+      blockHeavyCommands: false,
+      metaSurfaceTimeoutMs: 1_000,
+      touchedPaths: ['scripts/lib/review-execution-runtime.ts']
+    });
+
+    state.observeChunk('thinking\nexec\n', 'stdout', 100);
+    state.observeChunk(`/bin/zsh -lc 'sed -n 1,120p scripts/run-review.ts'\n`, 'stdout', 110);
+
+    const expansion = state.getMetaSurfaceExpansionState(2_000);
+    const summary = state.buildOutputSummary();
+    expect(expansion.triggered).toBe(false);
+    expect(summary.metaSurfaceSignals).toBe(0);
+    expect(summary.metaSurfaceKinds).toEqual([]);
+  });
+
   it('keeps prompt-context helpers as meta-surface activity when only review-scope helpers are touched', () => {
     const state = new ReviewExecutionState({
       startedAtMs: 0,
@@ -3267,6 +3467,28 @@ describe('ReviewExecutionState', () => {
     state.observeChunk('thinking\nexec\n', 'stdout', 100);
     state.observeChunk(
       `/bin/zsh -lc 'sed -n 1,120p dist/scripts/lib/review-shell-env-interpreter.js'\n`,
+      'stdout',
+      110
+    );
+
+    const expansion = state.getMetaSurfaceExpansionState(2_000);
+    const summary = state.buildOutputSummary();
+    expect(expansion.triggered).toBe(false);
+    expect(summary.metaSurfaceSignals).toBe(1);
+    expect(summary.metaSurfaceKinds).toEqual(['review-support']);
+  });
+
+  it('keeps execution-runtime helpers as meta-surface activity when only prompt-context helpers are touched', () => {
+    const state = new ReviewExecutionState({
+      startedAtMs: 0,
+      blockHeavyCommands: false,
+      metaSurfaceTimeoutMs: 1_000,
+      touchedPaths: ['scripts/lib/review-prompt-context.ts']
+    });
+
+    state.observeChunk('thinking\nexec\n', 'stdout', 100);
+    state.observeChunk(
+      `/bin/zsh -lc 'sed -n 1,120p dist/scripts/lib/review-execution-runtime.js'\n`,
       'stdout',
       110
     );

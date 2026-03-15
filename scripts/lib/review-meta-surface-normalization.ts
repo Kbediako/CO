@@ -394,6 +394,29 @@ export function isTouchedReviewScopePathFamilyOperand(
       'scripts/run-review.ts',
       'dist/scripts/run-review.js'
     ];
+    const reviewExecutionRuntimePathFamily = [
+      'scripts/lib/review-execution-runtime.ts',
+      'scripts/lib/review-execution-runtime.js',
+      'dist/scripts/lib/review-execution-runtime.js'
+    ];
+    const reviewExecutionRuntimeRunReviewPathFamily = [
+      ...reviewExecutionRuntimePathFamily,
+      'scripts/run-review.ts',
+      'scripts/run-review.js',
+      'dist/scripts/run-review.js'
+    ];
+    const reviewExecutionRuntimeRegressionSpecPathFamily = [
+      'tests/run-review.spec.ts',
+      'tests/run-review.spec.js'
+    ];
+    const reviewExecutionRuntimeExecutionStatePathFamily = [
+      ...reviewExecutionRuntimePathFamily,
+      'scripts/lib/review-execution-state.ts',
+      'scripts/lib/review-execution-state.js',
+      'dist/scripts/lib/review-execution-state.js',
+      'tests/review-execution-state.spec.ts',
+      'tests/review-execution-state.spec.js'
+    ];
     const reviewSupportPathFamilies = [
       reviewMetaSurfaceNormalizationPathFamily,
       reviewInspectionTargetParsingPathFamily,
@@ -406,8 +429,23 @@ export function isTouchedReviewScopePathFamilyOperand(
       reviewShellCommandParserMetaSurfaceBoundaryAnalysisPathFamily,
       reviewShellCommandParserNormalizationPathFamily,
       reviewShellCommandParserExecutionStatePathFamily,
-      reviewExecutionTelemetryPathFamily
+      reviewExecutionTelemetryPathFamily,
+      reviewExecutionRuntimeRunReviewPathFamily,
+      reviewExecutionRuntimeExecutionStatePathFamily
     ];
+    if (reviewExecutionRuntimeRegressionSpecPathFamily.includes(repoRelativeOperand)) {
+      return reviewExecutionRuntimePathFamily.some((path) =>
+        isTouchedScopePath(path, touchedPaths, repoRoot)
+      );
+    }
+    if (
+      reviewExecutionRuntimePathFamily.includes(repoRelativeOperand) &&
+      reviewExecutionRuntimeRegressionSpecPathFamily.some((path) =>
+        isTouchedScopePath(path, touchedPaths, repoRoot)
+      )
+    ) {
+      return true;
+    }
     return reviewSupportPathFamilies.some(
       (familyPath) =>
         familyPath.includes(repoRelativeOperand) &&
@@ -639,6 +677,9 @@ function classifyMetaSurfaceOperand(
     matchesPathSuffix(normalized, 'dist/scripts/lib/review-shell-command-parser.js') ||
     matchesPathSuffix(normalized, 'scripts/lib/review-execution-telemetry.ts') ||
     matchesPathSuffix(normalized, 'dist/scripts/lib/review-execution-telemetry.js') ||
+    matchesPathSuffix(normalized, 'scripts/lib/review-execution-runtime.ts') ||
+    matchesPathSuffix(normalized, 'scripts/lib/review-execution-runtime.js') ||
+    matchesPathSuffix(normalized, 'dist/scripts/lib/review-execution-runtime.js') ||
     matchesPathSuffix(normalized, 'tests/review-meta-surface-boundary-analysis.spec.ts') ||
     matchesPathSuffix(normalized, 'scripts/run-review.ts') ||
     matchesPathSuffix(normalized, 'scripts/run-review.js') ||
