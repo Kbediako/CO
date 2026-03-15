@@ -674,10 +674,6 @@ async function main(): Promise<void> {
           : reviewSurface === 'architecture'
             ? reviewTaskContext.architectureSurfacePaths
           : [],
-      allowedMetaSurfaceEnvVars:
-        reviewSurface === 'audit'
-          ? ['MANIFEST', ...(runnerLogExists ? ['RUNNER_LOG', 'RUN_LOG'] : [])]
-          : [],
       auditStartupAnchorEnvVarPaths:
         reviewSurface === 'audit'
           ? {
@@ -1377,7 +1373,6 @@ interface RunCodexReviewOptions {
   startupAnchorMode: ReviewStartupAnchorMode | null;
   auditStartupAnchorPaths: string[];
   allowedMetaSurfacePaths: string[];
-  allowedMetaSurfaceEnvVars: string[];
   auditStartupAnchorEnvVarPaths: Record<string, string>;
   allowedMetaSurfaceEnvVarPaths: Record<string, string>;
   repoRoot: string;
@@ -1470,7 +1465,6 @@ async function runCodexReview(
     startupAnchorMode: options.startupAnchorMode,
     auditStartupAnchorPaths: options.auditStartupAnchorPaths,
     allowedMetaSurfacePaths: options.allowedMetaSurfacePaths,
-    allowedMetaSurfaceEnvVars: options.allowedMetaSurfaceEnvVars,
     auditStartupAnchorEnvVarPaths: options.auditStartupAnchorEnvVarPaths,
     allowedMetaSurfaceEnvVarPaths: options.allowedMetaSurfaceEnvVarPaths,
     repoRoot: options.repoRoot,

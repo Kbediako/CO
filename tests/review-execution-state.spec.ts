@@ -185,7 +185,6 @@ describe('ReviewExecutionState', () => {
       startupAnchorMode: 'audit',
       repoRoot: '/repo',
       auditStartupAnchorPaths: ['/repo/.runs/sample-task/cli/sample-run/manifest.json'],
-      allowedMetaSurfaceEnvVars: ['MANIFEST'],
       auditStartupAnchorEnvVarPaths: {
         MANIFEST: '/repo/.runs/sample-task/cli/sample-run/manifest.json'
       }
@@ -210,7 +209,6 @@ describe('ReviewExecutionState', () => {
       startupAnchorMode: 'audit',
       repoRoot: '/repo',
       auditStartupAnchorPaths: ['/repo/.runs/sample-task/cli/sample-run/manifest.json'],
-      allowedMetaSurfaceEnvVars: ['MANIFEST'],
       auditStartupAnchorEnvVarPaths: {
         MANIFEST: '/repo/.runs/sample-task/cli/sample-run/manifest.json'
       }
@@ -2092,7 +2090,6 @@ describe('ReviewExecutionState', () => {
       startupAnchorMode: 'audit',
       repoRoot: '/Users/kbediako/Code/CO',
       auditStartupAnchorPaths: ['/Users/kbediako/Code/CO/.runs/sample-task/cli/sample-run/manifest.json'],
-      allowedMetaSurfaceEnvVars: ['MANIFEST'],
       auditStartupAnchorEnvVarPaths: {
         MANIFEST: '/Users/kbediako/Code/CO/.runs/sample-task/cli/sample-run/manifest.json'
       }
@@ -2125,7 +2122,6 @@ describe('ReviewExecutionState', () => {
       startupAnchorMode: 'audit',
       repoRoot: '/Users/kbediako/Code/CO',
       auditStartupAnchorPaths: ['/Users/kbediako/Code/CO/.runs/sample-task/cli/sample-run/manifest.json'],
-      allowedMetaSurfaceEnvVars: ['MANIFEST'],
       auditStartupAnchorEnvVarPaths: {
         MANIFEST: '/Users/kbediako/Code/CO/.runs/sample-task/cli/sample-run/manifest.json'
       }
@@ -2153,7 +2149,6 @@ describe('ReviewExecutionState', () => {
       allowedMetaSurfaceKinds: ['run-manifest', 'run-runner-log'],
       repoRoot: '/Users/kbediako/Code/CO',
       allowedMetaSurfacePaths: ['/Users/kbediako/Code/CO/.runs/sample-task/cli/sample-run/manifest.json'],
-      allowedMetaSurfaceEnvVars: ['MANIFEST'],
       allowedMetaSurfaceEnvVarPaths: {
         MANIFEST: '/Users/kbediako/Code/CO/.runs/sample-task/cli/sample-run/manifest.json'
       }
@@ -2262,7 +2257,6 @@ describe('ReviewExecutionState', () => {
       startedAtMs: 0,
       blockHeavyCommands: false,
       repoRoot: '/Users/kbediako/Code/CO',
-      allowedMetaSurfaceEnvVars: ['MANIFEST'],
       allowedMetaSurfaceEnvVarPaths: {
         MANIFEST: '/Users/kbediako/Code/CO/manual-review/manifest.json'
       }
@@ -2285,7 +2279,6 @@ describe('ReviewExecutionState', () => {
       startedAtMs: 0,
       blockHeavyCommands: false,
       repoRoot: '/Users/kbediako/Code/CO',
-      allowedMetaSurfaceEnvVars: ['MANIFEST'],
       allowedMetaSurfaceEnvVarPaths: {
         MANIFEST: '/Users/kbediako/Code/CO/manual-review/manifest.json'
       }
