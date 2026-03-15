@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260315-1213-coordinator-symphony-aligned-standalone-review-inspection-target-parsing-pipeline-extraction",
+      "title": "Coordinator Symphony-Aligned Standalone Review Inspection Target Parsing Pipeline Extraction",
+      "relates_to": "tasks/tasks-1213-coordinator-symphony-aligned-standalone-review-inspection-target-parsing-pipeline-extraction.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-15",
+      "paths": {
+        "spec": "tasks/specs/1213-coordinator-symphony-aligned-standalone-review-inspection-target-parsing-pipeline-extraction.md",
+        "task": "tasks/tasks-1213-coordinator-symphony-aligned-standalone-review-inspection-target-parsing-pipeline-extraction.md",
+        "agent_task": ".agent/task/1213-coordinator-symphony-aligned-standalone-review-inspection-target-parsing-pipeline-extraction.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-standalone-review-inspection-target-parsing-pipeline-extraction.md"
+      }
+    },
+    {
       "id": "20260315-1212-coordinator-symphony-aligned-standalone-review-operand-path-normalization-boundary-extraction",
       "title": "Coordinator Symphony-Aligned Standalone Review Operand Path Normalization Boundary Extraction",
       "relates_to": "tasks/tasks-1212-coordinator-symphony-aligned-standalone-review-operand-path-normalization-boundary-extraction.md",

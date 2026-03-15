@@ -1,0 +1,5 @@
+
+> @kbediako/codex-orchestrator@0.1.38 docs:freshness
+> node scripts/docs-freshness.mjs --check
+
+docs:freshness OK - 2159 docs, 2169 registry entries
