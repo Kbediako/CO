@@ -1,7 +1,7 @@
 ---
 id: 20260315-1218-coordinator-symphony-aligned-standalone-review-shell-command-parser-review-support-classification
 title: Coordinator Symphony-Aligned Standalone Review Shell Command Parser Review-Support Classification
-status: draft
+status: completed
 owner: Codex
 created: 2026-03-15
 last_review: 2026-03-15
@@ -13,6 +13,7 @@ related_tasks:
   - tasks/tasks-1218-coordinator-symphony-aligned-standalone-review-shell-command-parser-review-support-classification.md
 review_notes:
   - 2026-03-15: Local read-only reassessment plus bounded scout approval confirm a real support-family parity gap after `1217`. The extracted shell-command parser family is reused by the adjacent standalone-review helpers but is still omitted from the `review-support` classifier and touched-family exemptions in `scripts/lib/review-meta-surface-normalization.ts`. Evidence: `docs/findings/1218-standalone-review-shell-command-parser-review-support-classification-deliberation.md`, `out/1217-coordinator-symphony-aligned-standalone-review-execution-telemetry-surface-extraction/manual/20260315T125429Z-closeout/14-next-slice-note.md`, `scripts/lib/review-meta-surface-normalization.ts`, `scripts/lib/review-shell-command-parser.ts`.
+  - 2026-03-15: Closeout completed with shipped pairwise parser adjacency groups covering direct consumer sources plus the normalization and execution-state host/spec pairs. Bounded review surfaced and the lane fixed the missing host parity and the overbroad clique regression; remaining dist/test-host omission chatter is recorded as an explicit low-signal override. Evidence: `out/1218-coordinator-symphony-aligned-standalone-review-shell-command-parser-review-support-classification/manual/20260315T131549Z-closeout/00-summary.md`, `out/1218-coordinator-symphony-aligned-standalone-review-shell-command-parser-review-support-classification/manual/20260315T131549Z-closeout/13-override-notes.md`.
 ---
 
 # Technical Specification
@@ -28,6 +29,7 @@ The standalone-review support-family classifier still points at the older adjace
 3. Extend the local touched-family exemption logic so the parser helper source and built pair inherit the same bounded diff behavior as the adjacent standalone-review helper families.
 4. Keep the lane local to support-family classification and its focused regressions.
 5. Do not widen into shell-command parser behavior changes, new helper extraction, or `scripts/run-review.ts` runtime supervision.
+6. Keep parser adjacency modeled as pairwise touched-path groups rather than a broad consumer clique.
 
 ## Validation Plan
 
