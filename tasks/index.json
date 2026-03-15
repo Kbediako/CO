@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260315-1211-coordinator-symphony-aligned-standalone-review-shell-command-parser-primitives-extraction",
+      "title": "Coordinator Symphony-Aligned Standalone Review Shell Command Parser Primitives Extraction",
+      "relates_to": "tasks/tasks-1211-coordinator-symphony-aligned-standalone-review-shell-command-parser-primitives-extraction.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-15",
+      "paths": {
+        "spec": "tasks/specs/1211-coordinator-symphony-aligned-standalone-review-shell-command-parser-primitives-extraction.md",
+        "task": "tasks/tasks-1211-coordinator-symphony-aligned-standalone-review-shell-command-parser-primitives-extraction.md",
+        "agent_task": ".agent/task/1211-coordinator-symphony-aligned-standalone-review-shell-command-parser-primitives-extraction.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-standalone-review-shell-command-parser-primitives-extraction.md"
+      }
+    },
+    {
       "id": "20260315-1210-coordinator-symphony-aligned-standalone-review-shell-env-interpreter-review-support-classification",
       "title": "Coordinator Symphony-Aligned Standalone Review Shell Env Interpreter Review-Support Classification",
       "relates_to": "tasks/tasks-1210-coordinator-symphony-aligned-standalone-review-shell-env-interpreter-review-support-classification.md",

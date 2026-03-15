@@ -1,6 +1,71 @@
 import { describe, expect, it } from 'vitest';
 
+import {
+  extractShellCommandPayload,
+  inferStaticShellTruthiness,
+  normalizeCommandToken,
+  segmentRunsInParentShell,
+  separatorCarriesParentShellStateForward,
+  splitShellControlSegmentsDetailed,
+  stripLeadingEnvAssignments,
+  tokenizeShellSegment,
+  unwrapEnvCommandTokens
+} from '../scripts/lib/review-shell-command-parser.js';
 import { ReviewExecutionState } from '../scripts/lib/review-execution-state.js';
+
+describe('review shell command parser', () => {
+  it('keeps quoted separators inside a single shell-control segment', () => {
+    const command = `/bin/zsh -lc 'printf "%s" "a&&b"; echo done'`;
+
+    expect(splitShellControlSegmentsDetailed(command)).toEqual([
+      {
+        segment: command,
+        separatorAfter: null
+      }
+    ]);
+  });
+
+  it('tracks parent-shell carry and execution gating across control separators', () => {
+    expect(separatorCarriesParentShellStateForward(';')).toBe(true);
+    expect(separatorCarriesParentShellStateForward('&')).toBe(false);
+    expect(separatorCarriesParentShellStateForward('|')).toBe(false);
+    expect(segmentRunsInParentShell(null, null)).toBe(true);
+    expect(segmentRunsInParentShell('&&', true)).toBe(true);
+    expect(segmentRunsInParentShell('&&', false)).toBe(false);
+    expect(segmentRunsInParentShell('||', false)).toBe(true);
+    expect(segmentRunsInParentShell('||', true)).toBe(false);
+  });
+
+  it('unwraps env launchers before extracting shell payloads', () => {
+    const rawTokens = tokenizeShellSegment(
+      'FOO=1 BAR=2 env -u MANIFEST --unset=RUN_LOG /bin/cmd.exe /C npm run test'
+    );
+    const strippedTokens = stripLeadingEnvAssignments(rawTokens);
+
+    expect(strippedTokens).toEqual([
+      'env',
+      '-u',
+      'MANIFEST',
+      '--unset=RUN_LOG',
+      '/bin/cmd.exe',
+      '/C',
+      'npm',
+      'run',
+      'test'
+    ]);
+
+    const unwrappedTokens = unwrapEnvCommandTokens(strippedTokens);
+    expect(unwrappedTokens).toEqual(['/bin/cmd.exe', '/C', 'npm', 'run', 'test']);
+    expect(extractShellCommandPayload(unwrappedTokens)).toBe('npm run test');
+  });
+
+  it('preserves command normalization and shell truthiness inference', () => {
+    expect(normalizeCommandToken('C:\\tools\\CMD.EXE')).toBe('cmd');
+    expect(inferStaticShellTruthiness('FOO=1 env -u MANIFEST false')).toBe(false);
+    expect(inferStaticShellTruthiness('export MANIFEST=/tmp/manifest.json')).toBe(true);
+    expect(inferStaticShellTruthiness('printf "%s" "$MANIFEST"')).toBeNull();
+  });
+});
 
 describe('ReviewExecutionState', () => {
   it('derives task progress from a single live state owner without command drift', () => {
@@ -1582,6 +1647,38 @@ describe('ReviewExecutionState', () => {
     state.observeChunk('thinking\nexec\n', 'stdout', 100);
     state.observeChunk(
       `/bin/zsh -lc 'true || export MANIFEST=/tmp/other.json; sed -n 1,80p \"$MANIFEST\"'\n`,
+      'stdout',
+      110
+    );
+    state.observeChunk('thinking\nexec\n', 'stdout', 200);
+    state.observeChunk(
+      `/bin/zsh -lc 'sed -n 1,120p /Users/kbediako/.codex/memories/MEMORY.md'\n`,
+      'stdout',
+      210
+    );
+
+    const boundary = state.getStartupAnchorBoundaryState(220);
+    expect(boundary.triggered).toBe(false);
+    expect(boundary.anchorObserved).toBe(true);
+    expect(boundary.preAnchorMetaSurfaceKinds).toEqual([]);
+  });
+
+  it('uses env-unwrapped false truthiness when deciding whether a following export runs in the parent shell', () => {
+    const state = new ReviewExecutionState({
+      startedAtMs: 0,
+      blockHeavyCommands: false,
+      enforceStartupAnchorBoundary: true,
+      startupAnchorMode: 'audit',
+      repoRoot: '/Users/kbediako/Code/CO',
+      auditStartupAnchorPaths: ['/Users/kbediako/Code/CO/manual-review/manifest.json'],
+      auditStartupAnchorEnvVarPaths: {
+        MANIFEST: '/Users/kbediako/Code/CO/manual-review/manifest.json'
+      }
+    });
+
+    state.observeChunk('thinking\nexec\n', 'stdout', 100);
+    state.observeChunk(
+      `/bin/zsh -lc 'CI=1 env -- false && export MANIFEST=/tmp/other.json; sed -n 1,80p \"$MANIFEST\"'\n`,
       'stdout',
       110
     );
@@ -3654,6 +3751,22 @@ describe('ReviewExecutionState', () => {
     const boundary = state.getCommandIntentBoundaryState(2_000);
     expect(boundary.triggered).toBe(false);
     expect(boundary.violationCount).toBe(0);
+  });
+
+  it('classifies env-unwrapped cmd payload validation suites after inner shell-control splitting', () => {
+    const state = new ReviewExecutionState({ startedAtMs: 0 });
+
+    state.observeChunk('thinking\nexec\n', 'stdout', 100);
+    state.observeChunk(
+      `/bin/zsh -lc 'CI=1 env -- cmd /c "echo prep && npm run test"'\n`,
+      'stdout',
+      110
+    );
+
+    const boundary = state.getCommandIntentBoundaryState(2_000);
+    expect(boundary.triggered).toBe(true);
+    expect(boundary.violationKind).toBe('validation-suite');
+    expect(boundary.violationSample).toContain('npm run test');
   });
 
   it('classifies package-manager validation suites as command-intent boundary violations by default', () => {
