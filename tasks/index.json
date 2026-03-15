@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260315-1216-coordinator-symphony-aligned-standalone-review-meta-surface-boundary-analysis-extraction",
+      "title": "Coordinator Symphony-Aligned Standalone Review Meta-Surface Boundary Analysis Extraction",
+      "relates_to": "tasks/tasks-1216-coordinator-symphony-aligned-standalone-review-meta-surface-boundary-analysis-extraction.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-15",
+      "paths": {
+        "spec": "tasks/specs/1216-coordinator-symphony-aligned-standalone-review-meta-surface-boundary-analysis-extraction.md",
+        "task": "tasks/tasks-1216-coordinator-symphony-aligned-standalone-review-meta-surface-boundary-analysis-extraction.md",
+        "agent_task": ".agent/task/1216-coordinator-symphony-aligned-standalone-review-meta-surface-boundary-analysis-extraction.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-standalone-review-meta-surface-boundary-analysis-extraction.md"
+      }
+    },
+    {
       "id": "20260315-1215-coordinator-symphony-aligned-standalone-review-command-intent-classification-extraction",
       "title": "Coordinator Symphony-Aligned Standalone Review Command-Intent Classification Extraction",
       "relates_to": "tasks/tasks-1215-coordinator-symphony-aligned-standalone-review-command-intent-classification-extraction.md",
