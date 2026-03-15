@@ -1,6 +1,3 @@
-import { writeFile } from 'node:fs/promises';
-import path from 'node:path';
-
 import {
   ARCHITECTURE_CONTEXT_META_SURFACE_KIND,
   expandMetaSurfaceOperandCandidates,
@@ -31,6 +28,11 @@ import {
   classifyMetaSurfaceOutputLine,
   classifyMetaSurfaceToolLine
 } from './review-meta-surface-boundary-analysis.js';
+import {
+  buildReviewTelemetryPayload,
+  inferTerminationBoundaryKindsFromErrorMessage,
+  type ReviewTelemetryPayload,
+} from './review-execution-telemetry.js';
 
 const REVIEW_DELEGATION_STARTUP_LINE_RE = /\bmcp:\s*delegation\s+(starting|ready)\b/i;
 const REVIEW_PROGRESS_SIGNAL_LINE_RE = /^(thinking|exec|codex)\b/i;
@@ -108,7 +110,6 @@ export type ReviewTerminationBoundaryProvenance =
   | 'targetless-speculative-narrative'
   | 'post-startup-anchor'
   | 'bounded-surface';
-
 export type ReviewScopeMode = 'uncommitted' | 'base' | 'commit';
 export type ReviewStartupAnchorMode = 'diff' | 'audit';
 
@@ -259,13 +260,6 @@ export interface ReviewRelevantReinspectionDwellBoundaryState {
   violationSample: string | null;
 }
 
-export interface ReviewTerminationBoundaryRecord {
-  kind: ReviewTerminationBoundaryKind;
-  provenance: ReviewTerminationBoundaryProvenance;
-  reason: string;
-  sample: string | null;
-}
-
 export interface ReviewExecutionStateOptions {
   blockHeavyCommands?: boolean;
   allowValidationCommandIntents?: boolean;
@@ -302,24 +296,11 @@ interface ReviewExecutionTelemetryPayloadOptions {
   telemetryDebugEnvKey: string;
 }
 
-export interface PersistReviewTelemetryOptions extends ReviewExecutionTelemetryPayloadOptions {
-  telemetryPath: string;
-  state: ReviewExecutionState;
-}
-
-export interface ReviewTelemetryPayload {
-  version: number;
-  generated_at: string;
-  status: 'succeeded' | 'failed';
-  error: string | null;
-  output_log_path: string;
-  termination_boundary: ReviewTerminationBoundaryRecord | null;
-  summary: ReviewOutputSummary;
-}
-
-export interface LogReviewTelemetryOptions {
-  debugTelemetry: boolean;
-  telemetryDebugEnvKey: string;
+export interface ReviewTerminationBoundaryRecord {
+  kind: ReviewTerminationBoundaryKind;
+  provenance: ReviewTerminationBoundaryProvenance;
+  reason: string;
+  sample: string | null;
 }
 
 type ReviewExecutionStream = 'stdout' | 'stderr';
@@ -777,37 +758,25 @@ export class ReviewExecutionState {
   buildTelemetryPayload(
     options: ReviewExecutionTelemetryPayloadOptions
   ): ReviewTelemetryPayload {
-    const summary = this.buildOutputSummary();
-    const persistedSummary = sanitizeTelemetrySummaryForPersistence(
-      summary,
-      options.includeRawTelemetry,
-      options.telemetryDebugEnvKey
-    );
     const explicitTerminationBoundaryProvided = Object.prototype.hasOwnProperty.call(
       options,
       'terminationBoundary'
     );
-    return {
-      version: 1,
-      generated_at: new Date().toISOString(),
+    return buildReviewTelemetryPayload({
       status: options.status,
-      error: sanitizeTelemetryErrorForPersistence(
-        options.error ?? null,
-        options.includeRawTelemetry,
-        options.telemetryDebugEnvKey
-      ),
-      output_log_path: path.relative(options.repoRoot, options.outputLogPath),
-      termination_boundary: sanitizeTerminationBoundaryForPersistence(
+      error: options.error ?? null,
+      terminationBoundary:
         options.status === 'failed'
           ? explicitTerminationBoundaryProvided
             ? options.terminationBoundary ?? null
             : this.getTerminationBoundaryRecord(options.error ?? null)
           : null,
-        options.includeRawTelemetry,
-        options.telemetryDebugEnvKey
-      ),
-      summary: persistedSummary
-    };
+      outputLogPath: options.outputLogPath,
+      repoRoot: options.repoRoot,
+      includeRawTelemetry: options.includeRawTelemetry,
+      telemetryDebugEnvKey: options.telemetryDebugEnvKey,
+      summary: this.buildOutputSummary()
+    });
   }
 
   getTerminationBoundaryRecordForKind(
@@ -1528,141 +1497,12 @@ export class ReviewExecutionState {
   }
 }
 
-export async function persistReviewTelemetry(
-  options: PersistReviewTelemetryOptions
-): Promise<ReviewTelemetryPayload> {
-  const payload = options.state.buildTelemetryPayload(options);
-  await writeFile(options.telemetryPath, `${JSON.stringify(payload, null, 2)}\n`, 'utf8');
-  return payload;
-}
-
-export function logReviewTelemetrySummary(
-  payload: ReviewTelemetryPayload,
-  telemetryPath: string,
-  options: LogReviewTelemetryOptions
-): void {
-  const summary = payload.summary;
-  console.error(
-    `[run-review] review telemetry: ${summary.commandStarts.length} command start(s), ${summary.heavyCommandStarts.length} heavy command start(s), ${summary.startupEvents} delegation startup event(s), ${summary.reviewProgressSignals} review progress signal(s).`
-  );
-  if (payload.termination_boundary) {
-    console.error(
-      `[run-review] termination boundary: ${payload.termination_boundary.kind} (${payload.termination_boundary.provenance}).`
-    );
-  }
-  const lastCommand = summary.commandStarts.at(-1);
-  if (lastCommand) {
-    if (options.debugTelemetry) {
-      console.error(`[run-review] last command started: ${lastCommand}`);
-    } else {
-      console.error(
-        `[run-review] last command started: [redacted] (set ${options.telemetryDebugEnvKey}=1 to print raw command text).`
-      );
-    }
-  }
-  if (summary.completionCount < summary.commandStarts.length) {
-    console.error(
-      `[run-review] command completions observed: ${summary.completionCount}; possible in-flight command at termination.`
-    );
-  }
-  if (summary.heavyCommandStarts.length > 0) {
-    if (options.debugTelemetry) {
-      console.error(
-        `[run-review] heavy commands detected: ${summary.heavyCommandStarts.join(' | ')}`
-      );
-    } else {
-      console.error(
-        `[run-review] heavy commands detected: ${summary.heavyCommandStarts.length} sample(s) captured (set ${options.telemetryDebugEnvKey}=1 to print raw command text).`
-      );
-    }
-  }
-  if (summary.metaSurfaceSignals > 0) {
-    console.error(
-      `[run-review] meta-surface signals detected: ${summary.metaSurfaceSignals} sample(s) across ${summary.distinctMetaSurfaces} surface kind(s) [${summary.metaSurfaceKinds.join(', ')}]; max repeated surface hits ${summary.maxMetaSurfaceHits}.`
-    );
-  }
-  if (summary.lastLines.length > 0) {
-    if (options.debugTelemetry) {
-      console.error(`[run-review] output tail: ${summary.lastLines.join(' || ')}`);
-    } else {
-      console.error(
-        `[run-review] output tail captured: ${summary.lastLines.length} line(s) hidden by default (set ${options.telemetryDebugEnvKey}=1 to print raw tail).`
-      );
-    }
-  }
-  console.error(`[run-review] review telemetry saved to: ${telemetryPath}`);
-}
-
-function inferTerminationBoundaryKindsFromErrorMessage(
-  errorMessage: string | null
-): ReviewTerminationBoundaryKind[] {
-  if (!errorMessage) {
-    return [];
-  }
-  const kinds: ReviewTerminationBoundaryKind[] = [];
-  if (errorMessage.includes('codex review timed out after')) {
-    kinds.push('timeout');
-  }
-  if (errorMessage.includes('codex review stalled with no output for')) {
-    kinds.push('stall');
-  }
-  if (errorMessage.includes('bounded command-intent boundary')) {
-    kinds.push('command-intent');
-  }
-  if (errorMessage.includes('shell-probe boundary violated')) {
-    kinds.push('shell-probe');
-  }
-  if (errorMessage.includes('appears stuck in delegation startup loop')) {
-    kinds.push('startup-loop');
-  }
-  if (errorMessage.includes('active-closeout-bundle reread boundary violated')) {
-    kinds.push('active-closeout-bundle-reread');
-  }
-  if (errorMessage.includes('startup-anchor boundary violated')) {
-    kinds.push('startup-anchor');
-  }
-  if (errorMessage.includes('meta-surface expansion detected')) {
-    kinds.push('meta-surface-expansion');
-  }
-  if (errorMessage.includes('relevant-reinspection dwell boundary violated')) {
-    kinds.push('relevant-reinspection-dwell');
-  }
-  if (errorMessage.includes('verdict-stability drift detected')) {
-    kinds.push('verdict-stability');
-  }
-  return kinds;
-}
-
 function normalizeTerminationBoundarySample(sample: string | null): string | null {
   if (!sample) {
     return null;
   }
   const trimmed = sample.trim();
   return trimmed.length > 0 ? trimmed : null;
-}
-
-function sanitizeTerminationBoundaryForPersistence(
-  boundary: ReviewTerminationBoundaryRecord | null,
-  includeRawTelemetry: boolean,
-  telemetryDebugEnvKey: string
-): ReviewTerminationBoundaryRecord | null {
-  if (!boundary) {
-    return null;
-  }
-  if (includeRawTelemetry) {
-    return boundary;
-  }
-  const redactedSample = boundary.sample
-    ? `[redacted ${boundary.kind} sample; set ${telemetryDebugEnvKey}=1 to persist raw sample]`
-    : null;
-  return {
-    ...boundary,
-    reason:
-      boundary.sample && redactedSample
-        ? boundary.reason.split(boundary.sample).join(redactedSample)
-        : boundary.reason,
-    sample: redactedSample
-  };
 }
 
 export function formatDurationMs(durationMs: number): string {
@@ -1772,47 +1612,4 @@ function extractInspectionCommandSignature(commandLine: string, targets: string[
     return null;
   }
   return normalizeReviewCommandLine(commandLine);
-}
-
-function sanitizeTelemetrySummaryForPersistence(
-  summary: ReviewOutputSummary,
-  includeRawTelemetry: boolean,
-  telemetryDebugEnvKey: string
-): ReviewOutputSummary {
-  if (includeRawTelemetry) {
-    return summary;
-  }
-  return {
-    ...summary,
-    commandStarts: redactTelemetryLines(summary.commandStarts, 'command', telemetryDebugEnvKey),
-    heavyCommandStarts: redactTelemetryLines(
-      summary.heavyCommandStarts,
-      'heavy-command',
-      telemetryDebugEnvKey
-    ),
-    commandIntentViolationSamples: redactTelemetryLines(
-      summary.commandIntentViolationSamples,
-      'command-intent',
-      telemetryDebugEnvKey
-    ),
-    lastLines: redactTelemetryLines(summary.lastLines, 'output-line', telemetryDebugEnvKey)
-  };
-}
-
-function redactTelemetryLines(lines: string[], label: string, telemetryDebugEnvKey: string): string[] {
-  return lines.map(
-    (_line, index) =>
-      `[redacted ${label} ${index + 1}; set ${telemetryDebugEnvKey}=1 to persist raw values]`
-  );
-}
-
-function sanitizeTelemetryErrorForPersistence(
-  error: string | null,
-  includeRawTelemetry: boolean,
-  telemetryDebugEnvKey: string
-): string | null {
-  if (!error || includeRawTelemetry) {
-    return error;
-  }
-  return `[redacted error; set ${telemetryDebugEnvKey}=1 to persist raw values]`;
 }

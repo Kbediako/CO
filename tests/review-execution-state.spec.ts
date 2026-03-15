@@ -486,6 +486,39 @@ describe('ReviewExecutionState', () => {
     });
   });
 
+  it('infers command-intent termination boundaries only when failed telemetry callers omit the field', () => {
+    const state = new ReviewExecutionState({ startedAtMs: 0 });
+
+    state.observeChunk('thinking\nexec\n', 'stdout', 100);
+    state.observeChunk(`/bin/zsh -lc 'npm run docs:freshness'\n`, 'stdout', 110);
+
+    const inferredPayload = state.buildTelemetryPayload({
+      status: 'failed',
+      error: 'codex review crossed the bounded command-intent boundary (validation suite launch).',
+      outputLogPath: '/repo/.runs/sample/review/output.log',
+      repoRoot: '/repo',
+      includeRawTelemetry: false,
+      telemetryDebugEnvKey: 'CODEX_REVIEW_DEBUG_TELEMETRY'
+    });
+    const suppressedPayload = state.buildTelemetryPayload({
+      status: 'failed',
+      error: 'codex review crossed the bounded command-intent boundary (validation suite launch).',
+      terminationBoundary: null,
+      outputLogPath: '/repo/.runs/sample/review/output.log',
+      repoRoot: '/repo',
+      includeRawTelemetry: false,
+      telemetryDebugEnvKey: 'CODEX_REVIEW_DEBUG_TELEMETRY'
+    });
+
+    expect(inferredPayload.termination_boundary).toEqual({
+      kind: 'command-intent',
+      provenance: 'validation-suite',
+      reason: expect.stringContaining('validation suite launch'),
+      sample: '[redacted command-intent sample; set CODEX_REVIEW_DEBUG_TELEMETRY=1 to persist raw sample]'
+    });
+    expect(suppressedPayload.termination_boundary).toBeNull();
+  });
+
   it('projects repeated shell probes into first-class termination boundary records', () => {
     const state = new ReviewExecutionState({ startedAtMs: 0 });
 

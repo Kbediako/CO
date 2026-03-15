@@ -242,4 +242,61 @@ describe('review meta-surface normalization', () => {
       )
     ).toBe(true);
   });
+
+  it('classifies the extracted execution telemetry helper as review-support when it is inspected directly', () => {
+    expect(
+      classifyMetaSurfaceDirectDetailed(
+        'sed',
+        ['-n', '1,80p', 'scripts/lib/review-execution-telemetry.ts'],
+        new Set(),
+        '/repo'
+      )
+    ).toEqual([
+      {
+        kind: 'review-support',
+        candidate: 'scripts/lib/review-execution-telemetry.ts',
+        operand: 'scripts/lib/review-execution-telemetry.ts'
+      }
+    ]);
+  });
+
+  it('treats the extracted execution telemetry helper family as touched when review-execution-state is the touched sibling', () => {
+    expect(
+      isTouchedReviewScopePathFamilyOperand(
+        'scripts/lib/review-execution-telemetry.ts',
+        new Set(['scripts/lib/review-execution-state.ts']),
+        '/repo'
+      )
+    ).toBe(true);
+  });
+
+  it('treats the extracted execution telemetry helper family as touched when run-review is the touched sibling', () => {
+    expect(
+      isTouchedReviewScopePathFamilyOperand(
+        'scripts/lib/review-execution-telemetry.ts',
+        new Set(['scripts/run-review.ts']),
+        '/repo'
+      )
+    ).toBe(true);
+  });
+
+  it('treats the extracted execution telemetry helper family as touched when the compiled review-execution-state sibling is touched', () => {
+    expect(
+      isTouchedReviewScopePathFamilyOperand(
+        'dist/scripts/lib/review-execution-telemetry.js',
+        new Set(['dist/scripts/lib/review-execution-state.js']),
+        '/repo'
+      )
+    ).toBe(true);
+  });
+
+  it('treats the extracted execution telemetry helper family as touched when the compiled run-review sibling is touched', () => {
+    expect(
+      isTouchedReviewScopePathFamilyOperand(
+        'dist/scripts/lib/review-execution-telemetry.js',
+        new Set(['dist/scripts/run-review.js']),
+        '/repo'
+      )
+    ).toBe(true);
+  });
 });

@@ -44,21 +44,24 @@ import {
   ARCHITECTURE_ALLOWED_META_SURFACE_KINDS,
   AUDIT_ALLOWED_META_SURFACE_KINDS,
   formatDurationMs,
-  logReviewTelemetrySummary as logReviewExecutionTelemetrySummary,
-  persistReviewTelemetry as persistReviewExecutionTelemetry,
+  type ReviewTerminationBoundaryKind,
+  type ReviewTerminationBoundaryRecord,
   type ReviewStartupAnchorMode,
   type ReviewStartupAnchorBoundaryState,
   type ReviewActiveCloseoutBundleRereadBoundaryState,
   type ReviewRelevantReinspectionDwellBoundaryState,
   type ReviewShellProbeBoundaryState,
-  type ReviewTelemetryPayload,
-  type ReviewTerminationBoundaryKind,
-  type ReviewTerminationBoundaryRecord,
   type ReviewVerdictStabilityState,
   ReviewExecutionState,
   type ReviewCommandIntentBoundaryState,
   type ReviewStartupLoopState
 } from './lib/review-execution-state.js';
+import {
+  buildReviewTelemetryPayload,
+  logReviewTelemetrySummary as logReviewExecutionTelemetrySummary,
+  persistReviewTelemetry as persistReviewExecutionTelemetry,
+  type ReviewTelemetryPayload
+} from './lib/review-execution-telemetry.js';
 import {
   parseNameStatusPathCollection,
   parseStatusZPathCollection,
@@ -699,16 +702,24 @@ async function main(): Promise<void> {
     terminationBoundary?: ReviewTerminationBoundaryRecord | null
   ): Promise<ReviewTelemetryPayload | null> => {
     try {
-      return await persistReviewExecutionTelemetry({
-        state,
-        telemetryPath: artifactPaths.telemetryPath,
+      const payload = buildReviewTelemetryPayload({
         outputLogPath: artifactPaths.outputLogPath,
         repoRoot,
         status,
         error: errorMessage ?? null,
-        terminationBoundary: terminationBoundary ?? null,
+        terminationBoundary:
+          status === 'failed'
+            ? terminationBoundary !== undefined
+              ? terminationBoundary ?? null
+              : state.getTerminationBoundaryRecord(errorMessage ?? null)
+            : null,
         includeRawTelemetry: envFlagEnabled(process.env[REVIEW_TELEMETRY_DEBUG_ENV_KEY]),
-        telemetryDebugEnvKey: REVIEW_TELEMETRY_DEBUG_ENV_KEY
+        telemetryDebugEnvKey: REVIEW_TELEMETRY_DEBUG_ENV_KEY,
+        summary: state.buildOutputSummary()
+      });
+      return await persistReviewExecutionTelemetry({
+        payload,
+        telemetryPath: artifactPaths.telemetryPath,
       });
     } catch (telemetryError) {
       const telemetryMessage = telemetryError instanceof Error ? telemetryError.message : String(telemetryError);
