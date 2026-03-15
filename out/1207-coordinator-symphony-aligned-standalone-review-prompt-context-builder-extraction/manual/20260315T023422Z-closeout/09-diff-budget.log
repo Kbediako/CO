@@ -1,0 +1,16 @@
+⚠️ Diff budget exceeded (override applied) (base=origin/main)
+ - changed files 1771 > 25
+ - total lines changed 147161 > 800
+Top changed files:
+  - docs/docs-freshness-registry.json: 14442
+  - tasks/index.json: 7968
+  - orchestrator/tests/ControlServer.test.ts: 7637
+  - scripts/lib/review-execution-state.ts: 4243
+  - tests/review-execution-state.spec.ts: 3522
+  - tests/run-review.spec.ts: 3105
+  - scripts/run-review.ts: 2118
+  - orchestrator/tests/DelegationServer.test.ts: 2115
+  - orchestrator/src/cli/orchestrator.ts: 1818
+  - orchestrator/tests/TelegramOversightBridge.test.ts: 1803
+
+Override accepted via DIFF_BUDGET_OVERRIDE_REASON: stacked branch carries prior Symphony alignment history; 1207 stays bounded to the standalone-review prompt/context extraction on the final tree

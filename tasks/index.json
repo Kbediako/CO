@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260315-1207-coordinator-symphony-aligned-standalone-review-prompt-context-builder-extraction",
+      "title": "Coordinator Symphony-Aligned Standalone Review Prompt Context Builder Extraction",
+      "relates_to": "tasks/tasks-1207-coordinator-symphony-aligned-standalone-review-prompt-context-builder-extraction.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-15",
+      "paths": {
+        "spec": "tasks/specs/1207-coordinator-symphony-aligned-standalone-review-prompt-context-builder-extraction.md",
+        "task": "tasks/tasks-1207-coordinator-symphony-aligned-standalone-review-prompt-context-builder-extraction.md",
+        "agent_task": ".agent/task/1207-coordinator-symphony-aligned-standalone-review-prompt-context-builder-extraction.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-standalone-review-prompt-context-builder-extraction.md"
+      }
+    },
+    {
       "id": "20260315-1206-coordinator-symphony-aligned-orchestrator-cloud-interactive-env-default-fallback-contract",
       "title": "Coordinator Symphony-Aligned Orchestrator Cloud Interactive Env Default Fallback Contract",
       "relates_to": "tasks/tasks-1206-coordinator-symphony-aligned-orchestrator-cloud-interactive-env-default-fallback-contract.md",

@@ -1,0 +1,290 @@
+
+> @kbediako/codex-orchestrator@0.1.38 pack:smoke
+> node scripts/pack-smoke.mjs
+
+
+added 53 packages in 2s
+Usage: codex-orchestrator <command> [options]
+
+Commands:
+  start [pipeline]          Start a new run (default pipeline is diagnostics).
+    --task <id>             Override task identifier (defaults to MCP_RUNNER_TASK_ID).
+    --parent-run <id>       Link run to parent run id.
+    --approval-policy <p>   Record approval policy metadata.
+    --format json           Emit machine-readable output.
+    --execution-mode <mcp|cloud>  Force execution mode for this run and child subpipelines.
+    --cloud                 Shortcut for --execution-mode cloud.
+    --runtime-mode <cli|appserver>  Force runtime mode for this run and child subpipelines.
+    --target <stage-id>     Focus plan/build metadata on a specific stage (alias: --target-stage).
+    --auto-issue-log [true|false]  On failure, auto-write doctor issue bundle/log entry.
+    --repo-config-required [true|false]  Require repo-local codex.orchestrator.json (no package fallback).
+    --goal "<goal>"         When pipeline is rlm, set the RLM goal.
+    --multi-agent [auto|true|false]  Preferred alias for multi-agent collab subagents (implies symbolic mode).
+    --collab [auto|true|false]  Legacy alias for --multi-agent.
+    --validator <cmd|none>  When pipeline is rlm, set the validator command.
+    --max-iterations <n>    When pipeline is rlm, override max iterations.
+    --max-minutes <n>       When pipeline is rlm, override max minutes.
+    --roles <single|triad>  When pipeline is rlm, set role split.
+    --interactive | --ui    Enable read-only HUD when running in a TTY.
+    --no-interactive        Force disable HUD (default is off unless requested).
+
+  rlm "<goal>"              Run RLM loop until validator passes.
+    --task <id>             Override task identifier.
+    --runtime-mode <cli|appserver>  Force runtime mode for this run.
+    --repo-config-required [true|false]  Require repo-local codex.orchestrator.json (no package fallback).
+    --multi-agent [auto|true|false]  Preferred alias for multi-agent collab subagents (implies symbolic mode).
+    --collab [auto|true|false]  Legacy alias for --multi-agent.
+    --validator <cmd|none>  Set validator command or disable validation.
+    --max-iterations <n>    Override max iterations (0 = unlimited with validator).
+    --max-minutes <n>       Optional time-based guardrail in minutes.
+    --roles <single|triad>  Choose single or triad role split.
+    --parent-run <id>       Link run to parent run id.
+    --approval-policy <p>   Record approval policy metadata.
+    --interactive | --ui    Enable read-only HUD when running in a TTY.
+    --no-interactive        Force disable HUD (default is off unless requested).
+
+  frontend-test             Run frontend testing pipeline.
+    --devtools             Enable Chrome DevTools MCP for this run.
+    --task <id>             Override task identifier (defaults to MCP_RUNNER_TASK_ID).
+    --runtime-mode <cli|appserver>  Force runtime mode for this run.
+    --repo-config-required [true|false]  Require repo-local codex.orchestrator.json (no package fallback).
+    --parent-run <id>       Link run to parent run id.
+    --approval-policy <p>   Record approval policy metadata.
+    --format json           Emit machine-readable output.
+    --target <stage-id>     Focus plan/build metadata on a specific stage (alias: --target-stage).
+    --interactive | --ui    Enable read-only HUD when running in a TTY.
+    --no-interactive        Force disable HUD (default is off unless requested).
+
+  flow                      Run docs-review then implementation-gate sequentially.
+    --task <id>             Override task identifier (defaults to MCP_RUNNER_TASK_ID).
+    --parent-run <id>       Link docs-review run to parent run id.
+    --approval-policy <p>   Record approval policy metadata.
+    --format json           Emit machine-readable output summary for both runs.
+    --execution-mode <mcp|cloud>  Force execution mode for both runs.
+    --cloud                 Shortcut for --execution-mode cloud.
+    --runtime-mode <cli|appserver>  Force runtime mode for both runs.
+    --target <stage-id>     Focus plan/build metadata on a specific stage (alias: --target-stage).
+    --auto-issue-log [true|false]  On failure, auto-write doctor issue bundle/log entry.
+    --repo-config-required [true|false]  Require repo-local codex.orchestrator.json (no package fallback).
+    --interactive | --ui    Enable read-only HUD when running in a TTY.
+    --no-interactive        Force disable HUD (default is off unless requested).
+
+  review [options]          Run manifest-backed standalone review wrapper.
+    Forwards flags/env to scripts/run-review (source) or dist/scripts/run-review.js (npm).
+    Common flags:
+      --manifest <path>     Explicit manifest path for review evidence.
+      --task <id>           Task id used for prompt context.
+      --uncommitted         Review uncommitted diff scope.
+      --base <branch>       Review against base branch.
+      --commit <sha>        Review specific commit.
+      --non-interactive     Force non-interactive review behavior.
+      --runtime-mode <cli|appserver>  Force runtime mode for the underlying codex review call.
+      --auto-issue-log [true|false]  Auto-capture issue bundle on review failure.
+      --disable-delegation-mcp [true|false]  Disable delegation MCP for this review.
+
+  plan [pipeline]           Preview pipeline stages without executing.
+    --task <id>             Override task identifier.
+    --format json           Emit machine-readable output.
+    --target <stage-id>     Highlight the stage chosen for orchestration (alias: --target-stage).
+    --repo-config-required [true|false]  Require repo-local codex.orchestrator.json (no package fallback).
+
+  exec [command]            Run a one-off command with unified exec runtime.
+    --json [compact]        Emit final JSON summary (optional compact mode).
+    --jsonl                 Stream JSONL events (default when STDIN is non-interactive).
+    --notify <uri>          Send run summary notifications (repeatable, comma-separated supported).
+    --otel-endpoint <url>   Forward events to OTEL collector endpoint.
+    --cwd <path>            Override working directory for the command.
+    --task <id>             Override task identifier for manifest routing.
+
+  resume --run <id> [options]
+    --token <resume-token>  Verify the resume token before restarting.
+    --actor <name>          Record who resumed the run.
+    --reason <text>         Record why the run was resumed.
+    --target <stage-id>     Override stage selection before resuming (alias: --target-stage).
+    --runtime-mode <cli|appserver>  Force runtime mode before resuming.
+    --repo-config-required [true|false]  Require repo-local codex.orchestrator.json (no package fallback).
+    --format json           Emit machine-readable output.
+    --interactive | --ui    Enable read-only HUD when running in a TTY.
+    --no-interactive        Force disable HUD (default is off unless requested).
+
+  status --run <id> [--watch] [--interval N] [--format json]
+
+  self-check [--format json]
+  init codex [--cwd <path>] [--force]
+    Installs AGENTS.md, mcp-client.json, .codex/config.toml (+ role files), and codex.orchestrator.json.
+    --codex-cli            Also run CO-managed Codex CLI setup (plan unless --yes; activate with CODEX_CLI_USE_MANAGED=1).
+    --codex-source <path>  Build from local Codex repo (or git URL).
+    --codex-ref <ref>      Git ref (branch/tag/sha) when building from repo.
+    --codex-download-url <url>  Download a prebuilt codex binary.
+    --codex-download-sha256 <sha>  Expected SHA256 for the prebuilt download.
+    --codex-force          Overwrite existing CO-managed codex binary.
+    --yes                  Apply codex CLI setup (otherwise plan only).
+  setup [--yes] [--refresh-skills] [--format json]
+    --yes                 Apply setup (otherwise plan only).
+    --refresh-skills      Overwrite bundled skills in $CODEX_HOME/skills during setup.
+    --repo <path>         Repo root for delegation wiring (default cwd).
+    --format json         Emit machine-readable output (dry-run only).
+  doctor [--format json] [--usage] [--window-days <n>] [--task <id>] [--cloud-preflight] [--apply]
+    --usage               Include a local usage snapshot (scans .runs/).
+    --window-days <n>     Window for --usage (default 30).
+    --task <id>           Limit --usage scan to a specific task directory.
+    --cloud-preflight     Run cloud readiness preflight checks (env/codex/git/branch).
+    --cloud-env-id <id>   Override env id for --cloud-preflight (default: CODEX_CLOUD_ENV_ID).
+    --cloud-branch <name> Override branch for --cloud-preflight (default: CODEX_CLOUD_BRANCH).
+    --issue-log           Append markdown issue entry + JSON bundle for downstream triage.
+    --issue-title <text>  Optional title for --issue-log entries.
+    --issue-notes <text>  Optional notes for --issue-log entries.
+    --issue-log-path <p>  Output markdown path (default: docs/codex-orchestrator-issues.md).
+    --apply               Plan/apply quick fixes for DevTools + delegation wiring (use with --yes).
+    --yes                 Apply fixes when --apply is set.
+    --format json         Emit machine-readable output (not supported with --apply).
+  codex setup
+    --source <path>        Build from local Codex repo (or git URL).
+    --ref <ref>            Git ref (branch/tag/sha) when building from repo.
+    --download-url <url>   Download a prebuilt codex binary.
+    --download-sha256 <sha>  Expected SHA256 for the prebuilt download.
+    --force                Overwrite existing CO-managed codex binary.
+    --yes                  Apply setup (otherwise plan only; stock codex remains default until CODEX_CLI_USE_MANAGED=1).
+    --format json          Emit machine-readable output.
+  codex defaults
+    --yes                  Apply setup (otherwise dry-run plan only).
+    --force                Allow overwriting existing role files in ~/.codex/agents.
+    --format json          Emit machine-readable output.
+  devtools setup          Print DevTools MCP setup instructions.
+    --yes                 Apply setup by running "codex mcp add ...".
+    --format json         Emit machine-readable output (dry-run only).
+  delegation setup        Configure delegation MCP server wiring.
+    --repo <path>         Repo root for delegation server (default cwd).
+    --yes                 Apply setup by running "codex mcp add ...".
+    --format json         Emit machine-readable output (dry-run only).
+  skills install          Install bundled skills into $CODEX_HOME/skills.
+    --force               Overwrite existing skill files.
+    --only <skills>       Install only selected skills (comma-separated).
+    --codex-home <path>   Override the target Codex home directory.
+    --format json         Emit machine-readable output.
+  mcp serve [--repo <path>] [--dry-run] [-- <extra args>]
+  mcp enable [--servers <csv>] [--yes] [--format json]
+    --servers <csv>       Comma-separated MCP server names to enable (default: all disabled).
+    --yes                 Apply changes (default is plan mode).
+    --format json         Emit machine-readable output.
+  pr watch-merge [options]
+    Monitor PR checks/reviews with polling and optional auto-merge after a quiet window.
+    Use `codex-orchestrator pr watch-merge --help` for full options.
+  pr resolve-merge [options]
+    Monitor until merge-ready or actionable feedback appears; exits early when author action is required.
+    Use `codex-orchestrator pr resolve-merge --help` for full options.
+  delegate-server         Run the delegation MCP server (stdio).
+    --repo <path>         Repo root for config + manifests (default cwd).
+    --mode <full|question_only|status_only>  Limit tool surface for child runs.
+    --config "<key>=<value>[;...]"  Apply config overrides (repeat via separators).
+  version | --version
+
+  help                      Show this message.
+
+Quickstart (agent-first):
+  codex-orchestrator flow --task <task-id>
+  NOTES="Goal: ... | Summary: ... | Risks: ..." codex-orchestrator review --task <task-id>
+  codex-orchestrator doctor --usage --window-days 30
+  codex-orchestrator rlm --multi-agent auto "<goal>"
+  codex-orchestrator start implementation-gate --cloud --target <stage-id>
+
+Notes:
+  RLM recursion guidance: docs/guides/rlm-recursion-v2.md
+  Cloud-mode preflight/fallback guide: docs/guides/cloud-mode-preflight.md
+  Review artifacts guide: docs/guides/review-artifacts.md
+
+0.1.38
+Usage: codex-orchestrator review [options]
+
+Runs the standalone review wrapper with manifest-backed evidence.
+This command forwards arguments/environment to run-review and preserves its behavior.
+
+Common options:
+  --manifest <path>                Explicit manifest path for review evidence.
+  --runs-dir <path>                Root runs directory when auto-resolving manifest.
+  --task <id>                      Task id used for prompt context.
+  --surface <diff|audit|architecture>  Select review surface (default: diff).
+  --uncommitted                    Review uncommitted diff scope.
+  --base <branch>                  Review against a base branch.
+  --commit <sha>                   Review a specific commit.
+  --title "<text>"                 Optional review title in the prompt.
+  --non-interactive                Force non-interactive behavior.
+  --runtime-mode <cli|appserver>   Force runtime mode for the underlying codex review call.
+  --auto-issue-log [true|false]    Auto-capture issue bundle on review failure.
+  --disable-delegation-mcp [true|false]  Disable delegation MCP for this review.
+  --enable-delegation-mcp [true|false]   Legacy delegation MCP toggle (disable via false).
+
+Environment controls (selected):
+  NOTES                            Recommended review notes ("Goal | Summary | Risks ..."); fallback notes are generated when omitted.
+  CODEX_REVIEW_ALLOW_HEAVY_COMMANDS=1      Allow unrestricted heavy commands.
+  CODEX_REVIEW_ENFORCE_BOUNDED_MODE=1      Enforce bounded mode (hard-stop heavy commands).
+  CODEX_REVIEW_TIMEOUT_SECONDS             Optional overall timeout (0 disables when set).
+  CODEX_REVIEW_STALL_TIMEOUT_SECONDS       Optional stall timeout (0 disables when set).
+  CODEX_REVIEW_MONITOR_INTERVAL_SECONDS    Patience checkpoint cadence (0 disables).
+
+Examples:
+  TASK=<task-id> NOTES="Goal: ... | Summary: ... | Risks: ..." codex-orchestrator review
+  TASK=<task-id> NOTES="Goal: ... | Summary: ... | Risks: ..." codex-orchestrator review --manifest .runs/<task-id>/cli/<run-id>/manifest.json
+
+{
+  "status": "ok",
+  "name": "@kbediako/codex-orchestrator",
+  "version": "0.1.38",
+  "node": "v25.2.1",
+  "timestamp": "2026-03-15T02:41:15.986Z"
+}
+[run-review] skipping diff budget (missing scripts/diff-budget.mjs; downstream npm environment detected).
+[run-review] bounded review guidance enabled by default (set CODEX_REVIEW_ALLOW_HEAVY_COMMANDS=1 to opt into unrestricted heavy-command execution).
+[run-review] review scope metrics unavailable (git scope stats could not be resolved).
+Codex review handoff (non-interactive):
+---
+Review task: pack-smoke
+Review surface: diff
+
+Agent notes:
+Goal: pack smoke review coverage | Summary: package smoke path | Risks: low
+
+Please review the current changes and confirm:
+- The solution is minimal and avoids unnecessary abstraction/scope
+- Behavior remains correct for changed files and nearby dependencies
+- Call out concrete regressions, risky edge cases, or missing tests in the changed area
+- Start with touched paths, scoped diff commands, or nearby changed code before consulting memory, skills, review docs, manifests, or review artifacts
+- Concrete same-diff progress can be shown by citing touched paths with explicit locations such as `path:line`, `path:line:col`, `path#Lline`, or `path#LlineCcol`.
+- If you already have that diff-local citation evidence, do not search the wider repo for other examples of the rendering.
+
+Keep this pass diff-focused. Do not audit checklist/docs/evidence surfaces unless they are directly required to assess code correctness.
+
+Execution constraints (bounded review mode):
+- Keep this review focused on changed files and nearby dependencies.
+- Avoid full validation suites (for example `npm run test`, `npm run lint`, `npm run build`, `npm run docs:check`, `npm run docs:freshness`) during this pass.
+- Do not launch direct validation runners (for example `npx vitest`, `npm exec jest`) or nested review/pipeline/delegation flows during this pass.
+- If broader validation would improve confidence, list follow-up commands instead of executing them.
+
+Review scope hint: uncommitted working tree changes (default).
+
+Review scope paths: unavailable or empty.
+---
+Review prompt saved to: .runs/pack-smoke/cli/2026-01-01T00-00-00-000Z-packsmoke/review/prompt.txt
+Set FORCE_CODEX_REVIEW=1 to invoke `codex review` in this environment.
+[run-review] skipping diff budget (missing scripts/diff-budget.mjs; downstream npm environment detected).
+[run-review] bounded review guidance enabled by default (set CODEX_REVIEW_ALLOW_HEAVY_COMMANDS=1 to opt into unrestricted heavy-command execution).
+[run-review] review scope metrics unavailable (git scope stats could not be resolved).
+[run-review] runtime requested=appserver selected=cli provider=CliRuntimeProvider fallback=appserver-command-unavailable (Appserver preflight failed (appserver-command-unavailable, login-status-failed). Failed probing `codex app-server --help`. Failed probing `codex login status`.).
+[run-review] delegation MCP enabled for this review (default; set --disable-delegation-mcp or CODEX_REVIEW_DISABLE_DELEGATION_MCP=1 to disable).
+Review prompt saved to: .runs/pack-smoke/cli/2026-01-01T00-00-00-000Z-packsmoke/review/prompt.txt
+Review output log: .runs/pack-smoke/cli/2026-01-01T00-00-00-000Z-packsmoke/review/output.log
+Launching Codex review (evidence: .runs/pack-smoke/cli/2026-01-01T00-00-00-000Z-packsmoke/manifest.json)
+[run-review] patience-first monitor checkpoints disabled (configured via CODEX_REVIEW_MONITOR_INTERVAL_SECONDS=0).
+[run-review] low-signal drift guard enabled after 3m 0s of repetitive bounded activity (set CODEX_REVIEW_LOW_SIGNAL_TIMEOUT_SECONDS=0 to disable).
+[run-review] verdict-stability guard enabled after 3m 0s of repeated speculative no-progress output (set CODEX_REVIEW_VERDICT_STABILITY_TIMEOUT_SECONDS=0 to disable).
+[run-review] meta-surface expansion guard enabled after 3m 0s of sustained off-task meta activity (set CODEX_REVIEW_META_SURFACE_TIMEOUT_SECONDS=0 to disable).
+thinking
+codex review mock ok
+Review output saved to: .runs/pack-smoke/cli/2026-01-01T00-00-00-000Z-packsmoke/review/output.log
+Review telemetry saved to: .runs/pack-smoke/cli/2026-01-01T00-00-00-000Z-packsmoke/review/telemetry.json
+Skills source: /private/var/folders/r8/ss2mqz1n5wgcph4gnh_894600000gn/T/codex-pack-smoke-Ce7nTm/node_modules/@kbediako/codex-orchestrator/skills
+Skills target: /var/folders/r8/ss2mqz1n5wgcph4gnh_894600000gn/T/codex-pack-smoke-Ce7nTm/.codex-home/skills
+Skills: long-poll-wait
+Written:
+  - ../../../../../../../var/folders/r8/ss2mqz1n5wgcph4gnh_894600000gn/T/codex-pack-smoke-Ce7nTm/.codex-home/skills/long-poll-wait/SKILL.md
+✅ pack smoke passed

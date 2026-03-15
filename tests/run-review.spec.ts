@@ -1063,6 +1063,25 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(heavyPrompt).not.toContain('Execution constraints (bounded review mode):');
   });
 
+  it('uses a generated NOTES fallback when NOTES is absent', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      NOTES: ''
+    });
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stderr).toContain('[run-review] NOTES was not provided; using a generated fallback.');
+    const promptPath = join(dirname(manifestPath), 'review', 'prompt.txt');
+    const prompt = await readFile(promptPath, 'utf8');
+    expect(prompt).toContain('Agent notes:');
+    expect(prompt).toContain(
+      'Goal: standalone review handoff | Summary: auto-generated NOTES fallback (task=sample-task, surface=diff) | Risks: missing custom intent details may reduce review precision'
+    );
+  });
+
   it('ignores ambient fake-codex harness env in baseEnv', async () => {
     const sandbox = await makeSandbox();
     const manifestPath = await makeManifest(sandbox);

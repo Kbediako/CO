@@ -1,0 +1,16 @@
+
+ RUN  v1.6.1 /Users/kbediako/Code/CO
+
+stderr | tests/review-prompt-context.spec.ts > review-prompt-context > returns generated fallback notes when NOTES is absent
+[run-review] NOTES was not provided; using a generated fallback. Set NOTES="Goal: ... | Summary: ... | Risks: ... | Questions (optional): ..." for higher-signal review context.
+
+stderr | tests/review-prompt-context.spec.ts > review-prompt-context > keeps active closeout roots separate from the prompt scaffold on diff surface
+[run-review] NOTES was not provided; using a generated fallback. Set NOTES="Goal: ... | Summary: ... | Risks: ... | Questions (optional): ..." for higher-signal review context.
+
+ ✓ tests/review-prompt-context.spec.ts  (3 tests) 6ms
+
+ Test Files  1 passed (1)
+      Tests  3 passed (3)
+   Start at  13:36:29
+   Duration  232ms (transform 24ms, setup 0ms, collect 29ms, tests 6ms, environment 0ms, prepare 27ms)
+
