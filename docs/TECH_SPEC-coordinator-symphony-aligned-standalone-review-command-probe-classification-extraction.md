@@ -28,6 +28,9 @@ The next truthful seam is the pure classifier cluster around `hasHeavyCommandTok
 - `npm run docs:check`
 - `npm run docs:freshness`
 - `npm run build`
-- `npx vitest run --config vitest.config.core.ts tests/review-execution-state.spec.ts`
+- `npm run lint`
+- `npx vitest run --config vitest.config.core.ts tests/review-command-probe-classification.spec.ts tests/review-execution-state.spec.ts tests/review-meta-surface-normalization.spec.ts`
+- `npm run test`
+- `node scripts/diff-budget.mjs`
 - `npm run review`
 - `npm run pack:smoke`
