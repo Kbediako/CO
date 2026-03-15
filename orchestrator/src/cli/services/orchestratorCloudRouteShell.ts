@@ -5,7 +5,7 @@ import type { TaskContext, PlanItem } from '../../types.js';
 import { appendSummary } from '../run/manifest.js';
 import type { CliManifest, PipelineRunExecutionResult } from '../types.js';
 import { buildCloudPreflightRequest, runCloudPreflight } from '../utils/cloudPreflight.js';
-import { resolveCloudEnvironmentId } from './orchestratorCloudTargetExecutor.js';
+import { resolveCloudEnvironmentId } from './orchestratorCloudEnvironmentResolution.js';
 import {
   buildCloudPreflightFailureContract,
   type OrchestratorCloudFallbackReroute

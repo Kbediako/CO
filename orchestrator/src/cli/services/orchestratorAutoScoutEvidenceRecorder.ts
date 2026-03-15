@@ -6,7 +6,7 @@ import { writeJsonAtomic } from '../utils/fs.js';
 import { buildAutoScoutEvidence } from '../utils/advancedAutopilot.js';
 import { isoTimestamp } from '../utils/time.js';
 import { relativeToRepo } from '../run/runPaths.js';
-import { resolveCloudEnvironmentId } from './orchestratorCloudTargetExecutor.js';
+import { resolveCloudEnvironmentId } from './orchestratorCloudEnvironmentResolution.js';
 
 const DEFAULT_AUTO_SCOUT_TIMEOUT_MS = 4000;
 

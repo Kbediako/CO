@@ -8,6 +8,7 @@ import type { RunPaths } from '../run/runPaths.js';
 import type { CliManifest, PipelineDefinition } from '../types.js';
 import { isoTimestamp } from '../utils/time.js';
 import { resolveCodexCliBin } from '../utils/codexCli.js';
+import { resolveCloudEnvironmentId } from './orchestratorCloudEnvironmentResolution.js';
 import { buildCloudPrompt, type CloudPromptManifest } from './orchestratorCloudPromptBuilder.js';
 import {
   CodexCloudTaskExecutor,
@@ -82,31 +83,6 @@ function readCloudFeatureList(raw: string | null | undefined): string[] {
     features.push(feature);
   }
   return features;
-}
-
-export function resolveCloudEnvironmentId(
-  task: TaskContext,
-  target: PlanItem,
-  envOverrides?: NodeJS.ProcessEnv
-): string | null {
-  const metadata = (target.metadata ?? {}) as Record<string, unknown>;
-  const taskMetadata = (task.metadata ?? {}) as Record<string, unknown>;
-  const taskCloud = (taskMetadata.cloud ?? null) as Record<string, unknown> | null;
-
-  const candidates: Array<string | null> = [
-    readCloudString(metadata.cloudEnvId),
-    readCloudString(metadata.cloud_env_id),
-    readCloudString(metadata.envId),
-    readCloudString(metadata.environmentId),
-    readCloudString(taskCloud?.envId),
-    readCloudString(taskCloud?.environmentId),
-    readCloudString(taskMetadata.cloudEnvId),
-    readCloudString(taskMetadata.cloud_env_id),
-    readCloudString(envOverrides?.CODEX_CLOUD_ENV_ID),
-    readCloudString(process.env.CODEX_CLOUD_ENV_ID)
-  ];
-
-  return candidates.find((candidate) => candidate !== null) ?? null;
 }
 
 function resolveCloudTargetStage(params: {
