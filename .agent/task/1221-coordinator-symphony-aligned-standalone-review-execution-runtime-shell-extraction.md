@@ -20,12 +20,19 @@
 
 ## Implementation
 
-- [ ] Child execution and termination-monitor shell extracted behind a dedicated runtime helper/module. Evidence: `scripts/run-review.ts`, `out/1221-coordinator-symphony-aligned-standalone-review-execution-runtime-shell-extraction/manual/20260315T213403Z-closeout/00-summary.md`
-- [ ] `main()` remains the orchestration owner for prompt/runtime/handoff and telemetry write/retry behavior. Evidence: `scripts/run-review.ts`, `out/1221-coordinator-symphony-aligned-standalone-review-execution-runtime-shell-extraction/manual/20260315T213403Z-closeout/00-summary.md`
-- [ ] Focused regressions cover the extracted runtime boundary. Evidence: `out/1221-coordinator-symphony-aligned-standalone-review-execution-runtime-shell-extraction/manual/20260315T213403Z-closeout/05a-targeted-tests.log`
+- [x] Child execution and termination-monitor shell extracted behind a dedicated runtime helper/module. Evidence: `scripts/lib/review-execution-runtime.ts`, `scripts/run-review.ts`, `out/1221-coordinator-symphony-aligned-standalone-review-execution-runtime-shell-extraction/manual/20260315T233116Z-closeout/00-summary.md`
+- [x] `main()` remains the orchestration owner for prompt/runtime/handoff and telemetry write/retry behavior. Evidence: `scripts/run-review.ts`, `out/1221-coordinator-symphony-aligned-standalone-review-execution-runtime-shell-extraction/manual/20260315T233116Z-closeout/00-summary.md`, `out/1221-coordinator-symphony-aligned-standalone-review-execution-runtime-shell-extraction/manual/20260315T233116Z-closeout/12-elegance-review.md`
+- [x] Focused regressions cover the extracted runtime boundary. Evidence: `tests/review-meta-surface-normalization.spec.ts`, `tests/review-execution-state.spec.ts`, `tests/run-review.spec.ts`, `out/1221-coordinator-symphony-aligned-standalone-review-execution-runtime-shell-extraction/manual/20260315T233116Z-closeout/00-summary.md`
 
 ## Validation
 
+- [x] `node scripts/delegation-guard.mjs`. Evidence: `.runs/1221-coordinator-symphony-aligned-standalone-review-execution-runtime-shell-extraction-guard/cli/2026-03-15T21-59-00-442Z-01b4cc59/manifest.json`, `out/1221-coordinator-symphony-aligned-standalone-review-execution-runtime-shell-extraction/manual/20260315T233116Z-closeout/00-summary.md`
 - [x] `node scripts/spec-guard.mjs --dry-run`. Evidence: `out/1221-coordinator-symphony-aligned-standalone-review-execution-runtime-shell-extraction/manual/20260315T213403Z-docs-first/02-spec-guard.log`
+- [x] `npm run build`. Evidence: `out/1221-coordinator-symphony-aligned-standalone-review-execution-runtime-shell-extraction/manual/20260315T233116Z-closeout/00-summary.md`
+- [x] `npm run lint`. Evidence: `out/1221-coordinator-symphony-aligned-standalone-review-execution-runtime-shell-extraction/manual/20260315T233116Z-closeout/00-summary.md`
+- [x] `npm run test`. Evidence: `out/1221-coordinator-symphony-aligned-standalone-review-execution-runtime-shell-extraction/manual/20260315T233116Z-closeout/00-summary.md`
 - [x] `npm run docs:check`. Evidence: `out/1221-coordinator-symphony-aligned-standalone-review-execution-runtime-shell-extraction/manual/20260315T213403Z-docs-first/03-docs-check.log`
 - [x] `npm run docs:freshness`. Evidence: `out/1221-coordinator-symphony-aligned-standalone-review-execution-runtime-shell-extraction/manual/20260315T213403Z-docs-first/04-docs-freshness.log`
+- [x] `node scripts/diff-budget.mjs`. Evidence: `out/1221-coordinator-symphony-aligned-standalone-review-execution-runtime-shell-extraction/manual/20260315T233116Z-closeout/13-override-notes.md`
+- [x] `npm run review -- --manifest .runs/1221-coordinator-symphony-aligned-standalone-review-execution-runtime-shell-extraction-guard/cli/2026-03-15T21-59-00-442Z-01b4cc59/manifest.json`. Evidence: `out/1221-coordinator-symphony-aligned-standalone-review-execution-runtime-shell-extraction/manual/20260315T233116Z-closeout/00-summary.md`
+- [x] `npm run pack:smoke`. Evidence: `out/1221-coordinator-symphony-aligned-standalone-review-execution-runtime-shell-extraction/manual/20260315T233116Z-closeout/00-summary.md`

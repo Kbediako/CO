@@ -1,7 +1,7 @@
 ---
 id: 20260316-1221-coordinator-symphony-aligned-standalone-review-execution-runtime-shell-extraction
 title: Coordinator Symphony-Aligned Standalone Review Execution Runtime Shell Extraction
-status: draft
+status: completed
 owner: Codex
 created: 2026-03-16
 last_review: 2026-03-16
@@ -13,6 +13,7 @@ related_tasks:
   - tasks/tasks-1221-coordinator-symphony-aligned-standalone-review-execution-runtime-shell-extraction.md
 review_notes:
   - 2026-03-16: `1220` narrowed the next truthful standalone-review implementation seam to the child execution and termination-monitor shell around `runCodexReview(...)` and `waitForChildExit(...)`. Evidence: `docs/findings/1221-standalone-review-execution-runtime-shell-extraction-deliberation.md`, `out/1220-coordinator-symphony-aligned-standalone-review-run-review-orchestration-boundary-reassessment/manual/20260315T213146Z-closeout/14-next-slice-note.md`.
+  - 2026-03-16: Closed with the runtime shell extracted into `scripts/lib/review-execution-runtime.ts`, focused regressions green (`306/306`), full validation green (`241/241` files, `1667/1667` tests), bounded review no findings, and `pack:smoke` passed. Evidence: `out/1221-coordinator-symphony-aligned-standalone-review-execution-runtime-shell-extraction/manual/20260315T233116Z-closeout/00-summary.md`.
 ---
 
 # Technical Specification
