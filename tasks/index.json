@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260315-1210-coordinator-symphony-aligned-standalone-review-shell-env-interpreter-review-support-classification",
+      "title": "Coordinator Symphony-Aligned Standalone Review Shell Env Interpreter Review-Support Classification",
+      "relates_to": "tasks/tasks-1210-coordinator-symphony-aligned-standalone-review-shell-env-interpreter-review-support-classification.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-15",
+      "paths": {
+        "spec": "tasks/specs/1210-coordinator-symphony-aligned-standalone-review-shell-env-interpreter-review-support-classification.md",
+        "task": "tasks/tasks-1210-coordinator-symphony-aligned-standalone-review-shell-env-interpreter-review-support-classification.md",
+        "agent_task": ".agent/task/1210-coordinator-symphony-aligned-standalone-review-shell-env-interpreter-review-support-classification.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-standalone-review-shell-env-interpreter-review-support-classification.md"
+      }
+    },
+    {
       "id": "20260315-1209-coordinator-symphony-aligned-standalone-review-shell-env-interpreter-extraction",
       "title": "Coordinator Symphony-Aligned Standalone Review Shell Env Interpreter Extraction",
       "relates_to": "tasks/tasks-1209-coordinator-symphony-aligned-standalone-review-shell-env-interpreter-extraction.md",

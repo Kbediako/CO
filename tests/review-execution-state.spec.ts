@@ -2153,6 +2153,29 @@ describe('ReviewExecutionState', () => {
     expect(summary.metaSurfaceKinds).toEqual(['run-manifest']);
   });
 
+  it('keeps nested shell-wrapped MANIFEST rebindings visible to generic run-manifest meta-surface tracking', () => {
+    const state = new ReviewExecutionState({
+      startedAtMs: 0,
+      blockHeavyCommands: false,
+      repoRoot: '/Users/kbediako/Code/CO',
+      allowedMetaSurfaceEnvVars: ['MANIFEST'],
+      allowedMetaSurfaceEnvVarPaths: {
+        MANIFEST: '/Users/kbediako/Code/CO/manual-review/manifest.json'
+      }
+    });
+
+    state.observeChunk('thinking\nexec\n', 'stdout', 100);
+    state.observeChunk(
+      `/bin/zsh -lc 'MANIFEST=/tmp/other.json /bin/zsh -lc \"sed -n 1,80p \\\"$MANIFEST\\\"\"'\n`,
+      'stdout',
+      110
+    );
+
+    const summary = state.buildOutputSummary();
+    expect(summary.metaSurfaceSignals).toBe(1);
+    expect(summary.metaSurfaceKinds).toEqual(['run-manifest']);
+  });
+
   it('does not treat exported ordinary repo manifest paths as generic run-manifest meta-surface activity', () => {
     const state = new ReviewExecutionState({
       startedAtMs: 0,
@@ -2726,6 +2749,28 @@ describe('ReviewExecutionState', () => {
     expect(summary.metaSurfaceKinds).toEqual(['review-support']);
   });
 
+  it('classifies untouched adjacent shell-env helpers as meta-surface activity for standalone-review diffs', () => {
+    const state = new ReviewExecutionState({
+      startedAtMs: 0,
+      blockHeavyCommands: false,
+      metaSurfaceTimeoutMs: 1_000,
+      touchedPaths: ['scripts/run-review.ts']
+    });
+
+    state.observeChunk('thinking\nexec\n', 'stdout', 100);
+    state.observeChunk(
+      `/bin/zsh -lc 'sed -n 1,120p dist/scripts/lib/review-shell-env-interpreter.js'\n`,
+      'stdout',
+      110
+    );
+
+    const expansion = state.getMetaSurfaceExpansionState(2_000);
+    const summary = state.buildOutputSummary();
+    expect(expansion.triggered).toBe(false);
+    expect(summary.metaSurfaceSignals).toBe(1);
+    expect(summary.metaSurfaceKinds).toEqual(['review-support']);
+  });
+
   it('keeps shared docs-helpers reads in ordinary diff scope even for standalone-review diffs', () => {
     const state = new ReviewExecutionState({
       startedAtMs: 0,
@@ -2778,6 +2823,28 @@ describe('ReviewExecutionState', () => {
 
     state.observeChunk('thinking\nexec\n', 'stdout', 100);
     state.observeChunk(`/bin/zsh -lc 'sed -n 1,120p tests/review-scope-paths.spec.ts'\n`, 'stdout', 110);
+
+    const expansion = state.getMetaSurfaceExpansionState(2_000);
+    const summary = state.buildOutputSummary();
+    expect(expansion.triggered).toBe(false);
+    expect(summary.metaSurfaceSignals).toBe(0);
+    expect(summary.metaSurfaceKinds).toEqual([]);
+  });
+
+  it('keeps touched shell-env helper pairs in ordinary diff scope', () => {
+    const state = new ReviewExecutionState({
+      startedAtMs: 0,
+      blockHeavyCommands: false,
+      metaSurfaceTimeoutMs: 1_000,
+      touchedPaths: ['scripts/lib/review-shell-env-interpreter.ts']
+    });
+
+    state.observeChunk('thinking\nexec\n', 'stdout', 100);
+    state.observeChunk(
+      `/bin/zsh -lc 'sed -n 1,120p dist/scripts/lib/review-shell-env-interpreter.js'\n`,
+      'stdout',
+      110
+    );
 
     const expansion = state.getMetaSurfaceExpansionState(2_000);
     const summary = state.buildOutputSummary();
@@ -2857,6 +2924,28 @@ describe('ReviewExecutionState', () => {
     const summary = state.buildOutputSummary();
     expect(expansion.triggered).toBe(false);
     expect(summary.metaSurfaceSignals).toBe(2);
+    expect(summary.metaSurfaceKinds).toEqual(['review-support']);
+  });
+
+  it('keeps shell-env helpers as meta-surface activity when only prompt-context helpers are touched', () => {
+    const state = new ReviewExecutionState({
+      startedAtMs: 0,
+      blockHeavyCommands: false,
+      metaSurfaceTimeoutMs: 1_000,
+      touchedPaths: ['scripts/lib/review-prompt-context.ts']
+    });
+
+    state.observeChunk('thinking\nexec\n', 'stdout', 100);
+    state.observeChunk(
+      `/bin/zsh -lc 'sed -n 1,120p dist/scripts/lib/review-shell-env-interpreter.js'\n`,
+      'stdout',
+      110
+    );
+
+    const expansion = state.getMetaSurfaceExpansionState(2_000);
+    const summary = state.buildOutputSummary();
+    expect(expansion.triggered).toBe(false);
+    expect(summary.metaSurfaceSignals).toBe(1);
     expect(summary.metaSurfaceKinds).toEqual(['review-support']);
   });
 
@@ -3292,6 +3381,30 @@ describe('ReviewExecutionState', () => {
     expect(dwellBoundary.triggered).toBe(true);
     expect(dwellBoundary.distinctTargets).toBe(1);
     expect(dwellBoundary.maxTargetHits).toBeGreaterThanOrEqual(3);
+  });
+
+  it('collapses touched shell-env helper source and built pairs to one inspection target family', () => {
+    const state = new ReviewExecutionState({
+      startedAtMs: 0,
+      blockHeavyCommands: false,
+      touchedPaths: ['scripts/lib/review-shell-env-interpreter.ts']
+    });
+
+    let nowMs = 100;
+    for (const command of [
+      "/bin/zsh -lc 'sed -n 1,120p scripts/lib/review-shell-env-interpreter.ts'",
+      "/bin/zsh -lc 'sed -n 1,120p dist/scripts/lib/review-shell-env-interpreter.js'",
+      "/bin/zsh -lc 'head -n 20 scripts/lib/review-shell-env-interpreter.ts'",
+      "/bin/zsh -lc 'tail -n 20 dist/scripts/lib/review-shell-env-interpreter.js'"
+    ]) {
+      state.observeChunk('thinking\nexec\n', 'stdout', nowMs);
+      state.observeChunk(`${command}\n`, 'stdout', nowMs + 10);
+      nowMs += 100;
+    }
+
+    const summary = state.buildOutputSummary();
+    expect(summary.distinctInspectionTargets).toBe(1);
+    expect(summary.maxInspectionTargetHits).toBe(4);
   });
 
   it('does not treat touched filenames inside search patterns as inspected targets', () => {

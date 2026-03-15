@@ -20,11 +20,21 @@
 
 ## Implementation
 
-- [ ] Shared shell-env interpreter extracted from `scripts/lib/review-execution-state.ts`. Evidence: `scripts/lib/review-execution-state.ts`
-- [ ] Focused `review-execution-state` regressions prove the extracted interpreter preserves current shell-env behavior. Evidence: `tests/review-execution-state.spec.ts`
+- [x] Shared shell-env interpreter extracted from `scripts/lib/review-execution-state.ts` into a bounded helper module without widening review-policy ownership. Evidence: `scripts/lib/review-shell-env-interpreter.ts`, `scripts/lib/review-execution-state.ts`, `out/1209-coordinator-symphony-aligned-standalone-review-shell-env-interpreter-extraction/manual/20260315T040118Z-closeout/00-summary.md`
+- [x] Focused `review-execution-state` regressions prove the extracted interpreter preserves current shell-env behavior, including nested generic `MANIFEST` rebinding. Evidence: `tests/review-execution-state.spec.ts`, `out/1209-coordinator-symphony-aligned-standalone-review-shell-env-interpreter-extraction/manual/20260315T040118Z-closeout/05a-targeted-review-execution-state.log`
 
 ## Validation & Closeout
 
-- [ ] `node scripts/spec-guard.mjs --dry-run`. Evidence: `out/1209-coordinator-symphony-aligned-standalone-review-shell-env-interpreter-extraction/manual/20260315T033505Z-docs-first/02-spec-guard.log`
-- [ ] `npm run docs:check`. Evidence: `out/1209-coordinator-symphony-aligned-standalone-review-shell-env-interpreter-extraction/manual/20260315T033505Z-docs-first/03-docs-check.log`
-- [ ] `npm run docs:freshness`. Evidence: `out/1209-coordinator-symphony-aligned-standalone-review-shell-env-interpreter-extraction/manual/20260315T033505Z-docs-first/04-docs-freshness.log`
+- [x] `node scripts/spec-guard.mjs --dry-run`. Evidence: `out/1209-coordinator-symphony-aligned-standalone-review-shell-env-interpreter-extraction/manual/20260315T040118Z-closeout/02-spec-guard.log`
+- [x] `npm run docs:check`. Evidence: `out/1209-coordinator-symphony-aligned-standalone-review-shell-env-interpreter-extraction/manual/20260315T040118Z-closeout/07-docs-check.log`
+- [x] `npm run docs:freshness`. Evidence: `out/1209-coordinator-symphony-aligned-standalone-review-shell-env-interpreter-extraction/manual/20260315T040118Z-closeout/08-docs-freshness.log`
+- [x] Task-scoped `node scripts/delegation-guard.mjs` passed with manifest-backed delegation evidence. Evidence: `out/1209-coordinator-symphony-aligned-standalone-review-shell-env-interpreter-extraction/manual/20260315T040118Z-closeout/01-delegation-guard.log`, `.runs/1209-coordinator-symphony-aligned-standalone-review-shell-env-interpreter-extraction-guard/cli/2026-03-15T04-02-22-812Z-6b1fe757/manifest.json`
+- [x] `npm run build` passed on the shipped tree. Evidence: `out/1209-coordinator-symphony-aligned-standalone-review-shell-env-interpreter-extraction/manual/20260315T040118Z-closeout/03-build.log`
+- [x] `npm run lint` passed on the shipped tree. Evidence: `out/1209-coordinator-symphony-aligned-standalone-review-shell-env-interpreter-extraction/manual/20260315T040118Z-closeout/04-lint.log`
+- [x] Focused shell-env interpreter regressions passed. Evidence: `out/1209-coordinator-symphony-aligned-standalone-review-shell-env-interpreter-extraction/manual/20260315T040118Z-closeout/05a-targeted-review-execution-state.log`
+- [x] Full validation lane passed on the shipped tree. Evidence: `out/1209-coordinator-symphony-aligned-standalone-review-shell-env-interpreter-extraction/manual/20260315T040118Z-closeout/05-test.log`
+- [x] `node scripts/diff-budget.mjs` passed with explicit stacked-branch override. Evidence: `out/1209-coordinator-symphony-aligned-standalone-review-shell-env-interpreter-extraction/manual/20260315T040118Z-closeout/09-diff-budget.log`, `out/1209-coordinator-symphony-aligned-standalone-review-shell-env-interpreter-extraction/manual/20260315T040118Z-closeout/13-override-notes.md`
+- [x] Bounded `npm run review` returned no findings on the implementation diff. Evidence: `out/1209-coordinator-symphony-aligned-standalone-review-shell-env-interpreter-extraction/manual/20260315T040118Z-closeout/10-review.log`
+- [x] `npm run pack:smoke` passed. Evidence: `out/1209-coordinator-symphony-aligned-standalone-review-shell-env-interpreter-extraction/manual/20260315T040118Z-closeout/11-pack-smoke.log`
+- [x] Elegance review completed. Evidence: `out/1209-coordinator-symphony-aligned-standalone-review-shell-env-interpreter-extraction/manual/20260315T040118Z-closeout/12-elegance-review.md`
+- [x] Closeout summary and explicit override notes recorded. Evidence: `out/1209-coordinator-symphony-aligned-standalone-review-shell-env-interpreter-extraction/manual/20260315T040118Z-closeout/00-summary.md`, `out/1209-coordinator-symphony-aligned-standalone-review-shell-env-interpreter-extraction/manual/20260315T040118Z-closeout/13-override-notes.md`

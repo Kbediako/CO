@@ -1,6 +1,17 @@
 import { writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
+import {
+  type ReviewShellDialect,
+  type ReviewShellEnvInterpreterDependencies,
+  type ReviewShellEnvState,
+  buildCommandEnvAssignments,
+  buildNestedShellEnvState,
+  collectInlineEnvAssignments,
+  createEmptyReviewShellEnvState,
+  updateReviewShellEnvStateForSegment
+} from './review-shell-env-interpreter.js';
+
 const REVIEW_DELEGATION_STARTUP_LINE_RE = /\bmcp:\s*delegation\s+(starting|ready)\b/i;
 const REVIEW_PROGRESS_SIGNAL_LINE_RE = /^(thinking|exec|codex)\b/i;
 const REVIEW_HEAVY_SCRIPT_TARGETS = new Set([
@@ -126,7 +137,6 @@ export type ReviewTerminationBoundaryProvenance =
 
 export type ReviewScopeMode = 'uncommitted' | 'base' | 'commit';
 export type ReviewStartupAnchorMode = 'diff' | 'audit';
-type ReviewShellDialect = 'bashlike' | 'zsh' | 'other';
 
 export interface ReviewOutputSummary {
   lineCount: number;
@@ -2423,7 +2433,11 @@ function resolveTouchedInspectionTarget(
     if (!normalizedTouchedPath) {
       continue;
     }
-    if (isTouchedScopePath(candidate, new Set<string>([normalizedTouchedPath]), repoRoot)) {
+    const touchedPathSet = new Set<string>([normalizedTouchedPath]);
+    if (
+      isTouchedScopePath(candidate, touchedPathSet, repoRoot) ||
+      isTouchedReviewScopePathFamilyOperand(candidate, touchedPathSet, repoRoot)
+    ) {
       return normalizedTouchedPath;
     }
   }
@@ -2693,255 +2707,6 @@ function analyzeStartupAnchorBoundaryProgress(
   return progress;
 }
 
-type ReviewShellEnvState = {
-  shellVars: Map<string, string>;
-  exportedVars: Set<string>;
-  blockedEnvVars: Set<string>;
-};
-
-function createEmptyReviewShellEnvState(
-  initialEnvVarPaths: ReadonlyMap<string, string> = new Map()
-): ReviewShellEnvState {
-  const shellVars = new Map<string, string>();
-  for (const [envVar, envPath] of initialEnvVarPaths.entries()) {
-    shellVars.set(envVar, envPath);
-  }
-  return {
-    shellVars,
-    exportedVars: new Set(shellVars.keys()),
-    blockedEnvVars: new Set()
-  };
-}
-
-function cloneReviewShellEnvState(shellEnvState: ReviewShellEnvState): ReviewShellEnvState {
-  return {
-    shellVars: new Map(shellEnvState.shellVars),
-    exportedVars: new Set(shellEnvState.exportedVars),
-    blockedEnvVars: new Set(shellEnvState.blockedEnvVars)
-  };
-}
-
-function buildBlockedEnvVarSet(
-  shellEnvState: ReviewShellEnvState,
-  rawTokens: string[]
-): Set<string> {
-  const blockedEnvVars = new Set(shellEnvState.blockedEnvVars);
-  for (const envVar of collectInlineEnvUnsetVars(rawTokens)) {
-    blockedEnvVars.add(envVar);
-  }
-  for (const envVar of collectInlineEnvAssignments(rawTokens).keys()) {
-    blockedEnvVars.delete(envVar);
-  }
-  return blockedEnvVars;
-}
-
-function collectLeadingShellAssignments(tokens: string[]): Map<string, string> {
-  const assignments = new Map<string, string>();
-  let index = 0;
-  while (index < tokens.length && /^[A-Za-z_][A-Za-z0-9_]*=.*/u.test(tokens[index] ?? '')) {
-    recordInlineEnvAssignment(assignments, tokens[index] ?? '');
-    index += 1;
-  }
-  return assignments;
-}
-
-function buildCommandEnvAssignments(
-  shellEnvState: ReviewShellEnvState,
-  rawTokens: string[]
-): Map<string, string> {
-  const envAssignments = commandUsesCleanEnvironment(rawTokens)
-    ? new Map<string, string>()
-    : mergeEnvAssignments(shellEnvState.shellVars, new Map());
-  for (const envVar of shellEnvState.blockedEnvVars) {
-    envAssignments.delete(envVar);
-  }
-  return mergeEnvAssignments(envAssignments, collectInlineEnvAssignments(rawTokens));
-}
-
-function buildNestedShellEnvState(
-  shellEnvState: ReviewShellEnvState,
-  rawTokens: string[]
-): ReviewShellEnvState {
-  const blockedEnvVars = buildBlockedEnvVarSet(shellEnvState, rawTokens);
-  const usesCleanEnvironment = commandUsesCleanEnvironment(rawTokens);
-  const shellVars = new Map<string, string>();
-  if (!usesCleanEnvironment) {
-    for (const envVar of shellEnvState.exportedVars) {
-      if (blockedEnvVars.has(envVar)) {
-        continue;
-      }
-      const value = shellEnvState.shellVars.get(envVar);
-      if (value !== undefined) {
-        shellVars.set(envVar, value);
-      }
-    }
-  }
-  for (const [key, value] of collectInlineEnvAssignments(rawTokens).entries()) {
-    shellVars.set(key, value);
-    blockedEnvVars.delete(key);
-  }
-  return {
-    shellVars,
-    exportedVars: new Set(shellVars.keys()),
-    blockedEnvVars
-  };
-}
-
-function updateReviewShellEnvStateForSegment(
-  shellEnvState: ReviewShellEnvState,
-  rawTokens: string[],
-  shellDialect: ReviewShellDialect = 'other'
-): ReviewShellEnvState {
-  const nextState = cloneReviewShellEnvState(shellEnvState);
-  const leadingAssignments = collectLeadingShellAssignments(rawTokens);
-  const strippedTokens = stripLeadingEnvAssignments(rawTokens);
-
-  if (strippedTokens.length === 0) {
-    for (const [key, value] of leadingAssignments.entries()) {
-      nextState.shellVars.set(key, value);
-      nextState.blockedEnvVars.delete(key);
-    }
-    return nextState;
-  }
-
-  const tokens = unwrapEnvCommandTokens(strippedTokens);
-  if (tokens.length === 0) {
-    return nextState;
-  }
-
-  const command = normalizeCommandToken(tokens[0] ?? '');
-  if (command === 'export') {
-    const exportTokens = tokens.slice(1);
-    const bashLikeUnexportMode = shellDialect === 'bashlike' && exportTokens.includes('-n');
-    if (shellDialect === 'bashlike' && !bashLikeUnexportMode) {
-      applyBashLikeLeadingBareExportAssignments(nextState, exportTokens, leadingAssignments);
-    }
-    applyExportTokensToReviewShellEnvState(
-      nextState,
-      exportTokens,
-      leadingAssignments,
-      shellDialect
-    );
-    return nextState;
-  }
-
-  if (command === 'unset') {
-    applyUnsetTokensToReviewShellEnvState(nextState, tokens.slice(1));
-    return nextState;
-  }
-
-  return nextState;
-}
-
-function applyBashLikeLeadingBareExportAssignments(
-  shellEnvState: ReviewShellEnvState,
-  tokens: string[],
-  leadingAssignments: ReadonlyMap<string, string>
-): void {
-  if (leadingAssignments.size === 0) {
-    return;
-  }
-
-  const bareExportTargets = new Set<string>();
-  for (const token of tokens) {
-    if (!token || token.startsWith('-') || /^[A-Za-z_][A-Za-z0-9_]*=.*/u.test(token)) {
-      continue;
-    }
-    const normalized = token.trim().replace(/^\$/u, '').replace(/[{}]/gu, '').toUpperCase();
-    if (normalized) {
-      bareExportTargets.add(normalized);
-    }
-  }
-
-  for (const [key, value] of leadingAssignments.entries()) {
-    if (!bareExportTargets.has(key)) {
-      continue;
-    }
-    shellEnvState.shellVars.set(key, value);
-    shellEnvState.exportedVars.add(key);
-    shellEnvState.blockedEnvVars.delete(key);
-  }
-}
-
-function applyExportTokensToReviewShellEnvState(
-  shellEnvState: ReviewShellEnvState,
-  tokens: string[],
-  leadingAssignments: ReadonlyMap<string, string> = new Map(),
-  shellDialect: ReviewShellDialect = 'other'
-): void {
-  let bashLikeExportMode: 'export' | 'unexport' = 'export';
-  for (const token of tokens) {
-    if (!token) {
-      continue;
-    }
-    if (shellDialect === 'bashlike' && token === '-n') {
-      bashLikeExportMode = 'unexport';
-      continue;
-    }
-    if (token === '--') {
-      continue;
-    }
-    if (/^[A-Za-z_][A-Za-z0-9_]*=.*/u.test(token)) {
-      if (bashLikeExportMode === 'unexport') {
-        continue;
-      }
-      const assignments = new Map<string, string>();
-      recordInlineEnvAssignment(assignments, token);
-      for (const [key, value] of assignments.entries()) {
-        let resolvedValue = value;
-        const normalizedInlineEnvVar = normalizeAuditMetaSurfaceEnvVar(value);
-        if (normalizedInlineEnvVar) {
-          const expansionEnv = new Map(shellEnvState.shellVars);
-          for (const [leadingKey, leadingValue] of leadingAssignments.entries()) {
-            if (leadingKey !== key) {
-              expansionEnv.set(leadingKey, leadingValue);
-            }
-          }
-          const currentValue = expansionEnv.get(normalizedInlineEnvVar);
-          resolvedValue = currentValue ?? '';
-        }
-        shellEnvState.shellVars.set(key, resolvedValue);
-        shellEnvState.exportedVars.add(key);
-        shellEnvState.blockedEnvVars.delete(key);
-      }
-      continue;
-    }
-    if (token.startsWith('-')) {
-      continue;
-    }
-    const normalized = token.trim().replace(/^\$/u, '').replace(/[{}]/gu, '').toUpperCase();
-    if (!normalized) {
-      continue;
-    }
-    if (bashLikeExportMode === 'unexport') {
-      shellEnvState.exportedVars.delete(normalized);
-      continue;
-    }
-    if (shellEnvState.shellVars.has(normalized)) {
-      shellEnvState.exportedVars.add(normalized);
-      shellEnvState.blockedEnvVars.delete(normalized);
-    }
-  }
-}
-
-function applyUnsetTokensToReviewShellEnvState(
-  shellEnvState: ReviewShellEnvState,
-  tokens: string[]
-): void {
-  for (const token of tokens) {
-    if (!token || token.startsWith('-')) {
-      continue;
-    }
-    const normalized = token.trim().replace(/^\$/u, '').replace(/[{}]/gu, '').toUpperCase();
-    if (!normalized) {
-      continue;
-    }
-    shellEnvState.shellVars.delete(normalized);
-    shellEnvState.exportedVars.delete(normalized);
-    shellEnvState.blockedEnvVars.add(normalized);
-  }
-}
-
 function classifyMetaSurfaceSegment(
   segment: string,
   touchedPaths: ReadonlySet<string>,
@@ -2957,10 +2722,15 @@ function classifyMetaSurfaceSegment(
   shellDialect: ReviewShellDialect = 'other'
 ) : { kind: string | null; nextShellEnvState: ReviewShellEnvState } {
   const rawTokens = tokenizeShellSegment(segment);
-  const envAssignments = buildCommandEnvAssignments(shellEnvState, rawTokens);
+  const envAssignments = buildCommandEnvAssignments(
+    shellEnvState,
+    rawTokens,
+    REVIEW_SHELL_ENV_INTERPRETER_DEPENDENCIES
+  );
   const nextShellEnvState = updateReviewShellEnvStateForSegment(
     shellEnvState,
     rawTokens,
+    REVIEW_SHELL_ENV_INTERPRETER_DEPENDENCIES,
     shellDialect
   );
   const strippedTokens = stripLeadingEnvAssignments(rawTokens);
@@ -2978,7 +2748,11 @@ function classifyMetaSurfaceSegment(
     if (payload) {
       const nestedShellDialect = detectReviewShellDialect(tokens);
       const nestedSegments = splitShellControlSegmentsDetailed(payload);
-      let nestedShellEnvState = buildNestedShellEnvState(shellEnvState, rawTokens);
+      let nestedShellEnvState = buildNestedShellEnvState(
+        shellEnvState,
+        rawTokens,
+        REVIEW_SHELL_ENV_INTERPRETER_DEPENDENCIES
+      );
       let separatorBefore: ShellControlSeparator = null;
       let previousSegmentTruthiness: boolean | null = null;
       for (const { segment: nestedSegment, separatorAfter } of nestedSegments) {
@@ -3017,7 +2791,9 @@ function classifyMetaSurfaceSegment(
 
   const command = normalizeCommandToken(tokens[0] ?? '');
   const args = tokens.slice(1);
-  const inlineAssignedEnvVars = new Set(collectInlineEnvAssignments(rawTokens).keys());
+  const inlineAssignedEnvVars = new Set(
+    collectInlineEnvAssignments(rawTokens, REVIEW_SHELL_ENV_INTERPRETER_DEPENDENCIES).keys()
+  );
   if (isReviewOrchestrationCommand(command, args)) {
     return { kind: 'review-orchestration', nextShellEnvState };
   }
@@ -3129,156 +2905,6 @@ function expandMetaSurfaceOperandCandidates(
   return candidates;
 }
 
-function collectInlineEnvAssignments(tokens: string[]): Map<string, string> {
-  const assignments = new Map<string, string>();
-  let index = 0;
-  while (index < tokens.length && /^[A-Za-z_][A-Za-z0-9_]*=.*/u.test(tokens[index] ?? '')) {
-    recordInlineEnvAssignment(assignments, tokens[index] ?? '');
-    index += 1;
-  }
-
-  if (normalizeCommandToken(tokens[index] ?? '') !== 'env') {
-    return assignments;
-  }
-
-  index += 1;
-  while (index < tokens.length) {
-    const token = tokens[index] ?? '';
-    const normalized = token.toLowerCase();
-    if (token === '--') {
-      index += 1;
-      break;
-    }
-    if (/^[A-Za-z_][A-Za-z0-9_]*=.*/u.test(token)) {
-      recordInlineEnvAssignment(assignments, token);
-      index += 1;
-      continue;
-    }
-    if (normalized === '-u' || normalized === '--unset') {
-      index += 2;
-      continue;
-    }
-    if (normalized.startsWith('--unset=')) {
-      index += 1;
-      continue;
-    }
-    if (token.startsWith('-')) {
-      index += 1;
-      continue;
-    }
-    break;
-  }
-  return assignments;
-}
-
-function commandUsesCleanEnvironment(tokens: string[]): boolean {
-  let index = 0;
-  while (index < tokens.length && /^[A-Za-z_][A-Za-z0-9_]*=.*/u.test(tokens[index] ?? '')) {
-    index += 1;
-  }
-
-  if (normalizeCommandToken(tokens[index] ?? '') !== 'env') {
-    return false;
-  }
-
-  index += 1;
-  while (index < tokens.length) {
-    const token = tokens[index] ?? '';
-    const normalized = token.toLowerCase();
-    if (token === '--') {
-      return false;
-    }
-    if (/^[A-Za-z_][A-Za-z0-9_]*=.*/u.test(token)) {
-      index += 1;
-      continue;
-    }
-    if (normalized === '-i' || normalized === '--ignore-environment') {
-      return true;
-    }
-    if ((normalized === '-u' || normalized === '--unset') && index + 1 < tokens.length) {
-      index += 2;
-      continue;
-    }
-    if (normalized.startsWith('--unset=')) {
-      index += 1;
-      continue;
-    }
-    if (token.startsWith('-')) {
-      index += 1;
-      continue;
-    }
-    return false;
-  }
-
-  return false;
-}
-
-function collectInlineEnvUnsetVars(tokens: string[]): Set<string> {
-  const unsetVars = new Set<string>();
-  let index = 0;
-  while (index < tokens.length && /^[A-Za-z_][A-Za-z0-9_]*=.*/u.test(tokens[index] ?? '')) {
-    index += 1;
-  }
-
-  if (normalizeCommandToken(tokens[index] ?? '') !== 'env') {
-    return unsetVars;
-  }
-
-  index += 1;
-  while (index < tokens.length) {
-    const token = tokens[index] ?? '';
-    const normalized = token.toLowerCase();
-    if (token === '--') {
-      index += 1;
-      break;
-    }
-    if (/^[A-Za-z_][A-Za-z0-9_]*=.*/u.test(token)) {
-      index += 1;
-      continue;
-    }
-    if ((normalized === '-u' || normalized === '--unset') && index + 1 < tokens.length) {
-      const envVar = tokens[index + 1]?.trim().replace(/^\$/u, '').replace(/[{}]/gu, '').toUpperCase();
-      if (envVar) {
-        unsetVars.add(envVar);
-      }
-      index += 2;
-      continue;
-    }
-    if (normalized.startsWith('--unset=')) {
-      const envVar = normalized
-        .slice('--unset='.length)
-        .trim()
-        .replace(/^\$/u, '')
-        .replace(/[{}]/gu, '')
-        .toUpperCase();
-      if (envVar) {
-        unsetVars.add(envVar);
-      }
-      index += 1;
-      continue;
-    }
-    if (token.startsWith('-')) {
-      index += 1;
-      continue;
-    }
-    break;
-  }
-  return unsetVars;
-}
-
-function recordInlineEnvAssignment(assignments: Map<string, string>, token: string): void {
-  const separatorIndex = token.indexOf('=');
-  if (separatorIndex <= 0) {
-    return;
-  }
-  const key = token.slice(0, separatorIndex).trim().toUpperCase();
-  const value = token.slice(separatorIndex + 1).trim();
-  if (!key || !value) {
-    return;
-  }
-  assignments.set(key, value);
-}
-
 function resolveAuditMetaSurfaceEnvOperandPath(
   operand: string,
   envAssignments: ReadonlyMap<string, string>,
@@ -3302,17 +2928,6 @@ function resolveAuditMetaSurfaceEnvOperandPath(
     return null;
   }
   return auditStartupAnchorEnvVarPaths.get(normalizedEnvVar) ?? null;
-}
-
-function mergeEnvAssignments(
-  inheritedEnvAssignments: ReadonlyMap<string, string>,
-  nextEnvAssignments: ReadonlyMap<string, string>
-): Map<string, string> {
-  const merged = new Map(inheritedEnvAssignments);
-  for (const [key, value] of nextEnvAssignments.entries()) {
-    merged.set(key, value);
-  }
-  return merged;
 }
 
 function detectAuditEnvRebindingMetaSurface(
@@ -3425,10 +3040,15 @@ function analyzeStartupAnchorBoundarySegment(
   shellDialect: ReviewShellDialect = 'other'
 ) : ReviewShellEnvState {
   const rawTokens = tokenizeShellSegment(segment);
-  const envAssignments = buildCommandEnvAssignments(shellEnvState, rawTokens);
+  const envAssignments = buildCommandEnvAssignments(
+    shellEnvState,
+    rawTokens,
+    REVIEW_SHELL_ENV_INTERPRETER_DEPENDENCIES
+  );
   const nextShellEnvState = updateReviewShellEnvStateForSegment(
     shellEnvState,
     rawTokens,
+    REVIEW_SHELL_ENV_INTERPRETER_DEPENDENCIES,
     shellDialect
   );
   const strippedTokens = stripLeadingEnvAssignments(rawTokens);
@@ -3446,7 +3066,11 @@ function analyzeStartupAnchorBoundarySegment(
     if (payload) {
       const nestedShellDialect = detectReviewShellDialect(tokens);
       const nestedSegments = splitShellControlSegmentsDetailed(payload);
-      let nestedShellEnvState = buildNestedShellEnvState(shellEnvState, rawTokens);
+      let nestedShellEnvState = buildNestedShellEnvState(
+        shellEnvState,
+        rawTokens,
+        REVIEW_SHELL_ENV_INTERPRETER_DEPENDENCIES
+      );
       let separatorBefore: ShellControlSeparator = null;
       let previousSegmentTruthiness: boolean | null = null;
       for (const { segment: nestedSegment, separatorAfter } of nestedSegments) {
@@ -3747,6 +3371,13 @@ function normalizeAuditMetaSurfaceEnvVarPathMap(
   }
   return normalized;
 }
+
+const REVIEW_SHELL_ENV_INTERPRETER_DEPENDENCIES: ReviewShellEnvInterpreterDependencies = {
+  normalizeAuditMetaSurfaceEnvVar,
+  normalizeCommandToken,
+  stripLeadingEnvAssignments,
+  unwrapEnvCommandTokens
+};
 
 function isReviewOrchestrationCommand(command: string, args: string[]): boolean {
   if (command === 'npm' || command === 'pnpm' || command === 'yarn' || command === 'bun') {
@@ -4071,6 +3702,8 @@ function classifyMetaSurfaceOperand(
     matchesPathSuffix(normalized, 'scripts/pack-smoke.js') ||
     matchesPathSuffix(normalized, 'scripts/lib/run-manifests.js') ||
     matchesPathSuffix(normalized, 'scripts/lib/run-manifests.d.ts') ||
+    matchesPathSuffix(normalized, 'scripts/lib/review-shell-env-interpreter.ts') ||
+    matchesPathSuffix(normalized, 'dist/scripts/lib/review-shell-env-interpreter.js') ||
     matchesPathSuffix(normalized, 'scripts/lib/review-prompt-context.ts') ||
     matchesPathSuffix(normalized, 'dist/scripts/lib/review-prompt-context.js') ||
     matchesPathSuffix(normalized, 'scripts/lib/review-scope-paths.ts') ||
@@ -4178,6 +3811,15 @@ function isTouchedReviewScopePathFamilyOperand(
 ): boolean {
   const normalizedOperand = normalizeScopePath(operand);
   const repoRelativeOperand = relativizeOperandToRepoRoot(normalizedOperand, repoRoot);
+  const shellEnvInterpreterPathFamily = [
+    'scripts/lib/review-shell-env-interpreter.ts',
+    'dist/scripts/lib/review-shell-env-interpreter.js'
+  ];
+  if (shellEnvInterpreterPathFamily.includes(repoRelativeOperand)) {
+    return shellEnvInterpreterPathFamily.some((path) =>
+      isTouchedScopePath(path, touchedPaths, repoRoot)
+    );
+  }
   const promptContextPathFamily = [
     'scripts/lib/review-prompt-context.ts',
     'dist/scripts/lib/review-prompt-context.js',
