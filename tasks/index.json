@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260315-1218-coordinator-symphony-aligned-standalone-review-shell-command-parser-review-support-classification",
+      "title": "Coordinator Symphony-Aligned Standalone Review Shell Command Parser Review-Support Classification",
+      "relates_to": "tasks/tasks-1218-coordinator-symphony-aligned-standalone-review-shell-command-parser-review-support-classification.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-15",
+      "paths": {
+        "spec": "tasks/specs/1218-coordinator-symphony-aligned-standalone-review-shell-command-parser-review-support-classification.md",
+        "task": "tasks/tasks-1218-coordinator-symphony-aligned-standalone-review-shell-command-parser-review-support-classification.md",
+        "agent_task": ".agent/task/1218-coordinator-symphony-aligned-standalone-review-shell-command-parser-review-support-classification.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-standalone-review-shell-command-parser-review-support-classification.md"
+      }
+    },
+    {
       "id": "20260315-1217-coordinator-symphony-aligned-standalone-review-execution-telemetry-surface-extraction",
       "title": "Coordinator Symphony-Aligned Standalone Review Execution Telemetry Surface Extraction",
       "relates_to": "tasks/tasks-1217-coordinator-symphony-aligned-standalone-review-execution-telemetry-surface-extraction.md",
