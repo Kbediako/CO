@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260315-1204-coordinator-symphony-aligned-orchestrator-cloud-branch-resolution-boundary-extraction",
+      "title": "Coordinator Symphony-Aligned Orchestrator Cloud Branch Resolution Boundary Extraction",
+      "relates_to": "tasks/tasks-1204-coordinator-symphony-aligned-orchestrator-cloud-branch-resolution-boundary-extraction.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-15",
+      "paths": {
+        "spec": "tasks/specs/1204-coordinator-symphony-aligned-orchestrator-cloud-branch-resolution-boundary-extraction.md",
+        "task": "tasks/tasks-1204-coordinator-symphony-aligned-orchestrator-cloud-branch-resolution-boundary-extraction.md",
+        "agent_task": ".agent/task/1204-coordinator-symphony-aligned-orchestrator-cloud-branch-resolution-boundary-extraction.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-cloud-branch-resolution-boundary-extraction.md"
+      }
+    },
+    {
       "id": "20260315-1203-coordinator-symphony-aligned-orchestrator-cloud-environment-resolution-boundary-extraction",
       "title": "Coordinator Symphony-Aligned Orchestrator Cloud Environment Resolution Boundary Extraction",
       "relates_to": "tasks/tasks-1203-coordinator-symphony-aligned-orchestrator-cloud-environment-resolution-boundary-extraction.md",
