@@ -633,10 +633,10 @@ fi
       for _ in $(seq 1 6); do
         echo "thinking"
         echo "exec"
-        echo "/bin/zsh -lc 'sed -n 1,120p dist/scripts/lib/review-scope-paths.js' in /Users/kbediako/Code/CO"
+        echo "/bin/zsh -lc 'sed -n 1,120p dist/scripts/lib/review-prompt-context.js' in /Users/kbediako/Code/CO"
         echo "thinking"
         echo "exec"
-        echo "/bin/zsh -lc 'sed -n 1,120p tests/review-scope-paths.spec.ts' in /Users/kbediako/Code/CO"
+        echo "/bin/zsh -lc 'sed -n 1,120p tests/review-prompt-context.spec.ts' in /Users/kbediako/Code/CO"
         sleep 0.05
       done
       while true; do sleep 1; done
@@ -3399,7 +3399,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(result.stderr).toContain('meta-surface expansion detected');
   }, LONG_WAIT_TEST_TIMEOUT_MS);
 
-  it('fails bounded diff review when untouched adjacent review-scope helpers keep expanding after the provenance hint', async () => {
+  it('fails bounded diff review when untouched adjacent prompt-context helpers keep expanding after the provenance hint', async () => {
     const sandbox = await makeSandbox();
     const manifestPath = await makeManifest(sandbox);
     await makeCloseoutBundle(sandbox, 'sample-task');

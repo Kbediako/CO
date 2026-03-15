@@ -4071,11 +4071,14 @@ function classifyMetaSurfaceOperand(
     matchesPathSuffix(normalized, 'scripts/pack-smoke.js') ||
     matchesPathSuffix(normalized, 'scripts/lib/run-manifests.js') ||
     matchesPathSuffix(normalized, 'scripts/lib/run-manifests.d.ts') ||
+    matchesPathSuffix(normalized, 'scripts/lib/review-prompt-context.ts') ||
+    matchesPathSuffix(normalized, 'dist/scripts/lib/review-prompt-context.js') ||
     matchesPathSuffix(normalized, 'scripts/lib/review-scope-paths.ts') ||
     matchesPathSuffix(normalized, 'dist/scripts/lib/review-scope-paths.js') ||
     matchesPathSuffix(normalized, 'scripts/run-review.ts') ||
     matchesPathSuffix(normalized, 'scripts/run-review.js') ||
     matchesPathSuffix(normalized, 'scripts/lib/review-execution-state.ts') ||
+    matchesPathSuffix(normalized, 'tests/review-prompt-context.spec.ts') ||
     matchesPathSuffix(normalized, 'tests/review-scope-paths.spec.ts') ||
     matchesPathSuffix(normalized, 'tests/run-review.spec.ts') ||
     matchesPathSuffix(normalized, 'tests/run-review.spec.js') ||
@@ -4175,6 +4178,14 @@ function isTouchedReviewScopePathFamilyOperand(
 ): boolean {
   const normalizedOperand = normalizeScopePath(operand);
   const repoRelativeOperand = relativizeOperandToRepoRoot(normalizedOperand, repoRoot);
+  const promptContextPathFamily = [
+    'scripts/lib/review-prompt-context.ts',
+    'dist/scripts/lib/review-prompt-context.js',
+    'tests/review-prompt-context.spec.ts'
+  ];
+  if (promptContextPathFamily.includes(repoRelativeOperand)) {
+    return promptContextPathFamily.some((path) => isTouchedScopePath(path, touchedPaths, repoRoot));
+  }
   const reviewScopePathFamily = [
     'scripts/lib/review-scope-paths.ts',
     'dist/scripts/lib/review-scope-paths.js',

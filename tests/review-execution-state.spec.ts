@@ -2698,6 +2698,34 @@ describe('ReviewExecutionState', () => {
     expect(summary.metaSurfaceKinds).toEqual(['review-support']);
   });
 
+  it('classifies untouched adjacent prompt-context helpers as meta-surface activity for standalone-review diffs', () => {
+    const state = new ReviewExecutionState({
+      startedAtMs: 0,
+      blockHeavyCommands: false,
+      metaSurfaceTimeoutMs: 1_000,
+      touchedPaths: ['scripts/run-review.ts']
+    });
+
+    state.observeChunk('thinking\nexec\n', 'stdout', 100);
+    state.observeChunk(
+      `/bin/zsh -lc 'sed -n 1,120p dist/scripts/lib/review-prompt-context.js'\n`,
+      'stdout',
+      110
+    );
+    state.observeChunk('thinking\nexec\n', 'stdout', 200);
+    state.observeChunk(
+      `/bin/zsh -lc 'sed -n 1,120p tests/review-prompt-context.spec.ts'\n`,
+      'stdout',
+      210
+    );
+
+    const expansion = state.getMetaSurfaceExpansionState(2_000);
+    const summary = state.buildOutputSummary();
+    expect(expansion.triggered).toBe(false);
+    expect(summary.metaSurfaceSignals).toBe(2);
+    expect(summary.metaSurfaceKinds).toEqual(['review-support']);
+  });
+
   it('keeps shared docs-helpers reads in ordinary diff scope even for standalone-review diffs', () => {
     const state = new ReviewExecutionState({
       startedAtMs: 0,
@@ -2756,6 +2784,80 @@ describe('ReviewExecutionState', () => {
     expect(expansion.triggered).toBe(false);
     expect(summary.metaSurfaceSignals).toBe(0);
     expect(summary.metaSurfaceKinds).toEqual([]);
+  });
+
+  it('keeps prompt-context helper tests in ordinary diff scope when the helper source is touched', () => {
+    const state = new ReviewExecutionState({
+      startedAtMs: 0,
+      blockHeavyCommands: false,
+      metaSurfaceTimeoutMs: 1_000,
+      touchedPaths: ['scripts/lib/review-prompt-context.ts']
+    });
+
+    state.observeChunk('thinking\nexec\n', 'stdout', 100);
+    state.observeChunk(
+      `/bin/zsh -lc 'sed -n 1,120p tests/review-prompt-context.spec.ts'\n`,
+      'stdout',
+      110
+    );
+
+    const expansion = state.getMetaSurfaceExpansionState(2_000);
+    const summary = state.buildOutputSummary();
+    expect(expansion.triggered).toBe(false);
+    expect(summary.metaSurfaceSignals).toBe(0);
+    expect(summary.metaSurfaceKinds).toEqual([]);
+  });
+
+  it('keeps prompt-context helpers as meta-surface activity when only review-scope helpers are touched', () => {
+    const state = new ReviewExecutionState({
+      startedAtMs: 0,
+      blockHeavyCommands: false,
+      metaSurfaceTimeoutMs: 1_000,
+      touchedPaths: ['scripts/lib/review-scope-paths.ts']
+    });
+
+    state.observeChunk('thinking\nexec\n', 'stdout', 100);
+    state.observeChunk(
+      `/bin/zsh -lc 'sed -n 1,120p dist/scripts/lib/review-prompt-context.js'\n`,
+      'stdout',
+      110
+    );
+    state.observeChunk('thinking\nexec\n', 'stdout', 200);
+    state.observeChunk(
+      `/bin/zsh -lc 'sed -n 1,120p tests/review-prompt-context.spec.ts'\n`,
+      'stdout',
+      210
+    );
+
+    const expansion = state.getMetaSurfaceExpansionState(2_000);
+    const summary = state.buildOutputSummary();
+    expect(expansion.triggered).toBe(false);
+    expect(summary.metaSurfaceSignals).toBe(2);
+    expect(summary.metaSurfaceKinds).toEqual(['review-support']);
+  });
+
+  it('keeps review-scope helpers as meta-surface activity when only prompt-context helpers are touched', () => {
+    const state = new ReviewExecutionState({
+      startedAtMs: 0,
+      blockHeavyCommands: false,
+      metaSurfaceTimeoutMs: 1_000,
+      touchedPaths: ['scripts/lib/review-prompt-context.ts']
+    });
+
+    state.observeChunk('thinking\nexec\n', 'stdout', 100);
+    state.observeChunk(
+      `/bin/zsh -lc 'sed -n 1,120p dist/scripts/lib/review-scope-paths.js'\n`,
+      'stdout',
+      110
+    );
+    state.observeChunk('thinking\nexec\n', 'stdout', 200);
+    state.observeChunk(`/bin/zsh -lc 'sed -n 1,120p tests/review-scope-paths.spec.ts'\n`, 'stdout', 210);
+
+    const expansion = state.getMetaSurfaceExpansionState(2_000);
+    const summary = state.buildOutputSummary();
+    expect(expansion.triggered).toBe(false);
+    expect(summary.metaSurfaceSignals).toBe(2);
+    expect(summary.metaSurfaceKinds).toEqual(['review-support']);
   });
 
   it('keeps touched review-scope helper tests and their paired source in ordinary diff scope', () => {
