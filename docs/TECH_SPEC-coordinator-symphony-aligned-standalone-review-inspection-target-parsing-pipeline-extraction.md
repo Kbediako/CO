@@ -28,6 +28,6 @@ The next truthful seam is the four-function parsing cluster around `extractInspe
 - `npm run docs:check`
 - `npm run docs:freshness`
 - `npm run build`
-- `npx vitest run --config vitest.config.core.ts tests/review-inspection-target-parsing.spec.ts tests/review-execution-state.spec.ts tests/run-review.spec.ts`
+- `npx vitest run --config vitest.config.core.ts tests/review-inspection-target-parsing.spec.ts tests/review-meta-surface-normalization.spec.ts tests/review-execution-state.spec.ts`
 - `npm run review`
 - `npm run pack:smoke`

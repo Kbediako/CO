@@ -13,6 +13,7 @@ related_tasks:
   - tasks/tasks-1213-coordinator-symphony-aligned-standalone-review-inspection-target-parsing-pipeline-extraction.md
 review_notes:
   - 2026-03-15: Local read-only reassessment after `1212` approves a narrow inspection-target parsing extraction. The remaining truthful seam is the deterministic target-extraction cluster reused by command-line and narrative inspection analyzers inside `scripts/lib/review-execution-state.ts`. Evidence: `docs/findings/1213-standalone-review-inspection-target-parsing-pipeline-extraction-deliberation.md`, `scripts/lib/review-execution-state.ts`.
+  - 2026-03-15: Closeout keeps the extraction bounded to the inspection-target parsing pipeline. A bounded review found one real helper-family touched-path regression in `review-meta-surface-normalization`, which was fixed before final validation; the remaining review activity drifted and is carried as an override. Evidence: `scripts/lib/review-meta-surface-normalization.ts`, `tests/review-meta-surface-normalization.spec.ts`, `out/1213-coordinator-symphony-aligned-standalone-review-inspection-target-parsing-pipeline-extraction/manual/20260315T070736Z-closeout/13-override-notes.md`.
 ---
 
 # Technical Specification
@@ -35,6 +36,6 @@ The standalone-review execution-state file still contains a deterministic inspec
 - `npm run docs:check`
 - `npm run docs:freshness`
 - `npm run build`
-- `npx vitest run --config vitest.config.core.ts tests/review-inspection-target-parsing.spec.ts tests/review-execution-state.spec.ts tests/run-review.spec.ts`
+- `npx vitest run --config vitest.config.core.ts tests/review-inspection-target-parsing.spec.ts tests/review-meta-surface-normalization.spec.ts tests/review-execution-state.spec.ts`
 - `npm run review`
 - `npm run pack:smoke`
