@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260315-1208-coordinator-symphony-aligned-standalone-review-prompt-context-review-support-classification",
+      "title": "Coordinator Symphony-Aligned Standalone Review Prompt Context Review-Support Classification",
+      "relates_to": "tasks/tasks-1208-coordinator-symphony-aligned-standalone-review-prompt-context-review-support-classification.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-15",
+      "paths": {
+        "spec": "tasks/specs/1208-coordinator-symphony-aligned-standalone-review-prompt-context-review-support-classification.md",
+        "task": "tasks/tasks-1208-coordinator-symphony-aligned-standalone-review-prompt-context-review-support-classification.md",
+        "agent_task": ".agent/task/1208-coordinator-symphony-aligned-standalone-review-prompt-context-review-support-classification.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-standalone-review-prompt-context-review-support-classification.md"
+      }
+    },
+    {
       "id": "20260315-1207-coordinator-symphony-aligned-standalone-review-prompt-context-builder-extraction",
       "title": "Coordinator Symphony-Aligned Standalone Review Prompt Context Builder Extraction",
       "relates_to": "tasks/tasks-1207-coordinator-symphony-aligned-standalone-review-prompt-context-builder-extraction.md",
