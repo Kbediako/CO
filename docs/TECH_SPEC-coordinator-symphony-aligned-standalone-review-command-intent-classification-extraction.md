@@ -8,6 +8,7 @@ After `1214`, the next deterministic helper cluster left inline in `scripts/lib/
 
 - extract the command-intent helper cluster from `scripts/lib/review-execution-state.ts`
 - preserve tool-line delegation detection, nested shell-segment command-intent parsing, direct validation runner allowlist handling, package-script validation-suite resolution, and violation-label formatting
+- preserve the extracted helper family's existing `review-support` and touched-family behavior in `scripts/lib/review-meta-surface-normalization.ts`
 - keep stateful review-boundary policy ownership local to `review-execution-state`
 - add only the focused regressions needed to pin preserved command-intent behavior
 
@@ -29,7 +30,7 @@ The next truthful seam is the pure command-intent helper family around `REVIEW_C
 - `npm run docs:freshness`
 - `npm run build`
 - `npm run lint`
-- `npx vitest run --config vitest.config.core.ts tests/review-execution-state.spec.ts`
+- `npx vitest run --config vitest.config.core.ts tests/review-command-intent-classification.spec.ts tests/review-meta-surface-normalization.spec.ts tests/review-execution-state.spec.ts`
 - `npm run test`
 - `node scripts/diff-budget.mjs`
 - `npm run review`

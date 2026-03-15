@@ -178,4 +178,31 @@ describe('review meta-surface normalization', () => {
       )
     ).toBe(true);
   });
+
+  it('classifies the extracted command-intent helper as review-support when it is inspected directly', () => {
+    expect(
+      classifyMetaSurfaceDirectDetailed(
+        'sed',
+        ['-n', '1,80p', 'scripts/lib/review-command-intent-classification.ts'],
+        new Set(),
+        '/repo'
+      )
+    ).toEqual([
+      {
+        kind: 'review-support',
+        candidate: 'scripts/lib/review-command-intent-classification.ts',
+        operand: 'scripts/lib/review-command-intent-classification.ts'
+      }
+    ]);
+  });
+
+  it('treats the extracted command-intent helper family as touched when review-execution-state is the touched sibling', () => {
+    expect(
+      isTouchedReviewScopePathFamilyOperand(
+        'scripts/lib/review-command-intent-classification.ts',
+        new Set(['scripts/lib/review-execution-state.ts']),
+        '/repo'
+      )
+    ).toBe(true);
+  });
 });

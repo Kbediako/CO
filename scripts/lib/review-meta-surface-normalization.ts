@@ -352,10 +352,22 @@ export function isTouchedReviewScopePathFamilyOperand(
       'scripts/lib/review-execution-state.ts',
       'tests/review-execution-state.spec.ts'
     ];
-    if (!reviewCommandProbeClassificationPathFamily.includes(repoRelativeOperand)) {
+    if (reviewCommandProbeClassificationPathFamily.includes(repoRelativeOperand)) {
+      return reviewCommandProbeClassificationPathFamily.some((familyPath) =>
+        isTouchedScopePath(familyPath, touchedPaths, repoRoot)
+      );
+    }
+    const reviewCommandIntentClassificationPathFamily = [
+      'scripts/lib/review-command-intent-classification.ts',
+      'dist/scripts/lib/review-command-intent-classification.js',
+      'tests/review-command-intent-classification.spec.ts',
+      'scripts/lib/review-execution-state.ts',
+      'tests/review-execution-state.spec.ts'
+    ];
+    if (!reviewCommandIntentClassificationPathFamily.includes(repoRelativeOperand)) {
       return false;
     }
-    return reviewCommandProbeClassificationPathFamily.some((familyPath) =>
+    return reviewCommandIntentClassificationPathFamily.some((familyPath) =>
       isTouchedScopePath(familyPath, touchedPaths, repoRoot)
     );
   }
@@ -576,6 +588,8 @@ function classifyMetaSurfaceOperand(
     matchesPathSuffix(normalized, 'dist/scripts/lib/review-inspection-target-parsing.js') ||
     matchesPathSuffix(normalized, 'scripts/lib/review-command-probe-classification.ts') ||
     matchesPathSuffix(normalized, 'dist/scripts/lib/review-command-probe-classification.js') ||
+    matchesPathSuffix(normalized, 'scripts/lib/review-command-intent-classification.ts') ||
+    matchesPathSuffix(normalized, 'dist/scripts/lib/review-command-intent-classification.js') ||
     matchesPathSuffix(normalized, 'scripts/run-review.ts') ||
     matchesPathSuffix(normalized, 'scripts/run-review.js') ||
     matchesPathSuffix(normalized, 'scripts/lib/review-execution-state.ts') ||
@@ -583,6 +597,7 @@ function classifyMetaSurfaceOperand(
     matchesPathSuffix(normalized, 'tests/review-meta-surface-normalization.spec.ts') ||
     matchesPathSuffix(normalized, 'tests/review-inspection-target-parsing.spec.ts') ||
     matchesPathSuffix(normalized, 'tests/review-command-probe-classification.spec.ts') ||
+    matchesPathSuffix(normalized, 'tests/review-command-intent-classification.spec.ts') ||
     matchesPathSuffix(normalized, 'tests/review-scope-paths.spec.ts') ||
     matchesPathSuffix(normalized, 'tests/run-review.spec.ts') ||
     matchesPathSuffix(normalized, 'tests/run-review.spec.js') ||
