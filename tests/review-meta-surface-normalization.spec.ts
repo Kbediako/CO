@@ -151,4 +151,31 @@ describe('review meta-surface normalization', () => {
       )
     ).toBe(true);
   });
+
+  it('classifies the extracted command-probe helper as review-support when it is inspected directly', () => {
+    expect(
+      classifyMetaSurfaceDirectDetailed(
+        'sed',
+        ['-n', '1,80p', 'scripts/lib/review-command-probe-classification.ts'],
+        new Set(),
+        '/repo'
+      )
+    ).toEqual([
+      {
+        kind: 'review-support',
+        candidate: 'scripts/lib/review-command-probe-classification.ts',
+        operand: 'scripts/lib/review-command-probe-classification.ts'
+      }
+    ]);
+  });
+
+  it('treats the extracted command-probe helper family as touched when review-execution-state is the touched sibling', () => {
+    expect(
+      isTouchedReviewScopePathFamilyOperand(
+        'scripts/lib/review-command-probe-classification.ts',
+        new Set(['scripts/lib/review-execution-state.ts']),
+        '/repo'
+      )
+    ).toBe(true);
+  });
 });

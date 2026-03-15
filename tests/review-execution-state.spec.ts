@@ -257,6 +257,36 @@ describe('ReviewExecutionState', () => {
     expect(state.getShellProbeBoundaryState(2_000).probeCount).toBe(0);
   });
 
+  it('does not treat explicit grep search targets as shell probes even when MANIFEST is the pattern source', () => {
+    const state = new ReviewExecutionState({ startedAtMs: 0 });
+
+    state.observeChunk('thinking\nexec\n', 'stdout', 100);
+    state.observeChunk(
+      `/bin/zsh -lc 'grep -e PATTERN $MANIFEST tests/run-review.spec.ts'\n`,
+      'stdout',
+      110
+    );
+
+    expect(state.getShellProbeBoundaryState(2_000).probeCount).toBe(0);
+  });
+
+  it('treats heavy shell wrappers as heavy commands rather than shell probes', () => {
+    const state = new ReviewExecutionState({
+      startedAtMs: 0,
+      blockHeavyCommands: true
+    });
+
+    state.observeChunk('thinking\nexec\n', 'stdout', 100);
+    state.observeChunk(
+      `/bin/zsh -lc 'npm run test && printenv MANIFEST'\n`,
+      'stdout',
+      110
+    );
+
+    expect(state.getShellProbeBoundaryState(2_000).probeCount).toBe(0);
+    expect(state.getBlockedHeavyCommand()).toContain('npm run test');
+  });
+
   it('counts nested shell payload probes', () => {
     const state = new ReviewExecutionState({ startedAtMs: 0 });
 
