@@ -1,7 +1,7 @@
 ---
 id: 20260315-1217-coordinator-symphony-aligned-standalone-review-execution-telemetry-surface-extraction
 title: Coordinator Symphony-Aligned Standalone Review Execution Telemetry Surface Extraction
-status: draft
+status: completed
 owner: Codex
 created: 2026-03-15
 last_review: 2026-03-15
@@ -13,6 +13,7 @@ related_tasks:
   - tasks/tasks-1217-coordinator-symphony-aligned-standalone-review-execution-telemetry-surface-extraction.md
 review_notes:
   - 2026-03-15: Post-`1216` scout confirms the next truthful standalone-review seam is the execution telemetry payload/persistence cluster still shared between `scripts/lib/review-execution-state.ts` and `scripts/run-review.ts`, not another `review-meta-surface-normalization.ts` split. Evidence: `docs/findings/1217-standalone-review-execution-telemetry-surface-extraction-deliberation.md`, `scripts/lib/review-execution-state.ts`, `scripts/run-review.ts`.
+  - 2026-03-15: Closeout completed. The shared telemetry seam now lives in `scripts/lib/review-execution-telemetry.ts`; `scripts/run-review.ts` builds persisted telemetry payloads through the extracted helper; the omitted-vs-null failure-path regression and helper-family review-support parity gap surfaced during bounded review were fixed on the shipped tree; and deterministic validation finished green through focused regressions, full `npm run test`, and `pack:smoke`. Evidence: `out/1217-coordinator-symphony-aligned-standalone-review-execution-telemetry-surface-extraction/manual/20260315T125429Z-closeout/00-summary.md`, `out/1217-coordinator-symphony-aligned-standalone-review-execution-telemetry-surface-extraction/manual/20260315T125429Z-closeout/13-override-notes.md`.
 ---
 
 # Technical Specification
