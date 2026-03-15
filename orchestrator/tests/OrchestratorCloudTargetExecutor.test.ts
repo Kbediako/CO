@@ -304,6 +304,10 @@ describe('executeOrchestratorCloudTarget request shaping', () => {
   });
 
   it('falls back to defaults when optional request env values are blank or invalid', async () => {
+    process.env.CODEX_NON_INTERACTIVE = '';
+    process.env.CODEX_NO_INTERACTIVE = '';
+    process.env.CODEX_INTERACTIVE = '';
+
     let captured: CloudTaskExecutorInput | null = null;
     vi.spyOn(CodexCloudTaskExecutor.prototype, 'execute').mockImplementationOnce(async (input) => {
       captured = input;

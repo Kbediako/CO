@@ -1,6 +1,38 @@
 {
   "items": [
     {
+      "id": "20260315-1206-coordinator-symphony-aligned-orchestrator-cloud-interactive-env-default-fallback-contract",
+      "title": "Coordinator Symphony-Aligned Orchestrator Cloud Interactive Env Default Fallback Contract",
+      "relates_to": "tasks/tasks-1206-coordinator-symphony-aligned-orchestrator-cloud-interactive-env-default-fallback-contract.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-15",
+      "paths": {
+        "spec": "tasks/specs/1206-coordinator-symphony-aligned-orchestrator-cloud-interactive-env-default-fallback-contract.md",
+        "task": "tasks/tasks-1206-coordinator-symphony-aligned-orchestrator-cloud-interactive-env-default-fallback-contract.md",
+        "agent_task": ".agent/task/1206-coordinator-symphony-aligned-orchestrator-cloud-interactive-env-default-fallback-contract.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-cloud-interactive-env-default-fallback-contract.md"
+      }
+    },
+    {
+      "id": "20260315-1205-coordinator-symphony-aligned-orchestrator-remaining-shared-cloud-request-contract-reassessment",
+      "title": "Coordinator Symphony-Aligned Orchestrator Remaining Shared Cloud Request-Contract Reassessment",
+      "relates_to": "tasks/tasks-1205-coordinator-symphony-aligned-orchestrator-remaining-shared-cloud-request-contract-reassessment.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-15",
+      "paths": {
+        "spec": "tasks/specs/1205-coordinator-symphony-aligned-orchestrator-remaining-shared-cloud-request-contract-reassessment.md",
+        "task": "tasks/tasks-1205-coordinator-symphony-aligned-orchestrator-remaining-shared-cloud-request-contract-reassessment.md",
+        "agent_task": ".agent/task/1205-coordinator-symphony-aligned-orchestrator-remaining-shared-cloud-request-contract-reassessment.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-remaining-shared-cloud-request-contract-reassessment.md"
+      }
+    },
+    {
       "id": "20260315-1204-coordinator-symphony-aligned-orchestrator-cloud-branch-resolution-boundary-extraction",
       "title": "Coordinator Symphony-Aligned Orchestrator Cloud Branch Resolution Boundary Extraction",
       "relates_to": "tasks/tasks-1204-coordinator-symphony-aligned-orchestrator-cloud-branch-resolution-boundary-extraction.md",

@@ -1,0 +1,5 @@
+# 1206 Pack Smoke Result
+
+- Command: `npm run pack:smoke`
+- Result: passed
+- Terminal confirmation: `pack smoke passed`

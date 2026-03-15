@@ -1,0 +1,14 @@
+# 1206 Full-Test Evidence
+
+- Delegated guard manifest: `.runs/1206-coordinator-symphony-aligned-orchestrator-cloud-interactive-env-default-fallback-contract-guard/cli/2026-03-15T01-35-33-226Z-463ba15b/manifest.json`
+- Terminal command statuses in the delegated guard manifest are all `succeeded` for:
+  - delegation guard
+  - build
+  - lint
+  - test
+  - spec guard
+- Full `npm run test` summary from `.runs/1206-coordinator-symphony-aligned-orchestrator-cloud-interactive-env-default-fallback-contract-guard/cli/2026-03-15T01-35-33-226Z-463ba15b/commands/04-test.ndjson`:
+  - `Test Files  235 passed (235)`
+  - `Tests  1565 passed (1565)`
+  - `Duration  231.11s`
+- Separate top-level `npm run test` on the local tree advanced green through the final visible `tests/cli-orchestrator.spec.ts` suite and then hit the recurring quiet-tail condition with no live `vitest` child remaining. That behavior is recorded as the lane-local override in `13-override-notes.md` and is not treated as a failing test result because the delegated guard run provides the authoritative clean full-suite completion.

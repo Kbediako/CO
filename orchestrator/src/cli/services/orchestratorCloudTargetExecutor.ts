@@ -217,10 +217,17 @@ function buildCloudTaskExecutorRequest(params: {
   const cloudEnvOverrides: NodeJS.ProcessEnv = {
     ...(params.envOverrides ?? {}),
     CODEX_NON_INTERACTIVE:
-      params.envOverrides?.CODEX_NON_INTERACTIVE ?? process.env.CODEX_NON_INTERACTIVE ?? '1',
+      readCloudString(params.envOverrides?.CODEX_NON_INTERACTIVE) ??
+      readCloudString(process.env.CODEX_NON_INTERACTIVE) ??
+      '1',
     CODEX_NO_INTERACTIVE:
-      params.envOverrides?.CODEX_NO_INTERACTIVE ?? process.env.CODEX_NO_INTERACTIVE ?? '1',
-    CODEX_INTERACTIVE: params.envOverrides?.CODEX_INTERACTIVE ?? process.env.CODEX_INTERACTIVE ?? '0'
+      readCloudString(params.envOverrides?.CODEX_NO_INTERACTIVE) ??
+      readCloudString(process.env.CODEX_NO_INTERACTIVE) ??
+      '1',
+    CODEX_INTERACTIVE:
+      readCloudString(params.envOverrides?.CODEX_INTERACTIVE) ??
+      readCloudString(process.env.CODEX_INTERACTIVE) ??
+      '0'
   };
 
   return {
