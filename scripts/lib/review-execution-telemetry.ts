@@ -33,6 +33,31 @@ export interface PersistReviewTelemetryOptions {
   telemetryPath: string;
 }
 
+export interface ReviewTelemetryPayloadBuilder {
+  buildTelemetryPayload(options: {
+    status: 'succeeded' | 'failed';
+    error?: string | null;
+    terminationBoundary?: ReviewTerminationBoundaryRecord | null;
+    outputLogPath: string;
+    repoRoot: string;
+    includeRawTelemetry: boolean;
+    telemetryDebugEnvKey: string;
+  }): ReviewTelemetryPayload;
+}
+
+export interface WriteReviewExecutionTelemetryOptions {
+  state: ReviewTelemetryPayloadBuilder;
+  status: 'succeeded' | 'failed';
+  error?: string | null;
+  terminationBoundary?: ReviewTerminationBoundaryRecord | null;
+  outputLogPath: string;
+  repoRoot: string;
+  telemetryPath: string;
+  includeRawTelemetry: boolean;
+  telemetryDebugEnvKey: string;
+  logPersistFailure?: (message: string) => void;
+}
+
 export interface LogReviewTelemetryOptions {
   debugTelemetry: boolean;
   telemetryDebugEnvKey: string;
@@ -69,6 +94,39 @@ export async function persistReviewTelemetry(
 ): Promise<ReviewTelemetryPayload> {
   await writeFile(options.telemetryPath, `${JSON.stringify(options.payload, null, 2)}\n`, 'utf8');
   return options.payload;
+}
+
+export async function writeReviewExecutionTelemetry(
+  options: WriteReviewExecutionTelemetryOptions
+): Promise<ReviewTelemetryPayload | null> {
+  try {
+    const payloadOptions: Parameters<ReviewTelemetryPayloadBuilder['buildTelemetryPayload']>[0] = {
+      status: options.status,
+      error: options.error ?? null,
+      outputLogPath: options.outputLogPath,
+      repoRoot: options.repoRoot,
+      includeRawTelemetry: options.includeRawTelemetry,
+      telemetryDebugEnvKey: options.telemetryDebugEnvKey
+    };
+    if (Object.prototype.hasOwnProperty.call(options, 'terminationBoundary')) {
+      payloadOptions.terminationBoundary = options.terminationBoundary;
+    }
+    const payload = options.state.buildTelemetryPayload(payloadOptions);
+    return await persistReviewTelemetry({
+      payload,
+      telemetryPath: options.telemetryPath
+    });
+  } catch (telemetryError) {
+    const telemetryMessage =
+      telemetryError instanceof Error ? telemetryError.message : String(telemetryError);
+    const logPersistFailure =
+      options.logPersistFailure ??
+      ((message: string) => {
+        console.error(`[run-review] failed to persist review telemetry: ${message}`);
+      });
+    logPersistFailure(telemetryMessage);
+    return null;
+  }
 }
 
 export function logReviewTelemetrySummary(

@@ -45,10 +45,9 @@ import {
   runCodexReview
 } from './lib/review-execution-runtime.js';
 import {
-  buildReviewTelemetryPayload,
   logReviewTelemetrySummary as logReviewExecutionTelemetrySummary,
-  persistReviewTelemetry as persistReviewExecutionTelemetry,
-  type ReviewTelemetryPayload
+  type ReviewTelemetryPayload,
+  writeReviewExecutionTelemetry
 } from './lib/review-execution-telemetry.js';
 import {
   assessReviewScope,
@@ -478,33 +477,18 @@ async function main(): Promise<void> {
     status: 'succeeded' | 'failed',
     errorMessage?: string | null,
     terminationBoundary?: ReviewTerminationBoundaryRecord | null
-  ): Promise<ReviewTelemetryPayload | null> => {
-    try {
-      const payload = buildReviewTelemetryPayload({
-        outputLogPath: artifactPaths.outputLogPath,
-        repoRoot,
-        status,
-        error: errorMessage ?? null,
-        terminationBoundary:
-          status === 'failed'
-            ? terminationBoundary !== undefined
-              ? terminationBoundary ?? null
-              : state.getTerminationBoundaryRecord(errorMessage ?? null)
-            : null,
-        includeRawTelemetry: envFlagEnabled(process.env[REVIEW_TELEMETRY_DEBUG_ENV_KEY]),
-        telemetryDebugEnvKey: REVIEW_TELEMETRY_DEBUG_ENV_KEY,
-        summary: state.buildOutputSummary()
-      });
-      return await persistReviewExecutionTelemetry({
-        payload,
-        telemetryPath: artifactPaths.telemetryPath,
-      });
-    } catch (telemetryError) {
-      const telemetryMessage = telemetryError instanceof Error ? telemetryError.message : String(telemetryError);
-      console.error(`[run-review] failed to persist review telemetry: ${telemetryMessage}`);
-      return null;
-    }
-  };
+  ): Promise<ReviewTelemetryPayload | null> =>
+    writeReviewExecutionTelemetry({
+      state,
+      status,
+      error: errorMessage ?? null,
+      terminationBoundary,
+      outputLogPath: artifactPaths.outputLogPath,
+      repoRoot,
+      telemetryPath: artifactPaths.telemetryPath,
+      includeRawTelemetry: envFlagEnabled(process.env[REVIEW_TELEMETRY_DEBUG_ENV_KEY]),
+      telemetryDebugEnvKey: REVIEW_TELEMETRY_DEBUG_ENV_KEY
+    });
 
   await runReviewLaunchAttemptShell({
     cliOptions: options,
