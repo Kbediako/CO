@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260316-1222-coordinator-symphony-aligned-standalone-review-launch-attempt-orchestration-shell-extraction",
+      "title": "Coordinator Symphony-Aligned Standalone Review Launch-Attempt Orchestration Shell Extraction",
+      "relates_to": "tasks/tasks-1222-coordinator-symphony-aligned-standalone-review-launch-attempt-orchestration-shell-extraction.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-16",
+      "paths": {
+        "spec": "tasks/specs/1222-coordinator-symphony-aligned-standalone-review-launch-attempt-orchestration-shell-extraction.md",
+        "task": "tasks/tasks-1222-coordinator-symphony-aligned-standalone-review-launch-attempt-orchestration-shell-extraction.md",
+        "agent_task": ".agent/task/1222-coordinator-symphony-aligned-standalone-review-launch-attempt-orchestration-shell-extraction.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-standalone-review-launch-attempt-orchestration-shell-extraction.md"
+      }
+    },
+    {
       "id": "20260316-1221-coordinator-symphony-aligned-standalone-review-execution-runtime-shell-extraction",
       "title": "Coordinator Symphony-Aligned Standalone Review Execution Runtime Shell Extraction",
       "relates_to": "tasks/tasks-1221-coordinator-symphony-aligned-standalone-review-execution-runtime-shell-extraction.md",
