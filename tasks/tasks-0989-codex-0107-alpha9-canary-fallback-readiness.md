@@ -1,0 +1,38 @@
+# Task Checklist - 0989-codex-0107-alpha9-canary-fallback-readiness
+
+- MCP Task ID: `0989-codex-0107-alpha9-canary-fallback-readiness`
+- Primary PRD: `docs/PRD-codex-0107-alpha9-canary-fallback-readiness.md`
+- TECH_SPEC: `tasks/specs/0989-codex-0107-alpha9-canary-fallback-readiness.md`
+- ACTION_PLAN: `docs/ACTION_PLAN-codex-0107-alpha9-canary-fallback-readiness.md`
+
+> Set `MCP_RUNNER_TASK_ID=0989-codex-0107-alpha9-canary-fallback-readiness` for orchestrator commands. Required quality lane for this docs/canary task: `node scripts/runtime-mode-canary.mjs`, `node scripts/delegation-guard.mjs --task 0989-codex-0107-alpha9-canary-fallback-readiness`, `node scripts/spec-guard.mjs --dry-run`, `npm run lint`, `npm run test`, `npm run eval:test` (fixtures present), `npm run docs:check`, `npm run docs:freshness`, `node scripts/diff-budget.mjs`.
+
+## Foundation
+- [x] Docs-first artifacts created (PRD/TECH_SPEC/ACTION_PLAN/checklist mirror). - Evidence: `docs/PRD-codex-0107-alpha9-canary-fallback-readiness.md`, `docs/TECH_SPEC-codex-0107-alpha9-canary-fallback-readiness.md`, `docs/ACTION_PLAN-codex-0107-alpha9-canary-fallback-readiness.md`, `tasks/specs/0989-codex-0107-alpha9-canary-fallback-readiness.md`, `tasks/tasks-0989-codex-0107-alpha9-canary-fallback-readiness.md`, `.agent/task/0989-codex-0107-alpha9-canary-fallback-readiness.md`.
+- [x] `tasks/index.json` + `docs/TASKS.md` updated for task registration/status. - Evidence: `tasks/index.json`, `docs/TASKS.md`.
+- [x] Delegated planning/research streams captured. - Evidence: `.runs/0989-codex-0107-alpha9-canary-fallback-readiness-scout/cli/2026-03-02T04-26-34-844Z-c77c1c2d/manifest.json`, `out/0989-codex-0107-alpha9-canary-fallback-readiness/manual/delegated-scout.log`.
+- [x] Docs-review manifest captured before non-doc command work. - Evidence: `.runs/0989-codex-0107-alpha9-canary-fallback-readiness/cli/2026-03-02T04-30-54-182Z-76ea4048/manifest.json`, `out/0989-codex-0107-alpha9-canary-fallback-readiness/manual/docs-review-pre-implementation-rerun2.log`.
+
+## Canary Execution
+- [x] Stable baseline (`0.106.0`) matrix executed with required artifacts. - Evidence: `out/0989-codex-0107-alpha9-canary-fallback-readiness/manual/codex-version-canary/stable/00-install.log` through `99-summary.json`.
+- [x] Prerelease (`0.107.0-alpha.9`) matrix executed with required artifacts. - Evidence: `out/0989-codex-0107-alpha9-canary-fallback-readiness/manual/codex-version-canary/prerelease/00-install.log` through `99-summary.json`.
+- [x] Comparison summary + go/no-go decision written. - Evidence: `out/0989-codex-0107-alpha9-canary-fallback-readiness/manual/codex-version-canary/compare/pass-rate-summary.json`, `out/0989-codex-0107-alpha9-canary-fallback-readiness/manual/codex-version-canary/compare/decision-go-no-go.md`.
+- [x] Fallback removal readiness decision recorded (`go` or `hold`) with criteria evidence. - Evidence: `out/0989-codex-0107-alpha9-canary-fallback-readiness/manual/codex-version-canary/compare/decision-go-no-go.md` (decision: hold).
+
+## Validation
+- [x] 00 `node scripts/runtime-mode-canary.mjs --task-id 0989-codex-0107-alpha9-canary-fallback-readiness --repos 1 --iterations 1 --output-dir out/0989-codex-0107-alpha9-canary-fallback-readiness/manual/runtime-mode-canary`. - Evidence: `out/0989-codex-0107-alpha9-canary-fallback-readiness/manual/final-00-runtime-mode-canary.log`.
+- [x] 01 `node scripts/delegation-guard.mjs --task 0989-codex-0107-alpha9-canary-fallback-readiness`. - Evidence: `out/0989-codex-0107-alpha9-canary-fallback-readiness/manual/final-01-delegation-guard.log`.
+- [x] 02 `node scripts/spec-guard.mjs --dry-run`. - Evidence: `out/0989-codex-0107-alpha9-canary-fallback-readiness/manual/final-02-spec-guard.log`.
+- [x] 04 `npm run lint`. - Evidence: `out/0989-codex-0107-alpha9-canary-fallback-readiness/manual/final-04-lint.log`.
+- [x] 05 `npm run test`. - Evidence: `out/0989-codex-0107-alpha9-canary-fallback-readiness/manual/final-05-test.log`.
+- [x] 05b `npm run eval:test` (fixtures present). - Evidence: `out/0989-codex-0107-alpha9-canary-fallback-readiness/manual/final-05b-eval-test.log`.
+- [x] 06 `npm run docs:check`. - Evidence: `out/0989-codex-0107-alpha9-canary-fallback-readiness/manual/final-06-docs-check.log`.
+- [x] 07 `npm run docs:freshness`. - Evidence: `out/0989-codex-0107-alpha9-canary-fallback-readiness/manual/final-07-docs-freshness.log`.
+- [x] 08 `node scripts/diff-budget.mjs`. - Evidence: `out/0989-codex-0107-alpha9-canary-fallback-readiness/manual/final-08-diff-budget.log`.
+- [x] 09 `TASK=0989-codex-0107-alpha9-canary-fallback-readiness NOTES="Goal: reviewer hand-off | Summary: alpha.9 parity + hold decisions recorded | Risks: fallback gate contract mismatch remains" npm run review -- --manifest .runs/0989-codex-0107-alpha9-canary-fallback-readiness/cli/2026-03-02T04-30-54-182Z-76ea4048/manifest.json`. - Evidence: `out/0989-codex-0107-alpha9-canary-fallback-readiness/manual/final-09-review.log`.
+- Reviewer hand-off note: `NOTES` is required and should include `<goal + summary + risks>` (optional questions can be appended).
+
+## Closeout
+- [x] Checklist mirror synced (`tasks/`, `.agent/task/`, `docs/TASKS.md`). - Evidence: `tasks/tasks-0989-codex-0107-alpha9-canary-fallback-readiness.md`, `.agent/task/0989-codex-0107-alpha9-canary-fallback-readiness.md`, `docs/TASKS.md`.
+- [x] Final evidence summary posted with alpha.9 + fallback decision. - Evidence: `out/0989-codex-0107-alpha9-canary-fallback-readiness/manual/codex-version-canary/compare/decision-go-no-go.md`.
+- [ ] PR merged and branch cleanup completed.
