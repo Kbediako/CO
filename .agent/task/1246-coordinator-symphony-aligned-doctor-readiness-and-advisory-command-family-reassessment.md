@@ -19,5 +19,5 @@
 
 ## Reassessment
 
-- [ ] Remaining doctor command-family boundary inspected for a truthful follow-on seam or freeze. Evidence: pending closeout packet.
-- [ ] Final freeze/go conclusion recorded. Evidence: pending closeout packet.
+- [x] Remaining doctor command-family boundary inspected for a truthful follow-on seam or freeze. Evidence: `out/1246-coordinator-symphony-aligned-doctor-readiness-and-advisory-command-family-reassessment/manual/20260316T133732Z-closeout/00-summary.md`
+- [x] Final freeze/go conclusion recorded. Evidence: `out/1246-coordinator-symphony-aligned-doctor-readiness-and-advisory-command-family-reassessment/manual/20260316T133732Z-closeout/00-summary.md`, `out/1246-coordinator-symphony-aligned-doctor-readiness-and-advisory-command-family-reassessment/manual/20260316T133732Z-closeout/14-next-slice-note.md`

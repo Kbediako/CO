@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260316-1247-coordinator-symphony-aligned-flow-cli-shell-extraction",
+      "title": "Coordinator Symphony-Aligned Flow CLI Shell Extraction",
+      "relates_to": "tasks/tasks-1247-coordinator-symphony-aligned-flow-cli-shell-extraction.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-16",
+      "paths": {
+        "spec": "tasks/specs/1247-coordinator-symphony-aligned-flow-cli-shell-extraction.md",
+        "task": "tasks/tasks-1247-coordinator-symphony-aligned-flow-cli-shell-extraction.md",
+        "agent_task": ".agent/task/1247-coordinator-symphony-aligned-flow-cli-shell-extraction.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-flow-cli-shell-extraction.md"
+      }
+    },
+    {
       "id": "20260316-1246-coordinator-symphony-aligned-doctor-readiness-and-advisory-command-family-reassessment",
       "title": "Coordinator Symphony-Aligned Doctor Readiness And Advisory Command Family Reassessment",
       "relates_to": "tasks/tasks-1246-coordinator-symphony-aligned-doctor-readiness-and-advisory-command-family-reassessment.md",
