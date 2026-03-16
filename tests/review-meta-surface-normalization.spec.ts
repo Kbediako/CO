@@ -233,6 +233,217 @@ describe('review meta-surface normalization', () => {
     ).toBe(true);
   });
 
+  it('classifies the extracted launch-attempt helper as review-support when it is inspected directly', () => {
+    expect(
+      classifyMetaSurfaceDirectDetailed(
+        'sed',
+        ['-n', '1,80p', 'scripts/lib/review-launch-attempt.ts'],
+        new Set(),
+        '/repo'
+      )
+    ).toEqual([
+      {
+        kind: 'review-support',
+        candidate: 'scripts/lib/review-launch-attempt.ts',
+        operand: 'scripts/lib/review-launch-attempt.ts'
+      }
+    ]);
+  });
+
+  it('classifies the JS focused launch-attempt regression spec as review-support when it is inspected directly', () => {
+    expect(
+      classifyMetaSurfaceDirectDetailed(
+        'sed',
+        ['-n', '1,80p', 'tests/review-launch-attempt.spec.js'],
+        new Set(),
+        '/repo'
+      )
+    ).toEqual([
+      {
+        kind: 'review-support',
+        candidate: 'tests/review-launch-attempt.spec.js',
+        operand: 'tests/review-launch-attempt.spec.js'
+      }
+    ]);
+  });
+
+  it('classifies the dist run-review host as review-support when it is inspected directly', () => {
+    expect(
+      classifyMetaSurfaceDirectDetailed(
+        'sed',
+        ['-n', '1,80p', 'dist/scripts/run-review.js'],
+        new Set(),
+        '/repo'
+      )
+    ).toEqual([
+      {
+        kind: 'review-support',
+        candidate: 'dist/scripts/run-review.js',
+        operand: 'dist/scripts/run-review.js'
+      }
+    ]);
+  });
+
+  it('treats the extracted launch-attempt helper family as touched when its focused regression spec is touched', () => {
+    expect(
+      isTouchedReviewScopePathFamilyOperand(
+        'scripts/lib/review-launch-attempt.ts',
+        new Set(['tests/review-launch-attempt.spec.ts']),
+        '/repo'
+      )
+    ).toBe(true);
+  });
+
+  it('treats the execution runtime helper as touched when the launch-attempt helper is touched', () => {
+    expect(
+      isTouchedReviewScopePathFamilyOperand(
+        'scripts/lib/review-execution-runtime.ts',
+        new Set(['scripts/lib/review-launch-attempt.ts']),
+        '/repo'
+      )
+    ).toBe(true);
+  });
+
+  it('treats the execution-state sibling as touched when the launch-attempt helper is touched', () => {
+    expect(
+      isTouchedReviewScopePathFamilyOperand(
+        'scripts/lib/review-execution-state.ts',
+        new Set(['scripts/lib/review-launch-attempt.ts']),
+        '/repo'
+      )
+    ).toBe(true);
+  });
+
+  it('treats the launch-attempt helper as touched when the execution runtime helper is touched', () => {
+    expect(
+      isTouchedReviewScopePathFamilyOperand(
+        'scripts/lib/review-launch-attempt.ts',
+        new Set(['scripts/lib/review-execution-runtime.ts']),
+        '/repo'
+      )
+    ).toBe(true);
+  });
+
+  it('treats the launch-attempt helper as touched when the execution-state sibling is touched', () => {
+    expect(
+      isTouchedReviewScopePathFamilyOperand(
+        'scripts/lib/review-launch-attempt.ts',
+        new Set(['scripts/lib/review-execution-state.ts']),
+        '/repo'
+      )
+    ).toBe(true);
+  });
+
+  it('treats the JS execution runtime helper as touched when the dist launch-attempt helper is touched', () => {
+    expect(
+      isTouchedReviewScopePathFamilyOperand(
+        'scripts/lib/review-execution-runtime.js',
+        new Set(['dist/scripts/lib/review-launch-attempt.js']),
+        '/repo'
+      )
+    ).toBe(true);
+  });
+
+  it('treats the JS execution-state sibling as touched when the JS launch-attempt helper is touched', () => {
+    expect(
+      isTouchedReviewScopePathFamilyOperand(
+        'scripts/lib/review-execution-state.js',
+        new Set(['scripts/lib/review-launch-attempt.js']),
+        '/repo'
+      )
+    ).toBe(true);
+  });
+
+  it('treats the execution runtime helper as touched when the focused launch-attempt regression spec is touched', () => {
+    expect(
+      isTouchedReviewScopePathFamilyOperand(
+        'scripts/lib/review-execution-runtime.ts',
+        new Set(['tests/review-launch-attempt.spec.ts']),
+        '/repo'
+      )
+    ).toBe(true);
+  });
+
+  it('treats the execution-state sibling as touched when the focused launch-attempt regression spec is touched', () => {
+    expect(
+      isTouchedReviewScopePathFamilyOperand(
+        'scripts/lib/review-execution-state.ts',
+        new Set(['tests/review-launch-attempt.spec.ts']),
+        '/repo'
+      )
+    ).toBe(true);
+  });
+
+  it('treats the launch-attempt helper as touched when the run-review regression spec host is touched', () => {
+    expect(
+      isTouchedReviewScopePathFamilyOperand(
+        'scripts/lib/review-launch-attempt.ts',
+        new Set(['tests/run-review.spec.ts']),
+        '/repo'
+      )
+    ).toBe(true);
+  });
+
+  it('treats the JS execution runtime helper as touched when the JS focused launch-attempt regression spec is touched', () => {
+    expect(
+      isTouchedReviewScopePathFamilyOperand(
+        'scripts/lib/review-execution-runtime.js',
+        new Set(['tests/review-launch-attempt.spec.js']),
+        '/repo'
+      )
+    ).toBe(true);
+  });
+
+  it('treats the JS launch-attempt helper as touched when the JS run-review regression spec host is touched', () => {
+    expect(
+      isTouchedReviewScopePathFamilyOperand(
+        'scripts/lib/review-launch-attempt.js',
+        new Set(['tests/run-review.spec.js']),
+        '/repo'
+      )
+    ).toBe(true);
+  });
+
+  it('treats the focused launch-attempt regression spec as touched when run-review is touched', () => {
+    expect(
+      isTouchedReviewScopePathFamilyOperand(
+        'tests/review-launch-attempt.spec.ts',
+        new Set(['scripts/run-review.ts']),
+        '/repo'
+      )
+    ).toBe(true);
+  });
+
+  it('treats run-review as touched when the focused launch-attempt regression spec is touched', () => {
+    expect(
+      isTouchedReviewScopePathFamilyOperand(
+        'scripts/run-review.ts',
+        new Set(['tests/review-launch-attempt.spec.ts']),
+        '/repo'
+      )
+    ).toBe(true);
+  });
+
+  it('treats the JS focused launch-attempt regression spec as touched when the JS run-review host is touched', () => {
+    expect(
+      isTouchedReviewScopePathFamilyOperand(
+        'tests/review-launch-attempt.spec.js',
+        new Set(['scripts/run-review.js']),
+        '/repo'
+      )
+    ).toBe(true);
+  });
+
+  it('treats the JS run-review host as touched when the JS focused launch-attempt regression spec is touched', () => {
+    expect(
+      isTouchedReviewScopePathFamilyOperand(
+        'scripts/run-review.js',
+        new Set(['tests/review-launch-attempt.spec.js']),
+        '/repo'
+      )
+    ).toBe(true);
+  });
+
   it('treats review-execution-state as touched when the extracted meta-surface boundary helper is the touched sibling', () => {
     expect(
       isTouchedReviewScopePathFamilyOperand(

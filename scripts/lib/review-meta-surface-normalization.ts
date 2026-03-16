@@ -399,15 +399,45 @@ export function isTouchedReviewScopePathFamilyOperand(
       'scripts/lib/review-execution-runtime.js',
       'dist/scripts/lib/review-execution-runtime.js'
     ];
+    const reviewLaunchAttemptPathFamily = [
+      'scripts/lib/review-launch-attempt.ts',
+      'scripts/lib/review-launch-attempt.js',
+      'dist/scripts/lib/review-launch-attempt.js'
+    ];
     const reviewExecutionRuntimeRunReviewPathFamily = [
       ...reviewExecutionRuntimePathFamily,
       'scripts/run-review.ts',
       'scripts/run-review.js',
       'dist/scripts/run-review.js'
     ];
+    const reviewLaunchAttemptRunReviewPathFamily = [
+      ...reviewLaunchAttemptPathFamily,
+      'scripts/run-review.ts',
+      'scripts/run-review.js',
+      'dist/scripts/run-review.js',
+      'tests/run-review.spec.ts',
+      'tests/run-review.spec.js'
+    ];
+    const reviewLaunchAttemptDependencyPathFamily = [
+      ...reviewLaunchAttemptPathFamily,
+      ...reviewExecutionRuntimePathFamily,
+      'scripts/lib/review-execution-state.ts',
+      'scripts/lib/review-execution-state.js',
+      'dist/scripts/lib/review-execution-state.js'
+    ];
+    const reviewLaunchAttemptFocusedSpecPathFamily = [
+      ...new Set([
+        ...reviewLaunchAttemptRunReviewPathFamily,
+        ...reviewLaunchAttemptDependencyPathFamily
+      ])
+    ];
     const reviewExecutionRuntimeRegressionSpecPathFamily = [
       'tests/run-review.spec.ts',
       'tests/run-review.spec.js'
+    ];
+    const reviewLaunchAttemptRegressionSpecPathFamily = [
+      'tests/review-launch-attempt.spec.ts',
+      'tests/review-launch-attempt.spec.js'
     ];
     const reviewExecutionRuntimeExecutionStatePathFamily = [
       ...reviewExecutionRuntimePathFamily,
@@ -430,9 +460,24 @@ export function isTouchedReviewScopePathFamilyOperand(
       reviewShellCommandParserNormalizationPathFamily,
       reviewShellCommandParserExecutionStatePathFamily,
       reviewExecutionTelemetryPathFamily,
+      reviewLaunchAttemptDependencyPathFamily,
+      reviewLaunchAttemptRunReviewPathFamily,
       reviewExecutionRuntimeRunReviewPathFamily,
       reviewExecutionRuntimeExecutionStatePathFamily
     ];
+    if (reviewLaunchAttemptRegressionSpecPathFamily.includes(repoRelativeOperand)) {
+      return reviewLaunchAttemptFocusedSpecPathFamily.some((path) =>
+        isTouchedScopePath(path, touchedPaths, repoRoot)
+      );
+    }
+    if (
+      reviewLaunchAttemptFocusedSpecPathFamily.includes(repoRelativeOperand) &&
+      reviewLaunchAttemptRegressionSpecPathFamily.some((path) =>
+        isTouchedScopePath(path, touchedPaths, repoRoot)
+      )
+    ) {
+      return true;
+    }
     if (reviewExecutionRuntimeRegressionSpecPathFamily.includes(repoRelativeOperand)) {
       return reviewExecutionRuntimePathFamily.some((path) =>
         isTouchedScopePath(path, touchedPaths, repoRoot)
@@ -677,18 +722,24 @@ function classifyMetaSurfaceOperand(
     matchesPathSuffix(normalized, 'dist/scripts/lib/review-shell-command-parser.js') ||
     matchesPathSuffix(normalized, 'scripts/lib/review-execution-telemetry.ts') ||
     matchesPathSuffix(normalized, 'dist/scripts/lib/review-execution-telemetry.js') ||
+    matchesPathSuffix(normalized, 'scripts/lib/review-launch-attempt.ts') ||
+    matchesPathSuffix(normalized, 'scripts/lib/review-launch-attempt.js') ||
+    matchesPathSuffix(normalized, 'dist/scripts/lib/review-launch-attempt.js') ||
     matchesPathSuffix(normalized, 'scripts/lib/review-execution-runtime.ts') ||
     matchesPathSuffix(normalized, 'scripts/lib/review-execution-runtime.js') ||
     matchesPathSuffix(normalized, 'dist/scripts/lib/review-execution-runtime.js') ||
     matchesPathSuffix(normalized, 'tests/review-meta-surface-boundary-analysis.spec.ts') ||
     matchesPathSuffix(normalized, 'scripts/run-review.ts') ||
     matchesPathSuffix(normalized, 'scripts/run-review.js') ||
+    matchesPathSuffix(normalized, 'dist/scripts/run-review.js') ||
     matchesPathSuffix(normalized, 'scripts/lib/review-execution-state.ts') ||
     matchesPathSuffix(normalized, 'tests/review-prompt-context.spec.ts') ||
     matchesPathSuffix(normalized, 'tests/review-meta-surface-normalization.spec.ts') ||
     matchesPathSuffix(normalized, 'tests/review-inspection-target-parsing.spec.ts') ||
     matchesPathSuffix(normalized, 'tests/review-command-probe-classification.spec.ts') ||
     matchesPathSuffix(normalized, 'tests/review-command-intent-classification.spec.ts') ||
+    matchesPathSuffix(normalized, 'tests/review-launch-attempt.spec.ts') ||
+    matchesPathSuffix(normalized, 'tests/review-launch-attempt.spec.js') ||
     matchesPathSuffix(normalized, 'tests/review-scope-paths.spec.ts') ||
     matchesPathSuffix(normalized, 'tests/run-review.spec.ts') ||
     matchesPathSuffix(normalized, 'tests/run-review.spec.js') ||

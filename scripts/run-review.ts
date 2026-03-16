@@ -12,27 +12,23 @@
 
 import { execFile, spawn } from 'node:child_process';
 import { createReadStream } from 'node:fs';
-import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
+import { stat } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import { promisify } from 'node:util';
 
 import {
-  createRuntimeCodexCommandContext,
   formatRuntimeSelectionSummary,
   parseRuntimeMode,
-  resolveRuntimeCodexCommand,
-  type RuntimeCodexCommandContext,
   type RuntimeMode
 } from '../orchestrator/src/cli/runtime/index.js';
-import { runDoctor } from '../orchestrator/src/cli/doctor.js';
-import {
-  formatDoctorIssueLogSummary,
-  type DoctorIssueLogResult,
-  writeDoctorIssueLog
-} from '../orchestrator/src/cli/doctorIssueLog.js';
 import { parseArgs as parseCliArgs, hasFlag } from './lib/cli-args.js';
 import { pathExists } from './lib/docs-helpers.js';
+import {
+  prepareReviewArtifacts,
+  resolveReviewRuntimeContext,
+  runReviewLaunchAttemptShell
+} from './lib/review-launch-attempt.js';
 import {
   buildActiveCloseoutProvenanceLines,
   buildReviewPromptContext,
@@ -43,15 +39,12 @@ import {
   ARCHITECTURE_ALLOWED_META_SURFACE_KINDS,
   AUDIT_ALLOWED_META_SURFACE_KINDS,
   formatDurationMs,
-  type ReviewTerminationBoundaryKind,
   type ReviewTerminationBoundaryRecord,
   type ReviewStartupAnchorMode,
   ReviewExecutionState
 } from './lib/review-execution-state.js';
 import {
-  CodexReviewError,
-  runCodexReview,
-  signalChildProcess
+  runCodexReview
 } from './lib/review-execution-runtime.js';
 import {
   buildReviewTelemetryPayload,
@@ -73,8 +66,6 @@ const DEFAULT_REVIEW_STARTUP_LOOP_MIN_EVENTS = 8;
 const DEFAULT_REVIEW_MONITOR_INTERVAL_SECONDS = 60;
 const DEFAULT_LARGE_SCOPE_FILE_THRESHOLD = 25;
 const DEFAULT_LARGE_SCOPE_LINE_THRESHOLD = 1200;
-const REVIEW_COMMAND_CHECK_TIMEOUT_MS = 30_000;
-const REVIEW_ARTIFACTS_DIRNAME = 'review';
 const BENIGN_STDIO_ERROR_CODES = new Set(['EPIPE', 'ERR_STREAM_DESTROYED']);
 const REVIEW_AUTO_ISSUE_LOG_ENV_KEY = 'CODEX_REVIEW_AUTO_ISSUE_LOG';
 const REVIEW_ENABLE_DELEGATION_MCP_ENV_KEY = 'CODEX_REVIEW_ENABLE_DELEGATION_MCP';
@@ -89,12 +80,6 @@ const REVIEW_VERDICT_STABILITY_TIMEOUT_ENV_KEY = 'CODEX_REVIEW_VERDICT_STABILITY
 const REVIEW_META_SURFACE_TIMEOUT_ENV_KEY = 'CODEX_REVIEW_META_SURFACE_TIMEOUT_SECONDS';
 const REVIEW_TELEMETRY_DEBUG_ENV_KEY = 'CODEX_REVIEW_DEBUG_TELEMETRY';
 const REVIEW_SURFACE_ENV_KEY = 'CODEX_REVIEW_SURFACE';
-const REVIEW_DISABLE_DELEGATION_CONFIG_OVERRIDE = 'mcp_servers.delegation.enabled=false';
-const REVIEW_PARTIAL_OUTPUT_HINT_BOUNDARY_KINDS = new Set<ReviewTerminationBoundaryKind>([
-  'timeout',
-  'stall',
-  'startup-loop'
-]);
 
 interface CliOptions {
   manifest?: string;
@@ -436,7 +421,7 @@ async function main(): Promise<void> {
   }
 
   const prompt = promptLines.join('\n');
-  const artifactPaths = await prepareReviewArtifacts(manifestPath, prompt);
+  const artifactPaths = await prepareReviewArtifacts(manifestPath, prompt, repoRoot);
   const nonInteractive = options.nonInteractive ?? shouldForceNonInteractive();
   const reviewEnv = { ...process.env };
   reviewEnv.MANIFEST = manifestPath;
@@ -475,31 +460,10 @@ async function main(): Promise<void> {
   const runtimeContext = await resolveReviewRuntimeContext({
     options,
     manifestPath,
-    env: reviewEnv
+    env: reviewEnv,
+    repoRoot
   });
   console.log(`[run-review] ${formatRuntimeSelectionSummary(runtimeContext.runtime)}.`);
-
-  await ensureReviewCommandAvailable(runtimeContext);
-  const disableDelegationMcp =
-    options.disableDelegationMcp ??
-    (options.enableDelegationMcp === undefined ? false : !options.enableDelegationMcp);
-  if (disableDelegationMcp) {
-    console.log(
-      '[run-review] delegation MCP disabled for this review (explicit opt-out via --disable-delegation-mcp or CODEX_REVIEW_DISABLE_DELEGATION_MCP=1).'
-    );
-  } else {
-    console.log(
-      '[run-review] delegation MCP enabled for this review (default; set --disable-delegation-mcp or CODEX_REVIEW_DISABLE_DELEGATION_MCP=1 to disable).'
-    );
-  }
-  const scopedReviewArgs = buildReviewArgs(options, prompt, {
-    includeScopeFlags: true,
-    disableDelegationMcp
-  });
-  const resolvedScoped = resolveReviewCommand(scopedReviewArgs, runtimeContext);
-  console.log(`Review prompt saved to: ${path.relative(repoRoot, artifactPaths.promptPath)}`);
-  console.log(`Review output log: ${path.relative(repoRoot, artifactPaths.outputLogPath)}`);
-  console.log(`Launching Codex review (evidence: ${relativeManifest})`);
   const timeoutMs = resolveReviewTimeoutMs();
   if (timeoutMs !== null) {
     console.log(
@@ -725,125 +689,21 @@ async function main(): Promise<void> {
     }
   };
 
-  try {
-    const execution = await runReview(resolvedScoped);
-    const telemetryPayload = await writeTelemetry(execution.state, 'succeeded');
-    console.log(`Review output saved to: ${path.relative(repoRoot, artifactPaths.outputLogPath)}`);
-    if (telemetryPayload) {
-      console.log(`Review telemetry saved to: ${path.relative(repoRoot, artifactPaths.telemetryPath)}`);
-    } else {
-      console.warn(
-        `[run-review] review telemetry unavailable (persistence failed); see earlier telemetry error logs.`
-      );
-    }
-  } catch (error) {
-    if (shouldRetryWithoutScopeFlags(error)) {
-      console.log('[run-review] codex CLI rejected scope flags with a custom prompt; retrying without flags.');
-      const unscopedArgs = buildReviewArgs(options, prompt, {
-        includeScopeFlags: false,
-        disableDelegationMcp
-      });
-      const resolvedUnscoped = resolveReviewCommand(unscopedArgs, runtimeContext);
-      try {
-        const retryExecution = await runReview(resolvedUnscoped);
-        const telemetryPayload = await writeTelemetry(retryExecution.state, 'succeeded');
-        console.log(`Review output saved to: ${path.relative(repoRoot, artifactPaths.outputLogPath)}`);
-        if (telemetryPayload) {
-          console.log(`Review telemetry saved to: ${path.relative(repoRoot, artifactPaths.telemetryPath)}`);
-        } else {
-          console.warn(
-            `[run-review] review telemetry unavailable (persistence failed); see earlier telemetry error logs.`
-          );
-        }
-        return;
-      } catch (retryError) {
-        await maybeCaptureReviewFailureIssueLog({
-          enabled: autoIssueLogEnabled,
-          error: retryError,
-          taskFilter: options.task ?? null,
-          manifestPath,
-          outputLogPath: artifactPaths.outputLogPath
-        });
-        const retryMessage = retryError instanceof Error ? retryError.message : String(retryError);
-        const retryState =
-          retryError instanceof CodexReviewError &&
-          'reviewState' in retryError &&
-          retryError.reviewState instanceof ReviewExecutionState
-            ? retryError.reviewState
-            : null;
-        const retryTerminationBoundary =
-          retryError instanceof CodexReviewError ? retryError.terminationBoundary : null;
-        const telemetryPayload = retryState
-          ? await writeTelemetry(
-              retryState,
-              'failed',
-              retryMessage,
-              retryTerminationBoundary
-            )
-          : null;
-        if (telemetryPayload) {
-          logReviewExecutionTelemetrySummary(
-            telemetryPayload,
-            path.relative(repoRoot, artifactPaths.telemetryPath),
-            {
-              debugTelemetry: envFlagEnabled(process.env[REVIEW_TELEMETRY_DEBUG_ENV_KEY]),
-              telemetryDebugEnvKey: REVIEW_TELEMETRY_DEBUG_ENV_KEY
-            }
-          );
-        } else if (retryState) {
-          logTerminationBoundaryFallback(
-            retryTerminationBoundary ?? retryState.getTerminationBoundaryRecord(retryMessage)
-          );
-        }
-        if (shouldLogPartialReviewOutput(retryTerminationBoundary)) {
-          console.error(`Review output log (partial): ${path.relative(repoRoot, artifactPaths.outputLogPath)}`);
-        }
-        throw retryError;
-      }
-    }
-    await maybeCaptureReviewFailureIssueLog({
-      enabled: autoIssueLogEnabled,
-      error,
-      taskFilter: options.task ?? null,
-      manifestPath,
-      outputLogPath: artifactPaths.outputLogPath
-    });
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    const failureState =
-      error instanceof CodexReviewError &&
-      'reviewState' in error &&
-      error.reviewState instanceof ReviewExecutionState
-        ? error.reviewState
-        : null;
-    const failureTerminationBoundary =
-      error instanceof CodexReviewError ? error.terminationBoundary : null;
-    const telemetryPayload = failureState
-      ? await writeTelemetry(
-          failureState,
-          'failed',
-          errorMessage,
-          failureTerminationBoundary
-        )
-      : null;
-    if (telemetryPayload) {
-      logReviewExecutionTelemetrySummary(
-        telemetryPayload,
-        path.relative(repoRoot, artifactPaths.telemetryPath),
-        {
-          debugTelemetry: envFlagEnabled(process.env[REVIEW_TELEMETRY_DEBUG_ENV_KEY]),
-          telemetryDebugEnvKey: REVIEW_TELEMETRY_DEBUG_ENV_KEY
-        }
-      );
-    } else if (failureState) {
-      logTerminationBoundaryFallback(
-        failureTerminationBoundary ?? failureState.getTerminationBoundaryRecord(errorMessage)
-      );
-    }
-    if (shouldLogPartialReviewOutput(failureTerminationBoundary)) {
-      console.error(`Review output log (partial): ${path.relative(repoRoot, artifactPaths.outputLogPath)}`);
-    }
-    throw error;
-  }
+  await runReviewLaunchAttemptShell({
+    cliOptions: options,
+    prompt,
+    runtimeContext,
+    repoRoot,
+    manifestPath,
+    artifactPaths,
+    autoIssueLogEnabled,
+    telemetryDebugEnabled: envFlagEnabled(process.env[REVIEW_TELEMETRY_DEBUG_ENV_KEY]),
+    telemetryDebugEnvKey: REVIEW_TELEMETRY_DEBUG_ENV_KEY,
+    runReview,
+    writeTelemetry,
+    logTelemetrySummary: logReviewExecutionTelemetrySummary,
+    logTerminationBoundaryFallback
+  });
 }
 
 main().catch((error) => {
@@ -851,107 +711,7 @@ main().catch((error) => {
   process.exitCode = typeof error?.exitCode === 'number' ? error.exitCode : 1;
 });
 
-async function ensureReviewCommandAvailable(context: RuntimeCodexCommandContext): Promise<void> {
-  const resolved = resolveRuntimeCodexCommand(['--help'], context);
-  const hasReview = await new Promise<boolean>((resolve, reject) => {
-    const detached = process.platform !== 'win32';
-    const child = spawn(resolved.command, resolved.args, { stdio: ['ignore', 'pipe', 'pipe'], detached });
-    let output = '';
-    let settled = false;
-    let hardKillArmed = false;
-    let killHandle: NodeJS.Timeout | undefined;
-    const timeoutHandle = setTimeout(() => {
-      if (settled) {
-        return;
-      }
-      signalChildProcess(child, 'SIGTERM', detached);
-      hardKillArmed = true;
-      killHandle = setTimeout(() => {
-        if (child.exitCode === null) {
-          signalChildProcess(child, 'SIGKILL', detached);
-        }
-      }, 5000);
-      killHandle.unref();
-      settled = true;
-      reject(new Error('codex --help timed out while checking the review subcommand.'));
-    }, REVIEW_COMMAND_CHECK_TIMEOUT_MS);
-    timeoutHandle.unref();
-
-    const finalize = (outcome: { ok: boolean } | { error: Error }) => {
-      if (settled) {
-        return;
-      }
-      settled = true;
-      clearTimeout(timeoutHandle);
-      if (killHandle && !hardKillArmed) {
-        clearTimeout(killHandle);
-      }
-      if ('error' in outcome) {
-        reject(outcome.error);
-      } else {
-        resolve(outcome.ok);
-      }
-    };
-
-    child.stdout?.on('data', (chunk) => {
-      output += chunk.toString();
-    });
-    child.stderr?.on('data', (chunk) => {
-      output += chunk.toString();
-    });
-    child.once('error', (error) =>
-      finalize({ error: error instanceof Error ? error : new Error(String(error)) })
-    );
-    child.once('close', () => {
-      finalize({ ok: output.includes(' review') });
-    });
-  });
-
-  if (!hasReview) {
-    throw new Error('codex CLI is missing the `review` subcommand (or is not installed).');
-  }
-}
-
-async function resolveReviewRuntimeContext(params: {
-  options: CliOptions;
-  manifestPath: string;
-  env: NodeJS.ProcessEnv;
-}): Promise<RuntimeCodexCommandContext> {
-  const runId = await resolveReviewRunId(params.manifestPath);
-  const requestedMode =
-    params.options.runtimeMode ??
-    parseRuntimeMode(
-      params.env.CODEX_ORCHESTRATOR_RUNTIME_MODE_ACTIVE ??
-        params.env.CODEX_ORCHESTRATOR_RUNTIME_MODE ??
-        null
-    );
-  return await createRuntimeCodexCommandContext({
-    requestedMode,
-    executionMode: 'mcp',
-    repoRoot,
-    env: params.env,
-    runId: runId ?? `review-${Date.now()}`
-  });
-}
-
-async function resolveReviewRunId(manifestPath: string): Promise<string | null> {
-  try {
-    const raw = await readFile(manifestPath, 'utf8');
-    const parsed = JSON.parse(raw) as { run_id?: unknown };
-    return typeof parsed.run_id === 'string' && parsed.run_id.trim().length > 0
-      ? parsed.run_id.trim()
-      : null;
-  } catch {
-    return null;
-  }
-}
-
 type ScopeFlagMode = ReviewScopeMode;
-
-interface ReviewArgsOptions {
-  includeScopeFlags: boolean;
-  disableDelegationMcp: boolean;
-}
 
 interface ReviewScopeAssessment {
   mode: ScopeFlagMode;
@@ -975,19 +735,6 @@ async function collectReviewScopePaths(options: CliOptions): Promise<ReviewScope
   return status ? parseStatusZPathCollection(status) : { paths: [], renderedLines: [] };
 }
 
-function resolveScopeFlag(options: CliOptions): { mode: ScopeFlagMode; args: string[] } | null {
-  if (options.commit) {
-    return { mode: 'commit', args: ['--commit', options.commit] };
-  }
-  if (options.base) {
-    return { mode: 'base', args: ['--base', options.base] };
-  }
-  if (options.uncommitted) {
-    return { mode: 'uncommitted', args: ['--uncommitted'] };
-  }
-  return null;
-}
-
 function resolveEffectiveScopeMode(options: CliOptions): ScopeFlagMode {
   if (options.commit) {
     return 'commit';
@@ -996,32 +743,6 @@ function resolveEffectiveScopeMode(options: CliOptions): ScopeFlagMode {
     return 'base';
   }
   return 'uncommitted';
-}
-
-function buildReviewArgs(options: CliOptions, prompt: string, opts: ReviewArgsOptions): string[] {
-  const args: string[] = [];
-  if (opts.disableDelegationMcp) {
-    args.push('-c', REVIEW_DISABLE_DELEGATION_CONFIG_OVERRIDE);
-  }
-  args.push('review');
-  if (options.title) {
-    args.push('--title', options.title);
-  }
-
-  const scopeFlag = resolveScopeFlag(options);
-  if (opts.includeScopeFlags && scopeFlag) {
-    args.push(...scopeFlag.args);
-  }
-
-  args.push(prompt);
-  return args;
-}
-
-function resolveReviewCommand(
-  reviewArgs: string[],
-  context: RuntimeCodexCommandContext
-): { command: string; args: string[] } {
-  return resolveRuntimeCodexCommand(reviewArgs, context);
 }
 
 function buildScopeNotes(options: CliOptions, scopePathCollection: ReviewScopePathCollection): string[] {
@@ -1222,109 +943,6 @@ function formatScopeMetrics(scope: ReviewScopeAssessment): string | null {
     return null;
   }
   return parts.join(', ');
-}
-
-interface ReviewArtifactPaths {
-  reviewDir: string;
-  promptPath: string;
-  outputLogPath: string;
-  telemetryPath: string;
-}
-
-function resolveReviewArtifactsDir(manifestPath: string): string {
-  const configuredRunDir = process.env.CODEX_ORCHESTRATOR_RUN_DIR?.trim();
-  if (configuredRunDir && configuredRunDir.length > 0) {
-    const resolvedRunDir = path.resolve(repoRoot, configuredRunDir);
-    const configuredManifestPath = path.join(resolvedRunDir, 'manifest.json');
-    if (configuredManifestPath === path.resolve(manifestPath)) {
-      return path.join(resolvedRunDir, REVIEW_ARTIFACTS_DIRNAME);
-    }
-  }
-  return path.join(path.dirname(manifestPath), REVIEW_ARTIFACTS_DIRNAME);
-}
-
-async function prepareReviewArtifacts(manifestPath: string, prompt: string): Promise<ReviewArtifactPaths> {
-  const reviewDir = resolveReviewArtifactsDir(manifestPath);
-  await mkdir(reviewDir, { recursive: true });
-
-  const promptPath = path.join(reviewDir, 'prompt.txt');
-  const outputLogPath = path.join(reviewDir, 'output.log');
-  const telemetryPath = path.join(reviewDir, 'telemetry.json');
-
-  await writeFile(promptPath, `${prompt}\n`, 'utf8');
-
-  return { reviewDir, promptPath, outputLogPath, telemetryPath };
-}
-
-interface ReviewFailureIssueLogOptions {
-  enabled: boolean;
-  error: unknown;
-  taskFilter: string | null;
-  manifestPath: string;
-  outputLogPath: string;
-}
-
-async function maybeCaptureReviewFailureIssueLog(
-  options: ReviewFailureIssueLogOptions
-): Promise<DoctorIssueLogResult | null> {
-  if (!options.enabled) {
-    return null;
-  }
-
-  const errorMessage = options.error instanceof Error ? options.error.message : String(options.error);
-  const issueNotes = [
-    'Automatic failure capture for standalone review wrapper.',
-    `Error: ${errorMessage}`,
-    `Manifest: ${path.relative(repoRoot, options.manifestPath)}`,
-    `Output log: ${path.relative(repoRoot, options.outputLogPath)}`
-  ].join(' | ');
-
-  try {
-    const issueLog = await writeDoctorIssueLog({
-      doctor: runDoctor(),
-      issueTitle: 'Auto issue log: standalone review failed',
-      issueNotes,
-      taskFilter: options.taskFilter
-    });
-    console.error('[run-review] captured review failure issue log:');
-    for (const line of formatDoctorIssueLogSummary(issueLog)) {
-      console.error(`[run-review] ${line}`);
-    }
-    return issueLog;
-  } catch (issueError) {
-    const message = issueError instanceof Error ? issueError.message : String(issueError);
-    console.error(`[run-review] failed to capture review issue log: ${message}`);
-    return null;
-  }
-}
-
-function shouldLogPartialReviewOutput(
-  terminationBoundary: ReviewTerminationBoundaryRecord | null
-): boolean {
-  return (
-    terminationBoundary !== null &&
-    REVIEW_PARTIAL_OUTPUT_HINT_BOUNDARY_KINDS.has(terminationBoundary.kind)
-  );
-}
-
-function shouldRetryWithoutScopeFlags(error: unknown): boolean {
-  if (!error || typeof error !== 'object') {
-    return false;
-  }
-  const preview = 'outputPreview' in error ? String((error as any).outputPreview ?? '') : '';
-  const message = 'message' in error ? String((error as any).message ?? '') : '';
-  const combined = `${message}\n${preview}`.toLowerCase();
-  return (
-    combined.includes('unknown option') ||
-    combined.includes('unknown flag') ||
-    combined.includes('unrecognized option') ||
-    combined.includes('cannot be used with') ||
-    combined.includes('cannot be combined') ||
-    combined.includes('incompatible with') ||
-    combined.includes('prompt cannot') ||
-    combined.includes('custom prompt') ||
-    combined.includes('with a prompt')
-  );
 }
 
 async function runDiffBudget(options: CliOptions): Promise<void> {
