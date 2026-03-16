@@ -1,6 +1,38 @@
 {
   "items": [
     {
+      "id": "20260316-1241-coordinator-symphony-aligned-shared-mcp-server-entry-detector-extraction",
+      "title": "Coordinator Symphony-Aligned Shared MCP Server Entry Detector Extraction",
+      "relates_to": "tasks/tasks-1241-coordinator-symphony-aligned-shared-mcp-server-entry-detector-extraction.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-16",
+      "paths": {
+        "spec": "tasks/specs/1241-coordinator-symphony-aligned-shared-mcp-server-entry-detector-extraction.md",
+        "task": "tasks/tasks-1241-coordinator-symphony-aligned-shared-mcp-server-entry-detector-extraction.md",
+        "agent_task": ".agent/task/1241-coordinator-symphony-aligned-shared-mcp-server-entry-detector-extraction.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-shared-mcp-server-entry-detector-extraction.md"
+      }
+    },
+    {
+      "id": "20260316-1240-coordinator-symphony-aligned-doctor-readiness-and-advisory-boundary-reassessment",
+      "title": "Coordinator Symphony-Aligned Doctor Readiness And Advisory Boundary Reassessment",
+      "relates_to": "tasks/tasks-1240-coordinator-symphony-aligned-doctor-readiness-and-advisory-boundary-reassessment.md",
+      "risk": "low",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-16",
+      "paths": {
+        "spec": "tasks/specs/1240-coordinator-symphony-aligned-doctor-readiness-and-advisory-boundary-reassessment.md",
+        "task": "tasks/tasks-1240-coordinator-symphony-aligned-doctor-readiness-and-advisory-boundary-reassessment.md",
+        "agent_task": ".agent/task/1240-coordinator-symphony-aligned-doctor-readiness-and-advisory-boundary-reassessment.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-doctor-readiness-and-advisory-boundary-reassessment.md"
+      }
+    },
+    {
       "id": "20260316-1239-coordinator-symphony-aligned-rlm-runner-remaining-boundary-freeze-reassessment",
       "title": "Coordinator Symphony-Aligned RLM Runner Remaining Boundary Freeze Reassessment",
       "relates_to": "tasks/tasks-1239-coordinator-symphony-aligned-rlm-runner-remaining-boundary-freeze-reassessment.md",

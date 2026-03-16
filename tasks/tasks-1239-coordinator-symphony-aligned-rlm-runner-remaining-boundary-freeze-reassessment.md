@@ -23,5 +23,5 @@
 
 ## Reassessment
 
-- [ ] Remaining RLM runner boundary re-inspected for truthful next seam vs freeze outcome. Evidence: pending closeout packet.
-- [ ] Closeout packet, override notes, and next-slice note captured. Evidence: pending closeout packet.
+- [x] Remaining RLM runner boundary re-inspected for truthful next seam vs freeze outcome. Evidence: `out/1239-coordinator-symphony-aligned-rlm-runner-remaining-boundary-freeze-reassessment/manual/20260316T101919Z-closeout/00-summary.md`
+- [x] Closeout packet, override notes, and next-slice note captured. Evidence: `out/1239-coordinator-symphony-aligned-rlm-runner-remaining-boundary-freeze-reassessment/manual/20260316T101919Z-closeout/00-summary.md`, `out/1239-coordinator-symphony-aligned-rlm-runner-remaining-boundary-freeze-reassessment/manual/20260316T101919Z-closeout/13-override-notes.md`, `out/1239-coordinator-symphony-aligned-rlm-runner-remaining-boundary-freeze-reassessment/manual/20260316T101919Z-closeout/14-next-slice-note.md`
