@@ -137,6 +137,25 @@ describe('startControlServerReadyInstanceLifecycle', () => {
 
     expect(order).toEqual(['expiry', 'bootstrap', 'client', 'server']);
   });
+
+  it('fails when startup resolves without publishing bootstrap assembly', async () => {
+    const server = { kind: 'server' } as unknown as http.Server;
+    const requestContextShared = {
+      clients: new Set()
+    } as unknown as ControlRequestSharedContext;
+
+    vi.mocked(createBoundControlServerRequestShell).mockReturnValue(server);
+    vi.mocked(startControlServerReadyInstanceStartup).mockResolvedValue('http://127.0.0.1:4321');
+
+    await expect(
+      startControlServerReadyInstanceLifecycle({
+        requestContextShared,
+        host: '127.0.0.1',
+        controlToken: 'token-123',
+        intervalMs: 15_000
+      })
+    ).rejects.toThrow('Control server ready instance startup did not publish bootstrap assembly');
+  });
 });
 
 describe('closeControlServerOwnedRuntime', () => {

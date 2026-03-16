@@ -1,21 +1,13 @@
 import http from 'node:http';
 
-import type { ControlExpiryLifecycle } from './controlExpiryLifecycle.js';
 import type { ControlRequestSharedContext } from './controlRequestContext.js';
-import { createBoundControlServerRequestShell } from './controlServerRequestShellBinding.js';
+import {
+  assertControlServerBootstrapAssemblyPublished,
+  closeControlServerOwnedRuntime,
+  createControlServerOwnedRuntime,
+  type ControlServerOwnedLifecycleState
+} from './controlServerOwnedRuntimeLifecycle.js';
 import { startControlServerReadyInstanceStartup } from './controlServerReadyInstanceStartup.js';
-import type { ControlServerBootstrapLifecycle } from './controlServerBootstrapLifecycle.js';
-
-export interface ControlServerOwnedLifecycleState {
-  expiryLifecycle: ControlExpiryLifecycle | null;
-  bootstrapLifecycle: ControlServerBootstrapLifecycle | null;
-}
-
-interface ControlServerOwnedRuntimeState {
-  server: http.Server;
-  requestContextShared: ControlRequestSharedContext;
-  lifecycleState: ControlServerOwnedLifecycleState;
-}
 
 interface StartControlServerReadyInstanceLifecycleOptions {
   requestContextShared: ControlRequestSharedContext;
@@ -30,39 +22,18 @@ interface StartControlServerReadyInstanceLifecycleResult {
   lifecycleState: ControlServerOwnedLifecycleState;
 }
 
-interface CloseControlServerOwnedRuntimeOptions {
-  server: http.Server;
-  requestContextShared: Pick<ControlRequestSharedContext, 'clients'>;
-  lifecycleState: ControlServerOwnedLifecycleState;
-}
-
 export async function startControlServerReadyInstanceLifecycle(
   options: StartControlServerReadyInstanceLifecycleOptions
 ): Promise<StartControlServerReadyInstanceLifecycleResult> {
-  const ownedRuntime: ControlServerOwnedRuntimeState = {
-    server: null as unknown as http.Server,
-    requestContextShared: options.requestContextShared,
-    lifecycleState: {
-      expiryLifecycle: null,
-      bootstrapLifecycle: null
-    }
-  };
-  const server = createBoundControlServerRequestShell({
-    readRequestContextShared: () => ownedRuntime.requestContextShared,
-    readExpiryLifecycle: () => ownedRuntime.lifecycleState.expiryLifecycle
-  });
-  ownedRuntime.server = server;
+  const ownedRuntime = createControlServerOwnedRuntime(options.requestContextShared);
 
   const baseUrl = await startControlServerReadyInstanceStartup({
-    server,
+    server: ownedRuntime.server,
     requestContextShared: ownedRuntime.requestContextShared,
     intervalMs: options.intervalMs,
     host: options.host,
     controlToken: options.controlToken,
-    onBootstrapAssembly: ({ expiryLifecycle, bootstrapLifecycle }) => {
-      ownedRuntime.lifecycleState.expiryLifecycle = expiryLifecycle;
-      ownedRuntime.lifecycleState.bootstrapLifecycle = bootstrapLifecycle;
-    },
+    onBootstrapAssembly: ownedRuntime.publishBootstrapAssembly,
     closeOnFailure: () =>
       closeControlServerOwnedRuntime({
         server: ownedRuntime.server,
@@ -71,11 +42,7 @@ export async function startControlServerReadyInstanceLifecycle(
       })
   });
 
-  const expiryLifecycle = ownedRuntime.lifecycleState.expiryLifecycle;
-  const bootstrapLifecycle = ownedRuntime.lifecycleState.bootstrapLifecycle;
-  if (!expiryLifecycle || !bootstrapLifecycle) {
-    throw new Error('Control server ready instance startup did not publish bootstrap assembly');
-  }
+  assertControlServerBootstrapAssemblyPublished(ownedRuntime.lifecycleState);
 
   return {
     server: ownedRuntime.server,
@@ -84,22 +51,7 @@ export async function startControlServerReadyInstanceLifecycle(
   };
 }
 
-export async function closeControlServerOwnedRuntime(
-  options: CloseControlServerOwnedRuntimeOptions
-): Promise<void> {
-  const expiryLifecycle = options.lifecycleState.expiryLifecycle;
-  expiryLifecycle?.close();
-  options.lifecycleState.expiryLifecycle = null;
-
-  const bootstrapLifecycle = options.lifecycleState.bootstrapLifecycle;
-  await bootstrapLifecycle?.close();
-  options.lifecycleState.bootstrapLifecycle = null;
-
-  for (const client of options.requestContextShared.clients) {
-    client.end();
-  }
-
-  await new Promise<void>((resolve) => {
-    options.server.close(() => resolve());
-  });
-}
+export {
+  closeControlServerOwnedRuntime,
+  type ControlServerOwnedLifecycleState
+} from './controlServerOwnedRuntimeLifecycle.js';
