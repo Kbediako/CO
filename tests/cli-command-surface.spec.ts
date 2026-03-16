@@ -1624,6 +1624,18 @@ describe('codex-orchestrator command surface', () => {
     expect(payload.steps?.guidance?.note).toContain('Agent-first default');
   }, TEST_TIMEOUT);
 
+  it('rejects setup --yes with --format json', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'co-cli-setup-apply-json-'));
+    const env = {
+      ...process.env,
+      CODEX_HOME: tempDir
+    };
+
+    await expect(runCli(['setup', '--yes', '--format', 'json'], env)).rejects.toMatchObject({
+      stderr: expect.stringContaining('setup does not support --format json with --yes.')
+    });
+  }, TEST_TIMEOUT);
+
   it('treats setup --yes=false as plan mode', async () => {
     tempDir = await mkdtemp(join(tmpdir(), 'co-cli-setup-yes-false-'));
     const env = {

@@ -36,15 +36,15 @@ import { formatDevtoolsSetupSummary, runDevtoolsSetup } from '../orchestrator/sr
 import { formatCodexCliSetupSummary, runCodexCliSetup } from '../orchestrator/src/cli/codexCliSetup.js';
 import { formatCodexDefaultsSetupSummary, runCodexDefaultsSetup } from '../orchestrator/src/cli/codexDefaultsSetup.js';
 import { formatDelegationSetupSummary, runDelegationSetup } from '../orchestrator/src/cli/delegationSetup.js';
-import { formatSkillsInstallSummary, installSkills, listBundledSkills } from '../orchestrator/src/cli/skills.js';
+import { formatSkillsInstallSummary, installSkills } from '../orchestrator/src/cli/skills.js';
 import { runFlowCliShell } from '../orchestrator/src/cli/flowCliShell.js';
+import { runSetupBootstrapShell } from '../orchestrator/src/cli/setupBootstrapShell.js';
 import { findPackageRoot, loadPackageInfo } from '../orchestrator/src/cli/utils/packageInfo.js';
 import { slugify } from '../orchestrator/src/cli/utils/strings.js';
 import { serveMcp } from '../orchestrator/src/cli/mcp.js';
 import { formatMcpEnableSummary, runMcpEnable } from '../orchestrator/src/cli/mcpEnable.js';
 import { startDelegationServer } from '../orchestrator/src/cli/delegationServer.js';
 import { splitDelegationConfigOverrides } from '../orchestrator/src/cli/config/delegationConfig.js';
-import { buildCommandPreview } from '../orchestrator/src/cli/utils/commandPreview.js';
 import { REPO_CONFIG_REQUIRED_ENV_KEY } from '../orchestrator/src/cli/config/repoConfigPolicy.js';
 
 type ArgMap = Record<string, string | boolean>;
@@ -74,12 +74,6 @@ interface RunOutputPayload {
   cloud_fallback_reason: string | null;
   issue_log: DoctorIssueLogResult | null;
   issue_log_error: string | null;
-}
-
-interface SetupGuidancePayload {
-  note: string;
-  references: string[];
-  recommended_commands: string[];
 }
 
 async function main(): Promise<void> {
@@ -1285,108 +1279,13 @@ Options:
 
   const repoFlag = readStringFlag(flags, 'repo');
   const repoRoot = repoFlag ?? process.cwd();
-  const delegationCommandPreview = repoFlag
-    ? buildCommandPreview('codex-orchestrator', ['delegation', 'setup', '--yes', '--repo', repoFlag])
-    : 'codex-orchestrator delegation setup --yes';
-  const bundledSkills = await listBundledSkills();
-  if (bundledSkills.length === 0) {
-    throw new Error('No bundled skills detected; cannot run setup.');
-  }
-  const guidance = buildSetupGuidance();
-
-  if (!apply) {
-    const installCommand = `codex-orchestrator skills install ${refreshSkills ? '--force ' : ''}--only ${bundledSkills.join(',')}`;
-    const skillsNote = refreshSkills
-      ? 'Installs bundled skills into $CODEX_HOME/skills with overwrite enabled via --refresh-skills.'
-      : 'Installs bundled skills into $CODEX_HOME/skills without overwriting existing files by default. Add --refresh-skills to force overwrite.';
-
-    const delegation = await runDelegationSetup({ repoRoot });
-    const devtools = await runDevtoolsSetup();
-    const payload = {
-      status: 'planned' as const,
-      steps: {
-        skills: {
-          commandLines: [installCommand],
-          note: skillsNote
-        },
-        delegation,
-        devtools,
-        guidance
-      }
-    };
-
-    if (format === 'json') {
-      console.log(JSON.stringify(payload, null, 2));
-      return;
-    }
-
-    console.log('Setup plan:');
-    console.log('- Skills:');
-    for (const commandLine of payload.steps.skills.commandLines) {
-      console.log(`  - ${commandLine}`);
-    }
-    console.log(`- Delegation: ${delegationCommandPreview}`);
-    console.log('- DevTools: codex-orchestrator devtools setup --yes');
-    for (const line of formatSetupGuidanceSummary(guidance)) {
-      console.log(line);
-    }
-    console.log('Run with --yes to apply this setup.');
-    return;
-  }
-
-  const skills = await installSkills({ force: refreshSkills, only: bundledSkills });
-  const delegation = await runDelegationSetup({ apply: true, repoRoot });
-  const devtools = await runDevtoolsSetup({ apply: true });
-
-  for (const line of formatSkillsInstallSummary(skills)) {
-    console.log(line);
-  }
-  for (const line of formatDelegationSetupSummary(delegation)) {
-    console.log(line);
-  }
-  for (const line of formatDevtoolsSetupSummary(devtools)) {
-    console.log(line);
-  }
-  for (const line of formatSetupGuidanceSummary(guidance)) {
-    console.log(line);
-  }
-  console.log('Next: codex-orchestrator doctor --usage');
-}
-
-function buildSetupGuidance(): SetupGuidancePayload {
-  return {
-    note: 'Agent-first default: run docs-review before implementation and implementation-gate before handoff.',
-    references: [
-      'https://github.com/Kbediako/CO#downstream-usage-cheatsheet-agent-first',
-      'https://github.com/Kbediako/CO/blob/main/docs/AGENTS.md',
-      'https://github.com/Kbediako/CO/blob/main/docs/guides/collab-vs-mcp.md',
-      'https://github.com/Kbediako/CO/blob/main/docs/guides/rlm-recursion-v2.md'
-    ],
-    recommended_commands: [
-      'codex-orchestrator flow --task <task-id>',
-      'codex-orchestrator doctor --usage',
-      'codex-orchestrator rlm --multi-agent auto "<goal>"',
-      'codex-orchestrator codex defaults --yes',
-      'codex-orchestrator mcp enable --servers delegation --yes'
-    ]
-  };
-}
-
-function formatSetupGuidanceSummary(guidance: SetupGuidancePayload): string[] {
-  const lines: string[] = ['Setup guidance:', `- ${guidance.note}`];
-  if (guidance.recommended_commands.length > 0) {
-    lines.push('- Recommended commands:');
-    for (const command of guidance.recommended_commands) {
-      lines.push(`  - ${command}`);
-    }
-  }
-  if (guidance.references.length > 0) {
-    lines.push('- References:');
-    for (const reference of guidance.references) {
-      lines.push(`  - ${reference}`);
-    }
-  }
-  return lines;
+  await runSetupBootstrapShell({
+    format,
+    apply,
+    refreshSkills,
+    repoRoot,
+    repoFlag: repoFlag ?? undefined
+  });
 }
 
 async function handleDoctor(rawArgs: string[]): Promise<void> {
