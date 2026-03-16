@@ -15,18 +15,18 @@
 - [x] `tasks/index.json` updated with the linked TECH_SPEC path. Evidence: `tasks/index.json`
 - [x] `docs/docs-freshness-registry.json` updated for all new docs/task artifacts. Evidence: `docs/docs-freshness-registry.json`
 - [x] `docs/TASKS.md` updated with the current snapshot and evidence. Evidence: `docs/TASKS.md`
-- [ ] docs-review approval or explicit override captured for registered `1228`.
+- [x] docs-review approval or explicit override captured for registered `1228`. Evidence: `out/1228-coordinator-symphony-aligned-standalone-review-remaining-wrapper-surface-freeze-reassessment/manual/20260316T054144Z-docs-first/05-docs-review-override.md`
 
 ## Reassessment
 
-- [ ] Remaining standalone-review wrapper-surface density reinspected without widening scope.
-- [ ] The lane records whether any truthful next implementation seam remains or whether no broader standalone-review extraction is still justified.
-- [ ] Independent scout passes corroborated the stop/go conclusion.
+- [x] Remaining standalone-review wrapper-surface density reinspected without widening scope. Evidence: `scripts/run-review.ts`, `scripts/lib/review-prompt-context.ts`, `scripts/lib/review-execution-state.ts`, `out/1228-coordinator-symphony-aligned-standalone-review-remaining-wrapper-surface-freeze-reassessment/manual/20260316T054631Z-closeout/00-summary.md`
+- [x] The lane records whether any truthful next implementation seam remains or whether no broader standalone-review extraction is still justified. Evidence: `out/1228-coordinator-symphony-aligned-standalone-review-remaining-wrapper-surface-freeze-reassessment/manual/20260316T054631Z-closeout/00-summary.md`, `out/1228-coordinator-symphony-aligned-standalone-review-remaining-wrapper-surface-freeze-reassessment/manual/20260316T054631Z-closeout/14-next-slice-note.md`
+- [x] Independent scout passes corroborated the stop/go conclusion. Evidence: `out/1228-coordinator-symphony-aligned-standalone-review-remaining-wrapper-surface-freeze-reassessment/manual/20260316T054631Z-closeout/00-summary.md`
 
 ## Validation & Closeout
 
-- [ ] `node scripts/spec-guard.mjs --dry-run`
-- [ ] `npm run docs:check`
-- [ ] `npm run docs:freshness`
-- [ ] Elegance review completed.
-- [ ] Closeout summary and explicit override notes recorded.
+- [x] `node scripts/spec-guard.mjs --dry-run`. Evidence: `out/1228-coordinator-symphony-aligned-standalone-review-remaining-wrapper-surface-freeze-reassessment/manual/20260316T054631Z-closeout/02-spec-guard.log`
+- [x] `npm run docs:check`. Evidence: `out/1228-coordinator-symphony-aligned-standalone-review-remaining-wrapper-surface-freeze-reassessment/manual/20260316T054631Z-closeout/03-docs-check.log`
+- [x] `npm run docs:freshness`. Evidence: `out/1228-coordinator-symphony-aligned-standalone-review-remaining-wrapper-surface-freeze-reassessment/manual/20260316T054631Z-closeout/04-docs-freshness.log`
+- [x] Elegance review completed. Evidence: `out/1228-coordinator-symphony-aligned-standalone-review-remaining-wrapper-surface-freeze-reassessment/manual/20260316T054631Z-closeout/12-elegance-review.md`
+- [x] Closeout summary and explicit override notes recorded. Evidence: `out/1228-coordinator-symphony-aligned-standalone-review-remaining-wrapper-surface-freeze-reassessment/manual/20260316T054631Z-closeout/00-summary.md`, `out/1228-coordinator-symphony-aligned-standalone-review-remaining-wrapper-surface-freeze-reassessment/manual/20260316T054631Z-closeout/13-override-notes.md`
