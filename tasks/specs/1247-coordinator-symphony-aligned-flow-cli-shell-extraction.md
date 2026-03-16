@@ -1,7 +1,7 @@
 ---
 id: 20260316-1247-coordinator-symphony-aligned-flow-cli-shell-extraction
 title: Coordinator Symphony-Aligned Flow CLI Shell Extraction
-status: active
+status: completed
 owner: Codex
 created: 2026-03-16
 last_review: 2026-03-16
@@ -13,6 +13,7 @@ related_tasks:
   - tasks/tasks-1247-coordinator-symphony-aligned-flow-cli-shell-extraction.md
 review_notes:
   - 2026-03-16: Approved for docs-first extraction after `1246` froze the broader doctor command family and bounded scout evidence confirmed the remaining truthful seam is the inline `flow` command shell around `handleFlow(...)` and `resolveFlowTargetStageSelection(...)` in `bin/codex-orchestrator.ts`, with the shared start/issue-log helpers explicitly left out of scope unless extraction requires them. Evidence: `docs/findings/1247-flow-cli-shell-extraction-deliberation.md`, `out/1246-coordinator-symphony-aligned-doctor-readiness-and-advisory-command-family-reassessment/manual/20260316T133732Z-closeout/14-next-slice-note.md`.
+  - 2026-03-16: Completed. Extracted the flow-owned target-stage resolution and docs-review to implementation-gate orchestration into `orchestrator/src/cli/flowCliShell.ts`, added seam-local parity tests, and kept parser/help/shared helper surfaces in `bin/codex-orchestrator.ts`. Evidence: `out/1247-coordinator-symphony-aligned-flow-cli-shell-extraction/manual/20260316T193233Z-closeout/00-summary.md`.
 ---
 
 # Technical Specification
