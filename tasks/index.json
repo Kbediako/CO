@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260316-1246-coordinator-symphony-aligned-doctor-readiness-and-advisory-command-family-reassessment",
+      "title": "Coordinator Symphony-Aligned Doctor Readiness And Advisory Command Family Reassessment",
+      "relates_to": "tasks/tasks-1246-coordinator-symphony-aligned-doctor-readiness-and-advisory-command-family-reassessment.md",
+      "risk": "low",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-16",
+      "paths": {
+        "spec": "tasks/specs/1246-coordinator-symphony-aligned-doctor-readiness-and-advisory-command-family-reassessment.md",
+        "task": "tasks/tasks-1246-coordinator-symphony-aligned-doctor-readiness-and-advisory-command-family-reassessment.md",
+        "agent_task": ".agent/task/1246-coordinator-symphony-aligned-doctor-readiness-and-advisory-command-family-reassessment.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-doctor-readiness-and-advisory-command-family-reassessment.md"
+      }
+    },
+    {
       "id": "20260316-1245-coordinator-symphony-aligned-delegation-setup-remaining-boundary-freeze-reassessment",
       "title": "Coordinator Symphony-Aligned Delegation Setup Remaining Boundary Freeze Reassessment",
       "relates_to": "tasks/tasks-1245-coordinator-symphony-aligned-delegation-setup-remaining-boundary-freeze-reassessment.md",

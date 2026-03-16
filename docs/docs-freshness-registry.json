@@ -33,21 +33,21 @@
     {
       "path": "tasks/tasks-1245-coordinator-symphony-aligned-delegation-setup-remaining-boundary-freeze-reassessment.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-03-16",
       "cadence_days": 30
     },
     {
       "path": "tasks/specs/1245-coordinator-symphony-aligned-delegation-setup-remaining-boundary-freeze-reassessment.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-03-16",
       "cadence_days": 30
     },
     {
       "path": ".agent/task/1245-coordinator-symphony-aligned-delegation-setup-remaining-boundary-freeze-reassessment.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-03-16",
       "cadence_days": 30
     },
@@ -16702,6 +16702,55 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-03-08",
+      "cadence_days": 30
+    },
+    {
+      "path": ".agent/task/1246-coordinator-symphony-aligned-doctor-readiness-and-advisory-command-family-reassessment.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-16",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-doctor-readiness-and-advisory-command-family-reassessment.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-16",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/PRD-coordinator-symphony-aligned-doctor-readiness-and-advisory-command-family-reassessment.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-16",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/TECH_SPEC-coordinator-symphony-aligned-doctor-readiness-and-advisory-command-family-reassessment.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-16",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/findings/1246-doctor-readiness-and-advisory-command-family-reassessment-deliberation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-16",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/specs/1246-coordinator-symphony-aligned-doctor-readiness-and-advisory-command-family-reassessment.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-16",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/tasks-1246-coordinator-symphony-aligned-doctor-readiness-and-advisory-command-family-reassessment.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-16",
       "cadence_days": 30
     }
   ]

@@ -19,5 +19,5 @@
 
 ## Reassessment
 
-- [ ] Remaining delegation-setup boundary inspected for a truthful follow-on seam or freeze. Evidence: pending closeout packet.
-- [ ] Final freeze/go conclusion recorded. Evidence: pending closeout packet.
+- [x] Remaining delegation-setup boundary inspected for a truthful follow-on seam or freeze. Evidence: `out/1245-coordinator-symphony-aligned-delegation-setup-remaining-boundary-freeze-reassessment/manual/20260316T131523Z-closeout/00-summary.md`
+- [x] Final freeze/go conclusion recorded. Evidence: `out/1245-coordinator-symphony-aligned-delegation-setup-remaining-boundary-freeze-reassessment/manual/20260316T131523Z-closeout/00-summary.md`, `out/1245-coordinator-symphony-aligned-delegation-setup-remaining-boundary-freeze-reassessment/manual/20260316T131523Z-closeout/14-next-slice-note.md`
