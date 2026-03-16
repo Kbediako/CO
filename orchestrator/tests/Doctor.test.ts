@@ -114,6 +114,31 @@ describe('runDoctor', () => {
     }
   });
 
+  it('reports delegation readiness when config declares the delegation MCP entry', async () => {
+    const originalCodexHome = process.env.CODEX_HOME;
+    const tempHome = await mkdtemp(join(tmpdir(), 'codex-home-'));
+    process.env.CODEX_HOME = tempHome;
+    try {
+      await writeFile(
+        join(tempHome, 'config.toml'),
+        ['mcp_servers."delegation" = { command = "codex-orchestrator" } # keep enabled'].join('\n'),
+        'utf8'
+      );
+
+      const result = runDoctor(process.cwd());
+      expect(result.delegation.status).toBe('ok');
+      expect(result.delegation.config.status).toBe('ok');
+      expect(formatDoctorSummary(result).join('\n')).toContain('Delegation: ok');
+    } finally {
+      if (originalCodexHome === undefined) {
+        delete process.env.CODEX_HOME;
+      } else {
+        process.env.CODEX_HOME = originalCodexHome;
+      }
+      await rm(tempHome, { recursive: true, force: true });
+    }
+  });
+
   it('flags review_model when it does not match the baseline', async () => {
     const originalCodexHome = process.env.CODEX_HOME;
     const tempHome = await mkdtemp(join(tmpdir(), 'codex-home-'));
