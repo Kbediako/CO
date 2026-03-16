@@ -18,6 +18,17 @@ import {
   evaluateDynamicToolBridgeRequest,
   type DynamicToolBridgeAction
 } from './control/dynamicToolBridgePolicy.js';
+import {
+  buildToolList,
+  createDelegationServerRpcHandler,
+  handleDelegationServerToolCall
+} from './delegationServerToolDispatchShell.js';
+import {
+  MAX_MCP_HEADER_BYTES,
+  MAX_MCP_MESSAGE_BYTES,
+  parseContentLengthHeader,
+  runJsonRpcServer
+} from './delegationServerTransport.js';
 
 interface McpRequest {
   jsonrpc: '2.0';
@@ -25,13 +36,6 @@ interface McpRequest {
   method: string;
   params?: Record<string, unknown>;
   codex_private?: Record<string, unknown>;
-}
-
-interface McpResponse {
-  jsonrpc: '2.0';
-  id: string | number | null;
-  result?: unknown;
-  error?: { code: number; message: string; data?: unknown };
 }
 
 interface DelegationServerOptions {
@@ -50,13 +54,6 @@ const DEFAULT_GH_TIMEOUT_MS = 60_000;
 const DEFAULT_DELEGATION_TOKEN_RETRY_MS = 2000;
 const DEFAULT_DELEGATION_TOKEN_RETRY_INTERVAL_MS = 200;
 const DEFAULT_CONTROL_ENDPOINT_TIMEOUT_MS = 15_000;
-const MAX_MCP_MESSAGE_BYTES = 1024 * 1024;
-const MAX_MCP_HEADER_BYTES = 16 * 1024;
-const MCP_HEADER_DELIMITER = '\r\n\r\n';
-const MCP_HEADER_DELIMITER_BYTES = MCP_HEADER_DELIMITER.length;
-const MCP_HEADER_DELIMITER_BUFFER = Buffer.from(MCP_HEADER_DELIMITER, 'utf8');
-const MAX_MCP_BUFFER_BYTES =
-  (MAX_MCP_MESSAGE_BYTES + MAX_MCP_HEADER_BYTES + MCP_HEADER_DELIMITER_BYTES) * 2;
 const DELEGATION_TOKEN_HEADER = 'x-codex-delegation-token';
 const DELEGATION_RUN_HEADER = 'x-codex-delegation-run-id';
 const DELEGATION_TOKEN_FILE = 'delegation_token.json';
@@ -99,7 +96,6 @@ interface ConfigOverride {
   value: string;
 }
 
-type ResponseFormat = 'framed' | 'jsonl';
 type DelegationMode = 'full' | 'question_only' | 'status_only';
 
 export async function startDelegationServer(options: DelegationServerOptions): Promise<void> {
@@ -119,18 +115,11 @@ export async function startDelegationServer(options: DelegationServerOptions): P
 
   const tools = buildToolList({ mode, githubEnabled, allowedGithubOps });
 
-  const handler = async (request: McpRequest): Promise<unknown> => {
-    switch (request.method) {
-      case 'initialize':
-        return {
-          protocolVersion: PROTOCOL_VERSION,
-          serverInfo: { name: 'codex-delegation', version: '0.1.0' },
-          capabilities: { tools: {} }
-        };
-      case 'tools/list':
-        return { tools };
-    case 'tools/call':
-      return await handleToolCall(request, {
+  const handler = createDelegationServerRpcHandler({
+    protocolVersion: PROTOCOL_VERSION,
+    tools,
+    handleToolCall: (request) =>
+      handleToolCall(request, {
         repoRoot,
         mode,
         allowNested,
@@ -140,255 +129,10 @@ export async function startDelegationServer(options: DelegationServerOptions): P
         allowedHosts,
         toolProfile,
         expiryFallback: effectiveConfig.delegate.expiryFallback
-      });
-      default:
-        throw new Error(`Unsupported method: ${request.method}`);
-    }
-  };
+      })
+  });
 
   await runJsonRpcServer(handler);
-}
-
-function buildToolList(options: {
-  mode: DelegationMode;
-  githubEnabled: boolean;
-  allowedGithubOps: Set<string>;
-}): Array<{ name: string; description: string; inputSchema: Record<string, unknown> }> {
-  const tools: Array<{ name: string; description: string; inputSchema: Record<string, unknown> }> = [];
-  const includeFull = options.mode === 'full';
-  const includeQuestionAndGithub = options.mode !== 'status_only';
-
-  if (includeFull) {
-    tools.push(toolDefinition('delegate.spawn', 'Spawn a delegated run', {
-      type: 'object',
-      properties: {
-        task_id: { type: 'string' },
-        pipeline: { type: 'string' },
-        repo: { type: 'string' },
-        parent_run_id: { type: 'string' },
-        parent_manifest_path: { type: 'string' },
-        env: { type: 'object', additionalProperties: { type: 'string' } },
-        delegate_mode: { type: 'string', enum: ['full', 'question_only', 'status_only'] },
-        start_only: { type: 'boolean' }
-      },
-      required: ['pipeline', 'repo']
-    }));
-    tools.push(toolDefinition('delegate.pause', 'Pause or resume a run', {
-      type: 'object',
-      properties: {
-        manifest_path: { type: 'string' },
-        paused: { type: 'boolean' },
-        intent_id: { type: 'string' },
-        request_id: { type: 'string' },
-        transport: { type: 'string', enum: ['discord', 'telegram'] },
-        actor_id: { type: 'string' },
-        actor_source: { type: 'string' },
-        transport_principal: { type: 'string' },
-        transport_nonce: { type: 'string' },
-        transport_nonce_expires_at: { type: 'string' }
-      },
-      required: ['manifest_path', 'paused']
-    }));
-    tools.push(toolDefinition('delegate.cancel', 'Cancel a run (confirmation required)', {
-      type: 'object',
-      properties: {
-        manifest_path: { type: 'string' },
-        intent_id: { type: 'string' },
-        request_id: { type: 'string' },
-        transport: { type: 'string', enum: ['discord', 'telegram'] },
-        actor_id: { type: 'string' },
-        actor_source: { type: 'string' },
-        transport_principal: { type: 'string' },
-        transport_nonce: { type: 'string' },
-        transport_nonce_expires_at: { type: 'string' }
-      },
-      required: ['manifest_path']
-    }));
-
-    tools.push(toolDefinition('coordinator.status', 'Experimental coordinator dynamic-tool status bridge', {
-      type: 'object',
-      properties: {
-        manifest_path: { type: 'string' },
-        intent_id: { type: 'string' },
-        request_id: { type: 'string' },
-        ...dynamicToolBridgeSourceSchemaProperties()
-      },
-      required: ['manifest_path']
-    }));
-    tools.push(toolDefinition('coordinator.pause', 'Experimental coordinator dynamic-tool pause bridge', {
-      type: 'object',
-      properties: {
-        manifest_path: { type: 'string' },
-        intent_id: { type: 'string' },
-        request_id: { type: 'string' },
-        transport: { type: 'string', enum: ['discord', 'telegram'] },
-        actor_id: { type: 'string' },
-        actor_source: { type: 'string' },
-        transport_principal: { type: 'string' },
-        transport_nonce: { type: 'string' },
-        transport_nonce_expires_at: { type: 'string' },
-        ...dynamicToolBridgeSourceSchemaProperties()
-      },
-      required: ['manifest_path']
-    }));
-    tools.push(toolDefinition('coordinator.resume', 'Experimental coordinator dynamic-tool resume bridge', {
-      type: 'object',
-      properties: {
-        manifest_path: { type: 'string' },
-        intent_id: { type: 'string' },
-        request_id: { type: 'string' },
-        transport: { type: 'string', enum: ['discord', 'telegram'] },
-        actor_id: { type: 'string' },
-        actor_source: { type: 'string' },
-        transport_principal: { type: 'string' },
-        transport_nonce: { type: 'string' },
-        transport_nonce_expires_at: { type: 'string' },
-        ...dynamicToolBridgeSourceSchemaProperties()
-      },
-      required: ['manifest_path']
-    }));
-    tools.push(toolDefinition('coordinator.cancel', 'Experimental coordinator dynamic-tool cancel bridge', {
-      type: 'object',
-      properties: {
-        manifest_path: { type: 'string' },
-        intent_id: { type: 'string' },
-        request_id: { type: 'string' },
-        transport: { type: 'string', enum: ['discord', 'telegram'] },
-        actor_id: { type: 'string' },
-        actor_source: { type: 'string' },
-        transport_principal: { type: 'string' },
-        transport_nonce: { type: 'string' },
-        transport_nonce_expires_at: { type: 'string' },
-        ...dynamicToolBridgeSourceSchemaProperties()
-      },
-      required: ['manifest_path']
-    }));
-  }
-
-  tools.push(toolDefinition('delegate.status', 'Fetch run status', {
-    type: 'object',
-    properties: {
-      manifest_path: { type: 'string' },
-      intent_id: { type: 'string' },
-      request_id: { type: 'string' }
-    },
-    required: ['manifest_path']
-  }));
-
-  if (includeQuestionAndGithub) {
-    tools.push(toolDefinition('delegate.question.enqueue', 'Enqueue a question to the parent run', {
-      type: 'object',
-      properties: {
-        parent_manifest_path: { type: 'string' },
-        parent_run_id: { type: 'string' },
-        parent_task_id: { type: 'string' },
-        from_manifest_path: { type: 'string' },
-        prompt: { type: 'string' },
-        urgency: { type: 'string', enum: ['low', 'med', 'high'] },
-        expires_in_ms: { type: 'number' },
-        auto_pause: { type: 'boolean' }
-      },
-      required: ['parent_manifest_path', 'prompt']
-    }));
-    tools.push(toolDefinition('delegate.question.poll', 'Poll for a question answer', {
-      type: 'object',
-      properties: {
-        parent_manifest_path: { type: 'string' },
-        question_id: { type: 'string' },
-        wait_ms: { type: 'number' }
-      },
-      required: ['parent_manifest_path', 'question_id']
-    }));
-  }
-
-  if (includeQuestionAndGithub && options.githubEnabled) {
-    if (options.allowedGithubOps.has('open_pr')) {
-      tools.push(toolDefinition('github.open_pr', 'Open a pull request', {
-        type: 'object',
-        properties: {
-          repo: { type: 'string' },
-          title: { type: 'string' },
-          body: { type: 'string' },
-          base: { type: 'string' },
-          head: { type: 'string' },
-          draft: { type: 'boolean' }
-        },
-        required: ['title']
-      }));
-    }
-    if (options.allowedGithubOps.has('comment')) {
-      tools.push(toolDefinition('github.comment', 'Create a PR/issue comment', {
-        type: 'object',
-        properties: {
-          repo: { type: 'string' },
-          issue_number: { type: 'number' },
-          body: { type: 'string' }
-        },
-        required: ['issue_number', 'body']
-      }));
-    }
-    if (options.allowedGithubOps.has('review')) {
-      tools.push(toolDefinition('github.review', 'Submit a PR review', {
-        type: 'object',
-        properties: {
-          repo: { type: 'string' },
-          pull_number: { type: 'number' },
-          event: { type: 'string', enum: ['APPROVE', 'REQUEST_CHANGES', 'COMMENT'] },
-          body: { type: 'string' }
-        },
-        required: ['pull_number', 'event']
-      }));
-    }
-    if (options.allowedGithubOps.has('get_checks')) {
-      tools.push(toolDefinition('github.get_checks', 'Fetch PR checks', {
-        type: 'object',
-        properties: {
-          repo: { type: 'string' },
-          pull_number: { type: 'number' }
-        },
-        required: ['pull_number']
-      }));
-    }
-    if (options.allowedGithubOps.has('merge')) {
-      tools.push(toolDefinition('github.merge', 'Merge a PR', {
-        type: 'object',
-        properties: {
-          manifest_path: { type: 'string' },
-          repo: { type: 'string' },
-          pull_number: { type: 'number' },
-          method: { type: 'string', enum: ['merge', 'squash', 'rebase'] },
-          delete_branch: { type: 'boolean' }
-        },
-        required: ['pull_number']
-      }));
-    }
-  }
-
-  return tools;
-}
-
-function toolDefinition(name: string, description: string, inputSchema: Record<string, unknown>) {
-  return { name, description, inputSchema };
-}
-
-function dynamicToolBridgeSourceSchemaProperties(): Record<string, unknown> {
-  return {
-    source: {
-      type: 'object',
-      properties: {
-        id: { type: 'string' },
-        source_id: { type: 'string' },
-        sourceId: { type: 'string' },
-        bridge_source: { type: 'string' },
-        bridgeSource: { type: 'string' }
-      },
-      additionalProperties: true
-    },
-    source_id: { type: 'string' },
-    sourceId: { type: 'string' },
-    bridge_source: { type: 'string' },
-    bridgeSource: { type: 'string' }
-  };
 }
 
 async function handleToolCall(
@@ -405,104 +149,21 @@ async function handleToolCall(
     expiryFallback: 'pause' | 'resume' | 'fail';
   }
 ): Promise<unknown> {
-  const params = asRecord(request.params);
-  const toolName = readStringValue(params, 'name');
-  if (!toolName) {
-    throw new Error('Invalid tool call: missing name');
-  }
-  const input = asRecord(params.arguments);
-
-  const delegateModeViolationMessage = getDelegateModeViolationMessage(context.mode, toolName);
-  if (delegateModeViolationMessage) {
-    await reportSecurityViolation(
-      'delegate_mode_violation',
-      delegateModeViolationMessage,
-      toolName,
-      context.allowedHosts
-    );
-    throw new Error(context.mode === 'question_only' ? 'delegate_mode_forbidden' : delegateModeViolationMessage);
-  }
-
-  if (containsSecret(input, 'confirm_nonce') || containsSecret(input, 'confirmNonce')) {
-    await reportSecurityViolation('confirm_nonce_present', 'Model supplied confirm_nonce.', toolName, context.allowedHosts);
-    throw new Error('confirm_nonce must be injected by the runner');
-  }
-  if (containsSecret(input, 'delegation_token') || containsSecret(input, 'delegationToken')) {
-    await reportSecurityViolation(
-      'delegation_token_present',
-      'Model supplied delegation_token.',
-      toolName,
-      context.allowedHosts
-    );
-    throw new Error('delegation_token must be injected by the runner');
-  }
-
-  switch (toolName) {
-    case 'delegate.status':
-      return wrapResult(await handleDelegateStatus(input, context.allowedRoots, context.allowedHosts));
-    case 'delegate.pause':
-      return wrapResult(await handleDelegatePause(input, context.allowedRoots, context.allowedHosts));
-    case 'delegate.cancel':
-      return wrapResult(await handleDelegateCancel(input, request, context.allowedRoots, context.allowedHosts));
-    case 'delegate.spawn':
-      return wrapResult(
-        await handleDelegateSpawn(
-          input,
-          context.repoRoot,
-          context.allowNested,
-          context.allowedRoots,
-          context.allowedHosts,
-          context.toolProfile
-        )
-      );
-    case 'delegate.question.enqueue':
-      return wrapResult(
-        await handleQuestionEnqueue(
-          input,
-          request,
-          context.allowedRoots,
-          context.allowedHosts,
-          context.expiryFallback
-        )
-      );
-    case 'delegate.question.poll':
-      return wrapResult(
-        await handleQuestionPoll(
-          input,
-          request,
-          context.allowedRoots,
-          context.allowedHosts,
-          context.expiryFallback
-        )
-      );
-    case 'coordinator.status':
-    case 'coordinator.pause':
-    case 'coordinator.resume':
-    case 'coordinator.cancel':
-      return wrapResult(
-        await handleCoordinatorDynamicToolCall(toolName, input, request, context.allowedRoots, context.allowedHosts)
-      );
-    case 'github.open_pr':
-    case 'github.comment':
-    case 'github.review':
-    case 'github.get_checks':
-    case 'github.merge':
-      return wrapResult(await handleGithubCall(toolName, input, request, context));
-    default:
-      throw new Error(`Unknown tool: ${toolName}`);
-  }
-}
-
-function wrapResult(payload: unknown): { content: Array<{ type: 'text'; text: string }>; isError: false } {
-  return {
-    content: [
-      {
-        type: 'text',
-        text: typeof payload === 'string' ? payload : JSON.stringify(payload, null, 2)
-      }
-    ],
-    isError: false
-  };
+  return handleDelegationServerToolCall(request, context, {
+    asRecord,
+    readStringValue,
+    containsSecret,
+    reportSecurityViolation,
+    getDelegateModeViolationMessage,
+    handleDelegateStatus,
+    handleDelegatePause,
+    handleDelegateCancel,
+    handleDelegateSpawn,
+    handleQuestionEnqueue,
+    handleQuestionPoll,
+    handleCoordinatorDynamicToolCall,
+    handleGithubCall
+  });
 }
 
 async function handleDelegateStatus(
@@ -1754,226 +1415,6 @@ async function runGh(args: string[], timeoutMs = DEFAULT_GH_TIMEOUT_MS): Promise
   });
 }
 
-async function runJsonRpcServer(
-  handler: (request: McpRequest) => Promise<unknown>,
-  options: { stdin?: NodeJS.ReadableStream; stdout?: NodeJS.WritableStream } = {}
-): Promise<void> {
-  let buffer = Buffer.alloc(0);
-  let expectedLength: number | null = null;
-  let processing = Promise.resolve();
-  let halted = false;
-  const input = options.stdin ?? process.stdin;
-  const output = options.stdout ?? process.stdout;
-
-  const handleProtocolViolation = (message: string) => {
-    if (halted) {
-      return;
-    }
-    halted = true;
-    logger.warn(message);
-    process.exitCode = 1;
-    buffer = Buffer.alloc(0);
-    expectedLength = null;
-    if (typeof (input as { pause?: () => void }).pause === 'function') {
-      input.pause();
-    }
-  };
-
-  input.on('data', (chunk) => {
-    if (halted) {
-      return;
-    }
-    buffer = Buffer.concat([buffer, Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)]);
-    if (buffer.length > MAX_MCP_BUFFER_BYTES) {
-      handleProtocolViolation(`Rejecting MCP buffer larger than ${MAX_MCP_BUFFER_BYTES} bytes`);
-      return;
-    }
-    processing = processing
-      .then(() => processBuffer())
-      .catch((error) => {
-        logger.error(`Failed to process MCP buffer: ${(error as Error)?.message ?? error}`);
-      });
-  });
-
-  async function processBuffer() {
-    while (buffer.length > 0) {
-      if (halted) {
-        return;
-      }
-      if (expectedLength !== null) {
-        if (buffer.length < expectedLength) {
-          return;
-        }
-        const body = buffer.slice(0, expectedLength);
-        buffer = buffer.slice(expectedLength);
-        expectedLength = null;
-        await handleMessage(body.toString('utf8'), 'framed');
-        continue;
-      }
-
-      const headerEnd = buffer.indexOf('\r\n\r\n');
-      if (headerEnd === -1) {
-        const newlineIndex = buffer.indexOf('\n');
-        if (newlineIndex !== -1) {
-          const lineBuffer = buffer.slice(0, newlineIndex);
-          const line = lineBuffer.toString('utf8').trim();
-          buffer = buffer.slice(newlineIndex + 1);
-          if (!line) {
-            continue;
-          }
-          const normalizedLine = line.trimStart();
-          const looksLikeHeaderLine = /^[A-Za-z0-9-]+:/.test(normalizedLine);
-          const looksLikeJson = normalizedLine.startsWith('{') || normalizedLine.startsWith('[');
-          const isContentLength = normalizedLine.toLowerCase().startsWith('content-length:');
-          let restoredHeader = false;
-          if (!looksLikeJson && looksLikeHeaderLine) {
-            // Fall through to header-size checks for partial Content-Length frames (and other header lines).
-            buffer = Buffer.concat([Buffer.from(lineBuffer), Buffer.from('\n'), buffer]);
-            restoredHeader = true;
-          } else if (!isContentLength) {
-            const lineBytes = Buffer.byteLength(line, 'utf8');
-            if (lineBytes > MAX_MCP_MESSAGE_BYTES) {
-              handleProtocolViolation(
-                `Rejecting MCP payload (${lineBytes} bytes) larger than ${MAX_MCP_MESSAGE_BYTES}`
-              );
-              return;
-            }
-            await handleMessage(line, 'jsonl');
-            continue;
-          }
-          if (!restoredHeader && isContentLength) {
-            // Fall through to header-size checks for partial Content-Length frames.
-            buffer = Buffer.concat([Buffer.from(lineBuffer), Buffer.from('\n'), buffer]);
-          }
-        } else if (buffer.length > MAX_MCP_MESSAGE_BYTES) {
-          handleProtocolViolation(
-            `Rejecting MCP payload (${buffer.length} bytes) larger than ${MAX_MCP_MESSAGE_BYTES}`
-          );
-          return;
-        }
-
-        if (buffer.length > MAX_MCP_HEADER_BYTES) {
-          const overflow = buffer.slice(MAX_MCP_HEADER_BYTES);
-          const allowedPrefix = MCP_HEADER_DELIMITER_BUFFER.subarray(0, overflow.length);
-          if (overflow.length > MCP_HEADER_DELIMITER_BYTES || !overflow.equals(allowedPrefix)) {
-            handleProtocolViolation(`Rejecting MCP header larger than ${MAX_MCP_HEADER_BYTES} bytes`);
-          }
-        }
-        return;
-      }
-      if (headerEnd > MAX_MCP_HEADER_BYTES) {
-        handleProtocolViolation(`Rejecting MCP header larger than ${MAX_MCP_HEADER_BYTES} bytes`);
-        return;
-      }
-      const header = buffer.slice(0, headerEnd).toString('utf8');
-      const parsed = parseContentLengthHeader(header);
-      if (parsed.error) {
-        handleProtocolViolation(parsed.error);
-        return;
-      }
-      if (parsed.length === null) {
-        const lines = header.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
-        if (lines.length === 0) {
-          buffer = buffer.slice(headerEnd + 4);
-          continue;
-        }
-        const allJsonLike = lines.every((line) => line.startsWith('{') || line.startsWith('['));
-        if (allJsonLike) {
-          buffer = buffer.slice(headerEnd + 4);
-          for (const line of lines) {
-            await handleMessage(line, 'jsonl');
-          }
-          continue;
-        }
-        handleProtocolViolation('Missing Content-Length header in MCP message');
-        return;
-      }
-      const length = parsed.length;
-      if (!Number.isFinite(length) || length < 0) {
-        handleProtocolViolation('Invalid Content-Length for MCP payload');
-        return;
-      }
-      if (length > MAX_MCP_MESSAGE_BYTES) {
-        handleProtocolViolation(`Rejecting MCP payload (${length} bytes) larger than ${MAX_MCP_MESSAGE_BYTES}`);
-        return;
-      }
-      expectedLength = length;
-      buffer = buffer.slice(headerEnd + 4);
-    }
-  }
-
-  async function handleMessage(raw: string, format: ResponseFormat) {
-    let request: McpRequest;
-    try {
-      request = JSON.parse(raw) as McpRequest;
-    } catch (error) {
-      logger.error(`Failed to parse MCP message: ${(error as Error)?.message ?? error}`);
-      return;
-    }
-    if (typeof request.method !== 'string') {
-      return;
-    }
-    const id = request.id ?? null;
-    try {
-      const result = await handler(request);
-      if (id !== null && typeof id !== 'undefined') {
-        sendResponse({ jsonrpc: '2.0', id, result }, output, format);
-      }
-    } catch (error) {
-      if (id !== null && typeof id !== 'undefined') {
-        sendResponse(
-          {
-            jsonrpc: '2.0',
-            id,
-            error: { code: -32603, message: (error as Error)?.message ?? String(error) }
-          },
-          output,
-          format
-        );
-      }
-    }
-  }
-}
-
-function parseContentLengthHeader(header: string): { length: number | null; error?: string } {
-  const lines = header.split(/\r?\n/);
-  let contentLength: number | null = null;
-  for (const line of lines) {
-    const separator = line.indexOf(':');
-    if (separator === -1) {
-      continue;
-    }
-    const name = line.slice(0, separator).trim().toLowerCase();
-    if (name !== 'content-length') {
-      continue;
-    }
-    if (contentLength !== null) {
-      return { length: null, error: 'Multiple Content-Length headers in MCP message' };
-    }
-    const value = line.slice(separator + 1).trim();
-    if (!/^\d+$/.test(value)) {
-      return { length: null, error: 'Invalid Content-Length header in MCP message' };
-    }
-    contentLength = Number(value);
-  }
-  return { length: contentLength };
-}
-
-function sendResponse(
-  response: McpResponse,
-  output: NodeJS.WritableStream = process.stdout,
-  format: ResponseFormat = 'framed'
-): void {
-  const payload = JSON.stringify(response);
-  if (format === 'jsonl') {
-    output.write(`${payload}\n`);
-    return;
-  }
-  const buffer = Buffer.from(payload, 'utf8');
-  const header = Buffer.from(`Content-Length: ${buffer.length}\r\n\r\n`, 'utf8');
-  output.write(Buffer.concat([header, buffer]));
-}
-
 function safeJsonParse(text: string): unknown | null {
   try {
     return JSON.parse(text);
@@ -2014,6 +1455,7 @@ export const __test__ = {
   runJsonRpcServer,
   handleToolCall,
   buildToolList,
+  createDelegationServerRpcHandler,
   resolveChildDelegateMode,
   parseContentLengthHeader,
   parseSpawnOutput,

@@ -22,6 +22,7 @@ const {
   handleDelegateSpawn,
   handleToolCall,
   buildToolList,
+  createDelegationServerRpcHandler,
   resolveChildDelegateMode,
   MAX_MCP_MESSAGE_BYTES,
   MAX_MCP_HEADER_BYTES,
@@ -586,6 +587,64 @@ describe('delegation server status behavior', () => {
 });
 
 describe('delegation server mode contracts', () => {
+  it('routes initialize, tools/list, and tools/call through the rpc handler shell', async () => {
+    const tools = buildToolList({
+      mode: 'full',
+      githubEnabled: false,
+      allowedGithubOps: new Set<string>()
+    });
+    const toolCallHandler = vi.fn().mockResolvedValue({ ok: true });
+    const handler = createDelegationServerRpcHandler({
+      protocolVersion: '2024-11-05',
+      tools,
+      handleToolCall: toolCallHandler
+    });
+
+    await expect(
+      handler({
+        jsonrpc: '2.0',
+        method: 'initialize'
+      })
+    ).resolves.toEqual({
+      protocolVersion: '2024-11-05',
+      serverInfo: { name: 'codex-delegation', version: '0.1.0' },
+      capabilities: { tools: {} }
+    });
+
+    await expect(
+      handler({
+        jsonrpc: '2.0',
+        method: 'tools/list'
+      })
+    ).resolves.toEqual({ tools });
+
+    const request = {
+      jsonrpc: '2.0' as const,
+      method: 'tools/call' as const,
+      params: {
+        name: 'delegate.status',
+        arguments: { manifest_path: '/tmp/run/manifest.json' }
+      }
+    };
+    await expect(handler(request)).resolves.toEqual({ ok: true });
+    expect(toolCallHandler).toHaveBeenCalledWith(request);
+  });
+
+  it('rejects unsupported rpc methods in the extracted handler shell', async () => {
+    const handler = createDelegationServerRpcHandler({
+      protocolVersion: '2024-11-05',
+      tools: [],
+      handleToolCall: vi.fn()
+    });
+
+    await expect(
+      handler({
+        jsonrpc: '2.0',
+        method: 'ping'
+      })
+    ).rejects.toThrow('Unsupported method: ping');
+  });
+
   it('exposes coordinator dynamic-tool bridge tools only in full mode', () => {
     const tools = buildToolList({
       mode: 'full',
