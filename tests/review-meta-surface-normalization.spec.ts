@@ -115,6 +115,63 @@ describe('review meta-surface normalization', () => {
     ).toBe(true);
   });
 
+  it('classifies the extracted scope-advisory helper as review-support when it is inspected directly', () => {
+    expect(
+      classifyMetaSurfaceDirectDetailed(
+        'sed',
+        ['-n', '1,80p', 'scripts/lib/review-scope-advisory.ts'],
+        new Set(),
+        '/repo'
+      )
+    ).toEqual([
+      {
+        kind: 'review-support',
+        candidate: 'scripts/lib/review-scope-advisory.ts',
+        operand: 'scripts/lib/review-scope-advisory.ts'
+      }
+    ]);
+  });
+
+  it('treats the extracted scope-advisory helper family as touched when the focused helper spec is touched', () => {
+    expect(
+      isTouchedReviewScopePathFamilyOperand(
+        'dist/scripts/lib/review-scope-advisory.js',
+        new Set(['tests/review-scope-advisory.spec.ts']),
+        '/repo'
+      )
+    ).toBe(true);
+  });
+
+  it('treats the extracted scope-advisory helper as touched when the scope-paths helper is touched', () => {
+    expect(
+      isTouchedReviewScopePathFamilyOperand(
+        'scripts/lib/review-scope-advisory.ts',
+        new Set(['scripts/lib/review-scope-paths.ts']),
+        '/repo'
+      )
+    ).toBe(true);
+  });
+
+  it('treats the extracted scope-paths helper as touched when the scope-advisory helper is touched', () => {
+    expect(
+      isTouchedReviewScopePathFamilyOperand(
+        'scripts/lib/review-scope-paths.ts',
+        new Set(['scripts/lib/review-scope-advisory.ts']),
+        '/repo'
+      )
+    ).toBe(true);
+  });
+
+  it('treats the extracted scope-advisory helper as touched when run-review is the touched sibling', () => {
+    expect(
+      isTouchedReviewScopePathFamilyOperand(
+        'scripts/lib/review-scope-advisory.ts',
+        new Set(['tests/run-review.spec.ts']),
+        '/repo'
+      )
+    ).toBe(true);
+  });
+
   it('classifies the extracted inspection-target parsing helper as review-support when it is inspected directly', () => {
     expect(
       classifyMetaSurfaceDirectDetailed(

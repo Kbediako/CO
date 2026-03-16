@@ -1,6 +1,38 @@
 {
   "items": [
     {
+      "id": "20260316-1224-coordinator-symphony-aligned-standalone-review-run-review-execution-boundary-preflight-shell-extraction",
+      "title": "Coordinator Symphony-Aligned Standalone Review Run-Review Execution-Boundary Preflight Shell Extraction",
+      "relates_to": "tasks/tasks-1224-coordinator-symphony-aligned-standalone-review-run-review-execution-boundary-preflight-shell-extraction.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-16",
+      "paths": {
+        "spec": "tasks/specs/1224-coordinator-symphony-aligned-standalone-review-run-review-execution-boundary-preflight-shell-extraction.md",
+        "task": "tasks/tasks-1224-coordinator-symphony-aligned-standalone-review-run-review-execution-boundary-preflight-shell-extraction.md",
+        "agent_task": ".agent/task/1224-coordinator-symphony-aligned-standalone-review-run-review-execution-boundary-preflight-shell-extraction.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-standalone-review-run-review-execution-boundary-preflight-shell-extraction.md"
+      }
+    },
+    {
+      "id": "20260316-1223-coordinator-symphony-aligned-standalone-review-run-review-scope-advisory-preflight-shell-extraction",
+      "title": "Coordinator Symphony-Aligned Standalone Review Run-Review Scope Advisory Preflight Shell Extraction",
+      "relates_to": "tasks/tasks-1223-coordinator-symphony-aligned-standalone-review-run-review-scope-advisory-preflight-shell-extraction.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-16",
+      "paths": {
+        "spec": "tasks/specs/1223-coordinator-symphony-aligned-standalone-review-run-review-scope-advisory-preflight-shell-extraction.md",
+        "task": "tasks/tasks-1223-coordinator-symphony-aligned-standalone-review-run-review-scope-advisory-preflight-shell-extraction.md",
+        "agent_task": ".agent/task/1223-coordinator-symphony-aligned-standalone-review-run-review-scope-advisory-preflight-shell-extraction.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-standalone-review-run-review-scope-advisory-preflight-shell-extraction.md"
+      }
+    },
+    {
       "id": "20260316-1222-coordinator-symphony-aligned-standalone-review-launch-attempt-orchestration-shell-extraction",
       "title": "Coordinator Symphony-Aligned Standalone Review Launch-Attempt Orchestration Shell Extraction",
       "relates_to": "tasks/tasks-1222-coordinator-symphony-aligned-standalone-review-launch-attempt-orchestration-shell-extraction.md",
