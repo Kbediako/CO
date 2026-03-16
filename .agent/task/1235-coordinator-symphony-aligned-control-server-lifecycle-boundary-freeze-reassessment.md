@@ -19,4 +19,5 @@
 
 ## Reassessment
 
-- [ ] Post-`1234` control-server lifecycle family re-inspected for any truthful remaining implementation seam. Evidence: pending docs-first packet.
+- [x] Post-`1234` control-server lifecycle family re-inspected for any truthful remaining implementation seam. Evidence: `out/1235-coordinator-symphony-aligned-control-server-lifecycle-boundary-freeze-reassessment/manual/20260316T082613Z-closeout/00-summary.md`
+- [x] Closeout packet, override notes, and next-slice note captured. Evidence: `out/1235-coordinator-symphony-aligned-control-server-lifecycle-boundary-freeze-reassessment/manual/20260316T082613Z-closeout/00-summary.md`, `out/1235-coordinator-symphony-aligned-control-server-lifecycle-boundary-freeze-reassessment/manual/20260316T082613Z-closeout/13-override-notes.md`, `out/1235-coordinator-symphony-aligned-control-server-lifecycle-boundary-freeze-reassessment/manual/20260316T082613Z-closeout/14-next-slice-note.md`

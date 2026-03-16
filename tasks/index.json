@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260316-1236-coordinator-symphony-aligned-control-bootstrap-and-telegram-oversight-contract-reassessment",
+      "title": "Coordinator Symphony-Aligned Control Bootstrap And Telegram Oversight Contract Reassessment",
+      "relates_to": "tasks/tasks-1236-coordinator-symphony-aligned-control-bootstrap-and-telegram-oversight-contract-reassessment.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-16",
+      "paths": {
+        "spec": "tasks/specs/1236-coordinator-symphony-aligned-control-bootstrap-and-telegram-oversight-contract-reassessment.md",
+        "task": "tasks/tasks-1236-coordinator-symphony-aligned-control-bootstrap-and-telegram-oversight-contract-reassessment.md",
+        "agent_task": ".agent/task/1236-coordinator-symphony-aligned-control-bootstrap-and-telegram-oversight-contract-reassessment.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-control-bootstrap-and-telegram-oversight-contract-reassessment.md"
+      }
+    },
+    {
       "id": "20260316-1235-coordinator-symphony-aligned-control-server-lifecycle-boundary-freeze-reassessment",
       "title": "Coordinator Symphony-Aligned Control Server Lifecycle Boundary Freeze Reassessment",
       "relates_to": "tasks/tasks-1235-coordinator-symphony-aligned-control-server-lifecycle-boundary-freeze-reassessment.md",
