@@ -23,4 +23,7 @@
 
 ## Implementation
 
-- [ ] Exact control-server lifecycle orchestration seam revalidated before code changes. Evidence: pending implementation packet.
+- [x] Exact control-server lifecycle orchestration seam revalidated before code changes. Evidence: `docs/findings/1234-control-server-lifecycle-orchestration-boundary-extraction-deliberation.md`, `out/1234-coordinator-symphony-aligned-control-server-lifecycle-orchestration-boundary-extraction/manual/20260316T075807Z-closeout/00-summary.md`
+- [x] Owned runtime publication/close sequencing extracted behind a truthful helper surface without widening into route/action dispatch. Evidence: `orchestrator/src/cli/control/controlServerOwnedRuntimeLifecycle.ts`, `orchestrator/src/cli/control/controlServerReadyInstanceLifecycle.ts`
+- [x] Bootstrap-publication parity is covered by focused lifecycle regressions. Evidence: `orchestrator/tests/ControlServerReadyInstanceLifecycle.test.ts`, `out/1234-coordinator-symphony-aligned-control-server-lifecycle-orchestration-boundary-extraction/manual/20260316T075807Z-closeout/05b-targeted-tests.log`
+- [x] Closeout summary, override notes, and next-slice continuity recorded. Evidence: `out/1234-coordinator-symphony-aligned-control-server-lifecycle-orchestration-boundary-extraction/manual/20260316T075807Z-closeout/00-summary.md`, `out/1234-coordinator-symphony-aligned-control-server-lifecycle-orchestration-boundary-extraction/manual/20260316T075807Z-closeout/13-override-notes.md`, `out/1234-coordinator-symphony-aligned-control-server-lifecycle-orchestration-boundary-extraction/manual/20260316T075807Z-closeout/14-next-slice-note.md`
