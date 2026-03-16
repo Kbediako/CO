@@ -23,6 +23,6 @@
 
 ## Extraction
 
-- [ ] Shared MCP server-entry detector extracted into bounded utility ownership. Evidence: pending implementation packet.
-- [ ] `doctor.ts` and `delegationSetup.ts` rewired to the shared helper with focused regressions recorded. Evidence: pending implementation packet.
-- [ ] Validation lane completed and closeout packet captured. Evidence: pending implementation packet.
+- [x] Shared MCP server-entry detector extracted into bounded utility ownership. Evidence: `out/1241-coordinator-symphony-aligned-shared-mcp-server-entry-detector-extraction/manual/20260316T112401Z-closeout/00-summary.md`
+- [x] `doctor.ts` and `delegationSetup.ts` rewired to the shared helper with focused regressions recorded. Evidence: `out/1241-coordinator-symphony-aligned-shared-mcp-server-entry-detector-extraction/manual/20260316T112401Z-closeout/00-summary.md`, `out/1241-coordinator-symphony-aligned-shared-mcp-server-entry-detector-extraction/manual/20260316T112401Z-closeout/05-targeted-tests.log`
+- [x] Validation lane completed and closeout packet captured. Evidence: `out/1241-coordinator-symphony-aligned-shared-mcp-server-entry-detector-extraction/manual/20260316T112401Z-closeout/00-summary.md`, `out/1241-coordinator-symphony-aligned-shared-mcp-server-entry-detector-extraction/manual/20260316T112401Z-closeout/13-override-notes.md`

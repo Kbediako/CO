@@ -1,7 +1,7 @@
 ---
 id: 20260316-1241-coordinator-symphony-aligned-shared-mcp-server-entry-detector-extraction
 title: Coordinator Symphony-Aligned Shared MCP Server Entry Detector Extraction
-status: active
+status: completed
 owner: Codex
 created: 2026-03-16
 last_review: 2026-03-16
@@ -13,6 +13,7 @@ related_tasks:
   - tasks/tasks-1241-coordinator-symphony-aligned-shared-mcp-server-entry-detector-extraction.md
 review_notes:
   - 2026-03-16: Approved for docs-first registration after `1240` confirmed that the broader doctor family is mostly orchestration and narrowed the next truthful seam to the duplicated MCP server-entry detector shared by `doctor.ts` and `delegationSetup.ts`. Evidence: `docs/findings/1241-shared-mcp-server-entry-detector-extraction-deliberation.md`, `out/1240-coordinator-symphony-aligned-doctor-readiness-and-advisory-boundary-reassessment/manual/20260316T111040Z-closeout/14-next-slice-note.md`.
+  - 2026-03-16: Closeout completed. Extracted the shared MCP server-entry detector into `orchestrator/src/cli/utils/mcpServerEntry.ts`, rewired doctor and delegation setup to it, fixed review-discovered whitespace and single-quoted-key gaps, and closed the lane with focused parity coverage. Evidence: `out/1241-coordinator-symphony-aligned-shared-mcp-server-entry-detector-extraction/manual/20260316T112401Z-closeout/00-summary.md`, `out/1241-coordinator-symphony-aligned-shared-mcp-server-entry-detector-extraction/manual/20260316T112401Z-closeout/05-targeted-tests.log`.
 ---
 
 # Technical Specification
