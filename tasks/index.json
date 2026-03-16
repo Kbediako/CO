@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260316-1234-coordinator-symphony-aligned-control-server-lifecycle-orchestration-boundary-extraction",
+      "title": "Coordinator Symphony-Aligned Control Server Lifecycle Orchestration Boundary Extraction",
+      "relates_to": "tasks/tasks-1234-coordinator-symphony-aligned-control-server-lifecycle-orchestration-boundary-extraction.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-16",
+      "paths": {
+        "spec": "tasks/specs/1234-coordinator-symphony-aligned-control-server-lifecycle-orchestration-boundary-extraction.md",
+        "task": "tasks/tasks-1234-coordinator-symphony-aligned-control-server-lifecycle-orchestration-boundary-extraction.md",
+        "agent_task": ".agent/task/1234-coordinator-symphony-aligned-control-server-lifecycle-orchestration-boundary-extraction.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-control-server-lifecycle-orchestration-boundary-extraction.md"
+      }
+    },
+    {
       "id": "20260316-1233-coordinator-symphony-aligned-control-request-and-action-dispatch-boundary-reassessment",
       "title": "Coordinator Symphony-Aligned Control Request and Action Dispatch Boundary Reassessment",
       "relates_to": "tasks/tasks-1233-coordinator-symphony-aligned-control-request-and-action-dispatch-boundary-reassessment.md",

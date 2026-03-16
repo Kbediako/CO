@@ -3,6 +3,55 @@
   "generated_at": "2026-03-16",
   "entries": [
     {
+      "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-control-server-lifecycle-orchestration-boundary-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-16",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/PRD-coordinator-symphony-aligned-control-server-lifecycle-orchestration-boundary-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-16",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/TECH_SPEC-coordinator-symphony-aligned-control-server-lifecycle-orchestration-boundary-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-16",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/findings/1234-control-server-lifecycle-orchestration-boundary-extraction-deliberation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-16",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/tasks-1234-coordinator-symphony-aligned-control-server-lifecycle-orchestration-boundary-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-16",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/specs/1234-coordinator-symphony-aligned-control-server-lifecycle-orchestration-boundary-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-16",
+      "cadence_days": 30
+    },
+    {
+      "path": ".agent/task/1234-coordinator-symphony-aligned-control-server-lifecycle-orchestration-boundary-extraction.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-16",
+      "cadence_days": 30
+    },
+    {
       "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-control-request-and-action-dispatch-boundary-reassessment.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",

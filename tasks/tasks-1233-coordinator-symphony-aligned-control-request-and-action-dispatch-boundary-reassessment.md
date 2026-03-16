@@ -23,4 +23,5 @@
 
 ## Implementation
 
-- [ ] Control request/action dispatch family reassessed for truthful next seam vs freeze outcome. Evidence: pending reassessment packet.
+- [x] Control request/action dispatch family reassessed for truthful next seam vs freeze outcome. Evidence: `out/1233-coordinator-symphony-aligned-control-request-and-action-dispatch-boundary-reassessment/manual/20260316T074123Z-closeout/00-summary.md`
+- [x] Closeout packet, override notes, and next-slice note captured. Evidence: `out/1233-coordinator-symphony-aligned-control-request-and-action-dispatch-boundary-reassessment/manual/20260316T074123Z-closeout/00-summary.md`, `out/1233-coordinator-symphony-aligned-control-request-and-action-dispatch-boundary-reassessment/manual/20260316T074123Z-closeout/13-override-notes.md`, `out/1233-coordinator-symphony-aligned-control-request-and-action-dispatch-boundary-reassessment/manual/20260316T074123Z-closeout/14-next-slice-note.md`
