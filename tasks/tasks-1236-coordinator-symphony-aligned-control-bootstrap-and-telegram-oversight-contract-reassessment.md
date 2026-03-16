@@ -23,4 +23,5 @@
 
 ## Reassessment
 
-- [ ] Bootstrap and Telegram oversight contract re-inspected for truthful next seam vs freeze outcome. Evidence: pending docs-first packet.
+- [x] Bootstrap and Telegram oversight contract re-inspected for truthful next seam vs freeze outcome. Evidence: `out/1236-coordinator-symphony-aligned-control-bootstrap-and-telegram-oversight-contract-reassessment/manual/20260316T084431Z-closeout/00-summary.md`
+- [x] Closeout packet, override notes, and next-slice note captured. Evidence: `out/1236-coordinator-symphony-aligned-control-bootstrap-and-telegram-oversight-contract-reassessment/manual/20260316T084431Z-closeout/00-summary.md`, `out/1236-coordinator-symphony-aligned-control-bootstrap-and-telegram-oversight-contract-reassessment/manual/20260316T084431Z-closeout/13-override-notes.md`, `out/1236-coordinator-symphony-aligned-control-bootstrap-and-telegram-oversight-contract-reassessment/manual/20260316T084431Z-closeout/14-next-slice-note.md`
