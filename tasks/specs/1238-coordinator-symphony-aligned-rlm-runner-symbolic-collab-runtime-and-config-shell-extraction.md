@@ -1,7 +1,7 @@
 ---
 id: 20260316-1238-coordinator-symphony-aligned-rlm-runner-symbolic-collab-runtime-and-config-shell-extraction
 title: Coordinator Symphony-Aligned RLM Runner Symbolic Collab Runtime And Config Shell Extraction
-status: active
+status: completed
 owner: Codex
 created: 2026-03-16
 last_review: 2026-03-16
@@ -13,6 +13,7 @@ related_tasks:
   - tasks/tasks-1238-coordinator-symphony-aligned-rlm-runner-symbolic-collab-runtime-and-config-shell-extraction.md
 review_notes:
   - 2026-03-16: Approved for docs-first registration after `1237` extracted the runtime and collab shell into `orchestrator/src/cli/rlm/rlmCodexRuntimeShell.ts` and local inspection plus scout evidence confirmed that `rlmRunner.ts` still owns duplicated symbolic collab-runtime invocation branches and shell-owned role-policy plus allow-default-role config wrappers. Evidence: `docs/findings/1238-rlm-runner-symbolic-collab-runtime-and-config-shell-extraction-deliberation.md`, `out/1237-coordinator-symphony-aligned-rlm-runner-codex-runtime-and-collab-lifecycle-shell-extraction/manual/20260316T092106Z-closeout/14-next-slice-note.md`.
+  - 2026-03-16: Closeout completed. Extracted `runSymbolicPrompt(...)` plus the shell-owned role-policy and allow-default-role config wrappers into `orchestrator/src/cli/rlm/rlmCodexRuntimeShell.ts`, kept `orchestrator/src/cli/rlmRunner.ts` on runner-owned orchestration, and carried forward the explicit local full-suite quiet-tail plus bounded review drift in the closeout packet. Evidence: `out/1238-coordinator-symphony-aligned-rlm-runner-symbolic-collab-runtime-and-config-shell-extraction/manual/20260316T100849Z-closeout/00-summary.md`, `out/1238-coordinator-symphony-aligned-rlm-runner-symbolic-collab-runtime-and-config-shell-extraction/manual/20260316T100849Z-closeout/13-override-notes.md`.
 ---
 
 # Technical Specification

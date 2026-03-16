@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260316-1239-coordinator-symphony-aligned-rlm-runner-remaining-boundary-freeze-reassessment",
+      "title": "Coordinator Symphony-Aligned RLM Runner Remaining Boundary Freeze Reassessment",
+      "relates_to": "tasks/tasks-1239-coordinator-symphony-aligned-rlm-runner-remaining-boundary-freeze-reassessment.md",
+      "risk": "low",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-16",
+      "paths": {
+        "spec": "tasks/specs/1239-coordinator-symphony-aligned-rlm-runner-remaining-boundary-freeze-reassessment.md",
+        "task": "tasks/tasks-1239-coordinator-symphony-aligned-rlm-runner-remaining-boundary-freeze-reassessment.md",
+        "agent_task": ".agent/task/1239-coordinator-symphony-aligned-rlm-runner-remaining-boundary-freeze-reassessment.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-rlm-runner-remaining-boundary-freeze-reassessment.md"
+      }
+    },
+    {
       "id": "20260316-1238-coordinator-symphony-aligned-rlm-runner-symbolic-collab-runtime-and-config-shell-extraction",
       "title": "Coordinator Symphony-Aligned RLM Runner Symbolic Collab Runtime And Config Shell Extraction",
       "relates_to": "tasks/tasks-1238-coordinator-symphony-aligned-rlm-runner-symbolic-collab-runtime-and-config-shell-extraction.md",

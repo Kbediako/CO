@@ -23,4 +23,4 @@
 
 ## Implementation
 
-- [ ] Symbolic collab-runtime invocation and shell-owned config surface extracted with focused regression coverage. Evidence: pending implementation packet.
+- [x] Symbolic collab-runtime invocation and shell-owned config surface extracted with focused regression coverage. Evidence: `out/1238-coordinator-symphony-aligned-rlm-runner-symbolic-collab-runtime-and-config-shell-extraction/manual/20260316T100849Z-closeout/00-summary.md`
