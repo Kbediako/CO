@@ -186,6 +186,22 @@ describe('rlmRunner collab lifecycle validation', () => {
     });
   });
 
+  it('fails when prompt role and explicit agent_type disagree', () => {
+    const raw = [
+      makeCollabLine('item.completed', 'spawn_agent', 'completed', ['agent-1'], {
+        agentType: 'explorer',
+        prompt: '[agent_type:worker]\nAnalyze this'
+      }),
+      makeCollabLine('item.completed', 'wait', 'completed', ['agent-1']),
+      makeCollabLine('item.completed', 'close_agent', 'completed', ['agent-1'])
+    ].join('\n');
+    expect(validateCollabLifecycle(raw)).toEqual({
+      ok: false,
+      reason: 'spawn_agent role mismatch for agent(s): agent-1',
+      reasonCode: 'role_mismatch'
+    });
+  });
+
   it('prioritizes lifecycle failures ahead of role-policy failures', () => {
     const raw = [
       makeCollabLine('item.completed', 'spawn_agent', 'completed', ['agent-1'], {
@@ -222,6 +238,47 @@ describe('rlmRunner collab lifecycle validation', () => {
       makeCollabLine('item.completed', 'close_agent', 'completed', ['agent-1'])
     ].join('\n');
     expect(validateCollabLifecycle(raw, { requireSpawnRole: false })).toEqual({ ok: true });
+  });
+
+  for (const [label, itemFields, error] of [
+    ['item.message', { message: 'agent thread limit reached (max 6)' }, undefined],
+    ['item.output', { output: 'agent thread limit reached (max 6)' }, undefined],
+    ['top-level error.message', {}, { message: 'agent thread limit reached (max 6)' }]
+  ] as const) {
+    it(`fails fast on thread-limit hints from ${label}`, () => {
+      const raw = JSON.stringify({
+        type: 'item.failed',
+        item: {
+          type: 'collab_tool_call',
+          tool: 'spawn_agent',
+          status: 'failed',
+          receiver_thread_ids: [],
+          ...itemFields
+        },
+        ...(error ? { error } : {})
+      });
+      expect(validateCollabLifecycle(raw)).toEqual({
+        ok: false,
+        reason: 'collab spawn hit thread limit',
+        reasonCode: 'thread_limit'
+      });
+    });
+  }
+
+  it('tracks wait and close bookkeeping across multiple receiver ids', () => {
+    const raw = [
+      makeCollabLine('item.completed', 'spawn_agent', 'completed', ['agent-1', 'agent-2'], {
+        agentType: 'explorer',
+        prompt: '[agent_type:explorer]\nSummarize module responsibilities'
+      }),
+      makeCollabLine('item.completed', 'wait', 'completed', ['agent-1', 'agent-2']),
+      makeCollabLine('item.completed', 'close_agent', 'completed', ['agent-1'])
+    ].join('\n');
+    expect(validateCollabLifecycle(raw)).toEqual({
+      ok: false,
+      reason: 'missing close_agent for spawned agent(s): agent-2',
+      reasonCode: 'missing_close'
+    });
   });
 });
 
