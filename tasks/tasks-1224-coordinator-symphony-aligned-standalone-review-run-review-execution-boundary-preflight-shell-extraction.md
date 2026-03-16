@@ -23,16 +23,16 @@
 
 ## Implementation
 
-- [ ] Execution-boundary preflight shell extracted behind a dedicated helper/module. Evidence: implementation closeout summary and shipped helper/module paths.
-- [ ] `run-review.ts` remains the orchestration owner for prompt context, scope advisory, runtime invocation, live monitor policy, and final telemetry behavior. Evidence: shipped wrapper/orchestration paths.
-- [ ] Focused regressions cover bounded-mode parsing, env-driven timeout/startup-loop normalization, and launch-boundary handoff shaping. Evidence: implementation closeout summary and focused regression logs.
+- [x] Execution-boundary preflight shell extracted behind a dedicated helper/module. Evidence: `out/1224-coordinator-symphony-aligned-standalone-review-run-review-execution-boundary-preflight-shell-extraction/manual/20260316T031419Z-closeout/00-summary.md`, `scripts/lib/review-execution-boundary-preflight.ts`
+- [x] `run-review.ts` remains the orchestration owner for prompt context, scope advisory, runtime invocation, live monitor policy, and final telemetry behavior. Evidence: `scripts/run-review.ts`, `out/1224-coordinator-symphony-aligned-standalone-review-run-review-execution-boundary-preflight-shell-extraction/manual/20260316T031419Z-closeout/00-summary.md`
+- [x] Focused regressions cover bounded-mode parsing, env-driven timeout/startup-loop normalization, and launch-boundary handoff shaping. Evidence: `out/1224-coordinator-symphony-aligned-standalone-review-run-review-execution-boundary-preflight-shell-extraction/manual/20260316T031419Z-closeout/00-summary.md`, `out/1224-coordinator-symphony-aligned-standalone-review-run-review-execution-boundary-preflight-shell-extraction/manual/20260316T031419Z-closeout/05a-targeted-tests.log`
 
 ## Validation
 
-- [ ] `node scripts/delegation-guard.mjs`. Evidence: closeout validation log
-- [ ] `npm run build`. Evidence: closeout build log
-- [ ] `npm run lint`. Evidence: closeout lint log
-- [ ] `npm run test`. Evidence: closeout test log
-- [ ] `node scripts/diff-budget.mjs`. Evidence: closeout diff-budget log
-- [ ] `npm run review -- --manifest <manifest-path>`. Evidence: closeout bounded review log
-- [ ] `npm run pack:smoke`. Evidence: closeout downstream smoke log
+- [x] `node scripts/delegation-guard.mjs`. Evidence: `out/1224-coordinator-symphony-aligned-standalone-review-run-review-execution-boundary-preflight-shell-extraction/manual/20260316T031419Z-closeout/01-delegation-guard.log`
+- [x] `npm run build`. Evidence: `out/1224-coordinator-symphony-aligned-standalone-review-run-review-execution-boundary-preflight-shell-extraction/manual/20260316T031419Z-closeout/03-build.log`
+- [x] `npm run lint`. Evidence: `out/1224-coordinator-symphony-aligned-standalone-review-run-review-execution-boundary-preflight-shell-extraction/manual/20260316T031419Z-closeout/04-lint.log`
+- [x] `npm run test`. Evidence: `out/1224-coordinator-symphony-aligned-standalone-review-run-review-execution-boundary-preflight-shell-extraction/manual/20260316T031419Z-closeout/05-test.log`
+- [x] `node scripts/diff-budget.mjs`. Evidence: `out/1224-coordinator-symphony-aligned-standalone-review-run-review-execution-boundary-preflight-shell-extraction/manual/20260316T031419Z-closeout/08-diff-budget.log`
+- [x] `npm run review -- --manifest <manifest-path>`. Evidence: `out/1224-coordinator-symphony-aligned-standalone-review-run-review-execution-boundary-preflight-shell-extraction/manual/20260316T031419Z-closeout/09-review.log`, `out/1224-coordinator-symphony-aligned-standalone-review-run-review-execution-boundary-preflight-shell-extraction/manual/20260316T031419Z-closeout/13-override-notes.md`
+- [x] `npm run pack:smoke`. Evidence: `out/1224-coordinator-symphony-aligned-standalone-review-run-review-execution-boundary-preflight-shell-extraction/manual/20260316T031419Z-closeout/10-pack-smoke.log`
