@@ -1,6 +1,38 @@
 {
   "items": [
     {
+      "id": "20260316-1245-coordinator-symphony-aligned-delegation-setup-remaining-boundary-freeze-reassessment",
+      "title": "Coordinator Symphony-Aligned Delegation Setup Remaining Boundary Freeze Reassessment",
+      "relates_to": "tasks/tasks-1245-coordinator-symphony-aligned-delegation-setup-remaining-boundary-freeze-reassessment.md",
+      "risk": "low",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-16",
+      "paths": {
+        "spec": "tasks/specs/1245-coordinator-symphony-aligned-delegation-setup-remaining-boundary-freeze-reassessment.md",
+        "task": "tasks/tasks-1245-coordinator-symphony-aligned-delegation-setup-remaining-boundary-freeze-reassessment.md",
+        "agent_task": ".agent/task/1245-coordinator-symphony-aligned-delegation-setup-remaining-boundary-freeze-reassessment.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-delegation-setup-remaining-boundary-freeze-reassessment.md"
+      }
+    },
+    {
+      "id": "20260316-1244-coordinator-symphony-aligned-delegation-setup-fallback-config-parser-extraction",
+      "title": "Coordinator Symphony-Aligned Delegation Setup Fallback Config Parser Extraction",
+      "relates_to": "tasks/tasks-1244-coordinator-symphony-aligned-delegation-setup-fallback-config-parser-extraction.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-16",
+      "paths": {
+        "spec": "tasks/specs/1244-coordinator-symphony-aligned-delegation-setup-fallback-config-parser-extraction.md",
+        "task": "tasks/tasks-1244-coordinator-symphony-aligned-delegation-setup-fallback-config-parser-extraction.md",
+        "agent_task": ".agent/task/1244-coordinator-symphony-aligned-delegation-setup-fallback-config-parser-extraction.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-delegation-setup-fallback-config-parser-extraction.md"
+      }
+    },
+    {
       "id": "20260316-1243-coordinator-symphony-aligned-devtools-readiness-boundary-freeze-reassessment",
       "title": "Coordinator Symphony-Aligned Devtools Readiness Boundary Freeze Reassessment",
       "relates_to": "tasks/tasks-1243-coordinator-symphony-aligned-devtools-readiness-boundary-freeze-reassessment.md",
