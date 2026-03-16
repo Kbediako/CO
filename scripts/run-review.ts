@@ -16,15 +16,20 @@ import path from 'node:path';
 import process from 'node:process';
 
 import {
-  formatRuntimeSelectionSummary,
   parseRuntimeMode,
   type RuntimeMode
 } from '../orchestrator/src/cli/runtime/index.js';
 import { parseArgs as parseCliArgs, hasFlag } from './lib/cli-args.js';
 import { pathExists } from './lib/docs-helpers.js';
 import {
+  allowHeavyReviewCommands,
+  enforceBoundedReviewMode,
+  prepareReviewExecutionBoundaryPreflight,
+  REVIEW_ALLOW_HEAVY_COMMANDS_ENV_KEY,
+  REVIEW_ENFORCE_BOUNDED_MODE_ENV_KEY
+} from './lib/review-execution-boundary-preflight.js';
+import {
   prepareReviewArtifacts,
-  resolveReviewRuntimeContext,
   runReviewLaunchAttemptShell
 } from './lib/review-launch-attempt.js';
 import {
@@ -33,11 +38,7 @@ import {
   type ReviewSurface
 } from './lib/review-prompt-context.js';
 import {
-  ARCHITECTURE_ALLOWED_META_SURFACE_KINDS,
-  AUDIT_ALLOWED_META_SURFACE_KINDS,
-  formatDurationMs,
   type ReviewTerminationBoundaryRecord,
-  type ReviewStartupAnchorMode,
   ReviewExecutionState
 } from './lib/review-execution-state.js';
 import {
@@ -61,18 +62,10 @@ import {
 import { collectManifests, resolveEnvironmentPaths } from './lib/run-manifests.js';
 
 const { repoRoot, runsRoot: defaultRunsDir } = resolveEnvironmentPaths();
-const DEFAULT_REVIEW_STARTUP_LOOP_MIN_EVENTS = 8;
-const DEFAULT_REVIEW_MONITOR_INTERVAL_SECONDS = 60;
 const BENIGN_STDIO_ERROR_CODES = new Set(['EPIPE', 'ERR_STREAM_DESTROYED']);
 const REVIEW_AUTO_ISSUE_LOG_ENV_KEY = 'CODEX_REVIEW_AUTO_ISSUE_LOG';
 const REVIEW_ENABLE_DELEGATION_MCP_ENV_KEY = 'CODEX_REVIEW_ENABLE_DELEGATION_MCP';
 const REVIEW_DISABLE_DELEGATION_MCP_ENV_KEY = 'CODEX_REVIEW_DISABLE_DELEGATION_MCP';
-const REVIEW_MONITOR_INTERVAL_ENV_KEY = 'CODEX_REVIEW_MONITOR_INTERVAL_SECONDS';
-const REVIEW_ALLOW_HEAVY_COMMANDS_ENV_KEY = 'CODEX_REVIEW_ALLOW_HEAVY_COMMANDS';
-const REVIEW_ENFORCE_BOUNDED_MODE_ENV_KEY = 'CODEX_REVIEW_ENFORCE_BOUNDED_MODE';
-const REVIEW_LOW_SIGNAL_TIMEOUT_ENV_KEY = 'CODEX_REVIEW_LOW_SIGNAL_TIMEOUT_SECONDS';
-const REVIEW_VERDICT_STABILITY_TIMEOUT_ENV_KEY = 'CODEX_REVIEW_VERDICT_STABILITY_TIMEOUT_SECONDS';
-const REVIEW_META_SURFACE_TIMEOUT_ENV_KEY = 'CODEX_REVIEW_META_SURFACE_TIMEOUT_SECONDS';
 const REVIEW_TELEMETRY_DEBUG_ENV_KEY = 'CODEX_REVIEW_DEBUG_TELEMETRY';
 const REVIEW_SURFACE_ENV_KEY = 'CODEX_REVIEW_SURFACE';
 
@@ -435,153 +428,40 @@ async function main(): Promise<void> {
     return;
   }
 
-  const runtimeContext = await resolveReviewRuntimeContext({
-    options,
+  const boundaryPreflight = await prepareReviewExecutionBoundaryPreflight({
+    cliOptions: options,
     manifestPath,
     env: reviewEnv,
-    repoRoot
+    repoRoot,
+    reviewSurface,
+    architectureSurfacePaths: reviewTaskContext.architectureSurfacePaths,
+    scopeTouchedPaths: scopePathCollection.paths,
+    activeCloseoutBundleRoots,
+    runnerLogExists,
+    runnerLogPath,
+    allowHeavyCommands
   });
-  console.log(`[run-review] ${formatRuntimeSelectionSummary(runtimeContext.runtime)}.`);
-  const timeoutMs = resolveReviewTimeoutMs();
-  if (timeoutMs !== null) {
-    console.log(
-      `[run-review] enforcing codex review timeout at ${Math.round(timeoutMs / 1000)}s (configured via CODEX_REVIEW_TIMEOUT_SECONDS).`
-    );
-  }
-  const stallTimeoutMs = resolveReviewStallTimeoutMs();
-  if (stallTimeoutMs !== null) {
-    console.log(
-      `[run-review] enforcing codex review stall timeout at ${Math.round(
-        stallTimeoutMs / 1000
-      )}s of no output (configured via CODEX_REVIEW_STALL_TIMEOUT_SECONDS).`
-    );
-  }
-  const startupLoopTimeoutMs = resolveReviewStartupLoopTimeoutMs();
-  const startupLoopMinEvents = resolveReviewStartupLoopMinEvents();
-  if (startupLoopTimeoutMs !== null) {
-    console.log(
-      `[run-review] enforcing delegation-startup loop timeout at ${Math.round(
-        startupLoopTimeoutMs / 1000
-      )}s after ${startupLoopMinEvents} startup events (configured via CODEX_REVIEW_STARTUP_LOOP_TIMEOUT_SECONDS).`
-    );
-  }
-  const monitorIntervalMs = resolveReviewMonitorIntervalMs();
-  if (monitorIntervalMs === null) {
-    console.log(
-      '[run-review] patience-first monitor checkpoints disabled (configured via CODEX_REVIEW_MONITOR_INTERVAL_SECONDS=0).'
-    );
-  } else {
-    console.log(
-      `[run-review] patience-first monitor checkpoints every ${formatDurationMs(
-        monitorIntervalMs
-      )} (set CODEX_REVIEW_MONITOR_INTERVAL_SECONDS=0 to disable).`
-    );
-  }
-  const lowSignalTimeoutMs = !allowHeavyCommands ? resolveReviewLowSignalTimeoutMs() : null;
-  const verdictStabilityTimeoutMs = !allowHeavyCommands
-    ? resolveReviewVerdictStabilityTimeoutMs()
-    : null;
-  const metaSurfaceTimeoutMs = !allowHeavyCommands ? resolveReviewMetaSurfaceTimeoutMs() : null;
-  const allowedMetaSurfaceKinds =
-    reviewSurface === 'audit'
-      ? AUDIT_ALLOWED_META_SURFACE_KINDS
-      : reviewSurface === 'architecture'
-        ? ARCHITECTURE_ALLOWED_META_SURFACE_KINDS
-      : ([] as const);
-  const scopeTouchedPaths = scopePathCollection.paths;
-  const architectureRelevantPaths =
-    reviewSurface === 'architecture'
-      ? reviewTaskContext.architectureSurfacePaths
-          .map((entry) => path.relative(repoRoot, entry))
-          .filter((entry) => entry.length > 0)
-      : [];
-  const touchedPaths =
-    reviewSurface === 'architecture'
-      ? [...new Set([...scopeTouchedPaths, ...architectureRelevantPaths])]
-      : scopeTouchedPaths;
-  const startupAnchorMode: ReviewStartupAnchorMode | null = !allowHeavyCommands
-    ? reviewSurface === 'audit'
-      ? 'audit'
-      : reviewSurface === 'diff' && touchedPaths.length > 0
-        ? 'diff'
-        : null
-    : null;
-  const enforceStartupAnchorBoundary = startupAnchorMode !== null;
-  const enforceActiveCloseoutBundleRereadBoundary =
-    reviewSurface === 'diff' && !allowHeavyCommands && activeCloseoutBundleRoots.length > 0;
-  const announceRelevantReinspectionDwellBoundary =
-    (reviewSurface === 'diff' || reviewSurface === 'architecture') &&
-    !allowHeavyCommands &&
-    touchedPaths.length > 0;
-  const enforceRelevantReinspectionDwellBoundary =
-    announceRelevantReinspectionDwellBoundary && lowSignalTimeoutMs !== null;
-  if (!allowHeavyCommands) {
-    if (lowSignalTimeoutMs === null) {
-      console.log(
-        `[run-review] low-signal drift guard disabled (${REVIEW_LOW_SIGNAL_TIMEOUT_ENV_KEY}=0).`
-      );
-    } else {
-      console.log(
-        `[run-review] low-signal drift guard enabled after ${formatDurationMs(
-          lowSignalTimeoutMs
-        )} of repetitive bounded activity (set ${REVIEW_LOW_SIGNAL_TIMEOUT_ENV_KEY}=0 to disable).`
-      );
-    }
-    if (verdictStabilityTimeoutMs === null) {
-      console.log(
-        `[run-review] verdict-stability guard disabled (${REVIEW_VERDICT_STABILITY_TIMEOUT_ENV_KEY}=0).`
-      );
-    } else {
-      console.log(
-        `[run-review] verdict-stability guard enabled after ${formatDurationMs(
-          verdictStabilityTimeoutMs
-        )} of repeated speculative no-progress output (set ${REVIEW_VERDICT_STABILITY_TIMEOUT_ENV_KEY}=0 to disable).`
-      );
-    }
-    if (metaSurfaceTimeoutMs === null) {
-      console.log(
-        `[run-review] meta-surface expansion guard disabled (${REVIEW_META_SURFACE_TIMEOUT_ENV_KEY}=0).`
-      );
-    } else if (allowedMetaSurfaceKinds.length > 0) {
-      const allowedMetaSurfaceLabel =
-        reviewSurface === 'audit' ? 'allowed audit meta surfaces' : 'allowed architecture meta surfaces';
-      console.log(
-        `[run-review] meta-surface expansion guard enabled after ${formatDurationMs(
-          metaSurfaceTimeoutMs
-        )} of sustained off-task meta activity; ${allowedMetaSurfaceLabel}: ${allowedMetaSurfaceKinds.join(
-          ', '
-        )} (set ${REVIEW_META_SURFACE_TIMEOUT_ENV_KEY}=0 to disable).`
-      );
-    } else {
-      console.log(
-        `[run-review] meta-surface expansion guard enabled after ${formatDurationMs(
-          metaSurfaceTimeoutMs
-        )} of sustained off-task meta activity (set ${REVIEW_META_SURFACE_TIMEOUT_ENV_KEY}=0 to disable).`
-      );
-    }
-    if (startupAnchorMode === 'diff') {
-      console.log(
-        '[run-review] startup-anchor boundary enabled for diff mode; repeated memory/skills/review-docs/manifest/review-artifact reads before the first startup anchor will terminate the review.'
-      );
-    } else if (startupAnchorMode === 'audit') {
-      console.log(
-        '[run-review] startup-anchor boundary enabled for audit mode; repeated memory/skills/review-doc reads before the first manifest/runner-log startup anchor will terminate the review.'
-      );
-    }
-    if (announceRelevantReinspectionDwellBoundary) {
-      if (lowSignalTimeoutMs === null) {
-        console.log(
-          `[run-review] bounded relevant reinspection dwell boundary disabled (${REVIEW_LOW_SIGNAL_TIMEOUT_ENV_KEY}=0).`
-        );
-      } else {
-        console.log(
-          `[run-review] bounded relevant reinspection dwell boundary enabled after ${formatDurationMs(
-            lowSignalTimeoutMs
-          )} of repetitive on-task reinspection without concrete findings (set ${REVIEW_LOW_SIGNAL_TIMEOUT_ENV_KEY}=0 to disable).`
-        );
-      }
-    }
-  }
+  const {
+    runtimeContext,
+    timeoutMs,
+    stallTimeoutMs,
+    startupLoopTimeoutMs,
+    startupLoopMinEvents,
+    monitorIntervalMs,
+    lowSignalTimeoutMs,
+    verdictStabilityTimeoutMs,
+    metaSurfaceTimeoutMs,
+    allowedMetaSurfaceKinds,
+    touchedPaths,
+    startupAnchorMode,
+    enforceStartupAnchorBoundary,
+    enforceActiveCloseoutBundleRereadBoundary,
+    enforceRelevantReinspectionDwellBoundary,
+    auditStartupAnchorPaths,
+    allowedMetaSurfacePaths,
+    auditStartupAnchorEnvVarPaths,
+    allowedMetaSurfaceEnvVarPaths
+  } = boundaryPreflight;
   const autoIssueLogEnabled = options.autoIssueLog ?? false;
   const runReview = async (resolved: { command: string; args: string[] }) =>
     runCodexReview({
@@ -606,30 +486,10 @@ async function main(): Promise<void> {
       allowedMetaSurfaceKinds: [...allowedMetaSurfaceKinds],
       scopeMode,
       startupAnchorMode,
-      auditStartupAnchorPaths:
-        reviewSurface === 'audit'
-          ? [manifestPath, ...(runnerLogExists ? [runnerLogPath] : [])]
-          : [],
-      allowedMetaSurfacePaths:
-        reviewSurface === 'audit'
-          ? [manifestPath, ...(runnerLogExists ? [runnerLogPath] : [])]
-          : reviewSurface === 'architecture'
-            ? reviewTaskContext.architectureSurfacePaths
-          : [],
-      auditStartupAnchorEnvVarPaths:
-        reviewSurface === 'audit'
-          ? {
-              MANIFEST: manifestPath,
-              ...(runnerLogExists ? { RUNNER_LOG: runnerLogPath, RUN_LOG: runnerLogPath } : {})
-            }
-          : {},
-      allowedMetaSurfaceEnvVarPaths:
-        reviewSurface === 'audit'
-          ? {
-              MANIFEST: manifestPath,
-              ...(runnerLogExists ? { RUNNER_LOG: runnerLogPath, RUN_LOG: runnerLogPath } : {})
-            }
-          : {},
+      auditStartupAnchorPaths,
+      allowedMetaSurfacePaths,
+      auditStartupAnchorEnvVarPaths,
+      allowedMetaSurfaceEnvVarPaths,
       repoRoot,
       touchedPaths,
       outputLogPath: artifactPaths.outputLogPath
@@ -742,14 +602,6 @@ function envFlagEnabled(value: string | undefined): boolean {
   return normalized === '1' || normalized === 'true' || normalized === 'yes';
 }
 
-function allowHeavyReviewCommands(): boolean {
-  return envFlagEnabled(process.env[REVIEW_ALLOW_HEAVY_COMMANDS_ENV_KEY]);
-}
-
-function enforceBoundedReviewMode(): boolean {
-  return envFlagEnabled(process.env[REVIEW_ENFORCE_BOUNDED_MODE_ENV_KEY]);
-}
-
 function shouldForceNonInteractive(): boolean {
   const stdinIsTTY = process.stdin?.isTTY === true;
   return (
@@ -760,128 +612,6 @@ function shouldForceNonInteractive(): boolean {
     envFlagEnabled(process.env.CODEX_NO_INTERACTIVE) ||
     envFlagEnabled(process.env.CODEX_NONINTERACTIVE)
   );
-}
-
-function resolveReviewTimeoutMs(): number | null {
-  const configured = process.env.CODEX_REVIEW_TIMEOUT_SECONDS?.trim();
-  if (!configured) {
-    return null;
-  }
-
-  const parsedSeconds = Number(configured);
-  if (!Number.isFinite(parsedSeconds)) {
-    throw new Error('CODEX_REVIEW_TIMEOUT_SECONDS must be a finite number.');
-  }
-  if (parsedSeconds <= 0) {
-    return null;
-  }
-  return Math.round(parsedSeconds * 1000);
-}
-
-function resolveReviewStallTimeoutMs(): number | null {
-  const configured = process.env.CODEX_REVIEW_STALL_TIMEOUT_SECONDS?.trim();
-  if (!configured) {
-    return null;
-  }
-
-  const parsedSeconds = Number(configured);
-  if (!Number.isFinite(parsedSeconds)) {
-    throw new Error('CODEX_REVIEW_STALL_TIMEOUT_SECONDS must be a finite number.');
-  }
-  if (parsedSeconds <= 0) {
-    return null;
-  }
-  return Math.round(parsedSeconds * 1000);
-}
-
-function resolveReviewStartupLoopTimeoutMs(): number | null {
-  const configured = process.env.CODEX_REVIEW_STARTUP_LOOP_TIMEOUT_SECONDS?.trim();
-  if (!configured) {
-    return null;
-  }
-
-  const parsedSeconds = Number(configured);
-  if (!Number.isFinite(parsedSeconds)) {
-    throw new Error('CODEX_REVIEW_STARTUP_LOOP_TIMEOUT_SECONDS must be a finite number.');
-  }
-  if (parsedSeconds <= 0) {
-    return null;
-  }
-  return Math.round(parsedSeconds * 1000);
-}
-
-function resolveReviewStartupLoopMinEvents(): number {
-  const configured = process.env.CODEX_REVIEW_STARTUP_LOOP_MIN_EVENTS?.trim();
-  if (!configured) {
-    return DEFAULT_REVIEW_STARTUP_LOOP_MIN_EVENTS;
-  }
-
-  const parsed = Number(configured);
-  if (!Number.isFinite(parsed) || !Number.isInteger(parsed) || parsed < 1) {
-    throw new Error('CODEX_REVIEW_STARTUP_LOOP_MIN_EVENTS must be a positive integer.');
-  }
-  return parsed;
-}
-
-function resolveReviewMonitorIntervalMs(): number | null {
-  const configured = process.env[REVIEW_MONITOR_INTERVAL_ENV_KEY]?.trim();
-  if (!configured) {
-    return DEFAULT_REVIEW_MONITOR_INTERVAL_SECONDS * 1000;
-  }
-
-  const parsedSeconds = Number(configured);
-  if (!Number.isFinite(parsedSeconds)) {
-    throw new Error(`${REVIEW_MONITOR_INTERVAL_ENV_KEY} must be a finite number.`);
-  }
-  if (parsedSeconds <= 0) {
-    return null;
-  }
-  return Math.round(parsedSeconds * 1000);
-}
-
-function resolveReviewLowSignalTimeoutMs(): number | null {
-  const configured = process.env[REVIEW_LOW_SIGNAL_TIMEOUT_ENV_KEY]?.trim();
-  if (!configured) {
-    return 180_000;
-  }
-  const parsedSeconds = Number(configured);
-  if (!Number.isFinite(parsedSeconds)) {
-    throw new Error(`${REVIEW_LOW_SIGNAL_TIMEOUT_ENV_KEY} must be a finite number.`);
-  }
-  if (parsedSeconds <= 0) {
-    return null;
-  }
-  return Math.round(parsedSeconds * 1000);
-}
-
-function resolveReviewVerdictStabilityTimeoutMs(): number | null {
-  const configured = process.env[REVIEW_VERDICT_STABILITY_TIMEOUT_ENV_KEY]?.trim();
-  if (!configured) {
-    return 180_000;
-  }
-  const parsedSeconds = Number(configured);
-  if (!Number.isFinite(parsedSeconds)) {
-    throw new Error(`${REVIEW_VERDICT_STABILITY_TIMEOUT_ENV_KEY} must be a finite number.`);
-  }
-  if (parsedSeconds <= 0) {
-    return null;
-  }
-  return Math.round(parsedSeconds * 1000);
-}
-
-function resolveReviewMetaSurfaceTimeoutMs(): number | null {
-  const configured = process.env[REVIEW_META_SURFACE_TIMEOUT_ENV_KEY]?.trim();
-  if (!configured) {
-    return 180_000;
-  }
-  const parsedSeconds = Number(configured);
-  if (!Number.isFinite(parsedSeconds)) {
-    throw new Error(`${REVIEW_META_SURFACE_TIMEOUT_ENV_KEY} must be a finite number.`);
-  }
-  if (parsedSeconds <= 0) {
-    return null;
-  }
-  return Math.round(parsedSeconds * 1000);
 }
 
 function printReviewWrapperHelp(): void {

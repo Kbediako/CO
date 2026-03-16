@@ -404,6 +404,13 @@ export function isTouchedReviewScopePathFamilyOperand(
       'scripts/lib/review-execution-runtime.js',
       'dist/scripts/lib/review-execution-runtime.js'
     ];
+    const reviewExecutionBoundaryPreflightPathFamily = [
+      'scripts/lib/review-execution-boundary-preflight.ts',
+      'scripts/lib/review-execution-boundary-preflight.js',
+      'dist/scripts/lib/review-execution-boundary-preflight.js',
+      'tests/review-execution-boundary-preflight.spec.ts',
+      'tests/review-execution-boundary-preflight.spec.js'
+    ];
     const reviewLaunchAttemptPathFamily = [
       'scripts/lib/review-launch-attempt.ts',
       'scripts/lib/review-launch-attempt.js',
@@ -427,6 +434,31 @@ export function isTouchedReviewScopePathFamilyOperand(
       'scripts/run-review.js',
       'dist/scripts/run-review.js'
     ];
+    const reviewExecutionBoundaryPreflightRunReviewPathFamily = [
+      ...reviewExecutionBoundaryPreflightPathFamily,
+      'scripts/run-review.ts',
+      'scripts/run-review.js',
+      'dist/scripts/run-review.js',
+      'tests/run-review.spec.ts',
+      'tests/run-review.spec.js'
+    ];
+    const reviewExecutionBoundaryPreflightDependencyPathFamily = [
+      ...reviewExecutionBoundaryPreflightPathFamily,
+      ...reviewLaunchAttemptPathFamily,
+      'scripts/lib/review-execution-state.ts',
+      'scripts/lib/review-execution-state.js',
+      'dist/scripts/lib/review-execution-state.js',
+      'tests/review-launch-attempt.spec.ts',
+      'tests/review-launch-attempt.spec.js'
+    ];
+    const reviewExecutionBoundaryPreflightExecutionStatePathFamily = [
+      ...reviewExecutionBoundaryPreflightPathFamily,
+      'scripts/lib/review-execution-state.ts',
+      'scripts/lib/review-execution-state.js',
+      'dist/scripts/lib/review-execution-state.js',
+      'tests/review-execution-state.spec.ts',
+      'tests/review-execution-state.spec.js'
+    ];
     const reviewLaunchAttemptRunReviewPathFamily = [
       ...reviewLaunchAttemptPathFamily,
       'scripts/run-review.ts',
@@ -445,7 +477,8 @@ export function isTouchedReviewScopePathFamilyOperand(
     const reviewLaunchAttemptFocusedSpecPathFamily = [
       ...new Set([
         ...reviewLaunchAttemptRunReviewPathFamily,
-        ...reviewLaunchAttemptDependencyPathFamily
+        ...reviewLaunchAttemptDependencyPathFamily,
+        ...reviewExecutionBoundaryPreflightDependencyPathFamily
       ])
     ];
     const reviewExecutionRuntimeRegressionSpecPathFamily = [
@@ -482,6 +515,9 @@ export function isTouchedReviewScopePathFamilyOperand(
       reviewExecutionTelemetryPathFamily,
       reviewLaunchAttemptDependencyPathFamily,
       reviewLaunchAttemptRunReviewPathFamily,
+      reviewExecutionBoundaryPreflightDependencyPathFamily,
+      reviewExecutionBoundaryPreflightExecutionStatePathFamily,
+      reviewExecutionBoundaryPreflightRunReviewPathFamily,
       reviewExecutionRuntimeRunReviewPathFamily,
       reviewExecutionRuntimeExecutionStatePathFamily
     ];
@@ -744,6 +780,9 @@ function classifyMetaSurfaceOperand(
     matchesPathSuffix(normalized, 'dist/scripts/lib/review-shell-command-parser.js') ||
     matchesPathSuffix(normalized, 'scripts/lib/review-execution-telemetry.ts') ||
     matchesPathSuffix(normalized, 'dist/scripts/lib/review-execution-telemetry.js') ||
+    matchesPathSuffix(normalized, 'scripts/lib/review-execution-boundary-preflight.ts') ||
+    matchesPathSuffix(normalized, 'scripts/lib/review-execution-boundary-preflight.js') ||
+    matchesPathSuffix(normalized, 'dist/scripts/lib/review-execution-boundary-preflight.js') ||
     matchesPathSuffix(normalized, 'scripts/lib/review-launch-attempt.ts') ||
     matchesPathSuffix(normalized, 'scripts/lib/review-launch-attempt.js') ||
     matchesPathSuffix(normalized, 'dist/scripts/lib/review-launch-attempt.js') ||
@@ -760,6 +799,8 @@ function classifyMetaSurfaceOperand(
     matchesPathSuffix(normalized, 'tests/review-inspection-target-parsing.spec.ts') ||
     matchesPathSuffix(normalized, 'tests/review-command-probe-classification.spec.ts') ||
     matchesPathSuffix(normalized, 'tests/review-command-intent-classification.spec.ts') ||
+    matchesPathSuffix(normalized, 'tests/review-execution-boundary-preflight.spec.ts') ||
+    matchesPathSuffix(normalized, 'tests/review-execution-boundary-preflight.spec.js') ||
     matchesPathSuffix(normalized, 'tests/review-launch-attempt.spec.ts') ||
     matchesPathSuffix(normalized, 'tests/review-launch-attempt.spec.js') ||
     matchesPathSuffix(normalized, 'tests/review-scope-paths.spec.ts') ||

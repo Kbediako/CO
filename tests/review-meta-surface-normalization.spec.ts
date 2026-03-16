@@ -759,4 +759,118 @@ describe('review meta-surface normalization', () => {
       )
     ).toBe(true);
   });
+
+  it('classifies the extracted execution-boundary preflight helper as review-support when it is inspected directly', () => {
+    expect(
+      classifyMetaSurfaceDirectDetailed(
+        'sed',
+        ['-n', '1,80p', 'scripts/lib/review-execution-boundary-preflight.ts'],
+        new Set(),
+        '/repo'
+      )
+    ).toEqual([
+      {
+        kind: 'review-support',
+        candidate: 'scripts/lib/review-execution-boundary-preflight.ts',
+        operand: 'scripts/lib/review-execution-boundary-preflight.ts'
+      }
+    ]);
+  });
+
+  it('classifies the JS-host execution-boundary preflight helper as review-support when it is inspected directly', () => {
+    expect(
+      classifyMetaSurfaceDirectDetailed(
+        'sed',
+        ['-n', '1,80p', 'scripts/lib/review-execution-boundary-preflight.js'],
+        new Set(),
+        '/repo'
+      )
+    ).toEqual([
+      {
+        kind: 'review-support',
+        candidate: 'scripts/lib/review-execution-boundary-preflight.js',
+        operand: 'scripts/lib/review-execution-boundary-preflight.js'
+      }
+    ]);
+  });
+
+  it('treats the extracted execution-boundary preflight helper family as touched when the focused helper spec is touched', () => {
+    expect(
+      isTouchedReviewScopePathFamilyOperand(
+        'dist/scripts/lib/review-execution-boundary-preflight.js',
+        new Set(['tests/review-execution-boundary-preflight.spec.ts']),
+        '/repo'
+      )
+    ).toBe(true);
+  });
+
+  it('treats the execution-boundary preflight helper as touched when the launch-attempt helper is the touched sibling', () => {
+    expect(
+      isTouchedReviewScopePathFamilyOperand(
+        'scripts/lib/review-execution-boundary-preflight.ts',
+        new Set(['scripts/lib/review-launch-attempt.ts']),
+        '/repo'
+      )
+    ).toBe(true);
+  });
+
+  it('treats the execution-boundary preflight helper as touched when review-execution-state is the touched sibling', () => {
+    expect(
+      isTouchedReviewScopePathFamilyOperand(
+        'scripts/lib/review-execution-boundary-preflight.ts',
+        new Set(['scripts/lib/review-execution-state.ts']),
+        '/repo'
+      )
+    ).toBe(true);
+  });
+
+  it('treats the execution-boundary preflight helper as touched when the focused execution-state regression spec is touched', () => {
+    expect(
+      isTouchedReviewScopePathFamilyOperand(
+        'scripts/lib/review-execution-boundary-preflight.ts',
+        new Set(['tests/review-execution-state.spec.ts']),
+        '/repo'
+      )
+    ).toBe(true);
+  });
+
+  it('does not treat the focused launch-attempt regression spec as touched when only the execution-state spec changes', () => {
+    expect(
+      isTouchedReviewScopePathFamilyOperand(
+        'tests/review-launch-attempt.spec.ts',
+        new Set(['tests/review-execution-state.spec.ts']),
+        '/repo'
+      )
+    ).toBe(false);
+  });
+
+  it('treats the execution-boundary preflight helper as touched when the focused launch-attempt regression spec is touched', () => {
+    expect(
+      isTouchedReviewScopePathFamilyOperand(
+        'scripts/lib/review-execution-boundary-preflight.ts',
+        new Set(['tests/review-launch-attempt.spec.ts']),
+        '/repo'
+      )
+    ).toBe(true);
+  });
+
+  it('treats the focused launch-attempt regression spec as touched when the execution-boundary preflight helper is touched', () => {
+    expect(
+      isTouchedReviewScopePathFamilyOperand(
+        'tests/review-launch-attempt.spec.ts',
+        new Set(['scripts/lib/review-execution-boundary-preflight.ts']),
+        '/repo'
+      )
+    ).toBe(true);
+  });
+
+  it('treats the extracted execution-boundary preflight helper as touched when run-review is the touched sibling', () => {
+    expect(
+      isTouchedReviewScopePathFamilyOperand(
+        'scripts/lib/review-execution-boundary-preflight.ts',
+        new Set(['tests/run-review.spec.ts']),
+        '/repo'
+      )
+    ).toBe(true);
+  });
 });
