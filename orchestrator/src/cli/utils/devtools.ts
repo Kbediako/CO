@@ -6,6 +6,7 @@ import { EnvUtils } from '../../../../packages/shared/config/env.js';
 import { resolveCodexCliBin } from './codexCli.js';
 import { resolveCodexHome } from './codexPaths.js';
 import { buildCommandPreview } from './commandPreview.js';
+import { hasMcpServerEntry } from './mcpServerEntry.js';
 
 export const DEVTOOLS_SKILL_NAME = 'chrome-devtools';
 export const DEVTOOLS_CONFIG_OVERRIDE = 'mcp_servers.chrome-devtools.enabled=true';
@@ -172,7 +173,7 @@ function inspectDevtoolsConfig(env: NodeJS.ProcessEnv = process.env): DevtoolsCo
     };
   }
 
-  const hasEntry = hasDevtoolsConfigEntry(raw);
+  const hasEntry = hasMcpServerEntry(raw, DEVTOOLS_SKILL_NAME);
   if (hasEntry) {
     return { status: 'ok', path: configPath };
   }
@@ -181,59 +182,6 @@ function inspectDevtoolsConfig(env: NodeJS.ProcessEnv = process.env): DevtoolsCo
     path: configPath,
     detail: 'chrome-devtools entry not found'
   };
-}
-
-function hasDevtoolsConfigEntry(raw: string): boolean {
-  const lines = raw.split('\n');
-  let currentTable: string | null = null;
-
-  for (const line of lines) {
-    const trimmed = stripTomlComment(line).trim();
-    if (!trimmed) {
-      continue;
-    }
-    const tableMatch = trimmed.match(/^\[(.+)\]$/);
-    if (tableMatch) {
-      currentTable = tableMatch[1]?.trim() ?? null;
-      if (
-        currentTable === 'mcp_servers.chrome-devtools' ||
-        currentTable === 'mcp_servers."chrome-devtools"' ||
-        currentTable === "mcp_servers.'chrome-devtools'"
-      ) {
-        return true;
-      }
-      continue;
-    }
-
-    if (trimmed.startsWith('mcp_servers.')) {
-      if (trimmed.startsWith('mcp_servers."chrome-devtools".')) {
-        return true;
-      }
-      if (trimmed.startsWith("mcp_servers.'chrome-devtools'.")) {
-        return true;
-      }
-      if (trimmed.startsWith('mcp_servers.chrome-devtools.')) {
-        return true;
-      }
-      if (trimmed.startsWith('mcp_servers."chrome-devtools"=')) {
-        return true;
-      }
-      if (trimmed.startsWith("mcp_servers.'chrome-devtools'=")) {
-        return true;
-      }
-      if (trimmed.startsWith('mcp_servers.chrome-devtools=')) {
-        return true;
-      }
-    }
-
-    if (currentTable === 'mcp_servers') {
-      if (/^"?chrome-devtools"?\s*=/.test(trimmed)) {
-        return true;
-      }
-    }
-  }
-
-  return false;
 }
 
 function parseConfigOverrides(env: NodeJS.ProcessEnv): string[] {
@@ -265,12 +213,4 @@ function applyConfigOverrides(overrides: string[], args: string[]): string[] {
 
 function dedupeOverrides(overrides: string[]): string[] {
   return Array.from(new Set(overrides.filter((override) => override.trim().length > 0)));
-}
-
-function stripTomlComment(line: string): string {
-  const index = line.indexOf('#');
-  if (index === -1) {
-    return line;
-  }
-  return line.slice(0, index);
 }

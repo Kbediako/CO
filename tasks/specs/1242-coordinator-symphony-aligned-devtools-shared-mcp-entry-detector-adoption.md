@@ -1,7 +1,7 @@
 ---
 id: 20260316-1242-coordinator-symphony-aligned-devtools-shared-mcp-entry-detector-adoption
 title: Coordinator Symphony-Aligned Devtools Shared MCP Entry Detector Adoption
-status: active
+status: completed
 owner: Codex
 created: 2026-03-16
 last_review: 2026-03-16
@@ -13,6 +13,7 @@ related_tasks:
   - tasks/tasks-1242-coordinator-symphony-aligned-devtools-shared-mcp-entry-detector-adoption.md
 review_notes:
   - 2026-03-16: Approved for docs-first registration after `1241` established the shared MCP server-entry detector and bounded scout evidence identified `devtools.ts` as the next truthful adoption seam. Evidence: `docs/findings/1242-devtools-shared-mcp-entry-detector-adoption-deliberation.md`, `out/1241-coordinator-symphony-aligned-shared-mcp-server-entry-detector-extraction/manual/20260316T112401Z-closeout/14-next-slice-note.md`.
+  - 2026-03-16: Closeout completed. `devtools.ts` now consumes `orchestrator/src/cli/utils/mcpServerEntry.ts`, duplicate local detection logic was removed, and focused parity coverage passed across `DevtoolsSetup`, `FrontendTestingRunner`, and `Doctor`. Evidence: `out/1242-coordinator-symphony-aligned-devtools-shared-mcp-entry-detector-adoption/manual/20260316T114357Z-closeout/00-summary.md`, `out/1242-coordinator-symphony-aligned-devtools-shared-mcp-entry-detector-adoption/manual/20260316T114357Z-closeout/05-targeted-tests.log`.
 ---
 
 # Technical Specification

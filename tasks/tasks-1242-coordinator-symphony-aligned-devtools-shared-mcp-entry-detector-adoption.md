@@ -23,6 +23,6 @@
 
 ## Adoption
 
-- [ ] `devtools.ts` rewired to the shared MCP entry detector with duplicate parser removal recorded. Evidence: pending implementation packet.
-- [ ] Focused devtools readiness regressions captured. Evidence: pending implementation packet.
-- [ ] Validation lane completed and closeout packet captured. Evidence: pending implementation packet.
+- [x] `devtools.ts` rewired to the shared MCP entry detector with duplicate parser removal recorded. Evidence: `out/1242-coordinator-symphony-aligned-devtools-shared-mcp-entry-detector-adoption/manual/20260316T114357Z-closeout/00-summary.md`
+- [x] Focused devtools readiness regressions captured. Evidence: `out/1242-coordinator-symphony-aligned-devtools-shared-mcp-entry-detector-adoption/manual/20260316T114357Z-closeout/05-targeted-tests.log`
+- [x] Validation lane completed and closeout packet captured. Evidence: `out/1242-coordinator-symphony-aligned-devtools-shared-mcp-entry-detector-adoption/manual/20260316T114357Z-closeout/00-summary.md`, `out/1242-coordinator-symphony-aligned-devtools-shared-mcp-entry-detector-adoption/manual/20260316T114357Z-closeout/13-override-notes.md`
