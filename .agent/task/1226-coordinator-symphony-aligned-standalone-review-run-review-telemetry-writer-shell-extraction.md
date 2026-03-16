@@ -23,19 +23,19 @@
 
 ## Implementation
 
-- [ ] Telemetry-writer callback extracted from `scripts/run-review.ts` into the execution-telemetry surface without widening into the sibling `runReview` adapter.
-- [ ] Focused regressions cover success/failure telemetry persistence and persistence-failure logging behavior.
+- [x] Telemetry-writer callback extracted from `scripts/run-review.ts` into the execution-telemetry surface without widening into the sibling `runReview` adapter. Evidence: `out/1226-coordinator-symphony-aligned-standalone-review-run-review-telemetry-writer-shell-extraction/manual/20260316T050223Z-closeout/00-summary.md`
+- [x] Focused regressions cover success/failure telemetry persistence, omitted-boundary inference, and persistence-failure logging behavior. Evidence: `out/1226-coordinator-symphony-aligned-standalone-review-run-review-telemetry-writer-shell-extraction/manual/20260316T050223Z-closeout/05a-targeted-tests.log`
 
 ## Validation
 
-- [ ] `node scripts/delegation-guard.mjs --task 1226-coordinator-symphony-aligned-standalone-review-run-review-telemetry-writer-shell-extraction`
-- [ ] `node scripts/spec-guard.mjs --dry-run`
-- [ ] `npm run build`
-- [ ] `npm run lint`
-- [ ] Focused targeted regressions
-- [ ] `npm run test`
-- [ ] `npm run docs:check`
-- [ ] `npm run docs:freshness`
-- [ ] `node scripts/diff-budget.mjs`
-- [ ] `npm run review -- --manifest <manifest>`
-- [ ] `npm run pack:smoke`
+- [x] `node scripts/delegation-guard.mjs --task 1226-coordinator-symphony-aligned-standalone-review-run-review-telemetry-writer-shell-extraction`. Evidence: `out/1226-coordinator-symphony-aligned-standalone-review-run-review-telemetry-writer-shell-extraction/manual/20260316T050223Z-closeout/01-delegation-guard.log`
+- [x] `node scripts/spec-guard.mjs --dry-run`. Evidence: `out/1226-coordinator-symphony-aligned-standalone-review-run-review-telemetry-writer-shell-extraction/manual/20260316T050223Z-closeout/02-spec-guard.log`
+- [x] `npm run build`. Evidence: `out/1226-coordinator-symphony-aligned-standalone-review-run-review-telemetry-writer-shell-extraction/manual/20260316T050223Z-closeout/03-build.log`
+- [x] `npm run lint`. Evidence: `out/1226-coordinator-symphony-aligned-standalone-review-run-review-telemetry-writer-shell-extraction/manual/20260316T050223Z-closeout/04-lint.log`
+- [x] Focused targeted regressions. Evidence: `out/1226-coordinator-symphony-aligned-standalone-review-run-review-telemetry-writer-shell-extraction/manual/20260316T050223Z-closeout/05a-targeted-tests.log`
+- [x] `npm run test`. Evidence: `out/1226-coordinator-symphony-aligned-standalone-review-run-review-telemetry-writer-shell-extraction/manual/20260316T050223Z-closeout/05-test.log`
+- [x] `npm run docs:check`. Evidence: `out/1226-coordinator-symphony-aligned-standalone-review-run-review-telemetry-writer-shell-extraction/manual/20260316T050223Z-closeout/06-docs-check.log`
+- [x] `npm run docs:freshness`. Evidence: `out/1226-coordinator-symphony-aligned-standalone-review-run-review-telemetry-writer-shell-extraction/manual/20260316T050223Z-closeout/07-docs-freshness.log`
+- [x] `node scripts/diff-budget.mjs`. Evidence: `out/1226-coordinator-symphony-aligned-standalone-review-run-review-telemetry-writer-shell-extraction/manual/20260316T050223Z-closeout/08-diff-budget.log`
+- [x] `npm run review -- --manifest .runs/1226-coordinator-symphony-aligned-standalone-review-run-review-telemetry-writer-shell-extraction/cli/2026-03-16T05-02-37-249Z-883ca07c/manifest.json`. Evidence: `out/1226-coordinator-symphony-aligned-standalone-review-run-review-telemetry-writer-shell-extraction/manual/20260316T050223Z-closeout/09-review.log`
+- [x] `npm run pack:smoke`. Evidence: `out/1226-coordinator-symphony-aligned-standalone-review-run-review-telemetry-writer-shell-extraction/manual/20260316T050223Z-closeout/10-pack-smoke.log`

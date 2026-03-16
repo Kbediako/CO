@@ -1,0 +1,16 @@
+⚠️ Diff budget exceeded (override applied) (base=origin/main)
+ - changed files 1927 > 25
+ - total lines changed 158217 > 800
+Top changed files:
+  - docs/docs-freshness-registry.json: 15373
+  - tasks/index.json: 8272
+  - orchestrator/tests/ControlServer.test.ts: 7637
+  - tests/review-execution-state.spec.ts: 4317
+  - tests/run-review.spec.ts: 3142
+  - scripts/run-review.ts: 2412
+  - orchestrator/tests/DelegationServer.test.ts: 2115
+  - orchestrator/src/cli/orchestrator.ts: 1818
+  - orchestrator/tests/TelegramOversightBridge.test.ts: 1803
+  - orchestrator/src/cli/control/controlServer.ts: 1639
+
+Override accepted via DIFF_BUDGET_OVERRIDE_REASON: 1226 closeout runs on a long-lived stacked branch; current diff budget signal is not lane-local.
