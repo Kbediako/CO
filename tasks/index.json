@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260316-1249-coordinator-symphony-aligned-setup-bootstrap-shell-extraction",
+      "title": "Coordinator Symphony-Aligned Setup Bootstrap Shell Extraction",
+      "relates_to": "tasks/tasks-1249-coordinator-symphony-aligned-setup-bootstrap-shell-extraction.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-16",
+      "paths": {
+        "spec": "tasks/specs/1249-coordinator-symphony-aligned-setup-bootstrap-shell-extraction.md",
+        "task": "tasks/tasks-1249-coordinator-symphony-aligned-setup-bootstrap-shell-extraction.md",
+        "agent_task": ".agent/task/1249-coordinator-symphony-aligned-setup-bootstrap-shell-extraction.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-setup-bootstrap-shell-extraction.md"
+      }
+    },
+    {
       "id": "20260316-1248-coordinator-symphony-aligned-flow-cli-remaining-boundary-freeze-reassessment",
       "title": "Coordinator Symphony-Aligned Flow CLI Remaining Boundary Freeze Reassessment",
       "relates_to": "tasks/tasks-1248-coordinator-symphony-aligned-flow-cli-remaining-boundary-freeze-reassessment.md",

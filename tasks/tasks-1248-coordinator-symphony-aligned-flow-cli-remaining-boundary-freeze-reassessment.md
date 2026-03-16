@@ -21,5 +21,5 @@
 
 ## Reassessment
 
-- [ ] Remaining flow boundary rechecked after `1247`. Evidence: pending closeout packet.
-- [ ] Freeze-or-go result recorded explicitly. Evidence: pending closeout packet.
+- [x] Remaining flow boundary rechecked after `1247`. Evidence: `out/1248-coordinator-symphony-aligned-flow-cli-remaining-boundary-freeze-reassessment/manual/20260316T195539Z-closeout/00-summary.md`
+- [x] Freeze-or-go result recorded explicitly. Evidence: `out/1248-coordinator-symphony-aligned-flow-cli-remaining-boundary-freeze-reassessment/manual/20260316T195539Z-closeout/00-summary.md`, `out/1248-coordinator-symphony-aligned-flow-cli-remaining-boundary-freeze-reassessment/manual/20260316T195539Z-closeout/14-next-slice-note.md`
