@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260316-1230-coordinator-symphony-aligned-delegation-server-rpc-transport-and-tool-dispatch-shell-extraction",
+      "title": "Coordinator Symphony-Aligned Delegation Server RPC Transport and Tool-Dispatch Shell Extraction",
+      "relates_to": "tasks/tasks-1230-coordinator-symphony-aligned-delegation-server-rpc-transport-and-tool-dispatch-shell-extraction.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-16",
+      "paths": {
+        "spec": "tasks/specs/1230-coordinator-symphony-aligned-delegation-server-rpc-transport-and-tool-dispatch-shell-extraction.md",
+        "task": "tasks/tasks-1230-coordinator-symphony-aligned-delegation-server-rpc-transport-and-tool-dispatch-shell-extraction.md",
+        "agent_task": ".agent/task/1230-coordinator-symphony-aligned-delegation-server-rpc-transport-and-tool-dispatch-shell-extraction.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-delegation-server-rpc-transport-and-tool-dispatch-shell-extraction.md"
+      }
+    },
+    {
       "id": "20260316-1228-coordinator-symphony-aligned-standalone-review-remaining-wrapper-surface-freeze-reassessment",
       "title": "Coordinator Symphony-Aligned Standalone Review Remaining Wrapper-Surface Freeze Reassessment",
       "relates_to": "tasks/tasks-1228-coordinator-symphony-aligned-standalone-review-remaining-wrapper-surface-freeze-reassessment.md",
