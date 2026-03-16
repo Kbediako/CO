@@ -16,11 +16,14 @@ export const COLLAB_FEATURE_LEGACY = 'collab';
 const DEFAULT_COLLAB_ROLE_POLICY = 'enforce';
 const COLLAB_ROLE_POLICY_ENV_CANONICAL = 'RLM_SYMBOLIC_MULTI_AGENT_ROLE_POLICY';
 const COLLAB_ROLE_POLICY_ENV_LEGACY = 'RLM_COLLAB_ROLE_POLICY';
+const COLLAB_ALLOW_DEFAULT_ROLE_ENV_CANONICAL = 'RLM_SYMBOLIC_MULTI_AGENT_ALLOW_DEFAULT_ROLE';
+const COLLAB_ALLOW_DEFAULT_ROLE_ENV_LEGACY = 'RLM_COLLAB_ALLOW_DEFAULT_ROLE';
 const COLLAB_ROLE_TAG_PATTERN = /^\s*\[(?:agent_type|role)\s*:\s*([a-z0-9._-]+)\]/i;
 const COLLAB_ROLE_TOKEN_PATTERN = /^[a-z0-9._-]+$/;
 
 export type CollabFeatureKey = typeof COLLAB_FEATURE_CANONICAL | typeof COLLAB_FEATURE_LEGACY;
 export type CollabRolePolicy = 'enforce' | 'warn' | 'off';
+export type EnvAliasSource = 'canonical' | 'legacy' | null;
 export type CollabLifecycleReasonCode =
   | 'thread_limit'
   | 'missing_wait'
@@ -47,6 +50,16 @@ export interface ParsedCollabToolCall {
   prompt: string | null;
   agentType: string | null;
   promptRole: string | null;
+}
+
+export interface CollabRolePolicyConfig {
+  value: CollabRolePolicy;
+  source: EnvAliasSource;
+}
+
+export interface CollabAllowDefaultRoleConfig {
+  value: boolean;
+  source: EnvAliasSource;
 }
 
 interface RuntimeShellLogger {
@@ -88,9 +101,18 @@ interface RlmCodexJsonlCompletionOptions {
   collabAllowDefaultRole?: boolean;
 }
 
+interface RlmSymbolicPromptOptions {
+  nonInteractive: boolean;
+  symbolicCollabEnabled: boolean;
+  collabFeatureKey: CollabFeatureKey;
+  collabRolePolicy: CollabRolePolicy;
+  collabAllowDefaultRole: boolean;
+}
+
 export interface RlmCodexRuntimeShell {
   runCompletion(prompt: string, options: RlmCodexExecOptions): Promise<string>;
   runJsonlCompletion(prompt: string, options: RlmCodexJsonlCompletionOptions): Promise<string>;
+  runSymbolicPrompt(prompt: string, options: RlmSymbolicPromptOptions): Promise<string>;
   resolveCollabFeatureKey(nonInteractive: boolean): Promise<CollabFeatureKey>;
 }
 
@@ -128,6 +150,14 @@ function defaultExecRunner(request: RuntimeExecRequest): Promise<{ stdout: strin
       }
     });
   });
+}
+
+function envFlagEnabled(value: string | undefined): boolean {
+  if (!value) {
+    return false;
+  }
+  const normalized = value.trim().toLowerCase();
+  return normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'on';
 }
 
 export function createRlmCodexRuntimeShell(
@@ -240,6 +270,24 @@ export function createRlmCodexRuntimeShell(
         return message;
       }
       return [stdout.trim(), stderr.trim()].filter(Boolean).join('\n');
+    },
+
+    async runSymbolicPrompt(prompt: string, options: RlmSymbolicPromptOptions): Promise<string> {
+      if (!options.symbolicCollabEnabled) {
+        return this.runCompletion(prompt, {
+          nonInteractive: options.nonInteractive,
+          subagentsEnabled: false,
+          mirrorOutput: false
+        });
+      }
+      return this.runJsonlCompletion(buildCollabSubcallPrompt(prompt), {
+        nonInteractive: options.nonInteractive,
+        mirrorOutput: true,
+        extraArgs: ['--enable', options.collabFeatureKey, '--sandbox', 'read-only'],
+        validateCollabLifecycle: true,
+        collabRolePolicy: options.collabRolePolicy,
+        collabAllowDefaultRole: options.collabAllowDefaultRole
+      });
     },
 
     async resolveCollabFeatureKey(nonInteractive: boolean): Promise<CollabFeatureKey> {
@@ -443,6 +491,44 @@ export function resolveCollabRolePolicy(value: string | undefined): CollabRolePo
       `legacy alias ${COLLAB_ROLE_POLICY_ENV_LEGACY}).`
   );
   return DEFAULT_COLLAB_ROLE_POLICY;
+}
+
+export function resolveCollabRolePolicyConfig(
+  env: NodeJS.ProcessEnv
+): CollabRolePolicyConfig {
+  const canonical = env[COLLAB_ROLE_POLICY_ENV_CANONICAL];
+  const legacy = env[COLLAB_ROLE_POLICY_ENV_LEGACY];
+  if (canonical !== undefined) {
+    if (legacy !== undefined && legacy.trim().toLowerCase() !== canonical.trim().toLowerCase()) {
+      logger.warn(
+        `${COLLAB_ROLE_POLICY_ENV_LEGACY} is ignored because ${COLLAB_ROLE_POLICY_ENV_CANONICAL} is set.`
+      );
+    }
+    return { value: resolveCollabRolePolicy(canonical), source: 'canonical' };
+  }
+  if (legacy !== undefined) {
+    return { value: resolveCollabRolePolicy(legacy), source: 'legacy' };
+  }
+  return { value: resolveCollabRolePolicy(undefined), source: null };
+}
+
+export function resolveCollabAllowDefaultRoleConfig(
+  env: NodeJS.ProcessEnv
+): CollabAllowDefaultRoleConfig {
+  const canonical = env[COLLAB_ALLOW_DEFAULT_ROLE_ENV_CANONICAL];
+  const legacy = env[COLLAB_ALLOW_DEFAULT_ROLE_ENV_LEGACY];
+  if (canonical !== undefined) {
+    if (legacy !== undefined && envFlagEnabled(legacy) !== envFlagEnabled(canonical)) {
+      logger.warn(
+        `${COLLAB_ALLOW_DEFAULT_ROLE_ENV_LEGACY} is ignored because ${COLLAB_ALLOW_DEFAULT_ROLE_ENV_CANONICAL} is set.`
+      );
+    }
+    return { value: envFlagEnabled(canonical), source: 'canonical' };
+  }
+  if (legacy !== undefined) {
+    return { value: envFlagEnabled(legacy), source: 'legacy' };
+  }
+  return { value: false, source: null };
 }
 
 export function isRolePolicyValidationReason(

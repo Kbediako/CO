@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { __test__ } from '../src/cli/rlmRunner.js';
-
-const { buildCollabSubcallPrompt, parseCollabToolCallsFromJsonl, validateCollabLifecycle } = __test__;
-const { isRolePolicyValidationReason, resolveCollabRolePolicy } = __test__;
+import {
+  buildCollabSubcallPrompt,
+  isRolePolicyValidationReason,
+  parseCollabToolCallsFromJsonl,
+  resolveCollabRolePolicy,
+  validateCollabLifecycle
+} from '../src/cli/rlm/rlmCodexRuntimeShell.js';
 
 function makeCollabLine(
   type: 'item.started' | 'item.updated' | 'item.completed',

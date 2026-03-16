@@ -2,7 +2,9 @@ import { describe, expect, it, vi } from 'vitest';
 
 import {
   COLLAB_FEATURE_LEGACY,
-  createRlmCodexRuntimeShell
+  createRlmCodexRuntimeShell,
+  resolveCollabAllowDefaultRoleConfig,
+  resolveCollabRolePolicyConfig
 } from '../src/cli/rlm/rlmCodexRuntimeShell.js';
 
 function makeCollabLine(
@@ -182,5 +184,103 @@ describe('rlmCodexRuntimeShell', () => {
     expect(log.debug).toHaveBeenCalledWith(
       'Unable to resolve Codex collab feature key via `codex features list`: features unavailable'
     );
+  });
+
+  it('runs plain symbolic prompts through non-collab completion', async () => {
+    const execRunner = vi.fn().mockResolvedValue({
+      stdout: 'plain symbolic response',
+      stderr: ''
+    });
+    const shell = createRlmCodexRuntimeShell({
+      env: {},
+      repoRoot: '/repo',
+      createRuntimeContextImpl: vi.fn(async () => ({ runtime: { provider: 'CliRuntimeProvider' } }) as never),
+      resolveRuntimeCommandImpl: vi.fn((args: string[]) => ({ command: 'codex', args })) as never,
+      formatRuntimeSelectionSummaryImpl: vi.fn(() => 'provider=CliRuntimeProvider'),
+      execRunner
+    });
+
+    await expect(
+      shell.runSymbolicPrompt('plain prompt', {
+        nonInteractive: false,
+        symbolicCollabEnabled: false,
+        collabFeatureKey: COLLAB_FEATURE_LEGACY,
+        collabRolePolicy: 'enforce',
+        collabAllowDefaultRole: false
+      })
+    ).resolves.toBe('plain symbolic response');
+
+    expect(execRunner).toHaveBeenCalledWith(
+      expect.objectContaining({
+        args: ['exec', 'plain prompt']
+      })
+    );
+  });
+
+  it('runs collab-enabled symbolic prompts through jsonl completion with lifecycle validation', async () => {
+    const execRunner = vi.fn().mockResolvedValue({
+      stdout: [
+        makeCollabLine('item.completed', 'spawn_agent', 'completed', ['agent-1'], {
+          agentType: 'explorer',
+          prompt: '[agent_type:explorer]\nAnalyze this'
+        }),
+        makeCollabLine('item.completed', 'wait', 'completed', ['agent-1']),
+        makeCollabLine('item.completed', 'close_agent', 'completed', ['agent-1']),
+        JSON.stringify({
+          type: 'item.completed',
+          item: { type: 'agent_message', text: 'collab symbolic response' }
+        })
+      ].join('\n'),
+      stderr: ''
+    });
+    const shell = createRlmCodexRuntimeShell({
+      env: {},
+      repoRoot: '/repo',
+      createRuntimeContextImpl: vi.fn(async () => ({ runtime: { provider: 'CliRuntimeProvider' } }) as never),
+      resolveRuntimeCommandImpl: vi.fn((args: string[]) => ({ command: 'codex', args })) as never,
+      formatRuntimeSelectionSummaryImpl: vi.fn(() => 'provider=CliRuntimeProvider'),
+      execRunner
+    });
+
+    await expect(
+      shell.runSymbolicPrompt('collab prompt', {
+        nonInteractive: true,
+        symbolicCollabEnabled: true,
+        collabFeatureKey: 'multi_agent',
+        collabRolePolicy: 'enforce',
+        collabAllowDefaultRole: false
+      })
+    ).resolves.toBe('collab symbolic response');
+
+    expect(execRunner).toHaveBeenCalledWith(
+      expect.objectContaining({
+        args: [
+          'exec',
+          '--json',
+          '--enable',
+          'multi_agent',
+          '--sandbox',
+          'read-only',
+          expect.stringContaining('Use collab tools to run the sub-agent prompt below.')
+        ]
+      })
+    );
+  });
+});
+
+describe('rlmCodexRuntimeShell config resolution', () => {
+  it('prefers canonical role-policy env keys', () => {
+    const resolved = resolveCollabRolePolicyConfig({
+      RLM_SYMBOLIC_MULTI_AGENT_ROLE_POLICY: 'warn',
+      RLM_COLLAB_ROLE_POLICY: 'off'
+    } as NodeJS.ProcessEnv);
+    expect(resolved).toEqual({ value: 'warn', source: 'canonical' });
+  });
+
+  it('falls back to legacy allow-default-role env keys', () => {
+    const resolved = resolveCollabAllowDefaultRoleConfig({
+      RLM_COLLAB_ALLOW_DEFAULT_ROLE: '1'
+    } as NodeJS.ProcessEnv);
+    expect(resolved).toEqual({ value: true, source: 'legacy' });
   });
 });

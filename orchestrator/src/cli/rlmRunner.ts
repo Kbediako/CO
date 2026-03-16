@@ -13,17 +13,9 @@ import { runRlmLoop } from './rlm/runner.js';
 import { buildContextObject, ContextStore, type ContextSource } from './rlm/context.js';
 import { runSymbolicLoop, type SymbolicBudgets } from './rlm/symbolic.js';
 import {
-  buildCollabSubcallPrompt,
-  COLLAB_FEATURE_CANONICAL,
-  COLLAB_FEATURE_LEGACY,
   createRlmCodexRuntimeShell,
-  isRolePolicyValidationReason,
-  parseCollabToolCallsFromJsonl,
-  parseFeatureFlagsFromText,
-  resolveCollabFeatureKeyFromFlags,
-  resolveCollabRolePolicy,
-  validateCollabLifecycle,
-  type CollabRolePolicy,
+  resolveCollabAllowDefaultRoleConfig,
+  resolveCollabRolePolicyConfig,
   type RlmCodexRuntimeShell
 } from './rlm/rlmCodexRuntimeShell.js';
 import type { AlignmentPolicy } from './rlm/alignment.js';
@@ -73,10 +65,6 @@ const DEFAULT_ALIGNMENT_SENTINEL_MODEL = 'gpt-5.3-spark';
 const DEFAULT_ALIGNMENT_HIGH_REASONING_MODEL = 'gpt-5.3-codex';
 const DEFAULT_ALIGNMENT_ARBITRATION_MODEL = 'gpt-5.3-codex';
 const DEFAULT_ALIGNMENT_HIGH_REASONING_AVAILABLE = true;
-const COLLAB_ROLE_POLICY_ENV_CANONICAL = 'RLM_SYMBOLIC_MULTI_AGENT_ROLE_POLICY';
-const COLLAB_ROLE_POLICY_ENV_LEGACY = 'RLM_COLLAB_ROLE_POLICY';
-const COLLAB_ALLOW_DEFAULT_ROLE_ENV_CANONICAL = 'RLM_SYMBOLIC_MULTI_AGENT_ALLOW_DEFAULT_ROLE';
-const COLLAB_ALLOW_DEFAULT_ROLE_ENV_LEGACY = 'RLM_COLLAB_ALLOW_DEFAULT_ROLE';
 const UNBOUNDED_ITERATION_ALIASES = new Set(['unbounded', 'unlimited', 'infinite', 'infinity']);
 
 type SymbolicMultiAgentSource = 'canonical' | 'legacy' | null;
@@ -84,18 +72,6 @@ type SymbolicMultiAgentSource = 'canonical' | 'legacy' | null;
 interface SymbolicMultiAgentConfig {
   enabled: boolean;
   source: SymbolicMultiAgentSource;
-}
-
-type EnvAliasSource = 'canonical' | 'legacy' | null;
-
-interface SymbolicMultiAgentRolePolicyConfig {
-  value: CollabRolePolicy;
-  source: EnvAliasSource;
-}
-
-interface SymbolicMultiAgentAllowDefaultRoleConfig {
-  value: boolean;
-  source: EnvAliasSource;
 }
 
 interface ParsedArgs {
@@ -426,42 +402,6 @@ async function runCodexAgent(
   });
   return { output };
 }
-function resolveSymbolicMultiAgentRolePolicyConfig(env: NodeJS.ProcessEnv): SymbolicMultiAgentRolePolicyConfig {
-  const canonical = env[COLLAB_ROLE_POLICY_ENV_CANONICAL];
-  const legacy = env[COLLAB_ROLE_POLICY_ENV_LEGACY];
-  if (canonical !== undefined) {
-    if (legacy !== undefined && legacy.trim().toLowerCase() !== canonical.trim().toLowerCase()) {
-      logger.warn(
-        `${COLLAB_ROLE_POLICY_ENV_LEGACY} is ignored because ${COLLAB_ROLE_POLICY_ENV_CANONICAL} is set.`
-      );
-    }
-    return { value: resolveCollabRolePolicy(canonical), source: 'canonical' };
-  }
-  if (legacy !== undefined) {
-    return { value: resolveCollabRolePolicy(legacy), source: 'legacy' };
-  }
-  return { value: resolveCollabRolePolicy(undefined), source: null };
-}
-
-function resolveSymbolicMultiAgentAllowDefaultRoleConfig(
-  env: NodeJS.ProcessEnv
-): SymbolicMultiAgentAllowDefaultRoleConfig {
-  const canonical = env[COLLAB_ALLOW_DEFAULT_ROLE_ENV_CANONICAL];
-  const legacy = env[COLLAB_ALLOW_DEFAULT_ROLE_ENV_LEGACY];
-  if (canonical !== undefined) {
-    if (legacy !== undefined && envFlagEnabled(legacy) !== envFlagEnabled(canonical)) {
-      logger.warn(
-        `${COLLAB_ALLOW_DEFAULT_ROLE_ENV_LEGACY} is ignored because ${COLLAB_ALLOW_DEFAULT_ROLE_ENV_CANONICAL} is set.`
-      );
-    }
-    return { value: envFlagEnabled(canonical), source: 'canonical' };
-  }
-  if (legacy !== undefined) {
-    return { value: envFlagEnabled(legacy), source: 'legacy' };
-  }
-  return { value: false, source: null };
-}
-
 function normalizeExitCode(code: number | string | undefined): number {
   if (typeof code === 'number' && Number.isInteger(code)) {
     return code;
@@ -766,9 +706,9 @@ async function main(): Promise<void> {
   const subagentsEnabled = envFlagEnabled(env.CODEX_SUBAGENTS) || envFlagEnabled(env.RLM_SUBAGENTS);
   const symbolicMultiAgent = resolveSymbolicMultiAgentConfig(env);
   const symbolicCollabEnabled = symbolicMultiAgent.enabled;
-  const collabRolePolicyConfig = resolveSymbolicMultiAgentRolePolicyConfig(env);
+  const collabRolePolicyConfig = resolveCollabRolePolicyConfig(env);
   const collabRolePolicy = collabRolePolicyConfig.value;
-  const collabAllowDefaultRoleConfig = resolveSymbolicMultiAgentAllowDefaultRoleConfig(env);
+  const collabAllowDefaultRoleConfig = resolveCollabAllowDefaultRoleConfig(env);
   const collabAllowDefaultRole = collabAllowDefaultRoleConfig.value;
   const symbolicDeliberationEnabled =
     env.RLM_SYMBOLIC_DELIBERATION === undefined
@@ -1067,19 +1007,10 @@ async function main(): Promise<void> {
       },
       runSubcall: (prompt, _meta) => {
         void _meta;
-        if (!symbolicCollabEnabled) {
-          return codexRuntimeShell.runCompletion(prompt, {
-            nonInteractive,
-            subagentsEnabled: false,
-            mirrorOutput: false
-          });
-        }
-        const collabPrompt = buildCollabSubcallPrompt(prompt);
-        return codexRuntimeShell.runJsonlCompletion(collabPrompt, {
+        return codexRuntimeShell.runSymbolicPrompt(prompt, {
           nonInteractive,
-          mirrorOutput: true,
-          extraArgs: ['--enable', collabFeatureKey, '--sandbox', 'read-only'],
-          validateCollabLifecycle: true,
+          symbolicCollabEnabled,
+          collabFeatureKey,
           collabRolePolicy,
           collabAllowDefaultRole
         });
@@ -1094,19 +1025,10 @@ async function main(): Promise<void> {
         logArtifacts: symbolicDeliberationLogArtifacts,
         run: (prompt, _meta) => {
           void _meta;
-          if (!symbolicCollabEnabled) {
-            return codexRuntimeShell.runCompletion(prompt, {
-              nonInteractive,
-              subagentsEnabled: false,
-              mirrorOutput: false
-            });
-          }
-          const collabPrompt = buildCollabSubcallPrompt(prompt);
-          return codexRuntimeShell.runJsonlCompletion(collabPrompt, {
+          return codexRuntimeShell.runSymbolicPrompt(prompt, {
             nonInteractive,
-            mirrorOutput: true,
-            extraArgs: ['--enable', collabFeatureKey, '--sandbox', 'read-only'],
-            validateCollabLifecycle: true,
+            symbolicCollabEnabled,
+            collabFeatureKey,
             collabRolePolicy,
             collabAllowDefaultRole
           });
@@ -1167,18 +1089,7 @@ export const __test__ = {
   resolveAlignmentCheckerEnabled,
   resolveAlignmentCheckerEnforce,
   resolveSymbolicMultiAgentConfig,
-  resolveSymbolicMultiAgentRolePolicyConfig,
-  resolveSymbolicMultiAgentAllowDefaultRoleConfig,
-  parseFeatureFlagsFromText,
-  resolveCollabFeatureKeyFromFlags,
-  resolveCollabRolePolicy,
-  isRolePolicyValidationReason,
   resolveRlmMode,
-  parseCollabToolCallsFromJsonl,
-  validateCollabLifecycle,
-  buildCollabSubcallPrompt,
-  COLLAB_FEATURE_CANONICAL,
-  COLLAB_FEATURE_LEGACY,
   DEFAULT_MAX_ITERATIONS,
   DEFAULT_MAX_MINUTES,
   DEFAULT_SYMBOLIC_MIN_BYTES,
