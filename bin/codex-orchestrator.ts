@@ -37,6 +37,7 @@ import { formatCodexCliSetupSummary, runCodexCliSetup } from '../orchestrator/sr
 import { formatCodexDefaultsSetupSummary, runCodexDefaultsSetup } from '../orchestrator/src/cli/codexDefaultsSetup.js';
 import { formatDelegationSetupSummary, runDelegationSetup } from '../orchestrator/src/cli/delegationSetup.js';
 import { formatSkillsInstallSummary, installSkills, listBundledSkills } from '../orchestrator/src/cli/skills.js';
+import { runFlowCliShell } from '../orchestrator/src/cli/flowCliShell.js';
 import { findPackageRoot, loadPackageInfo } from '../orchestrator/src/cli/utils/packageInfo.js';
 import { slugify } from '../orchestrator/src/cli/utils/strings.js';
 import { serveMcp } from '../orchestrator/src/cli/mcp.js';
@@ -71,15 +72,6 @@ interface RunOutputPayload {
     checked_at: string | null;
   } | null;
   cloud_fallback_reason: string | null;
-  issue_log: DoctorIssueLogResult | null;
-  issue_log_error: string | null;
-}
-
-interface FlowOutputPayload {
-  status: string;
-  failed_stage: 'docs-review' | 'implementation-gate' | null;
-  docs_review: RunOutputPayload;
-  implementation_gate: RunOutputPayload | null;
   issue_log: DoctorIssueLogResult | null;
   issue_log_error: string | null;
 }
@@ -265,200 +257,6 @@ function resolveTargetStageId(flags: ArgMap): string | undefined {
     return alias.trim();
   }
   return undefined;
-}
-
-interface FlowTargetStageSelection {
-  docsReviewTargetStageId?: string;
-  implementationGateTargetStageId?: string;
-}
-
-interface FlowPlanItem {
-  id: string;
-  metadata?: Record<string, unknown>;
-}
-
-interface FlowPlanPreview {
-  plan: {
-    items: FlowPlanItem[];
-  };
-}
-
-interface NormalizedFlowTargetToken {
-  literal: string;
-  literalLower: string;
-  stageTokenLower: string;
-  scopeLower: string | null;
-  scoped: boolean;
-}
-
-const FLOW_TARGET_PIPELINE_SCOPES = new Set(['docs-review', 'implementation-gate']);
-
-function isFlowTargetPipelineScope(scope: string): boolean {
-  return FLOW_TARGET_PIPELINE_SCOPES.has(scope);
-}
-
-function normalizeFlowTargetToken(candidate: string): NormalizedFlowTargetToken | null {
-  const trimmed = candidate.trim();
-  if (!trimmed) {
-    return null;
-  }
-  const tokens = trimmed.split(':');
-  if (tokens.length > 1 && !(tokens[0] ?? '').trim()) {
-    return null;
-  }
-
-  let scoped = false;
-  let scopeToken: string | null = null;
-  let suffixToken = trimmed;
-  if (tokens.length > 1) {
-    const candidateScope = (tokens[0] ?? '').trim().toLowerCase();
-    if (isFlowTargetPipelineScope(candidateScope)) {
-      scoped = true;
-      scopeToken = candidateScope;
-      suffixToken = (tokens[tokens.length - 1] ?? '').trim();
-    }
-  }
-
-  if (!suffixToken) {
-    return null;
-  }
-  return {
-    literal: trimmed,
-    literalLower: trimmed.toLowerCase(),
-    stageTokenLower: suffixToken.toLowerCase(),
-    scopeLower: scopeToken,
-    scoped
-  };
-}
-
-function flowPlanItemPipelineId(item: FlowPlanItem): string | null {
-  const metadataPipelineId =
-    item.metadata && typeof item.metadata['pipelineId'] === 'string'
-      ? (item.metadata['pipelineId'] as string).trim().toLowerCase()
-      : '';
-  if (metadataPipelineId) {
-    return metadataPipelineId;
-  }
-  const delimiterIndex = item.id.indexOf(':');
-  if (delimiterIndex <= 0) {
-    return null;
-  }
-  return item.id.slice(0, delimiterIndex).trim().toLowerCase() || null;
-}
-
-function flowPlanItemMatchesTarget(item: FlowPlanItem, candidate: string): boolean {
-  const normalized = normalizeFlowTargetToken(candidate);
-  if (!normalized) {
-    return false;
-  }
-  if (item.id.toLowerCase() === normalized.literalLower) {
-    return true;
-  }
-
-  if (normalized.scoped && normalized.scopeLower) {
-    const itemPipelineId = flowPlanItemPipelineId(item);
-    if (itemPipelineId && itemPipelineId !== normalized.scopeLower) {
-      return false;
-    }
-  }
-
-  const metadataStageId =
-    item.metadata && typeof item.metadata['stageId'] === 'string'
-      ? (item.metadata['stageId'] as string).toLowerCase()
-      : null;
-
-  const aliases = Array.isArray(item.metadata?.['aliases'])
-    ? (item.metadata?.['aliases'] as unknown[])
-    : [];
-  const aliasTokens = aliases.filter((alias): alias is string => typeof alias === 'string')
-    .map((alias) => alias.toLowerCase());
-
-  if (normalized.scoped) {
-    if (
-      metadataStageId
-      && (metadataStageId === normalized.literalLower || metadataStageId === normalized.stageTokenLower)
-    ) {
-      return true;
-    }
-    return aliasTokens.some(
-      (alias) => alias === normalized.literalLower || alias === normalized.stageTokenLower
-    );
-  }
-
-  if (item.id.toLowerCase().endsWith(`:${normalized.stageTokenLower}`)) {
-    return true;
-  }
-
-  if (
-    metadataStageId
-    && (
-      metadataStageId === normalized.stageTokenLower
-      || metadataStageId.endsWith(`:${normalized.stageTokenLower}`)
-    )
-  ) {
-    return true;
-  }
-
-  return aliasTokens.some(
-    (alias) => alias === normalized.stageTokenLower || alias.endsWith(`:${normalized.stageTokenLower}`)
-  );
-}
-
-function planIncludesStageId(
-  plan: FlowPlanPreview,
-  stageId: string
-): boolean {
-  if (!stageId.trim()) {
-    return false;
-  }
-  return plan.plan.items.some((item) => flowPlanItemMatchesTarget(item, stageId));
-}
-
-function resolveFlowTargetScope(stageId: string): string | null {
-  const delimiterIndex = stageId.indexOf(':');
-  if (delimiterIndex <= 0) {
-    return null;
-  }
-  const scope = stageId.slice(0, delimiterIndex).trim().toLowerCase();
-  if (!isFlowTargetPipelineScope(scope)) {
-    return null;
-  }
-  return scope;
-}
-
-async function resolveFlowTargetStageSelection(
-  orchestrator: CodexOrchestrator,
-  taskId: string | undefined,
-  requestedTargetStageId: string | undefined
-): Promise<FlowTargetStageSelection> {
-  if (!requestedTargetStageId) {
-    return {};
-  }
-
-  const [docsPlan, implementationPlan] = (await Promise.all([
-    orchestrator.plan({ pipelineId: 'docs-review', taskId }),
-    orchestrator.plan({ pipelineId: 'implementation-gate', taskId })
-  ])) as [FlowPlanPreview, FlowPlanPreview];
-
-  const requestedScope = resolveFlowTargetScope(requestedTargetStageId);
-  const docsScopeMatch = !requestedScope || requestedScope === 'docs-review';
-  const implementationScopeMatch = !requestedScope || requestedScope === 'implementation-gate';
-
-  const docsReviewTargetStageId = docsScopeMatch && planIncludesStageId(docsPlan, requestedTargetStageId)
-    ? requestedTargetStageId
-    : undefined;
-  const implementationGateTargetStageId =
-    implementationScopeMatch && planIncludesStageId(implementationPlan, requestedTargetStageId)
-    ? requestedTargetStageId
-    : undefined;
-
-  if (!docsReviewTargetStageId && !implementationGateTargetStageId) {
-    throw new Error(
-      `Target stage "${requestedTargetStageId}" is not defined in docs-review or implementation-gate.`
-    );
-  }
-
-  return { docsReviewTargetStageId, implementationGateTargetStageId };
 }
 
 function readStringFlag(flags: ArgMap, key: string): string | undefined {
@@ -893,124 +691,25 @@ async function handleFlow(orchestrator: CodexOrchestrator, rawArgs: string[]): P
   const parentRunId = typeof flags['parent-run'] === 'string' ? (flags['parent-run'] as string) : undefined;
   const approvalPolicy = typeof flags['approval-policy'] === 'string' ? (flags['approval-policy'] as string) : undefined;
   const targetStageId = resolveTargetStageId(flags);
-  try {
-    const { docsReviewTargetStageId, implementationGateTargetStageId } =
-      await resolveFlowTargetStageSelection(orchestrator, taskId, targetStageId);
-
-    await withRunUi(flags, format, async (runEvents) => {
-      const docsReviewResult = await orchestrator.start({
-        pipelineId: 'docs-review',
-        taskId,
-        parentRunId,
-        approvalPolicy,
-        targetStageId: docsReviewTargetStageId,
-        executionMode,
-        runtimeMode,
-        runEvents
-      });
-      const docsPayload = toRunOutputPayload(docsReviewResult);
-      if (format === 'text') {
-        emitRunOutput(docsReviewResult, format, 'Docs-review run');
-      }
-
-      if (docsReviewResult.manifest.status !== 'succeeded') {
-        const issueLogCapture = await maybeCaptureAutoIssueLog({
-          enabled: autoIssueLogEnabled,
-          issueTitle: 'Auto issue log: flow docs-review failed',
-          issueNotes: `Automatic failure capture for docs-review run ${docsReviewResult.manifest.run_id} (${docsReviewResult.manifest.status}).`,
-          taskFilter: resolveTaskFilter(docsReviewResult.manifest.task_id, taskId)
-        });
-        process.exitCode = 1;
-        if (format === 'json') {
-          const payload: FlowOutputPayload = {
-            status: docsReviewResult.manifest.status,
-            failed_stage: 'docs-review',
-            docs_review: docsPayload,
-            implementation_gate: null,
-            issue_log: issueLogCapture.issueLog,
-            issue_log_error: issueLogCapture.issueLogError
-          };
-          console.log(JSON.stringify(payload, null, 2));
-        } else {
-          console.log('Flow halted: docs-review failed.');
-          if (issueLogCapture.issueLog) {
-            for (const line of formatDoctorIssueLogSummary(issueLogCapture.issueLog)) {
-              console.log(line);
-            }
-          }
-          if (issueLogCapture.issueLogError) {
-            console.log(`Auto issue log: failed (${issueLogCapture.issueLogError})`);
-          }
-        }
-        return;
-      }
-
-      const implementationGateResult = await orchestrator.start({
-        pipelineId: 'implementation-gate',
-        taskId,
-        parentRunId: docsReviewResult.manifest.run_id,
-        approvalPolicy,
-        targetStageId: implementationGateTargetStageId,
-        executionMode,
-        runtimeMode,
-        runEvents
-      });
-      const implementationPayload = toRunOutputPayload(implementationGateResult);
-      const issueLogCapture =
-        implementationGateResult.manifest.status !== 'succeeded'
-          ? await maybeCaptureAutoIssueLog({
-              enabled: autoIssueLogEnabled,
-              issueTitle: 'Auto issue log: flow implementation-gate failed',
-              issueNotes: `Automatic failure capture for implementation-gate run ${implementationGateResult.manifest.run_id} (${implementationGateResult.manifest.status}).`,
-              taskFilter: resolveTaskFilter(implementationGateResult.manifest.task_id, taskId)
-            })
-          : { issueLog: null, issueLogError: null };
-
-      if (format === 'json') {
-        const payload: FlowOutputPayload = {
-          status: implementationGateResult.manifest.status,
-          failed_stage: implementationGateResult.manifest.status === 'succeeded' ? null : 'implementation-gate',
-          docs_review: docsPayload,
-          implementation_gate: implementationPayload,
-          issue_log: issueLogCapture.issueLog,
-          issue_log_error: issueLogCapture.issueLogError
-        };
-        console.log(JSON.stringify(payload, null, 2));
-        if (implementationGateResult.manifest.status !== 'succeeded') {
-          process.exitCode = 1;
-        }
-        return;
-      }
-
-      emitRunOutput(implementationGateResult, format, 'Implementation-gate run');
-      if (implementationGateResult.manifest.status !== 'succeeded') {
-        process.exitCode = 1;
-        console.log('Flow halted: implementation-gate failed.');
-        if (issueLogCapture.issueLog) {
-          for (const line of formatDoctorIssueLogSummary(issueLogCapture.issueLog)) {
-            console.log(line);
-          }
-        }
-        if (issueLogCapture.issueLogError) {
-          console.log(`Auto issue log: failed (${issueLogCapture.issueLogError})`);
-        }
-        return;
-      }
-      console.log('Flow complete: docs-review -> implementation-gate.');
-      await maybeEmitRunAdoptionHint({
-        format,
-        taskFilter: resolveTaskFilter(implementationGateResult.manifest.task_id, taskId)
-      });
-    });
-  } catch (error) {
-    const issueLogCapture = await maybeCaptureAutoIssueLog({
-      enabled: autoIssueLogEnabled,
-      issueTitle: 'Auto issue log: flow failed before run manifest',
-      issueNotes: 'Automatic failure capture for flow setup failure before run manifest creation.',
-      taskFilter: resolveTaskFilter(undefined, taskId)
-    });
-    throw withAutoIssueLogContext(error, issueLogCapture);
-  }
+  await runFlowCliShell({
+    orchestrator,
+    format,
+    executionMode,
+    runtimeMode,
+    autoIssueLogEnabled,
+    taskId,
+    parentRunId,
+    approvalPolicy,
+    targetStageId,
+    runWithUi: async (action) => await withRunUi(flags, format, action),
+    emitRunOutput,
+    formatIssueLogSummary: formatDoctorIssueLogSummary,
+    toRunOutputPayload,
+    maybeCaptureAutoIssueLog,
+    resolveTaskFilter,
+    withAutoIssueLogContext,
+    maybeEmitRunAdoptionHint
+  });
 }
 
 interface ExternalReviewRunner {
