@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260316-1227-coordinator-symphony-aligned-standalone-review-run-review-orchestration-adapter-reassessment",
+      "title": "Coordinator Symphony-Aligned Standalone Review Run-Review Orchestration Adapter Reassessment",
+      "relates_to": "tasks/tasks-1227-coordinator-symphony-aligned-standalone-review-run-review-orchestration-adapter-reassessment.md",
+      "risk": "low",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-16",
+      "paths": {
+        "spec": "tasks/specs/1227-coordinator-symphony-aligned-standalone-review-run-review-orchestration-adapter-reassessment.md",
+        "task": "tasks/tasks-1227-coordinator-symphony-aligned-standalone-review-run-review-orchestration-adapter-reassessment.md",
+        "agent_task": ".agent/task/1227-coordinator-symphony-aligned-standalone-review-run-review-orchestration-adapter-reassessment.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-standalone-review-run-review-orchestration-adapter-reassessment.md"
+      }
+    },
+    {
       "id": "20260316-1226-coordinator-symphony-aligned-standalone-review-run-review-telemetry-writer-shell-extraction",
       "title": "Coordinator Symphony-Aligned Standalone Review Run-Review Telemetry Writer Shell Extraction",
       "relates_to": "tasks/tasks-1226-coordinator-symphony-aligned-standalone-review-run-review-telemetry-writer-shell-extraction.md",

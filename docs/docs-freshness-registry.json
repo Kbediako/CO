@@ -3,6 +3,55 @@
   "generated_at": "2026-03-16",
   "entries": [
     {
+      "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-standalone-review-run-review-orchestration-adapter-reassessment.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-16",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/PRD-coordinator-symphony-aligned-standalone-review-run-review-orchestration-adapter-reassessment.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-16",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/TECH_SPEC-coordinator-symphony-aligned-standalone-review-run-review-orchestration-adapter-reassessment.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-16",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/findings/1227-standalone-review-run-review-orchestration-adapter-reassessment-deliberation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-16",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/tasks-1227-coordinator-symphony-aligned-standalone-review-run-review-orchestration-adapter-reassessment.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-16",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/specs/1227-coordinator-symphony-aligned-standalone-review-run-review-orchestration-adapter-reassessment.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-16",
+      "cadence_days": 30
+    },
+    {
+      "path": ".agent/task/1227-coordinator-symphony-aligned-standalone-review-run-review-orchestration-adapter-reassessment.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-16",
+      "cadence_days": 30
+    },
+    {
       "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-standalone-review-run-review-telemetry-writer-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
