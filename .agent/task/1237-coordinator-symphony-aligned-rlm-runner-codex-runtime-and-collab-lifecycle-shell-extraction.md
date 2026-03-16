@@ -19,4 +19,4 @@
 
 ## Implementation
 
-- [ ] RLM runtime and collab lifecycle shell extracted with focused regression coverage. Evidence: pending implementation packet.
+- [x] RLM runtime and collab lifecycle shell extracted with focused regression coverage. Evidence: `out/1237-coordinator-symphony-aligned-rlm-runner-codex-runtime-and-collab-lifecycle-shell-extraction/manual/20260316T092106Z-closeout/00-summary.md`

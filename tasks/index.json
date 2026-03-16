@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260316-1238-coordinator-symphony-aligned-rlm-runner-symbolic-collab-runtime-and-config-shell-extraction",
+      "title": "Coordinator Symphony-Aligned RLM Runner Symbolic Collab Runtime And Config Shell Extraction",
+      "relates_to": "tasks/tasks-1238-coordinator-symphony-aligned-rlm-runner-symbolic-collab-runtime-and-config-shell-extraction.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-16",
+      "paths": {
+        "spec": "tasks/specs/1238-coordinator-symphony-aligned-rlm-runner-symbolic-collab-runtime-and-config-shell-extraction.md",
+        "task": "tasks/tasks-1238-coordinator-symphony-aligned-rlm-runner-symbolic-collab-runtime-and-config-shell-extraction.md",
+        "agent_task": ".agent/task/1238-coordinator-symphony-aligned-rlm-runner-symbolic-collab-runtime-and-config-shell-extraction.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-rlm-runner-symbolic-collab-runtime-and-config-shell-extraction.md"
+      }
+    },
+    {
       "id": "20260316-1237-coordinator-symphony-aligned-rlm-runner-codex-runtime-and-collab-lifecycle-shell-extraction",
       "title": "Coordinator Symphony-Aligned RLM Runner Codex Runtime and Collab Lifecycle Shell Extraction",
       "relates_to": "tasks/tasks-1237-coordinator-symphony-aligned-rlm-runner-codex-runtime-and-collab-lifecycle-shell-extraction.md",
