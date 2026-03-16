@@ -307,6 +307,23 @@ describe('review meta-surface normalization', () => {
     ]);
   });
 
+  it('classifies the extracted non-interactive handoff helper as review-support when it is inspected directly', () => {
+    expect(
+      classifyMetaSurfaceDirectDetailed(
+        'sed',
+        ['-n', '1,80p', 'scripts/lib/review-non-interactive-handoff.ts'],
+        new Set(),
+        '/repo'
+      )
+    ).toEqual([
+      {
+        kind: 'review-support',
+        candidate: 'scripts/lib/review-non-interactive-handoff.ts',
+        operand: 'scripts/lib/review-non-interactive-handoff.ts'
+      }
+    ]);
+  });
+
   it('classifies the JS focused launch-attempt regression spec as review-support when it is inspected directly', () => {
     expect(
       classifyMetaSurfaceDirectDetailed(
@@ -436,6 +453,46 @@ describe('review meta-surface normalization', () => {
       isTouchedReviewScopePathFamilyOperand(
         'scripts/lib/review-launch-attempt.ts',
         new Set(['tests/run-review.spec.ts']),
+        '/repo'
+      )
+    ).toBe(true);
+  });
+
+  it('treats the extracted non-interactive handoff helper as touched when the run-review regression host is touched', () => {
+    expect(
+      isTouchedReviewScopePathFamilyOperand(
+        'scripts/lib/review-non-interactive-handoff.ts',
+        new Set(['tests/run-review.spec.ts']),
+        '/repo'
+      )
+    ).toBe(true);
+  });
+
+  it('treats the extracted non-interactive handoff helper as touched when the launch-attempt helper is touched', () => {
+    expect(
+      isTouchedReviewScopePathFamilyOperand(
+        'scripts/lib/review-non-interactive-handoff.ts',
+        new Set(['scripts/lib/review-launch-attempt.ts']),
+        '/repo'
+      )
+    ).toBe(true);
+  });
+
+  it('treats run-review as touched when the extracted non-interactive handoff helper is touched', () => {
+    expect(
+      isTouchedReviewScopePathFamilyOperand(
+        'tests/run-review.spec.ts',
+        new Set(['scripts/lib/review-non-interactive-handoff.ts']),
+        '/repo'
+      )
+    ).toBe(true);
+  });
+
+  it('treats the focused launch-attempt regression spec as touched when the extracted non-interactive handoff helper is touched', () => {
+    expect(
+      isTouchedReviewScopePathFamilyOperand(
+        'tests/review-launch-attempt.spec.ts',
+        new Set(['scripts/lib/review-non-interactive-handoff.ts']),
         '/repo'
       )
     ).toBe(true);

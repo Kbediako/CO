@@ -1,0 +1,12 @@
+
+ RUN  v1.6.1 /Users/kbediako/Code/CO
+
+ ✓ tests/review-meta-surface-normalization.spec.ts  (78 tests) 6ms
+ ✓ tests/review-non-interactive-handoff.spec.ts  (4 tests) 9ms
+ ✓ tests/run-review.spec.ts  (115 tests) 180874ms
+
+ Test Files  3 passed (3)
+      Tests  197 passed (197)
+   Start at  15:31:06
+   Duration  181.04s (transform 165ms, setup 0ms, collect 279ms, tests 180.89s, environment 0ms, prepare 79ms)
+

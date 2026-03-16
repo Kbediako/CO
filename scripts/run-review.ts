@@ -29,9 +29,9 @@ import {
   REVIEW_ENFORCE_BOUNDED_MODE_ENV_KEY
 } from './lib/review-execution-boundary-preflight.js';
 import {
-  prepareReviewArtifacts,
   runReviewLaunchAttemptShell
 } from './lib/review-launch-attempt.js';
+import { prepareReviewNonInteractiveHandoffShell } from './lib/review-non-interactive-handoff.js';
 import {
   buildActiveCloseoutProvenanceLines,
   buildReviewPromptContext,
@@ -392,39 +392,18 @@ async function main(): Promise<void> {
   }
 
   const prompt = promptLines.join('\n');
-  const artifactPaths = await prepareReviewArtifacts(manifestPath, prompt, repoRoot);
-  const nonInteractive = options.nonInteractive ?? shouldForceNonInteractive();
-  const reviewEnv = { ...process.env };
-  reviewEnv.MANIFEST = manifestPath;
-  if (runnerLogExists) {
-    reviewEnv.RUNNER_LOG = runnerLogPath;
-    reviewEnv.RUN_LOG = runnerLogPath;
-  } else {
-    delete reviewEnv.RUNNER_LOG;
-    delete reviewEnv.RUN_LOG;
-  }
-  const stdinIsTTY = process.stdin?.isTTY === true;
-  if (nonInteractive) {
-    reviewEnv.CODEX_NON_INTERACTIVE = reviewEnv.CODEX_NON_INTERACTIVE ?? '1';
-    reviewEnv.CODEX_NO_INTERACTIVE = reviewEnv.CODEX_NO_INTERACTIVE ?? '1';
-    reviewEnv.CODEX_INTERACTIVE = reviewEnv.CODEX_INTERACTIVE ?? '0';
-  }
-  if (
-    nonInteractive &&
-    !envFlagEnabled(process.env.FORCE_CODEX_REVIEW) &&
-    (envFlagEnabled(process.env.CI) ||
-      !stdinIsTTY ||
-      envFlagEnabled(process.env.CODEX_REVIEW_NON_INTERACTIVE) ||
-      envFlagEnabled(process.env.CODEX_NON_INTERACTIVE) ||
-      envFlagEnabled(process.env.CODEX_NO_INTERACTIVE) ||
-      envFlagEnabled(process.env.CODEX_NONINTERACTIVE))
-  ) {
-    console.log('Codex review handoff (non-interactive):');
-    console.log('---');
-    console.log(prompt);
-    console.log('---');
-    console.log(`Review prompt saved to: ${path.relative(repoRoot, artifactPaths.promptPath)}`);
-    console.log('Set FORCE_CODEX_REVIEW=1 to invoke `codex review` in this environment.');
+  const { artifactPaths, nonInteractive, reviewEnv, handedOff } =
+    await prepareReviewNonInteractiveHandoffShell({
+      cliNonInteractive: options.nonInteractive,
+      env: process.env,
+      manifestPath,
+      prompt,
+      repoRoot,
+      runnerLogExists,
+      runnerLogPath,
+      stdinIsTTY: process.stdin?.isTTY === true
+    });
+  if (handedOff) {
     return;
   }
 
@@ -600,18 +579,6 @@ function envFlagEnabled(value: string | undefined): boolean {
   }
   const normalized = value.trim().toLowerCase();
   return normalized === '1' || normalized === 'true' || normalized === 'yes';
-}
-
-function shouldForceNonInteractive(): boolean {
-  const stdinIsTTY = process.stdin?.isTTY === true;
-  return (
-    !stdinIsTTY ||
-    envFlagEnabled(process.env.CI) ||
-    envFlagEnabled(process.env.CODEX_REVIEW_NON_INTERACTIVE) ||
-    envFlagEnabled(process.env.CODEX_NON_INTERACTIVE) ||
-    envFlagEnabled(process.env.CODEX_NO_INTERACTIVE) ||
-    envFlagEnabled(process.env.CODEX_NONINTERACTIVE)
-  );
 }
 
 function printReviewWrapperHelp(): void {

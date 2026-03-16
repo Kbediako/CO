@@ -411,10 +411,23 @@ export function isTouchedReviewScopePathFamilyOperand(
       'tests/review-execution-boundary-preflight.spec.ts',
       'tests/review-execution-boundary-preflight.spec.js'
     ];
+    const reviewNonInteractiveHandoffPathFamily = [
+      'scripts/lib/review-non-interactive-handoff.ts',
+      'scripts/lib/review-non-interactive-handoff.js',
+      'dist/scripts/lib/review-non-interactive-handoff.js',
+      'tests/review-non-interactive-handoff.spec.ts',
+      'tests/review-non-interactive-handoff.spec.js'
+    ];
     const reviewLaunchAttemptPathFamily = [
       'scripts/lib/review-launch-attempt.ts',
       'scripts/lib/review-launch-attempt.js',
       'dist/scripts/lib/review-launch-attempt.js'
+    ];
+    const reviewNonInteractiveHandoffLaunchAttemptPathFamily = [
+      ...reviewNonInteractiveHandoffPathFamily,
+      ...reviewLaunchAttemptPathFamily,
+      'tests/review-launch-attempt.spec.ts',
+      'tests/review-launch-attempt.spec.js'
     ];
     const reviewScopeAdvisoryScopePathsPathFamily = [
       ...reviewScopeAdvisoryPathFamily,
@@ -436,6 +449,14 @@ export function isTouchedReviewScopePathFamilyOperand(
     ];
     const reviewExecutionBoundaryPreflightRunReviewPathFamily = [
       ...reviewExecutionBoundaryPreflightPathFamily,
+      'scripts/run-review.ts',
+      'scripts/run-review.js',
+      'dist/scripts/run-review.js',
+      'tests/run-review.spec.ts',
+      'tests/run-review.spec.js'
+    ];
+    const reviewNonInteractiveHandoffRunReviewPathFamily = [
+      ...reviewNonInteractiveHandoffPathFamily,
       'scripts/run-review.ts',
       'scripts/run-review.js',
       'dist/scripts/run-review.js',
@@ -478,6 +499,7 @@ export function isTouchedReviewScopePathFamilyOperand(
       ...new Set([
         ...reviewLaunchAttemptRunReviewPathFamily,
         ...reviewLaunchAttemptDependencyPathFamily,
+        ...reviewNonInteractiveHandoffLaunchAttemptPathFamily,
         ...reviewExecutionBoundaryPreflightDependencyPathFamily
       ])
     ];
@@ -513,11 +535,13 @@ export function isTouchedReviewScopePathFamilyOperand(
       reviewShellCommandParserNormalizationPathFamily,
       reviewShellCommandParserExecutionStatePathFamily,
       reviewExecutionTelemetryPathFamily,
+      reviewNonInteractiveHandoffLaunchAttemptPathFamily,
       reviewLaunchAttemptDependencyPathFamily,
       reviewLaunchAttemptRunReviewPathFamily,
       reviewExecutionBoundaryPreflightDependencyPathFamily,
       reviewExecutionBoundaryPreflightExecutionStatePathFamily,
       reviewExecutionBoundaryPreflightRunReviewPathFamily,
+      reviewNonInteractiveHandoffRunReviewPathFamily,
       reviewExecutionRuntimeRunReviewPathFamily,
       reviewExecutionRuntimeExecutionStatePathFamily
     ];
@@ -535,8 +559,13 @@ export function isTouchedReviewScopePathFamilyOperand(
       return true;
     }
     if (reviewExecutionRuntimeRegressionSpecPathFamily.includes(repoRelativeOperand)) {
-      return reviewExecutionRuntimePathFamily.some((path) =>
-        isTouchedScopePath(path, touchedPaths, repoRoot)
+      return (
+        reviewExecutionRuntimePathFamily.some((path) =>
+          isTouchedScopePath(path, touchedPaths, repoRoot)
+        ) ||
+        reviewNonInteractiveHandoffPathFamily.some((path) =>
+          isTouchedScopePath(path, touchedPaths, repoRoot)
+        )
       );
     }
     if (
@@ -783,6 +812,9 @@ function classifyMetaSurfaceOperand(
     matchesPathSuffix(normalized, 'scripts/lib/review-execution-boundary-preflight.ts') ||
     matchesPathSuffix(normalized, 'scripts/lib/review-execution-boundary-preflight.js') ||
     matchesPathSuffix(normalized, 'dist/scripts/lib/review-execution-boundary-preflight.js') ||
+    matchesPathSuffix(normalized, 'scripts/lib/review-non-interactive-handoff.ts') ||
+    matchesPathSuffix(normalized, 'scripts/lib/review-non-interactive-handoff.js') ||
+    matchesPathSuffix(normalized, 'dist/scripts/lib/review-non-interactive-handoff.js') ||
     matchesPathSuffix(normalized, 'scripts/lib/review-launch-attempt.ts') ||
     matchesPathSuffix(normalized, 'scripts/lib/review-launch-attempt.js') ||
     matchesPathSuffix(normalized, 'dist/scripts/lib/review-launch-attempt.js') ||
@@ -801,6 +833,8 @@ function classifyMetaSurfaceOperand(
     matchesPathSuffix(normalized, 'tests/review-command-intent-classification.spec.ts') ||
     matchesPathSuffix(normalized, 'tests/review-execution-boundary-preflight.spec.ts') ||
     matchesPathSuffix(normalized, 'tests/review-execution-boundary-preflight.spec.js') ||
+    matchesPathSuffix(normalized, 'tests/review-non-interactive-handoff.spec.ts') ||
+    matchesPathSuffix(normalized, 'tests/review-non-interactive-handoff.spec.js') ||
     matchesPathSuffix(normalized, 'tests/review-launch-attempt.spec.ts') ||
     matchesPathSuffix(normalized, 'tests/review-launch-attempt.spec.js') ||
     matchesPathSuffix(normalized, 'tests/review-scope-paths.spec.ts') ||
