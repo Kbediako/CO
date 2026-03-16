@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260316-1250-coordinator-symphony-aligned-doctor-apply-mutation-and-readiness-boundary-reassessment",
+      "title": "Coordinator Symphony-Aligned Doctor Apply Mutation And Readiness Boundary Reassessment",
+      "relates_to": "tasks/tasks-1250-coordinator-symphony-aligned-doctor-apply-mutation-and-readiness-boundary-reassessment.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-16",
+      "paths": {
+        "spec": "tasks/specs/1250-coordinator-symphony-aligned-doctor-apply-mutation-and-readiness-boundary-reassessment.md",
+        "task": "tasks/tasks-1250-coordinator-symphony-aligned-doctor-apply-mutation-and-readiness-boundary-reassessment.md",
+        "agent_task": ".agent/task/1250-coordinator-symphony-aligned-doctor-apply-mutation-and-readiness-boundary-reassessment.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-doctor-apply-mutation-and-readiness-boundary-reassessment.md"
+      }
+    },
+    {
       "id": "20260316-1249-coordinator-symphony-aligned-setup-bootstrap-shell-extraction",
       "title": "Coordinator Symphony-Aligned Setup Bootstrap Shell Extraction",
       "relates_to": "tasks/tasks-1249-coordinator-symphony-aligned-setup-bootstrap-shell-extraction.md",

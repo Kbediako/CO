@@ -21,6 +21,6 @@
 
 ## Extraction
 
-- [ ] Setup bootstrap shell boundary implemented. Evidence: pending implementation packet.
-- [ ] Focused setup parity coverage updated if needed. Evidence: pending implementation packet.
-- [ ] Final implementation validation complete. Evidence: pending implementation packet.
+- [x] Setup bootstrap shell boundary implemented. Evidence: `out/1249-coordinator-symphony-aligned-setup-bootstrap-shell-extraction/manual/20260316T200645Z-closeout/00-summary.md`
+- [x] Focused setup parity coverage updated. Evidence: `out/1249-coordinator-symphony-aligned-setup-bootstrap-shell-extraction/manual/20260316T200645Z-closeout/05a-targeted-tests.log`
+- [x] Final implementation validation complete. Evidence: `out/1249-coordinator-symphony-aligned-setup-bootstrap-shell-extraction/manual/20260316T200645Z-closeout/02-delegation-guard.log`, `out/1249-coordinator-symphony-aligned-setup-bootstrap-shell-extraction/manual/20260316T200645Z-closeout/03-spec-guard.log`, `out/1249-coordinator-symphony-aligned-setup-bootstrap-shell-extraction/manual/20260316T200645Z-closeout/05-lint.log`, `out/1249-coordinator-symphony-aligned-setup-bootstrap-shell-extraction/manual/20260316T200645Z-closeout/07-docs-check.log`, `out/1249-coordinator-symphony-aligned-setup-bootstrap-shell-extraction/manual/20260316T200645Z-closeout/08-docs-freshness.log`, `out/1249-coordinator-symphony-aligned-setup-bootstrap-shell-extraction/manual/20260316T200645Z-closeout/10-review.log`, `out/1249-coordinator-symphony-aligned-setup-bootstrap-shell-extraction/manual/20260316T200645Z-closeout/11-pack-smoke.log`, `out/1249-coordinator-symphony-aligned-setup-bootstrap-shell-extraction/manual/20260316T200645Z-closeout/13-override-notes.md`

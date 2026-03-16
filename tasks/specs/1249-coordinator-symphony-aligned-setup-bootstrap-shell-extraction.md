@@ -1,7 +1,7 @@
 ---
 id: 20260316-1249-coordinator-symphony-aligned-setup-bootstrap-shell-extraction
 title: Coordinator Symphony-Aligned Setup Bootstrap Shell Extraction
-status: active
+status: completed
 owner: Codex
 created: 2026-03-16
 last_review: 2026-03-16
@@ -13,6 +13,7 @@ related_tasks:
   - tasks/tasks-1249-coordinator-symphony-aligned-setup-bootstrap-shell-extraction.md
 review_notes:
   - 2026-03-16: Opened after `1248` froze the post-flow pocket. Local inspection showed that `handleSetup(...)` still mixes plan/apply branching, bundled-skill bootstrap composition, delegation/DevTools orchestration, and setup guidance rendering in the top-level CLI file while the underlying setup modules already exist outside it. Evidence: `out/1248-coordinator-symphony-aligned-flow-cli-remaining-boundary-freeze-reassessment/manual/20260316T195539Z-closeout/14-next-slice-note.md`, `docs/findings/1249-setup-bootstrap-shell-extraction-deliberation.md`.
+  - 2026-03-16: Completed by extracting the setup bootstrap shell into `orchestrator/src/cli/setupBootstrapShell.ts`, leaving `bin/codex-orchestrator.ts` as the parse/help wrapper. Focused setup parity passed, bounded review returned no findings after the stale-import and helper-text-plan coverage fixes, and the honest carry-forwards are the unrelated `rlmRunner.ts` build break plus the recurring local full-suite quiet-tail after the final visible `tests/cli-orchestrator.spec.ts` pass. Evidence: `out/1249-coordinator-symphony-aligned-setup-bootstrap-shell-extraction/manual/20260316T200645Z-closeout/00-summary.md`.
 ---
 
 # Technical Specification
