@@ -22,4 +22,7 @@
 
 ## Implementation
 
-- [ ] Exact question/delegation-token seam revalidated before code changes. Evidence: pending implementation packet.
+- [x] Exact question/delegation-token seam revalidated before code changes. Evidence: `out/1231-coordinator-symphony-aligned-delegation-server-question-and-token-flow-shell-extraction/manual/20260316T070652Z-closeout/00-summary.md`
+- [x] Question enqueue/poll and delegation-token flow extracted behind a dedicated helper boundary. Evidence: `out/1231-coordinator-symphony-aligned-delegation-server-question-and-token-flow-shell-extraction/manual/20260316T070652Z-closeout/00-summary.md`
+- [x] Focused regressions cover expired question fallback and manifest-root token-path containment parity. Evidence: `out/1231-coordinator-symphony-aligned-delegation-server-question-and-token-flow-shell-extraction/manual/20260316T070652Z-closeout/05-targeted-tests.log`
+- [x] Closeout packet, override notes, and next-slice note captured. Evidence: `out/1231-coordinator-symphony-aligned-delegation-server-question-and-token-flow-shell-extraction/manual/20260316T070652Z-closeout/00-summary.md`, `out/1231-coordinator-symphony-aligned-delegation-server-question-and-token-flow-shell-extraction/manual/20260316T070652Z-closeout/13-override-notes.md`, `out/1231-coordinator-symphony-aligned-delegation-server-question-and-token-flow-shell-extraction/manual/20260316T070652Z-closeout/14-next-slice-note.md`

@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260316-1232-coordinator-symphony-aligned-delegation-server-remaining-wrapper-surface-reassessment",
+      "title": "Coordinator Symphony-Aligned Delegation Server Remaining Wrapper-Surface Reassessment",
+      "relates_to": "tasks/tasks-1232-coordinator-symphony-aligned-delegation-server-remaining-wrapper-surface-reassessment.md",
+      "risk": "low",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-16",
+      "paths": {
+        "spec": "tasks/specs/1232-coordinator-symphony-aligned-delegation-server-remaining-wrapper-surface-reassessment.md",
+        "task": "tasks/tasks-1232-coordinator-symphony-aligned-delegation-server-remaining-wrapper-surface-reassessment.md",
+        "agent_task": ".agent/task/1232-coordinator-symphony-aligned-delegation-server-remaining-wrapper-surface-reassessment.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-delegation-server-remaining-wrapper-surface-reassessment.md"
+      }
+    },
+    {
       "id": "20260316-1231-coordinator-symphony-aligned-delegation-server-question-and-token-flow-shell-extraction",
       "title": "Coordinator Symphony-Aligned Delegation Server Question and Token Flow Shell Extraction",
       "relates_to": "tasks/tasks-1231-coordinator-symphony-aligned-delegation-server-question-and-token-flow-shell-extraction.md",
