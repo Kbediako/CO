@@ -19,6 +19,7 @@
 
 ## Implementation
 
-- [ ] RPC transport/runtime shell extracted behind a dedicated helper boundary. Evidence: pending closeout packet.
-- [ ] Tool-dispatch entry validation/routing extracted without changing handler behavior. Evidence: pending closeout packet.
-- [ ] Focused regressions cover JSON-RPC framing, top-level routing, and delegate-mode/tool-dispatch parity. Evidence: pending closeout packet.
+- [x] RPC transport/runtime shell extracted behind a dedicated helper boundary. Evidence: `out/1230-coordinator-symphony-aligned-delegation-server-rpc-transport-and-tool-dispatch-shell-extraction/manual/20260316T062527Z-closeout/00-summary.md`
+- [x] Tool-dispatch entry validation/routing extracted without changing handler behavior. Evidence: `out/1230-coordinator-symphony-aligned-delegation-server-rpc-transport-and-tool-dispatch-shell-extraction/manual/20260316T062527Z-closeout/00-summary.md`
+- [x] Focused regressions cover JSON-RPC framing, top-level routing, and delegate-mode/tool-dispatch parity. Evidence: `out/1230-coordinator-symphony-aligned-delegation-server-rpc-transport-and-tool-dispatch-shell-extraction/manual/20260316T062527Z-closeout/05-targeted-tests.log`
+- [x] Closeout packet, override notes, and next-slice note captured. Evidence: `out/1230-coordinator-symphony-aligned-delegation-server-rpc-transport-and-tool-dispatch-shell-extraction/manual/20260316T062527Z-closeout/00-summary.md`, `out/1230-coordinator-symphony-aligned-delegation-server-rpc-transport-and-tool-dispatch-shell-extraction/manual/20260316T062527Z-closeout/13-override-notes.md`, `out/1230-coordinator-symphony-aligned-delegation-server-rpc-transport-and-tool-dispatch-shell-extraction/manual/20260316T062527Z-closeout/14-next-slice-note.md`
