@@ -2352,6 +2352,33 @@ describe('delegation server question helpers', () => {
     }
   });
 
+  it('blocks explicit delegation token paths outside the run directory when manifest context is present', async () => {
+    const { root, manifestPath } = await setupRun();
+    const outsideTokenPath = join(root, 'outside-token.json');
+    await writeFile(outsideTokenPath, JSON.stringify({ token: 'outside-token' }), 'utf8');
+    const previousManifestPath = process.env.CODEX_ORCHESTRATOR_MANIFEST_PATH;
+    const previousTokenPath = process.env.CODEX_DELEGATION_TOKEN_PATH;
+    process.env.CODEX_ORCHESTRATOR_MANIFEST_PATH = manifestPath;
+    process.env.CODEX_DELEGATION_TOKEN_PATH = outsideTokenPath;
+
+    try {
+      const token = await resolveDelegationToken({ jsonrpc: '2.0', method: 'tools/call', params: {} }, [root]);
+      expect(token).toBeNull();
+    } finally {
+      if (previousManifestPath) {
+        process.env.CODEX_ORCHESTRATOR_MANIFEST_PATH = previousManifestPath;
+      } else {
+        delete process.env.CODEX_ORCHESTRATOR_MANIFEST_PATH;
+      }
+      if (previousTokenPath) {
+        process.env.CODEX_DELEGATION_TOKEN_PATH = previousTokenPath;
+      } else {
+        delete process.env.CODEX_DELEGATION_TOKEN_PATH;
+      }
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   it('retries delegation token reads until the file is available', async () => {
     const { root, runDir, manifestPath } = await setupRun();
     const tokenPath = join(runDir, 'delegation_token.json');
@@ -2513,6 +2540,111 @@ describe('delegation server question helpers', () => {
       sockets.forEach((socket) => socket.destroy());
       await new Promise<void>((resolve) => stalledServer.close(() => resolve()));
       await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('returns expired question details and applies fallback action on expired polls', async () => {
+    const expiresAt = '2026-03-16T00:00:00.000Z';
+    let receivedAction: Record<string, unknown> | null = null;
+    const parentServer = http.createServer((req, res) => {
+      if (req.url === '/questions/q-1') {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ status: 'expired', expires_at: expiresAt }));
+        return;
+      }
+      res.writeHead(404);
+      res.end();
+    });
+    const childServer = http.createServer(async (req, res) => {
+      if (req.url === '/control/action' && req.method === 'POST') {
+        let body = '';
+        for await (const chunk of req) {
+          body += chunk.toString();
+        }
+        receivedAction = JSON.parse(body || '{}') as Record<string, unknown>;
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ status: 'ok' }));
+        return;
+      }
+      res.writeHead(404);
+      res.end();
+    });
+    await new Promise<void>((resolve) => parentServer.listen(0, '127.0.0.1', resolve));
+    await new Promise<void>((resolve) => childServer.listen(0, '127.0.0.1', resolve));
+    const parentAddress = parentServer.address();
+    const childAddress = childServer.address();
+    const parentPort = typeof parentAddress === 'string' || !parentAddress ? 0 : parentAddress.port;
+    const childPort = typeof childAddress === 'string' || !childAddress ? 0 : childAddress.port;
+    const parentBaseUrl = `http://127.0.0.1:${parentPort}`;
+    const childBaseUrl = `http://127.0.0.1:${childPort}`;
+
+    const parentRun = await setupRun({ baseUrl: parentBaseUrl });
+    const childRun = await setupRun({ baseUrl: childBaseUrl });
+    await writeFile(
+      join(childRun.runDir, 'control.json'),
+      JSON.stringify({
+        run_id: 'run-1',
+        control_seq: 1,
+        latest_action: {
+          request_id: null,
+          requested_by: 'delegate',
+          requested_at: new Date().toISOString(),
+          action: 'pause',
+          reason: 'awaiting_question_answer'
+        }
+      }),
+      'utf8'
+    );
+    const previousManifestPath = process.env.CODEX_ORCHESTRATOR_MANIFEST_PATH;
+    process.env.CODEX_ORCHESTRATOR_MANIFEST_PATH = childRun.manifestPath;
+
+    try {
+      const result = (await handleToolCall(
+        {
+          jsonrpc: '2.0',
+          method: 'tools/call',
+          params: {
+            name: 'delegate.question.poll',
+            arguments: {
+              parent_manifest_path: parentRun.manifestPath,
+              question_id: 'q-1',
+              wait_ms: 0
+            }
+          },
+          codex_private: { delegation_token: 'secret-token' }
+        },
+        {
+          repoRoot: process.cwd(),
+          mode: 'full',
+          allowNested: false,
+          githubEnabled: false,
+          allowedGithubOps: new Set<string>(),
+          allowedRoots: [parentRun.root, childRun.root],
+          allowedHosts: ['127.0.0.1'],
+          toolProfile: [],
+          expiryFallback: 'resume'
+        }
+      )) as { content: Array<{ text: string }>; isError?: boolean };
+      const payload = JSON.parse(result.content[0].text) as Record<string, unknown>;
+
+      expect(result.isError).toBe(false);
+      expect(payload).toMatchObject({
+        status: 'expired',
+        expired_at: expiresAt,
+        fallback_action: 'resume'
+      });
+      expect((receivedAction as { action?: string } | null)?.action).toBe('resume');
+      expect((receivedAction as { reason?: string } | null)?.reason).toBe('question_expired');
+    } finally {
+      if (previousManifestPath) {
+        process.env.CODEX_ORCHESTRATOR_MANIFEST_PATH = previousManifestPath;
+      } else {
+        delete process.env.CODEX_ORCHESTRATOR_MANIFEST_PATH;
+      }
+      await new Promise<void>((resolve) => parentServer.close(() => resolve()));
+      await new Promise<void>((resolve) => childServer.close(() => resolve()));
+      await rm(parentRun.root, { recursive: true, force: true });
+      await rm(childRun.root, { recursive: true, force: true });
     }
   });
 

@@ -24,6 +24,16 @@ import {
   handleDelegationServerToolCall
 } from './delegationServerToolDispatchShell.js';
 import {
+  applyDelegationQuestionFallback,
+  clampQuestionPollWaitMs,
+  handleDelegationServerQuestionEnqueue,
+  handleDelegationServerQuestionPoll,
+  MAX_QUESTION_POLL_WAIT_MS,
+  QUESTION_POLL_INTERVAL_MS,
+  resolveDelegationTokenValue,
+  type DelegationServerQuestionFlowDeps
+} from './delegationServerQuestionFlowShell.js';
+import {
   MAX_MCP_HEADER_BYTES,
   MAX_MCP_MESSAGE_BYTES,
   parseContentLengthHeader,
@@ -45,8 +55,6 @@ interface DelegationServerOptions {
 }
 
 const PROTOCOL_VERSION = '2024-11-05';
-const QUESTION_POLL_INTERVAL_MS = 500;
-const MAX_QUESTION_POLL_WAIT_MS = 10_000;
 const DEFAULT_SPAWN_TIMEOUT_MS = 5 * 60 * 1000;
 const DEFAULT_SPAWN_START_TIMEOUT_MS = 10_000;
 const DEFAULT_SPAWN_START_POLL_INTERVAL_MS = 200;
@@ -929,70 +937,14 @@ async function handleQuestionEnqueue(
   allowedHosts: string[],
   expiryFallback: 'pause' | 'resume' | 'fail'
 ): Promise<unknown> {
-  const parentManifestPath = resolveParentManifestPath(input, allowedRoots);
-  if (!parentManifestPath) {
-    throw new Error('parent_manifest_path is required');
-  }
-
-  const delegationToken = await resolveDelegationToken(request, allowedRoots, {
-    retryMs: DEFAULT_DELEGATION_TOKEN_RETRY_MS,
-    intervalMs: DEFAULT_DELEGATION_TOKEN_RETRY_INTERVAL_MS
-  });
-  const childRunId = process.env.CODEX_ORCHESTRATOR_RUN_ID ?? readStringValue(input, 'from_run_id', 'fromRunId') ?? '';
-
-  if (!delegationToken) {
-    throw new Error('delegation_token missing');
-  }
-
-  const autoPause = readBooleanValue(input, 'auto_pause', 'autoPause') ?? true;
-  const manifestFromEnv = process.env.CODEX_ORCHESTRATOR_MANIFEST_PATH;
-  const manifestFromInput = readStringValue(input, 'from_manifest_path', 'fromManifestPath');
-  const childManifestPath = manifestFromEnv ?? manifestFromInput;
-  const result = await callControlEndpointWithRetry(
-    parentManifestPath,
-    '/questions/enqueue',
-    {
-      parent_run_id: readStringValue(input, 'parent_run_id', 'parentRunId') ?? '',
-      parent_task_id: readStringValue(input, 'parent_task_id', 'parentTaskId') ?? null,
-      from_run_id: childRunId,
-      from_manifest_path: childManifestPath ?? null,
-      prompt: requireString(readStringValue(input, 'prompt'), 'prompt'),
-      urgency: readStringValue(input, 'urgency') ?? 'med',
-      expires_in_ms: readNumberValue(input, 'expires_in_ms', 'expiresInMs'),
-      auto_pause: autoPause,
-      expiry_fallback: expiryFallback
-    },
-    {
-      [DELEGATION_TOKEN_HEADER]: delegationToken,
-      [DELEGATION_RUN_HEADER]: childRunId
-    },
-    {
-      allowedHosts,
-      allowedRoots,
-      retryMs: DEFAULT_DELEGATION_TOKEN_RETRY_MS,
-      retryIntervalMs: DEFAULT_DELEGATION_TOKEN_RETRY_INTERVAL_MS
-    }
+  return handleDelegationServerQuestionEnqueue(
+    input,
+    request,
+    allowedRoots,
+    allowedHosts,
+    expiryFallback,
+    questionFlowDeps
   );
-
-  if (autoPause && manifestFromEnv) {
-    const resolvedManifest = resolveRunManifestPath(manifestFromEnv, allowedRoots, 'manifest_path');
-    await callControlEndpoint(
-      resolvedManifest,
-      '/control/action',
-      {
-        action: 'pause',
-        requested_by: 'delegate',
-        reason: 'awaiting_question_answer'
-      },
-      undefined,
-      { allowedHosts, allowedRoots }
-    );
-  }
-
-  return {
-    ...result,
-    fallback_action: expiryFallback
-  };
 }
 
 async function handleQuestionPoll(
@@ -1002,85 +954,14 @@ async function handleQuestionPoll(
   allowedHosts: string[],
   expiryFallback: 'pause' | 'resume' | 'fail'
 ): Promise<unknown> {
-  const parentManifestPath = resolveParentManifestPath(input, allowedRoots);
-  if (!parentManifestPath) {
-    throw new Error('parent_manifest_path is required');
-  }
-
-  const delegationToken = await resolveDelegationToken(request, allowedRoots, {
-    retryMs: DEFAULT_DELEGATION_TOKEN_RETRY_MS,
-    intervalMs: DEFAULT_DELEGATION_TOKEN_RETRY_INTERVAL_MS
-  });
-  const childRunId = process.env.CODEX_ORCHESTRATOR_RUN_ID ?? readStringValue(input, 'from_run_id', 'fromRunId') ?? '';
-
-  if (!delegationToken) {
-    throw new Error('delegation_token missing');
-  }
-
-  const questionId = requireString(readStringValue(input, 'question_id', 'questionId'), 'question_id');
-  const requestedWaitMs = readNumberValue(input, 'wait_ms', 'waitMs') ?? 0;
-  const waitMs = clampQuestionPollWaitMs(requestedWaitMs);
-  const deadline = Date.now() + waitMs;
-  const maxIterations = waitMs > 0 ? Math.max(1, Math.ceil(waitMs / QUESTION_POLL_INTERVAL_MS)) : 1;
-
-  for (let iteration = 0; iteration < maxIterations; iteration += 1) {
-    const remainingMs = waitMs > 0 ? Math.max(0, deadline - Date.now()) : null;
-    const timeoutMs =
-      remainingMs === null ? undefined : Math.max(1, Math.min(DEFAULT_CONTROL_ENDPOINT_TIMEOUT_MS, remainingMs));
-    const retryMs =
-      remainingMs === null ? DEFAULT_DELEGATION_TOKEN_RETRY_MS : Math.min(DEFAULT_DELEGATION_TOKEN_RETRY_MS, remainingMs);
-    const record = await callControlEndpointWithRetry(
-      parentManifestPath,
-      `/questions/${questionId}`,
-      null,
-      {
-        [DELEGATION_TOKEN_HEADER]: delegationToken,
-        [DELEGATION_RUN_HEADER]: childRunId
-      },
-      {
-        allowedHosts,
-        allowedRoots,
-        retryMs,
-        retryIntervalMs: DEFAULT_DELEGATION_TOKEN_RETRY_INTERVAL_MS,
-        ...(timeoutMs !== undefined ? { timeoutMs } : {})
-      }
-    );
-    const status = readStringValue(record, 'status');
-    if (status !== 'queued' || waitMs <= 0 || Date.now() >= deadline) {
-      const expiresAt = readStringValue(record, 'expires_at', 'expiresAt');
-      if (status === 'expired') {
-        await applyQuestionFallback(expiryFallback, allowedHosts, allowedRoots);
-      }
-      return {
-        ...record,
-        expired_at: status === 'expired' ? expiresAt ?? null : null,
-        fallback_action: status === 'expired' ? expiryFallback : null
-      };
-    }
-    await delay(QUESTION_POLL_INTERVAL_MS);
-  }
-
-  const remainingMs = waitMs > 0 ? Math.max(0, deadline - Date.now()) : null;
-  const timeoutMs =
-    remainingMs === null ? undefined : Math.max(1, Math.min(DEFAULT_CONTROL_ENDPOINT_TIMEOUT_MS, remainingMs));
-  const record = await callControlEndpoint(
-    parentManifestPath,
-    `/questions/${questionId}`,
-    null,
-    {
-      [DELEGATION_TOKEN_HEADER]: delegationToken,
-      [DELEGATION_RUN_HEADER]: childRunId
-    },
-    {
-      allowedHosts,
-      ...(timeoutMs !== undefined ? { timeoutMs } : {})
-    }
+  return handleDelegationServerQuestionPoll(
+    input,
+    request,
+    allowedRoots,
+    allowedHosts,
+    expiryFallback,
+    questionFlowDeps
   );
-  return {
-    ...record,
-    expired_at: null,
-    fallback_action: null
-  };
 }
 
 async function handleGithubCall(
@@ -1467,16 +1348,29 @@ export const __test__ = {
   clampQuestionPollWaitMs
 };
 
-function clampQuestionPollWaitMs(value: number): number {
-  if (!Number.isFinite(value) || value <= 0) {
-    return 0;
-  }
-  return Math.min(value, MAX_QUESTION_POLL_WAIT_MS);
-}
-
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
+
+const questionFlowDeps: DelegationServerQuestionFlowDeps = {
+  resolveParentManifestPath,
+  readStringValue,
+  readNumberValue,
+  readBooleanValue,
+  requireString,
+  callControlEndpoint,
+  callControlEndpointWithRetry,
+  resolveRunManifestPath,
+  isPathWithinRoots,
+  safeJsonParse,
+  delay,
+  defaultDelegationTokenRetryMs: DEFAULT_DELEGATION_TOKEN_RETRY_MS,
+  defaultDelegationTokenRetryIntervalMs: DEFAULT_DELEGATION_TOKEN_RETRY_INTERVAL_MS,
+  defaultControlEndpointTimeoutMs: DEFAULT_CONTROL_ENDPOINT_TIMEOUT_MS,
+  delegationTokenHeader: DELEGATION_TOKEN_HEADER,
+  delegationRunHeader: DELEGATION_RUN_HEADER,
+  delegationTokenFile: DELEGATION_TOKEN_FILE
+};
 
 function resolveRepoRootForRuns(repoRoot: string, env: NodeJS.ProcessEnv): string {
   const configured = env.CODEX_ORCHESTRATOR_ROOT?.trim();
@@ -1943,76 +1837,7 @@ export async function resolveDelegationToken(
   allowedRoots?: string[],
   options: { retryMs?: number; intervalMs?: number } = {}
 ): Promise<string | null> {
-  const privateToken = request.codex_private?.delegation_token;
-  if (privateToken) {
-    return String(privateToken);
-  }
-  const tokenPath = resolveDelegationTokenPath(allowedRoots);
-  if (!tokenPath) {
-    return null;
-  }
-  const retryMs = options.retryMs ?? 0;
-  const intervalMs = options.intervalMs ?? DEFAULT_DELEGATION_TOKEN_RETRY_INTERVAL_MS;
-  const deadline = Date.now() + retryMs;
-  let token = await readDelegationTokenFile(tokenPath);
-  while (!token && Date.now() < deadline) {
-    await delay(intervalMs);
-    token = await readDelegationTokenFile(tokenPath);
-  }
-  return token;
-}
-
-function resolveDelegationTokenPath(allowedRoots?: string[]): string | null {
-  const explicit = process.env.CODEX_DELEGATION_TOKEN_PATH?.trim();
-  const manifestPath = process.env.CODEX_ORCHESTRATOR_MANIFEST_PATH?.trim();
-  let runDir: string | null = null;
-
-  if (manifestPath) {
-    try {
-      const resolvedManifest = resolveRunManifestPath(manifestPath, allowedRoots, 'manifest_path');
-      runDir = dirname(resolvedManifest);
-    } catch {
-      return null;
-    }
-  }
-
-  if (explicit) {
-    if (!runDir && !isAbsolute(explicit)) {
-      return null;
-    }
-    const resolvedToken =
-      runDir && !isAbsolute(explicit) ? resolve(runDir, explicit) : resolve(explicit);
-    if (runDir) {
-      if (!isPathWithinRoots(resolvedToken, [runDir])) {
-        return null;
-      }
-    } else if (allowedRoots && allowedRoots.length > 0 && !isPathWithinRoots(resolvedToken, allowedRoots)) {
-      return null;
-    }
-    return resolvedToken;
-  }
-
-  if (runDir) {
-    return resolve(runDir, DELEGATION_TOKEN_FILE);
-  }
-
-  return null;
-}
-
-async function readDelegationTokenFile(tokenPath: string): Promise<string | null> {
-  try {
-    const raw = await readFile(tokenPath, 'utf8');
-    const parsed = safeJsonParse(raw);
-    const tokenValue =
-      parsed && typeof parsed === 'object' && !Array.isArray(parsed)
-        ? (parsed as Record<string, unknown>).token
-        : null;
-    const token =
-      typeof tokenValue === 'string' && tokenValue.trim().length > 0 ? tokenValue.trim() : raw.trim();
-    return token || null;
-  } catch {
-    return null;
-  }
+  return resolveDelegationTokenValue(request, allowedRoots, options, questionFlowDeps);
 }
 
 function buildDelegateMcpOverrides(toolProfile: string[]): string[] {
@@ -2183,55 +2008,10 @@ async function persistDelegationToken(
   }
 }
 
-async function isRunAwaitingQuestion(
-  manifestPath: string,
-  allowedRoots?: string[]
-): Promise<boolean> {
-  try {
-    const resolvedManifest = resolveRunManifestPath(manifestPath, allowedRoots, 'manifest_path');
-    const controlPath = resolve(dirname(resolvedManifest), 'control.json');
-    const raw = await readFile(controlPath, 'utf8');
-    const snapshot = safeJsonParse(raw) as Record<string, unknown> | null;
-    const latest =
-      snapshot && snapshot.latest_action && typeof snapshot.latest_action === 'object'
-        ? (snapshot.latest_action as Record<string, unknown>)
-        : null;
-    if (!latest) {
-      return false;
-    }
-    return latest.action === 'pause' && latest.reason === 'awaiting_question_answer';
-  } catch {
-    return false;
-  }
-}
-
 export async function applyQuestionFallback(
   fallback: 'pause' | 'resume' | 'fail',
   allowedHosts?: string[],
   allowedRoots?: string[]
 ): Promise<void> {
-  const manifestPath = process.env.CODEX_ORCHESTRATOR_MANIFEST_PATH;
-  if (!manifestPath) {
-    return;
-  }
-  const shouldResolve = await isRunAwaitingQuestion(manifestPath, allowedRoots);
-  if (!shouldResolve) {
-    return;
-  }
-  const action = fallback === 'pause' ? 'pause' : fallback === 'resume' ? 'resume' : 'fail';
-  try {
-    await callControlEndpoint(
-      resolveRunManifestPath(manifestPath, allowedRoots, 'manifest_path'),
-      '/control/action',
-      {
-        action,
-        requested_by: 'delegate',
-        reason: 'question_expired'
-      },
-      undefined,
-      { allowedHosts, allowedRoots }
-    );
-  } catch {
-    // ignore
-  }
+  return applyDelegationQuestionFallback(fallback, allowedHosts, allowedRoots, questionFlowDeps);
 }
