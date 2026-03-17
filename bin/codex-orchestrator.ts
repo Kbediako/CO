@@ -33,6 +33,7 @@ import { runSkillsCliShell } from '../orchestrator/src/cli/skillsCliShell.js';
 import { runFlowCliShell } from '../orchestrator/src/cli/flowCliShell.js';
 import { runStartCliShell } from '../orchestrator/src/cli/startCliShell.js';
 import { runFrontendTestCliShell } from '../orchestrator/src/cli/frontendTestCliShell.js';
+import { runResumeCliShell } from '../orchestrator/src/cli/resumeCliShell.js';
 import { runSetupBootstrapShell } from '../orchestrator/src/cli/setupBootstrapShell.js';
 import { runReviewCliLaunchShell } from '../orchestrator/src/cli/reviewCliLaunchShell.js';
 import { findPackageRoot, loadPackageInfo } from '../orchestrator/src/cli/utils/packageInfo.js';
@@ -783,17 +784,17 @@ async function handleResume(orchestrator: CodexOrchestrator, rawArgs: string[]):
     throw new Error('resume requires --run <run-id>.');
   }
   const format: OutputFormat = (flags['format'] as string | undefined) === 'json' ? 'json' : 'text';
-  await withRunUi(flags, format, async (runEvents) => {
-    const result = await orchestrator.resume({
-      runId,
-      resumeToken: typeof flags['token'] === 'string' ? (flags['token'] as string) : undefined,
-      actor: typeof flags['actor'] === 'string' ? (flags['actor'] as string) : undefined,
-      reason: typeof flags['reason'] === 'string' ? (flags['reason'] as string) : undefined,
-      targetStageId: resolveTargetStageId(flags),
-      runtimeMode,
-      runEvents
-    });
-    emitRunOutput(result, format, 'Run resumed');
+  await runResumeCliShell({
+    orchestrator,
+    runId,
+    format,
+    runtimeMode,
+    resumeToken: typeof flags['token'] === 'string' ? (flags['token'] as string) : undefined,
+    actor: typeof flags['actor'] === 'string' ? (flags['actor'] as string) : undefined,
+    reason: typeof flags['reason'] === 'string' ? (flags['reason'] as string) : undefined,
+    targetStageId: resolveTargetStageId(flags),
+    runWithUi: async (action) => await withRunUi(flags, format, action),
+    emitRunOutput
   });
 }
 

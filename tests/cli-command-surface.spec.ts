@@ -156,6 +156,12 @@ describe('codex-orchestrator command surface', () => {
     expect(stdout).toContain('Usage: codex-orchestrator resume --run <id>');
   }, TEST_TIMEOUT);
 
+  it('rejects resume without a run id through the binary shell', async () => {
+    await expect(runCli(['resume'])).rejects.toMatchObject({
+      stderr: expect.stringContaining('resume requires --run <run-id>.')
+    });
+  }, TEST_TIMEOUT);
+
   it('prints delegate-server help', async () => {
     const { stdout } = await runCli(['delegate-server', '--help']);
     expect(stdout).toContain('Usage: codex-orchestrator delegate-server');
