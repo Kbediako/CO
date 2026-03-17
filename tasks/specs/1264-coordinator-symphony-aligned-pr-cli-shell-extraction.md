@@ -1,7 +1,7 @@
 ---
 id: 20260317-1264-coordinator-symphony-aligned-pr-cli-shell-extraction
 title: Coordinator Symphony-Aligned PR CLI Shell Extraction
-status: active
+status: completed
 owner: Codex
 created: 2026-03-17
 last_review: 2026-03-17
@@ -13,6 +13,7 @@ related_tasks:
   - tasks/tasks-1264-coordinator-symphony-aligned-pr-cli-shell-extraction.md
 review_notes:
   - 2026-03-17: Opened after `1263` extracted the remaining review launch shell and froze the local review pocket. Current-tree inspection plus bounded scouting show `handlePr(...)` still owns a bounded top-level shell above `scripts/lib/pr-watch-merge.js`, so the next truthful nearby move is a dedicated PR CLI shell extraction lane. Evidence: `out/1263-coordinator-symphony-aligned-review-cli-launch-shell-extraction/manual/20260317T034647Z-closeout/14-next-slice-note.md`, `docs/findings/1264-pr-cli-shell-extraction-deliberation.md`.
+  - 2026-03-17: Completed as a real extraction. `handlePr(...)` now keeps only top-level `pr` help gating and delegates subcommand mode selection, downstream runner handoff, and non-zero exit propagation to `orchestrator/src/cli/prCliShell.ts`. Focused helper parity passed `5/5`, focused CLI parity passed `5 passed | 78 skipped`, manifest-backed standalone review returned no correctness regressions, and the next truthful move is the remaining local `pr` freeze reassessment lane (`1265`). Evidence: `out/1264-coordinator-symphony-aligned-pr-cli-shell-extraction/manual/20260317T040010Z-closeout/00-summary.md`, `out/1264-coordinator-symphony-aligned-pr-cli-shell-extraction/manual/20260317T040010Z-closeout/14-next-slice-note.md`.
 ---
 
 # Technical Specification

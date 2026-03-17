@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260317-1265-coordinator-symphony-aligned-pr-cli-remaining-boundary-freeze-reassessment",
+      "title": "Coordinator Symphony-Aligned PR CLI Remaining Boundary Freeze Reassessment",
+      "relates_to": "tasks/tasks-1265-coordinator-symphony-aligned-pr-cli-remaining-boundary-freeze-reassessment.md",
+      "risk": "low",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-17",
+      "paths": {
+        "spec": "tasks/specs/1265-coordinator-symphony-aligned-pr-cli-remaining-boundary-freeze-reassessment.md",
+        "task": "tasks/tasks-1265-coordinator-symphony-aligned-pr-cli-remaining-boundary-freeze-reassessment.md",
+        "agent_task": ".agent/task/1265-coordinator-symphony-aligned-pr-cli-remaining-boundary-freeze-reassessment.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-pr-cli-remaining-boundary-freeze-reassessment.md"
+      }
+    },
+    {
       "id": "20260317-1264-coordinator-symphony-aligned-pr-cli-shell-extraction",
       "title": "Coordinator Symphony-Aligned PR CLI Shell Extraction",
       "relates_to": "tasks/tasks-1264-coordinator-symphony-aligned-pr-cli-shell-extraction.md",
