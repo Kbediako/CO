@@ -21,4 +21,4 @@
 
 ## Reassessment
 
-- [ ] Remaining local delegation-server CLI pocket reinspected and freeze-or-go result recorded. Evidence: pending closeout packet.
+- [x] Remaining local delegation-server CLI pocket reinspected and freeze-or-go result recorded. Evidence: `out/1260-coordinator-symphony-aligned-delegation-server-cli-remaining-boundary-freeze-reassessment/manual/20260317T023928Z-closeout/00-summary.md`, `out/1260-coordinator-symphony-aligned-delegation-server-cli-remaining-boundary-freeze-reassessment/manual/20260317T023928Z-closeout/14-next-slice-note.md`

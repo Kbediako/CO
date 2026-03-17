@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260317-1261-coordinator-symphony-aligned-delegation-setup-cli-shell-extraction",
+      "title": "Coordinator Symphony-Aligned Delegation Setup CLI Shell Extraction",
+      "relates_to": "tasks/tasks-1261-coordinator-symphony-aligned-delegation-setup-cli-shell-extraction.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-17",
+      "paths": {
+        "spec": "tasks/specs/1261-coordinator-symphony-aligned-delegation-setup-cli-shell-extraction.md",
+        "task": "tasks/tasks-1261-coordinator-symphony-aligned-delegation-setup-cli-shell-extraction.md",
+        "agent_task": ".agent/task/1261-coordinator-symphony-aligned-delegation-setup-cli-shell-extraction.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-delegation-setup-cli-shell-extraction.md"
+      }
+    },
+    {
       "id": "20260317-1260-coordinator-symphony-aligned-delegation-server-cli-remaining-boundary-freeze-reassessment",
       "title": "Coordinator Symphony-Aligned Delegation Server CLI Remaining Boundary Freeze Reassessment",
       "relates_to": "tasks/tasks-1260-coordinator-symphony-aligned-delegation-server-cli-remaining-boundary-freeze-reassessment.md",
