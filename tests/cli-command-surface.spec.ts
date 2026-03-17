@@ -258,6 +258,34 @@ describe('codex-orchestrator command surface', () => {
     expect(stdout).toContain('CODEX_REVIEW_ALLOW_HEAVY_COMMANDS=1');
   }, TEST_TIMEOUT);
 
+  it('launches review via the CLI shell in non-interactive handoff mode', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'co-cli-review-launch-'));
+    const taskId = 'review-cli-launch-shell';
+    const runDir = join(tempDir, '.runs', taskId, 'cli', 'sample-run');
+    await mkdir(runDir, { recursive: true });
+    const manifestPath = join(runDir, 'manifest.json');
+    await writeFile(manifestPath, JSON.stringify({ run: 'sample' }), 'utf8');
+    await writeFile(join(runDir, 'runner.ndjson'), '{"event":"sample"}\n', 'utf8');
+
+    const { stdout } = await runCli(
+      ['review', '--manifest', manifestPath, '--non-interactive', '--surface', 'audit', '--task', taskId],
+      {
+        ...process.env,
+        NOTES: 'Goal: launch review via CLI shell | Summary: non-interactive handoff | Risks: arg forwarding',
+        CODEX_REVIEW_MONITOR_INTERVAL_SECONDS: '0',
+        DIFF_BUDGET_OVERRIDE_REASON:
+          'cli command-surface review shell test exercises non-interactive handoff against the stacked branch baseline'
+      }
+    );
+
+    expect(stdout).toContain('Codex review handoff (non-interactive):');
+    expect(stdout).toContain(`Review task: ${taskId}`);
+    expect(stdout).toContain('Review surface: audit');
+    const prompt = await readFile(join(runDir, 'review', 'prompt.txt'), 'utf8');
+    expect(prompt).toContain('Evidence manifest:');
+    expect(prompt).toContain('sample-run/manifest.json');
+  }, TEST_TIMEOUT);
+
   it('prints start help without preparing a run', async () => {
     const { stdout } = await runCli(['start', '--help']);
     expect(stdout).toContain('Usage: codex-orchestrator start');

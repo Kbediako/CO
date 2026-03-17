@@ -1,10 +1,8 @@
 #!/usr/bin/env node
-import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { opendir, readFile } from 'node:fs/promises';
 import { basename, join } from 'node:path';
 import process from 'node:process';
-import { fileURLToPath } from 'node:url';
 
 import { CodexOrchestrator } from '../orchestrator/src/cli/orchestrator.js';
 import { formatPlanPreview } from '../orchestrator/src/cli/utils/planFormatter.js';
@@ -37,6 +35,7 @@ import { runDelegationCliShell } from '../orchestrator/src/cli/delegationCliShel
 import { runSkillsCliShell } from '../orchestrator/src/cli/skillsCliShell.js';
 import { runFlowCliShell } from '../orchestrator/src/cli/flowCliShell.js';
 import { runSetupBootstrapShell } from '../orchestrator/src/cli/setupBootstrapShell.js';
+import { runReviewCliLaunchShell } from '../orchestrator/src/cli/reviewCliLaunchShell.js';
 import { findPackageRoot, loadPackageInfo } from '../orchestrator/src/cli/utils/packageInfo.js';
 import { slugify } from '../orchestrator/src/cli/utils/strings.js';
 import { serveMcp } from '../orchestrator/src/cli/mcp.js';
@@ -703,80 +702,13 @@ async function handleFlow(orchestrator: CodexOrchestrator, rawArgs: string[]): P
   });
 }
 
-interface ExternalReviewRunner {
-  command: string;
-  args: string[];
-}
-
-function runningFromSourceRuntime(): boolean {
-  return fileURLToPath(import.meta.url).endsWith('.ts');
-}
-
-function resolveReviewRunner(): ExternalReviewRunner {
-  const packageRoot = findPackageRoot(import.meta.url);
-  const sourceRunner = join(packageRoot, 'scripts', 'run-review.ts');
-  const distRunner = join(packageRoot, 'dist', 'scripts', 'run-review.js');
-
-  if (runningFromSourceRuntime() && existsSync(sourceRunner)) {
-    return {
-      command: process.execPath,
-      args: ['--loader', 'ts-node/esm', sourceRunner]
-    };
-  }
-
-  if (existsSync(distRunner)) {
-    return {
-      command: process.execPath,
-      args: [distRunner]
-    };
-  }
-
-  if (existsSync(sourceRunner)) {
-    return {
-      command: process.execPath,
-      args: ['--loader', 'ts-node/esm', sourceRunner]
-    };
-  }
-
-  throw new Error(
-    'Unable to locate review runner. Expected dist/scripts/run-review.js (npm) or scripts/run-review.ts (source checkout).'
-  );
-}
-
-async function runPassthroughCommand(
-  command: string,
-  args: string[],
-  options: { env?: NodeJS.ProcessEnv; cwd?: string } = {}
-): Promise<number> {
-  return await new Promise<number>((resolve, reject) => {
-    const child = spawn(command, args, {
-      env: options.env ?? process.env,
-      cwd: options.cwd ?? process.cwd(),
-      stdio: 'inherit'
-    });
-    child.once('error', (error) => reject(error instanceof Error ? error : new Error(String(error))));
-    child.once('close', (code, signal) => {
-      if (signal) {
-        resolve(1);
-        return;
-      }
-      resolve(typeof code === 'number' ? code : 1);
-    });
-  });
-}
-
 async function handleReview(rawArgs: string[]): Promise<void> {
   const { positionals, flags } = parseArgs(rawArgs);
   if (isHelpRequest(positionals, flags)) {
     printReviewHelp();
     return;
   }
-
-  const runner = resolveReviewRunner();
-  const exitCode = await runPassthroughCommand(runner.command, [...runner.args, ...rawArgs], {
-    cwd: process.cwd(),
-    env: process.env
-  });
+  const exitCode = await runReviewCliLaunchShell({ rawArgs });
   if (exitCode !== 0) {
     process.exitCode = exitCode;
   }

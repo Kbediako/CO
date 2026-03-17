@@ -15,9 +15,10 @@ Bounded extraction of the binary-facing review launch shell from `bin/codex-orch
 ## Requirements
 
 1. Extract the inline review launch shell without changing user-facing behavior.
-2. Preserve help behavior, source-vs-dist runner resolution, passthrough launch semantics, and exit-code propagation.
-3. Keep `scripts/run-review.ts` and deeper review engine helpers out of scope.
-4. Add focused parity tests if the extracted shell needs direct coverage.
+2. Keep the binary help surface local and unchanged.
+3. Preserve source-vs-dist runner resolution, passthrough launch semantics, and exit-code propagation.
+4. Keep `scripts/run-review.ts` and deeper review engine helpers out of scope.
+5. Add focused parity tests if the extracted shell needs direct coverage.
 
 ## Validation Plan
 

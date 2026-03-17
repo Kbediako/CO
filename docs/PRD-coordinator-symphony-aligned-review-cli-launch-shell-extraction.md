@@ -6,14 +6,13 @@
 
 ## Problem
 
-After `1262` froze the remaining local `delegation` pocket, the next nearby real shell boundary is the inline review wrapper. It still owns:
+After `1262` froze the remaining local `delegation` pocket, the next nearby real shell boundary is the inline review launch wrapper. It still owns:
 
-- top-level review help/entry handling
 - source-vs-dist review-runner resolution
 - passthrough child-process launch with inherited stdio/env/cwd
 - exit-code mapping back into `process.exitCode`
 
-That is a real mixed shell boundary even though the review wrapper behavior already lives in `scripts/run-review.ts` and the deeper review engine helpers under `scripts/lib/`.
+The binary help surface remains local, but the launch behavior is still a real mixed shell boundary even though the review wrapper behavior already lives in `scripts/run-review.ts` and the deeper review engine helpers under `scripts/lib/`.
 
 ## Goal
 
@@ -29,5 +28,6 @@ Extract the binary-facing review launch shell behind a dedicated helper while pr
 ## Success Criteria
 
 - the inline review launch shell is extracted behind a dedicated boundary
-- help behavior, runner resolution, passthrough launch semantics, and exit-code propagation remain identical
+- binary help behavior remains local and unchanged
+- runner resolution, passthrough launch semantics, and exit-code propagation remain identical
 - focused parity coverage exists where the extraction needs it
