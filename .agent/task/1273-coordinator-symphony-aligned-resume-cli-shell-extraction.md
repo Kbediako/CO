@@ -21,6 +21,6 @@
 
 ## Extraction
 
-- [ ] Resume CLI shell boundary implemented. Evidence: pending closeout packet.
-- [ ] Focused resume CLI shell parity coverage updated. Evidence: pending closeout packet.
-- [ ] Final implementation validation complete. Evidence: pending closeout packet.
+- [x] Resume CLI shell boundary implemented. Evidence: `out/1273-coordinator-symphony-aligned-resume-cli-shell-extraction/manual/20260317T114549Z-closeout/00-summary.md`
+- [x] Focused resume CLI shell parity coverage updated. Evidence: `out/1273-coordinator-symphony-aligned-resume-cli-shell-extraction/manual/20260317T114549Z-closeout/05a-targeted-helper-tests.log`, `out/1273-coordinator-symphony-aligned-resume-cli-shell-extraction/manual/20260317T114549Z-closeout/05b-targeted-cli-tests.log`
+- [x] Final implementation validation complete. Evidence: `out/1273-coordinator-symphony-aligned-resume-cli-shell-extraction/manual/20260317T114549Z-closeout/00-summary.md`, `out/1273-coordinator-symphony-aligned-resume-cli-shell-extraction/manual/20260317T114549Z-closeout/13-override-notes.md`
