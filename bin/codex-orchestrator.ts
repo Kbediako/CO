@@ -5,7 +5,6 @@ import { basename, join } from 'node:path';
 import process from 'node:process';
 
 import { CodexOrchestrator } from '../orchestrator/src/cli/orchestrator.js';
-import { formatPlanPreview } from '../orchestrator/src/cli/utils/planFormatter.js';
 import { type ExecOutputMode } from '../orchestrator/src/cli/exec/command.js';
 import { runExecCliShell, type RunExecCliShellParams } from '../orchestrator/src/cli/execCliShell.js';
 import { resolveEnvironmentPaths } from '../scripts/lib/run-manifests.js';
@@ -33,6 +32,7 @@ import { runSkillsCliShell } from '../orchestrator/src/cli/skillsCliShell.js';
 import { runFlowCliShell } from '../orchestrator/src/cli/flowCliShell.js';
 import { runStartCliShell } from '../orchestrator/src/cli/startCliShell.js';
 import { runFrontendTestCliShell } from '../orchestrator/src/cli/frontendTestCliShell.js';
+import { runPlanCliShell } from '../orchestrator/src/cli/planCliShell.js';
 import { runResumeCliShell } from '../orchestrator/src/cli/resumeCliShell.js';
 import { runStatusCliShell } from '../orchestrator/src/cli/statusCliShell.js';
 import { runSetupBootstrapShell } from '../orchestrator/src/cli/setupBootstrapShell.js';
@@ -680,16 +680,13 @@ async function handlePlan(orchestrator: CodexOrchestrator, rawArgs: string[]): P
   applyRepoConfigRequiredPolicy(flags);
   const pipelineId = positionals[0];
   const format = (flags['format'] as string | undefined) === 'json' ? 'json' : 'text';
-  const result = await orchestrator.plan({
+  await runPlanCliShell({
+    orchestrator,
     pipelineId,
     taskId: typeof flags['task'] === 'string' ? (flags['task'] as string) : undefined,
-    targetStageId: resolveTargetStageId(flags)
+    targetStageId: resolveTargetStageId(flags),
+    format
   });
-  if (format === 'json') {
-    console.log(JSON.stringify(result, null, 2));
-    return;
-  }
-  process.stdout.write(`${formatPlanPreview(result)}\n`);
 }
 
 async function handleRlm(orchestrator: CodexOrchestrator, rawArgs: string[]): Promise<void> {
