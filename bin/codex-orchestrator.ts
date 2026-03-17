@@ -33,6 +33,7 @@ import { runFlowCliShell } from '../orchestrator/src/cli/flowCliShell.js';
 import { runStartCliShell } from '../orchestrator/src/cli/startCliShell.js';
 import { runFrontendTestCliShell } from '../orchestrator/src/cli/frontendTestCliShell.js';
 import { runPlanCliShell } from '../orchestrator/src/cli/planCliShell.js';
+import { runDoctorCliRequestShell } from '../orchestrator/src/cli/doctorCliRequestShell.js';
 import { runRlmCompletionCliShell } from '../orchestrator/src/cli/rlmCompletionCliShell.js';
 import { runRlmLaunchCliShell } from '../orchestrator/src/cli/rlmLaunchCliShell.js';
 import { runResumeCliShell } from '../orchestrator/src/cli/resumeCliShell.js';
@@ -1000,55 +1001,7 @@ async function handleSetup(rawArgs: string[]): Promise<void> {
 
 async function handleDoctor(rawArgs: string[]): Promise<void> {
   const { flags } = parseArgs(rawArgs);
-  const format = (flags['format'] as string | undefined) === 'json' ? 'json' : 'text';
-  const includeUsage = Boolean(flags['usage']);
-  const includeCloudPreflight = Boolean(flags['cloud-preflight']);
-  const includeIssueLog = Boolean(flags['issue-log']);
-  const cloudEnvIdOverride = readStringFlag(flags, 'cloud-env-id');
-  const cloudBranchOverride = readStringFlag(flags, 'cloud-branch');
-  const issueTitle = readStringFlag(flags, 'issue-title');
-  const issueNotes = readStringFlag(flags, 'issue-notes');
-  const issueLogPath = readStringFlag(flags, 'issue-log-path');
-  if (!includeCloudPreflight && (cloudEnvIdOverride || cloudBranchOverride)) {
-    throw new Error('--cloud-env-id/--cloud-branch require --cloud-preflight.');
-  }
-  if (!includeIssueLog && (issueTitle || issueNotes || issueLogPath)) {
-    throw new Error('--issue-title/--issue-notes/--issue-log-path require --issue-log.');
-  }
-  const wantsApply = Boolean(flags['apply']);
-  const apply = Boolean(flags['yes']);
-  if (wantsApply && format === 'json') {
-    throw new Error('doctor --apply does not support --format json.');
-  }
-  const windowDaysRaw = readStringFlag(flags, 'window-days');
-  let windowDays: number | undefined = undefined;
-  if (windowDaysRaw) {
-    if (!/^\d+$/u.test(windowDaysRaw)) {
-      throw new Error(`Invalid --window-days value '${windowDaysRaw}'. Expected a positive integer.`);
-    }
-    const parsed = Number(windowDaysRaw);
-    if (!Number.isInteger(parsed) || parsed <= 0) {
-      throw new Error(`Invalid --window-days value '${windowDaysRaw}'. Expected a positive integer.`);
-    }
-    windowDays = parsed;
-  }
-  const taskFilter = readStringFlag(flags, 'task') ?? null;
-  await runDoctorCliShell({
-    format,
-    includeUsage,
-    includeCloudPreflight,
-    includeIssueLog,
-    cloudEnvIdOverride: cloudEnvIdOverride ?? undefined,
-    cloudBranchOverride: cloudBranchOverride ?? undefined,
-    issueTitle: issueTitle ?? undefined,
-    issueNotes: issueNotes ?? undefined,
-    issueLogPath: issueLogPath ?? undefined,
-    wantsApply,
-    apply,
-    windowDays,
-    taskFilter,
-    repoRoot: process.cwd()
-  });
+  await runDoctorCliRequestShell({ flags });
 }
 
 async function handleDevtools(rawArgs: string[]): Promise<void> {

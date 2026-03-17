@@ -948,6 +948,12 @@ describe('codex-orchestrator command surface', () => {
     });
   }, TEST_TIMEOUT);
 
+  it('rejects doctor cloud override flags without --cloud-preflight', async () => {
+    await expect(runCli(['doctor', '--cloud-env-id', 'env_123'])).rejects.toMatchObject({
+      stderr: expect.stringContaining('--cloud-env-id/--cloud-branch require --cloud-preflight.')
+    });
+  }, TEST_TIMEOUT);
+
   it('rejects invalid doctor --window-days values', async () => {
     await expect(runCli(['doctor', '--usage', '--window-days', '0'])).rejects.toMatchObject({
       stderr: expect.stringContaining("Invalid --window-days value '0'. Expected a positive integer.")
