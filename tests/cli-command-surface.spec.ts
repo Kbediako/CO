@@ -818,6 +818,41 @@ describe('codex-orchestrator command surface', () => {
     });
   }, TEST_TIMEOUT);
 
+  it('rejects devtools without a subcommand', async () => {
+    await expect(runCli(['devtools'])).rejects.toMatchObject({
+      stderr: expect.stringContaining('devtools requires a subcommand (setup).')
+    });
+  }, TEST_TIMEOUT);
+
+  it('rejects unknown devtools subcommands', async () => {
+    await expect(runCli(['devtools', 'ship-it'])).rejects.toMatchObject({
+      stderr: expect.stringContaining('Unknown devtools subcommand: ship-it')
+    });
+  }, TEST_TIMEOUT);
+
+  it('emits devtools setup plan json', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'co-cli-devtools-setup-json-'));
+    const env = {
+      ...process.env,
+      CODEX_HOME: tempDir
+    };
+
+    const { stdout } = await runCli(['devtools', 'setup', '--format', 'json'], env);
+    const payload = JSON.parse(stdout) as {
+      status?: string;
+      plan?: { commandLine?: string };
+    };
+
+    expect(payload.status).toBe('planned');
+    expect(payload.plan?.commandLine).toContain('chrome-devtools');
+  }, TEST_TIMEOUT);
+
+  it('rejects devtools setup --format json with --yes', async () => {
+    await expect(runCli(['devtools', 'setup', '--format', 'json', '--yes'])).rejects.toMatchObject({
+      stderr: expect.stringContaining('devtools setup does not support --format json with --yes.')
+    });
+  }, TEST_TIMEOUT);
+
   it('rejects doctor issue-log metadata flags without --issue-log', async () => {
     await expect(runCli(['doctor', '--issue-title', 'Example issue'])).rejects.toMatchObject({
       stderr: expect.stringContaining('--issue-title/--issue-notes/--issue-log-path require --issue-log.')

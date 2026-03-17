@@ -27,9 +27,9 @@ import {
   type DoctorIssueLogResult,
   writeDoctorIssueLog
 } from '../orchestrator/src/cli/doctorIssueLog.js';
-import { formatDevtoolsSetupSummary, runDevtoolsSetup } from '../orchestrator/src/cli/devtoolsSetup.js';
 import { formatCodexCliSetupSummary, runCodexCliSetup } from '../orchestrator/src/cli/codexCliSetup.js';
 import { runCodexCliShell } from '../orchestrator/src/cli/codexCliShell.js';
+import { runDevtoolsCliShell } from '../orchestrator/src/cli/devtoolsCliShell.js';
 import { runDelegationCliShell } from '../orchestrator/src/cli/delegationCliShell.js';
 import { runPrCliShell } from '../orchestrator/src/cli/prCliShell.js';
 import { runSkillsCliShell } from '../orchestrator/src/cli/skillsCliShell.js';
@@ -1272,27 +1272,7 @@ async function handleDoctor(rawArgs: string[]): Promise<void> {
 
 async function handleDevtools(rawArgs: string[]): Promise<void> {
   const { positionals, flags } = parseArgs(rawArgs);
-  const subcommand = positionals.shift();
-  if (!subcommand) {
-    throw new Error('devtools requires a subcommand (setup).');
-  }
-  if (subcommand !== 'setup') {
-    throw new Error(`Unknown devtools subcommand: ${subcommand}`);
-  }
-  const format = (flags['format'] as string | undefined) === 'json' ? 'json' : 'text';
-  const apply = Boolean(flags['yes']);
-  if (format === 'json' && apply) {
-    throw new Error('devtools setup does not support --format json with --yes.');
-  }
-  const result = await runDevtoolsSetup({ apply });
-  if (format === 'json') {
-    console.log(JSON.stringify(result, null, 2));
-    return;
-  }
-  const summary = formatDevtoolsSetupSummary(result);
-  for (const line of summary) {
-    console.log(line);
-  }
+  await runDevtoolsCliShell({ positionals, flags });
 }
 
 async function handleDelegation(rawArgs: string[]): Promise<void> {
