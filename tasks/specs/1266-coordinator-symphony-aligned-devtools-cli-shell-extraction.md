@@ -1,7 +1,7 @@
 ---
 id: 20260317-1266-coordinator-symphony-aligned-devtools-cli-shell-extraction
 title: Coordinator Symphony-Aligned Devtools CLI Shell Extraction
-status: active
+status: completed
 owner: Codex
 created: 2026-03-17
 last_review: 2026-03-17
@@ -13,6 +13,7 @@ related_tasks:
   - tasks/tasks-1266-coordinator-symphony-aligned-devtools-cli-shell-extraction.md
 review_notes:
   - 2026-03-17: Opened after `1265` froze the remaining local `pr` pocket. Current-tree inspection plus bounded scouting show `handleDevtools(...)` still owns a bounded top-level shell above `orchestrator/src/cli/devtoolsSetup.ts`, so the next truthful nearby move is a dedicated devtools CLI shell extraction lane. The already-frozen internal devtools readiness family from `1243` remains out of scope. Evidence: `out/1265-coordinator-symphony-aligned-pr-cli-remaining-boundary-freeze-reassessment/manual/20260317T042400Z-closeout/14-next-slice-note.md`, `docs/findings/1266-devtools-cli-shell-extraction-deliberation.md`.
+  - 2026-03-17: Completed as a real extraction. `bin/codex-orchestrator.ts` now keeps only the shared `parseArgs(...)` handoff while `orchestrator/src/cli/devtoolsCliShell.ts` owns missing and unknown subcommand validation, JSON-vs-text shaping, the `--format json` plus `--yes` incompatibility guard, `runDevtoolsSetup(...)` handoff, and summary emission. Focused helper parity passed `5/5`, focused CLI parity passed `4 passed | 83 skipped`, and full `npm run test` passed `261/261` files and `1824/1824` tests. The next truthful nearby move is a freeze reassessment of the remaining local devtools pocket. Evidence: `out/1266-coordinator-symphony-aligned-devtools-cli-shell-extraction/manual/20260317T044020Z-closeout/00-summary.md`, `out/1266-coordinator-symphony-aligned-devtools-cli-shell-extraction/manual/20260317T044020Z-closeout/14-next-slice-note.md`.
 ---
 
 # Technical Specification

@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260317-1267-coordinator-symphony-aligned-devtools-cli-remaining-boundary-freeze-reassessment",
+      "title": "Coordinator Symphony-Aligned Devtools CLI Remaining Boundary Freeze Reassessment",
+      "relates_to": "tasks/tasks-1267-coordinator-symphony-aligned-devtools-cli-remaining-boundary-freeze-reassessment.md",
+      "risk": "low",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-17",
+      "paths": {
+        "spec": "tasks/specs/1267-coordinator-symphony-aligned-devtools-cli-remaining-boundary-freeze-reassessment.md",
+        "task": "tasks/tasks-1267-coordinator-symphony-aligned-devtools-cli-remaining-boundary-freeze-reassessment.md",
+        "agent_task": ".agent/task/1267-coordinator-symphony-aligned-devtools-cli-remaining-boundary-freeze-reassessment.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-devtools-cli-remaining-boundary-freeze-reassessment.md"
+      }
+    },
+    {
       "id": "20260317-1266-coordinator-symphony-aligned-devtools-cli-shell-extraction",
       "title": "Coordinator Symphony-Aligned Devtools CLI Shell Extraction",
       "relates_to": "tasks/tasks-1266-coordinator-symphony-aligned-devtools-cli-shell-extraction.md",

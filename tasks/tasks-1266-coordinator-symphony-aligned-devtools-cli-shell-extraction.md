@@ -21,6 +21,6 @@
 
 ## Extraction
 
-- [ ] Devtools CLI shell boundary implemented. Evidence: pending closeout packet.
-- [ ] Focused devtools CLI shell parity coverage updated. Evidence: pending closeout packet.
-- [ ] Final implementation validation complete. Evidence: pending closeout packet.
+- [x] Devtools CLI shell boundary implemented. Evidence: `out/1266-coordinator-symphony-aligned-devtools-cli-shell-extraction/manual/20260317T044020Z-closeout/00-summary.md`
+- [x] Focused devtools CLI shell parity coverage updated. Evidence: `out/1266-coordinator-symphony-aligned-devtools-cli-shell-extraction/manual/20260317T044020Z-closeout/06a-focused-helper-tests.log`, `out/1266-coordinator-symphony-aligned-devtools-cli-shell-extraction/manual/20260317T044020Z-closeout/06b-focused-cli-tests.log`
+- [x] Final implementation validation complete. Evidence: `out/1266-coordinator-symphony-aligned-devtools-cli-shell-extraction/manual/20260317T044020Z-closeout/00-summary.md`, `out/1266-coordinator-symphony-aligned-devtools-cli-shell-extraction/manual/20260317T044020Z-closeout/13-override-notes.md`
