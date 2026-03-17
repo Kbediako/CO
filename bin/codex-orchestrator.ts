@@ -37,6 +37,7 @@ import { runRlmCompletionCliShell } from '../orchestrator/src/cli/rlmCompletionC
 import { runRlmLaunchCliShell } from '../orchestrator/src/cli/rlmLaunchCliShell.js';
 import { runResumeCliShell } from '../orchestrator/src/cli/resumeCliShell.js';
 import { runStatusCliShell } from '../orchestrator/src/cli/statusCliShell.js';
+import { runSelfCheckCliShell } from '../orchestrator/src/cli/selfCheckCliShell.js';
 import { runSetupBootstrapShell } from '../orchestrator/src/cli/setupBootstrapShell.js';
 import { runReviewCliLaunchShell } from '../orchestrator/src/cli/reviewCliLaunchShell.js';
 import { findPackageRoot, loadPackageInfo } from '../orchestrator/src/cli/utils/packageInfo.js';
@@ -971,16 +972,11 @@ async function maybeEmitExecAdoptionHint(taskFilter: string | null | undefined):
 async function handleSelfCheck(rawArgs: string[]): Promise<void> {
   const { flags } = parseArgs(rawArgs);
   const format = (flags['format'] as string | undefined) === 'json' ? 'json' : 'text';
-  const result = buildSelfCheckResult();
-  if (format === 'json') {
-    console.log(JSON.stringify(result, null, 2));
-    return;
-  }
-  console.log(`Status: ${result.status}`);
-  console.log(`Name: ${result.name}`);
-  console.log(`Version: ${result.version}`);
-  console.log(`Node: ${result.node}`);
-  console.log(`Timestamp: ${result.timestamp}`);
+  await runSelfCheckCliShell({
+    format,
+    buildResult: buildSelfCheckResult,
+    log: (line) => console.log(line)
+  });
 }
 
 async function handleInit(rawArgs: string[]): Promise<void> {

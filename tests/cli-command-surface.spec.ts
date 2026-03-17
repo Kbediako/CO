@@ -863,6 +863,32 @@ describe('codex-orchestrator command surface', () => {
     });
   }, TEST_TIMEOUT);
 
+  it('prints self-check text output through the binary shell', async () => {
+    const { stdout } = await runCli(['self-check']);
+    expect(stdout).toContain('Status: ok');
+    expect(stdout).toContain('Name: @kbediako/codex-orchestrator');
+    expect(stdout).toContain('Version: 0.1.38');
+    expect(stdout).toContain(`Node: ${process.version}`);
+    expect(stdout).toContain('Timestamp: ');
+  }, TEST_TIMEOUT);
+
+  it('prints self-check json output through the binary shell', async () => {
+    const { stdout } = await runCli(['self-check', '--format', 'json']);
+    const payload = JSON.parse(stdout) as {
+      status?: string;
+      name?: string;
+      version?: string;
+      node?: string;
+      timestamp?: string;
+    };
+
+    expect(payload.status).toBe('ok');
+    expect(payload.name).toBe('@kbediako/codex-orchestrator');
+    expect(payload.version).toBe('0.1.38');
+    expect(payload.node).toBe(process.version);
+    expect(new Date(String(payload.timestamp)).toISOString()).toBe(payload.timestamp);
+  }, TEST_TIMEOUT);
+
   it('prints doctor apply plan when wiring is missing', async () => {
     tempDir = await mkdtemp(join(tmpdir(), 'co-cli-doctor-apply-'));
     const env = {
