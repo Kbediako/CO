@@ -13,6 +13,7 @@ related_tasks:
   - tasks/tasks-1278-coordinator-symphony-aligned-rlm-cli-completion-and-state-reporting-shell-extraction.md
 review_notes:
   - 2026-03-17: Opened after `1277` closed as a `go` reassessment. Current-tree inspection plus bounded scout evidence shows the remaining truthful nearby seam is the RLM post-start completion/state-reporting path still inline in `handleRlm(...)`. Evidence: `out/1277-coordinator-symphony-aligned-rlm-cli-boundary-reassessment/manual/20260317T123845Z-closeout/00-summary.md`, `out/1277-coordinator-symphony-aligned-rlm-cli-boundary-reassessment/manual/20260317T123845Z-closeout/14-next-slice-note.md`, `docs/findings/1278-rlm-cli-completion-and-state-reporting-shell-extraction-deliberation.md`.
+  - 2026-03-17: Closed after extracting `orchestrator/src/cli/rlmCompletionCliShell.ts`. The remaining truthful nearby seam is the inline RLM launch/start shell still owned by `handleRlm(...)`, so the next slice is `1279`. Evidence: `out/1278-coordinator-symphony-aligned-rlm-cli-completion-and-state-reporting-shell-extraction/manual/20260317T125403Z-closeout/00-summary.md`, `out/1278-coordinator-symphony-aligned-rlm-cli-completion-and-state-reporting-shell-extraction/manual/20260317T125403Z-closeout/14-next-slice-note.md`.
 ---
 
 # Technical Specification

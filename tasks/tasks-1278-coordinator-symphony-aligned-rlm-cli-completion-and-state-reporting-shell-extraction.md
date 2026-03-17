@@ -21,4 +21,4 @@
 
 ## Implementation
 
-- [ ] RLM completion/state-reporting shell extracted with focused parity evidence. Evidence: pending closeout packet.
+- [x] RLM completion/state-reporting shell extracted with focused parity evidence. Evidence: `out/1278-coordinator-symphony-aligned-rlm-cli-completion-and-state-reporting-shell-extraction/manual/20260317T125403Z-closeout/00-summary.md`, `out/1278-coordinator-symphony-aligned-rlm-cli-completion-and-state-reporting-shell-extraction/manual/20260317T125403Z-closeout/05a-targeted-helper-tests.log`, `out/1278-coordinator-symphony-aligned-rlm-cli-completion-and-state-reporting-shell-extraction/manual/20260317T125403Z-closeout/05b-targeted-cli-tests.log`
