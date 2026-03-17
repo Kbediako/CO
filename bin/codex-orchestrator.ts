@@ -32,6 +32,7 @@ import { runPrCliShell } from '../orchestrator/src/cli/prCliShell.js';
 import { runSkillsCliShell } from '../orchestrator/src/cli/skillsCliShell.js';
 import { runFlowCliShell } from '../orchestrator/src/cli/flowCliShell.js';
 import { runStartCliShell } from '../orchestrator/src/cli/startCliShell.js';
+import { runFrontendTestCliShell } from '../orchestrator/src/cli/frontendTestCliShell.js';
 import { runSetupBootstrapShell } from '../orchestrator/src/cli/setupBootstrapShell.js';
 import { runReviewCliLaunchShell } from '../orchestrator/src/cli/reviewCliLaunchShell.js';
 import { findPackageRoot, loadPackageInfo } from '../orchestrator/src/cli/utils/packageInfo.js';
@@ -602,36 +603,18 @@ async function handleFrontendTest(orchestrator: CodexOrchestrator, rawArgs: stri
     console.error(`[frontend-test] ignoring extra arguments: ${positionals.join(' ')}`);
   }
 
-  const originalDevtools = process.env.CODEX_REVIEW_DEVTOOLS;
-  if (devtools) {
-    process.env.CODEX_REVIEW_DEVTOOLS = '1';
-  }
-
-  try {
-    await withRunUi(flags, format, async (runEvents) => {
-      const result = await orchestrator.start({
-        pipelineId: 'frontend-testing',
-        taskId: typeof flags['task'] === 'string' ? (flags['task'] as string) : undefined,
-        parentRunId: typeof flags['parent-run'] === 'string' ? (flags['parent-run'] as string) : undefined,
-        approvalPolicy: typeof flags['approval-policy'] === 'string' ? (flags['approval-policy'] as string) : undefined,
-        targetStageId: resolveTargetStageId(flags),
-        runtimeMode,
-        runEvents
-      });
-      emitRunOutput(result, format, 'Run started');
-      if (result.manifest.status === 'failed' || result.manifest.status === 'cancelled') {
-        process.exitCode = 1;
-      }
-    });
-  } finally {
-    if (devtools) {
-      if (originalDevtools === undefined) {
-        delete process.env.CODEX_REVIEW_DEVTOOLS;
-      } else {
-        process.env.CODEX_REVIEW_DEVTOOLS = originalDevtools;
-      }
-    }
-  }
+  await runFrontendTestCliShell({
+    orchestrator,
+    format,
+    devtoolsEnabled: devtools,
+    runtimeMode,
+    taskId: typeof flags['task'] === 'string' ? (flags['task'] as string) : undefined,
+    parentRunId: typeof flags['parent-run'] === 'string' ? (flags['parent-run'] as string) : undefined,
+    approvalPolicy: typeof flags['approval-policy'] === 'string' ? (flags['approval-policy'] as string) : undefined,
+    targetStageId: resolveTargetStageId(flags),
+    runWithUi: async (action) => await withRunUi(flags, format, action),
+    emitRunOutput
+  });
 }
 
 async function handleFlow(orchestrator: CodexOrchestrator, rawArgs: string[]): Promise<void> {
