@@ -21,6 +21,6 @@
 
 ## Extraction
 
-- [ ] Plan CLI shell boundary implemented. Evidence: pending closeout packet.
-- [ ] Focused plan CLI shell parity coverage updated. Evidence: pending closeout packet.
-- [ ] Final implementation validation complete. Evidence: pending closeout packet.
+- [x] Plan CLI shell boundary implemented. Evidence: `out/1276-coordinator-symphony-aligned-plan-cli-shell-extraction/manual/20260317T124500Z-closeout/00-summary.md`
+- [x] Focused plan CLI shell parity coverage updated. Evidence: `out/1276-coordinator-symphony-aligned-plan-cli-shell-extraction/manual/20260317T124500Z-closeout/05a-targeted-helper-tests.log`, `out/1276-coordinator-symphony-aligned-plan-cli-shell-extraction/manual/20260317T124500Z-closeout/05b-targeted-cli-tests.log`
+- [x] Final implementation validation complete. Evidence: `out/1276-coordinator-symphony-aligned-plan-cli-shell-extraction/manual/20260317T124500Z-closeout/00-summary.md`, `out/1276-coordinator-symphony-aligned-plan-cli-shell-extraction/manual/20260317T124500Z-closeout/13-override-notes.md`

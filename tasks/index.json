@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260317-1277-coordinator-symphony-aligned-rlm-cli-boundary-reassessment",
+      "title": "Coordinator Symphony-Aligned RLM CLI Boundary Reassessment",
+      "relates_to": "tasks/tasks-1277-coordinator-symphony-aligned-rlm-cli-boundary-reassessment.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-17",
+      "paths": {
+        "spec": "tasks/specs/1277-coordinator-symphony-aligned-rlm-cli-boundary-reassessment.md",
+        "task": "tasks/tasks-1277-coordinator-symphony-aligned-rlm-cli-boundary-reassessment.md",
+        "agent_task": ".agent/task/1277-coordinator-symphony-aligned-rlm-cli-boundary-reassessment.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-rlm-cli-boundary-reassessment.md"
+      }
+    },
+    {
       "id": "20260317-1276-coordinator-symphony-aligned-plan-cli-shell-extraction",
       "title": "Coordinator Symphony-Aligned Plan CLI Shell Extraction",
       "relates_to": "tasks/tasks-1276-coordinator-symphony-aligned-plan-cli-shell-extraction.md",
