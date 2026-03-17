@@ -21,6 +21,6 @@
 
 ## Extraction
 
-- [ ] Exec CLI shell boundary implemented. Evidence: pending closeout packet.
-- [ ] Focused exec CLI shell parity coverage updated. Evidence: pending closeout packet.
-- [ ] Final implementation validation complete. Evidence: pending closeout packet.
+- [x] Exec CLI shell boundary implemented. Evidence: `out/1270-coordinator-symphony-aligned-exec-cli-shell-extraction/manual/20260317T063411Z-closeout/00-summary.md`
+- [x] Focused exec CLI shell parity coverage updated. Evidence: `out/1270-coordinator-symphony-aligned-exec-cli-shell-extraction/manual/20260317T063411Z-closeout/06a-focused-helper-tests.log`, `out/1270-coordinator-symphony-aligned-exec-cli-shell-extraction/manual/20260317T063411Z-closeout/06b-focused-cli-tests.log`
+- [x] Final implementation validation complete. Evidence: `out/1270-coordinator-symphony-aligned-exec-cli-shell-extraction/manual/20260317T063411Z-closeout/13-override-notes.md`
