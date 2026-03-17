@@ -30,7 +30,7 @@ import { runDelegationCliShell } from '../orchestrator/src/cli/delegationCliShel
 import { runPrCliShell } from '../orchestrator/src/cli/prCliShell.js';
 import { runSkillsCliShell } from '../orchestrator/src/cli/skillsCliShell.js';
 import { runFlowCliShell } from '../orchestrator/src/cli/flowCliShell.js';
-import { runStartCliShell } from '../orchestrator/src/cli/startCliShell.js';
+import { runStartCliRequestShell } from '../orchestrator/src/cli/startCliRequestShell.js';
 import { runFrontendTestCliShell } from '../orchestrator/src/cli/frontendTestCliShell.js';
 import { runPlanCliShell } from '../orchestrator/src/cli/planCliShell.js';
 import { runDoctorCliRequestShell } from '../orchestrator/src/cli/doctorCliRequestShell.js';
@@ -535,33 +535,24 @@ async function handleStart(orchestrator: CodexOrchestrator, rawArgs: string[]): 
     printStartHelp();
     return;
   }
-  const pipelineId = positionals[0];
-  const format: OutputFormat = (flags['format'] as string | undefined) === 'json' ? 'json' : 'text';
-  const executionMode = resolveExecutionModeFlag(flags);
-  const runtimeMode = resolveRuntimeModeFlag(flags);
-  applyRepoConfigRequiredPolicy(flags);
-  const autoIssueLogEnabled = resolveAutoIssueLogEnabled(flags);
-  const taskIdOverride = typeof flags['task'] === 'string' ? (flags['task'] as string) : undefined;
-  const goal = readStringFlag(flags, 'goal');
-  await runStartCliShell({
+  await runStartCliRequestShell({
     orchestrator,
-    pipelineId,
-    format,
-    executionMode,
-    runtimeMode,
-    autoIssueLogEnabled,
-    taskIdOverride,
-    parentRunId: typeof flags['parent-run'] === 'string' ? (flags['parent-run'] as string) : undefined,
-    approvalPolicy: typeof flags['approval-policy'] === 'string' ? (flags['approval-policy'] as string) : undefined,
-    targetStageId: resolveTargetStageId(flags),
-    runWithUi: async (action) => await withRunUi(flags, format, action),
+    positionals,
+    flags,
+    runWithUi: async (format, action) => await withRunUi(flags, format, action),
     emitRunOutput,
     maybeCaptureAutoIssueLog,
     resolveTaskFilter,
     withAutoIssueLogContext,
     maybeEmitRunAdoptionHint,
-    isLegacyCollabEnvAliasEnabled: () => shouldWarnLegacyMultiAgentEnv(flags, process.env),
-    applyRlmEnvOverrides: () => applyRlmEnvOverrides(flags, goal),
+    resolveExecutionModeFlag,
+    resolveRuntimeModeFlag,
+    applyRepoConfigRequiredPolicy,
+    resolveAutoIssueLogEnabled,
+    resolveTargetStageId,
+    readStringFlag,
+    shouldWarnLegacyMultiAgentEnv: (requestFlags) => shouldWarnLegacyMultiAgentEnv(requestFlags, process.env),
+    applyRlmEnvOverrides,
     resolveRlmTaskId,
     setTaskEnvironment: (taskId) => {
       process.env.MCP_RUNNER_TASK_ID = taskId;
