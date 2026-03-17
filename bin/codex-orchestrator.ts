@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { existsSync } from 'node:fs';
-import { opendir, readFile } from 'node:fs/promises';
+import { opendir } from 'node:fs/promises';
 import { basename, join } from 'node:path';
 import process from 'node:process';
 
@@ -33,6 +33,7 @@ import { runFlowCliShell } from '../orchestrator/src/cli/flowCliShell.js';
 import { runStartCliShell } from '../orchestrator/src/cli/startCliShell.js';
 import { runFrontendTestCliShell } from '../orchestrator/src/cli/frontendTestCliShell.js';
 import { runPlanCliShell } from '../orchestrator/src/cli/planCliShell.js';
+import { runRlmCompletionCliShell } from '../orchestrator/src/cli/rlmCompletionCliShell.js';
 import { runResumeCliShell } from '../orchestrator/src/cli/resumeCliShell.js';
 import { runStatusCliShell } from '../orchestrator/src/cli/statusCliShell.js';
 import { runSetupBootstrapShell } from '../orchestrator/src/cli/setupBootstrapShell.js';
@@ -462,31 +463,6 @@ function resolveRlmTaskId(taskFlag?: string): string {
   return sanitizeTaskId(`rlm-${slug}`);
 }
 
-async function waitForManifestCompletion(manifestPath: string, intervalMs = 2000): Promise<any> {
-  const terminal = new Set(['succeeded', 'failed', 'cancelled']);
-  while (true) {
-    const raw = await readFile(manifestPath, 'utf8');
-    const manifest = JSON.parse(raw);
-    if (terminal.has(manifest.status)) {
-      return manifest;
-    }
-    await new Promise((resolve) => setTimeout(resolve, intervalMs));
-  }
-}
-
-async function readRlmState(statePath: string): Promise<{ exitCode: number; status: string } | null> {
-  try {
-    const raw = await readFile(statePath, 'utf8');
-    const parsed = JSON.parse(raw);
-    if (!parsed?.final) {
-      return null;
-    }
-    return { exitCode: parsed.final.exitCode, status: parsed.final.status };
-  } catch {
-    return null;
-  }
-}
-
 interface AutoIssueLogCaptureResult {
   issueLog: DoctorIssueLogResult | null;
   issueLogError: string | null;
@@ -753,20 +729,15 @@ async function handleRlm(orchestrator: CodexOrchestrator, rawArgs: string[]): Pr
     manifest: { run_id: string; status: string; artifact_root: string; log_path: string | null };
   };
   const { repoRoot } = resolveEnvironmentPaths();
-  const manifestPath = join(repoRoot, resolvedStart.manifest.artifact_root, 'manifest.json');
-  const manifest = await waitForManifestCompletion(manifestPath);
-  const statePath = join(repoRoot, resolvedStart.manifest.artifact_root, 'rlm', 'state.json');
-  const rlmState = await readRlmState(statePath);
-
-  if (rlmState) {
-    console.log(`RLM status: ${rlmState.status}`);
-    process.exitCode = rlmState.exitCode;
-    return;
-  }
-
-  console.log(`RLM status: ${manifest.status}`);
-  console.error('RLM state file missing; treating as internal error.');
-  process.exitCode = 10;
+  await runRlmCompletionCliShell({
+    repoRoot,
+    artifactRoot: resolvedStart.manifest.artifact_root,
+    log: (line) => console.log(line),
+    error: (line) => console.error(line),
+    setExitCode: (code) => {
+      process.exitCode = code;
+    }
+  });
 }
 
 async function handleResume(orchestrator: CodexOrchestrator, rawArgs: string[]): Promise<void> {

@@ -857,6 +857,12 @@ describe('codex-orchestrator command surface', () => {
     });
   }, TEST_TIMEOUT);
 
+  it('requires a goal for rlm runs', async () => {
+    await expect(runCli(['rlm'])).rejects.toMatchObject({
+      stderr: expect.stringContaining('rlm requires a goal. Use: codex-orchestrator rlm "<goal>".')
+    });
+  }, TEST_TIMEOUT);
+
   it('prints doctor apply plan when wiring is missing', async () => {
     tempDir = await mkdtemp(join(tmpdir(), 'co-cli-doctor-apply-'));
     const env = {
