@@ -21,4 +21,4 @@
 
 ## Reassessment
 
-- [ ] Remaining local skills pocket reinspected and freeze-or-go result recorded. Evidence: pending reassessment packet.
+- [x] Remaining local skills pocket reinspected and freeze-or-go result recorded. Evidence: `out/1258-coordinator-symphony-aligned-skills-cli-remaining-boundary-freeze-reassessment/manual/20260317T020243Z-closeout/00-summary.md`, `out/1258-coordinator-symphony-aligned-skills-cli-remaining-boundary-freeze-reassessment/manual/20260317T020243Z-closeout/14-next-slice-note.md`
