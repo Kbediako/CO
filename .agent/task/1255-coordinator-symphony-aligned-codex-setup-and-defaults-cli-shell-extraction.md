@@ -21,6 +21,6 @@
 
 ## Extraction
 
-- [ ] Codex setup/defaults shell boundary implemented. Evidence: pending implementation packet.
-- [ ] Focused codex CLI parity coverage updated if needed. Evidence: pending implementation packet.
-- [ ] Final implementation validation complete. Evidence: pending implementation packet.
+- [x] Codex setup/defaults shell boundary implemented. Evidence: `out/1255-coordinator-symphony-aligned-codex-setup-and-defaults-cli-shell-extraction/manual/20260317T012819Z-closeout/00-summary.md`
+- [x] Focused codex CLI parity coverage updated if needed. Evidence: `out/1255-coordinator-symphony-aligned-codex-setup-and-defaults-cli-shell-extraction/manual/20260317T012819Z-closeout/05a-targeted-helper-tests.log`, `out/1255-coordinator-symphony-aligned-codex-setup-and-defaults-cli-shell-extraction/manual/20260317T012819Z-closeout/05b-targeted-cli-tests.log`
+- [x] Final implementation validation complete. Evidence: `out/1255-coordinator-symphony-aligned-codex-setup-and-defaults-cli-shell-extraction/manual/20260317T012819Z-closeout/00-summary.md`
