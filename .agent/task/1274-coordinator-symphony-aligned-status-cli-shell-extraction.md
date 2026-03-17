@@ -21,6 +21,6 @@
 
 ## Extraction
 
-- [ ] Status CLI shell boundary implemented. Evidence: pending closeout packet.
-- [ ] Focused status CLI shell parity coverage updated. Evidence: pending closeout packet.
-- [ ] Final implementation validation complete. Evidence: pending closeout packet.
+- [x] Status CLI shell boundary implemented. Evidence: `out/1274-coordinator-symphony-aligned-status-cli-shell-extraction/manual/20260317T120000Z-closeout/00-summary.md`
+- [x] Focused status CLI shell parity coverage updated. Evidence: `out/1274-coordinator-symphony-aligned-status-cli-shell-extraction/manual/20260317T120000Z-closeout/05a-targeted-helper-tests.log`, `out/1274-coordinator-symphony-aligned-status-cli-shell-extraction/manual/20260317T120000Z-closeout/05b-targeted-cli-tests.log`, `out/1274-coordinator-symphony-aligned-status-cli-shell-extraction/manual/20260317T120000Z-closeout/05c-targeted-lower-status-tests.log`
+- [x] Final implementation validation complete. Evidence: `out/1274-coordinator-symphony-aligned-status-cli-shell-extraction/manual/20260317T120000Z-closeout/00-summary.md`, `out/1274-coordinator-symphony-aligned-status-cli-shell-extraction/manual/20260317T120000Z-closeout/13-override-notes.md`
