@@ -1,7 +1,7 @@
 ---
 id: 20260317-1257-coordinator-symphony-aligned-skills-install-cli-shell-extraction
 title: Coordinator Symphony-Aligned Skills Install CLI Shell Extraction
-status: active
+status: completed
 owner: Codex
 created: 2026-03-17
 last_review: 2026-03-17
@@ -13,6 +13,7 @@ related_tasks:
   - tasks/tasks-1257-coordinator-symphony-aligned-skills-install-cli-shell-extraction.md
 review_notes:
   - 2026-03-17: Opened after `1256` froze the remaining local `codex` pocket. Current-tree inspection shows `handleSkills(...)` still owns a bounded `skills install` shell above `orchestrator/src/cli/skills.ts`, so the next truthful nearby move is a dedicated skills CLI shell extraction lane. Evidence: `out/1256-coordinator-symphony-aligned-codex-cli-remaining-boundary-freeze-reassessment/manual/20260317T014124Z-closeout/14-next-slice-note.md`, `docs/findings/1257-skills-install-cli-shell-extraction-deliberation.md`.
+  - 2026-03-17: Completed. `handleSkills(...)` now delegates the install subcommand family to `orchestrator/src/cli/skillsCliShell.ts`, preserving help gating, flag mapping, JSON/text output, and unknown-subcommand handling with focused helper and CLI parity coverage. Evidence: `out/1257-coordinator-symphony-aligned-skills-install-cli-shell-extraction/manual/20260317T015522Z-closeout/00-summary.md`.
 ---
 
 # Technical Specification

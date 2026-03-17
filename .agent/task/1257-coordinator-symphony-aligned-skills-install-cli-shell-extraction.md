@@ -21,6 +21,6 @@
 
 ## Extraction
 
-- [ ] Skills install shell boundary implemented. Evidence: pending implementation packet.
-- [ ] Focused skills CLI parity coverage updated if needed. Evidence: pending implementation packet.
-- [ ] Final implementation validation complete. Evidence: pending implementation packet.
+- [x] Skills install shell boundary implemented. Evidence: `out/1257-coordinator-symphony-aligned-skills-install-cli-shell-extraction/manual/20260317T015522Z-closeout/00-summary.md`
+- [x] Focused skills CLI parity coverage updated if needed. Evidence: `out/1257-coordinator-symphony-aligned-skills-install-cli-shell-extraction/manual/20260317T015522Z-closeout/05a-targeted-shell-tests.log`, `out/1257-coordinator-symphony-aligned-skills-install-cli-shell-extraction/manual/20260317T015522Z-closeout/05b-targeted-cli-tests.log`
+- [x] Final implementation validation complete. Evidence: `out/1257-coordinator-symphony-aligned-skills-install-cli-shell-extraction/manual/20260317T015522Z-closeout/00-summary.md`, `out/1257-coordinator-symphony-aligned-skills-install-cli-shell-extraction/manual/20260317T015522Z-closeout/13-override-notes.md`
