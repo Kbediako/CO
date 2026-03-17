@@ -21,4 +21,4 @@
 
 ## Reassessment
 
-- [ ] Remaining local RLM CLI pocket reinspected and go/freeze result recorded. Evidence: pending closeout packet.
+- [x] Remaining local RLM CLI pocket reinspected and explicit `go` result recorded. Evidence: `out/1277-coordinator-symphony-aligned-rlm-cli-boundary-reassessment/manual/20260317T123845Z-closeout/00-summary.md`, `out/1277-coordinator-symphony-aligned-rlm-cli-boundary-reassessment/manual/20260317T123845Z-closeout/14-next-slice-note.md`
