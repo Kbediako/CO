@@ -21,5 +21,5 @@
 
 ## Reassessment
 
-- [ ] Remaining doctor boundary rechecked after `1251`. Evidence: pending closeout packet.
-- [ ] Freeze-or-go result recorded explicitly. Evidence: pending closeout packet.
+- [x] Remaining doctor boundary rechecked after `1251`. Evidence: `out/1252-coordinator-symphony-aligned-doctor-cli-remaining-boundary-freeze-reassessment/manual/20260317T010338Z-closeout/00-summary.md`
+- [x] Freeze-or-go result recorded explicitly. Evidence: `out/1252-coordinator-symphony-aligned-doctor-cli-remaining-boundary-freeze-reassessment/manual/20260317T010338Z-closeout/00-summary.md`, `out/1252-coordinator-symphony-aligned-doctor-cli-remaining-boundary-freeze-reassessment/manual/20260317T010338Z-closeout/14-next-slice-note.md`

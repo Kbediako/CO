@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260317-1253-coordinator-symphony-aligned-mcp-enable-cli-shell-extraction",
+      "title": "Coordinator Symphony-Aligned MCP Enable CLI Shell Extraction",
+      "relates_to": "tasks/tasks-1253-coordinator-symphony-aligned-mcp-enable-cli-shell-extraction.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-17",
+      "paths": {
+        "spec": "tasks/specs/1253-coordinator-symphony-aligned-mcp-enable-cli-shell-extraction.md",
+        "task": "tasks/tasks-1253-coordinator-symphony-aligned-mcp-enable-cli-shell-extraction.md",
+        "agent_task": ".agent/task/1253-coordinator-symphony-aligned-mcp-enable-cli-shell-extraction.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-mcp-enable-cli-shell-extraction.md"
+      }
+    },
+    {
       "id": "20260317-1252-coordinator-symphony-aligned-doctor-cli-remaining-boundary-freeze-reassessment",
       "title": "Coordinator Symphony-Aligned Doctor CLI Remaining Boundary Freeze Reassessment",
       "relates_to": "tasks/tasks-1252-coordinator-symphony-aligned-doctor-cli-remaining-boundary-freeze-reassessment.md",
