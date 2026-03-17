@@ -21,6 +21,6 @@
 
 ## Extraction
 
-- [ ] Start CLI shell boundary implemented. Evidence: pending closeout packet.
-- [ ] Focused start CLI shell parity coverage updated. Evidence: pending closeout packet.
-- [ ] Final implementation validation complete. Evidence: pending closeout packet.
+- [x] Start CLI shell boundary implemented. Evidence: `out/1271-coordinator-symphony-aligned-start-cli-shell-extraction/manual/20260317T074911Z-closeout/00-summary.md`
+- [x] Focused start CLI shell parity coverage updated. Evidence: `out/1271-coordinator-symphony-aligned-start-cli-shell-extraction/manual/20260317T074911Z-closeout/05a-targeted-helper-tests.log`, `out/1271-coordinator-symphony-aligned-start-cli-shell-extraction/manual/20260317T074911Z-closeout/05b-targeted-cli-tests.log`
+- [x] Final implementation validation complete. Evidence: `out/1271-coordinator-symphony-aligned-start-cli-shell-extraction/manual/20260317T074911Z-closeout/00-summary.md`, `out/1271-coordinator-symphony-aligned-start-cli-shell-extraction/manual/20260317T074911Z-closeout/13-override-notes.md`
