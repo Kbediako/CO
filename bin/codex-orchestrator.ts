@@ -34,6 +34,7 @@ import { runStartCliShell } from '../orchestrator/src/cli/startCliShell.js';
 import { runFrontendTestCliShell } from '../orchestrator/src/cli/frontendTestCliShell.js';
 import { runPlanCliShell } from '../orchestrator/src/cli/planCliShell.js';
 import { runRlmCompletionCliShell } from '../orchestrator/src/cli/rlmCompletionCliShell.js';
+import { runRlmLaunchCliShell } from '../orchestrator/src/cli/rlmLaunchCliShell.js';
 import { runResumeCliShell } from '../orchestrator/src/cli/resumeCliShell.js';
 import { runStatusCliShell } from '../orchestrator/src/cli/statusCliShell.js';
 import { runSetupBootstrapShell } from '../orchestrator/src/cli/setupBootstrapShell.js';
@@ -674,69 +675,44 @@ async function handleRlm(orchestrator: CodexOrchestrator, rawArgs: string[]): Pr
   const runtimeMode = resolveRuntimeModeFlag(flags);
   applyRepoConfigRequiredPolicy(flags);
   const goalFromArgs = positionals.length > 0 ? positionals.join(' ') : undefined;
-  const goal = goalFromArgs ?? readStringFlag(flags, 'goal') ?? process.env.RLM_GOAL?.trim();
-  if (!goal) {
-    throw new Error('rlm requires a goal. Use: codex-orchestrator rlm \"<goal>\".');
-  }
-
-  const taskFlag = typeof flags['task'] === 'string' ? (flags['task'] as string) : undefined;
-  const taskId = resolveRlmTaskId(taskFlag);
-  process.env.MCP_RUNNER_TASK_ID = taskId;
-  const warnLegacyEnvAlias = shouldWarnLegacyMultiAgentEnv(flags, process.env);
-  applyRlmEnvOverrides(flags, goal);
-  if (warnLegacyEnvAlias) {
-    console.warn('Warning: RLM_SYMBOLIC_COLLAB is a legacy alias; prefer RLM_SYMBOLIC_MULTI_AGENT.');
-  }
-
-  console.log(`Task: ${taskId}`);
 
   const collabUserChoice =
     flags['collab'] !== undefined ||
     flags['multi-agent'] !== undefined ||
     process.env.RLM_SYMBOLIC_COLLAB !== undefined ||
     process.env.RLM_SYMBOLIC_MULTI_AGENT !== undefined;
-  if (!collabUserChoice) {
-    const doctor = runDoctor();
-    if (doctor.collab.status === 'ok') {
-      console.log(
-        'Tip: multi-agent collab is enabled. Try: codex-orchestrator rlm --multi-agent auto \"<goal>\" (legacy: --collab auto).'
-      );
-    } else if (doctor.collab.status === 'disabled') {
-      console.log(
-        'Tip: multi-agent collab is available but disabled. Enable with: codex features enable multi_agent (legacy alias: collab).'
-      );
-    }
-  }
-
-  let startResult: { manifest: { run_id: string; status: string; artifact_root: string; log_path: string | null } } | null = null;
-  await withRunUi(flags, 'text', async (runEvents) => {
-    startResult = await orchestrator.start({
-      pipelineId: 'rlm',
-      taskId,
-      parentRunId: typeof flags['parent-run'] === 'string' ? (flags['parent-run'] as string) : undefined,
-      approvalPolicy: typeof flags['approval-policy'] === 'string' ? (flags['approval-policy'] as string) : undefined,
-      runtimeMode,
-      runEvents
-    });
-    emitRunOutput(startResult, 'text', 'Run started');
-  });
-
-  if (!startResult) {
-    throw new Error('rlm run failed to start.');
-  }
-
-  const resolvedStart = startResult as {
-    manifest: { run_id: string; status: string; artifact_root: string; log_path: string | null };
-  };
-  const { repoRoot } = resolveEnvironmentPaths();
-  await runRlmCompletionCliShell({
-    repoRoot,
-    artifactRoot: resolvedStart.manifest.artifact_root,
+  await runRlmLaunchCliShell({
+    orchestrator,
+    runtimeMode,
+    goalFromArgs,
+    goalFlag: readStringFlag(flags, 'goal') ?? undefined,
+    goalEnv: process.env.RLM_GOAL,
+    taskIdOverride: typeof flags['task'] === 'string' ? (flags['task'] as string) : undefined,
+    parentRunId: typeof flags['parent-run'] === 'string' ? (flags['parent-run'] as string) : undefined,
+    approvalPolicy: typeof flags['approval-policy'] === 'string' ? (flags['approval-policy'] as string) : undefined,
+    collabUserChoice,
+    runWithUi: async (action) => await withRunUi(flags, 'text', action),
+    emitRunOutput,
+    applyRlmEnvOverrides: (goal) => applyRlmEnvOverrides(flags, goal),
+    shouldWarnLegacyEnvAlias: () => shouldWarnLegacyMultiAgentEnv(flags, process.env),
+    resolveRlmTaskId,
+    setTaskEnvironment: (taskId) => {
+      process.env.MCP_RUNNER_TASK_ID = taskId;
+    },
+    runDoctor,
+    resolveRepoRoot: () => resolveEnvironmentPaths().repoRoot,
+    runCompletionShell: async ({ repoRoot, artifactRoot }) =>
+      await runRlmCompletionCliShell({
+        repoRoot,
+        artifactRoot,
+        log: (line) => console.log(line),
+        error: (line) => console.error(line),
+        setExitCode: (code) => {
+          process.exitCode = code;
+        }
+      }),
     log: (line) => console.log(line),
-    error: (line) => console.error(line),
-    setExitCode: (code) => {
-      process.exitCode = code;
-    }
+    warn: (line) => console.warn(line)
   });
 }
 
