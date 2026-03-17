@@ -21,6 +21,6 @@
 
 ## Extraction
 
-- [ ] Frontend-test CLI shell boundary implemented. Evidence: pending closeout packet.
-- [ ] Focused frontend-test CLI shell parity coverage updated. Evidence: pending closeout packet.
-- [ ] Final implementation validation complete. Evidence: pending closeout packet.
+- [x] Frontend-test CLI shell boundary implemented. Evidence: `out/1272-coordinator-symphony-aligned-frontend-test-cli-shell-extraction/manual/20260317T081917Z-closeout/00-summary.md`
+- [x] Focused frontend-test CLI shell parity coverage updated. Evidence: `out/1272-coordinator-symphony-aligned-frontend-test-cli-shell-extraction/manual/20260317T081917Z-closeout/05a-targeted-helper-tests.log`, `out/1272-coordinator-symphony-aligned-frontend-test-cli-shell-extraction/manual/20260317T081917Z-closeout/05b-targeted-cli-tests.log`
+- [x] Final implementation validation complete. Evidence: `out/1272-coordinator-symphony-aligned-frontend-test-cli-shell-extraction/manual/20260317T081917Z-closeout/00-summary.md`, `out/1272-coordinator-symphony-aligned-frontend-test-cli-shell-extraction/manual/20260317T081917Z-closeout/13-override-notes.md`
