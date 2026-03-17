@@ -175,6 +175,12 @@ describe('codex-orchestrator command surface', () => {
     expect(stdout).toContain('docs/guides/review-artifacts.md');
   }, TEST_TIMEOUT);
 
+  it('prints pr help when no subcommand is provided', async () => {
+    const { stdout } = await runCli(['pr']);
+    expect(stdout).toContain('Usage: codex-orchestrator pr <subcommand>');
+    expect(stdout).toContain('watch-merge');
+  }, TEST_TIMEOUT);
+
   it('prints pr watch-merge help', async () => {
     const { stdout } = await runCli(['pr', 'watch-merge', '--help']);
     expect(stdout).toContain('Usage: codex-orchestrator pr watch-merge');
@@ -184,6 +190,12 @@ describe('codex-orchestrator command surface', () => {
     const { stdout } = await runCli(['pr', 'resolve-merge', '--help']);
     expect(stdout).toContain('Usage: codex-orchestrator pr resolve-merge');
     expect(stdout).toContain('--exit-on-action-required');
+  }, TEST_TIMEOUT);
+
+  it('rejects unknown pr subcommands through the binary shell', async () => {
+    await expect(runCli(['pr', 'ship-it'])).rejects.toMatchObject({
+      stderr: expect.stringContaining('Unknown pr subcommand: ship-it')
+    });
   }, TEST_TIMEOUT);
 
   it('prints setup help', async () => {

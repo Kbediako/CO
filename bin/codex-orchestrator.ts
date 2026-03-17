@@ -11,7 +11,6 @@ import {
   type ExecOutputMode
 } from '../orchestrator/src/cli/exec/command.js';
 import { resolveEnvironmentPaths } from '../scripts/lib/run-manifests.js';
-import { runPrWatchMerge } from '../scripts/lib/pr-watch-merge.js';
 import { normalizeEnvironmentPaths, sanitizeTaskId } from '../orchestrator/src/cli/run/environment.js';
 import { RunEventEmitter } from '../orchestrator/src/cli/events/runEvents.js';
 import type { HudController } from '../orchestrator/src/cli/ui/controller.js';
@@ -32,6 +31,7 @@ import { formatDevtoolsSetupSummary, runDevtoolsSetup } from '../orchestrator/sr
 import { formatCodexCliSetupSummary, runCodexCliSetup } from '../orchestrator/src/cli/codexCliSetup.js';
 import { runCodexCliShell } from '../orchestrator/src/cli/codexCliShell.js';
 import { runDelegationCliShell } from '../orchestrator/src/cli/delegationCliShell.js';
+import { runPrCliShell } from '../orchestrator/src/cli/prCliShell.js';
 import { runSkillsCliShell } from '../orchestrator/src/cli/skillsCliShell.js';
 import { runFlowCliShell } from '../orchestrator/src/cli/flowCliShell.js';
 import { runSetupBootstrapShell } from '../orchestrator/src/cli/setupBootstrapShell.js';
@@ -1338,24 +1338,7 @@ async function handlePr(rawArgs: string[]): Promise<void> {
     printPrHelp();
     return;
   }
-  const [subcommand, ...subcommandArgs] = rawArgs;
-  const modeBySubcommand: Record<string, { usage: string; defaultAutoMerge?: boolean; defaultExitOnActionRequired?: boolean }> = {
-    'watch-merge': {
-      usage: 'codex-orchestrator pr watch-merge'
-    },
-    'resolve-merge': {
-      usage: 'codex-orchestrator pr resolve-merge',
-      defaultExitOnActionRequired: true
-    }
-  };
-  const mode = modeBySubcommand[subcommand];
-  if (!mode) {
-    throw new Error(`Unknown pr subcommand: ${subcommand}`);
-  }
-  const exitCode = await runPrWatchMerge(subcommandArgs, mode);
-  if (exitCode !== 0) {
-    process.exitCode = exitCode;
-  }
+  await runPrCliShell({ rawArgs });
 }
 
 async function handleDelegationServer(rawArgs: string[]): Promise<void> {
