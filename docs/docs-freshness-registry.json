@@ -3,6 +3,55 @@
   "generated_at": "2026-03-17",
   "entries": [
     {
+      "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-setup-cli-remaining-boundary-freeze-reassessment.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-17",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/PRD-coordinator-symphony-aligned-setup-cli-remaining-boundary-freeze-reassessment.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-17",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/TECH_SPEC-coordinator-symphony-aligned-setup-cli-remaining-boundary-freeze-reassessment.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-17",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/findings/1284-setup-cli-remaining-boundary-freeze-reassessment-deliberation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-17",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/tasks-1284-coordinator-symphony-aligned-setup-cli-remaining-boundary-freeze-reassessment.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-17",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/specs/1284-coordinator-symphony-aligned-setup-cli-remaining-boundary-freeze-reassessment.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-17",
+      "cadence_days": 30
+    },
+    {
+      "path": ".agent/task/1284-coordinator-symphony-aligned-setup-cli-remaining-boundary-freeze-reassessment.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-17",
+      "cadence_days": 30
+    },
+    {
       "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-setup-cli-wrapper-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",

@@ -1,7 +1,7 @@
 ---
 id: 20260317-1283-coordinator-symphony-aligned-setup-cli-wrapper-extraction
 title: Coordinator Symphony-Aligned Setup CLI Wrapper Extraction
-status: active
+status: done
 owner: Codex
 created: 2026-03-17
 last_review: 2026-03-17
@@ -13,6 +13,7 @@ related_tasks:
   - tasks/tasks-1283-coordinator-symphony-aligned-setup-cli-wrapper-extraction.md
 review_notes:
   - 2026-03-17: Opened after `1282` closed as a truthful freeze. Current-tree inspection plus bounded scout evidence shows the next truthful nearby binary-facing seam is the inline `setup` wrapper still owned by `handleSetup(...)` above `orchestrator/src/cli/setupBootstrapShell.ts`. Evidence: `out/1282-coordinator-symphony-aligned-self-check-cli-remaining-boundary-freeze-reassessment/manual/20260317T135320Z-closeout/00-summary.md`, `out/1282-coordinator-symphony-aligned-self-check-cli-remaining-boundary-freeze-reassessment/manual/20260317T135320Z-closeout/14-next-slice-note.md`, `docs/findings/1283-setup-cli-wrapper-extraction-deliberation.md`.
+  - 2026-03-17: Closed as a real extraction. `handleSetup(...)` now keeps only shared `parseArgs(...)` ownership, top-level help routing, and a thin wrapper into `orchestrator/src/cli/setupCliShell.ts`, which owns the bounded binary-facing `setup` shell. The next truthful nearby move is `1284`, a freeze reassessment of the remaining local `setup` pocket. Evidence: `out/1283-coordinator-symphony-aligned-setup-cli-wrapper-extraction/manual/20260317T140307Z-closeout/00-summary.md`, `out/1283-coordinator-symphony-aligned-setup-cli-wrapper-extraction/manual/20260317T140307Z-closeout/14-next-slice-note.md`.
 ---
 
 # Technical Specification

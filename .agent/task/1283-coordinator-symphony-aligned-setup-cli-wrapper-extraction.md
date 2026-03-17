@@ -21,4 +21,4 @@
 
 ## Implementation
 
-- [ ] Setup CLI wrapper extracted with focused parity evidence. Evidence: pending closeout packet.
+- [x] Setup CLI wrapper extracted with focused parity evidence. Evidence: `out/1283-coordinator-symphony-aligned-setup-cli-wrapper-extraction/manual/20260317T140307Z-closeout/00-summary.md`
