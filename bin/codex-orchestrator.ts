@@ -6,10 +6,8 @@ import process from 'node:process';
 
 import { CodexOrchestrator } from '../orchestrator/src/cli/orchestrator.js';
 import { formatPlanPreview } from '../orchestrator/src/cli/utils/planFormatter.js';
-import {
-  executeExecCommand,
-  type ExecOutputMode
-} from '../orchestrator/src/cli/exec/command.js';
+import { type ExecOutputMode } from '../orchestrator/src/cli/exec/command.js';
+import { runExecCliShell, type RunExecCliShellParams } from '../orchestrator/src/cli/execCliShell.js';
 import { resolveEnvironmentPaths } from '../scripts/lib/run-manifests.js';
 import { normalizeEnvironmentPaths, sanitizeTaskId } from '../orchestrator/src/cli/run/environment.js';
 import { RunEventEmitter } from '../orchestrator/src/cli/events/runEvents.js';
@@ -1015,57 +1013,10 @@ function toRunOutputPayload(
   };
 }
 
-interface ParsedExecArgs {
-  commandTokens: string[];
-  notifyTargets: string[];
-  otelEndpoint: string | null;
-  requestedMode: ExecOutputMode | null;
-  jsonPretty: boolean;
-  cwd?: string;
-  taskId?: string;
-}
-
 async function handleExec(rawArgs: string[]): Promise<void> {
-  const parsed = parseExecArgs(rawArgs);
-  if (parsed.commandTokens.length === 0) {
-    throw new Error('exec requires a command to run.');
-  }
-
-  const isInteractive = process.stdout.isTTY === true && process.stderr.isTTY === true;
-  const outputMode: ExecOutputMode =
-    parsed.requestedMode ?? (isInteractive ? 'interactive' : 'jsonl');
-
-  const env = normalizeEnvironmentPaths(resolveEnvironmentPaths());
-  if (parsed.taskId) {
-    env.taskId = sanitizeTaskId(parsed.taskId);
-  }
-
-  const context = {
-    env,
-    stdout: process.stdout,
-    stderr: process.stderr
-  };
-
-  const invocation = {
-    command: parsed.commandTokens[0]!,
-    args: parsed.commandTokens.slice(1),
-    cwd: parsed.cwd,
-    outputMode,
-    notifyTargets: parsed.notifyTargets,
-    otelEndpoint: parsed.otelEndpoint,
-    jsonPretty: parsed.jsonPretty
-  };
-
-  const result = await executeExecCommand(context, invocation);
-  if (result.exitCode !== null) {
-    process.exitCode = result.exitCode;
-  } else if (result.status !== 'succeeded') {
-    process.exitCode = 1;
-  }
-
-  if (outputMode === 'interactive') {
-    await maybeEmitExecAdoptionHint(env.taskId);
-  }
+  await runExecCliShell(parseExecArgs(rawArgs), {
+    maybeEmitAdoptionHint: maybeEmitExecAdoptionHint
+  });
 }
 
 async function shouldScanAdoptionHint(taskFilter: string | null | undefined): Promise<boolean> {
@@ -1296,7 +1247,7 @@ async function handleDelegationServer(rawArgs: string[]): Promise<void> {
   });
 }
 
-function parseExecArgs(rawArgs: string[]): ParsedExecArgs {
+function parseExecArgs(rawArgs: string[]): RunExecCliShellParams {
   const notifyTargets: string[] = [];
   let otelEndpoint: string | null = null;
   let requestedMode: ExecOutputMode | null = null;

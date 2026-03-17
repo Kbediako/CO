@@ -2046,6 +2046,12 @@ describe('codex-orchestrator command surface', () => {
     expect(payload.payload?.outputs?.stdout).toContain('quoted-smoke');
   }, TEST_TIMEOUT);
 
+  it('rejects exec without a command through the binary shell', async () => {
+    await expect(runCli(['exec'])).rejects.toMatchObject({
+      stderr: expect.stringContaining('exec requires a command to run.')
+    });
+  }, TEST_TIMEOUT);
+
   it('preserves backslashes in quoted single-token exec commands', async () => {
     tempDir = await mkdtemp(join(tmpdir(), 'co-cli-surface-'));
     const env = {
