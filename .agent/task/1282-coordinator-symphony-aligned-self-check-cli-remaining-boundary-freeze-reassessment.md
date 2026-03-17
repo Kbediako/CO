@@ -21,4 +21,4 @@
 
 ## Reassessment
 
-- [ ] Remaining local self-check CLI pocket reinspected and freeze-or-go result recorded. Evidence: pending closeout packet.
+- [x] Remaining local self-check CLI pocket reinspected and freeze-or-go result recorded. Evidence: `out/1282-coordinator-symphony-aligned-self-check-cli-remaining-boundary-freeze-reassessment/manual/20260317T135320Z-closeout/00-summary.md`

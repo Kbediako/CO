@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260317-1283-coordinator-symphony-aligned-setup-cli-wrapper-extraction",
+      "title": "Coordinator Symphony-Aligned Setup CLI Wrapper Extraction",
+      "relates_to": "tasks/tasks-1283-coordinator-symphony-aligned-setup-cli-wrapper-extraction.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-17",
+      "paths": {
+        "spec": "tasks/specs/1283-coordinator-symphony-aligned-setup-cli-wrapper-extraction.md",
+        "task": "tasks/tasks-1283-coordinator-symphony-aligned-setup-cli-wrapper-extraction.md",
+        "agent_task": ".agent/task/1283-coordinator-symphony-aligned-setup-cli-wrapper-extraction.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-setup-cli-wrapper-extraction.md"
+      }
+    },
+    {
       "id": "20260317-1282-coordinator-symphony-aligned-self-check-cli-remaining-boundary-freeze-reassessment",
       "title": "Coordinator Symphony-Aligned Self-Check CLI Remaining Boundary Freeze Reassessment",
       "relates_to": "tasks/tasks-1282-coordinator-symphony-aligned-self-check-cli-remaining-boundary-freeze-reassessment.md",
