@@ -21,6 +21,6 @@
 
 ## Extraction
 
-- [ ] Delegation setup CLI shell boundary implemented. Evidence: pending implementation packet.
-- [ ] Focused delegation setup CLI parity coverage updated if needed. Evidence: pending implementation packet.
-- [ ] Final implementation validation complete. Evidence: pending implementation packet.
+- [x] Delegation setup CLI shell boundary implemented. Evidence: `out/1261-coordinator-symphony-aligned-delegation-setup-cli-shell-extraction/manual/20260317T025705Z-closeout/00-summary.md`
+- [x] Focused delegation setup CLI parity coverage updated. Evidence: `out/1261-coordinator-symphony-aligned-delegation-setup-cli-shell-extraction/manual/20260317T025705Z-closeout/00-summary.md`
+- [x] Final implementation validation complete. Evidence: `out/1261-coordinator-symphony-aligned-delegation-setup-cli-shell-extraction/manual/20260317T025705Z-closeout/00-summary.md`, `out/1261-coordinator-symphony-aligned-delegation-setup-cli-shell-extraction/manual/20260317T025705Z-closeout/13-override-notes.md`
