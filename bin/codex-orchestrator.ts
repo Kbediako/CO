@@ -34,7 +34,7 @@ import { formatDevtoolsSetupSummary, runDevtoolsSetup } from '../orchestrator/sr
 import { formatCodexCliSetupSummary, runCodexCliSetup } from '../orchestrator/src/cli/codexCliSetup.js';
 import { runCodexCliShell } from '../orchestrator/src/cli/codexCliShell.js';
 import { formatDelegationSetupSummary, runDelegationSetup } from '../orchestrator/src/cli/delegationSetup.js';
-import { formatSkillsInstallSummary, installSkills } from '../orchestrator/src/cli/skills.js';
+import { runSkillsCliShell } from '../orchestrator/src/cli/skillsCliShell.js';
 import { runFlowCliShell } from '../orchestrator/src/cli/flowCliShell.js';
 import { runSetupBootstrapShell } from '../orchestrator/src/cli/setupBootstrapShell.js';
 import { findPackageRoot, loadPackageInfo } from '../orchestrator/src/cli/utils/packageInfo.js';
@@ -1399,37 +1399,7 @@ async function handleCodex(rawArgs: string[]): Promise<void> {
 
 async function handleSkills(rawArgs: string[]): Promise<void> {
   const { positionals, flags } = parseArgs(rawArgs);
-  const subcommand = positionals[0];
-  const wantsHelp = flags['help'] === true || subcommand === 'help' || subcommand === '--help';
-  if (!subcommand || wantsHelp) {
-    printSkillsHelp();
-    return;
-  }
-
-  switch (subcommand) {
-    case 'install': {
-      const format: OutputFormat = (flags['format'] as string | undefined) === 'json' ? 'json' : 'text';
-      const force = flags['force'] === true;
-      const codexHome = readStringFlag(flags, 'codex-home');
-      const onlyRaw = flags['only'];
-      let only: string[] | undefined;
-      if (onlyRaw !== undefined) {
-        if (typeof onlyRaw !== 'string') {
-          throw new Error('--only requires a comma-separated list of skill names.');
-        }
-        only = onlyRaw.split(',').map((entry) => entry.trim()).filter(Boolean);
-      }
-      const result = await installSkills({ force, codexHome, only });
-      if (format === 'json') {
-        console.log(JSON.stringify(result, null, 2));
-      } else {
-        console.log(formatSkillsInstallSummary(result).join('\n'));
-      }
-      return;
-    }
-    default:
-      throw new Error(`Unknown skills command: ${subcommand}`);
-  }
+  await runSkillsCliShell({ positionals, flags, printHelp: printSkillsHelp });
 }
 
 async function handleMcp(rawArgs: string[]): Promise<void> {

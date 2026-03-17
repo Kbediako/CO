@@ -132,6 +132,25 @@ describe('codex-orchestrator command surface', () => {
     });
   }, TEST_TIMEOUT);
 
+  it('emits skills install JSON output', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'co-cli-skills-json-'));
+
+    const { stdout } = await runCli(['skills', 'install', '--only', 'long-poll-wait', '--codex-home', tempDir, '--format', 'json']);
+    const payload = JSON.parse(stdout) as {
+      targetRoot?: string;
+      skills?: string[];
+      written?: string[];
+    };
+
+    expect(payload.targetRoot).toBe(join(tempDir, 'skills'));
+    expect(payload.skills).toEqual(['long-poll-wait']);
+    expect(payload.written).toEqual(
+      expect.arrayContaining([
+        join(tempDir, 'skills', 'long-poll-wait', 'SKILL.md')
+      ])
+    );
+  }, TEST_TIMEOUT);
+
   it('prints resume help without requiring a run id', async () => {
     const { stdout } = await runCli(['resume', '--help']);
     expect(stdout).toContain('Usage: codex-orchestrator resume --run <id>');
