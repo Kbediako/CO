@@ -21,4 +21,4 @@
 
 ## Implementation
 
-- [ ] Self-check CLI shell extracted with focused parity evidence. Evidence: pending closeout packet.
+- [x] Self-check CLI shell extracted with focused parity evidence. Evidence: `out/1281-coordinator-symphony-aligned-self-check-cli-shell-extraction/manual/20260317T133750Z-closeout/00-summary.md`

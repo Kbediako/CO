@@ -13,6 +13,7 @@ related_tasks:
   - tasks/tasks-1281-coordinator-symphony-aligned-self-check-cli-shell-extraction.md
 review_notes:
   - 2026-03-17: Opened after `1280` closed as a truthful freeze. Current-tree inspection shows the next truthful nearby binary-facing seam is the inline `self-check` output shell still owned by `handleSelfCheck(...)` above `orchestrator/src/cli/selfCheck.ts`. Evidence: `out/1280-coordinator-symphony-aligned-rlm-cli-remaining-boundary-freeze-reassessment/manual/20260317T132919Z-closeout/00-summary.md`, `out/1280-coordinator-symphony-aligned-rlm-cli-remaining-boundary-freeze-reassessment/manual/20260317T132919Z-closeout/14-next-slice-note.md`, `docs/findings/1281-self-check-cli-shell-extraction-deliberation.md`.
+  - 2026-03-17: Closed after extracting `orchestrator/src/cli/selfCheckCliShell.ts`. The remaining local `self-check` pocket is now only shared `parseArgs(...)` ownership and a thin wrapper into the extracted shell, so the next truthful nearby move is `1282`, a freeze reassessment rather than another extraction. Evidence: `out/1281-coordinator-symphony-aligned-self-check-cli-shell-extraction/manual/20260317T133750Z-closeout/00-summary.md`, `out/1281-coordinator-symphony-aligned-self-check-cli-shell-extraction/manual/20260317T133750Z-closeout/14-next-slice-note.md`.
 ---
 
 # Technical Specification
