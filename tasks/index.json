@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260317-1288-coordinator-symphony-aligned-start-cli-boundary-reassessment-revisit",
+      "title": "Coordinator Symphony-Aligned Start CLI Boundary Reassessment Revisit",
+      "relates_to": "tasks/tasks-1288-coordinator-symphony-aligned-start-cli-boundary-reassessment-revisit.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-17",
+      "paths": {
+        "spec": "tasks/specs/1288-coordinator-symphony-aligned-start-cli-boundary-reassessment-revisit.md",
+        "task": "tasks/tasks-1288-coordinator-symphony-aligned-start-cli-boundary-reassessment-revisit.md",
+        "agent_task": ".agent/task/1288-coordinator-symphony-aligned-start-cli-boundary-reassessment-revisit.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-start-cli-boundary-reassessment-revisit.md"
+      }
+    },
+    {
       "id": "20260317-1287-coordinator-symphony-aligned-doctor-cli-remaining-boundary-freeze-reassessment",
       "title": "Coordinator Symphony-Aligned Doctor CLI Remaining Boundary Freeze Reassessment",
       "relates_to": "tasks/tasks-1287-coordinator-symphony-aligned-doctor-cli-remaining-boundary-freeze-reassessment.md",

@@ -21,4 +21,4 @@
 
 ## Reassessment
 
-- [ ] Remaining local doctor CLI pocket reinspected and freeze-or-go result recorded. Evidence: pending closeout packet.
+- [x] Remaining local doctor CLI pocket reinspected and freeze-or-go result recorded. Evidence: `out/1287-coordinator-symphony-aligned-doctor-cli-remaining-boundary-freeze-reassessment/manual/20260317T144725Z-closeout/00-summary.md`
