@@ -21,6 +21,6 @@
 
 ## Extraction
 
-- [ ] MCP enable shell boundary implemented. Evidence: pending implementation packet.
-- [ ] Focused MCP enable parity coverage updated if needed. Evidence: pending implementation packet.
-- [ ] Final implementation validation complete. Evidence: pending implementation packet.
+- [x] MCP enable shell boundary implemented. Evidence: `out/1253-coordinator-symphony-aligned-mcp-enable-cli-shell-extraction/manual/20260317T004545Z-closeout/00-summary.md`
+- [x] Focused MCP enable parity coverage updated if needed. Evidence: `out/1253-coordinator-symphony-aligned-mcp-enable-cli-shell-extraction/manual/20260317T004545Z-closeout/05a-targeted-helper-tests.log`, `out/1253-coordinator-symphony-aligned-mcp-enable-cli-shell-extraction/manual/20260317T004545Z-closeout/05b-targeted-cli-tests.log`
+- [x] Final implementation validation complete. Evidence: `out/1253-coordinator-symphony-aligned-mcp-enable-cli-shell-extraction/manual/20260317T004545Z-closeout/00-summary.md`, `out/1253-coordinator-symphony-aligned-mcp-enable-cli-shell-extraction/manual/20260317T004545Z-closeout/13-override-notes.md`

@@ -1,7 +1,7 @@
 ---
 id: 20260317-1253-coordinator-symphony-aligned-mcp-enable-cli-shell-extraction
 title: Coordinator Symphony-Aligned MCP Enable CLI Shell Extraction
-status: active
+status: completed
 owner: Codex
 created: 2026-03-17
 last_review: 2026-03-17
@@ -13,6 +13,7 @@ related_tasks:
   - tasks/tasks-1253-coordinator-symphony-aligned-mcp-enable-cli-shell-extraction.md
 review_notes:
   - 2026-03-17: Opened after `1252` confirmed the remaining local doctor pocket is exhausted. Current-tree inspection shows `mcp enable` still owns a bounded top-level shell above `orchestrator/src/cli/mcpEnable.ts`, so the next truthful move is a dedicated MCP enable shell extraction lane. Evidence: `out/1252-coordinator-symphony-aligned-doctor-cli-remaining-boundary-freeze-reassessment/manual/20260317T010338Z-closeout/14-next-slice-note.md`, `docs/findings/1253-mcp-enable-cli-shell-extraction-deliberation.md`.
+  - 2026-03-17: Completed. The `mcp enable` shell now lives in `orchestrator/src/cli/mcpEnableCliShell.ts`, while `bin/codex-orchestrator.ts` keeps only shared `mcp` routing/help ownership. Evidence: `out/1253-coordinator-symphony-aligned-mcp-enable-cli-shell-extraction/manual/20260317T004545Z-closeout/00-summary.md`.
 ---
 
 # Technical Specification
