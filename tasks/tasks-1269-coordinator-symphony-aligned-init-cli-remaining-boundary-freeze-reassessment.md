@@ -21,4 +21,4 @@
 
 ## Reassessment
 
-- [ ] Remaining local init CLI pocket reinspected and freeze-or-go result recorded. Evidence: pending closeout packet.
+- [x] Remaining local init CLI pocket reinspected and freeze-or-go result recorded. Evidence: `out/1269-coordinator-symphony-aligned-init-cli-remaining-boundary-freeze-reassessment/manual/20260317T060903Z-closeout/00-summary.md`
