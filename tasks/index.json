@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260317-1257-coordinator-symphony-aligned-skills-install-cli-shell-extraction",
+      "title": "Coordinator Symphony-Aligned Skills Install CLI Shell Extraction",
+      "relates_to": "tasks/tasks-1257-coordinator-symphony-aligned-skills-install-cli-shell-extraction.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-17",
+      "paths": {
+        "spec": "tasks/specs/1257-coordinator-symphony-aligned-skills-install-cli-shell-extraction.md",
+        "task": "tasks/tasks-1257-coordinator-symphony-aligned-skills-install-cli-shell-extraction.md",
+        "agent_task": ".agent/task/1257-coordinator-symphony-aligned-skills-install-cli-shell-extraction.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-skills-install-cli-shell-extraction.md"
+      }
+    },
+    {
       "id": "20260317-1256-coordinator-symphony-aligned-codex-cli-remaining-boundary-freeze-reassessment",
       "title": "Coordinator Symphony-Aligned Codex CLI Remaining Boundary Freeze Reassessment",
       "relates_to": "tasks/tasks-1256-coordinator-symphony-aligned-codex-cli-remaining-boundary-freeze-reassessment.md",
