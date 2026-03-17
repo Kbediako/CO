@@ -16,7 +16,6 @@ import { RunEventEmitter } from '../orchestrator/src/cli/events/runEvents.js';
 import type { HudController } from '../orchestrator/src/cli/ui/controller.js';
 import { evaluateInteractiveGate } from '../orchestrator/src/cli/utils/interactive.js';
 import { buildSelfCheckResult } from '../orchestrator/src/cli/selfCheck.js';
-import { initCodexTemplates, formatInitSummary } from '../orchestrator/src/cli/init.js';
 import {
   runDoctor
 } from '../orchestrator/src/cli/doctor.js';
@@ -27,7 +26,7 @@ import {
   type DoctorIssueLogResult,
   writeDoctorIssueLog
 } from '../orchestrator/src/cli/doctorIssueLog.js';
-import { formatCodexCliSetupSummary, runCodexCliSetup } from '../orchestrator/src/cli/codexCliSetup.js';
+import { runInitCliShell } from '../orchestrator/src/cli/initCliShell.js';
 import { runCodexCliShell } from '../orchestrator/src/cli/codexCliShell.js';
 import { runDevtoolsCliShell } from '../orchestrator/src/cli/devtoolsCliShell.js';
 import { runDelegationCliShell } from '../orchestrator/src/cli/delegationCliShell.js';
@@ -1146,40 +1145,7 @@ async function handleInit(rawArgs: string[]): Promise<void> {
     printInitHelp();
     return;
   }
-  const template = positionals[0];
-  if (!template) {
-    throw new Error('init requires a template name (e.g. init codex).');
-  }
-  if (template !== 'codex') {
-    throw new Error(`Unknown init template: ${template}`);
-  }
-  const cwd = typeof flags['cwd'] === 'string' ? (flags['cwd'] as string) : process.cwd();
-  const force = Boolean(flags['force']);
-  const result = await initCodexTemplates({ template, cwd, force });
-  const summary = formatInitSummary(result, cwd);
-  for (const line of summary) {
-    console.log(line);
-  }
-
-  if (flags['codex-cli'] === true) {
-    const apply = Boolean(flags['yes']);
-    const source = readStringFlag(flags, 'codex-source');
-    const ref = readStringFlag(flags, 'codex-ref');
-    const downloadUrl = readStringFlag(flags, 'codex-download-url');
-    const downloadSha256 = readStringFlag(flags, 'codex-download-sha256');
-    const cliForce = Boolean(flags['codex-force']);
-    const setupResult = await runCodexCliSetup({
-      apply,
-      force: cliForce,
-      source,
-      ref,
-      downloadUrl,
-      downloadSha256
-    });
-    for (const line of formatCodexCliSetupSummary(setupResult)) {
-      console.log(line);
-    }
-  }
+  await runInitCliShell({ positionals, flags });
 }
 
 async function handleSetup(rawArgs: string[]): Promise<void> {

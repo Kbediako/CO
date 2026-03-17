@@ -688,6 +688,51 @@ describe('codex-orchestrator command surface', () => {
     expect(stdout).toContain('codex.orchestrator.json');
   }, TEST_TIMEOUT);
 
+  it('rejects init without a template', async () => {
+    await expect(runCli(['init'])).rejects.toMatchObject({
+      stderr: expect.stringContaining('init requires a template name (e.g. init codex).')
+    });
+  }, TEST_TIMEOUT);
+
+  it('rejects unknown init templates', async () => {
+    await expect(runCli(['init', 'ship-it'])).rejects.toMatchObject({
+      stderr: expect.stringContaining('Unknown init template: ship-it')
+    });
+  }, TEST_TIMEOUT);
+
+  it('writes init codex templates to the requested cwd', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'co-cli-init-codex-'));
+
+    const { stdout } = await runCli(['init', 'codex', '--cwd', tempDir]);
+    const orchestratorConfig = await readFile(join(tempDir, 'codex.orchestrator.json'), 'utf8');
+    const agentsDoc = await readFile(join(tempDir, 'AGENTS.md'), 'utf8');
+
+    expect(stdout).toContain('Written:');
+    expect(stdout).toContain('codex.orchestrator.json');
+    expect(stdout).toContain('Next steps (recommended):');
+    expect(orchestratorConfig.trim().length).toBeGreaterThan(0);
+    expect(orchestratorConfig).toContain('"pipelines"');
+    expect(agentsDoc).toContain('codex:instruction-stamp');
+    expect(agentsDoc).toContain('# Agent Instructions (Template)');
+  }, TEST_TIMEOUT);
+
+  it('appends the managed codex setup summary when --codex-cli is requested', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'co-cli-init-codex-cli-'));
+    const env = {
+      ...process.env,
+      CODEX_HOME: join(tempDir, 'codex-home')
+    };
+
+    const { stdout } = await runCli(['init', 'codex', '--cwd', tempDir, '--codex-cli'], env);
+    const writtenIndex = stdout.indexOf('Written:');
+    const codexSetupIndex = stdout.indexOf('Codex CLI setup: planned');
+
+    expect(writtenIndex).toBeGreaterThanOrEqual(0);
+    expect(codexSetupIndex).toBeGreaterThan(writtenIndex);
+    expect(stdout).toContain('cargo build -p codex-cli --release');
+    expect(stdout).toContain('Selection: stock `codex` stays default.');
+  }, TEST_TIMEOUT);
+
   it('accepts scoped aliases for the matching flow pipeline and rejects scope-mismatched aliases', async () => {
     tempDir = await mkdtemp(join(tmpdir(), 'co-cli-flow-target-'));
     const config = {
