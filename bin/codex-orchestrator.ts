@@ -32,7 +32,7 @@ import {
 } from '../orchestrator/src/cli/doctorIssueLog.js';
 import { formatDevtoolsSetupSummary, runDevtoolsSetup } from '../orchestrator/src/cli/devtoolsSetup.js';
 import { formatCodexCliSetupSummary, runCodexCliSetup } from '../orchestrator/src/cli/codexCliSetup.js';
-import { formatCodexDefaultsSetupSummary, runCodexDefaultsSetup } from '../orchestrator/src/cli/codexDefaultsSetup.js';
+import { runCodexCliShell } from '../orchestrator/src/cli/codexCliShell.js';
 import { formatDelegationSetupSummary, runDelegationSetup } from '../orchestrator/src/cli/delegationSetup.js';
 import { formatSkillsInstallSummary, installSkills } from '../orchestrator/src/cli/skills.js';
 import { runFlowCliShell } from '../orchestrator/src/cli/flowCliShell.js';
@@ -1394,58 +1394,7 @@ async function handleDelegation(rawArgs: string[]): Promise<void> {
 
 async function handleCodex(rawArgs: string[]): Promise<void> {
   const { positionals, flags } = parseArgs(rawArgs);
-  const subcommand = positionals.shift();
-  if (flags['help'] === true || flags['--help'] === true || flags['h'] === true || !subcommand || subcommand === 'help' || subcommand === '--help' || subcommand === '-h') {
-    printCodexHelp();
-    return;
-  }
-  if (subcommand === 'setup') {
-    const format: OutputFormat = (flags['format'] as string | undefined) === 'json' ? 'json' : 'text';
-    const apply = Boolean(flags['yes']);
-    const source = readStringFlag(flags, 'source');
-    const ref = readStringFlag(flags, 'ref');
-    const downloadUrl = readStringFlag(flags, 'download-url');
-    const downloadSha256 = readStringFlag(flags, 'download-sha256');
-    const force = Boolean(flags['force']);
-    const result = await runCodexCliSetup({
-      apply,
-      force,
-      source,
-      ref,
-      downloadUrl,
-      downloadSha256
-    });
-    if (format === 'json') {
-      console.log(JSON.stringify(result, null, 2));
-      return;
-    }
-    const summary = formatCodexCliSetupSummary(result);
-    for (const line of summary) {
-      console.log(line);
-    }
-    return;
-  }
-
-  if (subcommand === 'defaults') {
-    const format: OutputFormat = (flags['format'] as string | undefined) === 'json' ? 'json' : 'text';
-    const apply = Boolean(flags['yes']);
-    const force = Boolean(flags['force']);
-    const result = await runCodexDefaultsSetup({
-      apply,
-      force
-    });
-    if (format === 'json') {
-      console.log(JSON.stringify(result, null, 2));
-      return;
-    }
-    const summary = formatCodexDefaultsSetupSummary(result);
-    for (const line of summary) {
-      console.log(line);
-    }
-    return;
-  }
-
-  throw new Error(`Unknown codex subcommand: ${subcommand}`);
+  await runCodexCliShell({ positionals, flags, printHelp: printCodexHelp });
 }
 
 async function handleSkills(rawArgs: string[]): Promise<void> {

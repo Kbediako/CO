@@ -174,6 +174,45 @@ describe('codex-orchestrator command surface', () => {
     expect(stdout).toContain('--force');
   }, TEST_TIMEOUT);
 
+  it('emits codex setup plan json', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'co-cli-codex-setup-json-'));
+    const env = {
+      ...process.env,
+      CODEX_HOME: tempDir
+    };
+
+    const { stdout } = await runCli(['codex', 'setup', '--format', 'json'], env);
+    const payload = JSON.parse(stdout) as {
+      status?: string;
+      plan?: { method?: string; installRoot?: string };
+    };
+    expect(payload.status).toBe('planned');
+    expect(payload.plan?.method).toBe('build');
+    expect(payload.plan?.installRoot).toBe(join(tempDir, 'orchestrator', 'codex-cli'));
+  }, TEST_TIMEOUT);
+
+  it('emits codex defaults plan json', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'co-cli-codex-defaults-json-'));
+    const env = {
+      ...process.env,
+      CODEX_HOME: tempDir
+    };
+
+    const { stdout } = await runCli(['codex', 'defaults', '--format', 'json'], env);
+    const payload = JSON.parse(stdout) as {
+      status?: string;
+      plan?: { configPath?: string };
+      changes?: Array<{ target?: string; status?: string }>;
+    };
+    expect(payload.status).toBe('planned');
+    expect(payload.plan?.configPath).toBe(join(tempDir, 'config.toml'));
+    expect(payload.changes).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ target: 'config', status: 'pending' })
+      ])
+    );
+  }, TEST_TIMEOUT);
+
   it('prints flow help', async () => {
     const { stdout } = await runCli(['flow', '--help']);
     expect(stdout).toContain('Usage: codex-orchestrator flow');
