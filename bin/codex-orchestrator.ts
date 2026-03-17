@@ -33,7 +33,7 @@ import {
 import { formatDevtoolsSetupSummary, runDevtoolsSetup } from '../orchestrator/src/cli/devtoolsSetup.js';
 import { formatCodexCliSetupSummary, runCodexCliSetup } from '../orchestrator/src/cli/codexCliSetup.js';
 import { runCodexCliShell } from '../orchestrator/src/cli/codexCliShell.js';
-import { formatDelegationSetupSummary, runDelegationSetup } from '../orchestrator/src/cli/delegationSetup.js';
+import { runDelegationCliShell } from '../orchestrator/src/cli/delegationCliShell.js';
 import { runSkillsCliShell } from '../orchestrator/src/cli/skillsCliShell.js';
 import { runFlowCliShell } from '../orchestrator/src/cli/flowCliShell.js';
 import { runSetupBootstrapShell } from '../orchestrator/src/cli/setupBootstrapShell.js';
@@ -1365,30 +1365,7 @@ async function handleDevtools(rawArgs: string[]): Promise<void> {
 
 async function handleDelegation(rawArgs: string[]): Promise<void> {
   const { positionals, flags } = parseArgs(rawArgs);
-  const subcommand = positionals.shift();
-  if (!subcommand) {
-    throw new Error('delegation requires a subcommand (setup).');
-  }
-  if (subcommand !== 'setup') {
-    throw new Error(`Unknown delegation subcommand: ${subcommand}`);
-  }
-
-  const format = (flags['format'] as string | undefined) === 'json' ? 'json' : 'text';
-  const apply = Boolean(flags['yes']);
-  if (format === 'json' && apply) {
-    throw new Error('delegation setup does not support --format json with --yes.');
-  }
-
-  const repoRoot = readStringFlag(flags, 'repo') ?? process.cwd();
-  const result = await runDelegationSetup({ apply, repoRoot });
-
-  if (format === 'json') {
-    console.log(JSON.stringify(result, null, 2));
-    return;
-  }
-  for (const line of formatDelegationSetupSummary(result)) {
-    console.log(line);
-  }
+  await runDelegationCliShell({ positionals, flags });
 }
 
 async function handleCodex(rawArgs: string[]): Promise<void> {
