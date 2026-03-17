@@ -41,8 +41,7 @@ import { findPackageRoot, loadPackageInfo } from '../orchestrator/src/cli/utils/
 import { slugify } from '../orchestrator/src/cli/utils/strings.js';
 import { serveMcp } from '../orchestrator/src/cli/mcp.js';
 import { runMcpEnableCliShell } from '../orchestrator/src/cli/mcpEnableCliShell.js';
-import { startDelegationServer } from '../orchestrator/src/cli/delegationServer.js';
-import { splitDelegationConfigOverrides } from '../orchestrator/src/cli/config/delegationConfig.js';
+import { runDelegationServerCliShell } from '../orchestrator/src/cli/delegationServerCliShell.js';
 import { REPO_CONFIG_REQUIRED_ENV_KEY } from '../orchestrator/src/cli/config/repoConfigPolicy.js';
 
 type ArgMap = Record<string, string | boolean>;
@@ -1452,35 +1451,11 @@ async function handlePr(rawArgs: string[]): Promise<void> {
 
 async function handleDelegationServer(rawArgs: string[]): Promise<void> {
   const { positionals, flags } = parseArgs(rawArgs);
-  if (isHelpRequest(positionals, flags)) {
-    printDelegationServerHelp();
-    return;
-  }
-  const repoRoot = typeof flags['repo'] === 'string' ? (flags['repo'] as string) : process.cwd();
-  const modeFlag = typeof flags['mode'] === 'string' ? (flags['mode'] as string) : undefined;
-  const overrideFlag =
-    typeof flags['config'] === 'string'
-      ? (flags['config'] as string)
-      : typeof flags['config-override'] === 'string'
-        ? (flags['config-override'] as string)
-        : undefined;
-  const envMode = process.env.CODEX_DELEGATE_MODE?.trim();
-  const resolvedMode = modeFlag ?? envMode;
-  let mode: 'full' | 'question_only' | 'status_only' | undefined;
-  if (resolvedMode) {
-    if (resolvedMode === 'full' || resolvedMode === 'question_only' || resolvedMode === 'status_only') {
-      mode = resolvedMode;
-    } else {
-      console.warn(`Invalid delegate mode "${resolvedMode}". Falling back to config default.`);
-    }
-  }
-  const configOverrides = overrideFlag
-    ? splitDelegationConfigOverrides(overrideFlag).map((value) => ({
-        source: 'cli' as const,
-        value
-      }))
-    : [];
-  await startDelegationServer({ repoRoot, mode, configOverrides });
+  await runDelegationServerCliShell({
+    positionals,
+    flags,
+    printHelp: printDelegationServerHelp
+  });
 }
 
 function parseExecArgs(rawArgs: string[]): ParsedExecArgs {
