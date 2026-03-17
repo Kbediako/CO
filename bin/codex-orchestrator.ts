@@ -31,6 +31,7 @@ import { runDelegationCliShell } from '../orchestrator/src/cli/delegationCliShel
 import { runPrCliShell } from '../orchestrator/src/cli/prCliShell.js';
 import { runSkillsCliShell } from '../orchestrator/src/cli/skillsCliShell.js';
 import { runFlowCliShell } from '../orchestrator/src/cli/flowCliShell.js';
+import { runStartCliShell } from '../orchestrator/src/cli/startCliShell.js';
 import { runSetupBootstrapShell } from '../orchestrator/src/cli/setupBootstrapShell.js';
 import { runReviewCliLaunchShell } from '../orchestrator/src/cli/reviewCliLaunchShell.js';
 import { findPackageRoot, loadPackageInfo } from '../orchestrator/src/cli/utils/packageInfo.js';
@@ -558,63 +559,37 @@ async function handleStart(orchestrator: CodexOrchestrator, rawArgs: string[]): 
   const runtimeMode = resolveRuntimeModeFlag(flags);
   applyRepoConfigRequiredPolicy(flags);
   const autoIssueLogEnabled = resolveAutoIssueLogEnabled(flags);
-  if (pipelineId === 'rlm') {
-    const goal = readStringFlag(flags, 'goal');
-    const warnLegacyEnvAlias = shouldWarnLegacyMultiAgentEnv(flags, process.env);
-    applyRlmEnvOverrides(flags, goal);
-    if (warnLegacyEnvAlias) {
-      console.warn('Warning: RLM_SYMBOLIC_COLLAB is a legacy alias; prefer RLM_SYMBOLIC_MULTI_AGENT.');
+  const taskIdOverride = typeof flags['task'] === 'string' ? (flags['task'] as string) : undefined;
+  const goal = readStringFlag(flags, 'goal');
+  await runStartCliShell({
+    orchestrator,
+    pipelineId,
+    format,
+    executionMode,
+    runtimeMode,
+    autoIssueLogEnabled,
+    taskIdOverride,
+    parentRunId: typeof flags['parent-run'] === 'string' ? (flags['parent-run'] as string) : undefined,
+    approvalPolicy: typeof flags['approval-policy'] === 'string' ? (flags['approval-policy'] as string) : undefined,
+    targetStageId: resolveTargetStageId(flags),
+    runWithUi: async (action) => await withRunUi(flags, format, action),
+    emitRunOutput,
+    maybeCaptureAutoIssueLog,
+    resolveTaskFilter,
+    withAutoIssueLogContext,
+    maybeEmitRunAdoptionHint,
+    isLegacyCollabEnvAliasEnabled: () => shouldWarnLegacyMultiAgentEnv(flags, process.env),
+    applyRlmEnvOverrides: () => applyRlmEnvOverrides(flags, goal),
+    resolveRlmTaskId,
+    setTaskEnvironment: (taskId) => {
+      process.env.MCP_RUNNER_TASK_ID = taskId;
+    },
+    log: (line) => console.log(line),
+    warn: (line) => console.warn(line),
+    setExitCode: (code) => {
+      process.exitCode = code;
     }
-  }
-  let taskIdOverride = typeof flags['task'] === 'string' ? (flags['task'] as string) : undefined;
-  try {
-    await withRunUi(flags, format, async (runEvents) => {
-      if (pipelineId === 'rlm') {
-        taskIdOverride = resolveRlmTaskId(taskIdOverride);
-        process.env.MCP_RUNNER_TASK_ID = taskIdOverride;
-        if (format !== 'json') {
-          console.log(`Task: ${taskIdOverride}`);
-        }
-      }
-      const result = await orchestrator.start({
-        pipelineId,
-        taskId: taskIdOverride,
-        parentRunId: typeof flags['parent-run'] === 'string' ? (flags['parent-run'] as string) : undefined,
-        approvalPolicy: typeof flags['approval-policy'] === 'string' ? (flags['approval-policy'] as string) : undefined,
-        targetStageId: resolveTargetStageId(flags),
-        executionMode,
-        runtimeMode,
-        runEvents
-      });
-      const issueLogCapture =
-        result.manifest.status !== 'succeeded'
-          ? await maybeCaptureAutoIssueLog({
-              enabled: autoIssueLogEnabled,
-              issueTitle: `Auto issue log: start ${pipelineId ?? 'diagnostics'} failed`,
-              issueNotes: `Automatic failure capture for run ${result.manifest.run_id} (${result.manifest.status}).`,
-              taskFilter: resolveTaskFilter(result.manifest.task_id, taskIdOverride)
-            })
-          : { issueLog: null, issueLogError: null };
-      emitRunOutput(result, format, 'Run started', issueLogCapture);
-      if (result.manifest.status === 'failed' || result.manifest.status === 'cancelled') {
-        process.exitCode = 1;
-      }
-      if (result.manifest.status === 'succeeded' && result.manifest.pipeline_id !== 'rlm') {
-        await maybeEmitRunAdoptionHint({
-          format,
-          taskFilter: resolveTaskFilter(result.manifest.task_id, taskIdOverride)
-        });
-      }
-    });
-  } catch (error) {
-    const issueLogCapture = await maybeCaptureAutoIssueLog({
-      enabled: autoIssueLogEnabled,
-      issueTitle: `Auto issue log: start ${pipelineId ?? 'diagnostics'} failed before run manifest`,
-      issueNotes: 'Automatic failure capture for start setup failure before run manifest creation.',
-      taskFilter: resolveTaskFilter(undefined, taskIdOverride)
-    });
-    throw withAutoIssueLogContext(error, issueLogCapture);
-  }
+  });
 }
 
 async function handleFrontendTest(orchestrator: CodexOrchestrator, rawArgs: string[]): Promise<void> {
