@@ -21,6 +21,6 @@
 
 ## Extraction
 
-- [ ] Delegation-server shell boundary implemented. Evidence: pending implementation packet.
-- [ ] Focused delegation-server CLI parity coverage updated if needed. Evidence: pending implementation packet.
-- [ ] Final implementation validation complete. Evidence: pending implementation packet.
+- [x] Delegation-server shell boundary implemented. Evidence: `out/1259-coordinator-symphony-aligned-delegation-server-cli-shell-extraction/manual/20260317T022241Z-closeout/00-summary.md`
+- [x] Focused delegation-server CLI parity coverage updated. Evidence: `out/1259-coordinator-symphony-aligned-delegation-server-cli-shell-extraction/manual/20260317T022241Z-closeout/00-summary.md`
+- [x] Final implementation validation complete. Evidence: `out/1259-coordinator-symphony-aligned-delegation-server-cli-shell-extraction/manual/20260317T022241Z-closeout/00-summary.md`, `out/1259-coordinator-symphony-aligned-delegation-server-cli-shell-extraction/manual/20260317T022241Z-closeout/13-override-notes.md`
