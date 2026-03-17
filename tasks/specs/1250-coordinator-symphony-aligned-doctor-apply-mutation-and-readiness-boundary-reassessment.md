@@ -1,7 +1,7 @@
 ---
 id: 20260316-1250-coordinator-symphony-aligned-doctor-apply-mutation-and-readiness-boundary-reassessment
 title: Coordinator Symphony-Aligned Doctor Apply Mutation And Readiness Boundary Reassessment
-status: active
+status: completed
 owner: Codex
 created: 2026-03-16
 last_review: 2026-03-16
@@ -13,6 +13,7 @@ related_tasks:
   - tasks/tasks-1250-coordinator-symphony-aligned-doctor-apply-mutation-and-readiness-boundary-reassessment.md
 review_notes:
   - 2026-03-16: Opened after `1249` extracted the setup bootstrap shell. Local post-implementation inspection indicates that `handleDoctor(...)` is now the most credible remaining top-level CLI candidate, but it still mixes readiness/advisory output with `--apply` mutation through shared setup owners, so this lane starts as a reassessment rather than a forced extraction. Evidence: `out/1249-coordinator-symphony-aligned-setup-bootstrap-shell-extraction/manual/20260316T200645Z-closeout/14-next-slice-note.md`, `docs/findings/1250-doctor-apply-mutation-and-readiness-boundary-reassessment-deliberation.md`.
+  - 2026-03-17: Completed as a `go` reassessment. Post-1249 local inspection plus bounded subagent review confirmed that the whole remaining `handleDoctor(...)` block is still a real command shell above already-separated services, so the truthful next move is a dedicated doctor shell extraction lane rather than a freeze. Evidence: `out/1250-coordinator-symphony-aligned-doctor-apply-mutation-and-readiness-boundary-reassessment/manual/20260317T000017Z-closeout/00-summary.md`.
 ---
 
 # Technical Specification

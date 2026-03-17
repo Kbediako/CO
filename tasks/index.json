@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260317-1251-coordinator-symphony-aligned-doctor-cli-shell-extraction",
+      "title": "Coordinator Symphony-Aligned Doctor CLI Shell Extraction",
+      "relates_to": "tasks/tasks-1251-coordinator-symphony-aligned-doctor-cli-shell-extraction.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-17",
+      "paths": {
+        "spec": "tasks/specs/1251-coordinator-symphony-aligned-doctor-cli-shell-extraction.md",
+        "task": "tasks/tasks-1251-coordinator-symphony-aligned-doctor-cli-shell-extraction.md",
+        "agent_task": ".agent/task/1251-coordinator-symphony-aligned-doctor-cli-shell-extraction.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-doctor-cli-shell-extraction.md"
+      }
+    },
+    {
       "id": "20260316-1250-coordinator-symphony-aligned-doctor-apply-mutation-and-readiness-boundary-reassessment",
       "title": "Coordinator Symphony-Aligned Doctor Apply Mutation And Readiness Boundary Reassessment",
       "relates_to": "tasks/tasks-1250-coordinator-symphony-aligned-doctor-apply-mutation-and-readiness-boundary-reassessment.md",

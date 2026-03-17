@@ -21,5 +21,5 @@
 
 ## Reassessment
 
-- [ ] Remaining doctor apply/readiness boundary rechecked after `1249`. Evidence: pending reassessment packet.
-- [ ] Freeze-or-go result recorded explicitly. Evidence: pending reassessment packet.
+- [x] Remaining doctor apply/readiness boundary rechecked after `1249`. Evidence: `out/1250-coordinator-symphony-aligned-doctor-apply-mutation-and-readiness-boundary-reassessment/manual/20260317T000017Z-closeout/00-summary.md`
+- [x] Freeze-or-go result recorded explicitly. Evidence: `out/1250-coordinator-symphony-aligned-doctor-apply-mutation-and-readiness-boundary-reassessment/manual/20260317T000017Z-closeout/00-summary.md`, `out/1250-coordinator-symphony-aligned-doctor-apply-mutation-and-readiness-boundary-reassessment/manual/20260317T000017Z-closeout/14-next-slice-note.md`
