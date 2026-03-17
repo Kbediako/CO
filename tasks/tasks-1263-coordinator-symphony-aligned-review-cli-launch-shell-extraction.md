@@ -21,6 +21,6 @@
 
 ## Extraction
 
-- [ ] Review CLI launch shell boundary implemented. Evidence: pending closeout packet.
-- [ ] Focused review CLI launch parity coverage updated. Evidence: pending closeout packet.
-- [ ] Final implementation validation complete. Evidence: pending closeout packet.
+- [x] Review CLI launch shell boundary implemented. Evidence: `out/1263-coordinator-symphony-aligned-review-cli-launch-shell-extraction/manual/20260317T034647Z-closeout/00-summary.md`
+- [x] Focused review CLI launch parity coverage updated. Evidence: `out/1263-coordinator-symphony-aligned-review-cli-launch-shell-extraction/manual/20260317T034647Z-closeout/00-summary.md`
+- [x] Final implementation validation complete. Evidence: `out/1263-coordinator-symphony-aligned-review-cli-launch-shell-extraction/manual/20260317T034647Z-closeout/00-summary.md`
