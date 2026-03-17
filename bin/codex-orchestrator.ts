@@ -21,12 +21,10 @@ import { evaluateInteractiveGate } from '../orchestrator/src/cli/utils/interacti
 import { buildSelfCheckResult } from '../orchestrator/src/cli/selfCheck.js';
 import { initCodexTemplates, formatInitSummary } from '../orchestrator/src/cli/init.js';
 import {
-  runDoctor,
-  runDoctorCloudPreflight,
-  formatDoctorSummary,
-  formatDoctorCloudPreflightSummary
+  runDoctor
 } from '../orchestrator/src/cli/doctor.js';
-import { formatDoctorUsageSummary, runDoctorUsage } from '../orchestrator/src/cli/doctorUsage.js';
+import { runDoctorUsage } from '../orchestrator/src/cli/doctorUsage.js';
+import { runDoctorCliShell } from '../orchestrator/src/cli/doctorCliShell.js';
 import {
   formatDoctorIssueLogSummary,
   type DoctorIssueLogResult,
@@ -1323,129 +1321,22 @@ async function handleDoctor(rawArgs: string[]): Promise<void> {
     windowDays = parsed;
   }
   const taskFilter = readStringFlag(flags, 'task') ?? null;
-
-  const doctorResult = runDoctor();
-  const usageResult = includeUsage ? await runDoctorUsage({ windowDays, taskFilter }) : null;
-  const cloudPreflightResult = includeCloudPreflight
-    ? await runDoctorCloudPreflight({
-        cwd: process.cwd(),
-        environmentId: cloudEnvIdOverride,
-        branch: cloudBranchOverride,
-        taskId: taskFilter
-      })
-    : null;
-  const issueLogResult = includeIssueLog
-    ? await writeDoctorIssueLog({
-        doctor: doctorResult,
-        usage: usageResult,
-        cloudPreflight: cloudPreflightResult,
-        issueTitle,
-        issueNotes,
-        issueLogPath,
-        taskFilter
-      })
-    : null;
-
-  if (format === 'json') {
-    const payload: Record<string, unknown> = { ...doctorResult };
-    if (usageResult) {
-      payload.usage = usageResult;
-    }
-    if (cloudPreflightResult) {
-      payload.cloud_preflight = cloudPreflightResult;
-    }
-    if (issueLogResult) {
-      payload.issue_log = issueLogResult;
-    }
-    console.log(JSON.stringify(payload, null, 2));
-    return;
-  }
-
-  for (const line of formatDoctorSummary(doctorResult)) {
-    console.log(line);
-  }
-  if (usageResult) {
-    for (const line of formatDoctorUsageSummary(usageResult)) {
-      console.log(line);
-    }
-  }
-  if (cloudPreflightResult) {
-    for (const line of formatDoctorCloudPreflightSummary(cloudPreflightResult)) {
-      console.log(line);
-    }
-  }
-  if (issueLogResult) {
-    for (const line of formatDoctorIssueLogSummary(issueLogResult)) {
-      console.log(line);
-    }
-  }
-
-  if (!wantsApply) {
-    return;
-  }
-
-  const repoRoot = process.cwd();
-  const delegationPlan = await runDelegationSetup({ repoRoot });
-  const devtoolsPlan = await runDevtoolsSetup();
-  const needsDelegation = !delegationPlan.readiness.configured;
-  const needsDevtoolsSkill = devtoolsPlan.readiness.skill.status !== 'ok';
-  const devtoolsConfigStatus = devtoolsPlan.readiness.config.status;
-  const needsDevtoolsConfig = devtoolsConfigStatus === 'missing';
-  const hasInvalidDevtoolsConfig = devtoolsConfigStatus === 'invalid';
-
-  if (!needsDelegation && !needsDevtoolsSkill && !needsDevtoolsConfig && !hasInvalidDevtoolsConfig) {
-    console.log('Doctor apply: nothing to do.');
-    return;
-  }
-
-  console.log('Doctor apply plan:');
-  if (needsDevtoolsSkill) {
-    console.log('- Install skill: chrome-devtools (codex-orchestrator skills install --only chrome-devtools)');
-  }
-  if (hasInvalidDevtoolsConfig) {
-    console.log(
-      `- DevTools MCP config is invalid: ${devtoolsPlan.readiness.config.path} (fix config.toml then rerun doctor --apply)`
-    );
-  }
-  if (needsDevtoolsConfig) {
-    console.log('- Configure DevTools MCP: codex-orchestrator devtools setup --yes');
-  }
-  if (needsDelegation) {
-    console.log('- Configure delegation MCP: codex-orchestrator delegation setup --yes');
-  }
-
-  if (!apply) {
-    console.log('Run with --apply --yes to apply these fixes.');
-    return;
-  }
-
-  if (needsDevtoolsSkill) {
-    const skills = await installSkills({ only: ['chrome-devtools'] });
-    for (const line of formatSkillsInstallSummary(skills)) {
-      console.log(line);
-    }
-  }
-  if (needsDelegation) {
-    const delegation = await runDelegationSetup({ apply: true, repoRoot });
-    for (const line of formatDelegationSetupSummary(delegation)) {
-      console.log(line);
-    }
-  }
-  if (hasInvalidDevtoolsConfig) {
-    console.log(
-      `DevTools setup: skipped (config.toml is invalid: ${devtoolsPlan.readiness.config.path}). Fix it and rerun doctor --apply --yes.`
-    );
-  } else if (needsDevtoolsConfig) {
-    const devtools = await runDevtoolsSetup({ apply: true });
-    for (const line of formatDevtoolsSetupSummary(devtools)) {
-      console.log(line);
-    }
-  }
-
-  const doctorAfter = runDoctor();
-  for (const line of formatDoctorSummary(doctorAfter)) {
-    console.log(line);
-  }
+  await runDoctorCliShell({
+    format,
+    includeUsage,
+    includeCloudPreflight,
+    includeIssueLog,
+    cloudEnvIdOverride: cloudEnvIdOverride ?? undefined,
+    cloudBranchOverride: cloudBranchOverride ?? undefined,
+    issueTitle: issueTitle ?? undefined,
+    issueNotes: issueNotes ?? undefined,
+    issueLogPath: issueLogPath ?? undefined,
+    wantsApply,
+    apply,
+    windowDays,
+    taskFilter,
+    repoRoot: process.cwd()
+  });
 }
 
 async function handleDevtools(rawArgs: string[]): Promise<void> {

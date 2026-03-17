@@ -708,6 +708,24 @@ describe('codex-orchestrator command surface', () => {
     expect(stdout).toContain('delegation');
   }, TEST_TIMEOUT);
 
+  it('rejects doctor --apply with --format json', async () => {
+    await expect(runCli(['doctor', '--apply', '--format', 'json'])).rejects.toMatchObject({
+      stderr: expect.stringContaining('doctor --apply does not support --format json.')
+    });
+  }, TEST_TIMEOUT);
+
+  it('rejects doctor issue-log metadata flags without --issue-log', async () => {
+    await expect(runCli(['doctor', '--issue-title', 'Example issue'])).rejects.toMatchObject({
+      stderr: expect.stringContaining('--issue-title/--issue-notes/--issue-log-path require --issue-log.')
+    });
+  }, TEST_TIMEOUT);
+
+  it('rejects invalid doctor --window-days values', async () => {
+    await expect(runCli(['doctor', '--usage', '--window-days', '0'])).rejects.toMatchObject({
+      stderr: expect.stringContaining("Invalid --window-days value '0'. Expected a positive integer.")
+    });
+  }, TEST_TIMEOUT);
+
   it('emits doctor cloud preflight payload in JSON output', async () => {
     tempDir = await mkdtemp(join(tmpdir(), 'co-cli-doctor-cloud-preflight-'));
     const fakeCodex = await writeFakeCodexBinary(tempDir);
