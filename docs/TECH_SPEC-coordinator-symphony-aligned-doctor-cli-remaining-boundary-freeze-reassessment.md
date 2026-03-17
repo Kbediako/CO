@@ -2,19 +2,20 @@
 
 ## Scope
 
-Bounded reassessment of the remaining doctor-adjacent wrapper surface after `1251`.
+Bounded reassessment of the remaining local `doctor` pocket after `1286` extracted the binary-facing doctor request shell.
 
 ## In-Scope Files
 
 - `bin/codex-orchestrator.ts`
-- `orchestrator/src/cli/doctorCliShell.ts`
-- adjacent doctor task/docs artifacts only if needed to record the freeze-or-go decision
+- `orchestrator/src/cli/doctorCliRequestShell.ts`
+- docs/task mirrors for the reassessment result
 
 ## Requirements
 
-1. Reinspect the remaining doctor pocket without widening into broader top-level CLI families.
-2. Record an explicit freeze result if only parser/help glue and wrapper-only validation remain.
-3. Only open another implementation slice if reassessment finds a real bounded ownership split.
+1. Reinspect the remaining local `doctor` ownership in `bin/codex-orchestrator.ts`.
+2. Determine whether any truthful local mixed-ownership seam remains after `1286`.
+3. Preserve the current `doctor` command behavior; this lane is reassessment-only unless a narrower truthful seam is proven.
+4. Record the freeze-or-go result explicitly with evidence.
 
 ## Validation Plan
 
@@ -24,5 +25,5 @@ Bounded reassessment of the remaining doctor-adjacent wrapper surface after `125
 
 ## Exit Conditions
 
-- `done`: the post-1251 doctor pocket is explicitly frozen or a single truthful follow-on seam is named
-- `abort`: reassessment requires cross-command widening to say anything truthful
+- `done`: the remaining local `doctor` pocket is closed honestly as `freeze` or moved forward honestly as `go`
+- `abort`: the current-tree evidence is ambiguous enough that no single truthful reassessment result can be recorded

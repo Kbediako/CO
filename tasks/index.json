@@ -1,6 +1,38 @@
 {
   "items": [
     {
+      "id": "20260317-1287-coordinator-symphony-aligned-doctor-cli-remaining-boundary-freeze-reassessment",
+      "title": "Coordinator Symphony-Aligned Doctor CLI Remaining Boundary Freeze Reassessment",
+      "relates_to": "tasks/tasks-1287-coordinator-symphony-aligned-doctor-cli-remaining-boundary-freeze-reassessment.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-17",
+      "paths": {
+        "spec": "tasks/specs/1287-coordinator-symphony-aligned-doctor-cli-remaining-boundary-freeze-reassessment.md",
+        "task": "tasks/tasks-1287-coordinator-symphony-aligned-doctor-cli-remaining-boundary-freeze-reassessment.md",
+        "agent_task": ".agent/task/1287-coordinator-symphony-aligned-doctor-cli-remaining-boundary-freeze-reassessment.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-doctor-cli-remaining-boundary-freeze-reassessment.md"
+      }
+    },
+    {
+      "id": "20260317-1286-coordinator-symphony-aligned-doctor-cli-request-shell-extraction",
+      "title": "Coordinator Symphony-Aligned Doctor CLI Request Shell Extraction",
+      "relates_to": "tasks/tasks-1286-coordinator-symphony-aligned-doctor-cli-request-shell-extraction.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-17",
+      "paths": {
+        "spec": "tasks/specs/1286-coordinator-symphony-aligned-doctor-cli-request-shell-extraction.md",
+        "task": "tasks/tasks-1286-coordinator-symphony-aligned-doctor-cli-request-shell-extraction.md",
+        "agent_task": ".agent/task/1286-coordinator-symphony-aligned-doctor-cli-request-shell-extraction.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-doctor-cli-request-shell-extraction.md"
+      }
+    },
+    {
       "id": "20260317-1285-coordinator-symphony-aligned-doctor-cli-boundary-reassessment-revisit",
       "title": "Coordinator Symphony-Aligned Doctor CLI Boundary Reassessment Revisit",
       "relates_to": "tasks/tasks-1285-coordinator-symphony-aligned-doctor-cli-boundary-reassessment-revisit.md",

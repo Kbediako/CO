@@ -2,30 +2,30 @@
 
 ## Summary
 
-After `1251` extracted the doctor-owned execution shell into `orchestrator/src/cli/doctorCliShell.ts`, the remaining nearby doctor surface needs a truthful freeze check instead of a forced follow-on extraction.
+After `1286` extracted `orchestrator/src/cli/doctorCliRequestShell.ts`, the next truthful nearby move is to reassess whether any real local `doctor` shell remains in `bin/codex-orchestrator.ts`.
 
 ## Problem
 
-The doctor command family still has nearby code in `bin/codex-orchestrator.ts`, but that remaining surface now appears to be:
+Post-`1286`, the remaining local `doctor` pocket may now be only:
 
-- parser/help glue
-- wrapper-only flag normalization and validation
-- shared top-level CLI routing that is intentionally still owned by `bin/`
+- shared `parseArgs(...)` ownership
+- top-level command dispatch
+- a thin handoff into `runDoctorCliRequestShell(...)`
 
-If that assessment is correct, the right result is a no-op freeze rather than another symmetry-driven slice.
+If that is all that remains, another extraction would be synthetic drift rather than a truthful Symphony-aligned seam.
 
 ## Goal
 
-Confirm whether any real post-`1251` doctor-boundary extraction remains. If not, close the pocket explicitly as frozen.
+Determine whether the remaining local `doctor` pocket should freeze explicitly or whether one smaller truthful follow-on seam still exists.
 
 ## Non-Goals
 
-- forcing another doctor extraction for symmetry
-- widening into broader top-level CLI helper families
-- reopening already-frozen neighboring command families
+- changing lower doctor execution/output behavior
+- reopening delegation/devtools/skills internals
+- forcing symmetry with earlier CLI shell slices
 
 ## Success Criteria
 
-- docs-first artifacts record whether the post-`1251` doctor pocket is truly exhausted
-- the result explicitly says `freeze` or identifies one bounded follow-on seam
-- no implementation work is started unless reassessment finds a real remaining boundary
+- the remaining local `doctor` pocket is reinspected and a truthful freeze-or-go result is recorded
+- if `freeze`, the closeout explains why no real local mixed-ownership seam remains
+- if `go`, the next narrower seam is named concretely with bounded ownership
