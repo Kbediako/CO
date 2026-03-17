@@ -1,7 +1,7 @@
 ---
 id: 20260317-1251-coordinator-symphony-aligned-doctor-cli-shell-extraction
 title: Coordinator Symphony-Aligned Doctor CLI Shell Extraction
-status: active
+status: completed
 owner: Codex
 created: 2026-03-17
 last_review: 2026-03-17
@@ -13,6 +13,7 @@ related_tasks:
   - tasks/tasks-1251-coordinator-symphony-aligned-doctor-cli-shell-extraction.md
 review_notes:
   - 2026-03-17: Opened after `1250` confirmed the remaining doctor surface is still a real shell candidate. Local inspection showed that `handleDoctor(...)` still aggregates advisory/reporting flows and `--apply` orchestration above already-separated services, so the next truthful move is a bounded extraction lane rather than another freeze. Evidence: `out/1250-coordinator-symphony-aligned-doctor-apply-mutation-and-readiness-boundary-reassessment/manual/20260317T000017Z-closeout/14-next-slice-note.md`, `docs/findings/1251-doctor-cli-shell-extraction-deliberation.md`.
+  - 2026-03-17: Completed. The post-parse doctor execution/output surface now lives in `orchestrator/src/cli/doctorCliShell.ts`, while `bin/codex-orchestrator.ts` keeps help/parse/validation ownership. Focused helper plus doctor-scoped CLI coverage were added to preserve JSON composition, `--apply` sequencing, and wrapper-only validation contracts. Evidence: `out/1251-coordinator-symphony-aligned-doctor-cli-shell-extraction/manual/20260317T002110Z-closeout/00-summary.md`.
 ---
 
 # Technical Specification

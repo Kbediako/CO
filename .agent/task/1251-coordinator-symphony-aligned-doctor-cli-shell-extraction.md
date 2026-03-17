@@ -21,6 +21,6 @@
 
 ## Extraction
 
-- [ ] Doctor command shell boundary implemented. Evidence: pending implementation packet.
-- [ ] Focused doctor parity coverage updated if needed. Evidence: pending implementation packet.
-- [ ] Final implementation validation complete. Evidence: pending implementation packet.
+- [x] Doctor command shell boundary implemented. Evidence: `out/1251-coordinator-symphony-aligned-doctor-cli-shell-extraction/manual/20260317T002110Z-closeout/00-summary.md`
+- [x] Focused doctor parity coverage updated if needed. Evidence: `out/1251-coordinator-symphony-aligned-doctor-cli-shell-extraction/manual/20260317T002110Z-closeout/05a-targeted-tests.log`
+- [x] Final implementation validation complete. Evidence: `out/1251-coordinator-symphony-aligned-doctor-cli-shell-extraction/manual/20260317T002110Z-closeout/00-summary.md`, `out/1251-coordinator-symphony-aligned-doctor-cli-shell-extraction/manual/20260317T002110Z-closeout/13-override-notes.md`
