@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260317-1280-coordinator-symphony-aligned-rlm-cli-remaining-boundary-freeze-reassessment",
+      "title": "Coordinator Symphony-Aligned RLM CLI Remaining Boundary Freeze Reassessment",
+      "relates_to": "tasks/tasks-1280-coordinator-symphony-aligned-rlm-cli-remaining-boundary-freeze-reassessment.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-17",
+      "paths": {
+        "spec": "tasks/specs/1280-coordinator-symphony-aligned-rlm-cli-remaining-boundary-freeze-reassessment.md",
+        "task": "tasks/tasks-1280-coordinator-symphony-aligned-rlm-cli-remaining-boundary-freeze-reassessment.md",
+        "agent_task": ".agent/task/1280-coordinator-symphony-aligned-rlm-cli-remaining-boundary-freeze-reassessment.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-rlm-cli-remaining-boundary-freeze-reassessment.md"
+      }
+    },
+    {
       "id": "20260317-1279-coordinator-symphony-aligned-rlm-cli-launch-shell-extraction",
       "title": "Coordinator Symphony-Aligned RLM CLI Launch Shell Extraction",
       "relates_to": "tasks/tasks-1279-coordinator-symphony-aligned-rlm-cli-launch-shell-extraction.md",

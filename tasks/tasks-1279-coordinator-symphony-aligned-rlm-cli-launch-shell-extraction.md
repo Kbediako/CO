@@ -21,4 +21,4 @@
 
 ## Implementation
 
-- [ ] RLM launch/start shell extracted with focused parity evidence. Evidence: pending closeout packet.
+- [x] RLM launch/start shell extracted with focused parity evidence. Evidence: `out/1279-coordinator-symphony-aligned-rlm-cli-launch-shell-extraction/manual/20260317T131048Z-closeout/00-summary.md`
