@@ -38,7 +38,7 @@ import { runRlmLaunchCliShell } from '../orchestrator/src/cli/rlmLaunchCliShell.
 import { runResumeCliShell } from '../orchestrator/src/cli/resumeCliShell.js';
 import { runStatusCliShell } from '../orchestrator/src/cli/statusCliShell.js';
 import { runSelfCheckCliShell } from '../orchestrator/src/cli/selfCheckCliShell.js';
-import { runSetupBootstrapShell } from '../orchestrator/src/cli/setupBootstrapShell.js';
+import { printSetupCliHelp, runSetupCliShell } from '../orchestrator/src/cli/setupCliShell.js';
 import { runReviewCliLaunchShell } from '../orchestrator/src/cli/reviewCliLaunchShell.js';
 import { findPackageRoot, loadPackageInfo } from '../orchestrator/src/cli/utils/packageInfo.js';
 import { slugify } from '../orchestrator/src/cli/utils/strings.js';
@@ -991,36 +991,11 @@ async function handleInit(rawArgs: string[]): Promise<void> {
 async function handleSetup(rawArgs: string[]): Promise<void> {
   const { positionals, flags } = parseArgs(rawArgs);
   if (isHelpRequest(positionals, flags)) {
-    console.log(`Usage: codex-orchestrator setup [--yes] [--refresh-skills] [--format json]
-
-One-shot bootstrap for downstream users. Installs bundled skills and configures
-delegation + DevTools MCP wiring.
-
-Options:
-  --yes                 Apply setup (otherwise plan only).
-  --refresh-skills      Overwrite bundled skills in $CODEX_HOME/skills during setup.
-  --repo <path>         Repo root for delegation wiring (default cwd).
-  --format json         Emit machine-readable output (dry-run only).
-`);
+    printSetupCliHelp();
     return;
   }
 
-  const format: OutputFormat = (flags['format'] as string | undefined) === 'json' ? 'json' : 'text';
-  const apply = Boolean(flags['yes']);
-  const refreshSkills = Boolean(flags['refresh-skills']);
-  if (format === 'json' && apply) {
-    throw new Error('setup does not support --format json with --yes.');
-  }
-
-  const repoFlag = readStringFlag(flags, 'repo');
-  const repoRoot = repoFlag ?? process.cwd();
-  await runSetupBootstrapShell({
-    format,
-    apply,
-    refreshSkills,
-    repoRoot,
-    repoFlag: repoFlag ?? undefined
-  });
+  await runSetupCliShell({ flags });
 }
 
 async function handleDoctor(rawArgs: string[]): Promise<void> {
