@@ -21,5 +21,5 @@
 
 ## Reassessment
 
-- [ ] Remaining MCP boundary rechecked after `1253`. Evidence: pending closeout packet.
-- [ ] Freeze-or-go result recorded explicitly. Evidence: pending closeout packet.
+- [x] Remaining MCP boundary rechecked after `1253`. Evidence: `out/1254-coordinator-symphony-aligned-mcp-cli-remaining-boundary-freeze-reassessment/manual/20260317T010356Z-closeout/00-summary.md`
+- [x] Freeze-or-go result recorded explicitly. Evidence: `out/1254-coordinator-symphony-aligned-mcp-cli-remaining-boundary-freeze-reassessment/manual/20260317T010356Z-closeout/00-summary.md`, `out/1254-coordinator-symphony-aligned-mcp-cli-remaining-boundary-freeze-reassessment/manual/20260317T010356Z-closeout/14-next-slice-note.md`
