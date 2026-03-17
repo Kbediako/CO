@@ -125,6 +125,12 @@ describe('codex-orchestrator command surface', () => {
     expect(stdout).toContain('Usage: codex-orchestrator status --run <id>');
   }, TEST_TIMEOUT);
 
+  it('requires a run id for status', async () => {
+    await expect(runCli(['status'])).rejects.toMatchObject({
+      stderr: expect.stringContaining('status requires --run <run-id>.')
+    });
+  }, TEST_TIMEOUT);
+
   it('rejects skills install --only when no skill list is provided', async () => {
     tempDir = await mkdtemp(join(tmpdir(), 'co-cli-skills-only-'));
     await expect(runCli(['skills', 'install', '--only', '--codex-home', tempDir, '--format', 'json'])).rejects.toMatchObject({

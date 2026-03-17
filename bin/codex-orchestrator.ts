@@ -34,6 +34,7 @@ import { runFlowCliShell } from '../orchestrator/src/cli/flowCliShell.js';
 import { runStartCliShell } from '../orchestrator/src/cli/startCliShell.js';
 import { runFrontendTestCliShell } from '../orchestrator/src/cli/frontendTestCliShell.js';
 import { runResumeCliShell } from '../orchestrator/src/cli/resumeCliShell.js';
+import { runStatusCliShell } from '../orchestrator/src/cli/statusCliShell.js';
 import { runSetupBootstrapShell } from '../orchestrator/src/cli/setupBootstrapShell.js';
 import { runReviewCliLaunchShell } from '../orchestrator/src/cli/reviewCliLaunchShell.js';
 import { findPackageRoot, loadPackageInfo } from '../orchestrator/src/cli/utils/packageInfo.js';
@@ -811,18 +812,7 @@ async function handleStatus(orchestrator: CodexOrchestrator, rawArgs: string[]):
   const watch = Boolean(flags['watch']);
   const format = (flags['format'] as string | undefined) === 'json' ? 'json' : 'text';
   const interval = parseInt((flags['interval'] as string | undefined) ?? '10', 10);
-  if (!watch) {
-    await orchestrator.status({ runId, format });
-    return;
-  }
-  const terminal = new Set(['succeeded', 'failed', 'cancelled']);
-  while (true) {
-    const manifest = await orchestrator.status({ runId, format });
-    if (terminal.has(manifest.status)) {
-      break;
-    }
-    await new Promise((resolve) => setTimeout(resolve, interval * 1000));
-  }
+  await runStatusCliShell({ orchestrator, runId, watch, format, interval });
 }
 
 async function maybeStartHud(
