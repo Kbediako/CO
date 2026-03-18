@@ -1,6 +1,38 @@
 {
   "items": [
     {
+      "id": "20260318-1293-coordinator-symphony-aligned-flow-cli-remaining-boundary-freeze-reassessment",
+      "title": "Coordinator Symphony-Aligned Flow CLI Remaining Boundary Freeze Reassessment Revisit",
+      "relates_to": "tasks/tasks-1293-coordinator-symphony-aligned-flow-cli-remaining-boundary-freeze-reassessment.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-18",
+      "paths": {
+        "spec": "tasks/specs/1293-coordinator-symphony-aligned-flow-cli-remaining-boundary-freeze-reassessment.md",
+        "task": "tasks/tasks-1293-coordinator-symphony-aligned-flow-cli-remaining-boundary-freeze-reassessment.md",
+        "agent_task": ".agent/task/1293-coordinator-symphony-aligned-flow-cli-remaining-boundary-freeze-reassessment.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-flow-cli-remaining-boundary-freeze-reassessment-revisit.md"
+      }
+    },
+    {
+      "id": "20260318-1292-coordinator-symphony-aligned-flow-cli-request-shell-extraction",
+      "title": "Coordinator Symphony-Aligned Flow CLI Request Shell Extraction",
+      "relates_to": "tasks/tasks-1292-coordinator-symphony-aligned-flow-cli-request-shell-extraction.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-18",
+      "paths": {
+        "spec": "tasks/specs/1292-coordinator-symphony-aligned-flow-cli-request-shell-extraction.md",
+        "task": "tasks/tasks-1292-coordinator-symphony-aligned-flow-cli-request-shell-extraction.md",
+        "agent_task": ".agent/task/1292-coordinator-symphony-aligned-flow-cli-request-shell-extraction.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-flow-cli-request-shell-extraction.md"
+      }
+    },
+    {
       "id": "20260318-1291-coordinator-symphony-aligned-flow-cli-boundary-reassessment-revisit",
       "title": "Coordinator Symphony-Aligned Flow CLI Boundary Reassessment Revisit",
       "relates_to": "tasks/tasks-1291-coordinator-symphony-aligned-flow-cli-boundary-reassessment-revisit.md",
