@@ -34,8 +34,8 @@ import { runStartCliRequestShell } from '../orchestrator/src/cli/startCliRequest
 import { runFrontendTestCliShell } from '../orchestrator/src/cli/frontendTestCliShell.js';
 import { runPlanCliShell } from '../orchestrator/src/cli/planCliShell.js';
 import { runDoctorCliRequestShell } from '../orchestrator/src/cli/doctorCliRequestShell.js';
+import { runRlmCliRequestShell } from '../orchestrator/src/cli/rlmCliRequestShell.js';
 import { runRlmCompletionCliShell } from '../orchestrator/src/cli/rlmCompletionCliShell.js';
-import { runRlmLaunchCliShell } from '../orchestrator/src/cli/rlmLaunchCliShell.js';
 import { runResumeCliShell } from '../orchestrator/src/cli/resumeCliShell.js';
 import { runStatusCliShell } from '../orchestrator/src/cli/statusCliShell.js';
 import { runSelfCheckCliShell } from '../orchestrator/src/cli/selfCheckCliShell.js';
@@ -651,29 +651,18 @@ async function handleRlm(orchestrator: CodexOrchestrator, rawArgs: string[]): Pr
     printRlmHelp();
     return;
   }
-  const runtimeMode = resolveRuntimeModeFlag(flags);
-  applyRepoConfigRequiredPolicy(flags);
-  const goalFromArgs = positionals.length > 0 ? positionals.join(' ') : undefined;
-
-  const collabUserChoice =
-    flags['collab'] !== undefined ||
-    flags['multi-agent'] !== undefined ||
-    process.env.RLM_SYMBOLIC_COLLAB !== undefined ||
-    process.env.RLM_SYMBOLIC_MULTI_AGENT !== undefined;
-  await runRlmLaunchCliShell({
+  await runRlmCliRequestShell({
     orchestrator,
-    runtimeMode,
-    goalFromArgs,
-    goalFlag: readStringFlag(flags, 'goal') ?? undefined,
-    goalEnv: process.env.RLM_GOAL,
-    taskIdOverride: typeof flags['task'] === 'string' ? (flags['task'] as string) : undefined,
-    parentRunId: typeof flags['parent-run'] === 'string' ? (flags['parent-run'] as string) : undefined,
-    approvalPolicy: typeof flags['approval-policy'] === 'string' ? (flags['approval-policy'] as string) : undefined,
-    collabUserChoice,
+    positionals,
+    flags,
+    env: process.env,
     runWithUi: async (action) => await withRunUi(flags, 'text', action),
     emitRunOutput,
-    applyRlmEnvOverrides: (goal) => applyRlmEnvOverrides(flags, goal),
-    shouldWarnLegacyEnvAlias: () => shouldWarnLegacyMultiAgentEnv(flags, process.env),
+    resolveRuntimeModeFlag,
+    applyRepoConfigRequiredPolicy,
+    readStringFlag,
+    applyRlmEnvOverrides,
+    shouldWarnLegacyEnvAlias: shouldWarnLegacyMultiAgentEnv,
     resolveRlmTaskId,
     setTaskEnvironment: (taskId) => {
       process.env.MCP_RUNNER_TASK_ID = taskId;
