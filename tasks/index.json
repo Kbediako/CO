@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260318-1294-coordinator-symphony-aligned-rlm-cli-boundary-reassessment-revisit",
+      "title": "Coordinator Symphony-Aligned RLM CLI Boundary Reassessment Revisit",
+      "relates_to": "tasks/tasks-1294-coordinator-symphony-aligned-rlm-cli-boundary-reassessment-revisit.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-18",
+      "paths": {
+        "spec": "tasks/specs/1294-coordinator-symphony-aligned-rlm-cli-boundary-reassessment-revisit.md",
+        "task": "tasks/tasks-1294-coordinator-symphony-aligned-rlm-cli-boundary-reassessment-revisit.md",
+        "agent_task": ".agent/task/1294-coordinator-symphony-aligned-rlm-cli-boundary-reassessment-revisit.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-rlm-cli-boundary-reassessment-revisit.md"
+      }
+    },
+    {
       "id": "20260318-1293-coordinator-symphony-aligned-flow-cli-remaining-boundary-freeze-reassessment",
       "title": "Coordinator Symphony-Aligned Flow CLI Remaining Boundary Freeze Reassessment Revisit",
       "relates_to": "tasks/tasks-1293-coordinator-symphony-aligned-flow-cli-remaining-boundary-freeze-reassessment.md",

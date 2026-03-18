@@ -1,7 +1,7 @@
 ---
 id: 20260318-1293-coordinator-symphony-aligned-flow-cli-remaining-boundary-freeze-reassessment
 title: Coordinator Symphony-Aligned Flow CLI Remaining Boundary Freeze Reassessment Revisit
-status: active
+status: done
 owner: Codex
 created: 2026-03-18
 last_review: 2026-03-18
@@ -13,6 +13,7 @@ related_tasks:
   - tasks/tasks-1293-coordinator-symphony-aligned-flow-cli-remaining-boundary-freeze-reassessment.md
 review_notes:
   - 2026-03-18: Opened after `1292` extracted `orchestrator/src/cli/flowCliRequestShell.ts`. Current-tree inspection suggests the remaining local `flow` pocket may now be only shared `parseArgs(...)` ownership, top-level help routing, and a thin wrapper into the extracted request-shell helper, so the next truthful nearby move is a freeze reassessment rather than an assumed follow-on extraction. Evidence: `out/1292-coordinator-symphony-aligned-flow-cli-request-shell-extraction/manual/20260318T003200Z-closeout/00-summary.md`, `out/1292-coordinator-symphony-aligned-flow-cli-request-shell-extraction/manual/20260318T003200Z-closeout/14-next-slice-note.md`, `docs/findings/1293-flow-cli-remaining-boundary-freeze-reassessment-revisit-deliberation.md`.
+  - 2026-03-18: Closed as a truthful no-op freeze. Post-`1292`, the remaining local `flow` pocket in `bin/codex-orchestrator.ts` is only shared `parseArgs(...)`, local help routing, and a thin handoff into `orchestrator/src/cli/flowCliRequestShell.ts`, while `orchestrator/src/cli/flowCliShell.ts` already owns the lower lifecycle. Evidence: `out/1293-coordinator-symphony-aligned-flow-cli-remaining-boundary-freeze-reassessment/manual/20260318T032653Z-closeout/00-summary.md`, `out/1293-coordinator-symphony-aligned-flow-cli-remaining-boundary-freeze-reassessment/manual/20260318T032653Z-closeout/14-next-slice-note.md`.
 ---
 
 # Technical Specification
