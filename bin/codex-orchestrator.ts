@@ -29,7 +29,7 @@ import { runDevtoolsCliShell } from '../orchestrator/src/cli/devtoolsCliShell.js
 import { runDelegationCliShell } from '../orchestrator/src/cli/delegationCliShell.js';
 import { runPrCliShell } from '../orchestrator/src/cli/prCliShell.js';
 import { runSkillsCliShell } from '../orchestrator/src/cli/skillsCliShell.js';
-import { runFlowCliShell } from '../orchestrator/src/cli/flowCliShell.js';
+import { runFlowCliRequestShell } from '../orchestrator/src/cli/flowCliRequestShell.js';
 import { runStartCliRequestShell } from '../orchestrator/src/cli/startCliRequestShell.js';
 import { runFrontendTestCliShell } from '../orchestrator/src/cli/frontendTestCliShell.js';
 import { runPlanCliShell } from '../orchestrator/src/cli/planCliShell.js';
@@ -595,37 +595,23 @@ async function handleFlow(orchestrator: CodexOrchestrator, rawArgs: string[]): P
     printFlowHelp();
     return;
   }
-  if (positionals.length > 0) {
-    throw new Error(`flow does not accept positional arguments: ${positionals.join(' ')}`);
-  }
-
-  const format: OutputFormat = (flags['format'] as string | undefined) === 'json' ? 'json' : 'text';
-  const executionMode = resolveExecutionModeFlag(flags);
-  const runtimeMode = resolveRuntimeModeFlag(flags);
-  applyRepoConfigRequiredPolicy(flags);
-  const autoIssueLogEnabled = resolveAutoIssueLogEnabled(flags);
-  const taskId = typeof flags['task'] === 'string' ? (flags['task'] as string) : undefined;
-  const parentRunId = typeof flags['parent-run'] === 'string' ? (flags['parent-run'] as string) : undefined;
-  const approvalPolicy = typeof flags['approval-policy'] === 'string' ? (flags['approval-policy'] as string) : undefined;
-  const targetStageId = resolveTargetStageId(flags);
-  await runFlowCliShell({
+  await runFlowCliRequestShell({
     orchestrator,
-    format,
-    executionMode,
-    runtimeMode,
-    autoIssueLogEnabled,
-    taskId,
-    parentRunId,
-    approvalPolicy,
-    targetStageId,
-    runWithUi: async (action) => await withRunUi(flags, format, action),
+    positionals,
+    flags,
+    runWithUi: async (format, action) => await withRunUi(flags, format, action),
     emitRunOutput,
     formatIssueLogSummary: formatDoctorIssueLogSummary,
     toRunOutputPayload,
     maybeCaptureAutoIssueLog,
     resolveTaskFilter,
     withAutoIssueLogContext,
-    maybeEmitRunAdoptionHint
+    maybeEmitRunAdoptionHint,
+    resolveExecutionModeFlag,
+    resolveRuntimeModeFlag,
+    applyRepoConfigRequiredPolicy,
+    resolveAutoIssueLogEnabled,
+    resolveTargetStageId
   });
 }
 
