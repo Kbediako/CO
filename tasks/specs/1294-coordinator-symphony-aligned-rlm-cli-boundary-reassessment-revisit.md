@@ -1,7 +1,7 @@
 ---
 id: 20260318-1294-coordinator-symphony-aligned-rlm-cli-boundary-reassessment-revisit
 title: Coordinator Symphony-Aligned RLM CLI Boundary Reassessment Revisit
-status: active
+status: done
 owner: Codex
 created: 2026-03-18
 last_review: 2026-03-18
@@ -13,6 +13,7 @@ related_tasks:
   - tasks/tasks-1294-coordinator-symphony-aligned-rlm-cli-boundary-reassessment-revisit.md
 review_notes:
   - 2026-03-18: Opened after `1293` froze the remaining local `flow` pocket. Current-tree inspection shows that `handleRlm(...)` still owns broader wrapper-local shaping than thin parse/help glue above `orchestrator/src/cli/rlmLaunchCliShell.ts` and `orchestrator/src/cli/rlmCompletionCliShell.ts`, so the next truthful nearby move is an RLM boundary reassessment revisit. Evidence: `out/1293-coordinator-symphony-aligned-flow-cli-remaining-boundary-freeze-reassessment/manual/20260318T032653Z-closeout/00-summary.md`, `out/1293-coordinator-symphony-aligned-flow-cli-remaining-boundary-freeze-reassessment/manual/20260318T032653Z-closeout/14-next-slice-note.md`, `docs/findings/1294-rlm-cli-boundary-reassessment-revisit-deliberation.md`.
+  - 2026-03-18: Closed as a truthful `go` reassessment. Current-tree inspection confirmed that `handleRlm(...)` still owns a real binary-facing request-shaping seam above `orchestrator/src/cli/rlmLaunchCliShell.ts` and `orchestrator/src/cli/rlmCompletionCliShell.ts`, so the next truthful nearby move is a bounded RLM request-shell extraction. Evidence: `out/1294-coordinator-symphony-aligned-rlm-cli-boundary-reassessment-revisit/manual/20260318T045148Z-closeout/00-summary.md`, `out/1294-coordinator-symphony-aligned-rlm-cli-boundary-reassessment-revisit/manual/20260318T045148Z-closeout/14-next-slice-note.md`.
 ---
 
 # Technical Specification

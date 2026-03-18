@@ -1,6 +1,70 @@
 {
   "items": [
     {
+      "id": "20260318-1298-coordinator-symphony-aligned-frontend-test-cli-request-shell-extraction",
+      "title": "Coordinator Symphony-Aligned Frontend-Test CLI Request Shell Extraction",
+      "relates_to": "tasks/tasks-1298-coordinator-symphony-aligned-frontend-test-cli-request-shell-extraction.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-18",
+      "paths": {
+        "spec": "tasks/specs/1298-coordinator-symphony-aligned-frontend-test-cli-request-shell-extraction.md",
+        "task": "tasks/tasks-1298-coordinator-symphony-aligned-frontend-test-cli-request-shell-extraction.md",
+        "agent_task": ".agent/task/1298-coordinator-symphony-aligned-frontend-test-cli-request-shell-extraction.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-frontend-test-cli-request-shell-extraction.md"
+      }
+    },
+    {
+      "id": "20260318-1297-coordinator-symphony-aligned-frontend-test-cli-boundary-reassessment-revisit",
+      "title": "Coordinator Symphony-Aligned Frontend-Test CLI Boundary Reassessment Revisit",
+      "relates_to": "tasks/tasks-1297-coordinator-symphony-aligned-frontend-test-cli-boundary-reassessment-revisit.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-18",
+      "paths": {
+        "spec": "tasks/specs/1297-coordinator-symphony-aligned-frontend-test-cli-boundary-reassessment-revisit.md",
+        "task": "tasks/tasks-1297-coordinator-symphony-aligned-frontend-test-cli-boundary-reassessment-revisit.md",
+        "agent_task": ".agent/task/1297-coordinator-symphony-aligned-frontend-test-cli-boundary-reassessment-revisit.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-frontend-test-cli-boundary-reassessment-revisit.md"
+      }
+    },
+    {
+      "id": "20260318-1296-coordinator-symphony-aligned-rlm-cli-remaining-boundary-freeze-reassessment-revisit",
+      "title": "Coordinator Symphony-Aligned RLM CLI Remaining Boundary Freeze Reassessment Revisit",
+      "relates_to": "tasks/tasks-1296-coordinator-symphony-aligned-rlm-cli-remaining-boundary-freeze-reassessment-revisit.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-18",
+      "paths": {
+        "spec": "tasks/specs/1296-coordinator-symphony-aligned-rlm-cli-remaining-boundary-freeze-reassessment-revisit.md",
+        "task": "tasks/tasks-1296-coordinator-symphony-aligned-rlm-cli-remaining-boundary-freeze-reassessment-revisit.md",
+        "agent_task": ".agent/task/1296-coordinator-symphony-aligned-rlm-cli-remaining-boundary-freeze-reassessment-revisit.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-rlm-cli-remaining-boundary-freeze-reassessment-revisit.md"
+      }
+    },
+    {
+      "id": "20260318-1295-coordinator-symphony-aligned-rlm-cli-request-shell-extraction",
+      "title": "Coordinator Symphony-Aligned RLM CLI Request Shell Extraction",
+      "relates_to": "tasks/tasks-1295-coordinator-symphony-aligned-rlm-cli-request-shell-extraction.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-18",
+      "paths": {
+        "spec": "tasks/specs/1295-coordinator-symphony-aligned-rlm-cli-request-shell-extraction.md",
+        "task": "tasks/tasks-1295-coordinator-symphony-aligned-rlm-cli-request-shell-extraction.md",
+        "agent_task": ".agent/task/1295-coordinator-symphony-aligned-rlm-cli-request-shell-extraction.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-rlm-cli-request-shell-extraction.md"
+      }
+    },
+    {
       "id": "20260318-1294-coordinator-symphony-aligned-rlm-cli-boundary-reassessment-revisit",
       "title": "Coordinator Symphony-Aligned RLM CLI Boundary Reassessment Revisit",
       "relates_to": "tasks/tasks-1294-coordinator-symphony-aligned-rlm-cli-boundary-reassessment-revisit.md",
