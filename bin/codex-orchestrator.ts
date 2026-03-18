@@ -568,6 +568,10 @@ async function handleStart(orchestrator: CodexOrchestrator, rawArgs: string[]): 
 
 async function handleFrontendTest(orchestrator: CodexOrchestrator, rawArgs: string[]): Promise<void> {
   const { positionals, flags } = parseArgs(rawArgs);
+  if (isHelpRequest(positionals, flags)) {
+    printFrontendTestHelp();
+    return;
+  }
   await runFrontendTestCliRequestShell({
     orchestrator,
     positionals,
@@ -1545,6 +1549,30 @@ Examples:
 Tips:
   - Use --multi-agent auto for ambiguous/long-horizon work.
   - Ensure multi-agent is enabled in Codex: codex features enable multi_agent (legacy alias: collab).
+`);
+}
+
+function printFrontendTestHelp(): void {
+  console.log(`Usage: codex-orchestrator frontend-test [options]
+
+Runs the frontend-testing pipeline.
+
+Options:
+  --devtools              Enable Chrome DevTools MCP for this run.
+  --task <id>             Override task identifier (defaults to MCP_RUNNER_TASK_ID).
+  --runtime-mode <cli|appserver>  Force runtime mode for this run.
+  --repo-config-required [true|false]  Require repo-local codex.orchestrator.json (no package fallback).
+  --parent-run <id>       Link run to parent run id.
+  --approval-policy <p>   Record approval policy metadata.
+  --format json           Emit machine-readable output.
+  --target <stage-id>     Focus plan/build metadata on a specific stage (alias: --target-stage).
+  --interactive | --ui    Enable read-only HUD when running in a TTY.
+  --no-interactive        Force disable HUD.
+  --help                  Show this message.
+
+Examples:
+  codex-orchestrator frontend-test
+  codex-orchestrator frontend-test --devtools --format json
 `);
 }
 

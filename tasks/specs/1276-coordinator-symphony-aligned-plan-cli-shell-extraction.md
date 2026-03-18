@@ -1,7 +1,7 @@
 ---
 id: 20260317-1276-coordinator-symphony-aligned-plan-cli-shell-extraction
 title: Coordinator Symphony-Aligned Plan CLI Shell Extraction
-status: active
+status: done
 owner: Codex
 created: 2026-03-17
 last_review: 2026-03-17

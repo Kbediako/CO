@@ -1,7 +1,7 @@
 ---
 id: 20260317-1282-coordinator-symphony-aligned-self-check-cli-remaining-boundary-freeze-reassessment
 title: Coordinator Symphony-Aligned Self-Check CLI Remaining Boundary Freeze Reassessment
-status: active
+status: done
 owner: Codex
 created: 2026-03-17
 last_review: 2026-03-17

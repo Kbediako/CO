@@ -1,7 +1,7 @@
 ---
 id: 20260317-1281-coordinator-symphony-aligned-self-check-cli-shell-extraction
 title: Coordinator Symphony-Aligned Self-Check CLI Shell Extraction
-status: active
+status: done
 owner: Codex
 created: 2026-03-17
 last_review: 2026-03-17

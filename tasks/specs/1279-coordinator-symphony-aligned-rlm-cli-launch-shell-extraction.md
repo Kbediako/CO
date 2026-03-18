@@ -1,7 +1,7 @@
 ---
 id: 20260317-1279-coordinator-symphony-aligned-rlm-cli-launch-shell-extraction
 title: Coordinator Symphony-Aligned RLM CLI Launch Shell Extraction
-status: active
+status: done
 owner: Codex
 created: 2026-03-17
 last_review: 2026-03-17

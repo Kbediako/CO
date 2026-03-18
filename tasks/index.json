@@ -1,6 +1,54 @@
 {
   "items": [
     {
+      "id": "20260319-1302-coordinator-linear-and-telegram-provider-setup-and-smoke-testing",
+      "title": "Coordinator Linear and Telegram Provider Setup and Smoke Testing",
+      "relates_to": "tasks/tasks-1302-coordinator-linear-and-telegram-provider-setup-and-smoke-testing.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-19",
+      "paths": {
+        "spec": "tasks/specs/1302-coordinator-linear-and-telegram-provider-setup-and-smoke-testing.md",
+        "task": "tasks/tasks-1302-coordinator-linear-and-telegram-provider-setup-and-smoke-testing.md",
+        "agent_task": ".agent/task/1302-coordinator-linear-and-telegram-provider-setup-and-smoke-testing.md",
+        "docs": "docs/TECH_SPEC-coordinator-linear-and-telegram-provider-setup-and-smoke-testing.md"
+      }
+    },
+    {
+      "id": "20260319-1301-coordinator-symphony-aligned-frontend-test-cli-remaining-boundary-freeze-reassessment-revisit",
+      "title": "Coordinator Symphony-Aligned Frontend-Test CLI Remaining Boundary Freeze Reassessment Revisit",
+      "relates_to": "tasks/tasks-1301-coordinator-symphony-aligned-frontend-test-cli-remaining-boundary-freeze-reassessment-revisit.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-19",
+      "paths": {
+        "spec": "tasks/specs/1301-coordinator-symphony-aligned-frontend-test-cli-remaining-boundary-freeze-reassessment-revisit.md",
+        "task": "tasks/tasks-1301-coordinator-symphony-aligned-frontend-test-cli-remaining-boundary-freeze-reassessment-revisit.md",
+        "agent_task": ".agent/task/1301-coordinator-symphony-aligned-frontend-test-cli-remaining-boundary-freeze-reassessment-revisit.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-frontend-test-cli-remaining-boundary-freeze-reassessment-revisit.md"
+      }
+    },
+    {
+      "id": "20260319-1300-coordinator-symphony-aligned-frontend-test-cli-help-surface-completion",
+      "title": "Coordinator Symphony-Aligned Frontend-Test CLI Help Surface Completion",
+      "relates_to": "tasks/tasks-1300-coordinator-symphony-aligned-frontend-test-cli-help-surface-completion.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-19",
+      "paths": {
+        "spec": "tasks/specs/1300-coordinator-symphony-aligned-frontend-test-cli-help-surface-completion.md",
+        "task": "tasks/tasks-1300-coordinator-symphony-aligned-frontend-test-cli-help-surface-completion.md",
+        "agent_task": ".agent/task/1300-coordinator-symphony-aligned-frontend-test-cli-help-surface-completion.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-frontend-test-cli-help-surface-completion.md"
+      }
+    },
+    {
       "id": "20260318-1299-coordinator-symphony-aligned-frontend-test-cli-remaining-boundary-freeze-reassessment",
       "title": "Coordinator Symphony-Aligned Frontend-Test CLI Remaining Boundary Freeze Reassessment",
       "relates_to": "tasks/tasks-1299-coordinator-symphony-aligned-frontend-test-cli-remaining-boundary-freeze-reassessment.md",

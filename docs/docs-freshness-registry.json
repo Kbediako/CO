@@ -1,54 +1,201 @@
 {
   "version": 1,
-  "generated_at": "2026-03-18",
+  "generated_at": "2026-03-19",
   "entries": [
+    {
+      "path": "docs/ACTION_PLAN-coordinator-linear-and-telegram-provider-setup-and-smoke-testing.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-19",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/PRD-coordinator-linear-and-telegram-provider-setup-and-smoke-testing.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-19",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/TECH_SPEC-coordinator-linear-and-telegram-provider-setup-and-smoke-testing.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-19",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/findings/1302-linear-and-telegram-provider-setup-and-smoke-testing-deliberation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-19",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/tasks-1302-coordinator-linear-and-telegram-provider-setup-and-smoke-testing.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-19",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/specs/1302-coordinator-linear-and-telegram-provider-setup-and-smoke-testing.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-19",
+      "cadence_days": 30
+    },
+    {
+      "path": ".agent/task/1302-coordinator-linear-and-telegram-provider-setup-and-smoke-testing.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-19",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-frontend-test-cli-remaining-boundary-freeze-reassessment-revisit.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-19",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/PRD-coordinator-symphony-aligned-frontend-test-cli-remaining-boundary-freeze-reassessment-revisit.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-19",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/TECH_SPEC-coordinator-symphony-aligned-frontend-test-cli-remaining-boundary-freeze-reassessment-revisit.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-19",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/findings/1301-frontend-test-cli-remaining-boundary-freeze-reassessment-revisit-deliberation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-19",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/tasks-1301-coordinator-symphony-aligned-frontend-test-cli-remaining-boundary-freeze-reassessment-revisit.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-19",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/specs/1301-coordinator-symphony-aligned-frontend-test-cli-remaining-boundary-freeze-reassessment-revisit.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-19",
+      "cadence_days": 30
+    },
+    {
+      "path": ".agent/task/1301-coordinator-symphony-aligned-frontend-test-cli-remaining-boundary-freeze-reassessment-revisit.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-19",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-frontend-test-cli-help-surface-completion.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-19",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/PRD-coordinator-symphony-aligned-frontend-test-cli-help-surface-completion.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-19",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/TECH_SPEC-coordinator-symphony-aligned-frontend-test-cli-help-surface-completion.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-19",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/findings/1300-frontend-test-cli-help-surface-completion-deliberation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-19",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/tasks-1300-coordinator-symphony-aligned-frontend-test-cli-help-surface-completion.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-19",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/specs/1300-coordinator-symphony-aligned-frontend-test-cli-help-surface-completion.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-19",
+      "cadence_days": 30
+    },
+    {
+      "path": ".agent/task/1300-coordinator-symphony-aligned-frontend-test-cli-help-surface-completion.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-19",
+      "cadence_days": 30
+    },
     {
       "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-frontend-test-cli-remaining-boundary-freeze-reassessment.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-18",
+      "last_review": "2026-03-19",
       "cadence_days": 30
     },
     {
       "path": "docs/PRD-coordinator-symphony-aligned-frontend-test-cli-remaining-boundary-freeze-reassessment.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-18",
+      "last_review": "2026-03-19",
       "cadence_days": 30
     },
     {
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-frontend-test-cli-remaining-boundary-freeze-reassessment.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-18",
+      "last_review": "2026-03-19",
       "cadence_days": 30
     },
     {
       "path": "docs/findings/1299-frontend-test-cli-remaining-boundary-freeze-reassessment-deliberation.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-18",
+      "last_review": "2026-03-19",
       "cadence_days": 30
     },
     {
       "path": "tasks/tasks-1299-coordinator-symphony-aligned-frontend-test-cli-remaining-boundary-freeze-reassessment.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-18",
+      "last_review": "2026-03-19",
       "cadence_days": 30
     },
     {
       "path": "tasks/specs/1299-coordinator-symphony-aligned-frontend-test-cli-remaining-boundary-freeze-reassessment.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-18",
+      "last_review": "2026-03-19",
       "cadence_days": 30
     },
     {
       "path": ".agent/task/1299-coordinator-symphony-aligned-frontend-test-cli-remaining-boundary-freeze-reassessment.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-18",
+      "last_review": "2026-03-19",
       "cadence_days": 30
     },
     {

@@ -1,7 +1,7 @@
 ---
 id: 20260317-1272-coordinator-symphony-aligned-frontend-test-cli-shell-extraction
 title: Coordinator Symphony-Aligned Frontend-Test CLI Shell Extraction
-status: active
+status: done
 owner: Codex
 created: 2026-03-17
 last_review: 2026-03-17
