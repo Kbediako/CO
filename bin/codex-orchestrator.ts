@@ -32,6 +32,7 @@ import { runSkillsCliShell } from '../orchestrator/src/cli/skillsCliShell.js';
 import { runFlowCliRequestShell } from '../orchestrator/src/cli/flowCliRequestShell.js';
 import { runStartCliRequestShell } from '../orchestrator/src/cli/startCliRequestShell.js';
 import { runFrontendTestCliShell } from '../orchestrator/src/cli/frontendTestCliShell.js';
+import { runFrontendTestCliRequestShell } from '../orchestrator/src/cli/frontendTestCliRequestShell.js';
 import { runPlanCliShell } from '../orchestrator/src/cli/planCliShell.js';
 import { runDoctorCliRequestShell } from '../orchestrator/src/cli/doctorCliRequestShell.js';
 import { runRlmCliRequestShell } from '../orchestrator/src/cli/rlmCliRequestShell.js';
@@ -567,25 +568,16 @@ async function handleStart(orchestrator: CodexOrchestrator, rawArgs: string[]): 
 
 async function handleFrontendTest(orchestrator: CodexOrchestrator, rawArgs: string[]): Promise<void> {
   const { positionals, flags } = parseArgs(rawArgs);
-  const format: OutputFormat = (flags['format'] as string | undefined) === 'json' ? 'json' : 'text';
-  const devtools = Boolean(flags['devtools']);
-  const runtimeMode = resolveRuntimeModeFlag(flags);
-  applyRepoConfigRequiredPolicy(flags);
-  if (positionals.length > 0) {
-    console.error(`[frontend-test] ignoring extra arguments: ${positionals.join(' ')}`);
-  }
-
-  await runFrontendTestCliShell({
+  await runFrontendTestCliRequestShell({
     orchestrator,
-    format,
-    devtoolsEnabled: devtools,
-    runtimeMode,
-    taskId: typeof flags['task'] === 'string' ? (flags['task'] as string) : undefined,
-    parentRunId: typeof flags['parent-run'] === 'string' ? (flags['parent-run'] as string) : undefined,
-    approvalPolicy: typeof flags['approval-policy'] === 'string' ? (flags['approval-policy'] as string) : undefined,
-    targetStageId: resolveTargetStageId(flags),
-    runWithUi: async (action) => await withRunUi(flags, format, action),
-    emitRunOutput
+    positionals,
+    flags,
+    resolveRuntimeModeFlag,
+    applyRepoConfigRequiredPolicy,
+    resolveTargetStageId,
+    runWithUi: async (format, action) => await withRunUi(flags, format, action),
+    emitRunOutput,
+    warn: (line) => console.error(line)
   });
 }
 
