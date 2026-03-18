@@ -21,4 +21,4 @@
 
 ## Implementation
 
-- [ ] Linear and Telegram setup/testing executed with explicit smoke evidence. Evidence: pending next-turn packet.
+- [x] Linear and Telegram setup/testing executed with explicit smoke evidence. Evidence: `out/1302-coordinator-linear-and-telegram-provider-setup-and-smoke-testing/manual/20260318T233401Z-provider-smoke/00-summary.md`, `out/1302-coordinator-linear-and-telegram-provider-setup-and-smoke-testing/manual/20260318T233401Z-provider-smoke/01-provider-smoke-results.json`
