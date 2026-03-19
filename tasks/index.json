@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260319-1304-coordinator-live-linear-tracked-issue-by-id-query-string-contract-fix",
+      "title": "Coordinator Live Linear Tracked-Issue By-Id Query String Contract Fix",
+      "relates_to": "tasks/tasks-1304-coordinator-live-linear-tracked-issue-by-id-query-string-contract-fix.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-19",
+      "paths": {
+        "spec": "tasks/specs/1304-coordinator-live-linear-tracked-issue-by-id-query-string-contract-fix.md",
+        "task": "tasks/tasks-1304-coordinator-live-linear-tracked-issue-by-id-query-string-contract-fix.md",
+        "agent_task": ".agent/task/1304-coordinator-live-linear-tracked-issue-by-id-query-string-contract-fix.md",
+        "docs": "docs/TECH_SPEC-coordinator-live-linear-tracked-issue-by-id-query-string-contract-fix.md"
+      }
+    },
+    {
       "id": "20260319-1303-coordinator-symphony-parity-linear-autonomous-intake-and-run-handoff",
       "title": "Coordinator Symphony-Parity Provider-Driven Autonomous Intake and Run Handoff",
       "relates_to": "tasks/tasks-1303-coordinator-symphony-parity-linear-autonomous-intake-and-run-handoff.md",

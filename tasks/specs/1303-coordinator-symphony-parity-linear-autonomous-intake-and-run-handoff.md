@@ -16,6 +16,7 @@ review_notes:
   - 2026-03-19: Planning scope widened beyond a bare “start from Linear” trigger because full Symphony parity here also requires provider-side start semantics, persistent intake hosting, deterministic issue-to-run mapping, idempotent claim/replay behavior, and restart-safe rehydration. Evidence: `docs/findings/1303-symphony-parity-linear-autonomous-intake-and-run-handoff-deliberation.md`.
   - 2026-03-19: Implementation landed a dedicated `codex-orchestrator control-host` intake surface, manifest-carried provider issue identity, and a separate `provider-intake-state.json` claim ledger. Live Linear intake remains bounded to `state_type=started`; task ids use a stable provider-id fallback when the live issue projection lacks an explicit CO task-id carrier.
   - 2026-03-19: Post-merge follow-up on PR `#278` stabilized `packages/orchestrator/tests/UnifiedExec.test.ts` for slower CI runners after the queued-handoff fix exposed startup-sensitive timeout coverage. This did not change the provider-intake runtime contract; it only preserved CI validation for the already-landed 1303 follow-up lane.
+  - 2026-03-19: First live autonomous intake rerun reached the exact Linear issue-by-id lookup and exposed a narrow upstream contract bug: `buildLinearIssueByIdQuery(...)` declared `$issueId: ID!` while Linear expects `issue(id: String!)`. The runtime contract stayed otherwise intact; the fix and live rerun are tracked separately in `1304-coordinator-live-linear-tracked-issue-by-id-query-string-contract-fix`.
 ---
 
 # Technical Specification

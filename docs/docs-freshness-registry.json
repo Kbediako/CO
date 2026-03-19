@@ -3027,6 +3027,13 @@
       "cadence_days": 30
     },
     {
+      "path": ".agent/task/1304-coordinator-live-linear-tracked-issue-by-id-query-string-contract-fix.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-19",
+      "cadence_days": 30
+    },
+    {
       "path": ".agent/task/ACTION_PLAN_TEMPLATE.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -3371,6 +3378,13 @@
     },
     {
       "path": "docs/ACTION_PLAN-coordinator-symphony-parity-linear-autonomous-intake-and-run-handoff.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-19",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/ACTION_PLAN-coordinator-live-linear-tracked-issue-by-id-query-string-contract-fix.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-03-19",
@@ -8074,6 +8088,13 @@
       "cadence_days": 30
     },
     {
+      "path": "docs/findings/1304-live-linear-tracked-issue-by-id-query-string-contract-fix-deliberation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-19",
+      "cadence_days": 30
+    },
+    {
       "path": "docs/findings/ethical-life.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -8432,6 +8453,13 @@
     },
     {
       "path": "docs/PRD-coordinator-symphony-parity-linear-autonomous-intake-and-run-handoff.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-19",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/PRD-coordinator-live-linear-tracked-issue-by-id-query-string-contract-fix.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-03-19",
@@ -11302,6 +11330,13 @@
     },
     {
       "path": "docs/TECH_SPEC-coordinator-symphony-parity-linear-autonomous-intake-and-run-handoff.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-19",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/TECH_SPEC-coordinator-live-linear-tracked-issue-by-id-query-string-contract-fix.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-03-19",
@@ -16663,6 +16698,13 @@
       "cadence_days": 30
     },
     {
+      "path": "tasks/specs/1304-coordinator-live-linear-tracked-issue-by-id-query-string-contract-fix.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-19",
+      "cadence_days": 30
+    },
+    {
       "path": "tasks/specs/README.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -19513,6 +19555,13 @@
     },
     {
       "path": "tasks/tasks-1303-coordinator-symphony-parity-linear-autonomous-intake-and-run-handoff.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-19",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/tasks-1304-coordinator-live-linear-tracked-issue-by-id-query-string-contract-fix.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-03-19",
