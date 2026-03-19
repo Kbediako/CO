@@ -13,6 +13,11 @@ import { runRlmLoop } from './rlm/runner.js';
 import { buildContextObject, ContextStore, type ContextSource } from './rlm/context.js';
 import { runSymbolicLoop, type SymbolicBudgets } from './rlm/symbolic.js';
 import {
+  COLLAB_ALLOW_DEFAULT_ROLE_ENV_CANONICAL,
+  COLLAB_ALLOW_DEFAULT_ROLE_ENV_LEGACY,
+  COLLAB_FEATURE_LEGACY,
+  COLLAB_ROLE_POLICY_ENV_CANONICAL,
+  COLLAB_ROLE_POLICY_ENV_LEGACY,
   createRlmCodexRuntimeShell,
   resolveCollabAllowDefaultRoleConfig,
   resolveCollabRolePolicyConfig,

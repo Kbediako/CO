@@ -25,7 +25,7 @@ Use this playbook whenever handing off a review (`codex-orchestrator review` / `
      - CI evidence: failing/passing GitHub Actions job logs and artifacts linked from the PR checks tab.
      - Runtime evidence: orchestrator manifests/logs under `.runs/<task-id>/cli/<run-id>/` and any monitor log capture (for example `/tmp/pr-watch.log`).
      - Record evidence links in the PR thread (or run manifest notes), use UTC timestamps + PR number in filenames, and carry the same links into any follow-up issue.
-6. Check inline review comments/threads (not just review summaries). Use `gh pr view <number> --comments` or `gh api repos/<owner>/<repo>/pulls/<number>/comments` and ensure no unresolved items remain.
+6. Check inline review comments/threads (not just review summaries). Use GraphQL `reviewThreads` to verify unresolved thread count is zero; use `gh pr view <number> --comments` or `gh api repos/<owner>/<repo>/pulls/<number>/comments` only as supplemental context.
 7. For GitHub agent review comments (CodeRabbit, Copilot, Codex connector), respond in-thread, react with 👍 once addressed, and resolve the review thread.
 8. If the reviewer finds issues, fix them, update `NOTES` with follow-up questions (when needed), and rerun the same gate.
 9. Repeat until the reviewer reports no findings.
@@ -63,9 +63,9 @@ gh api -X POST repos/<org>/<repo>/pulls/<pr>/comments \
 ## Notes
 - Keep reviewer questions concise and specific to unblock decisions.
 - Avoid switching gates mid-loop unless the reviewer explicitly requests a different toolset.
-- Inline review comments live in review threads; use the API to list them when monitoring:
-  - `gh api repos/<owner>/<repo>/pulls/<number>/comments`
-  - Or GraphQL (reviewThreads) if you need thread context.
+- Inline review comments live in review threads; use GraphQL when monitoring thread state:
+  - `gh api graphql` against `pullRequest.reviewThreads { nodes { id isResolved isOutdated comments { nodes { url path } } } }`
+  - `gh api repos/<owner>/<repo>/pulls/<number>/comments` can be used as supplemental comment context only.
 - Resolve threads via GraphQL: `resolveReviewThread` with the thread id from `reviewThreads`.
 
 ## Template

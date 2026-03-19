@@ -1,37 +1,46 @@
-# TECH_SPEC - Task Index Canonicalization + Registry Normalization (1006)
-
-- Canonical TECH_SPEC: `tasks/specs/1006-task-index-canonicalization-and-registry-normalization.md`.
-- Owner: Codex.
-- Last Reviewed: 2026-03-05.
+---
+id: 20260305-1006-task-index-canonicalization-and-registry-normalization
+title: Task Index Canonicalization + Registry Normalization
+relates_to: docs/PRD-task-index-canonicalization-and-registry-normalization.md
+risk: medium
+owners:
+  - Codex
+last_review: 2026-03-05
+---
 
 ## Summary
-- Technical objective: migrate `tasks/index.json` from split-state registry (`items[]` + `tasks[]`) to canonical `items[]` only.
-- Safety objective: preserve current tooling behavior during migration and validate with docs/guardrail checks.
-- Current stage: docs-first lane complete before any runtime implementation edits.
+- Objective: normalize task registry contract to canonical `items[]` and retire legacy split-state safely.
+- Scope: docs-first definition + validation gate for implementation handoff.
+- Scope status: completed; implementation and mirror-sync closeout validation reached terminal pass.
 
-## Requirements
+## Pre-Implementation Review Note
+- Decision: approved for implementation planning handoff after docs-review gate passes.
+- Reasoning: split-state registry can produce drift/ambiguity; migration requires explicit constraints and bounded scope.
+- Constraint: no unrelated refactors.
+
+## Technical Requirements
 - Functional:
-  - Define canonical registry contract as top-level `items[]` for task discovery.
-  - Define safe retirement path for legacy top-level `tasks[]`.
-  - Identify and align all docs/tooling references to canonical contract.
+  - Canonical contract for task registry is top-level `items[]`.
+  - Legacy top-level `tasks[]` is retired via safe migration path.
+  - Affected docs/tooling references are aligned to canonical contract.
 - Non-functional:
+  - Preserve guardrail behavior and task-id normalization assumptions.
   - Keep migration minimal and auditable.
-  - Preserve existing task-id normalization and delegation guard assumptions.
-  - No unrelated refactors.
 
-## Expected Implementation Touch Scope (for follow-on stream)
-- `tasks/index.json` canonicalization changes.
-- Tooling/docs references that assume or mention split-state.
-- Tests/guards that enforce registry presence and structure.
+## Docs Lane Validation Evidence
+- Docs-review manifest: `.runs/1006-task-index-canonicalization-and-registry-normalization/cli/2026-03-05T10-29-59-282Z-375092f4/manifest.json`.
+- Docs checks: `out/1006-task-index-canonicalization-and-registry-normalization/manual/20260305T102337Z-docs-first-lane/11-docs-check-final.log`, `out/1006-task-index-canonicalization-and-registry-normalization/manual/20260305T102337Z-docs-first-lane/12-docs-freshness-final.log`.
+- Standalone review checkpoint: `out/1006-task-index-canonicalization-and-registry-normalization/manual/20260305T102337Z-docs-first-lane/07-standalone-review.log`, `out/1006-task-index-canonicalization-and-registry-normalization/manual/20260305T102337Z-docs-first-lane/08-standalone-review-checkpoint.md`.
+- Elegance note: `out/1006-task-index-canonicalization-and-registry-normalization/manual/20260305T102337Z-docs-first-lane/09-elegance-note.md`.
+- Handoff note: `out/1006-task-index-canonicalization-and-registry-normalization/manual/20260305T102337Z-docs-first-lane/10-implementation-handoff-note.md`.
+- Optional rerun disposition: `out/1006-task-index-canonicalization-and-registry-normalization/manual/20260305T102337Z-docs-first-lane/15-docs-review-rerun-disposition.md`.
 
-## Validation Gate (Docs Lane)
-- Docs-review manifest captured for `1006`.
-- `npm run docs:check` pass.
-- `npm run docs:freshness` pass.
-- Standalone review checkpoint recorded.
-- Explicit elegance/minimality pass recorded.
+## Terminal Closeout Validation Evidence
+- Closeout summary: `out/1006-task-index-canonicalization-and-registry-normalization/manual/20260305T110206Z-terminal-closeout-validation/00-terminal-closeout-summary.md`.
+- Gate matrix + index: `out/1006-task-index-canonicalization-and-registry-normalization/manual/20260305T110206Z-terminal-closeout-validation/00-gate-matrix.tsv`, `out/1006-task-index-canonicalization-and-registry-normalization/manual/20260305T110206Z-terminal-closeout-validation/00-log-index.md`.
+- Override records (shared-checkout only): `out/1006-task-index-canonicalization-and-registry-normalization/manual/20260305T110206Z-terminal-closeout-validation/08-diff-budget.attempt2-override.log`, `out/1006-task-index-canonicalization-and-registry-normalization/manual/20260305T110206Z-terminal-closeout-validation/09-review.attempt2-override.log`.
+- Post-sync docs checks + mirror parity: `out/1006-task-index-canonicalization-and-registry-normalization/manual/20260305T110206Z-terminal-closeout-validation/12-docs-check-post-sync.log`, `out/1006-task-index-canonicalization-and-registry-normalization/manual/20260305T110206Z-terminal-closeout-validation/13-docs-freshness-post-sync.log`, `out/1006-task-index-canonicalization-and-registry-normalization/manual/20260305T110206Z-terminal-closeout-validation/14-task-agent-mirror-parity.diff`.
 
-## Constraints
-- CO remains current execution authority boundaries; this slice is registry/docs normalization only.
-- No scheduler ownership transfer.
-- No language/runtime rewrite.
+## Approvals
+- Reviewer: Codex.
+- Date: 2026-03-05.

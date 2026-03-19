@@ -58,7 +58,7 @@ function extractSnapshotKey(line) {
   if (typeof line !== 'string') {
     return null;
   }
-  const match = line.match(/^# Task List Snapshot(?: —|-)\s+.*\(([^)]+)\)\s*$/);
+  const match = line.match(/\(([0-9]{4,}-[A-Za-z0-9-]+)\)/u);
   if (!match) {
     return null;
   }
@@ -96,6 +96,14 @@ function normalizeInlineSnapshotHeaders(content) {
   }
 
   return normalizedLines.join('\n');
+}
+
+function countNormalizedLines(content) {
+  if (typeof content !== 'string' || content.length === 0) {
+    return 0;
+  }
+  const lines = content.split('\n');
+  return lines.at(-1) === '' ? lines.length - 1 : lines.length;
 }
 
 function headerMatchesTask(headerKey, taskKey) {
@@ -337,8 +345,9 @@ async function main() {
   ]);
 
   const policy = parsePolicy(policyRaw, policyPath);
-  const lines = normalizeInlineSnapshotHeaders(tasksRaw).split('\n');
-  const totalLines = lines.length;
+  const normalizedTasks = normalizeInlineSnapshotHeaders(tasksRaw);
+  const lines = normalizedTasks.split('\n');
+  const totalLines = countNormalizedLines(normalizedTasks);
 
   if (totalLines <= policy.maxLines) {
     console.log(`docs/TASKS.md is within limit (${totalLines}/${policy.maxLines}).`);
@@ -412,7 +421,7 @@ async function main() {
   const updatedLines = lines.filter((_, index) => !removeMask[index]);
   let updatedContent = updatedLines.join('\n');
   updatedContent = updateArchiveIndex(updatedContent, policy, archivedYears);
-  const updatedLineCount = updatedContent.split('\n').length;
+  const updatedLineCount = countNormalizedLines(updatedContent);
 
   if (updatedLineCount > policy.maxLines) {
     throw new Error(
