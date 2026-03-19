@@ -4245,8 +4245,8 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toContain('Review task: task-b');
     expect(result.stdout).not.toContain('Review task: task-a');
-    expect(result.stdout).toContain(requestedManifestPath.replace(`${sandbox}/`, ''));
-    expect(result.stdout).not.toContain(staleManifestPath.replace(`${sandbox}/`, ''));
+    expect(result.stdout).toContain('Review prompt saved to: .runs/task-b/cli/run-b/review/prompt.txt');
+    expect(result.stdout).not.toContain('.runs/task-a/cli/run-a/review/prompt.txt');
   });
 
   it('derives task context from legacy run-layout manifests', async () => {
