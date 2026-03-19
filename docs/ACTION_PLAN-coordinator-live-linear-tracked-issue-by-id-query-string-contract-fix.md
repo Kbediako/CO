@@ -14,6 +14,7 @@
 2) Run `docs-review` for `1304`, then patch `linearDispatchSource.ts` and add the focused regression in `LinearDispatchSource.test.ts`.
 3) Run required validation, rebuild/restart the detached `co-control-host`, and rerun live autonomy until the provider-intake ledger plus child-run handoff confirm the fix or reveal the next blocker.
 4) Run an explicit elegance/minimality pass before final handoff so the lane stays at one query-contract fix plus the narrow regression and documentation updates that support it.
+5) Archive implementation docs per `docs/implementation-docs-archive-policy.json` through the automation path (sync payloads to `doc-archives` and open the stub PR) or `npm run docs:archive-implementation` fallback, then record the resulting run id or PR URL in the closeout packet when the archive window is reached.
 
 ## Dependencies
 - Live Linear GraphQL availability
@@ -33,6 +34,7 @@
   - `npm run review`
   - `npm run pack:smoke`
   - explicit elegance review pass
+  - implementation-docs archive execution path recorded against `docs/implementation-docs-archive-policy.json` when the lane is archived, including `doc-archives` automation evidence or the fallback command evidence
 - Rollback plan:
   - revert the query-contract patch if the focused regression or live rerun disproves the fix
   - restore the prior detached host command if the tmux restart path misbehaves
