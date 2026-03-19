@@ -275,7 +275,12 @@ async function resolveManifestPath(options: CliOptions): Promise<string> {
   }
 
   const runDirManifest = await resolveManifestPathFromRunDir();
-  if (runDirManifest) {
+  const requestedTask = options.task?.trim();
+  const runDirTask = runDirManifest ? inferTaskFromManifestPath(runDirManifest) : null;
+  if (
+    runDirManifest &&
+    (!requestedTask || (typeof runDirTask === 'string' && runDirTask === requestedTask))
+  ) {
     return runDirManifest;
   }
 

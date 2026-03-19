@@ -2258,6 +2258,28 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(prompt).toContain('Evidence manifest: .runs/sample-task/cli/run-dir-active/manifest.json');
   });
 
+  it('prefers an explicit task over a stale CODEX_ORCHESTRATOR_RUN_DIR manifest', async () => {
+    const sandbox = await makeSandbox();
+    const staleRunManifestPath = await makeManifestForTask(sandbox, 'stale-task', 'stale-run-dir');
+    const requestedManifestPath = await makeManifestForTask(sandbox, 'requested-task', 'active-manifest');
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(null, {
+      ...baseEnv(sandbox, codexBin),
+      CODEX_ORCHESTRATOR_RUN_DIR: dirname(staleRunManifestPath)
+    }, ['--task', 'requested-task', '--surface', 'audit']);
+
+    expect(result.exitCode).toBe(0);
+    const requestedPromptPath = join(dirname(requestedManifestPath), 'review', 'prompt.txt');
+    const stalePromptPath = join(dirname(staleRunManifestPath), 'review', 'prompt.txt');
+    const requestedPrompt = await readFile(requestedPromptPath, 'utf8');
+    expect(requestedPrompt).toContain(
+      'Evidence manifest: .runs/requested-task/cli/active-manifest/manifest.json'
+    );
+    expect(requestedPrompt).not.toContain('.runs/stale-task/');
+    expect(requestedPrompt).not.toContain('stale-run-dir');
+    await expect(readFile(stalePromptPath, 'utf8')).rejects.toMatchObject({ code: 'ENOENT' });
+  });
+
   it('derives audit task context from the resolved run-dir manifest when task env is absent', async () => {
     const sandbox = await makeSandbox();
     const activeManifestPath = await makeManifestForTask(sandbox, 'sample-task', 'run-dir-active');
@@ -2441,6 +2463,45 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     const stalePromptPath = join(dirname(staleRunManifestPath), 'review', 'prompt.txt');
     const activePrompt = await readFile(activePromptPath, 'utf8');
     expect(activePrompt).toContain('Evidence manifest: .runs/sample-task/cli/active-manifest/manifest.json');
+    await expect(readFile(stalePromptPath, 'utf8')).rejects.toMatchObject({ code: 'ENOENT' });
+  });
+
+  it('ignores CODEX_ORCHESTRATOR_RUN_DIR when --task requests a different task', async () => {
+    const sandbox = await makeSandbox();
+    const staleRunManifestPath = await makeManifestForTask(sandbox, 'stale-task', 'stale-run-dir');
+    const requestedManifestPath = await makeManifestForTask(sandbox, 'sample-task', 'requested-task-active');
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(null, {
+      ...baseEnv(sandbox, codexBin),
+      CODEX_ORCHESTRATOR_RUN_DIR: dirname(staleRunManifestPath)
+    }, ['--task', 'sample-task', '--surface', 'audit']);
+
+    expect(result.exitCode).toBe(0);
+    const requestedPromptPath = join(dirname(requestedManifestPath), 'review', 'prompt.txt');
+    const stalePromptPath = join(dirname(staleRunManifestPath), 'review', 'prompt.txt');
+    const requestedPrompt = await readFile(requestedPromptPath, 'utf8');
+    expect(requestedPrompt).toContain(
+      'Evidence manifest: .runs/sample-task/cli/requested-task-active/manifest.json'
+    );
+    await expect(readFile(stalePromptPath, 'utf8')).rejects.toMatchObject({ code: 'ENOENT' });
+  });
+
+  it('ignores CODEX_ORCHESTRATOR_RUN_DIR when MCP_RUNNER_TASK_ID requests a different task', async () => {
+    const sandbox = await makeSandbox();
+    const staleRunManifestPath = await makeManifestForTask(sandbox, 'stale-task', 'stale-run-dir');
+    const requestedManifestPath = await makeManifestForTask(sandbox, 'sample-task', 'env-task-active');
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(null, {
+      ...baseEnv(sandbox, codexBin),
+      MCP_RUNNER_TASK_ID: 'sample-task',
+      CODEX_ORCHESTRATOR_RUN_DIR: dirname(staleRunManifestPath)
+    }, ['--surface', 'audit']);
+
+    expect(result.exitCode).toBe(0);
+    const requestedPromptPath = join(dirname(requestedManifestPath), 'review', 'prompt.txt');
+    const stalePromptPath = join(dirname(staleRunManifestPath), 'review', 'prompt.txt');
+    const requestedPrompt = await readFile(requestedPromptPath, 'utf8');
+    expect(requestedPrompt).toContain('Evidence manifest: .runs/sample-task/cli/env-task-active/manifest.json');
     await expect(readFile(stalePromptPath, 'utf8')).rejects.toMatchObject({ code: 'ENOENT' });
   });
 
@@ -4166,6 +4227,26 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toContain('Review task: task-b');
     expect(result.stdout).not.toContain('Review task: task-a');
+  });
+
+  it('ignores a stale run-dir manifest when it conflicts with the requested task', async () => {
+    const sandbox = await makeSandbox();
+    const staleManifestPath = await makeManifestForTask(sandbox, 'task-a', 'run-a');
+    const requestedManifestPath = await makeManifestForTask(sandbox, 'task-b', 'run-b');
+    const codexBin = await makeFakeCodex(sandbox);
+    const staleRunDir = dirname(staleManifestPath).replace(`${sandbox}/`, '');
+    const result = await runReviewCommand(null, {
+      ...baseEnv(sandbox, codexBin),
+      MCP_RUNNER_TASK_ID: 'task-b',
+      CODEX_ORCHESTRATOR_RUN_DIR: staleRunDir,
+      FORCE_CODEX_REVIEW: '0'
+    });
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain('Review task: task-b');
+    expect(result.stdout).not.toContain('Review task: task-a');
+    expect(result.stdout).toContain(requestedManifestPath.replace(`${sandbox}/`, ''));
+    expect(result.stdout).not.toContain(staleManifestPath.replace(`${sandbox}/`, ''));
   });
 
   it('derives task context from legacy run-layout manifests', async () => {
