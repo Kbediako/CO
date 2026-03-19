@@ -60,6 +60,7 @@ interface ControlServerSeededRuntimeAssemblyOptions {
   createProviderIssueHandoff?: ((input: {
     providerIntakeState: ProviderIntakeState;
     persistProviderIntake: () => Promise<void>;
+    publishRuntime: (source: string) => void;
   }) => ProviderIssueHandoffService) | null;
 }
 
@@ -165,7 +166,8 @@ export function createControlServerSeededRuntimeAssembly(
   const providerIssueHandoff =
     options.createProviderIssueHandoff?.({
       providerIntakeState,
-      persistProviderIntake: persist.providerIntake ?? (async () => undefined)
+      persistProviderIntake: persist.providerIntake,
+      publishRuntime: (source) => controlRuntime.publish({ source })
     }) ?? null;
   const requestContextShared = {
     token: options.token,

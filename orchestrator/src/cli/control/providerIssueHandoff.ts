@@ -38,6 +38,8 @@ export interface ProviderIssueHandoffResult {
 }
 
 interface ProviderIssueRunRecord {
+  provider: 'linear';
+  issueId: string;
   taskId: string;
   runId: string;
   manifestPath: string;
@@ -62,23 +64,37 @@ export interface CreateProviderIssueHandoffServiceOptions {
   persist: () => Promise<void>;
   launcher: ProviderIssueLauncher;
   startPipelineId?: string;
+  publishRuntime?: ((source: string) => void) | null;
 }
 
 const RESUME_ELIGIBLE_STATUSES = new Set(['failed', 'cancelled']);
+const BEST_EFFORT_REHYDRATE_DELAY_MS = 1_000;
+const BEST_EFFORT_REHYDRATE_MAX_ATTEMPTS = 5;
+const BEST_EFFORT_REHYDRATE_TIMEOUT_MS =
+  BEST_EFFORT_REHYDRATE_DELAY_MS * BEST_EFFORT_REHYDRATE_MAX_ATTEMPTS;
 
 export function createProviderIssueHandoffService(
   options: CreateProviderIssueHandoffServiceOptions
 ): ProviderIssueHandoffService {
   const startPipelineId = options.startPipelineId ?? 'diagnostics';
-  const rehydrateNow = async (): Promise<void> => {
+  const rehydrateNow = async (): Promise<{ hasPendingClaims: boolean }> => {
     const now = isoTimestamp();
+    const discoveredRuns = await discoverProviderIssueRuns(options.paths.runDir);
+    const runsByProviderIssue = groupProviderIssueRuns(discoveredRuns);
+    let hasPendingClaims = false;
+    let publishRuntime = false;
+
     for (const claim of [...options.state.claims]) {
-      const discoveredRuns = await discoverProviderIssueRuns(options.paths.runDir, {
-        provider: claim.provider,
-        issueId: claim.issue_id
-      });
-      const activeRun = discoveredRuns.find((run) => run.status === 'in_progress');
+      const claimRuns = runsByProviderIssue.get(buildProviderIssueKey(claim.provider, claim.issue_id)) ?? [];
+      const activeRun = claimRuns.find((run) => run.status === 'in_progress');
       if (activeRun) {
+        publishRuntime ||= hasProviderClaimTransitioned(claim, {
+          state: 'running',
+          reason: 'provider_issue_rehydrated_active_run',
+          task_id: activeRun.taskId,
+          run_id: activeRun.runId,
+          run_manifest_path: activeRun.manifestPath
+        });
         upsertProviderIntakeClaim(options.state, {
           ...claim,
           task_id: activeRun.taskId,
@@ -91,10 +107,17 @@ export function createProviderIssueHandoffService(
         continue;
       }
 
-      const resumableRun = discoveredRuns.find(
+      const resumableRun = claimRuns.find(
         (run) => run.status !== null && RESUME_ELIGIBLE_STATUSES.has(run.status)
       );
       if (resumableRun) {
+        publishRuntime ||= hasProviderClaimTransitioned(claim, {
+          state: 'resumable',
+          reason: 'provider_issue_rehydrated_resumable_run',
+          task_id: resumableRun.taskId,
+          run_id: resumableRun.runId,
+          run_manifest_path: resumableRun.manifestPath
+        });
         upsertProviderIntakeClaim(options.state, {
           ...claim,
           task_id: resumableRun.taskId,
@@ -107,8 +130,15 @@ export function createProviderIssueHandoffService(
         continue;
       }
 
-      const completedRun = discoveredRuns.find((run) => run.status === 'succeeded');
+      const completedRun = claimRuns.find((run) => run.status === 'succeeded');
       if (completedRun) {
+        publishRuntime ||= hasProviderClaimTransitioned(claim, {
+          state: 'completed',
+          reason: 'provider_issue_rehydrated_completed_run',
+          task_id: completedRun.taskId,
+          run_id: completedRun.runId,
+          run_manifest_path: completedRun.manifestPath
+        });
         upsertProviderIntakeClaim(options.state, {
           ...claim,
           task_id: completedRun.taskId,
@@ -121,7 +151,29 @@ export function createProviderIssueHandoffService(
         continue;
       }
 
-      if (claim.state === 'starting' || claim.state === 'resuming' || claim.state === 'accepted') {
+      if (claim.state === 'starting' || claim.state === 'resuming') {
+        if (isProviderClaimRehydrationTimedOut(claim, now)) {
+          publishRuntime ||= hasProviderClaimTransitioned(claim, {
+            state: 'handoff_failed',
+            reason: 'provider_issue_rehydration_timeout',
+            task_id: claim.task_id,
+            run_id: claim.run_id,
+            run_manifest_path: claim.run_manifest_path
+          });
+          upsertProviderIntakeClaim(options.state, {
+            ...claim,
+            state: 'handoff_failed',
+            reason: 'provider_issue_rehydration_timeout',
+            updated_at: now
+          });
+          continue;
+        }
+
+        hasPendingClaims = true;
+        continue;
+      }
+
+      if (claim.state === 'accepted') {
         upsertProviderIntakeClaim(options.state, {
           ...claim,
           state: 'accepted',
@@ -133,6 +185,10 @@ export function createProviderIssueHandoffService(
 
     markProviderIntakeRehydrated(options.state, now);
     await options.persist();
+    if (publishRuntime) {
+      options.publishRuntime?.('provider-intake.rehydrate');
+    }
+    return { hasPendingClaims };
   };
 
   return {
@@ -141,6 +197,21 @@ export function createProviderIssueHandoffService(
       const taskId = buildProviderFallbackTaskId(input.trackedIssue);
       const mappingSource: ProviderTaskMappingSource = 'provider_id_fallback';
       const existing = readProviderIntakeClaim(options.state, providerKey);
+      const claimBase = {
+        provider: 'linear' as const,
+        provider_key: providerKey,
+        issue_id: input.trackedIssue.id,
+        issue_identifier: input.trackedIssue.identifier,
+        issue_title: input.trackedIssue.title,
+        issue_state: input.trackedIssue.state,
+        issue_state_type: input.trackedIssue.state_type,
+        issue_updated_at: input.trackedIssue.updated_at,
+        last_delivery_id: input.deliveryId,
+        last_event: input.event,
+        last_action: input.action,
+        last_webhook_timestamp: input.webhookTimestamp,
+        accepted_at: existing?.accepted_at ?? null
+      };
 
       if (
         isTrackedIssueStale({
@@ -149,25 +220,13 @@ export function createProviderIssueHandoffService(
         })
       ) {
         const claim = upsertProviderIntakeClaim(options.state, {
-          provider: 'linear',
-          provider_key: providerKey,
-          issue_id: input.trackedIssue.id,
-          issue_identifier: input.trackedIssue.identifier,
-          issue_title: input.trackedIssue.title,
-          issue_state: input.trackedIssue.state,
-          issue_state_type: input.trackedIssue.state_type,
-          issue_updated_at: input.trackedIssue.updated_at,
+          ...claimBase,
           task_id: taskId,
           mapping_source: mappingSource,
           state: 'stale',
           reason: 'provider_issue_stale',
-          last_delivery_id: input.deliveryId,
-          last_event: input.event,
-          last_action: input.action,
-          last_webhook_timestamp: input.webhookTimestamp,
           run_id: existing?.run_id ?? null,
           run_manifest_path: existing?.run_manifest_path ?? null,
-          accepted_at: existing?.accepted_at ?? null
         });
         await options.persist();
         return { kind: 'ignored', reason: 'provider_issue_stale', claim };
@@ -175,25 +234,13 @@ export function createProviderIssueHandoffService(
 
       if (input.trackedIssue.state_type !== 'started') {
         const claim = upsertProviderIntakeClaim(options.state, {
-          provider: 'linear',
-          provider_key: providerKey,
-          issue_id: input.trackedIssue.id,
-          issue_identifier: input.trackedIssue.identifier,
-          issue_title: input.trackedIssue.title,
-          issue_state: input.trackedIssue.state,
-          issue_state_type: input.trackedIssue.state_type,
-          issue_updated_at: input.trackedIssue.updated_at,
+          ...claimBase,
           task_id: taskId,
           mapping_source: mappingSource,
           state: 'ignored',
           reason: 'provider_issue_state_not_started',
-          last_delivery_id: input.deliveryId,
-          last_event: input.event,
-          last_action: input.action,
-          last_webhook_timestamp: input.webhookTimestamp,
           run_id: existing?.run_id ?? null,
           run_manifest_path: existing?.run_manifest_path ?? null,
-          accepted_at: existing?.accepted_at ?? null
         });
         await options.persist();
         return { kind: 'ignored', reason: 'provider_issue_state_not_started', claim };
@@ -206,25 +253,13 @@ export function createProviderIssueHandoffService(
       const activeRun = discoveredRuns.find((run) => run.status === 'in_progress');
       if (activeRun) {
         const claim = upsertProviderIntakeClaim(options.state, {
-          provider: 'linear',
-          provider_key: providerKey,
-          issue_id: input.trackedIssue.id,
-          issue_identifier: input.trackedIssue.identifier,
-          issue_title: input.trackedIssue.title,
-          issue_state: input.trackedIssue.state,
-          issue_state_type: input.trackedIssue.state_type,
-          issue_updated_at: input.trackedIssue.updated_at,
+          ...claimBase,
           task_id: activeRun.taskId,
           mapping_source: mappingSource,
           state: 'running',
           reason: 'provider_issue_run_already_active',
-          last_delivery_id: input.deliveryId,
-          last_event: input.event,
-          last_action: input.action,
-          last_webhook_timestamp: input.webhookTimestamp,
           run_id: activeRun.runId,
           run_manifest_path: activeRun.manifestPath,
-          accepted_at: existing?.accepted_at ?? null
         });
         await options.persist();
         return { kind: 'ignored', reason: 'provider_issue_run_already_active', claim };
@@ -232,25 +267,15 @@ export function createProviderIssueHandoffService(
 
       if (existing && (existing.state === 'starting' || existing.state === 'resuming')) {
         const claim = upsertProviderIntakeClaim(options.state, {
-          provider: 'linear',
-          provider_key: providerKey,
-          issue_id: input.trackedIssue.id,
-          issue_identifier: input.trackedIssue.identifier,
-          issue_title: input.trackedIssue.title,
-          issue_state: input.trackedIssue.state,
-          issue_state_type: input.trackedIssue.state_type,
-          issue_updated_at: input.trackedIssue.updated_at,
+          ...claimBase,
           task_id: existing.task_id,
           mapping_source: existing.mapping_source,
           state: existing.state,
           reason: 'provider_issue_handoff_inflight',
-          last_delivery_id: input.deliveryId,
-          last_event: input.event,
-          last_action: input.action,
-          last_webhook_timestamp: input.webhookTimestamp,
           run_id: existing.run_id,
           run_manifest_path: existing.run_manifest_path,
-          accepted_at: existing.accepted_at
+          accepted_at: existing.accepted_at,
+          updated_at: existing.updated_at
         });
         await options.persist();
         return { kind: 'ignored', reason: 'provider_issue_handoff_inflight', claim };
@@ -258,6 +283,16 @@ export function createProviderIssueHandoffService(
 
       const latestRun = discoveredRuns[0] ?? null;
       if (latestRun && latestRun.status && RESUME_ELIGIBLE_STATUSES.has(latestRun.status)) {
+        const inflightClaim = upsertProviderIntakeClaim(options.state, {
+          ...claimBase,
+          task_id: latestRun.taskId,
+          mapping_source: mappingSource,
+          state: 'resuming',
+          reason: 'provider_issue_resume_launched',
+          run_id: latestRun.runId,
+          run_manifest_path: latestRun.manifestPath
+        });
+        await options.persist();
         try {
           await options.launcher.resume({
             runId: latestRun.runId,
@@ -266,81 +301,45 @@ export function createProviderIssueHandoffService(
           });
         } catch (error) {
           const claim = upsertProviderIntakeClaim(options.state, {
-            provider: 'linear',
-            provider_key: providerKey,
-            issue_id: input.trackedIssue.id,
-            issue_identifier: input.trackedIssue.identifier,
-            issue_title: input.trackedIssue.title,
-            issue_state: input.trackedIssue.state,
-            issue_state_type: input.trackedIssue.state_type,
-            issue_updated_at: input.trackedIssue.updated_at,
+            ...claimBase,
             task_id: latestRun.taskId,
             mapping_source: mappingSource,
             state: 'handoff_failed',
             reason: `provider_issue_resume_failed:${(error as Error)?.message ?? String(error)}`,
-            last_delivery_id: input.deliveryId,
-            last_event: input.event,
-            last_action: input.action,
-            last_webhook_timestamp: input.webhookTimestamp,
             run_id: latestRun.runId,
             run_manifest_path: latestRun.manifestPath,
-            accepted_at: existing?.accepted_at ?? null
           });
           await options.persist();
           throw new Error(`Failed to resume provider issue ${input.trackedIssue.identifier}: ${claim.reason}`);
         }
-        const claim = upsertProviderIntakeClaim(options.state, {
-          provider: 'linear',
-          provider_key: providerKey,
-          issue_id: input.trackedIssue.id,
-          issue_identifier: input.trackedIssue.identifier,
-          issue_title: input.trackedIssue.title,
-          issue_state: input.trackedIssue.state,
-          issue_state_type: input.trackedIssue.state_type,
-          issue_updated_at: input.trackedIssue.updated_at,
-          task_id: latestRun.taskId,
-          mapping_source: mappingSource,
-          state: 'resuming',
-          reason: 'provider_issue_resume_launched',
-          last_delivery_id: input.deliveryId,
-          last_event: input.event,
-          last_action: input.action,
-          last_webhook_timestamp: input.webhookTimestamp,
-          run_id: latestRun.runId,
-          run_manifest_path: latestRun.manifestPath,
-          accepted_at: existing?.accepted_at ?? null
-        });
-        await options.persist();
         scheduleBestEffortRehydrate(rehydrateNow);
-        return { kind: 'resume', reason: 'provider_issue_resume_launched', claim };
+        return { kind: 'resume', reason: 'provider_issue_resume_launched', claim: inflightClaim };
       }
 
       if (latestRun?.status === 'succeeded') {
         const claim = upsertProviderIntakeClaim(options.state, {
-          provider: 'linear',
-          provider_key: providerKey,
-          issue_id: input.trackedIssue.id,
-          issue_identifier: input.trackedIssue.identifier,
-          issue_title: input.trackedIssue.title,
-          issue_state: input.trackedIssue.state,
-          issue_state_type: input.trackedIssue.state_type,
-          issue_updated_at: input.trackedIssue.updated_at,
+          ...claimBase,
           task_id: latestRun.taskId,
           mapping_source: mappingSource,
           state: 'completed',
           reason: 'provider_issue_run_already_completed',
-          last_delivery_id: input.deliveryId,
-          last_event: input.event,
-          last_action: input.action,
-          last_webhook_timestamp: input.webhookTimestamp,
           run_id: latestRun.runId,
           run_manifest_path: latestRun.manifestPath,
-          accepted_at: existing?.accepted_at ?? null
         });
         await options.persist();
         return { kind: 'ignored', reason: 'provider_issue_run_already_completed', claim };
       }
 
+      const inflightClaim = upsertProviderIntakeClaim(options.state, {
+        ...claimBase,
+        task_id: taskId,
+        mapping_source: mappingSource,
+        state: 'starting',
+        reason: 'provider_issue_start_launched',
+        run_id: null,
+        run_manifest_path: null
+      });
+      await options.persist();
       try {
         await options.launcher.start({
           taskId,
@@ -352,53 +351,19 @@ export function createProviderIssueHandoffService(
         });
       } catch (error) {
         const claim = upsertProviderIntakeClaim(options.state, {
-          provider: 'linear',
-          provider_key: providerKey,
-          issue_id: input.trackedIssue.id,
-          issue_identifier: input.trackedIssue.identifier,
-          issue_title: input.trackedIssue.title,
-          issue_state: input.trackedIssue.state,
-          issue_state_type: input.trackedIssue.state_type,
-          issue_updated_at: input.trackedIssue.updated_at,
+          ...claimBase,
           task_id: taskId,
           mapping_source: mappingSource,
           state: 'handoff_failed',
           reason: `provider_issue_start_failed:${(error as Error)?.message ?? String(error)}`,
-          last_delivery_id: input.deliveryId,
-          last_event: input.event,
-          last_action: input.action,
-          last_webhook_timestamp: input.webhookTimestamp,
           run_id: null,
           run_manifest_path: null,
-          accepted_at: existing?.accepted_at ?? null
         });
         await options.persist();
         throw new Error(`Failed to start provider issue ${input.trackedIssue.identifier}: ${claim.reason}`);
       }
-      const claim = upsertProviderIntakeClaim(options.state, {
-        provider: 'linear',
-        provider_key: providerKey,
-        issue_id: input.trackedIssue.id,
-        issue_identifier: input.trackedIssue.identifier,
-        issue_title: input.trackedIssue.title,
-        issue_state: input.trackedIssue.state,
-        issue_state_type: input.trackedIssue.state_type,
-        issue_updated_at: input.trackedIssue.updated_at,
-        task_id: taskId,
-        mapping_source: mappingSource,
-        state: 'starting',
-        reason: 'provider_issue_start_launched',
-        last_delivery_id: input.deliveryId,
-        last_event: input.event,
-        last_action: input.action,
-        last_webhook_timestamp: input.webhookTimestamp,
-        run_id: null,
-        run_manifest_path: null,
-        accepted_at: existing?.accepted_at ?? null
-      });
-      await options.persist();
       scheduleBestEffortRehydrate(rehydrateNow);
-      return { kind: 'start', reason: 'provider_issue_start_launched', claim };
+      return { kind: 'start', reason: 'provider_issue_start_launched', claim: inflightClaim };
     },
 
     async rehydrate(): Promise<void> {
@@ -424,7 +389,7 @@ function isTrackedIssueStale(input: {
 
 async function discoverProviderIssueRuns(
   currentRunDir: string,
-  input: {
+  input?: {
     provider: 'linear';
     issueId: string;
   }
@@ -447,10 +412,15 @@ async function discoverProviderIssueRuns(
       }
       const issueProvider = readStringValue(manifest, 'issue_provider');
       const issueId = readStringValue(manifest, 'issue_id');
-      if (issueProvider !== input.provider || issueId !== input.issueId) {
+      if (issueProvider !== 'linear' || !issueId) {
+        continue;
+      }
+      if (input && (issueProvider !== input.provider || issueId !== input.issueId)) {
         continue;
       }
       discovered.push({
+        provider: issueProvider,
+        issueId,
         taskId: readStringValue(manifest, 'task_id') ?? taskEntry,
         runId: readStringValue(manifest, 'run_id') ?? runEntry,
         manifestPath,
@@ -469,17 +439,67 @@ async function readDirectoryNames(path: string): Promise<string[]> {
   try {
     const entries = await readdir(path, { withFileTypes: true });
     return entries.filter((entry) => entry.isDirectory()).map((entry) => entry.name);
-  } catch {
-    return [];
+  } catch (error) {
+    if (isMissingPathError(error)) {
+      return [];
+    }
+    throw error;
   }
+}
+
+function groupProviderIssueRuns(records: ProviderIssueRunRecord[]): Map<string, ProviderIssueRunRecord[]> {
+  const grouped = new Map<string, ProviderIssueRunRecord[]>();
+  for (const record of records) {
+    const key = buildProviderIssueKey(record.provider, record.issueId);
+    const existing = grouped.get(key);
+    if (existing) {
+      existing.push(record);
+      continue;
+    }
+    grouped.set(key, [record]);
+  }
+  return grouped;
+}
+
+function hasProviderClaimTransitioned(
+  claim: ProviderIntakeClaimRecord,
+  next: Pick<ProviderIntakeClaimRecord, 'state' | 'reason' | 'task_id' | 'run_id' | 'run_manifest_path'>
+): boolean {
+  return (
+    claim.state !== next.state ||
+    claim.reason !== next.reason ||
+    claim.task_id !== next.task_id ||
+    claim.run_id !== next.run_id ||
+    claim.run_manifest_path !== next.run_manifest_path
+  );
+}
+
+function isProviderClaimRehydrationTimedOut(
+  claim: ProviderIntakeClaimRecord,
+  now: string
+): boolean {
+  const launchedAt = Date.parse(claim.updated_at);
+  const observedAt = Date.parse(now);
+  if (!Number.isFinite(launchedAt) || !Number.isFinite(observedAt)) {
+    return false;
+  }
+  return observedAt - launchedAt >= BEST_EFFORT_REHYDRATE_TIMEOUT_MS;
+}
+
+function isMissingPathError(error: unknown): boolean {
+  const code = (error as { code?: string } | null)?.code;
+  return code === 'ENOENT' || code === 'ENOTDIR';
 }
 
 async function readJsonFile<T>(path: string): Promise<T | null> {
   try {
     const raw = await readFile(path, 'utf8');
     return JSON.parse(raw) as T;
-  } catch {
-    return null;
+  } catch (error) {
+    if (isMissingPathError(error)) {
+      return null;
+    }
+    throw error;
   }
 }
 
@@ -493,9 +513,22 @@ function readStringValue(record: Record<string, unknown>, ...keys: string[]): st
   return null;
 }
 
-function scheduleBestEffortRehydrate(perform: () => Promise<void>): void {
+function scheduleBestEffortRehydrate(
+  perform: () => Promise<{ hasPendingClaims: boolean }>,
+  attempt = 1
+): void {
   const timer = setTimeout(() => {
-    void perform().catch(() => undefined);
-  }, 1_000);
+    void perform()
+      .then((result) => {
+        if (result.hasPendingClaims && attempt < BEST_EFFORT_REHYDRATE_MAX_ATTEMPTS) {
+          scheduleBestEffortRehydrate(perform, attempt + 1);
+        }
+      })
+      .catch(() => {
+        if (attempt < BEST_EFFORT_REHYDRATE_MAX_ATTEMPTS) {
+          scheduleBestEffortRehydrate(perform, attempt + 1);
+        }
+      });
+  }, BEST_EFFORT_REHYDRATE_DELAY_MS);
   timer.unref?.();
 }

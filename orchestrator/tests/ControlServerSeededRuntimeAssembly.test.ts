@@ -183,8 +183,12 @@ describe('createControlServerSeededRuntimeAssembly', () => {
         outcome: 'accepted',
         reason: 'linear_delivery_accepted'
       });
-      context.providerIntakeState = context.providerIntakeState ?? seededProviderIntake;
-      context.providerIntakeState.claims.push({
+      const providerIntakeState = context.providerIntakeState;
+      expect(providerIntakeState).toBeDefined();
+      if (!providerIntakeState) {
+        throw new Error('Expected seeded provider intake state to be available');
+      }
+      providerIntakeState.claims.push({
         provider: 'linear',
         provider_key: 'linear:ISSUE-1',
         issue_id: 'ISSUE-1',

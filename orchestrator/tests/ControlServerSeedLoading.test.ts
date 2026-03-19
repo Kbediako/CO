@@ -27,7 +27,7 @@ async function createRunRoot(taskId: string) {
 }
 
 describe('readControlServerSeeds', () => {
-  it('returns null for all five seeds when the files are missing', async () => {
+  it('returns null for all six seeds when the files are missing', async () => {
     const { root, paths } = await createRunRoot('task-1086');
 
     try {
@@ -44,7 +44,7 @@ describe('readControlServerSeeds', () => {
     }
   });
 
-  it('loads all five seeds with their stored payload shapes preserved', async () => {
+  it('loads all six seeds with their stored payload shapes preserved', async () => {
     const { root, paths } = await createRunRoot('task-1086');
     const controlSeed: ControlState = {
       run_id: 'run-1',

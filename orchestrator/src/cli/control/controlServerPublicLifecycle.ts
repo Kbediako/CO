@@ -24,6 +24,7 @@ export interface StartControlServerPublicLifecycleOptions {
   createProviderIssueHandoff?: ((input: {
     providerIntakeState: ProviderIntakeState;
     persistProviderIntake: () => Promise<void>;
+    publishRuntime: (source: string) => void;
   }) => ProviderIssueHandoffService) | null;
 }
 

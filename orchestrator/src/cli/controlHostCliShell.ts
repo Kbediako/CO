@@ -68,12 +68,13 @@ export async function runControlHostCliShell(
     paths,
     config,
     runId,
-    createProviderIssueHandoff: ({ providerIntakeState, persistProviderIntake }) =>
+    createProviderIssueHandoff: ({ providerIntakeState, persistProviderIntake, publishRuntime }) =>
       createProviderIssueHandoffService({
         paths,
         state: providerIntakeState,
         persist: persistProviderIntake,
         startPipelineId,
+        publishRuntime,
         launcher: {
           start: async (input) => {
             await spawnBackgroundCli(env.repoRoot, cliEntrypoint, [
@@ -141,9 +142,13 @@ async function spawnBackgroundCli(repoRoot: string, cliEntrypoint: string, args:
       detached: true,
       stdio: 'ignore'
     });
-    child.once('error', reject);
-    child.unref();
-    resolve();
+    const onError = (error: Error) => reject(error);
+    child.once('error', onError);
+    child.once('spawn', () => {
+      child.off('error', onError);
+      child.unref();
+      resolve();
+    });
   });
 }
 

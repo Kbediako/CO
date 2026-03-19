@@ -33,8 +33,8 @@
 - existing Linear advisory resolver and webhook ingress
 - existing Telegram `/dispatch` read path
 - prior findings that intentionally deferred unattended or tracker-authoritative behavior
-- local Codex CLI baseline verified at `codex-cli 0.115.0`
-- local Symphony checkout `/Users/kbediako/Code/symphony` synced to `1f86bac53a84eb0e9f10d6546e3f19a5724a5b09`
+- local Codex CLI baseline aligned with the current CO-supported stable release
+- synced local Symphony checkout available for parity reference
 
 ## Validation
 

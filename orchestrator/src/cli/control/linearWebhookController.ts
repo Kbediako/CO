@@ -230,6 +230,13 @@ export async function handleLinearWebhookRequest(input: LinearWebhookControllerI
   });
 
   if (resolution.kind === 'ready') {
+    await input.providerIssueHandoff?.handleAcceptedTrackedIssue({
+      trackedIssue: resolution.tracked_issue,
+      deliveryId,
+      event: eventName,
+      action,
+      webhookTimestamp
+    });
     await recordAndPersistLinearAdvisoryOutcome(input, {
       deliveryId,
       event: eventName,
@@ -239,13 +246,6 @@ export async function handleLinearWebhookRequest(input: LinearWebhookControllerI
       outcome: 'accepted',
       reason: 'linear_delivery_accepted',
       trackedIssue: resolution.tracked_issue
-    });
-    await input.providerIssueHandoff?.handleAcceptedTrackedIssue({
-      trackedIssue: resolution.tracked_issue,
-      deliveryId,
-      event: eventName,
-      action,
-      webhookTimestamp
     });
     writeLinearWebhookResponse(res, 200, 'accepted', 'linear_delivery_accepted');
     input.publishRuntime();
