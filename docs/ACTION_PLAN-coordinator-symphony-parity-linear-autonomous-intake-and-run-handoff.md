@@ -46,6 +46,7 @@
 ## Validation
 
 - Checks / tests:
+  - `node scripts/delegation-guard.mjs`
   - `node scripts/spec-guard.mjs --dry-run`
   - `node scripts/diff-budget.mjs`
   - `npm run docs:check`
